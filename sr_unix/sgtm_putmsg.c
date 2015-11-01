@@ -80,11 +80,12 @@ va_dcl
 
 			fao_count = fao_actual;
 			if (fao_count > MAX_FAO_PARMS)
+			{
+				assert(FALSE);
 				fao_count = MAX_FAO_PARMS;
-		}
-		else
-			fao_actual = fao_count
-				   = 0;
+			}
+		} else
+			fao_actual = fao_count = 0;
 
 		util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
 		VAR_COPY(var, last_va_list_ptr);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,54 +23,20 @@
 #include "send_msg.h"
 #include "caller_id.h"
 
-GBLREF bool caller_id_flag;
+GBLREF bool 	caller_id_flag;
+GBLREF uint4	process_id;
 
-void jnl_send_oper4(jnl_private_control *jpc, uint4 status, uint4 status2, int4 cond);
-
-void jnl_send_oper4(jnl_private_control *jpc, uint4 status, uint4 status2, int4 cond)
+void jnl_send_oper(jnl_private_control *jpc, uint4 status)
 {
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	jnl_buffer_ptr_t	jb;
-
-	error_def(ERR_JNLBUFINFO);
-
-	switch(jpc->region->dyn.addr->acc_meth)
-	{
-	case dba_mm:
-	case dba_bg:
-		csa = &FILE_INFO(jpc->region)->s_addrs;
-		break;
-	default:
-		GTMASSERT;
-	}
-	csd = csa->hdr;
-	jb = jpc->jnl_buff;
-	if (0 != status2 || 0 != status)
-	{
-		if (0 != status2)
-			send_msg(VARLSTCNT(6) status, 2, JNL_LEN_STR(csd), status2, cond);
-		else /* 0 != status */
-			send_msg(VARLSTCNT(4) status, 2, JNL_LEN_STR(csd));
-		send_msg(VARLSTCNT(17) ERR_JNLBUFINFO, 15, jb->dskaddr, jb->freeaddr, jb->dsk, jb->free,
-			jb->lastaddr, jb->wrtsize, jb->bytcnt, jb->qiocnt, jb->errcnt,
-#ifdef VMS
-			jb->io_in_prog, jb->now_writer, jb->filesize,
-#elif defined(UNIX)
-			(jb->io_in_prog_latch.latch_pid ? TRUE : FALSE), jb->io_in_prog_latch.latch_pid, jb->filesize,
-#endif
-			(jb->fsync_in_prog_latch.latch_pid ? TRUE : FALSE),
-			jb->fsync_in_prog_latch.latch_pid, jb->fsync_dskaddr);
-	}
-}
-
-void jnl_send_oper(jnl_private_control *jpc, uint4 status)
-{
-	sgmnt_addrs	*csa;
-	uint4		status2;
-	int4		cond;
+	uint4			now_writer, fsync_pid;
+	int4			io_in_prog, fsync_in_prog;
 
 	error_def(ERR_CALLERID);
+	error_def(ERR_JNLBUFINFO);
+	error_def(ERR_JNLSENDOPER);
 
 	caller_id_flag = FALSE;
 	SEND_CALLERID("jnl_send_oper()");
@@ -84,20 +50,41 @@ void jnl_send_oper(jnl_private_control *jpc, uint4 status)
 	default:
 		GTMASSERT;
 	}
-#ifdef VMS
-	cond = jpc->jnl_buff ? (int4)jpc->jnl_buff->iosb.cond : 0;
-	if (SS_NORMAL == cond)
-		cond = 0;
-#else
-	cond = 0;
-#endif
-	status2 = jpc->status;
-        jpc->status = 0;
-	if ((0 == status2) || (SS_NORMAL == status2) || (status2 == cond))
+	csd = csa->hdr;
+	jb = jpc->jnl_buff;
+	if (0 != status)
 	{
-		status2 = cond;
-		cond = 0;
+		if (SS_NORMAL != jpc->status)
+		{
+			if (SS_NORMAL != jpc->status2)
+			{
+				send_msg(VARLSTCNT(14)
+						ERR_JNLSENDOPER, 5, process_id, status, jpc->status, jpc->status2, jb->iosb.cond,
+						status, 2, JNL_LEN_STR(csd), jpc->status, 0, jpc->status2);
+			} else
+				send_msg(VARLSTCNT(12)
+						ERR_JNLSENDOPER, 5, process_id, status, jpc->status, jpc->status2, jb->iosb.cond,
+						status, 2, JNL_LEN_STR(csd), jpc->status);
+		} else
+			send_msg(VARLSTCNT(11) ERR_JNLSENDOPER, 5, process_id, status, jpc->status, jpc->status2, jb->iosb.cond,
+					status, 2, JNL_LEN_STR(csd));
 	}
-        jnl_send_oper4(jpc, status, status2, cond);
+	jpc->status = SS_NORMAL;
+	jpc->status2 = SS_NORMAL;
+	UNIX_ONLY(
+		io_in_prog = (jb->io_in_prog_latch.latch_pid ? TRUE : FALSE);
+		now_writer = jb->io_in_prog_latch.latch_pid;
+	)
+	VMS_ONLY(
+		io_in_prog = jb->io_in_prog;
+		now_writer = jb->now_writer;
+	)
+	fsync_in_prog = jb->fsync_in_prog_latch.latch_pid ? TRUE : FALSE;
+	fsync_pid     = jb->fsync_in_prog_latch.latch_pid;
+	/* note: the alignment of the parameters below is modelled on the alignment defined for JNLBUFINFO in merrors.msg */
+	send_msg(VARLSTCNT(18) ERR_JNLBUFINFO, 16, process_id,
+			     jb->dsk,     jb->free, jb->bytcnt,  io_in_prog,     fsync_in_prog,
+			 jb->dskaddr, jb->freeaddr, jb->qiocnt,  now_writer,         fsync_pid,
+			jb->filesize, jb->lastaddr, jb->errcnt, jb->wrtsize, jb->fsync_dskaddr);
 	caller_id_flag = TRUE;
 }

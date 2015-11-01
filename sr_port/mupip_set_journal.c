@@ -55,6 +55,7 @@
 
 GBLREF	bool			region;
 GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	mu_set_rlist		*grlist;
 GBLREF	seq_num			seq_num_one;
@@ -445,25 +446,30 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				} else
 					gtm_putmsg(VARLSTCNT(4) ERR_JNLFNF, 2, JNL_LEN_STR(csd));
 			}
-			if (jnl_open == jnl_curr_state)
+			if (!rptr->exclusive)
 			{
-				UNIX_ONLY(if (0 != csd->jnl_file.u.inode))
-				VMS_ONLY(if (0 != memcmp(csd->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid))))
+				if (jnl_open == jnl_curr_state)
 				{
-					if (SS_NORMAL != (status = set_jnl_file_close(FALSE)))
+					assert(NULL != cs_addrs->nl);
+					UNIX_ONLY(if (cs_addrs->nl->jnl_file.u.inode))
+					VMS_ONLY(if (memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid))))
 					{
-						if (newjnlfiles)
+						if (SS_NORMAL != (status = set_jnl_file_close(FALSE)))
 						{
-							gtm_putmsg(VARLSTCNT(1) status);
-							gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
+							if (newjnlfiles)
+							{
+								gtm_putmsg(VARLSTCNT(1) status);
+								gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2,
+												jnl_info.jnl_len, jnl_info.jnl);
+							}
+							exit_status |= EXIT_ERR;
+							break;
 						}
-						exit_status |= EXIT_ERR;
-						break;
 					}
-				}
-			} else if (!rptr->exclusive && (jnl_closed == jnl_curr_state) && (jnl_open == rptr->jnl_new_state))
-				wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR); /* sync database in case of 1-2 jnl_state transition.
-									      * for VMS WCSFLU_FSYNC_DB is ignored */
+				} else if ((jnl_closed == jnl_curr_state) && (jnl_open == rptr->jnl_new_state))
+					wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR); /* sync db for closed->open transition.
+										      * for VMS WCSFLU_FSYNC_DB is ignored */
+			}
 			if (newjnlfiles)
 			{
 				if (curr_jnl_present)
@@ -487,7 +493,10 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
                                 if (EXIT_NRM != (status = cre_jnl_file(&jnl_info)))
 				{	/* There was an error attempting to create the journal file */
 					exit_status |= status;
-					gtm_putmsg(VARLSTCNT(1) jnl_info.status);
+					if (SS_NORMAL != jnl_info.status2)
+						gtm_putmsg(VARLSTCNT(3) jnl_info.status, 0, jnl_info.status2);
+					else
+						gtm_putmsg(VARLSTCNT(1) jnl_info.status);
 					gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
 					continue;
 				}

@@ -34,6 +34,7 @@
 #include "jnl_write.h"
 #include "gtmmsg.h"	/* for gtm_putmsg() prototype */
 #include "util.h"	/* for util_out_print() prototype */
+#include "iosp.h"	/* for SS_NORMAL */
 
 GBLREF	boolean_t	mupip_jnl_recover;
 GBLREF	boolean_t	jnlfile_truncation;
@@ -60,7 +61,7 @@ GBLREF  jnl_process_vector      *prc_vec;
 	if (lcnt == JNL_MAX_FLUSH_TRIES)									\
 	{													\
 		assert(FALSE);											\
-		jpc->status = 0;										\
+		jpc->status = SS_NORMAL;										\
 		jnl_send_oper(csa->jnl, ERR_JNLQIOLOCKED);							\
 		rts_error(VARLSTCNT(6) ERR_JNLCLOSE, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(reg));		\
 	}													\
@@ -75,7 +76,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool eov)
 	jnl_buffer_ptr_t	jb;
 	jnl_file_header		*header;
 	struct_jrec_eof		eof_record;
-	uint4			end_of_data, status = 0;
+	uint4			end_of_data, status = SS_NORMAL;
 	int4			zero_len;
 	char			hdr_buffer[HDR_LEN];
 	char			zeroes[DISK_BLOCK_SIZE];
@@ -85,8 +86,8 @@ void	jnl_file_close(gd_region *reg, bool clean, bool eov)
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	assert(csa->now_crit);
-	assert(0 != csa->hdr->jnl_file.u.inode);
-	assert(0 != csa->hdr->jnl_file.u.device);
+	assert(0 != csa->nl->jnl_file.u.inode);
+	assert(0 != csa->nl->jnl_file.u.device);
 
 	jpc = csa->jnl;
 	if ((NULL == jpc) || (NOJNL == jpc->channel))
@@ -105,12 +106,12 @@ void	jnl_file_close(gd_region *reg, bool clean, bool eov)
 		end_of_data = jb->freeaddr = ROUND_UP(jb->freeaddr, DISK_BLOCK_SIZE);
 		zero_len = end_of_data - jb->dskaddr;
 		assert(zero_len >= 0 && DISK_BLOCK_SIZE > zero_len);
-		jpc->status = 0;
+		jpc->status = SS_NORMAL;
 		if (zero_len > 0)
 		{
 			memset(zeroes, 0, zero_len);
 			LSEEKWRITE(jpc->channel, jb->dskaddr, zeroes, zero_len, jpc->status);
-			if (0 != jpc->status)
+			if (SS_NORMAL != jpc->status)
 			{
 				jnl_send_oper(jpc, ERR_JNLEOFPREZERO);
 				RELEASE_IO_IN_PROG_LOCK(jb);
@@ -141,9 +142,9 @@ void	jnl_file_close(gd_region *reg, bool clean, bool eov)
 		assert(jb->dskaddr == jb->fsync_dskaddr);
 
 		GET_IO_IN_PROG_LOCK(reg, csa, jb);
-		if (0 == jpc->status)
+		if (SS_NORMAL == jpc->status)
 			LSEEKREAD(jpc->channel, 0, (sm_uc_ptr_t)hdr_buffer, sizeof(hdr_buffer), jpc->status);
-		if (0 == jpc->status)
+		if (SS_NORMAL == jpc->status)
 		{
 			header = (jnl_file_header *)hdr_buffer;
 			assert(jnlfile_truncation || header->end_of_data <= end_of_data);
@@ -156,7 +157,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool eov)
 			if (mupip_jnl_recover && recovery_success & 0 != header->forw_phase_jnl_file_len)
 			{
 				header->forw_phase_jnl_file_name[header->forw_phase_jnl_file_len] = 0;
-				if (0 != (status = UNLINK(header->forw_phase_jnl_file_name)))
+				if (SS_NORMAL != (status = UNLINK(header->forw_phase_jnl_file_name)))
 				{
 					if (-1 == status)
 					{
@@ -181,8 +182,8 @@ void	jnl_file_close(gd_region *reg, bool clean, bool eov)
 		 * assumes that the jnl file has been completely written to disk (including the header) before the switch is
 		 * signalled.
 		 */
-		csa->hdr->jnl_file.u.inode = 0;
-		csa->hdr->jnl_file.u.device = 0;
+		csa->nl->jnl_file.u.inode = 0;
+		csa->nl->jnl_file.u.device = 0;
 	}
 	/* This will be closed as part of recover closing journal files in mur_close_files as this value is assigned in
 	 * mur_recover_write_epoch_rec/mur_rollback_truncate as part of recover/rollback trying to write EOF/truncate */
@@ -192,9 +193,9 @@ void	jnl_file_close(gd_region *reg, bool clean, bool eov)
 	jpc->lastwrite = 0;
 	jpc->regnum = 0;
 	jpc->pini_addr = 0;
-	if (clean && (0 != status))
+	if (clean && (SS_NORMAL != status))
 	{
-		jpc->status = status;        /* jnl_send_oper zeroes */
+		jpc->status = status;        /* jnl_send_oper resets to SS_NORMAL */
 		jnl_send_oper(jpc, ERR_JNLCLOSE);
 		rts_error(VARLSTCNT(7) ERR_JNLCLOSE, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(reg), status);
 	}

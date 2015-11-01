@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,11 +29,6 @@ GBLREF char	 	patch_comp_key[MAX_KEY_SZ + 1];
 
 static unsigned char	*work_buff;
 static unsigned int	work_buff_length;
-
-#define MAX_ZWR_INFLATION	6 	/* This factor is also used in other places and should be moved to a central include file.
-					 * it assumes that the worst case is that every other character
-				  	 * is a non-graphis with a 3 digit code (e.g. "a"_$c(127)_"a"_$C(127)...
-					 * which leads to (n / 2 * 4) + n / 2 * 8) = n / 2 * 12 = n * 6 */
 
 boolean_t dse_fdmp(sm_uc_ptr_t data, int len)
 {

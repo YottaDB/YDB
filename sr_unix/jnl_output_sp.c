@@ -72,7 +72,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		assert(0 <= jnl_qio_in_prog);
 		return ERR_JNLWRTDEFER;
 	}
-	if (is_gdid_gdid_identical(&jpc->fileid, &csa->hdr->jnl_file.u))
+	if (is_gdid_gdid_identical(&jpc->fileid, &csa->nl->jnl_file.u))
 		jpc->fd_mismatch = FALSE;
 	else
 	{
@@ -115,26 +115,26 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		if (NOJNL == jpc->channel)
 		{
 			jb->wrtsize = 0;
-			jpc->status = 0;
+			jpc->status = SS_NORMAL;
 		} else
 		{
 			LSEEKWRITE(jpc->channel, (off_t)jb->dskaddr, (sm_uc_ptr_t)base, tsz, jpc->status);
-			if (0 != jpc->status)
+			if (SS_NORMAL != jpc->status)
 				jpc->channel = NOJNL;
 		}
 	} else
 	{
 		jb->wrtsize = 0;
-		jpc->status = 0;
+		jpc->status = SS_NORMAL;
 	}
 	status = jpc->status;
-	if (0 != jpc->status)
+	if (SS_NORMAL != jpc->status)
 	{
 		jb->errcnt++;
 		jnl_send_oper(jpc, ERR_JNLACCESS);
 		assert(FALSE);
 	}
-	jpc->status = 0;
+	jpc->status = SS_NORMAL;
 	assert(jb->dsk <= jb->size);
 	assert(jb->io_in_prog_latch.latch_pid == process_id);
 	jpc->new_dsk = jb->dsk + jb->wrtsize;

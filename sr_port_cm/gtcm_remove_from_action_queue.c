@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,20 +23,17 @@
 #include "relqueopi.h"
 #include "gtcm_remove_from_action_queue.h"
 
-GBLREF relque			action_que;
-GBLREF gd_region		*gv_cur_region, *action_que_dummy_reg;
-GBLREF connection_struct	*curr_entry;
-GBLREF sgmnt_addrs		*cs_addrs;
-GBLREF sgmnt_data_ptr_t		cs_data;
+GBLREF	relque			action_que;
+GBLREF	gd_region		*action_que_dummy_reg;
+GBLREF	connection_struct	*curr_entry;
+GBLREF	node_local_ptr_t	locknl;
 
 void gtcm_remove_from_action_queue()
 {
-	DEBUG_ONLY(gd_region	*r_save;)
-
 	VMS_ONLY(assert(lib$ast_in_prog()));
-	UNIX_ONLY(DEBUG_ONLY(r_save = gv_cur_region; TP_CHANGE_REG(action_que_dummy_reg);) /* for LOCK_HIST macro */)
+	UNIX_ONLY(DEBUG_ONLY(locknl = FILE_INFO(action_que_dummy_reg)->s_addrs.nl;))	/* for DEBUG_ONLY LOCK_HIST macro */
 	curr_entry = (connection_struct *)REMQHI(&action_que);
-	UNIX_ONLY(DEBUG_ONLY(TP_CHANGE_REG(r_save);) /* restore gv_cur_region */)
+	UNIX_ONLY(DEBUG_ONLY(locknl = NULL;))	/* restore "locknl" to default value */
 	if ((connection_struct *)EMPTY_QUEUE != curr_entry && (connection_struct *)INTERLOCK_FAIL != curr_entry)
 	{
 		switch(*curr_entry->clb_ptr->mbf)

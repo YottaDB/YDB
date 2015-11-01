@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -156,7 +156,10 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 			mlk_bckout(pvt_ptr2, action);
 		}
 		if ((0 < dollar_tlevel) && (CDB_STAGNATE <= t_tries))
-			t_retry(cdb_sc_needcrit);		/* release crit to prevent a deadlock */
+		{
+			mlk_unpend(pvt_ptr1);		/* Eliminated the dangling request block */
+			t_retry(cdb_sc_needcrit);	/* release crit to prevent a deadlock */
+		}
 		/* Start with 0.5 second timer interval, double that interval each
 		 * iteration until a maximum timer limit is achieved.
 		 */

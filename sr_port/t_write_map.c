@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,5 +62,6 @@ void t_write_map (
 	cs->upd_addr = upd_addr;
 	cs->tn = tn;
 	cs->level = LCL_MAP_LEVL;
+	cs->done = FALSE;
 	cs->write_type = GDS_WRITE_PLAIN;
 }

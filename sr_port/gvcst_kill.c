@@ -52,14 +52,12 @@
 #include "gvcst_expand_free_subtree.h"
 #include "gvcst_kill.h"
 #include "rc_cpt_ops.h"
-#include "tp_grab_crit.h"
 #include "add_inter.h"
 
 error_def(ERR_GVKILLFAIL);
 
 GBLREF	boolean_t		is_updproc;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF	bool			run_time, is_db_updater;
 GBLREF  boolean_t               pool_init;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	gd_region		*gv_cur_region;
@@ -83,6 +81,7 @@ GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		t_tries;
 GBLREF	boolean_t 		kip_incremented;
 GBLREF	boolean_t		need_kip_incr;
+GBLREF	boolean_t		is_replicator;
 DEBUG_ONLY(GBLREF uint4		cumul_index;)
 
 void	gvcst_kill(bool do_subtree)
@@ -102,7 +101,7 @@ void	gvcst_kill(bool do_subtree)
 
 	error_def(ERR_SCNDDBNOUPD);
 
-	if (FALSE == pool_init  &&  REPL_ENABLED(cs_data)  &&  (run_time || is_db_updater))
+	if ((FALSE == pool_init) && REPL_ENABLED(cs_data) && is_replicator)
 		jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
 	if (REPL_ENABLED(cs_data) && pool_init && jnlpool_ctl->upd_disabled && !is_updproc)
 		rts_error(VARLSTCNT(1) ERR_SCNDDBNOUPD);
@@ -123,16 +122,7 @@ void	gvcst_kill(bool do_subtree)
 	assert(update_array + update_array_size >= update_array_ptr);
 	for (;;)
 	{
-		if (!((t_tries < CDB_STAGNATE) || cs_addrs->now_crit))	/* Final retry and this region not locked down */
-		{
-			if (0 == dollar_tlevel)				/* Ensure TP */
-				GTMASSERT;
-			if (FALSE == tp_grab_crit(gv_cur_region))	/* Attempt lockdown now */
-			{
-				cdb_status = cdb_sc_needcrit;		/* avoid deadlock -- restart transaction */
-				goto retry;
-			}
-		}
+		assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 		if (0 == dollar_tlevel)
 		{
 			update_array_ptr = update_array;

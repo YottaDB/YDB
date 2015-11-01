@@ -53,9 +53,9 @@ typedef unix_file_info		fi_type;
 #define DEF_DB_EXT_NAME			"dat"
 #define DEF_JNL_EXT_NAME		".mjl"
 
-#define JNL_FILE_SWITCHED(reg) 	(!is_gdid_gdid_identical((gd_id_ptr_t)&(&FILE_INFO(reg)->s_addrs)->hdr->jnl_file.u,		\
+#define JNL_FILE_SWITCHED(reg) 	(!is_gdid_gdid_identical((gd_id_ptr_t)&(&FILE_INFO(reg)->s_addrs)->nl->jnl_file.u,		\
 									(gd_id_ptr_t)&(&FILE_INFO(reg)->s_addrs)->jnl->fileid))
-#define JNL_GDID_PTR(sa)	((gd_id_ptr_t)(&(sa->hdr->jnl_file.u)))
+#define JNL_GDID_PTR(sa)	((gd_id_ptr_t)(&((sa)->nl->jnl_file.u)))
 
 uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy);
 

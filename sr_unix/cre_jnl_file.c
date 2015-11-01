@@ -32,6 +32,7 @@
 #include "rename_file_if_exists.h"
 #include "util.h"
 #include "gtmmsg.h"
+#include "iosp.h"	/* for SS_NORMAL */
 
 #define ZERO_SIZE	(128 * DISK_BLOCK_SIZE)
 
@@ -73,6 +74,7 @@ uint4	cre_jnl_file (jnl_create_info *info)
 	int             stat_res, rename_stat;
 	uint4		curr_time;
 
+	info->status2 = SS_NORMAL; /* initialize secondary error status at start. this is a VMS only field used in portable code */
 	assert(EPOCH_RECLEN < DISK_BLOCK_SIZE);
 	/* rename is called not to overwrite the new journal file it will create */
         if (RENAME_FAILED == (rename_stat = rename_file_if_exists(info->jnl, info->jnl_len,

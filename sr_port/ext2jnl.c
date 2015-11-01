@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,6 @@
 
 #include "mlkdef.h"
 #include "gtm_string.h"
-#include "stringpool.h"
 #include "subscript.h"
 #include "gdsroot.h"		/* for filestruct.h */
 #include "gdsbt.h"		/* for gdsfhead.h */
@@ -25,7 +24,7 @@
 #include "copy.h"
 #include "zshow.h"
 #include "mvalconv.h"
-#include "mupip_put_gvsubsc.h"
+#include "str2gvkey.h"
 
 static	boolean_t	in_tp;
 static	int4		num_records;
@@ -36,13 +35,6 @@ GBLDEF	char		*ext_stop;
 LITREF	int		jnl_fixed_size[];
 
 GBLREF	gv_key		*gv_currkey;
-GBLREF	spdesc		stringpool;
-GBLREF	struct
-{
-	int4	count;		/* caveat: this should be the same size as a pointer */
-	mval	*args[MAX_GVSUBSCRIPTS + 1];
-} op_gvargs;
-
 
 /* callers please set up the proper condition-handlers */
 /* expects a null-terminated ext_buff. does the equivalent but inverse of jnl2ext */
@@ -272,19 +264,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 		}
 	}
 	assert(keylength <= len);
-
-	pool_save = stringpool.free;
-	mupip_put_gvsubsc(ptr, keylength, FALSE);
-	gv_currkey->end = op_gvargs.args[0]->str.len;
-	gv_currkey->base[gv_currkey->end] = 0;
-	gv_currkey->end++;
-	gv_currkey->prev = 0;
-	memcpy(gv_currkey->base, op_gvargs.args[0]->str.addr, op_gvargs.args[0]->str.len);
-
-	for (i = 1; i < op_gvargs.count; i++)
-		mval2subsc(op_gvargs.args[i], gv_currkey);
-
-	stringpool.free = pool_save;
+	str2gvkey_nogvfunc(ptr, keylength, gv_currkey);
 	ret += gv_currkey->end + sizeof(rec->val.jrec_kill.mumps_node.length);
 
 	switch(rectype)

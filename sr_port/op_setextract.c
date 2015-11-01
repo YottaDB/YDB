@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ void op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 
 	/* There are four cases in the spec:
 
-	   1) echar > schar or echar < 1 -- glvn and naked indicator are not changed. This is
+	   1) schar > echar or echar < 1 -- glvn and naked indicator are not changed. This is
 	                                    handled by generated code in m_set
 	   2) echar '< schar-1 > srclen  -- dst = src_$J("",schar-1-srclen)_expr
 	   3) schar-1 '> srclen < echar  -- dst = $E(src,1,schar-1)_expr

@@ -35,7 +35,7 @@
 #include "tp.h"
 #include "tp_timeout.h"
 #include "op.h"
-#include "have_crit_any_region.h"
+#include "have_crit.h"
 #include <varargs.h>
 
 error_def(ERR_STACKCRIT);
@@ -133,7 +133,7 @@ va_dcl
 		t_tries = (FALSE == is_standalone) ? 0 : CDB_STAGNATE;
 		t_fail_hist[t_tries] = cdb_sc_normal;
 		/* ensure that we don't have crit on any region at the beginning of a TP transaction (be it GT.M or MUPIP) */
-		assert(!have_crit_any_region(FALSE));
+		assert(0 == have_crit(CRIT_HAVE_ANY_REG));
 		for (tr = tp_reg_list; NULL != tr; tr = tr_next)
 		{	/* start with empty list, place all existing entries on free list */
 			tp_reg_list = tr_next = tr->fPtr;	/* Remove from queue */

@@ -97,7 +97,7 @@ typedef struct jnl_process_vector_struct	/* name needed since this is used in cm
 #define	DEFAULT_EPOCH_INTERVAL_IN_SECONDS	300
 #endif
 
-#define DEFAULT_EPOCH_INTERVAL	SECOND2EPOCH_SECOND(DEFAULT_EPOCH_INTERVAL_IN_SECONDS)
+#define DEFAULT_EPOCH_INTERVAL	SECOND2EPOCH_SECOND(DEFAULT_EPOCH_INTERVAL_IN_SECONDS) /* ***MUST*** include math.h for VMS */
 
 #define	MAX_EPOCH_INTERVAL	32767	/* in seconds. Amounts to nearly 10 hours. Don't want to keep db stale so long */
 
@@ -240,6 +240,7 @@ typedef struct jnl_private_control_struct
 	uint4			jnl_alq;		/* copies of journal allocation/extension/autoswitchlimit */
 	uint4			jnl_deq;		/*	to be restored whenever a journal switch occurs   */
 	uint4			autoswitchlimit;	/*	during forward phase of journal recovery/rollback */
+	uint4			status2;		/* for secondary error status, currently used only in VMS */
 } jnl_private_control;
 
 typedef enum
@@ -341,6 +342,7 @@ typedef struct
 	int4			prev_jnl_len;
 	int4			repl_state;
 	seq_num			reg_seqno;
+	uint4			status2;		/* for secondary error status information in VMS */
 } jnl_create_info;
 
 /* Journal record definitions */

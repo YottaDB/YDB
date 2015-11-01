@@ -424,8 +424,8 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 		REPL_DPRINT2("Update EOF : New EOF addr will be found from jnl file hdr for %s\n", ctl->jnl_fn);
 		UNIX_ONLY(
 			REPL_DPRINT4("Update EOF : FC ID IS %u %d %u\n", fc->id.inode, fc->id.device, fc->id.st_gen);
-			REPL_DPRINT4("Update EOF : csa->hdr->jnl_file.u (unreliable) is %u %d %u\n", csa->hdr->jnl_file.u.inode,
-					csa->hdr->jnl_file.u.device,  csa->hdr->jnl_file.u.st_gen);
+			REPL_DPRINT4("Update EOF : csa->nl->jnl_file.u (unreliable) is %u %d %u\n", csa->nl->jnl_file.u.inode,
+					csa->nl->jnl_file.u.device,  csa->nl->jnl_file.u.st_gen);
 		)
 		if (!ctl->fh_read_done)
 		{

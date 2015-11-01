@@ -103,7 +103,7 @@
 #define DEFAULT_ZERROR_STR	"Unprocessed $ZERROR, see $ZSTATUS"
 #define DEFAULT_ZERROR_LEN	(sizeof(DEFAULT_ZERROR_STR) - 1)
 
-GBLDEF	gd_region		*gv_cur_region, *db_init_region;
+GBLDEF	gd_region		*db_init_region;
 GBLDEF	sgmnt_data_ptr_t	cs_data;
 GBLDEF	sgmnt_addrs		*cs_addrs;
 
@@ -132,13 +132,11 @@ GBLDEF	bool		error_mupip = FALSE,
 			record = FALSE,
 			run_time = FALSE,
 			is_standalone = FALSE,
-			is_db_updater = FALSE,
 			std_dev_outbnd = FALSE,
 			in_mupip_freeze = FALSE,
 			in_backup = FALSE;
 
-GBLDEF	boolean_t	crit_in_flux =  FALSE,
-			is_updproc = FALSE,
+GBLDEF	boolean_t	is_updproc = FALSE,
 			mupip_jnl_recover = FALSE,
 			copy_jnl_record	= FALSE,
 			set_resync_to_region = FALSE,
@@ -146,6 +144,7 @@ GBLDEF	boolean_t	crit_in_flux =  FALSE,
 			repl_enabled = FALSE,
 			unhandled_stale_timer_pop = FALSE,
 			gtcm_connection = FALSE,
+			is_replicator = FALSE,	/* TRUE => this process can write jnl records to the jnlpool for replicated db */
 			dollar_truth = TRUE;
 
 GBLDEF	VSIG_ATOMIC_T	forced_exit = FALSE;	/* Asynchronous signal/interrupt handler sets this variable to TRUE,
@@ -163,7 +162,7 @@ GBLDEF	int4		backup_close_errno,
 			forced_exit_err,
 			exit_state,
 			restore_read_errno;
-GBLDEF	volatile int4	outofband;
+GBLDEF	volatile int4	outofband, crit_count = 0;
 GBLDEF	int		mumps_status = SS_NORMAL,
 			restart_pc,
 			stp_array_size = 0;
@@ -236,7 +235,6 @@ GBLDEF	bool		rc_locked = FALSE,
 							 * written to the database.  Upon error we stay critical
 							 * and report.  This flag can be set via the MUMPS command
 							 * VIEW 1. */
-GBLDEF	bool		caller_id_flag = TRUE;
 GBLDEF	mval		curr_gbl_root;
 GBLDEF	gd_addr		*original_header;
 GBLDEF	mem_list	*mem_list_head;
@@ -309,20 +307,6 @@ GBLDEF	volatile	int4		fast_lock_count = 0;	/* Used in wcs_stale */
 /* REPLICATION RELATED GLOBALS */
 GBLDEF gtmsource_options_t      gtmsource_options;
 
-#ifdef INT8_SUPPORTED
-	GBLDEF	const seq_num	seq_num_zero = 0;
-	GBLDEF	const seq_num	seq_num_one = 1;
-	GBLDEF	const seq_num	seq_num_minus_one = (seq_num)-1;
-#else
-	GBLDEF	const seq_num	seq_num_zero = {0, 0};
-	GBLDEF	const seq_num	seq_num_minus_one = {(uint4)-1, (uint4)-1};
-#	ifdef BIGENDIAN
-		GBLDEF	const seq_num	seq_num_one = {0, 1};
-#	else
-		GBLDEF	const seq_num	seq_num_one = {1, 0};
-#	endif
-#endif
-
 GBLDEF	unsigned char		*profstack_base, *profstack_top, *prof_msp, *profstack_warn;
 GBLDEF	unsigned char		*prof_stackptr;
 GBLDEF	boolean_t		is_tracing_on;
@@ -334,7 +318,7 @@ GBLDEF	void			(*ctrlc_handler_ptr)() = ctrlc_handler_dummy;
 GBLDEF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace) = op_open_dummy;
 GBLDEF	void			(*unw_prof_frame_ptr)(void) = unw_prof_frame_dummy;
 GBLDEF	boolean_t		mu_reorg_process = FALSE;
-GBLDEF	gv_key			*gv_altkey, *gv_currkey, *gv_currkey_next_reorg;
+GBLDEF	gv_key			*gv_currkey_next_reorg;
 GBLDEF	gv_namehead		*reorg_gv_target;
 
 #ifdef UNIX
@@ -635,3 +619,8 @@ GBLDEF	int4		cur_pte_csh_tail_count;			/* copy of pte_csh_tail_count correspondi
 
 GBLDEF	readonly char	*before_image_lit[] = {"NOBEFORE_IMAGES", "BEFORE_IMAGES"};
 GBLDEF	readonly char	*jnl_state_lit[] = {"DISABLED", "OFF", "ON"};
+GBLDEF	boolean_t	crit_sleep_expired;		/* mutex.mar: signals that a timer waiting for crit has expired */
+GBLDEF	uint4		crit_deadlock_check_cycle;	/* compared to csa->crit_check_cycle to determine if a given region
+							   in a transaction legitimately has crit or not */
+GBLDEF	node_local_ptr_t	locknl;		/* if non-NULL, indicates node-local of interest to the LOCK_HIST macro */
+GBLDEF	boolean_t	in_mutex_deadlock_check;	/* if TRUE, mutex_deadlock_check() is part of our current C-stack trace */

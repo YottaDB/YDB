@@ -46,7 +46,7 @@ GBLREF	boolean_t		*lseekIoInProgress_flags;	/* needed for the LSEEK* macros in g
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	volatile boolean_t	crit_in_flux;
+GBLREF	volatile int4		crit_count;
 GBLREF	volatile int4		db_fsync_in_prog, jnl_qio_in_prog;
 GBLREF	volatile int4 		fast_lock_count;
 GBLREF	volatile int4		gtmMallocDepth;		/* Recursion indicator */
@@ -113,7 +113,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);
 		if (!mupip_jnl_recover && (FALSE == lseekIoInProgress_flag)
 			GTM_MALLOC_NO_RENT_ONLY(&& 0 == gtmMallocDepth)
-			&& (FALSE == crit_in_flux) && (0 == fast_lock_count)
+			&& (0 == crit_count)       && (0 == fast_lock_count)
 			&& (!jnl_qio_in_prog)      && (!db_fsync_in_prog)
 		        && (!jpc || !jpc->jnl_buff || (LOCK_AVAILABLE == jpc->jnl_buff->fsync_in_prog_latch.latch_pid))
 			&& (NULL == save_csaddrs || FALSE == save_csaddrs->now_crit) && (FALSE == csa->now_crit)

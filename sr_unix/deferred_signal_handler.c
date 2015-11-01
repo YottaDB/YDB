@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@
 #include "gtmsiginfo.h"
 #include "gtmimagename.h"
 #include "send_msg.h"
-#include "have_crit_any_region.h"
+#include "have_crit.h"
 #include "deferred_signal_handler.h"
 #include "gtmmsg.h"
 
@@ -78,7 +78,7 @@ void deferred_signal_handler(void)
 		gtm_putmsg(VARLSTCNT(1) forced_exit_err);
 	}
 	/* As on VMS, a mupip stop does not drive the condition handlers unless we are in crit */
-	if ((have_crit_any_region(FALSE) || SIGTERM != exi_condition) && CHANDLER_EXISTS)
+	if ((0 != have_crit(CRIT_HAVE_ANY_REG) || SIGTERM != exi_condition) && CHANDLER_EXISTS)
 		DRIVECH(0);
 	/* If a special routine was registered to be driven on a signal, drive it now */
 	if (0 != exi_condition && call_on_signal)

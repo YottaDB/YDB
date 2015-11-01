@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,9 +28,9 @@
 #define MAX_FILLFACTOR 100
 #define MIN_FILLFACTOR 30
 
-GBLREF int	gv_fillfactor;
-GBLREF bool	mupip_error_occurred;
-GBLREF bool	is_db_updater;
+GBLREF int		gv_fillfactor;
+GBLREF bool		mupip_error_occurred;
+GBLREF boolean_t	is_replicator;
 
 void mupip_cvtgbl(void)
 {
@@ -43,7 +43,7 @@ void mupip_cvtgbl(void)
 	error_def(ERR_MUPCLIERR);
 	error_def(ERR_LOADEDBG);
 
-	is_db_updater = TRUE;
+	is_replicator = TRUE;
 	fn_len = 256;
 	if (!cli_get_str("FILE", fn, &fn_len))
 		mupip_exit(ERR_MUPCLIERR);

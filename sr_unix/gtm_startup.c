@@ -91,6 +91,7 @@
 #define MIN_INDIRECTION_NESTING 32
 #define MAX_INDIRECTION_NESTING 256
 
+GBLDEF void		(*restart)() = &mum_tstart;
 GBLREF mval 		**ind_result_array, **ind_result_sp, **ind_result_top;
 GBLREF mval 		**ind_source_array, **ind_source_sp, **ind_source_top;
 GBLREF rtn_tables 	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
@@ -124,6 +125,7 @@ GBLREF uint4		process_id;
 GBLREF int4		exi_condition;
 GBLREF global_latch_t 	defer_latch;
 GBLREF jnlpool_addrs	jnlpool;
+GBLREF boolean_t	is_replicator;
 GBLREF void		(*ctrlc_handler_ptr)();
 OS_PAGE_SIZE_DECLARE
 
@@ -168,6 +170,7 @@ void gtm_startup(struct startup_vector *svec)
 	rts_stringpool = stringpool;
 	compile_time = FALSE;
 	run_time = TRUE;
+	is_replicator = TRUE;	/* as GT.M goes through t_end() and can write jnl records to the jnlpool for replicated db */
 	getjobname();
 	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, OS_PAGE_SIZE,
 			  &jnlpool.jnlpool_dummy_reg);

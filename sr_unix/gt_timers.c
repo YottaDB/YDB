@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -496,13 +496,12 @@ static void start_first_timer(ABS_TIME *curr_time)
 			else
 				break;			/* eltime ok -- */
 		}
-	}
-
-	if (timeroot)	/* We still have a timer to set ? */
-	{
-		add_int_to_abs_time(&eltime, SLACKTIME, &interval);
-		/* Call system to set timer */
-		sys_settimer(timeroot->tid, &interval, timeroot->handler);
+		if (timeroot)	/* We still have a timer to set ? */
+		{
+			add_int_to_abs_time(&eltime, SLACKTIME, &interval);
+			/* Call system to set timer */
+			sys_settimer(timeroot->tid, &interval, timeroot->handler);
+		}
 	}
 }
 

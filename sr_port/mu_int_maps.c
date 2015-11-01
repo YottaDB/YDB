@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,7 @@ void mu_int_maps(void)
 	unsigned int	level;
 	uint_ptr_t	dskmap_p;
 	uint4		dskmap, lfree, *lmap, map_blk_size;
-	block_id	blkno;
+	block_id	blkno, last_bmp;
 
 	error_def(ERR_DBREADBM);
 	error_def(ERR_DBLVLINC);
@@ -73,8 +73,11 @@ void mu_int_maps(void)
 	maps = (mu_int_data.trans_hist.total_blks + mu_int_data.bplmap - 1) / mu_int_data.bplmap;
 	local = mu_int_locals;
 	map_blk_size = BM_SIZE(mu_int_data.bplmap);
-	for(mcnt = 0;  mcnt < maps;  mcnt++, local += mapsize / BITS_PER_UCHAR * BML_BITS_PER_BLK)
+	last_bmp = ((mu_int_data.trans_hist.total_blks / mu_int_data.bplmap) * mu_int_data.bplmap);
+	mapsize = mu_int_data.bplmap;
+	for (mcnt = 0;  mcnt < maps;  mcnt++, local += BM_MINUS_BLKHDR_SIZE(mapsize))
 	{
+		assert(mapsize == mu_int_data.bplmap);
 		blkno = mcnt * mu_int_data.bplmap;
 		disk = mu_int_read(blkno);
 		if (!disk)
@@ -124,10 +127,8 @@ void mu_int_maps(void)
 			}
 		}
 		master_full = !bit_set(mcnt, mu_int_master);
-		if (((mu_int_data.trans_hist.total_blks / mu_int_data.bplmap) * mu_int_data.bplmap) == blkno)
+		if (last_bmp == blkno)
 			mapsize = (mu_int_data.trans_hist.total_blks - blkno);
-		else
-			mapsize = mu_int_data.bplmap;
 		disk_full = (-1 == bml_find_free(0, disk + sizeof(blk_hdr), mapsize, &dummy));
 		agree = TRUE;
 		for (lcnt = 0, dskmap_p = (uint_ptr_t)(disk + sizeof(blk_hdr)), lmap = (uint4 *)local;

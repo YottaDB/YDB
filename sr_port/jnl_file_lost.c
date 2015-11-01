@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,7 @@ void jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 		GTMASSERT;
 	}
 #ifdef VMS
-	assert(0 != memcmp(csa->hdr->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)));
+	assert(0 != memcmp(csa->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)));
 #endif
 	/* assert((TRUE == csa->now_crit) || ((TRUE == csa->hdr->clustered) && (CCST_CLOSED == csa->nl->ccp_state)));
 	 * disabled for now because of the demon */

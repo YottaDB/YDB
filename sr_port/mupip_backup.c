@@ -23,6 +23,8 @@
 #endif
 #include "gtm_string.h"
 #include "gtm_stdio.h"
+#include "gtm_stdlib.h"
+#include "gtm_tempnam.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -144,12 +146,12 @@ void mupip_backup(void)
 	jnl_create_info jnl_info;
 	file_control	*fc;
 	char            tempdir_trans_buffer[MAX_TRANS_NAME_LEN],
-			tempnam_prefix[MAX_FN_LEN], jnl_file_name[JNL_NAME_SIZE];
+			tempnam_prefix[MAX_FN_LEN], tempdir_full_buffer[MAX_FN_LEN + 1], jnl_file_name[JNL_NAME_SIZE];
 	char		*jnl_str_ptr, rep_str[256], jnl_str[256], entry[256],
 			full_jnl_fn[JNL_NAME_SIZE], prev_jnl_fn[JNL_NAME_SIZE];
 	int		ccnt, index, comparison, num;
-        mstr            tempdir_log, tempdir_trans, *file;
-	uint4		jnl_status, temp_file_name_len;
+	mstr            tempdir_log, tempdir_trans, *file, tempdir_full;
+	uint4		jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status;
 
 #if defined(VMS)
 	struct FAB	temp_fab;
@@ -185,6 +187,8 @@ void mupip_backup(void)
 	error_def(ERR_JNLSTATE);
 	error_def(ERR_FILEEXISTS);
 	error_def(ERR_JNLDISABLE);
+	error_def(ERR_FILEPARSE);
+	error_def(ERR_NOTRNDMACC);
 
 	/* ==================================== STEP 1. Initialization ======================================= */
 
@@ -330,6 +334,10 @@ void mupip_backup(void)
 						gtm_putmsg(VARLSTCNT(1) ustatus);
 				}
 			)
+		} else if (!incremental)
+		{ 	/* non-incremental backups to "exec" and "tp" are not supported*/
+			gtm_putmsg(VARLSTCNT(1) ERR_NOTRNDMACC);
+			error_mupip = TRUE;
 		}
 	}
 	if (TRUE == error_mupip)
@@ -345,9 +353,21 @@ void mupip_backup(void)
 	size = ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE);
 
 	ESTABLISH(mu_freeze_ch);
+	tempfilename = tempdir_full.addr = tempdir_full_buffer;
+	if (TRUE == online)
+	{
+		tempdir_log.addr = TEMPDIR_LOG_NAME;
+		tempdir_log.len = sizeof(TEMPDIR_LOG_NAME) - 1;
+		trans_log_name_status = trans_log_name(&tempdir_log, &tempdir_trans, tempdir_trans_buffer);
+		/* save the length of the "base" so we can (restore it and) re-use the string in tempdir_trans.addr */
+		tempdir_trans_len = tempdir_trans.len;
+	} else
+		tempdir_trans_len = 0;
 
 	for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
 	{
+		/* restore the original length since we are looping thru regions */
+		tempdir_trans.len = tempdir_trans_len;
 		file = &(rptr->backup_file);
 		file->addr[file->len] = '\0';
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
@@ -387,15 +407,15 @@ void mupip_backup(void)
 			memcpy(tempnam_prefix, gv_cur_region->rname, gv_cur_region->rname_len);
 			SPRINTF(&tempnam_prefix[gv_cur_region->rname_len], "_%x", process_id);
 
-			tempdir_log.addr = TEMPDIR_LOG_NAME;
-			tempdir_log.len = sizeof(TEMPDIR_LOG_NAME) - 1;
-			if ((SS_NORMAL == trans_log_name(&tempdir_log, &tempdir_trans, tempdir_trans_buffer))
+			if ((SS_NORMAL == trans_log_name_status)
 				&& (NULL != tempdir_trans.addr) && (0 != tempdir_trans.len))
 				*(tempdir_trans.addr + tempdir_trans.len) = 0;
 			else if (incremental && (backup_to_file != rptr->backup_to))
 			{
-				tempdir_trans.addr = NULL;
-				tempdir_trans.len = 0;
+				tempdir_trans.addr = tempdir_trans_buffer;
+				tempdir_trans.len = sizeof(SCRATCH_DIR) - 1;
+				memcpy(tempdir_trans_buffer, SCRATCH_DIR, tempdir_trans.len);
+				tempdir_trans_buffer[tempdir_trans.len]='\0';
 			} else
 			{
 				ptr = rptr->backup_file.addr + rptr->backup_file.len - 1;
@@ -417,35 +437,40 @@ void mupip_backup(void)
 			}
 
 			/* verify the accessibility of the tempdir */
-			if ((NULL != tempdir_trans.addr) &&
-				(0 != ACCESS(tempdir_trans.addr, TMPDIR_ACCESS_MODE)))
+			if (FILE_STAT_ERROR == (fstat_res = gtm_file_stat(&tempdir_trans, NULL, &tempdir_full, FALSE, &ustatus)))
+			{
+				gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, tempdir_trans.len, tempdir_trans.addr, ustatus);
+				mupip_exit(ustatus);
+			}
+			SPRINTF(tempfilename + tempdir_full.len,"/%s_XXXXXX",tempnam_prefix);
+			MKSTEMP(tempfilename, rptr->backup_fd);
+			if (-1 == rptr->backup_fd )
 			{
 				status = errno;
-				mubclnup(rptr, need_to_del_tempfile);
-				util_out_print("!/Do not have full access to directory for temporary files: !AD", TRUE,
-						tempdir_trans.len, tempdir_trans.addr);
-				mupip_exit(status);
-			}
-			tempfilename = TEMPNAM(tempdir_trans.addr, tempnam_prefix);
-			ntries = 0;
-			while (-1 == (rptr->backup_fd = OPEN3(tempfilename, O_CREAT | O_EXCL | O_RDWR, 0666)))
-			{
-				if ((EEXIST != errno) || (ntries > MAX_TEMP_OPEN_TRY))
+				if ((NULL != tempdir_full.addr) &&
+					(0 != ACCESS(tempdir_full.addr, TMPDIR_ACCESS_MODE)))
 				{
 					status = errno;
+					util_out_print("!/Do not have full access to directory for temporary files: !AD", TRUE,
+							tempdir_trans.len, tempdir_trans.addr);
+					gtm_putmsg(VARLSTCNT(1) status);
+					util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
 					mubclnup(rptr, need_to_del_tempfile);
-					util_out_print("!/Cannot create the temporary file !AD for online backup", TRUE,
-							LEN_AND_STR(tempfilename));
-					rts_error(VARLSTCNT(1) status);
 					mupip_exit(status);
 				}
-                                /* free(tempfilename); */
-                                ntries++;
-				tempfilename = TEMPNAM(tempdir_trans.addr, tempnam_prefix);
+				util_out_print("!/Cannot create the temporary file in directory !AD for online backup", TRUE,
+						tempdir_trans.len, tempdir_trans.addr);
+				gtm_putmsg(VARLSTCNT(1) status);
+				util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
+				mubclnup(rptr, need_to_del_tempfile);
+				mupip_exit(status);
+
 			}
-			memcpy(&rptr->backup_tempfile[0], tempfilename, strlen(tempfilename));
-			rptr->backup_tempfile[strlen(tempfilename)] = 0;
-			/* free(tempfilename); */
+			tempdir_full.len = strlen(tempdir_full.addr); /* update the length */
+			if (debug_mupip)
+				util_out_print("!/MUPIP INFO:   Temp file name: !AD", TRUE,tempdir_full.len, tempdir_full.addr);
+			memcpy(&rptr->backup_tempfile[0], tempdir_full.addr, tempdir_full.len);
+			rptr->backup_tempfile[tempdir_full.len] = 0;
 
 			/* give temporary files the same set of permission as the database files */
 			FSTAT_FILE(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
@@ -453,8 +478,9 @@ void mupip_backup(void)
 				|| (-1 == fchmod(rptr->backup_fd, stat_buf.st_mode)))
 			{
 				status = errno;
+				gtm_putmsg(VARLSTCNT(1) status);
+				util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
 				mubclnup(rptr, need_to_del_tempfile);
-				rts_error(VARLSTCNT(1) status);
 				mupip_exit(status);
 			}
 #elif defined(VMS)
@@ -475,7 +501,7 @@ void mupip_backup(void)
 		        temp_fab.fab$l_fop = FAB$M_MXV | FAB$M_CBT | FAB$M_TEF | FAB$M_CIF;
 		        temp_fab.fab$b_fac = FAB$M_GET | FAB$M_PUT | FAB$M_BIO | FAB$M_TRN;
 
-			tempfilename = gtm_tempnam(tempdir_trans.addr, tempnam_prefix);
+			gtm_tempnam(tempdir_trans.addr, tempnam_prefix, tempfilename);
 			temp_file_name_len = exp_file_name_len = strlen(tempfilename);
 			memcpy(exp_file_name, tempfilename, temp_file_name_len);
 			if (!get_full_path(tempfilename, temp_file_name_len, exp_file_name,
@@ -487,6 +513,8 @@ void mupip_backup(void)
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ERR_MUNOACTION);
 			}
+			if (debug_mupip)
+				util_out_print("!/MUPIP INFO:   Temp file name: !AD", TRUE, exp_file_name_len, exp_file_name);
 
 			temp_fab.fab$l_fna = exp_file_name;
 			temp_fab.fab$b_fns = exp_file_name_len;
@@ -505,8 +533,7 @@ void mupip_backup(void)
 				        case RMS$_FILEPURGED:
 						sys$close(&temp_fab);
 						ntries++;
-						free(tempfilename);
-						tempfilename = gtm_tempnam(tempdir_trans.addr, tempnam_prefix);
+						gtm_tempnam(tempdir_trans.addr, tempnam_prefix, tempfilename);
 			                        temp_fab.fab$l_fna = tempfilename;
 			                        temp_fab.fab$b_fns = strlen(tempfilename);
 				                break;
@@ -624,8 +651,8 @@ void mupip_backup(void)
 						set_jnl_info(gv_cur_region, &jnl_info);
 						if (jnl_options[jnl_noprevjnlfile] || !keep_prev_link || !JNL_ENABLED(cs_data))
 							jnl_info.prev_jnl_len = 0;
-						UNIX_ONLY(if (0 != cs_addrs->hdr->jnl_file.u.inode))
-						VMS_ONLY(if(0 != memcmp(cs_addrs->hdr->jnl_file.jnl_file_id.fid,
+						UNIX_ONLY(if (0 != cs_addrs->nl->jnl_file.u.inode))
+						VMS_ONLY(if(0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid,
 									zero_fid, sizeof(zero_fid))))
 						{
 							jnl_status = jnl_ensure_open();
@@ -642,7 +669,7 @@ void mupip_backup(void)
 							}
 						}
 #if defined(UNIX)
-						if (cs_addrs->hdr->jnl_file.u.inode != 0)
+						if (cs_addrs->nl->jnl_file.u.inode != 0)
 							jnl_file_close(gv_cur_region, TRUE, TRUE);
 #elif defined(VMS)				/* Is it possible for gds_info not initialized? */
 						gds_info = FILE_INFO(gv_cur_region);
@@ -651,7 +678,7 @@ void mupip_backup(void)
 						prev_jnl_fn_len = cs_data->jnl_file_len;
 						memcpy(prev_jnl_fn, cs_data->jnl_file_name, prev_jnl_fn_len);
 						assert((DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE) == jnl_info.alignsize);
-						if (memcmp(cs_addrs->hdr->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)))
+						if (memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)))
 						{
 							if (SS_NORMAL != (status = set_jnl_file_close(FALSE)))
 							{
@@ -702,8 +729,14 @@ void mupip_backup(void)
 							}
 						} else
 						{
-							gtm_putmsg(VARLSTCNT(5) ERR_JNLNOCREATE,
-								3, jnl_info.jnl_len, jnl_info.jnl, jnl_info.status);
+							if (SS_NORMAL != jnl_info.status2)
+								gtm_putmsg(VARLSTCNT(7)
+									ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl,
+									jnl_info.status, 0, jnl_info.status2);
+							else
+								gtm_putmsg(VARLSTCNT(5)
+									ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl,
+									jnl_info.status);
 							rptr->not_this_time = give_up_after_create_tempfile;
 							rel_crit(rptr->reg);
 							continue;

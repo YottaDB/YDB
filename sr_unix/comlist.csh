@@ -431,7 +431,9 @@ foreach i ( $comlist_liblist )
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_tools/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
-		rm -f `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list`
+		# retain_list.txt contains modules listed in *.list that also need to be 
+		# included in libmumps.a (eg. getmaxfds, gtm_mumps_call_xdr)
+		rm -f `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list |egrep -v -f $gtm_tools/retain_list.txt`
 		breaksw
 
 	case "mumps":
@@ -446,7 +448,7 @@ foreach i ( $comlist_liblist )
 
 		# Exclude files that define the same externals
 		# (e.g., "main" and the VMS CLI [command line interpreter] emulator arrays):
-		set exclude = "^gtm\.o|^gtm_svc\.o|^mumps_clitab\.o|^lke\.o|^lke_cmd\.o|^dse\.o|^dse_cmd\.o"
+		set exclude = "^gtm\.o|^gtm_svc\.o|^gtm_dal_svc\.o|^gtm_rpc_init\.o|^mumps_clitab\.o|^lke\.o|^lke_cmd\.o|^dse\.o|^dse_cmd\.o"
 		set exclude = "$exclude|^mupip\.o|^mupip_cmd\.o|^daemon\.o|^gtmsecshr\.o|^geteuid\.o|^dtgbldir\.o"
 		set exclude = "$exclude|^semstat2\.o|^ftok\.o|^msg\.o|^gtcm_main\.o|^gtcm_play\.o|^gtcm_pkdisp\.o|^gtcm_shmclean\.o"
 		set exclude = "$exclude|^omi_srvc_xct\.o|^omi_sx_play\.o"
@@ -467,7 +469,9 @@ foreach i ( $comlist_liblist )
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
-		rm -f `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list`
+		# retain_list.txt contains modules listed in *.list that also need to be 
+		# included in libmumps.a (eg. getmaxfds, gtm_mumps_call_xdr)
+		rm -f `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list |egrep -v -f $gtm_tools/retain_list.txt`
 		breaksw
 
 	endsw

@@ -64,10 +64,6 @@
 					   		 */
 #define GTMRECV_XOFF_LOG_CNT			100
 
-#define LOGTRNUM_INTERVAL			100
-
-#define GTMRECV_LOGSTATS_INTERVAL		10 /* sec */
-
 GBLDEF	repl_msg_ptr_t		gtmrecv_msgp;
 GBLDEF	int			gtmrecv_max_repl_msglen;
 GBLDEF	struct timeval		gtmrecv_poll_interval, gtmrecv_poll_immediate;
@@ -931,8 +927,8 @@ void gtmrecv_process(boolean_t crash_restart)
 	gtmrecv_poll_immediate.tv_sec = 0;
 	gtmrecv_poll_immediate.tv_usec = 0;
 	recvpool_high_watermark = (long)((float)RECVPOOL_HIGH_WATERMARK_PCTG/100 * recvpool_ctl->recvpool_size);
-	repl_log(gtmrecv_log_fp, FALSE, FALSE, "RECVPOOL HIGH WATERMARK is %d, pctg of recvpool size is %d\n",
-		 recvpool_high_watermark, RECVPOOL_HIGH_WATERMARK_PCTG);
+	REPL_DPRINT3("RECVPOOL HIGH WATERMARK is %d, pctg of recvpool size is %d\n", recvpool_high_watermark,
+			RECVPOOL_HIGH_WATERMARK_PCTG);
 	gtmrecv_msgp = NULL;
 	while (TRUE)
 	{

@@ -115,7 +115,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 				si->num_of_blks = 0;
 			}
 			si->cr_array_index = 0;			/* reinitialize si->cr_array */
-			si->backup_block_saved = 0;
+			si->backup_block_saved = FALSE;
 			for (ks = si->kill_set_head;  ks != NULL;  ks = next_ks)
 			{
 				next_ks = ks->next_kill_set;

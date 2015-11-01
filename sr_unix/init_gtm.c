@@ -46,7 +46,6 @@ GBLREF void		(*unw_prof_frame_ptr)(void);
 GBLREF enum gtmImageTypes	image_type;
 GBLREF mstr			default_sysid;
 GBLDEF boolean_t		gtm_startup_active = FALSE;
-GBLDEF void			(*restart)() = &mum_tstart;
 
 void init_gtm(void)
 {

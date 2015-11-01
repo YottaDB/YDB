@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,14 +23,11 @@
 #include "gtcm_add_region.h"
 #include "relqueopi.h"
 
-GBLREF gd_region	*gv_cur_region;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
+GBLREF	node_local_ptr_t	locknl;
 
 void gtcm_add_region(connection_struct *cnx,cm_region_head *rh)
 {
 	cm_region_list *ptr, *list_head;
-	DEBUG_ONLY(gd_region	*r_save;)
 
 	for (ptr = cnx->region_root; ptr ; ptr = ptr->next)
 		if (ptr->reghead == rh)
@@ -43,9 +40,9 @@ void gtcm_add_region(connection_struct *cnx,cm_region_head *rh)
 		ptr->regnum = cnx->maxregnum++;
 		ptr->reghead = rh;
 		ptr->cs = cnx;
-		DEBUG_ONLY(r_save = gv_cur_region; TP_CHANGE_REG(rh->reg)); /* for LOCK_HIST macro */
+		DEBUG_ONLY(locknl = FILE_INFO(rh->reg)->s_addrs.nl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 		INSQTI(ptr,rh);
-		DEBUG_ONLY(TP_CHANGE_REG(r_save));	/* restore gv_cur_region */
+		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		rh->refcnt++;
 		if (cnx->region_root == 0)
 			cnx->region_root = ptr;

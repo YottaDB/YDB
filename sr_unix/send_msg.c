@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,11 +78,12 @@ va_dcl
 
                         fao_count = fao_actual;
                         if (fao_count > MAX_FAO_PARMS)
-                                fao_count = MAX_FAO_PARMS;
-                }
-                else
-                        fao_actual = fao_count
-                                   = 0;
+			{
+				assert(FALSE);
+				fao_count = MAX_FAO_PARMS;
+			}
+                } else
+                        fao_actual = fao_count = 0;
 
                 util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
 		VAR_COPY(var, last_va_list_ptr);

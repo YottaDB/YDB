@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,12 @@
 #define SCANF          			scanf
 #define SSCANF         			sscanf
 #define SPRINTF       			sprintf
+#ifdef VMS
+int					gtm_snprintf(char *str, size_t size, const char *format, ...);
+#define SNPRINTF       			gtm_snprintf /* hack for VMS, ignore size argument and call sprintf */
+#else
+#define SNPRINTF       			snprintf
+#endif
 #define VFPRINTF       			vfprintf
 #define VPRINTF        			vprintf
 #define VSPRINTF       			vsprintf

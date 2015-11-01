@@ -262,39 +262,70 @@ typedef struct
 	volatile int4   wcsflu_pid;				/* pid of the process executing wcs_flu in BG mode */
 	time_t		creation_date_time;			/* Database's creation time to be compared at sm attach time */
 	boolean_t	remove_shm;				/* can this shm be removed by the last process to rundown */
+	union
+	{
+		gds_file_id	jnl_file_id;  	/* needed on UNIX to hold space */
+		unix_file_id	u;		/* from gdsroot.h even for VMS */
+	} jnl_file;	/* Note that in versions before V4.3-001B, "jnl_file" used to be a member of sgmnt_data.
+			 * Now it is a filler there and rightly used here since it is non-zero only when shared memory is active.
+			 */
 } node_local;
 
 #ifdef DEBUG
-#define CRIT_TRACE(X) {if (csa && csa->nl) {assert(NULL != (node_local_ptr_t)csa->nl); \
-			coidx = ++csa->nl->crit_ops_index; \
-			if (CRIT_OPS_ARRAY_SIZE <= coidx) coidx = csa->nl->crit_ops_index = 0; \
-			csa->nl->crit_ops_array[coidx].call_from = (caddr_t)caller_id(); \
-			csa->nl->crit_ops_array[coidx].epid = process_id; \
-			csa->nl->crit_ops_array[coidx].crit_act = (X);}}
-	/* the above macro does not use a separate semaphore to protect its maintenance of the shared memory value crit_ops_index
-	 * (which would complicate precisely the situation it was created to examine)
-	 * therefore, in order to to maximize the chances of gathering meaningful data,
-	 * it seems better placed after grab_[read_]crit and before rel_[read_]crit,
-	 * but since multiple processes can do grab_read_crit and rel_read_crit simultaneously,
-	 * we will increment the index first and cache it so we can shorten our exposure window.
-	 */
+/* The following macro does not use a separate semaphore to protect its maintenance of the shared memory value crit_ops_index
+ * (which would complicate precisely the situation it was created to examine) therefore, in order to to maximize the chances
+ * of gathering meaningful data, it seems better placed after grab_[read_]crit and before rel_[read_]crit, but since multiple
+ * processes can do grab_read_crit and rel_read_crit simultaneously, we will increment the index first and cache it so we can
+ * shorten our exposure window.
+ */
+#define CRIT_TRACE(X)								\
+{										\
+	int4			coidx;						\
+	node_local_ptr_t	cnl;						\
+										\
+	if (csa && csa->nl)							\
+	{									\
+		cnl = csa->nl;							\
+		assert(NULL != (node_local_ptr_t)cnl);				\
+		coidx = ++cnl->crit_ops_index;					\
+		if (CRIT_OPS_ARRAY_SIZE <= coidx)				\
+			coidx = cnl->crit_ops_index = 0;			\
+		cnl->crit_ops_array[coidx].call_from = (caddr_t)caller_id();	\
+		cnl->crit_ops_array[coidx].epid = process_id;			\
+		cnl->crit_ops_array[coidx].crit_act = (X);			\
+	}									\
+}
+
 /*
  * The following macro places lock history entries in an array for debugging.
- * NOTE: Users of this macro, set gv_cur_region to the region whose history
- * we are storing prior to using this macro.
+ * NOTE: Users of this macro, set either of the following prior to using this macro.
+ * 	 (i) gv_cur_region to the region whose history we are storing.
+ * 	(ii) global variable "locknl" to correspond to the node-local of the region whose history we are storing.
+ * If "locknl" is non-NULL, it is used to store the lock history. If not only then is gv_cur_region used.
  */
-#define LOCK_HIST(OP, LOC, ID, CNT) {int lockidx; \
-			node_local_ptr_t locknl; \
-			assert(NULL != gv_cur_region); \
-			locknl = FILE_INFO(gv_cur_region)->s_addrs.nl; \
-			assert(NULL != locknl); \
-			lockidx = ++locknl->lockhist_idx; \
-			if (LOCKHIST_ARRAY_SIZE <= lockidx) lockidx = locknl->lockhist_idx = 0; \
-			GET_LONGP(&locknl->lockhists[lockidx].lock_op[0], (OP)); \
-			locknl->lockhists[lockidx].lock_addr = (sm_int_ptr_t)(LOC); \
-			locknl->lockhists[lockidx].lock_callr = (caddr_t)caller_id(); \
-			locknl->lockhists[lockidx].lock_pid = (int4)(ID); \
-			locknl->lockhists[lockidx].loop_cnt = (int4)(CNT);}
+#define LOCK_HIST(OP, LOC, ID, CNT)					\
+{									\
+	GBLREF	node_local_ptr_t	locknl;				\
+									\
+	int			lockidx;				\
+	node_local_ptr_t	lcknl;					\
+									\
+	if (NULL == locknl)						\
+	{								\
+		assert(NULL != gv_cur_region);				\
+		lcknl = FILE_INFO(gv_cur_region)->s_addrs.nl;		\
+		assert(NULL != lcknl);					\
+	} else								\
+		lcknl = locknl;						\
+	lockidx = ++lcknl->lockhist_idx;				\
+	if (LOCKHIST_ARRAY_SIZE <= lockidx)				\
+		lockidx = lcknl->lockhist_idx = 0;			\
+	GET_LONGP(&lcknl->lockhists[lockidx].lock_op[0], (OP));		\
+	lcknl->lockhists[lockidx].lock_addr = (sm_int_ptr_t)(LOC);	\
+	lcknl->lockhists[lockidx].lock_callr = (caddr_t)caller_id();	\
+	lcknl->lockhists[lockidx].lock_pid = (int4)(ID);		\
+	lcknl->lockhists[lockidx].loop_cnt = (int4)(CNT);		\
+}
 
 void dump_lockhist(void);
 
@@ -305,7 +336,7 @@ void dump_lockhist(void);
 #define DUMP_LOCKHIST()
 #endif
 
-#define NUM_CRIT_ENTRY		512
+#define NUM_CRIT_ENTRY		1024
 #define CRIT_SPACE		(NUM_CRIT_ENTRY * sizeof(mutex_que_entry) + sizeof(mutex_struct))
 #define NODE_LOCAL_SIZE		(ROUND_UP(sizeof(node_local), OS_PAGE_SIZE))
 #define NODE_LOCAL_SPACE	(ROUND_UP(CRIT_SPACE + NODE_LOCAL_SIZE, OS_PAGE_SIZE))

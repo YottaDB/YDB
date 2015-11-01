@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -141,8 +141,6 @@ void mu_dwngrd_header(sgmnt_data *old_head, v3_sgmnt_data *new_head)
 	DWNGRADE_MEM(ccp_tick_interval);
 	new_head->flu_outstanding = old_head->flu_outstanding;
 	new_head->free_blocks_filler = old_head->free_blocks_filler;
-	memcpy((unsigned char *) (&new_head->jnl_file),
-	       (unsigned char *) (&old_head->jnl_file), sizeof(old_head->jnl_file));
 	new_head->last_rec_backup = old_head->last_rec_backup;
 	DWNGRADE_MEM(ccp_quantum_interval);
 	DWNGRADE_MEM(ccp_response_interval);

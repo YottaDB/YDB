@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,15 +37,15 @@ GBLREF mstr             extnam_str;
 void op_gvquery (mval *v)
 {
 	int4			size;
-	unsigned char		buff[LCL_BUF_SIZE], *end;
+	unsigned char		buff[LCL_BUF_SIZE], *end, *glob_begin;
  	bool			found;
 	enum db_acc_method 	acc_meth;
-	char			*extnamsrc, *extnamdst, *extnamtop;
+	unsigned char		*extnamsrc, *extnamdst, *extnamtop;
 	int			maxlen;
 	char			extnamdelim[] = "^|\"\"|";
 	mval			val;
 
-	/* We want to turn QUERY into QUERYGET for all types of access methods so that we can cache the value of the key returned 
+	/* We want to turn QUERY into QUERYGET for all types of access methods so that we can cache the value of the key returned
 	 * by $QUERY. The value is very likely to be used shortly after $QUERY - Vinaya, Aug 13, 2001 */
 	acc_meth = gv_cur_region->dyn.addr->acc_meth;
 	if (gv_curr_subsc_null)
@@ -56,58 +56,66 @@ void op_gvquery (mval *v)
 		gv_currkey->base[gv_currkey->end++] = 0;
 		gv_currkey->base[gv_currkey->end] = 0;
 	}
-	if (acc_meth == dba_bg || acc_meth == dba_mm)
-	{	if (gv_target->root == 0)	/* global does not exist */
-			found = FALSE;
-		else
-			found = gvcst_query();
-	} else if (acc_meth == dba_cm)
-		found = gvcmx_query(&val); /* val ignored currently - Vinaya Aug 13, 2001*/
-	else
+	switch (acc_meth)
 	{
-		assert(acc_meth == dba_usr);
-		found = gvusr_query(v);
-		s2pool(&v->str);
+		case dba_bg:
+		case dba_mm:
+			found = ((0 != gv_target->root) ? gvcst_query() : FALSE); /* global does not exist if root is 0 */
+			break;
+		case dba_cm:
+			found = gvcmx_query(&val); /* val ignored currently - Vinaya Aug 13, 2001*/
+			break;
+		case dba_usr:
+			found = gvusr_query(v); /* $Q result in v for dba_usr, for others, in gv_altkey */
+			break;
+		default:
+			assert(FALSE); /* why didn't we cover all access methods? */
+			found = FALSE;
+			break;
 	}
-
 	v->mvtype = MV_STR;
-	if (!found)
-		v->str.len = 0;
-	else
-	{	if (acc_meth != dba_usr)
+	if (found)
+	{
+		if (acc_meth != dba_usr)
 		{
 			if ((end = format_targ_key(&buff[0], LCL_BUF_SIZE, gv_altkey, TRUE)) == 0)
 				end = &buff[LCL_BUF_SIZE - 1];
-			size = end - &buff[0];
-			/* you need to return a double-quote for every single-quote. assume worst case. */
-			maxlen = size + (!extnam_str.len ? 0 : ((extnam_str.len * 2) + sizeof(extnamdelim)));
-			if ((stringpool.top - stringpool.free) < maxlen)
-				stp_gcol(maxlen);
-			extnamdst = v->str.addr = (char *)stringpool.free;
-			*extnamdst++ = extnamdelim[0];
-			if (extnam_str.len > 0)
-			{
-				*extnamdst++ = extnamdelim[1];
-				*extnamdst++ = extnamdelim[2];
-				extnamsrc = &extnam_str.addr[0];
-				extnamtop = extnamsrc + extnam_str.len;
-				for ( ; extnamsrc < extnamtop; )
-				{
-					*extnamdst++ = *extnamsrc;
-					if ('"' == *extnamsrc++)	/* caution : pointer increment side-effect */
-						*extnamdst++ = '"';
-				}
-				*extnamdst++ = extnamdelim[3];
-				*extnamdst++ = extnamdelim[4];
-				extnam_str.len = 0;
-			}
-			memcpy(extnamdst, &buff[1], size - 1);
-			v->str.len = extnamdst - v->str.addr + size - 1;
-			stringpool.free += v->str.len;
-	 		assert (v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);
-	 		assert (v->str.addr + v->str.len <= (char *)stringpool.top &&
-				v->str.addr + v->str.len >= (char *)stringpool.base);
+			size = end - &buff[0] - 1; /* exclude ^ */
+			glob_begin = &buff[1]; /* skip ^ */
+		} else
+		{
+			size = v->str.len - 1; /* exclude ^ */
+			glob_begin = v->str.addr + 1; /* skip ^ */
 		}
-	}
+		/* Need to return a double-quote for every single-quote; assume worst case. */
+		/* Account for ^ in both cases - extnam and no extnam */
+		maxlen = size + ((0 == extnam_str.len) ? 1 : ((extnam_str.len * 2) + STR_LIT_LEN(extnamdelim)));
+		if ((stringpool.top - stringpool.free) < maxlen)
+			stp_gcol(maxlen);
+		extnamdst = stringpool.free;
+		*extnamdst++ = extnamdelim[0];
+		if (extnam_str.len > 0)
+		{
+			*extnamdst++ = extnamdelim[1];
+			*extnamdst++ = extnamdelim[2];
+			for (extnamsrc = extnam_str.addr, extnamtop = extnamsrc + extnam_str.len; extnamsrc < extnamtop; )
+			{
+				*extnamdst++ = *extnamsrc;
+				if ('"' == *extnamsrc++)	/* caution : pointer increment side-effect */
+					*extnamdst++ = '"';
+			}
+			*extnamdst++ = extnamdelim[3];
+			*extnamdst++ = extnamdelim[4];
+			extnam_str.len = 0;
+		}
+		memcpy(extnamdst, glob_begin, size);
+		v->str.len = extnamdst - stringpool.free + size;
+		v->str.addr = stringpool.free;
+		stringpool.free += v->str.len;
+		assert (v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);
+		assert (v->str.addr + v->str.len <= (char *)stringpool.top &&
+			v->str.addr + v->str.len >= (char *)stringpool.base);
+	} else /* !found */
+		v->str.len = 0;
 	return;
 }

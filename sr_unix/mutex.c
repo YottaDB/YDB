@@ -50,6 +50,7 @@
 #include "gtmsecshr.h"
 #include "rel_quant.h"
 #include "add_inter.h"
+#include "mutex_deadlock_check.h"
 
 #define QUANT_RETRY			10000
 #define QUEUE_RETRY			255
@@ -152,6 +153,7 @@ void			mutex_salvage(gd_region *reg);
  *		^Note:  only one entry at a time (at the head of the
  *		        waiting process queue) will ever use "super_crit".
  *		        CCP is used in VMS only - 03/11/98
+ *              07-31-2002 se: super-crit is not used at all anymore. Comments are left for historical purposes.
  *
  *		Fields may be interspersed with fillers for alignment purposes.
  */
@@ -397,8 +399,12 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr)
 		 * If I was woken up and am a writer, others are blocking on
 		 * me. So, I shall try to get the lock NOW
 		 */
-		if (wakeup_status && (MUTEX_LOCK_WRITE == mutex_lock_type))
-			return (cdb_sc_normal);
+		if (wakeup_status)
+		{
+			if (MUTEX_LOCK_WRITE == mutex_lock_type)
+				return (cdb_sc_normal);
+		} else
+			mutex_deadlock_check(addr);	/* Timed out: See if any deadlocks and fix if detected */
 		status = mutex_wakeup(addr); /* Timed out or reader. In case
 					      * of reader this causes
 					      * accelerated wakeup of readers
@@ -419,7 +425,6 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr)
 static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa)
 {
 	/* Insert this process at the tail of the wait queue and hibernate */
-	void			rel_quant();
 	mutex_struct_ptr_t	addr;
 	mutex_que_entry_ptr_t	free_slot;
 	int			redo_cntr;
@@ -554,7 +559,6 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa)
 
 static	enum cdb_sc mutex_wakeup(mutex_struct_ptr_t addr)
 {
-	void			rel_quant();
 	mutex_que_entry_ptr_t	free_entry;
 	int			queue_retry_counter_remq,
 				quant_retry_counter_remq,

@@ -92,7 +92,6 @@ GBLREF jnlpool_addrs		jnlpool;
 GBLREF jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
 GBLREF uint4			cumul_jnl_rec_len;
 GBLREF bool			is_standalone;
-GBLREF bool			is_db_updater, run_time;
 GBLREF boolean_t		is_updproc;
 GBLREF seq_num			seq_num_one;
 GBLREF boolean_t		mu_reorg_process;
@@ -104,11 +103,12 @@ GBLREF uint4			gbl_jrec_time;	/* see comment in gbldefs.c for usage */
 GBLREF seq_num			max_resync_seqno;
 GBLREF boolean_t 		kip_incremented;
 GBLREF boolean_t		need_kip_incr;
+GBLREF boolean_t		write_after_image;
+GBLREF boolean_t		is_replicator;
+
 DEBUG_ONLY(GBLREF uint4		cumul_index;
 	   GBLREF uint4		cu_jnl_index;
 	  )
-
-GBLREF boolean_t		write_after_image;
 
 /* This macro isn't enclosed in parantheses to allow for optimizations */
 #define VALIDATE_CYCLE(history)						\
@@ -484,8 +484,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 			}
 			if (cdb_sc_normal == status)
 			{
-				if (REPL_ENABLED(csa) && cw_depth && (run_time || is_db_updater)
-								&& inctn_invalid_op == inctn_opcode)
+				if (REPL_ENABLED(csa) && cw_depth && is_replicator && (inctn_invalid_op == inctn_opcode))
 				{
 					grab_lock(jnlpool.jnlpool_dummy_reg);
 					QWASSIGN(temp_jnlpool_ctl->write_addr, jnlpool_ctl->write_addr);
@@ -657,8 +656,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					if (!(csa->ti->curr_tn & (HEADER_UPDATE_COUNT-1)))
 						fileheader_sync(gv_cur_region);
 				}
-				if (REPL_ENABLED(csa) && cw_depth && (run_time || is_db_updater)
-						&& inctn_invalid_op == inctn_opcode)
+				if (REPL_ENABLED(csa) && cw_depth && is_replicator && (inctn_invalid_op == inctn_opcode))
 				{
 					assert(QWGT(jnlpool_ctl->early_write_addr, jnlpool_ctl->write_addr));
 					QWINCRBY(temp_jnlpool_ctl->jnl_seqno, seq_num_one);

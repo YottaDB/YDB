@@ -180,7 +180,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			if (MAX_ZFF_LEN >= (zff_len = (int4)(unsigned char)*(pp->str.addr + p_offset)))
 				memcpy(zff_buffer, (char *)(pp->str.addr + p_offset + 1), zff_len);
 			else
-				rts_error(VARLSTCNT(1) ERR_ZFF2MANY, zff_len, MAX_ZFF_LEN);
+				rts_error(VARLSTCNT(4) ERR_ZFF2MANY, 2, zff_len, MAX_ZFF_LEN);
 			break;
 		case	iop_znoff:
 			zff_len = 0;

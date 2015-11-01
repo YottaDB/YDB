@@ -261,7 +261,11 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZBITSET, ALL_SYS }
 	,{ OC_FNZBITSTR, ALL_SYS }
 	,{ OC_FNZBITXOR, ALL_SYS }
+#ifdef __sun
+	,{ OC_FNZCALL,UNIX_OS}, { OC_FNZCALL,UNIX_OS}
+#else
 	,{ OC_FNZCALL, VMS_OS }, { OC_FNZCALL, VMS_OS }
+#endif
 	,{ OC_FNZDATE, ALL_SYS }, { OC_FNZDATE, ALL_SYS }
         ,{ OC_FNCHAR, ALL_SYS }
 	,{ OC_FNZFILE, VMS_OS }, { OC_FNZFILE, VMS_OS }

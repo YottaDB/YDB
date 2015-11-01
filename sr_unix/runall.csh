@@ -158,6 +158,9 @@ lke lke
 lke_cmd lke
 geteuid geteuid
 gtm mumps
+gtm_svc gtm_svc
+gtm_dal_svc gtm_svc
+gtm_rpc_init gtm_svc
 daemon gtm_dmna
 gtmsecshr gtmsecshr
 mumps_clitab
@@ -300,6 +303,7 @@ echo ""
 echo "****************************** COMPILING *********************************"
 echo ""
 
+
 foreach file (`cat ${TMP_DIR}_src_files`)
 	set file = $file:t
 	set ext = $file:e
@@ -351,6 +355,11 @@ foreach file (`cat ${TMP_DIR}_src_files`)
 		set library=`grep " $file " ${TMP_DIR}_list | awk '{print $1}'`
 		if ("$library" == "") then
 			set library="libmumps.a"
+		else 
+			set retain=`grep "^$file" $gtm_tools/retain_list.txt`
+			if ("$retain" != "") then
+				echo $objfile >> ${TMP_DIR}_lib_.libmumps.a
+			endif
 		endif
 		echo $objfile >> ${TMP_DIR}_lib_.$library
 	else

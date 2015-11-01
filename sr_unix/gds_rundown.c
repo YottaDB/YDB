@@ -223,6 +223,7 @@ void gds_rundown(void)
 		if (-1 == status)			/* We couldn't get it in one shot -- see if we already have it */
 		{
 			save_errno = errno;
+			/* see comment about Linux specific difference in behaviour of semctl() with GETPID in gds_rundown_ch() */
 			if (semctl(udi->semid, 0, GETPID) == process_id)
 			{
 				send_msg(VARLSTCNT(5) MAKE_MSG_INFO(ERR_CRITSEMFAIL), 2,
@@ -356,7 +357,7 @@ void gds_rundown(void)
                                 assert(FALSE);
                                 compswap(&csa->jnl->jnl_buff->io_in_prog_latch, process_id, LOCK_AVAILABLE);
                         }
-			if ((0 != csd->jnl_file.u.inode) && (NOJNL != csa->jnl->channel || we_are_last_writer))
+			if ((0 != csa->nl->jnl_file.u.inode) && (NOJNL != csa->jnl->channel || we_are_last_writer))
 			/* If a file has actually been opened .. */
 			{
 				grab_crit(reg);
@@ -571,7 +572,15 @@ CONDITION_HANDLER(gds_rundown_ch)
 				csa->now_crit = FALSE;
 		}
 		sem_pid = semctl(udi->semid, 0, GETPID);
+#ifndef __linux__
+		/* On non Linux platforms, semctl with GETPID argument returns the process_id of the last process to have
+		 * successfully completed a semop() system call. But on Linux it seems to return the process_id of the last
+		 * process to have attempted a semop() system call, be it successful or not. Hence, we cannot rely on the
+		 * fact that the return value will be "process_id" if we did the last semop - other concurrent processes
+		 * might have failed to acquire the semaphore after we succeeded.
+		 */
 		assert(sem_pid == process_id);
+#endif
 		if (0 != (semop_res = do_semop(udi->semid, 0, -1, SEM_UNDO | IPC_NOWAIT)))
 			gtm_putmsg(VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(gv_cur_region),
 					  ERR_TEXT, 2, RTS_ERROR_TEXT("Error releasing access semaphore"), semop_res);

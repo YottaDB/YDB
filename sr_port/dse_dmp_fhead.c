@@ -88,10 +88,10 @@ void dse_dmp_fhead (void)
         jnl_state = (uint4)cs_addrs->hdr->jnl_state;
 	VMS_ONLY(
 		memset(&zero_fid, 0, sizeof(zero_fid));
-		jnl_buff_open = (0 != memcmp(cs_addrs->hdr->jnl_file.jnl_file_id.fid, zero_fid.fid, sizeof(zero_fid.fid)));
+		jnl_buff_open = (0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid.fid, sizeof(zero_fid.fid)));
 	)
 	UNIX_ONLY(
-		jnl_buff_open = (0 != cs_addrs->hdr->jnl_file.u.inode);
+		jnl_buff_open = (0 != cs_addrs->nl->jnl_file.u.inode);
 	)
 	if (CLI_NEGATED != cli_present("BASIC"))
 	{

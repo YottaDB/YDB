@@ -48,7 +48,8 @@ if ( $#setactive_parms >= 2 ) then
 	set setactive_p2 = $setactive_parms[2]
 endif
 
-set setactive_setenv = "/tmp/setactive.$$.setenv"
+set setactive_setenv = "/tmp/setactive.${USER}_$$.setenv"
+if (-e $setactive_setenv) \rm -f $setactive_setenv
 
 
 if ( $?prompt == "1" ) then

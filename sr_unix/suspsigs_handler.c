@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
 #include "error.h"
 #include "gtmsiginfo.h"
 #include "gtmimagename.h"
-#include "have_crit_any_region.h"
+#include "have_crit.h"
 #include "suspsigs_handler.h"
 
 GBLREF	volatile int		suspend_status;
@@ -41,7 +41,7 @@ void suspsigs_handler(int sig, siginfo_t* info, void *context)
 			/* Terminal access while running in the background */
 			if (GTMSECSHR_IMAGE != image_type) /* Ignore signal if gtmsecshr */
 			{
-				if (EXIT_NOTPENDING < exit_state || have_crit_any_region(TRUE))
+				if (EXIT_NOTPENDING < exit_state || 0 != have_crit(CRIT_HAVE_ANY_REG))
 				{
 					 /* Let the process run in the foreground till it finishes the terminal I/O */
 					if (EXIT_NOTPENDING == exit_state)
@@ -66,7 +66,7 @@ void suspsigs_handler(int sig, siginfo_t* info, void *context)
 			{
 				if (EXIT_NOTPENDING == exit_state) /* not processing other signals */
 				{
-					if (have_crit_any_region(TRUE))
+					if (0 != have_crit(CRIT_IN_COMMIT))
 					{
 						suspend_status = DEFER_SUSPEND;
 						break;

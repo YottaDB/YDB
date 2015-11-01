@@ -53,7 +53,7 @@
 #include "send_msg.h"
 #include "generic_signal_handler.h"
 #include "gtmmsg.h"
-#include "have_crit_any_region.h"
+#include "have_crit.h"
 #include "trans_log_name.h"
 #include "sig_init.h"
 #include "gtmio.h"
@@ -121,9 +121,9 @@ void clean_client_sockets(char *path)
 }
 
 /* For gtmsecshr, override this routine since crit doesn't exist here */
-boolean_t have_crit_any_region(boolean_t in_commit)
+uint4 have_crit(uint4 crit_state)
 {
-	return FALSE;
+	return 0;
 }
 /* For gtmsecshr, override this routine so no fork is done */
 void gtm_fork_n_core(void)

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -43,7 +43,7 @@ gt_cc_compiler=gcc
 #	   _XOPEN_SOURCE=500 should probably define POSIX 199309 and/or
 #		POSIX 199506 but doesnt so...
 # Linux gcc optimizations cause problems so do without them for now.
-gt_cc_options_common=-c -ansi -Wimplicit -Wmissing-prototypes -DFULLBLOCKWRITES -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
+gt_cc_options_common=-c -ansi -Wimplicit -Wmissing-prototypes -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
 ifeq ($(strip $(patsubst 2.2.%, 2.2, $(shell uname -r))), 2.2)
 gt_cc_options_common:=$(gt_cc_options_common) -DNeedInAddrPort
 endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,11 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
 #include "gtm_time.h"
 #include "gtm_string.h"
 #include "gtm_unistd.h"
+
 #include <netinet/in.h> /* Required for gtmsource.h */
 #include <arpa/inet.h>
 #ifdef VMS
@@ -31,7 +33,6 @@
 #include "gtmsource.h"
 #include "repl_dbg.h"
 #include "repl_log.h"
-#include "gtm_stdio.h"
 #include "iosp.h"
 #include "repl_shutdcode.h"
 #include "gtmsource_heartbeat.h"
@@ -39,6 +40,10 @@
 #include "repl_filter.h"
 #include "util.h"
 #include "repl_comm.h"
+#include "eintr_wrappers.h"
+#ifdef UNIX
+#include "gtmio.h"
+#endif
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	int			gtmsource_sock_fd;
@@ -60,6 +65,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	char			seq_num_str[32], *seq_num_ptr;
 	char			*time_ptr;
 	char			time_str[CTIME_BEFORE_NL + 1];
+	int			status;
 
 	gtmsource_local = jnlpool.gtmsource_local;
 	if (SHUTDOWN == gtmsource_local->shutdown)
@@ -110,7 +116,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, NULL, gtmsource_local->log_file, NULL);
 		repl_log_fd2fp(&gtmsource_log_fp, gtmsource_log_fd);
 #elif defined(VMS)
-		util_log_open(STR_AND_LEN(gtmsource_local));
+		util_log_open(STR_AND_LEN(gtmsource_local->log_file));
 #else
 #error unsupported platform
 #endif
@@ -124,16 +130,28 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 			      gtmsource_local->statslog_file);
 		repl_log_fd2fp(&gtmsource_statslog_fp, gtmsource_statslog_fd);
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Starting stats log to %s\n", gtmsource_local->statslog_file);
+		repl_log(gtmsource_statslog_fp, TRUE, TRUE, "Begin statistics logging\n");
 #else
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Stats logging tobe done on VMS\n", gtmsource_local->statslog_file);
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Stats logging not supported on VMS\n");
 #endif
 
 	} else if (gtmsource_logstats && !gtmsource_local->statslog)
 	{
 		gtmsource_logstats = FALSE;
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Stopping stats log\n");
-		close(gtmsource_statslog_fd);
+		/* Force all data out to the file before closing the file */
+		repl_log(gtmsource_statslog_fp, TRUE, TRUE, "End statistics logging\n");
+		UNIX_ONLY(CLOSEFILE(gtmsource_statslog_fd, status);) VMS_ONLY(close(gtmsource_statslog_fd);)
 		gtmsource_statslog_fd = -1;
+		/* We need to FCLOSE because a later open() in repl_log_init() might return the same file descriptor as the one
+		 * that we just closed. In that case, FCLOSE done in repl_log_fd2fp() affects the newly opened file and
+		 * FDOPEN will fail returning NULL for the file pointer. So, we close both the file descriptor and file pointer.
+		 * Note the same problem does not occur with GENERAL LOG because the current log is kept open while opening
+		 * the new log and hence the new file descriptor will be different (we keep the old log file open in case there
+		 * are errors during DUPing. In such a case, we do not switch the log file, but keep the current one).
+		 * We can FCLOSE the old file pointer later in repl_log_fd2fp() */
+		FCLOSE(gtmsource_statslog_fp, status);
+		gtmsource_statslog_fp = NULL;
 	}
 	if ((gtmsource_filter & EXTERNAL_FILTER) && ('\0' == gtmsource_local->filter_cmd[0]))
 	{

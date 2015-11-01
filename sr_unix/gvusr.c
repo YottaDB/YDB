@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "gvusr.h"
+#include "gvusr_queryget.h"
 
 /* this module is just a set of stubs */
 
@@ -70,12 +71,17 @@ void gvusr_put(mval *v)
 }
 
 
-int gvusr_lock(int lock_len, unsigned char *lock_key, gd_region *reg)
+int gvusr_lock(uint4 lock_len, unsigned char *lock_key, gd_region *reg)
 {	/* 0 indicates successful lock */
 	return TRUE;
 }
 
-void gvusr_unlock(int lock_len, unsigned char *lock_key, gd_region *reg)
+void gvusr_unlock(uint4 lock_len, unsigned char *lock_key, gd_region *reg)
 {
 	return;
+}
+
+boolean_t gvusr_queryget(mval *v)
+{
+	return 1;
 }

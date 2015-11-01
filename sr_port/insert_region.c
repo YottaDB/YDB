@@ -50,9 +50,14 @@
 #include "dbfilop.h"
 #include "gtmmsg.h"
 #include "is_file_identical.h"
+#include "tp_grab_crit.h"
+#include "t_retry.h"
 
 GBLREF	tp_region	*rlist;
 GBLREF	gd_region	*gv_cur_region;
+GBLREF	bool		run_time;
+GBLREF	short		dollar_tlevel;
+GBLREF	unsigned int	t_tries;
 
 tp_region	*insert_region(	gd_region	*reg,
 		   		tp_region	**reg_list,
@@ -69,6 +74,7 @@ tp_region	*insert_region(	gd_region	*reg,
 #endif
 
 	assert(size >= sizeof(tp_region));
+	assert(!run_time || dollar_tlevel);
 #if defined(VMS)
 	local_id_fiptr = &local_id.file_id[0];
 	temp_reg = gv_cur_region;
@@ -123,7 +129,11 @@ tp_region	*insert_region(	gd_region	*reg,
 	for (tr = *reg_list, tr_last = NULL; NULL != tr; tr = tr->fPtr)
 	{
 		if (reg == tr->reg)			/* Region is found */
+		{	/* assert we are not in final retry or we are in TP and have crit on the region already */
+			assert((CDB_STAGNATE > t_tries)
+				|| ((0 < dollar_tlevel) && reg->open && (&FILE_INFO(reg)->s_addrs)->now_crit));
 			return tr;
+		}
 		VMS_ONLY(if (0 < memcmp(&(tr->file_id), local_id_fiptr, sizeof(gd_id))))
 		UNIX_ONLY(if (0 < gdid_cmp(&(tr->file_id), &(local_id.uid))))
 			break;				/* .. we have found our insertion point */
@@ -133,8 +143,7 @@ tp_region	*insert_region(	gd_region	*reg,
 	{
 		tr_new = *reg_free_list;		/* Get element */
 		*reg_free_list = tr_new->fPtr;		/* Remove from queue */
-	}
-	else						/* get a new one */
+	} else						/* get a new one */
 	{
 		tr_new = (tp_region *)malloc(size);
 		if (size > sizeof(tp_region))
@@ -151,6 +160,19 @@ tp_region	*insert_region(	gd_region	*reg,
 	{	/* Insert into list */
 		tr_new->fPtr = tr_last->fPtr;
 		tr_last->fPtr = tr_new;
+	}
+	if ((CDB_STAGNATE <= t_tries) && (0 < dollar_tlevel) && reg->open && !(&FILE_INFO(reg)->s_addrs)->now_crit)
+	{	/* Final retry in TP and this region not locked down. Get crit on it if it is open.
+		 * reg->open needs to be checked above to take care of the case where we do an insert_region() from gvcst_init()
+		 * 	in the 3rd retry in TP when we have not yet opened the region. In case region is not open,
+		 * 	tp_restart() (invoked through t_retry from gvcst_init) will open "reg" as well as get crit on it for us.
+		 */
+		if (FALSE == tp_grab_crit(reg))		/* Attempt lockdown now */
+		{
+			t_retry(cdb_sc_needcrit);	/* avoid deadlock -- restart transaction */
+			assert(FALSE);			/* should not come here as t_retry() does not return */
+		}
+		assert((&FILE_INFO(reg)->s_addrs)->now_crit);	/* ensure we have crit now */
 	}
 	return tr_new;
 }

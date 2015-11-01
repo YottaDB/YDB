@@ -76,7 +76,7 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	assert(csa->now_crit);
 	assert(jpc->region == gv_cur_region);
 	if (!JNL_ENABLED(csa) || (NOJNL == jpc->channel)
-		|| !is_gdid_gdid_identical(&csa->jnl->fileid, &csd->jnl_file.u))
+		|| !is_gdid_gdid_identical(&csa->jnl->fileid, &csa->nl->jnl_file.u))
 			GTMASSERT;	/* crit and messing with the journal file - how could it have vanished? */
 	if (!csd->jnl_deq)
 	{
@@ -120,7 +120,7 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			jnl_info.prev_jnl = &prev_jnl_fn[0];
 			set_jnl_info(gv_cur_region, &jnl_info);
 			assert((JNL_ENABLED(csa) && (NOJNL != jpc->channel)
-				&& is_gdid_gdid_identical(&csa->jnl->fileid, &csd->jnl_file.u)));
+				&& is_gdid_gdid_identical(&csa->jnl->fileid, &csa->nl->jnl_file.u)));
 			jnl_status = jnl_ensure_open();
 			if (0 == jnl_status)
 			{
@@ -128,7 +128,7 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				jnl_file_close(gv_cur_region, TRUE, TRUE);
 			} else
 				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
-			if (0 == cre_jnl_file(&jnl_info))
+			if (EXIT_NRM == cre_jnl_file(&jnl_info))
 			{
 				assert(0 == memcmp(csd->jnl_file_name, jnl_info.jnl, jnl_info.jnl_len));
 				assert(csd->jnl_file_name[jnl_info.jnl_len] == '\0');
@@ -174,7 +174,7 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			/* do type cast to off_t below to take care of 32-bit overflows due to multiplication by DISK_BLOCK_SIZE */
 			LSEEKWRITE(jpc->channel, (((off_t)jb->filesize) - 1) * DISK_BLOCK_SIZE,
 							zero_disk_block, DISK_BLOCK_SIZE, status);
-			if (0 != status)
+			if (SS_NORMAL != status)
 			{
 				new_blocks = -1;
 				jpc->status = status;

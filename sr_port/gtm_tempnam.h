@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +9,16 @@
  *								*
  ****************************************************************/
 
-#ifndef MUPIP_PUT_GVSUBSC_INCLUDED
-#define MUPIP_PUT_GVSUBSC_INCLUDED
+#ifndef __GTM_TEMPNAM_H__
+#define __GTM_TEMPNAM_H__
 
-void mupip_put_gvsubsc(char *cp, int len, boolean_t call_gvfunc);
+void gtm_tempnam(char *dir, char *prefix, char *fullname);
 
-#endif /* MUPIP_PUT_GVSUBSC_INCLUDED */
+#if defined(UNIX)
+# define SCRATCH_DIR "/tmp/"
+#elif defined(VMS)
+# define SCRATCH_DIR "SYS$SCRATCH:"
+#else
+# error Unsupported Platform
+#endif
+#endif

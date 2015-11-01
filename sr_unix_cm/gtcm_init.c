@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,24 +50,24 @@
 static char rcsid[] = "$Header:$";
 #endif
 
-GBLREF int				errno;
-GBLREF short 				gtcm_ast_avail;
-GBLREF bool				licensed;
-GBLREF int				omi_pid;
-GBLREF int4				omi_errno;
-GBLREF int				history;
-GBLREF pattern          		*pattern_list;
-GBLREF pattern          		*curr_pattern;
-GBLREF pattern          		mumps_pattern;
-GBLREF uint4    			*pattern_typemask;
-GBLREF bool				is_db_updater;
-GBLREF enum gtmImageTypes 		image_type;
-GBLREF spdesc       			rts_stringpool, stringpool;
-GBLREF unsigned char 			cw_set_depth;
-GBLREF cw_set_element 			cw_set[];
-GBLREF uint4 				process_id;
-GBLREF jnlpool_addrs 			jnlpool;
-GBLREF bool 				certify_all_blocks;
+GBLREF int			errno;
+GBLREF short 			gtcm_ast_avail;
+GBLREF bool			licensed;
+GBLREF int			omi_pid;
+GBLREF int4			omi_errno;
+GBLREF int			history;
+GBLREF pattern          	*pattern_list;
+GBLREF pattern          	*curr_pattern;
+GBLREF pattern          	mumps_pattern;
+GBLREF uint4    		*pattern_typemask;
+GBLREF enum gtmImageTypes 	image_type;
+GBLREF spdesc       		rts_stringpool, stringpool;
+GBLREF unsigned char 		cw_set_depth;
+GBLREF cw_set_element 		cw_set[];
+GBLREF uint4 			process_id;
+GBLREF jnlpool_addrs 		jnlpool;
+GBLREF bool 			certify_all_blocks;
+GBLREF boolean_t		is_replicator;
 
 /* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
  * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is
@@ -86,7 +86,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 
 	/*  Disassociate from the rest of the universe */
 	get_page_size();
-	is_db_updater = TRUE; /* it is necessary to initialize is_db_updater for running replication */
+	is_replicator = TRUE;	/* as GT.CM OMI goes through t_end() and can write jnl records to the jnlpool for replicated db */
 	image_type = GTCM_SERVER_IMAGE;
 
 	if (NULL != getenv("GTCM_GDSCERT"))

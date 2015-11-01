@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ GBLREF gd_addr			*original_header;
 #define MAX_UTIL_LEN 80
 void dse_crit(void)
 {
-	int			util_len, crit_count;
+	int			util_len, dse_crit_count;
 	char			util_buff[MAX_UTIL_LEN];
 	boolean_t		crash = FALSE, cycle = FALSE, owner = FALSE;
 	gd_region		*save_region, *r_local, *r_top;
@@ -139,7 +139,7 @@ void dse_crit(void)
 	}
 	if (cli_present("ALL") == CLI_PRESENT)
 	{
-		crit_count = 0;
+		dse_crit_count = 0;
 		save_region = gv_cur_region;
 		for (r_local = original_header->regions, r_top = r_local + original_header->n_regions; r_local < r_top; r_local++)
 		{
@@ -149,14 +149,14 @@ void dse_crit(void)
 			tp_change_reg();
 			if (cs_addrs->nl->in_crit)
 			{
-				crit_count++;
+				dse_crit_count++;
 				UNIX_ONLY(util_out_print("Database !AD : CRIT Owned by pid [!UL]", TRUE,
 						DB_LEN_STR(gv_cur_region), cs_addrs->nl->in_crit);)
 				VMS_ONLY(util_out_print("Database !AD : CRIT owned by pid [0x!XL]", TRUE,
 						DB_LEN_STR(gv_cur_region), cs_addrs->nl->in_crit);)
 			}
 		}
-		if (0 == crit_count)
+		if (0 == dse_crit_count)
 			util_out_print("CRIT is currently unowned on all regions", TRUE);
 		gv_cur_region = save_region;
 		tp_change_reg();

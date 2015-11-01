@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,6 @@
 #endif
 #define INSERT			TRUE
 #define NO_INSERT		FALSE
-#define MAX_TRANS_NAME_LEN	257
 #define IO_SEQ_WRT		1
 #define IO_RD_ONLY		2
 #define ESC_LEN			16

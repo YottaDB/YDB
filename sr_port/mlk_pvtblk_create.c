@@ -82,9 +82,14 @@ void	mlk_pvtblk_create (va_list subptr)
 	subcnt = va_arg(subptr, int);
 	assert (subcnt >= 2);
 
-	extgbl1 = va_arg(subptr, mval *);
+	extgbl1 = va_arg(subptr, mval *); /* compiler gives us this argument always, even if the nref is not an extended ref */
 	subcnt--;
-	if (extgbl1)
+	if (NULL == extgbl1)
+	{ /* not an extended reference */
+		if (!gd_header)
+			gvinit();
+		gld = gd_header;
+	} else
 	{
 		MV_FORCE_STR(extgbl1);
 		extgbl2 = va_arg(subptr, mval *);
@@ -94,11 +99,11 @@ void	mlk_pvtblk_create (va_list subptr)
 			gld = zgbldir(extgbl1);
 		else
 		{
-			assert(gd_header);
+			if (!gd_header)
+				gvinit();
 			gld = gd_header;
 		}
-	} else
-		gld = gd_header;
+	}
 
 	VAR_COPY(mp, subptr);
 	mp_temp = va_arg(mp, mval *);

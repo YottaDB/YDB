@@ -52,7 +52,7 @@ if ( $?gtm_version_change == "1" ) then
 
 #	setenv	gt_cc_options_common	"-c -ansi -D_XOPEN_SOURCE=500 -D_BSD_SOURCE -D_POSIX_C_SOURCE=199506L -D_FILE_OFFSET_BITS=64 -DFULLBLOCKWRITES -fsigned-char"
 #	_GNU_SOURCE includes _XOPEN_SOURCE=400, _BSD_SOURCE, and _POSIX_C_SOURCE-199506L among others
-	setenv	gt_cc_options_common	"-c -ansi -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DFULLBLOCKWRITES -fsigned-char"
+	setenv	gt_cc_options_common	"-c -ansi -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -fsigned-char"
 	setenv gt_cc_options_common "$gt_cc_options_common -Wimplicit -Wmissing-prototypes"
         set lversion=`uname -r`
         set ltemp_ver=`echo $lversion | sed 's/./& /g'`

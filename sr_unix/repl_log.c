@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,7 @@ int repl_log(FILE *fp, boolean_t stamptime, boolean_t flush, char *fmt, ...)
 	char    *time_ptr;
 	char	fmt_str[BUFSIZ];
 
+	assert(NULL != fp);
 	if (stamptime)
 	{
 		GET_CUR_TIME;

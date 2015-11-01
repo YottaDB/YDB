@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,8 @@ void gvname_env_save(gvname_info *  curr_gvname_info)
 	DEBUG_ONLY(is_bg_or_mm = (dba_mm == gv_cur_region->dyn.addr->acc_meth || dba_bg == gv_cur_region->dyn.addr->acc_meth);)
 	curr_gvname_info->s_gv_target = gv_target;
 	curr_gvname_info->s_gv_cur_region = gv_cur_region;
-	assert((is_bg_or_mm && cs_addrs->hdr == cs_data) || (dba_cm == gv_cur_region->dyn.addr->acc_meth));
+	assert((is_bg_or_mm && cs_addrs->hdr == cs_data) || dba_cm == gv_cur_region->dyn.addr->acc_meth ||
+		dba_usr == gv_cur_region->dyn.addr->acc_meth);
 	curr_gvname_info->s_cs_addrs = cs_addrs;
 	assert(gv_currkey->top <= curr_gvname_info->s_gv_currkey->top);
 	curr_gvname_info->s_gv_currkey->end = gv_currkey->end;
@@ -50,5 +51,5 @@ void gvname_env_save(gvname_info *  curr_gvname_info)
 	memcpy(curr_gvname_info->s_gv_currkey->base, gv_currkey->base, gv_currkey->end + 1);
 	curr_gvname_info->s_sgm_info_ptr = sgm_info_ptr;
 	assert((is_bg_or_mm && ((dollar_tlevel && sgm_info_ptr) || (!dollar_tlevel && !sgm_info_ptr))) ||
-	       dba_cm == gv_cur_region->dyn.addr->acc_meth);
+	       dba_cm == gv_cur_region->dyn.addr->acc_meth || dba_usr == gv_cur_region->dyn.addr->acc_meth);
 }

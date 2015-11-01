@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,14 +60,14 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 			if (MAX_FSYNC_WAIT_CNT == lcnt / 2)	/* half way into max.patience*/
 			{
 				saved_status = jpc->status;
-				jpc->status = 0;
+				jpc->status = SS_NORMAL;
 				jnl_send_oper(jpc, ERR_JNLFSYNCLSTCK);
 				jpc->status = saved_status ;
 			}
 			if (MAX_FSYNC_WAIT_CNT == lcnt)	/* tried a long */
 			{
 				saved_status = jpc->status;
-				jpc->status = 0;
+				jpc->status = SS_NORMAL;
 				jnl_send_oper(jpc, ERR_JNLFSYNCLSTCK);
 				jpc->status = saved_status ;
 				send_msg(VARLSTCNT(4) ERR_FSYNCTIMOUT, 2, jpc->region->jnl_file_len,

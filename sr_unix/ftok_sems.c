@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -160,7 +160,7 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 				return FALSE;
 			}
 			if (EAGAIN == save_errno)	/* Someone else is holding it */
-			{
+			{	/* see note on Linux specific difference in behaviour of semctl() with GETPID in gds_rundown_ch() */
 				sem_pid = semctl(udi->ftok_semid, 0, GETPID);
 				if (-1 == sem_pid)
 				{
@@ -207,8 +207,8 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 		{
 			save_errno = errno;
 			if (EINTR == save_errno && semwt2long)
-			{
-				/* Timer popped */
+			{	/* Timer popped */
+				/* see note on Linux specific difference in behaviour of semctl() with GETPID in gds_rundown_ch() */
 				sem_pid = semctl(udi->ftok_semid, 0, GETPID);
 				if (-1 != sem_pid)
 				{
@@ -290,6 +290,7 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 	if (-1 == status)	/* We couldn't get it in one shot -- see if we already have it */
 	{
 		save_errno = errno;
+		/* see note on Linux specific difference in behaviour of semctl() with GETPID in gds_rundown_ch() */
 		if (semctl(udi->ftok_semid, 0, GETPID) == process_id)
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));

@@ -29,7 +29,6 @@
 #include "error.h"
 #include "rtnhdr.h"
 #include "stack_frame.h"
-#include "stringpool.h"
 #include "subscript.h"
 #include "svnames.h"
 #include "mprof.h"
@@ -38,12 +37,12 @@
 #include "op.h"
 #include "callg.h"
 #include "gtmmsg.h"
+#include "str2gvargs.h"
 
 GBLREF	int			(*xfer_table[])();
 GBLREF 	boolean_t		is_tracing_on;
 GBLREF 	stack_frame		*frame_pointer;
 GBLREF 	unsigned char 		*profstack_base, *profstack_top, *prof_msp, *profstack_warn;
-GBLREF 	spdesc 			stringpool;
 GBLREF 	unsigned char 		*prof_stackptr;
 GBLREF 	stack_frame_prof 	*prof_fp;
 GBLREF 	mval			dollar_job;
@@ -72,11 +71,7 @@ static char			**pcavailptr, **pcavailbase;
 static int			pcavail;
 static boolean_t		is_tracing_ini;
 static mval			subsc[MAX_GVSUBSCRIPTS];
-static struct
-{
-	int4	count;
-	mval	*args[MAX_GVSUBSCRIPTS + 1];
-} op_gvargs;
+static gvargs_t			gvargs;
 static mval			gbl_to_fill;
 static int			overflowed_levels;
 
@@ -111,7 +106,7 @@ void	turn_tracing_on(mval *gvn)
 		gtm_putmsg(VARLSTCNT(1) ERR_TRACINGON);
 		return;
 	}
-	if (!gvn->str.len || '^' != *(signed char *)&gvn->str.addr[0])
+	if (0 == gvn->str.len || '^' != gvn->str.addr[0])
 		rts_error(VARLSTCNT(4) ERR_NOTGBL, 2, gvn->str.len, gvn->str.addr);
 	parse_gvn(gvn);
 	memcpy(&gbl_to_fill, gvn, sizeof(gbl_to_fill));
@@ -443,7 +438,6 @@ void unw_prof_frame (void)
 		t = mprof_tree_insert(head_tblnd, e);
 		/*update count and timing (from prof_fp) of frame I'm leaving*/
 		t->e.count++;
-		assert(prof_fp->sys_time >= 0 && prof_fp->usr_time >= 0);
 		t->e.sys_time += prof_fp->sys_time;
 		t->e.usr_time += prof_fp->usr_time;
 		if (prof_fp->prev)
@@ -509,14 +503,14 @@ void	crt_gbl(struct mprof_tree *p, int info_level)
 
 	if (0 == p->e.count)
 		return;
-	count = op_gvargs.count;
+	count = gvargs.count;
 	spt = &subsc[count];
 	/* Global name --> ^PREFIX(<OPTIONAL ARGUMENTS>, "rout-name", "label-name", "line-num", "forloop") */
 	spt->mvtype = MV_STR;
 	spt->str.len = strlen((char *)p->e.rout_name);
 	spt->str.addr = (char *)pcalloc(spt->str.len+1);
 	memcpy(spt->str.addr, p->e.rout_name, strlen((char *)p->e.rout_name));
-	op_gvargs.args[count++] = spt++;
+	gvargs.args[count++] = spt++;
 	spt->mvtype = MV_STR;
 	if (p->e.label_name[0] != '\0')
 	{
@@ -530,14 +524,14 @@ void	crt_gbl(struct mprof_tree *p, int info_level)
 		spt->str.addr = (char *)pcalloc(sizeof(MPROF_NULL_LABEL));
 		memcpy(spt->str.addr, MPROF_NULL_LABEL, spt->str.len);
 	}
-	op_gvargs.args[count++] = spt++;
+	gvargs.args[count++] = spt++;
 	spt->mvtype = MV_STR;
 	spt->str.len = strlen((char *)p->e.line_num);
 	if (strcmp((char *)p->e.line_num, "*dlin*"))
 	{
 		spt->str.addr = (char *)pcalloc(spt->str.len+1);
 		memcpy(spt->str.addr, p->e.line_num, strlen((char *)p->e.line_num));
-		op_gvargs.args[count] = spt;
+		gvargs.args[count] = spt;
 		count++;
 		spt++;
 	}
@@ -546,7 +540,7 @@ void	crt_gbl(struct mprof_tree *p, int info_level)
 		spt->str.len = strlen("*unk*");
 		spt->str.addr = (char *)pcalloc(spt->str.len+1);
 		memcpy(spt->str.addr, "*unk*", spt->str.len);
-		op_gvargs.args[count] = spt;
+		gvargs.args[count] = spt;
 		count++;
 	}
 	if (info_level)
@@ -555,7 +549,7 @@ void	crt_gbl(struct mprof_tree *p, int info_level)
 		spt->str.len = strlen(MPROF_FOR_LOOP);
 		spt->str.addr = (char *)pcalloc(sizeof(MPROF_FOR_LOOP));
 		memcpy(spt->str.addr, MPROF_FOR_LOOP, spt->str.len);
-		op_gvargs.args[count++] = spt++;
+		gvargs.args[count++] = spt++;
 		/*write for level into the subscript as well*/
 		spt->mvtype = MV_STR;
 		tmpnum = i2asc(subsval, p->e.loop_level);
@@ -563,11 +557,11 @@ void	crt_gbl(struct mprof_tree *p, int info_level)
 		spt->str.len = strlen((char *)subsval);
 		spt->str.addr = (char *)pcalloc(spt->str.len+1);
 		memcpy(spt->str.addr, subsval, spt->str.len);
-		op_gvargs.args[count++] = spt++;
+		gvargs.args[count++] = spt++;
 	}
-	op_gvargs.count = count;
-	callg((int(*)())op_gvname, &op_gvargs);
-	op_gvargs.count = curr_num_subscripts;
+	gvargs.count = count;
+	callg((int(*)())op_gvname, &gvargs);
+	gvargs.count = curr_num_subscripts;
 	/* Data --> "count:cpu-time in user mode:cpu-time in sys mode" */
 	start_point = (int)&dataval[0];
 	tmpnum = (unsigned char *)&dataval[0];
@@ -722,19 +716,18 @@ void parse_gvn(mval *gvn)
 {
 	boolean_t 		dot_seen;
 	mval			*spt;
-	char			*mpsp;			/* mprof stringpool pointer */
-	signed char		*c_top, *c_ref, ch;
-	unsigned short		dollarc_val, i;
+	char			*c_top, *c_ref, ch;
 	unsigned int		count = 0;
-	static mstr		mprof_mstr;
+	static mstr		mprof_mstr;	/* area to hold global and subscripts */
+	char			*mpsp;		/* pointer into mprof_mstr area */
 
 	error_def(ERR_NOTGBL);
 	error_def(ERR_STRUNXEOR);
 	error_def(ERR_VIEWNOTFOUND);
 	error_def(ERR_TEXT);
 
-	c_ref = (signed char *)&gvn->str.addr[0];
-	c_top = (signed char *)c_ref + gvn->str.len;
+	c_ref = gvn->str.addr;
+	c_top = c_ref + gvn->str.len;
 	if (!gvn->str.len || '^' != *c_ref++)
 		rts_error(VARLSTCNT(4) ERR_NOTGBL, 2, gvn->str.len, gvn->str.addr);
 	if (mprof_mstr.len < 4 * gvn->str.len)
@@ -766,7 +759,7 @@ void parse_gvn(mval *gvn)
 			RTS_ERROR_VIEWNOTFOUND("Invalid global name");
 	}
 	spt->str.len = (long)mpsp - (long)spt->str.addr;
-	op_gvargs.args[count++] = spt++;
+	gvargs.args[count++] = spt++;
 	spt->str.addr = (char *)mpsp;
 	/* Process subscripts if any */
 	if (c_ref++ < c_top)
@@ -845,7 +838,7 @@ void parse_gvn(mval *gvn)
 				continue;
 			}
 			spt->str.len = (long)mpsp - (long)spt->str.addr;
-			op_gvargs.args[count++] = spt++;
+			gvargs.args[count++] = spt++;
 			if (*c_ref != ',')
 				break;
 			spt->str.addr = mpsp;
@@ -860,7 +853,7 @@ void parse_gvn(mval *gvn)
 			RTS_ERROR_VIEWNOTFOUND("There are trailing characters after the global name");
 	}
 	assert((char *)mpsp <= mprof_mstr.addr + mprof_mstr.len);	/* Ensure we haven't overrun the malloced buffer */
-	curr_num_subscripts = op_gvargs.count = count;
+	curr_num_subscripts = gvargs.count = count;
 }
 
 #if defined(VMS)
@@ -869,9 +862,10 @@ void	get_cputime (struct tms *curr)
 	int4	cpu_time_used;
 	int	status;
 	int	jpi_code = JPI$_CPUTIM;
+	error_def(ERR_SYSCALL);
 
 	 if ((status = lib$getjpi(&jpi_code, &process_id, 0, &cpu_time_used, 0, 0)) != SS$_NORMAL)
-		rts_error(VARLSTCNT(1)  status );
+		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("LIB$GETJPI"), CALLFROM, status);
 	curr->tms_utime = cpu_time_used;
 	curr->tms_stime = 0;
 }

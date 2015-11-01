@@ -48,8 +48,6 @@
 #include "repl_filter.h"
 #include "repl_log.h"
 
-#define GTMSOURCE_LOGSTATS_INTERVAL	10 /* sec */
-#define	LOGTRNUM_INTERVAL		100
 #define OVERFLOWN(qw)		(0 == (DWASSIGNQW(temp_dw, qw)))
 
 GBLDEF	seq_num			gtmsource_save_read_jnl_seqno;

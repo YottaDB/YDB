@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,5 +28,8 @@ int repl_log(FILE *fp, boolean_t stamptime, boolean_t flush, char *fmt, ...);
 int repl_log_init(repl_log_file_t log_type, int *log_fd, int *stats_fd, char *log,
 	char *stats_log);
 
+#define LOGTRNUM_INTERVAL			1000
+#define GTMRECV_LOGSTATS_INTERVAL		300 /* sec */
+#define GTMSOURCE_LOGSTATS_INTERVAL		300 /* sec */
 
 #endif

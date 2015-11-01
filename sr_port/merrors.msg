@@ -282,7 +282,7 @@ TRANSMINUS	<Negative numbers not allowed with ZTCOMMIT>/error/fao=0!/ansi=0
 MAXNRSUBSCRIPTS	<Maximum number of subscripts exceeded>/error/fao=0!/ansi=0
 MAXSTRLEN	<Maximum string length exceeded>/error/fao=0!/ansi=75
 JNLDBERR	<Journal file !AD does not correspond to database file !AD>/error/fao=4!/ansi=0
-JNLFILOPN	<Error opening journal file !AD !/ Region: !AD>/error/fao=4!/ansi=0
+JNLFILOPN	<Error opening journal file !AD for database file !AD>/error/fao=4!/ansi=0
 MBXRDONLY	<Mailbox is read only, cannot write to it>/error/fao=0!/ansi=0
 JNLINVALID	<!AD is not a valid journal file !/ for database file: !AD>/error/fao=4!/ansi=0
 MBXWRTONLY	<Mailbox is write only, cannot read from it>/error/fao=0!/ansi=0
@@ -353,11 +353,11 @@ UIDSND		<Unidentified sender PID>/error/fao=0!/ansi=0
 UNDEF		<Undefined local variable: !AD>/error/fao=2!/ansi=6
 UNIMPLOP	<Unimplemented construct encountered>/error/fao=0!/ansi=0
 VAREXPECTED	<Variable expected in this context>/error/fao=0!/ansi=39
-VARRECBLKSZ	<Blocksize must be at least record size + 4 bytes>/error/fao=2!/ansi=0
+VARRECBLKSZ	<Blocksize must be at least record size + 4 bytes>/error/fao=0!/ansi=0
 MAXARGCNT	<Maximum number of arguments !UL exceeded>/error/fao=1!/ansi=0
 WCFAIL		<The database cache is corrupt>/error/fao=0!/ansi=0
 VIEWARGCNT	<View parameter !AD has inappropriate number of subparameters>/error/fao=2!/ansi=0
-XKILLCNTEXC	<Maximum number of arguments (!UL) to exclusive kill exceeded>/error/fao=2!/ansi=0
+XKILLCNTEXC	<Maximum number of arguments (!UL) to exclusive kill exceeded>/error/fao=1!/ansi=0
 ZATTACHERR	<Error attaching to "!AD">/error/fao=2!/ansi=0
 ZDATEFMT	<$ZDATE format string contains invalid character>/error/fao=0!/ansi=0
 ZEDFILSPEC	<Illegal ZEDIT file specification: !AD> /error/fao=2!/ansi=0
@@ -398,7 +398,7 @@ ZCUNKQUAL	<External call: Unknown input qualifier>/error/fao=0!/ansi=0
 UNUSEDMSG398	<ZCUNSQUAL last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
 ZCALLTABLE	<External call Table format error>/error/fao=0!/ansi=0
 ZCARGMSMTCH	<External call: Actual argument count, !UL, is greater than formal argument count, !UL>/error/fao=2!/ansi=58
-ZCCONMSMTCH	<External call: Too many input arguments>/error/fao=2!/ansi=58
+ZCCONMSMTCH	<External call: Too many input arguments>/error/fao=0!/ansi=58
 ZCOPT0		<External call: Qualifier OPTIONAL_0 can be used only with mechanisms REFERENCE or DESCRIPTOR>/error/fao=0!/ansi=0
 ZCSTATUS	<External call: Unsuccessful return status>/error/fao=0!/ansi=0
 ZCUSRRTN	<External call: Run-time error in user routine>/error/fao=0!/ansi=0
@@ -498,7 +498,7 @@ OPRCCPSTOP	<The Cluster Control Program has been halted by an operator stop requ
 SELECTSYNTAX	<Argument to !AD clause is not valid>/fatal/fao=2!/ansi=0
 LOADABORT	<Aborting load at record !UL>/error/fao=1!/ansi=0
 FNOTONSYS	<Function or special variable is not supported by this operating system>/error/fao=0!/ansi=0
-AMBISYIPARAM	<Parameter !AD is ambiguous to $ZGETSYI()>/error/fao=1!/ansi=0
+AMBISYIPARAM	<Parameter !AD is ambiguous to $ZGETSYI()>/error/fao=2!/ansi=0
 UNUSEDMSG502	<MAXLKSTR last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
 LKSECINIT	<Error creating lock section for database !AD>/error/fao=2!/ansi=0
 MTDOSLAB	<Tape label is not in valid DOS-11 format>/error/fao=0!/ansi=0
@@ -648,7 +648,7 @@ PATTABNOTFND	<Pattern table !AD not found>/error/fao=2!/ansi=0
 OBJFILERR	<Error with object file I/O on file !AD>/error/fao=2!/ansi=0
 SRCFILERR	<Error with source file I/O on file !AD>/error/fao=2!/ansi=0
 NEGFRACPWR	<Invalid operation: fractional power of negative number>/error/fao=0!/ansi=95
-MTNOSKIP	<SKIP operation not supported on this device>/error/fao=2!/ansi=0
+MTNOSKIP	<SKIP operation not supported on this device>/error/fao=0!/ansi=0
 CETOOMANY	<Too many compiler escape substitutions in a single statement>/error/fao=0!/ansi=0
 CEUSRERROR	<Compiler escape user routine returned error code !UL>/error/fao=1!/ansi=0
 CEBIGSKIP	<Compiler escape user routine skip count is too large>/error/fao=0!/ansi=0
@@ -803,7 +803,7 @@ LISTENPASSBND	<Controlmnemonic LISTEN can be applied to PASSIVE socket in the st
 DBCLNUPINFO	<Database file !AD !/!AD>/info/fao=4!/ansi=0
 MUNODWNGRD	<MUPIP downgrade did not occur because of preceding errors>/error/fao=0!/ansi=0
 REPLTRANS2BIG	<Transaction !AD of size !UL too large to be accommodated in the !AD pool>/error/fao=5!/ansi=0
-LITERALS2LARGE	<Modify or segment the M routine to reduce the total number and / or size of the [string] literals>/error/fao=2!/ansi=0
+UNUSEDMSG806	<LITERALS2LARGE last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
 MUNOFINISH	<MUPIP unable to finish all requested actions>/error/fao=0!/ansi=0
 DBFILEXT	<Database file !AD extended from 0x!XL blocks to 0x!XL at transaction 0x!XL>/info/fao=5!/ansi=0
 JNLFSYNCERR	<Error synchronizing journal file !AD to disk>/error/fao=2!/ansi=0
@@ -974,7 +974,7 @@ WCBLOCKED	<Field !AD is set by process !UL at transaction number 0x!XL for datab
 REPLJNLCLOSED	<Replication and journaling closed for !AD >/info/fao=2!/ansi=0
 RENAMEFAIL	<Rename of file !AD to !AD failed>/warning/fao=4!/ansi=0
 FILERENAME	<File !AD is renamed to !AD>/info/fao=4!/ansi=0
-JNLBUFINFO	<dskaddr [0x!XL] freeaddr [0x!XL] dsk [0x!XL] free [0x!XL] lastaddr [0x!XL] !/wrtsize [0x!XL] bytcnt [0x!XL] qiocnt [0x!XL] errcnt [0x!XL]!/io_in_prog [0x!XL] now_writer [0x!XL] filesize [0x!XL] fsync_in_prog [0x!XL] fsync_pid [0x!XL] fsync_dskaddr [0x!XL]>/info/fao=15!/ansi=0
+JNLBUFINFO	<Pid 0x!XL!/     dsk 0x!XL     free 0x!XL  bytcnt 0x!XL io_in_prog 0x!XL fsync_in_prog 0x!XL!/ dskaddr 0x!XL freeaddr 0x!XL  qiocnt 0x!XL now_writer 0x!XL     fsync_pid 0x!XL!/filesize 0x!XL lastaddr 0x!XL  errcnt 0x!XL    wrtsize 0x!XL fsync_dskaddr 0x!XL>/info/fao=16!/ansi=0
 JNLQIOLOCKED	<Error obtaining io_in_prog lock on jnl-file !AD>/error/fao=2!/ansi=0
 JNLEOFPREZERO	<Error while zeroing jnl-file !AD>/error/fao=2!/ansi=0
 TPNOTACID	<ZSYSTEM at !AD violates ACID properties of a TRANSACTION; indefinite RESTARTs may occur>/info/fao=2!/ansi=0
@@ -1059,7 +1059,7 @@ XTRNRETSTR	<Return string from extended reference translation algorithm is NULL>
 INVECODEVAL	<Invalid value for $ECODE (!AD)>/error/fao=2!/ansi=101
 SETECODE	<Non-empty value assigned to $ECODE (user-defined error trap)>/error/fao=0!/ansi=0
 INVSTACODE	<Invalid value for second parameter of $STACK (!AD)>/error/fao=2!/ansi=0
-REPEATERROR	<Repeat previous error>/error/fao=15!/ansi=0
+REPEATERROR	<Repeat previous error>/error/fao=0!/ansi=0
 NOCANONICNAME	<Value is not a canonic name (!AD)>/error/fao=2!/ansi=90
 NOSUBSCRIPT	<No such subscript found (!SL)>/error/fao=1!/ansi=0
 SYSTEMVALUE	<Invalid value for $SYSTEM (!AD)>/error/fao=2!/ansi=0
@@ -1082,7 +1082,7 @@ JNLINVSWITCHLMT	<Journal AUTOSWITCHLIMIT [!UL] falls outside of allowed limits [
 SETZDIR		<Cannot change working directory to !AD>/error/fao=2!/ansi=0
 JOBACTREF	<Actual parameter in job command passed by reference>/error/fao=0!/ansi=40
 ECLOSTMID	<ECODE exceeded maximum string length, all codes except the first and last suppressed>/warning/fao=0!/ansi=0
-ZFF2MANY	<Number of characters specified for ZFF deviceparameter (!UL) is more than the maximum allowed (!UL)>/error/fao=0!/ansi=0
+ZFF2MANY	<Number of characters specified for ZFF deviceparameter (!UL) is more than the maximum allowed (!UL)>/error/fao=2!/ansi=0
 JNLFSYNCLSTCK	<Journaling fsync lock is stuck>/info/fao=0!/ansi=0
 DELIMWIDTH	<Delimiter length !UL exceeds device width !UL>/error/fao=2!/ansi=0
 DBBMLCORRUPT	<Database !AD : Bitmap blk [0x!XL] is corrupt (size = [0x!XL], levl = [0x!XL], tn = [0x!XL]) : Dbtn = [0x!XL] : Database integrity errors likely>/error/fao=7!/ansi=0
@@ -1121,6 +1121,28 @@ JNLCREATERR	<Error creating journal file !AD>/error/fao=2!/ansi=0
 JNLTRANS2BIG	<Transaction needs an estimated [!UL blocks] in journal file !AD which exceeds the AUTOSWITCHLIMIT of !UL blocks>/error/fao=4!/ansi=0
 JNLSWITCHTOOSM	<Journal AUTOSWITCHLIMIT [!UL blocks] is less than Journal ALLOCATION [!UL blocks] for database file !AD>/error/fao=4!/ansi=0
 JNLSWITCHSZCHG	<Journal AUTOSWITCHLIMIT [!UL blocks] is rounded down to [!UL blocks] to equal the sum of Journal ALLOCATION [!UL blocks] and a multiple of Journal EXTENSION [!UL blocks] for database file !AD>/info/fao=6!/ansi=0
+NOTRNDMACC	<Only random access files are supported as backup files for non-incremental backup>/error/fao=0!/ansi=0
+TMPFILENOCRE	<Error in MUPIP BACKUP while trying to create temporary file !AD>/error/fao=2!/ansi=0
+SHRMEMEXHAUSTED <Attempt by process to use more shared memory than currently permitted by VMS>/error/fao=0!/ansi=0
+JNLSENDOPER	<pid = 0x!XL : status = 0x!XL : jpc_status = 0x!XL : jpc_status2 = 0x!XL : iosb.cond = 0x!XW>/error/fao=5!/ansi=0
+DDPSUBSNUL	<NUL characters in subscripts are not supported by DDP>/error/fao=0!/ansi=0
+DDPNOCONNECT	<Named volume set, !AD, is not connected>/error/fao=2!/ansi=0
+DDPCONGEST	<Agent congestion>/error/fao=0!/ansi=0
+DDPSHUTDOWN	<Server has shut down>/error/fao=0!/ansi=0
+DDPTOOMANYPROCS	<Maximum process limit of !UL exceeded>/error/fao=1!/ansi=0
+DDPBADRESPONSE	<DDP invalid response code: !XB; message text follows>/error/fao=1!/ansi=0
+DDPINVCKT	<Invalid format for CIRCUIT>/error/fao=0!/ansi=0
+DDPVOLSETCONFIG	<Volume Set Configuration file error>/error/fao=0!/ansi=0
+DDPCONFGOOD	<Volume Set Configuration entry accepted>/success/fao=0!/ansi=0
+DDPCONFIGNORE	<Volume Set Configuration line ignored>/success/fao=0!/ansi=0
+DDPCONFINCOMPL	<Volume Set Configuration entry incomplete>/warning/fao=0!/ansi=0
+DDPCONFBADVOL	<Volume Set Configuration entry : invalid volume>/error/fao=0!/ansi=0
+DDPCONFBADUCI	<Volume Set Configuration entry : invalid uci>/error/fao=0!/ansi=0
+DDPCONFBADGLD	<Volume Set Configuration entry : invalid global directory>/error/fao=0!/ansi=0
+DDPRECSIZNOTNUM	<Maximum record size is not numeric>/error/fao=0!/ansi=0
+DDPOUTMSG2BIG	<DDP message too big to be accommodated in outbound buffer>/error/fao=0!/ansi=0
+DDPNOSERVER	<DDP Server not running on local node>/error/fao=0!/ansi=0
+MUTEXRELEASED	<Process !UL [0x!XL] has released the critical section for database !AD to avoid deadlock. $TLEVEL: !UL  t_tries: !UL>/error/fao=6!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

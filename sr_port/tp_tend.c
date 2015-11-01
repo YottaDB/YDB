@@ -101,10 +101,10 @@ GBLREF	int4			tprestart_syslog_delta;
 boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse);
 enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse);
 
-bool	tp_tend(bool crit_only)
+boolean_t	tp_tend(boolean_t crit_only)
 {
 	block_id		tp_blk;
-	bool			history_validated, is_mm, no_sets, was_crit, x_lock, do_deferred_writes, replication = FALSE;
+	boolean_t		history_validated, is_mm, no_sets, was_crit, x_lock, do_deferred_writes, replication = FALSE;
 	bt_rec_ptr_t		bt;
 	cache_rec_ptr_t		cr;
 	cw_set_element		*cse;
@@ -196,7 +196,7 @@ bool	tp_tend(bool crit_only)
 			if (csa->now_crit)  /* bypass 1st check if already in crit -- check later */
 				continue;
 			csd = cs_data;
-			is_mm = dba_mm == csd->acc_meth;
+			is_mm = (dba_mm == csd->acc_meth);
 			if (!is_mm && (NULL != si->first_cw_set))
 			{
 				if (csa->nl->wc_in_free < si->cw_set_depth + 1)
@@ -324,7 +324,7 @@ bool	tp_tend(bool crit_only)
 				}
 			}
 		}
-		is_mm = dba_mm == csd->acc_meth;
+		is_mm = (dba_mm == csd->acc_meth);
 		if (!is_mm)
 			tnque_earliest_tn = ((th_rec_ptr_t)((sm_uc_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn;
 		if (!is_mm && (NULL != si->first_cw_set))
@@ -828,7 +828,7 @@ bool	tp_tend(bool crit_only)
 			QWASSIGN(tcom_record.jnl_seqno, mur_jrec_fixed_tcom.jnl_seqno);
 		}
 		QWASSIGN(tcom_record.token, jnl_fence_ctl.token);
-		if (TRUE == replication)
+		if (replication)
 		{
 			QWINCRBY(temp_jnlpool_ctl->jnl_seqno, seq_num_one);
 			if (is_updproc)
@@ -869,7 +869,7 @@ bool	tp_tend(bool crit_only)
 			TP_CHANGE_REG_IF_NEEDED(csa->jnl->region);
 			jnl_write(csa->jnl, JRT_TCOM, (jrec_union *)&tcom_record, NULL, NULL);
 		}
-		if (TRUE == replication)
+		if (replication)
 		{
 			assert(cumul_index == cu_jnl_index);
 			assert((jnlpool_ctl->write + cumul_jnl_rec_len) % jnlpool_ctl->jnlpool_size == temp_jnlpool_ctl->write);
@@ -919,7 +919,7 @@ failed:
 			rel_crit(tr->reg);
 		for (si = first_sgm_info;  NULL != si; si = si->next_sgm_info)
 		{
-			if (TRUE == si->backup_block_saved)
+			if (si->backup_block_saved)
 				backup_buffer_flush(si->gv_cur_region);
 		}
 		do_deferred_writes = TRUE;

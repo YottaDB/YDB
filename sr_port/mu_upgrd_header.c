@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <math.h> /* needed for handling of epoch_interval */
 
 #include "gtm_string.h"
 #include "iosp.h"
@@ -126,8 +127,6 @@ void mu_upgrd_header(v3_sgmnt_data *old_head, sgmnt_data *new_head)
 	UPGRADE_MEM(ccp_tick_interval);
 	new_head->flu_outstanding = old_head->flu_outstanding;
 	new_head->free_blocks_filler = old_head->free_blocks_filler;
-	memcpy((unsigned char *) (&new_head->jnl_file),
-	       (unsigned char *) (&old_head->jnl_file), sizeof(old_head->jnl_file));
 	new_head->last_rec_backup = old_head->last_rec_backup;
 	UPGRADE_MEM(ccp_quantum_interval);
 	UPGRADE_MEM(ccp_response_interval);

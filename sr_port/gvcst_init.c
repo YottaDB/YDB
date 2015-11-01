@@ -44,7 +44,7 @@
 #include "dbfilop.h"
 #include "gvcst_init_sysops.h"
 #include "set_num_additional_processors.h"
-#include "have_crit_any_region.h"
+#include "have_crit.h"
 #include "t_retry.h"
 
 #define CWS_INITIAL_SIZE        32
@@ -272,6 +272,7 @@ void gvcst_init (gd_region *greg)
 	mstr			log_nam, trans_log_nam;
 	char			trans_buff[MAX_FN_LEN+1];
 	static int4		first_time = TRUE;
+	char			now_running[MAX_REL_NAME];
 
 	error_def (ERR_DBFLCORRP);
 	error_def (ERR_DBCREINCOMP);
@@ -285,8 +286,8 @@ void gvcst_init (gd_region *greg)
 	 * mupip_set_journal trying to switch journals across all regions. Currently, there is no fine-granular
 	 * checking for mupip_set_journal, hence a coarse MUPIP_IMAGE check for image_type
 	 */
-	assert(dollar_tlevel && (CDB_STAGNATE <= t_tries) || MUPIP_IMAGE == image_type || !have_crit_any_region(FALSE));
-	if (0 < dollar_tlevel && have_crit_any_region(FALSE))
+	assert(dollar_tlevel && (CDB_STAGNATE <= t_tries) || MUPIP_IMAGE == image_type || (0 == have_crit(CRIT_HAVE_ANY_REG)));
+	if ((0 < dollar_tlevel) && (0 != have_crit(CRIT_HAVE_ANY_REG)))
 	{	/* to avoid deadlocks with currently holding crits and the DLM lock request to be done in db_init(),
 		 * we should insert this region in the tp_reg_list and tp_restart should do the gvcst_init after
 		 * having released crit on all regions.
@@ -474,8 +475,22 @@ void gvcst_init (gd_region *greg)
 
 	csd = csa->hdr;
 	if (memcmp(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1))
+	{	/* Copy csa->nl->now_running into a local variable before passing to rts_error() due to the following issue.
+		 * In VMS, a call to rts_error() copies only the error message and its arguments (as pointers) and
+		 *  transfers control to the topmost condition handler which is dbinit_ch() in this case. dbinit_ch()
+		 *  does a PRN_ERROR only for SUCCESS/INFO (VERMISMATCH is neither of them) and in addition
+		 *  nullifies csa->nl as part of its condition handling. It then transfers control to the next level condition
+		 *  handler which does a PRN_ERROR but at that point in time, the parameter csa->nl->now_running is no longer
+		 *  accessible and hence no parameter substitution occurs (i.e. the error message gets displayed with plain !ADs).
+		 * In UNIX, this is not an issue since the first call to rts_error() does the error message
+		 *  construction before handing control to the topmost condition handler. But it does not hurt to do the copy.
+		 */
+		assert(strlen(csa->nl->now_running) < sizeof(now_running));
+		memcpy(now_running, csa->nl->now_running, sizeof(now_running));
+		now_running[sizeof(now_running) - 1] = '\0';	/* protection against bad values of csa->nl->now_running */
 		rts_error(VARLSTCNT(8) ERR_VERMISMATCH & ~SEV_MSK | ((DSE_IMAGE != image_type) ? ERROR : INFO), 6,
-			DB_LEN_STR(greg), gtm_release_name_len, gtm_release_name, LEN_AND_STR(csa->nl->now_running));
+			DB_LEN_STR(greg), gtm_release_name_len, gtm_release_name, LEN_AND_STR(now_running));
+	}
 	/* set csd and fill in selected fields */
 	switch (greg->dyn.addr->acc_meth)
 	{

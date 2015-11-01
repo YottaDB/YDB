@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
 #include "send_msg.h"
 #include "t_commit_cleanup.h"
 #include "util.h"
-#include "have_crit_any_region.h"	/* for have_crit_any_region() prototype */
+#include "have_crit.h"
 
 GBLREF	boolean_t		created_core;
 GBLREF	boolean_t		need_core;
@@ -58,10 +58,10 @@ CONDITION_HANDLER(t_ch)
 	)
 	ENABLE_AST;
 	/* We could go through all regions involved in the TP and check for crit on only those regions - instead we use an existing
-	 * function: have_crit_any_region().  If the design assumption that all crits held at transaction commit time are
+	 * function: have_crit().  If the design assumption that all crits held at transaction commit time are
 	 * transaction related holds true, the result is the same and efficiency doesn't matter (too much) in exception handling.
 	 */
-	if (((!dollar_tlevel && cs_addrs->now_crit) || (dollar_tlevel && have_crit_any_region(FALSE)))
+	if (((!dollar_tlevel && cs_addrs->now_crit) || (dollar_tlevel && 0 != have_crit(CRIT_HAVE_ANY_REG)))
 		&& t_commit_cleanup(cdb_sc_uperr, SIGNAL) && SIGNAL)
 	{
 		for (hist_index = 0;  hist_index < t_tries;  hist_index++)

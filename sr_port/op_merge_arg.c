@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -107,22 +107,20 @@ void op_merge_arg(int m_opr_type, lv_val *lvp)
 		mglvnp->lclp[IND2] = lvp;
 		break;
 	case MARG2_GBL:
-		if (dba_bg == gv_cur_region->dyn.addr->acc_meth || dba_mm == gv_cur_region->dyn.addr->acc_meth ||
+		if (dba_bg  == gv_cur_region->dyn.addr->acc_meth || dba_mm == gv_cur_region->dyn.addr->acc_meth ||
+		    dba_usr == gv_cur_region->dyn.addr->acc_meth ||
 		    (dba_cm == gv_cur_region->dyn.addr->acc_meth &&
-		    ((link_info *)gv_cur_region->dyn.addr->cm_blk->usr)->query_is_queryget))
+		     ((link_info *)gv_cur_region->dyn.addr->cm_blk->usr)->query_is_queryget))
 			gvname_env_save(mglvnp->gblp[IND2]);
 		else
 		{ /* M ^LHS=^RHS where RHS resides on a remote node served by a GTCM server that does not support QUERYGET
-		   * operation, OR, that resides in a db whose access method is dba_usr won't work */
+		   * operation won't work */
+			assert(dba_cm == gv_cur_region->dyn.addr->acc_meth); /* we should've covered all access methods */
 			end = format_targ_key(buff, MAX_STRLEN, gv_currkey, TRUE);
-			if (dba_cm == gv_cur_region->dyn.addr->acc_meth)
-				err_str = "GT.CM server does not support MERGE operation";
-			else if (dba_usr == gv_cur_region->dyn.addr->acc_meth)
-				err_str = "MERGE is not supported with access method USR";
-			else
-				GTMASSERT; /* why didn't we cover all access methods? */
-			rts_error(VARLSTCNT(14) ERR_UNIMPLOP, 0, ERR_TEXT, 2, LEN_AND_STR(err_str), ERR_GVIS, 2, end - buff, buff,
-					ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
+			rts_error(VARLSTCNT(14) ERR_UNIMPLOP, 0,
+				  	        ERR_TEXT, 2, LEN_AND_LIT("GT.CM server does not support MERGE operation"),
+				  		ERR_GVIS, 2, end - buff, buff,
+				  		ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
 		}
 		break;
 	default:

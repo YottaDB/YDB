@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,29 +25,24 @@
 #include "cmmdef.h"
 #include "gtcm_action_pending.h"
 
-GBLREF relque		action_que;
-GBLREF gd_region	*gv_cur_region, *action_que_dummy_reg;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
+GBLREF	relque			action_que;
+GBLREF	gd_region		*action_que_dummy_reg;
+GBLREF	node_local_ptr_t	locknl;
 
-/* gtcm_action_pending - insert action into action queue and set flag so
- * the same action cannot be inserted more than once.
- *
- * N.B.  gtcm_action_pending should only be invoked from an AST.
- *                         (or with ASTs disabled)
+/* gtcm_action_pending - insert action into action queue and set flag so the same action cannot be inserted more than once.
+ * N.B.  gtcm_action_pending should only be invoked from an AST (or with ASTs disabled).
  */
 
 long gtcm_action_pending(connection_struct *c)
 {
 	long		status = 0;
-	gd_region	*r_save;
 
-/*	assert (lib$ast_in_prog()); */
+	/* assert (lib$ast_in_prog()); */
 	if (!c->waiting_in_queue)
 	{
-		UNIX_ONLY(DEBUG_ONLY(r_save = gv_cur_region; TP_CHANGE_REG(action_que_dummy_reg);) /* for LOCK_HIST macro */)
+		UNIX_ONLY(DEBUG_ONLY(locknl = FILE_INFO(action_que_dummy_reg)->s_addrs.nl;))	/* for DEBUG_ONLY LOCK_HIST macro */
 		status = INSQTI(c, &action_que);
-		UNIX_ONLY(DEBUG_ONLY(TP_CHANGE_REG(r_save);) /* restore gv_cur_region */)
+		UNIX_ONLY(DEBUG_ONLY(locknl = NULL;))	/* restore "locknl" to default value */
 		if (-1 == status)
 			return status;
 		c->waiting_in_queue = TRUE;

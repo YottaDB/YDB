@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +9,9 @@
  *								*
  ****************************************************************/
 
-#ifndef __BIT_OPI_H__
-#define __BIT_OPI_H__
+#ifndef SEVEN_2_ASCII_H_INCLUDED
+#define SEVEN_2_ASCII_H_INCLUDED
 
-uint4 bit_opi(bit_op_t bit_op, uint4 bit, uint4 *base, sm_int_ptr_t latch);
+int seven_2_ascii(unsigned char *inpt, unsigned char *outp);
 
-#endif
+#endif /* SEVEN_2_ASCII_H_INCLUDED */

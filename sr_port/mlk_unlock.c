@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,6 @@
 #include "mlk_unlock.h"
 #include "mlk_wake_pending.h"
 #include "gvusr.h"
-#include "tp_grab_crit.h"
 
 GBLREF	int4 		process_id;
 GBLREF	short		crash_count;
@@ -57,16 +56,11 @@ void mlk_unlock(mlk_pvtblk *p)
 		if (csa->critical)
 			crash_count = csa->critical->crashcnt;
 
-		if (0 < dollar_tlevel && !((t_tries < CDB_STAGNATE) || csa->now_crit))
-			/* ... Final retry and this region not locked down */
-		{
-			/* make sure this region is in the list in case we end up retrying */
+		if (0 < dollar_tlevel && !((t_tries < CDB_STAGNATE) || csa->now_crit)) /* Final retry and region not locked down */
+		{	/* make sure this region is in the list in case we end up retrying */
 			insert_region(p->region, &tp_reg_list, &tp_reg_free_list, sizeof(tp_region));
-			if (FALSE == tp_grab_crit(p->region))		/* Attempt lockdown now */
-			{
-				status = cdb_sc_needcrit;		/* avoid deadlock -- restart transaction */
-				t_retry(status);
-			}
+			/* insert_region() will additionally attempt CRIT on the region and restart if not possible */
+			assert(csa->now_crit);
 		}
 		if (FALSE == (was_crit = csa->now_crit))
 			grab_crit(p->region);

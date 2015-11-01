@@ -129,10 +129,8 @@ GBLDEF int4		rundown_os_page_size;
 GBLDEF gd_region	**jnlpool_reg_addrs;
 
 #ifdef UNIX
-DEBUG_ONLY(GBLREF gd_region	*gv_cur_region;
-	   GBLREF sgmnt_addrs	*cs_addrs;
-	   GBLREF sgmnt_data_ptr_t	cs_data;)
 GBLREF short		crash_count;
+GBLREF node_local_ptr_t	locknl;
 #endif
 
 bool secshr_tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
@@ -153,7 +151,6 @@ void secshr_db_clnup(boolean_t termination_mode)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		blk_ptr;
-	DEBUG_ONLY(gd_region	*r_save;)
 
 	if (NULL == get_next_gdr_addrs)
 		return;
@@ -691,10 +688,9 @@ void secshr_db_clnup(boolean_t termination_mode)
 						if (csa->nl->in_crit == rundown_process_id)
 							csa->nl->in_crit = 0;
 						UNIX_ONLY(
-							DEBUG_ONLY(r_save = gv_cur_region; TP_CHANGE_REG(reg));
-									/* for LOCK_HIST macro which is used only in DEBUG */
+							DEBUG_ONLY(locknl = csa->nl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 							mutex_unlockw(reg, crash_count);
-							DEBUG_ONLY(TP_CHANGE_REG(r_save));	/* restore gv_cur_region */
+							DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 						)
 						VMS_ONLY(
 							mutex_stoprelw(csa->critical);
@@ -752,10 +748,9 @@ void secshr_db_clnup(boolean_t termination_mode)
 					if (csa->nl->in_crit == rundown_process_id)
 						csa->nl->in_crit = 0;
 					UNIX_ONLY(
-						DEBUG_ONLY(r_save = gv_cur_region; TP_CHANGE_REG(reg));
-							/* for LOCK_HIST macro which is used only in DEBUG */
+						DEBUG_ONLY(locknl = csa->nl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 						mutex_unlockw(reg, 0);
-						DEBUG_ONLY(TP_CHANGE_REG(r_save));	/* restore gv_cur_region */
+						DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 					)
 					VMS_ONLY(
 						mutex_stoprelw(csa->critical);

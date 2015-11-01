@@ -34,6 +34,8 @@
 #include "util.h"
 #include "gtmmsg.h"
 #include "wcs_sleep.h"
+#include "gtm_file_stat.h"
+#include "gtm_tempnam.h"
 
 #define BACKUP_CHUNK_SIZE	(32*1024)
 #define BLK_SZ			512
@@ -63,19 +65,22 @@ GBLREF	boolean_t	debug_mupip;
 
 bool	mubfilcpy (backup_reg_list *list)
 {
-	mstr			*file;
+	mstr			*file, tempfile;
 	unsigned char		command[MAX_FN_LEN * 2 + 5]; /* 5 == max(sizeof("cp"),sizeof("mv")) + 2 (space) + 1 (NULL) */
 	sgmnt_data_ptr_t	header_cpy;
-	int4			backup_fd = -1, size, vbn, status, counter, rsize;
+	int4			backup_fd = -1, size, vbn, status, counter, rsize, ntries;
 	int4			handled, save_errno, adjust, blk_num, temp, rv, tempfilelen;
 	struct stat		stat_buf;
 	off_t			filesize;
 	char 			*inbuf, *zero_blk, *ptr, *errptr;
 	boolean_t		done;
-	char			*tempfilename, tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN], *tempnam();
+	char			tempfilename[MAX_FN_LEN + 1], tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN], *tempnam();
 	int                     fstat_res, save_no;
+	uint4			ustatus;
 
 	error_def(ERR_BCKUPBUFLUSH);
+	error_def(ERR_TMPFILENOCRE);
+	error_def(ERR_TEXT);
 
 	file = &(list->backup_file);
 	file->addr[file->len] = '\0';
@@ -114,15 +119,25 @@ bool	mubfilcpy (backup_reg_list *list)
 	}
 
 	/* make this cp a two step process ==> cp followed by mv */
-	if (NULL == (tempfilename = TEMPNAM(tempdir, prefix)))
+	ntries = 0;
+	fstat_res = FILE_NOT_FOUND;
+	/* do go into the loop for the first time, irrespective of fstat_res*/
+	while ((FILE_NOT_FOUND != fstat_res) || (!ntries))
 	{
-		save_no = errno;
-		errptr = (char *)STRERROR(save_no);
-                util_out_print("tempname() : !AZ", TRUE, errptr);
-		if (online)
-			cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
-		util_out_print("ERROR: Cannot create the temporary filename needed for backup.", TRUE);
-		return FALSE;
+		gtm_tempnam(tempdir, prefix, tempfilename);
+		tempfile.addr = tempfilename;
+		tempfile.len = strlen(tempfilename);
+		if ((FILE_STAT_ERROR == (fstat_res = gtm_file_stat(&tempfile, NULL, NULL, FALSE, &ustatus))) ||
+		    (ntries > MAX_TEMP_OPEN_TRY))
+		{
+			if (FILE_STAT_ERROR != fstat_res)
+				gtm_putmsg(VARLSTCNT(8) ERR_TMPFILENOCRE, 2, tempfile.len, tempfile.addr,
+				 ERR_TEXT, 2, LEN_AND_LIT("Tried a maximum number of times, clean-up temporary files in backup directory and retry."));
+			else
+				gtm_putmsg(VARLSTCNT(5) ERR_TMPFILENOCRE, 2, tempfile.len, tempfile.addr, ustatus);
+			return FALSE;
+		}
+		ntries++;
 	}
 	tempfilelen = strlen(tempfilename);
 	memcpy(command, "cp ", 3);

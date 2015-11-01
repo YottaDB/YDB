@@ -38,6 +38,7 @@ gtmsource_showbacklog
 gtmsource_shutdown
 gtmsource_statslog
 gtmsource_stopfilter
+gtm_tempnam
 gv_select
 jnl2ext
 jnl_setver
@@ -58,6 +59,7 @@ mu_clsce
 mu_cre_file
 mucregini
 mu_cre_structs
+mu_dwngrd_header
 mu_extract
 mu_extr_gblout
 mu_extr_getblk
@@ -108,7 +110,6 @@ mupip_set_journal_parse
 mupip_stop
 mupip_upgrade
 mu_put_gvdata
-mu_put_gvsubsc
 mur_back_process
 mur_block_count_correct
 mur_blocks_free
@@ -143,6 +144,8 @@ mur_master_map
 mur_multi_manager
 mu_rndwn_all
 mu_rndwn_file
+mu_rndwn_repl_instance
+mu_rndwn_replpool
 mur_open_files
 mur_output_record
 mur_output_show
@@ -155,6 +158,11 @@ mur_sort_files
 mu_signal_process
 mu_split
 mu_swap_blk
+mu_upgrd_adjust_blkptr
+mu_upgrd_adjust_mm
+mu_upgrd_ctrlc_handler
+mu_upgrd_header
+mu_upgrd_sig_init
 mu_write_map
 recvpool_init
 repl_comm

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,6 @@
 #include "t_end.h"
 #include "t_retry.h"
 #include "t_begin.h"
-#include "tp_grab_crit.h"
 #include "gvcst_rtsib.h"
 #include "gvcst_search.h"
 #include "gvcst_search_blk.h"
@@ -59,17 +58,7 @@ bool	gvcst_order(void)
 		t_err = ERR_GVORDERFAIL;
 	for (;;)
 	{
-		if (!((t_tries < CDB_STAGNATE) || cs_addrs->now_crit))	/* Final retry and this region not locked down */
-		{
-			if (0 == dollar_tlevel)				/* Ensure TP */
-				GTMASSERT;
-			if (FALSE == tp_grab_crit(gv_cur_region))	/* Attempt lockdown now */
-			{
-				status = cdb_sc_needcrit;		/* avoid deadlock -- restart transaction */
-				t_retry(status);
-				continue;
-			}
-		}
+		assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 		two_histories = FALSE;
 		if (cdb_sc_normal == (status = gvcst_search(gv_currkey, NULL)))
 		{

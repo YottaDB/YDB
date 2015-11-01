@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,11 +18,15 @@
 #define BLK_MAPINVALID		0x02
 #define BLK_RECYCLED		0x03
 #define BML_BITS_PER_BLK	2
-#define BM_SIZE(bplm)		(sizeof(blk_hdr) + ((bplm) * BML_BITS_PER_BLK)/8)
+
+#define	BM_MINUS_BLKHDR_SIZE(bplm)	((bplm) / (BITS_PER_UCHAR / BML_BITS_PER_BLK))
+#define BM_SIZE(bplm)			(sizeof(blk_hdr) + BM_MINUS_BLKHDR_SIZE(bplm))
 
 #define	VALIDATE_BM_BLK(blk, bp, csa, region, status)								\
 {														\
 	error_def(ERR_DBBMLCORRUPT);										\
+														\
+	assert(BITS_PER_UCHAR % BML_BITS_PER_BLK == 0);	/* assert this for the BM_MINUS_BLKHDR_SIZE macro */	\
 	if (IS_BITMAP_BLK(blk) && ((LCL_MAP_LEVL != (bp)->levl) || (BM_SIZE(csa->hdr->bplmap) != (bp)->bsiz)))	\
 	{													\
 		send_msg(VARLSTCNT(9) ERR_DBBMLCORRUPT, 7, DB_LEN_STR(region), 					\

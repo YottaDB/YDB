@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +9,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __GTMMSG_H__
-#define __GTMMSG_H__
+#ifndef GTMMSG_H_INCLUDED
+#define GTMMSG_H_INCLUDED
 
 
 void gtm_putmsg();
@@ -23,4 +23,4 @@ void gtm_putmsg_noflush();
 #error Unsupported platform
 #endif
 
-#endif
+#endif /* GTMMSG_H_INCLUDED */

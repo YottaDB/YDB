@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,8 @@ GBLREF	unsigned short		dollar_tlevel;
 GBLREF	uint4			process_id;
 GBLREF	seq_num			seq_num_zero;
 GBLREF  enum gtmImageTypes      image_type;
+GBLREF	node_local_ptr_t	locknl;
+
 LITREF	char			gtm_release_name[];
 LITREF	int4			gtm_release_name_len;
 
@@ -79,7 +81,7 @@ void jnlpool_init(jnlpool_user pool_user,
 	unsigned int	full_len;
 	mutex_spin_parms_ptr_t	jnlpool_mutex_spin_parms;
 	unix_db_info	*udi;
-	sgmnt_addrs	*sa;
+	sgmnt_addrs	*csa;
 	gd_segment	*seg;
 
 	error_def(ERR_REPLREQRUNDOWN);
@@ -100,7 +102,7 @@ void jnlpool_init(jnlpool_user pool_user,
 	reg->rname_len = sizeof(JNLPOOL_DUMMY_REG_NAME) - 1;
 	reg->rname[reg->rname_len] = 0;
 	udi = FILE_INFO(reg);
-	sa = &udi->s_addrs;
+	csa = &udi->s_addrs;
 	seg = reg->dyn.addr;
 	if (!repl_inst_get_name((char *)seg->fname, &full_len, sizeof(seg->fname)))
 		rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
@@ -290,13 +292,13 @@ void jnlpool_init(jnlpool_user pool_user,
 		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error with journal pool shmat"), save_errno);
 	}
-	sa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + sizeof(jnlpool_ctl_struct));
-	jnlpool_mutex_spin_parms = (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)sa->critical + CRIT_SPACE);
-	sa->nl = (node_local_ptr_t) ((sm_uc_ptr_t)sa->critical + CRIT_SPACE + sizeof(mutex_spin_parms_struct));
+	csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + sizeof(jnlpool_ctl_struct));
+	jnlpool_mutex_spin_parms = (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)csa->critical + CRIT_SPACE);
+	csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)csa->critical + CRIT_SPACE + sizeof(mutex_spin_parms_struct));
 	if (shm_created)
-		memset(sa->nl, 0, sizeof(node_local)); /* Make sa->nl->glob_sec_init FALSE */
-	sa->now_crit = FALSE;
-	jnlpool.gtmsource_local = (gtmsource_local_ptr_t)((sm_uc_ptr_t)sa->nl + sizeof(node_local));
+		memset(csa->nl, 0, sizeof(node_local)); /* Make csa->nl->glob_sec_init FALSE */
+	csa->now_crit = FALSE;
+	jnlpool.gtmsource_local = (gtmsource_local_ptr_t)((sm_uc_ptr_t)csa->nl + sizeof(node_local));
 	jnldata_base = jnlpool.jnldata_base = (sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLDATA_BASE_OFF;
 	jnlpool_ctl = jnlpool.jnlpool_ctl;
 	if (GTMSOURCE == pool_user && gtmsource_startup)
@@ -304,7 +306,7 @@ void jnlpool_init(jnlpool_user pool_user,
 		jnlpool.gtmsource_local->gtmsource_pid = 0;
 		*jnlpool_initialized = FALSE;
 	}
-	if (!sa->nl->glob_sec_init)
+	if (!csa->nl->glob_sec_init)
 	{
 		if (GTMSOURCE != pool_user || !gtmsource_startup)
 		{
@@ -331,14 +333,9 @@ void jnlpool_init(jnlpool_user pool_user,
 		assert(0 == offsetof(jnlpool_ctl_struct, jnlpool_id));
 					/* ensure that the pool identifier is at the top of the pool */
 		jnlpool_ctl->jnlpool_id.pool_type = JNLPOOL_SEGMENT;
-#ifdef DEBUG
-		r_save = gv_cur_region; /* Setup gv_cur_region for LOCK_HIST */
-		gv_cur_region = reg;
-#endif
+		DEBUG_ONLY(locknl = csa->nl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 		gtm_mutex_init(reg, NUM_CRIT_ENTRY, FALSE);
-#ifdef DEBUG
-		gv_cur_region = r_save; /* Restore gv_cur_region */
-#endif
+		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		jnlpool_mutex_spin_parms->mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
 		jnlpool_mutex_spin_parms->mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
 		jnlpool_mutex_spin_parms->mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
@@ -357,7 +354,7 @@ void jnlpool_init(jnlpool_user pool_user,
 		strcpy(jnlpool.gtmsource_local->filter_cmd, gtmsource_options.filter_cmd);
 		strcpy(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file);
 		jnlpool.gtmsource_local->statslog_file[0] = '\0';
-		sa->nl->glob_sec_init = TRUE;
+		csa->nl->glob_sec_init = TRUE;
 		*jnlpool_initialized = TRUE;
 		/* we initialized jnlpool for the first time, so write it to the instance file
 		 */
@@ -385,6 +382,9 @@ void jnlpool_init(jnlpool_user pool_user,
 		rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	pool_init = TRUE; /* This is done for properly setting the updata_disable flag by active/passive
 				source server in jnl_file_open */
+	reg->open = TRUE;	/* this is used by t_commit_cleanup/tp_restart/mutex_deadlock_check */
+	reg->read_only = FALSE;
+	csa->read_write = TRUE;	/* the jnlpool reg is writable since we are already in jnlpool_init() */
 	return;
 }
 

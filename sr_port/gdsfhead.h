@@ -627,12 +627,13 @@ typedef struct sgmnt_data_struct
 	unsigned char	reorg_restart_key[256];         /* 1st key of a leaf block where reorg was done last time */
 	int4		alignsize;		/* alignment size for JRT_ALIGN */
 	block_id	reorg_restart_block;
-	/******* following three members (jnl_file, dbfid, filler_ino_t) together occupy 64 bytes on all platforms *******/
+	/******* following three members (filler_{jnl_file,dbfid}, filler_ino_t) together occupy 64 bytes on all platforms *******/
+	/* this area which was previously used for the field "jnl_file" is now moved to node_local */
 	union
 	{
 		gds_file_id	jnl_file_id;  	/* needed on UNIX to hold space */
 		unix_file_id	u;		/* from gdsroot.h even for VMS */
-	} jnl_file;
+	} filler_jnl_file;
 	union
 	{
 		gds_file_id	vmsfid;		/* not used, just hold space */
@@ -955,6 +956,7 @@ typedef struct	sgmnt_addrs_struct
 	int4		min_total_nontpjnl_rec_size;	/* minimum journal space requirement for a non-TP transaction */
 	int4		jnl_state;		/* journaling state: it can be 0, 1 or 2 (same as enum jnl_state_codes in jnl.h) */
 	int4		repl_state;		/* state of replication whether "on" or "off" */
+	uint4		crit_check_cycle;	/* Used to mark which regions in a transaction legiticamtely have crit */
 } sgmnt_addrs;
 
 

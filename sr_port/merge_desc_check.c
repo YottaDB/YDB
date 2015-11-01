@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,7 @@
 #include "lvname_info.h"
 #include "op_merge.h"
 #include "format_targ_key.h"
+#include "ddphdr.h"
 
 GBLREF int              merge_args;
 GBLREF merge_glvn_ptr	mglvnp;
@@ -53,7 +54,8 @@ void merge_desc_check(void)
 		acc_meth1 = mglvnp->gblp[IND1]->s_gv_cur_region->dyn.addr->acc_meth;
 		acc_meth2 = mglvnp->gblp[IND2]->s_gv_cur_region->dyn.addr->acc_meth;
 		/* if (!(both are bg/mm regions && dbs are same && same global) &&
-		 *     !(both are cm regions && on the same remote node && same region))
+		 *     !(both are cm regions && on the same remote node && same region)
+		 *     !(both are usr regions && in the same volume set))
 		 *   NO DESCENDANTS
 		 * endif
 		 */
@@ -64,14 +66,17 @@ void merge_desc_check(void)
 			&& mglvnp->gblp[IND1]->s_gv_cur_region->dyn.addr->cm_blk ==
 			   mglvnp->gblp[IND2]->s_gv_cur_region->dyn.addr->cm_blk
 			&& mglvnp->gblp[IND1]->s_gv_cur_region->cmx_regnum ==
-			   mglvnp->gblp[IND2]->s_gv_cur_region->cmx_regnum))
+			   mglvnp->gblp[IND2]->s_gv_cur_region->cmx_regnum)
+		   VMS_ONLY (&&
+		   !(dba_usr == acc_meth1 && dba_usr == acc_meth2
+			&& ((ddp_info *)(&FILE_INFO(mglvnp->gblp[IND1]->s_gv_cur_region)->file_id))->volset ==
+			   ((ddp_info *)(&FILE_INFO(mglvnp->gblp[IND2]->s_gv_cur_region)->file_id))->volset)))
 		{
-			assert(dba_usr != acc_meth1 && dba_usr != acc_meth2); /* merge not ready for dba_usr yet */
+			UNIX_ONLY(assert(dba_usr != acc_meth1 && dba_usr != acc_meth2);)
 			return;
 		}
 		if (0 == memcmp(mglvnp->gblp[IND1]->s_gv_currkey->base, mglvnp->gblp[IND2]->s_gv_currkey->base,
-			        MIN(mglvnp->gblp[IND1]->s_gv_currkey->end,
-				    mglvnp->gblp[IND2]->s_gv_currkey->end)))
+			        MIN(mglvnp->gblp[IND1]->s_gv_currkey->end, mglvnp->gblp[IND2]->s_gv_currkey->end)))
 		{
 			if (0 == (end1 = format_targ_key(buff1, MAX_STRLEN, mglvnp->gblp[IND1]->s_gv_currkey, TRUE)))
 				end1 = &buff1[MAX_STRLEN - 1];

@@ -143,7 +143,10 @@ void t_retry(enum cdb_sc failure)
 	{
 		/* for TP, do the minimum; most of the logic is in tp_retry, because it is also invoked directly from t_commit */
 		t_fail_hist[t_tries] = failure;
-		TP_RETRY_ACCOUNTING(cs_addrs->hdr, failure);
+		assert(NULL == cs_addrs || NULL != cs_addrs->hdr);	/* both cs_addrs and cs_data should be NULL or non-NULL. */
+		assert(NULL != cs_addrs || cdb_sc_needcrit == failure); /* cs_addrs can be NULL in case of retry in op_lock2 */
+		if (NULL != cs_addrs)					/*  in which case failure code should be cdb_sc_needcrit. */
+			TP_RETRY_ACCOUNTING(cs_addrs->hdr, failure);
 		if (cdb_sc_blkmod != failure)
 			TP_TRACE_HIST(CR_BLKEMPTY, gv_target);
 		gv_target->clue.end = 0;

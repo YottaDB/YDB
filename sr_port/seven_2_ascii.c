@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +9,20 @@
  *								*
  ****************************************************************/
 
-#ifndef __HAVE_CRIT_ANY_REGION_H__
-#define __HAVE_CRIT_ANY_REGION_H__
+#include "mdef.h"
+#include "seven_2_ascii.h"
 
-boolean_t have_crit_any_region(boolean_t in_commit);
+int seven_2_ascii(unsigned char *inpt, unsigned char *outp)
+{
+	unsigned char	*p1, *p2;
+	int		in_val;
 
-#endif
+	p1 = inpt;
+	p2 = outp;
+	do
+	{
+		in_val = *p1++;
+		*p2++ = (in_val >> 1);
+	}  while (in_val & 1); /* end do */
+	return p2 - outp; /* length of output */
+}

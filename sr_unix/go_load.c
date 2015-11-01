@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@
 #include "load.h"
 #include "mu_gvis.h"
 #include "mupip_put_gvdata.h"
-#include "mupip_put_gvsubsc.h"
+#include "str2gvkey.h"
 #include "gtmmsg.h"
 
 GBLREF bool	mupip_error_occurred;
@@ -87,10 +87,7 @@ void go_load(int begin, int end)
 		if (len >= 0)
 		{
 		        util_out_print("!AD", TRUE, len, ptr);
-			if (0 == memcmp(ptr + len - sizeof("ZWR") + 1, "ZWR", sizeof("ZWR") - 1))
-			        fmt = MU_FMT_ZWR;
-			else
-			        fmt = MU_FMT_GO;
+			fmt = (0 == memcmp(ptr + len - STR_LIT_LEN("ZWR"), "ZWR", STR_LIT_LEN("ZWR"))) ? MU_FMT_ZWR : MU_FMT_GO;
 		} else
 			mupip_exit(ERR_LOADFILERR);
 		begin = 3;
@@ -107,12 +104,8 @@ void go_load(int begin, int end)
 			if (len < 0)
 				break;
 			if (2 == i) /* the format flag appears only in the second record. */
-			{
-			        if (0 == memcmp(ptr + len - sizeof("ZWR") + 1, "ZWR", sizeof("ZWR") - 1))
-				        fmt = MU_FMT_ZWR;
-				else
-				        fmt = MU_FMT_GO;
-			}
+				fmt = (0 == memcmp(ptr + len - STR_LIT_LEN("ZWR"), "ZWR", STR_LIT_LEN("ZWR"))) ?
+					MU_FMT_ZWR : MU_FMT_GO;
 		}
 		util_out_print("Beginning LOAD at #!UL\n", TRUE, begin);
 	}
@@ -326,7 +319,7 @@ void go_call_db(int routine, char *parm1, int parm2)
 	ESTABLISH(mupip_load_ch);
 	switch(routine)
 	{	case GO_PUT_SUB:
-			mupip_put_gvsubsc(parm1, parm2, TRUE);
+			str2gvkey_gvfunc(parm1, parm2);
 			break;
 		case GO_PUT_DATA:
 			mupip_put_gvdata(parm1 , parm2);

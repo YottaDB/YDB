@@ -139,6 +139,7 @@ GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF enum gtmImageTypes	image_type;
 GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF char			cli_token_buf[];
+GBLREF boolean_t		is_replicator;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -380,6 +381,7 @@ int main(int argc, char **argv, char **envp)
 	error_def(ERR_TEXT);
 
 	image_type = GTCM_GNP_SERVER_IMAGE;
+	is_replicator = TRUE;	/* as GT.CM GNP goes through t_end() and can write jnl records to the jnlpool for replicated db */
 	gtmenvp = envp;
 	run_time = TRUE;
 	getjobnum();

@@ -39,6 +39,7 @@
 #include "is_file_identical.h"
 #include "gtmmsg.h"
 #include "send_msg.h"
+#include "iosp.h"	/* for SS_NORMAL */
 
 #define BACKPTR		ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_eof), JNL_REC_START_BNDRY)
 
@@ -102,12 +103,12 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 	jb = jpc->jnl_buff;
 	assert(NOJNL == jpc->channel);
 	sts = 0;
-	jpc->status = 0;
+	jpc->status = jpc->status2 = SS_NORMAL;
 	nameptr = JNL_NAME_EXP_PTR(jb);
 	if (init)
 	{
-		csd->jnl_file.u.inode = 0;
-		csd->jnl_file.u.device = 0;
+		csa->nl->jnl_file.u.inode = 0;
+		csa->nl->jnl_file.u.device = 0;
 		for (retry = TRUE;  ;)
 		{	/* this is stuctured as a loop, in a fashion analogous to the VMS logic,
 			 * in order to permit creation of a new file in case the existing one is found wanting.
@@ -131,14 +132,14 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 				 * We should try to avoid it. But this is unusual code path and
 				 * so performance issue can be ignored */
 				create.prev_jnl_len = 0;
-				if (0 != cre_jnl_file(&create))
+				if (EXIT_NRM != cre_jnl_file(&create))
 				{
 					jpc->status = create.status;
 					sts = ERR_JNLINVALID;
 					continue;
 				} else
 				{
-					jpc->status = 0;
+					jpc->status = SS_NORMAL;
 					sts = 0;
 				}
 				send_msg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
@@ -163,13 +164,13 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 			hdr_ptr = (sm_uc_ptr_t)ROUND_UP((uint4)hdr_buffer, 2 * sizeof(uint4));
 			/* Read the journal file header and check the label */
 			LSEEKREAD(jpc->channel, 0, hdr_ptr, hdr_len, jpc->status);
-			if (0 != jpc->status)
+			if (SS_NORMAL != jpc->status)
 			{
 				sts = (-1 == jpc->status) ? ERR_IOEOF : ERR_JNLRDERR;
 				continue;
 			}
 			header = (jnl_file_header *)hdr_ptr;
-			if (0 != memcmp(header->label, JNL_LABEL_TEXT, sizeof(JNL_LABEL_TEXT) - 1))
+			if (0 != MEMCMP_LIT(header->label, JNL_LABEL_TEXT))
 			{
 				jpc->status = ERR_JNLBADLABEL;
 				sts = ERR_JNLOPNERR;
@@ -198,7 +199,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 				  (sm_uc_ptr_t)eof_buffer,
 				  sizeof(eof_buffer),
 				  jpc->status);
-			if (0 != jpc->status)
+			if (SS_NORMAL != jpc->status)
 			{
 				sts = (-1 == jpc->status) ? ERR_IOEOF : ERR_JNLRDERR;
 				continue;
@@ -298,7 +299,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 			if (REPL_ENABLED(csd) && pool_init)
 				header->update_disabled = jnlpool_ctl->upd_disabled;
 			LSEEKWRITE(jpc->channel, 0, hdr_ptr, hdr_len, jpc->status);
-			if (0 != jpc->status)
+			if (SS_NORMAL != jpc->status)
 			{
 				sts = ERR_JNLWRERR;
 				continue;
@@ -370,7 +371,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 		}   /* for retry */
 	} else   /* not init */
 	{
-		assert(0 != csd->jnl_file.u.inode);
+		assert(0 != csa->nl->jnl_file.u.inode);
 		if (csd->jnl_sync_io)
 		{
 			OPENFILE_SYNC((sm_c_ptr_t)nameptr, O_RDWR, jpc->channel);
@@ -392,7 +393,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 		STAT_FILE((sm_c_ptr_t)nameptr, &stat_buf, stat_res);
 		if (0 == stat_res)
 		{
-			if (init || is_gdid_stat_identical(&csd->jnl_file.u, &stat_buf))
+			if (init || is_gdid_stat_identical(&csa->nl->jnl_file.u, &stat_buf))
 			{
 				if (jnl_closed == csd->jnl_state)
 				{	/* Operator close came in while opening */
@@ -406,9 +407,8 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 				} else
 				{
 					if (init)
-					{
-						/* Stash the file id in the header for subsequent users */
-						set_gdid_from_stat(&csd->jnl_file.u, &stat_buf);
+					{	/* Stash the file id in shared-memory for subsequent users */
+						set_gdid_from_stat(&csa->nl->jnl_file.u, &stat_buf);
 					}
 					/* Stash the file id in the process-private area,
 				 	  to detect any later change of jnl file "on the fly" */

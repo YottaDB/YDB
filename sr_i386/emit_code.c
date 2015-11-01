@@ -805,6 +805,9 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 				literal = ct->operand[0].oprval.ilit;
 				switch(op)
 				{
+				case COMPARE: /* 1byte(opcode) + 1byte(ModR/M) + 4byte(literal) */
+					code_idx += 2 + sizeof(int4);
+					break;
 				case LOAD:
 					code_idx += 1 + sizeof(int4);
 					break;
@@ -972,6 +975,15 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 				literal = ct->operand[0].oprval.ilit;
 				switch (op)
 				{
+				case COMPARE: /* cmpl $literal,use_reg - 1byte(opcode) + 1byte(ModR/M) + 4byte(literal) */
+					code_buf[code_idx++] = I386_INS_Grp1_Ev_Iv_Prefix;
+					modrm_byte.modrm.reg_opcode = I386_INS_CMP__;
+					modrm_byte.modrm.mod = I386_MOD32_REGISTER;
+					modrm_byte.modrm.r_m = use_reg;
+					code_buf[code_idx++] = modrm_byte.byte;
+					*((int4 *)&code_buf[code_idx]) = literal;
+					code_idx += sizeof(int4);
+					break;
 				case LOAD:
 					code_buf[code_idx++] = I386_INS_MOV_eAX + use_reg;
 					*((int4 *)&code_buf[code_idx]) = literal;

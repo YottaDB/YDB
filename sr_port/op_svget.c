@@ -51,10 +51,10 @@
 #define MAX_COMMAND_LINE_LENGTH	255
 
 GBLDEF mval		dollar_zmode;
-GBLDEF mval		dollar_zproc;
 GBLDEF mstr		dollar_zroutines;
 GBLDEF mstr		dollar_zcompile;
 
+GBLREF mval		dollar_zproc;
 GBLREF mval		dollar_zdir;
 GBLREF stack_frame	*frame_pointer;
 GBLREF mval		dollar_estack_delta;

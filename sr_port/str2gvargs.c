@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,24 +11,33 @@
 
 #include "mdef.h"
 
+#include "gtm_ctype.h"
 
-#include "stringpool.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
 #include "subscript.h"
-#include "op.h"
-#include "mupip_put_gvsubsc.h"
-#include "callg.h"
+#include "str2gvargs.h"
 
-GBLREF spdesc stringpool;
+static mval subsc[MAX_GVSUBSCRIPTS]; 	/* At return, op_gvargs elements will be pointing to elements of this array, hence static */
+static mstr subsc_buffer = {0, NULL}; 	/* Buffer space (subsc_buffer.addr) will be allocated on the first call.
+					 * Buffer space to hold string mvals in subsc; we don't want to use stringpool because
+					 * this module is called from both DDPGVUSR and GTMSHR, and stringpool is not set up in
+					 * DDPGVUSR. In addition, if we use stringpool, we might have to garbage collect, which
+					 * means pulling in all GBLDEFs and functions referenced in stp_gcol into DDPGVUSR.
+					 * That will be a link nightmare! */
 
-static	mval	subsc[MAX_GVSUBSCRIPTS];
-struct
-{
-	int4	count;		/* caveat: this should be the same size as a pointer */
-	mval	*args[MAX_GVSUBSCRIPTS + 1];
-} op_gvargs;
+boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
+{ /* IMPORTANT : op_gvargs will point to static area which gets overwritten by the next call to this function. Callers should
+     make a copy of op_gvargs if necessary */
 
-void	mupip_put_gvsubsc (char *cp, int len, boolean_t call_gvfunc)
-{
+	char		*p1, *p2, *c_top, *c_ref, ch, *subsc_ptr;
+	int		count;
+	mval		*spt;
+	int 		dollarc_val;
+	boolean_t	naked, concat, dot_seen;
 	error_def(ERR_NOTGBL);
 	error_def(ERR_GVINVALID);
 	error_def(ERR_LPARENREQD);
@@ -38,104 +47,98 @@ void	mupip_put_gvsubsc (char *cp, int len, boolean_t call_gvfunc)
 	error_def(ERR_DLRCTOOBIG);
 	error_def(ERR_EORNOTFND);
 	error_def(ERR_RPARENREQD);
-	char		*p1, *p2, *c_top, *c_ref, ch;
-	int		count;
-	mval		*spt;
-	unsigned short	dollarc_val, i;
-	bool		naked, concat, dot_seen;
 
-	assert (sizeof(op_gvargs.count) == sizeof(op_gvargs.args[0]));
+	assert(sizeof(op_gvargs->count) == sizeof(op_gvargs->args[0]));
 	naked = FALSE;
 	concat = FALSE;
 	c_ref = cp;
 	c_top = cp + len;
+	assert(0 < len); /* why is our code calling with "" string? */
+	if (len > subsc_buffer.len)
+	{
+		if (NULL != subsc_buffer.addr)
+			free(subsc_buffer.addr);
+		subsc_buffer.len = ((MAX_ZWR_INFLATION * MAX_KEY_SZ) < len ? len : (MAX_ZWR_INFLATION * MAX_KEY_SZ));
+		subsc_buffer.addr = malloc(subsc_buffer.len);
+	}
 	spt = subsc;
 	count = 0;
-	if (*cp++ != '^')
-		rts_error(VARLSTCNT(4) ERR_NOTGBL, 2, len, c_ref);
+	if (0 >= len || '^' != *cp++)
+		rts_error(VARLSTCNT(4) ERR_NOTGBL, 2, (len > 0) ? len : 0, c_ref);
 	spt->mvtype = MV_STR;
 	spt->str.addr = cp;
 	ch = *cp;
-	if ( ch == '(' )
+	if ('(' == ch)
+	{
+		spt->str.len = cp - spt->str.addr - 1;
 		naked = TRUE;
-	else
+	} else
 	{
 		cp++;
-		if ((ch < 'A' || ch > 'Z')  &&  ch != '%'  &&  (ch < 'a' || ch > 'z'))
+		if (!ISALPHA(ch) && '%' != ch)
 			rts_error(VARLSTCNT(4) ERR_GVINVALID, 2, len, c_ref);
-		for (  ;  cp < c_top  &&  *cp != '(' ;  )
+		for ( ; cp < c_top && *cp != '('; )
 		{
 			ch = *cp++;
-			if ((ch < 'A' || ch > 'Z')  &&  (ch < 'a' || ch > 'z')  &&  (ch < '0' || ch > '9'))
+			if (!ISALPHA(ch) && !ISDIGIT(ch))
 				rts_error(VARLSTCNT(4) ERR_GVINVALID, 2, len, c_ref);
 		}
-	}
-	spt->str.len = cp - spt->str.addr - naked;
-	if (!naked)
-	{
-		op_gvargs.args[count] = spt;
+		spt->str.len = cp - spt->str.addr;
+		op_gvargs->args[count] = spt;
 		count++;
 		spt++;
 	}
+	subsc_ptr = subsc_buffer.addr;
 	if (cp < c_top)
 	{
-		if (*cp++ != '(')
+		if ('(' != *cp++)
 			rts_error(VARLSTCNT(4) ERR_LPARENREQD, 2, len, c_ref);
-		for (  ;  ;  )
+		for (; ;)
 		{
 			spt->mvtype = MV_STR;
 			ch = *cp;
-			if (ch == '\"')
+			if ('\"' == ch)
 			{
 				if (!concat)
 				{
-					spt->str.addr = (char*)stringpool.free;
-					p1 = (char*)stringpool.free;
-				}
-				else
+					spt->str.addr = subsc_ptr;
+					p1 = subsc_ptr;
+				} else
 					p2 = p1;
 				++cp;
-				for (  ;  ;  )
+				for (; ;)
 				{
 					if (cp == c_top)
 						rts_error(VARLSTCNT(4) ERR_STRUNXEOR, 2, len, c_ref);
-					if (*cp == '\"')
-						if (*++cp != '\"')
+					if ('\"' == *cp)
+						if ('\"' != *++cp)
 							break;
 					*p1++ = *cp++;
 				}
 				if (!concat)
 				{
 					spt->str.len = p1 - spt->str.addr;
-					stringpool.free = (unsigned char*)p1;
-				}else
+					subsc_ptr = p1;
+				} else
 				{
 					spt->str.len += p1 - p2;
-					stringpool.free += p1 - p2;
+					subsc_ptr += p1 - p2;
 				}
-				if (*cp == '_')
+				if ('_' == *cp)
 				{
 					cp++;
 					concat = TRUE;
 					continue;
 				}
-			}
-			else if (ch == '$')
+			} else if ('$' == ch)
 			{
-				if (++cp == c_top)
+				if (3 > c_top - ++cp || 'C' != toupper(*cp) || '(' != *(++cp))
 					rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
-				if (*cp != 'C' && *cp != 'c')
-					rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
-				if (++cp == c_top)
-					rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
-				if (*cp != '(')
-					rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
-				if (++cp == c_top)
-					rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
-				while (TRUE)
+				cp++;
+				for (; ;)
 				{
 					dollarc_val = 0;
-					if (*cp < '0'  ||  *cp > '9')
+					if (!ISDIGIT(*cp))
 						rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 					do
 					{
@@ -145,59 +148,57 @@ void	mupip_put_gvsubsc (char *cp, int len, boolean_t call_gvfunc)
 							rts_error(VARLSTCNT(4) ERR_DLRCTOOBIG, 2, len, c_ref);
 						if (++cp == c_top)
 							rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
-					} while (*cp >= '0'  &&  *cp <= '9');
+					} while (ISDIGIT(*cp));
 					if (!concat)
 					{
-						spt->str.addr = (char*)stringpool.free;
+						spt->str.addr = subsc_ptr;
 						*spt->str.addr = dollarc_val;
 						spt->str.len = 1;
-						p1 = (char*)(++stringpool.free);
-					}
-					else
+						subsc_ptr++;
+						p1 = subsc_ptr;
+					} else
 					{
 						*p1++ = dollarc_val;
 						spt->str.len++;
-						stringpool.free++;
+						subsc_ptr++;
 					}
-					if (*cp == ',')
+					if (',' == *cp)
 					{
 						concat = TRUE;
 						if (++cp == c_top)
 							rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 						continue;
 					}
-					if (*cp != ')')
+					if (')' != *cp)
 						rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 					break;
 				}
 				cp++;
-				if (*cp == '_')
+				if ('_' == *cp)
 				{
 					cp++;
 					concat = TRUE;
 					continue;
 				}
-			}
-			else
+			} else
 			{
 				dot_seen = FALSE;
-				if ((ch > '9' || ch < '0')  &&  ch != '.'  &&  ch != '-'  &&  ch != '+')
+				if (!ISDIGIT(ch) && '.' != ch && '-' != ch && '+' != ch)
 					rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
 				if (!concat)
 				{
-					spt->str.addr = (char*)stringpool.free;
-					p1 = (char*)stringpool.free;
-				}
-				else
+					spt->str.addr = subsc_ptr;
+					p1 = subsc_ptr;
+				} else
 					p2 = p1;
 				*p1++ = *cp++;
-				for (  ;  ;  )
+				for (; ;)
 				{
 					if (cp == c_top)
 						rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
-					if (*cp > '9'  ||  *cp < '0')
+					if (!ISDIGIT(*cp))
 					{
-						if (*cp != '.')
+						if ('.' != *cp)
 							break;
 						else if (!dot_seen)
 							dot_seen = TRUE;
@@ -209,35 +210,32 @@ void	mupip_put_gvsubsc (char *cp, int len, boolean_t call_gvfunc)
 				if (!concat)
 				{
 					spt->str.len = p1 - spt->str.addr;
-					stringpool.free = (unsigned char*)p1;
-				}
-				else
+					subsc_ptr = p1;
+				} else
 				{
 					spt->str.len += p1 - p2;
-					stringpool.free += p1 - p2;
+					subsc_ptr += p1 - p2;
 				}
-				if (*cp == '_')
+				if ('_' == *cp)
 				{
 					cp++;
 					concat = TRUE;
 					continue;
 				}
 			}
-			op_gvargs.args[count] = spt;
+			op_gvargs->args[count] = spt;
 			count++;
 			spt++;
-			if (*cp != ',')
+			if (',' != *cp)
 				break;
 			concat = FALSE;
 			cp++;
 		}
-		if (*cp++ != ')')
+		if (')' != *cp++)
 			rts_error(VARLSTCNT(4) ERR_RPARENREQD, 2, len, c_ref);
 		if (cp < c_top)
 			rts_error(VARLSTCNT(4) ERR_EORNOTFND, 2, len, c_ref);
 	}
-	op_gvargs.count = count;
-	if (TRUE == call_gvfunc)
-		callg((int(*)())(naked ? op_gvnaked : op_gvname), &op_gvargs);
-	return;
+	op_gvargs->count = count;
+	return naked;
 }

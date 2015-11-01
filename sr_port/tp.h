@@ -344,15 +344,16 @@ GBLREF	short	dollar_trestart;
 
 
 void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
-bool tp_tend(bool crit_only);
 void tp_clean_up(boolean_t rollback_flag);
 void tp_cw_list(cw_set_element **cs);
 void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
 void tp_incr_clean_up(short newlevel);
 void tp_set_sgm(void);
-tp_region *insert_region(gd_region *reg, tp_region **reg_list, tp_region **reg_free_list, int4 size);
 void tp_start_timer_dummy(int4 timeout_seconds);
 void tp_clear_timeout_dummy(void);
 void tp_timeout_action_dummy(void);
+
+tp_region	*insert_region(gd_region *reg, tp_region **reg_list, tp_region **reg_free_list, int4 size);
+boolean_t	tp_tend(boolean_t crit_only);
 
 #endif

@@ -160,7 +160,7 @@ bool wcs_flu(bool options)
 	 * and if the journal file has been opened in shared memory. If the journal file hasn't
 	 * been opened in shared memory, we needn't (and shouldn't) do any journal file activity.
 	 */
-	jnl_enabled = JNL_ENABLED(csd) && (0 != csd->jnl_file.u.inode);
+	jnl_enabled = (JNL_ENABLED(csd) && (0 != cnl->jnl_file.u.inode));
 	if (jnl_enabled)
 	{
 		jpc = csa->jnl;
@@ -243,7 +243,18 @@ bool wcs_flu(bool options)
 				BG_TRACE_PRO_ANY(csa, wcb_wcs_flu1);
 				send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_wcs_flu1"),
                         		process_id, csa->ti->curr_tn, DB_LEN_STR(gv_cur_region));
+				assert(!jnl_enabled || jb->fsync_dskaddr == jb->freeaddr);
 				wcs_recover(gv_cur_region);
+				if (jnl_enabled && (jb->fsync_dskaddr != jb->freeaddr))
+				{	/* an INCTN record should have been written above */
+					assert(jb->fsync_dskaddr <= jb->dskaddr);
+					assert((jb->dskaddr - jb->fsync_dskaddr) >= INCTN_RECLEN);
+						/* above assert has a >= instead of == due to possible ALIGN record in between */
+					jnl_flush(gv_cur_region);
+					assert(jb->freeaddr == jb->dskaddr);
+					jnl_fsync(gv_cur_region, jb->dskaddr);
+					assert(jb->fsync_dskaddr == jb->dskaddr);
+				}
 				wcs_wtstart(gv_cur_region, csd->n_bts);		/* Flush it all */
 				WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart);
 				if (cnl->wcs_active_lvl || crq->fl)
@@ -293,7 +304,7 @@ bool wcs_flu(bool options)
 		}
 		jb->need_db_fsync = TRUE;	/* for comments on need_db_fsync, see jnl_output_sp.c */
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
-		assert(is_gdid_gdid_identical(&jpc->fileid, &csa->hdr->jnl_file.u));
+		assert(is_gdid_gdid_identical(&jpc->fileid, &cnl->jnl_file.u));
 		if (0 == csa->jnl->pini_addr)
 			jnl_put_jrt_pini(csa);
 		jnl_write_epoch_rec(csa);

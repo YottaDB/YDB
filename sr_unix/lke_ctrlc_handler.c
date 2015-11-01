@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
 #include "error.h"
 #include "cmidef.h"
 #include "lke.h"
-#include "have_crit_any_region.h"
+#include "have_crit.h"
 
 GBLREF VSIG_ATOMIC_T	util_interrupt;
 GBLREF volatile int4 	fast_lock_count;
@@ -31,7 +31,7 @@ void lke_ctrlc_handler(void)
 
 	START_CH;				/* Drive top level condition handler if we can */
 	util_interrupt = 1;
-	if (0 == fast_lock_count && !have_crit_any_region(FALSE))
+	if (0 == fast_lock_count && 0 == have_crit(CRIT_HAVE_ANY_REG))
 	{
 		UNWIND(dummy1, dummy2);		/* This will do a longjmp and not 'return' here */
 	}

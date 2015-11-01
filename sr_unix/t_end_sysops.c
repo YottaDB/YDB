@@ -78,7 +78,7 @@
 
 GBLDEF	cache_rec_ptr_t		get_space_fail_cr;	/* gbldefed to be accessible in a pro core */
 
-GBLREF volatile boolean_t	crit_in_flux;
+GBLREF volatile int4		crit_count;
 GBLREF bool             	certify_all_blocks;
 GBLREF bool             	run_time;
 GBLREF uint4            	process_id;
@@ -573,6 +573,7 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
         bt_rec_ptr_t    bt;
         cache_rec_ptr_t cr;
         bool            recycled;
+	boolean_t	bmp_status;
 
         error_def(ERR_DBCCERR);
         error_def(ERR_ERRCALL);
@@ -879,12 +880,21 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                 if (FALSE == cs->done)
                		gvcst_map_build((uint4 *)cs->upd_addr, blk_ptr, cs, effective_tn);
 		else
-		{
-			/* It has been built; Update tn in the block and copy from private memory to shared space */
-			/* It's actually dse_chng_bhead which needs dse_running flag, it's ok for now */
-			assert(dse_running || write_after_image);
+		{	/* It has been built; Update tn in the block and copy from private memory to shared space */
+			/* It's actually dse_chng_bhead which comes here but dse_running is close enough for now */
+			if (!dse_running && !write_after_image)
+				GTMASSERT;
+			VALIDATE_BM_BLK(cs->blk, (blk_hdr_ptr_t)blk_ptr, cs_addrs, gv_cur_region, bmp_status);
+			if (!bmp_status)
+				GTMASSERT;
                         assert(((blk_hdr_ptr_t)cs->new_buff)->tn == effective_tn);
                         memcpy(blk_ptr, cs->new_buff, ((blk_hdr_ptr_t)cs->new_buff)->bsiz);
+			/* Since this is unusual code (either DSE or MUPIP RECOVER while playing AIMG records),
+			 * we want to validate the bitmap block's buffer twice, once BEFORE and once AFTER the update.
+			 */
+			VALIDATE_BM_BLK(cs->blk, (blk_hdr_ptr_t)blk_ptr, cs_addrs, gv_cur_region, bmp_status);
+			if (!bmp_status)
+				GTMASSERT;
 		}
                 bm_update(cs, (sm_uc_ptr_t)cr->buffaddr, FALSE);
         } else
@@ -1106,17 +1116,17 @@ uint4	jnl_ensure_open(void)
         if (NOJNL == cs_addrs->jnl->channel)
         {
                 cs_addrs->jnl->pini_addr = 0;
-                jnl_status = jnl_file_open(gv_cur_region, 0 == cs_data->jnl_file.u.inode, 0);
-        } else if (!is_gdid_gdid_identical(&cs_addrs->jnl->fileid, &cs_data->jnl_file.u))
+                jnl_status = jnl_file_open(gv_cur_region, 0 == cs_addrs->nl->jnl_file.u.inode, 0);
+        } else if (!is_gdid_gdid_identical(&cs_addrs->jnl->fileid, &cs_addrs->nl->jnl_file.u))
         {
-		DEBUG_ONLY(save_jnl_gdid = cs_data->jnl_file.u;)
+		DEBUG_ONLY(save_jnl_gdid = cs_addrs->nl->jnl_file.u;)
                 /* The journal file has been changed "on the fly"; close the old one and open the new one */
                 close(cs_addrs->jnl->channel);
                 cs_addrs->jnl->channel = NOJNL;
                 cs_addrs->jnl->pini_addr = 0;
 		if (GTCM_GNP_SERVER_IMAGE == image_type)
 			gtcm_jnl_switched();
-                jnl_status = jnl_file_open(gv_cur_region, 0 == cs_data->jnl_file.u.inode, 0);
+                jnl_status = jnl_file_open(gv_cur_region, 0 == cs_addrs->nl->jnl_file.u.inode, 0);
         }
 	return jnl_status;
 }
@@ -1370,7 +1380,7 @@ void    wcs_stale(TID tid, int4 hd_len, gd_region **region)
            **************************************************************************************************/
 	GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);
 	if ((FALSE == lseekIoInProgress_flag)
-		&& (FALSE == crit_in_flux)
+		&& (0 == crit_count)
 		&& (NULL == save_csaddrs || FALSE == save_csaddrs->now_crit)
 		&& (0 == fast_lock_count))
         {

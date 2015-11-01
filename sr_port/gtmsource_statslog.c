@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +45,12 @@ GBLREF	gtmsource_options_t	gtmsource_options;
 
 int gtmsource_statslog(void)
 {
+#ifdef VMS
+	error_def(ERR_UNIMPLOP);
+	error_def(ERR_TEXT);
+
+	rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2, LEN_AND_LIT("Statistics logging not supported on VMS"));
+#endif
 	/* Grab the jnlpool jnlpool option write lock */
 	if (0 > grab_sem(SOURCE, SRC_SERV_OPTIONS_SEM))
 	{

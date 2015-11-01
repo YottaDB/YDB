@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,8 +29,6 @@ LITDEF	int	v07_jnl_fixed_size[JRT_RECTYPES] =
 #include "v07_jnl_rec_table.h"
 #undef JNL_TABLE_ENTRY
 };
-
-GBLREF	boolean_t	is_db_updater;
 
 /*
    Returns:	> 0:	Length of the record, including prefix and suffix;  however, if > top,

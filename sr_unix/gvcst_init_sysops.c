@@ -88,12 +88,14 @@ GBLREF  gd_region               *gv_cur_region;
 GBLREF  boolean_t               sem_incremented;
 GBLREF  boolean_t               mupip_jnl_recover;
 GBLREF	ipcs_mesg		db_ipcs;
-LITREF  char                    gtm_release_name[];
-LITREF  int4                    gtm_release_name_len;
+GBLREF	node_local_ptr_t	locknl;
 
 #ifndef MUTEX_MSEM_WAKE
 GBLREF	int 	mutex_sock_fd;
 #endif
+
+LITREF  char                    gtm_release_name[];
+LITREF  int4                    gtm_release_name_len;
 
 #ifdef DEBUG_DB64
 /* if debugging large address stuff, make all memory segments allocate above 1G line */
@@ -235,7 +237,6 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
         boolean_t       	is_bg, read_only, new_ipc = FALSE;
         char            	machine_name[MAX_MCNAMELEN];
         file_control    	*fc;
-	DEBUG_ONLY( gd_region   *r_save;)
 	int			gethostname_res, stat_res, mm_prot;
         int4            	status, semval;
         sm_long_t       	status_l;
@@ -534,14 +535,9 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
                 }
                 reg->dyn.addr->ext_blk_count = csd->extension_size;
                 mlk_shr_init(csa->lock_addrs[0], csd->lock_space_size, csa, (FALSE == read_only));
-		DEBUG_ONLY(
-			r_save = gv_cur_region; /* set gv_cur_region for LOCK_HIST */
-			gv_cur_region = reg;
-		)
+		DEBUG_ONLY(locknl = csa->nl;)	/* for DEBUG_ONLY LOCK_HIST macro */
                 gtm_mutex_init(reg, NUM_CRIT_ENTRY, FALSE);
-		DEBUG_ONLY(
-                	gv_cur_region = r_save; /* restore gv_cur_region */
-		)
+		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		if (read_only)
 			csa->nl->remove_shm = TRUE;	/* gds_rundown can remove shmem if first process has read-only access */
 		db_auto_upgrade(reg);
@@ -571,7 +567,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			rts_error(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
 				ERR_TEXT, 2, LEN_AND_LIT("Fileid of database file doesn't match fileid in shared memory"));
 		}
-		/* Check whether cs_addrs->nl->fname exists. If not, then it is a serious condition. Error out. */
+		/* Check whether csa->nl->fname exists. If not, then it is a serious condition. Error out. */
 		STAT_FILE((char *)csa->nl->fname, &stat_buf, stat_res);
 		if (-1 == stat_res)
 		{
@@ -622,8 +618,6 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		 */
 		csa->nl->remove_shm = FALSE;
 		strcpy(csd->machine_name, machine_name);
-		if (JNL_ALLOWED(csa))
-			memset(&csd->jnl_file, 0, sizeof(csd->jnl_file));
 		LSEEKWRITE(udi->fd, (off_t)0, (sm_uc_ptr_t)csd, sizeof(sgmnt_data), errno_save);
 		if (0 != errno_save)
 		{

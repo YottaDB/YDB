@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,11 @@
 
 #include "mdef.h"
 
-#include <sys/wait.h>
+#include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_unistd.h"
+
+#include <sys/wait.h>
 #include <errno.h>
 #include <arpa/inet.h>
 #ifdef VMS
@@ -40,8 +42,10 @@
 #include "repl_log.h"
 #include "repl_errno.h"
 #include "iosp.h"
-#include "gtm_stdio.h"
 #include "eintr_wrappers.h"
+#ifdef UNIX
+#include "gtmio.h"
+#endif
 
 #ifdef REPL_RECVR_HELP_UPD
 #include "error.h"
@@ -439,19 +443,32 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				recvpool.gtmrecv_local->statslog_file);
 		repl_log_fd2fp(&gtmrecv_statslog_fp, gtmrecv_statslog_fd);
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Starting stats log to %s\n", recvpool.gtmrecv_local->statslog_file);
+		repl_log(gtmrecv_statslog_fp, TRUE, TRUE, "Begin statistics logging\n");
 #else
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Stats logging to be done on VMS\n", recvpool.gtmrecv_local->statslog_file);
+		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Stats logging not supported on VMS\n");
 #endif
 	} else if (0 == *pending_data_len && gtmrecv_logstats && !recvpool.gtmrecv_local->statslog)
 	{
 		gtmrecv_logstats = FALSE;
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Stopping stats log\n");
-		close(gtmrecv_statslog_fd);
+		/* Force all data out to the file before closing the file */
+		repl_log(gtmrecv_statslog_fp, TRUE, TRUE, "End statistics logging\n");
+		UNIX_ONLY(CLOSEFILE(gtmrecv_statslog_fd, status);) VMS_ONLY(close(gtmrecv_statslog_fd);)
 		gtmrecv_statslog_fd = -1;
+		/* We need to FCLOSE because a later open() in repl_log_init() might return the same file descriptor as the one
+		 * that we just closed. In that case, FCLOSE done in repl_log_fd2fp() affects the newly opened file and
+		 * FDOPEN will fail returning NULL for the file pointer. So, we close both the file descriptor and file pointer.
+		 * Note the same problem does not occur with GENERAL LOG because the current log is kept open while opening
+		 * the new log and hence the new file descriptor will be different (we keep the old log file open in case there
+		 * are errors during DUPing. In such a case, we do not switch the log file, but keep the current one).
+		 * We can FCLOSE the old file pointer later in repl_log_fd2fp() */
+		FCLOSE(gtmrecv_statslog_fp, status);
+		gtmrecv_statslog_fp = NULL;
 	}
 
 #ifdef REPL_RECVR_HELP_UPD
 
+	VMS_ONLY(GTMASSERT);	/* not clear if the following #ifdefed code will work in VMS */
 	if (0 != *pending_data_len)
 	{
 		ESTABLISH(helper_ch);
@@ -462,12 +479,12 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 			if (JNL_ENABLED(cs_data))
 			{
 				util_out_print("channel = !UL :: fd_mismatch = !UL :: jnl_file.u.inode = !UL", TRUE,
-						cs_addrs->jnl->channel, cs_addrs->jnl->fd_mismatch, cs_data->jnl_file.u.inode);
+						cs_addrs->jnl->channel, cs_addrs->jnl->fd_mismatch, cs_addrs->nl->jnl_file.u.inode);
 				if (((NOJNL == cs_addrs->jnl->channel)  ||  TRUE == cs_addrs->jnl->fd_mismatch)
-					&& (0 != cs_data->jnl_file.u.inode))
+					&& (0 != cs_addrs->nl->jnl_file.u.inode))
 				{
 					grab_crit(gv_cur_region);
-					if (0 != cs_data->jnl_file.u.inode)
+					if (0 != cs_addrs->nl->jnl_file.u.inode)
 					{
 						jnl_status = jnl_ensure_open();
 						if (0 != jnl_status)

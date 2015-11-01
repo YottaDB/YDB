@@ -50,6 +50,7 @@
 #include "gtmrecv.h"
 #include "cli.h"
 #include "error.h"
+#include "repl_dbg.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "repl_shutdcode.h"
@@ -107,7 +108,6 @@ GBLREF	mur_opt_struct		mur_options;
 GBLREF	bool			is_standalone;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	seq_num			start_jnl_seqno;
-GBLREF	bool			is_db_updater;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		tstarted;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -130,6 +130,7 @@ GBLREF	boolean_t	tp_restart_fail_sig_used;
 #endif
 GBLREF	fixed_jrec_tp_kill_set 	mur_jrec_fixed_field;
 GBLREF	struct_jrec_tcom 	mur_jrec_fixed_tcom;
+GBLREF	boolean_t		is_replicator;
 
 error_def(ERR_NORECOVERERR);
 
@@ -241,7 +242,7 @@ int updproc(void)
 #endif
 	/* is_standalone = TRUE; */
 	is_updproc = TRUE;
-	is_db_updater = TRUE;
+	is_replicator = TRUE;	/* as update process goes through t_end() and can write jnl recs to the jnlpool for replicated db */
 	memset((uchar_ptr_t)&recvpool, 0, sizeof(recvpool)); /* For util_base_ch and mupip_exit */
 	if (updproc_init() == UPDPROC_EXISTS) /* we got the global directory header already */
 		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Update Process already exists"));
@@ -386,13 +387,16 @@ void updproc_actions(void)
 				SHORT_SLEEP(1);
 				continue;
 			}
-			repl_log(updproc_log_fp, TRUE, TRUE,
-				"-- Wrapping -- read = %ld :: write_wrap = %ld :: upd_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-				temp_read, recvpool.recvpool_ctl->write_wrap, INT8_PRINT(jnl_seqno),INT8_PRINTX(jnl_seqno));
-			repl_log(updproc_log_fp, TRUE, TRUE,
-				"-------------> wrapped = %ld :: write = %ld :: recv_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-				recvpool.recvpool_ctl->wrapped, recvpool.recvpool_ctl->write,
-				INT8_PRINT(recvpool.recvpool_ctl->jnl_seqno), INT8_PRINTX(recvpool.recvpool_ctl->jnl_seqno));
+			DEBUG_ONLY(
+				repl_log(updproc_log_fp, TRUE, FALSE,
+				       "-- Wrapping -- read = %ld :: write_wrap = %ld :: upd_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
+					temp_read, recvpool.recvpool_ctl->write_wrap, INT8_PRINT(jnl_seqno),INT8_PRINTX(jnl_seqno));
+				repl_log(updproc_log_fp, TRUE, TRUE,
+					"-------------> wrapped = %ld :: write = %ld :: recv_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
+					recvpool.recvpool_ctl->wrapped, recvpool.recvpool_ctl->write,
+					INT8_PRINT(recvpool.recvpool_ctl->jnl_seqno),
+					INT8_PRINTX(recvpool.recvpool_ctl->jnl_seqno));
+			)
 			temp_read = 0;
 			temp_write = recvpool.recvpool_ctl->write;
 			recvpool.upd_proc_local->read = 0;
@@ -597,7 +601,7 @@ void updproc_actions(void)
 			rel_lock(jnlpool.jnlpool_dummy_reg);
 			rel_crit(gv_cur_region);
 			cumul_jnl_rec_len = 0;
-			if (0 == QWMODDW(jnl_seqno, 1000))
+			if (0 == QWMODDW(jnl_seqno, LOGTRNUM_INTERVAL))
 				repl_log(updproc_log_fp, TRUE, TRUE, "Committed NULL Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
 					INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
 			QWINCRBY(jnl_seqno, seq_num_one);
@@ -621,7 +625,7 @@ void updproc_actions(void)
 			v.str.addr = (char *)data_len + sizeof(mstr_len_t);
 			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_set.recov_short_time;
 			op_gvput(&v);
-			if (0 == QWMODDW(jnl_seqno, 1000))
+			if (0 == QWMODDW(jnl_seqno, LOGTRNUM_INTERVAL))
 				repl_log(updproc_log_fp, TRUE, TRUE, "Committed SET Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
 					INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
 			QWINCRBY(jnl_seqno, seq_num_one);
@@ -665,7 +669,7 @@ void updproc_actions(void)
 			gv_currkey->end = v.str.len;
 			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_kill.recov_short_time;
 			op_gvkill();
-			if (0 == QWMODDW(jnl_seqno, 1000))
+			if (0 == QWMODDW(jnl_seqno, LOGTRNUM_INTERVAL))
 				repl_log(updproc_log_fp, TRUE, TRUE, "Committed KILL Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
 					INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
 			QWINCRBY(jnl_seqno, seq_num_one);
@@ -684,7 +688,7 @@ void updproc_actions(void)
 			gv_currkey->end = v.str.len;
 			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_zkill.recov_short_time;
 			op_gvzwithdraw();
-			if (0 == QWMODDW(jnl_seqno, 1000))
+			if (0 == QWMODDW(jnl_seqno, LOGTRNUM_INTERVAL))
 				repl_log(updproc_log_fp, TRUE, TRUE, "Committed ZKILL Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
 					INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
 			QWINCRBY(jnl_seqno, seq_num_one);
@@ -751,7 +755,7 @@ void updproc_actions(void)
 					rts_error(VARLSTCNT(1) ERR_TPRETRY);
 #endif
 				}
-				if (0 == QWMODDW(jnl_seqno, 1000))
+				if (0 == QWMODDW(jnl_seqno, LOGTRNUM_INTERVAL))
 					repl_log(updproc_log_fp, TRUE, TRUE,
 						"Committed TCOM Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
 						INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
@@ -814,8 +818,6 @@ bool	upd_open_files(upd_proc_ctl **upd_db_files)
 		/* The assignment of Seqno needs to be done before checking the state of replication since receiver
 			server expects the update process to write Seqno in the recvpool before initiating
 			communication with the source server */
-		if (QWLT(max_resync_seqno, csa->hdr->resync_seqno))
-			QWASSIGN(max_resync_seqno, csa->hdr->resync_seqno);
 		if (!(recvpool.upd_proc_local->updateresync))
 		{
 			if (QWLT(start_jnl_seqno, csa->hdr->resync_seqno))
@@ -826,6 +828,11 @@ bool	upd_open_files(upd_proc_ctl **upd_db_files)
 			if (QWLT(start_jnl_seqno, csa->hdr->reg_seqno))
 				QWASSIGN(start_jnl_seqno, csa->hdr->reg_seqno);
 		}
+		/* max_resync_seqno should be set only after the test for updateresync because resync_seqno gets modified
+			to reg_seqno in case receiver is started with -updateresync option */
+		if (QWLT(max_resync_seqno, csa->hdr->resync_seqno))
+			QWASSIGN(max_resync_seqno, csa->hdr->resync_seqno);
+
 		repl_log(updproc_log_fp, TRUE, TRUE, "             -------->  start_jnl_seqno = "INT8_FMT" "INT8_FMTX"\n",
 			INT8_PRINT(start_jnl_seqno), INT8_PRINTX(start_jnl_seqno));
 		if (!REPL_ENABLED(csd))

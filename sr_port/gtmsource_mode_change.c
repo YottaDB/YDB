@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,22 +77,16 @@ int gtmsource_mode_change(int to_mode)
 		jnlpool.gtmsource_local->secondary_port = gtmsource_options.secondary_port;
 		jnlpool.gtmsource_local->secondary_inet_addr = gtmsource_options.sec_inet_addr;
 		strcpy(jnlpool.gtmsource_local->secondary, gtmsource_options.secondary_host);
-		jnlpool.gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT] =
-								gtmsource_options.connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT];
-		jnlpool.gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD] =
-								gtmsource_options.connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD];
-		jnlpool.gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD] =
-								gtmsource_options.connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD];
-		jnlpool.gtmsource_local->connect_parms[GTMSOURCE_CONN_ALERT_PERIOD] =
-								gtmsource_options.connect_parms[GTMSOURCE_CONN_ALERT_PERIOD];
+		memcpy(&jnlpool.gtmsource_local->connect_parms[0], &gtmsource_options.connect_parms[0],
+				sizeof(gtmsource_options.connect_parms));
 	}
 	if ('\0' != gtmsource_options.log_file[0] &&
 	    0 != strcmp(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file))
 	{
-		strcpy(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file);
-		jnlpool.gtmsource_local->changelog = TRUE;
 		repl_log(stdout, FALSE, TRUE, "Signalling change in log file from %s to %s\n",
 				jnlpool.gtmsource_local->log_file, gtmsource_options.log_file);
+		strcpy(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file);
+		jnlpool.gtmsource_local->changelog = TRUE;
 	}
 
 	jnlpool.gtmsource_local->mode = to_mode;

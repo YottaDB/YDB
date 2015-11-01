@@ -54,7 +54,6 @@
 #include "gvcst_search.h"
 #include "gvcst_search_blk.h"
 #include "gvcst_put.h"
-#include "tp_grab_crit.h"
 
 error_def(ERR_GVPUTFAIL);
 
@@ -72,7 +71,6 @@ GBLREF	uint4			t_err, process_id;
 GBLREF	cw_set_element		cw_set[];
 GBLREF	unsigned char		cw_set_depth;
 GBLREF 	unsigned int		t_tries;
-GBLREF	bool			run_time, is_db_updater;
 GBLREF	boolean_t		pool_init;
 GBLREF	boolean_t		horiz_growth;
 GBLREF	int4			prev_first_off, prev_next_off;
@@ -89,6 +87,7 @@ GBLREF	uint4			cumul_jnl_rec_len;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF  jnl_format_buffer       *non_tp_jfb_ptr;
 GBLREF  inctn_opcode_t          inctn_opcode;
+GBLREF	boolean_t		is_replicator;
 DEBUG_ONLY(GBLREF uint4		cumul_index;)
 
 static	block_id	lcl_root;
@@ -108,7 +107,7 @@ void	gvcst_put(mval *v)
 	boolean_t       	new_tn;
 	error_def(ERR_SCNDDBNOUPD);
 
-	if (FALSE == pool_init  &&  REPL_ENABLED(cs_data)  &&  (run_time || is_db_updater))
+	if ((FALSE == pool_init) && REPL_ENABLED(cs_data) && is_replicator)
 		jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
 	if (REPL_ENABLED(cs_data) && pool_init && jnlpool_ctl->upd_disabled && !is_updproc)
 		rts_error(VARLSTCNT(1) ERR_SCNDDBNOUPD);
@@ -213,16 +212,7 @@ static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
 		gbl_target_was_set = FALSE;
 		reset_gv_target = save_targ;
 	}
-	if (!((t_tries < CDB_STAGNATE) || cs_addrs->now_crit))	/* Final retry and this region not locked down */
-	{
-		if (0 == dollar_tlevel)				/* Ensure TP */
-			GTMASSERT;
-		if (FALSE == tp_grab_crit(gv_cur_region))	/* Attempt lockdown now */
-		{
-			status = cdb_sc_needcrit;		/* avoid deadlock -- restart transaction */
-			goto retry;
-		}
-	}
+	assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 	/* Assume we don't require an additional block split */
 	*extra_block_split_req = FALSE;
 	/* level_0 == true and no_pointers == false means that this is a directory tree data block containing pointers to roots */

@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include <time.h>
+#include <math.h> /* needed for handling of epoch_interval */
 
 #include "gtm_string.h"
 #include "gdsroot.h"

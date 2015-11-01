@@ -110,8 +110,8 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 unsigned char *n2s(mval *mv_ptr);
 char *s2n(mval *u);
 
-#define MV_FORCE_STR(X)		if (((X)->mvtype & MV_STR) == 0) n2s(X);
-#define MV_FORCE_NUM(X)		if (((X)->mvtype & MV_NM) == 0) s2n(X);
+#define MV_FORCE_STR(X)		((0 == ((X)->mvtype & MV_STR)) ? n2s(X) : NULL)
+#define MV_FORCE_NUM(X)		((0 == ((X)->mvtype & MV_NM )) ? s2n(X) : NULL)
 #define MV_FORCE_INT(M)		( (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2i(M) )
 #define MV_FORCE_ULONG_MVAL(M,I)   (((I) >= 1000000) ? i2usmval((M),(I)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (I)*MV_BIAS ))
@@ -749,5 +749,11 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define EXIT_MASK 	7
 #define MIN_FN_LEN	1
 #define MAX_FN_LEN	255
+#define MAX_TRANS_NAME_LEN	257
+
+#define MAX_ZWR_INFLATION	6 	/* Inflation of key length when converting to ZWR representation.
+					 * The worst case is that every other character is a non-graphic with a 3 digit code
+					 * e.g. "a"_$c(127)_"a"_$C(127)...
+					 * which leads to (n / 2 * 4) + n / 2 * 8) = n / 2 * 12 = n * 6 */
 
 #endif /* MDEF_included */
