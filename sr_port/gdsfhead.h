@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -420,6 +420,9 @@ void verify_queue(que_head_ptr_t qhdr);
 #define	MIN_FLUSH_TRIGGER(n_bts)	((n_bts)/4)	/* the minimum flush_trigger as a function of n_bts */
 #define	MAX_FLUSH_TRIGGER(n_bts)	((n_bts)*15/16)	/* the maximum flush_trigger as a function of n_bts */
 
+#define MIN_FILLFACTOR 30
+#define MAX_FILLFACTOR 100
+
 #ifdef DEBUG_DYNGRD
 #  define DEBUG_DYNGRD_ONLY(X) X
 #else
@@ -440,7 +443,7 @@ void verify_queue(que_head_ptr_t qhdr);
 			ENABLE_AST;				\
 	}							\
 }
-#elif UNIX
+#elif defined(UNIX)
 #define	DCLAST_WCS_WTSTART(reg, num_bufs, RET)	RET = wcs_wtstart(reg, num_bufs);
 #else
 #error UNSUPPORTED PLATFORM
@@ -540,7 +543,7 @@ n_db_csh_acct_rec_types
 
 enum tp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] */
 {
-	tp_blkmod_gvcst_put = 0,
+	tp_blkmod_nomod = 0,
 	tp_blkmod_gvcst_srch,
 	tp_blkmod_t_qread,
 	tp_blkmod_tp_tend,
@@ -1099,6 +1102,10 @@ typedef struct	sgmnt_addrs_struct
 						   have a unique prefix per region (and all regions have same prefix)
 						*/
 	int4		n_pre_read_trigger;	/* For update process to keep track of progress and when to trigger pre-read */
+	boolean_t	replinst_matches_db;	/* TRUE if replication instance file name stored in db shared memory matches the
+						 * instance file name stored in the journal pool that this process has attached to.
+						 * Updates are allowed to this replicated database only if this is TRUE.
+						 */
 } sgmnt_addrs;
 
 
@@ -1224,7 +1231,7 @@ typedef struct	gv_namehead_struct
 	}											\
 }
 
-#define COPY_SUBS_TO_GVCURRKEY(var, gv_currkey, was_null, is_null)								\
+#define COPY_SUBS_TO_GVCURRKEY(mvarg, gv_currkey, was_null, is_null)								\
 {																\
 	GBLREF mv_stent		*mv_chain;											\
 	GBLREF unsigned char	*msp, *stackwarn, *stacktop;									\
@@ -1234,16 +1241,15 @@ typedef struct	gv_namehead_struct
 	error_def(ERR_STACKCRIT);												\
 																\
 	was_null |= is_null;													\
-	val = va_arg(var, mval *);												\
-	if (val->mvtype & MV_SUBLIT)												\
+	if (mvarg->mvtype & MV_SUBLIT)												\
 	{															\
-		is_null = ((STR_SUB_PREFIX == *(unsigned char *)val->str.addr) && (KEY_DELIMITER == *(val->str.addr + 1))); 	\
+		is_null = ((STR_SUB_PREFIX == *(unsigned char *)mvarg->str.addr) && (KEY_DELIMITER == *(mvarg->str.addr + 1))); \
 		if (gv_target->collseq || gv_target->nct)									\
 		{														\
 			assert(dba_cm != gv_cur_region->dyn.addr->acc_meth); /* collation transformation should be done at the	\
 										server's end for CM regions */			\
 			transform = FALSE;											\
-			end = gvsub2str((uchar_ptr_t)val->str.addr, buff, FALSE);						\
+			end = gvsub2str((uchar_ptr_t)mvarg->str.addr, buff, FALSE);						\
 			transform = TRUE;											\
 			/* it does not seem like we need the PUSH_MV_STENT and POP_MV_STENT here --- nars - 2003/09/17 */	\
 			PUSH_MV_STENT(MVST_MVAL);										\
@@ -1255,14 +1261,14 @@ typedef struct	gv_namehead_struct
 			POP_MV_STENT(); /* temp */										\
 		} else														\
 		{														\
-			len = val->str.len;											\
+			len = mvarg->str.len;											\
 			if (gv_currkey->end + len - 1 >= max_key)								\
 			{													\
 				if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))			\
 					end = &buff[MAX_ZWR_KEY_SZ - 1];							\
 				rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);			\
 			}													\
-			memcpy((gv_currkey->base + gv_currkey->end), val->str.addr, len);					\
+			memcpy((gv_currkey->base + gv_currkey->end), mvarg->str.addr, len);					\
 			if (is_null && 0 != gv_cur_region->std_null_coll)							\
 				gv_currkey->base[gv_currkey->end] = SUBSCRIPT_STDCOL_NULL;					\
 			gv_currkey->prev = gv_currkey->end;									\
@@ -1270,14 +1276,14 @@ typedef struct	gv_namehead_struct
 		}														\
 	} else															\
 	{															\
-		mval2subsc(val, gv_currkey);											\
+		mval2subsc(mvarg, gv_currkey);											\
 		if (gv_currkey->end >= max_key)											\
 		{														\
 			if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))				\
 				end = &buff[MAX_ZWR_KEY_SZ - 1 ];								\
 			rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);				\
 		}														\
-	 	is_null = (MV_IS_STRING(val) && (0 == val->str.len));								\
+	 	is_null = (MV_IS_STRING(mvarg) && (0 == mvarg->str.len));							\
 	}															\
 }
 
@@ -1430,17 +1436,17 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 #define INVALID_SHMID -1
 
 #if defined(UNIX)
-#define DB_FSYNC(reg, udi, csa, db_fsync_in_prog)						\
+#define DB_FSYNC(reg, udi, csa, db_fsync_in_prog, save_errno)					\
 {												\
-	error_def(ERR_DBFSYNCERR);								\
 	BG_TRACE_PRO_ANY(csa, n_db_fsyncs);							\
 	if (csa->now_crit)									\
 		BG_TRACE_PRO_ANY(csa, n_db_fsyncs_in_crit);					\
 	db_fsync_in_prog++;									\
+	save_errno = 0;										\
 	if (-1 == fsync(udi->fd))								\
 	{											\
 		db_fsync_in_prog--;								\
-		rts_error(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), errno);		\
+		save_errno = errno;								\
 	}											\
 	db_fsync_in_prog--;									\
 	assert(0 <= db_fsync_in_prog);								\
@@ -1562,7 +1568,6 @@ void jnl_write_inctn_rec(sgmnt_addrs *csa);
 void fileheader_sync(gd_region *reg);
 
 gd_addr *create_dummy_gbldir(void);
-gv_namehead *tp_get_target(sm_uc_ptr_t buffaddr);
 
 #include "gdsfheadsp.h"
 

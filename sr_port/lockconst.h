@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,7 @@
         /* above tries a fast pretest before calling load_and_clear to actually
            get the latch */
 #  define RELEASE_LATCH_GLOBAL(a) release_spinlock(a)
-#  define SET_LATCH_GLOBAL(a, b)	{RELEASE_LATCH_GLOBAL(a); SET_LATCH(a, b);}
+#  define SET_LATCH_GLOBAL(a, b)	{RELEASE_LATCH_GLOBAL(a); assert(LOCK_AVAILABLE == b); SET_LATCH(a, b);}
 
 #elif defined(__sparc) && defined(SPARCV8_NO_CAS)
 /* For Sun sparc, we use the extra word of the latch for a micro lock for compswap. Future

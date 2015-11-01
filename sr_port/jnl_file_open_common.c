@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,9 +58,7 @@ GBLREF	boolean_t		pool_init;
 GBLREF  jnl_process_vector      *prc_vec;
 
 error_def(ERR_FILEIDMATCH);
-error_def(ERR_JNLACCESS);
 error_def(ERR_JNLBADLABEL);
-error_def(ERR_JNLDBERR);
 error_def(ERR_JNLOPNERR);
 error_def(ERR_JNLRDERR);
 error_def(ERR_JNLBADRECFMT);

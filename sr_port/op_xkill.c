@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,13 +11,13 @@
 
 #include "mdef.h"
 
+#include <stdarg.h>
 #include "gtm_string.h"
 
 #include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "hashtab.h"
 #include "lv_val.h"
 #include "op.h"
-#include <varargs.h>
 
 typedef struct
 {
@@ -29,11 +29,10 @@ typedef struct
 GBLREF symval *curr_symval;
 GBLREF lv_val *active_lv;
 
-void op_xkill(va_alist)
-va_dcl
+void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 {
 	va_list		var;
-	int		n;
+	VMS_ONLY(int	n;)
 	save_lv		saved[MAX_SAVED_LV], *s, *s_top, *s_bot;
 	lv_val		*lv;
 	mval		*lvname;
@@ -43,13 +42,14 @@ va_dcl
 
 	active_lv = (lv_val *)0;	/* if we get here, subscript set was successful.  clear active_lv to avoid later
 						cleanup problems */
-	VAR_START(var);
-	n = va_arg(var, int4);
+	VAR_START(var, lvname_arg);
+	VMS_ONLY(va_count(n);)
+	lvname = lvname_arg;
+	assert(0 < n);
 	s = s_bot = &saved[0];
 	s_top = s + MAX_SAVED_LV;
-	for (;  n-- > 0;)
+	for (;  0 < n;)
 	{
-		lvname = va_arg(var, mval *);
 		MV_FORCE_STR(lvname);
 		if (lvname->str.len)
 		{	/* convert mval to var_tabent and see if it is in the symbol table */
@@ -69,10 +69,18 @@ va_dcl
 				lv->ptrs.val_ent.children = 0;
 				s++;
 				if (s >= s_top)
+				{
+					va_end(var);
 					rts_error(VARLSTCNT(3) ERR_XKILLCNTEXC, 1, MAX_SAVED_LV);
+				}
 			}
 		}
-	}
+		if (0 < --n)
+			lvname = va_arg(var, mval *);
+		else
+			break;
+	};
+	va_end(var);
 	op_killall();
 
 	/* restore the saved variables */

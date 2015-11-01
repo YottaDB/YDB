@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,17 +13,12 @@
 
 #include "gtm_string.h"
 
-#ifdef EARLY_VARARGS
-#include <varargs.h>
-#endif
+#include <stdarg.h>
 
 #include <errno.h>
 
 #include "gtm_stdlib.h"
 
-#ifndef EARLY_VARARGS
-#include "varargs.h"
-#endif
 #include "stringpool.h"
 #include "copy.h"
 #include "rtnhdr.h"
@@ -247,14 +242,9 @@ static int	extarg_getsize(void *src, enum xc_types typ, mval *dst)
 	}
 }
 
-void	op_fnfgncal (n_mvals, dst, package, extref, mask, argcnt, va_alist)
-uint4	n_mvals;
-mval	*dst, *package, *extref;
-uint4	mask;
-int4	argcnt;
-va_dcl
+void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
 {
-	va_list		var, save_var;
+	va_list		var;
 	int		i;
 	int4 		callintogtm_vectorindex;
 	mval		*arg, *v;
@@ -277,16 +267,11 @@ va_dcl
 	error_def	(ERR_ZCCTENV);
 	error_def	(ERR_XCVOIDRET);
 
-	/* As we may have to pass the M input parameters more than once, save the
-	current var_args var pointer */
-	VAR_START(var);
-	VAR_COPY(save_var, var);
 	assert(n_mvals == argcnt + 5);
 	assert(MV_IS_STRING(package));	/* package and routine are literal strings */
 	assert(MV_IS_STRING(extref));
 	if (MAXIMUM_PARAMETERS < argcnt)
 		rts_error(VARLSTCNT(1) ERR_ZCMAXPARAM);
-		;
 	/* find package */
 	for (package_ptr = extcall_package_root;  package_ptr;  package_ptr = package_ptr->next_package)
 	{
@@ -321,10 +306,11 @@ va_dcl
 	/* It is an error to have more actual parameters than formal parameters */
 	if (argcnt > entry_ptr->argcnt)
 		rts_error(VARLSTCNT(4) ERR_ZCARGMSMTCH, 2, argcnt, entry_ptr->argcnt);
+	VAR_START(var, argcnt);
 	/* compute size of parameter block */
 	n = entry_ptr->parmblk_size;	/* This is enough for the parameters and the fixed length entries */
 	/* Now, add enough for the char *'s and the char **'s */
-	for (i = 0, VAR_COPY(var, save_var), m1 = entry_ptr->input_mask;  i < argcnt;  i++, m1 = m1 >> 1)
+	for (i = 0, m1 = entry_ptr->input_mask;  i < argcnt;  i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		/* if it is an input value of char* or char **, add the length */
@@ -356,11 +342,13 @@ va_dcl
 				break;
 			}
 	}
+	va_end(var);
 	param_list = (struct param_list_struct *)malloc(n);
 	free_space_pointer = (int4 *)((char *)param_list + sizeof(int) + sizeof(void *)*argcnt);
 	free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
 	/* load-up the parameter list */
-	for (i = 0, VAR_COPY(var, save_var), m1 = entry_ptr->input_mask;  i < argcnt;  i++, m1 = m1 >> 1)
+	VAR_START(var, argcnt);
+	for (i = 0, m1 = entry_ptr->input_mask;  i < argcnt;  i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		/* Verify that all input values are defined */
@@ -450,10 +438,12 @@ va_dcl
 			free_space_pointer++;
 			break;
 		default:
+			va_end(var);
 			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
 			break;
 		}
 	}
+	va_end(var);
 	param_list->n = argcnt;
 	save_mumps_status = mumps_status; /* save mumps_status as a callin from external call may change it */
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
@@ -468,23 +458,27 @@ va_dcl
 	/* NOTE: ADD RETURN STATUS CALCUATIONS HERE */
 	/* compute space requirement for return values */
 	n = 0;
-	for (i = 0, VAR_COPY(var, save_var), m1 = mask & entry_ptr->output_mask;  i < argcnt;  i++, m1 = m1 >> 1)
+	VAR_START(var, argcnt);
+	for (i = 0, m1 = mask & entry_ptr->output_mask;  i < argcnt;  i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		if (m1 & 1)
 			n += extarg_getsize(param_list->arg[i], entry_ptr->parms[i], v);
 	}
+	va_end(var);
 	if (dst)
 		n += extarg_getsize((void *)&status, xc_status, dst);
 	if (stringpool.free + n > stringpool.top)
 		stp_gcol(n);
 	/* convert return values */
-	for (i = 0, VAR_COPY(var, save_var), m1 = mask & entry_ptr->output_mask;  i < argcnt;  i++, m1 = m1 >> 1)
+	VAR_START(var, argcnt);
+	for (i = 0, m1 = mask & entry_ptr->output_mask;  i < argcnt;  i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		if (m1 & 1)
 			extarg2mval((void *)param_list->arg[i], entry_ptr->parms[i], v);
 	}
+	va_end(var);
 	if (dst)
 	{
 		if (entry_ptr->return_type != xc_void)

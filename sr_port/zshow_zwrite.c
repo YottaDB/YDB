@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,6 @@ void zshow_zwrite(zshow_out *output)
 	pat.str.len = sizeof_pat_everything - 1;
 	MV_FORCE_MVAL(&mv,ZWRITE_ASTERISK) ;
 	n2s(&mv);
-	op_lvpatwrite(VARLSTCNT(3) output, &pat, &mv);
+	op_lvpatwrite(VARLSTCNT(3) (int4)output, &pat, &mv);
 	return;
 }

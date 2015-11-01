@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -44,12 +44,6 @@ if ( $?gtm_version_change == "1" ) then
 
 	# C definitions:
 
-	# this is a temporary "fix", until we use stdargs, rather than varargs,
-	# since that is supposed to happen soon, we will keep this fix, simple (and dirty)
-	if ("scylla" == "$HOST:r:r") then
-		setenv gt_cc_compiler "gcc-2.95"
-	endif
-
 	# generate position independent code
 	setenv 	gt_cc_shl_fpic		"-fPIC"
 
@@ -59,7 +53,8 @@ if ( $?gtm_version_change == "1" ) then
 	#		POSIX 199506 but doesnt so...
 	#	   -fsigned-char for Linux390 but shouldn't hurt x86
 
-#	setenv	gt_cc_options_common	"-c -ansi -D_XOPEN_SOURCE=500 -D_BSD_SOURCE -D_POSIX_C_SOURCE=199506L -D_FILE_OFFSET_BITS=64 -DFULLBLOCKWRITES -fsigned-char"
+#	setenv	gt_cc_options_common	"-c -ansi -D_XOPEN_SOURCE=500 -D_BSD_SOURCE -D_POSIX_C_SOURCE=199506L
+#	setenv	gt_cc_options_common	"$gt_cc_options_common -D_FILE_OFFSET_BITS=64 -DFULLBLOCKWRITES -fsigned-char"
 #	_GNU_SOURCE includes _XOPEN_SOURCE=400, _BSD_SOURCE, and _POSIX_C_SOURCE-199506L among others
 	setenv	gt_cc_options_common	"-c -ansi -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -fsigned-char"
 	setenv gt_cc_options_common "$gt_cc_options_common $gt_cc_shl_fpic -Wimplicit -Wmissing-prototypes"
@@ -69,8 +64,10 @@ if ( $?gtm_version_change == "1" ) then
             setenv gt_cc_options_common "$gt_cc_options_common -DNeedInAddrPort"
         endif
 
-	# Linux gcc optimizations cause problems so do without them for now.
-	setenv	gt_cc_option_optimize	$gt_cc_option_nooptimize
+# -fno-defer-pop to prevent problems with assembly/generated code with optimization
+# -fno-strict-aliasing since we don't comply with the rules
+# -ffloat-store for consistent results avoiding rounding differences
+	setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store"
 
 	# -g	generate debugging information for dbx (no longer overrides -O)
 	setenv	gt_cc_option_debug	"-g"

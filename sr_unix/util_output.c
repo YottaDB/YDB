@@ -13,15 +13,8 @@
 
 #include "gtm_string.h"
 
-/* LinuxIA32/gcc needs stdio before varargs due to stdarg */
-/* Linux390/gcc needs varargs before stdarg */
-#ifdef EARLY_VARARGS
-#include <varargs.h>
-#endif
+#include <stdarg.h>
 #include "gtm_stdio.h"
-#ifndef EARLY_VARARGS
-#include <varargs.h>
-#endif
 #include "gtm_syslog.h"
 #include <errno.h>
 
@@ -121,12 +114,14 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 		{
 			if (schar == '\0')
 			{
+				va_end(last_va_list_ptr);	/* reset before using as dest in copy */
 				VAR_COPY(last_va_list_ptr, fao);
 				return outptr;
 			}
 			*outptr++ = schar;
 			if (outptr >= outtop)
 			{
+				va_end(last_va_list_ptr);	/* reset before using as dest in copy */
 				VAR_COPY(last_va_list_ptr, fao);
 				return outptr;
 			}
@@ -368,6 +363,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 				}
 		}
 	}
+	va_end(last_va_list_ptr);	/* reset before using as dest in copy */
 	VAR_COPY(last_va_list_ptr, fao);
 	return outptr;
 }
@@ -479,18 +475,15 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 
 }
 
-void	util_out_print(va_alist)
-va_dcl
+void	util_out_print(caddr_t message, int flush, ...)
 {
 	va_list	var;
-	caddr_t	message;
-	int	flush;
 
-	va_start(var);
-	message = va_arg(var, caddr_t);
-	flush = va_arg(var, int);
+	va_start(var, flush);
 
 	util_out_print_vaparm(message, flush, var, MAXPOSINT4);
+	va_end(last_va_list_ptr);
+	va_end(var);
 }
 
 /* If $x of the standard output device is non-zero, and we are going to flush a buffer,

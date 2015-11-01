@@ -155,10 +155,10 @@ static	void	mur_show_jpv(jnl_process_vector	*pv, boolean_t print_header)
 	term_len = real_len(JPV_LEN_TERMINAL,	(unsigned char *)pv->jpv_terminal);
 	if (print_header)
 	{
-		util_out_print(proc_header, TRUE);
-		util_out_print(dashes_fao, TRUE, sizeof(proc_header) - 1);
+		util_out_print((caddr_t)proc_header, TRUE);
+		util_out_print((caddr_t)dashes_fao, TRUE, sizeof(proc_header) - 1);
 	}
-	util_out_print(proc_fao, TRUE, pv->jpv_pid, node_len, pv->jpv_node, user_len, pv->jpv_user,
+	util_out_print((caddr_t)proc_fao, TRUE, pv->jpv_pid, node_len, pv->jpv_node, user_len, pv->jpv_user,
 		term_len, pv->jpv_terminal, jpv_time_len, jpv_time_str);
 }
 
@@ -316,10 +316,10 @@ void	mur_output_show()
 			if (mur_options.show & SHOW_STATISTICS)
 			{
 				assert(CLI_PRESENT == cli_present("SHOW"));
-				util_out_print(statistics_header, TRUE);
-				util_out_print(dashes_fao, TRUE, STR_LIT_LEN(statistics_header));
+				util_out_print((caddr_t)statistics_header, TRUE);
+				util_out_print((caddr_t)dashes_fao, TRUE, STR_LIT_LEN(statistics_header));
 				for (rectype = JRT_BAD;  rectype < JRT_RECTYPES;  ++rectype)
-					util_out_print(statistics_fao, TRUE, jrt_label[rectype], jctl->jnlrec_cnt[rectype]);
+					util_out_print((caddr_t)statistics_fao, TRUE, jrt_label[rectype], jctl->jnlrec_cnt[rectype]);
 			}
 			jctl = jctl->next_gen;
 			if ((CLI_PRESENT == cli_present("SHOW")) || !first_time)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,7 +96,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				continue;
 			}
 			assert(0 < blk->block);
-			assert((int4)blk->block <= cs_addrs->ti->total_blks);
+			assert((int4)blk->block < cs_addrs->ti->total_blks);
 			bit_map = ROUND_DOWN2((int)blk->block, BLKS_PER_LMAP);
 			next_bm = bit_map + BLKS_PER_LMAP;
 			/* Scan for the next local bitmap */
@@ -161,7 +161,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 		if (0 != blk->flag)
 			continue;
 		assert(0 < blk->block);
-		assert((int4)blk->block <= cs_addrs->ti->total_blks);
+		assert((int4)blk->block < cs_addrs->ti->total_blks);
 		assert(!IS_BITMAP_BLK(blk->block));
 		bit_map = ROUND_DOWN2((int)blk->block, BLKS_PER_LMAP);
 		assert(dba_bg == cs_addrs->hdr->acc_meth);

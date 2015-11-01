@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,13 +9,13 @@
  *								*
  ****************************************************************/
 
-#ifndef __CLI_DISALLOW_H__
-#define __CLI_DISALLOW_H__
+#ifndef CLI_DISALLOW_H
+#define CLI_DISALLOW_H
 
 void cli_err_strcat(char *str);
 boolean_t d_c_cli_present(char *str);
 boolean_t d_c_cli_negated(char *str);
-boolean_t cli_check_any2();
+boolean_t cli_check_any2(int argcnt, ...);
 boolean_t check_disallow(CLI_ENTRY *pparm);
 
 #define CLI_DIS_CHECK_N_RESET	if (disallow_return_value) return TRUE; *cli_err_str_ptr = '\0';

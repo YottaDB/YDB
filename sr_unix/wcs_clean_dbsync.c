@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -129,11 +129,21 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		{
 			/* Note that if we are here, we have obtained crit using tp_grab_crit. */
 			assert(csa->ti->early_tn == csa->ti->curr_tn);
-			/* Note that the following wcs_flu() asks for an epoch to be synced. But if not before-imaging,
-			 * it will just flush the file-header which is exactly what we want in that case.
+			/* Do not invoke wcs_flu if the database has a newer journal file than what this process had open when the
+			 * dbsync timer was started in wcs_wtstart. This is because mainline (non-interrupt) code in
+			 * jnl_write_attempt/jnl_output_sp assumes that interrupt code will not update jpc structures to
+			 * point to latest journal file (i.e. will not do a jnl_ensure_open) but wcs_flu might invoke just that.
+			 * It is ok not to do a wcs_flu since whichever process did the journal switch would have written the
+			 * EPOCH record in the older generation journal file. Therefore there is no need to start a new dbsync
+			 * timer in this case.
 			 */
-			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-			BG_TRACE_PRO_ANY(csa, n_dbsync_writes);
+			if (!jpc || (NOJNL == jpc->channel) || !JNL_FILE_SWITCHED(jpc))
+			{	/* Note that the following wcs_flu() asks for an epoch to be synced. But if not before-imaging,
+				 * it will just flush the file-header which is exactly what we want in that case.
+				 */
+				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
+				BG_TRACE_PRO_ANY(csa, n_dbsync_writes);
+			}
 			dbsync_defer_timer = FALSE;
 			rel_crit(reg);
 		}

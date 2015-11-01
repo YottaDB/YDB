@@ -139,7 +139,7 @@ boolean_t dse_b_dmp(void)
 				memcpy(&util_buff[util_len], "!/", 2);
 				util_len += 2;
 				util_buff[util_len] = 0;
-				util_out_print(util_buff, TRUE, ((blk_hdr_ptr_t) bp)->levl );
+				util_out_print((caddr_t)util_buff, TRUE, ((blk_hdr_ptr_t) bp)->levl );
 			}
 			rp = bp + sizeof(blk_hdr);
 			if (CLI_PRESENT != head && (!patch_is_fdmp || ((blk_hdr_ptr_t) bp)->levl == 0))
@@ -175,7 +175,7 @@ boolean_t dse_b_dmp(void)
 					memcpy(&util_buff[util_len], "   Master Status: Cannot Determine (bplmap == 0)!/", 50);
 					util_len += 50;
 					util_buff[util_len] = 0;
-					util_out_print(util_buff, TRUE );
+					util_out_print((caddr_t)util_buff, TRUE );
 				} else
 				{
 					mb = cs_addrs->bmm + blk / (8 * bplmap);
@@ -198,17 +198,17 @@ boolean_t dse_b_dmp(void)
 					memcpy(&util_buff[util_len], gtm_dbversion_table[ondsk_blkver], len);
 					util_len += len;
 					util_buff[util_len] = 0;
-					util_out_print(util_buff, FALSE, ((blk_hdr_ptr_t) bp)->levl );
+					util_out_print((caddr_t)util_buff, FALSE, ((blk_hdr_ptr_t) bp)->levl );
 					util_len = 0;
 					memcpy(&util_buff[util_len], "   Master Status: !AD!/",23);
 					util_len = 23;
 					util_buff[util_len] = 0;
-					util_out_print(util_buff, TRUE, free ? 10 : 4, free ? "Free Space" : "Full");
+					util_out_print((caddr_t)util_buff, TRUE, free ? 10 : 4, free ? "Free Space" : "Full");
 				}
 			}
 			if (CLI_PRESENT != head)
 			{
-				util_out_print ("           !_Low order                         High order", TRUE);
+				util_out_print("           !_Low order                         High order", TRUE);
 
 				lmap_num = 0;
 				while (lmap_num < bplmap)
@@ -219,30 +219,30 @@ boolean_t dse_b_dmp(void)
 					memcpy(&util_buff[util_len], ":!_|  ", 6);
 					util_len += 6;
 					util_buff[util_len] = 0;
-					util_out_print (util_buff, FALSE);
+					util_out_print((caddr_t)util_buff, FALSE);
 					for (iter1 = 0; iter1 < 4; iter1++)
 					{
 						for (iter2 = 0; iter2 < 8; iter2++)
 						{
 							mask = dse_lm_blk_free(lmap_num * BML_BITS_PER_BLK, bp + sizeof(blk_hdr));
 							if (!mask)
-								util_out_print ("!AD", FALSE, 1, BUSY_CHAR);
+								util_out_print("!AD", FALSE, 1, BUSY_CHAR);
 							else if (BLK_FREE == mask)
-								util_out_print ("!AD", FALSE, 1, FREE_CHAR);
+								util_out_print("!AD", FALSE, 1, FREE_CHAR);
 							else if (BLK_RECYCLED == mask)
-								util_out_print ("!AD", FALSE, 1, REUSABLE_CHAR);
+								util_out_print("!AD", FALSE, 1, REUSABLE_CHAR);
 							else {
 								invalid_bitmap = TRUE;
-								util_out_print ("!AD", FALSE, 1, CORRUPT_CHAR);
+								util_out_print("!AD", FALSE, 1, CORRUPT_CHAR);
 							}
 							if (++lmap_num >= bplmap)
 								break;
 						}
-						util_out_print ("  ", FALSE);
+						util_out_print("  ", FALSE);
 						if (lmap_num >= bplmap)
 							break;
 					}
-					util_out_print ("|", TRUE);
+					util_out_print("|", TRUE);
 					if (util_interrupt)
 					{
 						if (!was_crit)

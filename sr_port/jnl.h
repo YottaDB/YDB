@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -233,6 +233,8 @@ typedef struct
 	volatile boolean_t	need_db_fsync;          /* need an fsync of the db file */
 	volatile int4		io_in_prog;		/* VMS only: write in progress indicator (NOTE: must manipulate
 										only with interlocked instructions */
+	uint4			enospc_errcnt;		/* number of times jb->errcnt was last incremented due to ENOSPC error
+							 * when writing to this journal file */
 	/* CACHELINE_PAD macros provide spacing between the following latches so that they do
 	   not interfere with each other which can happen if they fall in the same data cacheline
 	   of a processor.

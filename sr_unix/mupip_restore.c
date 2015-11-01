@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,7 +66,7 @@
 #include "min_max.h"
 
 #define COMMON_READ(S, BUFF, LEN)				\
-        {							\
+	{							\
 		assert(BACKUP_TEMPFILE_BUFF_SIZE >= LEN);	\
 		(*common_read)(S, BUFF, LEN);			\
 		if (0 != restore_read_errno)			\
@@ -121,10 +121,10 @@ void mupip_restore(void)
 	uint4			cli_status;
 	BFILE			*in;
 	int			i, db_fd;
- 	uint4			old_blk_size, old_tot_blks, bplmap;
+	uint4			old_blk_size, old_tot_blks, bplmap, old_bit_maps, new_bit_maps;
 	off_t			new_eof, offset;
 	char			buff[DISK_BLOCK_SIZE];
- 	char			msg_buffer[1024], *newmap, *newmap_bptr;
+	char			msg_buffer[1024], *newmap, *newmap_bptr;
 	mstr			msg_string;
 	char			addr[SA_MAXLEN+1];
 	unsigned char		tcp[5];
@@ -198,7 +198,8 @@ void mupip_restore(void)
 	old_blk_size = old_data->blk_size;
 	old_tot_blks = old_data->trans_hist.total_blks;
 	old_start_vbn = old_data->start_vbn;
- 	bplmap = old_data->bplmap;
+	bplmap = old_data->bplmap;
+	old_bit_maps = DIVIDE_ROUND_DOWN(old_tot_blks, bplmap);
 	inbuf = (char *)malloc(BACKUP_TEMPFILE_BUFF_SIZE);
 	sblkh_p = (shmpool_blk_hdr_ptr_t)inbuf;
 	free(old_data);
@@ -347,6 +348,7 @@ void mupip_restore(void)
 			mu_gv_cur_reg_free();
 			mupip_exit(ERR_MUPRESTERR);
 		}
+		new_bit_maps = DIVIDE_ROUND_DOWN(inhead->db_total_blks, bplmap);
 		if (old_tot_blks != inhead->db_total_blks)
 		{
 			if (old_tot_blks > inhead->db_total_blks || !extend)
@@ -391,8 +393,8 @@ void mupip_restore(void)
 					mupip_exit(ERR_MUPRESTERR);
 				}
 				/* --- initialize all new bitmaps, just in case they are not touched later --- */
-        			if (DIVIDE_ROUND_DOWN(inhead->db_total_blks, bplmap) > DIVIDE_ROUND_DOWN(old_tot_blks, bplmap))
-        			{	/* -- similar logic exist in bml_newmap.c, which need to pick up any new updates here -- */
+				if (new_bit_maps > old_bit_maps)
+				{	/* -- similar logic exist in bml_newmap.c, which need to pick up any new updates here -- */
 					newmap = (char *)malloc(old_blk_size);
 					((blk_hdr *)newmap)->bver = GDSVCURR;
 					((blk_hdr *)newmap)->bsiz = BM_SIZE(bplmap);
@@ -401,12 +403,12 @@ void mupip_restore(void)
 					newmap_bptr = newmap + sizeof(blk_hdr);
 					*newmap_bptr++ = THREE_BLKS_FREE;
 					memset(newmap_bptr, FOUR_BLKS_FREE, BM_SIZE(bplmap) - sizeof(blk_hdr) - 1);
-			                for (ii = ROUND_UP(old_tot_blks, bplmap); ii < inhead->db_total_blks; ii += bplmap)
-                			{
+					for (ii = ROUND_UP(old_tot_blks, bplmap); ii < inhead->db_total_blks; ii += bplmap)
+					{
 						new_eof = (off_t)(old_start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)ii * old_blk_size;
 						LSEEKWRITE(db_fd, new_eof, newmap, old_blk_size, status);
 						if (0 != status)
-                        			{
+						{
 							util_out_print("Aborting restore!/", TRUE);
 							util_out_print("Bitmap 0x!XL initialization error!", TRUE, ii);
 							gtm_putmsg(VARLSTCNT(1) status);
@@ -439,7 +441,8 @@ void mupip_restore(void)
 					       TRUE, ptr->input_file.len,
 					       ptr->input_file.addr);
 				assert(FALSE);
-				iob_close(in);
+				if (backup_to_file == type)
+					iob_close(in);
 				free(inbuf);
 				db_ipcs_reset(gv_cur_region, TRUE);
 				mu_gv_cur_reg_free();
@@ -523,7 +526,7 @@ void mupip_restore(void)
 		assert(SGMNT_HDR_LEN == offset);	/* Still have contiguou master map for now */
 		for (i = 0;  ;  i++)			/* Restore master map */
 		{
-		    	COMMON_READ(in, inbuf, rsize);
+			COMMON_READ(in, inbuf, rsize);
 			if (!MEMCMP_LIT(inbuf, MAP_MSG))
 				break;
 			LSEEKWRITE(db_fd,
@@ -566,7 +569,7 @@ void mupip_restore(void)
 	free(inbuf);
 	db_ipcs_reset(gv_cur_region, FALSE);
 	mu_gv_cur_reg_free();
- 	mupip_exit(SS_NORMAL);
+	mupip_exit(SS_NORMAL);
 }
 
 static void exec_read(BFILE *bf, char *buf, int nbytes)
@@ -631,9 +634,9 @@ static void tcp_read(BFILE *bf, char *buf, int nbytes)
 		/* Note: the check for EINTR from the select below should remain, as aa_select is a
 		 * function, and not all callers of aa_select behave the same when EINTR is returned.
 		 */
-                save_nap = nap;
+		save_nap = nap;
 		status = tcp_routines.aa_select(bf->fd + 1, (void *)(&fs), (void *)0, (void *)0, &nap);
-                nap = save_nap;
+		nap = save_nap;
 
 		if (status > 0)
 		{

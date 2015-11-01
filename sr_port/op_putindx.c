@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,7 @@
 
 #include "gtm_string.h"
 
-#include <varargs.h>
+#include <stdarg.h>
 
 #include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
@@ -27,16 +27,15 @@ GBLDEF lv_val		*active_lv;
 GBLDEF bool		lv_null_subs = TRUE;
 GBLREF collseq		*local_collseq;
 
-lv_val	*op_putindx(va_alist)
-va_dcl
+lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 {
 	int	subs_level;
 	mval	tmp_sbs;
         int	length;
 	va_list	var;
-	int	argcnt;
 	int4	temp;
-	lv_val	*lv, *start;
+	VMS_ONLY(int	argcnt;)
+	lv_val	*lv;
  	lv_sbs_tbl *tbl;
  	sbs_blk	*blk;
        	sbs_search_status status;
@@ -44,9 +43,8 @@ va_dcl
 	boolean_t is_canonical;
 	error_def(ERR_LVNULLSUBS);
 
-	VAR_START(var);
-	argcnt = va_arg(var, int4);
-	start = va_arg(var, lv_val *);
+	VAR_START(var, start);
+	VMS_ONLY(va_count(argcnt);)
 	if (NULL != start->tp_var)		/* if this variable is marked as a Transaction Processing protected variable, */
 		tp_var_clone(start);	/*	 clone the tree. */
 	for (subs_level = 1 + ((MV_SBS != start->ptrs.val_ent.parent.sbs->ident) ? 0 : start->ptrs.val_ent.parent.sbs->level);
@@ -59,6 +57,7 @@ va_dcl
 			if (!key->str.len && !lv_null_subs)
 			{
 				active_lv = start;
+				va_end(var);
 				rts_error(VARLSTCNT(1) ERR_LVNULLSUBS);
 			}
 		}
@@ -159,6 +158,7 @@ va_dcl
 		}
 		tbl->level = subs_level;
 	}
+	va_end(var);
 	active_lv = lv;
 	return lv;
 }

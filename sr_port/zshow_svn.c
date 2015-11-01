@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,6 +75,7 @@ static readonly char trestart_text[] = "$TRESTART";
 static readonly char x_text[] = "$X";
 static readonly char y_text[] = "$Y";
 static readonly char za_text[] = "$ZA";
+static readonly char zallocstor_text[] = "$ZALLOCSTOR";
 static readonly char zb_text[] = "$ZB";
 static readonly char zcmdline_text[] = "$ZCMDLINE";
 static readonly char zcompile_text[] = "$ZCOMPILE";
@@ -95,6 +96,7 @@ static readonly char zmode_text[] = "$ZMODE";
 static readonly char zproc_text[] = "$ZPROCESS";
 static readonly char zprompt_text[] = "$ZPROMPT";
 static readonly char zpos_text[] = "$ZPOSITION";
+static readonly char zrealstor_text[] = "$ZREALSTOR";
 static readonly char zroutines_text[] = "$ZROUTINES";
 static readonly char zsource_text[] = "$ZSOURCE";
 static readonly char zstatus_text[] = "$ZSTATUS";
@@ -102,6 +104,7 @@ static readonly char zstep_text[] = "$ZSTEP";
 static readonly char zsystem_text[] = "$ZSYSTEM";
 static readonly char ztexit_text[] = "$ZTEXIT";
 static readonly char ztrap_text[] = "$ZTRAP";
+static readonly char zusedstor_text[] = "$ZUSEDSTOR";
 static readonly char zversion_text[] = "$ZVERSION";
 static readonly char zyerror_text[] = "$ZYERROR";
 static readonly char arrow_text[] = "->";
@@ -135,6 +138,9 @@ GBLREF mval		dollar_zinterrupt, dollar_ztexit;
 GBLREF boolean_t	dollar_zininterrupt;
 GBLREF int4		zdir_form;
 GBLREF int4		zdate_form;
+GBLREF int		totalAlloc;
+GBLREF int		totalRmalloc;
+GBLREF int		totalUsed;
 
 LITREF mval		literal_zero,literal_one;
 LITREF char		gtm_release_name[];
@@ -271,6 +277,11 @@ void zshow_svn(zshow_out *output)
 		MV_FORCE_MVAL(&var, count);
 		ZS_VAR_EQU(&x, za_text);
 		mval_write(output, &var, TRUE);
+	/* SV_ZALLOCSTOR */
+		count = totalAlloc;
+		MV_FORCE_MVAL(&var, count);
+		ZS_VAR_EQU(&x, zallocstor_text);
+		mval_write(output, &var, TRUE);
 	/* SV_ZB */
 		c1 = (char *)io_curr_device.in->dollar.zb;
 		c2 = c1 + sizeof(io_curr_device.in->dollar.zb);
@@ -383,6 +394,11 @@ void zshow_svn(zshow_out *output)
 		var.str.len = gtmprompt.len;
 		ZS_VAR_EQU(&x, zprompt_text);
 		mval_write(output, &var, TRUE);
+	/* SV_ZREALSTOR */
+		count = totalRmalloc;
+		MV_FORCE_MVAL(&var, count);
+		ZS_VAR_EQU(&x, zrealstor_text);
+		mval_write(output, &var, TRUE);
 	/* SV_ZROUTINES */
 		if (!zro_root)
 			zro_init();
@@ -414,6 +430,11 @@ void zshow_svn(zshow_out *output)
 		var.mvtype = MV_STR;
 		var.str = dollar_ztrap.str;
 		ZS_VAR_EQU(&x, ztrap_text);
+		mval_write(output, &var, TRUE);
+	/* SV_ZUSEDSTOR */
+		count = totalUsed;
+		MV_FORCE_MVAL(&var, count);
+		ZS_VAR_EQU(&x, zusedstor_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZVERSION */
 		var.mvtype = MV_STR;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,11 +96,6 @@ GBLREF	boolean_t		skip_block_chain_tail_check;
 
 #define	ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value)									\
 {														\
-	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;								\
-														\
-	error_def(ERR_REC2BIG);											\
-	error_def(ERR_GVIS);											\
-                                                                                                                \
 	if (gv_currkey->end + 1 + value.len + sizeof(rec_hdr) > gv_cur_region->max_rec_size)			\
 	{                                                                                                       \
 		if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))			\
@@ -111,25 +106,52 @@ GBLREF	boolean_t		skip_block_chain_tail_check;
 	}                                                                                                       \
 }
 
+#define	ISSUE_RSVDBYTE2HIGH_ERROR								\
+{												\
+	/* The record that is newly inserted/updated does not fit by itself in a separate block	\
+	 * if the current reserved-bytes for this database is taken into account. Cannot go on.	\
+	 */											\
+	if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, temp_key, TRUE)))			\
+		end = &buff[MAX_ZWR_KEY_SZ - 1];						\
+	rts_error(VARLSTCNT(11) ERR_RSVDBYTE2HIGH, 5, new_blk_size_single,			\
+		REG_LEN_STR(gv_cur_region), blk_size, reserved_bytes,				\
+		ERR_GVIS, 2, end - buff, buff);							\
+}
+
 static	block_id	lcl_root;
 static	int4		blk_size, blk_fill_size;
 static	int4 const	zeroes = 0;
 static	boolean_t	jnl_format_done;
 
-static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req);
+static	boolean_t	gvcst_put_blk(mval *val, boolean_t *extra_block_split_req);
 
 void	gvcst_put(mval *val)
 {
-	bool			extra_block_split_req;
+	boolean_t	extra_block_split_req;
+	sm_uc_ptr_t	jnlpool_instname;
 
 	error_def(ERR_SCNDDBNOUPD);
+	error_def(ERR_REPLINSTMISMTCH);
 
 	is_dollar_incr = in_gvcst_incr;
 	in_gvcst_incr = FALSE;
-	if ((FALSE == pool_init) && REPL_ENABLED(cs_data) && is_replicator)
-		jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
-	if (REPL_ENABLED(cs_data) && pool_init && jnlpool_ctl->upd_disabled && !is_updproc)
-		rts_error(VARLSTCNT(1) ERR_SCNDDBNOUPD);
+	if (REPL_ENABLED(cs_data) && is_replicator)
+	{
+		if (FALSE == pool_init)
+			jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
+		assert(pool_init);
+		if (!cs_addrs->replinst_matches_db)
+		{
+			if (jnlpool_ctl->upd_disabled && !is_updproc)
+				rts_error(VARLSTCNT(1) ERR_SCNDDBNOUPD);
+			UNIX_ONLY(jnlpool_instname = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.instname;)
+			VMS_ONLY(jnlpool_instname = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.gtmgbldir;)
+			if (STRCMP(cs_addrs->nl->replinstname, jnlpool_instname))
+				rts_error(VARLSTCNT(8) ERR_REPLINSTMISMTCH, 6, LEN_AND_STR(jnlpool_instname),
+					DB_LEN_STR(gv_cur_region), LEN_AND_STR(cs_addrs->nl->replinstname));
+			cs_addrs->replinst_matches_db = TRUE;
+		}
+	}
 	blk_size = cs_data->blk_size;
 	blk_fill_size = (blk_size * gv_fillfactor) / 100 - cs_data->reserved_bytes;
 	jnl_format_done = FALSE;	/* do jnl_format() only once per logical transaction irrespective of number of retries */
@@ -142,7 +164,7 @@ void	gvcst_put(mval *val)
 	} while (extra_block_split_req);
 }
 
-static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
+static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 {
 	blk_segment		*bs1, *bs_ptr, *new_blk_bs;
 	block_id		allocation_clue, tp_root, gvt_for_root;
@@ -158,22 +180,29 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 	srch_blk_status		*bh, *bq, *tp_srch_status;
 	srch_hist		*dir_hist;
 	int			cur_blk_size, blk_seg_cnt, delta, i, left_hand_offset, n, ins_chain_offset,
-				new_blk_size_l, new_blk_size_r, last_possible_left_offset, new_rec_size,
-				next_rec_shrink, next_rec_shrink1, offset_sum, rec_cmpc, target_key_size, tp_lev, undo_index;
+				new_blk_size_l, new_blk_size_r, new_blk_size_single, new_blk_size, blk_reserved_size,
+				last_possible_left_offset, new_rec_size, next_rec_shrink, next_rec_shrink1,
+				offset_sum, rec_cmpc, target_key_size, tp_lev, undo_index;
 	uint4			segment_update_array_size;
+	int4			reserved_bytes;
 	char			*va;
 	sm_uc_ptr_t		cp1, cp2, curr;
 	unsigned short		extra_record_orig_size, rec_size, temp_short;
+	unsigned int		prev_rec_offset, prev_rec_match, curr_rec_offset, curr_rec_match;
 	bool			chain_in_orig_block, copy_extra_record, level_0, new_rec, no_pointers,
 				succeeded = FALSE;
-	boolean_t		make_it_null, gbl_target_was_set, duplicate_set = FALSE;
+	boolean_t		make_it_null, gbl_target_was_set, duplicate_set = FALSE, new_rec_goes_to_right;
 	key_cum_value		*tempkv;
 	jnl_format_buffer	*jfb;
 	jnl_action		*ja;
 	mval			*set_val;	/* actual right-hand-side value of the SET or $INCR command */
 	ht_ent_int4		*tabent;
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;
 
 	error_def(ERR_GVINCRISOLATION);
+	error_def(ERR_GVIS);
+	error_def(ERR_REC2BIG);
+	error_def(ERR_RSVDBYTE2HIGH);
 
 	assert(NULL != update_array);
 	assert(NULL != update_array_ptr);
@@ -265,12 +294,15 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 			gv_target->root = tp_root;
 		}
 	}
+	reserved_bytes = cs_data->reserved_bytes;
+	blk_reserved_size = blk_size - reserved_bytes;
 	if (0 == tp_root)
 	{	/* there is no entry in the GVT (and no root), so create a new empty tree and put the name in the GVT */
 		/* Create the data block */
 		if (is_dollar_incr)
-		{ /* The global variable that is being $INCREMENTed does not exist.  $INCREMENT() should not signal
-		     UNDEF error but proceed with an implicit $GET() */
+		{	/* The global variable that is being $INCREMENTed does not exist.
+			 * $INCREMENT() should not signal UNDEF error but proceed with an implicit $GET().
+			 */
 			if (0 == dollar_tlevel)
 				update_trans = TRUE;
 			else
@@ -284,6 +316,14 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 			ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value);
 		} else
 			value = val->str;
+		/* Potential size of a GVT leaf block containing just the new/updated record */
+		new_blk_size_single = sizeof(blk_hdr) + sizeof(rec_hdr) + temp_key->end + 1 + value.len;
+		if (new_blk_size_single > blk_reserved_size)
+		{	/* The record that is newly inserted/updated does not fit by itself in a separate block
+			 * if the current reserved-bytes for this database is taken into account. Cannot go on.
+			 */
+			ISSUE_RSVDBYTE2HIGH_ERROR;
+		}
 		BLK_ADDR(curr_rec_hdr, sizeof(rec_hdr), rec_hdr);
 		curr_rec_hdr->rsiz = sizeof(rec_hdr) + temp_key->end + 1 + value.len;
 		curr_rec_hdr->cmpc = 0;
@@ -304,6 +344,7 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 			status = cdb_sc_mkblk;
 			goto retry;
 		}
+		assert(new_blk_bs[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
 		/* Create the index block */
 		BLK_ADDR(curr_rec_hdr, sizeof(rec_hdr), rec_hdr);
 		curr_rec_hdr->rsiz = BSTAR_REC_SIZE;
@@ -317,6 +358,7 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 			status = cdb_sc_mkblk;
 			goto retry;
 		}
+		assert(bs1[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
 		allocation_clue = cs_data->trans_hist.total_blks / 64 + 8; /* roger 19990607 - arbitrary & should be improved */
 		next_blk_index = t_create(allocation_clue, (uchar_ptr_t)new_blk_bs, 0, 0, 0);
 		++allocation_clue;
@@ -346,8 +388,8 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 					goto retry;
 				}
 			} else
-			{ /* The global variable that is being $INCREMENTed does not exist.  $INCREMENT() should not
-			     signal UNDEF error but proceed with an implicit $GET() */
+			{	/* The global variable that is being $INCREMENTed does not exist.  $INCREMENT() should not
+				 * signal UNDEF error but proceed with an implicit $GET() */
 				*post_incr_mval = *val;
 				MV_FORCE_STR(post_incr_mval);
 			}
@@ -375,15 +417,36 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 	{
 		cur_blk_size = ((blk_hdr_ptr_t)bh->buffaddr)->bsiz;
 		target_key_size = temp_key->end + 1;
-		new_rec = (target_key_size != bh->curr_rec.match);
+		/* Potential size of a block containing just the new/updated record */
+		new_blk_size_single = sizeof(blk_hdr) + sizeof(rec_hdr) + target_key_size + value.len;
+		if (new_blk_size_single > blk_reserved_size)
+		{	/* The record that is newly inserted/updated does not fit by itself in a separate block
+			 * if the current reserved-bytes for this database is taken into account. If this is not a
+			 * GVT leaf block, this situation is then possible if we are not in the final retry (and hence
+			 * dont hold crit on the region) and "temp_key->end" (and in turn "target_key_size") was
+			 * computed from a stale copy (due to concurrent updates or buffer reuse) of the global buffer
+			 * (effectively a restartable situation). If so, restart. If not issue error.
+			 */
+			if (no_pointers || (CDB_STAGNATE <= t_tries))
+			{
+				ISSUE_RSVDBYTE2HIGH_ERROR;
+			} else
+			{
+				status = cdb_sc_mkblk;
+				goto retry;
+			}
+		}
+		curr_rec_match = bh->curr_rec.match;
+		curr_rec_offset = bh->curr_rec.offset;
+		new_rec = (target_key_size != curr_rec_match);
                 if (!new_rec && !no_pointers)
                 {
                         assert(CDB_STAGNATE > t_tries);
                         status = cdb_sc_lostcr;         /* will a new cdb_sc status be better */
                         goto retry;
                 }
-		rp = (rec_hdr_ptr_t)(bh->buffaddr + bh->curr_rec.offset);
-		if (bh->curr_rec.offset == cur_blk_size)
+		rp = (rec_hdr_ptr_t)(bh->buffaddr + curr_rec_offset);
+		if (curr_rec_offset == cur_blk_size)
 		{
 			if ((FALSE == new_rec) && (0 < dollar_tlevel))
 			{
@@ -404,17 +467,18 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 				goto retry;
 			}
 		}
+		prev_rec_match = bh->prev_rec.match;
 		if (new_rec)
 		{
-			new_rec_size = sizeof(rec_hdr) + target_key_size - bh->prev_rec.match + value.len;
-			if (cur_blk_size <= (int)bh->curr_rec.offset)
+			new_rec_size = sizeof(rec_hdr) + target_key_size - prev_rec_match + value.len;
+			if (cur_blk_size <= (signed int)curr_rec_offset) /* typecast necessary to enforce "signed int" comparison */
 				next_rec_shrink = 0;
 			else
-				next_rec_shrink = bh->curr_rec.match - rec_cmpc;
+				next_rec_shrink = curr_rec_match - rec_cmpc;
 			delta = new_rec_size - next_rec_shrink;
 		} else
 		{
-			if (rec_cmpc != bh->prev_rec.match)
+			if (rec_cmpc != prev_rec_match)
 			{
 				assert(CDB_STAGNATE > t_tries);
 				status = cdb_sc_mkblk;
@@ -433,7 +497,7 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 		}
 		if (0 < dollar_tlevel)
 		{
-			if ((sizeof(rec_hdr) + target_key_size - bh->prev_rec.match + value.len) != new_rec_size)
+			if ((sizeof(rec_hdr) + target_key_size - prev_rec_match + value.len) != new_rec_size)
 			{
 				assert(CDB_STAGNATE > t_tries);
 				status = cdb_sc_mkblk;
@@ -449,8 +513,15 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 			}
 		}
 		next_rec_shrink1 = next_rec_shrink;
-		if (cur_blk_size + delta <= blk_fill_size)
-		{	/* Do not split block */
+		/* Potential size of the current block including the new/updated record */
+		new_blk_size = cur_blk_size + delta;
+		assert(new_blk_size >= new_blk_size_single);
+		if ((new_blk_size <= blk_fill_size) || (new_blk_size <= new_blk_size_single))
+		{	/* Update can be done without overflowing the block's fillfactor OR the record to be updated
+			 * is the only record in the new block. Do not split block in either case. This means we might
+			 * not honour the desired FillFactor if the only record in a block exceeds the blk_fill_size,
+			 * but in this case we are guaranteed the block has room for the current reserved bytes.
+			 */
 			if (no_pointers)	/* level zero (normal) data block: no deferred pointer chains */
 				ins_chain_offset = 0;
 			else			/* index or directory level block */
@@ -458,14 +529,14 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 			BLK_INIT(bs_ptr, bs1);
 			if (0 == rc_set_fragment)
 			{
-				BLK_SEG(bs_ptr, bh->buffaddr + sizeof(blk_hdr), bh->curr_rec.offset - sizeof(blk_hdr));
+				BLK_SEG(bs_ptr, bh->buffaddr + sizeof(blk_hdr), curr_rec_offset - sizeof(blk_hdr));
 				BLK_ADDR(curr_rec_hdr, sizeof(rec_hdr), rec_hdr);
 				curr_rec_hdr->rsiz = new_rec_size;
-				curr_rec_hdr->cmpc = bh->prev_rec.match;
+				curr_rec_hdr->cmpc = prev_rec_match;
 				BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, sizeof(rec_hdr));
-				BLK_ADDR(cp1, target_key_size - bh->prev_rec.match, unsigned char);
-				memcpy(cp1, temp_key->base + bh->prev_rec.match, target_key_size - bh->prev_rec.match);
-				BLK_SEG(bs_ptr, cp1, target_key_size - bh->prev_rec.match);
+				BLK_ADDR(cp1, target_key_size - prev_rec_match, unsigned char);
+				memcpy(cp1, temp_key->base + prev_rec_match, target_key_size - prev_rec_match);
+				BLK_SEG(bs_ptr, cp1, target_key_size - prev_rec_match);
 				if (0 != value.len)
 				{
 					BLK_ADDR(va, value.len, char);
@@ -481,7 +552,7 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 					{
 						BLK_ADDR(next_rec_hdr, sizeof(rec_hdr), rec_hdr);
 						next_rec_hdr->rsiz = rec_size - next_rec_shrink;
-						next_rec_hdr->cmpc = bh->curr_rec.match;
+						next_rec_hdr->cmpc = curr_rec_match;
 						BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, sizeof(rec_hdr));
 						next_rec_shrink += sizeof(rec_hdr);
 					}
@@ -489,11 +560,11 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 				}
 			} else
 			{
-				curr_rec_hdr = (rec_hdr_ptr_t)(bh->buffaddr + bh->curr_rec.offset);
+				curr_rec_hdr = (rec_hdr_ptr_t)(bh->buffaddr + curr_rec_offset);
 				/* First piece is block prior to record + key + data prior to fragment */
 				BLK_SEG(bs_ptr,
 					bh->buffaddr + sizeof(blk_hdr),
-					bh->curr_rec.offset - sizeof(blk_hdr) + sizeof(rec_hdr) + rc_set_fragment
+					curr_rec_offset - sizeof(blk_hdr) + sizeof(rec_hdr) + rc_set_fragment
 						+ gv_currkey->end + 1 - curr_rec_hdr->cmpc);
 				/* Second piece is fragment itself */
 				BLK_ADDR(va, value.len, char);
@@ -514,6 +585,7 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 				status = cdb_sc_mkblk;
 				goto retry;
 			}
+			assert(bs1[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
 			cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh->level, FALSE, FALSE);
 			assert(!dollar_tlevel || !cse->high_tlevel);
 			bh->ptr = cse;	/* used only in TP */
@@ -523,10 +595,11 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 								bh->buffaddr == cse->low_tlevel->new_buff);
 				assert(0 == cse->next_off);
 				assert(ins_chain_offset > (signed)sizeof(blk_hdr));	/* we want signed comparison */
-				assert((bh->curr_rec.offset - sizeof(off_chain)) == (ins_chain_offset - new_rec_size));
+				assert((curr_rec_offset - sizeof(off_chain)) == (ins_chain_offset - new_rec_size));
 				offset_sum = cse->first_off;
 				curr = bh->buffaddr + offset_sum;
-				if (offset_sum >= (int)bh->curr_rec.offset)
+				/* The typecast is needed below to enforce a "signed int" (versus "unsigned int") comparison */
+				if (offset_sum >= (signed int)curr_rec_offset)
 				{	/* the new record is prior to the first existing chain record, id the new one as first */
 					/* first_off-------------v--------------------v
 					 * [blk_hdr]...[new rec ( )]...[existing rec ( )]... */
@@ -549,7 +622,8 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 						if (0 == curr_chain.next_off)
 							break;
 						offset_sum += curr_chain.next_off;
-						if (offset_sum >= (int)bh->curr_rec.offset)
+						/* The typecast is needed below to enforce a "signed int" comparison */
+						if (offset_sum >= (signed int)curr_rec_offset)
 							break;
 					}
 					/* store the next_off in old_cse before chainging it in the buffer (for rolling back) */
@@ -584,29 +658,38 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 		{	/* Block split required */
 			gv_target->clue.end = 0;	/* invalidate clue */
 			/* Potential size of the left and right blocks, including the new record */
-			new_blk_size_l = bh->curr_rec.offset + new_rec_size;
+			new_blk_size_l = curr_rec_offset + new_rec_size;
 			new_blk_size_r = sizeof(blk_hdr) + sizeof(rec_hdr) + target_key_size + value.len + cur_blk_size
-						- bh->curr_rec.offset - (new_rec ? next_rec_shrink : rec_size);
+						- curr_rec_offset - (new_rec ? next_rec_shrink : rec_size);
+			assert(new_blk_size_single <= blk_reserved_size);
+			assert(blk_reserved_size >= blk_fill_size);
 			extra_record_orig_size = 0;
-			if ((blk_size - cs_data->reserved_bytes >= new_blk_size_r)
-			   && (((blk_fill_size / 2) < (int)bh->curr_rec.offset)
-			   || ((blk_size - cs_data->reserved_bytes) < new_blk_size_l)))
-			{	/* left side of this block will be split off into a new block.
+			prev_rec_offset = bh->prev_rec.offset;
+			assert(new_blk_size_single <= new_blk_size_r);
+			/* Decide which side (left or right) the new record goes. Ensure either side has at least one record.
+			 * This means we might not honour the desired FillFactor if the only record in a block exceeds the
+			 * blk_fill_size, but in this case we are guaranteed the block has room for the current reserved bytes.
+			 * The typecast of curr_rec_offset is needed below to enforce a "signed int" comparison.
+			 */
+			new_rec_goes_to_right = (new_blk_size_r <= blk_fill_size)
+				? (((blk_fill_size / 2) < (signed int)curr_rec_offset) || (blk_fill_size < new_blk_size_l))
+				: (new_blk_size_r <= new_blk_size_single);
+			if (new_rec_goes_to_right)
+			{	/* Left side of this block will be split off into a new block.
 				 * The new record and the right side of this block will remain in this block.
 				 */
 				/* prepare new block */
 				BLK_INIT(bs_ptr, bs1);
 				if (level_0)
 				{
-					BLK_SEG(bs_ptr, bh->buffaddr + sizeof(blk_hdr), bh->curr_rec.offset - sizeof(blk_hdr));
+					BLK_SEG(bs_ptr, bh->buffaddr + sizeof(blk_hdr), curr_rec_offset - sizeof(blk_hdr));
 				} else
-				{
-					/* for index records, the record before the split becomes a new *-key */
+				{	/* for index records, the record before the split becomes a new *-key */
 					/* Note:  If the block split was caused by our appending the new record
 					 * to the end of the block, this code causes the record PRIOR to the
 					 * current *-key to become the new *-key.
 					 */
-					BLK_SEG(bs_ptr, bh->buffaddr + sizeof(blk_hdr), bh->prev_rec.offset - sizeof(blk_hdr));
+					BLK_SEG(bs_ptr, bh->buffaddr + sizeof(blk_hdr), prev_rec_offset - sizeof(blk_hdr));
 					BLK_ADDR(new_star_hdr, sizeof(rec_hdr), rec_hdr);
 					new_star_hdr->rsiz = BSTAR_REC_SIZE;
 					new_star_hdr->cmpc = 0;
@@ -620,6 +703,13 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 					status = cdb_sc_mkblk;
 					goto retry;
 				}
+				/* It is possible that the left block DOES NOT have enough space for reserved bytes if
+				 * the pre-split block was previously populated with a very low reserved bytes setting
+				 * and if the current reserved bytes setting is much higher than what the chosen split
+				 * point would free up. The following assert checks that at least for reserved bytes
+				 * less than or equal to 16, the space constraint is unconditionally met.
+				 */
+				assert((bs1[0].len <= blk_reserved_size) || reserved_bytes > 16);
 				/* prepare the existing block */
 				BLK_INIT(bs_ptr, bs1);
 				ins_chain_offset = no_pointers ? 0 : sizeof(blk_hdr) + sizeof(rec_hdr) + target_key_size;
@@ -645,7 +735,7 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 					BLK_ADDR(next_rec_hdr, sizeof(rec_hdr), rec_hdr);
 					GET_USHORT(next_rec_hdr->rsiz, &rp->rsiz);
 					next_rec_hdr->rsiz -= next_rec_shrink;
-					next_rec_hdr->cmpc = new_rec ? bh->curr_rec.match : rp->cmpc;
+					next_rec_hdr->cmpc = new_rec ? curr_rec_match : rp->cmpc;
 					BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, sizeof(rec_hdr));
 					next_rec_shrink += sizeof(rec_hdr);
 					BLK_SEG(bs_ptr,
@@ -658,16 +748,17 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 					status = cdb_sc_mkblk;
 					goto retry;
 				}
+				assert(bs1[0].len <= blk_reserved_size); /* Assert that right block has space for reserved bytes */
 				assert(gv_altkey->top == gv_currkey->top);
 				assert(gv_altkey->end < gv_altkey->top);
 				temp_key = gv_altkey;
-				if (cdb_sc_normal != (status = gvcst_expand_key((blk_hdr_ptr_t)bh->buffaddr, bh->prev_rec.offset,
+				if (cdb_sc_normal != (status = gvcst_expand_key((blk_hdr_ptr_t)bh->buffaddr, prev_rec_offset,
 						temp_key)))
 					goto retry;
 			} else
 			{	/* Insert in left hand (new) block */
 				/* If there is only one record on the left hand side, try for two */
-				copy_extra_record = ((0 == bh->prev_rec.offset)
+				copy_extra_record = ((0 == prev_rec_offset)
 							&& level_0
 							&& new_rec
 							&& (sizeof(blk_hdr) < cur_blk_size));
@@ -676,9 +767,9 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 					left_hand_offset = 0;
 				else
 				{
-					left_hand_offset = bh->curr_rec.offset + sizeof(rec_hdr);
+					left_hand_offset = curr_rec_offset + sizeof(rec_hdr);
 					if (level_0)
-						left_hand_offset += target_key_size - bh->prev_rec.match;
+						left_hand_offset += target_key_size - prev_rec_match;
 					/* else it is a *-key (implies the child pointer follows immediately) so no need to
 					 * change left_hand_offset. Note that if copy_extra_record was TRUE, then we need to
 					 * update left_hand_offset as the new record to be inserted will no longer be a *-key
@@ -689,37 +780,33 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 				}
 				left_hand_index = ins_chain_index;
 				ins_chain_index = ins_chain_offset = 0;
-				BLK_SEG(bs_ptr, bh->buffaddr + sizeof(blk_hdr), bh->curr_rec.offset - sizeof(blk_hdr));
+				BLK_SEG(bs_ptr, bh->buffaddr + sizeof(blk_hdr), curr_rec_offset - sizeof(blk_hdr));
 				if (level_0)
 				{	/* After the initial split, will this block fit into the new left block?
 					 * If not, this pass through gvcst_put_blk will make room and we will do
 					 * another block split on the next pass.
 					 */
-					if ((blk_seg_cnt + sizeof(rec_hdr) + target_key_size - bh->prev_rec.match + value.len)
-						> (blk_size - cs_data->reserved_bytes))
-					{
-						if (bh->prev_rec.offset)
-						{	/* there is at least one existing record to the left of the split point.
-							 * do the initial split this pass and make an extra split next pass */
-							*extra_block_split_req = TRUE;
-						} else
-						{	/* updated or newly inserted current record cannot fit in block (even though
-							 * it is the only record in the new block). Retry */
-							assert(CDB_STAGNATE > t_tries);
-							status = cdb_sc_mkblk;
-							goto retry;
-						}
+					assert((blk_seg_cnt + sizeof(rec_hdr) + target_key_size - prev_rec_match + value.len)
+						== new_blk_size_l);
+					assert(new_blk_size_single <= new_blk_size_l);
+					assert((new_blk_size_single < new_blk_size_l)
+						|| ((0 == prev_rec_offset) && (sizeof(blk_hdr) == curr_rec_offset)));
+					assert((new_blk_size_single == new_blk_size_l)
+						|| ((sizeof(blk_hdr) <= prev_rec_offset) && (sizeof(blk_hdr) < curr_rec_offset)));
+					if ((new_blk_size_l > blk_fill_size) && (new_blk_size_l > new_blk_size_single))
+					{	/* There is at least one existing record to the left of the split point.
+						 * Do the initial split this pass and make an extra split next pass.
+						 */
+						*extra_block_split_req = TRUE;
 					} else
 					{
 						BLK_ADDR(curr_rec_hdr, sizeof(rec_hdr), rec_hdr);
 						curr_rec_hdr->rsiz = new_rec_size;
-						curr_rec_hdr->cmpc = bh->prev_rec.match;
+						curr_rec_hdr->cmpc = prev_rec_match;
 						BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, sizeof(rec_hdr));
-						BLK_ADDR(cp1, target_key_size - bh->prev_rec.match, unsigned char);
-						memcpy(cp1,
-						       temp_key->base + bh->prev_rec.match,
-						       target_key_size - bh->prev_rec.match);
-						BLK_SEG(bs_ptr, cp1, target_key_size - bh->prev_rec.match);
+						BLK_ADDR(cp1, target_key_size - prev_rec_match, unsigned char);
+						memcpy(cp1, temp_key->base + prev_rec_match, target_key_size - prev_rec_match);
+						BLK_SEG(bs_ptr, cp1, target_key_size - prev_rec_match);
 						if (0 != value.len)
 						{
 							BLK_ADDR(va, value.len, char);
@@ -728,15 +815,15 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 						}
 						if (copy_extra_record)
 						{
-							n = rec_size - bh->curr_rec.match;
-							if ((n + (int)bh->curr_rec.offset + new_rec_size)
-									> (blk_size - cs_data->reserved_bytes))
+							n = rec_size - curr_rec_match;
+			 				/* typecast needed below to enforce a "signed int" comparison */
+							if ((n + (signed int)curr_rec_offset + new_rec_size) > blk_fill_size)
 								copy_extra_record = FALSE;
 							else
 							{
 								BLK_ADDR(extra_rec_hdr, sizeof(rec_hdr), rec_hdr);
 								extra_rec_hdr->rsiz = n;
-								extra_rec_hdr->cmpc = bh->curr_rec.match;
+								extra_rec_hdr->cmpc = curr_rec_match;
 								BLK_SEG(bs_ptr, (sm_uc_ptr_t)extra_rec_hdr, sizeof(rec_hdr));
 								if (n < (signed)sizeof(rec_hdr)) /* want signed compare */
 								{				     /* as 'n' can be negative */
@@ -746,7 +833,7 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 								}
 								BLK_SEG(bs_ptr,
 									bh->buffaddr + sizeof(blk_hdr) + sizeof(rec_hdr)
-										+ bh->curr_rec.match,
+										+ curr_rec_match,
 									n - sizeof(rec_hdr));
 								new_blk_size_l += n;
 							}
@@ -767,6 +854,13 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 					status = cdb_sc_mkblk;
 					goto retry;
 				}
+				/* It is possible that the left block DOES NOT have enough space for reserved bytes if
+				 * the pre-split block was previously populated with a very low reserved bytes setting
+				 * and if the current reserved bytes setting is much higher than what the chosen split
+				 * point would free up. The following assert checks that at least for reserved bytes
+				 * less than or equal to 16, the space constraint is unconditionally met.
+				 */
+				assert((bs1[0].len <= blk_reserved_size) || reserved_bytes > 16);
 				/* assert that both !new_rec and copy_extra_record can never be TRUE at the same time */
 				assert(new_rec || !copy_extra_record);
 				if (!new_rec || copy_extra_record)
@@ -783,7 +877,7 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 					assert(gv_altkey->end < gv_altkey->top);
 					temp_key = gv_altkey;
 					if (cdb_sc_normal !=
-						(status = gvcst_expand_key((blk_hdr_ptr_t)bh->buffaddr, bh->curr_rec.offset,
+						(status = gvcst_expand_key((blk_hdr_ptr_t)bh->buffaddr, curr_rec_offset,
 							temp_key)))
 						goto retry;
 				} else if (temp_key != gv_altkey)
@@ -809,6 +903,13 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 					status = cdb_sc_mkblk;
 					goto retry;
 				}
+				/* It is possible that the right block DOES NOT have enough space for reserved bytes if
+				 * the pre-split block was previously populated with a very low reserved bytes setting
+				 * and if the current reserved bytes setting is much higher than what the chosen split
+				 * point would free up. The following assert checks that at least for reserved bytes
+				 * less than or equal to 16, the space constraint is unconditionally met.
+				 */
+				assert((bs1[0].len <= blk_reserved_size) || reserved_bytes > 16);
 			}
 			next_blk_index = t_create(bh->blk_num, (uchar_ptr_t)new_blk_bs, left_hand_offset, left_hand_index,
 				bh->level);
@@ -843,13 +944,12 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 					curr = bh->buffaddr + offset_sum;
 					GET_LONGP(&curr_chain, curr);
 					assert(curr_chain.flag == 1);
-					last_possible_left_offset = bh->curr_rec.offset + extra_record_orig_size
-						- sizeof(off_chain);
+					last_possible_left_offset = curr_rec_offset + extra_record_orig_size - sizeof(off_chain);
 					/* some of the following logic used to be in tp_split_chain which was nixed */
 					if (offset_sum <= last_possible_left_offset)
 					{	/* the split falls within or after the chain; otherwise entire chain stays right */
-						assert(bh->curr_rec.offset != (int4)cse->first_off);
-						if (left_hand_offset && (bh->curr_rec.offset < (int4)cse->first_off))
+						assert(curr_rec_offset != (int4)cse->first_off);
+						if (left_hand_offset && (curr_rec_offset < (int4)cse->first_off))
 							/* we are inserting the new record (with the to-be-filled child block
 							 * number) in the left block and the TP block chain of the block to be
 							 * split starts AFTER the new record's offset in the current block.
@@ -916,21 +1016,21 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 								{	/* it's all there is */
 									/* first_off --------------------v
 									 * [blk_hdr]...[curr rec (*-key)( )] */
-									assert(bh->prev_rec.offset >= sizeof(blk_hdr));
-									cse_new->first_off = bh->prev_rec.offset + sizeof(rec_hdr);
+									assert(prev_rec_offset >= sizeof(blk_hdr));
+									cse_new->first_off = prev_rec_offset + sizeof(rec_hdr);
 								} else
 								{	/* update the next_off of the previous chain record */
 									/*		      ---|--------------------v
 									 * [blk_hdr]...[prev rec( )][curr rec (*-key)( )] */
-									assert((bh->buffaddr + bh->prev_rec.offset) > curr);
+									assert((bh->buffaddr + prev_rec_offset) > curr);
 									prev_chain = curr_chain;
 									assert((offset_sum - prev_chain.next_off) /* check old */
 										== (curr - bh->buffaddr)); /* method equivalent */
-									prev_chain.next_off = (bh->prev_rec.offset
+									prev_chain.next_off = (prev_rec_offset
 										+ sizeof(rec_hdr) - (curr - bh->buffaddr));
 									assert((curr - bh->buffaddr + prev_chain.next_off)
-										<= ((new_blk_size_l < cs_data->blk_size
-										? new_blk_size_l : cs_data->blk_size)
+										<= ((new_blk_size_l < blk_reserved_size
+										? new_blk_size_l : blk_reserved_size)
 										- sizeof(off_chain)));
 									if (dollar_tlevel != cse->t_level)
 									{
@@ -990,8 +1090,8 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 							} else
 								curr_chain.next_off = 0;
 							assert((curr - bh->buffaddr + curr_chain.next_off)
-									<= ((new_blk_size_l < cs_data->blk_size
-									? new_blk_size_l : cs_data->blk_size) - sizeof(off_chain)));
+									<= ((new_blk_size_l < blk_reserved_size
+									? new_blk_size_l : blk_reserved_size) - sizeof(off_chain)));
 							if (dollar_tlevel != cse->t_level)
 							{
 								assert(dollar_tlevel > cse->t_level);
@@ -1003,7 +1103,7 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 							GET_LONGP(curr, &curr_chain);
 						}	/* end of *-key or not alternatives */
 						assert((left_hand_offset + (int)cse_new->next_off) <=
-							((new_blk_size_l < cs_data->blk_size ? new_blk_size_l : cs_data->blk_size)
+							((new_blk_size_l < blk_reserved_size ? new_blk_size_l : blk_reserved_size)
 								- sizeof(off_chain)));
 					}	/* end of buffer and cse_new adjustments */
 					prev_first_off = cse->first_off;
@@ -1036,7 +1136,7 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 						assert(cse->first_off >= (sizeof(blk_hdr) + sizeof(rec_hdr)));
 					}
 					assert((ins_chain_offset + (int)cse->next_off) <=
-						((new_blk_size_r < cs_data->blk_size ? new_blk_size_r : cs_data->blk_size)
+						((new_blk_size_r < blk_reserved_size ? new_blk_size_r : blk_reserved_size)
 							- sizeof(off_chain)));
 				}	/* end of of split processing */
 			}	/* end of tp only code */
@@ -1177,6 +1277,7 @@ static	bool	gvcst_put_blk(mval *val, bool *extra_block_split_req)
 					status = cdb_sc_mkblk;
 					goto retry;
 				}
+				assert(bs1[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
 				ins_off1 = sizeof(blk_hdr) + sizeof(rec_hdr) + target_key_size;
 				ins_off2 = sizeof(blk_hdr) + 2 * sizeof(rec_hdr) + sizeof(block_id) + target_key_size;
 				assert(ins_off1 < ins_off2);

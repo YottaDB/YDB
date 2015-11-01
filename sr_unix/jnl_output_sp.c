@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,10 +54,12 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	sm_uc_ptr_t		base;
 	unix_db_info		*udi;
 	unsigned int		status;
+	int			save_errno;
 
 	error_def(ERR_JNLACCESS);
 	error_def(ERR_JNLWRTDEFER);
 	error_def(ERR_JNLWRTNOWWRTR);
+	error_def(ERR_DBFSYNCERR);								\
 
 	assert(NULL != jpc);
 	udi = FILE_INFO(jpc->region);
@@ -91,7 +93,16 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	 */
 	if (jb->need_db_fsync)
 	{
-		DB_FSYNC(jpc->region, udi, csa, db_fsync_in_prog);
+		DB_FSYNC(jpc->region, udi, csa, db_fsync_in_prog, save_errno);
+		if (0 != save_errno)
+		{
+			RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
+			jnl_qio_in_prog--;
+			assert(0 <= jnl_qio_in_prog);
+			rts_error(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(jpc->region), save_errno);
+			assert(FALSE);	/* should not come here as the rts_error above should not return */
+			return ERR_DBFSYNCERR;	/* ensure we do not fall through to the code below as we no longer have the lock */
+		}
 		jb->need_db_fsync = FALSE;
 	}
 	free = jb->free;
@@ -100,7 +111,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		free = ROUND_DOWN(free, IO_BLOCK_SIZE);
 	assert(!(jb->size % IO_BLOCK_SIZE));
 	tsz = (free < jb->dsk ? jb->size : free) - jb->dsk;
-	if (aligned_write && !was_wrapped && free <= jb->dsk)
+	if ((aligned_write && !was_wrapped && free <= jb->dsk) || (NOJNL == jpc->channel))
 		tsz = 0;
 	assert(0 <= tsz);
 	/* Note that this assert relies on the fact that freeaddr is updated before free in jnl_write() [jnl_output.c] */
@@ -112,55 +123,45 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		jb->qiocnt++;
 		base = &jb->buff[jb->dsk];
 		assert((base + tsz) <= (jb->buff + jb->size));
-		if (NOJNL == jpc->channel)
-		{
-			jb->wrtsize = 0;
-			jpc->status = SS_NORMAL;
+		assert(NOJNL != jpc->channel);
+		LSEEKWRITE(jpc->channel, (off_t)jb->dskaddr, (sm_uc_ptr_t)base, tsz, jpc->status);
+		status = jpc->status;
+		if (SS_NORMAL == status)
+		{	/* update jnl_buff pointers to reflect the successful write to the journal file */
+			assert(jb->dsk <= jb->size);
+			assert(jb->io_in_prog_latch.u.parts.latch_pid == process_id);
+			jpc->new_dsk = jb->dsk + tsz;
+			if (jpc->new_dsk >= jb->size)
+			{
+				assert(jpc->new_dsk == jb->size);
+				jpc->new_dsk = 0;
+			}
+			jpc->new_dskaddr = jb->dskaddr + tsz;
+			assert(jpc->new_dsk == jpc->new_dskaddr % jb->size);
+			assert(jb->freeaddr >= jpc->new_dskaddr);
+
+			jpc->dsk_update_inprog = TRUE;	/* for secshr_db_clnup to clean it up (when it becomes feasible in Unix) */
+			jb->dsk = jpc->new_dsk;
+			jb->dskaddr = jpc->new_dskaddr;
+			jpc->dsk_update_inprog = FALSE;
 		} else
 		{
-			LSEEKWRITE(jpc->channel, (off_t)jb->dskaddr, (sm_uc_ptr_t)base, tsz, jpc->status);
-			if (SS_NORMAL != jpc->status)
-			{
-				F_CLOSE(jpc->channel, close_res);
-				jpc->channel = NOJNL;
-			}
+			assert(ENOSPC == jpc->status);
+			jb->errcnt++;
+			if (ENOSPC == jpc->status)
+				jb->enospc_errcnt++;
+			else
+				jb->enospc_errcnt = 0;
+			jnl_send_oper(jpc, ERR_JNLACCESS);
 		}
 	} else
-	{
-		jb->wrtsize = 0;
-		jpc->status = SS_NORMAL;
-	}
-	status = jpc->status;
-	if (SS_NORMAL != jpc->status)
-	{
-		jb->errcnt++;
-		jnl_send_oper(jpc, ERR_JNLACCESS);
-		assert(FALSE);
-	}
-	jpc->status = SS_NORMAL;
-	assert(jb->dsk <= jb->size);
-	assert(jb->io_in_prog_latch.u.parts.latch_pid == process_id);
-	jpc->new_dsk = jb->dsk + jb->wrtsize;
-	if (jpc->new_dsk >= jb->size)
-	{
-		assert(jpc->new_dsk == jb->size);
-		jpc->new_dsk = 0;
-	}
-	jpc->new_dskaddr = jb->dskaddr + jb->wrtsize;
-	assert(jpc->new_dsk == jpc->new_dskaddr % jb->size);
-	assert(jb->freeaddr >= jpc->new_dskaddr);
-
-	jpc->dsk_update_inprog = TRUE;	/* for secshr_db_clnup to clean it up (when it becomes feasible in Unix) */
-	jb->dsk = jpc->new_dsk;
-	jb->dskaddr = jpc->new_dskaddr;
-	jpc->dsk_update_inprog = FALSE;
-
+		status = SS_NORMAL;
 	RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
-	if ((jnl_closed == csa->hdr->jnl_state) && NOJNL != csa->jnl->channel)
+	if ((jnl_closed == csa->hdr->jnl_state) && (NOJNL != jpc->channel))
 	{
-		F_CLOSE(csa->jnl->channel, close_res);
-		csa->jnl->channel = NOJNL;
-		csa->jnl->pini_addr = 0;
+		F_CLOSE(jpc->channel, close_res);
+		jpc->channel = NOJNL;
+		jpc->pini_addr = 0;
 	}
 	jnl_qio_in_prog--;
 	assert(0 <= jnl_qio_in_prog);

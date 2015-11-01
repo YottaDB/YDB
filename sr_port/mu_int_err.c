@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,14 +95,14 @@ void	mu_int_err(
 				memcpy(&util_buff[util_len], TEXT4, sizeof(TEXT4) - 1);
 				util_len += sizeof(TEXT4) - 1;
 				util_buff[util_len] = 0;
-				util_out_print(util_buff, FALSE);
+				util_out_print((caddr_t)util_buff, FALSE);
 			}
 			util_len = i2hex_nofill(trees->path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
 			memcpy(&util_buff[util_len], TEXT3, sizeof(TEXT3) - 1);
 			util_len += sizeof(TEXT3) - 1;
 			util_len += i2hex_nofill(trees->offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
 			util_buff[util_len] = 0;
-			util_out_print(util_buff, TRUE);
+			util_out_print((caddr_t)util_buff, TRUE);
 			util_out_print("                   Path:  ", FALSE);
 		} else
 			util_out_print("                   Directory Path:  ", FALSE);
@@ -115,14 +115,14 @@ void	mu_int_err(
 			memcpy(&util_buff[util_len], TEXT4, sizeof(TEXT4) - 1);
 			util_len += sizeof(TEXT4) - 1;
 			util_buff[util_len] = 0;
-			util_out_print(util_buff, FALSE);
+			util_out_print((caddr_t)util_buff, FALSE);
 		}
 		util_len = i2hex_nofill(mu_int_path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
 		memcpy(&util_buff[util_len], TEXT3, sizeof(TEXT3) - 1);
 		util_len += sizeof(TEXT3) - 1;
 		util_len += i2hex_nofill(mu_int_offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
 		util_buff[util_len] = 0;
-		util_out_print(util_buff, TRUE);
+		util_out_print((caddr_t)util_buff, TRUE);
 	}
 	if (do_range && mu_int_err_ranges)
 	{

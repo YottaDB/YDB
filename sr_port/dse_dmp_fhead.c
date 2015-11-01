@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -275,7 +275,7 @@ void dse_dmp_fhead (void)
 	{
                 util_out_print(0, TRUE);
 		assert(n_tp_blkmod_types < ARRAYSIZE(csd->tp_cdb_sc_blkmod));
-                util_out_print("  TP blkmod gvcst_put   !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_gvcst_put]);
+                util_out_print("  TP blkmod nomod       !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_nomod]);
                 util_out_print("  TP blkmod gvcst_srch  !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_gvcst_srch]);
                 util_out_print("  TP blkmod t_qread     !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_t_qread]);
                 util_out_print("  TP blkmod tp_tend     !12UL", TRUE, csd->tp_cdb_sc_blkmod[tp_blkmod_tp_tend]);
@@ -363,12 +363,7 @@ void dse_dmp_fhead (void)
 		util_out_print("  INTRPT repl_state     !12UL", FALSE, csd->intrpt_recov_repl_state);
 		util_out_print(0, TRUE);
 	}
-	if (NEED_TO_DUMP("BACKUP")
-#ifndef DEBUG
-	    && ((BACKUP_NOT_IN_PROGRESS != csa->nl->nbb) VMS_ONLY(|| GDSVCURR != csd->desired_db_format))
-#endif
-	    /* In debug mode, don't make dependent on being in a specific mode to see it */
-	    )
+	if (NEED_TO_DUMP("BACKUP"))
 	{
 		bptr = csa->shmpool_buffer;
 		/* --------------------------- online backup buffer ---------------------------------- */

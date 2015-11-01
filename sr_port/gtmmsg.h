@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,12 +13,13 @@
 #define GTMMSG_H_INCLUDED
 
 
-void gtm_putmsg();
 #ifdef VMS
 void gtm_getmsg(uint4 msgnum, mstr *msgbuf);
+void gtm_putmsg(int4 msgid, ...);
 #elif defined(UNIX)
 void gtm_getmsg(int4 msgnum, mstr *msgbuf);
-void gtm_putmsg_noflush();
+void gtm_putmsg(int argcnt, ...);
+void gtm_putmsg_noflush(int argcnt, ...);
 #else
 #error Unsupported platform
 #endif

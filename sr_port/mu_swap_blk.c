@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,7 @@ mu_swap_blk.c:
 #include "muextr.h"
 #include "mu_reorg.h"
 #include "hashtab_int4.h"
+#include "cws_insert.h"
 
 /* Include prototypes */
 #include "t_qread.h"
@@ -137,6 +138,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		assert(t_tries < CDB_STAGNATE);
 		return cdb_sc_blkmod;
 	}
+	cws_reorg_remove_index = 0;
 	/*===== Infinite loop to find the destination block =====*/
 	for ( ; ; )
 	{
@@ -155,6 +157,31 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			return cdb_sc_oprnotneeded;
 		}
 		ctn = cs_addrs->ti->curr_tn;
+		/* We need to save the block numbers that were NEWLY ADDED (since entering this function "mu_swap_blk")
+		 * through the CWS_INSERT macro (in db_csh_get/db_csh_getn which can be called by t_qread or gvcst_search below).
+		 * This is so that we can delete these blocks from the "cw_stagnate" hashtable in case we determine the need to
+		 * choose a different "dest_blk_id" in this for loop (i.e. come to the next iteration). If these blocks are not
+		 * deleted, then the hashtable will keep growing (a good example will be if -EXCLUDE qualifier is specified and
+		 * a lot of prospective dest_blk_ids get skipped because they contain EXCLUDEd global variables) and very soon
+		 * the hashtable will contain more entries than there are global buffers and at that point db_csh_getn will not
+		 * be able to get a free global buffer for a new block (since it checks the "cw_stagnate" hashtable before reusing
+		 * a buffer in case of MUPIP REORG). To delete these previous iteration blocks, we use the "cws_reorg_remove_array"
+		 * variable. This array should have enough entries to accommodate the maximum number of blocks that can be t_qread
+		 * in one iteration down below. And that number is the sum of
+		 *	+     MAX_BT_DEPTH : for the t_qread while loop down the tree done below
+		 *	+ 2 * MAX_BT_DEPTH : for the two calls to gvcst_search done below
+		 *	+ 2                : 1 for the t_qread of dest_blk_id and 1 more for the t_qread of a
+		 *			     bitmap block done inside the call to get_lmap below
+		 *	= 3 * MAX_BT_DEPTH + 2
+		 * To be safe, we give a buffer of MAX_BT_DEPTH elements i.e. (4 * MAX_BT_DEPTH) + 2.
+		 * This is defined in the macro CWS_REMOVE_ARRAYSIZE in cws_insert.h
+		 */
+		/* reset whatever blocks the previous iteration of this for loop had filled in the cw_stagnate hashtable */
+		for ( ; cws_reorg_remove_index > 0; cws_reorg_remove_index--)
+		{
+			deleted = delete_hashtab_int4(&cw_stagnate, (uint4 *)&cws_reorg_remove_array[cws_reorg_remove_index]);
+			assert(deleted);
+		}
 		/* read corresponding bitmap block before attempting to read destination  block.
 		 * if bitmap indicates block is free, we will not read the destination block
 		 */
@@ -167,7 +194,9 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			return cdb_sc_badbitmap;
 		}
 		if (BLK_FREE != x_blk_lmap)
-		{	/* now that we know block is not FREE read destination block */
+		{	/* x_blk_lmap is either BLK_BUSY or BLK_RECYCLED. In either case, we need to read destination block
+			 * in case we later detect that the before-image needs to be written.
+			 */
 			if (!(dest_blk_ptr = t_qread(dest_blk_id, (sm_int_ptr_t)&destblkhist.cycle, &destblkhist.cr)))
 			{
 				assert(t_tries < CDB_STAGNATE);
@@ -178,7 +207,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			destblkhist.level = dest_blk_level = ((blk_hdr_ptr_t)dest_blk_ptr)->levl;
 		}
 		if (BLK_BUSY != x_blk_lmap)
-		{
+		{	/* x_blk_map is either BLK_FREE or BLK_RECYCLED both of which mean the block is not used in the bitmap */
 			blk_was_free = TRUE;
 			break;
 		}
@@ -186,10 +215,15 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		 * So follow the pointer to go to the data/index block, which has a non-* key to search.
 		 */
 		nslevel = dest_blk_level;
+		if (MAX_BT_DEPTH <= nslevel)
+		{
+			assert(CDB_STAGNATE > t_tries);
+			return cdb_sc_maxlvl;
+		}
 		rec_base = dest_blk_ptr + sizeof(blk_hdr);
 		GET_RSIZ(rec_size1, rec_base);
 		tblk_ptr = dest_blk_ptr;
-		while (BSTAR_REC_SIZE == rec_size1 && 0 != nslevel)
+		while ((BSTAR_REC_SIZE == rec_size1) && (0 != nslevel))
 		{
 			GET_LONG(child1, (rec_base + sizeof(rec_hdr)));
 			if (0 == child1 || child1 > cs_data->trans_hist.total_blks - 1)
@@ -204,23 +238,14 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			}
 			/* leaf of a killed GVT can have block header only.   Skip those blocks */
 			if (sizeof(blk_hdr) >= ((blk_hdr_ptr_t)tblk_ptr)->bsiz)
-			{
-				/* if (CDB_STAGNATE <= t_tries) */
-				deleted = delete_hashtab_int4(&cw_stagnate, (uint4 *)&child1);
-				assert(deleted);
 				break;
-			}
 			nslevel--;
 			rec_base = tblk_ptr + sizeof(blk_hdr);
 			GET_RSIZ(rec_size1, rec_base);
 		}
 		/* leaf of a killed GVT can have block header only.   Skip those blocks */
 		if (sizeof(blk_hdr) >= ((blk_hdr_ptr_t)tblk_ptr)->bsiz)
-		{	/* if (CDB_STAGNATE <= t_tries) */
-			deleted = delete_hashtab_int4(&cw_stagnate, (uint4 *)&dest_blk_id);
-			assert(deleted);
 			continue;
-		}
 		/* get length of global variable name (do not read subscript) for dest_blk_id */
 		GET_GBLNAME_LEN(key_len_dir, rec_base + sizeof(rec_hdr));
 		/* key_len = length of 1st key value (including subscript) for dest_blk_id */
@@ -230,11 +255,8 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			 * which is just killed and still marked busy.  Skip it, if we are in last retry.
 			 */
 			if (CDB_STAGNATE <= t_tries)
-			{
-				deleted = delete_hashtab_int4(&cw_stagnate, (uint4 *)&dest_blk_id);
-				assert(deleted);
 				continue;
-			} else
+			else
 				return cdb_sc_blkmod;
 		}
 		memcpy(&(dest_gv_currkey->base[0]), rec_base + sizeof(rec_hdr), key_len_dir);
@@ -243,11 +265,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (exclude_glist_ptr->next)
 		{	/* exclude blocks for globals in the list of EXCLUDE option */
 			if  (in_exclude_list(&(dest_gv_currkey->base[0]), key_len_dir - 1, exclude_glist_ptr))
-			{	/* if (CDB_STAGNATE <= t_tries) */
-				deleted = delete_hashtab_int4(&cw_stagnate, (uint4 *)&dest_blk_id);
-				assert(deleted);
 				continue;
-			}
 		}
 		save_targ = gv_target;
 		if (INVALID_GV_TARGET != reset_gv_target)
@@ -407,10 +425,10 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			 * from gds_t_create to gds_t_acquired). Instead we do that and a little more (that t_end does) all here.
 			 */
 			assert(dest_blk_id == tmpcse->blk);
-			if (BLK_FREE == x_blk_lmap)
+			if (BLK_FREE == x_blk_lmap) /* Destination block was free and never used, so no need before image */
 				tmpcse->old_block = NULL;
 			else
-			{
+			{	/* Destination is a recycled block, so we need before image */
 				tmpcse->old_block = destblkhist.buffaddr;;
 				jbbp = (JNL_ENABLED(cs_addrs) && cs_addrs->jnl_before_image) ? cs_addrs->jnl->jnl_buff : NULL;
 				if ((NULL != jbbp) && (((blk_hdr_ptr_t)tmpcse->old_block)->tn < jbbp->epoch_tn))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ GBLREF	uint4			process_id;
 GBLREF	boolean_t		tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
 GBLREF	gv_namehead		*gv_target;
 GBLREF	boolean_t		dse_running;
-GBLREF boolean_t		disk_blk_read;
+GBLREF	boolean_t		disk_blk_read;
 
 /* There are 3 passes (of the do-while loop below) we allow now.
  * The first pass which is potentially out-of-crit and hence can end up not locating the cache-record for the input block.
@@ -140,47 +140,68 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				cse = first_tp_srch_status ? first_tp_srch_status->ptr : NULL;
 			}
 			assert(!cse || !cse->high_tlevel);
+			assert(!chain1.flag || cse);
 			if (cse)
 			{	/* transaction has modified the sought after block  */
-				assert(gds_t_writemap != cse->mode);
-				if (FALSE == cse->done)
-				{	/* out of date, so make it current */
-					already_built = (NULL != cse->new_buff);
-					gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, 0);
-					assert(cse->blk_target);
-					if (!already_built && !chain1.flag)
-					{
-						assert(first_tp_srch_status && (is_mm || first_tp_srch_status->cr)
-										&& first_tp_srch_status->buffaddr);
-						if (first_tp_srch_status->tn <=
-								((blk_hdr_ptr_t)(first_tp_srch_status->buffaddr))->tn)
+				if ((gds_t_committed != cse->mode) || (n_gds_t_op < cse->old_mode))
+				{	/* Changes have not been committed to shared memory, i.e. still in private memory.
+					 * Build block in private buffer if not already done and return the same.
+					 */
+					assert(gds_t_writemap != cse->mode);
+					if (FALSE == cse->done)
+					{	/* out of date, so make it current */
+						assert(gds_t_committed != cse->mode);
+						already_built = (NULL != cse->new_buff);
+						gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, 0);
+						assert(NULL != cse->blk_target);
+						if (!already_built && !chain1.flag)
 						{
-							assert(CDB_STAGNATE > t_tries);
-							rdfail_detail = cdb_sc_blkmod;	/* should this be something else */
-							TP_TRACE_HIST_MOD(blk, gv_target, tp_blkmod_t_qread, cs_data,
-								first_tp_srch_status->tn,
-								((blk_hdr_ptr_t)(first_tp_srch_status->buffaddr))->tn,
-								((blk_hdr_ptr_t)(first_tp_srch_status->buffaddr))->levl);
-							return (sm_uc_ptr_t)NULL;
+							assert(first_tp_srch_status && (is_mm || first_tp_srch_status->cr)
+											&& first_tp_srch_status->buffaddr);
+							if (first_tp_srch_status->tn <=
+									((blk_hdr_ptr_t)(first_tp_srch_status->buffaddr))->tn)
+							{
+								assert(CDB_STAGNATE > t_tries);
+								rdfail_detail = cdb_sc_blkmod;	/* should this be something else */
+								TP_TRACE_HIST_MOD(blk, gv_target, tp_blkmod_t_qread, cs_data,
+									first_tp_srch_status->tn,
+									((blk_hdr_ptr_t)(first_tp_srch_status->buffaddr))->tn,
+									((blk_hdr_ptr_t)(first_tp_srch_status->buffaddr))->levl);
+								return (sm_uc_ptr_t)NULL;
+							}
+							if ((!is_mm)
+								&& (first_tp_srch_status->cycle != first_tp_srch_status->cr->cycle
+								|| first_tp_srch_status->blk_num != first_tp_srch_status->cr->blk))
+							{
+								assert(CDB_STAGNATE > t_tries);
+								rdfail_detail = cdb_sc_lostcr;	/* should this be something else */
+								return (sm_uc_ptr_t)NULL;
+							}
+							if (certify_all_blocks) /* will GTMASSERT on integ error */
+								cert_blk(gv_cur_region, blk, (blk_hdr_ptr_t)cse->new_buff,
+									cse->blk_target->root, TRUE);
 						}
-						if ((!is_mm) && (first_tp_srch_status->cycle != first_tp_srch_status->cr->cycle
-							|| first_tp_srch_status->blk_num != first_tp_srch_status->cr->blk))
-						{
-							assert(CDB_STAGNATE > t_tries);
-							rdfail_detail = cdb_sc_lostcr;	/* should this be something else */
-							return (sm_uc_ptr_t)NULL;
-						}
-						if (certify_all_blocks)
-							cert_blk(gv_cur_region, blk, (blk_hdr_ptr_t)cse->new_buff,
-								cse->blk_target->root, TRUE);	/* will GTMASSERT on integ error */
+						cse->done = TRUE;
 					}
-					cse->done = TRUE;
+					*cycle = CYCLE_PVT_COPY;
+					*cr_out = 0;
+					return (sm_uc_ptr_t)cse->new_buff;
+				} else
+				{	/* Block changes are already committed to shared memory (possible if we are in TP
+					 * in the 2nd phase of M-Kill in gvcst_expand_free_subtree.c). In this case, read
+					 * block from shared memory; do not look at private memory (i.e. cse) as that might
+					 * not be as uptodate as shared memory.
+					 */
+					assert(csa->now_crit);	/* gvcst_expand_free_subtree does t_qread in crit */
+					/* If this block was newly created as part of the TP transaction, it should not be killed
+					 * as part of the 2nd phase of M-kill. This is because otherwise the block's cse would
+					 * have had an old_mode of kill_t_create in which case we would not have come into this
+					 * else block. Assert accordingly.
+					 */
+					assert(!chain1.flag);
+					first_tp_srch_status = NULL;	/* do not use any previous srch_hist information */
 				}
-				*cycle = CYCLE_PVT_COPY;
-				*cr_out = 0;
-				return (sm_uc_ptr_t)cse->new_buff;
 			}
-			assert(!chain1.flag);
 		} else
 		{
 			if (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&blk)))
@@ -201,11 +222,18 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					CWS_INSERT(blk);
 				return (sm_uc_ptr_t)first_tp_srch_status->buffaddr;
 			} else
-			{	/* Block was already part of the read-set of this transaction, but got recycled. Allow for
-				 * recycling. But update the first_tp_srch_status (for this blk) in the si->first_tp_hist
-				 * array to reflect the new buffer, cycle and cache-record. Since we know those only at the end of
-				 * t_qread, set a variable here that will enable the updation before returning from t_qread().
+			{	/* Block was already part of the read-set of this transaction, but got recycled in the cache.
+				 * Allow block recycling by resetting first_tp_srch_status for this blk to reflect the new
+				 * buffer, cycle and cache-record. tp_hist (invoked much later) has validation checks to detect
+				 * if block recycling happened within the same mini-action and restart in that case.
+				 * Updating first_tp_srch_status has to wait until the end of t_qread since only then do we know
+				 * the values to update to. Set a variable that will enable the updation before returning.
+				 * Also assert that if we are in the final retry, we are never in a situation where we have a
+				 * block that got recycled since the start of the current mini-action. This is easily detected since
+				 * as part of the final retry we maintain a hash-table "cw_stagnate" that holds the blocks that
+				 * have been read as part of the current mini-action until now.
 				 */
+				assert(CDB_STAGNATE > t_tries || (NULL == lookup_hashtab_int4(&cw_stagnate, (uint4 *)&blk)));
 				reset_first_tp_srch_status = TRUE;
 			}
 		}
@@ -368,7 +396,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					 * this <cr,cycle> combination although we don't want to since this "cr" is not current for
 					 * the given block as of now. Note that the "indexmod" optimization in tp_tend() relies on
 					 * an accurate intermediate validation by tp_hist() which in turn relies on the <cr,cycle>
-					 * value returned by t_qread() to be accurate for a given blk at the current point in time.
+					 * value returned by t_qread to be accurate for a given blk at the current point in time.
 					 * We detect the older-twin case by the following check. Note that here we depend on the
 					 * the fact that bg_update() sets cr->bt_index to 0 before incrementing cr->cycle.
 					 * Given that order, cr->bt_index can be guaranteed to be 0 if we read the incremented cycle
@@ -385,7 +413,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				{	/* keep the parantheses for the if (although single line) since the following is a macro */
 					RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, cr, *cycle);
 				}
-				/* Note that at this point we expect t_qread() to return a <cr,cycle> combination that
+				/* Note that at this point we expect t_qread to return a <cr,cycle> combination that
 				 * corresponds to "blk" passed in. It is crucial to get an accurate value for both the fields
 				 * since tp_hist() relies on this for its intermediate validation.
 				 */

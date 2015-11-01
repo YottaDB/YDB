@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,9 +61,10 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	off_jnl_t		eof_addr;
 	uint4			status;
 	int			rc;
-	error_def		(ERR_PREMATEOF);
-	error_def		(ERR_JNLCLOSE);
-	error_def		(ERR_JNLWRERR);
+
+	error_def(ERR_PREMATEOF);
+	error_def(ERR_JNLCLOSE);
+	error_def(ERR_JNLWRERR);
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	assert(csa->now_crit || (csa->hdr->clustered && (CCST_CLOSED == csa->nl->ccp_state)));
@@ -128,6 +129,6 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	{
 		status = jpc->status;	/* jnl_send_oper resets jpc->status, so save it */
 		jnl_send_oper(jpc, ERR_JNLCLOSE);
-		rts_error(VARLSTCNT(7) ERR_JNLCLOSE, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(reg), status);
+		rts_error(VARLSTCNT(5) ERR_JNLCLOSE, 2, JNL_LEN_STR(csa->hdr), status);
 	}
 }

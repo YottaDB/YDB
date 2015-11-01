@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,15 +66,15 @@ static readonly unsigned char gt_lit[] = "LOAD TOTAL";
 
 void		bin_call_db(int, int, int);
 
-void bin_load(int begin, int end)
+void bin_load(uint4 begin, uint4 end)
 {
 	unsigned char	*ptr, *cp1, *cp2, *btop, *gvkey_char_ptr, *tmp_ptr, *tmp_key_ptr;
 	unsigned char	hdr_lvl, src_buff[MAX_KEY_SZ + 1], dest_buff[MAX_ZWR_KEY_SZ],
 			cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1];
 	unsigned char	*end_buff;
 	unsigned short	len, rec_len, next_cmpc;
-	int		current, last, length, iter, max_blk_siz, max_key, status, subsc_len;
-	uint4		max_data_len, max_subsc_len, key_count, rec_count, global_key_count;
+	int		current, last, length, max_blk_siz, max_key, status, subsc_len;
+	uint4		iter, max_data_len, max_subsc_len, key_count, rec_count, global_key_count;
 	boolean_t	need_xlation, new_gvn;
 	rec_hdr		*rp, *next_rp;
 	mval		v, tmp_mval;
@@ -89,6 +89,7 @@ void bin_load(int begin, int end)
 	error_def(ERR_TEXT);
 	error_def(ERR_LDBINFMT);
 	error_def(ERR_LOADCTRLY);
+	error_def(ERR_LOADEOF);
 	error_def(ERR_MUNOFINISH);
 	error_def(ERR_COLLTYPVERSION);
 	error_def(ERR_COLLATIONUNDEF);
@@ -141,34 +142,36 @@ void bin_load(int begin, int end)
 		new_gvn = TRUE;
 	} else
 		gtm_putmsg(VARLSTCNT(3) ERR_OLDBINEXTRACT, 1, hdr_lvl - '0');
-	if (!begin)
+	if (begin < 2)
 		begin = 2;
-	else
+	for (iter = 2; iter < begin; iter++)
 	{
-		if (begin < 2)
-			begin = 2;
-		for (iter = 2; iter < begin; iter++)
+		if (!(len = mu_bin_get((char **)&ptr)))
 		{
-			if (!(len = mu_bin_get((char **)&ptr)))
-				break;
-			else if (len == sizeof(coll_hdr))
-			{
-				extr_collhdr = *((coll_hdr *)(ptr));
-				assert(hdr_lvl > '2');
-				iter--;
-			}
+			gtm_putmsg(VARLSTCNT(3) ERR_LOADEOF, 1, begin);
+			util_out_print("Error reading record number: !UL\n", TRUE, iter);
+			mupip_error_occurred = TRUE;
+			return;
+		} else if (len == sizeof(coll_hdr))
+		{
+			extr_collhdr = *((coll_hdr *)(ptr));
+			assert(hdr_lvl > '2');
+			iter--;
 		}
-		util_out_print("Beginning LOAD at #!UL\n", TRUE, begin);
 	}
+	assert(iter == begin);
+	util_out_print("Beginning LOAD at record number: !UL\n", TRUE, begin);
 	max_data_len = 0;
 	max_subsc_len = 0;
 	key_count = 0;
-	rec_count = 1;
+	rec_count = begin - 1;
 	extr_collseq = db_collseq = NULL;
 	need_xlation = FALSE;
 
 	for (; !mupip_DB_full ;)
 	{
+		if (++rec_count > end)
+			break;
 		next_cmpc = 0;
 		mupip_error_occurred = FALSE;
 		if (mu_ctrly_occurred)
@@ -177,15 +180,13 @@ void bin_load(int begin, int end)
 		{
 			util_out_print("!AD:!_  Key cnt: !UL  max subsc len: !UL  max data len: !UL", TRUE,
 				LEN_AND_LIT(gt_lit), key_count, max_subsc_len, max_data_len);
-			util_out_print("Last LOAD record number: !UL", TRUE, rec_count - 1);
+			util_out_print("Last LOAD record number: !UL", TRUE, key_count ? (rec_count - 1) : 0);
 			mu_gvis();
 			util_out_print(0, TRUE);
 			mu_ctrlc_occurred = FALSE;
 		}
 		/* reset the stringpool for every record in order to avoid garbage collection */
 		stringpool.free = stringpool.base;
-		if (rec_count >= end)
-			break;
 		if (!(len = mu_bin_get((char **)&ptr)) || mupip_error_occurred)
 			break;
 		else if (len == sizeof(coll_hdr))
@@ -193,9 +194,9 @@ void bin_load(int begin, int end)
 			extr_collhdr = *((coll_hdr *)(ptr));
 			assert(hdr_lvl > '2');
 			new_gvn = TRUE;			/* next record will contain a new gvn */
+			rec_count--;	/* Decrement as this record does not count as a record for loading purposes */
 			continue;
 		}
-		rec_count++;
 		global_key_count = 1;
 		rp = (rec_hdr*)ptr;
 		btop = ptr + len;
@@ -214,7 +215,7 @@ void bin_load(int begin, int end)
 		GET_SHORT(rec_len, &rp->rsiz);
 		if (rp->cmpc != 0 || v.str.len > rec_len || mupip_error_occurred)
 		{
-			bin_call_db(ERR_COR, rec_count - 1, global_key_count);
+			bin_call_db(ERR_COR, rec_count, global_key_count);
 			mu_gvis();
 			util_out_print(0, TRUE);
 			continue;
@@ -270,7 +271,7 @@ void bin_load(int begin, int end)
 			GET_SHORT(rec_len, &rp->rsiz);
 			if (rec_len + (unsigned char *)rp > btop)
 			{
-				bin_call_db(ERR_COR, rec_count - 1, global_key_count);
+				bin_call_db(ERR_COR, rec_count, global_key_count);
 				mu_gvis();
 				util_out_print(0, TRUE);
 				break;
@@ -287,7 +288,7 @@ void bin_load(int begin, int end)
 				if (cp1 > (unsigned char *) rp + rec_len ||
 				    cp2 > (unsigned char *) gv_currkey + gv_currkey->top)
 				{
-					bin_call_db(ERR_COR, rec_count - 1, global_key_count);
+					bin_call_db(ERR_COR, rec_count, global_key_count);
 					mu_gvis();
 					util_out_print(0, TRUE);
 					break;
@@ -368,7 +369,7 @@ void bin_load(int begin, int end)
 			}
 			if (gv_currkey->end >= max_key)
 			{
-				bin_call_db(ERR_COR, rec_count - 1, global_key_count);
+				bin_call_db(ERR_COR, rec_count, global_key_count);
 				mu_gvis();
 				util_out_print(0, TRUE);
 				continue;
@@ -384,7 +385,7 @@ void bin_load(int begin, int end)
 			{
 				if (!mupip_DB_full)
 				{
-					bin_call_db(ERR_COR, rec_count - 1, global_key_count);
+					bin_call_db(ERR_COR, rec_count, global_key_count);
 					util_out_print(0, TRUE);
 				}
 				break;
@@ -397,8 +398,8 @@ void bin_load(int begin, int end)
 	mu_load_close();
 	util_out_print("LOAD TOTAL!_!_Key Cnt: !UL  Max Subsc Len: !UL  Max Data Len: !UL", TRUE, key_count, max_subsc_len,
 			max_data_len);
-	util_out_print("Last LOAD record number: !UL\n", TRUE, rec_count);
-	if(mu_ctrly_occurred)
+	util_out_print("Last LOAD record number: !UL\n", TRUE, key_count ? (rec_count - 1) : 0);
+	if (mu_ctrly_occurred)
 	{
 		gtm_putmsg(VARLSTCNT(1) ERR_LOADCTRLY);
 		mupip_exit(ERR_MUNOFINISH);

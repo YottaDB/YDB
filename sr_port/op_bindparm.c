@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,15 +17,14 @@
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "op.h"
-#include <varargs.h>
+#include <stdarg.h>
 
 GBLREF mv_stent			*mv_chain;
 GBLREF unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF symval			*curr_symval;
 GBLREF stack_frame		*frame_pointer;
 
-void op_bindparm(va_alist)
-va_dcl
+void op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...)
 {
 	va_list		var;
 	uint4		mask;
@@ -33,7 +32,8 @@ va_dcl
 	mv_stent	*mv_ent;
 	var_tabent	*parm_name;
 	int		i;
-	int		frmc, frmp;	/* formal argument count, formal argument pointer */
+	int		frmp;	/* formal argument pointer */
+	VMS_ONLY(int	frmc;)	/* formal argument count */
 	int		actc;
 	lv_val		**actp;		/* actual pointer */
 	lv_val		**lspp;
@@ -46,14 +46,15 @@ va_dcl
 
 	for (mv_ent = mv_chain; MVST_PARM != mv_ent->mv_st_type; mv_ent = (mv_stent *)((char *)mv_ent + mv_ent->mv_st_next))
 		assert(mv_ent < (mv_stent *)frame_pointer);
-	VAR_START(var);
-	frmc = va_arg(var, int4);
+	frmp = frmp_arg;
 	actc = mv_ent->mv_st_cont.mvs_parm.mvs_parmlist->actualcnt;
 	actp = mv_ent->mv_st_cont.mvs_parm.mvs_parmlist->actuallist;
 	mask = mv_ent->mv_st_cont.mvs_parm.mvs_parmlist->mask;
+	VMS_ONLY(va_count(frmc);)
 	if (actc > frmc)
 		rts_error(VARLSTCNT(1) ERR_ACTLSTTOOLONG);
-	for (i = 0, frmp = va_arg(var, int4); i < frmc; i++, frmp = va_arg(var, int4), actp++)
+	VAR_START(var, frmp_arg);
+	for (i = 0; i < frmc; i++, frmp = va_arg(var, int4), actp++)
 	{
 		if (i >= actc)
 		{
@@ -87,6 +88,7 @@ va_dcl
 		tabent->value = (char *)new_var;
 		*lspp = (lv_val *)new_var;
 	}
+	va_end(var);
 	free(mv_ent->mv_st_cont.mvs_parm.mvs_parmlist);
 	mv_ent->mv_st_cont.mvs_parm.mvs_parmlist = 0;
 }

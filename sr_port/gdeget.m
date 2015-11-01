@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2005 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -84,7 +84,6 @@ LOAD
 	f s="JOURNAL","KEY_SIZE","NULL_SUBSCRIPTS","RECORD_SIZE" d tmpreg(s) ;,"STOP_ENABLE"
 	; need to handle versioning
 	i 'v44&'v30 d tmpreg("STDNULLCOLL")
-	e  s tmpreg("STDNULLCOLL")=0
 	f i=2:1:$l(accmeth,"\") s am=$p(accmeth,"\",i) d
 	. i am="MM" d:$l(rec)-(rel-1)<3 nextrec i +$e(rec,rel,rel+2)'=2 d tmpmm q
 	. f s="ACCESS_METHOD","ALLOCATION","BLOCK_SIZE","BUCKET_SIZE","DEFER","EXTENSION_COUNT","FILE_TYPE" d tmpseg(am,s)

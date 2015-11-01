@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,17 +23,17 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "zwrite.h"
-#include <varargs.h>
+#include <stdarg.h>
 #include "op.h"
 #include "mvalconv.h"
 #include "gtm_maxstr.h"
 
-void op_gvzwrite(va_alist)
-va_dcl
+void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 {
 	va_list		var;
 	bool		flag;
-	int4		pat, subsc, count, arg, arg1, arg2;
+	int4		subsc, arg, arg1, arg2;
+	VMS_ONLY(int4	count;)
 	mval		*mv;
 	zshow_out	output;
 	MAXSTR_BUFF_DECL(buff);
@@ -46,9 +46,8 @@ va_dcl
 	output.len = sizeof(buff);
 	output.ptr = output.buff;
 
-	VAR_START(var);
-	count = va_arg(var, int4);
-	pat = va_arg(var, int4);
+	VAR_START(var, pat);
+	VMS_ONLY(va_count(count);)
 	subsc = va_arg(var, int4);
 	arg1 = va_arg(var, int4);
 	gvzwr_init(subsc, (mval *)arg1, pat);
@@ -89,5 +88,6 @@ va_dcl
 			break;
 		}
 	}
+	va_end(var);
 	MAXSTR_BUFF_FINI;
 }

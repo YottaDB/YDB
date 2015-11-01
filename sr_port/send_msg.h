@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef SEND_MSG_included
 #define SEND_MSG_included
 
-void send_msg();
+void send_msg(UNIX_ONLY(int arg_count) VMS_ONLY(int msg_id_arg), ...);
 
 #endif /* SEND_MSG_included */

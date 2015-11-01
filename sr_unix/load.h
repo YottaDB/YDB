@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +12,8 @@
 #ifndef LOAD_INCLUDED
 #define LOAD_INCLUDED
 
-void bin_load(int begin, int end);
-void go_load(int begin, int end);
+void bin_load(uint4 begin, uint4 end);
+void go_load(uint4 begin, uint4 end);
 void goq_load(void);
 
 #endif /* LOAD_INCLUDED */

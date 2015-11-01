@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,26 +60,25 @@ void tp_incr_commit(void)
 				if (low_cse && low_cse->t_level == cse->t_level)	/* delete the duplicate link */
 				{
 					lower_cse = low_cse->low_tlevel;
+					assert((low_cse->done && low_cse->new_buff) || (n_gds_t_op < cse->mode));
 					if (lower_cse)
 					{
 						assert(lower_cse->t_level < cse->t_level);
 						lower_cse->high_tlevel = cse;
 						cse->low_tlevel = lower_cse;
-						assert(low_cse->new_buff);
 						if (!cse->new_buff)
-						{	/* if we never needed to build in the new level, copy the
-							 * built copy of the older level before going back to that level
+						{	/* if we never needed to build in the new level, copy the built copy
+							 * (if any) of the older level before going back to that level
 							 */
-							assert(!cse->done && low_cse->done);
+							assert(!cse->done);
 							cse->new_buff = low_cse->new_buff;
-						} else
+						} else if (low_cse->new_buff)
 							free_element(si->new_buff_list,
 									(char *)low_cse->new_buff - sizeof(que_ent));
 						free_element(si->tlvl_cw_set_list, (char *)low_cse);
 						orig_cse = cse;
 					} else
-					{
-						/* In this case, there are only two elements in the horizontal list out of
+					{	/* In this case, there are only two elements in the horizontal list out of
 						 * which we are going to delete one. We prefer to copy the second link into
 						 * the first and delete the second (rather than simply deleting the first), since
 						 * the first element may be an intermediate element in the vertical list and
@@ -100,14 +99,13 @@ void tp_incr_commit(void)
 						 */
 						prev_cse = low_cse->prev_cw_set;
 						next_cse = low_cse->next_cw_set;
-						assert(low_cse->new_buff);
 						if (!cse->new_buff)
 						{	/* if we never needed to build in the new level, copy the
 							 * built copy of the older level before going back to that level
 							 */
-							assert(!cse->done && low_cse->done);
+							assert(!cse->done);
 							cse->new_buff = low_cse->new_buff;
-						} else
+						} else if (low_cse->new_buff)
 							free_element(si->new_buff_list,
 									(char *)low_cse->new_buff - sizeof(que_ent));
 						memcpy(low_cse, cse, sizeof(cw_set_element));

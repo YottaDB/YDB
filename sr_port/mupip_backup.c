@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,8 @@
 #include "sleep_cnt.h"
 #if defined(UNIX)
 #include "eintr_wrappers.h"
+#include "gtmio.h"		/* for OPENFILE macro */
+#include "repl_sp.h"		/* for F_CLOSE macro */
 #endif
 #include "gtm_file_stat.h"
 #include "util.h"
@@ -90,7 +92,7 @@ static  const   unsigned short  zero_fid[3];
 #define TMPDIR_ACCESS_MODE	(R_OK | W_OK | X_OK | F_OK)
 #endif
 
-
+GBLDEF  boolean_t	backup_started;
 GBLREF 	bool		record;
 GBLREF 	bool		error_mupip;
 GBLREF 	bool		file_backed_up;
@@ -116,6 +118,8 @@ GBLREF	char		*before_image_lit[];
 GBLREF	char		*jnl_state_lit[];
 GBLREF	char		*repl_state_lit[];
 GBLREF	jnl_gbls_t	jgbl;
+GBLREF	void            (*call_on_signal)();
+GBLREF  int		process_exiting;		/* Process is on it's way out */
 
 static char	* const jnl_parms[] =
 {
@@ -131,51 +135,63 @@ enum
 	jnl_end_of_list
 };
 
+void mupip_backup_call_on_signal(void)
+{	/* Called if mupip backup is terminated by a signal. Performs cleanup of temporary files and shutdown backup. */
+	call_on_signal = NULL;	/* Do not recurse via call_on_signal if there is an error */
+	process_exiting = TRUE;	/* Signal function "free" (in gtm_malloc_src.h) not to bother with frees as we are anyways exiting.
+				 * This avoids assert failures that would otherwise occur due to nested storage mgmt calls
+				 * just in case we came here because of an interrupt (e.g. SIGTERM) while a malloc was in progress.
+				 */
+	if (backup_started)
+		mubclnup(NULL, need_to_del_tempfile);
+}
+
 void mupip_backup(void)
 {
-	bool		journal;
-	char		*tempdirname, *tempfilename, *ptr;
-	uint4		level, blk, status, ret;
-	unsigned short	s_len, length, ntries;
-	int4		size, gds_ratio, buff_size, i, crit_counter;
-	uint4		ustatus;
-	size_t		backup_buf_size;
-	trans_num	tn;
-	shmpool_buff_hdr_ptr_t	bptr;
+	bool			journal;
+	char			*tempdirname, *tempfilename, *ptr;
+	uint4			level, blk, status, ret;
+	unsigned short		s_len, length, ntries;
+	int4			size, gds_ratio, buff_size, i, crit_counter;
+	uint4			ustatus;
+	size_t			backup_buf_size;
+	trans_num		tn;
+	shmpool_buff_hdr_ptr_t	sbufh_p;
+	shmpool_blk_hdr_ptr_t	sblkh_p, next_sblkh_p;
 	static boolean_t	once = TRUE;
-	backup_reg_list	*rptr, *clnup_ptr;
-	boolean_t	inc_since_inc , inc_since_rec, result, newjnlfiles, gotit, tn_specified,
-			replication_on, newjnlfiles_specified, keep_prev_link, bkdbjnl_disable_specified,
-			bkdbjnl_off_specified;
-	unsigned char	since_buff[50];
-	jnl_create_info jnl_info;
-	file_control	*fc;
-	char            tempdir_trans_buffer[MAX_TRANS_NAME_LEN],
-			tempnam_prefix[MAX_FN_LEN], tempdir_full_buffer[MAX_FN_LEN + 1], jnl_file_name[JNL_NAME_SIZE];
-	char		*jnl_str_ptr, rep_str[256], jnl_str[256], entry[256],
-			full_jnl_fn[JNL_NAME_SIZE], prev_jnl_fn[JNL_NAME_SIZE];
-	int		ccnt, index, comparison, num, jnl_fstat;
-	mstr            tempdir_log, tempdir_trans, *file, tempdir_full, filestr;
-	uint4		jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status;
+	backup_reg_list		*rptr, *clnup_ptr;
+	boolean_t		inc_since_inc , inc_since_rec, result, newjnlfiles, gotit, tn_specified,
+				replication_on, newjnlfiles_specified, keep_prev_link, bkdbjnl_disable_specified,
+				bkdbjnl_off_specified;
+	unsigned char		since_buff[50];
+	jnl_create_info		jnl_info;
+	file_control		*fc;
+	char			tempdir_trans_buffer[MAX_TRANS_NAME_LEN],
+				tempnam_prefix[MAX_FN_LEN], tempdir_full_buffer[MAX_FN_LEN + 1], jnl_file_name[JNL_NAME_SIZE];
+	char			*jnl_str_ptr, rep_str[256], jnl_str[256], entry[256],
+				full_jnl_fn[JNL_NAME_SIZE], prev_jnl_fn[JNL_NAME_SIZE];
+	int			ccnt, index, comparison, num, jnl_fstat;
+	mstr			tempdir_log, tempdir_trans, *file, tempdir_full, filestr;
+	uint4			jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status;
 
 #if defined(VMS)
-	struct FAB	temp_fab;
-	struct NAM	temp_nam;
-	struct XABPRO	temp_xabpro;
-	short		iosb[4];
-	char		def_jnl_fn[MAX_FN_LEN];
-	GDS_INFO	*gds_info;
-	char		exp_file_name[MAX_FN_LEN];
-	uint4		exp_file_name_len;
+	struct FAB		temp_fab;
+	struct NAM		temp_nam;
+	struct XABPRO		temp_xabpro;
+	short			iosb[4];
+	char			def_jnl_fn[MAX_FN_LEN];
+	GDS_INFO		*gds_info;
+	char			exp_file_name[MAX_FN_LEN];
+	uint4			exp_file_name_len;
 #elif defined(UNIX)
-	struct stat     stat_buf;
-	int		fstat_res;
-	int		sync_io_status;
-	boolean_t	sync_io, sync_io_specified;
+	struct stat		stat_buf;
+	int			fstat_res, fclose_res, tmpfd;
+	int			sync_io_status;
+	boolean_t		sync_io, sync_io_specified;
 #else
 # error UNSUPPORTED PLATFORM
 #endif
-	boolean_t	jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
+	boolean_t		jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
 
 
 	error_def(ERR_BACKUPCTRL);
@@ -206,12 +222,14 @@ void mupip_backup(void)
 
 	/* ==================================== STEP 1. Initialization ======================================= */
 
+	backup_started = FALSE;
 	ret = SS_NORMAL;
 	jnl_str_ptr = &jnl_str[0];
 	halt_ptr = grlist = NULL;
 	in_backup = TRUE;
 	inc_since_inc = inc_since_rec = file_backed_up = error_mupip = FALSE;
 	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
+	call_on_signal = mupip_backup_call_on_signal;
 
 	mu_outofband_setup();
 	jnl_status = 0;
@@ -367,7 +385,7 @@ void mupip_backup(void)
 				}
 			)
 		} else if (!incremental)
-		{ 	/* non-incremental backups to "exec" and "tp" are not supported*/
+		{ 	/* non-incremental backups to "exec" and "tcp" are not supported*/
 			gtm_putmsg(VARLSTCNT(1) ERR_NOTRNDMACC);
 			error_mupip = TRUE;
 		}
@@ -481,16 +499,16 @@ void mupip_backup(void)
 					tempdir_trans.len = 1;
 				}
 			}
-
 			/* verify the accessibility of the tempdir */
 			if (FILE_STAT_ERROR == (fstat_res = gtm_file_stat(&tempdir_trans, NULL, &tempdir_full, FALSE, &ustatus)))
 			{
 				gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, tempdir_trans.len, tempdir_trans.addr, ustatus);
+				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ustatus);
 			}
 			SPRINTF(tempfilename + tempdir_full.len,"/%s_XXXXXX",tempnam_prefix);
 			MKSTEMP(tempfilename, rptr->backup_fd);
-			if (-1 == rptr->backup_fd )
+			if (-1 == rptr->backup_fd)
 			{
 				status = errno;
 				if ((NULL != tempdir_full.addr) &&
@@ -498,20 +516,34 @@ void mupip_backup(void)
 				{
 					status = errno;
 					util_out_print("!/Do not have full access to directory for temporary files: !AD", TRUE,
-							tempdir_trans.len, tempdir_trans.addr);
-					gtm_putmsg(VARLSTCNT(1) status);
-					util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
-					mubclnup(rptr, need_to_del_tempfile);
-					mupip_exit(status);
-				}
-				util_out_print("!/Cannot create the temporary file in directory !AD for online backup", TRUE,
 						tempdir_trans.len, tempdir_trans.addr);
+				} else
+					util_out_print("!/Cannot create the temporary file in directory !AD for online backup",
+						TRUE, tempdir_trans.len, tempdir_trans.addr);
 				gtm_putmsg(VARLSTCNT(1) status);
 				util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(status);
-
 			}
+			/* Temporary file for backup was created above using "mkstemp" which on AIX opens the file without
+			 * large file support enabled. Work around that by closing the file descriptor returned and reopening
+			 * the file with the "open" system call (which gets correctly translated to "open64"). We need to do
+			 * this because the temporary file can get > 2GB. Since it is not clear if mkstemp on other Unix platforms
+			 * will open the file for large file support, we use this solution for other Unix flavours as well.
+			 */
+			tmpfd = rptr->backup_fd;
+			OPENFILE(tempfilename, O_RDWR, rptr->backup_fd);
+			if (-1 == rptr->backup_fd)
+			{
+				status = errno;
+				util_out_print("!/Error re-opening temporary file created by mkstemp()!/", TRUE);
+				gtm_putmsg(VARLSTCNT(1) status);
+				util_out_print("!/MUPIP cannot start backup with above errors!/", TRUE);
+				mubclnup(rptr, need_to_del_tempfile);
+				mupip_exit(status);
+			}
+			/* Now that the temporary file has been opened successfully, close the fd returned by mkstemp */
+			F_CLOSE(tmpfd, fclose_res);
 			tempdir_full.len = strlen(tempdir_full.addr); /* update the length */
 			if (debug_mupip)
 				util_out_print("!/MUPIP INFO:   Temp file name: !AD", TRUE,tempdir_full.len, tempdir_full.addr);
@@ -657,6 +689,7 @@ void mupip_backup(void)
 							 * This is done once outside region loop so all regions have same eov/bov
 							 * timestamps in the journal files. This reduces the probability of
 							 * occurrence of D9D12-002410 --- nars -- 2004/01/02 */
+		backup_started = TRUE;
 		jgbl.dont_reset_gbl_jrec_time = TRUE;
 		for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
 		{
@@ -690,14 +723,14 @@ void mupip_backup(void)
 			memcpy(rptr->backup_hdr, cs_data, SIZEOF_FILE_HDR(cs_data));
 			if (online) /* save a copy of the fileheader, modify current fileheader and release crit */
 			{
-				bptr = cs_addrs->shmpool_buffer;
+				sbufh_p = cs_addrs->shmpool_buffer;
 				if (BACKUP_NOT_IN_PROGRESS != cs_addrs->nl->nbb)
 				{
-					if (TRUE == is_proc_alive(bptr->backup_pid, bptr->backup_image_count))
+					if (TRUE == is_proc_alive(sbufh_p->backup_pid, sbufh_p->backup_image_count))
 					{
 					    	/* someone else is doing the backup */
 						util_out_print("!/Process !UL is backing up region !AD now.", TRUE,
-								bptr->backup_pid, REG_LEN_STR(rptr->reg));
+								sbufh_p->backup_pid, REG_LEN_STR(rptr->reg));
 						rptr->not_this_time = give_up_after_create_tempfile;
 						rel_crit(rptr->reg);
 						continue;
@@ -880,15 +913,37 @@ void mupip_backup(void)
 					rel_crit(rptr->reg);
 					continue;
 				}
-				memcpy(&(bptr->tempfilename[0]), &(rptr->backup_tempfile[0]),
+				memcpy(&(sbufh_p->tempfilename[0]), &(rptr->backup_tempfile[0]),
 						strlen(rptr->backup_tempfile));
-				bptr->tempfilename[strlen(rptr->backup_tempfile)] = 0;
-				bptr->backup_tn = cs_addrs->ti->curr_tn;
-				bptr->backup_pid = process_id;
-				bptr->inc_backup_tn = (incremental ? rptr->tn : 0);
-				bptr->dskaddr = 0;
-				VMS_ONLY(bptr->backup_image_count = image_count;)
+				sbufh_p->tempfilename[strlen(rptr->backup_tempfile)] = 0;
+				sbufh_p->backup_tn = cs_addrs->ti->curr_tn;
+				sbufh_p->backup_pid = process_id;
+				sbufh_p->inc_backup_tn = (incremental ? rptr->tn : 0);
+				sbufh_p->dskaddr = 0;
+				sbufh_p->backup_errno = 0;
+				sbufh_p->failed = 0;
+				VMS_ONLY(sbufh_p->backup_image_count = image_count);
+				/* Make sure that the backup queue does not have any remnants on it. Note that we do not
+				   depend on the queue count here as it is imperative that, in the event that the count
+				   and queue get out of sync, that there ARE NO BLOCKS on this queue when we start or
+				   the backup will have unknown potentially very stale blocks resulting in at best bad
+				   data progressing to severe integrity errors.
+				*/
+				for (sblkh_p = SBLKP_REL2ABS(&sbufh_p->que_backup, fl);
+				     sblkh_p != (shmpool_blk_hdr_ptr_t)&sbufh_p->que_backup;
+				     sblkh_p = next_sblkh_p)
+				{	/* Loop through the queued backup blocks */
+					VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_free);
+					VERIFY_QUEUE((que_head_ptr_t)&sbufh_p->que_backup);
+					next_sblkh_p = SBLKP_REL2ABS(sblkh_p, fl);	/* Get next offset before remove entry */
+					shmpool_blk_free(rptr->reg, sblkh_p);
+				}
+				/* Unlock everything and let the backup proceed */
 				shmpool_unlock_hdr(gv_cur_region);
+				/* Signal to GT.M processes to start backing up before-images of any GDS block that gets changed
+				 * starting now. To do that set "nbb" to -1 as that is smaller than every valid block number in db
+				 * (starting from 0 upto a max. of 2^28-1 which is lesser than 2^31-1=BACKUP_NOT_IN_PROGRESS)
+				 */
 				cs_addrs->nl->nbb = -1; /* start */
 				rel_crit(rptr->reg);
 			}

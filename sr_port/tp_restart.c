@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,15 +60,20 @@ error_def(ERR_TRESTLOC);
 UNIX_ONLY(error_def(ERR_GVFAILCORE);)
 
 #define	MAX_TRESTARTS	16
+#define	GVNAME_UNKNOWN	"*UNKNOWN"
 
 static	int		num_tprestart = 0;
-GBLDEF	int		tprestart_syslog_limit;			/* limit TPRESTARTs */
+static	char		gvname_unknown[] = GVNAME_UNKNOWN;
+static	int4		gvname_unknown_len = STR_LIT_LEN(GVNAME_UNKNOWN);
+
+GBLDEF	int4		tprestart_syslog_limit;			/* limit TPRESTARTs */
 GBLDEF	int4		tprestart_syslog_delta; 		/* limit TPRESTARTs */
 GBLDEF	int4		tp_fail_histtn[CDB_MAX_TRIES], tp_fail_bttn[CDB_MAX_TRIES];
 GBLDEF	int4		tp_fail_n, tp_fail_level;
 GBLDEF	int4		n_pvtmods, n_blkmods;
 GBLDEF	gv_namehead	*tp_fail_hist[CDB_MAX_TRIES];
 GBLDEF	block_id	t_fail_hist_blk[CDB_MAX_TRIES];
+GBLDEF	gd_region	*tp_fail_hist_reg[CDB_MAX_TRIES];
 
 GBLREF	short		dollar_tlevel, dollar_trestart;
 GBLREF	int		dollar_truth;
@@ -131,7 +136,8 @@ void	tp_restart(int newlevel)
 	sgmnt_addrs		*csa;
 	int4			num_closed = 0;
 	boolean_t		tp_tend_status;
-	static gv_namehead	*noplace;
+	mstr			gvname_mstr, reg_mstr;
+	gd_region		*restart_reg;
 	DEBUG_ONLY(
 	static int4		uncounted_restarts;	/* do not count some failure codes towards MAX_TRESTARTS */
 	)
@@ -165,38 +171,43 @@ void	tp_restart(int newlevel)
 				|| 0 == ((num_tprestart - tprestart_syslog_limit) % tprestart_syslog_delta)))
 	{
 		if (NULL != tp_fail_hist[t_tries])
+			gvname_mstr = tp_fail_hist[t_tries]->gvname.var_name;
+		else
 		{
-			for (cp = tp_fail_hist[t_tries]->clue.base, top = 0;
-				(0 != *cp) && (MAX_MIDENT_LEN >= top);
-					cp++, top++)
-				;
-		} else
-		{
-			if (NULL == noplace)
-			{
-				noplace = (gv_namehead *)targ_alloc(sizeof("*UNKNOWN"), NULL);
-				noplace->clue.end = sizeof("*UNKNOWN");
-				memcpy(noplace->clue.base, "*UNKNOWN", sizeof("*UNKNOWN"));
-			}
-			tp_fail_hist[t_tries] = noplace;
-			top = noplace->clue.end;
+			gvname_mstr.addr = (char *)&gvname_unknown[0];
+			gvname_mstr.len = gvname_unknown_len;
 		}
 		caller_id_flag = FALSE;		/* don't want caller_id in the operator log */
 		assert(0 == cdb_sc_normal);
 		if (cdb_sc_normal == t_fail_hist[t_tries])
 			t_fail_hist[t_tries] = '0';	/* temporarily reset just for pretty printing */
+		restart_reg = tp_fail_hist_reg[t_tries];
+		if (NULL != restart_reg)
+		{
+			reg_mstr.len = restart_reg->dyn.addr->fname_len;
+			reg_mstr.addr = (char *)&restart_reg->dyn.addr->fname[0];
+		} else
+		{
+			reg_mstr.len = 0;
+			reg_mstr.addr = NULL;
+		}
 		if (cdb_sc_blkmod != t_fail_hist[t_tries])
 		{
-			send_msg(VARLSTCNT(14) ERR_TPRESTART, 12, t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries],
-				(int)top, tp_fail_hist[t_tries]->clue.base, 0, 0, 0, 0,
+			send_msg(VARLSTCNT(16) ERR_TPRESTART, 14, reg_mstr.len, reg_mstr.addr,
+				t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
+				0, 0, 0, tp_blkmod_nomod,
 				(NULL != sgm_info_ptr) ? sgm_info_ptr->num_of_blks : 0,
 				(NULL != sgm_info_ptr) ? sgm_info_ptr->cw_set_depth : 0, &local_tn);
 		} else
 		{
-			send_msg(VARLSTCNT(14) ERR_TPRESTART, 12, t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries],
-				(int)top, tp_fail_hist[t_tries]->clue.base, n_pvtmods, n_blkmods, tp_fail_level,
-				tp_fail_n, sgm_info_ptr->num_of_blks, sgm_info_ptr->cw_set_depth, &local_tn);
+			send_msg(VARLSTCNT(16) ERR_TPRESTART, 14, reg_mstr.len, reg_mstr.addr,
+				t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
+				n_pvtmods, n_blkmods, tp_fail_level, tp_fail_n,
+				sgm_info_ptr->num_of_blks,
+				sgm_info_ptr->cw_set_depth, &local_tn);
 		}
+		tp_fail_hist_reg[t_tries] = NULL;
+		tp_fail_hist[t_tries] = NULL;
 		if ('0' == t_fail_hist[t_tries])
 			t_fail_hist[t_tries] = cdb_sc_normal;	/* get back to where it was */
 		caller_id_flag = TRUE;

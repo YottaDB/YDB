@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include <varargs.h>
+#include <stdarg.h>
 
 #include "rtnhdr.h"
 #include "stack_frame.h"
@@ -20,30 +20,40 @@
 
 GBLREF stack_frame *frame_pointer;
 
-#ifndef __MVS__
-void fetch(va_alist)
+#ifdef __MVS__
+/* fetch conflicts with MVS name */
+void gtm_fetch(unsigned int cnt_arg, unsigned int indxarg, ...)
+#elif defined(UNIX)
+void fetch(unsigned int cnt_arg, unsigned int indxarg, ...)
+#elif defined(VMS)
+void fetch(unsigned int indxarg, ...)
 #else
-void gtm_fetch(va_alist)
+#error unsupported platform
 #endif
-va_dcl
 {
 	va_list		var;
-	unsigned int 	cnt, indx;
+	unsigned int 	indx;
+	unsigned int 	cnt;
 	stack_frame	*fp;
 	mval		**mvpp;
 
-	VAR_START(var);
-	cnt = va_arg(var, int4);
+	VAR_START(var, indxarg);
+	VMS_ONLY(va_count(cnt);)
+	UNIX_ONLY(cnt = cnt_arg;)	/* need to preserve stack copy on i386 */
 	fp = frame_pointer;
 	if (0 < cnt)
 	{	/* All generated code comes here to verify instantiation
 		   of a given set of variables from the local variable table */
-		for (; 0 < cnt; --cnt)
+		indx = indxarg;
+		for ( ; ; )
 		{
-			indx = va_arg(var, int4);
 			mvpp = &fp->l_symtab[indx];
 			if (0 == *mvpp)
 				*mvpp = lookup_variable(indx);
+			if (0 < --cnt)
+				indx = va_arg(var, int4);
+			else
+				break;
 		}
 	} else
 	{	/* GT.M calls come here to verify instantiation of the
@@ -58,4 +68,5 @@ va_dcl
 				*mvpp = lookup_variable(indx);
 		}
 	}
+	va_end(var);
 }

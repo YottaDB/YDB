@@ -41,6 +41,7 @@ GBLREF	boolean_t	gtm_fullblockwrites;	/* Do full (not partial) database block wr
 GBLREF	bool		certify_all_blocks;
 GBLREF	boolean_t	local_collseq_stdnull; /*If true, standard null subscript collation will be used for local variables */
 GBLREF	uint4		gtm_blkupgrade_flag;	/* controls whether dynamic block upgrade is attempted or not */
+GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
 
 void	gtm_env_init(void)
 {
@@ -104,6 +105,13 @@ void	gtm_env_init(void)
 		val.addr = GTM_BLKUPGRADE_FLAG;
 		val.len = sizeof(GTM_BLKUPGRADE_FLAG) - 1;
 		gtm_blkupgrade_flag = trans_numeric(&val, &is_defined, TRUE);
+
+		/* Initialize whether database file extensions need to be logged in the operator log */
+		val.addr = GTM_DBFILEXT_SYSLOG_DISABLE;
+		val.len = sizeof(GTM_DBFILEXT_SYSLOG_DISABLE) - 1;
+		ret = logical_truth_value(&val, &is_defined);
+		if (is_defined)
+			gtm_dbfilext_syslog_disable = ret; /* if the logical is not defined, we want to take default value */
 
 		/* Platform specific initializations */
 		gtm_env_init_sp();

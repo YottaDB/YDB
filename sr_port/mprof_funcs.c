@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -620,7 +620,7 @@ void crt_gbl(mprof_tree *p, int info_level)
 		mprof_ptr->gvargs.args[count++] = spt++;
 	}
 	mprof_ptr->gvargs.count = count;
-	callg((int(*)())op_gvname, &mprof_ptr->gvargs);
+	callg((int(*)(int count_arg, ...))op_gvname, &mprof_ptr->gvargs);
 	mprof_ptr->gvargs.count = mprof_ptr->curr_num_subscripts;
 	/* Data --> "count:cpu-time in user mode:cpu-time in sys mode:cpu-time total" */
 	start_point = (int)&dataval[0];

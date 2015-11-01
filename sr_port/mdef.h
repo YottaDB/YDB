@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -230,10 +230,14 @@ void gtm_assert ( int file_name_len, char file_name[], int line_no);
 #define GTMASSERT	(gtm_assert(CALLFROM))
 
 #ifdef UNIX
-int rts_error();
+int rts_error(int argcnt, ...);
+void dec_err(uint4 argcnt, ...);
+#elif defined(VMS)
+void dec_err(int4 msgnum, ...);
+#else
+#error unsupported platform
 #endif
-void stx_error();
-void dec_err();
+void stx_error(int in_error, ...);
 void ins_errtriple(int4 in_error);
 
 int4 timeout2msec(int4 timeout);
@@ -249,8 +253,8 @@ int4 timeout2msec(int4 timeout);
 #define	STR_LIT_LEN(LITERAL)		(sizeof(LITERAL) - 1)
 #define	LITERAL_AND_LENGTH(LITERAL)	(LITERAL), (sizeof(LITERAL) - 1)
 #define	LENGTH_AND_LITERAL(LITERAL)	(sizeof(LITERAL) - 1), (LITERAL)
-#define	STRING_AND_LENGTH(STRING)	(STRING), (strlen(STRING))
-#define	LENGTH_AND_STRING(STRING)	(strlen(STRING)), (STRING)
+#define	STRING_AND_LENGTH(STRING)	(STRING), (strlen((char *)STRING))
+#define	LENGTH_AND_STRING(STRING)	(strlen((char *)STRING)), (STRING)
 
 #define	LEN_AND_LIT(LITERAL)		LENGTH_AND_LITERAL(LITERAL)
 #define	LIT_AND_LEN(LITERAL)		LITERAL_AND_LENGTH(LITERAL)
@@ -260,7 +264,10 @@ int4 timeout2msec(int4 timeout);
 #define	MEMCMP_LIT(SOURCE, LITERAL)	memcmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
 #define MEMCPY_LIT(TARGET, LITERAL)	memcpy(TARGET, LITERAL, sizeof(LITERAL) - 1)
 #define	STRNCMP_LIT(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
-#define	STRNCMP_STR(SOURCE, STRING)	strncmp(SOURCE, STRING, strlen(STRING))
+#define	STRNCMP_STR(SOURCE, STRING)	strncmp(SOURCE, STRING, strlen((char *)STRING))
+
+#define	STRCPY(SOURCE, DEST)		strcpy((char *)SOURCE, (char *)DEST)
+#define	STRCMP(SOURCE, DEST)		strcmp((char *)SOURCE, (char *)DEST)
 
 /* *********************************************************************************************************** */
 /*		   Frequently used len + str combinations in macro form.				       */
@@ -295,14 +302,18 @@ int m_usleep(int useconds);
 
 #ifdef UNIX
 #	define UNIX_ONLY(X)		X
+#	define UNIX_ONLY_COMMA(X)	X,
 #else
 #	define UNIX_ONLY(X)
+#	define UNIX_ONLY_COMMA(X)
 #endif
 
 #ifdef VMS
 #	define VMS_ONLY(X)		X
+#	define VMS_ONLY_COMMA(X)	X,
 #else
 #	define VMS_ONLY(X)
+#	define VMS_ONLY_COMMA(X)
 #endif
 
 #if (defined(UNIX) || defined(VMS))
@@ -796,7 +807,7 @@ void mcfree(void);
 
 int4 getprime(int4 n);
 
-void push_parm();
+void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...);
 void suspend(void);
 mval *push_mval(mval *arg1);
 void mval_lex(mval *v, mstr *output);

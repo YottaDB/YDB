@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,6 +68,9 @@ error_def(ERR_ASSERT);
 
 /* Use rc_mval2subsc only for sun until every DTM client (that needs 16-bit precision as opposed to 18-bit for GT.M) is gone */
 #define	mval2subsc	rc_mval2subsc
+#ifndef VAR_COPY
+#define VAR_COPY	va_copy
+#endif
 #endif /* __sparc */
 
 #ifdef __hpux
@@ -87,17 +90,14 @@ typedef uint4 mach_inst;	/* machine instruction */
 #ifdef NeedInAddrPort
 typedef unsigned short	in_port_t;
 #endif
+#ifndef VAR_COPY
+#define VAR_COPY(dst,src) __va_copy(dst, src)
+#endif
 #ifdef __s390__
 #ifndef Linux390
 #define Linux390
 #endif
 #define INO_T_LONG			    /* see gdsfhead.h, actually for dev_t == 8 on Linux390 2.2.15 */
-#ifndef EARLY_VARARGS
-#define EARLY_VARARGS
-#endif
-#ifndef VAR_COPY
-#define VAR_COPY(dst,src) __va_copy(dst, src)
-#endif
 #endif
 #endif /* __linux__ */
 
@@ -169,7 +169,7 @@ typedef struct
 	{TYPE, EXPONENT, SIGN, 0xffff, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH}
 #endif
 
-#define VAR_START(a)	va_start(a)
+#define VAR_START(a, b)	va_start(a, b)
 #define VARLSTCNT(a)	a,		/* push count of arguments*/
 
 #ifndef GTSQL    /* these cannot be used within SQL */

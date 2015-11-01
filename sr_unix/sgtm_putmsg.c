@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,15 +13,8 @@
 
 #include "gtm_string.h"
 
-/* gcc/LinuxIA32 needs stdio.h before varargs.h until removed from error.h */
-/* gcc/Linux390 needs varargs before stdarg in stdio */
-#ifdef EARLY_VARARGS
-#include <varargs.h>
+#include <stdarg.h>
 #include "gtm_stdio.h"
-#else
-#include "gtm_stdio.h"
-#include <varargs.h>
-#endif
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -48,17 +41,15 @@ GBLREF	va_list	last_va_list_ptr;
 *   This routine is a variation on the unix version of rts_error, and has an identical interface.
 */
 
-void sgtm_putmsg(va_alist)
-va_dcl
+void sgtm_putmsg(char *out_str, ...)
 {
 	va_list	var;
 	int	arg_count, dummy, fao_actual, fao_count, i, msg_id;
-	char	msg_buffer[1024], *out_str;
+	char	msg_buffer[OUT_BUFF_SIZE];
 	mstr	msg_string;
 	int	util_outbufflen;
 
-	VAR_START(var);
-	out_str = va_arg(var, char *);
+	VAR_START(var, out_str);
 	arg_count = va_arg(var, int);
 
 	assert(arg_count > 0);
@@ -88,7 +79,9 @@ va_dcl
 			fao_actual = fao_count = 0;
 
 		util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
+		va_end(var);	/* need before using as dest in va_copy */
 		VAR_COPY(var, last_va_list_ptr);
+		va_end(last_va_list_ptr);
 		arg_count -= fao_count;
 
 		if (0 >= arg_count)
@@ -96,6 +89,7 @@ va_dcl
 
 		util_out_print("!/", NOFLUSH);
 	}
+	va_end(var);
 
 	util_out_print(NULL, SPRINT);
 	util_outbufflen = strlen(util_outbuff);

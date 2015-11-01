@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,9 +59,7 @@
 #include "eintr_wrappers.h"
 #include "is_file_identical.h"
 
-#ifdef MUTEX_MSEM_WAKE
 #include "heartbeat_timer.h"
-#endif
 #include "util.h"
 #include "dbfilop.h"
 #include "gvcst_protos.h"
@@ -164,7 +162,7 @@ gd_region *dbfilopn (gd_region *reg)
 		}
 		rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 	}
-	assert(pblk.b_esl < sizeof(seg->fname));
+	assert(((int)pblk.b_esl + 1) <= sizeof(seg->fname));
 	memcpy(seg->fname, pblk.buffer, pblk.b_esl);
 	pblk.buffer[pblk.b_esl] = 0;
 	seg->fname[pblk.b_esl] = 0;
@@ -719,9 +717,13 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	if (!mutex_init_done) /* If not already done */
 	{
 		mutex_seed_init();
-#ifdef MUTEX_MSEM_WAKE
+		/* The heartbeat timer is used
+		 * 	1) To periodically check if we have older generation journal files open and if so to close them.
+		 *	2) By mutex logic to approximately measure the time spent sleeping while waiting for CRIT or MSEMLOCK.
+		 * Linux currently does not support MSEMs. It uses the heartbeat timer only for (1).
+		 */
 		start_timer((TID)&heartbeat_timer, HEARTBEAT_INTERVAL, heartbeat_timer, 0, NULL);
-#else
+#ifndef MUTEX_MSEM_WAKE
 		mutex_sock_init();
 #endif
 		mutex_init_done = TRUE;

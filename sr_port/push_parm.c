@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include <stdarg.h>
+
 #include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "rtnhdr.h"
@@ -18,20 +20,17 @@
 #include "compiler.h"
 #include "underr.h"
 
-#include <varargs.h>
-
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*msp, *stackbase, *stackwarn, *stacktop;
 GBLREF symval		*curr_symval;
 
-void push_parm(va_alist)
-va_dcl
+void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 {
 	va_list		var;
-	int		truth_value;
 	mval		*ret_value;
 	int		mask;
-	unsigned	totalcnt, actualcnt;
+	VMS_ONLY(unsigned	totalcnt;)
+	unsigned	actualcnt;
 	parm_blk	*parm;
 	mv_stent	*mvp_blk;
 	int		i;
@@ -39,10 +38,9 @@ va_dcl
 	error_def	(ERR_STACKOFLOW);
 	error_def	(ERR_STACKCRIT);
 
-	VAR_START(var);
-	totalcnt = va_arg(var, unsigned int);
+	VAR_START(var, truth_value);
+	VMS_ONLY(va_count(totalcnt);)
 	assert(4 <= totalcnt);
-	truth_value = va_arg(var, int);
 	ret_value = va_arg(var, mval *);
 	mask = va_arg(var, int);
 	actualcnt = va_arg(var, unsigned int);
@@ -75,6 +73,7 @@ va_dcl
 		else
 			parm->actuallist[i] = actp;
 	}
+	va_end(var);
 	mvp_blk->mv_st_cont.mvs_parm.ret_value = ret_value;
 	return;
 }

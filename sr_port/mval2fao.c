@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,8 @@
 	The parameters list is determined by the fao control string, message,
 	with limitations on the number of parameters allowed, and the
 	buffer space available for certain fao directive formats.
+
+	The caller should call va_end.
  *-----------------------------------------------------------------------------
  */
 
@@ -25,7 +27,7 @@
 #include "gtm_string.h"
 
 #include "fao_parm.h"
-#include <varargs.h>
+#include <stdarg.h>
 #include "underr.h"
 #include "mvalconv.h"
 #include "mval2fao.h"

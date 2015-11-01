@@ -14,7 +14,7 @@
 
 /* defined as macro on MVS */
 #ifndef callg
-typedef	int	(*callgfnptr)();
+typedef	int	(*callgfnptr)(int cnt, ...);
 int callg(callgfnptr, void *);
 #endif
 void callg_signal(void *);

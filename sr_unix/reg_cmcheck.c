@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ bool reg_cmcheck(gd_region *reg)
 	if (!(status & 1))
 		rts_error(VARLSTCNT(5) ERR_DBFILERR,2, seg->fname_len, seg->fname, status);
 
-	assert((int)pblk.b_esl < sizeof(seg->fname));
+	assert((int)pblk.b_esl + 1 <= sizeof(seg->fname));
 	memcpy(seg->fname, pblk.buffer, pblk.b_esl);
 	pblk.buffer[pblk.b_esl] = 0;
 	seg->fname[pblk.b_esl] = 0;

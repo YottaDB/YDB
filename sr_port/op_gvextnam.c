@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,9 +19,7 @@
 
 #include "gtm_limits.h"	/* for GTM_ENV_TRANSLATE */
 
-#ifdef EARLY_VARARGS
-#include <varargs.h>
-#endif
+#include <stdarg.h>
 
 #include "error.h"	/* for GTM_ENV_TRANSLATE */
 #include "gdsroot.h"
@@ -40,10 +38,6 @@
 #include "mvalconv.h"
 #include "rtnhdr.h"
 #include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro */
-
-#ifndef EARLY_VARARGS
-#include <varargs.h>	/* needs to be after the above include files otherwise linux/x86 gcc complains */
-#endif
 
 /*the header files below are for environment translation*/
 #ifdef UNIX
@@ -64,23 +58,22 @@ GBLREF gd_addr		*gd_header;
 
 static int	extnam_str_alloc = 0;
 
-void op_gvextnam(va_alist)
-va_dcl
+void op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...)
 {
 	va_list		var;
-	int		count, len;
+	VMS_ONLY(int4	count;)
+	int		len;
 	bool		was_null, is_null;
 	mstr		*tmp_mstr_ptr;
-	mval		*val, *val1, *val2, val_xlated;
+	mval		*val, *val2, val_xlated;
 	short		max_key;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 
 	error_def(ERR_GVSUBOFLOW);
 	error_def(ERR_GVIS);
 
-	VAR_START(var);
-	count = va_arg(var,int4);
-	val1 = va_arg(var, mval *);
+	VAR_START(var, val1);
+	VMS_ONLY(va_count(count);)
 	val2 = va_arg(var, mval *);
 	MV_FORCE_STR(val1);
 	GTM_ENV_TRANSLATE(val1, val2);
@@ -119,8 +112,10 @@ va_dcl
 	max_key = gv_cur_region->max_key_size;
 	for (count -= 3;  count > 0;  count--)
 	{
-		COPY_SUBS_TO_GVCURRKEY(var, gv_currkey, was_null, is_null);	/* updates gv_currkey, was_null, is_null */
+		val = va_arg(var, mval *);
+		COPY_SUBS_TO_GVCURRKEY(val, gv_currkey, was_null, is_null);	/* updates gv_currkey, was_null, is_null */
 	}
+	va_end(var);
 	gv_prev_subsc_null = was_null; /* if true, it indicates there is a null subscript (except last subscript) in current key */
 	gv_curr_subsc_null = is_null; /* if true, it indicates that last subscript in current key is null */
 	if (was_null && (NEVER == gv_cur_region->null_subs))

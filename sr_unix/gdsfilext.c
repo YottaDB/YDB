@@ -72,6 +72,7 @@ GBLREF	sgm_info	*sgm_info_ptr;
 GBLREF	unsigned int	t_tries;
 GBLREF	jnl_gbls_t	jgbl;
 GBLREF	inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
+GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
 
 OS_PAGE_SIZE_DECLARE
 
@@ -386,6 +387,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	}
 	fileheader_sync(gv_cur_region);
 	GDSFILEXT_CLNUP;
-	send_msg(VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), blocks, new_total, &curr_tn);
+	if (!gtm_dbfilext_syslog_disable)
+		send_msg(VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), blocks, new_total, &curr_tn);
 	return (SS_NORMAL);
 }

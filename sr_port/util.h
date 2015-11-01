@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,11 +50,13 @@ void util_in_open(void *);
 #define HEX8		8
 #define HEX16		16
 
-void util_cm_print();
 void util_exit_handler(void);
 void util_out_close(void);
-void util_out_print();
 void util_out_send_oper(char *addr, unsigned int len);
 void util_out_write(unsigned char *addr, unsigned int len);
+void util_out_print(caddr_t message, int flush, ...);
+
+#include "cmidef.h"	/* for clb_struct */
+void util_cm_print(clb_struct *lnk, int code, char *message, int flush, ...);
 
 #endif /* UTIL_included */

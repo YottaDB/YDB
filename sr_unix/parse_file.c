@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,7 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 	error_def(ERR_SYSCALL);
 
 	pblk->fnb = 0;
-	assert(pblk->buff_size <= MAX_FBUFF);
+	assert(((unsigned int)pblk->buff_size + 1) <= MAX_FBUFF + 1);
 	status = trans_log_name(file, &trans, pblk->buffer);
 	assert(trans.addr == pblk->buffer);
 

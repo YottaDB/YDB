@@ -10,34 +10,28 @@
  ****************************************************************/
 
 #include "mdef.h"
-#ifdef EARLY_VARARGS
-#include <varargs.h>
-#endif
+#include <stdarg.h>
 #include "fao_parm.h"
 #include "error.h"
 #include "msg.h"
-#ifndef EARLY_VARARGS
-#include <varargs.h>
-#endif
 #include "util.h"
 #include "util_out_print_vaparm.h"
 #include "gtmmsg.h"
 
 GBLREF bool dec_nofac;
+GBLREF va_list last_va_list_ptr;
 
-void dec_err(va_alist)
-va_dcl
+void dec_err(uint4 argcnt, ...)
 {
 	va_list		var;
-	uint4		i, j, count, argcnt, err;
+	uint4		i, j, count, err;
 	const err_ctl 	*ec;
 	const err_msg	*em;
 	char		msgbuff[2048];
 	mstr		msgstr;
 
 	util_out_print(0, RESET, 0);	/* reset the buffer */
-	VAR_START(var);
-	argcnt = va_arg(var, int4);
+	VAR_START(var, argcnt);
 	assert (argcnt >= 1);
 	err = va_arg(var, uint4);
 	ec = err_check(err);
@@ -64,5 +58,7 @@ va_dcl
 		} else
 			count = 0;
 		util_out_print_vaparm(msgstr.addr, FLUSH, var, count);
+		va_end(last_va_list_ptr);
 	}
+	va_end(var);
 }

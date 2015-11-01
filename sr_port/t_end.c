@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -660,11 +660,15 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 					cr->in_cw_set = TRUE;
 					cr->refer = TRUE;
 					cs->ondsk_blkver = cr->ondsk_blkver;
-					if (cs->old_block != (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr))
-					{
+					if ((cs->cr != cr) || (cs->cycle != cr->cycle))
+					{	/* Global buffer containing "cs->blk" changed since we read it out of crit */
 						cs->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+						cs->cr = cr;
+						cs->cycle = cr->cycle;
 						if (NULL != jbbp)
-						{
+						{	/* PBLK checksum was computed outside-of-crit when block was read but
+							 * block has relocated in the cache since then. Recompute the checksum.
+							 */
 							old_block = (blk_hdr_ptr_t)cs->old_block;
 							/* We hold crit at this point so we are guaranteed valid bsiz field.
 							 * Hence we do not need to take MIN(bsiz, csd->blk_size) like we did
@@ -679,6 +683,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 								cs->blk_checksum = 0;
 						}
 					}
+					assert(cs->old_block == (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr));
 				}
 			}
 		}
@@ -891,6 +896,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			for (cs = cw_set, cs_top = cs + cw_set_depth;  cs < cs_top;  ++cs)
 			{
 				assert((gds_t_write_root != cs->mode) || ((cs - cw_set) + 1 == cw_depth));
+				cs->old_mode = cs->mode;	/* note down before being reset to gds_t_committed */
 				if (gds_t_write_root != cs->mode)
 				{
 					if (is_mm)

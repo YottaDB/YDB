@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,15 +11,8 @@
 
 #include "mdef.h"
 
-/* gcc/LinuxIA32 requires stdarg which is included by stdio before varargs */
-/* gcc/Linux390 requires varargs before stdio - annoying */
-#ifdef EARLY_VARARGS
-#include <varargs.h>
-#endif
+#include <stdarg.h>
 #include "gtm_stdio.h"
-#ifndef EARLY_VARARGS
-#include <varargs.h>
-#endif
 
 #include "fao_parm.h"
 #include "error.h"
@@ -42,16 +35,15 @@ GBLREF va_list	last_va_list_ptr;
  * ----------------------------------------------------------------------------------------
  */
 
-void gtm_putmsg_list(va_list var)
+void gtm_putmsg_list(int arg_count, va_list var)
 {
-	int		i, msg_id, arg_count, fao_actual, fao_count, dummy;
+	int		i, msg_id, fao_actual, fao_count, dummy;
 	char		msg_buffer[1024];
 	mstr		msg_string;
 	boolean_t	first_error;
 	const err_msg	*msg;
 	const err_ctl	*ctl;
 
-	arg_count = va_arg(var, int);
 	assert(0 < arg_count);
 
 	util_out_print(NULL, RESET);
@@ -124,6 +116,7 @@ void gtm_putmsg_list(va_list var)
 			}
 
 			util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
+			va_end(var);	/* needed before used as dest in copy */
 			VAR_COPY(var, last_va_list_ptr);			/* How much we unwound */
 			arg_count -= fao_count;
 
@@ -137,6 +130,7 @@ void gtm_putmsg_list(va_list var)
 				dummy = va_arg(var, int);
 				--arg_count;
 			}
+			va_end(last_va_list_ptr);
 		}
 
 		if (0 == arg_count)

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -21,34 +21,34 @@
 # Assembler routine to immitate the VAX CALLG instruction, which can redirect
 # a routine calls argument list to a prepared list in memory.
 # This implementation has the caveat that the argument list must be integers,
-# and that it follows our VARARGS C conventions - i.e. that a count of the
-# arguments is actually the first thing on the stack.
+# and that it follows our version of the VMS calling conventions - i.e. that
+# a count of the arguments following is actually the first thing on the stack.
 
+routarg =	8
+argsarg =	12
+cntsav  =	-4
 	.text
-# PUBLIC	callg
-# callg	PROC
 ENTRY callg
-	enter	$0,$0
+	enter	$4,$0
 	pushl	%edi
 	pushl	%esi
 	pushl	%ebx
 
-	movl	8(%ebp),%edx		# routine to call
-	movl	12(%ebp),%esi		# argument list
+	movl	routarg(%ebp),%edx	# routine to call
+	movl	argsarg(%ebp),%esi	# argument list
 	movl	(%esi),%ecx
-	addl	$4,%esi
+	movl	%ecx,cntsav(%ebp)	# save following argument count
+	addl	$4,%esi			# skip argument count
 	movl	%ecx, %eax
 	negl	%eax
-#	lea	esp, [esp][4*eax]
 	leal	(%esp,%eax,4),%esp
 	movl	%esp,%edi
 	pushl	%ecx
-#	REP movsd
 	rep
 	movsl
 	call	*%edx
-	popl	%edx			# preserve return value in eax
-#	lea	esp, [esp][4*edx]
+	popl	%edx			# discard possibly modified count
+	movl	cntsav(%ebp),%edx	# edx to preserve return value in eax
 	leal	(%esp,%edx,4),%esp
 
 	popl	%ebx
@@ -56,6 +56,3 @@ ENTRY callg
 	popl	%edi
 	leave
 	ret
-# callg	ENDP
-
-# END

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,7 +84,7 @@ void jobinterrupt_process_cleanup(void)
 		mbptr += zstlen;
 	}
 	*mbptr++ = 0;
-	util_out_print(msgbuf, OPER);
+	util_out_print((caddr_t)msgbuf, OPER);
 	if (NULL == dollar_ecode.error_last_b_line)
 	{	/* Was a direct mode frame this message needs to go out to the console */
 		dec_err(VARLSTCNT(1) ERR_ERRWZINTR);

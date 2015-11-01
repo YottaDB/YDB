@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <varargs.h>
+#include <stdarg.h>
 #include "gtm_string.h"
 #include "cmd_qlf.h"
 #include "compiler.h"
@@ -28,12 +28,14 @@ GBLREF command_qualifier	cmd_qlf;
 GBLREF bool 			shift_gvrefs, run_time, dec_nofac;
 GBLREF char			cg_phase;
 GBLREF io_pair			io_curr_device, io_std_device;
+#ifdef UNIX
+GBLREF va_list			last_va_list_ptr;	/* set by util_format */
+#endif
 
-void stx_error(va_alist)
-va_dcl
+void stx_error(int in_error, ...)
 {
-	va_list	args, sav_arg;
-	int	in_error, cnt, arg1, arg2;
+	va_list	args;
+	int	cnt, arg1, arg2;
 	bool	list, warn;
 	char	msgbuf[MAX_SRCLINE];
 	char	buf[MAX_SRCLINE + LISTTAB + 7];
@@ -53,8 +55,7 @@ va_dcl
 	error_def(ERR_CENOINDIR);
 
 	flush_pio();
-	va_start(args);
-	in_error = va_arg(args, int);
+	va_start(args, in_error);
 	shift_gvrefs = FALSE;
 	if (run_time)
 	{
@@ -67,25 +68,27 @@ va_dcl
 			assert(cnt == 2);
 			arg1 = va_arg(args, int);
 			arg2 = va_arg(args, int);
+			va_end(args);
 			rts_error(VARLSTCNT(4) in_error, cnt, arg1, arg2);
-		}
-		else if (in_error == ERR_CEUSRERROR)
+		} else if (in_error == ERR_CEUSRERROR)
 		{
 			cnt = va_arg(args, int);
 			assert(cnt == 1);
 			arg1 = va_arg(args, int);
+			va_end(args);
 			rts_error(VARLSTCNT(3) in_error, cnt, arg1);
-		}
-		else
-		{	rts_error(VARLSTCNT(1) in_error);
+		} else
+		{
+			va_end(args);
+			rts_error(VARLSTCNT(1) in_error);
 		}
 		GTMASSERT;
-	}
-	else if (cg_phase == CGP_PARSE)
-	{	ins_errtriple(in_error);
-	}
+	} else if (cg_phase == CGP_PARSE)
+		ins_errtriple(in_error);
 	if (source_error_found)
-	{	return;
+	{
+		va_end(args);
+		return;
 	}
 	if (in_error != ERR_CETOOMANY &&	/* compiler escape errors shouldn't hide others */
 	    in_error != ERR_CEUSRERROR &&
@@ -98,7 +101,9 @@ va_dcl
 	list = (cmd_qlf.qlf & CQ_LIST) != 0;
 	warn = (cmd_qlf.qlf & CQ_WARNINGS) != 0;
 	if (!warn && !list) /*SHOULD BE MESSAGE TYPE IS WARNING OR LESS*/
-	{	return;
+	{
+		va_end(args);
+		return;
 	}
 
 	if (list && io_curr_device.out == io_std_device.out)
@@ -130,8 +135,7 @@ va_dcl
 			if (in_error != ERR_CEUSRERROR)
 			{
 				dec_err(VARLSTCNT(1) in_error);
-			}
-			else
+			} else
 			{
 				cnt = va_arg(args, int);
 				assert(cnt == 1);
@@ -140,15 +144,12 @@ va_dcl
 			}
 		}
 		if (list)
-		{	list_line(buf);
-		}
+			list_line(buf);
 		arg1 = arg2 = 0;
-	}
-	else
+	} else
 	{
 		cnt = va_arg(args, int);
 		assert(cnt == 2);
-		VAR_COPY(sav_arg, args);
 		arg1 = va_arg(args, int);
 		arg2 = va_arg(args, int);
 		if (warn)
@@ -157,17 +158,21 @@ va_dcl
 			dec_err(VARLSTCNT(4) ERR_SRCNAM, 2, source_name_len, source_file_name);
 		}
 	}
+	va_end(args);
 	if (list)
 	{
+		va_start(args, in_error);
 		msg.addr = msgbuf;
 		msg.len = sizeof(msgbuf);
 		gtm_getmsg(in_error, &msg);
 		assert(msg.len);
 #ifdef UNIX
-		c = util_format(msgbuf, sav_arg, LIT_AND_LEN(buf), MAXPOSINT4);
+		c = util_format(msgbuf, args, LIT_AND_LEN(buf), MAXPOSINT4);
+		va_end(last_va_list_ptr);	/* set by util_format */
 #else
-		c = util_format(msgbuf, sav_arg, LIT_AND_LEN(buf));
+		c = util_format(msgbuf, args, LIT_AND_LEN(buf));
 #endif
+		va_end(args);
 		*c = 0;
 		list_line(buf);
 	}

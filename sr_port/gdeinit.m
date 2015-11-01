@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2005 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -100,7 +100,7 @@ GDEINIT
 	s minseg("BG","ALLOCATION")=10,minseg("BG","BLOCK_SIZE")=SIZEOF("dsk_blk"),minseg("BG","EXTENSION_COUNT")=0
 	s minseg("BG","GLOBAL_BUFFER_COUNT")=64,minseg("BG","LOCK_SPACE")=10,minseg("BG","RESERVED_BYTES")=0
 	s maxseg("BG","ALLOCATION")=TWO(26),(maxseg("BG","BLOCK_SIZE"),maxseg("BG","RESERVED_BYTES"))=HEX(4)-SIZEOF("dsk_blk")
-	s maxseg("BG","EXTENSION_COUNT")=HEX(4)-1,maxseg("BG","GLOBAL_BUFFER_COUNT")=65536,maxseg("BG","LOCK_SPACE")=1000
+	s maxseg("BG","EXTENSION_COUNT")=HEX(4)-1,maxseg("BG","GLOBAL_BUFFER_COUNT")=65536,maxseg("BG","LOCK_SPACE")=65536
 ; mm
 	s minseg("MM","ALLOCATION")=10,minseg("MM","BLOCK_SIZE")=SIZEOF("dsk_blk"),minseg("MM","DEFER")=0
 	s minseg("MM","LOCK_SPACE")=10,minseg("MM","EXTENSION_COUNT")=0,minseg("MM","RESERVED_BYTES")=0

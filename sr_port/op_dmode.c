@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,8 @@
 #include "tp_change_reg.h"
 #include "getzposition.h"
 
+#define	DIRECTMODESTR	"Entering DIRECT MODE"
+
 GBLREF io_pair		io_curr_device;
 GBLREF io_pair		io_std_device;
 GBLREF stack_frame	*frame_pointer;
@@ -59,13 +61,12 @@ void	op_dmode(void)
 	tp_region	*tr;
 	static io_pair	save_device;
 	static bool	dmode_intruptd;
-
 #ifdef UNIX
 	static int	loop_cnt = 0;
 	static int	old_errno = 0;
 #endif
-
 	static bool	kill = FALSE;
+
 	error_def(ERR_NOTPRINCIO);
 	error_def(ERR_NOPRINCIO);
 	error_def(ERR_TPNOTACID);
@@ -139,8 +140,8 @@ void	op_dmode(void)
 			assert(CDB_STAGNATE == t_tries);
 			t_tries = CDB_STAGNATE - 1;
 			getzposition(&zpos);
-			gtm_putmsg(VARLSTCNT(4) ERR_TPNOTACID, 2, zpos.str.len, zpos.str.addr);
-			send_msg(VARLSTCNT(4) ERR_TPNOTACID, 2, zpos.str.len, zpos.str.addr);
+			gtm_putmsg(VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(DIRECTMODESTR), zpos.str.len, zpos.str.addr);
+			send_msg(VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(DIRECTMODESTR), zpos.str.len, zpos.str.addr);
 		}
 	} else  if (cs_addrs && cs_addrs->now_crit)
 		GTMASSERT;

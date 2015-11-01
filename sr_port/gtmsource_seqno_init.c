@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_inet.h"
 #include "gtm_fcntl.h"
 #ifdef VMS
@@ -41,6 +42,7 @@ void gtmsource_seqno_init(void)
 	/* Find the start_jnl_seqno */
 
 	gd_region	*region_top, *reg;
+	sgmnt_addrs	*csa;
 	sgmnt_data_ptr_t csd;
 	seq_num          local_read_jsn, local_jsn;
 	sm_uc_ptr_t	gld_fn;
@@ -60,13 +62,20 @@ void gtmsource_seqno_init(void)
 	for (reg = gd_header->regions; reg < region_top; reg++)
 	{
 		assert(reg->open);
-		csd = FILE_INFO(reg)->s_addrs.hdr;
+		csa = &FILE_INFO(reg)->s_addrs;
+		csd = csa->hdr;
 		if (REPL_ALLOWED(csd))
 		{
 			if (QWLT(local_read_jsn, csd->resync_seqno))
 				QWASSIGN(local_read_jsn, csd->resync_seqno);
 			if (QWLT(local_jsn, csd->reg_seqno))
 				QWASSIGN(local_jsn, csd->reg_seqno);
+			/* Copy replication instance name (Unix) or gtmgbldir (VMS) in the database shared memory.
+			 * Used later to avoid updates from a different replication instance name to this database.
+			 */
+			assert(sizeof(csa->nl->replinstname) == UNIX_ONLY(sizeof(jnlpool.jnlpool_ctl->jnlpool_id.instname))
+								VMS_ONLY(sizeof(jnlpool.jnlpool_ctl->jnlpool_id.gtmgbldir)));
+			memcpy(csa->nl->replinstname, gld_fn, sizeof(csa->nl->replinstname));
 		}
 	}
 	if (QWEQ(local_jsn, seq_num_zero))

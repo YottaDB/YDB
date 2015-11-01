@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,8 +67,7 @@ GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	buddy_list		*global_tlvl_info_list;
 GBLREF	enum gtmImageTypes	image_type;
-GBLREF	int			tprestart_syslog_limit;
-GBLREF	int			tprestart_syslog_delta;
+GBLREF	int4			tprestart_syslog_limit;
 GBLREF	tp_region		*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
 GBLREF	tp_region		*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
 GBLREF	unsigned int		t_tries;

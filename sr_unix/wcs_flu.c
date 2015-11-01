@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -111,7 +111,7 @@ bool wcs_flu(bool options)
 	error_def(ERR_WCBLOCKED);
 	error_def(ERR_SYSCALL);
 	error_def(ERR_DBFILERR);
-
+	error_def(ERR_DBFSYNCERR);
 
 	jnl_status = 0;
 	flush_hdr = options & WCSFLU_FLUSH_HDR;
@@ -329,6 +329,15 @@ bool wcs_flu(bool options)
 		jnl_wait(gv_cur_region);
 	}
 	if (need_db_fsync && JNL_ALLOWED(csd))
-		DB_FSYNC(gv_cur_region, udi, csa, db_fsync_in_prog);
+	{
+		DB_FSYNC(gv_cur_region, udi, csa, db_fsync_in_prog, save_errno);
+		if (0 != save_errno)
+		{
+			send_msg(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
+			rts_error(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
+			assert(FALSE);	/* should not come here as the rts_error above should not return */
+			return FALSE;
+		}
+	}
 	return ret;
 }

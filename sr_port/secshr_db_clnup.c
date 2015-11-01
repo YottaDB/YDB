@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -399,11 +399,11 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			}
 			if (is_bg)
 			{
-				if ((0 == reg->sec_size) || !GTM_PROBE(reg->sec_size, csa->nl, WRITE))
+				if ((0 == reg->sec_size) || !GTM_PROBE(reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE), csa->nl, WRITE))
 				{
 					SECSHR_ACCOUNTING(3);
 					SECSHR_ACCOUNTING(__LINE__);
-					SECSHR_ACCOUNTING(reg->sec_size);
+					SECSHR_ACCOUNTING(reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
 					continue;
 				}
 				CHECK_UNIX_LATCH(&csa->acc_meth.bg.cache_state->cacheq_active.latch, is_exiting);

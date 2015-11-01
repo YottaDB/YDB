@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,22 +110,22 @@ void mupip_reorg(void)
 	if ((cli_status = cli_present("FILL_FACTOR")) == CLI_PRESENT)
 	{
 		assert(sizeof(data_fill_factor) == sizeof(int4));
-		if (!cli_get_int("FILL_FACTOR", (int4 *)&data_fill_factor) || MAX_FILL_FACTOR < data_fill_factor)
-			data_fill_factor = MAX_FILL_FACTOR;
-		else if (MIN_FILL_FACTOR > data_fill_factor)
-			data_fill_factor = MIN_FILL_FACTOR;
+		if (!cli_get_int("FILL_FACTOR", (int4 *)&data_fill_factor) || MAX_FILLFACTOR < data_fill_factor)
+			data_fill_factor = MAX_FILLFACTOR;
+		else if (MIN_FILLFACTOR > data_fill_factor)
+			data_fill_factor = MIN_FILLFACTOR;
 	}
 	else
-		data_fill_factor = MAX_FILL_FACTOR;
+		data_fill_factor = MAX_FILLFACTOR;
 	if ((cli_status = cli_present("INDEX_FILL_FACTOR")) == CLI_PRESENT)
 	{
 		assert(sizeof(index_fill_factor) == sizeof(int4));
 		if (!cli_get_int("INDEX_FILL_FACTOR", (int4 *)&index_fill_factor))
 			index_fill_factor = data_fill_factor;
-		else if (MIN_FILL_FACTOR > index_fill_factor)
-			index_fill_factor = MIN_FILL_FACTOR;
-		else if (MAX_FILL_FACTOR < index_fill_factor)
-			index_fill_factor = MAX_FILL_FACTOR;
+		else if (MIN_FILLFACTOR > index_fill_factor)
+			index_fill_factor = MIN_FILLFACTOR;
+		else if (MAX_FILLFACTOR < index_fill_factor)
+			index_fill_factor = MAX_FILLFACTOR;
 	}
 	else
 		index_fill_factor = data_fill_factor;

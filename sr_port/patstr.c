@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -430,7 +430,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				if (pattern_mask & PATM_ALT)
 				{	/* If the alternation contains only one alternative (altcount == 1) AND
 					 * that alternative contains only one pattern atom, AND that atom is not an
-					 * alternation itself, the alternation can be reduced to that atom.
+					 * alternation or a DFA, the alternation can be reduced to that atom.
 					 * The boundaries of the compressed atom will be the products of the
 					 * boundaries of the alternation and those of the atom within the alternation
 					 * (lower*lower and upper*upper) E.g. 10.20(.5AN) is the same as .100AN
@@ -463,7 +463,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					 *    			20 = 5 + 5 + 5 + 5
 					 */
 					altsimplify = ((1 == altcount) && cur_alt) ? TRUE : FALSE;
-					if (altsimplify && (cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET] & PATM_ALT))
+					if (altsimplify && (cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET] & (PATM_ALT | PATM_DFA)))
 						altsimplify = FALSE;
 					if (altsimplify)
 					{

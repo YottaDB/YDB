@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -88,6 +88,10 @@ if ($status != 0) then
 	echo "OFFSET-E-SRCSTRUCTMISMATCH : Very likely that the c-structure isn't used in the c-source-file-name. Please give a valid input."
 	echo "	If you feel that the input is valid, please contact the author for assistance in debugging the offset utility (See ${TMPFILE}_$srcfile:r* for details)"
 	echo "	Exiting..."
+	echo "-----------------------------------------------------------------------------------------"
+	echo "###### Below is the output from the compiler ########"
+	echo "-----------------------------------------------------------------------------------------"
+	gt_cc ${TMPFILE}_$srcfile -o ${TMPFILE}_$srcfile.o
 	exit -1
 endif
 

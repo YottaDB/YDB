@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,15 +11,19 @@
 
 #include "mdef.h"
 
-#include <varargs.h>
+#include <stdarg.h>
 
 #include "mlk_pvtblk_create.h"
+#include "op.h"
 
-void	op_lkname(va_alist)
-va_dcl
+void	op_lkname(UNIX_ONLY_COMMA(int subcnt) mval *extgbl1, ...)
 {
+	VMS_ONLY(int subcnt;)
 	va_list	var;
 
-	VAR_START(var);
-	mlk_pvtblk_create(var);
+	VAR_START(var, extgbl1);
+	VMS_ONLY(va_count(subcnt);)
+	assert(2 <= subcnt);
+	mlk_pvtblk_create(subcnt, extgbl1, var);
+	va_end(var);
 }

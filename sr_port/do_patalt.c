@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,11 +92,10 @@ static	int	pte_csh_present(char *patptr, char *strptr, int4 len, int repcnt)
 	pte_csh		*tmp_pte, *pte_top;
 
 	assert(PTE_MAX_CURALT_DEPTH > curalt_depth);
-	len = (PTE_STRLEN_CUTOFF > len) ? len : PTE_STRLEN_CUTOFF;
-	index = len * cur_pte_csh_entries_per_len;
+	index = ((PTE_STRLEN_CUTOFF > len) ? len : PTE_STRLEN_CUTOFF) * cur_pte_csh_entries_per_len;
 	assert(cur_pte_csh_size > index);
 	tmp_pte = cur_pte_csh_array + index;
-	pte_top = tmp_pte + ((len != PTE_STRLEN_CUTOFF) ? cur_pte_csh_entries_per_len : cur_pte_csh_tail_count);
+	pte_top = tmp_pte + ((PTE_STRLEN_CUTOFF > len) ? cur_pte_csh_entries_per_len : cur_pte_csh_tail_count);
 	assert(pte_top <= (cur_pte_csh_array + cur_pte_csh_size));
 	for (; tmp_pte < pte_top; tmp_pte++)
 	{
@@ -121,11 +120,10 @@ static	void	pte_csh_insert(char *patptr, char *strptr, int4 len, int repcnt, boo
 
 	assert(PTE_MAX_CURALT_DEPTH > curalt_depth);
 	assert(PTE_NOT_FOUND == pte_csh_present(patptr, strptr, len, repcnt));
-	len = (PTE_STRLEN_CUTOFF > len) ? len : PTE_STRLEN_CUTOFF;
-	index = len * cur_pte_csh_entries_per_len;
+	index = ((PTE_STRLEN_CUTOFF > len) ? len : PTE_STRLEN_CUTOFF) * cur_pte_csh_entries_per_len;
 	assert(cur_pte_csh_size > index);
 	tmp_pte = cur_pte_csh_array + index;
-	pte_top = tmp_pte + ((len != PTE_STRLEN_CUTOFF) ? cur_pte_csh_entries_per_len : cur_pte_csh_tail_count);
+	pte_top = tmp_pte + ((PTE_STRLEN_CUTOFF > len) ? cur_pte_csh_entries_per_len : cur_pte_csh_tail_count);
 	assert(pte_top <= (cur_pte_csh_array + cur_pte_csh_size));
 	min_pte = tmp_pte;
 	free_pte = NULL;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@
 #define WC_DEF_BUFFS 128
 #define WC_MIN_BUFFS 64
 
-#define MAX_LOCK_SPACE 1000 	/* need to change these whenever global directory defaults change */
+#define MAX_LOCK_SPACE 65536 	/* need to change these whenever global directory defaults change */
 #define MIN_LOCK_SPACE 10
 
 #define MAX_REL_NAME	36
@@ -289,6 +289,9 @@ typedef struct node_local_struct
 			 */
 	boolean_t	donotflush_dbjnl; /* whether database and journal can be flushed to disk or not (TRUE for mupip recover) */
 	int4		n_pre_read;
+	char		replinstname[MAX_FN_LEN + 1];	/* 256 : Name of the replication instance corresponding to this database.
+							 *       In VMS, this is the name of the corresponding global directory.
+							 */
 } node_local;
 
 #ifdef DEBUG

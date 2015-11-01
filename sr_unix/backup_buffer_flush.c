@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,9 +12,10 @@
 #include "mdef.h"
 
 #include "gtm_stat.h"
-#include "errno.h"
+#include <errno.h>
 #include "gtm_unistd.h"
 #include "gtm_fcntl.h"
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -29,9 +30,13 @@
 #include "shmpool.h"
 #include "gtmimagename.h"
 #include "mupipbckup.h"
+#include "send_msg.h"
 
 GBLREF	uint4			process_id;
 GBLREF	enum gtmImageTypes	image_type;
+
+error_def(ERR_BKUPTMPFILOPEN);
+error_def(ERR_BKUPTMPFILWRITE);
 
 boolean_t backup_buffer_flush(gd_region *reg)
 {
@@ -57,15 +62,15 @@ boolean_t backup_buffer_flush(gd_region *reg)
 	}
 
 	/* See if there are any buffers needing flushing. Note that we are holding the shmpool lock across
-	   the IO we will be doing. This simplifies the backup logic substantialy. If we released and obtained
-	   the lock for each buffer we dequeue (to allow other processes to proceed while we are doing IO) it
-	   is likely that some of those other processes would get the idea to also run a buffer flush. Then we
-	   would have to manage the task of doing multiple simultaneous IO to the temporary file potentially
-	   resulting in gaps in the file which is something we definitely do not want to do. Besides, if a backup
-	   is going on (and thus causing the flush) we are likely doing this in crit which is holding up all
-	   other processes anyway so we aren't losing much if anything. This is also historically how this
-	   has been done to assure the robustness of the temporary file. SE 1/2005.
-	*/
+	 * the IO we will be doing. This simplifies the backup logic substantialy. If we released and obtained
+	 * the lock for each buffer we dequeue (to allow other processes to proceed while we are doing IO) it
+	 * is likely that some of those other processes would get the idea to also run a buffer flush. Then we
+	 * would have to manage the task of doing multiple simultaneous IO to the temporary file potentially
+	 * resulting in gaps in the file which is something we definitely do not want to do. Besides, if a backup
+	 * is going on (and thus causing the flush) we are likely doing this in crit which is holding up all
+	 * other processes anyway so we aren't losing much if anything. This is also historically how this
+	 * has been done to assure the robustness of the temporary file. SE 1/2005.
+	 */
 	if (0 < sbufh_p->backup_cnt)
 	{	/* open the file, write to it at the address and close the file */
 		OPENFILE(sbufh_p->tempfilename, O_RDWR, fd);
@@ -74,6 +79,7 @@ boolean_t backup_buffer_flush(gd_region *reg)
 			sbufh_p->failed = process_id;
 			sbufh_p->backup_errno = errno;
 			csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
+			send_msg(VARLSTCNT(5) ERR_BKUPTMPFILOPEN, 2, LEN_AND_STR(sbufh_p->tempfilename), sbufh_p->backup_errno);
 			shmpool_unlock_hdr(reg);
 			return FALSE;
 		}
@@ -106,6 +112,7 @@ boolean_t backup_buffer_flush(gd_region *reg)
 				sbufh_p->failed = process_id;
 				sbufh_p->backup_errno = status;
 				csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
+				send_msg(VARLSTCNT(8) ERR_BKUPTMPFILWRITE, 2, LEN_AND_STR(sbufh_p->tempfilename), status);
 				break;	/* close file, release lock and return now.. */
 			}
 			/* Update disk addr with record just written */

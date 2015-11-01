@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,26 +15,24 @@
 
 #include "stringpool.h"
 #include "op.h"
-#include <varargs.h>
+#include <stdarg.h>
 
 #define MAX_NUM_LEN 64
 
 GBLREF spdesc stringpool;
 
-void op_cat(va_alist)
-va_dcl
+void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 {
-	va_list var, argbase;
-	mval *in, *dst, *src;
-	int maxlen;
-	int srcargs, i;
+	va_list var;
+	mval *in, *src;
+	int maxlen, i;
+	VMS_ONLY(int srcargs;)
 	unsigned char *cp, *base;
 	error_def(ERR_MAXSTRLEN);
 
-	VAR_START(var);
-	srcargs = va_arg(var,int4) - 1;
-	dst = va_arg(var, mval *);
-	VAR_COPY(argbase, var);
+	VAR_START(var, dst);
+	VMS_ONLY(va_count(srcargs);)
+	srcargs -= 1;			/* account for dst */
 	/* determine if garbage collection is required */
 	maxlen = 0;
 	for (i = 0; i < srcargs ; i++)
@@ -45,13 +43,17 @@ va_dcl
 		in = va_arg(var, mval *);
 		maxlen += (MV_IS_STRING(in)) ? (in)->str.len : MAX_NUM_LEN;
 		if (maxlen > MAX_STRLEN)
+		{
+			va_end(var);
 			rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+		}
 	}
+	va_end(var);
 	if (stringpool.free + maxlen > stringpool.top)
 		stp_gcol(maxlen);
 	base = cp = stringpool.free;
 	/* if the first string is at the end of the stringpool, then don't recopy the first string */
-	VAR_COPY(var, argbase);
+	VAR_START(var, dst);
 	in = va_arg(var, mval *);
 	if (MV_IS_STRING(in)  &&  (unsigned char *)in->str.addr + in->str.len == cp)
 	{
@@ -77,6 +79,7 @@ va_dcl
 			break;
 		in = va_arg(var, mval *);
 	}
+	va_end(var);
 	dst->mvtype = MV_STR;
 	dst->str.addr = (char *) base;
 	dst->str.len = cp - base;

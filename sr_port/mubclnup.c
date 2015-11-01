@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@
 #include "tp.h"
 #include "util.h"
 #include "gtmmsg.h"
+#include "memcoherency.h"
 
 GBLREF 	spdesc 		stringpool;
 GBLREF 	tp_region 	*grlist;
@@ -65,13 +66,30 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 		curr_ptr = (backup_reg_list *)halt_ptr;
 		/* Intentional Fall Through */
 	case need_to_del_tempfile:
-		for(ptr = (backup_reg_list *)grlist; ptr != NULL && ptr != curr_ptr;)
+		for (ptr = (backup_reg_list *)grlist; ptr != NULL && ptr != curr_ptr;)
 		{
-			if (keep_going == ptr->not_this_time || give_up_after_create_tempfile == ptr->not_this_time)
+			assert(3 == num_backup_proc_status);   /* Ensure there are only 3 possible values for "ptr->not_this_time".
+								* The assert below and the following if check rely on this. */
+			assert((keep_going == ptr->not_this_time)
+				|| (give_up_before_create_tempfile == ptr->not_this_time)
+				|| (give_up_after_create_tempfile == ptr->not_this_time));
+			if (give_up_before_create_tempfile != ptr->not_this_time)
 			{
 				free(ptr->backup_hdr);
 				if (online)
-				{
+				{	/* Stop temporary file from growing if we made it active */
+					if (keep_going == ptr->not_this_time)
+					{
+						FILE_INFO(ptr->reg)->s_addrs.nl->nbb = BACKUP_NOT_IN_PROGRESS;
+						/* Ideally, we should grab/release crit here but given that this is cleanup
+						   code in the event of an error, that seems risky for what we are trying to
+						   accomplish. The worst that will happen if a process does not see this flag
+						   change is it will try to write to the temporary file and possibly find it
+						   gone in which case it will record the error and keep running. The error is
+						   irrelevant as stopping the backup was what we are trying to do anyway.
+						*/
+						SHM_WRITE_MEMORY_BARRIER;
+					}
 					/* get rid of the temporary file */
 #if defined(UNIX)
 					if (ptr->backup_fd > 2)
@@ -98,12 +116,8 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 #else
 #error UNSUPPORTED PLATFORM
 #endif
-				}
-				else
-				{
-					/* defreeze the databases */
+				} else	/* defreeze the databases */
 					region_freeze(ptr->reg, FALSE, FALSE);
-				}
 			}
 			ptr = ptr->fPtr;
 		}
@@ -121,6 +135,5 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 			ptr = next;
 		}
 	}
-
 	return;
 }

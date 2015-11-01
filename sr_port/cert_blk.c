@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -397,7 +397,10 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 		{
 			GET_LONG(child, blk_id_ptr);
 			chain = *(off_chain *)&child;
-			if (!dollar_tlevel || csa->t_commit_crit || !chain.flag)
+			/* In TP, child block number can be greater than the total_blks for blocks created within TP.
+			 * Dont do any checks on such blocks.
+			 */
+			if (!dollar_tlevel || !chain.flag)
 			{
 				if (child <= 0)
 				{

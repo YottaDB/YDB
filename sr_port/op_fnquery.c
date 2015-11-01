@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include <varargs.h>
+#include <stdarg.h>
 #include "gtm_string.h"
 
 #include "hashtab_mname.h"	/* needed for lv_val.h */
@@ -40,13 +40,12 @@ GBLREF mval		last_fnquery_return_sub[MAX_LVSUBSCRIPTS];
 GBLREF int		last_fnquery_return_subcnt;
 GBLREF boolean_t 	local_collseq_stdnull;
 
-void op_fnquery (va_alist)
-va_dcl
+void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 {
 	int			length;
 	mval		 	tmp_sbs;
 	va_list			var;
-	mval			*dst, *varname, *v1, *v2;
+	mval			*varname, *v1, *v2;
 	mval			*arg1, **argpp, *args[MAX_LVSUBSCRIPTS], **argpp2, *lfrsbs, *argp2;
 	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
 	mstr			format_out;
@@ -55,15 +54,17 @@ va_dcl
 	lv_sbs_tbl		*tbl;
 	sbs_search_status	status;
 	sbs_blk			*num, *str;
-	int			i, j, sbscnt;
+	int			i, j;
+	VMS_ONLY(int		sbscnt;)
 	boolean_t		found, is_num, last_sub_null, nullify_term;
 
 	error_def		(ERR_STACKOFLOW);
 	error_def		(ERR_STACKCRIT);
 
-	VAR_START(var);
-	sbscnt = va_arg(var, int4) - 3;
-	dst = va_arg(var, mval *);
+	VAR_START(var, dst);
+	VMS_ONLY(va_count(sbscnt);)
+	assert(3 <= sbscnt);
+	sbscnt -= 3;
 	varname = va_arg(var, mval *);
 	v = va_arg(var, lv_val *);
 	assert(v);
@@ -202,6 +203,7 @@ va_dcl
 		} else
 			break;
 	}
+	va_end(var);
 	found = FALSE;
 	if (i == sbscnt)
 	{

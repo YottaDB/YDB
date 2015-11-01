@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,8 @@ GBLREF	sgm_info	*sgm_info_ptr;
 GBLREF	short		dollar_tlevel;
 GBLREF  gv_namehead	*gv_target;
 GBLREF  boolean_t	horiz_growth;
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	unsigned int	t_tries;
 
 void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 {
@@ -45,9 +47,9 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 	uint4		iter;
 	ht_ent_int4	*tabent;
 
-	/* an assert to verify the validity of the block number was removed
-	 * because it could be triggered by a concurrency conflict
-	 */
+	DEBUG_ONLY(
+	boolean_t	block_already_in_hist = FALSE;
+	)
 
 	horiz_growth = FALSE;
 	if (dollar_tlevel == 0)
@@ -64,15 +66,26 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 				tp_srch_status = (srch_blk_status *)tabent->value;
 			cse = tp_srch_status ? tp_srch_status->ptr : NULL;
 		}
-		assert(!cse || !cse->high_tlevel);
 		if (cse)
 		{
 			if (!committed)
 			{
 				assert(dollar_tlevel >= cse->t_level);
+	     			if (NULL != cse->high_tlevel)
+				{	/* this is possible only if this block is already part of either of the tree paths
+					 * in gv_target->hist or alt_hist (see gvcst_kill.c) and got a newer cse created as
+					 * part of a gvcst_kill_blk on this block in gvcst_kill.c a little before the call
+					 * to gvcst_kill_blk of a parent block which in turn decided to delete this block
+					 * as part of its records that are getting removed. this is a guaranteed restartable
+					 * situation. since gvcst_delete_blk does not return any status, proceed with the
+					 * newer cse and return. the restart will be later detected by tp_hist.
+					 */
+					 cse = cse->high_tlevel;
+					 DEBUG_ONLY(block_already_in_hist = TRUE;)
+				}
+				assert(!cse->high_tlevel);
 				if (cse->t_level != dollar_tlevel)
-				{
-					/* this part of the code is almost similar to that in t_write(),
+				{	/* this part of the code is almost similar to that in t_write(),
 					 * any changes in one should be reflected in the other */
 					horiz_growth = TRUE;
 					old_cse = cse;
@@ -86,14 +99,19 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 					assert(2 == (sizeof(cse->undo_next_off) / sizeof(cse->undo_next_off[0])));
 					for (iter = 0; iter < 2; iter++)
 						cse->undo_next_off[iter] = cse->undo_offset[iter] = 0;
-					if (!old_cse->new_buff)		/* it's possible to arrive here with an unbuilt block */
-						gvcst_blk_build(old_cse, (uchar_ptr_t)old_cse->new_buff, 0);
-					old_cse->done = TRUE;
-					cse->new_buff = ((new_buff_buddy_list *)
+					if (old_cse->done)
+					{
+						assert(NULL != old_cse->new_buff);
+						cse->new_buff = ((new_buff_buddy_list *)
 								get_new_free_element(sgm_info_ptr->new_buff_list))->new_buff;
-					memcpy(cse->new_buff, old_cse->new_buff, ((blk_hdr_ptr_t)old_cse->new_buff)->bsiz);
-					/* tp_srch_status->ptr has to be updated here, since gvcst_kill() does
-					 * not call tp_hist() at the end as in gvcst_put_blk() */
+						memcpy(cse->new_buff, old_cse->new_buff, ((blk_hdr_ptr_t)old_cse->new_buff)->bsiz);
+					} else
+						cse->new_buff = NULL;
+					assert(!block_already_in_hist);
+					/* tp_hist (called from gvcst_kill) updates "->ptr" fields for all blocks that are
+					 * part of the left or right histories of the M-kill. But this block is not one of
+					 * those. Hence tp_srch_status->ptr has to be updated here explicitly.
+					 */
 					if (tp_srch_status)
 						tp_srch_status->ptr = (void *)cse;
 				}
@@ -150,6 +168,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 	ks->blk[ks->used].level = level;
 	if (dollar_tlevel == 0 || chain.flag == 0)
 	{
+		assert((CDB_STAGNATE > t_tries) || (blk < cs_addrs->ti->total_blks));
 		ks->blk[ks->used].block = blk;
 		ks->blk[ks->used].flag = 0;
 	} else

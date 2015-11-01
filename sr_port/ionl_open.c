@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,13 @@
 
 #include "mdef.h"
 
+#include "errno.h"
+#include "gtm_unistd.h"
+
 #include "io_params.h"
 #include "io.h"
 #include "stringpool.h"
+#include "gtmio.h"
 
 #define DEF_NL_WIDTH 255
 #define DEF_NL_LENGTH 66
@@ -24,9 +28,20 @@ short ionl_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 {
 	unsigned char	ch;
 	io_desc		*d_in, *d_out, *ioptr;
-	int		p_offset;
+	int		p_offset, status;
 
 	p_offset = 0;
+	/* If UNIX, then /dev/null was actually opened by io_open_try so we have to close it
+	   since we don't use the device, we just simulate it by doing nothing on writes except
+	   maintaining the appropriate pointers. We test for fd >= 0 since the less than zero
+	   values mean no device was opened.
+	*/
+	UNIX_ONLY(
+		if (0 <= fd)
+	        {
+		        CLOSEFILE(fd, status);
+		}
+	);
 	ioptr = dev_name->iod;
 	ioptr->state = dev_open;
 	d_in = ioptr->pair.in;

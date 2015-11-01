@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +9,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __CCP_H__
-#define __CCP_H__
+#ifndef CCP_H
+#define CCP_H
 
 /* requires gdsroot */
 
@@ -238,7 +238,7 @@ void ccp_pndg_proc_wake(ccp_wait_head *list);
 void ccp_request_write_mode(ccp_db_header *db);
 void ccp_reqwm_interrupt(ccp_db_header **pdb);
 void ccp_rundown(void);
-void ccp_signal_cont();
+void ccp_signal_cont(uint4 arg1, ...);
 void ccp_tick_interrupt(ccp_db_header **p);
 void ccp_tick_start(ccp_db_header *db);
 void ccp_tr_checkdb(void);

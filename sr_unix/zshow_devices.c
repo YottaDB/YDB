@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,7 @@ void zshow_devices(zshow_out *output)
 	sm_uc_ptr_t	delim_buff_sm;
 	unsigned short  delim_len_sm;
 	mstr		delim;
-	int		delim_len;
+	int		delim_len, tmpport;
 	static readonly char space8_text[] = "        ";
 	static readonly char filchar_text[] = "CHARACTERS";
 	static readonly char filesc_text[] = "ESCAPES";
@@ -361,7 +361,8 @@ void zshow_devices(zshow_out *output)
 		/* address + port */		if (socketptr->passive)
 						{
 							ZS_STR_OUT(&v, port_text);
-							MV_FORCE_MVAL(&m, (int)socketptr->local.port);
+							tmpport = (int)socketptr->local.port;
+							MV_FORCE_MVAL(&m, tmpport);
 							mval_write(output, &m, FALSE);
 						} else
 						{
@@ -370,7 +371,8 @@ void zshow_devices(zshow_out *output)
 							v.str.len = strlen(socketptr->remote.saddr_ip);
 							zshow_output(output, &v.str);
 							ZS_ONE_OUT(&v, at_text);
-							MV_FORCE_MVAL(&m, (int)socketptr->remote.port);
+							tmpport = (int)socketptr->remote.port;
+							MV_FORCE_MVAL(&m, tmpport);
 							mval_write(output, &m, FALSE);
 							ZS_ONE_OUT(&v, space_text);
 							if (socketptr->local.saddr_ip[0])
@@ -380,7 +382,8 @@ void zshow_devices(zshow_out *output)
                                                         	v.str.len = strlen(socketptr->local.saddr_ip);
                                                         	zshow_output(output, &v.str);
                                                         	ZS_ONE_OUT(&v, at_text);
-                                                        	MV_FORCE_MVAL(&m, (int)socketptr->local.port);
+								tmpport = (int)socketptr->local.port;
+								MV_FORCE_MVAL(&m, tmpport);
                                                         	mval_write(output, &m, FALSE);
 							}
 						}

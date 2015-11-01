@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,10 +97,10 @@ void lvzwr_var(lv_val *lv, int4 n);
 unsigned char   *format_lvname(lv_val *start, unsigned char *buff, int size);
 unsigned char *format_key_lv_val(lv_val *lvpin, unsigned char *buff, int size);
 
-lv_val *op_srchindx();
-lv_val *op_m_srchindx();
-lv_val *op_putindx();
-lv_val *op_getindx();
+lv_val *op_srchindx(UNIX_ONLY_COMMA(int argcnt_arg) lv_val *lv, ...);
+lv_val *op_m_srchindx(UNIX_ONLY_COMMA(int4 count) lv_val *lvarg, ...);
+lv_val *op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
+lv_val *op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
 
 boolean_t lcl_arg1_is_desc_of_arg2(lv_val *cur, lv_val *ref);
 

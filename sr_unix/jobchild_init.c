@@ -153,7 +153,7 @@ void jobchild_init(void)
 	}
 	if (job_arglist.callargs)
 	{
-		callg((int(*)())push_parm, &job_arglist);
+		callg((int(*)(int cnt, ...))push_parm, &job_arglist);
 		frame_pointer->type |= SFT_EXTFUN;
 	}
 	REVERT;

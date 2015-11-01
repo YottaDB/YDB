@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@
  */
 #include "mdef.h"
 
-#include <varargs.h>
+#include <stdarg.h>
 
 #include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
@@ -38,21 +38,23 @@
 #include "lvname_info.h"
 #include "callg.h"
 
-lv_val* op_m_srchindx(va_alist)
-va_dcl
+lv_val* op_m_srchindx(UNIX_ONLY_COMMA(int4 count) lv_val *lvarg, ...)
 {
 
 	va_list			var;
 	int			cur_subscr;
+	VMS_ONLY(int		count;)
 	static lvname_info_ptr	lvn_info = NULL;
 
 	if (!lvn_info)
 		lvn_info = (lvname_info_ptr) malloc(sizeof(struct lvname_info_struct));
-	VAR_START(var);
-	lvn_info->total_lv_subs = va_arg(var, int4);
-	lvn_info->start_lvp = va_arg(var, lv_val *);  	/* process arg[1] */
+	VAR_START(var, lvarg);
+	VMS_ONLY(va_count(count);)
+	lvn_info->start_lvp = lvarg;  	/* process arg[1] */
+	lvn_info->total_lv_subs = count;
 	for (cur_subscr = 0;  cur_subscr < lvn_info->total_lv_subs - 1;  cur_subscr++)
 		lvn_info->lv_subs[cur_subscr] = va_arg(var, mval *); /* subcsripts are args[2:argcnt] */
-	lvn_info->end_lvp = (lv_val *)callg((int(*)())op_srchindx, lvn_info);
+	va_end(var);
+	lvn_info->end_lvp = (lv_val *)callg((int(*)(int argcnt_arg, ...))op_srchindx, lvn_info);
 	return lvn_info->end_lvp;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <stdarg.h>
 #include "gtm_string.h"
 
 #include "error.h"
@@ -23,24 +24,23 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "zwrite.h"
-#include <varargs.h>
 #include "op.h"
 #include "mvalconv.h"
 #include "gtm_maxstr.h"
 
-void op_lvpatwrite(va_alist)
-va_dcl
+void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) int4 arg1, ...)
 {
 	va_list		var;
 	boolean_t	flag, local_buff;
-	int4		count, arg1, arg2;
+	int4		arg2;
+	VMS_ONLY(int4	count;)
 	mval		*mv;
 	zshow_out	output, *out;
 	MAXSTR_BUFF_DECL(buff);
 
-	VAR_START(var);
-	count = va_arg(var, int4);
-	arg1 = va_arg(var, int4);
+	VAR_START(var, arg1);
+	VMS_ONLY(va_count(count);)
+	assert(1 < count);
 	local_buff = FALSE;
 	if (!arg1)
 	{
@@ -97,6 +97,7 @@ va_dcl
 			break;
 		}
 	}
+	va_end(var);
 	if (local_buff)
 		MAXSTR_BUFF_FINI;
 }

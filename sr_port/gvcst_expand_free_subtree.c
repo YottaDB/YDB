@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -121,6 +121,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 								== cs_addrs);
 							GTMASSERT;
 						}
+						assert(chain.flag || temp_long < csa->ti->total_blks);
 					}
 					gvcst_delete_blk(temp_long, ksb->level - 1, TRUE);
 					if ((1 == ksb->level)  &&  (0 == dollar_tlevel)  &&

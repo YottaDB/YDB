@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "error.h"
 #include "indir_enum.h"
@@ -29,6 +31,7 @@ GBLREF boolean_t	dollar_zininterrupt;
 GBLREF unsigned short	proc_act_type;
 GBLREF mv_stent		*mv_chain;
 GBLREF int		dollar_truth;
+GBLREF mstr		extnam_str;
 
 void jobinterrupt_process(void)
 {
@@ -52,9 +55,17 @@ void jobinterrupt_process(void)
 	   were able to envision uses for job interrupt that might involve legitimate changes
 	   in the current IO device (for example application log switches). So in the
 	   interest of flexibilty, we leave this big gun pointed at the user's feet..
+	   2006-03-06 se: add any extended reference in $REFERENCE to the things being saved/restored
 	*/
 	PUSH_MV_STENT(MVST_ZINTR);
 	mv_chain->mv_st_cont.mvs_zintr.saved_dollar_truth = dollar_truth;
 	op_gvsavtarg(&mv_chain->mv_st_cont.mvs_zintr.savtarg);
+	mv_chain->mv_st_cont.mvs_zintr.savextref.len = extnam_str.len;
+	if (extnam_str.len)
+	{
+		mv_chain->mv_st_cont.mvs_zintr.savextref.addr = (char *)malloc(extnam_str.len);
+		memcpy(mv_chain->mv_st_cont.mvs_zintr.savextref.addr, extnam_str.addr, extnam_str.len);
+	} else
+		mv_chain->mv_st_cont.mvs_zintr.savextref.addr = NULL;
 	return;
 }

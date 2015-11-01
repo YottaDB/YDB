@@ -202,7 +202,7 @@ void gtm_startup(struct startup_vector *svec)
 	cache_init();
 #ifdef __sun
         if (NULL != GETENV(PACKAGE_ENV_TYPE))	/* chose xcall (default) or rpc zcall */
-            xfer_table[xf_fnfgncal] = op_fnfgncal_rpc;  /* using RPC */
+            xfer_table[xf_fnfgncal] = (int (*)())op_fnfgncal_rpc;  /* using RPC */
 #endif
 	msp -= sizeof(stack_frame);
 	frame_pointer = (stack_frame *) msp;

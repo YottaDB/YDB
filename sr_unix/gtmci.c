@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,13 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
-#ifdef EARLY_VARARGS
-#include <varargs.h>
-#endif
+#include <stdarg.h>
 #include "gtm_stdio.h"
-#ifndef EARLY_VARARGS
-#include <varargs.h>
-#endif
 #include <errno.h>
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
@@ -74,11 +69,9 @@ static callin_entry_list* get_entry(const char* call_name)
 	return entry;
 }
 
-int gtm_ci (c_rtn_name, va_alist)
-const char* c_rtn_name;
-va_dcl
+int gtm_ci (const char *c_rtn_name, ...)
 {
-	va_list			var, save_var;
+	va_list			var;
 	callin_entry_list	*entry;
 	mstr			label, routine;
 	int			has_return, i;
@@ -127,8 +120,7 @@ va_dcl
 	param_blk.labaddr = USHBIN_ONLY(&)lnr_entry;
 	param_blk.argcnt = entry->argcnt;
 
-	VAR_START(var);
-	VAR_COPY(save_var, var);
+	VAR_START(var, c_rtn_name);
 	has_return = (xc_void == entry->return_type) ? 0 : 1;
 	if (has_return)
 	{ /* create mval slot for return value */
@@ -168,6 +160,7 @@ va_dcl
 				case xc_string_star:
 					va_arg(var, gtm_string_t*); break;
 				default:
+					va_end(var);
 					GTMASSERT;
 			}
 		}
@@ -201,25 +194,33 @@ va_dcl
 					arg_mval.str.addr = va_arg(var, gtm_char_t*);
 					arg_mval.str.len = strlen(arg_mval.str.addr);
 					if (MAX_STRLEN < arg_mval.str.len)
+					{
+						va_end(var);
 						rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+					}
 					s2pool(&arg_mval.str);
 					break;
 				case xc_string_star:
 					mstr_parm = va_arg(var, gtm_string_t*);
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
+					{
+						va_end(var);
 						rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+					}
 					arg_mval.str.len = mstr_parm->length;
 					arg_mval.str.addr = mstr_parm->address;
 					s2pool(&arg_mval.str);
 
 					break;
 				default:
+					va_end(var);
 					GTMASSERT; /* should have been caught by citab_parse */
 			}
 		}
 		param_blk.args[i] = push_mval(&arg_mval);
 	}
+	va_end(var);
 	param_blk.mask = out_mask;
 	param_blk.ci_rtn = (!has_return && param_blk.argcnt <= 0) ? &op_extcall : &op_extexfun;
 	/* the params block needs to be stored & restored across multiple
@@ -245,7 +246,7 @@ va_dcl
 		return mumps_status;
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
-	VAR_COPY(var, save_var);
+	VAR_START(var, c_rtn_name);
 	/* convert mval args passed by reference to C types */
 	for (i=0; i <= entry->argcnt; ++i)
 	{
@@ -290,6 +291,7 @@ va_dcl
 				case xc_double:
 					va_arg(var, gtm_double_t); break;
 				default:
+					va_end(var);
 					GTMASSERT;
 			}
 
@@ -320,10 +322,12 @@ va_dcl
 					memcpy(mstr_parm->address, arg_ptr->str.addr, mstr_parm->length);
 					break;
 				default:
+					va_end(var);
 					GTMASSERT;
 			}
 		}
 	}
+	va_end(var);
 	REVERT;
 	return 0;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,13 +34,18 @@
 
 #include "mdef.h"
 
+/* We are the redefined versions so use real versions in this module */
+#undef malloc
+#undef free
+
 #include <sys/types.h>
 #include <signal.h>
 #include <stddef.h>
 #include <errno.h>
-
 #include "gtm_stdio.h"
 #include "gtm_string.h"
+#include "gtm_stdlib.h"
+
 #include "eintr_wrappers.h"
 #include "gtmdbglvl.h"
 #include "io.h"
@@ -54,19 +59,20 @@
 #include "gtm_logicals.h"
 
 /* To debug this routine effectively, normally static routines are turned into
-   GBLDEFs. */
+   GBLDEFs. Also, for vars that need one copy, define GBLRDEF to GBLDEF for
+   debug and GBLREF for pro. This is because the pro builds always have a
+   debug version in them satisfiying the GBLREF but the debug builds won't
+   have any pro code in them so the define must be in the debug version.
+*/
 #ifdef DEBUG
-#  define STATICD
-#  define STATICR
+#  define STATICD GBLDEF
+#  define STATICR extern
+#  define GBLRDEF GBLDEF
 #else
 #  define STATICD static
 #  define STATICR static
+#  define GBLRDEF GBLREF
 #endif
-
-/* We are the redefined versions so use real versions in this module */
-#undef malloc
-#undef free
-#include "gtm_stdlib.h"
 
 #ifdef VMS
 /* These routines for VMS are AST-safe */
@@ -379,11 +385,14 @@ STATICD readonly unsigned char backfillMarkC[4] = {0xde, 0xad, 0xbe, 0xef};
 #  endif
 #endif
 
+GBLRDEF	int	totalRmalloc;				/* Total storage currently (real) malloc'd (includes extent blocks) */
+GBLRDEF int	totalAlloc;				/* Total allocated (includes allocation overhead but not free space */
+GBLRDEF int	totalUsed;				/* Sum of user allocated portions (totalAlloc - overhead) */
+
 #ifdef DEBUG
 /* Define variables used to instrument how our algorithm works */
 STATICD	int	totalMallocs;				/* Total malloc requests */
 STATICD	int	totalFrees;				/* Total free requests */
-STATICD	int	totalRmalloc;				/* Total storage currently (real) malloc'd (includes extent blocks) */
 STATICD int	totalExtents;				/* Times we allocated more storage */
 STATICD int	maxExtents;				/* Highwater mark of extents */
 STATICD	int	rmallocMax;				/* Maximum value of totalRmalloc */
@@ -533,7 +542,7 @@ storElem *findStorElem(int sizeIndex)
 		MALLOC(EXTENT_SIZE, uStorAlloc);
 		uStor2 = (storElem *)uStorAlloc;
 		uStor = (storElem *)(((unsigned long)(uStor2) + MAXTWO - 1) & -MAXTWO); /* Make addr "MAXTWO" byte aligned */
-		INCR_SUM(totalRmalloc, EXTENT_SIZE);
+		totalRmalloc += EXTENT_SIZE;
 		SET_MAX(rmallocMax, totalRmalloc);
 		sEHdr = (storExtHdr *)((char *)uStor + (ELEMS_PER_EXTENT * MAXTWO));
 		DEBUGSM(("debugsm: Allocating extent at 0x%08lx\n", uStor));
@@ -698,16 +707,34 @@ void *gtm_malloc(size_t size)
 						tSize += 256;
 				}
 #endif
+				/* If DEBUG, we record the original malloc request size in the malloc queue header
+				 * in "uStor->allocLen", so we can note this down as the user level malloc usage "totalUsed".
+				 * This way when this storage element is FREED we know exactly by how much to decrement
+				 * "totalUsed". But if DEBUG is not defined, we do not maintain "uStor->allocLen" and hence
+				 * cannot know at FREE time how much to exactly decrement "totalUsed" by. In this case,
+				 * record an approximation "uStor->realLen" instead in "totalUsed" as the former available in
+				 * all cases. This way at FREE time "totalUsed" can be decremented by this exact amount. This
+				 * means "totalUsed" will not be accurate in tracking user level malloc usage in GT.M (if not
+				 * DEBUG) but that is better than maintaining an incorrect value (possible if it is incremented
+				 * by one amount during MALLOC and decremented by another amount during FREE).
+				 */
 				if (MAXTWO >= tSize GMR_ONLY(&& !reentered))
 				{	/* Use our memory manager for smaller pieces */
 					sizeIndex = GetSizeIndex(tSize);		/* Get index to size we need */
 					assert(sizeIndex >= 0 && sizeIndex <= MAXINDEX);
 					GET_QUEUED_ELEMENT(sizeIndex, uStor, qHdr, sEHdr);
-					uStor->realLen = TwoTable[sizeIndex];
+					tSize = TwoTable[sizeIndex];
+					uStor->realLen = tSize;
+#ifdef DEBUG
+					totalUsed += size;
+#else
+					totalUsed += tSize;
+#endif
+					totalAlloc += tSize;
 				} else
 				{	/* Use regular malloc to obtain the piece */
 					MALLOC(tSize, uStor);
-					INCR_SUM(totalRmalloc, tSize);
+					totalRmalloc += tSize;
 					SET_MAX(rmallocMax, totalRmalloc);
 
 					uStor->queueIndex = REAL_MALLOC;
@@ -716,7 +743,11 @@ void *gtm_malloc(size_t size)
 					sizeIndex = MAXINDEX + 1;	/* Just so the ENQUEUE below has a queue since
 									   we usually use -1 as the "real" queueindex
 									   for malloc'd storage */
+					totalUsed += size;
+#else
+					totalUsed += tSize;
 #endif
+					totalAlloc += tSize;
 				}
 				INCR_CNTR(mallocCnt[sizeIndex]);
 				uStor->state = Allocated;
@@ -799,7 +830,7 @@ void gtm_free(void *addr)
 	storElem 	*uStor, *buddyElem;
 	storExtHdr	*sEHdr;
 	unsigned char	*trailerMarker;
-	int 		sizeIndex, hdrSize, saveIndex, dqIndex, saveSize, freedElemCnt;
+	int 		sizeIndex, hdrSize, saveIndex, dqIndex, saveSize, freedElemCnt, allocSize;
 
 	error_def(ERR_MEMORYRECURSIVE);
 	VMS_ONLY(error_def(ERR_VMSMEMORY);)
@@ -902,6 +933,9 @@ void gtm_free(void *addr)
 				}
 			} else
 				DECR_CNTR(allocElemCnt[((0 <= uStor->queueIndex) ? uStor->queueIndex : MAXINDEX + 1)]);
+			totalUsed -= uStor->allocLen;
+#else
+			totalUsed -= uStor->realLen;
 #endif
 			if (sizeIndex >= 0)
 			{	/* We can put the storage back on one of our simple queues */
@@ -909,7 +943,8 @@ void gtm_free(void *addr)
 				assert(sizeIndex >= 0 && sizeIndex <= MAXINDEX);
 				uStor->state = Free;
 				INCR_CNTR(freeCnt[sizeIndex]);
-
+				assert(uStor->realLen == TwoTable[sizeIndex]);
+				totalAlloc -= TwoTable[sizeIndex];
 			        /* First, if there are larger queues than this one, see if it has a buddy that it can
 				   combine with */
 				while (sizeIndex < MAXINDEX)
@@ -966,6 +1001,7 @@ void gtm_free(void *addr)
 						assert((char *)uStor == (char *)sEHdr);
 						dqdel(sEHdr, links);
 						FREE(EXTENT_SIZE, sEHdr->extentStart);
+						totalRmalloc -= EXTENT_SIZE;
 						--curExtents;
 						assert(curExtents);
 					}
@@ -977,8 +1013,10 @@ void gtm_free(void *addr)
 				DEBUG_ONLY(saveSize = 0);
 				assert(REAL_MALLOC == sizeIndex);		/* Better be a real malloc type block */
 				INCR_CNTR(freeCnt[MAXINDEX + 1]);		/* Count free of malloc */
-				DECR_SUM(totalRmalloc, uStor->realLen);
-				FREE(uStor->realLen, uStor);
+				allocSize = uStor->realLen;
+				FREE(allocSize, uStor);
+				totalRmalloc -= allocSize;
+				totalAlloc -= allocSize;
 			}
 		}
 #ifdef DEBUG
@@ -1199,6 +1237,9 @@ void printMallocInfo(void)
 		FPRINTF(stderr,
 			"Total mallocs: %d, total frees: %d, total extents: %d, total rmalloc bytes: %d, max rmalloc bytes: %d\n",
 			totalMallocs, totalFrees, totalExtents, totalRmalloc, rmallocMax);
+		FPRINTF(stderr,
+			"Total (currently) allocated (includes overhead): %d, Total (currently) used (no overhead): %d\n",
+			totalAlloc, totalUsed);
 		FPRINTF(stderr,
 			"Maximum extents: %d, Current extents: %d, Released extents: %d\n", maxExtents, curExtents,
 			(totalExtents - curExtents));

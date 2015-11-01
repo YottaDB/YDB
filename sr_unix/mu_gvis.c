@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,8 +26,12 @@ void mu_gvis(void )
 {
 	char key_buff[MAX_ZWR_KEY_SZ], *key_end;
 
-	if ((key_end = (char*)format_targ_key((uchar_ptr_t)&key_buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
-		key_end = &key_buff[MAX_ZWR_KEY_SZ - 1];
+	if (gv_currkey->end)
+	{
+		if ((key_end = (char*)format_targ_key((uchar_ptr_t)&key_buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
+			key_end = &key_buff[MAX_ZWR_KEY_SZ - 1];
+	} else
+		key_end = &key_buff[0];
 	util_out_print("!_!_Global variable : !AD", TRUE, key_end - &key_buff[0], key_buff);
 	return;
 }

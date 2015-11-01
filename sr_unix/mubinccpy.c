@@ -239,8 +239,8 @@ bool	mubinccpy (backup_reg_list *list)
 			}
 			break;
 		default :
-			util_out_print("ERROR: Backup format not supported.");
-			util_out_print("WARNING: Backup not valid.");
+			util_out_print("ERROR: Backup format not supported.", TRUE);
+			util_out_print("WARNING: Backup not valid.", TRUE);
 			return FALSE;
 	}
 

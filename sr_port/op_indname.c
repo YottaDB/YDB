@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,27 +15,25 @@
 
 #include "compiler.h"
 #include "stringpool.h"
-#include <varargs.h>
+#include <stdarg.h>
 #include "op.h"
 
 GBLREF spdesc stringpool;
 
-void op_indname(va_alist)
-va_dcl
+void op_indname(UNIX_ONLY_COMMA(int argcnt) mval *dst, ...)
 {
 	va_list	var, sublst;
-	mval *dst, *src;
-	mval  *subs;
-	int argcnt, i;
+	mval *src, *subs;
+	int i;
+	VMS_ONLY(int argcnt;)
 	unsigned char *ch, *ctop, *out, *double_chk;
 	unsigned char outch;
 	error_def(ERR_INDRMAXLEN);
 	error_def(ERR_STRINGOFLOW);
 	error_def(ERR_VAREXPECTED);
 
-	VAR_START(var);
-	argcnt = va_arg(var, int4);
-	dst = va_arg(var, mval *);
+	VAR_START(var, dst);
+	VMS_ONLY(va_count(argcnt);)
 
 	VAR_COPY(sublst,  var);
 	src = va_arg(var, mval *);
@@ -44,6 +42,7 @@ va_dcl
 		subs = va_arg(sublst, mval *);
 		MV_FORCE_STR(subs);
 	}
+	va_end(sublst);
 	if (stringpool.free + MAX_SRCLINE > stringpool.top)
 		stp_gcol(MAX_SRCLINE);
 	out = stringpool.free;
@@ -137,6 +136,8 @@ va_dcl
 		}
 		*out++ = '"';
 	}
+	va_end(var);
+	va_end(sublst);
 	assert(out < stringpool.top);
 	assert(out > stringpool.free);
 	*out++ = ')';

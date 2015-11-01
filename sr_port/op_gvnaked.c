@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <stdarg.h>
 #include "gtm_string.h"
 
 #include "gdsroot.h"
@@ -37,7 +38,6 @@
 #include "sgnl.h"
 #include "mvalconv.h"
 #include "tp_set_sgm.h"
-#include <varargs.h>
 
 GBLREF short            dollar_tlevel;
 GBLREF gd_addr		*gd_header;
@@ -51,11 +51,11 @@ GBLREF sgm_info         *first_sgm_info;
 GBLREF bool		transform;
 GBLREF mstr		extnam_str;
 
-void op_gvnaked(va_alist)
-va_dcl
+void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 {
 	va_list		var;
-	int		count, len;
+	int		len;
+	int		count;
 	bool		was_null, is_null, sbs_cnt;
 	mval		*val;
 	short 		max_key;
@@ -81,13 +81,15 @@ va_dcl
 		assert(gv_target->gd_reg == gv_cur_region);
 	}
 
-	VAR_START(var);
+	VMS_ONLY(va_count(count);)
+	UNIX_ONLY(count = count_arg;)	/* i386 assembler modules may depend on unchanged count */
+	if (0 >= count)
+		GTMASSERT;
 	gv_currkey->end = gv_currkey->prev;
 	is_null = FALSE;
 	was_null = (gv_currkey->end ? gv_prev_subsc_null : FALSE);
 	max_key = gv_cur_region->max_key_size;
 	sbs_cnt = 0;
-	count = va_arg(var, int4);
 	if (1 < count)
 	{
 		/* Use of naked reference can cause increase in number of subscripts.   So count the subscripts */
@@ -100,10 +102,17 @@ va_dcl
 			rts_error(VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	}
 	/* else naked reference will not increase number of subscripts, so do not worry about exceeding the limit */
-	for (; count > 0 ; count--)
+	VAR_START(var, val_arg);
+	val = val_arg;
+	for ( ; ; )
 	{
-		COPY_SUBS_TO_GVCURRKEY(var, gv_currkey, was_null, is_null);	/* updates gv_currkey, was_null, is_null */
+		COPY_SUBS_TO_GVCURRKEY(val, gv_currkey, was_null, is_null);	/* updates gv_currkey, was_null, is_null */
+		if (0 < --count)
+			val = va_arg(var, mval *);
+		else
+			break;
 	}
+	va_end(var);
 	gv_prev_subsc_null = was_null; /* if true, it indicates there is a null subscript (except last subscript) in current key */
 	gv_curr_subsc_null = is_null; /* if true, it indicates that last subscript in current key is null */
 	if (was_null && (NEVER == gv_cur_region->null_subs))

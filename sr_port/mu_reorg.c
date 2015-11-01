@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,26 +62,27 @@
 #include "add_inter.h"
 #include "t_abort.h"
 
-GBLREF	bool		mu_ctrlc_occurred;
-GBLREF	bool		mu_ctrly_occurred;
+GBLREF	bool			mu_ctrlc_occurred;
+GBLREF	bool			mu_ctrly_occurred;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	gv_key		*gv_currkey_next_reorg;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	gv_key		*gv_currkey;
-GBLREF	gv_namehead 	*gv_target;
-GBLREF	gv_namehead 	*reorg_gv_target;
-GBLREF	unsigned char	cw_map_depth;
-GBLREF	unsigned char	cw_set_depth;
-GBLREF	cw_set_element	cw_set[];
-GBLREF	uint4		t_err;
-GBLREF	unsigned int	t_tries;
-GBLREF	unsigned char	rdfail_detail;
-GBLREF	inctn_opcode_t	inctn_opcode;
-GBLREF	kill_set	*kill_set_tail;
-GBLREF	boolean_t 	kip_incremented;
-GBLREF	boolean_t 	need_kip_incr;
-GBLREF	int4		update_trans;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	gv_key			*gv_currkey_next_reorg;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gv_key			*gv_currkey;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	gv_namehead		*reorg_gv_target;
+GBLREF	unsigned char		cw_map_depth;
+GBLREF	unsigned char		cw_set_depth;
+GBLREF	cw_set_element		cw_set[];
+GBLREF	uint4			t_err;
+GBLREF	unsigned int		t_tries;
+GBLREF	unsigned char		rdfail_detail;
+GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	kill_set		*kill_set_tail;
+GBLREF	boolean_t		kip_incremented;
+GBLREF	boolean_t		need_kip_incr;
+GBLREF	int4			update_trans;
+GBLREF	boolean_t		mu_reorg_in_swap_blk;
 
 void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *kill_set_list, trans_num tn);
 void reorg_finish(block_id dest_blk_id, int blks_processed, int blks_killed,
@@ -514,7 +515,9 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					break;
 				/* swap working block with appropriate dest_blk_id block.
 				   Historys are sent as gv_target->hist and reorg_gv_target->hist */
+				mu_reorg_in_swap_blk = TRUE;
 				status = mu_swap_blk(level, &dest_blk_id, &kill_set_list, exclude_glist_ptr);
+				mu_reorg_in_swap_blk = FALSE;
 				if (cdb_sc_oprnotneeded == status)
 				{
 					if (cs_data->trans_hist.total_blks <= dest_blk_id)

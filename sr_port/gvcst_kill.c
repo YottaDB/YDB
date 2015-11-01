@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,13 +93,28 @@ void	gvcst_kill(bool do_subtree)
 	srch_hist		*alt_hist;
 	srch_blk_status		*left,*right;
 	srch_rec_status		*left_rec_stat, local_srch_rec;
+	sm_uc_ptr_t		jnlpool_instname;
 
 	error_def(ERR_SCNDDBNOUPD);
+	error_def(ERR_REPLINSTMISMTCH);
 
-	if ((FALSE == pool_init) && REPL_ENABLED(cs_data) && is_replicator)
-		jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
-	if (REPL_ENABLED(cs_data) && pool_init && jnlpool_ctl->upd_disabled && !is_updproc)
-		rts_error(VARLSTCNT(1) ERR_SCNDDBNOUPD);
+	if (REPL_ENABLED(cs_data) && is_replicator)
+	{
+		if (FALSE == pool_init)
+			jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
+		assert(pool_init);
+		if (!cs_addrs->replinst_matches_db)
+		{
+			if (jnlpool_ctl->upd_disabled && !is_updproc)
+				rts_error(VARLSTCNT(1) ERR_SCNDDBNOUPD);
+			UNIX_ONLY(jnlpool_instname = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.instname;)
+			VMS_ONLY(jnlpool_instname = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.gtmgbldir;)
+			if (STRCMP(cs_addrs->nl->replinstname, jnlpool_instname))
+				rts_error(VARLSTCNT(8) ERR_REPLINSTMISMTCH, 6, LEN_AND_STR(jnlpool_instname),
+					DB_LEN_STR(gv_cur_region), LEN_AND_STR(cs_addrs->nl->replinstname));
+			cs_addrs->replinst_matches_db = TRUE;
+		}
+	}
 	clue = (0 != gv_target->clue.end);
 	if (0 == dollar_tlevel)
 	{

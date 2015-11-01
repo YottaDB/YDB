@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <stdarg.h>
 #include "gtm_string.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -39,7 +40,6 @@
 #include "gtm_caseconv.h"
 #include "gvcst_protos.h"	/* for gvcst_tp_init prototype */
 #include "dpgbldir.h"
-#include <varargs.h>
 #include "longset.h"		/* needed for cws_insert.h */
 #include "hashtab.h"
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
@@ -97,12 +97,10 @@ static  struct gv_orig_key_struct *gv_orig_key_ptr;
 /*** temporary ***/
 GBLREF int4	    		dollar_zmaxtptime;
 
-void	op_tstart(va_alist)
-va_dcl
+void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 {
 	bool			serial;			/* whether SERIAL keyword was present */
-	int			dollar_t,		/* value of $T when TSTART */
-				prescnt,		/* number of names to save, -1 = no restart, -2 = preserve all */
+	int			prescnt,		/* number of names to save, -1 = no restart, -2 = preserve all */
 				pres;
 	lv_val			*lv, *var;
 	mlk_pvtblk		*pre_lock;
@@ -155,8 +153,7 @@ va_dcl
 		rts_error(VARLSTCNT(4) ERR_TPMIXUP, 2, "An M", "a fenced logical");
 	if (dollar_tlevel + 1 >= TP_MAX_NEST)
 		rts_error(VARLSTCNT(1) ERR_TPTOODEEP);
-	va_start(varlst);
-	dollar_t = va_arg(varlst, int);
+	va_start(varlst, dollar_t);	/* no argument count first */
 	serial = va_arg(varlst, int);
 	tid = va_arg(varlst, mval *);
 	prescnt = va_arg(varlst, int);
@@ -202,6 +199,7 @@ va_dcl
 			preserve = va_arg(lvname, mval *);
 			MV_FORCE_STR(preserve);
 		}
+		va_end(lvname);
 	}
 	if (NULL == gd_header)
 		gvinit();
@@ -214,6 +212,7 @@ va_dcl
 		msp -= mvs_size[MVST_TPHOLD];
 		if (msp <= stackwarn)
 		{
+			va_end(varlst);
 			if (msp <= stacktop)
 			{
 				msp = old_sp;
@@ -282,7 +281,10 @@ va_dcl
 	 * we no longer allocate the extra "sizeof(mident) * pres" effective V5. */
 	tf = (tp_frame *)(tp_sp -= sizeof(tp_frame));
 	if (tp_sp < tpstackwarn)
+	{
+		va_end(varlst);
 		rts_error(VARLSTCNT(1) tp_sp < tpstacktop ? ERR_TPSTACKOFLOW : ERR_TPSTACKCRIT);
+	}
 	tf->dlr_t = dollar_t;
 	tf->restart_pc = fp->mpc;
 	tf->restart_ctxt = fp->ctxt;
@@ -346,6 +348,7 @@ va_dcl
 				}
 			}
 		}
+		va_end(lvname);
 	}
 	else if (ALLLOCAL == prescnt)
 	{	/* Preserve all variables */
@@ -369,6 +372,7 @@ va_dcl
 			}
 		}
 	}
+	va_end(varlst);
 	/* Store existing state of locks */
 	for (pre_lock = mlk_pvt_root;  NULL != pre_lock;  pre_lock = pre_lock->next)
 	{

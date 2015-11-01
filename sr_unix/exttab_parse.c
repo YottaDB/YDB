@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,17 +13,10 @@
 
 #include "gtm_string.h"
 
-/* gcc/LinuxIA32 needs stdio before varargs until stdio.h removed from error.h */
-/* gcc/Linux390 needs varargs before stdio */
-#ifdef EARLY_VARARGS
-#include <varargs.h>
-#endif
+#include <stdarg.h>
 #include "gtm_stdio.h"
 #include <errno.h>
 #include "gtm_stdlib.h"
-#ifndef EARLY_VARARGS
-#include <varargs.h>
-#endif
 
 #include "gtm_ctype.h"
 #include "gtm_stat.h"
@@ -51,7 +44,7 @@ static  char	ext_source_line[MAX_SRC_LINE];
 static  char	*ext_table_file_name;
 static  bool	star_found;
 
-static  void 	ext_stx_error();
+static  void 	ext_stx_error(int in_error, ...);
 static 	int 	scan_array_bound(char **b,int curr_type);
 const static int parm_space_needed[] =
 {
@@ -675,20 +668,18 @@ callin_entry_list*	citab_parse (void)
 	return entry_ptr;
 }
 
-static void ext_stx_error(va_alist)
-va_dcl
+static void ext_stx_error(int in_error, ...)
 {
-	va_list	args, sav_arg;
+	va_list	args;
 	char	*ext_table_name;
 	char	buf[MAX_SRC_LINE], *b;
 	int	num_tabs, num_spaces;
-	int	in_error;
 	error_def(ERR_EXTSRCLIN);
 	error_def(ERR_EXTSRCLOC);
 
-	va_start(args);
-	in_error = va_arg(args, int);
+	va_start(args, in_error);
 	ext_table_name = va_arg(args, char *);
+	va_end(args);
 
 	num_tabs = ext_source_column/TABLEN;
 	num_spaces = ext_source_column%TABLEN;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,8 @@ typedef enum
 {
 	keep_going = 0,
 	give_up_before_create_tempfile,
-	give_up_after_create_tempfile
+	give_up_after_create_tempfile,
+	num_backup_proc_status
 } backup_proc_status;
 
 /* ATTN: the first four items in this structure need to be identical to those

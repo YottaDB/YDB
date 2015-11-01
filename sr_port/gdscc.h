@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,9 +61,7 @@ enum gds_t_mode
 	gds_t_writemap,
 	n_gds_t_op,		/* tp_tend() depends on this order of placement of n_gds_t_op */
 	kill_t_create,
-	kill_t_write,
-	kill_t_write_root,
-        kill_t_writemap
+	kill_t_write
 };
 
 typedef struct key_value_struct
@@ -137,7 +135,7 @@ typedef struct cw_set_element_struct
 							 * Whenever "cse->old_block" is reset, this needs to be reset too (except
 							 *	in the case of gds_t_create/gds_t_acquired).
 							 */
-	int4		filler;				/* 8-byte alignment filler */
+	enum gds_t_mode	old_mode;			/* saved copy of "cse->mode" before being reset to gds_t_committed */
 
 	/* The following two fields aid in rolling back the transactions. 'undo_next_off' holds the
 	 * original next_off in the blk buffer that would be if another nested transaction was not

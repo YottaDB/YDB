@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,15 +17,10 @@
 #include <descrip.h>	/* for GTM_ENV_TRANSLATE */
 #endif
 
-#ifdef EARLY_VARARGS
-#include <varargs.h>
-#endif
+#include <stdarg.h>
 #include "gtm_limits.h"	/*for GTM_ENV_TRANSLATE */
 
 #include "error.h"
-#ifndef EARLY_VARARGS
-#include <varargs.h>
-#endif
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -64,26 +59,24 @@
 GBLREF gd_addr		*gd_header;
 static mstr     	gtmgbldir_mstr;
 
-void	mlk_pvtblk_create (va_list subptr)
+void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 {
 	va_list		mp;
 	int		i, len;
 	int4		rlen;			/* Roundup each length to get clear len for mlk_shrsub */
 	unsigned char	*cp;
-	mval		*extgbl1, *extgbl2, *mp_temp, val_xlated;
-	int		subcnt;
+	mval		*extgbl2, *mp_temp, val_xlated;
 	mlk_pvtblk	*r;
 	gd_region	*reg;
 	sgmnt_addrs	*sa;
 	gd_addr		*gld;
 
 
-	/* Get count of mvals */
-	subcnt = va_arg(subptr, int);
+	/* Get count of mvals including extgbl1 */
 	assert (subcnt >= 2);
 
-	extgbl1 = va_arg(subptr, mval *); /* compiler gives us this argument always, even if the nref is not an extended ref */
 	subcnt--;
+	/* compiler gives us extgbl1 always, even if the nref is not an extended ref */
 	if (NULL == extgbl1)
 	{ /* not an extended reference */
 		if (!gd_header)
@@ -119,6 +112,7 @@ void	mlk_pvtblk_create (va_list subptr)
 		len += (mp_temp)->str.len;
 		rlen += ROUND_UP(((mp_temp)->str.len + 1), 4);
 	}
+	va_end(mp);
 
 /*
  * Allocate a buffer for all mval strings.
@@ -137,13 +131,14 @@ void	mlk_pvtblk_create (va_list subptr)
 		/* Copy all strings into the buffer one after another */
 	for (i = 0, VAR_COPY(mp, subptr);  i < subcnt;  i++)
 	{
-		mp_temp = va_arg( mp, mval *);
+		mp_temp = va_arg(mp, mval *);
 		MV_FORCE_STR(mp_temp);
 		len = (mp_temp)->str.len;
 		*cp++ = len;
 		memcpy(cp, (mp_temp)->str.addr, len);
 		cp += len;
 	}
+	va_end(mp);
 	r->region = reg;
 	sa = &FILE_INFO(r->region)->s_addrs;
 	r->ctlptr = (mlk_ctldata_ptr_t)sa->lock_addrs[0];

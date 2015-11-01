@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,8 @@
 #define _HEARTBEAT_TIMER_H
 
 /* define heartbeat interval */
-#define HEARTBEAT_INTERVAL 	8 * 1000 /* ms */
+#define HEARTBEAT_INTERVAL 			8 * 1000 /* ms */
+#define	NUM_HEARTBEATS_FOR_OLDERJNL_CHECK	8	/* gives a total of 8 * 8 = 64 seconds between checks of older jnl files */
 
 void heartbeat_timer(void);
 

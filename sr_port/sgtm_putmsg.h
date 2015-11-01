@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,9 +8,9 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-#ifndef __SGTM_PUTMSG_H__
-#define __SGTM_PUTMSG_H__
+#ifndef SGTM_PUTMSG_H
+#define SGTM_PUTMSG_H
 
-void		sgtm_putmsg();
+void		sgtm_putmsg(char *out_str, ...);
 
 #endif

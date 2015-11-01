@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,6 +67,7 @@ LITDEF nametabent svn_names[] = {
 	,{ 1,"X" }
 	,{ 1,"Y" }
 	,{ 2,"ZA" }
+	,{ 3,"ZAL*"}
 	,{ 2,"ZB" }
 	,{ 2,"ZC" }
 	,{ 3,"ZCM*" }
@@ -89,6 +90,7 @@ LITDEF nametabent svn_names[] = {
 	,{ 4,"ZPOS*" }
 	,{ 5,"ZPROC*" }
 	,{ 5,"ZPROM*" }
+	,{ 3,"ZRE*" }
 	,{ 3,"ZRO*" }
 	,{ 3,"ZSO*" }
 	,{ 2,"ZS" }, { 4,"ZSTA*" }
@@ -96,6 +98,7 @@ LITDEF nametabent svn_names[] = {
 	,{ 3,"ZSY*"}
 	,{ 3,"ZTE" }, { 6,"ZTEXIT"}
 	,{ 2,"ZT*" }
+	,{ 3,"ZUS*" }
 	,{ 2,"ZV*" }
 	,{ 4,"ZYER*" }
 };
@@ -104,7 +107,7 @@ LITDEF nametabent svn_names[] = {
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 71	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 74	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -130,6 +133,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_X, TRUE, ALL_SYS }
 	,{ SV_Y, TRUE, ALL_SYS }
 	,{ SV_ZA, FALSE, ALL_SYS }
+	,{ SV_ZALLOCSTOR, FALSE, ALL_SYS }
 	,{ SV_ZB, FALSE, ALL_SYS }
 	,{ SV_ZC, FALSE, ALL_SYS }
 	,{ SV_ZCMDLINE, FALSE, ALL_SYS }
@@ -152,6 +156,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZPOS, FALSE, ALL_SYS }
 	,{ SV_ZPROC, FALSE, ALL_SYS }
 	,{ SV_PROMPT, TRUE, ALL_SYS }
+	,{ SV_ZREALSTOR, FALSE, ALL_SYS }
 	,{ SV_ZROUTINES, TRUE, ALL_SYS }
 	,{ SV_ZSOURCE, TRUE, ALL_SYS }
 	,{ SV_ZSTATUS, TRUE, ALL_SYS },{ SV_ZSTATUS, TRUE, ALL_SYS }
@@ -159,6 +164,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZSYSTEM, FALSE, ALL_SYS }
 	,{ SV_ZTEXIT, TRUE, ALL_SYS }, { SV_ZTEXIT, TRUE, ALL_SYS }
 	,{ SV_ZTRAP, TRUE, ALL_SYS }
+	,{ SV_ZUSEDSTOR, FALSE, ALL_SYS }
 	,{ SV_ZVERSION, FALSE, ALL_SYS }
 	,{ SV_ZYERROR, TRUE, ALL_SYS }
 };

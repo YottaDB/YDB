@@ -42,3 +42,5 @@
 #define	GTM_WHITE_BOX_TEST_CASE_ENABLE	"$gtm_white_box_test_case_enable"
 #define	GTM_WHITE_BOX_TEST_CASE_NUMBER	"$gtm_white_box_test_case_number"
 #define	GTM_WHITE_BOX_TEST_CASE_COUNT	"$gtm_white_box_test_case_count"
+
+#define	GTM_DBFILEXT_SYSLOG_DISABLE	"$gtm_dbfilext_syslog_disable"

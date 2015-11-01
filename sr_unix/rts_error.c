@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,15 +11,8 @@
 
 #include "mdef.h"
 
-/* gcc/LinuxIA32 needs stdio.h before varargs until removed from error.h */
-/* gcc/Linux390 needs varargs before stdarg in stdio */
-#ifdef EARLY_VARARGS
-#include <varargs.h>
-#endif
+#include <stdarg.h>
 #include "gtm_stdio.h"
-#ifndef EARLY_VARARGS
-#include <varargs.h>
-#endif
 
 #include "gtm_putmsg_list.h"
 #include <errno.h>
@@ -40,11 +33,10 @@ GBLREF boolean_t	dont_want_core;
  * ----------------------------------------------------------------------------------------
  */
 
-int rts_error(va_alist)
-va_dcl
+int rts_error(int argcnt, ...)
 {
-	int 		argcnt, msgid;
-	va_list		var, varl;
+	int 		msgid;
+	va_list		var;
 
 	error_def(ERR_TPRETRY);
 	error_def(ERR_ASSERT);
@@ -57,10 +49,9 @@ va_dcl
 	if (-1 == gtm_errno)
 		gtm_errno = errno;
 
-	VAR_START(var);
-	VAR_COPY(varl, var);
-	argcnt = va_arg(varl, int);
-	msgid = va_arg(varl, int);
+	VAR_START(var, argcnt);
+	msgid = va_arg(var, int);
+	va_end(var);
 
 	if (ERR_TPRETRY == msgid)		/* This is simply a place holder msg to signal tp restart */
 	{
@@ -72,13 +63,15 @@ va_dcl
 		   polluted with messages that are going to be handled by a ZTRAP. If
 		   ZTRAP is not active, the message will be flushed out in mdb_condition_handler
 		   (which is usually the top level handler or is rolled over into by higher handlers. */
-		gtm_putmsg_list(var);
+		VAR_START(var, argcnt);		/* restart arg list */
+		gtm_putmsg_list(argcnt, var);
+		va_end(var);
 		if (DUMPABLE)
 			created_core = dont_want_core = FALSE;		/* We can create a(nother) core now */
 
 	}
 
-	DRIVECH(var);				/* Drive the topmost (inactive) condition handler */
+	DRIVECH(msgid);				/* Drive the topmost (inactive) condition handler */
 
 	/* Note -- at one time there was code here to catch if we returned from the condition handlers
 	   when the severity was error or above. That code had to be removed because of several errors

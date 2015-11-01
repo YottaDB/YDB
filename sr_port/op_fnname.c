@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <stdarg.h>
 #include "gtm_string.h"
 
 #include "gdsroot.h"
@@ -23,7 +24,6 @@
 #include "rtnhdr.h"
 #include "mv_stent.h"
 #include "fnname.h"
-#include <varargs.h>
 #include "op.h"
 #include "gvsub2str.h"
 #include "mvalconv.h"
@@ -75,12 +75,12 @@ GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 		dst->str.len++;								\
 	}
 
-void op_fnname(va_alist)
-va_dcl
+void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 {
 	int		space_needed;
-	int 		sub_count, depth_count, fnname_type;
-	mval		*dst, *arg, *finaldst, *depth;
+	int 		depth_count, fnname_type;
+	mval		*dst, *arg, *depth;
+	VMS_ONLY(int	sub_count;)
 	mstr		format_out;
 	va_list		var;
 	unsigned char	*sptr, *key_ptr, *key_top;
@@ -94,16 +94,19 @@ va_dcl
 	/* Implementation note: $NAME does not edit check the result, such as if the key size exceeds the maximum for a global.
 	 * So, the result if used in other operations (such as SET, KILL) may generate run time errors (GVSUBOFLOW, etc) */
 
-	VAR_START(var);
-	sub_count = va_arg(var, int);
-	finaldst = va_arg(var, mval *);
+	VAR_START(var, finaldst);
+	VMS_ONLY(va_count(sub_count);)
+	assert(3 <= sub_count);
 	fnname_type = va_arg(var, int);
 	depth = va_arg(var, mval *); /* if second arg to $NAME not specified, compiler sets depth_count to MAXPOSINT4 */
 	depth_count = MV_FORCE_INT(depth);
 	sub_count -=3;
 
 	if (depth_count < 0)
+	{
+		va_end(var);
 		rts_error(VARLSTCNT(1) ERR_FNNAMENEG);
+	}
 
 	/* Note about garbage collection : *dst and all possible *arg's in this function are anchored in the stringpool chains
 	 * and preserved during garbage collection (run time argument mvals provided by compiler). So, if we maintain dst->str.len
@@ -123,7 +126,10 @@ va_dcl
 	if (fnname_type == FNNAKGBL)
 	{
 		if (!gv_currkey || gv_currkey->prev == 0)
+		{
+			va_end(var);
 			rts_error(VARLSTCNT(1) ERR_GVNAKED);
+		}
 		/* Reserve enough space for naked reference. Include space for ^() and a maximum of sub_count ',' separators for
 		 * subscripts specified as arguments to $NAME() in addition to those in the naked reference */
 		space_needed = (STR_LIT_LEN("^()") + MAX_ZWR_INFLATION * MAX_KEY_SZ + sub_count);
@@ -228,6 +234,7 @@ va_dcl
 			dst->str.len++;
 		}
 	}
+	va_end(var);
 	if (MAX_STRLEN < dst->str.len)
 		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 	*finaldst = *dst;

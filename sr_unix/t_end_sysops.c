@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -260,7 +260,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 	error_def(ERR_TEXT);
 
 	INCR_DB_CSH_COUNTER(cs_addrs, n_bg_updates, 1);
-	assert((0 <= cs->blk) && (cs->blk <= cs_addrs->ti->total_blks));
+	assert((0 <= cs->blk) && (cs->blk < cs_addrs->ti->total_blks));
 	db_addr[0] = cs_addrs->acc_meth.mm.base_addr + (sm_off_t)cs_data->blk_size * (cs->blk);
 
 #if (!defined(UNTARGETED_MSYNC))
@@ -586,7 +586,7 @@ enum cdb_sc	bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 	cnl = csa->nl;
 	assert(csd == cs_data);
 	assert(csa->now_crit);
-	assert((0 < dollar_tlevel) || (cs->blk <= csa->ti->total_blks));
+	assert((0 < dollar_tlevel) || (cs->blk < csa->ti->total_blks));
 	assert(0 <= cs->blk);
 	INCR_DB_CSH_COUNTER(csa, n_bg_updates, 1);
 	bt = bt_put(gv_cur_region, cs->blk);
@@ -874,7 +874,7 @@ enum cdb_sc	bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 		cr->dirty = ctn;		/* block will be dirty.	 Note the tn in which this occurred */
 	blk_ptr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
 	assert(!read_before_image || (NULL == cs->old_block) || (blk_ptr == cs->old_block));
-	assert((0 <= cs->blk) && (cs->blk <= csa->ti->total_blks));
+	assert((0 <= cs->blk) && (cs->blk < csa->ti->total_blks));
 	/* check for online backup - ATTN: this part of code should be same as that in mm_update, except for the blk_ptr part. */
 	if ((cs->blk >= cnl->nbb)
 	    && (NULL != cs->old_block)
@@ -925,8 +925,7 @@ enum cdb_sc	bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 				cs->first_copy = TRUE;
 			gvcst_blk_build(cs, blk_ptr, effective_tn);
 		} else
-		{
-			/* It has been built; Update tn in the block and copy from private memory to shared space */
+		{	/* It has been built; Update tn in the block and copy from private memory to shared space */
 			/* It's actually dse_chng_bhead which needs dse_running flag, it's ok for now */
 			assert(write_after_image || 0 < dollar_tlevel);
 			assert(dse_running || ctn == effective_tn);

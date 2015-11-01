@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include <varargs.h>
+#include <stdarg.h>
 
 #include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
@@ -28,26 +28,23 @@ GBLREF collseq		*local_collseq;
 GBLREF bool		undef_inhibit;
 LITREF mval		literal_null ;
 
-lv_val	*op_getindx(va_alist)
-va_dcl
+lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 {
 	mval			tmp_sbs;
 	int			cur_subscr;
 	int                     length;
 	error_def(ERR_UNDEF);
-	va_list			var, keyptr;
-	int			argcnt;
-	lv_val			*start;
+	va_list			var;
+	VMS_ONLY(int		argcnt;)
 	int4			temp;
 	lv_sbs_tbl     		*tbl;
-	lv_val	       		*lv;
+	lv_val			*lv;
        	sbs_search_status      	status;
 	mval			*key;
 	int			arg1;
 
-	VAR_START(var);
-	argcnt = va_arg(var, int4);
-	start = va_arg(var, lv_val *);
+	VAR_START(var, start);
+	VMS_ONLY(va_count(argcnt);)
 
 	if (local_collseq)
 	{
@@ -56,7 +53,6 @@ va_dcl
 
 	lv = start;
 	arg1 = --argcnt;
-	VAR_COPY(keyptr, var);
 	cur_subscr = 1;
 	while (lv  &&  argcnt-- > 0)
 	{
@@ -106,6 +102,7 @@ va_dcl
 			}
 		}
 	}
+	va_end(var);
 	if (!lv  ||  !MV_DEFINED(&lv->v))
 	{
 		if (undef_inhibit)
@@ -114,7 +111,9 @@ va_dcl
 		{
 			unsigned char	buff[512], *end;
 
-			end = undx(start, keyptr, arg1, buff, sizeof(buff));
+			VAR_START(var, start);
+			end = undx(start, var, arg1, buff, sizeof(buff));
+			va_end(var);
 			rts_error(VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
 		}
 	}

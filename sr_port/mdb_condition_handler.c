@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@
 #include "outofband.h"
 #include "stack_frame.h"
 #include "stringpool.h"
-#include "hashtab_int4.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "tp_frame.h"
@@ -126,9 +126,11 @@ GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to 
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 GBLREF	boolean_t		in_gvcst_incr;
 
-#define GTMFATAL_ERROR_DUMP_FILENAME "GTM_FATAL_ERROR"
+#define	RUNTIME_ERROR_STR		"Following runtime error"
+#define GTMFATAL_ERROR_DUMP_FILENAME	"GTM_FATAL_ERROR"
+
 static readonly mval gtmfatal_error_filename = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(GTMFATAL_ERROR_DUMP_FILENAME) - 1,
-							 GTMFATAL_ERROR_DUMP_FILENAME, 0, 0);
+							 		GTMFATAL_ERROR_DUMP_FILENAME, 0, 0);
 
 boolean_t clean_mum_tstart(void);
 
@@ -309,11 +311,18 @@ CONDITION_HANDLER(mdb_condition_handler)
 
 		/* If we are about to core/exit on a stack over flow, only do the core part if a debug
 		   flag requests this behaviour. Otherwise, supress the core and just exit.
+		   2006-03-07 se: If a stack overflow occurs on VMS, it has happened that the stack is no
+		   longer well formed so attempting to unwind it as it does in MUMPS_EXIT causes things
+		   to really become screwed up. For this reason, this niceness of avoiding a dump on a
+		   stack overflow on VMS is being disabled. The dump can be controlled wih set proc/dump
+		   (or not) as desired.
 		*/
+#ifndef VMS
 		if ((int)ERR_STACKOFLOW == SIGNAL && !(GDL_DumpOnStackOFlow & gtmDebugLevel))
 		{
 			MUMPS_EXIT;	/* Do a clean exit rather than messy core exit */
 		}
+#endif
 		gtm_dump();
 		TERMINATE;
 	}
@@ -350,7 +359,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 			assert(CDB_STAGNATE == t_tries);
 			t_tries = CDB_STAGNATE - 1;
 			getzposition(&zpos);
-			send_msg(VARLSTCNT(4) ERR_TPNOTACID, 2, zpos.str.len, zpos.str.addr);
+			send_msg(VARLSTCNT(8) ERR_TPNOTACID, 4, LEN_AND_LIT(RUNTIME_ERROR_STR), zpos.str.len, zpos.str.addr,
+						SIGNAL, 0);
 		}
 		ENABLE_AST
 		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))

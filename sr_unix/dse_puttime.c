@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,6 @@
 /*	display uint4 *, representing a time value in millisec */
 void dse_puttime(int_ptr_t time, char *c, bool flush)
 {
-	void	util_out_print();
 	char 	outbuf[TIME_SIZE * 4];		/* Leave room for unexpected values */
 
 	SPRINTF(outbuf,"%2.2d:%02.2d:%02.2d:%02.2d", *time / 3600000,

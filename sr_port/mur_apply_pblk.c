@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@
 #include "mur_read_file.h"
 #include "iosp.h"
 #include "gtmmsg.h"
+#include "send_msg.h"
 #include "dbfilop.h"
 #include "gds_blk_downgrade.h"
 
@@ -53,6 +54,7 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 	inctn_opcode_t		opcode;
 	struct_jrec_inctn	*inctn_rec;
 	enum jnl_record_type 	rectype;
+	int			save_errno;
 
         UNIX_ONLY(unix_db_info   *udi;)
 
@@ -63,6 +65,7 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 	error_def(ERR_MUINFOUINT4);
 	error_def(ERR_MUINFOUINT8);
 	error_def(ERR_MUINFOSTR);
+	error_def(ERR_DBFSYNCERR);								\
 
 	murgbl.db_updated = TRUE;
 	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
@@ -277,7 +280,13 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 		UNIX_ONLY(
 			gv_cur_region = rctl->csa->region;
 			udi = FILE_INFO(gv_cur_region);
-			DB_FSYNC(gv_cur_region, udi, rctl->csa, db_fsync_in_prog);
+			DB_FSYNC(gv_cur_region, udi, rctl->csa, db_fsync_in_prog, save_errno);
+			if (0 != save_errno)
+			{
+				send_msg(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
+				gtm_putmsg(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
+				return ERR_DBFSYNCERR;
+			}
 		)
 	}
 	return SS_NORMAL;

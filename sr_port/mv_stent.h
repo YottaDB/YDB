@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,8 @@ typedef struct
 typedef struct
 {
 	int		saved_dollar_truth;
-	mval		savtarg;
+	mval		savtarg;	/* Current gv_currkey */
+	mstr		savextref;	/* Current extended reference name component (if any) */
 } mvs_zintr_struct;
 
 typedef struct mv_stent_struct

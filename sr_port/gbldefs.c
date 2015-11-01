@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -111,6 +111,7 @@
 #endif
 
 #include "gds_blk_upgrade.h"	/* for UPGRADE_IF_NEEDED flag */
+#include "cws_insert.h"		/* for CWS_REORG_ARRAYSIZE */
 
 #define DEFAULT_ZERROR_STR	"Unprocessed $ZERROR, see $ZSTATUS"
 #define DEFAULT_ZERROR_LEN	(sizeof(DEFAULT_ZERROR_STR) - 1)
@@ -295,7 +296,7 @@ GBLDEF	char		**cmd_arg;
 GBLDEF	fnpc_area	fnpca;			/* $piece cache structure area */
 #endif
 
-#ifdef MUTEX_MSEM_WAKE
+#ifdef UNIX
 GBLDEF	volatile uint4	heartbeat_counter = 0;
 #endif
 
@@ -330,7 +331,8 @@ GBLDEF	void			(*tp_timeout_action_ptr)(void) = tp_timeout_action_dummy;
 GBLDEF	void			(*ctrlc_handler_ptr)() = ctrlc_handler_dummy;
 GBLDEF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace) = op_open_dummy;
 GBLDEF	void			(*unw_prof_frame_ptr)(void) = unw_prof_frame_dummy;
-GBLDEF	boolean_t		mu_reorg_process = FALSE;
+GBLDEF	boolean_t		mu_reorg_process = FALSE;	/* set to TRUE by MUPIP REORG */
+GBLDEF	boolean_t		mu_reorg_in_swap_blk = FALSE;	/* set to TRUE for the duration of the call to "mu_swap_blk" */
 GBLDEF	boolean_t		mu_rndwn_process = FALSE;
 GBLDEF	gv_key			*gv_currkey_next_reorg;
 GBLDEF	gv_namehead		*reorg_gv_target;
@@ -791,3 +793,9 @@ GBLDEF	boolean_t	disk_blk_read;
 #ifdef UNIX
 GBLDEF	uint4		gtm_principal_editing_defaults;	/* ext_cap flags if tt */
 #endif
+
+GBLDEF	boolean_t	gtm_dbfilext_syslog_disable = FALSE;	/* by default, log every file extension message */
+
+GBLDEF	int4		cws_reorg_remove_index;			/* see mu_swap_blk.c for comments on the need for these two */
+GBLDEF	block_id	cws_reorg_remove_array[CWS_REORG_REMOVE_ARRAYSIZE];
+

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,15 +11,8 @@
 
 #include "mdef.h"
 
-/* LinuxIA32/gcc needs stdio before varargs due to stdarg */
-/* Linux390/gcc needs varargs first */
-#ifdef EARLY_VARARGS
-#include <varargs.h>
+#include <stdarg.h>
 #include "gtm_stdio.h"
-#else
-#include "gtm_stdio.h"
-#include <varargs.h>
-#endif
 
 #include <sys/wait.h>
 #include <errno.h>
@@ -71,11 +64,10 @@ void	job_timer_handler(void)
  * Job command main entry point
  * ---------------------------------------------------
  */
-int	op_job(va_alist)
-va_dcl
+int	op_job(int4 argcnt, ...)
 {
-	va_list		var, save;
-	int4		argcnt, i;
+	va_list		var;
+	int4		i;
 	mval		*label, *inp;
 	int4		offset;
 	mval		*routine, *param_buf;
@@ -100,8 +92,7 @@ va_dcl
 	error_def(ERR_TEXT);
 	error_def(ERR_JOBFAIL);
 
-	VAR_START(var);
-	argcnt = va_arg(var, int4);
+	VAR_START(var, argcnt);
 	assert(argcnt >= 5);
 	label = va_arg(var, mval *);
 	offset = va_arg(var, int4);
@@ -117,6 +108,7 @@ va_dcl
 	OPEN_PIPE(pipe_fds, pipe_status);
 	if (-1 == pipe_status)
 	{
+		va_end(var);
 		rts_error(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Error creating pipe"), errno);
 	}
 	jobcnt++;
@@ -165,6 +157,7 @@ va_dcl
 		jp->next = 0;
 	} else
 		job_params.parms = 0;
+	va_end(var);
 
 	assert(joberr_tryagain + 1 == joberr_end);	/* they must be adjacent and the last two */
 	assert((joberr_tryagain * 2 - 1) < MAX_CHAR_CAPACITY);

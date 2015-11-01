@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -269,6 +269,11 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 			grab_crit(gv_cur_region);
 			status = EXIT_NRM;
+			access_new = (n_dba == access ? cs_data->acc_meth : access);
+							/* recalculate; n_dba is a proxy for no change */
+			change_fhead_timer("FLUSH_TIME", cs_data->flush_time,
+					   (dba_bg == access_new ? TIM_FLU_MOD_BG : TIM_FLU_MOD_MM),
+					   FALSE);
 			if (GDSVLAST != desired_dbver)
 			{
 				status1 = desired_db_format_set(gv_cur_region, desired_dbver, command);
@@ -341,8 +346,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			access_new = (n_dba == access ? csd->acc_meth : access);
 							/* recalculate; n_dba is a proxy for no change */
 			change_fhead_timer("FLUSH_TIME", csd->flush_time,
-					(dba_bg == access_new ? TIM_FLU_MOD_BG : TIM_FLU_MOD_MM),
-					FALSE);
+					   (dba_bg == access_new ? TIM_FLU_MOD_BG : TIM_FLU_MOD_MM),
+					   FALSE);
 			if ((n_dba != access) && (csd->acc_meth != access))	/* n_dba is a proxy for no change */
 			{
 				if (dba_mm == access)

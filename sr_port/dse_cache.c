@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -108,9 +108,9 @@ void dse_cache(void)
 								: RECOVER_DONE);
 		} else if (offset_present)
 		{
-			if (reg->sec_size < (offset + size))
+			if ((reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE)) < (offset + size))
 				util_out_print("Region !12AD : Error: offset + size is greater than region's max_offset = 0x!XL",
-						TRUE, REG_LEN_STR(reg), reg->sec_size);
+						TRUE, REG_LEN_STR(reg), (reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE)));
 			else
 			{
 				chng_ptr = (sm_uc_ptr_t)csa->db_addrs[0] + offset;
@@ -192,7 +192,7 @@ void dse_cache(void)
 			util_out_print("Region !AD :  bt_record          = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_base), sizeof(bt_rec), csa->hdr->n_bts);
 			util_out_print("Region !AD :  shared_memory_size = 0x!XL",
-					TRUE, REG_LEN_STR(reg), reg->sec_size VMS_ONLY(* DISK_BLOCK_SIZE));
+					TRUE, REG_LEN_STR(reg), reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
 		}
 		if (!was_crit && !nocrit_present)
 			rel_crit(reg);

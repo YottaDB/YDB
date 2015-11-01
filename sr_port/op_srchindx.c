@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,7 @@
 #include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "sbs_blk.h"
-#include <varargs.h>
+#include <stdarg.h>
 #include "collseq.h"
 #include "stringpool.h"
 #include "do_xform.h"
@@ -23,23 +23,21 @@ GBLREF collseq		*local_collseq;
 
 #define IS_INTEGER 0
 
-lv_val	*op_srchindx(va_alist)
-va_dcl
+lv_val	*op_srchindx(UNIX_ONLY_COMMA(int argcnt_arg) lv_val *lv, ...)
 {
 	int			cur_subscr;
 	int                     length;
 	mval                    tmp_sbs;
 	va_list			var;
-	int			argcnt;
 	int4			temp;
 	lv_sbs_tbl     		*tbl;
-	lv_val	       		*lv;
+	int			argcnt;
        	sbs_search_status      	status;
 	mval			*key;
 
-	VAR_START(var);
-	argcnt = va_arg(var, int4);
-	lv = va_arg(var, lv_val *);
+	VAR_START(var, lv);
+	VMS_ONLY(va_count(argcnt);)
+	UNIX_ONLY(argcnt = argcnt_arg;)		/* need to preserve stack copy for i386 */
 
 	cur_subscr = 0;
 	while (lv && --argcnt > 0)
@@ -91,5 +89,6 @@ va_dcl
 			}
 		}
 	}
+	va_end(var);
 	return lv;
 }

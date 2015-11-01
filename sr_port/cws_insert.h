@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,17 +34,38 @@ GBLREF	boolean_t	cw_stagnate_reinitialized;
  *				it is initially NULL
  *	CWS_INITIAL_SIZE	is the initial size of the hash table
  *				table is enlarged each time it fills up
- * The hashtable is allocated the first time this routine is
- * called, and the contents of it are reset by calling cws_reset
- * in t_begin, t_begin_crit and tp_hist. The hashtable expands
- * by itself
+ * The hashtable is allocated the first time this routine is* called, and the contents of it are reset by calling cws_reset
+ * in t_begin, t_begin_crit and tp_hist. The hashtable expands by itself.
  */
 
-#define CWS_INSERT(block)							\
-{										\
-	ht_ent_int4	*dummy;							\
-	cw_stagnate_reinitialized = FALSE;					\
-	add_hashtab_int4(&cw_stagnate, (uint4 *)(&block), HT_VALUE_DUMMY, &dummy);\
+GBLREF	boolean_t	mu_reorg_in_swap_blk;
+GBLREF	int4		cws_reorg_remove_index;
+GBLREF	block_id	cws_reorg_remove_array[];
+
+#define CWS_INSERT(block)									\
+{												\
+	ht_ent_int4		*dummy;								\
+	boolean_t		new_entry;							\
+												\
+	cw_stagnate_reinitialized = FALSE;							\
+	new_entry = add_hashtab_int4(&cw_stagnate, (uint4 *)(&block), HT_VALUE_DUMMY, &dummy);	\
+	/* If in mu_swap_blk and a new entry was added to the hashtable, note this block number	\
+	 * in the cws_reorg_remove_array for later removal in the next iteration of the for 	\
+	 * loop in "mu_swap_blk" (see mu_swap_blk.c for more detail).				\
+	 */											\
+	if (mu_reorg_in_swap_blk && new_entry)							\
+	{											\
+		CWS_REORG_INSERT(block);							\
+	}											\
+}
+
+#define	CWS_REORG_REMOVE_ARRAYSIZE	((4 * MAX_BT_DEPTH) + 2)	/* see mu_swap_blk.c for detail on this calculation */
+#define	CWS_REORG_REMOVE_MAXINDEX	(CWS_REORG_REMOVE_ARRAYSIZE - 1)
+
+#define	CWS_REORG_INSERT(blk)						\
+{									\
+	assert(cws_reorg_remove_index < CWS_REORG_REMOVE_MAXINDEX);	\
+	cws_reorg_remove_array[++cws_reorg_remove_index] = (blk);	\
 }
 
 /* the use of the variable cw_stagnate_reinitialized to optimize CWS_RESET assumes that all calls to

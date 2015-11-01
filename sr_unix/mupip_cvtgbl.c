@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,11 @@
 #include "gtm_string.h"
 #include "gtm_stdlib.h"		/* for exit() */
 
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
 #include "stp_parms.h"
 #include "iosp.h"
 #include "cli.h"
@@ -25,24 +30,26 @@
 #include "load.h"
 #include "mu_outofband_setup.h"
 
-#define MAX_FILLFACTOR 100
-#define MIN_FILLFACTOR 30
-
-GBLREF int		gv_fillfactor;
-GBLREF bool		mupip_error_occurred;
-GBLREF boolean_t	is_replicator;
+GBLREF	int		gv_fillfactor;
+GBLREF	bool		mupip_error_occurred;
+GBLREF	boolean_t	is_replicator;
 
 void mupip_cvtgbl(void)
 {
 	unsigned short	fn_len, len;
 	char		fn[256];
 	unsigned char	buff[7];
-	int4		begin, end;
+	uint4		begin, end;
 	int		i, format;
 	uint4	        cli_status;
+	gtm_int64_t	begin_i8, end_i8;
 
 	error_def(ERR_MUPCLIERR);
 	error_def(ERR_LOADEDBG);
+	error_def(ERR_LOADBGSZ);
+	error_def(ERR_LOADBGSZ2);
+	error_def(ERR_LOADEDSZ);
+	error_def(ERR_LOADEDSZ2);
 
 	is_replicator = TRUE;
 	fn_len = 256;
@@ -54,35 +61,41 @@ void mupip_cvtgbl(void)
 	mu_outofband_setup();
 	if ((cli_status = cli_present("BEGIN")) == CLI_PRESENT)
 	{
-	        if (!cli_get_int("BEGIN", &begin))
+	        if (!cli_get_int64("BEGIN", &begin_i8))
 			mupip_exit(ERR_MUPCLIERR);
-		if ( begin < 1)
-			begin = 1;
+		if (1 > begin_i8)
+			mupip_exit(ERR_LOADBGSZ);
+		else if (MAXUINT4 < begin_i8)
+			mupip_exit(ERR_LOADBGSZ2);
+		begin = begin_i8;
+	} else
+	{
+		begin = 1;
+		begin_i8 = 1;
 	}
-	else
-		begin = 0;
 	if ((cli_status = cli_present("END")) == CLI_PRESENT)
 	{
-	        if (!cli_get_int("END", &end))
+	        if (!cli_get_int64("END", &end_i8))
 			mupip_exit(ERR_MUPCLIERR);
-		if ( end < 1)
-			end = 1;
-		if (end < begin)
+		if (1 > end_i8)
+			mupip_exit(ERR_LOADEDSZ);
+		else if (MAXUINT4 < end_i8)
+			mupip_exit(ERR_LOADEDSZ2);
+		if (end_i8 < begin_i8)
 			mupip_exit(ERR_LOADEDBG);
-	}
-	else
-		end = 999999999;
+		end = end_i8;
+	} else
+		end = MAXUINT4;
 	if ((cli_status = cli_present("FILL_FACTOR")) == CLI_PRESENT)
 	{
 		assert(sizeof(gv_fillfactor) == sizeof(int4));
 	        if (!cli_get_int("FILL_FACTOR", (int4 *)&gv_fillfactor))
 			gv_fillfactor = MAX_FILLFACTOR;
-		if ( gv_fillfactor < MIN_FILLFACTOR)
+		if (gv_fillfactor < MIN_FILLFACTOR)
 			gv_fillfactor = MIN_FILLFACTOR;
 		else if (gv_fillfactor > MAX_FILLFACTOR)
 			gv_fillfactor = MAX_FILLFACTOR;
-	}
-	else
+	} else
 		gv_fillfactor = MAX_FILLFACTOR;
 
 	if (cli_present("FORMAT") == CLI_PRESENT)
@@ -107,8 +120,7 @@ void mupip_cvtgbl(void)
 				mupip_exit(ERR_MUPCLIERR);
 			}
 		}
-	}
-	else
+	} else
 		go_load(begin, end);
 
 	if (mupip_error_occurred)

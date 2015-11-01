@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -115,6 +115,8 @@ struct CLB
 	struct clb_stat_struct stt;
 };
 
+typedef struct CLB clb_struct;
+
 struct NTD
 {
 	que_ent		cqh;		/* queue of open CLB's */
@@ -172,9 +174,10 @@ struct NTD
 #define CMI_TCP_PREFIX_LEN	2
 
 #define ALIGN_QUAD	/**/
+
+void cmi_dprint(char *cs, ...);
 #ifdef DEBUG
 GBLREF int cmi_debug_enabled;
-void cmi_dprint();
 #define CMI_DPRINT(x) if (cmi_debug_enabled) cmi_dprint x; else;
 #else
 #define CMI_DPRINT(x) /**/

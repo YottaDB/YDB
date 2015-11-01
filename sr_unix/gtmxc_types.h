@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@ typedef xc_string_t	gtm_string_t;
 typedef xc_pointertofunc_t	gtm_pointertofunc_t;
 
 /* call-in interface */
-xc_status_t 	gtm_ci();
+xc_status_t 	gtm_ci(const char *c_rtn_name, ...);
 xc_status_t 	gtm_init(void);
 xc_status_t 	gtm_exit(void);
 void 		gtm_zstatus(char* msg, int len);

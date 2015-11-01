@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,6 +70,7 @@
 #include "memcoherency.h"
 #include "jnl_get_checksum.h"
 #include "wbox_test_init.h"
+#include "cert_blk.h"
 
 GBLREF	short			dollar_tlevel;
 GBLREF	gd_region		*gv_cur_region;
@@ -96,6 +97,8 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	int4			tprestart_syslog_delta;
 GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
+GBLREF	bool			certify_all_blocks;
+GBLREF	gv_namehead		*gv_target;
 
 boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse);
 enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse);
@@ -259,6 +262,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 					t_fail_hist[t_tries] = status;
 					SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(tmpcsa, status);
 					TP_RETRY_ACCOUNTING(tmpcsa, tmpcsa->hdr, status);
+					TP_CHANGE_REG_IF_NEEDED(tmpsi->gv_cur_region);	/* needed by TP_TRACE_HIST */
 					TP_TRACE_HIST(CR_BLKEMPTY, NULL);
 					return FALSE;
 				}
@@ -392,6 +396,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 		assert(cdb_sc_normal == status);
 		for (t1 = si->first_tp_hist;  t1 != si->last_tp_hist; t1++)
 		{
+			assert(NULL != t1->blk_target);
 			if (is_mm)
 			{	/* the check below is different from the one for BG (i.e. doesn't have the killtn check)
 				 * because there is no BT equivalent in MM. there is a mmblk_rec which is more or
@@ -409,7 +414,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 						status = cdb_sc_blkmod;
 						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
 						TP_RETRY_ACCOUNTING(csa, csd, status);
-						TP_TRACE_HIST(t1->blk_num, tp_get_target(t1->buffaddr));
+						TP_TRACE_HIST(t1->blk_num, t1->blk_target);
 						DEBUG_ONLY(continue;)
 						PRO_ONLY(goto failed;)
 					}
@@ -419,7 +424,6 @@ boolean_t	tp_tend(boolean_t crit_only)
 				bt = bt_get(t1->blk_num);
 				if (NULL != bt)
 				{
-					assert(t1->blk_target);
 					if (t1->tn <= bt->tn)
 					{
 						cse = t1->ptr;
@@ -473,7 +477,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 							status = cdb_sc_blkmod;
 							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
 							TP_RETRY_ACCOUNTING(csa, csd, status);
-							TP_TRACE_HIST_MOD(t1->blk_num, tp_get_target(t1->buffaddr),
+							TP_TRACE_HIST_MOD(t1->blk_num, t1->blk_target,
 									tp_blkmod_tp_tend, csd, t1->tn, bt->tn, t1->level);
 							DEBUG_ONLY(continue;)
 							PRO_ONLY(goto failed;)
@@ -485,14 +489,15 @@ boolean_t	tp_tend(boolean_t crit_only)
 					status = cdb_sc_losthist;
 					SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
 					TP_RETRY_ACCOUNTING(csa, csd, status);
-					TP_TRACE_HIST(t1->blk_num, tp_get_target(t1->buffaddr));
+					TP_TRACE_HIST(t1->blk_num, t1->blk_target);
 					DEBUG_ONLY(continue;)
 					PRO_ONLY(goto failed;)
 				}
 				assert(CYCLE_PVT_COPY != t1->cycle);
 				if (t1->ptr)
-				{	/* do cycle check only if blk has cse and hasn't been built or if we have BI journaling
-					 * or online backup is currently running. The before-image-journaling/online-backup check
+				{	/* do cycle check only if blk has cse and hasn't been built (if it has, then tp_hist
+					 * would have done the cdb_sc_lostcr check soon after it got built) or if we have BI
+					 * journaling or online backup is currently running. The BI-journaling/online-backup check
 					 * is to ensure that the before-image/pre-update-copy we write hasn't been recycled.
 					 */
 					if ((NULL == bt) || (CR_NOTVALID == bt->cache_index))
@@ -508,7 +513,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 							status = cdb_sc_crbtmismatch;
 							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
 							TP_RETRY_ACCOUNTING(csa, csd, status);
-							TP_TRACE_HIST(t1->blk_num, tp_get_target(t1->buffaddr));
+							TP_TRACE_HIST(t1->blk_num, t1->blk_target);
 							goto failed;
 						}
 					}
@@ -519,7 +524,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 						status = cdb_sc_cacheprob;
 						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
 						TP_RETRY_ACCOUNTING(csa, csd, status);
-						TP_TRACE_HIST(t1->blk_num, tp_get_target(t1->buffaddr));
+						TP_TRACE_HIST(t1->blk_num, t1->blk_target);
 						goto failed;
 					}
 					assert(si->update_trans);	/* ensure read_before_image was computed above */
@@ -536,14 +541,14 @@ boolean_t	tp_tend(boolean_t crit_only)
 								status = cdb_sc_crbtmismatch;
 								SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
 								TP_RETRY_ACCOUNTING(csa, csd, status);
-								TP_TRACE_HIST(t1->blk_num, tp_get_target(t1->buffaddr));
+								TP_TRACE_HIST(t1->blk_num, t1->blk_target);
 								goto failed;
 							}
 							assert(CDB_STAGNATE > t_tries);
 							status = cdb_sc_lostcr;
 							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
 							TP_RETRY_ACCOUNTING(csa, csd, status);
-							TP_TRACE_HIST(t1->blk_num, NULL == cr ? NULL : tp_get_target(t1->buffaddr));
+							TP_TRACE_HIST(t1->blk_num, t1->blk_target);
 							DEBUG_ONLY(continue;)
 							PRO_ONLY(goto failed;)
 						}
@@ -743,15 +748,17 @@ boolean_t	tp_tend(boolean_t crit_only)
 					assert(FALSE == cr->in_cw_set);
 					cr->in_cw_set = TRUE;
 					cr->refer = TRUE;
-					cse->cr = cr;
-					cse->cycle = cr->cycle;
 					cse->ondsk_blkver = cr->ondsk_blkver;
-					if (cse->old_block != (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr))
-					{
+					if ((cse->cr != cr) || (cse->cycle != cr->cycle))
+					{	/* Global buffer containing "cse->blk" changed since we read it out of crit */
+						cse->cr = cr;
+						cse->cycle = cr->cycle;
 						cse->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
-						old_block = (blk_hdr_ptr_t)cse->old_block;
 						if (NULL != jbp)
-						{
+						{	/* PBLK checksum was computed outside-of-crit when block was read but
+							 * block has relocated in the cache since then. Recompute the checksum.
+							 */
+							old_block = (blk_hdr_ptr_t)cse->old_block;
 							assert(old_block->bsiz <= csd->blk_size);
 							if (old_block->tn < jbp->epoch_tn)
 								cse->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED,
@@ -901,8 +908,6 @@ boolean_t	tp_tend(boolean_t crit_only)
 					assert((n_gds_t_op != cse->mode) && (gds_t_committed != cse->mode));
 					assert(n_gds_t_op < kill_t_create);
 					assert(n_gds_t_op < kill_t_write);
-					assert(n_gds_t_op < kill_t_write_root);
-					assert(n_gds_t_op < kill_t_writemap);
 					if (n_gds_t_op <= cse->mode)
 						continue;
 					if ((NULL != old_block) && (old_block->tn < jbp->epoch_tn))
@@ -999,8 +1004,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 				assert((n_gds_t_op != cse->mode) && (gds_t_committed != cse->mode));
 				assert(n_gds_t_op < kill_t_create);
 				assert(n_gds_t_op < kill_t_write);
-				assert(n_gds_t_op < kill_t_write_root);
-				assert(n_gds_t_op < kill_t_writemap);
+				cse->old_mode = cse->mode;	/* note down before being reset to gds_t_committed */
 				if (n_gds_t_op > cse->mode)
 				{
 					if (csd->dsid && !tp_kill_bitmaps && (0 == cse->level))
@@ -1018,6 +1022,14 @@ boolean_t	tp_tend(boolean_t crit_only)
 						status = cdb_sc_normal;	/* reset status to normal as transaction is complete */
 						goto skip_failed;	/* do not do "failed:" processing as we do not hold crit */
 					}
+				} else if (!cse->done)
+				{	/* This is a block that is needed in the 2nd-phase of KILL. Build a private copy
+					 * right now while we hold crit and the update array points to validated buffer contents.
+					 */
+					gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, 0);
+					cse->done = TRUE;
+					assert(NULL != cse->blk_target);
+					CERT_BLK_IF_NEEDED(certify_all_blocks, si->gv_cur_region, cse, cse->new_buff, gv_target);
 				}
 				cse->mode = gds_t_committed;
 				cse = cse->next_cw_set;

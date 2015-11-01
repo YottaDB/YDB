@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,75 +48,73 @@ GBLREF gv_key	*gv_currkey;
 static readonly unsigned char gt_lit[] = "LOAD TOTAL";
 void go_call_db(int routine, char *parm1, int parm2);
 
-void go_load(int begin, int end)
+void go_load(uint4 begin, uint4 end)
 {
 	char		*ptr;
-	int		i, len, fmt, keylength, keystate;
-	uint4	        max_data_len, max_subsc_len, key_count, rec_count, max_rec_size;
+	int		len, fmt, keylength, keystate;
+	uint4	        iter, max_data_len, max_subsc_len, key_count, max_rec_size;
 	mstr            src, des;
 	unsigned char   *rec_buff, ch;
 	boolean_t	format_error = FALSE, keepgoing;
 
+	error_def(ERR_LOADCTRLY);
+	error_def(ERR_LOADEOF);
 	error_def(ERR_LOADFILERR);
 	error_def(ERR_MUNOFINISH);
-	error_def(ERR_LOADCTRLY);
 
 	gvinit();
 
 	max_rec_size = DEFAULT_MAX_REC_SIZE;
 	rec_buff = (unsigned char *)malloc(max_rec_size);
 
-	if (!begin)
+	fmt = MU_FMT_ZWR;	/* by default, the extract format is ZWR (not GO) */
+	len = mu_load_get(&ptr);
+	if (mupip_error_occurred)
+	{
+		free(rec_buff);
+		return;
+	}
+	if (len >= 0)
+		util_out_print("!AD", TRUE, len, ptr);
+	else
+		mupip_exit(ERR_LOADFILERR);
+	len = mu_load_get(&ptr);
+	if (mupip_error_occurred)
+	{
+		free(rec_buff);
+		return;
+	}
+	if (len >= 0)
+	{
+		util_out_print("!AD", TRUE, len, ptr);
+		fmt = (0 == memcmp(ptr + len - STR_LIT_LEN("ZWR"), "ZWR", STR_LIT_LEN("ZWR"))) ? MU_FMT_ZWR : MU_FMT_GO;
+	} else
+		mupip_exit(ERR_LOADFILERR);
+	if (begin < 3)
+		begin = 3;
+	for (iter = 3; iter < begin; iter++)
 	{
 		len = mu_load_get(&ptr);
-		if (mupip_error_occurred)
+		if (len < 0)	/* The IO device has signalled an end of file */
 		{
-		        free(rec_buff);
-		        return;
+			gtm_putmsg(VARLSTCNT(3) ERR_LOADEOF, 1, begin);
+			mupip_error_occurred = TRUE;
 		}
-		if (len >= 0)
-		        util_out_print("!AD", TRUE, len, ptr);
-		else
-			mupip_exit(ERR_LOADFILERR);
-		len = mu_load_get(&ptr);
 		if (mupip_error_occurred)
 		{
-		        free(rec_buff);
+			util_out_print("Error reading record number: !UL\n", TRUE, iter);
+			free(rec_buff);
 			return;
 		}
-		if (len >= 0)
-		{
-		        util_out_print("!AD", TRUE, len, ptr);
-			fmt = (0 == memcmp(ptr + len - STR_LIT_LEN("ZWR"), "ZWR", STR_LIT_LEN("ZWR"))) ? MU_FMT_ZWR : MU_FMT_GO;
-		} else
-			mupip_exit(ERR_LOADFILERR);
-		begin = 3;
-	} else
-	{
-	        for (i = 1; i < begin; i++)
-		{
-		        len = mu_load_get(&ptr);
-			if (mupip_error_occurred)
-			{
-			        free(rec_buff);
-				return;
-			}
-			if (len < 0)
-				break;
-			if (2 == i) /* the format flag appears only in the second record. */
-				fmt = (0 == memcmp(ptr + len - STR_LIT_LEN("ZWR"), "ZWR", STR_LIT_LEN("ZWR"))) ?
-					MU_FMT_ZWR : MU_FMT_GO;
-		}
-		util_out_print("Beginning LOAD at #!UL\n", TRUE, begin);
 	}
+	assert(iter == begin);
+	util_out_print("Beginning LOAD at record number: !UL\n", TRUE, begin);
 	max_data_len = 0;
 	max_subsc_len = 0;
 	key_count = 0;
-	rec_count = 1;
-
-	for (i = begin - 1 ; ;)
+	for (iter = begin - 1; ; )
 	{
-		if (++i > end)
+		if (++iter > end)
 			break;
 		if (mu_ctrly_occurred)
 			break;
@@ -124,12 +122,12 @@ void go_load(int begin, int end)
 		{
 			util_out_print("!AD:!_  Key cnt: !UL  max subsc len: !UL  max data len: !UL", TRUE,
 				LEN_AND_LIT(gt_lit), key_count, max_subsc_len, max_data_len);
-			util_out_print("Last LOAD record number: !UL", TRUE, rec_count - 1);
+			util_out_print("Last LOAD record number: !UL", TRUE, key_count ? iter : 0);
 			mu_gvis();
 			util_out_print(0, TRUE);
 			mu_ctrlc_occurred = FALSE;
 		}
-		if ((len = mu_load_get(&ptr)) < 0)
+		if (0 > (len = mu_load_get(&ptr)))
 			break;
 		if (mupip_error_occurred)
 		{
@@ -138,32 +136,31 @@ void go_load(int begin, int end)
 		}
 		if ('\n' == *ptr)
 		{
-		    if ('\n' == *(ptr+1))
-			break;
-		    ptr++;
+			if ('\n' == *(ptr+1))
+				break;
+			ptr++;
 		}
 		stringpool.free = stringpool.base;
-		rec_count++;
 		if (0 == len)
 			continue;
 		if (MU_FMT_GO != fmt)
 		{
-		        keylength = 0;					/* determine length of key */
+			keylength = 0;					/* determine length of key */
 			keystate  = 0;
 			keepgoing = TRUE;
 			while((keylength < len - 1) && keepgoing)	/* 1 == sizeof(=), since ZWR allows '^x(1,2)='*/
 			{
-			        ch = *(ptr + keylength);
+				ch = *(ptr + keylength);
 				keylength++;
 				switch (keystate)
 				{
 				case 0:						/* in global name */
-				        if ('=' == ch)				/* end of key */
+					if ('=' == ch)				/* end of key */
 					{
-					        keylength--;
+						keylength--;
 						keepgoing = FALSE;
 					} else if ('(' == ch)			/* start of subscripts */
-					        keystate = 1;
+						keystate = 1;
 					break;
 				case 1:						/* in subscript area, but out of "..." or $C(...) */
 					switch (ch)
@@ -221,14 +218,15 @@ void go_load(int begin, int end)
 					break;
 				}
 			}
-			assert(keylength < len - 1);
 			go_call_db(GO_PUT_SUB, ptr, keylength);
 			if (mupip_error_occurred)
 			{
 			        mu_gvis();
+				util_out_print("Error loading record number: !UL\n", TRUE, iter);
 				mupip_error_occurred = FALSE;
 				continue;
 			}
+			assert(keylength < len - 1);
 			if (max_subsc_len < (gv_currkey->end + 1))
 				max_subsc_len = gv_currkey->end + 1;
 			src.len = len - keylength - 1;
@@ -243,8 +241,7 @@ void go_load(int begin, int end)
 			des.addr = (char *)rec_buff;
 			if (FALSE == zwr2format(&src, &des))
 			{
-				util_out_print("Format error in record !8UL: !/!AD", TRUE, rec_count + 1,
-					src.len, src.addr);
+				util_out_print("Format error in record number !8UL: !/!AD", TRUE, iter, src.len, src.addr);
 				format_error = TRUE;
 				continue;
 			}
@@ -255,6 +252,7 @@ void go_load(int begin, int end)
 			if (mupip_error_occurred)
 			{
 			        mu_gvis();
+				util_out_print("Error loading record number: !UL\n", TRUE, iter);
 				mupip_error_occurred = FALSE;
 				continue;
 			}
@@ -265,14 +263,15 @@ void go_load(int begin, int end)
 			if (mupip_error_occurred)
 			{
 			        mu_gvis();
+				util_out_print("Error loading record number: !UL\n", TRUE, iter);
 				mupip_error_occurred = FALSE;
 				continue;
 			}
 			if (max_subsc_len < (gv_currkey->end + 1))
 				max_subsc_len = gv_currkey->end + 1;
-			if (++i > end)
+			if (++iter > end)
 			{
-			        i--;	/* Decrement as didn't load key */
+			        iter--;	/* Decrement as didn't load key */
 				break;
 			}
 			if ((len = mu_load_get(&ptr)) < 0)
@@ -280,9 +279,9 @@ void go_load(int begin, int end)
 			if (mupip_error_occurred)
 			{
 			        mu_gvis();
+				util_out_print("Error loading record number: !UL\n", TRUE, iter);
 				break;
 			}
-			rec_count++;
 			stringpool.free = stringpool.base;
 			if (max_data_len < len)
 			        max_data_len = len;
@@ -290,6 +289,7 @@ void go_load(int begin, int end)
 			if (mupip_error_occurred)
 			{
 			        mu_gvis();
+				util_out_print("Error loading record number: !UL\n", TRUE, iter);
 				mupip_error_occurred = FALSE;
 				continue;
 			}
@@ -298,14 +298,14 @@ void go_load(int begin, int end)
 	}
 	free(rec_buff);
 	mu_load_close();
-	if(mu_ctrly_occurred)
+	if (mu_ctrly_occurred)
 	{
 		gtm_putmsg(VARLSTCNT(1) ERR_LOADCTRLY);
 		mupip_exit(ERR_MUNOFINISH);
 	}
 	util_out_print("LOAD TOTAL!_!_Key Cnt: !UL  Max Subsc Len: !UL  Max Data Len: !UL",TRUE,key_count,max_subsc_len,
 			max_data_len);
-	util_out_print("Last LOAD record number: !UL\n",TRUE,i - 1);
+	util_out_print("Last LOAD record number: !UL\n", TRUE, key_count ? (iter - 1) : 0);
 	if (format_error)
 		mupip_exit(ERR_LOADFILERR);
 }
@@ -319,6 +319,7 @@ void go_call_db(int routine, char *parm1, int parm2)
 	ESTABLISH(mupip_load_ch);
 	switch(routine)
 	{	case GO_PUT_SUB:
+			gv_currkey->end = 0;
 			str2gvkey_gvfunc(parm1, parm2);
 			break;
 		case GO_PUT_DATA:

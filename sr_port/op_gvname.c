@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <stdarg.h>
 #include "gtm_string.h"
 
 #include "gdsroot.h"
@@ -36,7 +37,6 @@
 #include "sgnl.h"
 #include "mvalconv.h"
 #include "tp_set_sgm.h"
-#include <varargs.h>
 
 GBLDEF bool		gv_curr_subsc_null;
 GBLDEF bool		gv_prev_subsc_null;
@@ -55,10 +55,10 @@ GBLREF short		dollar_tlevel;
 GBLREF bool		transform;
 GBLREF mstr		extnam_str;
 
-void op_gvname(va_alist)
-va_dcl
+void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 {
-	int		count, len;
+	int		len;
+	int		count;
 	bool		was_null, is_null;
 	boolean_t	bgormm;
 	mval		*val;
@@ -73,9 +73,11 @@ va_dcl
 	if (!gd_header)
 		gvinit();
 	gd_targ_addr = gd_header;
-	VAR_START(var);
-	count = va_arg(var, int) - 1;
-	val = va_arg(var, mval *);
+	VAR_START(var, val_arg);
+	VMS_ONLY(va_count(count);)
+	UNIX_ONLY(count = count_arg;)	/* need to preserve stack copy for i386 */
+	count--;
+	val = val_arg;
 	if ((gd_header->maps == gd_map) && gv_currkey && (0 == gv_currkey->base[val->str.len]) &&
 			(0 == memcmp(gv_currkey->base, val->str.addr, val->str.len)))
 	{
@@ -108,8 +110,10 @@ va_dcl
 	max_key = gv_cur_region->max_key_size;
 	for ( ; count > 0; count--)
 	{
-		COPY_SUBS_TO_GVCURRKEY(var, gv_currkey, was_null, is_null);	/* updates gv_currkey, was_null, is_null */
+		val = va_arg(var, mval *);
+		COPY_SUBS_TO_GVCURRKEY(val, gv_currkey, was_null, is_null);	/* updates gv_currkey, was_null, is_null */
 	}
+	va_end(var);
 	gv_prev_subsc_null = was_null; /* if true, it indicates there is a null subscript (except last subscript) in current key */
 	gv_curr_subsc_null = is_null; /* if true, it indicates that last subscript in current key is null */
 	if (was_null && NEVER == gv_cur_region->null_subs)

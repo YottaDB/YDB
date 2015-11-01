@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -187,14 +187,19 @@ typedef struct new_buff_buddy_list_struct
 	unsigned char	new_buff[1];
 }new_buff_buddy_list;
 
+GBLREF	int4		tprestart_syslog_delta;
+GBLREF	block_id	t_fail_hist_blk[];
+GBLREF	gd_region	*tp_fail_hist_reg[];
+GBLREF	gv_namehead	*tp_fail_hist[];
+GBLREF	int4		tp_fail_n;
+GBLREF	int4		tp_fail_level;
+GBLREF	int4		tp_fail_histtn[], tp_fail_bttn[];
+
 #define TP_TRACE_HIST(X, Y) 										\
 {													\
-	GBLREF	int4		tprestart_syslog_delta;							\
-	GBLREF	block_id	t_fail_hist_blk[CDB_MAX_TRIES];						\
-	GBLREF	gv_namehead	*tp_fail_hist[CDB_MAX_TRIES];						\
-													\
 	if (tprestart_syslog_delta)									\
 	{												\
+		tp_fail_hist_reg[t_tries] = gv_cur_region;						\
 		t_fail_hist_blk[t_tries] = ((block_id)X); 						\
 		tp_fail_hist[t_tries] = (gv_namehead *)(((int)X & ~(-BLKS_PER_LMAP)) ? Y : NULL);	\
 	}												\
@@ -202,15 +207,9 @@ typedef struct new_buff_buddy_list_struct
 
 #define TP_TRACE_HIST_MOD(X, Y, n, csd, histtn, bttn, level)						\
 {													\
-	GBLREF	int4		tprestart_syslog_delta;							\
-	GBLREF	int4		tp_fail_n;								\
-	GBLREF	int4		tp_fail_level;								\
-	GBLREF	block_id	t_fail_hist_blk[CDB_MAX_TRIES];						\
-	GBLREF	gv_namehead	*tp_fail_hist[CDB_MAX_TRIES];						\
-	GBLREF	int4		tp_fail_histtn[CDB_MAX_TRIES], tp_fail_bttn[CDB_MAX_TRIES];		\
-													\
 	if (tprestart_syslog_delta)									\
 	{												\
+		tp_fail_hist_reg[t_tries] = gv_cur_region;						\
 		t_fail_hist_blk[t_tries] = ((block_id)X);						\
 		tp_fail_hist[t_tries] = (gv_namehead *)(((int)X & ~(-BLKS_PER_LMAP)) ? Y : NULL); 	\
 		(csd)->tp_cdb_sc_blkmod[(n)]++;								\

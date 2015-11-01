@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +22,6 @@
 #endif
 
 /* Following definitions give some default values for reorg */
-#define MIN_FILL_FACTOR 30
-#define MAX_FILL_FACTOR 100
 #define DATA_FILL_TOLERANCE 10
 #define INDEX_FILL_TOLERANCE 10
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,29 +25,28 @@
 #include "zwrite.h"
 #include "op.h"
 #include "mvalconv.h"
-#include <varargs.h>
+#include <stdarg.h>
 #include "gtm_maxstr.h"
 
-void op_lvzwrite(va_alist)
-va_dcl
+void op_lvzwrite(UNIX_ONLY_COMMA(int4 count) int4 arg1, ...)
 {
 	va_list		var;
 	boolean_t	flag;
-	int4		count, arg1, arg2;
+	int4		arg2;
+	VMS_ONLY(int4	count;)
 	mval		*mv;
 	zshow_out	output, *out;
 	MAXSTR_BUFF_DECL(buff);
 
-	VAR_START(var);
+	VAR_START(var, arg1);
+	VMS_ONLY(va_count(count);)
 	MAXSTR_BUFF_INIT;
-	count = va_arg(var, int4);
 	memset(&output, 0, sizeof(output));
 	output.code = 'V';
 	output.type = ZSHOW_DEVICE;
 	output.buff = &buff[0];
 	output.ptr = output.buff;
 	out = &output;
-	arg1 = va_arg(var, int4);
 	count--;
 	lvzwr_init(FALSE, (mval *)arg1);
 	for (; count > 0; )
@@ -87,5 +86,6 @@ va_dcl
 			break;
 		}
 	}
+	va_end(var);
 	MAXSTR_BUFF_FINI;
 }

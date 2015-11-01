@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,5 +62,8 @@ enum
 	SV_ZDATE_FORM, 		/* 49 */
 	SV_ZTEXIT,		/* 50 */
 	SV_NUM_SV,		/* 51 */
+	SV_ZALLOCSTOR,		/* 52 */
+	SV_ZREALSTOR,		/* 53 */
+	SV_ZUSEDSTOR,		/* 54 */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

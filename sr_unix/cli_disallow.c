@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,15 +11,8 @@
 
 #include "mdef.h"
 
-/* gcc/LinuxIA32 needs stdio.h before varargs until removed from error.h */
-/* gcc/Linux390 needs varargs before stdarg in stdio */
-#ifdef EARLY_VARARGS
-#include <varargs.h>
-#endif
+#include <stdarg.h>
 #include "gtm_stdio.h"
-#ifndef EARLY_VARARGS
-#include <varargs.h>
-#endif
 #include <errno.h>
 
 #include "gtm_string.h"
@@ -140,14 +133,12 @@ boolean_t d_c_cli_negated(char *str)
  * 	FALSE otherwise
  *----------------------------------------------
  */
-boolean_t cli_check_any2(va_alist)
-va_dcl
+boolean_t cli_check_any2(int argcnt, ...)
 {
-	va_list var, varl;
-	int argcnt, oper, state = 0;
+	va_list var;
+	int oper, state = 0;
 
-	VAR_START(var);
-	argcnt = va_arg(var, int);
+	VAR_START(var, argcnt);
 	oper = 0;
 	while(argcnt)
 	{
@@ -155,6 +146,7 @@ va_dcl
 			return TRUE;
 		argcnt--;
 	}
+	va_end(var);
 	return FALSE;
 }
 

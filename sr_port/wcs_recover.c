@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -216,7 +216,8 @@ void wcs_recover(gd_region *reg)
 					if ((0 != cr->r_epid) && (epid != cr->r_epid))
 						GTMASSERT;
 					/* process still active but not playing fair or cache is corrupted */
-					send_msg(VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id, cr->blk, cr, cr->r_epid, DB_LEN_STR(reg));
+					send_msg(VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id, cr->blk, cr, cr->r_epid,
+						DB_LEN_STR(reg));
 					send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Buffer forcibly seized"));
 					INTERLOCK_INIT(cr);
 					cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
@@ -542,6 +543,7 @@ void wcs_recover(gd_region *reg)
 				VMS_ONLY(
 					assert(WRT_STRT_PNDNG != cr->iosb.cond);
 					assert(FALSE == cr_alt->wip_stopped);
+					WRITE_LATCH_VAL(cr) = LATCH_CONFLICT;
 					cr_alt->twin = GDS_ANY_ABS2REL(csa, cr);
 					cr->twin = GDS_ANY_ABS2REL(csa, cr_alt);
 				)

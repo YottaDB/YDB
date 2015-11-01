@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -40,13 +40,15 @@ gt_cc_shl_fpic=-fPIC			# generate Position Independent Code.
 # For gcc: _BSD_SOURCE for caddr_t, others
 #	   _XOPEN_SOURCE=500 should probably define POSIX 199309 and/or
 #		POSIX 199506 but doesnt so...
-# Linux gcc optimizations cause problems so do without them for now.
 gt_cc_options_common=$(gt_cc_shl_fpic) -c -ansi -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -fsigned-char -Wimplicit -Wmissing-prototypes
 ifeq ($(strip $(patsubst 2.2.%, 2.2, $(shell uname -r))), 2.2)
 gt_cc_options_common:=$(gt_cc_options_common) -DNeedInAddrPort
 endif
 gt_cc_option_nooptimize=
-gt_cc_option_optimize=
+# -fno-defer-pop to prevent problems with assembly/generated code with optimization
+# -fno-strict-aliasing since we don't comply with the rules
+# -ffloat-store for consistent results avoiding rounding differences
+gt_cc_option_optimize=-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store
 # autodepend option
 gt_cc_dep_option=-w
 # -g	generate debugging information for dbx (no longer overrides -O)

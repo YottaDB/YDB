@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,7 +74,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	enum cdb_sc	status = cdb_sc_normal;
 	boolean_t	is_mm, store_history;
 	sgm_info	*si;
-	ht_ent_int4	*tabent;
+	ht_ent_int4	*tabent, *lookup_tabent;
 
 	error_def(ERR_TRANS2BIG);
 	error_def(ERR_GVKILLFAIL);
@@ -161,6 +161,37 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 					status = cdb_sc_blkmod;
 					BREAK_IN_PRO__CONTINUE_IN_DBG;
 				}
+				/* Although t1->first_tp_srch_status (i.e. t2) is used for doing blkmod check,
+				 * we need to use BOTH t1 and t1->first_tp_srch_status to do the cdb_sc_lostcr check.
+				 *
+				 * Need to use t1 for the cdb_sc_lostcr check
+				 * -------------------------------------------
+				 * We allow for recycled crs within a transaction but not within a mini-action (one that
+				 * ends up calling tp_hist e.g. SET/KILL/GET etc.). An example of how recycled crs within
+				 * a mini-action are possible is the M-kill. It does gvcst_search twice one for the left
+				 * path and one for the right path that identifies the subtree of blocks to be killed.
+				 * It is possible that the same block gets included in both the paths but with different
+				 * state of the "cr" implying a block recycle within the KILL and hence the need for a restart.
+				 *
+				 * Need to also use t1->first_tp_srch_status (i.e. t2) for the cdb_sc_lostcr check
+				 * --------------------------------------------------------------------------------
+				 * tp_tend does not validate those blocks that have already been built privately
+				 * (i.e. cse->new_buff is non-NULL). Instead it relies on tp_hist (called for every mini-action)
+				 * to have done the validation right after the block was built. Hence we need to validate
+				 * t1->first_tp_srch_status (right now) against the current state of the cache to ensure whatever
+				 * shared memory buffer we used to privately build the block has not been recycled since.
+				 */
+				if ((t1 != t2) && t1->cr)
+				{
+					assert((sm_long_t)GDS_REL2ABS(t1->cr->buffaddr) == (sm_long_t)t1->buffaddr);
+					if (t1->cycle != t1->cr->cycle)
+					{
+						assert(CDB_STAGNATE > t_tries);
+						status = cdb_sc_lostcr;
+						break;
+					}
+					t1->cr->refer = TRUE;
+				}
 				if (t2->cr)
 				{
 					assert((sm_long_t)GDS_REL2ABS(t2->cr->buffaddr) == (sm_long_t)t2->buffaddr);
@@ -173,90 +204,75 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 					t2->cr->refer = TRUE;
 				}
 			}
-			if (store_history)
+			/* Note that blocks created within the transaction (chain.flag != 0) are NOT counted
+			 * in the read-set of this transaction. They are still counted against the write-set.
+			 * si->num_of_blks is the count of the read-set (the si->blks_in_use has the actual block numbers)
+			 * while si->cw_set_depth is the count of the write-set (si->first_cw_set has the block numbers).
+			 * We have a limit on the maximum number of buffers that a TP transaction can have both in
+			 * its read-set (64K buffers) and write-set (1/2 the number of global buffers). The former
+			 * limit check is done here. The latter is done in tp_cw_list.c.
+			 *
+			 * Since created blocks are not added into the hashtable, we expect the "first_tp_srch_status"
+			 * members of those block's srch_blk_status to be NULL. That is asserted below.
+			 *
+			 * For an existing block, we copy its search history into si->last_tp_hist.
+			 * For a created block, we dont since it doesn't need to be validated at commit.
+			 */
+			assert(!chain.flag || !t1->first_tp_srch_status);
+			if (store_history && !chain.flag)
 			{
 				assert(si->cw_set_depth || !t1->ptr);
 				local_hash_entry = t1->first_tp_srch_status;
+				DEBUG_ONLY(lookup_tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&blk);)
 				ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(local_hash_entry, si);
-				/* Note that blocks created within the transaction (chain.flag != 0) are counted
-				 * in the num_of_blks calculation since the created block still uses up a buffer at
-				 * commit time and we have a limit on the maximum number of buffers that a
-				 * TP transaction can have in its read-set (although it is a huge value of 64K
-				 * even for BG due to the recent big-read TP changes).
-				 *
-				 * Also note that created and existing blocks are added in the hashtable
-				 * "sgm_info_ptr->blks_in_use". Since the add_hashtab_int4() routine expects
-				 * a pointer to the srch_blk_status element in the first_tp_hist array
-				 * where we are going to copy over the block's history, and since we want to have
-				 * common code wherever possible for both created and existing blocks, we pass in
-				 * "si->last_tp_hist" in both cases. For an existing block, we actually
-				 * copy its history into last_tp_hist. For a created block, we don't since it
-				 * doesn't need to be validated at commit. This creates a dangling pointer from the
-				 * created block's hashtable entry into last_tp_hist. Note that the next existing
-				 * block which needs to be added into the hashtable will also have its hashtable
-				 * entry pointing to the same "last_tp_hist". We now have two pointers to the same
-				 * location, the first of which (that of the created block) is not valid.
-				 * Still we are safe because any future t_qread done on the created block will
-				 * return only a NULL value in the "first_tp_srch_status" member of the block's
-				 * srch_blk_status. We assert this below. It is only because of this (that a created
-				 * block's first_tp_srch_status member will be NULL even though it may be added
-				 * already) that we need to do a check of the return value of add_hashtab_int4().
-				 * Otherwise, we should be guaranteed that add_hashtab_int4() always returns FALSE.
-				 * We assert this in the else block.
-				 */
-				assert(!chain.flag || !local_hash_entry);
-				if (!local_hash_entry && add_hashtab_int4(si->blks_in_use, (uint4 *)&blk,
+				if ((NULL == local_hash_entry) && add_hashtab_int4(si->blks_in_use, (uint4 *)&blk,
 									(void *)(si->last_tp_hist), &tabent))
 				{	/* not a duplicate block */
+					assert(NULL == lookup_tabent);
 					if (++si->num_of_blks > si->tp_hist_size)
 					{	/* catch the case where MUPIP recover or update process gets into this situation */
 						assert(!mupip_jnl_recover && !is_updproc);
 						rts_error(VARLSTCNT(4) ERR_TRANS2BIG, 2, REG_LEN_STR(gv_cur_region));
 					}
-					if (!chain.flag)
-					{
-						/* Either history has a clue or not.
-						 * If yes, then it could have been constructed in an earlier
-						 * 		local_tn or the current local_tn.
-						 *	If an earlier local_tn, then the logic in gvcst_search would
-						 *		have nullified first_tp_srch_status members.
-						 * 	If the current local_tn, then this block should have been
-						 *		added in the hashtable already and we shouldn't be
-						 *		in this part of the code.
-						 * If no, then we t_qread all the blocks in the search path. The
-						 *		blocks may have been read already in this local_tn or not.
-						 *	If already read in this local_tn, then this block should have
-						 *		been added in the hashtable already and we shouldn't be
-						 *		in this part of the code.
-						 *	If not already read in this local_tn, then t_qread of this block
-						 *		should have returned a NULL for first_tp_srch_status.
-						 * In either case, the first_tp_srch_status member should be NULL.
-						 */
-						assert(NULL == t1->first_tp_srch_status);
-						/* If history array is full, allocate more */
-						if (si->last_tp_hist - si->first_tp_hist == si->cur_tp_hist_size)
-							gds_tp_hist_moved(si, hist1);
-						memcpy(si->last_tp_hist, t1, sizeof(srch_blk_status));
-						t1->first_tp_srch_status = si->last_tp_hist;
-						si->last_tp_hist++;
-						/* Ensure that we are doing an M-kill if for a non-isolated global we end up
-						 *	adding to the history a leaf-level block which has no corresponding cse.
-						 * To be more specific we are doing an M-kill that freed up the data block from
-						 * 	the B-tree, but that checking involves more coding.
-						 * The only exception to this is if we are in an M-set and the set was a duplicate
-						 *	set. Since we do not have that information (gvcst_put the caller has it),
-						 *	we do a less stringent check and ensure the optimization ("gvdupsetnoop"
-						 *	global variable) is turned on at the very least.
-						 */
-						assert(!t1->blk_target->noisolation || t1->level || t1->ptr ||
-							((ERR_GVKILLFAIL == t_err)
-								|| ((ERR_GVPUTFAIL == t_err) && gvdupsetnoop)));
-					}
+					/* Either history has a clue or not.
+					 * If yes, then it could have been constructed in an earlier
+					 * 		local_tn or the current local_tn.
+					 *	If an earlier local_tn, then the logic in gvcst_search would
+					 *		have nullified first_tp_srch_status members.
+					 * 	If the current local_tn, then this block should have been
+					 *		added in the hashtable already and we shouldn't be
+					 *		in this part of the code.
+					 * If no, then we t_qread all the blocks in the search path. The
+					 *		blocks may have been read already in this local_tn or not.
+					 *	If already read in this local_tn, then this block should have
+					 *		been added in the hashtable already and we shouldn't be
+					 *		in this part of the code.
+					 *	If not already read in this local_tn, then t_qread of this block
+					 *		should have returned a NULL for first_tp_srch_status.
+					 * In either case, the first_tp_srch_status member should be NULL.
+					 */
+					assert(NULL == t1->first_tp_srch_status);
+					/* If history array is full, allocate more */
+					if (si->last_tp_hist - si->first_tp_hist == si->cur_tp_hist_size)
+						gds_tp_hist_moved(si, hist1);
+					memcpy(si->last_tp_hist, t1, sizeof(srch_blk_status));
+					t1->first_tp_srch_status = si->last_tp_hist;
+					si->last_tp_hist++;
+					/* Ensure that we are doing an M-kill if for a non-isolated global we end up
+					 *	adding to the history a leaf-level block which has no corresponding cse.
+					 * To be more specific we are doing an M-kill that freed up the data block from
+					 * 	the B-tree, but that checking involves more coding.
+					 * The only exception to this is if we are in an M-set and the set was a duplicate
+					 *	set. Since we do not have that information (gvcst_put the caller has it),
+					 *	we do a less stringent check and ensure the optimization ("gvdupsetnoop"
+					 *	global variable) is turned on at the very least.
+					 */
+					assert(!t1->blk_target->noisolation || t1->level || t1->ptr ||
+						((ERR_GVKILLFAIL == t_err)
+							|| ((ERR_GVPUTFAIL == t_err) && gvdupsetnoop)));
 				} else
-				{	/* While it is always true that in this part of the code atmost one of
-					 * local_hash_entry and chain.flag will be non-NULL, it is almost always
-					 * true that exactly one of them is non-NULL. There is a very rare case
-					 * when both of them can be NULL. That is when two histories are passed
+				{	/* While it is almost always true that local_hash_entry is non-NULL here, there
+					 * is a very rare case when it can be NULL. That is when two histories are passed
 					 * each containing the same block. In that case, when the loop is executed
 					 * for the first history, the block would have been added into the hashtable.
 					 * During the second history's loop, the first_tp_srch_status member in
@@ -273,16 +289,20 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 					 * it during the previous for-loop for the first history. Hence the check
 					 * for if (local_hash_entry) below.
 					 */
-					assert(!local_hash_entry || !chain.flag);
-					assert(chain.flag || local_hash_entry 	/* ensure we don't miss updating "ptr" */
-						|| ((srch_blk_status *)(tabent->value)) || !t1->ptr);
+					/* Ensure that "first_tp_srch_status" reflects what is in the hash-table.
+					 * The only exception is when two histories are passed (explained above)
+					 */
+					assert(local_hash_entry && lookup_tabent && (local_hash_entry == lookup_tabent->value)
+						|| !local_hash_entry && (hist == hist1));
+					/* Ensure we don't miss updating "ptr" */
+					assert((NULL != local_hash_entry) || ((srch_blk_status *)(tabent->value))->ptr || !t1->ptr);
 					assert(!local_hash_entry || !local_hash_entry->ptr || !t1->ptr ||
 						t1->ptr == local_hash_entry->ptr  ||
 						t1->ptr->low_tlevel == local_hash_entry->ptr);
 					if (local_hash_entry && t1->ptr)
 					{
-						assert(is_mm || local_hash_entry->ptr ||
-								t1->first_tp_srch_status == local_hash_entry
+						assert(is_mm || local_hash_entry->ptr
+								|| t1->first_tp_srch_status == local_hash_entry
 									&& t1->cycle == local_hash_entry->cycle
 									&& t1->cr == local_hash_entry->cr
 									&& t1->buffaddr == local_hash_entry->buffaddr);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include <stdarg.h>
 #include "util.h"
-#include <varargs.h>
 #include "gtmmsg.h"
 #include "gtm_putmsg_list.h"
 
@@ -23,21 +23,21 @@
 
 
 void
-gtm_putmsg(va_alist)
-va_dcl
+gtm_putmsg(int argcnt, ...)
 {
 	va_list	var;
 
-	VAR_START(var);
-	gtm_putmsg_list(var);
+	VAR_START(var, argcnt);
+	gtm_putmsg_list(argcnt, var);
+	va_end(var);
 	util_out_print("",TRUE);
 }
 
-void gtm_putmsg_noflush(va_alist)
-va_dcl
+void gtm_putmsg_noflush(int argcnt, ...)
 {
 	va_list var;
 
-	VAR_START(var);
-	gtm_putmsg_list(var);
+	VAR_START(var, argcnt);
+	gtm_putmsg_list(argcnt, var);
+	va_end(var);
 }

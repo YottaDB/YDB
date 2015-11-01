@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 
 #include "stringpool.h"
 #include "io.h"
-#include <varargs.h>
+#include <stdarg.h>
 #include "op.h"
 
 /* THIS VERSION OF OP_IOCONTROL FORMATS MNENOMIC SPACE COMMANDS IN A
@@ -25,37 +25,42 @@
 GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
 
-void op_iocontrol(va_alist)
-va_dcl
+void op_iocontrol(UNIX_ONLY_COMMA(int4 n) mval *vparg, ...)
 {
-	va_list var, sav_var;
+	va_list var;
 	mval *vp;
-	int n, m;
-	int count;
+	VMS_ONLY(int n;)
+	int count, m;
 	unsigned char *cp, *cq;
 	int length;
 	mstr val;
 	error_def(ERR_CTLMNEMAXLEN);
 
-	VAR_START(var);
-	n = va_arg(var, int4);
-	VAR_COPY(sav_var, var);
-	for (count = 0 ; count < n ; count++)
+	VAR_START(var, vparg);
+	VMS_ONLY(va_count(n);)
+	assert(0 < n);
+	MV_FORCE_STR(vparg);
+	for (count = 1; count < n; count++)
 	{
 		vp = va_arg(var, mval *);
 		MV_FORCE_STR(vp);
 	}
-	VAR_COPY(var, sav_var);
+	va_end(var);
 	/* format will be:
 		if n=1  KEYWORD
 		if n>1  KEYWORD(PAR1,PAR2,...PARx)
 	*/
+	VAR_START(var, vparg);
+	vp = vparg;
 	if (stringpool.top - stringpool.free < MAX_DEVCTL_LENGTH + 3)
 		stp_gcol(MAX_DEVCTL_LENGTH + 3);
 	for (cp = stringpool.free, count = 0 ; count < n ; count++)
-	{	vp = va_arg(var, mval *);
+	{
 		if (count > 0)
+		{
+			vp = va_arg(var, mval *);
 			*cp++ = (count == 1) ? '(' : ',';
+		}
 		if (MV_IS_CANONICAL(vp))
 		{
 			m = vp->str.len;
@@ -81,6 +86,7 @@ va_dcl
 				*cp++ = '"';
 		}
 	}
+	va_end(var);
 	if (count > 1)
 		*cp++ = ')';
 	if (cp - stringpool.free > MAX_DEVCTL_LENGTH)

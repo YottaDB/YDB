@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,31 +21,30 @@
 #include "gtm_unistd.h"
 #endif
 #include "op.h"
-#include <varargs.h>
+#include <stdarg.h>
 #include "ebc_xlat.h"
 
 GBLREF spdesc stringpool;
 
-void op_fnchar(va_alist)
-va_dcl
+void op_fnchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
 {
 	va_list var;
-	int cnt, ch;
+	int ch;
 	int ebcdic_trans;
 	unsigned char *base;
-	mval	*dst;
+	VMS_ONLY(int	cnt;)
 	error_def(ERR_TEXT);
 	iconv_t	tmp_cvt_cd;
 	unsigned char	*tmp_ptr;
 	unsigned int	tmp_len;
 
-	VAR_START(var);
-	cnt = va_arg(var, int4) - 2;
+	VAR_START(var, dst);
+	VMS_ONLY(va_count(cnt);)
+	cnt -= 2;
 
 	if (stringpool.free + cnt > stringpool.top)
 		stp_gcol(cnt);
 
-	dst = va_arg(var, mval *);
 	ebcdic_trans = va_arg(var, int4);
 	dst->mvtype = MV_STR;
 	dst->str.addr = (char *)stringpool.free;
@@ -57,6 +56,7 @@ va_dcl
 		if ((ch >= 0) && (ch < 256))	/* only true for single byte character set */
 			*base++ = ch;
 	}
+	va_end(var);
 	dst->str.len = (char *)base - dst->str.addr;
 	stringpool.free += dst->str.len;
 	if (ebcdic_trans)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -139,7 +139,7 @@ void tp_incr_clean_up(short newlevel)
 				if (NULL != cse_newlvl)
 				{
 					assert(cse_newlvl->t_level <= newlevel);
-					assert(cse_newlvl->done);
+					assert(cse_newlvl->done || (n_gds_t_op < cse->mode));
 					cse_newlvl->high_tlevel = NULL;
 					/* if either an index block or root of GVT's and next_off has been disturbed */
 					if (cse_newlvl->undo_offset[0])
