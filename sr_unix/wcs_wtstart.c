@@ -244,7 +244,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		assert(WRITE_LATCH_VAL(csr) >= LATCH_CLEAR);
 		assert(WRITE_LATCH_VAL(csr) <= LATCH_CONFLICT);
 		if (OWN_BUFF(n))
-		{			/* sole owner */
+		{	/* sole owner */
+			assert(WRITE_LATCH_VAL(csr) > LATCH_CLEAR);
 			assert(0 == n);
 			assert(0 != csr->dirty);
 			/* We're going to write this block out now */

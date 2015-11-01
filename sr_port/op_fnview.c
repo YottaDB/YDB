@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -412,9 +412,6 @@ va_dcl
 		reg = parmblk.gv_ptr;
 		if (dba_cm == reg->dyn.addr->acc_meth)
 			n = ((link_info *)reg->dyn.addr->cm_blk->usr)->buffer_used;
-		break;
-	case VTK_ZDATE_FORM:
-		n = (zdate_form ? 1 : 0);
 		break;
 	case VTK_ZDIR_FORM:
 		n = zdir_form;

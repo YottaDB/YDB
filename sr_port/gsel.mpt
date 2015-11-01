@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -12,7 +12,7 @@
 	;invoke ^%GSEL to create %ZG - a local array of existing globals, interactively
 	;
 	n add,beg,cnt,end,g,gd,gdf,k,out,pat,stp
-	i '$d(%zdebug) n $et s $et="szg "_$zl_":ERR^%GSEL" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%GSEL")
+	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%GSEL" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%GSEL")
 	d init,main
 	u $p:(ctrap="":exc="")
 	q
@@ -35,7 +35,8 @@ main	f  d inter q:'$l(%ZG)
 	s %ZG=cnt
 	q
 inter	r !,"Global ^",%ZG,! q:'$l(%ZG)
-	i $e(%ZG)="?" d help q
+	i $e(%ZG)="?",$l(%ZG)=1 d help q
+	i (%ZG="?D")!(%ZG="?d") d cur q
 	d setup,it
 	w !,$s(gd:"T",1:"Current t"),"otal of ",cnt," global",$s(cnt=1:".",1:"s."),!
 	q
@@ -76,14 +77,15 @@ save	i add,'$d(%ZG(g)) s %ZG(g)="",cnt=cnt+1 d prt:out
 	q
 prt	w:$x>70 ! w g,?$x\10+1*10
 	q
-help	i "Dd"[$e(%ZG,2),$l(%ZG)=2 d cur q
+help	;
 	w !,?2,"<RET>",?25,"to leave",!,?2,"""*""",?25,"for all"
 	w !,?2,"global",?25,"for 1 global"
 	w !,?2,"global1:global2",?25,"for a range"
 	w !,?2,"""*"" as a wildcard",?25,"permitting any number of characters"
-	w !,?2,"""%"" as a wildcard",?25,"for a single character"
+	w !,?2,"""%"" as a wildcard",?25,"for a single character in positions other than the first"
+	w !,?2,"""?"" as a wildcard",?25,"for a single character in positions other than the first"
 	i gd q
-	w !,?2,"""'"" as the 1st character",!,?25,"to remove routines from the list"
+	w !,?2,"""'"" as the 1st character",!,?25,"to remove globals from the list"
 	w !,?2,"?D",?25,"for the currently selected globals",!
 	q
 cur	w ! s g=""

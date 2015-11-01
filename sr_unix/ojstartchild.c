@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -143,7 +143,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	char			tbuff[MAX_CMD_LINE], tbuff2[MAX_CMD_LINE], parm_string[PARM_STRING_SIZE];
 	char			*pgbldir_str;
 	char			*transfer_addr;
-	int4			i, environ_count, string_len, temp;
+	int4			index, environ_count, string_len, temp;
 	int			wait_status, save_errno, kill_ret;
 	int			rc;
 	bool			status;
@@ -156,7 +156,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	sgmnt_data_ptr_t	csd;
 	gd_region		*r_top, *r_local;
 	gd_addr			*addr_ptr;
-	int			pipe_status;
+	int			pipe_status, env_len;
 
 #ifdef	__osf__
 /* These must be O/S-compatible 64-bit pointers for OSF/1.  */
@@ -167,6 +167,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	char		*c1, *c2, **c3;
 	char		*argv[3];
 	char		**env_ary, **env_ind;
+	char		**new_env_cur, **new_env_top, **old_env_cur, **old_env_top, *env_end;
 
 #ifdef	__osf__
 #pragma pointer_size (restore)
@@ -283,7 +284,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		CLOSEFILE(pipe_fds[1], pipe_status);
 
 		/* Run through the list of databases to simply close them out (still open by parent) */
-		for (addr_ptr = get_next_gdr(0); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 		{
 			for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top;
 			     r_local++)
@@ -314,10 +315,6 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			mutex_sock_fd = -1;
 		}
 #endif
-		DUP2(1, 2, rc); /* equate stdout, stderr */
-		if (-1 == rc)
-			rts_error(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
-					LEN_AND_LIT("Error duping STDERR to STDOUT."), errno);
 
 		/* Count the number of environment variables.  */
 		for (environ_count = 0, c3 = environ, c2 = *c3;  c2;  c3++, c2 = *c3)
@@ -328,6 +325,34 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #pragma	pointer_size (save)
 #pragma pointer_size (long)
 #endif
+
+		/* the environment array passed to the grandchild is constructed by prefixing the job related environment
+		 * variables ahead of the current environment (pointed to by the "environ" variable)
+		 *
+		 * e.g. if the current environment has only two environment variables env1=one and env2=two,
+		 * and the job command is as follows
+		 * 	job ^x(1,2):(output="x.mjo":error="x.mje")
+		 *
+		 * then the environment array passed is as follows
+		 *	 gtmj0=			// parent pid
+		 *	 gtmgbldir=mumps.gld	// current global directory
+		 *	 gtmjb=			// startup parameter to job command
+		 *	 gtmj3=/dev/null	// input file parameter to job command
+		 *	 gtmj4=x.mjo		// output file parameter to job command
+		 *	 gtmj5=x.mje		// error file parameter to job command
+		 *	 gtmj7=x		// routine name to job off
+		 *	 gtmj8=			// label name to job off
+		 *	 gtmj9=0		// offset to job off
+		 *	 gtmja=			// base priority;
+		 *	 gtmj000=1		// parameter 1 to routine ^x
+		 *	 gtmj001=2		// parameter 2 to routine ^x
+		 *	 gtmjcnt=2		// number of parameters to routine ^x
+		 *	 env1=one		// old environment
+		 *	 env2=two		// old environment
+		 *
+		 *	those parameters that are NULL or 0 are not passed.
+		 *	each line above is an entry in the environment array.
+		 */
 
 		env_ind = env_ary = (char **)malloc((environ_count + MAX_JOB_QUALS + argcnt + 1)*sizeof(char *));
 
@@ -342,14 +367,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef __MVS__
 #pragma convlit(suspend)
 #endif
-		SPRINTF_ENV_NUM(CHILD_FLAG_ENV, par_pid);
+		SPRINTF_ENV_NUM(c1, CHILD_FLAG_ENV, par_pid, env_ind);
 #ifdef __MVS__
 #pragma convlit(resume)
 #endif
-		*env_ind++ = c1;
-
-		/*
-		 * Pass all information about the job via shell's environment.
+		/* Pass all information about the job via shell's environment.
 		 * The grandchild will get those variables to obtain the info about the job.
 		 */
 
@@ -367,11 +389,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef __MVS__
 #pragma convlit(suspend)
 #endif
-			SPRINTF_ENV_STR(GBLDIR_ENV, pbuff);
+			SPRINTF_ENV_STR(c1, GBLDIR_ENV, pbuff, env_ind);
 #ifdef __MVS__
 #pragma convlit(resume)
 #endif
-			*env_ind++ = c1;
 		}
 		/* pass startup program to child */
 		if (jparms->startup.len != 0)
@@ -387,11 +408,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef __MVS__
 #pragma convlit(suspend)
 #endif
-			SPRINTF_ENV_STR(STARTUP_ENV, pbuff);
+			SPRINTF_ENV_STR(c1, STARTUP_ENV, pbuff, env_ind);
 #ifdef __MVS__
 #pragma convlit(resume)
 #endif
-			*env_ind++ = c1;
 		}
 		/* pass input file to child */
 		if (jparms->input.len != 0)
@@ -407,11 +427,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef __MVS__
 #pragma convlit(suspend)
 #endif
-			SPRINTF_ENV_STR(IN_FILE_ENV, pbuff);
+			SPRINTF_ENV_STR(c1, IN_FILE_ENV, pbuff, env_ind);
 #ifdef __MVS__
 #pragma convlit(resume)
 #endif
-			*env_ind++ = c1;
 		}
 
 		/* pass output file to child */
@@ -430,11 +449,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef __MVS__
 #pragma convlit(suspend)
 #endif
-			SPRINTF_ENV_STR(OUT_FILE_ENV, pbuff);
+			SPRINTF_ENV_STR(c1, OUT_FILE_ENV, pbuff, env_ind);
 #ifdef __MVS__
 #pragma convlit(resume)
 #endif
-			*env_ind++ = c1;
 		}
 
 		/* pass error file to child */
@@ -453,11 +471,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef __MVS__
 #pragma convlit(suspend)
 #endif
-			SPRINTF_ENV_STR(ERR_FILE_ENV, pbuff);
+			SPRINTF_ENV_STR(c1, ERR_FILE_ENV, pbuff, env_ind);
 #ifdef __MVS__
 #pragma convlit(resume)
 #endif
-			*env_ind++ = c1;
 		}
 
 		/* pass routine name to child */
@@ -474,11 +491,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef __MVS__
 #pragma convlit(suspend)
 #endif
-			SPRINTF_ENV_STR(ROUTINE_ENV, pbuff);
+			SPRINTF_ENV_STR(c1, ROUTINE_ENV, pbuff, env_ind);
 #ifdef __MVS__
 #pragma convlit(resume)
 #endif
-			*env_ind++ = c1;
 		}
 
 		/* pass label name to child */
@@ -495,11 +511,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef __MVS__
 #pragma convlit(suspend)
 #endif
-			SPRINTF_ENV_STR(LABEL_ENV, pbuff);
+			SPRINTF_ENV_STR(c1, LABEL_ENV, pbuff, env_ind);
 #ifdef __MVS__
 #pragma convlit(resume)
 #endif
-			*env_ind++ = c1;
 		}
 
 		/* pass the offset */
@@ -510,11 +525,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef __MVS__
 #pragma convlit(suspend)
 #endif
-		SPRINTF_ENV_NUM(OFFSET_ENV, jparms->offset);
+		SPRINTF_ENV_NUM(c1, OFFSET_ENV, jparms->offset, env_ind);
 #ifdef __MVS__
 #pragma convlit(resume)
 #endif
-		*env_ind++ = c1;
 
 		/* pass Priority to child */
 		if (jparms->baspri != 0)
@@ -526,15 +540,14 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef __MVS__
 #pragma convlit(suspend)
 #endif
-			SPRINTF_ENV_NUM(PRIORITY_ENV, jparms->baspri);
+			SPRINTF_ENV_NUM(c1, PRIORITY_ENV, jparms->baspri, env_ind);
 #ifdef __MVS__
 #pragma convlit(resume)
 #endif
-			*env_ind++ = c1;
 		}
 
 		memcpy(parm_string, "gtmj000=", PARM_STRING_SIZE);
-		for (i = 0, jp = jparms->parms;  jp ;  i++, jp = jp->next)
+		for (index = 0, jp = jparms->parms;  jp ;  index++, jp = jp->next)
 		{
 			if (jp->parm->str.len > MAX_CMD_LINE - 2)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
@@ -572,19 +585,48 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef __MVS__
 #pragma convlit(suspend)
 #endif
-		SPRINTF_ENV_NUM(GTMJCNT_ENV, i);
+		SPRINTF_ENV_NUM(c1, GTMJCNT_ENV, index, env_ind);
 #ifdef __MVS__
 #pragma convlit(resume)
 #endif
-		*env_ind++ = c1;
 
 #ifdef	__osf__
 /* Make sure sizeof(char *) is correct.  */
 #pragma pointer_size (save)
 #pragma pointer_size (long)
 #endif
-
-		memcpy(env_ind, environ, (environ_count + 1)*sizeof(char *));
+		/* before appending the old environment into the environment array, do not add those
+		 * lines that correspond to any of the above already initialized environment variables.
+		 * this prevents indefinite growing of the environment array with nesting of job commands
+		 * which otherwise would show up eventually as an "Arg list too long" error from EXECVE() below.
+		 */
+		new_env_top = env_ind;
+		old_env_top = &environ[environ_count];
+		DEBUG_ONLY(
+			/* check that all new environment variables begin with the string "gtm".
+			 * this assumption is used later in the for loop below.
+			 */
+			for (new_env_cur = env_ary; new_env_cur < new_env_top; new_env_cur++)
+				assert(!STRNCMP_LIT(*new_env_cur, "gtm"));
+		)
+		for (old_env_cur = environ; old_env_cur < old_env_top; old_env_cur++)
+		{
+			env_end = strchr(*old_env_cur, '=');
+			if ((NULL != env_end) && !STRNCMP_LIT(*old_env_cur, "gtm"))
+			{
+				env_len = env_end - *old_env_cur + 1;	/* include the '=' too */
+				assert(env_len <= strlen(*old_env_cur));
+				for (new_env_cur = env_ary; new_env_cur < new_env_top; new_env_cur++)
+				{
+					if (0 == strncmp(*new_env_cur, *old_env_cur, env_len))
+						break;
+				}
+				if (new_env_cur < new_env_top)
+					continue;
+			}
+			*env_ind++ = *old_env_cur;
+		}
+		*env_ind = NULL;	/* null terminator required by execve() */
 
 #ifdef	__osf__
 #pragma pointer_size (restore)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@ typedef struct
         int               (*aa_close)();
         int               (*aa_connect)();
         int               (*aa_getsockopt)();
+	int               (*aa_getsockname)();
         unsigned short    (*aa_htons)(in_port_t);
 /* smw 1999/12/15 STDC is not a good flag to use so why is it here
 		  perhaps should define in_addr_t somewhere if needed. */

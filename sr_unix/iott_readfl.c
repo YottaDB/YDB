@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -143,7 +143,6 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		}
 	}
 	input_timeval.tv_usec = 0;
-	save_input_timeval = input_timeval;
 	do
 	{
 		if (outofband)
@@ -158,13 +157,11 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		FD_ZERO(&input_fd);
 		FD_SET(tt_ptr->fildes, &input_fd);
 		assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));
-		/*
-		 * the checks for EINTR below are valid and should not be converted to EINTR
+		/* the checks for EINTR below are valid and should not be converted to EINTR
 		 * wrapper macros, since the select/read is not retried on EINTR.
 		 */
-		selstat = select(tt_ptr->fildes + 1, (void *)&input_fd,
-					(void *)NULL, (void *)NULL, &input_timeval);
-                input_timeval = save_input_timeval;
+		save_input_timeval = input_timeval;	/* take a copy and pass it because select() below might change it */
+		selstat = select(tt_ptr->fildes + 1, (void *)&input_fd, (void *)NULL, (void *)NULL, &save_input_timeval);
 		if (selstat < 0)
 		{
 			if (EINTR != errno)
@@ -241,57 +238,45 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 					io_ptr->dollar.za = 2;
 					break;
 				}
-				/* ---------------------------------------------
-				 * In escape sequence...do not process further,
-				 * but get next character
-				 * ---------------------------------------------
+				/* --------------------------------------------------------------------
+				 * In escape sequence...do not process further, but get next character
+				 * --------------------------------------------------------------------
 				 */
-				if (nonzerotimeout)
+			} else
+			{	/* SIMPLIFY THIS! */
+				msk_num = (uint4)INPUT_CHAR / NUM_BITS_IN_INT4;
+				msk_in = (1 << ((uint4)INPUT_CHAR % NUM_BITS_IN_INT4));
+				if (msk_in & mask_term.mask[msk_num])
 				{
-					sys_get_curr_time(&cur_time);
-					cur_time = sub_abs_time(&end_time, &cur_time);
-					if (0 >= cur_time.at_sec)
-					{
-						ret = FALSE;
-						break;
-					}
-					input_timeval.tv_sec = cur_time.at_sec;
+					*zb_ptr++ = INPUT_CHAR;
+					break;
 				}
-				continue;
-			}
-			/* SIMPLIFY THIS! */
-			msk_num = (uint4)INPUT_CHAR / NUM_BITS_IN_INT4;
-			msk_in = (1 << ((uint4)INPUT_CHAR % NUM_BITS_IN_INT4));
-			if (msk_in & mask_term.mask[msk_num])
-			{
-				*zb_ptr++ = INPUT_CHAR;
-				break;
-			}
-			if (((int)inchar == tt_ptr->ttio_struct->c_cc[VERASE]) && !(mask & TRM_PASTHRU))
-			{
-				if ((0< outlen) && (0 < dx))
+				if (((int)inchar == tt_ptr->ttio_struct->c_cc[VERASE]) && !(mask & TRM_PASTHRU))
 				{
-					outlen--;
-					dx--;
-					*temp--;
+					if ((0< outlen) && (0 < dx))
+					{
+						outlen--;
+						dx--;
+						*temp--;
+						if (!(mask & TRM_NOECHO))
+						{
+							DOWRITERC(tt_ptr->fildes, eraser, sizeof(eraser), status);
+							if (0 != status)
+								goto term_error;
+						}
+					}
+				} else
+				{
 					if (!(mask & TRM_NOECHO))
 					{
-						DOWRITERC(tt_ptr->fildes, eraser, sizeof(eraser), status);
+						DOWRITERC(tt_ptr->fildes, &inchar, 1, status);
 						if (0 != status)
 							goto term_error;
 					}
+					*temp++ = inchar;
+					outlen++;
+					dx++;
 				}
-			} else
-			{
-				if (!(mask & TRM_NOECHO))
-				{
-					DOWRITERC(tt_ptr->fildes, &inchar, 1, status);
-					if (0 != status)
-						goto term_error;
-				}
-				*temp++ = inchar;
-				outlen++;
-				dx++;
 			}
 		} else if (0 == rdlen)
 		{
@@ -340,12 +325,13 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		{
 			sys_get_curr_time(&cur_time);
 			cur_time = sub_abs_time(&end_time, &cur_time);
-			if (0 >= cur_time.at_sec)
+			if (0 > cur_time.at_sec)
 			{
 				ret = FALSE;
 				break;
 			}
 			input_timeval.tv_sec = cur_time.at_sec;
+			input_timeval.tv_usec = cur_time.at_usec;
 		}
 	} while (outlen < length);
 	*zb_ptr++ = 0;

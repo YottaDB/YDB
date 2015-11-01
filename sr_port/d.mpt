@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -18,6 +18,7 @@
 	q
 INT	s %DAT=$$FUNC()
 	q
-FUNC()	n h
+FUNC()	n h,monyear
+	s monyear=$S($ZDATEFORM:"-MON-YEAR",1:"-MON-YY")
 	s h=$h
-	q +$zd(h,"DD")_$zd(h,"-MON-YY")
+	q +$zd(h,"DD")_$zd(h,monyear)

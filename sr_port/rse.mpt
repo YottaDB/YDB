@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1988,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1988, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -23,5 +23,5 @@ CALL	i '$l($g(%ZF)) q
 	n %ZC,cnt1,cnt2,cnt3,flen,fnd,gtmvt,h,i,o,out,outd,p,r,rl,sx,tics,x,xn n:'$d(%ZD) %ZD
 	s %ZD=$g(%ZD),(%ZC,cnt1,cnt2,cnt3,out)=0,outd=$l(%ZD)
 	i $d(%ZR)<10 d CALL^%RSEL
-	d WORK^%RCE
+	d work^%RCE
 	q

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -222,7 +222,7 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 			else if (   ((mask & TRM_ESCAPE) != 0)
 				 && (inchar == NATIVE_ESC  ||  io_ptr->esc_state != START))
 			{
-				*v = 0;
+				*v = INPUT_CHAR;
 				ret = FALSE;
 				do
 				{

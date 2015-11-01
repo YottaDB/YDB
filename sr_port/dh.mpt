@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -14,7 +14,7 @@
 	;invoke at FUNC as an extrinsic function
 	;if you make heavy use of this routine, consider $ZCALL
 	;
-	s %DH=$$FUNC(%DH,%DL)
+	s %DH=$$FUNC(%DH,$G(%DL))
 	q
 INT	n %DL
 	r !,"Decimal: ",%DH r !,"Digits:  ",%DL s %DH=$$FUNC(%DH,%DL)

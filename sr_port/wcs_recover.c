@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -241,9 +241,10 @@ void		wcs_recover(gd_region *reg)
 				cr->jnl_addr = csa->jnl->jnl_buff->freeaddr;
 			}
 		} else
-		{
-			assert(0 == cr->jnl_addr);
-			cr->jnl_addr = 0;		/* just be safe */
+		{	/* cr->jnl_addr can be non-zero at this point in time because of a JNL_ENABLED to JNL_ALLOWED online
+			 * state transition. in this case, reset cr->jnl_addr to 0. even otherwise, just be safe.
+			 */
+			cr->jnl_addr = 0;
 		}
 		if (cr->stopped)
 		{	/* cache record attached to a buffer built by secshr_db_clnup: finish work; clearest case: do it 1st */

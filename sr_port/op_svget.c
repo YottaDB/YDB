@@ -1,5 +1,5 @@
 /****************************************************************
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,6 +85,7 @@ GBLREF mval		dollar_zinterrupt;
 GBLREF boolean_t	dollar_zininterrupt;
 GBLREF int4		zdir_form;
 GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
+GBLREF int4		zdate_form;
 
 LITREF mval		literal_zero,literal_one;
 LITREF char		gtm_release_name[];
@@ -332,6 +333,9 @@ void op_svget(int varnum, mval *v)
 		break;
         case SV_ZJOB:
 		MV_FORCE_ULONG_MVAL(v, dollar_zjob);
+		break;
+	case SV_ZDATE_FORM:
+		MV_FORCE_MVAL(v, zdate_form);
 		break;
 	default:
 		GTMASSERT;

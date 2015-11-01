@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,30 +10,30 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
 #include "cmd.h"
 #include "indir_enum.h"
 
-GBLREF char	window_token;
-GBLREF bool	run_time;
-GBLREF oprtype	*for_stack[],**for_stack_ptr;
-GBLREF mval	dollar_ztrap;
+GBLREF	char		window_token;
+GBLREF	bool		run_time;
+GBLREF	oprtype		*for_stack[], **for_stack_ptr;
 
 int m_quit(void)
 {
 	int	rval;
 	triple	*triptr;
 	triple	*r;
-	oprtype x;
+	oprtype	x;
 	error_def(ERR_QUITARGUSE);
 	error_def(ERR_QUITARGLST);
 
 	if (for_stack_ptr == for_stack)
 	{
 		if (window_token == TK_EOL || window_token == TK_SPACE)
-			newtriple((dollar_ztrap.str.len) ? OC_HARDRET : OC_RET);
+			newtriple((run_time) ? OC_HARDRET : OC_RET);
 		else
 		{
 			if (!(rval = expr(&x)))

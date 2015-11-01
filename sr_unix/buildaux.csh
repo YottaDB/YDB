@@ -235,12 +235,8 @@ if ( $buildaux_mupip == 1 ) then
 	if ( $HOSTOS == "AIX") then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/mupip.loadmap"
 	endif
-	set hpux_callg = ''
-	if ( $HOSTOS == "HP-UX") then
-		set hpux_callg = "$gtm_obj/callg.o"
-	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/mupip	-L$gtm_obj $gtm_obj/{mupip,mupip_cmd}.o \
-		$hpux_callg $gt_ld_sysrtns -lmupip -lmumps -lstub \
+		$gt_ld_sysrtns -lmupip -lmumps -lstub \
 		$gt_ld_syslibs >& $gtm_map/mupip.map
 	if ( $status != 0  ||  ! -x $3/mupip ) then
 		set buildaux_status = `expr $buildaux_status + 1`
@@ -254,12 +250,8 @@ if ( $buildaux_gtcm_server == 1 ) then
 	if ( $HOSTOS == "AIX") then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtcm_server.loadmap"
 	endif
-	set hpux_callg = ''
-	if ( $HOSTOS == "HP-UX") then
-		set hpux_callg = "$gtm_obj/callg.o"
-	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_server -L$gtm_obj \
-		$gtm_obj/gtcm_main.o $gtm_obj/omi_srvc_xct.o $hpux_callg $gt_ld_sysrtns \
+		$gtm_obj/gtcm_main.o $gtm_obj/omi_srvc_xct.o $gt_ld_sysrtns \
 		-lgtcm -lmumps -lstub $gt_ld_syslibs >& $gtm_map/gtcm_server.map
 	if ( $status != 0  ||  ! -x $3/gtcm_server) then
 		set buildaux_status = `expr $buildaux_status + 1`
@@ -273,12 +265,8 @@ if ( $buildaux_gtcm_gnp_server == 1 ) then
 	if ( $HOSTOS == "AIX") then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtcm_gnp_server.loadmap"
 	endif
-	set hpux_callg = ''
-	if ( $HOSTOS == "HP-UX") then
-		set hpux_callg = "$gtm_obj/callg.o"
-	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_gnp_server -L$gtm_obj \
-		$gtm_obj/gtcm_gnp_server.o $gtm_obj/gtcm_gnp_clitab.o $hpux_callg $gt_ld_sysrtns \
+		$gtm_obj/gtcm_gnp_server.o $gtm_obj/gtcm_gnp_clitab.o $gt_ld_sysrtns \
 		-lgnpserver -llke -lmumps -lcmisockettcp -lstub \
 		$gt_ld_syslibs >& $gtm_map/gtcm_gnp_server.map
 	if ( $status != 0  ||  ! -x $3/gtcm_gnp_server) then
@@ -294,12 +282,8 @@ if ( $buildaux_gtcm_play == 1 ) then
 	if ( $HOSTOS == "AIX") then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtcm_play.loadmap"
 	endif
-	set hpux_callg = ''
-	if ( $HOSTOS == "HP-UX") then
-		set hpux_callg = "$gtm_obj/callg.o"
-	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_play -L$gtm_obj \
-		$gtm_obj/gtcm_play.o $gtm_obj/omi_sx_play.o $hpux_callg $gt_ld_sysrtns \
+		$gtm_obj/gtcm_play.o $gtm_obj/omi_sx_play.o $gt_ld_sysrtns \
 		-lgtcm -lmumps -lstub $gt_ld_syslibs >& $gtm_map/gtcm_play.map
 	if ( $status != 0  ||  ! -x $3/gtcm_play) then
 		set buildaux_status = `expr $buildaux_status + 1`
@@ -313,12 +297,8 @@ if ( $buildaux_gtcm_pkdisp == 1 ) then
 	if ( $HOSTOS == "AIX") then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtcm_pkdisp.loadmap"
 	endif
-	set hpux_callg = ''
-	if ( $HOSTOS == "HP-UX") then
-		set hpux_callg = "$gtm_obj/callg.o"
-	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_pkdisp -L$gtm_obj $gtm_obj/gtcm_pkdisp.o \
-		$hpux_callg $gt_ld_sysrtns -lgtcm -lmumps -lstub $gt_ld_syslibs \
+		$gt_ld_sysrtns -lgtcm -lmumps -lstub $gt_ld_syslibs \
 			>& $gtm_map/gtcm_pkdisp.map
 	if ( $status != 0  ||  ! -x $3/gtcm_pkdisp) then
 		set buildaux_status = `expr $buildaux_status + 1`
@@ -332,12 +312,8 @@ if ( $buildaux_gtcm_shmclean == 1 ) then
 	if ( $HOSTOS == "AIX") then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtcm_shmclean.loadmap"
 	endif
-	set hpux_callg = ''
-	if ( $HOSTOS == "HP-UX") then
-		set hpux_callg = "$gtm_obj/callg.o"
-	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_shmclean -L$gtm_obj $gtm_obj/gtcm_shmclean.o	\
-		$hpux_callg $gt_ld_sysrtns -lgtcm -lmumps -lstub $gt_ld_syslibs			\
+		$gt_ld_sysrtns -lgtcm -lmumps -lstub $gt_ld_syslibs			\
 			>& $gtm_map/gtcm_shmclean.map
 	if ( $status != 0  ||  ! -x $3/gtcm_shmclean) then
 		set buildaux_status = `expr $buildaux_status + 1`

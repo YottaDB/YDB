@@ -75,7 +75,7 @@ void t_retry(enum cdb_sc failure)
 		cs_addrs->hdr->n_retries[t_tries]++;
 		if (cs_addrs->critical)
 			crash_count = cs_addrs->critical->crashcnt;
-		if (cdb_sc_jnlclose == failure || cdb_sc_jnlstatemod == failure)
+		if (cdb_sc_jnlclose == failure || cdb_sc_jnlstatemod == failure || cdb_sc_backupstatemod == failure)
 			t_tries--;
 		if ((CDB_STAGNATE <= ++t_tries) || (cdb_sc_future_read == failure) || (cdb_sc_helpedout == failure))
 		{

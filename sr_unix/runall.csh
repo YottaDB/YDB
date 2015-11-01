@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -20,9 +20,10 @@ echo ""
 
 set listonly = 0
 set compileonly = 0
+set linkonly = 0
 set helponly = 0
 
-set temp=(`getopt nch $argv:q`)
+set temp=(`getopt nchl $argv:q`)
 if ($? == 0) then
 	eval set argv=\($temp:q\)
 	while (1)
@@ -34,6 +35,11 @@ if ($? == 0) then
 
 			case -c :
 				set compileonly = 1
+				shift
+				breaksw
+
+			case -l :
+				set linkonly = 1
 				shift
 				breaksw
 
@@ -317,45 +323,47 @@ foreach file (`cat ${TMP_DIR}_src_files`)
 	alias gt_as $gt_as_assembler $gt_as_options_common $gt_as_option_I $RUNALL_EXTRA_AS_FLAGS
 	alias runall_as gt_as_${RUNALL_IMAGE}
 
-	if ($ext == "s") then
-		echo "$gtm_src/$file.$ext   ---->  $gtm_obj/$file.o"
-		runall_as $gtm_src/$file.s
-	else if ($ext == "c") then
-		echo "$gtm_src/$file.$ext   ---->  $gtm_obj/$file.o"
-		runall_cc $RUNALL_EXTRA_CC_FLAGS $gtm_src/$file.c
-		if ($file == "omi_srvc_xct") then
-			chmod +w $gtm_src/omi_sx_play.c
-			\cp $gtm_src/omi_srvc_xct.c $gtm_src/omi_sx_play.c
-			chmod -w $gtm_src/omi_sx_play.c
-			echo "$gtm_src/omi_sx_play.c   ---->  $gtm_obj/omi_sx_play.o"
-			runall_cc -DFILE_TCP $RUNALL_EXTRA_CC_FLAGS $gtm_src/omi_sx_play.c
+	if ($linkonly == 0) then
+		if ($ext == "s") then
+			echo "$gtm_src/$file.$ext   ---->  $gtm_obj/$file.o"
+			runall_as $gtm_src/$file.s
+		else if ($ext == "c") then
+			echo "$gtm_src/$file.$ext   ---->  $gtm_obj/$file.o"
+			runall_cc $RUNALL_EXTRA_CC_FLAGS $gtm_src/$file.c
+			if ($file == "omi_srvc_xct") then
+				chmod +w $gtm_src/omi_sx_play.c
+				\cp $gtm_src/omi_srvc_xct.c $gtm_src/omi_sx_play.c
+				chmod -w $gtm_src/omi_sx_play.c
+				echo "$gtm_src/omi_sx_play.c   ---->  $gtm_obj/omi_sx_play.o"
+				runall_cc -DFILE_TCP $RUNALL_EXTRA_CC_FLAGS $gtm_src/omi_sx_play.c
+			endif
+		else if ($ext == "msg") then
+			echo "$gtm_src/$file.$ext   ---->  $gtm_obj/${file}_ctl.c  ---->  $gtm_obj/${file}_ctl.o"
+			# gtm_startup_chk requires gtm_dist setup
+			rm -f ${file}_ctl.c ${file}_ansi.h	# in case an old version is lying around
+			set real_gtm_dist = "$gtm_dist"
+			setenv gtm_dist "$gtm_root/$gtm_curpro/pro"
+			setenv gtmroutines "$gtm_obj($gtm_pct)"
+			$gtm_root/$gtm_curpro/pro/mumps -run msg $gtm_src/$file.msg Unix
+			setenv gtm_dist "$real_gtm_dist"
+			unset real_gtm_dist
+			mv ${file}_ctl.c $gtm_src/${file}_ctl.c
+			if ( -f ${file}_ansi.h ) then
+				mv -f ${file}_ansi.h $gtm_inc
+			endif
+			runall_cc $RUNALL_EXTRA_CC_FLAGS $gtm_src/${file}_ctl.c
+			set objfile = ${file}_ctl.o
 		endif
-	else if ($ext == "msg") then
-		echo "$gtm_src/$file.$ext   ---->  $gtm_obj/${file}_ctl.c  ---->  $gtm_obj/${file}_ctl.o"
-		# gtm_startup_chk requires gtm_dist setup
-		rm -f ${file}_ctl.c ${file}_ansi.h	# in case an old version is lying around
-		set real_gtm_dist = "$gtm_dist"
-		setenv gtm_dist "$gtm_root/$gtm_curpro/pro"
-		setenv gtmroutines "$gtm_obj($gtm_pct)"
-		$gtm_root/$gtm_curpro/pro/mumps -run msg $gtm_src/$file.msg Unix
-		setenv gtm_dist "$real_gtm_dist"
-		unset real_gtm_dist
-		mv ${file}_ctl.c $gtm_src/${file}_ctl.c
-		if ( -f ${file}_ansi.h ) then
-			mv -f ${file}_ansi.h $gtm_inc
+		if ($status == 1) then
+			goto cleanup
 		endif
-		runall_cc $RUNALL_EXTRA_CC_FLAGS $gtm_src/${file}_ctl.c
-		set objfile = ${file}_ctl.o
-	endif
-	if ($status == 1) then
-		goto cleanup
 	endif
 	set library=`grep "^$file " ${TMP_DIR}_exclude`
 	if ("$library" == "") then
 		set library=`grep " $file " ${TMP_DIR}_list | awk '{print $1}'`
 		if ("$library" == "") then
 			set library="libmumps.a"
-		else 
+		else
 			set retain=`grep "^$file" $gtm_tools/retain_list.txt`
 			if ("$retain" != "") then
 				echo $objfile >> ${TMP_DIR}_lib_.libmumps.a

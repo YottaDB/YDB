@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1985,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1985, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -28,27 +28,29 @@
 	. i %ZD="?" d  q
 	 . . w !!,"Select the device you want for input"
 	 . . w !,"If you wish to exit enter a carat (^)",!
+	 . . s %ZD=""
 	. i $zparse(%ZD)="" w "  no such device" s %ZD="" q
 	. o %ZD:(readonly:block=2048:record=2044:exception="g noopen"):0
 	. i '$t  w !,%ZD," is not available" s %ZD="" q
 	. q
 noopen	. w !,$p($ZS,",",2,999),! c %ZD s %ZD=""
 	q:%ZD="^"
-	u %ZD:exception="zg "_$zl_":eof"
-	r x,y u $p w !,x,!,y,!!
+	u %ZD:(exception="zg "_$zl_":eof":ctrap=$C(3,$s($zver["VMS":26,1:4)))
+	if %ZD'=$P r x,y u $p w !,x,!,y,!!
 	r !,"Output directory : ",dir,!!
 	i dir="^" c:%ZD'=$p %ZD u $p:(ctrap="":exc="") q
 	s (l,r)=0
-	f  u %ZD r x i $l(x),$e(x)?1a!($e(x)="%"),$e(x,2,99)?.an d
+	f  u %ZD w:$P=%ZD !,"Routine: " r x q:'$l(x)  i $l(x),$e(x)?1a!($e(x)="%"),$e(x,2,99)?.an d
+	. w:$P=%ZD !,"Enter routine "
 	. ;warning - loop terminated by exception
 	. u $p w:$x>70 ! w x,?$x\10+1*10
 	. s x=dir_$tr($e(x),"%","_")_$e(x,2,9999)_".m",r=r+1	;convert % to _
 	. o x:(newversion:noreadonly:blocksize=2048:recordsize=2044)
-	. f  u %ZD r y q:y=ff  s l=l+1 u x w $s(y="":" ",1:y),!
+	. f  u %ZD w:$P=%ZD ! r y q:y=ff  s l=l+1 u x w $s(y="":" ",1:y),!
 	. c x
 eof	u $p
 	i $l(x) c x
-	w !!,"Restored ",l," line",$s(l=1:"",1:"s")
+	w !!!,"Restored ",l," line",$s(l=1:"",1:"s")
 	w " in ",r," routine",$s(r=1:".",1:"s.")
 	c:%ZD'=$p %ZD u $p:(ctrap="":exc="")
 	q

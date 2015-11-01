@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,6 +99,7 @@ GBLREF boolean_t        	write_after_image;
 GBLREF boolean_t        	dse_running;
 GBLREF enum gtmImageTypes	image_type;
 GBLREF boolean_t		gtm_environment_init;
+GBLREF	boolean_t		is_src_server;
 
 #define MAX_CYCLES      2
 
@@ -574,6 +575,7 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
         cache_rec_ptr_t cr;
         bool            recycled;
 	boolean_t	bmp_status;
+	boolean_t	read_before_image;
 
         error_def(ERR_DBCCERR);
         error_def(ERR_ERRCALL);
@@ -590,11 +592,13 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
 		bt->killtn = ctn;
         cr = (cache_rec_ptr_t)bt->cache_index;
         recycled = FALSE;
+	DEBUG_ONLY(read_before_image = ((JNL_ENABLED(cs_addrs) && cs_addrs->jnl_before_image) || cs_addrs->backup_in_prog);)
         if ((cache_rec_ptr_t)CR_NOTVALID == cr)
         {       /* no cache record associated with the bt_rec */
                 if (NULL == (cr = db_csh_get(cs->blk)))
                 {       /* no cache_rec associated with the block */
-			assert((gds_t_acquired == cs->mode) || (0 != cs->new_buff));
+			assert(((gds_t_acquired == cs->mode) && (!read_before_image || (NULL == cs->old_block)))
+					|| (gds_t_acquired != cs->mode) && (0 != cs->new_buff));
 			INCR_DB_CSH_COUNTER(cs_addrs, n_bg_update_creates, 1);
                         cr = db_csh_getn(cs->blk);
                         if ((cache_rec_ptr_t)CR_NOTVALID == cr)
@@ -622,10 +626,9 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                 process_id, ctn, DB_LEN_STR(gv_cur_region));
                         return cdb_sc_cacheprob;
                 } else if (-1 != cr->read_in_progress)
-                {
-                        /* wait for another process in t_qread to stop overlaying the buffer */
+                {	/* wait for another process in t_qread to stop overlaying the buffer */
                         /* this case is believed to require the reuse of a killed block that's still in the cache */
-			assert(gds_t_acquired == cs->mode);
+			assert((gds_t_acquired == cs->mode) && (!read_before_image || (NULL == cs->old_block)));
                         for (lcnt = 1; -1 != cr->read_in_progress; lcnt++)
                         {       /* very similar code appears elsewhere and perhaps should be common */
                                 wcs_sleep(lcnt);
@@ -726,10 +729,9 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                 }
                                 /* Buffer is free */
                                 if (-1 != cr->read_in_progress)
-                                {
-                                        /* wait for another process in t_qread to stop overlaying the buffer */
+                                {	/* wait for another process in t_qread to stop overlaying the buffer */
                                         /* this case is believed to require the reuse of a killed block that's still in the cache */
-					assert(gds_t_acquired == cs->mode);
+					assert((gds_t_acquired == cs->mode) && (!read_before_image || (NULL == cs->old_block)));
                                         for (lcnt = 1; -1 != cr->read_in_progress; lcnt++)
                                         {
                                                 wcs_sleep(lcnt);
@@ -795,11 +797,11 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                 }       /* end of for loop to control buffer */
         }       /* end of if / else on cr NOTVALID */
         if (FALSE == cr->in_cw_set)
-        {
-                /* in_cw_set should always be set unless we're in DSE (indicated by !run_time),
+        {	/* in_cw_set should always be set unless we're in DSE (indicated by !run_time),
                  * or this is a newly created block, or we have an in-memory copy.
                  */
-		assert((FALSE == run_time) || (gds_t_acquired == cs->mode) || (0 != cs->new_buff));
+		assert(!run_time || ((gds_t_acquired == cs->mode) && (!read_before_image || (NULL == cs->old_block)))
+				|| (gds_t_acquired != cs->mode) && (0 != cs->new_buff));
                 if (0 == dollar_tlevel)         /* stuff it in the array before setting in_cw_set */
                 {
                         assert((((MAX_BT_DEPTH * 2) - 1) * 2) > cr_array_index);
@@ -833,33 +835,20 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                          * dirty flag remained set to an old value.  Fix the value of dirty and
                          * arrange for this buffer to be placed on the active queue.
                          */
-#ifdef DEBUG
-                        cache_rec cr_save;      /* save it for core which will rewrite it */
-                        cr_save = *cr;
-                        assert(FALSE);
-#endif
+			DEBUG_ONLY(
+				cache_rec cr_save;      /* save it for core which will rewrite it */
+				cr_save = *cr;
+				assert(FALSE);
+			)
                         cr->dirty = ctn;
                         recycled = FALSE;
                 }
         } else
                 cr->dirty = ctn;                /* block will be dirty.  Note the tn in which this occurred */
         blk_ptr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+	assert((gds_t_acquired != cs->mode) || !read_before_image || (NULL == cs->old_block) || (blk_ptr == cs->old_block));
         assert((0 <= cs->blk) && (cs->blk <= cs_addrs->ti->total_blks));
-
         /* check for online backup - ATTN: this part of code should be same as that in mm_update, except for the blk_ptr part. */
-#ifdef DEBUG_COMPREHENSIVE_BACKUP
-        /* the following util_out_print part is for debug use only */
-        if (cs->blk < cs_addrs->nl->nbb)
-                util_out_print("no backup because: block !8UL < !8UL", TRUE, cs->blk, cs_addrs->nl->nbb);
-        else if (0 != cs_addrs->backup_buffer->failed)
-                util_out_print("no backup because: failed field in backup buffer is !12UL", TRUE, cs_addrs->backup_buffer->failed);
-        else if (((blk_hdr_ptr_t)(blk_ptr))->tn >= cs_addrs->backup_buffer->backup_tn)
-                util_out_print("no backup because: blk tn !8UL >= !8UL, backup_tn", TRUE,
-				((blk_hdr_ptr_t)(blk_ptr))->tn, cs_addrs->backup_buffer->backup_tn);
-        else if (((blk_hdr_ptr_t)(blk_ptr))->tn < cs_addrs->backup_buffer->inc_backup_tn)
-                util_out_print("no backup because: blk tn !8UL < !8UL inc_backup_tn", TRUE,
-				((blk_hdr_ptr_t)(blk_ptr))->tn, cs_addrs->backup_buffer->inc_backup_tn);
-#endif
         if ((cs->blk >= cs_addrs->nl->nbb)
                 && (0 == cs_addrs->backup_buffer->failed)
                 && (((blk_hdr_ptr_t)(blk_ptr))->tn < cs_addrs->backup_buffer->backup_tn)
@@ -992,52 +981,6 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
         } else
                 assert(FALSE == OWN_BUFF(n));
         VERIFY_QUEUE_LOCK(&cs_addrs->acc_meth.bg.cache_state->cacheq_active, &cs_addrs->nl->db_latch);
-
-#ifdef unused_code
-/* the code above is the simple alternative;
- * the code below has the advantage of limiting (but not eliminating) the likelihood of an insqti,
- * which (really shouldn't, but) might fail after some blocks have been committed
- */
-        while (WRITER_BLOCKED_BY_PROC(n))
-        {       /* this loop should probably be limited for safety */
-                if ((0 == cr->jnl_addr) || (cr->jnl_addr <= cs_addrs->jnl->jnl_buff->dskaddr))
-                {
-                        cr->epid = process_id;
-                        if (SS_NORMAL != dsk_write(gv_cur_region, cs->blk, GDS_REL2ABS(cr->buffaddr)))
-                        {       /* if it fails, put it back and hope that another time,
-                                   another writer will do the work (infinite retry) */
-                                cr->epid = 0;
-                                n = INSQTI((que_ent_ptr_t)&cr->state_que,
-						(que_head_ptr_t)&cs_addrs->acc_meth.bg.cache_state->cacheq_active);
-                                if (INTERLOCK_FAIL == n)
-                                {
-                                        CLEAR_BUFF_UPDATE_LOCK(cr, &cs_addrs->nl->db_latch);      /* not on the active queue */
-                                        rts_error(VARLSTCNT(9) ERR_DBCCERR, 2, DB_LEN_STR(reg), ERR_ERRCALL, 3, CALLFROM);
-                                }
-                                RELEASE_BUFF_UPDATE_LOCK(cr, n, &cs_addrs->nl->db_latch);
-                                assert(FALSE);
-                        } else
-                        {
-                                SUB_ENT_FROM_ACTIVE_QUE_CNT(&cs_addrs->nl->wcs_active_lvl, &cs_addrs->nl->wc_var_lock);
-                                cr->dirty = 0;
-                                cr->epid = 0;
-                                CLEAR_BUFF_UPDATE_LOCK(cr, &cs_addrs->nl->db_latch);     /* not on the active queue */
-                                break;
-                        }
-                } else
-                {       /* put it back */
-                        n = INSQTI((que_ent_ptr_t)&cr->state_que,
-					(que_head_ptr_t)&cs_addrs->acc_meth.bg.cache_state->cacheq_active);
-                        if (INTERLOCK_FAIL == n)
-                        {
-                                CLEAR_BUFF_UPDATE_LOCK(cr, &cs_addrs->nl->db_latch);     /* not on the active queue */
-                                rts_error(VARLSTCNT(9) ERR_DBCCERR, 2, DB_LEN_STR(reg),
-                                                       ERR_ERRCALL, 3, CALLFROM);
-                        }
-                        RELEASE_BUFF_UPDATE_LOCK(cr, n, &cs_addrs->nl->db_latch);
-                }
-        }
-#endif
         return cdb_sc_normal;
 }
 
@@ -1106,28 +1049,37 @@ void    wcs_timer_start(gd_region *reg, boolean_t io_ok)
 /* make sure that the journal file is available if appropriate */
 uint4	jnl_ensure_open(void)
 {
-	uint4	jnl_status = 0;
+	uint4			jnl_status = 0;
+	jnl_private_control	*jpc;
 	DEBUG_ONLY(
 		gd_id	save_jnl_gdid;
 	)
 
 	assert(cs_addrs->now_crit);
-        assert(NULL !=  cs_addrs->jnl);
-        if (NOJNL == cs_addrs->jnl->channel)
+        assert(NULL != cs_addrs->jnl);
+	jpc = cs_addrs->jnl;
+	/* The goal is to change the code below to do only one JNL_FILE_SWITCHED(jpc) check instead of the two including
+	 * the additional (NOJNL == jpc->channel) check done below. The assert below ensures that the NOJNL check can indeed
+	 * be subsumed by the JNL_FILE_SWITCHED check (with the exception of the source-server which has a special case that
+	 * needs to be fixed in V43002 [C9D02-002241]). Over time, this has to be changed to be one check.
+	 */
+	assert((NOJNL != jpc->channel) || JNL_FILE_SWITCHED(jpc) || is_src_server);
+        if (NOJNL == jpc->channel)
         {
-                cs_addrs->jnl->pini_addr = 0;
+                jpc->pini_addr = 0;
                 jnl_status = jnl_file_open(gv_cur_region, 0 == cs_addrs->nl->jnl_file.u.inode, 0);
-        } else if (!is_gdid_gdid_identical(&cs_addrs->jnl->fileid, &cs_addrs->nl->jnl_file.u))
+        } else if (JNL_FILE_SWITCHED(jpc))
         {
 		DEBUG_ONLY(save_jnl_gdid = cs_addrs->nl->jnl_file.u;)
                 /* The journal file has been changed "on the fly"; close the old one and open the new one */
-                close(cs_addrs->jnl->channel);
-                cs_addrs->jnl->channel = NOJNL;
-                cs_addrs->jnl->pini_addr = 0;
+                close(jpc->channel);
+                jpc->channel = NOJNL;
+                jpc->pini_addr = 0;
 		if (GTCM_GNP_SERVER_IMAGE == image_type)
 			gtcm_jnl_switched();
                 jnl_status = jnl_file_open(gv_cur_region, 0 == cs_addrs->nl->jnl_file.u.inode, 0);
         }
+	assert((0 != jnl_status) || !JNL_FILE_SWITCHED(jpc));
 	return jnl_status;
 }
 
@@ -1234,13 +1186,9 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 
                 ++fast_lock_count;                      /* Disable wcs_stale for duration */
                 if (dba_bg == csd->acc_meth)            /* Determine queue base to use */
-                {
                         base = &csa->acc_meth.bg.cache_state->cacheq_active;
-                }
                 else
-                {
                         base = &csa->acc_meth.mm.mmblk_state->mmblkq_active;
-                }
 
                 for (k = 0; k < QI_STARVATION; k++)
                 {

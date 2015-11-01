@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,6 @@
 #include <unistd.h>
 #include <errno.h>
 #include "gtm_socket.h"
-#include <netinet/in.h>
 #include "gtm_inet.h"
 #include "io.h"
 #ifdef _AIX
@@ -32,6 +31,7 @@
 int accept(int, struct sockaddr *, int *);
 int bind(int, struct sockaddr *, int);
 int connect(int, struct sockaddr *, int);
+int getsockname(int, struct sockaddr *, size_t *);
 int getsockopt(int, int, int, char *, int *);
 int listen(int, int);
 int recv(int, char *, int, int);
@@ -111,6 +111,7 @@ int	iotcp_fillroutine(void)
 	tcp_routines.aa_bind = bind;
 	tcp_routines.aa_close = close;
 	tcp_routines.aa_connect = gtm_connect;
+	tcp_routines.aa_getsockname = getsockname;
 	tcp_routines.aa_getsockopt = getsockopt;
 #ifndef htons       /* if htons is not a macro, assign the routine */
 	tcp_routines.aa_htons = htons;

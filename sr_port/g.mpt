@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -30,6 +30,7 @@ noopen  . w !,$p($ZS,",",2,999),! c %ZD s %ZD=""
 	q
 base	f  r !,"List ^",%in,! q:%in=""  d
 	. i $e(%in)="?",$l(%in)=1 d help q
+	. i (%in="?D")!(%in="?d") d ^%GD u $p:(ctrap=$c(3):exc="zg "_($zl-2)_":LOOP^%G") q
 	. s:%in="*" %in="?.E(*)"
 	. s:$p(%in,"(")="*" $p(%in,"(")="?.E"
 	. s:$e(%in)'="^" %in="^"_%in
@@ -40,8 +41,7 @@ badzwr	. u $p w !,$p($zs,",",3,99),!
 	. s $ec=""
 	d EXIT
 	q
-help	i "dD"[$e(%in,2),$l(%in)=2 d ^%GD u $p:(ctrap=$c(3):exc="zg "_($zl-2)_":LOOP^%G") q
-	w !,"VALID INPUT",!!
+help	w !,"VALID INPUT",!!
 	w !,?3,"<RET>",?16,"to leave the %G utility ",!
 	w !,?4,"?D",?16,"to display existing globals in your directory ",!
 	w !,"[global name]",?16,"the MUMPS name for the global e.g. ABC, or"

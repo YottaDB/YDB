@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,9 +106,12 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 	jpc->status = jpc->status2 = SS_NORMAL;
 	nameptr = JNL_NAME_EXP_PTR(jb);
 	if (init)
-	{
+	{	/* although jnl_file_close() would have reset jnl_file.u.inode and device to 0 and incremented cycle, it
+		 * might have got shot in the middle of executing those instructions. we redo it here just to be safe.
+		 */
 		csa->nl->jnl_file.u.inode = 0;
 		csa->nl->jnl_file.u.device = 0;
+		jb->cycle++;
 		for (retry = TRUE;  ;)
 		{	/* this is stuctured as a loop, in a fashion analogous to the VMS logic,
 			 * in order to permit creation of a new file in case the existing one is found wanting.
@@ -410,9 +413,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 					{	/* Stash the file id in shared-memory for subsequent users */
 						set_gdid_from_stat(&csa->nl->jnl_file.u, &stat_buf);
 					}
-					/* Stash the file id in the process-private area,
-				 	  to detect any later change of jnl file "on the fly" */
-					set_gdid_from_stat(&jpc->fileid, &stat_buf);
+					jpc->cycle = jb->cycle;	/* make private cycle and shared cycle in sync */
 				}  /* if jnl_state */
 			} else
 				{  /* not init and file moved */
@@ -432,9 +433,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 		jpc->channel = NOJNL;
 		status = jpc->status;
 		jnl_send_oper(jpc, sts);
-		gtm_putmsg(VARLSTCNT(7) sts, 4, csd->jnl_file_len,
-			csd->jnl_file_name, reg->dyn.addr->fname_len,
-			reg->dyn.addr->fname, status);
+		gtm_putmsg(VARLSTCNT(7) sts, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), status);
 	}
 	return sts;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -141,6 +141,9 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 			tmp_ctl->jnl_fn_len = csa->hdr->jnl_file_len;
 			memcpy(tmp_ctl->jnl_fn, csa->hdr->jnl_file_name, tmp_ctl->jnl_fn_len);
 		}
+		/* stash the shared fileid into private storage before rel_crit() as it is used in JNL_GDID_PVT macro below */
+		VMS_ONLY (cs_addrs->jnl->fileid = cs_addrs->nl->jnl_file.jnl_file_id;)
+		UNIX_ONLY(cs_addrs->jnl->fileid = cs_addrs->nl->jnl_file.u;)
 		rel_crit(reg);
 		gv_cur_region = r_save;
 		tp_change_reg();
@@ -320,6 +323,7 @@ int gtmsource_ctl_close(void)
 				{
 					F_CLOSE(csa->jnl->channel);
 					csa->jnl->channel = NOJNL;
+					csa->jnl->cycle--; /* decrement cycle so jnl_ensure_open() knows to reopen the journal */
 					ctl->repl_buff->fc->fd = NOJNL;
 				}
 				reg = ctl->reg;

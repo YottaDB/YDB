@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -428,7 +428,16 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	csa->lock_addrs[1] = csa->lock_addrs[0] + LOCK_SPACE_SIZE(tsd) - 1;
 	csa->total_blks = tsd->trans_hist.total_blks;   		/* For test to see if file has extended */
 	if (new_ipc)
+	{
 		memset(csa->nl, 0, sizeof(*csa->nl));			/* We allocated shared storage -- we have to init it */
+		if (JNL_ALLOWED(csa))
+		{	/* initialize jb->cycle to a value different from initial value of jpc->cycle (0). although this is not
+			 * necessary right now, in the future, the plan is to change jnl_ensure_open() to only do a cycle mismatch
+			 * check in order to determine whether to call jnl_file_open() or not. this is in preparation for that.
+			 */
+			csa->jnl->jnl_buff->cycle = 1;
+		}
+	}
         if (is_bg)
 		csd = csa->hdr = (sgmnt_data_ptr_t)(csa->lock_addrs[1] + 1 + CACHE_CONTROL_SIZE(tsd));
 	else
@@ -623,7 +632,9 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 				  ERR_TEXT, 2, LEN_AND_LIT("gtmsecshr failed to update database file header"));
 
 	}
-	++csa->nl->ref_cnt;         /* This value is changed under control of the init/rundown semaphore only */
+	++csa->nl->ref_cnt;	/* This value is changed under control of the init/rundown semaphore only */
+	assert(!csa->ref_cnt);	/* Increment shared ref_cnt before private ref_cnt increment. */
+	csa->ref_cnt++;		/* Currently journaling logic in gds_rundown() in VMS relies on this order to detect last writer */
 	if (!mupip_jnl_recover)
 	{
  		/* Release control lockout now that it is init'd */

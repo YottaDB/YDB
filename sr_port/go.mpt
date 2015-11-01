@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -31,6 +31,7 @@
 	. i %ZD="?" d  q
 	 . . w !!,"Select the device you want for output"
 	 . . w !,"If you wish to exit enter a carat (^)",!
+	 . . s %ZD=""
 	. i $zparse(%ZD)="" w "  no such device" s %ZD="" q
 	. o %ZD:(newversion:block=2048:record=2044:exception="g noopen"):0
 	. i '$t  w !,%ZD," is not available" s %ZD="" q

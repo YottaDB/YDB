@@ -23,6 +23,8 @@
 
 #if defined(__osf__) && defined(__alpha)
 #define GTM_SOCKLEN_TYPE size_t
+#elif defined(VMS) 
+#define GTM_SOCKLEN_TYPE size_t
 #elif __sparc
 #define GTM_SOCKLEN_TYPE int
 #else

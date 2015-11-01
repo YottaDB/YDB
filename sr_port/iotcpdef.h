@@ -11,7 +11,7 @@
 
 #ifndef __IOTCPDEF_H__
 #define __IOTCPDEF_H__
-
+#include "gtm_inet.h"
 /* iotcpdef.h UNIX - TCP header file */
 
 #define TCPDEF_WIDTH	255

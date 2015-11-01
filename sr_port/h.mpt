@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -30,12 +30,16 @@ CTS(tm)
 %CDN	s %DAT=$$CDN(%DT)
 	q
 CDN(dt)
-	n cc,dat,dd,mm,yy
+	n cc,dat,dd,mm,yy,dh,zd
 	s mm=+dt,dd=$p(dt,"/",2),yy=$p(dt,"/",3),dat=""
 	i mm<1 q ""
 	i mm>13 q ""
 	i dd<1 q ""
-	i $l(yy)<3 s yy=yy+1900
+	s zd=$ZDATEFORM
+	i $l(yy)<3 d
+	. s dh=$H
+	. s yy=yy+(100*$S('zd:19,(zd>1840)&($L(zd)=4):($E(zd,1,2)+$S($E(zd,3,4)'>yy:0,1:1)),1:$E($ZDATE(dh,"YEAR"),1,2)))
+	;                  20th           rolling                                current century
 	i dd>$s(+mm'=2:$e(303232332323,mm)+28,yy#4:28,yy#100:29,yy#400:28,1:29) q ""
 	s dat=yy-1841,mm=mm-1,cc=1
 	i dat<0 s dd=dd-1,cc=-1

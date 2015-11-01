@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ gd_region *gv_match(gd_region *reg)
 	gd_region	*r_top, *gv_region;
 	gd_addr		*addr_ptr;
 
-	for (addr_ptr = get_next_gdr(0); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{	for (gv_region = addr_ptr->regions, r_top = gv_region + addr_ptr->n_regions; gv_region < r_top;
 				gv_region++)
 		{

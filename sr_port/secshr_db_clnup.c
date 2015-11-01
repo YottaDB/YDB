@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,7 +86,7 @@
 	if (!GTM_PROBE(sizeof(GDS_INFO), (reg)->dyn.addr->file_cntl->file_info, READ))			\
 		continue; /* would be nice to notify the world of a problem but where and how? */	\
 	csa = &(FILE_INFO((reg)))->s_addrs;								\
-	if (!GTM_PROBE(sizeof(sgmnt_addrs), csa, READ))							\
+	if (!GTM_PROBE(sizeof(sgmnt_addrs), csa, WRITE))						\
 		continue; /* would be nice to notify the world of a problem but where and how? */	\
 	assert(reg->read_only && !csa->read_write || !reg->read_only && csa->read_write);
 
@@ -172,7 +172,7 @@ void secshr_db_clnup(boolean_t termination_mode)
 				break;
 		}
 	}
-	for (gd_header = (*get_next_gdr_addrs)(0);  NULL != gd_header;  gd_header = (*get_next_gdr_addrs)(gd_header))
+	for (gd_header = (*get_next_gdr_addrs)(NULL);  NULL != gd_header;  gd_header = (*get_next_gdr_addrs)(gd_header))
 	{
 		if (GTM_PROBE(sizeof(gd_addr), gd_header, READ))
 		{
@@ -221,9 +221,13 @@ void secshr_db_clnup(boolean_t termination_mode)
                                                 csa->timer = FALSE;
 					}
 					VMS_ONLY(
-						if ((ABNORMAL_TERMINATION == termination_mode)
-								&& csa->read_write && (csa->nl->ref_cnt > 0))
+						if ((ABNORMAL_TERMINATION == termination_mode) && csa->read_write && csa->ref_cnt)
+						{
+							assert(0 < csa->nl->ref_cnt);
+							csa->ref_cnt--;
+							assert(!csa->ref_cnt);
 							CAREFUL_DECR_CNT(&csa->nl->ref_cnt, &csa->nl->wc_var_lock);
+						}
 					)
 					if ((csa->in_wtstart) && (0 < csa->nl->in_wtstart))
 						CAREFUL_DECR_CNT(&csa->nl->in_wtstart, &csa->nl->wc_var_lock);

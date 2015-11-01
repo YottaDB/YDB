@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,10 +72,10 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		assert(0 <= jnl_qio_in_prog);
 		return ERR_JNLWRTDEFER;
 	}
-	if (is_gdid_gdid_identical(&jpc->fileid, &csa->nl->jnl_file.u))
+	if (!JNL_FILE_SWITCHED(jpc))
 		jpc->fd_mismatch = FALSE;
 	else
-	{
+	{	/* journal file has been switched; release io_in_prog lock and return */
 		jpc->fd_mismatch = TRUE;
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
 		jnl_qio_in_prog--;
@@ -205,7 +205,7 @@ uint4 jnl_qio_start(jnl_private_control *jpc)
 	{	/* yield() until someone has finished your job or no one else is active on the jnl file */
 		old_freeaddr = jb->freeaddr;
 		rel_quant();
-		if (JNL_FILE_SWITCHED(jpc->region))
+		if (JNL_FILE_SWITCHED(jpc))
 			return SS_NORMAL;
 		assert(old_freeaddr <= jb->freeaddr);
 		if (old_freeaddr == jb->freeaddr || target_freeaddr <= jb->dskaddr)
@@ -226,7 +226,7 @@ void jnl_mm_timer_write(void)
 	gd_addr		*addr_ptr;
 	sgmnt_addrs	*csa;
 
-	for (addr_ptr = get_next_gdr(0);  NULL != addr_ptr;  addr_ptr = get_next_gdr(addr_ptr))
+	for (addr_ptr = get_next_gdr(NULL);  NULL != addr_ptr;  addr_ptr = get_next_gdr(addr_ptr))
 	{	/* since the unix timers don't provide an argument, for now write all regions */
 		for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions;  reg < r_top; reg++)
 		{
@@ -244,14 +244,13 @@ void jnl_mm_timer_write(void)
 
 void jnl_mm_timer(sgmnt_addrs *csa, gd_region *reg)
 {	/* While this should work by region and use baton passing to more accurately and efficiently perform its task,
-	 * it is currently a blunt instrument
+	 * it is currently a blunt instrument.
 	 */
-
-
+	assert(reg->open);
 	if (FALSE == jnl_timer)
 	{
 		jnl_timer = TRUE;
-		start_timer((TID)jnl_mm_timer, FILE_INFO(reg)->s_addrs.hdr->flush_time[0], &jnl_mm_timer_write, 0, NULL);
+		start_timer((TID)jnl_mm_timer, csa->hdr->flush_time[0], &jnl_mm_timer_write, 0, NULL);
 	}
 	return;
 }

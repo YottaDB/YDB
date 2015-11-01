@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -120,7 +120,7 @@ bool wcs_flu(bool options)
 	cnl = csa->nl;
 	BG_TRACE_ANY(csa, total_buffer_flush);
 
-	if ((was_crit = csa->now_crit) != TRUE)
+	if (!(was_crit = csa->now_crit))	/* Caution: assignment */
 		grab_crit(gv_cur_region);
 	cnl->wcsflu_pid = process_id;
 	if (dba_mm == csd->acc_meth)
@@ -267,7 +267,7 @@ bool wcs_flu(bool options)
 			}
 		}
 	}
-	if (TRUE == flush_hdr)
+	if (flush_hdr)
 	{
 		assert(memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1) == 0);
 		fileheader_sync(gv_cur_region);
@@ -299,12 +299,12 @@ bool wcs_flu(bool options)
 					rel_crit(gv_cur_region);
 				GTMASSERT;
 			}
-			wcs_sleep(1);	/* since it is a short lock, sleep the minimum */
+			wcs_sleep(SLEEP_JNLQIOLOCKWAIT);	/* since it is a short lock, sleep the minimum */
 			performCASLatchCheck(&jb->io_in_prog_latch, lcnt);
 		}
 		jb->need_db_fsync = TRUE;	/* for comments on need_db_fsync, see jnl_output_sp.c */
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
-		assert(is_gdid_gdid_identical(&jpc->fileid, &cnl->jnl_file.u));
+		assert(!(JNL_FILE_SWITCHED(jpc)));
 		if (0 == csa->jnl->pini_addr)
 			jnl_put_jrt_pini(csa);
 		jnl_write_epoch_rec(csa);

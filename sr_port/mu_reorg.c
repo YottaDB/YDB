@@ -686,7 +686,7 @@ void reorg_finish(block_id dest_blk_id, int blks_processed, int blks_killed,
 	T_ABORT(gv_cur_region, cs_addrs);
 	file_extended = cs_data->trans_hist.total_blks - file_extended;
 	util_out_print("Blocks processed    : !SL ", FLUSH, blks_processed);
-	util_out_print("Blocks coalsced     : !SL ", FLUSH, blks_coalesced);
+	util_out_print("Blocks coalesced    : !SL ", FLUSH, blks_coalesced);
 	util_out_print("Blocks split        : !SL ", FLUSH, blks_split);
 	util_out_print("Blocks swapped      : !SL ", FLUSH, blks_swapped);
 	util_out_print("Blocks freed        : !SL ", FLUSH, blks_killed);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,13 +22,12 @@
 #include "mdef.h"
 
 #include "gtm_ctype.h"
-#include "gtm_inet.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
 #include <errno.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include "gtm_socket.h"
+#include "gtm_inet.h"
 
 #include "io.h"
 #include "iotcproutine.h"
@@ -90,7 +89,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize)
 		SPRINTF(socketptr->remote.saddr_ip, "%s", addr);
 	}
 	lower_to_upper((uchar_ptr_t)tcp, (uchar_ptr_t)tcp, sizeof("TCP") - 1);
-	if (0 == memcmp(tcp, "TCP", sizeof("TCP") - 1))
+	if (0 == MEMCMP_LIT(tcp, "TCP"))
 		socketptr->protocol = socket_tcpip;
 	else
 	{

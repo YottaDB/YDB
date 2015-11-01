@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,7 +99,7 @@ op_fnzdate(mval *src,mval *fmt,mval *mo_str,mval *day_str,mval *dst)
 	}
 	if ((0 == fmt->str.len) || ((1 == fmt->str.len) && ('1' == *fmt->str.addr)))
 	{
-		if (!zdate_form || (year < 2000))
+		if (!zdate_form || ((1 == zdate_form) && (year < 2000)))
 		{
 			fmtptr = default1;
 			fmttop = fmtptr + STR_LIT_LEN(DEFAULT1);

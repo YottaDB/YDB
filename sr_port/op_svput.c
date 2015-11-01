@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,6 +65,7 @@ GBLREF mval		dollar_zinterrupt;
 GBLREF boolean_t	ztrap_new;
 GBLREF stack_frame	*error_frame;
 GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
+GBLREF int 		zdate_form;
 
 void op_svput(int varnum, mval *v)
 {
@@ -269,6 +270,10 @@ void op_svput(int varnum, mval *v)
 		MV_FORCE_STR(v);
 		dollar_zinterrupt.mvtype = MV_STR;
 		dollar_zinterrupt.str = v->str;
+		break;
+	case SV_ZDATE_FORM:
+		MV_FORCE_NUM(v);
+		zdate_form = (short)MV_FORCE_INT(v);
 		break;
 	default:
 		GTMASSERT;

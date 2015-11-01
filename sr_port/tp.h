@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,8 +29,9 @@
 #define TP_MAX_MM_TRANSIZE		64*1024
 #define JNL_FORMAT_BUFF_INIT_ALLOC	16*1024
 
+
 #define TP_BATCH_ID		"BATCH"
-#define TP_BATCH_LEN		sizeof(TP_BATCH_ID)
+#define TP_BATCH_LEN		(sizeof(TP_BATCH_ID) - 1)
 #define TP_BATCH_SHRT		2	/* permit abbreviation to two characters */
 #define TP_DEADLOCK_FACTOR	5	/* multiplied by dollar_trestart to produce an argument for wcs_backoff */
 #define MAX_VISIBLE_TRESTART	4	/* Per Bhaskar on 10/20/98: dollar_trestart is not allowed to visibly exceed 4

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,7 @@ int nref(void)
 		/* caution fall through */
 	case TK_LBRACKET:
 	case TK_IDENT:
+	case TK_VBAR:
 		if (!lkglvn(gbl))
 			return EXPR_FAIL;
 		return TRUE;

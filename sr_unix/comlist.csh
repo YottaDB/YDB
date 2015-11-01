@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -254,6 +254,7 @@ cp $gtm_tools/repl_sort_add_seq.awk repl_sort_add_seq.awk
 cp $gtm_tools/repl_sort_rem_tran.awk repl_sort_rem_tran.awk
 
 cp $gtm_inc/gtmxc_types.h .
+cp $gtm_inc/gtm_descript.h .
 #
 # headers to support ASCII/EBCDIC independence
 #
@@ -270,7 +271,8 @@ endif
 
 if ( "$HOSTOS" == "SunOS" ) then
 	# Support for RPC implementation of DAL's and ZCALL's.
-	cp $gtm_inc/{gtm_descript.h,gtmidef.h} .
+	# gtm_descript.h is already copied.
+	cp $gtm_inc/gtmidef.h .
 endif
 
 cp $gtm_pct/*.hlp .
@@ -430,11 +432,11 @@ foreach i ( $comlist_liblist )
 		# Note: libgtmrpc.a must be built in $gtm_exe because it must also be shipped with the release.
 		gt_ar $gt_ar_option_create $gtm_exe/lib$i.a `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list` >>& ar$i.log
 		if ( $status != 0 ) then
-			set comlist_status = `expr $comlist_status + 1`
+			@ comlist_status = $comlist_status + 1
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_tools/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
-		# retain_list.txt contains modules listed in *.list that also need to be 
+		# retain_list.txt contains modules listed in *.list that also need to be
 		# included in libmumps.a (eg. getmaxfds, gtm_mumps_call_xdr)
 		rm -f `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list |egrep -v -f $gtm_tools/retain_list.txt`
 		breaksw
@@ -451,15 +453,15 @@ foreach i ( $comlist_liblist )
 
 		# Exclude files that define the same externals
 		# (e.g., "main" and the VMS CLI [command line interpreter] emulator arrays):
-		set exclude = "^gtm\.o|^gtm_svc\.o|^gtm_dal_svc\.o|^gtm_rpc_init\.o|^mumps_clitab\.o|^lke\.o|^lke_cmd\.o|^dse\.o|^dse_cmd\.o"
-		set exclude = "$exclude|^mupip\.o|^mupip_cmd\.o|^daemon\.o|^gtmsecshr\.o|^geteuid\.o|^dtgbldir\.o"
+		set exclude = "^gtm\.o|^gtm_svc\.o|^gtm_dal_svc\.o|^gtm_rpc_init\.o|^mumps_clitab\.o|^lke\.o|^lke_cmd\.o|^dse\.o"
+		set exclude = "$exclude|^dse_cmd\.o|^mupip\.o|^mupip_cmd\.o|^daemon\.o|^gtmsecshr\.o|^geteuid\.o|^dtgbldir\.o"
 		set exclude = "$exclude|^semstat2\.o|^ftok\.o|^msg\.o|^gtcm_main\.o|^gtcm_play\.o|^gtcm_pkdisp\.o|^gtcm_shmclean\.o"
 		set exclude = "$exclude|^omi_srvc_xct\.o|^omi_sx_play\.o"
 		set exclude = "$exclude|^gtcm_gnp_server\.o|^gtcm_gnp_clitab\.o"
 		/bin/ls | egrep '\.o$' | egrep -v "$exclude" | \
 			xargs -n50 $shell $gtm_tools/gt_ar.csh $gt_ar_option_create lib$i.a >>& ar$i.log
 		if ( $status != 0 ) then
-			set comlist_status = `expr $comlist_status + 1`
+			@ comlist_status = $comlist_status + 1
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_tools/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
@@ -468,11 +470,11 @@ foreach i ( $comlist_liblist )
 	default:
 		gt_ar $gt_ar_option_create lib$i.a `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list` >>& ar$i.log
 		if ( $status != 0 ) then
-			set comlist_status = `expr $comlist_status + 1`
+			@ comlist_status = $comlist_status + 1
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
-		# retain_list.txt contains modules listed in *.list that also need to be 
+		# retain_list.txt contains modules listed in *.list that also need to be
 		# included in libmumps.a (eg. getmaxfds, gtm_mumps_call_xdr)
 		rm -f `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list |egrep -v -f $gtm_tools/retain_list.txt`
 		breaksw
@@ -502,25 +504,24 @@ if ( "$HOSTOS" == "OS/390" ) then
 	cp $gtm_obj/libascii.a ${gtm_dist}
 endif
 
-# smw 990509 want to explicitly include earlier - HP only
-set exclude = "$exclude|callg\.o"
 /bin/ls | egrep '\.o$' | egrep -v "$exclude" | xargs -n25 rm -f
 
 switch ( $3 )
 case "gtm_bta":
 	$shell $gtm_tools/buildbta.csh $p4
-	breaksw
+	@ comlist_status = $comlist_status + $status	# done before each breaksw instead of after endsw
+	breaksw						# as $status seems to be get reset in between
 
 case "gtm_dbg":
 	$shell $gtm_tools/builddbg.csh $p4
+	@ comlist_status = $comlist_status + $status
 	breaksw
 
 case "gtm_pro":
 	$shell $gtm_tools/buildpro.csh $p4
+	@ comlist_status = $comlist_status + $status
 	breaksw
-
 endsw
-
 
 if ( ! -x $gtm_dist/mumps ) then
 	echo "comlist-E-nomumps, ${dollar_sign}gtm_dist/mumps is not executable" >> $gtm_log/error.`basename $gtm_exe`.log
@@ -529,22 +530,19 @@ if ( ! -x $gtm_dist/mumps ) then
 	goto comlist.END
 endif
 
-
 cd $p3
 cd ./obj
 
-
 # Verify that $gtm_src/ttt.c has been generated from $gtm_tools/ttt.txt, $gtm_inc/opcode_def.h, and $gtm_inc/vxi.h
-if ( -x $gtm_dist/mumps ) then
-    cp $gtm_inc/opcode_def.h $gtm_inc/vxi.h $gtm_tools/ttt.txt .
-    gtm <<GTM.in_tttgen
+cp $gtm_inc/opcode_def.h $gtm_inc/vxi.h $gtm_tools/ttt.txt .
+gtm <<GTM.in_tttgen
 Set \$ZROUTINES=". $gtm_dist"
 Do ^TTTGEN
 ZContinue
 Halt
 GTM.in_tttgen
-    diff {$gtm_src/,}ttt.c >& ttt.dif
-    if ( $status != 0 ) then
+diff {$gtm_src/,}ttt.c >& ttt.dif
+if ( $status != 0 ) then
 	echo "comlist-W-tttoutofdate, ${dollar_sign}gtm_src/ttt.c was not generated from ${dollar_sign}gtm_tools/ttt.txt, " \
 		"${dollar_sign}gtm_inc/opcode_def.h, and ${dollar_sign}gtm_inc/vxi.h" \
 		>> $gtm_log/error.`basename $gtm_exe`.log
@@ -552,13 +550,6 @@ GTM.in_tttgen
 		>> $gtm_log/error.`basename $gtm_exe`.log
 	echo "comlist-I-tttgen, See ${dollar_sign}gtm_obj/ttt.c for C source file generated from ${dollar_sign}gtm_tools/ttt.txt" \
 		>> $gtm_log/error.`basename $gtm_exe`.log
-    endif
-endif
-
-if ( ! -x $gtm_dist/mumps ) then
-	echo "comlist-E-nomumps, ${dollar_sign}gtm_dist/mumps is not executable" >> $gtm_log/error.`basename $gtm_exe`.log
-	echo "comlist-W-noonlinehelp, unable to generate on-line help files" >> $gtm_log/error.`basename $gtm_exe`.log
-	goto comlist.END
 endif
 
 set mupip_size = `ls -l $gtm_exe/mupip |awk '{print $5}'`

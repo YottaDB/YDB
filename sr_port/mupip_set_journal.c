@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -454,7 +454,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					UNIX_ONLY(if (cs_addrs->nl->jnl_file.u.inode))
 					VMS_ONLY(if (memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid))))
 					{
-						if (SS_NORMAL != (status = set_jnl_file_close(FALSE)))
+						if (SS_NORMAL != (status = set_jnl_file_close(SET_JNL_FILE_CLOSE_SETJNL)))
 						{
 							if (newjnlfiles)
 							{

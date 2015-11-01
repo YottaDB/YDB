@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -234,7 +234,7 @@ void verify_queue(que_head_ptr_t qhdr);
 	cache_rec_ptr_t		cache_start;									\
 	int4			bufindx;									\
 	sm_uc_ptr_t		bufstart;									\
-	GBLREF	boolean_t	dse_running, write_after_image;								\
+	GBLREF	boolean_t	dse_running, write_after_image;							\
 														\
 	assert(gds_t_write != cse->mode && gds_t_writemap != cse->mode || cse->old_block); 			\
 									/* don't miss writing a PBLK */		\
@@ -248,7 +248,7 @@ void verify_queue(que_head_ptr_t qhdr);
 			bufindx = (cse->old_block - bufstart) / csd->blk_size;					\
 			assert(bufindx < csd->n_bts);								\
 			assert(cse->blk == cache_start[bufindx].blk);						\
-			assert(dse_running || write_after_image || cache_start[bufindx].in_cw_set);				\
+			assert(dse_running || write_after_image || cache_start[bufindx].in_cw_set);		\
 		} else												\
 		{												\
 			assert(cse->old_block == csa->db_addrs[0] + cse->blk * csd->blk_size			\
@@ -957,6 +957,8 @@ typedef struct	sgmnt_addrs_struct
 	int4		jnl_state;		/* journaling state: it can be 0, 1 or 2 (same as enum jnl_state_codes in jnl.h) */
 	int4		repl_state;		/* state of replication whether "on" or "off" */
 	uint4		crit_check_cycle;	/* Used to mark which regions in a transaction legiticamtely have crit */
+	int4		backup_in_prog;		/* true if online backup in progress for this region (used in op_tcommit/tp_tend) */
+	int4		ref_cnt;		/* count of number of times csa->nl->ref_cnt was incremented by this process */
 } sgmnt_addrs;
 
 
@@ -1225,8 +1227,7 @@ cache_rec_ptr_t db_csh_getn(block_id block);
 
 enum cdb_sc tp_hist(srch_hist *hist1);
 
-sm_uc_ptr_t get_lmap(block_id blk, unsigned char *bits, sm_int_ptr_t cycle,
-	cache_rec_ptr_ptr_t cr);
+sm_uc_ptr_t get_lmap(block_id blk, unsigned char *bits, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr);
 
 bool ccp_userwait(struct gd_region_struct *reg, uint4 state, int4 *timadr, unsigned short cycle);
 void ccp_closejnl_ast(struct gd_region_struct *reg);
@@ -1252,7 +1253,6 @@ gd_addr *create_dummy_gbldir(void);
 gv_namehead *tp_get_target(sm_uc_ptr_t buffaddr);
 
 #include "gdsfheadsp.h"
-
 
 /* End of gdsfhead.h */
 

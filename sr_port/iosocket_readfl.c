@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,12 +13,12 @@
 #include "mdef.h"
 #include <errno.h>
 #include <stdio.h>
-#include <time.h>
+#include "gtm_time.h"
 #ifdef __MVS__
 #include <sys/time.h>
 #endif
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include "gtm_socket.h"
+#include "gtm_inet.h"
 #include "gtm_string.h"
 #ifdef UNIX
 #include <fcntl.h>

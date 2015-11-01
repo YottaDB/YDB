@@ -11,15 +11,13 @@
 
 #include "mdef.h"
 
+#include <errno.h>
+
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_socket.h"
 #include "gtm_inet.h"
 #include "gtm_time.h"
-
-#include <errno.h>
-#include <netinet/in.h>
-
 #include "copy.h"
 #include "gt_timer.h"
 #include "io.h"

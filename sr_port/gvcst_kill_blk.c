@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -119,7 +119,11 @@ enum cdb_sc	gvcst_kill_blk(block_id blk,
 		{
 			if ((bytptr)first_in_blk == (bytptr)top_of_block)
 			{
-				assert(0 == level);
+				if (0 != level)
+				{
+					assert(CDB_STAGNATE > t_tries);
+					return cdb_sc_rmisalign;
+				}
 				return cdb_sc_normal;
 			}
 			if (!gv_target->hist.h[level + 1].blk_num)

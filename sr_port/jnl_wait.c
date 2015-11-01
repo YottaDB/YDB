@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,7 @@ void jnl_wait(gd_region *reg)
 		{	/* wait on jnl writes for region */
 			status = jnl_write_attempt(jpc, jpc->new_freeaddr);
 			UNIX_ONLY(
-				  if (SS_NORMAL == status && !JNL_FILE_SWITCHED(jpc->region))
+				  if (SS_NORMAL == status && !JNL_FILE_SWITCHED(jpc))
 					jnl_fsync(reg, jpc->new_freeaddr);
 				 );
 		}

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1988,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1988, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -19,8 +19,11 @@
 	u $p:(ctrap="":exc="")
 	q
 CALL	i '$l($g(%ZF)) q
-	n %ZC,cnt1,cnt2,cnt3,fnd,h,i,o,out,outd,r,tf,x,xn n:'$d(%ZD) %ZD
-	s %ZC=1,%ZD=$g(%ZD),%ZN=$g(%ZN),(cnt1,cnt2,cnt3,out)=0,outd=$l(%ZD),tf=$j_"rce.tmp" s:'outd %ZD=$p
+	n zc,zd s zc=$G(%ZC),zd=$G(%ZD)
+	n cnt1,cnt2,cnt3,fnd,h,i,o,out,outd,r,tf,x,xn,%ZD,%ZC,lzd n:'$d(%ZN) %ZN
+	s %ZC=zc,%ZD=zd
+	s %ZD=$g(%ZD),%ZN=$g(%ZN),(cnt1,cnt2,cnt3,out,outd)=0,tf=$j_"rce.tmp",lzd=$l(%ZD) s:'lzd %ZD=$P
+	s:%ZC outd=$l(%ZD) s:'outd %ZD=$p s:'lzd %ZD=$P s %ZC=1
 	i $d(%ZR)<10 d CALL^%RSEL
 	d work
 	q
@@ -45,11 +48,13 @@ MAIN	s %ZR="" d CALL^%RSEL
 	. i %ZD="?" d  q
 	 . . w !!,"Select the device you want for output"
 	 . . w !,"If you wish to exit enter a carat (^)",!
+	 . . s %ZD=""
 	. i $zparse(%ZD)="" w "  no such device" s %ZD="" q
 	. o %ZD:(newversion:block=2048:record=2044:exception="g noopen"):0
 	. i '$t  w !,%ZD," is not available" s %ZD="" q
 	. q
 noopen	. w !,$p($ZS,",",2,999),! c %ZD s %ZD=""
+	i '$D(%ZD) s %ZD=""
 	q:%ZD="^"
 	w !
 	d work
@@ -94,7 +99,7 @@ reof	i fnd s cnt2=cnt2+fnd,cnt3=cnt3+1 i %ZC c:$zver'["VMS" o:(DELETE) c tf:(REN
 	; warning - fall-through
 rnoopen	i $zs'["EOF" w !,$p($zs,",",2,999),!
 	q
-help	i "Dd"[$e(x,2),$l(%x)=2 d cur q
+help	i "Dd"[$e(x,2),$l(x)=2 d cur q
 	i %ZC w !,"Answer No to this prompt if you do not wish a trail of the changes"
 	w !,"Enter Q to exit",!
 	w !,"?D for the current routine selection"

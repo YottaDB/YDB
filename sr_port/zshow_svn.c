@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,6 +79,7 @@ static readonly char zb_text[] = "$ZB";
 static readonly char zcmdline_text[] = "$ZCMDLINE";
 static readonly char zcompile_text[] = "$ZCOMPILE";
 static readonly char zcstatus_text[] = "$ZCSTATUS";
+static readonly char zdate_form_text[] = "$ZDATEFORM";
 static readonly char zdirectory_text[] = "$ZDIRECTORY";
 static readonly char zeditor_text[] = "$ZEDITOR";
 static readonly char zeof_text[] = "$ZEOF";
@@ -89,6 +90,7 @@ static readonly char zinterrupt_text[] = "$ZINTERRUPT";
 static readonly char zio_text[] = "$ZIO";
 static readonly char zjob_text[] = "$ZJOB";
 static readonly char zlevel_text[] = "$ZLEVEL";
+static readonly char zmaxtptime_text[] = "$ZMAXTPTIME";
 static readonly char zmode_text[] = "$ZMODE";
 static readonly char zproc_text[] = "$ZPROCESS";
 static readonly char zprompt_text[] = "$ZPROMPT";
@@ -96,6 +98,7 @@ static readonly char zpos_text[] = "$ZPOSITION";
 static readonly char zroutines_text[] = "$ZROUTINES";
 static readonly char zsource_text[] = "$ZSOURCE";
 static readonly char zstatus_text[] = "$ZSTATUS";
+static readonly char zstep_text[] = "$ZSTEP";
 static readonly char zsystem_text[] = "$ZSYSTEM";
 static readonly char ztrap_text[] = "$ZTRAP";
 static readonly char zversion_text[] = "$ZVERSION";
@@ -116,9 +119,11 @@ GBLREF mval		dollar_zgbldir;
 GBLREF mval		dollar_job;
 GBLREF uint4		dollar_zjob;
 GBLREF mval		dollar_zstatus;
+GBLREF mval		dollar_zstep;
 GBLREF char		*zro_root;  /* ACTUALLY some other pointer type! */
 GBLREF mstr		gtmprompt;
 GBLREF mstr		dollar_zsource;
+GBLREF int		dollar_zmaxtptime;
 GBLREF int4		dollar_zsystem;
 GBLREF int4		dollar_zcstatus;
 GBLREF int4		dollar_zeditor;
@@ -132,6 +137,7 @@ GBLREF mval		dollar_system;
 GBLREF mval		dollar_zinterrupt;
 GBLREF boolean_t	dollar_zininterrupt;
 GBLREF int4		zdir_form;
+GBLREF int4		zdate_form;
 
 LITREF mval		literal_zero,literal_one;
 LITREF char		gtm_release_name[];
@@ -291,6 +297,10 @@ void zshow_svn(zshow_out *output)
 		MV_FORCE_MVAL(&var, dollar_zcstatus);
 		ZS_VAR_EQU(&x, zcstatus_text);
 		mval_write(output, &var, TRUE);
+	/* SV_ZDATEFORM */
+		MV_FORCE_MVAL(&var, zdate_form);
+		ZS_VAR_EQU(&x, zdate_form_text);
+		mval_write(output, &var, TRUE);
 	/* SV_ZDIR */
 		ZS_VAR_EQU(&x, zdirectory_text);
 		setzdir(NULL, &zdir);
@@ -356,6 +366,10 @@ void zshow_svn(zshow_out *output)
 		MV_FORCE_MVAL(&var, save_dollar_zlevel);
 		ZS_VAR_EQU(&x, zlevel_text);
 		mval_write(output, &var, TRUE);
+	/* SV_ZMAXTPTIME */
+		MV_FORCE_MVAL(&var, dollar_zmaxtptime);
+		ZS_VAR_EQU(&x, zmaxtptime_text);
+		mval_write(output, &var, TRUE);
 	/* SV_ZMODE */
 		ZS_VAR_EQU(&x, zmode_text);
 		mval_write(output, &dollar_zmode, TRUE);
@@ -387,6 +401,9 @@ void zshow_svn(zshow_out *output)
 	/* SV_ZSTATUS */
 		ZS_VAR_EQU(&x, zstatus_text);
 		mval_write(output, &dollar_zstatus, TRUE);
+	/* SV_ZSTEP   */
+		ZS_VAR_EQU(&x, zstep_text);
+		mval_write(output, &dollar_zstep, TRUE);
 	/* SV_ZSYSTEM */
 		MV_FORCE_MVAL(&var, dollar_zsystem);
 		ZS_VAR_EQU(&x, zsystem_text);

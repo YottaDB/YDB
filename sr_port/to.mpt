@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -13,5 +13,5 @@
 	;supplied for illustration and compatibility
 	;use of inline code is easy and efficient
 	;
-INT	s %TS=+$zd(","_%TN,"12")_$zd(","_%TN,":60 AM")
+INT	n tn s tn=$g(%TN) s:'$D(%TN) tn=$p($H,",",2) s %TS=+$zd(","_tn,"12")_$zd(","_tn,":60 AM")
 	q

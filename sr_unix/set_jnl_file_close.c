@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@
 GBLREF	gd_region		*gv_cur_region;
 GBLREF  sgmnt_addrs             *cs_addrs;
 
-uint4 set_jnl_file_close(boolean_t in_jnlfilext)
+uint4	set_jnl_file_close(set_jnl_file_close_opcode_t set_jnl_file_close_opcode)
 {
 	uint4 		jnl_status = 0;
 

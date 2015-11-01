@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,7 @@
 #include "gvcmz.h"
 #include "testpt.h"
 #include "mvalconv.h"
+#include "dpgbldir.h"	/* for get_next_gdr() prototype */
 
 #define WRITE_LITERAL(x) (outval.str.len = sizeof(x) - 1, outval.str.addr = (x), op_write(&outval))
 
@@ -98,6 +99,7 @@ va_dcl
 	va_list		var;
 	viewparm	parmblk;
 	viewtab_entry	*vtp;
+	gd_addr		*addr_ptr;
 	noisolation_element	*gvnh_entry;
 
 	static int ydirt_str_len = 0;
@@ -240,10 +242,10 @@ va_dcl
 		change_reg();
 		break;
 	case VTK_JNLWAIT:
-		if (NULL == gd_header)		/* open gbldir */
-			gvinit();
-		for (reg = gd_header->regions, r_top = reg + gd_header->n_regions;  reg < r_top;  reg++)
-			jnl_wait(reg);
+		/* go through all regions that could have possibly been open across all global directories */
+		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+			for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions;  reg < r_top;  reg++)
+				jnl_wait(reg);
 		break;
 	case VTK_JOBPID:
 		outval.mvtype = MV_STR;
@@ -366,7 +368,10 @@ va_dcl
 		{
 			local_collseq = 0;
 			if (NULL != lcl_coll_xform_buff)
+			{
 				free(lcl_coll_xform_buff);
+				lcl_coll_xform_buff = NULL;
+			}
 		}
 		break;
 		}
@@ -433,9 +438,6 @@ va_dcl
 		 	zdir_form = testvalue;
 		 )
 		 break;
-	case VTK_ZDATE_FORM:
-		zdate_form = (0 != MV_FORCE_INT(parmblk.value));
-		break;
 	default:
 		rts_error(VARLSTCNT(1) ERR_VIEWCMD);
 	}

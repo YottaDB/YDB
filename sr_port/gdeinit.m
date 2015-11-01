@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -19,7 +19,7 @@ GDEINIT
 	s endian("x86")=FALSE,glo("SCO")=384,glo("UWIN")=1024,glo("Linux")=1024
 	s endian("SEQUOIA_SERIES_400")=TRUE,glo("VAX")=1024
 	s endian("HP-PA")=TRUE,glo("HP-UX")=1024
-	s endian("SPARC")=TRUE,glo("SUN/OS_V4.x")=800,glo("Solaris/V2.x")=1024
+	s endian("SPARC")=TRUE,glo("SUN/OS_V4.x")=800,glo("Solaris")=1024
 	s endian("MIPS")=TRUE,glo("A25")=1024
 	s endian("B30")=TRUE,glo("NONSTOP-UX")=1024
 	s endian("B32")=TRUE,glo("NONSTOP-UX")=1024

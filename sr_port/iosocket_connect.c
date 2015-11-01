@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,13 +12,12 @@
 /* iosocket_connect.c */
 #include "mdef.h"
 #include <errno.h>
-#include <time.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include "gtm_time.h"
+#include "gtm_socket.h"
+#include "gtm_inet.h"
 #ifndef __MVS__
 #include <netinet/tcp.h>
 #endif
-#include "gtm_inet.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gt_timer.h"

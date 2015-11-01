@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,6 @@
 #include "dollar_zlevel.h"		/* for SET_ERROR_FRAME macro to use dollar_zlevel() function */
 
 #define POP_SPECIFIED 	((ztrap_form & ZTRAP_POP) && (level2go = MV_FORCE_INT(&ztrap_pop2level))) /* note: assignment */
-#define IS_ETRAP	(err_act == &dollar_etrap.str)
 
 GBLREF stack_frame	*frame_pointer, *zyerr_frame, *error_frame;
 GBLREF unsigned short	proc_act_type;

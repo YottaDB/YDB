@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -69,7 +69,7 @@ set echo
 
 set aix_loadmap_option = ''
 if ( $HOSTOS == "AIX") then
-	set aix_loadmap_option = "-bloadmap:$gtm_map/mumps.loadmap"
+	set aix_loadmap_option = "-bcalls:$gtm_map/mumps.loadmap -bmap:$gtm_map/mumps.loadmap -bxref:$gtm_map/mumps.loadmap"
 endif
 
 gt_ld $gt_ld_options $gt_ld_ci_options $aix_loadmap_option ${gt_ld_option_output}$3/mumps -L$gtm_obj $gtm_obj/{gtm,mumps_clitab}.o $gt_ld_sysrtns \
@@ -80,7 +80,7 @@ if ( $status != 0  ||  ! -x $3/mumps ) then
 		>> $gtm_log/error.`basename $gtm_exe`.log
 endif
 
-# Note: gtm_svc should link with gtm_dal_svc.o before gtm_mumps_call_clnt.o(libgtmrpc.a) to 
+# Note: gtm_svc should link with gtm_dal_svc.o before gtm_mumps_call_clnt.o(libgtmrpc.a) to
 #       resolve conflicting symbols (gtm_init_1, gtm_halt_1 etc..) appropriately.
 if ( $gt_ar_gtmrpc_name != "" ) then
 	set aix_loadmap_option = ''

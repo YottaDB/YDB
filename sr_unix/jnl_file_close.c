@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,8 +42,6 @@ GBLREF	uint4		process_id;
 GBLREF	boolean_t	recovery_success;
 GBLREF  jnl_process_vector      *prc_vec;
 
-
-
 #define	GET_IO_IN_PROG_LOCK(reg, csa, jb)									\
 {														\
 	int	lcnt, temp_count;										\
@@ -69,7 +67,7 @@ GBLREF  jnl_process_vector      *prc_vec;
 
 #define	RELEASE_IO_IN_PROG_LOCK(jb) RELEASE_SWAPLOCK(&jb->io_in_prog_latch)
 
-void	jnl_file_close(gd_region *reg, bool clean, bool eov)
+void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 {
 	sgmnt_addrs		*csa;
 	jnl_private_control	*jpc;
@@ -184,12 +182,14 @@ void	jnl_file_close(gd_region *reg, bool clean, bool eov)
 		 */
 		csa->nl->jnl_file.u.inode = 0;
 		csa->nl->jnl_file.u.device = 0;
+		jb->cycle++;	/* increment shared cycle so all future callers of jnl_ensure_open recognize journal switch */
 	}
 	/* This will be closed as part of recover closing journal files in mur_close_files as this value is assigned in
 	 * mur_recover_write_epoch_rec/mur_rollback_truncate as part of recover/rollback trying to write EOF/truncate */
 	if (!mupip_jnl_recover)
 		close(jpc->channel);
 	jpc->channel = NOJNL;
+	jpc->cycle--;	/* decrement cycle so jnl_ensure_open() knows to reopen the journal */
 	jpc->lastwrite = 0;
 	jpc->regnum = 0;
 	jpc->pini_addr = 0;

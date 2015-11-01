@@ -297,6 +297,23 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				}
 				*cycle = cr->cycle;
 				*cr_out = cr;
+				VMS_ONLY(
+					/* If we were doing the db_csh_get() above (in t_qread itself) and located the cache-record
+					 * which, before coming here and taking a copy of cr->cycle a few lines above, was made an
+					 * older twin by another process in bg_update (note this can happen in VMS only) which has
+					 * already incremented the cycle, we will end up having a copy of the old cache-record with
+					 * its incremented cycle number and hence will succeed in tp_hist validation if we return
+					 * this <cr,cycle> combination although we don't want to since this "cr" is not current for
+					 * the given block as of now. Note that the "indexmod" optimization in tp_tend() relies on
+					 * an accurate intermediate validation by tp_hist() which in turn relies on the <cr,cycle>
+					 * value returned by t_qread() to be accurate for a given blk at the current point in time.
+					 * We detect the older-twin case by the following check. Note that here we depend on the
+					 * the fact that bg_update() sets cr->bt_index to 0 before incrementing cr->cycle.
+					 * Given that order, cr->bt_index can be guaranteed to be 0 if we read the incremented cycle
+					 */
+					if (cr->twin && (0 == cr->bt_index))
+						break;
+				)
 				if (cr->blk != blk)
 					break;
 				if (was_crit != csa->now_crit)
@@ -308,18 +325,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				}
 				/* Note that at this point we expect t_qread() to return a <cr,cycle> combination that
 				 * corresponds to "blk" passed in. It is crucial to get an accurate value for both the fields
-				 * since tp_hist() relies on this for its intermediate validation. There is one possibility
-				 * wherein t_qread() might return an out-of-date cache-record. If we were doing the db_csh_get()
-				 * above (in t_qread itself) and located the cache-record which before coming here (and taking a
-				 * copy of cr->cycle a few lines above) was made an older twin by another process in bg_update
-				 * (note this can happen in VMS only) which has already incremented the cycle, we will end up
-				 * having a copy of the old cache-record with its incremented cycle number and hence will succeed
-				 * in tp_hist validation although we don't want to. But this is liveable for now since the
-				 * only issue with false validations in tp_hist is signalling a FALSE GVUNDEF (anything
-				 * else will get caught in tp_tend in the final validation necessitating a restart) and if a
-				 * key doesn't exist in the old twin and gets created only in the new twin, it was created as part
-				 * of a transaction concurrent with ours and hence theoretically the key didn't exist at the
-				 * beginning of our transaction and hence it is an arguably legitimate UNDEF.
+				 * since tp_hist() relies on this for its intermediate validation.
 				 */
 				return (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr);
 			}

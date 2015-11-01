@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -8,20 +8,24 @@
 ;	the license, please stop and do not read further.	;
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%RO     ;service@greystone.com ESM %RO;19920722 07:40;routine output
+%RO     ;routine output
         ;last modified by R. Partridge
         ;invoke ^%RO to get interaction
         ;invoke CALL^%RO with %ZR - routine array,
         ;%ZC - strip comments, %ZD - device, %ZH - header label
         ;
         w !,"Routine Output - Save selected routines into RO file.",!
+        n ctrap,exc,d,k
+        d dev
         i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%RO" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%RO")
-        n ename,fl,l,lc,out,r,rn,rf,src,x,y,t1,%ZC,%ZD,%ZH,%ZR
+        n ename,fl,l,lc,out,r,rn,rf,src,x,y,t1,%ZC,%ZD,%ZH,%ZR,%ZRSET
         s (fl,lc,r)=0,out=1
         d main
         q
         ;
-CALL    n ename,fl,l,lc,out,r,rn,rf,src,x,y,t1
+CALL    n ctrap,exc,d,k
+        d dev
+        n ename,fl,l,lc,out,r,rn,rf,src,x,y,t1,%ZRSET
         n:'$d(%ZC) %ZC n:'$d(%ZD) %ZD n:'$d(%ZH) %ZH
         s %ZC=$g(%ZC,1),%ZD=$g(%ZD,$p),%ZH=$g(%ZH),(fl,lc,r,out)=0
         o %ZD:(newversion:block=2048:record=2044):0 e  q
@@ -30,10 +34,13 @@ CALL    n ename,fl,l,lc,out,r,rn,rf,src,x,y,t1
         q
         ;
 FL      w !,"First Line Lister",!
+        n ctrap,exc,d,k
+        d dev
         i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%RO" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%RO")
-        n ename,fl,l,lc,out,r,rf,rn,src,x,y,t1,%ZC,%ZD,%ZH,%ZR
+        n ename,fl,l,lc,out,r,rf,rn,src,x,y,t1,%ZC,%ZD,%ZH,%ZR,%ZRSET
         s (lc,r)=0,(%ZC,fl,out)=1,%ZH="Routine First Line Lister Utility"
         d main
+        u $p:(ctrap=ctrap:exc=exc)
         q
         ;
 main
@@ -46,6 +53,7 @@ main
         . i %ZD="?" d  q
          . . w !!,"Select the device you want for output"
          . . w !,"If you wish to exit enter a carat (^)",!
+         . . s %ZD=""
         . i $zparse(%ZD)="" w "  no such device" s %ZD="" q
         . o %ZD:(newversion:block=2048:record=2044:exception="g noopen"):0
         . i '$t  w !,%ZD," is not available" s %ZD="" q
@@ -70,7 +78,7 @@ work    i '$l(%ZH) s %ZH="%RO Routine Output Utility"
         i out d
         . w !!,"Total of ",lc," line",$s(lc=1:"",1:"s")
         . w " in ",r," routine",$s(r=1:".",1:"s."),!!
-        c:%ZD'=$p %ZD u $p:(ctrap="":exc="")
+        c:%ZD'=$p %ZD u $p:(ctrap=ctrap:exc=exc)
         q
         ;
 out     s rf=%ZR(%ZR)_$tr($e(%ZR),"%","_")_$e(%ZR,2,9999)_".m"
@@ -82,7 +90,7 @@ out     s rf=%ZR(%ZR)_$tr($e(%ZR),"%","_")_$e(%ZR,2,9999)_".m"
         u %ZD w rn,!,x,!
         ; warning - loop terminated by an execption
         i 'fl f  u rf r x d frmt i $l(x) u %ZD w x,! s lc=lc+1
-        f  u rf r x d frmt q:x'?.E1";".E1.A.E  u %ZD w x,! s lc=lc+1
+        f  u rf r x d frmt q:x'?.E1";"1.E  u %ZD w x,! s lc=lc+1
         u %ZD w ! c rf
         q
         ;
@@ -102,9 +110,19 @@ frmt    i '%ZC s t1=0 d                         ;strip comments
         q
         ;
 ERR     u $p w !,$p($zs,",",2,99),!
-	s $ec=""
+        s $ec=""
         ; Warning - Fall-though
 EXIT    i $d(%ZD),%ZD'=$p c %ZD
         i $d(rf) c rf
-        u $p:(ctrap="":exc="")
+        u $p:(ctrap=ctrap:exc=exc)
+        q
+dev     ; save device parameters EXC, and CTRAP
+        zsh "d":d
+        s d=""
+        f  s d=$o(d("D",d)) q:d=""  i $p=$p(d("D",d)," ") s d=d("D",d),ctrap=$p($p(d,"CTRA=",2)," "),exc=$p(d,"EXCE=",2) q
+        e  s (ctrap,exc)="" ; should never happen
+        s k=$l(exc,"""")
+        s k=$l(exc) i $e(exc,1,1)="""",$e(exc,k,k)="""" s exc=$e(exc,2,k-1)
+        if ctrap'="" s exc="s ctrap="_ctrap x exc
+        k d
         q

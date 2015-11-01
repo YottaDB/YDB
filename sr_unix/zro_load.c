@@ -70,111 +70,114 @@ void zro_load (mstr *str)
 		array[3] = array[1];
 		array[3].type = ZRO_TYPE_SOURCE;
 		si = 4;
-	}
-	else
-	for (oi = 1;;)
+	} else
 	{
-		if (toktyp != ZRO_IDN)
-			rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FSEXP);
-		if (oi + 1 >= ZRO_MAX_ENTS)
-			rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
-		if (tok.len >= sizeof (tranbuf))
-			rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FILEPARSE, 2, tok.len, tok.addr);
-		pblk.buff_size = MAX_FBUFF;
-		pblk.fnb = 0;
-		status = parse_file(&tok, &pblk);
-		if (!(status & 1))
-			rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
-				ERR_FILEPARSE, 2, tok.len, tok.addr, status);
-
-		tranbuf[ pblk.b_esl ] = 0;
-		STAT_FILE(tranbuf, &outbuf, stat_res);
-		if (-1 == stat_res)
-			rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FILEPARSE, 2, tok.len, tok.addr, errno);
-		if (S_ISREG(outbuf.st_mode))
-		{ /* regular file - a shared library file */
-			array[oi].shrlib = fgn_getpak(tranbuf, ERROR);
-			array[oi].type = ZRO_TYPE_OBJLIB;
-			si = oi + 1;
-		}
-		else {
-			if (!S_ISDIR(outbuf.st_mode))
-				rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_INVZROENT, 2, tok.len, tok.addr);
-			array[oi].type = ZRO_TYPE_OBJECT;
-			array[oi + 1].type = ZRO_TYPE_COUNT;
-			si = oi + 2;
-		}
-		array[0].count++;
-		array[oi].str = tok;
-		GETTOK;
-		if (toktyp == ZRO_LBR)
+		for (oi = 1;;)
 		{
-			if (array[oi].type == ZRO_TYPE_OBJLIB)
-				rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_NOLBRSRC);
+			if (toktyp != ZRO_IDN)
+				rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FSEXP);
+			if (oi + 1 >= ZRO_MAX_ENTS)
+				rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
+			if (tok.len >= sizeof (tranbuf))
+				rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FILEPARSE, 2, tok.len, tok.addr);
+			pblk.buff_size = MAX_FBUFF;
+			pblk.fnb = 0;
+			status = parse_file(&tok, &pblk);
+			if (!(status & 1))
+				rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
+					ERR_FILEPARSE, 2, tok.len, tok.addr, status);
 
-			GETTOK;
-			if (toktyp == ZRO_DEL)
-				GETTOK;
-			if (toktyp != ZRO_IDN && toktyp != ZRO_RBR)
-				rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_QUALEXP);
-
-			array[oi + 1].count = 0;
-			for (;;)
+			tranbuf[ pblk.b_esl ] = 0;
+			STAT_FILE(tranbuf, &outbuf, stat_res);
+			if (-1 == stat_res)
+				rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FILEPARSE, 2, tok.len, tok.addr,
+						errno);
+			if (S_ISREG(outbuf.st_mode))
+			{ /* regular file - a shared library file */
+				array[oi].shrlib = fgn_getpak(tranbuf, ERROR);
+				array[oi].type = ZRO_TYPE_OBJLIB;
+				si = oi + 1;
+			} else
 			{
-				if (toktyp == ZRO_RBR)
-					break;
-				if (toktyp != ZRO_IDN)
-					rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FSEXP);
-				if (si >= ZRO_MAX_ENTS)
-					rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr,
-							ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
-				if (tok.len >= sizeof (tranbuf))
-					rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
-						ERR_FILEPARSE, 2, tok.len, tok.addr);
-				pblk.buff_size = MAX_FBUFF;
-				pblk.fnb = 0;
-				status = parse_file(&tok, &pblk);
-				if (!(status & 1))
-					rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
-						ERR_FILEPARSE, 2, tok.len, tok.addr, status);
-				tranbuf[ pblk.b_esl ] = 0;
-				STAT_FILE(tranbuf, &outbuf, stat_res);
-				if (-1 == stat_res)
-					rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
-						ERR_FILEPARSE, 2, tok.len, tok.addr, errno);
 				if (!S_ISDIR(outbuf.st_mode))
-					rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
-						ERR_DIRONLY, 2, tok.len, tok.addr);
-				array[oi + 1].count++;
-				array[si].type = ZRO_TYPE_SOURCE;
-				array[si].str = tok;
-				si++;
+					rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_INVZROENT, 2,
+							tok.len, tok.addr);
+				array[oi].type = ZRO_TYPE_OBJECT;
+				array[oi + 1].type = ZRO_TYPE_COUNT;
+				si = oi + 2;
+			}
+			array[0].count++;
+			array[oi].str = tok;
+			GETTOK;
+			if (toktyp == ZRO_LBR)
+			{
+				if (array[oi].type == ZRO_TYPE_OBJLIB)
+					rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_NOLBRSRC);
+
 				GETTOK;
 				if (toktyp == ZRO_DEL)
 					GETTOK;
-			}
-			GETTOK;
-		}
-		else {
-			if ((array[oi].type != ZRO_TYPE_OBJLIB) && (toktyp == ZRO_DEL || toktyp == ZRO_EOL))
-			{
-				if (si >= ZRO_MAX_ENTS)
-					rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr,
-						  ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
-				array[oi + 1].count = 1;
-				array[si] = array[oi];
-				array[si].type = ZRO_TYPE_SOURCE;
-				si++;
-			}
-		}
-		if (toktyp == ZRO_EOL)
-			break;
+				if (toktyp != ZRO_IDN && toktyp != ZRO_RBR)
+					rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_QUALEXP);
 
-		if (toktyp == ZRO_DEL)
-			GETTOK;
-		else
-			rts_error(VARLSTCNT(4) ERR_ZROSYNTAX, 2, str->len, str->addr);
-		oi = si;
+				array[oi + 1].count = 0;
+				for (;;)
+				{
+					if (toktyp == ZRO_RBR)
+						break;
+					if (toktyp != ZRO_IDN)
+						rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FSEXP);
+					if (si >= ZRO_MAX_ENTS)
+						rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr,
+								ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
+					if (tok.len >= sizeof (tranbuf))
+						rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
+							ERR_FILEPARSE, 2, tok.len, tok.addr);
+					pblk.buff_size = MAX_FBUFF;
+					pblk.fnb = 0;
+					status = parse_file(&tok, &pblk);
+					if (!(status & 1))
+						rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
+							ERR_FILEPARSE, 2, tok.len, tok.addr, status);
+					tranbuf[ pblk.b_esl ] = 0;
+					STAT_FILE(tranbuf, &outbuf, stat_res);
+					if (-1 == stat_res)
+						rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
+							ERR_FILEPARSE, 2, tok.len, tok.addr, errno);
+					if (!S_ISDIR(outbuf.st_mode))
+						rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
+							ERR_DIRONLY, 2, tok.len, tok.addr);
+					array[oi + 1].count++;
+					array[si].type = ZRO_TYPE_SOURCE;
+					array[si].str = tok;
+					si++;
+					GETTOK;
+					if (toktyp == ZRO_DEL)
+						GETTOK;
+				}
+				GETTOK;
+			} else
+			{
+				if ((array[oi].type != ZRO_TYPE_OBJLIB) && (toktyp == ZRO_DEL || toktyp == ZRO_EOL))
+				{
+					if (si >= ZRO_MAX_ENTS)
+						rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr,
+							  ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
+					array[oi + 1].count = 1;
+					array[si] = array[oi];
+					array[si].type = ZRO_TYPE_SOURCE;
+					si++;
+				}
+			}
+			if (toktyp == ZRO_EOL)
+				break;
+
+			if (toktyp == ZRO_DEL)
+				GETTOK;
+			else
+				rts_error(VARLSTCNT(4) ERR_ZROSYNTAX, 2, str->len, str->addr);
+			oi = si;
+		}
 	}
 	total_ents = si;
 	if (zro_root)

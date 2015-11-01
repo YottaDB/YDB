@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,9 +53,9 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	jpc = csa->jnl;
 	jb  = jpc->jnl_buff;
 
-	if ((NOJNL != jpc->channel) && !JNL_FILE_SWITCHED(jpc->region))
+	if ((NOJNL != jpc->channel) && !JNL_FILE_SWITCHED(jpc))
 	{
-		for (lcnt = 1; fsync_addr > jb->fsync_dskaddr && !JNL_FILE_SWITCHED(jpc->region); lcnt++)
+		for (lcnt = 1; fsync_addr > jb->fsync_dskaddr && !JNL_FILE_SWITCHED(jpc); lcnt++)
 		{
 			if (MAX_FSYNC_WAIT_CNT == lcnt / 2)	/* half way into max.patience*/
 			{
@@ -80,7 +80,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 			wcs_sleep(lcnt);
 			performCASLatchCheck(&jb->fsync_in_prog_latch, lcnt);
 		}
-		if (fsync_addr > jb->fsync_dskaddr && !JNL_FILE_SWITCHED(jpc->region))
+		if (fsync_addr > jb->fsync_dskaddr && !JNL_FILE_SWITCHED(jpc))
 		{
 			assert(process_id == jb->fsync_in_prog_latch.latch_pid);  /* assert we have the lock */
 			saved_dsk_addr = jb->dskaddr;

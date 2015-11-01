@@ -75,10 +75,17 @@ int do_pattern(mval *str, mval *pat)
 	/* set up information */
 	MV_FORCE_STR(str);
 	patptr = (uint4 *) pat->str.addr;
-	DEBUG_ONLY(
-		GET_ULONG(tempuint, patptr);
-		assert(!tempuint);
-	)
+	GET_ULONG(tempuint, patptr);
+	if (tempuint)
+	{	/* tempuint non-zero implies fixed length pattern string. this in turn implies we are not called from op_pattern.s
+		 * but instead called from op_fnzsearch(), gvzwr_fini(), gvzwr_var(), lvzwr_fini(), lvzwr_var() etc.
+		 * in this case, call do_patfixed() as the code below and code in do_patsplit() assumes we are dealing with a
+		 * variable length pattern string. changing all the callers to call do_patfixed() directly instead of this extra
+		 * redirection was considered, but not felt worth it since the call to do_pattern() is not easily macroizable
+		 * due to the expression-like usage in those places.
+		 */
+		return do_patfixed(str, pat);
+	}
 	patptr++;
 	patidx[0] = patptr + 1;
 	stridx[0] = (unsigned char *)str->str.addr;

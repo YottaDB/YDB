@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,9 +75,8 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	assert(csa == cs_addrs && csd == cs_data);
 	assert(csa->now_crit);
 	assert(jpc->region == gv_cur_region);
-	if (!JNL_ENABLED(csa) || (NOJNL == jpc->channel)
-		|| !is_gdid_gdid_identical(&csa->jnl->fileid, &csa->nl->jnl_file.u))
-			GTMASSERT;	/* crit and messing with the journal file - how could it have vanished? */
+	if (!JNL_ENABLED(csa) || (NOJNL == jpc->channel) || (JNL_FILE_SWITCHED(jpc)))
+		GTMASSERT;	/* crit and messing with the journal file - how could it have vanished? */
 	if (!csd->jnl_deq)
 	{
 		assert(DIVIDE_ROUND_UP(total_jnl_rec_size, DISK_BLOCK_SIZE) <= csd->jnl_alq);
@@ -119,8 +118,7 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			memset(&jnl_info, 0, sizeof(jnl_info));
 			jnl_info.prev_jnl = &prev_jnl_fn[0];
 			set_jnl_info(gv_cur_region, &jnl_info);
-			assert((JNL_ENABLED(csa) && (NOJNL != jpc->channel)
-				&& is_gdid_gdid_identical(&csa->jnl->fileid, &csa->nl->jnl_file.u)));
+			assert(JNL_ENABLED(csa) && (NOJNL != jpc->channel) && !(JNL_FILE_SWITCHED(jpc)));
 			jnl_status = jnl_ensure_open();
 			if (0 == jnl_status)
 			{
@@ -138,7 +136,7 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				assert(csd->jnl_deq == jnl_info.extend);
 				assert(csd->jnl_before_image == jnl_info.before_images);
 				csd->trans_hist.header_open_tn = jnl_info.tn;	/* needed for successful jnl_file_open() */
-				send_msg(VARLSTCNT(3) ERR_NEWJNLFILECREATE, 2, JNL_LEN_STR(csd));
+				send_msg(VARLSTCNT(4) ERR_NEWJNLFILECREATE, 2, JNL_LEN_STR(csd));
 				fc = gv_cur_region->dyn.addr->file_cntl;
 				fc->op = FC_WRITE;
 				fc->op_buff = (sm_uc_ptr_t)csd;

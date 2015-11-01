@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -158,7 +158,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				BG_TRACE_PRO(db_csh_getn_flush_dirty);
 				if (FALSE == wcs_get_space(gv_cur_region, 0, cr))
 				{	/* failed to flush it out - force a rebuild */
-					BG_TRACE_PRO_ANY(csa, wc_blocked_db_csh_getn_wcsstarvewrt);
+					BG_TRACE_PRO(wc_blocked_db_csh_getn_wcsstarvewrt);
 					assert(FALSE);
 					break;
 				}
@@ -170,6 +170,28 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				cr->dirty = 0;	/* something dropped the bits; fix it and proceed */
 			}
 		}
+		UNIX_ONLY(
+		/* the cache-record is not free for reuse until the write-latch value becomes LATCH_CLEAR.
+		 * In VMS, since resetting the write-latch value occurs in wcs_wtfini() which is in CRIT, we are fine.
+		 * In Unix, this resetting is done by wcs_wtstart() which is out-of-crit. Therefore, we need to wait
+		 * 	for this value to be LATCH_CLEAR before reusing this cache-record.
+		 */
+		else if (LATCH_CLEAR != WRITE_LATCH_VAL(cr))
+		{	/* possible if a concurrent wcs_wtstart() has set cr->dirty to 0 but not yet cleared the latch.
+			 * this should be very rare though.
+			 */
+			if (lcnt < pass2)
+				continue;	/* try to find some other cache-record to reuse until the 3rd pass */
+			for (ocnt = 1; (MAXWRTLATCHWAIT >= ocnt) && (LATCH_CLEAR != WRITE_LATCH_VAL(cr)); ocnt++)
+				wcs_sleep(SLEEP_WRTLATCHWAIT);	/* since it is a short lock, sleep the minimum */
+			if (MAXWRTLATCHWAIT <= ocnt)
+			{
+				BG_TRACE_PRO(db_csh_getn_wrt_latch_stuck);
+				assert(FALSE);
+				continue;
+			}
+		}
+		)
 		/* Note that before setting up a buffer for the requested block, we should make sure the cache-record's
 		 * 	read_in_progress is set. This is so that noone else in t_qread gets access to this empty buffer.
 		 * By setting up a buffer, it is meant assigning cr->blk in addition to inserting the cr in the blkques
@@ -235,12 +257,9 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		{	/* this should probably use cr->in_cw_set with a condition handler to cleanup */
 			CWS_INSERT(block);
 		}
-		/* We don't do the following assert in unix, since the LATCH may be released by
-		 * a writer later which need not be in crit. And that will not cause problems.
-		 */
-		VMS_ONLY(assert(LATCH_CLEAR == WRITE_LATCH_VAL(cr)));
+		assert(LATCH_CLEAR == WRITE_LATCH_VAL(cr));
 		/* got a block - set it up */
-		assert(0 == cr->epid);	/* we can assert this in Unix since this is zeroed before dirty is zeroed */
+		assert(0 == cr->epid);
 		assert(0 == cr->r_epid);
 		cr->r_epid = process_id;	/* establish ownership */
 		cr->image_count = image_count;

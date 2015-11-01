@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,7 +99,8 @@ void	op_tcommit(void)
 	sm_long_t		delta;
 	sm_uc_ptr_t		old_db_addrs[2];
 	srch_blk_status		*t1;
-
+	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
+						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
 	if (0 == dollar_tlevel)
 		rts_error(VARLSTCNT(1) ERR_TLVLZERO);
 	assert(0 == jnl_fence_ctl.level);
@@ -116,12 +117,10 @@ void	op_tcommit(void)
 				TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
 				csa = cs_addrs;
 				csd = cs_data;
-				csa->jnl_before_image = csd->jnl_before_image;
-				is_mm = dba_mm == cs_addrs->hdr->acc_meth;
+				is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
 				si->cr_array_index = 0;
-				if (!is_mm && si->cr_array_size < (si->num_of_blks + (si->cw_set_depth * 2)))
-				{
-					/* reallocate a bigger cr_array. We need atmost read-set (si->num_of_blks) +
+				if (!is_mm && (si->cr_array_size < (si->num_of_blks + (si->cw_set_depth * 2))))
+				{	/* reallocate a bigger cr_array. We need atmost read-set (si->num_of_blks) +
 					 * write-set (si->cw_set_depth) + bitmap-write-set (a max. of si->cw_set_depth)
 					 */
 					free(si->cr_array);
@@ -133,6 +132,11 @@ void	op_tcommit(void)
 				{
 					assert(0 != si->cw_set_depth);
 					cw_depth = si->cw_set_depth;
+					/* Caution : since csa->backup_in_prog and read_before_image are initialized below only if
+					 * cw_depth is non-zero, these variable should be used below only within an if (cw_depth).
+					 */
+					csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb);
+					read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog);
 					/* The following section allocates new blocks required by the transaction
 					 * it is done before going crit in order to reduce the change of having to
 					 * wait on a read while crit. The trade-off is that if a newly allocated
@@ -199,7 +203,7 @@ void	op_tcommit(void)
 								TP_RETRY_ACCOUNTING(csd, status);
 								break;	/* transaction must attempt restart */
 							}
-							if (JNL_ENABLED(csa) && csa->jnl_before_image && (blk_used))
+							if (blk_used && read_before_image)
 							{
 								cse->old_block = t_qread(new_blk,
 										(sm_int_ptr_t)&cse->cycle, &cse->cr);

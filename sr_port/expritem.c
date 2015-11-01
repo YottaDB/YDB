@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,6 +72,7 @@ LITDEF nametabent svn_names[] = {
 	,{ 3,"ZCM*" }
 	,{ 3,"ZCO*" }
 	,{ 3,"ZCS*" }
+	,{ 3,"ZDA*" }
 	,{ 2,"ZD*" }
 	,{ 2,"ZE" }
 	,{ 3,"ZED*" }
@@ -101,7 +102,7 @@ LITDEF nametabent svn_names[] = {
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 68	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 69	/* s t u v w x y z ~ */
 };
 /* These entries correspond to the entries in the svn_names array */
 LITDEF svn_data_type svn_data[] =
@@ -131,6 +132,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZCMDLINE, FALSE, ALL_SYS }
 	,{ SV_ZCOMPILE, TRUE, ALL_SYS }
 	,{ SV_ZCSTATUS, FALSE, ALL_SYS}
+	,{ SV_ZDATE_FORM, TRUE, ALL_SYS }
 	,{ SV_ZDIR, TRUE, ALL_SYS }
 	,{ SV_ZERROR, TRUE, ALL_SYS }
 	,{ SV_ZEDITOR, FALSE, ALL_SYS }

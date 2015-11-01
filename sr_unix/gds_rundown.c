@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -247,6 +247,9 @@ void gds_rundown(void)
 	 * and nobody else can attach.
 	 * See if we are all alone in accessing this database shared memory.
 	 */
+	assert(csa->ref_cnt);	/* decrement private ref_cnt before shared ref_cnt decrement. */
+	csa->ref_cnt--;		/* Currently journaling logic in gds_rundown() in VMS relies on this order to detect last writer */
+	assert(!csa->ref_cnt);
 	--csa->nl->ref_cnt;
 	if (-1 == shmctl(udi->shmid, IPC_STAT, &shm_buf))
 	{
@@ -524,8 +527,7 @@ void gds_rundown(void)
 				CTIME_BEFORE_NL, time_ptr, ipc_deleted ? "deleted" : "did not delete", REG_LEN_STR(reg));
 	if (mupip_jnl_recover)
 	{
-                send_msg(VARLSTCNT(7) ERR_RECOVIPCDEL, 5, CTIME_BEFORE_NL, time_ptr,
-				ipc_deleted ? "deleted" : "did not delete", DB_LEN_STR(reg));
+                send_msg(VARLSTCNT(5) ERR_RECOVIPCDEL, 3, ipc_deleted ? "deleted" : "did not delete", DB_LEN_STR(reg));
 		if(!ipc_deleted)
 			util_out_print("!AD : Recover process did not delete IPC resources for database !AD", TRUE,
 					CTIME_BEFORE_NL, time_ptr, DB_LEN_STR(reg));

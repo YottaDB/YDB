@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -19,7 +19,7 @@
 #######################################################################
 
 #	gtm_curpro is the current production version
-setenv	gtm_curpro	"V42000"
+setenv	gtm_curpro	"V43001D"
 
 #	gtm_verno is the current production version
 setenv	gtm_verno	$gtm_curpro

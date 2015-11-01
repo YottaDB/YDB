@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,8 +20,7 @@
  */
 #include "mdef.h"
 #include <errno.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include "gtm_socket.h"
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
@@ -34,7 +33,7 @@
 #include "iotcpdef.h"
 #include "iosocketdef.h"
 #include "min_max.h"
-#define	CONNECT	"CONNECT"
+#define	CONNECTED	"CONNECT"
 #define READ	"READ"
 GBLREF tcp_library_struct        tcp_routines;
 boolean_t iosocket_wait(io_desc *iod, int4 timepar)
@@ -125,8 +124,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		iosocket_handle(newsocketptr->handle, &newsocketptr->handle_len, TRUE, dsocketptr);
 		dsocketptr->socket[dsocketptr->n_socket++] = newsocketptr;
 		dsocketptr->current_socket = dsocketptr->n_socket - 1;
-		len = sizeof(CONNECT) - 1;
-		memcpy(&dsocketptr->dollar_key[0], CONNECT, len);
+		len = sizeof(CONNECTED) - 1;
+		memcpy(&dsocketptr->dollar_key[0], CONNECTED, len);
 		dsocketptr->dollar_key[len++] = '|';
 		memcpy(&dsocketptr->dollar_key[len], newsocketptr->handle, newsocketptr->handle_len);
 		len += newsocketptr->handle_len;

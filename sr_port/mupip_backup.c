@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -680,7 +680,7 @@ void mupip_backup(void)
 						assert((DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE) == jnl_info.alignsize);
 						if (memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)))
 						{
-							if (SS_NORMAL != (status = set_jnl_file_close(FALSE)))
+							if (SS_NORMAL != (status = set_jnl_file_close(SET_JNL_FILE_CLOSE_BACKUP)))
 							{
 								util_out_print("!/Journal file !AD not closed:",
 									TRUE, jnl_info.jnl_len, jnl_info.jnl);

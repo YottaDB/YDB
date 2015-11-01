@@ -12,6 +12,12 @@
 /* gtm_inet.h - interlude to <arpa/inet.h> system header file.  */
 #ifndef GTM_INETH
 #define GTM_INETH
+#ifdef VMS
+#include <inet/in.h>
+#endif
+#ifdef _AIX
+#include <netinet/in.h>
+#endif
 
 #include <arpa/inet.h>
 

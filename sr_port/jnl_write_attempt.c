@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -181,7 +181,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 	     lcnt++, prev_lcnt = lcnt, cnt++)
 	{
 		status = jnl_sub_write_attempt(jpc, &lcnt, threshold);
-		if (!csa->now_crit && JNL_FILE_SWITCHED(jpc->region))
+		if (!csa->now_crit && JNL_FILE_SWITCHED(jpc))
 		{
 			jpc->status = SS_NORMAL;
 			return SS_NORMAL;

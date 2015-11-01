@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1989,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1989, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -10,7 +10,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %GCE	;GT.M %GCE utility - global change every occurrence
 	;
-	n c,g,gn,m,n,ns,os,s,sc,sn,%ZD,%ZG
+	n c,g,gn,m,n,ns,os,s,sc,sn,%ZD,%ZG,x
 	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%GCE" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%GCE")
 	w !,"Global Change Every occurrence",!
 	d base
@@ -36,6 +36,7 @@ main	k %ZG d CALL^%GSEL i '%ZG q
 	. i %ZD="?" d  q
 	 . . w !!,"Select the device you want for output"
 	 . . w !,"If you wish to exit enter a carat (^)",!
+	 . . s %ZD=""
 	. i $zparse(%ZD)="" w "  no such device" s %ZD="" q
 	. o %ZD:(newversion:block=2048:record=2044:exception="g noopen"):0
 	. i '$t  w !,%ZD," is not available" s %ZD="" q
@@ -61,13 +62,8 @@ change	w:sc !,g,!,"Was : ",@g
 	s @g=sn_$p(s,os,c),m=m+i
 	w:sc !,"Now : ",@g,!
 	q
-help	i "Dd"[$e(x,2),$l(%x)=2 d cur q
-	i %ZC w !,"Answer No to this prompt if you do not wish a trail of the changes"
-	w !,"Enter Q to exit",!
-	w !,"?D for the current global selection"
+help	w !,"Answer No to this prompt if you do not wish a trail of the changes"
 	q
-cur	w ! s g=""
-	f  s r=$o(%ZG(g)) q:'$l(g)  w:$x>70 ! w g,?$x\10+1*10
 	q
 ERR	i $d(%ZD),%ZD'=$p c %ZD
 	u $p w !,$p($zs,",",2,99),!

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1989,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1989, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -12,7 +12,7 @@
 	;
 	n c,i,g,gn,gtmvt,m,n,p,rl,s,sl,sx,tics,x,%ZD,%ZG
 	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%GSE" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%GSE")
-	w !,"Global Search for Every occurrence",!
+	w !,"Global Search for Every Occurrence",!
 	d base
 	q
 base	f  d  q:$l(%ZD)
@@ -22,6 +22,7 @@ base	f  d  q:$l(%ZD)
 	. i %ZD="?" d  q
 	 . . w !!,"Select the device you want for output"
 	 . . w !,"If you wish to exit enter a carat (^)",!
+	 . . s %ZD=""
 	. i $zparse(%ZD)="" w "  no such device" s %ZD="" q
 	. o %ZD:(newversion:block=2048:record=2044:exception="g noopen"):0
 	. i '$t  w !,%ZD," is not available" s %ZD="" q

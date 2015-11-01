@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,3 +40,4 @@ TAB_BG_TRC_REC("  WcBlocked mu_backup   ", wcb_mu_back)
 TAB_BG_TRC_REC("  WcBlocked dirty_invcr ", wcb_t_end_sysops_dirty_invcr)
 TAB_BG_TRC_REC("  WcBlocked wtfini_fail ", wcb_t_end_sysops_wtfini_fail)
 TAB_BG_TRC_REC("  WcBlocked twin_stuck  ", wcb_t_end_sysops_twin_stuck)
+TAB_BG_TRC_REC("  DbCshGetn_WrtLtchStuck", db_csh_getn_wrt_latch_stuck)

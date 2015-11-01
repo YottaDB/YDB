@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	!
+!	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -137,7 +137,6 @@
 !  List of known undocumented messages follows (along with a comment)
 !	ERR_JNLREQUIRED		message referenced only in GT.CX code (not supported currently)
 !	ERR_LKSECINIT		message referenced only in GT.CX code (not supported currently)
-!	ERR_JNLWRTDEFER		internal error (not displayed to the users)
 !	ERR_JNLWRTNOWWRTR	internal error (not displayed to the users)
 !	ERR_ACK			internal error (not displayed to the users)
 !	ERR_ENQ			internal error (not displayed to the users)
@@ -330,7 +329,7 @@ VIEWGVN		<Invalid global key name used with VIEW/$VIEW(): !AD>/error/fao=2!/ansi
 RTSLOC		<!_!_At M source location !AD>/info/fao=2!/ansi=0
 RWARG		<This is not a legal argument for a READ or WRITE command>/error/fao=0!/ansi=0
 RWFORMAT	<A valid format expression (!, #, or ?expr) expected here>/error/fao=0!/ansi=0
-JNLWRTDEFER	<Journal write start deferred>/error/fao=0!/ansi=0
+JNLWRTDEFER	<Journal write start deferred>/info/fao=0!/ansi=0
 SELECTFALSE	<No argument to $SELECT was true>/error/fao=0!/ansi=4
 SPOREOL		<Either a space or an end-of-line was expected but not found>/error/fao=0!/ansi=0
 SRCLIN		<!_!AD!/!_!AD>/info/fao=4!/ansi=0
@@ -1039,7 +1038,7 @@ MERGEINCOMPL	<Error encountered during MERGE; operation may be incomplete>/warni
 DBNAMEMISMATCH	<Database file !AZ (region !AD) referenced by shared memory (id = !SL) is not accessible>/error/fao=4!/ansi=0
 DBIDMISMATCH	<Database file !AZ id (region !AD) does not match file id in shared memory (id = !SL).  !/Ensure region is properly rundown.>/error/fao=4!/ansi=0
 DEVOPENFAIL	<Error opening !AD>/error/fao=2!/ansi=0
-RECOVIPCDEL	<!AD : Recover process !AZ IPC resources for database file !AD>/info/fao=5!/ansi=0
+RECOVIPCDEL	<Recover process !AZ IPC resources for database file !AD>/info/fao=3!/ansi=0
 XCVOIDRET	<Attempt to return a value from function !AD, which is declared void in external call table !AD>/error/fao=4!/ansi=0
 MURAIMGFAIL	<Mupip recover or rollback failed while processing an after-image journal record.  Failure code: !AD.>/error/fao=2!/ansi=0
 REPLINSTUNDEF	<Replication instance environment variable $gtm_repl_instance is undefined>/error/fao=0!/ansi=0
@@ -1124,7 +1123,7 @@ JNLSWITCHSZCHG	<Journal AUTOSWITCHLIMIT [!UL blocks] is rounded down to [!UL blo
 NOTRNDMACC	<Only random access files are supported as backup files for non-incremental backup>/error/fao=0!/ansi=0
 TMPFILENOCRE	<Error in MUPIP BACKUP while trying to create temporary file !AD>/error/fao=2!/ansi=0
 SHRMEMEXHAUSTED <Attempt by process to use more shared memory than currently permitted by VMS>/error/fao=0!/ansi=0
-JNLSENDOPER	<pid = 0x!XL : status = 0x!XL : jpc_status = 0x!XL : jpc_status2 = 0x!XL : iosb.cond = 0x!XW>/error/fao=5!/ansi=0
+JNLSENDOPER	<pid = 0x!XL : status = 0x!XL : jpc_status = 0x!XL : jpc_status2 = 0x!XL : iosb.cond = 0x!XW>/info/fao=5!/ansi=0
 DDPSUBSNUL	<NUL characters in subscripts are not supported by DDP>/error/fao=0!/ansi=0
 DDPNOCONNECT	<Named volume set, !AD, is not connected>/error/fao=2!/ansi=0
 DDPCONGEST	<Agent congestion>/error/fao=0!/ansi=0
@@ -1148,6 +1147,7 @@ ZBREAKFAIL	<Could not set breakpoint at !AD due to insufficient memory>/info/fao
 DLLVERSION	<Routine !AD in library !AD was compiled with an incompatible version of GT.M.  Recompile with the current version and re-link.>/error/fao=4!/ansi=0
 INVZROENT	<!AD is neither a directory nor an object library(DLL)>/error/fao=2!/ansi=0
 DDPLOGERR	<!AD: !AD>/error/fao=4!/ansi=0
+GETSOCKNAMERR	<Getting the socket name failed from getsockname(): (errno==!UL) !AD>/error/fao=3!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

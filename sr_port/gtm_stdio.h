@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,16 @@ int					gtm_snprintf(char *str, size_t size, const char *format, ...);
 #define VPRINTF        			vprintf
 #define VSPRINTF       			vsprintf
 
-#define SPRINTF_ENV_NUM(ENV_VAR, ENV_VAL)	sprintf(c1, "%s=%d", ENV_VAR, ENV_VAL)
-#define SPRINTF_ENV_STR(ENV_VAR, ENV_VAL)	sprintf(c1, "%s=%s", ENV_VAR, ENV_VAL)
+#define SPRINTF_ENV_NUM(BUFF, ENV_VAR, ENV_VAL, ENV_IND)							\
+{														\
+	assert(NULL == strchr(ENV_VAR, '='));	/* strchr() done later in ojstartchild() relies on this */	\
+	sprintf(BUFF, "%s=%d", ENV_VAR, ENV_VAL); *ENV_IND++ = BUFF;						\
+}
+
+#define SPRINTF_ENV_STR(BUFF, ENV_VAR, ENV_VAL, ENV_IND)							\
+{														\
+	assert(NULL == strchr(ENV_VAR, '='));	/* strchr() done later in ojstartchild() relies on this */	\
+	sprintf(BUFF, "%s=%s", ENV_VAR, ENV_VAL); *ENV_IND++ = BUFF;						\
+}
 
 #endif

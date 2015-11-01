@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +16,8 @@
 #include "gtm_string.h"
 
 #include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include "gtm_socket.h"
+#include "gtm_inet.h"
 
 #include "io.h"
 #include "io_params.h"

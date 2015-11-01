@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,8 @@
 #include "io_params.h"
 #include "op.h"
 #include "io.h"
+#include "rtnhdr.h"
+#include "stack_frame.h"
 #include "jobexam_process.h"
 #ifdef UNIX
 #  include "jobexam_signal_handler.h"
@@ -31,6 +33,7 @@
 #include "util.h"
 #include "hashdef.h"
 #include "lv_val.h"
+#include "mv_stent.h"
 
 #define DEFAULT_DUMP_FILENAME "GTM_JOBEXAM.ZSHOW_DMP"
 #define NOCONCEAL_OPTION "NO_CONCEAL"
@@ -42,20 +45,47 @@ static unsigned char dumpable_error_dump_file_parms[2] = {iop_newversion, iop_eo
 static unsigned char dumpable_error_dump_file_noparms[1] = {iop_eol};
 static unsigned int  jobexam_counter;
 
-GBLREF uint4	process_id;
-GBLREF io_pair	io_std_device, io_curr_device;
+GBLREF uint4		process_id;
+GBLREF io_pair		io_std_device, io_curr_device;
+GBLREF mv_stent		*mv_chain;
+GBLREF unsigned char    *msp, *stackwarn, *stacktop;
 UNIX_ONLY(GBLREF sigset_t blockalrm;)
 
+error_def(ERR_STACKOFLOW);
+error_def(ERR_STACKCRIT);
 error_def(ERR_JOBEXAMFAIL);
 error_def(ERR_JOBEXAMDONE);
 
 void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 {
+	mval			*input_dump_file_name;
 	io_pair			dev_in_use;
+	mv_stent		*new_mv_stent;
+	boolean_t		saved_mv_stent;
 #ifdef UNIX
 	struct sigaction	new_action, prev_action;
 	sigset_t		savemask;
+#endif
+	/* If the input file name is the result of an expression, it is likely being held in the
+	   same temporary as the output file spec. We can tell if this is true by comparing the
+	   address of the input and output mvals. If they are the same, make a copy of the input
+	   filespec in a garbage collection safe mval prior to initializing the output mval
+	   (which in this case would clear the input mval as well if it had not just been saved).
+	*/
+	if (dump_file_name == dump_file_spec)
+	{	/* Make saved copy of input mval */
+		PUSH_MV_STENT(MVST_MVAL);
+		new_mv_stent = mv_chain;
+		input_dump_file_name = &mv_chain->mv_st_cont.mvs_mval;
+		*input_dump_file_name = *dump_file_name;
+		saved_mv_stent = TRUE;
+	} else
+	{	/* Just use input mval as-is */
+		input_dump_file_name = dump_file_name;
+		saved_mv_stent = FALSE;
+	}
 
+#ifdef UNIX
 	/* Block out timer calls that might trigger processing that could fail. We especially want to prevent
 	   nesting of signal handlers since the longjump() function used by the UNWIND macro is undefined on
 	   Tru64 when signal handlers are nested.
@@ -76,11 +106,29 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 #endif
 	*dump_file_spec = empty_str_mval;
 	dev_in_use = io_curr_device;		/* Save current IO device */
-	jobexam_dump(dump_file_name, dump_file_spec);
+	jobexam_dump(input_dump_file_name, dump_file_spec);
 	/* If any errors occur in job_exam_dump, the condition handler will unwind the stack
 	   to this point and return.
 	*/
 	io_curr_device = dev_in_use;		/* Restore IO device */
+
+	/* If we saved an mval on our stack, we need to pop it off. If there was an error while doing the
+	   jobexam dump, zshow may have left some other mv_stent entries on the stack. Pop them all off with
+	   just a regular POP_MV_STENT macro rather than unw_mv_ent() call because the mv_stent entries
+	   created in zshow_output reference automatic storage that cannot be referenced at this stack
+	   level without potential (C) stack corruption.
+	*/
+	if (saved_mv_stent)
+	{
+		if (mv_chain > new_mv_stent)
+			/* This violates our assumptions that the mv_stent we pushed onto the stack should
+			   still be there */
+			GTMASSERT;
+		while (mv_chain <= new_mv_stent)
+		{
+			POP_MV_STENT();
+		}
+	}
 #ifdef UNIX
 	/* Restore the signal handlers how they were */
 	sigaction(SIGBUS, &prev_action, 0);

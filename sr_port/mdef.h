@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -203,6 +203,7 @@ int4 timeout2msec(int4 timeout);
 
 #define	MEMCMP_LIT(SOURCE, LITERAL)	memcmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
 #define MEMCPY_LIT(TARGET, LITERAL)	memcpy(TARGET, LITERAL, sizeof(LITERAL) - 1)
+#define	STRNCMP_LIT(TARGET, LITERAL)	strncmp(TARGET, LITERAL, sizeof(LITERAL) - 1)
 
 /* *********************************************************************************************************** */
 /*		   Frequently used len + str combinations in macro form.				       */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -174,13 +174,14 @@ typedef struct
 	/* alignsize is removed and log2_of_alignsize introduced */
 	uint4         		log2_of_alignsize;       /* Ceiling of log2(alignsize) */
  	uint4			autoswitchlimit;	/* limit in disk blocks (max 4GB) when jnl should be auto switched */
+	uint4			cycle;			/* shared copy of the number of the current journal file generation */
 	volatile int4		qiocnt,			/* Number of qio's issued */
 				bytcnt,			/* Number of bytes written */
 				errcnt,			/* Number of errors during writing */
 				reccnt[JRT_RECTYPES];	/* Number of records written per opcode */
-	int			filler_align[28 - JRT_RECTYPES];	/* So buff below starts on even (QW) keel */
-	/* Note the above filler will fail if JRT_RECTYPES grows beyond 27 elements. In that case, change the start num to
-	   the next even number above JRT_RECTYPES.
+	int			filler_align[29 - JRT_RECTYPES];	/* So buff below starts on even (QW) keel */
+	/* Note the above filler will fail if JRT_RECTYPES grows beyond 29 elements and give compiler warning in VMS
+	 * if JRT_RECTYPES equals 29. In that case, change the start num to the next odd number above JRT_RECTYPES.
 	*/
 	volatile trans_num	epoch_tn;		/* Transaction number for current epoch */
 	volatile uint4		next_epoch_time;	/* Time when next epoch is to be written (in epoch-seconds) */
@@ -220,7 +221,7 @@ typedef struct jnl_private_control_struct
 	gd_region		*region;		/* backpointer to region head */
 	fd_type			channel,		/* output channel, aka fd in UNIX */
 				old_channel;		/* VMS only - for dealing with deferred deassign */
-	gd_id			fileid;			/* used for UNIX only */
+	gd_id			fileid;			/* currently initialized and used only by source-server */
 	vms_lock_sb		*jnllsb;		/* VMS only */
 	boolean_t		free_update_inprog;	/* M VMS only */
 	int4			regnum;			/* M index for 'tokens' */
@@ -234,13 +235,14 @@ typedef struct jnl_private_control_struct
 				status;			/* A for error reporting */
 	volatile boolean_t	dsk_update_inprog;	/* A VMS only */
 	volatile boolean_t	qio_active;		/* jnl buffer write in progress in THIS process (recursion indicator) */
-	boolean_t		fd_mismatch;
+	boolean_t		fd_mismatch;		/* TRUE when jpc->channel does not point to the active journal */
 	volatile boolean_t	sync_io;		/* TRUE if the process is using O_SYNC/O_DSYNC for this jnl (UNIX) */
 	boolean_t		alq_deq_auto_override;	/* set in jnl_file_open() and reset in set_jnl_info() */
 	uint4			jnl_alq;		/* copies of journal allocation/extension/autoswitchlimit */
 	uint4			jnl_deq;		/*	to be restored whenever a journal switch occurs   */
 	uint4			autoswitchlimit;	/*	during forward phase of journal recovery/rollback */
 	uint4			status2;		/* for secondary error status, currently used only in VMS */
+	uint4			cycle;			/* private copy of the number of this journal file generation */
 } jnl_private_control;
 
 typedef enum
@@ -629,6 +631,16 @@ typedef struct mu_set_reglist
 	boolean_t		before_images;
 } mu_set_rlist;
 
+/* The enum codes below correspond to code-paths that can call set_jnl_file_close() in VMS */
+typedef enum
+{
+        SET_JNL_FILE_CLOSE_BACKUP = 1,	/* just for safety a non-zero value to start with */
+	SET_JNL_FILE_CLOSE_SETJNL,
+	SET_JNL_FILE_CLOSE_EXTEND,
+	SET_JNL_FILE_CLOSE_RUNDOWN,
+        SET_JNL_FILE_CLOSE_INVALID_OP
+} set_jnl_file_close_opcode_t;
+
 /* jnl_ prototypes */
 int4	jnl_record_length(jnl_record *rec, int4 top);
 int	jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size); /***type int added***/
@@ -659,7 +671,7 @@ void	detailed_extract_tcom(jnl_record *rec, uint4 pid);
 void	wcs_defer_wipchk_ast(jnl_private_control *jpc);
 boolean_t  mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info *jnl_info);
 uint4	mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *jnl_info, mu_set_rlist *rptr);
-uint4	set_jnl_file_close(boolean_t in_jnlfilext);
+uint4	set_jnl_file_close(set_jnl_file_close_opcode_t set_jnl_file_close_opcode);
 void	mupip_set_journal_fname(jnl_create_info *jnl_info);
 uint4	mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname);
 char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec);
@@ -676,7 +688,18 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff);
 
 /* pass address of jnl_buffer to get address of expanded jnl file name */
 #define JNL_NAME_EXP_PTR(X) ((sm_uc_ptr_t)(X) - JNL_NAME_EXP_SIZE)
-#define JNL_GDID_PVT(sa)        (sa->jnl->fileid)
+#define JNL_GDID_PVT(CSA)        ((CSA)->jnl->fileid)
+
+#ifdef UNIX
+#define JNL_GDID_PTR(CSA)	((gd_id_ptr_t)(&((CSA)->nl->jnl_file.u)))
+#else
+#define JNL_GDID_PTR(CSA)	((gd_id_ptr_t)(&((CSA)->nl->jnl_file.jnl_file_id)))
+#endif
+
+/* Note that since "cycle" (in jpc and jb below) can rollover the 4G limit back to 0, it should
+ * only be used to do "!=" checks and never to do ordered checks like "<", ">", "<=" or ">=".
+ */
+#define JNL_FILE_SWITCHED(JPC) 	((JPC)->cycle != (JPC)->jnl_buff->cycle)
 
 /* Given a journal record, get_jnl_seqno returns the jnl_seqno field
  * NOTE : All replication type records have the same first fields

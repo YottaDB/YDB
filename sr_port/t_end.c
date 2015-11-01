@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -130,7 +130,8 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 	srch_hist		*hist;
 	blk_hdr_ptr_t		bp;
 	bt_rec_ptr_t		bt;
-	bool			blk_used, is_mm, was_crit;
+	bool			blk_used;
+	boolean_t		is_mm, was_crit;
 	cache_rec_ptr_t		cr, cr0, cr1;
 	cw_set_element		*cs, *cs_top, *nxt;
 	enum cdb_sc		status;
@@ -148,7 +149,11 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 	uint4			total_jnl_rec_size, tmp_cumul_jnl_rec_len, tmp_cw_set_depth;
 	uint4			tot_jrec_size;
 	uint4			jnl_alq, jnl_deq;
-
+	jnlpool_ctl_ptr_t	jpl, tjpl;
+	boolean_t		replication = FALSE;
+	boolean_t		release_crit;
+	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
+						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
 	error_def(ERR_GVKILLFAIL);
 	error_def(ERR_NOTREPLICATED);
 	error_def(ERR_JNLTRANS2BIG);
@@ -189,10 +194,12 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 	else
 		cw_depth = cw_set_depth;
 	if (0 != cw_depth)
-	{
-		for (cs = cw_set, cs_top = cw_set + cw_depth;
-		     (cs < cs_top) && (gds_t_write_root != cs->mode);
-		     cs++)
+	{	/* Caution : since csa->backup_in_prog and read_before_image are initialized below only if (cw_depth),
+		 * 	these variable should be used below only within an if (cw_depth).
+		 */
+		csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb);
+		read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog);
+		for (cs = &cw_set[0], cs_top = cs + cw_depth; cs < cs_top; cs++)
 		{
 			assert(0 == cs->jnl_freeaddr);	/* ensure haven't missed out resetting jnl_freeaddr for any cse in
 							 * t_write/t_create/t_write_map/t_write_root/mu_write_map [D9B11-001991] */
@@ -211,8 +218,8 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					}
 					break;
 				}
-				if (!blk_used || !(JNL_ENABLED(csa) && csa->jnl_before_image))
-					cs->old_block = 0;
+				if (!blk_used || !read_before_image)
+					cs->old_block = NULL;
 				else
 				{
 					cs->old_block = t_qread(cs->blk, (sm_int_ptr_t)&cs->cycle, &cs->cr);
@@ -267,15 +274,32 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 			} else
 				grab_crit(gv_cur_region);
 		}
+		/* Any retry transition where the destination state is the 3rd retry, we don't want to release crit,
+		 * i.e. for 2nd to 3rd retry transition or 3rd to 3rd retry transition.
+		 * Therefore we need to release crit only if (CDB_STAGNATE - 1) > t_tries
+		 * But 2nd to 3rd retry transition doesn't occur if in 2nd retry we get jnlstatemod/jnlclose/backupstatemod code.
+		 * Hence the variable release_crit to track the above.
+		 */
+		release_crit = (CDB_STAGNATE - 1) > t_tries;
 		if (JNL_ALLOWED(csa))
 		{
 			if ((csa->jnl_state != csd->jnl_state) || (csa->jnl_before_image != csd->jnl_before_image))
-			{ 	/* csd->jnl_state changed or csd->jnl_before_image changed since last time
-				 * we set csa->jnl_before_image and csa->jnl_state */
-				assert(CDB_STAGNATE > t_tries);
+			{ 	/* csd->jnl_state or csd->jnl_before_image changed since last time
+				 * 	csa->jnl_before_image and csa->jnl_state got set */
 				csa->jnl_before_image = csd->jnl_before_image;
 				csa->jnl_state = csd->jnl_state;
+				/* jnl_file_lost() causes a jnl_state transition from jnl_open to jnl_closed
+				 * and additionally causes a repl_state transition from repl_open to repl_closed
+				 * all without standalone access. This means that csa->repl_state might be repl_open
+				 * while csd->repl_state might be repl_closed. update csa->repl_state in this case
+				 * as otherwise the rest of the code might look at csa->repl_state and incorrectly
+				 * conclude replication is on and generate sequence numbers when actually no journal
+				 * records are being generated. [C9D01-002219]
+				 */
+				csa->repl_state = csd->repl_state;
 				status = cdb_sc_jnlstatemod;
+				if ((CDB_STAGNATE - 1) == t_tries)
+					release_crit = TRUE;
 				REVERT;
 				goto failed;
 			}
@@ -287,6 +311,23 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 							JNL_LEN_STR(csd), csd->autoswitchlimit);
 				}
 			}
+		}
+		if (cw_depth && (csa->backup_in_prog != (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb)))
+		{
+			if (!csa->backup_in_prog && !(JNL_ENABLED(csa) && csa->jnl_before_image))
+			{	/* If online backup is in progress now and before-image journaling is not enabled,
+				 * we would not have read before-images for created blocks. Although it is possible
+				 * that this transaction might not have blocks with gds_t_create at all, we expect
+				 * this backup_in_prog state change to be so rare that it is ok to restart.
+				 */
+				status = cdb_sc_backupstatemod;
+				if ((CDB_STAGNATE - 1) == t_tries)
+					release_crit = TRUE;
+				REVERT;
+				goto failed;
+			}
+			csa->backup_in_prog = !csa->backup_in_prog;	/* reset csa->backup_in_prog to current state */
+			read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog); /* recalculate */
 		}
 		assert(csd == csa->hdr);
 		valid_thru = ctn = csa->ti->curr_tn;
@@ -452,33 +493,41 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 		assert(csd == csa->hdr);
 		if ((cdb_sc_normal == status) && (0 != cw_set_depth))
 		{
-			if (!is_mm && JNL_ENABLED(csa) && csa->jnl_before_image)
+			if (cw_depth && read_before_image && !is_mm)
 			{
 				for (cs = cw_set, cs_top = cs + cw_set_depth;  cs < cs_top;  ++cs)
-				{	/* Read old block for creates before got crit,
-					   make sure cache record still has correct block */
+				{	/* have already read old block for creates before we got crit, make sure
+					 * cache record still has correct block. if not, reset "cse" fields to
+					 * point to correct cache-record. this is ok to do since we only need the
+					 * prior content of the block (for online backup or before-image journaling)
+					 * and did not rely on it for constructing the transaction. Restart if
+					 * block is not present in cache now or is being read in currently.
+					 */
 					if ((gds_t_acquired == cs->mode) && (NULL != cs->old_block))
 					{
+						assert(read_before_image == ((JNL_ENABLED(csa) && csa->jnl_before_image)
+											|| csa->backup_in_prog));
 						cr = db_csh_get(cs->blk);
-						if ((NULL == cr) || ((cache_rec_ptr_t)CR_NOTVALID == cr)
-						    || (cr->cycle != cs->cycle))
+						if ((cache_rec_ptr_t)CR_NOTVALID == cr)
 						{
-							if ((cache_rec_ptr_t)CR_NOTVALID == cr)
-							{
-								SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-								BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_jnl_cwset);
-								status = cdb_sc_cacheprob;
-							} else
-							{
-								assert(CDB_STAGNATE > t_tries);
-								status = cdb_sc_lostbefor;
-							}
+							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+							BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_jnl_cwset);
+							status = cdb_sc_cacheprob;
+							break;
+						}
+						if ((NULL == cr) || (0 <= cr->read_in_progress))
+						{
+							assert(CDB_STAGNATE > t_tries);
+							status = cdb_sc_lostbefor;
 							break;
 						}
 						cr_array[cr_array_index++] = cr;
 						assert(FALSE == cr->in_cw_set);
 						cr->in_cw_set = TRUE;
 						cr->refer = TRUE;
+						cs->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+						cs->cr = cr;
+						cs->cycle = cr->cycle;
 					}
 				}
 			}
@@ -486,21 +535,23 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 			{
 				if (REPL_ENABLED(csa) && cw_depth && is_replicator && (inctn_invalid_op == inctn_opcode))
 				{
+					replication = TRUE;
+					jpl = jnlpool_ctl;
+					tjpl = temp_jnlpool_ctl;
 					grab_lock(jnlpool.jnlpool_dummy_reg);
-					QWASSIGN(temp_jnlpool_ctl->write_addr, jnlpool_ctl->write_addr);
-					QWASSIGN(temp_jnlpool_ctl->write, jnlpool_ctl->write);
-					QWASSIGN(temp_jnlpool_ctl->jnl_seqno, jnlpool_ctl->jnl_seqno);
-					INT8_ONLY(assert(temp_jnlpool_ctl->write ==
-								temp_jnlpool_ctl->write_addr % temp_jnlpool_ctl->jnlpool_size);)
+					QWASSIGN(tjpl->write_addr, jpl->write_addr);
+					QWASSIGN(tjpl->write, jpl->write);
+					QWASSIGN(tjpl->jnl_seqno, jpl->jnl_seqno);
+					INT8_ONLY(assert(tjpl->write == tjpl->write_addr % tjpl->jnlpool_size);)
 					tmp_cumul_jnl_rec_len = cumul_jnl_rec_len + sizeof(jnldata_hdr_struct);
-					temp_jnlpool_ctl->write += sizeof(jnldata_hdr_struct);
-					if (temp_jnlpool_ctl->write >= temp_jnlpool_ctl->jnlpool_size)
+					tjpl->write += sizeof(jnldata_hdr_struct);
+					if (tjpl->write >= tjpl->jnlpool_size)
 					{
-						assert(temp_jnlpool_ctl->write == temp_jnlpool_ctl->jnlpool_size);
-						temp_jnlpool_ctl->write = 0;
+						assert(tjpl->write == tjpl->jnlpool_size);
+						tjpl->write = 0;
 					}
-					assert(QWEQ(jnlpool_ctl->early_write_addr, jnlpool_ctl->write_addr));
-					QWADDDW(jnlpool_ctl->early_write_addr, jnlpool_ctl->write_addr, tmp_cumul_jnl_rec_len);
+					assert(QWEQ(jpl->early_write_addr, jpl->write_addr));
+					QWADDDW(jpl->early_write_addr, jpl->write_addr, tmp_cumul_jnl_rec_len);
 				}
 				assert(cw_set_depth < CDB_CW_SET_SIZE);
 				assert(csa->ti->early_tn == csa->ti->curr_tn);
@@ -540,6 +591,8 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 								assert((!JNL_ENABLED(csd)) && (JNL_ENABLED(csa)));
 								status = cdb_sc_jnlclose;
 								t_commit_cleanup(status, 0);
+								if ((CDB_STAGNATE - 1) == t_tries)
+									release_crit = TRUE;
 								REVERT;
 								goto failed;
 							}
@@ -656,31 +709,31 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					if (!(csa->ti->curr_tn & (HEADER_UPDATE_COUNT-1)))
 						fileheader_sync(gv_cur_region);
 				}
-				if (REPL_ENABLED(csa) && cw_depth && is_replicator && (inctn_invalid_op == inctn_opcode))
+				if (replication)
 				{
-					assert(QWGT(jnlpool_ctl->early_write_addr, jnlpool_ctl->write_addr));
-					QWINCRBY(temp_jnlpool_ctl->jnl_seqno, seq_num_one);
-					QWASSIGN(csa->hdr->reg_seqno, temp_jnlpool_ctl->jnl_seqno);
+					assert(QWGT(jpl->early_write_addr, jpl->write_addr));
+					QWINCRBY(tjpl->jnl_seqno, seq_num_one);
+					QWASSIGN(csa->hdr->reg_seqno, tjpl->jnl_seqno);
 					if (is_updproc)
 					{
 						QWINCRBY(max_resync_seqno, seq_num_one);
 						QWASSIGN(csa->hdr->resync_seqno, max_resync_seqno);
 					}
-					assert(tmp_cumul_jnl_rec_len == (temp_jnlpool_ctl->write - jnlpool_ctl->write +
-						(temp_jnlpool_ctl->write > jnlpool_ctl->write ? 0 : jnlpool_ctl->jnlpool_size)));
+					assert(tmp_cumul_jnl_rec_len == (tjpl->write - jpl->write +
+						(tjpl->write > jpl->write ? 0 : jpl->jnlpool_size)));
 					/* the following statements should be atomic */
-					jnl_header = (jnldata_hdr_ptr_t)(jnlpool.jnldata_base + jnlpool_ctl->write);
+					jnl_header = (jnldata_hdr_ptr_t)(jnlpool.jnldata_base + jpl->write);
 					jnl_header->jnldata_len = tmp_cumul_jnl_rec_len;
-					jnl_header->prev_jnldata_len = jnlpool_ctl->lastwrite_len;
+					jnl_header->prev_jnldata_len = jpl->lastwrite_len;
 					/* The following assert should be an == rather than a >= (as in tp_tend) because, we have
 					 * either one or no update.  If no update, we would have no cw_depth and we wouldn't enter
 					 * this path.  If there is an update, then both the indices should be 1.
 					 */
 					INT8_ONLY(assert(cumul_index == cu_jnl_index);)
-					jnlpool_ctl->lastwrite_len = jnl_header->jnldata_len;
-					QWINCRBYDW(jnlpool_ctl->write_addr, jnl_header->jnldata_len);
-					jnlpool_ctl->write = temp_jnlpool_ctl->write;
-					jnlpool_ctl->jnl_seqno = temp_jnlpool_ctl->jnl_seqno;
+					jpl->lastwrite_len = jnl_header->jnldata_len;
+					QWINCRBYDW(jpl->write_addr, jnl_header->jnldata_len);
+					jpl->write = tjpl->write;
+					jpl->jnl_seqno = tjpl->jnl_seqno;
 					rel_lock(jnlpool.jnlpool_dummy_reg);
 				}
 			}
@@ -719,7 +772,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 /*** Warning: Possible fall-thru... ***/
   failed:
 	gv_target->clue.end = 0;
-	if (((CDB_STAGNATE - 1) > t_tries) && (cs_addrs->now_crit))
+	if (release_crit && (cs_addrs->now_crit))
 		rel_crit(gv_cur_region);
 	t_retry(status);
 	cw_map_depth = 0;
