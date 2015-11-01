@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,14 +34,14 @@
 #error UNSUPPORTED PLATFORM
 #endif
 
-GBLREF char window_token;
-GBLREF char director_token;
-GBLREF mval window_mval;
-GBLREF mident window_ident;
-GBLREF bool temp_subs;
-GBLREF bool devctlexp;
+GBLREF	char	window_token;
+GBLREF	char	director_token;
+GBLREF	mval	window_mval;
+GBLREF	mident	window_ident;
+GBLREF	bool	temp_subs;
+GBLREF	bool	devctlexp;
 
-LITREF toktabtype tokentable[];
+LITREF	toktabtype	tokentable[];
 
 /* note that svn_index array provides indexes into this array for each letter of the
    alphabet so changes here should be reflected there.
@@ -84,7 +84,7 @@ LITDEF nametabent svn_names[] = {
 	,{ 3,"ZIO" }
 	,{ 2,"ZJ" }, { 4,"ZJOB" }
 	,{ 2,"ZL*" }
-	,{ 8,"ZMAXTPTI" }
+	,{ 8,"ZMAXTPTI*" }
 	,{ 3,"ZMO*" }
 	,{ 4,"ZPOS*" }
 	,{ 5,"ZPROC*" }
@@ -99,12 +99,14 @@ LITDEF nametabent svn_names[] = {
 	,{ 2,"ZV*" }
 	,{ 4,"ZYER*" }
 };
+
 /* Indexes into svn_names array for each letter of the alphabet */
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
 	22, 28, 34 ,34, 34, 34, 35, 36, 71	/* s t u v w x y z ~ */
 };
+
 /* These entries correspond to the entries in the svn_names array */
 LITDEF svn_data_type svn_data[] =
 {
@@ -162,8 +164,10 @@ LITDEF svn_data_type svn_data[] =
 };
 
 /* note that fun_index array provides indexes into this array for each letter of the
-   alphabet so changes here should be reflected there.
-*/
+ * alphabet so changes here should be reflected there.
+ *
+ * "*" is used below only after 8 characters.
+ */
 LITDEF nametabent fun_names[] =
 {
 	{1, "A"}, {5, "ASCII"}
@@ -173,6 +177,7 @@ LITDEF nametabent fun_names[] =
 	,{1, "F"}, {4, "FIND"}
 	,{2, "FN"}, {7, "FNUMBER"}
 	,{1, "G"}, {3, "GET"}
+	,{1, "I"}, {4, "INCR"}, {8, "INCREMEN*"}
 	,{1, "J"}, {7, "JUSTIFY"}
 	,{1, "L"}, {6, "LENGTH"}
 	,{1, "N"}
@@ -191,7 +196,7 @@ LITDEF nametabent fun_names[] =
 	,{2, "TR"}, {8, "TRANSLAT*"}
 	,{1, "V*"}
 	,{7, "ZBITAND"}
-	,{8, "ZBITCOUN"}
+	,{8, "ZBITCOUN*"}
 	,{8, "ZBITFIND"}
 	,{7, "ZBITGET"}
 	,{7, "ZBITLEN"}
@@ -208,6 +213,7 @@ LITDEF nametabent fun_names[] =
 	,{7, "ZGETJPI"}
 	,{7, "ZGETLKI"}
 	,{7, "ZGETSYI"}
+	,{5, "ZINCR"}, {8, "ZINCREME*"}
 	,{8, "ZJOBEXAM"}
 	,{5, "ZLKID"}
 	,{2, "ZM"}, {8, "ZMESSAGE"}
@@ -221,13 +227,14 @@ LITDEF nametabent fun_names[] =
 	,{8, "ZSIGPROC"}
 	,{7, "ZTRNLNM"}
 };
-/* Index into fun_names array where entries that start with each letter of
-   the alphabet begin. */
+
+/* Index into fun_names array where entries that start with each letter of the alphabet begin. */
 LITDEF unsigned char fun_index[27] = {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
-	14, 16, 16, 18, 18, 22, 24, 26, 32,	/* j k l m n o p q r */
-	36, 40, 44, 44, 45, 45, 45, 45, 82	/* s t u v w x y z ~ */
+	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
+	39, 43, 47, 47, 48, 48, 48, 48, 87	/* s t u v w x y z ~ */
 };
+
 /* Each entry corresponds to an entry in fun_names */
 LITDEF fun_data_type fun_data[] =
 {
@@ -238,6 +245,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNFIND, ALL_SYS }, { OC_FNFIND, ALL_SYS }
 	,{ OC_FNFNUMBER, ALL_SYS }, { OC_FNFNUMBER, ALL_SYS }
 	,{ OC_FNGET, ALL_SYS }, { OC_FNGET, ALL_SYS }
+	,{ OC_FNINCR, ALL_SYS }, { OC_FNINCR, ALL_SYS }, { OC_FNINCR, ALL_SYS }
 	,{ OC_FNJ2, ALL_SYS }, { OC_FNJ2, ALL_SYS }
 	,{ OC_FNLENGTH, ALL_SYS }, { OC_FNLENGTH, ALL_SYS }
 	,{ OC_FNNEXT, ALL_SYS }
@@ -277,6 +285,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZGETJPI, ALL_SYS }
 	,{ OC_FNZGETLKI, VMS_OS }
 	,{ OC_FNZGETSYI, VMS_OS }
+	,{ OC_FNINCR, ALL_SYS }, { OC_FNINCR, ALL_SYS }
 	,{ OC_FNZJOBEXAM, ALL_SYS }
 	,{ OC_FNZLKID, VMS_OS}
 	,{ OC_FNZM, ALL_SYS }, { OC_FNZM, ALL_SYS }
@@ -291,31 +300,75 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZTRNLNM, ALL_SYS }
 };
 
+/* Each entry corresponds to an entry in fun_names */
 GBLDEF int (*fun_parse[])(oprtype *, opctype) =
 {
-	f_ascii, f_ascii, f_char, f_char, f_data, f_data, f_extract
-	, f_extract, f_find, f_find, f_fnumber, f_fnumber, f_get, f_get
-	, f_justify, f_justify, f_length, f_length, f_next, f_name, f_name, f_next, f_order
-	, f_order, f_piece, f_piece, f_qlength, f_qlength, f_qsubscript, f_qsubscript
-	, f_query, f_query, f_mint, f_mint, f_reverse, f_reverse, f_select, f_select
-	, f_stack, f_stack, f_text, f_text, f_translate, f_translate, f_view
-	, f_two_mval, f_one_mval, f_fnzbitfind, f_fnzbitget, f_one_mval
-	, f_one_mval, f_two_mval, f_fnzbitset, f_fnzbitstr, f_two_mval
-	, f_zcall, f_zcall, f_zdate, f_zdate, f_zechar
-	, f_two_mstrs, f_two_mstrs, f_two_mstrs, f_mint_mstr, f_two_mstrs, f_zgetsyi
-	, f_zjobexam, f_mint, f_mint, f_mint, f_zparse, f_mint, f_zprevious, f_zprevious, f_mstr, f_mstr
-	, f_zqgblmod, f_zqgblmod, f_zsearch, f_mstr, f_zsigproc, f_ztrnlnm
+	f_ascii, f_ascii,
+	f_char, f_char,
+	f_data, f_data,
+	f_extract, f_extract,
+	f_find, f_find,
+	f_fnumber, f_fnumber,
+	f_get, f_get,
+	f_incr, f_incr, f_incr,
+	f_justify, f_justify,
+	f_length, f_length,
+	f_next,
+	f_name, f_name,
+	f_next,
+	f_order, f_order,
+	f_piece, f_piece,
+	f_qlength, f_qlength,
+	f_qsubscript, f_qsubscript,
+	f_query, f_query,
+	f_mint, f_mint,
+	f_reverse, f_reverse,
+	f_select, f_select,
+	f_stack, f_stack,
+	f_text, f_text,
+	f_translate, f_translate,
+	f_view,
+	f_two_mval,
+	f_one_mval,
+	f_fnzbitfind,
+	f_fnzbitget,
+	f_one_mval,
+	f_one_mval,
+	f_two_mval,
+	f_fnzbitset,
+	f_fnzbitstr,
+	f_two_mval,
+	f_zcall, f_zcall,
+	f_zdate, f_zdate,
+	f_zechar,
+	f_two_mstrs, f_two_mstrs,
+	f_two_mstrs,
+	f_mint_mstr,
+	f_two_mstrs,
+	f_zgetsyi,
+	f_incr, f_incr,
+	f_zjobexam,
+	f_mint,
+	f_mint, f_mint,
+	f_zparse,
+	f_mint,
+	f_zprevious, f_zprevious,
+	f_mstr, f_mstr,
+	f_zqgblmod, f_zqgblmod,
+	f_zsearch,
+	f_mstr,
+	f_zsigproc,
+	f_ztrnlnm
 };
-
 
 int expritem(oprtype *a)
 {
-
 	int 		index, sv_opcode;
 	unsigned char 	type;
 	short int 	i;
 	triple 		*ref;
 	oprtype 	x1;
+
 	error_def(ERR_EXPR);
 	error_def(ERR_FCNSVNEXPECTED);
 	error_def(ERR_FNOTONSYS);
@@ -395,7 +448,7 @@ int expritem(oprtype *a)
 			}
 			if (director_token == TK_LPAREN)
 			{
-				index = namelook(fun_index,fun_names,window_ident.c);
+				index = namelook(fun_index, fun_names, window_ident.addr, window_ident.len);
 				if (index < 0)
 				{
 					stx_error(ERR_INVFCN);
@@ -420,7 +473,7 @@ int expritem(oprtype *a)
 				advancewindow();
 			} else
 			{
-				index = namelook(svn_index,svn_names,window_ident.c);
+				index = namelook(svn_index, svn_names, window_ident.addr, window_ident.len);
 				if (index < 0)
 				{
 					stx_error(ERR_INVSVN);

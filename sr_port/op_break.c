@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,11 @@ GBLREF bool	dec_nofac;
 
 void op_break(void)
 {
+	bool		do_msg;
+	char		*c, *c_top;
+	char		line[MAX_ENTRYREF_LEN];
+	int		line_length;
+	int		em;
 	error_def(ERR_RTSLOC);
 	error_def(ERR_BREAK);
 	error_def(ERR_BREAKDEA);
@@ -33,11 +38,6 @@ void op_break(void)
 	error_def(ERR_BREAKZST);
 	error_def(ERR_NOTPRINCIO);
 	error_def(ERR_TEXT);
-	bool		do_msg;
-	char		*c, *c_top;
-	char		line[50];
-	int		line_length;
-	int		em;
 
 	flush_pio();
 	if (frame_pointer->type & SFT_ZTRAP)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,7 @@
 
 #if defined(UNIX)
 # include "gtm_fcntl.h"
-# include <sys/stat.h>
+# include "gtm_stat.h"
 # include "gtm_unistd.h"
 #elif defined(VMS)
 # include <rms.h>
@@ -44,8 +44,8 @@
 #include "gdscc.h"
 #include "gdskill.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "io.h"
 #include "interlock.h"
@@ -58,7 +58,6 @@
 #include "util.h"
 #include "gtm_caseconv.h"
 #include "gt_timer.h"
-#include "gvcst_init.h"
 #include "is_proc_alive.h"
 #include "is_file_identical.h"
 #include "dbfilop.h"
@@ -69,8 +68,10 @@
 #include "wcs_sleep.h"
 #include "wcs_flu.h"
 #include "trans_log_name.h"
+#include "shmpool.h"
 #include "mupip_backup.h"
 #include "gtm_rename.h"		/* for cre_jnl_file_intrpt_rename() prototype */
+#include "gvcst_protos.h"	/* for gvcst_init prototype */
 
 #if defined(UNIX)
 # define PATH_DELIM		'/'
@@ -113,6 +114,7 @@ GBLREF	uint4		image_count;
 GBLREF 	boolean_t 	debug_mupip;
 GBLREF	char		*before_image_lit[];
 GBLREF	char		*jnl_state_lit[];
+GBLREF	char		*repl_state_lit[];
 GBLREF	jnl_gbls_t	jgbl;
 
 static char	* const jnl_parms[] =
@@ -139,11 +141,12 @@ void mupip_backup(void)
 	uint4		ustatus;
 	size_t		backup_buf_size;
 	trans_num	tn;
-	backup_buff_ptr_t	bptr;
+	shmpool_buff_hdr_ptr_t	bptr;
 	static boolean_t	once = TRUE;
 	backup_reg_list	*rptr, *clnup_ptr;
-	boolean_t	inc_since_inc , inc_since_rec, result, newjnlfiles, gotit,
-			newjnlfiles_specified, keep_prev_link, bkdbjnl_disable_specified, bkdbjnl_off_specified;
+	boolean_t	inc_since_inc , inc_since_rec, result, newjnlfiles, gotit, tn_specified,
+			replication_on, newjnlfiles_specified, keep_prev_link, bkdbjnl_disable_specified,
+			bkdbjnl_off_specified;
 	unsigned char	since_buff[50];
 	jnl_create_info jnl_info;
 	file_control	*fc;
@@ -188,11 +191,18 @@ void mupip_backup(void)
         error_def(ERR_JNLCREATE);
 	error_def(ERR_PREVJNLLINKCUT);
 	error_def(ERR_JNLSTATE);
+	error_def(ERR_REPLSTATE);
 	error_def(ERR_FILEEXISTS);
 	error_def(ERR_JNLDISABLE);
 	error_def(ERR_FILEPARSE);
 	error_def(ERR_JNLFNF);
 	error_def(ERR_NOTRNDMACC);
+	error_def(ERR_MUNOSTRMBKUP);
+	error_def(ERR_DBCCERR);
+	error_def(ERR_ERRCALL);
+	error_def(ERR_REPLSTATEERR);
+	error_def(ERR_TEXT);
+	error_def(ERR_REPLJNLCNFLCT);
 
 	/* ==================================== STEP 1. Initialization ======================================= */
 
@@ -213,11 +223,12 @@ void mupip_backup(void)
 
 	/* ============================ STEP 2. Parse and construct grlist ================================== */
 
+	tn_specified = FALSE;
 	if (incremental = (CLI_PRESENT == cli_present("INCREMENTAL") || CLI_PRESENT == cli_present("BYTESTREAM")))
 	{
-		int4 temp_tn;
+		trans_num temp_tn;
 
-		if (0 == cli_get_hex("TRANSACTION", &temp_tn))
+		if (0 == cli_get_hex64("TRANSACTION", &temp_tn))
 		{
 			temp_tn = 0;
 			s_len = sizeof(since_buff);
@@ -230,12 +241,16 @@ void mupip_backup(void)
 				else if (0 == memcmp(since_buff, "RECORD", s_len))
 					inc_since_rec = TRUE;
 			}
-		} else if (temp_tn < 1)
+		} else
 		{
-			util_out_print("The minimum allowable transaction number is one.", TRUE);
-			mupip_exit(ERR_MUNOACTION);
+			tn_specified = TRUE;
+			if (temp_tn < 1)
+			{
+				util_out_print("The minimum allowable transaction number is one.", TRUE);
+				mupip_exit(ERR_MUNOACTION);
+			}
 		}
-		tn = (trans_num)temp_tn;
+		tn = temp_tn;
 	}
 	online = (TRUE != cli_negated("ONLINE"));
 	record = (CLI_PRESENT == cli_present("RECORD"));
@@ -263,6 +278,10 @@ void mupip_backup(void)
 		newjnlfiles_specified = TRUE;
 		newjnlfiles = FALSE;
 	}
+	replication_on = FALSE;
+	if (CLI_PRESENT == cli_present("REPLICATION.ON")) /* REPLICATION.OFF is disabled at the CLI layer */
+		replication_on = TRUE;
+
 	bkdbjnl_disable_specified = FALSE;
 	bkdbjnl_off_specified = FALSE;
 	if (CLI_PRESENT == cli_present("BKUPDBJNL"))
@@ -363,7 +382,7 @@ void mupip_backup(void)
 
 	mubmaxblk = 0;
 	halt_ptr = grlist;
-	size = ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE);
+	size = ROUND_UP(SIZEOF_FILE_HDR_MAX, DISK_BLOCK_SIZE);
 
 	ESTABLISH(mu_freeze_ch);
 	tempfilename = tempdir_full.addr = tempdir_full_buffer;
@@ -409,6 +428,20 @@ void mupip_backup(void)
 		if (gv_cur_region->read_only)
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+			rptr->not_this_time = give_up_before_create_tempfile;
+			continue;
+		}
+		/* Used to have MAX_RMS_RECORDSIZE here (instead of 32 * 1024) but this def does not exist on
+		   UNIX where we are making the same restirction due to lack of testing more than anything else
+		   so the hard coded value will do for now. SE 5/2005
+		*/
+		if (incremental && ((32 * 1024) - sizeof(shmpool_blk_hdr)) < cs_data->blk_size)
+		{	/* Limitation: VMS RMS IO limited to 32K - 1 VMS blk so we likewise limit our IO. This can be
+			   overcome with more code to deal with the larger block sizes much like the regular
+			   backup does but this is not being done as part of this (64bittn) project. SE 2/2005
+			*/
+			gtm_putmsg(VARLSTCNT(5) MAKE_MSG_TYPE(ERR_MUNOSTRMBKUP, ERROR), 3, DB_LEN_STR(gv_cur_region),
+				   32 * 1024 - DISK_BLOCK_SIZE);
 			rptr->not_this_time = give_up_before_create_tempfile;
 			continue;
 		}
@@ -634,17 +667,30 @@ void mupip_backup(void)
 			if (incremental)
 			{
 				if (inc_since_inc)
-					tn = cs_data->last_inc_backup;
-				else if (inc_since_rec)
-					tn = cs_data->last_rec_backup;
-				else if (0 == tn)
-					tn = cs_data->last_com_backup;
-				rptr->tn = tn;
+				{
+					rptr->tn = cs_data->last_inc_backup;
+					rptr->last_blk_at_last_bkup = cs_data->last_inc_bkup_last_blk;
+				} else if (inc_since_rec)
+				{
+					rptr->tn = cs_data->last_rec_backup;
+					rptr->last_blk_at_last_bkup = cs_data->last_rec_bkup_last_blk;
+				} else if (0 == tn)
+				{
+					rptr->tn = cs_data->last_com_backup;
+					rptr->last_blk_at_last_bkup = cs_data->last_com_bkup_last_blk;
+				} else
+				{	/* /TRANS was specified as arg so use it and all bitmaps are
+					   subject to being backed up (since this is not a contiguous backup
+					   to the last one)
+					*/
+					rptr->tn = tn;
+					rptr->last_blk_at_last_bkup = 0;
+				}
 			}
-			memcpy(rptr->backup_hdr, cs_data, size);
+			memcpy(rptr->backup_hdr, cs_data, SIZEOF_FILE_HDR(cs_data));
 			if (online) /* save a copy of the fileheader, modify current fileheader and release crit */
 			{
-				bptr = cs_addrs->backup_buffer;
+				bptr = cs_addrs->shmpool_buffer;
 				if (BACKUP_NOT_IN_PROGRESS != cs_addrs->nl->nbb)
 				{
 					if (TRUE == is_proc_alive(bptr->backup_pid, bptr->backup_image_count))
@@ -689,6 +735,7 @@ void mupip_backup(void)
 								gtm_putmsg(VARLSTCNT(1) status);
 								rptr->not_this_time = give_up_after_create_tempfile;
 								rel_crit(rptr->reg);
+								error_mupip = TRUE;
 								continue;
 							}
 							jnl_info.no_rename = FALSE;
@@ -703,12 +750,62 @@ void mupip_backup(void)
 									filestr.len, filestr.addr, ustatus);
 								rptr->not_this_time = give_up_after_create_tempfile;
 								rel_crit(rptr->reg);
+								error_mupip = TRUE;
 								continue;
 							}
 							jnl_info.no_rename = (FILE_NOT_FOUND == jnl_fstat);
 						}
 						wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR);	/* For VMS WCSFLU_FSYNC_DB
 												 * is ignored */
+						if (!JNL_ENABLED(cs_data) && (NULL != cs_addrs->nl))
+
+						{ /* Cleanup the jnl file info in shared memory before switching
+						     journal file. This case occurs if mupip backup -newjnl is
+						     run after jnl_file_lost() closes journaling on a region */
+							NULLIFY_JNL_FILE_ID(cs_addrs);
+						}
+						if (replication_on)
+						{
+							if (REPL_WAS_ENABLED(cs_data))
+							{
+								jnl_info.jnl_state = jnl_open;
+								jnl_info.repl_state = repl_open;
+								jnl_info.no_prev_link = TRUE;
+								gtm_putmsg(VARLSTCNT(8) ERR_REPLSTATE, 6,
+									LEN_AND_LIT(FILE_STR), DB_LEN_STR(gv_cur_region),
+									LEN_AND_STR(repl_state_lit[repl_open]));
+								gtm_putmsg(VARLSTCNT(8) ERR_JNLSTATE, 6,
+									LEN_AND_LIT(FILE_STR), DB_LEN_STR(gv_cur_region),
+									LEN_AND_STR(jnl_state_lit[jnl_open]));
+							} else if (!REPL_ALLOWED(cs_data))
+							{
+								gtm_putmsg(VARLSTCNT(8) ERR_REPLSTATEERR, 2,
+									DB_LEN_STR(gv_cur_region), ERR_TEXT, 2,
+									LEN_AND_LIT("Standalone access required"));
+								rptr->not_this_time = give_up_after_create_tempfile;
+								rel_crit(rptr->reg);
+								error_mupip = TRUE;
+								continue;
+							}
+						} else if (REPL_WAS_ENABLED(cs_data))
+						{ /* Do not switch journal file when replication was turned
+						     OFF by jnl_file_lost() */
+							assert(cs_data->jnl_state == jnl_closed);
+							gtm_putmsg(VARLSTCNT(8) ERR_REPLJNLCNFLCT, 6,
+									LEN_AND_STR(jnl_state_lit[jnl_open]),
+									DB_LEN_STR(gv_cur_region),
+									LEN_AND_STR(repl_state_lit[repl_closed]));
+							rptr->not_this_time = give_up_after_create_tempfile;
+							rel_crit(rptr->reg);
+							error_mupip = TRUE;
+							continue;
+						} else
+						{ /* While switching journal file, perhaps we never intended
+						   * to turn journaling ON from OFF (either with replication
+						   * or with M journaling). However, to keep the existing
+						   * behavior, we will turn journaling ON */
+							jnl_info.jnl_state = jnl_open;
+						}
 						if (EXIT_NRM == cre_jnl_file(&jnl_info))
 						{
 							if (jnl_info.no_prev_link && (save_no_prev_link != jnl_info.no_prev_link))
@@ -722,11 +819,13 @@ void mupip_backup(void)
 							cs_data->jnl_deq = jnl_info.extend;
 							cs_data->jnl_before_image = jnl_info.before_images;
 							cs_data->trans_hist.header_open_tn = jnl_info.tn;
-							cs_data->jnl_state = jnl_open;
+							cs_data->jnl_state = jnl_info.jnl_state;
+							cs_data->repl_state = jnl_info.repl_state;
 							UNIX_ONLY(
 								if (newjnlfiles_specified && sync_io_specified)
 									cs_data->jnl_sync_io = sync_io;
 							)
+							cs_data->jnl_checksum = jnl_info.checksum;
 							gtm_putmsg(VARLSTCNT(10) ERR_JNLCREATE, 8, jnl_info.jnl_len, jnl_info.jnl,
 								LEN_AND_LIT("region"), REG_LEN_STR(gv_cur_region),
 								LEN_AND_STR(before_image_lit[(jnl_info.before_images ? 1 : 0)]));
@@ -737,6 +836,8 @@ void mupip_backup(void)
 							fc = gv_cur_region->dyn.addr->file_cntl;
 							fc->op = FC_WRITE;
 							fc->op_buff = (sm_uc_ptr_t)cs_data;
+							fc->op_len = SGMNT_HDR_LEN;
+							fc->op_pos = 1;
 							status = dbfilop(fc);
 							if (SS_NORMAL != status)
 							{
@@ -747,6 +848,7 @@ void mupip_backup(void)
 										gds_info->fab->fab$l_stv, 0);)
 								rptr->not_this_time = give_up_after_create_tempfile;
 								rel_crit(rptr->reg);
+								error_mupip = TRUE;
 								continue;
 							}
 						} else
@@ -754,23 +856,39 @@ void mupip_backup(void)
 							gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
 							rptr->not_this_time = give_up_after_create_tempfile;
 							rel_crit(rptr->reg);
+							error_mupip = TRUE;
 							continue;
 						}
 					} else
 						gtm_putmsg(VARLSTCNT(4) MAKE_MSG_WARNING(ERR_JNLDISABLE),
 										2, DB_LEN_STR(gv_cur_region));
+				} else if (replication_on && !REPL_ENABLED(cs_data))
+				{
+					gtm_putmsg(VARLSTCNT(8) ERR_REPLSTATEERR, 2, DB_LEN_STR(gv_cur_region),
+						ERR_TEXT, 2,
+						LEN_AND_LIT("Cannot turn replication ON without also switching journal file"));
+					rptr->not_this_time = give_up_after_create_tempfile;
+					rel_crit(rptr->reg);
+					error_mupip = TRUE;
+					continue;
 				}
-				memset(bptr, 0, sizeof(backup_buff));
-				bptr->size = BACKUP_BUFFER_SIZE - sizeof(backup_buff);
+				if (FALSE == shmpool_lock_hdr(gv_cur_region))
+				{
+					gtm_putmsg(VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(gv_cur_region),
+						   ERR_ERRCALL, 3, CALLFROM);
+					rptr->not_this_time = give_up_after_create_tempfile;
+					rel_crit(rptr->reg);
+					continue;
+				}
 				memcpy(&(bptr->tempfilename[0]), &(rptr->backup_tempfile[0]),
 						strlen(rptr->backup_tempfile));
 				bptr->tempfilename[strlen(rptr->backup_tempfile)] = 0;
 				bptr->backup_tn = cs_addrs->ti->curr_tn;
 				bptr->backup_pid = process_id;
-				bptr->inc_backup_tn = (incremental ? tn : 0);
-				SET_LATCH_GLOBAL(&bptr->backup_ioinprog_latch, LOCK_AVAILABLE);
-				VMS_ONLY(SET_LATCH(&bptr->backup_ioinprog_latch.latch_word, LOCK_AVAILABLE));
+				bptr->inc_backup_tn = (incremental ? rptr->tn : 0);
+				bptr->dskaddr = 0;
 				VMS_ONLY(bptr->backup_image_count = image_count;)
+				shmpool_unlock_hdr(gv_cur_region);
 				cs_addrs->nl->nbb = -1; /* start */
 				rel_crit(rptr->reg);
 			}

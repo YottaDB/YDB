@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,8 +24,10 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "copy.h"
 #include "util.h"
@@ -35,16 +37,14 @@
 #include "gtmmsg.h"
 #include "jnl_typedef.h"
 #include "iosp.h"		/* for SS_NORMAL */
+#include "send_msg.h"
 
 /* Include prototypes */
 #include "t_qread.h"
-#include "t_write.h"
 #include "t_begin_crit.h"
 #include "t_end.h"
 #include "dbfilop.h"
-#include "targ_alloc.h"
 #include "gvcst_blk_build.h"
-#include "hashtab.h"
 #include "jnl_write.h"
 
 GBLREF  mur_opt_struct  	mur_options;
@@ -188,7 +188,7 @@ uint4	mur_output_record()
 			memcpy(tcom_record.jnl_tid, rec->jrec_tcom.jnl_tid, TID_STR_SIZE);
 		}
 		op_tcommit();
-		return SS_NORMAL;
+		break;
 	case JRT_ZTCOM:
 		/* Even for FENCE_NONE we apply fences. Otherwise an FUPD/GUPD becomes UPD etc. */
 		if (jnl_enabled)
@@ -208,7 +208,7 @@ uint4	mur_output_record()
 		jnl_fence_ctl.level = 0;
 		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1;
 		cs_addrs->next_fenced = NULL;
-		return SS_NORMAL;
+		break;
 	case JRT_INCTN:
 		assert(mur_ctl[mur_regno].gd == gv_cur_region);
 		assert(cs_addrs == (sgmnt_addrs *)&FILE_INFO(mur_ctl[mur_regno].gd)->s_addrs);
@@ -216,9 +216,15 @@ uint4	mur_output_record()
 		if (mur_options.forward)
 		{
 			assert(rec->jrec_inctn.prefix.tn == cs_data->trans_hist.curr_tn || mur_options.notncheck);
-			cs_data->trans_hist.early_tn = ++cs_data->trans_hist.curr_tn;
+			if (FALSE == ((was_crit = cs_addrs->now_crit)))
+				grab_crit(gv_cur_region);
+			CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
+			cs_data->trans_hist.early_tn = cs_data->trans_hist.curr_tn + 1;
+			INCREMENT_CURR_TN(cs_data);
+			if (!was_crit)
+				rel_crit(gv_cur_region);
 		}
-                return SS_NORMAL;
+		break;
 	case JRT_AIMG:
 		assert(mur_ctl[mur_regno].gd == gv_cur_region);
 		assert(cs_addrs == (sgmnt_addrs *)&FILE_INFO(mur_ctl[mur_regno].gd)->s_addrs);
@@ -229,7 +235,7 @@ uint4	mur_output_record()
 		write_after_image = TRUE;
 		mur_put_aimg_rec(rec);
 		write_after_image = FALSE;
-		return SS_NORMAL;
+		break;
 	case JRT_PFIN:
 		if (jnl_enabled)
 		{
@@ -245,12 +251,14 @@ uint4	mur_output_record()
 			if (!was_crit)
 				rel_crit(mur_ctl[mur_regno].gd);
 		}
-		return SS_NORMAL;
+		break;
 	case JRT_NULL:
 		if (jnl_enabled)
 		{
-			grab_crit(mur_ctl[mur_regno].gd);
+			if (FALSE == ((was_crit = mur_ctl[mur_regno].csa->now_crit)))
+				grab_crit(mur_ctl[mur_regno].gd);
 			assert(gv_cur_region == mur_ctl[mur_regno].gd);
+			CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 			cs_addrs->ti->early_tn = cs_addrs->ti->curr_tn + 1;
 			jnl_status = jnl_ensure_open();
 			if (0 == jnl_status)
@@ -267,10 +275,11 @@ uint4	mur_output_record()
 				jnl_write(cs_addrs->jnl, JRT_NULL, (jnl_record *)&null_record, NULL, NULL);
 			} else
 				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
-			cs_addrs->ti->curr_tn = cs_addrs->ti->early_tn;
-			rel_crit(gv_cur_region);
+			INCREMENT_CURR_TN(cs_data);
+			if (!was_crit)
+				rel_crit(mur_ctl[mur_regno].gd);
 		}
-		return SS_NORMAL;
+		break;
 	default:
 		assert(FALSE);
 		mur_report_error(MUR_JNLBADRECFMT);

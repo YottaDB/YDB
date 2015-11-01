@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,19 +11,18 @@
 
 #include "mdef.h"
 
-#include <errno.h>
 #include "gtm_unistd.h"
-#include <fcntl.h>
-#include <arpa/inet.h>
+#include "gtm_fcntl.h"
+#include "gtm_inet.h"
 #ifdef UNIX
-#include <sys/ipc.h>
-#include <sys/sem.h>
+#include "gtm_ipc.h"
 #include <sys/wait.h>
 #include "repl_instance.h"
 #elif defined(VMS)
 #include <ssdef.h>
 #include <descrip.h> /* Required for gtmrecv.h */
 #endif
+#include <errno.h>
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -73,12 +72,14 @@ GBLREF int			gtmrecv_log_fd;
 GBLREF FILE			*gtmrecv_log_fp;
 GBLREF boolean_t        	is_rcvr_server;
 GBLREF int			gtmrecv_srv_count;
+GBLREF uint4			log_interval;
 
 int gtmrecv(void)
 {
 	recvpool_ctl_ptr_t	recvpool_ctl;
 	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
+	upd_helper_ctl_ptr_t	upd_helper_ctl;
 	uint4			gtmrecv_pid, channel;
 	int			semval, status, save_upd_status, upd_start_status, upd_start_attempts;
 	char			print_msg[1024];
@@ -107,7 +108,7 @@ int gtmrecv(void)
 	memset((uchar_ptr_t)&recvpool, 0, sizeof(recvpool));
 	if (-1 == gtmrecv_get_opt())
 		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
-	recvpool_init(pool_user, gtmrecv_options.start && !gtmrecv_options.updateonly, gtmrecv_options.start);
+	recvpool_init(pool_user, gtmrecv_options.start && 0 != gtmrecv_options.listen_port, gtmrecv_options.start);
 	/*
 	 * When gtmrecv_options.start is TRUE, shm field recvpool.recvpool_ctl->fresh_start is updated in recvpool_init()
 	 *	recvpool.recvpool_ctl->fresh_start == TRUE ==> fresh start, and
@@ -116,18 +117,20 @@ int gtmrecv(void)
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
 	gtmrecv_local = recvpool.gtmrecv_local;
+	upd_helper_ctl = recvpool.upd_helper_ctl;
 	if (GTMRECV == pool_user)
 	{
 		if (gtmrecv_options.start)
 		{
-			if (gtmrecv_options.updateonly || !recvpool_ctl->fresh_start)
+			if (0 == gtmrecv_options.listen_port /* implies (updateonly || helpers only) */
+				|| !recvpool_ctl->fresh_start)
 			{
-				if (SRV_ALIVE == (status = is_recv_srv_alive()) && !gtmrecv_options.updateonly)
+				if (SRV_ALIVE == (status = is_recv_srv_alive()) && 0 != gtmrecv_options.listen_port)
 				{
 					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
 					rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 						  RTS_ERROR_LITERAL("Receiver Server already exists"));
-				} else if (SRV_DEAD == status && gtmrecv_options.updateonly)
+				} else if (SRV_DEAD == status && 0 == gtmrecv_options.listen_port)
 				{
 					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
 					rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
@@ -145,9 +148,15 @@ int gtmrecv(void)
 					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
 					gtmrecv_exit(status);
 				}
+				if (gtmrecv_options.helpers && 0 == gtmrecv_options.listen_port)
+				{ /* start helpers only */
+					status = gtmrecv_start_helpers(gtmrecv_options.n_readers, gtmrecv_options.n_writers);
+					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
+					gtmrecv_exit(status - NORMAL_SHUTDOWN);
+				}
 			}
 #ifndef REPL_DEBUG_NOBACKGROUND
-			if (SS_NORMAL == (status = repl_fork_server(&pid, &channel, 1)) && pid)
+			if (SS_NORMAL == (status = repl_fork_rcvr_server(&pid, &channel)) && pid)
 			{
 				REPL_DPRINT2("Waiting for receiver child process %d to startup\n", pid);
 				while (0 == (semval = get_sem_info(RECV, RECV_SERV_COUNT_SEM, SEM_INFO_VAL)) &&
@@ -187,6 +196,8 @@ int gtmrecv(void)
 		{
 			if (gtmrecv_options.updateonly)
 				gtmrecv_exit(gtmrecv_endupd() - NORMAL_SHUTDOWN);
+			if (gtmrecv_options.helpers)
+				gtmrecv_exit(gtmrecv_end_helpers(FALSE) - NORMAL_SHUTDOWN);
 			gtmrecv_exit(gtmrecv_shutdown(FALSE, NORMAL_SHUTDOWN) - NORMAL_SHUTDOWN);
 		} else if (gtmrecv_options.changelog)
 		{
@@ -205,6 +216,10 @@ int gtmrecv(void)
 	is_rcvr_server = TRUE;
 	process_id = getpid();
 	strcpy(gtmrecv_local->log_file, gtmrecv_options.log_file);
+	gtmrecv_local->log_interval = log_interval = gtmrecv_options.rcvr_log_interval;
+	upd_proc_local->log_interval = gtmrecv_options.upd_log_interval;
+	upd_helper_ctl->start_helpers = FALSE;
+	upd_helper_ctl->start_n_readers = upd_helper_ctl->start_n_writers = 0;
 #ifdef UNIX
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, NULL, gtmrecv_options.log_file, NULL);
 	assert(SS_NORMAL == log_init_status);
@@ -228,10 +243,6 @@ int gtmrecv(void)
 	gtm_event_log_init();
 	gtmrecv_local->recv_serv_pid = process_id;
 	gtmrecv_local->listen_port = gtmrecv_options.listen_port;
-#ifdef REPL_RECVR_HELP_UPD
-	gvinit();
-	region_init(FALSE);
-#endif
 	if (recvpool_ctl->fresh_start)
 		QWASSIGNDW(recvpool_ctl->jnl_seqno, 0); /* Update process will initialize this to a non-zero value */
 	else
@@ -286,6 +297,8 @@ int gtmrecv(void)
 		upd_proc_local->changelog = TRUE;
 		gtmrecv_local->restart = GTMRECV_NO_RESTART; /* release the update process wait */
 	}
+	if (gtmrecv_options.helpers)
+		gtmrecv_helpers_init(gtmrecv_options.n_readers, gtmrecv_options.n_writers);
 #ifdef UNIX
 	/*
 	 * Child needs to increment receivpool lock couner semaphore.

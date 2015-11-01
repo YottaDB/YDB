@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@
 
 #include <varargs.h>
 
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "sbs_blk.h"
 #include "subscript.h"

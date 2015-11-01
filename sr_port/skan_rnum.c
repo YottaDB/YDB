@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,13 +28,14 @@
 
 GBLREF block_id		patch_curr_blk;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF char		patch_comp_key[256];
+GBLREF char		patch_comp_key[MAX_KEY_SZ + 1];
 GBLREF unsigned char	patch_comp_count;
 GBLREF int		patch_rec_counter;
 
 sm_uc_ptr_t skan_rnum(sm_uc_ptr_t bp, bool over_run)
 {
-	char 		util_buff[MAX_UTIL_LEN], cc;
+	char 		util_buff[MAX_UTIL_LEN];
+	unsigned char	cc;
 	sm_uc_ptr_t 	b_top, rp, r_top, key_top;
 	short int 	size, rec_size;
 	int4 		record;
@@ -45,10 +46,11 @@ sm_uc_ptr_t skan_rnum(sm_uc_ptr_t bp, bool over_run)
 		b_top = bp + sizeof(blk_hdr);
 	else
 		b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
-	if (!cli_get_hex("RECORD",&record))
+	if (!cli_get_hex("RECORD", (uint4 *)&record))
 		return 0;
 	if (record < 1)
-	{	util_out_print("Error: record less than 1",TRUE);
+	{
+		util_out_print("Error: record less than 1",TRUE);
 		return 0;
 	}
 
@@ -57,7 +59,8 @@ sm_uc_ptr_t skan_rnum(sm_uc_ptr_t bp, bool over_run)
 	patch_comp_key[0] = patch_comp_key[1] = 0;
 	patch_comp_count = 0;
 	for ( ; record > 1 && rp < b_top ;record--)
-	{	GET_SHORT(rec_size, &((rec_hdr_ptr_t)rp)->rsiz);
+	{
+		GET_SHORT(rec_size, &((rec_hdr_ptr_t)rp)->rsiz);
 		if (rec_size < sizeof(rec_hdr))
 			r_top = rp + sizeof(rec_hdr);
 		else
@@ -82,11 +85,11 @@ sm_uc_ptr_t skan_rnum(sm_uc_ptr_t bp, bool over_run)
 		else
 			cc = ((rec_hdr_ptr_t) rp)->cmpc;
 		size = key_top - rp - sizeof(rec_hdr);
+		if (size > sizeof(patch_comp_key) - 2 - cc)
+			size = sizeof(patch_comp_key) - 2 - cc;
 		if (size < 0)
 			size = 0;
-		else if (size > sizeof(patch_comp_key) - 2)
-			size = sizeof(patch_comp_key) - 2;
-		memcpy(&patch_comp_key[cc],rp + sizeof(rec_hdr),size);
+		memcpy(&patch_comp_key[cc], rp + sizeof(rec_hdr), size);
 		patch_comp_count = cc + size;
 		rp = r_top;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,9 +22,9 @@ GBLREF unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
 
 void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr)
 {
-	register stack_frame *sf;
-	unsigned char	*msp_save;
-	short int	x1, x2;
+	register stack_frame 	*sf;
+	unsigned char		*msp_save;
+	unsigned int		x1, x2;
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
 

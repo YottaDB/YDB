@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include "gtm_stat.h"
 #include "gtm_string.h"
 #include "gtm_time.h"
+#include "gtm_inet.h"
 #if defined(UNIX)
 #include <errno.h>
 #include "gtm_fcntl.h"
@@ -34,8 +35,6 @@
 #include <efndef.h>
 #include "iosb_disk.h"
 #endif
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -186,6 +185,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	jb->max_write_size = JNL_MAX_WRITE;
 	jb->before_images = header.before_images;
 	jb->epoch_tn = eof_record.prefix.tn;
+	csd->jnl_checksum = header.checksum;
 	LOG2_OF_INTEGER(header.alignsize, jb->log2_of_alignsize);
 	assert(header.autoswitchlimit == csd->autoswitchlimit);
 	assert(header.jnl_alq == csd->jnl_alq);

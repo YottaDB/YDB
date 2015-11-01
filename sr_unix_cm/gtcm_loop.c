@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@
 #include "gtm_string.h"
 #include "gtm_unistd.h"		/* for execlp() and fork() */
 #include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdio.h"		/* for sprintf */
 
 #include <sys/wait.h>		/* for wait() */
 
@@ -32,33 +33,35 @@
 #	ifdef SEQUOIA
 #		include <sys/bsd_time.h>
 #	else
-#		include <time.h>
+#		include "gtm_time.h"
 #	endif
 #endif
 
 #include <errno.h>
 #ifdef DEBUG
-#include "gtm_stdio.h"
 #include "gtm_fcntl.h"
 #endif /* defined(DEBUG) */
 
-#include "gt_timer.h"	/* for cancel_timer() and start_timer() atleast */
+#include "gt_timer.h"	/* for cancel_timer() and start_timer() and TID declaration atleast */
+#include "error.h"
 
 #ifndef lint
 static char rcsid[] = "$Header:$";
 #endif
 
-GBLREF int	psock;
-GBLREF int 	conn_timeout;
-GBLREF int	history;
-GBLREF int	omi_pid;
-GBLDEF omi_conn *curr_conn;
+GBLREF int		psock;
+GBLREF int 		conn_timeout;
+GBLREF int		history;
+GBLREF int		omi_pid;
+GBLDEF omi_conn 	*curr_conn;
+GBLDEF boolean_t	servtime_expired;
+GBLREF int		per_conn_servtime;
 
-static int detect_hang = 5;
 
-void
-gtcm_loop(cll)
-    omi_conn_ll	*cll;
+void	hang_handler(void);
+void	gcore_server(void);
+
+void gtcm_loop(omi_conn_ll *cll)
 {
     extern int	 omi_exitp;
 
@@ -67,7 +70,6 @@ gtcm_loop(cll)
     fd_set	 r_fds, e_fds;
     omi_conn	*cptr, *prev;
     struct timeval timeout, *tp;
-    void hang_handler();
 
     if (psock >= 0)
     {
@@ -133,15 +135,14 @@ gtcm_loop(cll)
 	for (cptr = cll->head, prev = (omi_conn *)0; cptr; ) {
 	    if (FD_ISSET(cptr->fd, &r_fds))
 	    {
-		if (detect_hang)
-		    start_timer(gtcm_loop, 60000, hang_handler, 0, NULL);
+	    	servtime_expired = FALSE; /* inside hang handler this is set TRUE */
+		start_timer((TID)gtcm_loop, per_conn_servtime * 1000, hang_handler, 0, NULL);
 
 		curr_conn = cptr;
 		res = omi_srvc_xact(cptr);
 		curr_conn = NULL;
 
-		if (detect_hang)
-		    cancel_timer(gtcm_loop);
+		cancel_timer((TID)gtcm_loop);
 
 		if (res >= 0)
 		{
@@ -208,34 +209,28 @@ gtcm_loop(cll)
 	    }
 	    nfds--;
 	}
-
-/*	Sanity check: is nfds == 0? */
-
+	/* Sanity check: is nfds == 0? */
     }
-
     return;
-
 }
 
-
-void hang_handler()
+void hang_handler(void)
 {
-	void gcore_server();
+	error_def(ERR_OMISERVHANG);
 	OMI_DBG_STMP;
 	OMI_DBG((omi_debug, "%s: server appears to be hung...generating core file...\n",
 		 SRVR_NAME));
+	gtcm_rep_err("", ERR_OMISERVHANG);
 
 	gcore_server();
-	detect_hang--;	   /* don't core dump when this value reaches zero */
 	wait(NULL);	   /* wait for a signal or the child to exit */
+	servtime_expired = TRUE;
 }
 
 
-void gcore_server()
+void gcore_server(void)
 {
 	int pid;
-	char *gtm_dist, *getenv();
-	char path[256];
 
 	if (history)
 	{
@@ -243,29 +238,15 @@ void gcore_server()
 		dump_rc_hist();
 	}
 
-	gtm_dist = getenv("gtm_dist");
-	if (gtm_dist)
+	pid=fork();
+	if (pid < 0)	/* fork error */
 	{
-	    	char omi_pid_str[12];
-		sprintf(omi_pid_str,"%d",omi_pid);
-		strcpy(path,gtm_dist);
-		strcat(path,"/gtcm_gcore");
-
-		pid=fork();	/* fork error */
-		if (pid < 0)
-		{
-			OMI_DBG((omi_debug,
-				 "%s: unable to start a new process to gcore the server\n",
-				 SRVR_NAME));
-			perror(SRVR_NAME);
-		}
-		else if (!pid)  /* child */
-		{
-			execlp(path,path,omi_pid_str,(char *) 0);
-			OMI_DBG((omi_debug, "%s: unable to generate core file\n", SRVR_NAME));
-			exit(1);
-		}
-	}
+		OMI_DBG((omi_debug,
+			 "%s: unable to start a new process to generate the core\n",
+			 SRVR_NAME));
+		perror(SRVR_NAME);
+	} else if (!pid)  /* child */
+		DUMP_CORE;
 }
 
 

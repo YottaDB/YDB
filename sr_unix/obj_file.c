@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,9 +39,11 @@ GBLREF unsigned char	*runtime_base;
 GBLREF mliteral		literal_chain;
 GBLREF char		source_file_name[];
 GBLREF unsigned short	source_name_len;
+GBLREF mident		routine_name;
 GBLREF spdesc		stringpool;
 GBLREF int4		linkage_size;
 GBLREF uint4		lnkrel_cnt;	/* number of entries in linkage Psect to relocate */
+GBLREF int4		sym_table_size;
 
 static char			emit_buff[OBJ_EMIT_BUF_SIZE];	/* buffer for emit output */
 static int			emit_buff_used;		/* number of chars in emit_buff */
@@ -194,6 +196,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 			sym1->next = newsym;
 		else
 			symbols = newsym;
+		sym_table_size += newsym->name_len;
 		sym = newsym;
 	}
 
@@ -257,7 +260,8 @@ void	output_symbol(void)
 	uint4			string_length;
 	struct sym_table	*sym;
 
-	string_length = output_symbol_size();
+	string_length = sizeof(int4) + sym_table_size;
+	assert(string_length == output_symbol_size());
 	emit_immed((char *)&string_length, sizeof(string_length));
 	sym = symbols;
 	while (sym)
@@ -278,6 +282,7 @@ void	obj_init(void)
 	lnkrel_cnt = 0;
 	link_rel = link_rel_end = NULL;
 	symbols = 0;
+	sym_table_size = 0;
 
 	linkage_first = linkage_last = NULL;
 	linkage_size = MIN_LINK_PSECT_SIZE;	/* minimum size of linkage Psect, assuming no references from generated code */
@@ -313,14 +318,26 @@ void	emit_literals(void)
 	uint4		offset, padsize;
 	mliteral	*p;
 
-	/* emit the literal text pool which includes the source file path */
+	/* emit the literal text pool which includes the source file path and routine name */
 	offset = stringpool.free - stringpool.base;
 	emit_immed((char *)stringpool.base, offset);
+	padsize = PADLEN(offset, NATIVE_WSIZE); /* comp_lits aligns the start of source path on NATIVE_WSIZE boundary.*/
+	if (padsize)
+	{
+		emit_immed(PADCHARS, padsize);
+		offset += padsize;
+	}
 	emit_immed(source_file_name, source_name_len);
 	offset += source_name_len;
-
-	/* Note: comp_lits aligns the start of the literal area on a 4-byte boundary.  */
-	padsize = PADLEN(offset, 4);
+	padsize = PADLEN(offset, NATIVE_WSIZE); /* comp_lits aligns the start of routine_name on NATIVE_WSIZE boundary.*/
+	if (padsize)
+	{
+		emit_immed(PADCHARS, padsize);
+		offset += padsize;
+	}
+	emit_immed(routine_name.addr, routine_name.len);
+	offset += routine_name.len;
+	padsize = PADLEN(offset, NATIVE_WSIZE); /* comp_lits aligns the start of literal area on NATIVE_WSIZE boundary.*/
 	if (padsize)
 	{
 		emit_immed(PADCHARS, padsize);

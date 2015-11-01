@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@
 #endif
 #include "util.h"
 #include "cli.h"
-#include "gvcst_init.h"
+#include "gvcst_protos.h"	/* for gvcst_init prototype */
 #include "mupip_exit.h"
 #include "mupip_extend.h"
 #include "gtmmsg.h"
@@ -66,7 +66,7 @@ void mupip_extend(void)
 	r_len = sizeof(regionname);
 	if (cli_get_str("REG_NAME", regionname, &r_len) == FALSE)
 		rts_error(VARLSTCNT(1) ERR_MUNODBNAME);
-	if (cli_get_num("BLOCKS",&tblocks))
+	if (cli_get_int("BLOCKS",&tblocks))
 	{
 		if (tblocks < 1)
 		{

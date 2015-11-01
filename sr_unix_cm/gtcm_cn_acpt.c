@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,12 +13,10 @@
  *	Accept a client connection.
  */
 
-#ifdef DEBUG
-#include "gtm_fcntl.h"
-#endif /* defined(DEBUG) */
 
 #include "mdef.h"
 
+#include "gtm_fcntl.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"		/* for close() */

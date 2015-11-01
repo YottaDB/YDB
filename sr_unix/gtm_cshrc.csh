@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -38,11 +38,7 @@ if ( $?gtm_environment_init == "0" ) then
 
 	set	gtm_cshrc_first_time =	"true"		# for gtm_env.csh (see below)
 	setenv	gtm_environment_init	"GT.M environment initialized at `date`"
-	if ( "HP-UX" == $HOSTOS ) then
-		setenv	gtm_root		/usr/library
-	else
-		setenv	gtm_root		'~library'
-	endif
+	setenv	gtm_root		'/usr/library'
 	setenv	gtm_com			$gtm_root/com
 
 	if ( ! -f $gtm_com/gtm_cshrc.csh )  then

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@
  * Note that OBJ_UNIX_LABEL and OBJ_PLATFORM_LABEL should not exceed 255.
  */
 
-#define OBJ_UNIX_LABEL	6
+#define OBJ_UNIX_LABEL	9
 
 #if defined(__osf__)
 #	define	OBJ_PLATFORM_LABEL	0
@@ -56,11 +56,12 @@
 #endif
 
 #ifdef USHBIN_SUPPORTED
-#  define OBJ_LABEL	((OBJ_UNIX_LABEL << 4) + (OBJ_PLATFORM_LABEL))
+#  define OBJ_LABEL		((OBJ_UNIX_LABEL << 4) + (OBJ_PLATFORM_LABEL))
+#  define MAGIC_COOKIE_V5	((GTM_OMAGIC << 16) + (8 << 4) + 0) /* A version stake for V5. Should never change. */
 #else
-#  define OBJ_LABEL	((OBJ_UNIX_LABEL << 8) + (OBJ_PLATFORM_LABEL))
+#  define OBJ_LABEL		((OBJ_UNIX_LABEL << 8) + (OBJ_PLATFORM_LABEL))
 #endif
 
 #define MAGIC_COOKIE ((GTM_OMAGIC << 16) + OBJ_LABEL)
 
-#endif
+#endif /* OBJLABEL_DEFINED */

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -68,6 +68,12 @@ TACCMETH
 	s value=$tr(token,lower,upper)
 	i @s@(qual,"TYPE","VALUES")'[("\"_value) zm gdeerr("VALUEBAD"):token:qual
 	q
+TNULLSUB
+	d GETTOK^GDESCAN
+	i toktype'="TKIDENT" zm gdeerr("VALUEBAD"):token:qual
+	s value=$tr(token,lower,upper)
+	i @s@(qual,"TYPE","VALUES")'[("\"_value) zm gdeerr("VALUEBAD"):token:qual
+	q
 TREGION
 	n REGION d REGION s value=REGION
 	q
@@ -84,7 +90,7 @@ NAME
 	i '$l(NAME) zm gdeerr("VALUEBAD"):token:"name"
 	i NAME'="*" s x=$e(NAME) i x'="%",x'?1A zm gdeerr("NAMSTARTBAD"):NAME
 	i $e(NAME,2,999)'?.AN.1"*" zm gdeerr("VALUEBAD"):NAME:"name"
-	i $l(NAME)>MAXNAMLN zm gdeerr("VALTOOLONG"):NAME:MAXNAMLN:"name"
+	i $l(NAME)>PARNAMLN zm gdeerr("VALTOOLONG"):NAME:PARNAMLN:"name"
 	q
 REGION
 	k REGION
@@ -96,7 +102,7 @@ REGION
 	i '$l(REGION) zm gdeerr("VALUEBAD"):token:renpref_"region"
 	i REGION=defreg q
 	s x=$e(REGION) i x'?1A zm gdeerr("PREFIXBAD"):REGION:renpref_"region"
-	i $l(REGION)>MAXREGLN zm gdeerr("VALTOOLONG"):REGION:MAXREGLN:renpref_"region"
+	i $l(REGION)>PARREGLN zm gdeerr("VALTOOLONG"):REGION:PARREGLN:renpref_"region"
 	q
 SEGMENT
 	k SEGMENT
@@ -108,7 +114,7 @@ SEGMENT
 	i '$l(SEGMENT) zm gdeerr("VALUEBAD"):token:renpref_"segment"
 	i SEGMENT=defseg q
 	s x=$e(SEGMENT) i x'?1A zm gdeerr("PREFIXBAD"):SEGMENT:renpref_"segment"
-	i $l(SEGMENT)>MAXSEGLN zm gdeerr("VALTOOLONG"):SEGMENT:MAXSEGLN:renpref_"segment"
+	i $l(SEGMENT)>PARSEGLN zm gdeerr("VALTOOLONG"):SEGMENT:PARSEGLN:renpref_"segment"
 	q
 matchtok:(tok,ent)
 	d GETTOK^GDESCAN

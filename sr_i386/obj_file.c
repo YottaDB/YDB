@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,16 +34,20 @@
 LITREF char gtm_release_name[];
 LITREF int4 gtm_release_name_len;
 
-GBLREF command_qualifier cmd_qlf;
-GBLREF char routine_name[];
-GBLREF char module_name[];
-GBLREF bool		run_time;
-GBLREF int4		mlmax;
-GBLREF int4		code_size, lit_addrs, lits_size;
+GBLREF mliteral 	literal_chain;
+GBLREF char 		source_file_name[];
+GBLREF unsigned short 	source_name_len;
 
-GBLDEF int4		psect_use_tab[GTM_LASTPSECT];	/* bytes of each psect in this module */
-GBLDEF char		object_file_name[MAX_FBUFF + 1];
-GBLDEF short		object_name_len;
+GBLREF command_qualifier cmd_qlf;
+GBLREF mident	routine_name;
+GBLREF mident	module_name;
+GBLREF bool	run_time;
+GBLREF int4	mlmax, mvmax;
+GBLREF int4	code_size, lit_addrs, lits_size;
+
+GBLDEF int4	psect_use_tab[GTM_LASTPSECT];	/* bytes of each psect in this module */
+GBLDEF char	object_file_name[MAX_FBUFF + 1];
+GBLDEF short	object_name_len;
 
 static short int current_psect;
 static char emit_buff[OBJ_EMIT_BUF_SIZE];	/* buffer for emit output */
@@ -54,24 +58,17 @@ static uint4 cdlits;
 static struct rel_table *data_rel, *data_rel_end;
 static struct rel_table *text_rel, *text_rel_end;
 static int file_des;
+DEBUG_ONLY(static uint4 		txtrel_cnt_in_hdr;)
 
 error_def(ERR_OBJFILERR);
-
-void emit_addr(int4 refaddr, int4 offset, int4 *result);
-void emit_pidr(int4 refoffset, int4 data_offset, int4 *result);
-void buff_emit(void);
-void set_psect(unsigned char psect,unsigned char offset);
-void resolve_sym(void);
-void output_relocation(void);
-void output_symbol(void);
 
 void create_object_file(rhdtyp *rhead)
 {
 	int status;
 	unsigned char rout_len;
 	uint4 stat;
-	char		obj_name[sizeof(mident) + 5];
-	mstr		rname_mstr, fstr;
+	char		obj_name[sizeof(mident_fixed) + 5];
+	mstr		fstr;
 	parse_blk	pblk;
 	struct exec	hdr;
 	error_def(ERR_FILEPARSE);
@@ -84,8 +81,8 @@ void create_object_file(rhdtyp *rhead)
 	/* create the object file */
 	fstr.len = (MV_DEFINED(&cmd_qlf.object_file) ? cmd_qlf.object_file.str.len : 0);
 	fstr.addr = cmd_qlf.object_file.str.addr;
-	rout_len = mid_len((mident *)module_name);
-	memcpy(&obj_name[0], module_name, rout_len);
+	rout_len = module_name.len;
+	memcpy(&obj_name[0], module_name.addr, rout_len);
 	obj_name[rout_len] = '.';
 	obj_name[rout_len + 1] = 'o';
 	obj_name[rout_len + 2] = 0;
@@ -105,9 +102,12 @@ void create_object_file(rhdtyp *rhead)
 	}
 
 	memcpy(&rhead->jsb[0], "GTM_CODE", sizeof(rhead->jsb));
-	emit_addr((char *)&rhead->src_full_name.addr - (char *) rhead,
-		(int4)rhead->src_full_name.addr, &rhead->src_full_name.addr);
-	txtrel_cnt++;
+	emit_addr((char *)&rhead->src_full_name.addr - (char *)rhead,
+		(int4)rhead->src_full_name.addr, (int4 *)&rhead->src_full_name.addr);
+	emit_addr((char *)&rhead->routine_name.addr - (char *)rhead,
+		(int4)rhead->routine_name.addr, (int4 *)&rhead->routine_name.addr);
+	txtrel_cnt += 2;
+	DEBUG_ONLY(txtrel_cnt_in_hdr = txtrel_cnt;)
 
 	set_psect(GTM_CODE, 0);
 	hdr.a_magic = OMAGIC;
@@ -115,23 +115,19 @@ void create_object_file(rhdtyp *rhead)
 	hdr.a_entry = 0;
 	hdr.a_bss = 0;
 	hdr.a_text = code_size;
-	hdr.a_data = lits_size + (lits_size & 1);		/* and pad to even # */
+	assert(0 == PADLEN(lits_size, NATIVE_WSIZE));
+	hdr.a_data = lits_size;		/* and pad to even # */
 	hdr.a_syms = (mlmax + cdlits) * sizeof(struct nlist);
 	hdr.a_trsize = txtrel_cnt * sizeof(struct relocation_info);
 	hdr.a_drsize = lit_addrs * sizeof(struct relocation_info);
-	emit_immed(&hdr, sizeof(hdr));
+	emit_immed((char *)&hdr, sizeof(hdr));
 	memset(psect_use_tab, 0, sizeof(psect_use_tab));
-	memcpy(rhead->routine_name.c,routine_name,sizeof(mident));
-	emit_immed(rhead,sizeof(*rhead));
+	emit_immed((char *)rhead, sizeof(*rhead));
 }
 
 void close_object_file(void)
 {
-	unsigned char x;
-
-	x = 0;
-	if (lits_size & 1)
-		emit_immed(&x, sizeof(x));
+	assert(0 == PADLEN(lits_size, NATIVE_WSIZE));
 	resolve_sym();
 	output_relocation();
 	output_symbol();
@@ -218,7 +214,7 @@ void emit_reference(uint4 refaddr, mstr *name, uint4 *result)
 	struct sym_table *sym;
 	struct rel_table *newrel;
 
-	sym = define_symbol(0, *name, 0);
+	sym = define_symbol(0, name, 0);
 	assert(sym);
 	if (sym->n.n_type == (N_TEXT | N_EXT))
 		*result = sym->n.n_value;
@@ -315,7 +311,7 @@ void set_psect(unsigned char psect,unsigned char offset)
  */
 
 static struct sym_table *symbols;
-struct sym_table *define_symbol(unsigned char psect, mstr name, int4 value)
+struct sym_table *define_symbol(unsigned char psect, mstr *name, int4 value)
 {
 	int cmp;
 	struct sym_table *sym, *sym1, *newsym;
@@ -324,16 +320,16 @@ struct sym_table *define_symbol(unsigned char psect, mstr name, int4 value)
 	sym1 = 0;
 	while(sym)
 	{
-		if ((cmp = memvcmp(name.addr, name.len, &sym->name[0], sym->name_len - 1)) <= 0)
+		if ((cmp = memvcmp(name->addr, name->len, &sym->name[0], sym->name_len - 1)) <= 0)
 			break;
 		sym1 = sym;
 		sym = sym->next;
 	}
 	if (cmp || !sym)
-	{	newsym = (struct sym_table *) mcalloc(sizeof(struct sym_table) + name.len);
-		newsym->name_len = name.len + 1;
-		memcpy(&newsym->name[0], name.addr, name.len);
-		newsym->name[ name.len ] = 0;
+	{	newsym = (struct sym_table *) mcalloc(sizeof(struct sym_table) + name->len);
+		newsym->name_len = name->len + 1;
+		memcpy(&newsym->name[0], name->addr, name->len);
+		newsym->name[ name->len ] = 0;
 		newsym->n.n_strx = 0;
 		newsym->n.n_type = N_EXT;
 		if (psect == GTM_CODE)
@@ -381,19 +377,28 @@ void resolve_sym(void)
 
 void output_relocation(void)
 {
-	struct rel_table *rel;
+	struct rel_table 	*rel;
+	DEBUG_ONLY(int	cnt;)
 
+	DEBUG_ONLY(cnt = 0;)
 	rel = text_rel;
 	while (rel)
-	{	emit_immed(&rel->r, sizeof(rel->r));
+	{
+		emit_immed((char *)&rel->r, sizeof(rel->r));
 		rel = rel->next;
+		DEBUG_ONLY(cnt++;)
 	}
+	assert(cnt == txtrel_cnt_in_hdr);
 
+	DEBUG_ONLY(cnt = 0;)
 	rel = data_rel;
 	while (rel)
-	{	emit_immed(&rel->r, sizeof(rel->r));
+	{
+		emit_immed((char *)&rel->r, sizeof(rel->r));
 		rel = rel->next;
+		DEBUG_ONLY(cnt++;)
 	}
+	assert(cnt == lit_addrs);
 }
 
 
@@ -407,11 +412,11 @@ void output_symbol(void)
 	while (sym)
 	{
 		sym->n.n_strx = string_length;
-		emit_immed(&sym->n, sizeof(sym->n));
+		emit_immed((char *)&sym->n, sizeof(sym->n));
 		string_length += sym->name_len;
 		sym = sym->next;
 	}
-	emit_immed(&string_length, sizeof(string_length));
+	emit_immed((char *)&string_length, sizeof(string_length));
 	sym = symbols;
 	while (sym)
 	{
@@ -429,24 +434,39 @@ void obj_init(void)
 }
 
 
-GBLREF mliteral literal_chain;
-GBLREF char source_file_name[];
-GBLREF unsigned short source_name_len;
 
 void emit_literals(void)
 {
-	uint4 offset, alignpad;
+	uint4 offset, padsize;
 	mliteral *p;
 
 	set_psect(GTM_LITERALS, 0);
 	offset = stringpool.free - stringpool.base;
 	emit_immed(stringpool.base, offset);
+	/* comp_lits aligns the start of source path on a NATIVE_WSIZE boundary.*/
+	padsize = PADLEN(offset, NATIVE_WSIZE);
+	if (padsize)
+	{
+		emit_immed(PADCHARS, padsize);
+		offset += padsize;
+	}
 	emit_immed(source_file_name, source_name_len);
 	offset += source_name_len;
-	if (offset & 3)
-	{	alignpad = 0;
-		emit_immed(&alignpad, 4 - (offset & 3));
-		offset += 4 - (offset & 3);
+	/* comp_lits aligns the start of routine_name on a NATIVE_WSIZE boundary.*/
+	padsize = PADLEN(offset, NATIVE_WSIZE);
+	if (padsize)
+	{
+		emit_immed(PADCHARS, padsize);
+		offset += padsize;
+	}
+	emit_immed(routine_name.addr, routine_name.len);
+	offset += routine_name.len;
+	/* comp_lits aligns the start of the literal area on a NATIVE_WSIZE boundary.*/
+	padsize = PADLEN(offset, NATIVE_WSIZE);
+	if (padsize)
+	{
+		emit_immed(PADCHARS, padsize);
+		offset += padsize;
 	}
 
 	dqloop(&literal_chain, que, p)
@@ -455,10 +475,11 @@ void emit_literals(void)
 		MV_FORCE_NUM(&p->v);
 		if (p->v.str.len)
 			emit_pidr(p->rt_addr + ((char *) &p->v.str.addr - (char *)&p->v),
-				 p->v.str.addr - (char *) stringpool.base, &p->v.str.addr);
+				 p->v.str.addr - (char *) stringpool.base, (int4 *)&p->v.str.addr);
 		else
 			p->v.str.addr = 0;
-		emit_immed(&p->v, sizeof(p->v));
+		emit_immed((char *)&p->v, sizeof(p->v));
 		offset += sizeof(p->v);
 	}
+	assert(lits_size == offset);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -273,7 +273,6 @@ CONDITION_HANDLER(gtmsecshr_cond_hndlr);
 CONDITION_HANDLER(mu_extract_handler);
 CONDITION_HANDLER(mu_extract_handler1);
 CONDITION_HANDLER(mupip_upgrade_ch);
-CONDITION_HANDLER(mupip_set_file_ch);
 CONDITION_HANDLER(iob_io_error1);
 CONDITION_HANDLER(iob_io_error2);
 CONDITION_HANDLER(omi_dbms_ch);

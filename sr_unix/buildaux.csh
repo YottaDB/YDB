@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2005 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -12,7 +12,7 @@
 #
 ###########################################################################################
 #
-#	buildaux.csh - Build GT.M auxiliaries: daemon, dse, geteuid, gtmsecshr, lke, mupip.
+#	buildaux.csh - Build GT.M auxiliaries: dse, geteuid, gtmsecshr, lke, mupip.
 #
 #	Arguments:
 #		$1 -	version number or code
@@ -74,8 +74,8 @@ endif
 #
 #####################################################################################
 
-set buildaux_auxillaries = "gde dse geteuid gtm_dmna gtmsecshr lke mupip gtcm_server gtcm_gnp_server"
-set buildaux_utilities = "semstat2 ftok gtcm_pkdisp gtcm_shmclean gtcm_play dummy"
+set buildaux_auxillaries = "gde dse geteuid  gtmsecshr lke mupip gtcm_server gtcm_gnp_server"
+set buildaux_utilities = "semstat2 ftok gtcm_pkdisp gtcm_shmclean gtcm_play dummy dbcertify"
 set buildaux_executables = "$buildaux_auxillaries $buildaux_utilities"
 set buildaux_validexecutable = 0
 
@@ -181,20 +181,6 @@ if ( $buildaux_geteuid == 1 ) then
 	if ( $status != 0  ||  ! -x $3/geteuid ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgeteuid, Failed to link geteuid (see ${dollar_sign}gtm_map/geteuid.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
-	endif
-endif
-
-if ( $buildaux_gtm_dmna == 1 ) then
-	set aix_loadmap_option = ''
-	if ( $HOSTOS == "AIX") then
-		set aix_loadmap_option = "-bloadmap:$gtm_map/gtm_dmna.loadmap"
-	endif
-	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtm_dmna	-L$gtm_obj $gtm_obj/daemon.o \
-			$gt_ld_sysrtns -lmumps $gt_ld_syslibs >& $gtm_map/gtm_dmna.map
-	if ( $status != 0  ||  ! -x $3/gtm_dmna ) then
-		set buildaux_status = `expr $buildaux_status + 1`
-		echo "buildaux-E-linkgtm_dmna, Failed to link gtm_dmna (see ${dollar_sign}gtm_map/gtm_dmna.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
 	endif
 endif
@@ -345,6 +331,21 @@ if ( $buildaux_ftok == 1 ) then
 	if ( $status != 0  ||  ! -x $3/ftok ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkftok, Failed to link ftok (see ${dollar_sign}gtm_map/ftok.map)" \
+			>> $gtm_log/error.`basename $gtm_exe`.log
+	endif
+endif
+
+if ( $buildaux_dbcertify == 1 ) then
+	set aix_loadmap_option = ''
+	if ( $HOSTOS == "AIX") then
+		set aix_loadmap_option = "-bloadmap:$gtm_map/dbcertify.loadmap"
+	endif
+	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/dbcertify -L$gtm_obj $gtm_obj/{dbcertify,dbcertify_cmd}.o \
+		$gt_ld_sysrtns -ldbcertify -lmupip -lmumps -lstub $gt_ld_aio_syslib \
+		$gt_ld_syslibs >& $gtm_map/dbcertify.map
+	if ( $status != 0  ||  ! -x $3/dbcertify ) then
+		set buildaux_status = `expr $buildaux_status + 1`
+		echo "buildaux-E-linkdbcertify, Failed to link dbcertify (see ${dollar_sign}gtm_map/dbcertify.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
 	endif
 endif

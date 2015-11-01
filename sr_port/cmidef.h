@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 #define CMIPORT_H_INCLUDED
 
 #define CM_MSG_BUF_SIZE 	512		/* Message buffer size */
+#define	CM_MAX_BUF_LEN		((unsigned short)0xFFFF) /* lnk->cbl is of type unsigned short, hence 64K-1 is the max currently */
 
 /*
  * Connection States

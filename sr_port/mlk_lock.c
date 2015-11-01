@@ -25,12 +25,12 @@
 #include "jnl.h"
 #include "gdscc.h"
 #include "gdskill.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "gtmimagename.h"
 #include "cmidef.h"		/* for cmmdef.h */
-#include "hashdef.h"		/* for cmmdef.h */
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"		/* for curr_entry structure definition */
 
 /* Include prototypes */

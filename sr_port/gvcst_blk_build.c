@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,23 +25,30 @@
 #include "filestruct.h"
 #include "copy.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "gvcst_blk_build.h"
 
-GBLREF unsigned char	cw_set_depth;
-GBLREF short		dollar_tlevel;
-GBLREF sgm_info		*sgm_info_ptr;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
+#ifdef DEBUG
+GBLDEF	boolean_t		skip_block_chain_tail_check;
+#endif
+
+GBLREF	unsigned char		cw_set_depth;
+GBLREF	short			dollar_tlevel;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	bool			certify_all_blocks;
+GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 
 void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 {
 	blk_segment	*seg, *stop_ptr, *array;
 	off_chain	chain;
-	sm_uc_ptr_t	ptr;
+	sm_uc_ptr_t	ptr, ptrtop;
 	int		n;
+	int4		offset;
 
 	assert(dollar_tlevel || cs_addrs->now_crit);
 	assert(cse->mode != gds_t_writemap);
@@ -74,7 +81,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	 * Note that a similar change is not needed in gvcst_map_build() because that will never be in the
 	 *     search history for any key.
 	 */
-	if (!ctn)
+	if (!ctn && !mu_reorg_upgrd_dwngrd_in_prog)
 	{
 		assert(dollar_tlevel);
 		/* Subtract one so will pass concurrency control for mm databases.
@@ -84,6 +91,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		 */
 		ctn = cs_addrs->ti->curr_tn - 1;
 	}
+	((blk_hdr_ptr_t)base_addr)->bver = GDSVCURR;
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	((blk_hdr_ptr_t)base_addr)->bsiz = array->len;
 	((blk_hdr_ptr_t)base_addr)->levl = cse->level;
@@ -115,21 +123,40 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 			seg--;
 		}
 	}
-	if (dollar_tlevel && cse->ins_off)
-	{	/* if the cw set has a reference to resolve, move it to the block */
-		assert(cse->index < sgm_info_ptr->cw_set_depth);
-		assert((int)cse->ins_off >= (int)(sizeof(blk_hdr) + sizeof(rec_hdr)));
-		assert((int)(cse->next_off + cse->ins_off + sizeof(block_id)) <= array->len);
-		if (cse->first_off == 0)
-			cse->first_off = cse->ins_off;
-		chain.flag = 1;
-		chain.cw_index = cse->index;
-		chain.next_off = cse->next_off;
-		ptr = base_addr + cse->ins_off;
-		GET_LONGP(ptr, &chain);
-		cse->index = 0;
-		cse->ins_off = 0;
-		cse->next_off = 0;
+	if (dollar_tlevel)
+	{
+		if (cse->ins_off)
+		{	/* if the cw set has a reference to resolve, move it to the block */
+			assert(cse->index < sgm_info_ptr->cw_set_depth);
+			assert((int)cse->ins_off >= (int)(sizeof(blk_hdr) + sizeof(rec_hdr)));
+			assert((int)(cse->next_off + cse->ins_off + sizeof(block_id)) <= array->len);
+			if (cse->first_off == 0)
+				cse->first_off = cse->ins_off;
+			chain.flag = 1;
+			chain.cw_index = cse->index;
+			chain.next_off = cse->next_off;
+			ptr = base_addr + cse->ins_off;
+			GET_LONGP(ptr, &chain);
+			cse->index = 0;
+			cse->ins_off = 0;
+			cse->next_off = 0;
+		}
+		DEBUG_ONLY(
+			if (cse->first_off)
+			{	/* verify the integrity of the TP chains within a newly created block */
+				ptr = base_addr;
+				ptrtop = ptr + cs_data->blk_size;
+				for (offset = cse->first_off; (0 < offset); offset = chain.next_off)
+				{
+					ptr = ptr + offset;
+					assert(ptr < ptrtop);	/* ensure we have not overrun the buffer */
+					GET_LONGP(&chain, ptr);
+					assert(1 == chain.flag || (skip_block_chain_tail_check && (0 == chain.next_off)));
+					assert(chain.cw_index < sgm_info_ptr->cw_set_depth);
+				}
+				assert(0 == offset);	/* ensure the chain is NULL terminated */
+			}
+		)
 	} else
 		assert(dollar_tlevel || (cse->index < (int)cw_set_depth));
 }

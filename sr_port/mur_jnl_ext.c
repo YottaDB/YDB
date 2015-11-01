@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +22,10 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "jnl_typedef.h"
 #include "copy.h"
@@ -35,6 +37,7 @@
 #include "mur_jnl_ext.h"
 #include "op.h"
 #include "real_len.h"		/* for real_len() prototype */
+#include "gtmmsg.h"
 
 GBLREF	gv_key		*gv_currkey;
 GBLREF 	mur_gbls_t	murgbl;
@@ -60,6 +63,10 @@ void	mur_extract_set(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 	char			*val_ptr, *ptr, *buff;
 	jnl_string		*keystr;
 
+	error_def		(ERR_MUINFOUINT4);
+	error_def		(ERR_JNLBADRECFMT);
+	error_def		(ERR_TEXT);
+
 	if (mur_options.detail)
 		SPRINTF(murgbl.extr_buff, "0x%08x [0x%04x] :: ", mur_jctl->rec_offset, mur_rab.jreclen);
 	extract_len = (mur_options.detail ? strlen(murgbl.extr_buff) : 0);
@@ -84,7 +91,9 @@ void	mur_extract_set(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 			extract_len = strlen(murgbl.extr_buff);
 		}
 		EXTTIME(rec->prefix.time);
-		EXTINT(rec->prefix.tn);
+		EXTQW(rec->prefix.tn);
+		if (mur_options.detail)
+			EXTINT(rec->prefix.checksum);
 		EXTPID(plst);
 		if (IS_ZTP(rectype))
 		{
@@ -123,7 +132,9 @@ void	mur_extract_set(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 		extract_len += LAB_TERM_SZ;
 	}
 	EXTTIME(rec->prefix.time);
-	EXTINT(rec->prefix.tn);
+	EXTQW(rec->prefix.tn);
+	if (mur_options.detail)
+		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
 	if (IS_ZTP(rectype))
 	{
@@ -159,7 +170,21 @@ void	mur_extract_set(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 				format2zwr((sm_uc_ptr_t)val_ptr, val_len, (unsigned char *)ptr, &val_extr_len);
 				extract_len += val_extr_len;
 			} else
+			{
+				gtm_putmsg(VARLSTCNT(9) ERR_JNLBADRECFMT,
+					3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, mur_jctl->rec_offset,
+					ERR_TEXT, 2, LEN_AND_LIT("Length of the record is too high for zwr format"));
+				if (mur_options.verbose || mur_options.detail)
+				{
+					gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4,
+						LEN_AND_LIT("After max expansion record length"),
+						ZWR_EXP_RATIO(val_len), ZWR_EXP_RATIO(val_len));
+					gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Buffer size"),
+						murgbl.max_extr_record_length - extract_len,
+						murgbl.max_extr_record_length - extract_len);
+				}
 				assert(FALSE);
+			}
 		}
 	}
 	jnlext_write(fi, murgbl.extr_buff, extract_len + 1);
@@ -179,7 +204,9 @@ void	mur_extract_null(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 		EXT_DET_PREFIX();
 	}
 	EXTTIME(rec->prefix.time);
-	EXTINT(rec->prefix.tn);
+	EXTQW(rec->prefix.tn);
+	if (mur_options.detail)
+		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
 	EXTQW(rec->jrec_null.jnl_seqno);
 	jnlext_write(fi, murgbl.extr_buff, extract_len);
@@ -194,7 +221,9 @@ void	mur_extract_align(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 		return;
 	EXT_DET_PREFIX();
 	EXTTIME(rec->prefix.time);
-	EXTINT(rec->prefix.tn);
+	EXTQW(rec->prefix.tn);
+	if (mur_options.detail)
+		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
 	jnlext_write(fi, murgbl.extr_buff, extract_len);
 }
@@ -209,12 +238,15 @@ void	mur_extract_blk(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 		return;
 	EXT_DET_PREFIX();
 	EXTTIME(rec->prefix.time);
-	EXTINT(rec->prefix.tn);
+	EXTQW(rec->prefix.tn);
+	if (mur_options.detail)
+		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
 	EXTINT(rec->jrec_pblk.blknum);
 	EXTINT(rec->jrec_pblk.bsiz);
 	memcpy((char*)&pblk_head, (char*)&rec->jrec_pblk.blk_contents[0], sizeof(blk_hdr));
-	EXTINT(pblk_head.tn);
+	EXTQW(pblk_head.tn);
+	EXTINT(rec->jrec_pblk.ondsk_blkver);
 	jnlext_write(fi, murgbl.extr_buff, extract_len);
 }
 
@@ -227,9 +259,12 @@ void	mur_extract_epoch(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 		return;
 	EXT_DET_PREFIX();
 	EXTTIME(rec->prefix.time);
-	EXTINT(rec->prefix.tn);
+	EXTQW(rec->prefix.tn);
+	if (mur_options.detail)
+		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
 	EXTQW(rec->jrec_epoch.jnl_seqno);
+	EXTINT(rec->jrec_epoch.blks_to_upgrd);
 	jnlext_write(fi, murgbl.extr_buff, extract_len);
 }
 
@@ -242,9 +277,18 @@ void    mur_extract_inctn(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 		return;
 	EXT_DET_PREFIX();
         EXTTIME(rec->prefix.time);
-	EXTINT(rec->prefix.tn);
+	EXTQW(rec->prefix.tn);
+	if (mur_options.detail)
+		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
 	EXTINT(rec->jrec_inctn.opcode);
+	EXTINT(rec->jrec_inctn.detail.blks_to_upgrd_delta);
+	/* currently "detail" member in the inctn journal record is a union (type inctn_detail_t) of two 4-byte fields.
+	 * hence extracting an int of one of the fields is enough to extract either.
+	 * but this will no longer hold true if the size of one of the union's fields changes.
+	 * add an assert here in case inctn_detail_t type changes.
+	 */
+	assert(sizeof(rec->jrec_inctn.detail) == sizeof(rec->jrec_inctn.detail.blks_to_upgrd_delta));
 	jnlext_write(fi, murgbl.extr_buff, extract_len);
 }
 
@@ -261,7 +305,9 @@ void	mur_extract_eof(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 		EXT_DET_PREFIX();
 	}
 	EXTTIME(rec->jrec_eof.prefix.time);
-	EXTINT(rec->jrec_eof.prefix.tn);
+	EXTQW(rec->jrec_eof.prefix.tn);
+	if (mur_options.detail)
+		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
 	EXTQW(rec->jrec_eof.jnl_seqno);
 	jnlext_write(fi, murgbl.extr_buff, extract_len);
@@ -282,7 +328,9 @@ void	mur_extract_pfin(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 		EXT_DET_PREFIX();
 	}
 	EXTTIME(rec->jrec_pfin.prefix.time);
-	EXTINT(rec->jrec_pfin.prefix.tn);
+	EXTQW(rec->jrec_pfin.prefix.tn);
+	if (mur_options.detail)
+		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
 	jnlext_write(fi, murgbl.extr_buff, extract_len);
 }
@@ -300,7 +348,9 @@ void	mur_extract_pini(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 		EXT_DET_PREFIX();
 	}
 	EXTTIME(rec->prefix.time);
-	EXTINT(rec->prefix.tn);
+	EXTQW(rec->prefix.tn);
+	if (mur_options.detail)
+		EXTINT(rec->prefix.checksum);
 	extract_len = extract_process_vector((jnl_process_vector *)&rec->jrec_pini.process_vector[CURR_JPV], extract_len);
 	extract_len = extract_process_vector((jnl_process_vector *)&rec->jrec_pini.process_vector[ORIG_JPV], extract_len);
 	jnlext_write(fi, murgbl.extr_buff, extract_len);
@@ -328,7 +378,9 @@ void	mur_extract_tcom(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 		EXT_DET_PREFIX();
 	}
 	EXTTIME(rec->jrec_tcom.prefix.time);
-	EXTINT(rec->jrec_tcom.prefix.tn);
+	EXTQW(rec->jrec_tcom.prefix.tn);
+	if (mur_options.detail)
+		EXTINT(rec->prefix.checksum);
 	EXTPID(plst);
 	if (JRT_ZTCOM == rec->prefix.jrec_type)
 	{
@@ -338,7 +390,7 @@ void	mur_extract_tcom(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 	EXTINT(rec->jrec_tcom.participants);
 	if (JRT_TCOM == rec->prefix.jrec_type)
 	{
-		EXTTXT(rec->jrec_tcom.jnl_tid, sizeof(rec->jrec_tcom.jnl_tid));
+		EXTTXT((unsigned char *)&rec->jrec_tcom.jnl_tid[0], sizeof(rec->jrec_tcom.jnl_tid));
 	}
 	jnlext_write(fi, murgbl.extr_buff, extract_len);
 }
@@ -350,9 +402,9 @@ int extract_process_vector(jnl_process_vector *pv, int extract_len)
 
 	/* EXTTIME(MID_TIME(pv->jpv_time)); */
 	EXTINT(pv->jpv_pid);
-	EXTTXT(pv->jpv_node, JPV_LEN_NODE);
-	EXTTXT(pv->jpv_user, JPV_LEN_USER);
-	EXTTXT(pv->jpv_terminal, JPV_LEN_TERMINAL);
+	EXTTXT((unsigned char *)&pv->jpv_node[0], JPV_LEN_NODE);
+	EXTTXT((unsigned char *)&pv->jpv_user[0], JPV_LEN_USER);
+	EXTTXT((unsigned char *)&pv->jpv_terminal[0], JPV_LEN_TERMINAL);
 	EXTINTVMS(pv->jpv_mode);
 	EXTTIMEVMS(MID_TIME(pv->jpv_login_time));
 	EXTINTVMS(pv->jpv_image_count);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,10 @@ typedef unsigned short mstr_len_t;
 #define MSTR_CONST(name,string)		mstr name = { LEN_AND_LIT(string) }
 #define MSTR_DEF(name,length,string)	mstr name = { length, string }
 
+#define MSTR_CMP(x, y, result) 	(((result) = memcmp((x)->addr, (y)->addr, MIN((x)->len, (y)->len))) ?\
+								(result) : ((result) = (x)->len - (y)->len))
+#define MSTR_EQ(x,y)		(((x)->len == (y)->len) && !memcmp((x)->addr, (y)->addr, (x)->len))
+
 #include <sys/types.h>
 
 
@@ -68,11 +72,47 @@ typedef char		bool;
 typedef unsigned char	mreg;
 typedef int4		mint;
 
+#define PRE_V5_MAX_MIDENT_LEN	8	/* Maximum length of an mident/mname before GT.M V5.0 */
+typedef struct
+{ /* The old mident structure used before V50FT01 */
+	char	c[PRE_V5_MAX_MIDENT_LEN];
+} pre_v5_mident;
+
+#define MAX_MIDENT_LEN		31	/* Maximum length of an mident/mname */
+typedef mstr		mident;
+typedef struct
+{ /* Although we use 31 chars, the extra byte is to keep things aligned */
+	char	c[MAX_MIDENT_LEN + 1];
+} mident_fixed;
+#define mid_len(name)		strlen(&(name)->c[0])	/* callers of mid_len should include gtm_string.h as well */
+
+#define MIDENT_CMP(x,y,result)	MSTR_CMP(x,y,result)
+#define MIDENT_EQ(x,y)		MSTR_EQ(x,y)
+
+#ifdef INT8_NATIVE
+#	define NATIVE_WSIZE	8
+#else
+#	define NATIVE_WSIZE	4
+#endif
+
+/* Maximum length of entry reference of the form "label+offset^routine" */
+#define MAX_ENTRYREF_LEN	(2 * MAX_MIDENT_LEN + MAX_DIGITS_IN_INT + STR_LIT_LEN("+^"))
+
+/* M name entry used in various structures - variable table (rtnhdr.h), hash table (hashtab_def.h) and
+ * global variable (gv_namehead in gdsfhead.h) */
 typedef struct
 {
-	char	c[8];
-} mident;
-int mid_len(mident *name);
+	mident 		var_name;	/* var_name.addr points to the actual variable name */
+	uint4		hash_code;	/* hash (scrambled) value of the variable name text */
+} mname_entry;
+
+/* The M stack frame on all platforms that follow pv-based linkage model (alpha model)
+ * contains a pointer to the base of routine's literal section. All such platforms
+ * must define HAS_LITERAL_SECT so that the routines that create a new stack frame
+ * initialize literal_ptr field apppropriately. */
+#if defined(__alpha) || defined(_AIX) || defined(__hpux) || defined(__MVS__) || defined(__s390__)
+#define HAS_LITERAL_SECT
+#endif
 
 typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of type long */
 
@@ -156,13 +196,15 @@ char *s2n(mval *u);
 #define ROUND_DOWN(VALUE, MODULUS)		(DIVIDE_ROUND_DOWN(VALUE, MODULUS) * (MODULUS))
 
 #ifdef DEBUG
-#define CHECKPOT(MODULUS)			((MODULUS) & ((MODULUS) - 1)) ? GTMASSERT, 0 :
-#define BREAK_IN_PRO__CONTINUE_IN_DBG		continue
-#define DEBUG_ONLY(statement)			statement
+#  define CHECKPOT(MODULUS)			((MODULUS) & ((MODULUS) - 1)) ? GTMASSERT, 0 :
+#  define BREAK_IN_PRO__CONTINUE_IN_DBG		continue
+#  define DEBUG_ONLY(statement)			statement
+#  define PRO_ONLY(statement)
 #else
-#define CHECKPOT(MODULUS)
-#define BREAK_IN_PRO__CONTINUE_IN_DBG		break
-#define DEBUG_ONLY(statement)
+#  define CHECKPOT(MODULUS)
+#  define BREAK_IN_PRO__CONTINUE_IN_DBG		break
+#  define DEBUG_ONLY(statement)
+#  define PRO_ONLY(statement)			statement
 #endif
 
 /* these are the analogs of the preceeding, but are more efficient when the MODULUS is a Power Of Two */
@@ -217,8 +259,8 @@ int4 timeout2msec(int4 timeout);
 
 #define	MEMCMP_LIT(SOURCE, LITERAL)	memcmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
 #define MEMCPY_LIT(TARGET, LITERAL)	memcpy(TARGET, LITERAL, sizeof(LITERAL) - 1)
-#define	STRNCMP_LIT(TARGET, LITERAL)	strncmp(TARGET, LITERAL, sizeof(LITERAL) - 1)
-#define	STRNCMP_STR(TARGET, STRING)	strncmp(TARGET, STRING, strlen(STRING))
+#define	STRNCMP_LIT(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
+#define	STRNCMP_STR(SOURCE, STRING)	strncmp(SOURCE, STRING, strlen(STRING))
 
 /* *********************************************************************************************************** */
 /*		   Frequently used len + str combinations in macro form.				       */
@@ -272,14 +314,20 @@ int m_usleep(int useconds);
 /* Note the macros below refer to the UNIX Shared Binary Support. Because the
    support is *specifically* for the Unix platform, "NON_USHBIN_ONLY()" will
    also be true for VMS even though that platform does have shared binary support
-   (but it does not have Unix Shared Binary support).
- */
+   (but it does not have Unix Shared Binary support). Use "NON_USHBIN_UNIX_ONLY()"
+   for UNIX platforms that do not support Shared Binaries. */
 #ifdef USHBIN_SUPPORTED
 #	define USHBIN_ONLY(X)		X
 #	define NON_USHBIN_ONLY(X)
+#	define NON_USHBIN_UNIX_ONLY(X)
 #else
 #	define USHBIN_ONLY(X)
 #	define NON_USHBIN_ONLY(X)	X
+#	ifdef UNIX
+#		define NON_USHBIN_UNIX_ONLY(X)	X
+#	else
+#		define NON_USHBIN_UNIX_ONLY(X)
+#	endif
 #endif
 
 /* Note: LONG_SLEEP *MUST*NOT* be the sleep() function because use of the sleep() function in
@@ -291,20 +339,45 @@ int m_usleep(int useconds);
 
 #define OS_PAGE_SIZE		gtm_os_page_size
 #define OS_PAGE_SIZE_DECLARE	GBLREF int4 gtm_os_page_size;
-#define IO_BLOCK_SIZE	      OS_PAGE_SIZE
+#define IO_BLOCK_SIZE		OS_PAGE_SIZE
+
+#ifndef GTM_INT64T_DEFINED
+#define GTM_INT64T_DEFINED
+   typedef	uint64_t		gtm_uint64_t;
+   typedef	int64_t			gtm_int64_t;
+#endif
 
 /* HPPA latches (used by load_and_clear) must be 16 byte aligned.
  * By allocating 16 bytes, the routines and macros used to access the latch can do the alignment.
  * Since nothing else should follow to avoid cache threshing, this doesn't really waste space.
- * While specific to HPPA, it is defined for all platforms to allow use in region header where a constant size is required.
+ * Note that the additional space for this latch is only allocated on HPPA. All other platforms
+ * have a "sensible" compare-and-swap type lock using the first two words in the latch.
  */
 typedef struct
 {
-	volatile int4	latch_pid;		/* (Usually) Process id of latch holder or LOCK_AVAILABLE. On VMS
-						   this word may have other values.  */
-	volatile int4	latch_word;		/* Extra word associated with lock (sometimes bci lock for VMS) */
-	volatile int4	hp_latch_space[4];	/* Used for HP load_and_clear locking instructions per HP whitepaper on spinlocks */
+	union
+	{
+		gtm_uint64_t	pid_imgcnt;		/* Combined atomic (unique) process id used on VMS */
+		struct
+		{
+			volatile int4	latch_pid;	/* (Usually) Process id of latch holder or LOCK_AVAILABLE. On VMS
+							   this word may have other values.  */
+			volatile int4	latch_word;	/* Extra word associated with lock (sometimes bci lock or image cnt
+							   for VMS) */
+		} parts;
+	} u;
+#ifdef __hpux
+	volatile int4	hp_latch_space[4];		/* Used for HP load_and_clear locking instructions per
+							   HP whitepaper on spinlocks */
+#endif
 } global_latch_t;
+#define latch_image_count latch_word
+
+typedef	union gtm_time8_struct
+{
+	time_t	ctime;		/* For current GTM code sem_ctime field corresponds to creation time */
+	int4	filler[2];	/* Filler to ensure size is 2 words on all platforms */
+} gtm_time8;
 
 typedef struct
 {
@@ -341,12 +414,6 @@ typedef que_head *	que_head_ptr_t;
 # ifdef __osf__
 #  pragma pointer_size(restore)
 # endif
-#endif
-
-#ifndef GTM_INT64T_DEFINED
-#define GTM_INT64T_DEFINED
-   typedef	uint64_t		gtm_uint64_t;
-   typedef	int64_t			gtm_int64_t;
 #endif
 
  /* Define 8-bytes as a structure containing 2-byte array of uint4s.  Overlay this structure upon an 8 byte quantity for easy
@@ -544,7 +611,6 @@ typedef que_head *	que_head_ptr_t;
   typedef vint_ptr_t sm_vint_ptr_t;	/* Define 64 bit pointer to volatile int */
   typedef uint_ptr_t sm_uint_ptr_t;	/* Define 64 bit pointer to uint */
   typedef vuint_ptr_t sm_vuint_ptr_t;	/* Define 64 bit pointer to volatile uint */
-  typedef gtm_int64_t sm_off_t;		/* Define 64 bit offset type */
   typedef gtm_int64_t sm_long_t;	/* Define 64 bit integer type */
   typedef gtm_uint64_t sm_ulong_t;	/* Define 64 bit unsigned integer type */
   typedef global_latch_t *sm_global_latch_ptr_t; /* Define 64 bit pointer to hp_latch */
@@ -579,7 +645,6 @@ typedef que_head *	que_head_ptr_t;
   typedef vint_ptr_t sm_vint_ptr_t;	/* Define 32 bit pointer to volatile int */
   typedef uint_ptr_t sm_uint_ptr_t;	/* Define 32 bit pointer to uint */
   typedef vuint_ptr_t sm_vuint_ptr_t;	/* Define 32 bit pointer to volatile uint */
-  typedef int4 sm_off_t;		/* Define 32 bit offset type */
   typedef int4 sm_long_t;		/* Define 32 bit integer type */
   typedef uint4 sm_ulong_t;		/* Define 32 bit unsigned integer type */
   typedef global_latch_t *sm_global_latch_ptr_t; /* Define 32 bit pointer to hp_latch */
@@ -648,9 +713,21 @@ typedef que_head *	que_head_ptr_t;
 */
 
 #ifdef CACHELINE_SIZE
-# define CACHELINE_PAD(fieldSize, fillnum) char fill##fillnum[CACHELINE_SIZE - (fieldSize)];
+# define CACHELINE_PAD(fieldSize, fillnum) char fill_cacheline##fillnum[CACHELINE_SIZE - (fieldSize)];
 #else
 # define CACHELINE_PAD(fieldSize, fillnum)
+#endif
+
+/* In certain cases we need to conditionally do a CACHELINE pad. For those platforms that
+   have load-locked/store-conditional logic, counters that are incremented under interlock
+   need to have spacing so they do not interfere with each other. But platforms that do
+   NOT have this capability need the spacing on the actual latch used instead. Hence this
+   form of padding is conditional.
+*/
+#if defined(__alpha) || defined(_AIX)
+#  define CACHELINE_PAD_COND(fieldSize, fillnum) CACHELINE_PAD(fieldSize, fillnum)
+#else
+#  define CACHELINE_PAD_COND(fieldSize, fillnum)
 #endif
 
 #define MEMCP(dst,src,start,count,limit){ \
@@ -804,8 +881,11 @@ qw_num	gtm_byteswap_64(qw_num num64);
 					 * which leads to (n / 2 * 4) + n / 2 * 8) = n / 2 * 12 = n * 6 */
 typedef uint4 		jnl_tm_t;
 typedef uint4 		off_jnl_t;
+typedef int4 		sm_off_t;
+
 #define MAXUINT8	((gtm_uint64_t)-1)
 #define MAXUINT4	((uint4)-1)
+#define MAXUINT2	((unsigned short)-1)
 
 /* On platforms that support native 8 byte operations (such as Alpha), an assignment to an 8 byte field is atomic. On other
  * platforms, an 8 byte assignment is a sequence of 4 byte operations. On such platforms, use this macro to determine if the

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,8 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_ctype.h"
+#include "gtm_stdlib.h"
 
 #include "stringpool.h"
 #include "stp_parms.h"
@@ -80,6 +82,8 @@ void bin_load(int begin, int end)
 	collseq		*extr_collseq, *db_collseq, *save_gv_target_collseq;
 	coll_hdr	extr_collhdr, db_collhdr;
 	gv_key 		*tmp_gvkey;
+	uint4		extr_std_null_coll;
+	char		std_null_coll[BIN_HEADER_NUMSZ + 1];
 
 	error_def(ERR_GVIS);
 	error_def(ERR_TEXT);
@@ -95,21 +99,37 @@ void bin_load(int begin, int end)
 	gvinit();
 	v.mvtype = MV_STR;
 	len = mu_bin_get((char **)&ptr);
-	if (len != BIN_HEADER_SZ)
+	hdr_lvl = EXTR_HEADER_LEVEL(ptr);
+	if (!((hdr_lvl == '4' && len == BIN_HEADER_SZ) || (hdr_lvl < '4' && len == V3_BIN_HEADER_SZ)))
 	{
 		rts_error(VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
 	/* assert the assumption that the level can be represented in a single character */
 	assert(' ' == *(ptr + sizeof(BIN_HEADER_LABEL) - 3));
-	if (memcmp(ptr, BIN_HEADER_LABEL, sizeof(BIN_HEADER_LABEL) - 2) || EXTR_HEADER_LEVEL(ptr) < '2')
+
+	if (0 != memcmp(ptr, BIN_HEADER_LABEL, sizeof(BIN_HEADER_LABEL) - 2) || hdr_lvl < '2' || *(BIN_HEADER_VERSION) < hdr_lvl)
 	{				/* ignore the level check */
 		rts_error(VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
 	util_out_print("Label = !AD\n", TRUE, len, ptr);
 	new_gvn = FALSE;
-	if ((hdr_lvl = EXTR_HEADER_LEVEL(ptr)) > '2')
+	if (hdr_lvl > '3')
+	{
+		memcpy(std_null_coll, ptr + BIN_HEADER_NULLCOLLOFFSET, BIN_HEADER_NUMSZ);
+		std_null_coll[BIN_HEADER_NUMSZ] = '\0';
+		extr_std_null_coll = STRTOUL(std_null_coll, NULL, 10);
+		if (0 != extr_std_null_coll && 1!= extr_std_null_coll)
+		{
+			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Corrupted null collation field  in header"),
+				ERR_LDBINFMT);
+			mupip_exit(ERR_LDBINFMT);
+
+		}
+	} else
+		extr_std_null_coll = 0;
+	if (hdr_lvl  > '2')
 	{
 		len = mu_bin_get((char **)&ptr);
 		if (sizeof(coll_hdr) != len)
@@ -199,46 +219,51 @@ void bin_load(int begin, int end)
 			util_out_print(0, TRUE);
 			continue;
 		}
-		if (new_gvn && (db_collhdr.act != extr_collhdr.act || db_collhdr.ver != extr_collhdr.ver
-				|| db_collhdr.nct != extr_collhdr.nct))
+		if (new_gvn)
 		{
-			if (extr_collhdr.act)
+			if ((db_collhdr.act != extr_collhdr.act || db_collhdr.ver != extr_collhdr.ver
+				|| db_collhdr.nct != extr_collhdr.nct
+				|| gv_cur_region->std_null_coll != extr_std_null_coll))
 			{
-				if (extr_collseq = ready_collseq((int)extr_collhdr.act))
+				if (extr_collhdr.act)
 				{
-					if (!do_verify(extr_collseq, extr_collhdr.act, extr_collhdr.ver))
+					if (extr_collseq = ready_collseq((int)extr_collhdr.act))
 					{
-						gtm_putmsg(VARLSTCNT(8) ERR_COLLTYPVERSION, 2, extr_collhdr.act, extr_collhdr.ver,
-							ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
-						mupip_exit(ERR_COLLTYPVERSION);
-					}
-				} else
-				{
-					gtm_putmsg(VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, extr_collhdr.act,
-						ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
-					mupip_exit(ERR_COLLATIONUNDEF);
-				}
-			}
-			if (db_collhdr.act)
-			{
-				if (db_collseq = ready_collseq((int)db_collhdr.act))
-				{
-					if (!do_verify(db_collseq, db_collhdr.act, db_collhdr.ver))
+						if (!do_verify(extr_collseq, extr_collhdr.act, extr_collhdr.ver))
+						{
+							gtm_putmsg(VARLSTCNT(8) ERR_COLLTYPVERSION, 2, extr_collhdr.act,
+								extr_collhdr.ver, ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
+							mupip_exit(ERR_COLLTYPVERSION);
+						}
+					} else
 					{
-						gtm_putmsg(VARLSTCNT(8) ERR_COLLTYPVERSION, 2, db_collhdr.act, db_collhdr.ver,
+						gtm_putmsg(VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, extr_collhdr.act,
 							ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
-						mupip_exit(ERR_COLLTYPVERSION);
+						mupip_exit(ERR_COLLATIONUNDEF);
 					}
-				} else
-				{
-					gtm_putmsg(VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, db_collhdr.act,
-						ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
-					mupip_exit(ERR_COLLATIONUNDEF);
 				}
-			}
-			need_xlation = TRUE;
-		} else if (new_gvn)
-			need_xlation = FALSE;
+				if (db_collhdr.act)
+				{
+					if (db_collseq = ready_collseq((int)db_collhdr.act))
+					{
+						if (!do_verify(db_collseq, db_collhdr.act, db_collhdr.ver))
+						{
+							gtm_putmsg(VARLSTCNT(8) ERR_COLLTYPVERSION, 2, db_collhdr.act,
+								db_collhdr.ver, ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
+							mupip_exit(ERR_COLLTYPVERSION);
+						}
+					} else
+					{
+						gtm_putmsg(VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, db_collhdr.act,
+							ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
+						mupip_exit(ERR_COLLATIONUNDEF);
+					}
+				}
+				need_xlation = TRUE;
+			} else
+				need_xlation = FALSE;
+		}
+
 		new_gvn = FALSE;
 		for (; rp < (rec_hdr*)btop; rp = (rec_hdr*)((unsigned char *)rp + rec_len))
 		{
@@ -274,7 +299,8 @@ void bin_load(int begin, int end)
 			if (need_xlation)
 			{
 				assert(hdr_lvl >= '3');
-				assert(extr_collhdr.act || db_collhdr.act || extr_collhdr.nct || db_collhdr.nct);
+				assert(extr_collhdr.act || db_collhdr.act || extr_collhdr.nct || db_collhdr.nct ||
+				 	extr_std_null_coll != gv_cur_region->std_null_coll);
 							/* gv_currkey would have been modified/translated in the earlier put */
 				memcpy(gv_currkey->base, cmpc_str, next_cmpc);
 				next_rp = (rec_hdr *)((unsigned char*)rp + rec_len);
@@ -329,6 +355,16 @@ void bin_load(int begin, int end)
 					gv_currkey->end += tmp_gvkey->end;
 					gvkey_char_ptr++;
 				}
+				if ( gv_cur_region->std_null_coll != extr_std_null_coll && gv_currkey->prev)
+				{
+					if (extr_std_null_coll == 0)
+					{
+						GTM2STDNULLCOLL(gv_currkey->base, gv_currkey->end);
+					} else
+					{
+						STD2GTMNULLCOLL(gv_currkey->base, gv_currkey->end);
+					}
+				}
 			}
 			if (gv_currkey->end >= max_key)
 			{
@@ -337,8 +373,8 @@ void bin_load(int begin, int end)
 				util_out_print(0, TRUE);
 				continue;
 			}
-			if (max_subsc_len < gv_currkey->end)
-				max_subsc_len = gv_currkey->end;
+			if (max_subsc_len < (gv_currkey->end + 1))
+				max_subsc_len = gv_currkey->end + 1;
 			v.str.addr = (char*)cp1;
 			v.str.len = rec_len - (cp1 - (unsigned char *) rp);
 			if (max_data_len < v.str.len)

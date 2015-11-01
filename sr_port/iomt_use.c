@@ -60,7 +60,7 @@ void iomt_use(io_desc *iod, mval *pp)
 	int4		skips;
 	d_mt_struct	*mt_ptr, *out_ptr;
 	io_desc		*d_in, *d_out;
-	mident		tab;
+	char		*tab;
 	int		p_offset;
 
 	error_def(ERR_MTINVLAB);
@@ -86,10 +86,9 @@ void iomt_use(io_desc *iod, mval *pp)
 			mt_ptr->newversion = TRUE;
 			break;
 		case iop_label:
-			memset(tab.c, 0, sizeof(mident));
 			len = *(pp->str.addr + p_offset);
-			memcpy(tab.c, (pp->str.addr + p_offset + 1), (len < sizeof(mident) ? len : sizeof(mident)));
-			if ((lab_type = namelook(mtlab_index, mtlab_names, tab.c)) < 0)
+			tab = pp->str.addr + p_offset + 1;
+			if ((lab_type = namelook(mtlab_index, mtlab_names, tab, len)) < 0)
 				rts_error(VARLSTCNT(1) ERR_MTINVLAB);
 			mt_ptr->labeled = mtlab_type[lab_type];
 			break;
@@ -173,10 +172,9 @@ void iomt_use(io_desc *iod, mval *pp)
 			iomt_tm(iod);
 			break;
 		case iop_writelb:
-			memset(&tab, 0, sizeof(mident));
 			len = *(pp->str.addr + p_offset);
-			memcpy(&tab.c[0], pp->str.addr + p_offset + 1, (len < sizeof(mident) ? len : sizeof(mident)));
-			if ((lab_type = namelook(mtwtlab_index, mtwtlab_names, tab.c)) < 0)
+			tab = pp->str.addr + p_offset + 1;
+			if ((lab_type = namelook(mtwtlab_index, mtwtlab_names, tab, len)) < 0)
 				rts_error(VARLSTCNT(1) ERR_MTINVLAB);
 			iomt_wtansilab(iod, mtwtlab_type[lab_type]);
 			break;

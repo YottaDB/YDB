@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,8 @@
 #include "send_msg.h"
 #include "iosp.h"
 #include "repl_sp.h"
+#include "is_file_identical.h"
+#include "jnl_get_checksum.h"
 
 /* Note : Now all system error messages are issued here. So callers do not need to issue them again */
 #define STATUS_MSG(info)										\
@@ -65,7 +67,8 @@
 #define RETURN_ON_ERROR(info)						\
 if (SYSCALL_ERROR(info->status) || SYSCALL_ERROR(info->status2))	\
 {									\
-	F_CLOSE(channel);						\
+	int	status;							\
+	F_CLOSE(channel, status);					\
 	if (NULL != jrecbuf)						\
 		free(jrecbuf);						\
 	return EXIT_ERR;						\
@@ -151,16 +154,21 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	struct_jrec_epoch	*epoch_record;
 	struct_jrec_eof		*eof_record;
 	unsigned char		*create_fn, fn_buff[MAX_FN_LEN];
-	int			create_fn_len, cre_jnl_rec_size;
+	int			create_fn_len, cre_jnl_rec_size, status;
 	fd_type			channel;
 	char            	*jrecbuf;
+	gd_id			jnlfile_id;
 #if defined(VMS)
 	struct FAB      	fab;
 	struct NAM      	nam;
 	char            	es_buffer[MAX_FN_LEN], name_buffer[MAX_FN_LEN];
 	uint4			blk, block, zero_size;
 	io_status_block_disk	iosb;
+#elif defined(UNIX)
+	struct stat		stat_buf;
+	int			fstat_res;
 #endif
+	uint4			temp_offset, temp_checksum;
 	error_def(ERR_FILERENAME);
 	error_def(ERR_RENAMEFAIL);
 	error_def(ERR_JNLCRESTATUS);
@@ -205,6 +213,15 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	}
 	jrecbuf = malloc(DISK_BLOCK_SIZE);
 	memset(jrecbuf, 0, DISK_BLOCK_SIZE);
+	FSTAT_FILE(channel, &stat_buf, fstat_res);
+	if (-1 == fstat_res)
+	{
+		info->status = errno;
+		STATUS_MSG(info);
+		F_CLOSE(channel, status);
+		return EXIT_ERR;
+	}
+	set_gdid_from_stat(&jnlfile_id, &stat_buf);
 #elif defined(VMS)
 	nam = cc$rms_nam;
 	nam.nam$l_rsa = name_buffer;
@@ -244,7 +261,11 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		STATUS_MSG(info);
 		RETURN_ON_ERROR(info);
 	}
+	memcpy(jnlfile_id.dvi, &nam.nam$t_dvi, sizeof(jnlfile_id.dvi));
+	memcpy(jnlfile_id.did, &nam.nam$w_did, sizeof(jnlfile_id.did));
+	memcpy(jnlfile_id.fid, &nam.nam$w_fid, sizeof(jnlfile_id.fid));
 #endif
+	info->checksum = jnl_get_checksum_entire(INIT_CHECKSUM_SEED, (uint4 *)&jnlfile_id, sizeof(gd_id));
 	/* We have already saved previous journal file name in info */
 	jfh_from_jnl_info(info, &header);
 	header.recover_interrupted = mupip_jnl_recover;
@@ -258,6 +279,9 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	pini_record->prefix.tn = info->tn;
 	pini_record->prefix.pini_addr = JNL_HDR_LEN;
 	pini_record->prefix.time = jgbl.gbl_jrec_time;	/* callers must set it */
+	temp_offset = JNL_HDR_LEN;
+	temp_checksum = ADJUST_CHECKSUM(INIT_CHECKSUM_SEED, temp_offset);
+	pini_record->prefix.checksum = ADJUST_CHECKSUM(temp_checksum, info->checksum);
 	pini_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 	assert(prc_vec);
 	memcpy((unsigned char*)&pini_record->process_vector[CURR_JPV], (unsigned char*)prc_vec, sizeof(jnl_process_vector));
@@ -271,15 +295,31 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		epoch_record->prefix.tn = info->tn;
 		epoch_record->prefix.pini_addr = JNL_HDR_LEN;
 		epoch_record->prefix.time = jgbl.gbl_jrec_time;
+		epoch_record->blks_to_upgrd = info->blks_to_upgrd;
+		temp_offset = JNL_HDR_LEN + PINI_RECLEN;
+		temp_checksum = ADJUST_CHECKSUM(INIT_CHECKSUM_SEED, temp_offset);
+		epoch_record->prefix.checksum = ADJUST_CHECKSUM(temp_checksum, info->checksum);
 		epoch_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 		QWASSIGN(epoch_record->jnl_seqno, info->reg_seqno);
 		pfin_record = (struct_jrec_pfin *)&jrecbuf[PINI_RECLEN + EPOCH_RECLEN];
+		temp_offset = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN;
+		temp_checksum = ADJUST_CHECKSUM(INIT_CHECKSUM_SEED, temp_offset);
+		pfin_record->prefix.checksum = ADJUST_CHECKSUM(temp_checksum, info->checksum);
 		eof_record = (struct_jrec_eof *)&jrecbuf[PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN];
+		temp_offset = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN;
+		temp_checksum = ADJUST_CHECKSUM(INIT_CHECKSUM_SEED, temp_offset);
+		eof_record->prefix.checksum = ADJUST_CHECKSUM(temp_checksum, info->checksum);
 		cre_jnl_rec_size = PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN;
 	} else
 	{
 		pfin_record = (struct_jrec_pfin *)&jrecbuf[PINI_RECLEN];
+		temp_offset = JNL_HDR_LEN + PINI_RECLEN;
+		temp_checksum = ADJUST_CHECKSUM(INIT_CHECKSUM_SEED, temp_offset);
+		pfin_record->prefix.checksum = ADJUST_CHECKSUM(temp_checksum, info->checksum);
 		eof_record = (struct_jrec_eof *)&jrecbuf[PINI_RECLEN + PFIN_RECLEN];
+		temp_offset = JNL_HDR_LEN + PINI_RECLEN + PFIN_RECLEN;
+		temp_checksum = ADJUST_CHECKSUM(INIT_CHECKSUM_SEED, temp_offset);
+		eof_record->prefix.checksum = ADJUST_CHECKSUM(temp_checksum, info->checksum);
 		cre_jnl_rec_size = PINI_RECLEN + PFIN_RECLEN + EOF_RECLEN;
 	}
 	pfin_record->prefix.jrec_type = JRT_PFIN;
@@ -298,7 +338,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	DO_FILE_WRITE(channel, JNL_HDR_LEN, jrecbuf, cre_jnl_rec_size, info->status, info->status2);
 	STATUS_MSG(info);
 	RETURN_ON_ERROR(info);
-	F_CLOSE(channel);
+	F_CLOSE(channel, status);
 	free(jrecbuf);
 	jrecbuf = NULL;
 	if (info->no_rename)

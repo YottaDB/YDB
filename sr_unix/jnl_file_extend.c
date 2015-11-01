@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,11 +12,9 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
-#include <fcntl.h>
-#include <unistd.h>
-#include <errno.h>
-#include <sys/stat.h>
+#include "gtm_stat.h"
+#include "gtm_fcntl.h"
+#include "gtm_unistd.h"
 
 #include "gdsroot.h"
 #include "gtm_statvfs.h"
@@ -28,7 +26,6 @@
 #include "ccp.h"
 #include "iosp.h"
 #include "jnl.h"
-#include "gtm_stat.h"
 #include "gtmio.h"
 #include "eintr_wrappers.h"
 #include "send_msg.h"
@@ -45,7 +42,7 @@ GBLREF 	jnl_gbls_t		jgbl;
 error_def(ERR_JNLEXTEND);
 error_def(ERR_JNLREADEOF);
 error_def(ERR_JNLSPACELOW);
-error_def(ERR_NEWJNLFILECREATE);
+error_def(ERR_NEWJNLFILECREAT);
 error_def(ERR_DSKSPACEFLOW);
 error_def(ERR_JNLFILEXTERR);
 error_def(ERR_JNLCREATERR);
@@ -163,10 +160,13 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				assert(csd->jnl_deq == jnl_info.extend);
 				assert(csd->jnl_before_image == jnl_info.before_images);
 				csd->trans_hist.header_open_tn = jnl_info.tn;	/* needed for successful jnl_file_open() */
-				send_msg(VARLSTCNT(4) ERR_NEWJNLFILECREATE, 2, JNL_LEN_STR(csd));
+				csd->jnl_checksum = jnl_info.checksum;
+				send_msg(VARLSTCNT(4) ERR_NEWJNLFILECREAT, 2, JNL_LEN_STR(csd));
 				fc = gv_cur_region->dyn.addr->file_cntl;
 				fc->op = FC_WRITE;
 				fc->op_buff = (sm_uc_ptr_t)csd;
+				fc->op_len = SGMNT_HDR_LEN;
+				fc->op_pos = 1;
 				status = dbfilop(fc);
 				if (SS_NORMAL != status)
 					send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);

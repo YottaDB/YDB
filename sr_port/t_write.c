@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,10 +24,12 @@
 #include "filestruct.h"
 #include "copy.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "t_write.h"
+#include "min_max.h"
+#include "jnl_get_checksum.h"
 
 GBLREF cw_set_element	cw_set[];
 GBLREF unsigned char	cw_set_depth;
@@ -42,45 +44,57 @@ GBLREF boolean_t	horiz_growth;
 GBLREF int4		prev_first_off, prev_next_off;
 
 error_def(ERR_GVKILLFAIL);
-cw_set_element *t_write (
-			 block_id 	blk,	   	/*  Block number being written */
-			 unsigned char 	*upd_addr,	/*  Address of the local buffer which contains
-							 *  the block to be written */
-			 block_offset 	ins_off,	/*  Offset to the position in the buffer that is to receive
-							 *  a block number when one is created. */
-			 block_index 	index,         	/*  Index into the create/write set.  The specified entry is
-							 *  always a create entry. When the create gets assigned a
-							 *  block number, the block number is inserted into this
-							 *  buffer at the location specified by ins_off. */
-			 sm_uc_ptr_t	old_addr,	/* address of before image of the block */
-			 char           level,
-			 bool		first_copy,	/* Is first copy needed if overlaying same buffer? */
-			 bool		forward)	/* Is forward processing required? */
-{
-	cw_set_element	*cse, *tp_cse, *old_cse;
-	off_chain	chain;
-	uint4		dummy, iter;
-	srch_blk_status	*tp_srch_status;
 
+cw_set_element *t_write (
+			srch_blk_status	*blkhist,	/* Search History of the block to be written. Currently the
+							 *	following members in this structure are used by "t_write"
+							 *	    "blk_num"		--> Block number being modified
+							 *	    "buffaddr"		--> Address of before image of the block
+							 *	    "cr->ondsk_blkver"	--> Actual block version on disk
+							 */
+			unsigned char 	*upd_addr,	/* Address of the update array that contains the changes for this block */
+			block_offset 	ins_off,	/* Offset to the position in the buffer that is to receive
+							 * 	a block number when one is created. */
+			block_index 	index,		/* Index into the create/write set.  The specified entry is
+							 * 	always a create entry. When the create gets assigned a
+							 * 	block number, the block number is inserted into this
+							 * 	buffer at the location specified by ins_off. */
+			char		level,		/* Level of the block in the tree */
+			boolean_t	first_copy,	/* Is first copy needed if overlaying same buffer? */
+			boolean_t	forward)	/* Is forward processing required? */
+{
+	cw_set_element		*cse, *tp_cse, *old_cse;
+	off_chain		chain;
+	uint4			iter;
+	srch_blk_status		*tp_srch_status;
+	ht_ent_int4		*tabent;
+	block_id		blk;
+	cache_rec_ptr_t		cr;
+	boolean_t		new_cse;	/* TRUE if we had to create a new cse for the input block */
+	jnl_buffer_ptr_t	jbbp;		/* jbbp is non-NULL only if before-image journaling */
+	sgmnt_addrs		*csa;
+	blk_hdr_ptr_t		old_block;
+	unsigned int		bsiz;
+
+	csa = cs_addrs;
 	horiz_growth = FALSE;
 
 	/* When the following two asserts trip, we should change the data types of prev_first_off
 	 * and prev_next_off, so they satisfy the assert.
 	 */
-	assert(sizeof(prev_first_off) > sizeof(block_offset));
-	assert(sizeof(prev_next_off) > sizeof(block_offset));
+	assert(sizeof(prev_first_off) >= sizeof(block_offset));
+	assert(sizeof(prev_next_off) >= sizeof(block_offset));
 
+	blk = blkhist->blk_num;
 	if (dollar_tlevel == 0)
 	{
-		if (blk >= cs_addrs->ti->total_blks)
+		if (blk >= csa->ti->total_blks)
 			GTMASSERT;
 		cse = &cw_set[cw_set_depth++];
 		assert(cw_set_depth < CDB_CW_SET_SIZE);
 		assert(index < (int)cw_set_depth);
-		cse->mode = gds_t_write;
-		cse->new_buff = NULL;
-		cse->old_block = old_addr;
-		tp_cse = NULL;	/* don't bother returning dse for non-TP; it's almost never needed and it distiguishes the cases */
+		new_cse = TRUE;
+		tp_cse = NULL; /* dont bother returning tp_cse for non-TP; it's almost never needed and it distiguishes the cases */
 	} else
 	{
 		assert(!index || index < sgm_info_ptr->cw_set_depth);
@@ -91,7 +105,10 @@ cw_set_element *t_write (
 			blk = cse->blk;
 		} else
 		{
-			tp_srch_status = (srch_blk_status *)lookup_hashtab_ent(sgm_info_ptr->blks_in_use, (void *)blk, &dummy);
+			if (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&blk)))
+				tp_srch_status = (srch_blk_status *)tabent->value;
+			else
+				tp_srch_status = NULL;
 			cse = tp_srch_status ? tp_srch_status->ptr : NULL;
 				/* tp_srch_status->ptr always returns latest in the horizontal list */
 	    	}
@@ -103,11 +120,10 @@ cw_set_element *t_write (
 			assert(gv_target);
 			cse->blk_target = gv_target;
 			gv_target->write_local_tn = local_tn;
-			cse->mode = gds_t_write;
-			cse->new_buff = NULL;
-			cse->old_block = old_addr;
+			new_cse = TRUE;
 		} else
 		{
+			new_cse = FALSE;
 			assert(cse->done);
 			assert(dollar_tlevel >= cse->t_level);
 			if (cse->t_level != dollar_tlevel)
@@ -134,25 +150,69 @@ cw_set_element *t_write (
 				if (PREV_OFF_INVALID != prev_next_off)
 					old_cse->next_off = prev_next_off;
 			}
-			assert(cse->blk == blk);
-			assert(cse->reference_cnt == 0);
+			/* cse->mode can be kill_t_create or kill_t_write only if we have a restartable situation.
+			 * this is because a TP transaction should never try modifying a block that is no longer visible in the
+			 * tree. the only exception is if due to concurrency issues, we read a stale copy of a buffer that
+			 * incorrectly led us to this child block number. this is a restartable situation.
+			 * since this routine does not return a failure code, we continue and expect tp_tend to detect this.
+			 */
 			switch (cse->mode)
 			{
-			case kill_t_create:
-				assert(CDB_STAGNATE > t_tries);
-				cse->mode = gds_t_create;
-				break;
-			case kill_t_write:
-				assert(CDB_STAGNATE > t_tries);
-				cse->mode = gds_t_write;
-				break;
-			default:
-				;
+				case kill_t_create:
+					assert(CDB_STAGNATE > t_tries);
+					cse->mode = gds_t_create;
+					break;
+				case kill_t_write:
+					assert(CDB_STAGNATE > t_tries);
+					cse->mode = gds_t_write;
+					break;
+				default:
+					;
 			}
 		}
 		tp_cse = cse;
 	}
-	cse->blk = blk;
+	if (new_cse)
+	{
+		cse->blk_checksum = 0;
+		cse->blk = blk;
+		cse->mode = gds_t_write;
+		cse->new_buff = NULL;
+		cse->old_block = blkhist->buffaddr;
+		old_block = (blk_hdr_ptr_t)cse->old_block;
+		assert(NULL != old_block);
+		jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
+		if ((NULL != jbbp) && (old_block->tn < jbbp->epoch_tn))
+		{	/* Pre-compute CHECKSUM. Since we dont necessarily hold crit at this point, ensure we never try to
+			 * access the buffer more than the db blk_size.
+			 */
+			bsiz = MIN(old_block->bsiz, csa->hdr->blk_size);
+			cse->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED, (uint4*)old_block, bsiz);
+		}
+		/* the buffer in shared memory holding the GDS block contents currently does not have in its block header the
+		 * on-disk format of that block. if it had, we could have easily copied that over to the cw-set-element.
+		 * until then, we have to use the cache-record's field "ondsk_blkver". but the cache-record is available only in BG.
+		 * thankfully, in MM, we do not allow GDSV4 type blocks, so we can safely assign GDSV5 (or GDSVCURR) to this field.
+		 */
+		cr = blkhist->cr;
+		assert((NULL != cr) || (dba_mm == csa->hdr->acc_meth));
+		cse->ondsk_blkver = (NULL == cr) ? GDSVCURR : cr->ondsk_blkver;
+	} else
+	{	/* we did not create a new cse. assert the integrity of few fields filled in when this cse was created */
+		assert(cse->blk == blk);
+		assert(0 == cse->reference_cnt);
+		/* If we did not create a new cse, check that the level already stored in the cse is the same as the input level.
+		 * It is possible that they are different but that would mean we are in one of two situations
+		 *	1) A restartable situation. Since this routine does not currently return a failure code,
+		 *		we do not restart here but instead wait for some other failure-code-returning-function
+		 *		(if nothing else, the function tp_tend) to catch this situation and trigger a restart.
+		 *	2) This block number is the root block of a GVT or Directory Tree and the height of the tree
+		 *		is increasing now. In either case cse->blk_target points to the gv_target for that tree.
+		 *		The only exception to this is if the global's root is being created.
+		 */
+		assert(cse->level == level || (CDB_STAGNATE > t_tries) || gds_t_create == cse->mode
+			|| cse->blk_target->root == cse->blk);
+	}
 	cse->upd_addr = upd_addr;
 	cse->ins_off = ins_off;
 	cse->index = index;
@@ -166,7 +226,10 @@ cw_set_element *t_write (
 	cse->forward_process = forward;
 	cse->jnl_freeaddr = 0;		/* reset jnl_freeaddr that previous transaction might have filled in */
 	cse->t_level = dollar_tlevel;
-	cse->write_type |= (ERR_GVKILLFAIL == t_err) ? GDS_WRITE_KILL : GDS_WRITE_PLAIN;
+	if (dollar_tlevel)
+		cse->write_type |= (ERR_GVKILLFAIL == t_err) ? GDS_WRITE_KILL : GDS_WRITE_PLAIN;
+	else
+		cse->write_type = (ERR_GVKILLFAIL == t_err) ? GDS_WRITE_KILL : GDS_WRITE_PLAIN;
 	prev_first_off = prev_next_off = PREV_OFF_INVALID;
 	return tp_cse;
 }

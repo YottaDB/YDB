@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,7 @@
 
 GBLREF command_qualifier	cmd_qlf;
 GBLREF char			cg_phase;
+GBLREF boolean_t		mstr_native_align, save_mstr_native_align;
 
 CONDITION_HANDLER(compiler_ch)
 {
@@ -32,9 +33,10 @@ CONDITION_HANDLER(compiler_ch)
 	error_def(ERR_GTMASSERT);
 	error_def(ERR_GTMCHECK);
 	error_def(ERR_STACKOFLOW);
+	error_def(ERR_OUTOFSPACE);
 
 	START_CH;
-	if (DUMP)
+	if (DUMPABLE)
 	{
 		NEXTCH;
 	}
@@ -43,6 +45,7 @@ CONDITION_HANDLER(compiler_ch)
 		PRN_ERROR;
 
 	reinit_externs();
+	mstr_native_align = save_mstr_native_align;
 
 	if (cg_phase == CGP_MACHINE)
 		drop_object_file();

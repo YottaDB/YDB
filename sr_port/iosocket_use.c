@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 #include "gtm_string.h"
 
 #include <errno.h>
-#include <netinet/in.h>
+#include "gtm_inet.h"
 #ifndef __MVS__
 #include <netinet/tcp.h>
 #endif
@@ -70,7 +70,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	int4 		index, n_specified, zff_len, delimiter_len;
 	int		fil_type, nodelay, p_offset = 0;
 	uint4		bfsize = DEFAULT_SOCKET_BUFFER_SIZE, ibfsize;
-	mident		tab;
+	char		*tab;
 	int		save_errno;
 
 	error_def(ERR_ABNCOMPTINC);
@@ -106,10 +106,9 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			s2pool(&iod->error_handler);
 			break;
 		case iop_filter:
-			memset(&tab, 0, sizeof(mident));
 			len = *(pp->str.addr + p_offset);
-			memcpy(&tab.c[0], pp->str.addr + p_offset + 1, (len < sizeof(mident) ? len : sizeof(mident)));
-			if ((fil_type = namelook(filter_index, filter_names, tab.c)) < 0)
+			tab = pp->str.addr + p_offset + 1;
+			if ((fil_type = namelook(filter_index, filter_names, tab, len)) < 0)
 			{
 				rts_error(VARLSTCNT(1) ERR_TTINVFILTER);
 				return;
@@ -325,7 +324,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	if (create_new_socket = (listen_specified || connect_specified))	/* real "=" */
 	{
 		/* allocate the structure for a new socket */
-                if (NULL == (socketptr = iosocket_create(sockaddr, bfsize)))
+                if (NULL == (socketptr = iosocket_create(sockaddr, bfsize, -1)))
                         return;
 		/* give the new socket a handle */
 		iosocket_handle(handles, &handles_len, TRUE, dsocketptr);

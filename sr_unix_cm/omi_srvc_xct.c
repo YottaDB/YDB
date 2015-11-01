@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,7 @@ GBLREF char	*omi_oprlist[];
 GBLREF char	*omi_errlist[];
 GBLREF char	*omi_pklog_addr;
 GBLREF int	history;
+GBLREF boolean_t	servtime_expired;
 
 static omi_op	omi_dispatch_table[OMI_OP_MAX] =
 {
@@ -84,13 +85,15 @@ int	omi_srvc_xact (omi_conn *cptr)
 	char		buff[OMI_BUFSIZ], *bptr, *xend, *bend;
 
 #ifdef BSD_TCP
-	int		 cc;
+	int		 cc, save_errno;
 
 /*	If true, an error occurred */
 	cc = &cptr->buff[cptr->bsiz] - &cptr->bptr[cptr->blen];
-	while ((cc = read(cptr->fd, &cptr->bptr[cptr->blen], cc)) < 0  &&  errno == EINTR)
+	while (!servtime_expired && (cc = read(cptr->fd, &cptr->bptr[cptr->blen], cc)) < 0  &&  errno == EINTR)
 			;
-
+	save_errno = errno;
+	if (servtime_expired)
+		return -1;
 	if (cc < 0)
 	{
 		if (errno == ETIMEDOUT)
@@ -108,7 +111,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 			char	msg[256];
 			sprintf(msg, "Attempted read from connection %d to %s failed",
 				cptr->stats.id, gtcm_hname(&cptr->stats.sin));
-			gtcm_rep_err(msg, errno);
+			gtcm_rep_err(msg, save_errno);
 		}
 		return -1;
 	}
@@ -171,7 +174,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 		char	msg[256];
 
 		sprintf(msg, "OMI packet length (%d) larger than max (%d)", mlen.value+4, OMI_BUFSIZ);
-		gtcm_cpktdmp(cptr->bptr, cptr->blen, msg);
+		gtcm_cpktdmp((char *)cptr->bptr, cptr->blen, msg);
 		return -1;
 	}
 
@@ -218,7 +221,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 			char	msg[256];
 
 			sprintf(msg, "invalid OMI packet (invalid nxact)");
-			gtcm_cpktdmp(cptr->bptr, cptr->blen, msg);
+			gtcm_cpktdmp((char *)cptr->bptr, cptr->blen, msg);
 			return -1;
 		}
 	}
@@ -385,7 +388,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 		}
 		if (bptr >= bend)
 		{
-			gtcm_rep_err("", errno);
+			gtcm_rep_err("Buffer overrun error", -1);
 			return -1;
 		}
 	}
@@ -414,7 +417,10 @@ int	omi_srvc_xact (omi_conn *cptr)
 /*	Write out the response (in pieces if necessary) */
 	while (blen > 0)
 	{
-		if ((cc = write(cptr->fd, bptr, blen)) < 0)
+		while(!servtime_expired && (cc = write(cptr->fd, bptr, blen)) < 0)
+			;
+		save_errno = errno;
+		if (cc < 0)
 		{
 			if (errno == ETIMEDOUT)
 			{
@@ -437,7 +443,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 			{
 				char	msg[256];
 				sprintf(msg, "Write attempt to connection %d failed", cptr->stats.id);
-				gtcm_rep_err(msg, errno);
+				gtcm_rep_err(msg, save_errno);
 			}
 			return -1;
 		}

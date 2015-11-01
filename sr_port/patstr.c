@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,17 +79,18 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			unsigned char	buff[MAX_PATTERN_LENGTH - 2];
 		}		strlit;
 	boolean_t		infinite, split_atom, done, dfa, fixed_len, prev_fixed_len;
-	int4			lower_bound, upper_bound;
-	unsigned char		str_ptr, *inchar, curchar, symbol;
+	int4			lower_bound, upper_bound, str_ptr;
+	gtm_uint64_t		bound;
+	unsigned char		*inchar, curchar, symbol;
 	uint4			pattern_mask, last_leaf_mask, y_max, mbit;
 	uint4			*patmaskptr;
-	short int		atom_map, count, total_min, total_max;
-	short int		min[MAX_PATTERN_ATOMS], max[MAX_PATTERN_ATOMS], size[MAX_PATTERN_ATOMS];
+	int			atom_map, count, total_min, total_max;
+	int			min[MAX_PATTERN_ATOMS], max[MAX_PATTERN_ATOMS], size[MAX_PATTERN_ATOMS];
 	struct leaf		leaves, *lv_ptr;
 	struct e_table		expand, *exp_ptr;
-	short int		exp_temp[CHAR_CLASSES];
-	short int		leaf_num, curr_leaf_num, min_dfa, curr_min_dfa, sym_num;
-	short int 		seqcnt, charpos, leafcnt, cursize;
+	int			exp_temp[CHAR_CLASSES];
+	int			leaf_num, curr_leaf_num, min_dfa, curr_min_dfa, sym_num;
+	int 			seqcnt, charpos, leafcnt, cursize;
 	int4			bitpos;
 	alternation		init_alt;
 	alternation		*cur_alt;
@@ -278,7 +279,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						if ((curchar = *inchar++) != '\"')
 							break;
 					}
-					if (str_ptr >= MAX_PATTERN_LENGTH - 2)
+					if (str_ptr >= (sizeof(strlit.buff) / sizeof(strlit.buff[0])))
 					{
 						instr->addr = (char *)inchar;
 						return ERR_PATMAXLEN;
@@ -413,7 +414,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				sym_num = 0;
 				min_dfa = 0;
 				atom_map = count;
-				memset(expand.num_e, 0, CHAR_CLASSES * sizeof(short int));
+				memset(expand.num_e, 0, sizeof(expand.num_e));
 			}
 			if (!dfa)
 			{
@@ -487,13 +488,13 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					if (altsimplify)
 					{
 						size[count - 1] = size_in;
-						min[count - 1] = MIN((low_in * lower_bound), PAT_MAX_REPEAT);
+						min[count - 1] = BOUND_MULTIPLY(low_in, lower_bound, bound);
 						lower_bound = min[count - 1];
 						if (!cur_alt->altpat.buff[0])
 							fixed_len = FALSE;
 						if (!fixed_len)
 						{
-							max[count - 1] = MIN((high_in * upper_bound), PAT_MAX_REPEAT);
+							max[count - 1] = BOUND_MULTIPLY(high_in, upper_bound, bound);
 							upper_bound = max[count - 1];
 						}
 						outchar--;
@@ -542,8 +543,12 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						min[count] = min_dfa;
 						max[count] = PAT_MAX_REPEAT;
 						size[count] = cursize;
-						total_min = MIN((total_min + (min[count] * size[count])), PAT_MAX_REPEAT);
-						total_max = MIN((total_max + (max[count] * size[count])), PAT_MAX_REPEAT);
+						total_min += BOUND_MULTIPLY(min[count], size[count], bound);
+						if (total_min > PAT_MAX_REPEAT)
+							total_min = PAT_MAX_REPEAT;
+						total_max += BOUND_MULTIPLY(max[count], size[count], bound);
+						if (total_max > PAT_MAX_REPEAT)
+							total_max = PAT_MAX_REPEAT;
 						lastpatptr = patmaskptr;
 						last_infinite = TRUE;
 						count++;
@@ -679,8 +684,12 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						min[count] = curr_min_dfa;
 						max[count] = PAT_MAX_REPEAT;
 						size[count] = cursize;
-						total_min = MIN((total_min + (min[count] * size[count])), PAT_MAX_REPEAT);
-						total_max = MIN((total_max + (max[count] * size[count])), PAT_MAX_REPEAT);
+						total_min += BOUND_MULTIPLY(min[count], size[count], bound);
+						if (total_min > PAT_MAX_REPEAT)
+							total_min = PAT_MAX_REPEAT;
+						total_max += BOUND_MULTIPLY(max[count], size[count], bound);
+						if (total_max > PAT_MAX_REPEAT)
+							total_max = PAT_MAX_REPEAT;
 						lastpatptr = patmaskptr;
 						last_infinite = TRUE;
 						count++;

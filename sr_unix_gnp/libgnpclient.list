@@ -4,6 +4,7 @@ gtcmtr_lke_showreq
 gvcmx_canremlk
 gvcmx_data
 gvcmx_get
+gvcmx_increment
 gvcmx_kill
 gvcmx_order
 gvcmx_put

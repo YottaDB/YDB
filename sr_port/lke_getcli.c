@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,9 +62,11 @@ int4 lke_getcli(bool *all,
 #ifdef HEXPID
 		if (!cli_get_hex("PID", pid))
 #else
-		if (!cli_get_int("PID", pid))
+		assert(sizeof(*pid) == sizeof(int));
+		if (!cli_get_int("PID", (int4 *)pid))
 #endif
-		{	*pid = 0;
+		{
+			*pid = 0;
 			status = FALSE;
 		}
 	}

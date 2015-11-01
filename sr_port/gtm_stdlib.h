@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,14 +21,20 @@
 #define ATOF	atof
 #define PUTENV	putenv
 #define STRTOL	strtol
+#define STRTOLL	strtoll
 #define STRTOUL	strtoul
-#define MKSTEMP(template,mkstemp_res)	(mkstemp_res = mkstemp(template))
-#if defined(__linux__) && !defined(Linux390)
-/* only needed until glibc 2.1.3 aka post RH 6.1 */
-int gtm_system(const char *);
-#define SYSTEM	gtm_system
+#if INT_MAX < LONG_MAX	/* like Tru64 */
+#define STRTO64L	strtol
+#define STRTOU64L	strtoul
+#elif defined(__hpux)
+#include <inttypes.h>
+#define STRTO64L	strtoimax
+#define STRTOU64L	strtoumax
 #else
-#define SYSTEM	system
+#define STRTO64L	strtoll
+#define STRTOU64L	strtoull
 #endif
+#define MKSTEMP(template,mkstemp_res)	(mkstemp_res = mkstemp(template))
+#define SYSTEM	system
 
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,8 +18,8 @@
 typedef struct
 {
 	zb_code		*mpc;		/* MUMPS address for ZBREAK */
-	mident		rtn;
-	mident		lab;
+	mident		*rtn;		/* points to the routine_name field of the target routine header */
+	mident		*lab;		/* points to the lab_name field of target's label table entry */
 	int		offset;
 	int		count;		/* # of time ZBREAK encountered */
 	cache_entry	*action;	/* action associated with ZBREAK (indirect cache entry) */

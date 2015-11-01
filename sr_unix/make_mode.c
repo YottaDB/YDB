@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ typedef struct dyn_modes_struct
 	int		rtn_name_len;
 	void		(*func_ptr1)(void);
 	void		(*func_ptr2)(void);
-	void		(*func_ptr3)(void);
+	int		(*func_ptr3)(void);
 } dyn_modes;
 
 static dyn_modes our_modes[2] =
@@ -75,7 +75,8 @@ rhdtyp *make_mode (int mode_index)
 	base_address = (rhdtyp *)malloc(sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(lnr_tabent));
 	memset(base_address, 0, 	sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(lnr_tabent));
 	dmode = &our_modes[mode_index];
-	memcpy(&base_address->routine_name, dmode->rtn_name, dmode->rtn_name_len);
+	base_address->routine_name.len = dmode->rtn_name_len;
+	base_address->routine_name.addr = dmode->rtn_name;
 
 	base_address->ptext_adr = (unsigned char *)base_address + sizeof(rhdtyp);
 	base_address->ptext_end_adr = (unsigned char *)base_address->ptext_adr + CODE_SIZE;

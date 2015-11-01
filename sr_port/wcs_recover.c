@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,20 +16,16 @@
 #include "gtmimagename.h"
 
 #ifdef UNIX
-
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <errno.h>
-#include <signal.h>
-
+#  include <sys/mman.h>
+#  include "gtm_stat.h"
+#  include <errno.h>
+#  include <signal.h>
 #elif defined(VMS)
-
-#include <fab.h>
-#include <iodef.h>
-#include <ssdef.h>
-
+#  include <fab.h>
+#  include <iodef.h>
+#  include <ssdef.h>
 #else
-#error UNSUPPORTED PLATFORM
+#  error UNSUPPORTED PLATFORM
 #endif
 
 #include "ast.h"	/* needed for DCLAST_WCS_WTSTART macro in gdsfhead.h */
@@ -46,11 +42,10 @@
 #include "jnl.h"
 #include "testpt.h"
 #include "sleep_cnt.h"
-#include "hashdef.h"
 
 #ifdef UNIX
-#include "eintr_wrappers.h"
-GBLREF	sigset_t		blockalrm;
+#  include "eintr_wrappers.h"
+   GBLREF	sigset_t	blockalrm;
 #endif
 #include "send_msg.h"
 #include "bit_set.h"
@@ -66,6 +61,7 @@ GBLREF	sigset_t		blockalrm;
 #include "add_inter.h"
 #include "gtm_malloc.h"		/* for verifyAllocatedStorage() prototype */
 #include "cert_blk.h"
+#include "shmpool.h"
 
 GBLREF	bool             	certify_all_blocks;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -84,17 +80,17 @@ GBLREF	boolean_t		mu_rndwn_file_dbjnl_flush;
 GBLREF	uint4			gtmDebugLevel;
 
 #ifdef DEBUG_DB64
-/* if debugging large address stuff, make all memory segments allocate above 4G line */
-GBLREF	sm_uc_ptr_t	next_smseg;
+  /* if debugging large address stuff, make all memory segments allocate above 4G line */
+  GBLREF sm_uc_ptr_t		next_smseg;
 #else
-#define next_smseg	NULL
+#  define next_smseg	NULL
 #endif
 
 #ifdef DEBUG
-GBLREF	boolean_t	in_wcs_recover;	/* TRUE if in wcs_recover(), used by bt_put() */
+  GBLREF boolean_t		in_wcs_recover;	/* TRUE if in wcs_recover(), used by bt_put() */
 #endif
 
-void		wcs_recover(gd_region *reg)
+void wcs_recover(gd_region *reg)
 {
 	bt_rec_ptr_t		bt;
 	cache_rec_ptr_t		cr, cr_alt, cr_lo, cr_top, hash_hdr;
@@ -108,7 +104,7 @@ void		wcs_recover(gd_region *reg)
 	uint4			jnl_status, epid;
 	int			bt_buckets;
 	inctn_opcode_t          save_inctn_opcode;
-	unsigned int		bplmap, lcnt, total_blks;
+	unsigned int		bplmap, lcnt, total_blks, wait_in_rip;
 	sm_uc_ptr_t		buffptr;
 
 	error_def(ERR_BUFRDTIMEOUT);
@@ -131,6 +127,7 @@ void		wcs_recover(gd_region *reg)
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	assert(csa->now_crit || csd->clustered);
+	CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 	DEBUG_ONLY(in_wcs_recover = TRUE;)	/* used by bt_put() called below */
 	/* ??? this should probably issue an error and
 	 * grab crit on the assumption that it is properly called and something will presently release it */
@@ -140,6 +137,7 @@ void		wcs_recover(gd_region *reg)
 		/* if this loop hits the limit, or in_wtstart goes negative wcs_verify reports and clears in_wtstart */
 		wcs_sleep(lcnt);
 	}
+	BG_TRACE_PRO_ANY(csa, wc_blocked_wcs_recover_invoked);
 	if (wcs_verify(reg, TRUE, TRUE))	/* expect_damage is TRUE, in_wcs_recover is TRUE */
 	{	/* if it passes verify, then recover can't help ??? what to do */
 		BG_TRACE_PRO_ANY(csa, wc_blocked_wcs_verify_passed);
@@ -166,14 +164,15 @@ void		wcs_recover(gd_region *reg)
 	cr_lo = cr_top;
 	cr_top = cr_top + csd->n_bts;
 	blk_size = csd->blk_size;
-	buffptr = (sm_uc_ptr_t)ROUND_UP((sm_ulong_t)cr_top, DISK_BLOCK_SIZE);
-	for (cr = cr_lo; cr < cr_top;  cr++, buffptr += blk_size)
+	buffptr = (sm_uc_ptr_t)ROUND_UP((sm_ulong_t)cr_top, OS_PAGE_SIZE);
+	for (cr = cr_lo, wait_in_rip = 0; cr < cr_top;  cr++, buffptr += blk_size)
 	{
 		cr->buffaddr = GDS_ANY_ABS2REL(csa, buffptr);	/* reset it to what it should be just to be safe */
 		if (((int)(cr->blk) != CR_BLKEMPTY) && (((int)(cr->blk) < 0) || ((int)(cr->blk) >= csd->trans_hist.total_blks)))
 		{	/* bad block number. discard buffer for now. actually can do better by looking at cr->bt_index... */
 			cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 			cr->blk = CR_BLKEMPTY;
+			SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
 		}
 		/* fix bad values of cr->dirty and cr->flushed_dirty_tn */
 		assert(csa->ti == &csd->trans_hist);
@@ -195,32 +194,37 @@ void		wcs_recover(gd_region *reg)
 				INTERLOCK_INIT(cr);
 				cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 				cr->blk = CR_BLKEMPTY;
+				SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
 				assert(cr->r_epid == 0);
 				assert(0 == cr->dirty);
 			} else  if ((0 != cr->r_epid)
 					&& ((cr->r_epid == process_id) || (FALSE == is_proc_alive(cr->r_epid, cr->image_count))))
 			{
-				INTERLOCK_INIT(cr);			/* Process gone, release that process's lock */
+				INTERLOCK_INIT(cr);	/* Process gone, release that process's lock */
 				cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 				cr->blk = CR_BLKEMPTY;
-	   		} else
-			{
+				SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
+	   		} else {
 				if (1 == lcnt)
 					epid = cr->r_epid;
-				else  if (BUF_OWNER_STUCK < lcnt)
-				{
+				else  if (BUF_OWNER_STUCK < lcnt || MAX_WAIT_FOR_RIP <= wait_in_rip ||
+						(0 == cr->r_epid && -1 != cr->read_in_progress))
+				{ /* If we have already waited for atleast 4 minutes, no longer wait but
+				     fixup all following cr's.  If r_epid is 0 and also read in progress,
+				     we identify this as corruption and fixup up this cr and proceed to
+				     the next cr */
 					if ((0 != cr->r_epid) && (epid != cr->r_epid))
 						GTMASSERT;
-					if (0 != epid)
-					{	/* process still active, but not playing fair */
-						send_msg(VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id,
-									cr->blk, cr, epid, DB_LEN_STR(reg));
-						send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Buffer forcibly seized"));
-					}
+					/* process still active but not playing fair or cache is corrupted */
+					send_msg(VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id, cr->blk, cr, cr->r_epid, DB_LEN_STR(reg));
+					send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Buffer forcibly seized"));
 					INTERLOCK_INIT(cr);
 					cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 					cr->blk = CR_BLKEMPTY;
-					continue;
+					SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
+					if (BUF_OWNER_STUCK < lcnt)
+						wait_in_rip++;
+					break;
 				}
     				wcs_sleep(lcnt);
 			}
@@ -287,8 +291,8 @@ void		wcs_recover(gd_region *reg)
 		assert(!cr->stopped || CR_BLKEMPTY != cr->blk);
 		if (cr->stopped && (CR_BLKEMPTY != cr->blk))
 		{	/* cache record attached to a buffer built by secshr_db_clnup: finish work; clearest case: do it 1st */
-			if (certify_all_blocks && !cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr), 0))
-				GTMASSERT;
+			if (certify_all_blocks)
+				cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr), 0, TRUE); /* GTMASSERT on error */
 			assert(LATCH_CLEAR == WRITE_LATCH_VAL(cr));
 			if ((cr->blk / bplmap) * bplmap == cr->blk)
 			{	/* it's a bitmap */
@@ -300,11 +304,11 @@ void		wcs_recover(gd_region *reg)
 						total_blks, &blk_used);
 				if (NO_FREE_SPACE == bml_full)
 				{
-					bit_clear(cr->blk / bplmap, csd->master_map);
+					bit_clear(cr->blk / bplmap, MM_ADDR(csd));
 					if (cr->blk > csa->nl->highest_lbm_blk_changed)
 						csa->nl->highest_lbm_blk_changed = cr->blk;
 					change_bmm = TRUE;
-				} else if (!(bit_set(cr->blk / bplmap, csd->master_map)))
+				} else if (!(bit_set(cr->blk / bplmap, MM_ADDR(csd))))
 				{
 					if (cr->blk > csa->nl->highest_lbm_blk_changed)
 						csa->nl->highest_lbm_blk_changed = cr->blk;
@@ -351,6 +355,7 @@ void		wcs_recover(gd_region *reg)
 					cr_alt->dirty = 0;
 					cr_alt->flushed_dirty_tn = 0;
 					cr_alt->in_tend = FALSE;
+					SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr_alt);
 					WRITE_LATCH_VAL(cr_alt) = LATCH_CLEAR;
 					VMS_ONLY(cr_alt->iosb.cond = 0;)
 					cr_alt->jnl_addr = 0;
@@ -378,8 +383,8 @@ void		wcs_recover(gd_region *reg)
 			cr->in_tend = FALSE;
 			cr->data_invalid = FALSE;
 			WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
-			VMS_ONLY(assert(0 == cr_alt->iosb.cond);)
-			VMS_ONLY(cr_alt->iosb.cond = 0;)
+			VMS_ONLY(assert(0 == cr->iosb.cond);)
+			VMS_ONLY(cr->iosb.cond = 0;)
 			cr->refer = TRUE;
 			cr->stopped = FALSE;
 			hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
@@ -402,6 +407,7 @@ void		wcs_recover(gd_region *reg)
 			cr->epid = 0;
 			cr->image_count = 0;
 			cr->in_tend = FALSE;
+			SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
 			WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
 			VMS_ONLY(cr->iosb.cond = 0;)
 			cr->jnl_addr = 0;
@@ -446,6 +452,7 @@ void		wcs_recover(gd_region *reg)
 				cr->flushed_dirty_tn = 0;
 				cr->epid = 0;
 				cr->image_count = 0;
+				SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
 				WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
 				VMS_ONLY(cr->iosb.cond = 0;)
 				cr->jnl_addr = 0;
@@ -501,6 +508,7 @@ void		wcs_recover(gd_region *reg)
 					cr->flushed_dirty_tn = 0;
 					cr->jnl_addr = 0;
 					cr->refer = FALSE;
+					SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
 					csa->nl->wc_in_free++;
 				}
 			}
@@ -580,8 +588,12 @@ void		wcs_recover(gd_region *reg)
 			} else
 				jnl_file_lost(csa->jnl, jnl_status);
 		}
+		/* do not increment early_tn/curr_tn for forward recovery */
 		if (!mupip_jnl_recover || JNL_ENABLED(csd))
-			csd->trans_hist.early_tn = ++csd->trans_hist.curr_tn;	/* do not increment tn for forward recovery */
+		{
+			csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
+			INCREMENT_CURR_TN(csd);
+		}
 	}
 	csa->wbuf_dqd = 0;	/* reset this so the wcs_wtstart below will work */
 	csd->wc_blocked = FALSE;
@@ -652,7 +664,7 @@ void	wcs_mm_recover(gd_region *reg)
 #endif
 	cs_data = cs_addrs->hdr = (sgmnt_data_ptr_t)cs_addrs->db_addrs[0];
 	cs_addrs->db_addrs[1] = cs_addrs->db_addrs[0] + stat_buf.st_size - 1;
-	cs_addrs->bmm = cs_data->master_map;
+	cs_addrs->bmm = MM_ADDR(cs_data);
 	cs_addrs->acc_meth.mm.base_addr = (sm_uc_ptr_t)((sm_uc_ptr_t)cs_data
 							+ (cs_data->start_vbn - 1) * DISK_BLOCK_SIZE);
 	bt_init(cs_addrs);
@@ -686,5 +698,5 @@ void	wcs_mm_recover(gd_region *reg)
 }
 
 #else
-#error UNSUPPORTED PLATFORM
+#  error UNSUPPORTED PLATFORM
 #endif

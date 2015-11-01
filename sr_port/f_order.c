@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -127,7 +127,7 @@ int f_order(oprtype *a, opctype op)
 		}
 		else
 		{
-			r->operand[0] = put_str(&window_ident.c[0], sizeof(mident));
+			r->operand[0] = put_str(window_ident.addr, window_ident.len);
 			advancewindow();
 			object = local_name;
 		}

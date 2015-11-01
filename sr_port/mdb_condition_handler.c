@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,9 +13,8 @@
 
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
+#include "gtm_inet.h"	/* Required for gtmsource.h */
 
-#include <netinet/in.h>		/* required for gtmsource.h */
-#include <arpa/inet.h>		/* required for gtmsource.h */
 #ifdef VMS
 #include <descrip.h>		/* required for gtmsource.h */
 #include <ssdef.h>
@@ -38,17 +37,17 @@
 #include "filestruct.h"
 #include "gtmdbglvl.h"
 #include "error.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"
 #include "io.h"
 #include "io_params.h"
 #include "jnl.h"
 #include "lv_val.h"
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "outofband.h"
-#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "stringpool.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab_int4.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "tp_frame.h"
@@ -59,6 +58,7 @@
 #include "gtmsource.h"
 #include "zwrite.h"
 #include "cache.h"
+#include "cache_cleanup.h"
 #include "objlabel.h"
 #include "op.h"
 #include "dpgbldir.h"
@@ -76,54 +76,55 @@
 #include "jobexam_process.h"
 #include "jobinterrupt_process_cleanup.h"
 
-GBLREF spdesc           stringpool, rts_stringpool, indr_stringpool;
-GBLREF volatile int4	outofband;
-GBLREF volatile bool	std_dev_outbnd;
-GBLREF volatile bool	compile_time;
-GBLREF int		restart_pc;
-GBLREF int		t_tries;
-GBLREF unsigned char	*restart_ctxt;
-GBLREF unsigned char	*stackwarn, *tpstackwarn;
-GBLREF unsigned char	*stacktop, *tpstacktop;
-GBLREF unsigned char	*msp, *tp_sp;
-GBLREF mv_stent		*mv_chain;
-GBLREF stack_frame	*frame_pointer, *zyerr_frame, *error_frame;
-GBLREF tp_frame		*tp_pointer;
-GBLREF io_desc		*active_device;
-GBLREF lv_val		*active_lv;
-GBLREF io_pair		io_std_device, io_curr_device;
-GBLREF short		dollar_tlevel;
-GBLREF mval		dollar_ztrap;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF volatile bool	neterr_pending;
-GBLREF int		(* volatile xfer_table[])();
-GBLREF unsigned short	proc_act_type;
-GBLREF mval		**ind_result_array, **ind_result_sp;
-GBLREF mval		**ind_source_array, **ind_source_sp;
-GBLREF int		mumps_status;
-GBLREF mstr		*err_act;
-GBLREF tp_region	*tp_reg_list;		/* Chained list of regions used in this transaction not cleared on tp_restart */
-GBLREF void		(*tp_timeout_clear_ptr)(void);
-GBLREF uint4		gtmDebugLevel;		/* Debug level */
-GBLREF uint4		process_id;
-GBLREF jnlpool_addrs	jnlpool;
-GBLREF boolean_t	pool_init;
-GBLREF boolean_t	created_core;
-GBLREF boolean_t	dont_want_core;
-GBLREF mval		dollar_zstatus, dollar_zerror;
-GBLREF mval		dollar_etrap;
-GBLREF volatile int4	gtmMallocDepth;
-GBLREF int4		exi_condition;
+GBLREF	spdesc		stringpool, rts_stringpool, indr_stringpool;
+GBLREF	volatile int4	outofband;
+GBLREF	volatile bool	std_dev_outbnd;
+GBLREF	volatile bool	compile_time;
+GBLREF	int		restart_pc;
+GBLREF	int		t_tries;
+GBLREF	unsigned char	*restart_ctxt;
+GBLREF	unsigned char	*stackwarn, *tpstackwarn;
+GBLREF	unsigned char	*stacktop, *tpstacktop;
+GBLREF	unsigned char	*msp, *tp_sp;
+GBLREF	mv_stent	*mv_chain;
+GBLREF	stack_frame	*frame_pointer, *zyerr_frame, *error_frame;
+GBLREF	tp_frame	*tp_pointer;
+GBLREF	io_desc		*active_device;
+GBLREF	lv_val		*active_lv;
+GBLREF	io_pair		io_std_device, io_curr_device;
+GBLREF	short		dollar_tlevel;
+GBLREF	mval		dollar_ztrap;
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	volatile bool	neterr_pending;
+GBLREF	int		(* volatile xfer_table[])();
+GBLREF	unsigned short	proc_act_type;
+GBLREF	mval		**ind_result_array, **ind_result_sp;
+GBLREF	mval		**ind_source_array, **ind_source_sp;
+GBLREF	int		mumps_status;
+GBLREF	mstr		*err_act;
+GBLREF	tp_region	*tp_reg_list;		/* Chained list of regions used in this transaction not cleared on tp_restart */
+GBLREF	void		(*tp_timeout_clear_ptr)(void);
+GBLREF	uint4		gtmDebugLevel;		/* Debug level */
+GBLREF	uint4		process_id;
+GBLREF	jnlpool_addrs	jnlpool;
+GBLREF	boolean_t	pool_init;
+GBLREF	boolean_t	created_core;
+GBLREF	boolean_t	dont_want_core;
+GBLREF	mval		dollar_zstatus, dollar_zerror;
+GBLREF	mval		dollar_etrap;
+GBLREF	volatile int4	gtmMallocDepth;
+GBLREF	int4		exi_condition;
 #ifdef VMS
-GBLREF struct chf$signal_array	*tp_restart_fail_sig;
-GBLREF boolean_t		tp_restart_fail_sig_used;
+GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
+GBLREF	boolean_t		tp_restart_fail_sig_used;
 #endif
-GBLREF int			merge_args;
-GBLREF lvzwrite_struct		lvzwrite_block;
-GBLREF int			process_exiting;
-GBLREF volatile boolean_t	dollar_zininterrupt;
-GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
-GBLREF dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
+GBLREF	int			merge_args;
+GBLREF	lvzwrite_struct		lvzwrite_block;
+GBLREF	int			process_exiting;
+GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
+GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
+GBLREF	boolean_t		in_gvcst_incr;
 
 #define GTMFATAL_ERROR_DUMP_FILENAME "GTM_FATAL_ERROR"
 static readonly mval gtmfatal_error_filename = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(GTMFATAL_ERROR_DUMP_FILENAME) - 1,
@@ -163,7 +164,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	unsigned char		*cp, *context, *sp_base;
 	boolean_t		dm_action;	/* did the error occur on a action from direct mode */
 	boolean_t		trans_action;	/* did the error occur during "transcendental" code */
-	char			src_line[50];
+	char			src_line[MAX_ENTRYREF_LEN];
 	mstr			src_line_d;
 	io_desc			*err_dev;
 	tp_region		*tr;
@@ -226,6 +227,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 		CONTINUE;
 	}
 	MDB_START;
+	assert(FALSE == in_gvcst_incr);	/* currently there is no known case where this can be TRUE at this point */
+	in_gvcst_incr = FALSE;	/* reset this just in case gvcst_incr/gvcst_put failed to do a good job of resetting */
 	/*
 	 * Ideally merge should have a condition handler to reset followings, but generated code
 	 * can call other routines during MERGE command. So it is not easy to establish a condition handler there.

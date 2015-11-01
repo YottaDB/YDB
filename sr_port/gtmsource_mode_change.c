@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,19 +11,13 @@
 
 #include "mdef.h"
 
-#if !defined(__MVS__) && !defined(VMS)
-#include <sys/param.h>
-#endif
-#include <sys/time.h>
-#include <errno.h>
-#include <fcntl.h>
+#include "gtm_time.h"
+#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #include "gtm_string.h"
-#ifdef UNIX
-#include <sys/sem.h>
-#endif
+
+#include <errno.h>
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
 #endif
@@ -53,9 +47,6 @@ int gtmsource_mode_change(int to_mode)
 	int		exit_status;
 	int		status, detach_status, remove_status;
 
-	repl_log(stdout, FALSE, FALSE, "Initiating change of mode from %s to %s\n", (GTMSOURCE_MODE_ACTIVE == to_mode) ?
-			"PASSIVE" : "ACTIVE", (GTMSOURCE_MODE_ACTIVE == to_mode) ? "ACTIVE" : "PASSIVE");
-
 	/* Grab the jnlpool jnlpool option write lock */
 	if (0 > grab_sem(SOURCE, SRC_SERV_OPTIONS_SEM))
 	{
@@ -72,6 +63,9 @@ int gtmsource_mode_change(int to_mode)
 		return (ABNORMAL_SHUTDOWN);
 	}
 
+	repl_log(stdout, FALSE, FALSE, "Initiating change of mode from %s to %s\n", (GTMSOURCE_MODE_ACTIVE == to_mode) ?
+			"PASSIVE" : "ACTIVE", (GTMSOURCE_MODE_ACTIVE == to_mode) ? "ACTIVE" : "PASSIVE");
+
 	if (GTMSOURCE_MODE_ACTIVE == to_mode)
 	{
 		jnlpool.gtmsource_local->secondary_port = gtmsource_options.secondary_port;
@@ -80,13 +74,19 @@ int gtmsource_mode_change(int to_mode)
 		memcpy(&jnlpool.gtmsource_local->connect_parms[0], &gtmsource_options.connect_parms[0],
 				sizeof(gtmsource_options.connect_parms));
 	}
-	if ('\0' != gtmsource_options.log_file[0] &&
-	    0 != strcmp(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file))
+	if ('\0' != gtmsource_options.log_file[0] && 0 != strcmp(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file))
 	{
-		repl_log(stdout, FALSE, TRUE, "Signalling change in log file from %s to %s\n",
+		repl_log(stdout, FALSE, TRUE, "Signaling change in log file from %s to %s\n",
 				jnlpool.gtmsource_local->log_file, gtmsource_options.log_file);
 		strcpy(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file);
-		jnlpool.gtmsource_local->changelog = TRUE;
+		jnlpool.gtmsource_local->changelog |= REPLIC_CHANGE_LOGFILE;
+	}
+	if (0 != gtmsource_options.src_log_interval && jnlpool.gtmsource_local->log_interval != gtmsource_options.src_log_interval)
+	{
+		repl_log(stdout, FALSE, TRUE, "Signaling change in log interval from %u to %u\n",
+				jnlpool.gtmsource_local->log_interval, gtmsource_options.src_log_interval);
+		jnlpool.gtmsource_local->log_interval = gtmsource_options.src_log_interval;
+		jnlpool.gtmsource_local->changelog |= REPLIC_CHANGE_LOGINTERVAL;
 	}
 
 	jnlpool.gtmsource_local->mode = to_mode;

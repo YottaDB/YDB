@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -127,11 +127,12 @@ void io_init(bool term_ctrl)
 	if ((val.str.addr == sys_net.addr) && (pars.str.addr == (char *)open_params_list))
 		/* sys$net is the only input thing that uses open_params_list */
 		outp->iod = io_curr_device.in;
-	/* For terminals and mailboxes, SYS$INPUT and SYS$OUTPUT may point to
+	/* For terminals and mailboxes and sockets, SYS$INPUT and SYS$OUTPUT may point to
 		the same device.  If input is one of those, then check translated
 		name for output against translated name for input;
 		in that case they should be joined by their logical names */
-	if (((tt == io_curr_device.in->type) || (mb == io_curr_device.in->type))
+	if (((tt == io_curr_device.in->type) || (mb == io_curr_device.in->type) ||
+		(gtmsocket == io_curr_device.in->type))
 		&& same_device_check(tn, buf1))
 		outp->iod = io_curr_device.in;
 	if (!outp->iod)

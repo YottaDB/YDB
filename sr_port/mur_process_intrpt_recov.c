@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,8 +33,10 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "iosp.h"
 #include "jnl_typedef.h"
@@ -57,42 +59,35 @@ LITREF	int			jrt_update[];
 
 uint4 mur_process_intrpt_recov()
 {
-	jnl_ctl_list		*jctl;
+	jnl_ctl_list		*jctl, *last_jctl;
 	reg_ctl_list		*rctl, *rctl_top;
 	int			rename_fn_len, save_name_len;
 	char			prev_jnl_fn[MAX_FN_LEN + 1], rename_fn[MAX_FN_LEN + 1], save_name[MAX_FN_LEN + 1];
 	jnl_create_info		jnl_info;
 	uint4			status, status2;
 	uint4			max_autoswitchlimit, max_jnl_alq, max_jnl_deq;
+	sgmnt_data_ptr_t	csd;
 #if defined(VMS)
 	io_status_block_disk	iosb;
 #endif
 	boolean_t		jfh_changed, first_time;
 
-	error_def		(ERR_PREMATEOF); /* for DO_FILE_WRITE */
-	error_def		(ERR_JNLCREATERR);
-	error_def		(ERR_JNLWRERR);
-	error_def		(ERR_JNLFSYNCERR);
-	error_def		(ERR_TEXT);
+	error_def(ERR_PREMATEOF); /* for DO_FILE_WRITE */
+	error_def(ERR_JNLCREATERR);
+	error_def(ERR_JNLWRERR);
+	error_def(ERR_JNLFSYNCERR);
+	error_def(ERR_TEXT);
 
 	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
 	{
-		cs_addrs = rctl->csa;
-		cs_data = rctl->csd;
+		gv_cur_region = rctl->gd;	/* mur_blocks_free, mur_master_map and wcs_flu require this to be set */
+		cs_addrs = rctl->csa;		/* mur_master_map requires this is set */
+		csd = cs_data = rctl->csd;	/* mur_blocks_free, mur_master_map require this to be set */
 		assert(rctl->csd == rctl->csa->hdr);
 		mur_jctl = jctl = rctl->jctl_turn_around;
 		assert(rctl->csd == rctl->csa->hdr);
-		mur_master_map();
-		cs_data->trans_hist.header_open_tn =
-		cs_data->trans_hist.early_tn =
-		cs_data->trans_hist.curr_tn = jctl->turn_around_tn;
-		cs_data->trans_hist.free_blocks = mur_blocks_free();
-		if (dba_bg == cs_data->acc_meth)
-			/* This is taken from bt_refresh() */
-			((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn =
-				jctl->turn_around_tn - 1;
 		max_jnl_alq = max_jnl_deq = max_autoswitchlimit = 0;
-		for ( ; (NULL != jctl->next_gen); jctl = jctl->next_gen)
+		for (last_jctl = NULL ; (NULL != jctl); last_jctl = jctl, jctl = jctl->next_gen)
 		{
 			if (max_autoswitchlimit < jctl->jfh->autoswitchlimit)
 			{	/* Note that max_jnl_alq, max_jnl_deq are not the maximum journal allocation/extensions across
@@ -102,19 +97,57 @@ uint4 mur_process_intrpt_recov()
 				max_jnl_alq         = jctl->jfh->jnl_alq;
 				max_jnl_deq         = jctl->jfh->jnl_deq;
 			}
+			/* Until now, "rctl->blks_to_upgrd_adjust" holds the number of V4 format newly created bitmap blocks
+			 * seen in INCTN records in backward processing. It is possible that backward processing might have
+			 * missed out on seeing those INCTN records which are part of virtually-truncated or completely-rolled-bak
+			 * journal files. The journal file-header has a separate field "prev_recov_blks_to_upgrd_adjust" which
+			 * maintains exactly this count. Therefore adjust the rctl counter accordingly.
+			 */
+			assert(!jctl->jfh->prev_recov_blks_to_upgrd_adjust || !jctl->jfh->recover_interrupted);
+			assert(!jctl->jfh->prev_recov_blks_to_upgrd_adjust || jctl->jfh->prev_recov_end_of_data);
+			rctl->blks_to_upgrd_adjust += jctl->jfh->prev_recov_blks_to_upgrd_adjust;
 		}
-		if (max_autoswitchlimit > jctl->jfh->autoswitchlimit)
+		if (max_autoswitchlimit > last_jctl->jfh->autoswitchlimit)
 		{
-			cs_data->jnl_alq         = max_jnl_alq;
-			cs_data->jnl_deq         = max_jnl_deq;
-			cs_data->autoswitchlimit = max_autoswitchlimit;
+			csd->jnl_alq         = max_jnl_alq;
+			csd->jnl_deq         = max_jnl_deq;
+			csd->autoswitchlimit = max_autoswitchlimit;
 		} else
 		{
-			assert(cs_data->jnl_alq         == jctl->jfh->jnl_alq);
-			assert(cs_data->jnl_deq         == jctl->jfh->jnl_deq);
-			assert(cs_data->autoswitchlimit == jctl->jfh->autoswitchlimit);
+			assert(csd->jnl_alq         == last_jctl->jfh->jnl_alq);
+			assert(csd->jnl_deq         == last_jctl->jfh->jnl_deq);
+			assert(csd->autoswitchlimit == last_jctl->jfh->autoswitchlimit);
 		}
-		gv_cur_region = rctl->gd;
+		/* now that rctl->blks_to_upgrd_adjust is completely computed, use that to increment filehdr blks_to_upgrd.
+		 * note that blks_to_upgrd should be adjusted before calling mur_master_map() as otherwise an assert
+		 * in that routine might fail in case the counter is incorrect and a V4 format bitmap block is read in.
+		 */
+		csd->blks_to_upgrd += rctl->blks_to_upgrd_adjust;
+		if (csd->blks_to_upgrd)
+			csd->fully_upgraded = FALSE;
+		mur_master_map();
+		jctl = mur_jctl;
+		csd->trans_hist.early_tn = csd->trans_hist.header_open_tn = jctl->turn_around_tn;
+		csd->trans_hist.curr_tn = csd->trans_hist.early_tn;	/* INCREMENT_CURR_TN macro not used but noted in comment
+									 * to identify all places that set curr_tn */
+		/* MUPIP REORG UPGRADE/DOWNGRADE stores its partially processed state in the database file header.
+		 * It is difficult for recovery to restore those fields to a correct partial value.
+		 * Hence reset the related fields as if the desired_db_format got set just then at the EPOCH record
+		 * 	and that there was no more processing that happened.
+		 * This might potentially mean some duplicate processing for MUPIP REORG UPGRADE/DOWNGRADE after the recovery.
+		 * But that will only be the case as long as the database is in compatibility (mixed) mode (hopefully not long).
+		 */
+		if (csd->desired_db_format_tn > jctl->turn_around_tn)
+			csd->desired_db_format_tn = jctl->turn_around_tn;
+		if (csd->reorg_db_fmt_start_tn > jctl->turn_around_tn)
+			csd->reorg_db_fmt_start_tn = jctl->turn_around_tn;
+		if (csd->tn_upgrd_blks_0 > jctl->turn_around_tn)
+			csd->tn_upgrd_blks_0 = (trans_num)-1;
+		csd->reorg_upgrd_dwngrd_restart_block = 0;
+		csd->trans_hist.free_blocks = mur_blocks_free();
+		if (dba_bg == csd->acc_meth)
+			/* This is taken from bt_refresh() */
+			((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn = jctl->turn_around_tn - 1;
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_FSYNC_DB);
 	}
 	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)

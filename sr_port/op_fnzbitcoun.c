@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,19 +28,17 @@ void op_fnzbitcoun(mval *dst, mval *bitstr)
 		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
 
 	byte_1 = (unsigned char *)bitstr->str.addr;
-	str_len = (bitstr->str.len -1) * 8;
-	if ((*byte_1 < 0) || (*byte_1 > 7))
-	{
+	str_len = (bitstr->str.len - 1) * 8;
+	if (7 < *byte_1)
 		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
-	}
 	n = (str_len - *byte_1 + 7)/8 - 1;
 	m = (str_len - *byte_1) % 8;
-	if (m == 0)
+	if (0 == m)
 		m = 8;
 	bit_count = 0;
 	for (byte_n = byte_1 + 1; byte_n <= (byte_1 + n); byte_n++)
 	{
-		for (i = 0; i < 8; i++)
+		for (i = 0; 8 > i; i++)
 		{
 			if (byte_0 = *byte_n & mask[i])
 				bit_count++;

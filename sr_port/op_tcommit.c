@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,11 +24,11 @@
 #include "filestruct.h"
 #include "gdsbml.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "min_max.h"		/* needed for MM extend */
 #include "gdsblkops.h"		/* needed for MM extend */
 
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "tp_frame.h"
 #include "copy.h"
@@ -49,6 +49,7 @@
 #include "tp_incr_commit.h"
 #include "have_crit.h"
 #include "jobinterrupt_process.h"
+#include "jnl_get_checksum.h"
 
 error_def(ERR_GBLOFLOW);
 error_def(ERR_GVIS);
@@ -102,8 +103,11 @@ void	op_tcommit(void)
 	sm_long_t		delta;
 	sm_uc_ptr_t		old_db_addrs[2];
 	srch_blk_status		*t1;
+	jnl_buffer_ptr_t	jbp; /* jbp is non-NULL only if before-image journaling */
+	blk_hdr_ptr_t		old_block;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
+	unsigned int		bsiz;
 
 	if (0 == dollar_tlevel)
 		rts_error(VARLSTCNT(1) ERR_TLVLZERO);
@@ -145,7 +149,8 @@ void	op_tcommit(void)
 					 * non-NULL, it should be used in tp_tend() only within an if (NULL != si->first_cw_set)
 					 */
 					csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb);
-					read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog);
+					jbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
+					read_before_image = ((NULL != jbp) || csa->backup_in_prog);
 					/* The following section allocates new blocks required by the transaction it is done
 					 * before going crit in order to reduce the change of having to wait on a read while crit.
 					 * The trade-off is that if a newly allocated block is "stolen," it will cause a restart.
@@ -222,7 +227,8 @@ void	op_tcommit(void)
 							{
 								cse->old_block = t_qread(new_blk,
 										(sm_int_ptr_t)&cse->cycle, &cse->cr);
-								if (NULL == cse->old_block)
+								old_block = (blk_hdr_ptr_t)cse->old_block;
+								if (NULL == old_block)
 								{
 									status = rdfail_detail;
 									t_fail_hist[t_tries] = status;
@@ -230,10 +236,32 @@ void	op_tcommit(void)
 									TP_RETRY_ACCOUNTING(csa, csd, status);
 									break;
 								}
+								if ((NULL != jbp) && (old_block->tn < jbp->epoch_tn))
+								{	/* Compute CHECKSUM for writing PBLK record before crit.
+									 * It is possible that we are reading a block that is
+									 * actually marked free in the bitmap (due to concurrency
+									 * issues at this point). Therefore we might be actually
+									 * reading uninitialized block headers and in turn a bad
+									 * value of "old_block->bsiz". Restart if we ever access a
+									 * buffer whose size is greater than the db block size.
+									 */
+									bsiz = old_block->bsiz;
+									if (bsiz > csd->blk_size)
+									{
+										status = cdb_sc_lostbmlcr;
+										t_fail_hist[t_tries] = status;
+										SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+										TP_RETRY_ACCOUNTING(csa, csd, status);
+										break;
+									}
+									cse->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED,
+													(uint4 *)old_block, bsiz);
+								}
 							} else
 								cse->old_block = NULL;
 							cse->blk = new_blk;
 							cse->mode = gds_t_acquired;
+							assert(GDSVCURR == cse->ondsk_blkver);
 							assert(CDB_STAGNATE > t_tries ||
 								(is_mm ? (cse->blk < csa->total_blks)
 										: (cse->blk < csa->ti->total_blks)));

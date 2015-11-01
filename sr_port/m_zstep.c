@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,12 +20,12 @@
 #include "cmd.h"
 #include "namelook.h"
 
-GBLREF char window_token;
-GBLREF mval window_mval;
-GBLREF mident window_ident;
-GBLREF char director_token;
-GBLREF short int source_column;
-GBLREF short int last_source_column;
+GBLREF char 		window_token;
+GBLREF mval 		window_mval;
+GBLREF mident 		window_ident;
+GBLREF char 		director_token;
+GBLREF short int 	source_column;
+GBLREF short int 	last_source_column;
 static readonly nametabent zstep_names[] =
 {
 	 { 1, "I"}, { 4, "INTO"}
@@ -64,7 +64,7 @@ int m_zstep(void)
 		type = ZSTEP_OVER;
 		break;
 	case TK_IDENT:
-		if ((x = namelook(zstep_index,zstep_names,window_ident.c)) < 0)
+		if ((x = namelook(zstep_index, zstep_names, window_ident.addr, window_ident.len)) < 0)
 		{
 			stx_error(ERR_INVZSTEP);
 			return FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,12 +42,14 @@
 #include "gtm_caseconv.h"
 #include "gt_timer.h"
 #include "timers.h"
+#include "send_msg.h"
 #include "dse.h"
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 GBLREF uint4		process_id;
 GBLREF int4             image_count;
+LITREF char		*gtm_dbversion_table[];
 
 #define	CLNUP_CRIT					\
 {							\
@@ -62,14 +64,17 @@ GBLREF int4             image_count;
 
 void dse_chng_fhead(void)
 {
-	int4		x, prev_tn, index_x, save_x;
+	int4		x, index_x, save_x;
 	unsigned short	buf_len;
 	bool		was_crit;
 	bool		override = FALSE;
 	int4		nocrit_present;
-	int4		location_present, location, value_present, value, old_value, size_present, size;
+	int4		location_present, value_present, size_present, size;
+	uint4		location;
+	boolean_t	max_tn_present, max_tn_warn_present, curr_tn_present, change_tn;
+	gtm_uint64_t	value, old_value;
 	seq_num		seq_no;
-	trans_num	tn;
+	trans_num	tn, prev_tn, max_tn_old, max_tn_warn_old, curr_tn_old, max_tn_new, max_tn_warn_new, curr_tn_new;
 	char		temp_str[256], temp_str1[256], buf[MAX_LINE];
 	int		gethostname_res;
 	sm_uc_ptr_t	chng_ptr;
@@ -77,7 +82,7 @@ void dse_chng_fhead(void)
 	error_def(ERR_FREEZE);
 	error_def(ERR_BLKSIZ512);
 	error_def(ERR_DBRDONLY);
-	error_def(ERR_SIZENOTVALID);
+	error_def(ERR_SIZENOTVALID8);
 
 	if (gv_cur_region->read_only)
 		rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
@@ -135,7 +140,7 @@ void dse_chng_fhead(void)
 	if (CLI_PRESENT == cli_present("DECLOCATION"))
 	{
 		location_present = TRUE;
-		if (!cli_get_num("DECLOCATION", &location))
+		if (!cli_get_int("DECLOCATION", (int4 *)&location))
 		{
 			CLNUP_CRIT;
 			return;
@@ -145,7 +150,7 @@ void dse_chng_fhead(void)
 	if (CLI_PRESENT == cli_present("SIZE"))
 	{
 		size_present = TRUE;
-		if (!cli_get_num("SIZE", &size))
+		if (!cli_get_int("SIZE", &size))
 		{
 			CLNUP_CRIT;
 			return;
@@ -155,7 +160,7 @@ void dse_chng_fhead(void)
 	if (CLI_PRESENT == cli_present("VALUE"))
 	{
 		value_present = TRUE;
-		if (!cli_get_hex("VALUE", &value))
+		if (!cli_get_hex64("VALUE", (gtm_uint64_t *)&value))
 		{
 			CLNUP_CRIT;
 			return;
@@ -164,7 +169,7 @@ void dse_chng_fhead(void)
 	if (CLI_PRESENT == cli_present("HEXVALUE"))
 	{
 		value_present = TRUE;
-		if (!cli_get_hex("HEXVALUE", &value))
+		if (!cli_get_hex64("HEXVALUE", &value))
 		{
 			CLNUP_CRIT;
 			return;
@@ -173,7 +178,7 @@ void dse_chng_fhead(void)
 	if (CLI_PRESENT == cli_present("DECVALUE"))
 	{
 		value_present = TRUE;
-		if (!cli_get_num("DECVALUE", &value))
+		if (!cli_get_uint64("DECVALUE", (gtm_uint64_t *)&value))
 		{
 			CLNUP_CRIT;
 			return;
@@ -183,12 +188,14 @@ void dse_chng_fhead(void)
 	{
 		if (FALSE == size_present)
 			size = sizeof(int4);
-		if (!((sizeof(char) == size) || (sizeof(short) == size) || (sizeof(int4) == size)))
+		if (!((sizeof(char) == size) || (sizeof(short) == size) || (sizeof(int4) == size) ||
+			(sizeof(gtm_int64_t) == size)))
 		{
 			CLNUP_CRIT;
-                        rts_error(VARLSTCNT(1) ERR_SIZENOTVALID);
+                        rts_error(VARLSTCNT(1) ERR_SIZENOTVALID8);
 		}
-		if (SGMNT_HDR_LEN < location + size)
+		if ((0 > (int4)size) || ((uint4)SGMNT_HDR_LEN < (uint4)location)
+				|| ((uint4)SGMNT_HDR_LEN < ((uint4)location + (uint4)size)))
 			util_out_print("Error: Cannot modify any location outside the file-header", TRUE);
 		else  if (0 != location % size)
 			util_out_print("Error: Location !UL [0x!XL] should be a multiple of Size !UL",
@@ -211,6 +218,11 @@ void dse_chng_fhead(void)
 				SPRINTF(temp_str, "!UL [0x!XL]");
 				old_value = *(sm_uint_ptr_t)chng_ptr;
 			}
+			else if (sizeof(gtm_int64_t) == size)
+			{
+				SPRINTF(temp_str, "!@UJ [0x!@XJ]");
+				old_value = *(qw_num_ptr_t)chng_ptr;
+			}
 			if (value_present)
 			{
 				if (sizeof(char) == size)
@@ -219,18 +231,25 @@ void dse_chng_fhead(void)
 					*(sm_ushort_ptr_t)chng_ptr = value;
 				else if (sizeof(int4) == size)
 					*(sm_uint_ptr_t)chng_ptr = value;
+				else if (sizeof(gtm_int64_t) == size)
+					*(qw_num_ptr_t)chng_ptr = value;
 			} else
 				value = old_value;
 			SPRINTF(temp_str1, "Location !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
-											temp_str, temp_str);
-			util_out_print(temp_str1, TRUE, location, location, old_value, old_value, value, value, size, size);
+				temp_str, temp_str);
+			if (sizeof(int4) >= size)
+				util_out_print(temp_str1, TRUE, location, location, (uint4)old_value, (uint4)old_value,
+					(uint4)value, (uint4)value, size, size);
+			else
+				util_out_print(temp_str1, TRUE, location, location, &old_value, &old_value,
+					&value, &value, size, size);
 		}
 	}
-	if ((CLI_PRESENT == cli_present("TOTAL_BLKS")) && (cli_get_hex("TOTAL_BLKS", &x)))
+	if ((CLI_PRESENT == cli_present("TOTAL_BLKS")) && (cli_get_hex("TOTAL_BLKS", (uint4 *)&x)))
 		cs_addrs->ti->total_blks = x;
-	if ((CLI_PRESENT == cli_present("BLOCKS_FREE")) && (cli_get_hex("BLOCKS_FREE", &x)))
+	if ((CLI_PRESENT == cli_present("BLOCKS_FREE")) && (cli_get_hex("BLOCKS_FREE", (uint4 *)&x)))
 		cs_addrs->ti->free_blocks = x;
-	if ((CLI_PRESENT == cli_present("BLK_SIZE")) && (cli_get_num("BLK_SIZE", &x)))
+	if ((CLI_PRESENT == cli_present("BLK_SIZE")) && (cli_get_int("BLK_SIZE", &x)))
 	{
 		if (!(x % DISK_BLOCK_SIZE) && (0 != x))
 			cs_addrs->hdr->blk_size = x;
@@ -241,51 +260,159 @@ void dse_chng_fhead(void)
 			rts_error(VARLSTCNT(4) ERR_BLKSIZ512, 2, x, cs_addrs->hdr->blk_size);
 		}
 	}
-	if ((CLI_PRESENT == cli_present("RECORD_MAX_SIZE")) && (cli_get_num("RECORD_MAX_SIZE", &x)))
+	if ((CLI_PRESENT == cli_present("RECORD_MAX_SIZE")) && (cli_get_int("RECORD_MAX_SIZE", &x)))
 	{
 		cs_addrs->hdr->max_rec_size = x;
 		gv_cur_region->max_rec_size = x;
 	}
-	if ((CLI_PRESENT == cli_present("KEY_MAX_SIZE")) && (cli_get_num("KEY_MAX_SIZE", &x)))
+	if ((CLI_PRESENT == cli_present("KEY_MAX_SIZE")) && (cli_get_int("KEY_MAX_SIZE", &x)))
 	{
 		cs_addrs->hdr->max_key_size = x;
 		gv_cur_region->max_key_size = x;
 	}
-	if ((CLI_PRESENT == cli_present("REFERENCE_COUNT")) && (cli_get_num("REFERENCE_COUNT", &x)))
+	if ((CLI_PRESENT == cli_present("REFERENCE_COUNT")) && (cli_get_int("REFERENCE_COUNT", &x)))
 		cs_addrs->nl->ref_cnt = x;
-	if ((CLI_PRESENT == cli_present("RESERVED_BYTES")) && (cli_get_num("RESERVED_BYTES", &x)))
+	if ((CLI_PRESENT == cli_present("RESERVED_BYTES")) && (cli_get_int("RESERVED_BYTES", &x)))
 		cs_addrs->hdr->reserved_bytes = x;
-	if ((CLI_PRESENT == cli_present("DEF_COLLATION")) && (cli_get_num("DEF_COLLATION", &x)))
+	if ((CLI_PRESENT == cli_present("DEF_COLLATION")) && (cli_get_int("DEF_COLLATION", &x)))
 		cs_addrs->hdr->def_coll = x;
 	if (CLI_PRESENT == cli_present("NULL_SUBSCRIPTS"))
 	{
-		x = cli_t_f_n("NULL_SUBSCRIPTS");
-		if (1 == x)
-			cs_addrs->hdr->null_subs = TRUE;
-		else if (0 == x)
-			cs_addrs->hdr->null_subs = FALSE;
-		gv_cur_region->null_subs = cs_addrs->hdr->null_subs;
+		x = cli_n_a_e("NULL_SUBSCRIPTS");
+		if (-1 != x)
+			gv_cur_region->null_subs = cs_addrs->hdr->null_subs = (unsigned char)x;
 	}
-	if ((CLI_PRESENT == cli_present("CURRENT_TN")) && (cli_get_hex("CURRENT_TN", &x)))
-		cs_addrs->ti->curr_tn = cs_addrs->ti->early_tn = cs_addrs->ti->header_open_tn = x;
-	if (CLI_PRESENT == cli_present("REG_SEQNO"))
+	if (CLI_PRESENT == cli_present("CERT_DB_VER"))
 	{
 		buf_len = sizeof(buf);
-		cli_get_str("REG_SEQNO", buf, &buf_len);
-		seq_no = asc2l((uchar_ptr_t)buf, buf_len);
-		QWASSIGN(cs_addrs->hdr->reg_seqno, seq_no);
+		if (cli_get_str("CERT_DB_VER", buf, &buf_len))
+		{
+			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
+			for (index_x=0; index_x < GDSVLAST ; index_x++)
+				if (0 == strcmp(buf, gtm_dbversion_table[index_x]))
+				{
+					cs_addrs->hdr->certified_for_upgrade_to = index_x;
+					break;
+				}
+			if (GDSVLAST <= index_x)
+				util_out_print("Invalid value for CERT_DB_VER qualifier", TRUE);
+		}
 	}
-	if (CLI_PRESENT == cli_present("RESYNC_SEQNO"))
+	if (CLI_PRESENT == cli_present("DB_WRITE_FMT"))
 	{
 		buf_len = sizeof(buf);
-		cli_get_str("RESYNC_SEQNO", buf, &buf_len);
-		seq_no = asc2l((uchar_ptr_t)buf, buf_len);
-		QWASSIGN(cs_addrs->hdr->resync_seqno, seq_no);
+		if (cli_get_str("DB_WRITE_FMT", buf, &buf_len))
+		{
+			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
+			for (index_x=0; index_x < GDSVLAST ; index_x++)
+				if (0 == strcmp(buf, gtm_dbversion_table[index_x]))
+				{
+					cs_addrs->hdr->desired_db_format = index_x;
+					cs_addrs->hdr->fully_upgraded = FALSE;
+					break;
+				}
+			if (GDSVLAST <= index_x)
+				util_out_print("Invalid value for DB_WRITE_FMT qualifier", TRUE);
+		}
 	}
-	if (CLI_PRESENT == cli_present("RESYNC_TN"))
+	/* ---------- Begin ------ CURRENT_TN/MAX_TN/WARN_MAX_TN processing -------- */
+	max_tn_old = cs_addrs->hdr->max_tn;
+	if ((CLI_PRESENT == cli_present("MAX_TN")) && (cli_get_hex64("MAX_TN", &max_tn_new)))
+		max_tn_present = TRUE;
+	else
 	{
-		cli_get_hex("RESYNC_TN", (int4 *)&tn);
+		max_tn_present = FALSE;
+		max_tn_new = max_tn_old;
+	}
+	max_tn_warn_old = cs_addrs->hdr->max_tn_warn;
+	if ((CLI_PRESENT == cli_present("WARN_MAX_TN")) && (cli_get_hex64("WARN_MAX_TN", &max_tn_warn_new)))
+		max_tn_warn_present = TRUE;
+	else
+	{
+		max_tn_warn_present = FALSE;
+		max_tn_warn_new = max_tn_warn_old;
+	}
+	curr_tn_old = cs_addrs->ti->curr_tn;
+	if ((CLI_PRESENT == cli_present("CURRENT_TN")) && (cli_get_hex64("CURRENT_TN", &curr_tn_new)))
+		curr_tn_present = TRUE;
+	else
+	{
+		curr_tn_present = FALSE;
+		curr_tn_new = curr_tn_old;
+	}
+	change_tn = TRUE;
+	if (max_tn_present)
+	{
+		if (max_tn_new < max_tn_warn_new)
+		{
+			change_tn = FALSE;
+			util_out_print("MAX_TN value cannot be less than the current/specified value of WARN_MAX_TN", TRUE);
+		}
+	}
+	if (max_tn_warn_present)
+	{
+		if (!max_tn_present && (max_tn_warn_new > max_tn_new))
+		{
+			change_tn = FALSE;
+			util_out_print("WARN_MAX_TN value cannot be greater than the current/specified value of MAX_TN", TRUE);
+		}
+		if (max_tn_warn_new < curr_tn_new)
+		{
+			change_tn = FALSE;
+			util_out_print("WARN_MAX_TN value cannot be less than the current/specified value of CURRENT_TN", TRUE);
+		}
+	}
+	if (curr_tn_present)
+	{
+		if (!max_tn_warn_present && (curr_tn_new > max_tn_warn_new))
+		{
+			change_tn = FALSE;
+			util_out_print("CURRENT_TN value cannot be greater than the current/specified value of WARN_MAX_TN", TRUE);
+		}
+	}
+	if (change_tn)
+	{
+		if (max_tn_present)
+			cs_addrs->hdr->max_tn = max_tn_new;
+		if (max_tn_warn_present)
+			cs_addrs->hdr->max_tn_warn = max_tn_warn_new;
+		if (curr_tn_present)
+			cs_addrs->ti->curr_tn = cs_addrs->ti->early_tn = cs_addrs->ti->header_open_tn = curr_tn_new;
+		assert(max_tn_new == cs_addrs->hdr->max_tn);
+		assert(max_tn_warn_new == cs_addrs->hdr->max_tn_warn);
+		assert(curr_tn_new == cs_addrs->ti->curr_tn);
+		assert(max_tn_new >= max_tn_warn_new);
+		assert(max_tn_warn_new >= curr_tn_new);
+	} else
+	{
+		/* if (max_tn_present)
+			util_out_print("MAX_TN value not changed", TRUE);
+		   if (max_tn_warn_present)
+			util_out_print("WARN_MAX_TN value not changed", TRUE);
+		   if (curr_tn_present)
+			util_out_print("CURRENT_TN value not changed", TRUE);
+		*/
+		assert(max_tn_old == cs_addrs->hdr->max_tn);
+		assert(max_tn_warn_old == cs_addrs->hdr->max_tn_warn);
+		assert(curr_tn_old == cs_addrs->ti->curr_tn);
+	}
+	/* ---------- End ------ CURRENT_TN/MAX_TN/WARN_MAX_TN processing -------- */
+	if (CLI_PRESENT == cli_present("REG_SEQNO") && cli_get_hex64("REG_SEQNO", (gtm_uint64_t *)&seq_no))
+	{
+		cs_addrs->hdr->reg_seqno = seq_no;
+	}
+	if (CLI_PRESENT == cli_present("RESYNC_SEQNO") && cli_get_hex64("RESYNC_SEQNO", (gtm_uint64_t *)&seq_no))
+	{
+		cs_addrs->hdr->resync_seqno = seq_no;
+	}
+	if (CLI_PRESENT == cli_present("RESYNC_TN") && cli_get_hex64("RESYNC_TN", &tn))
+	{
 		cs_addrs->hdr->resync_tn = tn;
+	}
+	if (CLI_PRESENT == cli_present("STDNULLCOLL"))
+	{
+		if ( -1 != (x = cli_t_f_n("STDNULLCOLL")))
+			gv_cur_region->std_null_coll = cs_addrs->hdr->std_null_coll = x;
 	}
 	if (CLI_PRESENT == cli_present("CORRUPT_FILE"))
 	{
@@ -295,30 +422,30 @@ void dse_chng_fhead(void)
 		else if (0 == x)
 			cs_addrs->hdr->file_corrupt = FALSE;
 	}
-	if ((CLI_PRESENT == cli_present("TIMERS_PENDING")) && (cli_get_num("TIMERS_PENDING", &x)))
+	if ((CLI_PRESENT == cli_present("TIMERS_PENDING")) && (cli_get_int("TIMERS_PENDING", &x)))
 		cs_addrs->nl->wcs_timers = x - 1;
 	change_fhead_timer("FLUSH_TIME", cs_addrs->hdr->flush_time,
 			(dba_bg == cs_addrs->hdr->acc_meth ? TIM_FLU_MOD_BG : TIM_FLU_MOD_MM), FALSE);
-	if ((CLI_PRESENT == cli_present("WRITES_PER_FLUSH")) && (cli_get_num("WRITES_PER_FLUSH", &x)))
+	if ((CLI_PRESENT == cli_present("WRITES_PER_FLUSH")) && (cli_get_int("WRITES_PER_FLUSH", &x)))
 		cs_addrs->hdr->n_wrt_per_flu = x;
-	if ((CLI_PRESENT == cli_present("TRIGGER_FLUSH")) && (cli_get_num("TRIGGER_FLUSH", &x)))
+	if ((CLI_PRESENT == cli_present("TRIGGER_FLUSH")) && (cli_get_int("TRIGGER_FLUSH", &x)))
 		cs_addrs->hdr->flush_trigger = x;
 	change_fhead_timer("STALENESS_TIMER", cs_addrs->hdr->staleness, 5000, TRUE);
 	change_fhead_timer("TICK_INTERVAL", cs_addrs->hdr->ccp_tick_interval, 100, TRUE);
 	change_fhead_timer("QUANTUM_INTERVAL", cs_addrs->hdr->ccp_quantum_interval, 1000, FALSE);
 	change_fhead_timer("RESPONSE_INTERVAL", cs_addrs->hdr->ccp_response_interval, 60000, FALSE);
-	if ((CLI_PRESENT == cli_present("B_BYTESTREAM")) && (cli_get_hex("B_BYTESTREAM", &x)))
-		cs_addrs->hdr->last_inc_backup = x;
-	if ((CLI_PRESENT == cli_present("B_COMPREHENSIVE")) && (cli_get_hex("B_COMPREHENSIVE", &x)))
-		cs_addrs->hdr->last_com_backup = x;
-	if ((CLI_PRESENT == cli_present("B_DATABASE")) && (cli_get_hex("B_DATABASE", &x)))
-		cs_addrs->hdr->last_com_backup = x;
-	if ((CLI_PRESENT == cli_present("B_INCREMENTAL")) && (cli_get_hex("B_INCREMENTAL", &x)))
-		cs_addrs->hdr->last_inc_backup = x;
-	if ((CLI_PRESENT == cli_present("WAIT_DISK")) && (cli_get_num("WAIT_DISK", &x)))
+	if ((CLI_PRESENT == cli_present("B_BYTESTREAM")) && (cli_get_hex64("B_BYTESTREAM", &tn)))
+		cs_addrs->hdr->last_inc_backup = tn;
+	if ((CLI_PRESENT == cli_present("B_COMPREHENSIVE")) && (cli_get_hex64("B_COMPREHENSIVE", &tn)))
+		cs_addrs->hdr->last_com_backup = tn;
+	if ((CLI_PRESENT == cli_present("B_DATABASE")) && (cli_get_hex64("B_DATABASE", &tn)))
+		cs_addrs->hdr->last_com_backup = tn;
+	if ((CLI_PRESENT == cli_present("B_INCREMENTAL")) && (cli_get_hex64("B_INCREMENTAL", &tn)))
+		cs_addrs->hdr->last_inc_backup = tn;
+	if ((CLI_PRESENT == cli_present("WAIT_DISK")) && (cli_get_int("WAIT_DISK", &x)))
 		cs_addrs->hdr->wait_disk_space = (x >= 0 ? x : 0);
-	if (((CLI_PRESENT == cli_present("HARD_SPIN_COUNT")) && cli_get_num("HARD_SPIN_COUNT", &x))
-	      UNIX_ONLY( || ((CLI_PRESENT == cli_present("MUTEX_HARD_SPIN_COUNT")) && cli_get_num("MUTEX_HARD_SPIN_COUNT", &x)))
+	if (((CLI_PRESENT == cli_present("HARD_SPIN_COUNT")) && cli_get_int("HARD_SPIN_COUNT", &x))
+	      UNIX_ONLY( || ((CLI_PRESENT == cli_present("MUTEX_HARD_SPIN_COUNT")) && cli_get_int("MUTEX_HARD_SPIN_COUNT", &x)))
 	   ) /* Unix should be backward compatible, accept MUTEX_ prefix qualifiers as well */
 	{
 		if (0 < x)
@@ -326,8 +453,8 @@ void dse_chng_fhead(void)
 		else
 			util_out_print("Error: HARD SPIN COUNT should be a non zero positive number", TRUE);
 	}
-	if (((CLI_PRESENT == cli_present("SLEEP_SPIN_COUNT")) && cli_get_num("SLEEP_SPIN_COUNT", &x))
-	      UNIX_ONLY( || ((CLI_PRESENT == cli_present("MUTEX_SLEEP_SPIN_COUNT")) && cli_get_num("MUTEX_SLEEP_SPIN_COUNT", &x)))
+	if (((CLI_PRESENT == cli_present("SLEEP_SPIN_COUNT")) && cli_get_int("SLEEP_SPIN_COUNT", &x))
+	      UNIX_ONLY( || ((CLI_PRESENT == cli_present("MUTEX_SLEEP_SPIN_COUNT")) && cli_get_int("MUTEX_SLEEP_SPIN_COUNT", &x)))
 	   ) /* Unix should be backward compatible, accept MUTEX_ prefix qualifiers as well */
 	{
 		if (0 < x)
@@ -335,8 +462,8 @@ void dse_chng_fhead(void)
 		else
 			util_out_print("Error: SLEEP SPIN COUNT should be a non zero positive number", TRUE);
 	}
-	if (((CLI_PRESENT == cli_present("SPIN_SLEEP_TIME")) && cli_get_num("SPIN_SLEEP_TIME", &x))
-	      UNIX_ONLY( || ((CLI_PRESENT == cli_present("MUTEX_SPIN_SLEEP_TIME")) && cli_get_num("MUTEX_SPIN_SLEEP_TIME", &x)))
+	if (((CLI_PRESENT == cli_present("SPIN_SLEEP_TIME")) && cli_get_int("SPIN_SLEEP_TIME", &x))
+	      UNIX_ONLY( || ((CLI_PRESENT == cli_present("MUTEX_SPIN_SLEEP_TIME")) && cli_get_int("MUTEX_SPIN_SLEEP_TIME", &x)))
 	   ) /* Unix should be backward compatible, accept MUTEX_ prefix qualifiers as well */
 	{
 		if (x < 0)
@@ -357,18 +484,26 @@ void dse_chng_fhead(void)
 				cs_addrs->hdr->mutex_spin_parms.mutex_spin_sleep_mask = x;
 		}
 	}
-	if ((CLI_PRESENT == cli_present("B_RECORD")) && (cli_get_hex("B_RECORD", &x)))
-		cs_addrs->hdr->last_rec_backup = x;
+	if ((CLI_PRESENT == cli_present("B_RECORD")) && (cli_get_hex64("B_RECORD", &tn)))
+		cs_addrs->hdr->last_rec_backup = tn;
+	if ((CLI_PRESENT == cli_present("BLKS_TO_UPGRADE")) && (cli_get_hex("BLKS_TO_UPGRADE", (uint4 *)&x)))
+	{
+		cs_addrs->hdr->blks_to_upgrd = x;
+		cs_addrs->hdr->fully_upgraded = FALSE;
+	}
+	if ((CLI_PRESENT == cli_present("MBM_SIZE")) && (cli_get_int("MBM_SIZE", &x)))
+		cs_addrs->hdr->master_map_len = x * DISK_BLOCK_SIZE;
 	if (cs_addrs->hdr->clustered)
 	{
 		cs_addrs->ti->header_open_tn = cs_addrs->ti->curr_tn;		/* Force write of header */
 		if (cs_addrs->ti->curr_tn == prev_tn)
 		{
-			cs_addrs->ti->curr_tn++;
-			cs_addrs->ti->early_tn = cs_addrs->ti->curr_tn;
+			CHECK_TN(cs_addrs, cs_addrs->hdr, cs_addrs->ti->curr_tn);/* can issue rts_error TNTOOLARGE */
+			cs_addrs->ti->early_tn++;
+			INCREMENT_CURR_TN(cs_addrs->hdr);
 		}
 	}
-	if ((CLI_PRESENT == cli_present("RC_SRV_COUNT")) && (cli_get_num("RC_SRV_COUNT", &x)))
+	if ((CLI_PRESENT == cli_present("RC_SRV_COUNT")) && (cli_get_int("RC_SRV_COUNT", &x)))
 		cs_addrs->hdr->rc_srv_cnt = x;
 	if (CLI_PRESENT == cli_present("FREEZE"))
 	{
@@ -461,7 +596,7 @@ void dse_chng_fhead(void)
 
 	}
 #ifdef UNIX
-	if (CLI_PRESENT == cli_present("JNL_YIELD_LIMIT") && cli_get_num("JNL_YIELD_LIMIT", &x))
+	if (CLI_PRESENT == cli_present("JNL_YIELD_LIMIT") && cli_get_int("JNL_YIELD_LIMIT", &x))
 	{
 		if (0 > x)
 			util_out_print("YIELD_LIMIT cannot be NEGATIVE", TRUE);
@@ -479,6 +614,34 @@ void dse_chng_fhead(void)
 			cs_addrs->hdr->jnl_sync_io = FALSE;
 	}
 #endif
+	if ((CLI_PRESENT == cli_present("AVG_BLKS_READ")) && (cli_get_int("AVG_BLKS_READ", &x)))
+	{
+		if (x <= 0)
+			util_out_print("Invalid value for AVG_BLKS_READ qualifier", TRUE);
+		else
+			cs_addrs->hdr->avg_blks_per_100gbl = x;
+	}
+	if ((CLI_PRESENT == cli_present("PRE_READ_TRIGGER_FACTOR")) && (cli_get_int("PRE_READ_TRIGGER_FACTOR", &x)))
+	{
+		if ((x < 0) || (x > 100))
+			util_out_print("Invalid value for PRE_READ_TRIGGER_FACTOR qualifier", TRUE);
+		else
+			cs_addrs->hdr->pre_read_trigger_factor = x;
+	}
+	if ((CLI_PRESENT == cli_present("UPD_RESERVED_AREA")) && (cli_get_int("UPD_RESERVED_AREA", &x)))
+	{
+		if ((x < 0) || (x > 100))
+			util_out_print("Invalid value for UPD_RESERVED_AREA qualifier", TRUE);
+		else
+			cs_addrs->hdr->reserved_for_upd = x;
+	}
+	if ((CLI_PRESENT == cli_present("UPD_WRITER_TRIGGER_FACTOR")) && (cli_get_int("UPD_WRITER_TRIGGER_FACTOR", &x)))
+	{
+		if ((x < 0) || (x > 100))
+			util_out_print("Invalid value for UPD_WRITER_TRIGGER_FACTOR qualifier", TRUE);
+		else
+			cs_addrs->hdr->writer_trigger_factor = x;
+	}
 	CLNUP_CRIT;
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,12 +42,13 @@ GBLREF int	authenticate;
 GBLREF int	ping_keepalive;
 GBLREF int	conn_timeout;
 GBLREF int	history;
+GBLDEF int	per_conn_servtime = MIN_TIMEOUT_INTERVAL;
 
 enum opt_enum
 {
 	opt_null, opt_debug, opt_pktlog, opt_service, opt_rc_id,
 	opt_pktlog_addr, opt_authenticate, opt_multipleconn,
-	opt_ping, opt_conn_timeout, opt_history
+	opt_ping, opt_conn_timeout, opt_history, opt_servtime
 };
 
 static struct
@@ -70,6 +71,7 @@ static struct
 	"-multiple",	opt_multipleconn,  0, /* allow multiple conn from same IP address */
 	"-ping",	opt_ping, 0,	/* ping connections to keepalive */
 	"-timeout",	opt_conn_timeout, 1,
+	"-servtime",	opt_servtime,	1, /* Used for setup the timer for servicing each connection, default 60 sec */
 	"-hist",	opt_history, 0, /* flag:  keep packet history in mem */
 	NULL,		opt_null, 0
 };
@@ -80,10 +82,11 @@ static struct
  * array passed to the main program is an array of 64-bit pointers.  Thus the C program needs to declare argv[]
  * as an array of 64-bit pointers and needs to do the same for any pointer it sets to an element of argv[].
  */
-void gtcm_prsopt(int argc, char_ptr_t argv[])
+int gtcm_prsopt(int argc, char_ptr_t argv[])
 {
     enum opt_enum opt;
-    int		  i,j, t;
+    int	 i,j, t;
+    boolean_t inv_option = FALSE;
 
     for (i = 1, argv++; i < argc; argv += optlist[j].args + 1, i += optlist[j].args + 1)
     {
@@ -118,22 +121,35 @@ void gtcm_prsopt(int argc, char_ptr_t argv[])
 		    break;
 		  case opt_ping: 	ping_keepalive = 1; break;
 		  case opt_null:
+		    inv_option = TRUE;
 		    fprintf(stderr,"Unknown option:  %s\n",*argv);
 		    break;
 		  case opt_conn_timeout:
 		    t = atoi(*(argv + 1));
 		    if (t < MIN_TIMEOUT_INTERVAL)
-			    fprintf(stderr,"-timeout parameter must be >= %d seconds - ignored.\n",
-				    MIN_TIMEOUT_INTERVAL);
+			fprintf(stderr,"-timeout parameter must be >= %d seconds. The default value %d seconds will be used\n"
+				, MIN_TIMEOUT_INTERVAL, TIMEOUT_INTERVAL);
 		    else
 			    conn_timeout = t;
+		    break;
+		  case opt_servtime:
+		    t = atoi(*(argv + 1));
+		    if (t < MIN_TIMEOUT_INTERVAL)
+			  fprintf(stderr, "-servtime parameter must be >= %d seconds. The default value %d seconds will be used\n",
+				    MIN_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL);
+		    else
+			    per_conn_servtime = t;
 		    break;
 		  case opt_history:
 		    history = 1;
 		    break;
 		  default:
+			inv_option = TRUE;
 		    fprintf(stderr,"Unsupported option:  %s\n",*argv);
 		    break;
 	    }
+	    if (inv_option)
+	    	return -1;
     }
+    return 0;
 }

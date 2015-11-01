@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,6 @@
 #include "gtm_stdlib.h"
 #include "gtm_inet.h"
 
-#include <netinet/in.h>
 #include <signal.h>
 
 #include "error.h"
@@ -27,7 +26,7 @@
 #include "mv_stent.h"
 #include "startup.h"
 #include "cmd_qlf.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "sbs_blk.h"
 #include "collseq.h"
@@ -41,8 +40,8 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "interlock.h"
 #include "repl_msg.h"
@@ -84,6 +83,9 @@
 #include "svnames.h"
 #include "jobinterrupt_init.h"
 #include "zco_init.h"
+#include "gtm_logicals.h"	/* for DISABLE_ALIGN_STRINGS */
+#include "suspsigs_handler.h"
+#include "logical_truth_value.h"
 
 #ifdef __sun
 #define PACKAGE_ENV_TYPE  "GTMXC_RPC"  /* env var to use rpc instead of xcall */
@@ -95,7 +97,7 @@
 GBLDEF void		(*restart)() = &mum_tstart;
 GBLREF mval 		**ind_result_array, **ind_result_sp, **ind_result_top;
 GBLREF mval 		**ind_source_array, **ind_source_sp, **ind_source_top;
-GBLREF RTN_TABENT 	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
+GBLREF rtn_tabent	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
 GBLREF int4		break_message_mask;
 GBLREF stack_frame 	*frame_pointer;
 GBLREF unsigned char 	*stackbase, *stacktop, *stackwarn, *msp;
@@ -129,6 +131,7 @@ GBLREF global_latch_t 	defer_latch;
 GBLREF jnlpool_addrs	jnlpool;
 GBLREF boolean_t	is_replicator;
 GBLREF void		(*ctrlc_handler_ptr)();
+GBLREF boolean_t	mstr_native_align;
 OS_PAGE_SIZE_DECLARE
 
 void gtm_startup(struct startup_vector *svec)
@@ -139,13 +142,16 @@ void gtm_startup(struct startup_vector *svec)
 	void		gtm_ret_code();
 	static readonly unsigned char init_break[1] = {'B'};
 	int4		lct;
+	mstr		val;
+	boolean_t	ret, is_defined;
 	int		i;
 	static char 	other_mode_buf[] = "OTHER";
+	mstr		log_name;
 
 	assert(svec->argcnt == sizeof(*svec));
 	get_page_size();
-	rtn_fst_table = rtn_names = (RTN_TABENT *) svec->rtn_start;
-	rtn_names_end = rtn_names_top = (RTN_TABENT *) svec->rtn_end;
+	rtn_fst_table = rtn_names = (rtn_tabent *) svec->rtn_start;
+	rtn_names_end = rtn_names_top = (rtn_tabent *) svec->rtn_end;
 	if (svec->user_stack_size < 4096)
 		svec->user_stack_size = 4096;
 	if (svec->user_stack_size > 8388608)
@@ -177,9 +183,16 @@ void gtm_startup(struct startup_vector *svec)
 	rts_stringpool = stringpool;
 	compile_time = FALSE;
 	run_time = TRUE;
+
+	/* Initialize alignment requirement for the runtime stringpool */
+	log_name.addr = DISABLE_ALIGN_STRINGS;
+	log_name.len = STR_LIT_LEN(DISABLE_ALIGN_STRINGS);
+	/* mstr_native_align = logical_truth_value(&log_name, NULL) ? FALSE : TRUE; */
+	mstr_native_align = FALSE; /* TODO: remove this line and uncomment the above line */
+
 	is_replicator = TRUE;	/* as GT.M goes through t_end() and can write jnl records to the jnlpool for replicated db */
 	getjobname();
-	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, OS_PAGE_SIZE,
+	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
 			  &jnlpool.jnlpool_dummy_reg);
 	getzprocess();
 	getzmode();
@@ -213,7 +226,7 @@ void gtm_startup(struct startup_vector *svec)
 		zsrch_dir2->ptrs.val_ent.parent.sym = curr_symval;
 	/* Initialize global pointer to control-C handler. Also used in iott_use */
 	ctrlc_handler_ptr = &ctrlc_handler;
-	sig_init(generic_signal_handler, ctrlc_handler_ptr);
+	sig_init(generic_signal_handler, ctrlc_handler_ptr, suspsigs_handler);
 	atexit(gtm_exit_handler);
 	io_init(TRUE);
 	jobinterrupt_init();

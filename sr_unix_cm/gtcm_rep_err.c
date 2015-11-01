@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,8 +31,8 @@ static char rcsid[] = "$Header:$";
 #include "gtcm.h"
 #include "fao_parm.h"
 #include "eintr_wrappers.h"
+#include "sgtm_putmsg.h"
 
-GBLREF char 		util_outbuff[], *util_outptr;
 GBLREF char		*omi_service;
 static boolean_t 	first_syslog = TRUE;
 
@@ -40,34 +40,28 @@ void gtcm_rep_err(char *msg, int errcode)
 {
     FILE	*fp;
     char	outbuf[2048];
-    mstr	msgstr;
-    unsigned int faol[MAX_FAO_PARMS];
-    void	gtm_getmsg(), util_out_print();
     time_t	now;
     int		status;
     char *gtm_dist, fileName[256];
+    error_def(ERR_TEXT);
+    /*error_def(ERR_OMISERVHANG);*/
 
-    msgstr.addr = outbuf;
-    msgstr.len = sizeof(outbuf);
-    gtm_getmsg(errcode, &msgstr);
-    memset(&faol[0], 0, sizeof(faol));
+    if ('\0' == msg[0])
+   	sgtm_putmsg(outbuf, VARLSTCNT(2) errcode, 0);
+    else
+   	sgtm_putmsg(outbuf, VARLSTCNT(6) errcode, 0, ERR_TEXT, 2, LEN_AND_STR(msg));
 
-    util_out_print(0, 2, 0);	/* reset error buffer */;
-    util_out_print(msgstr.addr,FALSE,faol[0],faol[1],faol[2],faol[3],faol[4],
-	faol[5],faol[6],faol[7],faol[8],faol[9],faol[10],faol[11]);
-    util_out_print("!/",FALSE);
-    *util_outptr++ = 0;
 
     if (gtm_dist = GETENV("gtm_dist"))
 	    SPRINTF(fileName,"%s/log/gtcm_server.erlg", gtm_dist);
     else
-	    strcpy(fileName,"/usr/tmp/gtcm_server.erlg");
+	    SPRINTF(fileName, "%s/log/gtcm_server.erlg", P_tmpdir);
 
     if ((fp = Fopen(fileName, "a")))
     {
 		now=time(0);
 		FPRINTF(fp, "%s", GTM_CTIME(&now));
-		FPRINTF(fp,"server(%s)  %s:  %s", omi_service, msg, util_outbuff);
+		FPRINTF(fp,"server(%s)  %s", omi_service, outbuf);
 		FCLOSE(fp, status);
     }
 
@@ -76,8 +70,8 @@ void gtcm_rep_err(char *msg, int errcode)
     {
 		first_syslog = FALSE;
 		(void)OPENLOG("GTCM", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
-	}
-    SYSLOG(LOG_ERR, util_outbuff);
+    }
+    SYSLOG(LOG_ERR, outbuf);
 #endif /* defined(BSD_LOG) */
 
     return;

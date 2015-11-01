@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmidef.h"
 #include "cmmdef.h"
 #include "stringpool.h"
@@ -156,10 +156,12 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 {
 	static readonly int4	wait[2] = {-100000, -1};
 	static readonly int4	reptim[2] = {-10000, -1};
-	unsigned char	*ptr;
-	link_info	*li;
-	int		len, i;
-	uint4		status;
+	unsigned char		*ptr;
+	link_info		*li;
+	int			len, i;
+	uint4			status;
+	protocol_msg		*server_proto;
+
 	error_def(ERR_BADSRVRNETMSG);
 	error_def(ERR_NETDBOPNERR);
 	error_def(ERR_TEXT);
@@ -221,13 +223,17 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 		gvcmy_close(c);
 		rts_error(VARLSTCNT(3) ERR_NETDBOPNERR, 0, ERR_BADSRVRNETMSG);
 	}
-	if (!gtcm_protocol_match((protocol_msg *)(c->mbf+1), &myproto))
+	server_proto = (protocol_msg *)(c->mbf + 1);
+	if (!gtcm_protocol_match(server_proto, &myproto))
 	{
 		gvcmy_close(c);
 		rts_error(VARLSTCNT(3) ERR_NETDBOPNERR, 0, CMERR_INVPROT);
 	}
-	li->convert_byteorder = (gtcm_is_big_endian(&myproto) != gtcm_is_big_endian((protocol_msg *)(c->mbf+1)));
-	li->query_is_queryget = gtcm_is_query_queryget((protocol_msg *)(c->mbf + 1), &myproto);
+	li->convert_byteorder = (gtcm_is_big_endian(&myproto) != gtcm_is_big_endian(server_proto));
+	li->query_is_queryget = gtcm_is_query_queryget(server_proto, &myproto);
+	li->server_supports_dollar_incr = (0 <= memcmp(server_proto->msg + CM_LEVEL_OFFSET, CMM_INCREMENT_MIN_LEVEL, 3));
+	li->server_supports_std_null_coll = (0 <= memcmp(server_proto->msg + CM_LEVEL_OFFSET, CMM_STDNULLCOLL_MIN_LEVEL, 3));
+	li->server_supports_long_names = (0 <= memcmp(server_proto->msg + CM_LEVEL_OFFSET, CMM_LONGNAMES_MIN_LEVEL, 3));
 	if (!(li->err_compat = gtcm_err_compat((protocol_msg *)(c->mbf + 1), &myproto)))
 	{
 		gvcmy_close(c);

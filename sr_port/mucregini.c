@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,14 +11,15 @@
 
 #include "mdef.h"
 
-#include <time.h>
 #include <math.h> /* needed for handling of epoch_interval */
+#include "gtm_time.h"
 
 #include "gtm_string.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
+#include "gdsdbver.h"
 #include "gdsfhead.h"
 #include "gdsblk.h"		/* needed for gdsblkops.h */
 #include "gdscc.h"		/* needed for CDB_CW_SET_SIZE macro in gdsblkops.h */
@@ -37,6 +38,7 @@
 #include "mucregini.h"
 #include "gtmmsg.h"
 #include "gtm_file_stat.h"
+#include "lockconst.h"
 
 #define WCR_SIZE_PER_BUF 	0
 #define BLK_SIZE (((gd_segment*)gv_cur_region->dyn.addr)->blk_size)
@@ -44,7 +46,6 @@
 GBLREF 	gd_region		*gv_cur_region;
 GBLREF 	sgmnt_data_ptr_t	cs_data;
 GBLREF 	sgmnt_addrs		*cs_addrs;
-GBLREF	bool			non_buffer_write;
 GBLREF	seq_num			seq_num_one;
 
 void mucregini(int4 blk_init_size)
@@ -52,7 +53,6 @@ void mucregini(int4 blk_init_size)
 	int4			status;
 	int4			i;
 	th_index_ptr_t 		th;
-	unsigned char		*base;
 	collseq			*csp;
 	uint4			ustatus;
 	mstr 			jnlfile, jnldef, tmpjnlfile;
@@ -65,7 +65,14 @@ void mucregini(int4 blk_init_size)
 	error_def(ERR_TEXT);
 	error_def(ERR_FILEPARSE);
 
-	memcpy(cs_data->label, GDS_LABEL, sizeof(GDS_LABEL) - 1);
+	MEMCPY_LIT(cs_data->label, GDS_LABEL);
+	cs_data->desired_db_format = GDSVCURR;
+	cs_data->fully_upgraded = TRUE;
+	cs_data->minor_dbver = GDSMVCURR;
+	cs_data->certified_for_upgrade_to = GDSVCURR;
+	cs_data->creation_db_ver = GDSVCURR;
+	cs_data->creation_mdb_ver = GDSMVCURR;
+	cs_data->master_map_len = MASTER_MAP_SIZE_DFLT;
 	cs_data->bplmap = BLKS_PER_LMAP;
 	assert(BLK_SIZE <= MAX_DB_BLK_SIZE);
 	cs_data->blk_size = BLK_SIZE;
@@ -73,8 +80,8 @@ void mucregini(int4 blk_init_size)
 	cs_data->trans_hist.free_blocks = i - DIVIDE_ROUND_UP(i, BLKS_PER_LMAP) - 2;
 	cs_data->max_rec_size = gv_cur_region->max_rec_size;
 	cs_data->max_key_size = gv_cur_region->max_key_size;
-	cs_data->lock_write = gv_cur_region->lock_write;
 	cs_data->null_subs = gv_cur_region->null_subs;
+	cs_data->std_null_coll = gv_cur_region->std_null_coll;
 	cs_data->reserved_bytes = gv_cur_region->dyn.addr->reserved_bytes;
 	cs_data->clustered = FALSE;
 	cs_data->file_corrupt = 0;
@@ -93,8 +100,6 @@ void mucregini(int4 blk_init_size)
 	cs_data->last_com_backup = 1;
 	cs_data->last_inc_backup = 1;
 	cs_data->last_rec_backup = 1;
-	cs_data->flu_outstanding = 0;
-	cs_data->flush_done = TRUE;
 	cs_data->defer_time = gv_cur_region->dyn.addr->defer_time;
 	cs_data->jnl_alq = gv_cur_region->jnl_alq;
 	if (cs_data->jnl_state && !cs_data->jnl_alq)
@@ -119,7 +124,7 @@ void mucregini(int4 blk_init_size)
 		if (csp = ready_collseq((int)(cs_data->def_coll)))
 		{
 			cs_data->def_coll_ver = (csp->version)(cs_data->def_coll);
-			if (!do_verify(csp,cs_data->def_coll, cs_data->def_coll_ver))
+			if (!do_verify(csp, cs_data->def_coll, cs_data->def_coll_ver))
 			{
 				gtm_putmsg(VARLSTCNT(4) ERR_COLLTYPVERSION, 2, cs_data->def_coll, cs_data->def_coll_ver);
 				mupip_exit(ERR_MUNOACTION);
@@ -154,6 +159,10 @@ void mucregini(int4 blk_init_size)
 		}
 		cs_data->jnl_file_len = tmpjnlfile.len;
 	}
+	cs_data->reserved_for_upd = UPD_RESERVED_AREA;
+	cs_data->avg_blks_per_100gbl =  AVG_BLKS_PER_100_GBL;
+	cs_data->pre_read_trigger_factor = PRE_READ_TRIGGER_FACTOR;
+	cs_data->writer_trigger_factor = UPD_WRITER_TRIGGER_FACTOR;
 	cs_addrs->hdr = cs_data;
 	cs_addrs->ti = &cs_data->trans_hist;
 	th = cs_addrs->ti;
@@ -179,10 +188,9 @@ void mucregini(int4 blk_init_size)
 	cs_data->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
 	cs_data->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
 	cs_data->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
-	time(&cs_data->creation.date_time);
-	cs_addrs->bmm = cs_data->master_map;
+	time(&cs_data->creation.ctime);
+	cs_addrs->bmm = MM_ADDR(cs_data);
 	bmm_init();
-	non_buffer_write = TRUE;
 	for (i = 0; i < blk_init_size ; i += cs_data->bplmap)
 	{	status = bml_init(i);
 		if (status != SS_NORMAL)
@@ -193,8 +201,14 @@ void mucregini(int4 blk_init_size)
 		}
 	}
 	mucblkini();
-	non_buffer_write = FALSE;
-	th->early_tn = th->curr_tn = 1;
 	th->mm_tn = 0;
+	th->early_tn = 1;
+	th->curr_tn = 1;	/* in order to use INCREMENT_CURR_TN macro here, the logic has to be made complicated.
+				 * this is because the macro relies on max_tn/max_tn_warn being set and that does not happen
+				 * until a few lines later. hence keeping it simple here by doing a plain assignment of curr_tn.
+				 */
 	th->header_open_tn = th->curr_tn;
+	cs_data->max_tn = MAX_TN_V5;
+	SET_TN_WARN(cs_data, cs_data->max_tn_warn);
+	SET_LATCH_GLOBAL(&cs_data->next_upgrd_warn.time_latch, LOCK_AVAILABLE);
 }

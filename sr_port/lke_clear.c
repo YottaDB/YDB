@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,9 @@
  */
 
 #include "mdef.h"
+
 #include "gtm_string.h"
+
 #include "mlkdef.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -26,8 +28,11 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
+#include "cmidef.h"	/* for cmmdef.h */
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
+#include "cmmdef.h"	/* for gtcmtr_protos.h */
 #include "util.h"
-#include "gtcmtr_lke.h"
+#include "gtcmtr_protos.h"
 #include "lke.h"
 #include "lke_getcli.h"
 #include "lke_cleartree.h"

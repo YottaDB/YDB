@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,19 +23,23 @@
 #include "gdsblk.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
+#include "gdscc.h"
 #include "jnl.h"
 #include "jnl_write.h"
 #include "jnl_write_aimg_rec.h"
+#include "jnl_get_checksum.h"
+#include "min_max.h"
 
 GBLREF 	jnl_gbls_t		jgbl;
 
-void jnl_write_aimg_rec(sgmnt_addrs *csa, block_id block, blk_hdr_ptr_t buffer)
+void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse)
 {
 	struct_jrec_blk		aimg_record;
 	int			tmp_jrec_size, jrec_size, zero_len;
 	jnl_format_buffer 	blk_trailer;	/* partial record after the aimg block */
 	char			local_buff[JNL_REC_START_BNDRY + JREC_SUFFIX_SIZE];
 	jrec_suffix		*suffix;
+	blk_hdr_ptr_t		buffer;
 
 	assert(csa->now_crit);
 	assert(0 != csa->jnl->pini_addr);
@@ -47,9 +51,15 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, block_id block, blk_hdr_ptr_t buffer)
 	{	/* no idea how this is possible, but just to be safe */
 		JNL_SHORT_TIME(jgbl.gbl_jrec_time);
 	}
+	buffer = (blk_hdr_ptr_t)cse->new_buff;
 	aimg_record.prefix.time = jgbl.gbl_jrec_time;
-	aimg_record.blknum = block;
-	aimg_record.bsiz = buffer->bsiz;
+	aimg_record.prefix.checksum = INIT_CHECKSUM_SEED;
+	aimg_record.blknum = cse->blk;
+	/* in case we have a bad block-size, we dont want to write an AIMG larger than the GDS block size (maximum block size) */
+	assert(buffer->bsiz <= csa->hdr->blk_size);
+	assert(buffer->bsiz >= sizeof(blk_hdr));
+	aimg_record.bsiz = MIN(csa->hdr->blk_size, buffer->bsiz);
+	aimg_record.ondsk_blkver = cse->ondsk_blkver;
 	tmp_jrec_size = FIXED_AIMG_RECLEN + aimg_record.bsiz + JREC_SUFFIX_SIZE;
 	jrec_size = ROUND_UP2(tmp_jrec_size, JNL_REC_START_BNDRY);
 	zero_len = jrec_size - tmp_jrec_size;

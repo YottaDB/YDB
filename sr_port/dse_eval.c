@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,28 +22,28 @@
 #include "util.h"
 #include "dse.h"
 
-#define MAX_UTIL_LEN 32
+#define MAX_UTIL_LEN 56
 
 void dse_eval(void)
 {
-	int4	num, util_len;
+	int4		util_len;
+	gtm_uint64_t	num;
 	char		util_buff[MAX_UTIL_LEN];
 
 	if (cli_present("NUMBER") != CLI_PRESENT)
 		return;
 	if (cli_present("DECIMAL") == CLI_PRESENT)
-	{	if (!cli_get_num("NUMBER",&num))
-		{	return;
-		}
-	}else if (!cli_get_hex("NUMBER",&num))
-	{	return;
-	}
-	memcpy(util_buff,"Hex:  ",6);
+	{
+		if (!cli_get_uint64("NUMBER", (gtm_uint64_t *)&num))
+			return;
+	} else if (!cli_get_hex64("NUMBER", &num))
+		return;
+	memcpy(util_buff, "Hex:  ", 6);
 	util_len = 6;
-	util_len += i2hex_nofill(num,(uchar_ptr_t)&util_buff[util_len],8);
-	memcpy(&util_buff[util_len],"   Dec:  !UL",12);
-	util_len += 12;
+	util_len += i2hexl_nofill(num, (uchar_ptr_t)&util_buff[util_len], 16);
+	memcpy(&util_buff[util_len],"   Dec:  !@UJ", 13);
+	util_len += 13;
 	util_buff[util_len] = 0;
-	util_out_print(util_buff,TRUE,num);
+	util_out_print(util_buff, TRUE, &num);
 	return;
 }

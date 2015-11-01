@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +23,9 @@
 #include "gtm_string.h"
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_inet.h"
 
 #include <signal.h>
-#include <netinet/in.h>
 
 #include "gtm_stdio.h"
 #include "error.h"
@@ -75,7 +75,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	error_def(ERR_KILLBYSIGUINFO);
 	error_def(ERR_KILLBYSIGSINFO1);
 	error_def(ERR_KILLBYSIGSINFO2);
-	error_def(ERR_GTMSECSHRSHUTDOWN);
+	error_def(ERR_GTMSECSHRSHUTDN);
 
 	/* Save parameter value in global variables for easy access in core */
 	dont_want_core = FALSE;		/* (re)set in case we recurse */
@@ -122,7 +122,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	{
 		case SIGTERM:
 			if (GTMSECSHR_IMAGE == image_type)
-				forced_exit_err = ERR_GTMSECSHRSHUTDOWN;
+				forced_exit_err = ERR_GTMSECSHRSHUTDN;
 			else
 				forced_exit_err = ERR_FORCEDHALT;
 			/* If nothing pending AND we have crit or in wcs_wtstart() or already in exit processing, wait to

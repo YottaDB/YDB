@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,11 +40,11 @@ void dse_rmsb(void)
 		util_out_print("Error:  save version number must be specified.", TRUE);
 		return;
 	}
-	if (!cli_get_num("VERSION", (int4 *)&version))
+	if (!cli_get_int("VERSION", (int4 *)&version))
 		return;
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
-		if (!cli_get_hex("BLOCK", &blk))
+		if (!cli_get_hex("BLOCK", (uint4 *)&blk))
 			return;
 		if (blk < 0 || blk >= cs_addrs->ti->total_blks || !(blk % cs_addrs->hdr->bplmap))
 		{
@@ -69,4 +69,3 @@ void dse_rmsb(void)
 				(patch_save_count - i) * sizeof(save_strct));
 	return;
 }
-

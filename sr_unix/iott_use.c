@@ -13,11 +13,11 @@
 
 #include <sys/ioctl.h>
 #include <errno.h>
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #include <signal.h>
-#include <string.h>
+#include "gtm_string.h"
 #include "gtm_iconv.h"
-#include "gtm_termio.h"
+#include "gtm_termios.h"
 #include "gtm_unistd.h"
 
 #include "io_params.h"
@@ -70,7 +70,7 @@ void iott_use(io_desc *iod, mval *pp)
 	d_tt_struct	*temp_ptr, *tt_ptr;
 	io_desc		*d_in, *d_out;
 	io_termmask	mask_term;
-	mident		ttab;
+	char		*ttab;
 	struct termios	t;
 	int		status;
 	int		save_errno;
@@ -190,11 +190,9 @@ void iott_use(io_desc *iod, mval *pp)
 					s2pool(&iod->error_handler);
 					break;
 				case iop_filter:
-					memset(&ttab, 0, sizeof(mident));
 					len = *(pp->str.addr + p_offset);
-					memcpy(&ttab.c[0], pp->str.addr + p_offset + 1,
-							(len < sizeof(mident) ? len : sizeof(mident)));
-					if ((fil_type = namelook(filter_index, filter_names, ttab.c)) < 0)
+					ttab = pp->str.addr + p_offset + 1;
+					if ((fil_type = namelook(filter_index, filter_names, ttab, len)) < 0)
 					{
 						rts_error(VARLSTCNT(1) ERR_TTINVFILTER);
 						return;

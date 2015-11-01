@@ -12,7 +12,7 @@
 #ifndef __CWS_INSERT_H__
 #define __CWS_INSERT_H__
 
-GBLREF	hashtab		*cw_stagnate;
+GBLREF	hash_table_int4	cw_stagnate;
 GBLREF	boolean_t	cw_stagnate_reinitialized;
 
 /* Usually a process does not need the cw_stagnate hash table as it is used only in the final retry.
@@ -23,10 +23,10 @@ GBLREF	boolean_t	cw_stagnate_reinitialized;
 #define CWS_INITIAL_SIZE        4
 
 /* Initialize the cw_stagnate hash-table */
-#define	CWS_INIT					\
-{							\
-	init_hashtab(&cw_stagnate, CWS_INITIAL_SIZE);	\
-	cw_stagnate_reinitialized = TRUE;               \
+#define	CWS_INIT						\
+{								\
+	init_hashtab_int4(&cw_stagnate, CWS_INITIAL_SIZE);	\
+	cw_stagnate_reinitialized = TRUE;               	\
 }
 
 /* macro CWS_INSERT appends a block_id onto an hashtable of block_id's
@@ -40,24 +40,21 @@ GBLREF	boolean_t	cw_stagnate_reinitialized;
  * by itself
  */
 
-#define CWS_INSERT(block)					\
-{								\
-	uint4	dummy;						\
-	cw_stagnate_reinitialized = FALSE;			\
-	add_hashtab_ent(&cw_stagnate, (void *)block, &dummy);	\
+#define CWS_INSERT(block)							\
+{										\
+	ht_ent_int4	*dummy;							\
+	cw_stagnate_reinitialized = FALSE;					\
+	add_hashtab_int4(&cw_stagnate, (uint4 *)(&block), HT_VALUE_DUMMY, &dummy);\
 }
 
 /* the use of the variable cw_stagnate_reinitialized to optimize CWS_RESET assumes that all calls to
- * add_hashtab_ent() are done through CWS_INSERT macro.
+ * add_hashtab_int4() are done through CWS_INSERT macro.
  */
 #define CWS_RESET											\
 {	/* if a transaction did not use cw_stagnate hash table, there is no need to reset it */		\
 	if (!cw_stagnate_reinitialized)									\
 	{												\
-		longset((uchar_ptr_t)cw_stagnate->tbl, sizeof(hashtab_ent) * cw_stagnate->size, 0);	\
-		cw_stagnate->first = NULL;								\
-		cw_stagnate->last = NULL;								\
-		cw_stagnate->count = 0;									\
+		reinitialize_hashtab_int4(&cw_stagnate);						\
 		cw_stagnate_reinitialized = TRUE;							\
 	}												\
 }

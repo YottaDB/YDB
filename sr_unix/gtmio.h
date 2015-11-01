@@ -100,8 +100,8 @@
 	if (-1 == statvfs(FNAME, &statvfs_buf))										\
 	{														\
 		macro_errno = errno;											\
-		util_out_send_oper("Error finding FS type for file, !AD :!AD", 						\
-				TRUE, LEN_AND_STR(FNAME), LEN_AND_STR(STRERROR(macro_errno)));				\
+		util_out_print("Error finding FS type for file, !AD :!AD", OPER, 					\
+				LEN_AND_STR(FNAME), LEN_AND_STR(STRERROR(macro_errno)));				\
 		dio_success = FALSE;											\
 	} else if (strcmp(FSTYPE_ADVFS, statvfs_buf.f_basetype))							\
 			dio_success = FALSE;										\
@@ -122,8 +122,8 @@
 	if (-1 == statvfs(FNAME, &statvfs_buf))										\
 	{														\
 		macro_errno = errno;											\
-		util_out_send_oper("Error finding FS type for file, !AD. !AD", 						\
-				TRUE, LEN_AND_STR(FNAME), LEN_AND_STR(STRERROR(macro_errno)));				\
+		util_out_print("Error finding FS type for file, !AD. !AD", OPER,					\
+				LEN_AND_STR(FNAME), LEN_AND_STR(STRERROR(macro_errno)));				\
 		dio_success = FALSE;											\
 	} else if (strcmp(FSTYPE_UFS, statvfs_buf.f_basetype))								\
 			dio_success = FALSE;										\
@@ -133,8 +133,8 @@
 		if (-1 == directio(FDESC, DIRECTIO_ON))									\
 		{													\
 			macro_errno = errno;										\
-			util_out_send_oper("Failed to set DIRECT IO option for !AD, reverting to normal IO. !AD ",	\
-					TRUE, LEN_AND_STR(FNAME), LEN_AND_STR(STRERROR(macro_errno)));			\
+			util_out_print("Failed to set DIRECT IO option for !AD, reverting to normal IO. !AD ",		\
+					OPER, LEN_AND_STR(FNAME), LEN_AND_STR(STRERROR(macro_errno)));			\
 		}													\
 	}														\
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,15 +53,17 @@ void dse_chng_rhead(void)
 {
 	block_id	blk;
 	sm_uc_ptr_t	bp, b_top, cp, rp;
-	bool		chng_rec;
+	boolean_t	chng_rec;
 	rec_hdr		new_rec;
-	int4		x;
+	uint4		x;
 	blk_segment	*bs1, *bs_ptr;
 	cw_set_element  *cse;
 	int4		blk_seg_cnt, blk_size;
+	srch_blk_status	blkhist;
+
+	error_def(ERR_DBRDONLY);
 	error_def(ERR_DSEBLKRDFAIL);
 	error_def(ERR_DSEFAIL);
-	error_def(ERR_DBRDONLY);
 
         if (gv_cur_region->read_only)
                 rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
@@ -71,7 +73,7 @@ void dse_chng_rhead(void)
 
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
-		if(!cli_get_hex("BLOCK", &blk))
+		if(!cli_get_hex("BLOCK", (uint4 *)&blk))
 			return;
 		patch_curr_blk = blk;
 	}
@@ -82,15 +84,15 @@ void dse_chng_rhead(void)
 	}
 
 	t_begin_crit(ERR_DSEFAIL);
-	if(!(bp = t_qread(patch_curr_blk, &dummy_hist.h[0].cycle, &dummy_hist.h[0].cr)))
+	blkhist.blk_num = patch_curr_blk;
+	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-
+	bp = blkhist.buffaddr;
 	blk_size = cs_addrs->hdr->blk_size;
 	chng_rec = FALSE;
 	b_top = bp + ((blk_hdr_ptr_t)bp)->bsiz;
 	if (((blk_hdr_ptr_t)bp)->bsiz > blk_size || ((blk_hdr_ptr_t)bp)->bsiz < sizeof(blk_hdr))
 		chng_rec = TRUE;	/* force rewrite to correct size */
-
 	if (cli_present("RECORD") == CLI_PRESENT)
 	{
 		if (!(rp = skan_rnum(bp, FALSE)))
@@ -98,7 +100,7 @@ void dse_chng_rhead(void)
 			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
-	} else if (!(rp = skan_offset (bp, FALSE)))
+	} else if (!(rp = skan_offset(bp, FALSE)))
 	{
 		t_abort(gv_cur_region, cs_addrs);
 		return;
@@ -158,7 +160,7 @@ void dse_chng_rhead(void)
 			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
-		t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)bp)->levl, TRUE, FALSE);
+		t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)bp)->levl, TRUE, FALSE);
 		BUILD_AIMG_IF_JNL_ENABLED(cs_addrs, cs_data, non_tp_jfb_buff_ptr, cse);
 		t_end(&dummy_hist, 0);
 	}

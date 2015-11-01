@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,10 +13,10 @@
 
 #include "gtm_string.h"
 
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
-#include "mv_stent.h"
 #include "rtnhdr.h"
+#include "mv_stent.h"
 #include "stack_frame.h"
 #include "mdq.h"
 
@@ -141,7 +141,7 @@ int4 symbinit(void)
 	memset(l_syms, 0, ls_size);
 	size++;
 	ptr = (symval *)malloc(sizeof(symval));
-	ht_init(&ptr->h_symtab, size);
+	init_hashtab_mname(&ptr->h_symtab, size);
 	ptr->last_tab = curr_symval;
 	ptr->lv_flist = 0;
 	ptr->tp_save_all = 0;

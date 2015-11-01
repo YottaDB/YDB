@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "gdsdbver.h"
 #include "gdsblk.h"
 #include "gdsbml.h"
 #include "copy.h"
@@ -35,6 +36,7 @@ GBLREF	boolean_t		block;
 GBLREF	boolean_t		muint_key;
 GBLREF	boolean_t		tn_reset_this_reg;
 GBLREF	int			mu_int_plen;
+GBLREF	int4			mu_int_blks_to_upgrd;
 GBLREF	int			disp_map_errors;
 GBLREF	int			mu_map_errs;
 GBLREF	int			disp_trans_errors;
@@ -51,6 +53,7 @@ void mu_int_maps(void)
 	uint_ptr_t	dskmap_p;
 	uint4		dskmap, lfree, *lmap, map_blk_size;
 	block_id	blkno, last_bmp;
+	enum db_ver	ondsk_blkver;
 
 	error_def(ERR_DBREADBM);
 	error_def(ERR_DBLVLINC);
@@ -79,7 +82,7 @@ void mu_int_maps(void)
 	{
 		assert(mapsize == mu_int_data.bplmap);
 		blkno = mcnt * mu_int_data.bplmap;
-		disk = mu_int_read(blkno);
+		disk = mu_int_read(blkno, &ondsk_blkver);	/* ondsk_blkver set to GDSV4 or GDSV5 (GDSVCURR) */
 		if (!disk)
 		{
 			mu_int_path[0] = blkno;
@@ -111,7 +114,10 @@ void mu_int_maps(void)
 		{
 			((blk_hdr_ptr_t)disk)->tn = 0;
 			mu_int_write(blkno, disk);
-		}
+			if (GDSVCURR != mu_int_data.desired_db_format)
+				mu_int_blks_to_upgrd++;
+		} else if (GDSVCURR != ondsk_blkver)
+			mu_int_blks_to_upgrd++;
 		if (((blk_hdr_ptr_t)disk)->tn >= mu_int_data.trans_hist.curr_tn)
 		{
 			if (trans_errors < disp_trans_errors)

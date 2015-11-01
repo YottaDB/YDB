@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,27 +24,35 @@
 #include "gdsblk.h"
 #include "gdsbml.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "iosp.h"
 #include "util.h"
 #include "dbfilop.h"
+#include "gds_blk_upgrade.h"	/* for gds_blk_upgrade prototype and GDS_BLK_UPGRADE_IF_NEEDED macro */
 
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF	reg_ctl_list	*mur_ctl;
-GBLREF 	int		mur_regno;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	reg_ctl_list		*mur_ctl;
+GBLREF	int			mur_regno;
 
 #define BPL	sizeof(int4)*8/BML_BITS_PER_BLK					/* blocks masked by a int4 */
 
 int4 mur_blocks_free()
 {
-	int4				x;
-	block_id 			bnum;
-	int 				maps,mapsize,i,j,k,fcnt;
-	unsigned char 			*disk, *c, *m_ptr;
-	uint4 				*dskmap,map_blk_size;
-	file_control 			*db_ctl;
+	int4		x;
+	block_id 	bnum;
+	int 		maps, mapsize, i, j, k, fcnt, status;
+	unsigned char 	*disk, *c, *m_ptr;
+	uint4 		*dskmap, map_blk_size;
+	file_control 	*db_ctl;
+	enum db_ver	dummy_ondskblkver;
+
+	error_def(ERR_DBRDERR);
+	error_def(ERR_DYNUPGRDFAIL);
 
 	db_ctl = mur_ctl[mur_regno].db_ctl;
 	cs_data = mur_ctl[mur_regno].csd;
@@ -55,48 +63,52 @@ int4 mur_blocks_free()
 	disk = (unsigned char *)(((int4)m_ptr) + 7 & -8);
 	db_ctl->op_buff = (uchar_ptr_t)disk;
 	db_ctl->op_len = cs_data->blk_size;
-	for( i = 0; i != maps; i++ )
+	for (i = 0; i != maps; i++)
 	{
 		bnum = i * cs_data->bplmap;
 		db_ctl->op = FC_READ;
-		db_ctl->op_pos = cs_data->start_vbn + (cs_data->blk_size / 512 * bnum);
-		dbfilop(db_ctl);
-		if (((blk_hdr *) disk)->bsiz != map_blk_size)
+		db_ctl->op_pos = cs_data->start_vbn + (cs_data->blk_size / DISK_BLOCK_SIZE * bnum);
+		status = dbfilop(db_ctl);
+		if (SYSCALL_ERROR(status))
+			rts_error(VARLSTCNT(5) ERR_DBRDERR, 2, DB_LEN_STR(gv_cur_region), status);
+		GDS_BLK_UPGRADE_IF_NEEDED(bnum, disk, disk, cs_data, &dummy_ondskblkver, status);
+		if (SS_NORMAL != status)
+			if (ERR_DYNUPGRDFAIL == status)
+				rts_error(VARLSTCNT(5) status, 3, bnum, DB_LEN_STR(gv_cur_region));
+			else
+				rts_error(VARLSTCNT(1) status);
+		if (((blk_hdr *)disk)->bsiz != map_blk_size)
 		{
-			util_out_print("Wrong size map block",TRUE); continue;
+			util_out_print("Wrong size map block", TRUE);
+			continue;
 		}
-		if (((blk_hdr *) disk)->levl != LCL_MAP_LEVL)
-		{
-			util_out_print("Local map block level incorrect.",TRUE);
-		}
-		mapsize = ( bnum == (cs_data->trans_hist.total_blks/cs_data->bplmap)*cs_data->bplmap ?
-				     cs_data->trans_hist.total_blks - bnum : cs_data->bplmap );
+		if (((blk_hdr *)disk)->levl != LCL_MAP_LEVL)
+			util_out_print("Local map block level incorrect.", TRUE);
+		mapsize = (bnum == (cs_data->trans_hist.total_blks/cs_data->bplmap) * cs_data->bplmap ?
+				     cs_data->trans_hist.total_blks - bnum : cs_data->bplmap);
 		j = BPL;
 		dskmap = (uint4*)(disk + sizeof(blk_hdr));
-		while ( j < mapsize )
+		while (j < mapsize)
 		{
-			for ( k = 0; k!=sizeof(int4)*8; k += BML_BITS_PER_BLK )
-			{
-				fcnt += (*dskmap>>k) & 1;
-			}
-			j +=BPL;
+			for (k = 0; k != sizeof(int4) * 8; k += BML_BITS_PER_BLK)
+				fcnt += (*dskmap >> k) & 1;
+			j += BPL;
 			dskmap++;
 		}
 		c = (unsigned char *)dskmap;
 		j -= BPL;
 		j += 4;
 		while (j < mapsize)
-		{	for (k = 0; k != 8; k += BML_BITS_PER_BLK)
-			{	fcnt += (*c >> k) & 1;
-			}
+		{
+			for (k = 0; k != 8; k += BML_BITS_PER_BLK)
+				fcnt += (*c >> k) & 1;
 			j += 4;
 			c++;
 		}
 
 		x = (mapsize + 4 - j) * BML_BITS_PER_BLK;
-		for ( k = 0; k < x; k += BML_BITS_PER_BLK )
-		{	fcnt += (*c >> k) & 1;
-		}
+		for (k = 0; k < x; k += BML_BITS_PER_BLK)
+			fcnt += (*c >> k) & 1;
 	}
 	free(m_ptr);
 	return fcnt;

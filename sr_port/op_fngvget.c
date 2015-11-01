@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
 #include "gdsfhead.h"
 #include "stringpool.h"
 #include "op.h"
-#include "gvcst_get.h"
+#include "gvcst_protos.h"	/* for gvcst_get prototype */
 #include "gvcmx.h"
 #include "gvusr.h"
 #include "sgnl.h"
@@ -30,7 +30,7 @@ void op_fngvget(mval *v, mval *def)
 {
 	bool gotit;
 
-	if (gv_curr_subsc_null && gv_cur_region->null_subs == FALSE)
+	if (gv_curr_subsc_null && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
 
 	gotit = FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@ typedef struct
         unsigned short    (*aa_htons)(in_port_t);
 /* smw 1999/12/15 STDC is not a good flag to use so why is it here
 		  perhaps should define in_addr_t somewhere if needed. */
-#if !defined(__STDC__) || defined(__linux__)
+#if !defined(__STDC__)
 	uint4             (*aa_inet_addr)();
 #else
 	in_addr_t         (*aa_inet_addr)(const char *);

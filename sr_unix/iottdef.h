@@ -12,7 +12,7 @@
 #ifndef __IOTTDEF_H__
 #define __IOTTDEF_H__
 
-#include "gtm_termio.h"
+#include "gtm_termios.h"
 #include "gtm_stdio.h"
 
 #define TERM_MSK 0x08002400

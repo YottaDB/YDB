@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +21,7 @@
 
 /* Include prototypes */
 #include "t_qread.h"
-#include "gvcst_search_blk.h"
-#include "gvcst_lftsib.h"
+#include "gvcst_protos.h"	/* for gvcst_search_blk,gvcst_lftsib prototype */
 
 /* WARNING:	assumes that the search history for the current target is in gv_target.hist */
 

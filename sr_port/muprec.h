@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,19 +15,23 @@
 #include "muprecsp.h" /* non-portable interface prototype */
 
 #define JNL_EXTR_LABEL		"GDSJEX01"
-#define JNL_DET_EXTR_LABEL	"GDSJDX01"
+#define JNL_DET_EXTR_LABEL	"GDSJDX02"
 
 #define EXTQW(I)							\
+{									\
 	ptr = &murgbl.extr_buff[extract_len];				\
 	ptr = (char *)i2ascl((uchar_ptr_t)ptr, I);			\
 	extract_len += (int)(ptr - &murgbl.extr_buff[extract_len]);	\
-	murgbl.extr_buff[extract_len++]='\\'
+	murgbl.extr_buff[extract_len++] = '\\';				\
+}
 
 #define EXTINT(I)							\
+{									\
 	ptr = &murgbl.extr_buff[extract_len];				\
 	ptr = (char *)i2asc((uchar_ptr_t)ptr, I);			\
 	extract_len += (int)(ptr - &murgbl.extr_buff[extract_len]);	\
-	murgbl.extr_buff[extract_len++]='\\'
+	murgbl.extr_buff[extract_len++] = '\\';				\
+}
 
 #define EXT_DET_PREFIX()									\
 {												\
@@ -39,15 +43,20 @@
 	extract_len += LAB_TERM_SZ;								\
 }
 
-#define	EXTTXT(T,L)		actual = real_len(L, T);		\
+#define	EXTTXT(T,L)							\
+{									\
+	actual = real_len(L, T);					\
 	memcpy (&murgbl.extr_buff[extract_len], T, actual);		\
 	extract_len += actual;						\
-	murgbl.extr_buff[extract_len++]= '\\'
+	murgbl.extr_buff[extract_len++] = '\\';				\
+}
 
 #define EXT2BYTES(T)							\
-	murgbl.extr_buff[extract_len++]= *(caddr_t)(T);			\
-	murgbl.extr_buff[extract_len++]= *((caddr_t)(T)+1);		\
-	murgbl.extr_buff[extract_len++]= '\\'
+{									\
+	murgbl.extr_buff[extract_len++] = *(caddr_t)(T);		\
+	murgbl.extr_buff[extract_len++] = *((caddr_t)(T) + 1);		\
+	murgbl.extr_buff[extract_len++] = '\\';				\
+}
 
 /* extract jnl record "rec" using extraction routine "extract" into file "file_info" (extract/lost/broken transaction files) */
 #define EXTRACT_JNLREC(rec, extract, file_info, status)			\
@@ -142,16 +151,18 @@
 	(JREC)->prefix.jrec_type > JRT_BAD && (JREC)->prefix.jrec_type < JRT_RECTYPES /* valid rectype */	\
 )
 
-#define IS_VALID_LEN_FROM_PREFIX(JREC, JFH)			\
-( /* length within range */					\
-	(JREC)->prefix.forwptr > MIN_JNLREC_SIZE  &&		\
-	(JREC)->prefix.forwptr <= (JFH)->max_phys_reclen	\
+#define IS_VALID_LEN_FROM_PREFIX(JREC, JFH)							\
+( /* length within range */									\
+	(ROUND_DOWN2((JREC)->prefix.forwptr, JNL_REC_START_BNDRY) == (JREC)->prefix.forwptr) &&	\
+	(JREC)->prefix.forwptr > MIN_JNLREC_SIZE  &&						\
+	(JREC)->prefix.forwptr <= (JFH)->max_phys_reclen					\
 )
 
-#define IS_VALID_LEN_FROM_SUFFIX(SUFFIX, JFH)			\
-( /* length within range */					\
-  	(SUFFIX)->backptr > MIN_JNLREC_SIZE &&			\
-	(SUFFIX)->backptr <= (JFH)->max_phys_reclen		\
+#define IS_VALID_LEN_FROM_SUFFIX(SUFFIX, JFH)							\
+( /* length within range */									\
+	(ROUND_DOWN2((SUFFIX)->backptr, JNL_REC_START_BNDRY) == (SUFFIX)->backptr) &&		\
+  	(SUFFIX)->backptr > MIN_JNLREC_SIZE &&							\
+	(SUFFIX)->backptr <= (JFH)->max_phys_reclen						\
 )
 
 #define IS_VALID_LINKS(JREC)													\
@@ -187,9 +198,9 @@
 
 #define DEFAULT_EXTR_BUFSIZE			(64 * 1024)
 #define JNLEXTR_DELIMSIZE			256
-#define MUR_MULTI_LIST_INIT_ALLOC		1024	/* initial allocation for mur_multi_list */
-#define MUR_MULTI_HASHTABLE_INIT_ELEMS		1024	/* initial elements in the token table */
-#define MUR_PINI_LIST_INIT_ELEMS		 256	/* initial no. of elements in hash table mur_jctl->pini_list */
+#define MUR_MULTI_LIST_INIT_ALLOC		1024		/* initial allocation for mur_multi_list */
+#define MUR_MULTI_HASHTABLE_INIT_ELEMS		(16 * 1024)	/* initial elements in the token table */
+#define MUR_PINI_LIST_INIT_ELEMS		 256		/* initial no. of elements in hash table mur_jctl->pini_list */
 
 #define DUMMY_FILE_ID	"123456"		/* needed only in VMS, but included here for lack of a better generic place */
 #define SHOW_STR	"Show"
@@ -204,9 +215,11 @@
 
 enum mur_error
 {
-	MUR_DUPTOKEN,
+	MUR_DUPTOKEN = 1,
 	MUR_PREVJNLNOEOF,
-	MUR_JNLBADRECFMT
+	MUR_JNLBADRECFMT,
+	MUR_CHNGTPRSLVTM,
+	MUR_BOVTMGTEOVTM
 };
 
 enum mur_fence_type
@@ -214,14 +227,6 @@ enum mur_fence_type
 	FENCE_NONE,
 	FENCE_PROCESS,
 	FENCE_ALWAYS
-};
-
-enum pini_rec_stat
-{
-	IGNORE_PROC = 0,
-	ACTIVE_PROC = 1,
-	FINISHED_PROC = 2,
-	BROKEN_PROC = 4
 };
 
 enum rec_fence_type
@@ -252,11 +257,12 @@ typedef struct
 	int			broken_cnt;		/* Number of broken entries */
 	int			max_extr_record_length;	/* maximum size of zwr-format extracted journal record */
 	jnl_tm_t		tp_resolve_time;	/* Time of the point upto which a region will be processed for
-							   TP token resolution for backward or forward recover */
+							   TP token resolution for backward or forward recover.
+							   Note : This is what prevents user to change system time. */
 	seq_num			resync_seqno;		/* is 0, if consistent rollback and no interrupted recovery */
 	seq_num			stop_rlbk_seqno;	/* Where fetch_resync/resync rollback stop to apply to database */
 	seq_num			consist_jnl_seqno;	/* Simulate replication server's sequence number */
-	htab_desc		token_table;
+	hash_table_int8		token_table;
 	buddy_list      	*multi_list;
 	buddy_list     		*pini_buddy_list;	/* Buddy list for pini_list */
 	char			*extr_buff;
@@ -283,17 +289,10 @@ typedef struct multi_element_struct
 	struct multi_element_struct	*next;
 } multi_struct;
 
-typedef struct pini_list
-{
-	uint4			pini_addr;
-	uint4			new_pini_addr;	/* used in forward phase of recovery */
-	jnl_process_vector	jpv;		/* CURR_JPV. Current process's JPV. For GTCM server we also use this. */
-	jnl_process_vector	origjpv;	/* ORIG_JPV. Used for GTCM client only */
-	enum pini_rec_stat	state;		/* used for show qualifier */
-} pini_list_struct;
-
 typedef struct jnl_ctl_list_struct
 {
+	trans_num 			turn_around_tn;		/* Turn around point transaction number of EPOCH */
+	seq_num 			turn_around_seqno;	/* Turn around point jnl_seqno of EPOCH */
 	unsigned char			jnl_fn[JNL_NAME_SIZE];	/* Journal file name */
 	unsigned int			jnl_fn_len;		/* Length of journal fine name string */
 	jnl_file_header			*jfh;			/* journal file header */
@@ -302,17 +301,17 @@ typedef struct jnl_ctl_list_struct
 	off_jnl_t 			rec_offset;		/* Last processed record's offset */
 	off_jnl_t			os_filesize;		/* OS file size in bytes  */
 	off_jnl_t			eof_addr;		/* Offset of end of last valid record of the journal */
-	off_jnl_t 			save_turn_around_offset;/* Turn around point journal record's offset for each region.
-								   Necessary for noverify and interrupted recovery */
+	off_jnl_t 			apply_pblk_stop_offset;	/* Offset where last PBLK was applied. Updated by both
+								 * mur_apply_pblk() and mur_back_process()
+								 */
 	off_jnl_t 			turn_around_offset; 	/* Turn around point journal record's offset for each region */
 	jnl_tm_t			turn_around_time; 	/* Turn around time for this region */
 	boolean_t 			properly_closed;	/* TRUE if journal was properly closed, having written EOF;
 									FALSE otherwise */
         boolean_t                       tail_analysis;		/* true for mur_fread_eof */
+        boolean_t                       after_end_of_data;	/* true for record offset more than end_of_data */
 	boolean_t 			before_image; 		/* True if the database has before image journaling enabled */
         boolean_t                       read_only;		/* TRUE if read_only for extract/show/verify */
-	trans_num 			turn_around_tn;		/* Turn around point transaction number of EPOCH */
-	seq_num 			turn_around_seqno;	/* Turn around point jnl_seqno of EPOCH */
 	int				jnlrec_cnt[JRT_RECTYPES];/* Count of each type of record found in this journal  */
 	int4				status;			/* Last status of the last operation done on this journal */
 	uint4				status2;		/* Last secondary status of the last operation done on
@@ -321,7 +320,7 @@ typedef struct jnl_ctl_list_struct
 #if defined(VMS)
 	struct FAB			*fab;
 #endif
-	struct hashtab_t               	*pini_list;		/* hash table of pini_addr to pid list */
+	hash_table_int4			pini_list;		/* hash table of pini_addr to pid list */
 	struct reg_ctl_list_struct	*reg_ctl;		/* Back pointer to this region's reg_ctl_list */
 	struct jnl_ctl_list_struct 	*next_gen;		/* next generation journal file */
 	struct jnl_ctl_list_struct 	*prev_gen;		/* previous generation journal file */
@@ -330,30 +329,31 @@ typedef struct jnl_ctl_list_struct
 
 typedef struct reg_ctl_list_struct
 {
-	struct gd_region_struct		*gd;			/* region info */
-	sgmnt_addrs			*csa;			/* cs_addrs of the region */
-	sgmnt_data_ptr_t		csd;			/* cs_data of the region */
-	file_control 			*db_ctl;		/* To do dbfilop() */
-	struct jnl_ctl_list_struct 	*jctl;			/* Current generation journal file control info */
-	struct jnl_ctl_list_struct 	*jctl_head;		/* For forward recovery starting (earliest) generation
-									journal file to be processed. */
-	struct jnl_ctl_list_struct	*jctl_save_turn_around;	/* First pass turn around point journal file.
-								   Necessary for for noverify and interrupted recovery */
-	struct jnl_ctl_list_struct	*jctl_turn_around;	/* final pass turn around point journal file */
-	struct jnl_ctl_list_struct 	*jctl_alt_head;		/* For backward recovery turn around point
-									journal file of interrupted recovery. */
-	void				*tab_ptr;      		/* actually htab_desc*, but due to dependency conflicts
-									keep it void *. Used for gv_target info for
-									globals in mur_output_record() */
-	jnl_tm_t 			lvrec_time;		/* Last Valid Journal Record's Time Stamp across all generations */
-	int				jnl_state;
-	int				repl_state;
-	int4 				lookback_count;
-	boolean_t 			before_image;		/* True if the database has before image journaling enabled */
-	boolean_t			standalone;		/* If standalone access was acheived for the region */
-	boolean_t			recov_interrupted;	/* a copy of csd->recov_interrupted before resetting it to TRUE */
-	boolean_t			jfh_recov_interrupted;	/* Whether latest generation journal file was created by recover */
-	trans_num			db_tn;			/* database curr_tn when region is opened first by recover */
+	trans_num		db_tn;			/* database curr_tn when region is opened first by recover */
+	FILL8DCL(sgmnt_data_ptr_t, csd, 0);		/* cs_data of the region */
+	struct gd_region_struct	*gd;			/* region info */
+	sgmnt_addrs		*csa;			/* cs_addrs of the region */
+	file_control 		*db_ctl;		/* To do dbfilop() */
+	jnl_ctl_list 		*jctl;			/* Current generation journal file control info */
+	jnl_ctl_list 		*jctl_head;		/* For forward recovery starting (earliest) generation
+							   journal file to be processed. */
+	jnl_ctl_list		*jctl_apply_pblk;	/* Journal file where PBLK application last stopped.
+							 * Updated by mur_apply_pblk() and mur_back_process()
+							 */
+	jnl_ctl_list		*jctl_turn_around;	/* final pass turn around point journal file */
+	jnl_ctl_list 		*jctl_alt_head;		/* For backward recovery turn around point
+							   journal file of interrupted recovery. */
+	hash_table_mname	gvntab;     		/* Used for gv_target info for globals in mur_output_record() */
+	jnl_tm_t 		lvrec_time;		/* Last Valid Journal Record's Time Stamp across all generations */
+	int			jnl_state;
+	int			repl_state;
+	int4 			lookback_count;
+	boolean_t 		before_image;		/* True if the database has before image journaling enabled */
+	boolean_t		standalone;		/* If standalone access was acheived for the region */
+	boolean_t		recov_interrupted;	/* a copy of csd->recov_interrupted before resetting it to TRUE */
+	boolean_t		jfh_recov_interrupted;	/* Whether latest generation journal file was created by recover */
+	int4			blks_to_upgrd_adjust;	/* delta to adjust turn around point's blks_to_upgrd counter with.
+							 * this will include all bitmaps created in V4 format by gdsfilext */
 } reg_ctl_list;
 
 typedef struct redirect_list_struct
@@ -427,7 +427,7 @@ typedef struct
 
 #define MUR_TOKEN_ADD(multi, rec_token, rec_pid, rec_image_count, rec_tok_time, rec_partner, rec_fence, rec_regno)	\
 {												\
-	char	new;										\
+	ht_ent_int8	*tabent; 								\
 	multi = (multi_struct *)get_new_element(murgbl.multi_list, 1);				\
 	multi->token = rec_token;								\
 	multi->pid = rec_pid;									\
@@ -436,15 +436,31 @@ typedef struct
 	multi->partner = rec_partner;								\
 	multi->fence = rec_fence;								\
 	multi->regnum = rec_regno;								\
-	hentry = ht_put(&murgbl.token_table, (mname *)&(multi->token), &new);			\
-	assert(new || NULL != hentry->ptr);							\
-	if (!new && hentry->ptr)								\
-		multi->next = (multi_struct *)hentry->ptr;					\
-	else											\
-		multi->next = NULL;								\
-	hentry->ptr = (char *)multi;								\
+	multi->next = NULL;									\
+	if (!add_hashtab_int8(&murgbl.token_table, &multi->token, multi, &tabent))		\
+	{											\
+		assert(NULL != tabent->value);							\
+		multi->next = (multi_struct *)tabent->value;					\
+		tabent->value = (char *)multi;							\
+	}											\
 	if (rec_partner)									\
 		murgbl.broken_cnt = murgbl.broken_cnt + 1;					\
+}
+
+#define	MUR_INCTN_BLKS_TO_UPGRD_ADJUST(rctl, mur_rab)							\
+{													\
+	inctn_opcode_t		opcode;									\
+	struct_jrec_inctn	*inctn_rec;								\
+													\
+	inctn_rec = &(mur_rab).jnlrec->jrec_inctn;							\
+	opcode = inctn_rec->opcode;									\
+	if ((inctn_gdsfilext_gtm == opcode) || (inctn_gdsfilext_mu_reorg == opcode))			\
+	{	/* Note down the number of bitmaps that were created during this file extension		\
+		 * in V4 format. At the turn around point, blks_to_upgrd counter has to be 		\
+		 * increased by this amount to reflect the current state of the new bitmaps.		\
+		 */											\
+		 (rctl)->blks_to_upgrd_adjust += (inctn_rec)->detail.blks_to_upgrd_delta;		\
+	}												\
 }
 
 #define	MUR_WITHIN_ERROR_LIMIT(err_cnt, error_limit) ((++err_cnt <= error_limit) || (mur_options.interactive && mur_interactive()))
@@ -455,11 +471,47 @@ typedef struct
 #define MUR_TOKEN_LOOKUP(token, pid, image_count, rec_time, fence) mur_token_lookup(token, pid, image_count, rec_time, fence)
 #endif
 
+#define PRINT_VERBOSE_STAT(MODULE)									\
+	if (mur_options.verbose)									\
+	{												\
+		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOSTR, 4,   LEN_AND_LIT("Module"), 			\
+				LEN_AND_LIT(MODULE));							\
+		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOSTR, 4,   LEN_AND_LIT("    Journal file"), 		\
+			mur_jctl->jnl_fn_len, mur_jctl->jnl_fn);					\
+		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Record Offset"), 		\
+			mur_jctl->rec_offset, mur_jctl->rec_offset);					\
+		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Turn around Offset"), 	\
+			mur_jctl->turn_around_offset, mur_jctl->turn_around_offset);			\
+		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Turn around timestamp"), 	\
+			mur_jctl->turn_around_time, mur_jctl->turn_around_time);			\
+		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("    Turn around transaction"),	\
+			&mur_jctl->turn_around_tn, &mur_jctl->turn_around_tn);				\
+		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("    Turn around seqno"), 	\
+			&mur_jctl->turn_around_seqno, &mur_jctl->turn_around_seqno);			\
+		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Tp_resolve_time"), 	\
+			murgbl.tp_resolve_time, murgbl.tp_resolve_time);				\
+		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Token total"), 		\
+			murgbl.token_table.count, murgbl.token_table.count);				\
+		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("    Token broken"), 		\
+			murgbl.broken_cnt, murgbl.broken_cnt);						\
+	}
+
+#define PRINT_VERBOSE_TAIL_BAD(mur_options, mur_jctl)							\
+	if (mur_options.verbose)									\
+	{												\
+		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOSTR, 4,						\
+			LEN_AND_LIT("Tail analysis found bad record for journal file"),			\
+			mur_jctl->jnl_fn_len, mur_jctl->jnl_fn);					\
+		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Record Offset"),		\
+			mur_jctl->rec_offset, mur_jctl->rec_offset);					\
+	}
+
 /* Prototypes */
 int			gtmrecv_fetchresync(int port, seq_num *resync_seqno);
 void			jnlext_write(fi_type *file_info, char *buffer, int length);
 uint4			mur_apply_pblk(boolean_t apply_intrpt_pblk);
 boolean_t 		mur_back_process(boolean_t apply_pblk, seq_num *pre_resolve_seqno);
+uint4 			mur_back_processing(boolean_t apply_pblk, seq_num *pre_resolve_seqno, jnl_tm_t alt_tp_resolve_time);
 uint4 			mur_block_count_correct(void);
 int4			mur_blocks_free(void);
 void			mur_close_files(void);
@@ -490,6 +542,7 @@ uint4			mur_prev(off_jnl_t dskaddr);
 uint4			mur_prev_rec(void);
 uint4			mur_process_intrpt_recov(void);
 void 			mur_process_seqno_table(seq_num *min_broken_seqno, seq_num *losttn_seqno);
+void 			mur_process_timequal(jnl_tm_t max_lvrec_time, jnl_tm_t min_bov_time);
 jnl_tm_t 		mur_process_token_table(boolean_t *ztp_broken);
 void			mur_put_aimg_rec(jnl_record *rec);
 uint4			mur_read(jnl_ctl_list *jctl);
@@ -501,6 +554,7 @@ multi_struct 		*mur_token_lookup(token_num token, uint4 pid, off_jnl_t rec_time,
 multi_struct 		*mur_token_lookup(token_num token, uint4 pid, int4 image_count,
 									off_jnl_t rec_time, enum rec_fence_type fence);
 #endif
+void 			mur_tp_resolve_time(jnl_tm_t max_lvrec_time);
 void			mur_show_header(jnl_ctl_list *jctl);
 boolean_t		mur_select_rec(void);
 void			mur_sort_files(void);

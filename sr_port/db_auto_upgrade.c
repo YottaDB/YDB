@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,11 +22,10 @@
 #include "gdscc.h"
 #include "gdsblkops.h"
 #include "filestruct.h"
-#include "hashdef.h"
 #include "io.h"
 #include "jnl.h"
-#include "gvcst_init_sysops.h"
 #include "mutex.h"
+#include "gvcst_protos.h"	/* for gvcst_init_sysops prototype */
 
 void db_auto_upgrade(gd_region *reg)
 {

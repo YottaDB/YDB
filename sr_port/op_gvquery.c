@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@
 #include "gdsfhead.h"
 #include "stringpool.h"
 #include "op.h"
-#include "gvcst_query.h"
+#include "gvcst_protos.h"	/* for gvcst_query prototype */
 #include "format_targ_key.h"
 #include "gvcmx.h"
 #include "gvusr.h"
@@ -47,8 +47,16 @@ void op_gvquery (mval *v)
 	 * by $QUERY. The value is very likely to be used shortly after $QUERY - Vinaya, Aug 13, 2001 */
 	acc_meth = gv_cur_region->dyn.addr->acc_meth;
 	if (gv_curr_subsc_null)
-		gv_currkey->base[gv_currkey->prev] = 01;
-	else
+	{
+		if (0 == gv_cur_region->std_null_coll)
+			gv_currkey->base[gv_currkey->prev] = 01;
+		else
+		{
+			gv_currkey->base[gv_currkey->end++]= 1;
+			gv_currkey->base[gv_currkey->end++] = 0;
+			gv_currkey->base[gv_currkey->end] = 0;
+		}
+	} else
 	{ /* Note, gv_currkey->prev isn't changed here. We rely on this in gtcmtr_query to distinguish different forms of the key */
 		gv_currkey->base[gv_currkey->end++]= 1;
 		gv_currkey->base[gv_currkey->end++] = 0;
@@ -83,7 +91,7 @@ void op_gvquery (mval *v)
 		} else
 		{
 			size = v->str.len - 1; /* exclude ^ */
-			glob_begin = v->str.addr + 1; /* skip ^ */
+			glob_begin = (unsigned char *)v->str.addr + 1; /* skip ^ */
 		}
 		/* Need to return a double-quote for every single-quote; assume worst case. */
 		/* Account for ^ in both cases - extnam and no extnam */
@@ -96,7 +104,8 @@ void op_gvquery (mval *v)
 		{
 			*extnamdst++ = extnamdelim[1];
 			*extnamdst++ = extnamdelim[2];
-			for (extnamsrc = extnam_str.addr, extnamtop = extnamsrc + extnam_str.len; extnamsrc < extnamtop; )
+			for (extnamsrc = (unsigned char *)extnam_str.addr, extnamtop = extnamsrc + extnam_str.len;
+					extnamsrc < extnamtop; )
 			{
 				*extnamdst++ = *extnamsrc;
 				if ('"' == *extnamsrc++)	/* caution : pointer increment side-effect */
@@ -108,7 +117,7 @@ void op_gvquery (mval *v)
 		}
 		memcpy(extnamdst, glob_begin, size);
 		v->str.len = extnamdst - stringpool.free + size;
-		v->str.addr = stringpool.free;
+		v->str.addr = (char *)stringpool.free;
 		stringpool.free += v->str.len;
 		assert (v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);
 		assert (v->str.addr + v->str.len <= (char *)stringpool.top &&

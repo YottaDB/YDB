@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@
 #include "mlkdef.h"
 #include "filestruct.h"
 #include "gbldirnam.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"
 
 typedef struct gdr_name_struct
 {
@@ -71,10 +71,28 @@ gd_addr *create_dummy_gbldir(void)
 	long_ptr = (int4*)((int4)(addr->maps));
 	*long_ptr++ = 0x232FFFFF;
 	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
 	*long_ptr++ = (int4)addr->regions;
 	*long_ptr++ = 0x24FFFFFF;
 	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
 	*long_ptr++ = (int4)addr->regions;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
+	*long_ptr++ = 0xFFFFFFFF;
 	*long_ptr++ = 0xFFFFFFFF;
 	*long_ptr++ = 0xFFFFFFFF;
 	*long_ptr++ = (int4)addr->regions;
@@ -99,8 +117,8 @@ gd_addr *create_dummy_gbldir(void)
 	addr->id = (gd_id *)malloc(sizeof(gd_id));
 	memset(addr->id, 0, sizeof(gd_id));
 
-	addr->tab_ptr = (htab_desc *)malloc(sizeof(htab_desc));
-	ht_init(addr->tab_ptr,0);
+	addr->tab_ptr = (hash_table_mname *)malloc(sizeof(hash_table_mname));
+	init_hashtab_mname((hash_table_mname *)addr->tab_ptr,0);
 
 	name = (gdr_name *)malloc(sizeof(gdr_name));
 	name->name.addr = (char *)malloc(10);

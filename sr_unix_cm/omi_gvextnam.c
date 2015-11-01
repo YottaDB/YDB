@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@ static char rcsid[] = "$Header:$";
 #include "dpgbldir.h"
 
 GBLREF bool		gv_curr_subsc_null;
+GBLREF bool		gv_prev_subsc_null;
 GBLREF gv_key		*gv_currkey;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*gd_header;
@@ -114,8 +115,9 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 		mval2subsc(&v, gv_currkey);
 		ptr       += si.value;
 	}
-	gv_curr_subsc_null = is_null;
-	if (was_null  &&  !gv_cur_region->null_subs)
+	gv_prev_subsc_null = was_null; /* if true, it indicates there is a null subscript (except last subscript) in current key */
+	gv_curr_subsc_null = is_null; /* if true, it indicates that last subscript in current key is null */
+	if (was_null  &&  NEVER == gv_cur_region->null_subs)
 		return -OMI_ER_DB_INVGLOBREF;
 	return 0;
 }

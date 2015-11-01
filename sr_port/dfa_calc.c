@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,14 +45,14 @@ static	uint4	classmask[CHAR_CLASSES] =
  * of values that will be passed to do_pattern (through patstr). do_pattern(), which operates at run-time will
  * interpret this string of values and do the actual DFA work (DFA = Discrete Finite Automaton).
  */
-int dfa_calc(struct leaf *leaves, short int leaf_num, struct e_table *expand, uint4 **fstchar_ptr, uint4 **outchar_ptr)
+int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **fstchar_ptr, uint4 **outchar_ptr)
 {
 	uint4			*locoutchar;
 	uint4			pattern_mask;
 	unsigned char		*textstring;
-	short int 		offset[2 * (MAX_SYM + 1)];
-	short int		pos_offset[CHAR_CLASSES];
-	short int		fst[2][2], lst[2][2];
+	int 			offset[2 * (MAX_SYM + 1)];
+	int			pos_offset[CHAR_CLASSES];
+	int			fst[2][2], lst[2][2];
 	int4			charcls, maskcls, numexpand, count, clsnum, maxcls, clsposlis;
 	int4			state_num, node_num, sym_num, expseq, seq;
 	struct node		nodes;
@@ -67,8 +67,8 @@ int dfa_calc(struct leaf *leaves, short int leaf_num, struct e_table *expand, ui
 				 */
 	boolean_t		states[2 * MAX_SYM][CHAR_CLASSES];
 	boolean_t		fpos[2 * MAX_SYM][CHAR_CLASSES];
-	short int		d_trans[2 * MAX_SYM][CHAR_CLASSES];
-	short int		pos_lis[2 * MAX_SYM][CHAR_CLASSES];
+	int			d_trans[2 * MAX_SYM][CHAR_CLASSES];
+	int			pos_lis[2 * MAX_SYM][CHAR_CLASSES];
 	struct c_trns_tb	c_trans;
 
 	/* Note: in various places, this procedure makes a reference to the array 'typemask'.
@@ -89,12 +89,12 @@ int dfa_calc(struct leaf *leaves, short int leaf_num, struct e_table *expand, ui
 		pos_offset[0] = 0;
 		for (seq = 1; seq < CHAR_CLASSES; seq++)
 			pos_offset[seq] = pos_offset[seq - 1] + expand->num_e[seq - 1];
-		memset(&nodes.nullable[0], 0, sizeof(nodes));
+		memset(&nodes, 0, sizeof(nodes));
 		memset(&fpos[0][0], 0, sizeof(fpos));
 		memset(&states[0][0], 0, sizeof(states));
 		memset(&d_trans[0][0], 128, sizeof(d_trans));
 		memset(&pos_lis[0][0], 128, sizeof(pos_lis));
-		memset(&c_trans.c[0], 0, sizeof(short int) * MAX_SYM * 2);
+		memset(&c_trans.c[0], 0, sizeof(c_trans.c));
 		memset(offset, 0, sizeof(offset));
 		memset(fst, 0, sizeof(fst));
 		memset(lst, 0, sizeof(lst));
@@ -393,7 +393,7 @@ int dfa_calc(struct leaf *leaves, short int leaf_num, struct e_table *expand, ui
 							if (count == state_num)
 								state_num++;
 							else
-								memset(states[state_num], 0, (sym_num + 1) * sizeof(boolean_t));
+								memset(states[state_num], 0, (sym_num + 1) * sizeof(states[0][0]));
 						}
 					}
 					charcls += expand->num_e[maskcls];

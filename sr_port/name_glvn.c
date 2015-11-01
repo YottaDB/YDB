@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,8 +17,8 @@
 #include "fnname.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
-GBLREF mident window_ident;
+GBLREF char 	window_token;
+GBLREF mident 	window_ident;
 
 int name_glvn(bool gblvn, oprtype *a)
 {
@@ -28,7 +28,6 @@ int name_glvn(bool gblvn, oprtype *a)
 			this should also change */
 	oprtype subscripts[MAX_LVSUBSCRIPTS + 1], *sb1, *sb2;
 	int	fnname_type;
-	unsigned short name_len;
 	bool vbar, parse_status;
 	error_def(ERR_COMMA);
 	error_def(ERR_GVNAKEDEXTNM);
@@ -97,8 +96,7 @@ int name_glvn(bool gblvn, oprtype *a)
 	}
 	else
 	{
-		name_len = mid_len(&window_ident);
-		*sb1++ = put_str(window_ident.c, name_len);
+		*sb1++ = put_str(window_ident.addr, window_ident.len);
 		advancewindow();
 	}
 	if (window_token == TK_LPAREN)

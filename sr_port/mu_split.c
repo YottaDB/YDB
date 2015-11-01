@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -178,8 +178,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		assert(t_tries < CDB_STAGNATE);
 		return cdb_sc_blkmod;
 	}
-	t_write(gv_target->hist.h[level].blk_num, (unsigned char *)bs_ptr1, 0, 0,
-		gv_target->hist.h[level].buffaddr, level, FALSE, TRUE);
+	t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0, level, FALSE, TRUE);
 
 	/* Create new split piece, we already know that this will not be *-rec only */
 	BLK_INIT(bs_ptr2, bs_ptr1);
@@ -410,8 +409,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				BLK_SEG(bs_ptr2, old_blk1_base + sizeof(blk_hdr),
 					gv_target->hist.h[level].curr_rec.offset - sizeof(blk_hdr));
 				first_copy = FALSE;
-			}
-			else
+			} else
 				first_copy = TRUE;
 			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1a, sizeof(rec_hdr));
 			BLK_SEG(bs_ptr2, new_ins_key + new_ins_keycmpc, new_ins_keylen);
@@ -428,8 +426,8 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				assert(t_tries < CDB_STAGNATE);
 				return cdb_sc_blkmod;
 			}
-			t_write(gv_target->hist.h[level].blk_num, (unsigned char *)bs_ptr1, ins_off, right_index,
-				gv_target->hist.h[level].buffaddr, level, first_copy, FALSE);
+			t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, ins_off, right_index,
+				level, first_copy, FALSE);
 			break;
 		}
 		/* if SPLIT REQUIRED */
@@ -441,8 +439,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				BLK_SEG(bs_ptr2, old_blk1_base + sizeof(blk_hdr),
 					gv_target->hist.h[level].curr_rec.offset - sizeof(blk_hdr));
 				first_copy = FALSE;
-			}
-			else
+			} else
 				first_copy = TRUE;
 			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1a, sizeof(rec_hdr));
 			BLK_SEG(bs_ptr2, new_ins_key + new_ins_keycmpc, new_ins_keylen);
@@ -469,8 +466,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				BLK_ADDR(bn_ptr2, sizeof(block_id), unsigned char);
 				memcpy(bn_ptr2, new_blk1_top - sizeof(block_id), sizeof(block_id));
 				BLK_SEG(bs_ptr2, bn_ptr2, sizeof(block_id));
-			}
-			else
+			} else
 			{
 				assert (old_blk_after_currec == new_blk1_top);
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, sizeof(rec_hdr) );
@@ -486,8 +482,8 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			if (create_root)
 				left_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, ins_off, right_index, level);
 			else
-				t_write(gv_target->hist.h[level].blk_num, (unsigned char *)bs_ptr1, ins_off, right_index,
-					gv_target->hist.h[level].buffaddr, level, first_copy, FALSE);
+				t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, ins_off, right_index,
+					level, first_copy, FALSE);
 			/* RIGHT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			if (new_rtblk_star_only)
@@ -496,8 +492,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				BLK_ADDR(bn_ptr2, sizeof(block_id), unsigned char);
 				memcpy(bn_ptr2, new_blk2_top - sizeof(block_id), sizeof(block_id));
 				BLK_SEG(bs_ptr2, bn_ptr2, sizeof(block_id));
-			}
-			else
+			} else
 			{
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr2, sizeof(rec_hdr));
 				BLK_SEG(bs_ptr2, newblk2_first_key, newblk2_first_keysz);
@@ -519,9 +514,8 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			right_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, 0, 0, level);
 			(*blks_created)++;
 		} /* end if insert_in_left */
-
-		else /* new_ins_key to be inserted in right block */
-		{
+		else
+		{	/* new_ins_key to be inserted in right block */
 			/* LEFT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			save_blk_piece_len = new_leftblk_top_off - sizeof(blk_hdr) - old_blk1_last_rec_size;
@@ -545,13 +539,11 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			if (create_root)
 				left_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, 0, 0, level);
 			else
-				t_write(gv_target->hist.h[level].blk_num, (unsigned char *)bs_ptr1, 0, 0,
-					gv_target->hist.h[level].buffaddr, level, TRUE, TRUE);
+				t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0, level, TRUE, TRUE);
 			/* RIGHT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			if (new_leftblk_top_off < gv_target->hist.h[level].curr_rec.offset)
-			{
-				/* anything before curr_rec */
+			{	/* anything before curr_rec */
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr2, sizeof(rec_hdr));
 				BLK_SEG(bs_ptr2, newblk2_first_key, newblk2_first_keysz);
 				save_blk_piece_len = gv_target->hist.h[level].curr_rec.offset -
@@ -614,8 +606,8 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				assert(t_tries < CDB_STAGNATE);
 				return cdb_sc_blkmod;
 			}
-			cse = t_write(gv_target->hist.h[level].blk_num, (unsigned char *)bs_ptr1, ins_off, left_index,
-				gv_target->hist.h[level].buffaddr, level + 1, TRUE, FALSE);
+			cse = t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, ins_off, left_index,
+				level + 1, TRUE, FALSE);
 			t_write_root(ins_off2, right_index);	/* create a sibling cw-set-element to store ins_off2/right_index */
 			(*lvls_increased)++;
 			break;

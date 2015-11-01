@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,11 +27,11 @@ int4 bml_find_busy(int4 hint, uchar_ptr_t base_addr, int4 total_blks)
 	int4		bits, hint_pos, total_bits, ret_val;
 
 	hint_pos = hint * BML_BITS_PER_BLK;
-	hint_pos = hint_pos / 8;
 	total_bits = total_blks * BML_BITS_PER_BLK;
-
-	if (hint_pos > total_bits)
+	if (hint_pos >= total_bits)
 		hint_pos = 0;
+	hint_pos = hint_pos / 8;
+
 	for (ptr = base_addr + hint_pos, top = base_addr + (total_bits +7) / 8 - 1; ptr < top; ptr++)
 	{	if ((*ptr & 0x3) == 0)
 		{	ret_val = (ptr - base_addr) * (8/BML_BITS_PER_BLK);

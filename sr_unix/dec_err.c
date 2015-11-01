@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,13 +23,7 @@
 #include "util_out_print_vaparm.h"
 #include "gtmmsg.h"
 
-GBLDEF bool dec_nofac;
-
-#define	NOFLUSH		0
-#define FLUSH		1
-#define RESET		2
-#define OPER		4
-#define SPRINT		5
+GBLREF bool dec_nofac;
 
 void dec_err(va_alist)
 va_dcl
@@ -67,8 +61,7 @@ va_dcl
 		{
 			count = va_arg(var, int4);
 			assert (count <= argcnt);
-		}
-		else
+		} else
 			count = 0;
 		util_out_print_vaparm(msgstr.addr, FLUSH, var, count);
 	}

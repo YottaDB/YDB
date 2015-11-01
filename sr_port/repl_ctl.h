@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,15 +78,14 @@ typedef struct repl_ctl_struct
 {
 	gd_region		*reg;
 	repl_buff_t		*repl_buff;
-	seq_num			min_seqno; /* least JNL_SEQNO in this file */
-	seq_num			max_seqno; /* largest JNL_SEQNO in this file */
+	seq_num			min_seqno;	/* least JNL_SEQNO in this file */
+	seq_num			max_seqno;	/* largest JNL_SEQNO in this file */
 	uint4			min_seqno_dskaddr;
 	uint4			max_seqno_dskaddr;
-	seq_num			seqno; /* Next read positioned at first
-					* jnl rec with JNL_SEQNO seqno */
-	trans_num		tn; /* tn corresponding to seqno */
-	int4			filler1;
-	int4			file_state; /* enum jnl_file_state */
+	seq_num			seqno;		/* Next read positioned at first
+						 * jnl rec with JNL_SEQNO seqno */
+	trans_num		tn; 		/* tn corresponding to seqno */
+	int4			file_state; 	/* enum jnl_file_state */
 	boolean_t		lookback;
 	boolean_t		first_read_done;
 	boolean_t		fh_read_done;

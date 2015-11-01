@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,7 @@ void dse_ctrlc_setup(void);
 int dse_data(char *dst, int *len);
 int dse_getki(char *dst, int *len, char *qual, int qual_len);
 int dse_is_blk_in(sm_uc_ptr_t rp, sm_uc_ptr_t r_top, short size);
-int dse_ksrch(block_id srch, block_id_ptr_t pp, int4 *off, char *targ_key, short targ_len);
+int dse_ksrch(block_id srch, block_id_ptr_t pp, int4 *off, char *targ_key, int targ_len);
 int dse_order(block_id srch, block_id_ptr_t pp, int4 *op, char *targ_key, short int targ_len,
 	bool dir_data_blk);
 void  dse_rmsb(void);

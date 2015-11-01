@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,5 +15,5 @@
 
 LITDEF char	cm_prd_name[] = "GT.CM" ;
 LITDEF int4	cm_prd_len    = sizeof(cm_prd_name) - 1 ;
-LITDEF char	cm_ver_name[] = "V200";
+LITDEF char	cm_ver_name[] = "V210";
 LITDEF int4	cm_ver_len    = sizeof(cm_ver_name) - 1 ;

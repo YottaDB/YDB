@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,10 +20,10 @@
 
 static readonly mstr zero_mstr;
 
-GBLREF char window_token;
-GBLREF mident window_ident;
-GBLREF bool run_time;
-GBLREF char routine_name[];
+GBLREF char 	window_token;
+GBLREF mident 	window_ident;
+GBLREF bool 	run_time;
+GBLREF mident	routine_name;
 GBLREF command_qualifier cmd_qlf;
 
 int f_text(oprtype *a, opctype op)
@@ -46,8 +46,8 @@ int f_text(oprtype *a, opctype op)
 		/* caution: fall through */
 	case TK_IDENT:
 		if (!(cmd_qlf.qlf & CQ_LOWER_LABELS))
-			lower_to_upper((uchar_ptr_t)&window_ident.c[0], (uchar_ptr_t)window_ident.c, sizeof(mident));
-		r->operand[0] = put_str(&window_ident.c[0], mid_len(&window_ident));
+			lower_to_upper((uchar_ptr_t)window_ident.addr, (uchar_ptr_t)window_ident.addr, window_ident.len);
+		r->operand[0] = put_str(window_ident.addr, window_ident.len);
 		advancewindow();
 		break;
 	case TK_ATSIGN:
@@ -85,7 +85,7 @@ int f_text(oprtype *a, opctype op)
 		if (OC_INDFUN != r->opcode)
 		{
 			if (!run_time)
-				label->operand[1] = put_str(routine_name, mid_len((mident *)routine_name));
+				label->operand[1] = put_str(routine_name.addr, routine_name.len);
 			else
 				label->operand[1] = put_tref(newtriple(OC_CURRTN));
 		}
@@ -95,7 +95,7 @@ int f_text(oprtype *a, opctype op)
 		switch(window_token)
 		{
 		case TK_IDENT:
-			label->operand[1] = put_str(&window_ident.c[0], mid_len(&window_ident));
+			label->operand[1] = put_str(window_ident.addr, window_ident.len);
 			advancewindow();
 			break;
 		case TK_ATSIGN:

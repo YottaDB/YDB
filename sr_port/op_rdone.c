@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,8 @@ int op_rdone(mval *v, int4 timeout)
 	if (timeout < 0)
 		timeout = 0;
 	x = -1;
-	stat = (io_curr_device.in->disp_ptr->rdone)(&x, timeout);
+	assert(sizeof(mint) == sizeof(x));
+	stat = (io_curr_device.in->disp_ptr->rdone)((mint *)&x, timeout);
 
 	if (DEFAULT_CODE_SET != active_device->in_code_set)
 	{

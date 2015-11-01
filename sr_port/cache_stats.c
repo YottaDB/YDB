@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,23 +13,29 @@
 #include "mdef.h"
 #include "gtm_stdio.h"
 #include "cache.h"
+#include "hashtab.h"
+#include "hashtab_objcode.h"
 
-GBLREF int		cache_hits, cache_fails;
-GBLREF cache_entry	*cache_entry_base, *cache_entry_top;
+GBLREF int			cache_hits, cache_fails;
+GBLREF	hash_table_objcode	cache_table;
 
 void cache_stats(void)
 {
 	int		total_attempts, ace;
-	cache_entry	*cp;
+	ht_ent_objcode 	*tabent, *topent;
+	cache_entry	*csp;
 
 	total_attempts = cache_hits + cache_fails;
 	FPRINTF(stderr,"\nIndirect code cache performance -- Hits: %d, Fails: %d, Hit Ratio: %d%%\n",
-		cache_hits, cache_fails, total_attempts ? (cache_hits * 100) / (cache_hits + cache_fails) : 0);
+		cache_hits, cache_fails, total_attempts ? ((100 * cache_hits) / (cache_hits + cache_fails)) : 0);
 	ace = 0;	/* active cache entries */
-	for (cp = cache_entry_base; cp < cache_entry_top; ++cp)
+	for (tabent = cache_table.base, topent = cache_table.top; tabent < topent; tabent++)
 	{
-		if (cp->refcnt)
-			++ace;
+		if (HTENT_VALID_OBJCODE(tabent, cache_entry, csp))
+		{
+			if (csp->refcnt || csp->zb_refcnt)
+				++ace;
+		}
 	}
 	FPRINTF(stderr,"Indirect cache entries currently marked active: %d\n", ace);
 }

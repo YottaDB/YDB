@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,10 +21,9 @@
 #include "filestruct.h"
 #include "copy.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
-#include "longset.h"		/* also needed for cws_insert.h */
 #include "tp_change_reg.h"
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
 
@@ -59,7 +58,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 	boolean_t       is_mm;
 	sgmnt_addrs	*csa;
 
-	assert((NULL != first_sgm_info) || (NULL == cw_stagnate) || cw_stagnate_reinitialized);
+	assert((NULL != first_sgm_info) || (0 == cw_stagnate.size) || cw_stagnate_reinitialized);
 		/* if no database activity, cw_stagnate should be uninitialized or reinitialized */
 	if (first_sgm_info != NULL)
 	{	/* It is possible that first_ua is NULL at this point due to a prior call to tp_clean_up() that failed in
@@ -135,10 +134,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 			if (si->num_of_blks)
 			{
 				assert(si->num_of_blks == si->blks_in_use->count);
-				longset((uchar_ptr_t)si->blks_in_use->tbl, sizeof(hashtab_ent) * si->blks_in_use->size, 0);
-				si->blks_in_use->first = NULL;
-				si->blks_in_use->last = NULL;
-				si->blks_in_use->count = 0;
+				reinitialize_hashtab_int4(si->blks_in_use);
 				si->num_of_blks = 0;
 			}
 			si->cr_array_index = 0;			/* reinitialize si->cr_array */
@@ -255,7 +251,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 		CWS_RESET; /* reinitialize the hashtable before restarting/committing the TP transaction */
 	}	/* if (any database work in the transaction) */
 
-	tp_allocation_clue = MASTER_MAP_SIZE * BLKS_PER_LMAP + 1;
+	tp_allocation_clue = MASTER_MAP_SIZE_MAX * BLKS_PER_LMAP + 1;
 	sgm_info_ptr = NULL;
 	first_sgm_info = NULL;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,10 +17,10 @@
 #include "mdq.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
-GBLREF mident window_ident;
-GBLREF triple *expr_start;
-GBLREF bool shift_gvrefs;
+GBLREF char 	window_token;
+GBLREF mident 	window_ident;
+GBLREF triple 	*expr_start;
+GBLREF bool 	shift_gvrefs;
 
 int gvn(void)
 {
@@ -87,7 +87,7 @@ int gvn(void)
 	{
 		if (!ox)
 			ox = OC_GVNAME;
-		*sb1++ = put_str(&window_ident.c[0],mid_len(&window_ident));
+		*sb1++ = put_str(window_ident.addr, window_ident.len);
 		advancewindow();
 	}
 	else

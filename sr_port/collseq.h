@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,30 +22,72 @@
 #ifdef UNIX					/* environment variable syntax is OS dependent */
 #	define	CT_PREFIX	"$gtm_collate_"
 #	define LCT_PREFIX	"$gtm_local_collate"
+#	define LCT_STDNULL	"$gtm_lct_stdnull"
 #elif defined VMS
 #	define	CT_PREFIX	"GTM_COLLATE_"
 #	define LCT_PREFIX	"GTM_LOCAL_COLLATE"
+#	define LCT_STDNULL	"GTM_LCT_STDNULL"
 #else
 #error UNSUPPORTED PLATFORM
 #endif
 
-#define ALLOC_XFORM_BUFF(str)							\
-if ((str)->len > max_lcl_coll_xform_bufsiz)					\
-{										\
-	if (0 == max_lcl_coll_xform_bufsiz)					\
-	{									\
-		assert(NULL == lcl_coll_xform_buff);				\
-		max_lcl_coll_xform_bufsiz = MAX_STRBUFF_INIT;			\
-	} else									\
-	{									\
-		assert(NULL != lcl_coll_xform_buff);				\
-		free(lcl_coll_xform_buff);					\
-	}									\
-	while ((str)->len > max_lcl_coll_xform_bufsiz)				\
-		max_lcl_coll_xform_bufsiz += max_lcl_coll_xform_bufsiz;		\
-	max_lcl_coll_xform_bufsiz = MIN(MAX_STRLEN, max_lcl_coll_xform_bufsiz);	\
-	lcl_coll_xform_buff = (char *)malloc(max_lcl_coll_xform_bufsiz);	\
+#define ALLOC_XFORM_BUFF(str)								\
+{											\
+	if (0 == max_lcl_coll_xform_bufsiz)						\
+	{										\
+		assert(NULL == lcl_coll_xform_buff);					\
+		max_lcl_coll_xform_bufsiz = MAX_STRBUFF_INIT;				\
+		lcl_coll_xform_buff = (char *)malloc(max_lcl_coll_xform_bufsiz);	\
+	} 										\
+	if ((str)->len > max_lcl_coll_xform_bufsiz)					\
+	{										\
+		assert(NULL != lcl_coll_xform_buff);					\
+		free(lcl_coll_xform_buff);						\
+		while ((str)->len > max_lcl_coll_xform_bufsiz)				\
+			max_lcl_coll_xform_bufsiz += max_lcl_coll_xform_bufsiz;		\
+		max_lcl_coll_xform_bufsiz = MIN(MAX_STRLEN, max_lcl_coll_xform_bufsiz);	\
+		lcl_coll_xform_buff = (char *)malloc(max_lcl_coll_xform_bufsiz);	\
+	}										\
 }
+/*
+   Following two macros are currently used in replication filters, merge command  and binary load to transform
+   GTM null subscripts collation to standard null subscript collation and vice versa
+*/
+
+#define GTM2STDNULLCOLL(key, len)							\
+{											\
+	unsigned char *currptr, *ptrtop;						\
+											\
+	currptr = (unsigned char *)(key);						\
+	ptrtop  = (currptr + (len));							\
+	assert(currptr < ptrtop);							\
+	do {										\
+		if ((STR_SUB_PREFIX == *currptr++) && (KEY_DELIMITER == *currptr))	\
+			*(currptr - 1) = SUBSCRIPT_STDCOL_NULL;				\
+		assert(currptr <= ptrtop);						\
+		while ((currptr < ptrtop) && (KEY_DELIMITER != *currptr++))		\
+			;								\
+	} while ((currptr < ptrtop) && (KEY_DELIMITER != *currptr));			\
+	assert(currptr <= ptrtop);							\
+}
+
+#define STD2GTMNULLCOLL(key, len)								\
+{												\
+	unsigned char *currptr, *ptrtop;							\
+												\
+	currptr = (unsigned char *)(key);							\
+	ptrtop  = (currptr + (len));								\
+	assert(currptr < ptrtop);								\
+	do {											\
+		if ((SUBSCRIPT_STDCOL_NULL == *currptr++) && (KEY_DELIMITER == *currptr))	\
+			*(currptr - 1) = STR_SUB_PREFIX;					\
+		assert(currptr <= ptrtop);							\
+		while ((currptr < ptrtop) && (KEY_DELIMITER != *currptr++))			\
+			;									\
+	} while ((currptr < ptrtop) && (KEY_DELIMITER != *currptr));				\
+	assert(currptr <= ptrtop);								\
+}
+
 
 typedef struct collseq_struct {
 	struct collseq_struct	*flink;

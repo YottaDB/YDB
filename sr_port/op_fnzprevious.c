@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "sbs_blk.h"
 #include "collseq.h"
@@ -24,6 +24,7 @@
 LITREF	mval 	SBS_MVAL_INT_ELE;
 
 GBLREF collseq	*local_collseq;
+GBLREF boolean_t local_collseq_stdnull;
 
 void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 {
@@ -53,9 +54,17 @@ void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 				{
 					assert (str->cnt);
 					while (str->nxt) str = str->nxt;
-					dst->mvtype = MV_STR;
-					dst->str = str->ptr.sbs_str[str->cnt - 1].str;
-					found = TRUE;
+					/* With standard collation we will skip the null sub */
+					/* if there is only one  non-null string, then it is the last entry in collation order
+					, so return it */
+					assert(0 < str->cnt);
+					if (!local_collseq_stdnull ||
+						   0 != str->ptr.sbs_str[str->cnt - 1].str.len)
+					{
+						dst->mvtype = MV_STR;
+						dst->str = str->ptr.sbs_str[str->cnt - 1].str;
+						found = TRUE;
+					}
 				}
 			} else
 			{
@@ -74,7 +83,11 @@ void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 						s2pool(&(tmp_sbs.str));
 						key = &tmp_sbs;
 					}
-					if (str && (strp = lv_prv_str_inx (str, &key->str)))
+					/* here needs special handling for standard null collation, because
+					   we need to skip null subscript if exists */
+
+					if (str && (NULL != (strp = lv_prv_str_inx (str, &key->str))) &&
+						(!local_collseq_stdnull || 0 != strp->len))
 					{
 						dst->str = *strp;
 						dst->mvtype = MV_STR;
@@ -117,6 +130,10 @@ void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 					}
 				}
 			}
+			/* it will come here if say x("x") and x(1) and $zp(x("x"))
+			   or for standard null collation x(""),x(1) and x("x") and we specify $zp(x("x"))
+			   */
+
 			if (!found && num)
 			{
 				assert (num->cnt);

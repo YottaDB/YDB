@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,11 +20,13 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "hashdef.h"
 #include "copy.h"
 
 /* Include prototypes */
 #include "t_qread.h"
+#include "min_max.h"
+#include "hashtab_mname.h"
+#include "hashtab.h"
 
 static	mval		val;
 static	char		buff[MAX_KEY_SZ];
@@ -47,9 +49,8 @@ gv_namehead *tp_get_target(sm_uc_ptr_t buffaddr)
 	sm_uc_ptr_t	rp, rtop;
 	cache_rec_ptr_t	dummycr;
 	gv_namehead	*cur_gv_target, *temp_gv_target;
-	mname		lcl_name;
-	unsigned char	*c,*c_top,*in,*in_top;
-	ht_entry	*h;
+	ht_ent_mname	*tabent;
+	mname_entry	 gvent;
 
 	for (levl = MAX_BT_DEPTH;;  levl--)
 	{
@@ -77,18 +78,12 @@ gv_namehead *tp_get_target(sm_uc_ptr_t buffaddr)
 	if (gv_target != cs_addrs->dir_tree)
 	{
 		/* this code is picked up from gv_bind_name */
-		c = (unsigned char *)&lcl_name;
-		c_top = c + sizeof(lcl_name);
-		in = (unsigned char *)val.str.addr;
-		in_top = in + (val.str.len < 8 ? val.str.len : 8);
-		for ( ; in < in_top; )
-			*c++ = *in++;
-		while (c < c_top)
-			*c++ = 0;
-		h = ht_get(gd_header->tab_ptr, &lcl_name);
-		if (!h)
+		gvent.var_name.addr = val.str.addr;
+		gvent.var_name.len = MIN(val.str.len, MAX_MIDENT_LEN);
+		COMPUTE_HASH_MNAME(&gvent);
+		if (NULL ==  (tabent = lookup_hashtab_mname(gd_header->tab_ptr, &gvent)))
 			return (gv_namehead *)NULL;
-		temp_gv_target = (gv_namehead *)h->ptr;
+		temp_gv_target = (gv_namehead *)tabent->value;
 	}
 	else
 		temp_gv_target = gv_target;

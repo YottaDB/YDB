@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,8 +27,8 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 
 /* Include prototypes */
@@ -47,16 +47,15 @@ GBLREF short		dollar_tlevel;
 GBLREF sgm_info		*sgm_info_ptr;
 GBLREF boolean_t	horiz_growth;
 
-/* delete all records greater than low and less than high in blk */
+/* delete all records greater than low and less than high in blkhist->blk_num */
 
-enum cdb_sc	gvcst_kill_blk(block_id blk,
-				char level,
-				sm_uc_ptr_t buffer,
-				gv_key *search_key,
-				srch_rec_status low,
-				srch_rec_status high,
-				bool right_extra,
-				cw_set_element **cseptr)
+enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
+			       char		level,
+			       gv_key  		*search_key,
+			       srch_rec_status	low,
+			       srch_rec_status	high,
+			       boolean_t	right_extra,
+			       cw_set_element	**cseptr)
 {
 	typedef sm_uc_ptr_t		bytptr;
 
@@ -79,10 +78,13 @@ enum cdb_sc	gvcst_kill_blk(block_id blk,
 	cw_set_element			*cse, *old_cse;
 	bytptr				curr, prev;
 	off_chain			chain1, curr_chain, prev_chain;
+	block_id			blk;
+	sm_uc_ptr_t			buffer;
 
 	*cseptr = NULL;
 	if (low.offset == high.offset)
 		return cdb_sc_normal;
+	blk = blkhist->blk_num;
 	if (dollar_tlevel)
 	{
 		PUT_LONG(&chain1, blk);
@@ -93,6 +95,7 @@ enum cdb_sc	gvcst_kill_blk(block_id blk,
 			return cdb_sc_blknumerr;
 		}
 	}
+	buffer = blkhist->buffaddr;
 	old_blk_hdr = (blk_hdr_ptr_t)buffer;
 	kill_root = FALSE;
 	blk_size = cs_data->blk_size;
@@ -100,7 +103,7 @@ enum cdb_sc	gvcst_kill_blk(block_id blk,
 	top_of_block = (rec_hdr_ptr_t)((bytptr)old_blk_hdr + old_blk_hdr->bsiz);
 	left_ptr = (rec_hdr_ptr_t)((bytptr)old_blk_hdr + low.offset);
 	right_ptr = (rec_hdr_ptr_t)((bytptr)old_blk_hdr + high.offset);
-	if (right_extra  &&  right_ptr < top_of_block)
+	if (right_extra && right_ptr < top_of_block)
 	{
 		right_prev_ptr = right_ptr;
 		GET_USHORT(temp_ushort, &right_ptr->rsiz);
@@ -153,7 +156,7 @@ enum cdb_sc	gvcst_kill_blk(block_id blk,
 			GET_USHORT(temp_ushort, &rp->rsiz);
 			rp1 = (rec_hdr_ptr_t)((bytptr)rp + temp_ushort);
 			if (((bytptr)rp1 < (bytptr)(rp + 1) + sizeof(block_id)) ||
-				((bytptr)rp1 < buffer)  ||  ((bytptr)rp1 > (buffer + blk_size)))
+				((bytptr)rp1 < buffer) || ((bytptr)rp1 > (buffer + blk_size)))
 			{
 					assert(CDB_STAGNATE > t_tries);
 					return cdb_sc_rmisalign;
@@ -193,8 +196,7 @@ enum cdb_sc	gvcst_kill_blk(block_id blk,
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_mkblk;
 		}
-		cse = t_write(blk, (unsigned char *)bs1, sizeof(blk_hdr) + sizeof(rec_hdr), new_block_index, buffer, 1,
-			TRUE, FALSE);
+		cse = t_write(blkhist, (unsigned char *)bs1, sizeof(blk_hdr) + sizeof(rec_hdr), new_block_index, 1, TRUE, FALSE);
 		assert(!dollar_tlevel || !cse->high_tlevel);
 		*cseptr = cse;
 		if (NULL != cse)
@@ -288,7 +290,7 @@ enum cdb_sc	gvcst_kill_blk(block_id blk,
 		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_mkblk;
 	}
-	cse = t_write(blk, (unsigned char *)bs1, 0, 0, buffer, level, first_copy, TRUE);
+	cse = t_write(blkhist, (unsigned char *)bs1, 0, 0, level, first_copy, TRUE);
 	assert(!dollar_tlevel || !cse->high_tlevel);
 	*cseptr = cse;
 	if (horiz_growth)

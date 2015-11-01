@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "lockconst.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"
 #include "cmidef.h"
 #include "cmmdef.h"
 #include "eintr_wrappers.h"
@@ -96,7 +96,7 @@ cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 		memcpy(ptr->reg->dyn.addr->fname, fname, len);
 		ptr->reg->dyn.addr->fname_len = len;
 		set_gdid_from_stat(&FILE_INFO(ptr->reg)->fileid, &stat_buf);
-		ptr->reg_hash = (htab_desc *)malloc(sizeof(htab_desc));
+		ptr->reg_hash = (hash_table_mname *)malloc(sizeof(hash_table_mname));
 		if (-1 != gethostname((char *)node, sizeof(node)))
 		{
 			retlen = strlen((char *)node);

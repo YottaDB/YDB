@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,16 @@ void mupip_set_jnl_cleanup(boolean_t clean_exit)
 		GDS_INFO	*gds_info;
 		uint4		status;
 	)
+
+	for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
+	{
+		if (ALLOCATED == rptr->state && !rptr->exclusive)
+		{
+			assert(NULL != rptr->reg->dyn.addr->file_cntl && NULL != rptr->sd);
+			if (NULL != rptr->reg->dyn.addr->file_cntl && NULL != rptr->sd)
+				rel_crit(rptr->reg);
+		}
+	}
 
 	for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
 	{

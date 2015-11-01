@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,8 +27,8 @@
 #include "jnl.h"
 #include "gdscc.h"
 #include "gdskill.h"
-#include "hashtab.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "error.h"
 #include "gbldirnam.h"

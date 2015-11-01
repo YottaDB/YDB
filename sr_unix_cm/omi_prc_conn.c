@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,11 +24,12 @@ static char rcsid[] = "$Header:$";
 
 #include "gtm_string.h"
 #include "gtm_stdio.h"
+#include <crypt.h> /* for crypt() */
 
 #include "gtcm.h"
 #include "omi.h"
-#include <pwd.h>
-#include <ctype.h>
+#include "gtm_pwd.h"
+#include "gtm_ctype.h"
 #ifdef GTCM_RC
 #include "rc.h"
 #endif /* defined(GTCM_RC) */

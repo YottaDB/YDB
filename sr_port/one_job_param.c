@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,7 @@ int one_job_param (char **parptr)
 	error_def	(ERR_JOBPARSTR);
 
 	if ((window_token != TK_IDENT) ||
-	   ((x = namelook (job_param_index, job_param_names, window_ident.c)) < 0))
+	   ((x = namelook (job_param_index, job_param_names, window_ident.addr, window_ident.len)) < 0))
 	{
 		stx_error (ERR_JOBPARUNK);
 		return FALSE;

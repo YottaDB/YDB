@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@ GBLDEF	int		max_lcl_coll_xform_bufsiz;
 
 GBLDEF	collseq		*collseq_list = (collseq*)0;
 GBLDEF  bool		transform;
+GBLDEF	boolean_t	local_collseq_stdnull = FALSE;
 
 int find_local_colltype(void)
 {

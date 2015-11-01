@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,9 @@
 
 #include "mdef.h"
 
-#include <sys/time.h>
+#include "gtm_time.h"
 #include <errno.h>
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #include "gtm_string.h"
 #ifdef UNIX
 #include <sys/sem.h>
@@ -76,17 +76,19 @@ int is_recv_srv_alive(void)
 
 int gtmrecv_checkhealth(void)
 {
-	int		rcv_status, upd_status;
-	uint4		gtmrecv_pid;
-	uint4 		updproc_pid;
-	uint4 		updproc_pid_prev;
+	int			rcv_status, upd_status, helper_status;
+	uint4			gtmrecv_pid, updproc_pid, updproc_pid_prev, helper_pid;
+	boolean_t		helper_alive;
+	upd_helper_ctl_ptr_t	upd_helper_ctl;
+	upd_helper_entry_ptr_t	helper, helper_top;
+	recvpool_user		helper_type;
 
 	/* Grab the recvpool option write lock */
 
 	if (0 > grab_sem(RECV, RECV_SERV_OPTIONS_SEM))
 	{
-		repl_log(stderr, FALSE, TRUE, "Error grabbing recvpool option write lock : %s. Could not check health of Receiver \
-			 Server/Update Process\n", REPL_SEM_ERROR);
+		repl_log(stderr, FALSE, TRUE, "Error grabbing recvpool option write lock : %s. Could not check health of Receiver"
+			 "Server/Update Process\n", REPL_SEM_ERROR);
 		return (((SRV_ERR << 2) | SRV_ERR) + NORMAL_SHUTDOWN);
 	}
 
@@ -145,6 +147,32 @@ int gtmrecv_checkhealth(void)
 			break;
 	}
 
+	helper_status = SRV_ALIVE;
+	if (gtmrecv_options.helpers)
+	{
+		upd_helper_ctl = recvpool.upd_helper_ctl;
+		for (helper = upd_helper_ctl->helper_list, helper_top = helper + MAX_UPD_HELPERS; helper < helper_top; helper++)
+		{
+			if (0 != (helper_pid = helper->helper_pid_prev))
+			{
+				helper_type = helper->helper_type;
+				helper_alive = is_proc_alive(helper_pid, 0);
+				if (helper_alive && 0 == helper->helper_pid) /* process has vacated its slot, but the rcvr hasn't */
+					helper_alive = FALSE;          /* salvaged it yet. Unix zombies are alive,* er, half dead */
+				helper_status = (SRV_ALIVE == helper_status && helper_alive) ? SRV_ALIVE : SRV_DEAD;
+				repl_log(stderr, FALSE, TRUE, FORMAT_STR, helper_pid,
+						(UPD_HELPER_READER == helper_type) ? "Helper reader" : "Helper writer",
+					 	helper_alive ? "" : " NOT");
+			}
+		}
+		if (SRV_DEAD == helper_status)
+		{ /* indicate to the receiver that it has to reap helpers */
+			upd_helper_ctl->reap_helpers = HELPER_REAP_NOWAIT;
+			while (HELPER_REAP_NONE != upd_helper_ctl->reap_helpers && SRV_ALIVE == is_recv_srv_alive())
+				SHORT_SLEEP(GTMRECV_WAIT_FOR_UPD_SHUTDOWN);
+			upd_helper_ctl->reap_helpers = HELPER_REAP_NONE; /* just in case recvr died */
+		}
+	}
 	rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-	return ((rcv_status | (upd_status << 2)) + NORMAL_SHUTDOWN);
+	return ((rcv_status | (upd_status << 2) | (helper_status << 4)) + NORMAL_SHUTDOWN);
 }

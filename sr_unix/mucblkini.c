@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,21 +69,25 @@ void mucblkini (void)
 	c = CST_BOK(rp);
 	tmp = DIR_DATA;
 	PUT_LONG(c, tmp);
+	bp1->bver = GDSVCURR;
 	bp1->levl = 1;
 	bp1->bsiz = BSTAR_REC_SIZE + sizeof(blk_hdr);
 	bp1->tn = 0;
+	bp2->bver = GDSVCURR;
 	bp2->levl =0;
 	bp2->bsiz = sizeof(blk_hdr);
 	bp2->tn = 0;
-	if (dsk_write(gv_cur_region, DIR_ROOT, (uchar_ptr_t)bp1) != SS_NORMAL)
+	DSK_WRITE_NOCACHE(gv_cur_region, DIR_ROOT, (uchar_ptr_t)bp1, cs_addrs->hdr->desired_db_format, status);
+	if (0 != status)
 	{
 		PERROR("Error writing to disk");
-		exit(errno);
+		exit(status);
 	}
-	if (dsk_write(gv_cur_region, DIR_DATA, (uchar_ptr_t)bp2) != SS_NORMAL)
+	DSK_WRITE_NOCACHE(gv_cur_region, DIR_DATA, (uchar_ptr_t)bp2, cs_addrs->hdr->desired_db_format, status);
+	if (0 != status)
 	{
 		PERROR("Error writing to disk");
-		exit(errno);
+		exit(status);
 	}
 	return;
 }

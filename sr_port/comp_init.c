@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "stp_parms.h"
 #include "compiler.h"
 #include "stringpool.h"
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "opcode.h"
 #include "cgp.h"

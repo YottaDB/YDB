@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,53 +18,58 @@
 #include "gtm_caseconv.h"
 #include "stringpool.h"
 #include "view.h"
+#include "min_max.h"	/* MIDENT_CMP needs MIN */
 
 #define S_CUTOFF 7
-GBLREF RTN_TABENT *rtn_names, *rtn_names_end;
-GBLREF stack_frame *frame_pointer;
 
-void view_routines(mval *dst,mident *name)
+GBLREF rtn_tabent	*rtn_names, *rtn_names_end;
+GBLREF stack_frame 	*frame_pointer;
+
+void view_routines(mval *dst, mident_fixed *name)
 {
-	unsigned short  len;
 	mident		temp;
-	RTN_TABENT	*bot, *top, *mid;
+	char		temp_buff[sizeof(mident_fixed)];
+	rtn_tabent	*bot, *top, *mid;
 	int4		comp;
 
-	len = mid_len(name);
-
+	temp.len = mid_len(name);
 #ifdef UNIX
-	memcpy(&temp.c[0], name, sizeof(mident));
+	temp.addr = &name->c[0];
 #else
-	lower_to_upper(&temp.c[0], name, sizeof(mident));
+	lower_to_upper(&temp_buff[0], &name->c[0], temp.len);
+	temp.addr = &temp_buff[0];
 #endif
 
 	bot = rtn_names;
 	top = rtn_names_end;
-	while (bot->rt_name.c[0] < '%' && bot < top)
+	/* Skip over all routines that are not created by the user. These routines include
+	 * the dummy null routine, $FGNXEC (created for DALs) and $FGNFNC (created for Call-ins)
+	 * which are guaranteed to sort before any valid M routine */
+	while (bot < top && (0 == bot->rt_name.len || '%' > bot->rt_name.addr[0]))
 		bot++;
-
 	assert(bot <= top);
-	if (!len)
-	{	dst->str.addr = &bot->rt_name.c[0];
-		dst->str.len = mid_len(&bot->rt_name);
+	if (!temp.len)
+	{	dst->str.addr = bot->rt_name.addr;
+		dst->str.len = bot->rt_name.len;
 		s2pool(&dst->str);
 		return;
 	}
 
 	for (;;)
-	{	if ((char *) top - (char *) bot < S_CUTOFF * sizeof(RTN_TABENT))
+	{
+		if ((top - bot) < S_CUTOFF)
 		{
 			comp = -1;
 			for (mid = bot; comp < 0 && mid <= top ;mid++)
 			{
-				comp = memcmp(mid->rt_name.c, &temp, sizeof(mident));
+				MIDENT_CMP(&mid->rt_name, &temp, comp);
 				if (!comp)
 				{
 					if (mid != rtn_names_end)
 					{
 						mid++;
-						dst->str.addr = &mid->rt_name.c[0];
-						dst->str.len = mid_len(&mid->rt_name);
+						dst->str.addr = mid->rt_name.addr;
+						dst->str.len = mid->rt_name.len;
 						s2pool(&dst->str);
 					}
 					else
@@ -74,8 +79,8 @@ void view_routines(mval *dst,mident *name)
 				else if (comp < 0)
 					continue;
 				else
-				{	dst->str.addr = &mid->rt_name.c[0];
-					dst->str.len = mid_len(&mid->rt_name);
+				{	dst->str.addr = mid->rt_name.addr;
+					dst->str.len = mid->rt_name.len;
 					s2pool(&dst->str);
 					return;
 				}
@@ -86,13 +91,13 @@ void view_routines(mval *dst,mident *name)
 		else
 		{
 			mid = bot + (top - bot)/2;
-			comp = memcmp(mid->rt_name.c, &temp, sizeof(mident));
+			MIDENT_CMP(&mid->rt_name, &temp, comp);
 			if (!comp)
 			{	if (mid != rtn_names_end)
 				{
 					mid++;
-					dst->str.addr = &mid->rt_name.c[0];
-					dst->str.len = mid_len(&mid->rt_name);
+					dst->str.addr = mid->rt_name.addr;
+					dst->str.len = mid->rt_name.len;
 					s2pool(&dst->str);
 				}
 				else

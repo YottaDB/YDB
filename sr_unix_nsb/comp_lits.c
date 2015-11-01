@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,11 +15,12 @@
 #include "mdq.h"
 #include "stringpool.h"
 
-GBLREF mliteral literal_chain;
-GBLREF spdesc stringpool;
-GBLREF unsigned short source_name_len;
+GBLREF mliteral 	literal_chain;
+GBLREF spdesc 		stringpool;
+GBLREF unsigned short 	source_name_len;
+GBLREF mident		routine_name;
 
-GBLDEF uint4 lits_size, lit_addrs;
+GBLDEF uint4 		lits_size, lit_addrs;
 
 void comp_lits(rhead)
 rhdtyp *rhead;
@@ -29,13 +30,15 @@ rhdtyp *rhead;
 	mliteral *p;
 
 	offset = stringpool.free - stringpool.base;
+	offset += PADLEN(offset, NATIVE_WSIZE);
 	rhead->src_full_name.len = source_name_len;
 	rhead->src_full_name.addr = (char *)offset;
 	offset += source_name_len;
-	align_pad = offset & 3;
-	if (align_pad)
-		offset += (4 - align_pad);
-
+	offset += PADLEN(offset, NATIVE_WSIZE);
+	rhead->routine_name.len = routine_name.len;
+	rhead->routine_name.addr = (char *)offset;
+	offset += routine_name.len;
+	offset += PADLEN(offset, NATIVE_WSIZE);
 	cnt = 0;
 	dqloop(&literal_chain, que, p)
 		if (p->rt_addr < 0)

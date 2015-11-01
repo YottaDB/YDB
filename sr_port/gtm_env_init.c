@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2004, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,9 @@
 #include "trans_numeric.h"
 #include "gtmdbglvl.h"
 #include "iosp.h"
+#include "wbox_test_init.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() and gtm_env_init_sp() prototype */
+#include "collseq.h"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -36,6 +38,9 @@ GBLREF	boolean_t	gvdupsetnoop; 		/* if TRUE, duplicate SETs update journal but n
 GBLREF	uint4		gtmDebugLevel; 		/* Debug level (0 = using default sm module so with
 						   a DEBUG build, even level 0 implies basic debugging) */
 GBLREF	boolean_t	gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
+GBLREF	bool		certify_all_blocks;
+GBLREF	boolean_t	local_collseq_stdnull; /*If true, standard null subscript collation will be used for local variables */
+GBLREF	uint4		gtm_blkupgrade_flag;	/* controls whether dynamic block upgrade is attempted or not */
 
 void	gtm_env_init(void)
 {
@@ -77,6 +82,28 @@ void	gtm_env_init(void)
 		gtm_fullblockwrites = logical_truth_value(&val, &is_defined);
 		if (!is_defined)
 			gtm_fullblockwrites = DEFAULT_FBW_FLAG;
+
+		/* GDS Block certification */
+		val.addr = GTM_GDSCERT;
+		val.len = sizeof(GTM_GDSCERT) - 1;
+		ret = logical_truth_value(&val, &is_defined);
+		if (is_defined)
+			certify_all_blocks = ret; /* if the logical is not defined, we want to take default value */
+
+		/* Initialize null subscript's collation order */
+		val.addr = LCT_STDNULL;
+		val.len = sizeof(LCT_STDNULL) - 1;
+		ret = logical_truth_value(&val, &is_defined);
+		if (is_defined)
+			local_collseq_stdnull = ret;
+
+		/* Initialize variables for white box testing */
+		DEBUG_ONLY(wbox_test_init();)
+
+		/* Initialize variable that controls dynamic GT.M block upgrade */
+		val.addr = GTM_BLKUPGRADE_FLAG;
+		val.len = sizeof(GTM_BLKUPGRADE_FLAG) - 1;
+		gtm_blkupgrade_flag = trans_numeric(&val, &is_defined, TRUE);
 
 		/* Platform specific initializations */
 		gtm_env_init_sp();

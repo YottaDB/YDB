@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,8 +29,8 @@
 #include "iosp.h"
 #include "interlock.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "gdsbgtr.h"
 #include "sleep_cnt.h"
@@ -49,25 +49,36 @@
 #include "gtmsecshr.h"		/* for continue_proc */
 #endif
 #include "cert_blk.h"
+#include "hashtab.h"
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
 GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a failure (no buffer filled) and the real
 					status of the read is returned using a global reference, as the status detail
 					should typically not be needed and optimizing the call is important */
 
-GBLREF bool             certify_all_blocks;
-GBLREF gd_region	*gv_cur_region;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF sgm_info		*sgm_info_ptr;
-GBLREF short		crash_count;
-GBLREF short		dollar_tlevel;
-GBLREF unsigned int	t_tries;
-GBLREF uint4		process_id;
-GBLREF boolean_t	tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
-GBLREF gv_namehead	*gv_target;
+GBLREF	bool			certify_all_blocks;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	short			crash_count;
+GBLREF	short			dollar_tlevel;
+GBLREF	unsigned int		t_tries;
+GBLREF	uint4			process_id;
+GBLREF	boolean_t		tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
+GBLREF	gv_namehead		*gv_target;
+GBLREF	boolean_t		dse_running;
+GBLREF boolean_t		disk_blk_read;
 
-#define BAD_LUCK_ABOUNDS 1
+/* There are 3 passes (of the do-while loop below) we allow now.
+ * The first pass which is potentially out-of-crit and hence can end up not locating the cache-record for the input block.
+ * The second pass which holds crit and is waiting for a concurrent reader to finish reading the input block in.
+ * The third pass is needed because the concurrent reader (in dsk_read) might encounter a DYNUPGRDFAIL error in which case
+ *	it is going to increment the cycle in the cache-record and reset the blk to CR_BLKEMPTY.
+ * We dont need any pass more than this because if we hold crit then no one else can start a dsk_read for this block.
+ * This # of passes is hardcoded in the macro BAD_LUCK_ABOUNDS
+ */
+#define BAD_LUCK_ABOUNDS 2
 #define	RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, newcr, newcycle)				\
 	assert((first_tp_srch_status)->cr != (newcr) || (first_tp_srch_status)->cycle != (newcycle));	\
 	(first_tp_srch_status)->cr = (newcr);								\
@@ -77,7 +88,7 @@ GBLREF gv_namehead	*gv_target;
 sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out)
 	/* cycle is used in t_end to detect if the buffer has been refreshed since the t_qread */
 {
-	uint4			status, duint4, blocking_pid;
+	uint4			status, blocking_pid;
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
 	bool			clustered, was_crit;
@@ -86,11 +97,14 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	off_chain		chain1;
 	register sgmnt_addrs	*csa;
 	register sgmnt_data_ptr_t	csd;
+	enum db_ver		ondsk_blkver;
 	int4			dummy_errno;
 	boolean_t		already_built, is_mm, reset_first_tp_srch_status, set_wc_blocked;
+	ht_ent_int4		*tabent;
 
-	error_def(ERR_DBFILERR);
 	error_def(ERR_BUFOWNERSTUCK);
+	error_def(ERR_DBFILERR);
+	error_def(ERR_DYNUPGRDFAIL);
 
 	first_tp_srch_status = NULL;
 	reset_first_tp_srch_status = FALSE;
@@ -118,8 +132,10 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				}
 			} else
 			{
-				first_tp_srch_status = (srch_blk_status *)lookup_hashtab_ent(sgm_info_ptr->blks_in_use,
-												(void *)blk, &duint4);
+				if (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&blk)))
+					first_tp_srch_status = tabent->value;
+				else
+					first_tp_srch_status = NULL;
 				ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(first_tp_srch_status, sgm_info_ptr);
 				cse = first_tp_srch_status ? first_tp_srch_status->ptr : NULL;
 			}
@@ -154,10 +170,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							rdfail_detail = cdb_sc_lostcr;	/* should this be something else */
 							return (sm_uc_ptr_t)NULL;
 						}
-        					if (certify_all_blocks &&
-								FALSE == cert_blk(gv_cur_region, blk, (blk_hdr_ptr_t)cse->new_buff,
-											cse->blk_target->root))
-							GTMASSERT;
+						if (certify_all_blocks)
+							cert_blk(gv_cur_region, blk, (blk_hdr_ptr_t)cse->new_buff,
+								cse->blk_target->root, TRUE);	/* will GTMASSERT on integ error */
 					}
 					cse->done = TRUE;
 				}
@@ -167,8 +182,12 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			}
 			assert(!chain1.flag);
 		} else
-			first_tp_srch_status =
-					(srch_blk_status *)lookup_hashtab_ent(sgm_info_ptr->blks_in_use, (void *)blk, &duint4);
+		{
+			if (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&blk)))
+				first_tp_srch_status = tabent->value;
+			else
+				first_tp_srch_status = NULL;
+		}
 		ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(first_tp_srch_status, sgm_info_ptr);
 		if (!is_mm && first_tp_srch_status)
 		{
@@ -257,9 +276,14 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				assert(0 == cr->dirty);
 				assert(cr->read_in_progress >= 0);
 				INCR_DB_CSH_COUNTER(csa, n_dsk_reads, 1);
-				if (SS_NORMAL != (status = dsk_read(blk, GDS_REL2ABS(cr->buffaddr))))
-				{
+				CR_BUFFER_CHECK(gv_cur_region, csa, csd, cr);
+				if (SS_NORMAL != (status = dsk_read(blk, GDS_REL2ABS(cr->buffaddr), &ondsk_blkver)))
+				{	/* buffer does not contain valid data, so reset blk to be empty */
+					cr->cycle++;	/* increment cycle for blk number changes (for tp_hist and others) */
+					cr->blk = CR_BLKEMPTY;
+					cr->r_epid = 0;
 					RELEASE_BUFF_READ_LOCK(cr);
+					assert(-1 <= cr->read_in_progress);
 					assert(was_crit == csa->now_crit);
 					if (FUTURE_READ == status)
 					{	/* in cluster, block can be in the "future" with respect to the local history */
@@ -268,10 +292,27 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						rdfail_detail = cdb_sc_future_read;	/* t_retry forces the history up to date */
 						return (sm_uc_ptr_t)NULL;
 					}
-					rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
+					if (ERR_DYNUPGRDFAIL == status)
+					{	/* if we dont hold crit on the region, it is possible due to concurrency conflicts
+						 * that this block is unused (i.e. marked free/recycled in bitmap, see comments in
+						 * gds_blk_upgrade.h). in this case we should not error out but instead restart.
+						 */
+						if (was_crit)
+						{
+							assert(FALSE);
+							rts_error(VARLSTCNT(5) status, 3, blk, DB_LEN_STR(gv_cur_region));
+						} else
+						{
+							rdfail_detail = cdb_sc_lostcr;
+							return (sm_uc_ptr_t)NULL;
+						}
+					} else
+						rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
 				}
+				disk_blk_read = TRUE;
 				assert(0 <= cr->read_in_progress);
 				assert(0 == cr->dirty);
+				cr->ondsk_blkver = ondsk_blkver;			/* Only set in cache if read was success */
 				cr->r_epid = 0;
 				RELEASE_BUFF_READ_LOCK(cr);
 				assert(-1 <= cr->read_in_progress);
@@ -296,6 +337,16 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			set_wc_blocked = TRUE;
 			break;
 		}
+		/* it is very important for cycle to be noted down before checking for read_in_progress. doing it
+		 * the other way round introduces the scope for a bug in the concurrency control validation logic in
+		 * t_end/tp_hist/tp_tend. this is because the validation logic relies on t_qread returning an atomically
+		 * consistent value of <"cycle","cr"> for a given input blk such that cr->buffaddr held the input blk's
+		 * contents at the time when cr->cycle was "cycle". it is important that cr->read_in_progress is -1
+		 * (indicating the read from disk into the buffer is complete) when t_qread returns. the only exception
+		 * is if cr->cycle is higher than the "cycle" returned by t_qread (signifying the buffer got reused for
+		 * another block concurrently) in which case the cycle check in the validation logic will detect this.
+		 */
+		*cycle = cr->cycle;
 		for (lcnt = 1;  ; lcnt++)
 		{
 			if (0 > cr->read_in_progress)
@@ -307,7 +358,6 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					cr->blk = CR_BLKEMPTY;
 					break;
 				}
-				*cycle = cr->cycle;
 				*cr_out = cr;
 				VMS_ONLY(
 					/* If we were doing the db_csh_get() above (in t_qread itself) and located the cache-record
@@ -377,7 +427,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							send_msg(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region));
 							send_msg(VARLSTCNT(9) ERR_BUFOWNERSTUCK, 7, process_id, blocking_pid,
 								cr->blk, cr->blk, (lcnt / BUF_OWNER_STUCK),
-								cr->read_in_progress, cr->rip_latch.latch_pid);
+								cr->read_in_progress, cr->rip_latch.u.parts.latch_pid);
 							if ((4 * BUF_OWNER_STUCK) <= lcnt)
 								GTMASSERT;
 							/* Kickstart the process taking a long time in case it was suspended */
@@ -408,16 +458,18 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		if (set_wc_blocked)	/* cannot use csd->wc_blocked here as we might not necessarily have crit */
 			break;
 		ocnt++;
-		if (BAD_LUCK_ABOUNDS <= ocnt)
+		assert((0 == was_crit) || (1 == was_crit));
+		/* if we held crit while entering t_qread we might need BAD_LUCK_ABOUNDS - 1 passes.
+		 * otherwise we might need BAD_LUCK_ABOUNDS passes. if we are beyond this GTMASSERT.
+		 */
+		if ((BAD_LUCK_ABOUNDS - was_crit) < ocnt)
 		{
-			if (BAD_LUCK_ABOUNDS < ocnt || csa->now_crit)
-			{
-				rel_crit(gv_cur_region);
-				GTMASSERT;
-			}
-			if (FALSE == csa->now_crit)
-				grab_crit(gv_cur_region);
+			assert(!csa->now_crit);
+			rel_crit(gv_cur_region);
+			GTMASSERT;
 		}
+		if (FALSE == csa->now_crit)
+			grab_crit(gv_cur_region);
 	} while (TRUE);
 	assert(set_wc_blocked && (csd->wc_blocked || !csa->now_crit));
 	rdfail_detail = cdb_sc_cacheprob;

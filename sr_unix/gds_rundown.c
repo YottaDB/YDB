@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,17 +11,18 @@
 
 #include "mdef.h"
 
-#include <sys/ipc.h>
-#include <sys/sem.h>
-#include <sys/mman.h>
-#include <sys/shm.h>
-#include <arpa/inet.h>
-#include <errno.h>
+#include "gtm_ipc.h"
+#include "gtm_inet.h"
 #include "gtm_fcntl.h"
 #include "gtm_string.h"
 #include "gtm_unistd.h"
-#include <signal.h>	/* for VSIG_ATOMIC_T type */
 #include "gtm_time.h"
+
+#include <sys/sem.h>
+#include <sys/mman.h>
+#include <sys/shm.h>
+#include <errno.h>
+#include <signal.h>	/* for VSIG_ATOMIC_T type */
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -201,13 +202,8 @@ void gds_rundown(void)
 	we_are_last_user = FALSE;
 	if (!csa->persistent_freeze)
 		region_freeze(reg, FALSE, FALSE);
-	if (csa->read_lock)			/* get locks to known state */
-	{
-		crash_count = csa->critical->crashcnt;
-		rel_read_crit(reg, crash_count);
-	}
-	else
-		rel_crit(reg);
+	assert(!csa->read_lock);
+	rel_crit(reg);		/* get locks to known state */
 	mutex_cleanup(reg);
 	/*
 	 * We need to guarantee that none else access database file header when semid/shmid fields are reset.
@@ -288,7 +284,7 @@ void gds_rundown(void)
 			SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 			BG_TRACE_PRO_ANY(csa, wcb_gds_rundown);
                         send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_gds_rundown"),
-                                process_id, csa->ti->curr_tn, DB_LEN_STR(reg));
+                                process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
 			csa->wbuf_dqd = 0;
 			wcs_recover(reg);
 			if (is_mm)
@@ -366,15 +362,15 @@ void gds_rundown(void)
 			 */
 			tp_change_reg();	/* call this because jnl_ensure_open checks cs_addrs rather than gv_cur_region */
 			jpc = csa->jnl;
-			if (jpc->jnl_buff->fsync_in_prog_latch.latch_pid == process_id)
+			if (jpc->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid == process_id)
                         {
                                 assert(FALSE);
-                                compswap(&jpc->jnl_buff->fsync_in_prog_latch, process_id, LOCK_AVAILABLE);
+                                COMPSWAP(&jpc->jnl_buff->fsync_in_prog_latch, process_id, 0, LOCK_AVAILABLE, 0);
                         }
-                        if (jpc->jnl_buff->io_in_prog_latch.latch_pid == process_id)
+                        if (jpc->jnl_buff->io_in_prog_latch.u.parts.latch_pid == process_id)
                         {
                                 assert(FALSE);
-                                compswap(&jpc->jnl_buff->io_in_prog_latch, process_id, LOCK_AVAILABLE);
+                                COMPSWAP(&jpc->jnl_buff->io_in_prog_latch, process_id, 0, LOCK_AVAILABLE, 0);
                         }
 			if (((NOJNL != jpc->channel) && !JNL_FILE_SWITCHED(jpc))
 				|| we_are_last_writer && (0 != csa->nl->jnl_file.u.inode))
@@ -474,10 +470,12 @@ void gds_rundown(void)
 	/* Unmap storage if mm mode but only the part that is not the fileheader (so shows up in dumps) */
 	if (is_mm)
 	{
-		munmap_len = (sm_long_t)(csa->db_addrs[1] - csa->db_addrs[0]) - ROUND_UP(sizeof(sgmnt_data), MSYNC_ADDR_INCS);
+		munmap_len = (sm_long_t)(csa->db_addrs[1] - csa->db_addrs[0]) - ROUND_UP(SIZEOF_FILE_HDR(csa->hdr),
+											 MSYNC_ADDR_INCS);
 		if (munmap_len > 0)
 		{
-			munmap((caddr_t)(csa->db_addrs[0] + ROUND_UP(sizeof(sgmnt_data), MSYNC_ADDR_INCS)), (size_t)(munmap_len));
+			munmap((caddr_t)(csa->db_addrs[0] + ROUND_UP(SIZEOF_FILE_HDR(csa->hdr), MSYNC_ADDR_INCS)),
+			       (size_t)(munmap_len));
 #ifdef DEBUG_DB64
 			rel_mmseg((caddr_t)csa->db_addrs[0]);
 #endif

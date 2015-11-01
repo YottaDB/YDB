@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -246,7 +246,7 @@ bool wcs_flu(bool options)
 				SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 				BG_TRACE_PRO_ANY(csa, wcb_wcs_flu1);
 				send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_wcs_flu1"),
-                        		process_id, csa->ti->curr_tn, DB_LEN_STR(gv_cur_region));
+                        		process_id, &csa->ti->curr_tn, DB_LEN_STR(gv_cur_region));
 				assert(!jnl_enabled || jb->fsync_dskaddr == jb->freeaddr);
 				wcs_recover(gv_cur_region);
 				if (jnl_enabled && (jb->fsync_dskaddr != jb->freeaddr))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ void dse_range(void)
 
     if (cli_present("FROM") == CLI_PRESENT)
     {
-	if (!cli_get_hex("FROM",&from))
+	if (!cli_get_hex("FROM", (uint4 *)&from))
 	    return;
 	if (from < 0 || from > cs_addrs->ti->total_blks
 	    || !(from % cs_addrs->hdr->bplmap))
@@ -71,7 +71,7 @@ void dse_range(void)
 	from = 1;
     if (cli_present("TO") == CLI_PRESENT)
     {
-	if(!cli_get_hex("TO",&to))
+	if(!cli_get_hex("TO", (uint4 *)&to))
 	    return;
 	if (to < 0 || to > cs_addrs->ti->total_blks
 	    || !(to % cs_addrs->hdr->bplmap))
@@ -160,6 +160,7 @@ void dse_range(void)
 	    r_top = rp + rsize;
 	if (r_top >= b_top)
 	    r_top = b_top;
+	got_lonely_star = FALSE;
 	if (((blk_hdr_ptr_t) bp)->levl)
 	{
 	    key_top = r_top - sizeof(block_id);

@@ -15,7 +15,7 @@
 
 #include <varargs.h>
 
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "sbs_blk.h"
 #include "collseq.h"

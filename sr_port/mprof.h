@@ -9,20 +9,14 @@
  *								*
  ****************************************************************/
 
-#ifndef _MPROF_H
-#define _MPROF_H
+#ifndef MPROF_H_INCLUDED
+#define MPROF_H_INCLUDED
 
 #define OFFSET_LEN 			8
 #define TOTAL_SIZE_OF_PROFILING_STACKS 	8388608
 #define	GUARD_RING_FOR_PROFILING_STACK	1024
 #define PROFCALLOC_DSBLKSIZE 		8180
 #define MAX_MPROF_TREE_HEIGHT		32
-
-#ifdef UNIX
-#define TIMES 				times
-#elif defined(VMS)
-#define TIMES 				get_cputime
-#endif
 
 /*entry points recognized by pcurrpos*/
 #define MPROF_OUTOFFOR	0x1
@@ -67,32 +61,31 @@
 	xfer_table[xf_forloop]   = op_forloop; \
 }
 
-struct trace_entry {
-	unsigned char  	rout_name[9];
-	unsigned char  	label_name[9];
-	unsigned char  	line_num[9];
+typedef struct {
+	mident		*rout_name;
+	mident  	*label_name;
+	signed int  	line_num;	/* it's actually an unsigned value, but -1 is used as the impossible line */
 	unsigned int	count;
 	unsigned int 	for_count;
 	unsigned int	sys_time;
 	unsigned int	usr_time;
 	int		loop_level;
 	int		cur_loop_level;
-};
+} trace_entry;
 
-struct mprof_tree{
-	struct 	trace_entry	e;
+typedef struct mprof_tree {
+	trace_entry		e;
 	struct  mprof_tree 	*link[2];
 	struct mprof_tree	*loop_link;
 	int 		bal;	/* Balance factor */
 	unsigned int	cache; 	/* Used during insertion */
-};
+} mprof_tree;
 
-typedef struct  stack_frame_prof_struct
+typedef struct stack_frame_prof_struct
 {
 	struct stack_frame_prof_struct *prev;
-	char            rout_name[9];
-	char            label_name[9];
-	char		filler[2];
+	mident		*rout_name;
+	mident		*label_name;
 	int		dummy_stack_count;
 	unsigned long   usr_time;
 	unsigned long   sys_time;
@@ -108,21 +101,14 @@ struct tms {
 char 	*pcalloc(unsigned int);
 void	turn_tracing_on(mval *glvn);
 void	turn_tracing_off(mval *);
-void	get_entryref_information(boolean_t, struct trace_entry *);
 void	new_prof_frame(int);
-void	parse_gvn(mval *);
-void 	mprof_tree_walk(struct mprof_tree *);
-void 	*mprof_tree_find_node(struct mprof_tree *, struct trace_entry);
+void 	mprof_tree_walk(mprof_tree *);
 void	pcurrpos(int inside_for_loop);
-void	pcfree(void);
 void	unw_prof_frame(void);
-struct 	mprof_tree *mprof_tree_insert(struct mprof_tree *, struct trace_entry);
-struct 	mprof_tree *new_node(struct trace_entry);
-void	mprof_tree_print(struct mprof_tree *tree,int tabs,int longl);
-#ifdef VMS
-void    get_cputime(struct tms *);
-#endif
-void	crt_gbl(struct mprof_tree *p, int info_level);
+mprof_tree *mprof_tree_insert(mprof_tree *, trace_entry *);
+mprof_tree *new_node(trace_entry *);
+void	mprof_tree_print(mprof_tree *tree,int tabs,int longl);
+void	crt_gbl(mprof_tree *p, int info_level);
 void	stack_leak_check(void);
 
 /* functions required for the transfer table manipulations*/
@@ -137,4 +123,4 @@ int op_callw(), op_calll(), op_callb();
 int op_callspw(), op_callspl(), op_callspb();
 int op_forlcldow(), op_forlcldol(), op_forlcldob(), op_forloop();
 
-#endif
+#endif /* MPROF_H_INCLUDED */

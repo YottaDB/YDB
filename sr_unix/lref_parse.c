@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,6 @@ void lref_parse(unsigned char *label_ref, mstr* routine, mstr* label, int* offse
 	if (label->len && !is_ident(label))
 		rts_error(VARLSTCNT(1) ERR_RUNPARAMERR);
 
-	routine->len = routine->len > sizeof(mident) ? sizeof(mident) : routine->len;
-	label->len = label->len > sizeof(mident) ? sizeof(mident) : label->len;
+	routine->len = routine->len > MAX_MIDENT_LEN ? MAX_MIDENT_LEN : routine->len;
+	label->len = label->len > MAX_MIDENT_LEN ? MAX_MIDENT_LEN : label->len;
 }

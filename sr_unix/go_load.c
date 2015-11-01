@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include <string.h>
+#include "gtm_string.h"
 
 #include "stringpool.h"
 #include "stp_parms.h"
@@ -229,8 +229,8 @@ void go_load(int begin, int end)
 				mupip_error_occurred = FALSE;
 				continue;
 			}
-			if (max_subsc_len < gv_currkey->end)
-			        max_subsc_len = gv_currkey->end;
+			if (max_subsc_len < (gv_currkey->end + 1))
+				max_subsc_len = gv_currkey->end + 1;
 			src.len = len - keylength - 1;
 			src.addr = (char *)(ptr + keylength + 1);
 			des.len = 0;
@@ -268,8 +268,8 @@ void go_load(int begin, int end)
 				mupip_error_occurred = FALSE;
 				continue;
 			}
-			if (max_subsc_len < gv_currkey->end)
-			        max_subsc_len = gv_currkey->end;
+			if (max_subsc_len < (gv_currkey->end + 1))
+				max_subsc_len = gv_currkey->end + 1;
 			if (++i > end)
 			{
 			        i--;	/* Decrement as didn't load key */

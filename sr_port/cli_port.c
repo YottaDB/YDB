@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,12 @@
 
 #include "mdef.h"
 
+#include "gtm_ctype.h"
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 
-#include <limits.h>
+#include "gtm_limits.h"
 #include <errno.h>
 
 #include "cli.h"
@@ -26,6 +27,24 @@
  */
 
 /*
+*-------------------------------------------------------
+* Check if string is a decimal number
+*
+* Return:
+*	TRUE    - only decimal digits
+*	FALSE   - otherwise
+* -------------------------------------------------------
+*/
+int cli_is_dcm(char *p)
+{
+        while (*p && ISDIGIT(*p))
+                p++;
+
+        if (*p) return (FALSE);
+        else return (TRUE);
+}
+
+/*
  * --------------------------------------------------
  * Convert string to hex.
  *
@@ -34,27 +53,20 @@
  *	FALSE	- Could not convert to hex
  * --------------------------------------------------
  */
-boolean_t cli_str_to_hex(char *str, int4 *dst)
+boolean_t cli_str_to_hex(char *str, uint4 *dst)
 {
-	long		result, minus_uintmax;
-	int		save_errno;
-	boolean_t	long_bigger_than_int4;
+	unsigned long	result;
+	int	save_errno;
 
-	long_bigger_than_int4 = (sizeof(result) > sizeof(int4));
-	if (long_bigger_than_int4)
-	{	/* store -UINT_MAX in a variable to compare against result later */
-		minus_uintmax = UINT_MAX;	/* need to do this in 2 steps as -UINT_MAX turns out to be 0 otherwise */
-		minus_uintmax = -minus_uintmax;
-	}
 	save_errno = errno;
 	errno = 0;
         result = STRTOUL(str, NULL, 16);
-	if ((0 != errno)
-		|| (long_bigger_than_int4 && ((UINT_MAX < result) || (minus_uintmax > result))))
-
-	{	/* errno is non-zero implies "str" is outside the range of representable values in an unsigned long.
-		 * else if result > UINT_MAX, it means that on platforms where long is 8-bytes, "str" is >= 4G
-		 */
+	if (
+#if INT_MAX < LONG_MAX
+		(UINT_MAX < result) ||	/* outside UINT range */
+#endif
+	    (ERANGE == errno && ULONG_MAX == result) || (0 == result && 0 != errno))
+	{	/* out of range or other error */
 		*dst = 0;
 		errno = save_errno;
 		return FALSE;
@@ -64,4 +76,269 @@ boolean_t cli_str_to_hex(char *str, int4 *dst)
 		errno = save_errno;
 		return TRUE;
 	}
+}
+
+/*
+ * --------------------------------------------------
+ * Convert string to 64 bit hex.
+ *
+ * Return:
+ *	TRUE	- OK
+ *	FALSE	- Could not convert to hex
+ * --------------------------------------------------
+ */
+boolean_t cli_str_to_hex64(char *str, gtm_uint64_t *dst)
+{
+	gtm_uint64_t	result;
+	int		save_errno;
+
+	save_errno = errno;
+	errno = 0;
+        result = STRTOU64L(str, NULL, 16);
+	if ((ERANGE == errno && GTM_UINT64_MAX == result) || (0 == result && 0 != errno))
+	{	/* out of range or other error */
+		*dst = 0;
+		errno = save_errno;
+		return FALSE;
+	} else
+	{
+		*dst = result;
+		errno = save_errno;
+		return TRUE;
+	}
+}
+
+/*
+ * --------------------------------------------------
+ * Convert string to 64 bit unsigned int.
+ *
+ * Return:
+ *	TRUE	- OK
+ *	FALSE	- Could not convert to int
+ * --------------------------------------------------
+ */
+boolean_t cli_str_to_uint64(char *str, gtm_uint64_t *dst)
+{
+	gtm_uint64_t	result;
+	int		save_errno;
+
+	save_errno = errno;
+	errno = 0;
+        result = STRTOU64L(str, NULL, 10);
+	if ((ERANGE == errno && GTM_UINT64_MAX == result) || (0 == result && 0 != errno))
+	{	/* out of range or other error */
+		*dst = 0;
+		errno = save_errno;
+		return FALSE;
+	} else
+	{
+		*dst = result;
+		errno = save_errno;
+		return TRUE;
+	}
+}
+
+/*
+ * --------------------------------------------------
+ * Convert string to int.
+ *
+ * Return:
+ *	TRUE	- OK
+ *	FALSE	- Could not convert to int
+ * --------------------------------------------------
+ */
+boolean_t cli_str_to_int(char *str, int4 *dst)
+{
+	long	result;
+	int	save_errno;
+
+	save_errno = errno;
+	errno = 0;
+        result = STRTOL(str, NULL, 10);
+	if (
+#if INT_MAX < LONG_MAX
+		(INT_MIN > result || INT_MAX < result) ||	/* outside INT range */
+#endif
+	    (ERANGE == errno && (LONG_MIN == result || LONG_MAX == result)) || (0 == result && 0 != errno))
+	{	/* out of range or other error */
+		*dst = 0;
+		errno = save_errno;
+		return FALSE;
+	} else
+	{
+		*dst = result;
+		errno = save_errno;
+		return TRUE;
+	}
+}
+
+/*
+ * --------------------------------------------------
+ * Convert string to 64 bit int.
+ *
+ * Return:
+ *	TRUE	- OK
+ *	FALSE	- Could not convert to int
+ * --------------------------------------------------
+ */
+boolean_t cli_str_to_int64(char *str, gtm_int64_t *dst)
+{
+	gtm_int64_t	result;
+	int		save_errno;
+
+	save_errno = errno;
+	errno = 0;
+        result = STRTO64L(str, NULL, 10);
+	if ((ERANGE == errno && (GTM_INT64_MIN == result || GTM_INT64_MAX == result)) || (0 == result && 0 != errno))
+	{	/* out of range or other error */
+		*dst = 0;
+		errno = save_errno;
+		return FALSE;
+	} else
+	{
+		*dst = result;
+		errno = save_errno;
+		return TRUE;
+	}
+}
+
+/*
+ * --------------------------------------------------
+ * Convert string to number.
+ *
+ * Return:
+ *	TRUE	- OK
+ *	FALSE	- Could not convert to number
+ * --------------------------------------------------
+ */
+boolean_t cli_str_to_num(char *str, int4 *dst)
+{
+	long	result;
+	int	save_errno, base;
+
+	save_errno = errno;
+	errno = 0;
+	if (cli_is_dcm(str))
+		base = 10;
+	else
+		base = 16;
+        result = STRTOL(str, NULL, base);
+	if (
+#if INT_MAX < LONG_MAX
+		(INT_MIN > result || INT_MAX < result) ||	/* outside INT range */
+#endif
+	    (ERANGE == errno && (LONG_MIN == result || LONG_MAX == result)) || (0 == result && 0 != errno))
+	{	/* out of range or other error */
+		*dst = 0;
+		errno = save_errno;
+		return FALSE;
+	} else
+	{
+		*dst = result;
+		errno = save_errno;
+		return TRUE;
+	}
+}
+
+/*
+ * --------------------------------------------------
+ * Convert string to 64 bit number.
+ *
+ * Return:
+ *	TRUE	- OK
+ *	FALSE	- Could not convert to number
+ * --------------------------------------------------
+ */
+boolean_t cli_str_to_num64(char *str, gtm_int64_t *dst)
+{
+	gtm_int64_t	result;
+	int	save_errno, base;
+
+	save_errno = errno;
+	errno = 0;
+	if (cli_is_dcm(str))
+		base = 10;
+	else
+		base = 16;
+        result = STRTO64L(str, NULL, base);
+	if ((ERANGE == errno && (GTM_INT64_MIN == result || GTM_INT64_MAX == result)) || (0 == result && 0 != errno))
+	{	/* out of range or other error */
+		*dst = 0;
+		errno = save_errno;
+		return FALSE;
+	} else
+	{
+		*dst = result;
+		errno = save_errno;
+		return TRUE;
+	}
+}
+
+int cli_parse_two_numbers(char *qual_name, const char delimiter, uint4 *first_num, uint4 *second_num)
+{ /* Parse two unsigned base 10 numbers separated by the given delimiter. Eg. -LOG_INTERVAL=10,20 (on VMS, -LOG_INTERVAL="10,20").
+   * Both Unix and VMS accept the qualifier as a string. NOTE: On VMS, such qualifiers are quoted strings.
+   * Both numbers are optional (eg. -LOG_INTERVAL=10, or -LOG_INTERVAL=",20", or -LOG_INTERVAL=,).
+   * Return values:
+   * 		     CLI_2NUM_FIRST_SPECIFIED  (binary 10), first number specified, second not
+   * 		     CLI_2NUM_SECOND_SPECIFIED (binary 01), first number not specified, second is
+   * 		     CLI_2NUM_BOTH_SPECIFIED   (binary 11) (CLI_2NUM_FIRST_SPECIFIED | CLI_2NUM_SECOND_SPECIFIED), both specified
+   * 		     0 (binary 00), error in parsing either number
+   */
+	char		*first_num_str, *second_num_str, *two_num_str_top, *num_endptr;
+	char		two_num_qual_str[128];
+	unsigned short	two_num_qual_len;
+	uint4		num;
+	int		retval = 0;
+
+	two_num_qual_len = sizeof(two_num_qual_str);
+	if (!cli_get_str(qual_name, two_num_qual_str, &two_num_qual_len))
+	{
+		util_out_print("Error parsing !AZ qualifier", TRUE, qual_name);
+		return 0;
+	}
+#ifdef VMS
+	/* DCL does not strip quotes included in the command line. However, the DEFAULT value (see mupip_cmd.cld) is stripped
+	 * of quotes. */
+	if ('"' == two_num_qual_str[0])
+	{
+		assert('"' == two_num_qual_str[two_num_qual_len - 1]); /* end quote should exist */
+		first_num_str = &two_num_qual_str[1]; /* Skip begin quote */
+		two_num_qual_str[two_num_qual_len - 1] = '\0'; /* Zap end quote */
+		two_num_qual_len -= 2; /* Quotes gone */
+	} else
+#endif
+		first_num_str = two_num_qual_str;
+	for (second_num_str = first_num_str, two_num_str_top = first_num_str + two_num_qual_len;
+		second_num_str < two_num_str_top && delimiter != *second_num_str;
+		second_num_str++)
+		;
+	if (delimiter == *second_num_str)
+		*second_num_str++ = '\0';
+	if (*first_num_str != '\0') /* VMS issues EINVAL if strtoul is passed null string */
+	{
+		errno = 0;
+		num = STRTOUL(first_num_str, &num_endptr, 10);
+		if ((0 == num && (0 != errno || (num_endptr == first_num_str && *first_num_str != '\0'))) ||
+		    (0 != errno && ULONG_MAX == num))
+		{
+			util_out_print("Error parsing or invalid parameter for !AZ", TRUE, qual_name);
+			return 0;
+		}
+		*first_num = num;
+		retval |= CLI_2NUM_FIRST_SPECIFIED;
+	} /* else, first number not specified */
+	if (second_num_str < two_num_str_top && *second_num_str != '\0')
+	{
+		errno = 0;
+		num = STRTOUL(second_num_str, &num_endptr, 10);
+		if ((0 == num && (0 != errno || (num_endptr == second_num_str && *second_num_str != '\0'))) ||
+		    (0 != errno && ULONG_MAX == num))
+		{
+			util_out_print("Error parsing or invalid parameter for LOG_INTERVAL", TRUE);
+			return 0;
+		}
+		*second_num = num;
+		retval |= CLI_2NUM_SECOND_SPECIFIED;
+	} /* else, second number not specified */
+	return retval;
 }

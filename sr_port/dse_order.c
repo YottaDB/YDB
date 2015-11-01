@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,20 +29,17 @@
 GBLREF short int	patch_path_count;
 GBLREF block_id		patch_left_sib,patch_right_sib,patch_find_blk;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF char		patch_comp_key[256];
+GBLREF char		patch_comp_key[MAX_KEY_SZ + 1];
 GBLREF unsigned char	patch_comp_count;
 GBLREF bool		patch_find_root_search;
 
-int
-dse_order(
-	  block_id srch,
-	  block_id_ptr_t pp,
-	  int4 *op,
-	  char *targ_key,
-	  short int targ_len,
-	  bool dir_data_blk)
+int dse_order(block_id srch,
+	      block_id_ptr_t pp,
+	      int4 *op,
+	      char *targ_key,
+	      short int targ_len,
+	      bool dir_data_blk)
 {
-
 	sm_uc_ptr_t	bp, b_top, rp, r_top, key_top, c1, ptr;
 	unsigned char	cc;
 	block_id	last;
@@ -64,7 +61,8 @@ dse_order(
 	patch_comp_count = 0;
 	patch_comp_key[0] = patch_comp_key[1] = 0;
 	for (rp = bp + sizeof(blk_hdr); rp < b_top ;rp = r_top, last = *pp)
-	{	GET_SHORT(rsize,&((rec_hdr_ptr_t)rp)->rsiz);
+	{
+		GET_SHORT(rsize,&((rec_hdr_ptr_t)rp)->rsiz);
 		if (rsize < sizeof(rec_hdr))
 			r_top = rp + sizeof(rec_hdr);
 		else
@@ -76,39 +74,34 @@ dse_order(
 			if (dir_data_blk && !((blk_hdr_ptr_t)bp)->levl)
 			{
 				for (ptr = rp + sizeof(rec_hdr); ;)
-				{
 					if (*ptr++ == 0 && *ptr++ == 0)
 						break;
-				}
 				GET_LONGP(pp,ptr);
-			}
-			else
+			} else
 				GET_LONGP(pp,b_top - sizeof(block_id));
 			break;
-		}
-		else
+		} else
 		{
 			if (r_top - rp < sizeof(block_id) + sizeof(rec_hdr))
 				break;
 			if (dir_data_blk && !((blk_hdr_ptr_t)bp)->levl)
 			{
 				for (ptr = rp + sizeof(rec_hdr); ;)
-				{
 					if (*ptr++ == 0 && *ptr++ == 0)
 						break;
-				}
 				key_top = ptr;
-			}
-			else
+			} else
 				key_top = r_top - sizeof(block_id);
-			size = key_top - rp - sizeof(rec_hdr);
-			if (size > sizeof(patch_comp_key) - 2)
-				size = sizeof(patch_comp_key) - 2;
 			if (((rec_hdr_ptr_t) rp)->cmpc > patch_comp_count)
 				cc = patch_comp_count;
 			else
 				cc = ((rec_hdr_ptr_t) rp)->cmpc;
-			memcpy(&patch_comp_key[cc],rp + sizeof(rec_hdr),size);
+			size = key_top - rp - sizeof(rec_hdr);
+			if (size > sizeof(patch_comp_key) - 2 - cc)
+				size = sizeof(patch_comp_key) - 2 - cc;
+			if (size < 0)
+				size = 0;
+			memcpy(&patch_comp_key[cc], rp + sizeof(rec_hdr), size);
 			patch_comp_count = cc + size;
 			GET_LONGP(pp,key_top);
 			if (memvcmp(targ_key,targ_len,&patch_comp_key[0],patch_comp_count) <= 0)
@@ -132,14 +125,13 @@ dse_order(
 		return TRUE;
 	}
 	if ( *pp > 0 && *pp < cs_addrs->ti->total_blks && (*pp % cs_addrs->hdr->bplmap))
-	{	if (((blk_hdr_ptr_t) bp)->levl > 1 && dse_order(*pp,pp + 1,op + 1,targ_key,targ_len, 0))
+	{
+		if (((blk_hdr_ptr_t) bp)->levl > 1 && dse_order(*pp,pp + 1,op + 1,targ_key,targ_len, 0))
 			return TRUE;
 		else if (((blk_hdr_ptr_t)bp)->levl == 1 && patch_find_root_search)
-			{	return dse_order( *pp,pp + 1,op + 1, targ_key, targ_len, 1);
-			}
+			return dse_order( *pp,pp + 1,op + 1, targ_key, targ_len, 1);
 		else if (((blk_hdr_ptr_t)bp)->levl == 0 && patch_find_root_search)
-		{	return TRUE;
-		}
+			return TRUE;
 	}
 	patch_path_count--;
 	return FALSE;

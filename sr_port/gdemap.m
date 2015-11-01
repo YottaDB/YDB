@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -99,7 +99,7 @@ pointins:(s,reg)
 	s map(s)=reg
 	q
 alphnext:(s)
-	i $l(s)=SIZEOF("mident") q $$lexnext(s)
+	i $l(s)=MAXNAMLN q $$lexnext(s)
 	e  q s_")"
 	;
 lexnext:(s)

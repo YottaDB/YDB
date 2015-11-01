@@ -110,7 +110,7 @@ int main(int argc, char_ptr_t argv[])
 /*  Initialize everything but the network */
     err_init(gtcm_exit_ch);
     omi_errno = OMI_ER_NO_ERROR;
-    ESTABLISH(omi_dbms_ch);
+    ESTABLISH_RET(omi_dbms_ch, -1);	/* any return value to signify error return */
     gtcm_init(argc, argv);
 #ifdef GTCM_RC
     rc_create_cpt();

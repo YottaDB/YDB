@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,7 @@
 #include "mucregini.h"
 #include "mu_cre_file.h"
 #include "gtmmsg.h"
+#include "util.h"
 
 #define BLK_SIZE (((gd_segment*)gv_cur_region->dyn.addr)->blk_size)
 
@@ -66,7 +67,7 @@ unsigned char mu_cre_file(void)
 {
 	char		*cc = NULL, path[MAX_FBUFF + 1], errbuff[512];
 	unsigned char	buff[DISK_BLOCK_SIZE];
-	int		fd = -1, i, lower, upper, status, padded_len, padded_vbn, norm_vbn;
+	int		fd = -1, i, lower, upper, status, norm_vbn;
 	uint4		raw_dev_size;		/* size of a raw device, in bytes */
 	int4		blocks_for_create, blocks_for_extension, save_errno;
 	GTM_BAVAIL_TYPE	avail_blocks;
@@ -79,8 +80,9 @@ unsigned char mu_cre_file(void)
 
 	error_def(ERR_NOSPACECRE);
 	error_def(ERR_LOWSPACECRE);
+	error_def(ERR_MUNOSTRMBKUP);
 
-	assert((-(sizeof(uint4) * 2) & sizeof(sgmnt_data)) == sizeof(sgmnt_data));
+	assert((-(sizeof(uint4) * 2) & SIZEOF_FILE_HDR_DFLT) == SIZEOF_FILE_HDR_DFLT);
 	cs_addrs = &udi_struct.s_addrs;
 	cs_data = (sgmnt_data_ptr_t)NULL;	/* for CLEANUP */
 	memset(&pblk, 0, sizeof(pblk));
@@ -178,7 +180,7 @@ unsigned char mu_cre_file(void)
 		seg = gv_cur_region->dyn.addr;
 
 		/* blocks_for_create is in the unit of DISK_BLOCK_SIZE */
-		blocks_for_create = DIVIDE_ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE) + 1 +
+		blocks_for_create = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE) + 1 +
 					(seg->blk_size / DISK_BLOCK_SIZE *
 					 ((DIVIDE_ROUND_UP(seg->allocation, BLKS_PER_LMAP - 1)) + seg->allocation));
 		if ((uint4)avail_blocks < blocks_for_create)
@@ -202,19 +204,18 @@ unsigned char mu_cre_file(void)
 	gv_cur_region->dyn.addr->file_cntl = &fc;
 	fc.file_info = (void*)&udi_struct;
 	udi->fd = fd;
-	cs_data = (sgmnt_data_ptr_t)malloc(sizeof(sgmnt_data));
-	memset(cs_data, 0, sizeof(*cs_data));
+	cs_data = (sgmnt_data_ptr_t)malloc(SIZEOF_FILE_HDR_DFLT);
+	memset(cs_data, 0, SIZEOF_FILE_HDR_DFLT);
 	cs_data->createinprogress = TRUE;
 	cs_data->semid = INVALID_SEMID;
 	cs_data->shmid = INVALID_SHMID;
-	/* We want our datablocks to start on what would be a block boundary within the file so pad the fileheader
-	   if necessary to make this happen.
+	/* We want our datablocks to start on what would be a block boundary within the file which will aid I/O
+	   so pad the fileheader if necessary to make this happen.
 	*/
-	padded_len = ROUND_UP(sizeof(sgmnt_data), BLK_SIZE);
-	padded_vbn = DIVIDE_ROUND_UP(padded_len, DISK_BLOCK_SIZE) + 1;
-	norm_vbn = DIVIDE_ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE) + 1;
-	cs_data->start_vbn = padded_vbn;
-	cs_data->free_space += (padded_vbn - norm_vbn) * DISK_BLOCK_SIZE;
+	norm_vbn = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE) + 1;
+	assert(START_VBN_CURRENT >= norm_vbn);
+	cs_data->start_vbn = START_VBN_CURRENT;
+	cs_data->free_space += (START_VBN_CURRENT - norm_vbn) * DISK_BLOCK_SIZE;
 	cs_data->acc_meth = gv_cur_region->dyn.addr->acc_meth;
 	if (udi->raw)
 	{
@@ -223,7 +224,7 @@ unsigned char mu_cre_file(void)
 		 * make into a multiple of BLKS_PER_LMAP to have a complete bitmap
 		 * for each set of blocks.
 		 */
-		cs_data->trans_hist.total_blks = raw_dev_size - ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE);
+		cs_data->trans_hist.total_blks = raw_dev_size - ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE);
 		cs_data->trans_hist.total_blks /= (uint4)(((gd_segment *)gv_cur_region->dyn.addr)->blk_size);
 		if (0 == (cs_data->trans_hist.total_blks - DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, BLKS_PER_LMAP - 1)
 			  % (BLKS_PER_LMAP - 1)))
@@ -244,7 +245,7 @@ unsigned char mu_cre_file(void)
 	}
 	mucregini(cs_data->trans_hist.total_blks);
 	cs_data->createinprogress = FALSE;
-	LSEEKWRITE(udi->fd, 0, cs_data, sizeof(sgmnt_data), status);
+	LSEEKWRITE(udi->fd, 0, cs_data, SIZEOF_FILE_HDR_DFLT, status);
 	if (0 != status)
 	{
 		SPRINTF_AND_PERROR("Error writing out header for file %s\n");
@@ -270,7 +271,9 @@ unsigned char mu_cre_file(void)
 		CLEANUP(EXIT_WRN);
 		return EXIT_WRN;
 	}
+	if ((32 * 1024 - sizeof(shmpool_blk_hdr)) < cs_data->blk_size)
+		gtm_putmsg(VARLSTCNT(5) ERR_MUNOSTRMBKUP, 3, RTS_ERROR_STRING(path), 32 * 1024 - DISK_BLOCK_SIZE);
+	util_out_print("Created file !AD", TRUE, RTS_ERROR_STRING(path));
 	CLEANUP(EXIT_NRM);
-	PRINTF("Created file %s\n", path);
 	return EXIT_NRM;
 }

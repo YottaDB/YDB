@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -123,8 +123,7 @@ va_dcl
 	command.addr = &combuf[0];
 
 	/* Setup job parameters by parsing param_buf and using label, offset, routine, & timeout).  */
-	job_params.routine.addr = routine->str.addr;
-	job_params.routine.len = mid_len((mident *)routine->str.addr);
+	job_params.routine = routine->str;
 	job_params.label = label->str;
 	job_params.offset = offset;
 	ojparams(param_buf->str.addr, &job_params);

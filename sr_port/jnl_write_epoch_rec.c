@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +22,7 @@
 #include <efndef.h>
 #include "iosb_disk.h"
 #endif
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 
 #include "gtm_time.h"
 #include "gdsroot.h"
@@ -39,6 +38,7 @@
 #include "gtmsource.h"
 #include "gtmio.h"
 #include "iosp.h"
+#include "jnl_get_checksum.h"
 
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF  jnlpool_ctl_ptr_t	jnlpool_ctl;
@@ -50,16 +50,20 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	jnl_buffer_ptr_t	jb;
 	jnl_private_control	*jpc;
 	jnl_file_header		header;
+	sgmnt_data_ptr_t	csd;
 #if defined(VMS)
 	io_status_block_disk	iosb;
 #endif
+
 	error_def		(ERR_PREMATEOF);
 
 	assert(csa->now_crit);
 	assert(0 != csa->jnl->pini_addr);
 	assert((csa->ti->early_tn == csa->ti->curr_tn) || (csa->ti->early_tn == csa->ti->curr_tn + 1));
+	csd = csa->hdr;
 	epoch_record.prefix.jrec_type = JRT_EPOCH;
 	epoch_record.prefix.forwptr = epoch_record.suffix.backptr = EPOCH_RECLEN;
+	epoch_record.blks_to_upgrd = csd->blks_to_upgrd;
 	epoch_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 	/* in case csa->jnl->pini_addr turns out to be zero (not clear how), we use the pini_addr field of the
 	 * first PINI journal record in the journal file which is nothing but JNL_HDR_LEN.
@@ -76,12 +80,13 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	epoch_record.prefix.time = jgbl.gbl_jrec_time;
 	/* we need to write epochs if jgbl.forw_phase_recovery so future recovers will have a closer turnaround point */
 	jb->next_epoch_time =  epoch_record.prefix.time + jb->epoch_interval;
-	assert(NULL == jnlpool_ctl  ||  QWLE(csa->hdr->reg_seqno, jnlpool_ctl->jnl_seqno));
+	epoch_record.prefix.checksum = INIT_CHECKSUM_SEED;
+	assert(NULL == jnlpool_ctl  ||  QWLE(csd->reg_seqno, jnlpool_ctl->jnl_seqno));
 	if (jgbl.forw_phase_recovery)
 		/* As the file header is not flushed too often and recover/rollback doesn't update reg_seqno */
 		QWASSIGN(epoch_record.jnl_seqno, jgbl.mur_jrec_seqno);
-	else if (REPL_ENABLED(csa->hdr))
-		QWASSIGN(epoch_record.jnl_seqno, csa->hdr->reg_seqno);	/* Note we cannot use jnlpool_ctl->jnl_seqno since
+	else if (REPL_ALLOWED(csd))
+		QWASSIGN(epoch_record.jnl_seqno, csd->reg_seqno);	/* Note we cannot use jnlpool_ctl->jnl_seqno since
 									 * we might not presently hold the journal pool lock */
 	else
 		QWASSIGN(epoch_record.jnl_seqno, seq_num_zero);

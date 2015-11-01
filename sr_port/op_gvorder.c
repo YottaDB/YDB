@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,8 +20,7 @@
 #include "gdsfhead.h"
 #include "stringpool.h"
 #include "op.h"
-#include "gvcst_data.h"
-#include "gvcst_order.h"
+#include "gvcst_protos.h"	/* for gvcst_order,gvcst_data prototype */
 #include "change_reg.h"
 #include "gvsub2str.h"
 #include "gvcmx.h"
@@ -51,13 +50,14 @@ void op_gvorder (mval *v)
 	boolean_t		gbl_target_was_set;
 	gv_namehead		*save_targ;
 
-	if (gv_curr_subsc_null)
-		*(&gv_currkey->base[0] + gv_currkey->prev) = 01;
-	else
-	{	*(&gv_currkey->base[0] + gv_currkey->end - 1) = 1;
+
+	if (!gv_curr_subsc_null || gv_cur_region->std_null_coll )
+	{
+		*(&gv_currkey->base[0] + gv_currkey->end - 1) = 1;
 		*(&gv_currkey->base[0] + gv_currkey->end + 1) = 0;
 		gv_currkey->end += 1;
-	}
+	} else
+		*(&gv_currkey->base[0] + gv_currkey->prev) = 01;
 
 	if (gv_currkey->prev)
 	{	acc_meth = gv_cur_region->dyn.addr->acc_meth;
@@ -95,7 +95,7 @@ void op_gvorder (mval *v)
 			v->str.len = 0;
 	} else	/* the following section is for $O(^gname) */
 	{	assert (2 < gv_currkey->end);
-		assert (gv_currkey->end < (sizeof(mident)+3));	/* until names are not in midents */
+		assert (gv_currkey->end < (MAX_MIDENT_LEN + 3));	/* until names are not in midents */
 		save_targ = gv_target;
 		if (INVALID_GV_TARGET != reset_gv_target)
 			gbl_target_was_set = TRUE;
@@ -107,7 +107,7 @@ void op_gvorder (mval *v)
 		map = gd_map + 1;
 		while (map < gd_map_top &&
 			(memcmp(gv_currkey->base, map->name,
-				gv_currkey->end == (sizeof(mident)+2) ? sizeof(mident) : gv_currkey->end - 1) >= 0))
+				gv_currkey->end == (MAX_MIDENT_LEN + 2) ? MAX_MIDENT_LEN : gv_currkey->end - 1) >= 0))
 		{	map++;
 		}
 
@@ -131,7 +131,7 @@ void op_gvorder (mval *v)
 				if (!found)
 					break;
 				assert (1 < gv_altkey->end);
-				assert (gv_altkey->end < (sizeof(mident)+2));	/* until names are not in midents */
+				assert (gv_altkey->end < (MAX_MIDENT_LEN + 2));	/* until names are not in midents */
 				if (memcmp(gv_altkey->base, map->name, gv_altkey->end - 1) > 0)
 				{	found = FALSE;
 					break;
@@ -154,8 +154,10 @@ void op_gvorder (mval *v)
 			if (found)
 				break;
 			else
-			{	memcpy(&gv_currkey->base[0], map->name, sizeof(mident));
-				gv_currkey->end = mid_len((mident *)map->name);
+			{
+				assert(sizeof(map->name) == sizeof(mident_fixed));
+				gv_currkey->end = mid_len((mident_fixed *)map->name);
+				memcpy(&gv_currkey->base[0], map->name, gv_currkey->end);
 				gv_currkey->base[ gv_currkey->end - 1 ] -= 1;
 				gv_currkey->base[ gv_currkey->end ] = 0xFF;	/* back off 1 spot from map */
 				gv_currkey->base[ gv_currkey->end + 1] = 0;

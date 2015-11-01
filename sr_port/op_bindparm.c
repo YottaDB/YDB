@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,14 +11,12 @@
 
 #include "mdef.h"
 
-
-#include "hashdef.h"
+#include "hashtab_mname.h"
 #include "lv_val.h"
-#include "mv_stent.h"
 #include "rtnhdr.h"
+#include "mv_stent.h"
 #include "stack_frame.h"
 #include "op.h"
-
 #include <varargs.h>
 
 GBLREF mv_stent			*mv_chain;
@@ -33,7 +31,7 @@ va_dcl
 	uint4		mask;
 	register lv_val *a;
 	mv_stent	*mv_ent;
-	mident		*labname;
+	var_tabent	*parm_name;
 	int		i;
 	int		frmc, frmp;	/* formal argument count, formal argument pointer */
 	int		actc;
@@ -41,8 +39,7 @@ va_dcl
 	lv_val		**lspp;
 	lv_val		*new_var;
 	mvs_ntab_struct	*ntab;
-	ht_entry	*hte;
-	bool		new;
+	ht_ent_mname	*tabent;
 	error_def	(ERR_STACKOFLOW);
 	error_def	(ERR_STACKCRIT);
 	error_def	(ERR_ACTLSTTOOLONG);
@@ -78,17 +75,16 @@ va_dcl
 			new_var = *actp;
 		}
 		lspp = (lv_val **)&frame_pointer->l_symtab[frmp];	/* address of l_symtab entry */
-		labname = &(((VAR_TABENT *)frame_pointer->vartab_ptr)[frmp]);
+		parm_name = &(((var_tabent *)frame_pointer->vartab_ptr)[frmp]);
 		assert(0 <= frmp && frmp < frame_pointer->vartab_len);
-		hte = ht_put(&curr_symval->h_symtab, (mname *)labname, &new);
-		if (new)
-			lv_newname(hte, curr_symval);
-		ntab->nam_addr = labname;				/* address of mident */
+		if (add_hashtab_mname(&curr_symval->h_symtab, parm_name, NULL, &tabent))
+			lv_newname(tabent, curr_symval);
+		ntab->nam_addr = parm_name;				/* address of var_tabent */
 		ntab->lst_addr = 0;
 		if (frame_pointer->l_symtab > (mval **)frame_pointer)	/* if symtab is from older frame */
 			ntab->lst_addr = lspp;				/* save address of l_symtab entry */
-		ntab->save_value = (lv_val *)hte->ptr;			/* address of original lv_val */
-		hte->ptr = (char *)new_var;
+		ntab->save_value = (lv_val *)tabent->value;			/* address of original lv_val */
+		tabent->value = (char *)new_var;
 		*lspp = (lv_val *)new_var;
 	}
 	free(mv_ent->mv_st_cont.mvs_parm.mvs_parmlist);

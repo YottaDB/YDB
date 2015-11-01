@@ -1,0 +1,35 @@
+The make file enclosed (sr_unix/comlist.mk) will build GT.M from source.  
+The only prerequisite is GNU make and Linux x86.   GNU make  3.79.1 and 
+Redhat 7.2 were used to do the test builds for this distribution.
+
+To build a production version GT.M for linux do the following steps:
+1. cd <gtm-directory> 	#<gtm-directory> is where all sr_* directories copied/checked out.
+2. Define an environment variable 'gtm_curpro' to point to the full path of the prior GT.M installation.
+   Download and install GT.M binary distribution from SourceForge if you do not have 
+   GT.M installed already. The build procedure needs an existing GT.M mumps installed
+   on the machine.
+   Example:
+   	gtm_curpro=<installation-directory>; export gtm_curpro	#bourne shell
+   	export gtm_curpro=<installation-directory> 		#bash shell
+	setenv gtm_curpro <installation-directory>		#tcsh shell
+3. Building GT.M -
+By default, the gmake will build a production version GT.M. The build type of GT.M
+can be controlled by a parameter "buildtypes" - dbg (debug), bta (beta),
+and pro (production).   Passing a subset of dbg, bta, or pro in "buildtypes"
+from the environment or the command line will build that subset. For example:
+
+	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg gtm_ver=<gtm-directory>
+
+will build just a debuggable GT.M release.
+
+4. Packaging GT.M -
+Once the required builds have been done the object distribution can be
+tar'ed by doing:
+
+	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux gtm_ver=<gtm-directory> package
+
+Again, buildtypes can be used to package just a subset. For example:
+
+	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=pro gtm_ver=<gtm-directory> package
+
+

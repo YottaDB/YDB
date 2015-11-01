@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,14 +22,14 @@
 #include "cmd.h"
 #include "namelook.h"
 
-LITREF unsigned char svn_index[];
-LITREF nametabent svn_names[];
-GBLREF char window_token;
-GBLREF mident window_ident;
-LITREF svn_data_type svn_data[];
-GBLREF oprtype	*for_stack[], **for_stack_ptr;
-GBLREF triple *curr_fetch_trip, *curr_fetch_opr;
-GBLREF int4 curr_fetch_count;
+LITREF unsigned char 	svn_index[];
+LITREF nametabent 	svn_names[];
+GBLREF char 		window_token;
+GBLREF mident 		window_ident;
+LITREF svn_data_type 	svn_data[];
+GBLREF oprtype		*for_stack[], **for_stack_ptr;
+GBLREF triple 		*curr_fetch_trip, *curr_fetch_opr;
+GBLREF int4 		curr_fetch_count;
 
 int m_new(void)
 {
@@ -72,7 +72,7 @@ int m_new(void)
 		case TK_DOLLAR:
 			advancewindow();
 			if (window_token == TK_IDENT)
-				if ((n = namelook(svn_index, svn_names, window_ident.c)) >= 0)
+				if ((n = namelook(svn_index, svn_names, window_ident.addr, window_ident.len)) >= 0)
 				{
 					tmp = maketriple(OC_NEWINTRINSIC);
 					switch(svn_data[n].opcode)
@@ -115,7 +115,7 @@ int m_new(void)
 				switch (window_token)
 				{
 				case TK_IDENT:
-					next->operand[0] = put_str(&window_ident.c[0],sizeof(mident));
+					next->operand[0] = put_str(window_ident.addr, window_ident.len);
 					advancewindow();
 					break;
 				case TK_ATSIGN:

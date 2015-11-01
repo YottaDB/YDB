@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2004, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +60,7 @@ void gtmsource_flush_fh(seq_num resync_seqno)
 	for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
 	{
 		csa = &FILE_INFO(reg)->s_addrs;
-		if (REPL_ENABLED(csa->hdr))
+		if (REPL_ALLOWED(csa->hdr))
 		{
 			assert(csa->hdr->resync_seqno <= resync_seqno); /* don't want to go back */
 			pre_update_seqno = csa->hdr->resync_seqno;

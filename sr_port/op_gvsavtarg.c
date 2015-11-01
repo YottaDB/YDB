@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,11 +35,8 @@ void op_gvsavtarg(mval *v)
 	{
 		assert (gd_targ_addr != 0);
 		len = gv_currkey->end + sizeof(short) + sizeof(gd_targ_addr);
-	}
-	else
-	{
+	} else
 		len = sizeof(short);
-	}
 	if (stringpool.top - stringpool.free < len)
 		stp_gcol(len);
 	v->str.len = len;
@@ -52,11 +49,14 @@ void op_gvsavtarg(mval *v)
 		c += sizeof(short);
 		memcpy(c, &gd_targ_addr, sizeof(gd_targ_addr));
 		c += sizeof(gd_targ_addr);
-		memcpy(c, &gv_currkey->base[0], len - sizeof(short) - sizeof(gd_targ_addr));
-	}
-	else
-	{
+		len = len - sizeof(short) - sizeof(gd_targ_addr);
+		assert(gv_currkey->end == len);
+		if (0 < len)
+		{
+			assert(gv_currkey->base[0]);
+			memcpy(c, &gv_currkey->base[0], len);
+		}
+	} else
 		memset(c, 0, sizeof(short));
-	}
 	return;
 }

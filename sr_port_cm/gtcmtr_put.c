@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,13 +22,13 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "cmidef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
-#include "gtcmtr_put.h"
+#include "gtcmtr_protos.h"
 #include "format_targ_key.h"
 #include "gtcm_find_region.h"
 #include "gtcm_bind_name.h"
-#include "gvcst_put.h"
+#include "gvcst_protos.h"	/* for gvcst_put prototype */
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
@@ -74,7 +74,7 @@ bool gtcmtr_put(void)
 		 * this approach ensures that the jnl_put_jrt_pini() gets the appropriate prc_vec for writing into the
 		 * 	journal record in case JNL_ENABLED turns out to be TRUE in t_end() time.
 		 * note that the value of JNL_ALLOWED(cs_addrs) cannot be changed on the fly without obtaining standalone access
-		 * 	and hence the correctness of prc_vec whenever it turns out necessary is guaranteed.
+		 * 	and hence the correctness of prc_vec (whenever it turns out necessary) is guaranteed.
 		 */
 		originator_prc_vec = curr_entry->pvec;
 		cs_addrs->jnl->pini_addr = reg_ref->pini_addr;

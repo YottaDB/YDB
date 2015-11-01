@@ -24,6 +24,7 @@
 #include "incr_link.h"
 #include "cachectl.h"
 #include "obj_file.h"
+#include "stringpool.h"
 #include "gtm_limits.h"
 #include "min_max.h"
 #include "gtmdbglvl.h"
@@ -66,8 +67,7 @@ static unsigned char	*sect_ro_rel, *sect_rw_rel, *sect_rw_nonrel;
 static boolean_t	shlib;
 static rhdtyp		*hdr;
 
-GBLDEF mident		zlink_mname;
-
+GBLREF mident_fixed	zlink_mname;
 GBLREF mach_inst	jsb_action[JSB_ACTION_N_INS];
 GBLREF uint4		gtmDebugLevel;
 
@@ -89,13 +89,15 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	int		status, sect_ro_rel_size, sect_rw_rel_size, sect_rw_nonrel_size;
 	lab_tabent	*lbt_ent, *lbt_bot, *lbt_top, *olbt_ent, *olbt_bot, *olbt_top;
 	lnr_tabent	*olnt_ent, olnt_top;
-	mident		module_name;
+	mident_fixed	module_name;
+	pre_v5_mident	*pre_v5_routine_name;
 	urx_rtnref	urx_lcl_anchor;
-	int		more, order, cnt;
+	int		order;
 	unsigned int	offset_correction;
 	unsigned char	*shdr, *rel_base;
-	mval		*curlit;
-	lab_tabent	*curlbe;
+	mval		*curlit, *littop;
+	lab_tabent	*curlbe, *lbetop;
+	var_tabent	*curvar, *vartop;
 	char		name_buf[PATH_MAX+1];
 	int		name_buf_len;
 	char		marker[sizeof(JSB_MARKER) - 1];
@@ -160,8 +162,23 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	if (MAGIC_COOKIE != hdr->objlabel)
 	{
 		if (shlib)
-			zl_error(0, zro_entry, ERR_DLLVERSION, mid_len(&hdr->routine_name), (char *)&hdr->routine_name,
-				 zro_entry->str.len, zro_entry->str.addr);
+		{
+			if (MAGIC_COOKIE_V5 > hdr->objlabel)
+			{ /* The library was built using a version prior to V50FT01. The routine_name field of the
+			     pre-V5 routine header was an 8-byte char array, so read the routine name in the old
+			     format */
+				int len;
+				pre_v5_routine_name = (pre_v5_mident *)&hdr->routine_name;
+				for (len = 0; len < sizeof(pre_v5_mident) && pre_v5_routine_name->c[len]; len++)
+					;
+				zl_error(0, zro_entry, ERR_DLLVERSION, len, &(pre_v5_routine_name->c[0]),
+				 	zro_entry->str.len, zro_entry->str.addr);
+			}
+			else {
+				zl_error(0, zro_entry, ERR_DLLVERSION, hdr->routine_name.len, hdr->routine_name.addr,
+				 	zro_entry->str.len, zro_entry->str.addr);
+			}
+		}
 		return FALSE;
 	}
 	/* Read in and/or relocate the pointers to the various sections. To understand the size calculations
@@ -208,7 +225,6 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	}
 	RELOCATE(hdr->ptext_adr, unsigned char *, rel_base);
 	RELOCATE(hdr->ptext_end_adr, unsigned char *, rel_base);
-	RELOCATE(hdr->vartab_adr, var_tabent *, rel_base);
 	RELOCATE(hdr->lnrtab_adr, lnr_tabent *, rel_base);
 	RELOCATE(hdr->literal_text_adr, unsigned char *, rel_base);
 
@@ -226,21 +242,31 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	offset_correction = (int)hdr->literal_adr;
 	rel_base = sect_rw_rel - offset_correction;
 	RELOCATE(hdr->literal_adr, mval *, rel_base);
+	RELOCATE(hdr->vartab_adr, var_tabent *, rel_base);
 	/* Also read-write releasable is the linkage section which had no initial value and was thus
 	   not resident in the object. The values in this section will be setup later by addr_fix()
 	   and/or auto-zlink.
 	*/
 	hdr->linkage_adr = (lnk_tabent *)malloc(hdr->linkage_len * sizeof(lnk_tabent));
 	memset((char *)hdr->linkage_adr, 0, (hdr->linkage_len * sizeof(lnk_tabent)));
-	/* Relocations for read-write releasable section. Perform relocation on all string literals. The
-	   relocations for the linkage section is done in addr_fix()
-	*/
-	for (cnt = hdr->literal_len, curlit = hdr->literal_adr; cnt; --cnt, ++curlit)
+	/* Relocations for read-write releasable section. Perform relocation on literal mval table and
+	 * variable table entries since they both point to the offsets from the beginning of the
+	 * literal text pool. The relocations for the linkage section is done in addr_fix() */
+	for (curlit = hdr->literal_adr, littop = curlit + hdr->literal_len; curlit < littop; ++curlit)
 	{
 		if (curlit->str.len)
-			curlit->str.addr += (int)hdr->literal_text_adr;
+			RELOCATE(curlit->str.addr, char *, hdr->literal_text_adr);
 	}
+	for (curvar = hdr->vartab_adr, vartop = curvar + hdr->vartab_len; curvar < vartop; ++curvar)
+	{
+		assert(0 < curvar->var_name.len);
+		RELOCATE(curvar->var_name.addr, char *, hdr->literal_text_adr);
+	}
+
+	/* Fixup header's source path and routine names as they both point to the offsets from the
+	 * beginning of the literal text pool */
 	hdr->src_full_name.addr += (int)hdr->literal_text_adr;
+	hdr->routine_name.addr += (int)hdr->literal_text_adr;
 
 	if (GDL_PrintEntryPoints & gtmDebugLevel)
 	{	/* Prepare name and address for announcement.. */
@@ -263,13 +289,16 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	}
 	hdr->labtab_adr = (lab_tabent *)sect_rw_nonrel;
 	/* Relocations for read-write non-releasable section. Perform relocation on label table entries. */
-	for (cnt = hdr->labtab_len, curlbe = hdr->labtab_adr; cnt; --cnt, ++curlbe)
+	for (curlbe = hdr->labtab_adr, lbetop = curlbe + hdr->labtab_len; curlbe < lbetop; ++curlbe)
 	{
+		RELOCATE(curlbe->lab_name.addr, char *, hdr->literal_text_adr);
 		RELOCATE(curlbe->lnr_adr, lnr_tabent *, hdr->lnrtab_adr);
 	}
 	/* Remaining initialization */
 	hdr->current_rhead_adr = hdr;
-	memcpy(&zlink_mname.c[0], &hdr->routine_name, sizeof(mident));
+	assert(hdr->routine_name.len < sizeof(zlink_mname.c));
+	memcpy(&zlink_mname.c[0], hdr->routine_name.addr, hdr->routine_name.len);
+	zlink_mname.c[hdr->routine_name.len] = 0;
 	/* Do address fix up with relocation and symbol entries from the object. Note that shdr will
 	   never be dereferenced except under a test of the shlib static flag to indicate we are processing
 	   a shared library.
@@ -286,11 +315,9 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		urx_free(&urx_lcl_anchor);
 
 		/* Copy routine name to local variable because zl_error free's it.  */
-		memcpy(module_name.c, hdr->routine_name.c, sizeof(mident));
-		zl_error(file_desc, zro_entry, ERR_LOADRUNNING, mid_len(&module_name), module_name.c, 0, 0);
+		memcpy(&module_name.c[0], hdr->routine_name.addr, hdr->routine_name.len);
+		zl_error(file_desc, zro_entry, ERR_LOADRUNNING, hdr->routine_name.len, &module_name.c[0], 0, 0);
 	}
-	/* Add local unresolves to global chain freeing elements that already existed in the global chain */
-	urx_add (&urx_lcl_anchor);
 	/* Fix up of routine headers for old versions of routine so they point to the newest version */
 	old_rhead = hdr->old_rhead_adr;
 	lbt_bot = hdr->labtab_adr;
@@ -302,12 +329,13 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		olbt_top = olbt_bot + old_rhead->labtab_len;
 		for (olbt_ent = olbt_bot;  olbt_ent < olbt_top;  olbt_ent++)
 		{	/* Match new label entries with old label entries */
-			while ((more = lbt_ent < lbt_top)
-			      && (order = memcmp(&olbt_ent->lab_name.c[0], &lbt_ent->lab_name.c[0], sizeof(mident))) > 0)
+			for (; lbt_ent < lbt_top; lbt_ent++)
 			{
-				lbt_ent++;
+				MIDENT_CMP(&olbt_ent->lab_name, &lbt_ent->lab_name, order);
+				if (order <= 0)
+					break;
 			}
-			if (more && !order)
+			if ((lbt_ent < lbt_top) && !order)
 			{	/* Have a label name match. Update line pointer for this entry */
 				olbt_ent->lnr_adr = lbt_ent->lnr_adr;
 			} else
@@ -316,10 +344,13 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 			}
 		}
 		old_rhead->src_full_name = hdr->src_full_name;
+		old_rhead->routine_name = hdr->routine_name;
 		old_rhead->vartab_len = hdr->vartab_len;
 		old_rhead->vartab_adr = hdr->vartab_adr;
 		old_rhead->ptext_adr = hdr->ptext_adr;
 		old_rhead->ptext_end_adr = hdr->ptext_end_adr;
+		old_rhead->lnrtab_adr = hdr->lnrtab_adr;
+		old_rhead->lnrtab_len = hdr->lnrtab_len;
 		old_rhead->current_rhead_adr = hdr;
 		old_rhead->temp_mvals = hdr->temp_mvals;
 		old_rhead->temp_size = hdr->temp_size;
@@ -327,6 +358,10 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		old_rhead->literal_adr = hdr->literal_adr;
 		old_rhead = (rhdtyp *)old_rhead->old_rhead_adr;
 	}
+	/* Add local unresolves to global chain freeing elements that already existed in the global chain */
+	urx_add (&urx_lcl_anchor);
+
+	/* Resolve all unresolved entries in the global chain that reference this routine */
 	urx_resolve(hdr, (lab_tabent *)lbt_bot, (lab_tabent *)lbt_top);
 	if (!shlib)
 		cacheflush(hdr->ptext_adr, (hdr->ptext_end_adr - hdr->ptext_adr), BCACHE);
@@ -340,7 +375,7 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 	unsigned char		*symbols, *sym_temp, *sym_temp1, *symtop, *res_addr;
 	struct relocation_info	rel[RELREAD], *rel_ptr;
 	int			numrel, rel_read, string_size, sym_size, status, i;
-	mident			rtnid, labid;
+	mident_fixed		rtnid, labid;
 	mstr			rtn_str;
 	rhdtyp			*rtn;
 	lab_tabent		*label, *labtop;
@@ -476,13 +511,13 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 				return FALSE;
 			}
 		}
-		memset(&rtnid.c[0], 0, sizeof(rtnid));
 		sym_size = sym_temp1 - sym_temp;
-		assert(sym_size <= sizeof(mident));
+		assert(sym_size <= MAX_MIDENT_LEN);
 		memcpy(&rtnid.c[0], sym_temp, sym_size);
+		rtnid.c[sym_size] = 0;
 		if (rtnid.c[0] == '_')
 			rtnid.c[0] = '%';
-		assert(memcmp(&zlink_mname.c[0], &rtnid.c[0], sizeof(mident)));
+		assert(sym_size != mid_len(&zlink_mname) || 0 != memcmp(&zlink_mname.c[0], &rtnid.c[0], sym_size));
 		rtn_str.addr = &rtnid.c[0];
 		rtn_str.len = sym_size;
 		rtn = find_rtn_hdr(&rtn_str);	/* Routine already resolved? */
@@ -504,9 +539,9 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 				}
 			}
 			sym_size = sym_temp1 - sym_temp;
-			assert(sym_size <= sizeof(mident));
-			memset(&labid.c[0], 0, sizeof(labid));
+			assert(sym_size <= MAX_MIDENT_LEN);
 			memcpy(&labid.c[0], sym_temp, sym_size);
+			labid.c[sym_size] = 0;
 			if (labid.c[0] == '_')
 				labid.c[0] = '%';
 			labsym = TRUE;
@@ -521,9 +556,9 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 			{	/* Look our target label up in the routines label table */
 				label = rtn->labtab_adr;
 				labtop = label + rtn->labtab_len;
-				for (  ;  label < labtop && memcmp(&labid.c[0], &label->lab_name.c[0], sizeof(mident));  label++)
+				for (; label < labtop && (sym_size != label->lab_name.len ||
+						memcmp(&labid.c[0], label->lab_name.addr, sym_size)); label++)
 					;
-
 				if (label < labtop)
 					res_addr = (unsigned char *)&label->lnr_adr; /* resolve to label entry address */
 				else
@@ -531,7 +566,6 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 								   just leave it unresolved
 								*/
 			}
-
 			if (res_addr)
 			{	/* We can fully resolve this symbol now */
 				res_temp = res_root->next;

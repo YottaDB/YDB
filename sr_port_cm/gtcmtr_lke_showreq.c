@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
 #include <stddef.h>
 
 #include "cmidef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "mlkdef.h"
 #include "gdsroot.h"
@@ -36,8 +36,7 @@
 #include "lke.h"
 #include "cmi.h"
 #include "util.h"
-#include "gtcmtr_lke.h"
-#include "gtcmtr_lke_show.h"
+#include "gtcmtr_protos.h"
 #include "iosp.h"
 #include "gtcm_find_region.h"
 #include "gvcmz.h"

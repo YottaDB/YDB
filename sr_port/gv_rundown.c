@@ -32,10 +32,9 @@
 #include "gdsblkops.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
-#include "hashdef.h"
 #include "ast.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
@@ -114,7 +113,9 @@ void gv_rundown(void)
 						FREEUP_BUDDY_LIST(si->tlvl_info_list);
 						FREEUP_BUDDY_LIST(si->tlvl_cw_set_list);
 						FREEUP_BUDDY_LIST(si->cw_set_list);
-						free_hashtab(&si->blks_in_use);
+						free_hashtab_int4(si->blks_in_use);
+						free(si->blks_in_use);
+						si->blks_in_use = NULL;
 						if (si->cr_array_size)
 						{
 							assert(NULL != si->cr_array);

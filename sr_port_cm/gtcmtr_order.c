@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,22 +21,23 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "filestruct.h"
 #include "cmidef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "gtcm_find_region.h"
 #include "gtcm_bind_name.h"
-#include "gvcst_order.h"
-#include "gvcst_data.h"
-#include "gtcmtr_order.h"
+#include "gvcst_protos.h"	/* for gvcst_order,gvcst_data prototype */
+#include "gtcmtr_protos.h"
 #include "gv_xform_key.h"
 
-GBLREF connection_struct *curr_entry;
-GBLREF gv_namehead	*gv_target;
-GBLREF gv_namehead	*reset_gv_target;
-GBLREF gv_key		*gv_currkey;
-GBLREF gv_key		*gv_altkey;
-GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF connection_struct	*curr_entry;
+GBLREF gv_namehead		*gv_target;
+GBLREF gv_namehead		*reset_gv_target;
+GBLREF gv_key			*gv_currkey;
+GBLREF gv_key			*gv_altkey;
+GBLREF sgmnt_addrs		*cs_addrs;
+GBLREF gd_region		*gv_cur_region;
 
 bool gtcmtr_order(void)
 {
@@ -45,7 +46,11 @@ bool gtcmtr_order(void)
 	unsigned short		top, old_top, len, tmp_len;
 	gv_key			*save_key;
 	cm_region_list		*reg_ref;
-	DEBUG_ONLY(boolean_t	was_null;)
+	boolean_t		last_subsc_is_null;
+	cm_region_head		*cm_reg_head;
+
+	error_def(ERR_UNIMPLOP);
+	error_def(ERR_TEXT);
 
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(CMMS_Q_ORDER == *ptr);
@@ -60,37 +65,49 @@ bool gtcmtr_order(void)
 	CM_GET_GVCURRKEY(ptr, len);
 	assert(0 == gv_currkey->prev || 1 == gv_currkey->base[gv_currkey->end - 2]); /* name level $O, or 1 appended to key by
 											op_gvorder on client */
-	gtcm_bind_name(reg_ref->reghead, FALSE); /* gtcm_bind_name sets gv_target; do not use gv_target before gtcm_bind_name */
-	if ((gv_target->collseq || gv_target->nct) && gv_currkey->prev)
-	{ /* undo client's change before we transfer control to user collation routine so that user gets a clean key to transform */
-		assert(3 <= gv_currkey->end);
-		if (0 != gv_currkey->base[gv_currkey->end - 3]) /* last subscript is not null */
-		{
-			gv_currkey->base[gv_currkey->end - 2] = KEY_DELIMITER;
-			gv_currkey->end--;
-			DEBUG_ONLY(was_null = FALSE;)
-		} else
-		{
-			gv_currkey->base[gv_currkey->end - 2] = STR_SUB_PREFIX;
-			DEBUG_ONLY(was_null = TRUE;) /* We have no way to tell if this is a fake NULL subscript that zwrite
-							created (client side, see gvzwr_var), or a user supplied NULL subscript.
-						        We don't want to pass a fake NULL subscript to collation routines, but,
-						        since we can't tell if it IS fake, we pass it through to the collation
-						        routines and expect the routines to not transform NULL to non NULL. */
-		}
-		gv_xform_key(gv_currkey, FALSE);
-	}
+	cm_reg_head = reg_ref->reghead;
 	if (gv_currkey->prev)
 	{
-		assert(3 <= gv_currkey->end);
+		gtcm_bind_name(cm_reg_head, FALSE); /* sets gv_target; do not use gv_target before gtcm_bind_name */
 		if (gv_target->collseq || gv_target->nct)
-		{ /* now do the same magic as in op_gvorder(), prepare the key for finding the "next" in order */
-			if (0 != gv_currkey->base[gv_currkey->end - 3] ||
-				STR_SUB_PREFIX != gv_currkey->base[gv_currkey->end - 2]) /* last subscript is not null */
+		{	/* undo client's change before we transfer control to user collation routine
+			 * so that user gets a clean key to transform */
+			assert(3 <= gv_currkey->end);
+			/* if region has standard null collation, assert that client op_gvorder should never have sent a key
+			 * with a trailing sequence of bytes ... 00 01 00 00 (assuming gv_currkey->end points to the last 00).
+			 */
+			assert((0 == gv_cur_region->std_null_coll) || (KEY_DELIMITER != gv_currkey->base[gv_currkey->end - 3]));
+			if (KEY_DELIMITER != gv_currkey->base[gv_currkey->end - 3])
 			{
-				assert(!was_null); /* NULL to non NULL transformation not allowed */
+				last_subsc_is_null = FALSE;
+				gv_currkey->base[gv_currkey->end - 2] = KEY_DELIMITER;
+				gv_currkey->end--;
+			} else
+			{
+				last_subsc_is_null = TRUE;
+				gv_currkey->base[gv_currkey->end - 2] = STR_SUB_PREFIX;
+				/* We have no way to tell if this is a fake NULL subscript that zwrite
+				 * created (client side, see gvzwr_var), or a user supplied NULL subscript.
+				 * We don't want to pass a fake NULL subscript to collation routines, but,
+				 * since we can't tell if it IS fake, we pass it through to the collation
+				 * routines and expect the routines to not transform NULL to non NULL.
+				 */
+			}
+			gv_xform_key(gv_currkey, FALSE);
+			assert(3 <= gv_currkey->end);
+			/* Now do the same magic as in op_gvorder(), prepare the key for finding the "next" in order.
+			 * op_gvorder relies on gv_curr_subsc_null and current region's std_null_coll setting.
+			 * But since op_gvorder has sent this key from the client side, the magic has already been done.
+			 * In this routine, we have already computed whether the last subscript is NULL or not. Use that below.
+			 */
+			/* assert that a null subscript is not transformed to a non-null by the collation routines */
+			assert(!last_subsc_is_null ||
+				((KEY_DELIMITER == gv_currkey->base[gv_currkey->end - 3])
+					&& (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->end - 2])));
+			if (!last_subsc_is_null)
+			{	/* last subscript is not null */
 				gv_currkey->base[gv_currkey->end - 1] = 1;
-				gv_currkey->base[gv_currkey->end + 1] = 0;
+				gv_currkey->base[gv_currkey->end + 1] = KEY_DELIMITER;
 				gv_currkey->end++;
 			} else
 				gv_currkey->base[gv_currkey->prev] = 1;
@@ -100,8 +117,9 @@ bool gtcmtr_order(void)
 	} else
 	{	/* name level */
 		assert(2 <= gv_currkey->end);			 /* at least one character of name, and two <NUL> delimiters */
-		assert((sizeof(mident) + 2) >= gv_currkey->end); /* no more than an mident, and two <NUL> delimiters */
+		assert((MAX_MIDENT_LEN + 2) >= gv_currkey->end); /* no more than MAX_MIDENT_LEN (31), and two <NUL> delimiters */
 		assert(INVALID_GV_TARGET == reset_gv_target);
+		GTCM_CHANGE_REG(cm_reg_head);	/* sets gv_cur_region/cs_addrs/cs_data appropriately */
 		for (;  ;)
 		{
 			reset_gv_target = gv_target;	/* for restoration, just in case something goes wrong before
@@ -111,11 +129,18 @@ bool gtcmtr_order(void)
 			if (!found)
 				break;
 			assert(2 <= gv_altkey->end);			/* at least one character of name and a <NUL> delimiter */
- 			assert((sizeof(mident) + 2) >= gv_altkey->end);	/* no more than an mident & two <NUL> delimiters */
+			assert((MAX_MIDENT_LEN + 2) >= gv_currkey->end);/* no more than MAX_MIDENT_LEN (31),
+									 * and two <NUL> delimiters */
+			if ((PRE_V5_MAX_MIDENT_LEN < strlen((char *)gv_altkey->base)) && !curr_entry->client_supports_long_names)
+			{
+				rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0,
+					ERR_TEXT, 2,
+					LEN_AND_LIT("GT.CM client does not support global names longer than 8 characters"));
+			}
 			save_key = gv_currkey;
 			gv_currkey = gv_altkey;
 			gv_altkey = save_key;
-			gtcm_bind_name(reg_ref->reghead, TRUE);
+			gtcm_bind_name(cm_reg_head, TRUE);
 			reset_gv_target = INVALID_GV_TARGET;
 			if ((0 != gv_target->root) && (0 != gvcst_data()))
 			{

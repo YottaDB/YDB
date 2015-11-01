@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,8 @@
 
 #include "mdef.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <fcntl.h>
+#include "gtm_inet.h"
+#include "gtm_fcntl.h"
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
 #endif
@@ -62,7 +61,7 @@ void gtmsource_seqno_init(void)
 	{
 		assert(reg->open);
 		csd = FILE_INFO(reg)->s_addrs.hdr;
-		if (REPL_ENABLED(csd))
+		if (REPL_ALLOWED(csd))
 		{
 			if (QWLT(local_read_jsn, csd->resync_seqno))
 				QWASSIGN(local_read_jsn, csd->resync_seqno);

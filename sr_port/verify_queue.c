@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,8 @@
 #define QI_RETRY 256
 
 GBLREF	volatile int4	fast_lock_count;
-GBLREF	int4		process_id;
+GBLREF	pid_t		process_id;
+VMS_ONLY(GBLREF	uint4	image_count;)	/* Needed for GET/RELEASE_SWAPLOCK */
 
 void verify_queue_lock(que_head_ptr_t qhdr)
 {

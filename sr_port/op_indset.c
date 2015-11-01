@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,20 +11,23 @@
 
 #include "mdef.h"
 
-#include "hashdef.h"
+#include "hashtab_mname.h"
 #include "lv_val.h"
 #include "toktyp.h"
 #include "compiler.h"
 #include "opcode.h"
 #include "indir_enum.h"
 #include "cache.h"
+#include "hashtab_objcode.h"
 #include "op.h"
 #include "underr.h"
+#include "rtnhdr.h"
+#include "valid_mname.h"
+#include "hashtab.h"
 
-GBLREF	symval	*curr_symval;
-GBLREF	char	window_token;
-GBLREF	mval	**ind_source_sp, **ind_source_top;
-LITREF	char	ctypetab[NUM_ASCII_CHARS];
+GBLREF	symval			*curr_symval;
+GBLREF	char			window_token;
+GBLREF	mval			**ind_source_sp, **ind_source_top;
 
 void	op_indset(mval *target, mval *value)
 {
@@ -34,45 +37,27 @@ void	op_indset(mval *target, mval *value)
 	mstr		object, *obj;
 	oprtype		v;
 	triple		*s, *src;
-	char		*i, *i_top, *c, *c_top;
-	ht_entry 	*q;
 	lv_val		*a;
 	char 		new;
-	int4		y;
-	mident		ident;
+	icode_str	indir_src;
+	var_tabent	targ_key;
+	ht_ent_mname 	*tabent;
 
 	MV_FORCE_DEFINED(value);
 	MV_FORCE_STR(target);
-	if (!(obj = cache_get(indir_set, &target->str)))
+	indir_src.str = target->str;
+	indir_src.code = indir_set;
+	if (NULL == (obj = cache_get(&indir_src)))
 	{
-		if (target->str.len && target->str.len <= sizeof(mident))
+		if (valid_mname(&target->str))
 		{
-			i = (char *)&ident;
-			i_top = i + sizeof(ident);
-			c = target->str.addr;
-			c_top = c + target->str.len;
-			if ((y = ctypetab[*i++ = *c++]) == TK_UPPER || y == TK_LOWER || y == TK_PERCENT)
-			{
-				for ( ; c < c_top; c++,i++)
-				{	y = ctypetab[*i = *c];
-					if (y != TK_UPPER && y != TK_DIGIT && y != TK_LOWER)
-					{	break;
-					}
-				}
-				if (c == c_top)
-				{	/* we have an ident */
-					for (; i < i_top; i++)
-					{	*i = 0;
-					}
-					q = ht_put(&curr_symval->h_symtab , (mname *)&ident , &new);
-					if (new)
-					{	lv_newname(q, curr_symval);
-					}
-					a = (lv_val *)q->ptr;
-					a->v = *value;
-					return;
-				}
-			}
+			targ_key.var_name = target->str;
+			COMPUTE_HASH_MNAME(&targ_key);
+			if (add_hashtab_mname(&curr_symval->h_symtab, &targ_key, NULL, &tabent))
+				lv_newname(tabent, curr_symval);
+			a = (lv_val *)tabent->value;
+			a->v = *value;
+			return;
 		}
 		comp_init(&target->str);
 		src = maketriple(OC_IGETSRC);
@@ -110,7 +95,9 @@ void	op_indset(mval *target, mval *value)
 			break;
 		}
 		if (comp_fini(rval, &object, OC_RET, 0, target->str.len))
-		{	cache_put(indir_set, &target->str, &object);
+		{
+			indir_src.str.addr = target->str.addr;
+			cache_put(&indir_src, &object);
 			*ind_source_sp++ = value;
 			if (ind_source_sp >= ind_source_top)
 				rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
@@ -118,7 +105,8 @@ void	op_indset(mval *target, mval *value)
 		}
 	}
 	else
-	{ 	*ind_source_sp++ = value;
+	{
+		*ind_source_sp++ = value;
 		if (ind_source_sp >= ind_source_top)
 			rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
 		comp_indr(obj);

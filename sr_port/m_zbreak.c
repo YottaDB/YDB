@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,11 +20,11 @@
 #define CANCEL_ONE -1
 #define CANCEL_ALL -2
 
-GBLREF char window_token;
-GBLREF mident window_ident;
-GBLREF bool run_time;
-GBLREF char routine_name[];
-LITDEF mident zero_ident;	/* the null mident */
+GBLREF char 	window_token;
+GBLREF mident 	window_ident;
+GBLREF bool 	run_time;
+GBLREF mident	routine_name;
+LITREF mident 	zero_ident;
 
 int m_zbreak(void)
 {
@@ -34,7 +34,7 @@ int m_zbreak(void)
 	error_def(ERR_LABELEXPECTED);
 	error_def(ERR_RTNNAME);
 
-	label = put_str((char *)&zero_ident.c[0], sizeof(mident));
+	label = put_str((char *)zero_ident.addr, zero_ident.len);
 	cancel_all = FALSE;
 	action = put_str("B", 1);
 	if (window_token == TK_MINUS)
@@ -54,7 +54,7 @@ int m_zbreak(void)
 			advancewindow();
 			cancel_all = TRUE;
 			if (!run_time)
-				routine = put_str(&routine_name[0], sizeof(mident));
+				routine = put_str(routine_name.addr, routine_name.len);
 			else
 				routine = put_tref(newtriple(OC_CURRTN));
 			offset = put_ilit((mint) 0);
@@ -74,7 +74,7 @@ int m_zbreak(void)
 		if (window_token != TK_CIRCUMFLEX)
 		{
 			if (!run_time)
-				routine = put_str(&routine_name[0], sizeof(mident));
+				routine = put_str(routine_name.addr, routine_name.len);
 			else
 				routine = put_tref(newtriple(OC_CURRTN));
 		} else
@@ -83,7 +83,7 @@ int m_zbreak(void)
 			switch(window_token)
 			{
 			case TK_IDENT:
-				routine = put_str(&window_ident.c[0], sizeof(mident));
+				routine = put_str(window_ident.addr, window_ident.len);
 				advancewindow();
 				break;
 			case TK_ATSIGN:

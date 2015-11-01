@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,12 +17,14 @@
 #include "gdsbt.h"
 #include "gdsblk.h"
 #include "gdsbml.h"
+#include "gdsdbver.h"
 
 void bml_newmap(blk_hdr_ptr_t ptr, uint4 size, trans_num curr_tn)
 {
 	sm_uc_ptr_t bptr;
 
 	/* --- similar logic exists in mupip_restore.c, which need to pick up any new updates here --- */
+	ptr->bver = GDSVCURR;
 	ptr->bsiz = size;
 	ptr->levl = LCL_MAP_LEVL;
 	ptr->tn = curr_tn;

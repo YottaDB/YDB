@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,7 @@ bt_rec_ptr_t bt_put(gd_region *r, int4 block)
 						assert(FALSE);
 						BG_TRACE_PRO_ANY(csa, wcb_bt_put);
 						send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bt_put"),
-							process_id, lcl_tn, DB_LEN_STR(r));
+							process_id, &lcl_tn, DB_LEN_STR(r));
 						return NULL;
 					}
 				}

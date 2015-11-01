@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,8 +23,7 @@
 #include "cdb_sc.h"
 #include "rc_oflow.h"
 #include "copy.h"
-#include "gvcst_order.h"
-#include "gvcst_search.h"
+#include "gvcst_protos.h"	/* for gvcst_order,gvcst_search prototype */
 #include "t_begin.h"
 #include "t_retry.h"
 #include "t_end.h"
@@ -38,7 +37,7 @@ GBLREF sgmnt_data	*cs_data;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLDEF rc_oflow	*rc_overflow;
 GBLREF gd_region	*gv_cur_region;
-GBLREF int		rc_read_stamp;
+GBLREF trans_num	rc_read_stamp;
 
 
 void rc_gbl_ord(rc_rsp_page *rsp)

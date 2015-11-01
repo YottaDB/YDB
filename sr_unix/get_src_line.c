@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,6 @@
 #include "gtm_unistd.h"
 #include "gtm_stat.h"
 
-#include "hashdef.h"
 #include "rtnhdr.h"
 #include "zroutines.h"
 #include "compiler.h"
@@ -26,32 +25,34 @@
 #include "eintr_wrappers.h"
 #include "op.h"
 #include "zbreak.h"
+#include "hashtab_mname.h"
+#include "hashtab.h"
 
 #define RT_TBL_SZ 20
 
-GBLDEF htab_desc rt_name_tbl;
-GBLREF mident zlink_mname;
+GBLREF hash_table_mname rt_name_tbl;
 
 int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 {
 	int		fd, n, status, *lt_ptr, size;
 	uint4		checksum, srcint;
-	bool		badfmt, found, not_present;
+	bool		badfmt, found, added;
 	mstr		src;
 	rhdtyp		*rtn_vector;
 	zro_ent		*srcdir;
-	ht_entry	*ht;
 	mstr		*base, *current, *top;
 	uint4		srcstat, *src_tbl;
 	char		buff[MAX_SRCLINE], *c1, *c2, *c, *chkcalc;
-	char		srcnamebuf[ sizeof(mident) + 2];
+	char		srcnamebuf[sizeof(mident_fixed) + STR_LIT_LEN(DOTM)];
+	ht_ent_mname	*tabent;
+	var_tabent	rtnent;
 	error_def(ERR_TXTSRCFMT);
 
 	srcstat = 0;
 	*srcret = (mstr *)0;
 
 	if (!rt_name_tbl.base)
-		ht_init(&rt_name_tbl, RT_TBL_SZ);
+		init_hashtab_mname(&rt_name_tbl, RT_TBL_SZ);
 	assert (routine->mvtype & MV_STR);
 	if (!(rtn_vector = find_rtn_hdr(&routine->str)))
 	{
@@ -63,9 +64,11 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 	if (!rtn_vector->src_full_name.len)
 		return SRCNOTAVAIL;
 
-	ht = ht_put(&rt_name_tbl, (mname *)&rtn_vector->routine_name, &not_present);
-	src_tbl = (uint4 *)ht->ptr;
-	if (not_present || ht->ptr == 0)
+	rtnent.var_name = rtn_vector->routine_name;
+	COMPUTE_HASH_MNAME(&rtnent);
+	added = add_hashtab_mname(&rt_name_tbl, &rtnent, NULL, &tabent);
+	src_tbl = (uint4 *)tabent->value;
+	if (added || tabent->value == 0)
 	{
 		c = malloc(rtn_vector->src_full_name.len + 1);
 		memcpy(c,rtn_vector->src_full_name.addr, rtn_vector->src_full_name.len);
@@ -74,14 +77,13 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 		free(c);
 		if (fd == -1)
 		{
-			n = mid_len(&rtn_vector->routine_name);
-			memcpy (srcnamebuf, &rtn_vector->routine_name.c[0], n);
+			n = rtn_vector->routine_name.len;
+			memcpy(srcnamebuf, rtn_vector->routine_name.addr, n);
 			if (srcnamebuf[0] == '%')	/* percents are translated to _ on filenames */
 				srcnamebuf[0] = '_';
-			srcnamebuf[n] = '.';
-			srcnamebuf[n + 1] = 'm';
+			MEMCPY_LIT(&srcnamebuf[n], DOTM);
 			src.addr = srcnamebuf;
-			src.len = n + 2;
+			src.len = n + STR_LIT_LEN(DOTM);
 			zro_search (0, 0, &src, &srcdir, TRUE);
 			if (srcdir)
 			{
@@ -177,10 +179,10 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 				srcstat |= CHECKSUMFAIL;
 		}
 		*src_tbl = srcstat;
-		ht->ptr = (char *) src_tbl;
+		tabent->value = (char *) src_tbl;
 	}
 	srcstat |= *src_tbl;
-	lt_ptr = (int *)find_line_addr(rtn_vector, &label->str, 0);
+	lt_ptr = (int *)find_line_addr(rtn_vector, &label->str, 0, NULL);
 	if (!lt_ptr)
 		srcstat |= LABELNOTFOUND;
 	else if (!(srcstat & (SRCNOTFND | SRCNOTAVAIL)))

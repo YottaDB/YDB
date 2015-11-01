@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include <unistd.h>
+#include "gtm_unistd.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -82,7 +82,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 		}
 		if (fsync_addr > jb->fsync_dskaddr && !JNL_FILE_SWITCHED(jpc))
 		{
-			assert(process_id == jb->fsync_in_prog_latch.latch_pid);  /* assert we have the lock */
+			assert(process_id == jb->fsync_in_prog_latch.u.parts.latch_pid);  /* assert we have the lock */
 			saved_dsk_addr = jb->dskaddr;
 			if (jpc->sync_io)
 			{
@@ -110,7 +110,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 				}
 			}
 		}
-		if (process_id == jb->fsync_in_prog_latch.latch_pid)
+		if (process_id == jb->fsync_in_prog_latch.u.parts.latch_pid)
 			RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);
 	}
 	return;

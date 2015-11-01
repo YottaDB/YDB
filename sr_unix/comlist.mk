@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -15,9 +15,9 @@
 #    (download and install GT.M binary distribution from SourceForge if you do not have
 #    GT.M installed already).
 # 3. To build debug version with no compiler optimzations -
-# 		gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg
+# 		gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg gtm_ver=<the current directory>
 #    To build a version enabling optimizations -
-#    		gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=pro
+#    		gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=pro gtm_ver=<the current directory>
 #
 
 # get_lib_dirs.mk must be in the same directory as this makefile
@@ -44,7 +44,7 @@ gt_ar_options=rv
 # and creates package
 
 VPATH=$(addprefix $(gtm_ver)/, $(gt_src_list))
-exe_list=mumps dse geteuid gtm_dmna gtmsecshr lke mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean semstat2 ftok
+exe_list=mumps dse geteuid gtmsecshr lke mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean semstat2 ftok dbcertify
 make_i_flags=$(addprefix -I$(gtm_ver)/, $(gt_src_list))
 
 export #export all variables defined here to sub-make
@@ -158,7 +158,7 @@ gtmshr_obj=mumps_clitab.o gtm_main.o
 lke_obj=lke.o lke_cmd.o
 dse_obj=dse.o dse_cmd.o
 mupip_obj=mupip.o mupip_cmd.o
-gtm_dmna_obj=daemon.o
+dbcertify_obj=dbcertify.o dbcertify_cmd.o
 gtmsecshr_obj=gtmsecshr.o
 geteuid_obj=geteuid.o
 semstat2_obj=semstat2.o
@@ -181,7 +181,7 @@ exclude_list:= \
 	$(lke_obj) \
 	$(dse_obj) \
 	$(mupip_obj) \
-	$(gtm_dmna_obj) \
+	$(dbcertify_obj) \
 	$(gtmsecshr_obj) \
 	$(geteuid_obj) \
 	$(semstat2_obj) \
@@ -322,8 +322,6 @@ endif
 ../geteuid: $(geteuid_obj) libmumps.a
 	$(gt-ld)
 
-../gtm_dmna: $(gtm_dmna_obj) libmumps.a
-	$(gt-ld)
 
 ../gtmsecshr: $(gtmsecshr_obj) libmumps.a
 	$(gt-ld)
@@ -332,6 +330,9 @@ endif
 	$(gt-ld)
 
 ../mupip: $(mupip_obj) libmupip.a libmumps.a libstub.a $(gt_ld_aio_syslib)
+	$(gt-ld)
+
+../dbcertify: $(dbcertify_obj) libdbcertify.a libmupip.a libmumps.a libstub.a $(gt_ld_aio_syslib)
 	$(gt-ld)
 
 ../gtcm_server: $(gtcm_server_obj) libgtcm.a libmumps.a libstub.a
@@ -362,7 +363,7 @@ endif
 	@echo $(gt_ld_linker) $(gt_ld_options) $(gt_ld_shl_options) $(gt_ld_options_gtmshr) -o $@ $(gtmshr_obj) -lmumps -lgnpclient -lcmisockettcp $(gt_ld_syslibs) > ../map/$(notdir $@).map 2>&1
 	@$(gt_ld_linker) $(gt_ld_options) $(gt_ld_shl_options) $(gt_ld_options_gtmshr) -o $@ $(gtmshr_obj) -lmumps -lgnpclient -lcmisockettcp $(gt_ld_syslibs) >> ../map/$(notdir $@).map 2>&1
 
-gtcmconfig: $(gtc_list) gtcm_gcore
+gtcmconfig: $(gtc_list)
 	cp -f $^ ..
 	cd ..;chmod a-wx $(notdir $^);mv -f configure.gtc configure
 	cd ..;touch gtmhelp.dmp;chmod a+rw gtmhelp.dmp

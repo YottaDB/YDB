@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,19 +12,18 @@
 #include "mdef.h"
 
 #include <sys/mman.h>
-#include <unistd.h>
-#include <sys/socket.h>
+#include "gtm_unistd.h"
+#include "gtm_socket.h"
 #include <sys/time.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include "gtm_fcntl.h"
+#include "gtm_inet.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_time.h"
 
 #ifdef UNIX
-#include <sys/ipc.h>
+#include "gtm_ipc.h"
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <sys/un.h>
@@ -46,8 +45,10 @@
 #include "gtmrecv.h"
 #include "repl_dbg.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_mname.h"	/* needed for muprec.h */
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "iosp.h"
 #include "repl_shutdcode.h"
@@ -64,8 +65,8 @@
 #endif
 #include "gtm_event_log.h"
 #include "mupip_exit.h"
-#include "updproc.h"
 #include "read_db_files_from_gld.h"
+#include "updproc.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	recvpool_addrs		recvpool;
@@ -73,11 +74,9 @@ GBLREF  gld_dbname_list		*upd_db_files;
 GBLREF	boolean_t	        pool_init;
 GBLREF	jnlpool_addrs	        jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF	int			updproc_log_fd;
-GBLREF	FILE			*updproc_log_fp;
 GBLREF	void                    (*call_on_signal)();
 
-static void  updproc_stop(boolean_t exit)
+void  updproc_stop(boolean_t exit)
 {
 	int4		status;
 	int		fclose_res;

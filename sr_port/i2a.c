@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,14 +19,14 @@
 
 int i2a(unsigned char *des, int *des_len, int num)
 {
-        int n;
+        int 		n1, n2; /* digits at the 10th and 100th decimal positions respectively */
 
-        if(0 != (n = (num/100)%10))
-	        *(des + ((*des_len)++)) = n + '0';
-	if(0 != (n = (num/10)%10))
-	        *(des + ((*des_len)++)) = n + '0';
-	n = num%10;
-	*(des + ((*des_len)++)) = n + '0';
-
+	n2 = (num / 100) % 10;
+	if(0 != n2)
+		des[(*des_len)++] = n2 + '0';
+	n1 = (num / 10) % 10;
+	if(0 != n1 || 0 != n2)
+		des[(*des_len)++] = n1 + '0';
+	des[(*des_len)++] = (num % 10) + '0';
 	return 0;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,214 +9,140 @@
  *								*
  ****************************************************************/
 
-/*---------------------------------------------------------------------------
-	mu_dwngrd_header.c
-	---------------
-        This program will downgrade v4.x header to v3.x database.
- ----------------------------------------------------------------------------*/
+/* This program will upgrade v4.x header to v5.0-000 database. */
+
 
 #include "mdef.h"
 
-#include <unistd.h>
-#include <sys/stat.h>
+#include <math.h> /* needed for handling of epoch_interval */
+#include "gtm_stat.h"
+#include "gtm_unistd.h"
+#include "gtm_time.h"
 #include "gtm_string.h"
 #include "iosp.h"
 #include "gdsroot.h"
+#include "v15_gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
+#include "v15_gdsbt.h"
 #include "gdsfhead.h"
-#include "v3_gdsfhead.h"
-#include "gdsblk.h"
+#include "v15_gdsfhead.h"
 #include "filestruct.h"
+#include "v15_filestruct.h"
+#include "gdsblk.h"           /* needed for gdsblkops.h */
 #include "jnl.h"
-#include "timers.h"
-#ifdef UNIX
-#include "mutex.h"
-#endif
-#include "util.h"
-#include "mu_dwngrd_header.h"
+#include "mu_upgrd_dngrd_hdr.h"
+#include "gtmmsg.h"
 
-#if defined(UNIX)
-#define GDS_V3_LABEL "GDSDYNUNX01"
-#elif defined(VMS)
-#define GDS_V3_LABEL "GDSDYNSEG09"
-#endif
+LITREF  char	gtm_release_name[];
+LITREF  int4	gtm_release_name_len;
 
-
-#define FLUSH 1
-
-
-/* to keep old values instead of reinitialize them */
-#define DWNGRADE_BG_TRC_REC(field) (new_head->field).evnt_cnt = (old_head->field).evnt_cnt; \
-				  (new_head->field).evnt_tn  = (old_head->field).evnt_tn
-
-/* is redundant */
-#define INIT_BG_TRC_REC(field) (new_head->field).evnt_cnt = 0; \
-			       (new_head->field).evnt_tn  = 0
-
-/* If sizeof(old_head->field) <= sizeof(new_head->field), and same type and array */
-#define DWNGRADE_MEM(field) memcpy(&new_head->field[0], &old_head->field[0], sizeof(new_head->field))
-
-
-
-
-
-/*---------------------------------------------------------------------------
-     Downgrade header from v4.x to v3.x.  This will cause header to shrink.
-     Different between 32016E and others 3.x
-	wc_blocked_t_end_hist/wc_blocked_t_end_hist2
-     Do not use followings of 32016E
-	jnl_blocked_writer_lost/jnl_blocked_writer_stuck/jnl_blocked_writer_blocked (for VMS)
- ---------------------------------------------------------------------------*/
-void mu_dwngrd_header(sgmnt_data *old_head, v3_sgmnt_data *new_head)
+/* Downgrade header from v5.0-000 to v4.x */
+void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 {
-	int4 old_hdr_size, new_hdr_size, old_hdr_size_vbn, new_hdr_size_vbn;
-
-	old_hdr_size  = sizeof(*old_head);
-	new_hdr_size = sizeof(*new_head);
-	old_hdr_size_vbn = DIVIDE_ROUND_UP(old_hdr_size, DISK_BLOCK_SIZE);
-	new_hdr_size_vbn = DIVIDE_ROUND_UP(new_hdr_size, DISK_BLOCK_SIZE);
-
-
-	memcpy(new_head, GDS_V3_LABEL, GDS_LABEL_SZ);
-	new_head->n_bts = old_head->n_bts;
-	assert(old_head->acc_meth == dba_mm || old_head->acc_meth == dba_bg);
-	new_head->acc_meth = old_head->acc_meth;
-	new_head->start_vbn = old_head->start_vbn;
-	new_head->createinprogress = old_head->createinprogress;
-	new_head->file_corrupt = old_head->file_corrupt;
-	new_head->total_blks_filler = old_head->total_blks_filler;
-	new_head->created = old_head->created;
-	new_head->lkwkval = old_head->lkwkval;
-	if (old_head->lock_space_size <= (new_head->start_vbn - 1 - new_hdr_size_vbn) * DISK_BLOCK_SIZE)
-		/* We have enough physical space for locks */
-		new_head->lock_space_size = old_head->lock_space_size;
-	else
-	{
-		/* We do not have enough physical space for locks */
-		new_head->lock_space_size = (new_head->start_vbn - 1 - new_hdr_size_vbn) * DISK_BLOCK_SIZE;
-		util_out_print("Lock space size is trucated to !UL bytes!!",FLUSH, new_head->lock_space_size);
-	}
-        new_head->free_space = (new_head->start_vbn - 1) * DISK_BLOCK_SIZE - new_hdr_size - new_head->lock_space_size;
-	assert (new_head->free_space >= 0);
-	new_head->owner_node = old_head->owner_node;
-	new_head->max_bts =  WC_MAX_BUFFS;
-	new_head->extension_size = old_head->extension_size;
-	new_head->blk_size = old_head->blk_size;
-	new_head->max_rec_size = old_head->max_rec_size;
-	new_head->max_key_size = old_head->max_key_size;
-	new_head->null_subs = old_head->null_subs;
-	new_head->lock_write = old_head->lock_write;
-	new_head->ccp_jnl_before = old_head->ccp_jnl_before;
-	new_head->clustered = old_head->clustered;
-	new_head->flush_done = old_head->flush_done;
-	new_head->unbacked_cache = old_head->unbacked_cache;
-	new_head->bplmap = old_head->bplmap;
-	new_head->bt_buckets = old_head->bt_buckets;
-	new_head->n_wrt_per_flu = old_head->n_wrt_per_flu;
-	DWNGRADE_MEM(n_retries);
-	new_head->n_puts = old_head->n_puts;
-	new_head->n_kills = old_head->n_kills;
-	new_head->n_queries = old_head->n_queries;
-	new_head->n_gets = old_head->n_gets;
-	new_head->n_order = old_head->n_order;
-	new_head->n_zprevs = old_head->n_zprevs;
-	new_head->n_data = old_head->n_data;
-	new_head->wc_rtries = old_head->wc_rtries;
-	new_head->wc_rhits = old_head->wc_rhits;
-	/* new_head->wcs_staleness =  old_head->wcs_staleness; */
-	new_head->wc_blocked = old_head->wc_blocked;
-	new_head->root_level = old_head->root_level;
-	/* new_head->filler_short */
-	if (old_head->acc_meth == dba_bg)
-		new_head->flush_time[0] = TIM_FLU_MOD_BG;
-	else
-		new_head->flush_time[0] = TIM_FLU_MOD_MM;
-	new_head->flush_time[1] = -1;
-	new_head->last_inc_backup = old_head->last_inc_backup;
-	new_head->last_com_backup = old_head->last_com_backup;
-	new_head->staleness[0] =  -300000000;
-	new_head->staleness[1] =  -1;
-	DWNGRADE_MEM(ccp_tick_interval);
-	new_head->flu_outstanding = old_head->flu_outstanding;
-	new_head->free_blocks_filler = old_head->free_blocks_filler;
-	new_head->last_rec_backup = old_head->last_rec_backup;
-	DWNGRADE_MEM(ccp_quantum_interval);
-	DWNGRADE_MEM(ccp_response_interval);
-	new_head->jnl_alq = old_head->jnl_alq;
-	new_head->jnl_deq = old_head->jnl_deq;
-	new_head->jnl_buffer_size = old_head->jnl_buffer_size;
-	new_head->jnl_before_image = old_head->jnl_before_image;
-	new_head->jnl_state = old_head->jnl_state;
-	/* new_head->filler_glob_sec_init[0] */
-	new_head->jnl_file_len = old_head->jnl_file_len;
-	DWNGRADE_MEM(jnl_file_name);
-
-	new_head->trans_hist.curr_tn = old_head->trans_hist.curr_tn;
-	new_head->trans_hist.early_tn = old_head->trans_hist.early_tn;
-	new_head->trans_hist.header_open_tn = old_head->trans_hist.header_open_tn;
-	new_head->trans_hist.mm_tn = old_head->trans_hist.mm_tn;
-	new_head->trans_hist.lock_sequence = old_head->trans_hist.lock_sequence;
-	new_head->trans_hist.ccp_jnl_filesize = old_head->trans_hist.ccp_jnl_filesize;
-	new_head->trans_hist.total_blks = old_head->trans_hist.total_blks;
-	new_head->trans_hist.free_blocks = old_head->trans_hist.free_blocks;
-	new_head->cache_lru_cycle = 0; 	/* assigned in run time */
-	new_head->reserved_bytes = old_head->reserved_bytes;
-	/* new_head->in_wtstart = 0; */
-	new_head->def_coll = old_head->def_coll;
-	new_head->def_coll_ver = old_head->def_coll_ver;
-	new_head->image_count = old_head->image_count;
-	new_head->freeze = old_head->freeze;
-	new_head->rc_srv_cnt = old_head->rc_srv_cnt;
-	new_head->dsid = old_head->dsid;
-	new_head->rc_node = old_head->rc_node;
-        /* new_head->dbfid;   Platform dependent. So updat in main */
-	/*  filler2_char[16];  */
-
-
-#if defined(VMS)
-	DWNGRADE_BG_TRC_REC(rmv_free);
-	DWNGRADE_BG_TRC_REC(rmv_clean);
-	DWNGRADE_BG_TRC_REC(clean_to_mod);
-	DWNGRADE_BG_TRC_REC(qio_to_mod);
-	DWNGRADE_BG_TRC_REC(blocked);
-	DWNGRADE_BG_TRC_REC(blkd_made_empty);
-	DWNGRADE_BG_TRC_REC(obsolete_to_empty);
-	DWNGRADE_BG_TRC_REC(qio_to_clean);
-	DWNGRADE_BG_TRC_REC(stale);
-	DWNGRADE_BG_TRC_REC(starved);
-	DWNGRADE_BG_TRC_REC(active_lvl_trigger);
-	DWNGRADE_BG_TRC_REC(new_buff);
-	DWNGRADE_BG_TRC_REC(get_new_buff);
-	DWNGRADE_BG_TRC_REC(mod_to_mod);
+	memset(v15_csd, 0, sizeof(v15_sgmnt_data));
+	MEMCPY_LIT(v15_csd->label, GDS_LABEL_GENERIC);
+	MEMCPY_LIT((v15_csd->label + sizeof(GDS_LABEL_GENERIC) - 1), GDS_V40);
+	v15_csd->blk_size = csd->blk_size;
+	v15_csd->bplmap = csd->bplmap;
+	v15_csd->start_vbn = csd->start_vbn;
+	v15_csd->acc_meth = csd->acc_meth;
+	v15_csd->max_bts = csd->max_bts;
+	v15_csd->n_bts = csd->n_bts;
+	v15_csd->bt_buckets = csd->bt_buckets;
+	v15_csd->reserved_bytes = csd->reserved_bytes + BLK_HDR_INCREASE;
+	v15_csd->max_rec_size = csd->max_rec_size;
+	v15_csd->max_key_size = csd->max_key_size;
+	v15_csd->lock_space_size = csd->lock_space_size;
+	v15_csd->extension_size = csd->extension_size;
+	v15_csd->def_coll = csd->def_coll;
+	v15_csd->def_coll_ver = csd->def_coll_ver;
+	v15_csd->std_null_coll = csd->std_null_coll;
+	v15_csd->null_subs = csd->null_subs;
+	v15_csd->free_space = csd->free_space;
+	v15_csd->mutex_spin_parms.mutex_hard_spin_count = csd->mutex_spin_parms.mutex_hard_spin_count;
+	v15_csd->mutex_spin_parms.mutex_sleep_spin_count = csd->mutex_spin_parms.mutex_sleep_spin_count;
+	v15_csd->mutex_spin_parms.mutex_spin_sleep_mask = csd->mutex_spin_parms.mutex_spin_sleep_mask;
+	v15_csd->max_update_array_size = csd->max_update_array_size;	/* This is filler for some early V4 versions */
+	v15_csd->max_non_bm_update_array_size = csd->max_non_bm_update_array_size;/* This is filler for some early V4 versions */
+	v15_csd->file_corrupt = csd->file_corrupt;
+	memcpy(&v15_csd->created, &csd->created, sizeof(csd->created));
+	v15_csd->createinprogress = csd->createinprogress;
+	time(&v15_csd->creation.date_time);	/* No need to propagate previous value */
+	v15_csd->last_inc_backup = csd->last_inc_backup;
+	v15_csd->last_com_backup = csd->last_com_backup;
+	v15_csd->last_rec_backup = csd->last_rec_backup;
+	v15_csd->reorg_restart_block = csd->reorg_restart_block;
+	memcpy(v15_csd->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
+	v15_csd->owner_node = csd->owner_node;
+	v15_csd->image_count = csd->image_count;
+	v15_csd->kill_in_prog = csd->kill_in_prog;
+	v15_csd->trans_hist.curr_tn = csd->trans_hist.curr_tn;
+	v15_csd->trans_hist.early_tn = csd->trans_hist.early_tn;
+	v15_csd->trans_hist.last_mm_sync = csd->trans_hist.last_mm_sync;
+	v15_csd->trans_hist.header_open_tn = csd->trans_hist.header_open_tn;
+	v15_csd->trans_hist.mm_tn = csd->trans_hist.mm_tn;
+	v15_csd->trans_hist.lock_sequence = csd->trans_hist.lock_sequence;
+	v15_csd->trans_hist.total_blks = csd->trans_hist.total_blks;
+	v15_csd->trans_hist.free_blocks = csd->trans_hist.free_blocks;
+	v15_csd->flush_time[0] = csd->flush_time[0];
+	v15_csd->flush_time[1] = csd->flush_time[1];
+	v15_csd->flush_trigger = csd->flush_trigger;
+	v15_csd->n_wrt_per_flu = csd->n_wrt_per_flu;
+	v15_csd->wait_disk_space = csd->wait_disk_space;
+	v15_csd->defer_time = csd->defer_time;
+#ifdef UNIX
+	v15_csd->semid = INVALID_SEMID;
+	v15_csd->shmid = INVALID_SHMID;
+	v15_csd->sem_ctime.ctime = 0;
+	v15_csd->shm_ctime.ctime = 0;
 #endif
-	DWNGRADE_BG_TRC_REC(db_csh_getn_flush_dirty);
-	DWNGRADE_BG_TRC_REC(db_csh_getn_rip_wait);
-	DWNGRADE_BG_TRC_REC(db_csh_getn_buf_owner_stuck);
-	DWNGRADE_BG_TRC_REC(db_csh_getn_out_of_design);
-	DWNGRADE_BG_TRC_REC(t_qread_buf_owner_stuck);
-	DWNGRADE_BG_TRC_REC(t_qread_out_of_design);
-	DWNGRADE_BG_TRC_REC(bt_put_flush_dirty);
-	DWNGRADE_BG_TRC_REC(wc_blocked_wcs_verify_passed);
-	DWNGRADE_BG_TRC_REC(wc_blocked_t_qread_db_csh_getn_invalid_blk);
-	DWNGRADE_BG_TRC_REC(wc_blocked_t_qread_db_csh_get_invalid_blk);
-	DWNGRADE_BG_TRC_REC(wc_blocked_db_csh_getn_loopexceed);
-	DWNGRADE_BG_TRC_REC(wc_blocked_db_csh_getn_wcsstarvewrt);
-	DWNGRADE_BG_TRC_REC(wc_blocked_db_csh_get);
-	DWNGRADE_BG_TRC_REC(wc_blocked_tp_tend_wcsgetspace);
-	DWNGRADE_BG_TRC_REC(wc_blocked_tp_tend_t1);
-	DWNGRADE_BG_TRC_REC(wc_blocked_tp_tend_bitmap);
-	DWNGRADE_BG_TRC_REC(wc_blocked_tp_tend_jnl_cwset);
-	DWNGRADE_BG_TRC_REC(wc_blocked_tp_tend_jnl_wcsflu);
-	DWNGRADE_BG_TRC_REC(wc_blocked_t_end_hist1_nullbt);
-	DWNGRADE_BG_TRC_REC(wc_blocked_t_end_hist1_nonnullbt);
-	DWNGRADE_BG_TRC_REC(wc_blocked_t_end_bitmap_nullbt);
-	DWNGRADE_BG_TRC_REC(wc_blocked_t_end_bitmap_nonnullbt);
-	DWNGRADE_BG_TRC_REC(wc_blocked_t_end_jnl_cwset);
-	DWNGRADE_BG_TRC_REC(wc_blocked_t_end_jnl_wcsflu);
+	/* Note none of the counter fields are being carried over. An upgrade or downgrade will
+	   implicitly set them to zero by not initializing them.
+	*/
+	v15_csd->staleness[0] = csd->staleness[0];
+	v15_csd->staleness[1] = csd->staleness[1];
+	v15_csd->ccp_tick_interval[0] = csd->ccp_tick_interval[0];
+	v15_csd->ccp_tick_interval[1] = csd->ccp_tick_interval[1];
+	v15_csd->ccp_quantum_interval[0] = csd->ccp_quantum_interval[0];
+	v15_csd->ccp_quantum_interval[1] = csd->ccp_quantum_interval[1];
+	v15_csd->ccp_response_interval[0] = csd->ccp_response_interval[0];
+	v15_csd->ccp_response_interval[1] = csd->ccp_response_interval[1];
+	v15_csd->ccp_jnl_before = csd->ccp_jnl_before;
+	v15_csd->clustered = csd->clustered;
+	v15_csd->unbacked_cache = csd->unbacked_cache;
+	v15_csd->rc_srv_cnt = csd->rc_srv_cnt;
+	v15_csd->dsid = csd->dsid;
+	v15_csd->rc_node = csd->rc_node;
 
-
-	DWNGRADE_MEM(master_map);
+	v15_csd->reg_seqno = csd->reg_seqno;
+	v15_csd->resync_seqno = csd->resync_seqno;
+	v15_csd->resync_tn = csd->resync_tn;
+	v15_csd->old_resync_seqno = csd->old_resync_seqno;
+	if (REPL_WAS_ENABLED(csd))
+		v15_csd->repl_state = repl_closed;
+	else
+		v15_csd->repl_state = csd->repl_state;
+	v15_csd->jnl_state = csd->jnl_state;
+	if (JNL_ALLOWED(v15_csd))
+	{
+		v15_csd->jnl_alq = csd->jnl_alq;
+		v15_csd->jnl_deq = csd->jnl_deq;
+		v15_csd->jnl_buffer_size = csd->jnl_buffer_size;
+		v15_csd->jnl_before_image = csd->jnl_before_image;
+		v15_csd->jnl_file_len = csd->jnl_file_len;
+		v15_csd->autoswitchlimit = csd->autoswitchlimit;
+		v15_csd->epoch_interval = csd->epoch_interval;
+		v15_csd->alignsize = csd->alignsize;
+		v15_csd->jnl_sync_io = csd->jnl_sync_io;
+		v15_csd->yield_lmt = csd->yield_lmt;
+		memcpy(v15_csd->jnl_file_name, csd->jnl_file_name, JNL_NAME_SIZE);
+		PRINT_JNL_FIELDS(v15_csd);
+	}
+	memcpy(v15_csd->reorg_restart_key, csd->reorg_restart_key, sizeof(csd->reorg_restart_key));
+	memcpy(v15_csd->machine_name, csd->machine_name, MAX_MCNAMELEN);
+	v15_csd->certified_for_upgrade_to = GDSV4;		/* ust re-certify to upgrade again */
+	v15_csd->creation_db_ver = csd->creation_db_ver;	/* Retain creation major/minor version */
+	v15_csd->creation_mdb_ver = csd->creation_mdb_ver;
 }
-

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +22,8 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "t_begin_crit.h"
-#include "hashtab.h"		/* needed for cws_insert.h */
 #include "longset.h"		/* needed for cws_insert.h */
+#include "hashtab_int4.h"	/* needed for cws_insert.h */
 #include "cws_insert.h"
 
 GBLDEF	srch_hist		dummy_hist;
@@ -37,6 +37,7 @@ GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		t_tries;
 GBLREF	int4			update_trans;
 GBLREF	boolean_t		write_after_image;
+GBLREF	volatile int4		fast_lock_count;
 
 void t_begin_crit(uint4 err)
 /* err - error code for current gvcst_routine */
@@ -45,6 +46,12 @@ void t_begin_crit(uint4 err)
 	start_tn = cs_addrs->ti->curr_tn;
 	cw_set_depth = 0;
 	t_tries = CDB_STAGNATE;
+	/* since this is mainline code and we know fast_lock_count should be 0 at this point reset it just in case it is not.
+	 * having fast_lock_count non-zero will defer the database flushing logic and other critical parts of the system.
+	 * hence this periodic reset at the beginning of each transaction.
+	 */
+	assert(0 == fast_lock_count);
+	fast_lock_count = 0;
 	t_err = err;
 	if (non_tp_jfb_ptr)
 		non_tp_jfb_ptr->record_size = 0; /* re-initialize it to 0 since TOTAL_NONTPJNL_REC_SIZE macro uses it */

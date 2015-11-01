@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "send_msg.h"
+#include "gtmio.h"
 #include "repl_sp.h"
 #include "iosp.h"	/* for SS_NORMAL */
 
@@ -37,13 +38,16 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts)
 	jnl_private_control	*jpc;
 	jnl_create_info		create;
 	char			prev_jnl_fn[JNL_NAME_SIZE];
+	int			status;
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	jpc = csa->jnl;
 
 	assert((ERR_JNLFILOPN != sts) && (NOJNL != jpc->channel) || (ERR_JNLFILOPN == sts) && (NOJNL == jpc->channel));
 	if ((ERR_JNLFILOPN != sts) && (NOJNL != jpc->channel))
-		F_CLOSE(jpc->channel);
+	{
+		F_CLOSE(jpc->channel, status);
+	}
 	jpc->channel = NOJNL;
 	jnl_send_oper(jpc, sts);
 	/* attempt to create a new journal file */
@@ -66,6 +70,7 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts)
 	{
 		jpc->status = SS_NORMAL;
 		sts = 0;
+		csa->hdr->jnl_checksum = create.checksum;
 	}
 	send_msg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(reg));
 	assert(csa->hdr->jnl_file_len == create.jnl_len);

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -26,21 +26,16 @@
 .extern	frame_pointer
 
 	.text
-.extern	mid_len
 
 # PUBLIC	op_currtn
 ENTRY op_currtn
 	movb	$mval_m_str,mval_b_mvtype(%edx)
 	movl	frame_pointer,%eax
-	movl	(%eax),%eax
-	leal	mrt_rtn_mid(%eax),%eax
-	movl	%eax,mval_a_straddr(%edx)
-	pushl	%edx			# save mval pointer
-	pushl	mval_a_straddr(%edx)
-	call	mid_len
-	addl	$4,%esp
-	popl	%edx			# restore mval pointer
-	movl	%eax,mval_l_strlen(%edx)
+	movl	msf_rvector_off(%eax),%eax
+	pushl	mrt_rtn_len(%eax)
+	popl	mval_l_strlen(%edx)		# %edx->str.len = frame_pointer->rvector->routine_name.len
+	movl	mrt_rtn_addr(%eax),%eax
+	movl	%eax,mval_a_straddr(%edx)	# %edx->str.addr = frame_pointer->rvector->routine_name.addr
 	ret
 # op_currtn ENDP
 

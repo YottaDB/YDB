@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,7 @@
 
 #include "mdef.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
+#include "gtm_inet.h"
 #include <signal.h>
 
 #include "mlkdef.h"
@@ -34,15 +33,14 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"
 #include "tp.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "stp_parms.h"
 #include "stringpool.h"
 #include "cli.h"
-#include "cache.h"
 #include "gt_timer.h"
 #include "io.h"
 #include "mupip_exit.h"
@@ -61,6 +59,7 @@
 #include "sig_init.h"
 #include "gtmmsg.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
+#include "suspsigs_handler.h"
 
 GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLDEF	bool			in_backup;
@@ -92,7 +91,7 @@ int main (int argc, char **argv)
 	image_type = MUPIP_IMAGE;
 	gtm_env_init();	/* read in all environment variables */
 	err_init(util_base_ch);
-	sig_init(generic_signal_handler, NULL);	/* Note: no ^C handler is defined (yet) */
+	sig_init(generic_signal_handler, NULL, suspsigs_handler);	/* Note: no ^C handler is defined (yet) */
 	atexit(mupip_exit_handler);
         SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	licensed = transform = TRUE;
@@ -101,7 +100,7 @@ int main (int argc, char **argv)
 	mu_get_term_characterstics();
 	get_page_size();
 	getjobnum();
-	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, OS_PAGE_SIZE,
+	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
 			  &jnlpool.jnlpool_dummy_reg);
 	getzdir();
 	initialize_pattern_table();
@@ -114,7 +113,6 @@ int main (int argc, char **argv)
 	gtm_chk_dist(argv[0]);
 	INIT_GBL_ROOT(); /* Needed for GVT initialization */
 	io_init(TRUE);
-	cache_init();
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;
 	while(1)

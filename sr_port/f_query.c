@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,8 +45,7 @@ int f_query ( oprtype *a, opctype op)
 			assert (r0->opcode == OC_VAR);
 			assert (r0->operand[0].oprclass == MVAR_REF);
 			r1 = maketriple (OC_PARAMETER);
-			r1->operand[0] = put_str (r0->operand[0].oprval.vref->mvname.c,
-							mid_len (&r0->operand[0].oprval.vref->mvname));
+			r1->operand[0] = put_str(r0->operand[0].oprval.vref->mvname.addr, r0->operand[0].oprval.vref->mvname.len);
 			r1->operand[1] = a->oprval.tref->operand[1];
 			a->oprval.tref->operand[1] = put_tref (r1);
 			dqins (a->oprval.tref->exorder.fl, exorder, r1);
@@ -57,8 +56,8 @@ int f_query ( oprtype *a, opctype op)
 			r0 = newtriple (OC_FNQUERY);
 			r0->operand[0] = put_ilit (3);
 			r0->operand[1] = put_tref (newtriple (OC_PARAMETER));
-			r0->operand[1].oprval.tref->operand[0] = put_str (a->oprval.tref->operand[0].oprval.vref->mvname.c,
-									mid_len (&a->oprval.tref->operand[0].oprval.vref->mvname));
+			r0->operand[1].oprval.tref->operand[0] = put_str(a->oprval.tref->operand[0].oprval.vref->mvname.addr,
+									a->oprval.tref->operand[0].oprval.vref->mvname.len);
 			r1 = r0->operand[1].oprval.tref;
 			r1->operand[1] = *a;
 			*a = put_tref (r0);

@@ -27,7 +27,7 @@
 
 #include "error.h"
 #include "collseq.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "mmemory.h"
 #include "do_xform.h"

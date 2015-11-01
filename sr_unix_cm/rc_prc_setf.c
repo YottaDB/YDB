@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
 #include "copy.h"
 #include "error.h"
 #include "gtcm.h"
-#include "gvcst_put.h"
+#include "gvcst_protos.h"	/* for gvcst_put prototype */
 
 GBLREF gv_key 		*gv_currkey;
 GBLREF gv_namehead 	*gv_target;
@@ -31,8 +31,7 @@ GBLREF int		rc_set_fragment;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*gd_header;
 
-int
-rc_prc_setf(rc_q_hdr *qhdr)
+int rc_prc_setf(rc_q_hdr *qhdr)
 {
     rc_set	*req, *rsp;
     short	 data_off, str_remain, *ptr;
@@ -45,7 +44,7 @@ rc_prc_setf(rc_q_hdr *qhdr)
     {
 	REVERT;
 #ifdef DEBUG
-	gtcm_cpktdmp(qhdr,qhdr->a.len.value,"rc_fnd_file failed.");
+	gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"rc_fnd_file failed.");
 #endif
 	return -1;
     }
@@ -59,7 +58,7 @@ rc_prc_setf(rc_q_hdr *qhdr)
 	{	qhdr->a.erc.value = RC_KEYTOOLONG;
 		REVERT;
 #ifdef DEBUG
-	gtcm_cpktdmp(qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");
+	gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");
 #endif
 		return -1;
 	}
@@ -83,7 +82,7 @@ rc_prc_setf(rc_q_hdr *qhdr)
     {
 	qhdr->a.erc.value = RC_KEYTOOLONG;
 #ifdef DEBUG
-	gtcm_cpktdmp(qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");
+	gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");
 #endif
     }
     else  /* the total record will fit into a block */

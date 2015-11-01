@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,40 +8,43 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+#ifndef CMD_QLF_H_INCLUDED
+#define CMD_QLF_H_INCLUDED
 
 typedef struct
 {
-	uint4	qlf;
+	uint4		qlf;
 	mval		object_file;
 	mval		list_file;
 	mval		ceprep_file;
-}command_qualifier;
-
+} command_qualifier;
 
 typedef struct
 {	unsigned short	page;		/* page number */
 	unsigned short	list_line;	/* listing line number */
 	unsigned short	lines_per_page;
 	unsigned short	space;		/* spacing */
-}list_params;
+} list_params;
 
-#define CQ_LIST			1
-#define CQ_MACHINE_CODE		2
-#define CQ_CROSS_REFERENCE	4
-#define CQ_DEBUG		8
-#define CQ_OBJECT		16
-#define CQ_WARNINGS		32
-#define CQ_IGNORE		64
-#define CQ_LOWER_LABELS		128
-#define CQ_LINE_ENTRY		256
-#define CQ_CE_PREPROCESS        512
-#define CQ_INLINE_LITERALS	1024
+/* command qualifer bit masks */
+#define CQ_LIST			(1<<0)
+#define CQ_MACHINE_CODE		(1<<1)
+#define CQ_CROSS_REFERENCE	(1<<2)
+#define CQ_DEBUG		(1<<3)
+#define CQ_OBJECT		(1<<4)
+#define CQ_WARNINGS		(1<<5)
+#define CQ_IGNORE		(1<<6)
+#define CQ_LOWER_LABELS		(1<<7)
+#define CQ_LINE_ENTRY		(1<<8)
+#define CQ_CE_PREPROCESS        (1<<9)
+#define CQ_INLINE_LITERALS	(1<<10)
+#define CQ_ALIGN_STRINGS	(1<<11)
 
+/* TODO: add CQ_ALIGN_STRINGS to the default list below when alignment is supported */
 #define CQ_DEFAULT (CQ_WARNINGS | CQ_OBJECT | CQ_IGNORE | CQ_LOWER_LABELS | CQ_LINE_ENTRY | CQ_INLINE_LITERALS)
 
 #define LISTTAB 10
 #define PG_WID 132
-
 
 typedef struct src_line_type
 {
@@ -55,3 +58,5 @@ typedef struct src_line_type
 
 void zl_cmd_qlf(mstr *quals, command_qualifier *qualif);
 void get_cmd_qlf(command_qualifier *qualif);
+
+#endif /* CMD_QLF_H_INCLUDED */

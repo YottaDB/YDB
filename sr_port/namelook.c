@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,19 +20,16 @@
 #include "gtm_caseconv.h"
 #include "namelook.h"
 
-int namelook(const unsigned char offset_tab[], const nametabent *name_tab, char *str)
+int namelook(const unsigned char offset_tab[], const nametabent *name_tab, char *str, int strlength)
 {
-	unsigned char		temp[20], x;
-	int4			strlength;
+	unsigned char		temp[NAME_ENTRY_SZ], x;
 	const nametabent	*top, *i;
 
-	if ((strlength = mid_len((mident *)str)) > 20)
+	if (strlength > NAME_ENTRY_SZ)
 		return -1;
-
 	lower_to_upper(&temp[0], (uchar_ptr_t)str, strlength);
 	if ((x = temp[0]) == '%')
 		return -1;
-
 	i = name_tab + offset_tab[x -= 'A'];
 	top = name_tab + offset_tab[++x];
 	assert(i == top || i->name[0] >= temp[0]);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,15 +49,13 @@
 #include "mu_reorg.h"
 
 /* Include prototypes */
-#include "t_write.h"
 #include "t_end.h"
 #include "t_retry.h"
 #include "mupip_reorg.h"
 #include "util.h"
 #include "t_begin.h"
 #include "op.h"
-#include "gvcst_rtsib.h"
-#include "gvcst_search.h"
+#include "gvcst_protos.h"	/* for gvcst_rtsib,gvcst_search prototype */
 #include "gvcst_bmp_mark_free.h"
 #include "gvcst_kill_sort.h"
 #include "gtmmsg.h"
@@ -98,7 +96,7 @@ void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *
 	assert(NULL != (char *)(Y));
 	assert(0 < (Y)->depth);
 	assert((NULL == (char *)(Z)) || (0 < (Z)->depth));
-	util_out_print("!AD::!UL::", FALSE, LEN_AND_STR(X), tn);
+	util_out_print("!AD::!16@XJ::", FALSE, LEN_AND_STR(X), &tn);
 	for (i = 0; i <= (Y)->depth; i++)
 		util_out_print("!SL|", FALSE, (Y)->h[i].blk_num);
 	if (NULL != (char *)(Z))
@@ -122,8 +120,7 @@ void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *
 				(Y)->h[level].blk_num, (Z)->h[level].blk_num);
 		else
 			util_out_print("::!SL", TRUE, (Y)->h[level].blk_num);
-	}
-	else
+	} else
 	{
 		if ((0 == memcmp((X), "KIL", 3)) && (NULL != kill_set_list))
 		{
@@ -334,7 +331,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						continue;
 					} else if (cdb_sc_normal == status)
 					{
-						if (!(ret_tn = t_end(&(gv_target->hist), 0)))
+						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), 0)))
 						{
 							need_kip_incr = FALSE;
 							continue;
@@ -376,8 +373,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						assert(CDB_STAGNATE > t_tries);
 						t_retry(status);
 						continue;
-					}
-					else if (cdb_sc_normal == status)
+					} else if (cdb_sc_normal == status)
 					{
 						if (level) /* delete lower elements of array, t_end might confuse */
 						{
@@ -387,7 +383,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						}
 						if (0 < kill_set_list.used)     /* increase kill_in_prog */
 							need_kip_incr = TRUE;
-						if (!(ret_tn = t_end(&(gv_target->hist), rtsib_hist)))
+						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), rtsib_hist)))
 						{
 							need_kip_incr = FALSE;
 							assert(!kip_incremented);
@@ -445,7 +441,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						inctn_opcode = inctn_invalid_op; /* temporary reset; satisfy an assert in t_end() */
 						assert(update_trans);
 						update_trans = FALSE; /* tell t_end, this is no longer an update transaction */
-						if (!(ret_tn = t_end(rtsib_hist, NULL)))
+						if ((trans_num)0 == (ret_tn = t_end(rtsib_hist, NULL)))
 						{
 							need_kip_incr = FALSE;
 							inctn_opcode = inctn_mu_reorg;	/* reset inctn_opcode to its default */
@@ -540,7 +536,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						need_kip_incr = TRUE;
 						/* second history not needed, because,
 						   we are reusing a free block, which does not need history */
-						if (!(ret_tn = t_end(&(gv_target->hist), NULL)))
+						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL)))
 						{
 							need_kip_incr = FALSE;
 							assert(!kip_incremented);
@@ -562,7 +558,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					/* gv_target->hist is for working block's history, and
 					   reorg_gv_target->hist is for destinition block's history.
 					   Note: gv_target and reorg_gv_target can be part of different GVT.  */
-					else if (!(ret_tn = t_end(&(gv_target->hist), &(reorg_gv_target->hist))))
+					else if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), &(reorg_gv_target->hist))))
 					{
 						need_kip_incr = FALSE;
 						assert(!kip_incremented);
@@ -653,7 +649,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 			{
 				assert(0 < kill_set_list.used);
 				need_kip_incr = TRUE;
-				if (!(ret_tn = t_end(&(gv_target->hist), NULL)))
+				if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL)))
 				{
 					need_kip_incr = FALSE;
 					assert(!kip_incremented);

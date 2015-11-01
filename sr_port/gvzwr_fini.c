@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,7 @@ GBLREF gd_binding	*gd_map_top;
 
 void gvzwr_fini(zshow_out *out, int pat)
 {
-	char 		m[sizeof(mident)];
+	char 		m[sizeof(mident_fixed)];
 	mval 		local, data;
 	gv_key		*old;
 
@@ -118,7 +118,8 @@ void gvzwr_fini(zshow_out *out, int pat)
 			}
 			op_gvorder(&local);
 			if (local.str.len)
-			{	assert(local.str.len <= sizeof(mident) + 1);
+			{
+				assert(local.str.len <= MAX_MIDENT_LEN + 1);
 				local.str.addr++;
 				local.str.len--;
 				memcpy(&m[0], local.str.addr, local.str.len);

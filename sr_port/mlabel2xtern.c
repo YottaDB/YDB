@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001,2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "compiler.h"
+#include "gtm_ctype.h"
+#include "gtm_string.h"
 #include "cmd_qlf.h"
 #include "mmemory.h"
 #include "mlabel2xtern.h"
@@ -19,54 +20,33 @@ GBLREF command_qualifier cmd_qlf;
 
 void mlabel2xtern(mstr *dst, mident *rtn, mident *lab)
 {
-	char	*pt, *name, ch;
+	char	*pt;
 	int	cnt;
 
-	/* max length is: routine name (mident) . label name (mident) <NUL> + space for case shift characters ($) in VMS labels */
-	dst->addr = mcalloc(sizeof(mident) * 3 + sizeof("."));
-	pt = dst->addr;
-	for (cnt = 0, name = (char *)rtn; cnt < sizeof(mident) && (ch = *name++); cnt++)
-		*pt++ = ch;
+	/* length of the resultant symbol "<routine name>.<label name>" */
+	pt = dst->addr = mcalloc(rtn->len + lab->len + STR_LIT_LEN("."));
+	memcpy(pt, rtn->addr, rtn->len);
+	pt += rtn->len;
 	*pt++ = '.';
-	cnt = 1;
-	name = (char *)lab;
-	ch = *name++;
-	if ('%' == ch)
-		ch = '_';
-	if (cmd_qlf.qlf & CQ_LOWER_LABELS)
+
+	if (0 < lab->len)
 	{
-#ifdef VMS
-		bool	is_lower, now_lower = FALSE;
-#endif
-		while (ch)
+		if (cmd_qlf.qlf & CQ_LOWER_LABELS)
 		{
-#ifdef VMS
-			/* Note: This toggle is complicated by the fact that we have lower, upper and numerics to deal with */
-			is_lower = (ch >= 'a' && ch <= 'z');
-			if ((is_lower && !now_lower) || (now_lower && (ch >= 'A' && ch <= 'Z')))
-			{
-				*pt++ = '$';
-				now_lower = !now_lower;
-			}
-			*pt++ = is_lower ? (ch - ('a' - 'A')) : ch;
-#else
-			*pt++ = ch;
-#endif
-			if (cnt++ >= sizeof(mident))
-				break;
-			ch = *name++;
+			memcpy(pt, lab->addr, lab->len);
+			if ('%' == *pt)
+				*pt = '_';
+			pt += lab->len;
 		}
-	} else
-	{
-		while (ch)
-		{
-			if (ch >= 'a' && ch <= 'z')
-				*pt++ = (ch - ('a' - 'A'));
-			else
-				*pt++ = ch;
-			if (cnt++ >= sizeof(mident))
-				break;
-			ch = *name++;
+		else {
+			cnt = 0;
+			if ('%' == lab->addr[cnt])
+			{
+				*pt++ = '_';
+				cnt++;
+			}
+			for (; cnt < lab->len; cnt++)
+				*pt++ = TOUPPER(lab->addr[cnt]);
 		}
 	}
 	dst->len = pt - dst->addr;

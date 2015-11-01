@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,9 +15,9 @@
 
 void op_fnzbitget(mval *dst, mval *bitstr, int pos)
 {
-	int str_len;
-	unsigned char *byte_1, byte_n;
-	int mp, np;
+	int 		str_len;
+	unsigned char	*byte_1, byte_n;
+	int		mp, np, bn;
 	error_def(ERR_INVBITSTR);
 	error_def(ERR_INVBITPOS);
 
@@ -28,20 +28,17 @@ void op_fnzbitget(mval *dst, mval *bitstr, int pos)
 
 	byte_1 = (unsigned char *)bitstr->str.addr;
 	str_len = (bitstr->str.len -1) * 8;
-	if ((*byte_1 < 0) || (*byte_1 > 7))
-	{
+	if (7 < *byte_1)
 		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
-	}
-	if ((pos < 1) || (pos > str_len - *byte_1))
-	{
+	if ((1 > pos) || (pos > str_len - *byte_1))
 		rts_error(VARLSTCNT(1) ERR_INVBITPOS);
-	}
 	np = ((pos + 7) / 8) - 1;
 	mp = pos % 8;
-	if (mp == 0)
+	if (0 == mp)
 		mp = 8;
 	byte_n = *(byte_1 + np + 1);
 	byte_n = byte_n << (mp - 1);
 	byte_n = byte_n >> 7;
-	MV_FORCE_MVAL(dst, (int)byte_n);
+	bn = byte_n;
+	MV_FORCE_MVAL(dst, bn);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,10 +10,13 @@
  ****************************************************************/
 
 /* mupip_reorg.c:
-	Main program for mupip reorg (portable) .
-	This program creates a list of globals to be organized from /SELECT option
-	and then calls mu_reorg() to reorganize each global seperately
-	but excludes some varibales' organization given in /EXCLUDE list. */
+ *	Main program for mupip reorg (portable) .
+ *
+ *	This program creates a list of globals to be organized from /SELECT option and then calls mu_reorg() to
+ *	reorganize each global seperately but excludes some variables' organization given in /EXCLUDE list.
+ *
+ *	This alternatively invokes mu_reorg_upgrd_dwngrd in case a MUPIP REORG -UPGRADE or -DOWNGRADE was specified
+ */
 
 #include "mdef.h"
 
@@ -35,6 +38,7 @@
 
 /* Prototypes */
 #include "mupip_reorg.h"
+#include "mu_reorg_upgrd_dwngrd.h"
 #include "targ_alloc.h"
 #include "mupip_exit.h"
 #include "gv_select.h"
@@ -68,6 +72,16 @@ void mupip_reorg(void)
 	error_def(ERR_MUNOFINISH);
 
 	mu_outofband_setup();
+
+	if ((CLI_PRESENT == cli_present("UPGRADE")) || (CLI_PRESENT == cli_present("DOWNGRADE")))
+	{
+		/* note that "mu_reorg_process" is not set to TRUE in case of MUPIP REORG UPGRADE/DOWNGRADE.
+		 * this is intentional because we are not doing any REORG kind of processing.
+		 */
+		mu_reorg_upgrd_dwngrd();
+		mupip_exit(SS_NORMAL);	/* does not return */
+	}
+
 	resume = (CLI_PRESENT == cli_present("RESUME"));
 	reorg_op = DEFAULT;
 	n_len = sizeof(cli_buff);
@@ -76,15 +90,15 @@ void mupip_reorg(void)
 	{
 		for (ptr = cli_buff; ; )
 		{
-			if (0 == strncmp(ptr, "SWAPHIST", strlen("SWAPHIST")))
+			if (0 == STRNCMP_LIT(ptr, "SWAPHIST"))
 				reorg_op |= SWAPHIST;
-			else if (0 == strncmp(ptr, "NOCOALESCE", strlen("NOCOALESCE")))
+			else if (0 == STRNCMP_LIT(ptr, "NOCOALESCE"))
 				reorg_op |= NOCOALESCE;
-			else if (0 == strncmp(ptr, "NOSPLIT", strlen("NOSPLIT")))
+			else if (0 == STRNCMP_LIT(ptr, "NOSPLIT"))
 				reorg_op |= NOSPLIT;
-			else if (0 == strncmp(ptr, "NOSWAP", strlen("NOSWAP")))
+			else if (0 == STRNCMP_LIT(ptr, "NOSWAP"))
 				reorg_op |= NOSWAP;
-			else if (0 == strncmp(ptr, "DETAIL", strlen("DETAIL")))
+			else if (0 == STRNCMP_LIT(ptr, "DETAIL"))
 				reorg_op |= DETAIL;
 			ptr  = (char *)strchr(ptr, ',');
 			if (ptr)
@@ -95,7 +109,8 @@ void mupip_reorg(void)
 	}
 	if ((cli_status = cli_present("FILL_FACTOR")) == CLI_PRESENT)
 	{
-		if (!cli_get_num("FILL_FACTOR", &data_fill_factor) || MAX_FILL_FACTOR < data_fill_factor)
+		assert(sizeof(data_fill_factor) == sizeof(int4));
+		if (!cli_get_int("FILL_FACTOR", (int4 *)&data_fill_factor) || MAX_FILL_FACTOR < data_fill_factor)
 			data_fill_factor = MAX_FILL_FACTOR;
 		else if (MIN_FILL_FACTOR > data_fill_factor)
 			data_fill_factor = MIN_FILL_FACTOR;
@@ -104,7 +119,8 @@ void mupip_reorg(void)
 		data_fill_factor = MAX_FILL_FACTOR;
 	if ((cli_status = cli_present("INDEX_FILL_FACTOR")) == CLI_PRESENT)
 	{
-		if (!cli_get_num("INDEX_FILL_FACTOR", &index_fill_factor))
+		assert(sizeof(index_fill_factor) == sizeof(int4));
+		if (!cli_get_int("INDEX_FILL_FACTOR", (int4 *)&index_fill_factor))
 			index_fill_factor = data_fill_factor;
 		else if (MIN_FILL_FACTOR > index_fill_factor)
 			index_fill_factor = MIN_FILL_FACTOR;
@@ -151,7 +167,7 @@ void mupip_reorg(void)
 	mu_reorg_process = TRUE;
 	gv_currkey_next_reorg = (gv_key *)malloc(sizeof(gv_key) + MAX_KEY_SZ);
 	gv_currkey_next_reorg->top = MAX_KEY_SZ;
-	reorg_gv_target = targ_alloc(MAX_KEY_SZ);
+	reorg_gv_target = targ_alloc(MAX_KEY_SZ, NULL);
 	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
 	{
 		util_out_print("   ", FLUSH);

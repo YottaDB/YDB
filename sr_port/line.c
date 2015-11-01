@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,7 @@ int line(uint4 *lnc)
 	bool success;
 	error_def(ERR_MULTLAB);
 	error_def(ERR_LSEXPECTED);
-	error_def(ERR_COMMAORRPARENEXP);
+	error_def(ERR_COMMAORRPAREXP);
 	error_def(ERR_MULTFORMPARM);
 	error_def(ERR_NAMEEXPECTED);
 	error_def(ERR_BLKTOODEEP);
@@ -77,8 +77,7 @@ int line(uint4 *lnc)
 		{
 			stx_error(ERR_MULTLAB);
 			success = FALSE;
-		}
-		else
+		} else
 		{
 			assert(x->formalcnt == NO_FORMALLIST);
 			x->ml = curlin;
@@ -86,7 +85,8 @@ int line(uint4 *lnc)
 			if (window_token != TK_COLON)
 				mlmax++;
 			else
-			{	x->gbl = FALSE;
+			{
+				x->gbl = FALSE;
 				advancewindow();
 			}
 		}
@@ -103,8 +103,7 @@ int line(uint4 *lnc)
 					stx_error (ERR_NAMEEXPECTED);
 					success = FALSE;
 					break;
-				}
-				else
+				} else
 				{
 					varnum = get_mvaddr(&window_ident)->mvidx;
 					for (r = parmbase->operand[1].oprval.tref ; r ; r = r->operand[1].oprval.tref)
@@ -132,7 +131,7 @@ int line(uint4 *lnc)
 					advancewindow();
 				else if (window_token != TK_RPAREN)
 				{
-					stx_error(ERR_COMMAORRPARENEXP);
+					stx_error(ERR_COMMAORRPAREXP);
 					success = FALSE;
 					break;
 				}
@@ -201,10 +200,10 @@ int line(uint4 *lnc)
 		*for_stack_ptr = 0;
 		success = linetail();
 		if (success)
-		{	assert(for_stack_ptr == for_stack);
+		{
+			assert(for_stack_ptr == for_stack);
 			if (*for_stack_ptr)
-			{	tnxtarg(*for_stack_ptr);
-			}
+				tnxtarg(*for_stack_ptr);
 		}
 	}
 	if (first_triple->exorder.fl == curtchain)

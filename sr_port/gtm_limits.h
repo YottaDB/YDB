@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,46 @@
 
 /* Interlude to <limits.h> */
 
+#ifndef GTM_LIMITSH
+#define GTM_LIMITSH
+
 #include <limits.h>
+#ifdef __hpux
+#include <inttypes.h>
+#endif
 
 #ifndef PATH_MAX
 /*  For zOS */
 #define PATH_MAX 255
 #endif
+
+#if defined(LLONG_MAX)		/* C99 and others */
+#define GTM_INT64_MIN LLONG_MIN
+#define GTM_INT64_MAX LLONG_MAX
+#define GTM_UINT64_MAX ULLONG_MAX
+#elif defined(LONG_LONG_MAX)
+#define GTM_INT64_MIN LONG_LONG_MIN
+#define GTM_INT64_MAX LONG_LONG_MAX
+#define GTM_UINT64_MAX ULONG_LONG_MAX
+#elif defined(LONGLONG_MAX)
+#define GTM_INT64_MIN LONGLONG_MIN
+#define GTM_INT64_MAX LONGLONG_MAX
+#define GTM_UINT64_MAX ULONGLONG_MAX
+#elif defined(__INT64_MAX)	/* OpenVMS Alpha */
+#define GTM_INT64_MIN __INT64_MIN
+#define GTM_INT64_MAX __INT64_MAX
+#define GTM_UINT64_MAX __UINT64_MAX
+#elif defined(INTMAX_MAX)	/* HP-UX */
+#define GTM_INT64_MIN INTMAX_MIN
+#define GTM_INT64_MAX INTMAX_MAX
+#define GTM_UINT64_MAX UINTMAX_MAX
+#elif LONG_MAX != INT_MAX	/* Tru64 */
+#define GTM_INT64_MIN LONG_MIN
+#define GTM_INT64_MAX LONG_MAX
+#define GTM_UINT64_MAX ULONG_MAX
+#else
+#error Unable to determine 64 bit MAX in gtm_limits.h
+#endif
+
+#endif
+

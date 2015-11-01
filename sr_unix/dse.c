@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +12,7 @@
 #include "mdef.h"
 
 #include <signal.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
+#include "gtm_inet.h"
 
 #include "mlkdef.h"
 #include "gtm_stdlib.h"
@@ -36,14 +35,13 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"
 #include "tp.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "util.h"
 #include "cli.h"
-#include "cache.h"
 #include "op.h"
 #include "gt_timer.h"
 #include "io.h"
@@ -63,6 +61,7 @@
 #include "getjobnum.h"
 #include "sig_init.h"
 #include "gtmmsg.h"
+#include "suspsigs_handler.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
 GBLDEF block_id			patch_curr_blk;
@@ -106,14 +105,14 @@ int main(int argc, char *argv[])
 	op_open_ptr = op_open;
 	patch_curr_blk = get_dir_root();
 	err_init(util_base_ch);
-	sig_init(generic_signal_handler, dse_ctrlc_handler);
+	sig_init(generic_signal_handler, dse_ctrlc_handler, suspsigs_handler);
 	atexit(util_exit_handler);
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	get_page_size();
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;
 	getjobname();
-	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, OS_PAGE_SIZE,
+	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
 			  &jnlpool.jnlpool_dummy_reg);
 	getzdir();
 	prealloc_gt_timers();
@@ -121,7 +120,6 @@ int main(int argc, char *argv[])
 	gvinit();
 	region_init(FALSE);
 	INIT_GBL_ROOT(); /* Needed for GVT initialization */
-	cache_init();
 	getjobnum();
 	util_out_print("!/File  !_!AD", TRUE, DB_LEN_STR(gv_cur_region));
 	util_out_print("Region!_!AD!/", TRUE, REG_LEN_STR(gv_cur_region));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,9 +56,8 @@ void dse_over(void)
 {
         block_id        blk;
 	char 		data[MAX_LINE];
-	sm_uc_ptr_t	bp;
 	uchar_ptr_t	lbp;
-        int4		offset;
+        uint4		offset;
 	int		data_len, size;
 	blk_segment	*bs1, *bs_ptr;
 	cw_set_element  *cse;
@@ -67,9 +66,11 @@ void dse_over(void)
 	unsigned int	insize, outsize;
 	char		chset_name[MAX_CHSET_NAME];
 	unsigned short	name_len = 0;
+	srch_blk_status	blkhist;
+
+	error_def(ERR_DBRDONLY);
 	error_def(ERR_DSEBLKRDFAIL);
 	error_def(ERR_DSEFAIL);
-	error_def(ERR_DBRDONLY);
 
         if (gv_cur_region->read_only)
                 rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
@@ -79,7 +80,7 @@ void dse_over(void)
 	blk_size = cs_addrs->hdr->blk_size;
         if (cli_present("BLOCK") == CLI_PRESENT)
 	{
-		if (!cli_get_hex("BLOCK",&blk))
+		if (!cli_get_hex("BLOCK", (uint4 *)&blk))
 			return;
 		if (blk < 0 || blk >= cs_addrs->ti->total_blks)
 		{
@@ -117,7 +118,7 @@ void dse_over(void)
 		util_out_print("Error:  offset must be specified.", TRUE);
 		return;
 	}
-	if (!cli_get_hex("OFFSET",&offset))
+	if (!cli_get_hex("OFFSET", &offset))
 		return;
 	if (offset < sizeof(blk_hdr))
 	{
@@ -130,10 +131,11 @@ void dse_over(void)
 		return;
 	}
 	t_begin_crit(ERR_DSEFAIL);
-	if(!(bp = t_qread(blk, &dummy_hist.h[0].cycle, &dummy_hist.h[0].cr)))
+	blkhist.blk_num = blk;
+	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 
-	size = ((blk_hdr_ptr_t)bp)->bsiz;
+	size = ((blk_hdr_ptr_t)blkhist.buffaddr)->bsiz;
 	if (size < sizeof(blk_hdr))
 		size = sizeof(blk_hdr);
 	else if (size >= blk_size)
@@ -161,7 +163,7 @@ void dse_over(void)
 		return;
 	}
 	lbp = (uchar_ptr_t)malloc(blk_size);
-	memcpy (lbp, bp, blk_size);
+	memcpy (lbp, blkhist.buffaddr, blk_size);
 	memcpy(lbp + offset, &data[0], data_len);
 
 	BLK_INIT(bs_ptr, bs1);
@@ -173,7 +175,7 @@ void dse_over(void)
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
-	t_write(blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
+	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
 	BUILD_AIMG_IF_JNL_ENABLED(cs_addrs, cs_data, non_tp_jfb_buff_ptr, cse);
 	t_end(&dummy_hist, 0);
 	return;

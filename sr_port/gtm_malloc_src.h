@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,46 +70,47 @@
 
 #ifdef VMS
 /* These routines for VMS are AST-safe */
-#  define MALLOC(size, addr)						\
-{									\
-        int	msize, errnum;						\
-	void	*maddr;							\
-	msize = size;							\
-        errnum = lib$get_vm(&msize, &maddr);				\
-	if (SS$_NORMAL != errnum)					\
-	{								\
-		--gtmMallocDepth;					\
-		assert(FALSE);						\
-		rts_error(VARLSTCNT(4) ERR_VMSMEMORY, 1, msize, errnum);\
-	}								\
-	addr = (void *)maddr;						\
+#  define MALLOC(size, addr)								\
+{											\
+        int	msize, errnum;								\
+	void	*maddr;									\
+	msize = size;									\
+        errnum = lib$get_vm(&msize, &maddr);						\
+	if (SS$_NORMAL != errnum)							\
+	{										\
+		--gtmMallocDepth;							\
+		assert(FALSE);								\
+		rts_error(VARLSTCNT(5) ERR_VMSMEMORY, 2, msize, CALLERID, errnum);	\
+	}										\
+	addr = (void *)maddr;								\
 }
-#  define FREE(size, addr)						\
-{									\
-        int	msize, errnum;						\
-	void	*maddr;							\
-	msize = size;							\
-        maddr = addr;							\
-        errnum = lib$free_vm(&msize, &maddr);				\
-	if (SS$_NORMAL != errnum)					\
-	{								\
-		--gtmMallocDepth;					\
-		assert(FALSE);						\
-		rts_error(VARLSTCNT(3) ERR_FREEMEMORY, 0, errnum);	\
-	}								\
+#  define FREE(size, addr)							\
+{										\
+        int	msize, errnum;							\
+	void	*maddr;								\
+	msize = size;								\
+        maddr = addr;								\
+        errnum = lib$free_vm(&msize, &maddr);					\
+	if (SS$_NORMAL != errnum)						\
+	{									\
+		--gtmMallocDepth;						\
+		assert(FALSE);							\
+		rts_error(VARLSTCNT(4) ERR_FREEMEMORY, 1, CALLERID, errnum);	\
+	}									\
 }
 #  define GTM_MALLOC_REENT
 #else
 /* These routines for Unix are NOT thread-safe */
-#  define MALLOC(size, addr) 						\
-{									\
-	addr = (void *)malloc(size);					\
-	if (NULL == (void *)addr)					\
-	{								\
-		--gtmMallocDepth;					\
-		assert(FALSE);						\
-		rts_error(VARLSTCNT(4) ERR_MEMORY, 1, size, errno);	\
-	}								\
+#  define MALLOC(size, addr) 							\
+{										\
+	addr = (void *)malloc(size);						\
+	if (NULL == (void *)addr)						\
+	{									\
+		--gtmMallocDepth;						\
+                --fast_lock_count;						\
+		assert(FALSE);							\
+		rts_error(VARLSTCNT(5) ERR_MEMORY, 2, size, CALLERID, errno);	\
+	}									\
 }
 #  define FREE(size, addr) free(addr);
 #endif
@@ -335,6 +336,7 @@ GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	volatile int4	gtmMallocDepth;			/* Recursion indicator. Volatile so it gets stored immediately */
 /* This var allows us to call ourselves but still have callerid info */
 GBLREF	unsigned char	*smCallerId;			/* Caller of top level malloc/free */
+GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
 
 STATICD	boolean_t	gtmSmInitialized;		/* Initialized indicator */
 
@@ -649,6 +651,9 @@ void *gtm_malloc(size_t size)
 			hdrSize = offsetof(storElem, userStorage);	/* Size of storElem header */
 			assert((hdrSize + sizeof(markerChar)) < MINTWO);
 
+#ifndef GTM_MALLOC_REENT
+			fast_lock_count++;
+#endif
 			++gtmMallocDepth;				/* Nesting depth of memory calls */
 			reentered = (1 < gtmMallocDepth);
 #ifndef GTM_MALLOC_REENT
@@ -765,6 +770,8 @@ void *gtm_malloc(size_t size)
 			/* Check on deferred frees */
 			if (0 == gtmMallocDepth && deferFreeExists)
 				processDeferredFrees();
+#else
+			--fast_lock_count;
 #endif
 			return retVal;
 		} else  /* Storage mgmt has not been initialized */
@@ -812,6 +819,9 @@ void gtm_free(void *addr)
 		if (process_exiting)	/* If we are exiting, don't bother with frees. Process destruction can do it */
 			return;
 
+#ifndef GTM_MALLOC_REENT
+		++fast_lock_count;
+#endif
 		++gtmMallocDepth;	/* Recursion indicator */
 
 #ifdef GTM_MALLOC_REENT
@@ -986,6 +996,8 @@ void gtm_free(void *addr)
 		/* Check on deferred frees */
 		if (0 == gtmMallocDepth && deferFreeExists)
 			processDeferredFrees();
+#else
+		--fast_lock_count;
 #endif
 #ifndef DEBUG
 	} else

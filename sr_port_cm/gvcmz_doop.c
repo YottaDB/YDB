@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmidef.h"
 #include "cmmdef.h"
 #include "stringpool.h"
@@ -24,11 +24,13 @@
 #include "mvalconv.h"
 #include "copy.h"
 #include "gtm_string.h"
+#include "format_targ_key.h"
 
-GBLREF gd_region	*gv_cur_region;
-GBLREF gv_key		*gv_currkey;
-GBLREF gv_key		*gv_altkey;
-GBLREF spdesc		stringpool;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	gv_key		*gv_currkey;
+GBLREF	gv_key		*gv_altkey;
+GBLREF	spdesc		stringpool;
+GBLREF	bool		undef_inhibit;
 
 void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 {
@@ -36,9 +38,23 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	short		len, temp_short;
 	int4		status, max_reply_len;
 	struct CLB	*lnk;
+	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
+
 	error_def(ERR_BADSRVRNETMSG);
+	error_def(ERR_UNIMPLOP);
+	error_def(ERR_TEXT);
+	error_def(ERR_GVIS);
 
 	lnk = gv_cur_region->dyn.addr->cm_blk;
+	if (!((link_info *)lnk->usr)->server_supports_long_names && (PRE_V5_MAX_MIDENT_LEN < strlen((char *)gv_currkey->base)))
+	{
+		end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
+		rts_error(VARLSTCNT(14) ERR_UNIMPLOP, 0,
+					ERR_TEXT, 2,
+					LEN_AND_LIT("GT.CM server does not support global names longer than 8 characters"),
+					ERR_GVIS, 2, end - buff, buff,
+					ERR_TEXT, 2, DB_LEN_STR(gv_cur_region));
+	}
 	lnk->ast = 0;	/* all database queries are sync */
 	lnk->cbl = 1 + /* HDR */
 		   gv_currkey->end + /* key */
@@ -48,12 +64,35 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		   sizeof(unsigned char) + /* gv_key.base */
 		   sizeof(unsigned char) + /* regnum */
 		   sizeof(unsigned short); /* size for variable len SUBSC */
-	if (CMMS_Q_PUT == query_code)
+	/* the current GT.CM maximum message buffer length is bounded by the size of a short which is 64K. but the
+	 * calculation below of lnk->cbl and max_reply_len takes into account the fact that the value that is sent in as
+	 * input or read in from the server side can be at most MAX_DBSTRLEN in size. therefore, there is a dependency
+	 * that MAX_DBSTRLEN always be less than the GT.CM maximum message buffer length. to ensure this is always the
+	 * case, the following assert is added so that whenever MAX_DBSTRLEN is increased, we will fail this assert
+	 * and reexamine the code below.
+	 */
+	assert(sizeof(lnk->cbl) == 2);	/* assert it is a short. when it becomes a uint4 the assert can be removed
+					 * if the macro CM_MAX_BUF_LEN (used below) is changed appropriately */
+	assert(MAX_DBSTRLEN == (32 * 1024 - 1));
+	if (CMMS_Q_PUT == query_code || CMMS_Q_INCREMENT == query_code)
+	{
+		if (CMMS_Q_INCREMENT == query_code)
+		{ /* 1-byte boolean value of "undef_inhibit" passed to the server for $INCREMENT
+		   although, effective V5.0-000, undef_inhibit is no longer relevant as $INCREMENT()
+		   implicitly does a $GET() on the global. We keep this byte to ensure compatibility
+		   with V5.0-FT01 */
+			lnk->cbl++;
+		}
+		assert((uint4)lnk->cbl + sizeof(unsigned short) + (uint4)MAX_DBSTRLEN <= (uint4)CM_MAX_BUF_LEN);
 		lnk->cbl += (sizeof(unsigned short) + v->str.len); /* VALUE + length */
-	if (CMMS_Q_GET == query_code || CMMS_Q_QUERY == query_code && ((link_info *)lnk->usr)->query_is_queryget)
-		max_reply_len = lnk->mbl + sizeof(unsigned short) + MAX_STRLEN; /* can't predict the length of data value */
+	}
+	if ((CMMS_Q_GET == query_code)
+			|| (CMMS_Q_INCREMENT == query_code)
+			|| (CMMS_Q_QUERY == query_code) && ((link_info *)lnk->usr)->query_is_queryget)
+		max_reply_len = lnk->mbl + sizeof(unsigned short) + MAX_DBSTRLEN; /* can't predict the length of data value */
 	else
 		max_reply_len = lnk->mbl;
+	assert(max_reply_len <= (int4)CM_MAX_BUF_LEN);
 	if (stringpool.top < stringpool.free + max_reply_len)
 		stp_gcol(max_reply_len);
 	lnk->mbf = stringpool.free;
@@ -71,7 +110,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	CM_PUT_SHORT(ptr, gv_currkey->prev, ((link_info *)(lnk->usr))->convert_byteorder);
 	ptr += sizeof(short);
 	memcpy(ptr, gv_currkey->base, gv_currkey->end + 1);
-	if (query_code == CMMS_Q_PUT)
+	if (CMMS_Q_PUT == query_code || CMMS_Q_INCREMENT == query_code)
 	{
 		ptr += gv_currkey->end + 1;
 		temp_short = (short)v->str.len;
@@ -79,30 +118,17 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		CM_PUT_SHORT(ptr, temp_short, ((link_info *)(lnk->usr))->convert_byteorder);
 		ptr += sizeof(short);
 		memcpy(ptr,v->str.addr, v->str.len);
+		if (CMMS_Q_INCREMENT == query_code)
+		{ /* UNDEF flag is no longer relevant, but set the flag to ensure compatibility with V5.0-FT01 */
+			assert(sizeof(undef_inhibit) == 1);
+			ptr[v->str.len] = (unsigned char)undef_inhibit;
+		}
 	}
 	status = cmi_write(lnk);
 	if (CMI_ERROR(status))
 	{
 		((link_info *)(lnk->usr))->neterr = TRUE;
 		gvcmz_error(query_code, status);
-		return;
-	}
-	if (CMMS_Q_PUT == query_code || CMMS_Q_ZWITHDRAW == query_code || CMMS_Q_KILL == query_code)
-	{
-		status = cmi_read(lnk);
-		if (CMI_ERROR(status))
-		{
-			((link_info *)(lnk->usr))->neterr = TRUE;
-			gvcmz_error(query_code, status);
-			return;
-		}
-		ptr = lnk->mbf;
-		if (reply_code != *ptr)
-		{
-			if (*ptr != CMMS_E_ERROR)
-				rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
-			gvcmz_errmsg(lnk,FALSE);
-		}
 		return;
 	}
 	status = cmi_read(lnk);
@@ -113,14 +139,26 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		return;
 	}
 	ptr = lnk->mbf;
+	if (CMMS_Q_PUT == query_code || CMMS_Q_ZWITHDRAW == query_code || CMMS_Q_KILL == query_code)
+	{
+		if (reply_code != *ptr)
+		{
+			if (*ptr != CMMS_E_ERROR)
+				rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+			gvcmz_errmsg(lnk,FALSE);
+		}
+		return;
+	}
 	if (reply_code != *ptr)
 	{
-		if (CMMS_R_UNDEF != *ptr || CMMS_Q_GET != query_code)
+		if ((CMMS_R_UNDEF != *ptr) || ((CMMS_Q_GET != query_code) && (CMMS_Q_INCREMENT != query_code)))
 		{
 			if (CMMS_E_ERROR != *ptr)
 				rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			gvcmz_errmsg(lnk, FALSE);
 		}
+		if (CMMS_Q_INCREMENT == query_code)
+			v->mvtype = 0;	/* set the result to be undefined */
 		return;
 	}
 	ptr++;
@@ -164,7 +202,9 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 			return;
 		}
 	}
-	assert(CMMS_R_GET == reply_code || CMMS_R_QUERY == reply_code && ((link_info *)lnk->usr)->query_is_queryget && 1 < len);
+	assert(CMMS_R_GET == reply_code
+		|| CMMS_R_INCREMENT == reply_code
+		|| CMMS_R_QUERY == reply_code && ((link_info *)lnk->usr)->query_is_queryget && 1 < len);
 	CM_GET_SHORT(len, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 	ptr += sizeof(unsigned short);
 	assert(ptr >= stringpool.base && ptr + len < stringpool.top); /* incoming message is in stringpool */

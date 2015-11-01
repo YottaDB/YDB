@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,13 +78,6 @@ typedef	struct
 	int4		offset;
 	job_parm	*parms;
 } job_params_type;
-
-typedef	struct
-	{
-		mident		label;
-		int4		offset;
-		mident		routine;
-	} isd_type;
 
 typedef enum
 {

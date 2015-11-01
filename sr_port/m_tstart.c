@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ static readonly nametabent tst_param_names[] =
 	,{6,"SERIAL"}
 
 	,{1,"T"}
-	,{8,"TRANSACT"}
+	,{8,"TRANSACT*"}
 };
 /* Offset of letter with dev_param_names */
 static readonly unsigned char tst_param_index[27] =
@@ -36,8 +36,8 @@ static readonly unsigned char tst_param_index[27] =
 	0,   0,   0,   0,   0,   2,   4,   4,   4,   4,   4,   4,   4
 };
 
-GBLREF char window_token;
-GBLREF mident window_ident;
+GBLREF char 	window_token;
+GBLREF mident 	window_ident;
 
 int m_tstart(void)
 {
@@ -56,7 +56,7 @@ int m_tstart(void)
 	{
 	case TK_IDENT:
 		count = 1;
-		varlst->operand[1] = put_str(window_ident.c, sizeof(window_ident));
+		varlst->operand[1] = put_str(window_ident.addr, window_ident.len);
 		advancewindow();
 		break;
 	case TK_ASTERISK:
@@ -92,7 +92,7 @@ int m_tstart(void)
 			{
 			case TK_IDENT:
 				varnext = newtriple(OC_PARAMETER);
-				varnext->operand[0] = put_str(window_ident.c, sizeof(window_ident));
+				varnext->operand[0] = put_str(window_ident.addr, window_ident.len);
 				varp->operand[1] = put_tref(varnext);
 				varp = varnext;
 				advancewindow();
@@ -138,7 +138,7 @@ int m_tstart(void)
 			bad_parse = TRUE;
 			if (window_token == TK_IDENT)
 			{
-				if ((n = namelook(tst_param_index,tst_param_names,window_ident.c)) >= 0)
+				if ((n = namelook(tst_param_index, tst_param_names, window_ident.addr, window_ident.len)) >= 0)
 				{
 					if (n < 2 && !has_ser)
 					{	has_ser = TRUE;

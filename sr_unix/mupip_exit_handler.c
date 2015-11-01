@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +12,10 @@
 /* The mupip exit handler called on all exits from mupip */
 #include "mdef.h"
 
-#include <sys/ipc.h>
+#include "gtm_ipc.h"
 #include <sys/shm.h>
 #include <sys/sem.h>
-#include <netinet/in.h>
+#include "gtm_inet.h"
 #include <signal.h>
 #include <errno.h>
 
@@ -49,11 +49,15 @@
 #include "ftok_sems.h"
 #include "gtm_unistd.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_mname.h"	/* needed for muprec.h */
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "gtmmsg.h"
 #include "secshr_db_clnup.h"
+#include "gtmio.h"
+#include "repl_shutdcode.h"
 
 GBLREF int			process_exiting;
 GBLREF boolean_t	        mupip_jnl_recover;
@@ -68,9 +72,11 @@ GBLREF jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF boolean_t        	is_src_server;
 GBLREF boolean_t        	is_rcvr_server;
 GBLREF boolean_t		is_updproc;
+GBLREF boolean_t		is_updhelper;
 GBLREF FILE			*gtmsource_log_fp;
 GBLREF FILE			*gtmrecv_log_fp;
 GBLREF FILE			*updproc_log_fp;
+GBLREF FILE			*updhelper_log_fp;
 GBLREF int			gtmsource_log_fd;
 GBLREF int			gtmsource_statslog_fd;
 GBLREF FILE			*gtmsource_statslog_fp;
@@ -78,12 +84,14 @@ GBLREF int			gtmrecv_log_fd;
 GBLREF int			gtmrecv_statslog_fd;
 GBLREF FILE			*gtmrecv_statslog_fp;
 GBLREF int			updproc_log_fd;
+GBLREF int			updhelper_log_fd;
 GBLREF int			gtmsource_srv_count;
 GBLREF int			gtmrecv_srv_count;
 GBLREF gd_region		*standalone_reg;
 GBLREF gd_region		*gv_cur_region;
 GBLREF gd_region		*ftok_sem_reg;
 GBLREF jnl_gbls_t		jgbl;
+GBLREF upd_helper_entry_ptr_t	helper_entry;
 
 void close_repl_logfiles(void);
 
@@ -113,6 +121,12 @@ void mupip_exit_handler(void)
 	gv_rundown();
 	if (standalone_reg)
 		db_ipcs_reset(standalone_reg, TRUE);
+	if (is_updhelper && NULL != helper_entry) /* haven't had a chance to cleanup, must be an abnormal exit */
+	{
+		helper_entry->helper_shutdown = ABNORMAL_SHUTDOWN;
+		helper_entry->helper_pid = 0; /* vacate my slot */
+		helper_entry = NULL;
+	}
         if (recvpool.recvpool_ctl)
 	{
                 SHMDT(recvpool.recvpool_ctl);
@@ -163,6 +177,8 @@ void mupip_exit_handler(void)
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Receiver server exiting...\n");
 	else if (is_updproc)
 		repl_log(updproc_log_fp, TRUE, TRUE, "Update process exiting...\n");
+	else if (is_updhelper)
+		repl_log(updhelper_log_fp, TRUE, TRUE, "Helper exiting...\n");
 	else
 		mu_reset_term_characterstics(); /* the replication servers use files for output/error, not terminal */
 	util_out_close();
@@ -177,26 +193,30 @@ void mupip_exit_handler(void)
 
 void close_repl_logfiles()
 {
-	int		fclose_res;
+	int	rc;
 
 	if (gtmsource_statslog_fd != -1)
-		close(gtmsource_statslog_fd);
+		CLOSEFILE(gtmsource_statslog_fd, rc);
 	if (gtmsource_statslog_fp != NULL)
-		FCLOSE(gtmsource_statslog_fp, fclose_res);
+		FCLOSE(gtmsource_statslog_fp, rc);
 	if (gtmsource_log_fd != -1)
-		close(gtmsource_log_fd);
+		CLOSEFILE(gtmsource_log_fd, rc);
 	if (gtmsource_log_fp != NULL)
-		FCLOSE(gtmsource_log_fp, fclose_res);
+		FCLOSE(gtmsource_log_fp, rc);
 	if (gtmrecv_statslog_fd != -1)
-		close(gtmrecv_statslog_fd);
+		CLOSEFILE(gtmrecv_statslog_fd, rc);
 	if (gtmrecv_statslog_fp != NULL)
-		FCLOSE(gtmrecv_statslog_fp, fclose_res);
+		FCLOSE(gtmrecv_statslog_fp, rc);
 	if (gtmrecv_log_fd != -1)
-		close(gtmrecv_log_fd);
+		CLOSEFILE(gtmrecv_log_fd, rc);
 	if (gtmrecv_log_fp != NULL)
-		FCLOSE(gtmrecv_log_fp, fclose_res);
+		FCLOSE(gtmrecv_log_fp, rc);
 	if (updproc_log_fd != -1)
-		close(updproc_log_fd);
+		CLOSEFILE(updproc_log_fd, rc);
 	if (updproc_log_fp != NULL)
-		FCLOSE(updproc_log_fp, fclose_res);
+		FCLOSE(updproc_log_fp, rc);
+	if (updhelper_log_fd != -1)
+		CLOSEFILE(updhelper_log_fd, rc);
+	if (updhelper_log_fp != NULL)
+		FCLOSE(updhelper_log_fp, rc);
 }

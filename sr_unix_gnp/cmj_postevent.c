@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@ cmi_status_t cmj_postevent(struct CLB *lnk)
 	case CMI_REASON_IODONE:
 		if (lnk->ast)
 		{
-			CMI_DPRINT(("CALLING AST FROM CMJ_POSTEVENT after IODONE, called from %x\n", caller_id()));
+			CMI_DPRINT(("CALLING AST FROM CMJ_POSTEVENT after IODONE, called from 0x%x\n", caller_id()));
 			(*lnk->ast)(lnk);
 		}
 		break;
@@ -61,7 +61,7 @@ cmi_status_t cmj_postevent(struct CLB *lnk)
 		}
 		if (lnk->ast)
 		{
-			CMI_DPRINT(("CALLING AST FROM CMJ_POSTEVENT after ERROR, called from %x\n", caller_id()));
+			CMI_DPRINT(("CALLING AST FROM CMJ_POSTEVENT after ERROR, called from 0x%x\n", caller_id()));
 			(*lnk->ast)(lnk);
 		}
 		if (tsk->err)

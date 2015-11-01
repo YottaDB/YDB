@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,8 +33,10 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "iosp.h"
 #include "tp_change_reg.h"
@@ -69,6 +71,7 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	char		*jnl_state_lit[];
 GBLREF	char		*repl_state_lit[];
+GBLREF  int		process_exiting;		/* Process is on it's way out */
 
 void	mur_close_files(void)
 {
@@ -106,6 +109,10 @@ void	mur_close_files(void)
 	error_def(ERR_JNLACTINCMPLT);
 
 	call_on_signal = NULL;	/* Do not recurs via call_on_signal if there is an error */
+	process_exiting = TRUE;	/* Signal function "free" (in gtm_malloc_src.h) not to bother with frees as we are any exiting.
+				 * This avoids assert failures that would otherwise occur due to nested storage mgmt calls
+				 * just in case we came here because of an interrupt (e.g. SIGTERM) while a malloc was in progress.
+				 */
 	csd = &csd_temp;
 	JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* For jnl_write* routnies we need this */
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_full_total; rctl < rctl_top; rctl++)
@@ -133,7 +140,8 @@ void	mur_close_files(void)
 				rctl->csa->nl->donotflush_dbjnl = FALSE;	/* shared memory is now clean for dbjnl flushing */
 			gds_rundown();
 			if (rctl->standalone && (murgbl.clean_exit || !murgbl.db_updated) &&
-					!rctl->gd->read_only && file_head_read((char *)rctl->gd->dyn.addr->fname, csd))
+					!rctl->gd->read_only && file_head_read((char *)rctl->gd->dyn.addr->fname, csd,
+									       sizeof(csd_temp)))
 			{
 				assert(mur_options.update);
 				csd->file_corrupt = FALSE;
@@ -175,7 +183,7 @@ void	mur_close_files(void)
 					csd->jnl_before_image = rctl->before_image;
 					csd->recov_interrupted = rctl->recov_interrupted;
 				}
-				if (!file_head_write((char *)rctl->gd->dyn.addr->fname, csd))
+				if (!file_head_write((char *)rctl->gd->dyn.addr->fname, csd, sizeof(csd_temp)))
 					wrn_count++;
 			} /* else do not restore state */
 			if (rctl->standalone && !mur_options.forward && murgbl.clean_exit && (NULL != rctl->jctl_turn_around))
@@ -241,6 +249,8 @@ void	mur_close_files(void)
 					jctl->jfh->prev_recov_end_of_data >= jctl->lvrec_off);
 				if (0 == jctl->jfh->prev_recov_end_of_data)
 					jctl->jfh->prev_recov_end_of_data = jctl->lvrec_off;
+				assert(jctl->jfh->prev_recov_blks_to_upgrd_adjust <= rctl->blks_to_upgrd_adjust);
+				jctl->jfh->prev_recov_blks_to_upgrd_adjust = rctl->blks_to_upgrd_adjust;
 				jctl->jfh->next_jnl_file_name_length = 0;
 				DO_FILE_WRITE(jctl->channel, 0, jctl->jfh, JNL_HDR_LEN, jctl->status, jctl->status2);
 				WARN_STATUS(jctl);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,7 @@
 #if !defined(__linux__) && !defined(__hpux)
 #include <siginfo.h>
 #endif
-#include <stdlib.h>
+#include "gtm_stdlib.h"
 #endif
 #include "gtm_sem.h"
 #include "gtm_string.h"
@@ -58,6 +58,7 @@
 #include "gtmio.h"
 #include "file_head_read.h"
 #include "file_head_write.h"
+#include "suspsigs_handler.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
 #define TIME_FORMAT	"_%Y%j%H%M%S"	/* .yearjuliendayhoursminutesseconds */
@@ -80,7 +81,6 @@ static	int			gtmsecshr_socket_dir_len;
 static	char			gtmsecshr_logpath[MAX_TRANS_NAME_LEN];
 
 void clean_client_sockets(char *path);
-int gtmsecshr_open_log_file (void);
 void gtmsecshr_timer_handler(void);
 void gtmsecshr_signal_handler(int sig, siginfo_t *info, void *context);
 
@@ -155,7 +155,7 @@ int main(void)
 	error_def(ERR_GTMSECSHRTMOUT);
 	error_def(ERR_GTMSECSHRRECVF);
 	error_def(ERR_GTMSECSHRSENDF);
-	error_def(ERR_GTMSECSHRSTARTUP);
+	error_def(ERR_GTMSECSHRSTART);
 	error_def(ERR_TEXT);
 
 	image_type = GTMSECSHR_IMAGE;
@@ -280,7 +280,7 @@ void gtmsecshr_init(void)
 	gtmsecshr_mesg	mesg;
 	struct stat	stat_buf;
 
-	error_def(ERR_GTMSECSHRSTARTUP);
+	error_def(ERR_GTMSECSHRSTART);
 	error_def(ERR_GTMSECSHRSRVF);
 	error_def(ERR_GTMSECSHRSUIDF);
 	error_def(ERR_GTMSECSHRSGIDF);
@@ -293,26 +293,26 @@ void gtmsecshr_init(void)
 	process_id = getpid();
 	if (-1 == setuid(ROOTUID))
 	{
-		send_msg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTARTUP), 3, RTS_ERROR_LITERAL("Server"), process_id,
+		send_msg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
 				ERR_GTMSECSHRSUIDF, 0, ERR_GTMSECSHROPCMP, 0, errno);
 		gtmsecshr_exit(SETUIDROOT, FALSE);
 	}
 	if (-1 == setgid(ROOTGID))
 	{
-		send_msg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTARTUP), 3, RTS_ERROR_LITERAL("Server"), process_id,
+		send_msg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
 				ERR_GTMSECSHRSGIDF, 0, ERR_GTMSECSHROPCMP, 0, errno);
 		gtmsecshr_exit(SETGIDROOT, FALSE);
 	}
 	if ((getsid(process_id) != process_id) && ((pid_t)-1 == setsid()))
-		send_msg(VARLSTCNT(8) MAKE_MSG_WARNING(ERR_GTMSECSHRSTARTUP), 3, RTS_ERROR_LITERAL("Server"), process_id,
+		send_msg(VARLSTCNT(8) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
 				ERR_GTMSECSHRSSIDF, 0, errno);
 	gtmsecshr_open_log_file();
 	if (0 > (pid = fork()))
 	{
 		save_errno = errno;
-		send_msg(VARLSTCNT(8) ERR_GTMSECSHRSTARTUP, 3, RTS_ERROR_LITERAL("Server"), process_id,
+		send_msg(VARLSTCNT(8) ERR_GTMSECSHRSTART, 3, RTS_ERROR_LITERAL("Server"), process_id,
 			ERR_GTMSECSHRFORKF, 0, save_errno);
-		gtm_putmsg(VARLSTCNT(8) ERR_GTMSECSHRSTARTUP, 3, RTS_ERROR_LITERAL("Server"), process_id,
+		gtm_putmsg(VARLSTCNT(8) ERR_GTMSECSHRSTART, 3, RTS_ERROR_LITERAL("Server"), process_id,
 			ERR_GTMSECSHRFORKF, 0, save_errno);
 		exit (GNDCHLDFORKFLD);
 	} else if (0 != pid)
@@ -351,7 +351,7 @@ void gtmsecshr_init(void)
 	SEMOP(secshr_sem, sop, 2, semop_res);
 	if (0 > semop_res)
 	{
-		send_msg(VARLSTCNT(10) MAKE_MSG_SEVERE(ERR_GTMSECSHRSTARTUP), 3, RTS_ERROR_LITERAL("Server"), process_id,
+		send_msg(VARLSTCNT(10) MAKE_MSG_SEVERE(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
 			ERR_TEXT, 2, RTS_ERROR_LITERAL("server already running"), errno);
 		util_out_print("A gtmsecshr server is already running - exiting", TRUE);
 		gtmsecshr_exit(SEMAPHORETAKEN, FALSE);
@@ -362,11 +362,11 @@ void gtmsecshr_init(void)
 		rts_error(VARLSTCNT(5) ERR_GTMSECSHRSOCKET, 3, RTS_ERROR_LITERAL("Server"), process_id);
 	}
 	if (-1 == Stat(gtmsecshr_sock_name.sun_path, &stat_buf))
-		gtm_putmsg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTARTUP), 3, RTS_ERROR_LITERAL("Server"), process_id,
+		gtm_putmsg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to get status of socket file"), errno);
 	stat_buf.st_mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 	if (-1 == CHMOD(gtmsecshr_sock_name.sun_path, stat_buf.st_mode))
-		gtm_putmsg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTARTUP), 3, RTS_ERROR_LITERAL("Server"), process_id,
+		gtm_putmsg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to change socket file permisions"), errno);
 	name_ptr = strrchr(gtmsecshr_sock_name.sun_path, '/');
 	while (*name_ptr == '/')	/* back off in case of double-slash */
@@ -561,7 +561,7 @@ void gtmsecshr_sig_init(void)
 {
 	struct sigaction	act;
 
-	sig_init(gtmsecshr_signal_handler, gtmsecshr_signal_handler);
+	sig_init(gtmsecshr_signal_handler, gtmsecshr_signal_handler, suspsigs_handler);
 	/* Redefine handler for SIGHUP to switch log file */
 	memset(&act, 0, sizeof(act));
 	act.sa_handler  = gtmsecshr_switch_log_file;
@@ -584,7 +584,7 @@ int service_request(gtmsecshr_mesg *buf)
 	error_def(ERR_DBNOTGDS);
 	error_def(ERR_GTMSECSHRSRVF);
 	error_def(ERR_GTMSECSHRSRVFID);
-	error_def(ERR_GTMSECSHRSRVFFILE);
+	error_def(ERR_GTMSECSHRSRVFIL);
 	error_def(ERR_TEXT);
 
 	GET_CUR_TIME;
@@ -668,7 +668,7 @@ int service_request(gtmsecshr_mesg *buf)
 		}
 		if ((0 == index) || (index >= sizeof(buf->mesg.path)))
 		{
-			gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFFILE, 7, RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
+			gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7, RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
 				buf->code, index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index,
 				buf->mesg.path, ERR_TEXT, 2, RTS_ERROR_LITERAL("no file or length too long"));
 			buf->code = EINVAL;
@@ -692,7 +692,7 @@ int service_request(gtmsecshr_mesg *buf)
 			if (-1 == stat_res)
 			{
 				buf->code = errno;
-				gtm_putmsg(VARLSTCNT(14) ERR_GTMSECSHRSRVFFILE, 7,
+				gtm_putmsg(VARLSTCNT(14) ERR_GTMSECSHRSRVFIL, 7,
 					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,
 					index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index, buf->mesg.path,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to get file status"), errno);
@@ -702,14 +702,14 @@ int service_request(gtmsecshr_mesg *buf)
 			} else if (!(S_ISSOCK(statbuf.st_mode) || S_ISCHR(statbuf.st_mode)))
 #endif
 			{
-				gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFFILE, 7,
+				gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7,
 					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,
 					index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index, buf->mesg.path,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("File is not a GTM mutex socket file"));
 				buf->code = EINVAL;
 			} else if (0 != MEMCMP_LIT(basnam, MUTEX_SOCK_FILE_PREFIX))
 			{
-				gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFFILE, 7,
+				gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7,
 			  	 RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
 				 buf->code, index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index,
 				 buf->mesg.path, ERR_TEXT, 2,
@@ -717,7 +717,7 @@ int service_request(gtmsecshr_mesg *buf)
 				buf->code = EINVAL;
 			} else if (0 != memcmp(gtmsecshr_sock_name.sun_path, buf->mesg.path, gtmsecshr_socket_dir_len))
 			{
-				gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFFILE, 7,
+				gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7,
 				 RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
 				 buf->code, index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index,
 				 buf->mesg.path, ERR_TEXT, 2,
@@ -725,7 +725,7 @@ int service_request(gtmsecshr_mesg *buf)
 				buf->code = EINVAL;
 			} else if (buf->code = (-1 == UNLINK(buf->mesg.path)) ? errno : 0)
 			{
-				gtm_putmsg(VARLSTCNT(14) ERR_GTMSECSHRSRVFFILE, 7, RTS_ERROR_LITERAL("Server"), process_id,
+				gtm_putmsg(VARLSTCNT(14) ERR_GTMSECSHRSRVFIL, 7, RTS_ERROR_LITERAL("Server"), process_id,
 					buf->pid, save_code, RTS_ERROR_STRING(buf->mesg.path),
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to remove file"), buf->code);
 			} else
@@ -757,7 +757,7 @@ int service_request(gtmsecshr_mesg *buf)
 		fn = buf->mesg.db_ipcs.fn;
 		fn_len = buf->mesg.db_ipcs.fn_len;
 		*(fn + fn_len) = 0;	/* We assumed we have one extra byte. fn must be null terminated */
-		if (!file_head_read(fn, &header))
+		if (!file_head_read(fn, &header, sizeof(header)))
 		{
 			buf->code = errno;
 			send_msg(VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code,
@@ -768,7 +768,7 @@ int service_request(gtmsecshr_mesg *buf)
 		header.shmid = buf->mesg.db_ipcs.shmid;
 		header.sem_ctime.ctime = buf->mesg.db_ipcs.sem_ctime;
 		header.shm_ctime.ctime = buf->mesg.db_ipcs.shm_ctime;
-		if (!file_head_write(fn, &header))
+		if (!file_head_write(fn, &header, sizeof(header)))
 		{
 			buf->code = errno;
 			send_msg(VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code,

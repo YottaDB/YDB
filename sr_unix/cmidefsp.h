@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,9 +66,9 @@ typedef struct
 				     * only valid on read if len_len is 2 */
 	int len_len;		    /* used to track length byte I/O */
 	union {			    /* buffer for read/write of length */
-		unsigned short len;
-		char lenbuf[2];
-	} u;
+		unsigned short len; /* Total length of the packet. IMPORTANT : length of a packet is always sent in network byte  */
+		char lenbuf[2];	    /* order. We maintain len in network byte order until the length bytes are successfully sent. */
+	} u;			    /* Thereafter we convert len back to host byte order to correctly track bytes yet to be sent. */
 } qio_iosb;
 
 typedef struct clb_stat_struct
@@ -175,7 +175,7 @@ struct NTD
 #ifdef DEBUG
 GBLREF int cmi_debug_enabled;
 void cmi_dprint();
-#define CMI_DPRINT(x) if (cmi_debug_enabled) cmi_dprint x
+#define CMI_DPRINT(x) if (cmi_debug_enabled) cmi_dprint x; else;
 #else
 #define CMI_DPRINT(x) /**/
 #endif

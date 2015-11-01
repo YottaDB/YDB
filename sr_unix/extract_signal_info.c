@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,11 +19,12 @@
 #ifndef __MVS__
 #  include <sys/param.h>
 #endif
-#include <netinet/in.h>
+#include "gtm_inet.h"
+#include "gtm_stdlib.h"
+#include "gtm_stdio.h"
+#include "gtm_unistd.h"
+
 #include <signal.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
 
 #include "gtmsiginfo.h"
 
@@ -198,7 +199,7 @@ void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsigin
 		gtmsi->int_iadr = (caddr_t)context->sc_jmpbuf.jmp_context.iar;
 		gtmsi->infotype |= GTMSIGINFO_ILOC;
 		if (NULL != gtmsi->bad_vadr)
-			gtmsi->infotype != GTMSIGINFO_BADR;
+			gtmsi->infotype |= GTMSIGINFO_BADR;
 	}
 #elif defined(__linux__)
 	/* Linux does not yet (intel RedHat 6.1) support returning signal information properly so

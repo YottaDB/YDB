@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,7 +81,7 @@
 
 #define MAX_DFA_SPACE 170
 
-#define PAT_MAX_REPEAT		32767
+#define PAT_MAX_REPEAT		MAX_STRLEN
 #define MAX_PATTERN_ATOMS	50
 #define	MAX_PATOBJ_LENGTH	1024
 #define MAX_PATTERN_LENGTH	MAX_PATOBJ_LENGTH - (3 * MAX_PATTERN_ATOMS) - 3 /* maximum length (in integers) of compiled pattern
@@ -99,6 +99,12 @@
 
 #define MAX_DFA_STRLEN 6
 #define MAX_DFA_REP    10
+
+/* The macro to perform 64-bit multiplication without losing precision due to overflow with 32-bit
+ * multiplication. With the increase of PAT_MAX_REPEAT from 32K to 1MB, the values of result and
+ * the expression value can potentially be as large as (1MB * 1MB).
+ * NOTE: The macro expects result to be declared with type gtm_uint64_t */
+#define BOUND_MULTIPLY(x, y, result) 	(((result = ((gtm_uint64_t)(x) * (y))) >= PAT_MAX_REPEAT) ? PAT_MAX_REPEAT : (int)(result))
 
 /*  Compiled Pattern
  *  -----------------
@@ -152,15 +158,15 @@ struct node
 
 struct e_table
 {
-	short int	meta_c[CHAR_CLASSES][26],
-			num_e[CHAR_CLASSES];
+	int	meta_c[CHAR_CLASSES][26],
+		num_e[CHAR_CLASSES];
 };
 
 struct c_trns_tb
 {
-	short int	c[2 * MAX_SYM];
-	int4		p_msk[2 * MAX_SYM][CHAR_CLASSES];
-	short int	trns[2 * MAX_SYM][CHAR_CLASSES];
+	int	c[2 * MAX_SYM];
+	int4	p_msk[2 * MAX_SYM][CHAR_CLASSES];
+	int	trns[2 * MAX_SYM][CHAR_CLASSES];
 };
 
 typedef struct ptstr_struct {
@@ -269,20 +275,20 @@ int	patstr(mstr *instr, ptstr *obj, unsigned char **relay);
 
 int	dfa_calc(
 		struct leaf	*leaves,
-		short int	leaf_num,
+		int		leaf_num,
 		struct e_table	*expand,
 		uint4 		**fstchar_ptr,
 		uint4 		**outchar_ptr);
 
 boolean_t pat_unwind(
-		short int	*count,
+		int		*count,
 		struct leaf	*leaves,
-		short int	leaf_num,
-		short int	*total_min,
-		short int	*total_max,
-		short int	min[],
-		short int	max[],
-		short int	size[],
+		int		leaf_num,
+		int		*total_min,
+		int		*total_max,
+		int		min[],
+		int		max[],
+		int		size[],
 		int		altmin,
 		int		altmax,
 		boolean_t	*last_infinite_ptr,
@@ -291,16 +297,16 @@ boolean_t pat_unwind(
 		uint4		**lastpatptr_ptr);
 
 boolean_t add_atom(
-		short int	*count,
+		int		*count,
 		uint4		pattern_mask,
 		void		*strlit_buff,
 		int4		strlen,
 		boolean_t	infinite,
-		short int	*min,
-		short int	*max,
-		short int	*size,
-		short int	*total_min,
-		short int	*total_max,
+		int		*min,
+		int		*max,
+		int		*size,
+		int		*total_min,
+		int		*total_max,
 		int		lower_bound,
 		int		upper_bound,
 		int		altmin,

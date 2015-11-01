@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,20 +28,22 @@
 #include "mdef.h"
 
 #include <varargs.h>
+#include "gtm_string.h"
 
 #include "rtnhdr.h"
 #include "stack_frame.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "sbs_blk.h"
+#include "min_max.h"
 
 GBLREF stack_frame	*frame_pointer;
 
 unsigned char	*format_lvname(lv_val *start, unsigned char *buff, int size)
 {
-	int		i;
+	int		i, len;
 	mval		**j, *startmv;
-	unsigned char	*cp, *cq;
+	mident		*vent;
 
 	if (!start)
 		return buff;
@@ -61,12 +63,9 @@ unsigned char	*format_lvname(lv_val *start, unsigned char *buff, int size)
 	if (i >= frame_pointer->vartab_len)
 		return buff;
 
-	cp = (unsigned char *) (frame_pointer->vartab_ptr + (i * sizeof(mident)));
-	for (cq = cp + sizeof(mident);  cp < cq  &&  *cp != '\0'  &&  size > 0;  cp++)
-	{
-		*buff++ = *cp;
-		size--;
-	}
-
-	return buff;
+	vent = &(((var_tabent *)frame_pointer->vartab_ptr)[i].var_name);
+	assert(vent->len <= MAX_MIDENT_LEN);
+	len = MIN(size, vent->len);
+	memcpy(buff, vent->addr, len);
+	return buff + len;
 }

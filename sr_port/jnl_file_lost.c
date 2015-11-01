@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,13 @@
 
 #include "mdef.h"
 
+#include "gtm_inet.h"
 #ifdef VMS
 #include <iodef.h>
 #include <psldef.h>
 #include <lckdef.h>
 #include <efndef.h>
+#include <descrip.h>
 #endif
 
 #include "gdsroot.h"
@@ -30,9 +32,10 @@
 #include "locks.h"
 #endif
 #include "send_msg.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
 
-
-error_def(ERR_REPLJNLCLOSED);
+GBLREF	jnlpool_addrs		jnlpool;
 
 static	const	unsigned short	zero_fid[3];
 
@@ -40,6 +43,8 @@ void jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 {	/* Notify operator and terminate journaling */
 	unsigned int	status;
 	sgmnt_addrs	*csa;
+	seq_num		reg_seqno, jnlseqno;
+	error_def(ERR_REPLJNLCLOSED);
 
 	switch(jpc->region->dyn.addr->acc_meth)
 	{
@@ -60,9 +65,10 @@ void jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 	csa->hdr->jnl_state = jnl_closed;
 	if (REPL_ENABLED(csa->hdr))
 	{
-		csa->hdr->repl_state = repl_closed;
-		send_msg(VARLSTCNT(4) ERR_REPLJNLCLOSED, 2, jpc->region->dyn.addr->fname_len,
-			jpc->region->dyn.addr->fname);
+		csa->hdr->repl_state = repl_was_open;
+		reg_seqno = csa->hdr->reg_seqno;
+		jnlseqno  = jnlpool.jnlpool_ctl->jnl_seqno;
+		send_msg(VARLSTCNT(8) ERR_REPLJNLCLOSED, 6, &reg_seqno, &reg_seqno, &jnlseqno, &jnlseqno, DB_LEN_STR(jpc->region));
 	}
 #ifdef VMS
 	assert(0 != csa->jnl->jnllsb->lockid);

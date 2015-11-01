@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,12 +8,10 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
-#ifndef __RTNHDR_H__
-#define __RTNHDR_H__
+#ifndef RTNHDR_H_INCLUDED
+#define RTNHDR_H_INCLUDED
 
 /* rtnhdr.h - routine header */
-#include "cache.h"
 
 /* There are several references to this structure from assembly language; these include:
 
@@ -54,14 +52,12 @@ typedef struct	rhead_struct
 	short int	lnrtab_len;
 	int4		ptext_off;		/* (updated) offset to start of instructions for current module version */
 	int4		checksum;
-	bool		label_only;		/* was routine compiled for label only entry? */
-	unsigned char	zlinked;		/* was routine zlinked? */
-	char		filler[2];		/* reserved for future use */
+	uint4		compiler_qlf;		/* bit flags of compiler qualifiers used (see cmd_qlf.h) */
 	int4		old_rhead_off;
 	int4		current_rhead_off;	/* (updated) offset to routine header of current module version */
 	short int	temp_mvals;		/* (updated) temp_mvals value of current module version */
 	unsigned short	temp_size;		/* (updated) temp_size value of current module version */
-#if defined(__alpha) || defined(__MVS__) || defined(__s390__)
+#ifdef HAS_LITERAL_SECT
 	int4		*linkage_ptr;		/* (updated) address of linkage Psect of current module version */
 	unsigned char	*literal_ptr;		/* (updated) address of literal Psect of current module version */
 #endif
@@ -79,9 +75,9 @@ typedef struct	rhead_struct
 #define current_rhead_ptr current_rhead_off
 
 /* Macros for accessing routine header fields in a portable way */
-#define VARTAB_ADR(rtnhdr) ((VAR_TABENT *)((char *)(rtnhdr) + (rtnhdr)->vartab_off))
-#define LABTAB_ADR(rtnhdr) ((LAB_TABENT *)((char *)(rtnhdr) + (rtnhdr)->labtab_off))
-#define LNRTAB_ADR(rtnhdr) ((LNR_TABENT *)((char *)(rtnhdr) + (rtnhdr)->lnrtab_off))
+#define VARTAB_ADR(rtnhdr) ((var_tabent *)((char *)(rtnhdr) + (rtnhdr)->vartab_off))
+#define LABTAB_ADR(rtnhdr) ((lab_tabent *)((char *)(rtnhdr) + (rtnhdr)->labtab_off))
+#define LNRTAB_ADR(rtnhdr) ((lnr_tabent *)((char *)(rtnhdr) + (rtnhdr)->lnrtab_off))
 #define LITERAL_ADR(rtnhdr) ((unsigned char *)(rtnhdr)->literal_ptr)
 #define LINKAGE_ADR(rtnhdr) ((caddr_t)(rtnhdr)->linkage_ptr)
 #define PTEXT_ADR(rtnhdr) ((unsigned char *)((char *)(rtnhdr) + (rtnhdr)->ptext_off))
@@ -89,7 +85,7 @@ typedef struct	rhead_struct
 #define CURRENT_RHEAD_ADR(rtnhdr) ((rhdtyp *)((char *)(rtnhdr) + (rtnhdr)->current_rhead_off))
 #define OLD_RHEAD_ADR(rtnhdr) ((rhdtyp *)((char *)(rtnhdr) + (rtnhdr)->old_rhead_off))
 #define LINE_NUMBER_ADDR(rtnhdr, lnr_tabent_ptr) ((unsigned char *)((char *)(rtnhdr) + *(lnr_tabent_ptr)))
-#define LABENT_LNR_ENTRY(rtnhdr, lab_tabent_ptr) ((LNR_TABENT *)((char *)(rtnhdr) + (lab_tabent_ptr)->lab_ln_ptr))
+#define LABENT_LNR_ENTRY(rtnhdr, lab_tabent_ptr) ((lnr_tabent *)((char *)(rtnhdr) + (lab_tabent_ptr)->lab_ln_ptr))
 #define LABEL_ADDR(rtnhdr, lab_tabent_ptr)(CODE_BASE_ADDR(rtnhdr) + *(LABENT_LNR_ENTRY(rtnhdr, lab_tabent_ptr)))
 #define CODE_BASE_ADDR(rtnhdr) ((unsigned char *)(rtnhdr))
 #define CODE_OFFSET(rtnhdr, addr) ((char *)(addr) - (char *)(rtnhdr))
@@ -105,58 +101,37 @@ typedef struct	rhead_struct
 #define ADDR_IN_CODE(caddr, rtnhdr) (PTEXT_ADR((rtnhdr)) <= (caddr) && (caddr) <= PTEXT_END_ADR((rtnhdr)))
 
 /* Types that are different across the versions */
-#define LAB_TABENT lbl_tables
-#define LNR_TABENT int4
-#define RTN_TABENT rtn_tables
-#define VAR_TABENT vent
 #define LABENT_LNR_OFFSET lab_ln_ptr
-#define RTNENT_RT_ADR rt_ptr
 
-typedef struct ihead_struct
-{
-	cache_entry	*indce;
-	int4		vartab_off;
-	int4		vartab_len;
-	int4		temp_mvals;
-	int4		temp_size;
-	int4		fixup_vals_off;
-	int4		fixup_vals_num;
-} ihdtyp;
+/* Variable table entry */
+typedef mname_entry var_tabent; /* the actual variable name is stored in the literal text pool */
 
-void indir_lits(ihdtyp *ihead);
-
-typedef mident	vent;
-
-/* use of lent deprecated .. same as lbl_tables below */
+/* Routine table entry */
 typedef struct
 {
-	mident	lname;
-	int4	laddr;
-} lent;
+	mident		rt_name;	/* The name of the routine (in the literal text pool) */
+	rhdtyp		*rt_adr;	/* Pointer to its routine header */
+} rtn_tabent;
+
+/* Line number table entry */
+typedef int4 	lnr_tabent;
 
 typedef struct
 {
-	mident	rt_name;
-	rhdtyp	*rt_ptr;
-} rtn_tables;
-
-typedef struct
-{
-	mident lab_name;
-	int4 lab_ln_ptr;
-} lbl_tables;
+	mident		lab_name;	/* The name of the label */
+	int4 		lab_ln_ptr;	/* Offset of the lnrtab entry from the routine header */
+} lab_tabent;
 
 int get_src_line(mval *routine, mval *label, int offset, mstr **srcret);
 unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine);
-int4 *find_line_addr(rhdtyp *routine, mstr *label, short int offset);
+int4 *find_line_addr(rhdtyp *routine, mstr *label, int4 offset, mident **lent_name);
 rhdtyp *find_rtn_hdr(mstr *name);
 bool zlput_rname(rhdtyp *hdr);
 rhdtyp *make_dmode(void);
 void comp_lits(rhdtyp *rhead);
 rhdtyp  *op_rhdaddr(mval *name, rhdtyp *rhd);
-LNR_TABENT *op_labaddr(rhdtyp *routine, mval *label, int4 offset);
-VMS_ONLY(void urx_resolve(rhdtyp *rtn, LAB_TABENT *lbl_tab, LAB_TABENT *lbl_top);)
-UNIX_ONLY(void urx_resolve(rhdtyp *rtn, lent *lbl_tab, lent *lbl_top);)
-char *rtnlaboff2entryref(char *entryref_buff, mstr *rtn, mstr *lab, int offset);
+lnr_tabent *op_labaddr(rhdtyp *routine, mval *label, int4 offset);
+void urx_resolve(rhdtyp *rtn, lab_tabent *lbl_tab, lab_tabent *lbl_top);
+char *rtnlaboff2entryref(char *entryref_buff, mident *rtn, mident *lab, int offset);
 
-#endif
+#endif /* RTNHDR_H_INCLUDED */

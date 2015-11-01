@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,14 +20,14 @@ cmi_status_t cmi_write(struct CLB *lnk)
 	struct NTD *tsk = lnk->ntd;
 	int rc;
 
-	CMI_DPRINT(("ENTER CMI_WRITE, AST %x\n", lnk->ast));
+	CMI_DPRINT(("ENTER CMI_WRITE, AST 0x%x\n", lnk->ast));
 
 	SIGPROCMASK(SIG_BLOCK, &tsk->mutex_set, &oset, rc);
 	status = cmj_write_start(lnk);
 	if (CMI_ERROR(status))
 	{
 		SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
-		CMI_DPRINT(("EXIT CMI_WRITE ERR\n"));
+		CMI_DPRINT(("EXIT CMI_WRITE ERROR %d\n", status));
 		return status;
 	}
 	cmj_housekeeping();

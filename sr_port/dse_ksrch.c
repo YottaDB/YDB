@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,27 +28,27 @@
 
 GBLREF short int	patch_path_count;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF char		patch_comp_key[256];
+GBLREF char		patch_comp_key[MAX_KEY_SZ + 1];
 GBLREF unsigned char	patch_comp_count;
 GBLREF bool		patch_find_root_search;
 GBLDEF block_id		ksrch_root;
 
-int
-dse_ksrch(block_id srch,
-	  block_id_ptr_t pp,
-	  int4 *off,
-	  char *targ_key,
-	  short targ_len)
+int dse_ksrch(block_id srch,
+	      block_id_ptr_t pp,
+	      int4 *off,
+	      char *targ_key,
+	      int targ_len)
 {
 	sm_uc_ptr_t	bp, b_top, rp, r_top, key_top, blk_id;
-	char		cc;
-	short    	size, rsize;
+	unsigned char	cc;
+	int	    	size, rsize;
 	int4		cmp;
+	short		dummy_short;
 	int4		dummy_int;
 	cache_rec_ptr_t dummy_cr;
 	error_def(ERR_DSEBLKRDFAIL);
 
-	if(!(bp = t_qread(srch,&dummy_int,&dummy_cr)))
+	if(!(bp = t_qread(srch, &dummy_int, &dummy_cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
@@ -59,10 +59,11 @@ dse_ksrch(block_id srch,
 	patch_comp_count = 0;
 	patch_comp_key[0] = patch_comp_key[1] = 0;
 	*off = 0;
-	for (rp = bp + sizeof(blk_hdr); rp < b_top ;rp = r_top)
+	for (rp = bp + sizeof(blk_hdr); rp < b_top; rp = r_top)
 	{
 		*off = rp - bp;
-		GET_SHORT(rsize,&((rec_hdr_ptr_t)rp)->rsiz);
+		GET_SHORT(dummy_short, &((rec_hdr_ptr_t)rp)->rsiz);
+		rsize = dummy_short;
 		if (rsize < sizeof(rec_hdr))
 			r_top = rp + sizeof(rec_hdr);
 		else
@@ -77,40 +78,43 @@ dse_ksrch(block_id srch,
 			break;
 		}
 		for (key_top = rp + sizeof(rec_hdr); key_top < r_top ; )
-		{	if (!*key_top++ && !*key_top++)
+			if (!*key_top++ && !*key_top++)
 				break;
-		}
+
 		if (((blk_hdr_ptr_t)bp)->levl && key_top > (blk_id = r_top - sizeof(block_id)))
-		{	key_top = blk_id;
-		}
-		size = key_top - rp - sizeof(rec_hdr);
-		if (size > sizeof(patch_comp_key) - 2)
-			size = sizeof(patch_comp_key) - 2;
+			key_top = blk_id;
 		if (((rec_hdr_ptr_t) rp)->cmpc > patch_comp_count)
 			cc = patch_comp_count;
 		else
 			cc = ((rec_hdr_ptr_t) rp)->cmpc;
-		memcpy(&patch_comp_key[cc],rp + sizeof(rec_hdr),size);
+		size = key_top - rp - sizeof(rec_hdr);
+		if (size > sizeof(patch_comp_key) - 2 - cc)
+			size = sizeof(patch_comp_key) - 2 - cc;
+		if (size < 0)
+			size = 0;
+		memcpy(&patch_comp_key[cc], rp + sizeof(rec_hdr), size);
 		patch_comp_count = cc + size;
 		GET_LONGP(pp, key_top);
-		cmp = memvcmp(targ_key,targ_len,&patch_comp_key[0],patch_comp_count);
-		if (cmp < 0)
+		cmp = memvcmp(targ_key, targ_len, &patch_comp_key[0], patch_comp_count);
+		if (0 > cmp)
 			break;
 		if (!cmp)
-		{	if (((blk_hdr_ptr_t)bp)->levl != 0)
+		{
+			if (0 != ((blk_hdr_ptr_t)bp)->levl)
 				break;
 			if (patch_find_root_search)
-			{	for (key_top = rp + sizeof(rec_hdr); key_top < r_top; )
+			{
+				for (key_top = rp + sizeof(rec_hdr); key_top < r_top; )
 					if (!*key_top++ && !*key_top++)
 						break;
-				GET_LONG(ksrch_root,key_top);
+				GET_LONG(ksrch_root, key_top);
 			}
 			return TRUE;
 		}
 	}
 	patch_path_count++;
 	if (((blk_hdr_ptr_t) bp)->levl && *pp > 0 && *pp < cs_addrs->ti->total_blks && (*pp % cs_addrs->hdr->bplmap)
-		&& dse_ksrch(*pp,pp + 1,off + 1,targ_key,targ_len))
+	    && dse_ksrch(*pp, pp + 1, off + 1, targ_key, targ_len))
 		return TRUE;
 	return FALSE;
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +12,6 @@
 #ifndef __SUSPSIGS_HANDLER_H__
 #define __SUSPSIGS_HANDLER_H__
 
-#ifdef __sparc
-void suspsigs_handler(int sig);
-#else
 void suspsigs_handler(int sig, siginfo_t *info, void *context);
-#endif
 
 #endif

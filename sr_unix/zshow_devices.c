@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,12 +13,12 @@
 
 #include "gtm_string.h"
 
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include "gtm_socket.h"
+#include "gtm_inet.h"
 
 #include "gtm_stdio.h"
 
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "mlkdef.h"
 #include "zshow.h"
@@ -367,7 +367,8 @@ void zshow_devices(zshow_out *output)
 							MV_FORCE_MVAL(&m, (int)socketptr->remote.port);
 							mval_write(output, &m, FALSE);
 							ZS_ONE_OUT(&v, space_text);
-							/* to be added later ...
+							if (socketptr->local.saddr_ip[0])
+							{
 								ZS_STR_OUT(&v, local_text);
                                                         	v.str.addr = socketptr->local.saddr_ip;
                                                         	v.str.len = strlen(socketptr->local.saddr_ip);
@@ -375,7 +376,7 @@ void zshow_devices(zshow_out *output)
                                                         	ZS_ONE_OUT(&v, at_text);
                                                         	MV_FORCE_MVAL(&m, (int)socketptr->local.port);
                                                         	mval_write(output, &m, FALSE);
-							*/
+							}
 						}
 						ZS_ONE_OUT(&v, space_text);
 						output->flush = TRUE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,9 +22,7 @@ static char     rcsid[] = "$Header:$";
 
 #include <errno.h>
 
-#ifdef DEBUG
 #include "gtm_stdio.h"
-#endif
 
 #include "mdef.h"
 
@@ -94,7 +92,7 @@ rc_srvc_xact(cptr, xend)
 	if (fxhdr->method.value != RC_METHOD)
 	{
 #ifdef DEBUG
-		gtcm_cpktdmp(cptr, pkt_len,"Unknown RC block type.");
+		gtcm_cpktdmp((char *)cptr, pkt_len,"Unknown RC block type.");
 		dumped = 1;
 #endif
 		return -OMI_ER_PR_INVMSGFMT;
@@ -132,7 +130,7 @@ rc_srvc_xact(cptr, xend)
 		if (history)
 		{
 			init_rc_hist(cptr->stats.id);
-			save_rc_req(qhdr,qhdr->a.len.value);
+			save_rc_req((char *)qhdr,qhdr->a.len.value);
 		}
 
 		rv = -1;
@@ -161,7 +159,7 @@ rc_srvc_xact(cptr, xend)
 			}
 			else
 			{
-				gtcm_cpktdmp(qhdr, qhdr->a.len.value, "Unknown request type.");
+				gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value, "Unknown request type.");
 				dumped = 1;
 			}
 #endif
@@ -188,7 +186,7 @@ rc_srvc_xact(cptr, xend)
 				char msg[256];
 				sprintf(msg,"invalid packet :  free (%x) > end (%x).  Dumped RC header + packet",
 					fxhdr->free.value, fxhdr->end.value);
-				gtcm_cpktdmp(fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
+				gtcm_cpktdmp((char *)fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
 				if (history)
 				    dump_omi_rq();
 				return -OMI_ER_PR_INVMSGFMT;
@@ -200,7 +198,7 @@ rc_srvc_xact(cptr, xend)
 				char *p;
 				sprintf(msg,"corrupted packet, free (%x) > end.value (%x).  Dumped RC header + packet",
 					fxhdr->free.value,fxhdr->end.value);
-				gtcm_cpktdmp(fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
+				gtcm_cpktdmp((char *)fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
 				p = (char *) -1;
 				*p = 1;   /*guarenteed core dump */
 			}
@@ -210,7 +208,7 @@ rc_srvc_xact(cptr, xend)
 				char *p;
 				sprintf(msg,"corrupted packet, qhdr.a.len.value=%x > fxhdr end (%x).  Dumped RC header + packet",
 					qhdr->a.len.value,fxhdr->end.value);
-				gtcm_cpktdmp(qhdr, qhdr->a.len.value, msg);
+				gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value, msg);
 				p = (char *) -1;
 				*p = 1;   /*guarenteed core dump */
 			}
@@ -225,7 +223,7 @@ rc_srvc_xact(cptr, xend)
 					char msg[256];
 
 					sprintf(msg,"RC error (0x%x).",rc_errno);
-					gtcm_cpktdmp(qhdr, qhdr->a.len.value, msg);
+					gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value, msg);
 					dumped = 1;
 				}
 #endif
@@ -245,7 +243,7 @@ rc_srvc_xact(cptr, xend)
 			 */
 #ifdef DEBUG
 			if (!dumped)
-				gtcm_cpktdmp(qhdr, qhdr->a.len.value,
+				gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value,
 					    "RC Request returned error.");
 			dumped = 1;
 #endif
@@ -259,7 +257,7 @@ rc_srvc_xact(cptr, xend)
 		qhdr->r.typ.value |= 0x80;
 
 		if (history)
-			save_rc_rsp(qhdr,qhdr->a.len.value);
+			save_rc_rsp((char *)qhdr,qhdr->a.len.value);
 
 		/* Move to the next request */
 		cptr->xptr += rqlen;
@@ -321,7 +319,7 @@ rc_srvc_xact(cptr, xend)
 	    char msg[256];
 	    sprintf(msg,"invalid packet :  free (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->free.value, fxhdr->end.value);
-	    gtcm_cpktdmp(fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
+	    gtcm_cpktdmp((char *)fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
 	    if (history)
 		dump_omi_rq();
 	    return -OMI_ER_PR_INVMSGFMT;
@@ -331,7 +329,7 @@ rc_srvc_xact(cptr, xend)
 	    char msg[256];
 	    sprintf(msg,"invalid packet :  cpt_tab (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->cpt_tab.value, fxhdr->end.value);
-	    gtcm_cpktdmp(fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
+	    gtcm_cpktdmp((char *)fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
 	    if (history)
 		dump_omi_rq();
 	    return -OMI_ER_PR_INVMSGFMT;
@@ -343,7 +341,7 @@ rc_srvc_xact(cptr, xend)
 	    sprintf(msg,"invalid packet :  cpt_tab + cpt_siz (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->cpt_tab.value + fxhdr->cpt_siz.value,
 		    fxhdr->end.value);
-	    gtcm_cpktdmp(fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
+	    gtcm_cpktdmp((char *)fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
 	    if (history)
 		dump_omi_rq();
 	    return -OMI_ER_PR_INVMSGFMT;
@@ -354,7 +352,7 @@ rc_srvc_xact(cptr, xend)
 	    char msg[256];
 	    sprintf(msg,"invalid Aq packet :  free (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->free.value, fxhdr->end.value);
-	    gtcm_cpktdmp(fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
+	    gtcm_cpktdmp((char *)fxhdr, ((char *)xend) - ((char *)fxhdr),msg);
 	    if (history)
 		dump_omi_rq();
 	    assert(fxhdr->free.value <= fxhdr->end.value);

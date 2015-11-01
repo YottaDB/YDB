@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,6 @@
 #include "jnl.h"
 #include "dse.h"
 
-
 /* Include prototypes */
 #include "t_qread.h"
 #include "t_write.h"
@@ -51,16 +50,17 @@ GBLREF unsigned char    *non_tp_jfb_buff_ptr;
 
 void dse_adstar(void)
 {
-	sm_uc_ptr_t	bp;
 	uchar_ptr_t	lbp, b_top;
 	block_id	blk;
 	blk_segment	*bs1, *bs_ptr;
 	int4		blk_seg_cnt, blk_size;
 	short		rsize;
 	cw_set_element  *cse;
-	error_def(ERR_DSEFAIL);
-	error_def(ERR_DSEBLKRDFAIL);
+	srch_blk_status	blkhist;
+
 	error_def(ERR_DBRDONLY);
+	error_def(ERR_DSEBLKRDFAIL);
+	error_def(ERR_DSEFAIL);
 
         if (gv_cur_region->read_only)
                 rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
@@ -70,7 +70,7 @@ void dse_adstar(void)
 
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
-		if (!cli_get_hex("BLOCK", &blk))
+		if (!cli_get_hex("BLOCK", (uint4 *)&blk))
 			return;
 		patch_curr_blk = blk;
 	}
@@ -84,14 +84,15 @@ void dse_adstar(void)
 		util_out_print("Error: block pointer must be specified.", TRUE);
 		return;
 	}
-	if (!cli_get_hex("POINTER", &blk))
+	if (!cli_get_hex("POINTER", (uint4 *)&blk))
 		return;
 	t_begin_crit(ERR_DSEFAIL);
 	blk_size = cs_addrs->hdr->blk_size;
-	if(!(bp = t_qread(patch_curr_blk, &dummy_hist.h[0].cycle, &dummy_hist.h[0].cr)))
+	blkhist.blk_num = patch_curr_blk;
+	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	lbp = (uchar_ptr_t)malloc(blk_size);
-	memcpy(lbp, bp, blk_size);
+	memcpy(lbp, blkhist.buffaddr, blk_size);
 
 	if (!((blk_hdr_ptr_t)lbp)->levl)
 	{
@@ -116,7 +117,7 @@ void dse_adstar(void)
 	rsize = sizeof(rec_hdr) + sizeof(block_id);
 	PUT_SHORT(&((rec_hdr_ptr_t)b_top)->rsiz, rsize);
 	((rec_hdr_ptr_t) b_top)->cmpc = 0;
-	*((block_id_ptr_t)(b_top + sizeof(rec_hdr))) = blk;
+	PUT_LONG((block_id_ptr_t)(b_top + sizeof(rec_hdr)), blk);
 	((blk_hdr_ptr_t)lbp)->bsiz += sizeof(rec_hdr) + sizeof(block_id);
 
 	BLK_INIT(bs_ptr, bs1);
@@ -128,7 +129,7 @@ void dse_adstar(void)
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
-	t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
+	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
 	BUILD_AIMG_IF_JNL_ENABLED(cs_addrs, cs_data, non_tp_jfb_buff_ptr, cse);
 	t_end(&dummy_hist, 0);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashdef.h"
 
+#include "hashtab_mname.h"
 #include "cmidef.h"
 #include "cmmdef.h"
 #include "gdsroot.h"
@@ -41,7 +41,6 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 	int4		link;
 	cm_region_list	*ptr, *last, *que_next, *que_last;
 	cm_region_head	*region;
-	ht_entry	*h, *htop;
 
 	for (ptr = cnx->region_root;  ptr;)
 	{

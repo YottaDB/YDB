@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -168,7 +168,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, int4 repmin, int4 repmax, 
 	if (PTE_MAX_CURALT_DEPTH > curalt_depth)
 	{	/* try to find it in the current pattern evaluation cache (cur_pte_csh_array) itself */
 		tmp_do_patalt_calls = ++do_patalt_calls[curalt_depth];
-		pat_found = pte_csh_present((char *)firstalt, strptr, totchar, repcnt);
+		pat_found = pte_csh_present((char *)firstalt, (char *)strptr, totchar, repcnt);
 		if (PTE_NOT_FOUND != pat_found)
 		{
 			do_patalt_hits[curalt_depth]++;
@@ -283,7 +283,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, int4 repmin, int4 repmax, 
 		GET_LONG(alt_size, patptr);
 	}
 	if (PTE_MAX_CURALT_DEPTH > curalt_depth)
-		pte_csh_insert((char *)firstalt, strptr, totchar, repcnt, match);
+		pte_csh_insert((char *)firstalt, (char *)strptr, totchar, repcnt, match);
 	return match;
 }
 

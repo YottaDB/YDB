@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,6 @@
 #include "filestruct.h"
 #include "jnl.h"		/* needed for WCSFLU_* macros */
 #include "muextr.h"
-#include "hashdef.h"
 #include "iosp.h"
 #include "cli.h"
 #include "util.h"
@@ -33,6 +32,8 @@
 #include "global_map.h"
 #include "gtmmsg.h"
 #include "wcs_flu.h"
+#include "hashtab_int4.h"
+#include "hashtab.h"
 
 
 GBLREF bool		mu_ctrlc_occurred;
@@ -54,9 +55,8 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	mstr				gmap[256], *gmap_ptr, gmap_beg, gmap_end;
 	mval				val, curr_gbl_name;
 	glist				*gl_tail, *gl_ptr;
-	htab_desc        		*ext_hash;
-	mname                           ht_mname;
-	ht_entry                        *h;
+	hash_table_int4	        	ext_hash;
+	ht_ent_int4                   	*tabent;
 
 	error_def(ERR_FREEZE);
 	error_def(ERR_DBRDONLY);
@@ -162,11 +162,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	}
 
 	if (freeze)
-	{
-		ext_hash = (htab_desc *)malloc(sizeof(htab_desc));
-                ht_init(ext_hash, 0);
-                memset(&ht_mname.txt[0], 0, sizeof(mname));
-	}
+		init_hashtab_int4(&ext_hash, 0);
 	gl_head->next = NULL;
 	gl_tail = gl_head;
 	*reg_max_rec = 0;
@@ -207,9 +203,9 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 				break;
 			if (freeze)
                         {
-                                memcpy(&ht_mname.txt[0], &gv_cur_region, sizeof(int4));
-                                h = ht_put(ext_hash, &ht_mname, &stashed);
-                                if (stashed)
+				/* Note: We cannot use int4 hash when we will have 64-bit address.
+				 * In that case we may choose to hash the region name or use int8 hash */
+				if (add_hashtab_int4(&ext_hash, (uint4 *)&gv_cur_region, HT_VALUE_DUMMY, &tabent))
                                 {
                                         if (cs_addrs->hdr->freeze)
                                         {

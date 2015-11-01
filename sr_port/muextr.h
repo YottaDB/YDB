@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,14 +40,17 @@ typedef struct coll_hdr_struct
 #define FORMAT_STR_MAX_SIZE 50
 #define LABEL_STR_MAX_SIZE 128
 
-#define BIN_HEADER_LABEL	"GDS BINARY EXTRACT LEVEL 3"
+#define BIN_HEADER_VERSION	"4"
+#define BIN_HEADER_LABEL	"GDS BINARY EXTRACT LEVEL "BIN_HEADER_VERSION
 #define BIN_HEADER_DATEFMT	"YEARMMDD2460SS"
 #define BIN_HEADER_NUMSZ	5
 #define BIN_HEADER_LABELSZ	32
-#define BIN_HEADER_BLKOFFSET	(sizeof BIN_HEADER_LABEL - 1 + sizeof BIN_HEADER_DATEFMT - 1)
-#define BIN_HEADER_RECOFFSET	(sizeof BIN_HEADER_LABEL - 1 + sizeof BIN_HEADER_DATEFMT - 1 + BIN_HEADER_NUMSZ)
-#define BIN_HEADER_KEYOFFSET	(sizeof BIN_HEADER_LABEL - 1 + sizeof BIN_HEADER_DATEFMT - 1 + 2 * BIN_HEADER_NUMSZ)
-#define BIN_HEADER_SZ		87
+#define BIN_HEADER_BLKOFFSET	(STR_LIT_LEN(BIN_HEADER_LABEL) + STR_LIT_LEN(BIN_HEADER_DATEFMT))
+#define BIN_HEADER_RECOFFSET	(STR_LIT_LEN(BIN_HEADER_LABEL) + STR_LIT_LEN(BIN_HEADER_DATEFMT) + BIN_HEADER_NUMSZ)
+#define BIN_HEADER_KEYOFFSET	(STR_LIT_LEN(BIN_HEADER_LABEL) + STR_LIT_LEN(BIN_HEADER_DATEFMT) + 2 * BIN_HEADER_NUMSZ)
+#define BIN_HEADER_NULLCOLLOFFSET	(STR_LIT_LEN(BIN_HEADER_LABEL) + STR_LIT_LEN(BIN_HEADER_DATEFMT) + 3 * BIN_HEADER_NUMSZ)
+#define BIN_HEADER_SZ		92 /* V4 (GTM V5.0) binary header stores null collation information [5 bytes numeric] */
+#define V3_BIN_HEADER_SZ	87
 #define EXTR_HEADER_LEVEL(extr_lbl)	*(extr_lbl + sizeof(BIN_HEADER_LABEL) - 2)
 					/* the assumption here is - level wont go beyond a single char representation */
 
@@ -99,6 +102,8 @@ boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format);
 	if (status != RMS$_NORMAL) \
 		rts_error(VARLSTCNT(1) status);		\
 }
+
+
 boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int format);
 #else
 #error UNSUPPORTED PLATFORM

@@ -22,25 +22,26 @@
 #include "gdscc.h"
 #include "gdskill.h"
 #include "cdb_sc.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "jnl.h"
 #include "mlkdef.h"
-#include "mv_stent.h"
 #include "rtnhdr.h"
+#include "mv_stent.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
-#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "tp_timeout.h"
 #include "op.h"
 #include "have_crit.h"
 #include "gtm_caseconv.h"
-#include "gvcst_tp_init.h"
+#include "gvcst_protos.h"	/* for gvcst_tp_init prototype */
 #include "dpgbldir.h"
 #include <varargs.h>
 #include "longset.h"		/* needed for cws_insert.h */
+#include "hashtab.h"
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
 
 error_def(ERR_STACKCRIT);
@@ -99,14 +100,11 @@ GBLREF int4	    		dollar_zmaxtptime;
 void	op_tstart(va_alist)
 va_dcl
 {
-	bool			serial,			/* whether SERIAL keyword was present */
-				new;
-	ht_entry		*hte, *sym, *symtop;
+	bool			serial;			/* whether SERIAL keyword was present */
 	int			dollar_t,		/* value of $T when TSTART */
 				prescnt,		/* number of names to save, -1 = no restart, -2 = preserve all */
-				pres, shift;
+				pres;
 	lv_val			*lv, *var;
-	mident			vname;
 	mlk_pvtblk		*pre_lock;
 	mlk_tp			*lck_tp;
 	mval			*preserve,		/* list of names to save */
@@ -128,6 +126,8 @@ va_dcl
 	gd_region		*r_top, *r_local;
 	gd_addr			*addr_ptr;
 	unsigned char		tp_bat[TP_BATCH_LEN];
+	mname_entry		tpvent;
+	ht_ent_mname		*tabent, *curent, *topent;
 
 	/* If we haven't done any TP until now, turn the flag on to tell gvcst_init to
 	   initialize it in any regions it opens from now on and initialize it in any
@@ -192,7 +192,7 @@ va_dcl
 			}
 		}
 	}
-	assert((NULL == cw_stagnate) || cw_stagnate_reinitialized);
+	assert((0 == cw_stagnate.size) || cw_stagnate_reinitialized);
 		/* either cw_stagnate has not been initialized at all or previous-non-TP or tp_hist should have done CWS_RESET */
 	if (prescnt > 0)
 	{
@@ -256,13 +256,11 @@ va_dcl
 			mvst_tmp->mv_st_next = (char *)mv_st_ent - (char *)mvst_tmp;
 			mv_st_ent->mv_st_next = (char *)mvst_prev - (char *)mv_st_ent + mvs_size[MVST_TPHOLD];
 		}
-		shift = mvs_size[MVST_TPHOLD];
 	} else
 	{
 		PUSH_MV_STENT(MVST_TPHOLD);
 		mv_st_ent = mv_chain;
 		fp = frame_pointer;
-		shift = 0;
 	}
 	mv_st_ent->mv_st_cont.mvs_tp_holder = dollar_tlevel;
 	if (NULL == tpstackbase)
@@ -274,11 +272,15 @@ va_dcl
 		tpstackwarn = tpstacktop + 1024;
 		tp_pointer = NULL;
 	}
-	pres = prescnt;
-	if ((0 > pres) || (0 != dollar_tlevel))
-		/* If no saves or a TSTART is already active, don't save names */
-		pres = 0;
-	tf = (tp_frame *)(tp_sp -= sizeof(tp_frame) + sizeof(mident) * pres);
+
+	/* Add a new tp_frame in the TP stack */
+	/* Pre V5, tf allocation was
+	 * tf = (tp_frame *)(tp_sp -= sizeof(tp_frame) + sizeof(mident) * pres);
+	 * The (sizeof(mident) * pres) area *may* have been for saving the names of preserved variables. We say *may*
+	 * because we could not locate such logic in the history of op_tstart(). We don't need the name of a local
+	 * variable to save and restore it (refer to the logic maintaining tf->vars). To avoid wasting space,
+	 * we no longer allocate the extra "sizeof(mident) * pres" effective V5. */
+	tf = (tp_frame *)(tp_sp -= sizeof(tp_frame));
 	if (tp_sp < tpstackwarn)
 		rts_error(VARLSTCNT(1) tp_sp < tpstacktop ? ERR_TPSTACKOFLOW : ERR_TPSTACKCRIT);
 	tf->dlr_t = dollar_t;
@@ -311,20 +313,28 @@ va_dcl
 		for (pres = 0;  pres < prescnt;  ++pres)
 		{
 			preserve = va_arg(lvname, mval *);
-			mvname = (mval *)((char *)preserve - shift);
+			/* The incoming 'preserve' is the pointer to a literal mval table entry. For the indirect code
+			 * (eg. Direct Mode), since the literal table is no longer on the M stack, we should not shift
+			 * the incoming va_arg pointer (C9D01-002205) */
+			mvname = preserve;
 			if (0 != mvname->str.len)
 			{	/* Convert mval to mident and see if it's in the symbol table */
-				memset(&vname, 0, sizeof(vname));
-				memcpy(vname.c, mvname->str.addr,
-				       mvname->str.len < sizeof(vname) ? mvname->str.len : sizeof(vname));
-				hte = ht_put(&curr_symval->h_symtab, (mname *)&vname, &new);
-				if (new)
-					lv_newname(hte, curr_symval);
-				lv = (lv_val *)hte->ptr;
+				tpvent.var_name.len = mvname->str.len;
+				tpvent.var_name.addr = mvname->str.addr;
+				COMPUTE_HASH_MNAME(&tpvent);
+				if (add_hashtab_mname(&curr_symval->h_symtab, &tpvent, NULL, &tabent))
+					lv_newname(tabent, curr_symval);
+				lv = (lv_val *)tabent->value;
 				/* In order to allow restart of a sub-transaction, this should chain rather than back stop,
 				   with appropriate changes to tp_var_clone and tp_unwind */
 				if (NULL == lv->tp_var)
 				{
+					/* Suggested enhancement: create space for restore_ent in the TP frame instead of
+					 * malloc'ing for each preserved variable. This will improve memory efficiency by
+					 * eliminating need for linked list. This may also assist in implementing restarting
+					 * of sub-transactions where we can limit the store/restore logic to locals for the
+					 * sub-transaction. With linked list, there is no straight-forward way to tell if
+					 * an lv was specified in a sub-transaction, and if so, which sub-transaction. */
 					var = lv_getslot(lv->ptrs.val_ent.parent.sym);
 					restore_ent = (tp_var *)malloc(sizeof(tp_var));
 					restore_ent->current_value = lv;
@@ -341,11 +351,10 @@ va_dcl
 	{	/* Preserve all variables */
 		tf->sym = curr_symval;
 		++curr_symval->tp_save_all;
-		for (sym = curr_symval->h_symtab.base, symtop = sym + curr_symval->h_symtab.size;  sym < symtop;  ++sym)
+		for (curent = curr_symval->h_symtab.base, topent = curr_symval->h_symtab.top;  curent < topent;  curent++)
 		{
-			if ('\0' != sym->nb.txt[0])
+			if (HTENT_VALID_MNAME(curent, lv_val, lv))
 			{
-				lv = (lv_val *)sym->ptr;
 				if (NULL == lv->tp_var)
 				{
 					var = lv_getslot(lv->ptrs.val_ent.parent.sym);

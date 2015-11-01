@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,12 +44,11 @@ static readonly unsigned char trnitm_index[27] =
 	,4, 4, 4
 };
 
-void op_fnztrnlnm(mval *name,mval *table,int4 ind,mval *mode,mval *case_blind,mval *item,mval *ret)
+void op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blind, mval *item, mval *ret)
 {
 	char		buf[MAX_TRANS_LOG+1];
 	char		*status;
 	int		item_code;
-	mident		tab;
 	short		retlen;
 
 	error_def(ERR_INVSTRLEN);
@@ -62,12 +61,8 @@ void op_fnztrnlnm(mval *name,mval *table,int4 ind,mval *mode,mval *case_blind,mv
 		rts_error(VARLSTCNT(4) ERR_INVSTRLEN, 2, name->str.len, MAX_TRANS_LOG);
 
 	if (item->str.len)
-	{	if (item->str.len > sizeof(mident))
-			rts_error(VARLSTCNT(4) ERR_BADTRNPARAM,2,item->str.len,item->str.addr);
-
-		memset(&tab, 0, sizeof(tab));
-		memcpy(&tab, item->str.addr, item->str.len);
-		if ((item_code = namelook(trnitm_index,trnitm_table, tab.c)) < 0)
+	{
+		if ((item_code = namelook(trnitm_index, trnitm_table, item->str.addr, item->str.len)) < 0)
 			rts_error(VARLSTCNT(4) ERR_BADTRNPARAM,2,item->str.len,item->str.addr);
 	}
 	else

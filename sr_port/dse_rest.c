@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,23 +54,24 @@ GBLREF unsigned char    *non_tp_jfb_buff_ptr;
 
 void dse_rest(void)
 {
-	block_id		to, from;
-	gd_region		*region;
-	int			i, util_len;
-	sm_uc_ptr_t		bp;
-	uchar_ptr_t		lbp;
-	char			util_buff[MAX_UTIL_LEN], rn[MAX_RN_LEN + 1];
-	blk_segment		*bs1, *bs_ptr;
-	cw_set_element		*cse;
-	int4			blk_seg_cnt, blk_size;
-	unsigned short		rn_len;
-	uint4			version;
-	gd_addr *temp_gdaddr;
-	gd_binding *map;
-	bool			found;
+	block_id	to, from;
+	gd_region	*region;
+	int		i, util_len;
+	uchar_ptr_t	lbp;
+	char		util_buff[MAX_UTIL_LEN], rn[MAX_RN_LEN + 1];
+	blk_segment	*bs1, *bs_ptr;
+	cw_set_element	*cse;
+	int4		blk_seg_cnt, blk_size;
+	unsigned short	rn_len;
+	uint4		version;
+	gd_addr		*temp_gdaddr;
+	gd_binding	*map;
+	boolean_t	found;
+	srch_blk_status	blkhist;
+
+	error_def(ERR_DBRDONLY);
 	error_def(ERR_DSEBLKRDFAIL);
 	error_def(ERR_DSEFAIL);
-	error_def(ERR_DBRDONLY);
 
 	if (gv_cur_region->read_only)
 		rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
@@ -82,11 +83,11 @@ void dse_rest(void)
 		util_out_print("Error:  save version number must be specified.", TRUE);
 		return;
 	}
-	if (!cli_get_num("VERSION", (int4 *)&version))
+	if (!cli_get_int("VERSION", (int4 *)&version))
 		return;
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
-		if (!cli_get_hex("BLOCK", &to))
+		if (!cli_get_hex("BLOCK", (uint4 *)&to))
 			return;
 		if (to < 0 || to >= cs_addrs->ti->total_blks)
 		{
@@ -98,7 +99,7 @@ void dse_rest(void)
 		to = patch_curr_blk;
 	if (cli_present("FROM") == CLI_PRESENT)
 	{
-		if (!cli_get_hex("FROM", &from))
+		if (!cli_get_hex("FROM", (uint4 *)&from))
 	 		return;
 	 	if (from < 0 || from >= cs_addrs->ti->total_blks)
 	 	{
@@ -168,7 +169,8 @@ void dse_rest(void)
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	t_begin_crit(ERR_DSEFAIL);
 	blk_size = cs_addrs->hdr->blk_size;
-	if(!(bp = t_qread(to, &dummy_hist.h[0].cycle, &dummy_hist.h[0].cr)))
+	blkhist.blk_num = to;
+	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	lbp = (uchar_ptr_t)patch_save_set[i].bp;
 
@@ -180,7 +182,7 @@ void dse_rest(void)
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
-	t_write(to, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
+	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
 	BUILD_AIMG_IF_JNL_ENABLED(cs_addrs, cs_data, non_tp_jfb_buff_ptr, cse);
 	t_end(&dummy_hist, 0);
 	return;

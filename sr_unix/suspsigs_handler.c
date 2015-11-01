@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,11 +25,7 @@ GBLREF	uint4			process_id;
 GBLREF	volatile int4		exit_state;
 GBLREF	enum gtmImageTypes	image_type;
 
-#ifdef __sparc
-void suspsigs_handler(int sig)
-#else
 void suspsigs_handler(int sig, siginfo_t* info, void *context)
-#endif
 {
 	sigset_t	block_susp_sigs, oldsigmask;
 	int		status;

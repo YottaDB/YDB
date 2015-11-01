@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -498,24 +498,21 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		}
 
 		/* pass label name to child */
-		if (jparms->label.len != 0)
-		{
-			if (jparms->label.len > TEMP_BUFF_SIZE)
-				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			strncpy(pbuff, jparms->label.addr, jparms->label.len);
-			*(pbuff + jparms->label.len) = '\0';
-			string_len = strlen("%s=%s") + strlen(LABEL_ENV) + strlen(pbuff) - 4;
-			if (string_len > TEMP_BUFF_SIZE)
-				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			c1 = (char *)malloc(string_len + 1);
+		if (jparms->label.len > TEMP_BUFF_SIZE)
+			rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
+		strncpy(pbuff, jparms->label.addr, jparms->label.len);
+		*(pbuff + jparms->label.len) = '\0';
+		string_len = strlen("%s=%s") + strlen(LABEL_ENV) + strlen(pbuff) - 4;
+		if (string_len > TEMP_BUFF_SIZE)
+			rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
+		c1 = (char *)malloc(string_len + 1);
 #ifdef __MVS__
 #pragma convlit(suspend)
 #endif
-			SPRINTF_ENV_STR(c1, LABEL_ENV, pbuff, env_ind);
+		SPRINTF_ENV_STR(c1, LABEL_ENV, pbuff, env_ind);
 #ifdef __MVS__
 #pragma convlit(resume)
 #endif
-		}
 
 		/* pass the offset */
 		string_len = strlen("%s=%ld") + strlen(OFFSET_ENV) + MAX_NUM_LEN - 5;

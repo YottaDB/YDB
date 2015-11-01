@@ -1,5 +1,5 @@
 /****************************************************************
- *      Copyright 2001 Sanchez Computer Associates, Inc.        *
+ *      Copyright 2001, 2004 Sanchez Computer Associates, Inc.        *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -32,9 +32,9 @@ void op_fnreverse(mval *src, mval *dst)
 	int	lcnt;
         char    *in, *out;
 
+	MV_FORCE_STR(src);
         if (stringpool.free + src->str.len > stringpool.top)
                 stp_gcol(src->str.len);
-	MV_FORCE_STR(src);
         out = (char *)stringpool.free;
         stringpool.free += src->str.len;
         in = src->str.addr + src->str.len * sizeof(char);

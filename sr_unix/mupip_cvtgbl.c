@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,8 @@ void mupip_cvtgbl(void)
 	unsigned short	fn_len, len;
 	char		fn[256];
 	unsigned char	buff[7];
-	int		i, begin, end, format;
+	int4		begin, end;
+	int		i, format;
 	uint4	        cli_status;
 
 	error_def(ERR_MUPCLIERR);
@@ -53,7 +54,7 @@ void mupip_cvtgbl(void)
 	mu_outofband_setup();
 	if ((cli_status = cli_present("BEGIN")) == CLI_PRESENT)
 	{
-	        if (!cli_get_num("BEGIN", &begin ))
+	        if (!cli_get_int("BEGIN", &begin))
 			mupip_exit(ERR_MUPCLIERR);
 		if ( begin < 1)
 			begin = 1;
@@ -62,7 +63,7 @@ void mupip_cvtgbl(void)
 		begin = 0;
 	if ((cli_status = cli_present("END")) == CLI_PRESENT)
 	{
-	        if (!cli_get_num("END", &end ))
+	        if (!cli_get_int("END", &end))
 			mupip_exit(ERR_MUPCLIERR);
 		if ( end < 1)
 			end = 1;
@@ -73,7 +74,8 @@ void mupip_cvtgbl(void)
 		end = 999999999;
 	if ((cli_status = cli_present("FILL_FACTOR")) == CLI_PRESENT)
 	{
-	        if (!cli_get_num("FILL_FACTOR", &gv_fillfactor))
+		assert(sizeof(gv_fillfactor) == sizeof(int4));
+	        if (!cli_get_int("FILL_FACTOR", (int4 *)&gv_fillfactor))
 			gv_fillfactor = MAX_FILLFACTOR;
 		if ( gv_fillfactor < MIN_FILLFACTOR)
 			gv_fillfactor = MIN_FILLFACTOR;

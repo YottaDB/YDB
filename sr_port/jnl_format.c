@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,10 +29,11 @@
 #include "iosp.h"
 #include "mdefsp.h"
 #include "ccp.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "copy.h"
+#include "jnl_get_checksum.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF 	short  			dollar_tlevel;
@@ -54,7 +55,7 @@ void	jnl_format(jnl_format_buffer *jfb)
 	uint4			align_fill_size, jrec_size, tmp_jrec_size;
 	int			subcode;
 	jnl_action		*ja;
-	char			*local_buffer;
+	char			*local_buffer, *mumps_node_ptr;
 	jnl_str_len_t		keystrlen;
 	mstr_len_t		valstrlen;
 
@@ -117,6 +118,7 @@ void	jnl_format(jnl_format_buffer *jfb)
 		local_buffer = jfb->buff + FIXED_ZTP_UPD_RECLEN;
 	else
 		local_buffer = jfb->buff + FIXED_UPD_RECLEN;
+	mumps_node_ptr = local_buffer;
 	*(jnl_str_len_t *)local_buffer = keystrlen; /* direct assignment for already aligned address */
 	local_buffer += sizeof(jnl_str_len_t);
 	memcpy(local_buffer, (uchar_ptr_t)ja->key->base, keystrlen);
@@ -133,6 +135,7 @@ void	jnl_format(jnl_format_buffer *jfb)
 		memset(local_buffer, 0, align_fill_size);
 		local_buffer += align_fill_size;
 	}
+	jfb->checksum = jnl_get_checksum(INIT_CHECKSUM_SEED, (uint4 *)mumps_node_ptr, local_buffer - mumps_node_ptr);
 	assert(0 == ((uint4)local_buffer % sizeof(jrec_suffix)));
 	/* SUFFIX */
 	((jrec_suffix *)local_buffer)->backptr = jrec_size;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,14 +28,11 @@ GBLREF	spdesc			stringpool;
 GBLREF	unsigned char		*error_frame_save_mpc[DOLLAR_STACK_MAXINDEX];
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 
-/* pos_str will contain "label+offset^routine" :: label & routine are midents, offset is an integer, "+" and "^" are literals */
-#define MAX_POS_LEN	(2 * sizeof(mident) + MAX_DIGITS_IN_INT + STR_LIT_LEN("+^"))
-
 void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result)
 {
 	int		count;
 	stack_frame	*fp;
-	unsigned char	pos_str[MAX_POS_LEN];
+	unsigned char	pos_str[MAX_ENTRYREF_LEN];
 	mval		label;
 	mval		routine;
 	int		ips;
@@ -136,7 +133,7 @@ void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result)
 			irtnhdr = (ihdtyp *)((char *)vp + *vp);
 			indce = irtnhdr->indce;
 			assert(0 < indce->refcnt);	/* currently used in the M stack better have a non-zero refcnt */
-			result->str = indce->src;
+			result->str = indce->src.str;
 			s2pool(&result->str);
 			assert(((unsigned char *)result->str.addr + result->str.len) == stringpool.free);
 		}

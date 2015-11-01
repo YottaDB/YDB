@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@
 #include "callg.h"
 #include "zshow.h"
 #include "util.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "mv_stent.h"
 
@@ -150,7 +150,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec)
 
 	++jobexam_counter;
 	/* Setup default filename/type to use for the parse. Append processid and a counter. */
-	memcpy(dump_file_name, DEFAULT_DUMP_FILENAME, sizeof(DEFAULT_DUMP_FILENAME) - 1);
+	MEMCPY_LIT(dump_file_name, DEFAULT_DUMP_FILENAME);
 	dump_file_name_ptr = dump_file_name + sizeof(DEFAULT_DUMP_FILENAME) - 1;
 	*dump_file_name_ptr++ = '_';
 	dump_file_name_ptr = i2asc(dump_file_name_ptr, process_id);

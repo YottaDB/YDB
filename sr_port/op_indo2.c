@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "toktyp.h"
 #include "compiler.h"
@@ -19,15 +19,16 @@
 #include "mdq.h"
 #include "advancewindow.h"
 #include "cache.h"
+#include "hashtab_objcode.h"
 #include "op.h"
 #include "underr.h"
 
-GBLREF char window_token, director_token;
-GBLREF mident window_ident;
-GBLREF mval **ind_source_sp, **ind_source_top;
-GBLREF mval **ind_result_sp, **ind_result_top;
-GBLREF bool shift_gvrefs;
-GBLREF triple *expr_start;
+GBLREF char 			window_token, director_token;
+GBLREF mident 			window_ident;
+GBLREF mval 			**ind_source_sp, **ind_source_top;
+GBLREF mval 			**ind_result_sp, **ind_result_top;
+GBLREF bool 			shift_gvrefs;
+GBLREF triple 			*expr_start;
 
 void	op_indo2(mval *dst, mval *target, mval *value)
 {
@@ -37,10 +38,13 @@ void	op_indo2(mval *dst, mval *target, mval *value)
 	mstr		object, *obj;
 	oprtype		v, sav_opr;
 	triple		*s, *src, *oldchain, tmpchain, *r;
+	icode_str	indir_src;
 
 	MV_FORCE_DEFINED(value);
 	MV_FORCE_STR(target);
-	if (!(obj = cache_get(indir_fnorder2, &target->str)))
+	indir_src.str = target->str;
+	indir_src.code = indir_fnorder2;
+	if (NULL == (obj = cache_get(&indir_src)))
 	{
 		comp_init(&target->str);
 		src = newtriple(OC_IGETSRC);
@@ -50,7 +54,7 @@ void	op_indo2(mval *dst, mval *target, mval *value)
 		case TK_IDENT:
 			if (director_token != TK_LPAREN)
 			{	s->opcode = OC_FNLVNAMEO2;
-				s->operand[0] = put_str(&window_ident.c[0],sizeof(mident));
+				s->operand[0] = put_str(window_ident.addr,window_ident.len);
 				s->operand[1] = put_tref(src);
 				ins_triple(s);
 				advancewindow();
@@ -113,7 +117,9 @@ void	op_indo2(mval *dst, mval *target, mval *value)
 		}
 		v = put_tref(s);
 		if (comp_fini(rval, &object, OC_IRETMVAL, &v, target->str.len))
-		{	cache_put(indir_fnorder2, &target->str, &object);
+		{
+			indir_src.str.addr = target->str.addr;
+			cache_put(&indir_src, &object);
 			if (ind_source_sp + 1 >= ind_source_top || ind_result_sp + 1 >= ind_result_top)
 				rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
 

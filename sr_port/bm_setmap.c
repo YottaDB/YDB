@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,30 +47,24 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
 	sm_uc_ptr_t	bmp;
 	trans_num	ctn;
 	srch_hist	alt_hist;
+	srch_blk_status	blkhist; /* block-history to fill in for t_write_map which uses "blk_num", "buffaddr", "cr", "cycle" */
 	cw_set_element  *cse;
 
 	error_def(ERR_DSEFAIL);
 
 	t_begin_crit(ERR_DSEFAIL);
 	ctn = cs_addrs->ti->curr_tn;
-	if (cs_addrs->hdr->acc_meth == dba_mm)
-	{
-		if (!(bmp = mm_read(bml)))
-			t_retry(rdfail_detail);
-	}
-	else
-	{
-		if (!(bmp = t_qread(bml, &alt_hist.h[0].cycle, &alt_hist.h[0].cr)))
-			t_retry(rdfail_detail);
-	}
+	if (!(bmp = t_qread(bml, &blkhist.cycle, &blkhist.cr)))
+		t_retry(rdfail_detail);
+	blkhist.blk_num = bml;
+	blkhist.buffaddr = bmp;
 	alt_hist.h[0].blk_num = 0;	/* Need for calls to T_END for bitmaps */
 	update_array_ptr = update_array;
 	*((block_id_ptr_t)update_array_ptr) = blk;
 	update_array_ptr += sizeof(block_id);
 	*((block_id_ptr_t)update_array_ptr) = 0;
-	t_write_map(bml, bmp, (uchar_ptr_t)update_array, ctn);
+	t_write_map(&blkhist, (uchar_ptr_t)update_array, ctn);
 	cw_set[0].reference_cnt = busy;	/* Set the block busy */
-	cw_set[0].cycle = alt_hist.h[0].cycle;
 	if (JNL_ENABLED(cs_data))
         {
                 cse = (cw_set_element *)(&cw_set[0]);
@@ -80,7 +74,7 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
                 cse->done = TRUE;
         }
 	/* Call t_end till it succeeds or aborts (error will be reported) */
-	while (t_end(&alt_hist, 0) == 0)
+	while ((trans_num)0 == t_end(&alt_hist, 0))
 		;
 	return;
 }

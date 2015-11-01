@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2005 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -19,6 +19,12 @@ LOAD
 	i debug u @useio
 ; header
 	s label=$e(rec,1,12)
+	set v5ft1=0
+	i (label="GTCGBLDIR008")!(label="GTCGBDUNX004") s label=hdrlab,v5ft1=1,update=1			;autoconvert
+	i v5ft1=1 n SIZEOF d v5ft1init
+	set v44=0
+	i (label="GTCGBLDIR007")!(label="GTCGBDUNX003") s label=hdrlab,v44=1,update=1			;autoconvert
+	i v44=1 n MAXNAMLN,MAXSEGLN,MAXREGLN,SIZEOF d v44init
 	s v30=0
 	i (label="GTCGBLDIR006")!(label="GTCGBDUNX002") s label=hdrlab,v30=4,update=1			;autoconvert
 	i label'=hdrlab d cretmps,CONVERT^GDEOGET,verify s update=1 q					;autoconvert
@@ -76,6 +82,9 @@ LOAD
 	i 'v30 d tmpreg("COLLATION_DEFAULT")
 	f s="EXTENSION","FILE_NAME" d tmpreg(s)
 	f s="JOURNAL","KEY_SIZE","NULL_SUBSCRIPTS","RECORD_SIZE" d tmpreg(s) ;,"STOP_ENABLE"
+	; need to handle versioning
+	i 'v44&'v30 d tmpreg("STDNULLCOLL")
+	e  s tmpreg("STDNULLCOLL")=0
 	f i=2:1:$l(accmeth,"\") s am=$p(accmeth,"\",i) d
 	. i am="MM" d:$l(rec)-(rel-1)<3 nextrec i +$e(rec,rel,rel+2)'=2 d tmpmm q
 	. f s="ACCESS_METHOD","ALLOCATION","BLOCK_SIZE","BUCKET_SIZE","DEFER","EXTENSION_COUNT","FILE_TYPE" d tmpseg(am,s)
@@ -148,9 +157,13 @@ region:
 	i $e(rec,rel,rel+3)'=$tr($j("",4)," ",ZERO) zm gdeerr("INPINTEG")				; 4 chars
 	s rel=rel+4
 	s regs(s,"COLLATION_DEFAULT")=$$bin2num($e(rec,rel)),rel=rel+1					; default collating type
-	i $e(rec,rel)'=$tr($j("",1)," ",ZERO) zm gdeerr("INPINTEG")					; 1 chars
+	; stdnullcoll is applicable from V5
+	i 'v44&'v30 s regs(s,"STDNULLCOLL")=$$bin2num($e(rec,rel))
+	e  d
+	. i $e(rec,rel)'=$tr($j("",1)," ",ZERO) zm gdeerr("INPINTEG")					; 1 chars
+	. s regs(s,"STDNULLCOLL")=0
 	s rel=rel+1
-	s l=$$bin2num($e(rec,rel)),rel=rel+1
+	s l=$$bin2num($e(rec,rel)),rel=rel+1 ;jnl_file_len
 	s regs(s,"FILE_NAME")=$e(rec,rel,rel+l-1),rel=rel+SIZEOF("file_spec")
 	i $e(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) zm gdeerr("INPINTEG")				; reserved
 	s rel=rel+8
@@ -246,6 +259,7 @@ cretmps:
 	s tmpreg("KEY_SIZE")=64
 	s tmpreg("NULL_SUBSCRIPTS")=0
 	s tmpreg("RECORD_SIZE")=256
+	s tmpreg("STDNULLCOLL")=0
 	;s tmpreg("STOP_ENABLED")=1
 	s tmpseg("BG","ACCESS_METHOD")="BG"
 	s tmpseg("BG","ALLOCATION")=100
@@ -287,4 +301,35 @@ tmpmm:	s tmpseg("MM","ACCESS_METHOD")="MM"
 maktseg:	s segs(defseg,"FILE_NAME")=defdb
 	s seg="segs(defseg)",x=""
 	f  s x=$o(tmpseg(am,x)) q:'$l(x)  s @seg@(x)=tmpseg(am,x)
+	q
+v44init:
+	s SIZEOF("am_offset")=308
+	s SIZEOF("file_spec")=256
+	s SIZEOF("gd_header")=16
+	s SIZEOF("gd_contents")=44
+	s SIZEOF("gd_map")=12
+	s SIZEOF("gd_region")=316
+	s SIZEOF("gd_segment")=320
+	s SIZEOF("mident")=8
+	s SIZEOF("rec_hdr")=3
+	s SIZEOF("dsk_blk")=512
+	s SIZEOF("max_str")=32767
+	s MAXNAMLN=SIZEOF("mident"),MAXREGLN=16,MAXSEGLN=16
+	i ver'="VMS" s SIZEOF("blk_hdr")=8
+	e  s SIZEOF("blk_hdr")=7
+	q
+v5ft1init:
+	s SIZEOF("am_offset")=324
+	s SIZEOF("file_spec")=256
+	s SIZEOF("gd_header")=16
+	s SIZEOF("gd_contents")=44
+	s SIZEOF("gd_map")=36
+	s SIZEOF("gd_region")=332
+	s SIZEOF("gd_segment")=336
+	s SIZEOF("mident")=32
+	s SIZEOF("rec_hdr")=3
+	s SIZEOF("dsk_blk")=512
+	s SIZEOF("max_str")=32767
+	i ver'="VMS" s SIZEOF("blk_hdr")=8
+	e  s SIZEOF("blk_hdr")=7
 	q

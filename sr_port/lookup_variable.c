@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"
 #include "lv_val.h"
 #include "sbs_blk.h"
 #include "rtnhdr.h"
@@ -22,13 +22,10 @@ GBLREF stack_frame *frame_pointer;
 
 mval *lookup_variable(unsigned int x)
 {
-	char new;
-	ht_entry *q;
+	ht_ent_mname	*tabent;
 
 	assert(x < frame_pointer->vartab_len);
-	q = ht_put(&curr_symval->h_symtab, (mname *)&(((VAR_TABENT *)frame_pointer->vartab_ptr)[x]), &new);
-	if (new)
-		lv_newname(q, curr_symval);
-
-	return (mval *) q->ptr;
+	if (add_hashtab_mname(&curr_symval->h_symtab, ((var_tabent *)frame_pointer->vartab_ptr + x), NULL, &tabent))
+		lv_newname(tabent, curr_symval);
+	return (mval *) tabent->value;
 }

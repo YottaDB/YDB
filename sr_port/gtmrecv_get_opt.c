@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,15 +8,15 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
 #include "mdef.h"
 
-#include <stdlib.h>
-#include <errno.h>
+#include "gtm_limits.h"
+#include "gtm_stdlib.h"
 #include "gtm_string.h"
 #include "gtm_unistd.h"
-#include <ctype.h>
-#include <arpa/inet.h>
+#include "gtm_ctype.h"
+#include "gtm_inet.h"
+#include <errno.h>
 #ifdef VMS
 #include <descrip.h> /* Required for gtmrecv.h */
 #endif
@@ -32,66 +32,43 @@
 #include "cli.h"
 #include "gtm_stdio.h"
 #include "util.h"
-
-#define DEFAULT_RECVPOOL_SIZE	(64 * 1024 * 1024)
-
-#define DEFAULT_SHUTDOWN_TIMEOUT	30
+#include "repl_log.h"
 
 GBLDEF	gtmrecv_options_t	gtmrecv_options;
 
 int gtmrecv_get_opt(void)
 {
 
-	boolean_t	log;
-	unsigned short	log_file_len;
+	boolean_t	log, log_interval_specified;
+	unsigned short 	log_file_len, filter_cmd_len;
 	boolean_t	buffsize_status;
 	boolean_t	filter;
-	unsigned short	filter_cmd_len;
-	int		timeout_status;
-	boolean_t	listenport_status;
+	int		status;
 	unsigned short	statslog_val_len;
 	char		statslog_val[4]; /* "ON" or "OFF" */
-	int		num_actions;
+	uint4		n_readers, n_helpers;
 
-
-	num_actions = 0;
-	num_actions += ((gtmrecv_options.start = (CLI_PRESENT == cli_present("START"))) ? 1 : 0);
-	num_actions += ((gtmrecv_options.shut_down = (CLI_PRESENT == cli_present("SHUTDOWN"))) ? 1 : 0);
-	num_actions += ((gtmrecv_options.checkhealth = (CLI_PRESENT == cli_present("CHECKHEALTH"))) ? 1 : 0);
-	num_actions += ((gtmrecv_options.statslog = (CLI_PRESENT == cli_present("STATSLOG"))) ? 1 : 0);
-	num_actions += ((gtmrecv_options.showbacklog = (CLI_PRESENT == cli_present("SHOWBACKLOG"))) ? 1 : 0);
-	num_actions += ((gtmrecv_options.changelog = (CLI_PRESENT == cli_present("CHANGELOG"))) ? 1 : 0);
-
-	if (1 < num_actions)
-	{
-		util_out_print("Invalid mixing of action qualifiers. Only one of START, SHUTDOWN, CHECKHEALTH, STATSLOG, "
-				"SHOWBACKLOG, CHANGELOG should be specified", TRUE);
-		return (-1);
-	} else if (0 == num_actions)
-	{
-		util_out_print("No action qualifier specified. One of START, SHUTDOWN, CHECKHEALTH, STATSLOG, SHOWBACKLOG, "
-				"CHANGELOG should be specified", TRUE);
-		return (-1);
-	}
-
+	gtmrecv_options.start = (CLI_PRESENT == cli_present("START"));
+	gtmrecv_options.shut_down = (CLI_PRESENT == cli_present("SHUTDOWN"));
+	gtmrecv_options.checkhealth = (CLI_PRESENT == cli_present("CHECKHEALTH"));
+	gtmrecv_options.statslog = (CLI_PRESENT == cli_present("STATSLOG"));
+	gtmrecv_options.showbacklog = (CLI_PRESENT == cli_present("SHOWBACKLOG"));
+	gtmrecv_options.changelog = (CLI_PRESENT == cli_present("CHANGELOG"));
 	gtmrecv_options.updateonly = (CLI_PRESENT == cli_present("UPDATEONLY"));
 	gtmrecv_options.updateresync = (CLI_PRESENT == cli_present("UPDATERESYNC"));
+	gtmrecv_options.helpers = (CLI_PRESENT == cli_present("HELPERS"));
 
-	if (gtmrecv_options.start && !gtmrecv_options.updateonly)
+	gtmrecv_options.listen_port = 0; /* invalid port; indicates listenport not specified */
+	if (gtmrecv_options.start && CLI_PRESENT == cli_present("LISTENPORT"))
 	{
-		if (!(listenport_status = (CLI_PRESENT == cli_present("LISTENPORT"))))
-		{
-			util_out_print("LISTENPORT should be specfied with START", TRUE);
-			return (-1);
-		} else if (!cli_get_num("LISTENPORT", &gtmrecv_options.listen_port))
+		if (!cli_get_int("LISTENPORT", &gtmrecv_options.listen_port))
 		{
 			util_out_print("Error parsing LISTENPORT qualifier", TRUE);
 			return (-1);
 		}
-
 		if (buffsize_status = (CLI_PRESENT == cli_present("BUFFSIZE")))
 		{
-			if (!cli_get_num("BUFFSIZE", &gtmrecv_options.buffsize))
+			if (!cli_get_int("BUFFSIZE", &gtmrecv_options.buffsize))
 			{
 				util_out_print("Error parsing BUFFSIZE qualifier", TRUE);
 				return (-1);
@@ -116,14 +93,10 @@ int gtmrecv_get_opt(void)
 		gtmrecv_options.stopsourcefilter = (CLI_PRESENT == cli_present("STOPSOURCEFILTER"));
 	}
 
-	if ((gtmrecv_options.start && !gtmrecv_options.updateonly) || gtmrecv_options.statslog || gtmrecv_options.changelog)
+	if ((gtmrecv_options.start && 0 != gtmrecv_options.listen_port) || gtmrecv_options.statslog || gtmrecv_options.changelog)
 	{
 		log = (CLI_PRESENT == cli_present("LOG"));
-		if ((gtmrecv_options.start && !gtmrecv_options.updateonly || gtmrecv_options.changelog) && !log)
-		{
-			util_out_print("LOG should be specified with START or CHANGELOG", TRUE);
-			return (-1);
-		}
+		log_interval_specified = (CLI_PRESENT == cli_present("LOG_INTERVAL"));
 		if (log)
 		{
 			log_file_len = MAX_FN_LEN + 1;
@@ -134,20 +107,26 @@ int gtmrecv_get_opt(void)
 			}
 		} else
 			gtmrecv_options.log_file[0] = '\0';
-	}
-
-	if (!gtmrecv_options.start && gtmrecv_options.updateresync)
-	{
-		util_out_print("UPDATERESYNC can be used only with START", TRUE);
-		gtmrecv_options.updateresync = FALSE;
-		return (-1);
+		gtmrecv_options.rcvr_log_interval = gtmrecv_options.upd_log_interval = 0;
+		if (log_interval_specified
+		    && 0 == cli_parse_two_numbers("LOG_INTERVAL", GTMRECV_LOGINTERVAL_DELIM, &gtmrecv_options.rcvr_log_interval,
+							&gtmrecv_options.upd_log_interval))
+			return (-1);
+		if (gtmrecv_options.start)
+		{
+			if (0 == gtmrecv_options.rcvr_log_interval)
+				gtmrecv_options.rcvr_log_interval = LOGTRNUM_INTERVAL;
+			if (0 == gtmrecv_options.upd_log_interval)
+				gtmrecv_options.upd_log_interval = LOGTRNUM_INTERVAL;
+		} /* For changelog, interval == 0 implies don't change log interval already established */
+		  /* We ignore interval specification for statslog, Vinaya 2005/02/07 */
 	}
 
 	if (gtmrecv_options.shut_down)
 	{
-		if (CLI_PRESENT == (timeout_status = cli_present("TIMEOUT")))
+		if (CLI_PRESENT == (status = cli_present("TIMEOUT")))
 		{
-			if (!cli_get_num("TIMEOUT", &gtmrecv_options.shutdown_time))
+			if (!cli_get_int("TIMEOUT", &gtmrecv_options.shutdown_time))
 			{
 				util_out_print("Error parsing TIMEOUT qualifier", TRUE);
 				return (-1);
@@ -157,7 +136,7 @@ int gtmrecv_get_opt(void)
 				gtmrecv_options.shutdown_time = DEFAULT_SHUTDOWN_TIMEOUT;
 				util_out_print("shutdown TIMEOUT changed to !UL", TRUE, gtmrecv_options.shutdown_time);
 			}
-		} else if (CLI_NEGATED == timeout_status)
+		} else if (CLI_NEGATED == status)
 			gtmrecv_options.shutdown_time = -1;
 		else /* TIMEOUT not specified */
 			gtmrecv_options.shutdown_time = DEFAULT_SHUTDOWN_TIMEOUT;
@@ -184,6 +163,29 @@ int gtmrecv_get_opt(void)
 			return (-1);
 		}
 	}
-
+	gtmrecv_options.n_readers = gtmrecv_options.n_writers = 0;
+	if (gtmrecv_options.helpers && gtmrecv_options.start)
+	{ /* parse the helpers qualifier to find out how many readers and writes have to be started */
+		if (0 == (status = cli_parse_two_numbers("HELPERS", UPD_HELPERS_DELIM, &n_helpers, &n_readers)))
+			return (-1);
+		if (!(status & CLI_2NUM_FIRST_SPECIFIED))
+			n_helpers = DEFAULT_UPD_HELPERS;
+		if (MIN_UPD_HELPERS > n_helpers || MAX_UPD_HELPERS < n_helpers)
+		{
+			util_out_print("Invalid number of helpers; must be in the range [!UL,!UL]", TRUE, MIN_UPD_HELPERS,
+					MAX_UPD_HELPERS);
+			return (-1);
+		}
+		if (!(status & CLI_2NUM_SECOND_SPECIFIED))
+			n_readers = (int)(n_helpers * ((float)DEFAULT_UPD_HELP_READERS)/DEFAULT_UPD_HELPERS); /* may round down */
+		if (n_readers > n_helpers)
+		{
+			n_readers = n_helpers;
+			util_out_print("Number of readers exceeds number of helpers, reducing number of readers to number of "
+					"helpers", TRUE);
+		}
+		gtmrecv_options.n_readers = n_readers;
+		gtmrecv_options.n_writers = n_helpers - n_readers;
+	}
 	return (0);
 }

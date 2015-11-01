@@ -28,7 +28,7 @@ static struct RAB	ceprep_rab;	/* record access block for compiler escape preproc
 #define CEPREP_OPEN_TIMEOUT 30
 
 GBLREF unsigned char		source_buffer[];
-GBLREF char			module_name[];
+GBLREF mident			module_name;
 GBLREF io_pair			io_curr_device;
 GBLREF command_qualifier	cmd_qlf;
 
@@ -62,23 +62,23 @@ void open_ceprep_file(void)
 #endif
 	int		mname_len;
 	uint4		status;
-	char		charspace, ceprep_name_buff[sizeof(mident) + sizeof(".MCI") - 1], fname[255];
+	char		charspace, ceprep_name_buff[MAX_MIDENT_LEN + sizeof(".MCI") - 1], fname[255];
 	mval		file, params;
 	struct NAM	ceprep_nam;	/* name block for file access block for compiler escape preprocessor output */
 
 	/* Create cepreprocessor output file. */
 	ceprep_fab = cc$rms_fab;
 	ceprep_fab.fab$l_dna = ceprep_name_buff;
-	mname_len = mid_len(module_name);
-	assert(mname_len <= sizeof(mident));
+	mname_len = module_name.len;
+	assert(mname_len <= MAX_MIDENT_LEN);
 	if (0 == mname_len)
 	{
-		memcpy(ceprep_name_buff, "MDEFAULT.MCI", sizeof("MDEFAULT.MCI") - 1);
+		MEMCPY_LIT(ceprep_name_buff, "MDEFAULT.MCI");
 		ceprep_fab.fab$b_dns = sizeof("MDEFAULT.MCI") - 1;
 	} else
 	{
-		memcpy(ceprep_name_buff, module_name, mname_len);
-		memcpy(&ceprep_name_buff[mname_len], ".MCI", sizeof(".MCI") - 1);
+		memcpy(ceprep_name_buff, module_name.addr, mname_len);
+		MEMCPY_LIT(&ceprep_name_buff[mname_len], ".MCI");
 		ceprep_fab.fab$b_dns = mname_len + sizeof(".MCI") - 1;
 	}
 	if (MV_DEFINED(&cmd_qlf.ceprep_file))

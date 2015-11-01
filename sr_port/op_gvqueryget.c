@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@
 #include "gdsfhead.h"
 #include "op.h"
 #include "sgnl.h"
-#include "gvcst_queryget.h"
+#include "gvcst_protos.h"	/* for gvcst_queryget prototype */
 #include "gvcmx.h"
 #include "stringpool.h"
 #include "gvusr_queryget.h"
@@ -36,7 +36,7 @@ boolean_t op_gvqueryget(mval *key, mval *val)
 	boolean_t 	gotit;
 	gv_key		*save_key;
 
-	if (gv_curr_subsc_null && gv_cur_region->null_subs == FALSE)
+	if (gv_curr_subsc_null && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
 	switch (gv_cur_region->dyn.addr->acc_meth)
 	{

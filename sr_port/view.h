@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ typedef struct noisolation_list_struct
 
 typedef union
 {
-	mident			ident;
+	mident_fixed		ident;
 	mval			*value;
 	struct gd_region_struct *gv_ptr;
 	noisolation_list	ni_list;
@@ -61,6 +61,6 @@ enum viewtab_keycode {
 
 viewtab_entry *viewkeys(mstr *v);
 void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk);
-void view_routines(mval *dst, mident *name);
+void view_routines(mval *dst, mident_fixed *name);
 
 #undef VIEWTAB

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,18 +24,15 @@
 #include "gdscc.h"		/* needed for tp.h */
 #include "jnl.h"		/* needed for tp.h */
 #include "gdskill.h"		/* needed for tp.h */
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
 
 #include "t_end.h"		/* prototypes */
 #include "t_retry.h"
 #include "t_begin.h"
 #include "gvcst_expand_key.h"
-#include "gvcst_lftsib.h"
-#include "gvcst_search.h"
-#include "gvcst_search_blk.h"
-#include "gvcst_zprevious.h"
+#include "gvcst_protos.h"	/* for gvcst_lftsib,gvcst_search,gvcst_search_blk,gvcst_zprevious prototype */
 
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF sgmnt_addrs	*cs_addrs;
@@ -135,7 +132,7 @@ bool gvcst_zprevious(void)
 			}
 			if (0 == dollar_tlevel)
 			{
-				if (0 == t_end(&gv_target->hist, two_histories ? lft_history : NULL))
+				if ((trans_num)0 == t_end(&gv_target->hist, two_histories ? lft_history : NULL))
 					continue;
 			} else
 			{

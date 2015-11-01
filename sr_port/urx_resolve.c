@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,32 +16,30 @@
 
 GBLDEF urx_rtnref		urx_anchor;
 
-void urx_resolve(rhdtyp *rtn, LAB_TABENT *lbl_tab, LAB_TABENT *lbl_top)
+void urx_resolve(rhdtyp *rtn, lab_tabent *lbl_tab, lab_tabent *lbl_top)
 {
 	urx_rtnref	*rp0, *rp1;
 	urx_labref	*lp0, *lp1;
 	urx_addr	*ap;
 
-	if (!urx_getrtn(rtn->routine_name.c, mid_len(&rtn->routine_name), &rp0, &rp1, &urx_anchor))
+	if (!urx_getrtn(rtn->routine_name.addr, rtn->routine_name.len, &rp0, &rp1, &urx_anchor))
 		return;
 
 	while ((ap = rp1->addr) != 0)
 	{
 		assert(*ap->addr == 0);
-
-#if	defined(__vms)
+#ifdef VMS
 		*ap->addr = (int4)rtn->linkage_ptr;
 #else
 		*ap->addr = (int4)rtn;
 #endif
-
 		rp1->addr = ap->next;
 		free(ap);
 	}
 
 	while (lbl_tab < lbl_top)
 	{
-		if (urx_getlab(lbl_tab->lab_name.c, mid_len(&lbl_tab->lab_name), rp1, &lp0, &lp1))
+		if (urx_getlab(lbl_tab->lab_name.addr, lbl_tab->lab_name.len, rp1, &lp0, &lp1))
 		{
 			while ((ap = lp1->addr) != 0)
 			{

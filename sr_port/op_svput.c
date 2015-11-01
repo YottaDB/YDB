@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -125,7 +125,10 @@ void op_svput(int varnum, mval *v)
 	  			s2pool(&dollar_zgbldir.str);
 			}
 		   	if (gv_currkey)
-				gv_currkey->base[0] = 0;
+			{
+				gv_currkey->base[0] = '\0';
+				gv_currkey->prev = gv_currkey->end = 0;
+			}
 		   	if (gv_target)
 				gv_target->clue.end = 0;
 		}

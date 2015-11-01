@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ bool urx_getlab (char *lab, int lablen, urx_rtnref *rtn, urx_labref **lp0p, urx_
 	{
 		c = lablen - lp1->len;
 		if (!c)
-			c = memcmp(lab, lp1->name.c, lablen);
+			c = memcmp(lab, &lp1->name[0], lablen);
 		if (c > 0)
 		{
 			lp0 = lp1;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,7 @@ const err_ctl *err_check(int err);
 CONDITION_HANDLER(ccp_ch);
 CONDITION_HANDLER(ccp_exi_ch);
 CONDITION_HANDLER(compiler_ch);
+CONDITION_HANDLER(cre_priv_ch);
 CONDITION_HANDLER(dbinit_ch);
 CONDITION_HANDLER(dse_dmp_handler);
 CONDITION_HANDLER(dse_f_blk_ch);
@@ -70,6 +71,7 @@ CONDITION_HANDLER(jobexam_dump_ch);
 CONDITION_HANDLER(iob_io_error);
 CONDITION_HANDLER(io_init_ch);
 CONDITION_HANDLER(iomt_ch);
+CONDITION_HANDLER(job_init_ch);
 CONDITION_HANDLER(lastchance1);
 CONDITION_HANDLER(lastchance2);
 CONDITION_HANDLER(lastchance3);
@@ -94,6 +96,7 @@ CONDITION_HANDLER(updproc_ch);
 CONDITION_HANDLER(util_base_ch);
 CONDITION_HANDLER(util_ch);
 CONDITION_HANDLER(gtm_maxstr_ch);
+CONDITION_HANDLER(zshow_ch);
 CONDITION_HANDLER(zyerr_ch);
 
 void mum_tstart();

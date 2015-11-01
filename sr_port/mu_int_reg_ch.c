@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,9 +31,16 @@ CONDITION_HANDLER(mu_int_reg_ch)
 {
 	error_def(ERR_TEXT);
 	error_def(ERR_DBFILERR);
-	START_CH
+	error_def(ERR_ASSERT);
+	error_def(ERR_GTMASSERT);
+	error_def(ERR_GTMCHECK);
+	error_def(ERR_STACKOFLOW);
+	error_def(ERR_OUTOFSPACE);
 
+	START_CH
 	mu_int_errknt++;
+	if (DUMPABLE)
+		NEXTCH;
 	PRN_ERROR;
 	UNWIND(NULL,NULL);
 }

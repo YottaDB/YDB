@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2005 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -40,22 +40,25 @@ GDEINIT
 	s ver=$p($zver," ",3)
 	s defglo=glo(ver)
 	s comline=$zcmdline
+	s nullsubs="\NEVER\FALSE\ALWAYS\TRUE\EXISTING"
 	d UNIX:ver'="VMS"
 	d VMS:ver="VMS"
 	d syntabi
 ;
-	s SIZEOF("am_offset")=308
+	s SIZEOF("am_offset")=324
 	s SIZEOF("file_spec")=256
 	s SIZEOF("gd_header")=16
 	s SIZEOF("gd_contents")=44
-	s SIZEOF("gd_map")=12
-	s SIZEOF("gd_region")=316
-	s SIZEOF("gd_segment")=320
-	s SIZEOF("mident")=8
+	s SIZEOF("gd_map")=36
+	s SIZEOF("gd_region")=332
+	s SIZEOF("gd_segment")=336
+	s SIZEOF("mident")=32
+	s SIZEOF("blk_hdr")=16
 	s SIZEOF("rec_hdr")=3
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=32767
-	s MAXNAMLN=SIZEOF("mident"),MAXREGLN=16,MAXSEGLN=16
+	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32	; maximum name length allowed is 31 characters
+	s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
 ;
 ; tokens are used for error reporting only
 	s tokens("TKIDENT")="identifier"
@@ -84,12 +87,13 @@ GDEINIT
 	s tokens("TKOTHER")="other"
 ; maximums and mimimums
 ; region
-	s minreg("ALLOCATION")=10,minreg("BEFORE_IMAGE")=0,minreg("COLLATION_DEFAULT")=0,minreg("EXTENSION")=0
+	s minreg("ALLOCATION")=10,minreg("BEFORE_IMAGE")=0,minreg("COLLATION_DEFAULT")=0,minreg("STDNULLCOLL")=0
+	s minreg("EXTENSION")=0
 	s minreg("JOURNAL")=0,minreg("KEY_SIZE")=3,minreg("NULL_SUBSCRIPTS")=0; ,minreg("STOP_ENABLED")=0
 	s minreg("RECORD_SIZE")=SIZEOF("rec_hdr")+4
 	s maxreg("ALLOCATION")=TWO(24),maxreg("BEFORE_IMAGE")=1,maxreg("BUFFER_SIZE")=2000
-	s maxreg("COLLATION_DEFAULT")=255,maxreg("EXTENSION")=HEX(4)-1
-	s maxreg("JOURNAL")=1,maxreg("KEY_SIZE")=255,maxreg("NULL_SUBSCRIPTS")=1; ,maxreg("STOP_ENABLED")=1
+	s maxreg("COLLATION_DEFAULT")=255,maxreg("STDNULLCOLL")=1,maxreg("EXTENSION")=HEX(4)-1
+	s maxreg("JOURNAL")=1,maxreg("KEY_SIZE")=255,maxreg("NULL_SUBSCRIPTS")=2; ,maxreg("STOP_ENABLED")=1
 	s maxreg("RECORD_SIZE")=SIZEOF("max_str")
 ; segments
 ; bg
@@ -114,6 +118,7 @@ syntabi:
 	s syntab("ADD","REGION")=""
 	s syntab("ADD","REGION","COLLATION_DEFAULT")="REQUIRED"
 	s syntab("ADD","REGION","COLLATION_DEFAULT","TYPE")="TNUMBER"
+	s syntab("ADD","REGION","STDNULLCOLL")="NEGATABLE"
 	s syntab("ADD","REGION","DYNAMIC_SEGMENT")="REQUIRED"
 	s syntab("ADD","REGION","DYNAMIC_SEGMENT","TYPE")="TSEGMENT"
 	s syntab("ADD","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
@@ -129,7 +134,9 @@ syntabi:
 	;s syntab("ADD","REGION","JOURNAL","STOP_ENABLED")="NEGATABLE"
 	s syntab("ADD","REGION","KEY_SIZE")="REQUIRED"
 	s syntab("ADD","REGION","KEY_SIZE","TYPE")="TNUMBER"
-	s syntab("ADD","REGION","NULL_SUBSCRIPTS")="NEGATABLE"
+	s syntab("ADD","REGION","NULL_SUBSCRIPTS")="NEGATABLE,REQUIRED"
+	s syntab("ADD","REGION","NULL_SUBSCRIPTS","TYPE")="TNULLSUB"
+	s syntab("ADD","REGION","NULL_SUBSCRIPTS","TYPE","VALUES")=nullsubs
 	s syntab("ADD","REGION","RECORD_SIZE")="REQUIRED"
 	s syntab("ADD","REGION","RECORD_SIZE","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT")=""
@@ -161,6 +168,7 @@ syntabi:
 	s syntab("CHANGE","REGION")=""
 	s syntab("CHANGE","REGION","COLLATION_DEFAULT")="REQUIRED"
 	s syntab("CHANGE","REGION","COLLATION_DEFAULT","TYPE")="TNUMBER"
+	s syntab("CHANGE","REGION","STDNULLCOLL")="NEGATABLE"
 	s syntab("CHANGE","REGION","DYNAMIC_SEGMENT")="REQUIRED"
 	s syntab("CHANGE","REGION","DYNAMIC_SEGMENT","TYPE")="TSEGMENT"
 	s syntab("CHANGE","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
@@ -176,7 +184,9 @@ syntabi:
 	;s syntab("CHANGE","REGION","JOURNAL","STOP_ENABLED")="NEGATABLE"
 	s syntab("CHANGE","REGION","KEY_SIZE")="REQUIRED"
 	s syntab("CHANGE","REGION","KEY_SIZE","TYPE")="TNUMBER"
-	s syntab("CHANGE","REGION","NULL_SUBSCRIPTS")="NEGATABLE"
+	s syntab("CHANGE","REGION","NULL_SUBSCRIPTS")="NEGATABLE,REQUIRED"
+	s syntab("CHANGE","REGION","NULL_SUBSCRIPTS","TYPE")="TNULLSUB"
+	s syntab("CHANGE","REGION","NULL_SUBSCRIPTS","TYPE","VALUES")=nullsubs
 	s syntab("CHANGE","REGION","RECORD_SIZE")="REQUIRED"
 	s syntab("CHANGE","REGION","RECORD_SIZE","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT")=""
@@ -205,6 +215,7 @@ syntabi:
 	s syntab("TEMPLATE","REGION")=""
 	s syntab("TEMPLATE","REGION","COLLATION_DEFAULT")="REQUIRED"
 	s syntab("TEMPLATE","REGION","COLLATION_DEFAULT","TYPE")="TNUMBER"
+	s syntab("TEMPLATE","REGION","STDNULLCOLL")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","DYNAMIC_SEGMENT")="REQUIRED"
 	s syntab("TEMPLATE","REGION","DYNAMIC_SEGMENT","TYPE")="TSEGMENT"
 	s syntab("TEMPLATE","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
@@ -220,7 +231,9 @@ syntabi:
 	;s syntab("TEMPLATE","REGION","JOURNAL","STOP_ENABLED")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","KEY_SIZE")="REQUIRED"
 	s syntab("TEMPLATE","REGION","KEY_SIZE","TYPE")="TNUMBER"
-	s syntab("TEMPLATE","REGION","NULL_SUBSCRIPTS")="NEGATABLE"
+	s syntab("TEMPLATE","REGION","NULL_SUBSCRIPTS")="NEGATABLE,REQUIRED"
+	s syntab("TEMPLATE","REGION","NULL_SUBSCRIPTS","TYPE")="TNULLSUB"
+	s syntab("TEMPLATE","REGION","NULL_SUBSCRIPTS","TYPE","VALUES")=nullsubs
 	s syntab("TEMPLATE","REGION","RECORD_SIZE")="REQUIRED"
 	s syntab("TEMPLATE","REGION","RECORD_SIZE","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT")=""
@@ -265,7 +278,7 @@ syntabi:
 	s syntab("RENAME","SEGMENT")=""
 	s syntab("SHOW")=""
 	s syntab("SHOW","ALL")=""
-	s syntab("SHOW","TEMPLATES")=""
+	s syntab("SHOW","TEMPLATE")=""
 	s syntab("SHOW","MAP")=""
 	s syntab("SHOW","MAP","REGION")="REQUIRED"
 	s syntab("SHOW","MAP","REGION","TYPE")="TREGION"
@@ -281,9 +294,8 @@ syntabi:
 	s syntab("VERIFY","TEMPLATE")=""
 	q
 VMS
-	s SIZEOF("blk_hdr")=7
 	s endian=FALSE
-	s hdrlab="GTCGBLDIR007"		; must be concurrently maintained in gbldirnam.h!!!
+	s hdrlab="GTCGBLDIR009"		; must be concurrently maintained in gbldirnam.h!!!
 	s tfile="GTM$GBLDIR"
 	s accmeth="\BG\MM\USER"
 	s helpfile="GTM$HELP:GDE.HLB"
@@ -298,8 +310,7 @@ VMS
 	q
 
 UNIX:
-	s SIZEOF("blk_hdr")=8
-	s hdrlab="GTCGBDUNX003"		; must be concurrently maintained in gbldirnam.h!!!
+	s hdrlab="GTCGBDUNX005"		; must be concurrently maintained in gbldirnam.h!!!
 	s tfile="$gtmgbldir"
 	s accmeth="\BG\MM"
 	s helpfile="$gtm_dist/gdehelp.gld"

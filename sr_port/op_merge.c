@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,10 +31,11 @@
 #include "mdef.h"
 
 #include "min_max.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "sbs_blk.h"
 #include "subscript.h"
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -48,7 +49,7 @@
 #include "gdscc.h"
 #include "copy.h"
 #include "jnl.h"
-#include "hashtab.h"
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"
 #include "tp.h"
 #include "gtm_string.h"
@@ -65,6 +66,7 @@
 #include "format_targ_key.h"
 #include "sgnl.h"
 #include "util.h"
+#include "collseq.h"
 
 #define UNDO_ACTIVE_LV										\
 {												\
@@ -98,6 +100,7 @@ void op_merge(void)
 	static gv_key          	*gvn2_org_key;
 	unsigned char		*ptr, *ptr2;
 	unsigned char  		buff[MAX_ZWR_KEY_SZ], *endbuff;
+	unsigned char		nullcoll_src, nullcoll_dst;
 	zshow_out		output;
 
 	error_def(ERR_STACKOFLOW);
@@ -106,6 +109,7 @@ void op_merge(void)
 	error_def(ERR_MERGEINCOMPL);
 	error_def(ERR_GVSUBOFLOW);
 	error_def(ERR_GVIS);
+	error_def(ERR_NCTCOLLDIFF);
 
 	assert(MAX_STRLEN >= MAX_ZWR_KEY_SZ);
 	assert ((merge_args == (MARG1_LCL | MARG2_LCL)) ||
@@ -148,7 +152,11 @@ void op_merge(void)
 		if (MARG1_IS_GBL(merge_args))
 		{
 			/*==================== MERGE ^gvn1=^gvn2 =====================*/
+			if (mglvnp->gblp[IND2]->s_gv_target->nct != mglvnp->gblp[IND1]->s_gv_target->nct)
+				rts_error(VARLSTCNT(1) ERR_NCTCOLLDIFF);
 			merge_desc_check(); /* will not proceed if one is descendant of another */
+			nullcoll_src = mglvnp->gblp[IND2]->s_gv_cur_region->std_null_coll;
+			nullcoll_dst = mglvnp->gblp[IND1]->s_gv_cur_region->std_null_coll;
 			if (1 == dollardata_src || 11 == dollardata_src)
 			{
 				found = op_gvget(value);  /* value of ^glvn2 */
@@ -157,10 +165,12 @@ void op_merge(void)
 					/* SET ^gvn1=^gvn2 */
 					gvname_env_restore(mglvnp->gblp[IND1]);
 					op_gvput(value);
+					/* Note: If ^gvn1's null_sub=ALLOWEXISTING and say ^gvn1("")=^gvn,
+					this will give NULL_SUBC error */
 				}
 			}
-			check_for_null_subs = mglvnp->gblp[IND2]->s_gv_cur_region->null_subs &&
-				!mglvnp->gblp[IND1]->s_gv_cur_region->null_subs;
+			check_for_null_subs = (NEVER != mglvnp->gblp[IND2]->s_gv_cur_region->null_subs) &&
+				(ALWAYS != mglvnp->gblp[IND1]->s_gv_cur_region->null_subs);
 			/* Traverse descendant of ^gvn2 and copy into ^gvn1 */
 			for (; ;)
 			{
@@ -207,13 +217,28 @@ void op_merge(void)
 				memcpy(gv_currkey->base + org_glvn1_keysz - 2,
 					mkey->str.addr + org_glvn2_keysz - 2, delta2 + 2);
 				gv_currkey->end = org_glvn1_keysz + delta2 - 1;
+				if (nullcoll_src != nullcoll_dst)
+				{
+					if (0 == nullcoll_dst)
+					{	/* Standard to GTM null subscript conversion*/
+						STD2GTMNULLCOLL((unsigned char *)gv_currkey->base + org_glvn1_keysz - 1,
+								delta2 - 1);
+					} else
+					{	/*  GTM to standard null subscript conversion */
+						GTM2STDNULLCOLL((unsigned char *)gv_currkey->base + org_glvn1_keysz - 1,
+								delta2 - 1);
+					}
+				}
+				/* check null subscripts in destination key, note that we have already restored, destination global
+				   and curresponding region, key  information */
 				if (check_for_null_subs)
 				{
 					ptr2 = gv_currkey->base + gv_currkey->end - 1;
 					for (ptr = gv_currkey->base + org_glvn1_keysz - 2; ptr < ptr2; )
 					{
-						if (KEY_DELIMITER == *ptr++ &&
-							STR_SUB_PREFIX == *ptr && KEY_DELIMITER == *(ptr + 1))
+						if (KEY_DELIMITER == *ptr++ && KEY_DELIMITER == *(ptr + 1) &&
+							(0 == gv_cur_region->std_null_coll ? (STR_SUB_PREFIX == *ptr) :
+							(SUBSCRIPT_STDCOL_NULL == *ptr)))
 							/* Note: For sgnl_gvnulsubsc/rts_error
 							 * 	 we do not restore proper naked indicator.
 							 * The standard states that the effect of a MERGE command

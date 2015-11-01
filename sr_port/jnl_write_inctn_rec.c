@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,10 @@
 
 #include "mdef.h"
 
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
 #endif
+#include "gtm_inet.h"
 
 #include "gtm_time.h"
 #include "gdsroot.h"
@@ -29,10 +28,12 @@
 #include "jnl_write.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#include "jnl_get_checksum.h"
 
 GBLREF  jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF 	jnl_gbls_t		jgbl;
+GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 
 void	jnl_write_inctn_rec(sgmnt_addrs	*csa)
 {
@@ -52,7 +53,25 @@ void	jnl_write_inctn_rec(sgmnt_addrs	*csa)
 	}
 	inctn_record.prefix.time = jgbl.gbl_jrec_time;
 	inctn_record.prefix.tn = csa->ti->curr_tn;
+	inctn_record.prefix.checksum = INIT_CHECKSUM_SEED;
 	assert(inctn_opcode_total > inctn_opcode && inctn_invalid_op < inctn_opcode);
 	inctn_record.opcode = inctn_opcode;
+	switch(inctn_opcode)
+	{
+		case inctn_bmp_mark_free_gtm:
+		case inctn_bmp_mark_free_mu_reorg:
+		case inctn_blkupgrd:
+		case inctn_blkdwngrd:
+		case inctn_blkupgrd_fmtchng:
+		case inctn_blkdwngrd_fmtchng:
+			inctn_record.detail.blknum = inctn_detail.blknum;
+			break;
+		case inctn_gdsfilext_gtm:
+		case inctn_gdsfilext_mu_reorg:
+			inctn_record.detail.blks_to_upgrd_delta = inctn_detail.blks_to_upgrd_delta;
+			break;
+		default:
+			break;
+	}
 	jnl_write(csa->jnl, JRT_INCTN, (jnl_record *)&inctn_record, NULL, NULL);
 }

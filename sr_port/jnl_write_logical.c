@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,7 @@
 
 #include "mdef.h"
 
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
 #endif
@@ -60,6 +59,7 @@ void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 		JNL_SHORT_TIME(jgbl.gbl_jrec_time);
 	}
 	jrec->prefix.time = jgbl.gbl_jrec_time;
+	jrec->prefix.checksum = jfb->checksum;
 	if (jgbl.forw_phase_recovery)
 	{
 		QWASSIGN(jrec->token_seq, jgbl.mur_jrec_token_seq);

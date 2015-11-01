@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,14 +26,14 @@
 #include "compile_pattern.h"
 #include "mvalconv.h"
 
-GBLREF char window_token;
-GBLREF mval window_mval;
-GBLREF mident window_ident;
-GBLREF char director_token;
-GBLREF short int source_column;
-GBLREF short int last_source_column;
-GBLREF uint4 pat_everything[];
-GBLREF uint4 sizeof_pat_everything;
+GBLREF char 		window_token;
+GBLREF mval 		window_mval;
+GBLREF mident 		window_ident;
+GBLREF char 		director_token;
+GBLREF short int 	source_column;
+GBLREF short int 	last_source_column;
+GBLREF uint4 		pat_everything[];
+GBLREF uint4 		sizeof_pat_everything;
 
 /******	CAUTION !!! ******
  *	All occurrences of put_lit should be replaced by put_ilit.  In order to maintain object
@@ -94,7 +94,7 @@ int m_zwrite(void)
 		ins_triple(head);
 		return TRUE;
 	case TK_IDENT:
-		name = put_str(&window_ident.c[0],mid_len(&window_ident));
+		name = put_str(window_ident.addr, window_ident.len);
 		advancewindow();
 		break;
 	case TK_LPAREN:
@@ -103,7 +103,7 @@ int m_zwrite(void)
 			stx_error(ERR_VAREXPECTED);
 			return FALSE;
 		}
-		name = put_str(&window_ident.c[0], 0);
+		name = put_str(window_ident.addr, 0);
 		break;
 	case TK_ATSIGN:
 		if (!indirection(&name))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,8 @@
 
 #include "gtm_string.h"
 
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
+#include "hashtab.h"
 #include "lv_val.h"
 #include "op.h"
 #include <varargs.h>
@@ -27,7 +28,6 @@ typedef struct
 
 GBLREF symval *curr_symval;
 GBLREF lv_val *active_lv;
-LITREF mident zero_ident;
 
 void op_xkill(va_alist)
 va_dcl
@@ -35,10 +35,10 @@ va_dcl
 	va_list		var;
 	int		n;
 	save_lv		saved[MAX_SAVED_LV], *s, *s_top, *s_bot;
-	ht_entry	*r;
 	lv_val		*lv;
 	mval		*lvname;
-	mident		m;
+	mname_entry	lvent;
+	ht_ent_mname	*tabent;
 	error_def(ERR_XKILLCNTEXC);
 
 	active_lv = (lv_val *)0;	/* if we get here, subscript set was successful.  clear active_lv to avoid later
@@ -50,13 +50,17 @@ va_dcl
 	for (;  n-- > 0;)
 	{
 		lvname = va_arg(var, mval *);
+		MV_FORCE_STR(lvname);
 		if (lvname->str.len)
-		{	/* convert mval to mident and see if it is in the symbol table */
-			m = zero_ident;
-			memcpy(&m.c[0], lvname->str.addr, (lvname->str.len < sizeof(mident)) ? lvname->str.len : sizeof(mident));
-			if (r = ht_get(&curr_symval->h_symtab, (mname *)&m))
+		{	/* convert mval to var_tabent and see if it is in the symbol table */
+			if (lvname->str.len > MAX_MIDENT_LEN)
+				lvname->str.len = MAX_MIDENT_LEN;
+			lvent.var_name.len = lvname->str.len;
+			lvent.var_name.addr = lvname->str.addr;
+			COMPUTE_HASH_MNAME(&lvent);
+			if (tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvent))
 			{	/* save info about the variable */
-				lv = (lv_val *)r->ptr;
+				lv = (lv_val *)tabent->value;
 				s->lv = *lv;
 				s->addr = lv;
 				lv->v.mvtype = 0;

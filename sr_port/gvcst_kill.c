@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,9 +15,8 @@
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
+#include "gtm_inet.h"	/* Required for gtmsource.h */
 
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
 #endif
@@ -36,8 +35,8 @@
 #include "gdsblkops.h"
 #include "jnl.h"
 #include "copy.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
@@ -49,9 +48,8 @@
 #include "t_end.h"
 #include "t_retry.h"
 #include "t_begin.h"
-#include "gvcst_search.h"
 #include "gvcst_expand_free_subtree.h"
-#include "gvcst_kill.h"
+#include "gvcst_protos.h"	/* for gvcst_kill,gvcst_search prototype */
 #include "rc_cpt_ops.h"
 #include "add_inter.h"
 
@@ -81,7 +79,8 @@ GBLREF	int4			update_trans;
 
 void	gvcst_kill(bool do_subtree)
 {
-	bool			clue, flush_cache, left_extra, right_extra;
+	bool			clue, flush_cache;
+	boolean_t		left_extra, right_extra;
 	boolean_t		actual_update, next_fenced_was_null, jnl_enabled;
 	int4			prev_update_trans;
 	cw_set_element		*tp_cse;
@@ -164,8 +163,8 @@ void	gvcst_kill(bool do_subtree)
 			left_rec_stat = left_extra ? &left->prev_rec : &left->curr_rec;
 			if (left->blk_num == right->blk_num)
 			{
-				cdb_status = gvcst_kill_blk(left->blk_num, lev, left->buffaddr, gv_currkey,
-							*left_rec_stat, right->curr_rec, right_extra, &tp_cse);
+				cdb_status = gvcst_kill_blk(left, lev, gv_currkey, *left_rec_stat, right->curr_rec,
+								right_extra, &tp_cse);
 				left->ptr = tp_cse;
 				if (tp_cse)
 					actual_update = TRUE;
@@ -193,8 +192,7 @@ void	gvcst_kill(bool do_subtree)
 				}
 				local_srch_rec.offset = ((blk_hdr_ptr_t)left->buffaddr)->bsiz;
 				local_srch_rec.match = 0;
-				cdb_status = gvcst_kill_blk(left->blk_num, lev, left->buffaddr, gv_currkey,
-							*left_rec_stat, local_srch_rec, FALSE, &tp_cse);
+				cdb_status = gvcst_kill_blk(left, lev, gv_currkey, *left_rec_stat, local_srch_rec, FALSE, &tp_cse);
 				left->ptr = tp_cse;
 				if (tp_cse)
 					actual_update = TRUE;
@@ -208,8 +206,8 @@ void	gvcst_kill(bool do_subtree)
 					goto retry;
 				local_srch_rec.offset = local_srch_rec.match
 						      = 0;
-				cdb_status = gvcst_kill_blk(right->blk_num, lev, right->buffaddr, gv_altkey,
-							local_srch_rec, right->curr_rec, right_extra, &tp_cse);
+				cdb_status = gvcst_kill_blk(right, lev, gv_altkey, local_srch_rec, right->curr_rec,
+								right_extra, &tp_cse);
 				right->ptr = tp_cse;
 				if (tp_cse)
 					actual_update = TRUE;
@@ -278,7 +276,7 @@ void	gvcst_kill(bool do_subtree)
 			}
 			if (0 < kill_set_head.used)		/* increase kill_in_prog */
 				need_kip_incr = TRUE;
-			if (0 == t_end(&gv_target->hist, alt_hist))
+			if ((trans_num)0 == t_end(&gv_target->hist, alt_hist))
 			{
 				if (jnl_fence_ctl.level && next_fenced_was_null && actual_update && jnl_enabled)
 				{	/* If ZTransaction and first KILL and the kill resulted in an update

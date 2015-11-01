@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,19 +14,22 @@
 /* Declare parms for t_write.c */
 
 cw_set_element *t_write (
-			 block_id 	blk,	   	/*  Block number being written */
-			 unsigned char 	*upd_addr,	/*  Address of the local buffer which contains
-							 *  the block to be written */
-			 block_offset 	ins_off,	/*  Offset to the position in the buffer that is to receive
-							 *  a block number when one is created. */
-			 block_index 	index,         	/*  Index into the create/write set.  The specified entry is
-							 *  always a create entry. When the create gets assigned a
-							 *  block number, the block number is inserted into this
-							 *  buffer at the location specified by ins_off. */
-			 sm_uc_ptr_t	old_addr,	/* address of before image of the block */
-			 char           level,
-			 bool		first_copy,	/* Is first copy needed if overlaying same buffer? */
-			 bool		forward);	/* Is forward processing required? */
+			srch_blk_status	*blkhist,	/* Search History of the block to be written. Currently the
+							 *	following members in this structure are used by "t_write"
+							 *	    "blk_num"		--> Block number being modified
+							 *	    "buffaddr"		--> Address of before image of the block
+							 *	    "cr->ondsk_blkver"	--> Actual block version on disk
+							 */
+			unsigned char 	*upd_addr,	/* Address of the update array that contains the changes for this block */
+			block_offset 	ins_off,	/* Offset to the position in the buffer that is to receive
+							 * 	a block number when one is created. */
+			block_index 	index,		/* Index into the create/write set.  The specified entry is
+							 * 	always a create entry. When the create gets assigned a
+							 * 	block number, the block number is inserted into this
+							 * 	buffer at the location specified by ins_off. */
+			char		level,		/* Level of the block in the tree */
+			boolean_t	first_copy,	/* Is first copy needed if overlaying same buffer? */
+			boolean_t	forward);	/* Is forward processing required? */
 
 #define T_WRITE_DEFINED
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,7 +104,7 @@ void dse_crit(void)
 			return;
 		}
 #ifdef UNIX
-		assert(LOCK_AVAILABLE != cs_addrs->critical->semaphore.latch_pid);
+		assert(LOCK_AVAILABLE != cs_addrs->critical->semaphore.u.parts.latch_pid);
 #elif defined(VMS)
 		assert(cs_addrs->critical->semaphore >= 0);
 #endif

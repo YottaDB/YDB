@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,8 +24,8 @@
 #include "copy.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "gvcst_blk_build.h"
 #include "gvcst_delete_blk.h"
@@ -42,7 +42,8 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 	kill_set	*ks;
 	off_chain	chain;
 	srch_blk_status	*tp_srch_status;
-	uint4		dummy, iter;
+	uint4		iter;
+	ht_ent_int4	*tabent;
 
 	/* an assert to verify the validity of the block number was removed
 	 * because it could be triggered by a concurrency conflict
@@ -59,8 +60,8 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 			tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain.cw_index, &cse);
 		else
 		{
-			tp_srch_status = (srch_blk_status *)lookup_hashtab_ent(sgm_info_ptr->blks_in_use,
-											(void *)blk, &dummy);
+			if (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&blk)))
+				tp_srch_status = (srch_blk_status *)tabent->value;
 			cse = tp_srch_status ? tp_srch_status->ptr : NULL;
 		}
 		assert(!cse || !cse->high_tlevel);

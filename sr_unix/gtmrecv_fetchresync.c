@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,14 +13,14 @@
 
 #include "gtm_ipc.h"
 #include "gtm_socket.h"
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include "gtm_string.h"
+#include "gtm_inet.h"
 #include <sys/un.h>
 #include "gtm_time.h" /* needed for difftime() definition; if this file is not included, difftime returns bad values on AIX */
 #include <sys/time.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
+#include "gtm_fcntl.h"
+#include "gtm_unistd.h"
 #include <sys/shm.h>
 #include <sys/wait.h>
 
@@ -32,8 +32,10 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_mname.h"	/* needed for muprec.h */
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "error.h"
 #include "iosp.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,8 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "gbldirnam.h"
-#include "hashdef.h"
+#include "hashtab.h"
+#include "hashtab_mname.h"
 #include "iosize.h"
 #include "probe.h"
 #include "dpgbldir.h"
@@ -155,12 +156,15 @@ gd_addr *gd_load(mstr *v)
 	}
 	file_read(file_ptr, sizeof(header_struct), (uchar_ptr_t)&temp_head, 1);		/* Read in header and verify is valid GD */
 	for (i = 0;  i < GDE_LABEL_NUM;  i++)
+	{
 		if (!memcmp(temp_head.label, gde_labels[i], GDE_LABEL_SIZE - 1))
 			break;
+	}
 	if (GDE_LABEL_NUM == i)
 	{
 		close_gd_file(file_ptr);
-		rts_error(VARLSTCNT(4) ERR_GDINVALID, 2, v->len, v->addr);
+		rts_error(VARLSTCNT(8) ERR_GDINVALID, 6, v->len, v->addr, LEN_AND_LIT(GDE_LABEL_LITERAL),
+				sizeof(temp_head.label), temp_head.label);
 	}
 	size = LEGAL_IO_SIZE(temp_head.filesize);
 	header = (header_struct *)malloc(size);
@@ -186,8 +190,8 @@ gd_addr *gd_load(mstr *v)
 	gd_addr_head = table;
 	fill_gd_addr_id(gd_addr_head, file_ptr);
 	close_gd_file(file_ptr);
-	table->tab_ptr = (htab_desc *)malloc(sizeof(htab_desc));
-	ht_init(table->tab_ptr, 0);
+	table->tab_ptr = (hash_table_mname *) malloc(sizeof(hash_table_mname));
+	init_hashtab_mname(table->tab_ptr, 0);
 	return table;
 }
 
@@ -289,8 +293,8 @@ void gd_rundown(void)		/* Wipe out the global directory structures */
 		if (gda_cur->end)
 		{
 			gd_ht_kill(gda_cur->tab_ptr, TRUE);
-			free(gda_cur->id);		/* free up gd_id malloced in gd_load()/fill_gd_addr_id() */
 			free(gda_cur->tab_ptr);		/* free up hashtable malloced in gd_load() */
+			free(gda_cur->id);		/* free up gd_id malloced in gd_load()/fill_gd_addr_id() */
 			free((char *)gda_cur - sizeof(header_struct));	/* free up global directory itself */
 		} else
 			free(gda_cur);	/* GT.CM gd_addr and hence header_struct wasn't malloced in cm_add_gdr_ptr */
@@ -306,19 +310,20 @@ void gd_rundown(void)		/* Wipe out the global directory structures */
 	gdr_name_head = (gdr_name *)NULL;
 }
 
-void gd_ht_kill(htab_desc *table, boolean_t contents)		/* wipe out the hash table corresponding to a gld */
+void gd_ht_kill(hash_table_mname *table, boolean_t contents)	/* wipe out the hash table corresponding to a gld */
 {
-	ht_entry	*ent, *top;
+	ht_ent_mname	*tabent, *topent;
+	gv_namehead	*gvt;
 
 	if (contents)
 	{
-		for (ent = table->base, top = ent + table->size; ent < top; ent++)
+		for (tabent = table->base, topent = tabent + table->size; tabent < topent; tabent++)
 		{
-			if (ent->ptr)
+			if (HTENT_VALID_MNAME(tabent, gv_namehead, gvt))
 			{
-				if (NULL != ((gv_namehead *)ent->ptr)->alt_hist)
-					free(((gv_namehead *)ent->ptr)->alt_hist);	/* can be NULL for GT.CM client */
-				free(ent->ptr);
+				if (NULL != gvt->alt_hist)
+					free(gvt->alt_hist);	/* can be NULL for GT.CM client */
+				free(gvt);
 			}
 		}
 	}

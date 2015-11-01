@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,7 +98,7 @@ int resolve_ref(int errknt)
 						} else
 						{
 							errknt++;
-							stx_error(ERR_FMLLSTPRESENT, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
+							stx_error(ERR_FMLLSTPRESENT, 2, mlbx->mvname.len, mlbx->mvname.addr);
 							source_error_found = 0;
 							y = newtriple(OC_RTERROR);
 							y->operand[0] = put_ilit(ERR_FMLLSTPRESENT);
@@ -109,7 +109,7 @@ int resolve_ref(int errknt)
 					} else
 					{
 						errknt++;
-						stx_error(ERR_LABELMISSING, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
+						stx_error(ERR_LABELMISSING, 2, mlbx->mvname.len, mlbx->mvname.addr);
 						source_error_found = 0;
 						y = newtriple(OC_RTERROR);
 						y->operand[0] = put_ilit(ERR_LABELUNKNOWN);
@@ -143,7 +143,7 @@ int resolve_ref(int errknt)
 						if (mlbx->formalcnt == NO_FORMALLIST)
 						{
 							errknt++;
-							stx_error(ERR_FMLLSTMISSING, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
+							stx_error(ERR_FMLLSTMISSING, 2, mlbx->mvname.len, mlbx->mvname.addr);
 							source_error_found = 0;
 							y = newtriple(OC_RTERROR);
 							y->operand[0] = put_ilit(ERR_FMLLSTMISSING);
@@ -153,7 +153,7 @@ int resolve_ref(int errknt)
 						} else if (mlbx->formalcnt < actcnt)
 						{
 							errknt++;
-							stx_error(ERR_ACTLSTTOOLONG, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
+							stx_error(ERR_ACTLSTTOOLONG, 2, mlbx->mvname.len, mlbx->mvname.addr);
 							source_error_found = 0;
 							y = newtriple(OC_RTERROR);
 							y->operand[0] = put_ilit(ERR_ACTLSTTOOLONG);
@@ -168,7 +168,7 @@ int resolve_ref(int errknt)
 					} else
 					{
 						errknt++;
-						stx_error(ERR_LABELMISSING, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
+						stx_error(ERR_LABELMISSING, 2, mlbx->mvname.len, mlbx->mvname.addr);
 						source_error_found = 0;
 						y = newtriple(OC_RTERROR);
 						y->operand[0] = put_ilit(ERR_LABELUNKNOWN);

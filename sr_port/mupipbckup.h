@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,17 +43,23 @@ typedef struct backup_reg_list_struct
 	struct 	gd_region_struct 	*reg;
 	gd_id           		unique_file_id;		/* both for VMS and UNIX */
 	mstr 				backup_file;
-	short 				crashcnt;
+	short 				crashcnt, filler;
 	backup_proc_status		not_this_time;
 	backup_type			backup_to;
 	sgmnt_data_ptr_t		backup_hdr;
 	trans_num			tn;
+	block_id			last_blk_at_last_bkup;
 	int 				backup_fd;
 	char				backup_tempfile[256];
 } backup_reg_list;
 
 #define BACKUP_TEMPFILE_PREFIX  "gtm_online_backup"
-#define BACKUP_READ_SIZE        (32 * 1024)
+#ifdef UNIX
+#define BACKUP_READ_SIZE        (64 * 1024)
+#else
+#define BACKUP_READ_SIZE	(32 * 1024 - DISK_BLOCK_SIZE)
+#endif
+#define BACKUP_TEMPFILE_BUFF_SIZE (BACKUP_READ_SIZE + sizeof(shmpool_blk_hdr))
 #define BLOCKING_FACTOR         32
 #define STARTING_BLOCKS         16
 #define EXTEND_SIZE             256
@@ -63,15 +69,18 @@ typedef struct backup_reg_list_struct
 #define DEFAULT_BKRS_PORT	6100
 #define DEFAULT_BKRS_TIMEOUT	30
 
+#define END_MSG "END OF SAVED BLOCKS"
+#define HDR_MSG "END OF FILE HEADER"
+#define MAP_MSG "END OF MASTER MAP"
+
 LITREF  mval            	mu_bin_datefmt;
 
-
-bool backup_block(block_id blk, sm_uc_ptr_t blk_ptr);
+boolean_t backup_block(block_id blk, cache_rec_ptr_t backup_cr, sm_uc_ptr_t backup_blk_p);
 bool mubfilcpy(backup_reg_list *list);
 bool mubgetfil(backup_reg_list *list, char *name, unsigned short len);
 bool mubinccpy(backup_reg_list *list);
 bool mubgetfil(backup_reg_list *list, char *name, unsigned short len);
-void backup_buffer_flush(gd_region *reg);
+boolean_t backup_buffer_flush(gd_region *reg);
 void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage);
 #ifdef VMS
 void mubexpfilnam(backup_reg_list *list);

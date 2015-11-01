@@ -24,8 +24,8 @@
 #include "cvtparm.h"
 #include "deviceparameters.h"
 
-GBLREF char window_token;
-GBLREF mident window_ident;
+GBLREF char 	window_token;
+GBLREF mident 	window_ident;
 
 LITREF unsigned char io_params_size[];
 LITREF dev_ctl_struct dev_param_control[];
@@ -508,7 +508,7 @@ int deviceparameters(oprtype *c,char who_calls)
 	for (;;)
 	{
 		if((window_token != TK_IDENT)
-			|| ((n = namelook(dev_param_index,dev_param_names,window_ident.c)) < 0))
+			|| ((n = namelook(dev_param_index, dev_param_names, window_ident.addr, window_ident.len)) < 0))
 		{
 			stx_error(ERR_DEVPARUNK);
 			return FALSE;

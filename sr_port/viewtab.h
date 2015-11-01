@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@ VIEWTAB("DEBUG1",	VTP_VALUE | VTP_NULL,	VTK_DEBUG1,	MV_STR),
 VIEWTAB("DEBUG2",	VTP_VALUE | VTP_NULL,	VTK_DEBUG2,	MV_STR),
 VIEWTAB("DEBUG3",	VTP_VALUE | VTP_NULL,	VTK_DEBUG3,	MV_STR),
 VIEWTAB("DEBUG4",	VTP_VALUE | VTP_NULL,	VTK_DEBUG4,	MV_STR),
+VIEWTAB("FLUSH",	VTP_DBREGION | VTP_NULL, VTK_FLUSH,	MV_STR),
 VIEWTAB("FREEBLOCKS",	VTP_DBREGION,		VTK_BLFREE,	MV_NM),
 VIEWTAB("FREEZE",	VTP_DBREGION,		VTK_FREEZE,	MV_NM),
 VIEWTAB("GDSCERT",	VTP_NULL | VTP_VALUE,	VTK_GDSCERT,	MV_STR),

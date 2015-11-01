@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,7 @@
 
 #include "gtm_time.h"	/* for time() */
 #include "gtm_socket.h"
+#include "gtm_string.h"
 #include "gtm_stdlib.h"
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
@@ -23,7 +24,7 @@
 #include <sys/un.h>
 #include <iotcp_select.h>
 #if defined(__sparc) || defined(__hpux) || defined(__MVS__) || defined(__linux__)
-#include <limits.h>
+#include "gtm_limits.h"
 #else
 #include <sys/limits.h>
 #endif
@@ -59,7 +60,8 @@
 #endif
 
 GBLREF boolean_t		mutex_salvaged, disable_sigcont;
-GBLREF uint4			process_id;
+GBLREF pid_t			process_id;
+GBLREF uint4			image_count;
 GBLREF int			num_additional_processors;
 #ifdef MUTEX_MSEM_WAKE
 GBLREF volatile uint4           heartbeat_counter;
@@ -273,7 +275,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr)
 	error_def(ERR_MUTEXERR);
 	error_def(ERR_TEXT);
 
-	if (LOCK_AVAILABLE == addr->semaphore.latch_pid && ++optimistic_attempts <= MUTEX_MAX_OPTIMISTIC_ATTEMPTS)
+	if (LOCK_AVAILABLE == addr->semaphore.u.parts.latch_pid && ++optimistic_attempts <= MUTEX_MAX_OPTIMISTIC_ATTEMPTS)
 	{
 		MUTEX_DPRINT2("%d: Nobody in crit (II) wake procs\n", process_id);
 		MUTEX_TRACE_CNTR(mutex_trc_mutex_slp_fn_noslp);
@@ -444,7 +446,7 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa)
 	addr = csa->critical;
 	MUTEX_TRACE_CNTR(mutex_trc_mutex_slp_fn);
 	MUTEX_DPRINT2("%d: In Mutex Sleep\n", process_id);
-	if (LOCK_AVAILABLE == addr->semaphore.latch_pid) /* there is nobody in crit */
+	if (LOCK_AVAILABLE == addr->semaphore.u.parts.latch_pid) /* there is nobody in crit */
 	{
 		/*
 		 * The above condition is an optimistic check to speed
@@ -729,7 +731,7 @@ static enum cdb_sc write_lock_spin(gd_region *reg,
 			write_sleep_spin_count = mutex_spin_parms->mutex_sleep_spin_count;
 	} while (--write_sleep_spin_count);
 	MUTEX_DPRINT4("%d: Could not acquire WRITE %sLOCK, held by %d\n", process_id,
-		(MUTEX_LOCK_WRITE == mutex_lock_type) ? "" : "IMMEDIATE ", addr->semaphore.latch_pid);
+		(MUTEX_LOCK_WRITE == mutex_lock_type) ? "" : "IMMEDIATE ", addr->semaphore.u.parts.latch_pid);
 	return (cdb_sc_nolock);
 }
 
@@ -820,7 +822,7 @@ enum cdb_sc mutex_unlockw(gd_region *reg, int crash_count)
 	assert(csa->now_crit);
 	MUTEX_TEST_SIGNAL_HERE("WRTUNLCK NOW CRIT\n", FALSE);
 	csa->now_crit = FALSE;
-	assert(csa->critical->semaphore.latch_pid == process_id);
+	assert(csa->critical->semaphore.u.parts.latch_pid == process_id);
 	RELEASE_SWAPLOCK(&csa->critical->semaphore);
 	MUTEX_DPRINT2("%d: WRITE LOCK RELEASED\n", process_id);
 	return (mutex_wakeup(csa->critical));
@@ -835,7 +837,7 @@ void mutex_cleanup(gd_region *reg)
 	   the lock, go ahead and release it.
 	*/
 	csa = &FILE_INFO(reg)->s_addrs;
-	if (compswap(&csa->critical->semaphore, process_id, LOCK_AVAILABLE))
+	if (COMPSWAP(&csa->critical->semaphore, process_id, image_count, LOCK_AVAILABLE, 0))
 	{
 		MUTEX_DPRINT2("%d  mutex_cleanup : released lock\n", process_id);
 	}
@@ -857,31 +859,33 @@ void mutex_salvage(gd_region *reg)
 {
 	sgmnt_addrs	*csa;
 	int		salvage_status;
-	uint4		holder;
+	pid_t		holder_pid;
+	VMS_ONLY(uint4	holder_imgcnt;)
 
 	error_def(ERR_MUTEXFRCDTERM);
 
 	csa = &FILE_INFO(reg)->s_addrs;
-	if (0 != (holder = csa->critical->semaphore.latch_pid))
+	if (0 != (holder_pid = csa->critical->semaphore.u.parts.latch_pid))
 	{
-		if (holder == process_id)
+		VMS_ONLY(holder_imgcnt = csa->critical->semaphore.u.parts.latch_image_count);
+		if (holder_pid == process_id VMS_ONLY(&& holder_imgcnt == image_count))
 		{	/* We were trying to obtain a lock we already held -- very odd */
 			RELEASE_SWAPLOCK(&csa->critical->semaphore);
 			csa->nl->in_crit = 0;
 			mutex_salvaged = TRUE;
 			MUTEX_DPRINT2("%d : mutex salvaged, culprit was our own process\n", process_id);
-		} else if (!is_proc_alive(holder, 0))
+		} else if (!is_proc_alive(holder_pid, UNIX_ONLY(0) VMS_ONLY(holder_imgcnt)))
 		{
-			compswap(&csa->critical->semaphore, holder, LOCK_AVAILABLE);
+			COMPSWAP(&csa->critical->semaphore, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
 			csa->nl->in_crit = 0;
 			mutex_salvaged = TRUE;
-			send_msg(VARLSTCNT(5) ERR_MUTEXFRCDTERM, 3, holder, REG_LEN_STR(reg));
-			MUTEX_DPRINT3("%d : mutex salvaged, culprit was %d\n", process_id, holder);
+			send_msg(VARLSTCNT(5) ERR_MUTEXFRCDTERM, 3, holder_pid, REG_LEN_STR(reg));
+			MUTEX_DPRINT3("%d : mutex salvaged, culprit was %d\n", process_id, holder_pid);
 		} else if (FALSE == disable_sigcont)
 		{
 			/* The process might have been STOPPED (kill -SIGSTOP). Send SIGCONT and nudge the stopped
 			 * process forward */
-			continue_proc(holder);
+			continue_proc(holder_pid);
 		}
 	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +12,11 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <unistd.h>
-#include <fcntl.h> /* for O_RDONLY */
+#include "gtm_unistd.h"
+#include "gtm_fcntl.h" /* for O_RDONLY */
+#include "gtm_stdio.h"
+#include "gtm_stdlib.h"
+#include "gtm_string.h"
 
 #include "cli.h"
 #include "gtm_stat.h"
@@ -23,9 +26,6 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-#include "gtm_stdio.h"
-#include "gtm_stdlib.h"
-#include "gtm_string.h"
 #include "gtmio.h"
 #include "iosp.h"
 #include "eintr_wrappers.h"
@@ -87,7 +87,7 @@ void mupip_ftok (void)
 		}
 	} else
 	{
-		if (!file_head_read(fn, &header))
+		if (!file_head_read(fn, &header, sizeof(header)))
 			mupip_exit(ERR_MUNOACTION);
 		semid = header.semid;
 		shmid = header.shmid;

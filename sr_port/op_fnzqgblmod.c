@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -19,7 +19,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "op.h"
-#include "gvcst_gblmod.h"
+#include "gvcst_protos.h"	/* for gvcst_gblmod prototype */
 #include "sgnl.h"
 
 LITREF mval *fnzqgblmod_table[2];
@@ -32,7 +32,7 @@ void op_fnzqgblmod(mval *v)
 {
 	bool	gblmod;
 
-	if (gv_curr_subsc_null && gv_cur_region->null_subs == FALSE)
+	if (gv_curr_subsc_null && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
 
 	gblmod = TRUE;

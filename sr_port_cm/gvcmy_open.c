@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,8 +27,8 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "hashdef.h"
 #include "cmidef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "stringpool.h"
 #include "gtm_string.h"
@@ -196,6 +196,9 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 		li->buffer_size = reg->max_rec_size + CM_BUFFER_OVERHEAD;
 	}
 	CM_GET_SHORT(reg->max_key_size, ptr, li->convert_byteorder);
+	ptr += sizeof(short);
+	reg->std_null_coll = (li->server_supports_std_null_coll) ? *ptr++ : 0;
+		/* From level 210 (GT.M V5), server will send null subscript collation info into CMMS_S_INITREG message */
 	reg->dyn.addr->cm_blk = clb_ptr;
 	reg->dyn.addr->acc_meth = dba_cm;
 	reg->open = TRUE;

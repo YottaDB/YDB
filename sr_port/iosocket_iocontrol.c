@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@ void	iosocket_iocontrol(mstr *d)
 {
 	char 		action[MAX_DEVCTL_LENGTH];
 	unsigned short 	depth; /* serve as depth for LISTEN and timeout for WAIT */
-	int		length, n;
+	int		length, n, timeout;
 
 	error_def(ERR_INVCTLMNE);
 
@@ -51,9 +51,10 @@ void	iosocket_iocontrol(mstr *d)
 	}
 	else if (0 == memcmp(&action[0], "WAIT", length))
 	{
+		timeout = depth;
 		if (2 != n)
-			depth = NO_M_TIMEOUT;
-		iosocket_wait(io_curr_device.out, depth); /* depth really means timeout here. */
+			timeout = NO_M_TIMEOUT;
+		iosocket_wait(io_curr_device.out, timeout); /* depth really means timeout here. */
 	}
 	else
 	{

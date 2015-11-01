@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,15 +17,22 @@
    header used by memory management system) */
 #define BLKS_IN_KILL_SET	251
 
+/* Note the 28 bit block field allows for a 256M GDS block database. The
+   three byte level field is the minimum required to contain the level.
+   However, if more addressability is needed, the level field can likely
+   be shrunk to a single bit to indicate a non-zero level and then the
+   actual level obtained when the blocks are read in. Note that if this
+   changes, a comment in gvcst_init() also needs adjustment.
+*/
 typedef struct
 {
 #ifdef BIGENDIAN
-	unsigned int    flag  : 1;
-	unsigned int	level : 5;
-	unsigned int	block : 26;
+	unsigned int    flag  : 1;	/* Block was created by this TP transaction (not real block yet) */
+	unsigned int	level : 3;	/* Block level (0 to 6) */
+	unsigned int	block : 28;	/* Block number */
 #else
-	unsigned int	block : 26;
-	unsigned int	level : 5;
+	unsigned int	block : 28;
+	unsigned int	level : 3;
 	unsigned int	flag  : 1;
 #endif
 } blk_ident;

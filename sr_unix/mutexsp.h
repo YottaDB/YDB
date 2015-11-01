@@ -62,8 +62,6 @@ typedef enum
  */
 void		gtm_mutex_init(gd_region *reg, int n, bool crash);
 
-enum cdb_sc mutex_lockr(gd_region *reg, mutex_spin_parms_ptr_t mutex_spin_parms, short crash_ct);
-
 /* mutex_lockw - write access to mutex for region reg */
 enum	cdb_sc	mutex_lockw(gd_region *reg, mutex_spin_parms_ptr_t mutex_spin_parms, int crash_count);
 

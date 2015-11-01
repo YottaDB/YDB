@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +13,8 @@
 
 #include <sys/mman.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
+#include "gtm_fcntl.h"
+#include "gtm_unistd.h"
 #include <signal.h>	/* for VSIG_ATOMIC_T type */
 
 #include "gtm_stdio.h"
@@ -49,13 +49,18 @@
 #include "wcs_recover.h"
 #include "gtm_string.h"
 #include "have_crit.h"
+#include "gds_blk_downgrade.h"
 #include "deferred_signal_handler.h"
 
-GBLREF	boolean_t		*lseekIoInProgress_flags;	/* needed for the LSEEK* macros in gtmio.h */
-GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	uint4			process_id;
-GBLREF	VSIG_ATOMIC_T		forced_exit;
-GBLREF	int			process_exiting;
+GBLREF	boolean_t	*lseekIoInProgress_flags;	/* needed for the LSEEK* macros in gtmio.h */
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	uint4		process_id;
+GBLREF	VSIG_ATOMIC_T	forced_exit;
+GBLREF	int		process_exiting;
+GBLREF	sm_uc_ptr_t	reformat_buffer;
+GBLREF	int		reformat_buffer_len;
+GBLREF	volatile int	reformat_buffer_in_use;	/* used only in DEBUG mode */
+GBLREF	int		fast_lock_count;
 
 /* In case of a disk-full situation, we want to print a message every 1 minute. We maintain two global variables to that effect.
  * dskspace_msg_counter and save_dskspace_msg_counter. If we encounter a disk-full situation and both those variables are different
@@ -84,9 +89,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	sm_uc_ptr_t		blk_ptr;
 	uint4			saved_dsk_addr;
 	unix_db_info		*udi;
-#ifdef DEBUG
 	cache_rec_ptr_t		cr, cr_lo, cr_hi;
-#endif
 	static	int4		error_message_loop_count = 0;
 
 	error_def(ERR_DBFILERR);
@@ -142,15 +145,15 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			}
 		}
 		ahead = &csa->acc_meth.bg.cache_state->cacheq_active;
-		DEBUG_ONLY(cr_lo = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;)
-		DEBUG_ONLY(cr_hi = cr_lo + csd->n_bts;)
+		cr_lo = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
+		cr_hi = cr_lo + csd->n_bts;
 	} else
 	{
 		ahead = &csa->acc_meth.mm.mmblk_state->mmblkq_active;
 		if (cnl->mm_extender_pid == process_id)
 			max_writes = max_ent;		/* allow file extender or rundown to write everything out */
-		DEBUG_ONLY(cr_lo = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets);)
-		DEBUG_ONLY(cr_hi = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets + csd->n_bts);)
+		DEBUG_ONLY(cr_lo = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets));
+		DEBUG_ONLY(cr_hi = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets + csd->n_bts));
 	}
 	assert(((sm_long_t)ahead & 7) == 0);
 	queue_empty = FALSE;
@@ -179,10 +182,10 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			}
 			break;
 		}
-		DEBUG_ONLY(cr = (cache_rec_ptr_t)((sm_uc_ptr_t)csr - sizeof(cr->blkque));
-		assert(!CR_NOT_ALIGNED(cr, cr_lo) && !CR_NOT_IN_RANGE(cr, cr_lo, cr_hi));)
+		cr = (cache_rec_ptr_t)((sm_uc_ptr_t)csr - sizeof(cr->blkque));
 		if (dba_bg == csd->acc_meth)
 		{
+			assert(!CR_NOT_ALIGNED(cr, cr_lo) && !CR_NOT_IN_RANGE(cr, cr_lo, cr_hi));
 			if (CR_BLKEMPTY == csr->blk)
 			{	/* must be left by t_commit_cleanup - removing it from the queue and the following
 				   completes the cleanup */
@@ -203,8 +206,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
                                 assert(!need_jnl_sync || jpc->channel != NOJNL || cnl->wcsflu_pid != process_id);
 				got_lock = FALSE;
                                 if ((csr->jnl_addr > jb->dskaddr)
-					|| (need_jnl_sync && (NOJNL == jpc->channel
-								|| (FALSE == (got_lock = GET_SWAPLOCK(&jb->fsync_in_prog_latch))))))
+				    || (need_jnl_sync && (NOJNL == jpc->channel
+							  || (FALSE == (got_lock = GET_SWAPLOCK(&jb->fsync_in_prog_latch))))))
                                 {
                                         if (need_jnl_sync)
                                                 BG_TRACE_PRO_ANY(csa, n_jnl_fsync_tries);
@@ -234,7 +237,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 						{
 							assert(FALSE);
 							send_msg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(region),
-								ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), errno);
+								 ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), errno);
 							RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);
 							if (NULL == csrfirst)
 								csrfirst = csr;
@@ -261,9 +264,40 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			if (dba_bg == csd->acc_meth)
 			{
 				csr->epid = process_id;
+				CR_BUFFER_CHECK1(region, csa, csd, cr, cr_lo, cr_hi);
 				bp = (blk_hdr_ptr_t)(GDS_ANY_REL2ABS(csa, csr->buffaddr));
 				VALIDATE_BM_BLK(csr->blk, bp, csa, region, bmp_status);	/* bmp_status holds bmp buffer's validity */
-				size = bp->bsiz;
+				assert(((blk_hdr_ptr_t)bp)->bver);	/* GDSV4 (0) version uses this field as a block length so
+									   should always be > 0 */
+				if (IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver))
+				{	/* Need to downgrade/reformat this block back to a previous format. */
+					assert(0 <= fast_lock_count);
+					++fast_lock_count; /* do not allow interrupts to use reformat buffer until we are done */
+					/* reformat_buffer_in_use should always be incremented only AFTER incrementing
+					 * fast_lock_count as it is the latter that prevents interrupts from using the
+					 * reformat buffer. Similarly the decrement of fast_lock_count should be done
+					 * AFTER decrementing reformat_buffer_in_use.
+					 */
+					assert(0 == reformat_buffer_in_use);
+					DEBUG_ONLY(reformat_buffer_in_use++;)
+					DEBUG_DYNGRD_ONLY(PRINTF("WCS_WTSTART: Block %d being dynamically downgraded on write\n", \
+								 csr->blk));
+					if (csd->blk_size > reformat_buffer_len)
+					{	/* Buffer not big enough (or does not exist) .. get a new one releasing
+						   old if it exists */
+						assert(1 == fast_lock_count);	/* should not be in a nested free/malloc */
+						if (reformat_buffer)
+							free(reformat_buffer);	/* Different blksized databases in use
+										   .. keep only largest one */
+						reformat_buffer = malloc(csd->blk_size);
+						reformat_buffer_len = csd->blk_size;
+					}
+					gds_blk_downgrade((v15_blk_hdr_ptr_t)reformat_buffer, (blk_hdr_ptr_t)bp);
+					bp = (blk_hdr_ptr_t)reformat_buffer;
+					size = (((v15_blk_hdr_ptr_t)bp)->bsiz + 1) & ~1;
+				} else DEBUG_ONLY(if (GDSV5 == csr->ondsk_blkver))
+					size = (bp->bsiz + 1) & ~1;
+				DEBUG_ONLY(else GTMASSERT);
 				if (csa->do_fullblockwrites)
 					size = ROUND_UP(size, csa->fullblockwrite_len);
 				assert(size <= csd->blk_size);
@@ -271,6 +305,13 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				INCR_DB_CSH_COUNTER(csa, n_dsk_writes, 1);
 				/* Do db write without timer protect (not needed since wtstart not reenterable in one task) */
 				LSEEKWRITE(udi->fd, offset, bp, size, save_errno);
+				if ((blk_hdr_ptr_t)reformat_buffer == bp)
+				{
+					DEBUG_ONLY(reformat_buffer_in_use--;)
+					assert(0 == reformat_buffer_in_use);
+					--fast_lock_count; /* allow interrupts now that we are done using the reformat buffer */
+					assert(0 <= fast_lock_count);
+				}
 			} else
 			{
 #if defined(TARGETED_MSYNC)
@@ -280,7 +321,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					wcs_recover(region);
 					csd = csa->hdr;
 					bp = (blk_hdr_ptr_t)(csa->db_addrs[0] +
-						(sm_off_t)csr->blk * MSYNC_ADDR_INCS);
+							     (sm_off_t)csr->blk * MSYNC_ADDR_INCS);
 					assert((sm_uc_ptr_t)bp < csa->db_addrs[1]);
 				}
 				size = MSYNC_ADDR_INCS;
@@ -294,7 +335,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					wcs_recover(region);
 					csd = csa->hdr;
 					bp = (blk_hdr_ptr_t)(csa->acc_meth.mm.base_addr +
-						(sm_off_t)csr->blk * csd->blk_size);
+							     (sm_off_t)csr->blk * csd->blk_size);
 					assert((sm_uc_ptr_t)bp < csa->db_addrs[1]);
 				}
 				size = bp->bsiz;
@@ -324,9 +365,9 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				if (dskspace_msg_counter != save_dskspace_msg_counter)
 				{	/* first time and every minute */
 					send_msg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
-						ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
+						 ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
 					gtm_putmsg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
-						ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
+						   ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
 					save_dskspace_msg_counter = dskspace_msg_counter;
 					start_timer((TID)&dskspace_msg_timer, DSKSPACE_MSG_INTERVAL, dskspace_msg_timer, 0, NULL);
 				}
@@ -358,9 +399,9 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	csa->wbuf_dqd--;
 	DEBUG_ONLY(
 		if (0 == n2)
-			BG_TRACE_ANY(csa, wrt_noblks_wrtn);
-	)
-	assert(cnl->in_wtstart > 0 && csa->in_wtstart);
+		BG_TRACE_ANY(csa, wrt_noblks_wrtn);
+		)
+		assert(cnl->in_wtstart > 0 && csa->in_wtstart);
 	DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
 	csa->in_wtstart = FALSE;			/* This process can write again */
 	if (forced_exit && !process_exiting && !have_crit(HAVE_CRIT_IN_WTSTART)) /* do deferred MUPIP STOP handling if needed */

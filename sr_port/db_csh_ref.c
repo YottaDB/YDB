@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ void	db_csh_ref(sgmnt_addrs *cs_addrs)
 
 	if (!is_mm)
 	{
-		bp = (sm_uc_ptr_t)ROUND_UP((sm_ulong_t)cr_top, DISK_BLOCK_SIZE);
+		bp = (sm_uc_ptr_t)ROUND_UP((sm_ulong_t)cr_top, OS_PAGE_SIZE);
 		bp_top = bp + cs_addrs->hdr->n_bts * buffer_size;
 	}
 

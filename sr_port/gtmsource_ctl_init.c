@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,8 +29,7 @@
 #include <errno.h>
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #include "gtm_stdio.h"
 
 #include "gdsroot.h"
@@ -261,8 +260,10 @@ int gtmsource_ctl_init(void)
 	{
 		assert(reg->open);
 		csa = &FILE_INFO(reg)->s_addrs;
-		if (REPL_ENABLED(csa->hdr))
-		{
+		if (REPL_ALLOWED(csa->hdr))
+		{ /* Although replication may be WAS_ON, it is possible that source server has not yet
+		     sent records that were generated when replication was ON. We have to open and read
+		     this journal file to cover such a case */
 			status = repl_ctl_create(&tmp_ctl, reg, 0, NULL, TRUE);
 			assert(SS_NORMAL == status);
 			prev_ctl->next = tmp_ctl;
@@ -279,6 +280,7 @@ int gtmsource_ctl_init(void)
 int repl_ctl_close(repl_ctl_element *ctl)
 {
 	int	index;
+	int	status;
 
 	if (ctl)
 	{
@@ -292,7 +294,9 @@ int repl_ctl_close(repl_ctl_element *ctl)
 				if (ctl->repl_buff->fc->jfh)
 					free(ctl->repl_buff->fc->jfh);
 				if (NOJNL != ctl->repl_buff->fc->fd)
-					F_CLOSE(ctl->repl_buff->fc->fd);
+				{
+					F_CLOSE(ctl->repl_buff->fc->fd, status);
+				}
 				free(ctl->repl_buff->fc);
 			}
 			free(ctl->repl_buff);
@@ -306,27 +310,30 @@ int gtmsource_ctl_close(void)
 {
 	repl_ctl_element	*ctl;
 	sgmnt_addrs		*csa;
-	gd_region		*reg;
+	int			status;
 
 	if (repl_ctl_list)
 	{
-		for (ctl = repl_ctl_list->next, reg = NULL; NULL != ctl; ctl = repl_ctl_list->next)
+		for (ctl = repl_ctl_list->next; NULL != ctl; ctl = repl_ctl_list->next)
 		{
 			repl_ctl_list->next = ctl->next; /* next element becomes head thereby removing this element,
 							    the current head from the list; if there is an error path that returns
 							    us to this function before all elements were freed, we won't try to
 							    free elements that have been freed already */
-			if (reg != ctl->reg)
-			{
+			if (NULL == ctl->next || ctl->reg != ctl->next->reg)
+			{	/* end of list, OR next region follows, either way, we are at the last generation for this region */
 				csa = &FILE_INFO(ctl->reg)->s_addrs;
 				if (csa->jnl && NOJNL != csa->jnl->channel)
-				{
-					F_CLOSE(csa->jnl->channel);
+				{	/* The last generation file source server opened must have been done using
+					 * jnl_ensure_open(). In which case, we would have copied jnl->channel to fc->fd.
+					 * Validate. */
+					assert(csa->jnl->channel == ctl->repl_buff->fc->fd);
+					F_CLOSE(csa->jnl->channel, status);
 					csa->jnl->channel = NOJNL;
+					ctl->repl_buff->fc->fd = NOJNL; /* closed jnl->channel which is the same as fc->fd.
+									 * no need to close again */
 					csa->jnl->cycle--; /* decrement cycle so jnl_ensure_open() knows to reopen the journal */
-					ctl->repl_buff->fc->fd = NOJNL;
 				}
-				reg = ctl->reg;
 			}
 			repl_ctl_close(ctl);
 		}

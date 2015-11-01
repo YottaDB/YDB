@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,7 @@ void jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header)
 	/**** We will write journal file header, epoch and eof in order ****/
 	/* Write the file header */
 	memset((char *)header, 0, JNL_HDR_LEN);
-	memcpy(header->label, JNL_LABEL_TEXT, sizeof(JNL_LABEL_TEXT) - 1);
+	memcpy(header->label, JNL_LABEL_TEXT, STR_LIT_LEN(JNL_LABEL_TEXT));
 	assert(NULL != prc_vec);
 	JNL_WHOLE_FROM_SHORT_TIME(prc_vec->jpv_time, jgbl.gbl_jrec_time);
 	memcpy(&header->who_created, (unsigned char*)prc_vec, sizeof(jnl_process_vector));
@@ -64,4 +64,5 @@ void jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header)
 	header->jnl_alq = info->alloc;
 	header->virtual_size = info->alloc;
 	header->jnl_deq = info->extend;
+	header->checksum = info->checksum;
 }

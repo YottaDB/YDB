@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,11 +23,11 @@
 #if defined(sun) || defined(mips)
 #include <sys/time.h>
 #else
-#include <time.h>
+#include "gtm_time.h"
 #endif
 #include <sys/types.h>
-#include <netdb.h>
-#include <sys/socket.h>
+#include "gtm_netdb.h"
+#include "gtm_socket.h"
 #ifdef SCO
 #include <sys/stream.h>
 #endif
@@ -35,7 +35,7 @@
 #include <netinet/tcp.h>
 #endif
 
-#include <netinet/in.h>
+#include "gtm_inet.h"
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
@@ -52,7 +52,7 @@ static char pingrcv[IP_MAXPACKET], pingsend[256];
  * Set up a raw socket to ping machines
  * Returns the socket id of the "ping" socket.
  */
-int init_ping()
+int init_ping(void)
 {
     struct protoent *proto;
 
@@ -143,7 +143,7 @@ int icmp_ping(int conn)
  * Returns:  The sequence field in the incoming ECHO_REPLY packet, or -1
  *           if the packet is not a response to one of our pings.
  */
-int get_ping_rsp()
+int get_ping_rsp(void)
 {
 	struct sockaddr_in from;
 	register int cc;

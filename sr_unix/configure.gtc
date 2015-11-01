@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2005 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -55,7 +55,7 @@ else
 fi
 
 # Binaries
-binaries="mupip mumps libgtmshr$ext lke dse gtm_dmna geteuid ftok semstat2"
+binaries="mupip mumps libgtmshr$ext lke dse  geteuid ftok semstat2"
 
 # Normal scripts - executed by anyone
 nscripts="gtmbase upperc upperc_cp lowerc lowerc_cp"
@@ -65,12 +65,6 @@ rscripts="gtmstart gtmstop"
 if [ $deliver_gtcm = "yes" ]; then
 	rscripts="$rscripts gtcm_run gtcm_slist"
 	binaries="$binaries gtcm_server gtcm_pkdisp gtcm_play gtcm_shmclean"
-	if [ -f gcore ]; then
-		binaries="$binaries gcore"
-	fi
-	if [ -f gtcm_gcore ]; then
-		binaries="$binaries gtcm_gcore"
-	fi
 fi
 
 if [ $deliver_gtcm_gnp = "yes" ]; then
@@ -90,11 +84,6 @@ else
 	ofiles="$hlpfiles"
 fi
 
-# Directories
-if [ $arch = "sun"  -o  $arch = "solaris" ]; then
-	dirs="examplesvc exampledal"
-fi
-
 # Files that need to have $gtm_dist, $echo, etc. set in them.
 pathmods="gtmbase.gtc gtmstart.gtc gtmstop.gtc gtmcshrc.gtc gtmprofile.gtc"
 
@@ -108,7 +97,7 @@ if [ "`./geteuid`" != "root" ] ; then
 fi
 
 $echo "                     MUMPS Configuration Script"
-$echo "c. 1993-2000 Sanchez Computer Associates. Use of this software"
+$echo "c. 1993-2005 Fidelity Information Services, Inc. Use of this software"
 $echo "is restricted by the provisions of your software license agreement."
 $echo ""
 
@@ -243,15 +232,6 @@ do
 done
 if [ $arch = "sun" ]; then
 	ranlib -t $gtmdist/libgtmrpc.a
-fi
-
-# Install the example directories
-if [ $arch = "sun"  -o  $arch = "solaris" ]; then
-	for i in $dirs
-	do
-		tar cf - $i | ( cd $gtmdist ; tar xfBp - )
-		chown -R $owner $gtmdist/$i
-	done
 fi
 
 # Install GDE, GTMHELP, and all the percent routines

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2005 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,13 +9,15 @@
 #								#
 #################################################################
 :
-# gtcm_run - Start the GTM server
+# gtcm_run - This script is used to start an invidiaul GTCM server
+# Usually this is called from gtmstart script
 #
 # If the GTCM_RESTART environment variable is set to 1, this script will
 # restart the server if some event causes it to stop running.
 #
 
 # set maximum number of failures per period in minutes
+arch=ARCH
 maxfails=5
 period=10
 server=${GTCM_SERVER-GTMDIST/gtcm_server}
@@ -47,18 +49,29 @@ do
         esac
         shift
 done
-$echo
-$echo "**********************************************************************"
-$echo "$0, service $service started on `date`"
-$echo "**********************************************************************"
+# In case, instead of running gtmstart, this script is run directly to start gtcm server,
+# $logdir may not be present, so create it
+if [ ! -d $logdir ]
+then
+	$echo "GT.M/GT.CM logging directory ($logdir) does not exist, creating it..."
+	mkdir -p $logdir
+fi
+oldservcnt=`ps -ea|grep gtcm_server |wc -l`
+
 $echo
 t0=`date '+%j %H %M' | awk '{ print $1 * 60 * 24 + $2 * 60 + $3 }'`
 while [ $fails -le $maxfails ]
 do
         $echo "Starting server:  \"$server $*\" on `date`."
-        $server -service $service $options >> $logdir/gtcm_server.log 2>&1
-        status=$?
-        $echo "Server terminated on `date` with status code $status."
+	startstatus=1
+        $server -service $service $options >> $logdir/gtcm_server.log$fails 2>&1
+	sleep 1
+	newservcnt=`ps -ea|grep gtcm_server | wc -l `
+	if [ $newservcnt -gt $oldservcnt ]
+	then
+		startstatus=0
+	fi
+
         if [ -r $cwd/core ]
         then
 		if `strings $cwd/core | egrep 'image_id=gtcm_server.*-service '$service >/dev/null 2>&1`
@@ -70,11 +83,26 @@ do
 		fi
         fi
 
-        # abort if we gave no restart option
-	if [ $restart -eq 0 ]
-	then
-		exit 1
-	fi
+        # abort if we gave no restart option or current try of starting gtcm server is successful
+	if [ $startstatus -eq 0 ]
+        then
+		$echo
+		$echo "**********************************************************************"
+		$echo "$0, service $service started on `date`"
+		$echo "**********************************************************************"
+		$echo
+                exit 1
+        else
+                if [ $restart -eq 0 ]
+                then
+                        $echo "**********************************************************************"
+                        $echo " service: $service failed to start"
+                        $echo "**********************************************************************"
+			$echo "Please look into $gtm_dist/log/gtcm_server.erlg file and  syslog messages."
+                        exit 1
+                fi
+        fi
+        echo "(restart is enabled) Retry to start service: $service"
 
         t1=`date '+%j %H %M' | awk '{ print $1 * 60 * 24 + $2 * 60 + $3 }'`
         delta=`expr $t1 - $t0`
@@ -87,7 +115,4 @@ do
         sleep 10
 done
 $echo "ABORT:  more than $maxfails failures in $period minutes."
-
-
-
-
+$echo "Please look into $gtm_dist/log/gtcm_server.erlg file and  syslog messages."

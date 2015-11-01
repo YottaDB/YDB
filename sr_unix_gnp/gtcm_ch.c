@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,14 +10,16 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_time.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "hashdef.h"
 #include "cmidef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "error.h"
 #include "fao_parm.h"
@@ -36,11 +38,13 @@
 #include "gtmmsg.h"
 #include "gtcm_open_cmerrlog.h"
 
-GBLREF connection_struct	*curr_entry;
-GBLDEF bool			gtcm_errfile = FALSE;
-GBLDEF bool			gtcm_firsterr = TRUE;
-GBLDEF FILE 			*gtcm_errfs = NULL;
-GBLREF unsigned char		*util_outptr;
+GBLDEF	bool			gtcm_errfile = FALSE;
+GBLDEF	bool			gtcm_firsterr = TRUE;
+GBLDEF	FILE 			*gtcm_errfs = NULL;
+
+GBLREF	connection_struct	*curr_entry;
+GBLREF	unsigned char		*util_outptr;
+GBLREF	bool			undef_inhibit;
 
 static 	short			szero = 0;
 
@@ -58,6 +62,9 @@ CONDITION_HANDLER(gtcm_ch)
 	error_def(ERR_SERVERERR);
 
 	START_CH;
+	undef_inhibit = FALSE;	/* reset undef_inhibit to the default value in case it got reset temporarily and there was an error.
+				 * currently, only $INCREMENT temporarily resets this (in gtcmtr_increment.c)
+				 */
 	if (gtcm_firsterr)
 		gtcm_open_cmerrlog();
 	msgnum = 1;

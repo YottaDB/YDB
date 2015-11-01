@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,11 +24,9 @@ static char rcsid[] = "$Header:$";
 #endif
 
 #include <errno.h>
-#include <ctype.h>
+#include "gtm_ctype.h"
 
-#ifdef DEBUG
 #include "gtm_stdio.h"
-#endif /* defined(DEBUG) */
 
 #include "gtcm.h"
 
@@ -45,6 +43,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	extern int4	omi_nxact, omi_nerrs, omi_brecv, omi_bsent;
 	omi_fd		fd;
 	int		i;
+	int 		save_errno;
 #ifdef NET_TCP
 	struct servent		*se;
 	unsigned short		port;
@@ -98,19 +97,24 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 #ifdef BSD_TCP
 	/*  Create a socket */
 	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-		return -1;
+	{
+		save_errno = errno;
+		return save_errno;
+	}
 	/*  Reuse a specified address */
 	if (port && setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *)&on, sizeof(on)) < 0)
 	{
+		save_errno = errno;
 		(void) close(fd);
-		return -1;
+		return save_errno;
 	}
 	/* the system should periodically check to see if the connections are live */
 	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&on, sizeof(on)) < 0)
 	{
+		save_errno = errno;
 		perror("setsockopt:");
 		(void) close(fd);
-		return -1;
+		return save_errno;
 	}
 	/*  Bind an address to the socket */
 	sin.sin_family      = AF_INET;
@@ -118,14 +122,16 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	sin.sin_port        = htons(port);
 	if (bind(fd, (struct sockaddr *)&sin, sizeof(sin)) < 0)
 	{
+		save_errno = errno;
 		(void) close(fd);
-		return -1;
+		return save_errno;
 	}
 	/*  Initialize the listen queue */
 	if (listen(fd, 5) < 0)
 	{
+		save_errno = errno;
 		(void) close(fd);
-		return -1;
+		return save_errno;
 	}
 	/* set up raw socket for use with pinging option */
 	if (ping_keepalive)
@@ -147,20 +153,25 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 #else /* defined(BSD_TCP) */
 #ifdef SYSV_TCP
 	if ((fd = t_open(SYSV_TCP, O_RDWR, NULL)) < 0)
-		return -1;
+	{
+		save_errno = errno;
+		return save_errno;
+	}
 	if (!(bind = (struct t_bind *)t_alloc(fd, T_BIND, T_ALL)))
 	{
+		save_errno = errno;
 		(void) t_close(fd);
-		return -1;
+		return save_errno;
 	}
 	bind->qlen      = 5;
 	bind->addr.len  = 0;
 	bind->addr.buf  = 0;
 	if (t_bind(fd, bind, bind) < 0)
 	{
+		save_errno = errno;
 		(void) t_free(bind, T_BIND);
 		(void) t_close(fd);
-		return -1;
+		return save_errno;
 	}
 	/*  Store the file descriptor away for use later */
 	cll->nve = fd;

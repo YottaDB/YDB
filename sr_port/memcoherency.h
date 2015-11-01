@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,15 @@ GBLREF	int	num_additional_processors; /* for Uniprocessor systems, no need for "
 		asm("mb");											\
 }
 
-#define SHM_READ_MEMORY_BARRIER	SHM_WRITE_MEMORY_BARRIER /* same MB instruction for both read and write barriers */
+#define SHM_READ_MEMORY_BARRIER		SHM_WRITE_MEMORY_BARRIER /* same MB instruction for both read and write barriers */
+
+#ifdef __vms
+/* Alpha OpenVMS SECSHR runs in kernel mode as a separate image. Avoid complications of making num_additional_processors available
+ * to SECSHR. Issue memory barrier regardless of number of processors. This is not performance intensive as the usage is limited
+ * to abnormal termination of processes in the midst of transaction processing. */
+#define SECSHR_SHM_WRITE_MEMORY_BARRIER	asm("mb")
+#define SECSHR_SHM_READ_MEMORY_BARRIER	SECSHR_SHM_WRITE_MEMORY_BARRIER
+#endif /* __vms */
 
 #elif defined(POWER) || defined(PWRPC)	/* GT.M defines POWER and PWRPC if _AIX is defined, see sr_rs6000/mdefsp.h */
 
@@ -149,6 +157,14 @@ void do_isync(void);
 #define SHM_WRITE_MEMORY_BARRIER
 #define SHM_READ_MEMORY_BARRIER
 
+#endif
+
+#if !defined(SECSHR_SHM_WRITE_MEMORY_BARRIER)
+#define SECSHR_SHM_WRITE_MEMORY_BARRIER		SHM_WRITE_MEMORY_BARRIER	/* default definition */
+#endif
+
+#if !defined(SECSHR_SHM_READ_MEMORY_BARRIER)
+#define	SECSHR_SHM_READ_MEMORY_BARRIER		SHM_READ_MEMORY_BARRIER		/* default definition */
 #endif
 
 #endif /* MEMCOHERENCY_H_INCLUDED */

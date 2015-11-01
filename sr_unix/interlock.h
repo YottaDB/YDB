@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,9 +74,12 @@
 #define IS_BIT0_SET(X)			((X) == 1)
 #define IS_BIT0_CLEAR(X)		((X) == 0)
 
-#define GET_SWAPLOCK(X)			(compswap((X), LOCK_AVAILABLE, process_id))
-/* Use ASWP to release the lock because of the memory barrier and other-processor notification it implies */
-#define RELEASE_SWAPLOCK(X)		{									\
-	                                        assert((X)->latch_pid == process_id);				\
-						ASWP(((sm_int_ptr_t)&(X)->latch_pid), LOCK_AVAILABLE, (X));	\
-                                        }
+#define GET_SWAPLOCK(X)			(COMPSWAP((X), LOCK_AVAILABLE, 0, process_id, 0))
+/* Use COMPSWAP to release the lock because of the memory barrier and other-processor notification it implies. Also
+   the usage of COMPSWAP allows us to check (with low cost) that we have/had the lock we are trying to release. If we
+   don't have the lock and are trying to release it, a GTMASSERT seems the logical choice as the logic is very broken
+   at that point. If this macro is used in part of an expression, the GTMASSERT path must also return a value (to keep
+   the compiler happy) thus the construct (GTMASSERT, 0) which returns a zero (see usage with assert() on UNIX).
+ */
+#define RELEASE_SWAPLOCK(X)		(COMPSWAP((X), process_id, 0, LOCK_AVAILABLE, 0) ? 1 : (GTMASSERT, 0))
+

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,12 +16,13 @@
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 
-#include <limits.h>
+#include "gtm_limits.h"
 #include <errno.h>
 
 #include "cli.h"
 #include "util.h"
 #include "cli_parse.h"
+#include "min_max.h"
 
 /*
  * --------------------------------------------------
@@ -32,7 +33,7 @@
  *	FALSE	- Could not convert to hex
  * --------------------------------------------------
  */
-boolean_t cli_get_hex(char *entry, int4 *dst)
+boolean_t cli_get_hex(char *entry, uint4 *dst)
 {
 	char	buf[MAX_LINE];
 	char	local_str[MAX_LINE];
@@ -54,6 +55,64 @@ boolean_t cli_get_hex(char *entry, int4 *dst)
 
 /*
  * --------------------------------------------------
+ * Find the qualifier and convert it to 64 bit hex.
+ *
+ * Return:
+ *	TRUE	- OK
+ *	FALSE	- Could not convert to hex
+ * --------------------------------------------------
+ */
+boolean_t cli_get_hex64(char *entry, gtm_uint64_t *dst)
+{
+	char	buf[MAX_LINE];
+	char	local_str[MAX_LINE];
+
+	assert(strlen(entry) > 0);
+	strncpy(local_str, entry, sizeof(local_str) - 1);
+
+	if ((cli_present(local_str) == CLI_PRESENT) && cli_get_value(local_str, buf))
+	{
+		if (!cli_str_to_hex64(buf, dst))
+		{
+			FPRINTF(stderr, "Error: cannot convert %s value to hex number.\n", buf);
+			return FALSE;
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/*
+ * --------------------------------------------------
+ * Find the qualifier and convert it to 64 bit unsigned decimal number.
+ *
+ * Return:
+ *	TRUE	- OK
+ *	FALSE	- Could not convert to hex
+ * --------------------------------------------------
+ */
+boolean_t cli_get_uint64(char *entry, gtm_uint64_t *dst)
+{
+	char	buf[MAX_LINE];
+	char	local_str[MAX_LINE];
+
+	assert(strlen(entry) > 0);
+	strncpy(local_str, entry, sizeof(local_str) - 1);
+
+	if ((cli_present(local_str) == CLI_PRESENT) && cli_get_value(local_str, buf))
+	{
+		if (!cli_str_to_uint64(buf, dst))
+		{
+			FPRINTF(stderr, "Error: cannot convert %s value to 64-bit unsigned decimal number.\n", buf);
+			return FALSE;
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/*
+ * --------------------------------------------------
  * Find the qualifier and convert it to decimal number.
  *
  * Return:
@@ -61,9 +120,9 @@ boolean_t cli_get_hex(char *entry, int4 *dst)
  *	FALSE	- Could not convert to number
  * --------------------------------------------------
  */
-boolean_t cli_get_int(char *entry, int *dst)
+boolean_t cli_get_int(char *entry, int4 *dst)
 {
-	char		buf[25];
+	char		buf[MAX_LINE];
 	char		local_str[MAX_LINE];
 
 	assert(strlen(entry) > 0);
@@ -72,22 +131,49 @@ boolean_t cli_get_int(char *entry, int *dst)
 	if (cli_present(local_str) == CLI_PRESENT
 		&& cli_get_value(local_str, buf))
 	{
-		if (!cli_is_dcm(buf))
+		if (!cli_is_dcm(buf) || !cli_str_to_int(buf, dst))
 		{
 			FPRINTF(stderr, "Error: cannot convert %s value to decimal number.\n", buf);
 			return FALSE;
 		}
-		*dst = ATOI(buf);
 		return TRUE;
 	}
 	return FALSE;
 }
 
-
 /*
  * --------------------------------------------------
- * Find the qualifier and convert it to hex.
- * If not possible, convert it to decimal number.
+ * Find the qualifier and convert it to 64 bit decimal number.
+ *
+ * Return:
+ *	TRUE	- OK
+ *	FALSE	- Could not convert to number
+ * --------------------------------------------------
+ */
+boolean_t cli_get_int64(char *entry, gtm_int64_t *dst)
+{
+	char		buf[MAX_LINE];
+	char		local_str[MAX_LINE];
+
+	assert(strlen(entry) > 0);
+	strncpy(local_str, entry, sizeof(local_str) - 1);
+
+	if (cli_present(local_str) == CLI_PRESENT
+		&& cli_get_value(local_str, buf))
+	{
+		if (!cli_is_dcm(buf) || !cli_str_to_int64(buf, dst))
+		{
+			FPRINTF(stderr, "Error: cannot convert %s value to decimal number.\n", buf);
+			return FALSE;
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+/*
+ * --------------------------------------------------
+ * Find the qualifier and convert it to decimal number
+ * unless 0x prefix.
  *
  * Return:
  *	TRUE	- OK
@@ -96,37 +182,52 @@ boolean_t cli_get_int(char *entry, int *dst)
  */
 boolean_t cli_get_num(char *entry, int4 *dst)
 {
-	char		buf[25];
+	char		buf[MAX_LINE];
 	char		local_str[MAX_LINE];
-	unsigned long 	local_ulong;
-	int		save_errno;
 
+	assert(strlen(entry) > 0);
 	strncpy(local_str, entry, sizeof(local_str) - 1);
-	if ((cli_present(local_str) == CLI_PRESENT) && cli_get_value(local_str, buf))
+
+	if (cli_present(local_str) == CLI_PRESENT
+		&& cli_get_value(local_str, buf))
 	{
-		if (cli_is_dcm(buf))
+		if (!cli_str_to_num(buf, dst))
 		{
-			save_errno = errno;
-			errno = 0;
-			local_ulong = STRTOUL(buf, NULL, 10);
-			if ((0 != errno) || UINT_MAX < local_ulong)
-			{	/* errno is non-zero implies "str" is outside the range of representable values in an unsigned long.
-				 * else if local_ulong > UINT_MAX, it means that on platforms where long is 8-bytes, "str" is >= 4G
-				 */
-				*dst = 0;
-				FPRINTF(stderr, "Error: Cannot convert %s string. Overflow\n",buf);
-				errno = save_errno;
-				return FALSE;
-			} else
-			{
-				*dst = local_ulong;
-				errno = save_errno;
-				return TRUE;
-			}
+			FPRINTF(stderr, "Error: cannot convert %s string to number.\n", buf);
+			return FALSE;
 		}
-		if (cli_str_to_hex(buf, dst))
-			return TRUE;
-		FPRINTF(stderr, "Error: Cannot convert %s string to number.\n", buf);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/*
+ * --------------------------------------------------
+ * Find the qualifier and convert it to 64 bit decimal number
+ * unless 0x prefix.
+ *
+ * Return:
+ *	TRUE	- OK
+ *	FALSE	- Could not convert to number
+ * --------------------------------------------------
+ */
+boolean_t cli_get_num64(char *entry, gtm_int64_t *dst)
+{
+	char		buf[MAX_LINE];
+	char		local_str[MAX_LINE];
+
+	assert(strlen(entry) > 0);
+	strncpy(local_str, entry, sizeof(local_str) - 1);
+
+	if (cli_present(local_str) == CLI_PRESENT
+		&& cli_get_value(local_str, buf))
+	{
+		if (!cli_str_to_num64(buf, dst))
+		{
+			FPRINTF(stderr, "Error: cannot convert %s string to number.\n", buf);
+			return FALSE;
+		}
+		return TRUE;
 	}
 	return FALSE;
 }
@@ -144,9 +245,13 @@ boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len)
 {
 	char		buf[MAX_LINE];
 	char		local_str[MAX_LINE];
+	unsigned int	maxdstlen, maxbuflen, copylen;
 
-	assert(*max_len <= sizeof(buf));
-	assert(*max_len > 0);
+	maxbuflen = sizeof(buf);
+	maxdstlen = *max_len;
+
+	assert(maxdstlen <= maxbuflen);
+	assert(maxdstlen > 0);
 
 	assert(strlen(entry) > 0);
 	strncpy(local_str, entry, sizeof(local_str) - 1);
@@ -157,9 +262,11 @@ boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len)
 		if (!cli_get_parm(local_str, buf))
 			return FALSE;
 	}
-	memset(dst, 0, *max_len);
-	memcpy(dst, buf, strlen(buf));
-	*max_len = strlen(buf);
+	copylen = strlen(buf);
+	copylen = MIN(copylen, maxdstlen);
+	memset(dst, 0, maxdstlen);
+	memcpy(dst, buf, copylen);
+	*max_len = copylen;
 	return TRUE;
 }
 
@@ -233,6 +340,48 @@ int4 cli_t_f_n (char *entry)
 			return (1);
 		else if ('f' == TOLOWER(buf[0]))
 			return (0);
+		else
+		{
+			util_out_print("Invalid value !AD specified for qualifier !AD", TRUE,
+					LEN_AND_STR(buf), LEN_AND_STR(local_str));
+			return (-1);
+		}
+	} else
+	{
+		FPRINTF(stderr, "Error: cannot get value for %s.\n", entry);
+		return (-1);
+	}
+}
+
+/*
+ * --------------------------------------------------
+ * Find out if cli entry is either T(rue), A(lways), F(alse), N(ever), or
+ * neither.
+ *
+ * Return:
+ *	0 - FALSE/NEVER
+ *	1 - TRUE/ALWAYS
+ *      2 - ALLOWEXISTING
+ *     -1 - None of them
+ * --------------------------------------------------
+ */
+int4 cli_n_a_e (char *entry)
+{
+	char		buf[MAX_LINE];
+	char		local_str[MAX_LINE];
+
+	assert (strlen(entry) > 0);
+	strncpy(local_str, entry, sizeof(local_str) - 1);
+
+	cli_strupper(local_str);
+	if (cli_get_value(local_str, buf))
+	{
+		if ('f' == TOLOWER(buf[0]) || 'n' == TOLOWER(buf[0]))
+			return (0);
+		else if ('t' == TOLOWER(buf[0]) || 'a' == TOLOWER(buf[0]))
+			return (1);
+		else if ('e' == TOLOWER(buf[0]))
+			return (2);
 		else
 		{
 			util_out_print("Invalid value !AD specified for qualifier !AD", TRUE,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,17 +11,17 @@
 
 #include "mdef.h"
 
-#include <limits.h>
-#include <netinet/in.h>
-#include <stddef.h>
-#include <errno.h>
-
+#include "gtm_limits.h"
+#include "gtm_inet.h"
 #include "gtm_stdio.h"
 #include "gtm_inet.h"
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
 #include "gtm_time.h"
 #include "gtm_stat.h"
+
+#include <stddef.h>
+#include <errno.h>
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -31,7 +31,7 @@
 #include "mlkdef.h"
 #include "gdscc.h"
 #include "cmidef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"
 #include "cmmdef.h"
 #include "cmi.h"
 #include "gt_timer.h"
@@ -41,15 +41,13 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "gtmimagename.h"
-#include "gtcmtr_kill.h"
-#include "gtcmtr_put.h"
 #include "trans_log_name.h"
 #include "get_page_size.h"
 #include "filestruct.h"
 #include "jnl.h"
 #include "gdskill.h"
-#include "hashtab.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"
 #include "tp.h"
 #include "init_secshr_addrs.h"
 #include "cli.h"
@@ -57,11 +55,7 @@
 #include "iosp.h"
 #include "error.h"
 #include "gtcml.h"
-#include "gtcmtr_lk.h"
-#include "gtcmtr_lke_clear.h"
-#include "gtcmtr_lke_show.h"
 #include "getjobnum.h"
-#include "cache.h"
 #include "gtmmsg.h"
 #include "dpgbldir.h"
 #include "sig_init.h"
@@ -69,16 +63,7 @@
 #include "copy.h"
 #include "lockconst.h"
 #include "generic_signal_handler.h"
-#include "gtcmtr_data.h"
-#include "gtcmtr_get.h"
-#include "gtcmtr_order.h"
-#include "gtcmtr_zprevious.h"
-#include "gtcmtr_query.h"
-#include "gtcmtr_zwithdraw.h"
-#include "gtcmtr_initproc.h"
-#include "gtcmtr_initreg.h"
-#include "gtcmtr_terminate.h"
-#include "gtcmtr_bufflush.h"
+#include "gtcmtr_protos.h"
 #include "gtcm_shutdown_ast.h"
 #include "gtcm_neterr.h"
 #include "gtcm_link_accept.h"
@@ -95,6 +80,7 @@
 #include "util.h"
 #include "getzdir.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
+#include "suspsigs_handler.h"
 
 #ifdef __osf__
 #pragma pointer_size (save)
@@ -290,6 +276,9 @@ static void gtcm_gnp_server_actions(void)
 				case CMMS_B_BUFFLUSH:
 					reply = gtcmtr_bufflush();
 					break;
+				case CMMS_Q_INCREMENT:
+					reply = gtcmtr_increment();
+					break;
 				default:
 					reply = FALSE;
 					if (SS_NORMAL == status)
@@ -399,7 +388,7 @@ int main(int argc, char **argv, char **envp)
 	cli_token_buf[0] = '\0';
 	ptr = cli_lex_in_ptr->in_str;
 	memmove(ptr + sizeof("GTCM_GNP_SERVER ") - 1, ptr, strlen(ptr));
-	memcpy(ptr, "GTCM_GNP_SERVER ", sizeof("GTCM_GNP_SERVER ") - 1);
+	MEMCPY_LIT(ptr, "GTCM_GNP_SERVER ");
 	cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
 	parse_ret = parse_cmd();
 	if (parse_ret && (EOF != parse_ret))
@@ -411,7 +400,7 @@ int main(int argc, char **argv, char **envp)
 		CMI_DESC_SET_LENGTH(&service_descr, service_len);
 	else
 		CMI_DESC_SET_LENGTH(&service_descr, 0);
-	if (cli_get_num("TIMEOUT", &timout))
+	if (cli_get_int("TIMEOUT", &timout))
 	{
 		cm_timeout = TRUE;
 		if (timout > (1 << 21))
@@ -431,9 +420,8 @@ int main(int argc, char **argv, char **envp)
 	licensed = TRUE;
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;
-	cache_init();
 	getzdir();
-	sig_init(generic_signal_handler, null_handler); /* should do be done before cmi_init */
+	sig_init(generic_signal_handler, null_handler, suspsigs_handler); /* should do be done before cmi_init */
 
 	/* Redefine handler for SIGHUP to switch log file */
 	memset(&act, 0, sizeof(act));
@@ -482,7 +470,7 @@ int main(int argc, char **argv, char **envp)
 		exit(status);
 	}
 	atexit(gtcm_exi_handler);
-	init_secshr_addrs(get_next_gdr, cw_set, NULL, &cw_set_depth, process_id, OS_PAGE_SIZE, &jnlpool.jnlpool_dummy_reg);
+	init_secshr_addrs(get_next_gdr, cw_set, NULL, &cw_set_depth, process_id, 0, OS_PAGE_SIZE, &jnlpool.jnlpool_dummy_reg);
 	initialize_pattern_table();
 
 	/* Pre-allocate some timer blocks. */

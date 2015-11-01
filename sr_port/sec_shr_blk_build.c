@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,11 +61,11 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 		SECSHR_ACCOUNTING(sizeof(blk_hdr));
 		return FALSE;
 	}
-
 	/* block transaction number needs to be modified first. see comment in gvcst_blk_build as to why */
-	((blk_hdr*)base_addr)->tn = ctn;
-	((blk_hdr*)base_addr)->bsiz = array->len;
-	((blk_hdr*)base_addr)->levl = cse->level;
+	((blk_hdr_ptr_t)base_addr)->bver = GDSVCURR;
+	((blk_hdr_ptr_t)base_addr)->tn = ctn;
+	((blk_hdr_ptr_t)base_addr)->bsiz = array->len;
+	((blk_hdr_ptr_t)base_addr)->levl = cse->level;
 
 	if (cse->forward_process)
 	{

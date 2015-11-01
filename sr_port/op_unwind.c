@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "mv_stent.h"
 #include "tp_frame.h"
 #include "cache.h"
+#include "cache_cleanup.h"
 #include "objlabel.h"
 #include "op.h"
 #include "error_trap.h"

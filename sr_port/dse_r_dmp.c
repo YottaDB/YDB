@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,7 @@ boolean_t dse_r_dmp(void)
 
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
-		int4 tmp_blk;
+		uint4 tmp_blk;
 
 		if(!cli_get_hex("BLOCK", &tmp_blk))
 			return FALSE;
@@ -65,7 +65,7 @@ boolean_t dse_r_dmp(void)
 	}
 	if (cli_present("COUNT") == CLI_PRESENT)
 	{
-		if (!cli_get_hex("COUNT", &count))
+		if (!cli_get_hex("COUNT", (uint4 *)&count))
 			return FALSE;
 	} else
 		count = 1;
@@ -128,7 +128,7 @@ boolean_t dse_r_dmp(void)
 		return FALSE;
 	}
 	util_out_print(0, TRUE);
-	for ( ; count > 0 ;count--)
+	for ( ; 0 < count; count--)
 	{
 		if (util_interrupt || !(rp = dump_record(rp, patch_curr_blk, bp, b_top)))
 			break;

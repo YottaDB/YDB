@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,7 @@
 
 #include "underr.h"
 #include <varargs.h>
-#include "hashdef.h"
+#include "hashtab_mname.h"    /* needed for lv_val.h */
 #include "lv_val.h"
 #include "undx.h"
 
@@ -24,7 +24,7 @@ void	underr (va_alist)
 va_dcl
 {
 	mval		*start;
-	mident		name;
+	mident_fixed	name;
 	unsigned char	*end;
 	va_list		var;		/* this is a dummy so we can pass a va_list to undx */
 	error_def(ERR_UNDEF);
@@ -35,8 +35,8 @@ va_dcl
 		*start = literal_null;
 	else
 	{
-		end = format_lvname((lv_val *)start, (uchar_ptr_t)name.c, sizeof(mident));
-		rts_error(VARLSTCNT(4) ERR_UNDEF, 2, end - ((unsigned char *) &name), &name);
+		end = format_lvname((lv_val *)start, (uchar_ptr_t)name.c, sizeof(name));
+		rts_error(VARLSTCNT(4) ERR_UNDEF, 2, ((char *)end - name.c), name.c);
 	}
 	return;
 }

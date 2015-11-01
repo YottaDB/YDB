@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +79,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 	rec = (jnl_record *)jnl_buff;
 	rectype = rec->prefix.jrec_type;
 	rec_len = rec->prefix.forwptr;
-	if (rec_len != REC_LEN_FROM_SUFFIX(jnl_buff, rec_len))
+	if ((ROUND_DOWN2(rec_len, JNL_REC_START_BNDRY) != rec_len) || rec_len != REC_LEN_FROM_SUFFIX(jnl_buff, rec_len))
 	{
 		assert(FALSE);
 		return ext_buff;

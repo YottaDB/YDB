@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,22 +61,22 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 	cc = ((rec_hdr_ptr_t)rp)->cmpc;
 	if ((CLI_NEGATED != head) && !patch_is_fdmp)
 	{
-		memcpy(util_buff, "Rec:", sizeof("Rec:") - 1);
+		MEMCPY_LIT(util_buff, "Rec:");
 		util_len = sizeof("Rec:") - 1;
 		util_len += i2hex_nofill(patch_rec_counter, (uchar_ptr_t)&util_buff[util_len], 4);
-		memcpy(&util_buff[util_len], "  Blk ", sizeof("  Blk ") - 1);
+		MEMCPY_LIT(&util_buff[util_len], "  Blk ");
 		util_len += sizeof("  Blk ") - 1;
 		util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len], 8);
-		memcpy(&util_buff[util_len], "  Off ", sizeof("  Off ") - 1);
+		MEMCPY_LIT(&util_buff[util_len], "  Off ");
 		util_len += sizeof("  Off ") - 1;
 		util_len += i2hex_nofill(rp - bp, (uchar_ptr_t)&util_buff[util_len], 4);
-		memcpy(&util_buff[util_len], "  Size ", sizeof("  Size ") - 1);
+		MEMCPY_LIT(&util_buff[util_len], "  Size ");
 		util_len += sizeof("  Size ") - 1;
 		util_len += i2hex_nofill(size, (uchar_ptr_t)&util_buff[util_len], 4);
-		memcpy(&util_buff[util_len], "  Cmpc ", sizeof("  Cmpc ") - 1);
+		MEMCPY_LIT(&util_buff[util_len], "  Cmpc ");
 		util_len += sizeof("  Cmpc ") - 1;
 		util_len += i2hex_nofill(cc, (uchar_ptr_t)&util_buff[util_len], 2);
-		memcpy(&util_buff[util_len], "  ", sizeof("  ") - 1);
+		MEMCPY_LIT(&util_buff[util_len], "  ");
 		util_len += sizeof("  ") - 1;
 		util_buff[util_len] = 0;
 		util_out_print(util_buff, FALSE);
@@ -97,10 +97,10 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 				break;
 	}
 	size = key_top - rp - sizeof(rec_hdr);
+	if (size > sizeof(patch_comp_key) - 2 - cc)
+		size = sizeof(patch_comp_key) - 2 - cc;
 	if (size < 0)
 		size = 0;
-	else  if (size > sizeof(patch_comp_key) - 2)
-		size = sizeof(patch_comp_key) - 2;
 	memcpy(&patch_comp_key[cc], rp + sizeof(rec_hdr), size);
 	patch_comp_count = cc + size;
 	patch_comp_key[patch_comp_count] = patch_comp_key[patch_comp_count + 1] = 0;
@@ -115,10 +115,10 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 			GET_LONG(blk_id, key_top);
 			if ((((blk_hdr_ptr_t)bp)->levl) || (blk_id <= cs_addrs->ti->total_blks))
 			{
-				memcpy(util_buff, "Ptr ", sizeof("Ptr ") - 1);
+				MEMCPY_LIT(util_buff, "Ptr ");
 				util_len = sizeof("Ptr ") - 1;
 				util_len += i2hex_nofill(blk_id, (uchar_ptr_t)&util_buff[util_len], sizeof(blk_id) * 2);
-				memcpy(&util_buff[util_len], "  ", sizeof("  ") - 1);
+				MEMCPY_LIT(&util_buff[util_len], "  ");
 				util_len += sizeof("  ") - 1;
 				util_buff[util_len] = 0;
 				util_out_print(util_buff, FALSE);
@@ -153,7 +153,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 
 				util_len = 8;
 				i2hex_blkfill(cptr0 - bp, (uchar_ptr_t)util_buff, 8);
-				memcpy(&util_buff[util_len], " : |", sizeof(" : |") - 1 );
+				MEMCPY_LIT(&util_buff[util_len], " : |");
 				util_len += sizeof(" : |") - 1;
 				util_buff[util_len] = 0;
 				util_out_print(util_buff, FALSE);
@@ -204,8 +204,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 								util_out_print("  !AD", FALSE, 1, cptr1);
 							else
 								util_out_print("  .", FALSE);
-						}
-						else
+						} else
 							util_out_print("   ", FALSE);
 					}
 				}

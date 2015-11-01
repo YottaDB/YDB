@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,8 +19,8 @@
 #include "gdsbt.h"
 #include "gdsblk.h"
 #include "gdsfhead.h"
-#include "mv_stent.h"
 #include "rtnhdr.h"
+#include "mv_stent.h"
 #include "stack_frame.h"
 #include "mu_gv_stack_init.h"
 

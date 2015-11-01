@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
 #include <errno.h>
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #include "gtm_string.h"
 #include <stddef.h>
 
@@ -43,6 +43,7 @@
 #include "gtm_sem.h"
 #include "ipcrmid.h"
 #include "ftok_sems.h"
+#include "interlock.h"
 
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int			recvpool_shmid;
@@ -234,9 +235,10 @@ void recvpool_init(recvpool_user pool_user,
 	}
 	if (shm_created)
 		recvpool.recvpool_ctl->initialized = FALSE;
-	recvpool.upd_proc_local = (upd_proc_local_ptr_t)((sm_uc_ptr_t)recvpool.recvpool_ctl + sizeof(recvpool_ctl_struct));
-	recvpool.gtmrecv_local = (gtmrecv_local_ptr_t)((sm_uc_ptr_t)recvpool.upd_proc_local + sizeof(upd_proc_local_struct));
-	recvpool.recvdata_base = (sm_uc_ptr_t)recvpool.recvpool_ctl + RECVDATA_BASE_OFF;
+	recvpool.upd_proc_local = (upd_proc_local_ptr_t)((sm_uc_ptr_t)recvpool.recvpool_ctl   + RECVPOOL_CTL_SIZE);
+	recvpool.gtmrecv_local  = (gtmrecv_local_ptr_t) ((sm_uc_ptr_t)recvpool.upd_proc_local + UPD_PROC_LOCAL_SIZE);
+	recvpool.upd_helper_ctl = (upd_helper_ctl_ptr_t)((sm_uc_ptr_t)recvpool.gtmrecv_local  + GTMRECV_LOCAL_SIZE);
+	recvpool.recvdata_base  = (sm_uc_ptr_t)recvpool.recvpool_ctl + RECVDATA_BASE_OFF;
 	if (GTMRECV == pool_user && gtmrecv_startup)
 		recvpool.recvpool_ctl->fresh_start = FALSE;
 	if (!recvpool.recvpool_ctl->initialized)
@@ -272,16 +274,16 @@ void recvpool_init(recvpool_user pool_user,
 		recvpool.upd_proc_local->upd_proc_pid = 0;
 		recvpool.upd_proc_local->upd_proc_pid_prev = 0;
 		recvpool.upd_proc_local->updateresync = gtmrecv_options.updateresync;
-
 		recvpool.gtmrecv_local->recv_serv_pid = process_id;
 		recvpool.gtmrecv_local->lastrecvd_time = -1;
-
 		recvpool.gtmrecv_local->restart = GTMRECV_NO_RESTART;
 		recvpool.gtmrecv_local->statslog = FALSE;
 		recvpool.gtmrecv_local->shutdown = NO_SHUTDOWN;
 		recvpool.gtmrecv_local->shutdown_time = -1;
 		strcpy(recvpool.gtmrecv_local->filter_cmd, gtmrecv_options.filter_cmd);
 		recvpool.gtmrecv_local->statslog_file[0] = '\0';
+		memset(recvpool.upd_helper_ctl, 0, sizeof(*recvpool.upd_helper_ctl));
+		SET_LATCH_GLOBAL(&recvpool.upd_helper_ctl->pre_read_lock, LOCK_AVAILABLE);
 		recvpool.recvpool_ctl->initialized = TRUE;
 		recvpool.recvpool_ctl->fresh_start = TRUE;
 	}

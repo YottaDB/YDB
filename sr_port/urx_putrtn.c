@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include <stddef.h>
 #include "gtm_string.h"
 #include "rtnhdr.h" /* needed by urx.h */
 #include "urx.h"
@@ -35,7 +36,7 @@ urx_rtnref *urx_putrtn (char *rtn, int rtnlen, urx_rtnref *anchor)
 	{	/* Find routine or insertion point */
 		c = rtnlen - rp1->len;
 		if (!c)
-			c = memcmp(rtn, rp1->name.c, rtnlen);
+			c = memcmp(rtn, &rp1->name[0], rtnlen);
 		if (c > 0)
 		{
 			rp0 = rp1;
@@ -50,14 +51,14 @@ urx_rtnref *urx_putrtn (char *rtn, int rtnlen, urx_rtnref *anchor)
 	assert(rp0->next == rp1);
 	if (!found)
 	{
-		tmp = (urx_rtnref *)malloc(sizeof(urx_rtnref));
+		tmp = (urx_rtnref *)malloc(offsetof(urx_rtnref, name[0]) + rtnlen);
 		tmp->len = rtnlen;
-		memcpy(tmp->name.c, rtn, rtnlen);
-		tmp->addr = 0;
-		tmp->lab = 0;
+		memcpy(&tmp->name[0], rtn, rtnlen);
+		tmp->addr = NULL;
+		tmp->lab = NULL;
 		tmp->next = rp1;
 		rp0->next = tmp;
 	}
-	assert(rp0->next != 0);
+	assert(rp0->next != NULL);
 	return rp0->next;
 }

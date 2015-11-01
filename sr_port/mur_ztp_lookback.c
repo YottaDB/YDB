@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,8 +20,10 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "iosp.h"
 #include "jnl_typedef.h"
@@ -42,13 +44,14 @@ boolean_t mur_ztp_lookback(void)
 	reg_ctl_list		*rctl, *rctl_top;
 	uint4			rec_pid, status;
 	int4			rec_image_count = 0;	/* This is a dummy variable for UNIX */
-	ht_entry		*htentry;
 	jnl_record		*jrec;
 	pini_list_struct	*plst;
 	enum jnl_record_type 	rectype;
 
 	error_def(ERR_NOPREVLINK);
-	error_def(ERR_MUJNINFO);
+	error_def(ERR_MUINFOUINT4);
+	error_def(ERR_MUINFOUINT8);
+	error_def(ERR_MUINFOSTR);
 
 	assert(FENCE_NONE != mur_options.fences);
 	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
@@ -87,8 +90,6 @@ boolean_t mur_ztp_lookback(void)
 			    	if ((NULL != (multi = MUR_TOKEN_LOOKUP(((struct_jrec_ztp_upd *)jrec)->token, rec_pid,
 								rec_image_count, 0, ZTPFENCE))) && (0 < multi->partner))
 				{	/* this transaction has already been identified as broken */
-					assert(murgbl.tp_resolve_time >= jrec->prefix.time);
-					murgbl.tp_resolve_time = jrec->prefix.time;
 					/* see turn-around-point code in mur_back_process/mur_apply_pblk for the fields to clear */
 					rctl->jctl_turn_around->turn_around_offset = 0;
 					rctl->jctl_turn_around->turn_around_time = 0;
@@ -102,11 +103,7 @@ boolean_t mur_ztp_lookback(void)
 					if (multi->time > jrec->prefix.time)
 						multi->time = jrec->prefix.time;
 					if (mur_options.verbose)
-						gtm_putmsg(VARLSTCNT(15) ERR_MUJNINFO, 13, LEN_AND_LIT("Mur_ztp_lookback"),
-						mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, mur_jctl->rec_offset,
-						murgbl.tp_resolve_time, mur_jctl->turn_around_offset, mur_jctl->turn_around_time,
-						mur_jctl->turn_around_tn, &mur_jctl->turn_around_seqno,
-						0, murgbl.token_table.count, murgbl.broken_cnt);
+						PRINT_VERBOSE_STAT("mur_ztp_lookback");
 				}
 			}
 		}

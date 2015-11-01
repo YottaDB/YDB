@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,10 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "rtnhdr.h"
 #include "mv_stent.h"
 
-GBLREF mv_stent *mv_chain;
-GBLREF unsigned char *stackbase,*stacktop,*msp,*stackwarn;
+GBLREF mv_stent 	*mv_chain;
+GBLREF unsigned char 	*stackbase,*stacktop,*msp,*stackwarn;
 
 mval *push_mval(arg1)
 mval *arg1;

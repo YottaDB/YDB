@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +16,7 @@
 #include "gtm_string.h"
 #include "gtm_unistd.h"
 
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
 #endif
@@ -57,6 +56,7 @@ GBLREF	int			gtmsource_statslog_fd;
 GBLREF 	FILE			*gtmsource_statslog_fp;
 GBLREF	int			gtmsource_filter;
 GBLREF	volatile time_t		gtmsource_now;
+GBLREF	uint4			log_interval;
 
 int gtmsource_poll_actions(boolean_t poll_secondary)
 {
@@ -65,7 +65,6 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	gtmsource_local_ptr_t	gtmsource_local;
 	time_t			now;
 	repl_heartbeat_msg_t	overdue_heartbeat;
-	char			seq_num_str[32], *seq_num_ptr;
 	char			*time_ptr;
 	char			time_str[CTIME_BEFORE_NL + 1];
 	char			print_msg[1024], msg_str[1024];
@@ -113,18 +112,28 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		}
 	}
 
-	if (gtmsource_local->changelog)
+	if (0 != gtmsource_local->changelog)
 	{
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Changing log file to %s\n", gtmsource_local->log_file);
+		if (gtmsource_local->changelog & REPLIC_CHANGE_LOGINTERVAL)
+		{
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "Changing log interval from %u to %u\n",
+					log_interval, gtmsource_local->log_interval);
+			log_interval = gtmsource_local->log_interval;
+			gtmsource_reinit_logseqno(); /* will force a LOG on the first send following the interval change */
+		}
+		if (gtmsource_local->changelog & REPLIC_CHANGE_LOGFILE)
+		{
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "Changing log file to %s\n", gtmsource_local->log_file);
 #ifdef UNIX
-		repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, NULL, gtmsource_local->log_file, NULL);
-		repl_log_fd2fp(&gtmsource_log_fp, gtmsource_log_fd);
+			repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, NULL, gtmsource_local->log_file, NULL);
+			repl_log_fd2fp(&gtmsource_log_fp, gtmsource_log_fd);
 #elif defined(VMS)
-		util_log_open(STR_AND_LEN(gtmsource_local->log_file));
+			util_log_open(STR_AND_LEN(gtmsource_local->log_file));
 #else
 #error unsupported platform
 #endif
-		gtmsource_local->changelog = FALSE;
+		}
+		gtmsource_local->changelog = 0;
 	}
 	if (!gtmsource_logstats && gtmsource_local->statslog)
 	{

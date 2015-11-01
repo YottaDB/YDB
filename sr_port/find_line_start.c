@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,8 +17,8 @@ GBLREF unsigned char *stackbase, *stacktop;
 unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine)
 {
 	unsigned char	*result;
-	LAB_TABENT	*max_label, *label_table, *last_label;
-	LNR_TABENT	*line_table, *last_line;
+	lab_tabent	*max_label, *label_table, *last_label;
+	lnr_tabent	*line_table, *last_line;
 	int4		in_addr_offset;
 
 	result = (unsigned char *)0;

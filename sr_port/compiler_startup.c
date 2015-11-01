@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,11 +35,11 @@ GBLREF short int source_column, source_line;
 /* ensure source_buffer is aligned on a int4 word boundary so that
  * we can calculate the checksum a longword at a time.
  */
-GBLREF int4 aligned_source_buffer[MAX_SRCLINE / sizeof(int4) + 1];
-GBLREF unsigned char *source_buffer;
-GBLREF int4 source_error_found;
-GBLREF src_line_struct src_head;
-GBLREF bool code_generated;
+GBLREF int4 			aligned_source_buffer[MAX_SRCLINE / sizeof(int4) + 1];
+GBLREF unsigned char 		*source_buffer;
+GBLREF int4 			source_error_found;
+GBLREF src_line_struct 		src_head;
+GBLREF bool 			code_generated;
 
 GBLREF triple			t_orig, *curr_fetch_trip, *curr_fetch_opr;
 GBLREF int4			curr_fetch_count;
@@ -47,28 +47,41 @@ GBLREF command_qualifier	cmd_qlf;
 GBLREF int			mlmax;
 GBLREF mline			mline_root;
 GBLREF char			cg_phase;	/* code generation phase */
+GBLREF boolean_t		mstr_native_align, save_mstr_native_align;
 
 bool compiler_startup(void)
 {
 #ifdef DEBUG
-	void	dumpall();
+	void		dumpall();
 #endif
-	bool	compile_w_err;
+	bool		compile_w_err;
 	unsigned char	err_buf[45];
-	unsigned char *cp, *cp2;
-	int	errknt, n;
-	uint4	checksum, srcint, line_count;
-	mlabel	*null_lab;
+	unsigned char 	*cp, *cp2;
+	int		errknt, n;
+	uint4		checksum, srcint, line_count;
+	mlabel		*null_lab;
 	src_line_struct	*sl;
-	mident	null_mident;
+	mident		null_mident;
+
 	static readonly char compile_terminated[] = "COMPILATION TERMINATED DUE TO EXCESS ERRORS";
 
 	memset(&null_mident, 0, sizeof(null_mident));
 	ESTABLISH_RET(compiler_ch, FALSE);
+
+	/* Since the stringpool alignment is solely based on mstr_native_align, we need to initialize it based
+	 * on the ALIGN_STRINGS qualifier so that all strings in the literal text pool are aligned.
+	 * However, when a module is compiled at runtime, we need to preserve the existing runtime setting
+	 * (that was initialized at GT.M startup) once the compilation is done.  save_mstr_native_align is used for
+	 * this purpose. */
+	save_mstr_native_align = mstr_native_align;
+	/* mstr_native_align = (cmd_qlf.qlf & CQ_ALIGN_STRINGS) ? TRUE : FALSE; */
+	mstr_native_align = FALSE; /* TODO: remove this line and  uncomment the above line */
+
 	cg_phase = CGP_NOSTATE;
 	source_error_found = errknt = 0;
 	if(!open_source_file())
 	{
+		mstr_native_align = save_mstr_native_align;
 		REVERT;
 		return FALSE;
 	}
@@ -181,6 +194,7 @@ bool compiler_startup(void)
 		close_list_file();
 	}
 	reinit_externs();
+	mstr_native_align = save_mstr_native_align;
 	REVERT;
 	if (errknt)
 		return TRUE;

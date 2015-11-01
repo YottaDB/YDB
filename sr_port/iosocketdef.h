@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +9,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __IOSOCKETDEF_H__
-#define __IOSOCKETDEF_H__
+#ifndef IOSOCKETDEF_H
+#define IOSOCKETDEF_H
 
 /* iosocketdef.h */
 
@@ -109,7 +109,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 boolean_t iosocket_delimiter(unsigned char *delimiter_buffer, int4 delimiter_len, socket_struct *socketptr, boolean_t rm);
 boolean_t iosocket_switch(char *handle, short handle_len, d_socket_struct *from, d_socket_struct *to);
 int4 iosocket_handle(char *handle, short *len, boolean_t newhandle, d_socket_struct *dsocketptr);
-socket_struct *iosocket_create(char *sockaddr, uint4 bfsize);
+socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des);
 ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, int flags, ABS_TIME *time_for_read);
 
 #endif

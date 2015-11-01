@@ -12,10 +12,10 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <fcntl.h>
-#include <string.h>
+#include "gtm_fcntl.h"
+#include "gtm_string.h"
 #include "gtm_stdlib.h"
-#include "gtm_termio.h"
+#include "gtm_termios.h"
 
 #include "io.h"
 #include "iottdef.h"

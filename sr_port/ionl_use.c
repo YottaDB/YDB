@@ -34,7 +34,7 @@ void ionl_use(io_desc *iod, mval *pp)
 	int		fil_type;
 	int4		width, length;
 	io_desc		*d_in, *d_out;
-	mident		tab;
+	char		*tab;
 	int		p_offset;
 
 	error_def(ERR_TTINVFILTER);
@@ -54,10 +54,9 @@ void ionl_use(io_desc *iod, mval *pp)
 			s2pool(&iod->error_handler);
 			break;
 		case iop_filter:
-			memset(&tab, 0, sizeof(mident));
 			len = *(pp->str.addr + p_offset);
-			memcpy(&tab.c[0], pp->str.addr + p_offset + 1, (len < sizeof(mident) ? len : sizeof(mident)));
-			if ((fil_type = namelook(filter_index, filter_names, tab.c)) < 0)
+			tab = pp->str.addr + p_offset + 1;
+			if ((fil_type = namelook(filter_index, filter_names, tab, len)) < 0)
 			{
 				rts_error(VARLSTCNT(1) ERR_TTINVFILTER);
 				return;

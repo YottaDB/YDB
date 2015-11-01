@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,17 +15,16 @@
 
 #include <stddef.h>	/* for offsetof macro */
 #ifdef UNIX
-#include <sys/ipc.h>
+#include "gtm_ipc.h"
 #endif
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include "gtm_socket.h"
+#include "gtm_inet.h"
 #ifdef UNIX
 #include <sys/un.h>
 #endif
 #include <sys/time.h>
 #include <errno.h>
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #ifdef UNIX
 #include "gtm_stat.h"
@@ -55,8 +54,10 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_mname.h"	/* needed for muprec.h */
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "repl_ctl.h"
 #include "repl_errno.h"
@@ -318,6 +319,7 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 
 	error_def(ERR_REPLFILIOERR);
 	error_def(ERR_TEXT);
+	error_def(ERR_NOPREVLINK);
 
 	/* Attempt to open newer generation journal files. Return the number of new files opened. Create new
 	 * ctl element(s) for each newer generation and attach at reg_ctl_end. Work backwards from the current journal file.
@@ -341,6 +343,10 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 		jnl_fn_len = new_ctl->repl_buff->fc->jfh->prev_jnl_file_name_length;
 		memcpy(jnl_fn, new_ctl->repl_buff->fc->jfh->prev_jnl_file_name, jnl_fn_len);
 		jnl_fn[jnl_fn_len] = '\0';
+		if ('\0' == jnl_fn[0])
+		{ /* prev link has been cut, can't follow path back from latest generation jnlfile to the latest we had opened */
+			rts_error(VARLSTCNT(4) ERR_NOPREVLINK, 2, new_ctl->jnl_fn_len, new_ctl->jnl_fn);
+		}
 		if (is_gdid_file_identical(&reg_ctl_end->repl_buff->fc->id, jnl_fn, jnl_fn_len))
 			break;
 	}
@@ -626,7 +632,7 @@ static	int first_read(repl_ctl_element *ctl)
 	repl_buff_desc		*b;
 	repl_file_control_t	*fc;
 	boolean_t		min_seqno_found;
-	unsigned char		seq_num_str[32], *seq_num_ptr;
+	unsigned char		seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
 
 	error_def(ERR_JNLBADRECFMT);
 
@@ -729,7 +735,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 	enum jnl_record_type	rectype;
 	int			status;
 	seq_num			read_seqno;
-	unsigned char		*seq_num_ptr, seq_num_str[32];
+	unsigned char		*seq_num_ptr, seq_num_str[32]; /* INT8_PRINT */
 
 	error_def(ERR_JNLBADRECFMT);
 	error_def(ERR_REPLCOMM);
@@ -810,11 +816,8 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 				}
 				ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 			} else if (rectype == JRT_EOF)
-			{
-				seq_num_ptr = i2ascl(seq_num_str, read_jnl_seqno);
-				rts_error(VARLSTCNT(8) ERR_REPLBRKNTRANS, 2, seq_num_ptr - seq_num_str, seq_num_str,
+				rts_error(VARLSTCNT(7) ERR_REPLBRKNTRANS, 1, &read_jnl_seqno,
 						ERR_TEXT, 2, RTS_ERROR_LITERAL("Early EOF found"));
-			}
 		} else if (status == EREPL_JNLRECINCMPL)
 		{	/* Log warning message for every certain number of attempts. There might have been a crash
 			 * and the file might have been corrupted. The file possibly might never grow.
@@ -1096,8 +1099,6 @@ static	tr_search_state_t do_binary_search(repl_ctl_element *ctl, uint4 lo_addr, 
 		}
 		return found;
 	} /* end for */
-	GTMASSERT; /* shouldn't reach here, must return from within for */
-	return TR_FIND_ERR;
 }
 
 static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno)
@@ -1196,7 +1197,7 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 {
 	int 			buff_avail, total_read, read_len, pass;
 	boolean_t		brkn_trans;
-	unsigned char		*seq_num_ptr, seq_num_str[32];
+	unsigned char		*seq_num_ptr, seq_num_str[32]; /* INT8_PRINT */
 	repl_ctl_element	*ctl;
 
 	error_def(ERR_REPLBRKNTRANS);
@@ -1224,10 +1225,7 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 		}
 		read_len = read_regions(&buff, &buff_avail, pass > 1, &brkn_trans, read_jnl_seqno);
 		if (brkn_trans)
-		{
-			seq_num_ptr = i2ascl(seq_num_str, read_jnl_seqno);
-			rts_error(VARLSTCNT(4) MAKE_MSG_SEVERE(ERR_REPLBRKNTRANS), 2, seq_num_ptr - seq_num_str, seq_num_str);
-		}
+			rts_error(VARLSTCNT(3) MAKE_MSG_SEVERE(ERR_REPLBRKNTRANS), 1, &read_jnl_seqno);
 		total_read += read_len;
 	}
 	if (tot_tcom_len > 0)
@@ -1247,7 +1245,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 	tr_search_state_t	found;
 	int			read_len, cumul_read;
 	int			nopen;
-	unsigned char		seq_num_str[32], *seq_num_ptr;
+	unsigned char		seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
 
 	cumul_read = 0;
 	*brkn_trans = TRUE;
@@ -1484,8 +1482,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 {
 
 	int4			read_size, read_state, first_tr_len, tot_tr_len;
-	unsigned char		seq_num_str[32], *seq_num_ptr;
-	unsigned char		seq_num_str1[32], *seq_num_ptr1;
+	unsigned char		seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
 	jnlpool_ctl_ptr_t	jctl;
 	gtmsource_local_ptr_t	gtmsource_local;
 	seq_num			read_jnl_seqno, jnl_seqno;
@@ -1636,7 +1633,7 @@ int gtmsource_update_resync_tn(seq_num resync_seqno)
 	gd_region		*region;
 	sgmnt_addrs		*csa;
 	int			read_size;
-	unsigned char		seq_num_str[32], *seq_num_ptr;
+	unsigned char		seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
 
 	REPL_DPRINT2("UPDATING RESYNC TN with seqno "INT8_FMT"\n", INT8_PRINT(resync_seqno));
 	gtmsource_ctl_close();

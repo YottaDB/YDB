@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,12 +36,11 @@
 
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_data		mu_int_data;
+GBLREF unsigned char		*mu_int_master;
 
 boolean_t mu_int_init(void)
 {
 	unsigned int	native_size, size, status;
-	sgmnt_addrs	*mu_int_addrs;
-	uchar_ptr_t	p1;
 	file_control	*fc;
 	boolean_t	standalone;
 	char		msgbuff[MSGBUF_SIZE], *msgptr;
@@ -70,17 +69,28 @@ boolean_t mu_int_init(void)
 		return FALSE;
 	}
 	native_size = mu_file_size(fc);
-	if (native_size < DIVIDE_ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE) + MIN_DB_BLOCKS)
+	if (native_size < DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_MIN, DISK_BLOCK_SIZE) + MIN_DB_BLOCKS)
 	{
 		mu_int_err(ERR_DBFSTHEAD, 0, 0, 0, 0, 0, 0, 0);
 		return FALSE;
 	}
-	p1 = (unsigned char *)malloc(ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE));
+	assert(SGMNT_HDR_LEN == sizeof(sgmnt_data));
 	fc->op = FC_READ;
-	fc->op_buff = p1;
-	fc->op_len = ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE);
+	fc->op_buff = (uchar_ptr_t)&mu_int_data;
+	fc->op_len = SGMNT_HDR_LEN;
 	fc->op_pos = 1;
 	dbfilop(fc);
-	memcpy(&mu_int_data, p1, sizeof(sgmnt_data));
+	if (MASTER_MAP_SIZE_MAX < MASTER_MAP_SIZE(&mu_int_data) ||
+	    native_size < DIVIDE_ROUND_UP(SGMNT_HDR_LEN + MASTER_MAP_SIZE(&mu_int_data), DISK_BLOCK_SIZE) + MIN_DB_BLOCKS)
+	{
+		mu_int_err(ERR_DBFSTHEAD, 0, 0, 0, 0, 0, 0, 0);
+		return FALSE;
+	}
+	mu_int_master = malloc(mu_int_data.master_map_len);
+	fc->op = FC_READ;
+	fc->op_buff = mu_int_master;
+	fc->op_len = MASTER_MAP_SIZE(&mu_int_data);
+	fc->op_pos = DIVIDE_ROUND_UP(SGMNT_HDR_LEN + 1, DISK_BLOCK_SIZE);
+	dbfilop(fc);
 	return (mu_int_fhead());
 }

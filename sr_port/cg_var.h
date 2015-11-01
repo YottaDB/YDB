@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +9,10 @@
  *								*
  ****************************************************************/
 
-#ifndef __CG_VAR_H__
-#define __CG_VAR_H__
+#ifndef CG_VAR_H_INCLUDED
+#define CG_VAR_H_INCLUDED
 
-void cg_var(mvar *l, VAR_TABENT **p);
+void cg_var(mvar *v, var_tabent **p);
+void ind_cg_var(mvar *v, var_tabent **p);
 
 #endif

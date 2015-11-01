@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,8 +44,8 @@
 #include "gdscc.h"
 #include "gdskill.h"	/* needed for tp.h */
 #include "jnl.h"	/* needed for tp.h */
-#include "hashtab.h"	/* needed for tp.h */
 #include "buddy_list.h"	/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"		/* needed for ua_list for ENSURE_UPDATE_ARRAY_SPACE macro */
 #include "iosp.h"
 #include "bmm_find_free.h"
@@ -73,13 +73,13 @@ block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw
 	sm_uc_ptr_t	bmp;
 	block_id	bml, hint, hint_cycled, hint_limit;
 	block_id_ptr_t	b_ptr;
-	cache_rec_ptr_t	cr;
-	int		cw_set_top, cycle, depth;
+	int		cw_set_top, depth;
 	unsigned int	lcnt, local_maps, map_size, n_decrements = 0, total_blks;
 	trans_num	ctn;
 	int4		free_bit, offset;
 	uint4		space_needed;
 	uint4		status;
+	srch_blk_status	blkhist;
 
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
 	if (orig_hint >= total_blks)		/* for TP, hint can be > total_blks */
@@ -90,7 +90,7 @@ block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw
 	local_maps = hint_cycled + 2;	/* for (up to) 2 wraps */
 	for (lcnt = 0; lcnt <= local_maps; lcnt++)
 	{
-		bml = bmm_find_free(hint / BLKS_PER_LMAP, (sm_uc_ptr_t)cs_data->master_map, local_maps);
+		bml = bmm_find_free(hint / BLKS_PER_LMAP, (sm_uc_ptr_t)MM_ADDR(cs_data), local_maps);
 		if ((NO_FREE_SPACE == bml) || (bml >= hint_cycled))
 		{	/* if no free space or might have looped to original map, extend */
 			if ((NO_FREE_SPACE != bml) && (hint_limit < hint_cycled))
@@ -168,7 +168,7 @@ block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw
 		if (0 == depth)
 		{
 			ctn = cs_addrs->ti->curr_tn;
-			if (!(bmp = t_qread(bml, (sm_int_ptr_t)&cycle, &cr)))
+			if (!(bmp = t_qread(bml, (sm_int_ptr_t)&blkhist.cycle, &blkhist.cr)))
 				return MAP_RD_FAIL;
 			if ((BM_SIZE(BLKS_PER_LMAP) != ((blk_hdr_ptr_t)bmp)->bsiz) || (LCL_MAP_LEVL != ((blk_hdr_ptr_t)bmp)->levl))
 			{
@@ -200,7 +200,7 @@ block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw
 				hint_cycled = (hint_limit < hint_cycled) ? hint_limit: 0;
 		}
 		if ((0 == depth) && (FALSE != cs_addrs->now_crit))	/* if it's from the cw_set, its state is murky */
-			bit_clear(bml / BLKS_PER_LMAP, cs_data->master_map);	/* if crit, repair master map error */
+			bit_clear(bml / BLKS_PER_LMAP, MM_ADDR(cs_data));	/* if crit, repair master map error */
 	}
 	/* If not in the final retry, it is possible that free_bit is >= map_size (e.g. if bitmap block gets recycled). */
 	if (map_size <= (uint4)free_bit && CDB_STAGNATE <= t_tries)
@@ -223,7 +223,9 @@ block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw
 		BLK_ADDR(b_ptr, space_needed, block_id);
 		memset(b_ptr, 0, space_needed);
 		*b_ptr = free_bit + bml;
-		t_write_map(bml, bmp, (uchar_ptr_t)b_ptr, ctn);
+		blkhist.blk_num = bml;
+		blkhist.buffaddr = bmp;	/* cycle and cr have already been assigned from t_qread */
+		t_write_map(&blkhist, (uchar_ptr_t)b_ptr, ctn);
 		if (0 != dollar_tlevel)
 		{
 			tp_get_cw(cs, (int)(*cw_depth_ptr - 1), &cs1);
@@ -231,8 +233,6 @@ block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw
 		} else
 			cs1 = cs + *cw_depth_ptr;
 		cs1->reference_cnt++;
-		cs1->cycle = cycle;
-		cs1->cr = cr;
 	}
 	return bml + free_bit;
 }
@@ -262,7 +262,7 @@ boolean_t	is_free_blks_ctr_ok(void)
 	local_maps = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 	for (free_blocks = 0, free_bml = 0; free_bml < local_maps; free_bml++)
 	{
-		bml = bmm_find_free((uint4)free_bml, (sm_uc_ptr_t)cs_data->master_map, local_maps);
+		bml = bmm_find_free((uint4)free_bml, (sm_uc_ptr_t)MM_ADDR(cs_data), local_maps);
 		if (bml < free_bml)
 			break;
 		bml *= BLKS_PER_LMAP;

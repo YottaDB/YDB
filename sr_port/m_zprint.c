@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,11 +17,11 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char window_token;
-GBLREF mident window_ident;
-GBLREF bool run_time;
-GBLREF char routine_name[];
-static readonly mident zero_ident;	/* the null mident */
+GBLREF char 	window_token;
+GBLREF mident 	window_ident;
+GBLREF bool 	run_time;
+GBLREF mident	routine_name;
+LITREF mident 	zero_ident;
 
 int m_zprint(void)
 {
@@ -32,7 +32,7 @@ int m_zprint(void)
 	error_def(ERR_RTNNAME);
 
 	got_some = FALSE;
-	lab1 = put_str(&zero_ident.c[0],sizeof(mident));
+	lab1 = put_str(zero_ident.addr, zero_ident.len);
 	off1 = put_ilit(0);
 	if (window_token != TK_EOL && window_token != TK_SPACE && !lref(&lab1,&off1,TRUE,indir_zprint,TRUE,&got_some))
 		return FALSE;
@@ -41,7 +41,7 @@ int m_zprint(void)
 	if (window_token != TK_CIRCUMFLEX)
 	{
 		if (!run_time)
-			rtn = put_str(routine_name, mid_len ((mident *)routine_name));
+			rtn = put_str(routine_name.addr, routine_name.len);
 		else
 			rtn = put_tref(newtriple(OC_CURRTN));
 	}
@@ -52,7 +52,7 @@ int m_zprint(void)
 		switch(window_token)
 		{
 		case TK_IDENT:
-			rtn = put_str(window_ident.c, mid_len (&window_ident));
+			rtn = put_str(window_ident.addr, window_ident.len);
 			advancewindow();
 			break;
 		case TK_ATSIGN:
@@ -70,7 +70,7 @@ int m_zprint(void)
 		{	stx_error(ERR_LABELEXPECTED);
 			return FALSE;
 		}
-		lab2 = put_str(&zero_ident.c[0],sizeof(mident));
+		lab2 = put_str(zero_ident.addr, zero_ident.len);
 		off2 = put_ilit(0);
 		advancewindow();
 		if (!lref(&lab2,&off2,TRUE,indir_zprint,FALSE,&got_some))

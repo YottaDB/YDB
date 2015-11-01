@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,7 @@ static	boolean_t	first_syslog = TRUE;
  *
  *		!mSB	!mSW	!mSL
  *
- *		!mUB	!mUW	!mUL
+ *		!mUB	!mUW	!mUL    !m@UH   !m@UJ
  *
  *		!mXB	!mXW	!mXL    !m@XH   !m@XJ
  *
@@ -332,9 +332,9 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 								numptr += length;
 							}
 						}
-					} else 	/* support ZH and ZJ */
+					} else 	/* support ZH, ZJ, UH, and UJ */
 					{
-						if ('Z' != type)
+						if ('Z' != type && 'U' != type)
 							GTMASSERT;
 						assert('H' == type2 || 'J' == type2);
 						GETFAOVALDEF(faocnt, fao, qw_num_ptr_t, val_ptr, NULL);	/* Addr of long type */

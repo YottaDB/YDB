@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,9 +42,9 @@
 #include "gdsfhead.h"
 #include "gdscc.h"
 #include "filestruct.h"
-#include "hashtab.h"
 #include "buddy_list.h"
 #include "jnl.h"
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "gtmimagename.h"
 #include "repl_msg.h"		/* needed for gtmsource.h */

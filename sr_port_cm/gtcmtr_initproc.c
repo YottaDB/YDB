@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,10 +22,10 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "cmidef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "gtcm_find_proc.h"
-#include "gtcmtr_initproc.h"
+#include "gtcmtr_protos.h"
 #include "gtcm_protocol.h"
 #include "gtcm_is_query_queryget.h"
 #include "gtcm_err_compat.h"		/* for gtcm_err_compat() prototype */
@@ -58,6 +58,8 @@ bool gtcmtr_initproc(void)
 		rts_error(VARLSTCNT(1) CMERR_INVPROT);
 	curr_entry->query_is_queryget = gtcm_is_query_queryget((protocol_msg *)reply, &myproto);
 	curr_entry->err_compat = gtcm_err_compat((protocol_msg *)reply, &myproto);
+	curr_entry->cli_supp_allowexisting_stdnullcoll = (0 <= memcmp(reply + CM_LEVEL_OFFSET, CMM_STDNULLCOLL_MIN_LEVEL, 3));
+	curr_entry->client_supports_long_names = (0 <= memcmp(reply + CM_LEVEL_OFFSET, CMM_LONGNAMES_MIN_LEVEL, 3));
 	originator_prc_vec = curr_entry->pvec = (jnl_process_vector *)malloc(sizeof(jnl_process_vector));
         jpv_size = sizeof(jnl_process_vector);
 	assert(jpv_size >= curr_entry->clb_ptr->cbl - S_HDRSIZE - S_PROTSIZE &&

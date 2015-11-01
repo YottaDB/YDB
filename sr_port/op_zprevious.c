@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,8 +20,7 @@
 #include "gdsfhead.h"
 #include "stringpool.h"
 #include "op.h"
-#include "gvcst_data.h"
-#include "gvcst_zprevious.h"
+#include "gvcst_protos.h"	/* for gvcst_data,gvcst_zprevious prototype */
 #include "change_reg.h"
 #include "gvsub2str.h"
 #include "gvcmx.h"
@@ -50,7 +49,11 @@ void op_zprevious(mval *v)
 	bool			found;
 
 	if (gv_curr_subsc_null)
-	{
+	{	/* With standard null collation, we still want the same behavior,
+		 * so replace 0x01 in gv_currkey->base[gv_currkey->prev] with 0xFF
+		 */
+		gv_currkey->base[gv_currkey->prev] = 0xFF;	/* redundant assignment for when !gv_cur_region->std_null_coll;
+								 * done to avoid pipeline break should we introduce an if */
 		gv_currkey->base[gv_currkey->prev + 1] = 0xFF;
 		gv_currkey->base[++(gv_currkey->end)] = 0;
 	}
@@ -73,7 +76,8 @@ void op_zprevious(mval *v)
 			gv_altkey->prev = gv_currkey->prev;
 			if (stringpool.top - stringpool.free < MAX_KEY_SZ)
 			{
-				if (0xFF != gv_altkey->base[gv_altkey->prev])
+				if (0xFF != gv_altkey->base[gv_altkey->prev] &&
+					SUBSCRIPT_STDCOL_NULL != gv_altkey->base[gv_altkey->prev])
 					n = MAX_FORM_NUM_SUBLEN;
 				else
 				{
@@ -94,12 +98,12 @@ void op_zprevious(mval *v)
 	} else
 	{	/* the following section is for $ZPREVIOUS(^gname) */
 		assert(2 <= gv_currkey->end);
-		assert(gv_currkey->end < (sizeof(mident) + 3));	/* until names are not in midents */
+		assert(gv_currkey->end < (MAX_MIDENT_LEN + 3));	/* until names are not in midents */
 		assert(INVALID_GV_TARGET == reset_gv_target);
 		reset_gv_target = gv_target;
-		for (map = gd_map_top - 1;  (map > (gd_map + 1)) &&
+		for (map = gd_map_top - 1; (map > (gd_map + 1)) &&
 			(0 >= memcmp(gv_currkey->base, map->name,
-				((sizeof(mident) + 2) == gv_currkey->end) ? sizeof(mident) : gv_currkey->end - 1));  map--)
+				((MAX_MIDENT_LEN + 2) == gv_currkey->end) ? MAX_MIDENT_LEN : gv_currkey->end - 1)); map--)
 			;
 		for (map++;  map > gd_map;  map--)
 		{
@@ -121,7 +125,7 @@ void op_zprevious(mval *v)
 				if (!found)
 					break;
 				assert(1 < gv_altkey->end);
-				assert(gv_altkey->end < (sizeof(mident) + 2));	/* until names are not in midents */
+				assert(gv_altkey->end < (MAX_MIDENT_LEN + 2));	/* until names are not in midents */
 				if (memcmp(gv_altkey->base, (map - 1)->name, gv_altkey->end - 1) < 0)
 				{
 					found = FALSE;
@@ -144,8 +148,10 @@ void op_zprevious(mval *v)
 				break;
 			else  if ((map - 1) > gd_map)
 			{
-				memcpy(gv_currkey->base, (map - 1)->name, sizeof(mident));
-				gv_currkey->end = mid_len((mident *)gv_currkey->base);
+				assert(sizeof((map - 1)->name) == sizeof(mident_fixed));
+				assert(0 == (map - 1)->name[sizeof((map - 1)->name) - 1]);
+				gv_currkey->end = mid_len((mident_fixed *)((map - 1)->name));
+				memcpy(gv_currkey->base, (map - 1)->name, gv_currkey->end);
 				gv_currkey->base[gv_currkey->end++] = 0;
 				gv_currkey->base[gv_currkey->end++] = 0;
 			}

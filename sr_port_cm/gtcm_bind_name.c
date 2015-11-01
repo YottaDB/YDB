@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,55 +11,52 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-#include "hashdef.h"
 #include "cmidef.h"
+#include "hashtab_mname.h"
 #include "cmmdef.h"
 #include "gtcm_bind_name.h"
 #include "gv_xform_key.h"
 #include "targ_alloc.h"
-#include "gvcst_root_search.h"
+#include "gvcst_protos.h"	/* for gvcst_root_search prototype */
+#include "hashtab.h"
 
 #define DIR_ROOT 1
 
 GBLREF gv_key		*gv_currkey;
-GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_data	*cs_data;
-GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gv_namehead	*gv_target;
-GBLREF cm_region_head	*curr_cm_reg_head;
 
 void gtcm_bind_name(cm_region_head *rh, boolean_t xform)
 {
-	ht_entry		*hte_ptr;
-	char			stashed;
-	register unsigned char	*c0, *c_top;
-	unsigned int		idx;
-	mname			lcl_name;
+	ht_ent_mname	*tabent;
+	mname_entry	 gvent;
+	boolean_t	added;
 
-	curr_cm_reg_head = rh;
-	gv_cur_region = rh->reg;
-	for (c0 = (unsigned char *)&lcl_name, c_top = c0 + sizeof(lcl_name), idx = 0;
-		gv_currkey->base[idx] && idx < sizeof(lcl_name.txt);  idx++)
-		*c0++ = gv_currkey->base[idx];
-	while (c0 < c_top)
-		*c0++ = 0;
-	hte_ptr = ht_put(rh->reg_hash, &lcl_name, &stashed);
-	if (stashed || !hte_ptr->ptr)
-		hte_ptr->ptr = (char *)targ_alloc(FILE_INFO(gv_cur_region)->s_addrs.hdr->max_key_size);
-	gv_target = (gv_namehead *)hte_ptr->ptr;
-	if ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth))
+	GTCM_CHANGE_REG(rh);	/* sets the global variables gv_cur_region/cs_addrs/cs_data appropriately */
+	gvent.var_name.addr = (char *)gv_currkey->base;
+	gvent.var_name.len = strlen((char *)gv_currkey->base);
+	COMPUTE_HASH_MNAME(&gvent);
+	if (NULL == (tabent = lookup_hashtab_mname(rh->reg_hash, &gvent)) || NULL == (gv_target = (gv_namehead *)tabent->value))
 	{
-		cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
-		cs_data = cs_addrs->hdr;
+		gv_target = targ_alloc(cs_data->max_key_size, &gvent);
+		if (NULL != tabent)
+		{ 	/* Since the global name was found but gv_target was null and now we created a new gv_target,
+			 * the hash table key must point to the newly created gv_target->gvname. */
+			tabent->key = gv_target->gvname;
+			tabent->value = gv_target;
+		} else
+		{
+			added = add_hashtab_mname((hash_table_mname *)rh->reg_hash, &gv_target->gvname, gv_target, &tabent);
+			assert(added);
+		}
 	}
-	else
-		GTMASSERT;
 	if ((!gv_target->root) || (DIR_ROOT == gv_target->root))
 		gvcst_root_search();
 	if ((gv_target->collseq || gv_target->nct) && xform)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,12 +52,6 @@ GBLREF	volatile	int4	fast_lock_count;
 GBLREF	int4		process_id;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	int		num_additional_processors;
-
-#ifdef DEBUG_QUEUE
-#define VERIFY_QUEUE(base) verify_queue(base)
-#else
-#define VERIFY_QUEUE(base)
-#endif
 
 int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 {

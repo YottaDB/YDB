@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,11 +12,10 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <unistd.h>
+#include "gtm_unistd.h"	/* fsync() needs this */
 
 #include "gtmio.h"	/* this has to come in before gdsfhead.h, for all "open" to be defined
 				to "open64", including the open in header files */
-#include "gtm_unistd.h"	/* fsync() needs this */
 #include "aswp.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -63,7 +62,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	udi = FILE_INFO(jpc->region);
 	csa = &udi->s_addrs;
 	jb = jpc->jnl_buff;
-	if (jb->io_in_prog_latch.latch_pid == process_id)	/* We already have the lock? */
+	if (jb->io_in_prog_latch.u.parts.latch_pid == process_id)	/* We already have the lock? */
 		return ERR_JNLWRTNOWWRTR;			/* timer driven io in progress */
 	jnl_qio_in_prog++;
 	if (!GET_SWAPLOCK(&jb->io_in_prog_latch))
@@ -136,7 +135,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	}
 	jpc->status = SS_NORMAL;
 	assert(jb->dsk <= jb->size);
-	assert(jb->io_in_prog_latch.latch_pid == process_id);
+	assert(jb->io_in_prog_latch.u.parts.latch_pid == process_id);
 	jpc->new_dsk = jb->dsk + jb->wrtsize;
 	if (jpc->new_dsk >= jb->size)
 	{
@@ -157,7 +156,6 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	{
 		close(csa->jnl->channel);
 		csa->jnl->channel = NOJNL;
-		csa->jnl->regnum = 0;
 		csa->jnl->pini_addr = 0;
 	}
 	jnl_qio_in_prog--;

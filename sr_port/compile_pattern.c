@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,7 +76,7 @@ int compile_pattern(oprtype *opr, bool is_indirect)
 		}
 		retmval.mvtype = MV_STR;
 		retmval.str.len = retstr.len * sizeof(uint4);
-		retmval.str.addr = stringpool.free;
+		retmval.str.addr = (char *)stringpool.free;
 		if (stringpool.top - stringpool.free < retmval.str.len)
 			stp_gcol(retmval.str.len);
 		memcpy(stringpool.free, &retstr.buff[0], retmval.str.len);

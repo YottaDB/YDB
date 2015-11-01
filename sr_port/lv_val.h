@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,7 +69,7 @@ typedef struct symval_struct
 	{
 		struct sbs_blk_struct	*fl, *bl;
 	}			sbs_que;
-       	htab_desc		h_symtab;
+       	hash_table_mname	h_symtab;
 	lv_blk	       		first_block;
 	lv_val	       		*lv_flist;
        	struct symval_struct	*last_tab;
@@ -78,7 +78,7 @@ typedef struct symval_struct
 lv_val *lv_getslot(symval *sym);
 void lv_cnv_int_tbl(lv_sbs_tbl *tbl);
 void lv_killarray(lv_sbs_tbl *a);
-void lv_newname(ht_entry *hte, symval *sym);
+void lv_newname(ht_ent_mname *hte, symval *sym);
 void lv_zap_sbs(lv_sbs_tbl *tbl, lv_val *lv);
 lv_blk *lv_newblock(lv_blk *block_addr, lv_blk *next_block, int size);
 

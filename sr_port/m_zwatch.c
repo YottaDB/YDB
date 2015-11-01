@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,9 +20,9 @@
 #define CANCEL_ONE -1
 #define CANCEL_ALL -2
 
-GBLREF char window_token;
-GBLREF mident window_ident;
-static readonly mident zero_ident;	/* the null mident */
+GBLREF char 	window_token;
+GBLREF mident 	window_ident;
+LITREF mident 	zero_ident;
 
 int m_zwatch(void)
 {
@@ -39,12 +39,12 @@ int m_zwatch(void)
 		switch(window_token)
 		{
 		case TK_ASTERISK:
-			name = put_str(&zero_ident.c[0],sizeof(mident));
+			name = put_str(zero_ident.addr, zero_ident.len);
 			count = put_ilit(CANCEL_ALL);
 			advancewindow();
 			break;
 		case TK_IDENT:
-			name = put_str(&window_ident.c[0],sizeof(mident));
+			name = put_str(window_ident.addr, window_ident.len);
 			count = put_ilit(CANCEL_ONE);
 			advancewindow();
 			break;
@@ -72,7 +72,7 @@ int m_zwatch(void)
 		switch(window_token)
 		{
 		case TK_IDENT:
-			name = put_str(&window_ident.c[0],sizeof(mident));
+			name = put_str(window_ident.addr, window_ident.len);
 			advancewindow();
 			break;
 		case TK_ATSIGN:

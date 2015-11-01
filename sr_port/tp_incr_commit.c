@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,8 +23,8 @@
 #include "gdskill.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "copy.h"
 #include "tp_incr_commit.h"
@@ -39,13 +39,12 @@ GBLREF	buddy_list		*global_tlvl_info_list;
 
 void tp_incr_commit(void)
 {
-	uint4		duint4;
-	sgm_info 	*si;
-	cw_set_element 	*cse, *orig_cse, *prev_cse, *next_cse, *low_cse, *lower_cse;
-	tlevel_info	*tli, *prev_tli = NULL, *last_prev_tli = NULL;
-	global_tlvl_info
-			*gtli, *prev_gtli;
-	srch_blk_status	*tp_srch_status;
+	sgm_info 		*si;
+	cw_set_element 		*cse, *orig_cse, *prev_cse, *next_cse, *low_cse, *lower_cse;
+	tlevel_info		*tli, *prev_tli = NULL, *last_prev_tli = NULL;
+	global_tlvl_info 	*gtli, *prev_gtli;
+	srch_blk_status		*tp_srch_status;
+	ht_ent_int4		*tabent;
 
 	for (si = first_sgm_info;  si != NULL;  si = si->next_sgm_info)
 	{
@@ -88,8 +87,10 @@ void tp_incr_commit(void)
 						 * with a given list together.
 						 * This might disturb the tp_srch_status->ptr, so reset it properly.
 						 */
-						tp_srch_status = (srch_blk_status *)lookup_hashtab_ent(si->blks_in_use,
-												(void *)cse->blk, &duint4);
+						if (NULL != (tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&cse->blk)))
+							tp_srch_status = tabent->value;
+						else
+							tp_srch_status = NULL;
 						assert(!tp_srch_status || tp_srch_status->ptr == cse);
 						if (tp_srch_status)
 							tp_srch_status->ptr = low_cse;

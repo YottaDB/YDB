@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,14 +11,13 @@
 
 #include "mdef.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
+#include "gtm_inet.h"
 #ifdef UNIX
-#include <sys/ipc.h>
+#include "gtm_ipc.h"
 #include <sys/mman.h>
 #include <sys/shm.h>
 #endif
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include <errno.h>
 #include "gtm_string.h"
@@ -53,12 +52,13 @@ GBLREF unsigned char	jnl_ver, remote_jnl_ver;
 GBLDEF	intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1][JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
 	/* This should be a square matrix. If you add a row, make sure you add a column too. */
-		/*  11         12         13	     14     	15	*/
-	/* 11 */{IF_NONE,   IF_11TO12, IF_11TO12, IF_11TO12, IF_11TO15},
-	/* 12 */{IF_12TO11, IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15},
-	/* 13 */{IF_12TO11, IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15},
-	/* 14 */{IF_12TO11, IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15},
-	/* 15 */{IF_15TO11, IF_15TO12, IF_15TO12, IF_15TO12, IF_NONE  },
+		/* 12         13	 14     	15          16    	17	*/
+	/* 12 */{IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15,  IF_12TO16,	IF_12TO17},
+	/* 13 */{IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15,  IF_12TO16,	IF_12TO17},
+	/* 14 */{IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15,  IF_12TO16,	IF_12TO17},
+	/* 15 */{IF_15TO12, IF_15TO12, IF_15TO12, IF_NONE,    IF_15TO16,	IF_15TO17},
+	/* 16 */{IF_16TO12, IF_16TO12, IF_16TO12, IF_16TO15,  IF_16TO16,	IF_NONE	 },
+	/* 17 */{IF_17TO12, IF_17TO12, IF_17TO12, IF_17TO15,  IF_NONE,		IF_17TO17},
 };
 GBLREF unsigned int	jnl_source_datalen, jnl_dest_maxdatalen;
 GBLREF unsigned char	jnl_source_rectype, jnl_dest_maxrectype;
@@ -428,7 +428,6 @@ int repl_stop_filter(void)
 
 void repl_filter_error(seq_num filter_seqno, int why)
 {
-	unsigned char	seq_num_str[32], *seq_num_ptr;
 
 	error_def(ERR_FILTERNOTALIVE);
 	error_def(ERR_FILTERCOMM);
@@ -436,19 +435,18 @@ void repl_filter_error(seq_num filter_seqno, int why)
 
 	repl_log(stderr, TRUE, TRUE, "Stopping filter due to error\n");
 	repl_stop_filter();
-	seq_num_ptr = i2ascl(seq_num_str, filter_seqno);
 	switch (repl_errno)
 	{
 		case EREPL_FILTERNOTALIVE :
-			rts_error(VARLSTCNT(4) ERR_FILTERNOTALIVE, 2, seq_num_ptr - seq_num_str, seq_num_str);
+			rts_error(VARLSTCNT(3) ERR_FILTERNOTALIVE, 1, &filter_seqno);
 			break;
 
 		case EREPL_FILTERSEND :
-			rts_error(VARLSTCNT(5) ERR_FILTERCOMM, 2, seq_num_ptr - seq_num_str, seq_num_str, why);
+			rts_error(VARLSTCNT(4) ERR_FILTERCOMM, 1, &filter_seqno, why);
 			break;
 
 		case EREPL_FILTERBADCONV :
-			rts_error(VARLSTCNT(4) ERR_FILTERBADCONV, 2, seq_num_ptr - seq_num_str, seq_num_str);
+			rts_error(VARLSTCNT(3) ERR_FILTERBADCONV, 1, &filter_seqno);
 			break;
 
 		default :
@@ -462,14 +460,9 @@ void repl_check_jnlver_compat(void)
 	error_def(ERR_UNIMPLOP);
 	error_def(ERR_TEXT);
 
-	/* On VMS, no customer has a pre V4.3-001 version running replication in production.
-	 * On Unix, effective V4.4-002, we stopped supporting dual site config with V4.1 versions.
-	 * Customers who want to run replication to upgrade to V4.3-001 (on VMS), V4.2 (on Unix).
-	 * We don't want to write/maintain internal filters to support rolling upgrades b/n pre
-	 * V4.3-001 (VMS), V4.2 (Unix) and contemporary releases.
-	 * Vinaya May 08, 2003 */
-	UNIX_ONLY(assert(JNL_VER_EARLIEST_REPL <= remote_jnl_ver);) /* remote must be V4.2+ */
-	VMS_ONLY(assert(V13_JNL_VER <= remote_jnl_ver);) /* remote must be V4.3+ */
+	/* see comment in repl_filter.h about list of filter-formats, jnl-formats and GT.M versions */
+	UNIX_ONLY(assert(JNL_VER_EARLIEST_REPL <= remote_jnl_ver);) /* remote must be V4.3-000+ */
+	VMS_ONLY(assert(V13_JNL_VER <= remote_jnl_ver);) /* remote must be V4.3-001+ */
 	if (VMS_ONLY(V13_JNL_VER) UNIX_ONLY(JNL_VER_EARLIEST_REPL) > remote_jnl_ver)
 		rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
 				LEN_AND_LIT("Dual site configuration not supported between these two GT.M versions"));

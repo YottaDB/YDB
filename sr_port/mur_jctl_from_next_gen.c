@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,8 +25,10 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "iosp.h"
 #include "jnl_typedef.h"
@@ -50,8 +52,8 @@ boolean_t mur_jctl_from_next_gen(void)
 	{
 		if (!rctl->jfh_recov_interrupted)
 			continue;
-		assert(rctl->jctl_save_turn_around == rctl->jctl_head);
-		jctl = rctl->jctl_save_turn_around;	/* journal file that has the turn around point of interrupted recovery */
+		assert(rctl->jctl_apply_pblk == rctl->jctl_head);
+		jctl = rctl->jctl_apply_pblk;	/* journal file that has the turn around point of interrupted recovery */
 		assert(rctl->jctl == jctl);
 		assert(NULL != rctl->jctl_alt_head);	/* should have been set in mur_apply_pblk */
 		assert(NULL != jctl->jfh);

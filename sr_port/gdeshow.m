@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2005 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -46,7 +46,9 @@ r1:	d regionhd s jnl=0,s=""
 onereg:
 	w !,BOL,?x(1),s,?x(2),regs(s,"DYNAMIC_SEGMENT"),?x(3),$j(regs(s,"COLLATION_DEFAULT"),4)
 	w ?x(4),$j(regs(s,"RECORD_SIZE"),5),?x(5),$j(regs(s,"KEY_SIZE"),5)
-	w ?x(6),$s(regs(s,"NULL_SUBSCRIPTS"):"Y",1:"N"),?x(7),$s(regs(s,"JOURNAL"):"Y",1:"N")
+	w ?x(6),$s(regs(s,"NULL_SUBSCRIPTS")=1:"ALWAYS",regs(s,"NULL_SUBSCRIPTS")=2:"EXISTING",1:"NEVER")
+	w ?x(7),$s(regs(s,"STDNULLCOLL"):"Y",1:"N")
+	w ?x(8),$s(regs(s,"JOURNAL"):"Y",1:"N")
 	q
 onejnl:
 	w !,BOL,?x(1),s,?x(2),$s($l(regs(s,"FILE_NAME")):regs(s,"FILE_NAME"),1:"<based on DB file-spec>")
@@ -107,12 +109,12 @@ onemap:(s1,s2)
 	i $l(mapreg),mapreg'=map(s2) q
 	s l1=$l(s1)
 	i $l(s2)=l1,$e(s1,l1)=0,$e(s2,l1)=")",$e(s1,1,l1-1)=$e(s2,1,l1-1) q
-	w !,BOL,?x(1),$tr(s2,")","0"),?x(2),$tr(s1,")","0"),?x(3),map(s2)
-	i '$d(regs(map(s2),"DYNAMIC_SEGMENT")) w ?x(4),"NONE",?x(5),"NONE" q
-	s j=regs(map(s2),"DYNAMIC_SEGMENT") w ?x(4),j
-	i '$d(segs(j,"ACCESS_METHOD")) w ?x(5),"NONE"
-	e  s s=segs(j,"FILE_NAME") i $l(s)<(79-x(5)) w ?x(5),s
-	e  w !,BOL,?$s(71-$l(s)>1:79-$l(s),1:1),s
+	w !,BOL,?x(1),$tr(s2,")","0"),?x(2),$tr(s1,")","0"),?x(3),"REG = ",map(s2)
+	i '$d(regs(map(s2),"DYNAMIC_SEGMENT")) d  q
+	. w !,BOL,?x(3),"SEG = NONE",!,BOL,?x(3),"FILE = NONE"
+	s j=regs(map(s2),"DYNAMIC_SEGMENT") w !,BOL,?x(3),"SEG = ",j
+	i '$d(segs(j,"ACCESS_METHOD")) w !,BOL,?x(3),"FILE = NONE"
+	e  s s=segs(j,"FILE_NAME") w !,BOL,?x(3),"FILE = ",s
 	q
 TEMPLATE
 	d t1
@@ -121,8 +123,9 @@ TEMPLATE
 t1:	d tmpreghd
 	w !,BOL,?x(1),"<default>",?x(3),$j(tmpreg("COLLATION_DEFAULT"),4)
 	w ?x(4),$j(tmpreg("RECORD_SIZE"),5),?x(5),$j(tmpreg("KEY_SIZE"),5)
-	w ?x(6),$s(tmpreg("NULL_SUBSCRIPTS"):"Y",1:"N")
-	w ?x(7),$s(tmpreg("JOURNAL"):"Y",1:"N")
+	w ?x(6),$s(tmpreg("NULL_SUBSCRIPTS")=1:"ALWAYS",tmpreg("NULL_SUBSCRIPTS")=2:"EXISTING",1:"NEVER")
+	w ?x(7),$s(tmpreg("STDNULLCOLL"):"Y",1:"N")
+	w ?x(8),$s(tmpreg("JOURNAL"):"Y",1:"N")
 	i tmpreg("JOURNAL") d tmpjnlhd,tmpjnlbd
 	d tmpseghd
 	w !,BOL,?x(1),"<default>",?x(2),$s(tmpacc="BG":"  *",1:""),?x(3),"BG"
@@ -148,46 +151,46 @@ tmpjnlbd:
 ;-----------------------------------------------------------------------------------------------------------------------------------
 
 namehd:
-	s x(0)=9,x(1)=1,x(2)=18
+	s x(0)=9,x(1)=1,x(2)=36
 	w !,BOL,!,BOL,?x(0),"*** NAMES ***",!,BOL,?x(1),"Global",?x(2),"Region"
-	w !,BOL,?x(1),$tr($j("",39)," ","-")
-	q
-regionhd:
-	s x(0)=32,x(1)=1,x(2)=18,x(3)=44,x(4)=49,x(5)=55,x(6)=61,x(7)=67
-	w !,BOL,!,BOL,?x(0),"*** REGIONS ***"
-	w !,BOL,?x(2),"Dynamic",?x(3),$j("Def",4),?x(4),$j("Rec",5),?x(5),$j("Key",5),?x(6),"Null"
-	w !,BOL,?x(1),"Region",?x(2),"Segment",?x(3),$j("Coll",4),?x(4),$j("Size",5),?x(5),$j("Size",5)
-	w ?x(6),"Subs",?x(7),"Journaling"
 	w !,BOL,?x(1),$tr($j("",78)," ","-")
 	q
+regionhd:
+	s x(0)=32,x(1)=1,x(2)=33,x(3)=65,x(4)=71,x(5)=77,x(6)=83,x(7)=94,x(8)=104
+	w !,BOL,!,BOL,?x(0),"*** REGIONS ***"
+	w !,BOL,?x(2),"Dynamic",?x(3),$j("Def",4),?x(4),$j("Rec",5),?x(5),$j("Key",5),?x(6),"Null",?x(7),"Standard"
+	w !,BOL,?x(1),"Region",?x(2),"Segment",?x(3),$j("Coll",4),?x(4),$j("Size",5),?x(5),$j("Size",5)
+	w ?x(6),"Subs",?x(7),"NullColl",?x(8),"Journaling"
+	w !,BOL,?x(1),$tr($j("",114)," ","-")
+	q
 jnlhd:
-	s x(0)=26,x(1)=1,x(2)=18,x(3)=44,x(4)=51,x(5)=57,x(6)=68,x(7)=74
+	s x(0)=26,x(1)=1,x(2)=33,x(3)=59,x(4)=65,x(5)=71,x(6)=82,x(7)=88
 	w !,BOL,!,BOL,?x(0),"*** JOURNALING INFORMATION ***"
 	w !,BOL,?x(1),"Region",?x(2),"Jnl File (def ext: .mjl)"
 	w ?x(3),"Before",?x(4),$j("Buff",5),?x(5),$j("Alloc",10),?x(6),"Exten" ;?x(7),"Stop"
-	w !,BOL,?x(1),$tr($j("",78)," ","-")
+	w !,BOL,?x(1),$tr($j("",87)," ","-")
 	q
 seghd:
-	s x(0)=32,x(1)=1,x(2)=18,x(3)=38,x(4)=42,x(5)=46,x(6)=52,x(7)=63,x(8)=69
+	s x(0)=32,x(1)=1,x(2)=33,x(3)=53,x(4)=57,x(5)=61,x(6)=67,x(7)=78,x(8)=84
 	w !,BOL,!,BOL,?x(0),"*** SEGMENTS ***"
 	w !,BOL,?x(1),"Segment",?x(2),"File (def ext: .dat)",?x(3),"Acc",?x(4),"Typ",?x(5),"Block",?x(6),$j("Alloc",10)
 	w ?x(7),"Exten",?x(8),"Options"
-	w !,BOL,?x(1),$tr($j("",78)," ","-")
+	w !,BOL,?x(1),$tr($j("",91)," ","-")
 	q
 maphd:
 	s x="*** MAP"_$s($l(mapreg):" for region "_mapreg,1:"")_" ***"
-	s x(0)=80-$l(x)*.5,x(1)=1,x(2)=14,x(3)=29,x(4)=46,x(5)=63
+	s x(0)=80-$l(x)*.5,x(1)=1,x(2)=33,x(3)=66,x(4)=98,x(5)=130
 	w !,BOL,!,BOL,?x(0),x
-	w !,BOL,?x(1),"  -  - Names -  -",?x(5),"File"
-	w !,BOL,?x(1),"From",?x(2),"Up to",?x(3),"Region",?x(4),"Segment",?x(5),"(def ext: .dat)"
-	w !,BOL,?x(1),$tr($j("",78)," ","-")
+	w !,BOL,?x(1),"  -  -  -  -  -  -  -  -  -  - Names -  -  - -  -  -  -  -  -  -"
+	w !,BOL,?x(1),"From",?x(2),"Up to",?x(3),"Region / Segment / File(def ext: .dat)"
+	w !,BOL,?x(1),$tr($j("",131)," ","-")
 	q
 tmpreghd:
-	s x(0)=31,x(1)=1,x(2)=19,x(3)=44,x(4)=49,x(5)=55,x(6)=61,x(7)=67
+	s x(0)=31,x(1)=1,x(2)=19,x(3)=44,x(4)=49,x(5)=55,x(6)=61,x(7)=72,x(8)=82
 	w !,BOL,!,BOL,?x(0),"*** TEMPLATES ***"
-	w !,BOL,?x(3),$j("Def",4),?x(4),$j("Rec",5),?x(5),$j("Key",5),?x(6),"Null"
-	w !,BOL,?x(1),"Region",?x(3),$j("Coll",4),?x(4),$j("Size",5),?x(5),$j("Size",5),?x(6),"Subs",?x(7),"Journaling"
-	w !,BOL,?x(1),$tr($j("",78)," ","-")
+	w !,BOL,?x(3),$j("Def",4),?x(4),$j("Rec",5),?x(5),$j("Key",5),?x(6),"Null",?x(7),"Standard"
+	w !,BOL,?x(1),"Region",?x(3),$j("Coll",4),?x(4),$j("Size",5),?x(5),$j("Size",5),?x(6),"Subs",?x(7),"NullColl",?x(8),"Journaling"
+	w !,BOL,?x(1),$tr($j("",92)," ","-")
 	q
 tmpjnlhd:
 	s x(0)=26,x(1)=1,x(2)=18,x(3)=44,x(4)=51,x(5)=57,x(6)=68,x(7)=74

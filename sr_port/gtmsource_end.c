@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,7 @@
 #include "gtm_unistd.h"		/* for close() */
 
 #ifdef UNIX
-#include <sys/ipc.h>
+#include "gtm_ipc.h"
 #include <sys/shm.h>
 #include <sys/sem.h>
 #elif defined(VMS)
@@ -25,8 +25,7 @@
 #error Unsupported platform
 #endif
 #include <errno.h>
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #include "gtm_string.h"
 
 #include "gdsroot.h"
@@ -78,7 +77,6 @@ int gtmsource_end1(boolean_t auto_shutdown)
 	int		exit_status;
 	seq_num		log_seqno, log_seqno1, diff_seqno;
 	int		fclose_res;
-	unsigned char	seq_num_str[32], *seq_num_ptr;
 #ifdef VMS
 	int4		status;
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,7 @@
 #include "dpgbldir.h"
 #include "sgnl.h"
 #include "mvalconv.h"
+#include "rtnhdr.h"
 #include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro */
 
 #ifndef EARLY_VARARGS
@@ -51,6 +52,7 @@
 #include "gtm_env_xlate_init.h"
 
 GBLREF bool		gv_curr_subsc_null;
+GBLREF bool		gv_prev_subsc_null;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_region	*gv_cur_region;
@@ -119,8 +121,9 @@ va_dcl
 	{
 		COPY_SUBS_TO_GVCURRKEY(var, gv_currkey, was_null, is_null);	/* updates gv_currkey, was_null, is_null */
 	}
-	gv_curr_subsc_null = is_null;
-	if (was_null && (FALSE == gv_cur_region->null_subs))
+	gv_prev_subsc_null = was_null; /* if true, it indicates there is a null subscript (except last subscript) in current key */
+	gv_curr_subsc_null = is_null; /* if true, it indicates that last subscript in current key is null */
+	if (was_null && (NEVER == gv_cur_region->null_subs))
 		sgnl_gvnulsubsc();
 	return;
 }

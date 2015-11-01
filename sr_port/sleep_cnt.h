@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,3 +59,11 @@
    each additional 4 processors.
 */
 #define MAX_LOCK_SPINS(base, proc) (base + MAX(0, ((((proc - 7) * LOCK_SPINS_PER_4PROC) / 4))))
+
+/* Maximum duration (in minutes) that a process waits for the completion of read-in-progress after which
+ * it stops waiting but rather continue fixing the remaining cache records. This is done to avoid
+ * waiting a long time in case there are many corrupt global buffers. After waiting 1 minute each for the
+ * first 4 cache-records (a wait time of 4 mins in total), we might as well stop waiting more and fix
+ * the remaining crs. The value of 4 minutes was chosen because that is what t_qread currently has as its
+ * maximum wait for reading a block from disk into the global buffer. */
+#define MAX_WAIT_FOR_RIP	4

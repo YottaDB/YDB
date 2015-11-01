@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,20 +10,22 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "mdq.h"
 #include "objlabel.h"
 #include "cache.h"
+#include "hashtab_objcode.h"
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "cache_cleanup.h"
 
-GBLREF int	cache_temp_cnt;
+GBLREF hash_table_objcode	cache_table;
+GBLREF	int			indir_cache_mem_size;
 
 void cache_cleanup(stack_frame *sf)
 {
 	ihdtyp		*irtnhdr;
-	cache_entry	*indce;
+	cache_entry	*csp;
 	int4		*vp;
+	boolean_t	deleted;
 
 	assert(sf->ctxt);
 	vp = (int4 *)sf->ctxt;
@@ -32,26 +34,13 @@ void cache_cleanup(stack_frame *sf)
 	{	/* Frame is one of ours */
 		vp--;
 		irtnhdr = (ihdtyp *)((char *)vp + *vp);
-		indce = irtnhdr->indce;
-		assert(0 < indce->refcnt);
-		indce->refcnt--;		/* This usage of this cache entry is done */
-		indce->referenced = TRUE; 	/* .. it has been recently referenced */
-		if (0 == indce->refcnt && indce->temp_elem)
-		{	/* Temp element to be freed */
-			if (indce->linkq.fl)
-			{	/* Cache entries orphaned by op_setzbrk won't be on queues */
-				dqdel(indce, linkq);
-			}
-			if (indce->linktemp.fl)
-			{
-				dqdel(indce, linktemp);
-			}
-			if (indce->obj.len)
-				free(indce->obj.addr);
-			free(indce);
-			assert(cache_temp_cnt);
-			DBG_DECR_CNT(cache_temp_cnt);
-		}
+		csp = irtnhdr->indce;
+		assert(0 < csp->refcnt);
+		csp->refcnt--;		/* This usage of this cache entry is done */
+		/* We want to keep the entry around with the hope that it will be accessed again.
+		 * When we keep too many entries or entries are using too much memory cache_put will call cache_table_rebuild()
+		 * to make space removing elements with csp->refcnt == 0 and csp->zb_refcnt == 0
+		 */
 	} else
 		GTMASSERT;			/* Not sure when this could happen */
 }

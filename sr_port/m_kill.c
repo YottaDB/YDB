@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,9 +18,8 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char window_token;
-GBLREF mident window_ident;
-
+GBLREF char 	window_token;
+GBLREF mident 	window_ident;
 
 int m_kill(void)
 {
@@ -66,7 +65,7 @@ switch (window_token)
 			switch (window_token)
 			{
 			case TK_IDENT:
-				next->operand[0] = put_str(&window_ident.c[0],sizeof(mident));
+				next->operand[0] = put_str(window_ident.addr, window_ident.len);
 				advancewindow();
 				break;
 			case TK_ATSIGN:

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashdef.h"
 #include "cmidef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "gtcm_find_region.h"
 
@@ -24,4 +24,4 @@ cm_region_list *gtcm_find_region(connection_struct *cnx, unsigned char rnum)
 	else
 		return cnx->region_array[rnum];
 }
-                    
+

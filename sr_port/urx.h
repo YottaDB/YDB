@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,24 +8,25 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
+#ifndef URX_H_INCLUDED
+#define URX_H_INCLUDED
 
 typedef	struct urx_rtnref_type
-	{
-		short			len;
-		mident			name;
-		struct urx_addr_type	*addr;
-		struct urx_labref_type	*lab;
-		struct urx_rtnref_type	*next;
-	}	urx_rtnref;
+{
+	struct urx_addr_type	*addr;
+	struct urx_labref_type	*lab;
+	struct urx_rtnref_type	*next;
+	unsigned int		len;
+	unsigned char		name[1];
+} urx_rtnref;
 
 typedef	struct urx_labref_type
-	{
-		short			len;
-		mident			name;
-		struct urx_addr_type	*addr;
-		struct urx_labref_type	*next;
-	}	urx_labref;
+{
+	struct urx_addr_type	*addr;
+	struct urx_labref_type	*next;
+	unsigned int		len;
+	unsigned char		name[1];
+} urx_labref;
 
 /* urx_addr_type and associated prototypes can vary by chip or platform */
 
@@ -40,3 +41,5 @@ urx_rtnref *urx_addrtn(urx_rtnref *rp_start, urx_rtnref *rp);
 bool urx_getlab(char *lab, int lablen, urx_rtnref *rtn, urx_labref **lp0p, urx_labref **lp1p);
 bool urx_getrtn(char *rtn, int rtnlen, urx_rtnref **rp0p, urx_rtnref **rp1p, urx_rtnref *anchor);
 USHBIN_ONLY(void urx_remove(lnk_tabent *, int4 tablen);)
+
+#endif /* URX_H_INCLUDED */

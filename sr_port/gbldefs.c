@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,14 +19,13 @@
 #include "gtm_iconv.h"
 #include "gtm_socket.h"
 #include "gtm_unistd.h"
+#include "gtm_limits.h"
 
-#include <limits.h>
 #include <signal.h>
-#include <netinet/in.h>		/* Required for gtmsource.h */
 #ifdef __MVS__
-#include <time.h>      /* required for fd_set */
-#include <sys/time.h>
+#include "gtm_time.h"      /* required for fd_set */
 #endif
+#include <sys/time.h>
 #ifdef UNIX
 # include <sys/un.h>
 #endif
@@ -35,6 +34,12 @@
 # include <ssdef.h>
 # include "desblk.h"
 #endif
+#include "cache.h"
+#include "hashtab_int4.h"
+#include "hashtab_int8.h"
+#include "hashtab_mname.h"
+#include "hashtab_objcode.h"
+#include "rtnhdr.h"
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "ccp.h"
@@ -44,11 +49,8 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "gdscc.h"
-#include "cache.h"
 #include "comline.h"
 #include "compiler.h"
-#include "hashdef.h"
-#include "hashtab.h"		/* needed also for tp.h */
 #include "cmd_qlf.h"
 #include "io.h"
 #include "iosp.h"
@@ -58,7 +60,6 @@
 #include "mdq.h"
 #include "mprof.h"
 #include "mv_stent.h"
-#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "stp_parms.h"
 #include "stringpool.h"
@@ -84,6 +85,7 @@
 #include "gtmsecshr.h"
 #include "error_trap.h"
 #include "patcode.h"	/* for pat_everything and sizeof_pat_everything */
+#include "source_file.h"	/* for REV_TIME_BUFF_LEN */
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
@@ -100,12 +102,15 @@
 #include "cli.h"
 #include "invocation_mode.h"
 #include "fgncal.h"
+#include "parse_file.h"		/* for MAX_FBUFF */
 #endif
 #include "jnl_typedef.h"
 
 #ifdef VMS
 #include "gtm_logicals.h"	/* for GTM_MEMORY_NOACCESS_COUNT */
 #endif
+
+#include "gds_blk_upgrade.h"	/* for UPGRADE_IF_NEEDED flag */
 
 #define DEFAULT_ZERROR_STR	"Unprocessed $ZERROR, see $ZSTATUS"
 #define DEFAULT_ZERROR_LEN	(sizeof(DEFAULT_ZERROR_STR) - 1)
@@ -142,12 +147,14 @@ GBLDEF	bool		error_mupip = FALSE,
 	                view_debug1 = FALSE,
 	                view_debug2 = FALSE,
 	                view_debug3 = FALSE,
-	                view_debug4 = FALSE;
+	                view_debug4 = FALSE,
+	                dec_nofac;
 
 GBLDEF	boolean_t	is_updproc = FALSE,
+			is_updhelper = FALSE,
 			mupip_jnl_recover = FALSE,
 			set_resync_to_region = FALSE,
-			repl_enabled = FALSE,
+			repl_allowed = FALSE,
 			unhandled_stale_timer_pop = FALSE,
 			gtcm_connection = FALSE,
 			is_replicator = FALSE,	/* TRUE => this process can write jnl records to the jnlpool for replicated db */
@@ -173,12 +180,8 @@ GBLDEF	volatile int4	outofband, crit_count = 0;
 GBLDEF	int		mumps_status = SS_NORMAL,
 			restart_pc,
 			stp_array_size = 0;
-GBLDEF	cache_entry	*cache_entry_base, *cache_entry_top, *cache_hashent, *cache_stealp, cache_temps;
-GBLDEF	cache_tabent	*cache_tabent_base;
-GBLDEF	int		cache_hits, cache_fails, cache_temp_cnt;
 GBLDEF	gvzwrite_struct	gvzwrite_block;
 GBLDEF	io_log_name	*io_root_log_name;
-GBLDEF	hashtab		*stp_duptbl = NULL;
 GBLDEF	lvzwrite_struct	lvzwrite_block;
 GBLDEF	mliteral	literal_chain;
 GBLDEF	mstr		*comline_base,
@@ -231,7 +234,7 @@ GBLDEF	boolean_t	sem_incremented = FALSE;
 GBLDEF	boolean_t	new_dbinit_ipc = FALSE;
 GBLDEF	mval		**ind_result_array, **ind_result_sp, **ind_result_top;
 GBLDEF	mval		**ind_source_array, **ind_source_sp, **ind_source_top;
-GBLDEF	RTN_TABENT	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
+GBLDEF	rtn_tabent	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
 GBLDEF	int4		break_message_mask;
 GBLDEF	bool		rc_locked = FALSE,
 			certify_all_blocks = FALSE;	/* If flag is set all blocks are checked after they are
@@ -255,10 +258,13 @@ GBLDEF	iconv_t		dse_over_cvtcd = (iconv_t)0;
 GBLDEF	short int	last_source_column;
 GBLDEF	char		window_token;
 GBLDEF	mval		window_mval;
-GBLDEF	mident		window_ident;
 GBLDEF	char		director_token;
 GBLDEF	mval		director_mval;
-GBLDEF	mident		director_ident;
+LITDEF	mident 		zero_ident = {0, NULL};	/* the null mident */
+static char 		ident_buff1[sizeof(mident_fixed)];
+static char 		ident_buff2[sizeof(mident_fixed)];
+GBLDEF	mident		window_ident = {0, &ident_buff1[0]};	/* the current identifier */
+GBLDEF	mident		director_ident = {0, &ident_buff2[0]};	/* the look-ahead identifier */
 GBLDEF	char		*lexical_ptr;
 GBLDEF	int4		aligned_source_buffer[MAX_SRCLINE / sizeof(int4) + 1];
 GBLDEF	unsigned char	*source_buffer = (unsigned char *)aligned_source_buffer;
@@ -325,6 +331,7 @@ GBLDEF	void			(*ctrlc_handler_ptr)() = ctrlc_handler_dummy;
 GBLDEF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace) = op_open_dummy;
 GBLDEF	void			(*unw_prof_frame_ptr)(void) = unw_prof_frame_dummy;
 GBLDEF	boolean_t		mu_reorg_process = FALSE;
+GBLDEF	boolean_t		mu_rndwn_process = FALSE;
 GBLDEF	gv_key			*gv_currkey_next_reorg;
 GBLDEF	gv_namehead		*reorg_gv_target;
 
@@ -360,7 +367,6 @@ GBLDEF	int4			prev_first_off, prev_next_off;
 				/* these two globals store the values of first_off and next_off in cse,
 				 * when there is a blk split at index level. This is to permit rollback
 				 * to intermediate states */
-GBLDEF	boolean_t		lv_dupcheck = FALSE;
 GBLDEF	sm_uc_ptr_t		min_mmseg;
 GBLDEF	sm_uc_ptr_t		max_mmseg;
 GBLDEF	mmseg			*mmseg_head;
@@ -377,7 +383,6 @@ GBLDEF	boolean_t		is_rcvr_server = FALSE;
 GBLDEF	jnl_format_buffer	*non_tp_jfb_ptr = NULL;
 GBLDEF	unsigned char		*non_tp_jfb_buff_ptr;
 GBLDEF	boolean_t		dse_running = FALSE;
-GBLDEF	inctn_opcode_t		inctn_opcode = inctn_invalid_op;
 GBLDEF	jnlpool_addrs		jnlpool;
 GBLDEF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLDEF	jnlpool_ctl_struct	temp_jnlpool_ctl_struct;
@@ -481,8 +486,9 @@ GBLDEF	gd_region	*standalone_reg = NULL;	/* We have standalone access for this r
 #endif
 
 #ifdef VMS
-GBLDEF	uint4	check_channel_status = 0; /* stores the qio return status just before GTMASSERT in CHECK_CHANNEL_STATUS macro */
-GBLDEF	uint4	check_channel_id = 0; 	/* stores the channel id just before a qio in a global variable for debugging purposes */
+/* Following global variables store the state of an erroring sys$qio just before a GTMASSERT in the CHECK_CHANNEL_STATUS macro */
+GBLDEF	uint4	check_channel_status = 0;	/* stores the qio return status */
+GBLDEF	uint4	check_channel_id = 0;		/* stores the qio channel id */
 #endif
 
 GBLDEF	boolean_t		write_after_image = FALSE;	/* true for after-image jnlrecord writing by recover/rollback */
@@ -497,7 +503,7 @@ GBLDEF	mval	dollar_zdir = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0);
 
 GBLDEF	int * volatile		var_on_cstack_ptr = NULL; /* volatile pointer to int; volatile so that nothing gets optimized out */
 GBLDEF	boolean_t		gtm_environment_init = FALSE;
-GBLDEF	hashtab			*cw_stagnate = NULL;
+GBLDEF	hash_table_int4		cw_stagnate;
 GBLDEF	boolean_t		cw_stagnate_reinitialized = FALSE;
 
 GBLDEF	uint4		pat_everything[] = { 0, 2, PATM_E, 1, 0, PAT_MAX_REPEAT, 0, PAT_MAX_REPEAT, 1 }; /* pattern = ".e" */
@@ -614,7 +620,7 @@ GBLDEF	int4		cur_pte_csh_tail_count;			/* copy of pte_csh_tail_count correspondi
 
 GBLDEF	readonly char	*before_image_lit[] = {"NOBEFORE_IMAGES", "BEFORE_IMAGES"};
 GBLDEF	readonly char	*jnl_state_lit[]    = {"DISABLED", "OFF", "ON"};
-GBLDEF	readonly char	*repl_state_lit[]   = {"OFF",      "ON"};
+GBLDEF	readonly char	*repl_state_lit[]   = {"OFF", "ON", "WAS_ON"};
 
 GBLDEF	boolean_t	crit_sleep_expired;		/* mutex.mar: signals that a timer waiting for crit has expired */
 GBLDEF	uint4		crit_deadlock_check_cycle;	/* compared to csa->crit_check_cycle to determine if a given region
@@ -634,6 +640,7 @@ GBLDEF	boolean_t		ztrap_explicit_null;	/* whether $ZTRAP was explicitly set to N
 GBLDEF	int4			gtm_object_size;	/* Size of entire gtm object for compiler use */
 GBLDEF	int4			linkage_size;		/* Size of linkage section during compile */
 GBLDEF	uint4			lnkrel_cnt;		/* number of entries in linkage Psect to relocate */
+GBLDEF  int4			sym_table_size;		/* size of the symbol table during compilation */
 GBLDEF	boolean_t		disallow_forced_expansion, forced_expansion; /* Used in stringpool managment */
 GBLDEF	jnl_fence_control	jnl_fence_ctl;
 GBLDEF	jnl_process_vector	*prc_vec = NULL;		/* for current process */
@@ -719,4 +726,65 @@ GBLDEF	uint4	gtm_memory_noaccess[GTM_MEMORY_NOACCESS_COUNT];	/* see VMS gtm_env_
 
 #ifdef DEBUG
 GBLDEF	boolean_t	in_wcs_recover = FALSE;	/* TRUE if in wcs_recover(), used by bt_put() */
+/* Following definitions are related to white_box testing */
+GBLDEF	boolean_t	gtm_white_box_test_case_enabled = FALSE;
+GBLDEF	int		gtm_white_box_test_case_number = 0;
+GBLDEF	int		gtm_white_box_test_case_count = 0;
+GBLDEF	int 		gtm_wbox_input_test_case_count = 0; /* VMS allows maximum 31 characters for external identifer */
 #endif
+
+GBLDEF	boolean_t	in_gvcst_incr = FALSE;	/* set to TRUE by gvcst_incr, set to FALSE by gvcst_put
+						 * distinguishes to gvcst_put, if the current db operation is a SET or $INCR */
+GBLDEF	mval		*post_incr_mval;	/* mval pointing to the post-$INCR value */
+GBLDEF	mval		increment_delta_mval;	/* mval holding the INTEGER increment value, set by gvcst_incr,
+						 * used by gvcst_put/gvincr_recompute_upd_array which is invoked by t_end */
+GBLDEF	boolean_t	is_dollar_incr = FALSE;	/* valid only if gvcst_put is in the call-stack (i.e. t_err == ERR_GVPUTFAIL);
+						 * is a copy of "in_gvcst_incr" just before it got reset to FALSE */
+GBLDEF	boolean_t	pre_incr_update_trans;	/* copy of "sgm_info_ptr->update_trans" before the $INCR */
+GBLDEF	int		indir_cache_mem_size;	/* Amount of memory currently in use by indirect cache */
+GBLDEF	hash_table_mname   rt_name_tbl;
+GBLDEF	hash_table_objcode cache_table;
+GBLDEF  int		cache_hits, cache_fails;
+
+/* The alignment feature is disabled due to some issues in stringpool garbage collection.
+ * TODO: When we sort out stringpool issues, change mstr_native_align to TRUE below */
+GBLDEF	boolean_t	mstr_native_align = FALSE;
+GBLDEF boolean_t	save_mstr_native_align;
+
+GBLDEF	mvar		*mvartab;
+GBLDEF	mvax		*mvaxtab,*mvaxtab_end;
+GBLDEF	mlabel		*mlabtab;
+GBLDEF	mline		mline_root;
+GBLDEF	mline		*mline_tail;
+GBLDEF	short int	block_level;
+GBLDEF	triple		t_orig;
+GBLDEF	int		mvmax, mlmax, mlitmax;
+#ifdef DEBUG
+GBLDEF	int4	expand_hashtab_depth;	/* number of nested calls to expand_hashtab_* routines in the current stack trace */
+#endif
+static	char		routine_name_buff[sizeof(mident_fixed)], module_name_buff[sizeof(mident_fixed)];
+GBLDEF	mident		routine_name = {0, &routine_name_buff[0]};
+GBLDEF	mident		module_name = {0, &module_name_buff[0]};
+GBLDEF	char		rev_time_buf[REV_TIME_BUFF_LEN];
+GBLDEF	unsigned short	source_name_len;
+UNIX_ONLY(GBLDEF unsigned char	source_file_name[MAX_FBUFF + 1];)
+VMS_ONLY(GBLDEF char	source_file_name[PATH_MAX];)
+
+GBLDEF	int4		curr_addr, code_size;
+GBLDEF	mident_fixed	zlink_mname;
+GBLDEF	boolean_t	in_op_fnnext = FALSE;	/* set to TRUE by op_fnnext, set to FALSE by op_fnorder */
+
+GBLDEF	sm_uc_ptr_t	reformat_buffer;
+GBLDEF	int		reformat_buffer_len;
+GBLDEF	volatile int	reformat_buffer_in_use;	/* used only in DEBUG mode */
+
+GBLDEF	boolean_t	mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
+GBLDEF	boolean_t	mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified */
+GBLDEF	trans_num	mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block processed by MUPIP REORG {UP,DOWN}GRADE */
+
+GBLDEF	inctn_opcode_t	inctn_opcode = inctn_invalid_op;
+GBLDEF	inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
+GBLDEF	uint4		region_open_count;		/* Number of region "opens" we have executed */
+
+GBLDEF	uint4		gtm_blkupgrade_flag = UPGRADE_IF_NEEDED;	/* by default upgrade only if necessary */
+GBLDEF	boolean_t	disk_blk_read;

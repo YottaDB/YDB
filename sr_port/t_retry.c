@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002  Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002  Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,8 +24,8 @@
 #include "error.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "tp_frame.h"
 #include "sleep_cnt.h"
@@ -39,29 +39,32 @@
 #include "have_crit.h"
 #include "gdsbgtr.h"		/* for the BG_TRACE_PRO macros */
 
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF short 		crash_count, dollar_tlevel;
-GBLREF gd_region	*gv_cur_region;
-GBLREF gv_key		*gv_currkey;
-GBLREF gv_namehead	*gv_target;
-GBLREF tp_frame		*tp_pointer;
-GBLREF trans_num	start_tn;
-GBLREF unsigned char	cw_set_depth, t_fail_hist[CDB_MAX_TRIES];
-GBLREF boolean_t	mu_reorg_process;
-GBLREF unsigned int	t_tries;
-GBLREF uint4		t_err;
-GBLREF jnl_gbls_t	jgbl;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	short			crash_count, dollar_tlevel;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gv_key			*gv_currkey;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	tp_frame		*tp_pointer;
+GBLREF	trans_num		start_tn;
+GBLREF	unsigned char		cw_set_depth, cw_map_depth, t_fail_hist[CDB_MAX_TRIES];
+GBLREF	boolean_t		mu_reorg_process;
+GBLREF	unsigned int		t_tries;
+GBLREF	uint4			t_err;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	boolean_t		is_dollar_incr;
 
 void t_retry(enum cdb_sc failure)
 {
 	tp_frame	*tf;
 	unsigned char	*end, buff[MAX_ZWR_KEY_SZ];
 	short		tl;
+
 	error_def(ERR_GBLOFLOW);
 	error_def(ERR_GVIS);
 	error_def(ERR_TPRETRY);
 	error_def(ERR_GVPUTFAIL);
+	error_def(ERR_GVINCRFAIL);
 	UNIX_ONLY(error_def(ERR_GVFAILCORE);)
 
 	t_fail_hist[t_tries] = (unsigned char)failure;
@@ -101,6 +104,11 @@ void t_retry(enum cdb_sc failure)
 
 					if (cdb_sc_gbloflow == failure)
 						rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+					if (IS_DOLLAR_INCREMENT)
+					{
+						assert(ERR_GVPUTFAIL == t_err);
+						t_err = ERR_GVINCRFAIL;	/* print more specific error message */
+					}
 					UNIX_ONLY(send_msg(VARLSTCNT(9) t_err, 2, t_tries, t_fail_hist,
 							   ERR_GVIS, 2, end-buff, buff, ERR_GVFAILCORE));
 					UNIX_ONLY(gtm_fork_n_core());
@@ -125,6 +133,7 @@ void t_retry(enum cdb_sc failure)
 			ccp_userwait(gv_cur_region, CCST_MASK_HAVE_DIRTY_BUFFERS, 0, cs_addrs->nl->ccp_cycle);
 		}
 		cw_set_depth = 0;
+		cw_map_depth = 0;
 		start_tn = cs_addrs->ti->curr_tn;
 		assert(NULL != gv_target);
 		if (NULL != gv_target)

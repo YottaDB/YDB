@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,15 +35,17 @@
  * Parameters :
  *	fn : full name of a database file.
  *	header: Pointer to database file header structure (may not be in shared memory)
+ *	len: length of header to write (should be either SGMNT_HDR_LEN or SIZEOF_FILE_HDR(header))
  */
-boolean_t file_head_write(char *fn, sgmnt_data_ptr_t header)
+boolean_t file_head_write(char *fn, sgmnt_data_ptr_t header, int4 len)
 {
 	int 		save_errno, fd, header_size;
 
 	error_def(ERR_DBFILOPERR);
 	error_def(ERR_DBNOTGDS);
 
-	header_size = sizeof(sgmnt_data);
+	header_size = SIZEOF_FILE_HDR(header);
+	assert(SGMNT_HDR_LEN == len || header_size == len);
 	OPENFILE(fn, O_RDWR, fd);
 	if (-1 == fd)
 	{
@@ -51,7 +53,7 @@ boolean_t file_head_write(char *fn, sgmnt_data_ptr_t header)
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
 		return FALSE;
 	}
-	LSEEKWRITE(fd, 0, header, header_size, save_errno);
+	LSEEKWRITE(fd, 0, header, len, save_errno);
 	if (0 != save_errno)
 	{
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);

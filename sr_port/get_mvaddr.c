@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001,2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,38 +15,41 @@
 
 #include "compiler.h"
 #include "mmemory.h"
+#include "min_max.h"
+#include "stringpool.h"
 
-mvar *get_mvaddr(mident *c)
+GBLREF mvar 	*mvartab;
+GBLREF mvax 	*mvaxtab, *mvaxtab_end;
+GBLREF int 	mvmax;
+
+mvar *get_mvaddr(mident *var_name)
 {
-	GBLREF mvar *mvartab;
-	GBLREF mvax *mvaxtab,*mvaxtab_end;
-	GBLREF int mvmax;
-	char *ch;
-	mvar **p;
-	mvax *px;
-	char *tmp;
-	int x;
-	ch = c->c;
+	mvar 	**p;
+	mvax 	*px;
+	mstr 	vname;
+	int 	x;
 
 	p = &mvartab;
 	while (*p)
-		if ((x = memcmp((*p)->mvname.c,ch,sizeof(mident) / sizeof(char)))
-		    < 0)
+	{
+		MIDENT_CMP(&(*p)->mvname, var_name, x);
+		if (x < 0)
 			p = &((*p)->rson);
+		else if (x > 0)
+			p = &((*p)->lson);
 		else
-			if (x > 0)
-				p = &((*p)->lson);
-			else
-				return *p;
+			return *p;
+	}
+	/* variable doesn't exist - create a new mvar in mvartab */
+	vname.len = var_name->len;
+	vname.addr = var_name->addr;
+	s2pool_align(&vname);
 	*p = (mvar *) mcalloc((unsigned int) sizeof(mvar));
-	for (tmp = (*p)->mvname.c ;
-	    *ch && tmp < &((*p)->mvname.c[sizeof(mident) / sizeof(char)]) ; )
-		*tmp++ = *ch++;
-	while(tmp < &((*p)->mvname.c[sizeof(mident) / sizeof(char)]))
-		*tmp++ = 0;
+	(*p)->mvname.len = vname.len;
+	(*p)->mvname.addr = vname.addr;
 	(*p)->mvidx = mvmax++;
-	(*p)->lson = (*p)->rson = 0;
-	(*p)->last_fetch = 0;
+	(*p)->lson = (*p)->rson = NULL;
+	(*p)->last_fetch = NULL;
 	px = (mvax *) mcalloc(sizeof(mvax));
 	px->var = *p;
 	px->last = px->next = 0;

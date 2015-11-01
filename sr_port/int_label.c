@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,20 +16,17 @@
 #include "compiler.h"
 #include "toktyp.h"
 
-GBLREF char window_token;
-GBLREF mval window_mval;
-GBLREF mident window_ident;
+GBLREF char 	window_token;
+GBLREF mval 	window_mval;
+GBLREF mident 	window_ident;
 
 void int_label(void)
 {
-
-	int len,left;
+	int len;
 
 	window_token = TK_IDENT;
 	len = window_mval.str.len;
-	len = len < sizeof(mident) ? len: sizeof(mident);
-	memcpy(window_ident.c, window_mval.str.addr, len);
-	left = sizeof(mident) - len;
-	memset(window_ident.c + len, 0, left);
-
+	len = (len < MAX_MIDENT_LEN) ? len: MAX_MIDENT_LEN;
+	memcpy(window_ident.addr, window_mval.str.addr, len);
+	window_ident.len = len;
 }

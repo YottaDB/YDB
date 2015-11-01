@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,8 @@
 #include "gtmdbglvl.h"
 #include "cdbg_dump.h"
 #include "emit_code.h"
-#include "obj_filesp.h"
+#include "rtnhdr.h"
+#include "obj_file.h"
 
 #if defined(USHBIN_SUPPORTED) || defined(VMS)
 

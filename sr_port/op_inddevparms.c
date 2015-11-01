@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,21 +11,20 @@
 
 /* Handle indirect device parameters for open, use and close commands */
 #include "mdef.h"
-#include "hashdef.h"
-#include "lv_val.h"
 #include "compiler.h"
 #include "opcode.h"
 #include "indir_enum.h"
 #include "toktyp.h"
 #include "io_params.h"
 #include "cache.h"
+#include "hashtab_objcode.h"
 #include "deviceparameters.h"
 #include "op.h"
 
-GBLREF mval	**ind_result_sp, **ind_result_top;
-GBLREF char	window_token;
+GBLREF mval			**ind_result_sp, **ind_result_top;
+GBLREF char			window_token;
 
-LITREF mval literal_null;
+LITREF mval 			literal_null;
 
 void	op_inddevparms(mval *devpsrc, int4 ok_iop_parms,  mval *devpiopl)
 {
@@ -34,11 +33,14 @@ void	op_inddevparms(mval *devpsrc, int4 ok_iop_parms,  mval *devpiopl)
 	oprtype		devpopr;
 	triple		*indref;
 	oprtype		plist;
+	icode_str	indir_src;
 	error_def(ERR_INDMAXNEST);
 	error_def(ERR_INDEXTRACHARS);
 
 	MV_FORCE_STR(devpsrc);
-	if (!(obj = cache_get(indir_devparms, &devpsrc->str)))
+	indir_src.str = devpsrc->str;
+	indir_src.code = indir_devparms;
+	if (NULL == (obj = cache_get(&indir_src)))
 	{	/* No cached version, compile it now */
 		comp_init(&devpsrc->str);
 		if (TK_ATSIGN == window_token)
@@ -54,7 +56,8 @@ void	op_inddevparms(mval *devpsrc, int4 ok_iop_parms,  mval *devpiopl)
 			rval = (bool)deviceparameters(&plist, ok_iop_parms);
 		if (!comp_fini(rval, &object, OC_IRETMVAL, &plist, devpsrc->str.len))
 			return;
-		cache_put(indir_devparms, &devpsrc->str, &object);
+		indir_src.str.addr = devpsrc->str.addr;
+		cache_put(&indir_src, &object);
 		obj = &object;
 		/* Fall into code activation below */
 	}

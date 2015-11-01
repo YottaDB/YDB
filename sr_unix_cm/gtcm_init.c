@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,11 +41,11 @@
 #include "gdscc.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
-#include "cache.h"		/* for cache_init() prototype */
 #include "getjobnum.h"		/* for getjobnum() prototype */
 #include "getmaxfds.h"		/* for getmaxfds() prototype */
 #include "getzdir.h"		/* for getzdir() prototype */
 #include "gt_timer.h"		/* for prealloc_gt_timers() prototype */
+#include "cli.h"
 
 #ifndef lint
 static char rcsid[] = "$Header:$";
@@ -56,18 +56,20 @@ GBLREF bool			licensed;
 GBLREF int			omi_pid;
 GBLREF int4			omi_errno;
 GBLREF int			history;
-GBLREF pattern          	*pattern_list;
-GBLREF pattern          	*curr_pattern;
-GBLREF pattern          	mumps_pattern;
-GBLREF uint4    		*pattern_typemask;
-GBLREF enum gtmImageTypes 	image_type;
-GBLREF spdesc       		rts_stringpool, stringpool;
-GBLREF unsigned char 		cw_set_depth;
-GBLREF cw_set_element 		cw_set[];
-GBLREF uint4 			process_id;
-GBLREF jnlpool_addrs 		jnlpool;
-GBLREF bool 			certify_all_blocks;
+GBLREF pattern			*pattern_list;
+GBLREF pattern			*curr_pattern;
+GBLREF pattern			mumps_pattern;
+GBLREF uint4			*pattern_typemask;
+GBLREF enum gtmImageTypes	image_type;
+GBLREF spdesc			rts_stringpool, stringpool;
+GBLREF unsigned char		cw_set_depth;
+GBLREF cw_set_element		cw_set[];
+GBLREF uint4			process_id;
+GBLREF jnlpool_addrs		jnlpool;
+GBLREF bool			certify_all_blocks;
 GBLREF boolean_t		is_replicator;
+
+void	gtcm_fail(int sig);
 
 /* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
  * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is
@@ -79,10 +81,12 @@ void gtcm_init(int argc, char_ptr_t argv[])
 {
 	char			*ptr, *getenv();
 	struct sigaction 	ignore, act;
-	void			gtcm_fail();
 	void			get_page_size();
 	void			init_secshr_addrs();
 	gd_addr 		*get_next_gdr();
+	int		  	pid;
+	char			msg[256];
+	int			save_errno;
 
 	/*  Disassociate from the rest of the universe */
 	get_page_size();
@@ -91,23 +95,19 @@ void gtcm_init(int argc, char_ptr_t argv[])
 
 	if (NULL != getenv("GTCM_GDSCERT"))
 		certify_all_blocks = TRUE;
-#ifndef DEBUG
+
+#ifndef GTCM_DEBUG_NOBACKGROUND
+	if ((pid = fork()) < 0)
 	{
-		int		  pid;
-
-		if ((pid = fork()) < 0)
-		{
-			char msg[256];
-			SPRINTF(msg,"Unable to detach %s from controlling tty", SRVR_NAME);
-			gtcm_rep_err(msg,errno);
-			exit(-1);
-		}
-		else if (pid > 0)
-			exit(0);
-		(void) setpgrp();
+		save_errno = errno;
+		SPRINTF(msg, "Unable to detach %s from controlling tty", SRVR_NAME);
+		gtcm_rep_err(msg, save_errno);
+		exit(-1);
 	}
-#endif				/* !defined(DEBUG) */
-
+	else if (pid > 0)
+		exit(0);
+	(void) setpgrp();
+#endif
 	/* Initialize logging */
 #ifdef BSD_LOG
 	openlog(SRVR_NAME, LOG_PID, LOG_LOCAL7);
@@ -147,13 +147,17 @@ void gtcm_init(int argc, char_ptr_t argv[])
 #endif
 
 	/*  Initialize the process flags */
-	gtcm_prsopt(argc, argv);
+	if (0 != gtcm_prsopt(argc, argv))
+		exit(-1);
+
+	/* Write down pid into log file */
+	 OMI_DBG((omi_debug, "GTCM_SERVER pid : %d\n", omi_pid));
 
 	/* Initialize history mechanism */
 	if (history)
 	{
 		init_hist();
-		act.sa_handler = dump_rc_hist;
+		act.sa_handler = (void (*)())dump_rc_hist;
 		act.sa_flags = 0;
 		(void) sigaction(SIGUSR2, &act, 0);
 	}
@@ -169,12 +173,9 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	}
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;
-	cache_init();
-
 	curr_pattern = pattern_list = &mumps_pattern;
 	pattern_typemask = mumps_pattern.typemask;
-
-	init_secshr_addrs(get_next_gdr, cw_set, NULL, &cw_set_depth, process_id, OS_PAGE_SIZE, &jnlpool.jnlpool_dummy_reg);
+	init_secshr_addrs(get_next_gdr, cw_set, NULL, &cw_set_depth, process_id, 0, OS_PAGE_SIZE, &jnlpool.jnlpool_dummy_reg);
 	initialize_pattern_table();
 
 	 /* Preallocate some timer blocks. */

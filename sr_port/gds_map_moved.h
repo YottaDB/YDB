@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef GDS_MAP_MOVED_INCLUDED
 #define GDS_MAP_MOVED_INCLUDED
 
-void gds_map_moved(htab_desc *tbl, sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, 	 sm_uc_ptr_t old_top);
+void gds_map_moved(struct hash_table_mname_struct *tbl, sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_top);
 
 #endif /* GDS_MAP_MOVED_INCLUDED */

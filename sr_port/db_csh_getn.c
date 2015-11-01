@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +22,8 @@
 #include "filestruct.h"
 #include "interlock.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "gdsbgtr.h"
 #include "min_max.h"
@@ -33,6 +33,7 @@
 #include "is_proc_alive.h"
 #include "cache.h"
 #include "longset.h"		/* needed for cws_insert.h */
+#include "hashtab.h"
 #include "cws_insert.h"
 #include "wcs_sleep.h"
 #include "wcs_get_space.h"
@@ -44,7 +45,6 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF uint4		process_id;
 GBLREF uint4		image_count;
 GBLREF unsigned int	t_tries;
-GBLREF hashtab		*cw_stagnate;
 GBLREF short		dollar_tlevel;
 GBLREF sgm_info		*sgm_info_ptr;
 GBLREF boolean_t        mu_reorg_process;
@@ -60,6 +60,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	srch_blk_status		*tp_srch_status;
+	ht_ent_int4		*tabent;
 
 	error_def(ERR_BUFRDTIMEOUT);
 	error_def(ERR_INVALIDRIP);
@@ -125,15 +126,13 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			 *	them even if they don't have a cse. This is to ensure that the current action doesn't
 			 *	encounter a restart due to cdb_sc_lostcr in tp_hist() even in the fourth-retry.
 			 */
-			if (dollar_tlevel
-				&& (tp_srch_status =
-					(srch_blk_status *)lookup_hashtab_ent(sgm_info_ptr->blks_in_use, (void *)cr->blk, &dummy))
-				&& tp_srch_status->ptr)
+			if (dollar_tlevel && (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&cr->blk)))
+				&& (tp_srch_status = (srch_blk_status *) tabent->value) && tp_srch_status->ptr)
 			{	/* this process is already using the block - skip it */
 				cr->refer = TRUE;
 				continue;
 			}
-			if (NULL != lookup_hashtab_ent(cw_stagnate, (void *)cr->blk, &dummy))
+			if (NULL != lookup_hashtab_int4(&cw_stagnate, (uint4 *)&cr->blk))
 			{
 				cr->refer = TRUE;
 				continue;

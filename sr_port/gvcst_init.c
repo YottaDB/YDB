@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include <stddef.h>		/* for offsetof macro */
 
 #include "gtm_string.h"
+#include "gtm_time.h"
 
 #include "cdb_sc.h"
 #include "gdsroot.h"
@@ -29,7 +30,7 @@
 #include "filestruct.h"
 #include "iosp.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "gtm_stdlib.h"		/* for ATOI */
@@ -40,16 +41,16 @@
 #include "gtmimagename.h"
 #include "trans_log_name.h"
 #include "gtm_logicals.h"
-#include "gvcst_init.h"
 #include "dbfilop.h"
-#include "gvcst_init_sysops.h"
 #include "set_num_additional_processors.h"
 #include "have_crit.h"
 #include "t_retry.h"
-#include "gvcst_tp_init.h"
 #include "dpgbldir.h"
 #include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"		/* for CWS_INIT macro */
+#include "gvcst_protos.h"	/* for gvcst_init,gvcst_init_sysops,gvcst_tp_init prototype */
+#include "compswap.h"
+#include "send_msg.h"
 
 GBLREF	gd_region		*gv_cur_region, *db_init_region;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -71,9 +72,13 @@ GBLREF	int			tprestart_syslog_delta;
 GBLREF	tp_region		*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
 GBLREF	tp_region		*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
 GBLREF	unsigned int		t_tries;
-GBLREF	hashtab			*cw_stagnate;
 GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF	boolean_t		tp_in_use;
+GBLREF	uint4			region_open_count;
+GBLREF	sm_uc_ptr_t		reformat_buffer;
+GBLREF	int			reformat_buffer_len;
+GBLREF	volatile int		reformat_buffer_in_use;	/* used only in DEBUG mode */
+GBLREF	volatile int4		fast_lock_count;
 
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
@@ -130,13 +135,14 @@ void	assert_jrec_member_offsets(void)
 	assert(MAX_DB_BLK_SIZE < MAX_JNL_REC_SIZE);	/* Ensure a PBLK record can accommodate a full GDS block */
 	assert(tcom_record.prefix.forwptr == tcom_record.suffix.backptr);
 	assert(TCOM_RECLEN == tcom_record.suffix.backptr);
+	assert(sizeof(token_split_t) == sizeof(token_build));   /* Required for TOKEN_SET macro */
 }
 
 void gvcst_init (gd_region *greg)
 {
 	sgmnt_addrs		*csa, *prevcsa, *regcsa;
 	sgmnt_data_ptr_t	csd, temp_cs_data;
-	char			cs_data_buff[ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE)];
+	char			cs_data_buff[ROUND_UP(SGMNT_HDR_LEN, DISK_BLOCK_SIZE)];
 	uint4			segment_update_array_size;
 	file_control		*fc;
 	gd_region		*prev_reg, *reg_top;
@@ -146,7 +152,7 @@ void gvcst_init (gd_region *greg)
 	blk_ident		tmp_blk;
 #endif
 	mstr			log_nam, trans_log_nam;
-	char			trans_buff[MAX_FN_LEN+1];
+	char			trans_buff[MAX_FN_LEN + 1];
 	static int4		first_time = TRUE;
 	char			now_running[MAX_REL_NAME];
 	unique_file_id		*greg_fid, *reg_fid;
@@ -154,12 +160,17 @@ void gvcst_init (gd_region *greg)
 	tp_region		*tr;
 	int4			prev_index;
 	ua_list			*tmp_ua;
+	time_t			curr_time;
+	uint4			curr_time_uint4, next_warn_uint4;
 
-	error_def (ERR_DBFLCORRP);
-	error_def (ERR_DBCREINCOMP);
-	error_def (ERR_DBNOTGDS);
-	error_def (ERR_BADDBVER);
-	error_def (ERR_VERMISMATCH);
+	error_def(ERR_DBFLCORRP);
+	error_def(ERR_DBCREINCOMP);
+	error_def(ERR_DBNOTGDS);
+	error_def(ERR_BADDBVER);
+	error_def(ERR_VERMISMATCH);
+	error_def(ERR_MMNODYNUPGRD);
+	error_def(ERR_DBVERPERFWARN1);
+	error_def(ERR_DBVERPERFWARN2);
 
 	CWS_INIT;	/* initialize the cw_stagnate hash-table */
 
@@ -184,15 +195,19 @@ void gvcst_init (gd_region *greg)
         set_num_additional_processors();
 
 	DEBUG_ONLY(
-		/* Note that the "block" member in the blk_ident structure in gdskill.h has 26 bits.
-		 * Currently, the maximum number of blocks is 2**26. If ever this increases, something
+		/* Note that the "block" member in the blk_ident structure in gdskill.h has 28 bits.
+		 * Currently, the maximum number of blocks is 2**28. If ever this increases, something
 		 * has to be correspondingly done to the "block" member to increase its capacity.
 		 * The following assert checks that we always have space in the "block" member
 		 * to represent a GDS block number.
 		 */
 		tmp_blk.block = -1;
-		assert(MAXTOTALBLKS - 1 <= tmp_blk.block);
+		assert(MAXTOTALBLKS_MAX - 1 <= tmp_blk.block);
 	)
+	/* TH_BLOCK is currently a hardcoded constant as basing it on the offsetof macro does not work with the VMS compiler.
+	 * Therefore assert that TH_BLOCK points to the 512-byte block where the "trans_hist" member lies in the fileheader.
+	 */
+	assert(DIVIDE_ROUND_UP(offsetof(sgmnt_data, trans_hist), DISK_BLOCK_SIZE) == TH_BLOCK);
 	if (TRUE == first_time)
 	{
 		log_nam.addr = GTM_TPRESTART_LOG_LIMIT;
@@ -225,6 +240,7 @@ void gvcst_init (gd_region *greg)
 		greg->max_rec_size = csd->max_rec_size;
 		greg->max_key_size = csd->max_key_size;
 	 	greg->null_subs = csd->null_subs;
+		greg->std_null_coll = csd->std_null_coll;
 		greg->jnl_state = csd->jnl_state;
 		greg->jnl_file_len = csd->jnl_file_len;		/* journal file name length */
 		memcpy(greg->jnl_file_name, csd->jnl_file_name, greg->jnl_file_len);	/* journal file name */
@@ -272,7 +288,8 @@ void gvcst_init (gd_region *greg)
 	fc->op_len = sizeof(*temp_cs_data);
 	fc->op_pos = 1;
 	dbfilop(fc);
-	if (memcmp(temp_cs_data->label, GDS_LABEL, GDS_LABEL_SZ - 1))
+
+	if (MEMCMP_LIT(temp_cs_data->label, GDS_LABEL))
 	{
 		if (memcmp(temp_cs_data->label, GDS_LABEL, GDS_LABEL_SZ - 3))
 			rts_error(VARLSTCNT(4) ERR_DBNOTGDS, 2, DB_LEN_STR(greg));
@@ -291,6 +308,8 @@ void gvcst_init (gd_region *greg)
 		rts_error(VARLSTCNT(4) ERR_DBCREINCOMP, 2, DB_LEN_STR(greg));
 	if (temp_cs_data->file_corrupt && !mupip_jnl_recover)
 		rts_error(VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(greg));
+	if ((dba_mm == temp_cs_data->acc_meth) && temp_cs_data->blks_to_upgrd)
+		rts_error(VARLSTCNT(4) ERR_MMNODYNUPGRD, 2, DB_LEN_STR(greg));
 	assert(greg->dyn.addr->acc_meth != dba_cm);
 	if (greg->dyn.addr->acc_meth != temp_cs_data->acc_meth)
 		greg->dyn.addr->acc_meth = temp_cs_data->acc_meth;
@@ -349,7 +368,7 @@ void gvcst_init (gd_region *greg)
 	assert(sizeof(csa->nl->now_running) == MAX_REL_NAME);
 	db_init(greg, temp_cs_data);
 	crash_count = csa->critical->crashcnt;
-
+	csa->regnum = ++region_open_count;
 	csd = csa->hdr;
 	if (memcmp(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1))
 	{	/* Copy csa->nl->now_running into a local variable before passing to rts_error() due to the following issue.
@@ -365,7 +384,11 @@ void gvcst_init (gd_region *greg)
 		assert(strlen(csa->nl->now_running) < sizeof(now_running));
 		memcpy(now_running, csa->nl->now_running, sizeof(now_running));
 		now_running[sizeof(now_running) - 1] = '\0';	/* protection against bad values of csa->nl->now_running */
-		rts_error(VARLSTCNT(8) ERR_VERMISMATCH & ~SEV_MSK | ((DSE_IMAGE != image_type) ? ERROR : INFO), 6,
+		/* for DSE, change VERMISMATCH to be INFO (instead of the more appropriate WARNING) as we want the
+		 * condition handler (dbinit_ch) to do a CONTINUE (which it does only for severity levels SUCCESS or INFO)
+		 * and resume processing in gvcst_init.c instead of detaching from shared memory.
+		 */
+		rts_error(VARLSTCNT(8) MAKE_MSG_TYPE(ERR_VERMISMATCH, ((DSE_IMAGE != image_type) ? ERROR : INFO)), 6,
 			DB_LEN_STR(greg), gtm_release_name_len, gtm_release_name, LEN_AND_STR(now_running));
 	}
 	/* set csd and fill in selected fields */
@@ -382,6 +405,27 @@ void gvcst_init (gd_region *greg)
 		GTMASSERT;
 	}
 	db_common_init(greg, csa, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
+
+	/* If we are not fully upgraded, see if we need to send a warning to the operator console about
+	   performance. Compatibility mode is a known performance drain. Actually, we can send one of two
+	   messages. If the desired_db_format is for an earlier release than the current release, we send
+	   a performance warning that this mode degrades performance. However, if the desired_db_format is
+	   for the current version but there are blocks to convert still, we send a gengle reminder that
+	   running mupip reorg upgrade would be a good idea to get the full performance benefit of V5.
+	*/
+	time(&curr_time);
+	assert(MAXUINT4 > curr_time);
+	curr_time_uint4 = curr_time;
+	next_warn_uint4 = csd->next_upgrd_warn.cas_time;
+	if (!csd->fully_upgraded && curr_time_uint4 > next_warn_uint4
+	    && COMPSWAP(&csd->next_upgrd_warn.time_latch, next_warn_uint4, 0, (curr_time_uint4 + UPGRD_WARN_INTERVAL), 0))
+	{	/* The msg is due and we have successfully updated the next time interval */
+		if (GDSVCURR != csd->desired_db_format)
+			send_msg(VARLSTCNT(4) ERR_DBVERPERFWARN1, 2, DB_LEN_STR(greg));
+		else
+			send_msg(VARLSTCNT(4) ERR_DBVERPERFWARN2, 2, DB_LEN_STR(greg));
+	}
+
 	/* Compute the maximum journal space requirements for a PBLK (including possible ALIGN record).
 	 * Use this variable in the TOTAL_TPJNL_REC_SIZE and TOTAL_NONTP_JNL_REC_SIZE macros instead of recomputing.
 	 */
@@ -459,6 +503,37 @@ void gvcst_init (gd_region *greg)
 	}
 	greg->open = TRUE;
 	greg->opening = FALSE;
+	if (dba_bg == greg->dyn.addr->acc_meth)
+	{	/* Check if (a) this region has non-upgraded blocks and if so, (b) the reformat buffer exists and
+		   (c) if it is big enough to deal with this region. If the region does not have any non-upgraded
+		   block (blks_to_upgrd is 0) we will not allocate the buffer at this time. Note that this opens up
+		   a small window for errors. If this buffer is not allocated and someone turns on compatibility
+		   mode and before the process can discover this and allocate the buffer, it runs out of memory,
+		   errors out and finds it is responsible for running down the database, it could fail on a recursive
+		   memory error when it tries to allocate the block. This is (to me) an acceptable risk as it is
+		   very low and compares favorably to the cost of every process allocating a database block sized
+		   chunk of private storage that will be seldom if ever used (SE 3/2005).
+		 */
+		if (0 != csd->blks_to_upgrd && csd->blk_size > reformat_buffer_len)
+		{	/* Buffer not big enough (or does not exist) .. get a new one releasing old if it exists */
+			assert(0 == fast_lock_count);	/* this is mainline (non-interrupt) code */
+			++fast_lock_count;		/* No interrupts across this use of reformat_buffer */
+			/* reformat_buffer_in_use should always be incremented only AFTER incrementing fast_lock_count
+			 * as it is the latter that prevents interrupts from using the reformat buffer. Similarly
+			 * the decrement of fast_lock_count should be done AFTER decrementing reformat_buffer_in_use.
+			 */
+			assert(0 == reformat_buffer_in_use);
+			DEBUG_ONLY(reformat_buffer_in_use++;)
+			if (reformat_buffer)
+				free(reformat_buffer);	/* Different blksized databases in use .. keep only largest one */
+			reformat_buffer = malloc(csd->blk_size);
+			reformat_buffer_len = csd->blk_size;
+			DEBUG_ONLY(reformat_buffer_in_use--;)
+			assert(0 == reformat_buffer_in_use);
+			--fast_lock_count;
+		}
+
+	}
 	if ((dba_bg == greg->dyn.addr->acc_meth) || (dba_mm == greg->dyn.addr->acc_meth))
 	{
 		/* Determine fid_index of current region's file_id across sorted file_ids of all regions open until now.

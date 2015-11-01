@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001-2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,9 +25,10 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
-#include "hashtab.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "mur_read_file.h"
 #include "iosp.h"
@@ -94,8 +95,8 @@ boolean_t mur_insert_prev(void)
 		if ((!mur_options.forward || !mur_options.notncheck) && (new_jctl->jfh->eov_tn != jctl->jfh->bov_tn))
 		{
 			gtm_putmsg(VARLSTCNT(8) ERR_JNLTNOUTOFSEQ, 6,
-				new_jctl->jfh->eov_tn, new_jctl->jnl_fn_len, new_jctl->jnl_fn,
-				jctl->jfh->bov_tn, jctl->jnl_fn_len, jctl->jnl_fn);
+				&new_jctl->jfh->eov_tn, new_jctl->jnl_fn_len, new_jctl->jnl_fn,
+				&jctl->jfh->bov_tn, jctl->jnl_fn_len, jctl->jnl_fn);
 			mur_jctl = jctl;
 			free(new_jctl);
 			return FALSE;

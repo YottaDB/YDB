@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +23,7 @@
 #include "t_end.h"
 #include "t_retry.h"
 #include "t_begin.h"
-#include "gvcst_rtsib.h"
-#include "gvcst_search.h"
-#include "gvcst_search_blk.h"
+#include "gvcst_protos.h"	/* for gvcst_rtsib,gvcst_search,gvcst_search_blk prototype */
 #include "muextr.h"
 
 GBLREF gd_region	*gv_cur_region;
@@ -77,7 +75,7 @@ int mu_extr_getblk(unsigned char *ptr)
 			}
 		}
 		memcpy(ptr, bp, bp->bsiz);
-		if (t_end(&gv_target->hist, two_histories ? rt_history : NULL) != 0)
+		if ((trans_num)0 != t_end(&gv_target->hist, two_histories ? rt_history : NULL))
 		{
 			if (two_histories)
 				memcpy(gv_target->hist.h, rt_history->h, sizeof(srch_blk_status) * (rt_history->depth + 1));

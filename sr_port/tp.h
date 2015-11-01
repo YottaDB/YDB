@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,7 @@
 
 #include <sys/types.h>
 
-/* HEADER-FILE-DEPENDENCIES : hashtab.h, buddy_list.h */
+/* HEADER-FILE-DEPENDENCIES : hashtab_int4.h */
 
 #define JNL_LIST_INIT_ALLOC		16		/* initial allocation for si->jnl_list */
 #define	CW_SET_LIST_INIT_ALLOC		64		/* initial allocation for si->cw_set_list */
@@ -101,9 +101,9 @@ typedef struct sgm_info_struct
 			*next_sgm_info;
 	srch_blk_status	*first_tp_hist,
 			*last_tp_hist;
-	hashtab		*blks_in_use;
-	gd_region	*gv_cur_region;
+	hash_table_int4	*blks_in_use;
 	trans_num	start_tn;
+	gd_region	*gv_cur_region;
 	int4		update_trans;	/* was this region updated; usually TRUE if cw_set_depth is non-zero, but additionally
 					 * TRUE in case of a duplicate set in gvcst_put.c (cw_set_depth is zero in that case) */
 	cw_set_element	*first_cw_set,
@@ -133,8 +133,8 @@ typedef struct sgm_info_struct
 			total_jnl_rec_size,
 			cr_array_size;
 	boolean_t	fresh_start;
-	short		crash_count;
-	bool		backup_block_saved;
+	int4		crash_count;
+	boolean_t	backup_block_saved;
 	boolean_t	kip_incremented;
 	int		tmp_cw_set_depth;	/* used only #ifdef DEBUG. see comments for tmp_cw_set_depth in tp_tend() */
 	uint4		tot_jrec_size;		/* maximum journal space needs for this transaction */

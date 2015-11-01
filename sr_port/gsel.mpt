@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2004 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -59,13 +59,16 @@ it	s gdf=0
 	s g=end d pat
 	i pat["""" s:beg]g g=beg d start f  d search q:'$l(g)  d save
 	q
-pat	i $e(g)="%" s g="!"_$e(g,2,9999)
+pat
+	n tmpstp
+	i $e(g)="%" s g="!"_$e(g,2,9999)
 	s pat=g
 	f  q:$l(g,"%")<2  s g=$p(g,"%",1)_"#"_$p(g,"%",2,999),pat=$p(pat,"%",1)_"""1E1"""_$p(pat,"%",2,999)
 	f  q:$l(g,"*")<2  s g=$p(g,"*",1)_"$"_$p(g,"*",2,999),pat=$p(pat,"*",1)_""".E1"""_$p(pat,"*",2,999)
 	i $e(g)="!" s g="%"_$e(g,2,9999),pat="%"_$e(pat,2,9999)
 	i pat["""" s pat="1""^"_pat_""""
-	s g="^"_$p($p(g,"#"),"$"),stp=g_$e("zzzzzzz",$l(g)-1,8)
+	s tmpstp="z",$p(tmpstp,"z",30)="z"
+	s g="^"_$p($p(g,"#"),"$"),stp=g_$e(tmpstp,$l(g)-1,31)
 	q
 start	i g="^" s g="^%"
 	i g?@pat,$d(@g) d save

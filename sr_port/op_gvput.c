@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 #include "gdsblk.h"
 #include "error.h"
 #include "op.h"
-#include "gvcst_put.h"
+#include "gvcst_protos.h"	/* for gvcst_put prototype */
 #include "change_reg.h"
 #include "format_targ_key.h"
 #include "gvcmx.h"
@@ -29,6 +29,7 @@
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_key		*gv_currkey;
 GBLREF bool		gv_curr_subsc_null;
+GBLREF bool		gv_prev_subsc_null;
 GBLREF bool		gv_replication_error;
 GBLREF bool		gv_replopen_error;
 
@@ -39,12 +40,12 @@ void op_gvput(mval *var)
 	gd_region	*save_reg;
 	int		temp;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
+
 	error_def(ERR_DBPRIVERR);
 	error_def(ERR_GVIS);
-	error_def(ERR_KEY2BIG);
 	error_def(ERR_REC2BIG);
 
-	if (!gv_curr_subsc_null || gv_cur_region->null_subs)
+	if ((!gv_curr_subsc_null && !gv_prev_subsc_null) || ALWAYS == gv_cur_region->null_subs)
 	{
 		if (!gv_cur_region->read_only)
 		{
@@ -98,8 +99,7 @@ void op_gvput(mval *var)
 					  REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, end - buff, buff);
 			}
 		} else
-			rts_error(VARLSTCNT(4) ERR_DBPRIVERR, 2, gv_cur_region->dyn.addr->fname_len,
-				gv_cur_region->dyn.addr->fname);
+			rts_error(VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	} else
 		sgnl_gvnulsubsc();
 }

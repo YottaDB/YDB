@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,9 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"
-#include "hashdef.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "hashtab.h"
 #include "muprec.h"
 
@@ -31,17 +33,11 @@ GBLREF	jnl_ctl_list		*mur_jctl;
 void	mur_pini_addr_reset(void)
 {
 	pini_list_struct	*plst;
-	hashtab_ent 		*h_ent;
-	int			cnt, size;
+	ht_ent_int4 		*tabent, *topent;
 
-	size = mur_jctl->pini_list->size;
-	h_ent = mur_jctl->pini_list->tbl;
-	for (cnt = 0; cnt < size; cnt++, h_ent++)
+	for (tabent = mur_jctl->pini_list.base, topent = mur_jctl->pini_list.top; tabent < topent; tabent++)
 	{
-		if (h_ent->v)
-		{
-			plst = (pini_list_struct *)h_ent->v;
+		if (HTENT_VALID_INT4(tabent, pini_list_struct, plst))
 			plst->new_pini_addr = 0;
-		}
 	}
 }

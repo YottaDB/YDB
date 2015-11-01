@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
-#include "copy.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -19,12 +19,13 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "cmidef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "gtcm_bind_name.h"
-#include "gvcst_get.h"
+#include "gvcst_protos.h"	/* for gvcst_get prototype */
 #include "gtcm_find_region.h"
-#include "gtcmtr_get.h"
+#include "gtcmtr_protos.h"
+#include "copy.h"
 
 GBLREF connection_struct *curr_entry;
 GBLREF gv_namehead	*gv_target;

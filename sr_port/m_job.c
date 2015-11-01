@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,11 +19,11 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char window_token;
-GBLREF mident window_ident;
-GBLREF bool run_time;
-GBLREF char routine_name[];
-static readonly mident zero_ident;	/* the null mident */
+GBLREF char 	window_token;
+GBLREF mident 	window_ident;
+GBLREF bool 	run_time;
+GBLREF mident	routine_name;
+LITREF mident 	zero_ident;
 
 int m_job(void)
 {
@@ -35,10 +35,10 @@ int m_job(void)
 
 	error_def(ERR_MAXACTARG);
 	error_def(ERR_RTNNAME);
-	error_def(ERR_COMMAORRPARENEXP);
+	error_def(ERR_COMMAORRPAREXP);
 	error_def(ERR_JOBACTREF);
 
-	label = put_str(zero_ident.c,sizeof(mident));
+	label = put_str(zero_ident.addr, zero_ident.len);
 	offset = put_ilit((mint)0);
 	if (!lref(&label, &offset, FALSE, indir_job, TRUE, &dummybool))
 		return FALSE;
@@ -47,7 +47,7 @@ int m_job(void)
 	if (TK_CIRCUMFLEX != window_token)
 	{
 		if (!run_time)
-			routine = put_str(routine_name,sizeof(mident));
+			routine = put_str(routine_name.addr, routine_name.len);
 		else
 			routine = put_tref(newtriple(OC_CURRTN));
 	} else
@@ -56,7 +56,7 @@ int m_job(void)
 		switch(window_token)
 		{
 		case TK_IDENT:
-			routine = put_str(window_ident.c,sizeof(mident));
+			routine = put_str(window_ident.addr, window_ident.len);
 			advancewindow();
 			break;
 		case TK_ATSIGN:
@@ -96,7 +96,7 @@ int m_job(void)
 				advancewindow();
 			else  if (TK_RPAREN != window_token)
 			{
-				stx_error(ERR_COMMAORRPARENEXP);
+				stx_error(ERR_COMMAORRPAREXP);
 				return FALSE;
 			}
 		}

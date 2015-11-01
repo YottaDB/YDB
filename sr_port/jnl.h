@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,9 +25,9 @@
 /* If you update JNL_LABEL_TEXT, you need to JNL_VER_THIS and repl_internal_filter array.
  * Also need to follow a set of directions (yet to be written 12/7/2000 -- nars) in case a new set of filters need to be written.
  */
-#define JNL_LABEL_TEXT		"GDSJNL15" /* update JNL_VER_THIS and repl_internal_filter array if you update JNL_LABEL_TEXT */
-#define JNL_VER_THIS		'\017' /* octal equivalent of JNL_LABEL_TEXT */
-#define JNL_VER_EARLIEST_REPL	'\013' /* from GDSJNL11 (V4.2-002), octal equivalent of decimal 11 */
+#define JNL_LABEL_TEXT		"GDSJNL17" /* update JNL_VER_THIS and repl_internal_filter array if you update JNL_LABEL_TEXT */
+#define JNL_VER_THIS		17
+#define JNL_VER_EARLIEST_REPL	12 	   /* from GDSJNL12 (V4.3-000) */
 #define	ALIGN_KEY		0xdeadbeef
 
 #define JNL_ALLOC_DEF		100
@@ -88,6 +88,9 @@
 #define JNL_ENABLED(X)		((X)->jnl_state == jnl_open)		/* If TRUE, journal records are to be written */
 #define JNL_ALLOWED(X)		((X)->jnl_state != jnl_notallowed)	/* If TRUE, journaling is allowed for the file */
 #define REPL_ENABLED(X)		((X)->repl_state == repl_open)		/* If TRUE, replication records are to be written */
+#define REPL_WAS_ENABLED(X)	((X)->repl_state == repl_was_open) /* If TRUE, replication is now closed, but was open earlier */
+									/* In this state, replication records are not written */
+#define REPL_ALLOWED(X)		((X)->repl_state != repl_closed)	/* If TRUE, replication records are/were written */
 
 #define MUEXTRACT_TYPE(A) 	(((A)[0]-'0')*10 + ((A)[1]-'0')) /* A is a character pointer */
 
@@ -99,6 +102,26 @@
 #define THREE_LOW_BYTES(x)	((uchar_ptr_t)(&x))
 #endif
 #define EXTTIME(S)					extract_len = exttime(S, murgbl.extr_buff, extract_len)
+
+/* Token generation used in non-replicated journaled environment. Note the assumption here
+   that sizeof(token_split_t) == sizeof(token_build) which will be asserted in gvcst_init().
+   The TOKEN_SET macro below depends on this assumption.
+*/
+typedef struct token_split_t_struct
+{
+	uint4	regnum;
+	uint4	tn;
+} token_split_t;
+
+typedef union
+{
+	token_split_t	t_piece;
+	token_num	token;
+} token_build;
+
+/* To assist in setting token value, the following macro is supplied to handle the two token parts */
+#define TOKEN_SET(BASE, TN, REGNUM) (((token_build_ptr_t)(BASE))->t_piece.tn = (uint4)(TN), \
+				     ((token_build_ptr_t)(BASE))->t_piece.regnum = (REGNUM))
 
 enum jpv_types
 {
@@ -123,6 +146,24 @@ typedef struct jnl_process_vector_struct	/* name needed since this is used in cm
 	/* sizeof(jnl_process_vector) must be a multiple of sizeof(int4) */
 } jnl_process_vector;
 
+enum pini_rec_stat
+{
+	IGNORE_PROC = 0,
+	ACTIVE_PROC = 1,
+	FINISHED_PROC = 2,
+	BROKEN_PROC = 4
+};
+
+typedef struct pini_list
+{
+	uint4			pini_addr;
+	uint4			new_pini_addr;	/* used in forward phase of recovery */
+	jnl_process_vector	jpv;		/* CURR_JPV. Current process's JPV. For GTCM server we also use this. */
+	jnl_process_vector	origjpv;	/* ORIG_JPV. Used for GTCM client only */
+	enum pini_rec_stat	state;		/* used for show qualifier */
+} pini_list_struct;
+
+
 enum jnl_record_type
 {
 #define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	rectype,
@@ -141,12 +182,16 @@ enum jnl_state_codes
 
 enum repl_state_codes
 {
-	repl_closed,
-	repl_open
+	repl_closed,	/* region not replicated, no records are written */
+	repl_open,	/* region is replicated, and records are written */
+	repl_was_open	/* region is currently not replicated, but it was earlier; jnl_file_lost() changes open to was_open */
 };
 
 typedef struct
 {
+ 	trans_num		eov_tn;		/* curr_tn is saved as eov_tn by jnl_write_epoch. Used by recover/rollback */
+	volatile trans_num	epoch_tn;	/* Transaction number for current epoch */
+	seq_num			end_seqno;		/* reg_seqno saved by jnl_write_epoch. Used by recover/rollback */
 	int4			min_write_size,	/* if unwritten data gets to this size, write it */
 				max_write_size, /* maximum size of any single write */
 				size;		/* buffer size */
@@ -174,11 +219,7 @@ typedef struct
 	}			iosb;
 	/* alignsize is removed and log2_of_alignsize introduced */
 	uint4         		log2_of_alignsize;      /* Ceiling of log2(alignsize) */
- 	trans_num		eov_tn;			/* curr_tn is saved as eov_tn by jnl_write_epoch.
-										Used by recover/rollback */
 	jnl_tm_t		eov_timestamp;		/* jgbl.gbl_jrec_time saved by jnl_write_epoch. Used by recover/rollback */
-	uint4			filler;
-	seq_num			end_seqno;		/* reg_seqno saved by jnl_write_epoch. Used by recover/rollback */
 	uint4			cycle;			/* shared copy of the number of the current journal file generation */
 	volatile int4		qiocnt,			/* Number of qio's issued */
 				bytcnt,			/* Number of bytes written */
@@ -188,18 +229,22 @@ typedef struct
 	/* Note the above filler will fail if JRT_RECTYPES grows beyond 29 elements and give compiler warning in VMS
 	 * if JRT_RECTYPES equals 29. In that case, change the start num to the next odd number above JRT_RECTYPES.
 	 */
-	volatile trans_num	epoch_tn;		/* Transaction number for current epoch */
 	volatile uint4		next_epoch_time;	/* Time when next epoch is to be written (in epoch-seconds) */
 	volatile boolean_t	need_db_fsync;          /* need an fsync of the db file */
 	volatile int4		io_in_prog;		/* VMS only: write in progress indicator (NOTE: must manipulate
 										only with interlocked instructions */
+	/* CACHELINE_PAD macros provide spacing between the following latches so that they do
+	   not interfere with each other which can happen if they fall in the same data cacheline
+	   of a processor.
+	*/
+	CACHELINE_PAD(sizeof(global_latch_t), 0)	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		io_in_prog_latch;	/* UNIX only: write in progress indicator */
-	CACHELINE_PAD(sizeof(global_latch_t), 1)	/* ; supplied by macro */
+	CACHELINE_PAD(sizeof(global_latch_t), 1)	/* pad enough space so next latch falls in different cacheline */
 	global_latch_t		fsync_in_prog_latch;	/* fsync in progress indicator */
-        CACHELINE_PAD(sizeof(global_latch_t), 2)	/* ; supplied by macro */
-	/************************************************************************************/
-	/* Important: must keep header structure quadword aligned for buffers used in QIO's */
-	/************************************************************************************/
+        CACHELINE_PAD(sizeof(global_latch_t), 2)	/* pad enough space so next non-filler byte falls in different cacheline */
+/******************************************************************************************************/
+	/* Important: must keep header structure quadword (8 byte)  aligned for buffers used in QIO's */
+	/**********************************************************************************************/
 	unsigned char		buff[1];		/* Actually buff[size] */
 } jnl_buffer;
 
@@ -212,7 +257,8 @@ typedef struct
 # endif
 #endif
 
-typedef jnl_buffer *jnl_buffer_ptr_t;
+typedef jnl_buffer	*jnl_buffer_ptr_t;
+typedef token_build	*token_build_ptr_t;
 
 #ifdef DB64
 # ifdef __osf__
@@ -229,7 +275,6 @@ typedef struct jnl_private_control_struct
 	gd_id			fileid;			/* currently initialized and used only by source-server */
 	vms_lock_sb		*jnllsb;		/* VMS only */
 	boolean_t		free_update_inprog;	/* M VMS only */
-	int4			regnum;			/* M index for 'tokens' */
 	uint4			pini_addr,		/* virtual on-disk address for JRT_PINI record, if journaling */
 				new_freeaddr;
 	int4			temp_free;		/* M Temp copy of free relative index until full write done */
@@ -280,19 +325,19 @@ typedef struct
 typedef struct
 {
 	sgmnt_addrs		*fence_list;
-	int			level,
-				total_regions;
+	int			level;
 	token_num		token;
 } jnl_fence_control;
 
 typedef struct
 {
-	uint4			jrec_type : 8;		/* Actually, enum jnl_record_type */
-	uint4			forwptr : 24;		/* Offset to beginning of next record */
-	off_jnl_t		pini_addr;		/* Offset in the journal file which contains pini record */
-	jnl_tm_t		time;			/* 4-byte time stamp both for UNIX and VMS */
-	trans_num		tn;
-} jrec_prefix;	/* 16-byte */
+	uint4			jrec_type : 8;		/* Offset:0 :: Actually, enum jnl_record_type */
+	uint4			forwptr : 24;		/* Offset:3 :: Offset to beginning of next record */
+	off_jnl_t		pini_addr;		/* Offset:4 :: Offset in the journal file which contains pini record */
+	jnl_tm_t		time;			/* Offset:8 :: 4-byte time stamp both for UNIX and VMS */
+	uint4			checksum;		/* Offset:12 :: Generated from journal record */
+	trans_num		tn;			/* Offset:16 */
+} jrec_prefix;	/* 24-byte */
 
 typedef struct
 {
@@ -348,7 +393,10 @@ typedef struct
 	uint4 			data_file_name_length;			/* Length of data_file_name */
 	uint4 			prev_jnl_file_name_length;		/* Length of prev_jnl_file_name */
 	uint4 			next_jnl_file_name_length;		/* Length of next_jnl_file_name */
-	char			filler[976];
+	uint4 			checksum;	/* Calculate from journal file id */
+	uint4			prev_recov_blks_to_upgrd_adjust;	/* amount to adjust filehdr "blks_to_upgrd" if ever
+									 * backward recovery goes back past this journal file */
+	char			filler[960];
 } jnl_file_header;
 
 typedef struct
@@ -358,15 +406,16 @@ typedef struct
 				extend,
 				buffer;
 	trans_num		tn;
-	unsigned char		*fn,
-				jnl[JNL_NAME_SIZE];
+	seq_num			reg_seqno;
+	unsigned char		jnl[JNL_NAME_SIZE],
+		                *fn;
 	uint4			max_phys_reclen;
 	uint4			max_logi_reclen;
 	short			fn_len,
 				jnl_len,
 				jnl_def_len;
 	bool			before_images;
-	bool			filler_bool[3];
+	bool			filler_bool[1];
 	uint4			alignsize;
  	int4			autoswitchlimit;	/* limit in disk blocks (8388607 blocks)
 							 * when jnl should be auto switched */
@@ -375,10 +424,11 @@ typedef struct
 	int4			prev_jnl_len;
 	int4                    jnl_state;              /* current csd->jnl_state */
 	int4			repl_state;
-	seq_num			reg_seqno;
 	uint4			status2;		/* for secondary error status information in VMS */
 	boolean_t		no_rename;
 	boolean_t		no_prev_link;
+	int4			blks_to_upgrd;		/* Blocks not at current block version level */
+	uint4 			checksum;
 } jnl_create_info;
 
 /* Journal record definitions */
@@ -408,6 +458,7 @@ typedef struct jnl_format_buff_struct
 	enum jnl_record_type		rectype;
 	int4				record_size;
 	char 				*buff;
+	uint4				checksum;
 	jnl_action			ja;
 } jnl_format_buffer;
 
@@ -443,6 +494,8 @@ typedef struct	/* variable length */
 	jrec_prefix		prefix;
 	block_id		blknum;
 	uint4			bsiz;
+	enum db_ver		ondsk_blkver;		/* Previous version of block from cache_rec */
+	int4			filler;
 	char			blk_contents[1];	/* Actually blk_contents[bsiz] */
 } struct_jrec_blk;
 
@@ -473,11 +526,18 @@ typedef struct	/* fixed length */
 	jrec_suffix		suffix;
 } struct_jrec_ztcom;
 
-/* Following is a for logical record. But no logical update to the database. */
+typedef union
+{
+	int4		blks_to_upgrd_delta; /* Delta to adjust csd->blks_to_upgrade (opcode = inctn_gdsfilext_*) */
+	block_id	blknum;		     /* block that got upgraded or downgraded (opcode = inctn_blk*grd) */
+} inctn_detail_t;
+
 typedef struct	/* fixed length */
 {
 	jrec_prefix		prefix;
 	uint4			opcode;
+	inctn_detail_t		detail;
+	uint4			filler;
 	jrec_suffix		suffix;
 } struct_jrec_inctn;
 
@@ -509,7 +569,7 @@ typedef struct	/* fixed length */
 {
 	jrec_prefix		prefix;
 	seq_num			jnl_seqno;		/* must start at 8-byte boundary */
-	uint4			filler;
+	uint4			blks_to_upgrd;		/* Counter at time of epoch */
 	jrec_suffix		suffix;
 } struct_jrec_epoch;
 

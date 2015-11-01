@@ -27,13 +27,10 @@
 #include "source_file.h"
 #include "zroutines.h"
 
-
-GBLDEF unsigned short	source_name_len;
-GBLDEF unsigned char	source_file_name[MAX_FBUFF + 1];
-GBLDEF char		rev_time_buf[20];
-
-GBLDEF unsigned char	routine_name[sizeof(mident) + 1];
-GBLDEF unsigned char	module_name[sizeof(mident) + 1];
+GBLREF unsigned short	source_name_len;
+GBLREF unsigned char	source_file_name[];
+GBLREF char		rev_time_buf[];
+GBLREF mident		routine_name, module_name;
 GBLREF unsigned char	*source_buffer;
 GBLREF int4		dollar_zcstatus;
 GBLREF io_pair          io_curr_device;
@@ -136,7 +133,7 @@ bool	open_source_file (void)
         };
 
 	mstr		fstr;
-	int		status, n,index;
+	int		status, n;
 	parse_blk	pblk;
 	char		*p, buff[MAX_FBUFF + 1];
 	time_t		clock;
@@ -169,8 +166,8 @@ bool	open_source_file (void)
 	if (tt_so_do_once)
 	{
 		clock = time(0);
-		memcpy(&routine_name[0], "MDEFAULT", sizeof("MDEFAULT") - 1);
-		memcpy(&module_name[0], "MDEFAULT", sizeof("MDEFAULT") - 1);
+		p = "MDEFAULT";
+		n = STR_LIT_LEN("MDEFAULT");
 	} else
 	{
 		STAT_FILE((char *)&source_file_name[0], &statbuf, status);
@@ -178,22 +175,16 @@ bool	open_source_file (void)
 		clock = statbuf.st_mtime;
 		p = pblk.l_name;
 		n = pblk.b_name;
-		if (n > sizeof(mident))
-			n = sizeof(mident);
-		index = 0;
-		if ('_' == *p)
-		{
-			routine_name[index] = '%';
-			module_name[index] = '_';
-			p++; index++;
-		}
-		for (; index < n; index++)
-			routine_name[index] = module_name[index] = *p++;
-		for (; index < (sizeof(mident)); index++ )
-			routine_name[index] = module_name[index] = 0;
+		if (n > MAX_MIDENT_LEN)
+			n = MAX_MIDENT_LEN;
 	}
+	memcpy(routine_name.addr, p, n);
+	memcpy(module_name.addr, p, n);
+	routine_name.len = module_name.len = n;
+	if ('_' == *p)
+		routine_name.addr[0] = '%';
 	p = (char *)GTM_CTIME(&clock);
-	memcpy (rev_time_buf, p + 4, sizeof(rev_time_buf));
+	memcpy(rev_time_buf, p + 4, REV_TIME_BUFF_LEN);
 
 	io_curr_device = dev_in_use;	/*	set it back to make open_list_file save the device	*/
 	return TRUE;

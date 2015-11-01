@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +22,10 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "io.h"
 #include "iosp.h"
@@ -35,8 +37,7 @@
 #include "mu_rndwn_repl_instance.h"
 #elif defined(VMS)
 #include <descrip.h>
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #include "iosb_disk.h"	/* For mur_read_file.h */
 #include "dpgbldir_sysops.h"
 #include "gbldirnam.h"
@@ -232,11 +233,10 @@ boolean_t mur_open_files()
 		rctl->standalone = FALSE;
 		rctl->csa = NULL;
 		rctl->csd = NULL;
-		rctl->jctl = rctl->jctl_head = rctl->jctl_alt_head = rctl->jctl_turn_around = rctl->jctl_save_turn_around = NULL;
+		rctl->jctl = rctl->jctl_head = rctl->jctl_alt_head = rctl->jctl_turn_around = rctl->jctl_apply_pblk = NULL;
 		murgbl.reg_full_total++;	/* mur_close_files() expects rctl->csa and rctl->jctl to be initialized.
 						 * so consider this rctl only after those have been initialized. */
-		rctl->tab_ptr = (void *)malloc(sizeof(htab_desc));
-		ht_init((htab_desc *)rctl->tab_ptr, 0);	/* for mur_forward() */
+		init_hashtab_mname(&rctl->gvntab, 0);	/* for mur_forward() */
 		rctl->db_ctl = (file_control *)malloc(sizeof(file_control));
 		memset(rctl->db_ctl, 0, sizeof(file_control));
 		/* For redirect we just need to change the name of database. recovery will redirect to new database file */
@@ -337,7 +337,7 @@ boolean_t mur_open_files()
 						}
 					} else
 					{
-						if (!REPL_ENABLED(csd))
+						if (!REPL_ALLOWED(csd))
 						{
 							if (JNL_ENABLED(csd))
 							{
@@ -372,7 +372,7 @@ boolean_t mur_open_files()
 					fc = rctl->gd->dyn.addr->file_cntl;
 					fc->op = FC_WRITE;
 					fc->op_buff = (sm_uc_ptr_t)csd;
-					fc->op_len = ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE);
+					fc->op_len = ROUND_UP(SIZEOF_FILE_HDR(csd), DISK_BLOCK_SIZE);
 					fc->op_pos = 1;
 					dbfilop(fc);
 				}
@@ -383,11 +383,11 @@ boolean_t mur_open_files()
 				csa->jnl_before_image = csd->jnl_before_image;
 			} else
 			{	/* NOTE: csa field is NULL, if we do not open database */
-				csd = rctl->csd = (sgmnt_data_ptr_t) malloc(sizeof(sgmnt_data));
+				csd = rctl->csd = (sgmnt_data_ptr_t)malloc(SGMNT_HDR_LEN);
 				assert(0 == curr->gd->dyn.addr->fname[curr->gd->dyn.addr->fname_len]);
 				/* 1) show 2) extract 3) verify action does not need standalone access.
 				 * In this case csa is NULL */
-				if (!file_head_read((char *)curr->gd->dyn.addr->fname, rctl->csd))
+				if (!file_head_read((char *)curr->gd->dyn.addr->fname, rctl->csd, SGMNT_HDR_LEN))
 				{
 					gtm_putmsg(VARLSTCNT(4) ERR_DBFILOPERR, 2, REG_LEN_STR(rctl->gd));
 					return FALSE;
@@ -586,8 +586,8 @@ boolean_t mur_open_files()
 						if (0 == jctl->jfh->prev_jnl_file_name_length)
 						{
 							gtm_putmsg(VARLSTCNT(8) ERR_JNLDBTNNOMATCH, 6,
-								jctl->jnl_fn_len, jctl->jnl_fn, jctl->jfh->bov_tn,
-								DB_LEN_STR(rctl->gd), csd->trans_hist.curr_tn);
+								jctl->jnl_fn_len, jctl->jnl_fn, &jctl->jfh->bov_tn,
+								DB_LEN_STR(rctl->gd), &csd->trans_hist.curr_tn);
 							gtm_putmsg(VARLSTCNT(4) ERR_NOPREVLINK, 2,
 									jctl->jnl_fn_len, jctl->jnl_fn);
 							return FALSE;
@@ -603,7 +603,7 @@ boolean_t mur_open_files()
 				if (jctl->jfh->bov_tn != csd->trans_hist.curr_tn && !mur_options.notncheck)
 				{
 					gtm_putmsg(VARLSTCNT(8) ERR_JNLDBTNNOMATCH, 6, jctl->jnl_fn_len, jctl->jnl_fn,
-						jctl->jfh->bov_tn, DB_LEN_STR(rctl->gd), csd->trans_hist.curr_tn);
+						&jctl->jfh->bov_tn, DB_LEN_STR(rctl->gd), &csd->trans_hist.curr_tn);
 					return FALSE;
 				}
 			} /* if mur_options.update */
@@ -612,8 +612,8 @@ boolean_t mur_open_files()
 				if (!mur_options.notncheck && (jctl->next_gen->jfh->bov_tn != jctl->jfh->eov_tn))
 				{
 					gtm_putmsg(VARLSTCNT(8) ERR_JNLTNOUTOFSEQ, 6,
-						jctl->jfh->eov_tn, jctl->jnl_fn_len, jctl->jnl_fn,
-						jctl->next_gen->jfh->bov_tn, jctl->next_gen->jnl_fn_len, jctl->next_gen->jnl_fn);
+						&jctl->jfh->eov_tn, jctl->jnl_fn_len, jctl->jnl_fn,
+						&jctl->next_gen->jfh->bov_tn, jctl->next_gen->jnl_fn_len, jctl->next_gen->jnl_fn);
 					return FALSE;
 				}
 				jctl = jctl->next_gen;

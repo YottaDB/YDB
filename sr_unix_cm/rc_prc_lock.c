@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,12 +99,12 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 				qhdr->a.erc.value = RC_BADXBUF;
 				REVERT;
 #ifdef DEBUG
-				gtcm_cpktdmp(qhdr,qhdr->a.len.value,"Bad Rq: Invalid nLockNames value.");
+				gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"Bad Rq: Invalid nLockNames value.");
 #endif
 				return -1;
 			}
 
-			if ((temp = rc_frmt_lck(key_buff, KEY_BUFF_SIZE, sbk->key, sbk->len.value, &subcnt)) < 0)
+			if ((temp = rc_frmt_lck(key_buff, KEY_BUFF_SIZE, (unsigned char *)sbk->key, sbk->len.value, &subcnt)) < 0)
 			{
 			        temp = -temp;
 			        qhdr->a.erc.value = temp;
@@ -112,9 +112,9 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 
 #ifdef DEBUG
 				if (temp == RC_KEYTOOLONG)
-				       gtcm_cpktdmp(qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");
+				       gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");
 				else
-				       gtcm_cpktdmp(qhdr,qhdr->a.len.value,"Invalid lock request.");
+				       gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"Invalid lock request.");
 #endif
 				return -1;
 			}
@@ -158,7 +158,7 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 			qhdr->a.erc.value = RC_BADXBUF;
 			REVERT;
 #ifdef DEBUG
-			gtcm_cpktdmp(qhdr,qhdr->a.len.value,"Bad Rq: Invalid nLockNames value.");
+			gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"Bad Rq: Invalid nLockNames value.");
 #endif
 			return -1;
 		}
@@ -167,21 +167,21 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 		    {
 			REVERT;
 #ifdef DEBUG
-	gtcm_cpktdmp(qhdr,qhdr->a.len.value,"rc_fnd_file failed.");
+	gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"rc_fnd_file failed.");
 #endif
 			return -1;
 		    }
 
-		if ((temp = rc_frmt_lck(key_buff, KEY_BUFF_SIZE, sbk->key, sbk->len.value, &subcnt)) < 0)
+		if ((temp = rc_frmt_lck(key_buff, KEY_BUFF_SIZE, (unsigned char *)sbk->key, sbk->len.value, &subcnt)) < 0)
 		{
 			temp = -temp;
 			qhdr->a.erc.value = temp;
 			REVERT;
 #ifdef DEBUG
 			if (temp == RC_KEYTOOLONG)
-				gtcm_cpktdmp(qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");
+				gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");
 			else
-				gtcm_cpktdmp(qhdr,qhdr->a.len.value,"Invalid lock request.");
+				gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"Invalid lock request.");
 #endif
 			return -1;
 		}
@@ -209,7 +209,7 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 		{	REVERT;
 			qhdr->a.erc.value = RC_GLOBERRUNSPEC;
 #ifdef DEBUG
-	gtcm_cpktdmp(qhdr,qhdr->a.len.value,"RC_GLOBERRUNSPEC.");
+	gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"RC_GLOBERRUNSPEC.");
 #endif
 			return -1;/* error */
 

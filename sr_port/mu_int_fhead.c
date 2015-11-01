@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,6 @@
 #include "filestruct.h"
 #include "gdsblk.h"
 #include "gdsbml.h"
-#include "longset.h"
 #include "mupint.h"
 #include "mu_file_size.h"
 #include "gtmmsg.h"
@@ -39,6 +38,7 @@ boolean_t mu_int_fhead(void)
 {
 	unsigned char	*p1;
 	unsigned int	maps, native_size, size, block_factor;
+	trans_num	temp_tn, max_tn_warn;
 	sgmnt_data_ptr_t mu_data;
 
 	error_def(ERR_MUKILLIP);
@@ -75,7 +75,7 @@ boolean_t mu_int_fhead(void)
 			mu_int_err(ERR_DBINCRVER, 0, 0, 0, 0, 0, 0, 0);
 		return FALSE;
 	}
-	if (mu_data->start_vbn < DIVIDE_ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE))
+	if (mu_data->start_vbn < DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data), DISK_BLOCK_SIZE))
 	{
 		mu_int_err(ERR_DBSVBNMIN, 0, 0, 0, 0, 0, 0, 0);
 		return FALSE;
@@ -123,16 +123,8 @@ boolean_t mu_int_fhead(void)
 	/* CHECK: total_blks <> 0 */
 	if (0 == mu_data->trans_hist.total_blks)
 	{
-		if (0 == mu_data->trans_hist.free_blocks)	/* if 0 because old version, both should be 0 */
-		{
-			mu_data->trans_hist.total_blks = mu_data->total_blks_filler;
-			mu_data->trans_hist.free_blocks = mu_data->free_blocks_filler;
-		}
-		if (0 == mu_data->trans_hist.total_blks)
-		{
-			mu_int_err(ERR_DBTTLBLK0, 0, 0, 0, 0, 0, 0, 0);
-			return FALSE;
-		}
+		mu_int_err(ERR_DBTTLBLK0, 0, 0, 0, 0, 0, 0, 0);
+		return FALSE;
 	}
 	if (mu_data->trans_hist.curr_tn != mu_data->trans_hist.early_tn)
 		mu_int_err(ERR_DBTNNEQ, 0, 0, 0, 0, 0, 0, 0);
@@ -151,10 +143,15 @@ boolean_t mu_int_fhead(void)
 	 * But at this point, tn_reset_this_reg has not yet been set for this region and to avoid taking a risk in
 	 *   changing the code flow, we redo the computation ot tn_reset_this_reg here. This is not as much a performance concern.
 	 */
-	if ((!tn_reset_specified || gv_cur_region->read_only) && (mu_data->trans_hist.curr_tn > WARNING_TN))
+	if (!tn_reset_specified || gv_cur_region->read_only)
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_MUTNWARN, 2, DB_LEN_STR(gv_cur_region));
-		mu_int_errknt++;
+		SET_TN_WARN(mu_data, max_tn_warn);
+		if (max_tn_warn == mu_data->trans_hist.curr_tn)
+		{	/* implies there is not enough transactions to go before reaching MAX_TN (see SET_TN_WARN macro) */
+			temp_tn = mu_data->max_tn - mu_data->trans_hist.curr_tn;
+			gtm_putmsg(VARLSTCNT(6) ERR_MUTNWARN, 4, DB_LEN_STR(gv_cur_region), &temp_tn, &mu_data->max_tn);
+			mu_int_errknt++;
+		}
 	}
 	/* Note - ovrhd is incremented once in order to achieve a zero-based
 	 * index of the GDS 'data' blocks (those other than the file header
@@ -168,20 +165,20 @@ boolean_t mu_int_fhead(void)
 #ifdef GT_CX_DEF
 		case dba_bg:	/* necessary to do calculation in this manner to prevent double rounding causing an error */
 			if (mu_data->unbacked_cache)
-				mu_int_ovrhd = DIVIDE_ROUND_UP(sizeof(sgmnt_data) + mu_data->free_space +
+				mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space +
 					mu_data->lock_space_size, DISK_BLOCK_SIZE);
 			else
-				mu_int_ovrhd = DIVIDE_ROUND_UP(sizeof(sgmnt_data) + BT_SIZE(mu_data)
+				mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + BT_SIZE(mu_data)
 					+ mu_data->free_space + mu_data->lock_space_size, DISK_BLOCK_SIZE);
 			break;
 		case dba_mm:
-			mu_int_ovrhd = DIVIDE_ROUND_UP(sizeof(sgmnt_data) + mu_data->free_space, DISK_BLOCK_SIZE);
+			mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
 			break;
 #else
 		case dba_bg:
 		/*** WARNING: Drop thru ***/
 		case dba_mm:
-			mu_int_ovrhd = DIVIDE_ROUND_UP(sizeof(sgmnt_data) + mu_data->free_space, DISK_BLOCK_SIZE);
+			mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
 		break;
 #endif
 
@@ -189,7 +186,7 @@ boolean_t mu_int_fhead(void)
 		case dba_bg:
 		/*** WARNING: Drop thru ***/
 		case dba_mm:
-			mu_int_ovrhd = DIVIDE_ROUND_UP(sizeof(sgmnt_data) + mu_data->free_space, DISK_BLOCK_SIZE);
+			mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
 #else
 #error unsupported platform
 #endif
@@ -207,8 +204,7 @@ boolean_t mu_int_fhead(void)
 	/* In the following tests, the EOF block should always be 1 greater
 	 * than the actual size of the file.  This is due to the GDS being
 	 * allocated in even DISK_BLOCK_SIZE-byte blocks. */
-	if (native_size && (DIVIDE_ROUND_DOWN(size - mu_int_ovrhd, block_factor) !=
-		DIVIDE_ROUND_DOWN(native_size - mu_int_ovrhd, block_factor)))
+	if (native_size && (size != native_size))
 	{
 		if (size < native_size)
 			mu_int_err(ERR_DBFGTBC, 0, 0, 0, 0, 0, 0, 0);
@@ -217,14 +213,11 @@ boolean_t mu_int_fhead(void)
 		gtm_putmsg(VARLSTCNT(4) ERR_DBTOTBLK, 2, (native_size - mu_data->start_vbn)
 			/ (block_factor), (mu_data->trans_hist.total_blks));
 	}
-	/* make copy of master bitmap in mu_int_master */
-	mu_int_master = (unsigned char *)malloc(MASTER_MAP_SIZE);
-	memcpy(mu_int_master, mu_data->master_map, MASTER_MAP_SIZE);
 	/* make working space for all local bitmaps */
 	maps = (mu_data->trans_hist.total_blks + mu_data->bplmap - 1) / mu_data->bplmap;
 	size = BM_SIZE(mu_data->bplmap) - sizeof(blk_hdr);
 	size *= maps;
 	mu_int_locals = (unsigned char *)malloc(size);
-	longset(mu_int_locals, size, FOUR_BLKS_FREE);
+	memset(mu_int_locals, FOUR_BLKS_FREE, size);
 	return TRUE;
 }

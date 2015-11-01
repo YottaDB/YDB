@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,19 +25,16 @@
 #include "copy.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "gvcst_blk_build.h"
-#include "gvcst_search_blk.h"
-#include "gvcst_search_tail.h"
-#include "gvcst_search.h"
-
-/* Include prototypes */
 #include "t_qread.h"
 #include "longset.h"		/* needed for cws_insert.h */
+#include "hashtab.h"
 #include "cws_insert.h"
 #include "cert_blk.h"
+#include "gvcst_protos.h"	/* for gvcst_search_blk,gvcst_search_tail,gvcst_search prototype */
 
 GBLREF bool             certify_all_blocks;
 GBLREF gd_region	*gv_cur_region;
@@ -79,9 +76,9 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	trans_num		tn;
 	cw_set_element		*cse;
 	off_chain		chain1, chain2;
-	uint4			dummy;
 	srch_blk_status		*tp_srch_status, *srch_status, *leaf_blk_hist;
 	boolean_t		already_built, is_mm;
+	ht_ent_int4		*tabent;
 
 	pTarg = gv_target;
 	assert(NULL != pTarg);
@@ -135,8 +132,11 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				if (leaf_blk_hist->first_tp_srch_status)
 					tp_srch_status = leaf_blk_hist->first_tp_srch_status;
 				else
-					tp_srch_status = (srch_blk_status *)lookup_hashtab_ent(sgm_info_ptr->blks_in_use,
-									(void *)leaf_blk_hist->blk_num, &dummy);
+				{
+					if (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use,
+											(uint4 *)&leaf_blk_hist->blk_num)))
+						tp_srch_status = tabent->value;
+				}
 				ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(tp_srch_status, sgm_info_ptr);
 				cse = tp_srch_status ? tp_srch_status->ptr : NULL;
 			}
@@ -166,10 +166,9 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 						assert(CDB_STAGNATE > t_tries);
 						return cdb_sc_lostcr;
 					}
-        				if (certify_all_blocks &&
-						  (FALSE == cert_blk(gv_cur_region, leaf_blk_hist->blk_num,
-								     (blk_hdr_ptr_t)cse->new_buff, cse->blk_target->root)))
-						GTMASSERT;
+					if (certify_all_blocks)
+						cert_blk(gv_cur_region, leaf_blk_hist->blk_num, (blk_hdr_ptr_t)cse->new_buff,
+								cse->blk_target->root, TRUE);	/* will GTMASSERT on integ error */
 				}
 				cse->done = TRUE;
 				leaf_blk_hist->buffaddr = cse->new_buff;

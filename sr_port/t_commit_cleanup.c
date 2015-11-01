@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,14 +30,12 @@
 #include "gdscc.h"
 #include "interlock.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "secshr_db_clnup.h"
 #include "t_commit_cleanup.h"
-#ifdef UNIX
 #include "process_deferred_stale.h"
-#endif
 #include "repl_msg.h"		/* for gtmsource.h */
 #include "gtmsource.h"		/* for jnlpool_addrs structure definition */
 #include "send_msg.h"
@@ -146,7 +144,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 			if (csa->now_crit)
 			{	/* reset any csa->hdr->early_tn like increments that might have occurred in jnlpool */
-				assert((sm_uc_ptr_t)csa->critical == ((sm_uc_ptr_t)jnlpool_ctl + sizeof(jnlpool_ctl_struct)));
+				assert((sm_uc_ptr_t)csa->critical == ((sm_uc_ptr_t)jnlpool_ctl + JNLPOOL_CTL_SIZE));
 				if (jnlpool_ctl->early_write_addr != jnlpool_ctl->write_addr)
 				{
 					reg_seqno_reset = TRUE;	/* reset reg_seqnos of all regions to jnlpool_ctl->jnl_seqno */
@@ -195,10 +193,8 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			if (t_tries < CDB_STAGNATE)
 				rel_crit(gv_cur_region);	/* step (1) of the commit logic is undone here */
 		}
-		UNIX_ONLY(
-			if ((t_tries < CDB_STAGNATE) && unhandled_stale_timer_pop)
-				process_deferred_stale();
-		)
+		if ((t_tries < CDB_STAGNATE) && unhandled_stale_timer_pop)
+			process_deferred_stale();
 	} else
 	{	/* Roll forward (complete the partial commit of) the transaction by invoking secshr_db_clnup() */
 		send_msg(VARLSTCNT(7) ERR_DBCOMMITCLNUP, 5, process_id, process_id, trstr, DB_LEN_STR(xactn_err_region));
@@ -208,10 +204,8 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		 * calls us (there is an assert in t_ch to that effect in terms of testing the return value of this routine)
 		 */
 		secshr_db_clnup(COMMIT_INCOMPLETE);
-		UNIX_ONLY(
-			if (unhandled_stale_timer_pop)
-				process_deferred_stale();
-		)
+		if (unhandled_stale_timer_pop)
+			process_deferred_stale();
 	}
 	return update_underway;
 }

@@ -82,6 +82,7 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -91,8 +92,8 @@
 #include "gdsblk.h"
 #include "copy.h"
 #include "cdb_sc.h"
-#include "gvcst_search_blk.h"
-#include "gvcst_search_tail.h"
+#include "gvcst_protos.h"	/* for gvcst_search_tail,gvcst_search_blk prototype */
+#include "send_msg.h"
 
 GBLREF unsigned int	t_tries;
 GBLREF sgmnt_addrs	*cs_addrs;
@@ -114,7 +115,7 @@ static	void	gvcst_search_fail(srch_blk_status *pStat)
 			SPRINTF(crbuff, ": crbuff = 0x%X", pStat->cr->buffaddr);
 		else
 			crbuff[0] = '\0';
-		memcpy(regbuff, REG_STR_LEN(gv_cur_region));
+		memcpy(regbuff, gv_cur_region->rname, gv_cur_region->rname_len);
 		regbuff[gv_cur_region->rname_len] = '\0';
 		SPRINTF(buff, "Possible data corruption in region %s : blk = 0x%X : buff = 0x%X : cr = 0x%X %s : "
 				"csa = 0x%X : csalock = 0x%X", regbuff, pStat->blk_num, pStat->buffaddr,

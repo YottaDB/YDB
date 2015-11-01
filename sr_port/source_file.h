@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,5 +17,6 @@ bool    open_source_file (void);
 int4    read_source_file (void);
 void    close_source_file (void);
 
+#define REV_TIME_BUFF_LEN	20
 
 #endif /* SOURCE_FILE_INCLUDED */

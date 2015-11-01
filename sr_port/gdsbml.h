@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,15 @@
 #define BLK_RECYCLED		0x03
 #define BML_BITS_PER_BLK	2
 
+/* sets the bitmap status (BLK_BUSY|BLK_FREE etc.) of the "blknum"th block in "bml_status", given the bitmap block buffer "bp" */
+#define	GET_BM_STATUS(bp, blknum, bml_status)								\
+{													\
+	sm_uc_ptr_t	ptr;										\
+													\
+	ptr = ((sm_uc_ptr_t)(bp) + sizeof(blk_hdr) + (blknum * BML_BITS_PER_BLK / 8));			\
+	bml_status = (*ptr >> ((blknum * BML_BITS_PER_BLK) % 8)) & ((1 << BML_BITS_PER_BLK) - 1);	\
+}
+
 #define	BM_MINUS_BLKHDR_SIZE(bplm)	((bplm) / (BITS_PER_UCHAR / BML_BITS_PER_BLK))
 #define BM_SIZE(bplm)			(sizeof(blk_hdr) + BM_MINUS_BLKHDR_SIZE(bplm))
 
@@ -30,7 +39,7 @@
 	if (IS_BITMAP_BLK(blk) && ((LCL_MAP_LEVL != (bp)->levl) || (BM_SIZE(csa->hdr->bplmap) != (bp)->bsiz)))	\
 	{													\
 		send_msg(VARLSTCNT(9) ERR_DBBMLCORRUPT, 7, DB_LEN_STR(region), 					\
-				blk, (bp)->bsiz, (bp)->levl, (bp)->tn, csa->ti->curr_tn);			\
+				blk, (bp)->bsiz, (bp)->levl, &(bp)->tn, &csa->ti->curr_tn);			\
 		status = FALSE;											\
 		assert(FALSE);											\
 	} else													\

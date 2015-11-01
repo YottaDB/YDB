@@ -60,7 +60,8 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
 	mstr		mstr_ch, mstr_targ;
 
 	ch = *sub++;
-	if (STR_SUB_PREFIX == ch)
+
+	if (STR_SUB_PREFIX == ch || (SUBSCRIPT_STDCOL_NULL == ch && KEY_DELIMITER == *sub))
 	{	/* If this is a string */
 		if (xlat_flg)
 			return gvstrsub(sub, targ);
@@ -72,10 +73,11 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
 			{	/* Copy string to targ, xlating each char */
 				in_length++;
 				if (STR_SUB_ESCAPE == ch)
-					/* if this is an escape, demote next char */
+				/* if this is an escape, demote next char */
 					ch = (*sub++ - 1);
 				*targ++ = ch;
 			}
+
 			if (transform && gv_target && gv_target->collseq)
 			{
 				mstr_ch.len = in_length;
@@ -93,7 +95,7 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
 			*targ++ = '0';
 		else
 		{
-			tbl_ptr = (unsigned short *)dpos - 1;
+			tbl_ptr = (unsigned short *)&dpos[0] - 1;
 			trail_ch = KEY_DELIMITER;
 			if ((signed char)ch >= 0)
 			{	/* Bit 7 of the exponent is set for positive numbers; must be negative */

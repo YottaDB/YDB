@@ -20,9 +20,11 @@
 #include "fileinfo.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-#include "hashdef.h"
 #include "buddy_list.h"
 #include "jnl.h"
+#include "hashtab_mname.h"	/* needed for muprec.h */
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "gtmio.h"
 #include "io.h"

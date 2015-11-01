@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,10 +11,9 @@
 
 #include "mdef.h"
 #include "gtm_string.h"
+#include "gtm_inet.h"
 
 #include <stddef.h> /* for offsetof() macro */
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
 
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
@@ -36,6 +35,7 @@
 #include "sleep_cnt.h"
 #include "jnl_write.h"
 #include "copy.h"
+#include "jnl_get_checksum.h"
 
 GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
 DEBUG_ONLY( GBLREF bool		run_time;)
@@ -98,6 +98,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	uint4 			status;
 	jrec_suffix		suffix;
 	boolean_t		nowrap;
+	struct_jrec_blk		*jrec_blk;
+	uint4			checksum;
 	DEBUG_ONLY(uint4	lcl_dskaddr;)
 
 	error_def(ERR_JNLWRTNOWWRTR);
@@ -176,6 +178,10 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		 * first PINI journal record in the journal file which is nothing but JNL_FILE_FIRST_RECORD.
 		 */
 		align_rec.prefix.pini_addr = (JRT_PINI == rectype) ? JNL_FILE_FIRST_RECORD : jnl_rec->prefix.pini_addr;
+		checksum = ADJUST_CHECKSUM(INIT_CHECKSUM_SEED, jb->freeaddr);
+		checksum = ADJUST_CHECKSUM(checksum, csa->hdr->jnl_checksum);
+		assert(checksum);
+		align_rec.prefix.checksum = checksum;
 		suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 		assert(jpc->temp_free >= 0 && jpc->temp_free < jpc->jnl_buff->size);
 		if (jpc->jnl_buff->size >= (jpc->temp_free + align_rec_len))
@@ -214,8 +220,13 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		jb->free = jpc->temp_free;
 		jpc->free_update_inprog = FALSE;
 		if (JRT_PINI == rectype)
-			jnl_rec->prefix.pini_addr = csa->jnl->jnl_buff->freeaddr;
+			jnl_rec->prefix.pini_addr = jb->freeaddr;
 	}
+	checksum = jnl_rec->prefix.checksum;
+	assert(checksum);
+	checksum = ADJUST_CHECKSUM(checksum, jb->freeaddr);
+	checksum = ADJUST_CHECKSUM(checksum, csa->hdr->jnl_checksum);
+	jnl_rec->prefix.checksum = checksum;
 	UNIX_ONLY(assert(!jb->blocked));
 	VMS_ONLY(assert(!jb->blocked || jb->blocked == process_id && lib$ast_in_prog())); /* wcs_wipchk_ast can set jb->blocked */
 	jb->blocked = process_id;
@@ -269,13 +280,14 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		{
 			assert(FIXED_BLK_RECLEN == FIXED_PBLK_RECLEN);
 			assert(FIXED_BLK_RECLEN == FIXED_AIMG_RECLEN);
+			jrec_blk = (struct_jrec_blk *)jnl_rec;
 			if (nowrap)
 			{	/* write fixed part of record before the actual gds block image */
 				memcpy(jpc->jnl_buff->buff + jpc->temp_free, (uchar_ptr_t)jnl_rec, FIXED_BLK_RECLEN);
 				jpc->temp_free += FIXED_BLK_RECLEN;
 				/* write actual block */
-				memcpy(jpc->jnl_buff->buff + jpc->temp_free, (uchar_ptr_t)blk_ptr, blk_ptr->bsiz);
-				jpc->temp_free += blk_ptr->bsiz;
+				memcpy(jpc->jnl_buff->buff + jpc->temp_free, (uchar_ptr_t)blk_ptr, jrec_blk->bsiz);
+				jpc->temp_free += jrec_blk->bsiz;
 				/* Now write trailing characters for 8-bye alignment and then suffix */
 				memcpy(jpc->jnl_buff->buff + jpc->temp_free, (uchar_ptr_t)jfb->buff, jfb->record_size);
 				jpc->temp_free += jfb->record_size;
@@ -286,7 +298,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			{	/* write fixed part of record before the actual gds block image */
 				JNL_PUTSTR(jpc, jb, (uchar_ptr_t)jnl_rec, FIXED_BLK_RECLEN);
 				/* write actual block */
-				JNL_PUTSTR(jpc, jb, (uchar_ptr_t)blk_ptr, blk_ptr->bsiz);
+				JNL_PUTSTR(jpc, jb, (uchar_ptr_t)blk_ptr, jrec_blk->bsiz);
 				/* Now write trailing characters for 8-bye alignment and then suffix */
 				JNL_PUTSTR(jpc, jb, (uchar_ptr_t)jfb->buff, jfb->record_size);
 			}

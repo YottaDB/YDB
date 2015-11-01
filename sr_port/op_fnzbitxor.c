@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,15 +15,15 @@
 
 GBLREF spdesc stringpool;
 
+static const unsigned char mask[8]={0xFF,0xFE,0xFC,0xF8,0xF0,0xE0,0xC0,0x80};
+
 void op_fnzbitxor(mval *dst, mval *bitstr1, mval *bitstr2)
 {
-	int new_str_len;
-	int str_len1, str_len2;
-	unsigned char *byte_1, *byte_n;
-	unsigned char *byte1_1, *byte1_n, byte1_len;
-	unsigned char *byte2_1, *byte2_n, byte2_len;
-	static const unsigned char mask[8]={0xFF,0xFE,0xFC,0xF8,0xF0,0xE0,0xC0,0x80};
-	int n;
+	int 		n, str_len1, str_len2, new_str_len;
+	unsigned char	*byte_1, *byte_n;
+	unsigned char	*byte1_1, *byte1_n, byte1_len;
+	unsigned char	*byte2_1, *byte2_n, byte2_len;
+
 	error_def(ERR_INVBITSTR);
 
 	MV_FORCE_STR(bitstr1);
@@ -33,27 +33,19 @@ void op_fnzbitxor(mval *dst, mval *bitstr1, mval *bitstr2)
 		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
 
 	byte1_len = *(unsigned char *)bitstr1->str.addr;
-	str_len1 = (bitstr1->str.len -1) * 8;
-	if (byte1_len > 7)
-	{
+	str_len1 = (bitstr1->str.len - 1) * 8;
+	if (7 < byte1_len)
 		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
-	}
 
 	byte2_len = *(unsigned char *)bitstr2->str.addr;
 	str_len2 = (bitstr2->str.len -1) * 8;
-	if ((byte2_len < 0) || (byte2_len > 7))
-	{
+	if (7 < byte2_len)
 		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
-	}
 
 	if (str_len1 - byte1_len > str_len2 - byte2_len)
-	{
 		new_str_len = str_len2 - byte2_len;
-	}
 	else
-	{
 		new_str_len = str_len1 - byte1_len;
-	}
 
 	n = (new_str_len + 7)/8 ;
 

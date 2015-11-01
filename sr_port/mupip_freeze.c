@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,13 +24,13 @@
 #include "gdscc.h"
 #include "gdskill.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "util.h"
 #include "gt_timer.h"
 #include "mupipbckup.h"
-#include "gvcst_init.h"
+#include "gvcst_protos.h"	/* for gvcst_init prototype */
 #include "change_reg.h"
 #include "mupip_exit.h"
 #include "mu_getlst.h"

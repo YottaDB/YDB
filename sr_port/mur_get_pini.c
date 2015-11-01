@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,10 +18,11 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
-#include "hashtab.h"
 #if defined(VMS)
 #include "iosb_disk.h"
 #endif
@@ -36,21 +37,26 @@ GBLREF	jnl_ctl_list	*mur_jctl;
 GBLREF	reg_ctl_list	*mur_ctl;
 GBLREF	mur_read_desc_t	mur_desc;
 GBLREF	mur_opt_struct  mur_options;
+GBLREF 	jnl_gbls_t	jgbl;
 
 #define	PROCEED_IF_EXTRACT_SHOW_VERIFY(pini_addr, plst, pplst)								\
 {	/* allow EXTRACT/SHOW/VERIFY to proceed after printing BAD PINI error if error_limit permits.			\
 	 * the way we proceed is by returning as if pini_addr was the first journal record in the file.			\
 	 * this is guaranteed to be a PINI record because of the way GT.M create journal files.				\
 	 */														\
-	boolean_t		proceed;										\
 	GBLREF 	mur_gbls_t	murgbl;											\
 	GBLREF	mur_opt_struct  mur_options;										\
+	ht_ent_int4		*tabent;										\
 															\
-	proceed = MUR_WITHIN_ERROR_LIMIT(murgbl.err_cnt, mur_options.error_limit);	/* increments murgbl.err_cnt */	\
-	if (!proceed || mur_options.update)	/* RECOVER/ROLLBACK should not proceed even if error_limit permits */	\
+	if (mur_options.update || !(MUR_WITHIN_ERROR_LIMIT(murgbl.err_cnt, mur_options.error_limit)))			\
+						/* RECOVER/ROLLBACK should not proceed even if error_limit permits */	\
 		return ERR_JNLBADRECFMT;										\
 	pini_addr = JNL_FILE_FIRST_RECORD;										\
-	if (NULL != (plst = (pini_list_struct *)lookup_hashtab_ent(mur_jctl->pini_list, (void *)pini_addr, &dummy)))	\
+	if (NULL != (tabent = lookup_hashtab_int4(&mur_jctl->pini_list, (uint4 *)&pini_addr)))				\
+		plst = tabent->value;											\
+	else														\
+		plst = NULL;												\
+	if (NULL != plst)												\
 	{														\
 		*pplst = plst;												\
 		return SS_NORMAL;											\
@@ -68,14 +74,18 @@ uint4	mur_get_pini(off_jnl_t pini_addr, pini_list_struct **pplst)
 {
 	pini_list_struct	*plst;
 	struct_jrec_pini	*pini_rec;
-	int4			dummy;
 	uint4			status;
+	ht_ent_int4		*tabent;
 
 	error_def(ERR_JNLREAD);
 	error_def(ERR_JNLBADRECFMT);
 	error_def(ERR_NOPINI);
 
-	if (NULL != (plst = (pini_list_struct *)lookup_hashtab_ent(mur_jctl->pini_list, (void *)pini_addr, &dummy)))
+	if (NULL != (tabent = lookup_hashtab_int4(&mur_jctl->pini_list, (uint4 *)&pini_addr)))
+		plst = tabent->value;
+	else
+		plst = NULL;
+	if (NULL != plst)
 	{
 		*pplst = plst;
 		return SS_NORMAL;
@@ -85,6 +95,8 @@ uint4	mur_get_pini(off_jnl_t pini_addr, pini_list_struct **pplst)
 	if (mur_desc.random_buff.dskaddr > mur_jctl->eof_addr - mur_desc.random_buff.blen ||
 		(SS_NORMAL != (status = mur_read(mur_jctl))))
 	{
+		if (mur_options.update && mur_jctl->after_end_of_data && !jgbl.forw_phase_recovery)
+			return ERR_JNLBADRECFMT;
 		gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, mur_jctl->rec_offset);
 		gtm_putmsg(VARLSTCNT(5) ERR_JNLREAD, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, pini_addr);
 		assert(FALSE);
@@ -96,6 +108,8 @@ uint4	mur_get_pini(off_jnl_t pini_addr, pini_list_struct **pplst)
 	if (JRT_PINI != mur_rab.pinirec->prefix.jrec_type || PINI_RECLEN != mur_rab.pinirec->prefix.forwptr ||
        		!IS_VALID_JNLREC((jnl_record *)mur_rab.pinirec, mur_jctl->jfh))
 	{
+		if (mur_options.update && mur_jctl->after_end_of_data && !jgbl.forw_phase_recovery)
+			return ERR_JNLBADRECFMT;
 		gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, mur_jctl->rec_offset);
 		if (JRT_PINI != mur_rab.pinirec->prefix.jrec_type)
 			gtm_putmsg(VARLSTCNT(5) ERR_NOPINI, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, pini_addr);
@@ -111,7 +125,7 @@ uint4	mur_get_pini(off_jnl_t pini_addr, pini_list_struct **pplst)
 	memcpy(&plst->jpv,     &mur_rab.pinirec->process_vector[CURR_JPV], sizeof(jnl_process_vector));
 	memcpy(&plst->origjpv, &mur_rab.pinirec->process_vector[ORIG_JPV], sizeof(jnl_process_vector));
 	assert(sizeof(void *) == sizeof(pini_addr));
-	add_hashtab_ent(&mur_jctl->pini_list, (void *)pini_addr, (void *)plst);
+	add_hashtab_int4(&mur_jctl->pini_list, (uint4 *)&pini_addr, (void *)plst, &tabent);
 	*pplst = plst;
 	return SS_NORMAL;
 }

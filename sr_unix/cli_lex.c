@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -191,25 +191,6 @@ int cli_is_id(char *p)
 		return (FALSE);
 
 	while (*p && (ISALPHA(*p) || ISDIGIT(*p) || *p == '_' ))
-		p++;
-
-	if (*p) return (FALSE);
-	else return (TRUE);
-}
-
-
-/*
- * -------------------------------------------------------
- * Check if string is a decimal number
- *
- * Return:
- *	TRUE	- identifier
- *	FALSE	- otherwise
- * -------------------------------------------------------
- */
-int cli_is_dcm(char *p)
-{
-	while (*p && ISDIGIT(*p))
 		p++;
 
 	if (*p) return (FALSE);

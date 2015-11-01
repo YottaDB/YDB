@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gdsroot.h"		/* needed for gdsfhead.h */
 #include "gtm_facility.h"	/* needed for gdsfhead.h */
 #include "fileinfo.h"		/* needed for gdsfhead.h */
@@ -17,6 +18,7 @@
 #include "gdsfhead.h"
 #include "stringpool.h"
 #include "format_targ_key.h"
+#include "get_reference.h"	/* for get_reference() prototype */
 
 GBLREF gv_key	*gv_currkey;
 GBLREF spdesc	stringpool;

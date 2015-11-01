@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2002 Sanchez Computer Associates, Inc.	#
+#	Copyright 2002, 2004 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -56,7 +56,10 @@ BEGIN	{
 						printf "\nmain()\n{\n\t%s\ttemp_%s;\n\n", c_struct, c_struct;
 						printf "\tprintf (\"\\nStructure ----> %s <---- \tsize = %%d [0x%%x] \\n\\n\", sizeof(temp_%s), sizeof(temp_%s));\n", c_struct, c_struct, c_struct;
 						for (i = 0; i < fieldcount; i++)
+						{
+							gsub(/[)(]*/,"",structarray[i]);
 							printf "\n\tPRINT_OFFSET(%s,%s);", c_struct, structarray[i];
+						}
 						printf "\n\tprintf(\"\\n\");\n}\n";
 						exit
 					}

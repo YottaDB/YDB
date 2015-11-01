@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,8 +25,8 @@
 #include "filestruct.h"		/* atleast for the FILE_INFO macro */
 #include "gdscc.h"		/* atleast for cw_set_element in tp.h */
 #include "jnl.h"		/* atleast for tp.h */
-#include "hashtab.h"		/* atleast for tp.h */
 #include "buddy_list.h"		/* atleast for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"			/* atleast for off_chain */
 #include "t_qread.h"
 #include "gvcst_bmp_mark_free.h"

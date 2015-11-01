@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,8 +26,8 @@
 #include "gdskill.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "mu_int_maps.h"
 #include "util.h"
@@ -117,6 +117,7 @@ GBLDEF global_list		*trees_tail;
 GBLDEF global_list		*trees;
 GBLDEF sgmnt_data		mu_int_data;
 GBLDEF trans_num		largest_tn;
+GBLDEF int4			mu_int_blks_to_upgrd;
 
 GBLREF bool			mu_ctrly_occurred;
 GBLREF bool			mu_ctrlc_occurred;
@@ -163,15 +164,17 @@ void mupip_integ(void)
 	error_def(ERR_DBTNRESETINC);
 	error_def(ERR_DBTNRESET);
 	error_def(ERR_DBTNLTCTN);
+	error_def(ERR_DBBTUWRNG);
+	error_def(ERR_DBBTUFIXED);
 
 	error_mupip = FALSE;
 	if (NULL == gv_target)
-		gv_target = (gv_namehead *)targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN);
+		gv_target = (gv_namehead *)targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN, NULL);
  	gv_altkey = (gv_key *)malloc(sizeof(gv_key) + MAX_KEY_SZ - 1);
 	if (CLI_PRESENT == (cli_status = cli_present("MAXKEYSIZE")))
 	{
 		assert(sizeof(disp_maxkey_errors) == sizeof(int4));
-		if (0 == cli_get_num("MAXKEYSIZE", (int4 *)&disp_maxkey_errors))
+		if (0 == cli_get_int("MAXKEYSIZE", (int4 *)&disp_maxkey_errors))
 			mupip_exit(ERR_MUPCLIERR);
 		if (disp_maxkey_errors < 1)
 			disp_maxkey_errors = 1;
@@ -182,7 +185,7 @@ void mupip_integ(void)
 	if (CLI_PRESENT == (cli_status = cli_present("TRANSACTION")))
 	{
 		assert(sizeof(disp_trans_errors) == sizeof(int4));
-		if (0 == cli_get_num("TRANSACTION", (int4 *)&disp_trans_errors))
+		if (0 == cli_get_int("TRANSACTION", (int4 *)&disp_trans_errors))
 			mupip_exit(ERR_MUPCLIERR);
 		if (disp_trans_errors < 1)
 			disp_trans_errors = 1;
@@ -193,7 +196,7 @@ void mupip_integ(void)
 	if (CLI_PRESENT == (cli_status = cli_present("MAP")))
 	{
 		assert(sizeof(disp_map_errors) == sizeof(int4));
-		if (0 == cli_get_num("MAP", (int4 *)&disp_map_errors))
+		if (0 == cli_get_int("MAP", (int4 *)&disp_map_errors))
 			mupip_exit(ERR_MUPCLIERR);
 		if (disp_map_errors < 1)
 			disp_map_errors = 1;
@@ -204,7 +207,7 @@ void mupip_integ(void)
 	if (CLI_PRESENT == cli_present("ADJACENCY"))
 	{
 		assert(sizeof(muint_adj) == sizeof(int4));
-		if (0 == cli_get_num("ADJACENCY", (int4 *)&muint_adj))
+		if (0 == cli_get_int("ADJACENCY", (int4 *)&muint_adj))
 			mupip_exit(ERR_MUPCLIERR);
 	} else
 		muint_adj = DEFAULT_ADJACENCY;
@@ -216,6 +219,8 @@ void mupip_integ(void)
 		full = FALSE;
 	if (CLI_PRESENT == cli_present("FAST"))
 		muint_fast = TRUE;
+	else
+		muint_fast = FALSE;
 	if (CLI_PRESENT == cli_present("REGION"))
 	{
 		gvinit();
@@ -272,6 +277,7 @@ void mupip_integ(void)
 		mu_int_err_ranges = (CLI_NEGATED != cli_present("KEYRANGES"));
 		mu_int_root_level = (unsigned char)-1;
 		mu_map_errs = 0, prev_errknt = largest_tn = 0;
+		mu_int_blks_to_upgrd = 0;
 		for (idx = 0;  idx <= MAX_BT_DEPTH;  idx++)
 		{
 			QWASSIGNDW(mu_int_size[idx], 0);
@@ -318,7 +324,7 @@ void mupip_integ(void)
 		}
 		if (CLI_PRESENT == cli_present("BLOCK"))
 		{
-			if (0 == cli_get_hex("BLOCK", &trees->root))
+			if (0 == cli_get_hex("BLOCK", (uint4 *)&trees->root))
 			{
 				if (region)
 				{
@@ -484,13 +490,23 @@ void mupip_integ(void)
 					memcpy(util_buff, "!/Free blocks counter in file header:  ", util_len);
 					util_len += i2hex_nofill(region ? cs_addrs->hdr->trans_hist.free_blocks :
 							mu_int_data.trans_hist.free_blocks, (uchar_ptr_t)&util_buff[util_len], 8);
-					memcpy(&util_buff[util_len], TEXT1, sizeof(TEXT1) - 1);
+					MEMCPY_LIT(&util_buff[util_len], TEXT1);
 					util_len += sizeof(TEXT1) - 1;
 					util_len += i2hex_nofill(blocks_free, (uchar_ptr_t)&util_buff[util_len], 8);
 					util_buff[util_len] = 0;
 					util_out_print(util_buff, TRUE);
 				} else
 					blocks_free = LEAVE_BLOCKS_ALONE;
+			}
+			if (!muint_fast &&
+				(mu_int_blks_to_upgrd != (region ? cs_addrs->hdr->blks_to_upgrd : mu_int_data.blks_to_upgrd)))
+			{
+				gtm_putmsg(VARLSTCNT(4) ERR_DBBTUWRNG, 2, mu_int_blks_to_upgrd,
+					region ? cs_addrs->hdr->blks_to_upgrd : mu_int_data.blks_to_upgrd);
+				if (gv_cur_region->read_only || mu_int_errknt)
+					mu_int_errknt++;
+				else
+					gtm_putmsg(VARLSTCNT(1) ERR_DBBTUFIXED);
 			}
 			if ((0 != mu_int_data.kill_in_prog) && (!mu_map_errs) && !region && !gv_cur_region->read_only)
 			{
@@ -555,14 +571,14 @@ void mupip_integ(void)
 						TRUE, disp_trans_errors);
 				util_out_print("!UL transaction number errors encountered.", TRUE, trans_errors);
 			}
-			memcpy(util_buff, TEXT2, sizeof(TEXT2) - 1);
+			MEMCPY_LIT(util_buff, TEXT2);
 			util_len = sizeof(TEXT2) - 1;
-			util_len += i2hex_nofill(largest_tn, (uchar_ptr_t)&util_buff[util_len], 8);
+			util_len += i2hexl_nofill(largest_tn, (uchar_ptr_t)&util_buff[util_len], 16);
 			util_buff[util_len] = 0;
 			util_out_print(util_buff, TRUE);
-			memcpy(util_buff, TEXT3, sizeof(TEXT3) - 1);
+			MEMCPY_LIT(util_buff, TEXT3);
 			util_len = sizeof(TEXT3) - 1;
-			util_len += i2hex_nofill(mu_int_data.trans_hist.curr_tn, (uchar_ptr_t)&util_buff[util_len], 8);
+			util_len += i2hexl_nofill(mu_int_data.trans_hist.curr_tn, (uchar_ptr_t)&util_buff[util_len], 16);
 			util_buff[util_len] = 0;
 			util_out_print(util_buff, TRUE);
 		}
@@ -578,6 +594,15 @@ void mupip_integ(void)
 			{
 				if (LEAVE_BLOCKS_ALONE != blocks_free)
 					cs_addrs->hdr->trans_hist.free_blocks = blocks_free;	/* Not if "online" integ */
+				if (!mu_int_errknt && !muint_fast)
+				{
+					if (mu_int_blks_to_upgrd != cs_addrs->hdr->blks_to_upgrd)
+						cs_addrs->hdr->blks_to_upgrd = mu_int_blks_to_upgrd;
+					if (0 == mu_int_blks_to_upgrd)
+						cs_addrs->hdr->fully_upgraded = TRUE;
+					else
+						cs_addrs->hdr->fully_upgraded = FALSE;
+				}
 				region_freeze(gv_cur_region, FALSE, FALSE);
 				fc = gv_cur_region->dyn.addr->file_cntl;
 				fc->op = FC_WRITE;
@@ -605,11 +630,24 @@ void mupip_integ(void)
 					mu_int_data.trans_hist.free_blocks = blocks_free;
 					update_filehdr = TRUE;
 				}
+				if (!mu_int_errknt && !muint_fast)
+				{
+					if (mu_int_blks_to_upgrd != mu_int_data.blks_to_upgrd)
+						mu_int_data.blks_to_upgrd = mu_int_blks_to_upgrd;
+					if (0 == mu_int_blks_to_upgrd)
+						mu_int_data.fully_upgraded = TRUE;
+					else
+						mu_int_data.fully_upgraded = FALSE;
+					update_filehdr = TRUE;
+				}
 			}
 			if (update_header_tn)
 			{
-				mu_int_data.trans_hist.curr_tn = mu_int_data.trans_hist.early_tn =
-					mu_int_data.trans_hist.header_open_tn = 1;
+				mu_int_data.trans_hist.early_tn = mu_int_data.trans_hist.header_open_tn = 1;
+				mu_int_data.trans_hist.curr_tn = 0;
+				/* curr_tn = 0 + 1 is done (instead of = 1) so as to use INCREMENT_CURR_TN macro.
+				 * this way all places that update db curr_tn are easily obtained by searching for the macro */
+				INCREMENT_CURR_TN(&mu_int_data);
 				update_filehdr = TRUE;
 			}
 			if (FALSE != update_filehdr)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ void dse_integ(void)
 
 	if (CLI_PRESENT == cli_present("BLOCK"))
 	{
-		if (!cli_get_hex("BLOCK", &blk))
+		if (!cli_get_hex("BLOCK", (uint4 *)&blk))
 			return;
 		if (blk < 0 || blk >= cs_addrs->ti->total_blks)
 		{
@@ -76,7 +76,7 @@ void dse_integ(void)
 
 	if (!(bp = t_qread(patch_curr_blk, &dummy_int, &dummy_cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-	if (TRUE == cert_blk(gv_cur_region, patch_curr_blk, (blk_hdr_ptr_t)bp, 0))
+	if (TRUE == cert_blk(gv_cur_region, patch_curr_blk, (blk_hdr_ptr_t)bp, 0, FALSE))
 		util_out_print("!/  No errors detected.!/", TRUE);
 	else
 		util_out_print(NULL, TRUE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,14 +12,14 @@
 #include "mdef.h"
 
 #include "gtm_socket.h"
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <time.h>
-#include <sys/time.h>
-#include <errno.h>
-#include <fcntl.h>
+#include "gtm_inet.h"
+#include "gtm_time.h"
+#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_string.h"
+
+#include <sys/time.h>
+#include <errno.h>
 #ifdef VMS
 #include <descrip.h> /* Required for gtmrecv.h */
 #endif
@@ -49,6 +49,7 @@
 #include "gt_timer.h"
 #include "min_max.h"
 #include "error.h"
+#include "copy.h"
 
 #define RECVBUFF_REPLMSGLEN_FACTOR 		8
 
@@ -106,6 +107,12 @@ GBLREF	int			repl_filter_bufsiz;
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
 GBLREF	unsigned char		jnl_source_rectype, jnl_dest_maxrectype;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
+GBLREF	boolean_t		null_subs_xform;
+GBLREF	boolean_t 		primary_side_std_null_coll;
+GBLREF	boolean_t 		secondary_side_std_null_coll;
+GBLREF	seq_num			lastlog_seqno;
+GBLREF	uint4			log_interval;
+GBLREF	qw_num			trans_recvd_cnt, last_log_tr_recvd_cnt;
 
 static	unsigned char	*buffp, *buff_start, *msgbuff, *filterbuff;
 static	int		buff_unprocessed;
@@ -117,11 +124,8 @@ static	repl_msg_t	xon_msg, xoff_msg;
 static	int		xoff_msg_log_cnt = 0;
 static	long		recvpool_high_watermark, recvpool_low_watermark;
 static	uint4		write_loc, write_wrap;
-static	seq_num		lastlog_seqno;
 static  uint4		write_len, write_off,
 			pre_filter_write_len, pre_filter_write, pre_intlfilter_datalen;
-static	qw_num		trans_recvd_cnt = 0;
-static	qw_num		last_log_tr_recvd_cnt = 0;
 static	double		time_elapsed;
 static	int		recvpool_size;
 static	int		heartbeat_period;
@@ -250,7 +254,7 @@ static int gtmrecv_est_conn(void)
 	int			status;
 	const   int     	disable_keepalive = 0;
 	struct  linger  	disable_linger = {0, 0};
-        struct  timeval 	save_gtmrecv_poll_interval;
+	struct  timeval 	save_gtmrecv_poll_interval;
 	char			print_msg[1024];
 	int			send_buffsize, recv_buffsize, tcp_r_bufsize;
 
@@ -276,10 +280,10 @@ static int gtmrecv_est_conn(void)
 	 * SELECT macro is not used because the FD_SET is redone before the new
 	 * call to select (after the continue).
 	 */
-        save_gtmrecv_poll_interval = gtmrecv_poll_interval;
+	save_gtmrecv_poll_interval = gtmrecv_poll_interval;
 	while (0 >= (status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &save_gtmrecv_poll_interval)))
 	{
-                save_gtmrecv_poll_interval = gtmrecv_poll_interval;
+		save_gtmrecv_poll_interval = gtmrecv_poll_interval;
 		FD_SET(gtmrecv_listen_sock_fd, &input_fds);
 		if (0 == status)
 			gtmrecv_poll_actions(0, 0, NULL);
@@ -440,13 +444,14 @@ static void process_tr_buff(void)
 	boolean_t		filter_pass = FALSE;
 	uchar_ptr_t		save_buffp, save_filter_buff, in_buff, out_buff;
 	int			status;
-	unsigned char		seq_num_str[32], *seq_num_ptr;
+	qw_num			msg_total;
 
 	error_def(ERR_REPLTRANS2BIG);
 	error_def(ERR_TEXT);
 	error_def(ERR_JNLRECFMT);
 	error_def(ERR_JNLSETDATA2LONG);
 	error_def(ERR_JNLNEWREC);
+	error_def(ERR_REPLGBL2LONG);
 
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
@@ -517,21 +522,21 @@ static void process_tr_buff(void)
 			write_len = ((recvpool_ctl->write != write_wrap) ?
 					(write_loc - recvpool_ctl->write) : write_loc);
 			write_off = ((recvpool_ctl->write != write_wrap) ? recvpool_ctl->write : 0);
-			QWASSIGN(log_seqno, lastlog_seqno);
-			QWINCRBYDW(log_seqno, LOGTRNUM_INTERVAL);
-			if (QWLE(log_seqno, recvpool_ctl->jnl_seqno) && (NO_FILTER == gtmrecv_filter || filter_pass))
+			if ((recvpool_ctl->jnl_seqno - lastlog_seqno >= log_interval)
+				&& (NO_FILTER == gtmrecv_filter || filter_pass))
 			{
-				QWASSIGN(log_seqno, recvpool_ctl->jnl_seqno);
+				log_seqno = recvpool_ctl->jnl_seqno;
 				trans_recvd_cnt += (log_seqno - lastlog_seqno);
+				msg_total = repl_recv_data_recvd - buff_unprocessed; /* don't include data not yet processed,
+										      * we'll include that count in a later log */
 				if (NO_FILTER == gtmrecv_filter)
 					repl_log(gtmrecv_log_fp, FALSE, TRUE, "REPL INFO - Tr num : %llu"
 						"  Tr Total : %llu  Msg Total : %llu\n", log_seqno,
-						repl_recv_data_processed, repl_recv_data_recvd - buff_unprocessed);
+						repl_recv_data_processed, msg_total);
 				else
 					repl_log(gtmrecv_log_fp, FALSE, TRUE, "REPL INFO - Tr num : %llu"
 						"  Pre filter total : %llu  Post filter total : %llu  Msg Total : %llu\n",
-						log_seqno, repl_recv_prefltr_data_procd, repl_recv_data_processed,
-						repl_recv_data_recvd - buff_unprocessed);
+						log_seqno, repl_recv_prefltr_data_procd, repl_recv_data_processed, msg_total);
 
 				/* approximate time with an error not more than GTMRECV_HEARTBEAT_PERIOD. We use this instead of
 				 * calling time(), and expensive system call, especially on VMS. The consequence of this choice
@@ -550,18 +555,18 @@ static void process_tr_buff(void)
 						 "Tr recvd : %llu  Tr bytes : %llu  Msg bytes : %llu\n", time_elapsed,
 						 trans_recvd_cnt - last_log_tr_recvd_cnt,
 						 repl_recv_data_processed - repl_recv_lastlog_data_procd,
-						 repl_recv_data_recvd - repl_recv_lastlog_data_recvd);
+						 msg_total - repl_recv_lastlog_data_recvd);
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO since last log : Time elapsed : %00.f  "
 						 "Tr recvd/s : %f  Tr bytes/s : %f  Msg bytes/s : %f\n", time_elapsed,
 						 (float)(trans_recvd_cnt - last_log_tr_recvd_cnt)/time_elapsed,
 						 (float)(repl_recv_data_processed - repl_recv_lastlog_data_procd)/time_elapsed,
-						 (float)(repl_recv_data_recvd - repl_recv_lastlog_data_recvd)/time_elapsed);
+						 (float)(msg_total - repl_recv_lastlog_data_recvd)/time_elapsed);
 					repl_recv_lastlog_data_procd = repl_recv_data_processed;
-					repl_recv_lastlog_data_recvd = repl_recv_data_recvd;
+					repl_recv_lastlog_data_recvd = msg_total;
 					last_log_tr_recvd_cnt = trans_recvd_cnt;
 					repl_recv_prev_log_time = repl_recv_this_log_time;
 				}
-				QWASSIGN(lastlog_seqno, log_seqno);
+				lastlog_seqno = log_seqno;
 			}
 			if (gtmrecv_logstats && (NO_FILTER == gtmrecv_filter || filter_pass))
 			{
@@ -629,6 +634,8 @@ static void process_tr_buff(void)
 						else if (EREPL_INTLFILTER_NEWREC == repl_errno)
 							rts_error(VARLSTCNT(4) ERR_JNLNEWREC, 2, (unsigned int)jnl_source_rectype,
 								  (unsigned int)jnl_dest_maxrectype);
+						else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
+								rts_error(VARLSTCNT(1) ERR_REPLGBL2LONG);
 						else /* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */
 							GTMASSERT;
 					}
@@ -645,12 +652,9 @@ static void process_tr_buff(void)
 					repl_filter_error(recvpool_ctl->jnl_seqno, status);
 				assert(write_len <= repl_filter_bufsiz);
 				if (write_len > recvpool_size)
-				{
-					seq_num_ptr = i2ascl(seq_num_str, recvpool_ctl->jnl_seqno);
-					rts_error(VARLSTCNT(11) ERR_REPLTRANS2BIG, 5, seq_num_ptr - &seq_num_str[0], seq_num_str,
+					rts_error(VARLSTCNT(10) ERR_REPLTRANS2BIG, 4, &recvpool_ctl->jnl_seqno,
 						  write_len, RTS_ERROR_LITERAL("Receive"), ERR_TEXT, 2,
 						  LEN_AND_LIT("Post filter tr len larger than receive pool size"));
-				}
 
 				/* Switch buffers */
 				save_buffp = buffp;
@@ -678,7 +682,6 @@ static void do_main_loop(boolean_t crash_restart)
 	recvpool_ctl_ptr_t	recvpool_ctl;
 	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
-	unsigned char		seq_num_str[32], seq_num_str1[32], *seq_num_ptr;
 	seq_num			request_from, recvd_jnl_seqno;
 	int			skip_for_alignment, msg_type, msg_len;
 	unsigned char		*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
@@ -687,6 +690,8 @@ static void do_main_loop(boolean_t crash_restart)
 	int			status;					/* needed for REPL_{SEND,RECV}_LOOP */
 	char			print_msg[1024];
 	repl_heartbeat_msg_t	heartbeat;
+	repl_start_reply_msg_t	*start_msg;
+	uint4			recvd_start_flags;
 
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_REPLWARN);
@@ -697,10 +702,6 @@ static void do_main_loop(boolean_t crash_restart)
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
 	gtmrecv_local = recvpool.gtmrecv_local;
-	lastlog_seqno = recvpool_ctl->jnl_seqno - 1;
-	QWDECRBYDW(lastlog_seqno, (LOGTRNUM_INTERVAL - 1));
-	trans_recvd_cnt = -LOGTRNUM_INTERVAL + 1;
-	last_log_tr_recvd_cnt = 0;
 	gtmrecv_wait_for_jnl_seqno = FALSE;
 
 	if (!gtmrecv_bad_trans_sent)
@@ -714,6 +715,7 @@ static void do_main_loop(boolean_t crash_restart)
 			if (repl_connection_reset)
 				return;
 		}
+		secondary_side_std_null_coll = recvpool_ctl->std_null_coll;
 		gtmrecv_wait_for_jnl_seqno = FALSE;
 		if (QWEQ(recvpool_ctl->start_jnl_seqno, seq_num_zero))
 			QWASSIGN(recvpool_ctl->start_jnl_seqno, recvpool_ctl->jnl_seqno);
@@ -726,6 +728,8 @@ static void do_main_loop(boolean_t crash_restart)
 			(gtmrecv_options.stopsourcefilter ? START_FLAG_STOPSRCFILTER : 0);
 		((repl_start_msg_ptr_t)gtmrecv_msgp)->start_flags |= (gtmrecv_options.updateresync ? START_FLAG_UPDATERESYNC : 0);
 		((repl_start_msg_ptr_t)gtmrecv_msgp)->start_flags |= START_FLAG_HASINFO;
+		if (secondary_side_std_null_coll)
+			((repl_start_msg_ptr_t)gtmrecv_msgp)->start_flags |= START_FLAG_COLL_M;
 		((repl_start_msg_ptr_t)gtmrecv_msgp)->jnl_ver = jnl_ver;
 		QWASSIGN(*(seq_num *)&((repl_start_msg_ptr_t)gtmrecv_msgp)->start_seqno[0], request_from);
 		gtmrecv_msgp->len = MIN_REPL_MSGLEN;
@@ -760,17 +764,14 @@ static void do_main_loop(boolean_t crash_restart)
 			}
 		}
 	}
-
 	gtmrecv_bad_trans_sent = FALSE;
-	QWASSIGN(request_from, recvpool_ctl->jnl_seqno);
-	assert(QWGE(request_from, seq_num_one));
-
+	request_from = recvpool_ctl->jnl_seqno;
+	assert(request_from >= seq_num_one);
+	gtmrecv_reinit_logseqno();
 
 	repl_log(gtmrecv_log_fp, FALSE, TRUE, "Waiting for WILL_START or ROLL_BACK_FIRST message\n");
 
-
-	/* Receive journal data and put it in the Receive Pool */
-
+	/* Receive journal data and place it in the Receive Pool */
 	buff_start = (unsigned char *)gtmrecv_msgp;
 	buffp = buff_start;
 	buff_unprocessed = 0;
@@ -870,8 +871,7 @@ static void do_main_loop(boolean_t crash_restart)
 				{
 					/* Too large a transaction to be
 					 * accommodated in the Receive Pool */
-					seq_num_ptr = i2ascl(seq_num_str, recvpool_ctl->jnl_seqno);
-					rts_error(VARLSTCNT(7) ERR_REPLTRANS2BIG, 5, seq_num_ptr - &seq_num_str[0], seq_num_str,
+					rts_error(VARLSTCNT(6) ERR_REPLTRANS2BIG, 4, &recvpool_ctl->jnl_seqno,
 						  data_len, RTS_ERROR_LITERAL("Receive"));
 				}
 			}
@@ -921,29 +921,48 @@ static void do_main_loop(boolean_t crash_restart)
 					if (0 == data_len)
 					{
 						assert(msg_len == MIN_REPL_MSGLEN - REPL_MSG_HDRLEN);
-						QWASSIGN(recvd_jnl_seqno, *(seq_num *)(buffp - msg_len));
+						start_msg = (repl_start_reply_msg_t *)(buffp - msg_len - REPL_MSG_HDRLEN);
+						assert((unsigned long)start_msg % sizeof(seq_num) == 0); /* alignment check */
+						QWASSIGN(recvd_jnl_seqno, *(seq_num *)start_msg->start_seqno);
 						if (REPL_WILL_RESTART_WITH_INFO == msg_type)
 						{
 							repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received WILL_START message. "
 											     "Primary acked the restart point\n");
-							remote_jnl_ver = *(buffp - msg_len + sizeof(seq_num));
+							remote_jnl_ver = start_msg->jnl_ver;
 							REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n",
 								     jnl_ver, remote_jnl_ver);
 							repl_check_jnlver_compat();
-							if (jnl_ver > remote_jnl_ver &&
-							    IF_NONE != repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
-							                                   [jnl_ver - JNL_VER_EARLIEST_REPL])
+							/* older versions zero filler that was in place of start_msg->start_flags,
+							 * so we are okay fetching start_msg->start_flags unconditionally.
+							 */
+							GET_ULONG(recvd_start_flags, start_msg->start_flags);
+							assert(remote_jnl_ver > V15_JNL_VER || 0 == recvd_start_flags);
+							if (remote_jnl_ver <= V15_JNL_VER) /* safety in pro */
+								recvd_start_flags = 0;
+							primary_side_std_null_coll = (recvd_start_flags & START_FLAG_COLL_M) ?
+								TRUE : FALSE;
+							if (FALSE != (null_subs_xform = ((primary_side_std_null_coll &&
+										!secondary_side_std_null_coll)
+									|| (secondary_side_std_null_coll &&
+										!primary_side_std_null_coll))))
+								null_subs_xform = (primary_side_std_null_coll ?
+									STDNULL_TO_GTMNULL_COLL : GTMNULL_TO_STDNULL_COLL);
+								/* this sets null_subs_xform regardless of remote_jnl_ver */
+							if ((jnl_ver > remote_jnl_ver &&
+								IF_NONE != repl_internal_filter[remote_jnl_ver -
+								JNL_VER_EARLIEST_REPL][jnl_ver - JNL_VER_EARLIEST_REPL])
+								|| (jnl_ver == remote_jnl_ver && 0 != null_subs_xform))
 							{
 								assert(IF_INVALID !=
 									repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
-										    	  [remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
+											[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
 								assert(IF_INVALID !=
 									repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
-										    	    [jnl_ver - JNL_VER_EARLIEST_REPL]);
+											[jnl_ver - JNL_VER_EARLIEST_REPL]);
 								/* reverse transformation should exist */
 								assert(IF_NONE !=
 									repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
-									 		  [remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
+											[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
 								gtmrecv_filter |= INTERNAL_FILTER;
 								gtmrecv_alloc_filter_buff(gtmrecv_max_repl_msglen);
 							} else
@@ -1002,6 +1021,25 @@ static void gtmrecv_heartbeat_timer(TID tid, int4 interval_len, int *interval_pt
 			&heartbeat_period); /* start_timer expects time interval in milli seconds, heartbeat_period is in seconds */
 }
 
+static void gtmrecv_main_loop(boolean_t crash_restart)
+{
+	assert(gtmrecv_sock_fd == -1);
+	gtmrecv_poll_actions(0, 0, NULL); /* Clear any pending bad trans */
+	gtmrecv_est_conn();
+	gtmrecv_bad_trans_sent = FALSE; /* this assignment should be after gtmrecv_est_conn since gtmrecv_est_conn can
+					 * potentially call gtmrecv_poll_actions. If the timing is right,
+					 * gtmrecv_poll_actions might set this variable to TRUE if the update process sets
+					 * bad_trans in the recvpool. When we are (re)establishing connection with the
+					 * source server, there is no point in doing bad trans processing. Also, we have
+					 * to send START_JNL_SEQNO message to the source server. If not, there will be a
+					 * deadlock with the source and receiver servers waiting for each other to send
+					 * a message. */
+	repl_recv_prev_log_time = gtmrecv_now;
+	while (!repl_connection_reset)
+		do_main_loop(crash_restart);
+	return;
+}
+
 void gtmrecv_process(boolean_t crash_restart)
 {
 	recvpool_ctl_ptr_t	recvpool_ctl;
@@ -1035,23 +1073,10 @@ void gtmrecv_process(boolean_t crash_restart)
 	heartbeat_period = GTMRECV_HEARTBEAT_PERIOD; /* time keeper, well sorta */
 	start_timer((TID)gtmrecv_heartbeat_timer, heartbeat_period * 1000, gtmrecv_heartbeat_timer, sizeof(heartbeat_period),
 			&heartbeat_period); /* start_timer expects time interval in milli seconds, heartbeat_period is in seconds */
-	while (TRUE)
+	do
 	{
-		assert(gtmrecv_sock_fd == -1);
-		gtmrecv_poll_actions(0, 0, NULL); /* Clear any pending bad trans */
-		gtmrecv_est_conn();
-		gtmrecv_bad_trans_sent = FALSE; /* this assignment should be after gtmrecv_est_conn since gtmrecv_est_conn can
-						 * potentially call gtmrecv_poll_actions. If the timing is right,
-						 * gtmrecv_poll_actions might set this variable to TRUE if the update process sets
-						 * bad_trans in the recvpool. When we are (re)establishing connection with the
-						 * source server, there is no point in doing bad trans processing. Also, we have
-						 * to send START_JNL_SEQNO message to the source server. If not, there will be a
-						 * deadlock with the source and receiver servers waiting for each other to send
-						 * a message. */
-		repl_recv_prev_log_time = gtmrecv_now;
-		while (!repl_connection_reset)
-			do_main_loop(crash_restart);
-	}
+		gtmrecv_main_loop(crash_restart);
+	} while (repl_connection_reset);
 	GTMASSERT; /* shouldn't reach here */
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include <stddef.h>
 #include "gtm_string.h"
 #include "rtnhdr.h" /* For urx.h */
 #include "urx.h"
@@ -37,7 +38,7 @@ void urx_putlab (char *lab, int lablen, urx_rtnref *rtn, char *addr)
 	{
 		c = lablen - lp1->len;
 		if (!c)
-			c = memcmp(lab, lp1->name.c, lablen);
+			c = memcmp(lab, &lp1->name[0], lablen);
 		if (c > 0)
 		{
 			lp0 = lp1;
@@ -56,9 +57,9 @@ void urx_putlab (char *lab, int lablen, urx_rtnref *rtn, char *addr)
 
 	if (!found)
 	{	/* Add new label name to list */
-		tmplp = (urx_labref *)malloc(sizeof(urx_labref));
+		tmplp = (urx_labref *)malloc(offsetof(urx_labref, name[0]) + lablen);
 		tmplp->len = lablen;
-		memcpy(tmplp->name.c, lab, lablen);
+		memcpy(&tmplp->name[0], lab, lablen);
 		tmplp->addr = 0;
 		tmplp->next = lp1;
 		if (lp0 == (urx_labref *)rtn)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +48,7 @@ int do_patsplit(mval *str, mval *pat)
 	int4		offset;
 	char		*strptr, *strtop;
 	boolean_t	match;		/* match status of input pattern with input string */
+	gtm_uint64_t	bound;
 
 	MV_FORCE_STR(str);
 	patptr = (uint4 *)pat->str.addr;
@@ -117,16 +118,20 @@ int do_patsplit(mval *str, mval *pat)
 				patptr++;
 				patptr += DIVIDE_ROUND_UP(len, sizeof(*patptr));
 			}
-			if ((min[index] == max[index]) && (min[index] * size[index]))
+			if ((min[index] == max[index]) && (bound = (gtm_uint64_t)min[index] * size[index]))
 			{	/* fixed_length */
 				if (ABS(index - (count / 2)) < ABS(fixed_index - (count / 2)))
 				{	/* non-zero fixed length pattern with a fixed_index closer to the median of the array */
 					if (right)
 					{	/* update left's tot_min and tot_max to reflect the new fixed_index */
-						tot_min[0] = MIN(PAT_MAX_REPEAT,
-							tot_min[0] + tot_min[right] + (min[fixed_index] * size[fixed_index]));
-						tot_max[0] = MIN(PAT_MAX_REPEAT,
-							tot_max[0] + tot_max[right] + (max[fixed_index] * size[fixed_index]));
+						tot_min[0] += tot_min[right] +
+							BOUND_MULTIPLY(min[fixed_index], size[fixed_index], bound);
+						if (tot_min[0] > PAT_MAX_REPEAT)
+							tot_min[0] = PAT_MAX_REPEAT;
+						tot_max[0] += tot_max[right] +
+							BOUND_MULTIPLY(max[fixed_index], size[fixed_index], bound);
+						if (tot_max[0] > PAT_MAX_REPEAT)
+							tot_max[0] = PAT_MAX_REPEAT;
 						fixed[0] &= fixed[right];
 					}
 					fixed_index = index;
@@ -140,16 +145,21 @@ int do_patsplit(mval *str, mval *pat)
 			} else
 				fixed[right] = FALSE;
 		}
-		tot_min[right] = MIN(PAT_MAX_REPEAT, tot_min[right] + (min[index] * size[index]));
-		tot_max[right] = MIN(PAT_MAX_REPEAT, tot_max[right] + (max[index] * size[index]));
+		tot_min[right] += BOUND_MULTIPLY(min[index], size[index], bound);
+		if (tot_min[right] > PAT_MAX_REPEAT)
+			tot_min[right] = PAT_MAX_REPEAT;
+		tot_max[right] += BOUND_MULTIPLY(max[index], size[index], bound);
+		if (tot_max[right] > PAT_MAX_REPEAT)
+			tot_max[right] = PAT_MAX_REPEAT;
 	}
 	assert(index == count);
 	if (-1 == fixed_index)
 		return DO_PATSPLIT_FAIL;
 	assert(fixed_index < count);
-	assert((total_min == (tot_min[0] + tot_min[1] + min[fixed_index] * size[fixed_index])) || (PAT_MAX_REPEAT == total_min));
-	assert((total_max == (tot_max[0] + tot_max[1] + max[fixed_index] * size[fixed_index])) || (PAT_MAX_REPEAT == total_max));
-
+	assert((total_min == (tot_min[0] + tot_min[1] + BOUND_MULTIPLY(min[fixed_index], size[fixed_index], bound))) ||
+		(PAT_MAX_REPEAT == total_min));
+	assert((total_max == (tot_max[0] + tot_max[1] + BOUND_MULTIPLY(max[fixed_index], size[fixed_index], bound))) ||
+		(PAT_MAX_REPEAT == total_max));
 	cnt[0] = fixed_index;
 	if (cnt[0])
 	{	/* left section has at least one pattern atom. create its compilation string */

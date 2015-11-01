@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +9,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __MUPINT_H__
-#define __MUPINT_H__
+#ifndef MUPINT_H
+#define MUPINT_H
 
 /*  requires gdsroot.h */
 
@@ -26,7 +26,7 @@ typedef	struct global_list_struct
 	unsigned char			nct;
 	unsigned char			act;
 	unsigned char			ver;
-	char				key[sizeof(mident) + 1];	/* max key length plus one for printf terminator */
+	char				key[MAX_MIDENT_LEN + 1];	/* max key length plus one for printf terminator */
 } global_list;
 #ifdef BIGENDIAN
 typedef struct
@@ -46,7 +46,7 @@ boolean_t mu_int_fhead(void);
 boolean_t mu_int_init(void);
 void mu_int_reg(gd_region *reg, boolean_t *return_value);
 int mu_int_getkey(unsigned char *key_buff, int keylen);
-uchar_ptr_t mu_int_read(block_id blk);
+uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver);
 void mu_int_err(int err, boolean_t do_path, boolean_t do_range, unsigned char *bot, int has_bot,
 	unsigned char *top, int has_top, unsigned int level);
 void mu_int_maps(void);

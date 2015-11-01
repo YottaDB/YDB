@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -456,7 +456,7 @@ va_dcl
 	}
 	param_list->n = argcnt;
 	save_mumps_status = mumps_status; /* save mumps_status as a callin from external call may change it */
-	status = callg(entry_ptr->fcn, param_list);
+	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	mumps_status = save_mumps_status;
 
 	/* Exit from the residual call-in environment(SFF_CI and base frames) which might

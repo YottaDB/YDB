@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,8 +23,8 @@ GBLREF unsigned char *stackbase, *stacktop;
 unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned char **b_line, rhdtyp *routine)
 {
 	unsigned char	temp[OFFSET_LEN];
-	LAB_TABENT	*max_label, *label_table, *last_label;
-	LNR_TABENT	*line_table, *last_line;
+	lab_tabent	*max_label, *label_table, *last_label;
+	lnr_tabent	*line_table, *last_line;
 	int4		len, ct, offset, in_addr_offset;
 
 	if (!ADDR_IN_CODE(in_addr, routine))
@@ -53,10 +53,10 @@ unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned ch
 		label_table++;
 	}
 	line_table = LABENT_LNR_ENTRY(routine, max_label);
-	len = mid_len(&max_label->lab_name);
+	len = max_label->lab_name.len;
 	if (len)
 	{
-		memcpy(out, &max_label->lab_name.c[0], len);
+		memcpy(out, max_label->lab_name.addr, len);
 		out += len;
 	}
 	offset = 0;
@@ -89,8 +89,8 @@ unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned ch
 		out += len;
 	}
 	*out++ = '^';
-	len = mid_len(&routine->routine_name);
-	memcpy(out, &routine->routine_name.c[0], len);
+	len = routine->routine_name.len;
+	memcpy(out, routine->routine_name.addr, len);
 	out += len;
 	return out;
 }

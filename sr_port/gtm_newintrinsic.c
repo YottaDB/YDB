@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,10 +11,10 @@
 
 #include "mdef.h"
 
-#include "hashdef.h"
+#include "hashtab_mname.h"
 #include "lv_val.h"
-#include "mv_stent.h"
 #include "rtnhdr.h"
+#include "mv_stent.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
 #include "gtm_string.h"
@@ -110,11 +110,11 @@ void gtm_newintrinsic(mval *intrinsic)
 		for (tpp = tp_pointer; (tpp && ((unsigned char *)tpp->fp < top)); tpp = tpp->old_tp_frame)
 		{
 			if ((unsigned char *)tpp->fp > stacktop)
-				tpp->fp = (struct stack_frame_struct *)((char *)tpp->fp - mvs_size[MVST_NVAL]);
+				tpp->fp = (struct stack_frame_struct *)((char *)tpp->fp - mvs_size[MVST_MSAV]);
 			/* Note low check for < top may be superfluous here but without a test case to verify, I
 			   feel better leaving it in. SE 8/2001 */
 			if ((unsigned char *)tpp->mvc < top && (unsigned char *)tpp->mvc > stacktop)
-				tpp->mvc = (struct mv_stent_struct *)((char *)tpp->mvc - mvs_size[MVST_NVAL]);
+				tpp->mvc = (struct mv_stent_struct *)((char *)tpp->mvc - mvs_size[MVST_MSAV]);
 		}
 		/* Put new mvstent entry on (into) the mvstent chain */
 		if ((unsigned char *)mv_chain >= top)

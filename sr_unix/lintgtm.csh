@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -216,9 +216,6 @@ gt_lint $gt_lint_options {dse,dse_cmd}.c llib-l{dse,mumps,stub}.ln $gt_lint_sysl
 
 cp $gtm_src/geteuid.c .
 gt_lint $gt_lint_options geteuid.c llib-lmumps.ln $gt_lint_syslibs >& lint.geteuid.log
-
-cp $gtm_src/daemon.c .
-gt_lint $gt_lint_options daemon.c llib-lmumps.ln $gt_lint_syslibs >& lint.gtm_dmna.log
 
 cp $gtm_src/gtmsecshr.c .
 gt_lint $gt_lint_options gtmsecshr.c llib-lmumps.ln $gt_lint_syslibs >& lint.gtmsecshr.log

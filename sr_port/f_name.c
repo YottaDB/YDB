@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,11 +10,13 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
 #include "indir_enum.h"
 #include "advancewindow.h"
+#include "subscript.h"
 
 GBLREF char window_token;
 
@@ -48,16 +50,19 @@ int f_name(oprtype *a, opctype op)
 		stx_error(ERR_VAREXPECTED);
 		return FALSE;
 	}
-
 	/* allow for optional default value */
 	if (window_token != TK_COMMA)
-		*depth = put_ilit(MAXPOSINT4);		/* default to largest positive number allowed by law */
-	else
+	{
+		*depth = put_ilit(MAX_LVSUBSCRIPTS + 1);	/* default to maximum number of subscripts allowed by law */
+		/* ideally this should be MAX(MAX_LVSUBSCRIPTS, MAX_GVSUBSCRIPTS) but they are the same so take the easy path */
+		assert(MAX_LVSUBSCRIPTS == MAX_GVSUBSCRIPTS);	/* add assert to ensure our assumption is valid */
+	} else
 	{
 		advancewindow();
-		if (!intexpr(depth))
+		if (!strexpr(depth))
 			return FALSE;
 	}
+	coerce(depth, OCT_MVAL);
 	ins_triple(r);
 	*a = put_tref(r);
 	return TRUE;

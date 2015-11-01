@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,6 @@
 
 #include "mdef.h"
 #include "gtm_string.h"
-#include "hashdef.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gtm_facility.h"
@@ -20,6 +19,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "cmidef.h"
+#include "hashtab_mname.h"
 #include "cmmdef.h"
 #include "gtcmd.h"
 #include "targ_alloc.h"
@@ -67,8 +67,8 @@ void gtcmd_cst_init(cm_region_head *ptr)
 		gv_altkey = temp_key;
 		gv_altkey->top = gv_keysize;
 	}
-	FILE_INFO(ptr->reg)->s_addrs.dir_tree = (gv_namehead *)targ_alloc(ptr->reg->max_rec_size);
+	FILE_INFO(ptr->reg)->s_addrs.dir_tree = (gv_namehead *)targ_alloc(ptr->reg->max_key_size, NULL);
 	FILE_INFO(ptr->reg)->s_addrs.dir_tree->root = DIR_ROOT;
-	ht_init(ptr->reg_hash,0);
+	init_hashtab_mname(ptr->reg_hash, 0);
 	cm_add_gdr_ptr(ptr->reg);
 }

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -15,7 +15,7 @@ arch=ARCH
 tmpfile="/tmp/tmp$$"
 
 if [ "`$gtm_dist/geteuid`" != "root" ] ; then
-$echo "If you want to stop the daemon or perform a rundown on anyone"
+$echo "If you want to perform a rundown on anyone"
 $echo "else's MUMPS process, you must run this program as root."
 $echo \\n
 fi
@@ -44,9 +44,9 @@ fi
 rm -f $tmpfile
 
 if [ "`$gtm_dist/geteuid`" != "root" ] ; then
-	$echo "You are not root. Unable to terminate GT.M daemon."
+	$echo "You are not root. Unable to terminate some GT.M processes"
 else
-	$echo "Do you want to stop the GT.M daemon and server(s) if present? (y or n)\c"
+	$echo "Do you want to stop GT.M server(s) if present? (y or n)\c"
 	read resp
 	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 		$echo \\n
@@ -65,31 +65,6 @@ else
 			    ps -ef | grep gtcm_s | grep -v grep | awk '{ print "kill -5", $2, " ; sleep 2" }' | sh > /dev/null 2>&1
 			    sleep 4
 			fi
-		fi
-
-		$echo "Stopping GT.M daemon ...."
-		ps -ef | grep gtm_dmna | grep -v grep | awk '{ print "kill -15", $2 }' | sh > /dev/null 2>&1
-		total_wait_time=600
-		waited_till_now=0
-		incremental_wait=2
-		while [ $waited_till_now -le $total_wait_time ]
-		do
-			ps -ef | grep gtm_dmna | grep -v grep > $tmpfile
-			status=$?
-			if [ $status -ne 0 ]
-			then
-				break
-			fi
-			sleep $incremental_wait
-			waited_till_now=`expr $waited_till_now + $incremental_wait`
-		done
-		rm -f $tmpfile
-		if [ $status -eq 0 ]
-		then
-			$echo "The daemon did not respond to kill -15."
-			$echo "sending SIGBUS signal to gtm_dmna."
-			ps -ef | grep gtm_dmna | grep -v grep | awk '{ print "kill -10", $2 }' | sh > /dev/null 2>&1
-			sleep 4
 		fi
 
 		if [ -f $gtm_dist/shmclean ]; then

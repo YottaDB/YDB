@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ int actuallist (oprtype *opr)
 	int		mask, parmcount;
 	error_def	(ERR_MAXACTARG);
 	error_def	(ERR_NAMEEXPECTED);
-	error_def	(ERR_COMMAORRPARENEXP);
+	error_def	(ERR_COMMAORRPAREXP);
 
 	assert (window_token == TK_LPAREN);
 	advancewindow ();
@@ -96,7 +96,7 @@ int actuallist (oprtype *opr)
 			break;
 		else
 		{
-			stx_error (ERR_COMMAORRPARENEXP);
+			stx_error (ERR_COMMAORRPAREXP);
 			return FALSE;
 		}
 		ref0 = ref1;

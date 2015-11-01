@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,11 +20,13 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "stringpool.h"
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "fnname.h"
 #include <varargs.h>
 #include "op.h"
 #include "gvsub2str.h"
+#include "mvalconv.h"
 
 GBLREF gv_key		*gv_currkey;
 GBLREF spdesc		stringpool;
@@ -78,7 +80,7 @@ va_dcl
 {
 	int		space_needed;
 	int 		sub_count, depth_count, fnname_type;
-	mval		*dst, *arg, *finaldst;
+	mval		*dst, *arg, *finaldst, *depth;
 	mstr		format_out;
 	va_list		var;
 	unsigned char	*sptr, *key_ptr, *key_top;
@@ -96,7 +98,8 @@ va_dcl
 	sub_count = va_arg(var, int);
 	finaldst = va_arg(var, mval *);
 	fnname_type = va_arg(var, int);
-	depth_count = va_arg(var, int); /* if second arg to $NAME not specified, compiler sets depth_count to MAXPOSINT4 */
+	depth = va_arg(var, mval *); /* if second arg to $NAME not specified, compiler sets depth_count to MAXPOSINT4 */
+	depth_count = MV_FORCE_INT(depth);
 	sub_count -=3;
 
 	if (depth_count < 0)
@@ -178,7 +181,7 @@ va_dcl
 		}
 	} else
 	{
-		space_needed = STR_LIT_LEN("^[,]()") + sizeof(mident) + sub_count - 1; 	/* ^[,]GLVN(max of sub_count-1 *
+		space_needed = STR_LIT_LEN("^[,]()") + MAX_MIDENT_LEN + sub_count - 1; 	/* ^[,]GLVN(max of sub_count-1 *
 											 * subscript separator commas) */
 		TEST_FAKE_STRINGPOOL_FULL;
 		if (space_needed > stringpool.top - stringpool.free) /* We don't account for subscripts here as they are        */
@@ -210,7 +213,7 @@ va_dcl
 			dst->str.len++;
 		}
 		arg = va_arg(var, mval *);
-		assert(MV_IS_STRING(arg) && (arg->str.len <= sizeof(mident)));
+		assert(MV_IS_STRING(arg) && (arg->str.len <= MAX_MIDENT_LEN));
 		memcpy(stringpool.free, arg->str.addr, arg->str.len);
 		stringpool.free += arg->str.len;
 		dst->str.len += arg->str.len;

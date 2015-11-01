@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,25 +11,27 @@
 
 #include "mdef.h"
 
-#include "hashdef.h"
+#include "hashtab.h"
+#include "hashtab_mname.h"
 #include "lv_val.h"
-#include "toktyp.h"
 #include "compiler.h"
+#include "toktyp.h"
 #include "opcode.h"
 #include "indir_enum.h"
 #include "mdq.h"
 #include "cache.h"
+#include "hashtab_objcode.h"
 #include "op.h"
 #include "underr.h"
+#include "rtnhdr.h"
+#include "valid_mname.h"
 
-GBLREF	symval	*curr_symval;
-GBLREF	char	window_token;
-GBLREF	mval	**ind_source_sp, **ind_source_top;
-GBLREF	mval	**ind_result_sp, **ind_result_top;
-GBLREF	bool	shift_gvrefs;
-GBLREF	triple	*expr_start;
-
-LITREF	char	ctypetab[NUM_ASCII_CHARS];
+GBLREF	symval			*curr_symval;
+GBLREF	char			window_token;
+GBLREF	mval			**ind_source_sp, **ind_source_top;
+GBLREF	mval			**ind_result_sp, **ind_result_top;
+GBLREF	bool			shift_gvrefs;
+GBLREF	triple			*expr_start;
 
 void	op_indget(mval *dst, mval *target, mval *value)
 {
@@ -41,45 +43,31 @@ void	op_indget(mval *dst, mval *target, mval *value)
 	char		*i, *i_top, *c, *c_top;
 	lv_val 		*a;
 	int4		y;
-	mident		ident;
-	ht_entry 	*q;
 	triple		*s, *src, *oldchain, tmpchain, *r, *triptr;
+	icode_str	indir_src;
+	lv_val		*lv;
+	var_tabent	targ_key;
+	ht_ent_mname	*tabent;
 
 	MV_FORCE_DEFINED(value);
 	MV_FORCE_STR(target);
-	if (!(obj = cache_get(indir_get, &target->str)))
+	indir_src.str = target->str;
+	indir_src.code = indir_get;
+	if (NULL == (obj = cache_get(&indir_src)))
 	{
-		if (target->str.len && target->str.len <= sizeof(mident))
+		if (valid_mname(&target->str))
 		{
-			i = (char *)&ident;
-			i_top = i + sizeof(ident);
-			c = target->str.addr;
-			c_top = c + target->str.len;
-			if (*c >= 0 && *c <= 127 && ((y = ctypetab[*i++ = *c++]) == TK_UPPER || y == TK_LOWER || y == TK_PERCENT))
+			targ_key.var_name = target->str;
+			COMPUTE_HASH_MNAME(&targ_key);
+			tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &targ_key);
+			if (!tabent || !MV_DEFINED(&((lv_val *)tabent->value)->v))
+				*dst = *value;
+			else
 			{
-				for ( ; c < c_top; c++,i++)
-				{	y = ctypetab[*i = *c];
-					if (y != TK_UPPER && y != TK_DIGIT && y != TK_LOWER)
-					{	break;
-					}
-				}
-				if (c == c_top)
-				{	/* we have an ident */
-					for (; i < i_top; i++)
-					{	*i = 0;
-					}
-					q = ht_get(&curr_symval->h_symtab , (mname *)&ident);
-					if (!q || !MV_DEFINED(&((lv_val *)q->ptr)->v))
-						*dst = *value;
-					else
-					{
-						assert (q->ptr);
-						a = (lv_val *)q->ptr;
-						*dst = a->v;
-					}
-					return;
-				}
+				a = (lv_val *)tabent->value;
+				*dst = a->v;
 			}
+			return;
 		}
 		comp_init(&target->str);
 		src = newtriple(OC_IGETSRC);
@@ -134,7 +122,9 @@ void	op_indget(mval *dst, mval *target, mval *value)
 		}
 		v = put_tref(s);
 		if (comp_fini(rval, &object, OC_IRETMVAL, &v, target->str.len))
-		{	cache_put(indir_get, &target->str, &object);
+		{
+			indir_src.str.addr = target->str.addr;
+			cache_put(&indir_src, &object);
 			if (ind_source_sp + 1 >= ind_source_top || ind_result_sp + 1 >= ind_result_top)
 				rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
 

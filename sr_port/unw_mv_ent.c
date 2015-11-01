@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,14 @@
 
 #include "mdef.h"
 
+#ifdef VMS
+#include <fab.h>		/* needed for dbgbldir_sysops.h */
+#endif
+
 #include "gtm_string.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "sbs_blk.h"
 #include "gdsroot.h"
@@ -44,7 +49,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 	lv_blk		*lp, *lp1;
 	symval		*symval_ptr;
 	mval		*ret_value;
-	ht_entry	*hte;
+	ht_ent_mname	*hte;
 
 	active_lv = (lv_val *)0; /* if we get here, subscript set was successful, clear active_lv to avoid later cleanup problems */
 	switch (mv_st_ent->mv_st_type)
@@ -109,11 +114,11 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 		}
 		return 0;
 	case MVST_NTAB:
-		hte = ht_get(&curr_symval->h_symtab, (mname *)mv_st_ent->mv_st_cont.mvs_ntab.nam_addr);
+		hte = lookup_hashtab_mname(&curr_symval->h_symtab, mv_st_ent->mv_st_cont.mvs_ntab.nam_addr);
 		assert(hte);
-		hte->ptr = (char *)mv_st_ent->mv_st_cont.mvs_ntab.save_value;
+		hte->value = (char *)mv_st_ent->mv_st_cont.mvs_ntab.save_value;
 		if (mv_st_ent->mv_st_cont.mvs_ntab.lst_addr)
-			*mv_st_ent->mv_st_cont.mvs_ntab.lst_addr = (struct lv_val_struct *)hte->ptr;
+			*mv_st_ent->mv_st_cont.mvs_ntab.lst_addr = (lv_val *)hte->value;
 		return 0;
 	case MVST_PARM:
 		if (mv_st_ent->mv_st_cont.mvs_parm.mvs_parmlist)
@@ -125,11 +130,11 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 	case MVST_PVAL:
 		if (mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.nam_addr)
 		{
-			hte = ht_get(&curr_symval->h_symtab, (mname *)mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.nam_addr);
+			hte = lookup_hashtab_mname(&curr_symval->h_symtab, mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.nam_addr);
 			assert(hte);
-			hte->ptr = (char *)mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.save_value;
+			hte->value = (char *)mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.save_value;
 			if (mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.lst_addr)
-				*mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.lst_addr = (struct lv_val_struct *)hte->ptr;
+				*mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.lst_addr = (lv_val *)hte->value;
 			if (mv_st_ent->mv_st_cont.mvs_pval.mvs_val->ptrs.val_ent.children)
 				lv_killarray(mv_st_ent->mv_st_cont.mvs_pval.mvs_val->ptrs.val_ent.children);
 		}
@@ -137,11 +142,11 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 		curr_symval->lv_flist = mv_st_ent->mv_st_cont.mvs_pval.mvs_val;
 		return 0;
 	case MVST_NVAL:
-		hte = ht_get(&curr_symval->h_symtab, (mname *)&mv_st_ent->mv_st_cont.mvs_nval.name);
+		hte = lookup_hashtab_mname(&curr_symval->h_symtab, &mv_st_ent->mv_st_cont.mvs_nval.name);
 		assert(hte);
-		hte->ptr = (char *)mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.save_value;
+		hte->value = (char *)mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.save_value;
 		if (mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.lst_addr)
-			*mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.lst_addr = (struct lv_val_struct *)hte->ptr;
+			*mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.lst_addr = (lv_val *)hte->value;
 		if (mv_st_ent->mv_st_cont.mvs_nval.mvs_val->ptrs.val_ent.children)
 			lv_killarray(mv_st_ent->mv_st_cont.mvs_nval.mvs_val->ptrs.val_ent.children);
 		mv_st_ent->mv_st_cont.mvs_nval.mvs_val->ptrs.free_ent.next_free = curr_symval->lv_flist;

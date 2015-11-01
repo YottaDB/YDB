@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -98,7 +98,7 @@ cregion:
 	s rec=rec_$c(regs(s,"BEFORE_IMAGE"))
 	s rec=rec_$tr($j("",4)," ",ZERO)							;filler
 	s rec=rec_$$num2bin(1,regs(s,"COLLATION_DEFAULT"))
-	s rec=rec_$tr($j("",1)," ",ZERO)							;filler
+	s rec=rec_$$num2bin(1,regs(s,"STDNULLCOLL"))
 	s rec=rec_$$num2bin(1,$l(regs(s,"FILE_NAME")))
 	s rec=rec_regs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$l(regs(s,"FILE_NAME")))," ",ZERO)
 	s rec=rec_$tr($j("",8)," ",ZERO)							; reserved

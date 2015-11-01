@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,16 +11,17 @@
 
 #include "mdef.h"
 
-#include <sys/time.h>
-#include <errno.h>
-#include <fcntl.h>
-#ifdef UNIX
+#include "gtm_time.h"
+#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
+#include "gtm_inet.h"
+#ifdef UNIX
 #include <sys/wait.h>
 #elif defined(VMS)
 #include <descrip.h>
 #endif
-#include <arpa/inet.h>
+
+#include <errno.h>
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -49,8 +50,6 @@
 #define UPDPROC_CMD_ARG1	"replicate"
 #define UPDPROC_CMD_ARG2	"-updateproc"
 #define UPDPROC_CMD_STR		"REPLICATE/UPDATEPROC"
-
-#define GTMRECV_WAIT_FOR_UPDSTART	(1000 - 1) /* ms */
 
 GBLDEF pid_t		updproc_pid;
 GBLREF recvpool_addrs	recvpool;
@@ -134,7 +133,7 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	}
 #elif defined(VMS)
 	/* Create detached server and write startup commands to it */
-	status = repl_create_server(&cmd_desc, "GTMU", &cmd_channel, &upd_pid, ERR_RECVPOOLSETUP);
+	status = repl_create_server(&cmd_desc, "GTMU", "", &cmd_channel, &upd_pid, ERR_RECVPOOLSETUP);
 	if (SS_NORMAL != status)
 	{
 		gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
@@ -172,7 +171,7 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	}
 #endif
 	updproc_pid = upd_pid;
-	repl_log(gtmrecv_log_fp, TRUE, FALSE, "Update Process forked. PID %d\n", upd_pid);
+	repl_log(gtmrecv_log_fp, TRUE, FALSE, "Update Process started. PID %d [0x%X]\n", upd_pid, upd_pid);
 	return(UPDPROC_STARTED);
 }
 
@@ -198,12 +197,12 @@ int gtmrecv_start_updonly(void)
 
 	assert(upd_status == SRV_DEAD);
 #ifdef VMS
-	recvpool.upd_proc_local->changelog = TRUE;
+	recvpool.upd_proc_local->changelog |= REPLIC_CHANGE_LOGFILE;
 #endif
 	recvpool.upd_proc_local->start_upd = UPDPROC_START;
 	while ((start_status = recvpool.upd_proc_local->start_upd) == UPDPROC_START &&
 	       (recvr_status = is_recv_srv_alive()) == SRV_ALIVE)
-		SHORT_SLEEP(GTMRECV_WAIT_FOR_UPDSTART);
+		SHORT_SLEEP(GTMRECV_WAIT_FOR_SRV_START);
 
 	if (start_status == UPDPROC_STARTED)
 	{
@@ -211,7 +210,7 @@ int gtmrecv_start_updonly(void)
 		return(UPDPROC_STARTED);
 	}
 #ifdef VMS
-	recvpool.upd_proc_local->changelog = FALSE;
+	recvpool.upd_proc_local->changelog &= ~REPLIC_CHANGE_LOGFILE;
 #endif
 	if (start_status == UPDPROC_START)
 	{

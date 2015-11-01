@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,8 @@
 #include "mdq.h"
 #include "cgp.h"
 #include "emit_code.h"
-#include "obj_filesp.h"
+#include "rtnhdr.h"
+#include "obj_file.h"
 
 GBLREF int4		curr_addr, code_size, codegen_padlen;
 GBLREF char		cg_phase;	/* code generation phase */

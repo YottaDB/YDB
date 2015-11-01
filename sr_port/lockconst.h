@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,7 @@
 */
 
 #ifdef __hppa
-#define alignedaddr(x) (volatile int *)((int)(x) + 15 & ~0xf)  /* 32-bit */
+#  define alignedaddr(x) (volatile int *)((int)(x) + 15 & ~0xf)  /* 32-bit */
 /*  #define alignedaddr(x) (volatile int *)((long)(x) + 15 & ~0xf)  64-bit */
 
     /* Given a pointer into memory, round up to the nearest 16-byte boundary
@@ -42,7 +42,7 @@
        the integrity the spinlock logic.
     */
 
-#define release_spinlock(lockarea)  {if (1) {                       \
+#  define release_spinlock(lockarea)  {if (1) {                       \
         _flush_globals();                                           \
         (*alignedaddr(&(lockarea)->hp_latch_space) = GLOBAL_LOCK_AVAILABLE); } else ;}
 
@@ -55,13 +55,13 @@
        the compiler doesn't hold any externally-visible values in registers
        across the lock release */
 
-int4 load_and_clear(sm_int_ptr_t);
-#define GET_LATCH_GLOBAL(a)     (GLOBAL_LOCK_AVAILABLE == *alignedaddr(&(a)->hp_latch_space) ? \
+   int4 load_and_clear(sm_int_ptr_t);
+#  define GET_LATCH_GLOBAL(a)     (GLOBAL_LOCK_AVAILABLE == *alignedaddr(&(a)->hp_latch_space) ? \
                                         load_and_clear((sm_int_ptr_t)&(a)->hp_latch_space) : GLOBAL_LOCK_IN_USE)
         /* above tries a fast pretest before calling load_and_clear to actually
            get the latch */
-#define RELEASE_LATCH_GLOBAL(a) release_spinlock(a)
-#define SET_LATCH_GLOBAL(a, b)	{RELEASE_LATCH_GLOBAL(a); SET_LATCH(a, b);}
+#  define RELEASE_LATCH_GLOBAL(a) release_spinlock(a)
+#  define SET_LATCH_GLOBAL(a, b)	{RELEASE_LATCH_GLOBAL(a); SET_LATCH(a, b);}
 
 #elif defined(__sparc) && defined(SPARCV8_NO_CAS)
 /* For Sun sparc, we use the extra word of the latch for a micro lock for compswap. Future
@@ -69,13 +69,15 @@ int4 load_and_clear(sm_int_ptr_t);
    in the Sparc Version 9 instruction set.
    These *_GLOBAL macros are used only from compswap.c (currently)
 */
-#define GET_LATCH_GLOBAL(a)	aswp(&(a)->latch_word, GLOBAL_LOCK_IN_USE)
-#define RELEASE_LATCH_GLOBAL(a) aswp(&(a)->latch_word, GLOBAL_LOCK_AVAILABLE)
-#define SET_LATCH_GLOBAL(a, b) {SET_LATCH(&(a)->latch_word, GLOBAL_LOCK_AVAILABLE); SET_LATCH(a, b);}
+#  define GET_LATCH_GLOBAL(a)	aswp(&(a)->u.parts.latch_word, GLOBAL_LOCK_IN_USE)
+#  define RELEASE_LATCH_GLOBAL(a) aswp(&(a)->u.parts.latch_word, GLOBAL_LOCK_AVAILABLE)
+#  define SET_LATCH_GLOBAL(a, b) {SET_LATCH(&(a)->u.parts.latch_word, GLOBAL_LOCK_AVAILABLE); SET_LATCH(a, b);}
 
+#elif defined(VMS)
+#  define SET_LATCH_GLOBAL(a, b) {(a)->u.parts.latch_image_count = 0; SET_LATCH(a, b);}
 #else
-#define SET_LATCH_GLOBAL(a, b)  SET_LATCH(a, b)
+#  define SET_LATCH_GLOBAL(a, b) SET_LATCH(a, b)
 #endif
 
 /* perhaps this should include flush so other CPUs see the change now */
-#define SET_LATCH(a,b)                  (*((sm_int_ptr_t)a) = b)
+#define SET_LATCH(a,b)		(*((sm_int_ptr_t)a) = b)

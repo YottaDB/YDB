@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -781,7 +781,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 					}
 					pc_value_idx = code_idx + 5;
 					code_idx += 1 + sizeof(int4) + 1;
-					emit_addr(0, ct->operand[0].oprval.mlit->rt_addr, &offset);
+					emit_addr(0, (int4)ct->operand[0].oprval.mlit->rt_addr, &offset);
 					offset -= pc_value_idx;
 					force_32 = 1;
 					emit_op_base_offset(op, temp_reg, offset, temp_reg);
@@ -797,7 +797,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 				break;
 			case OC_CDLIT:
 				if (cg_phase == CGP_APPROX_ADDR)
-					define_symbol(GTM_LITERALS, *ct->operand[0].oprval.cdlt, 0);
+					define_symbol(GTM_LITERALS, ct->operand[0].oprval.cdlt, 0);
 				emit_op_alit(op, use_reg);
 				code_idx += sizeof(int4);
 				break;
@@ -951,7 +951,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 					pc_value_idx = code_idx;
 					code_buf[code_idx++] = I386_INS_POP_eAX + temp_reg;
 
-					emit_addr(0, ct->operand[0].oprval.mlit->rt_addr, &offset);
+					emit_addr(0, (int4)ct->operand[0].oprval.mlit->rt_addr, &offset);
 					offset -= pc_value_idx;
 					force_32 = 1;
 					emit_op_base_offset(op, temp_reg, offset, temp_reg);
@@ -961,14 +961,14 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 				{
 					emit_op_alit(op, use_reg);
 					emit_addr(code_reference + (code_idx * sizeof(unsigned char)),
-						ct->operand[0].oprval.mlit->rt_addr, &code_buf[code_idx]);
+						(int4)ct->operand[0].oprval.mlit->rt_addr, (int4 *)&code_buf[code_idx]);
 					code_idx += sizeof(int4);
 				}
 				break;
 			case OC_CDLIT:
 				emit_op_alit(op, use_reg);
 				emit_reference(code_reference + (code_idx * sizeof(unsigned char)),
-					ct->operand[0].oprval.cdlt, &code_buf[code_idx]);
+					ct->operand[0].oprval.cdlt, (int4 *)&code_buf[code_idx]);
 				code_idx += sizeof(int4);
 				break;
 			case OC_ILIT:

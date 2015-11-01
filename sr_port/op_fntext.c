@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,6 @@
 #include "op.h"
 #include "stringpool.h"
 
-GBLREF mident zlink_mname;
 GBLREF spdesc stringpool;
 
 void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
@@ -28,7 +27,7 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 /* int_exp contains label offset or line number to reference */
 /* ret is used to return the correct string to caller */
 {
-	char		*cp, *ctop;
+	char		*cp;
 	int		i, lbl, letter;
 	mval		*temp_rtn, temp_mval;
 	mstr		*sld;
@@ -63,10 +62,8 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 			}
 			if (NULL != rtn_vector)
 			{
-				ret->str.addr = cp = (char *)&rtn_vector->routine_name;
-				for (ctop = cp + sizeof(mident);  *cp && cp < ctop;  cp++)
-					;
-				ret->str.len = cp - ret->str.addr;
+				ret->str.addr = rtn_vector->routine_name.addr;
+				ret->str.len = rtn_vector->routine_name.len;
 			}
 		} else  if (NULL != sld)
 			ret->str = *sld;
@@ -79,7 +76,7 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 	{
 		if (stringpool.free + ret->str.len > stringpool.top)
 				stp_gcol(ret->str.len);
-		cp = stringpool.free;
+		cp = (char *)stringpool.free;
 		for (i = 0, lbl = 1; i < ret->str.len; i++)
 		{
 			letter = ret->str.addr[i];
@@ -101,7 +98,7 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 					*cp++ = ' ';
 			}
 		}
-		ret->str.addr=stringpool.free;
+		ret->str.addr = (char *)stringpool.free;
 		stringpool.free += ret->str.len;
 	}
 	return;

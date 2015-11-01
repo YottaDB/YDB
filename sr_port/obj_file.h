@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,15 @@ void emit_linkages(void);
 int4 literal_offset(int4 offset);
 int4 find_linkage(mstr* name);
 void drop_object_file(void);
-void close_object_file(void);
+UNIX_ONLY(void close_object_file(void);)
+VMS_ONLY(void close_object_file(rhdtyp *rhead);)
 void create_object_file(rhdtyp *rhead);
 void obj_init(void);
+
+#define PADCHARS	"PADDING PADDING"
+#ifndef SECTION_ALIGN_BOUNDARY
+#	define SECTION_ALIGN_BOUNDARY  8
 #endif
+#define OBJECT_SIZE_ALIGNMENT 16
+
+#endif /* OBJ_FILE_INCLUDED */

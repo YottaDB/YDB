@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,12 +28,13 @@ GBLREF	jnl_process_vector	*prc_vec;
 
 void	db_common_init(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t csd)
 {
-	csa->bmm = csd->master_map;
+	csa->bmm = MM_ADDR(csd);
 	csa->reorg_last_dest = 0;	/* For mupip reorg swap operation */
 	csa->region = reg;		/* initialize the back-link */
 	reg->max_rec_size = csd->max_rec_size;
 	reg->max_key_size = csd->max_key_size;
  	reg->null_subs = csd->null_subs;
+ 	reg->std_null_coll = csd->std_null_coll;
 	reg->jnl_state = csd->jnl_state;
 	reg->jnl_file_len = csd->jnl_file_len;		/* journal file name length */
 	memcpy(reg->jnl_file_name, csd->jnl_file_name, reg->jnl_file_len);	/* journal file name */

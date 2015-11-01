@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,7 +69,7 @@ void dse_f_blk(void)
 
     if (cli_present("BLOCK") == CLI_PRESENT)
     {
-	if(!cli_get_hex("BLOCK",&blk))
+	if(!cli_get_hex("BLOCK", (uint4 *)&blk))
 	    return;
 	if (blk < 0 || blk >= cs_addrs->ti->total_blks
 	    || !(blk % cs_addrs->hdr->bplmap))

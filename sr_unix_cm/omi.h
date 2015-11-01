@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,6 @@
 #define OMI_EXTENSIONS	 (OMI_XTF_BUNCH | OMI_XTF_NEWOP | OMI_XTF_RC)
 #define OMI_NUM_EXT	 5
 
-#ifdef DEBUG
 
 #define OMI_DBG_STMP							\
 	do								\
@@ -77,12 +76,9 @@
 		}				\
 	} while (0)
 
-#else /* defined(DEBUG) */
 
-#define OMI_DBG(X)
-#define OMI_DBG_STMP
-
-#endif /* !defined(DEBUG) */
+/*#define OMI_DBG(X)
+#define OMI_DBG_STMP*/
 
 /*  Operations */
 #define OMI_CONNECT	  1
@@ -386,10 +382,9 @@ int		omi_prc_lock (omi_conn *, char *, char *, char *);
 int		omi_prc_unlk (omi_conn *, char *, char *, char *);
 int		omi_prc_unlc (omi_conn *, char *, char *, char *);
 int		omi_prc_unla (omi_conn *, char *, char *, char *);
-int		omi_buff_rsp (omi_req_hdr *, omi_err_hdr *, omi_status, char *, int);
+void		omi_buff_rsp (omi_req_hdr *, omi_err_hdr *, omi_status, char *, int);
 int		omi_gvextnam (omi_conn *, uns_short, char *);
 int		omi_lkextnam (omi_conn *, uns_short, char *, char *);
-void		omi_dbms_ch  ();
 void		omi_dump_pkt (omi_conn *);
 
 #ifdef __STDC__
@@ -398,9 +393,9 @@ void		omi_dump_pkt (omi_conn *);
 #define P(X) ()
 #endif /* !defined(__STDC__) */
 
-int		get_ping_rsp  P(());
+int		get_ping_rsp  P((void));
 int		icmp_ping     P((int conn));
-int		init_ping     P(());
+int		init_ping     P((void));
 int		in_cksum      P((u_short *addr, int len));
 
 #undef P

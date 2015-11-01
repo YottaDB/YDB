@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,13 +12,12 @@
 #include "mdef.h"
 
 #include "gtm_socket.h"
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #include <sys/time.h>
 #include <errno.h>
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-#include <sys/stat.h>
+#include "gtm_stat.h"
 #include "gtm_string.h"
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
@@ -35,7 +34,9 @@
 #include "gtmsource.h"
 #include "repl_comm.h"
 #include "jnl.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"     /* needed for muprec.h */
+#include "hashtab_int4.h"     /* needed for muprec.h */
+#include "hashtab_int8.h"     /* needed for muprec.h */
 #include "buddy_list.h"
 #include "muprec.h"
 #include "repl_ctl.h"
@@ -76,6 +77,7 @@ GBLREF	int			repl_filter_bufsiz;
 GBLREF	boolean_t		gtmsource_pool2file_transition;
 GBLREF  repl_ctl_element        *repl_ctl_list;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
+GBLREF	boolean_t		secondary_side_std_null_coll;
 
 static	unsigned char		*tcombuff, *msgbuff, *filterbuff;
 
@@ -363,6 +365,10 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				remote_jnl_ver = ((repl_start_msg_ptr_t)&msg)->jnl_ver;
 				REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n", jnl_ver, remote_jnl_ver);
 				repl_check_jnlver_compat();
+				assert(remote_jnl_ver > V15_JNL_VER || 0 == (*start_flags & START_FLAG_COLL_M));
+				if (remote_jnl_ver <= V15_JNL_VER)
+					*start_flags &= ~START_FLAG_COLL_M; /* zap it for pro, just in case */
+				secondary_side_std_null_coll = (*start_flags & START_FLAG_COLL_M) ? TRUE : FALSE;
 				return (SS_NORMAL);
 			} else if (REPL_FETCH_RESYNC == msg.type)
 			{
@@ -581,7 +587,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 	for (reg = gd_header->regions; reg < region_top; reg++)
 	{
 		csa = &FILE_INFO(reg)->s_addrs;
-		if (REPL_ENABLED(csa->hdr))
+		if (REPL_ALLOWED(csa->hdr))
 		{
 #ifndef INT8_SUPPORTED
 			grab_crit(reg); /* File-header sync is done in crit, and so grab_crit here */
@@ -599,7 +605,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 
 int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multpile)
 {
-	int 			prev_read_state, total_tr_len;
+	int 			total_tr_len;
 	unsigned char		seq_num_str[32], *seq_num_ptr;
 	jnlpool_ctl_ptr_t	jctl;
 	gtmsource_local_ptr_t	gtmsource_local;
@@ -618,11 +624,10 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 #ifdef GTMSOURCE_ALWAYS_READ_FILES
 	gtmsource_local->read_state = READ_FILE;
 #endif
-	prev_read_state = gtmsource_local->read_state;
-
-	switch(prev_read_state)
+	switch(gtmsource_local->read_state)
 	{
 		case READ_POOL:
+#ifndef GTMSOURCE_ALWAYS_READ_FILES_STRESS
 			if (read_addr == write_addr)
 			{/* Nothing to read. While reading pool, the comparison of read_addr against write_addr is the only
 			  * reliable indicator if there are any transactions to be read. This is due to the placement of
@@ -638,10 +643,11 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 				return (total_tr_len);
 			if (0 < *data_len)
 				return (-1);
+#endif /* for GTMSOURCE_ALWAYS_READ_FILES_STRESS, we let the source server switch back and forth between pool read and file read */
 			/* Overflow, switch to READ_FILE */
 			gtmsource_local->read_state = READ_FILE;
-
 			QWASSIGN(gtmsource_save_read_jnl_seqno, read_jnl_seqno);
+			gtmsource_pool2file_transition = TRUE; /* so that we read the latest gener jnl files */
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server now reading from journal files; journal pool "
 					"overflow detected at transaction %llu\n", gtmsource_save_read_jnl_seqno);
 
@@ -668,7 +674,7 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 				*data_len = 0;
 				return 0;
 			}
-			if (READ_POOL == prev_read_state || gtmsource_pool2file_transition /* read_pool -> read_file transition */
+			if (gtmsource_pool2file_transition /* read_pool -> read_file transition */
 			    || NULL == repl_ctl_list) /* files not opened */
 			{
 				/* Close all the file read related structures

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,17 +15,15 @@
 
 GBLREF int4 source_error_found;
 
-void resolve_lab(mlabel *label,int *errknt)
+void resolve_lab(mlabel *label, int *errknt)
 {
-
 	error_def(ERR_LABELMISSING);
 
 	if (!label->ml)
 	{
 		(*errknt)++;
-		stx_error(ERR_LABELMISSING, 2, mid_len(&label->mvname), &label->mvname);
+		stx_error(ERR_LABELMISSING, 2, label->mvname.len, label->mvname.addr);
 		source_error_found = 0;
 	}
 	return;
-
 }

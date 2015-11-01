@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,16 +28,17 @@
 
 GBLREF block_id		patch_curr_blk;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF char		patch_comp_key[256];
+GBLREF char		patch_comp_key[MAX_KEY_SZ + 1];
 GBLREF unsigned char	patch_comp_count;
 GBLREF int		patch_rec_counter;
+
 sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 {
-	sm_uc_ptr_t b_top, rp, r_top, rp_targ, key_top;
-	char util_buff[MAX_UTIL_LEN];
-	char cc;
-	short int size, rec_size;
-	int4 offset;
+	sm_uc_ptr_t 	b_top, rp, r_top, rp_targ, key_top;
+	char 		util_buff[MAX_UTIL_LEN];
+	unsigned char 	cc;
+	short int	size, rec_size;
+	uint4		offset;
 
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
@@ -46,10 +47,11 @@ sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 	else
 		b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
 
-	if (!cli_get_hex("OFFSET",&offset))
+	if (!cli_get_hex("OFFSET", &offset))
 		return 0;
 	if (offset < sizeof(blk_hdr))
-	{	util_out_print("Error: offset less than blk header",TRUE);
+	{
+		util_out_print("Error: offset less than blk header",TRUE);
 		return 0;
 	}
 	rp_targ = bp + offset;
@@ -64,13 +66,15 @@ sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 	patch_rec_counter = 1;
 	patch_comp_key[0] = patch_comp_key[1] = 0;
 	for (rp = bp + sizeof(blk_hdr); rp < rp_targ ; )
-	{	GET_SHORT(rec_size, &((rec_hdr_ptr_t)rp)->rsiz);
+	{
+		GET_SHORT(rec_size, &((rec_hdr_ptr_t)rp)->rsiz);
 		if (rec_size < sizeof(rec_hdr))
 			r_top = rp + sizeof(rec_hdr);
 		else
 			r_top = rp + rec_size;
 		if (r_top >= b_top)
-		{	if (!over_run)
+		{
+			if (!over_run)
 				return rp;
 			r_top = b_top;
 		}
@@ -81,7 +85,8 @@ sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 		if (((blk_hdr_ptr_t) bp)->levl)
 			key_top = r_top - sizeof(block_id);
 		else
-		{	for (key_top = rp + sizeof(rec_hdr); key_top < r_top ; )
+		{
+			for (key_top = rp + sizeof(rec_hdr); key_top < r_top ; )
 				if (!*key_top++ && !*key_top++)
 					break;
 		}
@@ -90,11 +95,11 @@ sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 		else
 			cc = ((rec_hdr_ptr_t) rp)->cmpc;
 		size = key_top - rp - sizeof(rec_hdr);
+		if (size > sizeof(patch_comp_key) - 2 - cc)
+			size = sizeof(patch_comp_key) - 2 - cc;
 		if (size < 0)
 			size = 0;
-		else if (size > sizeof(patch_comp_key) - 2)
-			size = sizeof(patch_comp_key) - 2;
-		memcpy(&patch_comp_key[cc],rp + sizeof(rec_hdr),size);
+		memcpy(&patch_comp_key[cc], rp + sizeof(rec_hdr), size);
 		patch_comp_count = cc + size;
 		rp = r_top;
 	}

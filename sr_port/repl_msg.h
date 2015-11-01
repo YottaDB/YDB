@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@ enum
 #define START_FLAG_STOPSRCFILTER		0x00000001
 #define START_FLAG_UPDATERESYNC			0x00000002
 #define START_FLAG_HASINFO			0x00000004
+#define START_FLAG_COLL_M			0x00000008
 
 #define	MIN_REPL_MSGLEN		32 /* To keep compiler happy with
 				    * the definition of repl_msg_t as well
@@ -75,7 +76,9 @@ typedef struct
 	int4		len;
 	unsigned char	start_seqno[sizeof(seq_num)];
 	unsigned char	jnl_ver;
-	char		filler[MIN_REPL_MSGLEN - REPL_MSG_HDRLEN - sizeof(seq_num) - sizeof(unsigned char)];
+	char		start_flags[4];
+	char		filler[MIN_REPL_MSGLEN - REPL_MSG_HDRLEN - sizeof(seq_num) -
+			       - sizeof(unsigned char) - 4 * sizeof(char)];
 } repl_start_reply_msg_t; /* The first two fields should be as in repl_msg_t */
 
 typedef struct

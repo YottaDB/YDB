@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +21,7 @@
 
 /* Include prototypes */
 #include "t_qread.h"
-#include "gvcst_search_blk.h"
-#include "gvcst_rtsib.h"
+#include "gvcst_protos.h"	/* for gvcst_search_blk,gvcst_rtsib prototype */
 
 /* construct a new array which is the path to the
    right sibling of the leaf of the old array

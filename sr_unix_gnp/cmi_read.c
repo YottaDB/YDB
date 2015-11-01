@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@ cmi_status_t cmi_read(struct CLB *lnk)
 	struct NTD *tsk = lnk->ntd;
 	int rc;
 
-	CMI_DPRINT(("ENTER CMI_READ, AST %x\n", lnk->ast));
+	CMI_DPRINT(("ENTER CMI_READ, AST 0x%x\n", lnk->ast));
 
 	lnk->cbl = lnk->mbl;
 	SIGPROCMASK(SIG_BLOCK, &tsk->mutex_set, &oset, rc);
@@ -28,7 +28,7 @@ cmi_status_t cmi_read(struct CLB *lnk)
 	if (CMI_ERROR(status))
 	{
 		SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
-		CMI_DPRINT(("EXIT CMI_READ ERR\n"));
+		CMI_DPRINT(("EXIT CMI_READ ERROR CODE %d\n", status));
 		return status;
 	}
 	/*

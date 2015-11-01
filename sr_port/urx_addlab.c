@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,9 +14,9 @@
 #include "rtnhdr.h"
 #include "urx.h"
 
-urx_labref **urx_addlab (urx_labref **lp0, urx_labref *lp)
+urx_labref **urx_addlab (urx_labref **anchor, urx_labref *lp)
 {
-	urx_labref	*lp1;
+	urx_labref	*target;
 	int		lablen;
 	unsigned char	*lab;
 	urx_addr	*ap;
@@ -26,24 +26,24 @@ urx_labref **urx_addlab (urx_labref **lp0, urx_labref *lp)
 
 	found = FALSE;
 	lablen = lp->len;
-	lab = (unsigned char *)lp->name.c;
-	lp1 = *lp0;
-	/* Locate if lp exists in chain anchored by *lp0. If it is not found, the
+	lab = &lp->name[0];
+	target = *anchor;
+	/* Locate if lp exists in chain anchored by *anchor. If it is not found, the
 	   local label and its attached addr chain are just added (inserted) into
 	   the global chain. If it is found, we put the labels addr refs at the
 	   end of the existing addr chain. Note that labels are ordered on this
 	   chain alphabetically within label name size ... i.e. all sorted 1 character
 	   labels followed by all sorted 2 character labels, etc.
 	*/
-	while (lp1 != 0)
+	while (target != 0)
 	{	/* Find existing label or insertion point */
-		c = lablen - lp1->len;
+		c = lablen - target->len;
 		if (!c)
-			c = memcmp(lab, lp1->name.c, lablen);
+			c = memcmp(lab, &target->name[0], lablen);
 		if (c > 0)
 		{
-			lp0 = &lp1->next;
-			lp1 = *lp0;
+			anchor = &target->next;
+			target = *anchor;
 		} else
 		{
 			if (c == 0)
@@ -51,17 +51,17 @@ urx_labref **urx_addlab (urx_labref **lp0, urx_labref *lp)
 			break;
 		}
 	}
-	assert(*lp0 == lp1);
+	assert(*anchor == target);
 
 	if (!found)
 	{	/* Put this label in its entirety on the new chain */
-		lp->next = lp1;
-		*lp0 = lp;
+		lp->next = target;
+		*anchor = lp;
 	} else
 	{
-		assert (lp1->addr);
-		for (ap = lp1->addr; ap->next; ap = ap->next) ; /* Find end of existing chain */
+		assert (target->addr);
+		for (ap = target->addr; ap->next; ap = ap->next) ; /* Find end of existing chain */
 		ap->next = lp->addr; /* append new list to end */
 	}
-	return &(*lp0)->next;
+	return &(*anchor)->next;
 }

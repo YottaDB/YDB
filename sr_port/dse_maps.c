@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,12 +27,13 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "cli.h"
 #include "util.h"
 #include "mupipbckup.h"
+#include "send_msg.h"
 #include "dse.h"
 
 /* Include prototypes */
@@ -48,9 +49,7 @@
 #include "mm_update.h"
 #include "bg_update.h"
 #include "wcs_timer_start.h"
-#ifdef UNIX
 #include "process_deferred_stale.h"
-#endif
 
 #define MAX_UTIL_LEN 80
 
@@ -90,6 +89,7 @@ void dse_maps(void)
         uchar_ptr_t     blk_ptr;
         bool            was_crit;
 	uint4		jnl_status;
+	srch_blk_status	blkhist;
 
         error_def(ERR_DSEBLKRDFAIL);
 	error_def(ERR_DBRDONLY);
@@ -110,7 +110,7 @@ void dse_maps(void)
         bplmap = cs_addrs->hdr->bplmap;
         if (CLI_PRESENT == cli_present("BLOCK"))
         {
-                if (!cli_get_hex("BLOCK", &blk))
+                if (!cli_get_hex("BLOCK", (uint4 *)&blk))
                         return;
                 if (blk < 0 || blk >= cs_addrs->ti->total_blks)
                 {
@@ -217,17 +217,20 @@ void dse_maps(void)
                 for (blk_index = 0, bml_index = 0;  blk_index < cs_addrs->ti->total_blks;
                                                                 blk_index += bplmap, bml_index++)
                 {
+			CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 			CWS_RESET;
                         cw_set_depth = 0;
                         update_array_ptr = update_array;
                         assert(cs_addrs->ti->early_tn == cs_addrs->ti->curr_tn);
                         cs_addrs->ti->early_tn++;
                         blk_ptr = bml_list + bml_index * bml_size;
-                        bp = t_qread(blk_index, &dummy_int, &dummy_cr);
+			blkhist.blk_num = blk_index;
+			if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
+				rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
                         BLK_INIT(bs_ptr, bs1);
                         BLK_SEG(bs_ptr, blk_ptr + sizeof(blk_hdr), bml_size - sizeof(blk_hdr));
                         BLK_FINI(bs_ptr, bs1);
-                        t_write(blk_index, (unsigned char *)bs1, 0, 0, bp, LCL_MAP_LEVL, TRUE, FALSE);
+                        t_write(&blkhist, (unsigned char *)bs1, 0, 0, LCL_MAP_LEVL, TRUE, FALSE);
 			cr_array_index = 0;
 			block_saved = FALSE;
 			if (JNL_ENABLED(cs_data))
@@ -242,7 +245,7 @@ void dse_maps(void)
 					cse->done = TRUE;
 					if (0 == cs_addrs->jnl->pini_addr)
 						jnl_put_jrt_pini(cs_addrs);
-					jnl_write_aimg_rec(cs_addrs, cse->blk, (blk_hdr_ptr_t)cse->new_buff);
+					jnl_write_aimg_rec(cs_addrs, cse);
 				} else
 					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
 			}
@@ -250,8 +253,7 @@ void dse_maps(void)
                                 bg_update(cw_set, cw_set + cw_set_depth, cs_addrs->ti->curr_tn, cs_addrs->ti->curr_tn, dummysi);
                         else
                                 mm_update(cw_set, cw_set + cw_set_depth, cs_addrs->ti->curr_tn, cs_addrs->ti->curr_tn, dummysi);
-                        cs_addrs->ti->curr_tn++;
-                        assert(cs_addrs->ti->curr_tn == cs_addrs->ti->early_tn);
+                        INCREMENT_CURR_TN(cs_data);
 			while (cr_array_index)
 				cr_array[--cr_array_index]->in_cw_set = FALSE;
 			if (block_saved)
@@ -290,15 +292,13 @@ void dse_maps(void)
                 }
                 if (!was_crit)
                         rel_crit(gv_cur_region);
-#ifdef UNIX
 		if (unhandled_stale_timer_pop)
 			process_deferred_stale();
-#endif
                 free(bml_list);
 		cs_addrs->hdr->kill_in_prog = 0;
                 return;
         }
-        memcpy(util_buff, "!/Block ", sizeof("!/Block ") - 1 );
+        MEMCPY_LIT(util_buff, "!/Block ");
         util_len = sizeof("!/Block ") - 1;
         util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len], 8);
         memcpy(&util_buff[util_len], " is marked !AD in its local bit map.!/",

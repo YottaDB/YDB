@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,19 +44,33 @@
 # pragma nomember_alignment
 #endif
 
+/* Version 4 block header */
 typedef struct
-{	unsigned short	bsiz;		/* block size */
+{
+	unsigned short	bsiz;		/* block size */
 	unsigned char	levl;		/* block level. level 0 is data level. level 1 is
 					 * first index level. etc.
 					 */
+	uint4		tn;		/* transaction number when block was written */
+} v15_blk_hdr;
+
+/* Current block header */
+typedef struct
+{
+	unsigned short	bver;		/* block version - overlays V4 block size */
+	unsigned char	filler;
+	unsigned char	levl;		/* block level. level 0 is data level. level 1 is
+					 * first index level. etc.
+					 */
+	unsigned int	bsiz;		/* block size */
 	trans_num	tn;		/* transaction number when block was written */
-}blk_hdr;
+} blk_hdr;
 
 typedef struct
 {
 	unsigned short	rsiz;
 	unsigned char	cmpc;
-}rec_hdr;
+} rec_hdr;
 
 #if defined(__alpha) && defined(__vms)
 # pragma member_alignment restore
@@ -72,6 +86,7 @@ typedef struct
 # endif
 #endif
 
+typedef v15_blk_hdr *v15_blk_hdr_ptr_t;	/* From jnl format 15 used in last GT.M V4 version */
 typedef blk_hdr *blk_hdr_ptr_t;
 typedef rec_hdr *rec_hdr_ptr_t;
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,7 @@
 
 #include "mdef.h"
 #include "gtm_time.h"
-
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
 #endif
@@ -32,9 +30,7 @@
 #include "jnl_write.h"
 #include "wcs_timer_start.h"
 #include "tp_change_reg.h"
-
-error_def(ERR_TRANSMINUS);
-error_def(ERR_TRANSNOSTART);
+#include "jnl_get_checksum.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
@@ -46,11 +42,15 @@ GBLREF	gd_region		*gv_cur_region;
 
 void    op_ztcommit(int4 n)
 {
-	boolean_t			replication;
+	boolean_t			replication, yes_jnl_no_repl;
 	uint4				jnl_status;
         sgmnt_addrs             	*csa, *next_csa;
+	gd_region			*save_gv_cur_region;
         static struct_jrec_ztcom	ztcom_record = {{JRT_ZTCOM, ZTCOM_RECLEN, 0, 0, 0},
 						0, 0, 0, {ZTCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
+	error_def(ERR_TRANSMINUS);
+	error_def(ERR_TRANSNOSTART);
+	error_def(ERR_REPLOFFJNLON);
 
 	assert(ZTCOM_RECLEN == ztcom_record.suffix.backptr);
         if (n < 0)
@@ -81,19 +81,27 @@ void    op_ztcommit(int4 n)
 		QWASSIGN(ztcom_record.jnl_seqno, jgbl.mur_jrec_seqno);
 		ztcom_record.participants = jgbl.mur_jrec_participants;
 	}
-	replication= FALSE;
+	replication = yes_jnl_no_repl = FALSE;
 	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = csa->next_fenced)
 	{
 		if (REPL_ENABLED(csa))
 		{
 			assert(JNL_ENABLED(csa));
 			replication = TRUE;
-		} else
-			assert(!JNL_ENABLED(csa) || !replication);
+		} else if (JNL_ENABLED(csa)) {
+			yes_jnl_no_repl = TRUE;
+			save_gv_cur_region = csa->region;
+		}
 	}
-	if (replication)
+	if (replication) /* instance is replicated */
+	{
+		if (yes_jnl_no_repl) /* journal is ON for a region in the replicated instance */
+			rts_error(VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(save_gv_cur_region));
 		grab_lock(jnlpool.jnlpool_dummy_reg);
+	}
+
 	/* Note that only those regions that are actively journaling will appear in the following list: */
+	save_gv_cur_region = gv_cur_region; /* we change gv_cur_region in the loop, so save for later restore */
 	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = csa->next_fenced)
 	{
 		gv_cur_region = csa->jnl->region;
@@ -113,11 +121,14 @@ void    op_ztcommit(int4 n)
 		}
 		ztcom_record.prefix.pini_addr = csa->jnl->pini_addr;
 		ztcom_record.prefix.tn = csa->ti->curr_tn;
+		ztcom_record.prefix.checksum = INIT_CHECKSUM_SEED;
 		jnl_write(csa->jnl, JRT_ZTCOM, (jnl_record *)&ztcom_record, NULL, NULL);
 		rel_crit(gv_cur_region);
 		if (!jgbl.forw_phase_recovery)
-			wcs_timer_start(csa->jnl->region, TRUE);
+			wcs_timer_start(gv_cur_region, TRUE);
 	}
+	gv_cur_region = save_gv_cur_region; /* restore original */
+	tp_change_reg(); /* bring cs_* in sync with gv_cur_region */
 	if (replication)
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = next_csa)

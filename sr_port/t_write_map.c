@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,10 +22,12 @@
 #include "gdsbml.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "t_write_map.h"
+#include "min_max.h"
+#include "jnl_get_checksum.h"
 
 GBLREF cw_set_element	cw_set[];
 GBLREF unsigned char	cw_set_depth;
@@ -34,15 +36,25 @@ GBLREF sgm_info		*sgm_info_ptr;
 GBLREF short		dollar_tlevel;
 
 void t_write_map (
-		  block_id 	blk,		/*  block number being written */
-		  sm_uc_ptr_t	old_addr,	/* address of before image of the block */
-		  unsigned char	*upd_addr,	/* list of blocks to be cleared in bit map */
-		  trans_num	tn)
+		srch_blk_status	*blkhist,	/* Search History of the block to be written. Currently the
+						 *	following members in this structure are used by "t_write_map"
+						 *	    "blk_num"		--> Block number being modified
+						 *	    "buffaddr"		--> Address of before image of the block
+						 *	    "cr"		--> cache-record that holds the block (BG only)
+						 *	    "cycle"		--> cycle when block was read by t_qread (BG only)
+						 *	    "cr->ondsk_blkver"	--> Actual block version on disk
+						 */
+		unsigned char 	*upd_addr,	/* Address of the update array containing list of blocks to be cleared in bitmap */
+		trans_num	tn)		/* Transaction Number when this block was read. Used for cdb_sc_blkmod validation */
 {
-	cw_set_element	*cs;
+	cw_set_element		*cs;
+	cache_rec_ptr_t		cr;
+	jnl_buffer_ptr_t	jbbp;		/* jbbp is non-NULL only if before-image journaling */
+	sgmnt_addrs		*csa;
+	blk_hdr_ptr_t		old_block;
+	unsigned int		bsiz;
 
-	if (blk >= cs_addrs->ti->total_blks)
-		GTMASSERT;
+	csa = cs_addrs;
 	if (dollar_tlevel == 0)
 	{
 		assert(cw_set_depth < CDB_CW_SET_SIZE);
@@ -53,8 +65,31 @@ void t_write_map (
 		sgm_info_ptr->cw_set_depth++;
 	}
 	cs->mode = gds_t_writemap;
-	cs->blk = blk;
-	cs->old_block = old_addr;
+	cs->blk_checksum = 0;
+	cs->blk = blkhist->blk_num;
+	if (cs->blk >= csa->ti->total_blks)
+		GTMASSERT;
+	cs->old_block = blkhist->buffaddr;
+	old_block = (blk_hdr_ptr_t)cs->old_block;
+	assert(NULL != old_block);
+	jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
+	if ((NULL != jbbp) && (old_block->tn < jbbp->epoch_tn))
+	{	/* Pre-compute CHECKSUM. Since we dont necessarily hold crit at this point, ensure we never try to
+		 * access the buffer more than the db blk_size.
+		 */
+		bsiz = MIN(old_block->bsiz, csa->hdr->blk_size);
+		cs->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED, (uint4*)old_block, bsiz);
+	}
+	cs->cycle = blkhist->cycle;
+	cr = blkhist->cr;
+	cs->cr = cr;
+	/* the buffer in shared memory holding the GDS block contents currently does not have in its block header the
+	 * on-disk format of that block. if it had, we could have easily copied that over to the cw-set-element.
+	 * until then, we have to use the cache-record's field "ondsk_blkver". but the cache-record is available only in BG.
+	 * thankfully, in MM, we do not allow GDSV4 type blocks, so we can safely assign GDSV5 (or GDSVCURR) to this field.
+	 */
+	assert((NULL != cr) || (dba_mm == csa->hdr->acc_meth));
+	cs->ondsk_blkver = (NULL == cr) ? GDSVCURR : cr->ondsk_blkver;
 	cs->ins_off = 0;
 	cs->index = 0;
 	cs->reference_cnt = 0;

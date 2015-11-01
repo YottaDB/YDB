@@ -24,10 +24,10 @@
 #define LISTEXT ".lis"
 
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
-GBLREF command_qualifier  cmd_qlf;
-GBLREF char module_name[];
-GBLREF io_pair io_curr_device;
-GBLREF list_params lst_param;
+GBLREF command_qualifier cmd_qlf;
+GBLREF mident		module_name;
+GBLREF io_pair 		io_curr_device;
+GBLREF list_params 	lst_param;
 
 GBLREF char rev_time_buf[20];
 static char print_time_buf[20];
@@ -54,7 +54,7 @@ void open_list_file(void)
 {
 	char charspace;
 	uint4  status;
-	char		*p, list_name[sizeof(mident) + sizeof(LISTEXT) - 1], fname[MAX_FBUFF + 1];
+	char		*p, list_name[MAX_MIDENT_LEN + STR_LIT_LEN(LISTEXT)], fname[MAX_FBUFF + 1];
 	mval		parms;
 	mval		file;
 	mstr		fstr;
@@ -65,10 +65,11 @@ void open_list_file(void)
 	lst_param.page = 0;
 
 	memset(&pblk, 0, sizeof(pblk));
-	pblk.def1_size = mid_len((mident *)module_name);
-	memcpy(&list_name[0], module_name, pblk.def1_size);
-	memcpy(&list_name[0] + pblk.def1_size, LISTEXT, sizeof(LISTEXT) - 1);
-	pblk.def1_size += sizeof(LISTEXT) - 1;
+	assert(module_name.len <= MAX_MIDENT_LEN);
+	pblk.def1_size = module_name.len;
+	memcpy(&list_name[0], module_name.addr, pblk.def1_size);
+	MEMCPY_LIT(&list_name[pblk.def1_size], LISTEXT);
+	pblk.def1_size += STR_LIT_LEN(LISTEXT);
 	pblk.def1_buf = list_name;
 	pblk.buffer = &fname[0];
 	pblk.buff_size = MAX_FBUFF;

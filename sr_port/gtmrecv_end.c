@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 #include "gtm_string.h"
 
 #ifdef UNIX
-#include <sys/ipc.h>
+#include "gtm_ipc.h"
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <sys/wait.h>
@@ -27,7 +27,7 @@
 #error Unsupported platform
 #endif
 #include <errno.h>
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -52,8 +52,6 @@
 #endif
 #include "repl_log.h"
 #include "is_proc_alive.h"
-
-#define GTMRECV_WAIT_FOR_UPDPROC_SHUTDOWN	(1000 - 1) /* ms, almost 1s */
 
 GBLREF uint4			process_id;
 GBLREF recvpool_addrs		recvpool;
@@ -83,7 +81,7 @@ int gtmrecv_endupd(void)
 	      (savepid = UNIX_ONLY((pid_t))recvpool.upd_proc_local->upd_proc_pid) > 0 &&
 	      is_proc_alive(savepid, 0))
 	{
-		SHORT_SLEEP(GTMRECV_WAIT_FOR_UPDPROC_SHUTDOWN);
+		SHORT_SLEEP(GTMRECV_WAIT_FOR_UPD_SHUTDOWN);
 		UNIX_ONLY(WAITPID(savepid, &exit_status, WNOHANG, waitpid_res);) /* Release defunct update process if dead */
 	}
 	exit_status = recvpool.upd_proc_local->upd_proc_shutdown;
@@ -116,12 +114,12 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 	uint4		savepid;
 	int		exit_status;
 	seq_num		log_seqno, log_seqno1;
-	unsigned char	seq_num_str[32], *seq_num_ptr;
 	int		fclose_res;
 #ifdef VMS
 	int4		status;
 #endif
 
+	exit_status = gtmrecv_end_helpers(TRUE);
 	exit_status = gtmrecv_endupd();
 	QWASSIGN(log_seqno, recvpool.recvpool_ctl->jnl_seqno);
 	QWASSIGN(log_seqno1, recvpool.upd_proc_local->read_jnl_seqno);

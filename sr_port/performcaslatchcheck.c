@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,23 +23,28 @@
 #include "gtmsecshr.h"
 #endif
 
-GBLREF	uint4	process_id;
+GBLREF	pid_t	process_id;
+GBLREF	uint4	image_count;
 GBLREF 	int4 	exi_condition;
 
 void performCASLatchCheck(sm_global_latch_ptr_t latch, int loopcnt)
 {
-	uint4	holder;
+	pid_t	holder_pid;
+	VMS_ONLY(uint4 holder_imgcnt;)
 
-	holder = latch->latch_pid;
-	if (0 != holder)
+	holder_pid = latch->u.parts.latch_pid;
+	VMS_ONLY(holder_imgcnt = latch->u.parts.latch_image_count);
+	if (LOCK_AVAILABLE != holder_pid)
 	{ 	/* should never be done recursively - but signal case is permitted for now as it will never return */
-		if ((process_id == holder) && (0 == exi_condition)) /* remove 0 == exi_condition when fixed */
+		/* remove 0 == exi_condition below when fixed */
+		if ((process_id == holder_pid) && (0 == exi_condition) VMS_ONLY(&& image_count == holder_imgcnt))
 			GTMASSERT;
-		if ((process_id == holder) || (FALSE == is_proc_alive(holder, 0)))
-		{ /* remove (processed == holder) when fixed */
-			compswap(latch, holder, LOCK_AVAILABLE);
+		if ((process_id == holder_pid VMS_ONLY(&& image_count == holder_imgcnt))
+		    || (FALSE == is_proc_alive(holder_pid, UNIX_ONLY(0) VMS_ONLY(holder_imgcnt))))
+		{ /* remove (processe_id == holder && image_count == holder_pid) when fixed */
+			COMPSWAP(latch, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
 		}
 		UNIX_ONLY(else if (loopcnt && 0 == (loopcnt % LOOP_CNT_SEND_WAKEUP))
-		                    continue_proc(holder));	/* Attempt wakeup in case process is stuck */
+		                    continue_proc(holder_pid));	/* Attempt wakeup in case process is stuck */
 	}
 }

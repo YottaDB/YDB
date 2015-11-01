@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,12 +12,17 @@
 #include "mdef.h"
 
 #include "gtm_ipc.h"
+#include "gtm_unistd.h"
+#include "gtm_string.h"
+#include "gtm_stdlib.h"
+#include "gtm_fcntl.h"
+#include "gtm_stdio.h"
+#include "gtm_stat.h"
 #include <sys/mman.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <sys/time.h>
 #include <errno.h>
-#include <unistd.h>
 #include <signal.h> /* for kill(), SIGTERM, SIGQUIT */
 
 #include "gtm_sem.h"
@@ -30,14 +35,8 @@
 #include "filestruct.h"
 #include "eintr_wrappers.h"
 #include "mu_rndwn_file.h"
-#include "gtm_string.h"
-#include "gtm_stdlib.h"
 #include "error.h"
 #include "io.h"
-#include "gtm_fcntl.h"
-#include "gtm_unistd.h"
-#include "gtm_stdio.h"
-#include "gtm_stat.h"
 #include "gt_timer.h"
 #include "iosp.h"
 #include "gtmio.h"
@@ -250,7 +249,6 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
  * Parameters:
  *	reg		: Regions structure
  * 	incr_cnt	: IF incr_cnt == TRUE, it will increment counter semaphore.
- *	project_id	: Project id for ftok call.
  * 	immediate	: IF immediate == TRUE, it will use IPC_NOWAIT flag.
  * Return Value: TRUE, if succsessful
  *	         FALSE, if fails.
@@ -259,12 +257,15 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 {
 	int			semflag, save_errno, status;
 	unix_db_info		*udi;
+	sgmnt_addrs		*csa;
 
 	error_def(ERR_CRITSEMFAIL);
 	error_def(ERR_SYSCALL);
 
 	assert(reg);
         udi = FILE_INFO(reg);
+	csa = &udi->s_addrs;
+	assert(!csa->now_crit);
 	/* The following two asserts are to ensure we never hold more than one FTOK semaphore at any point in time.
 	 * The only exception is if we were MUPIP STOPped (or kill -3ed) while having ftok_sem lock on one region and we
 	 * 	came to rundown code that invoked ftok_sem_lock() on a different region. Hence the SIGTERM/SIGQUIT check below.

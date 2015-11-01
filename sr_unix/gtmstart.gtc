@@ -1,7 +1,7 @@
 :
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -38,40 +38,6 @@ then
 	mkdir $logdir
 fi
 
-if [ $arch = "sun" ]; then
-ps -ax | fgrep gtm_dmna | fgrep -v grep > /usr/tmp/tmp$$
-else
-ps -ea | fgrep gtm_dmna > /usr/tmp/tmp$$
-fi
-
-if [ $? -eq 0 ]
-then
-	$echo "The following daemon(s) are running:"
-	cat /usr/tmp/tmp$$
-	$echo "Do you want to start a GT.M daemon? (Y or N)\c"
-else
-	$echo "Do you want to start the GT.M daemon? (Y or N)\c"
-fi
-rm /usr/tmp/tmp$$
-
-read resp
-$echo
-if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-
-        if [ "`$gtm_dist/geteuid`" != "root" ] ; then
-                $echo "You are not root. Do you want to start the daemon anyhow? (y or n) \c"
-                read resp
-                if [ "$resp" = "n" -o "$resp" = "N" ] ; then
-                        exit 1
-                fi
-        fi
-
-        nohup $gtm_dist/gtm_dmna >> $logdir/daemon.log 2>&1 < /dev/null &
-        if [ $? != 0 ]; then
-                $echo "The GT.M daemon failed to start."
-        fi
-fi
-
 if [ ! -f $gtm_dist/gtcm_server ]
 then
 	exit 0
@@ -100,13 +66,12 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
                 $echo "The environment variable gtmgbldir is not defined. gtcm_server will"
                 $echo "not run correctly without this variable. Please do the following"
                 $echo "to start GT.M up correctly: "
-                $echo "    1) Stop the daemon with gtmstop."
-                $echo "    2) Define gtmgbldir. (Please see the manual for instructions.)"
-                $echo "    3) Rerun this script."
+                $echo "    1) Define gtmgbldir. (Please see the manual for instructions.)"
+                $echo "    2) Rerun this script."
                 exit
         fi
 
-	if [ "$GTCM_RESTART" -eq "1" ]
+	if [ "$GTCM_RESTART" -eq 1 ]
 	then
 		$echo "Starting the GT.CM server(s) in auto-restart mode."
 	else

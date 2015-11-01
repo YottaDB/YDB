@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@ rhdtyp *auto_zlink (unsigned char *pc, int4 *line)
 {
 	unsigned char	*adj_pc;	/* address of PEA rtnref offset */
 	mstr		rname;
-	char		*rname_local;
+	mident_fixed	rname_local;
 	urx_rtnref	*rtnurx;
 	mval		rtn;
 	rhdtyp		*rhead;
@@ -68,15 +68,14 @@ rhdtyp *auto_zlink (unsigned char *pc, int4 *line)
 
 	if (azl_geturxrtn (adj_pc + INST_SZ, &rname, &rtnurx))
 	{
-		assert (0 <= rname.len && rname.len <= sizeof(mident));
+		assert (0 <= rname.len && rname.len <= MAX_MIDENT_LEN);
 		assert (rname.addr);
 		/* Copy rname into local storage because azl_geturxrtn sets
 			rname.addr to an address that is freed during op_zlink
 			and before the call to find_rtn_hdr.
 		*/
-		rname_local = (char *)malloc(rname.len);
-		memcpy(rname_local, rname.addr, rname.len);
-		rname.addr = rname_local;
+		memcpy(rname_local.c, rname.addr, rname.len);
+		rname.addr = rname_local.c;
 		assert (rtnurx);
 		assert (*(adj_pc - PEA_SZ) == I386_INS_PUSH_Iv);
 		assert (azl_geturxlab (adj_pc - PEA_SZ + INST_SZ, rtnurx));
@@ -90,10 +89,8 @@ rhdtyp *auto_zlink (unsigned char *pc, int4 *line)
 			*line = *(int4 *) (adj_pc - PEA_SZ + INST_SZ);
 			if (!(*line))
 				rts_error(VARLSTCNT(1) ERR_LABELUNKNOWN);
-			free(rname_local);
 			return rhead;
 		}
-		free(rname_local);
 	}
 	rts_error(VARLSTCNT(1) ERR_ROUTINEUNKNOWN);
 	return NULL;

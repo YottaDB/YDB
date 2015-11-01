@@ -41,6 +41,7 @@ gtcm_shutdown_ast
 gtcmtr_bufflush
 gtcmtr_data
 gtcmtr_get
+gtcmtr_increment
 gtcmtr_initproc
 gtcmtr_initreg
 gtcmtr_kill

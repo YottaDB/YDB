@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,15 +72,15 @@ void jnl_send_oper(jnl_private_control *jpc, uint4 status)
 	jpc->status = SS_NORMAL;
 	jpc->status2 = SS_NORMAL;
 	UNIX_ONLY(
-		io_in_prog = (jb->io_in_prog_latch.latch_pid ? TRUE : FALSE);
-		now_writer = jb->io_in_prog_latch.latch_pid;
+		io_in_prog = (jb->io_in_prog_latch.u.parts.latch_pid ? TRUE : FALSE);
+		now_writer = jb->io_in_prog_latch.u.parts.latch_pid;
 	)
 	VMS_ONLY(
 		io_in_prog = jb->io_in_prog;
 		now_writer = jb->now_writer;
 	)
-	fsync_in_prog = jb->fsync_in_prog_latch.latch_pid ? TRUE : FALSE;
-	fsync_pid     = jb->fsync_in_prog_latch.latch_pid;
+	fsync_in_prog = jb->fsync_in_prog_latch.u.parts.latch_pid ? TRUE : FALSE;
+	fsync_pid     = jb->fsync_in_prog_latch.u.parts.latch_pid;
 	/* note: the alignment of the parameters below is modelled on the alignment defined for JNLBUFINFO in merrors.msg */
 	send_msg(VARLSTCNT(17) ERR_JNLBUFINFO, 15, process_id,
 			jb->dsk,      jb->free,     jb->bytcnt,  io_in_prog,     fsync_in_prog,

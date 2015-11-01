@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,8 +25,9 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"
-#include "hashdef.h"
-#include "hashtab.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "cli.h"
 #include "util.h"
@@ -35,10 +36,11 @@
 #include <jpidef.h>
 #endif
 #include "real_len.h"		/* for real_len() prototype */
+#include "hashtab.h"
 
 GBLREF	mur_opt_struct	mur_options;
 GBLREF	reg_ctl_list	*mur_ctl;
-GBLREF 	mur_gbls_t	murgbl;
+GBLREF	mur_gbls_t	murgbl;
 
 LITREF	char		*jrt_label[JRT_RECTYPES];
 
@@ -164,58 +166,62 @@ static	void	mur_show_jpv(jnl_process_vector	*pv, boolean_t print_header)
 
 void	mur_show_header(jnl_ctl_list * jctl)
 {
-	jnl_file_header	*header;
-	int		regno;
+	jnl_file_header	*hdr;
 	int		time_len;
 	char		time_str[LENGTH_OF_TIME + 1];
 
-	header = jctl->jfh;
-	util_out_print("!/Journal file name!_!AD", TRUE, jctl->jnl_fn_len, jctl->jnl_fn);
-	util_out_print("Journal file label!_!AD", TRUE, sizeof(JNL_LABEL_TEXT) - 1, header->label);
-	util_out_print("Database file name!_!AD", TRUE, header->data_file_name_length, header->data_file_name);
-	util_out_print(" Prev journal file name!_!AD", TRUE, header->prev_jnl_file_name_length, header->prev_jnl_file_name);
-	util_out_print(" Next journal file name!_!AD", TRUE, header->next_jnl_file_name_length, header->next_jnl_file_name);
-	if (header->before_images)
-		util_out_print("!/ Before-image journal!_!_!_ ENABLED", TRUE);
+	hdr = jctl->jfh;
+	util_out_print("!/Journal file name       !AD", TRUE, jctl->jnl_fn_len, jctl->jnl_fn);
+	util_out_print("Journal file label      !AD", TRUE, sizeof(JNL_LABEL_TEXT) - 1, hdr->label);
+	util_out_print("Database file name      !AD", TRUE, hdr->data_file_name_length, hdr->data_file_name);
+	util_out_print(" Prev journal file name !AD", TRUE, hdr->prev_jnl_file_name_length, hdr->prev_jnl_file_name);
+	util_out_print(" Next journal file name !AD", TRUE, hdr->next_jnl_file_name_length, hdr->next_jnl_file_name);
+	if (hdr->before_images)
+		util_out_print("!/ Before-image journal                      ENABLED", TRUE);
 	else
-		util_out_print("!/ Before-image journal!_!_!_DISABLED", TRUE);
-	util_out_print(" Journal file header size!_!_!8UL [0x!XL]", TRUE, DOUBLE_ARG(JNL_HDR_LEN));
-	util_out_print(" Virtual file size!_!_!_!8UL [0x!XL] blocks", TRUE, DOUBLE_ARG(header->virtual_size));
-	util_out_print(" Crash    !_!_!_!_   !AD", TRUE, 5, (header->crash ? " TRUE" : "FALSE"));
-	util_out_print(" Recover interrupted!_!_!_   !AD", TRUE, 5, (header->recover_interrupted ? " TRUE" : "FALSE"));
-	util_out_print(" End of Data!_!_!_      !10UL [0x!XL]", TRUE, DOUBLE_ARG(header->end_of_data));
-	util_out_print(" Prev Recovery End of Data!_      !10UL [0x!XL]", TRUE, DOUBLE_ARG(header->prev_recov_end_of_data));
-	time_len = format_time(header->bov_timestamp, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
-	util_out_print(" Journal Creation Time      "TIME_DISPLAY_FAO, TRUE, time_len, time_str);
-	time_len = format_time(header->eov_timestamp, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
-	util_out_print(" Time of last update        "TIME_DISPLAY_FAO, TRUE, time_len, time_str);
-	util_out_print(" Begin Transaction!_!_      !10UL [0x!XL]", TRUE, DOUBLE_ARG(header->bov_tn));
-	util_out_print(" End Transaction!_!_      !10UL [0x!XL]", TRUE, DOUBLE_ARG(header->eov_tn));
-	util_out_print(" Align size!_!_!_!16UL [0x!XL] bytes", TRUE, DOUBLE_ARG(header->alignsize));
-	util_out_print(" Epoch Interval!_!_!_!_!8UL", TRUE, EPOCH_SECOND2SECOND(header->epoch_interval));
-	util_out_print(" Replication State!_!_!_  !AD", TRUE, 6, (header->repl_state == repl_closed ? "CLOSED" : "  OPEN"));
-	util_out_print(" Updates Disabled on Secondary!_!_   !AD", TRUE, 5, (header->update_disabled ? " TRUE" : "FALSE"));
-	util_out_print(" Jnlfile SwitchLimit!_!_!16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(header->autoswitchlimit));
-	util_out_print(" Jnlfile Allocation!_!_!16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(header->jnl_alq));
-	util_out_print(" Jnlfile Extension!_!_!16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(header->jnl_deq));
-	util_out_print(" Maximum Physical Record Length!_!16UL [0x!XL]", TRUE, DOUBLE_ARG(header->max_phys_reclen));
-	util_out_print(" Maximum Logical Record Length!_!16UL [0x!XL]", TRUE, DOUBLE_ARG(header->max_logi_reclen));
-	util_out_print(" Turn Around Point Offset!_      !10UL [0x!XL]", TRUE, DOUBLE_ARG(header->turn_around_offset));
-	if (header->turn_around_time)
-		time_len = format_time(header->turn_around_time, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
+		util_out_print("!/ Before-image journal                     DISABLED", TRUE);
+	util_out_print(" Journal file header size                 !8UL [0x!XL]", TRUE, DOUBLE_ARG(JNL_HDR_LEN));
+	util_out_print(" Virtual file size                        !8UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->virtual_size));
+	util_out_print(" Journal file checksum seed             !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->checksum));
+	util_out_print(" Crash                                       !AD", TRUE, 5, (hdr->crash ? " TRUE" : "FALSE"));
+	util_out_print(" Recover interrupted                         !AD", TRUE, 5, (hdr->recover_interrupted ? " TRUE" : "FALSE"));
+	util_out_print(" Blocks to Upgrade Adjustment           !10UL [0x!XL]", TRUE,
+		DOUBLE_ARG(hdr->prev_recov_blks_to_upgrd_adjust));
+	util_out_print(" End of Data                            !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->end_of_data));
+	util_out_print(" Prev Recovery End of Data              !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->prev_recov_end_of_data));
+	time_len = format_time(hdr->bov_timestamp, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
+	util_out_print(" Journal Creation Time        "TIME_DISPLAY_FAO, TRUE, time_len, time_str);
+	time_len = format_time(hdr->eov_timestamp, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
+	util_out_print(" Time of last update          "TIME_DISPLAY_FAO, TRUE, time_len, time_str);
+	util_out_print(" Begin Transaction            !20@UJ [0x!16@XJ]", TRUE, DOUBLE_ARG(&hdr->bov_tn));
+	util_out_print(" End Transaction              !20@UJ [0x!16@XJ]", TRUE, DOUBLE_ARG(&hdr->eov_tn));
+	util_out_print(" Align size                       !16UL [0x!XL] bytes", TRUE, DOUBLE_ARG(hdr->alignsize));
+	util_out_print(" Epoch Interval                           !8UL", TRUE, EPOCH_SECOND2SECOND(hdr->epoch_interval));
+	assert(!REPL_WAS_ENABLED(hdr));
+	util_out_print(" Replication State                        !8AD", TRUE, 8,
+		(hdr->repl_state == repl_closed ? "  CLOSED" : (hdr->repl_state == repl_open ? "    OPEN" : "WAS_OPEN")));
+	util_out_print(" Updates Disabled on Secondary               !AD", TRUE, 5, (hdr->update_disabled ? " TRUE" : "FALSE"));
+	util_out_print(" Jnlfile SwitchLimit              !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->autoswitchlimit));
+	util_out_print(" Jnlfile Allocation               !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->jnl_alq));
+	util_out_print(" Jnlfile Extension                !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->jnl_deq));
+	util_out_print(" Maximum Physical Record Length   !16UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->max_phys_reclen));
+	util_out_print(" Maximum Logical Record Length    !16UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->max_logi_reclen));
+	util_out_print(" Turn Around Point Offset               !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->turn_around_offset));
+	if (hdr->turn_around_time)
+		time_len = format_time(hdr->turn_around_time, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
 	else
 	{
 		time_len = STR_LIT_LEN(ZERO_TIME_LITERAL);
 		MEMCPY_LIT(time_str, ZERO_TIME_LITERAL);
 	}
-	util_out_print(" Turn Around Point Time     !20AD", TRUE, time_len, time_str);
-	util_out_print(" Start Region Sequence Number !_!16@ZJ [0x!16@XJ]", TRUE, &header->start_seqno, &header->start_seqno);
-	util_out_print(" End Region Sequence Number!_!16@ZJ [0x!16@XJ]", TRUE, &header->end_seqno, &header->end_seqno);
+	util_out_print(" Turn Around Point Time       !20AD", TRUE, time_len, time_str);
+	util_out_print(" Start Region Sequence Number !20@UJ [0x!16@XJ]", TRUE, &hdr->start_seqno, &hdr->start_seqno);
+	util_out_print(" End Region Sequence Number   !20@UJ [0x!16@XJ]", TRUE, &hdr->end_seqno, &hdr->end_seqno);
 
 	util_out_print("!/Process That Created the Journal File:!/", TRUE);
-	mur_show_jpv(&header->who_created, TRUE);
+	mur_show_jpv(&hdr->who_created, TRUE);
 	util_out_print("!/Process That Last Wrote to the Journal File:!/", TRUE);
-	mur_show_jpv(&header->who_opened, TRUE);
+	mur_show_jpv(&hdr->who_opened, TRUE);
 	util_out_print("", TRUE);
 }
 
@@ -223,9 +229,9 @@ void	mur_output_show()
 {
 	reg_ctl_list		*rctl, *rctl_top;
 	jnl_ctl_list		*jctl;
-	int			cnt, regno, rectype, size;
+	int			rectype, size;
 	pini_list_struct	*plst;
-	hashtab_ent 		*h_ent;
+	ht_ent_int4 		*tabent, *topent;
 	boolean_t		first_time;
 
 	assert(mur_options.show);
@@ -241,18 +247,16 @@ void	mur_output_show()
 				assert(CLI_PRESENT == cli_present("SHOW"));
 				mur_show_header(jctl);
 			}
-			size = jctl->pini_list->size;
+			size = jctl->pini_list.size;
 			if (mur_options.show & SHOW_BROKEN
 				|| mur_options.show & SHOW_ACTIVE_PROCESSES
 				|| mur_options.show & SHOW_ALL_PROCESSES)
 			{
 				first_time = TRUE;
-				h_ent = jctl->pini_list->tbl;
-				for (cnt = 0; cnt < size; cnt++, h_ent++)
+				for (tabent = jctl->pini_list.base, topent = jctl->pini_list.top; tabent < topent; tabent++)
 				{
-					if (h_ent->v)
+					if (HTENT_VALID_INT4(tabent, pini_list_struct, plst))
 					{
-						plst = (pini_list_struct *)h_ent->v;
 						if (BROKEN_PROC == plst->state)
 						{
 							if (first_time)
@@ -275,12 +279,10 @@ void	mur_output_show()
 			{
 				assert(CLI_PRESENT == cli_present("SHOW"));
 				first_time = TRUE;
-				h_ent = jctl->pini_list->tbl;
-				for (cnt = 0; cnt < size; cnt++, h_ent++)
+				for (tabent = jctl->pini_list.base, topent =  jctl->pini_list.top; tabent < topent; tabent++)
 				{
-					if (h_ent->v)
+					if (HTENT_VALID_INT4(tabent, pini_list_struct, plst))
 					{
-						plst = (pini_list_struct *)h_ent->v;
 						if (ACTIVE_PROC == plst->state)
 						{
 							if (first_time)
@@ -296,12 +298,10 @@ void	mur_output_show()
 			{
 				assert(CLI_PRESENT == cli_present("SHOW"));
 				first_time = TRUE;
-				h_ent = jctl->pini_list->tbl;
-				for (cnt = 0; cnt < size; cnt++, h_ent++)
+				for (tabent = jctl->pini_list.base, topent =  jctl->pini_list.top; tabent < topent; tabent++)
 				{
-					if (h_ent->v)
+					if (HTENT_VALID_INT4(tabent, pini_list_struct, plst))
 					{
-						plst = (pini_list_struct *)h_ent->v;
 						if (FINISHED_PROC == plst->state)
 						{
 							if (first_time)
@@ -317,7 +317,7 @@ void	mur_output_show()
 			{
 				assert(CLI_PRESENT == cli_present("SHOW"));
 				util_out_print(statistics_header, TRUE);
-				util_out_print(dashes_fao, TRUE, sizeof statistics_header - 1);
+				util_out_print(dashes_fao, TRUE, STR_LIT_LEN(statistics_header));
 				for (rectype = JRT_BAD;  rectype < JRT_RECTYPES;  ++rectype)
 					util_out_print(statistics_fao, TRUE, jrt_label[rectype], jctl->jnlrec_cnt[rectype]);
 			}

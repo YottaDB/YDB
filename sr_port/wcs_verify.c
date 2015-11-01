@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,12 +61,15 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 	sm_uc_ptr_t		jnl_buff_expected;
 	boolean_t		blkque_array[WC_MAX_BUFFS]; /* TRUE indicates we saw the cr or bt of that array index */
 	int4			n_bts;	/* a copy of csd->n_bts since it is used frequently in this routine */
+	trans_num		dummy_tn;
 
 	error_def(ERR_DBFHEADERR);
 	error_def(ERR_DBADDRANGE);
+	error_def(ERR_DBADDRANGE8);
 	error_def(ERR_DBADDRALIGN);
 	error_def(ERR_DBQUELINK);
 	error_def(ERR_DBCRERR);
+	error_def(ERR_DBCRERR8);
 	error_def(ERR_DBCLNUPINFO);
 	error_def(ERR_DBWCVERIFYSTART);
 	error_def(ERR_DBWCVERIFYEND);
@@ -74,7 +77,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	ret = TRUE;
-	send_msg(VARLSTCNT(7) ERR_DBWCVERIFYSTART, 5, DB_LEN_STR(reg), process_id, process_id, csd->trans_hist.curr_tn);
+	send_msg(VARLSTCNT(7) ERR_DBWCVERIFYSTART, 5, DB_LEN_STR(reg), process_id, process_id, &csd->trans_hist.curr_tn);
 	/* while some errors terminate loops, as of this writing, no errors are treated as terminal */
 	if ((csa->now_crit == FALSE) && (csd->clustered == FALSE))
 	{
@@ -83,7 +86,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		send_msg(VARLSTCNT(8) ERR_DBFHEADERR, 6, DB_LEN_STR(reg), RTS_ERROR_TEXT("now_crit"), csa->now_crit, TRUE);
 		grab_crit(reg);		/* what if it has it but lost track of it ??? should there be a crit reset ??? */
 	}
-	offset = ROUND_UP(sizeof(sgmnt_data), (sizeof(int4) * 2));
+	offset = ROUND_UP(SIZEOF_FILE_HDR(csd), (sizeof(int4) * 2));
 	if (csa->nl->bt_header_off != offset)				/* bt_header is "quadword-aligned" after the header */
 	{
 		assert(expect_damage);
@@ -368,8 +371,9 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 					{
 						assert(expect_damage);
 						ret = FALSE;
-						send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg), cr,
-							bt->blk, RTS_ERROR_TEXT("bt block"), cr->blk, bt->blk);
+						send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr,
+							bt->blk, RTS_ERROR_TEXT("bt block"), cr->blk, bt->blk,
+							CALLFROM);
 					}
 				}
 			}
@@ -401,7 +405,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		}
 	}
 
-	bp_lo = ROUND_UP(cr_top, DISK_BLOCK_SIZE);
+	bp_lo = ROUND_UP(cr_top, OS_PAGE_SIZE);
 	bp_top = bp_lo + (n_bts * csd->blk_size);
 	bt_base_off = GDS_ANY_ABS2REL(csa, (sm_uc_ptr_t)csd + csa->nl->bt_base_off);
 	bt_top_off = GDS_ANY_ABS2REL(csa, (sm_uc_ptr_t)csd + offset);
@@ -409,6 +413,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 	/* print info. that secshr_db_clnup stored */
 	if (0 != csd->secshr_ops_index)
 	{
+		assert(expect_damage);
 		if (sizeof(csd->secshr_ops_array) < csd->secshr_ops_index)
 		{
 			SPRINTF(secshr_string, "secshr_max_index exceeded. max_index = %d [0x%08x] : ops_index = %d [0x%08x]",
@@ -468,8 +473,9 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 				{
 					assert(expect_damage);
 					ret = FALSE;
-					send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg), cr,
-						cr->blk, RTS_ERROR_TEXT("cr block"), cr->blk, bt->blk);
+					send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr,
+						cr->blk, RTS_ERROR_TEXT("cr block"), cr->blk, bt->blk,
+						CALLFROM);
 				}
 			}
 		}
@@ -489,22 +495,22 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cr->blk, RTS_ERROR_TEXT("cr->buffaddr"), cr->buffaddr, bp);
+			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+				cr, cr->blk, RTS_ERROR_TEXT("cr->buffaddr"), cr->buffaddr, bp, CALLFROM);
 		}
 		if (cr->in_tend)
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cr->blk, RTS_ERROR_TEXT("cr->in_tend"), cr->in_tend, FALSE);
+			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+				cr, cr->blk, RTS_ERROR_TEXT("cr->in_tend"), cr->in_tend, FALSE, CALLFROM);
 		}
 		if (cr->data_invalid)
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cr->blk, RTS_ERROR_TEXT("cr->data_invalid"), cr->data_invalid, FALSE);
+			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+				cr, cr->blk, RTS_ERROR_TEXT("cr->data_invalid"), cr->data_invalid, FALSE, CALLFROM);
 		}
 		if (cr->r_epid != 0)
 		{
@@ -512,8 +518,8 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->r_epid"), cr->r_epid, 0);
+				send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+					cr, cr->blk, RTS_ERROR_TEXT("cr->r_epid"), cr->r_epid, 0, CALLFROM);
 			}
 		} else if ((-1 == cr->read_in_progress) && !caller_is_wcs_recover && (CR_BLKEMPTY != cr->blk) && !cr->data_invalid)
 		{	/* if the buffer is not being read into currently (checked both by cr->r_epid being 0 and
@@ -527,14 +533,16 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 			 * should not return failure in that case.
 			 */
 			bptmp = (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, bp);
-			if (!cert_blk(reg, cr->blk, (blk_hdr_ptr_t)bptmp, 0))
+			if (!cert_blk(reg, cr->blk, (blk_hdr_ptr_t)bptmp, 0, FALSE))
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("Block certification result"), FALSE, TRUE);
-				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg), cr, cr->blk,
-						RTS_ERROR_TEXT("Block certification result buffer"), bptmp, csa->lock_addrs[0]);
+				send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+					cr, cr->blk, RTS_ERROR_TEXT("Block certification result"),
+					FALSE, TRUE, CALLFROM);
+				send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+						RTS_ERROR_TEXT("Block certification result buffer"),
+						bptmp, csa->lock_addrs[0], CALLFROM);
 			}
 		}
 		if ((cr->in_cw_set != TRUE) && (cr->in_cw_set != FALSE))
@@ -559,8 +567,8 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				 cr, cr->blk, RTS_ERROR_TEXT("cr->jnl_addr"), (uint4)cr->jnl_addr, 0);
+			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+				 cr, cr->blk, RTS_ERROR_TEXT("cr->jnl_addr"), (uint4)cr->jnl_addr, 0, CALLFROM);
 		}
 		if ((WRITE_LATCH_VAL(cr) < LATCH_CLEAR) || (WRITE_LATCH_VAL(cr) > LATCH_CONFLICT))
 		{	/* the message would read cr->interlock.semaphore although in Unix it means cr->interlock.latch */
@@ -571,12 +579,12 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		}
 		/* as of this time cycle is believed to be a relative timestamp with no characteristics useful to verify */
 #ifdef VMS
-		if (cr->rip_latch.latch_pid != 0)
+		if (cr->rip_latch.u.parts.latch_pid != 0)
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cr->blk, RTS_ERROR_TEXT("cr->rip_latch"), cr->rip_latch.latch_pid, 0);
+			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+				RTS_ERROR_TEXT("cr->rip_latch"), cr->rip_latch.u.parts.latch_pid, 0, CALLFROM);
 		}
 		if (cr->iosb.cond != 0)
 		{	/* do not set "ret" to FALSE in both cases below. this is because it seems like VMS can set iosb.cond to
@@ -588,26 +596,28 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 			if (0 == cr->dirty)
 			{
 				assert(expect_damage);
-				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->cr->dirty"), cr->dirty, TRUE);
-				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->cr->iosb"), cr->iosb.cond, 0);
+				dummy_tn = (trans_num)TRUE;
+				send_msg(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg),
+					cr, cr->blk, RTS_ERROR_TEXT("cr->cr->dirty"), &cr->dirty, &dummy_tn, CALLFROM);
+				send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+					cr, cr->blk, RTS_ERROR_TEXT("cr->cr->iosb"), cr->iosb.cond, 0, CALLFROM);
 			}
 			if (0 == cr->epid)
 			{
 				assert(expect_damage);
-				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->epid"), cr->epid, -1);
-				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->iosb"), cr->iosb.cond, 0);
+				send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+					cr, cr->blk, RTS_ERROR_TEXT("cr->epid"), cr->epid, -1, CALLFROM);
+				send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+					cr, cr->blk, RTS_ERROR_TEXT("cr->iosb"), cr->iosb.cond, 0, CALLFROM);
 			}
 		}
 		if ((WRT_STRT_PNDNG == cr->iosb.cond) && (0 == cr->dirty))
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cr->blk, RTS_ERROR_TEXT("cr->dirty"), cr->dirty, TRUE);
+			dummy_tn = (trans_num)TRUE;
+			send_msg(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, cr->blk,
+				RTS_ERROR_TEXT("cr->dirty"), &cr->dirty, &dummy_tn, CALLFROM);
 		}
 		if (cr->twin != 0)
 		{
@@ -628,8 +638,8 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-					cr_tmp, cr->blk, RTS_ERROR_TEXT("cr->twin->twin"), GDS_ANY_REL2ABS(csa, cr_tmp->twin), cr);
+				send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr_tmp, cr->blk,
+					RTS_ERROR_TEXT("cr->twin->twin"), GDS_ANY_REL2ABS(csa, cr_tmp->twin), cr, CALLFROM);
 			}
 		}
 #else
@@ -638,37 +648,37 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cr->blk, RTS_ERROR_TEXT("cr->twin"), cr->twin, 0);
+			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+				cr, cr->blk, RTS_ERROR_TEXT("cr->twin"), cr->twin, 0, CALLFROM);
 		}
 		if (0 != cr->image_count)
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cr->blk, RTS_ERROR_TEXT("cr->image_count"), cr->image_count, 0);
+			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+				cr, cr->blk, RTS_ERROR_TEXT("cr->image_count"), cr->image_count, 0, CALLFROM);
 		}
 		if ((0 != cr->epid) && caller_is_wcs_recover)
 		{	/* if called from DSE CACHE -VERIFY, we do not wait for concurrent writers to finish */
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cr->blk, RTS_ERROR_TEXT("cr->epid"), cr->epid, 0);
+			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+				cr, cr->blk, RTS_ERROR_TEXT("cr->epid"), cr->epid, 0, CALLFROM);
 		}
 #endif
 		if (FALSE != cr->wip_stopped)
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cr->blk, RTS_ERROR_TEXT("cr->wip_stopped"), cr->wip_stopped, FALSE);
+			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+				RTS_ERROR_TEXT("cr->wip_stopped"), cr->wip_stopped, FALSE, CALLFROM);
 		}
 		if (FALSE != cr->stopped)
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cr->blk, RTS_ERROR_TEXT("cr->stopped"), cr->stopped, FALSE);
+			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+				RTS_ERROR_TEXT("cr->stopped"), cr->stopped, FALSE, CALLFROM);
 		}
 	}
 	/* loop through the cr blkques */
@@ -678,8 +688,8 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cr->blk, RTS_ERROR_TEXT("queue head cr->blk"), cr0->blk, BT_QUEHEAD);
+			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr0, cr0->blk,
+				RTS_ERROR_TEXT("queue head cr->blk"), cr0->blk, BT_QUEHEAD, CALLFROM);
 			cr0->blk = BT_QUEHEAD;
 		}
 		for (cr_prev = cr0, cr = (cache_rec_ptr_t)((sm_uc_ptr_t)cr0 + cr0->blkque.fl), cnt = n_bts + 1;
@@ -713,12 +723,18 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr hash"), cr0 - cr_qbase, cr->blk % csd->bt_buckets);
+				send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+					RTS_ERROR_TEXT("cr hash"), cr0 - cr_qbase, cr->blk % csd->bt_buckets, CALLFROM);
 				if (caller_is_wcs_recover && !cr->stopped)
 				{	/* if cr->stopped is TRUE, then the buffer was created by secshr_db_clnup(),
 					 * and hence it is ok to have different hash value, but otherwise we believe
 					 * the hash value and consider cr->blk to be invalid and hence make this buffer empty
+					 *
+					 * Possible causes of this condition are if a process gets shot (kill -9 or STOP/ID)
+					 * in the midst of shuffling a cache-record from one blkque to another blkque (done through
+					 * a call to shuffqth in db_csh_getn.c). Since the act of removing a cache-record from
+					 * one hashqueue and adding it to another hashqueue is not atomic, we can end up with
+					 * a cache-record that is not in the proper hashqueue if we get shot in the middle.
 					 *
 					 * Ideally we would like to dump the contents of this broken buffer to a file for later
 					 * analysis. Since we hold crit now, we do not want to do that. It might be better
@@ -730,7 +746,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 					 * disparity in the hash value. To avoid that we reset cr->blk here itself but
 					 * do it only if called from wcs_recover().
 					 */
-					assert(FALSE);
+					assert(expect_damage);
 					cr->blk = CR_BLKEMPTY;
 				}
 			}
@@ -757,11 +773,11 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cr->blk, RTS_ERROR_TEXT("cr blkque hash"), -1, cr->blk % csd->bt_buckets);
+			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
+				RTS_ERROR_TEXT("cr blkque hash"), -1, cr->blk % csd->bt_buckets, CALLFROM);
 			if (caller_is_wcs_recover && !cr->stopped)	/* see comment above ("cr hash") for similar handling */
 			{
-				assert(FALSE);
+				assert(expect_damage);
 				cr->blk = CR_BLKEMPTY;
 			}
 		}
@@ -809,17 +825,18 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cstt->blk, RTS_ERROR_TEXT("active cr->dirty"), cstt->dirty, TRUE);
+			dummy_tn = (trans_num)TRUE;
+			send_msg(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, cstt->blk,
+				RTS_ERROR_TEXT("active cr->dirty"), &cstt->dirty, &dummy_tn, CALLFROM);
 		}
 		if (((0 != cstt->flushed_dirty_tn) && (cstt->dirty <= cstt->flushed_dirty_tn))
 			 || (cstt->dirty > csd->trans_hist.curr_tn))
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg), (int)cstt + sizeof(que_head), cstt->blk,
-				cstt->dirty, RTS_ERROR_TEXT("active dirty (tn)"),
-				cstt->flushed_dirty_tn + 1, csd->trans_hist.curr_tn);
+			dummy_tn = cstt->flushed_dirty_tn + 1;
+			send_msg(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), (int)cstt + sizeof(que_head), cstt->blk,
+				&cstt->dirty, RTS_ERROR_TEXT("active dirty (tn)"), &dummy_tn, &csd->trans_hist.curr_tn);
 		}
 		/* if caller_is_wcs_recover, we would have waited for all writers to stop manipulating the active/wip queues
 		 * and so it is ok to do the FAKE_DIRTY check. but otherwise it is not.
@@ -885,25 +902,26 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cstt->blk, RTS_ERROR_TEXT("wip cr->epid"), cstt->epid, -1);
+			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+				cr, cstt->blk, RTS_ERROR_TEXT("wip cr->epid"), cstt->epid, -1, CALLFROM);
 		}
 */
 		if (0 == cstt->dirty)
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-				cr, cstt->blk, RTS_ERROR_TEXT("wip cr->dirty"), cstt->dirty, TRUE);
+			dummy_tn = (trans_num)TRUE;
+			send_msg(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, cstt->blk,
+				RTS_ERROR_TEXT("wip cr->dirty"), &cstt->dirty, &dummy_tn, CALLFROM);
 		}
 		if (((0 != cstt->flushed_dirty_tn) && (cstt->dirty <= cstt->flushed_dirty_tn))
 			 || (cstt->dirty > csd->trans_hist.curr_tn))
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg), (int)cstt + sizeof(que_head), cstt->blk,
-				cstt->dirty, RTS_ERROR_TEXT("wip dirty (tn)"),
-				cstt->flushed_dirty_tn + 1, csd->trans_hist.curr_tn);
+			dummy_tn = cstt->flushed_dirty_tn + 1;
+			send_msg(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), (int)cstt + sizeof(que_head), cstt->blk,
+				&cstt->dirty, RTS_ERROR_TEXT("wip dirty (tn)"), &dummy_tn, &csd->trans_hist.curr_tn);
 		}
 		/* if caller_is_wcs_recover, we would have waited for all writers to stop manipulating the active/wip queues
 		 * and so it is ok to do the FAKE_DIRTY check. but otherwise it is not.
@@ -958,12 +976,13 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 				{
 					assert(expect_damage);
 					ret = FALSE;
-					send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-						cr, cr->blk, RTS_ERROR_TEXT("non-state cr->dirty"), cr->dirty, FALSE);
+					dummy_tn = (trans_num)FALSE;
+					send_msg(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, cr->blk,
+						RTS_ERROR_TEXT("non-state cr->dirty"), &cr->dirty, &dummy_tn, CALLFROM);
 				}
 			}
 		}
 	}
-	send_msg(VARLSTCNT(7) ERR_DBWCVERIFYEND, 5, DB_LEN_STR(reg), process_id, process_id, csd->trans_hist.curr_tn);
+	send_msg(VARLSTCNT(7) ERR_DBWCVERIFYEND, 5, DB_LEN_STR(reg), process_id, process_id, &csd->trans_hist.curr_tn);
 	return ret;
 }

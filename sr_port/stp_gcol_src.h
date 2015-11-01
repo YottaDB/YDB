@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <stddef.h>
 #include "gtm_string.h"
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -24,20 +25,20 @@
 #include "cache.h"
 #include "comline.h"
 #include "compiler.h"
-#include "hashdef.h"
-#include "hashtab.h"		/* needed also for tp.h */
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "io.h"
 #include "jnl.h"
 #include "lv_val.h"
 #include "subscript.h"
 #include "mdq.h"
-#include "mv_stent.h"
 #include "rtnhdr.h"
+#include "mv_stent.h"
 #include "sbs_blk.h"
 #include "stack_frame.h"
 #include "stp_parms.h"
 #include "stringpool.h"
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "tp_frame.h"
 #include "mlkdef.h"
@@ -47,6 +48,8 @@
 #include "error.h"
 #include "longcpy.h"
 #include "stpg_sort.h"
+#include "hashtab_objcode.h"
+#include "hashtab.h"
 
 /* Undefine memmove since the Vax shortcut defines a 64K max move which we can
    easily exceed with the stringpool moves */
@@ -54,14 +57,17 @@
 #undef memmove
 #endif
 
+GBLREF mvar 		*mvartab;
+GBLREF mlabel 		*mlabtab;
+GBLREF int 		mvmax;
+GBLREF int		mlmax;
+GBLREF int 		mvar_index;
+GBLREF hash_table_objcode cache_table;
 GBLREF bool		compile_time, run_time;
 GBLREF unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF int		stp_array_size;
-GBLREF cache_entry	*cache_entry_base, *cache_entry_top;
-GBLREF int4		cache_fails;
 GBLREF gvzwrite_struct	gvzwrite_block;
 GBLREF io_log_name	*io_root_log_name;
-GBLREF hashtab		*stp_duptbl;
 GBLREF lvzwrite_struct	lvzwrite_block;
 GBLREF mliteral		literal_chain;
 GBLREF mstr		*comline_base, dollar_zsource, **stp_array;
@@ -73,30 +79,30 @@ GBLREF spdesc		indr_stringpool, rts_stringpool, stringpool;
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
 GBLREF tp_frame		*tp_pointer;
-GBLREF boolean_t        lv_dupcheck;
-GBLREF z_records	zbrk_recs;
 GBLREF boolean_t	disallow_forced_expansion, forced_expansion;
 GBLREF mval		last_fnquery_return_varname;			/* Return value of last $QUERY (on stringpool) (varname) */
 GBLREF mval		last_fnquery_return_sub[MAX_LVSUBSCRIPTS];	/* .. (subscripts) */
 GBLREF int		last_fnquery_return_subcnt;			/* .. (count of subscripts) */
+GBLREF boolean_t	mstr_native_align;
 #ifndef __vax
 GBLREF fnpc_area	fnpca;
 #endif
 OS_PAGE_SIZE_DECLARE
 
+static mstr		**topstr, **array, **arraytop;
 
 #ifdef STP_MOVE
 
 #define MV_STPG_GET(x) \
 	((((x)->mvtype & MV_STR) && (x)->str.len) ? \
 		(((x)->str.addr >= (char *)stringpool.base && (x)->str.addr < (char *)stringpool.free) ? &((x)->str) \
-		: (((x)->str.addr >= from && (x)->str.addr < to) ? space_needed += (x)->str.len, move_count++, &((x)->str) : NULL))\
+		: (((x)->str.addr >= from && (x)->str.addr < to) ? move_count++, &((x)->str) : NULL))\
 	: NULL)
 
 #define STR_STPG_GET(x) \
 	(((x)->len) ? \
 	  	(((x)->addr >= (char *)stringpool.base && (x)->addr < (char *)stringpool.free) ? (x) \
-	 	: (((x)->addr >= from && (x)->addr < to) ? space_needed += (x)->len, move_count++, (x) : NULL)) \
+	 	: (((x)->addr >= from && (x)->addr < to) ? move_count++, (x) : NULL)) \
 	: NULL)
 
 #else /* !STP_MOVE <=> STP_GCOL */
@@ -108,17 +114,17 @@ OS_PAGE_SIZE_DECLARE
 
 #define STR_STPG_GET(x) (((x)->len && (x)->addr >= (char *)stringpool.base && (x)->addr < (char *)stringpool.free) ? (x) : NULL)
 
-#endif /* if STP_MOVE ... else ... */
+#endif /* end if STP_MOVE ... else ... */
 
 #define MV_STPG_PUT(X) \
-	(((lv_dupcheck && !add_hashtab_ent(&stp_duptbl, HASH_KEY_INVALID, (void *)X)) ? 0 : (*a++ = (X), a >= arraytop ? \
-        (stp_put_int = a - array, stp_expand_array(), array = stp_array, \
-        a = array + stp_put_int, arraytop = array + stp_array_size) : 0)))
+	(*topstr++ = (X), topstr >= arraytop ? \
+        (stp_put_int = topstr - array, stp_expand_array(), array = stp_array, \
+        topstr = array + stp_put_int, arraytop = array + stp_array_size) : 0)
 
 #define PROCESS_CACHE_ENTRY(cp)								\
-        if (cp->src.len)	/* entry is used */					\
+        if (cp->src.str.len)	/* entry is used */					\
 	{										\
-		x = STR_STPG_GET(&cp->src);						\
+		x = STR_STPG_GET(&cp->src.str);						\
 		if (x)									\
 			MV_STPG_PUT(x);							\
 		/* Run list of mvals for each code stream that exists */		\
@@ -129,9 +135,20 @@ OS_PAGE_SIZE_DECLARE
 			if (fixup_cnt)							\
 			{								\
 				m = (mval *)((char *)ihdr + ihdr->fixup_vals_off);	\
-				for (mtop = m + fixup_cnt;  m < mtop;  m++)		\
+				for (mtop = m + fixup_cnt;  m < mtop; m++)		\
 				{							\
 					x = MV_STPG_GET(m);				\
+					if (x)						\
+						MV_STPG_PUT(x);				\
+				}							\
+			}								\
+			fixup_cnt = ihdr->vartab_len;					\
+			if (fixup_cnt)							\
+			{								\
+				vent = (var_tabent *)((char *)ihdr + ihdr->vartab_off);	\
+				for (vartop = vent + fixup_cnt;  vent < vartop; vent++)\
+				{							\
+					x = STR_STPG_GET(&vent->var_name);		\
 					if (x)						\
 						MV_STPG_PUT(x);				\
 				}							\
@@ -139,25 +156,37 @@ OS_PAGE_SIZE_DECLARE
 		}									\
 	}
 
-#define MOVE_CONTIGUOUS_BLOCKS \
-	while (b < a) \
+#define PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta) \
+{ \
+	padlen = 0; \
+	for (; cstr < topstr; cstr++) \
 	{ \
-		/* Determine extent of next contiguous block to move and move it. */ \
-		delta = (*b)->addr - (char *)stringpool.free; \
-		for (s = e = (unsigned char *)((*b)->addr);  (b < a) && ((*b)->addr <= (char *)e);  b++) \
-		{ \
-			assert((*b)->addr >= (char *)s); \
-			e1 = (unsigned char *)(*b)->addr; \
-			e1 += (*b)->len; \
-			if (e1 > e) \
-				e = e1; \
-			(*b)->addr -= delta; \
-			assert(((*b)->addr >= (char *)stringpool.free) && ((*b)->addr <= (char *)(e - delta))); \
-		} \
-		n = e - s; \
-		memmove(stringpool.free, s, n); /* potentially overlapped memory, use memmove, not memcpy */ \
-		stringpool.free += n; \
-	}
+		assert((*cstr)->addr >= (char *)begaddr); \
+		if ((*cstr)->addr > (char *)endaddr && (*cstr)->addr != (char *)endaddr + padlen) \
+			break; \
+		tmpaddr = (unsigned char *)(*cstr)->addr + (*cstr)->len; \
+		if (tmpaddr > endaddr) \
+			endaddr = tmpaddr;\
+		padlen = mstr_native_align ? PADLEN((*cstr)->len, NATIVE_WSIZE) : 0;\
+		(*cstr)->addr -= delta; \
+	} \
+}
+
+#define COPY2STPOOL(cstr, topstr) \
+{ \
+	while (cstr < topstr) \
+	{ \
+		if (mstr_native_align) \
+			stringpool.free = (unsigned char *)ROUND_UP2((uint4)stringpool.free, NATIVE_WSIZE); \
+		/* Determine extent of next contiguous block and copy it into new stringpool.base. */ \
+		begaddr = endaddr = (unsigned char *)((*cstr)->addr); \
+		delta = (*cstr)->addr - (char *)stringpool.free; \
+		PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta); \
+		blklen = endaddr - begaddr; \
+		memcpy(stringpool.free, begaddr, blklen); \
+		stringpool.free += blklen; \
+	} \
+}
 
 static void expand_stp(unsigned int new_size)
 {
@@ -167,24 +196,42 @@ static void expand_stp(unsigned int new_size)
 	return;
 }
 
+
+#ifndef STP_MOVE
+void mv_parse_tree_collect(mvar *node);
+void mv_parse_tree_collect(mvar *node)
+{
+	mstr	*string;
+	int	stp_put_int;
+	string = (mstr *)STR_STPG_GET(&node->mvname);
+	if (string)
+		MV_STPG_PUT(string);
+	if (node->lson)
+		mv_parse_tree_collect(node->lson);
+	if (node->rson)
+		mv_parse_tree_collect(node->rson);
+}
+#endif
+
 #ifdef STP_MOVE
+
 void stp_move(char *from, char *to) /* garbage collect and move range (from,to] to stringpool adjusting all mvals/mstrs pointing
 				     * in this range */
 #else
-void stp_gcol(int space_needed) /* garbage collect and create enough space for space_needed bytes */
+void stp_gcol(int space_asked) /* garbage collect and create enough space for space_asked bytes */
 #endif
 {
 #ifdef STP_MOVE
-	int			space_needed = 0, move_count = 0;
+	int			space_asked = 0, move_count = 0;
 #endif
-	unsigned char		*e, *e1, i, *s, *top;
-	int			delta, n, n1, stp_put_int, fixup_cnt;
-	cache_entry		*cp;
+	unsigned char		*strpool_base, *straddr, *tmpaddr, *begaddr, *endaddr;
+	int			delta, index, blklen, space_before_compact, space_after_compact, space_needed;
+	int			stp_put_int, fixup_cnt, tmplen, totspace, padlen;
 	io_log_name		*l;		/* logical name pointer		*/
 	lv_blk			*lv_blk_ptr;
 	lv_sbs_tbl		*tbl;
 	lv_val			*lvp, *lvlimit;
-	mstr			**a, **array, **arraytop, **b, *x;
+	mstr			**cstr, *x;
 	mv_stent		*mvs;
 	mval			*m, *mtop;
 	sbs_blk			*blk;
@@ -208,12 +255,18 @@ void stp_gcol(int space_needed) /* garbage collect and create enough space for s
 	static int		indr_stp_maxnoexp_passes = STP_INITMAXNOEXP_PASSES;
 	static int		rts_stp_maxnoexp_passes = STP_INITMAXNOEXP_PASSES;
 	int			*maxnoexp_passes;
-	int			stp_incr, space_reclaimed;
+	int			stp_incr, space_reclaim;
 	boolean_t		maxnoexp_growth;
+	ht_ent_objcode 		*tabent_objcode, *topent;
+	ht_ent_mname		*tabent_mname, *topent_mname;
+	cache_entry		*cp;
+	var_tabent		*vent, *vartop;
+	symval			*symtab;
+	error_def		(ERR_STPEXPFAIL);
 
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
-	assert(stringpool.top - stringpool.free < space_needed || space_needed == 0);
+	assert(stringpool.top - stringpool.free < space_asked || space_asked == 0);
 	assert(((unsigned)stringpool.top & 0x00000003) == 0);
 
 #ifdef STP_MOVE
@@ -222,6 +275,8 @@ void stp_gcol(int space_needed) /* garbage collect and create enough space for s
 	       (from >= (char *)stringpool.top  && to >= (char *)stringpool.top));   /* with stringpool range */
 #endif
 
+	space_needed = ROUND_UP2(space_asked, NATIVE_WSIZE);
+	assert(0 == (uint4)stringpool.base % NATIVE_WSIZE);
 	if (stringpool.base == rts_stringpool.base)
 	{
 		low_reclaim_passes = &rts_stp_low_reclaim_passes;
@@ -242,27 +297,34 @@ void stp_gcol(int space_needed) /* garbage collect and create enough space for s
 	if (stp_array == 0)
 		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * sizeof(mstr *));
 
-	if (lv_dupcheck)
-		init_hashtab(&stp_duptbl, stp_array_size);
-	a = array = stp_array;
-	arraytop = a + stp_array_size;
+	topstr = array = stp_array;
+	arraytop = topstr + stp_array_size;
 
 	/* if dqloop == 0 then we got here from mcompile
 	 * if literal_chain.que.fl=0 then put_lit was never done
-	 * as is true in gtcm_server. Test for cache_entry_base is to
+	 * as is true in gtcm_server. Test for cache_table.size is to
 	 * check that we have not done a cache_init() which would be true
 	 * if doing mumps standalone compile.
 	 */
-	if (((stringpool.base != rts_stringpool.base) || (NULL == cache_entry_base)) &&
-		(literal_chain.que.fl !=0))
+	if (((stringpool.base != rts_stringpool.base) || (0 == cache_table.size)))
 	{
+#ifndef STP_MOVE
 		mliteral *p;
-		dqloop(&literal_chain, que, p)
+		if (literal_chain.que.fl != 0)
 		{
-			x = MV_STPG_GET(&(p->v));
-			if (x)
-				MV_STPG_PUT(x);
+			dqloop(&literal_chain, que, p)
+			{
+				x = MV_STPG_GET(&(p->v));
+				if (x)
+					MV_STPG_PUT(x);
+			}
 		}
+		assert(offsetof(mvar, mvname) == offsetof(mlabel, mvname));
+		if (NULL != mvartab)
+			mv_parse_tree_collect(mvartab);
+		if (NULL != mlabtab)
+			mv_parse_tree_collect((mvar *)mlabtab);
+#endif
 	} else
 	{
 		/* Some house keeping since we are garbage collecting. Clear out all the lookaside
@@ -272,30 +334,43 @@ void stp_gcol(int space_needed) /* garbage collect and create enough space for s
 		GBLREF int c_clear;
 		++c_clear;		/* Count clearing operations */
 #  endif
-		for (n = 0; FNPC_MAX > n; n++)
+		for (index = 0; FNPC_MAX > index; index++)
 		{
-			fnpca.fnpcs[n].last_str.addr = NULL;
-			fnpca.fnpcs[n].last_str.len = 0;
-			fnpca.fnpcs[n].delim = 0;
+			fnpca.fnpcs[index].last_str.addr = NULL;
+			fnpca.fnpcs[index].last_str.len = 0;
+			fnpca.fnpcs[index].delim = 0;
 		}
 #endif
-		assert(cache_entry_base != NULL);	/* Must have done a cache_init() */
+		assert(0 != cache_table.size);	/* Must have done a cache_init() */
 		/* These cache entries have mvals in them we need to keep */
-		for (cp = cache_entry_base; cp < cache_entry_top; cp++)
+		for (tabent_objcode = cache_table.base, topent = cache_table.top; tabent_objcode < topent; tabent_objcode++)
 		{
-			PROCESS_CACHE_ENTRY(cp);
-		}
-		/* Run the zbreak chain to collect any mvals in it's own cache entries */
-		for (z_ptr = zbrk_recs.beg; NULL != z_ptr && z_ptr < zbrk_recs.free; ++z_ptr)
-		{
-			if (cp = z_ptr->action)
+			if (HTENT_VALID_OBJCODE(tabent_objcode, cache_entry, cp))
 			{
+				x = (mstr *)STR_STPG_GET(&(tabent_objcode->key.str));
+				if (x)
+					MV_STPG_PUT(x);
 				PROCESS_CACHE_ENTRY(cp);
 			}
 		}
+
+		for (symtab = curr_symval; NULL != symtab; symtab = symtab->last_tab)
+		{
+			for (tabent_mname = symtab->h_symtab.base, topent_mname = symtab->h_symtab.top;
+					tabent_mname < topent_mname; tabent_mname++)
+			{
+				if (HTENT_VALID_MNAME(tabent_mname, lv_val, lvp))
+				{
+					x = (mstr *)STR_STPG_GET(&(tabent_mname->key.var_name));
+					if (x)
+						MV_STPG_PUT(x);
+				}
+			}
+		}
+
 		if (x = comline_base)
 		{
-			for (n = MAX_RECALL;  n > 0 && x->len;  n--, x++)
+			for (index = MAX_RECALL;  index > 0 && x->len;  index--, x++)
 				MV_STPG_PUT(x);
 		}
 
@@ -303,19 +378,19 @@ void stp_gcol(int space_needed) /* garbage collect and create enough space for s
 		{
 			assert(lvzwrite_block.sub);
 			zwr_sub = (zwr_sub_lst *)lvzwrite_block.sub;
-			for (n = 0;  n < (int)lvzwrite_block.curr_subsc;  n++)
+			for (index = 0;  index < (int)lvzwrite_block.curr_subsc;  index++)
 			{
-				assert(zwr_sub->subsc_list[n].actual != zwr_sub->subsc_list[n].first
-					|| !zwr_sub->subsc_list[n].second);
+				assert(zwr_sub->subsc_list[index].actual != zwr_sub->subsc_list[index].first
+					|| !zwr_sub->subsc_list[index].second);
 				/*
 				 * we cannot garbage collect duplicate mval pointers.
-				 * So make sure zwr_sub->subsc_list[n].actual is not pointing to an
+				 * So make sure zwr_sub->subsc_list[index].actual is not pointing to an
 				 * existing (mval *) which  is already protected
 				 */
-				if (zwr_sub->subsc_list[n].actual &&
-					zwr_sub->subsc_list[n].actual != zwr_sub->subsc_list[n].first)
+				if (zwr_sub->subsc_list[index].actual &&
+					zwr_sub->subsc_list[index].actual != zwr_sub->subsc_list[index].first)
 				{
-					x = MV_STPG_GET(zwr_sub->subsc_list[n].actual);
+					x = MV_STPG_GET(zwr_sub->subsc_list[index].actual);
 					if (x)
 						MV_STPG_PUT(x);
 				}
@@ -369,9 +444,9 @@ void stp_gcol(int space_needed) /* garbage collect and create enough space for s
 		x = MV_STPG_GET(&last_fnquery_return_varname);
 		if (x)
 			MV_STPG_PUT(x);
-		for (n = 0; n < last_fnquery_return_subcnt; n++);
+		for (index = 0; index < last_fnquery_return_subcnt; index++);
 		{
-			x = MV_STPG_GET(&last_fnquery_return_sub[n]);
+			x = MV_STPG_GET(&last_fnquery_return_sub[index]);
 			if (x)
 				MV_STPG_PUT(x);
 		}
@@ -403,9 +478,8 @@ void stp_gcol(int space_needed) /* garbage collect and create enough space for s
 								for (;  blk;  blk = blk->nxt)
 								{
 									for (s_sbs = &blk->ptr.sbs_str[0],
-										top = (unsigned char *)&blk->ptr.sbs_str[blk->cnt];
-										s_sbs < (sbs_str_struct *)top;
-										s_sbs++)
+									    straddr = (unsigned char *)&blk->ptr.sbs_str[blk->cnt];
+									    s_sbs < (sbs_str_struct *)straddr; s_sbs++)
 									{
 										x = STR_STPG_GET(&s_sbs->str);
 										if (x)
@@ -436,8 +510,12 @@ void stp_gcol(int space_needed) /* garbage collect and create enough space for s
 			case MVST_TVAL:
 			case MVST_STCK:
 			case MVST_PVAL:
-			case MVST_NVAL:
 			case MVST_TPHOLD:
+				continue;
+			case MVST_NVAL:
+				x = (mstr *)STR_STPG_GET(&mvs->mv_st_cont.mvs_nval.name.var_name);
+				if (x)
+					MV_STPG_PUT(x);
 				continue;
 			case MVST_ZINTR:
 				m = &mvs->mv_st_cont.mvs_zintr.savtarg;
@@ -482,50 +560,49 @@ void stp_gcol(int space_needed) /* garbage collect and create enough space for s
 			}
 		}
 	}
-	n1 = stringpool.top - stringpool.free; /* Available space before compaction */
-	stringpool.free = stringpool.base;
-	if (a != array)
+	space_before_compact = stringpool.top - stringpool.free; /* Available space before compaction */
+	if (topstr != array)
 	{
-		stpg_sort(array, a - 1);
-#ifdef STP_MOVE
-		if (0 != move_count)
+		stpg_sort(array, topstr - 1);
+		for (totspace = 0, cstr = array, straddr = (unsigned char *)(*cstr)->addr; (cstr < topstr); cstr++ )
 		{
-			if ((*array)->addr >= (char *)stringpool.base && (*array)->addr < (char *)stringpool.top)
-				a -= move_count; /* stringpool elements before move elements in stp_array */
-			else
-				array += move_count; /* stringpool elements after move elements or no stringpool elements in
-						      * stp_array */
+			assert(cstr == array || (*cstr)->addr >= ((*(cstr-1))->addr));
+			tmpaddr = (unsigned char *)(*cstr)->addr;
+			tmplen = (*cstr)->len;
+			if (tmpaddr + tmplen > straddr) /* if it is not a proper substring of previous one */
+			{
+				totspace += ((tmpaddr >= straddr) ? tmplen : (tmpaddr + tmplen - straddr));
+				if (mstr_native_align)
+					totspace += PADLEN(totspace, NATIVE_WSIZE);
+				straddr = tmpaddr + tmplen;
+			}
 		}
+		/* Now totspace is the total space needed for all the current entries and any stp_move entries.
+		 * Note that because of not doing exact calculation with substring,
+		 * totspace may be little more than what is needed */
+		space_after_compact = stringpool.top - stringpool.base - totspace; /* can be -ve number */
+	} else
+		space_after_compact = stringpool.top - stringpool.free;
+#ifndef STP_MOVE
+	assert(mstr_native_align || space_after_compact >= space_before_compact);
 #endif
-		/* Skip over contiguous block, if any, at beginning of stringpool. */
-		for (b = array;  (b < a) && ((*b)->addr <= (char *)stringpool.free);  b++)
-		{
-			e = (unsigned char *)(*b)->addr;
-			e += (*b)->len;
-			if (e > stringpool.free)
-				stringpool.free = e;
-		}
-		MOVE_CONTIGUOUS_BLOCKS;
-	}
-	n = stringpool.top - stringpool.free; /* Available space after compaction */
-	assert(n >= n1);
-	space_reclaimed = n - n1; /* Space reclaimed due to compaction */
-	if (space_needed && STP_RECLAIMLIMIT > space_reclaimed)
+	space_reclaim = space_after_compact - space_before_compact; /* this can be -ve, if alignment causes expansion */
+	space_needed -= space_after_compact;
+	if (0 < space_needed && STP_RECLAIMLIMIT > space_reclaim)
 	{
 		(*spc_needed_passes)++;
-		if (STP_MINRECLAIM > space_reclaimed)
+		if (STP_MINRECLAIM > space_reclaim)
 			(*low_reclaim_passes)++;
 		else
 		{
 			*low_reclaim_passes = 0;
-			if (STP_ENOUGHRECLAIMED <= space_reclaimed)
+			if (STP_ENOUGHRECLAIMED <= space_reclaim)
 				*spc_needed_passes = 0;
 		}
 	}
-
 	forced_expansion = maxnoexp_growth = FALSE;
-	if (n < space_needed || /* i */
-	    STP_MINFREE > n /* ii */
+	if (0 < space_needed || /* i */
+	    STP_MINFREE > space_after_compact /* ii */
 #ifndef STP_MOVE /* do forced expansion only for stp_gcol, no forced expansion for stp_move */
 	    || (forced_expansion =
 	        (!disallow_forced_expansion && /* iii */
@@ -546,8 +623,8 @@ void stp_gcol(int space_needed) /* garbage collect and create enough space for s
 		 * 	 occurrences of the stringpool filling up, and compaction reclaiming enough space. In such cases,
 		 *       if the stringpool is expanded, we create more room, resulting in fewer calls to stp_gcol.
 		 */
-		e = stringpool.base;
-		n = stringpool.free - stringpool.base;
+		strpool_base = stringpool.base;
+		blklen = stringpool.free - stringpool.base;
 		if ((stringpool.top - stringpool.base) < STP_MAXGEOMGROWTH)
 		{
 			stp_incr = STP_GEOM_INCREMENT * (*incr_factor);
@@ -557,51 +634,83 @@ void stp_gcol(int space_needed) /* garbage collect and create enough space for s
 		stp_incr = ROUND_UP(stp_incr, OS_PAGE_SIZE);
 		if (stp_incr < space_needed)
 			stp_incr = ROUND_UP(space_needed, OS_PAGE_SIZE);
-		n1 = stp_incr + stringpool.top - stringpool.base;
-		assert(n1 >= space_needed + n);
-		expand_stp(n1);
-		if (e != stringpool.base) /* expanded successfully */
+		assert(stp_incr + stringpool.top - stringpool.base >= space_needed + blklen);
+		expand_stp(stp_incr + stringpool.top - stringpool.base);
+		if (strpool_base != stringpool.base) /* expanded successfully */
 		{
-			stringpool.free = stringpool.base + n;
-			longcpy(stringpool.base, e, n);
-			free(e);
+			cstr = array;
+			COPY2STPOOL(cstr, topstr);
 			/*
-		 	 * NOTE: rts_stringpool must be kept up-to-date because it is used to tell whether the current
+		 	 * NOTE: rts_stringpool must be kept up-to-date because it tells whether the current
 			 * stringpool is the run-time or indirection stringpool.
 		 	 */
-			(e == rts_stringpool.base) ? (rts_stringpool = stringpool) : (indr_stringpool = stringpool);
-			delta = stringpool.base - e;
-			for (b = array;  b < a;  b++)
-			{
-				(*b)->addr += delta;
-				assert(((*b)->addr >= (char *)stringpool.base) && ((*b)->addr < (char *)stringpool.free));
-			}
+			(strpool_base == rts_stringpool.base) ? (rts_stringpool = stringpool) : (indr_stringpool = stringpool);
+			free(strpool_base);
 		} else
 		{
 			/* could not expand during forced expansion */
 			assert(forced_expansion && disallow_forced_expansion);
+			if (space_after_compact < space_needed)
+				rts_error(VARLSTCNT(3) ERR_STPEXPFAIL, 1, stp_incr + stringpool.top - stringpool.base);
 		}
 		*spc_needed_passes = 0;
 		if (maxnoexp_growth && (*maxnoexp_passes < STP_MAXNOEXP_PASSES))
 			*maxnoexp_passes += STP_NOEXP_PASSES_INCR;
 		*low_reclaim_passes = 0;
+	} else
+	{
+		stringpool.free = stringpool.base;
+		if (topstr != array)
+		{
+#ifdef STP_MOVE
+			if (0 != move_count)
+			{	/* All stp_move elements must be contiguous in the 'array'. They point outside
+				 * the range of stringpool.base and stringpool.top. In the 'array' of (mstr *) they
+				 * must be either at the beginning, or at the end. */
+				if ((*array)->addr >= (char *)stringpool.base && (*array)->addr < (char *)stringpool.top)
+					topstr -= move_count; /* stringpool elements before move elements in stp_array */
+				else
+					array += move_count; /* stringpool elements after move elements or no stringpool elements in
+							      * stp_array */
+			}
+#endif
+			/* Skip over contiguous block, if any, at beginning of stringpool.
+			 * Note that here we are not considering any stp_move() elements.  */
+			cstr = array;
+			begaddr = endaddr = (unsigned char *)((*cstr)->addr);
+			while (cstr < topstr)
+			{
+				/* Determine extent of next contiguous block to move and move it. */
+				if (mstr_native_align)
+					stringpool.free = (unsigned char *)ROUND_UP2((uint4)stringpool.free, NATIVE_WSIZE);
+				begaddr = endaddr = (unsigned char *)((*cstr)->addr);
+				delta = (*cstr)->addr - (char *)stringpool.free;
+				PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta);
+				blklen = endaddr - begaddr;
+				if (delta)
+					memmove(stringpool.free, begaddr, blklen);
+				stringpool.free += blklen;
+			}
+		}
+#ifdef STP_MOVE
+		if (0 != move_count)
+		{	/* Copy stp_move elements into stringpool now */
+			assert(topstr == cstr); /* all stringpool elements garbage collected */
+			if (array == stp_array) /* stringpool elements before move elements in stp_array */
+				topstr += move_count;
+			else
+			{ /* stringpool elements after move elements OR no stringpool elements in stp_array */
+				cstr = stp_array;
+				topstr = array;
+			}
+			COPY2STPOOL(cstr, topstr);
+		}
+#endif
 	}
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
-	assert(stringpool.top - stringpool.free >= space_needed);
-#ifdef STP_MOVE
-	if (0 != move_count)
-	{
-		assert(a == b); /* all stringpool elements garbage collected */
-		if (array == stp_array) /* stringpool elements before move elements in stp_array */
-			a += move_count;
-		else
-		{ /* stringpool elements after move elements OR no stringpool elements in stp_array */
-			b = stp_array;
-			a = array;
-		}
-		MOVE_CONTIGUOUS_BLOCKS;
-	}
+#ifndef STP_MOVE
+	assert(stringpool.top - stringpool.free >= space_asked);
 #endif
 	return;
 }

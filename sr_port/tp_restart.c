@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,10 +30,10 @@
 #include "error.h"
 #include "iosp.h"		/* for declaration of SS_NORMAL */
 #include "jnl.h"
-#include "mv_stent.h"
 #include "rtnhdr.h"
+#include "mv_stent.h"
 #include "stack_frame.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "tp_frame.h"
@@ -167,14 +167,14 @@ void	tp_restart(int newlevel)
 		if (NULL != tp_fail_hist[t_tries])
 		{
 			for (cp = tp_fail_hist[t_tries]->clue.base, top = 0;
-				(0 != *cp) && (sizeof(mident) >= top);
+				(0 != *cp) && (MAX_MIDENT_LEN >= top);
 					cp++, top++)
 				;
 		} else
 		{
 			if (NULL == noplace)
 			{
-				noplace = (gv_namehead *)targ_alloc(sizeof("*UNKNOWN"));
+				noplace = (gv_namehead *)targ_alloc(sizeof("*UNKNOWN"), NULL);
 				noplace->clue.end = sizeof("*UNKNOWN");
 				memcpy(noplace->clue.base, "*UNKNOWN", sizeof("*UNKNOWN"));
 			}
@@ -190,12 +190,12 @@ void	tp_restart(int newlevel)
 			send_msg(VARLSTCNT(14) ERR_TPRESTART, 12, t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries],
 				(int)top, tp_fail_hist[t_tries]->clue.base, 0, 0, 0, 0,
 				(NULL != sgm_info_ptr) ? sgm_info_ptr->num_of_blks : 0,
-				(NULL != sgm_info_ptr) ? sgm_info_ptr->cw_set_depth : 0, local_tn);
+				(NULL != sgm_info_ptr) ? sgm_info_ptr->cw_set_depth : 0, &local_tn);
 		} else
 		{
 			send_msg(VARLSTCNT(14) ERR_TPRESTART, 12, t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries],
 				(int)top, tp_fail_hist[t_tries]->clue.base, n_pvtmods, n_blkmods, tp_fail_level,
-				tp_fail_n, sgm_info_ptr->num_of_blks, sgm_info_ptr->cw_set_depth, local_tn);
+				tp_fail_n, sgm_info_ptr->num_of_blks, sgm_info_ptr->cw_set_depth, &local_tn);
 		}
 		if ('0' == t_fail_hist[t_tries])
 			t_fail_hist[t_tries] = cdb_sc_normal;	/* get back to where it was */

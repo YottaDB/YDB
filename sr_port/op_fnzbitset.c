@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,12 +18,13 @@
 
 GBLREF spdesc stringpool;
 
+static unsigned char	mask[8] = {1,128,64,32,16,8,4,2};
+
 void op_fnzbitset(mval *dst, mval *bitstr, int pos, int truthval)
 {
-	int str_len;
-	unsigned char *byte_1, *dist_byte, byte_len;
-	static unsigned char mask[8]={1,128,64,32,16,8,4,2};
-	int mp, np;
+	int		mp, np, str_len;
+	unsigned char	*byte_1, *dist_byte, byte_len;
+
 	error_def(ERR_INVBITSTR);
 	error_def(ERR_INVBITPOS);
 
@@ -33,15 +34,11 @@ void op_fnzbitset(mval *dst, mval *bitstr, int pos, int truthval)
 		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
 
 	byte_len = *(unsigned char *)bitstr->str.addr;
-	str_len = (bitstr->str.len -1) * 8;
-	if ((byte_len < 0) || (byte_len > 7))
-	{
+	str_len = (bitstr->str.len - 1) * 8;
+	if (7 < byte_len)
 		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
-	}
-	if ((pos < 1) || (pos > str_len - byte_len))
-	{
+	if ((1> pos) || (pos > str_len - byte_len))
 		rts_error(VARLSTCNT(1) ERR_INVBITPOS);
-	}
 	if (stringpool.top - stringpool.free < bitstr->str.len)
 		stp_gcol(bitstr->str.len);
 	dist_byte = (unsigned char *)stringpool.free;

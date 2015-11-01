@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,7 @@ static	char	gtm_clr_eos[] = "[J";
 static	char	gtm_clr_eol[] = "[K";
 static	int	gtm_columns = 80;
 static	char	gtm_cursor_address[] = "[%i%p1%d;%p2%dH";
-static	char	gtm_cursor_down[] = "";
+static	char	gtm_cursor_down[] = "\015";	/* <Ctrl-M> */
 static	char	gtm_cursor_left[] = "";
 static	char	gtm_cursor_right[] = "OC";
 static	char	gtm_cursor_up[] = "OA";

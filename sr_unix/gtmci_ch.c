@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@ error_def(ERR_OUTOFSPACE);
 
 CONDITION_HANDLER(gtmci_ch)
 {
-	char	src_buf[50];
+	char	src_buf[MAX_ENTRYREF_LEN];
 	mstr	src_line;
 	START_CH;
 	if (DUMPABLE)

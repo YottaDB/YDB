@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "cmidef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "util.h"
 #include "lke.h"
@@ -123,8 +123,8 @@ bool	lke_showlock(
 	if (tree->owner || (tree->pending && wait))
 	{
 		pblk.process_id = tree->owner;
-		pblk.next = wait && (tree->pending ? ((uchar_ptr_t)&tree->pending - (uchar_ptr_t)&pblk.next + tree->pending)
-						       : 0);
+		pblk.next = (wait && tree->pending) ? ((uchar_ptr_t)&tree->pending - (uchar_ptr_t)&pblk.next + tree->pending)
+						       : 0;
 		owned = (all || !wait) && tree->owner;
 		r = owned ? &pblk
 			  : ((0 == tree->pending) ? NULL

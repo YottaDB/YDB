@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,10 +16,10 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "cmidef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "mlkdef.h"
-#include "gtcmtr_lk.h"
+#include "gtcmtr_protos.h"
 #include "gt_timer.h"
 #include "gtcmlkdef.h"
 #include "gtcml.h"

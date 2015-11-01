@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,14 +25,6 @@
 
    Warning: the lists above may not be complete.
 */
-
-/* The M stack frame on all platforms that follow pv-based linkage model (alpha model)
- * contains a pointer to the base of routine's literal section. All such platforms
- * must define HAS_LITERAL_SECT so that the routines that create a new stack frame
- * initialize literal_ptr field apppropriately. */
-#if defined(__alpha) || defined(_AIX) || defined(__hpux)
-#define HAS_LITERAL_SECT
-#endif
 
 typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 {

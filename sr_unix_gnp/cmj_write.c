@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@ cmi_status_t cmj_write_start(struct CLB *lnk)
 	msg.msg_iov = vec;
 	vec[IOVEC_LEN].iov_len = CMI_TCP_PREFIX_LEN;
 	vec[IOVEC_LEN].iov_base = (caddr_t)lnk->ios.u.lenbuf;
-	lnk->ios.u.len = htons((unsigned short)lnk->cbl);
+	lnk->ios.u.len = htons((unsigned short)lnk->cbl); /* length of message is sent in network byte order */
 	vec[IOVEC_MSG].iov_len = lnk->cbl;
 	vec[IOVEC_MSG].iov_base = (caddr_t)lnk->mbf;
 	/*
@@ -61,12 +61,16 @@ cmi_status_t cmj_write_start(struct CLB *lnk)
 	 */
 	while ((-1 == (rval = sendmsg(lnk->mun, &msg, 0))) && EINTR == errno)
 		;
-	if ((-1 == rval) && !CMI_IO_WOULDBLOCK(errno))
+	if (-1 == rval)
 	{
 		save_errno = errno;
-		cmj_err(lnk, CMI_REASON_STATUS, save_errno);
-		cmj_postevent(lnk);
-		return save_errno;
+		CMI_DPRINT(("cmj_write_start: sendmsg error code : %d\n", save_errno));
+		if (!CMI_IO_WOULDBLOCK(save_errno))
+		{
+			cmj_err(lnk, CMI_REASON_STATUS, save_errno);
+			cmj_postevent(lnk);
+			return save_errno;
+		}
 	}
 	if (rval >= CMI_TCP_PREFIX_LEN)
 	{
@@ -79,8 +83,10 @@ cmi_status_t cmj_write_start(struct CLB *lnk)
 			cmj_fini(lnk);		/* done */
 			return status;
 		}
-	}
-	else
+		/* After successfully sending message length, convert length back to host order since we use this to compute
+		 * length remaining for partial sends */
+		lnk->ios.u.len = ntohs((unsigned short)lnk->ios.u.len);
+	} else
 	{
 		/* partial or no write of length */
 		if (rval > 0)
@@ -89,6 +95,7 @@ cmi_status_t cmj_write_start(struct CLB *lnk)
 			lnk->ios.len_len = rval;
 		}
 	}
+	CMI_DPRINT(("cmj_write_start: sendmsg partial send %d bytes\n", rval));
 	status = cmj_clb_set_async(lnk); /* more to write */
 	return status;
 }
@@ -109,19 +116,18 @@ cmi_status_t cmj_write_urg_start(struct CLB *lnk)
 		;
 	if (-1 == rval && !CMI_IO_WOULDBLOCK(errno))
 		return errno;
-	if (rval == 1)
+	if (1 == rval)
 	{
 		cmj_fini(lnk);
 		return status;
 	}
-	/* partial or no write of length */
-	status = cmj_clb_set_async(lnk); /* more to write */
+	status = cmj_clb_set_async(lnk); /* could not send 1 byte urgent data, try again. NOTE: no length prefix for urgent data */
 	return status;
 }
 
 void cmj_write_interrupt(struct CLB *lnk, int signo)
 {
-	int rval;
+	int rval, save_errno;
 	cmi_status_t status = SS_NORMAL;
 
 	if (lnk->mun == -1)
@@ -130,12 +136,17 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 	{
 		while ((-1 == (rval = send(lnk->mun, (void *)&lnk->urgdata, 1, MSG_OOB))) && EINTR == errno)
 			;
-		if (-1 == rval && !CMI_IO_WOULDBLOCK(errno))
+		if (-1 == rval)
 		{
-			cmj_err(lnk, CMI_REASON_STATUS, (cmi_status_t)errno);
-			return;
+			save_errno = errno;
+			CMI_DPRINT(("cmj_write_interrupt : send URGENT error code : %d\n", save_errno));
+			if (!CMI_IO_WOULDBLOCK(save_errno))
+			{
+				cmj_err(lnk, CMI_REASON_STATUS, (cmi_status_t)save_errno);
+				return;
+			}
 		}
-		if (rval == 1)
+		if (1 == rval)
 		{
 			cmj_fini(lnk);
 			return;
@@ -150,16 +161,34 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 		while ((-1 == (rval = send(lnk->mun, (void *)(lnk->ios.u.lenbuf + lnk->ios.len_len),
 					CMI_TCP_PREFIX_LEN - lnk->ios.len_len, 0))) && EINTR == errno)
 			;
-		if (-1 == rval && !CMI_IO_WOULDBLOCK(errno))
+		if (-1 == rval)
 		{
-			cmj_err(lnk, CMI_REASON_STATUS, (cmi_status_t)errno);
-			return;
+			save_errno = errno;
+			CMI_DPRINT(("cmj_write_interrupt : send error code : %d\n", save_errno));
+			if (!CMI_IO_WOULDBLOCK(save_errno))
+			{
+				cmj_err(lnk, CMI_REASON_STATUS, (cmi_status_t)save_errno);
+				return;
+			}
 		}
 		if (rval > 0)
+		{
 			lnk->ios.len_len += rval;
+			assert(CMI_TCP_PREFIX_LEN >= lnk->ios.len_len);
+			if (lnk->ios.len_len == CMI_TCP_PREFIX_LEN) /* prefix length successfully sent */
+			{
+				/* After successfully sending message length, convert length back to host order since we use
+				 * this to compute length remaining for partial sends */
+				lnk->ios.u.len = ntohs((unsigned short)lnk->ios.u.len);
+			}
+		} else
+		{
+			CMI_DPRINT(("cmj_write_interrupt : send wrote 0 bytes\n"));
+		}
 	}
 	if (lnk->ios.len_len == CMI_TCP_PREFIX_LEN)
 	{
+		assert(lnk->ios.u.len > lnk->ios.xfer_count); /* we shouldn't be wasting system calls on doing 0 byte output */
 		while ((-1 == (rval = send(lnk->mun, (void *)(lnk->mbf + lnk->ios.xfer_count),
 					(int)(lnk->ios.u.len - lnk->ios.xfer_count), 0))) && EINTR == errno)
 			;
@@ -170,13 +199,14 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 		}
 		if (rval > 0)
 			lnk->ios.xfer_count += rval;
-		if (rval == (int)(lnk->ios.u.len - lnk->ios.xfer_count))
+		if (0 == (int)(lnk->ios.u.len - lnk->ios.xfer_count)) /* entire message successfully sent */
 			cmj_fini(lnk);
 		else
 		{
 			status = cmj_clb_set_async(lnk);
 			if (CMI_ERROR(status))
 				cmj_err(lnk, CMI_REASON_STATUS, status);
+			CMI_DPRINT(("cmj_write_interrupt: send partial (1) send %d bytes\n", rval));
 		}
 	}
 	else
@@ -184,11 +214,12 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 		/* partial or no write of length */
 		if (rval > 0)
 		{
-			assert(CMI_TCP_PREFIX_LEN > rval);
 			lnk->ios.len_len += rval;
+			assert(CMI_TCP_PREFIX_LEN > lnk->ios.len_len);
 		}
 		status = cmj_clb_set_async(lnk);
 		if (CMI_ERROR(status))
 			cmj_err(lnk, CMI_REASON_STATUS, status);
+		CMI_DPRINT(("cmj_write_interrupt: send partial (2) send %d bytes\n", rval));
 	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+#ifndef COMPILER_H_INCLUDED
+#define COMPILER_H_INCLUDED
 
 typedef unsigned int	opctype;
 
@@ -78,11 +80,11 @@ typedef struct	oprtypestruct
 		mliteral		*mlit;
 		mstr			*cdlt;
 		mvar			*vref;
-		int4		temp;
-		int4		ilit;
-		int4		offset;
+		int4			temp;
+		int4			ilit;
+		int4			offset;
 		unsigned char		vreg;
-	}			oprval;
+	} oprval;
 } oprtype;
 
 /* Values for oprclass */
@@ -314,6 +316,7 @@ int f_fnzbitget(oprtype *a, opctype op);
 int f_fnzbitset(oprtype *a, opctype op);
 int f_fnzbitstr(oprtype *a, opctype op);
 int f_get(oprtype *a, opctype op);
+int f_incr(oprtype *a, opctype op);
 int f_justify(oprtype *a, opctype op);
 int f_length(oprtype *a, opctype op);
 int f_mint(oprtype *a, opctype op);
@@ -350,4 +353,4 @@ int f_zsqlexpr (oprtype *a, opctype op);
 int f_zsqlfield (oprtype *a, opctype op);
 int f_ztrnlnm(oprtype *a, opctype op);
 
-int put_tval(oprtype *ref, short index);
+#endif /* COMPILER_H_INCLUDED */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,12 +34,13 @@
 GBLREF boolean_t		gtm_environment_init;
 #endif
 
-GBLREF	uint4		process_id;
+GBLREF	pid_t	process_id;
+GBLREF	uint4	image_count;
 
 #ifdef VMS
 #  define CURRENT_WRITER jb->now_writer
 #else
-#  define CURRENT_WRITER jb->io_in_prog_latch.latch_pid
+#  define CURRENT_WRITER jb->io_in_prog_latch.u.parts.latch_pid
 #endif
 
 static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt, uint4 threshold)
@@ -71,14 +72,14 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	while (jb->dskaddr < threshold)
 	{
 #ifdef UNIX
-		if (jb->io_in_prog_latch.latch_pid == process_id)
+		if (jb->io_in_prog_latch.u.parts.latch_pid == process_id)
 		{
 			/* if error condition occurred while doing jnl_qio_start(), then release the lock before waiting */
 			/* note that this is done only in UNIX because Unix does synchronous I/O */
 			jb->image_count = 0;
 			RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
 		}
-		if (!jb->io_in_prog_latch.latch_pid)
+		if (!jb->io_in_prog_latch.u.parts.latch_pid)
 			status = jnl_qio_start(jpc);
 #elif defined VMS
 		if (lib$ast_in_prog())
@@ -128,7 +129,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			{	/* no one home, clear the semaphore; */
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
 				VMS_ONLY(jb->io_in_prog = 0);
-				UNIX_ONLY(compswap(&jb->io_in_prog_latch, writer, LOCK_AVAILABLE));
+				UNIX_ONLY(COMPSWAP(&jb->io_in_prog_latch, writer, jb->image_count, LOCK_AVAILABLE, 0));
 				if (FALSE == was_crit)
 					rel_crit(jpc->region);
 				*lcnt = 1;

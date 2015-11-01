@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,8 @@
 #include "gtm_unistd.h"
 #include "gtm_stat.h"
 #include "gtm_iconv.h"
+#include "gtm_socket.h"
+#include "gtm_inet.h"
 
 #include <errno.h>
 #include <sys/ioctl.h>
@@ -40,6 +42,9 @@
 #include "stringpool.h"
 
 #define  LOGNAME_LEN 255
+/* avoid calling getservbyname for shell and Kerberos shell */
+#define	RSHELL_PORT		514
+#define	KSHELL_PORT		544
 
 LITREF	unsigned char		io_params_size[];
 GBLREF	dev_dispatch_struct	io_dev_dispatch[];
@@ -81,6 +86,16 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	int		p_offset;
 	boolean_t	mknod_err , stat_err;
 	int 		save_mknod_err, save_stat_err;
+
+	int		sockstat, sockoptval;
+	in_port_t	sockport;
+	GTM_SOCKLEN_TYPE	socknamelen;
+	struct sockaddr_in	sockname;
+#ifndef sun
+	size_t		sockoptlen;
+#else
+	int		sockoptlen;
+#endif
 
 	mt_ptr = NULL;
 	char_or_block_special = FALSE;
@@ -223,6 +238,35 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 						tl->iod->type = rm;
 						break;
 					case S_IFSOCK:
+/*	If SOCK_STREAM, AF_INET, and not [kr]shell port assume we were
+	started by inetd.
+	We are not able to trigger exception until active_device set
+	and exception parsed which is not done for fd == 0/1 which
+	is from io_init called from gtm_startup before condition handlers
+	are setup so we can't report errors, just will be treated as rm.
+	Note the fall through if the above conditions are not true to
+	maintain compatibility for rshd startup PER 3252.
+	28-JUL-1995 14:24:31 FERTIG REPLACE IO_OPEN_TRY.C(18)
+	"PER 3252: fix problems starting up mumps from an ""rsh"" or ""remsh"""
+*/
+						sockoptlen = sizeof(sockoptval);
+						sockstat = getsockopt(file_des, SOL_SOCKET, SO_TYPE, &sockoptval, &sockoptlen);
+						if (!sockstat && SOCK_STREAM == sockoptval)
+						{
+							socknamelen = sizeof(sockname);
+							sockstat = getsockname(file_des,
+								(struct sockaddr *)&sockname, &socknamelen);
+							if (!sockstat && AF_INET == sockname.sin_family)
+							{
+								sockport = ntohs(sockname.sin_port);
+								if (RSHELL_PORT != sockport && KSHELL_PORT != sockport)
+								{
+									tl->iod->type = gtmsocket;
+									break;
+								}
+							}
+						}
+						/* fall through */
 					case 0:
 						tl->iod->type = ff;
 #ifdef __MVS__

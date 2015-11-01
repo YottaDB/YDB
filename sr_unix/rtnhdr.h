@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,12 +8,10 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
-#ifndef __RTNHDR_H__
-#define __RTNHDR_H__
+#ifndef RTNHDR_H_INCLUDED
+#define RTNHDR_H_INCLUDED
 
 /* rtnhdr.h - routine header for shared binary Unix platforms */
-#include "cache.h"
 
 /* There are several references to this structure from assembly language; these include:
 
@@ -25,7 +23,7 @@
 */
 
 /* Variable table entry */
-typedef mident var_tabent;
+typedef mname_entry var_tabent; /* the actual variable name is stored in the literal text pool */
 
 /* Linenumber table entry */
 typedef int4 lnr_tabent;
@@ -33,14 +31,14 @@ typedef int4 lnr_tabent;
 /* Label table entry */
 typedef struct
 {
-	mident		lab_name;		/* The name of the label */
-	lnr_tabent	*lnr_adr;		/* Pointer to lnrtab entry offset into code for this label */
+	mident		lab_name;	/* The name of the label */
+	lnr_tabent	*lnr_adr;	/* Pointer to lnrtab entry offset into code for this label */
 } lab_tabent;
 
 /* Linkage table entry */
 typedef struct
 {
-	char_ptr_t	ext_ref;		/* Address (quadword on alpha) this linkage entry resolves to or NULL */
+	char_ptr_t	ext_ref;	/* Address (quadword on alpha) this linkage entry resolves to or NULL */
 } lnk_tabent;
 
 /*	rhead_struct is the routine header; it occurs at the beginning of the
@@ -82,7 +80,7 @@ typedef struct	rhead_struct
 	int4			checksum;		/* verification value */
 	int4			temp_mvals;		/* (#) temp_mvals value of current module version */
 	int4			temp_size;		/* (#) temp_size value of current module version */
-	boolean_t		label_only;		/* was routine compiled for label only entry? */
+	uint4			compiler_qlf;		/* bit flags of compiler qualifiers used (see cmd_qlf.h) */
 	struct rhead_struct	*current_rhead_adr;	/* (#) address of routine header of current module version */
 	struct rhead_struct	*old_rhead_adr;		/* (#) chain of replaced routine headers */
 } rhdtyp;
@@ -90,8 +88,8 @@ typedef struct	rhead_struct
 /* Routine table entry */
 typedef struct
 {
-	mident	rt_name;
-	rhdtyp	*rt_adr;
+	mident		rt_name;	/* The name of the routine (in the literal text pool) */
+	rhdtyp		*rt_adr;	/* Pointer to its routine header */
 } rtn_tabent;
 
 /* Macros for accessing routine header fields in a portable way */
@@ -121,24 +119,7 @@ typedef struct
 #define ADDR_IN_CODE(caddr, rtnhdr) (PTEXT_ADR((rtnhdr)) <= (caddr) && (caddr) <= PTEXT_END_ADR((rtnhdr)))
 
 /* Types that are different depending on shared/unshared unix binaries */
-#define LAB_TABENT lab_tabent
-#define LNR_TABENT lnr_tabent
-#define RTN_TABENT rtn_tabent
-#define VAR_TABENT var_tabent
 #define LABENT_LNR_OFFSET lnr_adr
-#define RTNENT_RT_ADR rt_adr
-
-/* Following is the indirect routine header build as part of an indirect code object */
-typedef struct ihead_struct
-{
-	cache_entry	*indce;
-	int4		vartab_off;
-	int4		vartab_len;
-	int4		temp_mvals;
-	int4		temp_size;
-	int4		fixup_vals_off;
-	int4		fixup_vals_num;
-} ihdtyp;
 
 /*
  * Format of a relocation datum.
@@ -184,17 +165,17 @@ struct	sym_table
 #define	N_EXT	0x01		/* external bit, or'ed in */
 
 /* Prototypes */
-void indir_lits(ihdtyp *ihead);
 int get_src_line(mval *routine, mval *label, int offset, mstr **srcret);
 unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine);
-int4 *find_line_addr(rhdtyp *routine, mstr *label, short int offset);
+int4 *find_line_addr(rhdtyp *routine, mstr *label, int4 offset, mident **lent_name);
 rhdtyp *find_rtn_hdr(mstr *name);
 bool zlput_rname(rhdtyp *hdr);
+void zlmov_lnames(rhdtyp *hdr);
 rhdtyp *make_dmode(void);
 void comp_lits(rhdtyp *rhead);
 rhdtyp  *op_rhdaddr(mval *name, rhdtyp *rhd);
 lnr_tabent **op_labaddr(rhdtyp *routine, mval *label, int4 offset);
 void urx_resolve(rhdtyp *rtn, lab_tabent *lbl_tab, lab_tabent *lbl_top);
-char *rtnlaboff2entryref(char *entryref_buff, mstr *rtn, mstr *lab, int offset);
+char *rtnlaboff2entryref(char *entryref_buff, mident *rtn, mident *lab, int offset);
 
-#endif
+#endif /* RTNHDR_H_INCLUDED */

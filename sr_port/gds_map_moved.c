@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,21 +20,23 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
-#include "hashtab.h"            /* needed for tp.h */
 #include "buddy_list.h"         /* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "gds_map_moved.h"
+#include "hashtab.h"
+#include "hashtab_mname.h"
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 
-void gds_map_moved(htab_desc *tbl, sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_top)
+void gds_map_moved(hash_table_mname *tbl, sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_top)
 {
 	int		hist_index;
 	sm_long_t	adj;
 	srch_hist	*hist, *dir_hist;
-	ht_entry	*htp, *ht_top;
+	ht_ent_mname 	*tabent, *topent;
+	gv_namehead	*gvt;
 
 	assert(cs_addrs->now_crit);
 	assert((NULL != cs_addrs->dir_tree) && (NULL != &cs_addrs->dir_tree->hist));
@@ -61,13 +63,11 @@ void gds_map_moved(htab_desc *tbl, sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, s
 	if (NULL == tbl)
 		return;		/* for mupip recover */
 
-	for (htp = tbl->base, ht_top = tbl->base + tbl->size;  htp < ht_top;  htp++)
+	for (tabent = tbl->base, topent = tbl->top; tabent < topent; tabent++)
 	{
-		if ((0 != htp->nb.txt[0])
-			&& (gv_cur_region == ((gv_namehead *)(htp->ptr))->gd_reg)
-			&& (((gv_namehead *)(htp->ptr))->clue.end > 0))
+		if ((HTENT_VALID_MNAME(tabent, gv_namehead, gvt)) && gv_cur_region == gvt->gd_reg && gvt->clue.end > 0)
 		{
-			hist = &(((gv_namehead *)(htp->ptr))->hist);
+			hist = &(((gv_namehead *)(tabent->value))->hist);
 			if (hist == dir_hist)
 				continue;
 			for (hist_index = 0;  HIST_TERMINATOR != hist->h[hist_index].blk_num;  hist_index++)

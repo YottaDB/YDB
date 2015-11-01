@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,8 +29,10 @@
 #include "gtm_string.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "cli.h"
 #include "min_max.h"
@@ -43,6 +45,7 @@
 GBLREF	mur_opt_struct	mur_options;
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF 	jnl_gbls_t	jgbl;
+GBLREF	boolean_t	mupip_jnl_recover;
 
 error_def(ERR_MUPCLIERR);
 error_def(ERR_INVQUALTIME);
@@ -83,8 +86,8 @@ void	mur_get_options(void)
 {
 	int4		status;
 	uint4		ustatus, state;
-	unsigned short	length, buf_len;
-	char		*cptr, *ctop, *qual_buffer, buf[32], inchar;
+	unsigned short	length;
+	char		*cptr, *ctop, *qual_buffer, inchar;
 	char		*qual_buffer_ptr, *entry, *entry_ptr;
 	char		*file_name_specified, *file_name_expanded;
 	unsigned int 	file_name_specified_len, file_name_expanded_len;
@@ -122,13 +125,12 @@ void	mur_get_options(void)
 	mur_options.rollback = cli_present("ROLLBACK") == CLI_PRESENT;
 	if (mur_options.rollback)
 		mur_options.update = TRUE;
+	mupip_jnl_recover = mur_options.update;
 	jgbl.mur_rollback = mur_options.rollback;	/* needed to set jfh->repl_state properly for newly created jnl files */
 	if (CLI_PRESENT == cli_present("RESYNC"))
 	{
-		buf_len = sizeof(buf);
-		cli_get_str("RESYNC", buf, &buf_len);
-		murgbl.resync_seqno = asc2l((uchar_ptr_t)buf, buf_len);
-		if (0 == murgbl.resync_seqno || ('-' == *buf))
+		status = cli_get_uint64("RESYNC", (gtm_uint64_t *)&murgbl.resync_seqno);
+		if (!status || 0 == murgbl.resync_seqno)
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_NOTPOSITIVE, 2, LEN_AND_LIT("RESYNC"));
 			mupip_exit(ERR_MUPCLIERR);
@@ -137,7 +139,7 @@ void	mur_get_options(void)
 	}
 	if ((status  = cli_present("FETCHRESYNC")) == CLI_PRESENT)
 	{
-		if (!cli_get_num("FETCHRESYNC", &mur_options.fetchresync_port))
+		if (!cli_get_int("FETCHRESYNC", &mur_options.fetchresync_port))
 			mupip_exit(ERR_MUPCLIERR);
 	}
 	/*-----		-[NO]VERIFY	-----*/
@@ -380,7 +382,7 @@ void	mur_get_options(void)
 	/*-----		-[NO]ERROR_LIMIT[=integer]	-----*/
 	if ((status = cli_present("ERROR_LIMIT")) == CLI_PRESENT)
 	{
-		if (!cli_get_num("ERROR_LIMIT", &mur_options.error_limit))
+		if (!cli_get_int("ERROR_LIMIT", &mur_options.error_limit))
 			mupip_exit(ERR_MUPCLIERR);
 
 		if (mur_options.error_limit < 0)

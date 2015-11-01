@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,8 +27,11 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "mur_jnl_ext.h"
 #include "iosp.h"
@@ -37,7 +40,7 @@
 #include "mu_gv_stack_init.h"
 #include "targ_alloc.h"
 #include "tp_change_reg.h"
-#include "gvcst_root_search.h"
+#include "gvcst_protos.h"	/* for gvcst_root_search prototype */
 #include "tp_set_sgm.h"
 
 GBLREF	gv_key		*gv_currkey;
@@ -71,7 +74,7 @@ static	void	(* const extraction_routine[])() =
 uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num losttn_seqno)
 {
 	char			new;
-	boolean_t		process_losttn, extr_file_create[TOT_EXTR_TYPES];
+	boolean_t		process_losttn, extr_file_create[TOT_EXTR_TYPES], added;
 	trans_num		curr_tn, last_tn;
 	enum jnl_record_type	rectype;
 	enum rec_fence_type	rec_fence;
@@ -80,15 +83,15 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	int4			rec_image_count = 0;	/* This is a dummy variable for UNIX */
 	uint4			rec_pid, status;
 	mval			mv;
-	mname			lcl_name;
 	seq_num 		rec_token_seq;
-	ht_entry		*hentry;
 	jnl_record		*rec;
 	jnl_string		*keystr;
 	multi_struct 		*multi;
 	pini_list_struct	*plst;
 	reg_ctl_list		*rctl, *rctl_top;
-	unsigned char		*mstack_ptr, *cptr, *c_top, *inptr, *in_top;
+	unsigned char		*mstack_ptr;
+	ht_ent_mname		*tabent;
+	mname_entry	 	gvent;
 
 	error_def(ERR_JNLREADEOF);
 	error_def(ERR_DUPTN);
@@ -102,7 +105,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	jgbl.mur_pini_addr_reset_fnptr = (pini_addr_reset_fnptr)mur_pini_addr_reset;
 	gv_keysize = ROUND_UP2(MAX_KEY_SZ + MAX_NUM_SUBSC_LEN, 4);
 	mu_gv_stack_init(&mstack_ptr);
-	gv_target = targ_alloc(gv_keysize);
+	gv_target = targ_alloc(gv_keysize, NULL);
 	murgbl.db_updated = mur_options.update;
 	murgbl.consist_jnl_seqno = 0;
 	assert(!mur_options.rollback || (losttn_seqno <= min_broken_seqno));
@@ -139,14 +142,15 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			assert(NULL == cs_addrs->dir_tree || cs_addrs->dir_tree->gd_reg == gv_cur_region);
 			if (NULL == cs_addrs->dir_tree)
 			{
-				cs_addrs->dir_tree = targ_alloc(gv_keysize);
+				cs_addrs->dir_tree = targ_alloc(gv_keysize, NULL);
 				cs_addrs->dir_tree->root = DIR_ROOT;
 				cs_addrs->dir_tree->gd_reg = gv_cur_region;
 			}
 		}
 		curr_tn = 0;
 		rec_token_seq = 0;
-		for (status = mur_next(mur_jctl->rec_offset); SS_NORMAL == status; status = mur_next_rec())
+		for (mur_jctl->after_end_of_data = FALSE, status = mur_next(mur_jctl->rec_offset);
+							SS_NORMAL == status; status = mur_next_rec())
 		{
 			rec = mur_rab.jnlrec;
 			rectype = rec->prefix.jrec_type;
@@ -258,7 +262,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 				{
 					assert(FALSE);
 					gtm_putmsg(VARLSTCNT(6) ERR_JNLTPNEST, 4, mur_jctl->jnl_fn_len,
-						mur_jctl->jnl_fn, mur_jctl->rec_offset, rec->prefix.tn);
+						mur_jctl->jnl_fn, mur_jctl->rec_offset, &rec->prefix.tn);
 					op_trollback(0);
 				}
 				/* Note: op_tstart resets gv_currkey. So set gv_currkey later. */
@@ -284,27 +288,34 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 				gv_currkey->end = keystr->length;
 				if (NULL != rctl->csa)
 				{/* find out collation of key in the jnl-record from the database corresponding to the jnl file */
-					for (cptr = (unsigned char *)&lcl_name, c_top = cptr + sizeof(lcl_name),
-							inptr = (unsigned char *)gv_currkey->base, in_top = inptr + sizeof(mname);
-							inptr < in_top && *inptr; )
-						*cptr++ = *inptr++;
-					assert(!*inptr);
-					while (cptr < c_top)
-						*cptr++ = 0;
-					hentry = ht_put((htab_desc *)rctl->tab_ptr, &lcl_name, &new);
-					if (!new && hentry->ptr)
+					gvent.var_name.addr = (char *)gv_currkey->base;
+					gvent.var_name.len = strlen((char *)gv_currkey->base);
+					COMPUTE_HASH_MNAME(&gvent);
+					if ((NULL !=  (tabent = lookup_hashtab_mname(&rctl->gvntab, &gvent))) &&
+								(NULL != (gv_target = (gv_namehead *)tabent->value)))
 					{
-						gv_target = (gv_namehead*)hentry->ptr;
 						assert(gv_target->gd_reg->open);
+						gv_cur_region = gv_target->gd_reg;
 						if (dollar_trestart)
 							gv_target->clue.end = 0;
 					} else
 					{
 						assert(gv_cur_region->max_key_size <= MAX_KEY_SZ);
-						gv_target = (gv_namehead *)targ_alloc(gv_cur_region->max_key_size);
+						gv_target = (gv_namehead *)targ_alloc(gv_cur_region->max_key_size,
+							&gvent);
 						gv_target->gd_reg = gv_cur_region;
-						hentry->ptr = (char *)gv_target;
-						memcpy(&gv_target->gvname, &lcl_name, sizeof(mident));
+						if (NULL != tabent)
+						{	/* Since the global name was found but gv_target was null and
+							 * now we created a new gv_target, the hash table key must point
+							 * to the newly created gv_target->gvname. */
+							tabent->key = gv_target->gvname;
+							tabent->value = gv_target;
+						} else
+						{
+							added = add_hashtab_mname(&rctl->gvntab, &gv_target->gvname,
+									gv_target, &tabent);
+							assert(added);
+						}
 					}
 					if ((0 == gv_target->root) || (DIR_ROOT == gv_target->root))
 					{
@@ -372,7 +383,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 					{
 						assert(FALSE); /* We want to debug this */
 						murgbl.wrn_count++;
-						gtm_putmsg(VARLSTCNT(6) ERR_DUPTN, 4, curr_tn, mur_jctl->rec_offset,
+						gtm_putmsg(VARLSTCNT(6) ERR_DUPTN, 4, &curr_tn, mur_jctl->rec_offset,
 							mur_jctl->jnl_fn_len, mur_jctl->jnl_fn);
 						if (mur_options.update && dollar_tlevel)
 							op_trollback(0);

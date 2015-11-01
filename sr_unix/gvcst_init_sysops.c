@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,17 +11,17 @@
 
 #include "mdef.h"
 
-#include "gtm_ipc.h"
 #include <sys/mman.h>
 #ifndef __MVS__
 #include <sys/param.h>
 #endif
 #include <errno.h>
-#include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <sys/time.h>
+#include "gtm_ipc.h"
+#include "gtm_socket.h"
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
@@ -64,7 +64,7 @@
 #endif
 #include "util.h"
 #include "dbfilop.h"
-#include "gvcst_init_sysops.h"
+#include "gvcst_protos.h"
 #include "is_raw_dev.h"
 #include "gv_match.h"
 #include "do_semop.h"
@@ -73,6 +73,7 @@
 #include "do_shmat.h"
 #include "send_msg.h"
 #include "gtmmsg.h"
+#include "shmpool.h"
 
 #define ATTACH_TRIES   		10
 #define DEFEXT          	"*.dat"
@@ -221,12 +222,12 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd)
 	switch(reg->dyn.addr->acc_meth)
 	{
 	case dba_mm:
-		reg->sec_size = NODE_LOCAL_SPACE + LOCK_SPACE_SIZE(csd) + MMBLK_CONTROL_SIZE(csd)
-			+ JNL_SHARE_SIZE(csd) + BACKUP_BUFFER_SIZE;
+		reg->sec_size = ROUND_UP(NODE_LOCAL_SPACE + LOCK_SPACE_SIZE(csd) + MMBLK_CONTROL_SIZE(csd) \
+					 + JNL_SHARE_SIZE(csd) + SHMPOOL_BUFFER_SIZE, OS_PAGE_SIZE);
 		break;
 	case dba_bg:
-		reg->sec_size = NODE_LOCAL_SPACE + (LOCK_BLOCK(csd) * DISK_BLOCK_SIZE) + LOCK_SPACE_SIZE(csd)
-			+ CACHE_CONTROL_SIZE(csd) + JNL_SHARE_SIZE(csd) + BACKUP_BUFFER_SIZE;
+		reg->sec_size = ROUND_UP(NODE_LOCAL_SPACE + (LOCK_BLOCK(csd) * DISK_BLOCK_SIZE) + LOCK_SPACE_SIZE(csd) \
+					 + CACHE_CONTROL_SIZE(csd) + JNL_SHARE_SIZE(csd) + SHMPOOL_BUFFER_SIZE, OS_PAGE_SIZE);
 		break;
 	default:
 		GTMASSERT;
@@ -253,9 +254,6 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	struct statvfs		dbvfs;
 	uint4           	sopcnt;
 	unix_db_info    	*udi;
-#ifdef periodic_timer_removed
-	void            	periodic_flush_check();
-#endif
 
 	error_def(ERR_CLSTCONFLICT);
 	error_def(ERR_CRITSEMFAIL);
@@ -431,8 +429,8 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	/* Note: Here we check jnl_sate from database file and its value cannot change without standalone access.
 	 * The jnl_buff buffer should be initialized irrespective of read/write process */
 	JNL_INIT(csa, reg, tsd);
-	csa->backup_buffer = (backup_buff_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SPACE + JNL_SHARE_SIZE(tsd));
-	csa->lock_addrs[0] = (sm_uc_ptr_t)csa->backup_buffer + BACKUP_BUFFER_SIZE + 1;
+	csa->shmpool_buffer = (shmpool_buff_hdr_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SPACE + JNL_SHARE_SIZE(tsd));
+	csa->lock_addrs[0] = (sm_uc_ptr_t)csa->shmpool_buffer + SHMPOOL_BUFFER_SIZE;
 	csa->lock_addrs[1] = csa->lock_addrs[0] + LOCK_SPACE_SIZE(tsd) - 1;
 	csa->total_blks = tsd->trans_hist.total_blks;   		/* For test to see if file has extended */
 	if (new_dbinit_ipc)
@@ -476,7 +474,15 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	{
 		assert(new_dbinit_ipc);
 		if (is_bg)
-			*csd = *tsd;
+		{
+			memcpy(csd, tsd, sizeof(sgmnt_data));
+			fc->file_type = dba_bg;
+			fc->op = FC_READ;
+			fc->op_buff = MM_ADDR(csd);
+			fc->op_len = MASTER_MAP_SIZE(csd);
+			fc->op_pos = MM_BLOCK;
+			dbfilop(fc);
+		}
 		if (csd->machine_name[0])                  /* crash occured */
 		{
 			if (0 != memcmp(csd->machine_name, machine_name, MAX_MCNAMELEN))  /* crashed on some other node */
@@ -491,12 +497,13 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			db_csh_ini(csa);
 		}
 		db_csh_ref(csa);
+		shmpool_buff_init(reg);
 		strcpy(csa->nl->machine_name, machine_name);					/* machine name */
 		assert(MAX_REL_NAME > gtm_release_name_len);
 		memcpy(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
 		memcpy(csa->nl->label, GDS_LABEL, GDS_LABEL_SZ - 1);				/* GDS label */
 		memcpy(csa->nl->fname, reg->dyn.addr->fname, reg->dyn.addr->fname_len);		/* database filename */
-		csa->nl->creation_date_time = csd->creation.date_time;
+		csa->nl->creation_date_time.ctime = csd->creation.ctime;
 		csa->nl->highest_lbm_blk_changed = -1;
 		csa->nl->wcs_timers = -1;
 		csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
@@ -505,8 +512,10 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		csa->nl->critical = (sm_off_t)((sm_uc_ptr_t)csa->critical - (sm_uc_ptr_t)csa->nl);
 		if (JNL_ALLOWED(csa))
 			csa->nl->jnl_buff = (sm_off_t)((sm_uc_ptr_t)csa->jnl->jnl_buff - (sm_uc_ptr_t)csa->nl);
-		csa->nl->backup_buffer = (sm_off_t)((sm_uc_ptr_t)csa->backup_buffer - (sm_uc_ptr_t)csa->nl);
-		csa->nl->hdr = (sm_off_t)((sm_uc_ptr_t)csd - (sm_uc_ptr_t)csa->nl);
+		csa->nl->shmpool_buffer = (sm_off_t)((sm_uc_ptr_t)csa->shmpool_buffer - (sm_uc_ptr_t)csa->nl);
+		if (is_bg)
+			/* Field is sm_off_t (4 bytes) so only in BG mode is this assurred to be 4 byte capable */
+			csa->nl->hdr = (sm_off_t)((sm_uc_ptr_t)csd - (sm_uc_ptr_t)csa->nl);
 		csa->nl->lock_addrs = (sm_off_t)((sm_uc_ptr_t)csa->lock_addrs[0] - (sm_uc_ptr_t)csa->nl);
 		if (!read_only || is_bg)
 		{
@@ -547,34 +556,17 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		if (-1 == stat_res)
 			rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
 		set_gdid_from_stat(&csa->nl->unique_id.uid, &stat_buf);
-		if (gtm_fullblockwrites)
-		{	/* We have been asked to do FULL BLOCK WRITES for this database. On *NIX, attempt to get the filesystem
-			   blocksize from statvfs. This allows a full write of a blockwithout the OS having to fetch the old
-			   block for a read/update operation. We will round the IOs to the next filesystem blocksize if the
-			   following criteria are met:
-
-			   1) Database blocksize must be a whole multiple of the filesystem blocksize for the above
-			      mentioned reason.
-
-			   2) Filesystem blocksize must be a factor of the size of the database file header. This is due
-			      to the fact that the fileheader is of an odd size (currently 24K) so only certain pagesize
-			      and database block size combinations give the aligned writes necessary for this support to
-			      make sense.
-
-			   The saved length (if the feature is enabled) will be the filesystem blocksize and will be the
-			   length that a database IO is rounded up to prior to initiation of the IO.
-			*/
-			FSTATVFS(udi->fd, &dbvfs, status);
-			if (0 == status)
-			{
-				dblksize = csd->blk_size;
-				fbwsize = dbvfs.f_bsize;
-				if (0 != fbwsize && (0 == dblksize % fbwsize) && (0 == sizeof(sgmnt_data) % fbwsize))
-					csa->do_fullblockwrites = TRUE;		/* This region is fullblockwrite enabled */
-				/* Report this length in DSE even if not enabled */
-				csa->fullblockwrite_len = fbwsize;		/* Length for rounding fullblockwrite */
-			}
-		}
+#ifdef RELEASE_LATCH_GLOBAL
+		/* On HP-UX, it is possible that mucregini/cs_data is not aligned at the same address
+		 * boundary as csd would be in shared memory. This may lead to the initialization and
+		 * usage of different elements of hp_latch_space. This may lead to the latch being
+		 * "in-use" permanently. To resolve this, shm-initialer re-initializes the global latch
+		 * to the "available" state.
+		 * Although Solaris doesn't have the same issue of alignment, we'll cover the case of
+		 * a corrupt latch (say in case of abnormal process termination).
+		 */
+		RELEASE_LATCH_GLOBAL(&csd->next_upgrd_warn.time_latch);
+#endif
 	} else
 	{
 		if (strcmp(csa->nl->machine_name, machine_name))       /* machine names do not match */
@@ -589,7 +581,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		 */
 		assert(csa->nl->fname[MAX_FN_LEN] == '\0');	/* Note: the first '\0' in csa->nl->fname can be much earlier */
 		if (FALSE == is_gdid_gdid_identical(&FILE_INFO(reg)->fileid, &csa->nl->unique_id.uid) ||
-						csa->nl->creation_date_time != csd->creation.date_time)
+						csa->nl->creation_date_time.ctime != csd->creation.ctime)
 		{
 			send_msg(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
 				ERR_TEXT, 2, LEN_AND_LIT("Fileid of database file doesn't match fileid in shared memory"));
@@ -628,10 +620,10 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
 				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("journal buffer"),
 					(uint4)((sm_uc_ptr_t)csa->jnl->jnl_buff - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->jnl_buff);
-		if (csa->nl->backup_buffer != (sm_off_t)((sm_uc_ptr_t)csa->backup_buffer - (sm_uc_ptr_t)csa->nl))
+		if (csa->nl->shmpool_buffer != (sm_off_t)((sm_uc_ptr_t)csa->shmpool_buffer - (sm_uc_ptr_t)csa->nl))
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
 				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("backup buffer"),
-				  (uint4)((sm_uc_ptr_t)csa->backup_buffer - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->backup_buffer);
+				  (uint4)((sm_uc_ptr_t)csa->shmpool_buffer - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->shmpool_buffer);
 		if ((is_bg) && (csa->nl->hdr != (sm_off_t)((sm_uc_ptr_t)csd - (sm_uc_ptr_t)csa->nl)))
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
 				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("file header"),
@@ -674,6 +666,37 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			rts_error(VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 				  ERR_TEXT, 2, LEN_AND_LIT("gtmsecshr failed to update database file header"));
 
+	}
+	if (gtm_fullblockwrites)
+	{	/* We have been asked to do FULL BLOCK WRITES for this database. On *NIX, attempt to get the filesystem
+		   blocksize from statvfs. This allows a full write of a blockwithout the OS having to fetch the old
+		   block for a read/update operation. We will round the IOs to the next filesystem blocksize if the
+		   following criteria are met:
+
+		   1) Database blocksize must be a whole multiple of the filesystem blocksize for the above
+		      mentioned reason.
+
+		   2) Filesystem blocksize must be a factor of the location of the first data block
+		      given by the start_vbn.
+
+		   The saved length (if the feature is enabled) will be the filesystem blocksize and will be the
+		   length that a database IO is rounded up to prior to initiation of the IO.
+		*/
+		FSTATVFS_FILE(udi->fd, &dbvfs, status);
+		if (-1 != status)
+		{
+			dblksize = csd->blk_size;
+			fbwsize = dbvfs.f_bsize;
+			if (0 != fbwsize && (0 == dblksize % fbwsize) && (0 == ((csd->start_vbn - 1) * DISK_BLOCK_SIZE) % fbwsize))
+				csa->do_fullblockwrites = TRUE;		/* This region is fullblockwrite enabled */
+			/* Report this length in DSE even if not enabled */
+			csa->fullblockwrite_len = fbwsize;		/* Length for rounding fullblockwrite */
+		}
+		else
+		{
+			errno_save = errno;
+			send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fstatvfs"), CALLFROM, errno_save);
+		}
 	}
 	++csa->nl->ref_cnt;	/* This value is changed under control of the init/rundown semaphore only */
 	assert(!csa->ref_cnt);	/* Increment shared ref_cnt before private ref_cnt increment. */

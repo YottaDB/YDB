@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,10 +16,11 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "cache.h"
+#include "hashtab_objcode.h"
 #include "op.h"
 
 UNIX_ONLY(GBLREF) VMS_ONLY(LITREF) int (*indir_fcn[])();
-GBLREF mval **ind_result_sp, **ind_result_top;
+GBLREF mval 			**ind_result_sp, **ind_result_top;
 
 #define INDIR(a, b, c) c
 static readonly opctype indir_opcode[] = {
@@ -27,26 +28,28 @@ static readonly opctype indir_opcode[] = {
 };
 #undef INDIR
 
-void op_indfun(mval *v, mint code, mval *dst)
+void op_indfun(mval *v, mint argcode, mval *dst)
 {
 	bool		rval;
 	mstr		*obj, object;
 	oprtype		x;
-	unsigned char	argcode;
+	icode_str	indir_src;
 
 	error_def(ERR_INDMAXNEST);
 
-	argcode = (unsigned char)code;
-	assert(UCHAR_MAX >= code); /* if not, the assignment to argcode is lossy */
+	assert((sizeof(indir_opcode)/sizeof(indir_opcode[0])) > argcode);
 	assert(indir_opcode[argcode]);
 	MV_FORCE_STR(v);
-	if (!(obj = cache_get(argcode, &v->str)))
+	indir_src.str = v->str;
+	indir_src.code = argcode;
+	if (NULL == (obj = cache_get(&indir_src)))
 	{
 		comp_init(&v->str);
 		rval = (*indir_fcn[argcode])(&x, indir_opcode[argcode]);
 		if (!comp_fini(rval, &object, OC_IRETMVAL, &x, v->str.len))
 			return;
-		cache_put(argcode, &v->str, &object);
+		indir_src.str.addr = v->str.addr;
+		cache_put(&indir_src, &object);
 		*ind_result_sp++ = dst;
 		if (ind_result_sp >= ind_result_top)
 			rts_error(VARLSTCNT(1) ERR_INDMAXNEST);

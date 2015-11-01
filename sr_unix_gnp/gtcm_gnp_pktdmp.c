@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,8 +67,12 @@ void gtcm_gnp_pktdmp(FILE *fp, struct CLB *lnk, int sta, unsigned char *buf, siz
 	case CM_CLB_READ:
 		op = "read";
 		break;
+	case CM_CLB_DISCONNECT:
+		op = "disconnect";
+		break;
 	default:
-		return;
+		op = "*unknown*";
+		break;
 	}
 	chr = buf;
 	ctim = time(NULL);

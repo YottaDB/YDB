@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,9 +15,10 @@
 #include "toktyp.h"
 #include "indir_enum.h"
 #include "cache.h"
+#include "hashtab_objcode.h"
 #include "op.h"
 
-GBLREF char	window_token;
+GBLREF char			window_token;
 
 void	op_indlvadr(mval *target)
 {
@@ -26,10 +27,12 @@ void	op_indlvadr(mval *target)
 	mstr		object, *obj;
 	oprtype		v;
 	triple		*s;
+	icode_str	indir_src;
 
 	MV_FORCE_STR(target);
-
-	if (!(obj = cache_get(indir_lvadr, &target->str)))
+	indir_src.str = target->str;
+	indir_src.code = indir_lvadr;
+	if (NULL == (obj = cache_get(&indir_src)))
 	{
 		comp_init(&target->str);
 		switch (window_token)
@@ -37,7 +40,9 @@ void	op_indlvadr(mval *target)
 		case TK_IDENT:
 			rval = lvn(&v, OC_PUTINDX, 0);
 			if (comp_fini(rval, &object, OC_IRETMVAD, &v, target->str.len))
-			{	cache_put(indir_lvadr, &target->str, &object);
+			{
+				indir_src.str.addr = target->str.addr;
+				cache_put(&indir_src, &object);
 				comp_indr(&object);
 			}
 			break;
@@ -48,7 +53,9 @@ void	op_indlvadr(mval *target)
 				s->operand[0] = v;
 				v = put_tref(s);
 				if (comp_fini(rval, &object, OC_IRETMVAD, &v, target->str.len))
-				{	cache_put(indir_lvadr, &target->str, &object);
+				{
+					indir_src.str.addr = target->str.addr;
+					cache_put(&indir_src, &object);
 					comp_indr(&object);
 				}
 			}
@@ -59,7 +66,5 @@ void	op_indlvadr(mval *target)
 		}
 	}
 	else
-	{
 		comp_indr(obj);
-	}
 }

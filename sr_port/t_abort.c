@@ -18,8 +18,8 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-#include "hashtab.h"		/* needed for cws_insert.h */
 #include "longset.h"		/* needed for cws_insert.h */
+#include "hashtab_int4.h"	/* needed for cws_insert.h */
 #include "cws_insert.h"		/* for CWS_RESET macro */
 #include "t_abort.h"		/* for prototype of t_abort() */
 

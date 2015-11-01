@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,13 +45,14 @@ void dse_cache(void)
 	gd_region	*reg, *r_top;
 	sgmnt_addrs	*csa;
 	mval		dollarh_mval, zdate_mval;
-	int4		offset, size, value, old_value;
+	int4		size;
+	uint4		offset, value, old_value;
 	char		dollarh_buffer[MAXNUMLEN], zdate_buffer[sizeof(DSE_DMP_TIME_FMT)];
 	char		temp_str[256], temp_str1[256];
 	sm_uc_ptr_t	chng_ptr;
 	cache_rec_ptr_t	cr_que_lo;
 
-	error_def(ERR_SIZENOTVALID);
+	error_def(ERR_SIZENOTVALID4);
 
 	all_present = (CLI_PRESENT == cli_present("ALL"));
 
@@ -70,10 +71,10 @@ void dse_cache(void)
 		return;
 	if (size_present)
 	{
-		if (!cli_get_num("SIZE",   &size))
+		if (!cli_get_int("SIZE",   &size))
 			return;
 		if (!((sizeof(char) == size) || (sizeof(short) == size) || (sizeof(int4) == size)))
-			rts_error(VARLSTCNT(1) ERR_SIZENOTVALID);
+			rts_error(VARLSTCNT(1) ERR_SIZENOTVALID4);
 	}
 	if (value_present  && !cli_get_hex("VALUE",  &value))
 		return;
@@ -117,13 +118,11 @@ void dse_cache(void)
 				{
 					SPRINTF(temp_str, "!UB [0x!XB]");
 					old_value = *(sm_uc_ptr_t)chng_ptr;
-				}
-				else if (sizeof(short) == size)
+				} else if (sizeof(short) == size)
 				{
 					SPRINTF(temp_str, "!UW [0x!XW]");
 					old_value = *(sm_ushort_ptr_t)chng_ptr;
-				}
-				else if (sizeof(int4) == size)
+				} else if (sizeof(int4) == size)
 				{
 					SPRINTF(temp_str, "!UL [0x!XL]");
 					old_value = *(sm_uint_ptr_t)chng_ptr;
@@ -168,8 +167,8 @@ void dse_cache(void)
 				util_out_print("Region !AD :  jnl_buffer_data    = 0x!XL",
 						TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->jnl->jnl_buff->buff));
 			}
-			util_out_print("Region !AD :  backup_buffer      = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->backup_buffer));
+			util_out_print("Region !AD :  shmpool_buffer     = 0x!XL",
+					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->shmpool_buffer));
 			util_out_print("Region !AD :  lock_space         = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->lock_addrs[0]));
 			util_out_print("Region !AD :  cache_queues_state = 0x!XL",
@@ -182,7 +181,7 @@ void dse_cache(void)
 					sizeof(cache_rec), csa->hdr->n_bts);
 			util_out_print("Region !AD :  global_buffer      = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg),
-					ROUND_UP2(DB_ABS2REL(cr_que_lo + csa->hdr->bt_buckets + csa->hdr->n_bts), DISK_BLOCK_SIZE),
+					ROUND_UP2(DB_ABS2REL(cr_que_lo + csa->hdr->bt_buckets + csa->hdr->n_bts), OS_PAGE_SIZE),
 					csa->hdr->blk_size, csa->hdr->n_bts);
 			util_out_print("Region !AD :  db_file_header     = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->hdr));

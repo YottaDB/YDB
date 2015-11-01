@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,20 +11,20 @@
 
 #include "mdef.h"
 
-#include <unistd.h>
+#include "gtm_unistd.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "hashdef.h"
 #include "cmidef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "locklits.h"
 #include "error.h"
 #include "print_exit_stats.h"
-#include "gtcmtr_terminate.h"
+#include "gtcmtr_protos.h"
 #include "send_msg.h"
 #include "gtmmsg.h"
 #include "gtcm_exi_handler.h"

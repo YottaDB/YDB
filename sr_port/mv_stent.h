@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 typedef struct
 {
-	mident		*nam_addr;
+	var_tabent		*nam_addr;
 	struct lv_val_struct	**lst_addr;
 	struct lv_val_struct	*save_value;
 } mvs_ntab_struct;
@@ -25,8 +25,8 @@ typedef struct
 typedef struct
 {
 	struct lv_val_struct	*mvs_val;
-	mvs_ntab_struct mvs_ptab;
-	mident		name;
+	mvs_ntab_struct 	mvs_ptab;
+	var_tabent		name;		/* name.var_name.addr points to whaever the original vartab entry points to */
 } mvs_nval_struct;
 
 typedef struct
@@ -112,8 +112,8 @@ LITREF unsigned char mvs_size[];
 	((mv_stent *) msp)->mv_st_next = (unsigned char *) mv_chain - msp), \
 	mv_chain = (mv_stent *) msp)
 
-#define PUSH_MV_STCK(size) (((msp -= (mvs_size[MVST_STCK]+size)) <= stackwarn) ? \
-	((msp <= stacktop) ? (msp += mvs_size[MVST_STCK]/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) : \
+#define PUSH_MV_STCK(size) (((msp -= (mvs_size[MVST_STCK] + (size))) <= stackwarn) ? \
+	((msp <= stacktop) ? (msp += (mvs_size[MVST_STCK] + (size))/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) : \
 	 rts_error(VARLSTCNT(1) ERR_STACKCRIT)) : \
 	(((mv_stent *) msp)->mv_st_type = MVST_STCK , \
 	((mv_stent *) msp)->mv_st_next = (unsigned char *) mv_chain - msp), \

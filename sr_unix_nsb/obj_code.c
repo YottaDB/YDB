@@ -34,6 +34,7 @@
 #include "mlabel2xtern.h"
 #include "cg_var.h"
 #include "gtm_string.h"
+#include "stringpool.h"
 
 GBLREF bool		run_time;
 GBLREF command_qualifier cmd_qlf;
@@ -41,29 +42,58 @@ GBLREF int4		mvmax, mlmax, mlitmax, psect_use_tab[], sa_temps[], sa_temps_offset
 GBLREF mlabel 		*mlabtab;
 GBLREF mline 		mline_root;
 GBLREF mvar 		*mvartab;
-GBLREF char		module_name[];
-
-GBLDEF int4		curr_addr, code_size;
+GBLREF mident		module_name;
+GBLREF spdesc		stringpool;
 GBLREF char		cg_phase;	/* code generation phase */
 GBLREF char		cg_phase_last;	/* previous code generation phase */
+GBLREF int4		curr_addr, code_size;
 
 void	cg_lab (mlabel *l, int4 base);
+
+/* The sections of the internal GT.M object are grouped according to their type (R/O, R/W).
+ * Note: Once an object is linked, no section will be released from memory. All sections
+ * will be retained.
+ *
+ * The GT.M object layout on the disk is as follows:
+ *
+ *	+---------------+
+ *	|     rhead	| \
+ *	+---------------+  \
+ *	|   generated	|   |
+ *	|     code	|   |
+ *	+ - - - - - - - +   |
+ *	| variable tbl	|   | - R/O
+ *	+ - - - - - - - +   |
+ *	|   label tbl	|   |
+ *	+---------------+   |
+ *	| line num tbl	|   |
+ *	+ - - - - - - - +  /
+ *	| lit text pool	| /
+ *	+---------------+
+ *	| lit mval tbl 	|-- R/W
+ *	+---------------+
+ *	| relocations	| > - relocations for external syms (not kept after link)
+ *	+---------------+
+ *	|  symbol tbl 	| > - external symbol table (not kept after link)
+ *	+---------------+
+ *
+ */
 
 void	obj_code (uint4 src_lines, uint4 checksum)
 {
 	rhdtyp		rhead;
 	mline		*mlx, *mly;
-	vent		*vptr;
+	var_tabent	*vptr;
 	mstr		rname_mstr;
+	int4		lnr_pad_len;
 	error_def(ERR_TEXT);
 	assert(!run_time);
 	obj_init();
 
-
 	/* Define the routine name global symbol. */
-	rname_mstr.addr = module_name;
-	rname_mstr.len = mid_len((mident *)module_name);
-	define_symbol(GTM_MODULE_DEF_PSECT, rname_mstr, 0);
+	rname_mstr.addr = module_name.addr;
+	rname_mstr.len = module_name.len;
+	define_symbol(GTM_MODULE_DEF_PSECT, &rname_mstr, 0);
 
 	memset(&rhead, 0, sizeof(rhead));
 	alloc_reg();
@@ -88,34 +118,36 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	rhead.checksum = checksum;
 	rhead.vartab_ptr = code_size;
 	rhead.vartab_len = mvmax;
-	code_size += mvmax*sizeof(vent);
+	code_size += mvmax * sizeof(var_tabent);
 	rhead.labtab_ptr = code_size;
 	rhead.labtab_len = mlmax;
-	code_size += mlmax * (sizeof(mident) + sizeof(int4));
+	code_size += mlmax * sizeof(lab_tabent);
 	rhead.lnrtab_ptr = code_size;
 	rhead.lnrtab_len = src_lines;
-	rhead.label_only = !(cmd_qlf.qlf & CQ_LINE_ENTRY);
+	rhead.compiler_qlf = cmd_qlf.qlf;
 	rhead.temp_mvals = sa_temps[TVAL_REF];
 	rhead.temp_size = sa_temps_offset[TCAD_REF];
-	code_size += src_lines*sizeof(int4);
+	code_size += src_lines * sizeof(int4);
+	lnr_pad_len = PADLEN(code_size, SECTION_ALIGN_BOUNDARY);
+	code_size += lnr_pad_len;
 
 	create_object_file(&rhead);
 	cg_phase = CGP_MACHINE;
 	code_gen();
 
 	/* Variable table: */
-	vptr = (vent *)mcalloc(mvmax*sizeof(vent));
+	vptr = (var_tabent *)mcalloc(mvmax * sizeof(var_tabent));
 	if (mvartab)
-	{
 		walktree(mvartab, cg_var, (char *)&vptr);
-	}
-	emit_immed((char *)vptr, mvmax*sizeof(vent));
+	else
+		assert(0 == mvmax);
+	emit_immed((char *)vptr, mvmax * sizeof(var_tabent));
 
 	/* Label table: */
 	if (mlabtab)
-	{
 		walktree((mvar *)mlabtab, cg_lab, (char *)rhead.lnrtab_ptr);
-	}
+	else
+		assert(0 == mlmax);
 
 	/* External entry definitions: */
 	emit_immed((char *)&(mline_root.externalentry->rtaddr), sizeof(mline_root.externalentry->rtaddr));	/* line 0 */
@@ -140,6 +172,8 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 			}
 		}
 	}
+	if (0 != lnr_pad_len) /* emit padding so literal text pool starts on proper boundary */
+		emit_immed(PADCHARS, lnr_pad_len);
 #if !defined(__MVS__) && !defined(__s390__)	/* assert not valid for instructions on OS390 */
 	assert (code_size == psect_use_tab[GTM_CODE]);
 #endif
@@ -147,21 +181,18 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	close_object_file();
 }
 
-
-GBLREF char		module_name[];
-
 void	cg_lab (mlabel *l, int4 base)
 {
-	mstr	glob_name;
-	int4	value;
+	mstr		glob_name;
+	lab_tabent	lent;
 
 	if (l->ml  &&  l->gbl)
 	{
-		emit_immed(l->mvname.c, sizeof(mident));
-		value = sizeof(int4)*l->ml->line_number + base;
-		emit_immed((char *)&value, sizeof(value));
-		mlabel2xtern(&glob_name, (mident *)module_name, &l->mvname);
-		define_symbol(GTM_CODE, glob_name, value);
+		lent.lab_name.len = l->mvname.len;
+		lent.lab_name.addr = (char *)(l->mvname.addr - (char *)stringpool.base);
+		lent.LABENT_LNR_OFFSET = (sizeof(lnr_tabent) * l->ml->line_number) + base;
+		emit_immed((char *)&lent, sizeof(lent));
+		mlabel2xtern(&glob_name, &module_name, &l->mvname);
+		define_symbol(GTM_CODE, &glob_name, lent.LABENT_LNR_OFFSET);
 	}
-	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 
 #include <sys/sem.h>
 #include "gtm_fcntl.h"
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include <errno.h>
 
 #include "gdsroot.h"
@@ -35,10 +35,10 @@ GBLREF	gd_region	*gv_cur_region;
 
 uint4 dbfilop(file_control *fc)
 {
-	unix_db_info	*udi;
-	struct stat	stat_buf;
-	int4		save_errno;
-	int		fstat_res;
+	unix_db_info		*udi;
+	struct stat		stat_buf;
+	int4			save_errno;
+	int			fstat_res;
 
 	error_def(ERR_DBFILOPERR);
 	error_def(ERR_DBNOTGDS);
@@ -70,6 +70,7 @@ uint4 dbfilop(file_control *fc)
 				if ((1 == fc->op_pos) && ((0 != memcmp(fc->op_buff, GDS_LABEL, GDS_LABEL_SZ - 1))
 						|| (0 == ((sgmnt_data_ptr_t)fc->op_buff)->acc_meth)))
 					GTMASSERT;
+				assert((1 != fc->op_pos) || fc->op_len <= SIZEOF_FILE_HDR(fc->op_buff));
  				LSEEKWRITE(udi->fd,
  					   (off_t)(fc->op_pos - 1) * DISK_BLOCK_SIZE,
  					   fc->op_buff,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,13 +10,14 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <sys/statvfs.h>
+#include "gtm_statvfs.h"
 
 #include <errno.h>
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_stat.h"
 #include "gtm_string.h"
+#include "util.h"
 
 #include "gtm_rename.h"
 #include "gdsroot.h"
@@ -146,7 +147,6 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 					jpc->channel = NOJNL;
 					jpc->fileid.inode = 0;
 					jpc->fileid.device = 0;
-					jpc->regnum = 0;
 					jpc->pini_addr = 0;
 				} else
 				{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,9 +28,7 @@
 #include "t_end.h"
 #include "t_retry.h"
 #include "t_begin.h"
-#include "gvcst_search.h"
-#include "gvcst_rtsib.h"
-#include "gvcst_lftsib.h"
+#include "gvcst_protos.h"	/* for gvcst_search,gvcst_rtsib,gvcst_lftsib prototype */
 
 GBLREF int		rc_size_return;
 GBLREF gd_addr		*gd_header;
@@ -41,7 +39,7 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLDEF rc_oflow		*rc_overflow;
 GBLREF bool		gv_curr_subsc_null;
 GBLREF gd_region	*gv_cur_region;
-GBLREF int		rc_read_stamp;
+GBLREF trans_num	rc_read_stamp;
 GBLREF int		gv_keysize;
 
 int rc_prc_getr(rc_q_hdr *qhdr)
@@ -70,7 +68,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	{
 		REVERT;
 #ifdef DEBUG
-	gtcm_cpktdmp(qhdr,qhdr->a.len.value,"rc_fnd_file failed.");
+	gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"rc_fnd_file failed.");
 #endif
 		return -1;
 	}
@@ -89,8 +87,9 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 		;
 	v.str.len = cp1 - req->key.key;
 	v.str.addr = req->key.key;
-	if (v.str.len > 8)	/* GT.M does not support global variables > 8 chars */
-	{	if (!(v.str.len == 9 && *(v.str.addr + 8)== 0x01))
+	if (v.str.len > MAX_MIDENT_LEN)	/* GT.M does not support global variables > MAX_MIDENT_LEN chars */
+	{
+		if (!(v.str.len == (MAX_MIDENT_LEN + 1) && v.str.addr[MAX_MIDENT_LEN] == 0x01))
 		{
 		    qhdr->a.erc.value = RC_KEYTOOLONG;
 		    rsp->size_return.value = 0;
@@ -98,11 +97,10 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 		    rsp->rstatus.value = 0;
 		    REVERT;
 #ifdef DEBUG
-	gtcm_cpktdmp(qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");
+	gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");
 #endif
 		    return -1;
 		}
-
 	}
 	gv_bind_name(gd_header, &v.str);
 	memcpy(gv_currkey->base, req->key.key, req->key.len.value);

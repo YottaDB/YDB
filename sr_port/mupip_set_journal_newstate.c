@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,9 @@
 
 #include "mdef.h"
 
-#include "gdsroot.h"
 #include "gtm_stat.h"
+#include "gtm_string.h"
+#include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
@@ -26,7 +27,9 @@
 #include "util.h"
 #include "gtmmsg.h"
 
-GBLREF	gd_region		*gv_cur_region;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	char		*jnl_state_lit[];
+GBLREF	char		*repl_state_lit[];
 
 uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *jnl_info, mu_set_rlist *rptr)
 {
@@ -49,7 +52,15 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 	{	/* journaling is already ENABLED or ENABLE is explicitly specified */
 		if (CLI_NEGATED == jnl_options->cli_on)	/* OFF specified */
 			rptr->jnl_new_state = jnl_closed;
-		else	/* ON explicitly specified or present by default */
+		else if (repl_curr_state == repl_was_open && CLI_PRESENT != jnl_options->cli_replic_on)
+		{ /* Journaling was turned OFF by jnl_file_lost(). Do not allow turning journaling ON without also
+		     turning replication ON */
+			gtm_putmsg(VARLSTCNT(8) ERR_REPLJNLCNFLCT, 6, LEN_AND_STR(jnl_state_lit[jnl_open]),
+					DB_LEN_STR(gv_cur_region),
+					LEN_AND_STR(repl_state_lit[repl_closed]));
+			return EXIT_WRN;
+		}
+		else /* ON explicitly specified or present by default */
 			rptr->jnl_new_state = jnl_open;
 	} else	/* jnl_notallowed == jnl_curr_state && CLI_ABSENT == jnl_options->cli_enable */
 	{
@@ -85,7 +96,10 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 				}
 				if (jnl_open != rptr->jnl_new_state)
 				{
-					gtm_putmsg(VARLSTCNT(4) ERR_REPLJNLCNFLCT, 2, DB_LEN_STR(gv_cur_region));
+					gtm_putmsg(VARLSTCNT(8) ERR_REPLJNLCNFLCT, 6,
+							LEN_AND_LIT("OFF/DISABLED"),
+							DB_LEN_STR(gv_cur_region),
+							LEN_AND_STR(repl_state_lit[repl_open]));
 					return EXIT_WRN;
 				}
 			}

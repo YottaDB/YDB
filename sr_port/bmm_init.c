@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ GBLREF sgmnt_data *cs_data;
 
 void bmm_init(void)
 {
-	assert(MASTER_MAP_SIZE < 32767);	/* or must use longset for VAX */
-	memset(cs_data->master_map, EIGHT_BLKS_FREE, MASTER_MAP_SIZE);
+	assert(cs_data && cs_data->master_map_len);
+	memset(MM_ADDR(cs_data), EIGHT_BLKS_FREE, MASTER_MAP_SIZE(cs_data));
 	return;
 }

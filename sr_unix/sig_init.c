@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,14 +19,13 @@
 #include <signal.h>
 #include "continue_handler.h"
 #include "sig_init.h"
-#include "suspsigs_handler.h"
 #include "gtmci_signals.h"
 
 GBLREF 	boolean_t		disable_sigcont;
 
 void	null_handler(int sig);
 
-void sig_init(void (*signal_handler)(), void (*ctrlc_handler)())
+void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)())
 {
 	struct sigaction 	ignore, act;
 	int			sig;
@@ -69,10 +68,13 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)())
 	 * Signals that suspend a process
 	 * --------------------------------------------------------------
 	 */
-	act.sa_sigaction = suspsigs_handler;
-	sigaction(SIGTSTP, &act, 0);
-	sigaction(SIGTTIN, &act, 0);
-	sigaction(SIGTTOU, &act, 0);
+	if (NULL != suspsig_handler)
+	{
+		act.sa_sigaction = suspsig_handler;
+		sigaction(SIGTSTP, &act, 0);
+		sigaction(SIGTTIN, &act, 0);
+		sigaction(SIGTTOU, &act, 0);
+	}
 
 	/* --------------------------------------------------------------
 	 * Set special rundown handler for the following terminal signals

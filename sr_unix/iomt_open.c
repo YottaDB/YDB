@@ -97,7 +97,7 @@ short iomt_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	d_mt_struct	*mt, newmt;
 	iosb		io_status_blk;
 	io_desc		*ioptr;
-	mident		tab;
+	char		*tab;
 	int		p_offset;
 
 	error_def(ERR_MTRECTOOBIG);
@@ -197,10 +197,9 @@ short iomt_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			newmt.labeled = FALSE;
 			break;
 		case iop_label:
-			memset(&tab, 0, sizeof(mident));
 			len = *(pp->str.addr + p_offset);
-			memcpy(&tab.c[0], (pp->str.addr + p_offset + 1), (len < sizeof(mident) ? len : sizeof(mident)));
-			if ((lab_type = namelook(mtlab_index, mtlab_names, tab.c)) < 0)
+			tab = pp->str.addr + p_offset + 1;
+			if ((lab_type = namelook(mtlab_index, mtlab_names, tab, len)) < 0)
 			{
 				iomt_closesp(fd);
 				rts_error(VARLSTCNT(1) ERR_MTINVLAB);

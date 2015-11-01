@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "min_max.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -23,15 +24,16 @@ GBLREF lvzwrite_struct lvzwrite_block;
 
 unsigned char *lvzwr_key(unsigned char *buff, int size)
 {
-	int	sub_idx;
+	int	sub_idx, len;
 	mstr	sub;
 	unsigned char *cp, *cq;
 
-	for (cp = (unsigned char *)lvzwrite_block.curr_name, cq = cp + sizeof(mident); cp < cq && *cp && size; cp++)
-	{
-		*buff++ = *cp;
-		size--;
-	}
+	len = MIN(size, lvzwrite_block.curr_name->len);
+	assert(MAX_MIDENT_LEN >= len);
+	memcpy(buff, lvzwrite_block.curr_name->addr, len);
+	size -= len;
+	buff += len;
+
 	if (lvzwrite_block.subsc_count)
 	{
 		if (size)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,12 +27,13 @@ GBLREF	bool		s2n_intlit;
 GBLREF	short int	last_source_column;
 GBLREF	char		window_token;
 GBLREF	mval		window_mval;
-GBLREF	mident		window_ident;
 GBLREF	char		director_token;
 GBLREF	mval		director_mval;
-GBLREF	mident		director_ident;
 GBLREF	char		*lexical_ptr;
 GBLREF	spdesc		stringpool;
+
+GBLREF	mident		window_ident;	/* the current identifier */
+GBLREF	mident		director_ident;	/* the look-ahead identifier */
 
 static readonly unsigned char apos_ok[] =
 {
@@ -50,13 +51,21 @@ void advancewindow(void)
 {
 	error_def(ERR_NUMOFLOW);
 	unsigned char	*cp1, *cp2, *cp3, x;
+	char		*tmp;
 	int		y;
 
 	last_source_column = source_column;
 	source_column = (unsigned char *) lexical_ptr - source_buffer + 1;
 	window_token = director_token;
 	window_mval = director_mval;
+
+	/* It is more efficient to swich buffers between window_ident and director_ident
+	 * instead of copying the text from director_ident to window_ident. This can be
+	 * done by exchanging the pointers window_ident.addr and director_ident.addr */
+	tmp = window_ident.addr;
 	window_ident = director_ident;
+	director_ident.addr = tmp;
+
 	if ((x = *lexical_ptr) > DEL)
 	{
 		director_token = TK_ERROR;
@@ -98,21 +107,17 @@ void advancewindow(void)
 	case TK_LOWER:
 	case TK_PERCENT:
 	case TK_UPPER:
-		cp2 = (unsigned char *) director_ident.c;
-		cp3 = cp2 + sizeof(director_ident.c);
+		cp2 = (unsigned char *)director_ident.addr;
+		cp3 = cp2 + MAX_MIDENT_LEN;
 		for (;;)
 		{
 			if (cp2 < cp3)
-			{	*cp2++ = x;
-			}
+				*cp2++ = x;
 			y = ctypetab[x = *++lexical_ptr];
 			if (y != TK_UPPER && y != TK_DIGIT && y != TK_LOWER)
-			{	break;
-			}
+				break;
 		}
-		while (cp2 < cp3)
-		{	*cp2++ = 0;
-		}
+		director_ident.len = cp2 - (unsigned char*)director_ident.addr;
 		director_token = TK_IDENT;
 		return;
 	case TK_PERIOD:

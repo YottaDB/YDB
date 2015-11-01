@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,17 +27,18 @@
 rhdtyp *make_dmode(void)
 {
 	rhdtyp		*base_address;
-	lbl_tables	*lbl;
+	lab_tabent	*lbl;
 	int		*lnr;
 	unsigned char	*code;
 						/* dummy code + label entry + line entries */
-	base_address = (rhdtyp *)malloc(sizeof(rhdtyp) + CODE_SIZE + sizeof(lbl_tables) + CODE_LINES * sizeof(int4));
-	memset(base_address,0,sizeof(rhdtyp) + CODE_SIZE + sizeof(lbl_tables) + CODE_LINES*sizeof(int4));
-	MEMCPY_LIT(&base_address->routine_name, GTM_DMOD);
+	base_address = (rhdtyp *)malloc(sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(int4));
+	memset(base_address,0,sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES*sizeof(int4));
+	base_address->routine_name.len = STR_LIT_LEN(GTM_DMOD);
+	base_address->routine_name.addr = GTM_DMOD;
 	base_address->ptext_ptr = sizeof(rhdtyp);
 	base_address->vartab_ptr =
 		base_address->labtab_ptr = sizeof(rhdtyp) + CODE_SIZE;	/* hdr + code */
-	base_address->lnrtab_ptr = sizeof(rhdtyp) + CODE_SIZE + sizeof(lbl_tables);
+	base_address->lnrtab_ptr = sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent);
 	base_address->labtab_len = 1;
 	base_address->lnrtab_len = CODE_LINES;
 	code = (unsigned char *) base_address + base_address->ptext_ptr;
@@ -52,7 +53,7 @@ rhdtyp *make_dmode(void)
 	*code++ = I386_INS_JMP_Jv;
 	*((int4 *)code) = (int4)((unsigned char *)opp_ret - (code + sizeof(int4)));
 	code += sizeof(int4);
-	lbl = (lbl_tables *)((int) base_address + base_address->labtab_ptr);
+	lbl = (lab_tabent *)((int) base_address + base_address->labtab_ptr);
 	lbl->lab_ln_ptr = base_address->lnrtab_ptr;
 	lnr = (int *)((int)base_address + base_address->lnrtab_ptr);
 	*lnr++ = base_address->ptext_ptr;
@@ -60,6 +61,6 @@ rhdtyp *make_dmode(void)
 	*lnr++ = base_address->ptext_ptr + 2 * CALL_SIZE;
 	assert(code - ((unsigned char *)base_address + base_address->ptext_ptr) == CODE_SIZE);
 	zlput_rname(base_address);
-	inst_flush(base_address, sizeof(rhdtyp) + CODE_SIZE + sizeof(lbl_tables) + CODE_LINES * sizeof(int4));
+	inst_flush(base_address, sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(int4));
 	return base_address;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,6 +83,8 @@ void lb_init(void)
 			{
 				for (cp1 = cp + 1; ; )
 				{
+					if (*cp1 >= NUM_ASCII_CHARS)
+						break;
 					y = ctypetab[*cp1];
 					if (y == TK_UPPER || y == TK_LOWER || y == TK_DIGIT || y == TK_PERIOD || y == TK_ATSIGN)
 						cp1++;

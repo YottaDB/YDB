@@ -23,6 +23,7 @@
 
 GBLREF gv_namehead	*gv_target;
 GBLREF bool		transform;
+GBLREF gd_region       *gv_cur_region;
 
 static readonly unsigned char pos_code[100] =
 {
@@ -106,7 +107,7 @@ unsigned char *mval2subsc( mval *v , gv_key *g )
 			mstr_ch.addr = (char*) in_ptr;
 			mstr_buf1.len = 256;
 			mstr_buf1.addr = buf1;
-			do_xform(gv_target->collseq, XFORM, &mstr_ch, &mstr_buf1, &n);
+			do_xform(gv_target->collseq, XFORM, &mstr_ch, &mstr_buf1, (int *)&n);
 			in_ptr = (unsigned char *) buf1;
                 }
 		if (g->end + n + 3 > g->top - MAX_NUM_SUBSC_LEN )
@@ -116,23 +117,30 @@ unsigned char *mval2subsc( mval *v , gv_key *g )
 			}
 			rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - &buff[0] , &buff[0]);
 		}
-		*out_ptr++ = 0xff;
-
-		for( ;n > 0; n--)
+		if (n > 0)
 		{
-			ch = *in_ptr++;
-			if (ch <= 1)
+			*out_ptr++ = STR_SUB_PREFIX;
+			do
 			{
-				*out_ptr++ = 1;
-				if ( out_ptr - g->base + n + 3 > g->top - MAX_NUM_SUBSC_LEN)
-				{	if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
-					{	end = &buff[MAX_ZWR_KEY_SZ - 1];
+				ch = *in_ptr++;
+				if (ch <= 1)
+				{
+					*out_ptr++ = STR_SUB_ESCAPE;
+					if ( out_ptr - g->base + n + 3 > g->top - MAX_NUM_SUBSC_LEN)
+					{
+						if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
+						{
+							end = &buff[MAX_ZWR_KEY_SZ - 1];
+						}
+						rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - &buff[0] , &buff[0]);
 					}
-					rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - &buff[0] , &buff[0]);
+					ch++;	/* promote character */
 				}
-				ch++;
-			}
-			*out_ptr++ = ch;
+				*out_ptr++ = ch;
+			} while (--n > 0);
+		} else
+		{
+			*out_ptr++ = (!transform || 0 == gv_cur_region->std_null_coll) ? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL ;
 		}
 		goto FINI;
 	}

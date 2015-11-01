@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,8 @@
 #define DIR_MODE_MESS		"    (Direct mode) "
 #define UNK_LOC_MESS		"        Indirection"
 
+#define MAX_FRAME_MESS_LEN	20	/* Maximum length of any of the frame messages above */
+
 #define HAS_TRANS_CODE_ERR(fp)	(fp->flags & SFF_ZTRAP_ERR || fp->flags & SFF_DEV_ACT_ERR)
 
 GBLREF stack_frame *frame_pointer;
@@ -37,7 +39,7 @@ void zshow_stack(zshow_out *output)
 	unsigned short	nocount_frames[64], *nfp, *nfp_top;
 	stack_frame	*fp;
 	mstr 		v;
-	unsigned char	buff[132];
+	unsigned char	buff[MAX_ENTRYREF_LEN + MAX_FRAME_MESS_LEN];
 
 	v.addr = (char *)&buff[0];
 	flush_pio();

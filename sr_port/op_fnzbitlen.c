@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,11 +25,9 @@ void op_fnzbitlen(mval *dst, mval *bitstr)
 		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
 
 	byte_1 = (unsigned char *)bitstr->str.addr;
-	str_len = (bitstr->str.len -1) * 8;
-	if ((*byte_1 < 0) || (*byte_1 > 7))
-	{
+	str_len = (bitstr->str.len - 1) * 8;
+	if (7 < *byte_1)
 		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
-	}
 	else
 		len = str_len - *byte_1;
 

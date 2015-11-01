@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,7 @@
 
 #include "mdef.h"
 
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
 #endif
@@ -29,6 +28,7 @@
 #include "jnl_write.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#include "jnl_get_checksum.h"
 
 GBLREF  jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF 	jnl_gbls_t		jgbl;
@@ -42,6 +42,7 @@ void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 	eof_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 	eof_record->prefix.pini_addr = (0 == csa->jnl->pini_addr) ? JNL_HDR_LEN : csa->jnl->pini_addr;
 	eof_record->prefix.tn = csa->hdr->trans_hist.curr_tn;
+	eof_record->prefix.checksum = INIT_CHECKSUM_SEED;
 	assert(jgbl.gbl_jrec_time);
 	if (!jgbl.gbl_jrec_time)
 	{	/* no idea how this is possible, but just to be safe */
@@ -51,7 +52,7 @@ void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 	assert(NULL == jnlpool_ctl  ||  csa->hdr->reg_seqno <= jnlpool_ctl->jnl_seqno);
 	if (!jgbl.forw_phase_recovery)
 	{
-		if (REPL_ENABLED(csa))
+		if (REPL_ALLOWED(csa))
 			eof_record->jnl_seqno = csa->hdr->reg_seqno;/* Note we cannot use jnlpool_ctl->jnl_seqno since
 									      * we might not presently hold the journal pool lock */
 		else

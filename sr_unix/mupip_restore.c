@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,18 +11,19 @@
 
 #include "mdef.h"
 
-#include <sys/wait.h>
-#include <errno.h>
 #include "gtm_fcntl.h"
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include "gtm_unistd.h"
+#include "gtm_socket.h"
+#include "gtm_inet.h"
+#include "gtm_stdio.h"
+#include "gtm_string.h"
+
+#include <sys/wait.h>
+#include <stddef.h>
+#include <errno.h>
 #ifdef __MVS__
 #include <sys/time.h>
 #endif
-
-#include "gtm_stdio.h"
-#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -60,22 +61,24 @@
 #include "gtmmsg.h"
 #include "wcs_sleep.h"
 #include "ftok_sems.h"
+#include "gds_blk_downgrade.h"
+#include "shmpool.h"
+#include "min_max.h"
 
-#define	INC_BACKUP_CHUNK_SIZE	(31*1024)
-#define	BLOCKING_FACTOR		32
-#define COMMON_READ(A,B,C)	{						\
-					(*common_read)(A,B,C);			\
-					if (0 != restore_read_errno)		\
-						mupip_exit(ERR_MUPRESTERR);	\
-				}
+#define COMMON_READ(S, BUFF, LEN)				\
+        {							\
+		assert(BACKUP_TEMPFILE_BUFF_SIZE >= LEN);	\
+		(*common_read)(S, BUFF, LEN);			\
+		if (0 != restore_read_errno)			\
+			mupip_exit(ERR_MUPRESTERR);		\
+	}
 GBLDEF	inc_list_struct		in_files;
 GBLREF	uint4			pipe_child;
 GBLREF	tcp_library_struct	tcp_routines;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	uint4			restore_read_errno;
 
-static readonly char end_msg[] = "END OF SAVED BLOCKS";
-static readonly char hdr_msg[] = "END OF FILE HEADER";
+LITREF	char			*gtm_dbversion_table[];
 
 static void exec_read(BFILE *bf, char *buf, int nbytes);
 static void tcp_read(BFILE *bf, char *buf, int nbytes);
@@ -103,13 +106,13 @@ CONDITION_HANDLER(iob_io_error)
 void mupip_restore(void)
 {
 	static readonly char	label[] =   GDS_LABEL;
-	char			db_name[MAX_FN_LEN + 1], *inbuf, *p;
+	char			db_name[MAX_FN_LEN + 1], *inbuf, *p, *blk_ptr;
 	inc_list_struct 	*ptr;
 	inc_header		*inhead;
 	sgmnt_data		*old_data;
 	short			iosb[4];
 	unsigned short		n_len;
-	int4			status, vbn, rsize, temp, save_errno;
+	int4			status, rsize, size, temp, save_errno, old_start_vbn;
 	uint4			rest_blks, totblks;
 	trans_num		curr_tn;
 	uint4			ii;
@@ -119,8 +122,7 @@ void mupip_restore(void)
 	BFILE			*in;
 	int			i, db_fd;
  	uint4			old_blk_size, old_tot_blks, bplmap;
-	short			old_start_vbn;
-	off_t			new_eof;
+	off_t			new_eof, offset;
 	char			buff[DISK_BLOCK_SIZE];
  	char			msg_buffer[1024], *newmap, *newmap_bptr;
 	mstr			msg_string;
@@ -133,6 +135,7 @@ void mupip_restore(void)
 	void			(*common_read)();
 	char			*errptr;
 	pid_t			waitpid_res;
+	shmpool_blk_hdr_ptr_t	sblkh_p;
 
 	error_def(ERR_MUPRESTERR);
 	error_def(ERR_MUPCLIERR);
@@ -163,8 +166,7 @@ void mupip_restore(void)
 		mupip_exit(save_errno);
 	}
 	murgetlst();
-	inbuf = (char*)malloc(INC_BACKUP_CHUNK_SIZE);
-	old_data = (sgmnt_data*)malloc(sizeof(sgmnt_data));
+	old_data = (sgmnt_data *)malloc(sizeof(sgmnt_data));
 	LSEEKREAD(db_fd, 0, old_data, sizeof(sgmnt_data), save_errno);
 	if (0 != save_errno)
 	{
@@ -187,7 +189,6 @@ void mupip_restore(void)
 	{
 		util_out_print("Output file !AD has an unrecognizable format", TRUE, n_len, db_name);
 		free(old_data);
-		free(inbuf);
 		db_ipcs_reset(gv_cur_region, TRUE);
 		mu_gv_cur_reg_free();
 		mupip_exit(ERR_MUPRESTERR);
@@ -198,6 +199,8 @@ void mupip_restore(void)
 	old_tot_blks = old_data->trans_hist.total_blks;
 	old_start_vbn = old_data->start_vbn;
  	bplmap = old_data->bplmap;
+	inbuf = (char *)malloc(BACKUP_TEMPFILE_BUFF_SIZE);
+	sblkh_p = (shmpool_blk_hdr_ptr_t)inbuf;
 	free(old_data);
 
 	msg_string.addr = msg_buffer;
@@ -249,6 +252,7 @@ void mupip_restore(void)
 						ptr->input_file.len, ptr->input_file.addr);
 					errptr = (char *)STRERROR(save_errno);
 					util_out_print("open : !AZ", TRUE, errptr);
+					free(inbuf);
 					db_ipcs_reset(gv_cur_region, TRUE);
 					mu_gv_cur_reg_free();
 					mupip_exit(save_errno);
@@ -263,6 +267,7 @@ void mupip_restore(void)
 				{
 					util_out_print("Error creating input pipe from !AD.",
 						TRUE, ptr->input_file.len, ptr->input_file.addr);
+					free(inbuf);
 					db_ipcs_reset(gv_cur_region, TRUE);
 					mu_gv_cur_reg_free();
 					mupip_exit(ERR_MUPRESTERR);
@@ -283,11 +288,13 @@ void mupip_restore(void)
 						break;
 					default :
 						util_out_print("Error : A hostname has to be specified.", TRUE);
+						free(inbuf);
 						db_ipcs_reset(gv_cur_region, TRUE);
 						mu_gv_cur_reg_free();
 						mupip_exit(ERR_MUPRESTERR);
 				}
-				if ((0 == cli_get_int("NETTIMEOUT", &timeout)) || (0 > timeout))
+				assert(sizeof(timeout) == sizeof(int));
+				if ((0 == cli_get_int("NETTIMEOUT", (int4 *)&timeout)) || (0 > timeout))
 					timeout = DEFAULT_BKRS_TIMEOUT;
 				in = (BFILE *)malloc(sizeof(BFILE));
 				iotcp_fillroutine();
@@ -295,6 +302,7 @@ void mupip_restore(void)
 				{
 					util_out_print("Error establishing TCP connection to !AD.",
 						TRUE, ptr->input_file.len, ptr->input_file.addr);
+					free(inbuf);
 					db_ipcs_reset(gv_cur_region, TRUE);
 					mu_gv_cur_reg_free();
 					mupip_exit(ERR_MUPRESTERR);
@@ -303,6 +311,7 @@ void mupip_restore(void)
 			default:
 				util_out_print("Aborting restore!/", TRUE);
 				util_out_print("Unrecognized input format !AD", TRUE, ptr->input_file.len, ptr->input_file.addr);
+				free(inbuf);
 				db_ipcs_reset(gv_cur_region, TRUE);
 				mu_gv_cur_reg_free();
 				mupip_exit(ERR_MUPRESTERR);
@@ -319,8 +328,9 @@ void mupip_restore(void)
 		}
 		if (curr_tn != inhead->start_tn)
 		{
-			util_out_print("Transaction in input file !AD does not align with database TN.!/DB: !XL!_Input file: !XL",
-				TRUE, ptr->input_file.len, ptr->input_file.addr, curr_tn, inhead->start_tn);
+			util_out_print("Transaction in input file !AD does not align with database TN.!/DB: !16@XJ!_"
+				       "Input file: !16@XJ", TRUE, ptr->input_file.len, ptr->input_file.addr,
+				       &curr_tn, &inhead->start_tn);
 			free(inbuf);
 			db_ipcs_reset(gv_cur_region, TRUE);
 			mu_gv_cur_reg_free();
@@ -328,7 +338,8 @@ void mupip_restore(void)
 		}
 		if (old_blk_size != inhead->blk_size)
 		{
-			util_out_print("Incompatable block size.  Output file !AD has block size !XL,", TRUE, n_len, db_name);
+			util_out_print("Incompatable block size.  Output file !AD has block size !XL,", TRUE, n_len, db_name,
+				       old_blk_size);
 			util_out_print("while input file !AD is from a database with block size !XL,", TRUE, ptr->input_file.len,
 				ptr->input_file.addr, inhead->blk_size);
 			free(inbuf);
@@ -351,12 +362,13 @@ void mupip_restore(void)
 				mu_gv_cur_reg_free();
 				mupip_exit(ERR_MUPRESTERR);
 			} else
-			{	/* this part of the code is similar to gdsfilext except that you don't need to do
-				 * most of the work that gdsfilext does. However, for situations where the database
-				 * extended since the last backup (the beginning of this incremental backup), and
-				 * there are new bitmaps that are never touched later on by GT.M, these bitmaps
-				 * will have tn == 0, which prevents the backup process to pick up these blocks,
-				 * so, we need to initialize these bitmaps here
+			{	/* The db must be exteneded which we will do ourselves (to avoid jnl and other interferences
+				   in gdsfilext). These local bit map blocks will be created in GDSVCURR format (always). The
+				   reason for this is that we do not know at this time whether these blocks will be replaced
+				   by blocks in the backup or not. If we are in compatibility mode, this is highly likely
+				   even if before image journaling is on which creates bit maps with TN=0. In either case,
+				   a GDSVCURR format block is the only one that can be added to the database without affecting
+				   the blks_to_upgrd counter.
 				 */
 				new_eof = ((off_t)(old_start_vbn - 1) * DISK_BLOCK_SIZE)
 						+ ((off_t)inhead->db_total_blks * old_blk_size);
@@ -382,13 +394,14 @@ void mupip_restore(void)
         			if (DIVIDE_ROUND_DOWN(inhead->db_total_blks, bplmap) > DIVIDE_ROUND_DOWN(old_tot_blks, bplmap))
         			{	/* -- similar logic exist in bml_newmap.c, which need to pick up any new updates here -- */
 					newmap = (char *)malloc(old_blk_size);
+					((blk_hdr *)newmap)->bver = GDSVCURR;
 					((blk_hdr *)newmap)->bsiz = BM_SIZE(bplmap);
 					((blk_hdr *)newmap)->levl = LCL_MAP_LEVL;
 					((blk_hdr *)newmap)->tn = curr_tn;
 					newmap_bptr = newmap + sizeof(blk_hdr);
 					*newmap_bptr++ = THREE_BLKS_FREE;
 					memset(newmap_bptr, FOUR_BLKS_FREE, BM_SIZE(bplmap) - sizeof(blk_hdr) - 1);
-			                for (ii = ROUND_UP(old_tot_blks, bplmap); ii <= inhead->db_total_blks; ii += bplmap)
+			                for (ii = ROUND_UP(old_tot_blks, bplmap); ii < inhead->db_total_blks; ii += bplmap)
                 			{
 						new_eof = (off_t)(old_start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)ii * old_blk_size;
 						LSEEKWRITE(db_fd, new_eof, newmap, old_blk_size, status);
@@ -409,31 +422,57 @@ void mupip_restore(void)
 				old_tot_blks = inhead->db_total_blks;
 			}
 		}
-		COMMON_READ(in, &rsize, sizeof(int4));
+		rsize = sizeof(shmpool_blk_hdr) + inhead->blk_size;
 		for ( ; ;)
-		{	/* rsize is the size of the record, including the size, but, since the size has already been
-			   read in, this will read in the current record and the size for the next record */
-		        /* ensure we have a reasonable record size, at least */
-		        if (rsize - sizeof(int4) - sizeof(block_id) > old_blk_size)
-			{
+		{        /* All reords are of fixed size so process until we get to a zeroed record marking the end */
+			COMMON_READ(in, inbuf, rsize);	/* Note rsize == sblkh_p */
+			if (0 == sblkh_p->blkid && FALSE == sblkh_p->valid_data)
+			{	/* This is supposed to be the end of list marker (null entry */
+				COMMON_READ(in, &rsize, sizeof(rsize));
+				if (sizeof(END_MSG) + sizeof(int4) == rsize)
+				{	/* the length of our secondary check is correct .. now check substance */
+					COMMON_READ(in, inbuf, rsize - sizeof(int4));
+					if (0 == MEMCMP_LIT(inbuf, END_MSG))
+						break;	/* We are done */
+				}
 				util_out_print("Invalid information in restore file !AD. Aborting restore.",
-					TRUE, ptr->input_file.len,
-					ptr->input_file.addr);
+					       TRUE, ptr->input_file.len,
+					       ptr->input_file.addr);
+				assert(FALSE);
 				iob_close(in);
+				free(inbuf);
 				db_ipcs_reset(gv_cur_region, TRUE);
 				mu_gv_cur_reg_free();
 				mupip_exit(ERR_MUPRESTERR);
 			}
-		    	COMMON_READ(in, inbuf, rsize);
-			if (!memcmp(inbuf, &end_msg[0], sizeof end_msg - 1))
-				break;
 			rest_blks++;
-			blk_num = *(block_id*)inbuf;
-			vbn = old_start_vbn - 1 + (old_blk_size / DISK_BLOCK_SIZE * blk_num);
+			blk_num = sblkh_p->blkid;
+			/* For blocks that were read during the main backup phase of stream backup, the blocks are
+			   recorded without version (there may even be some garbage blocks in the stream of
+			   indeterminate/invalid format if a bitmap was written out prior to the data blocks that
+			   were recently allocated in it). For these blocks, we just write out what we have as a
+			   full block. For blocks that were written out during the backup as part of the online
+			   image processing, these are always recorded in V5 mode. We will rewrite these in the mode
+			   they were oringally found on disk (potentially necessitating a downgrade of the block).
+			   This allows us to exactly match the blks_to_upgrade counter in the saved file-header without
+			   worrying about what blocks were converted (or not) in the interim.
+			*/
+			blk_ptr = inbuf + sizeof(shmpool_blk_hdr);
+			size = old_blk_size;
+			if (GDSNOVER != sblkh_p->use.bkup.ondsk_blkver)
+			{	/* Specifically versioned blocks - Put them back in the version they were originally */
+				if (GDSV4 == sblkh_p->use.bkup.ondsk_blkver)
+				{
+					gds_blk_downgrade((v15_blk_hdr_ptr_t)blk_ptr, (blk_hdr_ptr_t)blk_ptr);
+					size = (((v15_blk_hdr_ptr_t)blk_ptr)->bsiz + 1) & ~1;
+				} else
+					size = (((blk_hdr_ptr_t)blk_ptr)->bsiz + 1) & ~1;
+			}
+			offset = (old_start_vbn - 1) * DISK_BLOCK_SIZE + ((off_t)old_blk_size * blk_num);
 			LSEEKWRITE(db_fd,
-				   (off_t)vbn * DISK_BLOCK_SIZE,
-				   inbuf + sizeof(block_id),
-				   rsize - sizeof(block_id) - sizeof(int4),
+				   offset,
+				   blk_ptr,
+				   size,
 				   save_errno);
 			if (0 != save_errno)
 			{
@@ -441,23 +480,54 @@ void mupip_restore(void)
 					TRUE, n_len, db_name);
 				errptr = (char *)STRERROR(save_errno);
 				util_out_print("write : !AZ", TRUE, errptr);
+				free(inbuf);
 				db_ipcs_reset(gv_cur_region, TRUE);
 				mu_gv_cur_reg_free();
 				mupip_exit(save_errno);
 			}
-			GET_LONG(temp, (inbuf + rsize - sizeof(int4)));
-			rsize = temp;
+		}
+		/* Next section is the file header which we need to restore */
+		COMMON_READ(in, &rsize, sizeof(rsize));
+		assert((sizeof(sgmnt_data) + sizeof(int4)) == rsize);
+		COMMON_READ(in, inbuf, rsize);
+		((sgmnt_data_ptr_t)inbuf)->start_vbn = old_start_vbn;
+		((sgmnt_data_ptr_t)inbuf)->free_space = ((old_start_vbn - 1) * DISK_BLOCK_SIZE) - SIZEOF_FILE_HDR(inbuf);
+		LSEEKWRITE(db_fd, 0, inbuf, rsize - sizeof(int4), save_errno);
+		if (0 != save_errno)
+		{
+			util_out_print("Error accessing output file !AD. Aborting restore.",
+				       TRUE, n_len, db_name);
+			errptr = (char *)STRERROR(save_errno);
+			util_out_print("write : !AZ", TRUE, errptr);
+			db_ipcs_reset(gv_cur_region, TRUE);
+			mu_gv_cur_reg_free();
+			mupip_exit(save_errno);
 		}
 		GET_LONG(temp, (inbuf + rsize - sizeof(int4)));
 		rsize = temp;
-		vbn = 0;
-		for (i = 0;  ;  i++)	/* Restore file header */
+		COMMON_READ(in, inbuf, rsize);
+		if (0 != MEMCMP_LIT(inbuf, HDR_MSG))
+		{
+			util_out_print("Unexpected backup format error restoring !AD. Aborting restore.",
+				       TRUE, n_len, db_name);
+			errptr = (char *)STRERROR(save_errno);
+			util_out_print("write : !AZ", TRUE, errptr);
+			db_ipcs_reset(gv_cur_region, TRUE);
+			mu_gv_cur_reg_free();
+			mupip_exit(save_errno);
+		}
+
+		GET_LONG(temp, (inbuf + rsize - sizeof(int4)));
+		rsize = temp;
+		offset = (MM_BLOCK - 1) * DISK_BLOCK_SIZE;
+		assert(SGMNT_HDR_LEN == offset);	/* Still have contiguou master map for now */
+		for (i = 0;  ;  i++)			/* Restore master map */
 		{
 		    	COMMON_READ(in, inbuf, rsize);
-			if (!memcmp(inbuf, &hdr_msg[0], sizeof hdr_msg - 1))
+			if (!MEMCMP_LIT(inbuf, MAP_MSG))
 				break;
 			LSEEKWRITE(db_fd,
-				   vbn,
+				   offset,
 				   inbuf,
 				   rsize - sizeof(int4),
 				   save_errno);
@@ -471,7 +541,7 @@ void mupip_restore(void)
 				mu_gv_cur_reg_free();
 				mupip_exit(save_errno);
 			}
-			vbn += rsize - sizeof(int4);
+			offset += rsize - sizeof(int4);
 			GET_LONG(temp, (inbuf + rsize - sizeof(int4)));
 			rsize = temp;
 		}

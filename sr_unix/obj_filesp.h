@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,13 +36,7 @@ void buff_flush(void);
 #else
 #  define JSB_ACTION_N_INS	2
 #endif
-
 #define JSB_MARKER		"GTM_CODE"
 #define MIN_LINK_PSECT_SIZE	0
-#define PADCHARS 		"PADDING PADDING"
-
-#ifndef SECTION_ALIGN_BOUNDARY
-#define SECTION_ALIGN_BOUNDARY	8
-#endif
 
 #endif

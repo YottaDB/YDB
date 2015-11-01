@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,8 @@
 
 #include "mdef.h"
 
-#include <fcntl.h>	/* needed for silly aix's expansion of open to open64 */
-#include <unistd.h>
+#include "gtm_fcntl.h"	/* needed for silly aix's expansion of open to open64 */
+#include "gtm_unistd.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -24,8 +24,8 @@
 #include "filestruct.h"
 #include "gdscc.h"
 #include "jnl.h"
-#include "hashtab.h"		/* for tp.h */
 #include "buddy_list.h"		/* for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"			/* for tp_region definition */
 #include "gt_timer.h"		/* for TID definition */
 #include "timers.h"		/* for TIM_DEFER_DBSYNC #define */
@@ -105,6 +105,12 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		 *   2) We are aquiring/releasing crit in any region (Strictly speaking it is enough
 		 *		to check this in the current region, but doesn't harm us much).
              	 *   3) We have crit in the current region or we need to wait to obtain crit.
+		 *   	At least one reason why we should not wait to obtain crit is because the timeout mechanism
+		 *   	for the critical section is currently (as of 2004 May) driven by heartbeat on Tru64, AIX,
+		 *   	Solaris and HPUX. The periodic heartbeat handler cannot pop as it is a SIGALRM
+		 *   	handler and cannot nest while we are already in a SIGALRM handler for the wcs_clean_dbsync.
+		 *   	Were this to happen, we could end up waiting for crit, not being able to interrupt the wait
+		 *   	with a timeout resulting in a hang until crit became available.
            	 *   4) We are in a "fast lock".
 		 *   5) We are in gtm_malloc. Don't want to recurse on malloc.
 		 * Other deadlock causing conditions that need to be taken care of
@@ -117,7 +123,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			GTM_MALLOC_NO_RENT_ONLY(&& 0 == gtmMallocDepth)
 			&& (0 == crit_count)       && (0 == fast_lock_count)
 			&& (!jnl_qio_in_prog)      && (!db_fsync_in_prog)
-		        && (!jpc || !jpc->jnl_buff || (LOCK_AVAILABLE == jpc->jnl_buff->fsync_in_prog_latch.latch_pid))
+		        && (!jpc || !jpc->jnl_buff || (LOCK_AVAILABLE == jpc->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid))
 			&& (NULL == check_csaddrs || FALSE == check_csaddrs->now_crit) && (FALSE == csa->now_crit)
 			&& (FALSE != tp_grab_crit(reg)))
 		{

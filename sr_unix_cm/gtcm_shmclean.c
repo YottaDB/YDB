@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,22 +12,18 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
-
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"		/* for exit() */
 #include "gtm_unistd.h"		/* for getopt() and read() */
+#include "gtm_fcntl.h"
+#include "gtm_ipc.h"
 
-#include "iosp.h"
-
-#include <fcntl.h>
 #include <sys/types.h>
-#include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/msg.h>		/* for msgget() and msgctl() prototype */
 #include <sys/sem.h>		/* for semget() and semctl() prototype */
 
-#include "daemon.h"
+#include "iosp.h"
 #include "rc_cpt.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -39,7 +35,10 @@
 
 int	quiet = 0;
 
-clean_mem(char *name)
+void	clean_mem(char *name);
+void	database_clean(char *path);
+
+void	clean_mem(char *name)
 {
 	mstr	path1, path2;
 	int	semid;
@@ -94,7 +93,7 @@ clean_mem(char *name)
 	}
 }
 
-database_clean(char *path)
+void	database_clean(char *path)
 {
 	key_t	d_key;
 	int	shmid;
@@ -183,8 +182,6 @@ int main(int argc, char_ptr_t argv[])
 			exit(0);
 		}
 	}
-	if (daemon == 1)
-		clean_mem(DAEMON_PATH);
 	if (server == 1 && daemon == 0)
 		clean_mem(RC_CPT_PATH);
 }

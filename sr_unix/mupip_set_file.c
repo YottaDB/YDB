@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,13 +11,14 @@
 
 #include "mdef.h"
 
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include "gtm_fcntl.h"
-#include <sys/ipc.h>
-#include <sys/sem.h>
+#include "gtm_ipc.h"
 #include "gtm_stdio.h"
 #include "gtm_stat.h"
 #include "gtm_string.h"
+
+#include <sys/sem.h>
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -36,8 +37,8 @@
 #include "mupipbckup.h"
 #include "timersp.h"
 #include "gt_timer.h"
-#include "hashtab.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "util.h"
 #include "mupip_set.h"
@@ -45,12 +46,14 @@
 #include "mupip_exit.h"
 #include "ipcrmid.h"
 #include "mu_gv_cur_reg_init.h"
-#include "gvcst_init.h"
+#include "gvcst_protos.h"	/* for gvcst_init prototype */
 #include "timers.h"
 #include "ftok_sems.h"
 #include "wcs_flu.h"
 #include "gds_rundown.h"
 #include "change_reg.h"
+#include "desired_db_format_set.h"
+#include "gtmmsg.h"		/* for gtm_putmsg prototype */
 
 GBLREF tp_region		*grlist;
 GBLREF gd_region		*gv_cur_region;
@@ -58,39 +61,39 @@ GBLREF sgmnt_data_ptr_t		cs_data;
 GBLREF sgmnt_addrs		*cs_addrs;
 GBLREF bool			region;
 GBLREF bool			in_backup;
+LITREF char			*gtm_dbversion_table[];
 
 #define MAX_ACC_METH_LEN	2
-
-CONDITION_HANDLER(mupip_set_file_ch)
-{
-	START_CH
-	db_ipcs_reset(gv_cur_region, TRUE);
-	CONTINUE
-}
+#define MAX_DB_VER_LEN		2
 
 int4 mupip_set_file(int db_fn_len, char *db_fn)
 {
-	bool			need_standalone = FALSE, got_standalone;
-	boolean_t		bypass_partial_recov;
-	char			acc_spec[MAX_ACC_METH_LEN], exit_stat, *fn;
-	unsigned short		acc_spec_len = MAX_ACC_METH_LEN;
-	int			fd, fn_len, new_cache_size, reserved_bytes, new_extn_count,
-				new_lock_space, new_disk_wait, status;
-	int			glbl_buff_status, defer_status, rsrvd_bytes_status, defer_time,
+	bool			got_standalone;
+	boolean_t		bypass_partial_recov, need_standalone = FALSE;
+	char			acc_spec[MAX_ACC_METH_LEN], ver_spec[MAX_DB_VER_LEN], exit_stat, *fn;
+	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
+	int			fd, fn_len;
+	uint4			status;
+	int4			status1;
+	int			glbl_buff_status, defer_status, rsrvd_bytes_status,
 				extn_count_status, lock_space_status, disk_wait_status;
+	int4			new_disk_wait, new_cache_size, new_extn_count, new_lock_space, reserved_bytes, defer_time;
 	sgmnt_data_ptr_t	csd;
 	tp_region		*rptr, single;
 	enum db_acc_method	access, access_new;
+	enum db_ver		desired_dbver;
 	gd_region		*temp_cur_region;
-	char			*errptr;
+	char			*errptr, *command = "MUPIP SET VERSION";
 	int			save_errno;
 
+	error_def(ERR_DBPREMATEOF);
+	error_def(ERR_DBRDERR);
+	error_def(ERR_DBRDONLY);
+	error_def(ERR_INVACCMETHOD);
+	error_def(ERR_MUNOACTION);
+	error_def(ERR_RBWRNNOTCHG);
 	error_def(ERR_WCERRNOTCHG);
 	error_def(ERR_WCWRNNOTCHG);
-	error_def(ERR_INVACCMETHOD);
-	error_def(ERR_DBRDERR);
-	error_def(ERR_RBWRNNOTCHG);
-	error_def(ERR_DBPREMATEOF);
 
 	exit_stat = EXIT_NRM;
 	defer_status = cli_present("DEFER_TIME");
@@ -207,6 +210,19 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	} else
 		access = n_dba;		/* really want to keep current method,
 					    which has not yet been read */
+	if (cli_present("VERSION"))
+	{
+		assert(!need_standalone);
+		cli_get_str("VERSION", ver_spec, &ver_spec_len);
+		cli_strupper(ver_spec);
+		if (0 == memcmp(ver_spec, "V4", ver_spec_len))
+			desired_dbver = GDSV4;
+		else  if (0 == memcmp(ver_spec, "V5", ver_spec_len))
+			desired_dbver = GDSV5;
+		else
+			GTMASSERT;		/* CLI should prevent us ever getting here */
+	} else
+		desired_dbver = GDSVLAST;	/* really want to keep version, which has not yet been read */
 	if (region)
 		rptr = grlist;
 	else
@@ -214,8 +230,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		rptr = &single;
 		memset(&single, 0, sizeof(single));
 	}
-	/* We should not establish mupip_set_file_ch before this point, because above is just parsing */
-	ESTABLISH_RET(mupip_set_file_ch, (int4)ERR_WCWRNNOTCHG);
+
 	csd = (sgmnt_data *)malloc(ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE));
 	in_backup = FALSE;		/* Only want yes/no from mupfndfil, not an address */
 	for (;  rptr != NULL;  rptr = rptr->fPtr)
@@ -244,23 +259,48 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		{
 			gvcst_init(gv_cur_region);
 			change_reg();	/* sets cs_addrs and cs_data */
+			if (gv_cur_region->read_only)
+			{
+				gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+				exit_stat |= EXIT_ERR;
+				gds_rundown();
+				mu_gv_cur_reg_free();
+				continue;
+			}
 			grab_crit(gv_cur_region);
-			if (extn_count_status)
-				cs_data->extension_size = new_extn_count;
-			wcs_flu(WCSFLU_FLUSH_HDR);
-			if (extn_count_status)
-				util_out_print("Database file !AD now has extension count !UL",
+			status = EXIT_NRM;
+			if (GDSVLAST != desired_dbver)
+			{
+				status1 = desired_db_format_set(gv_cur_region, desired_dbver, command);
+				if (SS_NORMAL != status1)
+				{	/* "desired_db_format_set" would have printed appropriate error messages */
+					if (ERR_MUNOACTION != status1)
+					{	/* real error occurred while setting the db format. skip to next region */
+						status = EXIT_ERR;
+					}
+				}
+			}
+			if (EXIT_NRM == status)
+			{
+				if (extn_count_status)
+					cs_data->extension_size = (uint4)new_extn_count;
+				wcs_flu(WCSFLU_FLUSH_HDR);
+				if (extn_count_status)
+					util_out_print("Database file !AD now has extension count !UL",
 						TRUE, fn_len, fn, cs_data->extension_size);
+				if (GDSVLAST != desired_dbver)
+					util_out_print("Database file !AD now has desired DB format !AD", TRUE,
+						fn_len, fn, LEN_AND_STR(gtm_dbversion_table[cs_data->desired_db_format]));
+			} else
+				exit_stat |= status;
 			rel_crit(gv_cur_region);
 			gds_rundown();
 		} else
 		{	/* Following part needs standalone access */
+			assert(GDSVLAST == desired_dbver);
 			got_standalone = mu_rndwn_file(gv_cur_region, TRUE);
 			if (FALSE == got_standalone)
-			{
-				REVERT;
 				return (int4)ERR_WCERRNOTCHG;
-			}
 			/* we should open it (for changing) after mu_rndwn_file, since mu_rndwn_file changes the file header too */
 			if (-1 == (fd = OPEN(fn, O_RDWR)))
 			{
@@ -269,13 +309,14 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				util_out_print("open : !AZ", TRUE, errptr);
 				exit_stat |= EXIT_ERR;
 				db_ipcs_reset(gv_cur_region, FALSE);
+				mu_gv_cur_reg_free();
 				continue;
 			}
 			LSEEKREAD(fd, 0, csd, sizeof(sgmnt_data), status);
 			if (0 != status)
 			{
-				PERROR("Error reading header of file");
 				save_errno = errno;
+				PERROR("Error reading header of file");
 				errptr = (char *)STRERROR(save_errno);
 				util_out_print("read : !AZ", TRUE, errptr);
 				util_out_print("Error reading header of file", TRUE);
@@ -290,9 +331,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				if (reserved_bytes > MAX_RESERVE_B(csd))
 				{
 					util_out_print("!UL too large, maximum reserved bytes allowed is !UL for database file !AD",
-							TRUE,reserved_bytes, MAX_RESERVE_B(csd), fn_len, fn);
+							TRUE, reserved_bytes, MAX_RESERVE_B(csd), fn_len, fn);
 					close(fd);
-					REVERT;
 					db_ipcs_reset(gv_cur_region, FALSE);
 					return (int4)ERR_RBWRNNOTCHG;
 				}
@@ -324,10 +364,10 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (disk_wait_status)
 				csd->wait_disk_space = new_disk_wait;
 			if (extn_count_status)
-				csd->extension_size = new_extn_count;
+				csd->extension_size = (uint4)new_extn_count;
 			if (lock_space_status)
-				csd->lock_space_size = new_lock_space * OS_PAGELET_SIZE;
-			if(bypass_partial_recov)
+				csd->lock_space_size = (uint4)new_lock_space * OS_PAGELET_SIZE;
+			if (bypass_partial_recov)
 			{
 				csd->file_corrupt = FALSE;
 				util_out_print("Database file !AD now has partial recovery flag set to  !UL(FALSE) ",
@@ -342,7 +382,6 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					if (!cli_get_int("DEFER_TIME", &defer_time))
 					{
 						util_out_print("Error getting DEFER_TIME qualifier value", TRUE);
-						REVERT;
 						db_ipcs_reset(gv_cur_region, FALSE);
 						return (int4)ERR_RBWRNNOTCHG;
 					}
@@ -352,9 +391,30 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 						util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
 						exit_stat |= EXIT_WRN;
 						db_ipcs_reset(gv_cur_region, FALSE);
+						mu_gv_cur_reg_free();
 						continue;
 					}
-					csd->defer_time = defer_time;
+					csd->defer_time = (short)defer_time;
+				}
+				if (csd->blks_to_upgrd)
+				{
+					util_out_print("MM access method cannot be set if there are blocks to upgrade",
+						TRUE);
+					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
+					exit_stat |= EXIT_WRN;
+					db_ipcs_reset(gv_cur_region, FALSE);
+					mu_gv_cur_reg_free();
+					continue;
+				}
+				if (GDSVCURR != csd->desired_db_format)
+				{
+					util_out_print("MM access method cannot be set in DB compatibility mode",
+						TRUE);
+					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
+					exit_stat |= EXIT_WRN;
+					db_ipcs_reset(gv_cur_region, FALSE);
+					mu_gv_cur_reg_free();
+					continue;
 				}
 			} else
 			{
@@ -364,6 +424,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
 					exit_stat |= EXIT_WRN;
 					db_ipcs_reset(gv_cur_region, FALSE);
+					mu_gv_cur_reg_free();
 					continue;
 				}
 			}
@@ -397,12 +458,11 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (disk_wait_status)
 				util_out_print("Database file !AD now has wait disk set to !UL seconds",
 						TRUE, fn_len, fn, csd->wait_disk_space);
-				db_ipcs_reset(gv_cur_region, FALSE);
+			db_ipcs_reset(gv_cur_region, FALSE);
 		} /* end of else part if (!need_standalone) */
 		mu_gv_cur_reg_free();
 	}
 	free(csd);
-	REVERT;
 	assert(!(exit_stat & EXIT_INF));
 	return (exit_stat & EXIT_ERR ? (int4)ERR_WCERRNOTCHG :
 		(exit_stat & EXIT_WRN ? (int4)ERR_WCWRNNOTCHG : SS_NORMAL));

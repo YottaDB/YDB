@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,10 @@
 #ifndef MROUT2XTERN_INCLUDED
 #define MROUT2XTERN_INCLUDED
 
-void mrout2xtern(unsigned char *src, unsigned char *dst);
+#ifdef VMS
+#	define MROUT2XTERN(src, dst, len)	lower_to_upper((uchar_ptr_t)(dst), (uchar_ptr_t)(src), len)
+#else
+#	define MROUT2XTERN(src, dst, len)	memcpy(dst, src, len)
+#endif
 
 #endif /* MROUT2XTERN_INCLUDED */

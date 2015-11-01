@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,8 +36,9 @@
  * Parameters :
  *	fn : full name of a database file.
  *	header: Pointer to database file header structure (may not be in shared memory)
+ *	len: size of header (may be just SGMNT_HDR_LEN or SIZEOF_FILE_HDR_MAX)
  */
-boolean_t file_head_read(char *fn, sgmnt_data_ptr_t header)
+boolean_t file_head_read(char *fn, sgmnt_data_ptr_t header, int4 len)
 {
 	int 		save_errno, fd, header_size;
 	struct stat	stat_buf;
@@ -63,7 +64,7 @@ boolean_t file_head_read(char *fn, sgmnt_data_ptr_t header)
 	}
 	if (!S_ISREG(stat_buf.st_mode) || stat_buf.st_size < header_size)
 	{
-		gtm_putmsg(VARLSTCNT(5) ERR_DBNOTGDS, 2, LEN_AND_STR(fn));
+		gtm_putmsg(VARLSTCNT(4) ERR_DBNOTGDS, 2, LEN_AND_STR(fn));
  		CLOSEFILE(fd, save_errno);
 		return FALSE;
 	}
@@ -79,6 +80,18 @@ boolean_t file_head_read(char *fn, sgmnt_data_ptr_t header)
 		gtm_putmsg(VARLSTCNT(4) ERR_DBNOTGDS, 2, LEN_AND_STR(fn));
  		CLOSEFILE(fd, save_errno);
 		return FALSE;
+	}
+	assert(MASTER_MAP_SIZE_MAX >= MASTER_MAP_SIZE(header));
+	assert(SGMNT_HDR_LEN == len || SIZEOF_FILE_HDR(header) <= len);
+	if (SIZEOF_FILE_HDR(header) <= len)
+	{
+		LSEEKREAD(fd, ROUND_UP(SGMNT_HDR_LEN + 1, DISK_BLOCK_SIZE), MM_ADDR(header), MASTER_MAP_SIZE(header), save_errno);
+		if (0 != save_errno)
+		{
+			gtm_putmsg(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
+			CLOSEFILE(fd, save_errno);
+			return FALSE;
+		}
 	}
 	CLOSEFILE(fd, save_errno);
 	if (0 != save_errno)

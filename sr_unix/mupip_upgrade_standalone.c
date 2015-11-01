@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,13 +10,16 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <unistd.h>
+
+#include "gtm_unistd.h"
 #include "gtm_ipc.h"
+#include "gtm_stdio.h"
+
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <errno.h>
+
 #include "gtm_sem.h"
-#include "gtm_stdio.h"
 #include "iosp.h"
 #include "eintr_wrappers.h"
 #include "ipcrmid.h"
@@ -28,7 +31,6 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-
 
 /* Lock a file using semaphore.
  * This is written so that we can use it to lock all database pre-V4.2000.
@@ -50,7 +52,7 @@ boolean_t mupip_upgrade_standalone(char *fn, int *semid)
 		return FALSE;
 	}
 	/* If shared memory exists, the disk file is probably incomplete */
-	while ((shmget(key, 0, 0) != -1) || errno != ENOENT)
+	if ((shmget(key, 0, 0) != -1) || errno != ENOENT)
 	{
 		util_out_print("File is locked by another user", TRUE);
 		return FALSE;

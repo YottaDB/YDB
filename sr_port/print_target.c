@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,8 @@
 #include "util.h"
 #include "gvsub2str.h"
 #include "print_target.h"
+
+GBLREF gd_region       *gv_cur_region;
 
 void print_target(unsigned char *c)
 {
@@ -49,7 +51,7 @@ void print_target(unsigned char *c)
 	util_out_print("(", FALSE);
 	for (;;)
 	{
-		if (STR_SUB_PREFIX == *ptr)
+		if (STR_SUB_PREFIX == *ptr || SUBSCRIPT_STDCOL_NULL == *ptr)
 		{
 			is_string = TRUE;
 			ptop1 = ptop;

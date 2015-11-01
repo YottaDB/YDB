@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,39 +11,29 @@
 
 #include "mdef.h"
 
-#include "gtm_string.h"
-
-#include "mdq.h"
 #include "cache.h"
+#include "hashtab_objcode.h"
 
-GBLREF cache_entry	*cache_hashent;
-GBLREF int		cache_hits, cache_fails;
+GBLREF	int			cache_hits, cache_fails;
+GBLREF	hash_table_objcode	cache_table;
 
-/* cache_get - get cached indirect object code corresponding to input source and code.
+/* cache_get - get cached indirect object code corresponding to input source and code from cache_table.
  *
  *	If object code exists in cache, return pointer to object code mstr
- *	otherwise, return 0.
- *
- *	In either case, set cache_hashent (via cache_hash) to the hash bucket for the
- *	desired entry.
+ *	otherwise, return NULL.
  */
-
-mstr	*cache_get(unsigned char code, mstr *source)
+mstr *cache_get(icode_str *indir_src)
 {
-	cache_entry	*cp;
+	cache_entry	*csp;
+	ht_ent_objcode	*tabent;
 
-	cache_hash(code, source);	/* set cache_hashent to hash bucket corresponding to desired entry */
-	dqloop(cache_hashent, linkq, cp)
+	if (NULL != (tabent = lookup_hashtab_objcode(&cache_table, indir_src)))
 	{
-		if (source->len == cp->src.len
-		    && code == cp->code
-                    && (0 == source->len || 0 == memcmp(source->addr, cp->src.addr, source->len)))
-		{
-			cache_hits++;
-			return &cp->obj;
-		}
+		cache_hits++;
+		return &(((cache_entry *)tabent->value)->obj);
+	} else
+	{
+		cache_fails++;
+		return NULL;
 	}
-
-	cache_fails++;
-	return NULL;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,6 @@ void		cm_add_gdr_ptr(gd_region *greg);
 void		cm_del_gdr_ptr(gd_region *greg);
 void		*open_gd_file(mstr *v);
 void		gd_rundown(void);
-void		gd_ht_kill(struct htab_desc_struct *table, boolean_t contents);
+void 		gd_ht_kill(struct hash_table_mname_struct *table, boolean_t contents);
 
 #endif

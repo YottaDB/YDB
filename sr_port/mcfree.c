@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,15 +10,17 @@
  ****************************************************************/
 
 #include "mdef.h"
-
 #include "mmemory.h"
 
-GBLREF int mcavail;
-GBLREF char **mcavailptr, **mcavailbase;
+GBLREF int 		mcavail;
+GBLREF mcalloc_hdr 	*mcavailptr, *mcavailbase;
 
+/* This routine doesn't actually release memory at the end of compilation. For efficiency sake
+ * (esp. during indirect code compilation), it just resets the mcavail* pointers to the beginning
+ * of the list so that the allocated area will be reused for the next compilation. */
 void mcfree(void)
 {
 	mcavailptr = mcavailbase;
-	mcavail = MC_DSBLKSIZE - sizeof(char_ptr_t);
+	mcavail = mcavailptr->size;
 	return;
 }

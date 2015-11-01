@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,8 +25,10 @@
 #include "copy.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "util.h"
 
@@ -34,6 +36,9 @@
 #include "t_qread.h"
 #include "t_write.h"
 #include "t_abort.h"
+#include "t_end.h"
+#include "gvcst_blk_build.h"
+#include "t_begin_crit.h"
 
 GBLREF gd_region        *gv_cur_region;
 GBLREF char		*update_array, *update_array_ptr;
@@ -47,13 +52,11 @@ GBLREF unsigned char    *non_tp_jfb_buff_ptr;
 
 void mur_put_aimg_rec(jnl_record *rec)
 {
-	sm_uc_ptr_t	aimg_blk_ptr, bp;
+	sm_uc_ptr_t	aimg_blk_ptr;
 	int4		blk_seg_cnt, blk_size;
-	block_id	blk_num;
 	blk_segment	*bs1, *bs_ptr;
 	cw_set_element  *cse;
-	void		gvcst_blk_build(), t_begin_crit();
-	int		t_end();
+	srch_blk_status	blkhist;
 
 	error_def(ERR_MURAIMGFAIL);
 
@@ -68,9 +71,9 @@ void mur_put_aimg_rec(jnl_record *rec)
 	assert(!cs_addrs->now_crit);
 
 	t_begin_crit(ERR_MURAIMGFAIL);
-	blk_num = rec->jrec_aimg.blknum;
 	blk_size = cs_addrs->hdr->blk_size;
-	if (NULL == (bp = t_qread(blk_num, &dummy_hist.h[0].cycle, &dummy_hist.h[0].cr)))
+	blkhist.blk_num = rec->jrec_aimg.blknum;
+	if (NULL == (blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 		GTMASSERT;
 	aimg_blk_ptr = (sm_uc_ptr_t)&rec->jrec_aimg.blk_contents[0];
 	BLK_INIT(bs_ptr, bs1);
@@ -81,7 +84,7 @@ void mur_put_aimg_rec(jnl_record *rec)
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
-	t_write(blk_num, (unsigned char *)bs1, 0, 0, (sm_uc_ptr_t)bp, ((blk_hdr_ptr_t)aimg_blk_ptr)->levl, TRUE, FALSE);
+	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)aimg_blk_ptr)->levl, TRUE, FALSE);
 	if (JNL_ENABLED(cs_data))
 	{
 		cse = (cw_set_element *)(&cw_set[0]);
@@ -90,7 +93,7 @@ void mur_put_aimg_rec(jnl_record *rec)
 		cse->done = TRUE;
 	}
 	/* Call t_end till it succeeds or aborts (error will be reported) */
-	while (t_end(&dummy_hist, 0) == 0)
+	while ((trans_num)0 == t_end(&dummy_hist, 0))
 		;
 	assert(!cs_addrs->now_crit);
 	return;

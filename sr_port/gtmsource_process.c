@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,16 +13,14 @@
 
 #include "gtm_string.h"
 #include "gtm_stdio.h"
-
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <time.h>
-#include <sys/time.h>
-#include <errno.h>
-#include <fcntl.h>
+#include "gtm_socket.h"
+#include "gtm_inet.h"
+#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-#include <sys/stat.h>
+#include "gtm_time.h"
+#include "gtm_stat.h"
+
+#include <errno.h>
 #include <signal.h>
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
@@ -39,7 +37,9 @@
 #include "gtmsource.h"
 #include "repl_comm.h"
 #include "jnl.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"    /* needed for muprec.h */
+#include "hashtab_int4.h"     /* needed for muprec.h */
+#include "hashtab_int8.h"     /* needed for muprec.h */
 #include "buddy_list.h"
 #include "muprec.h"
 #include "repl_ctl.h"
@@ -52,6 +52,7 @@
 #include "repl_log.h"
 #include "min_max.h"
 #include "rel_quant.h"
+#include "copy.h"
 
 #define MAX_HEXDUMP_CHARS_PER_LINE	26 /* 2 characters per byte + space, 80 column assumed */
 
@@ -95,6 +96,12 @@ GBLREF	unsigned char		jnl_ver, remote_jnl_ver;
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
 GBLREF	unsigned char		jnl_source_rectype, jnl_dest_maxrectype;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
+GBLREF	boolean_t		null_subs_xform;
+GBLREF	boolean_t 		primary_side_std_null_coll;
+GBLREF	boolean_t 		secondary_side_std_null_coll;
+GBLREF	seq_num			lastlog_seqno;
+GBLREF	uint4			log_interval;
+GBLREF	qw_num			trans_sent_cnt, last_log_tr_sent_cnt;
 
 int gtmsource_process(void)
 {
@@ -117,13 +124,10 @@ int gtmsource_process(void)
 	repl_msg_ptr_t		send_msgp;
 	uchar_ptr_t		in_buff, out_buff, save_filter_buff;
 	uint4			in_size, out_size, out_bufsiz, tot_out_size, pre_intlfilter_datalen;
-	seq_num			lastlog_seqno, log_seqno, diff_seqno, pre_read_jnl_seqno, post_read_jnl_seqno, jnl_seqno;
-	unsigned char		seq_num_str[32], *seq_num_ptr;
+	seq_num			log_seqno, diff_seqno, pre_read_jnl_seqno, post_read_jnl_seqno, jnl_seqno;
 	char			err_string[1024];
 	boolean_t		xon_wait_logged, prev_catchup, catchup, force_recv_check;
 	double			time_elapsed;
-	qw_num			trans_sent_cnt = 0;
-	qw_num			last_log_tr_sent_cnt = 0;
 	seq_num			resync_seqno, old_resync_seqno, curr_seqno, filter_seqno;
 	gd_region		*reg, *region_top, *gtmsource_upd_reg, *old_upd_reg;
 	sgmnt_addrs		*csa;
@@ -134,12 +138,14 @@ int gtmsource_process(void)
 	time_t			prev_now = 0, save_now;
 	int			index;
 	struct timeval		poll_wait, poll_immediate;
+	uint4 			temp_ulong;
 
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
 	error_def(ERR_REPLRECFMT);
 	error_def(ERR_JNLSETDATA2LONG);
 	error_def(ERR_JNLNEWREC);
+	error_def(ERR_REPLGBL2LONG);
 
 	assert(REPL_MSG_HDRLEN == sizeof(jnldata_hdr_struct)); /* necessary for reading multiple transactions from jnlpool in
 								* a single attempt */
@@ -164,12 +170,7 @@ int gtmsource_process(void)
 	while (TRUE)
 	{
 		gtmsource_stop_heartbeat();
-
-		lastlog_seqno = gtmsource_local->read_jnl_seqno - 1;
-		QWDECRBYDW(lastlog_seqno, (LOGTRNUM_INTERVAL - 1));
-		trans_sent_cnt = -LOGTRNUM_INTERVAL + 1;
-		last_log_tr_sent_cnt = 0;
-
+		gtmsource_reinit_logseqno();
 		if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 		{
 			gtmsource_est_conn(&secondary_addr);
@@ -240,7 +241,9 @@ int gtmsource_process(void)
 				memset(gtmsource_msgp, 0, MIN_REPL_MSGLEN); /* to idenitify older releases in the future */
 				gtmsource_msgp->type = REPL_WILL_RESTART_WITH_INFO;
 				((repl_start_reply_msg_ptr_t)gtmsource_msgp)->jnl_ver = jnl_ver;
-				recvd_start_flags = START_FLAG_NONE;
+				temp_ulong = (0 == primary_side_std_null_coll) ?  START_FLAG_NONE : START_FLAG_COLL_M;
+				PUT_ULONG(((repl_start_reply_msg_ptr_t)gtmsource_msgp)->start_flags, temp_ulong);
+				 recvd_start_flags = START_FLAG_NONE;
 			} else /* srch_restart returned EREPL_SEC_AHEAD */
 			{
 				assert(EREPL_SEC_AHEAD == srch_status);
@@ -303,7 +306,7 @@ int gtmsource_process(void)
 				for (reg = gd_header->regions; reg < region_top; reg++)
 				{
 					csa = &FILE_INFO(reg)->s_addrs;
-					if (REPL_ENABLED(csa->hdr))
+					if (REPL_ALLOWED(csa->hdr))
 					{
 						if (QWLT(old_resync_seqno, csa->hdr->old_resync_seqno))
 							QWASSIGN(old_resync_seqno, csa->hdr->old_resync_seqno);
@@ -323,7 +326,7 @@ int gtmsource_process(void)
 					for (reg = gd_header->regions; reg < region_top; reg++)
 					{
 						csa = &FILE_INFO(reg)->s_addrs;
-						if (REPL_ENABLED(csa->hdr))
+						if (REPL_ALLOWED(csa->hdr))
 						{
 							REPL_DPRINT4("Assigning %llu to old_resyc_seqno of %s. Prev value %llu\n",
 									resync_seqno, reg->rname, csa->hdr->old_resync_seqno);
@@ -386,6 +389,14 @@ int gtmsource_process(void)
 			/* reverse transformation should exist */
 			assert(IF_NONE != repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
 							      [jnl_ver - JNL_VER_EARLIEST_REPL]);
+			if (FALSE != (null_subs_xform = (primary_side_std_null_coll   && !secondary_side_std_null_coll ||
+					secondary_side_std_null_coll && !primary_side_std_null_coll)))
+				null_subs_xform = (primary_side_std_null_coll ?
+							STDNULL_TO_GTMNULL_COLL : GTMNULL_TO_STDNULL_COLL);
+			/* note that if jnl_ver == remote_jnl_ver and jnl_ver > V15_JNL_VER, the two sides may be running
+			 * different null collation. However, we leave the overhead of null collation transformation to
+			 * the receiver as source server is generally more loaded than the receiver
+			 */
 			gtmsource_filter |= INTERNAL_FILTER;
 			gtmsource_alloc_filter_buff(gtmsource_msgbufsiz);
 		} else
@@ -401,7 +412,7 @@ int gtmsource_process(void)
 		for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
 		{
 			csa = &FILE_INFO(reg)->s_addrs;
-			if (REPL_ENABLED(csa->hdr))
+			if (REPL_ALLOWED(csa->hdr))
 			{
 				if (NULL == gtmsource_upd_reg)
 					gtmsource_upd_reg = gtmsource_mru_reg = reg;
@@ -739,6 +750,8 @@ int gtmsource_process(void)
 								rts_error(VARLSTCNT(4) ERR_JNLNEWREC, 2,
 									  (unsigned int)jnl_source_rectype,
 								  	  (unsigned int)jnl_dest_maxrectype);
+							else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
+								rts_error(VARLSTCNT(1) ERR_REPLGBL2LONG);
 							else /* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */
 								GTMASSERT;
 						}
@@ -812,7 +825,7 @@ int gtmsource_process(void)
 						if (gtmsource_upd_reg >= gd_header->regions + gd_header->n_regions)
 							gtmsource_upd_reg = gd_header->regions; /* wrap back to first region */
 					} while (gtmsource_upd_reg != old_upd_reg && /* back to the original region? */
-							!REPL_ENABLED(FILE_INFO(gtmsource_upd_reg)->s_addrs.hdr));
+							!REPL_ALLOWED(FILE_INFO(gtmsource_upd_reg)->s_addrs.hdr));
 					save_now = gtmsource_now;
 					if (GTMSOURCE_FH_FLUSH_INTERVAL <= difftime(save_now, gtmsource_last_flush_time))
 					{
@@ -823,18 +836,17 @@ int gtmsource_process(void)
 					repl_source_msg_sent += (qw_num)tot_tr_len;
 					repl_source_data_sent += (qw_num)(tot_tr_len) -
 								(post_read_jnl_seqno - pre_read_jnl_seqno) * REPL_MSG_HDRLEN;
-					QWASSIGN(log_seqno, lastlog_seqno);
-					QWINCRBYDW(log_seqno, LOGTRNUM_INTERVAL + 1);
-					if (QWLE(log_seqno, post_read_jnl_seqno) || gtmsource_logstats)
+					log_seqno = post_read_jnl_seqno - 1; /* post_read_jnl_seqno is the "next" seqno to be sent,
+									      * not the last one we sent */
+					if (log_seqno - lastlog_seqno >= log_interval || gtmsource_logstats)
 					{ /* print always when STATSLOG is ON, or when the log interval has passed */
-						QWASSIGN(log_seqno, post_read_jnl_seqno);
-						QWDECRBYDW(log_seqno, 1);
-						trans_sent_cnt += log_seqno - lastlog_seqno;
+						trans_sent_cnt += (log_seqno - lastlog_seqno);
 						/* jctl->jnl_seqno >= post_read_jnl_seqno is the most common case;
 						 * see gtmsource_readpool() for when the rare case can occur */
-						assert(jctl->jnl_seqno >= post_read_jnl_seqno - 1);
-						diff_seqno = (jctl->jnl_seqno >= post_read_jnl_seqno) ?
-								(jctl->jnl_seqno - post_read_jnl_seqno) : 0;
+						jnl_seqno = jctl->jnl_seqno;
+						assert(jnl_seqno >= post_read_jnl_seqno - 1);
+						diff_seqno = (jnl_seqno >= post_read_jnl_seqno) ?
+								(jnl_seqno - post_read_jnl_seqno) : 0;
 						repl_log(gtmsource_log_fp, FALSE, FALSE, "REPL INFO - Tr num : %llu", log_seqno);
 						repl_log(gtmsource_log_fp, FALSE, FALSE, "  Tr Total : %llu  Msg Total : %llu  ",
 							 repl_source_data_sent, repl_source_msg_sent);
@@ -876,7 +888,7 @@ int gtmsource_process(void)
 							last_log_tr_sent_cnt = trans_sent_cnt;
 							repl_source_prev_log_time = repl_source_this_log_time;
 						}
-						QWASSIGN(lastlog_seqno, log_seqno);
+						lastlog_seqno = log_seqno;
 					}
 					poll_time = poll_immediate;
 				} else /* data_len == 0 */

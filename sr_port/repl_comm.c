@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,17 +12,17 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
+#include "gtm_string.h"
 #include "gtmio.h"
 
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include "gtm_socket.h"
+#include "gtm_inet.h"
 #include <sys/time.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/stat.h>
+#include "gtm_fcntl.h"
+#include "gtm_unistd.h"
+#include "gtm_stat.h"
 
 #include "repl_msg.h"
 #include "repl_errno.h"

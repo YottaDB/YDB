@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ omi_prc_lock(omi_conn *cptr, char *xend, char *buff, char *bend)
 /*  Global Ref */
     OMI_LI_READ(&li, cptr->xptr);
 /*  Condition handler for DBMS operations */
-    ESTABLISH(omi_dbms_ch);
+    ESTABLISH_RET(omi_dbms_ch, -1);	/* any return value to signify error return */
 
 /*  Clean up dead locks in private list */
     for (prior = &mlk_pvt_root; *prior; )

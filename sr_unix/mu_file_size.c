@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +12,9 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
+#include "gtm_fcntl.h"
+#include "gtm_unistd.h"
 #include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -39,5 +38,6 @@ unsigned int mu_file_size(file_control *fc)
 	FSTAT_FILE(udi->fd, &stat_buf, fstat_res);
 	if (-1 == fstat_res)
 		rts_error(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(udi->fn), errno);
+	assert(0 == stat_buf.st_size % DISK_BLOCK_SIZE);
 	return stat_buf.st_size / DISK_BLOCK_SIZE;
 }

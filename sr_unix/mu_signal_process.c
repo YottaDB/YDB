@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,9 +27,9 @@ GBLREF uint4	process_id;
 
 void mu_signal_process(char *command, int signal)
 {
-	short	slen;
-	int	len, toprocess_id, save_errno;
-	char	buff[256];
+	unsigned short	slen;
+	int		len, toprocess_id, save_errno;
+	char		buff[256];
 	error_def(ERR_MUPCLIERR);
 	error_def(ERR_MUPIPSIG);
 

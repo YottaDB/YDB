@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,19 +22,19 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "cmidef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
-#include "gvcst_query.h"
 #include "gtcm_find_region.h"
 #include "gtcm_bind_name.h"
-#include "gtcmtr_query.h"
+#include "gtcmtr_protos.h"
 #include "gv_xform_key.h"
-#include "gvcst_queryget.h"
+#include "gvcst_protos.h"	/* for gvcst_query,gvcst_queryget prototype */
 
 GBLREF connection_struct *curr_entry;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
+GBLREF gd_region        *gv_cur_region;
 
 bool gtcmtr_query(void)
 {
@@ -65,25 +65,41 @@ bool gtcmtr_query(void)
 		if (0 == gv_currkey->prev ||
 			1 != gv_currkey->base[gv_currkey->prev] || 0 != gv_currkey->base[gv_currkey->prev + 1])
 		{ /* name level $Q, or last subscript of incoming key not null */
+			DEBUG_ONLY(was_null = FALSE;)
 			gv_currkey->end -= 2;
 			gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
-			DEBUG_ONLY(was_null = FALSE;)
 		} else
 		{ /* last subscript of incoming key null */
-			gv_currkey->base[gv_currkey->prev] = STR_SUB_PREFIX;
 			DEBUG_ONLY(was_null = TRUE;)
+			if (0 == gv_cur_region->std_null_coll)
+				gv_currkey->base[gv_currkey->prev] = STR_SUB_PREFIX;
+			else
+			{
+				gv_currkey->end -= 2;
+				gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
+			}
 		}
 		gv_xform_key(gv_currkey, FALSE);
 		/* redo append 01 00 00 now that we are done with collation */
 		if (0 == gv_currkey->prev || KEY_DELIMITER != gv_currkey->base[gv_currkey->end - 3] ||
-			STR_SUB_PREFIX != gv_currkey->base[gv_currkey->end - 2])
+				 gv_currkey->base[gv_currkey->end - 2] != (0 == gv_cur_region->std_null_coll ? STR_SUB_PREFIX :
+				 	SUBSCRIPT_STDCOL_NULL))
 		{
 			assert(!was_null); /* null to non null transformation not allowed */
 			gv_currkey->base[gv_currkey->end++] = 1;
 			gv_currkey->base[gv_currkey->end++] = 0;
 			gv_currkey->base[gv_currkey->end] = 0;
 		} else
-			gv_currkey->base[gv_currkey->prev] = 1;
+		{
+			if (0 == gv_cur_region->std_null_coll)
+				gv_currkey->base[gv_currkey->prev] = 1;
+			else
+			{
+				gv_currkey->base[gv_currkey->end++]= 1;
+				gv_currkey->base[gv_currkey->end++] = 0;
+				gv_currkey->base[gv_currkey->end] = 0;
+			}
+		}
 	}
 	found = (0 != gv_target->root) ? (curr_entry->query_is_queryget ? gvcst_queryget(&val) : gvcst_query()) : FALSE;
 	if (found)

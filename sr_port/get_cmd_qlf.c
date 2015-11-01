@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,9 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-
 #include "gtm_string.h"
-
 #include "cmd_qlf.h"
 #include "cli.h"
 
@@ -23,10 +21,10 @@ void get_cmd_qlf(command_qualifier *qualif)
 {
 	static readonly char upper[] = "UPPER";
 	static readonly char lower[] = "LOWER";
-	mstr *s;
-	int temp_int;
-	unsigned short len;
-	unsigned char inbuf[255];
+	mstr		*s;
+	int4		temp_int;
+	unsigned short	len;
+	unsigned char	inbuf[255];
 
 	qualif->qlf = glb_cmd_qlf.qlf;
 	qualif->object_file.mvtype = qualif->list_file.mvtype = qualif->ceprep_file.mvtype = 0;
@@ -47,8 +45,7 @@ void get_cmd_qlf(command_qualifier *qualif)
 			}
 		} else
 			s->len = len;
-	}
-	else if (cli_negated("OBJECT") == TRUE)
+	} else if (cli_negated("OBJECT") == TRUE)
 		qualif->qlf &= ~CQ_OBJECT;
 
 
@@ -73,6 +70,9 @@ void get_cmd_qlf(command_qualifier *qualif)
 	if (cli_negated("INLINE_LITERALS") == TRUE)
 		qualif->qlf &= ~CQ_INLINE_LITERALS;
 
+	if (cli_negated("ALIGN_STRINGS") == TRUE)
+		qualif->qlf &= ~CQ_ALIGN_STRINGS;
+
 #ifdef DEBUG
 	if (cli_present("MACHINE_CODE") == CLI_PRESENT)
 		qualif->qlf |= CQ_MACHINE_CODE;
@@ -91,7 +91,8 @@ void get_cmd_qlf(command_qualifier *qualif)
 	if (cli_negated("LIST") == TRUE)
 		qualif->qlf &= (~CQ_LIST & ~CQ_MACHINE_CODE);
 	else if (cli_present("LIST") == CLI_PRESENT)
-	{	qualif->qlf |= CQ_LIST;
+	{
+		qualif->qlf |= CQ_LIST;
 		qualif->list_file.mvtype = MV_STR;
 		s = &qualif->list_file.str;
 		len = s->len;
@@ -99,16 +100,16 @@ void get_cmd_qlf(command_qualifier *qualif)
 		{
 			s->len = 0;
 			if (glb_cmd_qlf.list_file.mvtype == MV_STR  &&  glb_cmd_qlf.list_file.str.len > 0)
-			{	s->len = glb_cmd_qlf.list_file.str.len;
+			{
+				s->len = glb_cmd_qlf.list_file.str.len;
 				memcpy(s->addr, glb_cmd_qlf.list_file.str.addr,
 					s->len);
 			}
 		} else
 			s->len = len;
-	}
-	else if (!(qualif->qlf & CQ_LIST))
-	{	qualif->qlf &= ~CQ_MACHINE_CODE;
-	}
+	} else if (!(qualif->qlf & CQ_LIST))
+		qualif->qlf &= ~CQ_MACHINE_CODE;
+
 	if (cli_get_int("LENGTH",&temp_int) == FALSE)
 		temp_int = 66;
 	lst_param.lines_per_page = temp_int;
@@ -147,7 +148,6 @@ void get_cmd_qlf(command_qualifier *qualif)
 			}
 		} else
 			s->len = len;
-	}
-	else if (cli_negated("CE_PREPROCESS") == TRUE)
+	} else if (cli_negated("CE_PREPROCESS") == TRUE)
 		qualif->qlf &= ~CQ_CE_PREPROCESS;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,15 +21,15 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "filestruct.h"
 #include "cmidef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
-#include "gvcst_zprevious.h"
-#include "gvcst_data.h"
+#include "gvcst_protos.h"	/* for gvcst_data,gvcst_zprevious prototype */
 #include "gv_xform_key.h"
 #include "gtcm_find_region.h"
 #include "gtcm_bind_name.h"
-#include "gtcmtr_zprevious.h"
+#include "gtcmtr_protos.h"
 
 GBLREF connection_struct *curr_entry;
 GBLREF gv_namehead	*gv_target;
@@ -37,15 +37,20 @@ GBLREF gv_namehead	*reset_gv_target;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF gd_region        *gv_cur_region;
 
 bool gtcmtr_zprevious(void)
 {
-	boolean_t	found, is_null;
-	unsigned char	*ptr, regnum;
-	unsigned short	top, old_top;
-	unsigned short	len, tmp_len;
-	gv_key		*save_key;
-	cm_region_list	*reg_ref;
+	boolean_t		found, is_null;
+	unsigned char		*ptr, regnum;
+	unsigned short		top, old_top;
+	unsigned short		len, tmp_len;
+	gv_key			*save_key;
+	cm_region_list		*reg_ref;
+	cm_region_head		*cm_reg_head;
+
+	error_def(ERR_UNIMPLOP);
+	error_def(ERR_TEXT);
 
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(CMMS_Q_PREV == *ptr);
@@ -58,31 +63,46 @@ bool gtcmtr_zprevious(void)
 	assert(0 == offsetof(gv_key, top));
 	GET_USHORT(old_top, ptr); /* old_top = ((gv_key *)ptr)->top; */
 	CM_GET_GVCURRKEY(ptr, len);
-	gtcm_bind_name(reg_ref->reghead, FALSE); /* gtcm_bind_name sets gv_target; do not use gv_target before gtcm_bind_name */
-	if ((gv_target->collseq || gv_target->nct) && gv_currkey->prev)
-	{
-		if (is_null = (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->end - 2] &&
-			       STR_SUB_PREFIX == gv_currkey->base[gv_currkey->end - 3]))
-		{ /* last subscript of incoming key is a NULL subscript */
-			gv_currkey->base[gv_currkey->end - 2] = KEY_DELIMITER;
-			gv_currkey->end--;
-		}
-		gv_xform_key(gv_currkey, FALSE);
-	}
+	cm_reg_head = reg_ref->reghead;
 	if (gv_currkey->prev)
 	{
-		if ((gv_target->collseq || gv_target->nct) && is_null)
+		gtcm_bind_name(cm_reg_head, FALSE); /* sets gv_target; do not use gv_target before gtcm_bind_name */
+		if (gv_target->collseq || gv_target->nct)
 		{
-			assert(STR_SUB_PREFIX == gv_currkey->base[gv_currkey->end - 2]); /* null subsc -> non null not allowed */
-			gv_currkey->base[gv_currkey->prev + 1] = STR_SUB_PREFIX;
-			gv_currkey->base[++(gv_currkey->end)] = 0;
+			is_null = ((gv_currkey->prev == (gv_currkey->end - 3))
+					&& (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->end - 2])
+					&& (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->end - 3]));
+			if (is_null)
+			{	/* last subscript of incoming key is a NULL subscript */
+				gv_currkey->base[gv_currkey->end - 2] = KEY_DELIMITER;
+				gv_currkey->end--;
+				if (0 != gv_cur_region->std_null_coll)
+					gv_currkey->base[gv_currkey->prev] = SUBSCRIPT_STDCOL_NULL;
+			}
+			gv_xform_key(gv_currkey, FALSE);
+			if (is_null)
+			{
+				assert((gv_currkey->end - 2) == gv_currkey->prev);
+				/* null subsc -> non null subsc transformation not allowed. the following asserts ensure that */
+				assert(gv_cur_region->std_null_coll || (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]));
+				assert(!gv_cur_region->std_null_coll
+					|| (SUBSCRIPT_STDCOL_NULL == gv_currkey->base[gv_currkey->prev]));
+				/* With standard null collation, we want the same behavior as without it. So replace 0x01 in
+				 * gv_currkey->base[gv_currkey->prev] with 0xFF. The following assignment is redundant if
+				 * not standard null collation. But it is done to avoid pipeline break should we introduce an if.
+				 */
+				gv_currkey->base[gv_currkey->prev] = STR_SUB_PREFIX;
+				gv_currkey->base[gv_currkey->prev + 1] = STR_SUB_PREFIX;
+				gv_currkey->base[++(gv_currkey->end)] = 0;
+			}
 		}
 		found = (0 == gv_target->root) ? FALSE : gvcst_zprevious();
 	} else
 	{	/* name level */
 		assert(2 <= gv_currkey->end);			/* at least one character of name, and 2 <NUL> delimiters */
-		assert((sizeof(mident) + 2) >= gv_currkey->end);	/* no more than an mident, and two <NUL> delimiters */
+		assert((MAX_MIDENT_LEN + 2) >= gv_currkey->end);/* no more than MAX_MIDENT_LEN (31),and two <NUL> delimiters */
 		assert(INVALID_GV_TARGET == reset_gv_target);
+		GTCM_CHANGE_REG(cm_reg_head);	/* sets gv_cur_region/cs_addrs/cs_data appropriately */
 		for (;  ;)
 		{
 			reset_gv_target = gv_target;	/* for restoration, just in case something goes wrong before
@@ -92,11 +112,18 @@ bool gtcmtr_zprevious(void)
 			if (!found)
 				break;
 			assert(2 <= gv_altkey->end);			/* at least one character of name and a <NUL> delimiter */
- 			assert((sizeof(mident) + 2) >= gv_currkey->end);	/* no more than an mident & two <NUL> delimiters */
+			assert((MAX_MIDENT_LEN + 2) >= gv_currkey->end);/* no more than MAX_MIDENT_LEN (31),
+									 * and two <NUL> delimiters */
+			if ((PRE_V5_MAX_MIDENT_LEN < strlen((char *)gv_altkey->base)) && !curr_entry->client_supports_long_names)
+			{
+				rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0,
+					ERR_TEXT, 2,
+					LEN_AND_LIT("GT.CM client does not support global names greater than 8 characters"));
+			}
 			save_key = gv_currkey;
 			gv_currkey = gv_altkey;
 			gv_altkey = save_key;
-			gtcm_bind_name(reg_ref->reghead, TRUE);
+			gtcm_bind_name(cm_reg_head, TRUE);
 			reset_gv_target = INVALID_GV_TARGET;
 			if ((0 != gv_target->root) && (0 != gvcst_data()))
 			{

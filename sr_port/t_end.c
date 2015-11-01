@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,13 +12,8 @@
 #include "mdef.h"
 
 #include <stddef.h>
-#ifdef UNIX
-#include "gtm_stdio.h"
-#endif
 #include "gtm_time.h"
-
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
@@ -39,8 +34,8 @@
 #include "error.h"
 #include "interlock.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "gdsbgtr.h"
 #include "repl_msg.h"
@@ -50,6 +45,7 @@
 #include "gt_timer.h"
 #include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
+#include "min_max.h"
 
 /* Include prototypes */
 #include "t_qread.h"
@@ -64,14 +60,14 @@
 #include "bg_update.h"
 #include "wcs_get_space.h"
 #include "wcs_timer_start.h"
-#ifdef UNIX
 #include "process_deferred_stale.h"
-#endif
 #include "t_end.h"
 #include "add_inter.h"
 #include "jnl_write_pblk.h"
 #include "jnl_write_aimg_rec.h"
 #include "memcoherency.h"
+#include "jnl_get_checksum.h"
+#include "wbox_test_init.h"
 
 #define BLOCK_FLUSHING(x) (csa->hdr->clustered && x->flushing && !CCP_SEGMENT_STATE(cs_addrs->nl,CCST_MASK_HAVE_DIRTY_BUFFERS))
 
@@ -89,41 +85,47 @@
 	}												\
 }
 
-GBLREF bool			certify_all_blocks, rc_locked;
-GBLREF unsigned char		t_fail_hist[CDB_MAX_TRIES];
-GBLREF cache_rec_ptr_t		cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
-GBLREF unsigned int		cr_array_index;
-GBLREF boolean_t		block_saved;
-GBLREF int4			update_trans;
-GBLREF cw_set_element		cw_set[];		/* create write set. */
-GBLREF gd_region		*gv_cur_region;
-GBLREF gv_namehead		*gv_target;
-GBLREF sgmnt_addrs		*cs_addrs;
-GBLREF sgmnt_data_ptr_t		cs_data;
-GBLREF short			dollar_tlevel;
-GBLREF trans_num		start_tn;
-GBLREF unsigned int		t_tries;
-GBLREF uint4			t_err, process_id;
-GBLREF unsigned char		cw_set_depth, cw_map_depth;
-GBLREF unsigned char		rdfail_detail;
-GBLREF jnlpool_addrs		jnlpool;
-GBLREF jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
-GBLREF bool			is_standalone;
-GBLREF boolean_t		is_updproc;
-GBLREF seq_num			seq_num_one;
-GBLREF boolean_t		mu_reorg_process;
-GBLREF boolean_t		dse_running;
-GBLREF boolean_t		unhandled_stale_timer_pop;
-GBLREF jnl_format_buffer	*non_tp_jfb_ptr;
-GBLREF inctn_opcode_t		inctn_opcode;
-GBLREF boolean_t 		kip_incremented;
-GBLREF boolean_t		need_kip_incr;
-GBLREF boolean_t		write_after_image;
-GBLREF boolean_t		is_replicator;
-GBLREF seq_num			seq_num_zero;
-GBLREF jnl_gbls_t		jgbl;
-GBLREF jnl_fence_control	jnl_fence_ctl;
-GBLREF boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
+GBLREF	bool			certify_all_blocks, rc_locked;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
+GBLREF	cache_rec_ptr_t		cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
+GBLREF	unsigned int		cr_array_index;
+GBLREF	boolean_t		block_saved;
+GBLREF	int4			update_trans;
+GBLREF	cw_set_element		cw_set[];		/* create write set. */
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	short			dollar_tlevel;
+GBLREF	trans_num		start_tn;
+GBLREF	unsigned int		t_tries;
+GBLREF	uint4			t_err, process_id;
+GBLREF	unsigned char		cw_set_depth, cw_map_depth;
+GBLREF	unsigned char		rdfail_detail;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
+GBLREF	bool			is_standalone;
+GBLREF	boolean_t		is_updproc;
+GBLREF	seq_num			seq_num_one;
+GBLREF	boolean_t		mu_reorg_process;
+GBLREF	boolean_t		dse_running;
+GBLREF	boolean_t		unhandled_stale_timer_pop;
+GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
+GBLREF	boolean_t 		kip_incremented;
+GBLREF	boolean_t		need_kip_incr;
+GBLREF	boolean_t		write_after_image;
+GBLREF	boolean_t		is_replicator;
+GBLREF	seq_num			seq_num_zero;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	jnl_fence_control	jnl_fence_ctl;
+GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
+GBLREF	boolean_t		is_dollar_incr;	/* valid only if gvcst_put is in the call-stack.
+						 * is a copy of "in_gvcst_incr" just before it got reset to FALSE */
+GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
+GBLREF	boolean_t		mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified */
+GBLREF	trans_num		mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block processed by REORG UP/DOWNGRADE */
+GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 
 /* This macro isn't enclosed in parantheses to allow for optimizations */
 #define VALIDATE_CYCLE(history)						\
@@ -140,7 +142,7 @@ if (history)								\
 	}								\
 }
 
-int	t_end(srch_hist *hist1, srch_hist *hist2)
+trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 {
 	srch_hist		*hist;
 	bt_rec_ptr_t		bt;
@@ -150,15 +152,15 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 	enum cdb_sc		status;
 	int			int_depth;
 	uint4			jnl_status;
-	jnl_buffer_ptr_t	jbp;
+	jnl_buffer_ptr_t	jbp, jbbp; /* jbp is non-NULL if journaling, jbbp is non-NULL only if before-image journaling */
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sgm_info		*dummysi = NULL;	/* needed as a dummy parameter for {mm,bg}_update */
 	srch_blk_status		*t1;
-	trans_num		start_ctn, valid_thru, ctn, tnque_earliest_tn;
+	trans_num		valid_thru, tnque_earliest_tn, dbtn, blktn, temp_tn, epoch_tn;
 	unsigned char		cw_depth;
 	jnldata_hdr_ptr_t	jnl_header;
-	uint4			total_jnl_rec_size, tmp_cumul_jnl_rec_len, tmp_cw_set_depth;
+	uint4			total_jnl_rec_size, tmp_cumul_jnl_rec_len, tmp_cw_set_depth, prev_cw_set_depth;
 	DEBUG_ONLY(unsigned int	tot_jrec_size;)
 	jnlpool_ctl_ptr_t	jpl, tjpl;
 	boolean_t		replication = FALSE;
@@ -167,10 +169,13 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
 	boolean_t		write_inctn = FALSE;	/* set to TRUE in case writing an inctn record is necessary */
 	boolean_t		decremented_currtn, retvalue;
+	blk_hdr_ptr_t		old_block;
+	unsigned int		bsiz;
 
 	error_def(ERR_GVKILLFAIL);
 	error_def(ERR_GVPUTFAIL);
 	error_def(ERR_NOTREPLICATED);
+	error_def(ERR_JNLFILOPN);
 
 	assert(hist1 != hist2);
 	csa = cs_addrs;
@@ -198,7 +203,8 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 			}
 			if (csa->now_crit)
 				rel_crit(gv_cur_region);
-			UNIX_ONLY(if (unhandled_stale_timer_pop) process_deferred_stale();)
+			if (unhandled_stale_timer_pop)
+				process_deferred_stale();
 			CWS_RESET;
 			t_tries = 0;	/* commit was successful so reset t_tries */
 			return csa->ti->curr_tn;
@@ -207,21 +213,24 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 	cr_array_index = 0;
 	ESTABLISH_RET(t_ch, 0);
 	if ((0 != cw_set_depth) && (gds_t_writemap == cw_set[0].mode))
-		cw_depth = 0;				/* freeing a block from gvcst_kill or, reorg */
+		cw_depth = 0;		/* freeing a block from gvcst_kill or reorg, or upgrading/downgrading a block by reorg */
 	else
 		cw_depth = cw_set_depth;
 	if (0 != cw_depth)
 	{	/* Caution : since csa->backup_in_prog and read_before_image are initialized below only if (cw_depth),
 		 * 	these variables should be used below only within an if (cw_depth).
 		 */
+		assert(sizeof(bsiz) == sizeof(old_block->bsiz));
 		csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb);
-		read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog);
+		jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
+		read_before_image = ((NULL != jbbp) || csa->backup_in_prog);
 		for (cs = &cw_set[0], cs_top = cs + cw_depth; cs < cs_top; cs++)
 		{
 			assert(0 == cs->jnl_freeaddr);	/* ensure haven't missed out resetting jnl_freeaddr for any cse in
 							 * t_write/t_create/t_write_map/t_write_root/mu_write_map [D9B11-001991] */
 			if (gds_t_create == cs->mode)
 			{
+				assert(0 == cs->blk_checksum);
 				int_depth = (int)cw_set_depth;
 				if (0 > (cs->blk = bm_getfree(cs->blk, &blk_used, cw_depth, cw_set, &int_depth)))
 				{
@@ -240,14 +249,38 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 				else
 				{
 					cs->old_block = t_qread(cs->blk, (sm_int_ptr_t)&cs->cycle, &cs->cr);
-					if (NULL == cs->old_block)
+					old_block = (blk_hdr_ptr_t)cs->old_block;
+					if (NULL == old_block)
 					{
 						status = rdfail_detail;
 						goto failed;
 					}
+					if ((NULL != jbbp) && (old_block->tn < jbbp->epoch_tn))
+					{	/* Compute CHECKSUM for writing PBLK record before getting crit.
+						 * It is possible that we are reading a block that is actually marked free in
+						 * the bitmap (due to concurrency issues at this point). Therefore we might be
+						 * actually reading uninitialized block headers and in turn a bad value of
+						 * "old_block->bsiz". Restart if we ever access a buffer whose size is greater
+						 * than the db block size.
+						 */
+						bsiz = old_block->bsiz;
+						if (bsiz > csd->blk_size)
+						{
+							status = cdb_sc_lostbmlcr;
+							goto failed;
+						}
+						cs->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED, (uint4*)old_block, bsiz);
+					}
 				}
-				assert(cs->blk < csa->ti->total_blks);
+				/* assert that the block that we got from bm_getfree is less than the total blocks.
+				 * if we do not have crit in this region, then it is possible that bm_getfree can return
+				 * a cs->blk that is >= csa->ti->total_blks (i.e. if the bitmap buffer gets recycled).
+				 * adjust assert accordingly.
+				 * note that checking for crit is equivalent to checking if we are in the final retry.
+				 */
+				assert((CDB_STAGNATE > t_tries) || (cs->blk < csa->ti->total_blks));
 				cs->mode = gds_t_acquired;
+				assert(GDSVCURR == cs->ondsk_blkver);
 			}
 		}
 	}
@@ -300,7 +333,10 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 	 */
 	release_crit = (CDB_STAGNATE - 1) > t_tries;
 	assert(!cw_depth || update_trans);
-	assert((inctn_invalid_op == inctn_opcode) || update_trans);
+	/* If inctn_opcode has a valid value, then we better be doing an update. The only exception to this rule is if we are
+	 * in MUPIP REORG UPGRADE/DOWNGRADE (mu_reorg_upgrd_dwngrd.c) where update_trans is explicitly set to FALSE in some cases.
+	 */
+	assert((inctn_invalid_op == inctn_opcode) || mu_reorg_upgrd_dwngrd_in_prog || update_trans);
 	if (update_trans)
 	{
 		if (JNL_ALLOWED(csa))
@@ -380,7 +416,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 		}
 	}
 	assert(csd == csa->hdr);
-	valid_thru = ctn = csa->ti->curr_tn;
+	valid_thru = dbtn = csa->ti->curr_tn;
 	if (!is_mm)
 		tnque_earliest_tn = ((th_rec_ptr_t)((sm_uc_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn;
 	if (update_trans)
@@ -417,12 +453,6 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 						status = cdb_sc_blockflush;
 						goto failed;
 					}
-					if (t1->tn <= bt->tn)
-					{
-						assert(CDB_STAGNATE > t_tries);
-						status = cdb_sc_blkmod;
-						goto failed;
-					}
 					if (CR_NOTVALID == bt->cache_index)
 						cr = db_csh_get(t1->blk_num);
 					else
@@ -435,6 +465,41 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 							BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_crbtmismatch1);
 							status = cdb_sc_crbtmismatch;
 							goto failed;
+						}
+					}
+					assert(bt->killtn <= bt->tn);
+					if (t1->tn <= bt->tn)
+					{
+						assert(CDB_STAGNATE > t_tries);
+						assert(!IS_DOLLAR_INCREMENT || !write_inctn);
+						/* If the current operation is a $INCREMENT, then try to optimize by recomputing
+						 * the update array. Do this only as long as ALL the following conditions are met.
+						 *	a) the current history's block is a leaf level block we intend to modify
+						 *	b) update is restricted to the data block
+						 *	c) no block splits are involved.
+						 *	d) this does not end up creating a new global variable tree
+						 *	e) this is not a case of $INCR about to signal a GVUNDEF
+						 *		cw_set_depth is 0 in that case
+						 * Conveniently enough, a simple check of (1 != cw_set_depth) is enough
+						 * to categorize conditions (c) to (e)
+						 *
+						 * Future optimization : It is possible that M-SETs (not just $INCR)
+						 * that update only one data block can benefit from this optimization.
+						 * But that has to be carefully thought out.
+						 */
+						if (!IS_DOLLAR_INCREMENT
+							|| t1->level || (1 != cw_set_depth) || (t1->blk_num != cw_set[0].blk))
+						{
+							status = cdb_sc_blkmod;
+							goto failed;
+						} else
+						{
+							status = gvincr_recompute_upd_array(t1, &cw_set[0], cr);
+							if (cdb_sc_normal != status)
+							{
+								status = cdb_sc_blkmod;
+								goto failed;
+							}
 						}
 					}
 				}
@@ -472,8 +537,11 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 		}
 	}
 	/* check bit maps for usage */
-	if (0 != cw_map_depth)	/* Bit maps on end from mupip_reorg */
+	if (0 != cw_map_depth)
+	{	/* Bit maps on end from mu_reorg (from a call to mu_swap_blk) or mu_reorg_upgrd_dwngrd */
+		prev_cw_set_depth = cw_set_depth;
 		cw_set_depth = cw_map_depth;
+	}
 	for (cs = &cw_set[cw_depth], cs_top = &cw_set[cw_set_depth]; cs < cs_top; cs++)
 	{
 		assert(0 == cs->jnl_freeaddr);	/* ensure haven't missed out resetting jnl_freeaddr for any cse in
@@ -547,11 +615,20 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 			cr->refer = TRUE;
 		}
 	}
+	if ((0 != cw_map_depth) && mu_reorg_upgrd_dwngrd_in_prog)
+	{	/* Bit maps on end from mu_reorg_upgrd_dwngrd. Bitmap history has been validated.
+		 * But we do not want bitmap cse to be considered for bg_update. Reset cw_set_depth accordingly.
+		 */
+		cw_set_depth = prev_cw_set_depth;
+		assert(1 >= cw_set_depth);
+	}
 	assert(csd == csa->hdr);
 	if (update_trans)
 	{
 		if (cw_depth && read_before_image && !is_mm)
 		{
+			assert(!(JNL_ENABLED(csa) && csa->jnl_before_image) || jbbp == csa->jnl->jnl_buff);
+			assert((JNL_ENABLED(csa) && csa->jnl_before_image) || (NULL == jbbp));
 			for (cs = cw_set, cs_top = cs + cw_set_depth;  cs < cs_top;  ++cs)
 			{	/* have already read old block for creates before we got crit, make sure
 				 * cache record still has correct block. if not, reset "cse" fields to
@@ -582,9 +659,26 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					assert(FALSE == cr->in_cw_set);
 					cr->in_cw_set = TRUE;
 					cr->refer = TRUE;
-					cs->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
-					cs->cr = cr;
-					cs->cycle = cr->cycle;
+					cs->ondsk_blkver = cr->ondsk_blkver;
+					if (cs->old_block != (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr))
+					{
+						cs->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+						if (NULL != jbbp)
+						{
+							old_block = (blk_hdr_ptr_t)cs->old_block;
+							/* We hold crit at this point so we are guaranteed valid bsiz field.
+							 * Hence we do not need to take MIN(bsiz, csd->blk_size) like we did
+							 * in the earlier call to jnl_get_checksum.
+							 */
+							assert(old_block->bsiz <= csd->blk_size);
+							if (old_block->tn < jbbp->epoch_tn)
+								cs->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED,
+													(uint4*)old_block,
+													old_block->bsiz);
+							else
+								cs->blk_checksum = 0;
+						}
+					}
 				}
 			}
 		}
@@ -629,8 +723,9 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 		}
 		assert(cw_set_depth < CDB_CW_SET_SIZE);
 		assert(csa->ti->early_tn == csa->ti->curr_tn);
-		start_ctn = csa->ti->curr_tn;
-		csa->ti->early_tn = start_ctn + 1;
+		CHECK_TN(csa, csd, dbtn);	/* can issue rts_error TNTOOLARGE */
+		blktn = dbtn;
+		csa->ti->early_tn = dbtn + 1;
 		if (JNL_ENABLED(csa))
 		{	/* The JNL_SHORT_TIME done below should be done before any journal writing activity on the
 			 * journal file. This is because all the jnl record writing routines assume that
@@ -646,14 +741,19 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 			jnl_status = jnl_ensure_open();
 			assert((csa->jnl_state == csd->jnl_state) &&
 				(csa->jnl_before_image == csd->jnl_before_image));
+			GTM_WHITE_BOX_TEST(WBTEST_T_END_JNLFILOPN, jnl_status, ERR_JNLFILOPN);
 			if (jnl_status == 0)
 			{
 				jbp = csa->jnl->jnl_buff;
-				/* tmp_cw_set_depth was used to do TOTAL_NONTPJNL_REC_SIZE calculation;
-				 * ensure it has not changed until now when the actual jnl record write occurs.
-				 * same case with csa->jnl_before_images & jbp->before_images.
+				/* tmp_cw_set_depth was used to do TOTAL_NONTPJNL_REC_SIZE calculation earlier in this function.
+				 * It is now though that the actual jnl record write occurs. Ensure that the current value of
+				 * cw_set_depth does not entail any change in journal record size than was calculated.
+				 * Same case with csa->jnl_before_images & jbp->before_images.
+				 * The only exception is that in case of mu_reorg_upgrd_dwngrd_in_prog cw_set_depth will be
+				 * LESSER than tmp_cw_set_depth (this is still fine as there is more size allocated than used).
 				 */
-				assert(cw_set_depth == tmp_cw_set_depth);
+				assert(cw_set_depth == tmp_cw_set_depth
+					|| mu_reorg_upgrd_dwngrd_in_prog && cw_map_depth && cw_set_depth < tmp_cw_set_depth);
 				assert(jbp->before_images == csa->jnl_before_image);
 				if (DISK_BLOCKS_SUM(jbp->freeaddr, total_jnl_rec_size) > jbp->filesize)
 				{	/* Moved as part of change to prevent journal records splitting
@@ -693,29 +793,76 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 							}
 						)
 					}
-					for (cs = cw_set, cs_top = cs + cw_set_depth;  cs < cs_top;  ++cs)
-					{	/* write out before-update journal image records */
-						if (gds_t_write_root == cs->mode)
-							continue;
-						ASSERT_IS_WITHIN_SHM_BOUNDS(cs->old_block, csa);
-						DBG_ENSURE_OLD_BLOCK_IS_VALID(cs, is_mm, csa, csd);
-						if ((NULL != cs->old_block) &&
-							((blk_hdr_ptr_t)(cs->old_block))->tn < jbp->epoch_tn)
-						{
-							jnl_write_pblk(csa, cs->blk, (blk_hdr_ptr_t)cs->old_block);
-							cs->jnl_freeaddr = jbp->freeaddr;
-						} else
-							cs->jnl_freeaddr = 0;
+					/* do not write PBLKs if MUPIP REORG UPGRADE/DOWNGRADE with -NOSAFEJNL */
+					if (!mu_reorg_upgrd_dwngrd_in_prog || !mu_reorg_nosafejnl)
+					{
+						epoch_tn = jbp->epoch_tn; /* store in a local as it is used in a loop below */
+						for (cs = cw_set, cs_top = cs + cw_set_depth;  cs < cs_top;  ++cs)
+						{	/* write out before-update journal image records */
+							if (gds_t_write_root == cs->mode)
+								continue;
+							old_block = (blk_hdr_ptr_t)cs->old_block;
+							ASSERT_IS_WITHIN_SHM_BOUNDS((sm_uc_ptr_t)old_block, csa);
+							DBG_ENSURE_OLD_BLOCK_IS_VALID(cs, is_mm, csa, csd);
+							if ((NULL != old_block) && (old_block->tn < epoch_tn))
+							{
+								bsiz = old_block->bsiz;
+								assert((bsiz <= csd->blk_size) || dse_running);
+								assert(bsiz >= sizeof(blk_hdr) || dse_running);
+								/* It is possible that the block has a bad block-size.
+								 * Before computing checksum ensure bsiz passed is safe.
+								 * The checks done here for "bsiz" assignment are
+								 * similar to those done in jnl_write_pblk/jnl_write_aimg.
+								 */
+								if (dse_running)
+									bsiz = MIN(bsiz, csd->blk_size);
+								assert(!cs->blk_checksum ||
+									(cs->blk_checksum == jnl_get_checksum(INIT_CHECKSUM_SEED,
+														(uint4 *)old_block,
+														bsiz)));
+								if (!cs->blk_checksum)
+									cs->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED,
+														(uint4 *)old_block,
+														bsiz);
+								jnl_write_pblk(csa, cs, old_block);
+								cs->jnl_freeaddr = jbp->freeaddr;
+							}
+							DEBUG_ONLY(
+							else
+								assert(0 == cs->jnl_freeaddr);
+							)
+						}
 					}
 				}
 				if (write_after_image)
 				{	/* either DSE or MUPIP RECOVER playing an AIMG record */
 					assert(1 == cw_set_depth); /* only one block at a time */
-					cs = cw_set;
-					jnl_write_aimg_rec(csa, cs->blk, (blk_hdr_ptr_t)cs->new_buff);
+					cs = &cw_set[0];
+					jnl_write_aimg_rec(csa, cs);
 				} else if (write_inctn)
+				{
+					assert(!mu_reorg_upgrd_dwngrd_in_prog
+						|| (inctn_blkupgrd == inctn_opcode) || (inctn_blkdwngrd == inctn_opcode));
+					if (mu_reorg_upgrd_dwngrd_in_prog)
+					{
+						assert(1 == cw_set_depth); /* upgrade/downgrade one block at a time */
+						cs = &cw_set[0];
+						inctn_detail.blknum = cs->blk;
+						assert(mu_reorg_upgrd_dwngrd_blktn < dbtn);
+						if (mu_reorg_nosafejnl)
+						{
+							blktn = mu_reorg_upgrd_dwngrd_blktn;
+							/* if NOSAFEJNL and there is going to be a block format change
+							 * as a result of this update, note it down in the inctn opcode
+							 * (for recovery) as there is no PBLK record for it to rely on.
+							 */
+							if (cs->ondsk_blkver != csd->desired_db_format)
+								inctn_opcode = (inctn_opcode == inctn_blkupgrd)
+										? inctn_blkupgrd_fmtchng : inctn_blkdwngrd_fmtchng;
+						}
+					}
 					jnl_write_inctn_rec(csa);
-				else if (0 == jnl_fence_ctl.level)
+				} else if (0 == jnl_fence_ctl.level)
 				{
 					if (replication)
 						QWASSIGN(jnl_fence_ctl.token, tjpl->jnl_seqno);
@@ -728,6 +875,11 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 				{
 					QWINCRBY(tjpl->jnl_seqno, seq_num_one);
 					QWASSIGN(csa->hdr->reg_seqno, tjpl->jnl_seqno);
+					if (is_updproc)
+					{
+						QWINCRBY(jgbl.max_resync_seqno, seq_num_one);
+						QWASSIGN(csa->hdr->resync_seqno, jgbl.max_resync_seqno);
+					}
 				}
 			} else
 				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
@@ -742,7 +894,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 				if (gds_t_write_root != cs->mode)
 				{
 					if (is_mm)
-						status = mm_update(cs, cs_top, ctn, ctn, dummysi);
+						status = mm_update(cs, cs_top, dbtn, blktn, dummysi);
 					else
 					{
 						if (csd->dsid)
@@ -760,11 +912,11 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 							} else	if (0 == cs->level)
 								rc_cpt_entry(cs->blk);
 						}
-						status = bg_update(cs, cs_top, ctn, ctn, dummysi);
+						status = bg_update(cs, cs_top, dbtn, blktn, dummysi);
 					}
 					if (cdb_sc_normal != status)
-					{
-						assert(FALSE);		/* the database is probably in trouble */
+					{	/* the database is probably in trouble */
+						assert(gtm_white_box_test_case_enabled);
 						retvalue = t_commit_cleanup(status, 0);	/* return value of TRUE implies	that */
 						assert(retvalue); 	/* secshr_db_clnup() should have completed the commit */
 						status = cdb_sc_normal;	/* reset status to normal as transaction is complete */
@@ -778,19 +930,13 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 			update_trans = T_COMMIT_STARTED; /* tell t_commit_cleanup(), roll-back is no longer possible */
 		csa->t_commit_crit = FALSE;
 		assert(cdb_sc_normal == status);
-		++csa->ti->curr_tn;
-		assert(csa->ti->curr_tn == csa->ti->early_tn);
+		INCREMENT_CURR_TN(csd);
 		/* write out the db header every HEADER_UPDATE_COUNT -1 transactions */
-		if (!(csa->ti->curr_tn & (HEADER_UPDATE_COUNT-1)))
+		if (!(csd->trans_hist.curr_tn & (HEADER_UPDATE_COUNT - 1)))
 			fileheader_sync(gv_cur_region);
 		if (replication)
 		{
 			assert(QWGT(jpl->early_write_addr, jpl->write_addr));
-			if (is_updproc)
-			{
-				QWINCRBY(jgbl.max_resync_seqno, seq_num_one);
-				QWASSIGN(csa->hdr->resync_seqno, jgbl.max_resync_seqno);
-			}
 			assert(tmp_cumul_jnl_rec_len == (tjpl->write - jpl->write +
 				(tjpl->write > jpl->write ? 0 : jpl->jnlpool_size)));
 			/* the following statements should be atomic */
@@ -831,22 +977,23 @@ skip_cr_array:
 	rel_crit(gv_cur_region);
 	if (block_saved)
 		backup_buffer_flush(gv_cur_region);
-	UNIX_ONLY(
-		if (unhandled_stale_timer_pop)
-			process_deferred_stale();
-	)
+	if (unhandled_stale_timer_pop)
+		process_deferred_stale();
 	if (update_trans)
 	{
 		wcs_timer_start(gv_cur_region, TRUE);
 		if (REPL_ENABLED(csa) && dse_running)
-			send_msg(VARLSTCNT(5) ERR_NOTREPLICATED, 4, start_ctn + 1, LEN_AND_LIT("DSE"), process_id);
+		{
+			temp_tn = dbtn + 1;
+			send_msg(VARLSTCNT(6) ERR_NOTREPLICATED, 4, &temp_tn, LEN_AND_LIT("DSE"), process_id);
+		}
 	}
 	REVERT;
 	/* secshr_db_clnup() assumes an active non-TP transaction if cw_set_depth is non-zero. now that it is complete, reset it */
 	cw_set_depth = 0;
 	CWS_RESET;
 	t_tries = 0;	/* commit was successful so reset t_tries */
-	return ctn;
+	return dbtn;
 failed:
 	assert(cdb_sc_normal != status);
 	REVERT;

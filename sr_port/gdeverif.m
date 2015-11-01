@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -91,7 +91,9 @@ dupfile:	s verified=0
 	q
 ALLTEM
 	s x=$$TRQUALS(.tmpreg)
-	f i=2:1:$l(accmeth,"\") s am=$p(accmeth,"\",i) d tmpseg
+	; The change is for TR C9E02-002518, any template command updates only active segment
+	; so verify only that segment with template region, not all segments
+	d tmpseg
 	q
 tmpseg:	n squals s s=""
 	f  s s=$o(tmpseg(am,s)) q:'$l(s)  s squals(s)=tmpseg(am,s)

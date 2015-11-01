@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,7 @@
 #include "masscomp.h"
 #include "gtmio.h"
 #include "incr_link.h"
+#include "min_max.h"	/* MIDENT_CMP needs MIN */
 
 /* INCR_LINK - read and process a mumps object module.  Link said module to
  	currently executing image */
@@ -31,23 +32,33 @@
 LITREF char gtm_release_name[];
 LITREF int4 gtm_release_name_len;
 
-static char *code;
-GBLDEF mident zlink_mname;
-GBLREF unsigned char *zl_lab_err;
+static char 		*code;
+GBLREF mident_fixed 	zlink_mname;
+GBLREF unsigned char 	*zl_lab_err;
 
-bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, unsigned char *code);
+#define RELREAD 50	/* number of relocation entries to buffer */
+typedef struct res_list_struct
+{
+	struct res_list_struct *next, *list;
+	unsigned int	addr, symnum;
+} res_list;
+
+void res_free(res_list *root);
+bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code);
 void zl_error(int4 file, int4 err, int4 len, char *addr);
 
 bool incr_link(int file_desc)
 {
-	rhdtyp	*hdr, *old_rhead;
-	int code_size, save_errno;
-	int4 rhd_diff,lab_miss_off,*olnt_ent,*olnt_top, read_size;
-	mident		module_name;
-	lbl_tables *lbt_ent, *lbt_bot, *lbt_top, *olbt_ent, *olbt_bot, *olbt_top;
+	rhdtyp		*hdr, *old_rhead;
+	int 		code_size, save_errno, cnt;
+	int4 		rhd_diff,lab_miss_off,*olnt_ent,*olnt_top, read_size;
+	char		*literal_ptr;
+	var_tabent	*curvar;
+	char		module_name[sizeof(mident_fixed)];
+	lab_tabent	*lbt_ent, *lbt_bot, *lbt_top, *olbt_ent, *olbt_bot, *olbt_top, *curlab;
 	urx_rtnref	urx_lcl_anchor;
-	bool	more, order;
-	struct exec file_hdr;
+	int		order;
+	struct exec 	file_hdr;
 	error_def(ERR_INVOBJ);
 	error_def(ERR_LOADRUNNING);
 
@@ -57,13 +68,9 @@ bool incr_link(int file_desc)
 	urx_lcl_anchor.next = 0;
 	code = NULL;
 
-/*
-	read_size = read(file_desc, &file_hdr, sizeof(file_hdr));
-	if (read_size != sizeof(file_hdr) || file_hdr.a_magic != OMAGIC || file_hdr.a_stamp != OBJ_LABEL)
-		zl_error(file_desc, ERR_INVOBJ, 0, 0);
-*/
 	DOREADRL(file_desc, &file_hdr, sizeof(file_hdr), read_size);
 	if (read_size != sizeof(file_hdr))
+	{
 		if (-1 == read_size)
 		{
 			save_errno = errno < sys_nerr ? (0 <= errno ? errno : 0) : 0;
@@ -72,6 +79,7 @@ bool incr_link(int file_desc)
 		}
 		else
 			zl_error(file_desc, ERR_INVOBJ, RTS_ERROR_TEXT("reading file header"));
+	}
 	else if (OMAGIC != file_hdr.a_magic)
 		zl_error(file_desc, ERR_INVOBJ, RTS_ERROR_TEXT("bad magic"));
 	else if (OBJ_LABEL != file_hdr.a_stamp)
@@ -80,13 +88,9 @@ bool incr_link(int file_desc)
 	assert (file_hdr.a_bss == 0);
 	code_size = file_hdr.a_text + file_hdr.a_data;
 	code = malloc(code_size);
-/*
-	read_size = read(file_desc, code, code_size);
-	if (read_size != code_size)
-		zl_error(file_desc, ERR_INVOBJ, 0, 0);
-*/
 	DOREADRL(file_desc, code, code_size, read_size);
 	if (read_size != code_size)
+	{
 		if (-1 == read_size)
 		{
 			save_errno = errno < sys_nerr ? (0 <= errno ? errno : 0) : 0;
@@ -95,29 +99,37 @@ bool incr_link(int file_desc)
 		}
 		else
 			zl_error(file_desc, ERR_INVOBJ, RTS_ERROR_TEXT("reading code"));
-
+	}
 	hdr = (rhdtyp *)code;
 	if (memcmp(&hdr->jsb[0], "GTM_CODE", sizeof(hdr->jsb)))
 		zl_error(file_desc, ERR_INVOBJ, RTS_ERROR_TEXT("missing GTM_CODE"));
 
-	memcpy(&zlink_mname.c[0], &hdr->routine_name, sizeof(mident));
-	if (!addr_fix(file_desc, &file_hdr, &urx_lcl_anchor, code))
+	literal_ptr = code + file_hdr.a_text;
+	for (cnt = hdr->vartab_len, curvar = VARTAB_ADR(hdr); cnt; --cnt, ++curvar)
+	{ /* relocate the variable table */
+		assert(0 < curvar->var_name.len);
+		curvar->var_name.addr += (uint4)literal_ptr;
+	}
+	for (cnt = hdr->labtab_len, curlab = LABTAB_ADR(hdr); cnt; --cnt, ++curlab)
+	{ /* relocate the label table */
+		curlab->lab_name.addr += (uint4)literal_ptr;
+	}
+	if (!addr_fix(file_desc, &file_hdr, &urx_lcl_anchor, hdr))
 	{
 		urx_free(&urx_lcl_anchor);
 		zl_error(file_desc, ERR_INVOBJ, RTS_ERROR_TEXT("address fixup failure"));
 	}
-
 	if (!zlput_rname (hdr))
 	{
 		urx_free(&urx_lcl_anchor);
 		/* Copy routine name to local variable because zl_error free's it.  */
-		memcpy(module_name.c, hdr->routine_name.c, sizeof(mident));
-		zl_error(file_desc, ERR_LOADRUNNING, mid_len(&module_name), module_name.c);
+		memcpy(&module_name[0], hdr->routine_name.addr, hdr->routine_name.len);
+		zl_error(file_desc, ERR_LOADRUNNING, hdr->routine_name.len, &module_name[0]);
 	}
 	urx_add (&urx_lcl_anchor);
 
 	old_rhead = (rhdtyp *) hdr->old_rhead_ptr;
-	lbt_bot = (lbl_tables *) ((char *)hdr + hdr->labtab_ptr);
+	lbt_bot = (lab_tabent *) ((char *)hdr + hdr->labtab_ptr);
 	lbt_top = lbt_bot + hdr->labtab_len;
 	while (old_rhead)
 	{
@@ -128,14 +140,17 @@ bool incr_link(int file_desc)
 		olnt_top = olnt_ent + old_rhead->lnrtab_len;
 		for ( ; olnt_ent < olnt_top ;olnt_ent++)
 			*olnt_ent = lab_miss_off;
-		olbt_bot = (lbl_tables *) ((char *) old_rhead + old_rhead->labtab_ptr);
+		olbt_bot = (lab_tabent *) ((char *) old_rhead + old_rhead->labtab_ptr);
 		olbt_top = olbt_bot + old_rhead->labtab_len;
 		for (olbt_ent = olbt_bot; olbt_ent < olbt_top ;olbt_ent++)
 		{
-			while((more = lbt_ent < lbt_top)
-				&& (order = memcmp(&olbt_ent->lab_name.c[0],&lbt_ent->lab_name.c[0],sizeof(mident))) > 0)
-				lbt_ent++;
-			if (more && !order)
+			for (; lbt_ent < lbt_top; lbt_ent++)
+			{
+				MIDENT_CMP(&olbt_ent->lab_name, &lbt_ent->lab_name, order);
+				if (order <= 0)
+					break;
+			}
+			if ((lbt_ent < lbt_top) && !order)
 			{
 				olnt_ent = (int4 *)((char *) old_rhead + olbt_ent->lab_ln_ptr);
 				assert(*olnt_ent == lab_miss_off);
@@ -143,6 +158,7 @@ bool incr_link(int file_desc)
 			}
 		}
 		old_rhead->src_full_name = hdr->src_full_name;
+		old_rhead->routine_name = hdr->routine_name;
 		old_rhead->vartab_len = hdr->vartab_len;
 		old_rhead->vartab_ptr = hdr->vartab_ptr + rhd_diff;
 		old_rhead->ptext_ptr = hdr->ptext_ptr + rhd_diff;
@@ -155,28 +171,18 @@ bool incr_link(int file_desc)
 	return TRUE;
 }
 
-typedef struct res_list_struct {
-	struct res_list_struct *next, *list;
-	unsigned int	addr, symnum;
-	} res_list;
-
-void res_free(res_list *root);
-
-#define RELREAD 50	/* number of relocation entries to buffer */
-
-bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, unsigned char *code)
+bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code)
 {
-	res_list *res_root, *new_res, *res_temp, *res_temp1;
-	char *symbols, *sym_temp, *sym_temp1, *symtop, *res_addr;
+	res_list 	*res_root, *new_res, *res_temp, *res_temp1;
+	char 		*symbols, *sym_temp, *sym_temp1, *symtop, *res_addr;
 	struct relocation_info rel[RELREAD];
-	struct nlist syms[10];
-	int	numrel, rel_read, i, string_size, sym_size;
-	size_t	status;
-	mident	rtnid, labid;
-	mstr	rtn_str;
-	rhdtyp	*rtn;
-	lent	*label, *labtop;
-	bool	labsym;
+	int		numrel, rel_read, i, string_size, sym_size;
+	size_t		status;
+	mident_fixed	rtnid, labid;
+	mstr		rtn_str;
+	rhdtyp		*rtn;
+	lab_tabent	*label, *labtop;
+	bool		labsym;
 	urx_rtnref	*urx_rp;
 	urx_addr	*urx_tmpaddr;
 
@@ -201,6 +207,7 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, unsigned char *
 				new_res->symnum = rel[i].r_symbolnum;
 				new_res->addr = rel[i].r_address;
 				new_res->next = new_res->list = 0;
+				/* Insert the relocation entry in symbol number order on the unresolved chain */
 				if (!res_root)
 					res_root = new_res;
 				else
@@ -234,9 +241,13 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, unsigned char *
 				}
 			}
 			else
-				*(unsigned int *)(code + rel[i].r_address) += (unsigned int) code;
+				*(unsigned int *)(((char *)code) + rel[i].r_address) += (unsigned int)code;
 		}
 	}
+	/* All relocations within the routine should have been done, so copy the routine_name */
+	assert(code->routine_name.len < sizeof(zlink_mname.c));
+	memcpy(&zlink_mname.c[0], code->routine_name.addr, code->routine_name.len);
+	zlink_mname.c[code->routine_name.len] = 0;
 	if (!res_root)
 		return TRUE;
 
@@ -259,11 +270,15 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, unsigned char *
 		res_free(res_root);
 		return FALSE;
 	}
+
+	/* Match up unresolved entries with the null terminated symbol name entries from the
+	 * symbol text pool we just read in. */
 	sym_temp = sym_temp1 = symbols;
 	symtop = symbols + string_size;
 	for (i = 0; res_root; i++)
 	{	while (i < res_root->symnum)
-		{ 	while (*sym_temp)
+		{  /* Forward symbol space until our symnum index (i) matches the symbol we are processing in res_root */
+			while (*sym_temp)
 			{
 				if (sym_temp >= symtop)
 				{
@@ -278,6 +293,7 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, unsigned char *
 			i++;
 		}
 		assert (i == res_root->symnum);
+		/* Find end of routine name that we care about */
 		while (*sym_temp1 != '.' && *sym_temp1)
 		{	if (sym_temp1 >= symtop)
 			{
@@ -287,20 +303,21 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, unsigned char *
 			}
 			sym_temp1++;
 		}
-		memset(&rtnid.c[0], 0, sizeof(rtnid));
 		sym_size = sym_temp1 - sym_temp;
-		assert (sym_size <= sizeof(mident));
+		assert(sym_size <= MAX_MIDENT_LEN);
 		memcpy(&rtnid.c[0], sym_temp, sym_size);
+		rtnid.c[sym_size] = 0;
 		if (rtnid.c[0] == '_')
 			rtnid.c[0] = '%';
-		assert (memcmp(&zlink_mname.c[0], &rtnid.c[0], sizeof(mident)));
+		assert(sym_size != mid_len(&zlink_mname) || 0 != memcmp(&zlink_mname.c[0], &rtnid.c[0], sym_size));
 		rtn_str.addr = &rtnid.c[0];
 		rtn_str.len = sym_size;
-		rtn = find_rtn_hdr(&rtn_str);
+		rtn = find_rtn_hdr(&rtn_str); /* Routine already resolved? */
 		sym_size = 0;
 		labsym = FALSE;
 		if (*sym_temp1 == '.')
-		{	sym_temp1++;
+		{ /* If symbol is for a label, find the end of the label name */
+			sym_temp1++;
 			sym_temp = sym_temp1;
 			while (*sym_temp1)
 			{	if (sym_temp1 >= symtop)
@@ -312,9 +329,9 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, unsigned char *
 				sym_temp1++;
 			}
 			sym_size = sym_temp1 - sym_temp;
-			assert (sym_size <= sizeof(mident));
-			memset(&labid.c[0], 0, sizeof(labid));
+			assert(sym_size <= MAX_MIDENT_LEN);
 			memcpy(&labid.c[0], sym_temp, sym_size);
+			labid.c[sym_size] = 0;
 			if (labid.c[0] == '_')
 				labid.c[0] = '%';
 			labsym = TRUE;
@@ -322,25 +339,26 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, unsigned char *
 		sym_temp1++;
 		sym_temp = sym_temp1;
 		if (rtn)
-		{	if (labsym)
-			{
-				label = (lent *)((char *) rtn + rtn->labtab_ptr);
+		{ /* The routine part at least is known */
+			if (labsym)
+			{ /* Look our target label up in the routines label table */
+				label = (lab_tabent *)((char *) rtn + rtn->labtab_ptr);
 				labtop = label + rtn->labtab_len;
-				for (; label < labtop && memcmp(&labid.c[0], &label->lname.c[0], sizeof(mident)); label++)
+				for (; label < labtop && (sym_size != label->lab_name.len ||
+						memcmp(&labid.c[0], label->lab_name.addr, sym_size)); label++)
 					;
-
 				if (label < labtop)
-					res_addr = (char *)(label->laddr + (char *) rtn);
+					res_addr = (char *)(label->LABENT_LNR_OFFSET + (char *)rtn);
 				else
 					res_addr = 0;
 			}
 			else
 				res_addr = (char *)rtn;
 			if (res_addr)
-			{
+			{ /* The external symbol definition is available. Resolve all references to it */
 				res_temp = res_root->next;
 				while(res_root)
-				{	*(uint4 *)(code + res_root->addr) = (unsigned int) res_addr;
+				{	*(uint4 *)(((char *)code) + res_root->addr) = (unsigned int) res_addr;
 					res_temp1 = res_root->list;
 					free(res_root);
 					res_root = res_temp1;
@@ -349,16 +367,17 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, unsigned char *
 				continue;
 			}
 		}
+		/* This symbol is unknown. Put on the (local) unresolved extern chain -- either for labels or routines */
 		urx_rp = urx_putrtn(rtn_str.addr, rtn_str.len, urx_lcl);
 		res_temp = res_root->next;
 		while(res_root)
 		{
 			if (labsym)
-				urx_putlab(&labid.c[0], sym_size, urx_rp, code + res_root->addr);
+				urx_putlab(&labid.c[0], sym_size, urx_rp, ((char *)code) + res_root->addr);
 			else
 			{	urx_tmpaddr = (urx_addr *) malloc(sizeof(urx_addr));
 				urx_tmpaddr->next = urx_rp->addr;
-				urx_tmpaddr->addr = (int4 *)(code + res_root->addr);
+				urx_tmpaddr->addr = (int4 *)(((char *)code) + res_root->addr);
 				urx_rp->addr = urx_tmpaddr;
 			}
 			res_temp1 = res_root->list;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,13 +11,13 @@
 
 #include "mdef.h"
 
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "tp_frame.h"
 
 GBLREF tp_frame *tp_pointer;
 
-void lv_newname(ht_entry *hte, symval *sym)
+void lv_newname(ht_ent_mname *hte, symval *sym)
 {
 	lv_val	*var, *lv;
 	tp_frame *tf;
@@ -29,7 +29,7 @@ void lv_newname(ht_entry *hte, symval *sym)
 	lv->tp_var = NULL;
 	lv->ptrs.val_ent.children = 0;
 	lv->ptrs.val_ent.parent.sym = sym;
-	hte->ptr = (char *)lv;
+	hte->value = lv;
 	if (sym->tp_save_all)
 	{
 		all_cnt = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,27 +23,27 @@ LITREF uint4	typemask[PATENTS];
  * for the DFA engine and build the data that would "normally" have been compiled for the pattern segment in question.
  */
 boolean_t pat_unwind(
-	short int		*count,
-	struct leaf		*leaves,
-	short int		leaf_num,
-	short int		*total_min,
-	short int		*total_max,
-	short int		min[],
-	short int		max[],
-	short int		size[],
-	int			altmin,
-	int			altmax,
-	boolean_t		*last_infinite_ptr,
-	uint4			**fstchar_ptr,
-	uint4			**outchar_ptr,
-	uint4			**lastpatptr_ptr)
+	int		*count,
+	struct leaf	*leaves,
+	int		leaf_num,
+	int		*total_min,
+	int		*total_max,
+	int		min[],
+	int		max[],
+	int		size[],
+	int		altmin,
+	int		altmax,
+	boolean_t	*last_infinite_ptr,
+	uint4		**fstchar_ptr,
+	uint4		**outchar_ptr,
+	uint4		**lastpatptr_ptr)
 {
 	struct {
 		int4	 	len;
 		unsigned char	lit_buf[MAX_DFA_STRLEN];
 		}  	str_lit;
 	uint4		pattern_mask;
-	short int	minim, maxim, leaf_cnt, charpos, offset, atom_map;
+	int		minim, maxim, leaf_cnt, charpos, offset, atom_map;
 	boolean_t	infinite;
 
 	assert(MAX_SYM > leaf_num);

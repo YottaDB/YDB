@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,282 +9,172 @@
  *								*
  ****************************************************************/
 
-/*---------------------------------------------------------------------------
-	mu_upgrd_header.c
-	---------------
-        This program will upgrade v3.x header to v4.x database.
-	note: Some operation in the header is redundant,
-	      but this is to keep track of the fields in the file header.
- ----------------------------------------------------------------------------*/
+/* This program will upgrade v4.x header to v5.0-000 database. */
 
 
 #include "mdef.h"
 
-#include <unistd.h>
-#include <sys/stat.h>
-#include <time.h>
 #include <math.h> /* needed for handling of epoch_interval */
-
+#include "gtm_stat.h"
+#include "gtm_unistd.h"
+#include "gtm_time.h"
 #include "gtm_string.h"
 #include "iosp.h"
 #include "gdsroot.h"
+#include "v15_gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
+#include "v15_gdsbt.h"
 #include "gdsfhead.h"
-#include "v3_gdsfhead.h"
+#include "v15_gdsfhead.h"
 #include "filestruct.h"
-#include "jnl.h"
+#include "v15_filestruct.h"
 #include "gdsblk.h"           /* needed for gdsblkops.h */
-#include "gdscc.h"            /* needed for CDB_CW_SET_SIZE macro in gdsblkops.h */
-#include "min_max.h"          /* needed for gdsblkops.h and MIN,MAX usage in this module */
-#include "gdsblkops.h"
-#include "timers.h"
-#include "mutex.h"
-#include "mu_upgrd.h"
-#include "mu_upgrd_header.h"
+#include "jnl.h"
+#include "mu_upgrd_dngrd_hdr.h"
+#include "gtmmsg.h"
+#include "lockconst.h"
 
+LITREF  char                    gtm_release_name[];
+LITREF  int4                    gtm_release_name_len;
 
-
-
-/* to keep old values instead of reinitialize them */
-#define UPGRADE_BG_TRC_REC(field) (new_head->field).evnt_cnt = (old_head->field).evnt_cnt; \
-				  (new_head->field).evnt_tn  = (old_head->field).evnt_tn
-
-/* is redundant */
-#define INIT_BG_TRC_REC(field) (new_head->field).evnt_cnt = 0; \
-			       (new_head->field).evnt_tn  = 0
-
-/* If sizeof(old_head->field) <= sizeof(new_head->field), and same type and array */
-#define UPGRADE_MEM(field) memcpy(&new_head->field[0], &old_head->field[0], sizeof(old_head->field))
-
-
-
-
-
-/*---------------------------------------------------------------------------
-     Update header from v3.x to v4.x.  This will cause header to expand.
-     Might be recalculated in main:
-     	1. start_vbn
-	2. dbfid
-	3. free_space
-	4. wc_blocked_t_end_hist/wc_blocked_t_end_hist2 (different between 16F and others 3.x)
-	5. flush_trigger/jnl_blocked_writer_lost/jnl_blocked_writer_stuck/jnl_blocked_writer_blocked (for VMS)
- ---------------------------------------------------------------------------*/
-void mu_upgrd_header(v3_sgmnt_data *old_head, sgmnt_data *new_head)
+/* Update header from v4.x to v5.0-000 */
+void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 {
 
-	memcpy(new_head,GDS_LABEL, GDS_LABEL_SZ);
-	new_head->n_bts = old_head->n_bts;
-	assert(old_head->acc_meth == dba_mm || old_head->acc_meth == dba_bg);
-	new_head->acc_meth = old_head->acc_meth;
-	/* new_head->start_vbn : Different for UNIX/VMS. So do not calculate it here */
-	new_head->createinprogress = old_head->createinprogress;
-	new_head->file_corrupt = old_head->file_corrupt;
-	new_head->total_blks_filler = old_head->total_blks_filler;
-	new_head->created = old_head->created;
-	new_head->lkwkval = old_head->lkwkval;
-	new_head->lock_space_size = old_head->lock_space_size;
-	new_head->owner_node = old_head->owner_node;
-	/* new_head->free_space : Different for UNIX/VMS. So do not calculate it here */
-	new_head->max_bts =  WC_MAX_BUFFS;
-	new_head->extension_size = old_head->extension_size;
-	new_head->blk_size = old_head->blk_size;
-	new_head->max_rec_size = old_head->max_rec_size;
-	new_head->max_key_size = old_head->max_key_size;
-	new_head->null_subs = old_head->null_subs;
-	new_head->lock_write = old_head->lock_write;
-	new_head->ccp_jnl_before = old_head->ccp_jnl_before;
-	new_head->clustered = old_head->clustered;
-	new_head->flush_done = old_head->flush_done;
-	new_head->unbacked_cache = old_head->unbacked_cache;
-	new_head->bplmap = old_head->bplmap;
-	new_head->bt_buckets = old_head->bt_buckets;
-	new_head->n_wrt_per_flu = old_head->n_wrt_per_flu;
-	UPGRADE_MEM(n_retries);
-	new_head->n_puts = old_head->n_puts;
-	new_head->n_kills = old_head->n_kills;
-	new_head->n_queries = old_head->n_queries;
-	new_head->n_gets = old_head->n_gets;
-	new_head->n_order = old_head->n_order;
-	new_head->n_zprevs = old_head->n_zprevs;
-	new_head->n_data = old_head->n_data;
-	new_head->wc_rtries = old_head->wc_rtries;
-	new_head->wc_rhits = old_head->wc_rhits;
-	/* new_head->wcs_staleness =  old_head->wcs_staleness; */
-	new_head->wc_blocked = old_head->wc_blocked;
-	new_head->root_level = old_head->root_level;
-	/* new_head->filler_short */
-	if (old_head->acc_meth == dba_bg)
-		new_head->flush_time[0] = TIM_FLU_MOD_BG;
-	else
-		new_head->flush_time[0] = TIM_FLU_MOD_MM;
-	new_head->flush_time[1] = -1;
-	new_head->last_inc_backup = old_head->last_inc_backup;
-	new_head->last_com_backup = old_head->last_com_backup;
-	new_head->staleness[0] =  -300000000;
-	new_head->staleness[1] =  -1;
-	UPGRADE_MEM(ccp_tick_interval);
-	new_head->flu_outstanding = old_head->flu_outstanding;
-	new_head->free_blocks_filler = old_head->free_blocks_filler;
-	new_head->last_rec_backup = old_head->last_rec_backup;
-	UPGRADE_MEM(ccp_quantum_interval);
-	UPGRADE_MEM(ccp_response_interval);
-	new_head->jnl_alq = old_head->jnl_alq;
-	new_head->jnl_deq = old_head->jnl_deq;
-	new_head->jnl_buffer_size = old_head->jnl_buffer_size;
-	if (JNL_ALLOWED(new_head) && !new_head->jnl_buffer_size)
-		new_head->jnl_buffer_size = JNL_BUFFER_DEF;
-	new_head->jnl_before_image = old_head->jnl_before_image;
-	new_head->jnl_state = old_head->jnl_state;
-	if (JNL_ALLOWED(old_head))
-	{	/* Following 3 are new fields starting from V43001.
-		 * Initialize them appropriately.
-		 */
-		new_head->epoch_interval = DEFAULT_EPOCH_INTERVAL;
-		new_head->alignsize = DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE;
-		if (!new_head->jnl_alq)
-			new_head->jnl_alq = JNL_ALLOC_DEF;
-		/* note new_head->jnl_deq is carried over without any change even if it is zero since a zero
-		 * jnl file extension size is supported starting V43001
-		 */
-		new_head->autoswitchlimit = ALIGNED_ROUND_DOWN(JNL_ALLOC_MAX, new_head->jnl_alq, new_head->jnl_deq);
-	} else
-	{
-		new_head->epoch_interval = 0;
-		new_head->alignsize = 0;
-		new_head->autoswitchlimit = 0;
-	}
-	new_head->yield_lmt = DEFAULT_YIELD_LIMIT;
-	/* new_head->filler_glob_sec_init[0] */
-	new_head->jnl_file_len = old_head->jnl_file_len;
-	UPGRADE_MEM(jnl_file_name);
-
-	new_head->trans_hist.curr_tn = old_head->trans_hist.curr_tn;
-	new_head->trans_hist.early_tn = old_head->trans_hist.early_tn;
-	new_head->trans_hist.last_mm_sync = old_head->trans_hist.curr_tn;
-	new_head->trans_hist.header_open_tn = old_head->trans_hist.header_open_tn;
-	new_head->trans_hist.mm_tn = old_head->trans_hist.mm_tn;
-	new_head->trans_hist.lock_sequence = old_head->trans_hist.lock_sequence;
-	new_head->trans_hist.ccp_jnl_filesize = old_head->trans_hist.ccp_jnl_filesize;
-	new_head->trans_hist.total_blks = old_head->trans_hist.total_blks;
-	new_head->trans_hist.free_blocks = old_head->trans_hist.free_blocks;
-	new_head->cache_lru_cycle = 0; 	/* assigned in run time */
-	new_head->reserved_bytes = old_head->reserved_bytes;
-	/* new_head->in_wtstart = 0; */
-	new_head->defer_time = 1;
-	new_head->def_coll = old_head->def_coll;
-	new_head->def_coll_ver = old_head->def_coll_ver;
-	new_head->image_count = old_head->image_count;
-	new_head->freeze = old_head->freeze;
-	new_head->rc_srv_cnt = old_head->rc_srv_cnt;
-	new_head->dsid = old_head->dsid;
-	new_head->rc_node = old_head->rc_node;
-	time(&new_head->creation.date_time);	/* Set creation date/time to current */
-        /* new_head->dbfid;   Platform dependent. So updat in main */
-	/*  filler2_char[16];  */
-
-
-#if defined(VMS)
-	UPGRADE_BG_TRC_REC(rmv_free);
-	UPGRADE_BG_TRC_REC(rmv_clean);
-	UPGRADE_BG_TRC_REC(clean_to_mod);
-	UPGRADE_BG_TRC_REC(qio_to_mod);
-	UPGRADE_BG_TRC_REC(blocked);
-	UPGRADE_BG_TRC_REC(blkd_made_empty);
-	UPGRADE_BG_TRC_REC(obsolete_to_empty);
-	UPGRADE_BG_TRC_REC(qio_to_clean);
-	UPGRADE_BG_TRC_REC(stale);
-	UPGRADE_BG_TRC_REC(starved);
-	UPGRADE_BG_TRC_REC(active_lvl_trigger);
-	UPGRADE_BG_TRC_REC(new_buff);
-	UPGRADE_BG_TRC_REC(get_new_buff);
-	UPGRADE_BG_TRC_REC(mod_to_mod);
-#elif defined(UNIX)
-	INIT_BG_TRC_REC(total_buffer_flush);
-	INIT_BG_TRC_REC(bufct_buffer_flush);
-	INIT_BG_TRC_REC(bufct_buffer_flush_loop);
-	INIT_BG_TRC_REC(stale_timer_started);
-	INIT_BG_TRC_REC(stale_timer_pop);
-	INIT_BG_TRC_REC(stale_process_defer);
-	INIT_BG_TRC_REC(stale_defer_processed);
-	INIT_BG_TRC_REC(wrt_calls);
-	INIT_BG_TRC_REC(wrt_count);
-	INIT_BG_TRC_REC(wrt_blocked);
-	INIT_BG_TRC_REC(wrt_busy);
-	INIT_BG_TRC_REC(wrt_noblks_wrtn);
-	INIT_BG_TRC_REC(reserved_bgtrcrec);
-	INIT_BG_TRC_REC(lost_block_recovery);
-#else
-# error Unsupported platform
-#endif
-	INIT_BG_TRC_REC(spcfc_buffer_flush);
-	INIT_BG_TRC_REC(spcfc_buffer_flush_loop);
-	INIT_BG_TRC_REC(spcfc_buffer_flush_retries);
-	INIT_BG_TRC_REC(spcfc_buffer_flushed_during_lockwait);
-	INIT_BG_TRC_REC(tp_crit_retries);
-	UPGRADE_BG_TRC_REC(db_csh_getn_flush_dirty);
-	UPGRADE_BG_TRC_REC(db_csh_getn_rip_wait);
-	UPGRADE_BG_TRC_REC(db_csh_getn_buf_owner_stuck);
-	UPGRADE_BG_TRC_REC(db_csh_getn_out_of_design);
-	UPGRADE_BG_TRC_REC(t_qread_buf_owner_stuck);
-	UPGRADE_BG_TRC_REC(t_qread_out_of_design);
-	UPGRADE_BG_TRC_REC(bt_put_flush_dirty);
-	INIT_BG_TRC_REC(mlock_wakeups);
-	UPGRADE_BG_TRC_REC(wc_blocked_wcs_verify_passed);
-	UPGRADE_BG_TRC_REC(wc_blocked_t_qread_db_csh_getn_invalid_blk);
-	UPGRADE_BG_TRC_REC(wc_blocked_t_qread_db_csh_get_invalid_blk);
-	UPGRADE_BG_TRC_REC(wc_blocked_db_csh_getn_loopexceed);
-	UPGRADE_BG_TRC_REC(wc_blocked_db_csh_getn_wcsstarvewrt);
-	UPGRADE_BG_TRC_REC(wc_blocked_db_csh_get);
-	UPGRADE_BG_TRC_REC(wc_blocked_tp_tend_wcsgetspace);
-	UPGRADE_BG_TRC_REC(wc_blocked_tp_tend_t1);
-	UPGRADE_BG_TRC_REC(wc_blocked_tp_tend_bitmap);
-	UPGRADE_BG_TRC_REC(wc_blocked_tp_tend_jnl_cwset);
-	UPGRADE_BG_TRC_REC(wc_blocked_tp_tend_jnl_wcsflu);
-	UPGRADE_BG_TRC_REC(wc_blocked_t_end_hist1_nullbt);
-	UPGRADE_BG_TRC_REC(wc_blocked_t_end_hist1_nonnullbt);
-	UPGRADE_BG_TRC_REC(wc_blocked_t_end_bitmap_nullbt);
-	UPGRADE_BG_TRC_REC(wc_blocked_t_end_bitmap_nonnullbt);
-	UPGRADE_BG_TRC_REC(wc_blocked_t_end_jnl_cwset);
-	UPGRADE_BG_TRC_REC(wc_blocked_t_end_jnl_wcsflu);
-	INIT_BG_TRC_REC(db_csh_get_too_many_loops);
-	/* filler_name_pad;  */
-	INIT_BG_TRC_REC(wc_blocked_tpckh_hist1_nullbt);
-	INIT_BG_TRC_REC(wc_blocked_tpckh_hist1_nonnullbt);
-	/* filler_2k[896];   */
-
-	new_head->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
-	new_head->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
-	new_head->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
+	memset(csd, 0, sizeof(sgmnt_data));
+	MEMCPY_LIT(csd->label, GDS_LABEL);
+	csd->blk_size = v15_csd->blk_size;
+	csd->bplmap = v15_csd->bplmap;
+	csd->start_vbn = v15_csd->start_vbn;
+	csd->acc_meth = v15_csd->acc_meth;
+	csd->max_bts = v15_csd->max_bts;
+	csd->n_bts = v15_csd->n_bts;
+	csd->bt_buckets = v15_csd->bt_buckets;
+	if (v15_csd->reserved_bytes > BLK_HDR_INCREASE)
+		csd->reserved_bytes = v15_csd->reserved_bytes - BLK_HDR_INCREASE;
+	csd->max_rec_size = v15_csd->max_rec_size;
+	csd->max_key_size = v15_csd->max_key_size;
+	csd->lock_space_size = v15_csd->lock_space_size;
+	csd->extension_size = v15_csd->extension_size;
+	csd->def_coll = v15_csd->def_coll;
+	csd->def_coll_ver = v15_csd->def_coll_ver;
+	csd->std_null_coll = v15_csd->std_null_coll;	/* New in V5.0-FT01 */
+	csd->null_subs = v15_csd->null_subs;
+	csd->free_space = v15_csd->free_space;
+	csd->mutex_spin_parms.mutex_hard_spin_count = v15_csd->mutex_spin_parms.mutex_hard_spin_count;
+	csd->mutex_spin_parms.mutex_sleep_spin_count = v15_csd->mutex_spin_parms.mutex_sleep_spin_count;
+	csd->mutex_spin_parms.mutex_spin_sleep_mask = v15_csd->mutex_spin_parms.mutex_spin_sleep_mask;
+	csd->max_update_array_size = v15_csd->max_update_array_size;			/* New from V4.0-001G */
+	csd->max_non_bm_update_array_size = v15_csd->max_non_bm_update_array_size;	/* New from V4.0-001G */
+	csd->file_corrupt = v15_csd->file_corrupt;
+	csd->minor_dbver = GDSMVCURR;		/* New in V5.0-000 */
+	memcpy(&csd->created, &v15_csd->created, sizeof(v15_csd->created));
+	csd->createinprogress = v15_csd->createinprogress;
+	time(&csd->creation.ctime);		/* No need to propagate previous value */
+	csd->last_inc_backup = v15_csd->last_inc_backup;
+	csd->last_com_backup = v15_csd->last_com_backup;
+	csd->last_rec_backup = v15_csd->last_rec_backup;
+	csd->reorg_restart_block = v15_csd->reorg_restart_block;		/* New from V4.2 */
+	memcpy(csd->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
+	csd->owner_node = v15_csd->owner_node;
+	csd->image_count = v15_csd->image_count;
+	csd->kill_in_prog = v15_csd->kill_in_prog;	/* assert to 0 ??? */
+	csd->blks_to_upgrd = v15_csd->trans_hist.total_blks - v15_csd->trans_hist.free_blocks;	/* New in V5.0-000 */
+	assert(csd->blks_to_upgrd);
+	csd->tn_upgrd_blks_0 = 0;								/* New in V5.0-000 */
+	csd->fully_upgraded = FALSE;								/* New in V5.0-000 */
+	csd->desired_db_format = GDSVCURR;							/* New in V5.0-000 */
+	csd->desired_db_format_tn = v15_csd->trans_hist.curr_tn;				/* New in V5.0-000 */
+	csd->reorg_db_fmt_start_tn = 0;								/* New in V5.0-000 */
+	csd->certified_for_upgrade_to = v15_csd->certified_for_upgrade_to;			/* New in V5.0-000 */
+	csd->master_map_len = MASTER_MAP_SIZE_V4;						/* New in V5.0-000 */
+	csd->reorg_upgrd_dwngrd_restart_block = 0;						/* New in V5.0-000 */
+	csd->creation_db_ver = v15_csd->creation_db_ver;	/* Retain creation major/minor version */
+	csd->creation_mdb_ver = v15_csd->creation_mdb_ver;
+	csd->trans_hist.early_tn = v15_csd->trans_hist.early_tn;
+	csd->trans_hist.curr_tn = v15_csd->trans_hist.curr_tn;	/* INCREMENT_CURR_TN comment added to note curr_tn set is done */
+	csd->max_tn = MAX_TN_V5;		/* New in V5.0-000 */
+	SET_TN_WARN(csd, csd->max_tn_warn);	/* New in V5.0-000 */
+	csd->trans_hist.last_mm_sync = v15_csd->trans_hist.last_mm_sync;
+	csd->trans_hist.header_open_tn = v15_csd->trans_hist.header_open_tn;
+	csd->trans_hist.mm_tn = v15_csd->trans_hist.mm_tn;
+	csd->trans_hist.lock_sequence = v15_csd->trans_hist.lock_sequence;
+	csd->trans_hist.total_blks = v15_csd->trans_hist.total_blks;
+	csd->trans_hist.free_blocks = v15_csd->trans_hist.free_blocks;
+	csd->flush_time[0] = v15_csd->flush_time[0];
+	csd->flush_time[1] = v15_csd->flush_time[1];
+	csd->flush_trigger = v15_csd->flush_trigger;
+	csd->n_wrt_per_flu = v15_csd->n_wrt_per_flu;
+	csd->wait_disk_space = v15_csd->wait_disk_space;
+	csd->defer_time = v15_csd->defer_time;
 #ifdef UNIX
-	new_head->semid = INVALID_SEMID;
-	new_head->shmid = INVALID_SHMID;
+	csd->semid = INVALID_SEMID;
+	csd->shmid = INVALID_SHMID;
+	csd->sem_ctime.ctime = 0;
+	csd->shm_ctime.ctime = 0;
 #endif
-	/* mutex_filler1 */
-	/* mutex_filler1 */
-	/* mutex_filler1 */
-	/* mutex_filler1 */
-	/* mutex_filler1 */
-	/* filler3[992]	 */
-	/* filler_4k[1020]			  */
-	/* new_head->unique_id[0] = 0;   	  */		/* assigned in run time */
-	/* new_head->machine_name[0] = 0;  	  */		/* assigned in run time */
-	new_head->flush_trigger =  FLUSH_FACTOR(new_head->n_bts); /* same as mucregeni.c */
-	new_head->max_update_array_size = new_head->max_non_bm_update_array_size
-                                       = ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(new_head), UPDATE_ARRAY_ALIGN_SIZE);
-	new_head->max_update_array_size += ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE);
-	/* filler_5k[732];  */
-	/* filler_6k[1024]; */
-	/* filler_7k[1024]; */
-	/* filler_8k[1024]; */
-
-
-	/* master map: v3.x has 2*DISK_BLOCK_SIZE  bytes and
-	   this will be copied into the first 2*DISK_BLOCK_SIZE bytes
-	   of 32*DISK_BLOCK_SIZE bytes master map of v4.x.
-	   Remaining 30*DISK_BLOCK_SIZE bytes are initialized  to 0xff */
-	UPGRADE_MEM(master_map);
-	memset(&(new_head->master_map[2*DISK_BLOCK_SIZE]), 0xFF, (MASTER_MAP_BLOCKS-2)*DISK_BLOCK_SIZE);
+	/* Note none of the counter fields are being carried over. An upgrade or downgrade will
+	   implicitly set them to zero by not initializing them.
+	*/
+	csd->staleness[0] = v15_csd->staleness[0];
+	csd->staleness[1] = v15_csd->staleness[1];
+	csd->ccp_tick_interval[0] = v15_csd->ccp_tick_interval[0];
+	csd->ccp_tick_interval[1] = v15_csd->ccp_tick_interval[1];
+	csd->ccp_quantum_interval[0] = v15_csd->ccp_quantum_interval[0];
+	csd->ccp_quantum_interval[1] = v15_csd->ccp_quantum_interval[1];
+	csd->ccp_response_interval[0] = v15_csd->ccp_response_interval[0];
+	csd->ccp_response_interval[1] = v15_csd->ccp_response_interval[1];
+	csd->ccp_jnl_before = v15_csd->ccp_jnl_before;
+	csd->clustered = v15_csd->clustered;
+	csd->unbacked_cache = v15_csd->unbacked_cache;
+	csd->rc_srv_cnt = v15_csd->rc_srv_cnt;
+	csd->dsid = v15_csd->dsid;
+	csd->rc_node = v15_csd->rc_node;
+	csd->reg_seqno = v15_csd->reg_seqno;
+	csd->resync_seqno = v15_csd->resync_seqno;
+	csd->resync_tn = v15_csd->resync_tn;
+	csd->old_resync_seqno = v15_csd->old_resync_seqno;
+	csd->repl_state = v15_csd->repl_state;
+	assert(0 != csd->reg_seqno || (0 == csd->resync_seqno && 0 == csd->resync_tn && repl_closed == csd->repl_state));
+	assert(0 != csd->resync_seqno || (0 == csd->reg_seqno && 0 == csd->resync_tn && repl_closed == csd->repl_state));
+	assert(0 != csd->resync_tn || (0 == csd->reg_seqno && 0 == csd->resync_seqno && repl_closed == csd->repl_state));
+	if (0 == csd->reg_seqno || 0 == csd->resync_seqno || 0 == csd->resync_tn)
+	{	/* This can happen for pre-replication versions */
+		csd->reg_seqno = 1;
+		csd->resync_seqno = 1;
+		csd->resync_tn = 1;
+		csd->old_resync_seqno = 1;
+		csd->repl_state = repl_closed;
+	}
+	csd->jnl_state = v15_csd->jnl_state;
+	if (JNL_ALLOWED(csd))
+	{
+		csd->jnl_alq = v15_csd->jnl_alq;
+		if (!csd->jnl_alq)
+			csd->jnl_alq = JNL_ALLOC_DEF;
+		csd->epoch_interval = v15_csd->epoch_interval;
+		if (!csd->epoch_interval)
+			csd->epoch_interval = DEFAULT_EPOCH_INTERVAL;
+		csd->alignsize = v15_csd->alignsize;
+		if (!csd->alignsize)
+			csd->alignsize = DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE;
+		csd->jnl_deq = v15_csd->jnl_deq;
+		csd->autoswitchlimit = ALIGNED_ROUND_DOWN(JNL_ALLOC_MAX, csd->jnl_alq, csd->jnl_deq);
+		csd->jnl_buffer_size = v15_csd->jnl_buffer_size;
+		csd->jnl_before_image = v15_csd->jnl_before_image;
+		csd->jnl_file_len = v15_csd->jnl_file_len;
+		csd->jnl_sync_io = v15_csd->jnl_sync_io;
+		csd->yield_lmt = v15_csd->yield_lmt;
+		memcpy(csd->jnl_file_name, v15_csd->jnl_file_name, JNL_NAME_SIZE);
+		PRINT_JNL_FIELDS(csd);
+	}
+	memcpy(csd->reorg_restart_key, v15_csd->reorg_restart_key, sizeof(csd->reorg_restart_key));	/* New from V4.2 */
+	memcpy(csd->machine_name, v15_csd->machine_name, MAX_MCNAMELEN);
+	csd->reserved_for_upd = UPD_RESERVED_AREA;
+	csd->avg_blks_per_100gbl =  AVG_BLKS_PER_100_GBL;
+	csd->pre_read_trigger_factor = PRE_READ_TRIGGER_FACTOR;
+	csd->writer_trigger_factor = UPD_WRITER_TRIGGER_FACTOR;
+	SET_LATCH_GLOBAL(&csd->next_upgrd_warn.time_latch, LOCK_AVAILABLE);
 }
-

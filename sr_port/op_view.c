@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,8 +34,9 @@
 #include "cmd_qlf.h"
 #include "collseq.h"
 #include "error.h"
-#include "hashdef.h"		/* needed for mname */
 #include "jnl.h"
+#include "hashtab_mname.h"
+#include "hashtab.h"
 #include "lv_val.h"
 #include "view.h"
 #include "send_msg.h"
@@ -48,6 +49,7 @@
 #include "testpt.h"
 #include "mvalconv.h"
 #include "dpgbldir.h"	/* for get_next_gdr() prototype */
+#include "ast.h"
 
 #define WRITE_LITERAL(x) (outval.str.len = sizeof(x) - 1, outval.str.addr = (x), op_write(&outval))
 
@@ -57,8 +59,8 @@
 	if (!dollar_tlevel || gvnh->read_local_tn != local_tn || status == gvnh->noisolation)		\
 		gvnh->noisolation = status;								\
 	else												\
-		rts_error(VARLSTCNT(6) ERR_ISOLATIONSTSCHNG, 4, mid_len(&gvnh->gvname), &gvnh->gvname,	\
-				gvnh->noisolation, status);						\
+		rts_error(VARLSTCNT(6) ERR_ISOLATIONSTSCHN, 4, gvnh->gvname.var_name.len, 		\
+			gvnh->gvname.var_name.addr, gvnh->noisolation, status);				\
 }
 
 GBLREF bool		certify_all_blocks, lv_null_subs, undef_inhibit, jobpid;
@@ -73,13 +75,14 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF gv_namehead	*gv_target, *gv_target_list;
 GBLREF gv_namehead	*reset_gv_target;
 GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF symval		*curr_symval;
 GBLREF trans_num	local_tn;	/* transaction number for THIS PROCESS */
 GBLREF short		dollar_tlevel;
-GBLREF boolean_t	lv_dupcheck;
 GBLREF int4		zdate_form;
 GBLREF int4		zdir_form;
 GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
+GBLREF boolean_t 	local_collseq_stdnull;
 
 #define MAX_YDIRTSTR 32
 #define ZDEFMIN 1024
@@ -89,18 +92,23 @@ GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not
 void	op_view(va_alist)
 va_dcl
 {
-	int4		testvalue;
-	uint4		jnl_status;
-	int		status, numarg;
-	gd_region	*reg, *r_top, *save_reg;
-	gv_namehead	*gvnh;
-	mval 		*arg, *keyword, outval;
-	mstr		tmpstr;
-	va_list		var;
-	viewparm	parmblk;
-	viewtab_entry	*vtp;
-	gd_addr		*addr_ptr;
+	int4			testvalue;
+	uint4			jnl_status, dummy_errno;
+	int			status, numarg;
+	gd_region		*reg, *r_top, *save_reg;
+	gv_namehead		*gvnh;
+	mval			*arg, *nextarg, *keyword, outval;
+	mstr			tmpstr;
+	va_list			var;
+	viewparm		parmblk;
+	viewtab_entry		*vtp;
+	gd_addr			*addr_ptr;
 	noisolation_element	*gvnh_entry;
+	int			lct, ncol;
+	collseq			*new_lcl_collseq;
+	ht_ent_mname		*tabent, *topent;
+	lv_val			*lv;
+	symval			*cstab;
 
 	static int ydirt_str_len = 0;
 	static char ydirt_str[MAX_YDIRTSTR + 1];
@@ -121,7 +129,7 @@ va_dcl
 	error_def(ERR_ACTRANGE);
 	error_def(ERR_COLLATIONUNDEF);
 	error_def(ERR_COLLDATAEXISTS);
-	error_def(ERR_ISOLATIONSTSCHNG);
+	error_def(ERR_ISOLATIONSTSCHN);
 	error_def(ERR_TRACEON);
 	error_def(ERR_INVZDIRFORM);
 
@@ -162,6 +170,30 @@ va_dcl
 		outval.mvtype = MV_STR;
 		view_debug4 = (0 != MV_FORCE_INT(parmblk.value));
 		break;
+	case VTK_FLUSH:
+		if (NULL == gd_header)		/* open gbldir */
+			gvinit();
+		save_reg = gv_cur_region;
+		if (NULL == parmblk.gv_ptr)
+		{	/* flush all regions */
+			reg = gd_header->regions;
+			r_top = reg + gd_header->n_regions - 1;
+		} else	/* flush selected region */
+			r_top = reg = parmblk.gv_ptr;
+		for (;  reg <= r_top;  reg++)
+		{
+			if (!reg->open)
+				gv_init_reg(reg);
+			if (!reg->read_only)
+			{
+				gv_cur_region = reg;
+				change_reg(); /* for jnl_ensure_open */
+				JNL_ENSURE_OPEN_WCS_WTSTART(cs_addrs, gv_cur_region, 0, dummy_errno);
+			}
+		}
+		gv_cur_region = save_reg;
+		change_reg();
+		break;
 	case VTK_GDSCERT0:
 		outval.mvtype = MV_STR;
 		op_wteol(1);
@@ -193,15 +225,7 @@ va_dcl
 		gvdupsetnoop = (0 != MV_FORCE_INT(parmblk.value));
 		break;
 	case VTK_LVDUPCHECK:
-		outval.mvtype = MV_STR;
-		op_wteol(1);
-		WRITE_LITERAL(lv_msg1);
-		lv_dupcheck = (0 != MV_FORCE_INT(parmblk.value));
-		if (lv_dupcheck)
-			WRITE_LITERAL(msg3);
-		else
-			WRITE_LITERAL(msg2);
-		op_wteol(1);
+		/* This feature is not needed any more. This is a noop now */
 		break;
 	case VTK_LVNULLSUBS:
 		lv_null_subs = TRUE;
@@ -215,30 +239,31 @@ va_dcl
 		save_reg = gv_cur_region;
 		if (NULL == parmblk.gv_ptr)
 		{	/* flush all journal files */
-			gv_cur_region = gd_header->regions;
-			r_top = gv_cur_region + gd_header->n_regions - 1;
+			reg = gd_header->regions;
+			r_top = reg + gd_header->n_regions - 1;
 		} else	/* flush journal for selected region */
-			r_top = gv_cur_region = parmblk.gv_ptr;
-		for (;  gv_cur_region <= r_top;  gv_cur_region++)
+			r_top = reg = parmblk.gv_ptr;
+		for (;  reg <= r_top;  reg++)
 		{
-			if (!gv_cur_region->open)
-				gv_init_reg(gv_cur_region);
+			if (!reg->open)
+				gv_init_reg(reg);
+			gv_cur_region = reg;
 			change_reg();
 			if (JNL_ENABLED(cs_addrs->hdr))
 			{
 				if (FALSE == cs_addrs->now_crit)
-					grab_crit(gv_cur_region);
+					grab_crit(reg);
 				else
 					GTMASSERT;
 				jnl_status = jnl_ensure_open();
 				if (0 == jnl_status)
-					jnl_flush(gv_cur_region);
+					jnl_flush(reg);
 				else
 				{
 					send_msg(VARLSTCNT(6) jnl_status, 4, cs_addrs->hdr->jnl_file_len,
-						cs_addrs->hdr->jnl_file_name, DB_LEN_STR(gv_cur_region));
+						cs_addrs->hdr->jnl_file_name, DB_LEN_STR(reg));
 				}
-				rel_crit(gv_cur_region);
+				rel_crit(reg);
 			}
 		}
 		gv_cur_region = save_reg;
@@ -327,57 +352,69 @@ va_dcl
 		op_gvput(&outval);
 		RESET_GV_TARGET;
 		gv_target->root = 0;
+		/* Now that root is set to 0, the next access to this global will go through gvcst_root_search which will
+		 * re-initialize "nct", "act" and "ver" accordingly and also initialize "collseq" ONLY IF "act" is non-zero.
+		 * Since we do not know if "act" will be 0 or not in gvcst_root_search, let us reset "collseq" to NULL here.
+		 */
+		gv_target->collseq = NULL;
 		break;
 	case VTK_YLCT:
-		{
-		int	lct;
-		collseq	*new_lcl_collseq;
 		if (arg)
 			lct = MV_FORCE_INT(parmblk.value);
 		else
 			rts_error(VARLSTCNT(1) ERR_REQDVIEWPARM);
-		if (lct < MIN_COLLTYPE || lct > MAX_COLLTYPE)
-			rts_error(VARLSTCNT(3) ERR_ACTRANGE, 1, lct);
-		/* at this point, verify that there is no local data with subscripts */
+		nextarg = NULL;
+		ncol = -1;
+		if (numarg > 1)
 		{
-			ht_entry *p, *top;
-			lv_sbs_tbl *tbl;
-			lv_val *lv;
-			symval *cstab;
-			for (cstab = curr_symval;  cstab;  cstab = cstab->last_tab)
+			nextarg = va_arg(var, mval *);
+			ncol = MV_FORCE_INT(nextarg);
+		}
+		if ((-1 == lct) && (-1 == ncol))
+			break;
+		/* lct = -1 indicates user wants to change only ncol, not lct */
+		if (-1 != lct)
+		{
+			if (lct < MIN_COLLTYPE || lct > MAX_COLLTYPE)
+				rts_error(VARLSTCNT(3) ERR_ACTRANGE, 1, lct);
+		}
+		/* at this point, verify that there is no local data with subscripts */
+		for (cstab = curr_symval;  cstab;  cstab = cstab->last_tab)
+		{
+			assert(cstab->h_symtab.top == cstab->h_symtab.base + cstab->h_symtab.size);
+			for (tabent = cstab->h_symtab.base, topent = cstab->h_symtab.top;
+							tabent < topent; tabent++)
 			{
-				p = cstab->h_symtab.base;
-				top = p + cstab->h_symtab.size;
-				for (;  p < top;  p++)
+				if (HTENT_VALID_MNAME(tabent, lv_val, lv))
 				{
-					if (p->nb.txt[0])
-					{
-						lv = (lv_val *)p->ptr;
-						if (lv && lv->ptrs.val_ent.children)
-							rts_error(VARLSTCNT(1) ERR_COLLDATAEXISTS);
-					}
+					if (lv && lv->ptrs.val_ent.children)
+						rts_error(VARLSTCNT(1) ERR_COLLDATAEXISTS);
 				}
 			}
 		}
-		if (0 != lct)
+		if (-1 != lct)
 		{
-			new_lcl_collseq = ready_collseq(lct);
-			if (0 == new_lcl_collseq)
-				rts_error(VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
-			local_collseq = new_lcl_collseq;
-		} else
-		{
-			local_collseq = 0;
-			if (NULL != lcl_coll_xform_buff)
+			if (0 != lct)
 			{
-				assert(0 < max_lcl_coll_xform_bufsiz);
-				free(lcl_coll_xform_buff);
-				lcl_coll_xform_buff = NULL;
-				max_lcl_coll_xform_bufsiz = 0;
+				new_lcl_collseq = ready_collseq(lct);
+				if (0 == new_lcl_collseq)
+					rts_error(VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
+				local_collseq = new_lcl_collseq;
+			} else
+			{
+				local_collseq = 0;
+				if (NULL != lcl_coll_xform_buff)
+				{
+					assert(0 < max_lcl_coll_xform_bufsiz);
+					free(lcl_coll_xform_buff);
+					lcl_coll_xform_buff = NULL;
+					max_lcl_coll_xform_bufsiz = 0;
+				}
 			}
 		}
+		if (-1 != ncol)
+			local_collseq_stdnull = (ncol ? TRUE: FALSE);
 		break;
-		}
 	case VTK_PATLOAD:
 		if (!load_pattern_table(parmblk.value->str.len, parmblk.value->str.addr))
 			rts_error(VARLSTCNT(4) ERR_PATLOAD, 2, parmblk.value->str.len, parmblk.value->str.addr);

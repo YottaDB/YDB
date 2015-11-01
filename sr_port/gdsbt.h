@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,11 @@
 #else
 #  include <sys/mman.h>
 #endif
+#endif
+
+#ifdef VMS
+#include <ssdef.h>	/* for SS$_WASSET */
+#include "ast.h"	/* for ENABLE/DISABLE */
 #endif
 
 #define CR_NOTVALID (-1)
@@ -46,7 +51,6 @@
 			/* note that the + 1 above is for the th_queue head which falls between the hash table and the */
 			/* actual bts */
 #define HEADER_UPDATE_COUNT 1024
-#define WARNING_TN 4000000000
 
 typedef struct
 {
@@ -69,12 +73,12 @@ typedef struct
 		int4		bl;	/* self-relative queue entry */
 	} blkque, tnque;		/* for block number hash, lru queue */
 	trans_num	tn;		/* transaction # #*/
+	trans_num	killtn;		/* last transaction when this block was updated as part of an M-kill */
 	block_id	blk;		/* block #*/
 	int4		cache_index;
 	bool		flushing;	/* buffer is being flushed after a machine switch on a cluster */
-	char		filler[3];	/* must be quad word aligned */
-	trans_num	killtn;		/* last transaction when this block was updated as part of an M-kill */
-	int4		filler_int4;
+	char		filler[3];
+	int4		filler_int4;	/* maintain 8 byte alignment */
 } bt_rec;				/* block table record */
 
 /* This structure is used to access the transaction queue.  It points at all but the
@@ -89,12 +93,12 @@ typedef struct
 		int4		bl;
 	} tnque;
 	trans_num	tn;
+	trans_num	killtn;		/* last transaction when this block was updated as part of an M-kill */
 	block_id	blk;
 	int4		cache_index;
 	bool		flushing;
-	char		filler[3];	/* must be quad word aligned */
-	trans_num	killtn;		/* last transaction when this block was updated as part of an M-kill */
-	int4		filler_int4;
+	char		filler[3];
+	int4		filler_int4;	/* maintain 8 byte alignment */
 } th_rec;
 
 /* This structure is used to maintain all cache records.  The BT queue contains
@@ -152,10 +156,11 @@ typedef struct
 	global_latch_t	semaphore;
 	CACHELINE_PAD(sizeof(global_latch_t), 1)
 	latch_t		crashcnt;
+	int4		filler1;	/* for alignment */
 	global_latch_t	crashcnt_latch;
-	CACHELINE_PAD(sizeof(latch_t) + sizeof(global_latch_t), 2)
+	CACHELINE_PAD(sizeof(latch_t) + sizeof(latch_t) + sizeof(global_latch_t), 2)
 	latch_t		queslots;
-	int4		filler; /* for alignment */
+	int4		filler2;	/* for alignment */
 	CACHELINE_PAD(sizeof(latch_t) + sizeof(latch_t), 3)
 	mutex_que_head	prochead;
 	CACHELINE_PAD(sizeof(mutex_que_head), 4)
@@ -225,33 +230,42 @@ typedef struct node_local_struct
 	unsigned char	fname[MAX_FN_LEN + 1];			/* 256	filename of corresponding database */
 	char		now_running[MAX_REL_NAME];		/* 36	current active GT.M version stamp */
 	char		machine_name[MAX_MCNAMELEN];		/* 256	machine name for clustering */
-	FILL8DCL(sm_off_t, bt_header_off, 6);                   /* (QW alignment) offset to hash table */
-	FILL8DCL(sm_off_t, bt_base_off, 7);                     /* bt first entry */
-	FILL8DCL(sm_off_t, th_base_off, 8);
-	FILL8DCL(sm_off_t, cache_off, 9);
-	FILL8DCL(sm_off_t, cur_lru_cache_rec_off, 10);          /* current LRU cache_rec pointer offset */
-	FILL8DCL(sm_off_t, critical, 11);
-	FILL8DCL(sm_off_t, jnl_buff, 12);
-	FILL8DCL(sm_off_t, backup_buffer, 13);
-	FILL8DCL(sm_off_t, lock_addrs, 14);
-	FILL8DCL(sm_off_t, hdr, 15);
+	sm_off_t	bt_header_off;				/* (QW alignment) offset to hash table */
+	sm_off_t	bt_base_off;				/* bt first entry */
+	sm_off_t	th_base_off;
+	sm_off_t	cache_off;
+	sm_off_t	cur_lru_cache_rec_off;			/* current LRU cache_rec pointer offset */
+	sm_off_t	critical;
+	sm_off_t	jnl_buff;
+	sm_off_t	shmpool_buffer;				/* Shared memory buffer pool area */
+	sm_off_t	lock_addrs;
+	sm_off_t	hdr;					/* Offset to file-header (BG mode ONLY!) */
 	volatile int4	in_crit;
 	int4		in_reinit;
 	unsigned short	ccp_cycle;
-	bool		ccp_crit_blocked;
-	char		ccp_state;
-	bool		ccp_jnl_closed;
-	bool		glob_sec_init;
+	unsigned short	filler;					/* Align for ccp_cycle. Not changing to int
+								   as that would perturb to many things at this point */
+	boolean_t	ccp_crit_blocked;
+	int4		ccp_state;
+	boolean_t	ccp_jnl_closed;
+	boolean_t	glob_sec_init;
 	global_latch_t	wc_var_lock;                            /* latch used for access to various wc_* ref counters */
 	CACHELINE_PAD(sizeof(global_latch_t), 1)		/* Keep these two latches in separate cache lines */
 	global_latch_t	db_latch;                               /* latch for interlocking on hppa and tandem */
+	CACHELINE_PAD(sizeof(global_latch_t), 2)
 	int4		cache_hits;
 	int4		wc_in_free;                             /* number of write cache records in free queue */
-	volatile CNTR4DCL(wcs_timers,1);			/* number of write cache timers in use - 1 */
-	volatile CNTR4DCL(wcs_active_lvl,2);			/* number of entries in active queue */
-	volatile CNTR4DCL(wcs_staleness,3);
-	CNTR4DCL(ref_cnt,4);					/* reference count. How many people are using the database */
-	volatile CNTR4DCL(in_wtstart,5);			/* Count of processes in wcs_wtstart */
+	volatile CNTR4DCL(wcs_timers, 1);			/* number of write cache timers in use - 1 */
+	CACHELINE_PAD_COND(sizeof(int4), 3)			/* Keep these counters in separate cache lines on
+								   load-lock/store-conditional platforms */
+	volatile CNTR4DCL(wcs_active_lvl, 2);			/* number of entries in active queue */
+	CACHELINE_PAD_COND(sizeof(int4), 4)
+	volatile CNTR4DCL(wcs_staleness, 3);
+	CACHELINE_PAD_COND(sizeof(int4), 5)
+	volatile CNTR4DCL(ref_cnt, 4);				/* reference count. How many people are using the database */
+	CACHELINE_PAD_COND(sizeof(int4), 6)
+	volatile CNTR4DCL(in_wtstart, 5);			/* Count of processes in wcs_wtstart */
+	CACHELINE_PAD_COND(sizeof(int4), 7)
 	int4            mm_extender_pid;			/* pid of the process executing gdsfilext in MM mode */
 	int4            highest_lbm_blk_changed;                /* Records highest local bit map block that
 									changed so we know how much of master bit
@@ -264,7 +278,7 @@ typedef struct node_local_struct
 	unique_file_id	unique_id;
 	uint4		owner_node;
 	volatile int4   wcsflu_pid;				/* pid of the process executing wcs_flu in BG mode */
-	time_t		creation_date_time;			/* Database's creation time to be compared at sm attach time */
+	gtm_time8	creation_date_time;			/* Database's creation time to be compared at sm attach time */
 	boolean_t	remove_shm;				/* can this shm be removed by the last process to rundown */
 	union
 	{
@@ -274,19 +288,21 @@ typedef struct node_local_struct
 			 * Now it is a filler there and rightly used here since it is non-zero only when shared memory is active.
 			 */
 	boolean_t	donotflush_dbjnl; /* whether database and journal can be flushed to disk or not (TRUE for mupip recover) */
+	int4		n_pre_read;
 } node_local;
 
 #ifdef DEBUG
-/* The following macro does not use a separate semaphore to protect its maintenance of the shared memory value crit_ops_index
- * (which would complicate precisely the situation it was created to examine) therefore, in order to to maximize the chances
- * of gathering meaningful data, it seems better placed after grab_[read_]crit and before rel_[read_]crit, but since multiple
- * processes can do grab_read_crit and rel_read_crit simultaneously, we will increment the index first and cache it so we can
- * shorten our exposure window.
+/* The following macro does not use a separate semaphore to protect its maintenance of the shared memory
+ * value crit_ops_index (which would complicate precisely the situation it was created to examine) therefore,
+ * in order to to maximize the chances of gathering meaningful data, it seems better placed after grab_crit
+ * and before rel_crit. Also we will increment the index first and cache it so we can shorten our exposure window.
  */
 #define CRIT_TRACE(X)								\
 {										\
 	int4			coidx;						\
 	node_local_ptr_t	cnl;						\
+	boolean_t		in_ast;						\
+	unsigned int		ast_status;					\
 										\
 	if (csa && csa->nl)							\
 	{									\
@@ -295,7 +311,16 @@ typedef struct node_local_struct
 		coidx = ++cnl->crit_ops_index;					\
 		if (CRIT_OPS_ARRAY_SIZE <= coidx)				\
 			coidx = cnl->crit_ops_index = 0;			\
+		VMS_ONLY(							\
+			in_ast = lib$ast_in_prog();				\
+			if (!in_ast)						\
+				ast_status = sys$setast(DISABLE);		\
+		)								\
 		cnl->crit_ops_array[coidx].call_from = (caddr_t)caller_id();	\
+		VMS_ONLY(							\
+			if ((!in_ast) && (SS$_WASSET == ast_status))		\
+				sys$setast(ENABLE);				\
+		)								\
 		cnl->crit_ops_array[coidx].epid = process_id;			\
 		cnl->crit_ops_array[coidx].crit_act = (X);			\
 	}									\
@@ -332,7 +357,6 @@ typedef struct node_local_struct
 	lcknl->lockhists[lockidx].loop_cnt = (int4)(CNT);		\
 }
 
-void dump_lockhist(void);
 #define DUMP_LOCKHIST() dump_lockhist()
 #else
 #define CRIT_TRACE(X)
@@ -378,6 +402,7 @@ typedef node_local *node_local_ptr_t;
 #include "cdb_sc.h"
 
 bt_rec_ptr_t bt_get(int4 block);
+void dump_lockhist(void);
 void wait_for_block_flush(bt_rec *bt, block_id block);
 
 #endif

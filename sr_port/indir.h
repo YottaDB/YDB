@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,4 +72,4 @@ INDIR(indir_merge1,		m_merge,	0),
 INDIR(indir_merge2,		m_merge,	0),
 INDIR(indir_fntext,		f_text,		OC_FNTEXT),
 INDIR(indir_quit,		m_quit,		0),
-INDIR(indir_linetail_nocache,	linetail,	0)
+INDIR(indir_increment,		f_incr,		0)

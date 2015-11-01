@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,8 @@ enum
 	EREPL_INTLFILTER_INCMPLREC,	/* 283 */
 	EREPL_INTLFILTER_NEWREC,	/* 284 */
 	EREPL_INTLFILTER_DATA2LONG,	/* 285 */
-	EREPL_MAXERRNO			/* 286 */
+	EREPL_INTLFILTER_REPLGBL2LONG,	/* 286 */
+	EREPL_MAXERRNO			/* 287 */
 };
 
 #endif

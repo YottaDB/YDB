@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,12 +24,13 @@
 #include "gdscc.h"
 #include "copy.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
+#include "rtnhdr.h"
 #include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "op.h"
-#include "gvcst_root_search.h"
+#include "gvcst_protos.h"	/* for gvcst_root_search prototype */
 #include "format_targ_key.h"
 #include "gvsub2str.h"
 #include "sgnl.h"
@@ -38,6 +39,7 @@
 #include <varargs.h>
 
 GBLDEF bool		gv_curr_subsc_null;
+GBLDEF bool		gv_prev_subsc_null;
 GBLDEF gd_addr		*gd_targ_addr = 0;
 
 GBLREF gd_addr		*gd_header;
@@ -88,6 +90,7 @@ va_dcl
 			assert(INVALID_GV_TARGET != gv_target);
 			if ((!gv_target->root) || (DIR_ROOT == gv_target->root))
 				gvcst_root_search();
+			assert(gv_target->gd_reg == gv_cur_region);
 		}
 	} else
 	{
@@ -97,7 +100,9 @@ va_dcl
 	}
 	assert(!bgormm || (gv_cur_region && &FILE_INFO(gv_cur_region)->s_addrs == cs_addrs && cs_addrs->hdr == cs_data));
 	assert(bgormm || !dollar_tlevel);
-	assert(!dollar_tlevel || sgm_info_ptr && sgm_info_ptr->gv_cur_region == gv_cur_region);
+	assert(!dollar_tlevel || sgm_info_ptr
+					&& ((sgm_info_ptr->gv_cur_region == gv_cur_region)
+						|| FILE_INFO(sgm_info_ptr->gv_cur_region) == FILE_INFO(gv_cur_region)));
 	assert(gd_targ_addr == gd_header);
 	was_null = is_null = FALSE;
 	max_key = gv_cur_region->max_key_size;
@@ -105,8 +110,9 @@ va_dcl
 	{
 		COPY_SUBS_TO_GVCURRKEY(var, gv_currkey, was_null, is_null);	/* updates gv_currkey, was_null, is_null */
 	}
-	gv_curr_subsc_null = is_null;
-	if (was_null && !gv_cur_region->null_subs)
+	gv_prev_subsc_null = was_null; /* if true, it indicates there is a null subscript (except last subscript) in current key */
+	gv_curr_subsc_null = is_null; /* if true, it indicates that last subscript in current key is null */
+	if (was_null && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
 	return;
 }

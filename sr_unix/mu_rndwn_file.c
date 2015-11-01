@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,16 +12,17 @@
 #include "mdef.h"
 
 #include "gtm_ipc.h"
+#include "gtm_string.h"
+#include "gtm_time.h"
+#include "gtm_unistd.h"
+#include "gtm_stdio.h"
+
 #include <sys/mman.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <errno.h>
-#include "gtm_string.h"
-#include "gtm_time.h"
-#include <unistd.h>
 
 #include "gtm_sem.h"
-#include "gtm_stdio.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -43,7 +44,7 @@
 #include "send_msg.h"
 #include "tp_change_reg.h"
 #include "dbfilop.h"
-#include "gvcst_init_sysops.h"
+#include "gvcst_protos.h"	/* for gvcst_init_sysops prototype */
 #include "do_semop.h"
 #include "ipcrmid.h"
 #include "rc_cpt_ops.h"
@@ -99,10 +100,9 @@ GBLREF	sm_uc_ptr_t	next_smseg;
  */
 bool mu_rndwn_file(gd_region *reg, bool standalone)
 {
-	int			status, save_errno, sopcnt;
+	int			status, save_errno, sopcnt, tsd_size;
 	char                    now_running[MAX_REL_NAME];
 	boolean_t		rc_cpt_removed = FALSE, sem_created = FALSE;
-	sgmnt_data		tsd_memory;
 	sgmnt_data_ptr_t	csd, tsd = NULL;
 	jnl_private_control	*jpc;
 	struct sembuf		sop[4];
@@ -134,7 +134,6 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 #ifdef GTCM_RC
         rc_cpt_removed = mupip_rundown_cpt();
 #endif
-	tsd = (sgmnt_data_ptr_t)&tsd_memory;
 	fc = reg->dyn.addr->file_cntl;
 	fc->op = FC_OPEN;
 	status = dbfilop(fc);
@@ -158,7 +157,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		close(udi->fd);
 		return FALSE;
 	}
-	ESTABLISH(mu_rndwn_file_ch);
+	ESTABLISH_RET(mu_rndwn_file_ch, FALSE);
 	if (!ftok_sem_get(reg, TRUE, GTM_ID, !standalone))
 	{
 		close(udi->fd);
@@ -170,11 +169,15 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	 * Any other ftok conflicted database will suspend there operation at this point.
 	 * At the end of this routine, we release ftok semaphore lock.
 	 */
-	LSEEKREAD(udi->fd, 0, tsd, sizeof(*tsd), status);
+	/* We only need to read sizeof(sgmnt_data) here */
+	tsd_size = ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE);
+	tsd = (sgmnt_data_ptr_t)malloc(tsd_size);
+	LSEEKREAD(udi->fd, 0, tsd, tsd_size, status);
 	if (0 != status)
 	{
 		RNDWN_ERR("!AD -> Error reading from file.", reg);
 		close(udi->fd);
+		free(tsd);
 		REVERT;
 		ftok_sem_release(reg, TRUE, TRUE);
 		return FALSE;
@@ -198,6 +201,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 				udi->semid = INVALID_SEMID;
 				RNDWN_ERR("!AD -> Error with semget with IPC_CREAT.", reg);
 				close(udi->fd);
+				free(tsd);
 				REVERT;
 				ftok_sem_release(reg, TRUE, TRUE);
 				return FALSE;
@@ -216,6 +220,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 				close(udi->fd);
 				if (sem_created && -1 == semctl(udi->semid, 0, IPC_RMID))
 						RNDWN_ERR("!AD -> Error removing semaphore.", reg);
+				free(tsd);
 				REVERT;
 				ftok_sem_release(reg, TRUE, TRUE);
 				return FALSE;
@@ -232,6 +237,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 				close(udi->fd);
 				if (sem_created && -1 == semctl(udi->semid, 0, IPC_RMID))
 						RNDWN_ERR("!AD -> Error removing semaphore.", reg);
+				free(tsd);
 				REVERT;
 				ftok_sem_release(reg, TRUE, TRUE);
 				return FALSE;
@@ -257,6 +263,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			else
 				RNDWN_ERR("!AD -> File already open by another process.", reg);
 			close(udi->fd);
+			free(tsd);
 			REVERT;
 			ftok_sem_release(reg, TRUE, TRUE);
 			return FALSE;
@@ -278,6 +285,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			/* attempt to force-write header */
 			tsd->rc_srv_cnt = tsd->dsid = tsd->rc_node = 0;
 			tsd->owner_node = 0;
+			free(tsd);
 			REVERT;
 			ftok_sem_release(reg, TRUE, TRUE);
 			return FALSE; /* This is safer, when this code is not complete */
@@ -298,11 +306,12 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 						tsd->freeze = 0;
 						tsd->owner_node = 0;
 					}
-					LSEEKWRITE(udi->fd, (off_t)0, tsd, sizeof(*tsd), status);
+					LSEEKWRITE(udi->fd, (off_t)0, tsd, tsd_size, status);
 					if (0 != status)
 					{
 						RNDWN_ERR("!AD -> Unable to write header to disk.", reg);
 						CLNUP_RNDWN(udi, reg);
+						free(tsd);
 						return FALSE;
 					}
 				} else
@@ -317,6 +326,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 						gtm_putmsg(VARLSTCNT(1) status_msg);
 						RNDWN_ERR("!AD -> get_full_path failed.", reg);
 						CLNUP_RNDWN(udi, reg);
+						free(tsd);
 						return FALSE;
 					}
 					db_ipcs.fn[db_ipcs.fn_len] = 0;
@@ -324,6 +334,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 					{
 						RNDWN_ERR("!AD -> gtmsecshr was unable to write header to disk.", reg);
 						CLNUP_RNDWN(udi, reg);
+						free(tsd);
 						return FALSE;
 					}
 				}
@@ -334,8 +345,10 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 					RNDWN_ERR("!AD -> Error from ftok_sem_release.", reg);
 					if (sem_created && -1 == semctl(udi->semid, 0, IPC_RMID))
 						RNDWN_ERR("!AD -> Error removing semaphore.", reg);
+					free(tsd);
 					return FALSE;
 				}
+				free(tsd);
 				standalone_reg = reg;
 				return TRUE; /* For "standalone" and "no shared memory existing", we exit here */
 			} else
@@ -354,14 +367,16 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			}
 		}
 		assert(!standalone);
-		LSEEKWRITE(udi->fd, (off_t)0, tsd, sizeof(*tsd), status);
+		LSEEKWRITE(udi->fd, (off_t)0, tsd, tsd_size, status);
 		if (0 != status)
 		{
 			RNDWN_ERR("!AD -> Unable to write header to disk.", reg);
 			CLNUP_RNDWN(udi, reg);
+			free(tsd);
 			return FALSE;
 		}
 		close(udi->fd);
+		free(tsd);
 		REVERT;
 		/* For mupip rundown (standalone = FALSE), we release/remove ftok semaphore here. */
 		if (!ftok_sem_release(reg, TRUE, TRUE))
@@ -381,12 +396,14 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	{
 		util_out_print("!AD -> File is in use by another process.", TRUE, DB_LEN_STR(reg));
 		CLNUP_RNDWN(udi, reg);
+		free(tsd);
 		return FALSE;
 	}
 	if (reg->read_only)             /* read only process can't succeed beyond this point */
 	{
 		gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(reg));
 		CLNUP_RNDWN(udi, reg);
+		free(tsd);
 		return FALSE;
 	}
 	/* Now we have a pre-existing shared memory section with no other processes attached.  Do some setup */
@@ -397,6 +414,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		else
 			gtm_putmsg(VARLSTCNT(4) ERR_BADDBVER, 2, DB_LEN_STR(reg));
 		CLNUP_RNDWN(udi, reg);
+		free(tsd);
 		return FALSE;
        	}
 	reg->dyn.addr->acc_meth = acc_meth = tsd->acc_meth;
@@ -412,6 +430,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			TRUE, reg->sec_size, shm_buf.shm_segsz);
 		util_out_print("!AD -> Existing shared memory size do not match.", TRUE, DB_LEN_STR(reg));
 		CLNUP_RNDWN(udi, reg);
+		free(tsd);
 		return FALSE;
 	}
 	/*
@@ -436,6 +455,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		gtm_putmsg(VARLSTCNT(8) ERR_VERMISMATCH, 6, DB_LEN_STR(reg), gtm_release_name_len,
 				gtm_release_name, LEN_AND_STR(now_running));
 		CLNUP_RNDWN(udi, reg);
+		free(tsd);
 		return FALSE;
 	}
 	if (memcmp(cs_addrs->nl->label, GDS_LABEL, GDS_LABEL_SZ - 1))
@@ -447,6 +467,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			gtm_putmsg(VARLSTCNT(8) ERR_BADDBVER, 2, DB_LEN_STR(reg),
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("(from shared segment - nl)"));
 		CLNUP_RNDWN(udi, reg);
+		free(tsd);
 		return FALSE;
 	}
 	/* Since nl is memset to 0 initially and then fname is copied over from gv_cur_region and since "fname" is
@@ -461,6 +482,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		send_msg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid, save_errno);
 		gtm_putmsg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid, save_errno);
 		CLNUP_RNDWN(udi, reg);
+		free(tsd);
 		return FALSE;
 	}
 	/* Check whether csa->nl->fname and csa->nl->dbfid are in sync. If not its a serious condition. Error out. */
@@ -472,6 +494,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		rts_error(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid,
 			ERR_TEXT, 2, LEN_AND_LIT("[MUPIP] Database filename and fileid in shared memory are not in sync"));
 		CLNUP_RNDWN(udi, reg);
+		free(tsd);
 		return FALSE;
 	}
 	/* The shared section is valid and up-to-date with respect to the database file header;
@@ -483,8 +506,8 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	assert(0 == ((int)cs_addrs->critical & (CACHELINE_SIZE - 1)));
 #endif
 	JNL_INIT(cs_addrs, reg, tsd);
-	cs_addrs->backup_buffer = (backup_buff_ptr_t)(cs_addrs->db_addrs[0] + NODE_LOCAL_SPACE + JNL_SHARE_SIZE(tsd));
-	cs_addrs->lock_addrs[0] = (sm_uc_ptr_t)cs_addrs->backup_buffer + BACKUP_BUFFER_SIZE + 1;
+	cs_addrs->shmpool_buffer = (shmpool_buff_hdr_ptr_t)(cs_addrs->db_addrs[0] + NODE_LOCAL_SPACE + JNL_SHARE_SIZE(tsd));
+	cs_addrs->lock_addrs[0] = (sm_uc_ptr_t)cs_addrs->shmpool_buffer + SHMPOOL_BUFFER_SIZE;
 	cs_addrs->lock_addrs[1] = cs_addrs->lock_addrs[0] + LOCK_SPACE_SIZE(tsd) - 1;
 
 	if (dba_bg == acc_meth)
@@ -497,6 +520,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		{
 			RNDWN_ERR("!AD -> Error with fstat.", reg);
 			CLNUP_RNDWN(udi, reg);
+			free(tsd);
 			return FALSE;
 		}
 #ifdef DEBUG_DB64
@@ -514,6 +538,8 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		csd->sem_ctime.ctime = tsd->sem_ctime.ctime;
 	}
 	assert(JNL_ALLOWED(csd) == JNL_ALLOWED(tsd));
+	free(tsd);
+	tsd = NULL;
 	/* Check to see that the fileheader in the shared segment is valid, so we won't endup flushing garbage to db file */
 	/* Check the label in the header - keep adding any further appropriate checks in future here */
 	if (memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
@@ -570,7 +596,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		{
 			grab_crit(gv_cur_region);
 			/* If we own it or owner died, clear the fsync lock */
-			if (process_id == jpc->jnl_buff->fsync_in_prog_latch.latch_pid)
+			if (process_id == jpc->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid)
 			{
 				RELEASE_SWAPLOCK(&jpc->jnl_buff->fsync_in_prog_latch);
 			} else
@@ -597,7 +623,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	}
 	if (dba_bg == acc_meth)
 	{
-		LSEEKWRITE(udi->fd, (off_t)0, csd, sizeof(*csd), status);
+		LSEEKWRITE(udi->fd, (off_t)0, csd, SIZEOF_FILE_HDR(csd), status);
 		if (0 != status)
 		{
 			RNDWN_ERR("!AD -> Error writing header to disk.", reg);

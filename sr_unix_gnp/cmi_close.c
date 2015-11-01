@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,8 @@ cmi_status_t cmi_close(struct CLB *lnk)
 	FD_CLR(lnk->mun, &tsk->es);
 	lnk->mun = -1;
 	lnk->sta = CM_CLB_DISCONNECT;
+	if (tsk->trc)
+		(*tsk->trc)(lnk, lnk->sta, (unsigned char *)"", 0);
 #ifdef notdef
 	/*
 	 * I really think this free should be a client

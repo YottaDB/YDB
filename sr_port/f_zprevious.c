@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,10 +17,10 @@
 #include "mdq.h"
 #include "advancewindow.h"
 
-GBLREF bool shift_gvrefs;
-GBLREF char window_token, director_token;
-GBLREF triple *expr_start;
-GBLREF mident window_ident;
+GBLREF bool 	shift_gvrefs;
+GBLREF char 	window_token, director_token;
+GBLREF triple 	*expr_start;
+GBLREF mident 	window_ident;
 
 int f_zprevious( oprtype *a, opctype op)
 {
@@ -34,7 +34,7 @@ int f_zprevious( oprtype *a, opctype op)
 		if (director_token != TK_LPAREN)
 		{
 			r->opcode = OC_FNLVPRVNAME;
-			r->operand[0] = put_str(&window_ident.c[0],sizeof(mident));
+			r->operand[0] = put_str(window_ident.addr, window_ident.len);
 			ins_triple(r);
 			advancewindow();
 			break;

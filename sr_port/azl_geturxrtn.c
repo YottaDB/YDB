@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,12 +14,9 @@
 
 GBLREF urx_rtnref urx_anchor;
 
-bool azl_geturxrtn (addr, rname, rp)
-char		*addr;
-mstr		*rname;
-urx_rtnref	**rp;
+bool azl_geturxrtn(char *addr, mstr *rname, urx_rtnref	**rp)
 {
-	assert (urx_anchor.len == 0);
+	assert(urx_anchor.len == 0);
 	for (*rp = urx_anchor.next; *rp; *rp = (*rp)->next)
 	{
 		urx_addr	*ap;
@@ -30,7 +27,7 @@ urx_rtnref	**rp;
 		if (ap)
 		{
 			rname->len = (*rp)->len;
-			rname->addr = (char *)&(*rp)->name;
+			rname->addr = (char *)&(*rp)->name[0];
 			return TRUE;
 		}
 	}

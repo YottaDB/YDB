@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -23,9 +25,8 @@
 #include "jnl.h"		/* needed for WCSFLU_* macros */
 #include "sleep_cnt.h"
 #include "util.h"
-#include "gvcst_init.h"
+#include "gvcst_protos.h"	/* for gvcst_init prototype */
 #include "change_reg.h"
-#include "longcpy.h"
 #include "mupint.h"
 #include "gtmmsg.h"
 #include "wcs_sleep.h"
@@ -33,6 +34,7 @@
 
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_data		mu_int_data;
+GBLREF unsigned char		*mu_int_master;
 GBLREF uint4			mu_int_errknt;
 GBLREF sgmnt_data_ptr_t		cs_data;
 
@@ -124,7 +126,9 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		mu_int_errknt++;
 		return;
 	}
-	longcpy((uchar_ptr_t)&mu_int_data, (uchar_ptr_t)cs_data, sizeof(sgmnt_data));
+	memcpy((uchar_ptr_t)&mu_int_data, (uchar_ptr_t)cs_data, sizeof(sgmnt_data));
+	mu_int_master = malloc(MASTER_MAP_SIZE(cs_data));
+	memcpy(mu_int_master, MM_ADDR(cs_data), MASTER_MAP_SIZE(cs_data));
 	*return_value = mu_int_fhead();
 	REVERT;
 	return;

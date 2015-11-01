@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,19 +12,18 @@
 #include "mdef.h"
 
 #include "gtm_stdlib.h"
-#include <errno.h>
 #include "gtm_netdb.h"
-#include <sys/socket.h>
+#include "gtm_socket.h"
+#include "gtm_inet.h"
+#include "gtm_string.h"
+#include "gtm_ctype.h"
 #if !defined(__MVS__) && !defined(VMS)
 #include <sys/socketvar.h>
 #endif
-#include "gtm_inet.h"
-#include <netinet/in.h>
-#include "gtm_string.h"
-#include <ctype.h>
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
 #endif
+#include <errno.h>
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -39,6 +38,7 @@
 #include "cli.h"
 #include "gtm_stdio.h"
 #include "util.h"
+#include "repl_log.h"
 
 #define MAX_SECONDARY_LEN 	(MAX_HOST_NAME_LEN + 11) /* +11 for ':' and
 							  * port number */
@@ -60,9 +60,7 @@ int gtmsource_get_opt(void)
 	char		secondary_sys[MAX_SECONDARY_LEN], *c;
 	struct hostent	*sec_hostentry;
 
-	boolean_t	passive;
-
-	boolean_t	log;
+	boolean_t	log, log_interval_specified;
 	unsigned short	log_file_len;
 
 	boolean_t	buffsize_status;
@@ -83,36 +81,19 @@ int gtmsource_get_opt(void)
 	char		*connect_parm_token_str, *connect_parm;
 	int		connect_parms_index;
 	boolean_t	connect_parms_badval;
-	int		num_actions;
 
 	memset((char *)&gtmsource_options, 0, sizeof(gtmsource_options));
 
-	num_actions  = 0;
-	num_actions += ((gtmsource_options.start = (cli_present("START") == CLI_PRESENT)) ? 1 : 0);
-	num_actions += ((gtmsource_options.shut_down = (cli_present("SHUTDOWN") == CLI_PRESENT)) ? 1 : 0);
-	num_actions += ((gtmsource_options.activate = (cli_present("ACTIVATE") == CLI_PRESENT)) ? 1 : 0);
-	num_actions += ((gtmsource_options.deactivate = (cli_present("DEACTIVATE") == CLI_PRESENT)) ? 1 : 0);
-	num_actions += ((gtmsource_options.checkhealth = (cli_present("CHECKHEALTH") == CLI_PRESENT)) ? 1 : 0);
-	num_actions += ((gtmsource_options.statslog = (cli_present("STATSLOG") == CLI_PRESENT)) ? 1 : 0);
-	num_actions += ((gtmsource_options.showbacklog = (cli_present("SHOWBACKLOG") == CLI_PRESENT)) ? 1 : 0);
-	num_actions += ((gtmsource_options.changelog = (cli_present("CHANGELOG") == CLI_PRESENT)) ? 1 : 0);
-	num_actions += ((gtmsource_options.stopsourcefilter = (cli_present("STOPSOURCEFILTER") == CLI_PRESENT)) ? 1 : 0);
-	num_actions += ((gtmsource_options.update = (cli_present("UPDATE") == CLI_PRESENT)) ? 1 : 0);
-
-	if (1 < num_actions && !gtmsource_options.update)
-	{
-		util_out_print(
-			"Invalid mixing of action qualifiers. Only one of START, "
-			"SHUTDOWN, ACTIVATE, DEACTIVATE, CHECKHEALTH, STATSLOG, SHOWBACKLOG, CHANGELOG, STOPSOURCEFILTER "
-			"should be specified", TRUE);
-		return(-1);
-	} else if (0 == num_actions)
-	{
-		util_out_print(
-			"No action qualifier specified. One of START, SHUTDOWN, ACTIVATE, DEACTIVATE, CHECKHEALTH, STATSLOG, "
-			"SHOWBACKLOG, CHANGELOG, STOPSOURCEFILTER, UPDATE should be specified", TRUE);
-		return(-1);
-	}
+	gtmsource_options.start = (cli_present("START") == CLI_PRESENT);
+	gtmsource_options.shut_down = (cli_present("SHUTDOWN") == CLI_PRESENT);
+	gtmsource_options.activate = (cli_present("ACTIVATE") == CLI_PRESENT);
+	gtmsource_options.deactivate = (cli_present("DEACTIVATE") == CLI_PRESENT);
+	gtmsource_options.checkhealth = (cli_present("CHECKHEALTH") == CLI_PRESENT);
+	gtmsource_options.statslog = (cli_present("STATSLOG") == CLI_PRESENT);
+	gtmsource_options.showbacklog = (cli_present("SHOWBACKLOG") == CLI_PRESENT);
+	gtmsource_options.changelog = (cli_present("CHANGELOG") == CLI_PRESENT);
+	gtmsource_options.stopsourcefilter = (cli_present("STOPSOURCEFILTER") == CLI_PRESENT);
+	gtmsource_options.update = (cli_present("UPDATE") == CLI_PRESENT);
 
 	if (gtmsource_options.start || gtmsource_options.activate)
 	{
@@ -172,69 +153,7 @@ int gtmsource_get_opt(void)
 				}
 				gtmsource_options.sec_inet_addr = ((struct in_addr *)sec_hostentry->h_addr_list[0])->s_addr;
 			}
-		} else if (gtmsource_options.activate) /* SECONDARY not specified */
-		{
-			util_out_print("SECONDARY qualifier should be specified with ACTIVATE", TRUE);
-			return(-1);
 		}
-	}
-
-	if (gtmsource_options.start)
-	{
-		if ((passive = (CLI_PRESENT == cli_present("PASSIVE"))) && secondary)
-		{
-			util_out_print("Only one of SECONDARY and PASSIVE should be specified, but not both", TRUE);
-			return(-1);
-		} else if (!passive && !secondary)
-		{
-			util_out_print("One of SECONDARY or PASSIVE should be specified with START", TRUE);
-			return(-1);
-		}
-		gtmsource_options.mode = ((secondary) ? GTMSOURCE_MODE_ACTIVE : GTMSOURCE_MODE_PASSIVE);
-	}
-
-	if (gtmsource_options.start || gtmsource_options.statslog ||
-	    gtmsource_options.changelog || gtmsource_options.activate ||
-	    gtmsource_options.deactivate)
-	{
-		log = (cli_present("LOG") == CLI_PRESENT);
-		if ((gtmsource_options.start || gtmsource_options.changelog) && !log)
-		{
-			util_out_print("LOG should be specified with START, or CHANGELOG", TRUE);
-			return(-1);
-		}
-		if (log)
-		{
-			log_file_len = MAX_FN_LEN + 1;
-			if (!cli_get_str("LOG", gtmsource_options.log_file, &log_file_len))
-			{
-				util_out_print("Error parsing LOG qualifier", TRUE);
-				return(-1);
-			}
-		} else
-			gtmsource_options.log_file[0] = '\0';
-	}
-
-	if (gtmsource_options.start)
-	{
-		if (buffsize_status = (CLI_PRESENT == cli_present("BUFFSIZE")))
-		{
-			if (!cli_get_num("BUFFSIZE", &gtmsource_options.buffsize))
-			{
-				util_out_print("Error parsing BUFFSIZE qualifier", TRUE);
-				return(-1);
-			}
-			if (MIN_JNLPOOL_SIZE > gtmsource_options.buffsize)
-				gtmsource_options.buffsize = MIN_JNLPOOL_SIZE;
-		} else
-			gtmsource_options.buffsize = DEFAULT_JNLPOOL_SIZE;
-		/* Round up buffsize to the nearest (~JNL_WRT_END_MASK + 1)
-		 * multiple */
-		gtmsource_options.buffsize = ((gtmsource_options.buffsize + ~JNL_WRT_END_MASK) & JNL_WRT_END_MASK);
-	}
-
-	if (gtmsource_options.start || gtmsource_options.activate)
-	{
 		if (CLI_PRESENT == cli_present("CONNECTPARAMS"))
 		{
 			connect_parms_str_len = GTMSOURCE_CONN_PARMS_LEN + 1;
@@ -303,8 +222,53 @@ int gtmsource_get_opt(void)
 				gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD];
 	}
 
+	if (gtmsource_options.start || gtmsource_options.statslog || gtmsource_options.changelog || gtmsource_options.activate ||
+	    gtmsource_options.deactivate)
+	{
+		log = (cli_present("LOG") == CLI_PRESENT);
+		log_interval_specified = (CLI_PRESENT == cli_present("LOG_INTERVAL"));
+		if (log)
+		{
+			log_file_len = MAX_FN_LEN + 1;
+			if (!cli_get_str("LOG", gtmsource_options.log_file, &log_file_len))
+			{
+				util_out_print("Error parsing LOG qualifier", TRUE);
+				return(-1);
+			}
+		} else
+			gtmsource_options.log_file[0] = '\0';
+		gtmsource_options.src_log_interval = 0;
+		if (log_interval_specified)
+		{
+			if (!cli_get_num("LOG_INTERVAL", (int4 *)&gtmsource_options.src_log_interval))
+			{
+				util_out_print("Error parsing LOG_INTERVAL qualifier", TRUE);
+				return (-1);
+			}
+		}
+		if (gtmsource_options.start && 0 == gtmsource_options.src_log_interval)
+			gtmsource_options.src_log_interval = LOGTRNUM_INTERVAL;
+		/* For changelog/activate/deactivate, interval == 0 implies don't change log interval already established */
+		/* We ignore interval specification for statslog, Vinaya 2005/02/07 */
+	}
+
 	if (gtmsource_options.start)
 	{
+		assert(secondary || CLI_PRESENT == cli_present("PASSIVE"));
+		gtmsource_options.mode = ((secondary) ? GTMSOURCE_MODE_ACTIVE : GTMSOURCE_MODE_PASSIVE);
+		if (buffsize_status = (CLI_PRESENT == cli_present("BUFFSIZE")))
+		{
+			if (!cli_get_int("BUFFSIZE", &gtmsource_options.buffsize))
+			{
+				util_out_print("Error parsing BUFFSIZE qualifier", TRUE);
+				return(-1);
+			}
+			if (MIN_JNLPOOL_SIZE > gtmsource_options.buffsize)
+				gtmsource_options.buffsize = MIN_JNLPOOL_SIZE;
+		} else
+			gtmsource_options.buffsize = DEFAULT_JNLPOOL_SIZE;
+		/* Round up buffsize to the nearest (~JNL_WRT_END_MASK + 1) multiple */
+		gtmsource_options.buffsize = ((gtmsource_options.buffsize + ~JNL_WRT_END_MASK) & JNL_WRT_END_MASK);
 		if (filter = (CLI_PRESENT == cli_present("FILTER")))
 		{
 			filter_cmd_len = MAX_FILTER_CMD_LEN;
@@ -321,7 +285,7 @@ int gtmsource_get_opt(void)
 	{
 		if ((timeout_status = cli_present("TIMEOUT")) == CLI_PRESENT)
 		{
-			if (!cli_get_num("TIMEOUT", &gtmsource_options.shutdown_time))
+			if (!cli_get_int("TIMEOUT", &gtmsource_options.shutdown_time))
 			{
 				util_out_print("Error parsing TIMEOUT qualifier", TRUE);
 				return(-1);
@@ -359,7 +323,7 @@ int gtmsource_get_opt(void)
 
 	if (gtmsource_options.activate)
 		update_disable = FALSE;
-	if (gtmsource_options.deactivate || (passive && gtmsource_options.start))
+	if (gtmsource_options.deactivate || (gtmsource_options.start && GTMSOURCE_MODE_PASSIVE == gtmsource_options.mode))
 		update_disable = TRUE;
 
 	if (gtmsource_options.update)

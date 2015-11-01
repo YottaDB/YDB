@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,7 +88,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 	/* Parsing for other journal characteristics given in "JOURNAL" option */
 	if (jnl_options->allocation_specified = (CLI_PRESENT == cli_present("JOURNAL.ALLOCATION")))
 	{
-		if (!cli_get_num("JOURNAL.ALLOCATION", &jnl_info->alloc))
+		if (!cli_get_int("JOURNAL.ALLOCATION", &jnl_info->alloc))
 			return FALSE;
 		if ((jnl_info->alloc < JNL_ALLOC_MIN) || (jnl_info->alloc > JNL_ALLOC_MAX))
 		{
@@ -98,7 +98,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 	}
 	if (jnl_options->alignsize_specified = (CLI_PRESENT == cli_present("ALIGNSIZE")))
 	{
-		if (!cli_get_num("ALIGNSIZE", &alignsize))
+		if (!cli_get_int("ALIGNSIZE", &alignsize))
 			return FALSE;
 		if (alignsize < JNL_MIN_ALIGNSIZE)
 		{
@@ -120,7 +120,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 	}
 	if (jnl_options->autoswitchlimit_specified = (CLI_PRESENT == cli_present("AUTOSWITCHLIMIT")))
 	{
-		if (!cli_get_num("AUTOSWITCHLIMIT", &jnl_info->autoswitchlimit))
+		if (!cli_get_int("AUTOSWITCHLIMIT", &jnl_info->autoswitchlimit))
 			return FALSE;
 		if (JNL_AUTOSWITCHLIMIT_MIN > jnl_info->autoswitchlimit
 			|| JNL_ALLOC_MAX < jnl_info->autoswitchlimit)
@@ -132,7 +132,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 	}
 	if (jnl_options->buffer_size_specified = (CLI_PRESENT == cli_present("BUFFER_SIZE")))
 	{
-		if (!cli_get_num("BUFFER_SIZE", &jnl_info->buffer))
+		if (!cli_get_int("BUFFER_SIZE", &jnl_info->buffer))
 			return FALSE;
 		if (jnl_info->buffer <= 0)
 			return FALSE;
@@ -144,7 +144,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 	}
 	if (jnl_options->epoch_interval_specified = (CLI_PRESENT == cli_present("EPOCH_INTERVAL")))
 	{
-		if (!cli_get_num("EPOCH_INTERVAL", &jnl_info->epoch_interval))
+		if (!cli_get_int("EPOCH_INTERVAL", &jnl_info->epoch_interval))
 			return FALSE;
 		if (jnl_info->epoch_interval <= 0)
 		{
@@ -160,10 +160,13 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 	}
 	if (jnl_options->extension_specified = (CLI_PRESENT == cli_present("JOURNAL.EXTENSION")))
 	{
-		if (!cli_get_num("JOURNAL.EXTENSION", &jnl_info->extend))
+		if (!cli_get_int("JOURNAL.EXTENSION", &jnl_info->extend))
 			return FALSE;
 		if (jnl_info->extend < 0)
+		{
+			util_out_print("EXTENSION_COUNT cannot be negative", TRUE);
 			return FALSE;
+		}
 		if (jnl_info->extend > JNL_EXTEND_MAX)
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_JNLINVEXT, 2, jnl_info->extend, JNL_EXTEND_MAX);
@@ -185,7 +188,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 		jnl_options->sync_io_specified = FALSE;
 	if (jnl_options->yield_limit_specified = (CLI_PRESENT == cli_present("YIELD_LIMIT")))
 	{
-		if (!cli_get_num("YIELD_LIMIT", &jnl_options->yield_limit))
+		if (!cli_get_int("YIELD_LIMIT", &jnl_options->yield_limit))
 			return FALSE;
 		if (jnl_options->yield_limit < MIN_YIELD_LIMIT)
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,7 +82,7 @@ bool	tp_grab_crit(gd_region *reg)
 			SET_TRACEABLE_VAR(csa->hdr->wc_blocked, TRUE);
 			BG_TRACE_PRO_ANY(csa, wcb_tp_grab_crit);
 			send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_tp_grab_crit"),
-				process_id, csa->ti->curr_tn, DB_LEN_STR(reg));
+				process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
 		}
 		crit_count = 0;
 	}

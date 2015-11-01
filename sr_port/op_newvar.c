@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,10 +11,10 @@
 
 #include "mdef.h"
 
-#include "hashdef.h"
+#include "hashtab_mname.h"
 #include "lv_val.h"
-#include "mv_stent.h"
 #include "rtnhdr.h"
+#include "mv_stent.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
 #include "op.h"
@@ -32,11 +32,11 @@ GBLREF short		dollar_tlevel;
 void op_newvar(uint4 arg1)
 {
 	mv_stent 	*mv_st_ent, *mvst_tmp, *mvst_prev;
-	ht_entry	*hte;
+	ht_ent_mname	*tabent;
 	stack_frame	*fp, *fp_prev, *fp_fix;
 	unsigned char	*old_sp, *top;
 	lv_val		*new;
-	mident		*varname;
+	var_tabent	*varname;
 	mvs_ntab_struct *ptab;
 	tp_frame	*tpp;
 	int		indx;
@@ -44,9 +44,9 @@ void op_newvar(uint4 arg1)
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
 
-	varname = &(((VAR_TABENT *)frame_pointer->vartab_ptr)[arg1]);
-	hte = ht_get(&curr_symval->h_symtab, (mname *)varname);
-	assert(hte);	/* variable must be defined and fetched by this point */
+	varname = &(((var_tabent *)frame_pointer->vartab_ptr)[arg1]);
+	tabent = lookup_hashtab_mname(&curr_symval->h_symtab, varname);
+	assert(tabent);	/* variable must be defined and fetched by this point */
 	if (frame_pointer->type & SFT_COUNT)
 	{	/* Current (youngest) frame is NOT an indirect frame.
 		   If the var being new'd exists in an earlier frame, we need to save
@@ -71,8 +71,8 @@ void op_newvar(uint4 arg1)
 			mv_st_ent = mv_chain;
 			new = mv_st_ent->mv_st_cont.mvs_nval.mvs_val = lv_getslot(curr_symval);
 			ptab = &mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab;
+			mv_st_ent->mv_st_cont.mvs_nval.name = ((var_tabent *)frame_pointer->vartab_ptr)[arg1];
 			varname = &mv_st_ent->mv_st_cont.mvs_nval.name;
-			memcpy(varname, &(((VAR_TABENT *)frame_pointer->vartab_ptr)[arg1]), sizeof(*varname));
 		}
 
 		/* save symtab that's older than the current frame */
@@ -172,8 +172,8 @@ void op_newvar(uint4 arg1)
 		}
 		new = mv_st_ent->mv_st_cont.mvs_nval.mvs_val = lv_getslot(curr_symval);
 		ptab = &mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab;
+		mv_st_ent->mv_st_cont.mvs_nval.name = ((var_tabent *)frame_pointer->vartab_ptr)[arg1];
 		varname = &mv_st_ent->mv_st_cont.mvs_nval.name;
-		memcpy(varname, &(((VAR_TABENT *)frame_pointer->vartab_ptr)[arg1]), sizeof(*varname));
 
 		/* For each (indirect) stack frame we have visited, find and set the new value of varname into the
 		   stack frame. Note that varname might not exist in all frames.
@@ -182,7 +182,7 @@ void op_newvar(uint4 arg1)
 		{
 			for (indx = 0; indx < fp_fix->vartab_len; indx++)
 			{
-				if (0 == memcmp(&((mident *)fp_fix->vartab_ptr)[indx], varname, sizeof(*varname)))
+				if (MSTR_EQ(&(((var_tabent *)fp_fix->vartab_ptr)[indx].var_name), &varname->var_name))
 					break;
 			}
 			if (fp_fix == fp_prev)		/* Have last substantive frame.. Set its value later */
@@ -209,8 +209,8 @@ void op_newvar(uint4 arg1)
 	new->ptrs.free_ent.next_free = 0;
 
 	/* finish initializing restoration structures */
-	ptab->save_value = (lv_val *)hte->ptr;
+	ptab->save_value = (lv_val *)tabent->value;
 	ptab->nam_addr = varname;
-	hte->ptr = (char *)new;
+	tabent->value = (char *)new;
 	return;
 }

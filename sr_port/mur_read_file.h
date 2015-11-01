@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,6 +96,7 @@ typedef struct
 } mur_read_desc_t;
 
 uint4	mur_fread_eof (jnl_ctl_list *jctl);
+uint4	mur_fread_eof_crash(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off);
 uint4 	mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off);
 uint4 	mur_valrec_next(jnl_ctl_list *jctl, off_jnl_t offset);
 /* Followings are not portable */

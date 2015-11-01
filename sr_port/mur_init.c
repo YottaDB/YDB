@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,13 +26,19 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "mur_read_file.h"
 
+GBLREF 	jnl_gbls_t	jgbl;
 GBLREF	mur_read_desc_t	mur_desc;
 GBLREF	mur_gbls_t	murgbl;
+GBLREF	bool		is_standalone;
+GBLREF	boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
+GBLREF	void		(*call_on_signal)();
 
 
 /****************************************************************************************
@@ -75,9 +81,19 @@ void mur_init(void)
 #endif
 	murgbl.multi_list = (buddy_list *)malloc(sizeof(buddy_list));
 	initialize_list(murgbl.multi_list, sizeof(multi_struct), MUR_MULTI_LIST_INIT_ALLOC);
-	ht_init(&murgbl.token_table, MUR_MULTI_HASHTABLE_INIT_ELEMS);
+	init_hashtab_int8(&murgbl.token_table, MUR_MULTI_HASHTABLE_INIT_ELEMS);
 	murgbl.pini_buddy_list = (buddy_list *)malloc(sizeof(buddy_list));
 	initialize_list(murgbl.pini_buddy_list, sizeof(pini_list_struct), MUR_PINI_LIST_INIT_ELEMS);
 	/* pini_list hash table of a jnl_ctl_list is initialized in mur_fopen */
 	/* FAB of a jnl_ctl_list is initialized in mur_fopen */
+	murgbl.resync_seqno = 0; 		/* interrupted rollback set this to non-zero value later */
+	murgbl.stop_rlbk_seqno = MAXUINT8;	/* allow default rollback to continue forward processing till last valid record */
+	jgbl.mupip_journal = TRUE;	/* this is a MUPIP JOURNAL command */
+	murgbl.db_updated = FALSE;
+	gvdupsetnoop = FALSE; /* disable optimization to avoid multiple updates to the database and journal for duplicate sets */
+	/* this is because, like the update process, MUPIP JOURNAL RECOVER/ROLLBACK is supposed to simulate GTM
+	 * update activity else there will be transaction-number mismatch in the database */
+	is_standalone = TRUE;
+	call_on_signal = mur_close_files;
+	DEBUG_ONLY(assert_jrec_member_offsets();)
 }

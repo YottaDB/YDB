@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -129,7 +129,7 @@ int m_set(void)
 				}
 				if (director_token != TK_LPAREN)
 				{	/* Look for extrinsic vars */
-					if ((index = namelook(svn_index, svn_names, window_ident.c)) < 0)
+					if ((index = namelook(svn_index, svn_names, window_ident.addr, window_ident.len)) < 0)
 					{
 						stx_error(ERR_INVSVN);
 						return FALSE;
@@ -153,7 +153,7 @@ int m_set(void)
 					break;
 				}
 				/* Only 2 function names allowed on left side: $Piece and $Extract */
-				index = namelook(fun_index, fun_names, window_ident.c);
+				index = namelook(fun_index, fun_names, window_ident.addr, window_ident.len);
 				if (0 > index || got_lparen)
 				{	/* function not found or appears in set list where only a var can be */
 					stx_error(ERR_VAREXPECTED);

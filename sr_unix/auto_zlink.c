@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@ rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent *line)
 	lnk_tabent	*A_rtnhdr;
 	lnk_tabent	*A_labaddr;
 	mstr		rname;
-	char            rname_buff[sizeof(mident)];
+	mident_fixed	rname_buff;
 	mval		rtn;
 	rhdtyp		*rhead;
 	urx_rtnref	*rtnurx;
@@ -58,14 +58,14 @@ rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent *line)
 
 	if (azl_geturxrtn((char *)A_rtnhdr, &rname, &rtnurx))
 	{
-		assert(rname.len <= sizeof(mident));
+		assert(rname.len <= MAX_MIDENT_LEN);
 		assert(0 != rname.addr);
 
 		/* Copy rname into local storage because azl_geturxrtn sets rname.addr to an address that is
 		 * free'd during op_zlink and before the call to find_rtn_hdr.
 		 */
-                memcpy(rname_buff, rname.addr, rname.len);
-                rname.addr = rname_buff;
+                memcpy(rname_buff.c, rname.addr, rname.len);
+                rname.addr = rname_buff.c;
 
 		assert(0 != rtnurx);
 		assert(azl_geturxlab((char *)A_labaddr, rtnurx));

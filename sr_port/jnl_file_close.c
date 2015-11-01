@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +60,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	struct_jrec_eof		eof_record;
 	off_jnl_t		eof_addr;
 	uint4			status;
+	int			rc;
 	error_def		(ERR_PREMATEOF);
 	error_def		(ERR_JNLCLOSE);
 	error_def		(ERR_JNLWRERR);
@@ -118,11 +119,10 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 		NULLIFY_JNL_FILE_ID(csa);
 		jb->cycle++;	/* increment shared cycle so all future callers of jnl_ensure_open recognize journal switch */
 	}
-	F_CLOSE(jpc->channel);
+	F_CLOSE(jpc->channel, rc);
 	jpc->channel = NOJNL;
 	jpc->cycle--;	/* decrement cycle so jnl_ensure_open() knows to reopen the journal */
 	VMS_ONLY(jpc->qio_active = FALSE;)
-	jpc->regnum = 0;
 	jpc->pini_addr = 0;
 	if (clean && (SS_NORMAL != jpc->status))
 	{

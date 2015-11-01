@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -90,8 +90,7 @@ enum cdb_sc mu_reduce_level(kill_set *kill_set_ptr)
 	}
 	save_t_err = t_err;
 	t_err = ERR_GVKILLFAIL;
-	t_write(gv_target->hist.h[level].blk_num, (unsigned char *)bs_ptr1, 0, 0,
-		gv_target->hist.h[level].buffaddr, level - 1, TRUE, TRUE);
+	t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0, level - 1, TRUE, TRUE);
 	t_err = save_t_err;
 	kill_set_ptr->blk[kill_set_ptr->used].flag = 0;
 	kill_set_ptr->blk[kill_set_ptr->used].level = 0;

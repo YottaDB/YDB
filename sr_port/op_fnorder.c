@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "sbs_blk.h"
 #include "collseq.h"
@@ -22,9 +22,14 @@
 
 LITREF	mval	SBS_MVAL_INT_ELE;
 
-GBLREF collseq	*local_collseq;
+GBLREF	collseq		*local_collseq;
+GBLREF	boolean_t 	local_collseq_stdnull;
+GBLREF	bool         	lv_null_subs;
+GBLREF	boolean_t	in_op_fnnext;
 
-void op_fnorder(lv_val *src,mval *key,mval *dst)
+#define MINUS_ONE -MV_BIAS
+
+void op_fnorder(lv_val *src, mval *key, mval *dst)
 {
 	int			cur_subscr;
 	mval			tmp_sbs;
@@ -35,7 +40,10 @@ void op_fnorder(lv_val *src,mval *key,mval *dst)
 	lv_val			**lv;
 	lv_sbs_tbl		*tbl;
 	sbs_search_status	status;
+	boolean_t		is_fnnext;
 
+	is_fnnext = in_op_fnnext;
+	in_op_fnnext = FALSE;
 	found = FALSE;
 	if (src)
 	{
@@ -45,8 +53,8 @@ void op_fnorder(lv_val *src,mval *key,mval *dst)
 			num = tbl->num;
 			str = tbl->str;
 			assert(tbl->ident == MV_SBS);
-			if (MV_IS_STRING(key) && key->str.len == 0)
-			{
+			if ((MV_IS_STRING(key) && key->str.len == 0) || (is_fnnext && MV_IS_INT(key) && key->m[1] == MINUS_ONE))
+			{ /* With GT.M collation , if last subscript is null, $o returns the first subscript in that level */
 				if (tbl->int_flag)
 				{
 					assert(num);
@@ -78,13 +86,13 @@ void op_fnorder(lv_val *src,mval *key,mval *dst)
 							i = 0;
 						else
 						{
-							if (1 == numcmp(key, (mval *)&SBS_MVAL_INT_ELE))
+							if (!is_fnnext && (1 == numcmp(key, (mval *)&SBS_MVAL_INT_ELE)))
 								i = SBS_NUM_INT_ELE;
-							   else
-							   {
-								   i =  MV_FORCE_INT(key);
-								   i++;
-							   }
+							else
+							{
+								i =  MV_FORCE_INT(key);
+								i++;
+							}
 						}
 						for (lv = &num->ptr.lv[i]; i < SBS_NUM_INT_ELE; i++, lv++)
 						{
@@ -116,26 +124,53 @@ void op_fnorder(lv_val *src,mval *key,mval *dst)
 						key = &tmp_sbs;
 					}
 					if (str && lv_nxt_str_inx(str, &key->str, &status))
-						dst->str = ((sbs_str_struct*)status.ptr)->str;
-					else
-						dst->str.len = 0;
-					dst->mvtype = MV_STR;
+					{
+						dst->mvtype = MV_STR;
+						dst->str = ((sbs_str_struct *)status.ptr)->str;
+					} else
+					{
+						if (!is_fnnext)
+						{
+							dst->mvtype = MV_STR;
+							dst->str.len = 0;
+						} else
+							MV_FORCE_MVAL(dst, -1);
+					}
 					found = TRUE;
 				}
 			}
 			if (!found && str)
-			{
+			{	/* We are here because
+				 * a. key is "" and there is no numeric subscript, OR
+				 * b. key is numeric and it is >= the largest numeric subscript at this level implying a switch from
+				 *    numeric to string subscripts
+				 * Either case, return the first string subscript. However, for STDNULLCOLL, skip to the next
+				 * subscript should the first subscript be ""
+				 */
 				assert(str->cnt);
 				dst->mvtype = MV_STR;
 				dst->str = str->ptr.sbs_str[0].str;
 				found = TRUE;
+				if (local_collseq_stdnull && 0 == dst->str.len)
+				{
+					assert(lv_null_subs);
+					if (lv_nxt_str_inx(str, &dst->str, &status))
+					{
+						dst->str = ((sbs_str_struct*)status.ptr)->str;
+					} else
+						found = FALSE;
+				}
 			}
 		}
 	}
 	if (!found)
 	{
-		dst->mvtype = MV_STR;
-		dst->str.len = 0;
+		if (!is_fnnext)
+		{
+			dst->mvtype = MV_STR;
+			dst->str.len = 0;
+		} else
+			MV_FORCE_MVAL(dst, -1);
 	} else if (dst->mvtype == MV_STR && local_collseq)
 	{
 		ALLOC_XFORM_BUFF(&dst->str);

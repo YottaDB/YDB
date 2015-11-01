@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@ GBLREF block_id		patch_curr_blk;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
 GBLREF gd_addr		*gd_header;
-GBLREF char 		patch_comp_key[256];
+GBLREF char 		patch_comp_key[MAX_KEY_SZ + 1];
 GBLREF unsigned char 	patch_comp_count;
 GBLREF gd_region        *gv_cur_region;
 GBLREF cw_set_element   cw_set[];
@@ -54,20 +54,23 @@ GBLREF unsigned char    *non_tp_jfb_buff_ptr;
 
 void dse_adrec(void)
 {
-	char		data[MAX_LINE], key[256], cc;
-	sm_uc_ptr_t	new_bp, bp, lbp, b_top, rp, r_top, key_top;
+	char		data[MAX_LINE], key[MAX_KEY_SZ + 1];
+	unsigned char	cc;
+	sm_uc_ptr_t	new_bp, lbp, b_top, rp, r_top, key_top;
 	short int	size, new_len, rsize;
 	int		data_len, key_len;
 	int4		blk_seg_cnt, blk_size;
 	block_id	blk;
 	blk_segment	*bs1, *bs_ptr;
 	cw_set_element  *cse;
-	error_def(ERR_DSEBLKRDFAIL);
-	error_def(ERR_DSEFAIL);
-	error_def(ERR_REC2BIG);
-	error_def(ERR_GVIS);
+	srch_blk_status	blkhist;
+
 	error_def(ERR_CPBEYALLOC);
 	error_def(ERR_DBRDONLY);
+	error_def(ERR_DSEBLKRDFAIL);
+	error_def(ERR_DSEFAIL);
+	error_def(ERR_GVIS);
+	error_def(ERR_REC2BIG);
 
         if (gv_cur_region->read_only)
                 rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
@@ -77,7 +80,7 @@ void dse_adrec(void)
 
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
-		if(!cli_get_hex("BLOCK", &blk))
+		if(!cli_get_hex("BLOCK", (uint4 *)&blk))
 			return;
 		patch_curr_blk = blk;
 	}
@@ -95,11 +98,12 @@ void dse_adrec(void)
 		return;
 	t_begin_crit(ERR_DSEFAIL);
 	blk_size = cs_addrs->hdr->blk_size;
-	if (!(bp = t_qread(patch_curr_blk, &dummy_hist.h[0].cycle, &dummy_hist.h[0].cr)))
+	blkhist.blk_num = patch_curr_blk;
+	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 
 	lbp = (uchar_ptr_t)malloc(blk_size);
-	MEMCP(lbp, bp, 0, blk_size, blk_size);
+	memcpy(lbp, blkhist.buffaddr, blk_size);
 
 	if (((blk_hdr_ptr_t)lbp)->bsiz > blk_size)
 		((blk_hdr_ptr_t)lbp)->bsiz = blk_size;
@@ -116,7 +120,7 @@ void dse_adrec(void)
 			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
-		if (!cli_get_hex("POINTER", &blk))
+		if (!cli_get_hex("POINTER", (uint4 *)&blk))
 		{
 			t_abort(gv_cur_region, cs_addrs);
 			free(lbp);
@@ -179,7 +183,7 @@ void dse_adrec(void)
 
 	new_bp = (uchar_ptr_t)malloc(blk_size);
 	size = (key_len < patch_comp_count) ? key_len : patch_comp_count;
-	for (cc = 0; cc < size && patch_comp_key[cc] ==  key[cc]; cc++)
+	for (cc = 0; cc < size && patch_comp_key[cc] == key[cc]; cc++)
 		;
 	((rec_hdr_ptr_t)new_bp)->cmpc = cc;
 	new_len = key_len - cc + data_len + sizeof(rec_hdr);
@@ -208,10 +212,10 @@ void dse_adrec(void)
 		else
 			cc = ((rec_hdr_ptr_t)rp)->cmpc;
 		size = key_top - rp - sizeof(rec_hdr);
+		if (size > sizeof(patch_comp_key) - 2 - cc)
+			size = sizeof(patch_comp_key) - 2 - cc;
 		if (size < 0)
 			size = 0;
-		else if (size > sizeof(patch_comp_key) - 2)
-			size = sizeof(patch_comp_key) - 2;
 		memcpy(&patch_comp_key[cc], rp + sizeof(rec_hdr), size);
 		patch_comp_count = cc + size;
 		size = (key_len < patch_comp_count) ? key_len : patch_comp_count;
@@ -245,7 +249,7 @@ void dse_adrec(void)
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
-	t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
+	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
 	BUILD_AIMG_IF_JNL_ENABLED(cs_addrs, cs_data, non_tp_jfb_buff_ptr, cse);
 	t_end(&dummy_hist, 0);
 

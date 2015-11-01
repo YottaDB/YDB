@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "gdsdbver.h"
 #include "gdsblk.h"
 #include "copy.h"
 #include "mupint.h"
@@ -37,7 +38,7 @@
 #define TEXT2 "Block "
 #define TEXT3 " doubly allocated"
 
-GBLDEF unsigned char		muint_temp_buff[sizeof(mident) + 1];
+GBLDEF unsigned char		muint_temp_buff[MAX_MIDENT_LEN + 1];
 GBLREF unsigned char		*mu_int_locals;
 GBLREF unsigned char		mu_int_root_level;
 GBLREF bool			mu_ctrly_occurred, mu_ctrlc_occurred;
@@ -63,6 +64,7 @@ GBLREF qw_num			mu_int_size[];
 GBLREF uint4			mu_int_errknt;
 GBLREF block_id			mu_int_adj_prev[];
 GBLREF block_id			mu_int_path[];
+GBLREF int4			mu_int_blks_to_upgrd;
 GBLREF global_list		*trees;
 GBLREF global_list		*trees_tail;
 GBLREF gv_key			*muint_end_key;
@@ -136,7 +138,7 @@ boolean_t mu_int_blk(
 		int		index;
 	} sub_list;
 
-	unsigned char	buff[MAX_KEY_SZ + 1], old_buff[MAX_KEY_SZ + 1], temp_buff[sizeof(mident) + 1], util_buff[MAX_UTIL_SIZE];
+	unsigned char	buff[MAX_KEY_SZ + 1], old_buff[MAX_KEY_SZ + 1], temp_buff[MAX_MIDENT_LEN + 1], util_buff[MAX_UTIL_SIZE];
 	unsigned char	blk_levl, *c1, cc, rec_cmpc;
 	uchar_ptr_t	c0, c2, c_base, blk_base, blk_top, key_base, ptr, rec_base, rec_top;
 	unsigned short	temp_ushort;
@@ -149,6 +151,7 @@ boolean_t mu_int_blk(
 	sub_num		check_vals;
 	trans_num	blk_tn;
 	uchar_ptr_t	subrec_ptr;
+	enum db_ver	ondsk_blkver;
 
 	error_def(ERR_DBBDBALLOC);
 	error_def(ERR_DBBSIZMN);
@@ -184,17 +187,23 @@ boolean_t mu_int_blk(
 	mu_int_offset[mu_int_plen] = 0;
 	mu_int_path[mu_int_plen++] = blk;
 	mu_int_path[mu_int_plen] = 0;
-	blk_base = mu_int_read(blk);
+	blk_base = mu_int_read(blk, &ondsk_blkver);	/* ondsk_blkver set to GDSV4 or GDSV5 (GDSVCURR) */
 	if (!blk_base)
 	{
 		mu_int_err(ERR_DBBDBALLOC, TRUE, TRUE, bot_key, bot_len, top_key, top_len, (unsigned int)(level));
 		return FALSE;
 	}
 	blk_size = (int)((blk_hdr_ptr_t)blk_base)->bsiz;
-	if (tn_reset_this_reg && !muint_fast)
+	if (!muint_fast)
 	{
-		((blk_hdr_ptr_t)blk_base)->tn = 0;
-		mu_int_write(blk, blk_base);
+		if (tn_reset_this_reg)
+		{
+			((blk_hdr_ptr_t)blk_base)->tn = 0;
+			mu_int_write(blk, blk_base);
+			if (GDSVCURR != mu_int_data.desired_db_format)
+				mu_int_blks_to_upgrd++;
+		} else if (GDSVCURR != ondsk_blkver)
+			mu_int_blks_to_upgrd++;
 	}
 	/* pstar indicates that the current block is a (root block with only a star key) or not.
 		This is passed into mu_int_blk() as eb_ok */
@@ -252,7 +261,7 @@ boolean_t mu_int_blk(
 			mu_int_err(ERR_DBTNTOOLG, TRUE, TRUE, bot_key, bot_len, top_key, top_len,
 					(unsigned int)blk_levl);
 			mu_int_plen++;	/* continuing, so compensate for mu_int_err decrement */
-			gtm_putmsg(VARLSTCNT(3) ERR_DBTN, 1, blk_tn);
+			gtm_putmsg(VARLSTCNT(3) ERR_DBTN, 1, &blk_tn);
 			trans_errors++;
 		} else
 		{
@@ -324,6 +333,14 @@ boolean_t mu_int_blk(
 			{
 				mu_int_err(ERR_DBINVGBL, TRUE, TRUE, buff, comp_length, top_key, top_len,
 					(unsigned int)blk_levl);
+				if (!level)
+				{	/* since global names are mixed, the numeric subscript check done later below
+					 * (using mu_sub_list) needs to not use the optimization which relies on the assumption
+					 * that all keys within a block have the same global name prefix.
+					 * reset mu_sub_list[0].index here to ensure the same.
+					 */
+					mu_sub_list[0].index = NO_SUBSCRIPTS;
+				}
 				mu_int_plen++;	/* continuing, so compensate for mu_int_err decrement */
 			}
 			if (rec_cmpc && (short int)rec_cmpc >= buff_length)
@@ -629,7 +646,8 @@ boolean_t mu_int_blk(
 				for (;  c_base < c0;)
 					*c1++ = *c_base++;
 				*c1 = 0;
-				memcpy(muint_temp_buff, temp_buff, 9);
+				assert(sizeof(muint_temp_buff) == sizeof(temp_buff));
+				memcpy(muint_temp_buff, temp_buff, sizeof(temp_buff));
 				if (muint_key)
 				{
 					if (muint_end_key)	/* range */
@@ -654,9 +672,11 @@ boolean_t mu_int_blk(
 
 				memcpy(trees_tail->path, mu_int_path, sizeof(block_id) * (MAX_BT_DEPTH + 1));
 				memcpy(trees_tail->offset, mu_int_offset, sizeof(uint4) * (MAX_BT_DEPTH + 1));
-				memcpy(trees_tail->key, muint_temp_buff, 9);
+				assert(sizeof(trees_tail->key) == sizeof(muint_temp_buff));
+				memcpy(trees_tail->key, muint_temp_buff, sizeof(muint_temp_buff));
 
-				hdr_len = sizeof(rec_hdr) + mid_len((mident *)trees_tail->key) + 2 - rec_cmpc;
+				hdr_len = sizeof(rec_hdr) + strlen(trees_tail->key) + 2 - rec_cmpc; /* We cannot use
+									mid_len() which expects mident_fixed structure */
 				/* +2 in the above hdr_len calculation is to take into account
 				   two \0's after the end of the key
 				*/

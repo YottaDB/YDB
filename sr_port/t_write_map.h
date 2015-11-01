@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,16 @@
 #ifndef T_WRITE_MAP
 #define T_WRITE_MAP
 
-void t_write_map(block_id blk, sm_uc_ptr_t old_addr, unsigned char *upd_addr, trans_num tn);
+void t_write_map(
+		srch_blk_status	*blkhist,	/* Search History of the block to be written. Currently the
+						 *	following members in this structure are used by "t_write_map"
+						 *	    "blk_num"		--> Block number being modified
+						 *	    "buffaddr"		--> Address of before image of the block
+						 *	    "cr"		--> cache-record that holds the block (BG only)
+						 *	    "cycle"		--> cycle when block was read by t_qread (BG only)
+						 *	    "cr->ondsk_blkver"	--> Actual block version on disk
+						 */
+		unsigned char 	*upd_addr,	/* Address of the update array containing list of blocks to be cleared in bitmap */
+		trans_num	tn);		/* Transaction Number when this block was read. Used for cdb_sc_blkmod validation */
 
 #endif

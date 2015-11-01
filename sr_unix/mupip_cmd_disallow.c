@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2005 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,10 @@ boolean_t cli_disallow_mupip_backup(void)
 	disallow_return_value = d_c_cli_present("TRANSACTION") && d_c_cli_present("SINCE");
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = d_c_cli_present("BKUPDBJNL.DISABLE") && d_c_cli_present("BKUPDBJNL.OFF");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = d_c_cli_present("REPLICATION.OFF");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("REPLICATION.ON") && d_c_cli_negated("NEWJNLFILES"));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
@@ -154,6 +158,33 @@ boolean_t cli_disallow_mupip_journal(void)
 	return FALSE;
 }
 
+boolean_t cli_disallow_mupip_reorg(void)
+{
+	int disallow_return_value = 0;
+
+	*cli_err_str_ptr = 0;
+	disallow_return_value = (d_c_cli_present("SELECT")
+				|| d_c_cli_present("EXCLUDE")
+				|| d_c_cli_present("FILL_FACTOR")
+				|| d_c_cli_present("INDEX_FILL_FACTOR")
+				|| d_c_cli_present("RESUME")
+				|| d_c_cli_present("USER_DEFINED_REORG")) && (d_c_cli_present("UPGRADE")
+										|| d_c_cli_present("DOWNGRADE"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = d_c_cli_present("UPGRADE") && d_c_cli_present("DOWNGRADE");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("UPGRADE") || d_c_cli_present("DOWNGRADE")) && !d_c_cli_present("REGION");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("REGION")
+				|| d_c_cli_present("SAFEJNL")
+				|| d_c_cli_negated("SAFEJNL")
+				|| d_c_cli_present("STARTBLK")
+				|| d_c_cli_present("STOPBLK")) && !(d_c_cli_present("UPGRADE")
+									|| d_c_cli_present("DOWNGRADE"));
+	CLI_DIS_CHECK_N_RESET;
+	return FALSE;
+}
+
 boolean_t cli_disallow_mupip_replicate(void)
 {
 	int disallow_return_value = 0;
@@ -162,6 +193,7 @@ boolean_t cli_disallow_mupip_replicate(void)
 	disallow_return_value = !(d_c_cli_present("RECEIVER")
 					|| d_c_cli_present("SOURCE")
 					|| d_c_cli_present("UPDATEPROC")
+					|| d_c_cli_present("UPDHELPER")
 					|| d_c_cli_present("INSTANCE_CREATE"));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
@@ -180,9 +212,9 @@ boolean_t cli_disallow_mupip_replic_receive(void)
 	p4 = d_c_cli_present("STATSLOG");
 	p5 = d_c_cli_present("SHOWBACKLOG");
 	p6 = d_c_cli_present("CHANGELOG");
+
 	disallow_return_value = cli_check_any2(VARLSTCNT(6) p1, p2, p3, p4, p5, p6);
 	CLI_DIS_CHECK_N_RESET;
-
 	disallow_return_value = !(d_c_cli_present("START")
 					|| d_c_cli_present("SHUTDOWN")
 					|| d_c_cli_present("CHECKHEALTH")
@@ -190,10 +222,22 @@ boolean_t cli_disallow_mupip_replic_receive(void)
 					|| d_c_cli_present("SHOWBACKLOG")
 					|| d_c_cli_present("CHANGELOG"));
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value = ((d_c_cli_present("START") && !d_c_cli_present("UPDATEONLY")) || d_c_cli_present("CHANGELOG"))
-					&& !d_c_cli_present("LOG");
+	disallow_return_value = (d_c_cli_present("START")
+				&& !(d_c_cli_present("LISTENPORT") || d_c_cli_present("UPDATEONLY") || d_c_cli_present("HELPERS")));
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value = !d_c_cli_present("START") && d_c_cli_present("UPDATERESYNC");
+	disallow_return_value = (d_c_cli_present("START") && d_c_cli_present("LISTENPORT") && !d_c_cli_present("LOG"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (!d_c_cli_present("START") && (d_c_cli_present("LISTENPORT") || d_c_cli_present("UPDATERESYNC")));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (!(d_c_cli_present("START") || d_c_cli_present("SHUTDOWN")) && d_c_cli_present("UPDATEONLY"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (!(d_c_cli_present("START") || d_c_cli_present("SHUTDOWN") || d_c_cli_present("CHECKHEALTH"))
+				&& d_c_cli_present("HELPERS"));
+	disallow_return_value = (d_c_cli_present("LISTENPORT") && d_c_cli_present("UPDATEONLY"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("UPDATEONLY") && d_c_cli_present("HELPERS"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("CHANGELOG") && !(d_c_cli_present("LOG") || d_c_cli_present("LOG_INTERVAL")));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
@@ -217,8 +261,7 @@ boolean_t cli_disallow_mupip_replic_source(void)
 	disallow_return_value = cli_check_any2(VARLSTCNT(9) p1, p2, p3, p4, p5, p6, p7, p8, p9);
 	CLI_DIS_CHECK_N_RESET;
 
-	disallow_return_value = !(d_c_cli_present("UPDATE")
-					|| d_c_cli_present("START")
+	disallow_return_value = !(d_c_cli_present("START")
 					|| d_c_cli_present("SHUTDOWN")
 					|| d_c_cli_present("ACTIVATE")
 					|| d_c_cli_present("DEACTIVATE")
@@ -227,6 +270,26 @@ boolean_t cli_disallow_mupip_replic_source(void)
 					|| d_c_cli_present("SHOWBACKLOG")
 					|| d_c_cli_present("CHANGELOG")
 					|| d_c_cli_present("STOPSOURCEFILTER"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("START") && d_c_cli_present("PASSIVE") && d_c_cli_present("SECONDARY"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("START") && !d_c_cli_present("PASSIVE") && !d_c_cli_present("SECONDARY"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("START") && !d_c_cli_present("LOG"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("ACTIVATE") && !d_c_cli_present("SECONDARY"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("CHANGELOG") && !d_c_cli_present("LOG") && !d_c_cli_present("LOG_INTERVAL"));
+	CLI_DIS_CHECK_N_RESET;
+
+	return FALSE;
+}
+
+boolean_t cli_disallow_mupip_replic_updhelper(void)
+{
+	int	disallow_return_value = 0;
+
+	disallow_return_value = !(d_c_cli_present("READER") || d_c_cli_present("WRITER"));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
@@ -276,6 +339,16 @@ boolean_t cli_disallow_mupip_set(void)
 		d_c_cli_present("JOURNAL.DISABLE") || d_c_cli_negated("JOURNAL") || d_c_cli_negated("JOURNAL.BEFORE_IMAGES")));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  (d_c_cli_present("PREVJNLFILE") && !(d_c_cli_present("JNLFILE")));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("VERSION") &&
+					(d_c_cli_present("ACCESS_METHOD")
+					|| d_c_cli_present("GLOBAL_BUFFERS")
+					|| d_c_cli_present("RESERVED_BYTES")
+					|| d_c_cli_present("FLUSH_TIME")
+					|| d_c_cli_present("LOCK_SPACE")
+					|| d_c_cli_present("DEFER_TIME")
+					|| d_c_cli_present("WAIT_DISK")
+					|| d_c_cli_present("PARTIAL_RECOV_BYPASS")));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }

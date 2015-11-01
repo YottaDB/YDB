@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,12 +17,12 @@
 #include <sys/time.h>
 #include <sys/un.h>
 #include <sys/sem.h>
-#include <ctype.h>
+#include "gtm_ctype.h"
 #include <stddef.h>
 #include <errno.h>
 #include <signal.h>
-#include <string.h>
 
+#include "gtm_string.h"
 #include "gtm_socket.h"
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
@@ -98,7 +98,7 @@ const static char readonly secshr_unbl_start_mesg_code[][MAX_GTMSECSHR_FAIL_MESG
 {												\
 	if (0 != (create_server_status = create_server()))					\
 	{											\
-		gtm_putmsg(VARLSTCNT(9) ERR_GTMSECSHRSTARTUP, 3, RTS_ERROR_TEXT("Client"),	\
+		gtm_putmsg(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"),	\
 			process_id, ERR_TEXT, 2,						\
 			RTS_ERROR_STRING(secshr_unbl_start_mesg_code[create_server_status]));	\
 		if (FATALFAILURE(create_server_status))						\
@@ -123,7 +123,6 @@ const static char readonly secshr_unbl_start_mesg_code[][MAX_GTMSECSHR_FAIL_MESG
 }
 
 void client_timer_handler(void);
-int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int path_len);
 int create_server (void);
 
 
@@ -157,9 +156,9 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 	int4			msec_timeout;
 
 	error_def(ERR_GTMSECSHR);
-	error_def(ERR_GTMSECSHRSTARTUP);
+	error_def(ERR_GTMSECSHRSTART);
 	error_def(ERR_GTMSECSHRSOCKET);
-	error_def(ERR_GTMSECSHRSRVFFILE);
+	error_def(ERR_GTMSECSHRSRVFIL);
 	error_def(ERR_GTMSECSHRSRVFID);
 	error_def(ERR_GTMSECSHRSRVF);
 	error_def(ERR_GTMSECSHRPERM);
@@ -175,9 +174,9 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
                 gtmsecshr_logname.len = sizeof(GTMSECSHR_PATH) - 1;
                 if (SS_NORMAL != trans_log_name(&gtmsecshr_logname, &gtmsecshr_pathname, gtmsecshr_path))
 		{
-                        send_msg(VARLSTCNT(9) ERR_GTMSECSHRSTARTUP, 3, RTS_ERROR_TEXT("Client"), process_id,
+                        send_msg(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
 					ERR_TEXT, 2, RTS_ERROR_STRING(secshr_unbl_start_mesg_code[INVTRANSGTMSECSHR]));
-                        rts_error(VARLSTCNT(9) ERR_GTMSECSHRSTARTUP, 3, RTS_ERROR_TEXT("Client"), process_id,
+                        rts_error(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
 					ERR_TEXT, 2, RTS_ERROR_STRING(secshr_unbl_start_mesg_code[INVTRANSGTMSECSHR]));
 		}
 		gtmsecshr_pathname.addr[gtmsecshr_pathname.len] = '\0';
@@ -331,7 +330,7 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 					if (retry  && ENOENT == ret_code)
 						ret_code = 0;  /* assume first time worked */
 					else
-						send_msg(VARLSTCNT(14) ERR_GTMSECSHRSRVFFILE, 7, RTS_ERROR_TEXT("Client"),
+						send_msg(VARLSTCNT(14) ERR_GTMSECSHRSRVFIL, 7, RTS_ERROR_TEXT("Client"),
 							process_id, mesg.pid, req_code, RTS_ERROR_TEXT(mesg.mesg.path),
 							ERR_TEXT, 2, RTS_ERROR_STRING(secshr_fail_mesg_code[req_code]),
 							mesg.code);
@@ -378,7 +377,7 @@ int create_server (void)
 #endif
 	int		save_errno;
 
-	error_def(ERR_GTMSECSHRSTARTUP);
+	error_def(ERR_GTMSECSHRSTART);
 	error_def(ERR_GTMSECSHRSRVF);
 	error_def(ERR_TEXT);
 
@@ -390,7 +389,7 @@ int create_server (void)
 		status = EXECL(gtmsecshr_path, gtmsecshr_path, 0);
 		if (-1 == status)
 		{
-                        send_msg(VARLSTCNT(9) ERR_GTMSECSHRSTARTUP, 3, RTS_ERROR_TEXT("Client"), process_id,
+                        send_msg(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
 					ERR_TEXT, 2, RTS_ERROR_STRING(secshr_unbl_start_mesg_code[INVTRANSGTMSECSHR]));
 			exit(UNABLETOEXECGTMSECSHR);
 		}
@@ -399,7 +398,7 @@ int create_server (void)
 		if (-1 == child_pid)
 		{
 			status = GNDCHLDFORKFLD;
-			gtm_putmsg(VARLSTCNT(10) ERR_GTMSECSHRSTARTUP, 3, RTS_ERROR_TEXT("Client"), process_id,
+			gtm_putmsg(VARLSTCNT(10) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
 					ERR_TEXT,  2, RTS_ERROR_TEXT("Failed to fork off gtmsecshr"), errno);
 			/* Sleep for a while and hope a subsequent fork will succeed */
 			hiber_start(1000);
@@ -419,7 +418,7 @@ int create_server (void)
 				else if (EINTR != errno)
 				{
 					status = GNDCHLDFORKFLD;
-					gtm_putmsg(VARLSTCNT(10) ERR_GTMSECSHRSTARTUP, 3, RTS_ERROR_TEXT("Client"), process_id,
+					gtm_putmsg(VARLSTCNT(10) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
 							ERR_TEXT, 2, RTS_ERROR_TEXT("Error spawning gtmsecshr"), errno);
 				}
 			}

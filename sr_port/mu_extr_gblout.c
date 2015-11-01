@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,6 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "hashdef.h"
 #include "muextr.h"
 #include "cdb_sc.h"
 #include "copy.h"
@@ -120,7 +119,7 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 		if (bp->bsiz == sizeof(blk_hdr))
 			break;
 		if (0 != bp->levl || bp->bsiz < sizeof(blk_hdr) || bp->bsiz > cs_data->blk_size ||
-			gv_target->hist.h[0].curr_rec.match < gname_size)
+				gv_target->hist.h[0].curr_rec.match < gname_size)
 			INTEG_ERROR_RETURN
 		/* Note that rp may not be the beginning of a block */
 		rp = (rec_hdr_ptr_t)(gv_target->hist.h[0].curr_rec.offset + (sm_uc_ptr_t)bp);
@@ -139,10 +138,12 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 				INTEG_ERROR_RETURN
 			cp1 = (sm_uc_ptr_t)(rp + 1);
 			cp2 = gv_currkey->base + rp->cmpc;
+			if (cp2 >= keytop || cp1 >= rectop)
+				INTEG_ERROR_RETURN
+			if (!beg_key && (*cp2 >= *cp1))
+				INTEG_ERROR_RETURN
 			for (;;)
 			{
-				if (cp2 >= keytop || cp1 >= rectop)
-					INTEG_ERROR_RETURN
 				if (0 == (*cp2++ = *cp1++))
 				{
 					if (cp2 >= keytop || cp1 >= rectop)
@@ -150,6 +151,8 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 					if (0 == (*cp2++ = *cp1++))
 						break;
 				}
+				if (cp2 >= keytop || cp1 >= rectop)
+					INTEG_ERROR_RETURN
 			}
 			gv_currkey->end = cp2 - gv_currkey->base - 1;
 			if (beg_key)

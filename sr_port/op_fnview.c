@@ -27,7 +27,7 @@
 #include "view.h"
 #include "stringpool.h"
 #include "cmd_qlf.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"    /* needed for cmmdef.h */
 #include "cmidef.h"
 #include "cmmdef.h"
 #include "tp_frame.h"
@@ -58,6 +58,7 @@ GBLREF bool		lv_null_subs;
 GBLREF tp_frame		*tp_pointer;
 GBLREF short		dollar_tlevel;
 GBLREF collseq		*local_collseq;
+GBLREF boolean_t 	local_collseq_stdnull;
 GBLREF int4		zdate_form;
 GBLREF int4		zdir_form;
 GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
@@ -257,7 +258,7 @@ va_dcl
 		assert(gd_header);
 		map = gd_map;
 		map++;	/* get past local locks */
-		for (; memcmp(&parmblk.ident, &(map->name[0]), sizeof(mident)) >= 0; map++)
+		for (; memcmp(&parmblk.ident.c[0], &(map->name[0]), sizeof(mident_fixed)) >= 0; map++)
 			assert(map < gd_map_top);
 		reg = map->reg.addr;
 		tmpstr.addr = (char *)reg->rname;
@@ -321,8 +322,8 @@ va_dcl
 			if (stringpool.top - stringpool.free < GVSTAT_MAX_SIZE)
 				stp_gcol(GVSTAT_MAX_SIZE);
 			dst->str.addr = (char *)stringpool.free;
-#define GVSTAT_PUT_PARM(B, A) (memcpy(stringpool.free, B, sizeof(B) - 1), stringpool.free += sizeof(B) - 1,	\
-	*stringpool.free++ = ':', stringpool.free = i2asc(stringpool.free, sa->hdr->A),	\
+#define GVSTAT_PUT_PARM(B, A) (MEMCPY_LIT(stringpool.free, B), stringpool.free += STR_LIT_LEN(B),\
+	*stringpool.free++ = ':', stringpool.free = i2asc(stringpool.free, sa->hdr->A),		\
 	*stringpool.free++ = ',')
 			GVSTAT_PUT_PARM("SET", n_puts);
 			GVSTAT_PUT_PARM("KIL", n_kills);
@@ -391,7 +392,13 @@ va_dcl
 		RESET_GV_TARGET;
 		break;
 	case VTK_YLCT:
-		n = local_collseq ? local_collseq->act : 0;
+		if (!arg)
+			n = local_collseq ? local_collseq->act : 0;
+		else
+		{
+			assert(!MEMCMP_LIT(arg->str.addr, "ncol"));
+			n = local_collseq_stdnull;
+		}
 		break;
 	case VTK_ZDEFBUFF:
 		n = 0;

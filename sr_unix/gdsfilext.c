@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,12 +13,11 @@
 
 #include "gtm_string.h"
 #include "gtm_time.h"
-
 #include <sys/mman.h>
 #include <errno.h>
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include <signal.h>
-#include <sys/stat.h>
+#include "gtm_stat.h"
 #include "gtm_statvfs.h"
 
 #include "buddy_list.h"
@@ -32,15 +31,16 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "gtmio.h"
-#include "hashtab.h"
 #include "iosp.h"
 #include "jnl.h"
+#include "hashtab_int4.h"     /* needed for tp.h */
 #include "tp.h"
-#include "hashdef.h"
 #include "eintr_wrappers.h"
 #include "send_msg.h"
 #include "gt_timer.h"
 #include "mmseg.h"
+#include "gdsblk.h"		/* needed for gds_blk_downgrade.h */
+#include "gds_blk_downgrade.h"	/* for IS_GDS_BLK_DOWNGRADE_NEEDED macro */
 
 /* Include prototypes */
 #include "bit_set.h"
@@ -66,12 +66,12 @@ GBLREF	gd_addr		*gd_header;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	inctn_opcode_t	inctn_opcode;
 GBLREF	boolean_t	mu_reorg_process;
-GBLREF	bool		non_buffer_write;
 GBLREF	uint4		process_id;
 GBLREF	bool		run_time;
 GBLREF	sgm_info	*sgm_info_ptr;
 GBLREF	unsigned int	t_tries;
-GBLREF 	jnl_gbls_t	jgbl;
+GBLREF	jnl_gbls_t	jgbl;
+GBLREF	inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
 
 OS_PAGE_SIZE_DECLARE
 
@@ -88,7 +88,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	boolean_t		was_crit, need_to_restore_mask = FALSE;
 	char			*buff;
 	int			mm_prot, result, save_errno, status;
-	uint4			bit_maps, bplmap, i, new_blocks, new_total;
+	uint4			new_bit_maps, bplmap, map, new_blocks, new_total, max_tot_blks;
 	uint4			jnl_status, to_wait, to_msg, wait_period;
 	GTM_BAVAIL_TYPE		avail_blocks;
 	sgmnt_data_ptr_t	tmp_csd;
@@ -97,6 +97,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	unix_db_info		*udi;
 	sigset_t		savemask;
 	inctn_opcode_t		save_inctn_opcode;
+	int4			prev_extend_blks_to_upgrd;
 
 	error_def(ERR_DBFILERR);
 	error_def(ERR_DBFILEXT);
@@ -105,6 +106,13 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	error_def(ERR_WAITDSKSPACE);
 	error_def(ERR_TEXT);
 
+	/* Both blocks and total blocks are unsigned ints so make sure we aren't asking for huge numbers that will
+	   overflow and end up doing silly things.
+	*/
+	assert(blocks <= (MAXTOTALBLKS(cs_data) - cs_data->trans_hist.total_blks));
+
+	if (!blocks)
+		return (NO_FREE_SPACE); /* should this be changed to show extension not enabled ? */
 	bplmap = cs_data->bplmap;
 	/* new total of non-bitmap blocks will be number of current, non-bitmap blocks, plus new blocks desired
 	   There are (bplmap - 1) non-bitmap blocks per bitmap, so add (bplmap - 2) to number of non-bitmap blocks
@@ -113,10 +121,11 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	   Current number of bitmaps is (total number of current blocks + bplmap - 1) / bplmap.
 	   Subtract current number of bitmaps from number needed for expanded database to get number of new bitmaps needed.
 	*/
-	bit_maps = DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks
+	new_bit_maps = DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks
 			- DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, bplmap) + blocks, bplmap - 1)
 			- DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, bplmap);
-	new_blocks = blocks + bit_maps;
+	new_blocks = blocks + new_bit_maps;
+	assert(0 < (int)new_blocks);
 	udi = FILE_INFO(gv_cur_region);
 	if (0 != (save_errno = disk_block_available(udi->fd, &avail_blocks, FALSE)))
 	{
@@ -135,8 +144,6 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 #endif
 		}
 	}
-	if (!blocks)
-		return (NO_FREE_SPACE);
 	cs_addrs->extending = TRUE;
 	was_crit = cs_addrs->now_crit;
 	/* If we are coming from mupip_extend (which gets crit itself) we better have waited for any unfreezes to occur */
@@ -235,12 +242,14 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		}
 		cs_addrs->hdr = cs_data;
 	}
-	if (new_blocks + cs_data->trans_hist.total_blks > MAXTOTALBLKS)
+	if (new_blocks + cs_data->trans_hist.total_blks > MAXTOTALBLKS(cs_data))
 	{
 		GDSFILEXT_CLNUP;
 		send_msg(VARLSTCNT(1) ERR_TOTALBLKMAX);
 		return (NO_FREE_SPACE);
 	}
+	CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
+	assert(0 < (int)new_blocks);
 	new_total = cs_data->trans_hist.total_blks + new_blocks;
 	new_eof = ((off_t)(cs_data->start_vbn - 1) * DISK_BLOCK_SIZE) + ((off_t)new_total * cs_data->blk_size);
 	buff = (char *)malloc(DISK_BLOCK_SIZE);
@@ -286,24 +295,42 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
 		return (NO_FREE_SPACE);
 	}
-	/* set non_buffer_write temporarily for bml_init, dsk_write to not complain */
-	/* non_buffer_write is an overloaded variable. It is used for 2 purposes
-		1) to indicate that we would be doing dsk_write even in MM (see assert in dsk_write).
-		2) to indicate that we would be writing out a non_cache_buffer to disk (see assert in dsk_write). */
-	non_buffer_write = TRUE;
-	if (DIVIDE_ROUND_UP(new_total, bplmap) > DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, bplmap))
+	DEBUG_ONLY(prev_extend_blks_to_upgrd = cs_data->blks_to_upgrd;)
+	/* inctn_detail.blks_to_upgrd_delta holds the increase in "csd->blks_to_upgrd" due to the file extension */
+	inctn_detail.blks_to_upgrd_delta = (IS_GDS_BLK_DOWNGRADE_NEEDED(cs_data->desired_db_format) ? new_bit_maps : 0);
+	if (JNL_ENABLED(cs_data))
 	{
-		for (i = ROUND_UP(cs_data->trans_hist.total_blks, bplmap); i <= new_total; i += bplmap)
+		save_inctn_opcode = inctn_opcode;
+		if (mu_reorg_process)
+			inctn_opcode = inctn_gdsfilext_mu_reorg;
+		else
+			inctn_opcode = inctn_gdsfilext_gtm;
+		if (!jgbl.forw_phase_recovery)
+			JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() and jnl_write_inctn_rec() */
+		if (0 == cs_addrs->jnl->pini_addr)
+			jnl_put_jrt_pini(cs_addrs);
+		jnl_write_inctn_rec(cs_addrs);
+		inctn_opcode = save_inctn_opcode;
+		/* Harden INCTN to disk before updating/flushing database. This will ensure that any positive adjustment to the
+		 * blks_to_upgrd counter (stored in the inctn record) is seen by recovery before a V4 format bitmap block is.
+		 */
+		jnl_flush(gv_cur_region);
+	}
+	if (new_bit_maps)
+	{
+		for (map = ROUND_UP(cs_data->trans_hist.total_blks, bplmap); map < new_total; map += bplmap)
 		{
-			if (SS_NORMAL != (status = bml_init(i)))
+			DEBUG_ONLY(new_bit_maps--;)
+			if (SS_NORMAL != (status = bml_init(map)))
 			{
 				GDSFILEXT_CLNUP;
 				send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
 				return (NO_FREE_SPACE);
 			}
 		}
+		assert(0 == new_bit_maps);
 	}
-	non_buffer_write = FALSE;
+	assert(cs_data->blks_to_upgrd == (inctn_detail.blks_to_upgrd_delta + prev_extend_blks_to_upgrd));
 	if (dba_mm == cs_addrs->hdr->acc_meth)
 	{	/* On 32 bit aix, is it possible we can have now increased the file size past what we can map ? */
 		mm_prot = cs_addrs->read_write ? (PROT_READ | PROT_WRITE) : PROT_READ;
@@ -331,42 +358,34 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		free(cs_data);			/* note current assumption that cs_data has not changed since memcpy above */
 		cs_data = cs_addrs->hdr = (sgmnt_data_ptr_t)cs_addrs->db_addrs[0];
 		cs_addrs->db_addrs[1] = cs_addrs->db_addrs[0] + new_eof - 1;
-		cs_addrs->bmm = cs_data->master_map;
+		cs_addrs->bmm = MM_ADDR(cs_data);
 		cs_addrs->acc_meth.mm.base_addr = (sm_uc_ptr_t)((sm_uc_ptr_t)cs_data + (cs_data->start_vbn - 1) * DISK_BLOCK_SIZE);
 		bt_init(cs_addrs);
 		if ((cs_addrs->db_addrs[0] != old_base[0]) && (NULL != cs_addrs->dir_tree))
 			gds_map_moved(gd_header->tab_ptr, cs_addrs->db_addrs[0], old_base[0], old_base[1]);
 		cs_addrs->total_blks = new_total;	/* Local copy to test if file has extended */
 	}
+	assert(0 < (int)blocks);
+	assert(0 < (int)(cs_addrs->ti->free_blocks + blocks));
 	cs_addrs->ti->free_blocks += blocks;
 	blocks = cs_data->trans_hist.total_blks;
 	cs_addrs->ti->total_blks = new_total;
 	if (blocks / bplmap * bplmap != blocks)
 	{
-		bit_set(blocks / bplmap, cs_data->master_map); /* Mark old last local map as having space */
+		bit_set(blocks / bplmap, MM_ADDR(cs_data)); /* Mark old last local map as having space */
 		if ((int4)blocks > cs_addrs->nl->highest_lbm_blk_changed)
 			cs_addrs->nl->highest_lbm_blk_changed = blocks;
 	}
 	curr_tn = cs_addrs->ti->curr_tn;
 	assert(cs_addrs->ti->early_tn == cs_addrs->ti->curr_tn);
-	if (JNL_ENABLED(cs_data))
-	{
-		save_inctn_opcode = inctn_opcode;
-		if (mu_reorg_process)
-			inctn_opcode = inctn_gdsfilext_mu_reorg;
-		else
-			inctn_opcode = inctn_gdsfilext_gtm;
-		if (!jgbl.forw_phase_recovery)
-			JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() and jnl_write_inctn_rec() */
-		if (0 == cs_addrs->jnl->pini_addr)
-			jnl_put_jrt_pini(cs_addrs);
-		jnl_write_inctn_rec(cs_addrs);
-		inctn_opcode = save_inctn_opcode;
-	}
+	/* do not increment transaction number for forward recovery */
 	if (!jgbl.forw_phase_recovery || JNL_ENABLED(cs_data))
-		cs_addrs->ti->early_tn = ++cs_addrs->ti->curr_tn; /* do not increment transaction number for forward recovery */
+	{
+		cs_data->trans_hist.early_tn = cs_data->trans_hist.curr_tn + 1;
+		INCREMENT_CURR_TN(cs_data);
+	}
 	fileheader_sync(gv_cur_region);
 	GDSFILEXT_CLNUP;
-	send_msg(VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), blocks, new_total, curr_tn);
+	send_msg(VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), blocks, new_total, &curr_tn);
 	return (SS_NORMAL);
 }

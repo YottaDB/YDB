@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 #include <errno.h>
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 #include <sys/sem.h>
@@ -96,8 +96,8 @@ void jnlpool_init(jnlpool_user pool_user,
 	jnlpool.jnlpool_dummy_reg = reg = gv_cur_region;
 	gv_cur_region = r_save;
 	ASSERT_IN_RANGE(MIN_RN_LEN, sizeof(JNLPOOL_DUMMY_REG_NAME) - 1, MAX_RN_LEN);
-	memcpy(reg->rname, JNLPOOL_DUMMY_REG_NAME, sizeof(JNLPOOL_DUMMY_REG_NAME) - 1);
-	reg->rname_len = sizeof(JNLPOOL_DUMMY_REG_NAME) - 1;
+	MEMCPY_LIT(reg->rname, JNLPOOL_DUMMY_REG_NAME);
+	reg->rname_len = STR_LIT_LEN(JNLPOOL_DUMMY_REG_NAME);
 	reg->rname[reg->rname_len] = 0;
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
@@ -290,12 +290,10 @@ void jnlpool_init(jnlpool_user pool_user,
 		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error with journal pool shmat"), save_errno);
 	}
-	csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + sizeof(jnlpool_ctl_struct));
-	/* secshr_db_clnup() relies on this relationship between jnlpool_ctl and csa->critical, hence the following assert */
-	assert(sizeof(jnlpool_ctl_struct) == ROUND_UP(sizeof(jnlpool_ctl_struct), (2*BITS_PER_UCHAR)));
-	assert((sm_uc_ptr_t)csa->critical == ((sm_uc_ptr_t)jnlpool.jnlpool_ctl + sizeof(jnlpool_ctl_struct)));
+	csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE); /* secshr_db_clnup uses this
+												    * relationship */
 	jnlpool_mutex_spin_parms = (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)csa->critical + CRIT_SPACE);
-	csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)csa->critical + CRIT_SPACE + sizeof(mutex_spin_parms_struct));
+ 	csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)jnlpool_mutex_spin_parms + sizeof(mutex_spin_parms_struct));
 	if (shm_created)
 		memset(csa->nl, 0, sizeof(node_local)); /* Make csa->nl->glob_sec_init FALSE */
 	csa->now_crit = FALSE;

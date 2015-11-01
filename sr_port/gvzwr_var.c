@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,23 +87,44 @@ void gvzwr_var(uint4 data, int4 n)
 		{
 			mval2subsc((mval *)&literal_null, gv_currkey);
 			gv_curr_subsc_null = TRUE;
-			op_gvorder(&mv);
-			if (0 == mv.str.len)
+			if (0 == gv_cur_region->std_null_coll)
 			{
-				if (!gv_cur_region->null_subs || seen_null)
-					loop_condition = 0;
-				else
+				op_gvorder(&mv); /* This will return the first subscript */
+				if (0 == mv.str.len)
 				{
-					seen_null = 1;			/* set flag to indicate processing null sub */
+					if (NEVER == gv_cur_region->null_subs || seen_null)
+						loop_condition = 0;
+					else
+					{
+						seen_null = 1;			/* set flag to indicate processing null sub */
+						op_gvnaked(VARLSTCNT(1) &mv);
+						op_gvdata(&subdata);
+						if (!MV_FORCE_INT(&subdata))
+							loop_condition = 0;
+					}
+				} else
+				{
 					op_gvnaked(VARLSTCNT(1) &mv);
 					op_gvdata(&subdata);
-					if (!MV_FORCE_INT(&subdata))
-						loop_condition = 0;
 				}
-			} else
+			} else /* for standard null collation */
 			{
-				op_gvnaked(VARLSTCNT(1) &mv);
-				op_gvdata(&subdata);
+				/* determine whether $data(^gbl("") == 1 or 11,
+				   if yes, first process that
+				*/
+				if (NEVER == gv_cur_region->null_subs)
+				{
+					op_gvorder(&mv);
+					assert(0 != mv.str.len); /* We are looking for the first subscript at a given level and so,
+								    we do not expect to have hit at the end of the list */
+					op_gvnaked(VARLSTCNT(1) &mv);
+					op_gvdata(&subdata);
+				} else
+				{
+					op_gvdata(&subdata);
+					if (MV_FORCE_INT(&subdata))
+						seen_null = 1;
+				}
 			}
 		}
 		while (loop_condition)
@@ -176,9 +197,12 @@ void gvzwr_var(uint4 data, int4 n)
 				seen_null = 2;				/* set flag to indicate null sub processed */
 			}
 			op_gvorder(&mv);
+			/* When null subscript is in the middle,
+			but with standard collation null subscripts can not be in the middle, so don't need to be worried
+			*/
 			if (0 == mv.str.len)
 			{
-				if (!gv_cur_region->null_subs || seen_null)
+				if (NEVER == gv_cur_region->null_subs || seen_null || gv_cur_region->std_null_coll)
 					break;
 				else
 				{

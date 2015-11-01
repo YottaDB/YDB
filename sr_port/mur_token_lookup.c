@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,8 +18,10 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 
 GBLREF 	mur_gbls_t	murgbl;
@@ -31,18 +33,18 @@ multi_struct *mur_token_lookup(token_num token, uint4 pid, off_jnl_t rec_time, e
 multi_struct *mur_token_lookup(token_num token, uint4 pid, int4 image_count, off_jnl_t rec_time, enum rec_fence_type fence)
 #endif
 {
-	ht_entry	*hentry;
+	ht_ent_int8	*tabent;
 	multi_struct 	*multi;
 
-	if (NULL != (hentry = ht_get(&murgbl.token_table, (mname *)&token)))
+	if (NULL != (tabent = lookup_hashtab_int8(&murgbl.token_table, (gtm_uint64_t *)&token)))
 	{
 		if (mur_options.rollback)
 		{
-			assert(NULL != ((multi_struct *)hentry->ptr));
-			assert(NULL == ((multi_struct *)hentry->ptr)->next);
-			return (multi_struct *)hentry->ptr;	/* The way it is generated that always unique */
+			assert(NULL != ((multi_struct *)tabent->value));
+			assert(NULL == ((multi_struct *)tabent->value)->next);
+			return (multi_struct *)tabent->value;	/* The way it is generated that always unique */
 		}
-		for (multi = (multi_struct *)hentry->ptr; NULL != multi; multi = (multi_struct *)multi->next)
+		for (multi = (multi_struct *)tabent->value; NULL != multi; multi = (multi_struct *)multi->next)
 		{
 			if (multi->pid == pid && VMS_ONLY(multi->image_count == image_count &&)
 					(ZTPFENCE == fence || multi->time == rec_time))

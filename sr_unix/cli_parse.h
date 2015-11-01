@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,6 @@ CLI_ENTRY *get_parm_entry(char *parm_str);
 bool cli_get_parm(char *entry, char val_buf[]);
 boolean_t cli_numeric_check(CLI_ENTRY *pparm, char *val_str);
 boolean_t cli_get_sub_quals(CLI_ENTRY *pparm);
-boolean_t check_disallow();
 int cli_check_negated(char **opt_str_ptr, CLI_ENTRY *pcmd_parm_ptr, CLI_ENTRY **pparm_ptr);
 
 #endif

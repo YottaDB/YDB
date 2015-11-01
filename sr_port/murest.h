@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,9 +15,9 @@ typedef	struct inc_list
 	struct inc_list		*next;
 } inc_list_struct;
 
-#define INC_HDR_LABEL_SZ	22
+#define INC_HDR_LABEL_SZ	26
 #define INC_HDR_DATE_SZ		14
-#define INC_HEADER_LABEL	"GDS INCREMENTAL BACKUP"
+#define INC_HEADER_LABEL	"GDSV5   INCREMENTAL BACKUP"
 
 typedef struct i_hdr
 {	char		label[INC_HDR_LABEL_SZ];
@@ -25,8 +25,10 @@ typedef struct i_hdr
 	char		reg[MAX_RN_LEN];
 	trans_num	start_tn;
 	trans_num	end_tn;
-	uint4	db_total_blks;
-	uint4	blk_size;
+	uint4		db_total_blks;
+	uint4		blk_size;
+	int4		blks_to_upgrd;
+	int4		filler;		/* For alignment so is same size on all platforms */
 } inc_header;
 
 void murgetlst(void);

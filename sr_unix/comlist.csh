@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2005 Fidelity Infromation Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -352,7 +352,7 @@ chmod -w $gs[1]/omi_sx_play.c
 #
 #############################################################
 
-foreach file (gtcm_slist.gtc gtcm_run.gtc gtcm_gcore)
+foreach file (gtcm_slist.gtc gtcm_run.gtc)
 	if ( -e $p3/$file ) then
 		chmod +w $p3/$file
 	endif
@@ -451,11 +451,11 @@ foreach i ( $comlist_liblist )
 		# Exclude files that define the same externals
 		# (e.g., "main" and the VMS CLI [command line interpreter] emulator arrays):
 		set exclude = "^gtm\.o|^gtm_main\.o|^gtm_svc\.o|^gtm_dal_svc\.o|^gtm_rpc_init\.o|^mumps_clitab\.o"
-		set exclude = "$exclude|^lke\.o|^lke_cmd\.o|^dse\.o|^dse_cmd\.o"
-		set exclude = "$exclude|^mupip\.o|^mupip_cmd\.o|^daemon\.o|^gtmsecshr\.o|^geteuid\.o|^dtgbldir\.o"
+		set exclude = "$exclude|^lke\.o|^lke_cmd\.o|^dse\.o|^dse_cmd\.o|^dbcertify\.o"
+		set exclude = "$exclude|^mupip\.o|^mupip_cmd\.o|^gtmsecshr\.o|^geteuid\.o|^dtgbldir\.o"
 		set exclude = "$exclude|^semstat2\.o|^ftok\.o|^msg\.o|^gtcm_main\.o|^gtcm_play\.o|^gtcm_pkdisp\.o|^gtcm_shmclean\.o"
 		set exclude = "$exclude|^omi_srvc_xct\.o|^omi_sx_play\.o"
-		set exclude = "$exclude|^gtcm_gnp_server\.o|^gtcm_gnp_clitab\.o"
+		set exclude = "$exclude|^gtcm_gnp_server\.o|^gtcm_gnp_clitab\.o|^dbcertify_cmd.o"
 		/bin/ls | egrep '\.o$' | egrep -v "$exclude" | \
 			xargs -n50 $shell $gtm_tools/gt_ar.csh $gt_ar_option_create lib$i.a >>& ar$i.log
 		if ( $status != 0 ) then

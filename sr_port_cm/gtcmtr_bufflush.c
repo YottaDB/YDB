@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,14 +20,14 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "cmidef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "copy.h"
 #include "format_targ_key.h"
 #include "gtcm_find_region.h"
 #include "gtcm_bind_name.h"
-#include "gvcst_put.h"
-#include "gtcmtr_bufflush.h"
+#include "gvcst_protos.h"	/* for gvcst_put prototype */
+#include "gtcmtr_protos.h"
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;

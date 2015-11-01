@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,9 +14,9 @@
 #include "gtm_ipc.h"
 #include <sys/shm.h>
 #include <errno.h>
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 #include <sys/sem.h>
@@ -152,7 +152,7 @@ boolean_t validate_db_shm_entry(char *entry, char *fname, int *exit_stat)
 	{
 		/* check for the bare minimum size of the shared memory segment that we expect
 		 * (with no fileheader related information at hand) */
-		if (NODE_LOCAL_SPACE + BACKUP_BUFFER_SIZE > parm_buff->sgmnt_siz)
+		if (NODE_LOCAL_SPACE + SHMPOOL_BUFFER_SIZE > parm_buff->sgmnt_siz)
 		{
 			free(parm_buff);
 			return FALSE;

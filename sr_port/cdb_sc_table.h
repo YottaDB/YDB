@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2003 Sanchez Computer Associates, Inc.        *
+ *      Copyright 2003, 2004 Sanchez Computer Associates, Inc.        *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -41,7 +41,7 @@
 CDB_SC_NUM_ENTRY(  cdb_sc_normal,                    0) /*  0   success */
 CDB_SC_NUM_ENTRY(  cdb_sc_endtree,                   1) /*  1   gvcst_lftsib or gvcst_rtsib searched past end of tree */
 CDB_SC_NUM_ENTRY(  cdb_sc_delete_parent,             2) /*  2   gvcst_kill_blk succeeded, but signals gvcst_kill that block was completely deleted */
-CDB_SC_NUM_ENTRY(  cdb_sc_nolock,                    3) /*  3   mutex_lockwim or mutex_lockwnoh was unable to obtain a lock, or grab_read_crit failed */
+CDB_SC_NUM_ENTRY(  cdb_sc_nolock,                    3) /*  3   mutex_lockwim was unable to obtain a lock */
 CDB_SC_NUM_ENTRY(  cdb_sc_needcrit,                  4) /*  4   on 4th attempt and need crit for this region -- restart transaction no penalty */
 CDB_SC_NUM_ENTRY(  cdb_sc_helpedout,                 5) /*  5   wcs_blocked when t_tries >= CDB_STAGNATE */
 CDB_SC_NUM_ENTRY(  cdb_sc_gbloflow,                  6) /*  6   t_end or tp_tend found the database full and could not be extended */

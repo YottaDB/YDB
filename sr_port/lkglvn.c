@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,15 +19,14 @@
 #include "subscript.h"
 #include "advancewindow.h"
 
-GBLREF char window_token;
-GBLREF mident window_ident;
+GBLREF char 	window_token;
+GBLREF mident 	window_ident;
 
 int lkglvn(bool gblvn)
 {
 	triple 	*ref, *t1;
-	char	x, lkname_buf[sizeof (mident) + 1], *lknam;
+	char	x, lkname_buf[MAX_MIDENT_LEN + 1], *lknam;
 	oprtype subscripts[MAX_LVSUBSCRIPTS], *sb1, *sb2;
-	unsigned short name_len;
 	opctype ox;
 	bool vbar, parse_status;
 	error_def(ERR_COMMA);
@@ -81,9 +80,9 @@ int lkglvn(bool gblvn)
 	{	stx_error(ERR_LKNAMEXPECTED);
 		return FALSE;
 	}
-	name_len = mid_len(&window_ident);
-	memcpy(lknam, &window_ident.c[0], name_len);
-	lknam += name_len;
+	assert(window_ident.len <= MAX_MIDENT_LEN);
+	memcpy(lknam, window_ident.addr, window_ident.len);
+	lknam += window_ident.len;
 	*sb1++ = put_str(lkname_buf,lknam - lkname_buf);
 	advancewindow();
 	if (window_token == TK_LPAREN)

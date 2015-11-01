@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,6 +112,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 	triple	*rtrip;
 	int	offset, len;
 	char	*buff;
+	char 	mid[sizeof(mident_fixed)];
 
 	if (opr)
 		PRINTF("%s %s  [0x%08lx]  Type: %s\n", cdbg_indent(indent), oprtype_names[opnum], opr,
@@ -137,7 +138,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 			{
 				PRINTF("%s   LS vref: 0x%08lx  RS vref: 0x%08lx  index: %d  varname: %s  last triple: 0x%08lx\n",
 				       cdbg_indent(indent), opr->oprval.vref->lson, opr->oprval.vref->rson, opr->oprval.vref->mvidx,
-				       cdbg_makstr(opr->oprval.vref->mvname.c, &buff, sizeof(opr->oprval.vref->mvname)),
+				       cdbg_makstr(opr->oprval.vref->mvname.addr, &buff, opr->oprval.vref->mvname.len),
 				       opr->oprval.vref->last_fetch);
 				free(buff);
 			}
@@ -189,10 +190,8 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 		case MFUN_REF:
 			if (opr->oprval.lab)
 			{
-				unsigned char mid[sizeof(mident) + 1];
-
-				len = mid_len(&opr->oprval.lab->mvname);
-				memcpy(mid, &opr->oprval.lab->mvname, len);
+				len = opr->oprval.lab->mvname.len;
+				memcpy(mid, opr->oprval.lab->mvname.addr, len);
 				mid[len] = 0;
 				PRINTF("%s   mlabel name: %s\n", cdbg_indent(indent), mid);
 			} else

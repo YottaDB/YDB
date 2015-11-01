@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,11 +23,11 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "op.h"
-#include "gvcst_root_search.h"
+#include "gvcst_protos.h"	/* for gvcst_root_search prototype */
 #include "tp_set_sgm.h"
 
 #define DIR_ROOT 1
@@ -71,7 +71,9 @@ void op_gvrectarg (mval *v)
 	if (len <= 0)
 	{
 		if (gv_currkey)
-		{	gv_currkey->end = gv_currkey->prev = 0;
+		{	/* the following code (reset gv_currkey) should be maintained in parallel with similar code in op_svput.c */
+			gv_currkey->end = gv_currkey->prev = 0;
+			gv_currkey->base[0] = '\0';
 		}
 		return;
 	}

@@ -14,11 +14,12 @@
 #include <varargs.h>
 #include "gtm_string.h"
 
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "sbs_blk.h"
 #include "subscript.h"
 #include "stringpool.h"
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "collseq.h"
 #include "compiler.h"
@@ -37,6 +38,7 @@ GBLREF collseq		*local_collseq;
 GBLREF mval		last_fnquery_return_varname;
 GBLREF mval		last_fnquery_return_sub[MAX_LVSUBSCRIPTS];
 GBLREF int		last_fnquery_return_subcnt;
+GBLREF boolean_t 	local_collseq_stdnull;
 
 void op_fnquery (va_alist)
 va_dcl
@@ -91,7 +93,7 @@ va_dcl
 				if (is_num = MV_IS_CANONICAL(*argpp))
 				{
 					MV_FORCE_NUM(*argpp);
-				} else if ((i + 1 == sbscnt) && (0 == (*argpp)->str.len))
+				} else if ((i + 1 == sbscnt) && (0 == (*argpp)->str.len) && !local_collseq_stdnull)
 				{ 	/* The last search argument is a null string. For this situation, there is the possibility
 					   of a syntax collision if (1) the user had (for example) specified $Q(a(1,3,"") to get
 					   the first a(1,3,x) node or (2) this is the "next" element that was legitimately returned
@@ -107,13 +109,13 @@ va_dcl
 					*/
 					nullify_term = TRUE;
 					if (last_fnquery_return_varname.str.len
-					    && last_fnquery_return_varname.str.len == varname->str.len
-					    && 0 == memcmp(last_fnquery_return_varname.str.addr, varname->str.addr,
-							   varname->str.len)
-					    && sbscnt == last_fnquery_return_subcnt)
+				    		&& last_fnquery_return_varname.str.len == varname->str.len
+				    		&& 0 == memcmp(last_fnquery_return_varname.str.addr, varname->str.addr,
+						varname->str.len)
+				    		&& sbscnt == last_fnquery_return_subcnt)
 					{	/* We have an equalvalent varname and same number subscripts */
 						for (j = 0, argpp2 = &args[0], lfrsbs = &last_fnquery_return_sub[0];
-						     j < i; j++, argpp2++, lfrsbs++)
+					     		j < i; j++, argpp2++, lfrsbs++)
 						{	/* For each subscript prior to the trailing null subscript */
 							argp2 = *argpp2;
 							if (MV_IS_NUMERIC(argp2) && MV_IS_NUMERIC(lfrsbs))
@@ -123,14 +125,14 @@ va_dcl
 							} else if (MV_IS_STRING(argp2) && MV_IS_STRING(lfrsbs))
 							{	/* Should be string only in order to compare */
 								if ((argp2)->str.len == lfrsbs->str.len
-								    && 0 != memcmp((argp2)->str.addr, lfrsbs->str.addr,
-										   lfrsbs->str.len))
+							    		&& 0 != memcmp((argp2)->str.addr, lfrsbs->str.addr,
+									   lfrsbs->str.len))
 									break;	/* This subscript isn't the same */
 							} else
 								break;		/* This subscript isn't even close.. */
 						}
 						if (j == i)
-							nullify_term = FALSE; 	/* We made it through the loop unscathed !! */
+							nullify_term = FALSE;/* We made it through the loop unscathed !! */
 					}
 					if (nullify_term)
 					{
@@ -138,7 +140,7 @@ va_dcl
 						break;
 					}
 				}
-			} else
+			} else /* not string */
 			{
 				assert(MV_IS_NUMERIC(*argpp));
 				assert(MV_IS_CANONICAL(*argpp));
@@ -224,8 +226,8 @@ va_dcl
 		if (tbl = parent->ptrs.val_ent.children)	/* Note assignment! */
 		{
 			found = TRUE;
-			if (num = tbl->num)
-			{
+			if ((!local_collseq_stdnull || !tbl->str || 0 != tbl->str->ptr.sbs_str[0].str.len) && (num = tbl->num))
+			{										 /*CAUTION assignment */
 				assert(num->cnt);
 				if (tbl->int_flag)
 				{
@@ -257,6 +259,7 @@ va_dcl
 	last_fnquery_return_varname.mvtype = MV_STR;
 	last_fnquery_return_varname.str.len = 0;
 	if (!found)
+	{
 		for (;;)
 		{
 			if (h1 == history)
@@ -273,13 +276,15 @@ va_dcl
 				--argpp;
 			}
 		}
+	}
 	q_nxt_val_node(&h1);
 
 	/* Before we start formatting for output, decide whether we will be saving mvals of our subscripts
 	   as we format. We only do this if the last subscript is a null. Bypassing it otherwise is a time
 	   saver..
+	   Note that with standard collation last subscript null has no special meaning
 	*/
-	last_sub_null = (SBS_BLK_TYPE_STR != h1->type || 0 != h1->addr.str->str.len) ? FALSE : TRUE;
+	last_sub_null = (SBS_BLK_TYPE_STR == h1->type &&  0 == h1->addr.str->str.len && !local_collseq_stdnull);
 
 	/* format the output string */
 	if (stringpool.top - stringpool.free < varname->str.len + 1)

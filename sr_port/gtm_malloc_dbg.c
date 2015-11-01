@@ -54,8 +54,8 @@
    Nobody should be calling these directly so we don't want them where they can
    get included anywhere else.
 */
-void gtm_malloc_dbg(size_t);
-void gtm_free_dbg(void *);
+void gtm_malloc_dbg(size_t size);
+void gtm_free_dbg(void *addr);
 
 void gtm_malloc_dbg(size_t size)  /* No return or return value since we are terminal */
 {

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -137,7 +137,7 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 				key_subsc.str.len = tmp - slit;
 			}
 
-			if (!(cs_addrs->hdr->null_subs || key_subsc.str.len))
+			if ( 0 == key_subsc.str.len && NEVER == cs_addrs->hdr->null_subs)
 			{
 				util_out_print("Error:  Null subscripts not allowed", TRUE);
 				return FALSE;

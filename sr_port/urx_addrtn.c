@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,11 +17,11 @@
 urx_rtnref *urx_addrtn(urx_rtnref *rp_start, urx_rtnref *rp)
 {
 	urx_rtnref	*rp0, *rp1;
-	char		*rtn;
+	unsigned char	*rtn;
 	int		rtnlen, c;
 
 	rtnlen = rp->len;
-	rtn = rp->name.c;
+	rtn = &rp->name[0];
 	assert(0 < rtnlen);
 	rp0 = rp_start;
 	rp1 = rp0->next;
@@ -35,7 +35,7 @@ urx_rtnref *urx_addrtn(urx_rtnref *rp_start, urx_rtnref *rp)
 	{
 		c = rtnlen - rp1->len;
 		if (!c)
-			c = memcmp(rtn, rp1->name.c, rtnlen);
+			c = memcmp(rtn, &rp1->name[0], rtnlen);
 		if (c > 0)
 		{
 			rp0 = rp1;

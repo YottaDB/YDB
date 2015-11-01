@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,8 @@
 #define MAX_NUM_SUBSC_LEN 10	/* one for exponent, nine for the 18 significant digits */
 #define EXTEND_WARNING_FACTOR 3
 
-typedef uint4	trans_num;
+typedef gtm_uint64_t	trans_num;
+typedef uint4		trans_num_4byte;
 typedef int4    block_id;
 
 enum db_acc_method

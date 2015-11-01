@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,11 +22,11 @@
 #include "gdscc.h"
 #include "gdskill.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "tp_timeout.h"
-#include "gvcst_tp_init.h"
+#include "gvcst_protos.h"	/* for gvcst_tp_init prototype */
 
 /* Initialize the TP structures we will be using for the successive TP operations */
 void gvcst_tp_init(gd_region *greg)
@@ -43,7 +43,8 @@ void gvcst_tp_init(gd_region *greg)
 		si->tp_hist_size = TP_MAX_MM_TRANSIZE;
 		si->cur_tp_hist_size = INIT_CUR_TP_HIST_SIZE;	/* should be very much less than si->tp_hist_size */
 		assert(si->cur_tp_hist_size <= si->tp_hist_size);
-		init_hashtab(&si->blks_in_use, BLKS_IN_USE_INIT_ELEMS);
+		si->blks_in_use = (hash_table_int4 *)malloc(sizeof(hash_table_int4));
+		init_hashtab_int4(si->blks_in_use, BLKS_IN_USE_INIT_ELEMS);
 		/* See comment in tp.h about cur_tp_hist_size for details */
 		si->first_tp_hist = si->last_tp_hist =
 			(srch_blk_status *)malloc(sizeof(srch_blk_status) * si->cur_tp_hist_size);

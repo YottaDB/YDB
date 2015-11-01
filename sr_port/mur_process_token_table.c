@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,8 +19,11 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
+#include "hashtab.h"
 #include "muprec.h"
 
 GBLREF mur_gbls_t	murgbl;
@@ -31,27 +34,27 @@ jnl_tm_t mur_process_token_table(boolean_t *ztp_broken)
 {
 	boolean_t 	ztp_brkn;
 	jnl_tm_t	min_broken_time;
-	int		ht_index;
 	multi_struct	*multi;
-	ht_entry	*table_base;
+	ht_ent_int8	*curent, *topent;
 
 	assert(!mur_options.rollback);
 	mur_multi_rehash();	/* To release memory and shorten the table */
-	table_base = murgbl.token_table.base;
 	ztp_brkn = FALSE;
 	min_broken_time = MAXUINT4;
-	for (ht_index = 0; ht_index < murgbl.token_table.size; ht_index++)
+	for (curent = murgbl.token_table.base, topent = murgbl.token_table.top; curent < topent; curent++)
 	{
-		multi = (multi_struct *)table_base[ht_index].ptr;
-		while (NULL != multi)
+		if (HTENT_VALID_INT8(curent, multi_struct, multi))
 		{
-			if (0 < multi->partner)
+			do
 			{
-				if (min_broken_time > multi->time)
-					min_broken_time = multi->time;
-				ztp_brkn = ztp_brkn || (ZTPFENCE == multi->fence);
-			}
-			multi = (multi_struct *)multi->next;
+				if (0 < multi->partner)
+				{
+					if (min_broken_time > multi->time)
+						min_broken_time = multi->time;
+					ztp_brkn = ztp_brkn || (ZTPFENCE == multi->fence);
+				}
+				multi = (multi_struct *)multi->next;
+			} while (NULL != multi);
 		}
 	}
 	*ztp_broken = ztp_brkn;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -251,4 +251,7 @@ XFER(xf_fnqsubscript, op_fnqsubscript),
 XFER(xf_fnreverse, op_fnreverse),
 XFER(xf_psvput, opp_svput),
 XFER(xf_fnzjobexam, op_fnzjobexam),
-XFER(xf_fnzsigproc, op_fnzsigproc)
+XFER(xf_fnzsigproc, op_fnzsigproc),
+XFER(xf_fnincr, op_fnincr),
+XFER(xf_gvincr, op_gvincr),
+XFER(xf_indincr, opp_indincr)

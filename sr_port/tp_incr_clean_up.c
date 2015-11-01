@@ -21,7 +21,7 @@
 #include "gdskill.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "copy.h"
@@ -64,7 +64,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si);
 
 void tp_incr_clean_up(short newlevel)
 {
-	uint4			duint4, num_free;
+	uint4			num_free;
 	boolean_t		freed;
 	sgm_info 		*si;
 	cw_set_element 		*cse, *next_cse, *tmp_cse;
@@ -72,6 +72,7 @@ void tp_incr_clean_up(short newlevel)
 	srch_blk_status		*tp_srch_status;
 	int			min_t_level;	/* t_level of the head of the horizontal-list of a given cw-set-element */
 	gd_region		*tmp_gv_cur_region;
+	ht_ent_int4		*tabent;
 
 	assert(newlevel > 0);
 	if ((sgmnt_addrs *)-1 != jnl_fence_ctl.fence_list)	/* currently global_tlvl_info struct holds only jnl related info */
@@ -93,7 +94,10 @@ void tp_incr_clean_up(short newlevel)
 		{
 			assert(NULL == cse->low_tlevel);
 			next_cse = cse->next_cw_set;
-			tp_srch_status = (srch_blk_status *)lookup_hashtab_ent(si->blks_in_use, (void *)cse->blk, &duint4);
+			if (NULL != (tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&cse->blk)))
+				tp_srch_status = tabent->value;
+			else
+				tp_srch_status = NULL;
 			DEBUG_ONLY(
 				tmp_cse = cse;
 				TRAVERSE_TO_LATEST_CSE(tmp_cse);
@@ -170,7 +174,7 @@ void tp_incr_clean_up(short newlevel)
 		freed = free_last_n_elements(si->cw_set_list, num_free);
 		assert(freed);
 	}
-	assert((NULL != first_sgm_info) || (NULL == cw_stagnate) || cw_stagnate_reinitialized);
+	assert((NULL != first_sgm_info) || 0 == cw_stagnate.size || cw_stagnate_reinitialized);
 		/* if no database activity, cw_stagnate should be uninitialized or reinitialized */
 	if (NULL != first_sgm_info)
 		CWS_RESET;
@@ -258,7 +262,7 @@ void rollbk_gbl_tlvl_info(short newlevel)
 void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 {
 	int			tli_cnt;
-	boolean_t		dummy_ret, invalidate;
+	boolean_t		deleted, invalidate;
 	void			*dummy = NULL;
 	block_id		blk;
 	kill_set        	*ks, *temp_kill_set;
@@ -326,8 +330,8 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 		DEBUG_ONLY(invalidate = FALSE;)
 		for (th = tli->tlvl_tp_hist_info; th != si->last_tp_hist; th++)
 		{
-			dummy_ret = del_hashtab_ent(&si->blks_in_use, (void *)th->blk_num, dummy);
-			assert(dummy_ret);
+			deleted = delete_hashtab_int4(si->blks_in_use, (uint4 *)&th->blk_num);
+			assert(deleted);
 			si->num_of_blks--;
 			DEBUG_ONLY(
 				/* this is prior code which is no longer deemed necessary since invalidating clues of all
@@ -366,7 +370,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 			jgbl.cumul_jnl_rec_len = 0;
 			DEBUG_ONLY(jgbl.cumul_index = 0;)
 		}
-		reinit_hashtab(&si->blks_in_use);
+		reinitialize_hashtab_int4(si->blks_in_use);
 		si->num_of_blks = 0;
 		si->update_trans = FALSE;
 		cs_addrs->dir_tree->clue.end = 0;

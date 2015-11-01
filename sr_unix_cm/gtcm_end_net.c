@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,12 +20,9 @@
 static char rcsid[] = "$Header:$";
 #endif
 
-#ifdef DEBUG
-#include "gtm_stdio.h"
-#endif /* defined(DEBUG) */
-
 #include "mdef.h"
 
+#include "gtm_stdio.h"
 #include "gtm_unistd.h"		/* for close() */
 #include "gtm_time.h"		/* for ctime() and time() */
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashdef.h"
 #include "cmidef.h"
+#include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -34,7 +34,7 @@ bool gvcmx_query(mval *val)
 	lnk = gv_cur_region->dyn.addr->cm_blk;
 	if (((link_info *)lnk->usr)->query_is_queryget)
 		*val = temp;
-	return (((link_info *)lnk->usr)->query_is_queryget ? 
+	return (((link_info *)lnk->usr)->query_is_queryget ?
 			(MV_DEFINED(&temp) ? TRUE : FALSE) : /* we return TRUE (1) to avoid int -> bool (char) lossy assignment */
 			MV_FORCE_INT(&temp));
 }

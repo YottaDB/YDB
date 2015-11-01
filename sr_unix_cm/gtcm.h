@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@
 
 /*  Routines */
 void		gtcm_init     P((int argc, char_ptr_t argv[]));
-void		gtcm_prsopt   P((int, char **));
+int		gtcm_prsopt   P((int, char **));
 int		gtcm_maxfds   P((void));
 int		gtcm_bgn_net  P((omi_conn_ll *));
 void		gtcm_end_net  P((omi_conn_ll *));

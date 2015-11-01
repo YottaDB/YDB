@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -183,7 +183,7 @@ typedef struct
 	/* Note the above filler will fail if JRT_RECTYPES grows beyond 29 elements and give compiler warning in VMS
 	 * if JRT_RECTYPES equals 29. In that case, change the start num to the next odd number above JRT_RECTYPES.
 	*/
-	volatile trans_num	epoch_tn;		/* Transaction number for current epoch */
+	volatile trans_num_4byte	epoch_tn;		/* Transaction number for current epoch */
 	volatile uint4		next_epoch_time;	/* Time when next epoch is to be written (in epoch-seconds) */
 	volatile boolean_t	need_db_fsync;          /* need an fsync of the db file */
 	volatile int4		io_in_prog;		/* VMS only: write in progress indicator (NOTE: must manipulate
@@ -310,7 +310,7 @@ typedef struct
 	char			forw_phase_jnl_file_name[JNL_NAME_SIZE];	/* Forward phase journal file name */
 	int4			repl_state;	/* To state whether replication is turned on for this journal file */
 	seq_num			start_seqno;	/* the reg_seqno when this journal file was created */
-	trans_num		bov_tn, eov_tn;
+	trans_num_4byte		bov_tn, eov_tn;
 	uint4			ftruncate_len;	/* Length upto which journal file was truncated (turn around point stop address) */
 	uint4			forw_phase_eof_addr;	/* Eof address and Last record of newly created forw_phase journal file, */
 	uint4			forw_phase_last_record;	/* Used incase rollback is interrupted during forward phase */
@@ -327,7 +327,7 @@ typedef struct
 				alloc,
 				extend,
 				buffer;
-	trans_num		tn;
+	trans_num_4byte		tn;
 	char			*fn,
 				*jnl;
 	short			rsize,
@@ -363,14 +363,14 @@ typedef struct
 {
 	jnl_process_vector	process_vector;
 	uint4			pini_addr;
-	trans_num		tn;
+	trans_num_4byte		tn;
 } struct_jrec_pfin;
 
 typedef struct
 {
 	uint4			pini_addr;
 	uint4			tc_short_time;
-	trans_num		tn;
+	trans_num_4byte		tn;
 	int4			rec_seqno;
 	seq_num			jnl_seqno;
 	uint4			tc_recov_short_time;
@@ -384,7 +384,7 @@ typedef struct
 {
 	uint4			pini_addr;	/* pini_addr and rec_seqno are just so that the other fields are the same offset */
 	uint4			short_time;
-	trans_num		tn;
+	trans_num_4byte		tn;
 	int4			rec_seqno;
 	seq_num			jnl_seqno;
 	uint4			recov_short_time;
@@ -395,7 +395,7 @@ typedef struct
 {
 	uint4			pini_addr;
 	uint4			short_time;
-	trans_num		tn;
+	trans_num_4byte		tn;
 	int4			rec_seqno;
 	seq_num			jnl_seqno;
 	uint4			recov_short_time;
@@ -408,7 +408,7 @@ typedef struct 		/* this should be the same as jrec_kill_set_struct except for m
 {
 	uint4			pini_addr;
 	uint4			short_time;
-	trans_num		tn;
+	trans_num_4byte		tn;
 	int4			rec_seqno;
 	seq_num			jnl_seqno;
 	uint4			recov_short_time;
@@ -419,7 +419,7 @@ typedef struct
 {
 	uint4			pini_addr;
 	uint4			short_time;
-	trans_num		tn;
+	trans_num_4byte		tn;
 	int4			rec_seqno;
 	seq_num			jnl_seqno;
 	uint4			recov_short_time;
@@ -434,7 +434,7 @@ typedef struct		/* this should be the same as jrec_tp_kill_set_struct except for
 {
 	uint4			pini_addr;
 	uint4			short_time;
-	trans_num		tn;
+	trans_num_4byte		tn;
 	int4			rec_seqno;
 	seq_num			jnl_seqno;
 	uint4			recov_short_time;
@@ -448,7 +448,7 @@ typedef struct
 {
         uint4                   pini_addr;
         uint4                   short_time;
-        trans_num               tn;
+        trans_num_4byte               tn;
 	inctn_opcode_t		opcode;
 } struct_jrec_inctn;
 
@@ -475,7 +475,7 @@ typedef struct
 {
         uint4                   pini_addr;
         uint4                   short_time;
-        trans_num               tn;
+        trans_num_4byte               tn;
         block_id                blknum;
         unsigned short          bsiz;
 	unsigned short 		filler_short; /* To make the 8 byte alignment requirement. It's ok to have 6 byte filler for the */
@@ -487,7 +487,7 @@ typedef struct
 {
         uint4                   pini_addr;
         uint4                   short_time;
-        trans_num               tn;
+        trans_num_4byte               tn;
         block_id                blknum;
         unsigned short          bsiz;
 	unsigned short 		filler_short; /* To make the 8 byte alignment requirement. It's ok to have 6 byte filler for the
@@ -509,7 +509,7 @@ typedef struct
 {
 	uint4			pini_addr;
 	uint4			short_time;
-	trans_num		tn;
+	trans_num_4byte		tn;
 	int4			filler_int4; /* To make the next field token to start at 8 byte boundary */
 	seq_num			jnl_seqno;
 } struct_jrec_epoch;
@@ -517,7 +517,7 @@ typedef struct
 typedef struct
 {
 	jnl_process_vector	process_vector;
-	trans_num		tn;
+	trans_num_4byte		tn;
 	int4			filler_int4;	/* to make the next field (jnl_seqno) 8-byte aligned */
 	seq_num			jnl_seqno;
 } struct_jrec_eof;

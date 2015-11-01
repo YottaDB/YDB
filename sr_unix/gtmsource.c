@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,10 @@
 
 #include "mdef.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
+#include "gtm_inet.h"
 #include <sys/mman.h>
-#include <fcntl.h>
-#include <unistd.h>
+#include "gtm_fcntl.h"
+#include "gtm_unistd.h"
 #include <errno.h>
 #include <sys/sem.h>
 #include <sys/wait.h>
@@ -46,7 +45,6 @@
 #include "send_msg.h"
 #include "is_proc_alive.h"
 #include "gtmmsg.h"
-#include "wcs_flu.h"
 #include "sgtm_putmsg.h"
 #include "repl_comm.h"
 #include "repl_instance.h"
@@ -78,6 +76,8 @@ GBLREF unsigned char	*gtmsource_tcombuff_start;
 GBLREF uchar_ptr_t	repl_filter_buff;
 GBLREF int		repl_filter_bufsiz;
 GBLREF int		gtmsource_srv_count;
+GBLREF boolean_t	primary_side_std_null_coll;
+GBLREF uint4		log_interval;
 
 int gtmsource()
 {
@@ -97,6 +97,7 @@ int gtmsource()
 	error_def(ERR_TEXT);
 	error_def(ERR_REPLINFO);
 	error_def(ERR_REPLOFFJNLON);
+	error_def(ERR_NULLCOLLDIFF);
 
 	memset((uchar_ptr_t)&jnlpool, 0, sizeof(jnlpool_addrs));
 	call_on_signal = gtmsource_sigstop;
@@ -131,6 +132,7 @@ int gtmsource()
 	}
 	assert(gtmsource_options.start);
 	strcpy(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file);
+	jnlpool.gtmsource_local->log_interval = log_interval = gtmsource_options.src_log_interval;
 	jnlpool.gtmsource_local->mode = gtmsource_options.mode;
 	if (GTMSOURCE_MODE_ACTIVE == gtmsource_options.mode)
 	{
@@ -215,6 +217,21 @@ int gtmsource()
 		gtm_putmsg(VARLSTCNT(1) ERR_NOTALLDBOPN);
 		gtmsource_autoshutdown();
 	}
+	/* Determine primary side null subscripts collation order */
+	/* Also check whether all regions have same null collation order */
+	primary_side_std_null_coll = -1;
+	for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
+	{
+		csa = &FILE_INFO(reg)->s_addrs;
+		if (primary_side_std_null_coll != csa->hdr->std_null_coll)
+		{
+			if (-1 == primary_side_std_null_coll)
+				primary_side_std_null_coll = csa->hdr->std_null_coll;
+			else
+				rts_error(VARLSTCNT(1) ERR_NULLCOLLDIFF);
+		}
+	}
+
 	EXIT_IF_REPLOFF_JNLON(gd_header);
 	if (jnlpool_inited)
 		gtmsource_seqno_init();
@@ -261,7 +278,7 @@ int gtmsource()
 	region_top = gd_header->regions + gd_header->n_regions;
 	for (reg = gd_header->regions; reg < region_top; reg++)
 	{
-		if (reg->read_only && REPL_ENABLED(FILE_INFO(reg)->s_addrs.hdr))
+		if (reg->read_only && REPL_ALLOWED(FILE_INFO(reg)->s_addrs.hdr))
 		{
 			gtm_putmsg(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				   RTS_ERROR_LITERAL("Source Server does not have write permissions to one or "
@@ -304,11 +321,6 @@ int gtmsource()
 			    RTS_ERROR_LITERAL("GTM Replication Source Server now in ACTIVE mode"));
 		repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
-		for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
-		{
-			TP_CHANGE_REG(reg);
-			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-		}
 		if (SS_NORMAL != (status = gtmsource_alloc_tcombuff()))
 			rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				  RTS_ERROR_LITERAL("Error allocating initial tcom buffer space. Malloc error"), status);
@@ -329,7 +341,7 @@ int gtmsource()
 		{
 			assert(reg->open);
 			csa = &FILE_INFO(reg)->s_addrs;
-			if (REPL_ENABLED(csa->hdr))
+			if (REPL_ALLOWED(csa->hdr))
 			{
 				if (QWLT(resync_seqno, csa->hdr->resync_seqno))
 					QWASSIGN(resync_seqno, csa->hdr->resync_seqno);
@@ -362,11 +374,6 @@ int gtmsource()
 			repl_close(&gtmsource_sock_fd);
 		if (gtmsource_filter & EXTERNAL_FILTER)
 			repl_stop_filter();
-		for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
-		{
-			TP_CHANGE_REG(reg);
-			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-		}
 	} while (TRUE);
 	gtmsource_end();
 	return(SS_NORMAL);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "release_name.h"
 
@@ -137,6 +138,16 @@ LITDEF char gtm_product[]        = GTM_PRODUCT;
 LITDEF int4 gtm_product_len      = sizeof(GTM_PRODUCT) - 1;
 LITDEF char gtm_version[]        = GTM_VERSION;
 LITDEF int4 gtm_version_len      = sizeof(GTM_VERSION) - 1;
+
+/* Indexed by enum db_ver in gdsdbver.h. Note that a db_ver value can be -1 but only in
+   the internal context of incremental/stream backup so the value should never appear where
+   this table is being indexed (suggest asserts for index being > 0 at usage points).
+*/
+LITDEF char *gtm_dbversion_table[] =
+{
+	"V4",
+	"V5"
+};
 
 LITDEF int4 ten_pwr[10] = { 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000 } ;
 LITDEF unsigned char lower_to_upper_table[] =

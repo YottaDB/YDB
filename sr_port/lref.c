@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,11 +17,10 @@
 #include "advancewindow.h"
 #include "gtm_caseconv.h"
 
-GBLREF char window_token;
-GBLREF mident window_ident;
+GBLREF char 	window_token;
+GBLREF mident 	window_ident;
 GBLREF command_qualifier cmd_qlf;
-
-static readonly mident zero_ident;	/* the null mident */
+LITREF mident 	zero_ident;
 
 int lref(oprtype *label,oprtype *offset,bool no_lab_ok,mint commarg_code,bool commarg_ok,bool *got_some)
 {
@@ -38,8 +37,8 @@ int lref(oprtype *label,oprtype *offset,bool no_lab_ok,mint commarg_code,bool co
 	case TK_IDENT:
 		*got_some = TRUE;
 		if (!(cmd_qlf.qlf & CQ_LOWER_LABELS))
-			lower_to_upper((uchar_ptr_t)&window_ident.c[0],(uchar_ptr_t)&window_ident.c[0],sizeof(mident));
-		*label = put_str(&window_ident.c[0],sizeof(mident));
+			lower_to_upper((uchar_ptr_t)window_ident.addr, (uchar_ptr_t)window_ident.addr, window_ident.len);
+		*label = put_str(window_ident.addr, window_ident.len);
 		advancewindow();
 		break;
 	case TK_ATSIGN:
@@ -59,7 +58,7 @@ int lref(oprtype *label,oprtype *offset,bool no_lab_ok,mint commarg_code,bool co
 	case TK_CIRCUMFLEX:
 		return TRUE;
 	case TK_PLUS:
-		*label = put_str(&zero_ident.c[0],sizeof(mident));
+		*label = put_str(zero_ident.addr, zero_ident.len);
 		if (no_lab_ok)
 			break;
 		/* caution: fall through */

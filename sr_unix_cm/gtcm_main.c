@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,6 +77,7 @@ int main(int argc, char_ptr_t argv[])
 {
     omi_conn_ll	  conns;
     bool	  set_pset();
+    int 	ret_val;
 
     ctxt = NULL;
     gtm_env_init(); /* read in all environment variables before calling any function particularly malloc (from err_init below)*/
@@ -103,8 +104,10 @@ int main(int argc, char_ptr_t argv[])
 	exit(omi_errno);
 
 /*  Initialize the network interface */
-    if (gtcm_bgn_net(&conns) < 0) {
-	gtcm_rep_err("Error initializing TCP",errno);
+    if ((ret_val = gtcm_bgn_net(&conns)) != 0)
+    {
+	gtcm_rep_err("Error initializing TCP", ret_val);
+	gtcm_exi_condition = ret_val;
 	gtcm_exit();
     }
 

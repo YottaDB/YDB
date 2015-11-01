@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,9 +21,9 @@
 #include "gdsfhead.h"
 #include "cryptdef.h"
 #include "filestruct.h"
-#include "gvcst_init.h"
 #include "targ_alloc.h"
 #include "gvusr.h"
+#include "gvcst_protos.h"	/* for gvcst_init prototype */
 
 GBLREF int4		lkid;
 GBLREF bool		licensed ;
@@ -97,7 +97,7 @@ void gv_init_reg (gd_region *reg)
 			csa = (sgmnt_addrs*)&FILE_INFO(reg)->s_addrs;
 			if (NULL == csa->dir_tree)
 			{
-				csa->dir_tree = (gv_namehead*)targ_alloc(reg->max_key_size);
+				csa->dir_tree = (gv_namehead*)targ_alloc(reg->max_key_size, NULL);
 				g = csa->dir_tree;
 				g->gd_reg = reg;
 				g->root = DIR_ROOT;

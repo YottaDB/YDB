@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +12,18 @@
 #include "mdef.h"
 #include "compiler.h"
 #include "rtnhdr.h"
+#include "obj_file.h"
 #include "cg_var.h"
+#include "stringpool.h"
+#include "hashtab.h"
+#include "hashtab_mname.h"
 
-void cg_var(mvar *l, VAR_TABENT **p)
+GBLREF spdesc stringpool;
+
+void cg_var(mvar *v, var_tabent **p)
 {	/* Copy mident with variable name to variable table entry */
-	(*p)[l->mvidx] = l->mvname;
-	return;
+	assert(stringpool.base <= (unsigned char *)v->mvname.addr && (unsigned char *)v->mvname.addr < stringpool.top);
+	(*p)[v->mvidx].var_name = v->mvname;
+	COMPUTE_HASH_MNAME(&((*p)[v->mvidx]));
+	(*p)[v->mvidx].var_name.addr = (char *)(v->mvname.addr - (char *)stringpool.base);
 }

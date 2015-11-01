@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,9 +22,7 @@
 #include "jnl.h"
 #include "jnl_write.h"
 #include "gtmimagename.h"
-#include "hashdef.h"	/* for muprec.h */
-#include "buddy_list.h"	/* for muprec.h */
-#include "muprec.h"
+#include "jnl_get_checksum.h"
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	jnl_process_vector	*prc_vec;
@@ -53,11 +51,11 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 	}
 	pini_record.prefix.time = jgbl.gbl_jrec_time;
 	JNL_WHOLE_FROM_SHORT_TIME(prc_vec->jpv_time, jgbl.gbl_jrec_time);
+	pini_record.prefix.checksum = INIT_CHECKSUM_SEED;
 	/* Note that only pini_record.prefix.time is considered in mupip journal command processing.
 	 * prc_vec->jpv_time is for accounting purpose only. Usually it is kind of redundant too. */
 	if (!jgbl.forw_phase_recovery)
 	{
-		csa->jnl->regnum = ++jnl_fence_ctl.total_regions;
 		if (GTCM_GNP_SERVER_IMAGE == image_type && NULL != originator_prc_vec)
 		{
 			memcpy((unsigned char*)&pini_record.process_vector[ORIG_JPV],

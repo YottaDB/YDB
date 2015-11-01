@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -186,45 +186,36 @@ enum
  */
 typedef struct
 {
-	uint4	gtmsource_pid;
-	int4	filler1;
+	uint4		gtmsource_pid;	/* Process identification of source server */
+	int4		filler1;	/* Keep read_addr 8-byte aligned */
 
  	/* Control fields */
-	qw_off_t read_addr; 	/* Virtual address of the next journal record
-			    	 * in the merged journal file to read */
-	seq_num	read_jnl_seqno; /* Next jnl_seqno to be read */
-	uint4	read; 		/* Offset relative to jnldata_base_off of
-				 * the next journal record from
-				 * the journal pool */
-	int4 	read_state;  	/* From where to read - pool or the file(s)? */
-	int4	mode; 		/* Active, or Passive */
-	int4	lastsent_time;
-	seq_num	lastsent_jnl_seqno; /* Last sent transaction identifier */
+	qw_off_t 	read_addr; 	/* Virtual address of the next journal record in the merged journal file to read */
+	seq_num		read_jnl_seqno; /* Next jnl_seqno to be read */
+	uint4		read; 		/* Offset relative to jnldata_base_off of the next journal record from the journal pool */
+	int4 		read_state;  	/* From where to read - pool or the file(s)? */
+	int4		mode; 		/* Active, or Passive */
+	int4		lastsent_time;	/* Currently unused, Vinaya 2005/02/08 */
+	seq_num		lastsent_jnl_seqno; /* Currently unsued, Vinaya 2005/02/08 */
 
-	/*
- 	 * Data items used in communicating action qualifiers (show statistics,
-	 * shutdown, etc) and qualifier values (log file, shutdown time, the
-	 * identity of the secondary system, etc).
+	/* Data items used in communicating action qualifiers (show statistics, shutdown, etc) and qualifier values
+	 * (log file, shutdown time, the identity of the secondary system, etc).
  	 */
 
-	uint4			statslog; /* Boolean - detailed log on/off? */
-	uint4			shutdown; /* Use to communicate shutdown
-					   * related values */
-	int4			shutdown_time; /* Time allowed for shutdown
-						* in seconds */
-	uint4			secondary_inet_addr; /* IP address of the
-						      * secondary */
-	uint4			secondary_port;	/* Port at which Receiver
-						 * is listening */
-	uint4			changelog; /* Boolean - change the log file */
-	int4			connect_parms[GTMSOURCE_CONN_PARMS_COUNT];
-					/* Connect failure tries parms.
-					 * Add fillers (if necessary) based on
-					 * GTMSOURCE_CONN_PARMS_COUNT */
-	char			secondary[MAX_HOST_NAME_LEN];
-	char			filter_cmd[MAX_FILTER_CMD_LEN];
-	char			log_file[MAX_FN_LEN + 1];
-	char			statslog_file[MAX_FN_LEN + 1];
+	uint4		statslog;	/* Boolean - detailed log on/off? */
+	uint4		shutdown;	/* Use to communicate shutdown related values */
+	int4		shutdown_time;	/* Time allowed for shutdown in seconds */
+	uint4		secondary_inet_addr; /* IP address of the secondary */
+	uint4		secondary_port;	/* Port at which Receiver is listening */
+	uint4		changelog; 	/* change the log file or log interval */
+	uint4		log_interval;	/* seqno count interval at which source server prints messages about replic traffic */
+	uint4		filler2;	/* make gtmsource_local_struct size multiple of 8 bytes */
+	int4		connect_parms[GTMSOURCE_CONN_PARMS_COUNT]; /* Connect failure tries parms. Add fillers (if necessary)
+								    * based on GTMSOURCE_CONN_PARMS_COUNT */
+	char		secondary[MAX_HOST_NAME_LEN];
+	char		filter_cmd[MAX_FILTER_CMD_LEN];
+	char		log_file[MAX_FN_LEN + 1];
+	char		statslog_file[MAX_FN_LEN + 1];
 } gtmsource_local_struct;
 
 #if defined(__osf__) && defined(__alpha)
@@ -255,7 +246,9 @@ typedef gtmsource_local_struct *gtmsource_local_ptr_t;
  * to (~JNL_WRT_END_MASK + 1)-byte boundary
  */
 
-#define JNLDATA_BASE_OFF	((sizeof(jnlpool_ctl_struct) +\
+#define JNLPOOL_CTL_SIZE	ROUND_UP(sizeof(jnlpool_ctl_struct), CACHELINE_SIZE) /* align crit semaphore at cache line */
+
+#define JNLDATA_BASE_OFF	((JNLPOOL_CTL_SIZE +\
 				  CRIT_SPACE +\
 				  sizeof(mutex_spin_parms_struct) +\
 				  sizeof(node_local) +\
@@ -316,6 +309,7 @@ typedef struct
 	int4		mode;
 	in_addr_t       sec_inet_addr; /* 32 bits */
 	int4		secondary_port;
+	uint4		src_log_interval;
 	int4		connect_parms[GTMSOURCE_CONN_PARMS_COUNT];
 	char            filter_cmd[MAX_FILTER_CMD_LEN];
 	char            secondary_host[MAX_HOST_NAME_LEN];
@@ -327,9 +321,9 @@ typedef struct
 	for (reg = gd_header->regions; reg < region_top; reg++)				\
 	{										\
 		csa = &FILE_INFO(reg)->s_addrs;						\
-		if (!REPL_ENABLED(csa) && JNL_ALLOWED(csa))				\
+		if (!REPL_ALLOWED(csa) && JNL_ALLOWED(csa))				\
 		{									\
-		 	gtm_putmsg(VARLSTCNT(4) ERR_REPLOFFJNLON, 2, REG_LEN_STR(reg));	\
+		 	gtm_putmsg(VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(reg));	\
 			gtmsource_autoshutdown();					\
 		}									\
 	}
@@ -337,7 +331,7 @@ typedef struct
 #define UPDATE_RESYNC_SEQNO(REGION, pre_update, post_update)							\
 { /* modifies csa, was_crit; uses pre_update, post_update */							\
 	csa = &FILE_INFO(REGION)->s_addrs;									\
-	if (REPL_ENABLED(csa->hdr))										\
+	if (REPL_ALLOWED(csa->hdr))										\
 	{ /* Although csa->hdr->resync_seqno is only modified by the source					\
 	   * server and never concurrently, it is accessed by fileheader_sync() which				\
 	   * does it while in crit. To avoid the latter from reading an inconsistent				\
@@ -410,5 +404,6 @@ int		gtmsource_process_heartbeat(repl_heartbeat_msg_t *heartbeat_msg);
 int		gtmsource_send_heartbeat(time_t *now);
 int		gtmsource_stop_heartbeat(void);
 void		gtmsource_flush_fh(seq_num resync_seqno);
+void		gtmsource_reinit_logseqno(void);
 
 #endif /* GTMSOURCE_H */

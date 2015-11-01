@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,10 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"
 #include "lv_val.h"
 #include "sbs_blk.h"
 #include "q_nxt_val_node.h"
+GBLREF boolean_t 	local_collseq_stdnull;
 
 void q_nxt_val_node (lv_sbs_srch_hist **hpp)		/* guard the size of history? */
 {
@@ -55,7 +56,7 @@ void q_nxt_val_node (lv_sbs_srch_hist **hpp)		/* guard the size of history? */
 		(*hpp)++;
 		h1 = *hpp;
 		assert (tbl);
-		if (tbl->num)
+		if ((!local_collseq_stdnull || !tbl->str || 0 != tbl->str->ptr.sbs_str[0].str.len) && tbl->num)
 		{
 			assert (tbl->num->cnt);
 			if (tbl->int_flag)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,6 @@
 #include "gdsfhead.h"
 #include "rc_nspace.h"
 #include "iosp.h"
-#include "hashdef.h"
 #include "copy.h"
 #include "rc_oflow.h"
 #include "error.h"
@@ -33,11 +32,11 @@
 #include "gtcm.h"
 #include "omi.h"
 #include "io.h"
-#include "gvcst_init.h"
-#include "gvcst_get.h"
+#include "gvcst_protos.h"	/* for gvcst_get,gvcst_init prototype */
 #include "change_reg.h"
 #include "mvalconv.h"
 #include "trans_log_name.h"
+#include "hashtab_mname.h"
 
 /* TEMPORARY CONSTANT - minimum value of the database RC_RESERVED field */
 #define RC_RESERVED	128
@@ -145,14 +144,14 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	dsid_list->gda->max_rec_size = gv_cur_region->max_rec_size;
 	map = dsid_list->gda->maps;
 	map ++;
-	memset(map->name,0,MAX_NM_LEN);
+	memset(map->name, 0, sizeof(map->name));
 	map->name[0] = '%';
 	map->reg.addr = gv_cur_region;
 	map++;
 	map->reg.addr = gv_cur_region;
-	memset(map->name,-1,MAX_NM_LEN);
-	dsid_list->gda->tab_ptr = (htab_desc *)malloc(sizeof(htab_desc));
-	ht_init(dsid_list->gda->tab_ptr,0);
+	memset(map->name, -1, sizeof(map->name));
+	dsid_list->gda->tab_ptr = (hash_table_mname *)malloc(sizeof(hash_table_mname));
+	init_hashtab_mname(dsid_list->gda->tab_ptr, 0);
 	change_reg();
 	if (rc_overflow->top < cs_addrs->hdr->blk_size)
 	{	if (rc_overflow->buff)
@@ -292,14 +291,14 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	fdi_ptr->gda->max_rec_size = gv_cur_region->max_rec_size;
 	map = fdi_ptr->gda->maps;
 	map ++;
-	memset(map->name,0,MAX_NM_LEN);
+	memset(map->name, 0, sizeof(map->name));
 	map->name[0] = '%';
 	map->reg.addr = gv_cur_region;
 	map++;
 	map->reg.addr = gv_cur_region;
-	memset(map->name,-1,MAX_NM_LEN);
-	fdi_ptr->gda->tab_ptr = (htab_desc *)malloc(sizeof(htab_desc));
-	ht_init(fdi_ptr->gda->tab_ptr,0);
+	memset(map->name, -1, sizeof(map->name));
+	fdi_ptr->gda->tab_ptr = (hash_table_mname *)malloc(sizeof(hash_table_mname));
+	init_hashtab_mname(fdi_ptr->gda->tab_ptr, 0);
 	fdi_ptr->next = dsid_list->next;
 	dsid_list->next = fdi_ptr;
     }

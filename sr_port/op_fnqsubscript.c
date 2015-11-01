@@ -1,5 +1,5 @@
 /****************************************************************
- *      Copyright 2001 Sanchez Computer Associates, Inc.        *
+ *      Copyright 2001, 2004 Sanchez Computer Associates, Inc.        *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -57,7 +57,7 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 	srcmval = *src;
 	src = &srcmval;		/* Copy of source mval in case same as dst mval */
 	dst->str.len = 0;
-	dst->str.addr = stringpool.free;
+	dst->str.addr = (char *)stringpool.free;
 	dst->mvtype = MV_STR;
 	if (-1 == seq)
 	{

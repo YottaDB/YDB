@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +9,9 @@
  *								*
  ****************************************************************/
 
-daemon_ch()
-{
+void	daemon_ch(void);	/* prototype to avoid warning */
 
+void	daemon_ch(void)
+{
 	return; /* No longer used */
 }

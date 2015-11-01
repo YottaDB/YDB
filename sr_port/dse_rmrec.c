@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,6 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -48,7 +47,7 @@ GBLREF srch_hist	dummy_hist;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
 GBLREF block_id 	patch_curr_blk;
-GBLREF char 		patch_comp_key[256];
+GBLREF char 		patch_comp_key[MAX_KEY_SZ + 1];
 GBLREF unsigned char 	patch_comp_count;
 GBLREF cw_set_element   cw_set[];
 GBLREF unsigned char	*non_tp_jfb_buff_ptr;
@@ -57,15 +56,18 @@ void dse_rmrec(void)
 {
 	block_id	blk;
 	blk_segment	*bs1, *bs_ptr;
-	int4		blk_seg_cnt, blk_size, count;
-	sm_uc_ptr_t	bp;
+	int4		blk_seg_cnt, blk_size;
+	int4		count;
 	uchar_ptr_t	lbp, b_top, rp, r_top, key_top, rp_base;
-	char		cc, comp_key[256], cc_base;
+	char		comp_key[MAX_KEY_SZ + 1];
+	unsigned char	cc, cc_base;
 	short int	size, i, rsize;
 	cw_set_element	*cse;
-	error_def(ERR_DSEFAIL);
-	error_def(ERR_DSEBLKRDFAIL);
+	srch_blk_status	blkhist;
+
 	error_def(ERR_DBRDONLY);
+	error_def(ERR_DSEBLKRDFAIL);
+	error_def(ERR_DSEFAIL);
 
         if (gv_cur_region->read_only)
                 rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
@@ -74,7 +76,7 @@ void dse_rmrec(void)
 	update_array_ptr = update_array;
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
-		if(!cli_get_hex("BLOCK", &blk))
+		if(!cli_get_hex("BLOCK", (uint4 *)&blk))
 			return;
 		if (blk < 0 || blk >= cs_addrs->ti->total_blks || !(blk % cs_addrs->hdr->bplmap))
 		{
@@ -85,16 +87,17 @@ void dse_rmrec(void)
 	}
 	if (cli_present("COUNT") == CLI_PRESENT)
 	{
-		if (!cli_get_hex("COUNT", &count) || count < 1)
+		if (!cli_get_hex("COUNT", (uint4 *)&count) || count < 1)
 			return;
 	} else
 		count = 1;
 	t_begin_crit(ERR_DSEFAIL);
 	blk_size = cs_addrs->hdr->blk_size;
-	if(!(bp = t_qread(patch_curr_blk, &dummy_hist.h[0].cycle, &dummy_hist.h[0].cr)))
+	blkhist.blk_num = patch_curr_blk;
+	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	lbp = (uchar_ptr_t)malloc(blk_size);
-	memcpy(lbp, bp, blk_size);
+	memcpy(lbp, blkhist.buffaddr, blk_size);
 
 	if (((blk_hdr_ptr_t)lbp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = lbp + cs_addrs->hdr->blk_size;
@@ -128,7 +131,8 @@ void dse_rmrec(void)
 		if (r_top >= b_top)
 		{
 			if (count)
-			{	if (((blk_hdr_ptr_t) lbp)->levl)
+			{
+				if (((blk_hdr_ptr_t) lbp)->levl)
 					util_out_print("Warning:  removed a star record from the end of this block.", TRUE);
 				((blk_hdr_ptr_t)lbp)->bsiz = rp_base - lbp;
 				BLK_INIT(bs_ptr, bs1);
@@ -141,7 +145,7 @@ void dse_rmrec(void)
 					t_abort(gv_cur_region, cs_addrs);
 					return;
 				}
-				t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
+				t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
 				BUILD_AIMG_IF_JNL_ENABLED(cs_addrs, cs_data, non_tp_jfb_buff_ptr, cse);
 				t_end(&dummy_hist, 0);
 				free(lbp);
@@ -162,10 +166,10 @@ void dse_rmrec(void)
 		else
 			cc = ((rec_hdr_ptr_t)rp)->cmpc;
 		size = key_top - rp - sizeof(rec_hdr);
+		if (size > sizeof(patch_comp_key) - 2 - cc)
+			size = sizeof(patch_comp_key) - 2 - cc;
 		if (size < 0)
 			size = 0;
-		else if (size > sizeof(patch_comp_key) - 2)
-			size = sizeof(patch_comp_key) - 2;
 		memcpy(&patch_comp_key[cc], rp + sizeof(rec_hdr), size);
 		patch_comp_count = cc + size;
 		if (--count >= 0)
@@ -191,7 +195,7 @@ void dse_rmrec(void)
 			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
-		t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
+		t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
 		BUILD_AIMG_IF_JNL_ENABLED(cs_addrs, cs_data, non_tp_jfb_buff_ptr, cse);
 		t_end(&dummy_hist, 0);
 		free(lbp);

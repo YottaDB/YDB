@@ -29,7 +29,6 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "muextr.h"
-#include "hashdef.h"
 #include "cli.h"
 #include "io.h"
 #include "iosp.h"
@@ -69,6 +68,21 @@ static readonly mval		null_str = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, 0, 0, 0);
 static char			outfilename[256];
 static unsigned short		filename_len;
 
+#define	WRITE_NUMERIC(nmfield)						\
+{									\
+	MV_FORCE_MVAL(&val, nmfield);					\
+	stringpool.free = stringpool.base;				\
+	n2s(&val);							\
+	if (val.mvtype & MV_NUM_APPROX)					\
+		GTMASSERT;						\
+	if (val.str.len > BIN_HEADER_NUMSZ)				\
+		GTMASSERT;						\
+	for (iter = val.str.len;  iter < BIN_HEADER_NUMSZ;  iter++)	\
+		*outptr++ = '0';					\
+	memcpy(outptr, val.str.addr, val.str.len);			\
+	outptr += val.str.len;						\
+}
+
 CONDITION_HANDLER(mu_extract_handler)
 {
 	mval				op_val, op_pars;
@@ -99,11 +113,13 @@ CONDITION_HANDLER(mu_extract_handler1)
 void mu_extract(void)
 {
 	int 				stat_res, truncate_res;
-	int				reg_max_rec, reg_max_key, reg_max_blk, iter, format, local_errno, int_nlen;
+	int				reg_max_rec, reg_max_key, reg_max_blk, reg_std_null_coll;
+	int				iter, format, local_errno, int_nlen;
 	boolean_t			freeze = FALSE, logqualifier, success;
 	char				format_buffer[FORMAT_STR_MAX_SIZE],  ch_set_name[MAX_CHSET_NAME], cli_buff[MAX_LINE],
-					label_buff[LABEL_STR_MAX_SIZE], gbl_name_buff[sizeof(mident) + 2]; /* 2 for null and '^' */
+					label_buff[LABEL_STR_MAX_SIZE], gbl_name_buff[MAX_MIDENT_LEN + 2]; /* 2 for null and '^' */
 	glist				gl_head, *gl_ptr;
+	gd_region			*reg, *region_top;
 	mu_extr_stats			global_total, grand_total;
 	uint4				item_code, devbufsiz, maxfield;
 	unsigned short			label_len, n_len, ch_set_len;
@@ -130,6 +146,7 @@ void mu_extract(void)
 	error_def(ERR_MUNOACTION);
 	error_def(ERR_MUNOFINISH);
 	error_def(ERR_RECORDSTAT);
+	error_def(ERR_NULLCOLLDIFF);
 
         /* Initialize all local character arrays to zero before using */
 
@@ -193,6 +210,28 @@ void mu_extract(void)
                 rts_error(VARLSTCNT(1) ERR_NOSELECT);
                 mupip_exit(ERR_NOSELECT);
         }
+	/* For binary format, check whether all regions have same null collation order */
+	if (MU_FMT_BINARY == format)
+	{
+		for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions, reg_std_null_coll = -1;
+			reg < region_top ; reg++)
+		{
+			if (reg->open)
+			{
+				if (reg_std_null_coll != reg->std_null_coll)
+				{
+					if (reg_std_null_coll == -1)
+						reg_std_null_coll = reg->std_null_coll;
+					else
+					{
+						rts_error(VARLSTCNT(1) ERR_NULLCOLLDIFF);
+						mupip_exit(ERR_NULLCOLLDIFF);
+					}
+				}
+			}
+		}
+		assert(-1 != reg_std_null_coll);
+	}
 	grand_total.recknt = grand_total.reclen = grand_total.keylen = grand_total.datalen = 0;
 	global_total.recknt = global_total.reclen = global_total.keylen = global_total.datalen = 0;
 
@@ -229,11 +268,11 @@ void mu_extract(void)
 	{
 		/* binary header label format:
 		 *	fixed length text, fixed length date & time,
-		 *	fixed length max blk size, fixed length max rec size, fixed length max key size,
+		 *	fixed length max blk size, fixed length max rec size, fixed length max key size, fixed length std_null_coll
 		 *	32-byte padded user-supplied string
 		 */
 		outbuf = (unsigned char *)malloc(sizeof(BIN_HEADER_LABEL) + sizeof(BIN_HEADER_DATEFMT) - 1 +
-				3 * BIN_HEADER_NUMSZ + BIN_HEADER_LABELSZ);
+				4 * BIN_HEADER_NUMSZ + BIN_HEADER_LABELSZ);
 		outptr = outbuf;
 		memcpy(outptr, BIN_HEADER_LABEL, sizeof(BIN_HEADER_LABEL) - 1);
 		outptr += sizeof(BIN_HEADER_LABEL) - 1;
@@ -243,39 +282,12 @@ void mu_extract(void)
 		op_fnzdate(&val, (mval *)&mu_bin_datefmt, &null_str, &null_str, &val);
 		memcpy(outptr, val.str.addr, val.str.len);
 		outptr += val.str.len;
-		MV_FORCE_MVAL(&val, reg_max_blk);
-		stringpool.free = stringpool.base;
-		n2s(&val);
-		if (val.mvtype & MV_NUM_APPROX)
-			GTMASSERT;
-		if (val.str.len > BIN_HEADER_NUMSZ)
-			GTMASSERT;
-		for (iter = val.str.len;  iter < BIN_HEADER_NUMSZ;  iter++)
-			*outptr++ = '0';
-		memcpy(outptr, val.str.addr, val.str.len);
-		outptr += val.str.len;
-		MV_FORCE_MVAL(&val, reg_max_rec);
-		stringpool.free = stringpool.base;
-		n2s(&val);
-		if (val.mvtype & MV_NUM_APPROX)
-			GTMASSERT;
-		if (val.str.len > BIN_HEADER_NUMSZ)
-			GTMASSERT;
-		for (iter = val.str.len; iter < BIN_HEADER_NUMSZ; iter++)
-			*outptr++ = '0';
-		memcpy(outptr, val.str.addr, val.str.len);
-		outptr += val.str.len;
-		MV_FORCE_MVAL(&val, reg_max_rec);
-		stringpool.free = stringpool.base;
-		n2s(&val);
-		if (val.mvtype & MV_NUM_APPROX)
-			GTMASSERT;
-		if (val.str.len > BIN_HEADER_NUMSZ)
-			GTMASSERT;
-		for (iter = val.str.len;  iter < BIN_HEADER_NUMSZ;  iter++)
-			*outptr++ = '0';
-		memcpy(outptr, val.str.addr, val.str.len);
-		outptr += val.str.len;
+
+		WRITE_NUMERIC(reg_max_blk);
+		WRITE_NUMERIC(reg_max_rec);
+		WRITE_NUMERIC(reg_max_key);
+		WRITE_NUMERIC(reg_std_null_coll);
+
 		label_len = sizeof(label_buff);
 		if (FALSE == cli_get_str("LABEL", label_buff, &label_len))
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
 #include "gdsfhead.h"
 #include "stringpool.h"
 #include "op.h"
-#include "gvcst_order.h"
+#include "gvcst_protos.h"	/* for gvcst_order prototype */
 #include "gvsub2str.h"
 #include "gvcmx.h"
 #include "gvusr.h"
@@ -48,21 +48,31 @@ void op_gvnext(mval *v)
 		*(&gv_currkey->base[0] + gv_currkey->prev + 1) == 0xEE &&
 		*(&gv_currkey->base[0] + gv_currkey->prev + 2) == 0xFF)
 
-	{	*(&gv_currkey->base[0] + gv_currkey->prev) = 01;
-		*(char *)(&gv_currkey->base[0] + gv_currkey->prev + 1) = 0;
+	{
+		*(&gv_currkey->base[0] + gv_currkey->prev) = 01;
 		*(char *)(&gv_currkey->base[0] + gv_currkey->prev + 2) = 0;
-		gv_currkey->end -= 2;
+		if (0 == gv_cur_region->std_null_coll)
+		{
+			*(char *)(&gv_currkey->base[0] + gv_currkey->prev + 1) = 0;
+			gv_currkey->end -= 2;
+		} else
+		{
+			*(char *)(&gv_currkey->base[0] + gv_currkey->prev + 1) = 1;
+			*(char *)(&gv_currkey->base[0] + gv_currkey->prev + 3) = 0;
+			gv_currkey->end --;
+		}
 	}
 	else
-	{	if (gv_curr_subsc_null)
-		{	*(&gv_currkey->base[0] + gv_currkey->prev) = 01;
-		}
-		else
-		{	*(&gv_currkey->base[0] + gv_currkey->end - 1) = 1;
+	{
+		if (!gv_curr_subsc_null || gv_cur_region->std_null_coll )
+		{
+			*(&gv_currkey->base[0] + gv_currkey->end - 1) = 1;
 			*(&gv_currkey->base[0] + gv_currkey->end + 1) = 0;
-			gv_currkey->end++;
-		}
+			gv_currkey->end += 1;
+		} else
+			*(&gv_currkey->base[0] + gv_currkey->prev) = 01;
 	}
+
 	if (acc_meth == dba_bg || acc_meth == dba_mm)
 	{
 		if (gv_target->root)

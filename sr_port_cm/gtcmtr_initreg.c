@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,11 +17,11 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "cmidef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"    /* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "gtcmd.h"
 #include "gtcm_add_region.h"
-#include "gtcmtr_initreg.h"
+#include "gtcmtr_protos.h"
 
 GBLREF connection_struct *curr_entry;
 
@@ -31,6 +31,11 @@ bool gtcmtr_initreg(void)
 	cm_region_list	*list_entry;
 	unsigned char	*reply;
 	unsigned short temp_short;
+	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
+
+	error_def(ERR_UNIMPLOP);
+	error_def(ERR_TEXT);
+	error_def(ERR_GVIS);
 
 	assert(*curr_entry->clb_ptr->mbf == CMMS_S_INITREG);
 	region = gtcmd_ini_reg(curr_entry);
@@ -42,6 +47,24 @@ bool gtcmtr_initreg(void)
 		curr_entry->clb_ptr->mbf = (unsigned char *)malloc(region->reg->max_rec_size + CM_BUFFER_OVERHEAD);
 		curr_entry->clb_ptr->mbl = region->reg->max_rec_size + CM_BUFFER_OVERHEAD;
 	}
+	if (0 == curr_entry->cli_supp_allowexisting_stdnullcoll)
+	{
+		if (ALLOWEXISTING == region->reg->null_subs)
+		{
+			rts_error(VARLSTCNT(10) ERR_UNIMPLOP, 0,
+				ERR_TEXT, 2,
+				LEN_AND_LIT("Client does not support ALLOWEXISTING for null subscripts"),
+				ERR_TEXT, 2, DB_LEN_STR(region->reg));
+		}
+		if ( 0 != region->reg->std_null_coll)
+		{
+			rts_error(VARLSTCNT(10) ERR_UNIMPLOP, 0,
+				ERR_TEXT, 2,
+				LEN_AND_LIT("Client does not support standard null collation for null subscripts"),
+				ERR_TEXT, 2, DB_LEN_STR(region->reg));
+		}
+	}
+
 	reply = curr_entry->clb_ptr->mbf;
 	*reply++ = CMMS_T_REGNUM;
 	*reply++ = curr_entry->current_region->regnum;
@@ -54,6 +77,8 @@ bool gtcmtr_initreg(void)
 	assert((int4)temp_short == region->reg->max_key_size); /* ushort <- int4 assignment lossy? */
 	PUT_USHORT(reply, temp_short);
 	reply += sizeof(unsigned short);
+	if (curr_entry->cli_supp_allowexisting_stdnullcoll)
+		*reply++ = region->reg->std_null_coll;
 	curr_entry->clb_ptr->cbl = reply - curr_entry->clb_ptr->mbf;
 	return TRUE;
 }

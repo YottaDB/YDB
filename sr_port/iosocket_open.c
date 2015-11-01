@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,9 @@
 GBLREF 	tcp_library_struct	tcp_routines;
 GBLREF	d_socket_struct		*socket_pool;
 LITREF 	unsigned char		io_params_size[];
+GBLREF	io_pair			io_std_device;	/* standard device */
+
+#define ESTABLISHED		"ESTABLISHED"
 
 short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 timepar)
 {
@@ -56,7 +59,8 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 				ioerror_specified = FALSE,
 				delay_specified = FALSE,
 				nodelay_specified = FALSE,
-				ibfsize_specified = FALSE;
+				ibfsize_specified = FALSE,
+				is_principal = FALSE;	/* called from inetd */
 	unsigned char 		delimiter_buffer[MAX_N_DELIMITER * (MAX_DELIM_LEN + 1)], zff_buffer[MAX_ZFF_LEN];
 	char			ioerror, ip[3], tcp[4],
 				sock_handle[MAX_HANDLE_LEN], delimiter[MAX_DELIM_LEN + 1];
@@ -98,6 +102,10 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		ioptr->wrap	= TRUE;
 		if (-1 == iotcp_fillroutine())
 			assert(FALSE);
+		if (!io_std_device.in)
+		{	/* called from io_init */
+			is_principal = TRUE;
+		}
 	}
 	ioptr->dollar.zeof = FALSE;
 	newdsocket = *dsocketptr;
@@ -205,9 +213,9 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		rts_error(VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("DELAY"), LEN_AND_LIT("NODELAY"), LEN_AND_LIT("OPEN"));
 		return FALSE;
 	}
-	if (listen_specified || connect_specified)
+	if (listen_specified || connect_specified || is_principal)
 	{
-		if (NULL == (socketptr = iosocket_create(sockaddr, bfsize)))
+		if (NULL == (socketptr = iosocket_create(sockaddr, bfsize, is_principal ? file_des : -1)))
 			return FALSE;
 		assert(listen_specified == socketptr->passive);
 		if (ioerror_specified)
@@ -248,8 +256,24 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		free(socketptr);
 		return FALSE;
 	}
+	else if (is_principal)
+	{	/* fill in what bind or connect would */
+		strncpy(socketptr->local.saddr_ip, tcp_routines.aa_inet_ntoa(socketptr->local.sin.sin_addr),
+			sizeof(socketptr->local.saddr_ip));
+		strncpy(socketptr->remote.saddr_ip, tcp_routines.aa_inet_ntoa(socketptr->remote.sin.sin_addr),
+			sizeof(socketptr->remote.saddr_ip));
+		len = sizeof(ESTABLISHED) - 1;
+		memcpy(&newdsocket.dollar_key[0], ESTABLISHED, len);
+		newdsocket.dollar_key[len++] = '|';
+		memcpy(&newdsocket.dollar_key[len], socketptr->handle, socketptr->handle_len);
+		len += socketptr->handle_len;
+		newdsocket.dollar_key[len++] = '|';
+		memcpy(&newdsocket.dollar_key[len], socketptr->remote.saddr_ip, strlen(socketptr->remote.saddr_ip));
+		len += strlen(socketptr->remote.saddr_ip);
+		newdsocket.dollar_key[len++] = '\0';
+	}
 	/* commit the changes to the list */
-	if (listen_specified || connect_specified)
+	if (listen_specified || connect_specified || is_principal)
 	{
 		socketptr->dev = dsocketptr;
 		*dsocketptr = newdsocket;

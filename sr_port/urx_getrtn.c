@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@ bool urx_getrtn (char *rtn, int rtnlen, urx_rtnref **rp0p, urx_rtnref **rp1p, ur
 	{
 		c = rtnlen - rp1->len;
 		if (!c)
-			c = memcmp(rtn, rp1->name.c, rtnlen);
+			c = memcmp(rtn, &rp1->name[0], rtnlen);
 		if (c > 0)
 		{
 			rp0 = rp1;

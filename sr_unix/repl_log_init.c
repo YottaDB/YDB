@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,9 +14,9 @@
 #include "gtm_fcntl.h"
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
-#include <sys/stat.h>
-#include <errno.h>
+#include "gtm_stat.h"
 #include "gtm_string.h"
+#include <errno.h>
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -38,12 +38,14 @@ GBLDEF int		gtmsource_statslog_fd = -1;
 GBLDEF int		gtmrecv_log_fd = -1;
 GBLDEF int		gtmrecv_statslog_fd = -1;
 GBLDEF int		updproc_log_fd = -1;
+GBLDEF int		updhelper_log_fd = -1;
 
 GBLDEF FILE		*gtmsource_log_fp = NULL;
 GBLDEF FILE		*gtmsource_statslog_fp = NULL;
 GBLDEF FILE		*gtmrecv_log_fp = NULL;
 GBLDEF FILE		*gtmrecv_statslog_fp = NULL;
 GBLDEF FILE		*updproc_log_fp = NULL;
+GBLDEF FILE		*updhelper_log_fp = NULL;
 
 int repl_log_init(repl_log_file_t log_type,
 		  int *log_fd,

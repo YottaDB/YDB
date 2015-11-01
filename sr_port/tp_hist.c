@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +23,10 @@
 #include "filestruct.h"
 #include "copy.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "longcpy.h"
+#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
+#include "hashtab.h"
 #include "tp.h"
 #include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
@@ -35,19 +36,22 @@
 
 #define	REPOSITION_PTR(ptr, type, delta, begin, end)			\
 {									\
-	if (ptr)							\
-	{								\
-		assert((sm_uc_ptr_t)(ptr) >= (sm_uc_ptr_t)(begin));	\
-		assert((sm_uc_ptr_t)(ptr) <= (sm_uc_ptr_t)(end));	\
-		(ptr) = (type *)((sm_uc_ptr_t)(ptr) + delta);		\
-	}								\
+	assert((sm_uc_ptr_t)(ptr) >= (sm_uc_ptr_t)(begin));		\
+	assert((sm_uc_ptr_t)(ptr) <= (sm_uc_ptr_t)(end));		\
+	(ptr) = (type *)((sm_uc_ptr_t)(ptr) + delta);			\
 }
+
+#define	REPOSITION_PTR_IF_NOT_NULL(ptr, type, delta, begin, end)	\
+{									\
+	if (ptr)							\
+		REPOSITION_PTR(ptr, type, delta, begin, end);		\
+}
+
 
 GBLREF gv_namehead	*gv_target, *gv_target_list;
 GBLREF sgm_info		*sgm_info_ptr;
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF void		*hash_entry;	/* updated by add_hashtab_ent(). see comment in tp_hist for more details */
 GBLREF trans_num	local_tn;	/* transaction number for THIS PROCESS */
 GBLREF int4		n_pvtmods, n_blkmods;
 GBLREF unsigned int	t_tries;
@@ -55,6 +59,7 @@ GBLREF uint4		t_err;
 GBLREF int4		tprestart_syslog_delta;
 GBLREF	boolean_t	is_updproc;
 GBLREF	boolean_t	mupip_jnl_recover;
+GBLREF	boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 
 void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1);
 
@@ -69,6 +74,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	enum cdb_sc	status = cdb_sc_normal;
 	boolean_t	is_mm, store_history;
 	sgm_info	*si;
+	ht_ent_int4	*tabent;
 
 	error_def(ERR_TRANS2BIG);
 	error_def(ERR_GVKILLFAIL);
@@ -179,7 +185,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				 * even for BG due to the recent big-read TP changes).
 				 *
 				 * Also note that created and existing blocks are added in the hashtable
-				 * "sgm_info_ptr->blks_in_use". Since the add_hashtab_ent() routine expects
+				 * "sgm_info_ptr->blks_in_use". Since the add_hashtab_int4() routine expects
 				 * a pointer to the srch_blk_status element in the first_tp_hist array
 				 * where we are going to copy over the block's history, and since we want to have
 				 * common code wherever possible for both created and existing blocks, we pass in
@@ -194,13 +200,13 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				 * return only a NULL value in the "first_tp_srch_status" member of the block's
 				 * srch_blk_status. We assert this below. It is only because of this (that a created
 				 * block's first_tp_srch_status member will be NULL even though it may be added
-				 * already) that we need to do a check of the return value of add_hashtab_ent().
-				 * Otherwise, we should be guaranteed that add_hashtab_ent() always returns FALSE.
+				 * already) that we need to do a check of the return value of add_hashtab_int4().
+				 * Otherwise, we should be guaranteed that add_hashtab_int4() always returns FALSE.
 				 * We assert this in the else block.
 				 */
 				assert(!chain.flag || !local_hash_entry);
-				if (!local_hash_entry && TRUE == add_hashtab_ent(&si->blks_in_use,
-									(void *)blk, (void *)(si->last_tp_hist)))
+				if (!local_hash_entry && add_hashtab_int4(si->blks_in_use, (uint4 *)&blk,
+									(void *)(si->last_tp_hist), &tabent))
 				{	/* not a duplicate block */
 					if (++si->num_of_blks > si->tp_hist_size)
 					{	/* catch the case where MUPIP recover or update process gets into this situation */
@@ -233,13 +239,18 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						memcpy(si->last_tp_hist, t1, sizeof(srch_blk_status));
 						t1->first_tp_srch_status = si->last_tp_hist;
 						si->last_tp_hist++;
-						/* Ensure that if for a non-isolated global, we end up adding a leaf-level block
-						 * which has no corresponding cse to the history, we are doing an M-kill.
+						/* Ensure that we are doing an M-kill if for a non-isolated global we end up
+						 *	adding to the history a leaf-level block which has no corresponding cse.
 						 * To be more specific we are doing an M-kill that freed up the data block from
 						 * 	the B-tree, but that checking involves more coding.
+						 * The only exception to this is if we are in an M-set and the set was a duplicate
+						 *	set. Since we do not have that information (gvcst_put the caller has it),
+						 *	we do a less stringent check and ensure the optimization ("gvdupsetnoop"
+						 *	global variable) is turned on at the very least.
 						 */
 						assert(!t1->blk_target->noisolation || t1->level || t1->ptr ||
-								ERR_GVKILLFAIL == t_err);
+							((ERR_GVKILLFAIL == t_err)
+								|| ((ERR_GVPUTFAIL == t_err) && gvdupsetnoop)));
 					}
 				} else
 				{	/* While it is always true that in this part of the code atmost one of
@@ -264,7 +275,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 					 */
 					assert(!local_hash_entry || !chain.flag);
 					assert(chain.flag || local_hash_entry 	/* ensure we don't miss updating "ptr" */
-						|| ((srch_blk_status *)hash_entry)->ptr || !t1->ptr);
+						|| ((srch_blk_status *)(tabent->value)) || !t1->ptr);
 					assert(!local_hash_entry || !local_hash_entry->ptr || !t1->ptr ||
 						t1->ptr == local_hash_entry->ptr  ||
 						t1->ptr->low_tlevel == local_hash_entry->ptr);
@@ -290,11 +301,11 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 {
 	gv_namehead		*gvnh;
-	hashtab			*hptr;
-	hashtab_ent		*h_ent, *h_end;
+	ht_ent_int4 		*tabent, *topent;
 	sm_long_t               delta;
 	srch_blk_status 	*new_first_tp_hist, *t1;
 	tlevel_info		*tli;
+	srch_blk_status		*srch_stat;
 
 	assert(si->cur_tp_hist_size < si->tp_hist_size);
 	si->cur_tp_hist_size <<= 1;
@@ -302,11 +313,16 @@ void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 	longcpy((uchar_ptr_t)new_first_tp_hist, (uchar_ptr_t)si->first_tp_hist,
 		(sm_uc_ptr_t)si->last_tp_hist - (sm_uc_ptr_t)si->first_tp_hist);
 	delta = (sm_uc_ptr_t)new_first_tp_hist - (sm_uc_ptr_t)si->first_tp_hist;
-	hptr = si->blks_in_use;
-	for (h_ent = hptr->tbl, h_end = h_ent + hptr->size; h_ent < h_end; h_ent++)
-		REPOSITION_PTR(h_ent->v, mstr, delta, si->first_tp_hist, si->last_tp_hist);
+	for (tabent = si->blks_in_use->base, topent = si->blks_in_use->top; tabent < topent; tabent++)
+	{
+		if (HTENT_VALID_INT4(tabent, srch_blk_status, srch_stat))
+		{
+			REPOSITION_PTR(srch_stat, srch_blk_status, delta, si->first_tp_hist, si->last_tp_hist);
+			tabent->value = (void *)srch_stat;
+		}
+	}
 	for (tli = si->tlvl_info_head; tli; tli = tli->next_tlevel_info)
-		REPOSITION_PTR(tli->tlvl_tp_hist_info, srch_blk_status, delta, si->first_tp_hist, si->last_tp_hist);
+		REPOSITION_PTR_IF_NOT_NULL(tli->tlvl_tp_hist_info, srch_blk_status, delta, si->first_tp_hist, si->last_tp_hist);
 	for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
 	{
 		/* Bypass gv_targets not used in this transaction. Note that the gvnh == gv_target check done below is
@@ -318,7 +334,7 @@ void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 		if (gvnh->gd_reg == si->gv_cur_region)
 		{	/* reposition pointers only if global is of current region */
 			for (t1 = &gvnh->hist.h[0]; t1->blk_num; t1++)
-				REPOSITION_PTR(t1->first_tp_srch_status, struct srch_blk_status_struct,
+				REPOSITION_PTR_IF_NOT_NULL(t1->first_tp_srch_status, struct srch_blk_status_struct,
 								delta, si->first_tp_hist, si->last_tp_hist);
 		} else
 			assert((gvnh != gv_target) && (gvnh != cs_addrs->dir_tree));
@@ -327,7 +343,7 @@ void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 	if (NULL != hist1 && hist1 != &cs_addrs->dir_tree->hist)		/* ensure don't reposition directory tree again */
 	{
 		for (t1 = &hist1->h[0]; t1->blk_num; t1++)
-			REPOSITION_PTR(t1->first_tp_srch_status, struct srch_blk_status_struct,
+			REPOSITION_PTR_IF_NOT_NULL(t1->first_tp_srch_status, struct srch_blk_status_struct,
 									delta, si->first_tp_hist, si->last_tp_hist);
 	}
 	free(si->first_tp_hist);

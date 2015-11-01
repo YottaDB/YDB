@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "sbs_blk.h"
 #include "gdsroot.h"
@@ -29,8 +29,8 @@
 #include "gdscc.h"
 #include "copy.h"
 #include "jnl.h"
-#include "hashtab.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "merge_def.h"
 #include "gvname_info.h"
@@ -52,7 +52,7 @@ GBLREF bool		gv_curr_subsc_null;
 
 void lvzwr_out( mval *val)
 {
-	char 		*cp, *cq, buff;
+	char 		buff;
 	int 		n;
 	lv_val		*dst_lv, *res_lv;
 	mstr 		one;
@@ -70,11 +70,9 @@ void lvzwr_out( mval *val)
 		    return;
 		MV_FORCE_STR(val);
 		outdesc.mvtype = MV_STR;
-		outdesc.str.addr = cp = (char *)lvzwrite_block.curr_name;
-		for (cq = cp + sizeof(mident) ; cp < cq && *cp ; cp++)
-			;
-		outdesc.str.len = cp - outdesc.str.addr;
-		zshow_output(zwr_output,&outdesc.str);
+		outdesc.str.len = lvzwrite_block.curr_name->len;
+		outdesc.str.addr = lvzwrite_block.curr_name->addr;
+		zshow_output(zwr_output, &outdesc.str);
 		if (lvzwrite_block.curr_subsc)
 		{
 			*one.addr = '(';
@@ -107,7 +105,8 @@ void lvzwr_out( mval *val)
 				subscp = ((zwr_sub_lst *)lvzwrite_block.sub)->subsc_list[n].actual;
 				MV_FORCE_STR(subscp);
 				mval2subsc(subscp, gv_currkey);
-				if (!subscp->str.len && !gv_cur_region->null_subs)
+				if (!subscp->str.len &&
+					(ALWAYS != gv_cur_region->null_subs))
 					sgnl_gvnulsubsc();
 			}
 			MV_FORCE_STR(val);

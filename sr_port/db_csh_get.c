@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 #include "gdsbgtr.h"
 #include "cache.h"
 #include "hashtab.h"		/* needed for cws_insert.h */
+#include "hashtab_int4.h"	/* needed for cws_insert.h */
 #include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 
@@ -68,7 +69,8 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 		do
 		{
 			cr = (cache_rec_ptr_t)((sm_uc_ptr_t)cr + cr->blkque.fl);
-			assert(!CR_NOT_ALIGNED(cr, cr_low) && !CR_NOT_IN_RANGE(cr, cr_low, cr_high));
+			assert(!CR_NOT_ALIGNED(cr, cr_low) && !CR_NOT_IN_RANGE(cr, cr_low, cr_high)
+				UNIX_ONLY(|| is_mm));
 			if (BT_QUEHEAD == cr->blk)
 			{	/* We have reached the end of the queue, validate we have run the queue
 				 * back around to the same queue header or we'll need to retry because the

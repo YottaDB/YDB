@@ -13,6 +13,7 @@
 #include "compiler.h"
 #include "objlabel.h"
 #include "rtnhdr.h"
+#include "cache.h"
 #include "cgp.h"
 #include "stringpool.h"
 #include "copy.h"
@@ -28,17 +29,36 @@ GBLREF int4	sa_temps[];
 GBLREF int4	sa_temps_offset[];
 GBLREF char	cg_phase;	/* code generation phase */
 GBLREF char	cg_phase_last; 	/* previous code generation phase */
-GBLREF spdesc	stringpool,indr_stringpool;
+GBLREF spdesc	stringpool, indr_stringpool;
 
 GBLDEF unsigned char	*runtime_base;
 
+/**************  Indirect Object Code Format *************
+ *
+ *	+-------------------------+> aligned section boundary
+ *	| ihdtyp                  |
+ *	+-------------------------> aligned section boundary
+ *	| lit text pool           |
+ *	+--------------------------
+ *	| lit mval table          |
+ *	+--------------------------
+ *	| hdr_offset (4-byte)     |
+ *	+--------------------------
+ *	| validation (4-byte)     |
+ *	+--------------------------
+ *	| Executable Code         |
+ *	+--------------------------
+ *	| variable Table          |
+ *	+-------------------------+
+ *
+ ***************************************************/
+
 void	ind_code(mstr *obj)
 {
-	VAR_TABENT	*vptr;
+	var_tabent	*vptr;
 	ihdtyp		*itext;
-	int		indir_code_size, validation, hdr_offset;
-	int4		long_temp;
-	uint4		ulong_temp;
+	int		indir_code_size;
+	int4		validation, hdr_offset, long_temp;
 	unsigned char	*indr_base_addr;
 
 	assert(run_time);
@@ -48,46 +68,59 @@ void	ind_code(mstr *obj)
 	code_gen();
 	code_size = curr_addr;
 	cg_phase = CGP_ADDR_OPT;
-	indir_code_size = indr_stringpool.free - indr_stringpool.base +	/* literal strings */
-		mlitmax * sizeof(mval) +			/* literal mvals */
-		mvmax * sizeof(VAR_TABENT) +				/* variable table ents */
-		code_size +
-		(sizeof(int4) * 2) +				/* validation word and (neg) offset to ihdtyp */
-		(SECTION_ALIGN_BOUNDARY - 1);						/* Max amount for code alignment */
+#if (!defined(USHBIN_SUPPORTED) && !defined(VMS))  /* non-shared binary UNIX platforms */
+	shrink_jmps();
+#endif
+	indir_code_size =
+		(SECTION_ALIGN_BOUNDARY - 1) +	/* extra padding to align the beginning of the entire indirect object */
+		PADLEN(sizeof(ihdtyp), NATIVE_WSIZE) + /* extra padding to align the beginning of lit text pool */
+		ROUND_UP2(indr_stringpool.free - indr_stringpool.base, NATIVE_WSIZE) +	/* literal strings */
+		mlitmax * sizeof(mval) +	/* literal mval table aligned at NATIVE_WSIZE boundary */
+		(sizeof(int4) * 2) +		/* validation word and (neg) offset to ihdtyp */
+		code_size +			/* code already aligned at SECTION_ALIGN_BOUNDARY boundary */
+		mvmax * sizeof(var_tabent);	/* variable table ents */
 	if (stringpool.top - stringpool.free < indir_code_size)
 		stp_gcol(indir_code_size);
+	/* Align the beginning of the indirect object so that ihdtyp fields can be accessed normally */
+	stringpool.free = (unsigned char *)ROUND_UP2((uint4)stringpool.free, SECTION_ALIGN_BOUNDARY);
 	itext = (ihdtyp *)stringpool.free;
 	indr_base_addr = stringpool.free;
 	stringpool.free += sizeof(ihdtyp);
 	indir_lits(itext);
-	/* Runtime base needs to be set to approximately what it would have been set to below for shrink_trips to work
-	   correctly so do that here */
+	/* Runtime base (fp->ctxt) needs to be set to the beginning of the Executable code so that
+	 * the literal references are generated with appropriate (-ve) offsets from the base
+	 * register (fp->ctxt). On USHBIN_SUPPORTED platforms, runtime_base should be computed
+	 * before shrink_trips since it could be used in codegen of literals */
 	runtime_base = stringpool.free + sizeof(hdr_offset) + sizeof(validation);
+#if (defined(USHBIN_SUPPORTED) || defined(VMS))
 	shrink_trips();
-	hdr_offset = indr_base_addr - stringpool.free;		/* offset to ihdtyp */
-	emit_immed((char *)&hdr_offset, sizeof(hdr_offset));
-	validation = (GTM_OMAGIC << 16) + OBJ_LABEL;			/* Word to validate we are in right place */
-	emit_immed((char *)&validation, sizeof(validation));
-	/* runtime_base = stringpool.free; */
+#endif
+	assert(0 == PADLEN((uint4)stringpool.free, sizeof(int4)));
+	/* Since we know stringpool is aligned atleast at 4-byte boundary, copy both offset and validation
+	 * words with integer assignments instead of copying them by emit_immed(). */
+	hdr_offset = indr_base_addr - stringpool.free;		/* -ve offset to ihdtyp */
+	*(int4 *)stringpool.free = hdr_offset;
+	stringpool.free += sizeof(hdr_offset);
+	validation = MAGIC_COOKIE;			/* Word to validate we are in right place */
+	*(int4 *)stringpool.free = validation;
+	stringpool.free += sizeof(validation);
+
 	cg_phase = CGP_MACHINE;
 	code_gen();
-
-	/* itext->vartab_off = stringpool.free - indr_base_addr; */
 	long_temp = stringpool.free - indr_base_addr;
-	PUT_LONG(&(itext->vartab_off), long_temp);
-	/* itext->vartab_len = mvmax; */
-	long_temp = mvmax;
-	PUT_LONG(&(itext->vartab_len), long_temp);
-	vptr = (VAR_TABENT *) mcalloc(mvmax * sizeof(VAR_TABENT));
+	assert(0 == PADLEN(long_temp, sizeof(int4))); /* Just to make sure things are aligned for the vartab that follows */
+	/* variable table */
+	itext->vartab_off = long_temp;
+	itext->vartab_len = mvmax;
+	vptr = (var_tabent*)mcalloc(mvmax * sizeof(var_tabent));
 	if (mvartab)
-		walktree(mvartab, cg_var, (char *)&vptr);
-	emit_immed((char *) vptr, mvmax * sizeof(VAR_TABENT));
-	/* itext->temp_mvals = sa_temps[TVAL_REF]; */
-	long_temp = sa_temps[TVAL_REF];
-	PUT_LONG(&(itext->temp_mvals), long_temp);
-	/* itext->temp_size = sa_temps_offset[TCAD_REF]; */
-	ulong_temp = sa_temps_offset[TCAD_REF];
-	PUT_ULONG(&(itext->temp_size), ulong_temp);
+		walktree(mvartab, ind_cg_var, (char *)&vptr);
+	else
+		assert(0 == mvmax);
+	emit_immed((char *) vptr, mvmax * sizeof(var_tabent));
+
+	itext->temp_mvals = sa_temps[TVAL_REF];
+	itext->temp_size = sa_temps_offset[TCAD_REF];
 	/* indir_code_size may be greater than the actual resultant code size
 	   because expression coersion may cause some literals to be optimized
 	   away, leaving mlitmax greater than actual.
@@ -97,5 +130,5 @@ void	ind_code(mstr *obj)
 	   the code to its new home and do the necessary cleanup on it.
 	*/
 	obj->addr = (char *)indr_base_addr;
-	obj->len = indir_code_size;
+	obj->len = stringpool.free - indr_base_addr;
 }

@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashdef.h"
+#include "hashtab_mname.h"
 #include "lv_val.h"
 #include "sbs_blk.h"
 #include "gdsroot.h"
@@ -34,10 +34,88 @@
 
 #define eb_less(u, v)    (numcmp(u, v) < 0)
 
+#define COMMON_STR_PROCESSING											\
+{														\
+	mv.mvtype = MV_STR;											\
+	mv.str.len = 0; /* makes sure stp_gcol() ignores this, in case actual points to this */			\
+	if (local_collseq)											\
+	{													\
+		ALLOC_XFORM_BUFF(&s->str);									\
+		tmp_sbs.mvtype = MV_STR;									\
+		tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;							\
+		assert(NULL != lcl_coll_xform_buff);								\
+		tmp_sbs.str.addr = lcl_coll_xform_buff;								\
+		do_xform(local_collseq, XBACK, &s->str, &tmp_sbs.str, &length);					\
+		tmp_sbs.str.len = length;									\
+		s2pool(&(tmp_sbs.str));										\
+		mv.str = tmp_sbs.str;										\
+	} else													\
+		mv.str = s->str;										\
+	do_lev = TRUE;												\
+	if (n < lvzwrite_block.subsc_count)									\
+	{													\
+		if (zwr_sub->subsc_list[n].subsc_type == ZWRITE_PATTERN)					\
+		{												\
+			if (!do_pattern(&mv, zwr_sub->subsc_list[n].first))					\
+				do_lev = FALSE;									\
+		} else  if (zwr_sub->subsc_list[n].subsc_type != ZWRITE_ALL)					\
+		{												\
+			if (zwr_sub->subsc_list[n].first)							\
+			{											\
+				if (!MV_IS_CANONICAL(zwr_sub->subsc_list[n].first) &&				\
+						(!follow(&mv, zwr_sub->subsc_list[n].first) &&			\
+						(mv.str.len != zwr_sub->subsc_list[n].first->str.len ||		\
+					  	memcmp(mv.str.addr, zwr_sub->subsc_list[n].first->str.addr,	\
+						mv.str.len))))							\
+					do_lev = FALSE;								\
+			}											\
+			if (do_lev && zwr_sub->subsc_list[n].second)						\
+			{											\
+				if (MV_IS_CANONICAL(zwr_sub->subsc_list[n].second) ||				\
+						(!follow(zwr_sub->subsc_list[n].second, &mv) &&			\
+						(mv.str.len != zwr_sub->subsc_list[n].second->str.len ||	\
+					  	memcmp(mv.str.addr,						\
+						zwr_sub->subsc_list[n].second->str.addr,			\
+						mv.str.len))))							\
+					do_lev = FALSE;								\
+			}											\
+		}												\
+	}													\
+	if (do_lev)												\
+		lvzwr_var(s->lv, n + 1);									\
+}
+
+#define COMMON_NUMERIC_PROCESSING										\
+{														\
+	if (n < lvzwrite_block.subsc_count)									\
+	{													\
+		if (zwr_sub->subsc_list[n].subsc_type == ZWRITE_PATTERN)					\
+		{												\
+			if (!do_pattern(&mv, zwr_sub->subsc_list[n].first))					\
+				do_lev = FALSE;									\
+		} else  if (zwr_sub->subsc_list[n].subsc_type != ZWRITE_ALL)					\
+		{												\
+			if (zwr_sub->subsc_list[n].first)							\
+			{											\
+		 		if (!MV_IS_CANONICAL(zwr_sub->subsc_list[n].first) ||				\
+						eb_less(&mv, zwr_sub->subsc_list[n].first))			\
+					do_lev = FALSE;								\
+			}											\
+			if (do_lev && zwr_sub->subsc_list[n].second)						\
+			{											\
+				if (MV_IS_CANONICAL(zwr_sub->subsc_list[n].second) &&				\
+						eb_less(zwr_sub->subsc_list[n].second, &mv))			\
+					do_lev = FALSE;								\
+			}											\
+		}												\
+	}													\
+}
+
 GBLREF lvzwrite_struct 	lvzwrite_block;
 GBLREF int4		outofband;
 GBLREF zshow_out	*zwr_output;
 GBLREF collseq  	*local_collseq;
+GBLREF boolean_t 	local_collseq_stdnull;
 
 void lvzwr_var(lv_val *lv, int4 n)
 {
@@ -100,6 +178,15 @@ void lvzwr_var(lv_val *lv, int4 n)
 	} else  if (tbl = lv->ptrs.val_ent.children)
 	{
 		zwr_sub->subsc_list[n].actual = &mv;
+		if (local_collseq_stdnull)
+		{
+			if (tbl->str && 0 == tbl->str->ptr.sbs_str[0].str.len)
+			{	/* Process null subscript first */
+				s = &tbl->str->ptr.sbs_str[0];
+				COMMON_STR_PROCESSING;
+			}
+		}
+		/** processing order of numeric subscripts are same for both GT.M collation and standard collation ***/
 		mv.mvtype = 0; /* Make sure stp_gcol() ignores zwr_sub->subsc_list[n].actual for now */
 		if (tbl->int_flag)
 		{
@@ -110,29 +197,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 				{
 					MV_FORCE_MVAL(&mv, i);
 					do_lev = TRUE;
-					if (n < lvzwrite_block.subsc_count)
-					{
-						if (zwr_sub->subsc_list[n].subsc_type == ZWRITE_PATTERN)
-						{
-							if (!do_pattern(&mv, zwr_sub->subsc_list[n].first))
-								do_lev = FALSE;
-						} else  if (zwr_sub->subsc_list[n].subsc_type != ZWRITE_ALL)
-						{
-							if (zwr_sub->subsc_list[n].first)
-							{
-							 	if (!MV_IS_CANONICAL(zwr_sub->subsc_list[n].first) ||
-									eb_less(&mv, zwr_sub->subsc_list[n].first))
-									do_lev = FALSE;
-							}
-							if (do_lev && zwr_sub->subsc_list[n].second)
-							{
-								if (MV_IS_CANONICAL(zwr_sub->subsc_list[n].second) &&
-									eb_less(zwr_sub->subsc_list[n].second, &mv))
-									do_lev = FALSE;
-							}
-						}
-					}
-
+					COMMON_NUMERIC_PROCESSING;
 					if (do_lev)
 						lvzwr_var(blk->ptr.lv[i], n + 1);
 				}
@@ -145,85 +210,30 @@ void lvzwr_var(lv_val *lv, int4 n)
 				{
 					MV_ASGN_FLT2MVAL(mv, f->flt);
 					do_lev = TRUE;
-					if (n < lvzwrite_block.subsc_count)
-					{
-						if (zwr_sub->subsc_list[n].subsc_type == ZWRITE_PATTERN)
-						{
-							if (!do_pattern(&mv, zwr_sub->subsc_list[n].first))
-								do_lev = FALSE;
-						} else  if (zwr_sub->subsc_list[n].subsc_type != ZWRITE_ALL)
-						{
-							if (zwr_sub->subsc_list[n].first)
-							{
-							 	if (!MV_IS_CANONICAL(zwr_sub->subsc_list[n].first) ||
-									eb_less(&mv, zwr_sub->subsc_list[n].first))
-									do_lev = FALSE;
-							}
-							if (do_lev && zwr_sub->subsc_list[n].second)
-							{
-								if (MV_IS_CANONICAL(zwr_sub->subsc_list[n].second) &&
-									eb_less(zwr_sub->subsc_list[n].second, &mv))
-									do_lev = FALSE;
-							}
-						}
-					}
+					COMMON_NUMERIC_PROCESSING;
 					if (do_lev)
 						lvzwr_var(f->lv, n + 1);
 				}
 			}
 		}
+
 		mv.mvtype = MV_STR;
-		for (blk = tbl->str; blk; blk = blk->nxt)
+		/* For standard collation, if there is any null subscripts we have already processed that */
+		if (blk = tbl->str) /* CAUTION: assignment */
 		{
-			for (s = &blk->ptr.sbs_str[0], top = (char *)(s + blk->cnt); s < (sbs_str_struct *)top; s++)
+			s = &blk->ptr.sbs_str[0];
+			if (0 == s->str.len && local_collseq_stdnull)
+				s++;
+			for(;;)
 			{
-				mv.mvtype = MV_STR;
-				mv.str.len = 0; /* makes sure stp_gcol() ignores this, in case actual points to this */
-				if (local_collseq)
+				for (top = (char *)(&blk->ptr.sbs_str[0] + blk->cnt); s < (sbs_str_struct *)top; s++)
 				{
-					ALLOC_XFORM_BUFF(&s->str);
-					tmp_sbs.mvtype = MV_STR;
-					tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
-					assert(NULL != lcl_coll_xform_buff);
-					tmp_sbs.str.addr = lcl_coll_xform_buff;
-					do_xform(local_collseq, XBACK, &s->str, &tmp_sbs.str, &length);
-					tmp_sbs.str.len = length;
-					s2pool(&(tmp_sbs.str));
-					mv.str = tmp_sbs.str;
-				} else
-					mv.str = s->str;
-				do_lev = TRUE;
-				if (n < lvzwrite_block.subsc_count)
-				{
-					if (zwr_sub->subsc_list[n].subsc_type == ZWRITE_PATTERN)
-					{
-						if (!do_pattern(&mv, zwr_sub->subsc_list[n].first))
-							do_lev = FALSE;
-					} else  if (zwr_sub->subsc_list[n].subsc_type != ZWRITE_ALL)
-					{
-						if (zwr_sub->subsc_list[n].first)
-						{
-							if (!MV_IS_CANONICAL(zwr_sub->subsc_list[n].first) &&
-								(!follow(&mv, zwr_sub->subsc_list[n].first) &&
-								(mv.str.len != zwr_sub->subsc_list[n].first->str.len ||
-								  memcmp(mv.str.addr, zwr_sub->subsc_list[n].first->str.addr,
-									mv.str.len))))
-							do_lev = FALSE;
-						}
-						if (do_lev && zwr_sub->subsc_list[n].second)
-						{
-							if (MV_IS_CANONICAL(zwr_sub->subsc_list[n].second) ||
-								(!follow(zwr_sub->subsc_list[n].second, &mv) &&
-								(mv.str.len != zwr_sub->subsc_list[n].second->str.len ||
-								  memcmp(mv.str.addr,
-									zwr_sub->subsc_list[n].second->str.addr,
-									mv.str.len))))
-							do_lev = FALSE;
-						}
-					}
+					COMMON_STR_PROCESSING;
 				}
-				if (do_lev)
-					lvzwr_var(s->lv, n + 1);
+				if (blk = blk->nxt) /* CAUTION: assignment */
+					s = &blk->ptr.sbs_str[0];
+				else
+					break;
 			}
 		}
 		zwr_sub->subsc_list[n].actual = (mval *)0;

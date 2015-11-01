@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 GBLREF bool		rc_locked;
-GBLDEF int		rc_read_stamp;
+GBLDEF trans_num	rc_read_stamp;
 
 error_def(ERR_DBFILERR);
 error_def(ERR_TEXT);
@@ -558,9 +558,8 @@ void rc_send_cpt(rc_xblk_hdr *head, rc_rsp_page *last_aq)	/* Zero if no read op 
 		grab_crit(gv_cur_region); /* DBP Need to verify that block hasn't changed since copied.  look in BT? */
 		rc_cpt_lock();
 		GET_LONG(blknum, last_aq->pageaddr);
-		if ((b = bt_get(blknum)) ? (int4)rc_read_stamp <= (int4)b->tn :
-			((int4)rc_read_stamp <=
-				(int4)((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn))
+		if ((b = bt_get(blknum)) ? rc_read_stamp <= b->tn :
+			(rc_read_stamp <= ((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn))
 		{
 			last_aq->hdr.a.erc.value = RC_NETERRRETRY;
 		}

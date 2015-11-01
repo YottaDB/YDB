@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -111,16 +111,16 @@ void op_zlink (mval *v, mval *quals)
 			objnamebuf[objnamelen] = 0;
 		} else  if (type == SRC)
 		{
-			memmove(&srcnamebuf[0],file.addr,file.len + pblk.b_ext);
+			memmove(&srcnamebuf[0], file.addr,file.len + pblk.b_ext);
 			srcnamelen = file.len + pblk.b_ext;
 			assert (srcnamelen <= MAX_FBUFF + 1);
 			srcnamebuf[srcnamelen] = 0;
 			objnamelen = file.len;
-			if (pblk.b_name > sizeof(mident))
-				objnamelen = pblk.b_dir + sizeof(mident);
+			if (pblk.b_name > MAX_MIDENT_LEN)
+				objnamelen = expdir ? (pblk.b_dir + MAX_MIDENT_LEN) : MAX_MIDENT_LEN;
 			memcpy(&objnamebuf[0], file.addr, objnamelen);
 			memcpy(&objnamebuf[objnamelen], DOTOBJ, sizeof(DOTOBJ));
-			objnamelen += sizeof(DOTOBJ) - 1;
+			objnamelen += STR_LIT_LEN(DOTOBJ);
 			assert (objnamelen + sizeof(DOTOBJ) <= MAX_FBUFF + 1);
 		} else
 		{

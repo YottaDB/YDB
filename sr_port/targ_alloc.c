@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -21,16 +22,45 @@
 
 GBLREF gv_namehead	*gv_target_list;
 
-gv_namehead *targ_alloc(int keysize)
+gv_namehead *targ_alloc(int keysize, mname_entry *gvent)
 {
 	gv_namehead	*gvt;
 	int4		index;
-
-	keysize = (keysize + MAX_NUM_SUBSC_LEN + 4) & (-4);
-
-	gvt = (gv_namehead *)malloc(sizeof(gv_namehead) + 2 * sizeof(gv_key) + 3 * (keysize - 1));
-	gvt->first_rec = (gv_key *)(gvt->clue.base + keysize);
-	gvt->last_rec = (gv_key *)(gvt->first_rec->base + keysize);
+	int		partial_size;
+	int		gvn_size;
+#ifdef DEBUG
+	int	first_rec_size, last_rec_size, clue_size;
+#endif
+	keysize = ROUND_UP2((keysize + MAX_NUM_SUBSC_LEN), 4);	/* Alignment is done so that first_rec
+							    	   and last_rec starts at aligned boundary */
+	partial_size = sizeof(gv_namehead) + 2 * sizeof(gv_key) + 3 * keysize;
+	gvn_size = (NULL == gvent) ? MAX_MIDENT_LEN : gvent->var_name.len;
+	gvt = (gv_namehead *)malloc(partial_size + gvn_size);
+	gvt->gvname.var_name.addr = (char *)gvt + partial_size;
+	if (NULL != gvent)
+	{
+		memcpy(gvt->gvname.var_name.addr, gvent->var_name.addr, gvent->var_name.len);
+		gvt->gvname.var_name.len = gvent->var_name.len;
+		gvt->gvname.hash_code = gvent->hash_code;
+	} else
+	{
+		gvt->gvname.var_name.len = 0;
+		gvt->gvname.hash_code = 0;
+	}
+	gvt->first_rec = (gv_key *)((char *)&gvt->clue + sizeof(gv_key) + keysize);
+	gvt->last_rec = (gv_key *)((char *)gvt->first_rec + sizeof(gv_key) + keysize);
+	assert((uint4) gvt->first_rec % sizeof(gvt->first_rec->top) == 0);
+	assert((uint4) gvt->last_rec % sizeof(gvt->last_rec->top) == 0);
+	assert((uint4) gvt->first_rec % sizeof(gvt->first_rec->end) == 0);
+	assert((uint4) gvt->last_rec % sizeof(gvt->last_rec->end) == 0);
+	assert((uint4) gvt->first_rec % sizeof(gvt->first_rec->prev) == 0);
+	assert((uint4) gvt->last_rec % sizeof(gvt->last_rec->prev) == 0);
+	DEBUG_ONLY(clue_size = (char *)gvt->first_rec - (char *)&gvt->clue);
+	DEBUG_ONLY(first_rec_size = (char *)gvt->last_rec - (char *)gvt->first_rec);
+	DEBUG_ONLY(last_rec_size = (char *)gvt->gvname.var_name.addr - (char *)gvt->last_rec);
+	assert(clue_size == first_rec_size);
+	assert(clue_size == last_rec_size);
+	assert(clue_size == (sizeof(gv_key) + keysize));
 	gvt->clue.top = gvt->last_rec->top = gvt->first_rec->top = keysize;
 	gvt->clue.prev = gvt->clue.end = 0;
 	gvt->root = 0;

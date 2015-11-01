@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +48,7 @@ boolean_t iosocket_listen(io_desc *iod, unsigned short len)
 	error_def(ERR_CURRSOCKOFR);
 	error_def(ERR_LISTENPASSBND);
 
-	if ((len > MAX_LISTEN_QUEUE_LENGTH) || (len < 0))
+	if (MAX_LISTEN_QUEUE_LENGTH < len)
 	{
 		rts_error(VARLSTCNT(3) ERR_LQLENGTHNA, 1, len);
 		return FALSE;

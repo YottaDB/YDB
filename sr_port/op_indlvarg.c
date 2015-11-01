@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,10 +15,11 @@
 #include "indir_enum.h"
 #include "toktyp.h"
 #include "cache.h"
+#include "hashtab_objcode.h"
 #include "op.h"
+#include "valid_mname.h"
 
-GBLREF	mval	**ind_result_sp, **ind_result_top;
-LITREF	char	ctypetab[NUM_ASCII_CHARS];
+GBLREF	mval			**ind_result_sp, **ind_result_top;
 
 void	op_indlvarg(mval *v, mval *dst)
 {
@@ -26,8 +27,7 @@ void	op_indlvarg(mval *v, mval *dst)
 	mstr		*obj, object;
 	oprtype		x;
 	triple		*ref;
-	char		*c, *c_top;
-	int4		y;
+	icode_str	indir_src;
 
 	error_def(ERR_INDMAXNEST);
 	error_def(ERR_VAREXPECTED);
@@ -35,24 +35,16 @@ void	op_indlvarg(mval *v, mval *dst)
 	MV_FORCE_STR(v);
 	if (v->str.len < 1)
 		rts_error(VARLSTCNT(1) ERR_VAREXPECTED);
-	c = v->str.addr;
-	c_top = c + v->str.len;
-	if ((y = ctypetab[*c++]) == TK_UPPER || y == TK_LOWER || y == TK_PERCENT)
+	if (valid_mname(&v->str))
 	{
-		for ( ; c < c_top; c++)
-		{	y = ctypetab[*c];
-			if (y != TK_UPPER && y != TK_DIGIT && y != TK_LOWER)
-			{	break;
-			}
-		}
-		if (c == c_top)
-		{	*dst = *v;
-			return;
-		}
+		*dst = *v;
+		return;
 	}
 	if (*v->str.addr == '@')
 	{
-		if (!(obj = cache_get(indir_lvarg, &v->str)))
+		indir_src.str = v->str;
+		indir_src.code = indir_lvarg;
+		if (NULL == (obj = cache_get(&indir_src)))
 		{
 			object.addr = v->str.addr;
 			object.len  = v->str.len;
@@ -64,7 +56,8 @@ void	op_indlvarg(mval *v, mval *dst)
 			}
 			if (comp_fini(rval, &object, OC_IRETMVAL, &x, object.len))
 			{
-				cache_put(indir_lvarg, &v->str, &object);
+				indir_src.str.addr = v->str.addr;
+				cache_put(&indir_src, &object);
 				*ind_result_sp++ = dst;
 				if (ind_result_sp >= ind_result_top)
 					rts_error(VARLSTCNT(1) ERR_INDMAXNEST);

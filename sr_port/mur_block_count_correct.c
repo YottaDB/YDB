@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,9 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include <signal.h>
-#include <sys/stat.h>
+#include "gtm_stat.h"
 #include "gtm_time.h"
 
 #include "gdsroot.h"
@@ -26,8 +26,10 @@
 #include "iosp.h"
 #include "gdsfilext.h"		/* for gdsfilext() prototype */
 #include "mu_file_size.h"	/* for mu_file_size() prototype */
-#include "hashdef.h"
 #include "buddy_list.h"
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 
 GBLREF 	gd_region		*gv_cur_region;
@@ -57,17 +59,17 @@ uint4 mur_block_count_correct(void)
 #if defined(VMS) && defined(GT_CX_DEF)
 		case dba_bg:	/* necessary to do calculation in this manner to prevent double rounding causing an error */
 			if (mu_data->unbacked_cache)
-				mu_int_ovrhd = DIVIDE_ROUND_UP(sizeof(sgmnt_data) + mu_data->free_space +
+				mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space +
 					mu_data->lock_space_size, DISK_BLOCK_SIZE);
 			else
-				mu_int_ovrhd = DIVIDE_ROUND_UP(sizeof(sgmnt_data) + BT_SIZE(mu_data)
+				mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + BT_SIZE(mu_data)
 					+ mu_data->free_space + mu_data->lock_space_size, DISK_BLOCK_SIZE);
 			break;
 #else
 		case dba_bg:
 #endif
 		case dba_mm:
-			mu_int_ovrhd = DIVIDE_ROUND_UP(sizeof(sgmnt_data) + mu_data->free_space, DISK_BLOCK_SIZE);
+			mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
 		break;
 	}
 	mu_int_ovrhd += 1;

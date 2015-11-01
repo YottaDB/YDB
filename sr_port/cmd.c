@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,9 +31,9 @@
 #error UNSUPPORTED PLATFORM
 #endif
 
-GBLREF char window_token;
-GBLREF mident window_ident;
-GBLREF triple *expr_start, *expr_start_orig, *curtchain, pos_in_chain, *curr_fetch_trip;
+GBLREF char 	window_token;
+GBLREF mident 	window_ident;
+GBLREF triple 	*expr_start, *expr_start_orig, *curtchain, pos_in_chain, *curr_fetch_trip;
 
 int cmd(void)
 {
@@ -198,18 +198,19 @@ int cmd(void)
 		stx_error(ERR_CMD);
 		return FALSE;
 	}
-	c = window_ident.c;
+	assert(0 != window_ident.len);
+	c = window_ident.addr;
 	if (*c == '%')
 	{
 		stx_error(ERR_CMD);
 		return FALSE;
 	}
-	if ((x = namelook(cmd_index,cmd_names,c)) < 0)
+	if ((x = namelook(cmd_index, cmd_names, c, window_ident.len)) < 0)
 	{
 		stx_error(ERR_INVCMD);
 		return FALSE;
 	}
-	if (! VALID_CMD(x) )
+	if (!VALID_CMD(x) )
 	{
 	    	stx_error(ERR_CNOTONSYS);
 		return FALSE;
