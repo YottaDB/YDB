@@ -1,0 +1,29 @@
+#################################################################
+#								#
+#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+#  #define SYMBOL_NAME_STR(X) #X
+#  #define SYMBOL_NAME(X) X
+#  #ifdef __STDC__
+#  #define SYMBOL_NAME_LABEL(X) X##:
+# #else
+# #define SYMBOL_NAME_LABEL(X) X/**/:
+# #endif
+
+.macro SYMBOL_NAME_LABEL X
+\X:
+.endm
+
+.macro ENTRY name
+#	.globl SYMBOL_NAME \name
+	.globl \name
+	.align 16,0x90
+	SYMBOL_NAME_LABEL \name
+.endm

@@ -1,0 +1,109 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+;	Copyright 1987,2001 Sanchez Computer Associates, Inc.	;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%RO     ;service@greystone.com ESM %RO;19920722 07:40;routine output
+        ;last modified by R. Partridge
+        ;invoke ^%RO to get interaction
+        ;invoke CALL^%RO with %ZR - routine array,
+        ;%ZC - strip comments, %ZD - device, %ZH - header label
+        ;
+        w !,"Routine Output - Save selected routines into RO file.",!
+        i '$d(%zdebug) n $zt s $zt="zg "_$zl_":ERR^%RO" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%RO")
+        n ename,fl,l,lc,out,r,rn,rf,src,x,y,t1,%ZC,%ZD,%ZH,%ZR
+        s (fl,lc,r)=0,out=1
+        d main
+        q
+        ;
+CALL    n ename,fl,l,lc,out,r,rn,rf,src,x,y,t1
+        n:'$d(%ZC) %ZC n:'$d(%ZD) %ZD n:'$d(%ZH) %ZH
+        s %ZC=$g(%ZC,1),%ZD=$g(%ZD,$p),%ZH=$g(%ZH),(fl,lc,r,out)=0
+        o %ZD:(newversion:block=2048:record=2044):0 e  q
+        i $d(%ZR)<10 d CALL^%RSEL q:$d(%ZR)<10
+        d work
+        q
+        ;
+FL      w !,"First Line Lister",!
+        i '$d(%zdebug) n $zt s $zt="zg "_$zl_":ERR^%RO" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%RO")
+        n ename,fl,l,lc,out,r,rf,rn,src,x,y,t1,%ZC,%ZD,%ZH,%ZR
+        s (lc,r)=0,(%ZC,fl,out)=1,%ZH="Routine First Line Lister Utility"
+        d main
+        q
+        ;
+main
+        s %ZR="" d CALL^%RSEL
+        i %ZR=0 w !,"No routines selected" q
+        f  d  q:$l(%ZD)
+        . r !,"Output device: <terminal>: ",%ZD,!
+        . i '$l(%ZD) s %ZD=$p q
+        . i %ZD="^" q
+        . i %ZD="?" d  q
+         . . w !!,"Select the device you want for output"
+         . . w !,"If you wish to exit enter a carat (^)",!
+        . i $zparse(%ZD)="" w "  no such device" s %ZD="" q
+        . o %ZD:(newversion:block=2048:record=2044:exception="g noopen"):0
+        . i '$t  w !,%ZD," is not available" s %ZD="" q
+        . q
+noopen  . w !,$p($ZS,",",2,999),! c %ZD s %ZD=""
+        q:%ZD="^"
+        i 'fl d
+        . r !,"Header Label: ",%ZH
+        . r !,"Strip comments <No>?: ",%ZC
+        . i $l(%ZC),"\YES"[("\"_$tr(%ZC,"yes","YES")) s %ZC=0
+        . e  s %ZC=1
+        w !
+        d work
+        q
+        ;
+work    i '$l(%ZH) s %ZH="%RO Routine Output Utility"
+        u %ZD w %ZH,!,"GT.M ",$zd($h,"DD-MON-YEAR 24:60:SS"),! u $p
+        s %ZR=""
+        f  s %ZR=$o(%ZR(%ZR)) q:'$l(%ZR)  d out
+        i 'fl u %ZD w !!
+        u $p
+        i out d
+        . w !!,"Total of ",lc," line",$s(lc=1:"",1:"s")
+        . w " in ",r," routine",$s(r=1:".",1:"s."),!!
+        c:%ZD'=$p %ZD u $p:(ctrap="":exc="")
+        q
+        ;
+out     s rf=%ZR(%ZR)_$tr($e(%ZR),"%","_")_$e(%ZR,2,9999)_".m"
+        o rf:(readonly:rewind:exception="g rnoopen")
+        u rf:exception="g reof" r x s rn=$p($p($p(x,$c(9))," "),"(") d frmt
+        i $tr(rn,"abcdefghijklmnopqrstuvwxyz","ABCDEFGHIJKLMNOPQRSTUVWXYZ")'=%ZR s rn=%ZR
+        i %ZD'=$p u $p w:$x>70 ! w %ZR,?$x\10+1*10
+        s r=r+1,lc=lc+1 s:x="" x=rn
+        u %ZD w rn,!,x,!
+        ; warning - loop terminated by an execption
+        i 'fl f  u rf r x d frmt i $l(x) u %ZD w x,! s lc=lc+1
+        f  u rf r x d frmt q:x'?.E1";".E1.A.E  u %ZD w x,! s lc=lc+1
+        u %ZD w ! c rf
+        q
+        ;
+reof    u %ZD w ! c rf
+rnoopen i $zs'["EOF" w !,$p($zs,",",2,999),!
+        q
+frmt    i '%ZC s t1=0 d                         ;strip comments
+        . f  s t1=$f(x,";",t1) q:'t1  i $l($e(x,1,t1),"""")#2 d  q
+        . . i $e(x,t1)'=";" s x=$e(x,1,t1-2)
+        i '$l(x) s x=" " q
+        i $e(x)=";" s x=" "_x                   ;if lonely comment, provide ls
+        s t1=0
+        f  s t1=$f(x,$c(9),t1) q:'t1  d         ;convert <TAB>s to spaces
+        . s x=$e(x,1,t1-2)_$j("",8-(t1-2#8))_$e(x,t1,9999)
+        f t1=$l(x):-1:0 q:$e(x,t1)'=" "         ;strip trailing spaces
+        s x=$e(x,1,t1)
+        q
+        ;
+ERR     u $p w !,$p($zs,",",2,99),!
+        ; Warning - Fall-though
+EXIT    i $d(%ZD),%ZD'=$p c %ZD
+        i $d(rf) c rf
+        u $p:(ctrap="":exc="")
+        q

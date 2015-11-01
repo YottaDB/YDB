@@ -1,0 +1,17 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+;	Copyright 1987,2001 Sanchez Computer Associates, Inc.	;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%TO	;GTM %TO utility - return current time in %TS as [h]h:mm a/pm
+	;invoke with %TN in $H format to set %TS to [h]h:mm a/pm
+	;supplied for illustration and compatibility
+	;use of inline code is easy and efficient
+	;
+INT	s %TS=+$zd(","_%TN,"12")_$zd(","_%TN,":60 AM")
+	q

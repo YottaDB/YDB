@@ -1,0 +1,136 @@
+/****************************************************************
+ *								*
+ *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
+ ****************************************************************/
+
+#include "mdef.h"
+#include "gtm_string.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "mupint.h"
+#include "min_max.h"
+#include "init_root_gv.h"
+#include "util.h"
+#include "print_target.h"
+#include "gtmmsg.h"
+
+GBLREF block_id		mu_int_path[];
+GBLREF int		mu_int_plen;
+GBLREF uint4		mu_int_offset[];
+GBLREF uint4		mu_int_errknt;
+GBLREF boolean_t	mu_int_err_ranges;
+GBLREF boolean_t	master_dir;
+GBLREF global_list	*trees;
+
+#define MAX_UTIL_LEN 40
+#define BLOCK_WINDOW 8
+#define LEVEL_WINDOW 3
+#define OFFSET_WINDOW 4
+
+#define TEXT1 ":     "
+#define TEXT2 " "
+#define TEXT3 ":"
+#define TEXT4 ", "
+
+void	mu_int_err(
+		int err,
+		boolean_t do_path,
+		boolean_t do_range,
+		unsigned char *bot,
+		int has_bot,
+		unsigned char *top,
+		int has_top,
+	      	unsigned int level)
+{
+	int		i, util_len;
+	unsigned char	util_buff[MAX_UTIL_LEN];
+
+	if (!mu_int_errknt)
+		util_out_print("!/Block:Offset Level", TRUE);
+	mu_int_errknt++;
+	mu_int_plen--;
+	util_len=0;
+	i2hex_blkfill(mu_int_path[mu_int_plen], &util_buff[util_len], BLOCK_WINDOW);
+	util_len += BLOCK_WINDOW;
+	memcpy(&util_buff[util_len], TEXT1, sizeof(TEXT1) - 1);	/* OFFSET_WINDOW + 1 spaces */
+	util_len += sizeof(TEXT3) - 1;				/* Using TEXT1 to clear space? */
+	i2hex_nofill(mu_int_offset[mu_int_plen], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
+	util_len += OFFSET_WINDOW + 1;
+	i2hex_blkfill(level, (uchar_ptr_t)&util_buff[util_len], LEVEL_WINDOW);
+	util_len += LEVEL_WINDOW;
+	memcpy(&util_buff[util_len], TEXT2, sizeof(TEXT2) - 1);
+	util_len += sizeof(TEXT2) - 1;
+	util_buff[util_len] = 0;
+	gtm_putmsg(VARLSTCNT(4) err, 2, LEN_AND_STR((char*)util_buff));
+	if (do_path)
+	{
+		if (!master_dir)
+		{
+			util_out_print("                   Directory Path:  ", FALSE);
+			for (i = 0;  trees->path[i + 1];  i++)
+			{
+				util_len = i2hex_nofill(trees->path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
+				memcpy(&util_buff[util_len], TEXT3, sizeof(TEXT3) - 1);
+				util_len += sizeof(TEXT3) - 1;
+				util_len += i2hex_nofill(trees->offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
+				memcpy(&util_buff[util_len], TEXT4, sizeof(TEXT4) - 1);
+				util_len += sizeof(TEXT4) - 1;
+				util_buff[util_len] = 0;
+				util_out_print(util_buff, FALSE);
+			}
+			util_len = i2hex_nofill(trees->path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
+			memcpy(&util_buff[util_len], TEXT3, sizeof(TEXT3) - 1);
+			util_len += sizeof(TEXT3) - 1;
+			util_len += i2hex_nofill(trees->offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
+			util_buff[util_len] = 0;
+			util_out_print(util_buff, TRUE);
+			util_out_print("                   Path:  ", FALSE);
+		} else
+			util_out_print("                   Directory Path:  ", FALSE);
+		for (i = 0;  i < mu_int_plen;  i++)
+		{
+			util_len = i2hex_nofill(mu_int_path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
+			memcpy(&util_buff[util_len], TEXT3, sizeof(TEXT3) - 1);
+			util_len += sizeof(TEXT3) - 1;
+			util_len += i2hex_nofill(mu_int_offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
+			memcpy(&util_buff[util_len], TEXT4, sizeof(TEXT4) - 1);
+			util_len += sizeof(TEXT4) - 1;
+			util_buff[util_len] = 0;
+			util_out_print(util_buff, FALSE);
+		}
+		util_len = i2hex_nofill(mu_int_path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
+		memcpy(&util_buff[util_len], TEXT3, sizeof(TEXT3) - 1);
+		util_len += sizeof(TEXT3) - 1;
+		util_len += i2hex_nofill(mu_int_offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
+		util_buff[util_len] = 0;
+		util_out_print(util_buff, TRUE);
+	}
+	if (do_range && mu_int_err_ranges)
+	{
+		util_out_print("Keys from ", FALSE);
+		if (has_bot)
+		{
+			util_out_print("^", FALSE);
+			print_target(bot);
+		} else
+			util_out_print("^A", FALSE);
+		util_out_print(" to ", FALSE);
+		if (has_top)
+		{
+			util_out_print("^", FALSE);
+			print_target(top);
+		} else
+			util_out_print("the end", FALSE);
+		util_out_print(" are suspect.", TRUE);
+	}
+	return;
+}

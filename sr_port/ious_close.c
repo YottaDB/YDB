@@ -1,0 +1,21 @@
+/****************************************************************
+ *								*
+ *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
+ ****************************************************************/
+
+#include "mdef.h"
+#include "io.h"
+#include "iousdef.h"
+
+void ious_close(io_desc *iod, mval *pp)
+{
+	assert(iod->state == dev_open);
+	((void(*)())(((d_us_struct*)(iod->dev_sp))->disp->close))();
+	iod->state = dev_closed;
+}

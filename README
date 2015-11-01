@@ -1,0 +1,23 @@
+The Makefile enclosed will build gtm from source.  The only prerequisite is
+GNU make and Linux x86.   GNU make 3.77 and Redhat 6.1 were used to do the
+test builds for this distribution.
+
+To build gtm for linux just type "make".
+
+By default the make will build three buildtypes: dbg (debug), bta (beta),
+and pro (production).   Passing a subset of dbg, bta, or pro in "buildtypes"
+from the environment or the command line will build that subset. For example:
+
+	make buildtypes=pro
+
+will build just a production release.
+
+Once the required builds have been done the object distribution can be
+tar'ed by doing:
+
+	make package
+
+Again, buildtypes can be used to package just a subset. For example:
+
+	make buildtypes=pro package
+

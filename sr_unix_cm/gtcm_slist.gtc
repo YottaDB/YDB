@@ -1,0 +1,30 @@
+#################################################################
+#								#
+#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+# GT.CM server configuration file
+#
+# This file contains one line per GT.CM server, giving the options to be
+# passed to that server.
+#
+# A line in the configuration file has the following fields separated by
+# tabs and/or spaces:
+#
+# 	service name or number		as in /etc/services.  Each service
+#					name/number must be unique.
+#	server id			RC server node.
+#	server options			additional options to be passed to
+#					GT.CM
+#
+# Examples:
+# omi	42	-hist
+# omi2	42	-hist
+# 6102  41	-ping -timeout 120 -auth
+#
+omi	SERVERID	-hist

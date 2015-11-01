@@ -1,0 +1,111 @@
+/****************************************************************
+ *								*
+ *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
+ ****************************************************************/
+
+#ifndef __FGNCALSP_H__
+#define  __FGNCALSP_H__
+
+/* fgncalsp.h - UNIX foreign calls (d &package.label) */
+
+#define MAXIMUM_PARAMETERS	31		/* maximum number of parameters */
+#define MAX_NAME_LENGTH		255		/* maximum length of file name */
+#define PACKAGE_ENV_PREFIX	"GTMXC"		/* prefix for environemnt variable containing external call table name */
+#define MAX_ERRSTR_LEN		1024		/* maximum length of the error string returned by dlerror() */
+						/* couldn't find any system defined length, 1024 is just arbitrary */
+#define PRN_DLERROR											\
+{													\
+	dummy_err_str = dlerror();									\
+	if (dummy_err_str)										\
+	{												\
+		/* this is done since util_out_print does not handle 64 bit pointers as of now */	\
+		err_str = (char *)malloc(MAX_ERRSTR_LEN);						\
+		strcpy(err_str, dummy_err_str);								\
+		gtm_putmsg(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_STRING(err_str));			\
+		free(err_str);										\
+	}												\
+}
+
+typedef int4	(*fgnfnc)();
+
+struct extcall_string
+{
+	int	len;
+	char	*addr;
+};
+
+/* A chain of packages, each package has a list of "entries", that is external routine entry points.  */
+
+struct extcall_package_list
+{
+	struct extcall_package_list	*next_package;
+	struct extcall_entry_list	*first_entry;
+	void_ptr_t			package_handle;
+	mstr				package_name;
+};
+
+enum xc_types
+{
+	xc_notfound,
+	xc_void,
+	xc_status,
+	xc_long,
+	xc_ulong,
+	xc_long_star,
+	xc_ulong_star,
+	xc_string_star,
+	xc_float_star,
+	xc_char_star,
+	xc_char_starstar,
+	xc_double_star,
+	xc_pointertofunc,
+	xc_pointertofunc_star
+};
+
+enum callintogtm_fncs {
+	xc_hiber_start,
+	xc_hiber_start_any,
+	xc_start_timer,
+	xc_cancel_timer,
+	xc_gtm_malloc,
+	xc_gtm_free,
+	xc_unknown_function
+};
+
+/* There is one of these for each external routine.  Each is owned by a package.  */
+struct extcall_entry_list
+{
+	struct extcall_entry_list	*next_entry;
+	enum xc_types			return_type;	/* function return value */
+	int				ret_pre_alloc_val; /* amount of space to be pre-allocated for the return type */
+	uint4				input_mask;	/* is it an input parameter lsb = 1st parm */
+	uint4				output_mask;	/* is it an output parameter lsb = 1st parm */
+	int				parmblk_size;	/* size in bytes of parameter block to be allocated for call*/
+	int				argcnt;		/* number of arguments */
+	enum xc_types			*parms;		/* pointer to parameter array */
+	int				*param_pre_alloc_size; /* amount of space to be pre-allocated for the parameters */
+	fgnfnc				fcn;		/* address of runtime routine */
+	mstr				entry_name;	/* name of M entryref */
+	mstr				call_name;	/* corresponding name of C function */
+};
+
+#include "rtnhdr.h"
+
+/* function prototypes */
+void_ptr_t	fgn_getpak(char *pak_name);
+fgnfnc 		fgn_getrtn(void_ptr_t pak_handle, mstr *sym_name);
+void		fgn_closepak(void_ptr_t pak_handle);
+int fgncal_getint(mstr *inp);
+int fgncal_read_args(mstr *inp);
+void fgncal_getstr(mstr *inp, mstr *str);
+void fgncal_lkbind(mstr *inp);
+void fgn_glopref(mval *v);
+struct extcall_package_list *exttab_parse (mval *package);
+
+#endif

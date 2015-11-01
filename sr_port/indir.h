@@ -1,0 +1,66 @@
+/****************************************************************
+ *								*
+ *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
+ ****************************************************************/
+
+INDIR(indir_fndata, f_data),
+INDIR(indir_fnnext, f_next),
+INDIR(indir_fnorder1, f_order1),
+INDIR(indir_get, f_get),
+INDIR(indir_close, m_close),
+INDIR(indir_hang, m_hang),
+INDIR(indir_if, m_if),
+INDIR(indir_kill, m_kill),
+INDIR(indir_open, m_open),
+INDIR(indir_read, m_read),
+INDIR(indir_set, m_set),
+INDIR(indir_use, m_use),
+INDIR(indir_write, m_write),
+INDIR(indir_xecute, m_xecute),
+INDIR(indir_nref, nref),
+INDIR(indir_lock, m_lock),
+INDIR(indir_do, m_do),
+INDIR(indir_goto, m_goto),
+INDIR(indir_job, m_job),
+INDIR(indir_linetail, linetail),
+INDIR(indir_new, m_new),
+INDIR(indir_zlink, m_zlink),
+INDIR(indir_zbreak, m_zbreak),
+INDIR(indir_zsystem, m_zsystem),
+INDIR(indir_zedit, m_zedit),
+INDIR(indir_zmess, m_zmessage),
+INDIR(indir_zwatch, m_zwatch),
+INDIR(indir_zgoto, m_zgoto),
+INDIR(indir_zprint, m_zprint),
+INDIR(indir_zwrite, m_zwrite),
+INDIR(indir_glvn, indirection),
+INDIR(indir_lvadr, indirection),
+INDIR(indir_pattern, indirection),
+INDIR(indir_iset, indirection),
+INDIR(indir_text, indirection),
+INDIR(indir_view, m_view),
+INDIR(indir_zattach, m_zattach),
+INDIR(indir_zallocate, m_zallocate),
+INDIR(indir_zdeallocate, m_zdeallocate),
+INDIR(indir_lvarg, indirection),
+INDIR(indir_fnzprevious, f_zprevious),
+INDIR(indir_fnquery, f_query),
+INDIR(indir_zhelp, m_zhelp),
+INDIR(indir_zshow, m_zshow),
+INDIR(indir_lvnamadr, indirection),
+INDIR(indir_zwithdraw, m_zwithdraw),
+INDIR(indir_tstart, m_tstart),
+INDIR(indir_fnname, f_name),
+INDIR(indir_fnorder2, f_order),
+INDIR(indir_fnzqgblmod, f_zqgblmod),
+INDIR(indir_trollback, m_trollback),
+INDIR(indir_devparms, indirection),
+INDIR(indir_merge, m_merge),
+INDIR(indir_merge1, m_merge),
+INDIR(indir_merge2, m_merge)

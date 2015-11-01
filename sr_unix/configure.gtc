@@ -1,0 +1,325 @@
+#################################################################
+#								#
+#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+# This script must be run with shell, not Cshell
+
+. ./arch.gtc
+
+
+# Path to the correct echo program
+if [ $arch = "sun"  -o  $arch = "solaris" ]; then
+	echo=/usr/5bin/echo
+elif [ $arch = "linux" ]; then
+	echo="/bin/echo -e"
+else
+	echo=/bin/echo
+fi
+
+# Path to the correct editor program
+if [ $arch = "sun"  -o  $arch = "solaris" ]; then
+	editor_env=/usr/ucb/vi
+elif [ $arch = "linux" ]; then
+	editor_env=/bin/vi
+else
+	editor_env=/usr/bin/vi
+fi
+
+# Options to ps
+psopts="-ea"
+
+# GTCM definitions
+if [ -f gtcm_server ]; then
+	deliver_gtcm="yes"
+else
+	deliver_gtcm="no"
+fi
+
+# Binaries
+binaries="mupip mumps lke dse gtm_dmna geteuid ftok semstat2"
+
+# Normal scripts - executed by anyone
+nscripts="gtmbase upperc upperc_cp lowerc lowerc_cp"
+
+# Root scripts - only executed by root
+rscripts="gtmstart gtmstop"
+if [ $deliver_gtcm = "yes" ]; then
+	rscripts="$rscripts gtcm_run gtcm_slist"
+	binaries="$binaries gtcm_server gtcm_pkdisp gtcm_play gtcm_shmclean"
+	if [ -f gcore ]; then
+		binaries="$binaries gcore"
+	fi
+	if [ -f gtcm_gcore ]; then
+		binaries="$binaries gtcm_gcore"
+	fi
+fi
+
+# Other files
+hlpfiles="gdehelp.dat gtmhelp.dat"
+if [ $arch = "sco" ]; then
+	ofiles="$hlpfiles esnecil"
+elif [ $arch = "sun"  -o  $arch = "solaris" ]; then
+	ofiles="$hlpfiles libgtmrpc.a gtm_descript.h gtmidef.h"
+	binaries="$binaries gtm_svc"
+elif [ $arch = "dux"  -o  $arch = "hp"  -o  $arch = "ibm" -o $arch = "linux" ]; then
+	ofiles="$hlpfiles gtmxc_types.h"
+else
+	ofiles="$hlpfiles"
+fi
+
+# Directories
+if [ $arch = "sun"  -o  $arch = "solaris" ]; then
+	dirs="examplesvc exampledal"
+fi
+
+# Files that need to have $gtm_dist, $echo, etc. set in them.
+pathmods="gtmbase.gtc gtmstart.gtc gtmstop.gtc gtmcshrc.gtc gtmprofile.gtc"
+
+if [ $deliver_gtcm = "yes" ]; then
+	pathmods="$pathmods gtcm_run.gtc gtcm_slist.gtc"
+fi
+
+if [ "`./geteuid`" != "root" ] ; then
+	$echo "You must run Configure as root."
+	exit
+fi
+
+$echo "                     MUMPS Configuration Script"
+$echo "c. 1993-2000 Sanchez Computer Associates. Use of this software"
+$echo "is restricted by the provisions of your software license agreement."
+$echo ""
+
+$echo "What account should own the files? (bin) \c"
+read resp
+if [ "$resp" = "" ] ; then
+	owner="bin"
+else
+	owner=$resp
+fi
+
+$echo "In what directory should GT.M be installed? \c"
+read gtmdist
+
+$echo ""
+
+if [ -d $gtmdist ]; then
+	$echo "Directory $gtmdist exists. If you proceed with this installation then"
+	$echo "some files will be over-written. Is it ok to proceed? (y or n) \c"
+	read resp
+	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+		chmod 0755 $gtmdist
+		chown $owner $gtmdist
+		chgrp bin $gtmdist
+	else
+		exit
+	fi
+
+else
+	$echo "Directory $gtmdist does not exist. Do you wish to create it as part of"
+	$echo "this installation? (y or n) \c"
+
+	read resp
+	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+		mkdir $gtmdist
+		chmod 0755 $gtmdist
+		chown $owner $gtmdist
+		chgrp bin $gtmdist
+	else
+		exit
+	fi
+fi
+
+
+server_id=42
+if [ $deliver_gtcm = "yes" ]; then
+	$echo ""
+	$echo "Enter the RC node ID of the GT.CM server, if desired ($server_id): \c"
+	read resp
+	if [ -z "$resp" ]; then resp=$server_id; fi
+	until [ $resp -gt 0 -a $resp -lt 256 ]
+	do
+	  $echo "GT.CM server ID must be between 1 and 255 (default $server_id)"
+	  $echo "Enter the RC node ID of the GT.CM server ($server_id): \c"
+	  read resp
+	  if [ -z "$resp" ]; then resp=$server_id; fi
+	done
+	server_id=$resp
+fi
+
+$echo ""
+$echo "Installing GT.M...."
+$echo ""
+
+# Modify the scripts as necessary for target configuration
+cat << SEDSCRIPT > sedin$$
+s|ARCH|$arch|g
+s|ECHO|"$echo"|g
+s|EDITOR_ENV|$editor_env|g
+s|GTMDIST|$gtmdist|g
+s|SERVERID|$server_id|g
+SEDSCRIPT
+for i in $pathmods
+do
+	sed -f sedin$$ $i > `basename $i .gtc`
+done
+rm sedin$$
+
+# Install the .cshrc and .profile files
+cp gtmprofile gtmcshrc $gtmdist
+chmod 0755 $gtmdist/gtmprofile
+chown $owner $gtmdist/gtmprofile
+chmod 0755 $gtmdist/gtmcshrc
+chown $owner $gtmdist/gtmcshrc
+
+# Install the normal scripts
+for i in $nscripts
+do
+	cp $i $gtmdist
+	chmod 0755 $gtmdist/$i
+	chown $owner $gtmdist/$i
+done
+
+# Install the root scripts
+for i in $rscripts
+do
+	cp $i $gtmdist
+	chmod 0744 $gtmdist/$i
+	chown root $gtmdist/$i
+done
+
+# Install the normal binaries
+for i in $binaries
+do
+	if [ $arch = "sun" -o $arch = "linux" ]; then
+		install -g bin -o $owner -m 755 $i $gtmdist
+	elif [ $arch = "ibm" ]; then
+		/usr/bin/install -f $gtmdist -M 755 -O $owner -G bin $i
+	else
+		install -f $gtmdist -m 755 -u $owner -g bin $i
+	fi
+#		strip $gtmdist/$i >/dev/null 2>&1
+done
+
+# Install gtmsecshr with special permissions
+if [ $arch = "sun" -o $arch = "linux" ]; then
+	install -m 4755 -o root -g bin gtmsecshr $gtmdist
+elif [ $arch = "ibm" ]; then
+	/usr/bin/install -f $gtmdist -M 4755 -O root -G bin gtmsecshr
+elif [ -x /usr/sbin/install ]; then
+	/usr/sbin/install -f $gtmdist -m 4755 -u root -g bin gtmsecshr $gtmdist
+else
+	install -f $gtmdist -m 4755 -u root -g bin gtmsecshr $gtmdist
+fi
+strip $gtmdist/gtmsecshr > /dev/null 2>&1
+
+# Install other individual files
+for i in  $ofiles
+do
+	cp $i $gtmdist
+	chown $owner $gtmdist/$i
+done
+if [ $arch = "sun" ]; then
+	ranlib -t $gtmdist/libgtmrpc.a
+fi
+
+# Install the example directories
+if [ $arch = "sun"  -o  $arch = "solaris" ]; then
+	for i in $dirs
+	do
+		tar cf - $i | ( cd $gtmdist ; tar xfBp - )
+		chown -R $owner $gtmdist/$i
+	done
+fi
+
+# Install GDE, GTMHELP, and all the percent routines
+cp *.o *.m $gtmdist
+
+$echo ""
+$echo "All of the GTC MUMPS routines are distributed with uppercase names."
+$echo "You can create lowercase copies of these routines if you wish, but"
+$echo "to avoid problems with compatibility in the future, GTC suggests that"
+$echo "you keep only the uppercase versions of the files."
+$echo ""
+$echo "Do you want uppercase and lowercase versions of the MUMPS routines? (y or n)\c"
+read resp
+if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+	$echo ""
+	$echo "Creating lowercase versions of the MUMPS routines."
+	(cd $gtmdist; ./lowerc_cp *.m)
+fi
+
+gtmroutines=$gtmdist
+gtmgbldir=$gtmdist/mumps.gld
+gtm_dist=$gtmdist
+export gtm_dist
+export gtmroutines
+export gtmgbldir
+
+$echo ""
+$echo "Compiling all of the MUMPS routines. This may take a moment."
+$echo ""
+(cd $gtmdist; ./mumps -nowarning *.m)
+
+chmod 0644 $gtmdist/*.m
+chmod 0644 $gtmdist/*.o
+chown $owner $gtmdist/*.m
+chown $owner $gtmdist/*.o
+chgrp bin $gtmdist/*.m
+chgrp bin $gtmdist/*.o
+
+export gtm_dist
+export gtmgbldir
+export gtmroutines
+
+gtm_dist=$gtmdist
+gtmroutines=$gtmdist
+
+
+# Create the global diretories for the help databases.
+
+gtmgbldir=$gtmdist/gtmhelp.gld
+$gtmdist/mumps -direct <<GDE.in1
+Do ^GDE
+Change -segment DEFAULT	-block=2048	-file=$gtmdist/gtmhelp.dat
+Change -region DEFAULT	-record=1020	-key=255
+Exit
+GDE.in1
+
+
+gtmgbldir=$gtmdist/gdehelp.gld
+$gtmdist/mumps -direct <<GDE.in2
+Do ^GDE
+Change -segment DEFAULT	-block=2048	-file=$gtmdist/gdehelp.dat
+Change -region DEFAULT	-record=1020	-key=255
+Exit
+GDE.in2
+
+
+# Create the dump file for ZHELP
+
+touch $gtmdist/gtmhelp.dmp
+chmod a+rw $gtmdist/gtmhelp.dmp
+
+other_object_files="CHK2LEV.o CHKOP.o GENDASH.o GENOUT.o GETNEAR.o GTMHELP.o GTMHLPLD.o LOAD.o LOADOP.o"
+other_object_files="$other_object_files LOADVX.o MSG.o TTTGEN.o TTTSCAN.o UNLOAD.o"
+csh_script_files="lowerc.csh lowerc_cp.csh upperc.csh upperc_cp.csh"
+
+# $other_object_files, $csh_script_files should be removed unconditionally
+\rm -rf $other_object_files $csh_script_files
+
+$echo ""
+$echo "Installation completed. Would you like all the temporary files"
+$echo "removed from this directory? (y or n) \c"
+read resp
+
+if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
+		*.gtc gtm* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid \
+		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.*
+fi

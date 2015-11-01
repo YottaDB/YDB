@@ -1,0 +1,140 @@
+/****************************************************************
+ *								*
+ *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
+ ****************************************************************/
+
+/* is_file_identical.c
+ *   returns TRUE   if the two files are identical,
+ *   returns FALSE  if 1. either one of the files specified
+ *                        doesn't exist, or
+ *                     2. they are different files.
+ */
+
+#include "mdef.h"
+
+#include <stdlib.h>
+
+#include "gtm_stat.h"
+
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsblk.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "eintr_wrappers.h"
+#include "is_file_identical.h"
+#include "copy.h"
+
+bool is_file_identical(char *filename1, char *filename2)
+{
+        struct stat	st1, st2;
+	int		stat_res;
+	int		rv = FALSE;
+
+	STAT_FILE(filename1, &st1, stat_res);
+	if (0 == stat_res)
+	{
+	        STAT_FILE(filename2, &st2, stat_res);
+	        if (0 == stat_res)
+#if defined(__osf__) || defined(_AIX)
+		        if ((st1.st_dev == st2.st_dev) && (st1.st_ino == st2.st_ino) && (
+#ifdef _AIX
+				 (FS_REMOTE == st1.st_flag || FS_REMOTE == st2.st_flag) ? TRUE :
+#endif
+				    st1.st_gen == st2.st_gen))
+#else
+		        if ((st1.st_dev == st2.st_dev) && (st1.st_ino == st2.st_ino))
+#endif
+			        rv = TRUE;
+	}
+	return rv;
+}
+
+bool is_gdid_stat_identical(gd_id_ptr_t fid, struct stat *stat_buf)
+{
+#if defined(__osf__) || defined(_AIX)
+
+	assert(sizeof(fid->st_gen) >= sizeof(stat_buf->st_gen));
+	if (fid->device == stat_buf->st_dev && fid->inode == stat_buf->st_ino &&  (
+#ifdef _AIX
+	     FS_REMOTE == stat_buf->st_flag ? TRUE :
+#endif
+	     fid->st_gen == stat_buf->st_gen))
+#else
+	if (fid->device == stat_buf->st_dev && fid->inode == stat_buf->st_ino)
+#endif
+		return TRUE;
+	else
+		return FALSE;
+}
+
+bool is_gdid_gdid_identical(gd_id_ptr_t fid_1, gd_id_ptr_t fid_2)
+{
+#if defined(__osf__) || defined(_AIX)
+	if (fid_1->device == fid_2->device && fid_1->inode == fid_2->inode && fid_1->st_gen == fid_2->st_gen)
+#else
+	if (fid_1->device == fid_2->device && fid_1->inode == fid_2->inode)
+#endif
+		return TRUE;
+	else
+		return FALSE;
+}
+
+void set_gdid_from_stat(gd_id_ptr_t fid, struct stat *stat_buf)
+{
+	assert(sizeof(gd_id) <= sizeof(gds_file_id));
+	fid->inode = stat_buf->st_ino;
+	fid->device = stat_buf->st_dev;
+#if defined(__osf__)
+	fid->st_gen = stat_buf->st_gen;
+#elif defined(_AIX)
+	if (FS_REMOTE != stat_buf->st_flag)
+		fid->st_gen = stat_buf->st_gen;
+	else
+		fid->st_gen = 0;   /* AIX has garbage for NFS files */
+#endif
+}
+
+/*
+ * Here we create a unique_id for a file.
+ */
+boolean_t filename_to_id(char *filename, char *unique_id)
+{
+        struct stat	filestat;
+	int		stat_res;
+
+	STAT_FILE(filename, &filestat, stat_res);
+	if (stat_res)
+		return FALSE;
+	stat_to_id(&filestat, unique_id);
+	return TRUE;
+}
+
+/*
+ * Here we create a unique_id from a file's filestat.
+ */
+void stat_to_id(struct stat *filestat, char *unique_id)
+{
+	unsigned char	*ptr;
+	gd_id_ptr_t	fid;
+
+	fid = (gd_id_ptr_t)unique_id;
+	fid->inode = filestat->st_ino;
+	fid->device = filestat->st_dev;
+	fid->st_gen = 0;
+#if defined(__osf__) || defined(_AIX)
+#ifdef _AIX
+	if (FS_REMOTE == filestat->st_flag)
+#endif
+		fid->st_gen = filestat->st_gen;
+#else
+#endif
+}

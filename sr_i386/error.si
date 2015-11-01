@@ -1,0 +1,58 @@
+#################################################################
+#								#
+#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+	.sbttl	error.si
+#	PAGE	+
+#-----------------------------------------------
+# Mumps error condition handler macros
+#-----------------------------------------------
+chnd_size	=	168
+chnd_save_active =	0
+chnd_ch_active	=	4
+chnd_ch		=	8
+chnd_jmp	=	12
+
+.data
+.extern	ctxt
+.extern	active_ch
+
+.text
+#	setjmp is really __sigsetjmp(env,0)
+.extern	__sigsetjmp
+
+	.sbttl	error.si    ESTABLISH
+.macro ESTABLISH  x, label
+	addl	$chnd_size,ctxt			# ctxt++
+	movl	ctxt,%eax
+	movl	active_ch,%edx			# ctxt->save_active_ch = active_ch
+	movl	%edx,chnd_save_active(%eax)
+	movl	$0,chnd_ch_active(%eax)		# ctxt->ch_active = FALSE
+	movl	%eax,active_ch			# active_ch = ctxt
+	movl	$\x,chnd_ch(%eax)		# ctxt->ch = x
+	addl	$chnd_jmp,%eax			# setjmp(ctxt->jnp)
+	pushl	$0
+	pushl 	%eax
+	call 	__sigsetjmp
+	addl  	$8,%esp
+	incl  	%eax
+	jne  	\label
+	REVERT
+	jmp  	return
+\label:
+.endm
+
+	.sbttl	error.si    REVERT
+.macro REVERT
+	movl	ctxt,%eax			# active_ch = ctxt->save_active_c
+	movl	chnd_save_active(%eax),%eax
+	movl	%eax,active_ch
+	subl  	$chnd_size,ctxt			# ctxt--
+.endm

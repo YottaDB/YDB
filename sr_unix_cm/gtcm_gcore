@@ -1,0 +1,11 @@
+:
+date >> $gtm_dist/log/gtcm_gcore.log
+ps -ef >> $gtm_dist/log/gtcm_gcore.log
+ps -ea | grep 'dmna' | awk '{ print "gcore ",$1 }' | sh >> $gtm_dist/log/gtcm_gcore.log 2>&1
+
+while [ $# -gt 0 ]
+do
+	gcore $1 >> $gtm_dist/log/gtcm_gcore.log 2>&1
+	shift
+done
+

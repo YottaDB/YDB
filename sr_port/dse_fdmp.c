@@ -1,0 +1,96 @@
+/****************************************************************
+ *								*
+ *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
+ ****************************************************************/
+
+#include "mdef.h"
+
+#include "mlkdef.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsfhead.h"
+#include "gtmctype.h"
+#include "cli.h"
+#include "dse.h"
+#include "gvsub2str.h"
+#include "zshow.h"
+
+GBLREF enum dse_fmt	dse_dmp_format;
+GBLREF gd_region	*gv_cur_region;
+GBLREF char	 	patch_comp_key[MAX_KEY_SZ + 1];
+
+static unsigned char	*work_buff;
+static unsigned int	work_buff_length;
+
+#define MAX_ZWR_INFLATION	6 	/* This factor is also used in other places and should be moved to a central include file.
+					 * it assumes that the worst case is that every other character
+				  	 * is a non-graphis with a 3 digit code (e.g. "a"_$c(127)_"a"_$C(127)...
+					 * which leads to (n / 2 * 4) + n / 2 * 8) = n / 2 * 12 = n * 6 */
+
+boolean_t dse_fdmp(sm_uc_ptr_t data, int len)
+{
+	unsigned char	*key_char_ptr, temp[MAX_KEY_SZ + 1], *temp_char_ptr, *top, *work_char_ptr;
+	int 		dest_len;
+
+	if (work_buff_length < (MAX_ZWR_INFLATION * gv_cur_region->max_rec_size))
+	{
+		work_buff_length = MAX_ZWR_INFLATION * gv_cur_region->max_rec_size;
+		if (work_buff)
+			free (work_buff);
+		work_buff = (unsigned char *)malloc(work_buff_length);
+	}
+	work_char_ptr = work_buff;
+	*work_char_ptr++ = '^';
+	for (key_char_ptr = (uchar_ptr_t)patch_comp_key; *key_char_ptr ; key_char_ptr++)
+		if (PRINTABLE(*key_char_ptr))
+			*work_char_ptr++ = *key_char_ptr;
+		else
+			return FALSE;
+	key_char_ptr++;
+	if (*key_char_ptr)
+	{
+		*work_char_ptr++ = '(';
+		for (;;)
+		{
+			top = gvsub2str(key_char_ptr, temp, TRUE);
+			for (temp_char_ptr = temp; temp_char_ptr < top ;temp_char_ptr++)
+			{
+				if (!PRINTABLE(*temp_char_ptr))
+					return FALSE;
+				*work_char_ptr++ = *temp_char_ptr;
+			}
+			for (; *key_char_ptr ; key_char_ptr++)
+				;
+			key_char_ptr++;
+			if (*key_char_ptr)
+				*work_char_ptr++ = ',';
+			else
+				break;
+		}
+		*work_char_ptr++ = ')';
+	}
+	assert(MAX_KEY_SZ >= work_char_ptr - work_buff);
+	if (GLO_FMT == dse_dmp_format)
+	{
+		if (!dse_fdmp_output(work_buff, (work_char_ptr - work_buff)))
+			return FALSE;
+		if (!dse_fdmp_output(data, len))
+			return FALSE;
+	} else
+	{
+		assert(ZWR_FMT == dse_dmp_format);
+		*work_char_ptr++ = '=';
+		format2zwr(data, len, work_char_ptr, &dest_len);
+		if (!dse_fdmp_output(work_buff, work_char_ptr + dest_len - work_buff))
+			return FALSE;
+	}
+	return TRUE;
+}
