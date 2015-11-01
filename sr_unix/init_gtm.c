@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,6 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "gtmimagename.h"
 #include "op.h"
 #include "tp_timeout.h"
 #include "ctrlc_handler.h"
@@ -43,15 +42,12 @@ GBLREF void		(*ctrlc_handler_ptr)();
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF void		(*unw_prof_frame_ptr)(void);
 
-GBLREF enum gtmImageTypes	image_type;
 GBLREF mstr			default_sysid;
 GBLDEF boolean_t		gtm_startup_active = FALSE;
 
 void init_gtm(void)
 {
 	struct startup_vector   svec;
-
-	image_type = GTM_IMAGE;
 
 	/* We believe much of our code depends on these relationships.  */
 	assert (sizeof(int) == 4);

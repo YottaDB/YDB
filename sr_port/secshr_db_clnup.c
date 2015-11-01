@@ -214,21 +214,22 @@ void secshr_db_clnup(boolean_t termination_mode)
 					*/
 					CHECK_LATCH(&csa->nl->wc_var_lock);
 #endif
-					if (TRUE == csa->timer)
+					if (ABNORMAL_TERMINATION == termination_mode)
 					{
-						if (-1 < csa->nl->wcs_timers) /* private flag is optimistic: don't over do */
-                                                        CAREFUL_DECR_CNT(&csa->nl->wcs_timers, &csa->nl->wc_var_lock);
-                                                csa->timer = FALSE;
-					}
-					VMS_ONLY(
-						if ((ABNORMAL_TERMINATION == termination_mode) && csa->read_write && csa->ref_cnt)
+						if (csa->timer)
+						{
+							if (-1 < csa->nl->wcs_timers) /* private flag is optimistic: dont overdo */
+								CAREFUL_DECR_CNT(&csa->nl->wcs_timers, &csa->nl->wc_var_lock);
+							csa->timer = FALSE;
+						}
+						if (csa->read_write && csa->ref_cnt)
 						{
 							assert(0 < csa->nl->ref_cnt);
 							csa->ref_cnt--;
 							assert(!csa->ref_cnt);
 							CAREFUL_DECR_CNT(&csa->nl->ref_cnt, &csa->nl->wc_var_lock);
 						}
-					)
+					}
 					if ((csa->in_wtstart) && (0 < csa->nl->in_wtstart))
 						CAREFUL_DECR_CNT(&csa->nl->in_wtstart, &csa->nl->wc_var_lock);
 					csa->in_wtstart = FALSE;	/* Let wcs_wtstart run for exit processing */
@@ -656,7 +657,6 @@ void secshr_db_clnup(boolean_t termination_mode)
 
 							if (csa->jnl->free_update_inprog)
 							{
-							 	jbp->lastaddr = csa->jnl->lastwrite;
 								jbp->free = csa->jnl->temp_free;
 								jbp->freeaddr = csa->jnl->new_freeaddr;
 							}

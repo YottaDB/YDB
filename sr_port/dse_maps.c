@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_time.h"
 
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -67,7 +68,7 @@ GBLREF unsigned int	cr_array_index;
 GBLREF boolean_t	block_saved;
 GBLREF boolean_t        unhandled_stale_timer_pop;
 GBLREF unsigned char    *non_tp_jfb_buff_ptr;
-
+GBLREF jnl_gbls_t	jgbl;
 
 void dse_maps(void)
 {
@@ -231,6 +232,7 @@ void dse_maps(void)
 			block_saved = FALSE;
 			if (JNL_ENABLED(cs_data))
 			{
+				JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() and jnl_write_aimg_rec() */
 				jnl_status = jnl_ensure_open();
 				if (0 == jnl_status)
 				{

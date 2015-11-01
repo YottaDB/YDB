@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -140,9 +140,10 @@ static boolean_t first_timeset = TRUE;
 volatile static GT_TIMER *timefree = NULL;
 static int4 timeblk_hdrlen;
 /*
- * Initialized blockalrm can be used by all
+ * Initialized blockalrm and block_sigsent can be used by all
  */
 GBLDEF sigset_t	blockalrm;
+GBLDEF sigset_t	block_sigsent;	/* block all signals that can be sent externally (SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT) */
 /*
  * Save previous SIGALRM handler if any.
  */
@@ -208,10 +209,16 @@ void	prealloc_gt_timers(void)
 	}
 	assert(((char *)timeblk - (char *)timeblks) == (timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN) * INIT_GT_TIMERS);
 
-	/* While we are initializing things, initialize blockalrm */
+	/* While we are initializing things, initialize blockalrm and block_sigsent */
 	sigemptyset(&blockalrm);
 	sigaddset(&blockalrm, SIGALRM);
 
+	sigemptyset(&block_sigsent);
+	sigaddset (&block_sigsent, SIGINT);
+	sigaddset (&block_sigsent, SIGQUIT);
+	sigaddset (&block_sigsent, SIGTERM);
+	sigaddset (&block_sigsent, SIGTSTP);
+	sigaddset (&block_sigsent, SIGCONT);
 }
 
 /*

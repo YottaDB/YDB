@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -560,7 +560,7 @@ void rc_send_cpt(rc_xblk_hdr *head, rc_rsp_page *last_aq)	/* Zero if no read op 
 		GET_LONG(blknum, last_aq->pageaddr);
 		if ((b = bt_get(blknum)) ? (int4)rc_read_stamp <= (int4)b->tn :
 			((int4)rc_read_stamp <=
-				(int4)((th_rec *)((unsigned char *)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn))
+				(int4)((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn))
 		{
 			last_aq->hdr.a.erc.value = RC_NETERRRETRY;
 		}

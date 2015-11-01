@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "hashdef.h"
 #include "lv_val.h"
 #include "mv_stent.h"
@@ -147,8 +148,15 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 		curr_symval->lv_flist = mv_st_ent->mv_st_cont.mvs_nval.mvs_val;
 		return 0;
 	case MVST_STCK:
-		*(mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_addr) =
-			(unsigned char *)mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_val;
+		if (0 < mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_size)
+		{
+			memcpy(*(mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_addr), (char*)mv_st_ent+mvs_size[MVST_STCK],
+				mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_size);
+		}
+		else {
+			*(mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_addr) =
+				(unsigned char *)mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_val;
+		}
 		return 0;
 	case MVST_TVAL:
 		dollar_truth = (boolean_t)mv_st_ent->mv_st_cont.mvs_tval;

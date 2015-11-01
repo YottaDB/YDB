@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,10 +31,11 @@ short key_len;
 short *subcnt;
 #endif
 /* return a pointer that points after the last char added */
-{	short		t_len;
+{
+	short		t_len;
 	unsigned char	*g, *g_top;
 	char		*length, *start;
-	char		buff[512], *b_top, *b, *c_top, *sub_start;
+	char		buff[MAX_ZWR_KEY_SZ], *b_top, *b, *c_top, *sub_start;
 
 	c_top = c + max_size;
 	g = key;

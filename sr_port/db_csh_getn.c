@@ -139,58 +139,65 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				continue;
 			}
 		}
-		if (0 != cr->dirty)
-		{
-			if (cr->dirty >= cr->flushed_dirty_tn) /* the block needs to be flushed */
-			{	/* cr->dirty == cr->flushed_dirty_tn can happen in a very small window wherein the block has
-				 * has actually been flushed by wcs_wtstart, but it hasn't yet cleared the dirty and epid field.
-				 * In this case, it is actually better to go ahead and reuse this cache-record but that would
-				 * add another if check to the most frequent codepath which we want to avoid.
-				 */
-				if (gv_cur_region->read_only)
-					continue;
-				if (lcnt < pass1)
-				{
-					if (!csa->timer && (csa->nl->wcs_timers < 1))
-						wcs_timer_start(gv_cur_region, FALSE);
-					continue;
-				}
-				BG_TRACE_PRO(db_csh_getn_flush_dirty);
-				if (FALSE == wcs_get_space(gv_cur_region, 0, cr))
-				{	/* failed to flush it out - force a rebuild */
-					BG_TRACE_PRO(wc_blocked_db_csh_getn_wcsstarvewrt);
-					assert(FALSE);
-					break;
-				}
-			} else
-			{	/* cr->dirty should have become 0 immediately after the if (0 != cr->dirty) check but before
-				 * the if (cr->dirty >= flushed_dirty_tn) check.
-				 */
-				assert(0 == cr->dirty);
-				cr->dirty = 0;	/* something dropped the bits; fix it and proceed */
-			}
-		}
-		UNIX_ONLY(
-		/* the cache-record is not free for reuse until the write-latch value becomes LATCH_CLEAR.
-		 * In VMS, since resetting the write-latch value occurs in wcs_wtfini() which is in CRIT, we are fine.
-		 * In Unix, this resetting is done by wcs_wtstart() which is out-of-crit. Therefore, we need to wait
-		 * 	for this value to be LATCH_CLEAR before reusing this cache-record.
-		 */
-		else if (LATCH_CLEAR != WRITE_LATCH_VAL(cr))
-		{	/* possible if a concurrent wcs_wtstart() has set cr->dirty to 0 but not yet cleared the latch.
-			 * this should be very rare though.
+		if (cr->dirty)
+		{	/* Note that in Unix, it is possible that we see a stale value of cr->dirty (possible if a
+			 * concurrent wcs_wtstart() has reset dirty to 0 but that update did not reach us yet). In this
+			 * case the call to wcs_get_space() below will do the necessary memory barrier instructions
+			 * (through calls to aswp()) which will allow us to see the non-stale value of cr->dirty.
+			 *
+			 * It is also possible that cr->dirty is non-zero but < cr->flushed_dirty_tn. In this case, wcs_get_space
+			 * done below will return FALSE forcing a cache-rebuild which will fix this situation.
+			 *
+			 * In VMS, another process cannot be concurrently resetting cr->dirty to 0 as the resetting routine
+			 * is wcs_wtfini() which is executed in crit which another process cannot be in as we are in crit now.
 			 */
-			if (lcnt < pass2)
-				continue;	/* try to find some other cache-record to reuse until the 3rd pass */
-			for (ocnt = 1; (MAXWRTLATCHWAIT >= ocnt) && (LATCH_CLEAR != WRITE_LATCH_VAL(cr)); ocnt++)
-				wcs_sleep(SLEEP_WRTLATCHWAIT);	/* since it is a short lock, sleep the minimum */
-			if (MAXWRTLATCHWAIT <= ocnt)
+			if (gv_cur_region->read_only)
+				continue;
+			if (lcnt < pass1)
 			{
-				BG_TRACE_PRO(db_csh_getn_wrt_latch_stuck);
-				assert(FALSE);
+				if (!csa->timer && (csa->nl->wcs_timers < 1))
+					wcs_timer_start(gv_cur_region, FALSE);
 				continue;
 			}
+			BG_TRACE_PRO(db_csh_getn_flush_dirty);
+			if (FALSE == wcs_get_space(gv_cur_region, 0, cr))
+			{	/* failed to flush it out - force a rebuild */
+				BG_TRACE_PRO(wc_blocked_db_csh_getn_wcsstarvewrt);
+				assert(FALSE);
+				break;
+			}
+			assert(0 == cr->dirty);
 		}
+		UNIX_ONLY(
+			/* the cache-record is not free for reuse until the write-latch value becomes LATCH_CLEAR.
+			 * In VMS, resetting the write-latch value occurs in wcs_wtfini() which is in CRIT, we are fine.
+			 * In Unix, this resetting is done by wcs_wtstart() which is out-of-crit. Therefore, we need to
+			 * 	wait for this value to be LATCH_CLEAR before reusing this cache-record.
+			 * Note that we are examining the write-latch-value without holding the interlock. It is ok to do
+			 * 	this because the only two routines that modify the latch value are bg_update() and
+			 * 	wcs_wtstart(). The former cannot be concurrently executing because we are in crit.
+			 * 	The latter will not update the latch value unless this cache-record is dirty. But in this
+			 * 	case we would have most likely gone through the if (cr->dirty) check above. Most likely
+			 * 	because there is one rare possibility where a concurrent wcs_wtstart() has set cr->dirty
+			 * 	to 0 but not yet cleared the latch. In that case we wait for the latch to be cleared.
+			 * 	In all other cases, nobody is modifying the latch since when we got crit and therefore
+			 * 	it is safe to observe the value of the latch without holding the interlock.
+			 */
+			if (LATCH_CLEAR != WRITE_LATCH_VAL(cr))
+			{	/* possible if a concurrent wcs_wtstart() has set cr->dirty to 0 but not yet
+				 * cleared the latch. this should be very rare though.
+				 */
+				if (lcnt < pass2)
+					continue; /* try to find some other cache-record to reuse until the 3rd pass */
+				for (ocnt = 1; (MAXWRTLATCHWAIT >= ocnt) && (LATCH_CLEAR != WRITE_LATCH_VAL(cr)); ocnt++)
+					wcs_sleep(SLEEP_WRTLATCHWAIT);	/* since it is a short lock, sleep the minimum */
+				if (MAXWRTLATCHWAIT <= ocnt)
+				{
+					BG_TRACE_PRO(db_csh_getn_wrt_latch_stuck);
+					assert(FALSE);
+					continue;
+				}
+			}
 		)
 		/* Note that before setting up a buffer for the requested block, we should make sure the cache-record's
 		 * 	read_in_progress is set. This is so that noone else in t_qread gets access to this empty buffer.

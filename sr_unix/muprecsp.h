@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,16 +9,11 @@
  *								*
  ****************************************************************/
 
-#ifndef __MUPRECSP_H__
-#define __MUPRECSP_H__
+#ifndef MUPRECSP_H_INCLUDED
+#define MUPRECSP_H_INCLUDED
 
-int4 mur_close(mur_rab *r);
-int4 mur_fopen(mur_rab *r, char *fna, int fnl);
-int4 mur_fread_eof(mur_rab *r, char *fna, int fnl);
-int4 mur_get_first(mur_rab *r);
-int4 mur_get_last(mur_rab *r);
-void mur_output_status(int4 status);
-void mur_open_files_error(ctl_list *curr, int fd);
-
+#define EXT_MJF		".mjf"
+#define EXT_BROKEN	".broken"
+#define EXT_LOST	".lost"
 
 #endif

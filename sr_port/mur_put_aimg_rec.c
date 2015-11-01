@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,8 @@
 #include "copy.h"
 #include "filestruct.h"
 #include "jnl.h"
+#include "hashdef.h"
+#include "buddy_list.h"
 #include "muprec.h"
 #include "util.h"
 
@@ -65,11 +67,11 @@ void mur_put_aimg_rec(jnl_record *rec)
 	assert(!cs_addrs->now_crit);
 
 	t_begin_crit(ERR_MURAIMGFAIL);
-	blk_num = rec->val.jrec_aimg.blknum;
+	blk_num = rec->jrec_aimg.blknum;
 	blk_size = cs_addrs->hdr->blk_size;
 	if (NULL == (bp = t_qread(blk_num, &dummy_hist.h[0].cycle, &dummy_hist.h[0].cr)))
 		GTMASSERT;
-	aimg_blk_ptr = (sm_uc_ptr_t)&rec->val.jrec_aimg.blk_contents[0];
+	aimg_blk_ptr = (sm_uc_ptr_t)&rec->jrec_aimg.blk_contents[0];
 	BLK_INIT(bs_ptr, bs1);
 	BLK_SEG(bs_ptr, (uchar_ptr_t)aimg_blk_ptr + sizeof(blk_hdr), (int)((blk_hdr_ptr_t)aimg_blk_ptr)->bsiz - sizeof(blk_hdr));
 	if (!BLK_FINI(bs_ptr, bs1))

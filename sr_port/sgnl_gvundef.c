@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,15 +21,13 @@
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_key		*gv_currkey;
 
-#define LCL_BUF_SIZE 256
-
 void sgnl_gvundef(void)
 {
-	unsigned char	buff[LCL_BUF_SIZE], *end;
+	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 	error_def(ERR_GVUNDEF);
 
-	if ((end = format_targ_key(&buff[0], LCL_BUF_SIZE, gv_currkey, TRUE)) == 0)
-	{	end = &buff[LCL_BUF_SIZE - 1];
+	if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
+	{	end = &buff[MAX_ZWR_KEY_SZ - 1];
 	}
 	rts_error(VARLSTCNT(4) ERR_GVUNDEF, 2, end - &buff[0], &buff[0]);
 }

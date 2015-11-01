@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001-2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,120 +11,128 @@
 
 #include "mdef.h"
 
+#include "min_max.h"
 #include "gtm_string.h"
+
+#ifdef VMS
+#include "iosb_disk.h"
+#endif
 
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
-#include "gdsblk.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
+#include "hashdef.h"
+#include "hashtab.h"
+#include "buddy_list.h"
 #include "muprec.h"
+#include "mur_read_file.h"
 #include "iosp.h"
-#include "util.h"
 #include "gtmmsg.h"
-#include "hashtab.h"	/* for init_hashtab() prototype */
 
+GBLREF	reg_ctl_list	*mur_ctl;
+GBLREF	int		mur_regno;
+GBLREF	jnl_ctl_list	*mur_jctl;
 GBLREF	mur_opt_struct	mur_options;
-GBLREF	int		mur_extract_bsize;
-GBLREF	char		*log_rollback;
 
-
-bool	mur_insert_prev(ctl_list *ctl, ctl_list **jnl_files)
+boolean_t mur_insert_prev(void)
 {
-	ctl_list	*curr;
-	jnl_file_header	*header, *prev_header;
-	int		status;
+	reg_ctl_list	*rctl;
+	jnl_ctl_list	*new_jctl, *cur_jctl, *jctl;
+	redirect_list	*rl_ptr;
+	boolean_t	proceed;
 
-	header = mur_get_file_header(ctl->rab);
-	if (0 == header->prev_jnl_file_name_length)
-         	return mur_report_error(ctl, MUR_MISSING_PREVLINK);
-	curr = (ctl_list *)malloc(sizeof(ctl_list));
-	memset(curr, 0, sizeof(ctl_list));
-	curr->next = ctl;
-	curr->prev = ctl->prev;
-	if (NULL != ctl->prev)
+	error_def(ERR_DBJNLNOTMATCH);
+	error_def(ERR_JNLBADRECFMT);
+	error_def(ERR_MUJNLPREVGEN);
+	error_def(ERR_JNLTNOUTOFSEQ);
+	error_def(ERR_JNLCYCLE);
+
+	rctl = &mur_ctl[mur_regno];
+	jctl = mur_jctl;
+   	assert(rctl->jctl_head == jctl);
+   	assert(rctl->jctl == jctl);
+	new_jctl = (jnl_ctl_list *)malloc(sizeof(jnl_ctl_list));
+	memset(new_jctl, 0, sizeof(jnl_ctl_list));
+	memcpy(new_jctl->jnl_fn, jctl->jfh->prev_jnl_file_name, jctl->jfh->prev_jnl_file_name_length);
+	new_jctl->jnl_fn_len = jctl->jfh->prev_jnl_file_name_length;
+	assert(0 != new_jctl->jnl_fn_len);
+	if (FALSE == mur_fopen(new_jctl))
 	{
-		assert(FALSE == ctl->concat_prev);
-		assert(FALSE == ctl->prev->concat_next);
-		ctl->prev->next = curr;
-	} else
-	{
-		assert(*jnl_files == ctl);
-		*jnl_files = curr;
+		free(new_jctl);
+		return FALSE;	/* mur_fopen() would have printed the appropriate error message */
 	}
-	ctl->prev = curr;
-	ctl->concat_prev = TRUE;
-	curr->concat_next = TRUE;
-	curr->concat_prev = FALSE;
-	if (log_rollback)
+	mur_jctl = new_jctl;	/* note: mur_fread_eof must be done after setting mur_ctl, mur_regno and mur_jctl */
+	if (SS_NORMAL != (new_jctl->status = mur_fread_eof(new_jctl)))
 	{
-		util_out_print("MUR-I-JNLPREVGEN: Database File  ---->  !AD", TRUE,
-					header->data_file_name_length, header->data_file_name);
-		util_out_print("                  Current Generation Jnl File  ---->  !AD", TRUE, ctl->jnl_fn_len, ctl->jnl_fn);
-		util_out_print("                  Previous Generation Jnl File  ---->  !AD", TRUE,
-								header->prev_jnl_file_name_length, header->prev_jnl_file_name);
-	}
-	curr->jnl_fn_len = header->prev_jnl_file_name_length;
-	memcpy(curr->jnl_fn, header->prev_jnl_file_name, curr->jnl_fn_len);
-	curr->gd = ctl->gd;
-	curr->db_ctl = ctl->db_ctl;
-	curr->db_tn = ctl->db_tn;
-	curr->turn_around_tn = ctl->turn_around_tn;
-	curr->jnl_tn = ctl->jnl_tn;
-	curr->jnl_state = ctl->jnl_state;
-	curr->repl_state = ctl->repl_state;
-	curr->tab_ptr = ctl->tab_ptr;
-	curr->rab = mur_rab_create(MINIMUM_BUFFER_SIZE);
-	/* When we are processing previous generation file, database should have before image journaled
-	 * Assign before image flag of previous generation to be the same as latest generation opened */
-	curr->before_image = ctl->before_image;
-	/* Initiate hashtable for the previous generation also, used in pini_addr tracking */
-	init_hashtab(&curr->pini_in_use, MUR_PINI_IN_USE_INIT_ELEMS);
-	if (SS_NORMAL != (status = mur_fopen(curr->rab, curr->jnl_fn, curr->jnl_fn_len)))
-	{
-		gtm_putmsg(VARLSTCNT(1) status);
-		VMS_ONLY(mur_open_files_error(curr);)
-		UNIX_ONLY(mur_open_files_error(curr, NO_FD_OPEN);)
+		gtm_putmsg(VARLSTCNT(6) ERR_JNLBADRECFMT, 3, new_jctl->jnl_fn_len, new_jctl->jnl_fn,
+				new_jctl->rec_offset, new_jctl->status);
+		mur_jctl = jctl;
 		return FALSE;
 	}
-	if (SS_NORMAL != (status = mur_fread_eof(curr->rab, curr->jnl_fn, curr->jnl_fn_len)))
+	assert(!mur_options.forward || (!(jctl->jfh->recover_interrupted && !new_jctl->jfh->recover_interrupted)));
+	/* Skip the continuty of journal files check if both of these are true:
+	 * 1) if current generation was created by recover and
+	 * 2) the new one to be inserted was not created by recover
+	 */
+	if (!(jctl->jfh->recover_interrupted && !new_jctl->jfh->recover_interrupted))
 	{
-		gtm_putmsg(VARLSTCNT(1) status);
-		VMS_ONLY(mur_open_files_error(curr);)
-		UNIX_ONLY(mur_open_files_error(curr, NO_FD_OPEN);)
-		return FALSE;
+		if (!new_jctl->properly_closed)
+		{
+			proceed = (FALSE == mur_report_error(MUR_PREVJNLNOEOF));/* mur_report_error() will print error message */
+			if (mur_options.update || !proceed)
+			{
+				mur_jctl = jctl;
+				return FALSE;
+			}
+		}
+		if ((!mur_options.forward || !mur_options.notncheck) && (new_jctl->jfh->eov_tn != jctl->jfh->bov_tn))
+		{
+			gtm_putmsg(VARLSTCNT(8) ERR_JNLTNOUTOFSEQ, 6,
+				new_jctl->jfh->eov_tn, new_jctl->jnl_fn_len, new_jctl->jnl_fn,
+				jctl->jfh->bov_tn, jctl->jnl_fn_len, jctl->jnl_fn);
+			mur_jctl = jctl;
+			return FALSE;
+		}
 	}
-	prev_header = mur_get_file_header(curr->rab);
-	COPY_BOV_FIELDS_FROM_JNLHDR_TO_CTL(prev_header, curr);
-	if ((FALSE == mur_jnlhdr_bov_check(prev_header, curr->jnl_fn_len, curr->jnl_fn))
-			|| (FALSE == mur_jnlhdr_multi_bov_check(prev_header, curr->jnl_fn_len, curr->jnl_fn,
-								header, curr->next->jnl_fn_len, curr->next->jnl_fn, TRUE)))
-		return FALSE;
-	header = prev_header;
-	if (!mur_options.forward  &&  !header->before_images)
+	if ((rctl->gd->dyn.addr->fname_len != new_jctl->jfh->data_file_name_length) ||
+		(0 != memcmp(new_jctl->jfh->data_file_name, rctl->gd->dyn.addr->fname, rctl->gd->dyn.addr->fname_len)))
 	{
-		util_out_print("Journal file !AD does not contain before-images;  cannot do backward recovery", TRUE,
-				curr->jnl_fn_len, curr->jnl_fn);
-		VMS_ONLY(mur_open_files_error(curr);)
-		UNIX_ONLY(mur_open_files_error(curr, NO_FD_OPEN);)
-		return FALSE;
+		for (rl_ptr = mur_options.redirect;  (NULL != rl_ptr);  rl_ptr = rl_ptr->next)
+		{
+			if ((new_jctl->jfh->data_file_name_length == rl_ptr->org_name_len)
+				&& (0 == memcmp(new_jctl->jfh->data_file_name,
+					rl_ptr->org_name, rl_ptr->org_name_len)))
+				break;
+		}
+		if (NULL == rl_ptr)
+		{
+			gtm_putmsg(VARLSTCNT(8) ERR_DBJNLNOTMATCH, 6, DB_LEN_STR(rctl->gd), new_jctl->jnl_fn_len,
+					new_jctl->jnl_fn, new_jctl->jfh->data_file_name_length,
+					new_jctl->jfh->data_file_name);
+			mur_jctl = jctl;
+			return FALSE;
+		}
 	}
-	if (NULL != mur_options.losttrans_file_info)
+	for (cur_jctl = rctl->jctl_head; cur_jctl; cur_jctl = cur_jctl->next_gen)
 	{
-		if (header->max_record_length > mur_extract_bsize)
-			mur_extract_bsize = header->max_record_length;
-		if (0 == mur_extract_bsize)
-			mur_extract_bsize = DEFAULT_EXTR_BUFSIZE;
+		if (new_jctl->jfh->prev_jnl_file_name_length == cur_jctl->jnl_fn_len &&
+			0 == memcmp(new_jctl->jfh->prev_jnl_file_name, cur_jctl->jnl_fn, cur_jctl->jnl_fn_len))
+		{
+			gtm_putmsg(VARLSTCNT(6) ERR_JNLCYCLE, 4, cur_jctl->jnl_fn_len, cur_jctl->jnl_fn, DB_LEN_STR(rctl->gd));
+			mur_jctl = jctl;
+			return FALSE;
+		}
+		if (new_jctl->jfh->turn_around_offset && cur_jctl->jfh->turn_around_offset)
+			GTMASSERT; /* out of design situation */
 	}
-	if (NULL != mur_options.extr_file_info)
-	{
-		if (header->max_record_length > mur_extract_bsize)
-			mur_extract_bsize = header->max_record_length;
-		if (0 == mur_extract_bsize)
-			mur_extract_bsize = DEFAULT_EXTR_BUFSIZE;
-	}
+	new_jctl->prev_gen = NULL;
+	new_jctl->next_gen = jctl;
+	jctl->prev_gen = new_jctl;
+	rctl->jctl = rctl->jctl_head = new_jctl;
+	gtm_putmsg(VARLSTCNT(6) ERR_MUJNLPREVGEN, 4, new_jctl->jnl_fn_len, new_jctl->jnl_fn, DB_LEN_STR(mur_ctl[mur_regno].gd));
 	return TRUE;
 }

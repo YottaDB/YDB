@@ -60,6 +60,7 @@ enum
 	SV_ZININTERRUPT,	/* 47 */
 	SV_ZJOB,                /* 48 */
 	SV_ZDATE_FORM, 		/* 49 */
-	SV_NUM_SV,		/* 50 */
+	SV_ZTEXIT,		/* 50 */
+	SV_NUM_SV,		/* 51 */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

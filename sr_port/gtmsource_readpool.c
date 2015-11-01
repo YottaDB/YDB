@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,8 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "jnl.h"
+#include "hashdef.h"
+#include "buddy_list.h"
 #include "muprec.h"
 #include "repl_ctl.h"
 #include "repl_errno.h"
@@ -86,8 +88,7 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen)
 				if (jnlpool_hasnt_overflowed(jnlpool.gtmsource_local->read_addr))
 				{
 					/* No overflow */
-					assert(QWEQ(jnlpool.gtmsource_local->read_jnl_seqno,
-							((jnl_record *)buff)->val.jrec_tset.jnl_seqno));
+					assert(QWEQ(jnlpool.gtmsource_local->read_jnl_seqno, GET_REPL_JNL_SEQNO(buff)));
 
 #ifdef REPL_DEBUG
 					repl_dbg_source_save_read = jnlpool.gtmsource_local->read;

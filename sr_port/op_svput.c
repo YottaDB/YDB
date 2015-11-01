@@ -65,7 +65,9 @@ GBLREF mval		dollar_zinterrupt;
 GBLREF boolean_t	ztrap_new;
 GBLREF stack_frame	*error_frame;
 GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
-GBLREF int 		zdate_form;
+GBLREF int4		zdate_form;
+GBLREF mval		dollar_ztexit;
+GBLREF boolean_t	dollar_ztexit_bool;
 
 void op_svput(int varnum, mval *v)
 {
@@ -274,6 +276,15 @@ void op_svput(int varnum, mval *v)
 	case SV_ZDATE_FORM:
 		MV_FORCE_NUM(v);
 		zdate_form = (short)MV_FORCE_INT(v);
+		break;
+	case SV_ZTEXIT:
+		MV_FORCE_STR(v);
+		dollar_ztexit.mvtype = MV_STR;
+		dollar_ztexit.str = v->str;
+		/* Coercing $ZTEXIT to boolean at SET command is more efficient than coercing before each
+		 * rethrow at TR/TRO. Since we want to maintain dollar_ztexit as a string, coercion should
+		 * not be performed on dollar_ztext, but on a temporary (i.e. parameter v) */
+		dollar_ztexit_bool = MV_FORCE_BOOL(v);
 		break;
 	default:
 		GTMASSERT;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -199,7 +199,7 @@ XFER(xf_iocontrol, op_iocontrol),
 XFER(xf_fnfgncal, op_fnfgncal),
 XFER(xf_zcompile, op_zcompile),
 XFER(xf_tcommit, opp_tcommit),
-XFER(xf_trollback, op_trollback),
+XFER(xf_trollback, opp_trollback),
 XFER(xf_trestart, opp_trestart),
 XFER(xf_tstart, opp_tstart),
 XFER(xf_exp, op_exp),

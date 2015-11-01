@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,12 +30,13 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
-#include "hashtab.h"          /* needed for tp.h */
-#include "buddy_list.h"               /* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h */
+#include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "tp_timeout.h"
 #include "op.h"
 #include "have_crit.h"
+#include "gtm_caseconv.h"
 #include <varargs.h>
 
 error_def(ERR_STACKCRIT);
@@ -45,7 +46,6 @@ error_def(ERR_TPSTACKCRIT);
 error_def(ERR_TPSTACKOFLOW);
 error_def(ERR_TPTOODEEP);
 
-GBLDEF        char                    jn_tid[8];
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	short			dollar_tlevel;
@@ -67,16 +67,13 @@ GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
 GBLREF	bool			is_standalone;
 GBLREF 	void			(*tp_timeout_start_timer_ptr)(int4 tmout_sec);
 GBLREF  sgm_info                *first_sgm_info;
-GBLREF  uint4			cumul_jnl_rec_len;
 GBLREF  global_tlvl_info	*global_tlvl_info_head;
 GBLREF  buddy_list		*global_tlvl_info_list;
 GBLREF  sgmnt_data_ptr_t	cs_data;
 GBLREF  sgmnt_addrs		*cs_addrs;
 GBLREF  gd_region		*gv_cur_region;
-DEBUG_ONLY(
-GBLREF  uint4			cumul_index;
-GBLREF  uint4			cu_jnl_index;
-)
+GBLREF	struct_jrec_tcom	tcom_record;
+GBLREF jnl_gbls_t		jgbl;
 
 #define NORESTART -1
 #define ALLLOCAL  -2
@@ -119,6 +116,7 @@ va_dcl
 	global_tlvl_info	*gtli, *new_gtli, *prev_gtli;
 	kill_set		*ks, *prev_ks;
 	jnl_format_buffer 	*jfb, *prev_jfb;
+	unsigned char		tp_bat[TP_BATCH_LEN];
 
 	if (0 != jnl_fence_ctl.level)
 		rts_error(VARLSTCNT(4) ERR_TPMIXUP, 2, "An M", "a fenced logical");
@@ -126,10 +124,9 @@ va_dcl
 		rts_error(VARLSTCNT(1) ERR_TPTOODEEP);
 	if (0 == dollar_tlevel)
 	{
-		jnl_fence_ctl.region_count = 0;
 		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1;
-		cumul_jnl_rec_len = 0;
-		DEBUG_ONLY(cumul_index = cu_jnl_index = 0;)
+		jgbl.cumul_jnl_rec_len = 0;
+		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
 		t_tries = (FALSE == is_standalone) ? 0 : CDB_STAGNATE;
 		t_fail_hist[t_tries] = cdb_sc_normal;
 		/* ensure that we don't have crit on any region at the beginning of a TP transaction (be it GT.M or MUPIP) */
@@ -141,22 +138,25 @@ va_dcl
 			tp_reg_free_list = tr; 			/* Place on free queue */
 		}
 		++local_tn;					/* Begin new local transaction */
+		jgbl.wait_for_jnl_hard = TRUE;
 	}
 	va_start(varlst);
 	dollar_t = va_arg(varlst, int);
 	serial = va_arg(varlst, int);
 	tid = va_arg(varlst, mval *);
-
-/* To take the case of transaction id in extracting journal file */
+	memset(tcom_record.jnl_tid, 0, TID_STR_SIZE);
 	if ((0 == dollar_tlevel) && (0 != tid->str.len))
 	{
-
-		if (tid->str.len >= sizeof(jn_tid))
-			tid->str.len = sizeof(jn_tid) - 1;
-		memcpy(jn_tid, (char *)tid->str.addr, tid->str.len);
-		jn_tid[tid->str.len] = '\0';
+		if (tid->str.len > TID_STR_SIZE)
+			tid->str.len = TID_STR_SIZE;
+		memcpy(tcom_record.jnl_tid, (char *)tid->str.addr, tid->str.len);
+		if ((TP_BATCH_SHRT == tid->str.len) || (TP_BATCH_LEN == tid->str.len))
+		{
+			lower_to_upper(tp_bat, (uchar_ptr_t)tid->str.addr, tid->str.len);
+			if (0 == memcmp(TP_BATCH_ID, tp_bat, tid->str.len))
+				jgbl.wait_for_jnl_hard = FALSE;
+		}
 	}
-
 	prescnt = va_arg(varlst, int);
 	MV_FORCE_STR(tid);
 	if (prescnt > 0)
@@ -369,8 +369,8 @@ va_dcl
 			for (prev_jfb = NULL, jfb = si->jnl_head; jfb; jfb = jfb->next)
 				prev_jfb = jfb;
 			new_tli->tlvl_jfb_info = prev_jfb;
-			new_tli->tlvl_cumul_jrec_len = cumul_jnl_rec_len;
-			DEBUG_ONLY(new_tli->tlvl_cumul_index = cumul_index;)
+			new_tli->tlvl_cumul_jrec_len = jgbl.cumul_jnl_rec_len;
+			DEBUG_ONLY(new_tli->tlvl_cumul_index = jgbl.cumul_index;)
 		}
 		new_tli->next_tlevel_info = NULL;
 		if (prev_tli)

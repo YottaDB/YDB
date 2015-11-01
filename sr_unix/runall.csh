@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -169,7 +169,8 @@ gtm_dal_svc gtm_svc
 gtm_rpc_init gtm_svc
 daemon gtm_dmna
 gtmsecshr gtmsecshr
-mumps_clitab
+mumps_clitab mumps
+gtm_main mumps
 semstat2 semstat2
 ftok ftok
 gtcm_main gtcm_server
@@ -397,11 +398,12 @@ foreach lib_ (`cat ${TMP_DIR}_Lib_list`)
 	set library = $library.$libext
 	echo "-->  into $gtm_obj/$library <--"
 	gt_ar $gt_ar_option_update $gtm_obj/$library `cat $lib_`
-	echo ""
-	if ($status == 1) then
-		env
+	if ($status) then
+		if ($?RUNALL_DEBUG != 0) env
 		goto cleanup
 	endif
+	rm -f `cat $lib_`
+	echo ""
 end
 echo ""
 

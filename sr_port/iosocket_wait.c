@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,18 +33,23 @@
 #include "iotcpdef.h"
 #include "iosocketdef.h"
 #include "min_max.h"
+#include "outofband.h"
+
 #define	CONNECTED	"CONNECT"
 #define READ	"READ"
-GBLREF tcp_library_struct        tcp_routines;
+GBLREF tcp_library_struct	tcp_routines;
+GBLREF volatile int4		outofband;
+
 boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 {
 	struct 	timeval  	utimeout;
+	ABS_TIME		cur_time, end_time;
 	struct 	sockaddr_in     peer;           /* socket address + port */
         fd_set    		tcp_fd;
         d_socket_struct 	*dsocketptr;
         socket_struct   	*socketptr, *newsocketptr;
         char            	*errptr;
-        int4            	errlen, ii;
+        int4            	errlen, ii, msec_timeout;
 	int			rv, size, max_fd;
 	short			len;
         error_def(ERR_SOCKACPT);
@@ -67,11 +72,33 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	}
 	utimeout.tv_sec = timepar;
 	utimeout.tv_usec = 0;
-	do
+	msec_timeout = timeout2msec(timepar);
+	sys_get_curr_time(&cur_time);
+	add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+	for ( ; ; )
 	{
 		rv = tcp_routines.aa_select(max_fd + 1, (void *)&tcp_fd, (void *)0, (void *)0,
 			(timepar == NO_M_TIMEOUT ? (struct timeval *)0 : &utimeout));
-	} while (rv < 0 && errno == EINTR);
+		if (0 > rv && EINTR == errno)
+		{
+			if (OUTOFBANDNOW(outofband))
+			{
+				rv = 0;		/* treat as time out */
+				break;
+			}
+			sys_get_curr_time(&cur_time);
+			cur_time = sub_abs_time(&end_time, &cur_time);
+			if (0 > cur_time.at_sec)
+			{
+				rv = 0;		/* time out */
+				break;
+			}
+			utimeout.tv_sec = cur_time.at_sec;
+			utimeout.tv_usec = cur_time.at_usec;
+		}
+		else
+			break;	/* either other error or done */
+	}
 	if (rv == 0)
 	{
 		dsocketptr->dollar_key[0] = '\0';

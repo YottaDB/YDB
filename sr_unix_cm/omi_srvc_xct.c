@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,8 +84,6 @@ int	omi_srvc_xact (omi_conn *cptr)
 	char		buff[OMI_BUFSIZ], *bptr, *xend, *bend;
 
 #ifdef BSD_TCP
-	extern int	 errno;
-
 	int		 cc;
 
 /*	If true, an error occurred */
@@ -128,8 +126,6 @@ int	omi_srvc_xact (omi_conn *cptr)
 #else /* defined(BSD_TCP) */
 
 #ifdef FILE_TCP
-	extern int	 errno;
-
 	int		 cc;
 
 	cc = &cptr->buff[cptr->bsiz] - &cptr->bptr[cptr->blen];

@@ -1,6 +1,6 @@
 /****************************************************************
- *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "min_max.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gtm_facility.h"
@@ -17,432 +18,388 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "muprec.h"
 #include "copy.h"
 #include "util.h"
+#include "hashdef.h"
+#include "buddy_list.h"
+#include "muprec.h"
+#include "iosp.h"
+#include "gtmmsg.h"	/* for gtm_putmsg() prototype */
+#include "dbfilop.h"	/* for dbfilop() prototype */
 
-#define ASSERT_MATCH(X,Y)	assert(&X.pini_addr == &Y.pini_addr); \
-				assert(&X.short_time == &Y.short_time); \
-				assert(&X.recov_short_time == &Y.recov_short_time); \
-				assert(&X.mumps_node == &Y.mumps_node); \
-				assert(&X.tn == &Y.tn)
-
-
-GBLDEF	int		participants;
+GBLREF 	jnl_gbls_t	jgbl;
+GBLREF  int		mur_regno;
+GBLREF 	mur_gbls_t	murgbl;
+GBLREF 	mur_rab_t	mur_rab;
+GBLREF	jnl_ctl_list	*mur_jctl;
+GBLREF	reg_ctl_list	*mur_ctl;
 GBLREF	mur_opt_struct	mur_options;
-GBLREF  seq_num		consist_jnl_seqno;
-GBLREF	seq_num		min_epoch_jnl_seqno;
-GBLREF	seq_num		max_epoch_jnl_seqno;
-GBLREF	seq_num		seq_num_zero, seq_num_minus_one;
-GBLREF	char		*log_rollback;
-GBLREF	broken_struct	*broken_array;
-GBLREF	int4		mur_error_count;
+LITREF	int		jrt_update[JRT_RECTYPES];
+LITREF	boolean_t	jrt_is_replicated[JRT_RECTYPES];
 
 
-
-/*
- *	This routine performs backward processing.  It returns TRUE unless either:
- *	     -	a disallowed error occurs;  OR
- *	     -	BACKWARD has been specified, and we've reached the "turn-around"
- *		point in the journal file.
- *
- *	The "turn-around" point is always the most recent EPOCH record whose
- *	timestamp is prior to the SINCE time, provided that there are no broken
- *	transactions that are still in progress at that point.  If there ARE,
- *	then it's the most recent EPOCH record at which there are no longer any
- *	outstanding broken transactions, or at which we have exceeded either of
- *	the LOOKBACK_LIMIT parameters, whichever occurs first.
- */
-
-bool	mur_back_process(ctl_list *ctl)
+static uint4 save_turn_around_point(reg_ctl_list *rctl)
 {
-	bool			proceed = TRUE, eof, broken;
-	uint4			pini_addr, turn_around_stop_addr;
-	uint4			rec_time, status;
-	token_num		token;
-	jnl_record		*rec;
-	jnl_process_vector	*pv;
-	struct current_struct	*curr;
-	enum jnl_record_type 	rectype;
-	seq_num			local_jnl_seqno;
-	seq_num			tempqw_seqno;
-	uint4			tempdw_seqno;
-	unsigned char		*ptr, qwstring[100];
-	unsigned char		*ptr1, qwstring1[100];
-
-	rec = (jnl_record *)ctl->rab->recbuff;
-
-	rectype = REF_CHAR(&rec->jrec_type);
-
-	switch(REF_CHAR(&rec->jrec_type))
+	error_def(ERR_TRNARNDTNHI);
+	assert(NULL == rctl->jctl_turn_around);
+	assert(0 == mur_jctl->turn_around_offset);
+	rctl->jctl_turn_around = mur_jctl;
+	if (NULL != rctl->csd && mur_jctl->turn_around_tn > rctl->csd->trans_hist.curr_tn)
 	{
-	default:
-		proceed = mur_report_error(ctl, MUR_UNKNOWN);
-		break;
-
-	case JRT_ALIGN:
-	case JRT_NULL:
-		break;
-
-	case JRT_INCTN:
-	case JRT_AIMG:
-		rec_time = rec->val.jrec_inctn.short_time;
-		if (mur_options.lookback_opers_specified)
-			++ctl->lookback_count;
-		break;
-
-	case JRT_PFIN:
-		if (mur_lookup_current(ctl, rec->val.jrec_pfin.pini_addr) != NULL)
-			/* Entries for this process were seen subsequent to the PFIN */
-			GTMASSERT;
-		/* drop through ... */
-
-	case JRT_PINI:
-		/* Needs to be done only when we are updating, beacuse we may need it for lost trans. The check for PINI is needed
-		due to drop through above */
-		if (mur_options.update)
-		{
-			if (rectype == JRT_PINI)
-				pini_addr = ctl->rab->dskaddr;
-			else
-			{
-				assert(rectype == JRT_PFIN);
-				pini_addr = rec->val.jrec_pfin.pini_addr;
-			}
-			if ((NULL  == mur_get_pini_jpv(ctl, pini_addr)))
-				proceed = mur_report_error(ctl, MUR_NOPINI);
-		}
-		assert(&rec->val.jrec_pini.process_vector[CURR_JPV] == &rec->val.jrec_pfin.process_vector);
-		if (0 == rec->val.jrec_pini.process_vector[SRVR_JPV].jpv_pid
-			&& 0 ==  rec->val.jrec_pini.process_vector[SRVR_JPV].jpv_image_count)
-			rec_time = JNL_S_TIME_PINI(rec, jrec_pini, ORIG_JPV);
-		else
-			rec_time = JNL_S_TIME_PINI(rec, jrec_pini, SRVR_JPV);
-		break;
-
-	case JRT_PBLK:
-		rec_time = rec->val.jrec_pblk.short_time;
-			/* Don't apply PBLK's to the database if VERIFY was specified,
-		   		in case any errors are encountered before we reach the turn-around point */
-		if (mur_options.update  &&  !mur_options.forward  &&  !mur_options.verify)
-			mur_output_record(ctl);
-		break;
-
-	case JRT_EPOCH:
-		rec_time = rec->val.jrec_epoch.short_time;
-		ctl->turn_around_epoch_time = rec_time;
-		if (mur_options.rollback)
-		{
-			ctl->turn_around_tn = rec->val.jrec_epoch.tn;
-			QWASSIGN(local_jnl_seqno, rec->val.jrec_epoch.jnl_seqno);
-			if (QWLE(local_jnl_seqno, consist_jnl_seqno))
-			{
-				proceed = FALSE;
-				ctl->consist_stop_addr = ctl->rab->dskaddr;
-				ptr = i2ascl(qwstring, local_jnl_seqno);
-				ptr1 = i2asclx(qwstring1, local_jnl_seqno);
-if (log_rollback)
-	util_out_print("MUR-I-DEBUG : Journal !AD  -->  SECOND Stop Epoch Jnl Seqno = !AD [0x!AD]--> Consist_Stop_Addr = 0x!XL",
-		TRUE, ctl->jnl_fn_len, ctl->jnl_fn, ptr - qwstring, qwstring, ptr1 - qwstring1, qwstring1, ctl->consist_stop_addr);
-			}
-			break;
-		}
-
-		ctl->turn_around_tn = rec->val.jrec_epoch.tn;
-		if (rec_time > MUR_OPT_MID_TIME(since_time)  ||  mur_options.forward)
-			break;
-
-		/* We've reached the SINCE time */
-
-		/* Start counting LOOKBACK_LIMIT operations from here */
-		ctl->reached_lookback_limit = rec_time < MUR_OPT_MID_TIME(lookback_time)  ||
-			(mur_options.lookback_opers_specified && ctl->lookback_count >= mur_options.lookback_opers);
-		JNL_WHOLE_FROM_SHORT_TIME(ctl->lookback_time, rec_time);
-		/* proceed will be TRUE until we have reached the turn-around point */
-		proceed = ctl->broken_entries > 0  &&  !ctl->reached_lookback_limit;
-		/* If interrupted recovery, make sure we go back to ftruncate_len irrespective of the earlier proceed decision */
-		if (0 != ctl->rab->pvt->jfh->ftruncate_len)
-		{
-			if (ctl->rab->dskaddr <= JNL_FILE_FIRST_RECORD)
-				turn_around_stop_addr = ctl->rab->dskaddr + DISK_BLOCK_SIZE;
-			else
-				turn_around_stop_addr = ctl->rab->dskaddr + ctl->rab->reclen;
-			if (turn_around_stop_addr == ctl->rab->pvt->jfh->ftruncate_len)
-				proceed = FALSE;
-			else
-				proceed = TRUE;
-		}
-		if (FALSE == proceed)
-			ctl->consist_stop_addr = ctl->rab->dskaddr;	/* Note down consist_stop_addr for recover too */
-		break;
-
-	case JRT_EOF:
-		rec_time = JNL_S_TIME(rec, jrec_eof);
-		eof = ctl->found_eof;
-		ctl->found_eof = TRUE;
-		proceed = !eof  ||  mur_report_error(ctl, MUR_MULTEOF);
-		break;
-
-	case JRT_SET:
-	case JRT_KILL:
-	case JRT_ZKILL:
-		ASSERT_MATCH(rec->val.jrec_kill, rec->val.jrec_set);
-		ASSERT_MATCH(rec->val.jrec_zkill, rec->val.jrec_set);
-		rec_time = rec->val.jrec_set.short_time;
-		if (mur_options.update)
-		{
-			pini_addr = rec->val.jrec_set.pini_addr;
-			if ((NULL == mur_get_pini_jpv(ctl, pini_addr)))
-				proceed = mur_report_error(ctl, MUR_NOPINI);
-		}
-		if (mur_options.fences == FENCE_NONE)
-			break;
-
-		if (mur_options.fences == FENCE_PROCESS)
-		{
-			if (mur_lookup_current(ctl, rec->val.jrec_set.pini_addr) != NULL)
-			{
-				mur_delete_current(ctl, rec->val.jrec_set.pini_addr);
-				proceed = mur_report_error(ctl, MUR_BRKTRANS);
-				if (mur_options.rollback)
-					proceed = TRUE;
-			}
-		}
-		else
-		{
-			assert(mur_options.fences == FENCE_ALWAYS);
-
-			proceed = mur_report_error(ctl, MUR_UNFENCE);
-		}
-
-		if (mur_options.lookback_opers_specified)
-			++ctl->lookback_count;
-
-		if (mur_options.rollback  &&  QWNE(seq_num_minus_one, min_epoch_jnl_seqno))
-		{
-			assert(&rec->val.jrec_kill.jnl_seqno ==  &rec->val.jrec_set.jnl_seqno);
-			assert(&rec->val.jrec_zkill.jnl_seqno ==  &rec->val.jrec_set.jnl_seqno);
-			assert(QWLT(rec->val.jrec_kill.jnl_seqno,  max_epoch_jnl_seqno));
-			if (QWGE(rec->val.jrec_kill.jnl_seqno, consist_jnl_seqno))
-			{
-				QWSUB(tempqw_seqno, rec->val.jrec_kill.jnl_seqno, consist_jnl_seqno);
-				DWASSIGNQW(tempdw_seqno, tempqw_seqno);
-				broken_array[tempdw_seqno].count = -1;
-			}
-					/* littleton changes -- this doesn't take care of multiple files having the same jnlseqno */
-		}
-		break;
-
-	case JRT_FSET:
-	case JRT_TSET:
-	case JRT_FKILL:
-	case JRT_TKILL:
-	case JRT_FZKILL:
-	case JRT_TZKILL:
-		ASSERT_MATCH(rec->val.jrec_fset, rec->val.jrec_tset);
-		ASSERT_MATCH(rec->val.jrec_fset, rec->val.jrec_fkill);
-		ASSERT_MATCH(rec->val.jrec_fset, rec->val.jrec_tkill);
-		ASSERT_MATCH(rec->val.jrec_fset, rec->val.jrec_fzkill);
-		ASSERT_MATCH(rec->val.jrec_fset, rec->val.jrec_tzkill);
-		assert(&rec->val.jrec_fset.token ==  &rec->val.jrec_tset.token);
-		assert(&rec->val.jrec_fset.token ==  &rec->val.jrec_fkill.token);
-		assert(&rec->val.jrec_fset.token ==  &rec->val.jrec_tkill.token);
-		assert(&rec->val.jrec_fset.token ==  &rec->val.jrec_fzkill.token);
-		assert(&rec->val.jrec_fset.token ==  &rec->val.jrec_tzkill.token);
-		assert(&rec->val.jrec_fset.jnl_seqno ==  &rec->val.jrec_tset.jnl_seqno);
-		assert(&rec->val.jrec_fset.jnl_seqno ==  &rec->val.jrec_fkill.jnl_seqno);
-		assert(&rec->val.jrec_fset.jnl_seqno ==  &rec->val.jrec_tkill.jnl_seqno);
-		assert(&rec->val.jrec_fset.jnl_seqno ==  &rec->val.jrec_fzkill.jnl_seqno);
-		assert(&rec->val.jrec_fset.jnl_seqno ==  &rec->val.jrec_tzkill.jnl_seqno);
-
-		rec_time = rec->val.jrec_fset.short_time;
-
-		if (mur_options.fences == FENCE_NONE  &&
-			(REF_CHAR(&rec->jrec_type) == JRT_FSET	|| REF_CHAR(&rec->jrec_type) == JRT_FKILL
-			 					|| REF_CHAR(&rec->jrec_type) == JRT_FZKILL))
-			break;
-
-		pini_addr = rec->val.jrec_fset.pini_addr;
-
-		QWASSIGN(token, rec->val.jrec_fset.token);
-		assert(QWEQ(token, rec->val.jrec_tset.token));
-		assert(QWEQ(token, rec->val.jrec_fkill.token));
-		assert(QWEQ(token, rec->val.jrec_tkill.token));
-		assert(QWEQ(token, rec->val.jrec_fzkill.token));
-		assert(QWEQ(token, rec->val.jrec_tzkill.token));
-
-		if (!mur_options.before  ||  rec_time <= MUR_OPT_MID_TIME(before_time))
-		{
-			if ((curr = mur_lookup_current(ctl, pini_addr)) == NULL)
-			{
-				if (!mur_options.selection  ||  mur_do_record(ctl))
-				{
-					mur_cre_broken(ctl, pini_addr, token);
-					proceed = mur_report_error(ctl, MUR_BRKTRANS);
-					if (mur_options.rollback)
-						proceed = TRUE;
-				}
-			} else
-			{
-				if (QWEQ(token, curr->token))
-				{
-					if (curr->broken)
-					{
-						mur_move_curr_to_broken(ctl, curr);
-						--ctl->broken_entries;
-					} else
-						mur_delete_current(ctl, pini_addr);
-				} else
-				{
-					mur_move_curr_to_broken(ctl, curr);
-					mur_cre_broken(ctl, pini_addr, token);
-					proceed = mur_report_error(ctl, MUR_BRKTRANS);
-					if (mur_options.rollback)
-						proceed = TRUE;
-				}
-			}
-		}
-
-		if (mur_options.lookback_opers_specified)
-			++ctl->lookback_count;
-
-		if (mur_options.rollback  &&  QWNE(seq_num_minus_one, min_epoch_jnl_seqno))
-		{
-			assert(QWLT(rec->val.jrec_tkill.jnl_seqno, max_epoch_jnl_seqno));
-			if (QWGE(rec->val.jrec_tkill.jnl_seqno, consist_jnl_seqno))
-			{
-				QWSUB(tempqw_seqno, rec->val.jrec_tkill.jnl_seqno, consist_jnl_seqno);
-				DWASSIGNQW(tempdw_seqno, tempqw_seqno);
-				broken_array[tempdw_seqno].count = -1;
-			}
-					/* littleton changes -- this doesn't take care of multiple files having the same jnlseqno */
-		}
-		break;
-
-	case JRT_GSET:
-	case JRT_USET:
-	case JRT_GKILL:
-	case JRT_UKILL:
-	case JRT_GZKILL:
-	case JRT_UZKILL:
-		ASSERT_MATCH(rec->val.jrec_gset, rec->val.jrec_uset);
-		ASSERT_MATCH(rec->val.jrec_gset, rec->val.jrec_gkill);
-		ASSERT_MATCH(rec->val.jrec_gset, rec->val.jrec_ukill);
-		ASSERT_MATCH(rec->val.jrec_gset, rec->val.jrec_gzkill);
-		ASSERT_MATCH(rec->val.jrec_gset, rec->val.jrec_uzkill);
-		assert(&rec->val.jrec_gset.token ==  &rec->val.jrec_uset.token);
-		assert(&rec->val.jrec_gset.token ==  &rec->val.jrec_gkill.token);
-		assert(&rec->val.jrec_gset.token ==  &rec->val.jrec_ukill.token);
-		assert(&rec->val.jrec_gset.token ==  &rec->val.jrec_gzkill.token);
-		assert(&rec->val.jrec_gset.token ==  &rec->val.jrec_uzkill.token);
-		assert(&rec->val.jrec_gset.jnl_seqno ==  &rec->val.jrec_uset.jnl_seqno);
-		assert(&rec->val.jrec_gset.jnl_seqno ==  &rec->val.jrec_gkill.jnl_seqno);
-		assert(&rec->val.jrec_gset.jnl_seqno ==  &rec->val.jrec_ukill.jnl_seqno);
-		assert(&rec->val.jrec_gset.jnl_seqno ==  &rec->val.jrec_gzkill.jnl_seqno);
-		assert(&rec->val.jrec_gset.jnl_seqno ==  &rec->val.jrec_uzkill.jnl_seqno);
-
-		rec_time = rec->val.jrec_gset.short_time;
-
-		if (mur_options.fences == FENCE_NONE  &&
-			(REF_CHAR(&rec->jrec_type) == JRT_GSET  ||  REF_CHAR(&rec->jrec_type) == JRT_GKILL
-								||  REF_CHAR(&rec->jrec_type) == JRT_GZKILL))
-			break;
-
-		pini_addr = rec->val.jrec_gset.pini_addr;
-
-		if ((pv = mur_get_pini_jpv(ctl, pini_addr)) == NULL)
-			proceed = mur_report_error(ctl, MUR_NOPINI);
-		else
-		{
-			QWASSIGN(token, rec->val.jrec_gset.token);
-			assert(QWEQ(token, rec->val.jrec_uset.token));
-			assert(QWEQ(token, rec->val.jrec_gkill.token));
-			assert(QWEQ(token, rec->val.jrec_ukill.token));
-			assert(QWEQ(token, rec->val.jrec_gzkill.token));
-			assert(QWEQ(token, rec->val.jrec_uzkill.token));
-			if (!mur_options.before  ||  rec_time <= MUR_OPT_MID_TIME(before_time))
-			{
-				if ((curr = mur_lookup_current(ctl, pini_addr)) == NULL)
-				{
-					/* (Use of assignment in the following condition is intentional) */
-					if (broken = (!mur_options.selection  ||  mur_do_record(ctl)))
-					{
-						++ctl->broken_entries;
-						proceed = mur_report_error(ctl, MUR_BRKTRANS);
-						if (mur_options.rollback)
-							proceed = TRUE;
-					}
-
-					mur_cre_current(ctl, pini_addr, token, pv, broken);
-				} else
-				{
-					if (QWNE(token, curr->token))
-					{
-						mur_move_curr_to_broken(ctl, curr);
-						mur_cre_current(ctl, pini_addr, token, pv, TRUE);
-						proceed = mur_report_error(ctl, MUR_BRKTRANS);
-						if (mur_options.rollback)
-							proceed = TRUE;
-					}
-				}
-			}
-		}
-
-		if (mur_options.lookback_opers_specified)
-			++ctl->lookback_count;
-		break;
-
-	case JRT_TCOM:
-	case JRT_ZTCOM:
-
-
-		rec_time = rec->val.jrec_tcom.tc_short_time;
-		assert(rec_time == rec->val.jrec_ztcom.tc_short_time);
-		assert(rec->val.jrec_tcom.tc_recov_short_time == rec->val.jrec_ztcom.tc_recov_short_time);
-		assert(&rec->val.jrec_tcom.tc_short_time == &rec->val.jrec_ztcom.tc_short_time);
-		assert(&rec->val.jrec_tcom.token ==  &rec->val.jrec_ztcom.token);
-		assert(&rec->val.jrec_tcom.jnl_seqno ==  &rec->val.jrec_ztcom.jnl_seqno);
-
-		if (mur_options.fences == FENCE_NONE  &&  REF_CHAR(&rec->jrec_type) == JRT_ZTCOM)
-			break;
-
-		pini_addr = rec->val.jrec_tcom.pini_addr;
-		assert(pini_addr == rec->val.jrec_ztcom.pini_addr);
-
-		if (mur_lookup_current(ctl, pini_addr) != NULL)
-			/* GKILL/GZKILL/GSET/ZTCOM or UKILL/UZKILL/USET/TCOM entries were seen
-			   without a corresponding FKILL/FZKILL/FSET or TKILL/TZKILL/TSET */
-			GTMASSERT;
-
-		if ((pv = mur_get_pini_jpv(ctl, pini_addr)) == NULL)
-		{
-			proceed = mur_report_error(ctl, MUR_NOPINI);
-			break;
-		}
-
-		QWASSIGN(token, rec->val.jrec_tcom.token);
-		assert(QWEQ(token, rec->val.jrec_ztcom.token));
-
-		if (!mur_options.before  ||  rec_time <= MUR_OPT_MID_TIME(before_time))
-			mur_cre_current(ctl, pini_addr, token, pv, FALSE);
-
-		if (1 < rec->val.jrec_tcom.participants  &&  participants < rec->val.jrec_tcom.participants)
-			participants = rec->val.jrec_tcom.participants;
-
-		if (rec->val.jrec_tcom.participants > 1 && (-1 == mur_decrement_multi(pv->jpv_pid, token,
-											rec->val.jrec_tcom.jnl_seqno))
-			&& (!mur_options.rollback || QWGE(rec->val.jrec_tcom.jnl_seqno, consist_jnl_seqno)))
-				mur_cre_multi(pv->jpv_pid, token, rec->val.jrec_tcom.participants - 1, rec_time,
-							rec->val.jrec_tcom.jnl_seqno);
-		break;
+		gtm_putmsg(VARLSTCNT(6) ERR_TRNARNDTNHI, 4, mur_jctl->jnl_fn_len,
+			mur_jctl->jnl_fn, mur_jctl->turn_around_tn, rctl->csd->trans_hist.curr_tn);
+		return ERR_TRNARNDTNHI;
 	}
+	mur_jctl->turn_around_offset = mur_jctl->rec_offset;
+	mur_jctl->turn_around_time = mur_rab.jnlrec->prefix.time;
+	mur_jctl->turn_around_seqno = mur_rab.jnlrec->jrec_epoch.jnl_seqno;
+	mur_jctl->turn_around_tn = ((jrec_prefix *)mur_rab.jnlrec)->tn;
+	if (NULL == rctl->jctl_save_turn_around)
+	{
+		rctl->jctl_save_turn_around = mur_jctl;
+		mur_jctl->save_turn_around_offset = mur_jctl->turn_around_offset;
+	} else
+	{
+		/* mur_apply_pblk set this earlier for interrupted recovery */
+		assert(rctl->jctl_save_turn_around->save_turn_around_offset);
+		/* rctl->jctl_save_turn_around->turn_around_offset  could be 0 */
+	}
+	return SS_NORMAL;
+}
 
-	if (!mur_options.rollback && mur_options.show  &&
-		(JRT_ALIGN == REF_CHAR(&rec->jrec_type)  ||  JRT_NULL == REF_CHAR(&rec->jrec_type)  ||
-			((!mur_options.before  ||  rec_time <= MUR_OPT_MID_TIME(before_time))  &&
-			 (!mur_options.since  ||  rec_time >= MUR_OPT_MID_TIME(since_time)))))
-		mur_do_show(ctl);
+/*	This routine performs backward processing for forward and backward recover/rollback.
+ *	This creates list of tokens for broken fenced transactions.
+ *	For noverify qualifier in backward recovry, it may apply PBLK calling mur_apply_pblk()
+ */
+boolean_t mur_back_process(boolean_t apply_pblk)
+{
+	boolean_t		apply_pblk_this_region, resolve_seq;
+	enum jnl_record_type 	rectype;
+	enum rec_fence_type	rec_fence;
+	int4			rec_image_count = 0;	/* This is a dummy variable for UNIX */
+	int			regno, reg_total, partner;
+	uint4			rec_pid, status;
+	jnl_tm_t		reg_tp_resolve_time, max_lvrec_time, min_broken_time = MAXUINT4, rec_time;
+	token_num		token;
+	seq_num			rec_token_seq;
+	multi_struct		*multi;
+	ht_entry		*hentry;
+	pini_list_struct	*plst;
+	reg_ctl_list		*rctl, *rctl_top;
+	file_control		*fc;
+	error_def(ERR_JNLREADBOF);
+	error_def(ERR_NOPREVLINK);
+	error_def(ERR_MUJNINFO);
+	error_def(ERR_RESOLVESEQNO);
 
-	return proceed;
-
+	reg_total = murgbl.reg_total;
+	if (mur_options.forward)
+	{
+		if (mur_options.verify) /* verify continues till beginning of journal file */
+			murgbl.tp_resolve_time = 0;
+		else
+		{
+			murgbl.tp_resolve_time = mur_ctl[0].lvrec_time;
+			for (regno = 1; regno < reg_total; regno++)
+			{
+				if (mur_ctl[regno].lvrec_time < murgbl.tp_resolve_time)
+					murgbl.tp_resolve_time = mur_ctl[regno].lvrec_time;
+			}
+			assert(murgbl.tp_resolve_time);
+		}
+	} else
+	{
+		/* mur_ctl[regno].lvrec_time is the last valid record's timestamp of journal file mur_ctl[regno].jctl->jnl_fn.
+		 * mur_sort_files will sort regions so that:
+		 * 	for regno = 0 to (reg_total-2) we have
+		 *		mur_ctl[regno].lvrec_time <= mur_ctl[regno+1].lvrec_time
+		 */
+		mur_sort_files();
+		murgbl.tp_resolve_time = MAXUINT4;
+		max_lvrec_time = mur_ctl[reg_total - 1].lvrec_time;
+		for (regno = 0; regno < reg_total; regno++)
+		{
+			rctl = &mur_ctl[regno];
+			/* Assumption : It is guaranteed to see an EPOCH in every
+			 * "rctl->jctl->jfh->epoch_interval + MAX_EPOCH_DELAY" seconds. */
+			assert(max_lvrec_time >= rctl->jctl->jfh->epoch_interval + MAX_EPOCH_DELAY);
+			reg_tp_resolve_time = max_lvrec_time - rctl->jctl->jfh->epoch_interval - MAX_EPOCH_DELAY;
+			if (rctl->lvrec_time > reg_tp_resolve_time)
+				reg_tp_resolve_time = rctl->lvrec_time;
+			if (reg_tp_resolve_time < murgbl.tp_resolve_time)
+				murgbl.tp_resolve_time = reg_tp_resolve_time;
+			if (mur_options.update)
+			{
+				assert(NULL != rctl->csd);
+				assert(!rctl->jfh_recov_interrupted || (rctl->jctl_head == rctl->jctl_save_turn_around));
+				/* assert(!rctl->jfh_recov_interrupted || rctl->recov_interrupted); ???
+				 * The above assert is temporarily commented out because in mur_close_files we set
+				 * csd->recov_interrupted = FALSE before we set jctl->jfh->recover_interrupted = FALSE
+				 * so it can fail if recover crashes in between those two assignments. But the assert is
+				 * not removed as the implications of the assert not being true have to be handled in
+				 * the entire recover code before removing it.
+				 */
+				if (rctl->recov_interrupted)
+				{
+					assert(murgbl.intrpt_recovery);
+					/* Previous backward recovery/rollback was interrupted.
+					 * Update tp_resolve_time/resync_seqno to reflect the minimum of the previous and
+					 * 	current recovery/rollback's turn-around-points.
+					 * It is possible that both rctl->csd->intrpt_recov_resync_seqno and
+					 * 	rctl->csd->intrpt_recov_tp_resolve_time are zero in case previous recover
+					 * 	was killed after mur_open_files (which sets csd->recov_interrupted) but before
+					 * 	mur_back_process() which would have set csd->intrpt_recov_tp_resolve_time
+					 */
+					if (rctl->csd->intrpt_recov_resync_seqno)
+					{
+						if (!mur_options.rollback)
+							GTMASSERT;	/* better error out ??? */
+						if ((0 == murgbl.resync_seqno) ||
+								(rctl->csd->intrpt_recov_resync_seqno < murgbl.resync_seqno))
+							murgbl.resync_seqno = rctl->csd->intrpt_recov_resync_seqno;
+					}
+					if (rctl->csd->intrpt_recov_tp_resolve_time &&
+							rctl->csd->intrpt_recov_tp_resolve_time < murgbl.tp_resolve_time)
+						murgbl.tp_resolve_time = rctl->csd->intrpt_recov_tp_resolve_time;
+				}
+			}
+		}
+		if (mur_options.since_time < murgbl.tp_resolve_time)
+			murgbl.tp_resolve_time = mur_options.since_time;
+		if (FENCE_NONE == mur_options.fences && !mur_options.since_time_specified && !murgbl.intrpt_recovery)
+			murgbl.tp_resolve_time = max_lvrec_time;
+		if (murgbl.stop_rlbk_seqno < murgbl.resync_seqno)
+		{
+			assert(murgbl.intrpt_recovery);
+			gtm_putmsg(VARLSTCNT(3) ERR_RESOLVESEQNO, 1, &murgbl.stop_rlbk_seqno);
+			murgbl.resync_seqno = murgbl.stop_rlbk_seqno;
+		} else if ((mur_options.resync_specified || mur_options.fetchresync_port) &&
+						murgbl.stop_rlbk_seqno > murgbl.resync_seqno)
+			gtm_putmsg(VARLSTCNT(3) ERR_RESOLVESEQNO, 1, &murgbl.resync_seqno);
+		if (!murgbl.intrpt_recovery)
+			resolve_seq = (mur_options.rollback && mur_options.resync_specified);
+		else
+			resolve_seq = (0 != murgbl.resync_seqno);
+		if (mur_options.update)
+		{
+			for (regno = 0; regno < reg_total; regno++)
+			{
+				rctl = &mur_ctl[regno];
+				assert(rctl->csd->recov_interrupted);	/* mur_open_files set this */
+				if (apply_pblk && !rctl->jfh_recov_interrupted)
+				{	/* When the 'if' condition is TRUE, we apply PBLKs in mur_back_process.
+					 * Store the murgbl.tp_resolve_time/murgbl.resync_seqno.
+					 * So we remember to undo PBLKs at least upto that point,
+					 * in case this recovery is interrupted/crashes.
+					 */
+					rctl->csd->intrpt_recov_tp_resolve_time = murgbl.tp_resolve_time;
+					rctl->csd->intrpt_recov_resync_seqno = (resolve_seq ? murgbl.resync_seqno : 0);
+					/* flush the changed csd to disk */
+					fc = rctl->gd->dyn.addr->file_cntl;
+					fc->op = FC_WRITE;
+					fc->op_buff = (sm_uc_ptr_t)rctl->csd;
+					fc->op_len = ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE);
+					fc->op_pos = 1;
+					dbfilop(fc);
+				}
+			}
+		}
+	} /* end else !mur_options.forward */
+	murgbl.db_updated = mur_options.update && !mur_options.verify;
+	/* At this point we have computed murgbl.tp_resolve_time. It is the time upto which (at least)
+	 * we need to do token resolution. This is for all kinds of recovery and rollback.
+	 * Following for loop will do backward processing and resolve token up to this murgbl.tp_resolve_time.
+	 * (For recover with lower since_time, we already set murgbl.tp_resolve_time as since_time.
+	 *  For interrupted recovery we also considered previous recovery's murgbl.tp_resolve_time.)
+	 * For rollback command without resync qualifier (even fetch_resync) we also resolve upto this murgbl.tp_resolve_time.
+	 * For rollback with resync qualifier, we may need to resolve more than the murgbl.tp_resolve_time */
+	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + reg_total; rctl < rctl_top; rctl++, mur_regno++)
+	{
+		apply_pblk_this_region = apply_pblk && !rctl->jfh_recov_interrupted;
+		/* Note that for rctl->jfh_recov_interrupted we do not apply pblks in this routine */
+		mur_jctl = rctl->jctl;
+		assert(NULL == mur_jctl->next_gen);
+		mur_jctl->rec_offset = mur_jctl->lvrec_off;
+		rec_token_seq = MAXUINT8;
+		rec_time = 0;
+		for (status = mur_prev(mur_jctl->rec_offset); SS_NORMAL == status; status = mur_prev_rec())
+		{
+			assert(0 == mur_jctl->turn_around_offset);
+			rectype = mur_rab.jnlrec->prefix.jrec_type;
+			if (rctl->lvrec_time < murgbl.tp_resolve_time && !resolve_seq && IS_SET_KILL_ZKILL(rectype))
+				GTMASSERT;	/* Out of design situation */
+			if (JRT_PBLK == rectype && apply_pblk_this_region)
+			{
+				mur_output_pblk();
+				continue;
+			}
+			rec_time = mur_rab.jnlrec->prefix.time;
+			if (IS_REPLICATED(rectype) || JRT_EPOCH == rectype)
+				rec_token_seq = GET_REPL_JNL_SEQNO(mur_rab.jnlrec);
+			/* We always resolve tokens till murgbl.tp_resolve_time.
+			 * In addition we also resolve tokens till murgbl.resync_seqno if resolve_seq == TRUE.
+			 * We call this as resolve point, which is different than turn around point.
+			 * Turn around point is defined as EPOCH where:
+			 *	a) For recover murgbl.tp_resolve_time is reached
+			 *	b) For rollback murgbl.tp_resolve_time is reached
+			 *		and  murgbl.resync_seqno is reached if non-zero
+			 */
+			if (JRT_EPOCH == rectype)
+			{
+				assert(mur_options.forward || murgbl.intrpt_recovery ||
+					NULL == rctl->csd || mur_rab.jnlrec->prefix.tn <= rctl->csd->trans_hist.curr_tn);
+				if (rec_time < murgbl.tp_resolve_time &&
+					(!murgbl.resync_seqno || rec_token_seq <= murgbl.resync_seqno))
+				{
+					if (SS_NORMAL != (status = save_turn_around_point(rctl)))
+						return status;
+					break;
+				}
+				continue;
+			}
+			if (rec_time < murgbl.tp_resolve_time && (!resolve_seq || rec_token_seq < murgbl.resync_seqno))
+				continue;
+			/* Note: token_seq is a union of jnl_seqno and token for TP or unfenced records.
+			 * 	 It is in the same offset for all records when they are present.
+			 *       For ZTP jnl_seqno and token are two different fields.
+			 *	 offset of jnl_seqno in ZTP is same as that of token_seq in TP or unfenced records.
+			 *	 token field is only present in ZTP.
+			 *	 For unfenced and TP records token_seq is used as token when necessary.
+			 *	 For non-replication (that is, doing recover) and unfenced records token_seq field has no use.
+			 */
+			if (IS_FENCED(rectype) && FENCE_NONE != mur_options.fences && rec_time <= mur_options.before_time)
+			{	/* Note for a ZTP if FSET/GSET is present before mur_options.before_time and
+				 * GUPD/ZTCOM are present after mur_options.before_time, it is considered broken. */
+				rec_fence = GET_REC_FENCE_TYPE(rectype);
+				if (SS_NORMAL != (status = mur_get_pini(mur_rab.jnlrec->prefix.pini_addr, &plst)))
+					break;
+				rec_pid = plst->jpv.jpv_pid;
+				VMS_ONLY(rec_image_count = plst->jpv.jpv_image_count;)
+				token = (TPFENCE == rec_fence) ? rec_token_seq :
+					((struct_jrec_ztp_upd *)mur_rab.jnlrec)->token;
+				if (IS_SET_KILL_ZKILL(rectype))	/* TUPD/UUPD/FUPD/GUPD */
+				{
+					if (NULL != (multi = MUR_TOKEN_LOOKUP(token, rec_pid, rec_image_count,
+												rec_time, rec_fence)))
+					{
+						if (multi->fence != rec_fence)
+						{
+							assert(!mur_options.rollback);	/* jnl_seqno cannot be duplicate */
+							if (!(mur_report_error(MUR_DUPTOKEN)))
+								return FALSE;
+							multi->partner = reg_total;	/* This is broken */
+							if (rec_time < multi->time)
+								multi->time = rec_time;
+						} else
+						{
+							assert((TPFENCE != rec_fence) || multi->time == rec_time);
+							if (ZTPFENCE == rec_fence && multi->time > rec_time)
+								multi->time = rec_time;
+						}
+					} else
+					{	/* This is broken */
+						MUR_TOKEN_ADD(multi, token, rec_pid, rec_image_count,
+								rec_time, reg_total, rec_fence, mur_regno);
+					}
+				} else	/* TCOM/ZTCOM */
+				{
+					if (NULL != (multi = MUR_TOKEN_LOOKUP(token, rec_pid, rec_image_count,
+												rec_time, rec_fence)))
+					{
+						if (mur_regno == multi->regnum || multi->fence != rec_fence)
+						{
+							assert(!mur_options.rollback);	/* jnl_seqno cannot be duplicate */
+							if (!mur_report_error(MUR_DUPTOKEN))
+								return FALSE;
+							multi->partner = reg_total;	/* It is broken */
+							if (rec_time < multi->time)
+								multi->time = rec_time;
+						} else
+						{
+							multi->partner--;
+							assert(0 <= multi->partner);
+							if (0 == multi->partner)
+							{
+								assert((TPFENCE != rec_fence) || multi->time == rec_time);
+								murgbl.broken_cnt--;	/* It is resolved */
+							}
+							multi->regnum = mur_regno;
+						}
+					} else
+					{
+						partner = (TPFENCE == rec_fence) ?
+							((struct_jrec_tcom *)mur_rab.jnlrec)->participants :
+							((struct_jrec_ztcom *)mur_rab.jnlrec)->participants;
+						partner--;
+						MUR_TOKEN_ADD(multi, token, rec_pid, rec_image_count,
+								rec_time, partner, rec_fence, mur_regno);
+					}
+				}
+			} else if (mur_options.rollback && IS_REPLICATED(rectype) && rec_token_seq <= murgbl.stop_rlbk_seqno)
+			{	/* We come here for rollback and and replicated records.
+				 * We come here even record is fenced. User must have specified fence=NONE in that case.
+				 * We are here because these are not considered broken. They are either lost or good.
+				 * For resync and fetch_resync all non-tp transactions (and TP with mur_options.fence_none)
+				 * after murgbl.stop_rlbk_seqno are considered lost or broken.
+				 * So, we do not need to add them in token(seqnum) table to find gap in sequence number.
+				 * For consitent rollback murgbl.stop_rlbk_seqno == MAXUINT8,
+				 * so all records till tp_resolve_time are considered for broken/lost/good */
+				rec_fence = GET_REC_FENCE_TYPE(rectype);
+				token = (ZTPFENCE != rec_fence) ? rec_token_seq :
+					((struct_jrec_ztp_upd *)mur_rab.jnlrec)->token;
+				/* For rollback pid or image_type or time are not necessary to establish uniqueness of token.
+				 * Because token is already guaranteed to be unique for an instance */
+				if (NULL == (multi = MUR_TOKEN_LOOKUP(token, 0, 0, 0, rec_fence)))
+				{
+					/* We reuse same token table. most of the fields in multi_struct are unused */
+					MUR_TOKEN_ADD(multi, token, 0, 0, 0, 0, rec_fence, 0);
+				} else
+				{
+					assert(FENCE_NONE == mur_options.fences && NOFENCE != rec_fence);
+					assert(0 == multi->partner);
+					assert(0 == multi->pid);
+					VMS_ONLY(assert(0 == multi->image_count);)
+				}
+			}
+		} /* end for mur_prev */
+		if (mur_options.verbose)
+			gtm_putmsg(VARLSTCNT(15) ERR_MUJNINFO, 13, LEN_AND_LIT("Mur_back_process:trnarnd "),
+			mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, mur_jctl->rec_offset,
+			murgbl.tp_resolve_time, mur_jctl->turn_around_offset, mur_jctl->turn_around_time,
+			mur_jctl->turn_around_tn, &mur_jctl->turn_around_seqno,
+			min_broken_time, murgbl.token_table.count, murgbl.broken_cnt);
+		if (SS_NORMAL != status)
+		{
+			if (!mur_options.forward)
+			{
+				if (ERR_NOPREVLINK == status)
+				{
+					assert(JNL_HDR_LEN ==  mur_jctl->rec_offset);
+					if ((rec_time > murgbl.tp_resolve_time) || (0 != murgbl.resync_seqno &&
+							MAXUINT8 != rec_token_seq && rec_token_seq > murgbl.resync_seqno))
+					{	/* We do not issue error for this boundary condition */
+						gtm_putmsg(VARLSTCNT(4) ERR_NOPREVLINK, 2, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn);
+						return FALSE;
+					} else
+					{
+						mur_jctl->rec_offset = JNL_HDR_LEN + PINI_RECLEN;
+						status = mur_prev(mur_jctl->rec_offset);
+						if (SS_NORMAL != status)
+							return FALSE;
+						assert(JRT_EPOCH == mur_rab.jnlrec->prefix.jrec_type);
+						if (SS_NORMAL != (status = save_turn_around_point(rctl)))
+							return status;
+					}
+				} else	/* mur_read_file should have issued messages */
+					return FALSE;
+			} else if (ERR_JNLREADBOF != status)	/* mur_read_file should have issued messages */
+			/* for mur_options.forward ERR_JNLREADBOF is not error but others are */
+				return FALSE;
+		}
+	} /* end for mur_regno */
+	if (!mur_forward && NULL == rctl->jctl_turn_around)
+		GTMASSERT;
+	/* Since murgbl.tp_resolve_time is one resolve time for all regions, no implicit lookback processing
+	 * to resolve transactions is not necessary */
+	return TRUE;
 }

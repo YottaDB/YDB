@@ -453,8 +453,9 @@ foreach i ( $comlist_liblist )
 
 		# Exclude files that define the same externals
 		# (e.g., "main" and the VMS CLI [command line interpreter] emulator arrays):
-		set exclude = "^gtm\.o|^gtm_svc\.o|^gtm_dal_svc\.o|^gtm_rpc_init\.o|^mumps_clitab\.o|^lke\.o|^lke_cmd\.o|^dse\.o"
-		set exclude = "$exclude|^dse_cmd\.o|^mupip\.o|^mupip_cmd\.o|^daemon\.o|^gtmsecshr\.o|^geteuid\.o|^dtgbldir\.o"
+		set exclude = "^gtm\.o|^gtm_main\.o|^gtm_svc\.o|^gtm_dal_svc\.o|^gtm_rpc_init\.o|^mumps_clitab\.o"
+		set exclude = "$exclude|^lke\.o|^lke_cmd\.o|^dse\.o|^dse_cmd\.o"
+		set exclude = "$exclude|^mupip\.o|^mupip_cmd\.o|^daemon\.o|^gtmsecshr\.o|^geteuid\.o|^dtgbldir\.o"
 		set exclude = "$exclude|^semstat2\.o|^ftok\.o|^msg\.o|^gtcm_main\.o|^gtcm_play\.o|^gtcm_pkdisp\.o|^gtcm_shmclean\.o"
 		set exclude = "$exclude|^omi_srvc_xct\.o|^omi_sx_play\.o"
 		set exclude = "$exclude|^gtcm_gnp_server\.o|^gtcm_gnp_clitab\.o"
@@ -553,11 +554,11 @@ if ( $status != 0 ) then
 endif
 
 set mupip_size = `ls -l $gtm_exe/mupip |awk '{print $5}'`
-set mumps_size = `ls -l $gtm_exe/mumps |awk '{print $5}'`
+set gtmshr_size = `ls -l $gtm_exe/libgtmshr$gt_ld_shl_suffix |awk '{print $5}'`
 
 if ( "$HOSTOS" != "SunOS" ) then
- 	if ($mupip_size > $mumps_size) then
-	echo "comlist-E-mupip_size larger, ${dollar_sign}gtm_dist/mupip size large" >> $gtm_log/error.`basename $gtm_exe`.log
+ 	if ($mupip_size > $gtmshr_size) then
+	echo "comlist-E-mupip_size, ${dollar_sign}gtm_dist/mupip is larger than ${dollar_sign}gtm_dist/libgtmshr$gt_ld_shl_suffix" >> $gtm_log/error.`basename $gtm_exe`.log
 	endif
 endif
 

@@ -157,7 +157,6 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	{
 		close(csa->jnl->channel);
 		csa->jnl->channel = NOJNL;
-		csa->jnl->lastwrite = 0;
 		csa->jnl->regnum = 0;
 		csa->jnl->pini_addr = 0;
 	}

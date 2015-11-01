@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -203,7 +203,7 @@ double mval2double(mval *v)
 }
 
 /* a (barely suitable) double2mval */
-void     double2mval(double src, mval *dst)
+void     double2mval(mval *dst, double src)
 {
         char    buf[67];    /* [possible] sign, decimal-point, [up to] 64 digits, and terminator */
 	SPRINTF(buf, "%lf", src);

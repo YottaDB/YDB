@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@
 #include <errno.h>
 #ifdef DEBUG
 #include "gtm_stdio.h"
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #endif /* defined(DEBUG) */
 
 #include "gt_timer.h"	/* for cancel_timer() and start_timer() atleast */
@@ -60,7 +60,6 @@ void
 gtcm_loop(cll)
     omi_conn_ll	*cll;
 {
-    extern int	 errno;
     extern int	 omi_exitp;
 
     int		 nfds, res;

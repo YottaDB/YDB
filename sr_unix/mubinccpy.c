@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,8 +75,8 @@ GBLREF	uchar_ptr_t		mubbuf;
 GBLREF	tcp_library_struct	tcp_routines;
 GBLREF	uint4			pipe_child;
 GBLREF	boolean_t		debug_mupip;
-
 GBLREF	int4			backup_write_errno;
+LITREF	mval			literal_null;
 
 #define	COMMON_WRITE(A,B,C)	{					\
 					(*common_write)(A,B,C);		\
@@ -227,7 +227,7 @@ bool	mubinccpy (backup_reg_list *list)
 	stringpool.free = stringpool.base;
 	op_horolog(&val);
 	stringpool.free = stringpool.base;
-	op_fnzdate(&val, &mu_bin_datefmt, &null_str, &null_str, &val);
+	op_fnzdate(&val, &mu_bin_datefmt, &literal_null, &literal_null, &val);
 	memcpy(&outbuf->date[0], val.str.addr, val.str.len);
 	memcpy(&outbuf->reg[0], gv_cur_region->rname, MAX_RN_LEN);
 	memcpy(&outbuf->start_tn, &(list->tn), sizeof(trans_num));

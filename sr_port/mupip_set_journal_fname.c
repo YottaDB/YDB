@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,7 @@ void	mupip_set_journal_fname(jnl_create_info *jnl_info)
 #if defined(UNIX)
 		memcpy(jnl_info->jnl, jnl_info->fn, jnl_info->fn_len);
 		jnl_info->jnl[jnl_info->fn_len] = 0;
-		for (ptr1 = jnl_info->jnl, ptr2 = ctop = ptr1 + jnl_info->fn_len; (ptr1 < ctop) && ('/' != *ctop); --ctop)
+		for (ptr1 = (char *)jnl_info->jnl, ptr2 = ctop = ptr1 + jnl_info->fn_len; (ptr1 < ctop) && ('/' != *ctop); --ctop)
 		{
 			if (first_time)
 			{

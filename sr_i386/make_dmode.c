@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,10 +15,11 @@
 
 #include "error.h"
 #include "rtnhdr.h"
+#include "op.h"
 #include "i386.h"
+#include "inst_flush.h"
 #include "dm_setup.h"
 
-#define GTM_DMOD	"GTM$DMOD"
 #define CALL_SIZE	5
 #define CODE_SIZE	3*CALL_SIZE
 #define CODE_LINES	3
@@ -29,12 +30,10 @@ rhdtyp *make_dmode(void)
 	lbl_tables	*lbl;
 	int		*lnr;
 	unsigned char	*code;
-	void		opp_ret();
-
 						/* dummy code + label entry + line entries */
-	base_address = (rhdtyp *)malloc(sizeof(rhdtyp) + CODE_SIZE + sizeof (lbl_tables) + CODE_LINES*sizeof(int4));
+	base_address = (rhdtyp *)malloc(sizeof(rhdtyp) + CODE_SIZE + sizeof(lbl_tables) + CODE_LINES * sizeof(int4));
 	memset(base_address,0,sizeof(rhdtyp) + CODE_SIZE + sizeof(lbl_tables) + CODE_LINES*sizeof(int4));
-	memcpy(&base_address->routine_name, LIT_AND_LEN(GTM_DMOD));
+	MEMCPY_LIT(&base_address->routine_name, GTM_DMOD);
 	base_address->ptext_ptr = sizeof(rhdtyp);
 	base_address->vartab_ptr =
 		base_address->labtab_ptr = sizeof(rhdtyp) + CODE_SIZE;	/* hdr + code */
@@ -58,8 +57,9 @@ rhdtyp *make_dmode(void)
 	lnr = (int *)((int)base_address + base_address->lnrtab_ptr);
 	*lnr++ = base_address->ptext_ptr;
 	*lnr++ = base_address->ptext_ptr;
-	*lnr++ = base_address->ptext_ptr + 2*CALL_SIZE;
+	*lnr++ = base_address->ptext_ptr + 2 * CALL_SIZE;
 	assert(code - ((unsigned char *)base_address + base_address->ptext_ptr) == CODE_SIZE);
 	zlput_rname(base_address);
+	inst_flush(base_address, sizeof(rhdtyp) + CODE_SIZE + sizeof(lbl_tables) + CODE_LINES * sizeof(int4));
 	return base_address;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,33 +20,28 @@
 #include "format_targ_key.h"
 #include "mlkdef.h"
 #include "zwrite.h"
-#define LCL_BUF_SIZE 256
 
-GBLREF gv_key *gv_currkey;
-GBLREF zshow_out *zwr_output;
+GBLREF gv_key		*gv_currkey;
+GBLREF zshow_out	*zwr_output;
 
 void gvzwr_out(void)
 {
-	int n;
-	mval val;
-	mval outdesc;
-	mstr one;
-	char	buff[LCL_BUF_SIZE], *end;
+	int	n;
+	mval	val;
+	mval	outdesc;
+	mstr	one;
+	char	buff[MAX_ZWR_KEY_SZ], *end;
 
-	if ((end = (char *)format_targ_key((uchar_ptr_t)&buff[0], LCL_BUF_SIZE, gv_currkey, TRUE)) == 0)
-	{	end = &buff[LCL_BUF_SIZE - 1];
-	}
-
+	if ((end = (char *)format_targ_key((uchar_ptr_t)&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
+		end = &buff[MAX_ZWR_KEY_SZ - 1];
 	op_gvget(&val);
 	if (!MV_DEFINED(&val))
 		return;
 	MV_FORCE_STR(&val);
-
 	outdesc.mvtype = MV_STR;
 	outdesc.str.addr = &buff[0];
 	outdesc.str.len = end - outdesc.str.addr;
 	zshow_output(zwr_output,&outdesc.str);
-
 	buff[0] = '=';
 	one.addr = &buff[0];
 	one.len = 1;

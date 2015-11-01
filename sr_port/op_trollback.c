@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,7 @@
 #include "tp_timeout.h"
 #include "tp_unwind.h"
 #include "op.h"
+#include "jobinterrupt_process.h"
 
 GBLREF	short		dollar_tlevel, dollar_trestart;
 GBLREF	gv_key		*gv_currkey;
@@ -35,7 +36,7 @@ GBLREF	gv_namehead	*gv_target;
 GBLREF tp_region	*tp_reg_list;		/* Chained list of regions used in this transaction not cleared on tp_restart */
 GBLREF void		(*tp_timeout_clear_ptr)(void);
 
-void	op_trollback(short rb_levels)		/* rb_levels -> # of transaction levels by which we need to rollback */
+void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by which we need to rollback */
 {
 	short		newlevel;
 	tp_region	*tr;
@@ -71,6 +72,8 @@ void	op_trollback(short rb_levels)		/* rb_levels -> # of transaction levels by w
 		}
 		if (NULL != gv_target)
 			gv_target->clue.end = 0;
+
+		JOBINTR_TP_RETHROW; /* rethrow job interrupt($ZINT) if $ZTEXIT, when coerced to boolean, is true */
 	} else
 	{
 		tp_incr_clean_up(newlevel);

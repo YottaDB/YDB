@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@ va_dcl
 	mval		*val;
 	short 		max_key;
 	unsigned char	*ptr, *end_ptr;
-	unsigned char	buff[MAX_KEY_SZ + 1], *end;
+	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 
 	error_def(ERR_GVNAKED);
 	error_def(ERR_GVSUBOFLOW);
@@ -120,8 +120,8 @@ va_dcl
 				len = val->str.len;
 				if (gv_currkey->end + len - 1 >= max_key)
 				{
-					if (0 == (end = format_targ_key(buff, MAX_KEY_SZ + 1, gv_currkey, TRUE)))
-						end = &buff[MAX_KEY_SZ];
+					if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+						end = &buff[MAX_ZWR_KEY_SZ - 1];
 					rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 				}
 				memcpy((gv_currkey->base + gv_currkey->end), val->str.addr, len);
@@ -133,8 +133,8 @@ va_dcl
 			mval2subsc(val, gv_currkey);
 			if (gv_currkey->end >= max_key)
 			{
-				if (0 == (end = format_targ_key(buff, MAX_KEY_SZ + 1, gv_currkey, TRUE)))
-					end = &buff[MAX_KEY_SZ];
+				if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+					end = &buff[MAX_ZWR_KEY_SZ - 1 ];
 				rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 			}
 		 	is_null = (MV_IS_STRING(val) && (0 == val->str.len));

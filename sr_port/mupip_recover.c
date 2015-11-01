@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,16 +9,17 @@
  *								*
  ****************************************************************/
 
+/* This routine processes the MUPIP JOURNAL command */
+
 #include "mdef.h"
 
-#include <stdio.h>
-#include "gtm_stdlib.h"
-#include <unistd.h>
+#include "gtm_time.h"
+#include "gtm_string.h"
+
 #ifdef VMS
-#include <chfdef.h>
+#include <math.h>	/* for mur_rel2abstime() function */
 #endif
 
-#include "gtm_string.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gtm_facility.h"
@@ -27,6 +28,8 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
+#include "hashdef.h"	/* For muprec.h */
+#include "buddy_list.h"	/* For muprec.h */
 #include "muprec.h"
 #include "iosp.h"
 #include "mv_stent.h"
@@ -47,101 +50,44 @@
 #include "dpgbldir.h"
 #include "gtmmsg.h"
 #include "mupip_recover.h"
+#include "mu_gv_stack_init.h"
 
-#define USER_STACK_SIZE	16384	/* (16 * 1024) */
-
-#ifdef UNIX
-#define INIT_PID	1
-#endif
-
-GBLDEF	boolean_t	brktrans;
-GBLDEF	boolean_t	losttrans;
-GBLDEF	mur_opt_struct	mur_options;
-GBLDEF	bool		mur_error_allowed;
-GBLDEF	int4		mur_error_count;
-GBLDEF	int4		mur_wrn_count;
-GBLDEF	int4		n_regions;
-GBLDEF	seq_num		stop_rlbk_seqno;
-GBLDEF	seq_num		max_reg_seqno;
-GBLDEF  seq_num		resync_jnl_seqno;
-GBLDEF  seq_num		min_epoch_jnl_seqno;
-GBLDEF	seq_num		max_epoch_jnl_seqno;
-GBLDEF	broken_struct	*broken_array;
-GBLREF	void		(*call_on_signal)();
-GBLDEF	char		*log_rollback = NULL;
-GBLDEF	ctl_list	*jnl_files;
-GBLDEF	jnl_proc_time	min_jnl_rec_time;
-
-GBLREF	seq_num		consist_jnl_seqno;
-GBLREF  seq_num		max_resync_seqno;
-GBLREF	int4		gv_keysize;
-GBLREF	gv_key		*gv_currkey, *gv_altkey;
-GBLREF	gv_namehead	*gv_target;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	sgmnt_data_ptr_t cs_data;
-GBLREF	mv_stent	*mv_chain;
-GBLREF	stack_frame	*frame_pointer;
-GBLREF	unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
-GBLREF	bool		is_standalone;
-GBLREF	seq_num		seq_num_zero;
-GBLREF	seq_num		seq_num_minus_one;
-GBLREF  gd_addr         *gd_header;
-GBLREF	gd_binding      *gd_map;
-GBLREF	gd_binding      *gd_map_top;
-GBLREF  int             participants;
-GBLREF	boolean_t	created_core;
-GBLREF	boolean_t	need_core;
-GBLREF	boolean_t	dont_want_core;
+GBLREF	void			(*call_on_signal)();
+GBLREF	int4			gv_keysize;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	bool			is_standalone;
+GBLREF  gd_addr         	*gd_header;
+GBLREF	gd_binding      	*gd_map;
+GBLREF	gd_binding      	*gd_map_top;
 #ifdef VMS
 GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
-GBLREF	boolean_t	tp_restart_fail_sig_used;
+GBLREF	boolean_t		tp_restart_fail_sig_used;
 #endif
-GBLREF	boolean_t	recovery_success;
-GBLREF	uint4		cur_logirec_short_time;
-GBLREF	boolean_t	forw_phase_recovery;
-
-error_def(ERR_ASSERT);
-error_def(ERR_EPOCHLIMGT);
-error_def(ERR_GTMASSERT);
-error_def(ERR_GTMCHECK);
-error_def(ERR_JNLREADEOF);
-error_def(ERR_NORECOVERWRN);
-error_def(ERR_NORECOVERERR);
-error_def(ERR_STACKOFLOW);
-error_def(ERR_TRNARNDTNHI);
-error_def(ERR_ENDRECOVERY);
-error_def(ERR_BLKCNTEDITFAIL);
+GBLREF	mur_opt_struct		mur_options;
+GBLREF 	jnl_gbls_t		jgbl;
+GBLREF 	mur_gbls_t		murgbl;
+GBLREF	reg_ctl_list		*mur_ctl;
+GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF  jnl_process_vector	*prc_vec;
 
 void		gtm_ret_code();
-
-#define	ROLLBACK_LOG(SEQNO, TEXT)									\
-{													\
-	if (log_rollback)										\
-	{												\
-		ptr = i2ascl(qwstring, SEQNO);								\
-		ptr1 = i2asclx(qwstring1, SEQNO);							\
-		util_out_print(TEXT, TRUE, ptr - qwstring, qwstring, ptr1 - qwstring1, qwstring1);	\
-	}												\
-}
-
-#define	ROLLBACK_LOG_STOP_JNL_SEQNO												\
-if (log_rollback)														\
-{																\
-	ptr = i2ascl(qwstring, rec->val.jrec_epoch.jnl_seqno);									\
-	ptr1 = i2asclx(qwstring1, rec->val.jrec_epoch.jnl_seqno);								\
-	util_out_print("MUR-I-DEBUG : Journal !AD : FIRST Stop Jnl Seqno = !AD [0x!AD] : Consist_Stop_Addr = 0x!XL", TRUE,	\
-		ctl->jnl_fn_len, ctl->jnl_fn, ptr - qwstring, qwstring, ptr1 - qwstring1, qwstring1, ctl->consist_stop_addr);	\
-}
 
 CONDITION_HANDLER(mupip_recover_ch)
 {
 	error_def(ERR_TPRETRY);
+	error_def(ERR_ASSERT);
+	error_def(ERR_GTMCHECK);
+	error_def(ERR_GTMASSERT);
+	error_def(ERR_STACKOFLOW);
 
 	START_CH;
 	PRN_ERROR;	/* Flush out the error message that is driving us */
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
+		assert(FALSE);
 		VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
 		tp_restart(1);			/* This SHOULD generate an error (TPFAIL or other) */
 #ifdef UNIX
@@ -167,8 +113,7 @@ CONDITION_HANDLER(mupip_recover_ch)
 	}
 	if (SEVERITY == SEVERE || DUMP || SEVERITY == ERROR)
 	{
-		mur_close_files();
-		NEXTCH; /* Will do prn_error for us */
+		NEXTCH;
 	} else
 	{
 		assert(SEVERITY == WARNING || SEVERITY == INFO);
@@ -176,566 +121,324 @@ CONDITION_HANDLER(mupip_recover_ch)
 	}
 }
 
-/* This routine handles errors reading the journal files.  It's also used by
- * mur_open_files(), mur_sort_files(), and mur_get_pini_jpv().
- */
-
-void	mur_jnl_read_error(ctl_list *ctl, uint4 status, bool ok)
+#ifdef VMS
+static	int4	mur_rel2abstime(jnl_proc_time deltatime, jnl_proc_time basetime, boolean_t roundup)
 {
-	util_out_print("Error reading record from journal file !AD - status:", TRUE, ctl->jnl_fn_len, ctl->jnl_fn);
-	mur_output_status(status);
-	if (!ok  ||  ++mur_error_count > mur_options.error_limit  &&  (!mur_options.interactive  ||  !mur_interactive()))
-	{
-		mur_close_files();
-		mupip_exit(ERR_NORECOVERERR);
-	}
-	ctl->bypass = TRUE;	/* Prevent further use of this journal file */
-}
+	/* In VMS, time in journal records is not stored in units of seconds. Instead it is stored in units of epoch-seconds.
+	 * (see vvms/jnlsp.h for comment on epoch-seconds). Since an epoch-second is approximately .8388th of a second, it is
+	 * possible that two consecutive journal records with timestamps of say t1 and t1+1 might map to the same time in seconds.
+	 * A mapping between epoch-seconds and seconds is given below (using the EPOCH_SECOND2SECOND macro)
+	 * 	epoch_second = 91 : second = 77
+	 * 	epoch_second = 92 : second = 78
+	 * 	epoch_second = 93 : second = 79
+	 * 	epoch_second = 94 : second = 79
+	 * 	epoch_second = 95 : second = 80
+	 * 	epoch_second = 96 : second = 81
+	 * 	epoch_second = 97 : second = 82
+	 * 	epoch_second = 98 : second = 83
+	 * 	epoch_second = 99 : second = 84
+	 * say basetime  is  83 seconds (this translates to 98 epoch-seconds)
+	 * say deltatime is   4 seconds (this translates to  4/.8388 = 4.76 = 4 (rounded down) epoch-seconds)
+	 * Now if we do 98 - 4 we get 94 epoch-seconds which maps to 79 seconds which is indeed 4 seconds below 83 seconds.
+	 * But notice that even 93 epoch-seconds maps to 79 seconds.
+	 * If this time is to be used as since-time or after-time or lookback-time it is 93 epoch-seconds that needs to be taken
+	 * 	(instead of 94) as otherwise we might miss out on few journal records that have 93 epoch-second timestamp).
+	 * If this time is to be used as before-time, it is 94 epoch-seconds that needs to be considered (instead of 93) as
+	 * 	otherwise we will stop at 93 timestamp journal records and miss out on including 94 timestamp journal records
+	 * 	although they correspond to the same second which the user sees in the journal extract.
+	 * Therefore, it is necessary that a relative to absolute delta-time conversion routine takes care of this.
+	 * It is taken care of in the below function mur_rel2abstime.
+	 * "roundup" is TRUE in case this function is called for mur_options.before_time and FALSE otherwise.
+	 */
+	uint4		baseseconds;
+	int4		diffseconds, deltaseconds;
 
-/* This routine processes the MUPIP JOURNAL command.  */
+	/* because of the way the final journal extract time comes out in seconds, the EPOCH_SECOND2SECOND macro needs to be
+	 * passed one more than the input epoch-seconds in order for us to get the exact corresponding seconds unit. wherever
+	 * the macro is used below, subtract one to find out the actual epoch-second that is being considered.
+	 */
+	deltaseconds = EPOCH_SECOND2SECOND(-deltatime);
+	baseseconds = EPOCH_SECOND2SECOND(basetime + 1);
+	deltatime += basetime;
+	diffseconds = baseseconds - EPOCH_SECOND2SECOND(deltatime + 1);
+	if (diffseconds < deltaseconds)
+	{
+		while ((baseseconds - EPOCH_SECOND2SECOND(deltatime + 1)) < deltaseconds)
+			deltatime--;
+		DEBUG_ONLY(diffseconds = baseseconds - EPOCH_SECOND2SECOND(deltatime + 1);)
+		assert(diffseconds == deltaseconds);
+	} else if (diffseconds > deltaseconds)
+	{
+		while ((baseseconds - EPOCH_SECOND2SECOND(deltatime + 1)) > deltaseconds)
+			deltatime++;
+		DEBUG_ONLY(diffseconds = baseseconds - EPOCH_SECOND2SECOND(deltatime + 1);)
+		assert(diffseconds == deltaseconds);
+	}
+	if (roundup)
+	{
+		if (EPOCH_SECOND2SECOND(deltatime + 2) == EPOCH_SECOND2SECOND(deltatime + 1))
+			deltatime++;
+		assert(EPOCH_SECOND2SECOND(deltatime + 1) < EPOCH_SECOND2SECOND(deltatime + 2));
+	} else
+	{
+		if (EPOCH_SECOND2SECOND(deltatime) == EPOCH_SECOND2SECOND(deltatime + 1))
+			deltatime--;
+		assert(EPOCH_SECOND2SECOND(deltatime) < EPOCH_SECOND2SECOND(deltatime + 1));
+	}
+	return deltatime;
+}
+#endif
 
 void	mupip_recover(void)
 {
-	bool			first_time;
-	char			fn[MAX_FN_LEN];
-	unsigned char		*ptr, qwstring[100], *ptr1, qwstring1[100];
-	ctl_list		*ctl, *last_jnl_file;
+	boolean_t		latest_gen_properly_closed, apply_pblk, ztp_broken, intrrupted_recov_processing;
 	enum jnl_record_type	rectype;
-	jnl_file_header		*header;
-	jnl_proc_time		min_lookback_time;
-	jnl_record		*rec;
-	jrec_suffix		*suffix_ptr;
-	mval			v;
-	seq_num			tempqw_seqno;	/* Used for temporary manipulation */
-	uint4			i, status, tempdw, lookup_lookback_time;
+	int			cur_time_len, regno, reg_total;
+	jnl_tm_t		max_lvrec_time, min_bov_time, min_broken_time;
+	seq_num 		losttn_seqno, min_broken_seqno;
 	unsigned char		*mstack_ptr;
-	int			epoch_limit;
-
-	error_def(ERR_ROLLBKIMPOS);
-	error_def(ERR_MURCLOSEWRN);
+	reg_ctl_list		*rctl;
+	jnl_ctl_list		*jctl;
+	char			time_str1[LENGTH_OF_TIME + 1], time_str2[LENGTH_OF_TIME + 1];
+	error_def		(ERR_MUNOACTION);
+	error_def		(ERR_BLKCNTEDITFAIL);
+	error_def		(ERR_JNLTMQUAL1);
+	error_def		(ERR_JNLTMQUAL2);
+	error_def		(ERR_JNLTMQUAL3);
+	error_def		(ERR_JNLTMQUAL4);
+	error_def		(ERR_MUJNLSTAT);
+	error_def		(ERR_MUJNLNOTCOMPL);
+	error_def		(ERR_RLBKJNSEQ);
+	error_def		(ERR_JNLACTINCMPLT);
+	error_def		(ERR_MUPJNLINTERRUPT);
 
 	ESTABLISH(mupip_recover_ch);
+	jgbl.mupip_journal = TRUE;	/* this is a MUPIP JOURNAL command */
+	murgbl.db_updated = FALSE;
 	call_on_signal = mur_close_files;
-	assert(0 == JREC_SUFFIX_SIZE % JNL_REC_START_BNDRY);
-	log_rollback = GETENV("LOG_ROLLBACK");
 	is_standalone = TRUE;
-	epoch_limit = 0;
+	DEBUG_ONLY(assert_jrec_member_offsets();)
+	/* PHASE 1: Process user input, open journal files, create rctl for phase 2 */
+	JNL_PUT_MSG_PROGRESS("Initial processing started");
+	mur_init();
+	murgbl.resync_seqno = 0; 		/* interrupted rollback set this to non-zero value later */
+	murgbl.stop_rlbk_seqno = MAXUINT8;	/* allow default rollback to continue forward processing till last valid record */
 	mur_get_options();
-	jnl_files = mur_get_jnl_files();
-	if (NULL == jnl_files)
+	mupip_jnl_recover = mur_options.update;
+	if (!mur_open_files())
+		/* mur_open_files already issued error */
+		mupip_exit(ERR_MUNOACTION);
+	murgbl.prc_vec = prc_vec;
+	reg_total = murgbl.reg_total;
+	if (mur_options.show_head_only)
 	{
-		util_out_print("", TRUE);
-		rts_error(VARLSTCNT(1) ERR_ROLLBKIMPOS);
+		mur_output_show();
+		murgbl.clean_exit = TRUE;
+		mupip_exit(SS_NORMAL);
 	}
-	QWASSIGN(consist_jnl_seqno, seq_num_zero);
-	QWASSIGN(max_resync_seqno, seq_num_zero);
-	if (!mur_open_files(&jnl_files))
+	latest_gen_properly_closed = TRUE;
+	intrrupted_recov_processing = murgbl.intrpt_recovery = FALSE;
+	for (regno = 0; regno < reg_total; regno++)
 	{
-		mur_close_files();
-		mupip_exit(ERR_NORECOVERERR);
+		rctl = &mur_ctl[regno];
+		jctl = rctl->jctl;
+		assert(NULL == jctl->next_gen);
+		if (!jctl->properly_closed)
+			latest_gen_properly_closed = FALSE;
+		if (jctl->jfh->recover_interrupted)
+		{
+			/* These journal files were created by recover */
+			if (!jctl->jfh->before_images)
+				GTMASSERT;
+			rctl->jfh_recov_interrupted = TRUE;
+			intrrupted_recov_processing = murgbl.intrpt_recovery = TRUE;
+		} else if (rctl->recov_interrupted) /* it is not necessary to do interrupted recover processing */
+			murgbl.intrpt_recovery = TRUE; /* Recovery was interrupted at some point */
 	}
-	if (mur_options.rollback)
+	if (latest_gen_properly_closed && !murgbl.intrpt_recovery && !mur_options.forward
+		&& ((!mur_options.rollback && !mur_options.since_time_specified &&
+			!mur_options.lookback_time_specified && !mur_options.lookback_opers_specified)
+		  || (mur_options.rollback && !mur_options.resync_specified && 0 == mur_options.fetchresync_port)))
+	{ 	/* We do not need to do unnecessary processing */
+		if (mur_options.show)
+			mur_output_show();
+		murgbl.clean_exit = TRUE;
+		mupip_exit(SS_NORMAL);
+	}
+	if (murgbl.intrpt_recovery && mur_options.update && mur_options.forward)
 	{
-		if (mur_options.fetchresync)
-		{
-			gtmrecv_fetchresync(jnl_files, mur_options.fetchresync, &resync_jnl_seqno);
-			ROLLBACK_LOG(resync_jnl_seqno, "MUR-I-DEBUG : ResyncJnlSeqno = !AD [0x!AD]");
-		} else if (CLI_PRESENT == cli_present("RESYNC"))
-		{
-			/* mur_get_options() fills in resync_jnl_seqno from the command line */
-			mur_options.fetchresync = TRUE;
-			QWASSIGN(consist_jnl_seqno, resync_jnl_seqno);
-			ROLLBACK_LOG(resync_jnl_seqno, "MUR-I-DEBUG : ResyncJnlSeqno = !AD [0x!AD]");
-		} else
-			QWASSIGN(consist_jnl_seqno, seq_num_minus_one);
+		gtm_putmsg(VARLSTCNT(4) ERR_MUPJNLINTERRUPT, 2, DB_LEN_STR(rctl->gd));
+		mupip_exit(ERR_MUNOACTION);
 	}
-	if (mur_options.rollback && mur_options.fetchresync && CLI_PRESENT != cli_present("RESYNC"))
+	if (mur_options.update && intrrupted_recov_processing)
 	{
-		/* Take the minimum of our resync_seqno and the other
-		 * system's resync_seqno */
-		if (QWGT(resync_jnl_seqno, max_resync_seqno))
-			QWASSIGN(resync_jnl_seqno, max_resync_seqno);
-		QWASSIGN(consist_jnl_seqno, resync_jnl_seqno);
+		JNL_PUT_MSG_PROGRESS("Interrupted recovery processing started");
+		/* Additional steps because recover was interrupted earlier */
+		if (SS_NORMAL != mur_apply_pblk(TRUE))
+			mupip_exit(ERR_MUNOACTION);
+		if (!mur_jctl_from_next_gen())
+			mupip_exit(ERR_MUNOACTION);
 	}
-	if (!mur_options.forward && mur_options.update && ((!mur_options.rollback && mur_options.chain) || mur_options.fetchresync))
+	jgbl.max_resync_seqno = 0; 		/* jgbl.max_resync_seqno must be calculated before gtmrecv_fetchresync() call */
+	max_lvrec_time = 0;			/* For delta format time qualifiers */
+	min_bov_time = MAXUINT4;		/* For forward qualifier we can find minimum of bov_timestamps */
+	for (regno = 0; regno < reg_total; regno++)
 	{
-		/* Check to see whether we have all the journal files that satisfy consist_jnl_seqno
-			criteria in case of fetchresync or resync */
-		if (!mur_check_jnlfiles_present(&jnl_files))
-		{
-			mur_close_files();
-			mupip_exit(ERR_NORECOVERERR);
-		}
+		rctl = &mur_ctl[regno];
+		jctl = rctl->jctl;
+		assert(NULL == jctl->next_gen);
+		if (mur_options.fetchresync_port && rctl->csd->resync_seqno > jgbl.max_resync_seqno)
+			jgbl.max_resync_seqno = rctl->csd->resync_seqno;
+		/* copy lvrec_time into region structure */
+		rctl->lvrec_time = jctl->lvrec_time;
+		if (rctl->lvrec_time > max_lvrec_time)
+			max_lvrec_time = rctl->lvrec_time;
+		if (mur_options.forward && (jnl_tm_t)rctl->jctl_head->jfh->bov_timestamp < min_bov_time)
+			min_bov_time = (jnl_tm_t)rctl->jctl_head->jfh->bov_timestamp;
 	}
-	if (mur_options.interactive)
-		util_in_open(NULL);
-	for (last_jnl_file = jnl_files;  NULL != last_jnl_file->next;  last_jnl_file = last_jnl_file->next)
-		;
-	mur_multi_initialize();		/* do initialization for multi-region TS/TC/ZTS/ZTC completeness check */
-	mur_current_initialize();	/* do buddy_list initialization for mur_current routines */
-	/* Do backward processing, if applicable */
-	if (!mur_options.forward || mur_options.verify || FENCE_NONE != mur_options.fences || mur_options.show & ~SHOW_BROKEN)
-	{
-		if (!mur_options.forward && mur_options.update)
-		{
-			if (mur_options.rollback)
-			{
-				QWASSIGN(min_epoch_jnl_seqno, seq_num_minus_one);
-				QWASSIGN(max_epoch_jnl_seqno, seq_num_zero);
-			}
-			for (ctl = last_jnl_file;
-				NULL != ctl  &&  (mur_error_count <= mur_options.error_limit  ||  mur_error_allowed);
-					ctl = ctl->prev)
-			{
-				ctl->consist_stop_addr = 0;
-				if (mur_options.rollback || mur_options.verify)
-				{
-					for (status = mur_get_last(ctl->rab); SS_NORMAL == status;
-									status = mur_previous(ctl->rab, 0))
-					{
-						if (!mur_options.rollback)
-							continue;
-						rec = (jnl_record *)ctl->rab->recbuff;
-						rectype = REF_CHAR(&rec->jrec_type);
-						if (JRT_EPOCH == rectype  ||  JRT_TCOM == rectype  ||  JRT_KILL == rectype
-							||  JRT_ZKILL == rectype ||  JRT_SET == rectype  ||  JRT_NULL == rectype)
-						{
-							assert(QWEQ(rec->val.jrec_epoch.jnl_seqno, rec->val.jrec_tcom.jnl_seqno));
-							assert(QWEQ(rec->val.jrec_epoch.jnl_seqno, rec->val.jrec_kill.jnl_seqno));
-							assert(QWEQ(rec->val.jrec_epoch.jnl_seqno, rec->val.jrec_zkill.jnl_seqno));
-							assert(QWEQ(rec->val.jrec_epoch.jnl_seqno, rec->val.jrec_set.jnl_seqno));
-							assert(QWEQ(rec->val.jrec_epoch.jnl_seqno, rec->val.jrec_null.jnl_seqno));
-							if (QWLT(max_epoch_jnl_seqno, rec->val.jrec_epoch.jnl_seqno))
-								QWASSIGN(max_epoch_jnl_seqno, rec->val.jrec_epoch.jnl_seqno);
-							if (!mur_options.fetchresync  ||
-								QWLE(rec->val.jrec_epoch.jnl_seqno, resync_jnl_seqno))
-							{
-								if (ctl->rab->pvt->jfh->crash
-									&& QWGT(min_epoch_jnl_seqno, rec->val.jrec_epoch.jnl_seqno))
-								       QWASSIGN(min_epoch_jnl_seqno, rec->val.jrec_epoch.jnl_seqno);
-								ctl->consist_stop_addr = ctl->rab->dskaddr;
-								ROLLBACK_LOG_STOP_JNL_SEQNO;
-								break;
-							}
-						}
-					}
-				}
-				if (mur_options.rollback)
-				{
-					if (0 == ctl->consist_stop_addr)
-					{
-						if (!mur_insert_prev(ctl, &jnl_files))
-						{
-							mur_close_files();
-							mupip_exit(ERR_NORECOVERERR);
-						}
-						continue;
-					}
-					if (!mur_options.fetchresync)
-					{
-						if (0 != epoch_limit)
-						{
-							gtm_putmsg(VARLSTCNT(7) ERR_EPOCHLIMGT, 5, ctl->jnl_fn_len, ctl->jnl_fn,
-							epoch_limit, mur_options.epoch_limit, epoch_limit);
-							mur_close_files();
-							mupip_exit(ERR_NORECOVERERR);
-						}
-					}
-				} else
-				{	/* Include previous generation journal files only when lookback/since time
-					 * is specified to be less than any default time and if mur_options.chain is TRUE.
-					 */
-					if (CMP_JNL_PROC_TIME(ctl->rab->pvt->jfh->bov_timestamp, min_jnl_rec_time) >=0)
-					{	/* Only one generation and not many updates */
-     						if (!mur_options.chain
-							|| ((0 == ctl->rab->pvt->jfh->prev_jnl_file_name_length)
-								&& !mur_options.since && !mur_options.lookback_time_specified))
-							continue;
-						if (!mur_insert_prev(ctl, &jnl_files))
-						{
-							mur_close_files();
-							mupip_exit(ERR_NORECOVERERR);
-						}
-					}
-					continue;
-				}
-				if (SS_NORMAL != status)
-				{
-					mur_jnl_read_error(ctl, status, TRUE);
-					continue;
-				}
-			}
-			if (mur_options.rollback)
-			{
-				if (QWEQ(seq_num_minus_one, min_epoch_jnl_seqno)  &&  QWGT(consist_jnl_seqno, max_epoch_jnl_seqno))
-					QWASSIGN(consist_jnl_seqno, max_epoch_jnl_seqno);
-				else if ((QWNE(seq_num_minus_one, min_epoch_jnl_seqno)) &&
-						(QWGT(consist_jnl_seqno, min_epoch_jnl_seqno)))
-					QWASSIGN(consist_jnl_seqno, min_epoch_jnl_seqno);
-				assert(QWNE(seq_num_zero, max_epoch_jnl_seqno));
-				if (QWNE(seq_num_minus_one, min_epoch_jnl_seqno))
-				{
-					QWINCRBYDW(max_epoch_jnl_seqno, (n_regions * EPOCH_SIZE + 2));
-					QWSUB(tempqw_seqno, max_epoch_jnl_seqno, consist_jnl_seqno);
-					DWASSIGNQW(tempdw, tempqw_seqno);
-					broken_array = (broken_struct *)malloc(tempdw * sizeof(broken_struct));
-					memset(broken_array, 0, tempdw * sizeof(broken_struct));
-				}
-			}
-		}
-		if (!mur_options.forward && mur_options.update && 0 != mur_options.epoch_limit)
-		{
-			for (ctl = last_jnl_file; NULL != ctl;  ctl = ctl->prev)
-			{
-				for (status = mur_get_last(ctl->rab); SS_NORMAL == status;  status = mur_previous(ctl->rab, 0))
-				{
-					rec = (jnl_record *)ctl->rab->recbuff;
-					rectype = REF_CHAR(&rec->jrec_type);
-					if (JRT_EPOCH == rectype)
-					{
-						epoch_limit++;
-						if (mur_options.rollback && QWLE(rec->val.jrec_epoch.jnl_seqno, consist_jnl_seqno))
-							break;
-						else if (!mur_options.rollback
-							   && rec->val.jrec_epoch.short_time < MUR_OPT_MID_TIME(lookback_time))
-							break;
-					}
-				}
-				if (0 == ctl->consist_stop_addr && mur_options.rollback)
-					continue;
-				if (epoch_limit > mur_options.epoch_limit)
-				{
-					gtm_putmsg(VARLSTCNT(7) ERR_EPOCHLIMGT, 5, ctl->jnl_fn_len, ctl->jnl_fn,
-									epoch_limit, mur_options.epoch_limit, epoch_limit);
-					mur_close_files();
-					mupip_exit(ERR_NORECOVERERR);
-				}
-				epoch_limit = 0;
-			}
-		}
-		for (ctl = last_jnl_file;
-			NULL != ctl  &&  (mur_error_count <= mur_options.error_limit  ||  mur_error_allowed);
-				ctl = ctl->prev)
-		{
-			ctl->consist_stop_addr = 0;
-			ctl->lookback_count = -1;       /* Initialize for mur_back_process() */
-			for (status = mur_get_last(ctl->rab), first_time = TRUE;
-				(SS_NORMAL == status) && ((mur_error_count <= mur_options.error_limit) || mur_error_allowed);
-					status = mur_previous(ctl->rab, 0), first_time = FALSE)
-				if (!mur_back_process(ctl))
-					break;
-			if (mur_options.update  &&  !mur_options.forward  &&  !mur_options.verify)
-			{
-				cs_addrs = (sgmnt_addrs *)&FILE_INFO(ctl->gd)->s_addrs;
-				cs_data = cs_addrs->hdr;
-				cs_data->trans_hist.header_open_tn =
-				cs_data->trans_hist.early_tn =
-				cs_data->trans_hist.curr_tn = ctl->turn_around_tn;
-				if (dba_bg == cs_data->acc_meth)
-					bt_refresh(cs_addrs);
-				if (ctl->turn_around_tn > ctl->db_tn)
-					rts_error(VARLSTCNT(6) ERR_TRNARNDTNHI, 4, ctl->jnl_fn_len,
-						ctl->jnl_fn, ctl->turn_around_tn, ctl->db_tn);
-			}
-			if (SS_NORMAL != status  &&  (first_time  ||  ERR_JNLREADEOF != status))
-			{
-				mur_jnl_read_error(ctl, status, TRUE);
-				continue;
-			} else if (mur_options.rollback  &&  !mur_options.forward  &&  ERR_JNLREADEOF == status)
-			{
-				assert(0 == ctl->consist_stop_addr  ||  FALSE == ctl->concat_prev);
-				ctl->consist_stop_addr = 0;
-				if (FALSE == ctl->concat_prev)
-				{
-					if (!mur_insert_prev(ctl, &jnl_files))
-					{
-						mur_close_files();
-						mupip_exit(ERR_NORECOVERERR);
-					}
-				}
-			}
-			if (mur_error_count > mur_options.error_limit  &&  !mur_error_allowed)
-				break;
-			if (!mur_options.rollback  &&  ctl->broken_entries > 0)
-			{
-				if (!mur_report_error(ctl, MUR_INSUFLOOK))
-					break;
-				if (mur_options.show & SHOW_BROKEN)
-					/* These broken transactions will be recovered */
-					mur_include_broken(ctl);
-			}
-			ctl->stop_addr = ctl->rab->dskaddr;
-			mur_empty_current(ctl);
-			if (!ctl->concat_prev  &&  mur_options.update &&  !mur_options.forward  &&  !mur_options.verify)
-			{
-				mur_master_map(ctl);
-				cs_addrs = (sgmnt_addrs *)&FILE_INFO(ctl->gd)->s_addrs;
-				cs_data = cs_addrs->hdr;
-				cs_data->trans_hist.free_blocks = mur_blocks_free(ctl);
-			}
-		}
-		if ((!mur_options.rollback) && (n_regions < participants) &&
-			mur_options.update && (FENCE_NONE != mur_options.fences))
-		{
-			mur_report_error(NULL, MUR_MISSING_FILES);
-			mur_close_files();
-			mupip_exit(ERR_NORECOVERWRN);
-		}
-		if (mur_options.rollback)
-		{
-			QWASSIGN(stop_rlbk_seqno, rlbk_lookup_seqno());
-			ROLLBACK_LOG(stop_rlbk_seqno, "MUR-I-DEBUG : BrokenJnlSeqno = !AD [0x!AD]");
-			if (QWNE(seq_num_minus_one, min_epoch_jnl_seqno))
-			{
-				QWSUB(tempqw_seqno, max_epoch_jnl_seqno, consist_jnl_seqno);
-				DWASSIGNQW(tempdw, tempqw_seqno);
-				for (i = 0; i < tempdw; i++)
-					if (-1 != broken_array[i].count)
-						break;
-				QWADDDW(tempqw_seqno, consist_jnl_seqno, i);
-				if (QWGT(stop_rlbk_seqno, tempqw_seqno))
-					QWASSIGN(stop_rlbk_seqno, tempqw_seqno);
-			}
-			ROLLBACK_LOG(stop_rlbk_seqno, "MUR-I-DEBUG : BrokenJnlSeqno = !AD [0x!AD]");
-			if (!mur_options.fetchresync  &&  QWNE(seq_num_minus_one, stop_rlbk_seqno))
-				assert(QWLE(consist_jnl_seqno, stop_rlbk_seqno));
-			else if (mur_options.fetchresync)
-				assert(QWLE(consist_jnl_seqno, stop_rlbk_seqno) || QWLE(consist_jnl_seqno, resync_jnl_seqno));
-			ROLLBACK_LOG(consist_jnl_seqno, "MUR-I-DEBUG : ConsistJnlSeqno = !AD [0x!AD]");
-		}
-		/* assert(!mur_multi_extant()  ||  !mur_options.rollback); */
-		if (mur_multi_extant()  &&  !mur_options.rollback)
-		{
-			lookup_lookback_time = mur_lookup_lookback_time();
-			JNL_WHOLE_FROM_SHORT_TIME(min_lookback_time, lookup_lookback_time);
-			if (lookup_lookback_time < MUR_OPT_MID_TIME(lookback_time))
-			{
-				mur_options.lookback_time = min_lookback_time;
-				for (ctl = last_jnl_file; NULL != ctl; ctl = ctl->prev)
-					if (MID_TIME(min_lookback_time) < MID_TIME(ctl->lookback_time))
-						ctl->reached_lookback_limit = FALSE;
-			}
-			for (ctl = last_jnl_file;
-				NULL != ctl  &&  (mur_error_count <= mur_options.error_limit  ||  mur_error_allowed);
-					ctl = ctl->prev)
-			{
-				if (ctl->bypass  ||  ctl->reached_lookback_limit)
-					continue;
-				while ((SS_NORMAL == (status = mur_previous(ctl->rab, 0))) && mur_lookback_process(ctl))
-					if (!mur_multi_extant())
-						goto check_pblk;	/* I know, I know ... but it's exactly what to do */
-				if (SS_NORMAL != status  &&  ERR_JNLREADEOF != status)
-					mur_jnl_read_error(ctl, status, TRUE);
-			}
-		}
-		if (mur_options.rollback)
-			util_out_print("MUR-I-PBLKSTART : Starting Phase for Applying PBLK records", TRUE);
-		/* If application of PBLK records was deferred above [see mur_back_process()], apply them now */
-check_pblk:
-		if (mur_options.update  &&  !mur_options.forward  &&  mur_options.verify)
-		{
-			for (ctl = last_jnl_file;
-				NULL != ctl  &&  (mur_error_count <= mur_options.error_limit  ||  mur_error_allowed);
-					ctl = ctl->prev)
-			{
-				if (ctl->bypass || mur_options.rollback && ctl->concat_next && 0 != ctl->next->consist_stop_addr)
-					continue;
-				for (status = mur_get_last(ctl->rab), first_time = TRUE;
-					(SS_NORMAL == status) && (ctl->rab->dskaddr != ctl->stop_addr);
-						status = mur_previous(ctl->rab, 0), first_time = FALSE)
-				{
-					if (mur_options.rollback
-						&&  JRT_EPOCH == REF_CHAR(&((jnl_record *)ctl->rab->recbuff)->jrec_type)
-						&&  QWGE(consist_jnl_seqno,
-							((jnl_record *)ctl->rab->recbuff)->val.jrec_epoch.jnl_seqno))
-					{
-						ctl->consist_stop_addr = ctl->stop_addr = ctl->rab->dskaddr;
-						break;
-					}
-					if (JRT_PBLK == REF_CHAR(&((jnl_record *)ctl->rab->recbuff)->jrec_type))
-						mur_output_record(ctl);
-				}
-				if (SS_NORMAL != status  &&  (first_time  ||  ERR_JNLREADEOF != status))
-				{
-					mur_jnl_read_error(ctl, status, TRUE);
-					continue;
-				}
-				cs_addrs = (sgmnt_addrs *)&FILE_INFO(ctl->gd)->s_addrs;
-				cs_data = cs_addrs->hdr;
-				if (!ctl->concat_prev)
-				{
-					/* Its ok to set cs_addrs explicitly instead of a tp_change_reg()
-					 * because there will be no actual updates to the database going on
-					 * and hence nobody relying on cs_addrs.
-					 */
-					mur_master_map(ctl);
-					cs_data->trans_hist.free_blocks = mur_blocks_free(ctl);
-				}
-				cs_data->trans_hist.header_open_tn =
-				cs_data->trans_hist.early_tn =
-				cs_data->trans_hist.curr_tn = ctl->turn_around_tn;
-				if (dba_bg == cs_data->acc_meth)
-					bt_refresh(cs_addrs);
-				if (ctl->turn_around_tn > ctl->db_tn)
-					rts_error(VARLSTCNT(6) ERR_TRNARNDTNHI, 4, ctl->jnl_fn_len,
-						ctl->jnl_fn, ctl->turn_around_tn, ctl->db_tn);
-			}
-		}
-	}
-	if (NULL != mur_options.losttrans_file_info)
-		util_out_print("MUR-I-LOSTTRANSSTART : Starting Phase for Extracting Lost Transactions", TRUE);
-	/* Do forward processing */
-	forw_phase_recovery = TRUE;	/* Initialize to TRUE so that recover copies original time stamps during forward phase
- 	 				 * while writing newly generated logical records */
-	/* Note that if all regions have before-imaging disabled, we dont need to invoke mur_crejnl_forwphase_file()
-	 * but we let it decide that since anyway it scans the ctl list
+	/* Following processing of time qualifiers cannot be done in mur_get_options() as it does not have max_lvrec_time
+	 * Also this should be done after interrupted recovery processing.
+	 * Otherwise delta time of previous command and delta time of this recover may not be same.
+	 * All time qualifiers are specified in delta time or absolute time.
+	 *	mur_options.since_time == 0 means no /SINCE time was specified
+	 *	mur_options.since_time < 0 means it is the delta since time.
+	 *	mur_options.since_time > 0 means it is absolute since time in seconds
 	 */
-	if (mur_options.update && !mur_crejnl_forwphase_file(&jnl_files))
+	assert(!mur_options.forward || 0 == mur_options.since_time);
+	assert(!mur_options.forward || 0 == mur_options.lookback_time);
+	if (mur_options.since_time <= 0)
+		REL2ABSTIME(mur_options.since_time, max_lvrec_time, FALSE); /* make it absolute time */
+	if (!mur_options.before_time_specified)
+		mur_options.before_time = MAXUINT4;
+	else if (mur_options.before_time <= 0)
+		REL2ABSTIME(mur_options.before_time, max_lvrec_time, TRUE); /* make it absolute time */
+	if ((CLI_PRESENT == cli_present("AFTER")) && (mur_options.after_time <= 0))
+		REL2ABSTIME(mur_options.after_time, max_lvrec_time, FALSE); /* make it absolute time */
+	if (mur_options.lookback_time <= 0)
+		REL2ABSTIME(mur_options.lookback_time, mur_options.since_time, FALSE); /* make it absolute time */
+	if (!mur_options.forward && (mur_options.before_time < mur_options.since_time))
 	{
-		mur_close_files();
-		mupip_exit(ERR_NORECOVERERR);
+		GET_TIME_STR(mur_options.before_time, time_str1);
+		GET_TIME_STR(mur_options.since_time, time_str2);
+		gtm_putmsg(VARLSTCNT(4) ERR_JNLTMQUAL1, 2, time_str1, time_str2);
+		mupip_exit(ERR_MUNOACTION);
 	}
-	mur_forward_buddy_list_init();
-        if (((mur_error_count <= mur_options.error_limit  ||  mur_error_allowed)  &&
-		(mur_options.update  ||  NULL != mur_options.extr_file_info)  ||
-		(mur_options.rollback) ||
-		(FENCE_NONE == mur_options.fences)))
+	if (!mur_options.forward && (mur_options.lookback_time > mur_options.since_time))
 	{
-		if (mur_options.update)
+		GET_TIME_STR(mur_options.lookback_time, time_str1);
+		GET_TIME_STR(mur_options.since_time, time_str2);
+		gtm_putmsg(VARLSTCNT(4) ERR_JNLTMQUAL2, 2, time_str1, time_str2);
+		mupip_exit(ERR_MUNOACTION);
+	}
+	if (mur_options.forward && mur_options.before_time < min_bov_time)
+	{
+		GET_TIME_STR(mur_options.before_time, time_str1);
+		GET_TIME_STR(min_bov_time, time_str2);
+		gtm_putmsg(VARLSTCNT(4) ERR_JNLTMQUAL3, 2, time_str1, time_str2);
+		mupip_exit(ERR_MUNOACTION);
+	}
+	if (mur_options.forward && (mur_options.before_time < mur_options.after_time))
+	{
+		GET_TIME_STR(mur_options.before_time, time_str1);
+		GET_TIME_STR(mur_options.after_time, time_str2);
+		gtm_putmsg(VARLSTCNT(4) ERR_JNLTMQUAL4, 2, time_str1, time_str2);
+		mupip_exit(ERR_MUNOACTION);
+	}
+	if (mur_options.fetchresync_port)
+	{
+		JNL_PUT_MSG_PROGRESS("FETCHRESYNC processing started");
+		if (SS_NORMAL != gtmrecv_fetchresync(mur_options.fetchresync_port, &murgbl.resync_seqno))
+			mupip_exit(ERR_MUNOACTION);
+		if (jgbl.max_resync_seqno < murgbl.resync_seqno)
+			murgbl.resync_seqno = jgbl.max_resync_seqno;
+		murgbl.stop_rlbk_seqno = murgbl.resync_seqno;
+	} else if (mur_options.resync_specified)
+		murgbl.stop_rlbk_seqno = murgbl.resync_seqno;
+
+	/* PHASE 2: Create list of broken transactions for both forward and backward recovery
+	 *          In addition apply PBLK for backward recover with noverify */
+	JNL_PUT_MSG_PROGRESS("Backward processing started");
+	apply_pblk = (mur_options.update && !mur_options.forward && !mur_options.verify);
+	if (!mur_back_process(apply_pblk))
+		mupip_exit(ERR_MUNOACTION);
+	if (!mur_options.rollback)
+	{
+		/* mur_process_token_table returns followings:
+		 * 	min_broken_time = token with minimum time stamp of broken entries
+		 * 	ztp_broken = TRUE, if any ztp entry is broken */
+		min_broken_time = mur_process_token_table(&ztp_broken);
+		losttn_seqno = MAXUINT8;
+	}
+       	/* Multi_region TP/ZTP resolution */
+	if (!mur_options.forward)
+	{
+		if (!mur_options.rollback && FENCE_NONE != mur_options.fences && ztp_broken)
 		{
-			if (!gd_header)
-			{
-				v.mvtype = MV_STR;
-				v.str.len = 0;
-				gd_header = zgbldir(&v);
-				gd_map = gd_header->maps;
-				gd_map_top = gd_map + gd_header->n_maps;
-			}
-			gv_currkey = (gv_key *)malloc(sizeof(gv_key) - 1 + gv_keysize);
-			gv_altkey = (gv_key *)malloc(sizeof(gv_key) - 1 + gv_keysize);
-			gv_currkey->top = gv_altkey->top = gv_keysize;
-			gv_currkey->end = gv_currkey->prev = gv_altkey->end = gv_altkey->prev = 0;
-			gv_altkey->base[0] = gv_currkey->base[0] = '\0';
-			gv_target = targ_alloc(gv_keysize);
-			/* There may be M transactions in the journal files.  If so, op_tstart() and op_tcommit()
-			   will be called during recovery;  they require a couple of dummy stack frames to be set up */
-			mstack_ptr = (unsigned char *)malloc(USER_STACK_SIZE);
-			msp = stackbase
-			    = mstack_ptr + USER_STACK_SIZE - 4;
-			mv_chain = (mv_stent *)msp;
-			stacktop = mstack_ptr + 2 * mvs_size[MVST_NTAB];
-			stackwarn = stacktop + 1024;
-			msp -= sizeof(stack_frame);
-			frame_pointer = (stack_frame *)msp;
-			memset(frame_pointer, 0, sizeof(stack_frame));
-			frame_pointer->type = SFT_COUNT;
-			frame_pointer->temps_ptr = (unsigned char *)frame_pointer; /* no temporaries in this frame */
-			--frame_pointer;
-			memset(frame_pointer, 0, sizeof(stack_frame));
-			frame_pointer->type = SFT_COUNT;
-			frame_pointer->temps_ptr = (unsigned char *)frame_pointer; /* no temporaries in this frame either */
-			frame_pointer->old_frame_pointer = (stack_frame *)msp;
-			msp = (unsigned char *)frame_pointer;
+			/* PHASE 3 : ZTP lookback processing phase (not for non-ZTP) */
+			JNL_PUT_MSG_PROGRESS("Lookback processing started");
+			if (!mur_ztp_lookback())
+				mupip_exit(ERR_MUNOACTION);
+			/* ZTP lookback processing might or might not have reset tp_resolve_time for some set of regions
+			 * to reflect the earliest time when we found a ZTP journal record whose token existed in the
+			 * hashtable as a broken ZTP transaction. In either case, we want to examine each ZTP record in the
+			 * forward processing phase for brokenness (instead of examining only those records from min_broken_time).
+			 * This is because otherwise we might miss out on recognizing broken transactions (see example below).
+			 * e.g.
+			 *	REGA has tp_resolve_time = t1, epochtime = "t1 - 5", FSET at "t1 + 2", no ZTCOM
+			 *	REGB has tp_resolve_time = t1, epochtime = "t1 - 5", FSET at "t1 - 4", no ZTCOM
+			 * While processing REGA we find a broken FSET at "t1 + 2" before reaching tp_resolve_time = "t1"
+			 * But while processing REGB we do not find anything broken before reaching tp_resolve_time = "t1"
+			 * We see the broken FSET at "t1 - 4" before reaching the turn-around-point for REGB but we do not
+			 *	consider it as broken since we do not add any records into the hashtable before tp_resolve_time "t1"
+			 * This means min_broken_time will correspond to the broken FSET in REGA which is "t1 + 2"
+			 * With this value of "min_broken_time" if we process REGA in mur_forward() we will treat the FSET
+			 * 	at "t1 + 2" as broken although while processing REGB in mur_forward() we will not treat the
+			 * 	FSET at "t1 - 4" as broken (since its timestamp is less than min_broken_time of "t1 + 2").
+			 * This is incorrect. To fix this, we instead set min_broken_time = 0. That way all journal records will
+			 * 	be examined for brokenness in mur_forward. Note: this is only if there is at least one broken ZTP.
+			 */
+			min_broken_time = 0;
 		}
-		for (ctl = jnl_files;
-			NULL != ctl  &&  (mur_error_count <= mur_options.error_limit  ||  mur_error_allowed);
-				ctl = ctl->next)
+
+		/* PHASE 4 : Apply PBLK
+		 *          If no ZTP is present and !mur_options.verify, this phase will effectively do nothing.
+		 *          If ZTP is present and !mur_options.verify and lookback processing changed resolve_time Then
+		 *          	This will do additional PBLK undoing
+                 * 	    For mur_options.verify == true following will do complete
+		 *	    	PBLK processing (from lvrec_off to turn_around point)
+		 */
+		JNL_PUT_MSG_PROGRESS("Before image applying started");
+                if (mur_options.update)
 		{
-			if (ctl->bypass)
-				continue;
-			/* Initialize cur_logirec_short_time to the time of the turn around epoch record.
-			 * Ideally we should never be writing an EPOCH record without writing a logical record (which
-			 * 	would update cur_logirec_short_time appropriately) but for clean flow, we do the initialization.
-			 */
-			cur_logirec_short_time = ctl->turn_around_epoch_time;
-			if (mur_options.update)
-			{
-				brktrans = FALSE;
-				losttrans = FALSE;
-				gv_target->gd_reg = gv_cur_region = ctl->gd;
-				gv_target->clue.prev = gv_target->clue.end = 0;
-				gv_target->root = 0;
-				gv_target->nct = 0;
-				gv_target->act = 0;
-				gv_target->ver = 0;
-				gv_target->collseq = NULL;
-				gv_target->noisolation = FALSE;
-				tp_change_reg();
-				assert(NULL == cs_addrs->dir_tree || cs_addrs->dir_tree->gd_reg == gv_cur_region);
-				if (NULL == cs_addrs->dir_tree)
-				{
-					cs_addrs->dir_tree = targ_alloc(gv_keysize);
-					cs_addrs->dir_tree->root = DIR_ROOT;
-					cs_addrs->dir_tree->gd_reg = gv_cur_region;
-				}
-			}
-			/* Check that if ctl's region has before-imaging, then stop_addr is > 0 and the converse.
-			 * Note that the above is true irrespective of whether we are doing forward or backward recovery.
-			 * For forward recovery, stop_addr is guaranteed to be non-zero by mur_crejnl_forwphase_file().
-			 * 	In case db's jnl-file-name is same as the first ctl->jnl_fn, stop_addr will point to
-			 * 		the offset of the first valid jnl-record in the forw-phase file.
-			 * 	In the other case, stop_addr will be HDR_LEN.
-			 * 	Note that for forward recovery, stop_addr will be non-zero only if the jnl-file has
-			 * 		before-imaged journal records and journalling is enabled.
-			 * For backward recovery, stop_addr can be non-zero even if ctl->before_image is FALSE in the
-			 * 	case that before-imaging is disabled before recovery.
-			 */
-			assert(!mur_options.update  && (!ctl->before_image || (0 != ctl->stop_addr))
-			    || !mur_options.forward && (0 != ctl->stop_addr)
-			    ||  mur_options.forward && (0 != ctl->stop_addr || !ctl->before_image));
-			if (0 == ctl->stop_addr)
-				status = mur_get_first(ctl->rab);
-			else
-				status = mur_next(ctl->rab, ctl->stop_addr);
-			if (SS_NORMAL != status  ||  SS_NORMAL != (status = mur_forward(ctl))  &&  ERR_JNLREADEOF != status)
-				mur_jnl_read_error(ctl, status, TRUE);
-			if (FALSE == ctl->concat_next && mur_options.update && SS_NORMAL != mur_block_count_correct())
-				gtm_putmsg(VARLSTCNT(4) ERR_BLKCNTEDITFAIL, 2, DB_LEN_STR(gv_cur_region));
+			if (SS_NORMAL != mur_apply_pblk(FALSE))
+				mupip_exit(ERR_MUNOACTION);
+
+			/* PHASE 5 : Update journal file header with current state of recover, so that if this process
+			 *           is interrupted, we can recover from it. We already synched updates */
+			if (SS_NORMAL != mur_process_intrpt_recov())
+				mupip_exit(ERR_MUNOACTION);
 		}
 	}
-	/* Output any reports requested by SHOW options */
-	if (mur_options.show  &&  (mur_error_count <= mur_options.error_limit  ||  mur_error_allowed))
-		for (ctl = jnl_files;  NULL != ctl;  ctl = ctl->next)
-			mur_output_show(ctl);
-	/* Moved out of mur_close_files() as it can be called as clean_up routine incase of abnormal mupip_recover termination */
-	if (mur_options.update)
-	{
-		for (ctl = jnl_files;  NULL != ctl;  ctl = ctl->next)
-			send_msg(VARLSTCNT(6) ERR_ENDRECOVERY, 4, DB_LEN_STR(ctl->gd), ctl->jnl_fn_len, ctl->jnl_fn);
-	}
-	/* Done */
-	assert(0 <= mur_error_count);	/* never gets decremented anywhere, better be positive */
-	if (mur_options.update)
-		recovery_success = TRUE;	/* Set it to true so that jnl_file_close will delete the forw_phase_files */
-	mur_close_files();
-	if (mur_wrn_count > 0)
-		mupip_exit(ERR_MURCLOSEWRN);
-	if (mur_error_count > 0)
-	{
-		if (mur_error_count <= mur_options.error_limit  ||  mur_error_allowed)
-			mupip_exit(ERR_NORECOVERWRN);
-		if (!mur_options.interactive)
-			util_out_print("!/Exceeded maximum number of errors allowed (!UL)", TRUE, mur_options.error_limit);
-		mupip_exit(ERR_NORECOVERERR);
-	}
-	if (NULL != mur_options.extr_file_info  ||  mur_options.update)
-	{
-		if (NULL != mur_options.extr_file_info)
-			util_out_print("!/Extraction successful", TRUE);
-		if (NULL != mur_options.extr_file_info && mur_multi_extant())
-                        mur_report_error(NULL, MUR_MISSING_EXTRACT);
-		if (mur_options.update)
-			util_out_print("!/Update successful", TRUE);
-	} else if (mur_options.verify)
-		util_out_print("!/Verification successful", TRUE);
-	if (NULL != mur_options.losttrans_file_info)
-		util_out_print("!/Lost transaction Extraction successful", TRUE);
+
+	/* PHASE 6 : Forward processing phase */
+	JNL_PUT_MSG_PROGRESS("Forward processing started");
 	if (mur_options.rollback)
 	{
-		ptr = i2ascl(qwstring, consist_jnl_seqno);
-		ptr1 = i2asclx(qwstring1, consist_jnl_seqno);
-		util_out_print("!/Rollback journal seqno is !AD [0x!AD]", TRUE, ptr - qwstring, qwstring, ptr1 - qwstring1,
-			qwstring1);
+		mur_process_seqno_table(&min_broken_seqno, &losttn_seqno);
+		min_broken_time = MAXUINT4;
 	}
-	mupip_exit(SS_NORMAL);
+	if (SS_NORMAL != mur_forward(min_broken_time, min_broken_seqno, losttn_seqno))
+		mupip_exit(ERR_MUNOACTION);
+	prc_vec = murgbl.prc_vec;
+	if (mur_options.show)
+		mur_output_show();
+
+	/* PHASE 7 : Close all files, rundown and exit */
+	murgbl.clean_exit = TRUE;
+	if (mur_options.rollback)
+		gtm_putmsg(VARLSTCNT(4) ERR_RLBKJNSEQ, 2, &murgbl.consist_jnl_seqno, &murgbl.consist_jnl_seqno);
+	if (murgbl.wrn_count)
+		mupip_exit(ERR_JNLACTINCMPLT);
+	else
+		mupip_exit(SS_NORMAL);
 }

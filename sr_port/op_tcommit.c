@@ -47,6 +47,7 @@
 #include "add_inter.h"
 #include "tp_incr_commit.h"
 #include "have_crit.h"
+#include "jobinterrupt_process.h"
 
 error_def(ERR_GBLOFLOW);
 error_def(ERR_GVIS);
@@ -73,13 +74,13 @@ GBLREF	boolean_t		is_updproc;
 GBLREF	void			(*tp_timeout_clear_ptr)(void);
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	tp_region		*tp_reg_list;	/* Chained list of regions used in this transaction not cleared on tp_restart */
+GBLREF jnl_gbls_t		jgbl;
 
 void	op_tcommit(void)
 {
-	boolean_t		wait_for_jnl_hard;
 	bool			blk_used, is_mm;
 	sm_uc_ptr_t		bmp;
-	unsigned char		buff[MAX_KEY_SZ * 2], *end, tp_bat[TP_BATCH_LEN];
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;
 	unsigned int		ctn;
 	int			cw_depth, cycle, len, old_cw_depth;
 	sgmnt_addrs		*csa, *next_csa;
@@ -101,6 +102,7 @@ void	op_tcommit(void)
 	srch_blk_status		*t1;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
+
 	if (0 == dollar_tlevel)
 		rts_error(VARLSTCNT(1) ERR_TLVLZERO);
 	assert(0 == jnl_fence_ctl.level);
@@ -256,46 +258,25 @@ void	op_tcommit(void)
 				)
 				if (cdb_sc_gbloflow == status)
 				{
-					if (NULL == (end = format_targ_key(buff, MAX_KEY_SZ * 2, cse->blk_target->last_rec, TRUE)))
-						end = &buff[MAX_KEY_SZ * 2 - 1];
+					if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, cse->blk_target->last_rec, TRUE)))
+						end = &buff[MAX_ZWR_KEY_SZ - 1];
 					rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 				} else
 					INVOKE_RESTART;
 				return;
 			}
 			assert(0 == have_crit(CRIT_HAVE_ANY_REG));
-			if ((sgmnt_addrs *)-1 != (csa = jnl_fence_ctl.fence_list))
+			if (jgbl.wait_for_jnl_hard && !is_updproc && !mupip_jnl_recover)
 			{	/* For mupip journal recover all transactions applied during forward phase are treated as
-				 * Batch transaction for performance gain, since the recover command can be reissued like
-				 * a batch restart. The wait_for_jnl_hard is set to FALSE for recover process to bypass
-				 * hardening done for each online transaction. We still retain the jnl_tid set in the
-				 * original journal record before recovery by copying the jnl_tid field in mur_output_record
-				 * and later copied in op_tstart */
-
-				if (!mupip_jnl_recover)
+			   	 * BATCH transaction for performance gain, since the recover command can be reissued like
+			   	 * a batch restart. Similarly update process considers all transactions as BATCH */
+				if ((sgmnt_addrs *)-1 != (csa = jnl_fence_ctl.fence_list))
 				{
-					wait_for_jnl_hard = TRUE;
-					if ((TP_BATCH_SHRT == tp_pointer->trans_id.str.len)
-						|| (TP_BATCH_LEN == tp_pointer->trans_id.str.len))
-					{
-						lower_to_upper(tp_bat, (uchar_ptr_t)tp_pointer->trans_id.str.addr,
-								tp_pointer->trans_id.str.len);
-						if (0 == memcmp(TP_BATCH_ID, tp_bat, tp_pointer->trans_id.str.len))
-							wait_for_jnl_hard = FALSE;
-					}
-				} else
-					wait_for_jnl_hard = FALSE;
-
-				for (; (sgmnt_addrs *)-1 != csa;  csa = next_csa)
-				{	/* only those regions that are actively journaling will appear in the list: */
-					if (wait_for_jnl_hard)
-					{
+					for (; (sgmnt_addrs *)-1 != csa;  csa = csa->next_fenced)
+					{	/* only those regions that are actively journaling will appear in the list: */
 						TP_CHANGE_REG_IF_NEEDED(csa->jnl->region);
-						if (!is_updproc)
-							jnl_wait(csa->jnl->region);
+						jnl_wait(csa->jnl->region);
 					}
-					next_csa = csa->next_fenced;
-					csa->next_fenced = NULL;
 				}
 			}
 		} else if ((CDB_STAGNATE <= t_tries) && (NULL != tp_reg_list))
@@ -343,4 +324,6 @@ void	op_tcommit(void)
 		tp_incr_commit();
 	assert(0 < dollar_tlevel);
 	tp_unwind(dollar_tlevel - 1, COMMIT_INVOCATION);
+	if (0 == dollar_tlevel) /* real commit */
+		JOBINTR_TP_RETHROW; /* rethrow job interrupt($ZINT) if $ZTEXIT, when coerced to boolean, is true */
 }

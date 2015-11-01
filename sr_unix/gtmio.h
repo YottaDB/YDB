@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -156,7 +156,8 @@
 	;  \
 	if (-1 != FDESC)  {  \
 		do { \
-			lock.l_type = ((O_WRONLY == ((FFLAG) & O_ACCMODE)) || (O_RDWR == ((FFLAG) & O_ACCMODE))) ? F_WRLCK : F_RDLCK;\
+			lock.l_type = ((O_WRONLY == ((FFLAG) & O_ACCMODE)) || (O_RDWR == ((FFLAG) & O_ACCMODE))) ? F_WRLCK \
+														 : F_RDLCK;\
 			lock.l_whence = SEEK_SET; /*locking offsets from file beginning*/ \
 			lock.l_start = lock.l_len = 0; /* lock the whole file */\
 			lock.l_pid = getpid(); \
@@ -228,7 +229,7 @@
 { \
 	CLOSEFILE(FDESC, RC); \
 	}
-#endif	
+#endif
 
 /* This is the workaround for a glitch in read locking in zlink:
  * OPEN_OBJECT_FILE -> 1. open the file, and 2. read lock it.
@@ -236,33 +237,35 @@
  * this process got read lock (step 2), then later incr_link will end up reading
  * an empty file. So here, polling for a non-empty object file before reading.
  */
-#define POLL_OBJECT_FILE(FNAME, FDESC) \
-for (cntr=0; cntr < MAX_FILE_OPEN_TRIES; cntr++) \
-{ \
-	OPEN_OBJECT_FILE(FNAME, O_RDONLY, FDESC); \
-	if (-1 == FDESC) \
-		break; \
-	FSTAT_FILE(FDESC, &stat_buf, status); \
-	if (!status && 0 < stat_buf.st_size) \
-		break; \
-	CLOSE_OBJECT_FILE(FDESC, status); \
-	FDESC = -1; \
-	SHORT_SLEEP(WAIT_FOR_FILE_TIME); \
+#define POLL_OBJECT_FILE(FNAME, FDESC)			\
+for (cntr=0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
+{							\
+	OPEN_OBJECT_FILE(FNAME, O_RDONLY, FDESC);	\
+	if (-1 == FDESC)				\
+		break;					\
+	FSTAT_FILE(FDESC, &stat_buf, status);		\
+	if (!status && 0 < stat_buf.st_size)		\
+		break;					\
+	CLOSE_OBJECT_FILE(FDESC, status);		\
+	FDESC = -1;					\
+	SHORT_SLEEP(WAIT_FOR_FILE_TIME);		\
 }
 
-#define CLOSEFILE(FDESC, RC) \
-{ \
-	do \
-	{ \
-		RC = close(FDESC); \
-	} while(-1 == RC && EINTR == errno); \
+#define CLOSEFILE(FDESC, RC)					\
+{								\
+	do							\
+	{							\
+		RC = close(FDESC);				\
+	} while(-1 == RC && EINTR == errno);			\
+	if (-1 == RC)	/* Had legitimate error - return it */	\
+		RC = errno;					\
 }
 
-#define GET_LSEEK_FLAGS_ARRAY \
-{ \
-	GBLREF	boolean_t	*lseekIoInProgress_flags; \
-	if ((boolean_t *)0 == lseekIoInProgress_flags) \
-		lseekIoInProgress_flags = (boolean_t *)malloc(sysconf(_SC_OPEN_MAX) * sizeof(boolean_t)); \
+#define GET_LSEEK_FLAGS_ARRAY											\
+{														\
+	GBLREF	boolean_t	*lseekIoInProgress_flags;							\
+	if ((boolean_t *)0 == lseekIoInProgress_flags)								\
+		lseekIoInProgress_flags = (boolean_t *)malloc(sysconf(_SC_OPEN_MAX) * sizeof(boolean_t));	\
 }
 
 #define GET_LSEEK_FLAG(FDESC, VAL) \
@@ -349,7 +352,7 @@ for (cntr=0; cntr < MAX_FILE_OPEN_TRIES; cntr++) \
 	else if (-1 == gtmioStatus)    	/* Had legitimate error - return it */ \
 		RC = errno; \
 	else \
-		RC = -1;		/* Something kept us from reading what we wanted */ \
+		RC = -1;		/* Something kept us from writing what we wanted */ \
 	SET_LSEEK_FLAG(FDESC, FALSE);	/* Reason this is last is so max optimization occurs */ \
 }
 
@@ -503,6 +506,21 @@ for (cntr=0; cntr < MAX_FILE_OPEN_TRIES; cntr++) \
 		RLEN = FBUFF_LEN - gtmioBuffLen; 	/* Return length actually written */ \
 	else 	    					/* Had legitimate error - return it */ \
 		RLEN = -1; \
+}
+
+#define DO_FILE_READ(CHANNEL, OFFSET, READBUFF, LEN, STATUS1, STATUS2)		\
+{										\
+	STATUS2 = SS_NORMAL;							\
+	LSEEKREAD(CHANNEL, OFFSET, READBUFF, LEN, STATUS1);			\
+	if (-1 == STATUS1)							\
+		STATUS1 = ERR_PREMATEOF;					\
+}
+#define DO_FILE_WRITE(CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1, STATUS2)	\
+{										\
+	STATUS2 = SS_NORMAL;							\
+	LSEEKWRITE(CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1);			\
+	if (-1 == STATUS1)							\
+		STATUS1 = ERR_PREMATEOF;					\
 }
 
 typedef struct {

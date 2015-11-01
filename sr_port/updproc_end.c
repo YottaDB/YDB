@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,8 @@
 #include "gtmrecv.h"
 #include "repl_dbg.h"
 #include "jnl.h"
+#include "hashdef.h"
+#include "buddy_list.h"
 #include "muprec.h"
 #include "iosp.h"
 #include "repl_shutdcode.h"
@@ -63,10 +65,11 @@
 #include "gtm_event_log.h"
 #include "mupip_exit.h"
 #include "updproc.h"
+#include "read_db_files_from_gld.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	recvpool_addrs		recvpool;
-GBLREF	upd_proc_ctl	        *upd_db_files;
+GBLREF  gld_dbname_list		*upd_db_files;
 GBLREF	boolean_t	        pool_init;
 GBLREF	jnlpool_addrs	        jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;

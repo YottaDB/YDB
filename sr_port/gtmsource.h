@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -322,6 +322,18 @@ typedef struct
 	char            secondary_host[MAX_HOST_NAME_LEN];
 	char            log_file[MAX_FN_LEN + 1];
 } gtmsource_options_t;
+
+#define EXIT_IF_REPLOFF_JNLON(gd_header)						\
+	region_top = gd_header->regions + gd_header->n_regions;				\
+	for (reg = gd_header->regions; reg < region_top; reg++)				\
+	{										\
+		csa = &FILE_INFO(reg)->s_addrs;						\
+		if (!REPL_ENABLED(csa) && JNL_ALLOWED(csa))				\
+		{									\
+		 	gtm_putmsg(VARLSTCNT(4) ERR_REPLOFFJNLON, 2, REG_LEN_STR(reg));	\
+			gtmsource_autoshutdown();					\
+		}									\
+	}
 
 /********** Source server function prototypes **********/
 int		gtmsource(void);

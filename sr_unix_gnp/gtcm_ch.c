@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,9 +51,8 @@ CONDITION_HANDLER(gtcm_ch)
 	err_ctl		*fac;
 	int		i, msglen, len, rc, orig_severity;
 	bool		first;
-	unsigned char	curtime[CTIME_BEFORE_NL + 1];
-	time_t		now;
-	char		*time_ptr;
+	now_t		now;	/* for GET_CUR_TIME macro */
+	char		time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
 	short		short_len;
 
 	error_def(ERR_SERVERERR);
@@ -78,9 +77,8 @@ CONDITION_HANDLER(gtcm_ch)
 	if (gtcm_errfile)
 	{
 		GET_CUR_TIME;
-		memcpy(curtime, time_ptr, CTIME_BEFORE_NL);
-		curtime[CTIME_BEFORE_NL] = 0;
-		FPRINTF(gtcm_errfs, "%s: %s", curtime, util_outbuff);
+		time_str[CTIME_BEFORE_NL] = 0;
+		FPRINTF(gtcm_errfs, "%s: %s", time_str, util_outbuff);
 		fflush(gtcm_errfs);
 	}
 	orig_severity = SEVERITY;

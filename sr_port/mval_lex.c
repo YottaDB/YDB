@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,13 +25,11 @@ void mval_lex(mval *v, mstr *output)
 	if (MV_IS_CANONICAL(v))
 		*output = v->str;
 	else
-	{	/* worst case is every other character is non-graphic
-		 * to cover cases of odd numbers of characters, allow for every one
-		 * quotes are only doubled */
-		space_needed = ((sizeof("_$C(255)_") - 1) * v->str.len) + sizeof("\"\"") - 1;
+	{
+		space_needed = ZWR_EXP_RATIO(v->str.len);
 		if (stringpool.free + space_needed > stringpool.top)
 			stp_gcol(space_needed);
-		output->addr = stringpool.free;
+		output->addr = (char *)stringpool.free;
 		format2zwr((sm_uc_ptr_t)v->str.addr, v->str.len, (unsigned char *)output->addr, &des_len);
 		output->len = des_len; /* need a temporary des_len since output->len is short on the VAX
 					* and format2zwr expects an (int *) as the last parameter */

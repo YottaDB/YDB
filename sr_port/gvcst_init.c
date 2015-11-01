@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,187 +71,63 @@ GBLREF	tp_region		*tp_reg_free_list;	/* Ptr to list of tp_regions that are unuse
 GBLREF	tp_region		*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
 GBLREF	unsigned int		t_tries;
 GBLREF	hashtab			*cw_stagnate;
+GBLREF	struct_jrec_tcom	tcom_record;
 
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
-LITREF int			jnl_fixed_size[];
-
-void	assert_jrec_member_offsets(void);
-
-/* The following function has been moved from jnl_write_logical.c to make sure that offsets are correct */
 
 void	assert_jrec_member_offsets(void)
 {
-	jrec_union		jnl_record;
-	enum jnl_record_type	rectype;
+	assert(JNL_HDR_LEN % DISK_BLOCK_SIZE == 0);
+	assert(JNL_HDR_LEN == JNL_FILE_FIRST_RECORD);
+	assert(DISK_BLOCK_SIZE >= PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN);
+	/* Following assert is for JNL_FILE_TAIL_PRESERVE macro in tp.h */
+	assert(PINI_RECLEN >= EPOCH_RECLEN && PINI_RECLEN >= PFIN_RECLEN && PINI_RECLEN >= EOF_RECLEN);
+	assert(sizeof(jnl_str_len_t) == sizeof(uint4));
+	/* since time in jnl record is a uint4, and since JNL_SHORT_TIME expects time_t, we better ensure they are same.
+	 * A change in the size of time_t would mean a redesign of the fields.  */
+	assert(sizeof(time_t) == sizeof(uint4));
+	/* Make sure all jnl_seqno fields start at same offset. mur_output_record and others rely on this. */
+	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_upd, token_seq.jnl_seqno));
+	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_ztp_upd, jnl_seqno));
+	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_epoch, jnl_seqno));
+	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_eof, jnl_seqno));
+	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_tcom, token_seq.jnl_seqno));
+	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_ztcom, jnl_seqno));
 
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_fkill.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_gkill.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_tkill.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_ukill.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_set.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_fset.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_gset.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_tset.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_uset.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_zkill.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_fzkill.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_gzkill.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_tzkill.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_uzkill.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_pblk.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_epoch.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_tcom.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_ztcom.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_null.pini_addr);
-	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_inctn.pini_addr);
-        assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_aimg.pini_addr);
-
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_fkill.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_gkill.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_tkill.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_ukill.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_set.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_fset.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_gset.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_tset.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_uset.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_zkill.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_fzkill.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_gzkill.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_tzkill.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_uzkill.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_pblk.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_epoch.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_tcom.tc_short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_ztcom.tc_short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_null.short_time);
-	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_inctn.short_time);
-        assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_aimg.short_time);
-
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_fkill.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_gkill.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_tkill.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_ukill.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_set.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_fset.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_gset.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_tset.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_uset.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_zkill.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_fzkill.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_gzkill.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_tzkill.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_uzkill.recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_tcom.tc_recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_ztcom.tc_recov_short_time);
-	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_null.recov_short_time);
-
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_fkill.tn);
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_gkill.tn);
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_tkill.tn);
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_ukill.tn);
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_set.tn);
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_fset.tn);
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_gset.tn);
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_tset.tn);
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_uset.tn);
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_zkill.tn);
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_fzkill.tn);
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_gzkill.tn);
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_tzkill.tn);
-	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_uzkill.tn);
-	assert(&jnl_record.jrec_kill.tn == &jnl_record.jrec_inctn.tn);
-        assert(&jnl_record.jrec_kill.tn == &jnl_record.jrec_aimg.tn);
-
-
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_fkill.rec_seqno);
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_gkill.rec_seqno);
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_tkill.rec_seqno);
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_ukill.rec_seqno);
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_set.rec_seqno);
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_fset.rec_seqno);
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_gset.rec_seqno);
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_tset.rec_seqno);
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_uset.rec_seqno);
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_zkill.rec_seqno);
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_fzkill.rec_seqno);
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_gzkill.rec_seqno);
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_tzkill.rec_seqno);
-	assert(&jnl_record.jrec_kill.rec_seqno == &jnl_record.jrec_uzkill.rec_seqno);
-
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_fkill.jnl_seqno);
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_gkill.jnl_seqno);
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_tkill.jnl_seqno);
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_ukill.jnl_seqno);
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_set.jnl_seqno);
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_fset.jnl_seqno);
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_gset.jnl_seqno);
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_tset.jnl_seqno);
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_uset.jnl_seqno);
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_zkill.jnl_seqno);
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_fzkill.jnl_seqno);
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_gzkill.jnl_seqno);
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_tzkill.jnl_seqno);
-	assert(&jnl_record.jrec_kill.jnl_seqno == &jnl_record.jrec_uzkill.jnl_seqno);
-
-	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_gkill.token);
-	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_tkill.token);
-	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_ukill.token);
-	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_fset.token);
-	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_gset.token);
-	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_tset.token);
-	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_uset.token);
-	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_fzkill.token);
-	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_gzkill.token);
-	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_tzkill.token);
-	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_uzkill.token);
-	assert(&jnl_record.jrec_pini.process_vector[CURR_JPV] == &jnl_record.jrec_pfin.process_vector);
-	assert(&jnl_record.jrec_pini.process_vector[CURR_JPV] == &jnl_record.jrec_eof.process_vector);
-
-	/* these asserts ensure that JREC_PREFIX_SIZE, JREC_SUFFIX_SIZE and jnl_fixed_size[] for all journal records
-	 * are a multiple of JNL_REC_START_BNDRY (which is 8 currently). this prevents the need for explicit ROUND_UP
-	 * done in the definition of the respective xxxx_RECLEN (EOF_RECLEN etc.) macros in jnl.h
-	 * the 8-byte multiple assumption is hard-coded in the codebase in lots of places and hence this assert at startup.
-	 */
-	assert(ROUND_UP(JREC_PREFIX_SIZE, JNL_REC_START_BNDRY) == JREC_PREFIX_SIZE);
-	assert(ROUND_UP(JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY) == JREC_SUFFIX_SIZE);
-
-	assert(ROUND_UP(AIMG_RECLEN,  JNL_REC_START_BNDRY) == AIMG_RECLEN );
-	assert(ROUND_UP(ALIGN_RECLEN, JNL_REC_START_BNDRY) == ALIGN_RECLEN);
-	assert(ROUND_UP(EOF_RECLEN,   JNL_REC_START_BNDRY) == EOF_RECLEN  );
-	assert(ROUND_UP(EPOCH_RECLEN, JNL_REC_START_BNDRY) == EPOCH_RECLEN);
-	assert(ROUND_UP(INCTN_RECLEN, JNL_REC_START_BNDRY) == INCTN_RECLEN);
-	assert(ROUND_UP(NULL_RECLEN,  JNL_REC_START_BNDRY) == NULL_RECLEN );
-	assert(ROUND_UP(PBLK_RECLEN,  JNL_REC_START_BNDRY) == PBLK_RECLEN );
-	assert(ROUND_UP(PFIN_RECLEN,  JNL_REC_START_BNDRY) == PFIN_RECLEN );
-	assert(ROUND_UP(PINI_RECLEN,  JNL_REC_START_BNDRY) == PINI_RECLEN );
-	assert(ROUND_UP(TCOM_RECLEN,  JNL_REC_START_BNDRY) == TCOM_RECLEN );
-	assert(ROUND_UP(ZTCOM_RECLEN, JNL_REC_START_BNDRY) == ZTCOM_RECLEN);
-
-	assert(ROUND_UP(SET_RECLEN,   JNL_REC_START_BNDRY) == SET_RECLEN  );
-	assert(ROUND_UP(TSET_RECLEN,  JNL_REC_START_BNDRY) == TSET_RECLEN );
-	assert(ROUND_UP(USET_RECLEN,  JNL_REC_START_BNDRY) == USET_RECLEN );
-	assert(ROUND_UP(FSET_RECLEN,  JNL_REC_START_BNDRY) == FSET_RECLEN );
-	assert(ROUND_UP(GSET_RECLEN,  JNL_REC_START_BNDRY) == GSET_RECLEN );
-
-	assert(ROUND_UP(KILL_RECLEN,  JNL_REC_START_BNDRY) == KILL_RECLEN );
-	assert(ROUND_UP(TKILL_RECLEN, JNL_REC_START_BNDRY) == TKILL_RECLEN);
-	assert(ROUND_UP(UKILL_RECLEN, JNL_REC_START_BNDRY) == UKILL_RECLEN);
-	assert(ROUND_UP(FKILL_RECLEN, JNL_REC_START_BNDRY) == FKILL_RECLEN);
-	assert(ROUND_UP(GKILL_RECLEN, JNL_REC_START_BNDRY) == GKILL_RECLEN);
-
-	assert(ROUND_UP(ZKILL_RECLEN,  JNL_REC_START_BNDRY) == ZKILL_RECLEN );
-	assert(ROUND_UP(TZKILL_RECLEN, JNL_REC_START_BNDRY) == TZKILL_RECLEN);
-	assert(ROUND_UP(UZKILL_RECLEN, JNL_REC_START_BNDRY) == UZKILL_RECLEN);
-	assert(ROUND_UP(FZKILL_RECLEN, JNL_REC_START_BNDRY) == FZKILL_RECLEN);
-	assert(ROUND_UP(GZKILL_RECLEN, JNL_REC_START_BNDRY) == GZKILL_RECLEN);
-
-	for (rectype = JRT_BAD; rectype < JRT_RECTYPES; rectype++)
-		assert(ROUND_UP(jnl_fixed_size[rectype], JNL_REC_START_BNDRY) == jnl_fixed_size[rectype]);
-
-	assert(ROUND_UP(EOF_BACKPTR  , JNL_REC_START_BNDRY) == EOF_BACKPTR  );
-	assert(ROUND_UP(EPOCH_BACKPTR, JNL_REC_START_BNDRY) == EPOCH_BACKPTR);
+	assert(offsetof(struct_jrec_ztcom, token) == offsetof(struct_jrec_ztp_upd, token));
+	/* Make sure all jnl_seqno and token fields start at 8-byte boundary */
+	assert(offsetof(struct_jrec_upd, token_seq.jnl_seqno) ==
+		(ROUND_UP(offsetof(struct_jrec_upd, token_seq.jnl_seqno), sizeof(seq_num))));
+	assert(offsetof(struct_jrec_ztp_upd, jnl_seqno) ==
+		(ROUND_UP(offsetof(struct_jrec_ztp_upd, jnl_seqno), sizeof(seq_num))));
+	assert(offsetof(struct_jrec_tcom, token_seq.jnl_seqno) ==
+		(ROUND_UP(offsetof(struct_jrec_tcom, token_seq.jnl_seqno), sizeof(seq_num))));
+	assert(offsetof(struct_jrec_ztcom, jnl_seqno) ==
+		(ROUND_UP(offsetof(struct_jrec_ztcom, jnl_seqno), sizeof(seq_num))));
+	assert(offsetof(struct_jrec_null, jnl_seqno) ==
+		(ROUND_UP(offsetof(struct_jrec_null, jnl_seqno), sizeof(seq_num))));
+	assert(offsetof(struct_jrec_epoch, jnl_seqno) ==
+		(ROUND_UP(offsetof(struct_jrec_epoch, jnl_seqno), sizeof(seq_num))));
+	assert(offsetof(struct_jrec_eof, jnl_seqno) ==
+		(ROUND_UP(offsetof(struct_jrec_eof, jnl_seqno), sizeof(seq_num))));
+	/* All fixed size records must be multiple of 8-byte */
+	assert(TCOM_RECLEN == (ROUND_UP(sizeof(struct_jrec_tcom), JNL_REC_START_BNDRY)));
+	assert(ZTCOM_RECLEN == (ROUND_UP(sizeof(struct_jrec_ztcom), JNL_REC_START_BNDRY)));
+	assert(INCTN_RECLEN == (ROUND_UP(sizeof(struct_jrec_inctn), JNL_REC_START_BNDRY)));
+	assert(PINI_RECLEN == (ROUND_UP(sizeof(struct_jrec_pini), JNL_REC_START_BNDRY)));
+	assert(PFIN_RECLEN == (ROUND_UP(sizeof(struct_jrec_pfin), JNL_REC_START_BNDRY)));
+	assert(NULL_RECLEN == (ROUND_UP(sizeof(struct_jrec_null), JNL_REC_START_BNDRY)));
+	assert(EPOCH_RECLEN == (ROUND_UP(sizeof(struct_jrec_epoch), JNL_REC_START_BNDRY)));
+	assert(EOF_RECLEN == (ROUND_UP(sizeof(struct_jrec_eof), JNL_REC_START_BNDRY)));
+	/* Assumption about the structures in code */
+	assert(0 == MIN_ALIGN_RECLEN % JNL_REC_START_BNDRY);
+	assert(sizeof(uint4) == sizeof(jrec_suffix));
+	assert((MAX_JNL_REC_SIZE - MAX_LOGI_JNL_REC_SIZE) > MIN_PBLK_RECLEN);
+	assert((DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE) >= MAX_JNL_REC_SIZE);/* default alignsize supports max jnl record length */
+	assert(MAX_DB_BLK_SIZE < MAX_JNL_REC_SIZE);	/* Ensure a PBLK record can accommodate a full GDS block */
+	assert(tcom_record.prefix.forwptr == tcom_record.suffix.backptr);
+	assert(TCOM_RECLEN == tcom_record.suffix.backptr);
 }
 
 void gvcst_init (gd_region *greg)
@@ -298,10 +174,6 @@ void gvcst_init (gd_region *greg)
 	/* check the header design assumptions */
 	assert(sizeof(th_rec) == (sizeof(bt_rec) - sizeof(bt->blkque)));
 	assert(sizeof(cache_rec) == (sizeof(cache_state_rec) + sizeof(cr->blkque)));
-	/* Comment this line out until we start supporting journal record sizes of 64K */
-	/* assert(MAX_DB_BLK_SIZE <= MAX_JNL_REC_SIZE);	*/ /* Ensure a PBLK record can accommodate a full GDS block */
-	/* Ensure minimum align size can support the maximum journal record size */
-	assert(MAX_JNL_REC_SIZE <= (DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE));
 	DEBUG_ONLY(assert_jrec_member_offsets();)
         set_num_additional_processors();
 
@@ -505,9 +377,9 @@ void gvcst_init (gd_region *greg)
 	}
 	db_common_init(greg, csa, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
 	/* Compute the maximum journal space requirements for a PBLK (including possible ALIGN record).
-	 * Use this constant in the TOTAL_TPJNL_REC_SIZE and TOTAL_NONTP_JNL_REC_SIZE macros instead of recomputing.
+	 * Use this variable in the TOTAL_TPJNL_REC_SIZE and TOTAL_NONTP_JNL_REC_SIZE macros instead of recomputing.
 	 */
-	csa->pblk_align_jrecsize = PBLK_RECLEN + csd->blk_size + ALIGN_RECLEN;
+	csa->pblk_align_jrecsize = MIN_PBLK_RECLEN + csd->blk_size + MIN_ALIGN_RECLEN;
 	segment_update_array_size = UA_SIZE(csd);
 
 	if (first_ua == NULL)
@@ -550,22 +422,22 @@ void gvcst_init (gd_region *greg)
 			non_tp_jfb_ptr->buff = (char *) non_tp_jfb_buff_ptr;
 			non_tp_jfb_ptr->record_size = 0;	/* initialize it to 0 since TOTAL_NONTPJNL_REC_SIZE macro uses it */
 		}
-		/* csa->min_total_tpjnl_rec_size represents the minimum journal buffer space needed for a TP
-		 * 	transaction. It is a conservative estimate assuming an align record will be written for
-		 *	every jnl record written and assuming a PINI will be written every TP transaction.
+		/* csa->min_total_tpjnl_rec_size represents the minimum journal buffer space needed for a TP transaction.
+		 * It is a conservative estimate assuming that one ALIGN record and one PINI record will be written for
+		 *	one set of fixed size jnl records written.
 		 * si->total_jnl_rec_size is initialized/reinitialized  to this value here and in tp_clean_up().
-		 * The purpose of this field is to avoid recomputation of a constant value in tp_clean_up().
+		 * The purpose of this field is to avoid recomputation of the variable in tp_clean_up().
 		 * In addition to this, space requirements for whatever journal records get formatted as part of
 		 *	jnl_format() need to be taken into account.
 		 *	This is done in jnl_format() where si->total_jnl_rec_size is appropriately incremented.
 		 */
-		csa->min_total_tpjnl_rec_size = PINI_RECLEN + ALIGN_RECLEN + TCOM_RECLEN + ALIGN_RECLEN;
+		csa->min_total_tpjnl_rec_size = PINI_RECLEN + TCOM_RECLEN + MIN_ALIGN_RECLEN;
 		/* Similarly csa->min_total_nontpjnl_rec_size represents the minimum journal buffer space needed
-		 *	for a non-TP transaction. It is a conservative estimate assuming an align record will be
-		 *	written for every jnl record written and also assumes a PINI will be written.
-		 * The second ALIGN record accounted below corresponds to the logical jnl record in non_tp_jfb_ptr.
+		 *	for a non-TP transaction.
+		 * It is a conservative estimate assuming that one ALIGN record and one PINI record will be written for
+		 *	one set of fixed size jnl records written.
 		 */
-		csa->min_total_nontpjnl_rec_size = PINI_RECLEN + ALIGN_RECLEN + ALIGN_RECLEN;
+		csa->min_total_nontpjnl_rec_size = PINI_RECLEN + MIN_ALIGN_RECLEN;
 	}
 	/* For the first open of this region we are guaranteed that csa->sgm_info_ptr is NULL.
 	 * Only in this case, the one-time TP structure-initialization needs to be done.
@@ -629,7 +501,8 @@ void gvcst_init (gd_region *greg)
 				 * Therefore, we request an elemSize of 8 bytes for the format-buffer and will convert as much
 				 * bytes as we need into as many 8-byte multiple segments (see code in jnl_format).
 				 */
-				initialize_list(si->format_buff_list, 8, DIVIDE_ROUND_UP(JNL_FORMAT_BUFF_INIT_ALLOC,8));
+				initialize_list(si->format_buff_list, JFB_ELE_SIZE,
+					DIVIDE_ROUND_UP(JNL_FORMAT_BUFF_INIT_ALLOC, JFB_ELE_SIZE));
 			}
 		} else if (NULL != si->jnl_tail)
 		{	/* journaling is currently disallowed although it was allowed (non-zero si->jnl_tail)

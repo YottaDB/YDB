@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,14 +11,15 @@
 
 /* iomt_opensp.c - UNIX (low-level) open mag tape device */
 #include "mdef.h"
+
+#include <errno.h>
 #include "gtm_fcntl.h"
 #include "gtm_stdio.h"
+
 #include "io.h"
 #include "iosp.h"
 #include "iottdef.h"
 #include "iomtdef.h"
-
-extern int      errno;
 
 uint4 iomt_opensp (io_log_name *dev_name, d_mt_struct *mtdef)
 {

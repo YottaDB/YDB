@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,8 @@
 #include "gtmsource.h"
 #include "repl_comm.h"
 #include "jnl.h"
+#include "hashdef.h"
+#include "buddy_list.h"
 #include "muprec.h"
 #include "repl_ctl.h"
 #include "repl_errno.h"
@@ -271,22 +273,10 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 							 "Filter is not active, ignoring STOP SOURCE FILTER msg\n");
 					*msg_type = REPL_START_JNL_SEQNO;
 				}
-				/* V4.2+ versions have jnl ver in the start msg */
-				remote_jnl_ver = ((*start_flags & START_FLAG_HASINFO) ?
-						  ((repl_start_msg_ptr_t)&msg)->jnl_ver : JNL_VER_EARLIEST_REPL);
+				assert(*start_flags & START_FLAG_HASINFO); /* V4.2+ versions have jnl ver in the start msg */
+				remote_jnl_ver = ((repl_start_msg_ptr_t)&msg)->jnl_ver;
 				REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n", jnl_ver, remote_jnl_ver);
-				assert(JNL_VER_EARLIEST_REPL <= jnl_ver && JNL_VER_EARLIEST_REPL <= remote_jnl_ver);
-				VMS_ONLY
-				(
-					/* No customer has a pre V4.3-001 version running replication in production. We expect
-					 * customers who want to run replication to upgrade to V4.3-001. We don't want to write
-					 * internal filters to support rolling upgrades b/n pre V4.3-001 and V4.3-001.
-					 * Vinaya Feb 27, 2002 */
-					if (V13_JNL_VER > remote_jnl_ver)
-						rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
-							LEN_AND_LIT("Rolling upgrade not supported between"
-								    "these two GT.M versions"));
-				)
+				repl_check_jnlver_compat();
 				return (SS_NORMAL);
 			} else if (REPL_FETCH_RESYNC == msg.type)
 			{

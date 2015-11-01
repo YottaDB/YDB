@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -289,7 +289,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			if (0 > cr->read_in_progress)
 			{	/* it's not being read */
 				if (clustered && (0 == cr->bt_index) &&
-					(cr->tn < ((th_rec *)((unsigned char *)csa->th_base + csa->th_base->tnque.fl))->tn))
+					(cr->tn < ((th_rec *)((uchar_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn))
 				{	/* can't rely on the buffer */
 					cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 					cr->blk = CR_BLKEMPTY;

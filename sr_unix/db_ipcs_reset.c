@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,7 +94,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	{
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 		CLOSEFILE(udi->fd, status);
-		if (-1 == status)
+		if (0 != status)
 			gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 		return FALSE;
 	}
@@ -109,7 +109,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 		{
 			gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 			CLOSEFILE(udi->fd, status);
-			if (-1 == status)
+			if (0 != status)
 				gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 			return FALSE;
 		}
@@ -119,8 +119,8 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 		db_ipcs.shmid = INVALID_SHMID;
 		db_ipcs.sem_ctime = 0;
 		db_ipcs.shm_ctime = 0;
-		if (!get_full_path((char *)reg->dyn.addr->fname, reg->dyn.addr->fname_len,
-			db_ipcs.fn, (unsigned int *)&db_ipcs.fn_len, MAX_TRANS_NAME_LEN, &ustatus))
+		if (!get_full_path((char *)DB_STR_LEN(reg), db_ipcs.fn, (unsigned int *)&db_ipcs.fn_len,
+					MAX_TRANS_NAME_LEN, &ustatus))
 		{
 			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, DB_LEN_STR(reg), ustatus);
 			return FALSE;
@@ -130,13 +130,13 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 		{
 			gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 			CLOSEFILE(udi->fd, status);
-			if (-1 == status)
+			if (0 != status)
 				gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 			return FALSE;
 		}
 	}
 	CLOSEFILE(udi->fd, status);
-	if (-1 == status)
+	if (0 != status)
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 	if (0 != sem_rmid(udi->semid))
 	{
@@ -151,6 +151,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	udi->sem_ctime = 0;
 	udi->shm_ctime = 0;
 	free(csd);
-	standalone_reg = NULL;
+	assert((reg != standalone_reg) || (NULL == standalone_reg));	/* ftok_sem_release() should have NULLified it */
+	standalone_reg = NULL;		/* just in case */
 	return TRUE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,24 +15,42 @@
 #include "error.h"
 #include "gtmci.h"
 #include "op.h"
+#include "error_trap.h"
 
-GBLREF	stack_frame 	*frame_pointer;
+GBLREF stack_frame 	*frame_pointer;
 GBLREF unsigned char	*msp;
+GBLREF int		mumps_status;
+GBLREF unsigned int	nested_level;
 
-/* routine executed from CI frame (SFF_CI) of the current gtm environment */
-void 	ci_ret_code(void)
+/* Routine executed at level 1 (SFF_CI frame) of the current gtm environment
+ * to return control from M to gtm_ci(). the longjmp returns control to dm_start
+ * which in turn returns to gtm_ci(). */
+void ci_ret_code(void)
 {
+	assert(active_ch->ch == &mdb_condition_handler);
 	longjmp(active_ch->jmp, -1);
 }
 
-/* routine executed from the bottom-most frame (base frame) of the
+/* Routine executed at level 0 from the bottom-most frame (base frame) of the
    current gtm environment - called when M routine does zgoto 0 */
-void	ci_ret_code_exit(void)
+void ci_ret_code_exit(void)
 {
-	op_unwind();
+	assert(active_ch->ch == &mdb_condition_handler);
+	ci_ret_code_quit();
+	mumps_status = 0;
+	longjmp(active_ch->jmp, -1);
+}
+
+/* Exit from the current Call-in environment */
+void ci_ret_code_quit(void)
+{
+	if (frame_pointer->flags & SFF_CI)
+		op_unwind();
+	gtmci_isv_restore(); /* restore $ECODE/$STACK of previous level in the nested call-ins */
+	op_unwind(); 	/* base frame of this call-in environment */
+
+	nested_level--;
 	/* restore frame_pointer stored at msp (see base_frame.c) */
 	frame_pointer = *(stack_frame**)msp;
 	msp += sizeof(frame_pointer);
-	assert(active_ch->ch == &mdb_condition_handler);
-	longjmp(active_ch->jmp, -1);
 }

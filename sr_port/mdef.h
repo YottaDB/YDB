@@ -107,12 +107,18 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 #define MAX_FORM_NUM_SUBLEN		  128	      /* this is enough to hold the largest numeric subscript */
 #define PERIODIC_FLUSH_CHECK_INTERVAL (30 * 1000)
 #define MAX_ARGS	256 /* in formallist */
+/* the macro ZWR_EXP_RATIO returns the maximum size of the extracted record given the internal subscript representation length
+ * worst case is every other character is non-graphic. e.g. $C(128)_"A"_$C(128)
+ * to cover cases of odd numbers of characters, add some buffer
+ */
+#define ZWR_EXP_RATIO(X)	((X) * 6 + 8)
 
 unsigned char *n2s(mval *mv_ptr);
 char *s2n(mval *u);
 
 #define MV_FORCE_STR(X)		((0 == ((X)->mvtype & MV_STR)) ? n2s(X) : NULL)
 #define MV_FORCE_NUM(X)		((0 == ((X)->mvtype & MV_NM )) ? s2n(X) : NULL)
+#define MV_FORCE_BOOL(X)	(MV_FORCE_NUM(X), (X)->m[1] ? TRUE : FALSE)
 #define MV_FORCE_INT(M)		( (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2i(M) )
 #define MV_FORCE_ULONG_MVAL(M,I)   (((I) >= 1000000) ? i2usmval((M),(I)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (I)*MV_BIAS ))
@@ -134,7 +140,8 @@ char *s2n(mval *u);
 #define MV_DEFINED(X)		(((X)->mvtype & (MV_STR | MV_NM)) != 0)
 #define MV_IS_CANONICAL(X)	(((X)->mvtype & MV_NM) ? (((X)->mvtype & MV_NUM_APPROX) == 0) : (bool)nm_iscan(X))
 
-#define DISK_BLOCK_SIZE 512
+#define DISK_BLOCK_SIZE		512
+#define LOG2_DISK_BLOCK_SIZE	9
 
 #define DIVIDE_ROUND_UP(VALUE, MODULUS)		(((VALUE) + ((MODULUS) - 1)) / (MODULUS))
 #define DIVIDE_ROUND_DOWN(VALUE, MODULUS)	((VALUE) / (MODULUS))
@@ -142,7 +149,7 @@ char *s2n(mval *u);
 #define ROUND_DOWN(VALUE, MODULUS)		(DIVIDE_ROUND_DOWN(VALUE, MODULUS) * (MODULUS))
 
 #ifdef DEBUG
-#define CHECKPOT(MODULUS)			(!(MODULUS) & ((MODULUS) - 1)) ? GTMASSERT, 0 :
+#define CHECKPOT(MODULUS)			((MODULUS) & ((MODULUS) - 1)) ? GTMASSERT, 0 :
 #define BREAK_IN_PRO__CONTINUE_IN_DBG		continue
 #define DEBUG_ONLY(statement)			statement
 #else
@@ -648,15 +655,6 @@ typedef enum
 #endif
 
 #define NOLICENSE	/* cheap way to obsolete it */
-/* To use GET_CUR_TIME macro 'now' of type time_t and 'time_ptr' of type char *
- * should be defined at the calling place */
-#define GET_CUR_TIME 						\
-{		 						\
-	if ((time_t)-1 == (now = time(NULL)))			\
-		time_ptr = "****** time failed *****\n"; /* keep string len same as CTIME_BEFORE_NL */ \
-	else if (NULL == (time_ptr = GTM_CTIME(&now)))		\
-		time_ptr = "***** ctime failed *****\n"; /* keep string len same as CTIME_BEFORE_NL */ \
-}
 
 /* i2 conversation functions */
 void i2hex(unsigned int val, uchar_ptr_t dest, int len);
@@ -754,8 +752,12 @@ qw_num	gtm_byteswap_64(qw_num num64);
 
 #if defined(VMS)
 #define DAYS		6530  /* adjust VMS returned days by this amount; GTM zero time Dec 31, 1840, VMS zero time 7-NOV-1858 */
+#define VARLSTCNT1(CNT)			VARLSTCNT(CNT)
+#define PUT_SYS_ERRNO(SYS_ERRNO) 	SYS_ERRNO
 #elif defined(UNIX)
 #define DAYS		47117 /* adjust Unix returned days (seconds converted to days); Unix zero time 1970 */
+#define VARLSTCNT1(CNT)			VARLSTCNT(CNT + 1)
+#define PUT_SYS_ERRNO(SYS_ERRNO) 	0, SYS_ERRNO
 #else
 #error Unsupported platform
 #endif
@@ -775,5 +777,9 @@ qw_num	gtm_byteswap_64(qw_num num64);
 					 * The worst case is that every other character is a non-graphic with a 3 digit code
 					 * e.g. "a"_$c(127)_"a"_$C(127)...
 					 * which leads to (n / 2 * 4) + n / 2 * 8) = n / 2 * 12 = n * 6 */
+typedef uint4 		jnl_tm_t;
+typedef uint4 		off_jnl_t;
+#define MAXUINT8	((gtm_uint64_t)-1)
+#define MAXUINT4	((uint4)-1)
 
 #endif /* MDEF_included */

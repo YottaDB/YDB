@@ -1,0 +1,12 @@
+gtm_main
+gtm_init
+gtm_ci
+gtm_exit
+gtm_zstatus
+gtm_hiber_start
+gtm_hiber_start_wait_any
+gtm_start_timer
+gtm_cancel_timer
+gtm_jnlpool_detach
+gtm_malloc
+gtm_free

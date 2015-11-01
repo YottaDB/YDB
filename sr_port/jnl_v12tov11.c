@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-#include "jnl.h"
+#include "v12_jnl.h"
 #include "copy.h"
 #include "iosp.h"
 #include "repl_filter.h"
@@ -29,9 +29,8 @@
 
 GBLREF unsigned int	jnl_source_datalen, jnl_dest_maxdatalen;
 GBLREF unsigned char	jnl_source_rectype, jnl_dest_maxrectype;
-GBLREF char		jn_tid[8];
 
-LITREF int      	v11_jnl_fixed_size[], jnl_fixed_size[];
+LITREF int      	v11_jnl_fixed_size[], v12_jnl_fixed_size[];
 
 int jnl_v12tov11(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz)
 {
@@ -59,7 +58,7 @@ int jnl_v12tov11(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	jlen = *jnl_len;
 	while (0 < jlen)
 	{
-		if (0 < (reclen = jnl_record_length((jnl_record *)jb, jlen)))
+		if (0 < (reclen = v12_jnl_record_length((jnl_record *)jb, jlen)))
 		{
 			if (reclen <= jlen)
 			{
@@ -81,21 +80,21 @@ int jnl_v12tov11(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 					|| (JRT_ZKILL == rectype || JRT_FZKILL == rectype || JRT_GZKILL == rectype
 						|| JRT_TZKILL == rectype || JRT_UZKILL == rectype))
 				{
-					GET_USHORT(key_len, jb + V12_JREC_PREFIX_SIZE + jnl_fixed_size[rectype]);
+					GET_USHORT(key_len, jb + V12_JREC_PREFIX_SIZE + v12_jnl_fixed_size[rectype]);
 					total_key = key_len + sizeof(unsigned short);
 					if (is_set)
 					{
 						GET_MSTR_LEN(long_data_len,
-							     jb + V12_JREC_PREFIX_SIZE + jnl_fixed_size[rectype] + total_key);
+							     jb + V12_JREC_PREFIX_SIZE + v12_jnl_fixed_size[rectype] + total_key);
 						total_data = long_data_len + sizeof(mstr_len_t);
 					}
 				}
 				if (JRT_TCOM == rectype || JRT_ZTCOM == rectype)
 					is_com = TRUE;
-				less_space = jnl_fixed_size[rectype] - v11_jnl_fixed_size[rectype];
+				less_space = v12_jnl_fixed_size[rectype] - v11_jnl_fixed_size[rectype];
 				assert(V11_JNL_REC_START_BNDRY == V12_JNL_REC_START_BNDRY);
 				assert(V11_JREC_PREFIX_SIZE == V12_JREC_PREFIX_SIZE);
-				clen_without_sfx = ROUND_UP(V12_JREC_PREFIX_SIZE + jnl_fixed_size[rectype] + total_key +
+				clen_without_sfx = ROUND_UP(V12_JREC_PREFIX_SIZE + v12_jnl_fixed_size[rectype] + total_key +
 							    total_data - less_space, V12_JNL_REC_START_BNDRY);
 				conv_reclen = clen_without_sfx + V12_JREC_SUFFIX_SIZE;
 				if (cb - conv_buff + conv_reclen > conv_bufsiz)

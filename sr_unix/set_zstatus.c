@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ GBLREF stack_frame	*zyerr_frame, *frame_pointer;
 GBLREF char		*util_outptr, util_outbuff[OUT_BUFF_SIZE];
 GBLREF mstr             *err_act;
 
-unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp)
+unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t need_rtsloc)
 {
 	unsigned char	*b_line;	/* beginning of line (used to restart line) */
 	mval		val;		/* pointer to dollar_zstatus */
@@ -43,20 +43,23 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp)
 	mval		*status_loc;
 	boolean_t 	trans_frame;
 
-	trans_frame = !(SFT_DM & frame_pointer->type) && ((!(frame_pointer->type & SFT_COUNT || 0 == frame_pointer->type)) ||
-		(SFT_ZINTR & frame_pointer->type));
-	if (trans_frame)
-	{
-		save_arg = arg;
-		SET_ERR_CODE(frame_pointer, arg);
-	}
 	b_line = 0;
-	/* get the line address of the last "known" MUMPS code that was executed.  MUMPS indirection
-	 * consitutes MUMPS code that is "unknown" is the sense that there is no line address for it.
-	 */
+	if (!need_rtsloc)
+	 	trans_frame = FALSE;
+	else { /* get the line address of the last "known" MUMPS code that was executed.  MUMPS
+		* indirection consitutes MUMPS code that is "unknown" is the sense that there is no
+		* line address for it.*/
+		trans_frame = !(SFT_DM & frame_pointer->type) && ((!(frame_pointer->type & SFT_COUNT
+			|| 0 == frame_pointer->type)) || (SFT_ZINTR & frame_pointer->type));
+		if (trans_frame)
+		{
+			save_arg = arg;
+			SET_ERR_CODE(frame_pointer, arg);
+		}
+		src->len = get_symb_line((unsigned char*)src->addr, &b_line, ctxtp) - (unsigned char*)src->addr;
+	}
 	MV_FORCE_MVAL(&val, arg);
 	n2s(&val);
-	src->len = get_symb_line((unsigned char*)src->addr, &b_line, ctxtp) - (unsigned char*)src->addr;
 	memcpy(zstatus_buff, val.str.addr, val.str.len);
 	zstatus_bptr = zstatus_buff + val.str.len;
 	*zstatus_bptr++ = ',';

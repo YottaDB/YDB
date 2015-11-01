@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <stddef.h>
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
@@ -75,14 +76,12 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	ua_list			*first_ua, *curr_ua;		/* needed for the ENSURE_UPDATE_ARRAY_SPACE macro */
 GBLREF	uint4			t_err;
-GBLREF	uint4			cumul_jnl_rec_len;
-GBLREF	uint4			process_id;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		t_tries;
 GBLREF	boolean_t 		kip_incremented;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	boolean_t		is_replicator;
-DEBUG_ONLY(GBLREF uint4		cumul_index;)
+GBLREF jnl_gbls_t		jgbl;
 
 void	gvcst_kill(bool do_subtree)
 {
@@ -254,24 +253,13 @@ void	gvcst_kill(bool do_subtree)
 				ja->operation = JNL_KILL;
 			else
 				ja->operation = JNL_ZKILL;
-			if (0 == dollar_tlevel)
-			{
-				assert(JRT_FKILL_FIXED_SIZE == JRT_GKILL_FIXED_SIZE);
-				assert(JRT_KILL_FIXED_SIZE  == JRT_ZKILL_FIXED_SIZE);
-				assert(JRT_FZKILL_FIXED_SIZE == JRT_GZKILL_FIXED_SIZE);
-				assert(JRT_FKILL_FIXED_SIZE  == JRT_FZKILL_FIXED_SIZE);
-				cumul_jnl_rec_len = ((jnl_fence_ctl.level == 0) ? KILL_RECLEN : FKILL_RECLEN);
-			} else
-			{
-				assert(JRT_TKILL_FIXED_SIZE  == JRT_UKILL_FIXED_SIZE);
-				assert(JRT_TZKILL_FIXED_SIZE == JRT_UZKILL_FIXED_SIZE);
-				assert(JRT_TKILL_FIXED_SIZE  == JRT_TZKILL_FIXED_SIZE);
-				cumul_jnl_rec_len += TKILL_RECLEN;
-			}
-			cumul_jnl_rec_len += ja->key->end + sizeof(ja->key->end);
-			cumul_jnl_rec_len = ROUND_UP(cumul_jnl_rec_len, JNL_REC_START_BNDRY);
-			DEBUG_ONLY(cumul_index++;)
 			jnl_format(jfb);
+			if (0 == dollar_tlevel)
+				jgbl.cumul_jnl_rec_len = jfb->record_size;
+			else
+				jgbl.cumul_jnl_rec_len += jfb->record_size;
+			assert(0 == jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY);
+			DEBUG_ONLY(jgbl.cumul_index++;)
 		}
 		flush_cache = FALSE;
 		if (0 == dollar_tlevel)

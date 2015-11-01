@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,15 +38,15 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "jnl.h"
-#include "muprec.h"
 #include "repl_log.h"
 #include "repl_sem.h"
 #include "mupip_exit.h"
 #include "dpgbldir.h"
+#include "read_db_files_from_gld.h"
 #include "updproc.h"
+#include "upd_open_files.h"
 
-GBLDEF  upd_proc_ctl    *upd_db_files;
-
+GBLREF  gld_dbname_list    *upd_db_files;
 GBLREF	uint4		process_id;
 GBLREF	recvpool_addrs	recvpool;
 GBLREF  gd_addr         *gd_header;

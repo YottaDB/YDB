@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,8 +73,9 @@ typedef struct mv_stent_struct
 		mvs_pval_struct mvs_pval;
 		mvs_nval_struct mvs_nval;
 		struct {
-			unsigned char **mvs_stck_addr;
-			unsigned char *mvs_stck_val;
+			void **mvs_stck_addr;
+			void *mvs_stck_val;
+			int4 mvs_stck_size;
 		} mvs_stck;
 		int4 mvs_tval;
 		int4 mvs_tp_holder;
@@ -82,7 +83,7 @@ typedef struct mv_stent_struct
 } mv_stent;
 
 mval *unw_mv_ent(mv_stent *mv_st_ent);
-void unw_mv_ent_n(int n);
+void push_stck(void* val, int val_size, void** addr);
 
 #define MVST_MSAV 0	/* An mval and an address to store it at pop time, most
 			   often used to save/restore new'd intrinsic variables.
@@ -94,7 +95,7 @@ void unw_mv_ent_n(int n);
 #define	MVST_NTAB 4	/* A place to save old name hash table values during parameter passed functions */
 #define	MVST_PARM 5	/* A pointer to a parameter passing block */
 #define	MVST_PVAL 6	/* A temporary mval for formal parameters */
-#define	MVST_STCK 7	/* save value of stackwarn */
+#define	MVST_STCK 7	/* save value of stackwarn or save an object of generic C struct */
 #define MVST_NVAL 8	/* A temporary mval for indirect news */
 #define MVST_TVAL 9	/* Saved value of $T, to be restored upon QUITing */
 #define MVST_TPHOLD 10	/* Place holder for MUMPS stack pertaining to TSTART */
@@ -108,6 +109,13 @@ LITREF unsigned char mvs_size[];
 	((msp <= stacktop) ? (msp += mvs_size[T]/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) : \
 	 rts_error(VARLSTCNT(1) ERR_STACKCRIT)) : \
 	(((mv_stent *) msp)->mv_st_type = T , \
+	((mv_stent *) msp)->mv_st_next = (unsigned char *) mv_chain - msp), \
+	mv_chain = (mv_stent *) msp)
+
+#define PUSH_MV_STCK(size) (((msp -= (mvs_size[MVST_STCK]+size)) <= stackwarn) ? \
+	((msp <= stacktop) ? (msp += mvs_size[MVST_STCK]/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) : \
+	 rts_error(VARLSTCNT(1) ERR_STACKCRIT)) : \
+	(((mv_stent *) msp)->mv_st_type = MVST_STCK , \
 	((mv_stent *) msp)->mv_st_next = (unsigned char *) mv_chain - msp), \
 	mv_chain = (mv_stent *) msp)
 

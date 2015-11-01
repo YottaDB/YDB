@@ -32,7 +32,8 @@ typedef struct mmblk_rec_struct
 	union
 	{
 		short	semaphore;
-		int4	latch;		/* int required for atomic swap on Unix */
+		volatile int4	latch;		/* int required for atomic swap on Unix */
+			/* volatile required as this value is referenced outside of the lock in db_csh_getn() */
 	} interlock;
 	block_id	blk;
 	trans_num	dirty;
@@ -51,7 +52,8 @@ typedef struct mmblk_state_rec_struct
 	union
 	{
 		short	semaphore;
-		int4	latch;		/* int required for atomic swap on Unix */
+		volatile int4	latch;		/* int required for atomic swap on Unix */
+			/* volatile required as this value is referenced outside of the lock in db_csh_getn() */
 	} interlock;
 	block_id	blk;
 	trans_num	dirty;
@@ -81,7 +83,8 @@ typedef struct cache_rec_struct
 	union
 	{
 		short	semaphore;
-		int4	latch;		/* int required for atomic swap on Unix */
+		volatile int4	latch;		/* int required for atomic swap on Unix */
+			/* volatile required as this value is referenced outside of the lock in db_csh_getn() */
 	} interlock;
 	block_id	blk;
 	trans_num	dirty;		/* block has been modified since last written to disk; used by bt_put, db_csh_getn
@@ -133,7 +136,8 @@ typedef struct
 	union
 	{
 		short	semaphore;
-		int4	latch;		/* int required for atomic swap on Unix */
+		volatile int4	latch;		/* int required for atomic swap on Unix */
+			/* volatile required as this value is referenced outside of the lock in db_csh_getn() */
 	} interlock;
 	block_id	blk;
 	trans_num	dirty;		/* block has been modified since last written to disk; used by bt_put, db_csh_getn
@@ -595,7 +599,7 @@ typedef struct sgmnt_data_struct
 	int4		rc_srv_cnt;		/* Count of RC servers accessing database */
 	short		dsid;			/* DSID value, non-zero when being accessed by RC */
 	short		rc_node;
-	int4		autoswitchlimit;	/* limit in disk blocks (max 4GB) when jnl should be auto switched */
+	uint4		autoswitchlimit;	/* limit in disk blocks (max 4GB) when jnl should be auto switched */
 	int4		epoch_interval;		/* Time between successive epochs in epoch-seconds */
 	int4		n_tp_retries[7];	/* indexed by t_tries and incremented by 1 for all regions in restarting TP */
 	/* The need for having tab_bg_trc_rec_fixed.h and tab_bg_trc_rec_variable.h is because
@@ -625,7 +629,7 @@ typedef struct sgmnt_data_struct
 #include "tab_db_csh_acct_rec.h"
 #undef TAB_DB_CSH_ACCT_REC
 	unsigned char	reorg_restart_key[256];         /* 1st key of a leaf block where reorg was done last time */
-	int4		alignsize;		/* alignment size for JRT_ALIGN */
+	uint4		alignsize;		/* alignment size for JRT_ALIGN */
 	block_id	reorg_restart_block;
 	/******* following three members (filler_{jnl_file,dbfid}, filler_ino_t) together occupy 64 bytes on all platforms *******/
 	/* this area which was previously used for the field "jnl_file" is now moved to node_local */
@@ -664,7 +668,12 @@ typedef struct sgmnt_data_struct
 		time_t	ctime;		/* For current GTM code sem_ctime field corresponds to creation time */
 		int4	filler[2];	/* Filler to make sure above is okay even if takes 2 words on some platform */
 	} shm_ctime;
-	char		filler3[968];
+	boolean_t	recov_interrupted;	/* whether a MUPIP JOURNAL -RECOVER/ROLLBACK command on this db got interrupted */
+	int4		intrpt_recov_jnl_state;		/* journaling state at start of interrupted recover/rollback */
+	int4		intrpt_recov_repl_state;	/* replication state at start of interrupted recover/rollback */
+	jnl_tm_t	intrpt_recov_tp_resolve_time;	/* since-time for the interrupted recover */
+	seq_num 	intrpt_recov_resync_seqno;	/* resync/fetchresync jnl_seqno of interrupted rollback */
+	char		filler3[944];
 	int4		filler_highest_lbm_blk_changed;	/* Records highest local bit map block that
 							   changed so we know how much of master bit
 							   map to write out. Modified only under crit */
@@ -782,6 +791,7 @@ typedef struct
 #define NEG_MNTSSA_END  0x0FF
 #define KEY_DELIMITER   0X00
 #define MIN_DB_BLOCKS	10	/* this should be maintained in conjunction with the mimimum allocation in GDEINIT.M */
+#define MAX_ZWR_KEY_SZ	ZWR_EXP_RATIO(MAX_KEY_SZ)
 
 #define OFFSET(x,y) ((uchar_ptr_t)x - (uchar_ptr_t)y)
 
@@ -870,7 +880,7 @@ typedef struct	gd_region_struct
 	/* deleted gbl_lk_root and lcl_lk_root, obsolete fields */
 
 	uint4			jnl_alq;
-	short			jnl_deq;
+	unsigned short		jnl_deq;
 	short			jnl_buffer_size;
 	bool			jnl_before_image;
 	bool			opening;
@@ -1087,7 +1097,8 @@ typedef struct	gv_namehead_struct
  * without having a logical update. Journaling currently needs to know all such code-paths */
 typedef enum
 {
-        inctn_bmp_mark_free_gtm = 0,
+        inctn_invalid_op = 0,
+        inctn_bmp_mark_free_gtm,
         inctn_bmp_mark_free_mu_reorg,
         inctn_gdsfilext_gtm,
         inctn_gdsfilext_mu_reorg,
@@ -1095,7 +1106,7 @@ typedef enum
         inctn_mu_reorg,
         inctn_wcs_recover,
         inctn_secshr_db_clnup,
-        inctn_invalid_op
+        inctn_opcode_total
 } inctn_opcode_t;
 
 #define HIST_TERMINATOR		0
@@ -1178,9 +1189,9 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 #define STANDALONE(x) mu_rndwn_file(x, TRUE)
 #define DBFILOP_FAIL_MSG(status, msg)	gtm_putmsg(VARLSTCNT(5) msg, 2, DB_LEN_STR(gv_cur_region), status);
 #elif defined(VMS)
-#define STANDALONE(x) mu_rndwn_file(TRUE)
+#define STANDALONE(x) mu_rndwn_file(TRUE)	/* gv_cur_region needs to be equal to "x" */
 #define DBFILOP_FAIL_MSG(status, msg)	gtm_putmsg(VARLSTCNT(7) msg, 2, DB_LEN_STR(gv_cur_region), status, \
-						0, FILE_INFO(gv_cur_region)->fab->fab$l_stv);
+						FILE_INFO(gv_cur_region)->fab->fab$l_stv);
 #else
 #error unsupported platform
 #endif
@@ -1200,6 +1211,7 @@ void rel_crit(gd_region *reg);
 void rel_lock(gd_region *reg);
 void gv_init_reg(gd_region *reg);
 void gvcst_init(gd_region *greg);
+void assert_jrec_member_offsets(void);
 boolean_t mupfndfil(gd_region *reg, mstr *mstr_addr);
 enum cdb_sc rel_read_crit(gd_region *reg, short crash_ct);
 
@@ -1236,7 +1248,6 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key);
 
 int4 dsk_read(block_id blk, sm_uc_ptr_t buff);
 
-void jnl_file_close(gd_region *reg, bool clean, bool eov);
 void jnl_flush(gd_region *reg);
 void jnl_fsync(gd_region *reg, uint4 fsync_addr);
 void jnl_mm_timer(sgmnt_addrs *csa, gd_region *reg);

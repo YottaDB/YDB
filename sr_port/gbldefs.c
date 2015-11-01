@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,7 +98,9 @@
 
 #ifdef UNIX
 #include "invocation_mode.h"
+#include "fgncal.h"
 #endif
+#include "jnl_typedef.h"
 
 #define DEFAULT_ZERROR_STR	"Unprocessed $ZERROR, see $ZSTATUS"
 #define DEFAULT_ZERROR_LEN	(sizeof(DEFAULT_ZERROR_STR) - 1)
@@ -107,9 +109,6 @@ GBLDEF	gd_region		*db_init_region;
 GBLDEF	sgmnt_data_ptr_t	cs_data;
 GBLDEF	sgmnt_addrs		*cs_addrs;
 
-GBLDEF	seq_num		start_jnl_seqno;
-GBLDEF	seq_num		max_resync_seqno;
-GBLDEF	seq_num		consist_jnl_seqno;
 GBLDEF	unsigned short	proc_act_type;
 GBLDEF	volatile bool	ctrlc_pending;
 GBLDEF	volatile int4	ctrap_action_is;
@@ -138,9 +137,7 @@ GBLDEF	bool		error_mupip = FALSE,
 
 GBLDEF	boolean_t	is_updproc = FALSE,
 			mupip_jnl_recover = FALSE,
-			copy_jnl_record	= FALSE,
 			set_resync_to_region = FALSE,
-			jnlfile_truncation = FALSE,
 			repl_enabled = FALSE,
 			unhandled_stale_timer_pop = FALSE,
 			gtcm_connection = FALSE,
@@ -193,10 +190,12 @@ GBLDEF	mval		dollar_zgbldir,
 			dollar_estack_delta = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0),
 			dollar_etrap,
 			dollar_zerror = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, DEFAULT_ZERROR_LEN, DEFAULT_ZERROR_STR, 0, 0),
-			dollar_zyerror;
+			dollar_zyerror,
+			dollar_ztexit = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0);
 GBLDEF  uint4		dollar_zjob;
 GBLDEF	mval		dollar_zinterrupt;
 GBLDEF	boolean_t	dollar_zininterrupt;
+GBLDEF	boolean_t	dollar_ztexit_bool; /* Truth value of dollar_ztexit when coerced to boolean */
 
 GBLDEF	mv_stent	*mv_chain;
 GBLDEF	sgm_info	*first_sgm_info;
@@ -366,6 +365,8 @@ GBLDEF	boolean_t		dse_running = FALSE;
 GBLDEF	inctn_opcode_t		inctn_opcode = inctn_invalid_op;
 GBLDEF	jnlpool_addrs		jnlpool;
 GBLDEF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLDEF	jnlpool_ctl_struct	temp_jnlpool_ctl_struct;
+GBLDEF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl = &temp_jnlpool_ctl_struct;
 GBLDEF	sm_uc_ptr_t		jnldata_base;
 GBLDEF	int4			jnlpool_shmid = INVALID_SHMID;
 GBLDEF	recvpool_addrs		recvpool;
@@ -376,14 +377,6 @@ GBLDEF	int			gtmrecv_srv_count = 0;
 /* The following _in_prog counters are needed to prevent deadlocks while doing jnl-qio (timer & non-timer). */
 GBLDEF	volatile int4		db_fsync_in_prog;
 GBLDEF	volatile int4		jnl_qio_in_prog;
-
-/* gbl_jrec_time is
- *	updated    by t_end, tp_tend
- *	referenced by jnl_write_pblk, jnl_write_epoch, jnl_write_logical, jnl_write (in jnl_output.c) and jnl_put_jrt_pini()
- */
-GBLDEF	uint4			gbl_jrec_time;
-GBLDEF	uint4			zts_jrec_time;	/* time when the ztstart journal record was written. used by op_ztcommit */
-GBLDEF	uint4			cur_logirec_short_time; /* Time of last logical jouranl record processed by recover */
 #ifdef UNIX
 GBLDEF	gtmsiginfo_t		signal_info;
 GBLDEF	boolean_t		mutex_salvaged;
@@ -407,6 +400,7 @@ GBLDEF	enum gtmImageTypes	image_type;	/* initialized at startup i.e. in dse.c, l
 GBLDEF	volatile boolean_t	semwt2long;
 
 #ifdef UNIX
+GBLDEF	parmblk_struct 		*param_list; /* call-in parameters block (defined in unix/fgncalsp.h)*/
 GBLDEF	unsigned int		invocation_mode = MUMPS_COMPILE; /* how mumps has been invoked */
 GBLDEF	char			cli_err_str[MAX_STRLEN] = "";   /* Parse Error message buffer */
 GBLDEF	char			*cli_err_str_ptr = NULL;
@@ -471,16 +465,12 @@ GBLDEF	gd_region	*ftok_sem_reg = NULL;	/* Last region for which ftok semaphore i
 GBLDEF	gd_region	*standalone_reg = NULL;	/* We have standalone access for this region */
 #endif
 
-GBLDEF	fixed_jrec_tp_kill_set 	mur_jrec_fixed_field;	/* Recover/Rollback uses to copy the journal record fields */
-GBLDEF	struct_jrec_tcom 	mur_jrec_fixed_tcom;	/* For copying tcom journal record fields */
 GBLDEF	boolean_t		write_after_image = FALSE;	/* true for after-image jnlrecord writing by recover/rollback */
-GBLDEF	boolean_t		got_repl_standalone_access = FALSE;
 GBLDEF	int			iott_write_error;
 GBLDEF	boolean_t		recovery_success = FALSE; /* To Indicate successful recovery */
 GBLDEF	int4			write_filter;
 GBLDEF	int4			zdate_form = 0;
 GBLDEF	boolean_t		need_no_standalone = FALSE;
-GBLDEF	boolean_t		forw_phase_recovery = FALSE; /* To inidicate the forward phase recovery */
 
 GBLDEF	int4	zdir_form = ZDIR_FORM_FULLPATH; /* $ZDIR shows full path including DEVICE and DIRECTORY */
 GBLDEF	mval	dollar_zdir = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0);
@@ -488,15 +478,6 @@ GBLDEF	mval	dollar_zdir = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0);
 GBLDEF	int * volatile		var_on_cstack_ptr = NULL; /* volatile pointer to int; volatile so that nothing gets optimized out */
 GBLDEF	boolean_t		gtm_environment_init = FALSE;
 GBLDEF	hashtab			*cw_stagnate = NULL;
-
-#ifdef VMS
-#ifdef INT8_SUPPORTED
-GBLDEF const jnl_proc_time jnl_min_delta_time = 0xFFFFFFFFFFFFFFFFll;	      /* time of 100 ns, the least possible time */
-#else /* ! INT8_SUPPORTED */						      /* quantity on VMS. If user specifies 0 as the */
-GBLDEF const jnl_proc_time jnl_min_delta_time = {0xFFFF, 0xFFFFFFFF, 0xFFFF}; /* delta time for any mupip recover time qualifier, */
-#endif /* INT8_SUPPORTED */						      /* we use this value instead of 0 because a time */
-#endif /* VMS */							      /* value of 0 is interpreted as the VMS system zero */
-									      /* time 17-NOV-1858 00:00:00.00 */
 
 GBLDEF	uint4		pat_everything[] = { 0, 2, PATM_E, 1, 0, PAT_MAX_REPEAT, 0, PAT_MAX_REPEAT, 1 }; /* pattern = ".e" */
 GBLDEF	uint4		sizeof_pat_everything = sizeof(pat_everything);
@@ -611,7 +592,9 @@ GBLDEF	int4		cur_pte_csh_entries_per_len;		/* copy of pte_csh_entries_per_len co
 GBLDEF	int4		cur_pte_csh_tail_count;			/* copy of pte_csh_tail_count corresponding to curalt_depth */
 
 GBLDEF	readonly char	*before_image_lit[] = {"NOBEFORE_IMAGES", "BEFORE_IMAGES"};
-GBLDEF	readonly char	*jnl_state_lit[] = {"DISABLED", "OFF", "ON"};
+GBLDEF	readonly char	*jnl_state_lit[]    = {"DISABLED", "OFF", "ON"};
+GBLDEF	readonly char	*repl_state_lit[]   = {"OFF",      "ON"};
+
 GBLDEF	boolean_t	crit_sleep_expired;		/* mutex.mar: signals that a timer waiting for crit has expired */
 GBLDEF	uint4		crit_deadlock_check_cycle;	/* compared to csa->crit_check_cycle to determine if a given region
 							   in a transaction legitimately has crit or not */
@@ -631,3 +614,44 @@ GBLDEF	int4			gtm_object_size;	/* Size of entire gtm object for compiler use */
 GBLDEF	int4			linkage_size;		/* Size of linkage section during compile */
 GBLDEF	uint4			lnkrel_cnt;		/* number of entries in linkage Psect to relocate */
 GBLDEF	boolean_t		disallow_forced_expansion, forced_expansion; /* Used in stringpool managment */
+GBLDEF	jnl_fence_control	jnl_fence_ctl;
+GBLDEF	jnl_process_vector	*prc_vec = NULL;		/* for current process */
+GBLDEF	jnl_process_vector	*originator_prc_vec = NULL;	/* for client/originator */
+LITDEF	char	*jrt_label[JRT_RECTYPES] =
+{
+#define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	label,
+#include "jnl_rec_table.h"
+#undef JNL_TABLE_ENTRY
+};
+LITDEF	int	jrt_update[JRT_RECTYPES] =
+{
+#define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	update,
+#include "jnl_rec_table.h"
+#undef JNL_TABLE_ENTRY
+};
+LITDEF	boolean_t	jrt_fixed_size[JRT_RECTYPES] =
+{
+#define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	fixed_size,
+#include "jnl_rec_table.h"
+#undef JNL_TABLE_ENTRY
+};
+LITDEF	boolean_t	jrt_is_replicated[JRT_RECTYPES] =
+{
+#define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	is_replicated,
+#include "jnl_rec_table.h"
+#undef JNL_TABLE_ENTRY
+};
+/* Change the initialization if struct_jrec_tcom in jnl.h changes */
+GBLDEF	struct_jrec_tcom	tcom_record = {{JRT_TCOM, TCOM_RECLEN, 0, 0, 0},
+					0, "", 0, {TCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
+GBLDEF 	jnl_gbls_t		jgbl;
+GBLDEF short 		crash_count;
+GBLDEF trans_num	start_tn;
+GBLDEF cw_set_element	cw_set[CDB_CW_SET_SIZE];
+GBLDEF unsigned char	cw_set_depth, cw_map_depth;
+GBLDEF unsigned int	t_tries;
+GBLDEF uint4		t_err;
+GBLDEF bool		update_trans;
+
+GBLDEF	boolean_t	mu_rndwn_file_dbjnl_flush;	/* to indicate standalone access is available to shared memory so
+							 * wcs_recover() need not increment db curr_tn or write inctn record */

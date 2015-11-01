@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,7 +82,6 @@
 #include "sig_init.h"
 #include "gtm_startup.h"
 #include "svnames.h"
-#include "gtmci_signals.h"
 #include "jobinterrupt_init.h"
 #include "zco_init.h"
 
@@ -100,6 +99,7 @@ GBLREF RTN_TABENT 	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
 GBLREF int4		break_message_mask;
 GBLREF stack_frame 	*frame_pointer;
 GBLREF unsigned char 	*stackbase, *stacktop, *stackwarn, *msp;
+GBLREF unsigned char	*fgncal_stack;
 GBLREF mv_stent		*mv_chain;
 GBLREF int		(* volatile xfer_table[])();
 GBLREF mval		dollar_system;
@@ -151,6 +151,10 @@ void gtm_startup(struct startup_vector *svec)
 		svec->user_stack_size = 8388608;
 	mstack_ptr = (unsigned char *)malloc(svec->user_stack_size);
 	msp = stackbase = mstack_ptr + svec->user_stack_size - 4;
+
+	/* mark the stack base so that if error occur during call-in gtm_init(), the unwind
+	   logic in gtmci_ch() will get rid of the stack completely */
+	fgncal_stack = stackbase;
 	mv_chain = (mv_stent *) msp;
 	stacktop = mstack_ptr + 2 * mvs_size[MVST_NTAB];
 	stackwarn = stacktop + 1024;
@@ -209,7 +213,6 @@ void gtm_startup(struct startup_vector *svec)
 	/* Initialize global pointer to control-C handler. Also used in iott_use */
 	ctrlc_handler_ptr = &ctrlc_handler;
 	sig_init(generic_signal_handler, ctrlc_handler_ptr);
-	atexit(gtmci_exit_handler);
 	atexit(gtm_exit_handler);
 	io_init(TRUE);
 	jobinterrupt_init();

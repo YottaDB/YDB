@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef T_BEGIN_DEFINED
 #define T_BEGIN_DEFINED
 
-void t_begin(uint4 err, bool update_transaction);
+void t_begin (uint4 err, boolean_t update_transaction);
 
 #endif

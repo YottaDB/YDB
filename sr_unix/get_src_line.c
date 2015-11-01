@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,10 @@
 
 #include "mdef.h"
 
+#include <errno.h>
 #include "gtm_string.h"
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-
-#include <errno.h>
 #include "gtm_stat.h"
 
 #include "hashdef.h"
@@ -32,8 +31,6 @@
 
 GBLDEF htab_desc rt_name_tbl;
 GBLREF mident zlink_mname;
-
-extern int errno;
 
 int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 {

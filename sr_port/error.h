@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,6 +81,7 @@ CONDITION_HANDLER(mu_rndwn_file_ch);
 CONDITION_HANDLER(mupip_load_ch);
 CONDITION_HANDLER(mupip_recover_ch);
 CONDITION_HANDLER(mupip_set_jnl_ch);
+CONDITION_HANDLER(mur_multi_rehash_ch);
 CONDITION_HANDLER(ojch);
 CONDITION_HANDLER(region_init_ch);
 CONDITION_HANDLER(replication_ch);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,8 @@ void cache_cleanup(stack_frame *sf)
 		irtnhdr = (ihdtyp *)((char *)vp + *vp);
 		indce = irtnhdr->indce;
 		assert(0 < indce->refcnt);
-		indce->refcnt--;	/* This usage of this cache entry is done */
+		indce->refcnt--;		/* This usage of this cache entry is done */
+		indce->referenced = TRUE; 	/* .. it has been recently referenced */
 		if (0 == indce->refcnt && indce->temp_elem)
 		{	/* Temp element to be freed */
 			if (indce->linkq.fl)

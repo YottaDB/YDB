@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,6 +96,7 @@ int gtmsource()
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
 	error_def(ERR_REPLINFO);
+	error_def(ERR_REPLOFFJNLON);
 
 	memset((uchar_ptr_t)&jnlpool, 0, sizeof(jnlpool_addrs));
 	call_on_signal = gtmsource_sigstop;
@@ -205,12 +206,6 @@ int gtmsource()
 	REPL_DPRINT1("Setting up regions\n");
 	gvinit();
 
-#ifdef GTMSOURCE_OPEN_DB_RDONLY
-	/* Open the regions in read-only mode */
-	region_top = gd_header->regions + gd_header->n_regions;
-	for (reg = gd_header->regions; reg < region_top; reg++)
-		reg->read_only = TRUE;
-#endif
 	/* We use the same code dse uses to open all regions but we must make sure
 	 * they are all open before proceeding.
 	 */
@@ -220,6 +215,7 @@ int gtmsource()
 		gtm_putmsg(VARLSTCNT(1) ERR_NOTALLDBOPN);
 		gtmsource_autoshutdown();
 	}
+	EXIT_IF_REPLOFF_JNLON(gd_header);
 	if (jnlpool_inited)
 		gtmsource_seqno_init();
 
@@ -262,7 +258,6 @@ int gtmsource()
 
 	gtmsource_srv_count++;
 	gtmsource_secnd_update(TRUE);
-#ifndef GTMSOURCE_OPEN_DB_RDONLY
 	region_top = gd_header->regions + gd_header->n_regions;
 	for (reg = gd_header->regions; reg < region_top; reg++)
 	{
@@ -274,7 +269,6 @@ int gtmsource()
 			gtmsource_autoshutdown();
 		}
 	}
-#endif
 	gtm_event_log_init();
 	if (jnlpool_inited)
 		sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2,

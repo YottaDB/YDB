@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,17 +61,12 @@ int gtm_bintim(char *toscan, jnl_proc_time *timep)
     time_t	now, mktime_ret;
     struct tm	time_tm, *now_tm;
     int		num, sec, min, hour, day, year;
+    int		len = strlen(toscan), matched = 0;
     char	month[256];
-    int		len = strlen(toscan),
-		matched = 0;
-
-    *month = '\0';
-    now = time((time_t *) 0);
-    now_tm = localtime(&now);
 
     num = SSCANF(toscan, "%d %d", &day, &hour);
-    if (2 == num)  /* delta time format */
-    {
+    if (2 == num)
+    {	/* delta time format. note: this is the same code as in VMS gtm_bintim.c */
 	num = SSCANF(toscan, "%d %d:%d:%d%n", &day, &hour, &min, &sec, &matched);
 	if (matched < len)
 	{
@@ -87,9 +82,11 @@ int gtm_bintim(char *toscan, jnl_proc_time *timep)
 	}
 	*timep = - (day*86400 + hour*3600 + min*60 + sec);
 	return 0;
-    }
-    else	 /* absolute time format */
+    } else	 /* absolute time format */
     {
+	*month = '\0';
+	now = time((time_t *) 0);
+	now_tm = localtime(&now);
 	num = SSCANF(toscan, "%d-%[" monthalphas "]-%d %d:%d:%d%n", &day, month, &year,
 		   &hour, &min, &sec, &matched);
 
@@ -132,24 +129,23 @@ int gtm_bintim(char *toscan, jnl_proc_time *timep)
 		}
 	    }
 	}
+	time_tm.tm_sec = sec;
+	time_tm.tm_min = min;
+	time_tm.tm_hour = hour;
+	if (*month)
+	    time_tm.tm_mon = getmon(month);
+	else
+	    time_tm.tm_mon = now_tm->tm_mon;
+	time_tm.tm_mday = day;
+	time_tm.tm_year = year-1900;
+	time_tm.tm_isdst = -1;
+
+	mktime_ret = mktime(&time_tm);
+	if ((time_t)-1 == mktime_ret)
+	    return -1;
+	*timep = (jnl_proc_time)mktime_ret;
+	return 0;
     }
-
-    time_tm.tm_sec = sec;
-    time_tm.tm_min = min;
-    time_tm.tm_hour = hour;
-    if (*month)
-	time_tm.tm_mon = getmon(month);
-    else
-	time_tm.tm_mon = now_tm->tm_mon;
-    time_tm.tm_mday = day;
-    time_tm.tm_year = year-1900;
-    time_tm.tm_isdst = -1;
-
-    mktime_ret = mktime(&time_tm);
-    if ((time_t)-1 == mktime_ret)
-	return -1;
-    *timep = (jnl_proc_time)mktime_ret;
-    return 0;
 }
 
 static int getmon(char *month)

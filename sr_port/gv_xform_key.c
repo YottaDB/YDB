@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ void	gv_xform_key(gv_key *keyp, bool xback)
 	static int4		gv_sparekey_size  = 0;
 	static gv_key		*gv_sparekey = NULL;
 	static mval		temp;
-	static unsigned char	buff[MAX_KEY_SZ + 1];
+	static unsigned char	buff[MAX_ZWR_KEY_SZ];
 	unsigned char		*c0, *c1, *ctop;
 
 	if (gv_sparekey_size < gv_keysize)

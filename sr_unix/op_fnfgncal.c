@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -108,6 +108,7 @@ GBLREF stack_frame      *frame_pointer;
 GBLREF unsigned char    *msp;
 GBLREF spdesc 		stringpool;
 GBLREF int    		(*callintogtm_vectortable[])();
+GBLREF int		mumps_status;
 error_def(ERR_ZCRTENOTF);
 error_def(ERR_ZCUSRRTN);
 error_def(ERR_ZCARGMSMTCH);
@@ -164,7 +165,7 @@ static void	extarg2mval(void *src, enum xc_types typ, mval *dst)
 		}
 		break;
 	case xc_float_star:
-		double2mval((double)*((float *)src), dst);
+		double2mval(dst, (double)*((float *)src));
 		break;
 	case xc_char_star:
 		cp = (char *)src;
@@ -181,7 +182,7 @@ static void	extarg2mval(void *src, enum xc_types typ, mval *dst)
 			extarg2mval(*((char **)src), xc_char_star, dst);
 		break;
 	case xc_double_star:
-		double2mval(*((double *)src), dst);
+		double2mval(dst, *((double *)src));
 		break;
 	default:
 		rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
@@ -254,6 +255,7 @@ va_dcl
 	uint4		m1, status;
 	char		*cp, *free_string_pointer;
 	int		pre_alloc_size;
+	int		save_mumps_status;
 	char		*gtmvectortable_temp, *tmp_buff_ptr, str_buffer[MAX_NAME_LENGTH];
 	char		*xtrnl_table_name;
 	struct extcall_package_list	*package_ptr;
@@ -446,15 +448,16 @@ va_dcl
 		}
 	}
 	param_list->n = argcnt;
+	save_mumps_status = mumps_status; /* save mumps_status as a callin from external call may change it */
 	status = callg(entry_ptr->fcn, param_list);
+	mumps_status = save_mumps_status;
 
+	/* Exit from the residual call-in environment(SFF_CI and base frames) which might
+	 * still exist on M stack when the externally called function in turn called
+	 * into an M routine */
 	if (frame_pointer->flags & SFF_CI)
-	{ /* exit from the residual call-in environment */
-		op_unwind(); /* SFF_CI */
-		op_unwind(); /* base frame of this call-in environment */
-		frame_pointer = *(stack_frame**)msp;
-		msp += sizeof(frame_pointer);
-	}
+		ci_ret_code_quit();
+
 	/* NOTE: ADD RETURN STATUS CALCUATIONS HERE */
 	/* compute space requirement for return values */
 	n = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,7 +114,7 @@ void mupip_restore(void)
 	trans_num		curr_tn;
 	uint4			ii;
 	block_id		blk_num;
-	bool			extend, standalone;
+	bool			extend;
 	uint4			cli_status;
 	BFILE			*in;
 	int			i, db_fd;
@@ -139,14 +139,20 @@ void mupip_restore(void)
 	error_def(ERR_IOEOF);
 
 	extend = TRUE;
-	if ((cli_status = cli_present("EXTEND")) == CLI_NEGATED)
+	if (CLI_NEGATED == (cli_status = cli_present("EXTEND")))
 		extend = FALSE;
 	mu_outofband_setup();
+	mu_gv_cur_reg_init();
 	n_len = sizeof(db_name);
 	if (cli_get_str("DATABASE", db_name, &n_len) == FALSE)
 		mupip_exit(ERR_MUPCLIERR);
-	murgetlst();
-
+	strcpy((char *)gv_cur_region->dyn.addr->fname, db_name);
+	gv_cur_region->dyn.addr->fname_len = n_len;
+	if (!mu_rndwn_file(gv_cur_region, TRUE))
+	{
+		util_out_print("Error securing stand alone access to output file !AD. Aborting restore.", TRUE, n_len, db_name);
+		mupip_exit(ERR_MUPRESTERR);
+	}
 	OPENFILE(db_name, O_RDWR, db_fd);
 	if (-1 == db_fd)
 	{
@@ -156,20 +162,9 @@ void mupip_restore(void)
 		util_out_print("open : !AZ", TRUE, errptr);
 		mupip_exit(save_errno);
 	}
-	mu_gv_cur_reg_init();
-	strcpy((char *)gv_cur_region->dyn.addr->fname, db_name);
-	gv_cur_region->dyn.addr->fname_len = n_len;
-	standalone = mu_rndwn_file(gv_cur_region, TRUE);
-
-	if (FALSE == standalone)
-	{
-		util_out_print("Error securing stand alone access to output file !AD. Aborting restore.", TRUE, n_len, db_name);
-		mupip_exit(ERR_MUPRESTERR);
-	}
-
+	murgetlst();
 	inbuf = (char*)malloc(INC_BACKUP_CHUNK_SIZE);
 	old_data = (sgmnt_data*)malloc(sizeof(sgmnt_data));
-
 	LSEEKREAD(db_fd, 0, old_data, sizeof(sgmnt_data), save_errno);
 	if (0 != save_errno)
 	{

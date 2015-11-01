@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
+#include "gtm_time.h"
 #include "gtmsiginfo.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -49,6 +50,11 @@
 #include "print_exit_stats.h"
 #include "ftok_sems.h"
 #include "gtm_unistd.h"
+#include "jnl.h"
+#include "hashdef.h"
+#include "buddy_list.h"
+#include "muprec.h"
+#include "gtmmsg.h"
 
 GBLREF int			process_exiting;
 GBLREF boolean_t	        mupip_jnl_recover;
@@ -78,21 +84,23 @@ GBLREF int			gtmrecv_srv_count;
 GBLREF gd_region		*standalone_reg;
 GBLREF gd_region		*gv_cur_region;
 GBLREF gd_region		*ftok_sem_reg;
-GBLREF boolean_t		forw_phase_recovery;
+GBLREF jnl_gbls_t		jgbl;
 
 void close_repl_logfiles(void);
 
 void mupip_exit_handler(void)
 {
-	char	err_log[1024];
-        unix_db_info    	*udi;
+	char		err_log[1024];
+        unix_db_info   	*udi;
 
 	if (exit_handler_active)	/* Don't recurse if exit handler exited */
 		return;
+	if (jgbl.mupip_journal)
+		mur_close_files();
 	exit_handler_active = TRUE;
 	process_exiting = TRUE;
 	mupip_jnl_recover = FALSE;
-	forw_phase_recovery = FALSE;
+	jgbl.forw_phase_recovery = FALSE;
 	cancel_timer(0);		/* Cancel all timers - No unpleasant surprises */
 	secshr_db_clnup(NORMAL_TERMINATION);
         if (jnlpool.jnlpool_ctl)

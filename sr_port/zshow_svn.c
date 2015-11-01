@@ -100,6 +100,7 @@ static readonly char zsource_text[] = "$ZSOURCE";
 static readonly char zstatus_text[] = "$ZSTATUS";
 static readonly char zstep_text[] = "$ZSTEP";
 static readonly char zsystem_text[] = "$ZSYSTEM";
+static readonly char ztexit_text[] = "$ZTEXIT";
 static readonly char ztrap_text[] = "$ZTRAP";
 static readonly char zversion_text[] = "$ZVERSION";
 static readonly char zyerror_text[] = "$ZYERROR";
@@ -129,12 +130,8 @@ GBLREF int4		dollar_zcstatus;
 GBLREF int4		dollar_zeditor;
 GBLREF short		dollar_tlevel;
 GBLREF short		dollar_trestart;
-GBLREF mval		dollar_etrap;
-GBLREF mval		dollar_estack_delta;
-GBLREF mval		dollar_zerror;
-GBLREF mval		dollar_zyerror;
-GBLREF mval		dollar_system;
-GBLREF mval		dollar_zinterrupt;
+GBLREF mval		dollar_etrap, dollar_estack_delta, dollar_zerror, dollar_zyerror, dollar_system;
+GBLREF mval		dollar_zinterrupt, dollar_ztexit;
 GBLREF boolean_t	dollar_zininterrupt;
 GBLREF int4		zdir_form;
 GBLREF int4		zdate_form;
@@ -407,6 +404,11 @@ void zshow_svn(zshow_out *output)
 	/* SV_ZSYSTEM */
 		MV_FORCE_MVAL(&var, dollar_zsystem);
 		ZS_VAR_EQU(&x, zsystem_text);
+		mval_write(output, &var, TRUE);
+	/* SV_ZTEXIT */
+		var.mvtype = MV_STR;
+		var.str = dollar_ztexit.str;
+		ZS_VAR_EQU(&x, ztexit_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZTRAP */
 		var.mvtype = MV_STR;

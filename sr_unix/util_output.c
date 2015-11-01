@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,21 +52,27 @@ static	boolean_t	first_syslog = TRUE;
  *
  *		!mUB	!mUW	!mUL
  *
- *		!mXB	!mXW	!mXL
+ *		!mXB	!mXW	!mXL    !m@XH   !m@XJ
  *
  *		!mZB	!mZW	!mZL
  *
  *		!n*c
  *
- *	Where `m' is an optional field width, `n' is a repeat count,
- *	and `c' is a single character.  `m' or `n' may be specified
- *	as the '#' character, in which case the value is taken from
- *	the next parameter.
+ *		!@ZJ	!@XJ	!@ZH	!@XH
+ #
+ *	Where `m' is an optional field width, `n' is a repeat count, and `c' is a single character.
+ *	`m' or `n' may be specified as the '#' character, in which case the value is taken from the next parameter.
  *
- *	FAO stands for "formatted ASCII output".  The FAO directives
- *	may be considered equivalent to format specifications and are
- *	documented with the VMS Lexical Fuction F$FAO in the OpenVMS
- *	DCL Dictionary.
+ *	FAO stands for "formatted ASCII output".  The FAO directives may be considered equivalent to format
+ *	specifications and are documented with the VMS Lexical Fuction F$FAO in the OpenVMS DCL Dictionary.
+ *
+ *	The @XH and @XJ types need special mention. XH and XJ are ascii formatting of addresses and integers respectively.
+ *	BOTH are ASCII formatted hexdecimal output of a 64 bit sign-extended value.
+ *	This support was new in VMS 7.2 (and is one reason why GTM 4.2 requires VMS 7.2).
+ *	The "@" designates an "indirect" request meaning that the address of
+ *	the 8 byte item is passed rather than the item itself. This is what allows us to print 8 byte values in the
+ *	non-Alpha 32 bit parameter worlds. These types are documented in the VMS System services manual under SYS$FAO.
+ *	There are several other types that are supported on VMS but only these two were added on Unix.
  */
 
 /*
@@ -93,6 +99,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 	signed char	schar;
 	unsigned char	type, type2;
 	caddr_t		c, outptr, outtop;
+	uchar_ptr_t 	ret_ptr;
 	unsigned char	uchar;
 	short		sshort, *s;
 	unsigned short	ushort;
@@ -309,20 +316,36 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 					}
 				} else
 				{
-					if ('X' != type)			/* Only support XH and XJ */
-						GTMASSERT;
-					assert('H' == type2 || 'J' == type2);
-					GETFAOVALDEF(faocnt, fao, qw_num_ptr_t, val_ptr, NULL);	/* Addr of long type */
-					if (val_ptr)
+					if ('X' == type)	/* Support XH and XJ */
 					{
-						if (0 != field_width)
+						assert('H' == type2 || 'J' == type2);
+						GETFAOVALDEF(faocnt, fao, qw_num_ptr_t, val_ptr, NULL);	/* Addr of long type */
+						if (val_ptr)
 						{
-							i2hexl(*val_ptr, numptr, field_width);
-							numptr += field_width;
-						} else
+							if (0 != field_width)
+							{
+								i2hexl(*val_ptr, numptr, field_width);
+								numptr += field_width;
+							} else
+							{
+								length = i2hexl_nofill(*val_ptr, numptr, HEX16);
+								numptr += length;
+							}
+						}
+					} else 	/* support ZH and ZJ */
+					{
+						if ('Z' != type)
+							GTMASSERT;
+						assert('H' == type2 || 'J' == type2);
+						GETFAOVALDEF(faocnt, fao, qw_num_ptr_t, val_ptr, NULL);	/* Addr of long type */
+						if (val_ptr)
 						{
-							length = i2hexl_nofill(*val_ptr, numptr, HEX16);
-							numptr += length;
+							ret_ptr = i2ascl(numptr, *val_ptr);
+							length = ret_ptr - (uchar_ptr_t)numptr;
+							if (0 != field_width)
+								numptr += MIN(length, field_width);
+							else
+								numptr += length;
 						}
 					}
 				}

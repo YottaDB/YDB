@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,8 @@
    mur_blocks_free = # of free blocks
 */
 #include "mdef.h"
+
+#include "gtm_string.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -22,36 +24,43 @@
 #include "gdsblk.h"
 #include "gdsbml.h"
 #include "jnl.h"
+#include "hashdef.h"
+#include "buddy_list.h"
 #include "muprec.h"
 #include "iosp.h"
 #include "util.h"
 #include "dbfilop.h"
 
 GBLREF sgmnt_data_ptr_t	cs_data;
+GBLREF	reg_ctl_list	*mur_ctl;
+GBLREF 	int		mur_regno;
 
 #define BPL	sizeof(int4)*8/BML_BITS_PER_BLK					/* blocks masked by a int4 */
 
-int4 mur_blocks_free (ctl_list *ctl)
+int4 mur_blocks_free()
 {
-	int4		x;
-	block_id 	bnum;
-	int 		maps,mapsize,i,j,k,fcnt;
-	unsigned char 	*disk, *c, *m_ptr;
-	uint4 	*dskmap,map_blk_size;
+	int4				x;
+	block_id 			bnum;
+	int 				maps,mapsize,i,j,k,fcnt;
+	unsigned char 			*disk, *c, *m_ptr;
+	uint4 				*dskmap,map_blk_size;
+	file_control 			*db_ctl;
 
+	db_ctl = mur_ctl[mur_regno].db_ctl;
+	cs_data = mur_ctl[mur_regno].csd;
 	fcnt = 0;
 	maps = (cs_data->trans_hist.total_blks + cs_data->bplmap - 1) / cs_data->bplmap;
 	map_blk_size = BM_SIZE(cs_data->bplmap);
 	m_ptr = (unsigned char*)malloc(cs_data->blk_size + 8);
 	disk = (unsigned char *)(((int4)m_ptr) + 7 & -8);
-	ctl->db_ctl->op_buff = (uchar_ptr_t)disk;
-	ctl->db_ctl->op_len = cs_data->blk_size;
+	db_ctl->op_buff = (uchar_ptr_t)disk;
+	db_ctl->op_len = cs_data->blk_size;
 	for( i = 0; i != maps; i++ )
 	{
 		bnum = i * cs_data->bplmap;
-		ctl->db_ctl->op = FC_READ;
-		ctl->db_ctl->op_pos = cs_data->start_vbn + (cs_data->blk_size / 512 * bnum);
-		dbfilop(ctl->db_ctl);
+		db_ctl->op = FC_READ;
+		db_ctl->op_pos = cs_data->start_vbn + (cs_data->blk_size / 512 * bnum);
+		dbfilop(db_ctl);
 		if (((blk_hdr *) disk)->bsiz != map_blk_size)
 		{
 			util_out_print("Wrong size map block",TRUE); continue;

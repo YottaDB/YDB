@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <stddef.h>
 #ifdef UNIX
 #include "gtm_stdio.h"
 #endif
@@ -57,8 +58,6 @@
 #include "rc_cpt_ops.h"
 #include "rel_quant.h"
 #include "wcs_flu.h"
-#include "jnl_write_aimg_rec.h"
-#include "jnl_write_pblk.h"
 #include "mm_update.h"
 #include "bg_update.h"
 #include "wcs_get_space.h"
@@ -68,8 +67,24 @@
 #endif
 #include "t_end.h"
 #include "add_inter.h"
+#include "jnl_write_pblk.h"
+#include "jnl_write_aimg_rec.h"
 
 #define BLOCK_FLUSHING(x) (csa->hdr->clustered && x->flushing && !CCP_SEGMENT_STATE(cs_addrs->nl,CCST_MASK_HAVE_DIRTY_BUFFERS))
+
+#define	RESTORE_CURRTN_IF_NEEDED(csa, write_inctn, decremented_currtn)					\
+{													\
+	if (write_inctn && decremented_currtn)								\
+	{	/* decremented curr_tn above; need to restore to original state due to the restart */	\
+		assert(csa->now_crit);									\
+		if (csa->now_crit)									\
+		{	/* need crit to update curr_tn and early_tn */					\
+			csa->ti->curr_tn++;								\
+			csa->ti->early_tn++;								\
+		}											\
+		decremented_currtn = FALSE;								\
+	}												\
+}
 
 GBLREF bool			certify_all_blocks, rc_locked;
 GBLREF unsigned char		t_fail_hist[CDB_MAX_TRIES];
@@ -90,7 +105,6 @@ GBLREF unsigned char		cw_set_depth, cw_map_depth;
 GBLREF unsigned char		rdfail_detail;
 GBLREF jnlpool_addrs		jnlpool;
 GBLREF jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
-GBLREF uint4			cumul_jnl_rec_len;
 GBLREF bool			is_standalone;
 GBLREF boolean_t		is_updproc;
 GBLREF seq_num			seq_num_one;
@@ -99,16 +113,13 @@ GBLREF boolean_t		dse_running;
 GBLREF boolean_t		unhandled_stale_timer_pop;
 GBLREF jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF inctn_opcode_t		inctn_opcode;
-GBLREF uint4			gbl_jrec_time;	/* see comment in gbldefs.c for usage */
-GBLREF seq_num			max_resync_seqno;
 GBLREF boolean_t 		kip_incremented;
 GBLREF boolean_t		need_kip_incr;
 GBLREF boolean_t		write_after_image;
 GBLREF boolean_t		is_replicator;
-
-DEBUG_ONLY(GBLREF uint4		cumul_index;
-	   GBLREF uint4		cu_jnl_index;
-	  )
+GBLREF seq_num			seq_num_zero;
+GBLREF jnl_gbls_t		jgbl;
+GBLREF jnl_fence_control	jnl_fence_ctl;
 
 /* This macro isn't enclosed in parantheses to allow for optimizations */
 #define VALIDATE_CYCLE(history)						\
@@ -128,14 +139,11 @@ if (history)								\
 int	t_end(srch_hist *hist1, srch_hist *hist2)
 {
 	srch_hist		*hist;
-	blk_hdr_ptr_t		bp;
 	bt_rec_ptr_t		bt;
 	bool			blk_used;
-	boolean_t		is_mm, was_crit;
-	cache_rec_ptr_t		cr, cr0, cr1;
-	cw_set_element		*cs, *cs_top, *nxt;
+	cache_rec_ptr_t		cr;
+	cw_set_element		*cs, *cs_top;
 	enum cdb_sc		status;
-	file_control		*fc;
 	int			int_depth;
 	uint4			jnl_status;
 	jnl_buffer_ptr_t	jbp;
@@ -143,17 +151,19 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 	sgmnt_data_ptr_t	csd;
 	sgm_info		*dummysi = NULL;	/* needed as a dummy parameter for {mm,bg}_update */
 	srch_blk_status		*t1;
-	trans_num		start_ctn, save_early_tn, valid_thru, ctn, tnque_earliest_tn;
+	trans_num		start_ctn, valid_thru, ctn, tnque_earliest_tn;
 	unsigned char		cw_depth;
 	jnldata_hdr_ptr_t	jnl_header;
 	uint4			total_jnl_rec_size, tmp_cumul_jnl_rec_len, tmp_cw_set_depth;
 	uint4			tot_jrec_size;
-	uint4			jnl_alq, jnl_deq;
 	jnlpool_ctl_ptr_t	jpl, tjpl;
 	boolean_t		replication = FALSE;
-	boolean_t		release_crit;
+	boolean_t		is_mm, release_crit;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
+	boolean_t		write_inctn = FALSE;	/* set to TRUE in case writing an inctn record is necessary */
+	boolean_t		decremented_currtn;
+
 	error_def(ERR_GVKILLFAIL);
 	error_def(ERR_NOTREPLICATED);
 	error_def(ERR_JNLTRANS2BIG);
@@ -330,6 +340,31 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 			read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog); /* recalculate */
 		}
 		assert(csd == csa->hdr);
+		if (inctn_invalid_op != inctn_opcode)
+		{
+			assert(cw_set_depth || mu_reorg_process);
+			write_inctn = TRUE;	/* mupip reorg or gvcst_bmp_mark_free or extra block split in gvcstput */
+			decremented_currtn = FALSE;
+			if (jgbl.forw_phase_recovery && !JNL_ENABLED(csa))
+			{	/* forward recovery (deduced above from the fact that journaling is not enabled) is supposed
+				 * to accurately simulate GT.M runtime activity for every transaction number. The way it does
+				 * this is by incrementing transaction numbers for all inctn records that GT.M wrote and not
+				 * incrementing transaction number for any inctn activity that forward recovery internally needs
+				 * to do. all inctn activity done outside of t_end has already been protected against incrementing
+				 * transaction number in case of forward recovery. t_end is a little bit tricky since in this case
+				 * a few database blocks get modified with the current transaction number and not incrementing the
+				 * transaction number might result in the database transaction number being lesser than the block
+				 * transaction number. we work around this problem by decrementing the database transaction number
+				 * just before the commit so the database block updates for the inctn transaction get the
+				 * transaction number of the previous transaction effectively merging the inctn transaction with
+				 * the previous transaction.
+				 */
+				assert((inctn_gvcstput_extra_blk_split == inctn_opcode) || (1 == cw_set_depth));
+				csa->ti->curr_tn--;
+				csa->ti->early_tn--;
+				decremented_currtn = TRUE;
+			}
+		}
 		valid_thru = ctn = csa->ti->curr_tn;
 		if (!is_mm)
 			tnque_earliest_tn = ((th_rec_ptr_t)((sm_uc_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn;
@@ -477,7 +512,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 						break;
 					}
 					if ((NULL == cr)  || (cr->cycle != cs->cycle) ||
-					    ((sm_long_t)GDS_REL2ABS(cr->buffaddr) != (sm_long_t)cs->old_block))
+						((sm_long_t)GDS_REL2ABS(cr->buffaddr) != (sm_long_t)cs->old_block))
 					{
 						assert(CDB_STAGNATE > t_tries);
 						status = cdb_sc_lostbmlcr;
@@ -543,7 +578,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					QWASSIGN(tjpl->write, jpl->write);
 					QWASSIGN(tjpl->jnl_seqno, jpl->jnl_seqno);
 					INT8_ONLY(assert(tjpl->write == tjpl->write_addr % tjpl->jnlpool_size);)
-					tmp_cumul_jnl_rec_len = cumul_jnl_rec_len + sizeof(jnldata_hdr_struct);
+					tmp_cumul_jnl_rec_len = jgbl.cumul_jnl_rec_len + sizeof(jnldata_hdr_struct);
 					tjpl->write += sizeof(jnldata_hdr_struct);
 					if (tjpl->write >= tjpl->jnlpool_size)
 					{
@@ -559,17 +594,17 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 				csa->ti->early_tn = start_ctn + 1;
 				if (JNL_ENABLED(csa))
 				{
-					/* The JNL_SHORT_TIME done below should be done before any journal writing activity on the
-					 * journal file. This is because at this stage, we have early_tn != curr_tn and hence
-					 * jnl_write_logical will assume that gbl_jrec_time is appropriately set and so
-					 * would use it as the current time rather than making a system call.
-					 * Note that jnl_file_extend() done below might trigger a jnl_write_epoch_rec()
-					 *	due to the fact that it switched journal files.
-					 * Therefore, it is imperative we assign gbl_jrec_time before atleast the call to
-					 *	jnl_file_extend().
-					 * To be safer, we do it the moment we increment early_tn.
+ 					/* The JNL_SHORT_TIME done below should be done before any journal writing activity on the
+ 					 * journal file. This is because all the jnl record writing routines assume that
+					 * jgbl.gbl_jrec_time is initialized approporiately.
+					 * Note that jnl_ensure_open() can call cre_jnl_file() which
+					 * in turn assumes jgbl.gbl_jrec_time is set. Also jnl_file_extend() can call
+					 * jnl_write_epoch_rec() which in turn assumes jgbl.gbl_jrec_time is set.
+					 * In case of forw-phase-recovery, mur_output_record() would have already set this.
 					 */
-					JNL_SHORT_TIME(gbl_jrec_time);
+					if (!jgbl.forw_phase_recovery)
+						JNL_SHORT_TIME(jgbl.gbl_jrec_time);
+					assert(jgbl.gbl_jrec_time);
 					jnl_status = jnl_ensure_open();
 					assert((csa->jnl_state == csd->jnl_state) &&
 						(csa->jnl_before_image == csd->jnl_before_image));
@@ -590,6 +625,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 							{
 								assert((!JNL_ENABLED(csd)) && (JNL_ENABLED(csa)));
 								status = cdb_sc_jnlclose;
+								RESTORE_CURRTN_IF_NEEDED(csa, write_inctn, decremented_currtn);
 								t_commit_cleanup(status, 0);
 								if ((CDB_STAGNATE - 1) == t_tries)
 									release_crit = TRUE;
@@ -597,20 +633,19 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 								goto failed;
 							}
 						}
-						/* tp_tend sets gbl_jrec_time before calling jnl_put_jrt_pini. t_end doesn't.
-						 * see comment in jnl_put_pini.c related to gbl_jrec_time for the reason.
-						 */
 						if (0 == csa->jnl->pini_addr)
 							jnl_put_jrt_pini(csa);
 						if (jbp->before_images)
 						{
-							if (jbp->next_epoch_time <= gbl_jrec_time)
+							if (jbp->next_epoch_time <= jgbl.gbl_jrec_time)
 							{	/* Flush the cache. Since we are in crit, defer syncing epoch */
 								if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH))
 								{
 									SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 									BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_jnl_wcsflu);
 									status = cdb_sc_cacheprob;
+									RESTORE_CURRTN_IF_NEEDED(csa, write_inctn,
+													decremented_currtn);
 									t_commit_cleanup(status, 0);
 									REVERT;
 									goto failed;
@@ -648,12 +683,17 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 													block at a time */
 							cs = cw_set;
 							jnl_write_aimg_rec(csa, cs->blk, (blk_hdr_ptr_t)cs->new_buff);
-						} else if (mu_reorg_process || 0 == cw_depth
-									|| inctn_gvcstput_extra_blk_split == inctn_opcode)
-							/* mupip reorg or gvcst_bmp_mark_free, extra block split in gvcstput */
+						} else if (write_inctn)
 							jnl_write_inctn_rec(csa);
-						else
+						else if (0 == jnl_fence_ctl.level)
+						{
+							if (replication)
+								QWASSIGN(jnl_fence_ctl.token, tjpl->jnl_seqno);
+							else
+								QWASSIGN(jnl_fence_ctl.token, seq_num_zero);
 							jnl_write_logical(csa, non_tp_jfb_ptr);
+						} else
+							jnl_write_ztp_logical(csa, non_tp_jfb_ptr);
 					} else
 					{
 						csa->ti->early_tn = start_ctn;
@@ -695,6 +735,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 						}
 						if (cdb_sc_normal != (status = bg_update(cs, cs_top, ctn, ctn, dummysi)))
 						{
+							assert(FALSE);
 							break;
 						}
 					}
@@ -716,8 +757,8 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					QWASSIGN(csa->hdr->reg_seqno, tjpl->jnl_seqno);
 					if (is_updproc)
 					{
-						QWINCRBY(max_resync_seqno, seq_num_one);
-						QWASSIGN(csa->hdr->resync_seqno, max_resync_seqno);
+						QWINCRBY(jgbl.max_resync_seqno, seq_num_one);
+						QWASSIGN(csa->hdr->resync_seqno, jgbl.max_resync_seqno);
 					}
 					assert(tmp_cumul_jnl_rec_len == (tjpl->write - jpl->write +
 						(tjpl->write > jpl->write ? 0 : jpl->jnlpool_size)));
@@ -729,7 +770,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					 * either one or no update.  If no update, we would have no cw_depth and we wouldn't enter
 					 * this path.  If there is an update, then both the indices should be 1.
 					 */
-					INT8_ONLY(assert(cumul_index == cu_jnl_index);)
+					INT8_ONLY(assert(jgbl.cumul_index == jgbl.cu_jnl_index);)
 					jpl->lastwrite_len = jnl_header->jnldata_len;
 					QWINCRBYDW(jpl->write_addr, jnl_header->jnldata_len);
 					jpl->write = tjpl->write;
@@ -740,12 +781,11 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 		}
 		if (cdb_sc_normal == status)
 		{
-			save_early_tn = csa->ti->early_tn;
 			while (cr_array_index)
 				cr_array[--cr_array_index]->in_cw_set = FALSE;
 			if (need_kip_incr)		/* increment kill_in_prog */
 			{
-				INCR_KIP(cs_data, cs_addrs, kip_incremented);
+				INCR_KIP(csd, csa, kip_incremented);
 				need_kip_incr = FALSE;
 			}
 			rel_crit(gv_cur_region);
@@ -762,8 +802,10 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					send_msg(VARLSTCNT(5) ERR_NOTREPLICATED, 4, start_ctn + 1, LEN_AND_LIT("DSE"), process_id);
 			}
 		} else if (cdb_sc_cacheprob != status)
+		{
+			RESTORE_CURRTN_IF_NEEDED(csa, write_inctn, decremented_currtn);
 			t_commit_cleanup(status, 0);
-		else
+		} else
 			status = cdb_sc_normal;
 	}
 	REVERT;
@@ -772,7 +814,8 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 /*** Warning: Possible fall-thru... ***/
   failed:
 	gv_target->clue.end = 0;
-	if (release_crit && (cs_addrs->now_crit))
+	RESTORE_CURRTN_IF_NEEDED(csa, write_inctn, decremented_currtn);
+	if (release_crit && (csa->now_crit))
 		rel_crit(gv_cur_region);
 	t_retry(status);
 	cw_map_depth = 0;

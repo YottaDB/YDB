@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@ boolean_t cli_get_hex(char *entry, int4 *dst);
 boolean_t cli_get_int(char *entry, int *dst);
 boolean_t cli_get_num(char *entry, int4 *dst);
 boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len);
-bool cli_get_str_ele_upper(char *inbuff, char *dst, unsigned short *dst_len);
+bool cli_get_str_ele(char *inbuff, char *dst, unsigned short *dst_len, boolean_t upper_case);
 boolean_t cli_get_time(char *entry, uint4 *dst);
 bool cli_get_value(char *entry, char val_buf[]);
 boolean_t cli_negated(char *entry);

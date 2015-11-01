@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,15 +15,11 @@
  *
  *
  */
+#include "mdef.h"
 
-#ifndef lint
-static char rcsid[] = "$Header:$";
-#endif
-
+#include <errno.h>
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
-
-#include "mdef.h"
 
 #include "gtm_string.h"
 
@@ -32,6 +28,10 @@ static char rcsid[] = "$Header:$";
 GBLREF char	*omi_pklog;
 GBLREF int	 omi_pkdbg;
 GBLREF char	*omi_oprlist[];
+
+#ifndef lint
+static char rcsid[] = "$Header:$";
+#endif
 
 
 void omi_dump_pkt(omi_conn *cptr)
@@ -50,7 +50,6 @@ void omi_dump_pkt(omi_conn *cptr)
 #endif
 
 #endif
-    extern int	 errno;
 
     char	*ptr, *end, *chr;
     omi_vi	 vi, mlen, xlen;

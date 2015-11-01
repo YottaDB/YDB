@@ -12,6 +12,8 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_time.h"
+#include "gtmimagename.h"
 
 #ifdef UNIX
 
@@ -74,6 +76,10 @@ GBLREF	uint4			process_id;
 GBLREF	bool			run_time;
 GBLREF	testpt_struct		testpoint;
 GBLREF  inctn_opcode_t          inctn_opcode;
+GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF 	jnl_gbls_t		jgbl;
+GBLREF	enum gtmImageTypes	image_type;
+GBLREF	boolean_t		mu_rndwn_file_dbjnl_flush;
 
 #ifdef DEBUG_DB64
 /* if debugging large address stuff, make all memory segments allocate above 4G line */
@@ -81,8 +87,6 @@ GBLREF	sm_uc_ptr_t	next_smseg;
 #else
 #define next_smseg	NULL
 #endif
-
-#define LCL_BUF_SIZE 	512			/* needed in VMS for error logging in MM */
 
 void		wcs_recover(gd_region *reg)
 {
@@ -508,24 +512,36 @@ void		wcs_recover(gd_region *reg)
 	}
 	if (FALSE == wcs_verify(reg, FALSE))
 		GTMASSERT;
-        if (JNL_ENABLED(csd))
-        {
-		assert(csa->jnl->region == reg);
-		csa->jnl->region = reg;	/* Make sure that in pro we make jnl_ensure happy if it's not initialized */
-                jnl_status = jnl_ensure_open();
-		if (0 == jnl_status)
+	assert(csa->ti->curr_tn == csa->ti->early_tn || MUPIP_IMAGE == image_type);
+	/* skip INCTN processing in case called from mu_rndwn_file().
+	 * if called from mu_rndwn_file(), we have standalone access to shared memory so no need to increment db curr_tn
+	 * or write inctn (since no concurrent GT.M process is present in order to restart because of this curr_tn change)
+	 */
+	if (!mu_rndwn_file_dbjnl_flush)
+	{
+		if (JNL_ENABLED(csd))
 		{
-			if (0 == csa->jnl->pini_addr)
-				jnl_put_jrt_pini(csa);
-			save_inctn_opcode = inctn_opcode; /* in case caller does not expect inctn_opcode to be changed here */
-			inctn_opcode = inctn_wcs_recover;
-			jnl_write_inctn_rec(csa);
-			inctn_opcode = save_inctn_opcode;
-		} else
-			jnl_file_lost(csa->jnl, jnl_status);
-        }
-        assert(csa->ti->curr_tn = csa->ti->early_tn);
-	csa->ti->early_tn = ++csa->ti->curr_tn;
+			assert(csa->jnl->region == reg);
+			csa->jnl->region = reg;	/* Make sure that in pro we make jnl_ensure happy if it's not initialized */
+			if (!jgbl.forw_phase_recovery && (csa->ti->curr_tn == csa->ti->early_tn))
+				JNL_SHORT_TIME(jgbl.gbl_jrec_time); /* needed for jnl_put_jrt_pini() and jnl_write_inctn_rec() */
+			assert(jgbl.gbl_jrec_time);
+			jnl_status = jnl_ensure_open();
+			if (0 == jnl_status)
+			{
+				if (0 == csa->jnl->pini_addr)
+					jnl_put_jrt_pini(csa);
+				save_inctn_opcode = inctn_opcode; /* in case caller does not expect inctn_opcode
+												to be changed here */
+				inctn_opcode = inctn_wcs_recover;
+				jnl_write_inctn_rec(csa);
+				inctn_opcode = save_inctn_opcode;
+			} else
+				jnl_file_lost(csa->jnl, jnl_status);
+		}
+		if (!mupip_jnl_recover || JNL_ENABLED(csd))
+			csa->ti->early_tn = ++csa->ti->curr_tn;	/* do not increment transaction number for forward recovery */
+	}
 	csa->wbuf_dqd = FALSE;	/* reset this so the wcs_wtstart below will work */
 	csd->wc_blocked = FALSE;
 	if (!reg->read_only)
@@ -611,7 +627,7 @@ void	wcs_mm_recover(gd_region *reg)
 
 void	wcs_mm_recover(gd_region *reg)
 {
-	unsigned char		*end, buff[LCL_BUF_SIZE];
+	unsigned char		*end, buff[MAX_STRLEN];
 
 	error_def(ERR_GBLOFLOW);
 	error_def(ERR_GVIS);
@@ -621,8 +637,8 @@ void	wcs_mm_recover(gd_region *reg)
 	assert(cs_addrs->hdr == cs_data);
 	/* but it isn't yet implemented on VMS */
 	rel_crit(gv_cur_region);
-	if (NULL == (end = format_targ_key(buff, LCL_BUF_SIZE, gv_currkey, TRUE)))
-		end = &buff[LCL_BUF_SIZE - 1];
+	if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+		end = &buff[MAX_ZWR_KEY_SZ - 1];
 	rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 	return;
 }

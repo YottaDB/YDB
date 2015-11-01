@@ -25,12 +25,10 @@ typedef unix_file_info		fi_type;
 #ifndef OFF_T_LONG
 #define JNL_ALLOC_MAX		4194304  /* 2GB */
 #else
-#define JNL_ALLOC_MAX		8388608  /* 4GB */
+#define JNL_ALLOC_MAX		8388607  /* 4GB - 512 Bytes */
 #endif
 #define JNL_BUFFER_DEF		ROUND_UP2(128, IO_BLOCK_SIZE / DISK_BLOCK_SIZE)
 #define NOJNL			-1
-#define LENGTH_OF_TIME		11
-#define IS_ZERO_PROC_TIME(W)	(0 == (W))
 #define MID_TIME(W)		W
 #define EXTTIMEVMS(T)
 #define EXTINTVMS(I)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,17 +22,16 @@
 #include "jnl.h"
 #include "jnl_write.h"
 #include "gtmimagename.h"
+#include "hashdef.h"	/* for muprec.h */
+#include "buddy_list.h"	/* for muprec.h */
+#include "muprec.h"
 
-GBLDEF	jnl_fence_control	jnl_fence_ctl;
-GBLDEF	jnl_process_vector	*prc_vec = NULL;		/* for current process */
-GBLDEF	jnl_process_vector	*originator_prc_vec = NULL;	/* for client/originator */
-GBLDEF	jnl_process_vector	*server_prc_vec = NULL;		/* for gtcm server */
-
+GBLREF	jnl_fence_control	jnl_fence_ctl;
+GBLREF	jnl_process_vector	*prc_vec;
+GBLREF	jnl_process_vector	*originator_prc_vec;
 GBLREF	short			dollar_tlevel;
-GBLREF	uint4			gbl_jrec_time;	/* see comment in gbldefs.c for usage */
-GBLREF  uint4			cur_logirec_short_time;	/* see comment in gbldefs.c for usage */
 GBLREF	enum gtmImageTypes 	image_type;
-GBLREF  boolean_t               forw_phase_recovery;
+GBLREF 	jnl_gbls_t		jgbl;
 
 void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 {
@@ -40,66 +39,42 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 
 	assert(csa->now_crit);
 	assert(prc_vec);
-	/* t_end, tp_tend call jnl_put_jrt_pini first and later jnl_write_pblk. It's possible that we can get a pini time
-	 * stamp greater than the later pblk as setting in pblk is based on the earlier gbl_jrec_time in t_end, tp_tend.
-	 * For non-TP, it is possible that a non t_end/tp_tend routine (e.g. the routines that write an aimg record
-	 * or an inctn record) calls this function with differing early_tn and curr_tn, in which case that need not
-	 * have set gbl_jrec_time appropriately. We don't want to take a chance.
-	 */
-	if (!forw_phase_recovery) /* For GTM only set the time as gbl_jrec_time, else retain the original PINI short time */
-	{
-		if (dollar_tlevel && csa->ti->early_tn != csa->ti->curr_tn)
-		{	/* in the commit phase of a transaction */
-			assert(csa->ti->early_tn == csa->ti->curr_tn + 1);
-			JNL_WHOLE_FROM_SHORT_TIME(prc_vec->jpv_time, gbl_jrec_time);
-		} else
-		{	/* For Non TP, it is possible that gbl_jrec_time is already set in t_end() to a timestamp value (which
-			 * will be used while writing the PBLK record in t_end) and we get a later value for prc_vec->jpv_time
-			 * (possible in rare timing situations) which results in PINI record getting written with a later
-			 * timestamp than a later written PBLK record i.e. an out-of-order timestamp in the journal file.
-			 * So reset gbl_jrec_time to be the latest, all later records use this time */
-			JNL_WHOLE_TIME(prc_vec->jpv_time);
-			gbl_jrec_time = MID_TIME(prc_vec->jpv_time);
-		}
+	assert((csa->ti->early_tn == csa->ti->curr_tn) || (csa->ti->early_tn == csa->ti->curr_tn + 1));
+	pini_record.prefix.jrec_type = JRT_PINI;
+	pini_record.prefix.forwptr = pini_record.suffix.backptr = PINI_RECLEN;
+	pini_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+	/* Caution: in case an ALIGN record is written before the PINI record in jnl_write(),
+	 * pini_addr is updated appropriately */
+	pini_record.prefix.pini_addr = csa->jnl->pini_addr = csa->jnl->jnl_buff->freeaddr;
+	pini_record.prefix.tn = csa->ti->curr_tn;
+	assert(jgbl.gbl_jrec_time);	/* the caller should have set it */
+	if (!jgbl.gbl_jrec_time)
+	{	/* no idea how this is possible, but just to be safe */
+		JNL_SHORT_TIME(jgbl.gbl_jrec_time);
 	}
-
-	csa->jnl->regnum = ++jnl_fence_ctl.total_regions;
-	memcpy((unsigned char*)&pini_record.process_vector[CURR_JPV], (unsigned char*)prc_vec, sizeof(jnl_process_vector));
-	if (!forw_phase_recovery)
+	pini_record.prefix.time = jgbl.gbl_jrec_time;
+	JNL_WHOLE_FROM_SHORT_TIME(prc_vec->jpv_time, jgbl.gbl_jrec_time);
+	/* Note that only pini_record.prefix.time is considered in mupip journal command processing.
+	 * prc_vec->jpv_time is for accounting purpose only. Usually it is kind of redundant too. */
+	if (!jgbl.forw_phase_recovery)
 	{
-		if (GTCM_GNP_SERVER_IMAGE == image_type)
+		csa->jnl->regnum = ++jnl_fence_ctl.total_regions;
+		if (GTCM_GNP_SERVER_IMAGE == image_type && NULL != originator_prc_vec)
 		{
-			assert(originator_prc_vec);
 			memcpy((unsigned char*)&pini_record.process_vector[ORIG_JPV],
 				(unsigned char*)originator_prc_vec, sizeof(jnl_process_vector));
-			memcpy((unsigned char*)&pini_record.process_vector[SRVR_JPV],
-				(unsigned char*)prc_vec, sizeof(jnl_process_vector));
 		} else
-		{
-			memcpy((unsigned char*)&pini_record.process_vector[ORIG_JPV],
-				(unsigned char*)prc_vec, sizeof(jnl_process_vector));
-			memset((unsigned char*)&pini_record.process_vector[SRVR_JPV],
-				0, sizeof(jnl_process_vector));
-		}
+			memset((unsigned char*)&pini_record.process_vector[ORIG_JPV], 0, sizeof(jnl_process_vector));
 	} else
 	{
-		if (NULL == originator_prc_vec)
+		/* assert(NULL != jgbl.mur_plst); This is not true for gdsfilext.c done during mur_forward */
+		if (NULL != jgbl.mur_plst)
 			memcpy((unsigned char*)&pini_record.process_vector[ORIG_JPV],
-				(unsigned char*)prc_vec, sizeof(jnl_process_vector));
-		else
-			memcpy((unsigned char*)&pini_record.process_vector[ORIG_JPV],
-				(unsigned char*)originator_prc_vec, sizeof(jnl_process_vector));
-		if (NULL == server_prc_vec)
-			memset((unsigned char*)&pini_record.process_vector[SRVR_JPV], 0, sizeof(jnl_process_vector));
-		else
-			memcpy((unsigned char*)&pini_record.process_vector[SRVR_JPV],
-				(unsigned char*)server_prc_vec, sizeof(jnl_process_vector));
-		if (0 == pini_record.process_vector[SRVR_JPV].jpv_pid
-			&& 0 ==  pini_record.process_vector[SRVR_JPV].jpv_image_count)
-			cur_logirec_short_time = MID_TIME(pini_record.process_vector[ORIG_JPV].jpv_time);
-		else
-			cur_logirec_short_time = MID_TIME(pini_record.process_vector[SRVR_JPV].jpv_time);
+					(unsigned char *)&jgbl.mur_plst->origjpv, sizeof(jnl_process_vector));
 	}
-	jnl_write(csa->jnl, JRT_PINI, (jrec_union *)&pini_record, NULL, NULL);
-	csa->jnl->pini_addr = csa->jnl->jnl_buff->freeaddr - PINI_RECLEN;
+	memcpy((unsigned char*)&pini_record.process_vector[CURR_JPV], (unsigned char*)prc_vec, sizeof(jnl_process_vector));
+	jnl_write(csa->jnl, JRT_PINI, (jnl_record *)&pini_record, NULL, NULL);
+	assert(csa->jnl->pini_addr == csa->jnl->jnl_buff->freeaddr - PINI_RECLEN);
+	if (jgbl.forw_phase_recovery && (NULL != jgbl.mur_plst))
+		jgbl.mur_plst->new_pini_addr = csa->jnl->pini_addr;/* note down for future forward play logical record processing */
 }

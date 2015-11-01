@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +23,8 @@
 
 void print_target(unsigned char *c)
 {
-
 	unsigned char	ctemp, *p, *ptop, *ptop1, *ptr, *ptr1, *top;
-	unsigned char	buff[MAX_KEY_SZ + 1 + sizeof("?.0")];
+	unsigned char	buff[MAX_ZWR_KEY_SZ + sizeof("?.0")];
 	boolean_t	bad_sub = FALSE;
 	boolean_t	is_string;
 

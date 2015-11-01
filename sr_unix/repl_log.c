@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,8 +34,8 @@ GBLREF FILE		*updproc_log_fp;
 int repl_log(FILE *fp, boolean_t stamptime, boolean_t flush, char *fmt, ...)
 {
 	va_list printargs;
-	time_t  now;
-	char    *time_ptr;
+	now_t	now; /* for GET_CUR_TIME macro */
+	char	*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	char	fmt_str[BUFSIZ];
 
 	assert(NULL != fp);

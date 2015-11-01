@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@
 #include "gtm_string.h"
 #include "gtcm_open_cmerrlog.h"
 #include "iosp.h"
-#include "rename_file_if_exists.h"
+#include "gtm_rename.h"
 
 GBLREF bool	gtcm_errfile;
 GBLREF bool	gtcm_firsterr;
@@ -34,13 +34,13 @@ void gtcm_open_cmerrlog(void)
 {
 	int		len;
 	mstr		lfn1, lfn2;
-	char	lfn_path[MAX_TRANS_NAME_LEN + 1];
-	char	new_lfn_path[MAX_TRANS_NAME_LEN + 1];
-	int	new_len;
+	char		lfn_path[MAX_TRANS_NAME_LEN + 1];
+	char		new_lfn_path[MAX_TRANS_NAME_LEN + 1];
+	int		new_len;
+	uint4 		ustatus;
+	uint4 		rval;
+	FILE 		*new_file;
 	error_def(ERR_TEXT);
-	int4 status;
-	uint4 rval;
-	FILE *new_file;
 
 	if (0 != (len = strlen(gtcm_gnp_server_log)))
 	{
@@ -55,7 +55,7 @@ void gtcm_open_cmerrlog(void)
 	if (rval == SS_NORMAL || rval == SS_NOLOGNAM)
 	{
 		lfn_path[lfn2.len] = 0;
-		rename_file_if_exists(STR_AND_LEN(lfn_path), &status, new_lfn_path, &new_len);
+		rename_file_if_exists(lfn_path, lfn2.len, new_lfn_path, &new_len, &ustatus);
 		new_file = Fopen(lfn_path, "a");
 		if (NULL != new_file)
 		{

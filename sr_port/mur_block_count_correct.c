@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include "gtm_time.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -21,15 +22,20 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
+#include "jnl.h"
 #include "iosp.h"
 #include "gdsfilext.h"		/* for gdsfilext() prototype */
 #include "mu_file_size.h"	/* for mu_file_size() prototype */
+#include "hashdef.h"
+#include "buddy_list.h"
+#include "muprec.h"
 
 GBLREF 	gd_region		*gv_cur_region;
 GBLREF	sgmnt_data_ptr_t 	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF 	jnl_gbls_t		jgbl;
 
-uint4 mur_block_count_correct()
+uint4 mur_block_count_correct(void)
 {
 	unsigned int		native_size, size;
 	sgmnt_data_ptr_t 	mu_data;
@@ -75,6 +81,7 @@ uint4 mur_block_count_correct()
 	if (native_size && (size < native_size))
 	{
 		total_blks = (dba_mm == mu_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
+		JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* jnl_write_inctn_rec needs it */
 		if (SS_NORMAL != (status = gdsfilext(mu_data->extension_size, total_blks)))
 			return (status);
 		DEBUG_ONLY(

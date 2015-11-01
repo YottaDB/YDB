@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -32,6 +32,7 @@
 .extern	mdb_condition_handler
 .extern	op_unwind
 
+	.type dm_start,@function
 ENTRY dm_start
 	enter	$0,$0
 	pushl	%edi

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -20,9 +20,9 @@
 .extern	param_list
 
 	.text
-.extern	ci_ret_code
-
 ENTRY ci_restart
+	pushl	%ebp				# save C frame pointer
+	movl    %esp,%ebp			# set frame marker for this procedure
 	movl	param_list,%eax
 	movl 	4(%eax),%eax			# argcnt
 	cmpl 	$0,%eax				# if (argcnt > 0) {
@@ -44,8 +44,10 @@ L0:	movl	param_list,%eax
 	pushl 	16(%eax)			#retaddr
 	pushl 	12(%eax)			#labaddr
 	pushl 	8(%eax)				#rtnaddr
-	call	*(%eax)
-	call	ci_ret_code
+
+	pushl	4(%ebp)				# push the return address to the caller of ci_restart
+	movl	0(%ebp),%ebp			# restore previous C frame pointer
+	jmp	*(%eax)
 	ret
 
 # ci_restart ENDP

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
+#include "jnl.h"
 #include "util.h"
 #if defined(UNIX)
 #include "parse_file.h"
@@ -27,8 +28,9 @@
 #include "gtmmsg.h"
 #include "gtm_file_stat.h"
 
-/*
- * mupfndfil.c
+GBLREF 	jnl_gbls_t	jgbl;
+
+/* mupfndfil.c
  * Description:
  *	For a region find if the corresponding database is present.
  * Arguments:
@@ -85,8 +87,12 @@ boolean_t mupfndfil(gd_region *reg, mstr *filestr)
 		retptr = filestr;
 	if (FILE_NOT_FOUND == gtm_file_stat(&file, &def, retptr, FALSE, &ustatus))
 	{
-		util_out_print("REGION !AD's file !AD cannot be found.", TRUE, REG_LEN_STR(reg), LEN_AND_STR(file.addr));
-		gtm_putmsg(VARLSTCNT(1) ustatus);
+		if (!jgbl.mupip_journal)
+		{	/* Do not print error messages in case of call from mur_open_files().
+			 * Currently we use "jgbl.mupip_journal" to identify a call from mupip_recover code */
+			util_out_print("REGION !AD's file !AD cannot be found.", TRUE, REG_LEN_STR(reg), LEN_AND_STR(file.addr));
+			gtm_putmsg(VARLSTCNT(1) ustatus);
+		}
 		return FALSE;
 	}
 	reg->dyn.addr->fname_len = retptr->len;

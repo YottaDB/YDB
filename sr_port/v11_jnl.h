@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -101,7 +101,7 @@
 enum jnl_record_type
 {
 #define JNL_TABLE_ENTRY(A,B,C,D)	A,
-#include "jnl_rec_table.h"
+#include "v11_jnl_rec_table.h"
 #undef JNL_TABLE_ENTRY
 
 	JRT_RECTYPES		/* Total number of journal record types */
@@ -509,7 +509,7 @@ typedef struct jnl_format_buff_struct
 } jnl_format_buffer;
 
 /* jnl_ prototypes */
-int4 jnl_record_length(jnl_record *rec, int4 top);
+int4 v11_jnl_record_length(jnl_record *rec, int4 top);
 int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size); /***type int added***/
 void  jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat);
 uint4 jnl_qio_start(jnl_private_control *jpc);

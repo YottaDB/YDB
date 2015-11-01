@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,5 +33,6 @@ void jnl_setver(void)
 	assert('\012' > jnl_ver_higher); /* assert(10 > jnl_ver_higher); */
 	jnl_ver = jnl_ver_higher * 10 + jnl_ver_lower;
 	assert(JNL_VER_THIS == jnl_ver);
+	assert(JNL_VER_EARLIEST_REPL <= jnl_ver);
 	return;
 }

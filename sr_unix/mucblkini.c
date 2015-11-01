@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,10 @@
 
 #include "mdef.h"
 
-#include "gtm_stdlib.h"		/* for exit() */
-
-#include <unistd.h>
 #include <errno.h>
 #include "gtm_stdio.h"
+#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_unistd.h"
 
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -33,7 +32,6 @@
 #define DIR_ROOT 1
 #define DIR_DATA 2
 
-GBLREF int		errno;
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 

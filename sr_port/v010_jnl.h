@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,7 @@
 enum jnl_record_type
 {
 #define JNL_TABLE_ENTRY(A,B,C,D)	A,
-#include "jnl_rec_table.h"
+#include "v12_jnl_rec_table.h"
 #undef JNL_TABLE_ENTRY
 
 	JRT_RECTYPES		/* Total number of journal record types */
@@ -81,7 +81,7 @@ typedef struct
 						/* end mainline QUAD */
 	volatile int4		blocked;
 	int4			filler_int4;
-	volatile int4		dsk;		/* relative index of 1st byte to write to disk;  
+	volatile int4		dsk;		/* relative index of 1st byte to write to disk;
 						 * if free == dsk, buffer is empty */
 	volatile int4		wrtsize;	/* size of write in progress */
 	volatile uint4		dskaddr,	/* virtual on-disk address corresponding to dsk */
@@ -100,7 +100,7 @@ typedef struct
 				reccnt[JRT_RECTYPES];	/* Number of records written per opcode */
 	volatile trans_num	epoch_tn;		/* Transaction number for current epoch */
 	double			filler_q1;		/* QUAD reset to insure memory coherency of the following int */
-	int			io_in_prog;		/* If 1, write is in progress (NOTE: must manipulate 
+	int			io_in_prog;		/* If 1, write is in progress (NOTE: must manipulate
 										only with interlocked instructions */
 	double			filler_q2;		/* QUAD reset to insure quadword alignment in comment below */
         global_latch_t          jb_latch;               /* needed by aswp on HPPA, 16 bytes */
@@ -111,7 +111,7 @@ typedef struct
 	unsigned char		buff[1];		/* Actually buff[size] */
 } jnl_buffer;
 
-#ifdef DB64 
+#ifdef DB64
 # ifdef __osf__
 #  pragma pointer_size(save)
 #  pragma pointer_size(long)
@@ -122,7 +122,7 @@ typedef struct
 
 typedef jnl_buffer *jnl_buffer_ptr_t;
 
-#ifdef DB64 
+#ifdef DB64
 # ifdef __osf__
 #  pragma pointer_size(restore)
 # endif
@@ -159,9 +159,9 @@ typedef enum
 	JNL_ZKILL
 } jnl_action_code;
 
-typedef enum 
+typedef enum
 {
- /* 00 */ MUEXT_NULL, 	
+ /* 00 */ MUEXT_NULL,
  /* 01 */ MUEXT_PINI,
  /* 02 */ MUEXT_PFIN,
  /* 03 */ MUEXT_EOF,

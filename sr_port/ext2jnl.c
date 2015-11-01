@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include <stddef.h> /* for offsetof() macro */
 
 #include "mlkdef.h"
 #include "gtm_string.h"
@@ -21,20 +23,18 @@
 #include "gdsfhead.h"		/* for filestruct.h */
 #include "filestruct.h"		/* for jnl.h */
 #include "jnl.h"
+#include "repl_dbg.h"
 #include "copy.h"
 #include "zshow.h"
 #include "mvalconv.h"
 #include "str2gvkey.h"
 
+GBLREF	char		*ext_stop;
+GBLREF	gv_key		*gv_currkey;
+LITREF	boolean_t	jrt_fixed_size[JRT_RECTYPES];
+LITREF	int		jrt_update[JRT_RECTYPES];
 static	boolean_t	in_tp;
 static	int4		num_records;
-static	char		jn_tid[8];	/* for transaction-id in TSTART record */
-
-GBLDEF	char		*ext_stop;
-
-LITREF	int		jnl_fixed_size[];
-
-GBLREF	gv_key		*gv_currkey;
 
 /* callers please set up the proper condition-handlers */
 /* expects a null-terminated ext_buff. does the equivalent but inverse of jnl2ext */
@@ -49,7 +49,7 @@ char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec)
 	{
 		*ext_next++ = '\0';
 		rec = (jnl_record *)ext2jnl(ext_buff, rec);
-		rec = (jnl_record *)ROUND_UP((int)rec, JNL_REC_START_BNDRY);
+		assert(0 == (int)rec % JNL_REC_START_BNDRY);
 		if (ext_stop == ext_buff)
 			break;
 		ext_buff = ext_next;
@@ -66,12 +66,14 @@ char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec)
 char	*ext2jnl(char *ptr, jnl_record *rec)
 {
 	unsigned char	*pool_save;
-	char		rectype, *ret, ch;
-	int		keylength, keystate, len, i;
+	char		*ret, ch;
+	int		keylength, keystate, len, i, reclen, temp_reclen;
 	bool		keepgoing;
 	mstr		src, des;
 	jnl_record	*temp_rec;
 	muextract_type	exttype;
+	enum jnl_record_type	rectype;
+	jrec_suffix	*suffix;
 
 	ext_stop = ptr + strlen(ptr) + 1;
 	temp_rec = rec;
@@ -87,13 +89,12 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 			if (0 == num_records)
 			{
 				num_records++;
-				rec->jrec_type = JRT_TSET;
+				rec->prefix.jrec_type = JRT_TSET;
 			}
 			else
-				rec->jrec_type = JRT_USET;
-		}
-		else
-			rec->jrec_type = JRT_SET;
+				rec->prefix.jrec_type = JRT_USET;
+		} else
+			rec->prefix.jrec_type = JRT_SET;
 		break;
 
 	case MUEXT_KILL:
@@ -102,13 +103,12 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 			if (0 == num_records)
 			{
 				num_records++;
-				rec->jrec_type = JRT_TKILL;
+				rec->prefix.jrec_type = JRT_TKILL;
 			}
 			else
-				rec->jrec_type = JRT_UKILL;
-		}
-		else
-			rec->jrec_type = JRT_KILL;
+				rec->prefix.jrec_type = JRT_UKILL;
+		} else
+			rec->prefix.jrec_type = JRT_KILL;
 		break;
 
 	case MUEXT_ZKILL:
@@ -117,30 +117,22 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 			if (0 == num_records)
 			{
 				num_records++;
-				rec->jrec_type = JRT_TZKILL;
+				rec->prefix.jrec_type = JRT_TZKILL;
 			}
 			else
-				rec->jrec_type = JRT_UZKILL;
-		}
-		else
-			rec->jrec_type = JRT_ZKILL;
+				rec->prefix.jrec_type = JRT_UZKILL;
+		} else
+			rec->prefix.jrec_type = JRT_ZKILL;
 		break;
 
 	case MUEXT_TSTART:
 		in_tp = TRUE;
-		ptr = strtok(ptr, "\\");		/* get the rec-type field */
-		ptr = strtok(NULL, "\\");		/* get the time field */
-		ptr = strtok(NULL, "\\");		/* get the pid field */
-		ptr = strtok(NULL, "\\");		/* get the tid */
-		jn_tid[0] = '\0';
-		if (NULL != ptr)
-			strcpy(jn_tid, ptr);
 		num_records = 0;
 		return (char *)rec;
 		break;
 
 	case MUEXT_TCOMMIT:
-		rec->jrec_type = JRT_TCOM;
+		rec->prefix.jrec_type = JRT_TCOM;
 		in_tp = FALSE;
 		break;
 
@@ -155,7 +147,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 		break;
 
 	case MUEXT_NULL:
-		rec->jrec_type = JRT_NULL;
+		rec->prefix.jrec_type = JRT_NULL;
 		break;
 
 	default:
@@ -164,27 +156,42 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 		return (char *)rec;
 		break;
 	}
-
+	rectype = rec->prefix.jrec_type;
 	ptr = strtok(ptr, "\\");		/* get the rec-type field */
-	ptr = strtok(NULL, "\\");		/* get the time field */
-	ptr = strtok(NULL, "\\");		/* get the pid field */
-	ptr = strtok(NULL, "\\");		/* get the jnl_seqno */
 	assert(NULL != ptr);
+	ptr = strtok(NULL, "\\");		/* get the time field */
+	assert(NULL != ptr);
+	ptr = strtok(NULL, "\\");		/* get the tn field */
+	assert(NULL != ptr);
+	rec->prefix.tn = asc2i((uchar_ptr_t)ptr, strlen(ptr));
+	ptr = strtok(NULL, "\\");		/* get the pid field */
+	assert(NULL != ptr);
+	ptr = strtok(NULL, "\\");		/* get the client pid field */
+	assert(NULL != ptr);
+	ptr = strtok(NULL, "\\");		/* get the token or jnl_seqno */
+	assert(NULL != ptr);
+	rec->jrec_null.jnl_seqno = asc2l((uchar_ptr_t)ptr, strlen(ptr));
 
-	rectype = REF_CHAR(&rec->jrec_type);
-	rec->val.jrec_null.jnl_seqno = asc2l((uchar_ptr_t)ptr, strlen(ptr));
-	ptr = strtok(NULL, "\\");		/* get the db-tn field */
-	rec->val.jrec_null.tn = asc2i((uchar_ptr_t)ptr, strlen(ptr));
-	ret = ((char_ptr_t)rec) + JREC_PREFIX_SIZE + jnl_fixed_size[rectype] + JREC_SUFFIX_SIZE;
-
-	switch(exttype)
+	if (MUEXT_NULL == exttype)
 	{
-	case MUEXT_NULL:
-	case MUEXT_TCOMMIT:
-		return ret;
-		break;
+		rec->jrec_null.prefix.forwptr =  rec->jrec_null.suffix.backptr = NULL_RECLEN;
+		rec->jrec_null.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+		return ((char_ptr_t)rec) + NULL_RECLEN;
+	}
+	else if (MUEXT_TCOMMIT == exttype)
+	{
+		ptr = strtok(NULL, "\\");		/* get the participants */
+		ptr = strtok(NULL, "\\");		/* get the jnl_tid */
+		rec->jrec_tcom.jnl_tid[0] = 0;
+		if (NULL != ptr)
+			strcpy(rec->jrec_tcom.jnl_tid, ptr);
+		num_records = 0;
+		rec->jrec_tcom.prefix.forwptr =  rec->jrec_tcom.suffix.backptr = TCOM_RECLEN;
+		rec->jrec_tcom.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+		return ((char_ptr_t)rec) + TCOM_RECLEN;
 	}
 	ptr = strtok(NULL, "\\");		/* get the key-value and data also */
+	assert(IS_SET_KILL_ZKILL(rectype));
 	assert(NULL != ptr);
 
 	/* this part is lifted from go_load. later think of having a common routine */
@@ -263,53 +270,42 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 			break;
 		}
 	}
+	REPL_DPRINT2("ext2jnl source:KEY=DATA:%s\n", ptr);
 	assert(keylength <= len);
 	str2gvkey_nogvfunc(ptr, keylength, gv_currkey);
-	ret += gv_currkey->end + sizeof(rec->val.jrec_kill.mumps_node.length);
-
-	switch(rectype)
+	rec->jrec_kill.mumps_node.length = gv_currkey->end;
+	memcpy(rec->jrec_kill.mumps_node.text, gv_currkey->base, gv_currkey->end);
+	temp_reclen = FIXED_UPD_RECLEN + rec->jrec_kill.mumps_node.length + sizeof(jnl_str_len_t);
+	if (IS_KILL_ZKILL(rectype))
 	{
-	case JRT_KILL:
-	case JRT_SET:
-	case JRT_ZKILL:
-		rec->val.jrec_kill.mumps_node.length = gv_currkey->end;
-		memcpy(rec->val.jrec_kill.mumps_node.text, gv_currkey->base, gv_currkey->end);
-		break;
-
-	case JRT_TSET:
-	case JRT_TKILL:
-	case JRT_TZKILL:
-		strcpy(rec->val.jrec_tset.jnl_tid, jn_tid);	/* explicit fallthrough */
-
-	case JRT_USET:
-	case JRT_UKILL:
-	case JRT_UZKILL:
-		rec->val.jrec_tkill.mumps_node.length = gv_currkey->end;
-		memcpy(rec->val.jrec_tkill.mumps_node.text, gv_currkey->base, gv_currkey->end);
-		break;
+		temp_reclen += JREC_SUFFIX_SIZE;
+		reclen = ROUND_UP2(temp_reclen, JNL_REC_START_BNDRY);
+		memset((char_ptr_t)rec + temp_reclen - JREC_SUFFIX_SIZE, 0, reclen - temp_reclen);
+		suffix = (jrec_suffix *)((char_ptr_t)rec + reclen - JREC_SUFFIX_SIZE);
+		rec->prefix.forwptr = suffix->backptr = reclen;
+		suffix->suffix_code = JNL_REC_SUFFIX_CODE;
+		return (char_ptr_t)rec + reclen;
 	}
-
-	switch(rectype)
-	{
-	case JRT_KILL:
-	case JRT_TKILL:
-	case JRT_UKILL:
-	case JRT_ZKILL:
-	case JRT_TZKILL:
-	case JRT_UZKILL:
-		return ret;
-		break;
-	}
-
 	/* we have to get the data value now */
-
 	src.len = len - keylength - 1;
 	src.addr = ptr + (keylength + 1);
 	des.len = 0;
-	des.addr = ret + sizeof(des.len) - JREC_SUFFIX_SIZE;
-	zwr2format(&src, &des);
-	memcpy(des.addr - sizeof(des.len), &des.len, sizeof(des.len));
-	ret += sizeof(des.len) + des.len;
-	return ret;
+	des.addr = (char_ptr_t)rec + temp_reclen + sizeof(jnl_str_len_t);
+	REPL_DPRINT3("ext2jnl JNL Format (before zwr2format): src : Len %d :: DATA:%s\n", src.len, src.addr);
+	REPL_DPRINT3("ext2jnl JNL Format (before zwr2format): des : Len %d :: DATA:%s\n", des.len, des.addr);
+	if (!zwr2format(&src, &des))
+	{
+		assert(FALSE);
+		return (char_ptr_t)rec;
+	}
+	REPL_DPRINT3("ext2jnl JNL Format : src : Len %d :: DATA:%s\n", src.len, src.addr);
+	REPL_DPRINT3("ext2jnl JNL Format : des : Len %d :: DATA:%s\n", des.len, des.addr);
+	PUT_MSTR_LEN((char_ptr_t)rec + temp_reclen, des.len);
+	temp_reclen += sizeof(jnl_str_len_t) + des.len + JREC_SUFFIX_SIZE;
+	reclen = ROUND_UP2(temp_reclen, JNL_REC_START_BNDRY);
+	memset((char_ptr_t)rec + temp_reclen - JREC_SUFFIX_SIZE, 0, reclen - temp_reclen);
+	suffix = (jrec_suffix *)((char_ptr_t)rec + reclen - JREC_SUFFIX_SIZE);
+	rec->prefix.forwptr = suffix->backptr = reclen;
+	suffix->suffix_code = JNL_REC_SUFFIX_CODE;
+	return (char_ptr_t)rec + reclen;
 }
-

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,8 +20,6 @@
 #include "rc_iscan.h"
 #include "do_xform.h"
 #include "format_targ_key.h"
-
-#define LCL_BUF_SIZE 256
 
 GBLREF gv_namehead	*gv_target;
 GBLREF bool		transform;
@@ -64,7 +62,7 @@ unsigned char *mval2subsc( mval *v , gv_key *g )
 	error_def(ERR_GVIS);
 	int	exp_val;
 	bool	is_negative;
-	unsigned char	buff[LCL_BUF_SIZE], *end;
+	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 	int4 	n, m , mx, digs;
 	unsigned char *cvt_table;
 	uint4 mvt;	/* Local copy of mvtype, bit ands use a int4, so do conversion once */
@@ -113,8 +111,8 @@ unsigned char *mval2subsc( mval *v , gv_key *g )
                 }
 		if (g->end + n + 3 > g->top - MAX_NUM_SUBSC_LEN )
 		{
-			if ((end = format_targ_key(&buff[0], LCL_BUF_SIZE, g, TRUE)) == 0)
-			{	end = &buff[LCL_BUF_SIZE - 1];
+			if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
+			{	end = &buff[MAX_ZWR_KEY_SZ - 1];
 			}
 			rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - &buff[0] , &buff[0]);
 		}
@@ -127,8 +125,8 @@ unsigned char *mval2subsc( mval *v , gv_key *g )
 			{
 				*out_ptr++ = 1;
 				if ( out_ptr - g->base + n + 3 > g->top - MAX_NUM_SUBSC_LEN)
-				{	if ((end = format_targ_key(&buff[0], LCL_BUF_SIZE, g, TRUE)) == 0)
-					{	end = &buff[LCL_BUF_SIZE - 1];
+				{	if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
+					{	end = &buff[MAX_ZWR_KEY_SZ - 1];
 					}
 					rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - &buff[0] , &buff[0]);
 				}
@@ -290,8 +288,8 @@ FINI:
 	g->end  = out_ptr - g->base ;
 	if (g->end > g->top - MAX_NUM_SUBSC_LEN - 1) /* take of extra space and one for last zero */
 	{
-		if ((end = format_targ_key(&buff[0], LCL_BUF_SIZE, g, TRUE)) == 0)
-		{	end = &buff[LCL_BUF_SIZE - 1];
+		if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
+		{	end = &buff[MAX_ZWR_KEY_SZ - 1];
 		}
 		rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - &buff[0] , &buff[0]);
 	}

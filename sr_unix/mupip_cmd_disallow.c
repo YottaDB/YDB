@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,27 +28,63 @@ boolean_t cli_disallow_mupip_journal(void)
 	disallow_return_value =  !(d_c_cli_present("RECOVER") || d_c_cli_present("VERIFY") ||
 		d_c_cli_present("SHOW") || d_c_cli_present("EXTRACT") || d_c_cli_present("ROLLBACK"));
 	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("RECOVER") && d_c_cli_present("ROLLBACK"));
+	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  !(d_c_cli_present("FORWARD") || d_c_cli_present("BACKWARD"));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("FORWARD") && d_c_cli_present("BACKWARD");
-	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value =  d_c_cli_present("AFTER") && !(d_c_cli_present("EXTRACT") && d_c_cli_present("FORWARD"));
-	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value =  d_c_cli_present("AFTER") && (d_c_cli_present("RECOVER") ||
-		d_c_cli_present("VERIFY") || d_c_cli_present("SHOW"));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("SINCE") && d_c_cli_present("FORWARD");
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("LOOKBACK_LIMIT") && d_c_cli_present("FORWARD");
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value =  d_c_cli_present("REDIRECT") && !d_c_cli_present("RECOVER");
-	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("CHECKTN") && d_c_cli_present("BACKWARD");
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value =  (d_c_cli_present("RESYNC") || d_c_cli_present("FETCHRESYNC")) && !d_c_cli_present("LOSTTRANS");
+	disallow_return_value =  (d_c_cli_present("RESYNC") && d_c_cli_present("FETCHRESYNC"));
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value =  d_c_cli_present("PRESERVE_JNL") && (d_c_cli_present("VERIFY") ||
-		d_c_cli_present("SHOW") || d_c_cli_present("EXTRACT"));
+	disallow_return_value =  (d_c_cli_present("RESYNC") || d_c_cli_present("FETCHRESYNC")) &&
+		!(d_c_cli_present("ROLLBACK"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  d_c_cli_present("LOSTTRANS") && !(d_c_cli_present("RECOVER") ||
+		d_c_cli_present("ROLLBACK") || d_c_cli_present("EXTRACT"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  d_c_cli_present("BROKENTRANS") && !(d_c_cli_present("RECOVER") ||
+		d_c_cli_present("ROLLBACK") || d_c_cli_present("EXTRACT"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  d_c_cli_present("FORWARD") && d_c_cli_present("ROLLBACK");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  d_c_cli_present("FULL") && (d_c_cli_present("RECOVER") || d_c_cli_present("ROLLBACK"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("DETAIL") && !d_c_cli_present("EXTRACT"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("AFTER") && !d_c_cli_present("FORWARD"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("AFTER") && (d_c_cli_present("RECOVER") || d_c_cli_present("ROLLBACK")));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("SINCE") && !d_c_cli_present("BACKWARD"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("LOOKBACK_LIMIT") && !d_c_cli_present("BACKWARD"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("LOOKBACK_LIMIT") && !(d_c_cli_present("VERIFY") ||
+		d_c_cli_present("RECOVER") || d_c_cli_present("EXTRACT") || d_c_cli_present("SHOW")));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("APPLY_AFTER_IMAGE") && !(d_c_cli_present("ROLLBACK") ||
+		d_c_cli_present("RECOVER")));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("REDIRECT") && !d_c_cli_present("RECOVER"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("REDIRECT") && !d_c_cli_present("FORWARD"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("BACKWARD") && d_c_cli_negated("CHAIN"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  (d_c_cli_present("CHECKTN") && d_c_cli_present("BACKWARD"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  ((d_c_cli_present("AFTER") || d_c_cli_present("BEFORE") ||
+		d_c_cli_present("SINCE") || d_c_cli_present("LOOKBACK_LIMIT")) && d_c_cli_present("ROLLBACK"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  ((d_c_cli_present("GLOBAL") || d_c_cli_present("USER") ||
+		d_c_cli_present("ID") || d_c_cli_present("TRANSACTION")) && !(d_c_cli_present("EXTRACT") ||
+		d_c_cli_present("SHOW")));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -381,8 +381,8 @@ void jnlpool_init(jnlpool_user pool_user,
 	pool_init = TRUE; /* This is done for properly setting the updata_disable flag by active/passive
 				source server in jnl_file_open */
 	reg->open = TRUE;	/* this is used by t_commit_cleanup/tp_restart/mutex_deadlock_check */
-	reg->read_only = FALSE;
-	csa->read_write = TRUE;	/* the jnlpool reg is writable since we are already in jnlpool_init() */
+	reg->read_only = FALSE;	/* maintain csa->read_write simultaneously */
+	csa->read_write = TRUE;	/* maintain reg->read_only simultaneously */
 	return;
 }
 

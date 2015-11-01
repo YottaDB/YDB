@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,7 @@
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	unsigned short		proc_act_type;
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
+GBLREF  int			mumps_status;
 
 void error_return(void)
 {
@@ -63,5 +64,9 @@ void error_return(void)
 		rts_error(VARLSTCNT(1) ERR_REPEATERROR);
 		assert(FALSE);	/* the previous rts_error() should not return */
 	}
-	UNIX_ONLY(MUM_TSTART;)
+	UNIX_ONLY(
+		if (parent_frame->flags & SFF_CI) /* Unhandled error in call-in: return to gtm_ci */
+			mumps_status = dollar_ecode.error_last_ecode;
+		MUM_TSTART;
+	)
 }

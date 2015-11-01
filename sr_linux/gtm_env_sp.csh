@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2002 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -44,6 +44,9 @@ if ( $?gtm_version_change == "1" ) then
 
 	# C definitions:
 
+	# generate position independent code
+	setenv 	gt_cc_shl_fpic		"-fPIC"
+
 #	setenv	gt_cc_options_common 	"-c -D_LARGEFILE64_SOURCE=1 -D_FILE_OFFSET_BITS=64"
 	# For gcc: _BSD_SOURCE for caddr_t, others
 	#	   _XOPEN_SOURCE=500 should probably define POSIX 199309 and/or
@@ -53,7 +56,7 @@ if ( $?gtm_version_change == "1" ) then
 #	setenv	gt_cc_options_common	"-c -ansi -D_XOPEN_SOURCE=500 -D_BSD_SOURCE -D_POSIX_C_SOURCE=199506L -D_FILE_OFFSET_BITS=64 -DFULLBLOCKWRITES -fsigned-char"
 #	_GNU_SOURCE includes _XOPEN_SOURCE=400, _BSD_SOURCE, and _POSIX_C_SOURCE-199506L among others
 	setenv	gt_cc_options_common	"-c -ansi -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -fsigned-char"
-	setenv gt_cc_options_common "$gt_cc_options_common -Wimplicit -Wmissing-prototypes"
+	setenv gt_cc_options_common "$gt_cc_options_common $gt_cc_shl_fpic -Wimplicit -Wmissing-prototypes"
         set lversion=`uname -r`
         set ltemp_ver=`echo $lversion | sed 's/./& /g'`
         if ($ltemp_ver[3] == "2"  && $ltemp_ver[1] == "2") then
@@ -66,7 +69,6 @@ if ( $?gtm_version_change == "1" ) then
 	# -g	generate debugging information for dbx (no longer overrides -O)
 	setenv	gt_cc_option_debug	"-g"
 
-
 	# Linker definitions:
 	setenv	gt_ld_linker		"$gt_cc_compiler" # redefine to use new C compiler definition
 
@@ -78,6 +80,8 @@ if ( $?gtm_version_change == "1" ) then
 	# setenv	gt_ld_options_common	"-Wl,-M -rdynamic"
 	setenv	gt_ld_options_common	"-Wl,-M"
 
+	setenv 	gt_ld_options_gtmshr	"-Wl,--version-script,gtmshr_symbols.export"
+
 	# need to re-define these in terms of new gt_ld_options_common:
 	setenv	gt_ld_options_bta	"$gt_ld_options_common"
 	setenv	gt_ld_options_dbg	"$gt_ld_options_common"
@@ -86,9 +90,11 @@ if ( $?gtm_version_change == "1" ) then
 
 #	setenv	gt_ld_syslibs		"-lcurses -lm -lsocket -lnsl -ldl -lposix4"
 	setenv	gt_ld_syslibs		"-lncurses -lm -ldl"
+	# -lrt for async I/O in mupip recover/rollback
+	setenv gt_ld_aio_syslib		"-lrt"
 
 	# Shared library definition overrides:
-	setenv	gt_cc_shl_options	"-c"
+	setenv	gt_cc_shl_options	"-c $gt_cc_shl_fpic"
 
 	setenv	gt_ld_shl_linker	"cc"
 	setenv	gt_ld_shl_options	"-shared"
@@ -103,8 +109,6 @@ if ( $?gtm_version_change == "1" ) then
 	setenv	gt_lint_options_common	""
 
 endif
-
-
 
 # Assembler definitions:
 # Note: we need to specify the assembler output file name or it will write it to the source directory.

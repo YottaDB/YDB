@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,12 +32,10 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF bool		gv_curr_subsc_null;
 GBLREF mstr             extnam_str;
 
-#define LCL_BUF_SIZE 256
-
 void op_gvquery (mval *v)
 {
 	int4			size;
-	unsigned char		buff[LCL_BUF_SIZE], *end, *glob_begin;
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, *glob_begin;
  	bool			found;
 	enum db_acc_method 	acc_meth;
 	unsigned char		*extnamsrc, *extnamdst, *extnamtop;
@@ -78,8 +76,8 @@ void op_gvquery (mval *v)
 	{
 		if (acc_meth != dba_usr)
 		{
-			if ((end = format_targ_key(&buff[0], LCL_BUF_SIZE, gv_altkey, TRUE)) == 0)
-				end = &buff[LCL_BUF_SIZE - 1];
+			if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_altkey, TRUE)) == 0)
+				end = &buff[MAX_ZWR_KEY_SZ - 1];
 			size = end - &buff[0] - 1; /* exclude ^ */
 			glob_begin = &buff[1]; /* skip ^ */
 		} else

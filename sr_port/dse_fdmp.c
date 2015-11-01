@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,12 +32,12 @@ static unsigned int	work_buff_length;
 
 boolean_t dse_fdmp(sm_uc_ptr_t data, int len)
 {
-	unsigned char	*key_char_ptr, temp[MAX_KEY_SZ + 1], *temp_char_ptr, *top, *work_char_ptr;
+	unsigned char	*key_char_ptr, temp[MAX_ZWR_KEY_SZ], *temp_char_ptr, *top, *work_char_ptr;
 	int 		dest_len;
 
-	if (work_buff_length < (MAX_ZWR_INFLATION * gv_cur_region->max_rec_size))
+	if (work_buff_length < ZWR_EXP_RATIO(gv_cur_region->max_rec_size))
 	{
-		work_buff_length = MAX_ZWR_INFLATION * gv_cur_region->max_rec_size;
+		work_buff_length = ZWR_EXP_RATIO(gv_cur_region->max_rec_size);
 		if (work_buff)
 			free (work_buff);
 		work_buff = (unsigned char *)malloc(work_buff_length);
@@ -72,7 +72,7 @@ boolean_t dse_fdmp(sm_uc_ptr_t data, int len)
 		}
 		*work_char_ptr++ = ')';
 	}
-	assert(MAX_KEY_SZ >= work_char_ptr - work_buff);
+	assert(MAX_ZWR_KEY_SZ >= work_char_ptr - work_buff);
 	if (GLO_FMT == dse_dmp_format)
 	{
 		if (!dse_fdmp_output(work_buff, (work_char_ptr - work_buff)))

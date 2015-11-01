@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <stddef.h>
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
@@ -83,12 +84,11 @@ GBLREF	int			gv_fillfactor,
 				cumul_update_array_size,	/* the current total size of the update array */
                                 rc_set_fragment;	/* Contains offset within data at which data fragment starts */
 GBLREF	sgm_info		*sgm_info_ptr;
-GBLREF	uint4			cumul_jnl_rec_len;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF  jnl_format_buffer       *non_tp_jfb_ptr;
 GBLREF  inctn_opcode_t          inctn_opcode;
 GBLREF	boolean_t		is_replicator;
-DEBUG_ONLY(GBLREF uint4		cumul_index;)
+GBLREF jnl_gbls_t		jgbl;
 
 static	block_id	lcl_root;
 static	int4		blk_size, blk_fill_size;
@@ -128,12 +128,7 @@ void	gvcst_put(mval *v)
 			if (0 == dollar_tlevel)
 			{
 				jfb = non_tp_jfb_ptr; /* already malloced in gvcst_init() */
-				assert(JRT_FSET_FIXED_SIZE == JRT_GSET_FIXED_SIZE);
-				/* the below needs to be an '=' rather than a '+=' till this gets moved out of the do loop.
-				 * this is because the extra_block_split_req case can cause a multiple-execution of
-				 * this code but will result in identical journal records which is not what we want
-				 */
-				cumul_jnl_rec_len = ((0 == jnl_fence_ctl.level) ? SET_RECLEN : FSET_RECLEN);
+				jgbl.cumul_jnl_rec_len = 0;
 			} else
 			{
 				jfb = (jnl_format_buffer *)get_new_element(sgm_info_ptr->jnl_list, 1);
@@ -141,17 +136,15 @@ void	gvcst_put(mval *v)
 				assert(NULL == *sgm_info_ptr->jnl_tail);
 				*sgm_info_ptr->jnl_tail = jfb;
 				sgm_info_ptr->jnl_tail = &jfb->next;
-				assert(JRT_TSET_FIXED_SIZE == JRT_USET_FIXED_SIZE);
-				cumul_jnl_rec_len += TSET_RECLEN;
 			}
 			ja = &(jfb->ja);
 			ja->key = gv_currkey;
 			ja->val = v;
 			ja->operation = JNL_SET;
 			jnl_format(jfb);
-			cumul_jnl_rec_len += ja->key->end + sizeof(ja->key->end) + ja->val->str.len + sizeof(ja->val->str.len);
-			cumul_jnl_rec_len = ROUND_UP(cumul_jnl_rec_len, JNL_REC_START_BNDRY);
-			DEBUG_ONLY(cumul_index++;)
+			jgbl.cumul_jnl_rec_len += jfb->record_size;
+			assert(0 == jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY);
+			DEBUG_ONLY(jgbl.cumul_index++;)
 		}
 		save_t_tries = t_tries;
 		if (gvcst_put_blk(v, &extra_block_split_req))

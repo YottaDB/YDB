@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -15,21 +15,22 @@
 #    (download and install GT.M binary distribution from SourceForge if you do not have
 #    GT.M installed already).
 # 3. To build debug version with no compiler optimzations -
-# 		gmake -f sr_unix/comlist.mk -I./sr_unix buildtypes=dbg
+# 		gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg
 #    To build a version enabling optimizations -
-#    		gmake -f sr_unix/comlist.mk -I./sr_unix buildtypes=pro
+#    		gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=pro
 #
 
 # get_lib_dirs.mk must be in the same directory as this makefile
 verbose ?= 0
 include get_lib_dirs.mk
 
+CURDIR=$(shell pwd)
+
+ifeq ($(MAKELEVEL),0)
+#the first-level make invocation - rules to create & clean directories and build utilities selectively.
+
 ifndef buildtypes
 buildtypes=pro
-endif
-
-ifndef CURDIR
-CURDIR=$(shell pwd)
 endif
 
 ifndef gtm_ver
@@ -39,23 +40,74 @@ endif
 gt_ar_archiver=ar
 gt_ar_options=rv
 
-ifneq ($(MAKELEVEL),0)
-
-include gtm_env_sp.mk
-
+# top level make - builds directory structure, calls make for each build type,
+# and creates package
 
 VPATH=$(addprefix $(gtm_ver)/, $(gt_src_list))
-gt_cc_option_I:=$(gt_cc_option_I) $(addprefix -I$(gtm_ver)/, $(gt_src_list)) -I$(CURDIR)
-gt_as_option_I:=$(gt_cc_option_I)
+exe_list=mumps dse geteuid gtm_dmna gtmsecshr lke mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean semstat2 ftok
+make_i_flags=$(addprefix -I$(gtm_ver)/, $(gt_src_list))
 
-aux_list=dse geteuid gtm_dmna gtmsecshr lke mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean semstat2 ftok
+export #export all variables defined here to sub-make
 
+# Build the complete suit for packaging - all executables, % utilities, help files etc.
+all: dirs $(addsuffix _all, $(buildtypes)) ;
 
-# all files based on gt_src_list
-# NOTE: sort/notdir will weed out duplicates
+dirs: 	$(addprefix $(gtm_ver)/, $(addsuffix /obj, $(buildtypes))) \
+	$(addprefix $(gtm_ver)/, $(addsuffix /map, $(buildtypes))) ;
+
+# Compile and archive all modules and stop.
+compile: dirs $(addsuffix _compile, $(buildtypes)) ;
+
+# Build all executables and stop.
+links: dirs $(addsuffix _links, $(buildtypes)) ;
+
+# Rules to make executables selectively (eg. make mumps, make dse etc..)
+$(exe_list):%: dirs $(addsuffix _%, $(buildtypes)) ;
+
+clean: $(addsuffix _clean, $(buildtypes))
+	rm -f idtemp ostemp
+
+# Package GT.M installation kit.
+package: $(addsuffix _tar, $(buildtypes))
+
+%_tar: release_name.h
+	@echo "packaging GT.M..."
+	grep RELEASE_NAME $< | awk '{print $$4}' | sed 's/[\.]//' | sed 's/-//' > idtemp
+	grep RELEASE_NAME $< | awk '{print $$5}' | tr '[:upper:]' '[:lower:]' > ostemp
+	@tar -zcvf gtm_`cat idtemp`_`cat ostemp`_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
+	rm -f idtemp ostemp
+
+%_clean:
+	rm -rf $(gtm_ver)/$*
+	rm -f $(gtm_ver)/*$*.tar.gz
+%/obj:
+	mkdir -p $@
+%/map:
+	mkdir -p $@
+
+dbg_%:comlist.mk
+	$(MAKE) -C $(gtm_ver)/dbg/obj -I$(gtm_ver)/dbg/obj $(make_i_flags) -f $< CURRENT_BUILDTYPE=dbg $*
+pro_%:comlist.mk
+	$(MAKE) -C $(gtm_ver)/pro/obj -I$(gtm_ver)/pro/obj $(make_i_flags) -f $< CURRENT_BUILDTYPE=pro $*
+bta_%:comlist.mk
+	$(MAKE) -C $(gtm_ver)/bta/obj -I$(gtm_ver)/bta/obj $(make_i_flags) -f $< CURRENT_BUILDTYPE=bta $*
+
+else
+# Second-level make invocation: compute dependencies, compile, archive, link and test.
+
+# gt_src_list is the list of all source (sr_*) directories. allfiles_list is the superset of all
+# GT.M files (.c, .s, .m, .list, etc. etc.) present in all sr_* directories.
 allfiles_list:=$(sort $(notdir $(foreach d,$(gt_src_list),$(wildcard $(gtm_ver)/$(d)/*))))
 
-# suffix specific lists filtered from allfiles_list
+# allfiles_list computation should precede this include, since os390:gtm_env_sp.mk requires $(allfiles_list)
+include gtm_env_sp.mk
+
+# the list of all GT.M executables
+exe_list:=libgtmshr$(gt_ld_shl_suffix) $(exe_list) $(gt_svc_exe)
+
+
+# In the following code, various categories of source files are filtered from allfiles_list into
+# separate variables based on the file extention.
 
 # m file stuff.  These list builds go to great pain to insure that either post cms_load
 # forms and pre-cms load forms work.
@@ -63,7 +115,6 @@ mfile_list:=$(filter-out _%.m, $(filter %.m, $(allfiles_list)))
 mptfile_list:=$(sort $(basename $(filter %.mpt, $(allfiles_list))) $(basename $(patsubst _%.m, %, $(filter _%.m, $(allfiles_list)))))
 mfile_targets:=$(addsuffix .m,$(foreach f,$(basename $(mfile_list)), $(shell echo $(f) | tr '[:lower:]' '[:upper:]')))
 mptfile_targets:=$(addprefix _,$(addsuffix .m, $(foreach f,$(mptfile_list), $(shell echo $(f) | tr '[:lower:]' '[:upper:]'))))
-
 cfile_list:=$(filter %.c, $(allfiles_list))
 
 ifdef gt_as_src_from_suffix
@@ -82,7 +133,7 @@ csh_files:=$(filter lower%.csh upper%.csh, $(allfiles_list))
 list_files:=$(filter %.list, $(allfiles_list))
 msgfile_list:=$(filter %.msg, $(allfiles_list))
 
-hfile_list= gtm_stdio.h gtm_stdlib.h gtm_string.h gtmxc_types.h
+hfile_list := gtm_stdio.h gtm_stdlib.h gtm_string.h gtmxc_types.h $(hfile_list_sp)
 sh_targets:=$(basename $(sh_list))
 
 msgcfile_list=$(addsuffix _ctl.c,$(basename $(msgfile_list)))
@@ -90,15 +141,11 @@ msgofile_list=$(addsuffix .o,$(basename $(msgcfile_list)))
 list_file_libs=$(addsuffix .a,$(basename $(list_files)))
 
 
-
 # object files
 # NOTE: sort/basename weeds out .s, .c duplication and
 #       rules giving %.s priority over %.c cause the %.s
 #       version to always be used
 ofile_list:=$(addsuffix .o,$(sort $(basename $(cfile_list)) $(basename $(sfile_list))))
-# Since MAKE compiles all source files, 'unsupported_modules' facilitates to
-# avoid compilation of a list of modules to be excluded from the build.
-ofile_list:=$(filter-out $(unsupported_modules), $(ofile_list))
 
 #
 # dynamic depend list - weed out .s based .o's
@@ -106,7 +153,8 @@ ofile_list:=$(filter-out $(unsupported_modules), $(ofile_list))
 dep_list:=$(addsuffix .d,$(filter-out $(basename $(sfile_list)),$(basename $(cfile_list))))
 
 # objects on link command lines
-mumps_obj=gtm.o mumps_clitab.o
+mumps_obj=gtm.o
+gtmshr_obj=mumps_clitab.o gtm_main.o
 lke_obj=lke.o lke_cmd.o
 dse_obj=dse.o dse_cmd.o
 mupip_obj=mupip.o mupip_cmd.o
@@ -128,6 +176,8 @@ non_mumps_objs:=$(addsuffix .o,$(shell cat $(foreach d,$(gt_src_list),$(wildcard
 exclude_list:= \
 	$(non_mumps_objs) \
 	$(mumps_obj) \
+	$(gtmshr_obj) \
+	$(gtm_svc_obj) \
 	$(lke_obj) \
 	$(dse_obj) \
 	$(mupip_obj) \
@@ -143,14 +193,17 @@ exclude_list:= \
 	$(gtcm_shmclean_obj) \
 	$(dtgbldir_obj)
 
-
+# retain_list contains the modules listed in a .list file that also need to be
+# included in libmumps.a (eg. getmaxfds, sleep in sr_sun:libgtmrpc.list)
+libmumps_obj:=$(sort $(filter-out $(exclude_list),$(ofile_list)) $(msgofile_list) $(retain_list))
 
 # rules, lists, variables specific to each type of build
 
-ifndef gtm_dist
+#ifndef gtm_dist
 gtm_dist=$(gtm_ver)/$(CURRENT_BUILDTYPE)
-endif
+#endif
 
+gt_cc_option_I:=$(gt_cc_option_I) $(addprefix -I$(gtm_ver)/, $(gt_src_list)) -I$(CURDIR)
 gt_cc_option_DDEBUG=-DDEBUG
 ifeq ($(CURRENT_BUILDTYPE), pro)
 gt_cc_options=$(gt_cc_option_optimize) $(gt_cc_options_common)
@@ -170,7 +223,8 @@ endif
 gt_cc_options += $(gt_cc_option_I)
 gt_as_options += $(gt_cc_option_I)
 
-gt_ld_options=$(gt_ld_options_common) $(gt_ld_options_buildsp) -L$(CURDIR)
+# gt_ld_options should be set with '=' to allow lazy evaluation of gt_ld_options_loadmap
+gt_ld_options=$(gt_ld_options_common) $(gt_ld_options_buildsp) $(gt_ld_options_loadmap) -L$(CURDIR)
 
 gt_cpus ?= 2
 
@@ -178,44 +232,24 @@ ifdef gt_ar_gtmrpc_name
 gt_ar_gtmrpc_name_target=../lib$(gt_ar_gtmrpc_name).a
 endif
 
-ifeq ($(PASS),2)
-PASS2ITEMS=$(gt_ar_gtmrpc_name_target) dotcsh dotsh helpfiles hfiles gtcmconfig \
+postbuild=$(gt_ar_gtmrpc_name_target) dotcsh dotsh helpfiles hfiles gtcmconfig \
 	../mumps.gld ../gtmhelp.dat ../gdehelp.dat
-endif
 
-all:	testit messagefiles compiles \
-	$(list_file_libs) libmumps.a links mfiles mcompiles \
-	$(PASS2ITEMS)
+all:	links mfiles mcompiles testit $(postbuild)
+
+compile:libmumps.a $(list_file_libs) $(filter-out $(non_mumps_objs), $(exclude_list))
+
+%.export:%.exp
+	$(gt-export)
 
 testit:
-	echo $(PASS2ITEMS)
+	echo $(postbuild)
 
-links: ../mumps $(addprefix ../,$(aux_list))
-
-ifeq ($(MAKELEVEL),1)
-compiles:
-	$(MAKE) -j $(gt_cpus) -f $(MYMAKE) -$(MAKEFLAGS) gtm_ver=$(gtm_ver) PASS=$(PASS) CURRENT_BUILDTYPE=$(CURRENT_BUILDTYPE) depends compiles
-
-.PRECIOUS: omi_sx_play.o $(ofile_list)
-
-endif
-ifeq ($(MAKELEVEL),2)
-
-depends: $(dep_list)
+links: $(exe_list)
+$(exe_list):%: $(prebuild) ../% ;
 
 vars:
 	echo MAKECMDGOALS $(MAKECMDGOALS)
-
-compiles: omi_sx_play.o $(ofile_list)
-
-#links: ../mumps $(addprefix ../,$(aux_list))
-
-#
-# autodepend files for C files
-#
--include $(dep_list)
-
-endif
 
 ../mumps.gld:
 	cd ..;gtm_dist=$(gtm_dist);export gtm_dist;gtmgbldir=./$(notdir $@);export gtmgbldir;\
@@ -240,8 +274,7 @@ endef
 	$(compile-help)
 
 mcompiles:
-	cd ..;gtm_dist=$(dir $(CURDIR));export gtm_dist;gtmgbldir=$(notdir $@);export gtmgbldir;\
-		./mumps *.m
+	cd ..;gtm_dist=$(dir $(CURDIR));export gtm_dist;gtmgbldir=$(notdir $@);export gtmgbldir; ./mumps *.m
 
 dotcsh: $(csh_files)
 	cp -f $^ ..
@@ -266,71 +299,68 @@ $(gt_ar_gtmrpc_name_target): lib$(gt_ar_gtmrpc_name).a
 endif
 
 # executables
-
 define gt-ld
 rm -f $@
-$(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $^ $(gt_ld_syslibs)
-endef
-../mumps: $(mumps_obj) -lmumps -lgnpclient -lcmisockettcp $(gt_ld_gtmrpc_library_option)
-	$(gt-ld) $(gt_ld_options_symbols) > ../map/$(notdir $@).map 2>&1
-
-../dse: $(dse_obj) -ldse -lmumps -lstub $(gt_ld_gtmrpc_library_option)
-	$(gt-ld) > ../map/$(notdir $@).map 2>&1
-
-../geteuid: $(geteuid_obj) -lmumps
-	$(gt-ld) > ../map/$(notdir $@).map 2>&1
-
-../gtm_dmna: $(gtm_dmna_obj) -lmumps
-	$(gt-ld) > ../map/$(notdir $@).map 2>&1
-
-../gtmsecshr: $(gtmsecshr_obj) -lmumps
-	$(gt-ld) > ../map/$(notdir $@).map 2>&1
-
-../lke: $(lke_obj) -llke -lmumps -lstub $(gt_ld_gtmrpc_library_option)
-	$(gt-ld) > ../map/$(notdir $@).map 2>&1
-
-../mupip: $(mupip_obj) -lmupip -lmumps -lstub $(gt_ld_gtmrpc_library_option)
-	$(gt-ld) > ../map/$(notdir $@).map 2>&1
-
-../gtcm_server: $(gtcm_server_obj) -lgtcm -lmumps -lstub $(gt_ld_gtmrpc_library_option)
-	$(gt-ld) > ../map/$(notdir $@).map 2>&1
-
-../gtcm_gnp_server: $(gtcm_gnp_server_obj) -lgnpserver -llke -lmumps -lcmisockettcp -lstub  $(gt_ld_gtmrpc_library_option)
-	$(gt-ld) > ../map/$(notdir $@).map 2>&1
-
-../gtcm_play: $(gtcm_play_obj) -lgtcm -lmumps -lstub $(gt_ld_gtmrpc_library_option)
-	$(gt-ld) > ../map/$(notdir $@).map 2>&1
-
-../gtcm_pkdisp: $(gtcm_pkdisp_obj) -lgtcm -lmumps -lstub $(gt_ld_gtmrpc_library_option)
-	$(gt-ld) > ../map/$(notdir $@).map 2>&1
-
-../gtcm_shmclean: $(gtcm_shmclean_obj) -lgtcm -lmumps -lstub $(gt_ld_gtmrpc_library_option)
-	$(gt-ld) > ../map/$(notdir $@).map 2>&1
-
-../semstat2: $(semstat2_obj)
-	$(gt-ld) > ../map/$(notdir $@).map 2>&1
-
-../ftok: $(ftok_obj)
-	$(gt-ld) > ../map/$(notdir $@).map 2>&1
-
-define update-lib
-@if [ -s $*.a.updates ]; then cat $*.a.updates | xargs $(gt_ar_archiver) $(gt_ar_options) $@;cat /dev/null > $*.a.updates; fi
+@echo "linking $(notdir $@)..."
+@echo $(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $+ $(gt_ld_syslibs) > ../map/$(notdir $@).map 2>&1
+@$(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $+ $(gt_ld_syslibs) >> ../map/$(notdir $@).map 2>&1
 endef
 
-libmumps_obj:=$(sort $(filter-out $(exclude_list),$(ofile_list)) $(msgofile_list))
-libmumps.a: $(libmumps_obj)
-	@echo Processing $@
-ifdef gt_smallarglist
-	@echo $(wordlist 1, 500, $?) | xargs $(gt_ar_archiver) $(gt_ar_options) $@
-	@echo $(wordlist 501, 1000, $?) | xargs $(gt_ar_archiver) $(gt_ar_options) $@
-	@echo $(wordlist 1001, 1500, $?) | xargs $(gt_ar_archiver) $(gt_ar_options) $@
-	@echo $(wordlist 1501, 2000, $?) | xargs $(gt_ar_archiver) $(gt_ar_options) $@
-	@echo $(wordlist 2001, 2500, $?) | xargs $(gt_ar_archiver) $(gt_ar_options) $@
-else
-	$(gt_ar_archiver) $(gt_ar_options) $@ $?
+ifdef gt_svc_exe
+# Note: gtm_svc should link with gtm_dal_svc.o before gtm_mumps_call_clnt.o(libgtmrpc.a) to
+#       resolve conflicting symbols (gtm_init_1, gtm_halt_1 etc..) appropriately.
+../$(gt_svc_exe): $(gtm_svc_obj) $(gtmshr_obj) libmumps.a libgnpclient.a libcmisockettcp.a $(gt_ld_gtmrpc_library_option)
+	$(gt-ld)
 endif
 
-messagefiles: $(msgofile_list)
+../mumps: $(mumps_obj)
+	$(gt-ld)
+
+../dse: $(dse_obj) libdse.a libmumps.a libstub.a
+	$(gt-ld)
+
+../geteuid: $(geteuid_obj) libmumps.a
+	$(gt-ld)
+
+../gtm_dmna: $(gtm_dmna_obj) libmumps.a
+	$(gt-ld)
+
+../gtmsecshr: $(gtmsecshr_obj) libmumps.a
+	$(gt-ld)
+
+../lke: $(lke_obj) liblke.a libmumps.a libgnpclient.a libmumps.a libgnpclient.a libcmisockettcp.a
+	$(gt-ld)
+
+../mupip: $(mupip_obj) libmupip.a libmumps.a libstub.a $(gt_ld_aio_syslib)
+	$(gt-ld)
+
+../gtcm_server: $(gtcm_server_obj) libgtcm.a libmumps.a libstub.a
+	$(gt-ld)
+
+../gtcm_gnp_server: $(gtcm_gnp_server_obj) libgnpserver.a liblke.a libmumps.a libcmisockettcp.a libstub.a
+	$(gt-ld)
+
+../gtcm_play: $(gtcm_play_obj) libgtcm.a libmumps.a libstub.a
+	$(gt-ld)
+
+../gtcm_pkdisp: $(gtcm_pkdisp_obj) libgtcm.a libmumps.a libstub.a
+	$(gt-ld)
+
+../gtcm_shmclean: $(gtcm_shmclean_obj) libgtcm.a libmumps.a libstub.a
+	$(gt-ld)
+
+../semstat2: $(semstat2_obj)
+	$(gt-ld)
+
+../ftok: $(ftok_obj)
+	$(gt-ld)
+
+# build GT.M shared library(libgtmshr) from PIC-compiled .o files
+../libgtmshr$(gt_ld_shl_suffix): gtmshr_symbols.export $(gtmshr_obj) libmumps.a libgnpclient.a libcmisockettcp.a
+	rm -f $@
+	@echo "linking $(notdir $@)..."
+	@echo $(gt_ld_linker) $(gt_ld_options) $(gt_ld_shl_options) $(gt_ld_options_gtmshr) -o $@ $(gtmshr_obj) -lmumps -lgnpclient -lcmisockettcp $(gt_ld_syslibs) > ../map/$(notdir $@).map 2>&1
+	@$(gt_ld_linker) $(gt_ld_options) $(gt_ld_shl_options) $(gt_ld_options_gtmshr) -o $@ $(gtmshr_obj) -lmumps -lgnpclient -lcmisockettcp $(gt_ld_syslibs) >> ../map/$(notdir $@).map 2>&1
 
 gtcmconfig: $(gtc_list) gtcm_gcore
 	cp -f $^ ..
@@ -342,10 +372,13 @@ ifndef gt_cc_options
 	$(error CURRENT_BUILDTYPE not properly defined)
 endif
 
+# no need to keep the archived object files
+.INTERMEDIATE: $(libmumps_obj) $(non_mumps_objs)
+
 #
-# autodepend to locate directory containing msg.m
-# and to set the path of msg.m into msgdir
--include msgdir.mk
+# autodepend files for C files
+#
+-include $(dep_list)
 #
 # autodepend files for M files
 #
@@ -359,49 +392,75 @@ endif
 #
 -include $(list_files:.list=.ldep)
 
+# Overriding the implicit archive rule a(m):m to accumulate all changed .o files
+# in a temporary dependency (.ardep) file that will be used by ar to archive
+# all files in a single command.
+# This enhancement [of accumulating in a temporary .ardep file instead of updating
+# the library righaway] improves the full building time. However for incremental
+# builds the object file is updated into the archive immediately.
+(%):%
+ifeq ($(incremental),1)
+	@$(gt_ar_archiver) $(gt_ar_options) $@ $<
+else
+	@echo $< >> $(basename $@).ardep
+endif
+
+# Since ecode_set.c includes merrors_ansi.h, merrors.msg should be precompiled.
+ecode_set.d:merrors_ctl.c
+
 %.d:%.c
+ifeq ($(verbose),1)
+	@echo generating $@...
+endif
 	$(gt-dep)
 
+ifeq ($(incremental),1)
 %.ldep:%.list
-	@echo $*.a\:$$\(addsuffix .o,$$\(shell cat $<\)\) > $@
-	@$(gt_echoe) "\t@echo Processing "$$\@ >> $@
-	@$(gt_echoe) "\t@echo "$$\(filter-out %.list,$$\?\) "| xargs $(gt_ar_archiver) $(gt_ar_options) "$$\@ >> $@
+	@echo $*.a\:$*.a\($$\(addsuffix .o,$$\(shell cat $<\)\)\) > $@
+	@$(gt_echoe) "\t@ranlib "$$\@ >> $@
+else
+%.ldep:%.list
+	@echo $*.a\:$*.a\($$\(addsuffix .o,$$\(shell cat $<\)\)\) $*.ardep > $@
+	@$(gt_echoe) "\t@echo Processing "$$\@ "; cp -f $*.ardep _$*.ardep; echo >$*.ardep" >> $@
+	@$(gt_echoe) "\t@cat _$*.ardep | xargs $(gt_ar_archiver) $(gt_ar_options) "$$\@ >>$@
+	@$(gt_echoe) "\t@rm -f _$*.ardep" >> $@
+endif
+
 %.mdep:%.m
 	@echo ../$(shell echo $* | tr '[:lower:]' '[:upper:]').m: $< > $@
-	@$(gt_echoe) "\t"cp $$\< $$\@ >> $@
+	@$(gt_echoe) "\t"cp -f $$\< $$\@ >> $@
 %.mptdep:_%.m
 	@echo ../_$(shell echo $* | tr '[:lower:]' '[:upper:]').m: $< > $@
-	@$(gt_echoe) "\t"cp $$\< $$\@ >> $@
+	@$(gt_echoe) "\t"cp -f $$\< $$\@ >> $@
 %.mptdep:%.mpt
 	@echo ../_$(shell echo $* | tr '[:lower:]' '[:upper:]').m: $< > $@
-	@$(gt_echoe) "\t"cp $$\< $$\@ >> $@
-msgdir.mk: msg.m
-	@echo msgdir=$(dir $<) > $@
+	@$(gt_echoe) "\t"cp -f $$\< $$\@ >> $@
 
-%_ctl.o:%.msg
-ifndef gtm_curpro
-# use the mumps program we just compiled
-	$(gtm_dist)/mumps $(msgdir)/msg.m
-	$(gtm_dist)/mumps -run msg $< unix
-else
-# use the gtm_curpro mumps program
-	$(shell gtm_dist=$(gtm_root)/$(gtm_curpro)/pro;export gtm_dist;\
-		$(gtm_root)/$(gtm_curpro)/pro/mumps $(msgdir)/msg.m;\
-		$(gtm_root)/$(gtm_curpro)/pro/mumps -run msg $< unix)
+# By setting gtm_curpro to point to a prior installed GT.M directory (if available), the following
+# rule automatically generates *_ctl.c from *.msg. If gtm_curpro does not exist (e.g. SourceForge),
+# the repository copies (*_ctl.c) will be used instead. 
+# NOTE: all *_ctl.c and merrors_ansi.h are added to CVS tree (sr_port) at SourceForge.
+ifdef gtm_curpro
+%_ctl.c:%.msg msg.m
+	gtm_dist=$(gtm_root)/$(gtm_curpro)/pro;export gtm_dist;\
+		$(gtm_root)/$(gtm_curpro)/pro/mumps $(filter-out $<, $^);\
+		$(gtm_root)/$(gtm_curpro)/pro/mumps -run msg $< unix
+	@rm -f msg.o
 endif
-	rm -f msg.o
-	$(gt_cc_compiler) -c $(gt_cc_options) $*_ctl.c -o $@ && rm -f $*_ctl.c
 
-# By default, .s files are preferred to .c files if both versions exist for a module.
-# To reverse this behavior, gt_cc_before_as should be defined to the list of .o files
-# to be compiled from .c instead of from .s files.
+# By default [since the rule %.o:%.s precedes %.o:%.c], the .s files take precedence over
+# .c files if both versions exist for a module. The following rule allows us to reverse
+# this behavior for a special set of modules (eg. compswap for sparcv8 etc.) by assigning
+# them to a variable gt_cc_before_as [in gtm_env_sp.mk].
+# gt_cc_before_as should be defined to the list of .o files for which both .c and .s exist
+# but need to be compiled from .c instead of from .s files.
 ifdef gt_cc_before_as
-$(gt_cc_before_as):%.o:%.c	#override rules for gt_cc_before_as modules only
+$(gt_cc_before_as):%.o:%.c	#override rules for gt_cc_before_as modules ONLY
 ifeq ($(verbose),1)
-	$(gt_cc_compiler) -c $(gt_cc_options) $< -o $@
+	$(gt_cc_compiler) -c $(gt_cc_options) -o $@ $<
 else
-	@echo $<
-	@$(gt_cc_compiler) -c $(gt_cc_options) $< -o $@
+	@echo "$< ----> $(CURDIR)/$@"
+	@$(gt_cc_compiler) -c $(gt_cc_options) -o $@ $<
 endif
 endif
 
@@ -410,7 +469,7 @@ ifdef gt_as_src_from_suffix
 ifeq ($(verbose),1)
 	$(gt-as-convert)
 else
-	@echo $<
+	@echo "$< ----> $(CURDIR)/$@"
 	@$(gt-as-convert)
 endif
 endif
@@ -418,60 +477,29 @@ endif
 ifeq ($(verbose),1)
 	$(gt-as)
 else
-	@echo $<
+	@echo "$< ----> $(CURDIR)/$@"
 	@$(gt-as)
 endif
 
-ifndef gt_cc_before_as
 %.o:%.c
 ifeq ($(verbose),1)
-	$(gt_cc_compiler) -c $(gt_cc_options) $< -o $@
+	$(gt_cc_compiler) -c $(gt_cc_options) -o $@ $<
 else
-	@echo $<
-	@$(gt_cc_compiler) -c $(gt_cc_options) $< -o $@
-endif
+	@echo "$< ----> $(CURDIR)/$@"
+	@$(gt_cc_compiler) -c $(gt_cc_options) -o $@ $<
 endif
 
 omi_sx_play.c: omi_srvc_xct.c
 	@cp $< $@
 
+ifeq ($(incremental),1)
+libmumps.a: libmumps.a($(msgofile_list) $(libmumps_obj))
+	@ranlib $@
 else
-
-# top level make - builds directory structure, calls make for each build type,
-# and creates package
-
-VPATH=$(addprefix $(gtm_ver)/, $(gt_src_list))
-make_i_flags=$(addprefix -I$(gtm_ver)/, $(gt_src_list))
-
-all:	$(addprefix $(gtm_ver)/, $(addsuffix /obj, $(buildtypes))) \
-	$(addprefix $(gtm_ver)/, $(addsuffix /map, $(buildtypes))) \
-	$(addsuffix _build, $(buildtypes))
-
-clean: $(addsuffix _clean, $(buildtypes))
-	rm -f idtemp ostemp
-
-package: $(addsuffix _tar, $(buildtypes))
-
-%_tar: release_name.h
-	@echo "packaging GT.M..."
-	@grep RELEASE_NAME $< | awk '{print $$4}' | sed 's/[\.]//' | sed 's/-//' > idtemp
-	@grep RELEASE_NAME $< | awk '{print $$5}' | tr '[:upper:]' '[:lower:]' > ostemp
-	@tar -zcvf gtm_`cat idtemp`_`cat ostemp`_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
-	@rm -f idtemp ostemp
-
-%_build: comlist.mk
-ifndef gtm_curpro
-	$(MAKE) -C $(gtm_ver)/$*/obj -I$(gtm_ver)/$*/obj $(make_i_flags) -f $< gtm_ver=$(gtm_ver) CURRENT_BUILDTYPE=$* PASS=1 MYMAKE=$<
-	rm -f $(addprefix $(gtm_ver)/$*/obj/, $(msgofile_list))
-endif
-	$(MAKE) -C $(gtm_ver)/$*/obj -I$(gtm_ver)/$*/obj $(make_i_flags) -f $< gtm_ver=$(gtm_ver) CURRENT_BUILDTYPE=$* PASS=2 MYMAKE=$<
-%_clean:
-	rm -rf $(gtm_ver)/$*
-	rm -f $(gtm_ver)/*$*.tar.gz
-%/obj:
-	mkdir -p $@
-%/map:
-	mkdir -p $@
-
+libmumps.a: libmumps.a($(msgofile_list) $(libmumps_obj)) libmumps.ardep
+	@echo Processing $@ ;cp -f libmumps.ardep _libmumps.ardep; echo "">libmumps.ardep
+	@cat _libmumps.ardep | xargs $(gt_ar_archiver) $(gt_ar_options) $@
+	@rm -f _libmumps.ardep
 endif
 
+endif #second-level make invocation

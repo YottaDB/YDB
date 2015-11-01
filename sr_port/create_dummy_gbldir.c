@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,11 @@
 
 #include "mdef.h"
 
+#include <errno.h>
 #include "gtm_string.h"
 #include "gtm_stdio.h"
-
-#include <fcntl.h>
-#include <unistd.h>
+#include "gtm_fcntl.h"
+#include "gtm_unistd.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -27,8 +27,6 @@
 #include "filestruct.h"
 #include "gbldirnam.h"
 #include "hashdef.h"
-
-extern int errno;
 
 typedef struct gdr_name_struct
 {

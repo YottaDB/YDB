@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,9 +40,8 @@ GBLREF int4		exi_condition;
 CONDITION_HANDLER(gtcm_exi_ch)
 {
 	int		rc;
-	unsigned char	curtime[CTIME_BEFORE_NL + 1];
-	time_t		now;
-	char		*time_ptr;
+	now_t		now;	/* for GET_CUR_TIME macro */
+	char		time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
 	error_def(ERR_TEXT);
 
 	if (gtcm_firsterr)
@@ -56,9 +55,8 @@ CONDITION_HANDLER(gtcm_exi_ch)
 			*(util_outptr + 1) = 0;
 		}
 		GET_CUR_TIME;
-		memcpy(curtime, time_ptr, CTIME_BEFORE_NL);
-		curtime[CTIME_BEFORE_NL] = 0;
-		FPRINTF(gtcm_errfs, "%s: %s", curtime, util_outbuff);
+		time_str[CTIME_BEFORE_NL] = 0;
+		FPRINTF(gtcm_errfs, "%s: %s", time_str, util_outbuff);
 		fflush(gtcm_errfs);
 	}
 	send_msg(VARLSTCNT(3) ERR_TEXT, RTS_ERROR_TEXT("GT.CM TERMINATION RUNDOWN ERROR"));

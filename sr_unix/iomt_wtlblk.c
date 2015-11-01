@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,23 +11,18 @@
 
 /* iomt_wtlblk.c - UNIX (low-level) Write block to tape */
 #include "mdef.h"
-#ifdef __MVS__
+
 #include <errno.h>
-#else
-#include <sys/errno.h>
-#endif
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
+
 #include "io.h"
 #include "iosp.h"
 #include "iottdef.h"
 #include "iomtdef.h"
 #include "gtmio.h"
 
-extern int      errno;
-
-uint4
-iomt_wtlblk (uint4 channel, uint4 mask, iosb *stat_blk, void *buff, int size)
+uint4 iomt_wtlblk (uint4 channel, uint4 mask, iosb *stat_blk, void *buff, int size)
 {
 	uint4   status;
 

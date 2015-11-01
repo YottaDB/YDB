@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,7 @@ void mucregini(int4 blk_init_size)
 	cs_data->jnl_before_image = gv_cur_region->jnl_before_image;
 	cs_data->jnl_state = gv_cur_region->jnl_state;
 	cs_data->epoch_interval = JNL_ALLOWED(cs_data) ? DEFAULT_EPOCH_INTERVAL : 0;
-	cs_data->alignsize = JNL_ALLOWED(cs_data) ? (DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE) : 0;
+	cs_data->alignsize = JNL_ALLOWED(cs_data) ? (DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE) : 0;
 	cs_data->autoswitchlimit = JNL_ALLOWED(cs_data) ? ALIGNED_ROUND_DOWN(JNL_ALLOC_MAX, cs_data->jnl_alq, cs_data->jnl_deq) : 0;
 #ifdef UNIX
 	assert(!(IO_BLOCK_SIZE % DISK_BLOCK_SIZE));
@@ -141,16 +141,15 @@ void mucregini(int4 blk_init_size)
 	cs_data->repl_state = repl_closed;              /* default */
 	if (cs_data->jnl_file_len)
 	{
-		tmpjnlfile.addr = cs_data->jnl_file_name;
+		tmpjnlfile.addr = (char *)cs_data->jnl_file_name;
 		tmpjnlfile.len = sizeof(cs_data->jnl_file_name);
-		jnlfile.addr = gv_cur_region->jnl_file_name;
+		jnlfile.addr = (char *)gv_cur_region->jnl_file_name;
 		jnlfile.len = gv_cur_region->jnl_file_len;
 		jnldef.addr = JNL_EXT_DEF;
 		jnldef.len = sizeof(JNL_EXT_DEF) - 1;
 		if (FILE_STAT_ERROR == gtm_file_stat(&jnlfile, &jnldef, &tmpjnlfile, TRUE, &ustatus))
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2,
-				gv_cur_region->jnl_file_len, gv_cur_region->jnl_file_name, ustatus);
+			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, JNL_LEN_STR(gv_cur_region), ustatus);
 			mupip_exit(ERR_MUNOACTION);
 		}
 		cs_data->jnl_file_len = tmpjnlfile.len;

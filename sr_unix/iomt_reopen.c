@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,19 +10,19 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include <errno.h>
 #include "gtm_fcntl.h"
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
+
 #include "io.h"
 #include "iottdef.h"
 #include "iomtdef.h"
 #include "iosp.h"
 #include "error.h"
 
-extern int      errno;
-
-uint4
-iomt_reopen (io_desc *dv, unsigned short mode, int rewind)
+uint4 iomt_reopen (io_desc *dv, unsigned short mode, int rewind)
 {
 	uint4   status;
 	d_mt_struct    *mt_ptr;
@@ -48,8 +48,8 @@ iomt_reopen (io_desc *dv, unsigned short mode, int rewind)
 	status = close (mt_ptr->access_id);
 	if (status < 0)
 	{
-	    PERROR("iomt_reopen");
-	rts_error (VARLSTCNT (5) ERR_MTIOERR, 2, dv->name->len, dv->name->dollar_io, errno);
+		PERROR("iomt_reopen");
+		rts_error (VARLSTCNT (5) ERR_MTIOERR, 2, dv->name->len, dv->name->dollar_io, errno);
 	}
 
 

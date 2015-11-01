@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_time.h"
 
 #include <sys/mman.h>
 #include <errno.h>
@@ -70,6 +71,8 @@ GBLREF	uint4		process_id;
 GBLREF	bool		run_time;
 GBLREF	sgm_info	*sgm_info_ptr;
 GBLREF	unsigned int	t_tries;
+GBLREF 	jnl_gbls_t	jgbl;
+
 OS_PAGE_SIZE_DECLARE
 
 #ifdef DEBUG_DB64
@@ -345,6 +348,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			cs_addrs->nl->highest_lbm_blk_changed = blocks;
 	}
 	curr_tn = cs_addrs->ti->curr_tn;
+	assert(cs_addrs->ti->early_tn == cs_addrs->ti->curr_tn);
 	if (JNL_ENABLED(cs_data))
 	{
 		save_inctn_opcode = inctn_opcode;
@@ -352,13 +356,15 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			inctn_opcode = inctn_gdsfilext_mu_reorg;
 		else
 			inctn_opcode = inctn_gdsfilext_gtm;
+		if (!jgbl.forw_phase_recovery)
+			JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() and jnl_write_inctn_rec() */
 		if (0 == cs_addrs->jnl->pini_addr)
 			jnl_put_jrt_pini(cs_addrs);
 		jnl_write_inctn_rec(cs_addrs);
 		inctn_opcode = save_inctn_opcode;
 	}
-	assert(cs_addrs->ti->early_tn == cs_addrs->ti->curr_tn);
-	cs_addrs->ti->early_tn = ++cs_addrs->ti->curr_tn;
+	if (!jgbl.forw_phase_recovery || JNL_ENABLED(cs_data))
+		cs_addrs->ti->early_tn = ++cs_addrs->ti->curr_tn; /* do not increment transaction number for forward recovery */
 	fileheader_sync(gv_cur_region);
 	GDSFILEXT_CLNUP;
 	send_msg(VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), blocks, new_total, curr_tn);

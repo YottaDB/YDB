@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,11 +74,11 @@ static CLI_ENTRY mup_set_journal_qual[] =
 
 static CLI_ENTRY mub_since_qual[] =
 {
-	{ "BYTESTREAM",		0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
-	{ "COMPREHENSIVE",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "BYTESTREAM",		0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "COMPREHENSIVE",	0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
 	{ "DATABASE",		0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
-	{ "INCREMENTAL",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
-	{ "RECORD",		0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "INCREMENTAL",	0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "RECORD",		0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
 	{ 0 }
 };
 
@@ -91,8 +91,8 @@ static CLI_ENTRY mup_set_acc_qual[] =
 
 static CLI_ENTRY mup_extract_format_qual[] =
 {
-	{ "BINARY",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
-	{ "GO",		0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "BINARY",	0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "GO",		0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
 	{ "ZWR",	0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
 	{ 0 }
 };
@@ -105,28 +105,28 @@ static CLI_ENTRY mup_convert_format_qual[] =
 
 static CLI_ENTRY mup_jnl_show_qual[] =
 {
-	{ "ACTIVE_PROCESSES",	 0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "ACTIVE_PROCESSES",	 0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
 	{ "ALL",		 0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
-	{ "BROKEN_TRANSACTIONS", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
-	{ "HEADER",		 0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
-	{ "PROCESSES",		 0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
-	{ "STATISTICS",		 0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "BROKEN_TRANSACTIONS", 0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "HEADER",		 0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "PROCESSES",		 0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "STATISTICS",		 0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
 	{ 0 }
 };
 
 static CLI_ENTRY mup_load_fmt_qual[] =
 {
-	{ "BINARY",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
-	{ "GO",		0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "BINARY",	0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "GO",		0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
 	{ "ZWR",	0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
 	{ 0 }
 };
 
 static CLI_ENTRY mup_jnl_fences_qual[] =
 {
-	{ "ALWAYS",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
-	{ "NONE",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
-	{ "PROCESS",	0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "ALWAYS",	0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A,	0 },
+	{ "NONE",	0, 0, 0, 0, 0, 0,            VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A,	0 },
+	{ "PROCESS",	0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A,	0 },
 	{ 0 }
 };
 
@@ -320,9 +320,6 @@ static readonly CLI_PARM mup_jnl_errlimit_parm[] = {
 { "ERROR_LIMIT", 0 }
 };
 
-static readonly CLI_PARM mup_jnl_extr_fn[] = {
-{ "EXTRACT", "extract.mjf"}
-};
 static readonly CLI_PARM mup_jnl_lost_fn[] = {
 { "LOSTTRANS", "losttrans.mlt"}
 };
@@ -333,6 +330,20 @@ static readonly CLI_PARM mup_jnl_lookback_parm[] = {
 
 static readonly CLI_PARM mup_jnl_fences_parm[] = {
 { "FENCES", "PROCESS"}
+};
+
+static CLI_ENTRY mur_jnl_lookback_qual[] =
+{
+	{ "OPERATIONS",	0, 0, 0, 0, 0, 0,            VAL_REQ,	0,	NON_NEG, VAL_NUM, 0 },
+	{ "TIME",	0, 0, 0, 0, 0, DEFA_PRESENT, VAL_REQ,	0,	NON_NEG, VAL_STR, 0 },
+	{ 0 }
+};
+
+static CLI_ENTRY mup_trans_qual[] =
+{
+	{ "KILL",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
+	{ "SET",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
+	{ 0 }
 };
 
 static readonly CLI_PARM mup_jnl_show_parm[] = {
@@ -346,29 +357,30 @@ static	CLI_ENTRY	mup_journal_qual[] =
 	{ "APPLY_AFTER_IMAGE", mupip_recover, 0, 0,                     0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 	{ "BACKWARD",          mupip_recover, 0, 0,                     0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 	{ "BEFORE",            mupip_recover, 0, 0,                     0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
+	{ "BROKENTRANS",       mupip_recover, 0, 0,                     0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 	{ "CHAIN",             mupip_recover, 0, 0,                     0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 	{ "CHECKTN",           mupip_recover, 0, 0,                     0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 	{ "DETAIL",            mupip_recover, 0, 0,                     0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
-	{ "EPOCHLIMIT",        mupip_recover, 0, 0,                     0, 0, 0, VAL_REQ,        1, NEG,     VAL_NUM, 0 },
 	{ "ERROR_LIMIT",       mupip_recover, 0, mup_jnl_errlimit_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0 },
-	{ "EXTRACT",           mupip_recover, 0, mup_jnl_extr_fn,       0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
+	{ "EXTRACT",           mupip_recover, 0, 0,                     0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
 	{ "FENCES",            mupip_recover, 0, mup_jnl_fences_parm,   mup_jnl_fences_qual, 0, 0, VAL_NOT_REQ,        1, NON_NEG, VAL_STR, 0 },
 	{ "FETCHRESYNC",       mupip_recover, 0, 0,                     0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
 	{ "FORWARD",           mupip_recover, 0, 0,                     0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
+	{ "FULL",              mupip_recover, 0, 0,                     0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 	{ "GLOBAL",            mupip_recover, 0, 0,                     0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 	{ "ID",                mupip_recover, 0, 0,                     0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 	{ "INTERACTIVE",       mupip_recover, 0, 0,                     0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
-	{ "LOOKBACK_LIMIT",    mupip_recover, 0, mup_jnl_lookback_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_STR, 0 },
-	{ "LOSTTRANS",         mupip_recover, 0, mup_jnl_lost_fn,       0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
-	{ "PRESERVE_JNL",      mupip_recover, 0, 0,                     0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
+	{ "LOOKBACK_LIMIT",    mupip_recover, 0, mup_jnl_lookback_parm, mur_jnl_lookback_qual, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_STR, 0 },
+	{ "LOSTTRANS",         mupip_recover, 0, mup_jnl_lost_fn,       0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 	{ "RECOVER",           mupip_recover, 0, 0,                     0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 	{ "REDIRECT",          mupip_recover, 0, 0,                     0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 	{ "RESYNC",            mupip_recover, 0, 0,                     0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
 	{ "ROLLBACK",          mupip_recover, 0, 0,                     0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 	{ "SHOW",              mupip_recover, 0, mup_jnl_show_parm,     mup_jnl_show_qual, 0, 0, VAL_NOT_REQ,        1, NON_NEG, VAL_STR, 0 },
 	{ "SINCE",             mupip_recover, 0, 0,                     0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
-	{ "TRANSACTION",       mupip_recover, 0, 0,                     0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
+	{ "TRANSACTION",       mupip_recover, 0, 0,        mup_trans_qual, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 	{ "USER",              mupip_recover, 0, 0,                     0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
+	{ "VERBOSE",           mupip_recover, 0, 0,                     0, 0, 0, VAL_DISALLOWED, 1, NON_NEG,     VAL_N_A, 0 },
 	{ "VERIFY",            mupip_recover, 0, 0,                     0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 	{ 0,                   0,             0, 0,                     0, 0,              0, 0,       0,       0 }
 };
@@ -546,10 +558,6 @@ static readonly CLI_PARM mup_set_ftime_parm[] = {
 { "FLUSH_TIME", "100" }
 };
 
-static readonly CLI_PARM mup_set_jnl_parm[] = {
-{ "JOURNAL", "enable,nobefore" }
-};
-
 static	CLI_ENTRY	mup_set_qual[] =
 {
 	{ "ACCESS_METHOD",   mupip_set, 0, 0, mup_set_acc_qual, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0 },
@@ -561,7 +569,7 @@ static	CLI_ENTRY	mup_set_qual[] =
 	{ "FLUSH_TIME",      mupip_set, 0, mup_set_ftime_parm, 0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_TIME, 0 },
 	{ "GLOBAL_BUFFERS",  mupip_set, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 	{ "JNLFILE",         mupip_set, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
-	{ "JOURNAL",         mupip_set, 0, mup_set_jnl_parm, mup_set_journal_qual, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_STR,  0 },
+	{ "JOURNAL",         mupip_set, 0, 0, mup_set_journal_qual, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_STR,  0 },
 	{ "LOCK_SPACE",      mupip_set, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 	{ "PARTIAL_RECOV_BYPASS",	mupip_set, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
 	{ "PREVJNLFILE",     mupip_set, 0, 0, 0, 0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },

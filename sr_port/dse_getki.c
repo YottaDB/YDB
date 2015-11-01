@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ GBLREF mval		curr_gbl_root;
 
 int dse_getki(char *dst, int *len, char *qual, int qual_len)
 {
-	char 		buf[MAX_KEY_SZ + 1], *src, *temp_dst, *bot, *top, *tmp, slit[MAX_KEY_SZ + 1], key_buf[MAX_KEY_SZ + 1];
+	char 		buf[MAX_ZWR_KEY_SZ], *src, *temp_dst, *bot, *top, *tmp, slit[MAX_KEY_SZ + 1], key_buf[MAX_KEY_SZ + 1];
 	char		*end;
 	short int	max_key;
 	unsigned short 	buf_len;
@@ -146,8 +146,8 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 			mval2subsc(&key_subsc, gv_currkey);
 			if (gv_currkey->end >= max_key)
 			{
-				if (0 == (end = (char *)format_targ_key((uchar_ptr_t)buf, MAX_KEY_SZ + 1, gv_currkey, TRUE)))
-					end = &buf[MAX_KEY_SZ];
+				if (0 == (end = (char *)format_targ_key((uchar_ptr_t)buf, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+					end = &buf[MAX_ZWR_KEY_SZ - 1];
 				rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buf, buf);
 			}
 			if (*src != ',')

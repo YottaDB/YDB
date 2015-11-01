@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -270,9 +270,9 @@ void gtmsecshr_init(void)
 	int		create_attempts = 0;
 	int		secshr_sem;
 	int		semop_res;
-	char		*time_ptr;
 	char		*name_ptr;
-	time_t  	now;
+	now_t		now;	/* for GET_CUR_TIME macro */
+	char		time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
 	pid_t		pid;
 	struct sembuf	sop[4];
 	gtmsecshr_mesg	mesg;
@@ -377,9 +377,9 @@ void gtmsecshr_init(void)
 
 void gtmsecshr_exit (int exit_code, boolean_t dump)
 {
-	time_t		now;
 	int		gtmsecshr_sem;
-	char		*time_ptr;
+	now_t		now;	/* for GET_CUR_TIME macro */
+	char		time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
 
 	if (dump)
 	{
@@ -470,8 +470,8 @@ int gtmsecshr_open_log_file (void)
 
 void gtmsecshr_switch_log_file(int sig)
 {
-	char		*time_ptr;
-	time_t  	now;
+	now_t		now;	/* for GET_CUR_TIME macro */
+	char		time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
 	char		newname[MAX_TRANS_NAME_LEN], *err_msg;
 	struct tm       *tm_struct;
 	size_t		dummy;
@@ -571,8 +571,8 @@ int service_request(gtmsecshr_mesg *buf)
 	int			ret_status = 0;
 	int			fn_len, index, basind, save_errno, save_code;
 	int			stat_res;
-	time_t			now;
-	char			*time_ptr;
+	now_t			now;	/* for GET_CUR_TIME macro */
+	char			time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
 	char			*basnam, *fn;
 	struct shmid_ds		temp_shmctl_buf;
 	struct stat		statbuf;
@@ -585,7 +585,7 @@ int service_request(gtmsecshr_mesg *buf)
 	error_def(ERR_GTMSECSHRSRVFFILE);
 	error_def(ERR_TEXT);
 
-	GET_CUR_TIME;		/* For z/OS, repeat before using time_ptr if anything could call ascii lib in between */
+	GET_CUR_TIME;
 	save_code = buf->code;
 	switch(buf->code)
 	{
@@ -595,9 +595,6 @@ int service_request(gtmsecshr_mesg *buf)
 			save_errno = errno;
 			send_msg(VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code,
 					buf->mesg.id, ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to wake up process"), save_errno);
-#ifdef __MVS__
-			GET_CUR_TIME;
-#endif
 			util_out_print("!AD [client pid !UL]", TRUE, CTIME_BEFORE_NL, time_ptr, buf->pid);
 			gtm_putmsg(VARLSTCNT(13)
 				ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id,
@@ -731,9 +728,6 @@ int service_request(gtmsecshr_mesg *buf)
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to remove file"), buf->code);
 			} else
 			{
-#ifdef __MVS__
-				GET_CUR_TIME;
-#endif
 				util_out_print("!AD [client pid !UL] File (!AD) removed", TRUE, CTIME_BEFORE_NL, time_ptr, buf->pid,
 					RTS_ERROR_STRING(buf->mesg.path));
 			}
@@ -746,9 +740,6 @@ int service_request(gtmsecshr_mesg *buf)
 			send_msg(VARLSTCNT(13)
 				ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id,
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to request process to resume processing"), save_errno);
-#ifdef __MVS__
-			GET_CUR_TIME;
-#endif
 			util_out_print("!AD [client pid !UL]", TRUE, CTIME_BEFORE_NL, time_ptr, buf->pid);
 			gtm_putmsg(VARLSTCNT(13)
 				ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id,
@@ -781,9 +772,6 @@ int service_request(gtmsecshr_mesg *buf)
 			send_msg(VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code,
 				buf->mesg.id, ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to write database file header"));
 		}
-#ifdef __MVS__
-		GET_CUR_TIME;
-#endif
 		util_out_print("!AD [client pid !UL] database fileheader (!AD) updated", TRUE, CTIME_BEFORE_NL, time_ptr, buf->pid,
 			fn_len, fn);
 		buf->code = 0;

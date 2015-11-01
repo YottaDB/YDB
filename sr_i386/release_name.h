@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,6 +9,6 @@
  *								*
  ****************************************************************/
 
-#define GTM_RELEASE_NAME 	"GT.M V4.3-001E Linux x86"
+#define GTM_RELEASE_NAME 	"GT.M V4.4-002 Linux x86"
 #define GTM_PRODUCT 		"GT.M"
-#define GTM_VERSION		"V4.3"
+#define GTM_VERSION		"V4.4"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -273,7 +273,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 		cli_get_string_token(eof);
 		if (parms_cnt >= gpcmd_verb->max_parms)
 		{
-			SPRINTF(cli_err_str, "Too many parameters ");
+			SNPRINTF(cli_err_str, MAX_STRLEN, "Too many parameters ");
 			return(-1);
 		}
 		strcpy(parm_ary[parms_cnt++], cli_token_buf);
@@ -288,7 +288,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	opt_str = cli_token_buf;
 	if (!pcmd_parms)
 	{
-		SPRINTF(cli_err_str, "No qualifiers allowed for this command");
+		SNPRINTF(cli_err_str, MAX_STRLEN, "No qualifiers allowed for this command");
 		return(-1);
 	}
 	/* ------------------------------------------
@@ -297,7 +297,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	 */
 	if (!cli_is_qualif(cli_token_buf))
 	{
-		SPRINTF(cli_err_str, "Qualifier expected instead of : %s ", opt_str);
+		SNPRINTF(cli_err_str, MAX_STRLEN, "Qualifier expected instead of : %s ", opt_str);
 		return(-1);
 	}
 	/* -------------------------
@@ -306,7 +306,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	 */
 	if (!cli_look_next_token(eof) || 0 == cli_gettoken(eof))
 	{
-		SPRINTF(cli_err_str, "Qualifier string missing %s ", opt_str);
+		SNPRINTF(cli_err_str, MAX_STRLEN, "Qualifier string missing %s ", opt_str);
 		return(-1);
 	}
 	/* ---------------------------------------
@@ -318,7 +318,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	 * See if option is negated and update
 	 * -------------------------
 	 */
-	if (-1 == (neg_flg = cli_check_negated(&opt_str, &pcmd_parms, &pparm)))
+	if (-1 == (neg_flg = cli_check_negated(&opt_str, pcmd_parms, &pparm)))
 		return(-1);
 	/* --------------------------------------------------
 	 * If there is another level, update global pointers
@@ -341,7 +341,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	{
 		if (cli_look_next_token(eof) && cli_is_assign(cli_token_buf))
 		{
-			SPRINTF(cli_err_str,
+			SNPRINTF(cli_err_str, MAX_STRLEN,
 			  "Assignment is not allowed for this option : %s",
 			  pparm->name);
 			return(-1);
@@ -358,7 +358,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 		{
 	    		if (VAL_REQ == pparm->required)
 			{
-				SPRINTF(cli_err_str, "Option : %s needs value", pparm->name);
+				SNPRINTF(cli_err_str, MAX_STRLEN, "Option : %s needs value", pparm->name);
 				return(-1);
 			}
 			else
@@ -385,6 +385,8 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 				{
 					pparm->pval_str = malloc(strlen(pparm->parm_values->prompt) + 1);
 					strcpy(pparm->pval_str, pparm->parm_values->prompt);
+					if (!cli_get_sub_quals(pparm))
+						return(-1);
 				}
 				return(1);
 			}
@@ -396,7 +398,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 		 */
 		if (!cli_is_assign(cli_token_buf))
 		{
-			SPRINTF(cli_err_str,
+			SNPRINTF(cli_err_str, MAX_STRLEN,
 			  "Assignment missing after option : %s",
 			  pparm->name);
 			return(-1);
@@ -407,7 +409,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 		 */
 		if (!cli_look_next_string_token(eof) || 0 == cli_get_string_token(eof))
 		{
-			SPRINTF(cli_err_str,
+			SNPRINTF(cli_err_str, MAX_STRLEN,
 			  "Unrecognized option : %s, value expected but not found",
 			  pparm->name);
 			cli_lex_in_ptr->tp = 0;
@@ -438,7 +440,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 
 		if (!cli_get_sub_quals(pparm))
 			return(-1);
-		}
+	}
 	if (pparm->present)
 		pparm->negated = 0;
 	pparm->negated = neg_flg;
@@ -466,7 +468,7 @@ boolean_t cli_numeric_check(CLI_ENTRY *pparm, char *val_str)
 		{
 			if (!cli_is_hex(val_str))
 			{
-				SPRINTF(cli_err_str,
+				SNPRINTF(cli_err_str, MAX_STRLEN,
 				  "Unrecognized value: %s, HEX number expected",
 				  val_str);
 				retval = FALSE;
@@ -474,7 +476,7 @@ boolean_t cli_numeric_check(CLI_ENTRY *pparm, char *val_str)
 		}
 		else if (!cli_is_dcm(val_str))
 		{
-			SPRINTF(cli_err_str,
+			SNPRINTF(cli_err_str, MAX_STRLEN,
 			  "Unrecognized value: %s, Decimal number expected",
 			  val_str);
 			retval = FALSE;
@@ -487,15 +489,15 @@ boolean_t cli_numeric_check(CLI_ENTRY *pparm, char *val_str)
  * Check if option is negated
  *---------------------------
  */
-int cli_check_negated(char **opt_str_ptr, CLI_ENTRY **pcmd_parm_ptr, CLI_ENTRY **pparm_ptr)
+int cli_check_negated(char **opt_str_ptr, CLI_ENTRY *pcmd_parm_ptr, CLI_ENTRY **pparm_ptr)
 {
 	int 		neg_flg;
 	CLI_ENTRY	*pcmd_parms;
 	char		*opt_str_tmp;
 
-	pcmd_parms = *pcmd_parm_ptr;
+	pcmd_parms = pcmd_parm_ptr;
 	opt_str_tmp = *opt_str_ptr;
-	if (0 == memcmp(*opt_str_ptr, NO_STRING, sizeof(NO_STRING) - 1))
+	if (0 == MEMCMP_LIT(*opt_str_ptr, NO_STRING))
 	{
 		*opt_str_ptr += sizeof(NO_STRING) - 1;
 		neg_flg = 1;
@@ -511,7 +513,7 @@ int cli_check_negated(char **opt_str_ptr, CLI_ENTRY **pcmd_parm_ptr, CLI_ENTRY *
 		/* Check that the qualifier does not have the NO prefix */
 		if (0 == (*pparm_ptr = find_cmd_param(opt_str_tmp, pcmd_parms, FALSE)))
 		{
-			SPRINTF(cli_err_str, "Unrecognized option : %s", *opt_str_ptr);
+			SNPRINTF(cli_err_str, MAX_STRLEN, "Unrecognized option : %s", *opt_str_ptr);
 			cli_lex_in_ptr->tp = 0;
 			return(-1);
 		} else
@@ -527,7 +529,7 @@ int cli_check_negated(char **opt_str_ptr, CLI_ENTRY **pcmd_parm_ptr, CLI_ENTRY *
 	 */
 	if (!(*pparm_ptr)->negatable && neg_flg)
 	{
-		SPRINTF(cli_err_str, "Option %s may not be negated", *opt_str_ptr);
+		SNPRINTF(cli_err_str, MAX_STRLEN, "Option %s may not be negated", *opt_str_ptr);
 		return(-1);
 	}
 	return neg_flg;
@@ -549,7 +551,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 	char		local_str[MAX_LINE], tmp_str[MAX_LINE], *tmp_str_ptr;
 	char 		*ptr_next_val, *ptr_next_comma, *ptr_equal;
 	int		len_str, neg_flg, ptr_equal_len;
-	boolean_t	val_flg;
+	boolean_t	val_flg, has_a_qual = FALSE;
 
 	pparm_qual = pparm->qual_vals;
 	if (!pparm_qual)
@@ -580,7 +582,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 			 * See if option is negated
 			 * -------------------------
 			 */
-			if (-1 == (neg_flg = cli_check_negated( &tmp_str_ptr, &pparm_qual, &pparm1)))
+			if (-1 == (neg_flg = cli_check_negated( &tmp_str_ptr, pparm_qual, &pparm1)))
 				return FALSE;
 			if ( 1 == neg_flg)
 				len_str -=  strlen(NO_STRING);
@@ -599,7 +601,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 			{
 				if (val_flg)
 				{
-					SPRINTF(cli_err_str,
+					SNPRINTF(cli_err_str, MAX_STRLEN,
 					  "Assignment is not allowed for this option : %s",
 					  pparm1->name);
 					cli_lex_in_ptr->tp = 0;
@@ -610,11 +612,11 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 				if ((!val_flg) && VAL_REQ == pparm1->required)
 				{
 					if (ptr_equal)
-						SPRINTF(cli_err_str,
+						SNPRINTF(cli_err_str, MAX_STRLEN,
 						  "Unrecognized option : %s, value expected but not found",
 						  pparm1->name);
 					else
-						SPRINTF(cli_err_str, "Option : %s needs value", tmp_str_ptr);
+						SNPRINTF(cli_err_str, MAX_STRLEN, "Option : %s needs value", tmp_str_ptr);
 					cli_lex_in_ptr->tp = 0;
 					return FALSE;
 				}
@@ -649,12 +651,13 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 				pparm->negated = 0;
 			pparm1->negated = neg_flg;
 			pparm1->present = CLI_PRESENT;
+			has_a_qual = TRUE;
 			if ((tmp_str_ptr + len_str) != ptr_next_comma)
 			{
 				ptr_next_val = strchr(ptr_next_val, ',')+ 1;
 				if (!*ptr_next_val)
 				{
-					SPRINTF(cli_err_str, "Option expected", tmp_str_ptr);
+					SNPRINTF(cli_err_str, MAX_STRLEN, "Option expected", tmp_str_ptr);
 					cli_lex_in_ptr->tp = 0;
 					return FALSE;
 
@@ -664,6 +667,20 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 				ptr_next_val = NULL;
 		}
 	}
+	/* do one last parse on the qualifier table, if there is any other qualifier present,
+	 * the DEFA_PRESENT one is not necessary, otherwise leave it as it is.
+	 */
+	if (has_a_qual)
+	{
+		pparm1 = pparm_qual;
+		while (0 != *pparm1->name)
+		{
+			if (CLI_DEFAULT == pparm1->present)
+				pparm1->present = CLI_ABSENT;
+			pparm1++;
+		}
+	}
+
 	return TRUE;
 }
 
@@ -736,14 +753,14 @@ int parse_cmd(void)
 	}
 	else
 	{
-		SPRINTF(cli_err_str, "Unrecognized command: %s", cmd_str);
+		SNPRINTF(cli_err_str, MAX_STRLEN, "Unrecognized command: %s", cmd_str);
 		cli_lex_in_ptr->tp = 0;
 		res = -1;
 	}
 	if (1 > opt_cnt && -1 != res
 	    && VAL_REQ == cmd_ary[cmd_ind].required)
 	{
-		SPRINTF(cli_err_str,
+		SNPRINTF(cli_err_str, MAX_STRLEN,
 		  "Command argument expected, but not found");
 		res = -1;
 	}

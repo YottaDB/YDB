@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -370,8 +370,9 @@ int main(int argc, char **argv, char **envp)
 	mstr			node_name;
 	cmi_descriptor		service_descr, log_path_descr;
 	unsigned short		service_len, log_path_len;
-	char			nbuff[256], *ptr, service[512], *time_ptr;
-	time_t			now;
+	char			nbuff[256], *ptr, service[512];
+	now_t			now;	/* for GET_CUR_TIME macro */
+	char			time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
 	pid_t			pid;
 	struct sigaction	act;
 

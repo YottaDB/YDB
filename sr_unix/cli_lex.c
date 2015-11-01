@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,8 +24,6 @@
 
 #include "cli.h"
 #include "eintr_wrappers.h"
-
-extern int errno;
 
 GBLDEF char cli_token_buf[MAX_LINE+1];	/* Token buffer */
 GBLREF int	cmd_cnt;

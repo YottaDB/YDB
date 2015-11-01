@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -121,8 +121,16 @@ void op_zedit(mval *v, mval *p)
 			objcnt = zro_root->count;
 			for (sp = zro_root + 1;  (NULL == srcdir) && (0 < objcnt--); ++sp)
 			{
-				if (ZRO_TYPE_OBJECT == sp->type && 0 != (++sp)->count)
-					srcdir  = sp;
+				if (ZRO_TYPE_OBJECT == sp->type)
+				{
+					sp++;
+					assert(ZRO_TYPE_COUNT == sp->type);
+					if (0 != sp->count)
+						srcdir  = sp + 1;
+				} else
+				{  /* shared library entries (ZRO_TYPE_OBJLIB) do not have source directories */
+					assert(ZRO_TYPE_OBJLIB == sp->type);
+				}
 			}
 		}
 		if (srcdir && srcdir->str.len)

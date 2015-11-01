@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,8 @@
 #include "gtmsource.h"
 #include "repl_comm.h"
 #include "jnl.h"
+#include "hashdef.h"
+#include "buddy_list.h"
 #include "muprec.h"
 #include "repl_ctl.h"
 #include "repl_errno.h"
@@ -131,7 +133,7 @@ int gtmsource_process(void)
 
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
-	error_def(ERR_JNLRECFMT);
+	error_def(ERR_REPLRECFMT);
 	error_def(ERR_JNLSETDATA2LONG);
 	error_def(ERR_JNLNEWREC);
 
@@ -225,13 +227,9 @@ int gtmsource_process(void)
 			if (SS_NORMAL == (srch_status = gtmsource_srch_restart(recvd_seqno, recvd_start_flags)))
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sending REPL_WILL_RESTART\n");
-				if (remote_jnl_ver > JNL_VER_EARLIEST_REPL)
-				{
-					memset(gtmsource_msgp, 0, MIN_REPL_MSGLEN); /* to idenitify older releases in the future */
-					gtmsource_msgp->type = REPL_WILL_RESTART_WITH_INFO;
-					((repl_start_reply_msg_ptr_t)gtmsource_msgp)->jnl_ver = jnl_ver;
-				} else
-					gtmsource_msgp->type = REPL_WILL_RESTART;
+				memset(gtmsource_msgp, 0, MIN_REPL_MSGLEN); /* to idenitify older releases in the future */
+				gtmsource_msgp->type = REPL_WILL_RESTART_WITH_INFO;
+				((repl_start_reply_msg_ptr_t)gtmsource_msgp)->jnl_ver = jnl_ver;
 				recvd_start_flags = START_FLAG_NONE;
 			} else /* srch_restart returned EREPL_SEC_AHEAD */
 			{
@@ -272,11 +270,9 @@ int gtmsource_process(void)
 				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 					  RTS_ERROR_LITERAL("Error sending ROLLBACK FIRST message. Error in select"), status);
 		}
-		if (REPL_WILL_RESTART != gtmsource_msgp->type && REPL_WILL_RESTART_WITH_INFO != gtmsource_msgp->type)
+		if (REPL_WILL_RESTART_WITH_INFO != gtmsource_msgp->type)
 		{
-			assert(gtmsource_msgp->type == REPL_RESYNC_SEQNO ||
-			       gtmsource_msgp->type == REPL_ROLLBACK_FIRST);
-
+			assert(gtmsource_msgp->type == REPL_RESYNC_SEQNO || gtmsource_msgp->type == REPL_ROLLBACK_FIRST);
 			if (REPL_RESYNC_SEQNO == gtmsource_msgp->type)
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "RESYNC_SEQNO msg sent with SEQNO "INT8_FMT"\n",
@@ -347,18 +343,18 @@ int gtmsource_process(void)
 		poll_time = gtmsource_poll_immediate;
 		gtmsource_state = GTMSOURCE_SENDING_JNLRECS;
 		gtmsource_init_heartbeat();
-		assert((intlfltr_t)0 != repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
-							    [remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
-		assert((intlfltr_t)0 != repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
-							    [jnl_ver - JNL_VER_EARLIEST_REPL]);
 		if (jnl_ver > remote_jnl_ver && IF_NONE != repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
 									       [remote_jnl_ver - JNL_VER_EARLIEST_REPL])
 		{
-			gtmsource_filter |= INTERNAL_FILTER;
-			gtmsource_alloc_filter_buff(gtmsource_msgbufsiz);
+			assert(IF_INVALID != repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
+								 [remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
+			assert(IF_INVALID != repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
+								 [jnl_ver - JNL_VER_EARLIEST_REPL]);
 			/* reverse transformation should exist */
 			assert(IF_NONE != repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
 							      [jnl_ver - JNL_VER_EARLIEST_REPL]);
+			gtmsource_filter |= INTERNAL_FILTER;
+			gtmsource_alloc_filter_buff(gtmsource_msgbufsiz);
 		} else
 		{
 			gtmsource_filter &= ~INTERNAL_FILTER;
@@ -474,6 +470,8 @@ int gtmsource_process(void)
 						gtmsource_process_heartbeat((repl_heartbeat_msg_t *)gtmsource_msgp);
 						break;
 					default:
+						repl_log(gtmsource_log_fp, TRUE, TRUE, "Message of unknown type (%d) received\n",
+								gtmsource_msgp->type);
 						break;
 				}
 			} else if (SS_NORMAL != status)
@@ -551,7 +549,7 @@ int gtmsource_process(void)
 					     	while ((status =
 							repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
 									    [remote_jnl_ver - JNL_VER_EARLIEST_REPL](
-								in_buff, &in_size, out_buff, &out_size, out_bufsiz)) == -1 &&
+								in_buff, &in_size, out_buff, &out_size, out_bufsiz)) != SS_NORMAL &&
 						       EREPL_INTLFILTER_NOSPC == repl_errno)
 						{
 							save_filter_buff = repl_filter_buff;
@@ -562,14 +560,14 @@ int gtmsource_process(void)
 							out_buff = repl_filter_buff + (out_buff - save_filter_buff) + out_size;
 							tot_out_size += out_size;
 						}
-						if (0 == status)
+						if (SS_NORMAL == status)
 						{
 							data_len = tot_out_size + out_size;
 							send_msgp = (repl_msg_ptr_t)repl_filter_buff;
 						} else
 						{
 							if (EREPL_INTLFILTER_BADREC == repl_errno)
-								rts_error(VARLSTCNT(1) ERR_JNLRECFMT);
+								rts_error(VARLSTCNT(1) ERR_REPLRECFMT);
 							else if (EREPL_INTLFILTER_DATA2LONG == repl_errno)
 								rts_error(VARLSTCNT(4) ERR_JNLSETDATA2LONG, 2, jnl_source_datalen,
 								  	  jnl_dest_maxdatalen);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,27 +96,6 @@ typedef struct repl_ctl_struct
 	struct repl_ctl_struct	*prev;
 	struct repl_ctl_struct	*next;
 } repl_ctl_element;
-
-#define JNL_FILE_FIRST_RECORD	ROUND_UP(sizeof(jnl_file_header), DISK_BLOCK_SIZE)	/* Defined in mur_read_file.c too */
-
-#define IS_REPL_RECTYPE(jrec_type) (jrec_type == JRT_ZTCOM  || \
-			    	    jrec_type == JRT_KILL   || \
-			    	    jrec_type == JRT_FKILL  || \
-			    	    jrec_type == JRT_GKILL  || \
-			    	    jrec_type == JRT_SET    || \
-			    	    jrec_type == JRT_FSET   || \
-			    	    jrec_type == JRT_GSET   || \
-			    	    jrec_type == JRT_TKILL  || \
-			    	    jrec_type == JRT_UKILL  || \
-			    	    jrec_type == JRT_TSET   || \
-			    	    jrec_type == JRT_USET   || \
-			    	    jrec_type == JRT_TCOM   || \
-			    	    jrec_type == JRT_ZKILL  || \
-			    	    jrec_type == JRT_FZKILL || \
-			    	    jrec_type == JRT_GZKILL || \
-			    	    jrec_type == JRT_TZKILL || \
-			    	    jrec_type == JRT_UZKILL || \
-				    jrec_type == JRT_NULL)
 
 #define JNL_BLK_DSKADDR(addr, blksize) \
 	((ROUND_DOWN((addr), (blksize)) > JNL_FILE_FIRST_RECORD) ? \

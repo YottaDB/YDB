@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,7 +71,7 @@ GBLREF gv_key		*gv_currkey;
 void op_merge_arg(int m_opr_type, lv_val *lvp)
 {
 	int 			maxkeysz;
-	unsigned char		buff[MAX_STRLEN], *end;
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;
 	char			*err_str;
 
 	error_def(ERR_UNIMPLOP);
@@ -116,7 +116,7 @@ void op_merge_arg(int m_opr_type, lv_val *lvp)
 		{ /* M ^LHS=^RHS where RHS resides on a remote node served by a GTCM server that does not support QUERYGET
 		   * operation won't work */
 			assert(dba_cm == gv_cur_region->dyn.addr->acc_meth); /* we should've covered all access methods */
-			end = format_targ_key(buff, MAX_STRLEN, gv_currkey, TRUE);
+			end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
 			rts_error(VARLSTCNT(14) ERR_UNIMPLOP, 0,
 				  	        ERR_TEXT, 2, LEN_AND_LIT("GT.CM server does not support MERGE operation"),
 				  		ERR_GVIS, 2, end - buff, buff,

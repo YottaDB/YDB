@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,9 +82,9 @@ void jnl_send_oper(jnl_private_control *jpc, uint4 status)
 	fsync_in_prog = jb->fsync_in_prog_latch.latch_pid ? TRUE : FALSE;
 	fsync_pid     = jb->fsync_in_prog_latch.latch_pid;
 	/* note: the alignment of the parameters below is modelled on the alignment defined for JNLBUFINFO in merrors.msg */
-	send_msg(VARLSTCNT(18) ERR_JNLBUFINFO, 16, process_id,
-			     jb->dsk,     jb->free, jb->bytcnt,  io_in_prog,     fsync_in_prog,
-			 jb->dskaddr, jb->freeaddr, jb->qiocnt,  now_writer,         fsync_pid,
-			jb->filesize, jb->lastaddr, jb->errcnt, jb->wrtsize, jb->fsync_dskaddr);
+	send_msg(VARLSTCNT(17) ERR_JNLBUFINFO, 15, process_id,
+			jb->dsk,      jb->free,     jb->bytcnt,  io_in_prog,     fsync_in_prog,
+			jb->dskaddr,  jb->freeaddr, jb->qiocnt,  now_writer,     fsync_pid,
+			jb->filesize, jb->errcnt,   jb->wrtsize, jb->fsync_dskaddr);
 	caller_id_flag = TRUE;
 }

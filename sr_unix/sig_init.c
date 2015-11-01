@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,21 +22,22 @@
 #include "suspsigs_handler.h"
 #include "gtmci_signals.h"
 
-GBLREF boolean_t	disable_sigcont;
+GBLREF 	boolean_t		disable_sigcont;
 
 void	null_handler(int sig);
 
-void	sig_init(void (*signal_handler)(), void (*ctrlc_handler)())
+void sig_init(void (*signal_handler)(), void (*ctrlc_handler)())
 {
 	struct sigaction 	ignore, act;
+	int			sig;
 
 	memset(&act, 0, sizeof(act));
 	sigemptyset(&act.sa_mask);
 	ignore = act;
 	ignore.sa_handler = SIG_IGN;
 
-	/* init all gtm handlers and save (possibly) external handlers */
-	sig_save_ext(&ignore);
+	for (sig = 1; sig <= NSIG; sig++)
+		sigaction(sig, &ignore, NULL);
 
         /* --------------------------------------------------------------
 	 * Tandem hack:  rather than ignore SIGHUP, we must catch it
@@ -58,19 +59,6 @@ void	sig_init(void (*signal_handler)(), void (*ctrlc_handler)())
 	sigaction(SIGCLD, &act, 0);
 
 	/* --------------------------------------------------------------
-	 * Signals that suspend a process
-	 * --------------------------------------------------------------
-	 */
-#ifdef __sparc
-	act.sa_handler = suspsigs_handler;
-#else
-	act.sa_sigaction = suspsigs_handler;
-#endif
-	sigaction(SIGTSTP, &act, 0);
-	sigaction(SIGTTIN, &act, 0);
-	sigaction(SIGTTOU, &act, 0);
-
-	/* --------------------------------------------------------------
 	 * Give us extra info on the following signals and a full core
 	 * if necessary.
 	 * --------------------------------------------------------------
@@ -78,15 +66,19 @@ void	sig_init(void (*signal_handler)(), void (*ctrlc_handler)())
 	act.sa_flags = SA_SIGINFO;
 
 	/* --------------------------------------------------------------
+	 * Signals that suspend a process
+	 * --------------------------------------------------------------
+	 */
+	act.sa_sigaction = suspsigs_handler;
+	sigaction(SIGTSTP, &act, 0);
+	sigaction(SIGTTIN, &act, 0);
+	sigaction(SIGTTOU, &act, 0);
+
+	/* --------------------------------------------------------------
 	 * Set special rundown handler for the following terminal signals
 	 * --------------------------------------------------------------
 	 */
-#ifdef __sparc
-	act.sa_handler = signal_handler;
-#else
-	act.sa_handler = NULL;
 	act.sa_sigaction = signal_handler;
-#endif
 
 	sigaction(SIGABRT, &act, 0);
 	sigaction(SIGBUS, &act, 0);
@@ -117,11 +109,7 @@ void	sig_init(void (*signal_handler)(), void (*ctrlc_handler)())
 	 */
 	if (NULL != ctrlc_handler)
 	{
-#ifdef __sparc
-		act.sa_handler = ctrlc_handler;
-#else
 		act.sa_sigaction = ctrlc_handler;
-#endif
 		sigaction(SIGINT, &act, 0);
 	}
 
@@ -132,21 +120,16 @@ void	sig_init(void (*signal_handler)(), void (*ctrlc_handler)())
 #ifndef DISABLE_SIGCONT_PROCESSING
 	if (FALSE == disable_sigcont)
 	{
-#ifdef __sparc
-		act.sa_handler = continue_handler;
-#else
 		act.sa_sigaction = continue_handler;
-#endif
 		sigaction(SIGCONT, &act, 0);
 	}
 #else
 	disable_sigcont = TRUE;
 #endif
-	sig_save_gtm(); /* record all gtm handlers */
 }
 
 /* Provide null signal handler */
 void	null_handler(int sig)
 {
-        /* */
+	/* */
 }

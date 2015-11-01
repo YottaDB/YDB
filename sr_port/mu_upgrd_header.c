@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -142,7 +142,7 @@ void mu_upgrd_header(v3_sgmnt_data *old_head, sgmnt_data *new_head)
 		 * Initialize them appropriately.
 		 */
 		new_head->epoch_interval = DEFAULT_EPOCH_INTERVAL;
-		new_head->alignsize = DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE;
+		new_head->alignsize = DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE;
 		if (!new_head->jnl_alq)
 			new_head->jnl_alq = JNL_ALLOC_DEF;
 		/* note new_head->jnl_deq is carried over without any change even if it is zero since a zero

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -503,7 +503,7 @@ static void process_tr_buff(void)
 					out_buff = repl_filter_buff;
 					out_bufsiz = repl_filter_bufsiz;
 					tot_out_size = 0;
-					while (-1 == (status =
+					while (SS_NORMAL != (status =
 						repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
 								    [jnl_ver - JNL_VER_EARLIEST_REPL](
 							in_buff, &in_size, out_buff, &out_size, out_bufsiz)) &&
@@ -517,7 +517,7 @@ static void process_tr_buff(void)
 						out_buff = repl_filter_buff + (out_buff - save_filter_buff) + out_size;
 						tot_out_size += out_size;
 					}
-					if (0 == status)
+					if (SS_NORMAL == status)
 						write_len = tot_out_size + out_size;
 					else
 					{
@@ -809,7 +809,6 @@ static void do_main_loop(boolean_t crash_restart)
 					}
 					break;
 
-				case REPL_WILL_RESTART:
 				case REPL_WILL_RESTART_WITH_INFO:
 				case REPL_ROLLBACK_FIRST:
 					buffp += buffered_data_len;
@@ -819,35 +818,30 @@ static void do_main_loop(boolean_t crash_restart)
 					{
 						assert(msg_len == MIN_REPL_MSGLEN - REPL_MSG_HDRLEN);
 						QWASSIGN(recvd_jnl_seqno, *(seq_num *)(buffp - msg_len));
-						if (REPL_WILL_RESTART_WITH_INFO == msg_type || REPL_WILL_RESTART == msg_type)
+						if (REPL_WILL_RESTART_WITH_INFO == msg_type)
 						{
 							repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received WILL_START message. "
 											     "Primary acked the restart point\n");
-							if (REPL_WILL_RESTART_WITH_INFO == msg_type) /* V4.2+ */
-								remote_jnl_ver = *(buffp - msg_len + sizeof(seq_num));
-							else
-								remote_jnl_ver = JNL_VER_EARLIEST_REPL;
+							remote_jnl_ver = *(buffp - msg_len + sizeof(seq_num));
 							REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n",
 								     jnl_ver, remote_jnl_ver);
-							assert(JNL_VER_EARLIEST_REPL <= jnl_ver &&
-							       JNL_VER_EARLIEST_REPL <= remote_jnl_ver);
-							assert((intlfltr_t)0 !=
-								repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
-										    [remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
-							assert((intlfltr_t)0 !=
-								repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
-										    [jnl_ver - JNL_VER_EARLIEST_REPL]);
+							repl_check_jnlver_compat();
 							if (jnl_ver > remote_jnl_ver &&
 							    IF_NONE != repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
 							                                   [jnl_ver - JNL_VER_EARLIEST_REPL])
 							{
+								assert(IF_INVALID !=
+									repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
+										    	  [remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
+								assert(IF_INVALID !=
+									repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
+										    	    [jnl_ver - JNL_VER_EARLIEST_REPL]);
+								/* reverse transformation should exist */
+								assert(IF_NONE !=
+									repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
+									 		  [remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
 								gtmrecv_filter |= INTERNAL_FILTER;
 								gtmrecv_alloc_filter_buff(gtmrecv_max_repl_msglen);
-								/* reverse transformation should exist */
-								assert(IF_NONE != repl_internal_filter[jnl_ver -
-												       JNL_VER_EARLIEST_REPL]
-									 		  	      [remote_jnl_ver -
-												       JNL_VER_EARLIEST_REPL]);
 							} else
 							{
 								gtmrecv_filter &= ~INTERNAL_FILTER;
@@ -858,19 +852,6 @@ static void do_main_loop(boolean_t crash_restart)
 									repl_filter_bufsiz = 0;
 								}
 							}
-							VMS_ONLY
-							(
-							 	/* No customer has a version prior to V4.3-001 running replication
-								 * in production. We expect customers who want to run replication
-								 * to upgrade to V4.3-001. We don't want to write internal filters
-								 * to support rolling upgrades b/n a prior version and V4.3-001.
-								 * Vinaya Feb 27, 2002 */
-								if (V13_JNL_VER > remote_jnl_ver)
-									rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
-									  	LEN_AND_LIT("Rolling upgrade not supported between"
-										            "these two GT.M versions"));
-							)
-
 							/* Don't send any more stopsourcefilter, or updateresync messages */
 							gtmrecv_options.stopsourcefilter = FALSE;
 							gtmrecv_options.updateresync = FALSE;
@@ -890,6 +871,7 @@ static void do_main_loop(boolean_t crash_restart)
 					buffp += buffered_data_len;
 					buff_unprocessed -= buffered_data_len;
 					data_len -= buffered_data_len;
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Message of unknown type (%d) received\n", msg_type);
 					break;
 			}
 			if (repl_connection_reset)

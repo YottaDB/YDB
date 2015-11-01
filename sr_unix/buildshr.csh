@@ -67,13 +67,32 @@ set buildshr_verbose = $?verbose
 set verbose
 set echo
 
+# Building libgtmshr.so shared library
+set aix_loadmap_option = ''
+if ( $HOSTOS == "AIX") then
+	set aix_loadmap_option = "-bcalls:$gtm_map/libgtmshr.loadmap -bmap:$gtm_map/libgtmshr.loadmap -bxref:$gtm_map/libgtmshr.loadmap"
+	# Delete old gtmshr since AIX linker fails to overwrite an already loaded shared library.
+	rm -f $3/libgtmshr$gt_ld_shl_suffix
+endif
+
+$shell $gtm_tools/genexport.csh $gtm_tools/gtmshr_symbols.exp gtmshr_symbols.export
+
+gt_ld $gt_ld_options $gt_ld_shl_options $gt_ld_ci_options $aix_loadmap_option ${gt_ld_option_output}$3/libgtmshr$gt_ld_shl_suffix -L$gtm_obj $gtm_obj/{gtm_main,mumps_clitab}.o \
+		-lmumps -lgnpclient -lcmisockettcp $gt_ld_syslibs >& $gtm_map/libgtmshr.map
+if ( $status != 0 ) then
+	set buildshr_status = `expr $buildshr_status + 1`
+	echo "buildshr-E-linkgtmshr, Failed to link gtmshr (see ${dollar_sign}gtm_map/libgtmshr.map)" \
+		>> $gtm_log/error.`basename $gtm_exe`.log
+endif
+
+
+# Building mumps executable
 set aix_loadmap_option = ''
 if ( $HOSTOS == "AIX") then
 	set aix_loadmap_option = "-bcalls:$gtm_map/mumps.loadmap -bmap:$gtm_map/mumps.loadmap -bxref:$gtm_map/mumps.loadmap"
 endif
 
-gt_ld $gt_ld_options $gt_ld_ci_options $aix_loadmap_option ${gt_ld_option_output}$3/mumps -L$gtm_obj $gtm_obj/{gtm,mumps_clitab}.o $gt_ld_sysrtns \
-		-lmumps -lgnpclient -lcmisockettcp $gt_ld_syslibs >& $gtm_map/mumps.map
+gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/mumps $gtm_obj/gtm.o $gt_ld_sysrtns $gt_ld_syslibs >& $gtm_map/mumps.map
 if ( $status != 0  ||  ! -x $3/mumps ) then
 	set buildshr_status = `expr $buildshr_status + 1`
 	echo "buildshr-E-linkmumps, Failed to link mumps (see ${dollar_sign}gtm_map/mumps.map)" \

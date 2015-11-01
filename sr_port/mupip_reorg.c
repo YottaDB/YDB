@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,11 +50,6 @@ GBLREF gv_namehead	*reorg_gv_target;
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF sgmnt_addrs	*cs_addrs;
 
-#ifdef VMS
-#define cli_get_str cli_get_str_all_piece
-#endif
-
-
 void mupip_reorg(void)
 {
 	boolean_t		resume, reorg_success = TRUE;
@@ -77,8 +72,7 @@ void mupip_reorg(void)
 	reorg_op = DEFAULT;
 	n_len = sizeof(cli_buff);
 	memset(cli_buff, 0, n_len);
-	if (CLI_PRESENT == cli_present("USER_DEFINED_REORG") &&
-		(cli_get_str("USER_DEFINED_REORG", cli_buff, &n_len)))
+	if (CLI_PRESENT == cli_present("USER_DEFINED_REORG") && (CLI_GET_STR_ALL("USER_DEFINED_REORG", cli_buff, &n_len)))
 	{
 		for (ptr = cli_buff; ; )
 		{
@@ -124,7 +118,7 @@ void mupip_reorg(void)
 	memset(cli_buff, 0, n_len);
 	if (CLI_PRESENT != cli_present("EXCLUDE"))
 		exclude_gl_head.next = NULL;
-	else if (FALSE == cli_get_str("EXCLUDE", cli_buff, &n_len))
+	else if (FALSE == CLI_GET_STR_ALL("EXCLUDE", cli_buff, &n_len))
 		exclude_gl_head.next = NULL;
 	else
 	{
@@ -141,7 +135,7 @@ void mupip_reorg(void)
 		n_len = 1;
                 cli_buff[0] = '*';
 	}
-	else if (FALSE == cli_get_str("SELECT", cli_buff, &n_len))
+	else if (FALSE == CLI_GET_STR_ALL("SELECT", cli_buff, &n_len))
 	{
 		n_len = 1;
                 cli_buff[0] = '*';

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,8 @@
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 GBLREF	dollar_stack_type	dollar_stack;			/* structure containing $STACK related information */
 
+/* NOTE: every malloc'd storage here should be free'd in a nested call-in environment.
+ * gtmci_isv_restore (in gtmci_isv.c) needs to be reflected for any future mallocs added here. */
 void	ecode_init(void)
 {
 	dollar_ecode.begin = (char *)malloc(DOLLAR_ECODE_ALLOC);

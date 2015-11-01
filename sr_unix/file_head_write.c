@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,9 +12,8 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <unistd.h>
-#include <fcntl.h>
-
+#include "gtm_unistd.h"
+#include "gtm_fcntl.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -37,7 +36,7 @@
  *	fn : full name of a database file.
  *	header: Pointer to database file header structure (may not be in shared memory)
  */
-boolean_t file_head_write(char *fn, sgmnt_data *header)
+boolean_t file_head_write(char *fn, sgmnt_data_ptr_t header)
 {
 	int 		save_errno, fd, header_size;
 
@@ -45,7 +44,8 @@ boolean_t file_head_write(char *fn, sgmnt_data *header)
 	error_def(ERR_DBNOTGDS);
 
 	header_size = sizeof(sgmnt_data);
-	if (-1 == (fd = OPEN(fn, O_RDWR)))
+	OPENFILE(fn, O_RDWR, fd);
+	if (-1 == fd)
 	{
 		save_errno = errno;
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);

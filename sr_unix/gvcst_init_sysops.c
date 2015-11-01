@@ -105,170 +105,171 @@ error_def(ERR_TEXT);
 
 gd_region *dbfilopn (gd_region *reg)
 {
-        unix_db_info    *udi;
-        parse_blk       pblk;
-        mstr            file;
-        char            *fnptr, fbuff[MAX_FBUFF + 1];
-        struct stat     buf;
-        gd_region       *prev_reg;
-        gd_segment      *seg;
-        int             status;
-        bool            raw;
+	unix_db_info    *udi;
+	parse_blk       pblk;
+	mstr            file;
+	char            *fnptr, fbuff[MAX_FBUFF + 1];
+	struct stat     buf;
+	gd_region       *prev_reg;
+	gd_segment      *seg;
+	int             status;
+	bool            raw;
 	int		stat_res;
 
-        seg = reg->dyn.addr;
-        assert(seg->acc_meth == dba_bg  ||  seg->acc_meth == dba_mm);
-        if (NULL == seg->file_cntl)
-        {
-                seg->file_cntl = (file_control *)malloc(sizeof(*seg->file_cntl));
-                memset(seg->file_cntl, 0, sizeof(*seg->file_cntl));
-        }
-        if (NULL == seg->file_cntl->file_info)
-        {
-                seg->file_cntl->file_info = (void *)malloc(sizeof(unix_db_info));
-                memset(seg->file_cntl->file_info, 0, sizeof(unix_db_info));
-        }
-        file.addr = (char *)seg->fname;
-        file.len = seg->fname_len;
-        memset(&pblk, 0, sizeof(pblk));
-        pblk.buffer = fbuff;
-        pblk.buff_size = MAX_FBUFF;
-        pblk.fop = (F_SYNTAXO | F_PARNODE);
-        memcpy(fbuff,file.addr,file.len);
-        *(fbuff + file.len) = '\0';
-        if (is_raw_dev(fbuff))
-        {
-                raw = TRUE;
-                pblk.def1_buf = DEF_NODBEXT;
-                pblk.def1_size = sizeof(DEF_NODBEXT) - 1;
-        } else
-        {
-                raw = FALSE;
-                pblk.def1_buf = DEF_DBEXT;
-                pblk.def1_size = sizeof(DEF_DBEXT) - 1;
-        }
-        status = parse_file(&file, &pblk);
-        if (!(status & 1))
-        {
-                if (GTCM_GNP_SERVER_IMAGE != image_type)
+	seg = reg->dyn.addr;
+	assert(seg->acc_meth == dba_bg  ||  seg->acc_meth == dba_mm);
+	if (NULL == seg->file_cntl)
+	{
+		seg->file_cntl = (file_control *)malloc(sizeof(*seg->file_cntl));
+		memset(seg->file_cntl, 0, sizeof(*seg->file_cntl));
+	}
+	if (NULL == seg->file_cntl->file_info)
+	{
+		seg->file_cntl->file_info = (void *)malloc(sizeof(unix_db_info));
+		memset(seg->file_cntl->file_info, 0, sizeof(unix_db_info));
+	}
+	file.addr = (char *)seg->fname;
+	file.len = seg->fname_len;
+	memset(&pblk, 0, sizeof(pblk));
+	pblk.buffer = fbuff;
+	pblk.buff_size = MAX_FBUFF;
+	pblk.fop = (F_SYNTAXO | F_PARNODE);
+	memcpy(fbuff,file.addr,file.len);
+	*(fbuff + file.len) = '\0';
+	if (is_raw_dev(fbuff))
+	{
+		raw = TRUE;
+		pblk.def1_buf = DEF_NODBEXT;
+		pblk.def1_size = sizeof(DEF_NODBEXT) - 1;
+	} else
+	{
+		raw = FALSE;
+		pblk.def1_buf = DEF_DBEXT;
+		pblk.def1_size = sizeof(DEF_DBEXT) - 1;
+	}
+	status = parse_file(&file, &pblk);
+	if (!(status & 1))
+	{
+		if (GTCM_GNP_SERVER_IMAGE != image_type)
 		{
 			free(seg->file_cntl->file_info);
-                	free(seg->file_cntl);
-                	seg->file_cntl = 0;
+			free(seg->file_cntl);
+			seg->file_cntl = 0;
 		}
-                rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
-        }
-        assert(pblk.b_esl < sizeof(seg->fname));
-        memcpy(seg->fname, pblk.buffer, pblk.b_esl);
-        pblk.buffer[pblk.b_esl] = 0;
-        seg->fname[pblk.b_esl] = 0;
-        seg->fname_len = pblk.b_esl;
-        if (pblk.fnb & F_HAS_NODE)
-        {	/* Remote node specification given */
-                assert(pblk.b_node && pblk.l_node[pblk.b_node - 1] == ':');
+		rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+	}
+	assert(pblk.b_esl < sizeof(seg->fname));
+	memcpy(seg->fname, pblk.buffer, pblk.b_esl);
+	pblk.buffer[pblk.b_esl] = 0;
+	seg->fname[pblk.b_esl] = 0;
+	seg->fname_len = pblk.b_esl;
+	if (pblk.fnb & F_HAS_NODE)
+	{	/* Remote node specification given */
+		assert(pblk.b_node && pblk.l_node[pblk.b_node - 1] == ':');
 		gvcmy_open(reg, &pblk);
 		return (gd_region *)-1;
-        }
-        fnptr = (char *)seg->fname + pblk.b_node;
-        udi = FILE_INFO(reg);
-        udi->raw = raw;
-        udi->fn = (char *)fnptr;
+	}
+	fnptr = (char *)seg->fname + pblk.b_node;
+	udi = FILE_INFO(reg);
+	udi->raw = raw;
+	udi->fn = (char *)fnptr;
 	OPENFILE(fnptr, O_RDWR, udi->fd);
-        udi->ftok_semid = INVALID_SEMID;
-        udi->semid = INVALID_SEMID;
+	udi->ftok_semid = INVALID_SEMID;
+	udi->semid = INVALID_SEMID;
 	udi->shmid = INVALID_SHMID;
-        udi->sem_ctime = 0;
+	udi->sem_ctime = 0;
 	udi->shm_ctime = 0;
-	((sgmnt_addrs *)&FILE_INFO(reg)->s_addrs)->read_write = TRUE;
-        if (udi->fd == -1)
-        {
-                OPENFILE(fnptr, O_RDONLY, udi->fd);
-                if (udi->fd == -1)
-                {
-                        errno_save = errno;
-                	if (GTCM_GNP_SERVER_IMAGE != image_type)
+	reg->read_only = FALSE;		/* maintain csa->read_write simultaneously */
+	udi->s_addrs.read_write = TRUE;	/* maintain reg->read_only simultaneously */
+	if (udi->fd == -1)
+	{
+		OPENFILE(fnptr, O_RDONLY, udi->fd);
+		if (udi->fd == -1)
+		{
+			errno_save = errno;
+			if (GTCM_GNP_SERVER_IMAGE != image_type)
 			{
 				free(seg->file_cntl->file_info);
 				free(seg->file_cntl);
 				seg->file_cntl = 0;
 			}
-                        rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno_save);
-                }
-                reg->read_only = TRUE;
-		((sgmnt_addrs *)&FILE_INFO(reg)->s_addrs)->read_write = FALSE;
-        }
-        STAT_FILE(fnptr, &buf, stat_res);
-        set_gdid_from_stat(&udi->fileid, &buf);
-        if (prev_reg = gv_match(reg))
-        {
-                close(udi->fd);
-                free(seg->file_cntl->file_info);
-                free(seg->file_cntl);
-                seg->file_cntl = 0;
-                return prev_reg;
-        }
-        return reg;
+			rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno_save);
+		}
+		reg->read_only = TRUE;			/* maintain csa->read_write simultaneously */
+		udi->s_addrs.read_write = FALSE;	/* maintain reg->read_only simultaneously */
+	}
+	STAT_FILE(fnptr, &buf, stat_res);
+	set_gdid_from_stat(&udi->fileid, &buf);
+	if (prev_reg = gv_match(reg))
+	{
+		close(udi->fd);
+		free(seg->file_cntl->file_info);
+		free(seg->file_cntl);
+		seg->file_cntl = 0;
+		return prev_reg;
+	}
+	return reg;
 }
 
 void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd)
 {
-        switch(reg->dyn.addr->acc_meth)
-        {
-        case dba_mm:
+	switch(reg->dyn.addr->acc_meth)
+	{
+	case dba_mm:
 		reg->sec_size = NODE_LOCAL_SPACE + LOCK_SPACE_SIZE(csd) + MMBLK_CONTROL_SIZE(csd)
 			+ JNL_SHARE_SIZE(csd) + BACKUP_BUFFER_SIZE;
-                break;
-        case dba_bg:
+		break;
+	case dba_bg:
 		reg->sec_size = NODE_LOCAL_SPACE + (LOCK_BLOCK(csd) * DISK_BLOCK_SIZE) + LOCK_SPACE_SIZE(csd)
 			+ CACHE_CONTROL_SIZE(csd) + JNL_SHARE_SIZE(csd) + BACKUP_BUFFER_SIZE;
-                break;
-        default:
-                GTMASSERT;
-        }
-        return;
+		break;
+	default:
+		GTMASSERT;
+	}
+	return;
 }
 
 void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 {
 	static boolean_t	mutex_init_done = FALSE;
-        boolean_t       	is_bg, read_only, new_ipc = FALSE;
-        char            	machine_name[MAX_MCNAMELEN];
-        file_control    	*fc;
+	boolean_t       	is_bg, read_only, new_ipc = FALSE;
+	char            	machine_name[MAX_MCNAMELEN];
+	file_control    	*fc;
 	int			gethostname_res, stat_res, mm_prot;
-        int4            	status, semval;
-        sm_long_t       	status_l;
-        sgmnt_addrs     	*csa;
-        sgmnt_data_ptr_t        csd;
-        struct sembuf   	sop[3];
-        struct stat     	stat_buf;
+	int4            	status, semval;
+	sm_long_t       	status_l;
+	sgmnt_addrs     	*csa;
+	sgmnt_data_ptr_t        csd;
+	struct sembuf   	sop[3];
+	struct stat     	stat_buf;
 	union semun		semarg;
 	struct semid_ds		semstat;
 	struct shmid_ds         shmstat;
-        uint4           	sopcnt;
-        unix_db_info    	*udi;
+	uint4           	sopcnt;
+	unix_db_info    	*udi;
 #ifdef periodic_timer_removed
-        void            	periodic_flush_check();
+	void            	periodic_flush_check();
 #endif
 
-        error_def(ERR_CLSTCONFLICT);
-        error_def(ERR_CRITSEMFAIL);
+	error_def(ERR_CLSTCONFLICT);
+	error_def(ERR_CRITSEMFAIL);
 	error_def(ERR_DBNAMEMISMATCH);
 	error_def(ERR_DBIDMISMATCH);
 	error_def(ERR_NLMISMATCHCALC);
 	error_def(ERR_REQRUNDOWN);
 	error_def(ERR_SYSCALL);
 
-        assert(tsd->acc_meth == dba_bg  ||  tsd->acc_meth == dba_mm);
+	assert(tsd->acc_meth == dba_bg  ||  tsd->acc_meth == dba_mm);
 	is_bg = (dba_bg == tsd->acc_meth);
 	read_only = reg->read_only;
-        udi = FILE_INFO(reg);
-        memset(machine_name, 0, sizeof(machine_name));
-        if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, gethostname_res))
-                rts_error(VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Unable to get the hostname"), errno);
+	udi = FILE_INFO(reg);
+	memset(machine_name, 0, sizeof(machine_name));
+	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, gethostname_res))
+		rts_error(VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Unable to get the hostname"), errno);
 	assert(strlen(machine_name) < MAX_MCNAMELEN);
-        csa = &udi->s_addrs;
-        csa->db_addrs[0] = csa->db_addrs[1] = csa->lock_addrs[0] = NULL;   /* to help in dbinit_ch  and gds_rundown */
-        reg->opening = TRUE;
+	csa = &udi->s_addrs;
+	csa->db_addrs[0] = csa->db_addrs[1] = csa->lock_addrs[0] = NULL;   /* to help in dbinit_ch  and gds_rundown */
+	reg->opening = TRUE;
 	/*
 	 * Create ftok semaphore for this region.
 	 * We do not want to make ftok counter semaphore to be 2 for on mupip journal recover process.
@@ -281,18 +282,18 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	 * Say, a.dat and b.dat both has same ftok and we have process A to access a.dat and
 	 * process B to access b.dat. In this case only one can continue to do db_init()
 	 */
-        fc = reg->dyn.addr->file_cntl;
-        fc->file_type = reg->dyn.addr->acc_meth;
-        fc->op = FC_READ;
-        fc->op_buff = (sm_uc_ptr_t)tsd;
-        fc->op_len = sizeof(*tsd);
-        fc->op_pos = 1;
-        dbfilop(fc);		/* Read file header */
+	fc = reg->dyn.addr->file_cntl;
+	fc->file_type = reg->dyn.addr->acc_meth;
+	fc->op = FC_READ;
+	fc->op_buff = (sm_uc_ptr_t)tsd;
+	fc->op_len = sizeof(*tsd);
+	fc->op_pos = 1;
+	dbfilop(fc);		/* Read file header */
 	udi->shmid = tsd->shmid;
 	udi->semid = tsd->semid;
 	udi->sem_ctime = tsd->sem_ctime.ctime;
 	udi->shm_ctime = tsd->shm_ctime.ctime;
-        dbsecspc(reg, tsd); 	/* Find db segment size */
+	dbsecspc(reg, tsd); 	/* Find db segment size */
 	if (!mupip_jnl_recover)
 	{
 		if (INVALID_SEMID == udi->semid)
@@ -380,12 +381,10 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			GTMASSERT;
 		new_ipc = TRUE;
 	}
-        sem_incremented = TRUE;
+	sem_incremented = TRUE;
 	if (new_ipc)
 	{
-		/*
-		 * Create new shared memory using IPC_PRIVATE. System guarantees a unique id.
-		 */
+		/* Create new shared memory using IPC_PRIVATE. System guarantees a unique id */
 #ifdef __MVS__
 		if (-1 == (status_l = udi->shmid = shmget(IPC_PRIVATE, ROUND_UP(reg->sec_size, MEGA_BOUND),
 			__IPC_MEGA | IPC_CREAT | RWDALL)))
@@ -404,19 +403,19 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		tsd->shm_ctime.ctime = udi->shm_ctime = shmstat.shm_ctime;
 	}
 #ifdef DEBUG_DB64
-        status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, next_smseg, SHM_RND));
-        next_smseg = (sm_uc_ptr_t)ROUND_UP((sm_long_t)(next_smseg + reg->sec_size), SHMAT_ADDR_INCS);
+	status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, next_smseg, SHM_RND));
+	next_smseg = (sm_uc_ptr_t)ROUND_UP((sm_long_t)(next_smseg + reg->sec_size), SHMAT_ADDR_INCS);
 #else
-        status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, 0, SHM_RND));
+	status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, 0, SHM_RND));
 #endif
-        if (-1 == status_l)
+	if (-1 == status_l)
 	{
-                rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-                          ERR_TEXT, 2, LEN_AND_LIT("Error attaching to database shared memory"), errno);
+		rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+			  ERR_TEXT, 2, LEN_AND_LIT("Error attaching to database shared memory"), errno);
 	}
 	csa->nl = (node_local_ptr_t)csa->db_addrs[0];
 	csa->critical = (mutex_struct_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
-        assert(((int)csa->critical & 0xf) == 0); 			/* critical should be 16-byte aligned */
+	assert(((int)csa->critical & 0xf) == 0); 			/* critical should be 16-byte aligned */
 #ifdef CACHELINE_SIZE
 	assert(0 == ((int)csa->critical & (CACHELINE_SIZE - 1)));
 #endif
@@ -438,60 +437,61 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			csa->jnl->jnl_buff->cycle = 1;
 		}
 	}
-        if (is_bg)
+	if (is_bg)
 		csd = csa->hdr = (sgmnt_data_ptr_t)(csa->lock_addrs[1] + 1 + CACHE_CONTROL_SIZE(tsd));
 	else
-        {
+	{
 		csa->acc_meth.mm.mmblk_state = (mmblk_que_heads_ptr_t)(csa->lock_addrs[1] + 1);
 		FSTAT_FILE(udi->fd, &stat_buf, stat_res);
 		if (-1 == stat_res)
-                        rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
+			rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
 		mm_prot = read_only ? PROT_READ : (PROT_READ | PROT_WRITE);
 #ifdef DEBUG_DB64
-                if (-1 == (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)get_mmseg((size_t)stat_buf.st_size),
-                                                                           (size_t)stat_buf.st_size,
-                                                                           mm_prot,
+		if (-1 == (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)get_mmseg((size_t)stat_buf.st_size),
+									   (size_t)stat_buf.st_size,
+									   mm_prot,
 									   GTM_MM_FLAGS, udi->fd, (off_t)0)))
-                        rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
+			rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
 		put_mmseg((caddr_t)(csa->db_addrs[0]), (size_t)stat_buf.st_size);
 #else
-                if (-1 == (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)NULL,
-                                                                           (size_t)stat_buf.st_size,
-                                                                           mm_prot,
-                                                                           GTM_MM_FLAGS, udi->fd, (off_t)0)))
-                        rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
+		if (-1 == (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)NULL,
+									   (size_t)stat_buf.st_size,
+									   mm_prot,
+									   GTM_MM_FLAGS, udi->fd, (off_t)0)))
+			rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
 #endif
-                csa->db_addrs[1] = csa->db_addrs[0] + stat_buf.st_size - 1;
+		csa->db_addrs[1] = csa->db_addrs[0] + stat_buf.st_size - 1;
 		csd = csa->hdr = (sgmnt_data_ptr_t)csa->db_addrs[0];
-        }
-        if (!csa->nl->glob_sec_init)
-        {
-                if (is_bg)
+	}
+	if (!csa->nl->glob_sec_init)
+	{
+		assert(new_ipc);
+		if (is_bg)
 			*csd = *tsd;
-                if (csd->machine_name[0])                  /* crash occured */
-                {
-                        if (0 != memcmp(csd->machine_name, machine_name, MAX_MCNAMELEN))  /* crashed on some other node */
+		if (csd->machine_name[0])                  /* crash occured */
+		{
+			if (0 != memcmp(csd->machine_name, machine_name, MAX_MCNAMELEN))  /* crashed on some other node */
 				rts_error(VARLSTCNT(6) ERR_CLSTCONFLICT, 4, DB_LEN_STR(reg), LEN_AND_STR(csd->machine_name));
 			else
 				rts_error(VARLSTCNT(6) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csd->machine_name));
-                }
+		}
 		if (is_bg)
 		{
-                        bt_malloc(csa);
-                        csa->nl->cache_off = -CACHE_CONTROL_SIZE(tsd);
-                        db_csh_ini(csa);
-                }
-                db_csh_ref(csa);
+			bt_malloc(csa);
+			csa->nl->cache_off = -CACHE_CONTROL_SIZE(tsd);
+			db_csh_ini(csa);
+		}
+		db_csh_ref(csa);
 		strcpy(csa->nl->machine_name, machine_name);					/* machine name */
 		assert(MAX_REL_NAME > gtm_release_name_len);
-                memcpy(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
+		memcpy(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
 		memcpy(csa->nl->label, GDS_LABEL, GDS_LABEL_SZ - 1);				/* GDS label */
 		memcpy(csa->nl->fname, reg->dyn.addr->fname, reg->dyn.addr->fname_len);		/* database filename */
 		csa->nl->creation_date_time = csd->creation.date_time;
-                csa->nl->highest_lbm_blk_changed = -1;
-                csa->nl->wcs_timers = -1;
-                csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
-                csa->nl->unique_id.uid = FILE_INFO(reg)->fileid;            /* save what file we initialized this storage for */
+		csa->nl->highest_lbm_blk_changed = -1;
+		csa->nl->wcs_timers = -1;
+		csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
+		csa->nl->unique_id.uid = FILE_INFO(reg)->fileid;            /* save what file we initialized this storage for */
 		/* save pointers in csa to access shared memory */
 		csa->nl->critical = (sm_off_t)((sm_uc_ptr_t)csa->critical - (sm_uc_ptr_t)csa->nl);
 		if (JNL_ALLOWED(csa))
@@ -512,23 +512,23 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 #include "tab_db_csh_acct_rec.h"
 #undef TAB_DB_CSH_ACCT_REC
 		}
-                if (!read_only)
-                {
-                        if (is_bg)
-                        {
-                                assert(memcmp(csd, GDS_LABEL, GDS_LABEL_SZ - 1) == 0);
-                                LSEEKWRITE(udi->fd, (off_t)0, (sm_uc_ptr_t)csd, sizeof(sgmnt_data), errno_save);
-                                if (0 != errno_save)
-                                {
-                                        rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-                                                  ERR_TEXT, 2, LEN_AND_LIT("Error with database write"), errno_save);
-                                }
-                        }
-                }
-                reg->dyn.addr->ext_blk_count = csd->extension_size;
-                mlk_shr_init(csa->lock_addrs[0], csd->lock_space_size, csa, (FALSE == read_only));
+		if (!read_only)
+		{
+			if (is_bg)
+			{
+				assert(memcmp(csd, GDS_LABEL, GDS_LABEL_SZ - 1) == 0);
+				LSEEKWRITE(udi->fd, (off_t)0, (sm_uc_ptr_t)csd, sizeof(sgmnt_data), errno_save);
+				if (0 != errno_save)
+				{
+					rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+						  ERR_TEXT, 2, LEN_AND_LIT("Error with database write"), errno_save);
+				}
+			}
+		}
+		reg->dyn.addr->ext_blk_count = csd->extension_size;
+		mlk_shr_init(csa->lock_addrs[0], csd->lock_space_size, csa, (FALSE == read_only));
 		DEBUG_ONLY(locknl = csa->nl;)	/* for DEBUG_ONLY LOCK_HIST macro */
-                gtm_mutex_init(reg, NUM_CRIT_ENTRY, FALSE);
+		gtm_mutex_init(reg, NUM_CRIT_ENTRY, FALSE);
 		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		if (read_only)
 			csa->nl->remove_shm = TRUE;	/* gds_rundown can remove shmem if first process has read-only access */
@@ -536,22 +536,22 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		csa->nl->glob_sec_init = TRUE;
 		STAT_FILE((char *)csa->nl->fname, &stat_buf, stat_res);
 		if (-1 == stat_res)
-                	rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
+			rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
 		set_gdid_from_stat(&csa->nl->unique_id.uid, &stat_buf);
-        } else
-        {
-                if (strcmp(csa->nl->machine_name, machine_name))       /* machine names do not match */
-                {
+	} else
+	{
+		if (strcmp(csa->nl->machine_name, machine_name))       /* machine names do not match */
+		{
 			if (csa->nl->machine_name[0])
 				rts_error(VARLSTCNT(6) ERR_CLSTCONFLICT, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name));
 			else
 				rts_error(VARLSTCNT(6) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name));
-                }
+		}
 		/* Since nl is memset to 0 initially and then fname is copied over from gv_cur_region and since "fname" is
 		 * guaranteed to not exceed MAX_FN_LEN, we should have a terminating '\0' atleast at csa->nl->fname[MAX_FN_LEN]
 		 */
 		assert(csa->nl->fname[MAX_FN_LEN] == '\0');	/* Note: the first '\0' in csa->nl->fname can be much earlier */
-                if (FALSE == is_gdid_gdid_identical(&FILE_INFO(reg)->fileid, &csa->nl->unique_id.uid) ||
+		if (FALSE == is_gdid_gdid_identical(&FILE_INFO(reg)->fileid, &csa->nl->unique_id.uid) ||
 						csa->nl->creation_date_time != csd->creation.date_time)
 		{
 			send_msg(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
@@ -563,8 +563,8 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		STAT_FILE((char *)csa->nl->fname, &stat_buf, stat_res);
 		if (-1 == stat_res)
 		{
-                        send_msg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid, errno);
-                        rts_error(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid, errno);
+			send_msg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid, errno);
+			rts_error(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid, errno);
 		}
 		/* Check whether csa->nl->fname and csa->nl->unique_id.uid are in sync.
 		 * If not its a serious condition. Error out. */
@@ -575,16 +575,22 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			rts_error(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
 				ERR_TEXT, 2, LEN_AND_LIT("Database filename and fileid in shared memory are not in sync"));
 		}
+		if (csa->nl->donotflush_dbjnl)
+		{
+			assert(FALSE);
+			rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
+				ERR_TEXT, 2, LEN_AND_LIT("mupip recover/rollback created shared memory. Needs MUPIP RUNDOWN"));
+		}
 		/* verify pointers from our calculation vs. the copy in shared memory */
 		if (csa->nl->critical != (sm_off_t)((sm_uc_ptr_t)csa->critical - (sm_uc_ptr_t)csa->nl))
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
 				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("critical"),
-				  	(uint4)((sm_uc_ptr_t)csa->critical - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->critical);
+					(uint4)((sm_uc_ptr_t)csa->critical - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->critical);
 		if ((JNL_ALLOWED(csa)) &&
 		    (csa->nl->jnl_buff != (sm_off_t)((sm_uc_ptr_t)csa->jnl->jnl_buff - (sm_uc_ptr_t)csa->nl)))
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
 				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("journal buffer"),
-				  	(uint4)((sm_uc_ptr_t)csa->jnl->jnl_buff - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->jnl_buff);
+					(uint4)((sm_uc_ptr_t)csa->jnl->jnl_buff - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->jnl_buff);
 		if (csa->nl->backup_buffer != (sm_off_t)((sm_uc_ptr_t)csa->backup_buffer - (sm_uc_ptr_t)csa->nl))
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
 				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("backup buffer"),
@@ -592,14 +598,14 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		if ((is_bg) && (csa->nl->hdr != (sm_off_t)((sm_uc_ptr_t)csd - (sm_uc_ptr_t)csa->nl)))
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
 				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("file header"),
-				  	(uint4)((sm_uc_ptr_t)csd - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->hdr);
+					(uint4)((sm_uc_ptr_t)csd - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->hdr);
 		if (csa->nl->lock_addrs != (sm_off_t)((sm_uc_ptr_t)csa->lock_addrs[0] - (sm_uc_ptr_t)csa->nl))
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
 				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("lock address"),
 				  (uint4)((sm_uc_ptr_t)csa->lock_addrs[0] - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->lock_addrs);
-        }
-        if (-1 == (semval = semctl(udi->semid, 1, GETVAL))) /* semval = number of process attached */
-        {
+	}
+	if (-1 == (semval = semctl(udi->semid, 1, GETVAL))) /* semval = number of process attached */
+	{
 		errno_save = errno;
 		gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
 		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl()"), CALLFROM, errno_save);
@@ -637,7 +643,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	csa->ref_cnt++;		/* Currently journaling logic in gds_rundown() in VMS relies on this order to detect last writer */
 	if (!mupip_jnl_recover)
 	{
- 		/* Release control lockout now that it is init'd */
+		/* Release control lockout now that it is init'd */
 		if (0 != (errno_save = do_semop(udi->semid, 0, -1, SEM_UNDO)))
 		{
 			errno_save = errno;
@@ -660,5 +666,5 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 #endif
 		mutex_init_done = TRUE;
 	}
-        return;
+	return;
 }

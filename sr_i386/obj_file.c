@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,6 @@ static uint4 cdlits;
 static struct rel_table *data_rel, *data_rel_end;
 static struct rel_table *text_rel, *text_rel_end;
 static int file_des;
-extern int errno;
 
 error_def(ERR_OBJFILERR);
 

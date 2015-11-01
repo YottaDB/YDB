@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2002 Sanchez Computer Associates, Inc.	#
+#	Copyright 2002, 2003 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,6 +9,10 @@
 #								#
 #################################################################
 ############### Define platform-specific directory ring-down ##################################
+
+ifeq ($(shell basename $(shell domainname) .com), sanchez)
+gt_src_list:=src inc tools pct
+else
 
 ifeq ($(gt_os_type), OSF1)
 common_dirs_sp=unix_gnp unix_cm unix port_cm port
@@ -40,4 +44,6 @@ endif
 ifeq ($(gt_os_type), OS/390)
 lib_dirs_sp=os390 s390 $(common_dirs_sp)
 endif
-gt_src_list:=src inc tools pct $(addprefix sr_, $(lib_dirs_sp))
+gt_src_list:=$(addprefix sr_, $(lib_dirs_sp))
+
+endif

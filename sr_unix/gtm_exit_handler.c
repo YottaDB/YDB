@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,7 @@
 #include "gv_rundown.h"
 #include "mprof.h"
 #include "print_exit_stats.h"
+#include "invocation_mode.h"
 
 GBLREF	int4		exi_condition;
 GBLREF	short		dollar_tlevel;
@@ -91,7 +92,13 @@ void gtm_exit_handler(void)
 	REVERT;
 
 	ESTABLISH(lastchance3);
-	io_rundown(NORMAL_RUNDOWN);
+	if (MUMPS_CALLIN & invocation_mode)
+	{
+		flush_pio();
+		io_rundown(RUNDOWN_EXCEPT_STD);
+	}
+	else
+		io_rundown(NORMAL_RUNDOWN);
 	REVERT;
 
 	print_exit_stats();

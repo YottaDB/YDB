@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -236,8 +236,7 @@ if ( $buildaux_mupip == 1 ) then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/mupip.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/mupip	-L$gtm_obj $gtm_obj/{mupip,mupip_cmd}.o \
-		$gt_ld_sysrtns -lmupip -lmumps -lstub \
-		$gt_ld_syslibs >& $gtm_map/mupip.map
+		$gt_ld_sysrtns -lmupip -lmumps -lstub $gt_ld_aio_syslib $gt_ld_syslibs >& $gtm_map/mupip.map
 	if ( $status != 0  ||  ! -x $3/mupip ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkmupip, Failed to link mupip (see ${dollar_sign}gtm_map/mupip.map)" \

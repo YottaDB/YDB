@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,16 +37,11 @@ GBLREF  gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	gv_namehead		*gv_target_list;
 GBLREF	trans_num		local_tn;
-GBLREF	uint4			cumul_jnl_rec_len;
 GBLREF  sgmnt_data_ptr_t        cs_data;
 GBLREF  short			dollar_tlevel;
 GBLREF  buddy_list		*global_tlvl_info_list;
 GBLREF  global_tlvl_info	*global_tlvl_info_head;
-
-DEBUG_ONLY(
-GBLREF  uint4			cumul_index;
-GBLREF  uint4			cu_jnl_index;
-)
+GBLREF jnl_gbls_t		jgbl;
 
 void	tp_clean_up(boolean_t rollback_flag)
 {
@@ -220,8 +215,8 @@ void	tp_clean_up(boolean_t rollback_flag)
 			si->next_sgm_info = NULL;
 			jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1;
 		}	/* for (all segments in the transaction) */
-		cumul_jnl_rec_len = 0;
-		DEBUG_ONLY(cumul_index = cu_jnl_index = 0;)
+		jgbl.cumul_jnl_rec_len = 0;
+		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
 		global_tlvl_info_head = NULL;
 		reinitialize_list(global_tlvl_info_list);		/* reinitialize the global_tlvl_info buddy_list */
 	}	/* if (any database work in the transaction) */

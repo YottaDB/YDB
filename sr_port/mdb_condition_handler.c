@@ -202,6 +202,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	error_def(ERR_REPEATERROR);
 	error_def(ERR_TPNOTACID);
 	error_def(ERR_JOBINTRRQST);
+	error_def(ERR_JOBINTRRETHROW);
 
 	START_CH;
 	if (repeat_error = (ERR_REPEATERROR == SIGNAL)) /* assignment and comparison */
@@ -493,7 +494,12 @@ CONDITION_HANDLER(mdb_condition_handler)
 						etrap_handling = FALSE;
 					}
 				}
-				if (etrap_handling)
+				if (SFF_CI & frame_pointer->flags)
+				{ /* Unhandled errors from called-in routines should return to gtm_ci() with error status */
+					mumps_status = SIGNAL;
+					MUM_TSTART;
+				}
+				else if (etrap_handling)
 				{
 					proc_act_type = SFT_ZTRAP;
 					err_act = &dollar_etrap.str;
@@ -533,18 +539,19 @@ CONDITION_HANDLER(mdb_condition_handler)
 		outofband_clear();
 		proc_act_type = SFT_ZINTR | SFT_COUNT;	/* trans_code will invoke jobinterrupt_process for us */
 		MUM_TSTART;
-
+	} else  if ((int)ERR_JOBINTRRETHROW == SIGNAL)
+	{ /* job interrupt is rethrown from TC/TRO */
+		assert(!dollar_zininterrupt);
+		dollar_zininterrupt = TRUE;
+		proc_act_type = SFT_ZINTR | SFT_COUNT; /* trans_code will invoke jobinterrupt_process for us */
+		MUM_TSTART;
 	} else  if ((int)ERR_STACKCRIT == SIGNAL)
 	{
 		assert(msp > stacktop);
 		cp = stackwarn;
 		stackwarn = stacktop;
-		PUSH_MV_STENT(MVST_STCK);
-		mv_chain->mv_st_cont.mvs_stck.mvs_stck_val = cp;
-		mv_chain->mv_st_cont.mvs_stck.mvs_stck_addr = &stackwarn;
-		PUSH_MV_STENT(MVST_STCK);
-		mv_chain->mv_st_cont.mvs_stck.mvs_stck_val = stacktop;
-		mv_chain->mv_st_cont.mvs_stck.mvs_stck_addr = &stacktop;
+		push_stck(cp, 0, (void**)&stackwarn);
+		push_stck(stacktop, 0, (void**)&stacktop);
 	}
 	if (!repeat_error)
 		dollar_ecode.error_last_b_line = NULL;
@@ -698,7 +705,12 @@ CONDITION_HANDLER(mdb_condition_handler)
 					etrap_handling = FALSE;
 				}
 			}
-			if (etrap_handling)
+			if (SFF_CI & frame_pointer->flags)
+			{ /* Unhandled errors from called-in routines should return to gtm_ci() with error status */
+				mumps_status = SIGNAL;
+				MUM_TSTART;
+			}
+			else if (etrap_handling)
 			{
 				proc_act_type = SFT_ZTRAP;
 				err_act = &dollar_etrap.str;

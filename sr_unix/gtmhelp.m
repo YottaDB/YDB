@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2002 Sanchez Computer Associates, Inc.	;
+;	Copyright 2002, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -188,7 +188,7 @@ PROMPT()
  .		set ref=$name(@ref@("s",TOPIC(i)))
  .		write @ref," "
  .		quit
- 	if COUNT=0 write "Topic? "
+ 	if COUNT=0 kill PROMPT write "Topic? "
  	if COUNT>0 write "Subtopic? "
 	quit ""
 UCASE(string)

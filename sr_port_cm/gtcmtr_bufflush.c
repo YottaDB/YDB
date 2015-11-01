@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,8 +29,6 @@
 #include "gvcst_put.h"
 #include "gtcmtr_bufflush.h"
 
-#define LCL_BUF_SIZE 256
-
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gv_key		*gv_currkey;
@@ -43,7 +41,7 @@ bool gtcmtr_bufflush(void)
 	mval		v;
 	short		n;
 	unsigned short	num_trans, data_len;
-	unsigned char	buff[LCL_BUF_SIZE], *end;
+	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 	unsigned char	*ptr, regnum, len, cc, prv;
 	static readonly gds_file_id file;
 
@@ -72,8 +70,8 @@ bool gtcmtr_bufflush(void)
 		assert(prv < gv_currkey->end);
 		if ((n = gv_currkey->end + 1) > gv_cur_region->max_key_size)
 		{
-			if ((end = format_targ_key(&buff[0], LCL_BUF_SIZE, gv_currkey, TRUE)) == 0)
-				end = &buff[LCL_BUF_SIZE - 1];
+			if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
+				end = &buff[MAX_ZWR_KEY_SZ - 1];
 			rts_error(VARLSTCNT(11) ERR_KEY2BIG, 4, n, (int4)gv_cur_region->max_key_size,
 				REG_LEN_STR(gv_cur_region), 0, ERR_GVIS, 2, end - buff, buff);
 		}
@@ -89,8 +87,8 @@ bool gtcmtr_bufflush(void)
 		v.str.addr = (char *)ptr;
 		if (n + v.str.len + sizeof(rec_hdr) > gv_cur_region->max_rec_size)
 		{
-			if ((end = format_targ_key(&buff[0], LCL_BUF_SIZE, gv_currkey, TRUE)) == 0)
-				end = &buff[LCL_BUF_SIZE - 1];
+			if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
+				end = &buff[MAX_ZWR_KEY_SZ - 1];
 			rts_error(VARLSTCNT(11) ERR_REC2BIG, 4, n + v.str.len + sizeof(rec_hdr), (int4)gv_cur_region->max_rec_size,
 				REG_LEN_STR(gv_cur_region), 0, ERR_GVIS, 2, end - buff, buff);
 		}

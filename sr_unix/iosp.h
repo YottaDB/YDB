@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,3 +29,6 @@
 /* parameters for io_rundown() */
 #define NORMAL_RUNDOWN		0
 #define RUNDOWN_EXCEPT_STD	1
+
+#define SYSCALL_SUCCESS(STATUS)		(SS_NORMAL == (STATUS))
+#define SYSCALL_ERROR(STATUS)		(SS_NORMAL != (STATUS))

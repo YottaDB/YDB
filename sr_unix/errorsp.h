@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,8 @@
 #include "gtm_stdio.h"
 
 #define CONDITION_HANDLER(name)	ch_ret_type name(int arg)
-#define MAX_HANDLERS 20
+#define MAX_HANDLERS 15		/* should be enough for dse/lke/mupip etc. */
+#define MAX_MUMPS_HANDLERS (MAX_HANDLERS + 20)	/* to allow upto 10 nested levels of callins */
 /* Count of arguments the TPRETRY error will make available for tp_restart to use */
 #define TPRESTART_ARG_CNT 6
 
@@ -37,7 +38,7 @@ typedef struct condition_handler_struct
 #else
 #  define GBLEXP GBLREF
 #endif
-GBLEXP condition_handler	chnd[MAX_HANDLERS], *ctxt, *active_ch;
+GBLEXP condition_handler	*chnd, *ctxt, *active_ch, *chnd_end;
 GBLEXP int4			severity;
 GBLEXP int4			error_condition;
 
@@ -53,7 +54,7 @@ LITREF err_ctl			merrors_ctl;
 #define SEV_MSK		7
 
 #define IS_GTM_ERROR(err) ((err & FACMASK(merrors_ctl.facnum))  &&  (MSGMASK(err, merrors_ctl.facnum) <= merrors_ctl.msg_cnt))
-#define CHECKHIGHBOUND(hptr)  assert(&chnd[MAX_HANDLERS] > hptr);
+#define CHECKHIGHBOUND(hptr)  assert(chnd_end > hptr);
 #define CHECKLOWBOUND(hptr)   assert(hptr >= (&chnd[0] - 1));
 
 #define SIGNAL		error_condition
@@ -246,9 +247,9 @@ void stop_image_no_core(void);
 				 ( SEVERITY == SEVERE && IS_GTM_ERROR(SIGNAL)   \
 					&& SIGNAL != (int)ERR_OUTOFSPACE) )
 
-unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp);
+unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t need_rtsloc);
 
-#define SET_ZSTATUS(ctxt)	set_zstatus(&src_line_d, SIGNAL, ctxt);
+#define SET_ZSTATUS(ctxt)	set_zstatus(&src_line_d, SIGNAL, ctxt, TRUE);
 
 #define MSG_OUTPUT		(1)
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -117,7 +117,7 @@ void op_sub(mval *u, mval *v, mval *s);
 void op_svget(int varnum, mval *v);
 void op_svput(int varnum, mval *v);
 void op_tcommit(void);
-void op_trollback(short rb_levels);
+void op_trollback(int rb_levels);
 void op_tstart();
 void op_unlock(void);
 void op_use(mval *v, mval *p);

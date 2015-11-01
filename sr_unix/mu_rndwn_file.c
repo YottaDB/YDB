@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #include <sys/shm.h>
 #include <errno.h>
 #include "gtm_string.h"
+#include "gtm_time.h"
 #include <unistd.h>
 
 #include "gtm_sem.h"
@@ -56,13 +57,16 @@
 #include "mu_rndwn_all.h"
 #include "error.h"
 
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF gd_region        *gv_cur_region;
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF uint4		process_id;
-GBLREF boolean_t	mupip_jnl_recover;
-GBLREF ipcs_mesg	db_ipcs;
-GBLREF gd_region	*standalone_reg;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	uint4			process_id;
+GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF	ipcs_mesg		db_ipcs;
+GBLREF	gd_region		*standalone_reg;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	boolean_t		mu_rndwn_file_dbjnl_flush;
+
 static gd_region	*rundown_reg = NULL;
 static gd_region	*temp_region;
 static sgmnt_data_ptr_t	temp_cs_data;
@@ -100,6 +104,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	boolean_t		rc_cpt_removed = FALSE, sem_created = FALSE;
 	sgmnt_data		tsd_memory;
 	sgmnt_data_ptr_t	csd, tsd = NULL;
+	jnl_private_control	*jpc;
 	struct sembuf		sop[4];
 	struct shmid_ds		shm_buf;
 	file_control		*fc;
@@ -287,6 +292,12 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 				/* Reset ipc fields in file header */
 				if (!reg->read_only)
 				{
+					if (mupip_jnl_recover)
+					{
+						memset(tsd->machine_name, 0, MAX_MCNAMELEN);
+						tsd->freeze = 0;
+						tsd->owner_node = 0;
+					}
 					LSEEKWRITE(udi->fd, (off_t)0, tsd, sizeof(*tsd), status);
 					if (0 != status)
 					{
@@ -535,23 +546,43 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	reg->open = TRUE;
 	if (rc_cpt_removed)
 		csd->rc_srv_cnt = csd->dsid = csd->rc_node = 0;   /* reset RC values if we've rundown the RC CPT */
-	/* WCSFLU_NONE only is done here , as we aren't sure of the state, so no EPOCH's are written.
- 	 * If we write EPOCH, recover may get confused
-	 * Note that for journaling we do not call jnl_file_close().
-	 * As a result journal file might not have an EOF record.
-	 * So, a new process will switch the journal file and cut the journal file link,
-	 * though it might be a good journal without an EOF */
-	if (cs_addrs->nl->glob_sec_init)
-		wcs_flu(WCSFLU_NONE);
-	if (JNL_ALLOWED(csd))
-	{	/* If we own it or owner died, clear the lock */
-		if (process_id == cs_addrs->jnl->jnl_buff->fsync_in_prog_latch.latch_pid)
+	mu_rndwn_file_dbjnl_flush = TRUE;	/* indicate to wcs_recover() no need to write inctn or increment db curr_tn */
+	/* If csa->nl->donotflush_dbjnl is set, it means mupip recover/rollback was interrupted and therefore we should
+	 * 	not flush shared memory contents to disk as they might be in an inconsistent state.
+	 * In this case, we will go ahead and remove shared memory (without flushing the contents) in this routine.
+	 * A reissue of the recover/rollback command will restore the database to a consistent state.
+	 */
+	if (!cs_addrs->nl->donotflush_dbjnl)
+	{
+		if (cs_addrs->nl->glob_sec_init)
+		{	/* WCSFLU_NONE only is done here, as we aren't sure of the state, so no EPOCHs are written.
+			 * If we write an EPOCH record, recover may get confused
+			 * Note that for journaling we do not call jnl_file_close() with TRUE for second parameter.
+			 * As a result journal file might not have an EOF record.
+			 * So, a new process will switch the journal file and cut the journal file link,
+			 * though it might be a good journal without an EOF
+			 */
+			JNL_SHORT_TIME(jgbl.gbl_jrec_time); /* needed for jnl_put_jrt_pini() and jnl_write_inctn_rec() */
+			wcs_flu(WCSFLU_NONE);
+		}
+		jpc = cs_addrs->jnl;
+		if (NULL != jpc)
 		{
-			RELEASE_SWAPLOCK(&cs_addrs->jnl->jnl_buff->fsync_in_prog_latch);
-		} else
-			performCASLatchCheck(&cs_addrs->jnl->jnl_buff->fsync_in_prog_latch, 0);
-		free(cs_addrs->jnl);
+			grab_crit(gv_cur_region);
+			/* If we own it or owner died, clear the fsync lock */
+			if (process_id == jpc->jnl_buff->fsync_in_prog_latch.latch_pid)
+			{
+				RELEASE_SWAPLOCK(&jpc->jnl_buff->fsync_in_prog_latch);
+			} else
+				performCASLatchCheck(&jpc->jnl_buff->fsync_in_prog_latch, 0);
+			if (NOJNL != jpc->channel)
+				jnl_file_close(gv_cur_region, FALSE, FALSE);
+			free(jpc);
+			cs_addrs->jnl = NULL;
+			rel_crit(gv_cur_region);
+		}
 	}
+	mu_rndwn_file_dbjnl_flush = FALSE;
 	reg->open = FALSE;
 	/* Note: At this point we have write permission */
 	memset(csd->machine_name, 0, MAX_MCNAMELEN);
@@ -631,6 +662,7 @@ CONDITION_HANDLER(mu_rndwn_file_ch)
 	unix_db_info	*udi;
 
 	START_CH;
+	mu_rndwn_file_dbjnl_flush = FALSE;
 	udi = FILE_INFO(rundown_reg);
 	if (udi->grabbed_ftok_sem)
 		ftok_sem_release(rundown_reg, FALSE, TRUE);

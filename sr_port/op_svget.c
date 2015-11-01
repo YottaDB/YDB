@@ -86,6 +86,7 @@ GBLREF boolean_t	dollar_zininterrupt;
 GBLREF int4		zdir_form;
 GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF int4		zdate_form;
+GBLREF mval		dollar_ztexit;
 
 LITREF mval		literal_zero,literal_one;
 LITREF char		gtm_release_name[];
@@ -336,6 +337,9 @@ void op_svget(int varnum, mval *v)
 		break;
 	case SV_ZDATE_FORM:
 		MV_FORCE_MVAL(v, zdate_form);
+		break;
+	case SV_ZTEXIT:
+		*v = dollar_ztexit;
 		break;
 	default:
 		GTMASSERT;

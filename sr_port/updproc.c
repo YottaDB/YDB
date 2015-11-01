@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,12 +41,9 @@
 #include "jnl.h"
 #include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
-#include "tp.h"
 #include "muprec.h"
+#include "tp.h"
 #include "iosp.h"
-#include "mv_stent.h"
-#include "rtnhdr.h"
-#include "stack_frame.h"
 #include "gtmrecv.h"
 #include "cli.h"
 #include "error.h"
@@ -77,66 +74,62 @@
 #include "gvcst_init.h"
 #include "targ_alloc.h"
 #include "dpgbldir.h"
+#include "read_db_files_from_gld.h"
 #include "updproc.h"
+#include "upd_open_files.h"
 #include "tp_change_reg.h"
 #include "wcs_flu.h"
 #include "repl_log.h"
 #include "tp_restart.h"
 #include "gtmmsg.h"	/* for gtm_putmsg() prototype */
+#include "mu_gv_stack_init.h"
+#include "jnl_typedef.h"
 
-#define USER_STACK_SIZE		16384			/* (16 * 1024) */
 #define MINIMUM_BUFFER_SIZE	(DISK_BLOCK_SIZE * 32)
 
 GBLREF	gd_binding		*gd_map;
 GBLREF	gd_binding              *gd_map_top;
 GBLREF  mur_opt_struct          mur_options;
-GBLREF  bool                    mur_error_allowed;
-GBLREF  int4                    mur_error_count;
 GBLREF	bool			gv_curr_subsc_null;
 GBLREF	unsigned short		dollar_tlevel;
 GBLREF	gv_key			*gv_currkey;
-GBLREF	gv_namehead		*gv_target;
 GBLREF  gd_region               *gv_cur_region;
 GBLREF  sgmnt_addrs             *cs_addrs;
 GBLREF  sgmnt_data_ptr_t	cs_data;
 GBLREF  int4			gv_keysize;
-GBLREF  gv_key                  *gv_altkey;
-GBLREF  mv_stent                *mv_chain;
-GBLREF  stack_frame             *frame_pointer;
-GBLREF  unsigned char           *msp, *stackbase, *stacktop, *stackwarn;
 GBLREF	mur_opt_struct		mur_options;
 GBLREF	bool			is_standalone;
 GBLREF	recvpool_addrs		recvpool;
-GBLREF	seq_num			start_jnl_seqno;
 GBLREF	uint4			process_id;
-GBLREF	boolean_t		tstarted;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
-GBLREF	uint4			cumul_jnl_rec_len;
 GBLREF	boolean_t		is_updproc;
 GBLREF	seq_num			seq_num_zero, seq_num_one;
-GBLREF  upd_proc_ctl            *upd_db_files;
+GBLREF  gld_dbname_list		*upd_db_files;
 GBLREF  gd_addr                 *gd_header;
 GBLREF  boolean_t               repl_enabled;
-GBLREF  seq_num			max_resync_seqno;
 GBLREF	FILE	 		*updproc_log_fp;
 GBLREF	void			(*call_on_signal)();
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	unsigned int		t_tries;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
+GBLREF	struct_jrec_tcom	tcom_record;
 #ifdef VMS
 GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
-GBLREF	boolean_t	tp_restart_fail_sig_used;
+GBLREF	boolean_t		tp_restart_fail_sig_used;
 #endif
-GBLREF	fixed_jrec_tp_kill_set 	mur_jrec_fixed_field;
-GBLREF	struct_jrec_tcom 	mur_jrec_fixed_tcom;
 GBLREF	boolean_t		is_replicator;
+GBLREF	jnl_gbls_t		jgbl;
+LITREF	int			jrt_update[JRT_RECTYPES];
+LITREF	boolean_t		jrt_fixed_size[JRT_RECTYPES];
+LITREF	boolean_t		jrt_is_replicated[JRT_RECTYPES];
 
 error_def(ERR_NORECOVERERR);
 
 static sgmnt_data_ptr_t csd;
 static seq_num		seqnum_diff;
 static 	boolean_t	updproc_continue = TRUE;
+static	seq_num		start_jnl_seqno;
 
 void			mupip_update();
 
@@ -247,27 +240,7 @@ int updproc(void)
 	if (updproc_init() == UPDPROC_EXISTS) /* we got the global directory header already */
 		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Update Process already exists"));
 	/* Initialization of all the relevant global datastructures and allocation for TP */
-	gv_currkey = (gv_key *)malloc(sizeof(gv_key) - 1 + gv_keysize);
-	gv_altkey = (gv_key *)malloc(sizeof(gv_key) - 1 + gv_keysize);
-	gv_currkey->top = gv_altkey->top = gv_keysize;
-	gv_currkey->end = gv_currkey->prev = gv_altkey->end = gv_altkey->prev = 0;
-	gv_altkey->base[0] = gv_currkey->base[0] = '\0';
-	mstack_ptr = (unsigned char *)malloc(USER_STACK_SIZE);
-	msp = stackbase = mstack_ptr + USER_STACK_SIZE - 4;
-	mv_chain = (mv_stent *)msp;
-	stacktop = mstack_ptr + 2 * mvs_size[MVST_NTAB];
-	stackwarn = stacktop + 1024;
-	msp -= sizeof(stack_frame);
-	frame_pointer = (stack_frame *)msp;
-	memset(frame_pointer, 0, sizeof(stack_frame));
-	frame_pointer->type = SFT_COUNT;
-	frame_pointer->temps_ptr = (unsigned char *)frame_pointer; /* no temporaries in this frame */
-	--frame_pointer;
-	memset(frame_pointer, 0, sizeof(stack_frame));
-	frame_pointer->type = SFT_COUNT;
-	frame_pointer->temps_ptr = (unsigned char *)frame_pointer; /* no temporaries in this frame either */
-	frame_pointer->old_frame_pointer = (stack_frame *)msp;
-	msp = (unsigned char *)frame_pointer;
+	mu_gv_stack_init(&mstack_ptr);
 	recvpool.upd_proc_local->read = 0;
 	QWASSIGN(seqnum_diff, seq_num_zero);
 	QWASSIGN(jnl_seqno, start_jnl_seqno);
@@ -294,29 +267,32 @@ int updproc(void)
 
 void updproc_actions(void)
 {
-	mval			v;
+	mval			ts_mv, key_mv, val_mv;
 	mstr_len_t		*data_len;
 	jnl_record		*rec;
 	uint4			temp_write, temp_read;
 	enum jnl_record_type	rectype;
 	jnl_process_vector	*pv;
-	int4			rec_seqno = 0; /* the total no of journal reocrds excluding TCOM records */
-	int4			tset_num = 0; /* the number of tset/tkill records encountered */
-	int4			tcom_num = 0; /* the number of tcom records encountered */
+	int4			upd_rec_seqno = 0; /* the total no of journal reocrds excluding TCOM records */
+	int4			tupd_num; /* the number of tset/tkill/tzkill records encountered */
+	int4			tcom_num; /* the number of tcom records encountered */
 	seq_num			jnl_seqno; /* the current jnl_seq no of the Update process */
 	bool			is_valid_hist();
 	struct stat		stat_buf;
 	int			fd, n;
-	int			m, rec_len;
+	int			rec_len, backptr;
 	char			fn[MAX_FN_LEN];
 	sm_uc_ptr_t		readaddrs;
 	struct_jrec_null	null_record;
 	jnldata_hdr_ptr_t	jnl_header;
-	boolean_t		bad_trans;
+	boolean_t		incr_seqno;
 	seq_num			temp_df_seqnum;
 	unsigned char		seq_num_str[32], *seq_num_ptr;
 	unsigned char		seq_num_strx[32], *seq_num_ptrx;
 	uint4			jnl_status = 0;
+	char			*val_ptr;
+	jnl_string		*keystr;
+	enum upd_bad_trans_type	bad_trans_type;
 
 	error_def(ERR_TPRETRY);
 
@@ -324,10 +300,11 @@ void updproc_actions(void)
 	temp_read = 0;
 	temp_write = 0;
 	readaddrs = recvpool.recvdata_base;
-	rec_seqno = tset_num = tcom_num = 0;
+	upd_rec_seqno = tupd_num = tcom_num = 0;
 	QWASSIGN(jnl_seqno, recvpool.upd_proc_local->read_jnl_seqno);
-	while (1)
+	while (TRUE)
 	{
+		incr_seqno = FALSE;
 		if (repl_enabled)
 		{
 			QWSUB(temp_df_seqnum, jnlpool_ctl->jnl_seqno, recvpool.upd_proc_local->read_jnl_seqno);
@@ -375,7 +352,6 @@ void updproc_actions(void)
 			SHORT_SLEEP(10);
 			continue;
 		}
-
 		/* To take the wrapping of buffer in case of over flow ------------ */
 		/*     assume receiver will update wrapped even for exact overflows */
 		if (temp_read >= recvpool.recvpool_ctl->write_wrap)
@@ -407,138 +383,215 @@ void updproc_actions(void)
 			if (0 == temp_write)
 				continue; /* Receiver server wrapped but hasn't yet written anything into the pool */
 		}
-		m = (temp_write > temp_read ? temp_write : recvpool.recvpool_ctl->write_wrap) - temp_read;
-		bad_trans = FALSE;
-		if (-1 == (rec_len = jnl_record_length((jnl_record *)readaddrs, m)))
+		rec = (jnl_record *)readaddrs;
+		rectype = rec->prefix.jrec_type;
+		rec_len = rec->prefix.forwptr;
+		backptr = REC_LEN_FROM_SUFFIX(readaddrs, rec_len);
+		assert(IS_REPLICATED(rectype));
+		/* NOTE: All journal sequence number fields are at same offset */
+		if (rec_len != backptr)
 		{
-			repl_log(updproc_log_fp, TRUE, TRUE, "-> Bad trans :: Invalid rec_len = %ld\n ", rec_len);
+			bad_trans_type = upd_bad_backptr;
 			assert(FALSE);
-			bad_trans = recvpool.upd_proc_local->bad_trans = TRUE;
-		}
-		if (!bad_trans)
+		} else if (!IS_REPLICATED(rectype))
 		{
-			assert(QWLT(jnl_seqno, recvpool.recvpool_ctl->jnl_seqno)
-				|| QWEQ(seq_num_zero, recvpool.recvpool_ctl->jnl_seqno));
-			rec = (jnl_record *)readaddrs;
-			rectype = REF_CHAR(&rec->jrec_type);
-			switch (rectype)
+			bad_trans_type = upd_rec_not_replicated;
+			assert(FALSE);
+		} else if (QWNE(jnl_seqno, rec->jrec_null.jnl_seqno))
+		{
+			bad_trans_type = upd_bad_jnl_seqno;
+			assert(FALSE);
+		} else
+		{
+			bad_trans_type = upd_good_record;
+			assert(QWLT(jnl_seqno, recvpool.recvpool_ctl->jnl_seqno) ||
+				QWEQ(seq_num_zero, recvpool.recvpool_ctl->jnl_seqno));
+			if (JRT_TCOM == rectype)
 			{
-			case JRT_TCOM:
-				assert(QWEQ(jnl_seqno, rec->val.jrec_tset.jnl_seqno));
-				if (QWNE(jnl_seqno, rec->val.jrec_tset.jnl_seqno))
-				{
-					bad_trans = recvpool.upd_proc_local->bad_trans = TRUE;
-					repl_log(updproc_log_fp, TRUE, TRUE,
-					 "-> Bad trans found  for record JRT_TCOM :: tset_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-				 	 INT8_PRINT(rec->val.jrec_tset.jnl_seqno),
-					 INT8_PRINTX(rec->val.jrec_tset.jnl_seqno));
-					repl_log(updproc_log_fp, TRUE, TRUE,
-					 "-> Bad trans found for record JRT_TCOM:: jnl_seqno = "INT8_FMT" "INT8_FMTX" n",
-					 INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
-				} else if (0 != rec_seqno)
+				assert(0 != upd_rec_seqno);	/* we know TCOM is not created without a SET/KILL/ZKILL */
+				if (0 != upd_rec_seqno)
 					tcom_num++;
-				break;
-			case JRT_TSET:
-			case JRT_TKILL:
-			case JRT_TZKILL:
-				assert(&rec->val.jrec_tset.jnl_seqno == &rec->val.jrec_tkill.jnl_seqno);
-				assert(&rec->val.jrec_tkill.jnl_seqno == &rec->val.jrec_tzkill.jnl_seqno);
-				assert(QWEQ(jnl_seqno, rec->val.jrec_tset.jnl_seqno));
-				assert(0 <= tset_num);
-				assert(0 == tcom_num);
-				if (QWNE(jnl_seqno, rec->val.jrec_tset.jnl_seqno) ||
-							0 > tset_num  ||  0 != tcom_num)
+			} else if (IS_SET_KILL_ZKILL(rectype))
+			{
+				if (IS_ZTP(rectype))
+					keystr = (jnl_string *)&rec->jrec_fset.mumps_node;
+				else
+					keystr = (jnl_string *)&rec->jrec_set.mumps_node;
+				key_mv.mvtype = MV_STR;
+				key_mv.str.addr = keystr->text;
+				key_mv.str.len = strlen(key_mv.str.addr);
+				if (key_mv.str.len > MAX_KEY_SZ || keystr->length > MAX_KEY_SZ)
 				{
-					if (0 > tset_num)
-						repl_log(updproc_log_fp, TRUE, TRUE, "-> Bad trans at tset_num :: = %ld\n ",
-							tset_num);
-					if (0 != tcom_num)
-						repl_log(updproc_log_fp, TRUE, TRUE, "-> Bad trans at tcom_num :: = %ld\n ",
-							tcom_num);
-					repl_log(updproc_log_fp, TRUE, TRUE,
-					 "-> Bad trans found for record JRT_TSET:: tset_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-					 INT8_PRINT(rec->val.jrec_tset.jnl_seqno), INT8_PRINTX(rec->val.jrec_tset.jnl_seqno));
-					repl_log(updproc_log_fp, TRUE, TRUE,
-					 "-> Bad trans found for record JRT_TSET:: jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-					 INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
-					bad_trans = recvpool.upd_proc_local->bad_trans = TRUE;
-					break;
-				}
-				v.mvtype = MV_STR;
-				v.str.len = 0;
-				v.str.addr = NULL;
-				assert((!dollar_tlevel && !tset_num)
-					|| dollar_tlevel && (tset_num || t_tries || cdb_sc_helpedout == t_fail_hist[t_tries]));
-				if (!dollar_tlevel)
-					op_tstart(TRUE, TRUE, &v, 0);   /* not equal to -1 ==> RESTARTABLE */
-				tset_num++;
-				rec_seqno++;
-				break;
-			case JRT_USET:
-			case JRT_UKILL:
-			case JRT_UZKILL:
-				assert(QWEQ(jnl_seqno, rec->val.jrec_tset.jnl_seqno));
-				assert(0 < tset_num);
-				assert(0 == tcom_num);
-				if (QWNE(jnl_seqno, rec->val.jrec_tset.jnl_seqno)
-					|| 0 >= tset_num  ||  0 != tcom_num)
+					bad_trans_type = upd_bad_key_size;
+					assert(FALSE);
+				} else
 				{
-					if (0 >= tset_num)
-						repl_log(updproc_log_fp, TRUE, TRUE, "-> Bad trans at tset_num :: = %ld\n ",
-							tset_num);
-					if (0 != tcom_num)
-						repl_log(updproc_log_fp, TRUE, TRUE, "-> Bad trans at tcom_num :: = %ld\n ",
-							tcom_num);
-					repl_log(updproc_log_fp, TRUE, TRUE,
-					 "-> Bad trans found for record JRT_USET:: tset_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-					 INT8_PRINT(rec->val.jrec_tset.jnl_seqno), INT8_PRINTX(rec->val.jrec_tset.jnl_seqno));
-					repl_log(updproc_log_fp, TRUE, TRUE,
-						"-> Bad trans found for record JRT_USET:: jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-						INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
-					bad_trans = recvpool.upd_proc_local->bad_trans = TRUE;
-					break;
+					if (IS_SET(rectype))
+					{
+						val_mv.mvtype = MV_STR;
+						val_ptr = &keystr->text[keystr->length];
+						GET_MSTR_LEN(val_mv.str.len, val_ptr);
+						val_mv.str.addr = val_ptr + sizeof(mstr_len_t);
+					}
+					if (IS_FENCED(rectype))
+					{
+						if (IS_TP(rectype))
+						{
+							assert(0 <= tupd_num);
+							assert(0 == tcom_num);
+							if (0 > tupd_num || 0 != tcom_num)
+							{
+								bad_trans_type = upd_fence_bad_t_num;
+								assert(FALSE);
+							} else if (IS_TUPD(rectype))
+							{
+								ts_mv.mvtype = MV_STR;
+								ts_mv.str.len = 0;
+								ts_mv.str.addr = NULL;
+								assert((!dollar_tlevel && !tupd_num)
+									|| dollar_tlevel && (tupd_num || t_tries ||
+										cdb_sc_helpedout == t_fail_hist[t_tries]));
+								if (!dollar_tlevel)
+									op_tstart(TRUE, TRUE, &ts_mv, 0); /* not equal to -1
+														==> RESTARTABLE */
+								tupd_num++;
+							}
+							upd_rec_seqno++;
+						} else if (IS_FUPD(rectype))
+							op_ztstart();
+					} else if (0 != tupd_num)
+					{
+						bad_trans_type = upd_nofence_bad_tupd_num;
+						assert(FALSE);
+					}
 				}
-				rec_seqno++;
-				break;
-			case JRT_SET:
-			case JRT_KILL:
-			case JRT_ZKILL:
-				assert(QWEQ(jnl_seqno, rec->val.jrec_set.jnl_seqno));
-				if (QWNE(jnl_seqno, rec->val.jrec_tset.jnl_seqno)  ||  0 != tset_num)
-				{
-					if (0 != tset_num)
-						repl_log(updproc_log_fp, TRUE, TRUE, "-> Bad trans at tset_num :: = %ld\n ",
-							tset_num);
-					repl_log(updproc_log_fp, TRUE, TRUE,
-					 "-> Bad trans found for record JRT_SET:: set_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-						INT8_PRINT(rec->val.jrec_set.jnl_seqno), INT8_PRINTX(rec->val.jrec_set.jnl_seqno));
-					repl_log(updproc_log_fp, TRUE, TRUE,
-						"-> Bad trans found for record JRT_SET:: jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-						INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
-					bad_trans = recvpool.upd_proc_local->bad_trans = TRUE;
-				}
-				break;
-			case JRT_NULL:
-				assert(QWEQ(jnl_seqno, rec->val.jrec_null.jnl_seqno));
-				if (QWNE(jnl_seqno, rec->val.jrec_null.jnl_seqno))
-				{
-					repl_log(updproc_log_fp, TRUE, TRUE,
-					 "-> Bad trans found for record JRT_NULL:: null_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-					 INT8_PRINT(rec->val.jrec_null.jnl_seqno), INT8_PRINTX(rec->val.jrec_null.jnl_seqno));
-					repl_log(updproc_log_fp, TRUE, TRUE,
-					 "-> Bad trans found for record JRT_SET:: null_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-						INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
-					bad_trans = recvpool.upd_proc_local->bad_trans = TRUE;
-				}
-				break;
-			default:
-				assert(FALSE);
-				bad_trans = recvpool.upd_proc_local->bad_trans = TRUE;
-				break;
 			}
 		}
-		if (bad_trans)
+		if (upd_good_record == bad_trans_type)
 		{
+			if (JRT_NULL == rectype)
+			{
+				gv_cur_region = upd_db_files->gd;
+				tp_change_reg();
+				assert(!cs_addrs->now_crit);
+				if (!cs_addrs->now_crit)
+					grab_crit(gv_cur_region);
+				grab_lock(jnlpool.jnlpool_dummy_reg);
+				QWASSIGN(temp_jnlpool_ctl->write_addr, jnlpool_ctl->write_addr);
+				QWASSIGN(temp_jnlpool_ctl->write, jnlpool_ctl->write);
+				QWASSIGN(temp_jnlpool_ctl->jnl_seqno, jnlpool_ctl->jnl_seqno);
+				assert(QWMODDW(temp_jnlpool_ctl->write_addr, temp_jnlpool_ctl->jnlpool_size) == temp_jnlpool_ctl->write);
+				jgbl.cumul_jnl_rec_len = sizeof(jnldata_hdr_struct) + NULL_RECLEN;
+				temp_jnlpool_ctl->write += sizeof(jnldata_hdr_struct);
+				if (temp_jnlpool_ctl->write >= temp_jnlpool_ctl->jnlpool_size)
+				{
+					assert(temp_jnlpool_ctl->write == temp_jnlpool_ctl->jnlpool_size);
+					temp_jnlpool_ctl->write = 0;
+				}
+				QWADDDW(jnlpool_ctl->early_write_addr, jnlpool_ctl->write_addr, jgbl.cumul_jnl_rec_len);
+				cs_addrs->ti->early_tn = cs_addrs->ti->curr_tn + 1;
+				JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() */
+				jnl_status = jnl_ensure_open();
+				if (0 == jnl_status)
+				{
+					if (0 == cs_addrs->jnl->pini_addr)
+						jnl_put_jrt_pini(cs_addrs);
+					null_record.prefix.jrec_type = JRT_NULL;
+					null_record.prefix.forwptr = null_record.suffix.backptr = NULL_RECLEN;
+					null_record.prefix.time = jgbl.gbl_jrec_time;
+					null_record.prefix.tn = cs_addrs->ti->curr_tn;
+					null_record.prefix.pini_addr = cs_addrs->jnl->pini_addr;
+					QWASSIGN(null_record.jnl_seqno, jnl_seqno);
+					null_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+					jnl_write(cs_addrs->jnl, JRT_NULL, (jnl_record *)&null_record, NULL, NULL);
+				} else
+					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+				QWINCRBY(temp_jnlpool_ctl->jnl_seqno, seq_num_one);
+				QWASSIGN(cs_addrs->hdr->reg_seqno, temp_jnlpool_ctl->jnl_seqno);
+				QWASSIGN(cs_addrs->hdr->resync_seqno, temp_jnlpool_ctl->jnl_seqno);
+				cs_addrs->hdr->resync_tn = cs_addrs->ti->curr_tn;
+				QWASSIGN(cs_addrs->hdr->old_resync_seqno, temp_jnlpool_ctl->jnl_seqno);
+				/* the following statements should be atomic */
+				jnl_header = (jnldata_hdr_ptr_t)(jnlpool.jnldata_base + jnlpool_ctl->write);
+				jnl_header->jnldata_len = temp_jnlpool_ctl->write - jnlpool_ctl->write +
+					(temp_jnlpool_ctl->write > jnlpool_ctl->write ? 0 : jnlpool_ctl->jnlpool_size);
+				jnl_header->prev_jnldata_len = jnlpool_ctl->lastwrite_len;
+				jnlpool_ctl->lastwrite_len = jnl_header->jnldata_len;
+				QWINCRBYDW(jnlpool_ctl->write_addr, jnl_header->jnldata_len);
+				jnlpool_ctl->write = temp_jnlpool_ctl->write;
+				jnlpool_ctl->jnl_seqno = temp_jnlpool_ctl->jnl_seqno;
+				cs_addrs->ti->curr_tn = cs_addrs->ti->early_tn;
+				rel_lock(jnlpool.jnlpool_dummy_reg);
+				rel_crit(gv_cur_region);
+				jgbl.cumul_jnl_rec_len = 0;
+				incr_seqno = TRUE;
+			} else if (JRT_TCOM == rectype)
+			{
+				if (tcom_num == tupd_num)
+				{
+					assert(0 != tcom_num);
+					memcpy(tcom_record.jnl_tid, rec->jrec_tcom.jnl_tid, TID_STR_SIZE);
+					op_tcommit();
+					if (0 != dollar_tlevel)
+					{	/* op_tcommit restarted the transaction - do update process special handling for tpretry */
+#ifdef VMS
+			/* The error below has special handling in a few condition handlers because it not so much signals an error
+			   as it does drive the necessary mechanisms to invoke a restart. Consequently this error can be
+			   overridden by a "real" error. For VMS, the extra parameters are specified to provide "placeholders" on
+			   the stack in the signal array if a real error needs to be overlayed in place of this one (see
+			   code in updproc_ch).
+			*/
+						rts_error(VARLSTCNT(6) ERR_TPRETRY, 4, 0, 0, 0, 0);
+#else
+						rts_error(VARLSTCNT(1) ERR_TPRETRY);
+#endif
+					}
+					tcom_num = tupd_num = upd_rec_seqno = 0;
+					incr_seqno = TRUE;
+				}
+			} else if (JRT_ZTCOM == rectype)
+			{
+				assert(0 != dollar_tlevel);
+				op_ztcommit(1);
+				incr_seqno = TRUE;
+			}
+			else if (IS_SET_KILL_ZKILL(rectype))
+			{
+				gv_bind_name(gd_header, &(key_mv.str));	/* this sets gv_target and gv_cur_region */
+				key_mv.str.len = keystr->length;
+				memcpy(gv_currkey->base, key_mv.str.addr, key_mv.str.len);
+				gv_currkey->base[key_mv.str.len] = 0;
+				gv_currkey->end = key_mv.str.len;
+				if (IS_KILL(rectype))
+					op_gvkill();
+				else if (IS_ZKILL(rectype))
+					op_gvzwithdraw();
+				else
+				{
+					assert(IS_SET(rectype));
+					if (keystr->length + 1 + val_mv.str.len + sizeof(rec_hdr) > gv_cur_region->max_rec_size)
+					{
+						bad_trans_type = upd_bad_val_size;
+						assert(FALSE);
+					} else
+						op_gvput(&val_mv);
+				}
+				if ((upd_good_record == bad_trans_type) && !IS_TP(rectype))
+					incr_seqno = TRUE;
+			}
+		}
+		if (upd_good_record != bad_trans_type)
+		{
+			if (IS_REPLICATED(rectype))
+				repl_log(updproc_log_fp, TRUE, TRUE,
+		 "-> Bad trans :: bad_trans_type = %ld type = %ld len = %ld backptr = %ld jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
+				rectype, rec_len, backptr, bad_trans_type, INT8_PRINT(rec->jrec_null.jnl_seqno),
+				INT8_PRINTX(rec->jrec_null.jnl_seqno));
+			else
+				repl_log(updproc_log_fp, TRUE, TRUE,
+		 "-> Bad trans :: bad_trans_type = %ld type = %ld len = %ld backptr = %ld jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
+					rectype, rec_len, backptr, bad_trans_type, INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
+			recvpool.upd_proc_local->bad_trans = TRUE;
 			if (0 < dollar_tlevel)
 			{
 				repl_log(updproc_log_fp, TRUE, TRUE,
@@ -549,224 +602,17 @@ void updproc_actions(void)
 			recvpool.upd_proc_local->read = 0;
 			temp_read = 0;
 			temp_write = 0;
-			rec_seqno = tset_num = tcom_num = 0;
+			upd_rec_seqno = tupd_num = tcom_num = 0;
 			continue;
 		}
-		switch (REF_CHAR(&rec->jrec_type))
+		if (incr_seqno)
 		{
-		case JRT_NULL:
-			gv_cur_region = upd_db_files->gd;
-			tp_change_reg();
-			assert(!cs_addrs->now_crit);
-			if (!cs_addrs->now_crit)
-				grab_crit(gv_cur_region);
-			grab_lock(jnlpool.jnlpool_dummy_reg);
-			QWASSIGN(temp_jnlpool_ctl->write_addr, jnlpool_ctl->write_addr);
-			QWASSIGN(temp_jnlpool_ctl->write, jnlpool_ctl->write);
-			QWASSIGN(temp_jnlpool_ctl->jnl_seqno, jnlpool_ctl->jnl_seqno);
-			assert(QWMODDW(temp_jnlpool_ctl->write_addr, temp_jnlpool_ctl->jnlpool_size) == temp_jnlpool_ctl->write);
-			cumul_jnl_rec_len = sizeof(jnldata_hdr_struct) + NULL_RECLEN;
-			temp_jnlpool_ctl->write += sizeof(jnldata_hdr_struct);
-			if (temp_jnlpool_ctl->write >= temp_jnlpool_ctl->jnlpool_size)
-			{
-				assert(temp_jnlpool_ctl->write == temp_jnlpool_ctl->jnlpool_size);
-				temp_jnlpool_ctl->write = 0;
-			}
-			QWADDDW(jnlpool_ctl->early_write_addr, jnlpool_ctl->write_addr, cumul_jnl_rec_len);
-			cs_addrs->ti->early_tn = cs_addrs->ti->curr_tn + 1;
-			null_record.tn = cs_addrs->ti->curr_tn;
-			JNL_SHORT_TIME(null_record.short_time);
-			QWASSIGN(null_record.jnl_seqno, jnl_seqno);
-			jnl_status = jnl_ensure_open();
-			if (0 == jnl_status)
-			{
-				if (0 == cs_addrs->jnl->pini_addr)
-					jnl_put_jrt_pini(cs_addrs);
-				jnl_write(cs_addrs->jnl, JRT_NULL, (jrec_union *)&null_record, NULL, NULL);
-			} else
-				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
-			QWINCRBY(temp_jnlpool_ctl->jnl_seqno, seq_num_one);
-			QWASSIGN(cs_addrs->hdr->reg_seqno, temp_jnlpool_ctl->jnl_seqno);
-			QWASSIGN(cs_addrs->hdr->resync_seqno, temp_jnlpool_ctl->jnl_seqno);
-			cs_addrs->hdr->resync_tn = cs_addrs->ti->curr_tn;
-			QWASSIGN(cs_addrs->hdr->old_resync_seqno, temp_jnlpool_ctl->jnl_seqno);
-			/* the following statements should be atomic */
-			jnl_header = (jnldata_hdr_ptr_t)(jnlpool.jnldata_base + jnlpool_ctl->write);
-			jnl_header->jnldata_len = temp_jnlpool_ctl->write - jnlpool_ctl->write +
-				(temp_jnlpool_ctl->write > jnlpool_ctl->write ? 0 : jnlpool_ctl->jnlpool_size);
-			jnl_header->prev_jnldata_len = jnlpool_ctl->lastwrite_len;
-			jnlpool_ctl->lastwrite_len = jnl_header->jnldata_len;
-			QWINCRBYDW(jnlpool_ctl->write_addr, jnl_header->jnldata_len);
-			jnlpool_ctl->write = temp_jnlpool_ctl->write;
-			jnlpool_ctl->jnl_seqno = temp_jnlpool_ctl->jnl_seqno;
-			cs_addrs->ti->curr_tn = cs_addrs->ti->early_tn;
-			rel_lock(jnlpool.jnlpool_dummy_reg);
-			rel_crit(gv_cur_region);
-			cumul_jnl_rec_len = 0;
-			if (0 == QWMODDW(jnl_seqno, LOGTRNUM_INTERVAL))
-				repl_log(updproc_log_fp, TRUE, TRUE, "Committed NULL Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
-					INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
 			QWINCRBY(jnl_seqno, seq_num_one);
 			QWASSIGN(recvpool.upd_proc_local->read_jnl_seqno, jnl_seqno);
-			break;
-		case JRT_SET:
-			v.mvtype = MV_STR;
-			v.str.addr = rec->val.jrec_set.mumps_node.text;
-			v.str.len = (char *)strchr(v.str.addr, '\0') - (char *)v.str.addr;
-			gv_bind_name(gd_header, &(v.str));	/* this sets gv_target */
-			v.str.len = rec->val.jrec_set.mumps_node.length;
-			/* if (0 != gv_target->clue.end  &&  (FALSE == is_valid_hist(&gv_target->hist))) */
-				gv_target->clue.end = 0;
-			memcpy(gv_currkey->base, v.str.addr, v.str.len);
-			gv_currkey->base[v.str.len] = '\0';
-			gv_currkey->end = v.str.len;
-			data_len = (mstr_len_t *)((char *)&rec->val.jrec_set.mumps_node + rec->val.jrec_set.mumps_node.length
-				+ sizeof(short));
-			GET_MSTR_LEN(v.str.len, data_len);
-			v.mvtype = MV_STR;
-			v.str.addr = (char *)data_len + sizeof(mstr_len_t);
-			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_set.recov_short_time;
-			op_gvput(&v);
 			if (0 == QWMODDW(jnl_seqno, LOGTRNUM_INTERVAL))
-				repl_log(updproc_log_fp, TRUE, TRUE, "Committed SET Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
-					INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
-			QWINCRBY(jnl_seqno, seq_num_one);
-			QWASSIGN(recvpool.upd_proc_local->read_jnl_seqno, jnl_seqno);
-			break;
-		case JRT_TSET:
-		case JRT_USET:
-		case JRT_FSET:
-		case JRT_GSET:
-			v.mvtype = MV_STR;
-			v.str.addr = rec->val.jrec_fset.mumps_node.text;
-			v.str.len = (char *)strchr(v.str.addr, '\0') - (char *)v.str.addr;
-			gv_bind_name(gd_header, &(v.str));	/* this sets gv_target */
-			v.str.len = rec->val.jrec_fset.mumps_node.length;
-			/* if (0 != gv_target->clue.end  &&  (FALSE == is_valid_hist(&gv_target->hist))) */
-				gv_target->clue.end = 0;
-			memcpy(gv_currkey->base, v.str.addr, v.str.len);
-			gv_currkey->base[v.str.len] = '\0';
-			gv_currkey->end = v.str.len;
-			assert(&rec->val.jrec_fset.mumps_node == &rec->val.jrec_gset.mumps_node);
-			assert(&rec->val.jrec_fset.mumps_node == &rec->val.jrec_tset.mumps_node);
-			assert(&rec->val.jrec_fset.mumps_node == &rec->val.jrec_uset.mumps_node);
-			data_len = (mstr_len_t *)((char *)&rec->val.jrec_fset.mumps_node + rec->val.jrec_fset.mumps_node.length
-				+ sizeof(short));
-			GET_MSTR_LEN(v.str.len, data_len);
-			v.mvtype = MV_STR;
-			v.str.addr = (char *)data_len + sizeof(mstr_len_t);
-			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_fset.recov_short_time;
-			op_gvput(&v);
-			break;
-		case JRT_KILL:
-			v.mvtype = MV_STR;
-			v.str.addr = rec->val.jrec_kill.mumps_node.text;
-			v.str.len = (char *)strchr(v.str.addr, '\0') - (char *)v.str.addr;
-			gv_bind_name(gd_header, &(v.str));	/* this sets gv_target */
-			v.str.len = rec->val.jrec_kill.mumps_node.length;
-			/* if (0 != gv_target->clue.end  &&  (FALSE == is_valid_hist(&gv_target->hist))) */
-				gv_target->clue.end = 0;
-			memcpy(gv_currkey->base, v.str.addr, v.str.len);
-			gv_currkey->base[v.str.len] = '\0';
-			gv_currkey->end = v.str.len;
-			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_kill.recov_short_time;
-			op_gvkill();
-			if (0 == QWMODDW(jnl_seqno, LOGTRNUM_INTERVAL))
-				repl_log(updproc_log_fp, TRUE, TRUE, "Committed KILL Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
-					INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
-			QWINCRBY(jnl_seqno, seq_num_one);
-			QWASSIGN(recvpool.upd_proc_local->read_jnl_seqno, jnl_seqno);
-			break;
-		case JRT_ZKILL:
-			v.mvtype = MV_STR;
-			v.str.addr = rec->val.jrec_zkill.mumps_node.text;
-			v.str.len = (char *)strchr(v.str.addr, '\0') - (char *)v.str.addr;
-			gv_bind_name(gd_header, &(v.str));	/* this sets gv_target */
-			v.str.len = rec->val.jrec_zkill.mumps_node.length;
-			/* if (0 != gv_target->clue.end  &&  (FALSE == is_valid_hist(&gv_target->hist))) */
-				gv_target->clue.end = 0;
-			memcpy(gv_currkey->base, v.str.addr, v.str.len);
-			gv_currkey->base[v.str.len] = '\0';
-			gv_currkey->end = v.str.len;
-			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_zkill.recov_short_time;
-			op_gvzwithdraw();
-			if (0 == QWMODDW(jnl_seqno, LOGTRNUM_INTERVAL))
-				repl_log(updproc_log_fp, TRUE, TRUE, "Committed ZKILL Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
-					INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
-			QWINCRBY(jnl_seqno, seq_num_one);
-			QWASSIGN(recvpool.upd_proc_local->read_jnl_seqno, jnl_seqno);
-			break;
-		case JRT_TKILL:
-		case JRT_UKILL:
-		case JRT_FKILL:
-		case JRT_GKILL:
-			v.mvtype = MV_STR;
-			v.str.addr = rec->val.jrec_fkill.mumps_node.text;
-			v.str.len = (char *)strchr(v.str.addr, '\0') - (char *)v.str.addr;
-			gv_bind_name(gd_header, &(v.str));	/* this sets gv_target */
-			v.str.len = rec->val.jrec_fkill.mumps_node.length;
-			/* if (0 != gv_target->clue.end  &&  (FALSE == is_valid_hist(&gv_target->hist))) */
-				gv_target->clue.end = 0;
-			memcpy(gv_currkey->base, v.str.addr, v.str.len);
-			gv_currkey->base[v.str.len] = '\0';
-			gv_currkey->end = v.str.len;
-			assert(&rec->val.jrec_fkill.mumps_node == &rec->val.jrec_gkill.mumps_node);
-			assert(&rec->val.jrec_fkill.mumps_node == &rec->val.jrec_tkill.mumps_node);
-			assert(&rec->val.jrec_fkill.mumps_node == &rec->val.jrec_ukill.mumps_node);
-			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_fkill.recov_short_time;
-			op_gvkill();
-			break;
-		case JRT_TZKILL:
-		case JRT_UZKILL:
-		case JRT_FZKILL:
-		case JRT_GZKILL:
-			v.mvtype = MV_STR;
-			v.str.addr = rec->val.jrec_fzkill.mumps_node.text;
-			v.str.len = (char *)strchr(v.str.addr, '\0') - (char *)v.str.addr;
-			gv_bind_name(gd_header, &(v.str));	/* this sets gv_target */
-			v.str.len = rec->val.jrec_fzkill.mumps_node.length;
-			/* if (0 != gv_target->clue.end  &&  (FALSE == is_valid_hist(&gv_target->hist))) */
-				gv_target->clue.end = 0;
-			memcpy(gv_currkey->base, v.str.addr, v.str.len);
-			gv_currkey->base[v.str.len] = '\0';
-			gv_currkey->end = v.str.len;
-			assert(&rec->val.jrec_fzkill.mumps_node == &rec->val.jrec_gzkill.mumps_node);
-			assert(&rec->val.jrec_fzkill.mumps_node == &rec->val.jrec_tzkill.mumps_node);
-			assert(&rec->val.jrec_fzkill.mumps_node == &rec->val.jrec_uzkill.mumps_node);
-			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_fzkill.recov_short_time;
-			op_gvzwithdraw();
-			break;
-		case JRT_TCOM:
-			if (tcom_num == tset_num)
-			{
-				assert(0 != tcom_num);
-				mur_jrec_fixed_tcom.tc_recov_short_time = rec->val.jrec_tcom.tc_recov_short_time;
-				mur_jrec_fixed_tcom.ts_recov_short_time = rec->val.jrec_tcom.ts_recov_short_time;
-				op_tcommit();
-				if (0 != dollar_tlevel)
-				{	/* op_tcommit restarted the transaction - do update process special handling for tpretry */
-#ifdef VMS
-		/* The error below has special handling in a few condition handlers because it not so much signals an error
-		   as it does drive the necessary mechanisms to invoke a restart. Consequently this error can be
-		   overridden by a "real" error. For VMS, the extra parameters are specified to provide "placeholders" on
-		   the stack in the signal array if a real error needs to be overlayed in place of this one (see
-		   code in updproc_ch).
-		*/
-					rts_error(VARLSTCNT(6) ERR_TPRETRY, 4, 0, 0, 0, 0);
-#else
-					rts_error(VARLSTCNT(1) ERR_TPRETRY);
-#endif
-				}
-				if (0 == QWMODDW(jnl_seqno, LOGTRNUM_INTERVAL))
-					repl_log(updproc_log_fp, TRUE, TRUE,
-						"Committed TCOM Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
-						INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
-				QWINCRBY(jnl_seqno, seq_num_one);
-				QWASSIGN(recvpool.upd_proc_local->read_jnl_seqno, jnl_seqno);
-				tstarted = FALSE;
-				tcom_num = tset_num = rec_seqno = 0;
-			}
-			break;
+				repl_log(updproc_log_fp, TRUE, TRUE,
+					"Rectype = %d Committed Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
+					rectype, INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
 		}
 		readaddrs = readaddrs + rec_len;
 		temp_read += rec_len;
@@ -775,9 +621,9 @@ void updproc_actions(void)
 	updproc_continue = FALSE;
 }
 
-bool	upd_open_files(upd_proc_ctl **upd_db_files)
+bool	upd_open_files(gld_dbname_list **upd_db_files)
 {
-	upd_proc_ctl	*curr, *prev;
+	gld_dbname_list	*curr, *prev;
 	sgmnt_addrs	*csa;
 	char		*fn;
 	sm_uc_ptr_t	gld_fn;
@@ -789,7 +635,7 @@ bool	upd_open_files(upd_proc_ctl **upd_db_files)
 	error_def(ERR_NOREPLCTDREG);
 
 	QWASSIGN(start_jnl_seqno, seq_num_zero);
-	QWASSIGN(max_resync_seqno, seq_num_zero);
+	QWASSIGN(jgbl.max_resync_seqno, seq_num_zero);
 	/*
 	 *	Open all of the database files
 	 */
@@ -830,10 +676,10 @@ bool	upd_open_files(upd_proc_ctl **upd_db_files)
 			if (QWLT(start_jnl_seqno, csa->hdr->reg_seqno))
 				QWASSIGN(start_jnl_seqno, csa->hdr->reg_seqno);
 		}
-		/* max_resync_seqno should be set only after the test for updateresync because resync_seqno gets modified
+		/* jgbl.max_resync_seqno should be set only after the test for updateresync because resync_seqno gets modified
 			to reg_seqno in case receiver is started with -updateresync option */
-		if (QWLT(max_resync_seqno, csa->hdr->resync_seqno))
-			QWASSIGN(max_resync_seqno, csa->hdr->resync_seqno);
+		if (QWLT(jgbl.max_resync_seqno, csa->hdr->resync_seqno))
+			QWASSIGN(jgbl.max_resync_seqno, csa->hdr->resync_seqno);
 
 		repl_log(updproc_log_fp, TRUE, TRUE, "             -------->  start_jnl_seqno = "INT8_FMT" "INT8_FMTX"\n",
 			INT8_PRINT(start_jnl_seqno), INT8_PRINTX(start_jnl_seqno));
@@ -842,7 +688,7 @@ bool	upd_open_files(upd_proc_ctl **upd_db_files)
 			curr = curr->next;
 			continue;
 		} else if (!JNL_ENABLED(csd))
-			assert(FALSE);
+			GTMASSERT;
 		else
 			repl_enabled = TRUE;
 		if (recvpool.upd_proc_local->updateresync)

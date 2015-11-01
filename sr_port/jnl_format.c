@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,10 +11,11 @@
 
 #include "mdef.h"
 
+#include <stddef.h> /* for offsetof() macro */
+
 #include "gtm_string.h"
 #include "gdsroot.h"
 #include "gdskill.h"
-#include "gdsblk.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
@@ -31,12 +32,13 @@
 #include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
+#include "copy.h"
 
 GBLREF	gd_region		*gv_cur_region;
-GBLREF	char			jn_tid[8];
 GBLREF 	short  			dollar_tlevel;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	sgm_info		*sgm_info_ptr;
+LITREF	int			jrt_update[];
 
 static	const	enum jnl_record_type	jnl_opcode[3][5] =
 					{
@@ -44,108 +46,95 @@ static	const	enum jnl_record_type	jnl_opcode[3][5] =
 						{ JRT_SET,  JRT_FSET,  JRT_TSET,  JRT_GSET,  JRT_USET  },
 						{ JRT_ZKILL, JRT_FZKILL, JRT_TZKILL, JRT_GZKILL, JRT_UZKILL}
 					};
-static	char			zeroes[JNL_REC_START_BNDRY] = "\0\0\0\0\0\0\0\0";
-
-LITREF	int			jnl_fixed_size[];
 
 void	jnl_format(jnl_format_buffer *jfb)
 {
 	enum jnl_record_type	rectype;
 	sgmnt_addrs		*csa;
-	int4			align_fill_size, offset, jrec_size;
-	int			subcode, temp_free;
+	uint4			align_fill_size, jrec_size, tmp_jrec_size;
+	int			subcode;
 	jnl_action		*ja;
 	char			*local_buffer;
+	jnl_str_len_t		keystrlen;
+	mstr_len_t		valstrlen;
 
 	csa = &FILE_INFO(gv_cur_region)->s_addrs;
 	if (jnl_fence_ctl.level == 0 && dollar_tlevel == 0)
-		subcode = 0;
-	else
 	{
-		if (csa->next_fenced == NULL)
+		/* Non-TP */
+		subcode = 0;
+		tmp_jrec_size = FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE;
+	} else
+	{
+		if (NULL == csa->next_fenced)
 		{
+			/* F (or T) */
 			subcode = 1;
 			csa->next_fenced = jnl_fence_ctl.fence_list;
 			jnl_fence_ctl.fence_list = csa;
 		} else
+			/* G (or U) */
 			subcode = 3;
-		if (dollar_tlevel != 0)
+		if (0 != dollar_tlevel)
+		{
+			/* TP */
 			++subcode;
+			tmp_jrec_size = FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE;
+		} else
+			tmp_jrec_size = FIXED_ZTP_UPD_RECLEN + JREC_SUFFIX_SIZE;
 	}
 	ja = &(jfb->ja);
 	rectype = jnl_opcode[ja->operation][subcode];
-	assert(rectype > JRT_BAD  &&  rectype < JRT_RECTYPES);
+	assert(rectype > JRT_BAD && rectype < JRT_RECTYPES);
+	assert(IS_SET_KILL_ZKILL(rectype));
 	/* Compute actual record length */
-	jrec_size = JREC_PREFIX_SIZE + jnl_fixed_size[rectype] + JREC_SUFFIX_SIZE;
-	if (NULL != ja->key)
-		jrec_size += ja->key->end + sizeof(ja->key->end);
-	switch (rectype)
+	assert(NULL != ja->key);
+	keystrlen = ja->key->end;
+	tmp_jrec_size += keystrlen + sizeof(jnl_str_len_t);
+	if (JNL_SET == ja->operation)
 	{
-	case JRT_SET:
-	case JRT_FSET:
-	case JRT_GSET:
-	case JRT_TSET:
-	case JRT_USET:
-		jrec_size += ja->val->str.len + sizeof(ja->val->str.len);
+		assert(NULL != ja->val);
+		valstrlen = ja->val->str.len;
+		tmp_jrec_size += valstrlen + sizeof(mstr_len_t);
 	}
-	jrec_size = ROUND_UP(jrec_size, JNL_REC_START_BNDRY);
-	if (0 == dollar_tlevel) /* jfb->buff already malloced in gvcst_init */
-		local_buffer = (char *)jfb->buff;
-	else
+	jrec_size = ROUND_UP2(tmp_jrec_size, JNL_REC_START_BNDRY);
+	align_fill_size = jrec_size - tmp_jrec_size; /* For JNL_REC_START_BNDRY alignment */
+	if (dollar_tlevel)
 	{
-		local_buffer = (char *)get_new_element(sgm_info_ptr->format_buff_list, DIVIDE_ROUND_UP(jrec_size, 8));
-		jfb->buff = local_buffer;
-		memcpy(((fixed_jrec_tp_kill_set *)(local_buffer + JREC_PREFIX_SIZE))->jnl_tid, (uchar_ptr_t)jn_tid, sizeof(jn_tid));
+		assert((1 << JFB_ELE_SIZE_IN_BITS) == JNL_REC_START_BNDRY);
+		assert(JFB_ELE_SIZE == JNL_REC_START_BNDRY);
+		jfb->buff = (char *)get_new_element(sgm_info_ptr->format_buff_list, jrec_size >> JFB_ELE_SIZE_IN_BITS);
 		/* assume an align record will be written while computing maximum jnl-rec size requirements */
-		sgm_info_ptr->total_jnl_rec_size += jrec_size + ALIGN_RECLEN;
+		sgm_info_ptr->total_jnl_rec_size += jrec_size + MIN_ALIGN_RECLEN;
 	}
+	/* else if (0 == dollar_tlevel) jfb->buff already malloced in gvcst_init */
 	jfb->record_size = jrec_size;
 	jfb->rectype = rectype;
-
 	/* PREFIX */
-	temp_free = 0;
-	local_buffer[temp_free++] = rectype;
-	local_buffer[temp_free++] = '\0';
-	local_buffer[temp_free++] = '\0';
-	local_buffer[temp_free++] = '\0';
-
-	offset = 0;
-	assert(0 == (int)(local_buffer + temp_free) % 4);
-	assert(4 == sizeof(offset));
-	*(int *)(local_buffer + temp_free) = offset;
-	temp_free += 4;
-	/* Actual content */
-	temp_free += jnl_fixed_size[rectype];
-	if (NULL != ja)
+	((jrec_prefix *)jfb->buff)->jrec_type = rectype;
+	((jrec_prefix *)jfb->buff)->forwptr = jrec_size;
+	if (IS_ZTP(rectype))
+		local_buffer = jfb->buff + FIXED_ZTP_UPD_RECLEN;
+	else
+		local_buffer = jfb->buff + FIXED_UPD_RECLEN;
+	*(jnl_str_len_t *)local_buffer = keystrlen; /* direct assignment for already aligned address */
+	local_buffer += sizeof(jnl_str_len_t);
+	memcpy(local_buffer, (uchar_ptr_t)ja->key->base, keystrlen);
+	local_buffer += keystrlen;
+	if (JNL_SET == ja->operation)
 	{
-		memcpy(local_buffer + temp_free, (uchar_ptr_t)&ja->key->end, sizeof(ja->key->end));
-		temp_free += sizeof(ja->key->end);
-		memcpy(local_buffer + temp_free, (uchar_ptr_t)ja->key->base, ja->key->end);
-		temp_free += ja->key->end;
+		PUT_MSTR_LEN(local_buffer, valstrlen); /* SET command's data may not be aligned */
+		local_buffer +=  sizeof(jnl_str_len_t);
+		memcpy(local_buffer, (uchar_ptr_t)ja->val->str.addr, valstrlen);
+		local_buffer += valstrlen;
 	}
-	switch (rectype)
+	if (0 != align_fill_size)
 	{
-	case JRT_SET:
-	case JRT_FSET:
-	case JRT_GSET:
-	case JRT_TSET:
-	case JRT_USET:
-		memcpy(local_buffer + temp_free, (uchar_ptr_t)&ja->val->str.len, sizeof(ja->val->str.len));
-		temp_free += sizeof(ja->val->str.len);
-		memcpy(local_buffer + temp_free, (uchar_ptr_t)ja->val->str.addr, ja->val->str.len);
-		temp_free += ja->val->str.len;
+		memset(local_buffer, 0, align_fill_size);
+		local_buffer += align_fill_size;
 	}
-	if (align_fill_size = (ROUND_UP(temp_free, JNL_REC_START_BNDRY) - temp_free))
-	{
-		memcpy(local_buffer + temp_free, (uchar_ptr_t)zeroes, align_fill_size);
-		temp_free += align_fill_size;
-	}
+	assert(0 == ((uint4)local_buffer % sizeof(jrec_suffix)));
 	/* SUFFIX */
-	assert(0 == offset);
-	*(int *)(local_buffer + temp_free) = offset;
-	temp_free += 4;
-	offset = jrec_size - JREC_SUFFIX_SIZE;	/* don't count the suffix */
-	memcpy(local_buffer + temp_free, (uchar_ptr_t)THREE_LOW_BYTES(offset), 3);
-	temp_free += 3;
-	local_buffer[temp_free++] = JNL_REC_TRAILER;
+	((jrec_suffix *)local_buffer)->backptr = jrec_size;
+	((jrec_suffix *)local_buffer)->suffix_code = JNL_REC_SUFFIX_CODE;
 }

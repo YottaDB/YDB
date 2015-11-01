@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,7 @@
 /* iosocket_readfl.c */
 #include "mdef.h"
 #include <errno.h>
-#include <stdio.h>
+#include "gtm_stdio.h"
 #include "gtm_time.h"
 #ifdef __MVS__
 #include <sys/time.h>
@@ -21,7 +21,7 @@
 #include "gtm_inet.h"
 #include "gtm_string.h"
 #ifdef UNIX
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #include "eintr_wrappers.h"
 static int fcntl_res;
 #endif
@@ -33,6 +33,7 @@ static int fcntl_res;
 #include "stringpool.h"
 #include "iosocketdef.h"
 #include "min_max.h"
+#include "outofband.h"
 #include "wake_alarm.h"
 
 #define	TIMEOUT_INTERVAL	200000
@@ -40,7 +41,7 @@ GBLREF	io_pair 		io_curr_device;
 GBLREF	bool			out_of_time;
 GBLREF	spdesc 			stringpool;
 GBLREF	tcp_library_struct	tcp_routines;
-GBLREF	int4			outofband;
+GBLREF	volatile int4		outofband;
 /* VMS uses the UCX interface; should support others that emulate it */
 short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 					/* width == 0 is a flag for non-fixed length read */
@@ -207,7 +208,7 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			real_errno = errno;
 			break;
 		}
-		if (outofband || (status > 0 && terminator))
+		if (OUTOFBANDNOW(outofband) || (status > 0 && terminator))
 			break;
 		if (timed)
 		{
@@ -215,7 +216,7 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			{
 				sys_get_curr_time(&cur_time);
 				cur_time = sub_abs_time(&end_time, &cur_time);
-				if (cur_time.at_sec <= 0)
+				if (0 > cur_time.at_sec)
 				{
 					out_of_time = TRUE;
 					cancel_timer(timer_id);

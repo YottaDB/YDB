@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,32 +14,39 @@
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "error.h"
+#include "error_trap.h"
 #include "fgncal.h"
 #include "gtmci.h"
 #include "util.h"
-#include "gtmci_signals.h"
-#include "invocation_mode.h"
 
-GBLREF  stack_frame     	*frame_pointer;
+GBLREF  unsigned char		*msp;
 GBLREF  int                     mumps_status;
-GBLREF  parmblk_struct          *param_list;
+GBLREF  unsigned char		*fgncal_stack;
+GBLREF  dollar_ecode_type 	dollar_ecode;
+GBLREF  boolean_t		created_core;
+GBLREF  boolean_t		dont_want_core;
 
-CONDITION_HANDLER(gtmci_init_ch)
-{
-	START_CH;
-	invocation_mode &= MUMPS_GTMCI_OFF;
-	sig_switch_ext(); 	/* restore user signal context */
-	PRN_ERROR;
-	UNWIND(NULL, NULL);
-}
+error_def(ERR_ASSERT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_GTMCHECK);
+error_def(ERR_OUTOFSPACE);
 
 CONDITION_HANDLER(gtmci_ch)
 {
+	char	src_buf[50];
+	mstr	src_line;
 	START_CH;
-	assert(frame_pointer->flags & SFF_CI);
-	invocation_mode &= MUMPS_GTMCI_OFF;
-	unw_mv_ent_n(param_list->retaddr ? (param_list->argcnt + 1) : param_list->argcnt);
-	sig_switch_ext(); 	/* restore user signal context */
-	PRN_ERROR;
+	if (DUMPABLE)
+	{
+		gtm_dump();
+		TERMINATE;
+	}
+	src_line.len = 0;
+	src_line.addr = &src_buf[0];
+	set_zstatus(&src_line, SIGNAL, NULL, FALSE);
+	if (msp < fgncal_stack) /* restore stack to the last marked position */
+		fgncal_unwind();
+	mumps_status = SIGNAL;
 	UNWIND(NULL, NULL);
 }

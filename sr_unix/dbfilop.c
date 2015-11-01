@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,11 +79,14 @@ uint4 dbfilop(file_control *fc)
 					rts_error(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(udi->fn), save_errno);
 				break;
 		case FC_OPEN:
+				gv_cur_region->read_only = FALSE;	/* maintain csa->read_write simultaneously */
+				udi->s_addrs.read_write = TRUE;		/* maintain reg->read_only simultaneously */
 				if (-1 == (udi->fd = OPEN((char *)gv_cur_region->dyn.addr->fname, O_RDWR)))
 				{
 					if (-1 == (udi->fd = OPEN((char *)gv_cur_region->dyn.addr->fname, O_RDONLY)))
 						return ERR_DBOPNERR;
-					gv_cur_region->read_only = TRUE;
+					gv_cur_region->read_only = TRUE;	/* maintain csa->read_write simultaneously */
+					udi->s_addrs.read_write = FALSE;	/* maintain reg->read_only simultaneously */
 				}
 				FSTAT_FILE(udi->fd, &stat_buf, fstat_res);
 				if (-1 == fstat_res)

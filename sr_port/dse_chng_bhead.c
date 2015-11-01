@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_time.h"
 
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -51,7 +53,7 @@ GBLREF char		*update_array, *update_array_ptr;
 GBLREF int		update_array_size;
 GBLREF srch_hist	dummy_hist;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t cs_data;
+GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF block_id		patch_curr_blk;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*gd_header;
@@ -60,8 +62,9 @@ GBLREF unsigned char	cw_set_depth;
 GBLREF cache_rec	*cr_array[((MAX_BT_DEPTH * 2) - 1) * 2];	/* Maximum number of blocks that can be in transaction */
 GBLREF unsigned int	cr_array_index;
 GBLREF boolean_t	block_saved;
-GBLREF boolean_t        unhandled_stale_timer_pop;
-GBLREF unsigned char    *non_tp_jfb_buff_ptr;
+GBLREF boolean_t	unhandled_stale_timer_pop;
+GBLREF unsigned char	*non_tp_jfb_buff_ptr;
+GBLREF jnl_gbls_t	jgbl;
 
 void dse_chng_bhead(void)
 {
@@ -219,6 +222,7 @@ void dse_chng_bhead(void)
 			block_saved = FALSE;
 			if (JNL_ENABLED(cs_data))
 			{
+				JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() and jnl_write_aimg_rec() */
 				jnl_status = jnl_ensure_open();
 				if (0 == jnl_status)
 				{

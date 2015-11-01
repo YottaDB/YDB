@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,10 +11,10 @@
 
 #include "mdef.h"
 
+#include <errno.h>
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_time.h"
-
 #include "gtm_stat.h"
 
 #include "compiler.h"
@@ -36,7 +36,6 @@ GBLDEF unsigned char	routine_name[sizeof(mident) + 1];
 GBLDEF unsigned char	module_name[sizeof(mident) + 1];
 GBLREF unsigned char	*source_buffer;
 GBLREF int4		dollar_zcstatus;
-GBLREF int		errno;
 GBLREF io_pair          io_curr_device;
 
 static bool	tt_so_do_once;
@@ -57,12 +56,11 @@ void	compile_source_file(unsigned short flen, char *faddr)
 	error_def	(ERR_FILENOTFND);
 	error_def	(ERR_ERRORSUMMARY);
 
-	if (flen > MAX_FBUFF)
+	if (MAX_FBUFF < flen)
 	{
 		dec_err(VARLSTCNT(4) ERR_FILEPARSE, 2, flen, faddr);
 		dollar_zcstatus = ERR_ERRORSUMMARY;
-	}
-	else
+	} else
 	{
 		fstr.mvtype = MV_STR;
 		fstr.str.addr = faddr;
@@ -87,12 +85,10 @@ void	compile_source_file(unsigned short flen, char *faddr)
 			memcpy(source_file_name, ret.str.addr, source_name_len);
 			source_file_name[source_name_len] = 0;
 			p = &source_file_name[plen.p.pblk.b_dir];
-			if (plen.p.pblk.b_dir >= sizeof("/dev/") - 1  &&  !memcmp(source_file_name, "/dev/", sizeof("/dev/") - 1))
-			{
+			if ((plen.p.pblk.b_dir >= sizeof("/dev/") - 1) && !MEMCMP_LIT(source_file_name, "/dev/"))
 				tt_so_do_once = TRUE;
-			}
-			else if (   plen.p.pblk.b_ext != 2
-				 || (p[plen.p.pblk.b_name + 1] != 'M'  &&  p[plen.p.pblk.b_name + 1] != 'm'))
+			else if (plen.p.pblk.b_ext != 2
+				 || ('M' != p[plen.p.pblk.b_name + 1]  &&  'm' != p[plen.p.pblk.b_name + 1]))
 			{
 				dec_err(VARLSTCNT(4) ERR_FILEPARSE, 2, source_name_len, source_file_name);
 				dollar_zcstatus = ERR_ERRORSUMMARY;
@@ -100,9 +96,7 @@ void	compile_source_file(unsigned short flen, char *faddr)
 			}
 
 			if (compiler_startup())
-			{
 				dollar_zcstatus = ERR_ERRORSUMMARY;
-			}
 
 			if (tt_so_do_once)
 				break;
@@ -178,8 +172,7 @@ bool	open_source_file (void)
 		clock = time(0);
 		memcpy(&routine_name[0], "MDEFAULT", sizeof("MDEFAULT") - 1);
 		memcpy(&module_name[0], "MDEFAULT", sizeof("MDEFAULT") - 1);
-	}
-	else
+	} else
 	{
 		STAT_FILE((char *)&source_file_name[0], &statbuf, status);
 		assert(status == 0);
@@ -189,7 +182,7 @@ bool	open_source_file (void)
 		if (n > sizeof(mident))
 			n = sizeof(mident);
 		index = 0;
-		if (*p == '_')
+		if ('_' == *p)
 		{
 			routine_name[index] = '%';
 			module_name[index] = '_';

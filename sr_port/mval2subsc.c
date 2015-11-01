@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@ static readonly unsigned char neg_code[100] =
 unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 {
 	boolean_t	is_negative;
-	unsigned char	buf1[MAX_KEY_SZ + 1], buff[MAX_KEY_SZ + 1], ch, *cvt_table, *end, *in_ptr, *out_ptr;
+	unsigned char	buf1[MAX_KEY_SZ + 1], buff[MAX_ZWR_KEY_SZ], ch, *cvt_table, *end, *in_ptr, *out_ptr;
 	unsigned char	*tm, temp_mantissa[NUM_DEC_DG_2L / 2 + 3];	/* Need 1 byte for each two digits.  Add 3 bytes slop */
 	mstr		mstr_ch, mstr_buf1;
 	int4		mt, mw, mx;
@@ -104,8 +104,8 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 		}
 		if ((unsigned char *)((int)out_key->end + tmp_len + 3) > (unsigned char *)(out_key->top - MAX_NUM_SUBSC_LEN))
 		{
-			if (0 == (end = format_targ_key(buff, MAX_KEY_SZ + 1, out_key, TRUE)))
-				end = &buff[MAX_KEY_SZ + 1 - 1];
+			if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, out_key, TRUE)))
+				end = &buff[MAX_ZWR_KEY_SZ - 1];
 			rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 		}
 		*out_ptr++ = STR_SUB_PREFIX;
@@ -118,8 +118,8 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 				if (out_ptr - (int)out_key->base + tmp_len + 3
 					> (unsigned char *)(out_key->top - MAX_NUM_SUBSC_LEN))
 				{
-					if (0 == (end = format_targ_key(buff, MAX_KEY_SZ + 1, out_key, TRUE)))
-						end = &buff[MAX_KEY_SZ + 1 - 1];
+					if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, out_key, TRUE)))
+						end = &buff[MAX_ZWR_KEY_SZ - 1];
 					rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 				}
 				ch++;	/* promote character */
@@ -276,8 +276,8 @@ FINI:
 	out_key->end = out_ptr - out_key->base;
 	if (0 >= (int)(out_key->top - out_key->end) - MAX_NUM_SUBSC_LEN)
 	{	/* take care of extra space plus <NUL> terminator */
-		if (0 == (end = format_targ_key(buff, MAX_KEY_SZ + 1, out_key, TRUE)))
-			end = &buff[MAX_KEY_SZ];
+		if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, out_key, TRUE)))
+			end = &buff[MAX_ZWR_KEY_SZ - 1];
 		rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 	}
 	return out_ptr;

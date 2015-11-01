@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,6 +51,8 @@
 				 * cli_present() should not return CLI_DEFAULT).
 				 */
 #define DEFA_PRESENT	(char *) CLI_PRESENT	/* default present */
+
+#define CLI_GET_STR_ALL	cli_get_str
 
 /*
  * ------------------------------------------------------

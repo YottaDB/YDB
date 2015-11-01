@@ -61,16 +61,19 @@
 #include "ftok_sems.h"
 #include "gtmimagename.h"
 
-#define CANCEL_DB_TIMERS(region)						\
+#define CANCEL_DB_TIMERS(region, cancelled_timer)				\
 {										\
 	sgmnt_addrs	*csa;							\
 										\
+	cancelled_timer = FALSE;						\
 	csa = &FILE_INFO(region)->s_addrs;					\
 	if (csa->timer)								\
 	{									\
 		cancel_timer((TID)region);					\
 		if (NULL != csa->nl)						\
 			DECR_CNT(&csa->nl->wcs_timers, &csa->nl->wc_var_lock);	\
+		cancelled_timer = TRUE;						\
+		csa->timer = FALSE;						\
 	}									\
 	if (csa->dbsync_timer)							\
 	{									\
@@ -90,6 +93,7 @@ GBLREF	ipcs_mesg		db_ipcs;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	jnl_process_vector	*prc_vec;
 GBLREF	jnl_process_vector	*originator_prc_vec;
+GBLREF 	jnl_gbls_t		jgbl;
 
 static boolean_t		grabbed_access_sem;
 
@@ -97,8 +101,9 @@ void gds_rundown(void)
 {
 
 	bool			is_mm, we_are_last_user, we_are_last_writer;
-	boolean_t		ipc_deleted, remove_shm;
-	char			*time_ptr, local_time_ptr[CTIME_BEFORE_NL + 1];
+	boolean_t		ipc_deleted, remove_shm, cancelled_timer;
+	now_t			now;	/* for GET_CUR_TIME macro */
+	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	gd_region		*reg;
 	int			save_errno, status;
 	int4			semval, ftok_semval, sopcnt, ftok_sopcnt;
@@ -108,16 +113,16 @@ void gds_rundown(void)
 	sgmnt_data_ptr_t	csd;
 	struct shmid_ds		shm_buf;
 	struct sembuf		sop[2], ftok_sop[2];
-	time_t  		now;
 	uint4           	jnl_status;
 	unix_db_info		*udi;
+	jnl_private_control	*jpc;
 
 	error_def(ERR_CRITSEMFAIL);
 	error_def(ERR_DBFILERR);
 	error_def(ERR_DBRNDWNWRN);
 	error_def(ERR_DBCCERR);
 	error_def(ERR_ERRCALL);
-	error_def(ERR_RECOVIPCDEL);
+	error_def(ERR_IPCNOTDEL);
 	error_def(ERR_RNDWNSEMFAIL);
 	error_def(ERR_TEXT);
 	error_def(ERR_WCBLOCKED);
@@ -190,7 +195,7 @@ void gds_rundown(void)
 		return;
 	}
 	/* Cancel any pending flush timer for this region by this task */
-	CANCEL_DB_TIMERS(reg);
+	CANCEL_DB_TIMERS(reg, cancelled_timer);
 	we_are_last_user = FALSE;
 	if (!csa->persistent_freeze)
 		region_freeze(reg, FALSE, FALSE);
@@ -262,13 +267,19 @@ void gds_rundown(void)
 	if (-1 == (semval = semctl(udi->semid, 1, GETVAL)))
 		rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
 	we_are_last_writer = (1 == semval && FALSE == reg->read_only);	/* There's one writer left and I am it */
-	assert(!mupip_jnl_recover || we_are_last_writer); /* recover => one writer */
+	assert(!(mupip_jnl_recover && !reg->read_only) || we_are_last_writer); /* recover + R/W region => one writer */
 	if (-1 == (ftok_semval = semctl(udi->ftok_semid, 1, GETVAL)))
 		rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
-	/* Certain things are only done for writing tasks */
-	if (!reg->read_only)
-	{
-		/* If we had an orphaned block and were interrupted, set wc_blocked so we can invoke wcs_recover */
+	/* If csa->nl->donotflush_dbjnl is set, it means mupip recover/rollback was interrupted and therefore we should
+	 * 	not flush shared memory contents to disk as they might be in an inconsistent state.
+	 * In this case, we will go ahead and remove shared memory (without flushing the contents) in this routine.
+	 * A reissue of the recover/rollback command will restore the database to a consistent state.
+	 * Otherwise, if we have write access to this region, let us perform a few writing tasks.
+	 */
+	if (csa->nl->donotflush_dbjnl)
+		csa->wbuf_dqd = FALSE;	/* ignore csa->wbuf_dqd status as we do not care about the cache contents */
+	else if (!reg->read_only)
+	{	/* If we had an orphaned block and were interrupted, set wc_blocked so we can invoke wcs_recover */
 		if (csa->wbuf_dqd)
 		{
 			grab_crit(reg);
@@ -286,12 +297,11 @@ void gds_rundown(void)
 			BG_TRACE_PRO_ANY(csa, lost_block_recovery);
 			rel_crit(reg);
 		}
-		if (((JNL_ENABLED(csd)) && (GTCM_GNP_SERVER_IMAGE == image_type)) || mupip_jnl_recover)
-			originator_prc_vec = prc_vec;
+		if (JNL_ENABLED(csd) && (GTCM_GNP_SERVER_IMAGE == image_type))
+			originator_prc_vec = NULL;
 		/* If we are the last writing user, then everything must be flushed */
 		if (we_are_last_writer)
-		{
-			/* Time to flush out all of our buffers */
+		{	/* Time to flush out all of our buffers */
 			if (FALSE == is_mm)
 			{
 				/* Note WCSFLU_SYNC_EPOCH ensures the epoch is synced to the journal and indirectly
@@ -338,7 +348,7 @@ void gds_rundown(void)
 				csa->nl->remove_shm = TRUE;
 			}
 			csd->trans_hist.header_open_tn = csd->trans_hist.curr_tn;
-		} else if (csa->timer && 0 > csa->nl->wcs_timers)		/* Last timer is running down now, perform flush */
+		} else if (cancelled_timer && (0 > csa->nl->wcs_timers)) /* Last timer is running down now, perform flush */
 		{
 			grab_crit(reg);
 			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH);
@@ -350,38 +360,48 @@ void gds_rundown(void)
 			 * of gds_rundown(), but just to be safe. To be removed by 2002!! --- nars -- 2001/04/25.
 			 */
 			tp_change_reg();	/* call this because jnl_ensure_open checks cs_addrs rather than gv_cur_region */
-			if (csa->jnl->jnl_buff->fsync_in_prog_latch.latch_pid == process_id)
+			jpc = csa->jnl;
+			if (jpc->jnl_buff->fsync_in_prog_latch.latch_pid == process_id)
                         {
                                 assert(FALSE);
-                                compswap(&csa->jnl->jnl_buff->fsync_in_prog_latch, process_id, LOCK_AVAILABLE);
+                                compswap(&jpc->jnl_buff->fsync_in_prog_latch, process_id, LOCK_AVAILABLE);
                         }
-                        if (csa->jnl->jnl_buff->io_in_prog_latch.latch_pid == process_id)
+                        if (jpc->jnl_buff->io_in_prog_latch.latch_pid == process_id)
                         {
                                 assert(FALSE);
-                                compswap(&csa->jnl->jnl_buff->io_in_prog_latch, process_id, LOCK_AVAILABLE);
+                                compswap(&jpc->jnl_buff->io_in_prog_latch, process_id, LOCK_AVAILABLE);
                         }
-			if ((0 != csa->nl->jnl_file.u.inode) && (NOJNL != csa->jnl->channel || we_are_last_writer))
-			/* If a file has actually been opened .. */
-			{
+			if (((NOJNL != jpc->channel) && !JNL_FILE_SWITCHED(jpc))
+				|| we_are_last_writer && (0 != csa->nl->jnl_file.u.inode))
+			{	/* We need to close the journal file cleanly if we have the latest generation journal file open
+				 *	or if we are the last writer and the journal file is open in shared memory (not necessarily
+				 *	by ourselves e.g. the only process that opened the journal got shot abnormally)
+				 * Note: we should not infer anything from the shared memory value of csa->nl->jnl_file.u.inode
+				 * 	if we are not the last writer as it can be concurrently updated.
+				 */
 				grab_crit(reg);
-				jnl_status = jnl_ensure_open();
-				if (0 == jnl_status)
+				if (JNL_ENABLED(csd))
 				{
-					/* If we_are_last_writer, we would have already done a wcs_flu() which would
-					 * have written an epoch record and we are guaranteed no further updates
-					 * since we are the last writer. So, just close the journal.
-					 * Although we assert pini_addr should be non-zero for last_writer, we
-					 * play it safe in PRO and write a PINI record if not written already.
-					 */
-					assert(!csa->jnl->jnl_buff->before_images || is_mm
-							|| !we_are_last_writer || 0 != csa->jnl->pini_addr);
-					if (we_are_last_writer && 0 == csa->jnl->pini_addr)
-						jnl_put_jrt_pini(csa);
-					if (0 != csa->jnl->pini_addr)
-						jnl_put_jrt_pfin(csa);
-					jnl_file_close(reg, we_are_last_writer, FALSE);
-				} else
-					send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+					JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* set_jnl/jnl_file_close,
+										 * jnl_put_jrt_pini/pfin need it */
+					jnl_status = jnl_ensure_open();
+					if (0 == jnl_status)
+					{	/* If we_are_last_writer, we would have already done a wcs_flu() which would
+						 * have written an epoch record and we are guaranteed no further updates
+						 * since we are the last writer. So, just close the journal.
+						 * Although we assert pini_addr should be non-zero for last_writer, we
+						 * play it safe in PRO and write a PINI record if not written already.
+						 */
+						assert(!jpc->jnl_buff->before_images || is_mm
+								|| !we_are_last_writer || 0 != jpc->pini_addr);
+						if (we_are_last_writer && 0 == jpc->pini_addr)
+							jnl_put_jrt_pini(csa);
+						if (0 != jpc->pini_addr)
+							jnl_put_jrt_pfin(csa);
+						jnl_file_close(reg, we_are_last_writer, FALSE);
+					} else
+						send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+				}
 				rel_crit(reg);
 			}
 		}
@@ -390,8 +410,7 @@ void gds_rundown(void)
 			grab_crit(reg);			/* To satisfy crit requirement in fileheader_sync() */
 			memset(csd->machine_name, 0, MAX_MCNAMELEN); /* clear the machine_name field */
 			if (!mupip_jnl_recover && we_are_last_user)
-			{
-				/* mupip_jnl_recover will do this after mur_close_file */
+			{	/* mupip_jnl_recover will do this after mur_close_file */
 				csd->semid = INVALID_SEMID;
 				csd->shmid = INVALID_SHMID;
 				csd->sem_ctime.ctime = 0;
@@ -423,10 +442,9 @@ void gds_rundown(void)
 #endif
 			}
                 }
-	} /* end if read-write */
+	} /* end if (!reg->read_only && !csa->nl->donotflush_dbjnl) */
 	if (reg->read_only && we_are_last_user && !mupip_jnl_recover)
-	{
-		/* mupip_jnl_recover will do this after mur_close_file */
+	{	/* mupip_jnl_recover will do this after mur_close_file */
 		db_ipcs.semid = INVALID_SEMID;
 		db_ipcs.shmid = INVALID_SHMID;
 		db_ipcs.sem_ctime = 0;
@@ -434,9 +452,7 @@ void gds_rundown(void)
 		db_ipcs.fn_len = reg->dyn.addr->fname_len;
 		memcpy(db_ipcs.fn, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
 		db_ipcs.fn[reg->dyn.addr->fname_len] = 0;
- 		/*
-		 * request gtmsecshr to flush. read_only cannot flush itself.
-		 */
+ 		/* request gtmsecshr to flush. read_only cannot flush itself */
 		if (0 != send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0))
 			rts_error(VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 				  ERR_TEXT, 2, RTS_ERROR_TEXT("gtmsecshr failed to update database file header"));
@@ -462,21 +478,24 @@ void gds_rundown(void)
 	/* Detach our shared memory while still under lock so reference counts will be
 	 * correct for the next process to run down this region.
 	 * In the process also get the remove_shm status from node_local before detaching.
+	 * If csa->nl->donotflush_dbjnl is TRUE, it means we can safely remove shared memory without compromising data
+	 * 	integrity as a reissue of recover will restore the database to a consistent state.
 	 */
-	remove_shm = csa->nl->remove_shm;
+	remove_shm = (csa->nl->remove_shm || csa->nl->donotflush_dbjnl);
 	status = shmdt((caddr_t)csa->nl);
 	csa->nl = NULL; /* dereferencing nl after detach is not right, so we set it to NULL so that we can test before dereference*/
 	if (-1 == status)
 		send_msg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_TEXT, 2, LEN_AND_LIT("Error during shmdt"), errno);
 	reg->open = FALSE;
-	if (csa->wbuf_dqd)			/* If file is still not in good shape, die here and now */
-		GTMASSERT;			/* .. before we get rid of our storage */
+
+	/* If file is still not in good shape, die here and now before we get rid of our storage */
+	if (csa->wbuf_dqd)
+		GTMASSERT;
 	assert (!is_rcvr_server);
 	ipc_deleted = FALSE;
 	/* If we are the very last user, remove shared storage id and the semaphores */
 	if (we_are_last_user)
-	{
-		/* remove shared storage, only if last writer to rundown did a successful wcs_flu() */
+	{	/* remove shared storage, only if last writer to rundown did a successful wcs_flu() */
 		if (remove_shm)
 		{
 			ipc_deleted = TRUE;
@@ -516,21 +535,22 @@ void gds_rundown(void)
 	}
 	if (!ftok_sem_release(reg, !mupip_jnl_recover, FALSE))
 			rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
-	GET_CUR_TIME;
-	strncpy(local_time_ptr, time_ptr, CTIME_BEFORE_NL);     /* make safe */
-	time_ptr = &local_time_ptr[0];
-	if (is_src_server)
-		util_out_print("!AD : Source server !AZ IPC resources for region !AD", TRUE,
-				CTIME_BEFORE_NL, time_ptr, ipc_deleted ? "deleted" : "did not delete", REG_LEN_STR(reg));
-	if (is_updproc)
-		util_out_print("!AD : Update process !AZ IPC resources for region !AD", TRUE,
-				CTIME_BEFORE_NL, time_ptr, ipc_deleted ? "deleted" : "did not delete", REG_LEN_STR(reg));
-	if (mupip_jnl_recover)
+	if (!ipc_deleted)
 	{
-                send_msg(VARLSTCNT(5) ERR_RECOVIPCDEL, 3, ipc_deleted ? "deleted" : "did not delete", DB_LEN_STR(reg));
-		if(!ipc_deleted)
-			util_out_print("!AD : Recover process did not delete IPC resources for database !AD", TRUE,
-					CTIME_BEFORE_NL, time_ptr, DB_LEN_STR(reg));
+		GET_CUR_TIME;
+		if (is_src_server)
+			gtm_putmsg(VARLSTCNT(8) ERR_IPCNOTDEL, 6, CTIME_BEFORE_NL, time_ptr,
+				LEN_AND_LIT("Source server"), REG_LEN_STR(reg));
+		if (is_updproc)
+			gtm_putmsg(VARLSTCNT(8) ERR_IPCNOTDEL, 6, CTIME_BEFORE_NL, time_ptr,
+				LEN_AND_LIT("Update process"), REG_LEN_STR(reg));
+		if (mupip_jnl_recover)
+		{
+			gtm_putmsg(VARLSTCNT(8) ERR_IPCNOTDEL, 6, CTIME_BEFORE_NL, time_ptr,
+				LEN_AND_LIT("Mupip journal process"), REG_LEN_STR(reg));
+			send_msg(VARLSTCNT(8) ERR_IPCNOTDEL, 6, CTIME_BEFORE_NL, time_ptr,
+				LEN_AND_LIT("Mupip journal process"), REG_LEN_STR(reg));
+		}
 	}
 	REVERT;
 }
@@ -541,6 +561,7 @@ CONDITION_HANDLER(gds_rundown_ch)
 	int		semop_res;
 	unix_db_info	*udi;
 	sgmnt_addrs	*csa;
+	boolean_t	cancelled_timer;
 	void		rel_crit();
 
 	error_def(ERR_ASSERT);
@@ -564,7 +585,7 @@ CONDITION_HANDLER(gds_rundown_ch)
 	udi = FILE_INFO(gv_cur_region);
 	csa = &udi->s_addrs;
 	/* We got here on an error and are going to close the region. Cancel any pending flush timer for this region by this task*/
-	CANCEL_DB_TIMERS(gv_cur_region);
+	CANCEL_DB_TIMERS(gv_cur_region, cancelled_timer);
 	/* release the access control semaphore, if you hold it */
 	if (grabbed_access_sem)
 	{

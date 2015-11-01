@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,15 +37,6 @@
 #include "parse_file.h"
 #include "is_file_identical.h"
 #include "gtm_startup_chk.h"
-
-#define	GTM_DIST		"gtm_dist"
-#define GTM_IMAGE		"mumps"
-#define GTM_IMAGE_NAMELEN	(sizeof(GTM_IMAGE) - 1)
-#define	DIR_SEPARATOR		'/'
-#define	GTMSECSHR_NAME		"gtmsecshr"
-#define GTMSECSHR_NAMELEN	(sizeof(GTMSECSHR_NAME) - 1)
-#define	ROOTUID			0	/*	also defined in gtmsecshr.h	*/
-
 
 GBLREF boolean_t	gtm_environment_init;
 static char		pbuff[MAX_FBUFF];
@@ -138,8 +129,8 @@ int gtm_chk_image(void)
 {
 	error_def(ERR_IMAGENAME);
 
-	if (memcmp(pblk.l_name, GTM_IMAGE, GTM_IMAGE_NAMELEN))
-		rts_error(VARLSTCNT(6) ERR_IMAGENAME, 4, LEN_AND_LIT(GTM_IMAGE), pblk.b_name, pblk.l_name);
+	if (memcmp(pblk.l_name, GTM_IMAGE_NAME, GTM_IMAGE_NAMELEN))
+		rts_error(VARLSTCNT(6) ERR_IMAGENAME, 4, LEN_AND_LIT(GTM_IMAGE_NAME), pblk.b_name, pblk.l_name);
 
 	return 0;
 }

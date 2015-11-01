@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,6 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF gd_addr		*gd_header;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLDEF sm_uc_ptr_t	mu_extr_buffer;
 GBLREF io_pair          io_curr_device;
 GBLREF io_desc          *active_device;
 GBLREF gv_namehead	*gv_target;
@@ -190,13 +189,13 @@ void mu_extract(void)
 		mupip_exit(ERR_MUPCLIERR);
 	}
 	n_len = sizeof(cli_buff);
-	if (FALSE == cli_get_str(select_text, cli_buff, &n_len))
+	if (FALSE == cli_get_str((char *)select_text, cli_buff, &n_len))
 	{
 		n_len = 1;
 		cli_buff[0] = '*';
 	}
 	/* gv_select will select globals */
-        gv_select(cli_buff, n_len, freeze, select_text, &gl_head, &reg_max_rec, &reg_max_key, &reg_max_blk);
+        gv_select(cli_buff, n_len, freeze, (char *)select_text, &gl_head, &reg_max_rec, &reg_max_key, &reg_max_blk);
  	if (!gl_head.next)
         {
                 rts_error(VARLSTCNT(1) ERR_NOSELECT);
@@ -244,7 +243,6 @@ void mu_extract(void)
 	(*op_open_ptr)(&op_val, &op_pars, 0, 0);
 	ESTABLISH(mu_extract_handler);
 	op_use(&op_val, &op_pars);
-	mu_extr_buffer = (sm_uc_ptr_t)malloc(reg_max_blk);
 	if (MU_FMT_BINARY == format)
 	{
 		/* binary header label format:

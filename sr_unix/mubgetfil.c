@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,14 +11,9 @@
 
 #include "mdef.h"
 
-#include "gtm_string.h"
-
-#ifdef __MVS__
 #include <errno.h>
-#else
-#include <sys/errno.h>
-#endif
 #include "gtm_stat.h"
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"

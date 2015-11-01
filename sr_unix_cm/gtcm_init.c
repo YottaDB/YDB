@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,12 +19,13 @@
 
 #include "mdef.h"
 
+#include <sys/types.h>
+#include <errno.h>
+#include <signal.h>
+
 #include "gtm_stdlib.h"		/* for exit() */
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"		/* for getpid() */
-
-#include <sys/types.h>
-#include <signal.h>
 
 #include "gtcm.h"
 #include "stp_parms.h"
@@ -50,7 +51,6 @@
 static char rcsid[] = "$Header:$";
 #endif
 
-GBLREF int			errno;
 GBLREF short 			gtcm_ast_avail;
 GBLREF bool			licensed;
 GBLREF int			omi_pid;

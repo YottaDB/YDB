@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@ GBLREF merge_glvn_ptr	mglvnp;
 
 void merge_desc_check(void)
 {
-        unsigned char		buff1[MAX_STRLEN], buff2[MAX_STRLEN], *end1, *end2;
+        unsigned char		buff1[MAX_ZWR_KEY_SZ], buff2[MAX_ZWR_KEY_SZ], *end1, *end2;
 	enum db_acc_method	acc_meth1, acc_meth2;
 
 	error_def(ERR_MERGEDESC);
@@ -78,10 +78,10 @@ void merge_desc_check(void)
 		if (0 == memcmp(mglvnp->gblp[IND1]->s_gv_currkey->base, mglvnp->gblp[IND2]->s_gv_currkey->base,
 			        MIN(mglvnp->gblp[IND1]->s_gv_currkey->end, mglvnp->gblp[IND2]->s_gv_currkey->end)))
 		{
-			if (0 == (end1 = format_targ_key(buff1, MAX_STRLEN, mglvnp->gblp[IND1]->s_gv_currkey, TRUE)))
-				end1 = &buff1[MAX_STRLEN - 1];
-			if (0 == (end2 = format_targ_key(buff2, MAX_STRLEN, mglvnp->gblp[IND2]->s_gv_currkey, TRUE)))
-				end2 = &buff2[MAX_STRLEN - 1];
+			if (0 == (end1 = format_targ_key(buff1, MAX_ZWR_KEY_SZ, mglvnp->gblp[IND1]->s_gv_currkey, TRUE)))
+				end1 = &buff1[MAX_ZWR_KEY_SZ - 1];
+			if (0 == (end2 = format_targ_key(buff2, MAX_ZWR_KEY_SZ, mglvnp->gblp[IND2]->s_gv_currkey, TRUE)))
+				end2 = &buff2[MAX_ZWR_KEY_SZ - 1];
 			if (mglvnp->gblp[IND1]->s_gv_currkey->end > mglvnp->gblp[IND2]->s_gv_currkey->end)
 				rts_error(VARLSTCNT(6) ERR_MERGEDESC, 4, end1 - buff1, buff1, end2 - buff2, buff2);
 			else

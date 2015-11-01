@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,11 @@
  *
  *  ** For new targets, use iomt_qio.c in SR_HPUX as a template **
  */
-#include "gtm_stdio.h"
 #include "mdef.h"
+
+#include <errno.h>
+#include "gtm_stdio.h"
+
 #include "io.h"
 #include "iottdef.h"
 #include "iomtdef.h"
@@ -25,8 +28,6 @@
 #include "gtm_mtio.h"
 #include <unistd.h>
 #include <values.h>
-
-extern int      errno;
  *********/
 
 GBLREF io_pair  io_curr_device;

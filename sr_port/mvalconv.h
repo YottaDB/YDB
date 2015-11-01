@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@ void i2smval(mval *v, uint4 i);
 void i2usmval(mval *v, unsigned int i);
 void i2mval(mval *v, int i);
 void i2flt(mflt *v, int i);
-void double2mval(double src, mval *dst);
+void double2mval(mval *dst, double src);
 double mval2double(mval *v);
 int4 mval2i(mval *v);
 uint4 mval2si(mval *v);

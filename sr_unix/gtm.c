@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,34 +11,11 @@
 
 #include "mdef.h"
 
-
-#include "gtm_stdlib.h"
+#include "gtm_stdio.h"
 #include "gtm_string.h"
-#include "startup.h"
-#include "rtnhdr.h"
-#include "stack_frame.h"
-#include "error.h"
-#include "cli.h"
-#include "gdsroot.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdsbt.h"
-#include "gdsfhead.h"
-#include "gtmimagename.h"
-#include "op.h"
-#include "tp_timeout.h"
-#include "ctrlc_handler.h"
-#include "mprof.h"
-#include "gtm_startup_chk.h"
-#include "gtm_compile.h"
-#include "gtm_startup.h"
-#include "jobchild_init.h"
-#include "cli_parse.h"
-#include "invocation_mode.h"
-
-GBLREF IN_PARMS			*cli_lex_in_ptr;
-GBLREF char			cli_token_buf[];
-GBLREF char			cli_err_str[];
+#include "gtm_stdlib.h"
+#include "gtm_limits.h"
+#include <dlfcn.h>
 
 #ifdef __osf__
 	/* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
@@ -50,60 +27,61 @@ GBLREF char			cli_err_str[];
 #pragma pointer_size (save)
 #pragma pointer_size (long)
 #endif
-
-GBLDEF char 		**gtmenvp;
+typedef int (*gtm_main_t)(int argc, char **argv, char **envp);
 
 int main (int argc, char **argv, char **envp)
-
 #ifdef __osf__
 #pragma pointer_size (restore)
 #endif
-
 {
-	char		*ptr;
-	int             eof, parse_ret;
+	int		status;
+	char		gtmshr_file[PATH_MAX];
+	char_ptr_t	fptr;
+	int		dir_len;
+	void_ptr_t	handle;
+	gtm_main_t	gtm_main;
+	/* We fake the output of the following messages to appear as if they were reported by GT.M error
+	 * handlers (gtm_putmsg/rts_error) by prefixing every message with %GTM-E-* */
+	int		ERR_GTMDISTUNDEF = 150377714;
+	int		ERR_DISTPATHMAX = 150377682;
+	int		ERR_DLLNOOPEN = 150379250;
+	int		ERR_DLLNORTN = 150379258;
 
-	gtmenvp = envp;
-	err_init(stop_image_conditional_core);
-	cli_lex_setup(argc, argv);
-	/*	put the arguments into buffer, then clean up the token buffer
-		cli_gettoken() copies all arguments except the first one argv[0]
-		into the buffer (cli_lex_in_ptr->in_str).
-		i.e. command line: "/usr/library/V990/mumps -run somefile"
-		the buffer cli_lex_in_ptr->in_str == "-run somefile"	*/
-	if (1 < argc)
-		cli_gettoken(&eof);
-	/*	cli_gettoken() extracts the first token into cli_token_buf (in tok_extract())
-		which should be done in parse_cmd(), So, reset the token buffer here to make
-		parse_cmd() starts from the first token
-	*/
-	cli_token_buf[0] = '\0';
-	/*	insert the "MUMPS " in the parsing buffer the buffer is now:
-		cli_lex_in_ptr->in_str == "MUMPS -run somefile"
-		we didnot change argv[0]
-	*/
-	ptr = cli_lex_in_ptr->in_str;
-	memmove(strlen("MUMPS ") + ptr, ptr, strlen(ptr));
-	memcpy(ptr, "MUMPS ", strlen("MUMPS "));
+	if (!(fptr = (char_ptr_t)GETENV(GTM_DIST)))
+	{
+		FPRINTF(stderr, "%%GTM-E-GTMDISTUNDEF, Environment variable $gtm_dist is not defined\n");
+		return ERR_GTMDISTUNDEF;
+	}
+	dir_len = strlen(fptr);
+	if (PATH_MAX <= dir_len + STR_LIT_LEN(GTMSHR_IMAGE_NAME) + 1)
+	{
+		FPRINTF(stderr, "%%GTM-E-DISTPATHMAX, $gtm_dist path is greater than maximum (%u)\n",
+				(PATH_MAX - STR_LIT_LEN(GTMSHR_IMAGE_NAME) - 2));
+		return ERR_DISTPATHMAX;
+	}
+	memcpy(&gtmshr_file[0], fptr, dir_len);
+	gtmshr_file[dir_len] = DIR_SEPARATOR;
+	memcpy(&gtmshr_file[dir_len+1], GTMSHR_IMAGE_NAME, STR_LIT_LEN(GTMSHR_IMAGE_NAME));
+	gtmshr_file[dir_len + STR_LIT_LEN(GTMSHR_IMAGE_NAME) + 1] = 0;
 
-	/*	reset the argument buffer pointer, it's changed in cli_gettoken() call above    */
-	/*	do NOT reset to 0(NULL) to avoid fetching cmd line args into buffer again       */
-	/*	cli_lex_in_ptr->tp is the pointer to indicate current position in the buffer    */
-	/*	cli_lex_in_ptr->in_str                                                          */
-	cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
-	parse_ret = parse_cmd();
-	if (parse_ret && (EOF != parse_ret))
-		rts_error(VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
-
-	if (cli_present("DIRECT_MODE"))
-		invocation_mode = MUMPS_DIRECT;
-	else if (cli_present("RUN"))
-		invocation_mode = MUMPS_RUN;
-
-	gtm_chk_dist(argv[0]);
-	gtm_chk_image();
-	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
-	init_gtm();
-	dm_start();
-	op_halt();
+	/* RTLD_NOW - resolve immediately so we know errors sooner than later
+	 * RTLD_GLOBAL - make all exported symbols from gtmshr available for subsequent dlopen */
+	handle = dlopen(&gtmshr_file[0], (RTLD_NOW | RTLD_GLOBAL));
+	if (NULL == handle)
+	{
+		FPRINTF(stderr, "%%GTM-E-DLLNOOPEN, Failed to load external dynamic library %s\n", gtmshr_file);
+		if ((fptr = dlerror()) != NULL)
+			FPRINTF(stderr, "%%GTM-E-TEXT, %s\n", fptr);
+		return ERR_DLLNOOPEN;
+	}
+	gtm_main = (gtm_main_t)dlsym(handle, GTM_MAIN_FUNC);
+	if (NULL == gtm_main)
+	{
+		FPRINTF(stderr, "%%GTM-E-DLLNORTN, Failed to look up the location of the symbol %s\n", GTM_MAIN_FUNC);
+		if ((fptr = dlerror()) != NULL)
+			FPRINTF(stderr, "%%GTM-E-TEXT, %s\n", fptr);
+		return ERR_DLLNORTN;
+	}
+	status = gtm_main(argc, argv, envp);
+	return status;
 }

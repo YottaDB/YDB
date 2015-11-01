@@ -94,6 +94,7 @@ LITDEF nametabent svn_names[] = {
 	,{ 2,"ZS" }, { 4,"ZSTA*" }
 	,{ 5,"ZSTEP"}
 	,{ 3,"ZSY*"}
+	,{ 3,"ZTE" }, { 6,"ZTEXIT"}
 	,{ 2,"ZT*" }
 	,{ 2,"ZV*" }
 	,{ 4,"ZYER*" }
@@ -102,7 +103,7 @@ LITDEF nametabent svn_names[] = {
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 69	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 71	/* s t u v w x y z ~ */
 };
 /* These entries correspond to the entries in the svn_names array */
 LITDEF svn_data_type svn_data[] =
@@ -154,6 +155,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZSTATUS, TRUE, ALL_SYS },{ SV_ZSTATUS, TRUE, ALL_SYS }
 	,{ SV_ZSTEP, TRUE, ALL_SYS }
 	,{ SV_ZSYSTEM, FALSE, ALL_SYS }
+	,{ SV_ZTEXIT, TRUE, ALL_SYS }, { SV_ZTEXIT, TRUE, ALL_SYS }
 	,{ SV_ZTRAP, TRUE, ALL_SYS }
 	,{ SV_ZVERSION, FALSE, ALL_SYS }
 	,{ SV_ZYERROR, TRUE, ALL_SYS }

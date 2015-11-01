@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,23 +31,28 @@
 #include "op.h"
 #include "jnl_write.h"
 #include "wcs_timer_start.h"
+#include "tp_change_reg.h"
 
 error_def(ERR_TRANSMINUS);
 error_def(ERR_TRANSNOSTART);
 
+GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
 GBLREF  jnl_fence_control       jnl_fence_ctl;
 GBLREF  short                   dollar_tlevel;
-GBLREF  uint4                   zts_jrec_time;
-GBLREF	boolean_t		copy_jnl_record;
-GBLREF	struct_jrec_tcom 	mur_jrec_fixed_tcom;
+GBLREF	seq_num			seq_num_zero;
+GBLREF 	jnl_gbls_t		jgbl;
+GBLREF	gd_region		*gv_cur_region;
 
 void    op_ztcommit(int4 n)
 {
-        struct_jrec_tcom 	ztcom_record;
-        sgmnt_addrs             *csa, *next_csa;
-	uint4			tc_jrec_time;
+	boolean_t			replication;
+	uint4				jnl_status;
+        sgmnt_addrs             	*csa, *next_csa;
+        static struct_jrec_ztcom	ztcom_record = {{JRT_ZTCOM, ZTCOM_RECLEN, 0, 0, 0},
+						0, 0, 0, {ZTCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
 
+	assert(ZTCOM_RECLEN == ztcom_record.suffix.backptr);
         if (n < 0)
                 rts_error(VARLSTCNT(1) ERR_TRANSMINUS);
         if (jnl_fence_ctl.level == 0  ||  n > jnl_fence_ctl.level)
@@ -59,41 +64,67 @@ void    op_ztcommit(int4 n)
                 jnl_fence_ctl.level = 0;
         else
                 jnl_fence_ctl.level -= n;
-
-        if (jnl_fence_ctl.level == 0)
-        {
-                ztcom_record.token = jnl_fence_ctl.token;
-                ztcom_record.participants = jnl_fence_ctl.region_count;
-
-                /* Note that only those regions that are actively journaling will appear in the following list: */
-                for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = csa->next_fenced)
-                {
-                        grab_crit(csa->jnl->region);
-			JNL_SHORT_TIME(tc_jrec_time);	/* get current time after holding crit on the region */
-			if (!copy_jnl_record)
-			{
-				ztcom_record.pini_addr = csa->jnl->pini_addr;
-				ztcom_record.ts_short_time = zts_jrec_time;
-				ztcom_record.tc_short_time = tc_jrec_time;
-			} else
-			{
-				ztcom_record.pini_addr = mur_jrec_fixed_tcom.pini_addr;
-				ztcom_record.ts_short_time = mur_jrec_fixed_tcom.ts_short_time;
-				ztcom_record.tc_short_time = mur_jrec_fixed_tcom.tc_short_time;
-			}
-			ztcom_record.ts_recov_short_time = zts_jrec_time;
-			ztcom_record.tc_recov_short_time = tc_jrec_time;
-                        ztcom_record.tn = csa->ti->curr_tn;
-			QWASSIGN(ztcom_record.jnl_seqno, temp_jnlpool_ctl->jnl_seqno);
-                        jnl_write(csa->jnl, JRT_ZTCOM, (jrec_union *)&ztcom_record, NULL, NULL);
-                        rel_crit(csa->jnl->region);
-                        wcs_timer_start(csa->jnl->region, TRUE);
-                }
-                for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = next_csa)
-                {       /* do the waits in a separate loop to prevent spreading out the transaction */
-                        jnl_wait(csa->jnl->region);
-                        next_csa = csa->next_fenced;
-                        csa->next_fenced = NULL;
-                }
-        }
+        if (0 != jnl_fence_ctl.level)
+		return;
+	if (!jgbl.forw_phase_recovery)
+	{
+		JNL_SHORT_TIME(ztcom_record.prefix.time);
+		QWASSIGN(ztcom_record.token, jnl_fence_ctl.token); /* token was computed in the first call to
+								      jnl_write_ztp_logical after op_ztstart */
+		ztcom_record.participants = 0;
+		for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = csa->next_fenced)
+			ztcom_record.participants++;
+	} else
+	{
+		ztcom_record.prefix.time = jgbl.gbl_jrec_time;
+		QWASSIGN(ztcom_record.token, jgbl.mur_jrec_token_seq.token);
+		QWASSIGN(ztcom_record.jnl_seqno, jgbl.mur_jrec_seqno);
+		ztcom_record.participants = jgbl.mur_jrec_participants;
+	}
+	replication= FALSE;
+	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = csa->next_fenced)
+	{
+		if (REPL_ENABLED(csa))
+		{
+			assert(JNL_ENABLED(csa));
+			replication = TRUE;
+		} else
+			assert(!JNL_ENABLED(csa) || !replication);
+	}
+	if (replication)
+		grab_lock(jnlpool.jnlpool_dummy_reg);
+	/* Note that only those regions that are actively journaling will appear in the following list: */
+	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = csa->next_fenced)
+	{
+		gv_cur_region = csa->jnl->region;
+		tp_change_reg();
+		grab_crit(gv_cur_region);
+		jnl_status = jnl_ensure_open();
+		if (jnl_status)
+			rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(gv_cur_region));
+		if (0 == csa->jnl->pini_addr)
+			jnl_put_jrt_pini(csa);
+		if (!jgbl.forw_phase_recovery)
+		{
+			if (REPL_ENABLED(csa))
+				QWASSIGN(ztcom_record.jnl_seqno, temp_jnlpool_ctl->jnl_seqno);
+			else
+				QWASSIGN(ztcom_record.jnl_seqno, seq_num_zero);
+		}
+		ztcom_record.prefix.pini_addr = csa->jnl->pini_addr;
+		ztcom_record.prefix.tn = csa->ti->curr_tn;
+		jnl_write(csa->jnl, JRT_ZTCOM, (jnl_record *)&ztcom_record, NULL, NULL);
+		rel_crit(gv_cur_region);
+		if (!jgbl.forw_phase_recovery)
+			wcs_timer_start(csa->jnl->region, TRUE);
+	}
+	if (replication)
+		rel_lock(jnlpool.jnlpool_dummy_reg);
+	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = next_csa)
+	{       /* do the waits in a separate loop to prevent spreading out the transaction */
+		if (!jgbl.forw_phase_recovery)
+			jnl_wait(csa->jnl->region);
+		next_csa = csa->next_fenced;
+		csa->next_fenced = NULL;
+	}
 }

@@ -25,6 +25,7 @@
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
 #include "gtm_tempnam.h"
+#include "gtm_time.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -52,8 +53,8 @@
 #include "sleep_cnt.h"
 #if defined(UNIX)
 #include "eintr_wrappers.h"
-#include "gtm_file_stat.h"
 #endif
+#include "gtm_file_stat.h"
 #include "util.h"
 #include "gtm_caseconv.h"
 #include "gt_timer.h"
@@ -80,7 +81,6 @@ static  const   unsigned short  zero_fid[3];
 #else
 # error Unsupported Platform
 #endif
-#define FILE_STR	"database file"
 
 #ifdef __MVS__
 #define TMPDIR_ACCESS_MODE	(R_OK | W_OK | X_OK)
@@ -112,6 +112,7 @@ GBLREF	uint4		image_count;
 GBLREF 	boolean_t 	debug_mupip;
 GBLREF	char		*before_image_lit[];
 GBLREF	char		*jnl_state_lit[];
+GBLREF	jnl_gbls_t	jgbl;
 
 static char	* const jnl_parms[] =
 {
@@ -149,8 +150,8 @@ void mupip_backup(void)
 			tempnam_prefix[MAX_FN_LEN], tempdir_full_buffer[MAX_FN_LEN + 1], jnl_file_name[JNL_NAME_SIZE];
 	char		*jnl_str_ptr, rep_str[256], jnl_str[256], entry[256],
 			full_jnl_fn[JNL_NAME_SIZE], prev_jnl_fn[JNL_NAME_SIZE];
-	int		ccnt, index, comparison, num;
-	mstr            tempdir_log, tempdir_trans, *file, tempdir_full;
+	int		ccnt, index, comparison, num, jnl_fstat;
+	mstr            tempdir_log, tempdir_trans, *file, tempdir_full, filestr;
 	uint4		jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status;
 
 #if defined(VMS)
@@ -160,7 +161,6 @@ void mupip_backup(void)
 	short		iosb[4];
 	char		def_jnl_fn[MAX_FN_LEN];
 	GDS_INFO	*gds_info;
-	uint4		prev_jnl_fn_len;
 	char		exp_file_name[MAX_FN_LEN];
 	uint4		exp_file_name_len;
 #elif defined(UNIX)
@@ -169,7 +169,7 @@ void mupip_backup(void)
 #else
 # error UNSUPPORTED PLATFORM
 #endif
-	boolean_t	jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE};
+	boolean_t	jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
 
 
 	error_def(ERR_BACKUPCTRL);
@@ -188,6 +188,7 @@ void mupip_backup(void)
 	error_def(ERR_FILEEXISTS);
 	error_def(ERR_JNLDISABLE);
 	error_def(ERR_FILEPARSE);
+	error_def(ERR_JNLFNF);
 	error_def(ERR_NOTRNDMACC);
 
 	/* ==================================== STEP 1. Initialization ======================================= */
@@ -265,12 +266,11 @@ void mupip_backup(void)
 	{
 		s_len = sizeof(jnl_str);
 		UNSUPPORTED_PLATFORM_CHECK;
-		UNIX_ONLY(if (!cli_get_str("JOURNAL", jnl_str_ptr, &s_len)))
-		VMS_ONLY(if (!cli_get_str_all_piece("JOURNAL", jnl_str_ptr, &s_len)))
+		if (!CLI_GET_STR_ALL("JOURNAL", jnl_str_ptr, &s_len))
 			mupip_exit(ERR_MUPCLIERR);
 		while (*jnl_str_ptr)
 		{
-			if (!cli_get_str_ele_upper(jnl_str_ptr, entry, &length))
+			if (!cli_get_str_ele(jnl_str_ptr, entry, &length, TRUE))
 				mupip_exit(ERR_MUPCLIERR);
 			for (index = 0;  index < jnl_end_of_list;  ++index)
 				if (0 == strncmp(jnl_parms[index], entry, length))
@@ -616,14 +616,14 @@ void mupip_backup(void)
 			if (incremental)
 			{
 				if (inc_since_inc)
-					tn = cs_addrs->hdr->last_inc_backup;
+					tn = cs_data->last_inc_backup;
 				else if (inc_since_rec)
-					tn = cs_addrs->hdr->last_rec_backup;
+					tn = cs_data->last_rec_backup;
 				else if (0 == tn)
-					tn = cs_addrs->hdr->last_com_backup;
+					tn = cs_data->last_com_backup;
 				rptr->tn = tn;
 			}
-			memcpy(rptr->backup_hdr, cs_addrs->hdr, size);
+			memcpy(rptr->backup_hdr, cs_data, size);
 			if (online) /* save a copy of the fileheader, modify current fileheader and release crit */
 			{
 				bptr = cs_addrs->backup_buffer;
@@ -640,46 +640,31 @@ void mupip_backup(void)
 					}
 				}
 				if (!newjnlfiles_specified)
-					newjnlfiles = (JNL_ENABLED(cs_addrs->hdr)) ? TRUE : FALSE;
+					newjnlfiles = (JNL_ENABLED(cs_data)) ? TRUE : FALSE;
 				/* switch the journal file, if journaled */
 				if (newjnlfiles)
 				{
+					if (cs_data->jnl_file_len)
+						cre_jnl_file_intrpt_rename(((int)cs_data->jnl_file_len), cs_data->jnl_file_name);
 					if (JNL_ALLOWED(cs_data))
 					{
 						memset(&jnl_info, 0, sizeof(jnl_info));
 						jnl_info.prev_jnl = &prev_jnl_fn[0];
 						set_jnl_info(gv_cur_region, &jnl_info);
-						if (jnl_options[jnl_noprevjnlfile] || !keep_prev_link || !JNL_ENABLED(cs_data))
-							jnl_info.prev_jnl_len = 0;
-						UNIX_ONLY(if (0 != cs_addrs->nl->jnl_file.u.inode))
-						VMS_ONLY(if(0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid,
-									zero_fid, sizeof(zero_fid))))
-						{
-							jnl_status = jnl_ensure_open();
-							if (jnl_status != 0)
-							{
-								gtm_putmsg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_addrs->hdr),
-										DB_LEN_STR(gv_cur_region));
-								util_out_print("!/Journal file !AD not closed "
-										"(jnl_ensure_open failed) :",
-										TRUE, JNL_LEN_STR(cs_addrs->hdr));
-								rptr->not_this_time = give_up_after_create_tempfile;
-								rel_crit(rptr->reg);
-								continue;
-							}
-						}
-#if defined(UNIX)
-						if (cs_addrs->nl->jnl_file.u.inode != 0)
-							jnl_file_close(gv_cur_region, TRUE, TRUE);
-#elif defined(VMS)				/* Is it possible for gds_info not initialized? */
-						gds_info = FILE_INFO(gv_cur_region);
-						assert(jnl_info.fn_len == gds_info->fab->fab$b_fns);
-						assert(0 == memcmp(jnl_info.fn, gds_info->fab->fab$l_fna, jnl_info.fn_len));
-						prev_jnl_fn_len = cs_data->jnl_file_len;
-						memcpy(prev_jnl_fn, cs_data->jnl_file_name, prev_jnl_fn_len);
-						assert((DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE) == jnl_info.alignsize);
-						if (memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)))
-						{
+						save_no_prev_link = jnl_info.no_prev_link =  (jnl_options[jnl_noprevjnlfile] ||
+							!keep_prev_link || !JNL_ENABLED(cs_data)) ? TRUE : FALSE;
+						JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* jnl_file_close & cre_jnl_file need it */
+						VMS_ONLY(
+							gds_info = FILE_INFO(gv_cur_region);
+								/* Is it possible for gds_info to be uninitialized? */
+							assert(jnl_info.fn_len == gds_info->fab->fab$b_fns);
+							assert(0 == memcmp(jnl_info.fn, gds_info->fab->fab$l_fna, jnl_info.fn_len));
+						)
+						if (JNL_ENABLED(cs_data) &&
+							UNIX_ONLY((0 != cs_addrs->nl->jnl_file.u.inode))
+							VMS_ONLY((0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid,
+									zero_fid, sizeof(zero_fid)))))
+						{	/* Note: following will again call wcs_flu() */
 							if (SS_NORMAL != (status = set_jnl_file_close(SET_JNL_FILE_CLOSE_BACKUP)))
 							{
 								util_out_print("!/Journal file !AD not closed:",
@@ -689,13 +674,29 @@ void mupip_backup(void)
 								rel_crit(rptr->reg);
 								continue;
 							}
+							jnl_info.no_rename = FALSE;
+						} else
+						{
+							filestr.addr = (char *)jnl_info.jnl;
+							filestr.len = jnl_info.jnl_len;
+							if (FILE_STAT_ERROR == (jnl_fstat =
+									gtm_file_stat(&filestr, NULL, NULL, FALSE, &ustatus)))
+							{
+								gtm_putmsg(VARLSTCNT(5) ERR_JNLFNF, 2,
+									filestr.len, filestr.addr, ustatus);
+								rptr->not_this_time = give_up_after_create_tempfile;
+								rel_crit(rptr->reg);
+								continue;
+							}
+							jnl_info.no_rename = (FILE_NOT_FOUND == jnl_fstat);
 						}
-#endif
-						if (JNL_ALLOWED(cs_addrs->hdr))
-							wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR);	/* For VMS WCSFLU_FSYNC_DB
-													 * is ignored */
+						wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR);	/* For VMS WCSFLU_FSYNC_DB
+												 * is ignored */
 						if (EXIT_NRM == cre_jnl_file(&jnl_info))
 						{
+							if (jnl_info.no_prev_link && (save_no_prev_link != jnl_info.no_prev_link))
+								gtm_putmsg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4,
+									JNL_LEN_STR(cs_data), DB_LEN_STR(rptr->reg));
 							memcpy(cs_data->jnl_file_name, jnl_info.jnl, jnl_info.jnl_len);
 							cs_data->jnl_file_name[jnl_info.jnl_len] = '\0';
 							cs_data->jnl_file_len = jnl_info.jnl_len;
@@ -704,6 +705,7 @@ void mupip_backup(void)
 							cs_data->jnl_deq = jnl_info.extend;
 							cs_data->jnl_before_image = jnl_info.before_images;
 							cs_data->trans_hist.header_open_tn = jnl_info.tn;
+							cs_data->jnl_state = jnl_open;
 							gtm_putmsg(VARLSTCNT(10) ERR_JNLCREATE, 8, jnl_info.jnl_len, jnl_info.jnl,
 								LEN_AND_LIT("region"), REG_LEN_STR(gv_cur_region),
 								LEN_AND_STR(before_image_lit[(jnl_info.before_images ? 1 : 0)]));
@@ -715,7 +717,6 @@ void mupip_backup(void)
 							fc->op = FC_WRITE;
 							fc->op_buff = (sm_uc_ptr_t)cs_data;
 							status = dbfilop(fc);
-							cs_addrs->hdr->jnl_state = jnl_open;
 							if (SS_NORMAL != status)
 							{
 								UNIX_ONLY(gtm_putmsg(VARLSTCNT(7) ERR_DBFILERR, 2,
@@ -729,14 +730,7 @@ void mupip_backup(void)
 							}
 						} else
 						{
-							if (SS_NORMAL != jnl_info.status2)
-								gtm_putmsg(VARLSTCNT(7)
-									ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl,
-									jnl_info.status, 0, jnl_info.status2);
-							else
-								gtm_putmsg(VARLSTCNT(5)
-									ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl,
-									jnl_info.status);
+							gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
 							rptr->not_this_time = give_up_after_create_tempfile;
 							rel_crit(rptr->reg);
 							continue;

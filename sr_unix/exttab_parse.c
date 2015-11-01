@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -327,7 +327,7 @@ struct extcall_package_list	*exttab_parse (mval *package)
 	mstr		callnam, rtnnam;
 	void_ptr_t	pakhandle;
 	enum xc_types	ret_tok, parameter_types[MAXIMUM_PARAMETERS], pr;
-	char		str_buffer[MAX_NAME_LENGTH], *tbp, *end;
+	char		str_buffer[MAX_TABLINE_LEN], *tbp, *end;
 	FILE		*ext_table_file_handle;
 	struct extcall_package_list	*pak;
 	struct extcall_entry_list	*entry_ptr;
@@ -551,7 +551,7 @@ callin_entry_list*	citab_parse (void)
 	uint4			inp_mask, out_mask, mask;
 	mstr			labref, callnam;
 	enum xc_types		ret_tok, parameter_types[MAXIMUM_PARAMETERS], pr;
-	char			str_buffer[MAX_NAME_LENGTH], *tbp, *end;
+	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end;
 	FILE			*ext_table_file_handle;
 	callin_entry_list	*entry_ptr, *save_entry_ptr = 0;
 
@@ -566,6 +566,7 @@ callin_entry_list*	citab_parse (void)
 	error_def(ERR_CIPARTYPE);
 	error_def(ERR_CIUNTYPE);
 	error_def(ERR_SYSCALL);
+	error_def(ERR_CIMAXPARAM);
 
 	ext_table_file_name = GETENV(CALLIN_ENV_NAME);
 	if (!ext_table_file_name) /* environment variable not set */
@@ -591,10 +592,6 @@ callin_entry_list*	citab_parse (void)
 		switch (ret_tok) /* return type valid ? */
 		{
 		case xc_void:
-		case xc_long:
-		case xc_ulong:
-		case xc_float:
-		case xc_double:
 		case xc_char_star:
 		case xc_long_star:
 		case xc_ulong_star:
@@ -614,6 +611,8 @@ callin_entry_list*	citab_parse (void)
 		inp_mask = out_mask = 0;
 		for (parameter_count = 0; (*tbp && ')' != *tbp); parameter_count++)
 		{
+			if (MAXIMUM_PARAMETERS <= parameter_count)
+				ext_stx_error(ERR_CIMAXPARAM, ext_table_file_name);
 			/* must have comma if this is not the first parameter, otherwise '(' */
 			if (((0 == parameter_count)?'(':',') != *tbp++)
 				ext_stx_error(ERR_CIRPARMNAME, ext_table_file_name);

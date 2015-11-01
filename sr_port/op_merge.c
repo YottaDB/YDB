@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,7 +93,7 @@ void op_merge(void)
 	boolean_t		found, check_for_null_subs;
 	lv_val			*dst_lv;
 	mval 			*mkey, *value, *subsc;
-	int			org_glvn1_keysz, org_glvn2_keysz, delta2, dollardata;
+	int			org_glvn1_keysz, org_glvn2_keysz, delta2, dollardata_src, dollardata_dst;
 	static boolean_t	first_time = TRUE;
 	static gv_key          	*gvn2_org_key;
 	unsigned char		*ptr, *ptr2;
@@ -107,6 +107,7 @@ void op_merge(void)
 	error_def(ERR_GVSUBOFLOW);
 	error_def(ERR_GVIS);
 
+	assert(MAX_STRLEN >= MAX_ZWR_KEY_SZ);
 	assert ((merge_args == (MARG1_LCL | MARG2_LCL)) ||
 		(merge_args == (MARG1_LCL | MARG2_GBL)) ||
 		(merge_args == (MARG1_GBL | MARG2_LCL)) ||
@@ -123,8 +124,8 @@ void op_merge(void)
 		gvname_env_restore(mglvnp->gblp[IND2]);
 		/* now $DATA will be done for gvn2. op_gvdata input parameters are set in the form of some GBLREF */
 		op_gvdata(value);
-		dollardata = MV_FORCE_INT(value);
-		if (0 == dollardata)
+		dollardata_src = MV_FORCE_INT(value);
+		if (0 == dollardata_src)
 		{
 			UNDO_ACTIVE_LV;
 			POP_MV_STENT();	/* value */
@@ -148,7 +149,7 @@ void op_merge(void)
 		{
 			/*==================== MERGE ^gvn1=^gvn2 =====================*/
 			merge_desc_check(); /* will not proceed if one is descendant of another */
-			if (1 == dollardata || 11 == dollardata)
+			if (1 == dollardata_src || 11 == dollardata_src)
 			{
 				found = op_gvget(value);  /* value of ^glvn2 */
 				if (found)
@@ -198,8 +199,8 @@ void op_merge(void)
 				gvname_env_restore(mglvnp->gblp[IND1]);
 				if (gv_cur_region->max_key_size < org_glvn1_keysz + delta2)
 				{
-					if (0 == (endbuff = format_targ_key(buff, MAX_KEY_SZ + 1, gv_currkey, TRUE)))
-						endbuff = &buff[MAX_KEY_SZ];
+					if (0 == (endbuff = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+						endbuff = &buff[MAX_ZWR_KEY_SZ - 1];
 					rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, endbuff - buff, buff);
 				}
 				assert(gv_currkey->end == org_glvn1_keysz - 1);
@@ -244,7 +245,7 @@ void op_merge(void)
 			subsc = &mv_chain->mv_st_cont.mvs_mval;
 			/* Restore ^gvn2 we will work */
 			gvname_env_save(mglvnp->gblp[IND2]);
-			if (1 == dollardata || 11 == dollardata)
+			if (1 == dollardata_src || 11 == dollardata_src)
 			{
 				/* SET lvn1=^gvn2 */
 				found = op_gvget(value);
@@ -306,17 +307,20 @@ void op_merge(void)
 	} else
 	{
 		op_fndata(mglvnp->lclp[IND2], value);
-		dollardata = MV_FORCE_INT(value);
-		if (0 == dollardata)
+		dollardata_src = MV_FORCE_INT(value);
+		if (0 == dollardata_src)
 		{
 			UNDO_ACTIVE_LV;
 			POP_MV_STENT();	/* value */
 			merge_args = 0;	/* Must reset to zero to reuse the Global */
 			return;
 		}
+		/* not memsetting output to 0 here can cause garbage value of output.out_var.lv.child which in turn can
+		 * cause a premature return from lvzwr_var resulting in op_merge() returning without having done the merge.
+		 */
+		memset(&output, 0, sizeof(output));
 		if (MARG1_IS_LCL(merge_args))
-		{
-			/*==================== MERGE lvn1=lvn2 =====================*/
+		{	/*==================== MERGE lvn1=lvn2 =====================*/
 			assert(mglvnp->lclp[IND1]);
 			merge_desc_check(); /* will not proceed if one is descendant of another */
 			output.buff = (char *)&buff[0];
@@ -326,9 +330,12 @@ void op_merge(void)
 			lvzwr_init(FALSE, &mglvnp->lclp[IND2]->v);
 			lvzwr_arg(ZWRITE_ASTERISK, 0, 0);
 			lvzwr_var(mglvnp->lclp[IND2], 0);
+			/* assert that destination got all data of the source and its descendants */
+			DEBUG_ONLY(op_fndata(mglvnp->lclp[IND1], value);)
+			DEBUG_ONLY(dollardata_dst = MV_FORCE_INT(value);)
+			assert((dollardata_src & dollardata_dst) == dollardata_src);
 		} else
-		{
-			/*==================== MERGE ^gvn1=lvn2 =====================*/
+		{	/*==================== MERGE ^gvn1=lvn2 =====================*/
 			assert(MARG1_IS_GBL(merge_args) && MARG2_IS_LCL(merge_args));
 			gvname_env_save(mglvnp->gblp[IND1]);
 			output.buff = (char *)&buff[0];

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,7 @@ void zshow_output(zshow_out *out, mstr *str)
 	mval		*mv, lmv;
 	lv_val		*temp;
 	char		buff, *ptr1, *ptr2;
-	unsigned char	*kend, kbuff[MAX_KEY_SZ + 1];
+	unsigned char	*kend, kbuff[MAX_ZWR_KEY_SZ];
 	int		key_ovrhd, len;
 
 	error_def(ERR_ZSHOWGLOSMALL);
@@ -255,8 +255,8 @@ void zshow_output(zshow_out *out, mstr *str)
 			mval2subsc(mv, gv_currkey);
 			if (gv_currkey->end + 1 > gv_cur_region->max_key_size)
 			{
-				if (0 == (kend = format_targ_key(kbuff, MAX_KEY_SZ + 1, gv_currkey, TRUE)))
-					kend = &kbuff[MAX_KEY_SZ];
+				if (0 == (kend = format_targ_key(kbuff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+					kend = &kbuff[MAX_ZWR_KEY_SZ - 1];
 				rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, kend - kbuff, kbuff);
 			}
 			op_gvkill();
@@ -287,8 +287,8 @@ void zshow_output(zshow_out *out, mstr *str)
 					mval2subsc(mv, gv_currkey);
 					if (gv_currkey->end + 1 > gv_cur_region->max_key_size)
 					{
-						if (0 == (kend = format_targ_key(kbuff, MAX_KEY_SZ + 1, gv_currkey, TRUE)))
-							kend = &kbuff[MAX_KEY_SZ];
+						if (0 == (kend = format_targ_key(kbuff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+							kend = &kbuff[MAX_ZWR_KEY_SZ - 1];
 						rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, kend - kbuff, kbuff);
 					}
 				}
@@ -320,8 +320,8 @@ void zshow_output(zshow_out *out, mstr *str)
 				mval2subsc(mv, gv_currkey);
 				if (gv_currkey->end + 1 > gv_cur_region->max_key_size)
 				{
-					if (0 == (kend = format_targ_key(kbuff, MAX_KEY_SZ + 1, gv_currkey, TRUE)))
-						kend = &kbuff[MAX_KEY_SZ];
+					if (0 == (kend = format_targ_key(kbuff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+						kend = &kbuff[MAX_ZWR_KEY_SZ - 1];
 					rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, kend - kbuff, kbuff);
 				}
 			}

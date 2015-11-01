@@ -35,7 +35,7 @@
 #include "cws_insert.h"
 #include "wcs_recover.h"
 #include "wcs_sleep.h"
-
+#include "have_crit.h"
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
@@ -49,17 +49,12 @@ GBLREF unsigned char	cw_set_depth, t_fail_hist[CDB_MAX_TRIES];
 GBLREF boolean_t	mu_reorg_process;
 GBLREF unsigned int	t_tries;
 GBLREF uint4		t_err;
-
-DEBUG_ONLY(GBLREF uint4 cumul_index;
-	   GBLREF uint4 cu_jnl_index;
-	  )
-
-#define LCL_BUF_SIZE 512
+GBLREF jnl_gbls_t	jgbl;
 
 void t_retry(enum cdb_sc failure)
 {
 	tp_frame	*tf;
-	unsigned char	*end, buff[LCL_BUF_SIZE];
+	unsigned char	*end, buff[MAX_ZWR_KEY_SZ];
 	short		tl;
 	error_def(ERR_GBLOFLOW);
 	error_def(ERR_GVIS);
@@ -98,8 +93,8 @@ void t_retry(enum cdb_sc failure)
 					assert(cs_addrs->now_crit);
 					rel_crit(gv_cur_region);
 
-					if (NULL == (end = format_targ_key(buff, LCL_BUF_SIZE, gv_currkey, TRUE)))
-						end = &buff[LCL_BUF_SIZE - 1];
+					if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+						end = &buff[MAX_ZWR_KEY_SZ - 1];
 
 					if (cdb_sc_gbloflow == failure)
 						rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
@@ -128,28 +123,35 @@ void t_retry(enum cdb_sc failure)
 		}
 		cw_set_depth = 0;
 		start_tn = cs_addrs->ti->curr_tn;
-		gv_target->clue.end = 0;
+		assert(NULL != gv_target);
+		if (NULL != gv_target)
+			gv_target->clue.end = 0;
 		DEBUG_ONLY(
 			/* gvcst_put currently writes a SET journal-record for every update and extra_block_split phase. This
 			 * means that it may write more than one journal-record although only one update went in. This is
 			 * because of the way the jnl code is structured in gvcst_put rather than in gvcst_put_blk
-			 * Until that structuring is moved into gvcst_put_blk, we should take care not to reset cumul_index
+			 * Until that structuring is moved into gvcst_put_blk, we should take care not to reset jgbl.cumul_index
 			 * for gvcst_put which is identified by (ERR_GVPUTFAIL == t_err) or by (ERR_GVKILLFAIL != t_err).
 			 */
 			if (ERR_GVPUTFAIL != t_err)
-				cumul_index = cu_jnl_index = 0;
+				jgbl.cumul_index = jgbl.cu_jnl_index = 0;
 		)
 	} else
-	{
-		/* for TP, do the minimum; most of the logic is in tp_retry, because it is also invoked directly from t_commit */
+	{	/* for TP, do the minimum; most of the logic is in tp_retry, because it is also invoked directly from t_commit */
 		t_fail_hist[t_tries] = failure;
 		assert(NULL == cs_addrs || NULL != cs_addrs->hdr);	/* both cs_addrs and cs_data should be NULL or non-NULL. */
 		assert(NULL != cs_addrs || cdb_sc_needcrit == failure); /* cs_addrs can be NULL in case of retry in op_lock2 */
 		if (NULL != cs_addrs)					/*  in which case failure code should be cdb_sc_needcrit. */
 			TP_RETRY_ACCOUNTING(cs_addrs->hdr, failure);
-		if (cdb_sc_blkmod != failure)
-			TP_TRACE_HIST(CR_BLKEMPTY, gv_target);
-		gv_target->clue.end = 0;
+		assert((NULL != gv_target)
+				|| (cdb_sc_needcrit == failure) && (CDB_STAGNATE <= t_tries) && have_crit(CRIT_HAVE_ANY_REG));
+		/* only known case of gv_target being NULL is if a t_retry is done from gvcst_init. the above assert checks this */
+		if (NULL != gv_target)
+		{
+			if (cdb_sc_blkmod != failure)
+				TP_TRACE_HIST(CR_BLKEMPTY, gv_target);
+			gv_target->clue.end = 0;
+		}
 		INVOKE_RESTART;
 	}
 }

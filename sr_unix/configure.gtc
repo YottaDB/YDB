@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -47,8 +47,15 @@ else
 	deliver_gtcm_gnp="no"
 fi
 
+# Native shared library extention.
+if [ $arch = "hp" ]; then
+	ext=".sl"
+else
+	ext=".so"
+fi
+
 # Binaries
-binaries="mupip mumps lke dse gtm_dmna geteuid ftok semstat2"
+binaries="mupip mumps libgtmshr$ext lke dse gtm_dmna geteuid ftok semstat2"
 
 # Normal scripts - executed by anyone
 nscripts="gtmbase upperc upperc_cp lowerc lowerc_cp"

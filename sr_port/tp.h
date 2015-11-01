@@ -28,7 +28,8 @@
 #define	INIT_CUR_TP_HIST_SIZE		64 		/* initial value of si->cur_tp_hist_size */
 #define TP_MAX_MM_TRANSIZE		64*1024
 #define JNL_FORMAT_BUFF_INIT_ALLOC	16*1024
-
+#define	JFB_ELE_SIZE			8		/* Same as JNL_REC_START_BNDRY */
+#define	JFB_ELE_SIZE_IN_BITS		3		/* log2 of JFB_ELE_SIZE */
 
 #define TP_BATCH_ID		"BATCH"
 #define TP_BATCH_LEN		(sizeof(TP_BATCH_ID) - 1)
@@ -229,16 +230,16 @@ GBLREF	short	dollar_trestart;
 #define PREV_OFF_INVALID -1
 
 /* JNL_FILE_TAIL_PRESERVE macro indicates maximum number of bytes to ensure allocated at the end of the journal file
- * 	to store the journal records that will be written whenever the journal file gets closed.
- * any process closing the journal file needs to at max. write a PINI, EPOCH, PFIN and EOF record.
- * the EOF record needs to be at a 512-byte (DISK_BLOCK_SIZE) aligned boundary.
- * (i) and each journal record might need an align record to be written too whose max. size is equal to the jnl record
- *     therefore the size needs to be multiplied by 2.
- * (ii) we now have to give room for twice the above space to accommodate the EOF writing by a process that closes the journal
- *	and the EOF writing by the first process that reopens it and finds no space left and switches to a new journal.
- * hence the multiplication by 4 i.e. 2 for each (i) and (ii).
+ * 	 to store the journal records that will be written whenever the journal file gets closed.
+ * (i)	 Any process closing the journal file needs to write at most one PINI, one EPOCH, one PFIN and one EOF record
+ * (ii)	 We may need to give room for twice the above space to accommodate the EOF writing by a process that closes the journal
+ *	 and the EOF writing by the first process that reopens it and finds no space left and switches to a new journal.
+ * (iii) We may need to write one ALIGN record at the most since the total calculated from (i) and (ii) above is
+ * 	   less than the minimum alignsize that we support (asserted before using JNL_FILE_TAIL_PRESERVE in macros below)
+ * 	   The variable portion of this ALIGN record can get at the most equal to the maximum of the sizes of the
+ * 	   PINI/EPOCH/PFIN/EOF record. (We know PINI_RECLEN is maximum of EPOCH_RECLEN, PFIN_RECLEN, EOF_RECLEN)
  */
-#define	JNL_FILE_TAIL_PRESERVE	(((4 * ALIGN_RECLEN) + PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN + DISK_BLOCK_SIZE) * 4)
+#define	JNL_FILE_TAIL_PRESERVE	(MIN_ALIGN_RECLEN + (PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN) * 2 + PINI_RECLEN)
 
 #define TOTAL_TPJNL_REC_SIZE(total_jnl_rec_size, si, csa)							\
 {														\
@@ -251,6 +252,7 @@ GBLREF	short	dollar_trestart;
 	 * we can be sure we won't need more than twice the computed space.					\
 	 */													\
 	total_jnl_rec_size *= 2;										\
+	assert(JNL_FILE_TAIL_PRESERVE < (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));					\
 	/* give allowance for space needed at end of journal file in case journal file close is needed */	\
 	total_jnl_rec_size += JNL_FILE_TAIL_PRESERVE;								\
 	si->total_jnl_rec_size = total_jnl_rec_size;								\
@@ -270,14 +272,15 @@ GBLREF	short	dollar_trestart;
 	 * 	is not a concern. Hence these are recomputed everytime instead of storing in a variable.	\
 	 */													\
 	if (dse_running || write_after_image)									\
-		total_jnl_rec_size += AIMG_RECLEN + csa->hdr->blk_size + ALIGN_RECLEN;				\
+		total_jnl_rec_size += MIN_AIMG_RECLEN + csa->hdr->blk_size + MIN_ALIGN_RECLEN;			\
 	if (mu_reorg_process || 0 == cw_depth || inctn_gvcstput_extra_blk_split == inctn_opcode)		\
-		total_jnl_rec_size += INCTN_RECLEN + ALIGN_RECLEN;						\
+		total_jnl_rec_size += INCTN_RECLEN + MIN_ALIGN_RECLEN;						\
 	/* Since we have already taken into account an align record per journal record and since the size of	\
 	 * an align record will be < (size of the journal record written + fixed-size of align record)		\
 	 * we can be sure we won't need more than twice the computed space.					\
 	 */													\
 	total_jnl_rec_size *= 2;										\
+	assert(JNL_FILE_TAIL_PRESERVE < (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));					\
 	/* give allowance for space needed at end of journal file in case journal file close is needed */	\
 	total_jnl_rec_size += JNL_FILE_TAIL_PRESERVE;								\
 }
@@ -315,8 +318,12 @@ GBLREF	short	dollar_trestart;
 		format_buf_cnt += jfb->record_size;				\
 		macro_cnt++;							\
 	}									\
-	free_last_n_elements(si->format_buff_list, format_buf_cnt); 		\
-	free_last_n_elements(si->jnl_list, macro_cnt); 				\
+	assert(0 == format_buf_cnt % JFB_ELE_SIZE);				\
+	format_buf_cnt = format_buf_cnt >> JFB_ELE_SIZE_IN_BITS;		\
+	if (!free_last_n_elements(si->format_buff_list, format_buf_cnt))	\
+		assert(FALSE);							\
+	if (!free_last_n_elements(si->jnl_list, macro_cnt))			\
+		assert(FALSE);							\
 }
 
 /* freeup gbl_tlvl_info_list starting from the link 'gti' */

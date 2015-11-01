@@ -33,9 +33,10 @@ uint4	set_jnl_file_close(set_jnl_file_close_opcode_t set_jnl_file_close_opcode)
 	jnl_status = jnl_ensure_open();
 	if (0 == jnl_status)
 	{
+		if (0 == cs_addrs->jnl->pini_addr)
+			jnl_put_jrt_pini(cs_addrs);
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH);
-		if (0 != cs_addrs->jnl->pini_addr)
-			jnl_put_jrt_pfin(cs_addrs);
+		jnl_put_jrt_pfin(cs_addrs);
 		jnl_file_close(gv_cur_region, TRUE, TRUE);
 	} else
 		gtm_putmsg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_addrs->hdr),

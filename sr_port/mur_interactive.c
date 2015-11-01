@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,11 +26,12 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
+#include "hashdef.h"
+#include "buddy_list.h"
 #include "muprec.h"
 #include "util.h"
 
 
-GBLREF	bool		mur_error_allowed;
 
 #define PROCEED_PROMPT	"Proceed? [Y/N]: "
 #define CORRECT_PROMPT	"Please enter Y or N: "
@@ -38,9 +39,9 @@ GBLREF	bool		mur_error_allowed;
 #define NO_STRING	"NO"
 
 
-bool mur_interactive(void)
+boolean_t mur_interactive(void)
 {
-	boolean_t	done = FALSE;
+	boolean_t	done = FALSE, mur_error_allowed;
 	unsigned short	len;
 	int		index;
 	char		res[8];

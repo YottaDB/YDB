@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,9 +110,10 @@ typedef int4 condition_code;
 
 #define DDP_LOG_ERROR(err_len, err_string)											\
 {																\
-	time_t			now;												\
-	char			*time_ptr;											\
-	bool			save_dec_nofac;											\
+	now_t	now;	/* for GET_CUR_TIME macro */										\
+	char	time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro*/							\
+	char	*time_ptr; /* for GET_CUR_TIME macro*/										\
+	bool	save_dec_nofac;													\
 																\
 	GET_CUR_TIME;														\
 	save_dec_nofac = dec_nofac; /* save for later restore */								\
@@ -122,8 +123,10 @@ typedef int4 condition_code;
 }
 
 /* All structures that are DDP messages should be packed; do not let the compiler pad for structure member alignment */
-#pragma member_alignment save
-#pragma nomember_alignment
+#if defined(__alpha)
+# pragma member_alignment save
+# pragma nomember_alignment
+#endif
 
 typedef struct
 {
@@ -199,6 +202,8 @@ typedef struct
 	unsigned char	global[1]; /* actually, global_len bytes of formatted global reference */
 } ddp_global_request_t; /* immediately follows the message header (ddp_hdr) for global request. For SET, ASCII value follows */
 
-#pragma member_alignment restore
+#if defined(__alpha)
+# pragma member_alignment restore
+#endif
 
 #endif /* DDPHDR_H_INCLUDED */

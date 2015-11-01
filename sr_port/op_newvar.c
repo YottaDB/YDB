@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,10 +55,25 @@ void op_newvar(uint4 arg1)
 		   If there was no previous entry, we will destroy the entry when we pop
 		   off this frame (make it undefined again).
 		*/
-		PUSH_MV_STENT(MVST_PVAL);
-		mv_st_ent = mv_chain;
-		new = mv_st_ent->mv_st_cont.mvs_pval.mvs_val = lv_getslot(curr_symval);
-		ptab = &mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab;
+		if (!(frame_pointer->flags & SFF_INDCE))
+		{	/* This is a normal counted frame with a stable variable name pointer */
+			PUSH_MV_STENT(MVST_PVAL);
+			mv_st_ent = mv_chain;
+			new = mv_st_ent->mv_st_cont.mvs_pval.mvs_val = lv_getslot(curr_symval);
+			ptab = &mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab;
+		} else
+		{	/* This is actually an indirect (likely XECUTE or ZINTERRUPT) so the varname
+			   pointer could be gone by the time we unroll this frame if an error occurs
+			   while this frame is executing and error processing marks this frame reusable
+			   so carry the name along with us to avoid this situation.
+			*/
+			PUSH_MV_STENT(MVST_NVAL);
+			mv_st_ent = mv_chain;
+			new = mv_st_ent->mv_st_cont.mvs_nval.mvs_val = lv_getslot(curr_symval);
+			ptab = &mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab;
+			varname = &mv_st_ent->mv_st_cont.mvs_nval.name;
+			memcpy(varname, &(((VAR_TABENT *)frame_pointer->vartab_ptr)[arg1]), sizeof(*varname));
+		}
 
 		/* save symtab that's older than the current frame */
 		if (frame_pointer->l_symtab > (mval **)frame_pointer)

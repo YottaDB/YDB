@@ -15,8 +15,10 @@
 #include <sys/shm.h>
 
 #include "gtm_string.h"
+#include "gtm_time.h"
 #include "gtm_unistd.h"	/* fsync() needs this */
-#include "aswp.h"		/* for ASWP */
+
+#include "aswp.h"	/* for ASWP */
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -42,6 +44,7 @@ GBLREF	gd_region	*gv_cur_region;
 GBLREF	uint4		process_id;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	volatile int4	db_fsync_in_prog;	/* for DB_FSYNC macro usage */
+GBLREF 	jnl_gbls_t	jgbl;
 
 #define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart)							\
 if (cnl->in_wtstart)												\
@@ -305,6 +308,9 @@ bool wcs_flu(bool options)
 		jb->need_db_fsync = TRUE;	/* for comments on need_db_fsync, see jnl_output_sp.c */
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
 		assert(!(JNL_FILE_SWITCHED(jpc)));
+		if (!jgbl.forw_phase_recovery && (csa->ti->curr_tn == csa->ti->early_tn))
+			JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() and jnl_write_epoch_rec() */
+		assert(jgbl.gbl_jrec_time);
 		if (0 == csa->jnl->pini_addr)
 			jnl_put_jrt_pini(csa);
 		jnl_write_epoch_rec(csa);

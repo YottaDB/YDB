@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,12 +54,7 @@ LITREF mval		literal_null;
 
 static mval dse_dmp_time_fmt = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, STR_LIT_LEN(DSE_DMP_TIME_FMT), DSE_DMP_TIME_FMT, 0, 0);
 
-static  char    * const jtype[] =
-{
-#define JNL_TABLE_ENTRY(A,B,C,D)        C,
-#include "jnl_rec_table.h"
-#undef JNL_TABLE_ENTRY
-};
+LITREF	char		*jrt_label[JRT_RECTYPES];
 
 #define SHOW_STAT(TEXT, VARIABLE)       if (0 != cs_addrs->hdr->VARIABLE.evnt_cnt) 					\
 	util_out_print(TEXT"  0x!8XL        Transaction =           0x!8XL", TRUE, (cs_addrs->hdr->VARIABLE.evnt_cnt),	\
@@ -82,7 +77,7 @@ void dse_dmp_fhead (void)
 {
 	boolean_t	jnl_buff_open;
         unsigned char   util_buff[MAX_UTIL_LEN], buffer[MAXNUMLEN], *ptr;
-        int             util_len, jrt, time_len;
+        int             util_len, rectype, time_len;
 	uint4		jnl_status;
 	enum jnl_state_codes		jnl_state;
 	gds_file_id	zero_fid;
@@ -193,7 +188,7 @@ void dse_dmp_fhead (void)
 			util_out_print("  Journal Extension     !12UL", TRUE, cs_addrs->hdr->jnl_deq);
 			util_out_print("  Journal Buffer Size   !12UL", FALSE, cs_addrs->hdr->jnl_buffer_size);
 			util_out_print("      ", FALSE);
-			util_out_print("  Journal Alignsize     !12UL", TRUE, cs_addrs->hdr->alignsize);
+			util_out_print("  Journal Alignsize     !12UL", TRUE, cs_addrs->hdr->alignsize / DISK_BLOCK_SIZE);
 			util_out_print("  Journal AutoSwitchLimit !10UL", FALSE, cs_addrs->hdr->autoswitchlimit);
 			util_out_print("      ", FALSE);
 			util_out_print("  Journal Epoch Interval!12UL", TRUE, EPOCH_SECOND2SECOND(cs_addrs->hdr->epoch_interval));
@@ -291,7 +286,6 @@ void dse_dmp_fhead (void)
 			util_out_print("  Freeaddr              !12UL", TRUE, cs_addrs->jnl->jnl_buff->freeaddr);
 			util_out_print("  Dsk                   !12UL", FALSE, cs_addrs->jnl->jnl_buff->dsk);
 			util_out_print("      ", FALSE);
-			util_out_print("  Lastaddr              !12UL", TRUE, cs_addrs->jnl->jnl_buff->lastaddr);
 			util_out_print("  Wrtsize               !12UL", FALSE, cs_addrs->jnl->jnl_buff->wrtsize);
 			util_out_print("      ", FALSE);
 			util_out_print("  Min_write_size        !12UL", TRUE, cs_addrs->jnl->jnl_buff->min_write_size);
@@ -336,20 +330,30 @@ void dse_dmp_fhead (void)
 			util_out_print("      ", FALSE);
 			util_out_print("  Need_db_fsync                !AD", TRUE, 5,
 				(cs_addrs->jnl->jnl_buff->need_db_fsync ? " TRUE" : "FALSE"));
-			for (jrt = JRT_BAD + 1; jrt < JRT_RECTYPES - 1; jrt++)
+			for (rectype = JRT_BAD + 1; rectype < JRT_RECTYPES - 1; rectype++)
 			{
-				util_out_print("  Jnl Rec Type    !5AZ      !7UL      ", FALSE, jtype[jrt],
-					cs_addrs->jnl->jnl_buff->reccnt[jrt - 1]);
-				jrt++;
-				util_out_print("  Jnl Rec Type    !5AZ      !7UL", TRUE, jtype[jrt],
-					cs_addrs->jnl->jnl_buff->reccnt[jrt - 1]);
+				util_out_print("  Jnl Rec Type    !5AZ      !7UL      ", FALSE, jrt_label[rectype],
+					cs_addrs->jnl->jnl_buff->reccnt[rectype]);
+				rectype++;
+				util_out_print("  Jnl Rec Type    !5AZ      !7UL", TRUE, jrt_label[rectype],
+					cs_addrs->jnl->jnl_buff->reccnt[rectype]);
 			}
-			if (jrt != JRT_RECTYPES)
+			if (rectype != JRT_RECTYPES)
 			{
-				util_out_print("  Jnl Rec Type    !5AZ      !7UL", TRUE, jtype[jrt],
-					cs_addrs->jnl->jnl_buff->reccnt[jrt - 1]);
+				util_out_print("  Jnl Rec Type    !5AZ      !7UL", TRUE, jrt_label[rectype],
+					cs_addrs->jnl->jnl_buff->reccnt[rectype]);
 			}
 		}
+		util_out_print(0, TRUE);
+		util_out_print("  Recover interrupted          !AD", FALSE, 5,
+			(cs_addrs->hdr->recov_interrupted ? " TRUE" : "FALSE"));
+		util_out_print("      ", FALSE);
+		util_out_print("  INTRPT resolve time   !12UL", TRUE, cs_addrs->hdr->intrpt_recov_tp_resolve_time);
+		util_out_print("  INTRPT seqno    0x!16@XJ", FALSE, &cs_addrs->hdr->intrpt_recov_resync_seqno);
+		util_out_print("      ", FALSE);
+		util_out_print("  INTRPT jnl_state      !12UL", TRUE, cs_addrs->hdr->intrpt_recov_jnl_state);
+		util_out_print("  INTRPT repl_state     !12UL", FALSE, cs_addrs->hdr->intrpt_recov_repl_state);
+		util_out_print(0, TRUE);
 	}
 	if (NEED_TO_DUMP("BACKUP") && (BACKUP_NOT_IN_PROGRESS != cs_addrs->nl->nbb))
 	{

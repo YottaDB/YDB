@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,15 @@
 #include "is_file_identical.h"
 #include "copy.h"
 
+bool is_gdid_file_identical(gd_id_ptr_t fid, char *filename, int4 filelen)
+{
+        struct stat	stat_buf;
+	int		stat_res;
+
+	assert(0 == filename[filelen]);
+	STAT_FILE(filename, &stat_buf, stat_res);
+	return is_gdid_stat_identical(fid, &stat_buf);
+}
 bool is_file_identical(char *filename1, char *filename2)
 {
         struct stat	st1, st2;

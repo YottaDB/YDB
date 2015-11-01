@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,8 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
+#include "hashdef.h"
+#include "buddy_list.h"
 #include "muprec.h"
 #include "error.h"
 #include "iosp.h"
@@ -57,9 +59,9 @@ GBLREF uint4			process_id;
 GBLREF int			recvpool_shmid;
 GBLREF int			gtmrecv_listen_sock_fd, gtmrecv_sock_fd;
 GBLREF struct sockaddr_in	primary_addr;
-GBLREF seq_num			max_resync_seqno;
 GBLREF seq_num			seq_num_zero;
 GBLREF uint4			repl_max_send_buffsize, repl_max_recv_buffsize;
+GBLREF 	jnl_gbls_t		jgbl;
 
 CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 {
@@ -75,7 +77,7 @@ CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 	NEXTCH;
 }
 
-int gtmrecv_fetchresync(ctl_list *jnl_files, int port, seq_num *resync_seqno)
+int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 {
 	int		status;
 	size_t		primary_addr_len;
@@ -162,12 +164,12 @@ int gtmrecv_fetchresync(ctl_list *jnl_files, int port, seq_num *resync_seqno)
 	{
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error getting socket send/recv buffsizes"), ERRNO);
-		return (!SS_NORMAL);
+		return ERR_REPLCOMM;
 	}
 
 	msg.type = REPL_FETCH_RESYNC;
 	memset(&msg.msg[0], 0, MIN_REPL_MSGLEN - REPL_MSG_HDRLEN);
-	QWASSIGN(*(seq_num *)&msg.msg[0], max_resync_seqno);
+	QWASSIGN(*(seq_num *)&msg.msg[0], jgbl.max_resync_seqno);
 	msg.len = MIN_REPL_MSGLEN;
 	REPL_SEND_LOOP(gtmrecv_sock_fd, &msg, msg.len, &gtmrecv_fetchresync_immediate)
 		; /* Empty Body */
@@ -218,4 +220,5 @@ int gtmrecv_fetchresync(ctl_list *jnl_files, int port, seq_num *resync_seqno)
 	}
 	close(gtmrecv_sock_fd);
 	REPL_DPRINT2("FETCH RESYNC : Waiting for pid %d rollback process to complete\n", rollback_pid);
+	return SS_NORMAL;
 }

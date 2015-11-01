@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -722,7 +722,7 @@ OC_SVPUT:	pushab	val.2
 OC_TIMTRU:	movl	r0,r10
 OC_TCOMMIT:	jsb	xfer.xf_tcommit
 OC_TROLLBACK:	pushl	val.1
-		calls	#1,xfer.xf_trollback
+		jsb	xfer.xf_trollback
 OC_TRESTART:	pushl	val.1
 		jsb	xfer.xf_trestart
 OC_TSTART:	irepab	val.4

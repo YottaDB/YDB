@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@ LITREF unsigned char	io_params_size[];
 void iott_close(io_desc *v, mval *pp)
 {
 	/* only exception allowed */
+	error_def(ERR_SYSCALL);
 
 	d_tt_struct	*ttptr;
 	params		ch;
@@ -61,8 +62,10 @@ void iott_close(io_desc *v, mval *pp)
 		return;
 
 	CLOSEFILE(ttptr->fildes, status);
-	if (-1 == status)
-		rts_error(VARLSTCNT(1) errno);
-
+	if (0 != status)
+	{
+		assert(status == errno);
+		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("iott_close(CLOSEFILE)"), CALLFROM, status);
+	}
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -171,7 +171,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 		}
 	}
 	temp_jnl_fn_len = jnl_info->jnl_len = MAX_FN_LEN + 1;
-	if (jnl_options->filename_specified = cli_get_str("FILENAME", jnl_info->jnl, &temp_jnl_fn_len))
+	if (jnl_options->filename_specified = cli_get_str("FILENAME", (char *)jnl_info->jnl, &temp_jnl_fn_len))
 		jnl_info->jnl_len = temp_jnl_fn_len;
 	else
 		jnl_info->jnl_len = 0;

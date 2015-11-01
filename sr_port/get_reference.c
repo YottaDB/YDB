@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,11 +30,11 @@ void get_reference(mval *var)
 	int	maxlen;
 
 	/* you need to return a double-quote for every single-quote. assume worst case. */
-	maxlen = MAX_KEY_SZ + (!extnam_str.len ? 0 : ((extnam_str.len * 2) + sizeof(extnamdelim)));
+	maxlen = MAX_ZWR_KEY_SZ + (!extnam_str.len ? 0 : ((extnam_str.len * 2) + sizeof(extnamdelim)));
 	if (stringpool.free + maxlen > stringpool.top)
 		stp_gcol(maxlen);
 	var->mvtype = MV_STR;
-	start = var->str.addr = stringpool.free;
+	start = var->str.addr = (char *)stringpool.free;
 	var->str.len = 0;
 	if (gv_currkey && gv_currkey->end)
 	{
@@ -53,7 +53,7 @@ void get_reference(mval *var)
 			}
 			*start++ = extnamdelim[3];
 		}
-		end = format_targ_key(start, MAX_KEY_SZ, gv_currkey, TRUE);
+		end = (char *)format_targ_key((unsigned char *)start, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
 		if (extnam_str.len)
 			/* Note: the next vertical bar overwrites the caret that
 			 * was part of he original name of the global variable

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,7 @@
 #include "jobchild_init.h"
 #include "callg.h"
 #include "invocation_mode.h"
+#include "gtmci.h"
 
 #define FILE_NAME_SIZE	255
 
@@ -130,6 +131,10 @@ void jobchild_init(void)
 				rts_error(VARLSTCNT(1) ERR_RUNPARAMERR);
 			lref_parse((uchar_ptr_t)run_file_name, &routine, &label, &offset);
 			job_addr(&routine, &label, offset, (char **)&base_addr, (char **)&transfer_addr);
+		} else if (MUMPS_CALLIN & invocation_mode) /* call-in mode */
+		{
+			base_addr = make_cimode();
+			transfer_addr = PTEXT_ADR(base_addr);
 		} else /* direct mode */
 		{
 			base_addr = make_dmode();
@@ -142,6 +147,10 @@ void jobchild_init(void)
 		dollar_zmode.str.len = sizeof(interactive_mode_buf) -1;
 	}
 	gtm_init_env(base_addr, transfer_addr);
+	if (MUMPS_CALLIN & invocation_mode)
+	{
+		SET_CI_ENV(ci_ret_code_exit);
+	}
 	if (job_arglist.callargs)
 	{
 		callg((int(*)())push_parm, &job_arglist);

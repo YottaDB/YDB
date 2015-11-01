@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <stddef.h>	/* for offsetof macro */
 #ifdef UNIX
 #include <sys/ipc.h>
 #endif
@@ -26,6 +27,7 @@
 #include "gtm_unistd.h"
 #ifdef UNIX
 #include "gtm_stat.h"
+#include "gtmio.h"
 #endif
 #ifdef VMS
 #include <ssdef.h>
@@ -38,6 +40,7 @@
 #include <descrip.h> /* Required for gtmsource.h */
 #include <efndef.h>
 #include <secdef.h>
+#include "iosb_disk.h"
 #endif
 
 #include "gdsroot.h"
@@ -50,13 +53,12 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "jnl.h"
+#include "hashdef.h"
+#include "buddy_list.h"
 #include "muprec.h"
 #include "repl_ctl.h"
 #include "repl_errno.h"
 #include "repl_dbg.h"
-#ifdef UNIX
-#include "gtmio.h"
-#endif
 #include "iosp.h"
 #include "gtm_stdio.h"
 #include "copy.h"
@@ -70,15 +72,12 @@
 #define LOG_WAIT_FOR_JNLOPEN_PERIOD	(10 * 1000) /* ms */
 
 #define LSEEK_ERR_STR		"Error in lseek"
-#define LSEEK_ERR_LEN		(sizeof(LSEEK_ERR_STR) - 1)
-#define READ_ERR_STR		"Error in lseek"
-#define READ_ERR_LEN		(sizeof(READ_ERR_STR) - 1)
-#define UNKNOWN_ERR_STR		"Error in lseek"
-#define UNKNOWN_ERR_LEN		(sizeof(LSEEK_ERR_STR) - 1)
+#define READ_ERR_STR		"Error in read"
+#define UNKNOWN_ERR_STR		"Error unknown"
 
-GBLDEF	unsigned char		*gtmsource_tcombuff_start = NULL;
-GBLDEF	unsigned char		*gtmsource_tcombuff_end = NULL;
-GBLDEF	unsigned char		*gtmsource_tcombuffp = NULL;
+GBLREF	unsigned char		*gtmsource_tcombuff_start;
+GBLREF	unsigned char		*gtmsource_tcombuff_end;
+GBLREF	unsigned char		*gtmsource_tcombuffp;
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	repl_ctl_element	*repl_ctl_list;
@@ -89,6 +88,7 @@ GBLREF	seq_num			seq_num_zero, seq_num_one;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	FILE			*gtmsource_log_fp;
 GBLREF	FILE			*gtmsource_statslog_fp;
+LITREF	boolean_t		jrt_is_replicated[JRT_RECTYPES];
 
 static	int4			num_tcom = -1;
 static	boolean_t		trans_read = FALSE;
@@ -106,8 +106,8 @@ static	int			read_regions(
 
 static	int			first_read(repl_ctl_element*);
 static	int			update_max_seqno_info(repl_ctl_element *ctl);
-static	int			adjust_for_eof_or_extension(repl_ctl_element *ctl);
 static	int			scavenge_closed_jnl_files(seq_num ack_seqno);
+static	int			update_eof_addr(repl_ctl_element *ctl, int *eof_change);
 
 static	int repl_read_file(repl_buff_t *rb)
 {
@@ -117,8 +117,9 @@ static	int repl_read_file(repl_buff_t *rb)
 	sgmnt_addrs		*csa;
 	uint4			dskaddr;
 	uint4			read_less, status;
+	int			eof_change;
 	VMS_ONLY(
-		short		iosb[4];
+		io_status_block_disk	iosb;
 		uint4		read_off;
 		uint4		extra_bytes;
 		sm_uc_ptr_t 	read_buff;
@@ -134,26 +135,33 @@ static	int repl_read_file(repl_buff_t *rb)
 	assert(b->readaddr >= b->recaddr);
 	assert(0 < b->buffremaining);
 	dskaddr = csa->jnl->jnl_buff->dskaddr;
-	if (is_gdid_gdid_identical(&fc->id, JNL_GDID_PTR(csa)))
-	{	/* Make sure we do not read beyond end of data in the journal file */
-		/* Note : This logic is always needed when journal file is pre-allocated.
-		 * With no pre-allocation, this logic is needed only when repl_read_file is called from
-		 * update_max_seqno_info -> repl_next. Specifically, this logic is needed till the existing
-		 * JRT_EOF record is completely overwritten and the file grows beyond its existing size.
-		 */
-		assert(b->readaddr <= dskaddr);
-		if (b->buffremaining > (dskaddr - b->readaddr))	/* note the ordering of the operands to take care of 4G overflow */
+	if (!is_gdid_gdid_identical(&fc->id, JNL_GDID_PTR(csa)))
+	{
+		if (!rb->backctl->fh_read_done)
+			update_eof_addr(rb->backctl, &eof_change); /* update possible change in end_of_data, re-read file header */
+		assert(!fc->jfh->crash);
+		dskaddr = fc->jfh->end_of_data;
+		if (0 == fc->jfh->prev_recov_end_of_data) /* file not virtually truncated by recover/rollback */
+			dskaddr += EOF_RECLEN;
+	}
+	/* Make sure we do not read beyond end of data in the journal file */
+	/* Note : This logic is always needed when journal file is pre-allocated.
+	 * With no pre-allocation, this logic is needed only when repl_read_file is called from
+	 * update_max_seqno_info -> repl_next. Specifically, this logic is needed till the existing
+	 * JRT_EOF record is completely overwritten and the file grows beyond its existing size.
+	 */
+	assert(b->readaddr <= dskaddr);
+	if (b->buffremaining > (dskaddr - b->readaddr))	/* note the ordering of the operands to take care of 4G overflow */
+	{
+		if (b->readaddr == dskaddr)
 		{
-			if (b->readaddr == dskaddr)
-			{
-				REPL_DPRINT3("READ FILE : Jnl file %s yet to grow from offset %u\n",
-						rb->backctl->jnl_fn, b->readaddr);
-				return (SS_NORMAL);
-			}
-			read_less = b->buffremaining - (dskaddr - b->readaddr);	/* explicit ordering to take care of 4G overflow */
-			REPL_DPRINT5("READ FILE : Racing with jnl file %s avoided. Read size reduced from %u to %u at offset %u\n",
-					rb->backctl->jnl_fn, b->buffremaining, b->buffremaining - read_less, b->readaddr);
+			REPL_DPRINT3("READ FILE : Jnl file %s yet to grow from (or ends at) offset %u\n",
+					rb->backctl->jnl_fn, b->readaddr);
+			return (SS_NORMAL);
 		}
+		read_less = b->buffremaining - (dskaddr - b->readaddr);	/* explicit ordering to take care of 4G overflow */
+		REPL_DPRINT5("READ FILE : Racing with jnl file %s avoided. Read size reduced from %u to %u at offset %u\n",
+				rb->backctl->jnl_fn, b->buffremaining, b->buffremaining - read_less, b->readaddr);
 	}
 #ifdef UNIX
 	if (lseek(fc->fd, (off_t)b->readaddr, SEEK_SET) == (off_t)-1)
@@ -174,12 +182,12 @@ static	int repl_read_file(repl_buff_t *rb)
 		else;
 	)
 	assert(read_buff >= b->base);
-	status = sys$qiow(EFN$C_ENF, fc->fd, IO$_READVBLK, &iosb[0], 0, 0, read_buff, nb + extra_bytes,
+	status = sys$qiow(EFN$C_ENF, fc->fd, IO$_READVBLK, &iosb, 0, 0, read_buff, nb + extra_bytes,
 			  DIVIDE_ROUND_DOWN(read_off, DISK_BLOCK_SIZE) + 1, 0, 0, 0);
-	if (SS$_NORMAL == status && (SS$_NORMAL == (status = iosb[0]) || SS$_ENDOFFILE == status))
+	if (SYSCALL_SUCCESS(status) && ((SYSCALL_SUCCESS(status = iosb.cond)) || SS$_ENDOFFILE == status))
 	{
-		GET_LONG(nb, &iosb[1]); /* num bytes actually read */
-		nb -= extra_bytes; /* that we are interested in */
+		nb = iosb.length;	/* num bytes actually read */
+		nb -= extra_bytes;	/* that we are interested in */
 		if ((SS$_NORMAL == status && nb < b->buffremaining - read_less) || (0 >= nb))
 			GTMASSERT; /* we thought VMS wouldn't return less than what we requested for */
 		DEBUG_ONLY((0 != extra_bytes) ? assert(0 == memcmp(verify_buff, read_buff, extra_bytes)) : 0;)
@@ -204,8 +212,8 @@ static	int repl_read_file(repl_buff_t *rb)
 static	int repl_next(repl_buff_t *rb)
 {
 	repl_buff_desc		*b;
-	repl_file_control_t	*fc;
 	int4			reclen;
+	jrec_suffix		*suffix;
 	uint4			maxreclen;
 	int			status, sav_buffremaining;
 	char			err_string[BUFSIZ];
@@ -213,7 +221,6 @@ static	int repl_next(repl_buff_t *rb)
 	error_def(ERR_REPLFILIOERR);
 	error_def(ERR_TEXT);
 
-	fc = rb->fc;
 	b = &rb->buff[rb->buffindex];
 	b->recbuff += b->reclen; /* The next record */
 	b->recaddr += b->reclen;
@@ -238,33 +245,27 @@ static	int repl_next(repl_buff_t *rb)
 		} else
 		{
 			if (repl_errno == EREPL_JNLFILESEEK)
-				memcpy(err_string, LSEEK_ERR_STR, LSEEK_ERR_LEN);
+				strcpy(err_string, LSEEK_ERR_STR);
 			else if (repl_errno == EREPL_JNLFILEREAD)
-				memcpy(err_string, READ_ERR_STR, READ_ERR_LEN);
+				strcpy(err_string, READ_ERR_STR);
 			else
-				memcpy(err_string, UNKNOWN_ERR_STR, UNKNOWN_ERR_LEN);
+				strcpy(err_string, UNKNOWN_ERR_STR);
 			rts_error(VARLSTCNT(9) ERR_REPLFILIOERR, 2, rb->backctl->jnl_fn_len, rb->backctl->jnl_fn,
 			  	  ERR_TEXT, 2, LEN_AND_STR(err_string), status);
 		}
 	}
 	maxreclen = ((b->base + REPL_BLKSIZE(rb)) - b->recbuff) - b->buffremaining;
 	assert(maxreclen > 0);
-	reclen = jnl_record_length((jnl_record *)b->recbuff, maxreclen);
-	if (reclen > 0 && reclen <= maxreclen)
+	if (maxreclen > JREC_PREFIX_UPTO_LEN_SIZE &&
+		(reclen = ((jrec_prefix *)b->recbuff)->forwptr) <= maxreclen &&
+		IS_VALID_JNLREC((jnl_record *)b->recbuff, rb->fc->jfh))
 	{
 		b->reclen = reclen;
-		return (SS_NORMAL);
+		return SS_NORMAL;
 	}
-	if (reclen > 0)
-		repl_errno = EREPL_JNLRECINCMPL;
-	else if (reclen == -1)
-		repl_errno = EREPL_JNLRECFMT;
-	else if (b->buffremaining == 0)
-		repl_errno = EREPL_JNLBADALIGN;
-	else
-		GTMASSERT;
+	repl_errno = (maxreclen > JREC_PREFIX_SIZE && reclen <= maxreclen) ? EREPL_JNLRECFMT : EREPL_JNLRECINCMPL;
 	b->reclen = 0;
-	return (repl_errno);
+	return repl_errno;
 }
 
 static int open_prev_gener(repl_ctl_element **old_ctl, repl_ctl_element *ctl, seq_num read_seqno)
@@ -279,7 +280,7 @@ static int open_prev_gener(repl_ctl_element **old_ctl, repl_ctl_element *ctl, se
 		return (0);
 	}
 	repl_ctl_create(old_ctl, ctl->reg, ctl->repl_buff->fc->jfh->prev_jnl_file_name_length,
-			ctl->repl_buff->fc->jfh->prev_jnl_file_name, FALSE);
+			(char *)ctl->repl_buff->fc->jfh->prev_jnl_file_name, FALSE);
 	REPL_DPRINT2("Prev gener file %s opened\n", ctl->repl_buff->fc->jfh->prev_jnl_file_name);
 	(*old_ctl)->prev = ctl->prev;
 	(*old_ctl)->next = ctl;
@@ -306,14 +307,10 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 	ino_t			save_jnl_inode;
 	int			jnl_fn_len;
 	char			jnl_fn[JNL_NAME_SIZE];
-#ifdef UNIX
-	struct stat		stat_buf;
-#endif
 	int			nopen, n;
 	int			status;
 	gd_region		*r_save;
 	uint4			jnl_status;
-	int			stat_res;
 	boolean_t		do_jnl_ensure_open;
 
 	error_def(ERR_REPLFILIOERR);
@@ -341,19 +338,8 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 		jnl_fn_len = new_ctl->repl_buff->fc->jfh->prev_jnl_file_name_length;
 		memcpy(jnl_fn, new_ctl->repl_buff->fc->jfh->prev_jnl_file_name, jnl_fn_len);
 		jnl_fn[jnl_fn_len] = '\0';
-#ifdef UNIX
-		STAT_FILE(jnl_fn, &stat_buf, stat_res);
-		if (stat_res < 0)
-			rts_error(VARLSTCNT(9) ERR_REPLFILIOERR, 2, jnl_fn_len, jnl_fn,
-					ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in stat in open_newer_gener_jnlfiles"), errno);
-		if (is_gdid_stat_identical(&reg_ctl_end->repl_buff->fc->id, &stat_buf))
-			break;
-#elif defined(VMS)
 		if (is_gdid_file_identical(&reg_ctl_end->repl_buff->fc->id, jnl_fn, jnl_fn_len))
 			break;
-#else
-#error Unsupported platform
-#endif
 	}
 	/* Name of the journal file corresponding to reg_ctl_end might have changed. Update the name.
 	 * Since inode info doesn't change when a file is renamed, it is not necessary to close and reopen the file.
@@ -413,7 +399,6 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 
 	csa = &FILE_INFO(ctl->reg)->s_addrs;
 	rb = ctl->repl_buff;
-	assert(rb->buffindex == REPL_MAINBUFF);
 	fc = rb->fc;
 	prev_eof_addr = fc->eof_addr;
 	*eof_change = 0;
@@ -448,13 +433,9 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 	 * in the above case, source server's read of REPL_BLKSIZE bytes while trying to read at offset end_of_data would
 	 * 	have succeeded since the whole REPL_BLKSIZE block has been allocated in the journal file both in Unix and VMS.
 	 * but only the first EOF_RECLEN bytes of that block is valid data.
-	 * the assert below effectively checks that new_eof_addr indeed includes only the eof record
-	 * 	at a DISK_BLOCK_SIZE aligned boundary in Unix and VMS.
 	 */
-	assert(EOF_RECLEN < DISK_BLOCK_SIZE);
 	assert((new_eof_addr >= prev_eof_addr)
-		|| ((0 == ((new_eof_addr - EOF_RECLEN) % DISK_BLOCK_SIZE))
-			&& (DIVIDE_ROUND_UP(prev_eof_addr, REPL_BLKSIZE(rb)) == DIVIDE_ROUND_UP(new_eof_addr, REPL_BLKSIZE(rb)))));
+		|| (DIVIDE_ROUND_UP(prev_eof_addr, REPL_BLKSIZE(rb)) == DIVIDE_ROUND_UP(new_eof_addr, REPL_BLKSIZE(rb))));
 	fc->eof_addr = new_eof_addr;
 	/* eof_change calculated below is not used anywhere. In case it needs to be used, the below calculation
 	 * 	has to be reexamined in light of the above assert involving new_eof_addr and prev_eof_addr
@@ -482,7 +463,7 @@ static	int force_file_read(repl_ctl_element *ctl)
 		return (SS_NORMAL);
 	}
 	/* b->recbuff points to valid record */
-	rectype = REF_CHAR(&((jnl_record *)b->recbuff)->jrec_type);
+	rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
 	assert(rectype > JRT_BAD && rectype <= JRT_RECTYPES);
 	if (rectype != JRT_EOF) /* Can't be stale */
 		return (SS_NORMAL);
@@ -493,78 +474,6 @@ static	int force_file_read(repl_ctl_element *ctl)
 	b->readaddr = fc->eof_addr = b->recaddr;
 	b->reclen = 0;
 	return (SS_NORMAL);
-}
-
-static	int adjust_for_eof_or_extension(repl_ctl_element *ctl)
-{	/* Filler zeroes and a JRT_EOF record might have been written
-	 * - the JRT_EOF record at the next DISK_BLOCK_SIZE boundary, and filler zeroes upto the next DISK_BLOCK_SIZE boundary.
-	 * OR
-	 * File has been extended putting filler zeroes till the next disk block.
-	 * Attempt adjusting the read pointers to move to the next record.
-	 */
-	repl_buff_t		*rb;
-	repl_buff_desc		*b;
-	repl_file_control_t	*fc;
-	int			zero_len, sav_buffremaining, status;
-	unsigned char		*c;
-	uint4			next_recaddr;
-	char			err_string[BUFSIZ];
-	unsigned char		seq_num_str[32], *seq_num_ptr;
-
-	error_def(ERR_REPLFILIOERR);
-	error_def(ERR_TEXT);
-
-	rb = ctl->repl_buff;
-	b = &rb->buff[rb->buffindex];
-	fc = rb->fc;
-	if (*b->recbuff != '\0')
-		return (EREPL_JNLRECFMT);
-	next_recaddr = ROUND_UP(b->recaddr, DISK_BLOCK_SIZE);
-	assert(next_recaddr <= fc->eof_addr);
-	zero_len = next_recaddr - b->recaddr;
-	assert(zero_len > 0);
-	while (next_recaddr > b->readaddr)
-	{
-		sav_buffremaining = b->buffremaining;
-		if ((status = repl_read_file(rb)) == SS_NORMAL)
-		{
-			if (sav_buffremaining == b->buffremaining)
-			{	/* Log warning message for every certain number of attempts. There might have been
-				 * a crash and the file might have been corrupted. The file might never grow.
-				 * Such cases have to be detected and attempt to read such files aborted.
-			 	 */
-				gtmsource_poll_actions(TRUE);
-				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNL_RECS);
-				if ((total_wait_for_jnl_recs += GTMSOURCE_WAIT_FOR_JNL_RECS) % LOG_WAIT_FOR_JNL_RECS_PERIOD == 0)
-				{
-					repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for file "
-						 "extension or EOF to be written to journal file %s while attempting to read "
-						 "transaction "INT8_FMT". Check for problems with journaling\n",
-						 total_wait_for_jnl_recs, ctl->jnl_fn, INT8_PRINT(ctl->seqno));
-				}
-			}
-		} else
-		{
-			if (repl_errno == EREPL_JNLFILESEEK)
-				memcpy(err_string, LSEEK_ERR_STR, LSEEK_ERR_LEN);
-			else if (repl_errno == EREPL_JNLFILEREAD)
-				memcpy(err_string, READ_ERR_STR, READ_ERR_LEN);
-			else
-				memcpy(err_string, UNKNOWN_ERR_STR, UNKNOWN_ERR_LEN);
-			rts_error(VARLSTCNT(9) ERR_REPLFILIOERR, 2, rb->backctl->jnl_fn_len, rb->backctl->jnl_fn,
-								ERR_TEXT, 2, LEN_AND_STR(err_string), status);
-		}
-	}
-	for (c = b->recbuff; c < b->recbuff + zero_len && *c == '\0'; c++)
-		;
-	if (c == b->recbuff + zero_len)
-	{
-		b->reclen = zero_len;
-		return (SS_NORMAL);
-	}
-	b->reclen = 0;
-	repl_errno = EREPL_JNLRECFMT;
-	return (repl_errno);
 }
 
 static	int update_max_seqno_info(repl_ctl_element *ctl)
@@ -583,7 +492,6 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	sgmnt_addrs		*csa;
 
 	error_def(ERR_JNLBADRECFMT);
-	error_def(ERR_JNLBADALIGN);
 	error_def(ERR_TEXT);
 
 	assert(ctl->file_state == JNL_FILE_OPEN);
@@ -609,7 +517,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	}
 	QWASSIGN(reg_seqno, csa->hdr->reg_seqno);
 	QWDECRBYDW(reg_seqno, 1);
- 	if (QWGE(ctl->max_seqno, reg_seqno) || (fh_read_done && ctl->fh_read_done))
+ 	if (QWGE(ctl->max_seqno, reg_seqno) || (fh_read_done && ctl->fh_read_done && ctl->first_read_done))
  	{	/* have searched already */
  		REPL_DPRINT4("UPDATE MAX SEQNO INFO : not reading file %s; max_seqno = "INT8_FMT", reg_seqno = "INT8_FMT"\n",
  			     ctl->jnl_fn, INT8_PRINT(ctl->max_seqno), INT8_PRINT(reg_seqno));
@@ -641,10 +549,10 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 		{
 			if ((status = repl_next(rb)) == SS_NORMAL)
 			{
-				rectype = REF_CHAR(&((jnl_record *)b->recbuff)->jrec_type);
-				if (IS_REPL_RECTYPE(rectype))
+				rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
+				if (IS_REPLICATED(rectype))
 				{
-					QWASSIGN(max_seqno, get_jnl_seqno((jnl_record *)b->recbuff));
+					QWASSIGN(max_seqno, GET_REPL_JNL_SEQNO(b->recbuff));
 					max_seqno_addr = b->recaddr;
 				} else if (rectype == JRT_EOF)
 				{
@@ -659,11 +567,9 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 				break;
 			} else
 			{
-				if (status == EREPL_JNLRECFMT && adjust_for_eof_or_extension(ctl) != SS_NORMAL)
+				if (status == EREPL_JNLRECFMT)
 					rts_error(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
-				else if (status == EREPL_JNLBADALIGN)
-					rts_error(VARLSTCNT(5) ERR_JNLBADALIGN, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
-				else if (status != EREPL_JNLRECFMT)
+				else
 					GTMASSERT;
 			}
 		}
@@ -716,7 +622,6 @@ static	int first_read(repl_ctl_element *ctl)
 	unsigned char		seq_num_str[32], *seq_num_ptr;
 
 	error_def(ERR_JNLBADRECFMT);
-	error_def(ERR_JNLBADALIGN);
 
 	rb = ctl->repl_buff;
 	assert(rb->buffindex == REPL_MAINBUFF);
@@ -738,12 +643,12 @@ static	int first_read(repl_ctl_element *ctl)
 	{
 		if ((status = repl_next(rb)) == SS_NORMAL)
 		{
-			rectype = REF_CHAR(&((jnl_record *)b->recbuff)->jrec_type);
-			if (IS_REPL_RECTYPE(rectype))
+			rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
+			if (IS_REPLICATED(rectype))
 			{
-				QWASSIGN(ctl->min_seqno, get_jnl_seqno((jnl_record *)b->recbuff));
+				QWASSIGN(ctl->min_seqno, GET_REPL_JNL_SEQNO(b->recbuff));
 				QWASSIGN(ctl->seqno, ctl->min_seqno);
-				ctl->tn = get_tn((jnl_record *)b->recbuff);
+				ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 				QWASSIGN(ctl->max_seqno, ctl->min_seqno);
 				ctl->min_seqno_dskaddr = ctl->max_seqno_dskaddr = b->recaddr;
 				ctl->file_state = JNL_FILE_OPEN;
@@ -762,10 +667,8 @@ static	int first_read(repl_ctl_element *ctl)
 			return (SS_NORMAL);
 		} else
 		{
-			if (status == EREPL_JNLRECFMT && adjust_for_eof_or_extension(ctl) != SS_NORMAL)
+			if (status == EREPL_JNLRECFMT)
 				rts_error(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
-			else if (status == EREPL_JNLBADALIGN)
-				rts_error(VARLSTCNT(5) ERR_JNLBADALIGN, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
 		}
 	}
 	REPL_DPRINT4("FIRST READ of %s - Min seqno "INT8_FMT" EOF addr %d\n",
@@ -821,7 +724,6 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 	seq_num			read_seqno;
 	unsigned char		*seq_num_ptr, seq_num_str[32];
 
-	error_def(ERR_JNLBADALIGN);
 	error_def(ERR_JNLBADRECFMT);
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_REPLBRKNTRANS);
@@ -840,16 +742,16 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 	*buff += b->reclen;
 	readlen += b->reclen;
 	*bufsiz -= b->reclen;
-	rectype = REF_CHAR(&((jnl_record *)b->recbuff)->jrec_type);
-	assert(IS_REPL_RECTYPE(rectype));
-	QWASSIGN(rec_jnl_seqno, get_jnl_seqno((jnl_record *)b->recbuff));
+	rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
+	assert(IS_REPLICATED(rectype));
+	QWASSIGN(rec_jnl_seqno, GET_JNL_SEQNO(b->recbuff));
 	assert(QWEQ(rec_jnl_seqno, ctl->seqno));
 	if (QWGT(rec_jnl_seqno, ctl->max_seqno))
 	{
 		QWASSIGN(ctl->max_seqno, rec_jnl_seqno);
 		ctl->max_seqno_dskaddr = b->recaddr;
 	}
-	ctl->tn = get_tn((jnl_record *)b->recbuff);
+	ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 	if (JRT_SET == rectype || JRT_KILL == rectype || JRT_ZKILL == rectype || JRT_NULL == rectype)
 	{	/* Entire transaction done */
 		ctl->read_complete = TRUE;
@@ -864,8 +766,8 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 	{
 		if ((status = repl_next(rb)) == SS_NORMAL)
 		{
-			rectype = REF_CHAR(&((jnl_record *)b->recbuff)->jrec_type);
-			if (IS_REPL_RECTYPE(rectype))
+			rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
+			if (IS_REPLICATED(rectype))
 			{
 				if (b->reclen > *bufsiz)
 					increase_buffer(buff, bufsiz, b->reclen);
@@ -883,20 +785,20 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 					/* End of transaction in this file */
 					ctl->read_complete = TRUE;
 					if (num_tcom == -1)
-						num_tcom = ((jnl_record *)b->recbuff)->val.jrec_tcom.participants;
+						num_tcom = ((jnl_record *)b->recbuff)->jrec_tcom.participants;
 					num_tcom--;
 					if (num_tcom == 0) /* Read the whole trans */
 						trans_read = TRUE;
 				}
 				*bufsiz -= b->reclen;
-				QWASSIGN(rec_jnl_seqno, get_jnl_seqno((jnl_record *)b->recbuff));
+				QWASSIGN(rec_jnl_seqno, GET_REPL_JNL_SEQNO(b->recbuff));
 				assert(QWEQ(rec_jnl_seqno, ctl->seqno));
 				if (QWGT(rec_jnl_seqno, ctl->max_seqno))
 				{
 					QWASSIGN(ctl->max_seqno, rec_jnl_seqno);
 					ctl->max_seqno_dskaddr = b->recaddr;
 				}
-				ctl->tn = get_tn((jnl_record *)b->recbuff);
+				ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 			} else if (rectype == JRT_EOF)
 			{
 				seq_num_ptr = i2ascl(seq_num_str, read_jnl_seqno);
@@ -919,11 +821,9 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 			}
 		} else
 		{
-			if (status == EREPL_JNLRECFMT && adjust_for_eof_or_extension(ctl) != SS_NORMAL)
+			if (status == EREPL_JNLRECFMT)
 				rts_error(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
-			else if (status == EREPL_JNLBADALIGN)
-				rts_error(VARLSTCNT(5) ERR_JNLBADALIGN, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
-			else if (status != EREPL_JNLRECFMT)
+			else
 				GTMASSERT;
 		}
 	}
@@ -945,7 +845,6 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 	int			status;
 
 	error_def(ERR_JNLBADRECFMT);
-	error_def(ERR_JNLBADALIGN);
 
 	rb = ctl->repl_buff;
 	assert(rb->buffindex == REPL_MAINBUFF);
@@ -968,17 +867,17 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 	{
 		if ((status = repl_next(rb)) == SS_NORMAL)
 		{
-			rectype = REF_CHAR(&((jnl_record *)b->recbuff)->jrec_type);
-			if (IS_REPL_RECTYPE(rectype))
+			rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
+			if (IS_REPLICATED(rectype))
 			{
-				rec_jnl_seqno = get_jnl_seqno((jnl_record *)b->recbuff);
+				rec_jnl_seqno = GET_REPL_JNL_SEQNO(b->recbuff);
 				if (QWLT(ctl->max_seqno, rec_jnl_seqno))
 				{
 					QWASSIGN(ctl->max_seqno, rec_jnl_seqno);
 					ctl->max_seqno_dskaddr = b->recaddr;
 				}
 				QWASSIGN(ctl->seqno, rec_jnl_seqno);
-				ctl->tn = get_tn((jnl_record *)b->recbuff);
+				ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 				if (QWEQ(rec_jnl_seqno, read_seqno))
 					found = TR_FOUND;
 				else if (QWGT(rec_jnl_seqno, read_seqno))
@@ -987,10 +886,8 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 				found = TR_WILL_NOT_BE_FOUND;
 		} else if (status == EREPL_JNLRECINCMPL)
 			found = TR_FIND_WOULD_BLOCK;
-		else if (status == EREPL_JNLRECFMT && adjust_for_eof_or_extension(ctl) != SS_NORMAL)
+		else if (status == EREPL_JNLRECFMT)
 			rts_error(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
-		else if (status == EREPL_JNLBADALIGN)
-			rts_error(VARLSTCNT(5) ERR_JNLBADALIGN, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
 	}
 	return (found);
 }
@@ -1208,7 +1105,7 @@ static	int read_regions(uchar_ptr_t *buff, int *buff_avail,
 					 * This region is not part of the transaction. Skip to the next region.
 					 */
 					REPL_DPRINT3("Gap between %s (max seqno "INT8_FMT,
-							ctl->prev->jnl_fn, INT8_PRINT(ctl->max_seqno));
+							ctl->prev->jnl_fn, INT8_PRINT(ctl->prev->max_seqno));
 					REPL_DPRINT3(") and %s (min seqno "INT8_FMT, ctl->jnl_fn, INT8_PRINT(ctl->min_seqno));
 					REPL_DPRINT2(") found while looking for "INT8_FMT"\n", INT8_PRINT(read_jnl_seqno));
 					assert(ctl->prev->file_state == JNL_FILE_CLOSED &&

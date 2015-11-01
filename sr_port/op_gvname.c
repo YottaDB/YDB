@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,7 @@ va_dcl
 	mval		*val, *temp;
 	short int	max_key;
 	va_list		var;
-	unsigned char	buff[MAX_KEY_SZ + 1], *end;
+	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 
 	error_def(ERR_GVSUBOFLOW);
 	error_def(ERR_GVIS);
@@ -114,8 +114,8 @@ va_dcl
 			is_null = ((STR_SUB_PREFIX == *(unsigned char *)val->str.addr) && (KEY_DELIMITER == *(val->str.addr + 1)));
 			if (gv_target->collseq || gv_target->nct)
 			{
-				assert(dba_cm != gv_cur_region->dyn.addr->acc_meth); /* collation transformation should be done at 
-											the server's end for CM regions */ 
+				assert(dba_cm != gv_cur_region->dyn.addr->acc_meth); /* collation transformation should be done at
+											the server's end for CM regions */
 				PUSH_MV_STENT(MVST_MVAL);
 				temp = &mv_chain->mv_st_cont.mvs_mval;
 				transform = FALSE;
@@ -131,8 +131,8 @@ va_dcl
 				len = val->str.len;
 				if (gv_currkey->end + len - 1 >= max_key)
 				{
-					if (0 == (end = format_targ_key(buff, MAX_KEY_SZ + 1, gv_currkey, TRUE)))
-						end = &buff[MAX_KEY_SZ];
+					if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+						end = &buff[MAX_ZWR_KEY_SZ - 1];
 					rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 				}
 				memcpy((gv_currkey->base + gv_currkey->end), val->str.addr, len);
@@ -144,8 +144,8 @@ va_dcl
 			mval2subsc(val, gv_currkey);
 			if (gv_currkey->end >= max_key)
 			{
-				if (0 == (end = format_targ_key(buff, MAX_KEY_SZ + 1, gv_currkey, TRUE)))
-					end = &buff[MAX_KEY_SZ];
+				if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+					end = &buff[MAX_ZWR_KEY_SZ - 1];
 				rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 			}
 			is_null = (MV_IS_STRING(val) && (0 == val->str.len));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,7 @@
 #include <sys/time.h>
 #include <errno.h>
 #include <unistd.h>
-#include <signal.h> /* for kill() */
+#include <signal.h> /* for kill(), SIGTERM, SIGQUIT */
 
 #include "gtm_sem.h"
 #include "gdsroot.h"
@@ -49,7 +49,6 @@
 #include "ftok_sems.h"
 #include "semwt2long_handler.h"
 
-
 GBLREF gd_region		*gv_cur_region;
 GBLREF uint4			process_id;
 GBLREF enum gtmImageTypes	image_type;
@@ -57,6 +56,8 @@ GBLREF boolean_t		sem_incremented;
 GBLREF gd_region		*ftok_sem_reg;
 GBLREF volatile boolean_t 	semwt2long;
 GBLREF boolean_t		gtm_environment_init;
+GBLREF gd_region		*standalone_reg;
+GBLREF int4			exi_condition;
 
 static struct sembuf		ftok_sop[3];
 static int			ftok_sopcnt;
@@ -264,15 +265,20 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 
 	assert(reg);
         udi = FILE_INFO(reg);
-	assert(!udi->grabbed_ftok_sem);
-	assert(NULL == ftok_sem_reg);
+	/* The following two asserts are to ensure we never hold more than one FTOK semaphore at any point in time.
+	 * The only exception is if we were MUPIP STOPped (or kill -3ed) while having ftok_sem lock on one region and we
+	 * 	came to rundown code that invoked ftok_sem_lock() on a different region. Hence the SIGTERM/SIGQUIT check below.
+	 * In the pro version, we will do the right thing by returning TRUE right away if udi->grabbed_ftok_sem is TRUE.
+	 * 	This is because incr_cnt is FALSE always (asserted below too).
+	 */
+	assert(!udi->grabbed_ftok_sem || SIGTERM == exi_condition || SIGQUIT == exi_condition);
+	assert((NULL == ftok_sem_reg) || SIGTERM == exi_condition || SIGQUIT == exi_condition);
+	assert(!incr_cnt);
 	assert(INVALID_SEMID != udi->ftok_semid);
 	ftok_sopcnt = 0;
 	semflag = SEM_UNDO | (immediate ? IPC_NOWAIT : 0);
 	if (!udi->grabbed_ftok_sem)
-	{
-		/*
-		 * We need to gaurantee that none else access database file header
+	{	/* We need to gaurantee that none else access database file header
 		 * when semid/shmid fields are updated in file header
 		 */
 		ftok_sop[0].sem_num = 0; ftok_sop[0].sem_op = 0;	/* Wait for 0 (unlocked) */
@@ -338,7 +344,11 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_count, boolean_t imme
 	error_def(ERR_SYSCALL);
 
 	assert(NULL != reg);
-	assert(reg == ftok_sem_reg);
+	/* The following assert is to ensure we never hold more than one FTOK semaphore at any point in time.
+	 * The only exception is if we were MUPIP STOPped (or kill -3ed) while having ftok_sem lock on one region and we
+	 * 	came to rundown code that invoked ftok_sem_lock() on a different region. Hence the SIGTERM/SIGQUIT check below.
+	 */
+	assert(reg == ftok_sem_reg || SIGTERM == exi_condition || SIGQUIT == exi_condition);
 	udi = FILE_INFO(reg);
 	assert(udi->grabbed_ftok_sem);
 	assert(udi && INVALID_SEMID != udi->ftok_semid);
@@ -364,6 +374,8 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_count, boolean_t imme
 				return FALSE;
 			}
 			udi->ftok_semid = INVALID_SEMID;
+			if (ftok_sem_reg == standalone_reg)
+				standalone_reg = NULL;
 			ftok_sem_reg = NULL;
 			udi->grabbed_ftok_sem = FALSE;
 			return TRUE;
@@ -382,6 +394,8 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_count, boolean_t imme
 		return FALSE;
 	}
 	udi->grabbed_ftok_sem = FALSE;
+	if (ftok_sem_reg == standalone_reg)
+		standalone_reg = NULL;
 	ftok_sem_reg = NULL;
 	return TRUE;
 }

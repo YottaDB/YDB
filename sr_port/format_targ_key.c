@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,8 +23,8 @@
 /* return a pointer that points after the last char added */
 unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_key *key, bool dollarc)
 {
-	unsigned char *gvkey_char_ptr, *out_top, *work_char_ptr, work_buff[MAX_KEY_SZ + 1], *work_top;
-	boolean_t is_string;
+	unsigned char	*gvkey_char_ptr, *out_top, *work_char_ptr, work_buff[MAX_ZWR_KEY_SZ], *work_top;
+	boolean_t	is_string;
 
 	assert(max_size > 12);
 	out_top = out_char_ptr + max_size - 2;	/* - 2, as could add comma left-paren or TWO double quotes between checks */

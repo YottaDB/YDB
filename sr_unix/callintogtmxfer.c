@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,24 +17,20 @@
 #include <errno.h>
 
 #include "callintogtmxfer.h"
+#include "gt_timer.h"
 
 typedef	int	(*int_fptr)();
-
-int	hiber_start();
-int	hiber_start_wait_any();
-int	start_timer();
-int	cancel_timer();
-GBLREF	int	jnlpool_detach();
+GBLREF  int     jnlpool_detach();
 
 GBLDEF int (*callintogtm_vectortable[])()=
 {
-	hiber_start,
-	hiber_start_wait_any,
-	start_timer,
-	cancel_timer,
-	(int_fptr)gtm_malloc,
-	(int_fptr)gtm_free,
-	jnlpool_detach,
+	(int_fptr)hiber_start,
+	(int_fptr)hiber_start_wait_any,
+	(int_fptr)start_timer,
+	(int_fptr)cancel_timer,
+	(int_fptr)malloc,
+	(int_fptr)free,
+	(int_fptr)jnlpool_detach,
 	(int_fptr)(-1)
 };
 

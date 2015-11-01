@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,8 @@
 
 #include "mdef.h"
 
-#include <unistd.h>
-
+#include <errno.h>
+#include "gtm_unistd.h"
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 
@@ -20,7 +20,6 @@
 #include "iormdef.h"
 #include "io_params.h"
 
-extern int errno;
 GBLREF io_pair io_curr_device;
 
 short ioff_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)

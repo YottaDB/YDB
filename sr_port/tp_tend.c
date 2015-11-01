@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <stddef.h>		/* for offsetof macro */
 #ifdef UNIX
 #include "gtm_stdio.h"
 #endif
@@ -81,7 +82,6 @@ GBLREF	int			t_tries;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
-GBLREF	uint4			rec_seqno, cumul_jnl_rec_len;
 GBLREF	boolean_t		is_updproc;
 GBLREF	seq_num			seq_num_zero;
 GBLREF	seq_num			seq_num_one;
@@ -90,14 +90,9 @@ GBLREF	ua_list			*first_ua, *curr_ua;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	int			rc_set_fragment, update_array_size, cumul_update_array_size;
 GBLREF	boolean_t		unhandled_stale_timer_pop;
-GBLREF	uint4			gbl_jrec_time;	/* see comment in gbldefs.c for usage */
-GBLREF	seq_num			max_resync_seqno;
-DEBUG_ONLY(GBLREF uint4		cumul_index;
-	   GBLREF uint4		cu_jnl_index;
-	  )
-GBLREF	boolean_t		copy_jnl_record;
-GBLREF	struct_jrec_tcom 	mur_jrec_fixed_tcom;
+GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	int4			tprestart_syslog_delta;
+GBLREF	struct_jrec_tcom	tcom_record;
 
 boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse);
 enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse);
@@ -121,11 +116,10 @@ boolean_t	tp_tend(boolean_t crit_only)
 	trans_num		valid_thru;	/* buffers touched by this transaction will be valid thru this tn */
 	enum cdb_sc		status;
 	gd_region		*save_gv_cur_region;
-	int			cw_depth, lcnt;
-	struct_jrec_tcom	tcom_record;
+	int			cw_depth, lcnt, participants;
 	jnldata_hdr_ptr_t	jnl_header;
 	int			repl_tp_region_count = 0;
-	boolean_t		yes_jnl_no_repl, first_time, release_crit;
+	boolean_t		first_time, release_crit, yes_jnl_no_repl;
 	uint4			jnl_status, leafmods, indexmods;
 	uint4			total_jnl_rec_size;
 	jnlpool_ctl_ptr_t	jpl, tjpl;
@@ -135,6 +129,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 
 	assert(dollar_tlevel > 0);
 	assert(0 == jnl_fence_ctl.level);
+	participants = 0;
 	status = cdb_sc_normal;
 	no_sets = TRUE;
 	jnl_status = 0;
@@ -708,7 +703,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 			}
 		}
 	}
-	if (repl_tp_region_count && yes_jnl_no_repl)
+	if (repl_tp_region_count && yes_jnl_no_repl) /* Make this assert and DEBUG_ONLY ??? */
 		GTMASSERT;
 	/* the following section is the actual commitment of the changes */
 	assert(cdb_sc_normal == status);
@@ -727,11 +722,11 @@ boolean_t	tp_tend(boolean_t crit_only)
 			assert(tjpl->write == tjpl->jnlpool_size);
 			tjpl->write = 0;
 		}
-		cumul_jnl_rec_len += TCOM_RECLEN * repl_tp_region_count + sizeof(jnldata_hdr_struct);
-		DEBUG_ONLY(cumul_index += repl_tp_region_count;)
-		assert(cumul_jnl_rec_len % JNL_REC_START_BNDRY == 0);
+		jgbl.cumul_jnl_rec_len += TCOM_RECLEN * repl_tp_region_count + sizeof(jnldata_hdr_struct);
+		DEBUG_ONLY(jgbl.cumul_index += repl_tp_region_count;)
+		assert(jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY == 0);
 		assert(QWEQ(jpl->early_write_addr, jpl->write_addr));
-		QWADDDW(jpl->early_write_addr, jpl->write_addr, cumul_jnl_rec_len);
+		QWADDDW(jpl->early_write_addr, jpl->write_addr, jgbl.cumul_jnl_rec_len);
 	}
 	first_time = TRUE;
 	for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
@@ -751,7 +746,16 @@ boolean_t	tp_tend(boolean_t crit_only)
 		{
 			if (first_time)
 			{
-				JNL_SHORT_TIME(gbl_jrec_time);
+				/* The JNL_SHORT_TIME done below should be done before any journal writing activity on the
+				 * journal file. This is because all the jnl record writing routines assume jgbl.gbl_jrec_time
+				 * initialized approporiately. Note that jnl_ensure_open() can call cre_jnl_file() which
+				 * in turn assumes jgbl.gbl_jrec_time is set. Also jnl_file_extend() can call
+				 * jnl_write_epoch_rec() which in turn assumes jgbl.gbl_jrec_time is set.
+				 * In case of forw-phase-recovery, mur_output_record() would have already set this.
+				 */
+				if (!jgbl.forw_phase_recovery)
+					JNL_SHORT_TIME(jgbl.gbl_jrec_time);
+				assert(jgbl.gbl_jrec_time);
 				first_time = FALSE;
 			}
 			jnl_status = jnl_ensure_open();
@@ -778,14 +782,11 @@ boolean_t	tp_tend(boolean_t crit_only)
 						goto failed;
 					}
 				}
-				/* jnl_put_jrt_pini will use gbl_jrec_time to fill in the time of the pini record.
-				 * see comment in jnl_put_pini.c about difference between tp_tend and t_end in this regard.
-				 */
 				if (0 == csa->jnl->pini_addr)
 					jnl_put_jrt_pini(csa);
 				if (jbp->before_images)
 				{
-					if (jbp->next_epoch_time <= gbl_jrec_time)
+					if (jbp->next_epoch_time <= jgbl.gbl_jrec_time)
 					{	/* Flush the cache. Since we are in crit, defer syncing the epoch */
 						if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH))
 						{
@@ -815,10 +816,19 @@ boolean_t	tp_tend(boolean_t crit_only)
 							cse->jnl_freeaddr = 0;
 					}
 				}
-				if (jnl_fence_ctl.region_count != 0)
-					++jnl_fence_ctl.region_count;
+				if (!jgbl.forw_phase_recovery)
+				{
+					if (0 == participants)
+					{
+						if (replication)
+							QWASSIGN(jnl_fence_ctl.token, tjpl->jnl_seqno);
+						else
+							QWASSIGN2DW(jnl_fence_ctl.token, csa->jnl->regnum, csa->ti->curr_tn);
+					}
+					++participants;
+				}
 				for (jfb = si->jnl_head;  NULL != jfb; jfb = jfb->next)
-						jnl_write_logical(csa, jfb);
+					jnl_write_logical(csa, jfb);
 			} else
 			{
 				csa->ti->early_tn = ctn;
@@ -867,64 +877,46 @@ boolean_t	tp_tend(boolean_t crit_only)
 	} /* for (si ... ) */
 	assert(cdb_sc_normal == status);
 	/* the next section marks the transaction complete in the journal */
-	if (!copy_jnl_record) /* Update process should operate on GLD, and can be different */
+	tcom_record.prefix.time = jgbl.gbl_jrec_time;
+	if (!jgbl.forw_phase_recovery)
 	{
-		tcom_record.participants = jnl_fence_ctl.region_count;
-		QWASSIGN(tcom_record.jnl_seqno, seq_num_zero);
+		tcom_record.participants = participants;
+		QWASSIGN(tcom_record.token_seq.token, jnl_fence_ctl.token);
 	} else
 	{
-		tcom_record.participants = mur_jrec_fixed_tcom.participants;
-		QWASSIGN(tcom_record.jnl_seqno, mur_jrec_fixed_tcom.jnl_seqno);
+		tcom_record.participants = jgbl.mur_jrec_participants;
+		QWASSIGN(tcom_record.token_seq, jgbl.mur_jrec_token_seq);
 	}
-	QWASSIGN(tcom_record.token, jnl_fence_ctl.token);
 	if (replication)
 	{
+		assert(!jgbl.forw_phase_recovery);
 		QWINCRBY(tjpl->jnl_seqno, seq_num_one);
 		if (is_updproc)
-			QWINCRBY(max_resync_seqno, seq_num_one);
+			QWINCRBY(jgbl.max_resync_seqno, seq_num_one);
 	}
 	/* Note that only those regions that are actively journaling will appear in the following list: */
 	for (csa = jnl_fence_ctl.fence_list;  (sgmnt_addrs *) - 1 != csa;  csa = csa->next_fenced)
 	{
 		assert(((sgm_info *)(csa->sgm_info_ptr))->first_cw_set);
-		tcom_record.tn = csa->ti->curr_tn - 1;
-		if (is_updproc)
-		{	/* recov_short_time for update process means the time at which update was done on primary */
-			tcom_record.tc_recov_short_time = mur_jrec_fixed_tcom.tc_recov_short_time;
-			tcom_record.ts_recov_short_time = mur_jrec_fixed_tcom.ts_recov_short_time;
-		} else
-		{
-			tcom_record.tc_recov_short_time = gbl_jrec_time;
-			tcom_record.ts_recov_short_time = gbl_jrec_time;
-		}
-		tcom_record.pini_addr = csa->jnl->pini_addr;
-		if (!copy_jnl_record)
-		{
-			tcom_record.ts_short_time = tcom_record.tc_short_time = gbl_jrec_time;
-			tcom_record.rec_seqno = rec_seqno;
-		} else
-		{
-			tcom_record.tc_short_time = mur_jrec_fixed_tcom.tc_short_time;
-			tcom_record.ts_short_time = mur_jrec_fixed_tcom.ts_short_time;
-			tcom_record.rec_seqno = mur_jrec_fixed_tcom.rec_seqno;
-		}
-		if (REPL_ENABLED(csa->hdr))
+		tcom_record.prefix.pini_addr = csa->jnl->pini_addr;
+		tcom_record.prefix.tn = csa->ti->curr_tn - 1;
+		if (REPL_ENABLED(csa))
 		{
 			QWASSIGN(csa->hdr->reg_seqno, tjpl->jnl_seqno);
 			if (is_updproc)
-				QWASSIGN(csa->hdr->resync_seqno, max_resync_seqno);
-			QWASSIGN(tcom_record.jnl_seqno, jpl->jnl_seqno);
+				QWASSIGN(csa->hdr->resync_seqno, jgbl.max_resync_seqno);
 		}
 		TP_CHANGE_REG_IF_NEEDED(csa->jnl->region);
-		jnl_write(csa->jnl, JRT_TCOM, (jrec_union *)&tcom_record, NULL, NULL);
+		/* Note tcom_record.jnl_tid was set in op_tstart() or updproc() */
+		jnl_write(csa->jnl, JRT_TCOM, (jnl_record *)&tcom_record, NULL, NULL);
 	}
 	if (replication)
 	{
-		assert(cumul_index == cu_jnl_index);
-		assert((jpl->write + cumul_jnl_rec_len) % jpl->jnlpool_size == tjpl->write);
+		assert(jgbl.cumul_index == jgbl.cu_jnl_index);
+		assert((jpl->write + jgbl.cumul_jnl_rec_len) % jpl->jnlpool_size == tjpl->write);
 		assert(QWGT(jpl->early_write_addr, jpl->write_addr));
 		jnl_header = (jnldata_hdr_ptr_t)(jnlpool.jnldata_base + jpl->write);	/* Begin atomic stmnts */
-		jnl_header->jnldata_len = cumul_jnl_rec_len;
+		jnl_header->jnldata_len = jgbl.cumul_jnl_rec_len;
 		jnl_header->prev_jnldata_len = jpl->lastwrite_len;
 		jpl->lastwrite_len = jnl_header->jnldata_len;
 		QWINCRBYDW(jpl->write_addr, jnl_header->jnldata_len);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,7 @@ GBLREF lvzwrite_struct	lvzwrite_block;
 GBLREF mliteral		literal_chain;
 GBLREF mstr		*comline_base, dollar_zsource, **stp_array;
 GBLREF mval		dollar_etrap, dollar_system, dollar_zerror, dollar_zgbldir, dollar_zstatus, dollar_zstep, dollar_ztrap;
-GBLREF mval		dollar_zyerror, zstep_action, dollar_zinterrupt;
+GBLREF mval		dollar_zyerror, zstep_action, dollar_zinterrupt, dollar_ztexit;
 GBLREF mv_stent		*mv_chain;
 GBLREF sgm_info		*first_sgm_info;
 GBLREF spdesc		indr_stringpool, rts_stringpool, stringpool;
@@ -354,6 +354,9 @@ void stp_gcol(int space_needed) /* garbage collect and create enough space for s
 		if (x)
 			MV_STPG_PUT(x);
 		x = MV_STPG_GET(&dollar_zerror);
+		if (x)
+			MV_STPG_PUT(x);
+		x = MV_STPG_GET(&dollar_ztexit);
 		if (x)
 			MV_STPG_PUT(x);
 		x = MV_STPG_GET(&dollar_zyerror);

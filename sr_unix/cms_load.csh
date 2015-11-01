@@ -1,7 +1,7 @@
 #! /usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -44,7 +44,7 @@ set dir_structure      = "inc pct src tools log $build_types"
 set gtm_src_types = "c m64 s msg"
 set gtm_inc_types = "h max mac si"
 set gtm_pct_types = "mpt m hlp"
-set gtm_tools_types = "gtc sed awk sh csh list txt exp"
+set gtm_tools_types = "gtc sed awk sh csh list txt exp mk"
 
 #####################################################################################
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,11 @@
 
 #include "mdef.h"
 
+#include <errno.h>
 #include "gtm_string.h"
+#ifdef DEBUG
+#include "gtm_stdio.h"
+#endif
 
 #include "rc.h"
 #include "gdsroot.h"
@@ -24,9 +28,6 @@
 #include "hashdef.h"
 #include "copy.h"
 #include "rc_oflow.h"
-#ifdef DEBUG
-#include "gtm_stdio.h"
-#endif
 #include "error.h"
 #include "gdsblk.h"
 #include "gtcm.h"
@@ -49,7 +50,6 @@ GBLREF gv_key		*gv_altkey;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gv_namehead	*gv_target;
 GBLREF int4		gv_keysize;
-GBLREF int		errno;
 GBLREF sgmnt_data	*cs_data;
 GBLREF gd_addr		*gd_header;
 GBLREF rc_oflow	*rc_overflow;

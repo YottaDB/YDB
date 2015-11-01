@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,9 @@ enum
 	REPL_START_JNL_SEQNO = 0,
 	REPL_TR_JNL_RECS, /* 1 */
 	REPL_ROLLBACK_FIRST, /* 2 */
-	REPL_WILL_RESTART, /* 3 */
+	REPL_WILL_RESTART_OBSOLETE, /* 3 */ /* Obsoleted effective V4.4-002 since we no longer support dual site config with
+					     * V4.1 versions. But, DO NOT remove this message type to keep other message types
+					     * same as in V4.2 and V4.3 versions */
 	REPL_XOFF, /* 4 */
 	REPL_XON, /* 5 */
 	REPL_BADTRANS, /* 6 */

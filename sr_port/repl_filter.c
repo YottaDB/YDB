@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,56 +47,37 @@
 #include "repl_sp.h"
 #include "gtmmsg.h"
 
-GBLDEF uchar_ptr_t	repl_filter_buff = NULL;
-GBLDEF unsigned int	repl_filter_bufsiz = 0;
-GBLDEF unsigned char	jnl_ver, remote_jnl_ver;
-
-GBLDEF intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1][JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
+GBLREF uchar_ptr_t	repl_filter_buff;
+GBLREF int		repl_filter_bufsiz;
+GBLREF unsigned char	jnl_ver, remote_jnl_ver;
+GBLDEF	intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1][JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
-	/* This should be a square matrix. If you add a row, make sure you add a column too.	            */
-		/*  07	       08,        09,        10,        11,          12           13	     14     */
-	/* 07 */{IF_NONE,   IF_NONE,   IF_NONE,   IF_NONE,   IF_07TO11,   IF_07TO12,   IF_07TO12,  IF_07TO12},
-	/* 08 */{IF_NONE,   IF_NONE,   IF_NONE,   IF_NONE,   IF_NONE,	  IF_NONE,     IF_NONE  ,  IF_NONE  },
-	/* 09 */{IF_NONE,   IF_NONE,   IF_NONE,   IF_NONE,   IF_NONE,	  IF_NONE,     IF_NONE  ,  IF_NONE  },
-	/* 10 */{IF_NONE,   IF_NONE,   IF_NONE,   IF_NONE,   IF_NONE,	  IF_NONE,     IF_NONE  ,  IF_NONE  },
-	/* 11 */{IF_11TO07, IF_NONE,   IF_NONE,   IF_NONE,   IF_NONE,	  IF_11TO12,   IF_11TO12,  IF_11TO12},
-	/* 12 */{IF_12TO07, IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO11,   IF_NONE,     IF_NONE  ,  IF_NONE  },
-	/* 13 */{IF_12TO07, IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO11,   IF_NONE,     IF_NONE  ,  IF_NONE  },
-	/* 14 */{IF_12TO07, IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO11,   IF_NONE,     IF_NONE  ,  IF_NONE  },
+	/* This should be a square matrix. If you add a row, make sure you add a column too. */
+		/*  11         12         13	     14     	15	*/
+	/* 11 */{IF_NONE,   IF_11TO12, IF_11TO12, IF_11TO12, IF_11TO15},
+	/* 12 */{IF_12TO11, IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15},
+	/* 13 */{IF_12TO11, IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15},
+	/* 14 */{IF_12TO11, IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15},
+	/* 15 */{IF_15TO11, IF_15TO12, IF_15TO12, IF_15TO12, IF_NONE  },
 };
-GBLDEF unsigned int	jnl_source_datalen, jnl_dest_maxdatalen;
-GBLDEF unsigned char	jnl_source_rectype, jnl_dest_maxrectype;
+GBLREF unsigned int	jnl_source_datalen, jnl_dest_maxdatalen;
+GBLREF unsigned char	jnl_source_rectype, jnl_dest_maxrectype;
 GBLREF seq_num		seq_num_zero, seq_num_one;
 GBLREF int4		gv_keysize;
 GBLREF gv_key  		*gv_currkey; /* for jnl_extr_init() */
 GBLREF bool    		transform; /* for jnl_extr_init() */
+LITREF boolean_t	jrt_is_replicated[JRT_RECTYPES];
+LITREF int		jrt_update[JRT_RECTYPES];
 
 static	pid_t	repl_filter_pid = -1;
 static int 	repl_srv_filter_fd[2] = {-1, -1}, repl_filter_srv_fd[2] = {-1, -1};
 static FILE 	*repl_srv_filter_write_fp = NULL, *repl_srv_filter_read_fp = NULL, *repl_filter_srv_write_fp = NULL,
 		*repl_filter_srv_read_fp = NULL;
 static char 	*extract_buff;
-static char	extr_rec[MAX_EXTRACT_RECLEN];
-static char	tcom_rec[MAX_EXTRACT_RECLEN];
-static int	tcom_rec_len;
-static int	tcom_pre_jnlseqno;
-static int	tcom_post_jnlseqno;
+static char	*extr_rec;
 
-static struct
-{
-	jrec_prefix		prefix;
-	struct_jrec_null	null_rec;
-	jrec_suffix		suffix;
-} null_jnlrec;
+static struct_jrec_null	null_jnlrec;
 
-static struct
-{
-	jrec_prefix		prefix;
-	struct_jrec_tcom	tcom_rec;
-	jrec_suffix		suffix;
-} tcommit_jnlrec;
-
-static int		tcommit_jnlrec_len, null_jnlrec_len;
 static seq_num		save_jnl_seqno;
 static boolean_t	is_nontp, is_null;
 VMS_ONLY(int decc$set_child_standard_streams(int, int, int);)
@@ -105,8 +86,10 @@ void jnl_extr_init(void)
 {
 	/* Should be a non-filter related function. But for now,... Needs GBLREFs gv_currkey and transform */
 	transform = FALSE;      /* to avoid the assert in mval2subsc() */
+	gv_keysize = (MAX_KEY_SZ + MAX_NUM_SUBSC_LEN + 4) & (-4);
 	gv_currkey = (gv_key *)malloc(sizeof(gv_key) + gv_keysize);
-	gv_currkey->prev = gv_currkey->end = gv_currkey->top = gv_keysize;
+	gv_currkey->top = gv_keysize;
+	gv_currkey->prev = gv_currkey->end = 0;
 	gv_currkey->base[0] = '\0';
 }
 
@@ -216,12 +199,8 @@ int repl_filter_init(char *filter_cmd)
 		return(FILTERSTART_ERR);
 	}
 	argv[0] = arg_ptr;
-	for (argc = 1;
-	     NULL != (arg_ptr = strtok(NULL, FILTER_CMD_ARG_DELIM_TOKENS));
-	     argc++)
-	{
+	for (argc = 1; NULL != (arg_ptr = strtok(NULL, FILTER_CMD_ARG_DELIM_TOKENS)); argc++)
 		argv[argc] = arg_ptr;
-	}
 	argv[argc] = NULL;
 	REPL_DPRINT2("Arg %d is NULL\n", argc);
 #ifdef REPL_DEBUG
@@ -229,7 +208,7 @@ int repl_filter_init(char *filter_cmd)
 		int index;
 		for (index = 0; argv[index]; index++)
 		{
-			REPL_DPRINT4("Filter Arg %d : %s Len : %d\n", index, STR_AND_LEN(argv[index])));
+			REPL_DPRINT3("Filter Arg %d : %s\n", index, argv[index]);
 		}
 		REPL_DPRINT2("Filter argc %d\n", index);
 	}
@@ -241,29 +220,14 @@ int repl_filter_init(char *filter_cmd)
 			close(repl_srv_filter_fd[READ_END]);
 			close(repl_filter_srv_fd[WRITE_END]);
 		)
-		null_jnlrec_len = sizeof(null_jnlrec);
-		memset((char *)&null_jnlrec, 0, null_jnlrec_len);
+		memset((char *)&null_jnlrec, 0, NULL_RECLEN);
 		null_jnlrec.prefix.jrec_type = JRT_NULL;
-#ifdef REPL_FILTER_SENDS_INCMPL_TCOMMIT
-		tcommit_jnlrec_len = sizeof(tcommit_jnlrec);
-		memset((char *)&tcommit_jnlrec, 0, tcommit_jnlrec_len);
-		tcommit_jnlrec.prefix.jrec_type = JRT_TCOM;
-		tcommit_jnlrec.tcom_rec.participants = 1;
-		/* Convert tcommit_jnlrec into extr format and place it in tcom_rec. Place the length of tcom_rec in tcom_rec_len */
-		JNL_REC2EXTR_REC((jnl_record *)&tcommit_jnlrec, tcommit_jnlrec_len, tcom_rec);
-		tcom_rec_len = EXTRACT_REC_LENGTH(tcom_rec);
-		/* Parse tcom_rec to get the offset where jnl_seqno field is */
-		for (delim_count = 1, delim_p = &tcom_rec[0];
-		     delim_count < TCOM_EXTR_JNLSEQNO_FIELDNUM;
-		     delim_count++)
-		{
-			for (; *delim_p++ != JNL_EXTRACT_DELIM; );
-		}
-		tcom_pre_jnlseqno = delim_p - &tcom_rec[0] - 1;
-		for (; *delim_p++ != JNL_EXTRACT_DELIM; );
-		tcom_post_jnlseqno = delim_p - &tcom_rec[0] - 1;
-#endif
+		null_jnlrec.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+		null_jnlrec.prefix.forwptr = null_jnlrec.suffix.backptr = NULL_RECLEN;
+		assert(NULL == extr_rec);
 		jnl_extr_init();
+		extr_rec = malloc(ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE));
+		assert(MAX_EXTRACT_BUFSIZ > ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE));
 		extract_buff = malloc(MAX_EXTRACT_BUFSIZ);
 		return(SS_NORMAL);
 	}
@@ -317,10 +281,10 @@ static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len)
 
 	if (QWNE(tr_num, seq_num_zero))
 	{
-		is_nontp = (JRT_SET == (first_rectype = REF_CHAR(&((jnl_record *)tr)->jrec_type))
-				|| JRT_KILL == first_rectype || JRT_ZKILL == first_rectype);
+		first_rectype = ((jnl_record *)tr)->prefix.jrec_type;
+		is_nontp = !IS_FENCED(first_rectype);
 		is_null = (JRT_NULL == first_rectype);
-		QWASSIGN(save_jnl_seqno, get_jnl_seqno((jnl_record *)tr));
+		save_jnl_seqno = GET_REPL_JNL_SEQNO(tr);
 		if (NULL == (extr_end = jnl2extcvt((jnl_record *)tr, tr_len, extract_buff)))
 			GTMASSERT;
 		extr_len = extr_end - extract_buff;
@@ -381,23 +345,24 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len)
 	 * of filter. When more input is expected, and there is none available, server should check if the filter is alive. */
 	/* wait_for_filter_input(); */
 
+	assert(NULL != extr_rec);
 	/* First record should be TSTART or NULL */
-	FGETS(extr_rec, MAX_EXTRACT_RECLEN, repl_filter_srv_read_fp, fgets_res);
+	FGETS(extr_rec, ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE), repl_filter_srv_read_fp, fgets_res);
 	REPL_DPRINT3("Filter output for "INT8_FMT" : %s", INT8_PRINT(tr_num), extr_rec);
 	if (!('0' == extr_rec[0] && ('8' == extr_rec[1] || '0' == extr_rec[1])))
 		return (repl_errno = EREPL_FILTERBADCONV);
 	firstrec_len = strlen(extr_rec);
-	strcpy(extract_buff, extr_rec);
+	memcpy(extract_buff, extr_rec, firstrec_len + 1); /* + 1 to include the terminating '\0' */
 	extr_len = firstrec_len;
 	rec_cnt = 0;
 	if (!is_null && ('0' != extr_rec[0] || '0' != extr_rec[1]))
 	{
 		while ('0' != extr_rec[0] || '9' != extr_rec[1])
 		{
-			FGETS(extr_rec, MAX_EXTRACT_RECLEN, repl_filter_srv_read_fp, fgets_res);
+			FGETS(extr_rec, ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE), repl_filter_srv_read_fp, fgets_res);
 			REPL_DPRINT2("%s", extr_rec);
 			extr_reclen = strlen(extr_rec);
-			strcpy(extract_buff + extr_len, extr_rec);
+			memcpy(extract_buff + extr_len, extr_rec, extr_reclen);
 			extr_len += extr_reclen;
 			rec_cnt++;
 		}
@@ -414,55 +379,23 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len)
 				/* Eliminate the dummy TSTART */
 				extr_ptr = extract_buff + firstrec_len;
 				extr_len -= firstrec_len;
-			}
-#ifndef REPL_FILTER_SENDS_INCMPL_TCOMMIT
-			if (1 == rec_cnt)
-			{
 				/* Eliminate the dummy TCOMMIT */
-				extr_ptr[extr_len - tcom_len] = '\0';
+				/* extr_ptr[extr_len - tcom_len] = '\0'; ??? */
 				extr_len -= tcom_len;
 			}
-#else
-			/* Eliminate the dummy TCOMMIT */
-			extr_ptr[extr_len - tcom_len] = '\0';
-			extr_len -= tcom_len;
-			if (1 < rec_cnt)
-			{
-				/* A single SET or a KILL has been transformed into multiple SETs/KILLs. Create the appropriate
-				 * TCOMMIT record */
-				memcpy(extr_ptr + extr_len, tcom_rec, tcom_pre_jnlseqno);
-				extr_len += tcom_pre_jnlseqno;
-				seq_num_ptr = i2ascl(seq_num_str, save_jnl_seqno);
-				memcpy(extr_ptr + extr_len, seq_num_str, seq_num_ptr - &seq_num_str[0]);
-				extr_len += (seq_num_ptr - &seq_num_str[0]);
-				memcpy(extr_ptr + extr_len, tcom_rec + tcom_post_jnlseqno, tcom_rec_len - tcom_post_jnlseqno);
-				extr_len += (tcom_rec_len - tcom_post_jnlseqno);
-			}
-#endif
 		}
-		extr_ptr[extr_len] = '\0'; /* For safety */
+		extr_ptr[extr_len] = '\0';	/* For safety */
 		if (NULL == (tr_end = ext2jnlcvt(extr_ptr, extr_len, (jnl_record *)tr)))
 			return (repl_errno = EREPL_FILTERBADCONV);
 		*tr_len = tr_end - (char *)&tr[0];
-		if (!is_nontp || 1 < rec_cnt)
-		{
-			/* Fill in the rec_seqno field in TCOM */
-			((struct_jrec_tcom *)(tr + *tr_len - JREC_SUFFIX_SIZE - sizeof(struct_jrec_tcom)))->rec_seqno = rec_cnt;
-#ifndef REPL_FILTER_SENDS_INCMPL_TCOMMIT
-			if (is_nontp)
-			{
-				/* Fill in the jnl_seqno in TCOM */
-				QWASSIGN(((struct_jrec_tcom *)(tr + *tr_len - JREC_SUFFIX_SIZE -
-							       sizeof(struct_jrec_tcom)))->jnl_seqno, save_jnl_seqno);
-			}
-#endif
-		}
+		/* TCOM record for non TP converted to TP must have the same seqno as the original non TP record */
+		assert(!is_nontp || 1 == rec_cnt || QWEQ(save_jnl_seqno, ((struct_jrec_tcom *)tr_end)->token_seq.jnl_seqno));
 	} else /* 0 == rec_cnt */
-	{
-		/* Transaction filtered out, put a JRT_NULL record */
-		QWASSIGN(null_jnlrec.null_rec.jnl_seqno, save_jnl_seqno);
-		memcpy(tr, (char *)&null_jnlrec, null_jnlrec_len);
-		*tr_len = null_jnlrec_len;
+	{ /* Transaction filtered out, put a JRT_NULL record; the prefix.{pini_addr,time,tn} fields are not filled in as they are
+	   * not relevant on the secondary */
+		QWASSIGN(null_jnlrec.jnl_seqno, save_jnl_seqno);
+		memcpy(tr, (char *)&null_jnlrec, NULL_RECLEN);
+		*tr_len = NULL_RECLEN;
 	}
 	return(SS_NORMAL);
 }
@@ -522,4 +455,22 @@ void repl_filter_error(seq_num filter_seqno, int why)
 			GTMASSERT;
 	}
 	return;
+}
+
+void repl_check_jnlver_compat(void)
+{
+	error_def(ERR_UNIMPLOP);
+	error_def(ERR_TEXT);
+
+	/* On VMS, no customer has a pre V4.3-001 version running replication in production.
+	 * On Unix, effective V4.4-002, we stopped supporting dual site config with V4.1 versions.
+	 * Customers who want to run replication to upgrade to V4.3-001 (on VMS), V4.2 (on Unix).
+	 * We don't want to write/maintain internal filters to support rolling upgrades b/n pre
+	 * V4.3-001 (VMS), V4.2 (Unix) and contemporary releases.
+	 * Vinaya May 08, 2003 */
+	UNIX_ONLY(assert(JNL_VER_EARLIEST_REPL <= remote_jnl_ver);) /* remote must be V4.2+ */
+	VMS_ONLY(assert(V13_JNL_VER <= remote_jnl_ver);) /* remote must be V4.3+ */
+	if (VMS_ONLY(V13_JNL_VER) UNIX_ONLY(JNL_VER_EARLIEST_REPL) > remote_jnl_ver)
+		rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
+				LEN_AND_LIT("Dual site configuration not supported between these two GT.M versions"));
 }

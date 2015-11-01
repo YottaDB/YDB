@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@ void bt_refresh(sgmnt_addrs *csa)
 		insqt((que_ent_ptr_t)ptr, (que_ent_ptr_t)bt1);
 		insqt((que_ent_ptr_t)((sm_uc_ptr_t)ptr + (2 * sizeof(int4))), (que_ent_ptr_t)csa->th_base);
 	}
-	((th_rec *)((unsigned char *)csa->th_base + csa->th_base->tnque.fl))->tn = csa->ti->curr_tn - 1;
+	((th_rec *)((uchar_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn = csa->ti->curr_tn - 1;
 	csa->ti->mm_tn = 0;
 	return;
 }

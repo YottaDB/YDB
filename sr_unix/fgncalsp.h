@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,7 @@
 
 /* fgncalsp.h - UNIX foreign calls (d &package.label) */
 
-#define MAXIMUM_PARAMETERS	31	/* maximum number of parameters */
+#define MAXIMUM_PARAMETERS	32	/* maximum number of parameters allowed to be passed between C and M */
 #define MAX_NAME_LENGTH		255	/* maximum length of file name */
 #define PACKAGE_ENV_PREFIX	"GTMXC"	/* prefix for environemnt variable containing
 					   external call table name */
@@ -22,6 +22,9 @@
 #define MAX_ERRSTR_LEN		1024	/* maximum length of the error string returned
 					   by dlerror(). Couldn't find any system
 					   defined length, 1024 is just arbitrary */
+#define MAX_TABLINE_LEN		1024	/* maximum length of a line estimated to be sufficient
+					   to specify MAXIMUM_PARAMETERS parameters in the
+					   callin/xcall table */
 typedef int4	(*fgnfnc)();
 
 struct extcall_string

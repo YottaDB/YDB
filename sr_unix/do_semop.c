@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,17 +10,13 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <fcntl.h>
+
 #include <sys/ipc.h>
 #include <sys/sem.h>
-#ifdef __MVS__
 #include <errno.h>
-#else
-#include <sys/errno.h>
-#endif
-#include "do_semop.h"
+#include "gtm_fcntl.h"
 
-GBLREF int errno;
+#include "do_semop.h"
 
 /* perform one semop, returning errno if it was unsuccessful */
 int do_semop(int sems, int num, int op, int flg)
@@ -31,11 +27,10 @@ int do_semop(int sems, int num, int op, int flg)
 	sop.sem_num = num;
 	sop.sem_op = op;
 	sop.sem_flg = flg;
-	while ( (rv=semop(sems,&sop,1)) == -1 && errno == EINTR )
+	while (-1 == (rv = semop(sems, &sop, 1)) && EINTR == errno)
 		;
 
-	if (rv == -1)
-	{	return errno;
-	}
+	if (-1 == rv)
+		return errno;
 	return 0;
 }

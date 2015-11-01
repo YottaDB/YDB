@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@
 #else
 #error UNSUPPORTED PLATFORM
 #endif
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -40,20 +41,18 @@
 #include "gtmmsg.h"
 #include "min_max.h"
 
-/* Following two are estimates for allocating memory. These values might be higher than needed just to be safe. */
-#define KEY_BUFF_SIZE       512
-#define MAX_EXPAND_TIMES    7
-#define INTEG_ERROR_RETURN {									\
-			gtm_putmsg(VARLSTCNT(4) ERR_EXTRFAIL, 2, gn->str.len, gn->str.addr); 	\
-			return FALSE;								\
-	}
+#define INTEG_ERROR_RETURN 							\
+{										\
+	gtm_putmsg(VARLSTCNT(4) ERR_EXTRFAIL, 2, gn->str.len, gn->str.addr); 	\
+	return FALSE;								\
+}
 
-GBLREF bool		mu_ctrlc_occurred;
-GBLREF bool		mu_ctrly_occurred;
-GBLREF gv_key		*gv_currkey;
-GBLREF gv_namehead	*gv_target;
-GBLREF sgmnt_addrs      *cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
+GBLREF	bool			mu_ctrlc_occurred;
+GBLREF	bool			mu_ctrly_occurred;
+GBLREF	gv_key			*gv_currkey;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
 
 static readonly unsigned char gt_lit[] = "TOTAL";
 
@@ -83,12 +82,12 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 
 	op_gvname(VARLSTCNT(1) gn);	/* op_gvname() must be done before any usage of cs_addrs or, gv_currkey */
 	if (NULL == key_buffer)
-		key_buffer = (unsigned char *)malloc(KEY_BUFF_SIZE);
-	if (KEY_BUFF_SIZE + MAX_EXPAND_TIMES * cs_addrs->hdr->max_rec_size + 1 > max_zwr_len)
+		key_buffer = (unsigned char *)malloc(MAX_ZWR_KEY_SZ);
+	if (ZWR_EXP_RATIO(cs_addrs->hdr->max_rec_size) > max_zwr_len)
 	{
 		if (NULL != zwr_buffer)
 			free (zwr_buffer);
-		max_zwr_len = KEY_BUFF_SIZE + MAX_EXPAND_TIMES * cs_addrs->hdr->max_rec_size + 1;
+		max_zwr_len = ZWR_EXP_RATIO(cs_addrs->hdr->max_rec_size);
 		zwr_buffer = (unsigned char *)malloc(max_zwr_len);
 	}
 	assert(0 < cs_data->blk_size);
@@ -172,7 +171,7 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 				st->datalen = data_len;
 			if (MU_FMT_BINARY != format)
 			{
-				cp2 = (unsigned char *)format_targ_key(key_buffer, KEY_BUFF_SIZE, gv_currkey, TRUE);
+				cp2 = (unsigned char *)format_targ_key(key_buffer, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
 				fmtd_key_len = cp2 - key_buffer;
 				if (MU_FMT_ZWR == format)
 				{

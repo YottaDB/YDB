@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,6 @@ typedef struct backup_reg_list_struct
 #define DEFAULT_BKRS_TIMEOUT	30
 
 LITREF  mval            	mu_bin_datefmt;
-static  readonly mval   	null_str = {MV_STR, 0, 0 , 0 , 0, 0};
 
 
 bool backup_block(block_id blk, sm_uc_ptr_t blk_ptr);
