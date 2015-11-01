@@ -17,17 +17,23 @@ OC_BINDPARM:	irepl	val.2
 OC_BOOLFINI:	incl	val.1
 OC_BOOLINIT:	clrl	val.0
 OC_BREAK:	jsb	xfer.xf_break
-OC_CALL-BYTE:	jsb	xfer.xf_callb
+OC_CALL-BYTE:	pushab	val.2
+		jsb	xfer.xf_callb
 		brb	jmp.1
-OC_CALL-LONG:	jsb	xfer.xf_calll
+OC_CALL-LONG:	pushl	val.2
+		jsb	xfer.xf_calll
 		jmp	jmp.1
-OC_CALL-WORD:	jsb	xfer.xf_callw
+OC_CALL-WORD:	pushl	val.2
+		jsb	xfer.xf_callw
 		brw	jmp.1
-OC_CALLSP-BYTE:	jsb	xfer.xf_callspb
+OC_CALLSP-BYTE:	pushl	val.2
+		jsb	xfer.xf_callspb
 		brb	jmp.1
-OC_CALLSP-LONG:	jsb	xfer.xf_callspl
+OC_CALLSP-LONG:	pushl	val.2
+		jsb	xfer.xf_callspl
 		jmp	jmp.1
-OC_CALLSP-WORD:	jsb	xfer.xf_callspw
+OC_CALLSP-WORD:	pushl	val.2
+		jsb	xfer.xf_callspw
 		brw	jmp.1
 OC_CAT:		irepab	val.2
 		pushab	val.0
@@ -70,12 +76,14 @@ OC_EQU:		movab	val.2,r1
 		jsb	xfer.xf_equ
 OC_EQUNUL:	movab	val.1,r0
 		jsb	xfer.xf_equnul
-OC_EXCAL:	irepab	val.4
+OC_EXCAL:	irepab	val.5
+		pushl	val.4
 		pushl	val.3
 		pushl	val.2
 		pushl	#0
 		jsb	xfer.xf_exfun
-OC_EXFUN:	irepab	val.4
+OC_EXFUN:	irepab	val.5
+		pushl	val.4
 		pushl	val.3
 		pushl	val.2
 		pushab	val.0
@@ -379,11 +387,14 @@ OC_FORINIT:	pushab	val.3
 		pushab	val.2
 		pushab	val.1
 		jsb	xfer.xf_forinit
-OC_FORLCLDO-BYTE:	jsb	xfer.xf_forlcldob
+OC_FORLCLDO-BYTE:	pushl	val.2
+		jsb	xfer.xf_forlcldob
 		brb	jmp.1
-OC_FORLCLDO-LONG:	jsb	xfer.xf_forlcldol
+OC_FORLCLDO-LONG:	pushl val.2
+		jsb	xfer.xf_forlcldol
 		jmp	jmp.1
-OC_FORLCLDO-WORD:	jsb	xfer.xf_forlcldow
+OC_FORLCLDO-WORD:	pushl val.2
+		jsb	xfer.xf_forlcldow
 		brw	jmp.1
 OC_FORLOOP-BYTE:jsb	xfer.xf_restartpc
 		pushab	jmp.1

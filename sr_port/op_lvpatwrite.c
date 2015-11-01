@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 
 #include "gtm_string.h"
 
+#include "error.h"
 #include "mlkdef.h"
 #include "zshow.h"
 #include "compiler.h"
@@ -25,22 +26,27 @@
 #include <varargs.h>
 #include "op.h"
 #include "mvalconv.h"
+#include "gtm_maxstr.h"
 
 void op_lvpatwrite(va_alist)
 va_dcl
 {
 	va_list		var;
-	bool		flag;
+	bool		flag, local_buff;
 	int4		count, arg1, arg2;
 	mval		*mv;
 	zshow_out	output, *out;
-	char		buff[MAX_STRLEN];
+	MAXSTR_BUFF_DECL(buff);
 
 	VAR_START(var);
 	count = va_arg(var, int4);
 	arg1 = va_arg(var, int4);
+	local_buff = FALSE;
 	if (!arg1)
-	{	memset(&output, 0, sizeof(output));
+	{
+		local_buff = TRUE;
+		MAXSTR_BUFF_INIT;
+		memset(&output, 0, sizeof(output));
 		output.code = 'V';
 		output.type = ZSHOW_DEVICE;
 		output.buff = &buff[0];
@@ -61,6 +67,8 @@ va_dcl
 			lvzwr_arg(flag, (mval *)0, (mval *)0);
 		case ZWRITE_END:
 			lvzwr_fini(out,flag);
+			if (local_buff)
+				MAXSTR_BUFF_FINI;
 			return;
 			break;
 		case ZWRITE_ALL:
@@ -89,4 +97,6 @@ va_dcl
 			break;
 		}
 	}
+	if (local_buff)
+		MAXSTR_BUFF_FINI;
 }

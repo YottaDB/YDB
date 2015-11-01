@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,9 +98,11 @@ boolean_t gtcm_protocol_match(protocol_msg *peer, protocol_msg *me)
 
 static char *encode_cpu()
 {
-	char *p = gtm_release_name;
-	int count = 0, cpuidx;
+	unsigned char	*p;
+	int		count, cpuidx;
 
+	count = 0;
+	p = (unsigned char *)gtm_release_name;
 	/* fourth arg in release name string */
 	while (*p && count < 3)
 	{
@@ -112,7 +114,7 @@ static char *encode_cpu()
 	{
 		for (cpuidx = 0; cpuidx < sizeof(gtcm_proto_cpu_info)/sizeof(gtcm_proto_cpu_info_t) - 1; cpuidx++)
 		{
-			if (0 == memcmp(p, gtcm_proto_cpu_info[cpuidx].cpu_in_rel_str, 
+			if (0 == memcmp(p, gtcm_proto_cpu_info[cpuidx].cpu_in_rel_str,
 						gtcm_proto_cpu_info[cpuidx].size_of_cpu_in_rel_str))
 				return gtcm_proto_cpu_info[cpuidx].proto_cpu;
 		}
@@ -122,9 +124,11 @@ static char *encode_cpu()
 
 static char *encode_os()
 {
-	char *p = gtm_release_name;
-	int count = 0, osidx;
+	unsigned char	*p;
+	int		count, osidx;
 
+	count = 0;
+	p = (unsigned char *)gtm_release_name;
 	/* third arg in release name string */
 	while (*p && count < 2)
 	{
@@ -136,7 +140,7 @@ static char *encode_os()
 	{
 		for (osidx = 0; osidx < sizeof(gtcm_proto_os_info)/sizeof(gtcm_proto_os_info_t) - 1; osidx++)
 		{
-			if (0 == memcmp(p, gtcm_proto_os_info[osidx].os_in_rel_str, 
+			if (0 == memcmp(p, gtcm_proto_os_info[osidx].os_in_rel_str,
 						gtcm_proto_os_info[osidx].size_of_os_in_rel_str))
 				return gtcm_proto_os_info[osidx].proto_os;
 		}

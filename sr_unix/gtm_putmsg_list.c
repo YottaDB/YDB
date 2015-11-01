@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,8 +48,8 @@ void gtm_putmsg_list(va_list var)
 	char		msg_buffer[1024];
 	mstr		msg_string;
 	boolean_t	first_error;
-	err_msg		*msg;
-	err_ctl		*ctl;
+	const err_msg	*msg;
+	const err_ctl	*ctl;
 
 	arg_count = va_arg(var, int);
 	assert(0 < arg_count);

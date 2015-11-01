@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,13 +32,14 @@ GBLREF list_params lst_param;
 GBLREF char rev_time_buf[20];
 static char print_time_buf[20];
 static io_pair dev_in_use;
-static readonly struct{
+static readonly struct
+{
 	unsigned char	newversion;
 	unsigned char	wrap;
 	unsigned char	width;
 	unsigned char	v_width[2];
 	unsigned char	eol;
-}open_params_list = {
+} open_params_list = {
 	(unsigned char)iop_newversion,	(unsigned char)iop_wrap,
 #ifdef BIGENDIAN
 	(unsigned char)iop_recordsize,	(unsigned char)0, (unsigned char)132,
@@ -74,17 +75,16 @@ void open_list_file(void)
 	fstr.len = (MV_DEFINED(&cmd_qlf.list_file) ? cmd_qlf.list_file.str.len : 0);
 	fstr.addr = cmd_qlf.list_file.str.addr;
 	if (!(status = parse_file(&fstr, &pblk)) & 1)
-	{	rts_error(VARLSTCNT(1) status);
-	}
+		rts_error(VARLSTCNT(1) status);
 
 	file.mvtype = parms.mvtype = MV_STR;
 	file.str.len = pblk.b_esl;
 	file.str.addr = &fname[0];
 	parms.str.len = sizeof(open_params_list);
-	parms.str.addr = (char*)&open_params_list;
+	parms.str.addr = (char *)&open_params_list;
 	(*op_open_ptr)(&file, &parms, 30, 0);
 	parms.str.len = 1;
-	charspace = (char) iop_eol;
+	charspace = (char)iop_eol;
 	parms.str.addr = &charspace;
 	dev_in_use = io_curr_device;
 	op_use(&file,&parms);
@@ -130,7 +130,7 @@ void list_cmd(void)
 
 
 LITDEF char gtm_copy_right[] = "\
-  Copyright 1985, 2002 Sanchez Computer Associates, Inc.";
+  Copyright 1985, 2003 Sanchez Computer Associates, Inc.";
 
 LITREF char gtm_release_name[];
 LITREF int4 gtm_release_name_len;
@@ -150,11 +150,11 @@ void list_head(bool newpage)
 		op_wtff();
 
 	head.mvtype = MV_STR;
-	head.str.addr = &gtm_release_name[0];
+	head.str.addr = (char *)&gtm_release_name[0];
 	head.str.len = gtm_release_name_len;
 	op_write (&head);
 
-	head.str.addr = &gtm_copy_right[0];
+	head.str.addr = (char *)&gtm_copy_right[0];
 	head.str.len = sizeof(gtm_copy_right) - 1;
 	op_write (&head);
 
@@ -165,11 +165,11 @@ void list_head(bool newpage)
 
 	op_wttab(100);
 	lst_param.page++;
-	head.str.addr = (char*)page_lit;
+	head.str.addr = (char *)page_lit;
 	head.str.len = sizeof(page_lit) - 1;
 	op_write(&head);
 
-	head.str.addr = (char*)page_no_buf;
+	head.str.addr = (char *)page_no_buf;
 	head.str.len = i2asc(page_no_buf, lst_param.page) - page_no_buf;
 	op_write(&head);
 	op_wteol(1);
@@ -197,7 +197,7 @@ void list_line(char *c)
 	mval out;
 
 	if (io_curr_device.out->dollar.y >= lst_param.lines_per_page -
-	 ((lst_param.lines_per_page < BIG_PG) ? SMALL_PG_BOT_SP : BIG_PG_BOT_SP))
+	    ((lst_param.lines_per_page < BIG_PG) ? SMALL_PG_BOT_SP : BIG_PG_BOT_SP))
 		list_head(1);
 
 	out.mvtype = MV_STR;
@@ -224,8 +224,7 @@ void list_line(char *c)
 	{
 		assert(n > 0);
 		op_wteol(n);
-	}
-	else
+	} else
 		op_wteol(lst_param.space);
 }
 
@@ -238,7 +237,7 @@ void list_line_number(void)
 
 	assert(cmd_qlf.qlf & CQ_LIST);
 	if (io_curr_device.out->dollar.y >= lst_param.lines_per_page -
-	 ((lst_param.lines_per_page < BIG_PG) ? SMALL_PG_BOT_SP : BIG_PG_BOT_SP))
+	    ((lst_param.lines_per_page < BIG_PG) ? SMALL_PG_BOT_SP : BIG_PG_BOT_SP))
 		list_head(1);
 
 	n = lst_param.list_line++;
@@ -261,7 +260,7 @@ void list_line_number(void)
 void list_chkpage(void)
 {
 	if (io_curr_device.out->dollar.y >= lst_param.lines_per_page -
-	 ((lst_param.lines_per_page < BIG_PG) ? SMALL_PG_BOT_SP : BIG_PG_BOT_SP))
+	    ((lst_param.lines_per_page < BIG_PG) ? SMALL_PG_BOT_SP : BIG_PG_BOT_SP))
 		list_head(1);
 }
 

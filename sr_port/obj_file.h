@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,11 +23,4 @@ void drop_object_file(void);
 void close_object_file(void);
 void create_object_file(rhdtyp *rhead);
 void obj_init(void);
-USHBIN_ONLY(
-	void comp_linkages(void);
-	void resolve_sym (void);
-	void output_relocation (void);
-	void output_symbol (void);
-)
-
 #endif

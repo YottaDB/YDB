@@ -282,7 +282,7 @@ void op_svget(int varnum, mval *v)
 		break;
 	case SV_ZVERSION:
 		v->mvtype = MV_STR;
-		v->str.addr = &gtm_release_name[0];
+		v->str.addr = (char *)&gtm_release_name[0];
 		v->str.len = gtm_release_name_len;
 		break;
 	case SV_ZSYSTEM:

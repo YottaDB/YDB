@@ -67,7 +67,6 @@ GBLREF bool		zdefactive;
 GBLREF unsigned short	zdefbufsiz;
 GBLREF int4		break_message_mask;
 GBLREF collseq		*local_collseq;
-GBLREF char		*lcl_coll_xform_buff;
 GBLREF command_qualifier cmd_qlf, glb_cmd_qlf;
 GBLREF gd_addr		*gd_header;
 GBLREF gd_region	*gv_cur_region;
@@ -362,15 +361,15 @@ va_dcl
 			if (0 == new_lcl_collseq)
 				rts_error(VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
 			local_collseq = new_lcl_collseq;
-			if (NULL == lcl_coll_xform_buff)
-				lcl_coll_xform_buff = (char *)malloc(MAX_LCL_COLL_XFORM_BUFSIZ);
 		} else
 		{
 			local_collseq = 0;
 			if (NULL != lcl_coll_xform_buff)
 			{
+				assert(0 < max_lcl_coll_xform_bufsiz);
 				free(lcl_coll_xform_buff);
 				lcl_coll_xform_buff = NULL;
+				max_lcl_coll_xform_bufsiz = 0;
 			}
 		}
 		break;

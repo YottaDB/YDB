@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 
 #include "gtm_string.h"
 
+#include "error.h"
 #include "hashdef.h"
 #include "lv_val.h"
 #include "mlkdef.h"
@@ -24,18 +25,20 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "gtm_maxstr.h"
 
 GBLREF gv_key *gv_currkey;
 
 void op_zshow(mval *func,int type,lv_val *lvn)
 {
 	static readonly char all[]="IVBDLSC";
-	char		buff[MAX_STRLEN], *ptr;
+	char		*ptr;
 	bool		do_all=FALSE,done_s=FALSE,done_b=FALSE,done_d=FALSE,done_v=FALSE,done_l=FALSE,
 			done_c=FALSE, done_i=FALSE;
 	int		i;
   	zshow_out	output;
 	error_def(ERR_ZSHOWBADFUNC);
+	MAXSTR_BUFF_DECL(buff);
 
 	MV_FORCE_STR(func);
 	for (i = 0, ptr = func->str.addr; i < func->str.len; i++, ptr++)
@@ -76,6 +79,7 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 	{	output.out_var.gv.end = gv_currkey->end;
 		output.out_var.gv.prev = gv_currkey->prev;
 	}
+	MAXSTR_BUFF_INIT;
 	output.type = type;
 	output.buff = &buff[0];
 	output.ptr = output.buff;
@@ -143,5 +147,5 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 	output.code = 0;
 	output.flush = TRUE;
 	zshow_output(&output,0);
-	return;
+	MAXSTR_BUFF_FINI;
 }

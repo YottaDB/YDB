@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,19 +30,19 @@ LITREF mval literal_zero;
 
 void op_exp(mval *u, mval* v, mval *p)
 {
-mval u1;
-double accuracy;
-double x, x1, y, z, z2, z3, z4, z5, id, il;
+	mval 	u1;
+	double 	accuracy;
+	double 	x, x1, y, z, z2, z3, z4, z5, id, il;
 #ifndef UNIX
-double pow();
+	double 	pow();
 #endif
-int im0, im1, ie, i, j, j1;
-bool fraction = FALSE, in = FALSE;
-bool neg = FALSE, change_sn = FALSE, even = TRUE;
-        mval            w, zmv;
-        int4            n, n1;
+	int	 im0, im1, ie, i, j, j1;
+	bool 	fraction = FALSE, in = FALSE;
+	bool 	neg = FALSE, change_sn = FALSE, even = TRUE;
+        mval    w, zmv;
+        int4    n, n1;
 #ifdef UNIX
-	double infinity, np = 20, inf = 9999999999999999.0;
+	double	infinity, np = 20, inf = 9999999999999999.0;
 #endif
 
 	error_def(ERR_NUMOFLOW);
@@ -74,8 +74,7 @@ bool neg = FALSE, change_sn = FALSE, even = TRUE;
                 		*p = literal_zero;
 		                return;
 			}
-        	}
-		else if (u1.m[1] == 0 && u1.m[0] == 0)
+        	} else if (u1.m[1] == 0 && u1.m[0] == 0)
 		{
 			*p = literal_zero;
 			return;
@@ -90,12 +89,10 @@ bool neg = FALSE, change_sn = FALSE, even = TRUE;
                         }
                         if (n1 < 0)
                         {
-                                op_div(&literal_one, &u1, &w);
+                                op_div((mval *)&literal_one, &u1, &w);
                                 n1 = -n1;
-                        }
-                        else
-                        {       w = u1;
-                        }
+                        } else
+				w = u1;
                         zmv = literal_one;
                         for ( ; ; )
                         {
@@ -108,8 +105,7 @@ bool neg = FALSE, change_sn = FALSE, even = TRUE;
                         }
                         *p = zmv;
                         return;
-                }
-                else
+                } else
                 {
 			if ((u1.mvtype & MV_INT) != 0)
 			{
@@ -118,8 +114,7 @@ bool neg = FALSE, change_sn = FALSE, even = TRUE;
                                 	rts_error(VARLSTCNT(1) ERR_NEGFRACPWR);
                                 	return;
                         	}
-			}
-			else
+			} else
 			{
 				if (u1.sgn)
 				{
@@ -128,8 +123,7 @@ bool neg = FALSE, change_sn = FALSE, even = TRUE;
 				}
 			}
                 }
-        }
-	else
+        } else
 	{
 	        if ((u1.mvtype & MV_INT) != 0)
         	{
@@ -143,8 +137,7 @@ bool neg = FALSE, change_sn = FALSE, even = TRUE;
 				*p = literal_zero;
 				return;
 			}
-        	}
-	        else if (u1.sgn)
+        	} else if (u1.sgn)
         	{
                 	u1.sgn = 0;
 	                neg = TRUE;
@@ -167,8 +160,7 @@ bool neg = FALSE, change_sn = FALSE, even = TRUE;
 					else
 						if ((i = im1 % (2 * j)) != 0)
 							even = FALSE;
-				}
-				else
+				} else
 				{
 					im0 = v->m[0];
 					if (ie == NUM_DEC_DG_1L)
@@ -178,11 +170,9 @@ bool neg = FALSE, change_sn = FALSE, even = TRUE;
 							im1 = v->m[1];
 							if ((i = im1 % 2) != 0)
 								even = FALSE;
-						}
-						else
+						} else
 							fraction = TRUE;
-					}
-					else
+					} else
 					{
 						for (i=1,j=10; i < NUM_DEC_DG_2L - ie; j *= 10, i++);
 						im0 = v->m[0];
@@ -190,16 +180,13 @@ bool neg = FALSE, change_sn = FALSE, even = TRUE;
 						{
 							if ((i = im0 % (2 * j)) != 0)
 								even = FALSE;
-						}
-						else
+						} else
 							fraction = TRUE;
 					}
 				}
-			}
-			else
+			} else
 				fraction = TRUE;
-		}
-		else
+		} else
 		{
 			if (ie == NUM_DEC_DG_2L)
 			{
@@ -215,8 +202,7 @@ bool neg = FALSE, change_sn = FALSE, even = TRUE;
 				if (!even)
 					change_sn = TRUE;
 			}
-		}
-		else
+		} else
 		{
 			if (neg)
 			{
@@ -247,8 +233,7 @@ bool neg = FALSE, change_sn = FALSE, even = TRUE;
 	{
 		z = -z;
 		p->sgn = 1;
-	}
-	else
+	} else
 		p->sgn = 0;
 
 	if (z == 0)
@@ -373,8 +358,7 @@ bool neg = FALSE, change_sn = FALSE, even = TRUE;
 		{
 			j1 = NUM_DEC_DG_2L - j;
 			for (i = 0,z2 = z; i < j1; z2 *= 10,i++);
-		}
-		else
+		} else
 		{
 			if (j == NUM_DEC_DG_2L)
 				z2 = z;

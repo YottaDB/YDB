@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,29 +21,29 @@
 #include "mvalconv.h"
 #include "underr.h"
 
-LITREF	mval SBS_MVAL_INT_ELE;
+LITREF	mval 	SBS_MVAL_INT_ELE;
 
-GBLREF collseq		*local_collseq;
-GBLREF char		*lcl_coll_xform_buff;
+GBLREF collseq	*local_collseq;
 
 void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 {
 	int		cur_subscr;
 	mval		tmp_sbs;
 	int             length;
-	sbs_blk			*num, *str;
-	bool			found;
-	int4			i;
-	lv_val			**lvpp;
-	lv_sbs_tbl		*tbl;
-	mstr			*strp;
-	mflt			*fltp;
+	sbs_blk		*num, *str;
+	boolean_t	found;
+	int4		i;
+	lv_val		**lvpp;
+	lv_sbs_tbl	*tbl;
+	mstr		*strp;
+	mflt		*fltp;
 
 	found = FALSE;
 	if (src)
 	{
 		if (tbl = src->ptrs.val_ent.children)
-		{	MV_FORCE_DEFINED(key);
+		{
+			MV_FORCE_DEFINED(key);
 			num = tbl->num;
 			str = tbl->str;
 			assert (tbl->ident == MV_SBS);
@@ -57,15 +57,15 @@ void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 					dst->str = str->ptr.sbs_str[str->cnt - 1].str;
 					found = TRUE;
 				}
-			}
-			else
+			} else
 			{
 				if (!MV_IS_CANONICAL(key))
 				{
 					if (local_collseq)
 					{
+						ALLOC_XFORM_BUFF(&key->str);
 						tmp_sbs.mvtype = MV_STR;
-						tmp_sbs.str.len = MAX_LCL_COLL_XFORM_BUFSIZ;
+						tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 						assert(NULL != lcl_coll_xform_buff);
 						tmp_sbs.str.addr = lcl_coll_xform_buff;
 						do_xform(local_collseq->xform, &key->str, &tmp_sbs.str, &length);
@@ -79,8 +79,7 @@ void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 						dst->mvtype = MV_STR;
 						found = TRUE;
 					}
-				}
-				else
+				} else
 				{	MV_FORCE_NUM(key);
 					if (!tbl->int_flag)
 					{
@@ -89,19 +88,18 @@ void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 							MV_ASGN_FLT2MVAL((*dst),(*fltp)) ;
 							found = TRUE;
 						}
-					}
-					else
+					} else
 					{
 						assert (num);
 						if ( key->m[1] > 0 )
 						{
-							if (numcmp(key,&SBS_MVAL_INT_ELE)==1)
+							if (1 == numcmp(key, (mval *)&SBS_MVAL_INT_ELE))
 								i = SBS_NUM_INT_ELE;
 							else
-								{
+							{
 								i = MV_FORCE_INT(key) ;
 								if (!MV_IS_INT(key)) i++;
-								}
+							}
 							for (lvpp = &num->ptr.lv[i]; 0 <= --i && !*--lvpp; );
 							if (0 <= i)
 							{
@@ -126,8 +124,7 @@ void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 					while (num->nxt) num = num->nxt;
 					MV_ASGN_FLT2MVAL((*dst),num->ptr.sbs_flt[num->cnt - 1].flt) ;
 					found = TRUE;
-				}
-				else
+				} else
 				{
 					for (i = SBS_NUM_INT_ELE, lvpp = &num->ptr.lv[SBS_NUM_INT_ELE];
 						(--i, num->ptr.lv <= --lvpp) && !*lvpp; );
@@ -146,9 +143,10 @@ void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 		dst->str.len = 0;
 	} else if (dst->mvtype == MV_STR && local_collseq)
 	{
+		ALLOC_XFORM_BUFF(&dst->str);
 		assert(NULL != lcl_coll_xform_buff);
 		tmp_sbs.str.addr = lcl_coll_xform_buff;
-		tmp_sbs.str.len = MAX_LCL_COLL_XFORM_BUFSIZ;
+		tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 		do_xform(local_collseq->xback, &dst->str, &tmp_sbs.str, &length);
 		tmp_sbs.str.len = length;
 		s2pool(&(tmp_sbs.str));

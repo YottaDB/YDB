@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,10 +20,9 @@
 #include "mvalconv.h"
 #include "underr.h"
 
-LITREF	mval SBS_MVAL_INT_ELE;
+LITREF	mval	SBS_MVAL_INT_ELE;
 
-GBLREF collseq		*local_collseq;
-GBLREF char		*lcl_coll_xform_buff;
+GBLREF collseq	*local_collseq;
 
 void op_fnorder(lv_val *src,mval *key,mval *dst)
 {
@@ -31,7 +30,7 @@ void op_fnorder(lv_val *src,mval *key,mval *dst)
 	mval			tmp_sbs;
 	int             	length;
 	sbs_blk			*num, *str;
-	bool			found, is_neg;
+	boolean_t		found, is_neg;
 	int4			i;
 	lv_val			**lv;
 	lv_sbs_tbl		*tbl;
@@ -39,66 +38,75 @@ void op_fnorder(lv_val *src,mval *key,mval *dst)
 
 	found = FALSE;
 	if (src)
-	{	if (tbl = src->ptrs.val_ent.children)
-		{	MV_FORCE_DEFINED(key);
+	{
+		if (tbl = src->ptrs.val_ent.children)
+		{
+			MV_FORCE_DEFINED(key);
 			num = tbl->num;
 			str = tbl->str;
 			assert(tbl->ident == MV_SBS);
 			if (MV_IS_STRING(key) && key->str.len == 0)
-			{	if (tbl->int_flag)
-				{	assert(num);
+			{
+				if (tbl->int_flag)
+				{
+					assert(num);
 					for (i = 0, lv = &num->ptr.lv[0]; i < SBS_NUM_INT_ELE; i++, lv++)
-					{	if (*lv)
-						{	MV_FORCE_MVAL(dst,i);
+					{
+						if (*lv)
+						{
+							MV_FORCE_MVAL(dst,i);
 							found = TRUE;
 							break;
 						}
 					}
-				}
-				else if (num)
-				{	assert(num->cnt);
+				} else if (num)
+				{
+					assert(num->cnt);
 					MV_ASGN_FLT2MVAL((*dst),num->ptr.sbs_flt[0].flt);
 					found = TRUE;
 				}
-			}
-			else
+			} else
 			{
 				if (MV_IS_CANONICAL(key))
-				{	MV_FORCE_NUM(key);
+				{
+					MV_FORCE_NUM(key);
 					if (tbl->int_flag)
-					{	assert(num);
+					{
+						assert(num);
 						is_neg = (key->mvtype & MV_INT) ? key->m[1] < 0 : key->sgn;
 						if (is_neg)
 							i = 0;
 						else
 						{
-							if (numcmp(key,&SBS_MVAL_INT_ELE)==1)
+							if (1 == numcmp(key, (mval *)&SBS_MVAL_INT_ELE))
 								i = SBS_NUM_INT_ELE;
 							   else
-								{i =  MV_FORCE_INT(key);
-								 i++;
-								}
+							   {
+								   i =  MV_FORCE_INT(key);
+								   i++;
+							   }
 						}
 						for (lv = &num->ptr.lv[i]; i < SBS_NUM_INT_ELE; i++, lv++)
-						{	if (*lv)
-							{	MV_FORCE_MVAL(dst,i);
+						{
+							if (*lv)
+							{
+								MV_FORCE_MVAL(dst,i);
 								found = TRUE;
 								break;
 							}
 						}
-					}
-					else if (num && lv_nxt_num_inx(num, key, &status))
+					} else if (num && lv_nxt_num_inx(num, key, &status))
 					{
 						MV_ASGN_FLT2MVAL((*dst),((sbs_flt_struct*)status.ptr)->flt);
 						found = TRUE;
 					}
-				}
-				else
+				} else
 				{
 					if (local_collseq)
 					{
+						ALLOC_XFORM_BUFF(&key->str);
 						tmp_sbs.mvtype = MV_STR;
-						tmp_sbs.str.len = MAX_LCL_COLL_XFORM_BUFSIZ;
+						tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 						assert(NULL != lcl_coll_xform_buff);
 						tmp_sbs.str.addr = lcl_coll_xform_buff;
 						do_xform(local_collseq->xform, &key->str, &tmp_sbs.str, &length);
@@ -107,9 +115,7 @@ void op_fnorder(lv_val *src,mval *key,mval *dst)
 						key = &tmp_sbs;
 					}
 					if (str && lv_nxt_str_inx(str, &key->str, &status))
-				 	{
 						dst->str = ((sbs_str_struct*)status.ptr)->str;
-					}
 					else
 						dst->str.len = 0;
 					dst->mvtype = MV_STR;
@@ -117,7 +123,8 @@ void op_fnorder(lv_val *src,mval *key,mval *dst)
 				}
 			}
 			if (!found && str)
-			{	assert(str->cnt);
+			{
+				assert(str->cnt);
 				dst->mvtype = MV_STR;
 				dst->str = str->ptr.sbs_str[0].str;
 				found = TRUE;
@@ -125,13 +132,15 @@ void op_fnorder(lv_val *src,mval *key,mval *dst)
 		}
 	}
 	if (!found)
-	{	dst->mvtype = MV_STR;
+	{
+		dst->mvtype = MV_STR;
 		dst->str.len = 0;
 	} else if (dst->mvtype == MV_STR && local_collseq)
 	{
+		ALLOC_XFORM_BUFF(&dst->str);
 		assert(NULL != lcl_coll_xform_buff);
 		tmp_sbs.str.addr = lcl_coll_xform_buff;
-		tmp_sbs.str.len = MAX_LCL_COLL_XFORM_BUFSIZ;
+		tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 		do_xform(local_collseq->xback,
 			&dst->str,
 			&tmp_sbs.str,

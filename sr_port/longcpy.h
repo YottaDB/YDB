@@ -12,6 +12,19 @@
 #ifndef LONGCPY_INCLUDED
 #define LONGCPY_INCLUDED
 
+/* 
+
+To be one day eliminated when usage is totally replaced by the memcpy
+calls it should be calling now instead. Since this is a stop-gap measure,
+it is ok that this include pulls in gtm_string.h if necessary.
+
 void longcpy(uchar_ptr_t a, uchar_ptr_t b, int4 len);
+
+ */
+
+#ifndef GTM_STRINGH
+#  include "gtm_string.h"
+#endif
+#define longcpy(dst, src, len) memcpy(dst, src, len)
 
 #endif /* LONGCPY_INCLUDED */

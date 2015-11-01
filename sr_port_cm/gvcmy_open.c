@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -101,9 +101,9 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	task1.addr = (char *)lbuff;
 	task1.len = node.len + GTCM_ENVVAR_PFXLEN;
 	lbuff[task1.len] = '\0';
-	task2.addr = buff;
+	task2.addr = (char *)buff;
 	task2.len = 0;
-	if (NULL != (trans_name = GETENV(lbuff)))
+	if (NULL != (trans_name = GETENV((const char *)lbuff)))
 	{
 		status = SS_NORMAL;
 		task2.len = strlen(trans_name);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,10 @@ GBLDEF	char		*lcl_coll_xform_buff; /* This buffer is meant to be
 					       * itself. This kind of nesting
 					       * will cause the buffer to be
 					       * overwritten */
+
+/* The max size of the local collation buffer that will be extended from 32K each time the buffer overflows */
+GBLDEF	int		max_lcl_coll_xform_bufsiz;
+
 GBLDEF	collseq		*collseq_list = (collseq*)0;
 GBLDEF  bool		transform;
 

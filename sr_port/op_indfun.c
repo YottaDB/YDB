@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,7 @@
 #include "cache.h"
 #include "op.h"
 
-LITREF int (*indir_fcn[])();
+UNIX_ONLY(GBLREF) VMS_ONLY(LITREF) int (*indir_fcn[])();
 GBLREF mval **ind_result_sp, **ind_result_top;
 
 #define INDIR(a, b, c) c

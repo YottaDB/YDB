@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,15 +9,18 @@
  *								*
  ****************************************************************/
 
+#ifndef GTM_DESCRIPT_INCLUDED
+#define GTM_DESCRIPT_INCLUDED
+
 /* copyright */
 int mumps_call();
 
 
 typedef struct  {
-	short	len;
+	int	len;
+	void	*val;
 	short 	type;
-	void	* val;
-}gtm_descriptor;
+} gtm_descriptor;
 
 
 /* legal types */
@@ -59,3 +62,4 @@ typedef struct  {
 #define DESC_LONG(x,y) {x.type=GTM_LONG; x.len=sizeof(y); x.val=&y;}
 #define DESC_DELIM(x,y) {x.type=GTM_DELIMITER;x.len=sizeof(y);x.val=(void *)&y;}
 
+#endif

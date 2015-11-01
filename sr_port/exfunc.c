@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,7 @@ GBLREF char	window_token;
 
 int exfunc (oprtype *a)
 {
-	triple		*ref0, *calltrip, *masktrip, *counttrip,*funret;
+	triple		*ref0, *calltrip, *masktrip, *counttrip, *funret, *tripsize;
 	triple		*triptr;
 	triple		tmpchain, *oldchain, *obp, *routineref, *labelref;
 	error_def	(ERR_ACTOFFSET);
@@ -39,7 +39,11 @@ int exfunc (oprtype *a)
 	if (calltrip->opcode == OC_EXFUN)
 	{
 		assert(calltrip->operand[0].oprclass == MLAB_REF);
-		ref0 = calltrip;
+		ref0 = newtriple(OC_PARAMETER);
+		ref0->operand[0] = put_tsiz();		/* Need size of following code gen triple here */
+		calltrip->operand[1] = put_tref(ref0);
+		tripsize = ref0->operand[0].oprval.tref;
+		assert(OC_TRIPSIZE == tripsize->opcode);
 	}
 	else
 	{
@@ -114,6 +118,7 @@ int exfunc (oprtype *a)
 		triptr = newtriple (OC_JMP);
 		triptr->operand[0] = put_mfun (&calltrip->operand[0].oprval.lab->mvname);
 		calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
+		tripsize->operand[0].oprval.tsize->ct = triptr;
 	}
 
 	funret = newtriple (OC_EXFUNRET);

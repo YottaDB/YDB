@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,6 @@ GBLREF spdesc		stringpool;
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 GBLREF collseq		*local_collseq;
-GBLREF char		*lcl_coll_xform_buff;
 
 void op_fnquery (va_alist)
 va_dcl
@@ -127,6 +126,7 @@ va_dcl
 			{	/* is_string */
 				if (local_collseq)
 				{
+					ALLOC_XFORM_BUFF(&(*argpp)->str);
 					/* D9607-258 changed xback to xform and added
 					   xform_args[] to hold mval pointing to
 					   xform'd subscript which is in pool space.
@@ -134,7 +134,7 @@ va_dcl
 					   overwritten if >1 alpha subscripts */
 					assert(NULL != lcl_coll_xform_buff);
 					tmp_sbs.str.addr = lcl_coll_xform_buff;
-					tmp_sbs.str.len = MAX_LCL_COLL_XFORM_BUFSIZ;
+					tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 					/* KMK subscript index is i+1 */
 					do_xform(local_collseq->xform /* was xback */,
 						 &(*argpp)->str, &tmp_sbs.str,
@@ -293,9 +293,10 @@ va_dcl
 				v2->mvtype = MV_STR;
 				if (local_collseq)
 				{
+					ALLOC_XFORM_BUFF(&h2->addr.str->str);
 					assert(NULL != lcl_coll_xform_buff);
 					tmp_sbs.str.addr = lcl_coll_xform_buff;
-					tmp_sbs.str.len = MAX_LCL_COLL_XFORM_BUFSIZ;
+					tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 					do_xform(local_collseq->xback, &h2->addr.str->str, &tmp_sbs.str, &length);
 					tmp_sbs.str.len = length;
 					v2->str = tmp_sbs.str;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,12 +93,12 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
 			*targ++ = '0';
 		else
 		{
-			tbl_ptr = dpos - 1;
+			tbl_ptr = (unsigned short *)dpos - 1;
 			trail_ch = KEY_DELIMITER;
 			if ((signed char)ch >= 0)
 			{	/* Bit 7 of the exponent is set for positive numbers; must be negative */
 				trail_ch = NEG_MNTSSA_END;
-				tbl_ptr = dneg;
+				tbl_ptr = (unsigned short *)dneg;
 				ch = ~ch;
 				*targ++ = '-';
 			}

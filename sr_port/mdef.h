@@ -102,9 +102,11 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 #define NUL		 0x00
 #define SP		 0x20
 #define DEL		 0x7f
-#define MAX_STRLEN			32767
-#define MAX_NUM_SIZE			   64
-#define MAX_FORM_NUM_SUBLEN		  128	      /* this is enough to hold the largest numeric subscript */
+#define MAX_STRLEN	 		(1 * 1024 * 1024) /* maximum GT.M string size (1 MB) */
+#define MAX_STRLEN_INIT	 		(32 * 1024) /* Initial buffer size allocated for a GT.M string
+						       which can adaptively be increased upto MAX_STRLEN */
+#define MAX_NUM_SIZE			64
+#define MAX_FORM_NUM_SUBLEN		128	/* this is enough to hold the largest numeric subscript */
 #define PERIODIC_FLUSH_CHECK_INTERVAL (30 * 1000)
 #define MAX_ARGS	256 /* in formallist */
 /* the macro ZWR_EXP_RATIO returns the maximum size of the extracted record given the internal subscript representation length

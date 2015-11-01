@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,15 +15,6 @@
 #include "toktyp.h"
 #include "mv_stent.h"
 #include "release_name.h"
-
-#ifdef DEBUG
-#	ifdef AIX
-#		include "rs6000.h"
-#	endif
-#	ifdef __alpha
-#		include "axp.h"
-#	endif
-#endif
 
 char LITDEF ctypetab[NUM_ASCII_CHARS] = {
  TK_EOL,TK_ERROR,TK_ERROR,TK_ERROR,TK_ERROR,TK_ERROR,TK_ERROR,TK_ERROR

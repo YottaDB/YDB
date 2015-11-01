@@ -23,7 +23,6 @@
 #ifdef UNIX
 #include "gtm_fcntl.h"
 #include "eintr_wrappers.h"
-static int fcntl_res;
 #endif
 #include "gt_timer.h"
 #include "io.h"
@@ -40,7 +39,6 @@ static int fcntl_res;
 GBLREF	io_pair 		io_curr_device;
 GBLREF	bool			out_of_time;
 GBLREF	spdesc 			stringpool;
-GBLREF	tcp_library_struct	tcp_routines;
 GBLREF	volatile int4		outofband;
 /* VMS uses the UCX interface; should support others that emulate it */
 short	iosocket_readfl(mval *v, int4 width, int4 timeout)
@@ -48,19 +46,16 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 					/* timeout in seconds */
 {
 	bool		ret;
-	boolean_t 	timed, vari, more_data, terminator, term_mode;
-	int		flags, len, real_errno, save_errno;
-	short int	i;
+	boolean_t 	timed, vari, more_data, terminator, has_delimiter;
+	int		flags, len, real_errno, save_errno, fcntl_res, errlen;
+	int		bytes_read, ii, max_bufflen, bufflen_init, bufflen;
 	io_desc		*iod;
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
 	int4		msec_timeout; /* timeout in milliseconds */
 	TID		timer_id;
-	ABS_TIME	cur_time, end_time, save_time_for_read, time_for_read, zero;
-	char		*errptr;
-	int4		errlen;
-	unsigned char	inchar;
-	int 		ii;
+	ABS_TIME	cur_time, end_time, time_for_read, zero;
+	char		*errptr, *buffptr;
 	ssize_t		status;
 
 	error_def(ERR_IOEOF);
@@ -81,8 +76,6 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		vari = FALSE;
 		width = (width < MAX_STRLEN) ? width : MAX_STRLEN;
 	}
-	if (stringpool.free + width > stringpool.top)
-		stp_gcol(width);
 	iod = io_curr_device.in;
 	assert(dev_open == iod->state);
 	assert(gtmsocket == iod->type);
@@ -107,9 +100,9 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	socketptr->lastop = TCP_READ;
 	ret = TRUE;
 	if (0 >= socketptr->n_delimiter)
-		term_mode = FALSE;
+		has_delimiter = FALSE;
 	else
-		term_mode = TRUE;
+		has_delimiter = TRUE;
 	time_for_read.at_sec  = 0;
 	time_for_read.at_usec = ((0 == timeout) ? 0 : TIMEOUT_INTERVAL);
 	/* ATTN: the 200000 above is mystery. This should be machine dependent 	*/
@@ -167,34 +160,62 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	more_data = TRUE;
 	dsocketptr->dollar_key[0] = '\0';
 	iod->dollar.zb[0] = '\0';
-	for (i = 0, status = 0;  status >= 0;)
+
+	bufflen_init = MAX_STRLEN_INIT;
+	max_bufflen = (vari) ? bufflen_init : width;
+	if (stringpool.free + max_bufflen > stringpool.top)
+		stp_gcol(max_bufflen);
+	for (bytes_read = 0, status = 0;  status >= 0;)
 	{
-		status = iosocket_snr(socketptr, &inchar, 1, 0, &time_for_read);
+		if (bytes_read >= max_bufflen)
+		{ /* more buffer needed. Extend the stringpool buffer by doubling the size as much as we
+		     extended previously */
+			assert(vari);
+			bufflen_init += bufflen_init;
+			assert(bufflen_init <= MAX_STRLEN);
+			if (stringpool.free + bytes_read + bufflen_init > stringpool.top)
+			{
+				v->str.len = bytes_read; /* to keep the data read so far from being garbage collected */
+				v->str.addr = (char *)stringpool.free;
+				stringpool.free += v->str.len;
+				assert(stringpool.free <= stringpool.top);
+				stp_gcol(bufflen_init);
+				memcpy(stringpool.free, v->str.addr, v->str.len);
+			}
+			max_bufflen = bufflen_init;
+		}
+		buffptr = (char*)(stringpool.free + bytes_read);
+		if (has_delimiter)
+			bufflen = 1;
+		else
+			bufflen = max_bufflen - bytes_read;
+		status = iosocket_snr(socketptr, buffptr, bufflen, 0, &time_for_read);
 		if (0 == status)
 			more_data = FALSE;
 		else if (0 < status)
 		{
 			terminator = FALSE;
-			*(stringpool.free + i) = inchar;
-			i += status;
-			/* ------- check to see if it is a delimiter -------- */
-			for (ii = 0; term_mode && (ii < socketptr->n_delimiter); ii++)
-			{
-				if (i < socketptr->delimiter[ii].len)
-					continue;
-				if (0 == memcmp(socketptr->delimiter[ii].addr,
-						stringpool.free + i - socketptr->delimiter[ii].len,
-						socketptr->delimiter[ii].len))
+			bytes_read += status;
+			if (has_delimiter)
+			{ /* ------- check to see if it is a delimiter -------- */
+				for (ii = 0; ii < socketptr->n_delimiter; ii++)
 				{
-					terminator = TRUE;
-					i -= socketptr->delimiter[ii].len;
-					memcpy(iod->dollar.zb, socketptr->delimiter[ii].addr,
-						MIN(socketptr->delimiter[ii].len, ESC_LEN - 1));
-					iod->dollar.zb[MIN(socketptr->delimiter[ii].len, ESC_LEN - 1)] = '\0';
-					memcpy(dsocketptr->dollar_key, socketptr->delimiter[ii].addr,
-						MIN(socketptr->delimiter[ii].len, DD_BUFLEN - 1));
-					dsocketptr->dollar_key[MIN(socketptr->delimiter[ii].len, DD_BUFLEN - 1)] = '\0';
-					break;
+					if (bytes_read < socketptr->delimiter[ii].len)
+						continue;
+					if (0 == memcmp(socketptr->delimiter[ii].addr,
+							stringpool.free + bytes_read - socketptr->delimiter[ii].len,
+							socketptr->delimiter[ii].len))
+					{
+						terminator = TRUE;
+						bytes_read -= socketptr->delimiter[ii].len;
+						memcpy(iod->dollar.zb, socketptr->delimiter[ii].addr,
+							MIN(socketptr->delimiter[ii].len, ESC_LEN - 1));
+						iod->dollar.zb[MIN(socketptr->delimiter[ii].len, ESC_LEN - 1)] = '\0';
+						memcpy(dsocketptr->dollar_key, socketptr->delimiter[ii].addr,
+							MIN(socketptr->delimiter[ii].len, DD_BUFLEN - 1));
+						dsocketptr->dollar_key[MIN(socketptr->delimiter[ii].len, DD_BUFLEN - 1)] = '\0';
+						break;
+					}
 				}
 			}
 			if (!terminator)
@@ -225,12 +246,13 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			} else if (!more_data)
 				break;
 		}
+		if (bytes_read >= width)
+			break;
 		if (vari)
 		{
-			if (!term_mode && 0 != i && !more_data)
+			if (!has_delimiter && 0 != bytes_read && !more_data)
 				break;
-		} else if (i >= width)
-			break;
+		}
 	}
 	if (EINTR == real_errno)
 		status = 0;	/* don't treat a <CTRL-C> or timeout as an error */
@@ -252,14 +274,14 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				ret = FALSE;
 			else
 				cancel_timer(timer_id);
-		} else if ((i < width) && !(term_mode && terminator))
+		} else if ((bytes_read < width) && !(has_delimiter && terminator))
 			ret = FALSE;
 	}
-	if (i > 0)
-	{	/* there's somthing to return */
-		v->str.len = i;
+	if (bytes_read > 0)
+	{	/* there's something to return */
+		v->str.len = (bytes_read > width) ? width : bytes_read;
 		v->str.addr = (char *)stringpool.free;
-		if (((iod->dollar.x += i) >= iod->width) && iod->wrap)
+		if (((iod->dollar.x += bytes_read) >= iod->width) && iod->wrap)
 		{
 			iod->dollar.y += (iod->dollar.x / iod->width);
 			if (0 != iod->length)
@@ -271,7 +293,7 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		v->str.len = 0;
 		v->str.addr = dsocketptr->dollar_key;
 	}
-	len = sizeof("1,") - 1;
+	len = sizeof(ONE_COMMA) - 1;
 	if (status >= 0)
 	{	/* no real problems */
 		iod->dollar.zeof = FALSE;
@@ -279,10 +301,10 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		memcpy(dsocketptr->dollar_device, "0", sizeof("0"));
 	} else
 	{	/* there's a significant problem */
-		if (0 == i)
+		if (0 == bytes_read)
 			iod->dollar.x = 0;
 		iod->dollar.za = 9;
-		memcpy(dsocketptr->dollar_device, "1,", len);
+		memcpy(dsocketptr->dollar_device, ONE_COMMA, len);
 		errptr = (char *)STRERROR(real_errno);
 		errlen = strlen(errptr);
 		memcpy(&dsocketptr->dollar_device[len], errptr, errlen);

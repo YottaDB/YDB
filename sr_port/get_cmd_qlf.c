@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,6 +69,9 @@ void get_cmd_qlf(command_qualifier *qualif)
 
 	if (cli_negated("LINE_ENTRY") == TRUE)
 		qualif->qlf &= ~CQ_LINE_ENTRY;
+
+	if (cli_negated("INLINE_LITERALS") == TRUE)
+		qualif->qlf &= ~CQ_INLINE_LITERALS;
 
 #ifdef DEBUG
 	if (cli_present("MACHINE_CODE") == CLI_PRESENT)

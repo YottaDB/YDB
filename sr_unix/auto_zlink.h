@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +9,9 @@
  *								*
  ****************************************************************/
 
-#ifndef IND_XEQ_INCLUDED
-#define IND_XEQ_INCLUDED
+#ifndef __AUTO_ZLINK_H__
+#define __AUTO_ZLINK_H__
 
-void ind_xeq(void);
+rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent *line);
 
-#endif /* IND_XEQ_INCLUDED */
+#endif

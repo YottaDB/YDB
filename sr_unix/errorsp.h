@@ -44,7 +44,7 @@ GBLEXP int4			error_condition;
 
 GBLREF char 			util_outbuff[];
 
-LITREF err_ctl			merrors_ctl;
+GBLREF err_ctl			merrors_ctl;
 
 #define WARNING		0
 #define SUCCESS		1

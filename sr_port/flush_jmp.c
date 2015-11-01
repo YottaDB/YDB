@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,7 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	frame_pointer->vartab_len = frame_pointer->rvector->vartab_len;
 	frame_pointer->mpc = transfer_addr;
 	frame_pointer->ctxt = context;
-#if defined(__alpha) || defined(__MVS__) || defined(__s390__)
+#if defined(__alpha) || defined(__MVS__) || defined(__s390__) || defined(_AIX)
 	frame_pointer->literal_ptr = (int4 *)0;
 #endif
 	frame_pointer->temp_mvals = frame_pointer->rvector->temp_mvals;

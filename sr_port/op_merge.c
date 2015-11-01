@@ -97,7 +97,7 @@ void op_merge(void)
 	static boolean_t	first_time = TRUE;
 	static gv_key          	*gvn2_org_key;
 	unsigned char		*ptr, *ptr2;
-	unsigned char  		buff[MAX_STRLEN], *endbuff;
+	unsigned char  		buff[MAX_ZWR_KEY_SZ], *endbuff;
 	zshow_out		output;
 
 	error_def(ERR_STACKOFLOW);

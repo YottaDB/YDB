@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 #include "movtc.h"
 
-void	movtc (int length, unsigned char *inbuf, unsigned char table[256], unsigned char *outbuf)
+void	movtc (int length, unsigned char *inbuf, const unsigned char table[256], unsigned char *outbuf)
 {
 	while (length > 0)
 	{

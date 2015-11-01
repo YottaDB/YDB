@@ -113,7 +113,6 @@ GBLREF bool		lv_null_subs;
 GBLREF lv_val		*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 GBLREF symval		*curr_symval;
 GBLREF collseq          *local_collseq;
-GBLREF char		*lcl_coll_xform_buff;
 GBLREF pattern          *pattern_list;
 GBLREF pattern          *curr_pattern;
 GBLREF pattern          mumps_pattern;
@@ -254,7 +253,6 @@ void gtm_startup(struct startup_vector *svec)
 			gtm_putmsg(VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
 			exit(exi_condition);
 		}
-		lcl_coll_xform_buff = malloc(MAX_LCL_COLL_XFORM_BUFSIZ);
 	} else
 		local_collseq = 0;
 	prealloc_gt_timers(); /* Preallocate some timer blocks. */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,8 +36,8 @@ va_dcl
 {
 	va_list		var;
 	uint4		i, j, count, argcnt, err;
-	err_ctl 	*ec;
-	err_msg		*em;
+	const err_ctl 	*ec;
+	const err_msg	*em;
 	char		msgbuff[2048];
 	mstr		msgstr;
 

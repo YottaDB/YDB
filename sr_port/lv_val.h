@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +16,6 @@
  *		lv_val.v.mvtype, symval.ident, and lv_sbs_tbl.ident
  *		MUST be aligned.
  */
-
-#define MAX_LCL_COLL_XFORM_BUFSIZ	MAX_STRLEN
 
 typedef struct lv_sbs_tbl_struct
 {

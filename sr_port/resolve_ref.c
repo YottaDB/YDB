@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -124,6 +124,11 @@ int resolve_ref(int errknt)
 					z = x->exorder.bl;
 					assert (z->opcode == OC_EXCAL || z->opcode == OC_EXFUN);
 					assert (z->operand[1].oprclass == TRIP_REF);
+					z = z->operand[1].oprval.tref;
+					assert (z->opcode == OC_PARAMETER);
+					assert (z->operand[0].oprclass == TRIP_REF);
+					assert (z->operand[0].oprval.tref->opcode == OC_TRIPSIZE);
+					assert (z->operand[0].oprval.tref->operand[0].oprclass == TSIZ_REF);
 					z = z->operand[1].oprval.tref;
 					assert (z->opcode == OC_PARAMETER);
 					assert (z->operand[0].oprclass == TRIP_REF);

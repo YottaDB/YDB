@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,7 @@
 
 #include "gtm_string.h"
 
+#include "error.h"
 #include "collseq.h"
 #include "hashdef.h"
 #include "lv_val.h"
@@ -32,10 +33,9 @@
 #include "do_xform.h"
 #include "numcmp.h"
 #include "sorts_after.h"
+#include "gtm_maxstr.h"
 
 GBLREF collseq		*local_collseq;
-GBLREF char		*lcl_coll_xform_buff;
-
 
 int	sorts_after (mval *lhs, mval *rhs)
 {
@@ -44,18 +44,21 @@ int	sorts_after (mval *lhs, mval *rhs)
 		int	cmp;
 		int	length1;
 		int	length2;
-		char	tmp[MAX_LCL_COLL_XFORM_BUFSIZ];
 		mstr	tmstr1;
 		mstr	tmstr2;
+		MAXSTR_BUFF_DECL(tmp);
 
-		tmstr1.len = MAX_LCL_COLL_XFORM_BUFSIZ;
+		ALLOC_XFORM_BUFF(&lhs->str);
+		tmstr1.len = max_lcl_coll_xform_bufsiz;
 		tmstr1.addr = lcl_coll_xform_buff;
 		assert(NULL != lcl_coll_xform_buff);
 		do_xform(local_collseq->xform, &lhs->str, &tmstr1, &length1);
 
-		tmstr2.len = MAX_LCL_COLL_XFORM_BUFSIZ;
+		MAXSTR_BUFF_INIT_RET;
 		tmstr2.addr = tmp;
+		tmstr2.len = MAXSTR_BUFF_ALLOC(rhs->str.len, tmstr2.addr, 0);
 		do_xform(local_collseq->xform, &rhs->str, &tmstr2, &length2);
+		MAXSTR_BUFF_FINI;
 
 		cmp = memcmp(tmstr1.addr, tmstr2.addr, length1 <= length2 ? length1 : length2);
 		return cmp != 0 ? cmp : length1 - length2;
@@ -87,5 +90,4 @@ int	sorts_after (mval *lhs, mval *rhs)
 
 	/* lhs and rhs are both strings */
 	return memvcmp(lhs->str.addr, lhs->str.len, rhs->str.addr, rhs->str.len);
-
 }

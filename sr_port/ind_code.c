@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,24 +46,27 @@ void	ind_code(mstr *obj)
 	code_gen();
 	code_size = curr_addr;
 	cg_phase = CGP_ADDR_OPT;
-	shrink_jmps();
 	indir_code_size = indr_stringpool.free - indr_stringpool.base +	/* literal strings */
 		mlitmax * sizeof(mval) +			/* literal mvals */
 		mvmax * sizeof(VAR_TABENT) +				/* variable table ents */
 		code_size +
 		(sizeof(int4) * 2) +				/* validation word and (neg) offset to ihdtyp */
-		3;						/* Max amount for code alignment */
+		(SECTION_ALIGN_BOUNDARY - 1);						/* Max amount for code alignment */
 	if (stringpool.top - stringpool.free < indir_code_size)
 		stp_gcol(indir_code_size);
 	itext = (ihdtyp *)stringpool.free;
 	indr_base_addr = stringpool.free;
 	stringpool.free += sizeof(ihdtyp);
 	indir_lits(itext);
+	/* Runtime base needs to be set to approximately what it would have been set to below for shrink_trips to work
+	   correctly so do that here */
+	runtime_base = stringpool.free + sizeof(hdr_offset) + sizeof(validation);
+	shrink_trips();
 	hdr_offset = indr_base_addr - stringpool.free;		/* offset to ihdtyp */
 	emit_immed((char *)&hdr_offset, sizeof(hdr_offset));
 	validation = (GTM_OMAGIC << 16) + OBJ_LABEL;			/* Word to validate we are in right place */
 	emit_immed((char *)&validation, sizeof(validation));
-	runtime_base = stringpool.free;
+	/* runtime_base = stringpool.free; */
 	cg_phase = CGP_MACHINE;
 	code_gen();
 

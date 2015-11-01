@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,12 +36,12 @@ typedef uint4 mach_inst;
 #define readonly
 #define GBLDEF
 #define GBLREF extern
-#define LITDEF
-#define LITREF extern
+#define LITDEF const
+#define LITREF extern const
 #define error_def(x) LITREF int x
 #ifdef DEBUG
 error_def(ERR_ASSERT);
-#define assert(x) ((x) ? 1 : rts_error(VARLSTCNT(5) ERR_ASSERT, 3, sizeof(__FILE__) - 1, __FILE__, __LINE__))
+#define assert(x) ((x) ? 1 : rts_error(VARLSTCNT(5) ERR_ASSERT, 3, LEN_AND_LIT(__FILE__), __LINE__))
 #else
 #define assert(x)
 #endif

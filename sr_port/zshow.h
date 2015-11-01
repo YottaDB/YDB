@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,16 @@
 #define ZSHOW_GLOBAL 2
 #define ZSHOW_LOCAL 3
 #define ZSHOW_NOPARM -1
+
+#define CLEANUP_ZSHOW_BUFF				\
+{							\
+	GBLREF char	*zwr_output_buff;		\
+	if (NULL != zwr_output_buff)			\
+	{						\
+		free(zwr_output_buff);			\
+		zwr_output_buff = NULL;			\
+	}						\
+}
 
 typedef struct {
 	struct lv_val_struct		*lvar;		/* local variable to output to			*/
@@ -33,7 +43,8 @@ typedef struct {
     char		curr_code;	/* code from previous write			*/
     char		*buff;		/* output buffer				*/
     char		*ptr;		/* end of current output line in output buffer	*/
-    int			len;		/* max line length, also size of output buffer	*/
+    int			len;		/* max line length 				*/
+    int			size;		/* max output buffer size that dynamically changes during buffer expansion */
     int			line_num;	/* index for output variable starts at one	*/
     union
     {		zs_lv_struct	lv;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,8 +44,8 @@ void	gtm_getmsg (int4 msgnum, mstr *msgbuf)
 {
 	short int	m_len, faclen, taglen, j, sever;
 	char 		*cp, *top, *msgp, *fac, *tag;
-	err_msg		*msg;
-	err_ctl		*ctl;
+	const err_msg	*msg;
+	const err_ctl	*ctl;
 
 	ctl = err_check(msgnum);
 	if (ctl != 0)
@@ -57,8 +57,7 @@ void	gtm_getmsg (int4 msgnum, mstr *msgbuf)
 		tag = msg->tag;
 		fac = ctl->facname;
 		sever = SEVMASK(msgnum);
-	}
-	else
+	} else
 	{
 		sever = ERROR;
 

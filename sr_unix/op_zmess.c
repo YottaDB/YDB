@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,13 +28,13 @@
 void op_zmess(va_alist)
 va_dcl
 {
-	va_list var;
-	err_ctl	*ectl;
-	err_msg *eptr;
-	int fao[MAX_FAO_PARMS];
-	char	buff[FAO_BUFFER_SPACE];
+	va_list		var;
+	const err_ctl	*ectl;
+	const err_msg	*eptr;
+	int		fao[MAX_FAO_PARMS];
+	char		buff[FAO_BUFFER_SPACE];
 	unsigned int	errnum, cnt, j;
-	int	faocnt;
+	int		faocnt;
 
 	VAR_START(var);
 	cnt = va_arg(var, int);
@@ -52,12 +52,8 @@ va_dcl
 		if (faocnt != -1)
 			rts_error(VARLSTCNT(faocnt+2) errnum, faocnt, fao[0], fao[1], fao[2], fao[3], fao[4], fao[5], fao[6],
 				fao[7], fao[8], fao[9], fao[10], fao[11]);
-		return;
-	}
-	else
-	{	rts_error(VARLSTCNT(1) errnum);
-		return;
-	}
+	} else
+		rts_error(VARLSTCNT(1) errnum);
 }
 
 

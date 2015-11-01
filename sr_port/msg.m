@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -150,7 +150,8 @@
  . Write "};",!!
  . For i1=1:1:cnt Write "LITDEF",$Char(9),"int ",prefix,outmsg(i1)," = ",outmsg(i1,"code"),";",!
  . Quit
- Write !,"LITDEF",$Char(9),"err_ctl "_fn_"_ctl = {",!
+ ; VMS can have addresses in constants, most Unix platforms cannot.
+ Write !,$Select(vms:"LITDEF",1:"GBLDEF"),$Char(9),"err_ctl "_fn_"_ctl = {",!
  Write $Char(9),facnum,",",!
  Write $Char(9),""""_facility_""",",!
  Write $Char(9),$Select(vms:"NULL,",1:"&"_fn_"[0],"),!

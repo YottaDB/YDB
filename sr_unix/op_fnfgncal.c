@@ -120,11 +120,13 @@ static	int			call_table_initialized = 0;
 /* routine to convert external return values to mval's */
 static void	extarg2mval(void *src, enum xc_types typ, mval *dst)
 {
+	int			str_len;
 	int4			s_int_num;
 	uint4			uns_int_num;
 	char			*cp;
 	struct extcall_string	*sp;
 	error_def(ERR_ZCSTATUSRET);
+	error_def(ERR_MAXSTRLEN);
 
 	switch(typ)
 	{
@@ -157,6 +159,8 @@ static void	extarg2mval(void *src, enum xc_types typ, mval *dst)
 	case xc_string_star:
 		sp = (struct extcall_string *)src;
 		dst->mvtype = MV_STR;
+		if (sp->len > MAX_STRLEN)
+			rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 		dst->str.len = sp->len;
 		if ((0 < sp->len) && (NULL != sp->addr))
 		{
@@ -171,7 +175,10 @@ static void	extarg2mval(void *src, enum xc_types typ, mval *dst)
 		cp = (char *)src;
 		assert(((int)cp < (int)stringpool.base) || ((int)cp > (int)stringpool.top));
 		dst->mvtype = MV_STR;
-		dst->str.len = strlen(cp);
+		str_len = strlen(cp);
+		if (str_len > MAX_STRLEN)
+			rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
+		dst->str.len = str_len;
 		dst->str.addr = cp;
 		s2pool(&dst->str);
 		break;

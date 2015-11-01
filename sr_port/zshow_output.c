@@ -13,6 +13,7 @@
 
 #include "gtm_string.h"
 
+#include "error.h"
 #include "hashdef.h"
 #include "lv_val.h"
 #include "subscript.h"
@@ -31,6 +32,7 @@
 #include "op.h"
 #include "mvalconv.h"
 #include "format_targ_key.h"
+#include "gtm_maxstr.h"
 
 #define F_SUBSC_LEN 3
 #define N_SUBSC_LEN 5
@@ -50,7 +52,7 @@ void zshow_output(zshow_out *out, mstr *str)
 	lv_val		*temp;
 	char		buff, *ptr1, *ptr2;
 	unsigned char	*kend, kbuff[MAX_ZWR_KEY_SZ];
-	int		key_ovrhd, len;
+	int		key_ovrhd, len, buff_len;
 
 	error_def(ERR_ZSHOWGLOSMALL);
 	error_def(ERR_STACKOFLOW);
@@ -59,6 +61,12 @@ void zshow_output(zshow_out *out, mstr *str)
 	error_def(ERR_GVSUBOFLOW);
 	error_def(ERR_GVIS);
 
+	if (NULL != str)
+	{
+		buff_len = out->ptr - out->buff;
+		MAXSTR_BUFF_ALLOC(str->len, out->buff, buff_len);
+		out->ptr = out->buff + buff_len;
+	}
 	switch (out->type)
 	{
 	case ZSHOW_DEVICE:

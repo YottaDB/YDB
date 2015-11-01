@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include "iosp.h"
 #include "error.h"
 #include "rtnhdr.h"
+#include "inst_flush.h"
 #include "private_code_copy.h"
 
 CONDITION_HANDLER(cre_priv_ch)
@@ -47,6 +48,7 @@ uint4 cre_private_code_copy(rhdtyp *rtn)
 		rtn->shared_ptext_adr = rtn->ptext_adr;
 		rtn->ptext_adr = new_ptext;
 		rtn->ptext_end_adr = new_ptext + code_size;
+		inst_flush(new_ptext, code_size);
 #endif
 	return SS_NORMAL;
 }

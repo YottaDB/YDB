@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,6 @@ GBLREF lvzwrite_struct 	lvzwrite_block;
 GBLREF int4		outofband;
 GBLREF zshow_out	*zwr_output;
 GBLREF collseq  	*local_collseq;
-GBLREF char		*lcl_coll_xform_buff;
 
 void lvzwr_var(lv_val *lv, int4 n)
 {
@@ -182,8 +181,9 @@ void lvzwr_var(lv_val *lv, int4 n)
 				mv.str.len = 0; /* makes sure stp_gcol() ignores this, in case actual points to this */
 				if (local_collseq)
 				{
+					ALLOC_XFORM_BUFF(&s->str);
 					tmp_sbs.mvtype = MV_STR;
-					tmp_sbs.str.len = MAX_LCL_COLL_XFORM_BUFSIZ;
+					tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 					assert(NULL != lcl_coll_xform_buff);
 					tmp_sbs.str.addr = lcl_coll_xform_buff;
 					do_xform(local_collseq->xback, &s->str, &tmp_sbs.str, &length);

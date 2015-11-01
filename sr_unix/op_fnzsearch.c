@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,8 @@
 
 GBLDEF lv_val	*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 GBLREF spdesc	stringpool;
+
+LITREF mval	literal_null;
 
 static mval	ind_val;	/* Subscript for variable tree search */
 static lv_val	*ind_var;	/* Variable tree holding existing search context */
@@ -88,8 +90,7 @@ int op_fnzsearch (mval *file, mint indx, mval *ret)
 			}
 			break;
 		}
-	}
-	else
+	} else
 	{
 		memset(&pblk, 0, sizeof(pblk));
 		pblk.buffer = buf1;
@@ -98,8 +99,7 @@ int op_fnzsearch (mval *file, mint indx, mval *ret)
 		{
 			ret->mvtype = MV_STR;
 			ret->str.len = 0;
-		}
-		else
+		} else
 		{
 			assert(!ind_var);
 			buf1[pblk.b_esl] = 0;
@@ -119,8 +119,7 @@ int op_fnzsearch (mval *file, mint indx, mval *ret)
 				plen->p.pblk.b_dir = pblk.b_dir;
 				plen->p.pblk.b_name = pblk.b_name;
 				plen->p.pblk.b_ext = pblk.b_ext;
-			}
-			else
+			} else
 				dir_srch(&pblk);
 
 			for (;;)
@@ -282,8 +281,7 @@ void dir_srch (parse_blk *pfil)
 			if (c >= top)
 				break;
 		}
-	}
-	else
+	} else
 	{
 		sub.str.addr = pfil->l_dir;
 		sub.str.len = pfil->b_dir;
@@ -362,8 +360,7 @@ void dir_srch (parse_blk *pfil)
 				}
 			}
 			CLOSEDIR(dp, closedir_res);
-		}
-		else
+		} else
 		{
 			assert(pfil->fnb & F_WILD_DIR);
 			compare.str.addr = pfil->l_name;
@@ -449,8 +446,6 @@ void	zsrch_clr (int indx)
 	than the parse_file() maximum are ignored.
 */
 
-LITREF mval	literal_null;
-
 static	int pop_top (lv_val *src, mval *res)
 {
 	lv_val	*tmp;
@@ -458,7 +453,7 @@ static	int pop_top (lv_val *src, mval *res)
 
 	for (;;)
 	{	/* get next element off the top */
-		op_fnorder(src, &literal_null, res);
+		op_fnorder(src, (mval *)&literal_null, res);
 		if (!res->str.len)
 		{
 			pret.p.pint = 0;

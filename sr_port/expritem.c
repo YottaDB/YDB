@@ -291,7 +291,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZTRNLNM, ALL_SYS }
 };
 
-LITDEF int (*fun_parse[])(oprtype *, opctype) =
+GBLDEF int (*fun_parse[])(oprtype *, opctype) =
 {
 	f_ascii, f_ascii, f_char, f_char, f_data, f_data, f_extract
 	, f_extract, f_find, f_find, f_fnumber, f_fnumber, f_get, f_get

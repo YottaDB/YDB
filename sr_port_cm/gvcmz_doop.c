@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -141,7 +141,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		{
 			MV_FORCE_MVAL(v, 0);
 		} else
-		{	
+		{
 			if (*ptr++ != gv_cur_region->cmx_regnum)
 				rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			/* memcpy(gv_altkey, ptr, len - 1); */
@@ -169,8 +169,8 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	assert(ptr >= stringpool.base && ptr + len < stringpool.top); /* incoming message is in stringpool */
 	v->mvtype = MV_STR;
 	v->str.len = len;
-	v->str.addr = stringpool.free; /* we don't need the reply msg anymore, can overwrite reply */
-	memcpy(v->str.addr, ptr, len); /* so that we don't leave a gaping hole in the stringpool */
+	v->str.addr = (char *)stringpool.free;	/* we don't need the reply msg anymore, can overwrite reply */
+	memcpy(v->str.addr, ptr, len);		/* so that we don't leave a gaping hole in the stringpool */
 	stringpool.free += len;
 	return;
 }

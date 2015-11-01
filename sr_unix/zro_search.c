@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,7 +66,7 @@ boolean_t	skip;		if TRUE, skip over shared libraries. If FALSE, probe shared lib
 					memcpy(objfn, objstr->addr, rtnname.len);
 					objfn[rtnname.len] = 0;
 					rtnname.addr = objfn;
-					if ((op->shrsym = fgn_getrtn(op->shrlib, &rtnname, SUCCESS)) != NULL)
+					if ((op->shrsym = (void *)fgn_getrtn(op->shrlib, &rtnname, SUCCESS)) != NULL)
 						op_result = op;
 				}
 				op++;

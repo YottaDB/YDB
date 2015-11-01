@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@
 
 GBLDEF int4		curr_addr, code_size;
 GBLDEF char		cg_phase;	/* code generation phase */
+GBLDEF uint4 		lits_text_size, lits_mval_size;
 
 GBLREF bool		run_time;
 GBLREF command_qualifier cmd_qlf;
@@ -44,13 +45,44 @@ GBLREF mlabel 		*mlabtab;
 GBLREF mline 		mline_root;
 GBLREF mvar 		*mvartab;
 GBLREF char		module_name[];
-GBLREF uint4 		lits_text_size, lits_mval_size;
 GBLREF int4		gtm_object_size;
 GBLREF int4		linkage_size;
 GBLREF uint4		lnkrel_cnt;	/* number of entries in linkage Psect to relocate */
 
 #define PTEXT_OFFSET sizeof(rhdtyp)
-#define PADCHARS "PADDING PADDING"
+
+/* The sections of the internal GT.M object (sans native object wrapper) are grouped
+ * according to their type (R/O-retain, R/O-release, R/W-retain, R/W-release). The
+ * "retain"/"release" refers to whether the sections in that segment are retained if the
+ * module is replaced by an explicit ZLINK.
+ *
+ * The GT.M object layout (in the native .text section) is as follows:
+ *
+ *	+---------------+
+ *	|     rhead	| > - R/O - retain
+ *	+---------------+
+ *	|   generated	| \
+ *	|     code	|  \
+ *	+ - - - - - - - +   |
+ *	| variable tbl	|   | - R/O releasable
+ *	+ - - - - - - - +   |
+ *	| line num tbl	|   |
+ *	+ - - - - - - - +  /
+ *	| lit text pool	| /
+ *	+---------------+
+ *	| lit mval tbl 	| > - R/W releasable
+ *	+---------------+
+ *	|   label tbl	| > - R/W retain
+ *	+---------------+
+ *	| relocations	| > - relocations for external syms (not kept after link)
+ *	+---------------+
+ *	|  symbol tbl 	| > - external symbol table (not kept after link)
+ *	+---------------+
+ *
+ * Note in addition to the above layout, a "linkage section" is allocated at run time and is
+ * also releasable.
+ *
+ */
 
 void	cg_lab (mlabel *mlbl, char *do_emit);
 
@@ -90,8 +122,8 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	code_gen();
 	code_size = curr_addr;
 	cg_phase = CGP_ADDR_OPT;
-	shrink_jmps();
 	comp_lits(&rhead);
+	shrink_trips();
 	if ((cmd_qlf.qlf & CQ_MACHINE_CODE))
 	{
 		cg_phase = CGP_ASSEMBLY;
@@ -192,7 +224,7 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	/* Both literal text pool and literal mval table */
 	emit_literals();
 	/* Emit padding so label section starts on proper boundary */
-	assert(lits_pad_size <= strlen(PADCHARS));
+	assert(STR_LIT_LEN(PADCHARS) >= lits_pad_size);
 	if (lits_pad_size)
 		emit_immed(PADCHARS, lits_pad_size);
 	/* The label table */
@@ -209,7 +241,7 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	*/
 	if (object_pad_size)
 	{
-		assert(sizeof(PADCHARS) >= object_pad_size);
+		assert(STR_LIT_LEN(PADCHARS) >= object_pad_size);
 		emit_immed(PADCHARS, object_pad_size);
 	}
 	close_object_file();

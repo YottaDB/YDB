@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,20 +11,12 @@
 
 #include "mdef.h"
 
-#include "gtm_string.h"
+#include "error.h"
+#include "zshow.h"
 
-#include "longset.h"
-
-#define MAXLEN 65535
-
-void longset(uchar_ptr_t ptr, int len, unsigned char fill)
+CONDITION_HANDLER(zshow_ch)
 {
-	while (len > MAXLEN)
-	{
-		memset(ptr, fill, MAXLEN);
-		ptr += MAXLEN;
-		len -= MAXLEN;
-	}
-	memset(ptr, fill, len);
-	return;
+	START_CH;
+	CLEANUP_ZSHOW_BUFF;
+	NEXTCH;
 }

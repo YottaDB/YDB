@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -213,7 +213,7 @@ int initialize_pattern_table(void)
 
 	/* Initialize pattern/typemask structures and pat_allmaskbits for default typemask */
 	curr_pattern = pattern_list = &mumps_pattern;
-	pattern_typemask = mumps_pattern.typemask = &(typemask[0]);
+	pattern_typemask = mumps_pattern.typemask = (unsigned long *)&(typemask[0]);
 	for (pat_allmaskbits = 0, letter = 0; letter < PATENTS; letter++)
 		pat_allmaskbits |= pattern_typemask[letter];	/* used in do_patfixed/do_pattern */
 
@@ -429,7 +429,7 @@ static int open_patfile(int name_len, char *file_name)
 	name_copy = malloc(name_len + 1);
 	memcpy(name_copy, file_name, name_len);
 	name_copy[name_len] = '\0';
-	patfile = Fopen(name_copy, "r");
+	patfile = Fopen((const char *)name_copy, "r");
 	free(name_copy);
 	if (NULL == patfile)
 		return 0;

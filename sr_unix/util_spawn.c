@@ -1,7 +1,7 @@
 #include "mdef.h"
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@
 #include "util_spawn.h"
 
 
-GBLREF char	parm_ary[MAX_PARMS][MAX_LINE];
+GBLREF char	*parm_ary[MAX_PARMS];
 GBLREF unsigned	parms_cnt;
 
 void util_spawn(void)
@@ -31,10 +31,11 @@ void util_spawn(void)
 		if (!cmd)
 			cmd = "/bin/sh";
 		SYSTEM(cmd);
-	}
-	else
+	} else
 	{
-		SYSTEM(parm_ary [parms_cnt - 1]);
+		assert(parm_ary[parms_cnt - 1]);
+		assert((char *)-1 != parm_ary[parms_cnt - 1]);
+		SYSTEM(parm_ary[parms_cnt - 1]);
 	}
 }
 

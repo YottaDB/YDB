@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,13 +9,14 @@
  *								*
  ****************************************************************/
 
-/* ind_xeq - stub for as-yet-unwritten assembly language routine */
+#ifndef MAKE_MODE_INCLUDED
+#define MAKE_MODE_INCLUDED
 
-#include "mdef.h"
-#include "ind_xeq.h"
+#include "make_mode_sp.h"
 
-void	ind_xeq (void)
-{
-	GTMASSERT;
-	return;
-}
+rhdtyp *make_mode (int mode_index);
+
+#define DM_MODE 0
+#define CI_MODE 1
+
+#endif

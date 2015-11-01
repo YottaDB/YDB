@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,10 +57,10 @@ void alloc_reg(void)
 	memset(&tempcont[0][0], 0, sizeof(tempcont));
 	memset(&temphigh[0], -1, sizeof(temphigh));
 	temphigh[TVAR_REF] = mvmax - 1;
-	COMPDBG(printf(" \n\n\n\n************************************** Begin alloc_reg scan *******************************\n"););
+	COMPDBG(PRINTF(" \n\n\n\n************************************ Begin alloc_reg scan *****************************\n"););
 	dqloop(&t_orig, exorder, x)
 	{
-		COMPDBG(printf(" ************************ Triple Start **********************\n"););
+		COMPDBG(PRINTF(" ************************ Triple Start **********************\n"););
 		COMPDBG(cdbg_dump_triple(x, 0););
 		opc = x->opcode;
 		switch (opc)
@@ -75,7 +75,7 @@ void alloc_reg(void)
 			if (opx == OC_LINESTART || opx == OC_LINEFETCH || opx == OC_ISFORMAL)
 			{
 				opc = x->opcode = OC_NOOP;
-				COMPDBG(printf("   ** Converting triple to NOOP (rsn 1) **\n"););
+				COMPDBG(PRINTF("   ** Converting triple to NOOP (rsn 1) **\n"););
 				continue;	/* continue, because 'normal' NOOP continues from this switch */
 			}
 			/* There is a special case in the case of NOLINE_ENTRY being specified. If a blank line is followed
@@ -87,7 +87,7 @@ void alloc_reg(void)
 			    && OC_LINEFETCH == x->exorder.fl->exorder.fl->opcode)
 			{
 				opc = x->opcode = OC_NOOP;
-				COMPDBG(printf("   ** Converting triple to NOOP (rsn 2) **\n"););
+				COMPDBG(PRINTF("   ** Converting triple to NOOP (rsn 2) **\n"););
 				continue;	/* continue, because 'normal' NOOP continues from this switch */
 			}
 			break;
@@ -103,8 +103,11 @@ void alloc_reg(void)
 			break;
 		case OC_STO:
 			/* If we are storing a literal e.g. s x="hi", don't call op_sto, because we do not
-				need to check if the literal is defined.  OC_STOLIT will be an in-line copy */
-			if (x->operand[1].oprclass == TRIP_REF && x->operand[1].oprval.tref->opcode == OC_LIT)
+			   need to check if the literal is defined.  OC_STOLIT will be an in-line copy.
+			   Bypass this if we have been requested to not do inline literals.
+			*/
+			if ((cmd_qlf.qlf & CQ_INLINE_LITERALS) && x->operand[1].oprclass == TRIP_REF &&
+			    x->operand[1].oprval.tref->opcode == OC_LIT)
 				opc = x->opcode = OC_STOLIT;
 			break;
 		case OC_EQU:
@@ -153,7 +156,7 @@ void alloc_reg(void)
 		}
 		if (x->opcode == OC_PASSTHRU)
 		{
-			COMPDBG(printf(" *** OC_PASSTHRU opcode being NOOP'd\n"););
+			COMPDBG(PRINTF(" *** OC_PASSTHRU opcode being NOOP'd\n"););
 			x->opcode = OC_NOOP;
 			continue;
 		}

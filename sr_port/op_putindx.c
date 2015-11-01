@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,6 @@
 GBLDEF lv_val		*active_lv;
 GBLDEF bool		lv_null_subs = TRUE;
 GBLREF collseq		*local_collseq;
-GBLREF char		*lcl_coll_xform_buff;
 
 lv_val	*op_putindx(va_alist)
 va_dcl
@@ -101,8 +100,9 @@ va_dcl
 			}
 			if (local_collseq)
 			{
+				ALLOC_XFORM_BUFF(&key->str);
 				tmp_sbs.mvtype = MV_STR;
-				tmp_sbs.str.len = MAX_LCL_COLL_XFORM_BUFSIZ;
+				tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 				assert(NULL != lcl_coll_xform_buff);
 				tmp_sbs.str.addr = lcl_coll_xform_buff;
 				do_xform(local_collseq->xform, &key->str, &tmp_sbs.str, &length);

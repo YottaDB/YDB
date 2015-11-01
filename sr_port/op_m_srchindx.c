@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,6 @@ va_dcl
 	va_list			var;
 	int			cur_subscr;
 	static lvname_info_ptr	lvn_info = NULL;
-	unsigned char           buff[MAX_STRLEN], *endbuff;
 
 	if (!lvn_info)
 		lvn_info = (lvname_info_ptr) malloc(sizeof(struct lvname_info_struct));

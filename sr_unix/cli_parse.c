@@ -20,17 +20,17 @@
 
 #define	NO_STRING	"NO"
 
-GBLDEF char	 	parm_ary[MAX_PARMS][MAX_LINE];	/* Parameter strings buffers */
+GBLDEF char	 	*parm_ary[MAX_PARMS];		/* Parameter strings buffers */
 GBLDEF unsigned int	parms_cnt;			/* Parameters count */
 GBLDEF void 		(*func)(void);			/* Function to be dispatched
-									to for this command */
+							   to for this command */
 
 GBLREF char 		cli_err_str[];	/* Parse Error message buffer */
 static CLI_ENTRY 	*gpqual_root;			/* pointer to root of
-								subordinate qualifier table */
+							   subordinate qualifier table */
 static CLI_ENTRY 	*gpcmd_qual;			/* pointer command qualifier table */
 static CLI_ENTRY 	*gpcmd_verb;			/* pointer to verb table */
-static CLI_ENTRY 	*gpcmd_qual_val;			/* pointer to qualifier table */
+static CLI_ENTRY 	*gpcmd_qual_val;		/* pointer to qualifier table */
 static CLI_PARM 	*gpcmd_parm_vals;		/* pointer to parameters for command */
 
 GBLREF char 		cli_token_buf[];
@@ -85,7 +85,7 @@ void	clear_parm_vals(CLI_ENTRY *cmd_parms, boolean_t follow) 		/* pointer to opt
 			if (cmd_parms->dfault_str)
 			{
 				cmd_parms->present = CLI_DEFAULT;
-				if (CLI_PRESENT != (int) cmd_parms->dfault_str)
+				if (CLI_PRESENT != (int)cmd_parms->dfault_str)
 					cmd_parms->pval_str = cmd_parms->dfault_str;
 			}
 			if ((FALSE != follow) && cmd_parms->qual_vals)
@@ -112,9 +112,10 @@ int 	find_entry(char *str, CLI_ENTRY *pparm)
 {
 	int 		match_ind, res;
 	boolean_t 	len_match;
-	int 		ind = 0;
+	int 		ind;
 	char 		*sp;
 
+	ind = 0;
 	match_ind = -1;
 	len_match = FALSE;
 	cli_strupper(str);
@@ -138,15 +139,13 @@ int 	find_entry(char *str, CLI_ENTRY *pparm)
 				if (FALSE == len_match)
 					return(-1);
 				break;
-			}
-			else
+			} else
 			{
 				if (strlen(str) == strlen(sp))
 					len_match = TRUE;
 				match_ind = ind;
 			}
-		}
-		else
+		} else
 		{
 			if (0 < res)
 				break;
@@ -192,9 +191,10 @@ int 	find_verb(char *str)
 CLI_ENTRY *find_cmd_param(char *str, CLI_ENTRY *pparm, int follow)
 {
 	CLI_ENTRY	*pparm_tmp;
-	int 	ind, ind_match = -1;
+	int 	ind, ind_match;
 	char 	*sp;
 
+	ind_match = -1;
 	if (NULL == pparm)
 		return NULL;
 	if (0 <= (ind = find_entry(str, pparm)))
@@ -239,7 +239,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 {
 	CLI_ENTRY 	*pparm;
 	char 		*opt_str, *val_str;
-	int 		neg_flg;
+	int 		neg_flg, parm_len;
 
 	/* -----------------------------------------
 	 * get qualifier marker, or parameter token
@@ -276,7 +276,11 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 			SNPRINTF(cli_err_str, MAX_STRLEN, "Too many parameters ");
 			return(-1);
 		}
-		strcpy(parm_ary[parms_cnt++], cli_token_buf);
+		if (parm_ary[parms_cnt] && ((char *)-1 != parm_ary[parms_cnt]))
+			free(parm_ary[parms_cnt]);
+		parm_len = strlen(cli_token_buf) + 1;
+		parm_ary[parms_cnt] = malloc(parm_len);
+		memcpy(parm_ary[parms_cnt++], cli_token_buf, parm_len);
 		return(1);
 	}
 	/* ---------------------------------------------------------------------
@@ -346,8 +350,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 			  pparm->name);
 			return(-1);
 		}
-	}
-	else
+	} else
 	{
 		/* --------------------------------------------------
 		 * Get Value either optional, or required.
@@ -360,8 +363,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 			{
 				SNPRINTF(cli_err_str, MAX_STRLEN, "Option : %s needs value", pparm->name);
 				return(-1);
-			}
-			else
+			} else
 			{
 				if (pparm->present)
 				{
@@ -473,8 +475,7 @@ boolean_t cli_numeric_check(CLI_ENTRY *pparm, char *val_str)
 				  val_str);
 				retval = FALSE;
 			}
-		}
-		else if (!cli_is_dcm(val_str))
+		} else if (!cli_is_dcm(val_str))
 		{
 			SNPRINTF(cli_err_str, MAX_STRLEN,
 			  "Unrecognized value: %s, Decimal number expected",
@@ -501,8 +502,7 @@ int cli_check_negated(char **opt_str_ptr, CLI_ENTRY *pcmd_parm_ptr, CLI_ENTRY **
 	{
 		*opt_str_ptr += sizeof(NO_STRING) - 1;
 		neg_flg = 1;
-	}
-	else
+	} else
 		neg_flg = 0;
 	/* --------------------------------------------
 	 * search qualifier table for qualifier string
@@ -551,8 +551,9 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 	char		local_str[MAX_LINE], tmp_str[MAX_LINE], *tmp_str_ptr;
 	char 		*ptr_next_val, *ptr_next_comma, *ptr_equal;
 	int		len_str, neg_flg, ptr_equal_len;
-	boolean_t	val_flg, has_a_qual = FALSE;
+	boolean_t	val_flg, has_a_qual;
 
+	has_a_qual = FALSE;
 	pparm_qual = pparm->qual_vals;
 	if (!pparm_qual)
 		return TRUE;
@@ -662,8 +663,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 					return FALSE;
 
 				}
-			}
-			else
+			} else
 				ptr_next_val = NULL;
 		}
 	}
@@ -705,10 +705,11 @@ int parse_cmd(void)
 {
 	int 	res, cmd_ind;
 	char 	*cmd_str;
-	int 	opt_cnt = 0;
+	int 	opt_cnt;
 	int 	eof, cmd_err;
-
 	error_def(ERR_CLIERR);
+
+	opt_cnt = 0;
 	gpqual_root = 0;
 	func = 0;
 	cmd_err = 0;
@@ -750,8 +751,7 @@ int parse_cmd(void)
 				opt_cnt++;
 			}
 		} while (1 == res);
-	}
-	else
+	} else
 	{
 		SNPRINTF(cli_err_str, MAX_STRLEN, "Unrecognized command: %s", cmd_str);
 		cli_lex_in_ptr->tp = 0;
@@ -760,16 +760,14 @@ int parse_cmd(void)
 	if (1 > opt_cnt && -1 != res
 	    && VAL_REQ == cmd_ary[cmd_ind].required)
 	{
-		SNPRINTF(cli_err_str, MAX_STRLEN,
-		  "Command argument expected, but not found");
+		SNPRINTF(cli_err_str, MAX_STRLEN, "Command argument expected, but not found");
 		res = -1;
 	}
 	/*------------------------------------------------------
 	 * Check that the disallow conditions are met (to allow)
 	 *------------------------------------------------------
 	 */
-	if ((-1 != res) && ((FALSE == check_disallow(gpcmd_verb)) ||
-		(FALSE == check_disallow(gpcmd_qual_val))))
+	if ((-1 != res) && ((FALSE == check_disallow(gpcmd_verb)) || (FALSE == check_disallow(gpcmd_qual_val))))
 		res = -1;
 	/* -------------------------------------
 	 * If parse error, display error string
@@ -893,9 +891,7 @@ bool cli_get_value(char *entry, char val_buf[])
 	strncpy(local_str, entry, sizeof(local_str) - 1);
 	cli_strupper(local_str);
 	if (NULL == (pparm = get_parm_entry(local_str)))
-	{
 		return(FALSE);
-	}
 	if (!pparm->present || NULL == pparm->pval_str)
 		return(FALSE);
 	else
@@ -921,9 +917,7 @@ boolean_t cli_negated(char *entry) 		/* entity */
 	strncpy(local_str, entry, sizeof(local_str) - 1);
 	cli_strupper(local_str);
 	if (pparm = get_parm_entry(local_str))
-	{
 		return(pparm->negated);
-	}
 	return(FALSE);
 }
 
@@ -931,13 +925,14 @@ boolean_t cli_negated(char *entry) 		/* entity */
 bool cli_get_parm(char *entry, char val_buf[])
 {
 	char		*sp;
-	int		ind = 0;
+	int		ind;
 	int		match_ind, res;
 	char		local_str[MAX_LINE];
 	int		eof;
 	char		*gets_res;
-	int		fgets_len;
+	int		parm_len;
 
+	ind = 0;
 	assert(0 != gpcmd_parm_vals);
 	strncpy(local_str, entry, sizeof(local_str) - 1);
 	cli_strupper(local_str);
@@ -946,13 +941,14 @@ bool cli_get_parm(char *entry, char val_buf[])
 	while (0 < strlen(sp = (gpcmd_parm_vals + ind)->name))
 	{
 		if (0 == (res = strncmp(sp, local_str, strlen(local_str))))
-		{	if (-1 != match_ind)
+		{
+			if (-1 != match_ind)
 				return(FALSE);
 			else
 				match_ind = ind;
-		}
-		else
-		{	if (0 < res)
+		} else
+		{
+			if (0 < res)
 				break;
 		}
 		ind++;
@@ -964,37 +960,44 @@ bool cli_get_parm(char *entry, char val_buf[])
 		 * ---------------------------
 		 */
 
-		if (0 == parm_ary[match_ind][0])
+		if (NULL == parm_ary[match_ind])
 		{
 			PRINTF("%s", (gpcmd_parm_vals + match_ind)->prompt);
-			FGETS((char *)parm_ary[match_ind], MAX_LINE, stdin, gets_res);
+			FGETS(local_str, MAX_LINE, stdin, gets_res);
 			if (gets_res)
 			{
-				fgets_len = strlen(gets_res);
+				parm_len = strlen(gets_res);
 				/* chop off newline */
-				if (parm_ary[match_ind][fgets_len-1] == '\n')
-					parm_ary[match_ind][fgets_len-1] = '\0';
-			}
-		}
-		else if ((char)-1 == parm_ary[match_ind][0])
-		{
+				if (local_str[parm_len - 1] == '\n')
+				{
+					local_str[parm_len - 1] = '\0';
+					--parm_len;
+				}
+				parm_ary[match_ind] = malloc(parm_len + 1);
+				if (parm_len)
+					memcpy(parm_ary[match_ind], &local_str[0], parm_len);
+				*(parm_ary[match_ind] + parm_len + 1) = '\0';
+			} else
+				return FALSE;
+		} else if ((char *)-1 == parm_ary[match_ind])
 			return(FALSE);
-		}
 		memcpy(val_buf, parm_ary[match_ind], strlen(parm_ary[match_ind]) + 1);
 		if (!cli_look_next_token(&eof) || (0 == cli_gettoken(&eof)))
-		{
-			parm_ary[match_ind][0] = (char)-1;
-		}
+			parm_ary[match_ind] = (char *)-1;
 		else
-		{	if (MAX_LINE < (strlen(cli_token_buf) + 1))
+		{
+			parm_len = strlen(cli_token_buf) + 1;
+			if (MAX_LINE < parm_len)
 			{
 				PRINTF("Parameter string too long\n");
 				return(FALSE);
 			}
-			memcpy(parm_ary[match_ind], cli_token_buf, strlen(cli_token_buf) + 1);
+			if (parm_ary[match_ind])
+				free(parm_ary[match_ind]);
+			parm_ary[match_ind] = malloc(parm_len);
+			memcpy(parm_ary[match_ind], cli_token_buf, parm_len);
 		}
-	}
-	else
+	} else
 	{
 		/* -----------------
 		 * check qualifiers

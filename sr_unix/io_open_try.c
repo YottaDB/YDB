@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@
 #define  LOGNAME_LEN 255
 
 LITREF	unsigned char		io_params_size[];
-LITREF	dev_dispatch_struct	io_dev_dispatch[];
+GBLREF	dev_dispatch_struct	io_dev_dispatch[];
 GBLREF	bool			run_time;
 GBLREF	io_desc			*active_device;
 GBLREF	mstr			sys_input;

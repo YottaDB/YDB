@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,7 @@ void gtm_init_env(rhdtyp *base_addr, unsigned char *transfer_addr)
 	assert(CURRENT_RHEAD_ADR(base_addr) == base_addr);
 	base_frame(base_addr);
 
-#if	defined(__osf__) || defined (__MVS__) || defined (__s390__)
+#if	defined(__osf__) || defined (__MVS__) || defined (__s390__) || defined(_AIX)
 	new_stack_frame(base_addr, (unsigned char *)LINKAGE_ADR(base_addr), transfer_addr);
 	frame_pointer->literal_ptr = (int4 *) LITERAL_ADR(base_addr);	/* new_stack_frame doesn't initialize this field */
 

@@ -118,7 +118,7 @@ cp $cms_dir/*/gtmsrc.csh .
 
 ############### Define platform-specific libraries ##################################
 
-set gtm_s_aix   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_rs6000 sr_aix"
+set gtm_s_aix   = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_rs6000 sr_aix"
 set gtm_s_osf1  = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_alpha  sr_dux"
 set gtm_s_hp_ux = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_hppa   sr_hpux"
 set gtm_s_linux = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_i386   sr_linux"

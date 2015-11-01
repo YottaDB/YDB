@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,15 +15,16 @@
 #include "mdq.h"
 #include "cgp.h"
 #include "emit_code.h"
+#include "obj_filesp.h"
 
-GBLREF int4		curr_addr, code_size;
+GBLREF int4		curr_addr, code_size, codegen_padlen;
 GBLREF char		cg_phase;	/* code generation phase */
 GBLREF triple		t_orig;		/* head of triples */
 LITREF octabstruct	oc_tab[];	/* op-code table */
 
 void shrink_jmps(void)
 {
-	int4	new_size, old_size, shrink;
+	int	new_size, old_size, shrink;
 	triple	*ct;	/* current triple */
 
 	assert(cg_phase == CGP_ADDR_OPT);
@@ -37,22 +38,28 @@ void shrink_jmps(void)
 				old_size = ct->exorder.fl->rtaddr - ct->rtaddr;
 				curr_addr = 0;
 				if (ct->operand[0].oprval.tref->rtaddr - ct->rtaddr < 0)
-				{	ct->rtaddr -= shrink;
+				{
+					ct->rtaddr -= shrink;
 					trip_gen(ct);
-				}
-				else
-				{	trip_gen(ct);
+				} else
+				{
+					trip_gen(ct);
 					ct->rtaddr -= shrink;
 				}
 				new_size = curr_addr;		/* size of operand 0 */
 				assert(old_size >= new_size);
 				shrink += old_size - new_size;
-			}
-			else
-			{
+			} else
 				ct->rtaddr -= shrink;
-			}
 		}/* dqloop */
 		code_size -= shrink;
-	}while (shrink != 0);
+	} while (shrink != 0);
+
+	/* Now that the code has been strunk, we may have to adjust the pad length of the code segment. Compute
+	   this by now subtracting out the size of the pad length from the code size and recomputing the pad length
+	   and readjusting the code size. (see similar computation in code_gen().
+	*/
+	code_size -= codegen_padlen;
+	codegen_padlen = PADLEN(code_size, SECTION_ALIGN_BOUNDARY);	/* Length to pad to align next section */
+	code_size += codegen_padlen;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@
 #include "util.h"
 #include "mupip_cmd_disallow.h"
 
-GBLREF char	cli_err_str[MAX_STRLEN];
+GBLREF char	cli_err_str[];
 GBLREF char	*cli_err_str_ptr;
 
 /* to check lengths and update cli_err_str*/
@@ -42,12 +42,11 @@ void cli_err_strcat(char *str)
 	lencli = strlen(cli_err_str);
 	lenstr = strlen(str);
 
-	/* No error string should be longer than MAX_STRLEN*/
-	assert(sizeof(cli_err_str) > lencli + lenstr + 2);
+	/* No error string should be longer than MAX_CLI_ERR_STR */
+	assert(MAX_CLI_ERR_STR > lencli + lenstr + 2);
 	memcpy(cli_err_str + lencli," ",1);
 	memcpy(cli_err_str + lencli + 1, str, lenstr);
 	*(cli_err_str + lencli + lenstr + 1) = '\0';
-
 }
 
 /*----------------------------------------------

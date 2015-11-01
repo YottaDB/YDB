@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 	mval		**l_symtab;	/* local symbol table */
 	unsigned char	*mpc;		/* mumps program counter */
 	unsigned char	*ctxt;		/* context pointer (base register for use when there's no PC-relative address mode) */
-#ifdef __alpha
+#if defined(__alpha) || defined(_AIX)
 	int4		*literal_ptr;	/* pointer to base of literals */
 #endif
 	unsigned char	*temps_ptr;	/* pointer to base of temps */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,17 +44,18 @@ int m_set(void)
 	int		first_val_lit, last_val_lit;
 	boolean_t	first_is_lit, last_is_lit, got_lparen, delim1char, is_extract;
 	opctype		put_oc;
-	oprtype		v, delimval, firstval, lastval, *sb1, *result, resptr;
-	triple		*delimiter, *first, *put, *get, *last, *obp, *s, *sub, *s0, *s1, setchain, getchain;
+	oprtype		v, firstval, lastval, *sb1, *result, resptr;
+	triple		*delimiter, *first, *put, *get, *last, *obp, *s, *sub, *s0, *s1, *oldchain;
+	triple		getchain, setchain;
 	triple		*jmptrp1, *jmptrp2;
+	mint		delimlit;
 
 	temp_subs = delim1char = is_extract = FALSE;
 	dqinit(&setchain, exorder);
-	result = (oprtype *) mcalloc(sizeof(oprtype));
+	result = (oprtype *)mcalloc(sizeof(oprtype));
 	resptr = put_indr(result);
-	jmptrp1 = jmptrp2 = 0;
-	sub = (triple *)0;
-	delimiter = last = NULL;
+	jmptrp1 = jmptrp2 = NULL;
+	delimiter = sub = last = NULL;
 
 	if (got_lparen = (window_token == TK_LPAREN))
 	{
@@ -63,8 +64,8 @@ int m_set(void)
 	}
 
 	/* Some explanation: The triples generated that are related to the lefthand side of the
-	   SET are put on the setchain triple list rather than curtchain. This is because that
-	   although they are generated first, they need to be evaluated and executed last so they
+	   SET are put on the setchain triple list rather than curtchain. This is because although
+	   they are generated first, they need to be evaluated and executed last so they
 	   will be added to curtchain after the righthand side has been completed.
 	*/
 
@@ -185,6 +186,7 @@ int m_set(void)
 				/* Even for SETPIECE and SETEXTRACT, the SETPIECE/SETEXTRACT opcodes
 				   do not do the final store, they only create the final value TO be
 				   stored so generate the triples that will actually do the store now.
+				   Note we are still building triples on the original curtchain.
 				*/
 				switch (window_token)
 				{
@@ -246,11 +248,14 @@ int m_set(void)
 				/* Code to fetch args for "get" triple are on getchain. Put get there now too. */
 				dqins(getchain.exorder.bl, exorder, get);
 				chktchain(&getchain);
-				/* From now on, put things on setchain */
+				/* From now on, put things on setchain which will be evaluated after right hand side
+				   of "=" expression as described earlier
+				*/
+				oldchain = setcurtchain(&setchain);
 				first = maketriple(OC_PARAMETER);
 				if (!is_extract)
 				{	/* Set $piece */
-					delimiter = maketriple(OC_PARAMETER);
+					delimiter = newtriple(OC_PARAMETER);
 					s->operand[1] = put_tref(delimiter);
 					delimiter->operand[1] = put_tref(first);
 					/* Process delimiter string ($piece only) */
@@ -260,17 +265,15 @@ int m_set(void)
 						return FALSE;
 					}
 					advancewindow();
-					if (!strexpr(&delimval))
+					if (!strexpr(&(delimiter->operand[0])))
 						return FALSE;
-					assert(delimval.oprclass == TRIP_REF);
-					/* Remove delimiter code gen from curtchain. It will be put on curtchain later
-					   if it is not being passed in as a literal. */
-					dqdel(delimval.oprval.tref, exorder);
+					assert(delimiter->operand[0].oprclass == TRIP_REF);
 				} else
 				{	/* Set $Extract */
 					s->operand[1] = put_tref(first);
 				}
-
+				dqins(setchain.exorder.bl, exorder, first);
+				chktchain(&setchain);
 				/* Process first integer value */
 				if (window_token != TK_COMMA)
 					firstval = put_ilit(1);
@@ -280,90 +283,59 @@ int m_set(void)
 					if (!intexpr(&firstval))
 						return FALSE;
 					assert(firstval.oprclass == TRIP_REF);
-					/* Remove first parm code gen from curtchain and put on setchain. Even though delimiter
-					   is not on the chain yet, the out-of-order execution of the args will be ok. Note that
-					   the put_ilit() call above puts the literal argument on the curtchain but since it is
-					   a literal, does not generate any real code and does not affect the naked indicator,
-					   this should not be a problem.
-					*/
-					dqdel(firstval.oprval.tref, exorder);
-					/* Put first code gen and first triple on the setchain */
-					dqins(setchain.exorder.bl, exorder, firstval.oprval.tref);
 				}
 				first->operand[0] = firstval;
-				dqins(setchain.exorder.bl, exorder, first);
 				if (first_is_lit = (firstval.oprval.tref->opcode == OC_ILIT))
 				{
 					assert(firstval.oprval.tref->operand[0].oprclass  == ILIT_REF);
 					first_val_lit = firstval.oprval.tref->operand[0].oprval.ilit;
 				}
+				chktchain(&setchain);
 				if (window_token != TK_COMMA)
 				{	/* There is no "last" value. Only if 1 char literal delimiter and
 					   no "last" value can we generate shortcut code to op_setp1 entry
 					   instead of op_setpiece.
 					*/
-					if (!is_extract && delimval.oprval.tref->opcode == OC_LIT &&
-					    delimval.oprval.tref->operand[0].oprval.mlit->v.str.len == 1)
-					{
+					if (!is_extract && delimiter->operand[0].oprval.tref->opcode == OC_LIT &&
+					    delimiter->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len == 1)
+					{	/* This reference to a one character literal needs to be turned into
+						   an explict literal instead */
+						delimlit =
+						       (mint)*delimiter->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.addr;
+						dqdel(delimiter->operand[0].oprval.tref, exorder);
+						delimiter->operand[0] = put_ilit(delimlit);
 						s->opcode = OC_SETP1;
-						delimiter->operand[0] =
-							put_ilit((uint4)*delimval.oprval.tref->operand[0].oprval.mlit->v.str.addr);
 						delim1char = TRUE;
-						/* Now can add in delimiter triple itself */
-						dqins(setchain.exorder.bl, exorder, delimiter);
 					} else
 					{
-						if (!is_extract)
-						{	/* Need larger delimiter code. Put it on setchain now */
-							delimiter->operand[0] = delimval;
-							dqins(setchain.exorder.bl, exorder, delimval.oprval.tref);
-							/* Now can add in delimiter triple itself */
-							dqins(setchain.exorder.bl, exorder, delimiter);
-						}
-						last = maketriple(OC_PARAMETER);
+						last = newtriple(OC_PARAMETER);
 						first->operand[1] = put_tref(last);
 						last->operand[0] = first->operand[0];
-						dqins(setchain.exorder.bl, exorder, last);
 					}
+					chktchain(&setchain);
 					/* Generate test sequences for first/last to bypass the set operation if
 					   first/last are not in a usable form */
 					if (first_is_lit)
 					{
 						if (first_val_lit < 1)
-						{
-							jmptrp1 = maketriple(OC_JMP);
-							dqins(setchain.exorder.bl, exorder, jmptrp1);
-						} /* note else no test necessary since first == last and are > 0 */
+							jmptrp1 = newtriple(OC_JMP);
+						/* note else no test necessary since first == last and are > 0 */
 					} else
 					{	/* Generate test for first being <= 0 */
-						jmptrp1 = maketriple(OC_COBOOL);
+						jmptrp1 = newtriple(OC_COBOOL);
 						jmptrp1->operand[0] = first->operand[0];
-						dqins(setchain.exorder.bl, exorder, jmptrp1);
-						jmptrp1 = maketriple(OC_JMPLEQ);
-						dqins(setchain.exorder.bl, exorder, jmptrp1);
+						jmptrp1 = newtriple(OC_JMPLEQ);
 					}
 				} else
 				{	/* There IS a last value */
-					if (!is_extract)
-					{	/* Need larger delimiter code. Put it on setchain now */
-						delimiter->operand[0] = delimval;
-						dqins(setchain.exorder.bl, exorder, delimval.oprval.tref);
-						/* Now can add in delimiter triple itself */
-						dqins(setchain.exorder.bl, exorder, delimiter);
-					}
-					last = maketriple(OC_PARAMETER);
+					last = newtriple(OC_PARAMETER);
 					first->operand[1] = put_tref(last);
 					advancewindow();
 					if (!intexpr(&lastval))
 						return FALSE;
 					assert(lastval.oprclass == TRIP_REF);
-					/* Remove last parm code gen from curtchain and put on setchain */
-					dqdel(lastval.oprval.tref, exorder);
-					/* Put first code gen and first triple on the setchain */
-					dqins(setchain.exorder.bl, exorder, lastval.oprval.tref);
-					dqins(setchain.exorder.bl, exorder, last);
 					last->operand[0] = lastval;
-
+					chktchain(&setchain);
 					/* Generate inline code to test first/last for usability and if found
 					   lacking, branch around the getchain and the actual store so we avoid
 					   setting the naked indicator so far as the target gvn is concerned. If
@@ -379,29 +351,25 @@ int m_set(void)
 							   so unconditionally branch around the whole thing. I think this
 							   leaves dead code but I'm not sure and also not worried about it
 							*/
-							jmptrp1 = maketriple(OC_JMP);
-							dqins(setchain.exorder.bl, exorder, jmptrp1);
+							jmptrp1 = newtriple(OC_JMP);
 						} /* else case actually handled at next 'if' .. */
 					} else
 					{	/* Last is not literal. Do test if it is greater than 0 */
-						jmptrp1 = maketriple(OC_COBOOL);
+						jmptrp1 = newtriple(OC_COBOOL);
 						jmptrp1->operand[0] = last->operand[0];
-						dqins(setchain.exorder.bl, exorder, jmptrp1);
-						jmptrp1 = maketriple(OC_JMPLEQ);
-						dqins(setchain.exorder.bl, exorder, jmptrp1);
+						jmptrp1 = newtriple(OC_JMPLEQ);
 					}
 					if (!last_is_lit || !first_is_lit)
 					{	/* Compare to check that last >= first */
-						jmptrp2 = maketriple(OC_VXCMPL);
+						jmptrp2 = newtriple(OC_VXCMPL);
 						jmptrp2->operand[0] = first->operand[0];
 						jmptrp2->operand[1] = last->operand[0];
-						dqins(setchain.exorder.bl, exorder, jmptrp2);
-						jmptrp2 = maketriple(OC_JMPGTR);
-						dqins(setchain.exorder.bl, exorder, jmptrp2);
+						jmptrp2 = newtriple(OC_JMPGTR);
 					}
 				}
 				chktchain(&setchain);
-				/* Now that the tests are done, we can add the get chain in.  We must do
+
+				/* First we need to add the getchain to the end of the setchain.We must do
 				   this manually as there are no macros to deal with adding a chain with a
 				   header being part of the chain (i.e. curtchain is a pointer, not a real
 				   element like setchain is).
@@ -427,6 +395,8 @@ int m_set(void)
 					first->operand[1] = resptr;
 				else
 					last->operand[1] = resptr;
+				/* One last duy to perform to set chain back to its former happy self */
+				setcurtchain(oldchain);
 				break;
 			default:
 				stx_error(ERR_VAREXPECTED);
@@ -455,11 +425,16 @@ int m_set(void)
 		return FALSE;
 	}
 	advancewindow();
+
+	/* Evaluate expression creating triples on the current chain */
 	if (!expr(result))
 		return FALSE;
+
+	/* Now add in the left-hand side triples */
 	obp = curtchain->exorder.bl;
-	dqadd(obp, &setchain, exorder);   /*this is a violation of info hiding*/
-	chktchain(curtchain)
+	dqadd(obp, &setchain, exorder);		/* this is a violation of info hiding */
+	chktchain(curtchain);
+
 	if (sub)
 	{
 		sb1 = &sub->operand[1];
@@ -527,6 +502,7 @@ int m_set(void)
 			sb1 = &sub->operand[1];
 		}
 	}
+	/* Set jump targets if we did tests above */
 	if (jmptrp1)
 		tnxtarg(&jmptrp1->operand[0]);
 	if (jmptrp2)

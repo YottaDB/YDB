@@ -227,7 +227,7 @@ bool	mubinccpy (backup_reg_list *list)
 	stringpool.free = stringpool.base;
 	op_horolog(&val);
 	stringpool.free = stringpool.base;
-	op_fnzdate(&val, &mu_bin_datefmt, &literal_null, &literal_null, &val);
+	op_fnzdate(&val, (mval *)&mu_bin_datefmt, (mval *)&literal_null, (mval *)&literal_null, &val);
 	memcpy(&outbuf->date[0], val.str.addr, val.str.len);
 	memcpy(&outbuf->reg[0], gv_cur_region->rname, MAX_RN_LEN);
 	memcpy(&outbuf->start_tn, &(list->tn), sizeof(trans_num));

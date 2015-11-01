@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,24 @@
 #error UNSUPPORTED PLATFORM
 #endif
 
+#define ALLOC_XFORM_BUFF(str)							\
+if ((str)->len > max_lcl_coll_xform_bufsiz)					\
+{										\
+	if (0 == max_lcl_coll_xform_bufsiz)					\
+	{									\
+		assert(NULL == lcl_coll_xform_buff);				\
+		max_lcl_coll_xform_bufsiz = MAX_STRLEN_INIT;			\
+	}									\
+	else {									\
+		assert(NULL != lcl_coll_xform_buff);				\
+		free(lcl_coll_xform_buff);					\
+	}									\
+	while ((str)->len > max_lcl_coll_xform_bufsiz)				\
+		max_lcl_coll_xform_bufsiz += max_lcl_coll_xform_bufsiz;		\
+	assert(max_lcl_coll_xform_bufsiz <= MAX_STRLEN);			\
+	lcl_coll_xform_buff = (char *)malloc(max_lcl_coll_xform_bufsiz);	\
+}
+
 typedef struct collseq_struct {
 	struct collseq_struct	*flink;
 	int			act;
@@ -30,6 +48,9 @@ typedef struct collseq_struct {
 	int4			(*version)();
 	int4			(*verify)();
 } collseq;
+
+GBLREF char	*lcl_coll_xform_buff;
+GBLREF	int	max_lcl_coll_xform_bufsiz;
 
 boolean_t map_collseq(mstr *fspec, collseq *ret_collseq);
 collseq *ready_collseq(int act);

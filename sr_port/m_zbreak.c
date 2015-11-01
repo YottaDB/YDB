@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,25 +28,24 @@ LITDEF mident zero_ident;	/* the null mident */
 
 int m_zbreak(void)
 {
-	triple *ref,*next;
-	oprtype label,offset,routine,action,count;
-	bool cancel,cancel_all,is_count,dummybool;
+	triple	*ref, *next;
+	oprtype label, offset, routine, action, count;
+	bool 	cancel, cancel_all, is_count, dummybool;
 	error_def(ERR_LABELEXPECTED);
 	error_def(ERR_RTNNAME);
 
-	label = put_str(&zero_ident.c[0],sizeof(mident));
+	label = put_str((char *)&zero_ident.c[0], sizeof(mident));
 	cancel_all = FALSE;
-	action = put_str("B",1);
+	action = put_str("B", 1);
 	if (window_token == TK_MINUS)
 	{
 		advancewindow();
 		cancel = TRUE;
-		count = put_ilit((mint) CANCEL_ONE);
-	}
-	else
+		count = put_ilit((mint)CANCEL_ONE);
+	} else
 	{
 		cancel = FALSE;
-		count = put_ilit((mint) 0);
+		count = put_ilit((mint)0);
 	}
 	if (window_token == TK_ASTERISK)
 	{
@@ -55,39 +54,36 @@ int m_zbreak(void)
 			advancewindow();
 			cancel_all = TRUE;
 			if (!run_time)
-				routine = put_str(&routine_name[0],sizeof(mident));
+				routine = put_str(&routine_name[0], sizeof(mident));
 			else
 				routine = put_tref(newtriple(OC_CURRTN));
 			offset = put_ilit((mint) 0);
 			count = put_ilit((mint) CANCEL_ALL);
-		}
-		else
+		} else
 		{
 			stx_error(ERR_LABELEXPECTED);
 			return FALSE;
 		}
-	}
-	else
+	} else
 	{
 		offset = put_ilit((mint) 0);
-		if (!lref(&label,&offset,TRUE,indir_zbreak,!cancel,&dummybool))
+		if (!lref(&label,&offset, TRUE, indir_zbreak, !cancel, &dummybool))
 			return FALSE;
 		if (label.oprclass == TRIP_REF && label.oprval.tref->opcode == OC_COMMARG)
 			return TRUE;
 		if (window_token != TK_CIRCUMFLEX)
 		{
 			if (!run_time)
-				routine = put_str(&routine_name[0],sizeof(mident));
+				routine = put_str(&routine_name[0], sizeof(mident));
 			else
 				routine = put_tref(newtriple(OC_CURRTN));
-		}
-		else
+		} else
 		{
 			advancewindow();
 			switch(window_token)
 			{
 			case TK_IDENT:
-				routine = put_str(&window_ident.c[0],sizeof(mident));
+				routine = put_str(&window_ident.c[0], sizeof(mident));
 				advancewindow();
 				break;
 			case TK_ATSIGN:
@@ -106,8 +102,7 @@ int m_zbreak(void)
 			{
 				is_count = TRUE;
 				action = put_str("B",1);
-			}
-			else
+			} else
 			{
 				if (!strexpr(&action))
 					return FALSE;

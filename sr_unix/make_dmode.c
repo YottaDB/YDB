@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,12 +9,12 @@
  *								*
  ****************************************************************/
 
-#ifndef OBJ_FILESP_INCLUDED
-#define OBJ_FILESP_INCLUDED
+#include "mdef.h"
 
-void emit_addr(int4 refaddr, int4 offset, int4 *result);
-void emit_reference(uint4 refaddr, mstr *name, uint4 *result);
-struct sym_table *define_symbol(unsigned char psect, mstr name, int4 value);
+#include "rtnhdr.h"
+#include "make_mode.h"
 
-#endif
-
+rhdtyp *make_dmode (void)
+{
+	return make_mode(DM_MODE);
+}

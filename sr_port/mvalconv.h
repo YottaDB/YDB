@@ -21,6 +21,5 @@ double mval2double(mval *v);
 int4 mval2i(mval *v);
 uint4 mval2si(mval *v);
 bool isint (mval *v);
-int mpath2mval(char *inbuff, int maxelem, mval *mvarray);
 
 #endif

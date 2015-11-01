@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,12 @@ typedef struct	mliteralstruct
 	mval			v;
 } mliteral;
 
+typedef struct	triplesize
+{
+	struct tripletype	*ct;
+	int4			size;
+} tripsize;
+
 typedef struct	oprtypestruct
 {
 	char			oprclass;
@@ -66,6 +72,7 @@ typedef struct	oprtypestruct
 	{
 		struct	oprtypestruct	*indr;
 		struct	tripletype	*tref;
+		struct	triplesize	*tsize;
 		mlabel			*lab;
 		mline			*mlin;
 		mliteral		*mlit;
@@ -73,6 +80,7 @@ typedef struct	oprtypestruct
 		mvar			*vref;
 		int4		temp;
 		int4		ilit;
+		int4		offset;
 		unsigned char		vreg;
 	}			oprval;
 } oprtype;
@@ -97,6 +105,8 @@ typedef struct	oprtypestruct
 #define TEMP_REF	16
 #define MFUN_REF	17
 #define MNXL_REF	18	/* refer to internalentry of child line */
+#define TSIZ_REF	19	/* ilit refering to size of given triple codegen */
+#define OCNT_REF	20	/* Offset from Call to Next Triple */
 
 
 typedef struct	tbptype
@@ -200,6 +210,8 @@ void comp_init(mstr *src);
 void comp_indr(mstr *obj);
 bool compiler_startup(void);
 
+oprtype put_ocnt(void);
+oprtype put_tsiz(void);
 oprtype put_cdlt(mstr *x);
 oprtype put_ilit(mint x);
 oprtype put_indr(oprtype *x);
@@ -277,7 +289,13 @@ void for_pop(void);
 
 void walktree(mvar *n,void (*f)(),char *arg);
 
+/* VMS uses same code generator as USHBIN so treat as USHBIN for these compiler routines */
+#if defined(USHBIN_SUPPORTED) || defined(VMS)
+void shrink_trips(void);
+boolean_t litref_triple_oprcheck(oprtype *operand);
+#else
 void shrink_jmps(void);
+#endif
 
 void tripinit(void);
 void wrtcatopt(triple *r, triple ***lpx, triple **lptop);

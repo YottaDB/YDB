@@ -23,7 +23,7 @@ typedef struct err_ctl_struct
 {
 	int		facnum;
 	char		*facname;
-	err_msg		*fst_msg; /* For VMS, this pointer is not used, and its value will typically be NULL */
+	const err_msg	*fst_msg; /* For VMS, this pointer is not used, and its value will typically be NULL */
 	int		msg_cnt;
 } err_ctl;
 
@@ -45,7 +45,7 @@ typedef struct err_ctl_struct
 /* to change default severity of msg to type */
 #define MAKE_MSG_TYPE(msg, type)  ((msg) & ~SEV_MSK | (type))
 
-err_ctl *err_check(int err);
+const err_ctl *err_check(int err);
 
 CONDITION_HANDLER(ccp_ch);
 CONDITION_HANDLER(ccp_exi_ch);
@@ -93,6 +93,7 @@ CONDITION_HANDLER(trans_code_ch);
 CONDITION_HANDLER(updproc_ch);
 CONDITION_HANDLER(util_base_ch);
 CONDITION_HANDLER(util_ch);
+CONDITION_HANDLER(gtm_maxstr_ch);
 CONDITION_HANDLER(zyerr_ch);
 
 void mum_tstart();

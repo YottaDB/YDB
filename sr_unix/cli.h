@@ -21,7 +21,7 @@
 
 #define MAX_CMD_LEN	25	/* Max Command name string length */
 #define MAX_OPT_LEN	25	/* Max Option name string length */
-#define MAX_ERR_STR	80	/* Max error string length */
+#define MAX_CLI_ERR_STR	256	/* Max error string length */
 #define MAX_LINE	32767+256	/* Max line len , maximum record size plus some overhead */
 
 #define VAL_N_A		0	/* value type not applicable */

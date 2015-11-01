@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,11 +44,11 @@ static readonly char space_text[] = {' '};
 #define ZS_STR_OUT(V,TEXT) ((V)->str.len = sizeof((TEXT)) - 1, (V)->str.addr = (TEXT), zshow_output(output,&(V)->str))
 #define ZS_PARM_SP(V,TEXT) ((V)->str.len = dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
 			zshow_param_index[(TEXT)].offset ].len, \
-			(V)->str.addr = dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
+			(V)->str.addr = (char *)dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
 			zshow_param_index[(TEXT)].offset ].name, zshow_output(output,&(V)->str), ZS_ONE_OUT((V),space_text))
 #define ZS_PARM_EQU(V,TEXT) ((V)->str.len = dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
 			zshow_param_index[(TEXT)].offset ].len, \
-			(V)->str.addr = dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
+			(V)->str.addr = (char *)dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
 			zshow_param_index[(TEXT)].offset ].name, zshow_output(output,&(V)->str), ZS_ONE_OUT((V),equal_text))
 
 GBLREF bool ctrlc_on;
@@ -156,43 +156,54 @@ void zshow_devices(zshow_out *output)
 						ZS_ONE_OUT(&v,space_text);
 					}
 					if ((int4)(tt_ptr->term_ctrl) & TRM_NOECHO)
-					{	ZS_PARM_SP(&v,zshow_noecho);
+					{
+						ZS_PARM_SP(&v,zshow_noecho);
 					}
 					if (tt_ptr->term_ctrl & TRM_PASTHRU)
-					{	ZS_PARM_SP(&v,zshow_past);
-					}else
-					{	ZS_PARM_SP(&v,zshow_nopast);
+					{
+						ZS_PARM_SP(&v,zshow_past);
+					} else
+					{
+						ZS_PARM_SP(&v,zshow_nopast);
 					}
 					if (!(tt_ptr->term_ctrl & TRM_ESCAPE))
-					{	ZS_PARM_SP(&v,zshow_noesca);
+					{
+						ZS_PARM_SP(&v,zshow_noesca);
 					}
 					if (tt_ptr->term_ctrl & TRM_READSYNC)
-					{	ZS_PARM_SP(&v,zshow_reads);
-					}else
-					{	ZS_PARM_SP(&v,zshow_noreads);
+					{
+						ZS_PARM_SP(&v,zshow_reads);
+					} else
+					{
+						ZS_PARM_SP(&v,zshow_noreads);
 					}
 					if (tt_ptr->term_ctrl & TRM_NOTYPEAHD)
-					{	ZS_PARM_SP(&v,zshow_notype);
-					}else
-					{	ZS_PARM_SP(&v,zshow_type);
+					{
+						ZS_PARM_SP(&v,zshow_notype);
+					} else
+					{
+						ZS_PARM_SP(&v,zshow_type);
 					}
 					if (!l->iod->wrap)
-					{	ZS_PARM_SP(&v,zshow_nowrap);
+					{
+						ZS_PARM_SP(&v,zshow_nowrap);
 					}
 					mask_out = &tt_ptr->mask_term;
 					if (mask_out->mask[0] != TERM_MSK)
-					{	ZS_PARM_EQU(&v,zshow_term);
+					{
+						ZS_PARM_EQU(&v,zshow_term);
 						ZS_STR_OUT(&v,dollarc_text);
 						first = TRUE;
 						for ( i = 0; i < 8 ;i++)
 						{
 							for ( j = 0; j < 32; j++)
 								if (mask_out->mask[i] & (1 << j))
-								{	if (!first)
-									{	ZS_ONE_OUT(&v, comma_text);
-									}else
-									{	first = FALSE;
-									}
+								{
+									if (!first)
+									{
+										ZS_ONE_OUT(&v, comma_text);
+									} else
+										first = FALSE;
 									MV_FORCE_MVAL(&m,i * 32 + j) ;
 									mval_write(output,&m,FALSE);
 								}
@@ -222,7 +233,8 @@ void zshow_devices(zshow_out *output)
 							}
 							ZS_STR_OUT(&v,filchar_text);
 							if (twoparms)
-							{	ZS_ONE_OUT(&v,comma_text);
+							{
+								ZS_ONE_OUT(&v,comma_text);
 								ZS_ONE_OUT(&v,space_text);
 							}
 						}
@@ -237,44 +249,54 @@ void zshow_devices(zshow_out *output)
 					ZS_STR_OUT(&v,rmsfile_text);
 					rm_ptr = (d_rm_struct*) l->iod->dev_sp;
 					if (rm_ptr->fixed)
-					{	ZS_PARM_SP(&v,zshow_fixed);
+					{
+						ZS_PARM_SP(&v,zshow_fixed);
 					}
 					if (rm_ptr->noread)
-					{	ZS_PARM_SP(&v,zshow_read);
+					{
+						ZS_PARM_SP(&v,zshow_read);
 					}
 					if (l->iod->width != DEF_RM_WIDTH)
-					{	ZS_PARM_EQU(&v,zshow_rec);
+					{
+						ZS_PARM_EQU(&v,zshow_rec);
 						MV_FORCE_MVAL(&m,(int) l->iod->width);
 						mval_write(output, &m, FALSE);
 						ZS_ONE_OUT(&v,space_text);
 					}
 					if (!l->iod->wrap)
-					{	ZS_PARM_SP(&v,zshow_nowrap);
+					{
+						ZS_PARM_SP(&v,zshow_nowrap);
 					}
 					break;
 				case mb:
 					ZS_STR_OUT(&v,mailbox_text);
 					mb_ptr = (d_mb_struct*) l->iod->dev_sp;
 					if (mb_ptr->write_mask)
-					{	ZS_PARM_SP(&v,zshow_wait);
+					{
+						ZS_PARM_SP(&v,zshow_wait);
 					}
 					if (mb_ptr->prmflg)
-					{	ZS_PARM_SP(&v,zshow_prmmbx);
+					{
+						ZS_PARM_SP(&v,zshow_prmmbx);
 					}
 					if (mb_ptr->maxmsg != DEF_MB_MAXMSG)
-					{	ZS_PARM_EQU(&v,zshow_bloc);
+					{
+						ZS_PARM_EQU(&v,zshow_bloc);
 						MV_FORCE_MVAL(&m,mb_ptr->maxmsg) ;
 						mval_write(output, &m, FALSE);
 						ZS_ONE_OUT(&v,space_text);
 					}
 					if (mb_ptr->promsk & IO_RD_ONLY)
-					{	ZS_PARM_SP(&v,zshow_read);
+					{
+						ZS_PARM_SP(&v,zshow_read);
 					}
 					if (mb_ptr->del_on_close)
-					{	ZS_PARM_SP(&v,zshow_dele);
+					{
+						ZS_PARM_SP(&v,zshow_dele);
 					}
 					if (mb_ptr->promsk & IO_SEQ_WRT)
-					{	ZS_PARM_SP(&v,zshow_write);
+					{
+						ZS_PARM_SP(&v,zshow_write);
 					}
 					break;
 				case gtmsocket:
@@ -317,8 +339,7 @@ void zshow_devices(zshow_out *output)
 		/* socket type */		if (socketptr->passive)
 						{
 							ZS_STR_OUT(&v, passive_text);
-						}
-						else
+						} else
 						{
 							ZS_STR_OUT(&v, active_text);
 						}
@@ -326,8 +347,7 @@ void zshow_devices(zshow_out *output)
 		/* error trapping */		if (socketptr->ioerror)
 						{
 							ZS_STR_OUT(&v, trap_text);
-						}
-						else
+						} else
 						{
 							ZS_STR_OUT(&v, notrap_text);
 						}
@@ -337,8 +357,7 @@ void zshow_devices(zshow_out *output)
 							ZS_STR_OUT(&v, port_text);
 							MV_FORCE_MVAL(&m, (int)socketptr->local.port);
 							mval_write(output, &m, FALSE);
-						}
-						else
+						} else
 						{
 							ZS_STR_OUT(&v, remote_text);
 							v.str.addr = socketptr->remote.saddr_ip;
@@ -366,8 +385,7 @@ void zshow_devices(zshow_out *output)
 		/* zdelay */			if (socketptr->nodelay)
 						{
 							ZS_STR_OUT(&v, znodelay_text);
-						}
-						else
+						} else
 						{
 							ZS_STR_OUT(&v, zdelay_text);
 						}
@@ -397,8 +415,7 @@ void zshow_devices(zshow_out *output)
 								zshow_output(output, &delim);
 								ZS_ONE_OUT(&v, space_text);
 							}
-						}
-						else
+						} else
 						{
 							ZS_STR_OUT(&v, nodelimiter_text);
 						}
@@ -417,12 +434,11 @@ void zshow_devices(zshow_out *output)
 					zshow_output(output, &v.str);
 					output->flush = TRUE;
 					ZS_ONE_OUT(&v, quote_text);
-				}else
+				} else
 				{	output->flush = TRUE;
 					zshow_output(output, 0);
 				}
-			}
-			else
+			} else
 			{	output->flush = TRUE;
 				ZS_STR_OUT(&v, devcl);
 			}

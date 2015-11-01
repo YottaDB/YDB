@@ -258,7 +258,7 @@ void mu_extract(void)
 		stringpool.free = stringpool.base;
 		op_horolog(&val);
 		stringpool.free = stringpool.base;
-		op_fnzdate(&val, &mu_bin_datefmt, &null_str, &null_str, &val);
+		op_fnzdate(&val, (mval *)&mu_bin_datefmt, &null_str, &null_str, &val);
 		memcpy(outptr, val.str.addr, val.str.len);
 		outptr += val.str.len;
 		MV_FORCE_MVAL(&val, reg_max_blk);

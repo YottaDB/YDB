@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -277,3 +277,4 @@ OPCODE_DEF(OC_FNREVERSE, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_PSVPUT, (OCT_NULL))
 OPCODE_DEF(OC_FNZJOBEXAM, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZSIGPROC, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_TRIPSIZE, (OCT_MVAL | OCT_CGSKIP | OCT_EXPRLEAF))

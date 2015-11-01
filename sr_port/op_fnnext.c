@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,6 @@
 #include "underr.h"
 
 GBLREF collseq		*local_collseq;
-GBLREF char		*lcl_coll_xform_buff;
 
 void op_fnnext(lv_val *src,mval *key,mval *dst)
 {
@@ -91,8 +90,9 @@ void op_fnnext(lv_val *src,mval *key,mval *dst)
 				{
 					if (local_collseq)
 					{
+						ALLOC_XFORM_BUFF(&key->str);
 						tmp_sbs.mvtype = MV_STR;
-						tmp_sbs.str.len = MAX_LCL_COLL_XFORM_BUFSIZ;
+						tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 						assert(NULL != lcl_coll_xform_buff);
 						tmp_sbs.str.addr = lcl_coll_xform_buff;
 						do_xform(local_collseq->xform, &key->str, &tmp_sbs.str, &length);
@@ -104,7 +104,8 @@ void op_fnnext(lv_val *src,mval *key,mval *dst)
 				 	{
 						if (local_collseq)
 						{
-							tmp_sbs.str.len = MAX_LCL_COLL_XFORM_BUFSIZ;
+							ALLOC_XFORM_BUFF(&((sbs_str_struct *)status.ptr)->str);
+							tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 							assert(NULL != lcl_coll_xform_buff);
 							tmp_sbs.str.addr = lcl_coll_xform_buff;
 							do_xform(local_collseq->xback,

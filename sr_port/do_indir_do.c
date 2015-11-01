@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,7 @@ int do_indir_do(mval *v, unsigned char argcode)
 				}
 				current_rhead = CURRENT_RHEAD_ADR(frame_pointer->rvector);
 				frame_pointer->mpc = LINE_NUMBER_ADDR(current_rhead, USHBIN_ONLY(*)addr);
-#if defined(__alpha) || defined(__MVS__) || defined(__s390__)
+#if defined(__alpha) || defined(__MVS__) || defined(__s390__) || defined(_AIX)
 				frame_pointer->ctxt = (unsigned char *)LINKAGE_ADR(current_rhead);
 #else
 				frame_pointer->ctxt = PTEXT_ADR(current_rhead);

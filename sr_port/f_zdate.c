@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,7 @@ int f_zdate( oprtype *a, opctype op ) /* op is not used */
 			}
 		}
 		if (!more_args)
-			args[i]->operand[0] = put_lit(&literal_null);
+			args[i]->operand[0] = put_lit((mval *)&literal_null);
 		args[i - 1]->operand[1] = put_tref(args[i]);
 	}
 	ins_triple(args[0]);

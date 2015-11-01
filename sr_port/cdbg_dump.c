@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +48,9 @@ LITDEF char *oprtype_type_names[] =
 	"CDLT_REF",
 	"TEMP_REF",
 	"MFUN_REF",
-	"MNXL_REF"
+	"MNXL_REF",
+	"TSIZ_REF",
+	"OCNT_REF"
 };
 
 LITDEF char *indents[11] =
@@ -77,9 +79,9 @@ void cdbg_dump_triple(triple *dtrip, int indent)
 {
 	int		len;
 
-	PRINTF("%s Triple %s [0x%08lx]   Forward ptr: 0x%08lx   Backward ptr: 0x%08lx  Source line: %d  Column: %d\n",
+	PRINTF("%s Triple %s [0x%08lx]   fwdptr: 0x%08lx   bkwdptr: 0x%08lx  srcline: %d  colmn: %d  rtaddr: %d\n",
 	       cdbg_indent(indent), oc_tab_graphic[dtrip->opcode], dtrip,
-	       dtrip->exorder.fl, dtrip->exorder.bl, dtrip->src.line, dtrip->src.column);
+	       dtrip->exorder.fl, dtrip->exorder.bl, dtrip->src.line, dtrip->src.column, dtrip->rtaddr);
 	/*switch(dtrip->opcode)
 	{
 		case OC_CDLIT:
@@ -96,11 +98,20 @@ void cdbg_dump_triple(triple *dtrip, int indent)
 	fflush(stdout);
 }
 
+void cdbg_dump_shrunk_triple(triple *dtrip, int old_size, int new_size)
+{
+	PRINTF("Shrunken triple %s [0x%08lx]   fwdptr: 0x%08lx   bkwdptr: 0x%08lx  srcline: %d  colmn: %d  rtaddr: %d\n",
+	       oc_tab_graphic[dtrip->opcode], dtrip, dtrip->exorder.fl, dtrip->exorder.bl, dtrip->src.line,
+	       dtrip->src.column, dtrip->rtaddr);
+	PRINTF("    old size: %d  new size: %d  shrinkage: %d\n", old_size, new_size, (old_size - new_size));
+	fflush(stdout);
+}
+
 void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 {
 	triple	*rtrip;
-	int4	offset;
-	char	buff[MAX_STRLEN + 1];
+	int	offset, len;
+	char	*buff;
 
 	if (opr)
 		PRINTF("%s %s  [0x%08lx]  Type: %s\n", cdbg_indent(indent), oprtype_names[opnum], opr,
@@ -118,12 +129,18 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 			break;
 		case TCAD_REF:
 		case TVAD_REF:
+			PRINTF("%s  %s reference - whatever it means: value is %d\n", cdbg_indent(indent),
+			       ((TCAD_REF == opr->oprclass) ? "TCAD_REF" : "TVAD_REF"), opr->oprval.temp);
+			break;
 		case MVAR_REF:
 			if (opr->oprval.vref)
+			{
 				PRINTF("%s   LS vref: 0x%08lx  RS vref: 0x%08lx  index: %d  varname: %s  last triple: 0x%08lx\n",
 				       cdbg_indent(indent), opr->oprval.vref->lson, opr->oprval.vref->rson, opr->oprval.vref->mvidx,
-				       cdbg_makstr(opr->oprval.vref->mvname.c, buff, sizeof(opr->oprval.vref->mvname)),
+				       cdbg_makstr(opr->oprval.vref->mvname.c, &buff, sizeof(opr->oprval.vref->mvname)),
 				       opr->oprval.vref->last_fetch);
+				free(buff);
+			}
 			else
 				PRINTF("%s   ** Warning ** oprval.vref is NULL\n", cdbg_indent(indent));
 			break;
@@ -138,7 +155,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 			break;
 		case MLIT_REF:
 			if (opr->oprval.mlit)
-				PRINTF("%s   lit-ref Fwd ptr: 0x%08lx  Bkwd ptr: 0x%08lx  rtaddr: 0x%08lx\n",
+				PRINTF("%s   lit-ref fwdptr: 0x%08lx  bkwdptr: 0x%08lx  rtaddr: 0x%08lx\n",
 				       cdbg_indent(indent), opr->oprval.mlit->que.fl, opr->oprval.mlit->que.bl,
 				       opr->oprval.mlit->rt_addr);
 			else
@@ -158,6 +175,28 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 			break;
 		case INDR_REF:
 			cdbg_dump_operand(indent, opr->oprval.indr, opnum);
+			break;
+		case TSIZ_REF:
+			if (opr->oprval.tsize)
+				PRINTF("%s   triple at 0x%08lx has size %d\n", cdbg_indent(indent), opr->oprval.tsize->ct,
+				       opr->oprval.tsize->size);
+			else
+				PRINTF("%s   ** Warning ** oprval.tsize is NULL\n", cdbg_indent(indent));
+			break;
+		case OCNT_REF:
+			PRINTF("%s   offset from call to next triple: %d\n", cdbg_indent(indent), opr->oprval.offset);
+			break;
+		case MFUN_REF:
+			if (opr->oprval.lab)
+			{
+				unsigned char mid[sizeof(mident) + 1];
+
+				len = mid_len(&opr->oprval.lab->mvname);
+				memcpy(mid, &opr->oprval.lab->mvname, len);
+				mid[len] = 0;
+				PRINTF("%s   mlabel name: %s\n", cdbg_indent(indent), mid);
+			} else
+				PRINTF("%s   ** Warning ** oprval.lab is NULL\n", cdbg_indent(indent));
 			break;
 		default:
 			PRINTF("%s   %s bogus reference\n", cdbg_indent(indent), oprtype_type_names[opr->oprclass]);
@@ -221,22 +260,22 @@ void cdbg_dump_mval(int indent, mval *mv)
 /* Dump value of a given mstr. Assumes length is non-zero */
 void cdbg_dump_mstr(int indent, mstr *ms)
 {
-	unsigned char	buffer[1024];
-	int4		len;
+	unsigned char	*buffer;
+	int		len;
 
 	len = ms->len;
-	if (len > (sizeof(buffer) - 1))
-		len = sizeof(buffer) - 1;
+	buffer = malloc(len + 1);
 	memcpy(buffer, ms->addr, len);
 	buffer[len] = 0;
 	PRINTF("%s   String value: %s\n", cdbg_indent(indent), buffer);
+	free(buffer);
 }
 
 /* Provide string to do indenting of formatted output */
 char *cdbg_indent(int indent)
 {
 	if (10 >= indent)
-		return indents[indent];
+		return (char *)indents[indent];
 
 	if (sizeof(indent_str) < indent * 2)
 		GTMASSERT;
@@ -248,9 +287,10 @@ char *cdbg_indent(int indent)
 }
 
 /* Make a given addr/len string into a null terminate string */
-char *cdbg_makstr(char *str, char *buf, int len)
+char *cdbg_makstr(char *str, char **buf, int len)
 {
-	memcpy(buf, str, len);
-	buf[len] = 0;
-	return buf;
+	*buf = malloc(len + 1);
+	memcpy(*buf, str, len);
+	(*buf)[len] = 0;
+	return *buf;
 }

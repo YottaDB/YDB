@@ -318,7 +318,7 @@ void zshow_svn(zshow_out *output)
 		mval_write(output, &var, TRUE);
 	/* SV_ZEOF */
 		ZS_VAR_EQU(&x, zeof_text);
-		mval_write(output, io_curr_device.in->dollar.zeof ? &literal_one : &literal_zero, TRUE);
+		mval_write(output, io_curr_device.in->dollar.zeof ? (mval *)&literal_one : (mval *)&literal_zero, TRUE);
 	/* SV_ZERROR */
 		var.mvtype = MV_STR;
 		var.str = dollar_zerror.str;
@@ -417,7 +417,7 @@ void zshow_svn(zshow_out *output)
 		mval_write(output, &var, TRUE);
 	/* SV_ZVERSION */
 		var.mvtype = MV_STR;
-		var.str.addr = &gtm_release_name[0];
+		var.str.addr = (char *)&gtm_release_name[0];
 		var.str.len = gtm_release_name_len;
 		ZS_VAR_EQU(&x, zversion_text);
 		mval_write(output, &var, TRUE);

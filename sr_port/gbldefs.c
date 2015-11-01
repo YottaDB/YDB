@@ -97,6 +97,7 @@
 #include "op_merge.h"
 
 #ifdef UNIX
+#include "cli.h"
 #include "invocation_mode.h"
 #include "fgncal.h"
 #endif
@@ -402,7 +403,7 @@ GBLDEF	volatile boolean_t	semwt2long;
 #ifdef UNIX
 GBLDEF	parmblk_struct 		*param_list; /* call-in parameters block (defined in unix/fgncalsp.h)*/
 GBLDEF	unsigned int		invocation_mode = MUMPS_COMPILE; /* how mumps has been invoked */
-GBLDEF	char			cli_err_str[MAX_STRLEN] = "";   /* Parse Error message buffer */
+GBLDEF	char			cli_err_str[MAX_CLI_ERR_STR] = "";   /* Parse Error message buffer */
 GBLDEF	char			*cli_err_str_ptr = NULL;
 #endif
 

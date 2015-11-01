@@ -103,7 +103,8 @@ void dse_dmp_fhead (void)
 									copy from stringpool to local buffer */
 		time_val.str.addr = (char*)buffer;
 		stringpool.free -= time_val.str.len; /* now that we've made a copy, we don't need time_val in stringpool */
-		op_fnzdate(&time_val, &dse_dmp_time_fmt, &literal_null, &literal_null, &zdate_time); /* returns zdate formatted
+		op_fnzdate(&time_val, &dse_dmp_time_fmt, (mval *)&literal_null, (mval *)&literal_null,
+			   &zdate_time); /* returns zdate formatted
 												        string in stringpool */
 		util_out_print("Date/Time       !AD [$H = !AD]", TRUE, zdate_time.str.len, zdate_time.str.addr,
 				time_val.str.len, time_val.str.addr);
@@ -349,7 +350,7 @@ void dse_dmp_fhead (void)
 			(cs_addrs->hdr->recov_interrupted ? " TRUE" : "FALSE"));
 		util_out_print("      ", FALSE);
 		util_out_print("  INTRPT resolve time   !12UL", TRUE, cs_addrs->hdr->intrpt_recov_tp_resolve_time);
-		util_out_print("  INTRPT seqno    0x!16@XJ", FALSE, &cs_addrs->hdr->intrpt_recov_resync_seqno);
+		util_out_print("  INTRPT seqno          !12UL", FALSE, cs_addrs->hdr->intrpt_recov_resync_seqno);
 		util_out_print("      ", FALSE);
 		util_out_print("  INTRPT jnl_state      !12UL", TRUE, cs_addrs->hdr->intrpt_recov_jnl_state);
 		util_out_print("  INTRPT repl_state     !12UL", FALSE, cs_addrs->hdr->intrpt_recov_repl_state);

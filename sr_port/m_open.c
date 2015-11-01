@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,7 +86,7 @@ int m_open(void)
 		}
 	}
 	if (TK_COLON != window_token)
-		mspace = put_lit(&literal_null);
+		mspace = put_lit((mval *)&literal_null);
 	else
 	{
 		advancewindow();

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@
 void ecode_set(int errnum)
 {
 	mval		tmpmval;
-	err_ctl		*ectl;
+	const err_ctl	*ectl;
 	mstr		ecode_mstr;
 	char		ecode_buff[ECODE_MAX_LEN_WITH_BUFFER];
 	char		*ecode_ptr;
