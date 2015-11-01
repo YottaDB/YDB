@@ -28,6 +28,14 @@
 #include "dpgbldir.h"
 #include "underr.h"
 #include "gtmmsg.h"
+#include "ztrap_save_ctxt.h"
+#include "dollar_zlevel.h"
+#include "error_trap.h"
+#include "gtm_ctype.h"
+#include "setzdir.h"
+#include "rtnhdr.h"
+#include "stack_frame.h"
+#include "getzdir.h"
 
 #define PROMPTBUF "GTM>           "
 
@@ -46,15 +54,27 @@ GBLREF mstr		dollar_zcompile;
 GBLREF mstr		dollar_zroutines;
 GBLREF mstr		dollar_zsource;
 GBLREF int		dollar_zmaxtptime;
-GBLREF mval           dollar_ecode;
-GBLREF mval           dollar_etrap;
-GBLREF mval           dollar_zerror;
-GBLREF mval           dollar_zyerror;
+GBLREF int		ztrap_form;
+GBLREF ecode_list	*dollar_ecode_list;
+GBLREF mval		dollar_etrap;
+GBLREF mval		dollar_zerror;
+GBLREF mval		dollar_zyerror;
+GBLREF mval		dollar_system;
+GBLREF boolean_t	ztrap_new;
+GBLREF stack_frame	*error_frame;
+GBLREF unsigned char	*error_last_mpc_err;
+GBLREF unsigned char	*error_last_ctxt_err;
+GBLREF stack_frame	*error_last_frame_err;
 
 void op_svput(int varnum, mval *v)
 {
+	int		i, ok, state;
+	ecode_list	*ecode_next;
 	error_def(ERR_UNIMPLOP);
 	error_def(ERR_TEXT);
+	error_def(ERR_INVECODEVAL);
+	error_def(ERR_SETECODE);
+	error_def(ERR_SYSTEMVALUE);
 
 	switch (varnum)
 	{
@@ -112,8 +132,22 @@ void op_svput(int varnum, mval *v)
 		break;
 	case SV_ZTRAP:
 		MV_FORCE_STR(v);
+		if (ztrap_new)
+			op_newintrinsic(SV_ZTRAP);
 		dollar_ztrap.mvtype = MV_STR;
 		dollar_ztrap.str = v->str;
+		/* Setting either $ZTRAP or $ETRAP to empty
+		 * causes all error trapping to be canceled
+		 */
+		if (!v->str.len)
+		{
+			dollar_etrap.mvtype = MV_STR;
+			dollar_etrap.str = v->str;
+		} else /* Ensure that $ETRAP and $ZTRAP are not both active at the same time */
+			if (dollar_etrap.str.len > 0)
+				op_newintrinsic(SV_ETRAP);
+		if (ztrap_form & ZTRAP_POP)
+			ztrap_save_ctxt();
 		break;
 	case SV_ZSTATUS:
 		MV_FORCE_STR(v);
@@ -127,15 +161,77 @@ void op_svput(int varnum, mval *v)
 		break;
 	case SV_ECODE:
 		MV_FORCE_STR(v);
-		dollar_ecode.mvtype = MV_STR;
-		dollar_ecode.str = v->str;
-		gtm_putmsg(VARLSTCNT(1) MAKE_MSG_WARNING(ERR_UNIMPLOP));
-		gtm_putmsg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("$ECODE"));
+		if (v->str.len)
+		{
+			/* Format must be like ,Mnnn,Mnnn,Zxxx,Uxxx,
+			 * Mnnn are ANSI standard error codes
+			 * Zxxx are implementation-specific codes
+			 * Uxxx are end-user defined codes
+			 * Note that there must be commas at the start and at the end
+			 */
+			for (state = 2, i = 0; (i < v->str.len) && (state <= 2); i++)
+			{
+				switch(state)
+				{
+				case 2: state = (v->str.addr[i] == ',') ? 1 : 101;
+					break;
+				case 1: state = ((v->str.addr[i] == 'M') ||
+				                 (v->str.addr[i] == 'U') ||
+					         (v->str.addr[i] == 'Z')) ? 0 : 101;
+					break;
+				case 0: state = (v->str.addr[i] == ',') ? 1 : 0;
+					break;
+				}
+			}
+			/* The above check would pass strings like ","
+			 * so double-check that there are at least three characters
+			 * (starting comma, ending comma, and something in between)
+			 */
+			if ((state != 1) || (v->str.len < 3))
+			{
+				/* error, ecode = M101 */
+				rts_error(VARLSTCNT(4) ERR_INVECODEVAL, 2, v->str.len, v->str.addr);
+			}
+		}
+		if (v->str.len > 0)
+		{
+			ecode_next = (ecode_list *) malloc(sizeof(ecode_list));
+			ecode_next->previous = dollar_ecode_list;
+			dollar_ecode_list = ecode_next;
+			ecode_next->level = dollar_zlevel();
+			ecode_next->str.len = v->str.len;
+			ecode_next->str.addr = malloc(v->str.len);
+			memcpy(ecode_next->str.addr, v->str.addr, v->str.len);
+			rts_error(VARLSTCNT(2) ERR_SETECODE, 0);
+		} else
+		{
+			for (ecode_next = dollar_ecode_list;
+				ecode_next->previous;
+				ecode_next = dollar_ecode_list)
+			{
+				free(ecode_next->str.addr);
+				dollar_ecode_list = ecode_next->previous;
+				free(ecode_next);
+			}
+			error_frame = NULL;
+			error_last_frame_err = NULL;
+			error_last_mpc_err = error_last_ctxt_err = NULL;
+		}
 		break;
 	case SV_ETRAP:
 		MV_FORCE_STR(v);
 		dollar_etrap.mvtype = MV_STR;
 		dollar_etrap.str = v->str;
+		/* Setting either $ZTRAP or $ETRAP to empty
+		 * causes all error trapping to be canceled
+		 */
+		if (!v->str.len)
+		{
+			dollar_ztrap.mvtype = MV_STR;
+			dollar_ztrap.str = v->str;
+		} else /* Ensure that $ETRAP and $ZTRAP are not both active at the same time */
+			if (dollar_ztrap.str.len > 0)
+				op_newintrinsic(SV_ZTRAP);
 		break;
 	case SV_ZERROR:
 		MV_FORCE_STR(v);
@@ -146,6 +242,25 @@ void op_svput(int varnum, mval *v)
 		MV_FORCE_STR(v);
 		dollar_zyerror.mvtype = MV_STR;
 		dollar_zyerror.str = v->str;
+		break;
+	case SV_SYSTEM:
+		ok = 1;
+		if (!(v->mvtype & MV_STR))
+			ok = 0;
+		if (ok && v->str.addr[0] != '4')
+			ok = 0;
+		if (ok && v->str.addr[1] != '7')
+			ok = 0;
+		if ((' ' != v->str.addr[2]) && !ispunct(v->str.addr[2]))
+			ok = 0;
+		if (ok)
+			dollar_system.str = v->str;
+		else
+			rts_error(VARLSTCNT(4) ERR_SYSTEMVALUE, 2, v->str.len, v->str.addr);
+		break;
+	case SV_ZDIR:
+		setzdir(v, NULL); /* change directory to v */
+		getzdir(); /* update dollar_zdir with current working directory */
 		break;
 	default:
 		GTMASSERT;

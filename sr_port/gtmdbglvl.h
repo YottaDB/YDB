@@ -34,4 +34,5 @@
 #define GDL_ZSHOWDumpOnSignal	0x00000800	/* (2048) Don't supress GTM_FATAL file creation when get a signal */
 #define GDL_PrintIndCacheStats	0x00001000	/* (4096) Print indirect cacheing stats */
 #define GDL_PrintPieceStats	0x00002000	/* (8192) Print stats on $Piece cacheing (debug only) */
+#define GDL_DebugCompiler	0x00004000	/* (16384) Turn on compiler debugging */
 #endif

@@ -10,33 +10,39 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 #include "io.h"
 #include "iottdef.h"
 
-GBLREF bool write_filter;
-
-void ionl_wteol(short v,io_desc *iod)
+/* essentially the same as iott_wteol */
+void ionl_wteol(short val, io_desc *io_ptr)
 {
-	mstr	temp;
-	short s;
-	char ptr[2];
+	mstr	eol;
+	int	eol_cnt;
 
-	temp.len = 2;
-	ptr[0] = NATIVE_CR;
-	ptr[1] = NATIVE_LF;
-	temp.addr = ptr;
-	iod->esc_state = START;
-	for (s = 0; s++ < v ; )
+	assert(val);
+	io_ptr->esc_state = START;
+	eol.len = strlen(NATIVE_TTEOL);
+	eol.addr = (char *)NATIVE_TTEOL;
+	for (eol_cnt = val; eol_cnt--; )
 	{
-		iod->dollar.x -= 2;
-		ionl_write(&temp);
+		io_ptr->dollar.x = 0; /* so that ionl_write doesn't try to wrap (based on escape state and width) */
+		ionl_write(&eol);
 	}
-	if (!(write_filter & CHAR_FILTER))
-	{
-		iod->dollar.x = 0;
-		iod->dollar.y += v;
-		if (iod->length)
-			iod->dollar.y %= iod->length;
+	/* $X is maintained in VMS without the below assignment (resetting to 0) because the NATIVE_TTEOL is \015\012
+	 * and the <CR> (\015) triggers appropriate maintenance of $X.  In UNIX, NATIVE_TTEOL is \012, so
+	 * FILTER=CHARACTER effectively turns off all $X maintenance (except for WRAP logic).
+	 * In VMS the below assignment is not necessary, but harmless; it is always logically correct.
+	 */
+	io_ptr->dollar.x = 0;
+	if (!(io_ptr->write_filter & CHAR_FILTER))
+	{	/* If no FILTER and EOL, also maintain $Y;
+		 * If FILTER, dollarx() of the linefeed character \012 takes care of this maintenance.
+		 */
+		io_ptr->dollar.y += val;
+		if (io_ptr->length)
+			io_ptr->dollar.y %= io_ptr->length;
 	}
 	return;
 }

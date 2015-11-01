@@ -15,7 +15,7 @@
         ;%ZC - strip comments, %ZD - device, %ZH - header label
         ;
         w !,"Routine Output - Save selected routines into RO file.",!
-        i '$d(%zdebug) n $zt s $zt="zg "_$zl_":ERR^%RO" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%RO")
+        i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%RO" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%RO")
         n ename,fl,l,lc,out,r,rn,rf,src,x,y,t1,%ZC,%ZD,%ZH,%ZR
         s (fl,lc,r)=0,out=1
         d main
@@ -30,7 +30,7 @@ CALL    n ename,fl,l,lc,out,r,rn,rf,src,x,y,t1
         q
         ;
 FL      w !,"First Line Lister",!
-        i '$d(%zdebug) n $zt s $zt="zg "_$zl_":ERR^%RO" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%RO")
+        i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%RO" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%RO")
         n ename,fl,l,lc,out,r,rf,rn,src,x,y,t1,%ZC,%ZD,%ZH,%ZR
         s (lc,r)=0,(%ZC,fl,out)=1,%ZH="Routine First Line Lister Utility"
         d main
@@ -102,6 +102,7 @@ frmt    i '%ZC s t1=0 d                         ;strip comments
         q
         ;
 ERR     u $p w !,$p($zs,",",2,99),!
+	s $ec=""
         ; Warning - Fall-though
 EXIT    i $d(%ZD),%ZD'=$p c %ZD
         i $d(rf) c rf

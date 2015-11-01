@@ -19,6 +19,8 @@
 #include "interlock.h"
 #include "lockconst.h"
 #include "add_inter.h"
+#include "op.h"
+#include "iott_wrterr.h"
 
 #ifdef DEBUG_DEFERRED
 #include "gtm_stdio.h"
@@ -41,23 +43,6 @@ GBLREF volatile short   num_deferred;
 #else
 GBLREF volatile int4    num_deferred;
 #endif
-
-/* =============================================================================
- * EXTERNAL FUNCTIONS
- * (Better to put these in header files)
- * =============================================================================
- */
-
-/* Adapted from xfer_table.c, with "volatile" added. Would be more modular
- * to put this in a .h file instead of declaring these functions here and
- * everywhere else that uses them.
- */
-
-#define XFER(a,b) b()
-int
-#include "xfer.h"
-;
-#undef XFER
 
 /* =============================================================================
  * FILE-SCOPE VARIABLES
@@ -124,9 +109,6 @@ static volatile int4	first_event = no_event;
  */
 boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 param_val)
 {
-	int		op_zstepfetch(), op_zstepstart(), op_zstzbfetch(), op_zstzbstart();
-	int		op_mproflinestart(), op_mproflinefetch(), op_mprofforloop();
-	int		op_fetchintrrpt(), op_startintrrpt(), op_forintrrpt();
 	boolean_t 	is_first_event = FALSE;
 
 	/* ------------------------------------------------------------
@@ -198,19 +180,27 @@ boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 p
 		 */
 		 assert((xfer_table[xf_linefetch] == op_linefetch) ||
 			(xfer_table[xf_linefetch] == op_zstepfetch) ||
+			(xfer_table[xf_linefetch] == op_zst_fet_over) ||
 			(xfer_table[xf_linefetch] == op_mproflinefetch));
 		 assert((xfer_table[xf_linestart] == op_linestart) ||
 			(xfer_table[xf_linestart] == op_zstepstart) ||
+			(xfer_table[xf_linestart] == op_zst_st_over) ||
 			(xfer_table[xf_linestart] == op_mproflinestart));
 		 assert((xfer_table[xf_zbfetch] == op_zbfetch) ||
+		 	(xfer_table[xf_zbfetch] == op_zstzb_fet_over) ||
 			(xfer_table[xf_zbfetch] == op_zstzbfetch));
 		 assert((xfer_table[xf_zbstart] == op_zbstart) ||
+			(xfer_table[xf_zbstart] == op_zstzb_st_over) ||
 			(xfer_table[xf_zbstart] == op_zstzbstart));
 		 assert(xfer_table[xf_forchk1] == op_forchk1);
 		 assert((xfer_table[xf_forloop] == op_forloop) ||
 			(xfer_table[xf_forloop] == op_mprofforloop));
-		 assert(xfer_table[xf_ret] == opp_ret);
-		 assert(xfer_table[xf_retarg] = op_retarg);
+		 assert(xfer_table[xf_ret] == opp_ret ||
+			xfer_table[xf_ret] == opp_zst_over_ret ||
+			xfer_table[xf_ret] == opp_zstepret);
+		 assert(xfer_table[xf_retarg] == op_retarg ||
+			xfer_table[xf_retarg] == opp_zst_over_retarg ||
+			xfer_table[xf_retarg] == opp_zstepretarg);
 		/* -----------------------------------------------
 		 * Now call the specified set function to swap in
 		 * the desired handlers (and set flags or whatever).
@@ -450,6 +440,12 @@ void async_action(bool lnfetch_or_start)
 	case (outofband_event):
 		outofband_action(lnfetch_or_start);
 		break;
+	case (tt_write_error_event):
+#ifdef UNIX
+		xfer_reset_if_setter(tt_write_error_event);
+		iott_wrterr();
+#endif /* VMS tt error processing is done in op_*intrrpt */
+		break;
 	case (network_error_event):
        		/* -------------------------------------------------------
 		 * Network error not implemented here yet. Need to move
@@ -476,6 +472,7 @@ void async_action(bool lnfetch_or_start)
  * Might not be needed.
  * ------------------------------------------------------------------
  */
-boolean_t xfer_table_changed(void) {return (0 != num_deferred);}
-
-
+boolean_t xfer_table_changed(void)
+{
+	return (0 != num_deferred);
+}

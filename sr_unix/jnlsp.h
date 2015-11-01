@@ -17,7 +17,7 @@
 #include <errno.h>
 #endif
 
-typedef int4			jnl_proc_time;
+typedef int64_t			jnl_proc_time;
 
 /* in disk blocks but jnl file addresses are kept by byte so limited by uint4 for now */
 #ifndef OFF_T_LONG
@@ -26,23 +26,6 @@ typedef int4			jnl_proc_time;
 #define JNL_ALLOC_MAX		8388608  /* 4GB */
 #endif
 
-#define JPV_LEN_PRCNAM		15
-#define JPV_LEN_NODE		15
-#define JPV_LEN_TERMINAL	15
-#define JPV_LEN_USER		15
-
-typedef struct jnl_process_vector_struct	/* name needed since this is used in cmmdef.h for "pvec" member */
-{
-	uint4	jpv_pid;			/* Process id */
-	jnl_proc_time	jpv_time,			/* Journal record timestamp;  also used for process termination time */
-			jpv_login_time;			/* Used for process initialization time */
-	char		jpv_node[JPV_LEN_NODE],		/* Node name */
-			jpv_user[JPV_LEN_USER],		/* User name */
-			jpv_prcnam[JPV_LEN_PRCNAM],	/* Process name */
-			jpv_terminal[JPV_LEN_TERMINAL];	/* Login terminal */
-	/* sizeof(jnl_process_vector) must be a multiple of sizeof(int4) */
-} jnl_process_vector;
-
 typedef	int			fd_type;
 typedef unix_file_info		fi_type;
 
@@ -50,6 +33,7 @@ typedef unix_file_info		fi_type;
 #define LENGTH_OF_TIME		11
 #define SOME_TIME(X)		(X != 0)
 #define JNL_S_TIME(Y,X)		Y->val.X.process_vector.jpv_time
+#define JNL_S_TIME_PINI(Y,X,Z)	Y->val.X.process_vector[Z].jpv_time
 #define JNL_M_TIME(X)		mur_options.X
 #define MID_TIME(X)		X
 #define EXTTIME(T)		extract_len = exttime(*T, ref_time, extract_len)
@@ -58,12 +42,16 @@ typedef unix_file_info		fi_type;
 #define EXTTXTVMS(T,L)
 
 #define	JNL_SHORT_TIME(X)	(time((time_t *)&X))
-#define	JNL_WHOLE_TIME(X)	(time((time_t *)&X))
+#define	JNL_WHOLE_TIME(X)	{	\
+	time_t temp_t; 			\
+	time(&temp_t); 			\
+	X = temp_t;			\
+	}
+#define CMP_JNL_PROC_TIME(t1, t2) (t1 - t2)
 #define JNL_FILE_SWITCHED(reg) 	(!is_gdid_gdid_identical((gd_id_ptr_t)&(&FILE_INFO(reg)->s_addrs)->hdr->jnl_file.u,		\
 									(gd_id_ptr_t)&(&FILE_INFO(reg)->s_addrs)->jnl->fileid))
 #define JNL_GDID_PTR(sa)	((gd_id_ptr_t)(&(sa->hdr->jnl_file.u)))
 
 uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy);
-int exttime(jnl_proc_time short_time, jnl_proc_time *ref_time, int extract_len);
 
 #endif

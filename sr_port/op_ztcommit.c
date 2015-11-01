@@ -39,6 +39,8 @@ GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
 GBLREF  jnl_fence_control       jnl_fence_ctl;
 GBLREF  short                   dollar_tlevel;
 GBLREF  uint4                   zts_jrec_time;
+GBLREF	boolean_t		copy_jnl_record;
+GBLREF	struct_jrec_tcom 	mur_jrec_fixed_tcom;
 
 void    op_ztcommit(int4 n)
 {
@@ -67,14 +69,24 @@ void    op_ztcommit(int4 n)
                 ztcom_record.participants = jnl_fence_ctl.region_count;
 		JNL_SHORT_TIME(tc_jrec_time);
 
-                /* Note that only those regions that are actively journalling will appear in the following list: */
+                /* Note that only those regions that are actively journaling will appear in the following list: */
                 for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = csa->next_fenced)
                 {
                         grab_crit(csa->jnl->region);
+			if (!copy_jnl_record)
+			{
+				ztcom_record.pini_addr = csa->jnl->pini_addr;
+				ztcom_record.ts_short_time = zts_jrec_time;
+				ztcom_record.tc_short_time = tc_jrec_time;
+			} else
+			{
+				ztcom_record.pini_addr = mur_jrec_fixed_tcom.pini_addr;
+				ztcom_record.ts_short_time = mur_jrec_fixed_tcom.ts_short_time;
+				ztcom_record.tc_short_time = mur_jrec_fixed_tcom.tc_short_time;
+			}
+			ztcom_record.ts_recov_short_time = zts_jrec_time;
+			ztcom_record.tc_recov_short_time = tc_jrec_time;
                         ztcom_record.tn = csa->ti->curr_tn;
-                        ztcom_record.pini_addr = csa->jnl->pini_addr;
-                        ztcom_record.ts_short_time = zts_jrec_time;
-                        ztcom_record.tc_short_time = tc_jrec_time;
 			QWASSIGN(ztcom_record.jnl_seqno, temp_jnlpool_ctl->jnl_seqno);
                         jnl_write(csa->jnl, JRT_ZTCOM, (jrec_union *)&ztcom_record, NULL, NULL);
                         rel_crit(csa->jnl->region);

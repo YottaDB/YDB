@@ -42,6 +42,9 @@
 #include "repl_sem.h"
 #include "is_proc_alive.h"
 #include "repl_log.h"
+#ifdef UNIX
+#include "ftok_sems.h"
+#endif
 
 #define GTMRECV_WAIT_FOR_SHUTDOWN	(1000 - 1) /* ms, almost 1s */
 
@@ -60,9 +63,13 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 	boolean_t       shut_upd_too;
 	int             status;
 
+	UNIX_ONLY(error_def(ERR_RECVPOOLSETUP);)
 	repl_log(stdout, TRUE, TRUE, "Initiating shut down\n");
 	call_on_signal = NULL;		/* So we don't reenter on error */
-	UNIX_ONLY( get_lock_recvpool_ftok_sems(FALSE, FALSE);) /* Do not increment counter sem */
+	UNIX_ONLY(
+		if (!ftok_sem_lock(recvpool.recvpool_dummy_reg, FALSE, FALSE))
+			rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
+	)
 	/* Grab the receive pool access control and receive pool option write lock */
 	status = grab_sem(RECV, RECV_POOL_ACCESS_SEM);
 	if (0 == status && (!auto_shutdown || gtmrecv_srv_count))
@@ -115,6 +122,10 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 	if (shut_upd_too)
 		gtmrecv_endupd();
 
+	/*
+	 * gtmrecv_ipc_cleanup will not be successful unless receiver server has completely exited.
+	 * It relies on RECV_SERV_COUNT_SEM value.
+	 */
 	if (FALSE == gtmrecv_ipc_cleanup(auto_shutdown, &exit_status))
 	{
 		/* Release all semaphores */
@@ -129,7 +140,8 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 	UNIX_ONLY(
 	else if (NORMAL_SHUTDOWN == exit_status)
 		repl_inst_recvpool_reset();
-	rel_recvpool_ftok_sems(TRUE, FALSE);
+	if (!ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, FALSE))
+		rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
 	)
 	return (exit_status);
 }

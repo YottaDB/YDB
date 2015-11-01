@@ -13,5 +13,6 @@
 #define MU_RNDWN_REPL_INSTANCE_INCLUDED
 
 boolean_t mu_rndwn_repl_instance(replpool_identifier *);
+boolean_t mu_rndwn_ftok_sem_get(gd_region *, int);
 
 #endif /* MU_RNDWN_REPL_INSTANCE_INCLUDED */

@@ -23,12 +23,19 @@
 #include "jnl_write_aimg_rec.h"
 #include "jnl_write.h"
 
+GBLREF uint4		cur_logirec_short_time;	/* see comment in gbldefs.c for usage */
+GBLREF boolean_t	forw_phase_recovery;
+
 void	jnl_write_aimg_rec(sgmnt_addrs *csa, block_id block, blk_hdr_ptr_t buffer)
 {
 	struct_jrec_after_image	aimg_record;
 
 	aimg_record.pini_addr = csa->jnl->pini_addr;
-	JNL_SHORT_TIME(aimg_record.short_time);
+	if (!forw_phase_recovery)
+	{
+		JNL_SHORT_TIME(aimg_record.short_time);
+	} else
+		aimg_record.short_time = cur_logirec_short_time;
 	aimg_record.tn = csa->ti->curr_tn;
 	aimg_record.blknum = block;
 	aimg_record.bsiz = buffer->bsiz;

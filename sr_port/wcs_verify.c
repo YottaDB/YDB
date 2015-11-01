@@ -147,6 +147,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage)
 		send_msg(VARLSTCNT(8) ERR_DBFHEADERR, 6, DB_LEN_STR(reg),
 			RTS_ERROR_TEXT("in_wtstart"), csa->nl->in_wtstart, 0);
 		csa->nl->in_wtstart = 0;
+		csa->in_wtstart = FALSE; /* To allow wcs_wtstart() after wcs_recover() */
 	}
 	th = csa->th_base;
 	if (th->blk != BT_QUEHEAD)
@@ -324,6 +325,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage)
 		{
 			send_msg(VARLSTCNT(10) ERR_DBADDRANGE, 8, DB_LEN_STR(reg),
 				cr, cr->blk, RTS_ERROR_TEXT("cr->blk"), 0, csa->ti->total_blks);
+			cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 			cr->blk = CR_BLKEMPTY;
 		}
 		if (cr->tn > (csd->trans_hist.curr_tn + 1))

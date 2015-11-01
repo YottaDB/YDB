@@ -20,11 +20,11 @@
  * To avoid any possible deadlock because of ftok collisions, we use different project ids.
  */
 #define GTM_ID		43
-#define JNLPOOL_ID	44
-#define RECVPOOL_ID	45
+#define REPLPOOL_ID	44
 #define GTMSECSHR_ID	46
-#define RWALL 0666
-#define RWDALL 0777
+#define RALL 		0444
+#define RWALL 		0666
+#define RWDALL 		0777
 
 /* parameters for io_rundown() */
 #define NORMAL_RUNDOWN		0

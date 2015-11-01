@@ -23,6 +23,7 @@
 
 #define ASSERT_MATCH(X,Y)	assert(&X.pini_addr == &Y.pini_addr); \
 				assert(&X.short_time == &Y.short_time); \
+				assert(&X.recov_short_time == &Y.recov_short_time); \
 				assert(&X.mumps_node == &Y.mumps_node); \
 				assert(&X.tn == &Y.tn)
 
@@ -56,7 +57,7 @@ GBLREF	int4		mur_error_count;
 bool	mur_back_process(ctl_list *ctl)
 {
 	bool			proceed = TRUE, eof, broken;
-	uint4			pini_addr;
+	uint4			pini_addr, turn_around_stop_addr;
 	uint4			rec_time, status;
 	token_num		token;
 	jnl_record		*rec;
@@ -97,8 +98,26 @@ bool	mur_back_process(ctl_list *ctl)
 		/* drop through ... */
 
 	case JRT_PINI:
-		assert(&rec->val.jrec_pini.process_vector == &rec->val.jrec_pfin.process_vector);
-		rec_time = JNL_S_TIME(rec, jrec_pini);
+		/* Needs to be done only when we are updating, beacuse we may need it for lost trans. The check for PINI is needed
+		due to drop through above */
+		if (mur_options.update)
+		{
+			if (rectype == JRT_PINI)
+				pini_addr = ctl->rab->dskaddr;
+			else
+			{
+				assert(rectype == JRT_PFIN);
+				pini_addr = rec->val.jrec_pfin.pini_addr;
+			}
+			if ((NULL  == mur_get_pini_jpv(ctl, pini_addr)))
+				proceed = mur_report_error(ctl, MUR_NOPINI);
+		}
+		assert(&rec->val.jrec_pini.process_vector[CURR_JPV] == &rec->val.jrec_pfin.process_vector);
+		if (0 == rec->val.jrec_pini.process_vector[SRVR_JPV].jpv_pid
+			&& 0 ==  rec->val.jrec_pini.process_vector[SRVR_JPV].jpv_image_count)
+			rec_time = JNL_S_TIME_PINI(rec, jrec_pini, ORIG_JPV);
+		else
+			rec_time = JNL_S_TIME_PINI(rec, jrec_pini, SRVR_JPV);
 		break;
 
 	case JRT_PBLK:
@@ -111,6 +130,7 @@ bool	mur_back_process(ctl_list *ctl)
 
 	case JRT_EPOCH:
 		rec_time = rec->val.jrec_epoch.short_time;
+		ctl->turn_around_epoch_time = rec_time;
 		if (mur_options.rollback)
 		{
 			ctl->turn_around_tn = rec->val.jrec_epoch.tn;
@@ -140,6 +160,18 @@ if (log_rollback)
 		MID_TIME(ctl->lookback_time) = rec_time;
 		/* proceed will be TRUE until we have reached the turn-around point */
 		proceed = ctl->broken_entries > 0  &&  !ctl->reached_lookback_limit;
+		/* If interrupted recovery, make sure we go back to ftruncate_len irrespective of the earlier proceed decision */
+		if (0 != ctl->rab->pvt->jfh->ftruncate_len)
+		{
+			if (ctl->rab->dskaddr <= JNL_FILE_FIRST_RECORD)
+				turn_around_stop_addr = ctl->rab->dskaddr + DISK_BLOCK_SIZE;
+			else
+				turn_around_stop_addr = ctl->rab->dskaddr + ctl->rab->reclen;
+			if (turn_around_stop_addr == ctl->rab->pvt->jfh->ftruncate_len)
+				proceed = FALSE;
+			else
+				proceed = TRUE;
+		}
 		if (FALSE == proceed)
 			ctl->consist_stop_addr = ctl->rab->dskaddr;	/* Note down consist_stop_addr for recover too */
 		break;
@@ -157,7 +189,12 @@ if (log_rollback)
 		ASSERT_MATCH(rec->val.jrec_kill, rec->val.jrec_set);
 		ASSERT_MATCH(rec->val.jrec_zkill, rec->val.jrec_set);
 		rec_time = rec->val.jrec_set.short_time;
-
+		if (mur_options.update)
+		{
+			pini_addr = rec->val.jrec_set.pini_addr;
+			if ((NULL == mur_get_pini_jpv(ctl, pini_addr)))
+				proceed = mur_report_error(ctl, MUR_NOPINI);
+		}
 		if (mur_options.fences == FENCE_NONE)
 			break;
 
@@ -168,10 +205,7 @@ if (log_rollback)
 				mur_delete_current(ctl, rec->val.jrec_set.pini_addr);
 				proceed = mur_report_error(ctl, MUR_BRKTRANS);
 				if (mur_options.rollback)
-				{
-					--mur_error_count;
 					proceed = TRUE;
-				}
 			}
 		}
 		else
@@ -237,40 +271,34 @@ if (log_rollback)
 		assert(QWEQ(token, rec->val.jrec_fzkill.token));
 		assert(QWEQ(token, rec->val.jrec_tzkill.token));
 
-		if ((curr = mur_lookup_current(ctl, pini_addr)) == NULL)
+		if (!mur_options.before  ||  rec_time <= JNL_M_TIME(before_time))
 		{
-			if (!mur_options.selection  ||  mur_do_record(ctl))
+			if ((curr = mur_lookup_current(ctl, pini_addr)) == NULL)
 			{
-				mur_cre_broken(ctl, pini_addr, token);
-				proceed = mur_report_error(ctl, MUR_BRKTRANS);
-				if (mur_options.rollback)
+				if (!mur_options.selection  ||  mur_do_record(ctl))
 				{
-					--mur_error_count;
-					proceed = TRUE;
+					mur_cre_broken(ctl, pini_addr, token);
+					proceed = mur_report_error(ctl, MUR_BRKTRANS);
+					if (mur_options.rollback)
+						proceed = TRUE;
 				}
-			}
-		}
-		else
-		{
-			if (QWEQ(token, curr->token))
+			} else
 			{
-				if (curr->broken)
+				if (QWEQ(token, curr->token))
+				{
+					if (curr->broken)
+					{
+						mur_move_curr_to_broken(ctl, curr);
+						--ctl->broken_entries;
+					} else
+						mur_delete_current(ctl, pini_addr);
+				} else
 				{
 					mur_move_curr_to_broken(ctl, curr);
-					--ctl->broken_entries;
-				}
-				else
-					mur_delete_current(ctl, pini_addr);
-			}
-			else
-			{
-				mur_move_curr_to_broken(ctl, curr);
-				mur_cre_broken(ctl, pini_addr, token);
-				proceed = mur_report_error(ctl, MUR_BRKTRANS);
-				if (mur_options.rollback)
-				{
-					--mur_error_count;
-					proceed = TRUE;
+					mur_cre_broken(ctl, pini_addr, token);
+					proceed = mur_report_error(ctl, MUR_BRKTRANS);
+					if (mur_options.rollback)
+						proceed = TRUE;
 				}
 			}
 		}
@@ -332,34 +360,29 @@ if (log_rollback)
 			assert(QWEQ(token, rec->val.jrec_ukill.token));
 			assert(QWEQ(token, rec->val.jrec_gzkill.token));
 			assert(QWEQ(token, rec->val.jrec_uzkill.token));
-
-			if ((curr = mur_lookup_current(ctl, pini_addr)) == NULL)
+			if (!mur_options.before  ||  rec_time <= JNL_M_TIME(before_time))
 			{
-				/* (Use of assignment in the following condition is intentional) */
-				if (broken = (!mur_options.selection  ||  mur_do_record(ctl)))
+				if ((curr = mur_lookup_current(ctl, pini_addr)) == NULL)
 				{
-					++ctl->broken_entries;
-					proceed = mur_report_error(ctl, MUR_BRKTRANS);
-					if (mur_options.rollback)
+					/* (Use of assignment in the following condition is intentional) */
+					if (broken = (!mur_options.selection  ||  mur_do_record(ctl)))
 					{
-						--mur_error_count;
-						proceed = TRUE;
+						++ctl->broken_entries;
+						proceed = mur_report_error(ctl, MUR_BRKTRANS);
+						if (mur_options.rollback)
+							proceed = TRUE;
 					}
-				}
 
-				mur_cre_current(ctl, pini_addr, token, pv, broken);
-			}
-			else
-			{
-				if (QWNE(token, curr->token))
+					mur_cre_current(ctl, pini_addr, token, pv, broken);
+				} else
 				{
-					mur_move_curr_to_broken(ctl, curr);
-					mur_cre_current(ctl, pini_addr, token, pv, TRUE);
-					proceed = mur_report_error(ctl, MUR_BRKTRANS);
-					if (mur_options.rollback)
+					if (QWNE(token, curr->token))
 					{
-						--mur_error_count;
-						proceed = TRUE;
+						mur_move_curr_to_broken(ctl, curr);
+						mur_cre_current(ctl, pini_addr, token, pv, TRUE);
+						proceed = mur_report_error(ctl, MUR_BRKTRANS);
+						if (mur_options.rollback)
+							proceed = TRUE;
 					}
 				}
 			}
@@ -375,6 +398,7 @@ if (log_rollback)
 
 		rec_time = rec->val.jrec_tcom.tc_short_time;
 		assert(rec_time == rec->val.jrec_ztcom.tc_short_time);
+		assert(rec->val.jrec_tcom.tc_recov_short_time == rec->val.jrec_ztcom.tc_recov_short_time);
 		assert(&rec->val.jrec_tcom.tc_short_time == &rec->val.jrec_ztcom.tc_short_time);
 		assert(&rec->val.jrec_tcom.token ==  &rec->val.jrec_ztcom.token);
 		assert(&rec->val.jrec_tcom.jnl_seqno ==  &rec->val.jrec_ztcom.jnl_seqno);
@@ -405,12 +429,11 @@ if (log_rollback)
 		if (1 < rec->val.jrec_tcom.participants  &&  participants < rec->val.jrec_tcom.participants)
 			participants = rec->val.jrec_tcom.participants;
 
-		if (rec->val.jrec_tcom.participants > 1 && (-1 == mur_decrement_multi(pv->jpv_pid, token)) && !mur_options.rollback)
-			mur_cre_multi(pv->jpv_pid, token, rec->val.jrec_tcom.participants - 1, rec_time);
-
-		if ((rec->val.jrec_tcom.participants > 1) && (-1 == mur_decrement_multi_seqno(rec->val.jrec_tcom.jnl_seqno))
-				&& mur_options.rollback  &&  QWGE(rec->val.jrec_tcom.jnl_seqno, consist_jnl_seqno))
-			mur_cre_multi_seqno(rec->val.jrec_tcom.participants - 1, rec->val.jrec_tcom.jnl_seqno);
+		if (rec->val.jrec_tcom.participants > 1 && (-1 == mur_decrement_multi(pv->jpv_pid, token,
+											rec->val.jrec_tcom.jnl_seqno))
+			&& (!mur_options.rollback || QWGE(rec->val.jrec_tcom.jnl_seqno, consist_jnl_seqno)))
+				mur_cre_multi(pv->jpv_pid, token, rec->val.jrec_tcom.participants - 1, rec_time,
+							rec->val.jrec_tcom.jnl_seqno);
 		break;
 	}
 

@@ -23,7 +23,6 @@
 #include <unistd.h>
 #include <sys/shm.h>
 #include <sys/wait.h>
-#include <sys/sem.h>
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -44,7 +43,6 @@
 #include "gtm_logicals.h"
 #include "gtm_stdio.h"
 #include "eintr_wrappers.h"
-#include "repl_sem.h"
 #include "repl_sp.h"
 #include "repl_log.h"
 #include "io.h"
@@ -54,9 +52,6 @@
 #define MAX_ATTEMPTS_FOR_FETCH_RESYNC	30
 #define MAX_WAIT_FOR_FETCHRESYNC_CONN	30 /* s */
 #define FETCHRESYNC_PRIMARY_POLL	1 /* s */
-#define GRAB_SEM_ERR_OUT 		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0,\
-					  ERR_TEXT, 2,\
-					  RTS_ERROR_LITERAL("Error with receive pool semaphores. Receiver Server possibly exists"))
 
 GBLREF uint4			process_id;
 GBLREF int			recvpool_shmid;
@@ -66,15 +61,9 @@ GBLREF seq_num			max_resync_seqno;
 GBLREF seq_num			seq_num_zero;
 GBLREF uint4			repl_max_send_buffsize, repl_max_recv_buffsize;
 
-static int gtmrecv_fetchresync_detach(ctl_list *jnl_files);
-
 CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 {
 	START_CH;
-
-	/* Remove semaphores created */
-
-	remove_sem_set(RECV);
 
 	if (gtmrecv_listen_sock_fd != -1)
 		close(gtmrecv_listen_sock_fd);
@@ -88,9 +77,6 @@ CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 
 int gtmrecv_fetchresync(ctl_list *jnl_files, int port, seq_num *resync_seqno)
 {
-	mstr            log_nam, trans_log_nam;
-	char            trans_buff[MAX_FN_LEN+1];
-	key_t		recvpool_key;
 	int		status;
 	size_t		primary_addr_len;
 	repl_msg_t	msg;
@@ -113,21 +99,10 @@ int gtmrecv_fetchresync(ctl_list *jnl_files, int port, seq_num *resync_seqno)
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
 
-	recvpool_key = -1;
-	recvpool_shmid = -1;
 
 	ESTABLISH_RET(gtmrecv_fetchresync_ch, (!SS_NORMAL));
 
 	QWASSIGN(*resync_seqno, seq_num_zero);
-
-	/* Verify that a receiver server is not already running */
-	log_nam.addr = ZGBLDIR;
-	log_nam.len = sizeof(ZGBLDIR) - 1;
-
-	if (trans_log_name(&log_nam, &trans_log_nam, trans_buff) != SS_NORMAL)
-		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("gtmgbldir not defined"));
-
-	trans_buff[trans_log_nam.len] = '\0';
 
 	gtmrecv_fetchresync_max_wait.tv_sec = MAX_WAIT_FOR_FETCHRESYNC_CONN;
 	gtmrecv_fetchresync_max_wait.tv_usec = 0;
@@ -137,47 +112,6 @@ int gtmrecv_fetchresync(ctl_list *jnl_files, int port, seq_num *resync_seqno)
 
 	gtmrecv_fetchresync_poll.tv_sec = FETCHRESYNC_PRIMARY_POLL;
 	gtmrecv_fetchresync_poll.tv_usec = 0;
-
-	if ((recvpool_key = FTOK(trans_buff, RECVPOOL_ID)) == -1)
-		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with receive pool ftok"), errno);
-
-	if (0 > init_sem_set_recvr(recvpool_key, NUM_RECV_SEMS, RWDALL | IPC_CREAT | IPC_EXCL))
-		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error with receive pool semget. Receiver Server possibly exists"),
-			REPL_SEM_ERRNO);
-	/* Lock all access to receive pool */
-	status = grab_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);
-	if (0 == status)
-		status = grab_sem_immediate(RECV, RECV_SERV_COUNT_SEM);
-	else
-		GRAB_SEM_ERR_OUT;
-	if (0 == status)
-		status = grab_sem_immediate(RECV, UPD_PROC_COUNT_SEM);
-	else
-	{
-		rel_sem(RECV, RECV_POOL_ACCESS_SEM);
-		GRAB_SEM_ERR_OUT;
-	}
-	if (0 == status)
-		status = grab_sem_immediate(RECV, RECV_SERV_OPTIONS_SEM);
-	else
-	{
-		rel_sem(RECV, RECV_POOL_ACCESS_SEM);
-		rel_sem(RECV, RECV_SERV_COUNT_SEM);
-		GRAB_SEM_ERR_OUT;
-	}
-	if (0 != status)
-	{
-		rel_sem(RECV, RECV_POOL_ACCESS_SEM);
-		rel_sem(RECV, RECV_SERV_COUNT_SEM);
-		rel_sem(RECV, UPD_PROC_COUNT_SEM);
-		GRAB_SEM_ERR_OUT;
-	}
-
-
-	if ((status = shmget(recvpool_key, 0, RWDALL)) > 0)
-		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Receive pool exists. Receiver Server possibly exist"));
 
 	gtmrecv_comm_init(port);
 
@@ -210,7 +144,7 @@ int gtmrecv_fetchresync(ctl_list *jnl_files, int port, seq_num *resync_seqno)
 	}
 	if (status == 0)
 	{
-		repl_log(stdout, TRUE, TRUE, "Waited about %d seconds for connection from primary source server\n", 
+		repl_log(stdout, TRUE, TRUE, "Waited about %d seconds for connection from primary source server\n",
 				MAX_WAIT_FOR_FETCHRESYNC_CONN);
 		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Waited too long to get a connection request. Check if primary is alive."));
@@ -276,88 +210,12 @@ int gtmrecv_fetchresync(ctl_list *jnl_files, int port, seq_num *resync_seqno)
 	QWASSIGN(*resync_seqno, *(seq_num *)&msg.msg[0]);
 
 	repl_log(stdout, TRUE, TRUE, "Received RESYNC SEQNO is "INT8_FMT"\n", INT8_PRINT(*resync_seqno));
-	/*
-	 * Fork a child which will do the rest of the roll-back. The parent
-	 * waits till the Source server signals completion of its task on
-	 * receiving FETCH_RESYNC */
-
-	if ((rollback_pid = fork()) > 0)
+	/* Wait till connection is broken or REPL_CONN_CLOSE
+	 * is received */
+	REPL_RECV_LOOP(gtmrecv_sock_fd, &msg, MIN_REPL_MSGLEN, &gtmrecv_fetchresync_poll)
 	{
-		/* Parent */
-		pid_t waitpid_res;
-
-		gtmrecv_fetchresync_detach(jnl_files);
-
-		/* Wait till connection is broken or REPL_CONN_CLOSE
-		 * is received */
-		REPL_RECV_LOOP(gtmrecv_sock_fd, &msg, MIN_REPL_MSGLEN, &gtmrecv_fetchresync_poll)
-		{
-			REPL_DPRINT1("FETCH_RESYNC : Waiting for source to send CLOSE_CONN or connection breakage\n");
-		}
-		close(gtmrecv_sock_fd);
-		REPL_DPRINT2("FETCH RESYNC : Waiting for pid %d rollback process to complete\n", rollback_pid);
-		WAITPID(rollback_pid, &rollback_status, 0, waitpid_res);
-		if (waitpid_res == rollback_pid)
-		{
-			REPL_DPRINT2("FETCH RESYNC : Rollback child exited with status %d\n", rollback_status);
-		} else if (waitpid_res < 0)
-		{
-			REPL_DPRINT2("FETCH RESYNC : wait_status from waitpid returned errno = %d\n", errno);
-		}
-
-		remove_sem_set(RECV);
-		/*
-		 * This is an exit from parent. We do not want to call mupip_exit_handler now.
-		 */
-#if defined(_AIX) && defined(_BSD)
-		_exit(WEXITSTATUS(*(union wait *)&rollback_status)); /* will exit from here */
-#else
-		_exit(WEXITSTATUS(rollback_status)); /* will exit from here */
-#endif
-	} else if (rollback_pid == 0)
-	{
-		/* Child */
-		process_id = getpid();
-		return(SS_NORMAL);
-	} else
-		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Could not fork rollback process"), errno);
-}
-
-static int gtmrecv_fetchresync_detach(ctl_list *jnl_files)
-{
-	/* Detach from all regions, and release recvr server count lock */
-
-	ctl_list	*ctl_ptr;
-	sgmnt_addrs	*csa;
-
-	for (ctl_ptr = jnl_files; ctl_ptr != NULL; ctl_ptr = ctl_ptr->next)
-	{
-		if (ctl_ptr->next != NULL && ctl_ptr->gd == ctl_ptr->next->gd)
-			continue;
-		if (ctl_ptr->gd && ctl_ptr->gd->dyn.addr->fname_len)
-		{
-			csa = &FILE_INFO(ctl_ptr->gd)->s_addrs;
-			if (csa->nl != NULL)
-			{
-				ctl_ptr->gd->dyn.addr->fname[ctl_ptr->gd->dyn.addr->fname_len] = '\0';
-				REPL_DPRINT3("Detaching from %s at %lx\n", ctl_ptr->gd->dyn.addr->fname, (long)csa->nl);
-				shmdt((caddr_t)csa->nl);
-			}
-		}
+		REPL_DPRINT1("FETCH_RESYNC : Waiting for source to send CLOSE_CONN or connection breakage\n");
 	}
-
-	return(rel_sem_immediate(RECV, RECV_SERV_COUNT_SEM) == 0 ? SS_NORMAL : errno);
-}
-
-int gtmrecv_wait_for_detach(void)
-{
-	/* Wait till parent detaches from all regions and releases receiver server count lock.
-	 * Release the semaphore to protect against hang if this function is re-entered.
-	 * Releasing is ok since this semaphore has no use once the parent has detached from the regions
-	 */
-
-	if (0 == grab_sem(RECV, RECV_SERV_COUNT_SEM) && 0 == rel_sem(RECV, RECV_SERV_COUNT_SEM))
-		return(SS_NORMAL);
-	return(REPL_SEM_ERRNO);
+	close(gtmrecv_sock_fd);
+	REPL_DPRINT2("FETCH RESYNC : Waiting for pid %d rollback process to complete\n", rollback_pid);
 }

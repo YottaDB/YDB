@@ -48,6 +48,7 @@
 #include "mupip_exit.h"
 #include "print_exit_stats.h"
 #include "ftok_sems.h"
+#include "gtm_unistd.h"
 
 GBLREF int			process_exiting;
 GBLREF boolean_t	        mupip_jnl_recover;
@@ -77,6 +78,7 @@ GBLREF int			gtmrecv_srv_count;
 GBLREF gd_region		*standalone_reg;
 GBLREF gd_region		*gv_cur_region;
 GBLREF gd_region		*ftok_sem_reg;
+GBLREF boolean_t		forw_phase_recovery;
 
 void close_repl_logfiles(void);
 
@@ -90,6 +92,7 @@ void mupip_exit_handler(void)
 	exit_handler_active = TRUE;
 	process_exiting = TRUE;
 	mupip_jnl_recover = FALSE;
+	forw_phase_recovery = FALSE;
 	cancel_timer(0);		/* Cancel all timers - No unpleasant surprises */
 	secshr_db_clnup(NORMAL_TERMINATION);
         if (jnlpool.jnlpool_ctl)
@@ -108,37 +111,44 @@ void mupip_exit_handler(void)
                 SHMDT(recvpool.recvpool_ctl);
 		recvpool.recvpool_ctl = NULL;
 	}
-	if (is_src_server && sem_set_exists(SOURCE) && gtmsource_srv_count && (0 != rel_sem(SOURCE, SRC_SERV_COUNT_SEM)))
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Error releasing the source server count semaphore : %s\n", REPL_SEM_ERROR);
-	if (is_rcvr_server && sem_set_exists(RECV) && gtmrecv_srv_count && (0 != rel_sem(RECV, RECV_SERV_COUNT_SEM)))
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Error releasing the receiver server count semaphore : %s\n", REPL_SEM_ERROR);
-	if (is_updproc && sem_set_exists(RECV) && 0 != rel_sem(RECV, UPD_PROC_COUNT_SEM))
-		repl_log(updproc_log_fp, TRUE, TRUE, "Error releasing the update process count semaphore : %s\n", REPL_STR_ERROR);
+	/*
+	 * Note:
+	 * 	In older versions we used to release replication semaphores here.
+	 * 	But it does not really help. We do not want to release them until this process exits.
+	 *	We use SEM_UNDO flag for semaphore creation. So when this process will exit,
+	 *	OS will automatically release the semaphore value by 1. That is do nothing about them.
+	 */
 	if (ftok_sem_reg)
 	{
-		/* This segment of code will be executed by utility routines
-		 * like mupip integ file/mupip restore etc., which operates on
-		 * one single region. In case of an error, we want to remove ftok semaphores.
-		 * We cannot rely on gv_cur_region which is used in so many places
-		 * in so many ways. So the global grabbed_ftok_sem is used.
-		 * For all other cases grabbed_ftok_sem will be FALSE.
+		/* This segment of code will be executed by utilities
+		 * like mupip integ file/mupip restore etc., which operates on one single region.
+		 * In case of an error or, for any other code path, if the ftok semaphore is
+		 * grabbed but not released, ftok_sem_reg will have non-null value
+		 * and grabbed_ftok_sem will be TRUE.
+		 * (We cannot rely on gv_cur_region which is used in so many places in so many ways.)
+		 * In case a processed released ftok semaphore lock but did not decrement
+		 * the counter, ftok_sem_reg will be NULL. In that case we rely on OS to decrement
+		 * the counter when the process exits completely.
 		 */
-		DEBUG_ONLY(udi = FILE_INFO(ftok_sem_reg));
+		DEBUG_ONLY(udi = FILE_INFO(ftok_sem_reg);)
 		assert(udi->grabbed_ftok_sem);
 		ftok_sem_release(ftok_sem_reg, TRUE, TRUE);
+	} else
+	{
+		/* This segment is for replication ftok semaphore cleanup in case of error. */
+		if (NULL != jnlpool.jnlpool_dummy_reg)
+		{
+			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+			if (udi->grabbed_ftok_sem)
+				ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
+		}
+		if (NULL != recvpool.recvpool_dummy_reg)
+		{
+			udi = FILE_INFO(recvpool.recvpool_dummy_reg);
+			if (udi->grabbed_ftok_sem)
+				ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
+		}
 	}
-        if (NULL != jnlpool.jnlpool_dummy_reg)
-	{
-		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-		if (udi->grabbed_ftok_sem)
-			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-	} 
-        if (NULL != recvpool.recvpool_dummy_reg)
-	{
-		udi = FILE_INFO(recvpool.recvpool_dummy_reg);
-		if (udi->grabbed_ftok_sem)
-			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-	} 
 	mu_reset_term_characterstics();
 	/* log the exit of replication servers */
 	if (is_src_server)

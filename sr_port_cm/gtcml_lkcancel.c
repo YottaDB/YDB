@@ -12,14 +12,19 @@
 #include "mdef.h"
 #include "mlkdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "locklits.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
+#include "mlk_unpend.h"
 
 GBLREF mlk_pvtblk *mlk_cm_root;
 GBLREF connection_struct *curr_entry;
 GBLREF uint4 process_id;
 
-unsigned char gtcml_lkcancel()
+unsigned char gtcml_lkcancel(void)
 {
 	cm_region_list *reg_walk;
 	unsigned short i;

@@ -11,13 +11,19 @@
 
 #include "mdef.h"
 
-/* gcc/Linux needs stdio.h before varargs until removed from error.h */
+/* gcc/LinuxIA32 requires stdarg which is included by stdio before varargs */
+/* gcc/Linux390 requires varargs before stdio - annoying */
+#ifdef EARLY_VARARGS
+#include <varargs.h>
+#endif
 #include "gtm_stdio.h"
+#ifndef EARLY_VARARGS
+#include <varargs.h>
+#endif
 
 #include "fao_parm.h"
 #include "error.h"
 #include "util.h"
-#include <varargs.h>
 #include "util_out_print_vaparm.h"
 #include "gtmmsg.h"
 #include "gtm_putmsg_list.h"
@@ -118,7 +124,7 @@ void gtm_putmsg_list(va_list var)
 			}
 
 			util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
-			var = last_va_list_ptr;			/* How much we unwound */
+			VAR_COPY(var, last_va_list_ptr);			/* How much we unwound */
 			arg_count -= fao_count;
 
 			/* ------------------------------

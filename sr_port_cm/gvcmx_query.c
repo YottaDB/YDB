@@ -10,15 +10,31 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "hashdef.h"
 #include "cmidef.h"
 #include "cmmdef.h"
+#include "gdsroot.h"
+#include "gdsblk.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "gvcmx.h"
+#include "gvcmz.h"
+#include "mvalconv.h"
 
-bool gvcmx_query()
-{	mval v;
+GBLREF	gd_region	*gv_cur_region;
 
-	gvcmz_doop(CMMS_Q_QUERY,CMMS_R_QUERY,&v);
-	if (MV_FORCE_INT(&v))
-		return TRUE;
-	else
-		return FALSE;
+bool gvcmx_query(mval *val)
+{
+	mval		temp;
+	struct CLB	*lnk;
+
+	gvcmz_doop(CMMS_Q_QUERY, CMMS_R_QUERY, &temp);
+	lnk = gv_cur_region->dyn.addr->cm_blk;
+	if (((link_info *)lnk->usr)->query_is_queryget)
+		*val = temp;
+	return (((link_info *)lnk->usr)->query_is_queryget ? 
+			(MV_DEFINED(&temp) ? TRUE : FALSE) : /* we return TRUE (1) to avoid int -> bool (char) lossy assignment */
+			MV_FORCE_INT(&temp));
 }

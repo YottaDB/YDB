@@ -114,7 +114,6 @@ void mupip_restore(void)
 	trans_num		curr_tn;
 	uint4			ii;
 	block_id		blk_num;
-	gds_file_id		gfd;
 	bool			extend, standalone;
 	uint4			cli_status;
 	BFILE			*in;

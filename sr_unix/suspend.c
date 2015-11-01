@@ -32,7 +32,7 @@ void suspend(void)
 	send_msg(VARLSTCNT(1) ERR_SUSPENDING);
 	suspend_status = NOW_SUSPEND;
 	flush_pio();
-	if (io_std_device.in->type == tt)
+	if (NULL != io_std_device.in && tt == io_std_device.in->type)
 		resetterm(io_std_device.in);
 	status = kill(process_id, SIGSTOP);
 	assert(0 == status);

@@ -16,10 +16,12 @@
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 
+#include <limits.h>
+#include <errno.h>
+
 #include "cli.h"
 #include "util.h"
 #include "cli_parse.h"
-
 
 /*
  * --------------------------------------------------
@@ -30,24 +32,26 @@
  *	FALSE	- Could not convert to hex
  * --------------------------------------------------
  */
-static int str_to_hex(char *str, int4 *dst)
+static boolean_t str_to_hex(char *str, int4 *dst)
 {
-	*dst = 0;
-	cli_strupper(str);
-	if(STRTOL(str,NULL,16) > 0x7FFFFFFF){
-		util_out_print("Error: maximum size exceeded.", TRUE);
-		return FALSE;
-	}
-	while (*str)
+	long int 	result;
+	int		save_errno;
+	boolean_t	retval;
+
+	save_errno = errno;
+	errno = 0;
+        result = STRTOL(str, NULL, 16);
+	if (ERANGE != errno && INT_MIN <= result && INT_MAX >= result)
 	{
-		if (ISDIGIT((int) *str))
-			*dst = *dst * 16 + *str++ - '0';
-		else if (ISXDIGIT((int) *str))
-			*dst = *dst * 16 + *str++ - 'A' + 10;
-		else
-			return FALSE;
+		*dst = result;
+		retval = TRUE;
+	} else
+	{
+		*dst = 0;
+		retval = FALSE;
 	}
-	return(TRUE);
+	errno = save_errno;
+	return (retval);
 }
 
 
@@ -60,7 +64,7 @@ static int str_to_hex(char *str, int4 *dst)
  *	FALSE	- Could not convert to hex
  * --------------------------------------------------
  */
-bool cli_get_hex(char *entry, int4 *dst)
+boolean_t cli_get_hex(char *entry, int4 *dst)
 {
 	char	buf[MAX_LINE];
 	char	local_str[MAX_LINE];
@@ -91,7 +95,7 @@ bool cli_get_hex(char *entry, int4 *dst)
  *	FALSE	- Could not convert to number
  * --------------------------------------------------
  */
-bool cli_get_int(char *entry, int *dst)
+boolean_t cli_get_int(char *entry, int *dst)
 {
 	char		buf[25];
 	char		local_str[MAX_LINE];
@@ -124,7 +128,7 @@ bool cli_get_int(char *entry, int *dst)
  *	FALSE	- Could not convert to number
  * --------------------------------------------------
  */
-bool cli_get_num(char *entry, int4 *dst)
+boolean_t cli_get_num(char *entry, int4 *dst)
 {
 	char		buf[25];
 	char		local_str[MAX_LINE];
@@ -161,7 +165,7 @@ bool cli_get_num(char *entry, int4 *dst)
  *	FALSE	- Could not get string
  * --------------------------------------------------
  */
-bool cli_get_str(char *entry, char *dst, unsigned short *max_len)
+boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len)
 {
 	char		buf[MAX_LINE];
 	char		local_str[MAX_LINE];
@@ -194,7 +198,7 @@ bool cli_get_str(char *entry, char *dst, unsigned short *max_len)
  *	FALSE	- Could not convert to time
  * --------------------------------------------------
  */
-bool cli_get_time(char *entry, uint4 *dst)
+boolean_t cli_get_time(char *entry, uint4 *dst)
 {
 #define MAXFACTOR (10 * 100 * 60 * 60)	/* (decisec / millisec) * (decisec / sec) * (sec /min) * (min / hour) */
 	char		buf[MAX_LINE + 1], *cp, local_str[MAX_LINE];

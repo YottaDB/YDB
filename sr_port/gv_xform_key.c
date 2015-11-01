@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -66,7 +67,7 @@ void	gv_xform_key(gv_key *keyp, bool xback)
 	assert(c0 < ctop);
 	keyp->prev = 0;
 	keyp->end = c1 - keyp->base;
-	for (;  c0 < ctop;)
+	for (; c0 < ctop; )
 	{
 		if (STR_SUB_PREFIX != *c0)
 		{
@@ -77,10 +78,9 @@ void	gv_xform_key(gv_key *keyp, bool xback)
 			keyp->end = c1 - keyp->base;
 		} else
 		{
-			transform = xback ? TRUE : FALSE;
-			temp.str.len  = gvsub2str(c0, buff, FALSE) - buff;
-			assert(temp.str.len);
-			transform = xback ? FALSE : TRUE;
+			transform = xback;
+			temp.str.len = gvsub2str(c0, buff, FALSE) - buff;
+			transform = !xback;
 			mval2subsc(&temp, keyp);
 			c1 = &keyp->base[keyp->end];
 			while (*c0++)

@@ -61,7 +61,7 @@ typedef struct	rhead_struct
 	int4		current_rhead_ptr;	/* (updated) offset to routine header of current module version */
 	short int	temp_mvals;		/* (updated) temp_mvals value of current module version */
 	unsigned short	temp_size;		/* (updated) temp_size value of current module version */
-#if defined(__alpha) || defined(__MVS__)
+#if defined(__alpha) || defined(__MVS__) || defined(__s390__)
 	int4		*linkage_ptr;		/* (updated) address of linkage Psect of current module version */
 	int4		*literal_ptr;		/* (updated) address of literal Psect of current module version */
 #endif
@@ -98,13 +98,7 @@ typedef struct
 	int4 lab_ln_ptr;
 } lbl_tables;
 
-typedef struct source_line_struct
-{
-	mstr text_form,ls_text;
-	unsigned short lablen,bodystart;
-} src_lin_dsc;
-
-int get_src_line(mval *routine, mval *label, int offset, src_lin_dsc **srcret);
+int get_src_line(mval *routine, mval *label, int offset, mstr **srcret);
 unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine);
 int4 *find_line_addr(rhdtyp *routine, mstr *label, short int offset);
 rhdtyp *find_rtn_hdr(mstr *name);

@@ -35,7 +35,7 @@ OC_COMINT-MVAL: movab	val.1,r1
 		movl	r0,val.0
 OC_COMMARG:	pushl	val.2
 		pushab	val.1
-		jsb	xfer.xf_commarg		
+		jsb	xfer.xf_commarg
 OC_COMVAL-MINT:	movab	val.0,r0
 		movl	val.1,r1
 		jsb	xfer.xf_mint2mval
@@ -146,7 +146,7 @@ OC_FNGET2:	pushab	val.2
 OC_FNGVGET:	pushab	val.1
 		pushab	val.0
 		calls	#2,xfer.xf_fngvget
-OC_FNGVGET1:	pushab	val.0	
+OC_FNGVGET1:	pushab	val.0
  		jsb	xfer.xf_fngvget1
  		tstl	r0
 OC_FNGVGET2:	pushab	val.2
@@ -206,6 +206,13 @@ OC_FNPIECE:	pushl	val.5
 		pushab	val.2
 		pushab	val.1
 		calls	#6,xfer.xf_fnpiece
+OC_FNQLENGTH:	pushab	val.0
+		pushab	val.1
+		calls	#2,xfer.xf_fnqlength
+OC_FNQSUBSCR:	pushab	val.0
+		pushl	val.2
+		pushab	val.1
+		calls	#3,xfer.xf_fnqsubscript
 OC_FNQUERY:	irepab	val.3
 		pushab	val.2
 		pushab	val.0
@@ -213,6 +220,16 @@ OC_FNQUERY:	irepab	val.3
 OC_FNRANDOM:	pushab	val.0
 		pushl	val.1
 		calls	#2,xfer.xf_fnrandom
+OC_FNREVERSE:	pushab	val.0
+		pushab	val.1
+		calls	#2,xfer.xf_fnreverse
+OC_FNSTACK1:	pushab	val.0
+		pushl	val.1
+		calls	#2,xfer.xf_fnstack1
+OC_FNSTACK2:	pushab	val.0
+		pushab	val.2
+		pushl	val.1
+		calls	#3,xfer.xf_fnstack2
 OC_FNTEXT:	pushab	val.0
 		pushab	val.3
 		pushl	val.2
@@ -357,13 +374,13 @@ OC_FORLOOP-BYTE:jsb	xfer.xf_restartpc
 		pushab	val.3
 		pushab	val.2
 		jsb	xfer.xf_forloop
-OC_FORLOOP-LONG:jsb     xfer.xf_restartpc
+OC_FORLOOP-LONG:jsb	xfer.xf_restartpc
 		pushab	jmp.1
 		pushab	val.4
 		pushab	val.3
 		pushab	val.2
 		jsb	xfer.xf_forloop
-OC_FORLOOP-WORD:jsb     xfer.xf_restartpc
+OC_FORLOOP-WORD:jsb	xfer.xf_restartpc
 		pushab	jmp.1
 		pushab	val.4
 		pushab	val.3
@@ -401,14 +418,14 @@ OC_GVRECTARG:	pushab	val.1
 OC_GVSAVTARG:	pushab	val.0
 		calls	#1,xfer.xf_gvsavtarg
 OC_GVZWITHDRAW: calls	#0,xfer.xf_gvzwithdraw
-OC_GVZWRITE:	jsb 	xfer.xf_restartpc	
+OC_GVZWRITE:	jsb 	xfer.xf_restartpc
 		irepab	val.4
 		pushl	val.3
 		pushl	val.2
 		calls	val.1,xfer.xf_gvzwrite
 OC_HALT:	calls	#0,xfer.xf_halt
 OC_HANG:	jsb 	xfer.xf_restartpc
-		pushl	val.1
+		pushab	val.1
 		calls	#1,xfer.xf_hang
 OC_HARDRET:	jsb	xfer.xf_hardret
 OC_IDIV:	pushab	val.0
@@ -462,6 +479,7 @@ OC_INDSET:	pushab	val.2
 		pushab	val.1
 		jsb	xfer.xf_indset
 OC_INDTEXT:	pushab	val.0
+		pushab	val.3
 		pushl	val.2
 		pushab	val.1
 		jsb	xfer.xf_indtext
@@ -483,7 +501,7 @@ OC_JMPEQU-WORD:	bneq	#3
 		brw	jmp.1
 OC_JMPGEQ-BYTE:	bgeq	jmp.1
 OC_JMPGEQ-LONG:	blss	#6
-		jmp	jmp.1		
+		jmp	jmp.1
 OC_JMPGEQ-WORD:	blss	#3
 		brw	jmp.1
 OC_JMPGTR-BYTE:	bgtr	jmp.1
@@ -554,13 +572,13 @@ OC_LKNAME:	irepab	val.4
 		calls	val.1,xfer.xf_lkname
 OC_LOCK:	pushl	val.1
 		calls	#1,xfer.xf_lock
-OC_LVPATWRITE:	jsb 	xfer.xf_restartpc	
+OC_LVPATWRITE:	jsb 	xfer.xf_restartpc
 		irepab	val.3
 		pushl	val.2
 		calls	val.1,xfer.xf_lvpatwrite
 OC_LVZWITHDRAW:	pushab	val.1
 		calls	#1,xfer.xf_lvzwithdraw
-OC_LVZWRITE:	jsb 	xfer.xf_restartpc	
+OC_LVZWRITE:	jsb 	xfer.xf_restartpc
 		irepab	val.2
 		calls	val.1,xfer.xf_lvzwrite
 OC_MOD:		pushab	val.0
@@ -576,7 +594,8 @@ OC_NAMECHK:	movab	val.1,r0
 OC_NEG:		movab	val.0,r0
 		movab	val.1,r1
 		jsb	xfer.xf_neg
-OC_NEWZT:	calls	#0,xfer.xf_newzt
+OC_NEWINTRINSIC:  pushl	val.1
+		jsb	xfer.xf_newintrinsic
 OC_NEWVAR:	pushl	val.1
 		jsb	xfer.xf_newvar
 OC_NULLEXP:	pushab	val.0
@@ -584,7 +603,7 @@ OC_NULLEXP:	pushab	val.0
 OC_NUMCMP:	movab	val.1,r0
 		movab	val.2,r1
 		jsb	xfer.xf_numcmp
-OC_OPEN:	jsb 	xfer.xf_restartpc	
+OC_OPEN:	jsb 	xfer.xf_restartpc
 		pushab	val.4
 		pushl	val.3
 		pushab	val.2
@@ -604,7 +623,7 @@ OC_RDONE:	jsb 	xfer.xf_restartpc
 		pushl	val.1
 		pushab	val.0
 		calls	#2,xfer.xf_rdone
-OC_READ:	jsb 	xfer.xf_restartpc	
+OC_READ:	jsb 	xfer.xf_restartpc
 		pushl	val.1
 		pushab	val.0
 		calls	#2,xfer.xf_read
@@ -625,7 +644,8 @@ OC_RHDADDR1:	pushl	#0
 		pushab	val.1
 		calls	#2,xfer.xf_rhdaddr
 		movl	r0,addr.0
-OC_RTERROR:	pushl	val.1
+OC_RTERROR:	pushl	val.2
+		pushl	val.1
 		jsb	xfer.xf_rterror
 OC_SETEXTRACT:	pushab	val.0
 		pushl	val.3
@@ -653,7 +673,7 @@ OC_SETZBRK:	pushl	val.5
 		pushl	val.2
 		pushab	val.1
 		pushab	val.3
-		calls	#5,xfer.xf_setzbrk	
+		calls	#5,xfer.xf_setzbrk
 OC_SORTS_AFTER:	movab	val.1,r0
 		movab	val.2,r1
 		jsb	xfer.xf_sorts_after
@@ -674,6 +694,9 @@ OC_SUB:		pushab	val.0
 OC_SVGET:	pushab	val.0
 		pushl	val.1
 		calls	#2,xfer.xf_svget
+OC_PSVPUT:	pushab	val.2
+		pushl	val.1
+		jsb	xfer.xf_psvput
 OC_SVPUT:	pushab	val.2
 		pushl	val.1
 		calls	#2,xfer.xf_svput
@@ -757,27 +780,27 @@ OC_ZSHOWLOC:	pushab	val.3
 OC_ZSTEP:	pushl	#0
 		pushl	val.1
 		calls	#2,xfer.xf_zstep
-		jsb	xfer.xf_zcont		
+		jsb	xfer.xf_zcont
 OC_ZSTEPACT:	pushab	val.2
 		pushl	val.1
 		calls	#2,xfer.xf_zstep
-		jsb	xfer.xf_zcont		
+		jsb	xfer.xf_zcont
 OC_ZSYSTEM:	jsb 	xfer.xf_restartpc
 		pushab	val.1
 		calls	#1,xfer.xf_zsystem
 OC_ZTCOMMIT:	pushl	val.1
 		calls	#1,xfer.xf_ztcommit
 OC_ZTSTART:	calls	#0,xfer.xf_ztstart
-OC_MERGE:       calls   #0,xfer.xf_merge
-OC_MERGE_GVARG: pushl   #0
-                pushl   val.1
-                calls   #2,xfer.xf_merge_arg
-OC_MERGE_LVARG: pushab  val.2
-                pushl   val.1
-                calls   #2,xfer.xf_merge_arg
-OC_INDMERGE:    pushab  val.1
-                pushab  val.2
-                jsb   	xfer.xf_indmerge
-OC_M_SRCHINDX:  irepab  val.2
-                calls   val.1,xfer.xf_m_srchindx
-                movl    r0,addr.0
+OC_MERGE:	calls	#0,xfer.xf_merge
+OC_MERGE_GVARG: pushl	#0
+		pushl	val.1
+		calls	#2,xfer.xf_merge_arg
+OC_MERGE_LVARG: pushab	val.2
+		pushl	val.1
+		calls	#2,xfer.xf_merge_arg
+OC_INDMERGE:	pushab	val.1
+		pushab	val.2
+		jsb	xfer.xf_indmerge
+OC_M_SRCHINDX:	irepab	val.2
+		calls	val.1,xfer.xf_m_srchindx
+		movl	r0,addr.0

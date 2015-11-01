@@ -25,6 +25,7 @@ void	mur_extract_pfin(jnl_record *rec);
 void	mur_extract_null(jnl_record *rec);
 void	mur_extract_pini(jnl_record *rec);
 void	mur_extract_eof(jnl_record *rec);
+int 	extract_process_vector(jnl_process_vector *pv, int extract_len);
 
 #endif
 

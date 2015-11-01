@@ -57,8 +57,10 @@ LITDEF nametabent svn_names[] = {
 	,{ 1,"K" }, { 3,"KEY" }
 	,{ 1,"P" }, { 8,"PRINCIPA*" }
 	,{ 1,"Q" }, { 4,"QUIT" }
+	,{ 1,"R" }, { 8,"REFERENC*" }
 	,{ 1,"S" }, { 7,"STORAGE" }
 	,{ 2,"ST" }, { 5,"STACK" }
+	,{ 2,"SY" }, { 6,"SYSTEM" }
 	,{ 1,"T" }, { 4,"TEST" }
 	,{ 2, "TL"}, { 6, "TLEVEL"}
 	,{ 2, "TR"}, { 8, "TRESTART"}
@@ -94,9 +96,9 @@ LITDEF nametabent svn_names[] = {
 };
 /* Indexes into svn_names array for each letter of the alphabet */
 LITDEF unsigned char svn_index[27] = {
-	0, 0, 0, 0, 2, 8, 8, 8, 10, 12, 14
-	,16, 16, 16, 16, 16, 18, 20, 20, 24, 30
-	,30, 30, 30, 31, 32, 60
+	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
+	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
+	22, 28, 34 ,34, 34, 34, 35, 36, 64	/* s t u v w x y z ~ */
 };
 /* These entries correspond to the entries in the svn_names array */
 LITDEF svn_data_type svn_data[] =
@@ -111,8 +113,10 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_KEY,FALSE, ALL_SYS }, { SV_KEY,FALSE, ALL_SYS }
 	,{ SV_PRINCIPAL,FALSE,ALL_SYS }, { SV_PRINCIPAL,FALSE,ALL_SYS }
 	,{ SV_QUIT,FALSE,ALL_SYS }, { SV_QUIT,FALSE,ALL_SYS }
+	,{ SV_REFERENCE,FALSE,ALL_SYS }, { SV_REFERENCE,FALSE,ALL_SYS }
 	,{ SV_STORAGE,FALSE,ALL_SYS }, { SV_STORAGE,FALSE,ALL_SYS }
 	,{ SV_STACK,FALSE,ALL_SYS }, { SV_STACK,FALSE,ALL_SYS }
+	,{ SV_SYSTEM,FALSE,ALL_SYS }, { SV_SYSTEM,FALSE,ALL_SYS }
 	,{ SV_TEST,FALSE,ALL_SYS }, { SV_TEST,FALSE,ALL_SYS }
 	,{ SV_TLEVEL,FALSE,ALL_SYS }, { SV_TLEVEL,FALSE,ALL_SYS }
 	,{ SV_TRESTART,FALSE,ALL_SYS }, { SV_TRESTART,FALSE,ALL_SYS }
@@ -124,7 +128,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZCMDLINE,FALSE,ALL_SYS }
 	,{ SV_ZCOMPILE,TRUE,ALL_SYS }
 	,{ SV_ZCSTATUS, FALSE, ALL_SYS}
-	,{ SV_ZDIR,FALSE,ALL_SYS }
+	,{ SV_ZDIR,TRUE,ALL_SYS }
 	,{ SV_ZERROR,TRUE,ALL_SYS }
 	,{ SV_ZEDITOR, FALSE, ALL_SYS }
 	,{ SV_ZEOF,FALSE,ALL_SYS }
@@ -166,9 +170,13 @@ LITDEF nametabent fun_names[] =
 	,{ 4,"NEXT" }
 	,{ 1,"O" }, { 5,"ORDER" }
 	,{ 1,"P" }, { 5,"PIECE" }
+	,{ 2,"QL" }, { 7,"QLENGTH" }
+	,{ 2,"QS" }, { 8,"QSUBSCRI*" }
 	,{ 1,"Q" }, { 5,"QUERY" }
 	,{ 1,"R" }, { 6,"RANDOM" }
+	,{ 2,"RE" }, { 7,"REVERSE" }
 	,{ 1,"S" }, { 6,"SELECT" }
+	,{ 2,"ST" }, { 5,"STACK" }
 	,{ 1,"T" }, { 4,"TEXT" }
 	,{ 2,"TR" }, { 8,"TRANSLAT*"}
 	,{ 1,"V*" }
@@ -204,9 +212,9 @@ LITDEF nametabent fun_names[] =
 /* Index into fun_names array where entries that start with each letter of
    the alphabet begin. */
 LITDEF unsigned char fun_index[27] = {
-	0, 2, 2, 4, 6, 8, 12, 14, 14, 14
-	,16, 16, 18, 18, 22, 24, 26, 28
-	,30, 32, 36, 36, 37, 37, 37, 37, 72
+	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
+	14, 16, 16, 18, 18, 22, 24, 26, 32,	/* j k l m n o p q r */
+	36, 40, 44, 44, 45, 45, 45, 45, 80	/* s t u v w x y z ~ */
 };
 /* Each entry corresponds to an entry in fun_names */
 LITDEF fun_data_type fun_data[] =
@@ -225,9 +233,13 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNNEXT,ALL_SYS }
 	,{ OC_FNORDER,ALL_SYS }, {OC_FNORDER,ALL_SYS }
 	,{ OC_FNPIECE,ALL_SYS }, { OC_FNPIECE,ALL_SYS }
+	,{ OC_FNQLENGTH,ALL_SYS }, { OC_FNQLENGTH,ALL_SYS }
+	,{ OC_FNQSUBSCR,ALL_SYS }, { OC_FNQSUBSCR,ALL_SYS }
 	,{ OC_FNQUERY,ALL_SYS }, { OC_FNQUERY,ALL_SYS }
 	,{ OC_FNRANDOM,ALL_SYS }, { OC_FNRANDOM,ALL_SYS }
+	,{ OC_FNREVERSE,ALL_SYS }, { OC_FNREVERSE,ALL_SYS }
 	,{ OC_PASSTHRU,ALL_SYS }, { OC_PASSTHRU,ALL_SYS }
+	,{ OC_FNSTACK1,ALL_SYS }, { OC_FNSTACK1,ALL_SYS }
 	,{ OC_FNTEXT,ALL_SYS }, { OC_FNTEXT,ALL_SYS }
 	,{ OC_FNTRANSLATE,ALL_SYS }, { OC_FNTRANSLATE,ALL_SYS }
 	,{ OC_FNVIEW,ALL_SYS }
@@ -266,8 +278,9 @@ LITDEF int (*fun_parse[])(oprtype *, opctype) =
 	f_ascii,f_ascii,f_char,f_char,f_data,f_data,f_extract
 	,f_extract,f_find,f_find,f_fnumber,f_fnumber,f_get,f_get
 	,f_justify,f_justify,f_length,f_length,f_next,f_name, f_name, f_next,f_order
-	,f_order,f_piece,f_piece,f_query,f_query,f_mint,f_mint,f_select,f_select
-	,f_text,f_text,f_translate,f_translate,f_view
+	,f_order,f_piece,f_piece,f_qlength,f_qlength,f_qsubscript,f_qsubscript
+	,f_query,f_query,f_mint,f_mint,f_reverse,f_reverse,f_select,f_select
+	,f_stack,f_stack,f_text,f_text,f_translate,f_translate,f_view
 	,f_two_mval,f_one_mval,f_fnzbitfind,f_fnzbitget,f_one_mval
 	,f_one_mval,f_two_mval,f_fnzbitset,f_fnzbitstr,f_two_mval
 	,f_zcall,f_zcall,f_zdate,f_zdate,f_zechar

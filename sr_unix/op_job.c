@@ -11,9 +11,16 @@
 
 #include "mdef.h"
 
-/* Linux/gcc needs stdio before varargs due to stdarg */
+/* LinuxIA32/gcc needs stdio before varargs due to stdarg */
+/* Linux390/gcc needs varargs first */
+#ifdef EARLY_VARARGS
+#include <varargs.h>
+#include "gtm_stdio.h"
+#else
 #include "gtm_stdio.h"
 #include <varargs.h>
+#endif
+
 #include <sys/wait.h>
 #include <errno.h>
 

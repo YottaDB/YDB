@@ -33,6 +33,7 @@
 #include "gtm_ipc.h"		/* needed for FTOK */
 #endif
 
+#include "gtm_string.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -48,6 +49,7 @@
 #include "iosp.h"
 #include "dbfilop.h"
 #include "gtmmsg.h"
+#include "is_file_identical.h"
 
 GBLREF	tp_region	*rlist;
 GBLREF	gd_region	*gv_cur_region;
@@ -58,15 +60,17 @@ tp_region	*insert_region(	gd_region	*reg,
 		   		int4		size)
 {
 	tp_region	*tr, *tr_last, *tr_new;
-	char		local_id[UNIQUE_ID_SIZE];
+	unique_file_id	local_id;
 #ifdef 	VMS
+	char		*local_id_fiptr;
 	file_control	*fc;
 	uint4		status;
 	gd_region	*temp_reg;
 #endif
 
 	assert(size >= sizeof(tp_region));
-#ifdef	VMS
+#if defined(VMS)
+	local_id_fiptr = &local_id.file_id[0];
 	temp_reg = gv_cur_region;
 	gv_cur_region = reg;
 	if (TRUE != reg->open)
@@ -92,39 +96,36 @@ tp_region	*insert_region(	gd_region	*reg,
 	  	status = dbfilop(fc);
 	  	if (status & 1)
 	    	{
-	      		memset(&local_id[0], 0, UNIQUE_ID_SIZE);
-	      		memcpy(&local_id[0], &(FILE_INFO(reg)->file_id), sizeof(gds_file_id));
+			local_id_fiptr = &(FILE_INFO(reg)->file_id);
 	      		sys$dassgn(FILE_INFO(reg)->fab->fab$l_stv);
 	    	}
 	  	else
 	    	{
-	      		gtm_putmsg(status);
+	      		gtm_putmsg(VARLSTCNT(1) status);
 			gv_cur_region = temp_reg;
 	      		return NULL;
 	    	}
 	}
 	else
-	{
-		memcpy(&local_id[0], &((&FILE_INFO(reg)->s_addrs)->nl->unique_id[0]), UNIQUE_ID_SIZE);
-      	}
+		local_id_fiptr = &((&FILE_INFO(reg)->s_addrs)->nl->unique_id.file_id);
 	gv_cur_region = temp_reg;
-#elif	defined(UNIX)
+#elif defined(UNIX)
 	if (!reg->open)
 	{
-		memset(&local_id[0], 0, UNIQUE_ID_SIZE);
 		if (NULL == mupfndfil(reg))
 			return NULL;
-		if (!filename_to_id((char *)reg->dyn.addr->fname, &local_id[0]))
+		if (!filename_to_id(&local_id.uid, (char *)reg->dyn.addr->fname))
 			return NULL;
 	} else
-		memcpy(&local_id[0], &((&FILE_INFO(reg)->s_addrs)->nl->unique_id[0]), UNIQUE_ID_SIZE);
+		local_id.uid = (&FILE_INFO(reg)->s_addrs)->nl->unique_id.uid;
 #endif
 	/* See if the region is already on the list or if we have to add it */
 	for (tr = *reg_list, tr_last = NULL; NULL != tr; tr = tr->fPtr)
 	{
 		if (reg == tr->reg)			/* Region is found */
 			return tr;
-		if (memcmp(&(tr->unique_id[0]), &local_id[0], UNIQUE_ID_SIZE) > 0)
+		VMS_ONLY(if (0 < memcmp(&(tr->file_id), local_id_fiptr, sizeof(gd_id))))
+		UNIX_ONLY(if (0 < gdid_cmp(&(tr->file_id), &(local_id.uid))))
 			break;				/* .. we have found our insertion point */
 		tr_last = tr;
 	}
@@ -140,7 +141,8 @@ tp_region	*insert_region(	gd_region	*reg,
 			memset(tr_new, 0, size);
 	}
 	tr_new->reg = reg;				/* Add this region to end of list */
-	memcpy(&(tr_new->unique_id[0]), &local_id[0], UNIQUE_ID_SIZE);
+	VMS_ONLY(memcpy(&(tr_new->file_id), local_id_fiptr, sizeof(gd_id));)
+	UNIX_ONLY(tr_new->file_id = local_id.uid;)
 	if (NULL == tr_last)
 	{	/* First element on the list */
 		tr_new->fPtr = *reg_list;

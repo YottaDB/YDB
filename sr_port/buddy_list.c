@@ -211,8 +211,8 @@ void    cleanup_list(buddy_list *list)
 	assert(list);
 	if (!list ||  !(curr = list->ptrArray))
 		return;
-
         while(*curr)
                 free(*curr++);
+	free(list->free_que);
         free(list->ptrArray);
 }

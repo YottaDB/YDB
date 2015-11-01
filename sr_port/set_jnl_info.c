@@ -31,6 +31,8 @@ void set_jnl_info(gd_region *reg, jnl_create_info *set_jnl_info)
 	set_jnl_info->extend = (0 == csd->jnl_deq) ? set_jnl_info->alloc * JNL_EXTEND_DEF_PERC : csd->jnl_deq;
 	set_jnl_info->buffer = (0 == csd->jnl_buffer_size) ? JNL_BUFFER_DEF : csd->jnl_buffer_size;
 	set_jnl_info->alignsize = (0 == csa->jnl->jnl_buff->alignsize) ? JNL_MIN_ALIGNSIZE : csa->jnl->jnl_buff->alignsize;
+	set_jnl_info->autoswitchlimit = (0 == csa->jnl->jnl_buff->autoswitchlimit) ?
+						JNL_ALLOC_MAX : csa->jnl->jnl_buff->autoswitchlimit;
 	set_jnl_info->epoch_interval = (0 == csa->jnl->jnl_buff->epoch_interval) ? DEFAULT_EPOCH_INTERVAL
 											: csa->jnl->jnl_buff->epoch_interval;
 	set_jnl_info->rsize = csd->blk_size + DISK_BLOCK_SIZE;

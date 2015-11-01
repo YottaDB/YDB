@@ -43,11 +43,13 @@ int real_len(int length, char *str);
 
 #define	MUR_MULTI_LIST_INIT_ALLOC		1024	/* initial allocation for mur_multi_list */
 #define	MUR_MULTI_TOKEN_HASHTABLE_INIT_ELEMS	1024	/* initial elements in the mur_multi token hashtable */
+#define	MUR_MULTI_SEQNO_HASHTABLE_INIT_ELEMS	1024	/* initial elements in the mur_multi seqno hashtable */
 #define	MUR_CURRENT_LIST_INIT_ALLOC		  64	/* initial allocation for current_list in "ctl" structure */
 #define	MUR_JNL_REC_BUDDY_LIST_INIT_ALLOC	  64	/* initial allocation for jnl_rec_buddy_list in mur_forward() */
 #define	MUR_RAB_BUDDY_LIST_INIT_ALLOC	  	  (1024 * 4)	/* initial allocation for jnl_rec_buddy_list in mur_forward() */
 
 #define DEFAULT_EXTR_BLKSIZE	10240
+#define	MUR_PINI_IN_USE_INIT_ELEMS	64		/* initial no. of elements in hash table ctl->pini_in_use */
 
 enum mur_error
 {
@@ -137,9 +139,6 @@ typedef struct ctl_list_struct
 	int4			broken_entries,
 				lookback_count,
 				jnlrec_cnt[JRT_RECTYPES];
-	jnl_proc_time		lookback_time;
-	uint4			bov_timestamp,
-				eov_timestamp;
 	short			jnl_fn_len;
 	char			jnl_fn[256],
 				jnl_state,
@@ -150,8 +149,14 @@ typedef struct ctl_list_struct
 				found_eof,
 				clustered,
 				reached_lookback_limit;
+	jnl_proc_time		lookback_time;
+	jnl_proc_time		bov_timestamp,
+				eov_timestamp;
 	seq_num			stop_jnl_seqno;
 	seq_num			jnl_seqno;
+	struct hashtab_t	*pini_in_use; /* Store hash table entries for pini_addr */
+	boolean_t		before_image; /* True if the database has before image journalling enabled */
+	uint4			turn_around_epoch_time; /* Used in forward processing for restoring turn around epoch time stamp */
 } ctl_list;
 
 
@@ -230,6 +235,7 @@ typedef struct
 				notncheck,
 				losttrans,
 				apply_after_image,
+				preserve_jnl,
 				chain;
 } mur_opt_struct;
 
@@ -246,7 +252,7 @@ bool mur_jnlhdr_multi_bov_check(jnl_file_header *prev_header, int prev_jnl_fn_le
 	char *prev_jnl_fn, jnl_file_header *header, int jnl_fn_len, char *jnl_fn, boolean_t ordered);
 bool mur_lookback_process(ctl_list *ctl);
 bool mur_lookup_broken(ctl_list *ctl, uint4 pini_addr, token_num token);
-bool mur_lookup_multi(ctl_list *ctl, uint4 pini, token_num token);
+bool mur_lookup_multi(ctl_list *ctl, uint4 pini, token_num token, seq_num seqno);
 bool mur_multi_extant(void);
 bool mur_multi_missing(int4 epid);
 bool mur_open_files(ctl_list **jnl_files);
@@ -255,8 +261,7 @@ bool mur_sort_and_checktn(ctl_list **jnl_files);
 bool mur_sort_files(ctl_list **jnl_file_list_ptr);
 ctl_list *mur_get_jnl_files(void);
 int4 mur_blocks_free(ctl_list *ctl);
-int4 mur_decrement_multi(int4 epid, token_num token);
-int4 mur_decrement_multi_seqno(seq_num seqno);
+int4 mur_decrement_multi(int4 epid, token_num token, seq_num seqno);
 jnl_file_header *mur_get_file_header(mur_rab *r);
 jnl_process_vector *mur_get_pini_jpv(ctl_list *ctl, uint4 pini_addr);
 mur_rab *mur_rab_create(int buffer_size);
@@ -269,9 +274,8 @@ uint4 mur_next(mur_rab *r, uint4 dskaddr);
 uint4 mur_previous(mur_rab *r, uint4 dskaddr);
 void mur_close_files(void);
 void mur_cre_broken(ctl_list *ctl, uint4 pini_addr, token_num token);
-void mur_cre_current(ctl_list *ctl, uint4 pini_addr, token_num token, jnl_process_vector *pv, 	 bool broken);
-void mur_cre_multi(int4 epid, token_num token, int4 count, uint4 lookback_time);
-void mur_cre_multi_seqno(int4 count, seq_num seqno);
+void mur_cre_current(ctl_list *ctl, uint4 pini_addr, token_num token, jnl_process_vector *pv, bool broken);
+void mur_cre_multi(int4 epid, token_num token, int4 count, uint4 lookback_time, seq_num seqno);
 void mur_current_initialize(void);
 void mur_delete_current(ctl_list *ctl, uint4 pini_addr);
 void mur_do_show(ctl_list *ctl);
@@ -291,6 +295,9 @@ seq_num rlbk_lookup_seqno(void);
 void jnlext1_write(ctl_list *ctl);
 int	gtmrecv_fetchresync(ctl_list *jnl_files, int port, seq_num *resync_seqno);
 uint4	mur_block_count_correct(void);
+boolean_t mur_crejnl_forwphase_file(ctl_list **jnl_files);
+void mur_put_aimg_rec(jnl_record *rec);
+
 
 #include "muprecsp.h"
 
@@ -337,7 +344,6 @@ struct mur_file_control
 };
 
 #define MINIMUM_BUFFER_SIZE (DISK_BLOCK_SIZE * 32)
-#define EOF_RECLEN      ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_eof) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
 
 #ifdef UNIX
 #define BKUP_CMD	"cp -p "
@@ -345,6 +351,7 @@ struct mur_file_control
 #define RLBKSUFFIX	"_roll_bak"
 #define NO_FD_OPEN     -1
 #endif
+#define FORWSUFFIX	"_forw_phase"
 
 #ifdef VMS
 #define BKUP_CMD	"BACKUP/IGNORE=INTERLOCK "
@@ -361,3 +368,9 @@ struct mur_file_control
 	ctl->eov_tn = header->eov_tn;
 
 #define DUMMY_FILE_ID	"123456"		/* needed only in VMS, but included here for lack of a better generic place */
+#define	COPY_MUR_JREC_FIXED_FIELDS(mur_jrec_fixed_field, jrec)		\
+	mur_jrec_fixed_field.short_time = jrec->short_time;		\
+	mur_jrec_fixed_field.rec_seqno = jrec->rec_seqno;		\
+	mur_jrec_fixed_field.jnl_seqno = jrec->jnl_seqno;		\
+	cur_logirec_short_time = jrec->short_time;
+

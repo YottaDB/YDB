@@ -62,10 +62,7 @@ void	iotcp_write(mstr *v)
 			errptr = (char *)STRERROR(errno);
 			errlen = strlen(errptr);
 			memcpy(&tcpptr->dollar_device[sizeof(LITONE_COMMA) - 1], errptr, errlen);
-			if (iod->error_handler.len > 0)
-				rts_error(VARLSTCNT(6) ERR_SOCKWRITE, 0, ERR_TEXT, 2, errlen, errptr);
-			else
-				return;
+			rts_error(VARLSTCNT(6) ERR_SOCKWRITE, 0, ERR_TEXT, 2, errlen, errptr);
 		}
 		assert(size == outlen);
 		iod->dollar.x += size;

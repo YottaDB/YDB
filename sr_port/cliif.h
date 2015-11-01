@@ -12,14 +12,14 @@
 #ifndef CLIIF_included
 #define CLIIF_included
 
-bool cli_get_hex(char *entry, int4 *dst);
-bool cli_get_int(char *entry, int *dst);
-bool cli_get_num(char *entry, int4 *dst);
-bool cli_get_str(char *entry, char *dst, unsigned short *max_len);
+boolean_t cli_get_hex(char *entry, int4 *dst);
+boolean_t cli_get_int(char *entry, int *dst);
+boolean_t cli_get_num(char *entry, int4 *dst);
+boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len);
 bool cli_get_str_ele_upper(char *inbuff, char *dst, unsigned short *dst_len);
-bool cli_get_time(char *entry, uint4 *dst);
+boolean_t cli_get_time(char *entry, uint4 *dst);
 bool cli_get_value(char *entry, char val_buf[]);
-bool cli_negated(char *entry);
+boolean_t cli_negated(char *entry);
 int4 cli_t_f_n(char *entry);
 int cli_get_string_token(int *eof);
 int cli_gettoken(int *eof);

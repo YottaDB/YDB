@@ -16,6 +16,7 @@
 #include "tp_frame.h"
 #include "unw_retarg.h"
 #include "underr.h"
+#include "unwind_nocounts.h"
 
 GBLREF void		(*unw_prof_frame_ptr)(void);
 GBLREF stack_frame	*frame_pointer, *zyerr_frame;
@@ -40,6 +41,12 @@ int unw_retarg(mval *src)
 	assert(frame_pointer <= (stack_frame *)stackbase && frame_pointer > (stack_frame *)stacktop);
 	MV_FORCE_DEFINED(src);
 	ret_value = *src;
+	/* Note: we are unwinding uncounted (indirect) frames here to allow
+	   the QUIT command to have indirect arguments and thus be executed by
+	   commarg in an indirect frame. By unrolling the indirect frames here
+	   we get back to the point where we can find where to put the quit value.
+	*/
+	unwind_nocounts();
 	got_ret_target = FALSE;
 	while (mv_chain < (mv_stent *)frame_pointer)
 	{

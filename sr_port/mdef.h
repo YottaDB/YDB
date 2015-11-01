@@ -38,6 +38,7 @@ typedef unsigned short mstr_len_t;
 
 #include <sys/types.h>
 
+
 #define sssize_t      size_t
 #define SHMDT(X)	shmdt((void *)(X))
 
@@ -160,7 +161,6 @@ char *s2n(mval *u);
 void gtm_assert ( int file_name_len, char file_name[], int line_no);
 #define GTMASSERT	(gtm_assert(CALLFROM))
 
-
 #ifdef UNIX
 int rts_error();
 #endif
@@ -178,6 +178,7 @@ int4 timeout2msec(int4 timeout);
 #define RTS_ERROR_STRING(STRING)	LENGTH_AND_STRING(STRING)
 
 /* the LITERAL version of the macro should be used over STRING whenever possible for efficiency reasons */
+#define STR_LIT_LEN(LITERAL)		(sizeof(LITERAL) - 1)
 #define LITERAL_AND_LENGTH(LITERAL)	(LITERAL), (sizeof(LITERAL) - 1)
 #define LENGTH_AND_LITERAL(LITERAL)	(sizeof(LITERAL) - 1), (LITERAL)
 #define STRING_AND_LENGTH(STRING)	(STRING), (strlen(STRING))
@@ -254,6 +255,38 @@ typedef struct
 	volatile int4	latch_word;		/* Extra word associated with lock (sometimes bci lock for VMS) */
 	volatile int4	hp_latch_space[4];	/* Used for HP load_and_clear locking instructions per HP whitepaper on spinlocks */
 } global_latch_t;
+
+typedef struct
+{
+	int4	fl;		/* forward link - relative offset from beginning of this element to next element in queue */
+	int4	bl;		/* backward link - relative offset from beginning of this element to previous element in queue */
+} que_ent;			/* this structure is intended to be identical to the first two items in a cache_que_head */
+
+typedef struct
+{
+	int4	fl;		/* forward link - relative offset from beginning of this element to next element in queue */
+	int4	bl;		/* backward link - relative offset from beginning of this element to previous element in queue */
+	global_latch_t	latch;	/* required for platforms without atomic operations to modify both fl and bl concurrently;
+				 * unused on platforms with such instructions. */
+} que_head, cache_que_head, mmblk_que_head;
+
+#ifdef DB64
+# ifdef __osf__
+#  pragma pointer_size(save)
+#  pragma pointer_size(long)
+# else
+#  error UNSUPPORTED PLATFORM
+# endif
+#endif
+
+typedef que_ent *	que_ent_ptr_t;
+typedef que_head *	que_head_ptr_t;
+
+#ifdef DB64
+# ifdef __osf__
+#  pragma pointer_size(restore)
+# endif
+#endif
 
 #ifdef INT8_SUPPORTED
    typedef	uint64_t		qw_num;
@@ -574,6 +607,11 @@ typedef enum
 # define VSIG_ATOMIC_T	volatile sig_atomic_t
 #endif
 
+/* For copying va_list items - Linux/390 needs __va_copy */
+#ifndef VAR_COPY
+#define VAR_COPY(dst, src)   dst = src
+#endif
+
 #define NOLICENSE	/* cheap way to obsolete it */
 /* To use GET_CUR_TIME macro 'now' of type time_t and 'time_ptr' of type char *
  * should be defined at the calling place */
@@ -631,6 +669,44 @@ char *i2s(int4 *i);
 
 #define ZTRAP_CODE	0x00000001
 #define ZTRAP_ENTRYREF	0x00000002
+#define ZTRAP_POP	0x00000004
 #define ZTRAP_ADAPTIVE	(ZTRAP_CODE | ZTRAP_ENTRYREF)
 
+#define GTM_BYTESWAP_16(S)		\
+	(  (((S) & 0xff00) >> 8)	\
+	 | (((S) & 0x00ff) << 8)	\
+	)
+
+#define GTM_BYTESWAP_32(L)		\
+	(  (((L) & 0xff000000) >> 24)	\
+	 | (((L) & 0x00ff0000) >>  8)	\
+	 | (((L) & 0x0000ff00) <<  8)	\
+	 | (((L) & 0x000000ff) << 24)	\
+	)
+
+qw_num	gtm_byteswap_64(qw_num num64);
+#ifdef INT8_SUPPORTED
+#define GTM_BYTESWAP_64(LL)				\
+	(  (((LL) & 0xff00000000000000ull) >> 56)	\
+	 | (((LL) & 0x00ff000000000000ull) >> 40)	\
+	 | (((LL) & 0x0000ff0000000000ull) >> 24)	\
+	 | (((LL) & 0x000000ff00000000ull) >>  8)	\
+	 | (((LL) & 0x00000000ff000000ull) <<  8)	\
+	 | (((LL) & 0x0000000000ff0000ull) << 24)	\
+	 | (((LL) & 0x000000000000ff00ull) << 40)	\
+	 | (((LL) & 0x00000000000000ffull) << 56)	\
+	)
+#else
+#define	GTM_BYTESWAP_64(LL) gtm_byteswap_64(LL)
+#endif
+
+#define ZDIR_FORM_FULLPATH		0x00000000
+#define ZDIR_FORM_DIRECTORY		0x00000001
+#define IS_VALID_ZDIR_FORM(zdirform)	(ZDIR_FORM_FULLPATH == (zdirform) || ZDIR_FORM_DIRECTORY == (zdirform))
+
+#ifdef __sparc
+#define SHMAT_ARG(X)		(X) | SHM_SHARE_MMU
+#else
+#define SHMAT_ARG(X)		(X)
+#endif
 #endif /* MDEF_included */

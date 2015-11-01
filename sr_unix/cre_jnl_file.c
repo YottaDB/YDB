@@ -37,12 +37,6 @@ GBLREF  boolean_t               rename_changes_jnllink;
 
 #define ZERO_SIZE	(128 * DISK_BLOCK_SIZE)
 
-#define EPOCH_BACKPTR	ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_epoch), JNL_REC_START_BNDRY)
-#define EPOCH_RECLEN	ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_epoch) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
-#define EOF_BACKPTR	ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_eof), JNL_REC_START_BNDRY)
-#define	EOF_RECLEN	ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_eof) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
-#define	HDR_LEN		ROUND_UP(sizeof(jnl_file_header), DISK_BLOCK_SIZE)
-
 #define EXIT_NRM	0
 #define EXIT_ERR	4
 #define JNL_TIME_FORMAT	"_%Y%j%H%M%S"	/* .yearjuliendayhoursminutesseconds */
@@ -192,6 +186,7 @@ uint4	cre_jnl_file (jnl_create_info *info)
 	memcpy(header->data_file_name, info->fn, info->fn_len);
 	header->data_file_name[info->fn_len] = '\0';
 	header->alignsize = info->alignsize;
+	header->autoswitchlimit = info->autoswitchlimit;
 	header->epoch_interval = info->epoch_interval;
 	QWASSIGN(header->start_seqno, info->reg_seqno);
 	header->prev_jnl_file_name_length = info->prev_jnl_len; ;

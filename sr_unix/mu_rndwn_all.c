@@ -20,6 +20,7 @@
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 #include <sys/sem.h>
+#include "gtm_sem.h"
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 #include "gtmio.h"
@@ -49,6 +50,7 @@
 #include "gtmmsg.h"
 #include "cliif.h"
 #include "mu_rndwn_repl_instance.h"
+#include "send_msg.h"
 
 GBLREF gd_region        *gv_cur_region;
 
@@ -56,6 +58,7 @@ LITREF char             gtm_release_name[];
 LITREF int4             gtm_release_name_len;
 
 #define	TMP_BUF_LEN	50
+
 boolean_t validate_db_shm_entry(char *, char *, int *);
 boolean_t validate_replpool_shm_entry(char *, replpool_id_ptr_t, int *, int *);
 shm_parms *get_shm_parm(char *entry);
@@ -161,7 +164,7 @@ boolean_t validate_db_shm_entry(char *entry, char *fname, int *exit_stat)
 		 * the other rundowns (if any) can also be allowed to share reading the
 		 * same info concurrently.
 		 */
-		if (-1 == (sm_long_t)(start_addr = shmat(parm_buff->shmid, 0, SHM_RND)))
+		if (-1 == (sm_long_t)(start_addr = (sm_uc_ptr_t) do_shmat(parm_buff->shmid, 0, SHM_RND)))
 		{
 			free(parm_buff);
 			return FALSE;
@@ -242,7 +245,7 @@ boolean_t validate_replpool_shm_entry(char *entry, replpool_id_ptr_t replpool_id
 		 * the other rundowns (if any) can also be allowed to share reading the
 		 * same info concurrently.
 		 */
-		if (-1 == (sm_long_t)(start_addr = shmat(parm_buff->shmid, 0, SHM_RND)))
+		if (-1 == (sm_long_t)(start_addr = (sm_uc_ptr_t) do_shmat(parm_buff->shmid, 0, SHM_RND)))
 		{
 			free(parm_buff);
 			return FALSE;
@@ -357,4 +360,94 @@ char *parse_shm_entry(char *entry, int which_field)
 	parm[indx2] = '\0';
 
 	return parm;
+}
+
+int parse_sem_id(char *entry)
+{
+	char 	*parm;
+	int 	iter, indx1 = 0, indx2;
+
+	while(entry[indx1] == ' ')
+		indx1++;
+	while(entry[indx1] && entry[indx1] != ' ')
+		indx1++;
+	while(entry[indx1] == ' ')
+		indx1++;
+	if ('\0' == entry[indx1])
+	{
+		assert(FALSE);
+		return -1;
+	}
+	indx2 = indx1;
+	parm = &entry[indx1];
+	while(entry[indx2] && entry[indx2] != ' ')
+		indx2++;
+	entry[indx2] = '\0';
+	if (cli_is_dcm(parm))
+		return STRTOUL(parm, NULL, 10);
+	else if (cli_is_hex(parm + 2))
+		return STRTOUL(parm, NULL, 16);
+	else
+	{
+		assert(FALSE);
+		return -1;
+	}
+}
+
+int mu_rndwn_sem_all(void)
+{
+	int 			save_errno, exit_status = SS_NORMAL, semid;
+	char			entry[MAX_ENTRY_LEN];
+	FILE			*pf;
+	char			fname[MAX_FN_LEN + 1], *fgets_res;
+	boolean_t 		rem_sem;
+	shm_parms		*parm_buff;
+
+	error_def(ERR_MUNOTALLSEC);
+	error_def(ERR_SEMREMOVED);
+
+	if (NULL == (pf = POPEN(IPCS_SEM_CMD_STR ,"r")))
+        {
+		save_errno = errno;
+		util_out_print("Error with popen(), !AD", TRUE, LEN_AND_STR(STRERROR(save_errno)));
+                return ERR_MUNOTALLSEC;
+        }
+	while (NULL != (FGETS(entry, sizeof(entry), pf, fgets_res)) && entry[0] != '\n')
+	{
+		if (-1 != (semid = parse_sem_id(entry)))
+		{
+			if (is_orphaned_gtm_semaphore(semid))
+			{
+				if (-1 != semctl(semid, 0, IPC_RMID))
+				{
+					gtm_putmsg(VARLSTCNT(3) ERR_SEMREMOVED, 1, semid);
+					send_msg(VARLSTCNT(3) ERR_SEMREMOVED, 1, semid);
+				}
+			}
+		}
+	}
+	pclose(pf);
+	return exit_status;
+}
+boolean_t is_orphaned_gtm_semaphore(int semid)
+{
+	int			semno, semval;
+	struct semid_ds		semstat;
+	union semun		semarg;
+
+	semarg.buf = &semstat;
+	if (-1 != semctl(semid, 0, IPC_STAT, semarg))
+	{
+		if (-1 == (semval = semctl(semid, semarg.buf->sem_nsems - 1, GETVAL)) || GTM_ID != semval)
+			return FALSE;
+		else
+		{
+			/* Make sure all has value = 0 */
+			for (semno = 0; semno < semarg.buf->sem_nsems - 1; semno++)
+				if (-1 == (semval = semctl(semid, semno, GETVAL)) || semval)
+					return FALSE;
+		}
+		return TRUE;
+	}
+	return FALSE;
 }

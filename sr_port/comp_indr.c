@@ -16,7 +16,7 @@
 #include "mv_stent.h"
 #include "copy.h"
 #include "cache.h"
-#include "masscomp.h"
+#include "objlabel.h"
 #include "mprof.h"
 #include "cacheflush.h"
 #include "compiler.h"
@@ -79,7 +79,7 @@ void	comp_indr (mstr *obj)
 	DEBUG_ONLY(
 		vp = (int *)sf->mpc;
 		vp--;
-		assert((OMAGIC << 16) + STAMP13 == *vp);
+		assert((OMAGIC << 16) + OBJ_LABEL == *vp);
 		vp--;
 		assert((unsigned char*)rtnhdr == (unsigned char *)vp + *vp);
 	);

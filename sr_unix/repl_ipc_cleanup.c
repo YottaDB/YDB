@@ -85,7 +85,7 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status)
 
 	if (attempt_ipc_cleanup)
 	{
-		if (udi->shmid > 0 && (auto_shutdown || (detach_status = SHMDT(jnlpool.jnlpool_ctl)) == 0)
+		if (INVALID_SHMID != udi->shmid && (auto_shutdown || (detach_status = SHMDT(jnlpool.jnlpool_ctl)) == 0)
 				   && (remove_status = shm_rmid(udi->shmid)) == 0)
 		{
 			jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
@@ -98,7 +98,7 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status)
 				repl_log(stderr, FALSE, TRUE, "Error removing jnlpool semaphore : %s\n", STRERROR(status));
 				*exit_status = ABNORMAL_SHUTDOWN;
 			}
-		} else if (udi->shmid > 0)
+		} else if (INVALID_SHMID != udi->shmid)
 		{
 			if (!auto_shutdown && detach_status < 0)
 				repl_log(stderr, FALSE, FALSE,
@@ -175,7 +175,7 @@ int	gtmrecv_ipc_cleanup(boolean_t auto_shutdown, int *exit_status)
 
 	if (attempt_ipc_cleanup)
 	{
-		if (recvpool_shmid > 0 && (auto_shutdown || (detach_status = SHMDT(recvpool.recvpool_ctl)) == 0)
+		if (INVALID_SHMID != recvpool_shmid && (auto_shutdown || (detach_status = SHMDT(recvpool.recvpool_ctl)) == 0)
 				       && (remove_status = shm_rmid(recvpool_shmid)) == 0)
 		{
 			recvpool.recvpool_ctl = NULL;
@@ -187,7 +187,7 @@ int	gtmrecv_ipc_cleanup(boolean_t auto_shutdown, int *exit_status)
 				repl_log(stderr, FALSE, TRUE, "Error removing receive pool semaphore : %s\n", STRERROR(status));
 				*exit_status = ABNORMAL_SHUTDOWN;
 			}
-		} else if (recvpool_shmid > 0)
+		} else if (INVALID_SHMID != recvpool_shmid)
 		{
 			if (!auto_shutdown && detach_status < 0)
 				repl_log(stderr, FALSE, FALSE,

@@ -24,9 +24,11 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 
-GBLREF sgm_info		*sgm_info_ptr;
-GBLREF gd_region	*gv_cur_region;
-GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF	sgm_info	*sgm_info_ptr;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	boolean_t	is_updproc;
+GBLREF	boolean_t	mupip_jnl_recover;
 
 void tp_cw_list(cw_set_element **cs)
 {
@@ -36,7 +38,10 @@ void tp_cw_list(cw_set_element **cs)
 
 	if (dba_bg == cs_addrs->hdr->acc_meth)
 		if (sgm_info_ptr->cw_set_depth + 2 >= (cs_addrs->hdr->n_bts >> 1))
+		{	/* catch the case where MUPIP recover or update process gets into this situation */
+			assert(!mupip_jnl_recover && !is_updproc);
 			rts_error(VARLSTCNT(4) ERR_TRANS2BIG, 2, REG_LEN_STR(gv_cur_region));
+		}
 
 	tempcs = (cw_set_element *)get_new_element(sgm_info_ptr->cw_set_list, 1);
 	if (sgm_info_ptr->first_cw_set == NULL)

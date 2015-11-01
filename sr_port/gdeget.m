@@ -10,9 +10,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 gdeget:	;read in an existing GD or create a default
 LOAD
-	n abs,contents,rel,xregs,xsegs,reglist,map,$zt
-	i debug s $zt="b"
-	e  s $zt="g ABORT^GDE:($p($p($zs,"","",3),""-"")'=""%GDE"") u io w !,$p($zs,"","",3,999),! h"
+	n abs,contents,rel,xregs,xsegs,reglist,map,$et
+	i debug s $et="b"
+	e  s $et="g ABORT^GDE:($p($p($zs,"","",3),""-"")'=""%GDE"") u io w !,$p($zs,"","",3,999),! h"
 	s abs=1,update=0,chset=$SELECT($ZV["OS390":"ISO8859-1",1:"")
 	o file:(exc="g badfile":rewind:recordsize=SIZEOF("dsk_blk"):readonly:fixed:blocksize=SIZEOF("dsk_blk"):ichset=chset)
 	u file r rec
@@ -98,7 +98,7 @@ verify:	s x=$$ALL^GDEVERIF
 ;----------------------------------------------------------------------------------------------------------------------------------
 
 badfile ;file access failed
-	s:'debug $zt="" u file:exc="" s abortzs=$zs zm gdeerr("GDREADERR"):file,+abortzs
+	s:'debug $et="" u file:exc="" s abortzs=$zs zm gdeerr("GDREADERR"):file,+abortzs
 	h
 	;
 bin2num:(bin)	; binary number -> number

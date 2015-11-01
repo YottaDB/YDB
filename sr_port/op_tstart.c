@@ -11,7 +11,6 @@
 
 #include "mdef.h"
 
-
 #include "gtm_string.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -36,12 +35,8 @@
 #include "tp.h"
 #include "tp_timeout.h"
 #include "op.h"
+#include "have_crit_any_region.h"
 #include <varargs.h>
-
-#ifdef sparc
-#include "cachectl.h"
-#include "cacheflush.h"
-#endif
 
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
@@ -133,6 +128,8 @@ va_dcl
 		DEBUG_ONLY(cumul_index = cu_jnl_index = 0;)
 		t_tries = (FALSE == is_standalone) ? 0 : CDB_STAGNATE;
 		t_fail_hist[t_tries] = cdb_sc_normal;
+		/* ensure that we don't have crit on any region at the beginning of a TP transaction (be it GT.M or MUPIP) */
+		assert(!have_crit_any_region(FALSE));
 		for (tr = tp_reg_list; NULL != tr; tr = tr_next)
 		{	/* start with empty list, place all existing entries on free list */
 			tp_reg_list = tr_next = tr->fPtr;	/* Remove from queue */
@@ -160,7 +157,7 @@ va_dcl
 	MV_FORCE_STR(tid);
 	if (prescnt > 0)
 	{
-		lvname = varlst;
+		VAR_COPY(lvname, varlst);
 		for (pres = 0;  pres < prescnt;  ++pres)
 		{
 			preserve = va_arg(lvname, mval *);
@@ -264,7 +261,7 @@ va_dcl
 	tp_pointer = tf;
 	if (prescnt > 0)
 	{
-		lvname = varlst;
+		VAR_COPY(lvname, varlst);
 		for (pres = 0;  pres < prescnt;  ++pres)
 		{
 			preserve = va_arg(lvname, mval *);

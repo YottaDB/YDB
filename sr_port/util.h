@@ -12,7 +12,6 @@
 #ifndef UTIL_included
 #define UTIL_included
 
-
 boolean_t util_is_log_open(void);
 
 #ifdef VMS
@@ -24,6 +23,16 @@ void util_log_open(char *filename, uint4 len);
 #else
 void util_in_open(void *);
 #endif
+
+#define OUT_BUFF_SIZE	2048
+#define	NOFLUSH		0
+#define FLUSH		1
+#define RESET		2
+#define OPER		4
+#define SPRINT		5
+#define HEX8		8
+#define HEX16		16
+
 void util_cm_print();
 void util_exit_handler(void);
 void util_out_close(void);

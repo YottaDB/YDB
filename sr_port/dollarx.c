@@ -13,28 +13,30 @@
 #include "io.h"
 #include "iottdef.h"
 #include "dollarx.h"
+#include "patcode.h"
 
-GBLDEF unsigned char write_filter;
+GBLREF uint4 *pattern_typemask;
 
 void dollarx(io_desc *io_ptr, unsigned char *str, unsigned char *strtop)
 {
-	unsigned char esc_level, *str1;
+	unsigned char	*str1;
+	int4		esc_level;
 
-	if (write_filter)
+	if (io_ptr->write_filter)
 	{
-		esc_level = (write_filter & ESC_MASK);
+		esc_level = (io_ptr->write_filter & ESC_MASK);
 		while (str < strtop)
 		{
-			if (io_ptr->esc_state != START)
+			if (START != io_ptr->esc_state)
 			{
 				assert (esc_level);
 				str1 = iott_escape(str, strtop, io_ptr);
 				str = str1;
-				if (io_ptr->esc_state == FINI || io_ptr->esc_state == BADESC)
+				if ((FINI == io_ptr->esc_state) || ( BADESC == io_ptr->esc_state))
 					io_ptr->esc_state = START;
 				continue;
 			}
-			if (write_filter & CHAR_FILTER)
+			if (io_ptr->write_filter & CHAR_FILTER)
 			{
 				switch(*str)
 				{
@@ -62,35 +64,32 @@ void dollarx(io_desc *io_ptr, unsigned char *str, unsigned char *strtop)
 						{
 							str1 = iott_escape(str, strtop, io_ptr);
 							str = str1;
-							if (io_ptr->esc_state == FINI || io_ptr->esc_state == BADESC)
+							if ((FINI == io_ptr->esc_state) || ( BADESC == io_ptr->esc_state))
 								io_ptr->esc_state = START;
 							continue;
 						}
 					/*** Caution: FALL THROUGH ***/
 					default:
-						io_ptr->dollar.x++;
+						if (!(pattern_typemask[*str] & PATM_C))
+							io_ptr->dollar.x++;
 						str++;
 						break;
 				}
-			}
-			else if (*str == NATIVE_ESC)
+			} else if (NATIVE_ESC == *str)
 			{
 				assert(esc_level);
 				str1 = iott_escape(str, strtop, io_ptr);
 				str = str1;
-				if (io_ptr->esc_state == FINI || io_ptr->esc_state == BADESC)
+				if ((FINI == io_ptr->esc_state) || (BADESC == io_ptr->esc_state))
 					io_ptr->esc_state = START;
-			}
-			else
+			} else
 			{
 				io_ptr->dollar.x++;
 				str++;
 			}
 		}
-	}
-	else
+	} else
 		io_ptr->dollar.x += (strtop - str);
-
 	if (io_ptr->dollar.x > io_ptr->width && io_ptr->wrap)
 	{
 		io_ptr->dollar.y += (io_ptr->dollar.x / io_ptr->width);

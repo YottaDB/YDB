@@ -25,7 +25,7 @@ GBLREF	mur_opt_struct	mur_options;
 
 
 void 	mur_do_show(ctl_list *ctl)	/* Called from mur_back_process() */
-        	     
+
 {
 	jnl_record		*rec;
 	jnl_process_vector	*pv;
@@ -53,7 +53,7 @@ void 	mur_do_show(ctl_list *ctl)	/* Called from mur_back_process() */
 	case JRT_PFIN:
 	case JRT_EOF:
 
-		pv = &rec->val.jrec_pini.process_vector;
+		pv = &rec->val.jrec_pini.process_vector[CURR_JPV];
 
 		assert(pv == &rec->val.jrec_pfin.process_vector);
 		assert(pv == &rec->val.jrec_eof.process_vector);

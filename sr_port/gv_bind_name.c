@@ -77,6 +77,7 @@ void gv_bind_name(gd_addr *addr, mstr *targ)
 		if ((dba_cm == gv_cur_region->dyn.addr->acc_meth) || (dba_usr == gv_cur_region->dyn.addr->acc_meth))
 		{
 			ht_ptr->ptr = (char *)malloc(sizeof(gv_namehead));
+			memset(ht_ptr->ptr, 0, sizeof(gv_namehead));	/* initialize all members to 0/NULL as the case applies */
 			gv_target = (gv_namehead *)ht_ptr->ptr;
 			gv_target->gd_reg = gv_cur_region;
 			gv_target->nct = 0;

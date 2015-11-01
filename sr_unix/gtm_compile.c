@@ -32,6 +32,7 @@
 #include "get_page_size.h"
 #include "getzdir.h"
 #include "gtm_compile.h"
+#include "patcode.h"
 
 GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
 GBLREF stack_frame	 	*frame_pointer;
@@ -95,7 +96,7 @@ int	gtm_compile (void)
 	cmd_qlf.ceprep_file.str.addr = ceprep_file;
 	cmd_qlf.ceprep_file.str.len = MAX_FBUFF;
 	get_cmd_qlf(&cmd_qlf);
-
+	initialize_pattern_table();
 	ce_init();	/* initialize compiler escape processing */
 
 	dollar_zcstatus = 1;

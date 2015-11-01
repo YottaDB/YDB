@@ -10,15 +10,19 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "hashdef.h"
 #include "cmidef.h"
 #include "cmmdef.h"
+#include "gvcmx.h"
+#include "gvcmz.h"
+#include "mvalconv.h"
 
-mint gvcmx_data()
+mint gvcmx_data(void)
 {
 	mval v;
 	mint ret;
 
-	gvcmz_doop(CMMS_Q_DATA,CMMS_R_DATA,&v);
+	gvcmz_doop(CMMS_Q_DATA, CMMS_R_DATA, &v);
 	ret = MV_FORCE_INT(&v);
 	return ret;
 }

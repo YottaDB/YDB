@@ -15,6 +15,7 @@
 #include <sys/mman.h>
 #include <sys/shm.h>
 #include <sys/sem.h>
+#include "gtm_unistd.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -29,9 +30,11 @@
 #include "ipcrmid.h"
 #include "util.h"
 #include "ftok_sems.h"
+#include "gtmimagename.h"
 
 GBLREF gd_region		*db_init_region;
 GBLREF boolean_t		sem_incremented;
+GBLREF enum gtmImageTypes	image_type;
 
 CONDITION_HANDLER(dbinit_ch)
 {
@@ -72,15 +75,15 @@ CONDITION_HANDLER(dbinit_ch)
 	{
 		if (FALSE == csa->nl->glob_sec_init)
 		{
-			if (-1 != udi->shmid)
+			if (INVALID_SHMID != udi->shmid)
 			{
 				shm_rmid(udi->shmid);
-				udi->shmid = -1;
+				udi->shmid = INVALID_SHMID;
 			}
-			if (-1 != udi->semid)
+			if (INVALID_SEMID != udi->semid)
 			{
 				sem_rmid(udi->semid);
-				udi->semid = -1;
+				udi->semid = INVALID_SEMID;
 			}
 		}
 		else
@@ -90,7 +93,7 @@ CONDITION_HANDLER(dbinit_ch)
 
 	if (sem_incremented)
 	{
-		if (-1 != udi->semid)
+		if (INVALID_SEMID != udi->semid)
 		{
 			if (FALSE == db_init_region->read_only)
 				do_semop(udi->semid, 1, -1, SEM_UNDO);	/* decrement the read-write sem */
@@ -101,8 +104,11 @@ CONDITION_HANDLER(dbinit_ch)
 
 	if (udi->grabbed_ftok_sem)
 		ftok_sem_release(db_init_region, TRUE, TRUE);
-	free(seg->file_cntl->file_info);
-	free(seg->file_cntl);
-	seg->file_cntl = NULL;
+	if (GTCM_GNP_SERVER_IMAGE != image_type) /* gtcm_gnp_server reuses file_cntl */
+	{
+		free(seg->file_cntl->file_info);
+		free(seg->file_cntl);
+		seg->file_cntl = NULL;
+	}
 	NEXTCH;
 }

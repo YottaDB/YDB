@@ -35,11 +35,13 @@ void jnl_prc_vector (jnl_process_vector *pv)
 	struct passwd	*pw;
         uid_t           eff_uid;       /* try to see why gets pwuid == nil */
 	int		gethostname_res;
+	time_t		temp_time;
 
 	memset(pv, 0, sizeof(jnl_process_vector));
 
 	pv->jpv_pid = process_id;
-	time(&pv->jpv_time);
+	time(&temp_time);
+	pv->jpv_time = temp_time;
 	GETHOSTNAME(pv->jpv_node, JPV_LEN_NODE, gethostname_res);
 
 	eff_uid = geteuid();          /* save results of each step */

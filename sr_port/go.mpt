@@ -16,7 +16,7 @@
 	;callable entry point
 	;
 	w !,"Global Output Utility",!
-	i '$d(%zdebug) n $zt s $zt="zg "_$zl_":ERR^%GO" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%GO")
+	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%GO" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%GO")
 	n g,gn,m,n,%ZD,%ZG,%ZH,fmt
 	d ^%GSEL
 	i %ZG=0 w !,"No globals selected" q
@@ -80,6 +80,7 @@ fw(s)	; variables used in this function are: fwlen, s, cc, fastate, isctl, i, th
 	;
 ERR	u $p w !,$p($zs,",",2,99),!
 	; Warning - Fall-though
+	s $ec=""
 EXIT	i $d(%ZD),%ZD'=$p c %ZD
 	u $p:(ctrap="":exc="")
 	q

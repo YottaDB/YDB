@@ -43,16 +43,41 @@ GBLREF merge_glvn_ptr	mglvnp;
 
 void merge_desc_check(void)
 {
-        unsigned char	buff1[MAX_STRLEN], buff2[MAX_STRLEN], *end1, *end2;
+        unsigned char		buff1[MAX_STRLEN], buff2[MAX_STRLEN], *end1, *end2;
+	enum db_acc_method	acc_meth1, acc_meth2;
+	int			cmp_less;
 
 	error_def(ERR_MERGEDESC);
 
-	if (MARG1_IS_GBL(merge_args) && MARG2_IS_GBL(merge_args)
+	if (MARG1_IS_GBL(merge_args) && MARG2_IS_GBL(merge_args))
+	{
+		acc_meth1 = mglvnp->gblp[IND1]->s_gv_cur_region->dyn.addr->acc_meth;
+		acc_meth2 = mglvnp->gblp[IND2]->s_gv_cur_region->dyn.addr->acc_meth;
+		/* if ((both are bg/mm regions && dbs are same && same global) ||
+		 *     (both are cm regions && on the same remote node && same region))
+		 *   COMPARE GV_CURRKEYs
+		 * else
+		 *   NOT DESCENDANTS
+		 * endif
+		 */
+		if (((dba_bg == acc_meth1 || dba_mm == acc_meth2) && (dba_bg == acc_meth1 || dba_mm == acc_meth2))
 			&& REG_EQUAL(FILE_INFO(mglvnp->gblp[IND1]->s_gv_target->gd_reg), mglvnp->gblp[IND2]->s_gv_target->gd_reg)
 			&& mglvnp->gblp[IND1]->s_gv_target->root == mglvnp->gblp[IND2]->s_gv_target->root)
-	{
+			cmp_less = 1;
+		else if (dba_cm == acc_meth1 && dba_cm == acc_meth2
+				&& mglvnp->gblp[IND1]->s_gv_cur_region->dyn.addr->cm_blk ==
+				   mglvnp->gblp[IND2]->s_gv_cur_region->dyn.addr->cm_blk
+				&& mglvnp->gblp[IND1]->s_gv_cur_region->cmx_regnum ==
+				   mglvnp->gblp[IND2]->s_gv_cur_region->cmx_regnum)
+			cmp_less = 0;
+		else
+		{
+			assert(dba_usr != acc_meth1 && dba_usr != acc_meth2); /* merge not ready for dba_usr yet */
+			return;
+		}
 		if (0 == memcmp(mglvnp->gblp[IND1]->s_gv_currkey->base, mglvnp->gblp[IND2]->s_gv_currkey->base,
-			MIN(mglvnp->gblp[IND1]->s_gv_currkey->end - 1, mglvnp->gblp[IND2]->s_gv_currkey->end - 1)))
+			        MIN(mglvnp->gblp[IND1]->s_gv_currkey->end - cmp_less, 
+				    mglvnp->gblp[IND2]->s_gv_currkey->end - cmp_less)))
 		{
 			if (0 == (end1 = format_targ_key(buff1, MAX_STRLEN, mglvnp->gblp[IND1]->s_gv_currkey, TRUE)))
 				end1 = &buff1[MAX_STRLEN - 1];

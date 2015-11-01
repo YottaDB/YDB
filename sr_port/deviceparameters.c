@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
@@ -225,9 +227,19 @@ LITDEF nametabent dev_param_names[] =
 	,{2,"ZB*"}
 	,{2,"ZD*"}
 	,{3,"ZEX*"}
+	,{4,"ZFIL*"}
+	,{3,"ZFF"}
 	,{2,"ZI*"}
+	,{4,"ZLEN*"}
 	,{4,"ZLIS*"}
-	,{2,"ZN*"}
+
+	,{8,"ZNODELAY"} /* ZNO* have to be spelled out fully */
+	,{9,"ZNOFILTER"}
+	,{5,"ZNOFF"}
+	,{7,"ZNOWRAP"}
+
+	,{4,"ZWID*"}
+	,{4,"ZWRA*"}
 };
 /* Offset of letter with dev_param_names */
 LITDEF	unsigned char dev_param_index[27] =
@@ -235,7 +247,7 @@ LITDEF	unsigned char dev_param_index[27] =
 /*	A    B    C    D    E    F    G    H    I    J    K    L    M    N   */
 	0,   5,   8,   22,  28,  41,  53,  55,  59,  63,  63,  63,  71,  72,
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	131, 136, 152, 153, 165, 177, 186, 192, 193, 208, 209, 210, 216
+	131, 136, 152, 153, 165, 177, 186, 192, 193, 208, 209, 210, 224
 };
 /* Offset of string within letter in dev_param_names */
 /* maintained in conjunction with zshow_params.h   = offset in letter, letter  */
@@ -465,10 +477,19 @@ int deviceparameters(oprtype *c,char who_calls)
 
 		,iop_zbfsize
 		,iop_zdelay
-		,iop_exception
+		,iop_exception /* for ZEXCEPTION; ZEXC* is a synonym for EXC* */
+		,iop_filter /* for ZFILTER; ZFIL* is a synonym for FIL* */
+		,iop_zff
 		,iop_zibfsize
+		,iop_length /* for ZLENGTH; ZLEN* is a synonym for LE* and LENG */
 		,iop_zlisten
+
 		,iop_znodelay
+		,iop_nofilter /* for ZNOFILTER; ZNOFILTER is a synonym for NOFIL* */
+		,iop_znoff
+		,iop_nowrap /* for ZNOWRAP; ZNOWRAP is a synonym for NOWR, NOWRA*, NOWRAP */
+		,iop_width /* for ZWIDTH; ZWID* is a synonym for WI*, WIDTH */
+		,iop_wrap /* for ZWRAP; ZWRA* is a synonym for WR, and WRA* */
 	} ;
 
 	assert(dev_param_index[26] == (sizeof(dev_param_names)/sizeof(nametabent)));

@@ -19,11 +19,9 @@
 
 void db_csh_ini(sgmnt_addrs *cs)
 {
-	sgmnt_data_ptr_t base;
-
-	if ((sm_long_t) cs->hdr & 7)
+	if ((sm_long_t)cs->hdr & 7)
 		GTMASSERT;
-	base = cs->hdr;
-	cs->acc_meth.bg.cache_state  = (cache_que_heads_ptr_t)((sm_uc_ptr_t) base + cs->nl->cache_off);
+	cs->acc_meth.bg.cache_state  = (cache_que_heads_ptr_t)((sm_uc_ptr_t)cs->hdr + cs->nl->cache_off); 
+	assert(cs->acc_meth.bg.cache_state);
 	return;
 }

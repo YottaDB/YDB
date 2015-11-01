@@ -217,6 +217,8 @@ void dse_chng_bhead(void)
 					cse->new_buff = non_tp_jfb_buff_ptr;
 					gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, x);
 					cse->done = TRUE;
+					if (0 == cs_addrs->jnl->pini_addr)
+						jnl_put_jrt_pini(cs_addrs);
 					jnl_write_aimg_rec(cs_addrs, cse->blk, (blk_hdr_ptr_t)cse->new_buff);
 				} else
 					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));

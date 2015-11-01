@@ -68,7 +68,7 @@ int do_indir_do(mval *v, unsigned char argcode)
 			}
 			frame_pointer->mpc = (unsigned char *)(*(int4*)addr + (char*) frame_pointer->rvector +
 				frame_pointer->rvector->current_rhead_ptr);
-#if defined(__alpha) || defined(__MVS__)
+#if defined(__alpha) || defined(__MVS__) || defined(__s390__)
 			current_rhead = (rhdtyp *)((unsigned char *)frame_pointer->rvector
 							+ frame_pointer->rvector->current_rhead_ptr);
 			frame_pointer->ctxt = (unsigned char *)current_rhead->linkage_ptr;

@@ -12,17 +12,22 @@
 #ifndef MU_RNDWN_DEFINED
 #define MU_RNDWN_DEFINED
 
+/* for FTOK_SEM_PER_ID */
+#include "gtm_sem.h"
+
 #define SHMID           2
 
 #ifdef __linux__
 #define KEY             1
-#define IPCS_CMD_STR    "ipcs -m | grep '^0x'"
+#define IPCS_CMD_STR		"ipcs -m | grep '^0x'"
+#define IPCS_SEM_CMD_STR	"ipcs -s | grep '^0x'"
 #else
 #define KEY             3
 /* though the extra blank space is required in AIX under certain cases, we
  * are adding it for all UNIX versions to avoid another ifdef for AIX.
  */
-#define IPCS_CMD_STR    "ipcs -m | grep '^m' | sed 's/^m/m /g'"
+#define IPCS_CMD_STR		"ipcs -m | grep '^m' | sed 's/^m/m /g'"
+#define IPCS_SEM_CMD_STR	"ipcs -s | grep '^s' | sed 's/^s/s /g'"
 #endif /* __linux__ */
 
 #define SGMNTSIZ        10
@@ -81,36 +86,39 @@ typedef struct shm_parms_struct{
 #define CLNUP_RNDWN(udi, reg)									\
 {												\
 	close(udi->fd);										\
-	if (TRUE == sem_created)								\
+	if (sem_created)									\
 	{											\
-		if (-1 == semctl(udi->semid, 2, IPC_RMID, 0))					\
+		if (-1 == semctl(udi->semid, 0, IPC_RMID))					\
 			RNDWN_ERR("Error removing the semaphore for file !AD", (reg));		\
 	} else											\
 		do_semop(udi->semid, 0, -1, IPC_NOWAIT | SEM_UNDO);				\
+	REVERT;											\
 	ftok_sem_release(reg, TRUE, TRUE);							\
+	if (restore_rndwn_gbl)									\
+		RESET_GV_CUR_REGION;								\
 }
 
 #define CLNUP_SEM(sem_id, reg)									\
 {												\
-	if (TRUE == sem_created)								\
+	if (sem_created)									\
 	{											\
-		if (-1 == semctl((sem_id), 2, IPC_RMID))					\
+		if (-1 == semctl((sem_id), 0, IPC_RMID))					\
 			RNDWN_ERR("Error removing the semaphore for file !AD", (reg));		\
 	} else											\
 		do_semop((sem_id), 0, -1, IPC_NOWAIT | SEM_UNDO);				\
 }
 
-#define CLNUP_REPLPOOL_ACC_SEM(sem_id, gdname)										\
+#define CLNUP_REPLPOOL_ACC_SEM(sem_id, insname)										\
 {															\
-	if (TRUE == sem_created)											\
+	if (sem_created)												\
 	{														\
-		if (-1 == semctl(sem_id, NUM_SRC_SEMS, IPC_RMID))							\
-			gtm_putmsg(VARLSTCNT(10) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(gdname), ERR_TEXT, 2, 	\
+		if (-1 == semctl(sem_id, 0, IPC_RMID))									\
+			gtm_putmsg(VARLSTCNT(10) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(insname), ERR_TEXT, 2, 	\
 					LEN_AND_LIT("Error removing semaphore"), errno);				\
 	} else														\
 	{														\
 		if (-1 == do_semop(sem_id, 0, -1, IPC_NOWAIT | SEM_UNDO))						\
-			gtm_putmsg(VARLSTCNT(10) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(gdname), ERR_TEXT, 2, 	\
+			gtm_putmsg(VARLSTCNT(10) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(insname), ERR_TEXT, 2, 	\
 					LEN_AND_LIT("Error releasing semaphore"), errno);				\
 	}														\
 }
@@ -134,13 +142,6 @@ typedef struct shm_parms_struct{
 		return NULL;						\
 	}								\
 	free(parm);							\
-}
-
-#define VALIDATE_REPLPOOL_RETURN(RETVAL)				\
-{									\
-	free(parm_buff);						\
-	CLNUP_REPLPOOL_ACC_SEM(sem_id, "UNKNOWN");			\
-	return RETVAL;							\
 }
 
 #define MU_RNDWN_REPLPOOL_RETURN(RETVAL)				\

@@ -18,6 +18,7 @@
 #include "mlkdef.h"
 #include "locklits.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "mlk_pvtblk_insert.h"
 #include "mlk_pvtblk_equ.h"

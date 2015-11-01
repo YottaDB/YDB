@@ -296,47 +296,34 @@ set gs = ($gtm_src)
 if ( -x $gtm_root/$gtm_curpro/pro/mumps ) then
     set comlist_ZPARSE_error_count = 0
     pushd $gtm_src
+    # gtm_startup_chk requires gtm_dist setup
+    set real_gtm_dist = "$gtm_dist"
+    setenv gtm_dist "$gtm_root/$gtm_curpro/pro"
+    set old_gtmroutines = "$gtmroutines"
+    setenv gtmroutines "$gtm_obj($gtm_pct)"
     foreach i ( *.msg )
 
 	set j = `basename $i .msg`
-	chmod +w $j.c >& /dev/null
-	rm -f $j.c	# in case an old version is lying around
+	rm -f ${j}_ctl.c ${gtm_inc}${j}_ansi.h	# in case an old version is lying around
 
-	# gtm_startup_chk requires gtm_dist setup
-	set real_gtm_dist = "$gtm_dist"
-	setenv gtm_dist "$gtm_root/$gtm_curpro/pro"
-	# MSG.m converts a VMS-style error message MSG input file to a C source file usable on Unix.
-	$gtm_root/$gtm_curpro/pro/mumps - direct<<GTM.in_msg
-Set \$ZROUTINES="$gtm_obj($gtm_pct)"
-Do ^msg
-$i
-Halt
-GTM.in_msg
+	# MSG.m converts a VMS-style error message MSG input file to a
+	# file with information about the messages.
+	# On unix, the C source file includes the message texts.
+	$gtm_root/$gtm_curpro/pro/mumps -run msg $i Unix
 
-	setenv gtm_dist "$real_gtm_dist"
-	unset real_gtm_dist
-
-	# Regettably, the Unix implementation of $ZPARSE does not handle default file extensions properly,
-	# so msg.m generates output files without the ".c" extension.  That is, msg.m takes input file
-	# "merrors.msg" and generates output file "merrors".  Sigh.
-	if ( -f $j ) then
-		set comlist_ZPARSE_error_count = `expr $comlist_ZPARSE_error_count + 1`
-		if ( $comlist_ZPARSE_error_count == "1" ) then
-			echo "comlist-W-${dollar_sign}ZPARSE, ${dollar_sign}ZPARSE() doesn't work properly on Unix" \
-				>> $gtm_log/error.`basename $gtm_exe`.log
-		endif
-		mv $j{,.c}	# add ".c" extension
-	else
-		if ( -f $j.c ) then
-			echo "comlist-I-${dollar_sign}ZPARSE, ${dollar_sign}ZPARSE() works now; you may remove this message and the whole nested if structure and comment block" \
-				>> $gtm_log/error.`basename $gtm_exe`.log
-		else
-			# Except, be sure to leave this message in (even after $ZPARSE() works) if $j.c doesn't exist.
-			echo "comlist-E-MSGfail, MSG.m failed to produce output file $j.c" \
-				>> $gtm_log/error.`basename $gtm_exe`.log
-		endif
+	if ( ! -f ${j}_ctl.c ) then
+		echo "comlist-E-MSGfail, MSG.m failed to produce output file ${j}_ctl.c" \
+			>> $gtm_log/error.`basename $gtm_exe`.log
+	endif
+	if ( -f ${j}_ansi.h ) then
+		mv -f ${j}_ansi.h $gtm_inc
 	endif
     end
+    setenv gtmroutines "$old_gtmroutines"
+    unset old_gtmroutines
+    setenv gtm_dist "$real_gtm_dist"
+    unset real_gtm_dist
+
     popd
 else
     echo "comlist-E-NoMUMPS, unable to regenerate merrors.c due to missing $gtm_curpro/pro/mumps" \
@@ -388,7 +375,8 @@ if ( $?gt_xargs_insert == 0 ) setenv gt_xargs_insert "-i"
 
 if ( $gt_as_inc_convert == "true" ) then
 	# Convert assembly language include files to native dialect:
-	/bin/ls $gi[1] | egrep "\$gt_as_inc_from_suffix$eol_anchor" | xargs $gt_xargs_insert $shell $gtm_tools/gt_as_inc_cvt.csh "$gs[1]/{}"
+	/bin/ls $gi[1] | egrep "\$gt_as_inc_from_suffix$eol_anchor" | \
+		xargs $gt_xargs_insert $shell $gtm_tools/gt_as_inc_cvt.csh "$gs[1]/{}"
 endif
 
 if ( "$HOSTOS" == "OS/390" ) then
@@ -397,7 +385,8 @@ endif
 
 if ( $gt_as_src_convert == "true" ) then
 	# Convert assembly language sources to native dialect in this directory:
-	/bin/ls $gs[1] | egrep "\$gt_as_src_from_suffix$eol_anchor" | xargs $gt_xargs_insert $shell $gtm_tools/gt_as_src_cvt.csh "$gs[1]/{}"
+	/bin/ls $gs[1] | egrep "\$gt_as_src_from_suffix$eol_anchor" | \
+		xargs $gt_xargs_insert $shell $gtm_tools/gt_as_src_cvt.csh "$gs[1]/{}"
 
 	# Then assemble them:
 	/bin/ls | egrep "\$gt_as_src_suffix$eol_anchor" | xargs $gt_xargs_insert $shell $gtm_tools/gt_as.csh {}
@@ -414,7 +403,10 @@ endif
 ############################################## Compilations and Assemblies ###################################################
 
 
-set comlist_liblist = "dse $gt_ar_gtmrpc_name lke mupip gtcm stub $gt_ar_ascii_name mumps"
+pushd $gtm_tools >& /dev/null
+set comlist_liblist = `ls *.list | sed 's/.list//' | sed 's/^lib//'`
+set comlist_liblist = "$comlist_liblist mumps"
+popd >& /dev/null
 
 foreach i ( $comlist_liblist )
 	if ( -f lib$i.a ) then
@@ -429,21 +421,6 @@ foreach i ( $comlist_liblist )
 	echo "" >> ar$i.log
 
 	switch ( $i )
-	case "dse":
-	case "lke":
-	case "mupip":
-	case "gtcm":
-	case "stub":
-	case "ascii":
-		gt_ar $gt_ar_option_create lib$i.a `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list` >>& ar$i.log
-		if ( $status != 0 ) then
-			set comlist_status = `expr $comlist_status + 1`
-			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
-				>> $gtm_log/error.`basename $gtm_exe`.log
-		endif
-		rm -f `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list`
-		breaksw
-
 	case "gtmrpc":
 		# Note: libgtmrpc.a must be built in $gtm_exe because it must also be shipped with the release.
 		gt_ar $gt_ar_option_create $gtm_exe/lib$i.a `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list` >>& ar$i.log
@@ -471,6 +448,7 @@ foreach i ( $comlist_liblist )
 		set exclude = "$exclude|^mupip\.o|^mupip_cmd\.o|^daemon\.o|^gtmsecshr\.o|^geteuid\.o|^dtgbldir\.o"
 		set exclude = "$exclude|^semstat2\.o|^ftok\.o|^msg\.o|^gtcm_main\.o|^gtcm_play\.o|^gtcm_pkdisp\.o|^gtcm_shmclean\.o"
 		set exclude = "$exclude|^omi_srvc_xct\.o|^omi_sx_play\.o"
+		set exclude = "$exclude|^gtcm_gnp_server\.o|^gtcm_gnp_clitab\.o"
 		/bin/ls | egrep '\.o$' | egrep -v "$exclude" | \
 			xargs -n50 $shell $gtm_tools/gt_ar.csh $gt_ar_option_create lib$i.a >>& ar$i.log
 		if ( $status != 0 ) then
@@ -478,6 +456,16 @@ foreach i ( $comlist_liblist )
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_tools/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
+		breaksw
+
+	default:
+		gt_ar $gt_ar_option_create lib$i.a `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list` >>& ar$i.log
+		if ( $status != 0 ) then
+			set comlist_status = `expr $comlist_status + 1`
+			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
+				>> $gtm_log/error.`basename $gtm_exe`.log
+		endif
+		rm -f `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list`
 		breaksw
 
 	endsw

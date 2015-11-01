@@ -37,6 +37,7 @@
 #include "ftok_sems.h"
 
 GBLREF gd_region        *gv_cur_region;
+GBLREF boolean_t	need_no_standalone;
 
 int4 mupip_set_jnl_file(char *jnl_fname)
 {
@@ -96,6 +97,7 @@ int4 mupip_set_jnl_file(char *jnl_fname)
 		util_out_print("close :!AZ", TRUE, errptr);
 		return((int4)ERR_JNLFILNOTCHG);
 	}
-	db_ipcs_reset(gv_cur_region, FALSE);
+	if (!need_no_standalone)
+		db_ipcs_reset(gv_cur_region, FALSE);
 	return SS_NORMAL;
 }

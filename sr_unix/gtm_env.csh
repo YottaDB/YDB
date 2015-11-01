@@ -106,6 +106,7 @@ if ( $?gtm_version_change == "1" ) then
 	setenv	gt_ld_options_bta	"$gt_ld_options_common"
 	setenv	gt_ld_options_dbg	"$gt_ld_options_common"
 	setenv	gt_ld_options_pro	"$gt_ld_options_common"
+	setenv	gt_ld_options_symbols	"$gt_ld_options_common"
 
 	setenv	gt_ld_syslibs		"-lcurses -lm"	# system libraries needed for link (in addition to defaults)
 	setenv	gt_ld_sysrtns		""		# system routines needed for link (in addition to defaults)

@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#ifdef MUTEX_MSEM_WAKE
 #include "heartbeat_timer.h"
 #include "gt_timer.h"
 
@@ -22,3 +23,4 @@ void heartbeat_timer(void)
 	start_timer((TID)heartbeat_timer, HEARTBEAT_INTERVAL, heartbeat_timer, 0, NULL);
 }
 
+#endif /* MUTEX_MSEM_WAKE */

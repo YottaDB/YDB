@@ -18,6 +18,7 @@ void gtm_putmsg();
 void gtm_getmsg(uint4 msgnum, mstr *msgbuf);
 #elif defined(UNIX)
 void gtm_getmsg(int4 msgnum, mstr *msgbuf);
+void gtm_putmsg_noflush();
 #else
 #error Unsupported platform
 #endif

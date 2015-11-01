@@ -14,6 +14,7 @@
 #include "gtm_fcntl.h"
 #include <unistd.h>
 #include "gtm_stat.h"
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -213,12 +214,12 @@ int4	mur_fopen (mur_rab *r, char *fna, int fnl)
 	{
 		if (-1 == status)
 			status = (int4)ERR_JNLREADEOF;
-	} else if (0 != memcmp(cp->label, LIT_AND_LEN(JNL_LABEL_TEXT)))
+	} else if (0 != memcmp(cp->label, JNL_LABEL_TEXT, sizeof(JNL_LABEL_TEXT) - 1))
 			status = (int4)ERR_JNLBADLABEL;
 	if (status != SS_NORMAL)
 	{
 		util_out_print("Error opening journal file !AD", TRUE, fnl, fna);
-		gtm_putmsg(status);
+		gtm_putmsg(VARLSTCNT(1) status);
 		close(fc->fd);
 		return status;
 	}
@@ -236,8 +237,9 @@ int4	mur_fread_eof (mur_rab *r, char *fna, int fnl)
 	unsigned char		*text;
 	jrec_suffix		suffix;
 	boolean_t		proceed;
-	uint4			check_time;
+	uint4			check_time, pini_check_time;
 	jnl_record		*jrec;
+	enum jnl_record_type	rectype;
 
 	fc = r->pvt;
 	FSTAT_FILE(fc->fd, &stat_buf, fstat_res);
@@ -274,7 +276,7 @@ int4	mur_fread_eof (mur_rab *r, char *fna, int fnl)
 		} else
 		{
 			start_offset = JNL_FILE_FIRST_RECORD;
-			check_time = fc->jfh->bov_timestamp;
+			check_time = MID_TIME(fc->jfh->bov_timestamp);
 			break;
 		}
 	}
@@ -290,7 +292,8 @@ int4	mur_fread_eof (mur_rab *r, char *fna, int fnl)
 		if (SS_NORMAL != mur_next(r, 0))
 			break;
 		jrec = (jnl_record *)r->recbuff;
-		switch(jrec->jrec_type)
+		rectype = REF_CHAR(&jrec->jrec_type);
+		switch(rectype)
 		{
 		case JRT_KILL:
 		case JRT_ZTCOM:
@@ -342,17 +345,29 @@ int4	mur_fread_eof (mur_rab *r, char *fna, int fnl)
 			} else
 				check_time = jrec->val.jrec_kill.short_time;
 			break;
-		case JRT_PINI:
 		case JRT_PFIN:
 		case JRT_EOF:
-			assert(&jrec->val.jrec_pini.process_vector == &jrec->val.jrec_pfin.process_vector);
-			assert(&jrec->val.jrec_pini.process_vector == &jrec->val.jrec_eof.process_vector);
-			if (check_time > jrec->val.jrec_pini.process_vector.jpv_time)
+			assert(&jrec->val.jrec_pini.process_vector[CURR_JPV] == &jrec->val.jrec_pfin.process_vector);
+			assert(&jrec->val.jrec_pini.process_vector[CURR_JPV] == &jrec->val.jrec_eof.process_vector);
+			if (check_time > jrec->val.jrec_pini.process_vector[CURR_JPV].jpv_time)
 			{
 				assert(FALSE);
 				proceed = FALSE;		/* how can we see an earlier-jnl-record */
 			} else
-				check_time = jrec->val.jrec_pini.process_vector.jpv_time;
+				check_time = jrec->val.jrec_pini.process_vector[CURR_JPV].jpv_time;
+			break;
+		case JRT_PINI:
+			if (0 == jrec->val.jrec_pini.process_vector[SRVR_JPV].jpv_pid
+					&& 0 ==  jrec->val.jrec_pini.process_vector[SRVR_JPV].jpv_image_count)
+				pini_check_time = jrec->val.jrec_pini.process_vector[ORIG_JPV].jpv_time;
+			else
+				pini_check_time = jrec->val.jrec_pini.process_vector[SRVR_JPV].jpv_time;
+			if (check_time > pini_check_time)
+			{
+				assert(FALSE);
+				proceed = FALSE;		/* how can we see an earlier-jnl-record */
+			} else
+				check_time = pini_check_time;
 			break;
 		default:
 			GTMASSERT;
@@ -368,7 +383,7 @@ int4	mur_fread_eof (mur_rab *r, char *fna, int fnl)
 		util_out_print("MUR-I-DEBUG : Journal !AD  -->  Last Record = 0x!XL --> Eof_Addr = 0x!XL",
 			TRUE, fnl, fna, fc->last_record, fc->eof_addr);
 	tail_analysis = FALSE;
-	return SS_NORMAL;
+	return (proceed ? SS_NORMAL : ERR_JNLRECFMT);
 }
 
 int4	mur_close (mur_rab *r)

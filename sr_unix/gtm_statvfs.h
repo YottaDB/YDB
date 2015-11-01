@@ -20,6 +20,8 @@
 
 #if defined(__osf__) && defined(__alpha)
 #define	GTM_BAVAIL_TYPE	unsigned long
+#elif defined(__linux__) && defined(__USE_FILE_OFFSET64)
+#define GTM_BAVAIL_TYPE unsigned long long int
 #else
 #define GTM_BAVAIL_TYPE	uint4
 #endif

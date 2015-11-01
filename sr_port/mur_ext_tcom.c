@@ -44,8 +44,7 @@ void	mur_extract_tcom(
 	if (REF_CHAR(&rec->jrec_type) == JRT_ZTCOM )
 	{
 		EXT2BYTES(&muext_code[MUEXT_ZTCOMMIT][0]);
-	}
-	else
+	} else
 	{
 		EXT2BYTES(&muext_code[MUEXT_TCOMMIT][0]);
 	}
@@ -54,8 +53,7 @@ void	mur_extract_tcom(
 	{
 		extract_len = exttime(rec->val.jrec_ztcom.ts_short_time, ref_time, 3);
 		extract_len = exttime(rec->val.jrec_ztcom.tc_short_time, ref_time, extract_len);
-	}
-	else
+	} else
 		extract_len = exttime(rec->val.jrec_tcom.tc_short_time, ref_time, 3);
 
 	EXTINT(pid);
@@ -83,14 +81,16 @@ void	detailed_extract_tcom(
 	{
 		extract_len = strlen(mur_extract_buff);
 		strcpy(mur_extract_buff + extract_len, "TCOMMIT\\");
-		extract_len = exttime(rec->val.jrec_ztcom.tc_short_time, ref_time, strlen(mur_extract_buff));
-	}
-	else
+		extract_len = exttime(rec->val.jrec_tcom.tc_short_time, ref_time, strlen(mur_extract_buff));
+		extract_len = exttime(rec->val.jrec_tcom.tc_recov_short_time, ref_time, extract_len);
+	} else
 	{
 		extract_len = strlen(mur_extract_buff);
 		strcpy(mur_extract_buff + extract_len, "ZTCOMMIT\\");
 		extract_len = exttime(rec->val.jrec_ztcom.ts_short_time, ref_time, strlen(mur_extract_buff));
+		extract_len = exttime(rec->val.jrec_ztcom.ts_recov_short_time, ref_time, extract_len);
 		extract_len = exttime(rec->val.jrec_ztcom.tc_short_time, ref_time, extract_len);
+		extract_len = exttime(rec->val.jrec_ztcom.tc_recov_short_time, ref_time, extract_len);
 	}
 	EXTINT(pid);
 	EXTQW(rec->val.jrec_tcom.token);

@@ -13,12 +13,16 @@
 #include "mlkdef.h"
 #include "locklits.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
+#include "mlk_bckout.h"
 
 GBLREF connection_struct *curr_entry;
 
-void gtcml_lkbckout(reg_list)
-cm_region_list *reg_list;
+void gtcml_lkbckout(cm_region_list *reg_list)
 {
 	mlk_pvtblk 	*mlk_pvt;
 	unsigned char action, *ptr;

@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -18,10 +19,13 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "mlkdef.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
 
 GBLREF connection_struct *curr_entry;
 
-gtcml_lkhold()
+void gtcml_lkhold(void)
 {
 	cm_region_list *reg_walk;
 	mlk_pvtblk *lk_walk,*lk_walk1;

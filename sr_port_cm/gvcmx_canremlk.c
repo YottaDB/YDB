@@ -11,41 +11,38 @@
 
 #include "mdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "stringpool.h"
+#include "gvcmx.h"
+#include "gvcmz.h"
 
-GBLREF struct NTD *ntd_root;
-GBLREF spdesc stringpool;
+GBLREF struct	NTD *ntd_root;
+GBLREF spdesc	stringpool;
 
-void gvcmx_canremlk()
+void gvcmx_canremlk(void)
 {
-	uint4	status,count,buffer;
-	unsigned char *ptr;
-	error_def(ERR_BADSRVRNETMSG);
+	uint4		status, count, buffer;
+	unsigned char	*ptr;
 	struct CLB	*p;
+	error_def(ERR_BADSRVRNETMSG);
 
 	if (!ntd_root)
 		return;
-
 	buffer = 0;
-
-	for ( p = (struct CLB *)RELQUE2PTR(ntd_root->cqh.fl); p != (struct CLB *)ntd_root ;
-		p = (struct CLB *)RELQUE2PTR(p->cqe.fl))
+	for (p = (struct CLB *)RELQUE2PTR(ntd_root->cqh.fl); p != (struct CLB *)ntd_root ; p = (struct CLB *)RELQUE2PTR(p->cqe.fl))
 	{
 		if (((link_info*)(p->usr))->lck_info & REQUEST_PENDING)
 			buffer += p->mbl;
 	}
-
 	if (stringpool.top < stringpool.free + buffer)
 		stp_gcol(buffer);
-
 	ptr = stringpool.free;
-
-	for ( p = (struct CLB *)RELQUE2PTR(ntd_root->cqh.fl); p != (struct CLB *)ntd_root ;
-		p = (struct CLB *)RELQUE2PTR(p->cqe.fl))
+	for (p = (struct CLB *)RELQUE2PTR(ntd_root->cqh.fl); p != (struct CLB *)ntd_root; p = (struct CLB *)RELQUE2PTR(p->cqe.fl))
 	{
 		if (((link_info*)(p->usr))->lck_info & REQUEST_PENDING)
-		{	p->mbf = ptr;
+		{
+			p->mbf = ptr;
 			ptr += p->mbl;
 		}
 	}

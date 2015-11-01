@@ -18,14 +18,14 @@
 #include "gdsfhead.h"
 #include "dpgbldir.h"
 
-GBLDEF gv_key		*gv_currkey;
-GBLDEF gv_key		*gv_altkey;
 GBLDEF int4		gv_keysize;
 GBLDEF gd_addr		*gd_header=0;
 GBLDEF gd_binding	*gd_map;
 GBLDEF gd_binding	*gd_map_top;
 
 GBLREF gd_addr		*gd_targ_addr;
+GBLREF gv_key		*gv_altkey;
+GBLREF gv_key		*gv_currkey;
 
 void gvinit(void)
 {

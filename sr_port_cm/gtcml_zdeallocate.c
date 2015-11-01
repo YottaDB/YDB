@@ -13,13 +13,19 @@
 #include "mlkdef.h"
 #include "locklits.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
+#include "mlk_unlock.h"
+#include "mlk_pvtblk_delete.h"
 
 GBLREF mlk_pvtblk *mlk_cm_root;
 GBLREF unsigned short cm_cmd_lk_ct;
 GBLREF connection_struct *curr_entry;
 
-void gtcml_zdeallocate()
+void gtcml_zdeallocate(void)
 {
 	int locks_done;
 	mlk_pvtblk	**prior;

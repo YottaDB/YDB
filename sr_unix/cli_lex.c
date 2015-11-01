@@ -200,11 +200,18 @@ int cli_is_dcm(char *p)
  */
 int cli_is_hex(char *p)
 {
+	if (('+' == *p) || ('-' == *p))
+		p++;
+
+	if (('0' == *p) && ('X' == toupper(*(p + 1))))
+        {
+                p = p + 2;
+        }
+
 	while (*p && ISXDIGIT(*p))
 		p++;
 
-	if (*p) return (FALSE);
-	else return (TRUE);
+	return ((*p) ? FALSE : TRUE);
 }
 
 
@@ -507,4 +514,5 @@ int cli_has_space(char *p)
 
 	return ((*p) ? (TRUE) : (FALSE));
 }
+
 

@@ -33,7 +33,6 @@
 #define MAX_MCNAMELEN   256
 
 #define GDS_LABEL_SZ 	12
-#define UNIQUE_ID_SIZE	32
 
 #define BT_FACTOR(X) (X)
 #define FLUSH_FACTOR(X) ((X)-(X)/16)
@@ -260,12 +259,7 @@ typedef struct
 	int4		crit_ops_index;				/* "circular" index into crit_ops_array */
 	lockhist	lockhists[LOCKHIST_ARRAY_SIZE];		/* Keep lock histories here */
 	crit_trace	crit_ops_array[CRIT_OPS_ARRAY_SIZE];	/* space for CRIT_TRACE macro to record info */
-	union
-	{
-		gds_file_id     vmsfid;                         /* not used, just hold space */
-		unix_file_id    u;                              /* For unix ftok error detection */
-	} dbfid;
-	char		unique_id[UNIQUE_ID_SIZE];
+	unique_file_id	unique_id;
 	uint4		owner_node;
 	volatile int4   wcsflu_pid;				/* pid of the process executing wcs_flu in BG mode */
 	time_t		creation_date_time;			/* Database's creation time to be compared at sm attach time */

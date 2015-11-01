@@ -73,8 +73,8 @@ boolean_t repl_inst_get_name(char *fn, unsigned int *fn_len, unsigned int bufsiz
 	temp_inst_fn[trans_name.len] = '\0';
 	if (!get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize))
 	{
-		gtm_putmsg(VARLSTCNT(6) ERR_ZREPLINST, trans_name.len, trans_name.addr,
-			0, ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"));
+		gtm_putmsg(VARLSTCNT(8) ERR_ZREPLINST, 2, trans_name.len, trans_name.addr,
+			ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"));
 		return FALSE;
 	}
 	return TRUE;
@@ -105,6 +105,11 @@ void repl_inst_create(void)
 	if (!repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN+1))
 		rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
 	memset(&temp_instance, 0, sizeof(repl_inst_fmt));
+	memcpy(&temp_instance.label[0], GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ);
+	temp_instance.jnlpool_semid = INVALID_SEMID;
+	temp_instance.jnlpool_shmid = INVALID_SHMID;
+	temp_instance.recvpool_semid = INVALID_SEMID;
+	temp_instance.recvpool_shmid = INVALID_SHMID;
 	STAT_FILE(inst_fn, &stat_buf, status);
 	if (-1 != status)
 	{
@@ -121,6 +126,11 @@ void repl_inst_create(void)
 	} else if (ENOENT != errno) /* some error happened */
 		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, inst_fn_len, inst_fn, errno);
 	memset(&repl_instance, 0, sizeof(repl_inst_fmt));
+	memcpy(&repl_instance.label[0], GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ);
+	repl_instance.jnlpool_semid = INVALID_SEMID;
+	repl_instance.jnlpool_shmid = INVALID_SHMID;
+	repl_instance.recvpool_semid = INVALID_SEMID;
+	repl_instance.recvpool_shmid = INVALID_SHMID;
 	ptr = (char *)&repl_instance;
 	OPENFILE3(inst_fn, O_CREAT | O_RDWR, 0666, fd);
 	if (-1 == fd)
@@ -149,16 +159,22 @@ void repl_inst_get(char *inst_fn, repl_inst_fmt *repl_instance)
 
 	error_def(ERR_TEXT);
 	error_def(ERR_ZREPLINST);
+	error_def(ERR_REPLINSTINCORRV);
 
 	ptr = (char *)repl_instance;
 	if (-1 == (fd = (OPEN(inst_fn, O_RDONLY))))
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), errno);
+	{
+		status = errno;
+		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), status);
+	}
 	LSEEKREAD(fd, (off_t)(0), ptr, sizeof(repl_inst_fmt), status);
 	if (0 != status)
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), errno);
+		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), status);
+	if (memcmp(&repl_instance->label[0], GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ))
+		rts_error(VARLSTCNT(1) ERR_REPLINSTINCORRV);
 	CLOSEFILE(fd, status);
 	if (0 != status)
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), errno);
+		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), status);
 }
 
 /*
@@ -179,13 +195,16 @@ void repl_inst_put(char *inst_fn, repl_inst_fmt *repl_instance)
 
 	ptr = (char *)repl_instance;
 	if (-1 == (fd = (OPEN(inst_fn, O_RDWR))))
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), errno);
+	{
+		status = errno;
+		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), status);
+	}
 	LSEEKWRITE(fd, (off_t)(0), ptr, sizeof(repl_inst_fmt), status);
 	if (0 != status)
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), errno);
+		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), status);
 	CLOSEFILE(fd, status);
 	if (0 != status)
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), errno);
+		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), status);
 }
 
 /*
@@ -204,8 +223,8 @@ void repl_inst_jnlpool_reset(void)
 	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
 	assert(udi->grabbed_ftok_sem);
 	repl_inst_get((char *)udi->fn, &repl_instance);
-	repl_instance.jnlpool_semid = 0;
-	repl_instance.jnlpool_shmid = 0;
+	repl_instance.jnlpool_semid = INVALID_SEMID;
+	repl_instance.jnlpool_shmid = INVALID_SHMID;
 	repl_instance.jnlpool_semid_ctime = 0;
 	repl_instance.jnlpool_shmid_ctime = 0;
 	repl_inst_put((char *)udi->fn, &repl_instance);
@@ -227,8 +246,8 @@ void repl_inst_recvpool_reset(void)
 	udi = FILE_INFO(recvpool.recvpool_dummy_reg);
 	assert(udi->grabbed_ftok_sem);
 	repl_inst_get((char *)udi->fn, &repl_instance);
-	repl_instance.recvpool_semid = 0;
-	repl_instance.recvpool_shmid = 0;
+	repl_instance.recvpool_semid = INVALID_SEMID;
+	repl_instance.recvpool_shmid = INVALID_SHMID;
 	repl_instance.recvpool_semid_ctime = 0;
 	repl_instance.recvpool_shmid_ctime = 0;
 	repl_inst_put((char *)udi->fn, &repl_instance);

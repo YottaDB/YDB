@@ -31,7 +31,7 @@
 #  define SI_USER 0
 #endif
 
-#if defined(__osf__) || defined(_AIX)
+#if defined(__osf__) || defined(_AIX) || defined(Linux390)
 void extract_signal_info(int sig, siginfo_t *info, struct sigcontext *context, gtmsiginfo_t *gtmsi)
 #else
 void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsiginfo_t *gtmsi)
@@ -201,15 +201,24 @@ void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsigin
 #elif defined(__linux__)
 	/* Linux does not yet (intel RedHat 6.1) support returning signal information properly so
 	   we will pull what information we can out of the context blocks. */
+	if (NULL != context)
+	{
+#ifdef Linux390
+		if (NULL != context->sregs)
+		{
+                	gtmsi->int_iadr = (caddr_t)context->sregs->regs.psw.addr;
+                	gtmsi->infotype |= GTMSIGINFO_ILOC; 
+		}
+
+#else      
 # ifndef REG_EIP
 #   define REG_EIP EIP
 # endif
-	if (NULL != context)
-	{
 		gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_EIP];
 		gtmsi->infotype = GTMSIGINFO_ILOC;
 		if (NULL != (gtmsi->bad_vadr = (caddr_t)context->uc_mcontext.cr2))
 			gtmsi->infotype |= GTMSIGINFO_BADR;
+#endif
 	}
 #else
 #  error "Unsupported Platform"

@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "cdb_sc.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -69,6 +70,7 @@ GBLREF  unsigned char           t_fail_hist[CDB_MAX_TRIES];
 GBLREF  unsigned int            t_tries;
 GBLREF  boolean_t               is_updproc;
 GBLREF	void			(*tp_timeout_clear_ptr)(void);
+GBLREF  boolean_t               mupip_jnl_recover;
 
 
 void    op_tcommit(void)
@@ -254,16 +256,27 @@ void    op_tcommit(void)
                                 return;
                         }
 			if ((sgmnt_addrs *)-1 != (csa = jnl_fence_ctl.fence_list))
-			{
-				wait_for_jnl_hard = TRUE;
-				if ((TP_BATCH_SHRT == tp_pointer->trans_id.str.len)
-					|| (TP_BATCH_LEN == tp_pointer->trans_id.str.len))
+			{	/* For mupip journal recover all transactions applied during forward phase are treated as
+				 * Batch transaction for performance gain, since the recover command can be reissued like
+				 * a batch restart. The wait_for_jnl_hard is set to FALSE for recover process to bypass
+				 * hardening done for each online transaction. We still retain the jnl_tid set in the
+				 * original journal record before recovery by copying the jnl_tid field in mur_output_record
+				 * and later copied in op_tstart */
+
+				if (!mupip_jnl_recover)
 				{
-					lower_to_upper(tp_bat, (uchar_ptr_t)tp_pointer->trans_id.str.addr,
-							tp_pointer->trans_id.str.len);
-					if (0 == memcmp(TP_BATCH_ID, tp_bat, tp_pointer->trans_id.str.len))
-						wait_for_jnl_hard = FALSE;
-				}
+					wait_for_jnl_hard = TRUE;
+					if ((TP_BATCH_SHRT == tp_pointer->trans_id.str.len)
+						|| (TP_BATCH_LEN == tp_pointer->trans_id.str.len))
+					{
+						lower_to_upper(tp_bat, (uchar_ptr_t)tp_pointer->trans_id.str.addr,
+								tp_pointer->trans_id.str.len);
+						if (0 == memcmp(TP_BATCH_ID, tp_bat, tp_pointer->trans_id.str.len))
+							wait_for_jnl_hard = FALSE;
+					}
+				} else
+					wait_for_jnl_hard = FALSE;
+
 	       	                for (;  (sgmnt_addrs *)-1 != csa;  csa = next_csa)
         	       	        {	/* only those regions that are actively journaling will appear in the list: */
 					if (wait_for_jnl_hard)

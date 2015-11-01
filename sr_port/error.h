@@ -12,7 +12,35 @@
 #ifndef __ERROR_H__
 #define __ERROR_H__
 
+typedef struct err_msg_struct
+{
+	char		*tag;
+	char		*msg;
+	int		parm_count;
+} err_msg;
+
+typedef struct err_ctl_struct
+{
+	int		facnum;
+	char		*facname;
+	err_msg		*fst_msg; /* For VMS, this pointer is not used, and its value will typically be NULL */
+	int		msg_cnt;
+} err_ctl;
+
 #include "errorsp.h"
+
+#define FCNTL		1
+#define MSGCNTL		27
+#define MSGFAC		16
+#define MSGNBIT		15
+#define MSGSEVERITY	3
+#define MSGNUM		3
+
+#define FACMASK(fac)		(FCNTL << MSGCNTL | 1 << MSGNBIT | (fac) << MSGFAC)
+#define MSGMASK(msg,fac)	(((msg) & ~FACMASK(fac)) >> MSGSEVERITY)
+#define SEVMASK(msg)		((msg) & 7)
+
+err_ctl *err_check(int err);
 
 CONDITION_HANDLER(ccp_ch);
 CONDITION_HANDLER(ccp_exi_ch);
@@ -26,9 +54,13 @@ CONDITION_HANDLER(fgncal_ch);
 CONDITION_HANDLER(fntext_ch);
 CONDITION_HANDLER(gds_rundown_ch);
 CONDITION_HANDLER(gtcm_ch);
+CONDITION_HANDLER(gtcm_exi_ch);
+CONDITION_HANDLER(gtm_env_xlate_ch);
 CONDITION_HANDLER(gtmrecv_ch);
 CONDITION_HANDLER(gtmrecv_fetchresync_ch);
 CONDITION_HANDLER(gtmsource_ch);
+CONDITION_HANDLER(gvcmy_open_ch);
+CONDITION_HANDLER(gvcmz_netopen_ch);
 CONDITION_HANDLER(gvzwrite_ch);
 CONDITION_HANDLER(iob_io_error);
 CONDITION_HANDLER(io_init_ch);
@@ -41,6 +73,7 @@ CONDITION_HANDLER(mdb_condition_handler);
 CONDITION_HANDLER(mu_freeze_ch);
 CONDITION_HANDLER(mu_int_ch);
 CONDITION_HANDLER(mu_int_reg_ch);
+CONDITION_HANDLER(mu_rndwn_file_ch);
 CONDITION_HANDLER(mupip_load_ch);
 CONDITION_HANDLER(mupip_recover_ch);
 CONDITION_HANDLER(mupip_set_jnl_ch);

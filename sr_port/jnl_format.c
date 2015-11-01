@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gdsblk.h"
@@ -94,7 +95,7 @@ void	jnl_format(jnl_format_buffer *jfb)
 	{
 		local_buffer = (char *)get_new_element(sgm_info_ptr->format_buff_list, DIVIDE_ROUND_UP(jrec_size, 8));
 		jfb->buff = local_buffer;
-		memcpy(((fixed_jrec_tp_kill_set *)local_buffer)->jnl_tid, (uchar_ptr_t)jn_tid, sizeof(jn_tid));
+		memcpy(((fixed_jrec_tp_kill_set *)(local_buffer + JREC_PREFIX_SIZE))->jnl_tid, (uchar_ptr_t)jn_tid, sizeof(jn_tid));
 		/* assume an align record will be written while computing maximum jnl-rec size requirements */
 		sgm_info_ptr->total_jnl_record_size += jrec_size + JREC_PREFIX_SIZE + jnl_fixed_size[JRT_ALIGN] + JREC_SUFFIX_SIZE;
 	}

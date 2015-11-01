@@ -30,15 +30,15 @@
 #include "send_msg.h"
 #include "wcs_sleep.h"
 #include "is_file_identical.h"
+#include "gtm_string.h"
 
-GBLREF volatile int4	jnl_fsync_in_prog;
 GBLREF uint4		process_id;
 
 void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 {
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jb;
-	uint4			lcnt, saved_dsk_addr;
+	uint4			lcnt, saved_dsk_addr, saved_status;
 	sgmnt_addrs		*csa;
 	int4			lck_state;
 	int			fsync_ret, save_errno;
@@ -47,6 +47,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	error_def(ERR_FSYNCTIMOUT);
 	error_def(ERR_TEXT);
 	error_def(ERR_JNLFRCDTERM);
+	error_def(ERR_JNLFSYNCLSTCK);
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	jpc = csa->jnl;
@@ -56,8 +57,19 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	{
 		for (lcnt = 1; fsync_addr > jb->fsync_dskaddr && !JNL_FILE_SWITCHED(jpc->region); lcnt++)
 		{
+			if (MAX_FSYNC_WAIT_CNT == lcnt / 2)	/* half way into max.patience*/
+			{
+				saved_status = jpc->status;
+				jpc->status = 0;
+				jnl_send_oper(jpc, ERR_JNLFSYNCLSTCK);
+				jpc->status = saved_status ;
+			}
 			if (MAX_FSYNC_WAIT_CNT == lcnt)	/* tried a long */
 			{
+				saved_status = jpc->status;
+				jpc->status = 0;
+				jnl_send_oper(jpc, ERR_JNLFSYNCLSTCK);
+				jpc->status = saved_status ;
 				send_msg(VARLSTCNT(4) ERR_FSYNCTIMOUT, 2, jpc->region->jnl_file_len,
 										jpc->region->jnl_file_name);
 				GTMASSERT;
@@ -66,15 +78,12 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 			if (GET_SWAPLOCK(&jb->fsync_in_prog_latch))
 				break;
 			wcs_sleep(lcnt);
-			/* check proc state every 1 sec */
-			if (!(lcnt % PRC_STATE_CNT))
-				performCASLatchCheck(&jb->fsync_in_prog_latch);
+			performCASLatchCheck(&jb->fsync_in_prog_latch, lcnt);
 		}
 		if (fsync_addr > jb->fsync_dskaddr && !JNL_FILE_SWITCHED(jpc->region))
 		{
 			assert(process_id == jb->fsync_in_prog_latch.latch_pid);  /* assert we have the lock */
 			saved_dsk_addr = jb->dskaddr;
-			jnl_fsync_in_prog++;
 			if (jpc->sync_io)
 			{
 				/* We need to maintain the fsync control fields irrespective of the type of IO, because we might
@@ -100,10 +109,6 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 					BG_TRACE_PRO_ANY(csa, n_jnl_fsyncs);
 				}
 			}
-			jnl_fsync_in_prog--;
-			assert(0 <= jnl_fsync_in_prog);
-			if (0 > jnl_fsync_in_prog)
-				jnl_fsync_in_prog = 0;
 		}
 		if (process_id == jb->fsync_in_prog_latch.latch_pid)
 			RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);

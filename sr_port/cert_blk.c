@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -49,7 +51,7 @@ GBLREF short		dollar_tlevel;
 
 #define MAX_UTIL_LEN 40
 
-void rts_error_func( int err, uchar_ptr_t buff);
+void rts_error_func(int err, uchar_ptr_t buff);
 
 int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 {
@@ -125,18 +127,18 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 	{
 		if ((unsigned char)blk_levl != LCL_MAP_LEVL)
 		{
-			rts_error_func( ERR_DBBMLEVL, util_buff);
+			rts_error_func(ERR_DBBMLEVL, util_buff);
 			return FALSE;
 		}
 		if (blk_size != BM_SIZE(bplmap))
 		{
-			rts_error_func( ERR_DBBMSIZE, util_buff);
+			rts_error_func(ERR_DBBMSIZE, util_buff);
 			return FALSE;
 		}
 		mp = (sm_uc_ptr_t)bp + sizeof(blk_hdr);
 		if ((*mp & 1) != 0)
 		{	/* bitmap doesn't protect itself */
-			rts_error_func( ERR_DBBMBARE, util_buff);
+			rts_error_func(ERR_DBBMBARE, util_buff);
 			return FALSE;
 		}
 		full = TRUE;
@@ -161,14 +163,14 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 			mask1 &= chunk;				/* check against the original contents */
 			if (mask1 != 0)				/* busy and reused should never appear together */
 			{
-				rts_error_func( ERR_DBBMINV, util_buff);
+				rts_error_func(ERR_DBBMINV, util_buff);
 				return FALSE;
 			}
 
 		}
 		if (full == (NO_FREE_SPACE != gtm_ffs(blk / bplmap, cs_data->master_map, MASTER_MAP_BITS_PER_LMAP)))
 		{
-			rts_error(VARLSTCNT(3) ERR_DBBMMSTR, 1, blk);
+			rts_error_func(ERR_DBBMMSTR, util_buff);
 			return FALSE;
 		}
 		return TRUE;
@@ -176,37 +178,37 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 
 	if (blk_levl > MAX_BT_DEPTH)
 	{
-		rts_error_func( ERR_DBBLEVMX, util_buff);
+		rts_error_func(ERR_DBBLEVMX, util_buff);
 		return FALSE;
 	}
 	if (blk_levl < 0)
 	{
-		rts_error_func( ERR_DBBLEVMN, util_buff);
+		rts_error_func(ERR_DBBLEVMN, util_buff);
 		return FALSE;
 	}
 	if (blk_levl == 0)
 	{	/* data block */
-		if ((blk == 1) || (( 0 != root ) && (blk == root)))
+		if ((blk == 1) || ((0 != root) && (blk == root)))
 		{	/* headed for where an index block should be */
-			rts_error_func( ERR_DBROOTBURN, util_buff);
+			rts_error_func(ERR_DBROOTBURN, util_buff);
 			return FALSE;
 		}
 		if (blk_size < sizeof(blk_hdr))
 		{
-			rts_error_func( ERR_DBBSIZMN, util_buff);
+			rts_error_func(ERR_DBBSIZMN, util_buff);
 			return FALSE;
 		}
 	} else
 	{	/* index block */
 		if (blk_size < (sizeof(blk_hdr) + sizeof(rec_hdr) + sizeof(block_id)))
 		{	/* must have at least one record */
-			rts_error_func( ERR_DBBSIZMN, util_buff);
+			rts_error_func(ERR_DBBSIZMN, util_buff);
 			return FALSE;
 		}
 	}
 	if (blk_size > cs_addrs->hdr->blk_size)
 	{
-		rts_error_func( ERR_DBBSIZMX, util_buff);
+		rts_error_func(ERR_DBBSIZMX, util_buff);
 		return FALSE;
 	}
 
@@ -239,12 +241,12 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 
 		if (rec_size <= sizeof(rec_hdr))
 		{
-			rts_error_func( ERR_DBRSIZMN, util_buff);
+			rts_error_func(ERR_DBRSIZMN, util_buff);
 			return FALSE;
 		}
 		if (rec_size > (short)((sm_ulong_t)blk_top - (sm_ulong_t)rp))
 		{
-			rts_error_func( ERR_DBRSIZMX, util_buff);
+			rts_error_func(ERR_DBRSIZMX, util_buff);
 			return FALSE;
 		}
 		r_top = (rec_hdr_ptr_t)((sm_ulong_t)rp + rec_size);
@@ -254,7 +256,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 			first_key = FALSE;
 			if (rec_cmpc)
 			{
-				rts_error_func( ERR_DBCMPNZRO, util_buff);
+				rts_error_func(ERR_DBCMPNZRO, util_buff);
 				return FALSE;
 			}
 			if (0 == blk_levl)
@@ -268,7 +270,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 		{
 			if (not_gvt && (rec_cmpc == 0) && (blk_levl == 0))
 			{
-				rts_error_func( ERR_DBCMPZERO, util_buff);
+				rts_error_func(ERR_DBCMPZERO, util_buff);
 				return FALSE;
 			}
 		}
@@ -276,12 +278,12 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 		{
 			if (rec_size != sizeof(rec_hdr) + sizeof(block_id))
 			{
-				rts_error_func( ERR_DBSTARSIZ, util_buff);
+				rts_error_func(ERR_DBSTARSIZ, util_buff);
 				return FALSE;
 			}
 			if (rec_cmpc)
 			{
-				rts_error_func( ERR_DBSTARCMP, util_buff);
+				rts_error_func(ERR_DBSTARCMP, util_buff);
 				return FALSE;
 			}
 			blk_id_ptr = (sm_uc_ptr_t)rp + sizeof(rec_hdr);
@@ -291,7 +293,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 			key_base = (sm_uc_ptr_t)rp + sizeof(rec_hdr);
 			if (rec_cmpc && rec_cmpc >= prior_expkeylen)
 			{
-				rts_error_func( ERR_DBCMPMX, util_buff);
+				rts_error_func(ERR_DBCMPMX, util_buff);
 				return FALSE;
 			}
 			/* num_subscripts = number of full subscripts found in the key (do not consider compressed part)
@@ -301,7 +303,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 			{
 				if (blk_id_ptr >= (sm_uc_ptr_t)r_top)
 				{
-					rts_error_func( ERR_DBKEYMX, util_buff);
+					rts_error_func(ERR_DBKEYMX, util_buff);
 					return FALSE;
 				}
 				if (KEY_DELIMITER == *blk_id_ptr++)
@@ -315,7 +317,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 			/* root of the directory tree contains only name-level globals */
 			if (DIR_ROOT == blk && num_subscripts)
 			{
-				rts_error_func( ERR_DBROOTSUBSC, util_buff);
+				rts_error_func(ERR_DBROOTSUBSC, util_buff);
 				return FALSE;
 			}
 			key_size = blk_id_ptr - key_base;
@@ -336,23 +338,23 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 						key_max_subs++;
 				if (MAX_GVSUBSCRIPTS < key_max_subs)
 				{
-					rts_error_func( ERR_DBMAXNRSUBS, util_buff);
+					rts_error_func(ERR_DBMAXNRSUBS, util_buff);
 					return FALSE;
 				}
 			}
 			if (blk_levl && key_size != rec_size - sizeof(block_id) - sizeof(rec_hdr))
 			{
-				rts_error_func( ERR_DBKEYMN, util_buff);
+				rts_error_func(ERR_DBKEYMN, util_buff);
 				return FALSE;
 			}
 			if (rec_cmpc < prior_expkeylen && prior_expkey[rec_cmpc] == *key_base)
 			{
-				rts_error_func( ERR_DBCMPBAD, util_buff);
+				rts_error_func(ERR_DBCMPBAD, util_buff);
 				return FALSE;
 			}
 			if (memvcmp(prior_expkey + rec_cmpc, comp_length - rec_cmpc, key_base, key_size) >= 0)
 			{
-				rts_error_func( ERR_DBKEYORD, util_buff);
+				rts_error_func(ERR_DBKEYORD, util_buff);
 				return FALSE;
 			}
 			memcpy(prior_expkey + rec_cmpc, key_base, key_size);
@@ -368,17 +370,17 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 			{
 				if (child <= 0)
 				{
-					rts_error_func( ERR_DBPTRNOTPOS, util_buff);
+					rts_error_func(ERR_DBPTRNOTPOS, util_buff);
 					return FALSE;
 				}
 				if (child > cs_addrs->ti->total_blks)
 				{
-					rts_error_func( ERR_DBPTRMX, util_buff);
+					rts_error_func(ERR_DBPTRMX, util_buff);
 					return FALSE;
 				}
 				if (!(child % bplmap))
 				{
-					rts_error_func( ERR_DBPTRMAP, util_buff);
+					rts_error_func(ERR_DBPTRMAP, util_buff);
 					return FALSE;
 				}
 			}
@@ -389,7 +391,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 
 }
 
-void rts_error_func( int err, uchar_ptr_t buff)
+void rts_error_func(int err, uchar_ptr_t buff)
 {
 	rts_error(VARLSTCNT(4) MAKE_MSG_INFO(err), 2, LEN_AND_STR(buff));
 }

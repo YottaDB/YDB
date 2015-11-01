@@ -19,8 +19,23 @@
 
 #define CHOWN		chown
 
-#define GETCWD(buffer,size,getcwd_res)				\
+#if defined(VMS)
+
+#define GTM_MAX_DIR_LEN		(PATH_MAX + PATH_MAX) /* DEVICE + DIRECTORY */
+#define GTM_VMS_STYLE_CWD	1
+#define GTM_UNIX_STYLE_CWD	0
+
+#define GETCWD(buffer, size, getcwd_res)			\
+	(getcwd_res = getcwd(buffer, size, GTM_VMS_STYLE_CWD)) /* force VMS style always 'cos many other parts of GT.M always
+								* do it the VMS way */
+#else /* !VMS => UNIX */
+
+#define GTM_MAX_DIR_LEN		(PATH_MAX + 1) /* DIRECTORY + terminating '\0' */
+
+#define GETCWD(buffer, size, getcwd_res)			\
 	(getcwd_res = getcwd(buffer, size))
+
+#endif
 
 #define GETHOSTNAME(name,namelen,gethostname_res)		\
 	(gethostname_res = gethostname(name, namelen))

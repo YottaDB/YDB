@@ -12,6 +12,6 @@
 #ifndef __GVCST_QUERYGET_H__
 #define __GVCST_QUERYGET_H__
 
-boolean_t gvcst_queryget(mval *key, mval *val);
+boolean_t gvcst_queryget(mval *val);
 
 #endif

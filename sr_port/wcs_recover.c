@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #ifdef UNIX
 
 #include <sys/mman.h>
@@ -155,6 +157,7 @@ void		wcs_recover(gd_region *reg)
 			{
 				send_msg(VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(reg));
 				INTERLOCK_INIT(cr);
+				cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 				cr->blk = CR_BLKEMPTY;
 				assert(cr->r_epid == 0);
 				assert(!cr->dirty);
@@ -162,6 +165,7 @@ void		wcs_recover(gd_region *reg)
 					&& ((cr->r_epid == process_id) || (FALSE == is_proc_alive(cr->r_epid, cr->image_count))))
 			{
 				INTERLOCK_INIT(cr);			/* Process gone, release that process's lock */
+				cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 				cr->blk = CR_BLKEMPTY;
 	   		} else
 			{
@@ -171,14 +175,15 @@ void		wcs_recover(gd_region *reg)
 				{
 					if ((0 != cr->r_epid) && (epid != cr->r_epid))
 						GTMASSERT;
-					INTERLOCK_INIT(cr);
-					cr->blk = CR_BLKEMPTY;
 					if (0 != epid)
 					{	/* process still active, but not playing fair */
-						send_msg(VARLSTCNT(6) ERR_BUFRDTIMEOUT, 4, process_id, epid, DB_LEN_STR(reg));
+						send_msg(VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id,
+									cr->blk, cr, epid, DB_LEN_STR(reg));
 						send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Buffer forcibly seized"));
-						cr->blk = CR_BLKEMPTY;
 					}
+					INTERLOCK_INIT(cr);
+					cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
+					cr->blk = CR_BLKEMPTY;
 					continue;
 				}
     				wcs_sleep(lcnt);
@@ -261,6 +266,8 @@ void		wcs_recover(gd_region *reg)
 				}
 			}	/* end of bitmap processing */
 			bt = bt_put(reg, cr->blk);
+			if (NULL == bt)		/* NULL value is only possible if wcs_get_space in bt_put fails */
+				GTMASSERT;	/* That is impossible here since we have called bt_refresh above */
 			bt->killtn = csa->ti->curr_tn;	/* be safe; don't know when was last kill after recover */
 			if (CR_NOTVALID != bt->cache_index)
 			{	/* the bt already identifies another cache entry with this block */
@@ -292,6 +299,7 @@ void		wcs_recover(gd_region *reg)
 					}
 					UNIX_ONLY(assert(!cr_alt->twin));
 					cr->twin = cr_alt->twin;		/* existing cache record may have a twin */
+					cr_alt->cycle++; /* increment cycle whenever blk number changes (tp_hist depends on this) */
 					cr_alt->blk = CR_BLKEMPTY;
 					cr_alt->dirty = 0;
 					cr_alt->in_tend = FALSE;
@@ -332,6 +340,7 @@ void		wcs_recover(gd_region *reg)
 				|| ((0 != cr->iosb[0]) && (0 == cr->bt_index)))
 		{	/* cache record has no valid buffer attached, or its contents are in the database,
 			 * or it has a more recent twin so we don't even have to care how its write terminated */
+			cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 			cr->blk = CR_BLKEMPTY;
 			cr->bt_index = 0;
 			cr->data_invalid = FALSE;
@@ -354,6 +363,8 @@ void		wcs_recover(gd_region *reg)
 				hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
 				WRITE_LATCH_VAL(cr) = LATCH_SET;
 				bt = bt_put(reg, cr->blk);
+				if (NULL == bt)		/* NULL value is only possible if wcs_get_space in bt_put fails */
+					GTMASSERT;	/* That is impossible here since we have called bt_refresh above */
 				bt->killtn = csa->ti->curr_tn;	/* be safe; don't know when was last kill after recover */
 				if (CR_NOTVALID == bt->cache_index)
 				{	/* no previous entry for this block; more recent cache record will twin when processed */
@@ -376,6 +387,7 @@ void		wcs_recover(gd_region *reg)
 				UNIX_ONLY(cr->epid = 0);
 			} else
 			{	/* the [current] in_tend cache record is no longer of value and can be discarded */
+				cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 				cr->blk = CR_BLKEMPTY;
 				cr->bt_index = 0;
 				cr->dirty = 0;
@@ -393,6 +405,8 @@ void		wcs_recover(gd_region *reg)
 		} else if ((LATCH_SET > WRITE_LATCH_VAL(cr)) || (WRT_STRT_PNDNG == cr->iosb[0]))
 		{	/* no process has an interest */
 			bt = bt_put(reg, cr->blk);
+			if (NULL == bt)		/* NULL value is only possible if wcs_get_space in bt_put fails */
+				GTMASSERT;	/* That is impossible here since we have called bt_refresh above */
 			bt->killtn = csa->ti->curr_tn;	/* be safe; don't know when was last kill after recover */
 			if (CR_NOTVALID == bt->cache_index)
 			{	/* no previous entry for this block */
@@ -429,6 +443,7 @@ void		wcs_recover(gd_region *reg)
 					assert(((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr))->tn
 						< ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
 					assert(LATCH_CLEAR == WRITE_LATCH_VAL(cr_alt));
+					cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 					cr->blk = CR_BLKEMPTY;
 					cr->bt_index = 0;
 					cr->dirty = 0;
@@ -449,6 +464,8 @@ void		wcs_recover(gd_region *reg)
 			UNIX_ONLY(WRITE_LATCH_VAL(cr) = LATCH_CLEAR;)
 			hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
 			bt = bt_put(reg, cr->blk);
+			if (NULL == bt)		/* NULL value is only possible if wcs_get_space in bt_put fails */
+				GTMASSERT;	/* That is impossible here since we have called bt_refresh above */
 			bt->killtn = csa->ti->curr_tn;	/* be safe; don't know when was last kill after recover */
 			if (CR_NOTVALID == bt->cache_index)
 			{	/* no previous entry for this block */
@@ -490,13 +507,12 @@ void		wcs_recover(gd_region *reg)
                 jnl_status = jnl_ensure_open();
 		if (0 == jnl_status)
 		{
-			assert(0 == jnl_status);
 			save_inctn_opcode = inctn_opcode; /* in case caller does not expect inctn_opcode to be changed here */
 			inctn_opcode = inctn_wcs_recover;
 			jnl_write_inctn_rec(cs_addrs);
 			inctn_opcode = save_inctn_opcode;
 		} else
-                        rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
+			jnl_file_lost(csa->jnl,jnl_status);
         }
         assert(csa->ti->curr_tn = csa->ti->early_tn);
 	csa->ti->early_tn = ++csa->ti->curr_tn;

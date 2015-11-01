@@ -36,6 +36,8 @@
  */
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "hashdef.h"
 #include "lv_val.h"
 #include "sbs_blk.h"
@@ -57,13 +59,24 @@
 #include "lvname_info.h"
 #include "gvname_info.h"
 #include "op_merge.h"
+#include "format_targ_key.h"
+#include "cmidef.h"
+#include "cmmdef.h"
 
 GBLREF int		merge_args;
 GBLREF merge_glvn_ptr	mglvnp;
+GBLREF gd_region	*gv_cur_region;
+GBLREF gv_key		*gv_currkey;
 
 void op_merge_arg(int m_opr_type, lv_val *lvp)
 {
 	int 			maxkeysz;
+	unsigned char		buff[MAX_STRLEN], *end;
+	char			*err_str;
+
+	error_def(ERR_UNIMPLOP);
+	error_def(ERR_TEXT);
+	error_def(ERR_GVIS);
 
 	if (!mglvnp)
 	{
@@ -94,7 +107,23 @@ void op_merge_arg(int m_opr_type, lv_val *lvp)
 		mglvnp->lclp[IND2] = lvp;
 		break;
 	case MARG2_GBL:
-		gvname_env_save(mglvnp->gblp[IND2]);
+		if (dba_bg == gv_cur_region->dyn.addr->acc_meth || dba_mm == gv_cur_region->dyn.addr->acc_meth ||
+		    (dba_cm == gv_cur_region->dyn.addr->acc_meth &&
+		    ((link_info *)gv_cur_region->dyn.addr->cm_blk->usr)->query_is_queryget))
+			gvname_env_save(mglvnp->gblp[IND2]);
+		else
+		{ /* M ^LHS=^RHS where RHS resides on a remote node served by a GTCM server that does not support QUERYGET
+		   * operation, OR, that resides in a db whose access method is dba_usr won't work */
+			end = format_targ_key(buff, MAX_STRLEN, gv_currkey, TRUE);
+			if (dba_cm == gv_cur_region->dyn.addr->acc_meth)
+				err_str = "GT.CM server does not support MERGE operation";
+			else if (dba_usr == gv_cur_region->dyn.addr->acc_meth)
+				err_str = "MERGE is not supported with access method USR";
+			else
+				GTMASSERT; /* why didn't we cover all access methods? */
+			rts_error(VARLSTCNT(14) ERR_UNIMPLOP, 0, ERR_TEXT, 2, LEN_AND_STR(err_str), ERR_GVIS, 2, end - buff, buff,
+					ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
+		}
 		break;
 	default:
 		GTMASSERT;

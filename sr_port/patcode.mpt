@@ -13,7 +13,7 @@
 get()	q $v("PATCODE")
 	;
 set(tab)
-	n ok,$zt
-	s $zt="s ok=0",ok=1
+	n ok,$et
+	s $et="s $ec="""" s ok=0",ok=1
 	i ok v "PATCODE":tab
 	q ok

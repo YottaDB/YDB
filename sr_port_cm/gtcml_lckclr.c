@@ -11,11 +11,18 @@
 
 #include "mdef.h"
 #include "mlkdef.h"
+#include "locklits.h"
+#include "cmidef.h"
+#include "hashdef.h"
+#include "cmmdef.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
 
 GBLREF short cm_cmd_lk_ct;
 GBLREF mlk_pvtblk *mlk_cm_root;
 
-void gtcml_lckclr()
+void gtcml_lckclr(void)
 {
 	short i;
 	mlk_pvtblk *p1;

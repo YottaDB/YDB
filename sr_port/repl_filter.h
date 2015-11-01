@@ -31,7 +31,11 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
 #define IF_NONE				((intlfltr_t)(-1))
 
 extern int jnl_v07tov11(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v07tov12(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v11tov12(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
 extern int jnl_v11tov07(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v12tov07(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v12tov11(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
 GBLREF intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1][JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
 
 /*
@@ -61,6 +65,7 @@ GBLREF intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1]
 #define V07_JRT_RECTYPES		25
 #define V07_JREC_PREFIX_SIZE		8
 #define V07_JREC_SUFFIX_SIZE		8
+#define V07_MUMPS_NODE_OFFSET		(2 * sizeof(uint4) + sizeof(trans_num) + sizeof(int4) + sizeof(seq_num))
 
 #define V11_JREC_TYPE_OFFSET		0
 #define V11_TCOM_TOKEN_OFFSET		24
@@ -70,6 +75,18 @@ GBLREF intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1]
 #define V11_JRT_RECTYPES		27
 #define V11_JREC_PREFIX_SIZE		8
 #define V11_JREC_SUFFIX_SIZE		8
+#define V11_MUMPS_NODE_OFFSET	 	V07_MUMPS_NODE_OFFSET
+
+#define V12_JRT_RECTYPES		27
+#define V12_JREC_PREFIX_SIZE		8
+#define V12_JREC_SUFFIX_SIZE		8
+#define V12_JNL_REC_START_BNDRY		8
+#define V12_JREC_TYPE_OFFSET		0
+#define V12_MUMPS_NODE_OFFSET		(V11_MUMPS_NODE_OFFSET + 2 * sizeof(uint4))
+#define V12_TCOM_TOKEN_OFFSET		(V12_MUMPS_NODE_OFFSET)
+#define V12_TCOM_PARTICIPANTS_OFFSET	(V12_TCOM_TOKEN_OFFSET + sizeof(token_num))
+#define TP_TOKEN_TID_SIZE		(sizeof(token_num) + sizeof(jn_tid))
+#define	TOKEN_PARTICIPANTS_TS_SHORT_TIME_SIZE (sizeof(token_num) + 2 * sizeof(uint4))
 
 int repl_filter_init(char *filter_cmd);
 int repl_filter(seq_num tr_num, unsigned char *tr, int *tr_len, int bufsize);

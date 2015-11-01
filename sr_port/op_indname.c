@@ -34,7 +34,7 @@ va_dcl
 	argcnt = va_arg(var, int4);
 	dst = va_arg(var, mval *);
 
-	sublst =  var;
+	VAR_COPY(sublst,  var);
 	src = va_arg(var, mval *);
 	for (i = argcnt - 1 ; i > 0 ; i-- )
 	{
@@ -93,7 +93,7 @@ va_dcl
 	{
 		outch = ',';
 	}
-	sublst =  var;
+	VAR_COPY(sublst,  var);
 	for (i = argcnt - 2 ; i > 0 ; i--)
 	{
 		subs = va_arg(sublst, mval * );

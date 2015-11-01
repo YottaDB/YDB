@@ -149,7 +149,7 @@ segres:	s x="" f  s x=$o(tmpseg(am,x)) q:x=""  s:'$d(segs(s,am,x)) segs(s,am,x)=
 ;----------------------------------------------------------------------------------------------------------------------------------
 
 badfile ;file access failed
-	s:'debug $zt="" s abortzs=$zs zm gdeerr("GDREADERR"):file,+abortzs
+	s:'debug $et="" s abortzs=$zs zm gdeerr("GDREADERR"):file,+abortzs
 	h
 	;
 bin2num:(bin)	; binary number -> number

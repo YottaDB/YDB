@@ -57,7 +57,7 @@ va_dcl
 
 	lv = start;
 	arg1 = --argcnt;
-	keyptr = var;
+	VAR_COPY(keyptr, var);
 	cur_subscr = 1;
 	while (lv  &&  argcnt-- > 0)
 	{

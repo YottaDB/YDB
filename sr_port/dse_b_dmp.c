@@ -27,9 +27,10 @@
 /* Include prototypes */
 #include "t_qread.h"
 
-#define RECYCLED_CHAR	":"
+#define REUSABLE_CHAR	":"
 #define FREE_CHAR	"."
 #define BUSY_CHAR	"X"
+#define CORRUPT_CHAR	"?"
 #define MAX_UTIL_LEN	80
 
 GBLREF VSIG_ATOMIC_T	util_interrupt;
@@ -44,12 +45,13 @@ boolean_t dse_b_dmp(void)
 {
 	int4		util_len, head, lmap_num, iter1, iter2, mapsize, bplmap, nocrit_present, dummy_int, count;
 	unsigned char	util_buff[MAX_UTIL_LEN], mask;
-	boolean_t	free, was_crit;
+	boolean_t	free, was_crit, invalid_bitmap = FALSE;
 	block_id	blk;
 	sm_uc_ptr_t	bp, b_top, rp, mb, dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_t b_top);
 	cache_rec_ptr_t dummy_cr;
 	error_def(ERR_DSEBLKRDFAIL);
 	error_def(ERR_CTRLC);
+	error_def(ERR_BITMAPSBAD);
 	head = cli_present("HEADER");
 	if (CLI_PRESENT == cli_present("BLOCK"))
 	{
@@ -207,11 +209,14 @@ boolean_t dse_b_dmp(void)
 							mask = dse_lm_blk_free(lmap_num * BML_BITS_PER_BLK, bp + sizeof(blk_hdr));
 							if (!mask)
 								util_out_print ("!AD", FALSE, 1, BUSY_CHAR);
-							else if (mask == 1)
+							else if (BLK_FREE == mask)
 								util_out_print ("!AD", FALSE, 1, FREE_CHAR);
-							else
-								util_out_print ("!AD", FALSE, 1, RECYCLED_CHAR);
-
+							else if (BLK_RECYCLED == mask)
+								util_out_print ("!AD", FALSE, 1, REUSABLE_CHAR);
+							else {
+								invalid_bitmap = TRUE;
+								util_out_print ("!AD", FALSE, 1, CORRUPT_CHAR);
+							}
 							if (++lmap_num >= bplmap)
 								break;
 						}
@@ -227,8 +232,10 @@ boolean_t dse_b_dmp(void)
 						rts_error(VARLSTCNT(1) ERR_CTRLC);
 					}
 				}
-				util_out_print("!/'!AD' == BUSY!_!_'!AD' == FREE!_!_'!AD' == RECYCLED!/",
-					TRUE,1, BUSY_CHAR, 1,FREE_CHAR, 1, RECYCLED_CHAR);
+				util_out_print("!/'!AD' == BUSY  '!AD' == FREE  '!AD' == REUSABLE  '!AD' == CORRUPT!/",
+					TRUE,1, BUSY_CHAR, 1, FREE_CHAR, 1, REUSABLE_CHAR, 1, CORRUPT_CHAR);
+				if (invalid_bitmap)
+					rts_error(VARLSTCNT(1) ERR_BITMAPSBAD);
 			}
 		}
 		count--;

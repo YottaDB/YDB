@@ -10,74 +10,57 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "compiler.h"
-#include "opcode.h"
-#include "indir_enum.h"
-#include "stringpool.h"
-#include "toktyp.h"
-#include "copy.h"
+
 #include "advancewindow.h"
 #include "cache.h"
+#include "compiler.h"
+#include "copy.h"
+#include "indir_enum.h"
+#include "mvalconv.h"
 #include "op.h"
+#include "opcode.h"
+#include "stringpool.h"
+#include "toktyp.h"
 
-GBLREF spdesc stringpool;
-GBLREF char window_token;
-GBLREF mident window_ident;
 GBLREF mval **ind_result_sp, **ind_result_top;
+GBLREF unsigned char *source_buffer;
+GBLREF short int source_column;
+GBLREF spdesc stringpool;
 
-void op_indtext(mval *v,mint offset,mval *dst)
+void op_indtext(mval *lab, mint offset, mval *rtn, mval *dst)
 {
-	triple *ref, *label;
-	mstr *obj, object, vprime;
-	oprtype x;
-	bool rval;
-	error_def(ERR_TEXTARG);
+	bool	rval;
+	mstr	*obj, object, vprime;
+	mval	mv_off;
+	oprtype	opt;
+	triple	*ref;
+
 	error_def(ERR_INDMAXNEST);
 
-	MV_FORCE_STR(v);
-	vprime = v->str;
-	vprime.len += sizeof(mint);
+	MV_FORCE_STR(lab);
+	vprime = lab->str;
+	vprime.len += sizeof("+^") - 1;
+	vprime.len += MAX_NUM_SIZE;
+	vprime.len += rtn->str.len;
 	if (stringpool.top - stringpool.free < vprime.len)
 		stp_gcol(vprime.len);
-	memcpy(stringpool.free, vprime.addr, v->str.len);
+	memcpy(stringpool.free, vprime.addr, lab->str.len);
 	vprime.addr = (char *)stringpool.free;
-	stringpool.free += v->str.len;
-	PUT_LONG(stringpool.free,offset);
-	stringpool.free += sizeof(mint);
-	if (!(obj = cache_get(indir_text,&vprime)))
+	stringpool.free += lab->str.len;
+	*stringpool.free++ = '+';
+	MV_FORCE_MVAL(&mv_off, offset);
+	MV_FORCE_STR(&mv_off);		/* goes at stringpool.free */
+	*stringpool.free++ = '^';
+	memcpy(stringpool.free, rtn->str.addr, rtn->str.len);
+	stringpool.free += rtn->str.len;
+	vprime.len = stringpool.free - (unsigned char*)vprime.addr;
+	if (!(obj = cache_get(indir_text, &vprime)))
 	{
-		comp_init(&v->str);
-		ref = maketriple(OC_FNTEXT);
-		label = newtriple(OC_PARAMETER);
-		ref->operand[1] = put_tref(label);
-		switch (window_token)
-		{
-		case TK_INTLIT:
-			int_label();
-			/* caution: fall through */
-		case TK_IDENT:
-			ref->operand[0] = put_str(&window_ident.c[0],sizeof(mident));
-			advancewindow();
-			rval = TRUE;
-			break;
-		case TK_ATSIGN:
-			if (rval = indirection(&(ref->operand[0])))
-				ref->opcode = OC_INDTEXT;
-			break;
-		default:
-			stx_error(ERR_TEXTARG);
-			rval = FALSE;
-		}
-		if (rval)
-		{
-			label->operand[0] = put_ilit(offset);
-			label->operand[1] = put_tref(newtriple(OC_CURRTN));
-			ins_triple(ref);
-			x = put_tref(ref);
-		}
-		if (!comp_fini(rval, &object, OC_IRETMVAL, &x, v->str.len))
+		comp_init(&vprime);
+		rval = f_text(&opt, OC_FNTEXT);
+		if (!comp_fini(rval, &object, OC_IRETMVAL, &opt, vprime.len))
 			return;
-		cache_put(indir_text,&vprime,&object);
+		cache_put(indir_text, &vprime, &object);
 		*ind_result_sp++ = dst;
 		if (ind_result_sp >= ind_result_top)
 			rts_error(VARLSTCNT(1) ERR_INDMAXNEST);

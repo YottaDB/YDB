@@ -17,6 +17,13 @@
 typedef          long	int4;		/* 4-byte signed integer */
 typedef unsigned long	uint4;		/* 4-byte unsigned integer */
 
+#ifdef __s390__
+typedef		 short int2;		/* 2-byte signed integer */
+typedef	unsigned short uint2;		/* 2-byte unsigned integer */
+#define LINKAGE_PSECT_BOUNDARY	8
+typedef uint4 mach_inst;
+#endif
+
 #define INT8_SUPPORTED
 #define	INT8_FMT		"%llu"
 #define	INT8_FMTX		"[0x%llx]"
@@ -41,7 +48,6 @@ error_def(ERR_ASSERT);
 
 #define UNIX 1
 #undef VMS
-#define PADDING 1
 #define BIGENDIAN 1
 #define CNTR_WORD_32
 
@@ -71,7 +77,37 @@ error_def(ERR_ASSERT);
 
 #ifdef __linux__
 #define OFF_T_LONG
+#ifdef NeedInAddrPort
 typedef unsigned short	in_port_t;
+#endif
+#ifdef __s390__
+#ifndef Linux390
+#define Linux390
+#endif
+#define INO_T_LONG			    /* see gdsfhead.h, actually for dev_t == 8 on Linux390 2.2.15 */
+#ifndef EARLY_VARARGS
+#define EARLY_VARARGS
+#endif
+#ifndef VAR_COPY
+#define VAR_COPY(dst,src) __va_copy(dst, src)
+#endif
+#endif
+#endif
+
+#ifdef __s390__
+#define CACHELINE_SIZE        256
+/* typedef struct {
+	unsigned char	*code_address;
+	unsigned char	*toc;
+	int		unknown;
+} func_desc; */
+
+#define	CONTEXT(func)		(unsigned char *)func
+
+#define SSM_SIZE		256*1024*1024	/* Segments on 256M boundary */
+#define SHMAT_ADDR_INCS 	SSM_SIZE
+#define MSYNC_ADDR_INCS 	OS_PAGE_SIZE
+
 #endif
 
 #ifdef __i386
@@ -132,7 +168,9 @@ typedef struct
 #endif
 
 #define CODE_ADDRESS(func)	(unsigned char *)func
+#ifndef CONTEXT
 #define	CONTEXT(func)		0	/* not used on this target */
+#endif
 
 /* PSECT in which the address of the module is defined: */
 #define GTM_MODULE_DEF_PSECT	GTM_CODE
@@ -141,7 +179,9 @@ typedef struct
 #define OS_PAGELET_SIZE		512
 #define OS_VIRTUAL_BLOCK_SIZE	OS_PAGELET_SIZE
 #define GTM_MM_FLAGS		MAP_SHARED
+#ifndef SSM_SIZE
 #define SSM_SIZE                OS_PAGE_SIZE
+#endif
 
 typedef volatile	int4    latch_t;
 typedef volatile	uint4   ulatch_t;

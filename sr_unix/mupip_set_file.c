@@ -237,6 +237,16 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			fn = db_fn;
 			fn_len = db_fn_len;
 		}
+		mu_gv_cur_reg_init();
+		strcpy((char *)gv_cur_region->dyn.addr->fname, fn);
+		gv_cur_region->dyn.addr->fname_len = fn_len;
+		standalone = mu_rndwn_file(gv_cur_region, TRUE);
+		if (FALSE == standalone)
+		{
+			REVERT;
+			return (int4)ERR_WCERRNOTCHG;
+		}
+		/* we should open it (for changing) after mu_rndwn_file, since mu_rndwn_file changes the file header too */
 		if (-1 == (fd = OPEN(fn, O_RDWR)))
 		{
 			save_errno = errno;
@@ -244,18 +254,6 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			util_out_print("open : !AZ", TRUE, errptr);
 			exit_stat |= EXIT_ERR;
 			continue;
-		}
-		mu_gv_cur_reg_init();
-		strcpy((char *)gv_cur_region->dyn.addr->fname, fn);
-		gv_cur_region->dyn.addr->fname_len = fn_len;
-
-		standalone = mu_rndwn_file(gv_cur_region, TRUE);
-
-
-		if (FALSE == standalone)
-		{
-			REVERT;
-			return (int4)ERR_WCERRNOTCHG;
 		}
 		LSEEKREAD(fd, 0, sd, sizeof(sgmnt_data), status);
 		if (0 != status)

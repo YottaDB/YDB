@@ -38,7 +38,7 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 	} else
 	{
 		if (NULL == GETCWD(cwdbuf, sizeof(cwdbuf), getcwd_res))
-			rts_error(VARLSTCNT(4) ERR_GETCWD, orig_len, orig_fn, errno);
+			rts_error(VARLSTCNT(5) ERR_GETCWD, 2, orig_len, orig_fn, errno);
 		cwd_len = strlen(cwdbuf);
 		cptr = orig_fn;
 		if (('.' == *cptr)  &&  ('.' == *(cptr + 1)))

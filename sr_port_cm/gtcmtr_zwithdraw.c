@@ -10,37 +10,46 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"
+#include "copy.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
+#include "gtcm_find_region.h"
+#include "gtcm_bind_name.h"
+#include "gvcst_kill.h"
+#include "gtcmtr_zwithdraw.h"
 
 GBLREF connection_struct	*curr_entry;
 GBLREF gv_key			*gv_currkey;
 GBLREF gv_namehead		*gv_target;
+GBLREF gd_region		*gv_cur_region;
 
-bool gtcmtr_zwithdraw()
+bool gtcmtr_zwithdraw(void)
 {
-	cm_region_list	*reg_ref, *gtcm_find_region();
+	cm_region_list	*reg_ref;
 	unsigned char	*ptr, regnum;
 	unsigned short	top, len;
+
+	error_def(ERR_DBPRIVERR);
 
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(*ptr == CMMS_Q_ZWITHDRAW);
 	ptr++;
-	len = *((unsigned short *)ptr);
+	GET_USHORT(len, ptr);
 	ptr += sizeof(unsigned short);
 	regnum = *ptr++;
 	reg_ref = gtcm_find_region(curr_entry,regnum);
 	len--; /* subtract size of regnum */
-	top = gv_currkey->top;
-	memcpy(gv_currkey, ptr, len);
-	gv_currkey->top = top;
-
-	gtcm_bind_name(reg_ref->reghead);
+	CM_GET_GVCURRKEY(ptr, len);
+	gtcm_bind_name(reg_ref->reghead, TRUE);
+	if (gv_cur_region->read_only)
+		rts_error(VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	if (gv_target->root)
 		gvcst_kill(FALSE);
 	ptr = curr_entry->clb_ptr->mbf;

@@ -10,7 +10,6 @@
 #								#
 #################################################################
 
-
 if( $# != 2 ) then
 	echo ""
 	echo "	Usage: $0 <cms-directory> <release-directory>"
@@ -45,7 +44,7 @@ set dir_structure      = "inc pct src tools log $build_types"
 set gtm_src_types = "c m64 s msg"
 set gtm_inc_types = "h max mac si"
 set gtm_pct_types = "mpt m hlp"
-set gtm_tools_types = "gtc sed awk sh csh list txt"
+set gtm_tools_types = "gtc sed awk sh csh list txt exp"
 
 #####################################################################################
 
@@ -62,7 +61,10 @@ endif
 cd $dst_top_dir
 if (-e $dst_ver) then
 	foreach image (pro bta dbg)
-		$gtm_com/IGS $gtm_root/V990/$image/gtmsecshr 1
+		if (-e $gtm_root/$dst_ver/$image/gtmsecshr) then
+			$gtm_com/IGS $gtm_root/$dst_ver/$image/gtmsecshr 1	/* stop gtmsecshr in case it is running */
+			$gtm_com/IGS $gtm_root/$dst_ver/$image/gtmsecshr 2	/* reset gtmsecshr to be suid and root owned */
+		endif
 	end
 	# Verify if anybody is using this version before deleting
 	if ($platform_name == "linux") then
@@ -83,6 +85,7 @@ if (-e $dst_ver) then
 	endif
 	if ($?move_args)  then
 		set save_ver = `ls -ld /usr/library/$dst_ver | awk '{if (length($7)==1) $7="0"_$7; time=$6"_"$7"_"$8; print toupper(time)}' | sed 's/://g'`
+		echo "Renaming /usr/library/${dst_ver} to /usr/library/${dst_ver}_${save_ver}"
 		mv /usr/library/$dst_ver /usr/library/${dst_ver}_${save_ver}
 	else
 		echo "Deleting existing $dst_dir directory structure"
@@ -115,18 +118,25 @@ cp $cms_dir/*/gtmsrc.csh .
 
 ############### Define platform-specific libraries ##################################
 
-set gtm_s_aix   = "sr_port sr_port_cm sr_unix sr_unix_cm sr_rs6000 sr_aix"
-set gtm_s_osf1  = "sr_port sr_port_cm sr_unix sr_unix_cm sr_alpha sr_dux"
-set gtm_s_hp_ux = "sr_port sr_port_cm sr_unix sr_unix_cm sr_hppa sr_hpux"
-set gtm_s_linux = "sr_port sr_port_cm sr_unix sr_unix_cm sr_i386 sr_linux"
-set gtm_s_sunos = "sr_port sr_port_cm sr_unix sr_unix_cm sr_sparc sr_sun"
-set gtm_s_os390 = "sr_port sr_port_cm sr_unix sr_unix_cm sr_s390 sr_os390"
+set gtm_s_aix   = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_rs6000 sr_aix"
+set gtm_s_osf1  = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_alpha sr_dux"
+set gtm_s_hp_ux = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_hppa sr_hpux"
+set gtm_s_linux = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_i386 sr_linux"
+set gtm_s_sunos = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_sparc sr_sun"
+set gtm_s_os390 = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_s390 sr_os390"
+set gtm_s_l390 = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_l390 sr_linux"
+
+set platform_library = "$platform_name"
+if ( "s390" == $MACHTYPE && "linux" == $platform_library ) then
+	set platform_library = "l390"
+endif
 
 ########### Copy sources from platform-specific directories into appropriate version-subdirectories ############
 
 cd $cms_dir
-set ref_libs = `set | grep "^gtm_s_${platform_name}[ 	]" | sed 's/^gtm_s_'${platform_name}'[ 	][ 	]*//g'`
+set ref_libs = `set | grep "^gtm_s_${platform_library}[ 	]" | sed 's/^gtm_s_'${platform_library}'[ 	][ 	]*//g'`
 foreach ref_library ( $ref_libs )
+    if ( -d $ref_library ) then
 	cd $ref_library
 	foreach dir (src inc pct tools)
 		foreach ftype (`set | grep "^gtm_${dir}_types[ 	]" | sed 's/^gtm_'$dir'_types[ 	][ 	]*//g'`)
@@ -143,6 +153,9 @@ foreach ref_library ( $ref_libs )
 		end
 	end
 	cd ..
+    else
+	echo "Skipping missing library $ref_library"
+    endif
 end
 cp sr_unix_cm/gtcm_gcore $gtm_ver/tools
 cp sr_unix_cm/makefile* $gtm_ver/tools

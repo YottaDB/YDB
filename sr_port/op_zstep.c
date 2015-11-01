@@ -24,6 +24,7 @@ GBLREF mval		zstep_action;
 GBLREF mval		dollar_zstep;
 GBLREF bool		neterr_pending;
 GBLREF int4		outofband;
+GBLREF int		iott_write_error;
 
 void op_zstep(uint4 code, mval *action)
 {
@@ -40,7 +41,7 @@ void op_zstep(uint4 code, mval *action)
 	switch(code)
 	{
 		case ZSTEP_INTO:
-			if (!neterr_pending && !outofband)
+			if (!neterr_pending && 0 == outofband && 0 == iott_write_error)
 			{
 				xfer_table[xf_linefetch] = op_zstepfetch;
 				xfer_table[xf_linestart] = op_zstepstart;
@@ -58,7 +59,7 @@ void op_zstep(uint4 code, mval *action)
 				}
 			}
 			zstep_level = (unsigned char *) fp;
-			if (!neterr_pending && !outofband)
+			if (!neterr_pending && 0 == outofband && 0 == iott_write_error)
 			{
 				if (code == ZSTEP_OVER)
 				{

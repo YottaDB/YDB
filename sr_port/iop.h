@@ -185,4 +185,10 @@ IOP_DESC(167, iop_zdelay, 0, IOP_OPEN_OK | IOP_USE_OK, 0),
 IOP_DESC(168, iop_znodelay, 0, IOP_OPEN_OK | IOP_USE_OK, 0),
 IOP_DESC(169, iop_zbfsize, sizeof(int4), IOP_OPEN_OK | IOP_USE_OK, IOP_SRC_INT),
 IOP_DESC(170, iop_zibfsize, sizeof(int4), IOP_OPEN_OK | IOP_USE_OK, IOP_SRC_INT),
-IOP_DESC(171, n_iops, 0, 0, 0)
+IOP_DESC(171, iop_zff, IOP_VAR_SIZE, IOP_OPEN_OK | IOP_USE_OK, IOP_SRC_STR),
+IOP_DESC(172, iop_znoff, 0, IOP_OPEN_OK | IOP_USE_OK, 0),
+IOP_DESC(173, iop_zlength, sizeof(short), IOP_USE_OK, IOP_SRC_INT),
+IOP_DESC(174, iop_zwidth, sizeof(short), IOP_USE_OK, IOP_SRC_INT),
+IOP_DESC(175, iop_zwrap, 0, IOP_OPEN_OK|IOP_USE_OK, 0),
+IOP_DESC(176, iop_znowrap, 0, IOP_OPEN_OK|IOP_USE_OK, 0),
+IOP_DESC(177, n_iops, 0, 0, 0)

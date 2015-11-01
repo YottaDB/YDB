@@ -12,6 +12,6 @@
 #ifndef GTM_BINTIM_INCLUDED
 #define GTM_BINTIM_INCLUDED
 
-int gtm_bintim(char *s, int4 *timep);
+int gtm_bintim (char *s, jnl_proc_time *timep);
 
 #endif /* GTM_BINTIM_INCLUDED */

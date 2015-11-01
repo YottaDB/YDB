@@ -10,12 +10,12 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "hashdef.h"
 #include "cmidef.h"
 #include "cmmdef.h"
+#include "gtcm_find_proc.h"
 
-struct CLB *gtcm_find_proc(tsk, pnum)
-struct NTD *tsk;
-unsigned short pnum;
+struct CLB *gtcm_find_proc(struct NTD *tsk, unsigned short pnum)
 {
 	struct CLB *ptr;
 
@@ -24,6 +24,6 @@ unsigned short pnum;
 		ptr = (struct CLB *)RELQUE2PTR(ptr->cqe.fl))
 		;
 	if (ptr == (struct CLB *)tsk)
-		ptr = 0;
+		ptr = NULL;
 	return ptr;
 }

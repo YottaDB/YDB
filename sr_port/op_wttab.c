@@ -11,31 +11,79 @@
 
 
 #include "mdef.h"
+
 #include "io.h"
+#include "iousdef.h"
 #include "op.h"
+
+LITDEF unsigned char spaces_block[TAB_BUF_SZ] =
+{
+	SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,
+	SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,
+	SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,
+	SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,
+	SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,
+	SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,
+	SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,
+	SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP,SP
+};
+LITDEF unsigned char ebcdic_spaces_block[TAB_BUF_SZ] =
+{
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,
+	EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP,EBCDIC_SP
+};
 
 GBLREF io_pair		io_curr_device;
 GBLREF io_desc		*active_device;
 
-void op_wttab(mint x)
+void op_wttab(mint col)
 {
-	short n;
+	mstr		spaces;
+	int		delta;
 	io_desc		*iod;
 
-	active_device = io_curr_device.out;
 	iod = io_curr_device.out;
-	if ((n = (short)x - iod->dollar.x) > 0)
+	iod->esc_state = START;
+	if ((delta = (short)col - iod->dollar.x) > 0)
 	{
-		(iod->disp_ptr->wttab)(n);
+		active_device = iod;
+		if ((us == iod->type) && (NULL != (((d_us_struct*)(iod->dev_sp))->disp->wttab)))
+			(((d_us_struct*)(iod->dev_sp))->disp->wttab)(delta);
+		else
+		{
+			spaces.addr = (char *)SPACES_BLOCK;
+			spaces.len = TAB_BUF_SZ;
+			for (; delta > 0; delta -= spaces.len)
+			{
+				if (delta < TAB_BUF_SZ)
+					spaces.len = delta;
+				(iod->disp_ptr->write)(&spaces);
+			}
+		}
 		if (iod->wrap)
-		{	iod->dollar.x = x % iod->width;
-			iod->dollar.y += (x / iod->width);
+		{
+			iod->dollar.x = col % iod->width;
+			assert(0 != iod->length || iod->dollar.y < iod->length);
+			iod->dollar.y += (col / iod->width);
 			if (iod->length)
 				iod->dollar.y %= iod->length;
-		}
-		else
-		{	iod->dollar.x = x;
-		}
+		} else
+			iod->dollar.x = col;
+		active_device = NULL;
 	}
-	active_device = 0;
+	return;
 }

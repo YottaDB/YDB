@@ -54,7 +54,7 @@ zro_ent		**srcdir;	like objdir, except for associated source program directory
 		if (objstr)
 		{
 			if (op->str.len + objstr->len + 2 > sizeof objfn)
-				rts_error(VARLSTCNT(1) ERR_ZFILENMTOOLONG);
+				rts_error(VARLSTCNT(4) ERR_ZFILENMTOOLONG, 2, op->str.len, op->str.addr);
 			obp = &objfn[0];
 			if (op->str.len)
 			{
@@ -83,7 +83,7 @@ zro_ent		**srcdir;	like objdir, except for associated source program directory
 			{
 				assert (sp->type == ZRO_TYPE_SOURCE);
 				if (sp->str.len + srcstr->len + 2 > sizeof srcfn)
-					rts_error(VARLSTCNT(1) ERR_ZFILENMTOOLONG);
+					rts_error(VARLSTCNT(4) ERR_ZFILENMTOOLONG, 2, sp->str.len, sp->str.addr);
 				sbp = &srcfn[0];
 				if (sp->str.len)
 				{

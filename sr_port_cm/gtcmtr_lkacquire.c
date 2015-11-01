@@ -11,11 +11,17 @@
 
 #include "mdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
+#include "mlkdef.h"
+#include "gtcmtr_lk.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
 
 GBLREF connection_struct *curr_entry;
 
-bool gtcmtr_lkacquire()
+bool gtcmtr_lkacquire(void)
 {
 	unsigned char *ptr, return_val, action, incr;
 	cm_region_list *reg_walk;
@@ -28,7 +34,11 @@ bool gtcmtr_lkacquire()
 
 	if (curr_entry->transnum == curr_entry->lk_cancel)
 		return_val = gtcml_lkcancel();
-	else
+	else if (curr_entry->transnum == curr_entry->last_cancelled)
+	{ /* LKACQUIRE arrived at the server after the INT CANCEL message for the same lock transaction; discard LKACQUIRE message;
+	     no need to respond to stale LKACQUIRE message */
+		return CM_READ; /* post a read for future messages from client */
+	} else
 	{
 		curr_entry->state |= CMMS_L_LKACQUIRE;
 		return_val = gtcml_dolock();

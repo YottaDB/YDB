@@ -240,6 +240,8 @@ void mu_upgrd_header(v3_sgmnt_data *old_head, sgmnt_data *new_head)
 	new_head->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
 	new_head->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
 	new_head->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
+	new_head->semid = INVALID_SEMID;
+	new_head->shmid = INVALID_SHMID;
 #endif
 	/* mutex_filler1 */
 	/* mutex_filler1 */

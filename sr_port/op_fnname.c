@@ -48,7 +48,7 @@ va_dcl
 	if (depth_count < 0)
 		rts_error(VARLSTCNT(1) ERR_FNNAMENEG);
 
-	argbase = var;
+	VAR_COPY(argbase, var);
 	/* determine if garbage collection is required */
 	space_needed = 3;	/* space for ^[] */
 	for (i = 0; i < sub_count ; i++)
@@ -68,7 +68,7 @@ va_dcl
 		stp_gcol(space_needed);		/* get a big buffer */
 	sptr = stringpool.free;
 
-	var = argbase;
+	VAR_COPY(var, argbase);
 
 	if (fnname_type == FNNAKGBL)
 	{

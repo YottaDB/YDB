@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 #include "mdq.h"
-#include "masscomp.h"
+#include "objlabel.h"
 #include "cache.h"
 #include "rtnhdr.h"
 #include "stack_frame.h"
@@ -31,7 +31,7 @@ void cache_cleanup(stack_frame *sf)
 	assert(sf->ctxt);
 	vp = (int4 *)sf->ctxt;
 	vp--;
-	if ((OMAGIC << 16) + STAMP13 == *vp)	/* Validate backward linkage */
+	if ((OMAGIC << 16) + OBJ_LABEL == *vp)	/* Validate backward linkage */
 	{	/* Frame is one of ours */
 		vp--;
 		irtnhdr = (ihdtyp *)((char *)vp + *vp);
@@ -44,8 +44,8 @@ void cache_cleanup(stack_frame *sf)
 			if (irtnhdr->indce->obj.len)
 				free(irtnhdr->indce->obj.addr);
 			free(irtnhdr->indce);
-			DBG_DECR_CNT(cache_temp_cnt);
 			assert(cache_temp_cnt);
+			DBG_DECR_CNT(cache_temp_cnt);
 		}
 	} else
 		GTMASSERT;			/* Not sure when this could happen */

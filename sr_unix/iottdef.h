@@ -17,20 +17,6 @@
 
 #define TERM_MSK 0x08002400
 
-#define CHAR_FILTER 	128
-#define ESC1 		1
-#define ESC2 		2
-#define ESC_MASK 	(ESC1+ESC2)
-
-#define START 	0
-#define AFTESC 	1
-#define SEQ1 	2
-#define SEQ2 	3
-#define SEQ3 	4
-#define SEQ4 	5
-#define FINI 	6
-#define BADESC 	7
-
 #include "iottdefsp.h"
 
 #define NUM_BITS_IN_INT4	(sizeof(int4) * 8)

@@ -15,7 +15,7 @@
 
 #include <arpa/inet.h>
 
-#ifdef __linux__
+#ifdef NeedInAddrPort
 typedef uint32_t	in_addr_t;
 #endif
 

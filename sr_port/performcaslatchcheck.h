@@ -11,4 +11,4 @@
 
 /* Check that the latch is not stuck on a dead process */
 
-void performCASLatchCheck(sm_global_latch_ptr_t);
+void performCASLatchCheck(sm_global_latch_ptr_t, int);

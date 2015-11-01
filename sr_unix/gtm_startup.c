@@ -11,12 +11,12 @@
 
 #include "mdef.h"
 
-#include <netinet/in.h>
-#include <signal.h>
-
-#include "gtm_inet.h"
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
+#include "gtm_inet.h"
+
+#include <netinet/in.h>
+#include <signal.h>
 
 #include "error.h"
 #include "fnpc.h"
@@ -47,6 +47,8 @@
 #include "interlock.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#include "gtm_env_xlate_init.h"
+#include "callintogtmxfer.h"
 #ifdef __sun
 #include "xfer_enum.h"
 #endif
@@ -73,8 +75,11 @@
 #include "jobchild_init.h"
 #include "zyerror_init.h"
 #include "ztrap_form_init.h"
+#include "ztrap_new_init.h"
 #include "sig_init.h"
 #include "gtm_startup.h"
+#include "svnames.h"
+#include "gtmci_signals.h"
 
 #ifdef __sun
 #define PACKAGE_ENV_TYPE  "GTMXC_RPC"  /* env var to use rpc instead of xcall */
@@ -91,6 +96,7 @@ GBLREF stack_frame 	*frame_pointer;
 GBLREF unsigned char 	*stackbase, *stacktop, *stackwarn, *msp;
 GBLREF mv_stent		*mv_chain;
 GBLREF int		(* volatile xfer_table[])();
+GBLREF mval		dollar_system;
 GBLREF mval		dollar_ztrap;
 GBLREF mval		dollar_zstatus;
 GBLREF bool		compile_time, run_time;
@@ -125,16 +131,15 @@ void gtm_startup(struct startup_vector *svec)
 	unsigned char	*mstack_ptr;
 	void		gtm_ret_code();
 	static readonly unsigned char init_break[1] = {'B'};
+	static readonly unsigned char init_sysid[] = "47,$gtm_sysid";
+	char		*env_sysid;
 	int4		lct;
 	int		i;
 #ifdef __sun
         char            *gtmxc_rpc = 0;
 #endif
-
-	assert(svec->argcnt/sizeof(int4) == 24);
-
+	assert(svec->argcnt == sizeof(*svec));
 	get_page_size();
-
 	rtn_fst_table = rtn_names = (rtn_tables *) svec->rtn_start;
 	rtn_names_end = rtn_names_top = (rtn_tables *) svec->rtn_end;
 	if (svec->user_stack_size < 4096)
@@ -142,24 +147,19 @@ void gtm_startup(struct startup_vector *svec)
 	if (svec->user_stack_size > 8388608)
 		svec->user_stack_size = 8388608;
 	mstack_ptr = (unsigned char *)malloc(svec->user_stack_size);
-
 	msp = stackbase = mstack_ptr + svec->user_stack_size - 4;
 	mv_chain = (mv_stent *) msp;
 	stacktop = mstack_ptr + 2 * mvs_size[MVST_NTAB];
 	stackwarn = stacktop + 1024;
-
 	break_message_mask = svec->break_message_mask;
 	lv_null_subs = svec->lvnullsubs;
 	if (svec->user_strpl_size < STP_INCREMENT)
-	{	svec->user_strpl_size = STP_INCREMENT;
-	}else if (svec->user_strpl_size > STP_MAXSIZE)
-	{	svec->user_strpl_size = STP_MAXSIZE;
-	}
+		svec->user_strpl_size = STP_INCREMENT;
+	else if (svec->user_strpl_size > STP_MAXSIZE)
+		svec->user_strpl_size = STP_MAXSIZE;
 	stp_init(svec->user_strpl_size);
-	if (svec->user_indrcache_size > MAX_INDIRECTION_NESTING
-	  || svec->user_indrcache_size < MIN_INDIRECTION_NESTING)
-	{	svec->user_indrcache_size = MIN_INDIRECTION_NESTING;
-	}
+	if (svec->user_indrcache_size > MAX_INDIRECTION_NESTING || svec->user_indrcache_size < MIN_INDIRECTION_NESTING)
+		svec->user_indrcache_size = MIN_INDIRECTION_NESTING;
 	ind_result_array = (mval **) malloc(sizeof(int4) * svec->user_indrcache_size);
 	ind_source_array = (mval **) malloc(sizeof(int4) * svec->user_indrcache_size);
 	ind_result_sp = ind_result_array;
@@ -178,7 +178,6 @@ void gtm_startup(struct startup_vector *svec)
 	zcall_init();
 	cmd_qlf.qlf = glb_cmd_qlf.qlf;
 	cache_init();
-
 /* on sun we determined if xcall or rpc zcall is used. default is xcall */
 #ifdef __sun
         gtmxc_rpc = (char*)GETENV(PACKAGE_ENV_TYPE);  /* using RPC? */
@@ -187,7 +186,6 @@ void gtm_startup(struct startup_vector *svec)
             xfer_table[xf_fnfgncal] = op_fnfgncal_rpc;
         }
 #endif
-
 	msp -= sizeof(stack_frame);
 	frame_pointer = (stack_frame *) msp;
 	memset(frame_pointer,0, sizeof(stack_frame));
@@ -198,7 +196,6 @@ void gtm_startup(struct startup_vector *svec)
 	frame_pointer->rvector = (rhdtyp*)malloc(sizeof(rhdtyp));
 	memset(frame_pointer->rvector,0,sizeof(rhdtyp));
 	symbinit();
-
 	/* Variables for supporting $ZSEARCH sorting and wildcard expansion */
 	zsrch_var = lv_getslot(curr_symval);
 	zsrch_dir1 = lv_getslot(curr_symval);
@@ -209,21 +206,17 @@ void gtm_startup(struct startup_vector *svec)
 		zsrch_dir2->ptrs.val_ent.children = 0;
 	zsrch_var->ptrs.val_ent.parent.sym = zsrch_dir1->ptrs.val_ent.parent.sym =
 		zsrch_dir2->ptrs.val_ent.parent.sym = curr_symval;
-
-
 	/* Initialize global pointer to control-C handler. Also used in iott_use */
 	ctrlc_handler_ptr = &ctrlc_handler;
 	sig_init(generic_signal_handler, ctrlc_handler_ptr);
+	atexit(gtmci_exit_handler);
 	atexit(gtm_exit_handler);
 	io_init(TRUE);
-
 	getzdir();
 	dpzgbini();
-
 	/* a base addr of 0 indicates a gtm_init call from an rpc server */
 	if (svec->base_addr)
 		jobchild_init();
-
 	svec->frm_ptr = (unsigned char *) frame_pointer;
 	dollar_ztrap.mvtype = MV_STR;
 	dollar_ztrap.str.len = sizeof(init_break);
@@ -233,16 +226,29 @@ void gtm_startup(struct startup_vector *svec)
 	dollar_zstatus.str.addr = (char *)0;
 	zyerror_init();
 	ztrap_form_init();
-
+	ztrap_new_init();
+	init_callin_functable();
+	gtm_env_xlate_init();
+	env_sysid = getenv("gtm_sysid");
+	dollar_system.mvtype = MV_STR;
+	if (!env_sysid)
+	{
+		dollar_system.str.len = strlen(init_sysid);
+		dollar_system.str.addr = &init_sysid[0];
+	} else
+	{
+		dollar_system.str.addr = stringpool.free;
+		memcpy(dollar_system.str.addr, "47,", 3);
+		stringpool.free += 3;
+		dollar_system.str.len = 3 + strlen(env_sysid);
+		memcpy(stringpool.free, env_sysid, strlen(env_sysid));
+		stringpool.free += strlen(env_sysid);
+	}
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
-
 	curr_pattern = pattern_list = &mumps_pattern;
 	pattern_typemask = mumps_pattern.typemask;
-
 	initialize_pattern_table();
-
 	ce_init();	/* initialize compiler escape processing */
-
 	/* Initialize local collating sequence */
 	transform = TRUE;
 	lct = find_local_colltype();
@@ -256,30 +262,15 @@ void gtm_startup(struct startup_vector *svec)
 			exit(exi_condition);
 		}
 		lcl_coll_xform_buff = malloc(MAX_LCL_COLL_XFORM_BUFSIZ);
-	}
-	else
+	} else
 		local_collseq = 0;
-
-	/* Preallocate some timer blocks. */
-	prealloc_gt_timers();
-
-	/* Initialize cache structure for $Piece function */
-
+	prealloc_gt_timers(); /* Preallocate some timer blocks. */
 	for (i = 0; FNPC_MAX > i; i++)
-	{
+	{ /* Initialize cache structure for $Piece function */
 		fnpca.fnpcs[i].pcoffmax = &fnpca.fnpcs[i].pstart[FNPC_ELEM_MAX];
 		fnpca.fnpcs[i].indx = i;
 	}
 	fnpca.fnpcsteal = &fnpca.fnpcs[0];		/* Starting place to look for cache reuse */
 	fnpca.fnpcmax = &fnpca.fnpcs[FNPC_MAX - 1];	/* The last element */
-
 	return;
 }
-
-
-
-
-
-
-
-

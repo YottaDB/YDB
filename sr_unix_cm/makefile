@@ -3,7 +3,7 @@
 #
 #	for just OMI/EMI, comment out the values of RCO and RCLIB
 #
-#  $Header: /cvsroot/sanchez-gtm/gtm/sr_unix_cm/makefile,v 1.1.1.1 2001/05/16 14:01:54 marcinim Exp $
+#  $Header:$
 #
 #  This makefile requires you to use the "ver" command to set the
 #  current GT.M version prior to execution.

@@ -279,8 +279,7 @@ void mupip_integ(void)
 		if (region)
 		{
 			util_out_print("!/!/Integ of region !AD", TRUE, REG_LEN_STR(rptr->reg));
-			retvalue_mu_int_reg = FALSE;
-			retvalue_mu_int_reg = mu_int_reg(rptr->reg);
+			mu_int_reg(rptr->reg, &retvalue_mu_int_reg);
 			if (TRUE != retvalue_mu_int_reg)
 			{
 				rptr = rptr->fPtr;

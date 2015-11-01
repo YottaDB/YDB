@@ -9,12 +9,11 @@
  *								*
  ****************************************************************/
 
-/* cm_release_name.c : defines product name and version for licensing
+/* defines product name and version for licensing */
 
-*/
 #include "mdef.h"
 
 LITDEF char	cm_prd_name[] = "GT.CM" ;
 LITDEF int4	cm_prd_len    = sizeof(cm_prd_name) - 1 ;
-LITDEF char	cm_ver_name[] = "V100";
+LITDEF char	cm_ver_name[] = "V200";
 LITDEF int4	cm_ver_len    = sizeof(cm_ver_name) - 1 ;

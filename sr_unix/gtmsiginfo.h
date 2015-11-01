@@ -39,7 +39,7 @@ typedef struct
 #define GTMSIGINFO_BADR		0x2	/* Bad virtual address information is available */
 #define GTMSIGINFO_USER		0x4	/* User information is available */
 
-#if defined(__osf__) || defined(_AIX)
+#if defined(__osf__) || defined(_AIX) || defined(Linux390)
 void extract_signal_info(int sig, siginfo_t *info, struct sigcontext *context, gtmsiginfo_t *gtmsi);
 #else
 void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsiginfo_t *gtmsi);

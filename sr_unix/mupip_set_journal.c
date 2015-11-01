@@ -64,6 +64,7 @@ error_def(ERR_MUPCLIERR);
 error_def(ERR_MUSTANDALONE);
 error_def(ERR_JNLDSKALIGN);
 error_def(ERR_JNLMINALIGN);
+error_def(ERR_JNLINVSWITCHLMT);
 
 #define EXIT_NRM	0
 #define EXIT_WRN	2
@@ -97,6 +98,7 @@ static	char	* const perror_format = "Error %s database file %s",
 			/* Make sure these stay in alphabetical order */
 			"ALIGNSIZE",
 			"ALLOCATION",
+			"AUTOSWITCHLIMIT",
 			"BEFORE_IMAGES",
 			"BUFFER_SIZE",
 			"DISABLE",
@@ -131,6 +133,7 @@ enum
 	/* Make sure these are in the same order as the above initializers */
 	jnl_alignsize,
 	jnl_allocation,
+	jnl_autoswitchlimit,
 	jnl_before_images,
 	jnl_buffer_size,
 	jnl_disable,
@@ -164,8 +167,8 @@ uint4	mupip_set_journal(bool journal, bool replication, unsigned short db_fn_len
 	bool		alignsize_specified = FALSE, allocation_specified = FALSE, before_images_specified = FALSE,
 			buffer_size_specified = FALSE, disable_specified = FALSE, enable_specified = FALSE,
 			epoch_interval_specified = FALSE, extension_specified = FALSE, filename_specified = FALSE,
-			nobefore_images_specified = FALSE, noprevjnlfile_specified = FALSE, off_specified = FALSE,
-			on_specified = FALSE, prevjnlfile_specified = FALSE,
+			autoswitchlimit_specified = FALSE, nobefore_images_specified = FALSE, noprevjnlfile_specified = FALSE,
+			off_specified = FALSE, on_specified = FALSE, prevjnlfile_specified = FALSE,
 			rep_off_specified = FALSE, rep_on_specified = FALSE, yield_limit_specified = FALSE,
 			nosync_io_specified = FALSE, sync_io_specified = FALSE, exclusive;
 	char		*fn, *jnl_fn, *cptr, *ctop, *c1, rep_str[256], jnl_str[256], entry[256],
@@ -215,11 +218,12 @@ uint4	mupip_set_journal(bool journal, bool replication, unsigned short db_fn_len
 			}
 			switch (index)
 			{
-				case jnl_allocation:
-				case jnl_buffer_size:
-				case jnl_extension:
 				case jnl_alignsize:
+				case jnl_allocation:
+				case jnl_autoswitchlimit:
+				case jnl_buffer_size:
 				case jnl_epoch_interval:
+				case jnl_extension:
 				case jnl_yield_limit:
 					if ('=' == *cptr++)
 					{
@@ -249,6 +253,10 @@ uint4	mupip_set_journal(bool journal, bool replication, unsigned short db_fn_len
 								jnl_info.epoch_interval = num;
 								epoch_interval_specified = TRUE;
 								continue;
+							case jnl_autoswitchlimit:
+								jnl_info.autoswitchlimit = num;
+								autoswitchlimit_specified = TRUE;
+              		                                        continue;
 							case jnl_yield_limit:
 								yield_limit = num;
 								yield_limit_specified = TRUE;
@@ -328,7 +336,8 @@ uint4	mupip_set_journal(bool journal, bool replication, unsigned short db_fn_len
 			if (enable_specified || on_specified || off_specified || before_images_specified
 				|| nobefore_images_specified || filename_specified || allocation_specified
 				|| extension_specified || alignsize_specified || buffer_size_specified
-				|| epoch_interval_specified || yield_limit_specified || sync_io_specified || nosync_io_specified)
+				|| epoch_interval_specified || yield_limit_specified || sync_io_specified
+				|| nosync_io_specified || autoswitchlimit_specified)
 			{
 				util_out_print("DISABLE may not be specified with any other options", TRUE);
 				return (uint4)ERR_MUPCLIERR;
@@ -415,6 +424,20 @@ uint4	mupip_set_journal(bool journal, bool replication, unsigned short db_fn_len
 				if (jnl_info.epoch_interval > MAX_EPOCH_INTERVAL)
 				{
 					util_out_print("EPOCH_INTERVAL cannot be greater than !UL", TRUE, MAX_EPOCH_INTERVAL);
+					return (uint4)ERR_JNLWRNNOCRE;
+				}
+			}
+			if (autoswitchlimit_specified)
+			{
+				if (off_specified)
+				{
+					util_out_print("AUTOSWITCHLIMIT may not be specified with the OFF qualifier", TRUE);
+					return (uint4)ERR_MUPCLIERR;
+				}
+				if (JNL_AUTOSWITCHLIMIT_MIN > jnl_info.autoswitchlimit || JNL_ALLOC_MAX < jnl_info.autoswitchlimit)
+				{
+					gtm_putmsg(VARLSTCNT(5) ERR_JNLINVSWITCHLMT, 3, jnl_info.autoswitchlimit,
+										JNL_AUTOSWITCHLIMIT_MIN, JNL_ALLOC_MAX);
 					return (uint4)ERR_JNLWRNNOCRE;
 				}
 			}
@@ -619,10 +642,8 @@ uint4	mupip_set_journal(bool journal, bool replication, unsigned short db_fn_len
 				}
 			} else
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_MUSTANDALONE, 2,
-					DB_LEN_STR(gv_cur_region));
+				gtm_putmsg(VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(gv_cur_region));
 				exit_status |= EXIT_ERR;
-				db_ipcs_reset(gv_cur_region, TRUE);
 				continue;
 			}
 		} else
@@ -657,7 +678,7 @@ uint4	mupip_set_journal(bool journal, bool replication, unsigned short db_fn_len
 		{
 			if ((jnl_notallowed == sd->jnl_state) && !enable_specified && !replication)
 			{
-				util_out_print("!/Journalling is not enabled for ", FALSE);
+				util_out_print("!/Journaling is not enabled for ", FALSE);
 				if (region)
 					util_out_print("region !AD", TRUE, REG_LEN_STR(gv_cur_region));
 				else
@@ -667,7 +688,7 @@ uint4	mupip_set_journal(bool journal, bool replication, unsigned short db_fn_len
 			if ((jnl_closed == sd->jnl_state) && enable_specified && !on_specified && !replication)
 			{
 				sd->jnl_state = jnl_open;
-				util_out_print("!/Journalling is enabled for ", FALSE);
+				util_out_print("!/Journaling is enabled for ", FALSE);
 				if (region)
 					util_out_print("region !AD", TRUE, REG_LEN_STR(gv_cur_region));
 				else
@@ -686,6 +707,9 @@ uint4	mupip_set_journal(bool journal, bool replication, unsigned short db_fn_len
 
 			if (FALSE == alignsize_specified)
 				jnl_info.alignsize = JNL_MIN_ALIGNSIZE;
+
+			if (FALSE == autoswitchlimit_specified)
+				jnl_info.autoswitchlimit = JNL_ALLOC_MAX;
 
 			if (FALSE == epoch_interval_specified)
 				jnl_info.epoch_interval = DEFAULT_EPOCH_INTERVAL;
@@ -884,7 +908,7 @@ uint4	mupip_set_journal(bool journal, bool replication, unsigned short db_fn_len
 						util_out_print(" are no longer journalled", TRUE);
 						break;
 					case jnl_closed:
-						util_out_print("!/Journalling is currently inactive for ", FALSE);
+						util_out_print("!/Journaling is currently inactive for ", FALSE);
 						if (region)
 							util_out_print("region !AD", TRUE, REG_LEN_STR(gv_cur_region));
 						else
@@ -893,7 +917,7 @@ uint4	mupip_set_journal(bool journal, bool replication, unsigned short db_fn_len
 						break;
 					case jnl_notallowed:
 						sd->jnl_state = jnl_closed;
-						util_out_print("!/Journalling is now enabled but inactive for ", FALSE);
+						util_out_print("!/Journaling is now enabled but inactive for ", FALSE);
 						if (region)
 							util_out_print("region !AD", TRUE, REG_LEN_STR(gv_cur_region));
 						else
@@ -905,7 +929,7 @@ uint4	mupip_set_journal(bool journal, bool replication, unsigned short db_fn_len
 					}
 				} else
 				{
-					/* Journalling is to be turned (or left) on;  a new journal file has been created */
+					/* Journaling is to be turned (or left) on;  a new journal file has been created */
 					if (!off_specified && jnl_open == sd->jnl_state)
 						util_out_print("Previous journal file !AD closed", TRUE,
 							jnl_info.prev_jnl_len, jnl_info.prev_jnl);
@@ -950,18 +974,18 @@ uint4	mupip_set_journal(bool journal, bool replication, unsigned short db_fn_len
 				gtm_putmsg(VARLSTCNT(1) jnl_info.status);
 			}
 		} else
-		{	/* Journalling is to be disabled */
+		{	/* Journaling is to be disabled */
 			if (jnl_notallowed == sd->jnl_state && !replication)
-				util_out_print("!/Journalling is not enabled for ", FALSE);
+				util_out_print("!/Journaling is not enabled for ", FALSE);
 			else
 			{
 				if (sd->repl_state == repl_open)
-					util_out_print("!/Replication is on journalling can not be disabled for ", FALSE);
+					util_out_print("!/Replication is on journaling can not be disabled for ", FALSE);
 				else
 				{
 					sd->jnl_state = jnl_notallowed;
 					sd->jnl_file_len = 0;
-					util_out_print("!/Journalling is now disabled for ", FALSE);
+					util_out_print("!/Journaling is now disabled for ", FALSE);
 				}
 			}
 			if (region)

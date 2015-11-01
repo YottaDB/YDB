@@ -107,6 +107,7 @@ int f_select( oprtype *a, opctype op )
 	tmparg = put_ilit(ERR_SELECTFALSE);
 	ref = newtriple(OC_RTERROR);
 	ref->operand[0] = tmparg;
+	ref->operand[1] = put_ilit(FALSE);	/* Not a subroutine reference */
 	ins_triple(r);
 	assert(!expr_depth);
 	shift_gvrefs = temp_shift_gvrefs;

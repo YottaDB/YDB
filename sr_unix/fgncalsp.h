@@ -14,22 +14,24 @@
 
 /* fgncalsp.h - UNIX foreign calls (d &package.label) */
 
-#define MAXIMUM_PARAMETERS	31		/* maximum number of parameters */
-#define MAX_NAME_LENGTH		255		/* maximum length of file name */
-#define PACKAGE_ENV_PREFIX	"GTMXC"		/* prefix for environemnt variable containing external call table name */
-#define MAX_ERRSTR_LEN		1024		/* maximum length of the error string returned by dlerror() */
-						/* couldn't find any system defined length, 1024 is just arbitrary */
-#define PRN_DLERROR											\
-{													\
-	dummy_err_str = dlerror();									\
-	if (dummy_err_str)										\
-	{												\
-		/* this is done since util_out_print does not handle 64 bit pointers as of now */	\
-		err_str = (char *)malloc(MAX_ERRSTR_LEN);						\
-		strcpy(err_str, dummy_err_str);								\
-		gtm_putmsg(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_STRING(err_str));			\
-		free(err_str);										\
-	}												\
+#define MAXIMUM_PARAMETERS	31	/* maximum number of parameters */
+#define MAX_NAME_LENGTH		255	/* maximum length of file name */
+#define PACKAGE_ENV_PREFIX	"GTMXC"	/* prefix for environemnt variable containing
+					   external call table name */
+#define CALLIN_ENV_NAME		"GTMCI"	/* call-in table environment variable */
+#define MAX_ERRSTR_LEN		1024	/* maximum length of the error string returned
+					   by dlerror(). Couldn't find any system
+					   defined length, 1024 is just arbitrary */
+#define PRN_DLERROR			\
+{					\
+	dummy_err_str = dlerror();	\
+	if (dummy_err_str)		\
+	{ /* this is done since util_out_print does not handle 64 bit pointers as of now */ \
+		err_str = (char *)malloc(MAX_ERRSTR_LEN);	\
+		strcpy(err_str, dummy_err_str);			\
+		gtm_putmsg(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_STRING(err_str)); \
+		free(err_str);		\
+	}				\
 }
 
 typedef int4	(*fgnfnc)();
@@ -57,6 +59,8 @@ enum xc_types
 	xc_status,
 	xc_long,
 	xc_ulong,
+	xc_float,
+	xc_double,
 	xc_long_star,
 	xc_ulong_star,
 	xc_string_star,
@@ -95,17 +99,42 @@ struct extcall_entry_list
 	mstr				call_name;	/* corresponding name of C function */
 };
 
+/* A list of entries in the call-in table each indicating the signature of
+   a call-in routine */
+typedef struct callin_entry_list
+{
+	mstr			label_ref;	/* labelref name of M routine */
+	mstr			call_name;	/* corresponding name of C function */
+	uint4			input_mask;	/* input parameter? LSB = 1st parm */
+	uint4			output_mask;	/* output parameter? LSB = 1st parm */
+	unsigned short		argcnt;		/* number of arguments */
+	enum xc_types		return_type;
+	enum xc_types		*parms;		/* parameter types */
+	struct callin_entry_list	*next_entry;
+} callin_entry_list;
+
+/* parameter block that ci_restart uses to pass arguments to M routine */
+typedef struct parmblk_struct
+{
+	void	(*ci_rtn)(void);
+	int4    argcnt;
+	void    *rtnaddr, *labaddr, *retaddr;
+	int4    mask;
+	mval    *args[MAXIMUM_PARAMETERS];
+} parmblk_struct;
+
 #include "rtnhdr.h"
 
 /* function prototypes */
 void_ptr_t	fgn_getpak(char *pak_name);
 fgnfnc 		fgn_getrtn(void_ptr_t pak_handle, mstr *sym_name);
 void		fgn_closepak(void_ptr_t pak_handle);
-int fgncal_getint(mstr *inp);
-int fgncal_read_args(mstr *inp);
-void fgncal_getstr(mstr *inp, mstr *str);
-void fgncal_lkbind(mstr *inp);
-void fgn_glopref(mval *v);
-struct extcall_package_list *exttab_parse (mval *package);
+int 		fgncal_getint(mstr *inp);
+int 		fgncal_read_args(mstr *inp);
+void 		fgncal_getstr(mstr *inp, mstr *str);
+void 		fgncal_lkbind(mstr *inp);
+void 		fgn_glopref(mval *v);
+struct extcall_package_list 	*exttab_parse (mval *package);
+callin_entry_list		*citab_parse (void);
 
 #endif

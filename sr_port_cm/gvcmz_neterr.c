@@ -16,31 +16,31 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "hashdef.h"
 #include "cmidef.h"
 #include "cmmdef.h"
 #include "locklits.h"
 #include "iotimer.h"
-#include "zwrite.h"
+#include "gtm_string.h"
+#include "gvcmy_close.h"
+#include "gvcmz.h"
+#include "op.h"
+#include "dpgbldir.h"
+#include "callg.h"
 
 GBLREF	struct NTD	*ntd_root;
-GBLREF	gv_key		*gv_currkey;
-GBLREF	gvzwrite_struct	gvzwrite_block;
-
 GBLDEF	bool		neterr_pending;
 
 error_def(ERR_LCKSCANCELLED);
 
-gd_addr	*get_next_gdr();
-void	op_lkinit(), op_unlock(), op_zdeallocate();
-
-void	gvcmz_neterr(char *err)
+void	gvcmz_neterr(int *err)
 {
 	struct CLB	*p, *pn, *p1;
-	char		*temp, buff[512];
+	unsigned char	*temp, buff[512];
 	gd_addr		*gdptr;
 	gd_region	*region, *r_top;
-	uint4	count, lck_info, err_buff[10];
-	bool		locks = FALSE;
+	uint4		count, lck_info, err_buff[10];
+	boolean_t	locks = FALSE;
 
 	neterr_pending = FALSE;
 	if (NULL == ntd_root)
@@ -90,13 +90,6 @@ void	gvcmz_neterr(char *err)
 					op_unlock();
 					op_zdeallocate(NO_M_TIMEOUT);
 				}
-			}
-			gv_currkey->end = 0;
-			gv_currkey->base[0] = '\0';
-			if (NULL != gvzwrite_block.old_key)
-			{
-				((gv_key *)gvzwrite_block.old_key)->end = 0;
-				((gv_key *)gvzwrite_block.old_key)->base[0] = '\0';
 			}
 			/* Cycle through all active global directories */
 			for (gdptr = get_next_gdr(NULL);  NULL != gdptr;  gdptr = get_next_gdr(gdptr))

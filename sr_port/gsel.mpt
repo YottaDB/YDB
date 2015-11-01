@@ -12,7 +12,7 @@
 	;invoke ^%GSEL to create %ZG - a local array of existing globals, interactively
 	;
 	n add,beg,cnt,end,g,gd,gdf,k,out,pat,stp
-	i '$d(%zdebug) n $zt s $ZT="zg "_$zl_":ERR^%GSEL" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%GSEL")
+	i '$d(%zdebug) n $et s $et="szg "_$zl_":ERR^%GSEL" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%GSEL")
 	d init,main
 	u $p:(ctrap="":exc="")
 	q
@@ -91,6 +91,7 @@ cur	w ! s g=""
 	q
 ERR	u $p w !,$p($ZS,",",2,999),!
 	u $p:(ctrap="":exc="")
+	s $ec=""
 	q
 LOOP	d main
 	u $p:(ctrap="":exc="")

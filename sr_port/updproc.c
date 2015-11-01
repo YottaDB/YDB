@@ -85,6 +85,7 @@
 #define USER_STACK_SIZE		16384			/* (16 * 1024) */
 #define MINIMUM_BUFFER_SIZE	(DISK_BLOCK_SIZE * 32)
 
+
 LITREF  int			jnl_fixed_size[];
 
 GBLREF	gd_binding		*gd_map;
@@ -129,6 +130,8 @@ GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
 GBLREF	boolean_t	tp_restart_fail_sig_used;
 #endif
+GBLREF	fixed_jrec_tp_kill_set 	mur_jrec_fixed_field;
+GBLREF	struct_jrec_tcom 	mur_jrec_fixed_tcom;
 
 error_def(ERR_NORECOVERERR);
 
@@ -169,17 +172,14 @@ CONDITION_HANDLER(updproc_ch)
 		 */
 		if (first_sgm_info)
 		{
-#ifdef VMS
-			/* Prep structures for potential use by tp_restart's condition handler */
-			if (!tp_restart_fail_sig)
-				tp_restart_fail_sig = (struct chf$signal_array *)malloc((TPRESTART_ARG_CNT + 1) * sizeof(int));
-			assert(FALSE == tp_restart_fail_sig_used);
-#endif
+			VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
 			tp_restart(1);
-#ifdef VMS
-			if (!tp_restart_fail_sig_used)	/* If tp_restart ran clean */
+#ifdef UNIX
+			if (ERR_TPRETRY == SIGNAL)		/* (signal value undisturbed) */
+#elif defined VMS
+			if (!tp_restart_fail_sig_used)		/* If tp_restart ran clean */
 #else
-			if (ERR_TPRETRY == SIGNAL)      /* (signal value undisturbed) */
+#error unsupported platform
 #endif
 			{
 				UNWIND(NULL, NULL);
@@ -188,9 +188,9 @@ CONDITION_HANDLER(updproc_ch)
 			else
 			{	/* Otherwise tp_restart had a signal that we must now deal with.
 				 * replace the TPRETRY information with that saved from tp_restart.
+				 * first assert that we have room for these arguments and proper setup
 				 */
 				assert(TPRESTART_ARG_CNT >= tp_restart_fail_sig->chf$is_sig_args);
-						/* Assert we have room for these arguments */
 				memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * sizeof(int));
 				tp_restart_fail_sig_used = FALSE;
 			}
@@ -296,7 +296,7 @@ void updproc_actions(void)
 	mval			v;
 	mstr_len_t		*data_len;
 	jnl_record		*rec;
-	uint4			temp_write, temp_read, jnl_status;
+	uint4			temp_write, temp_read;
 	enum jnl_record_type	rectype;
 	jnl_process_vector	*pv;
 	int4			rec_seqno = 0; /* the total no of journal reocrds excluding TCOM records */
@@ -315,6 +315,7 @@ void updproc_actions(void)
 	seq_num			temp_df_seqnum;
 	unsigned char		seq_num_str[32], *seq_num_ptr;
 	unsigned char		seq_num_strx[32], *seq_num_ptrx;
+	uint4			jnl_status = 0;
 
 	error_def(ERR_TPRETRY);
 
@@ -416,7 +417,7 @@ void updproc_actions(void)
 				|| QWEQ(seq_num_zero, recvpool.recvpool_ctl->jnl_seqno));
 			rec = (jnl_record *)readaddrs;
 			rectype = REF_CHAR(&rec->jrec_type);
-			switch (REF_CHAR(&rec->jrec_type))
+			switch (rectype)
 			{
 			case JRT_TCOM:
 				assert(QWEQ(jnl_seqno, rec->val.jrec_tset.jnl_seqno));
@@ -621,6 +622,7 @@ void updproc_actions(void)
 			GET_MSTR_LEN(v.str.len, data_len);
 			v.mvtype = MV_STR;
 			v.str.addr = (char *)data_len + sizeof(mstr_len_t);
+			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_set.recov_short_time;
 			op_gvput(&v);
 			if (0 == QWMODDW(jnl_seqno, 1000))
 				repl_log(updproc_log_fp, TRUE, TRUE, "Committed SET Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
@@ -650,6 +652,7 @@ void updproc_actions(void)
 			GET_MSTR_LEN(v.str.len, data_len);
 			v.mvtype = MV_STR;
 			v.str.addr = (char *)data_len + sizeof(mstr_len_t);
+			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_fset.recov_short_time;
 			op_gvput(&v);
 			break;
 		case JRT_KILL:
@@ -663,6 +666,7 @@ void updproc_actions(void)
 			memcpy(gv_currkey->base, v.str.addr, v.str.len);
 			gv_currkey->base[v.str.len] = '\0';
 			gv_currkey->end = v.str.len;
+			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_kill.recov_short_time;
 			op_gvkill();
 			if (0 == QWMODDW(jnl_seqno, 1000))
 				repl_log(updproc_log_fp, TRUE, TRUE, "Committed KILL Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
@@ -681,6 +685,7 @@ void updproc_actions(void)
 			memcpy(gv_currkey->base, v.str.addr, v.str.len);
 			gv_currkey->base[v.str.len] = '\0';
 			gv_currkey->end = v.str.len;
+			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_zkill.recov_short_time;
 			op_gvzwithdraw();
 			if (0 == QWMODDW(jnl_seqno, 1000))
 				repl_log(updproc_log_fp, TRUE, TRUE, "Committed ZKILL Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
@@ -705,6 +710,7 @@ void updproc_actions(void)
 			assert(&rec->val.jrec_fkill.mumps_node == &rec->val.jrec_gkill.mumps_node);
 			assert(&rec->val.jrec_fkill.mumps_node == &rec->val.jrec_tkill.mumps_node);
 			assert(&rec->val.jrec_fkill.mumps_node == &rec->val.jrec_ukill.mumps_node);
+			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_fkill.recov_short_time;
 			op_gvkill();
 			break;
 		case JRT_TZKILL:
@@ -724,12 +730,15 @@ void updproc_actions(void)
 			assert(&rec->val.jrec_fzkill.mumps_node == &rec->val.jrec_gzkill.mumps_node);
 			assert(&rec->val.jrec_fzkill.mumps_node == &rec->val.jrec_tzkill.mumps_node);
 			assert(&rec->val.jrec_fzkill.mumps_node == &rec->val.jrec_uzkill.mumps_node);
+			mur_jrec_fixed_field.recov_short_time = rec->val.jrec_fzkill.recov_short_time;
 			op_gvzwithdraw();
 			break;
 		case JRT_TCOM:
 			if (tcom_num == tset_num)
 			{
 				assert(0 != tcom_num);
+				mur_jrec_fixed_tcom.tc_recov_short_time = rec->val.jrec_tcom.tc_recov_short_time;
+				mur_jrec_fixed_tcom.ts_recov_short_time = rec->val.jrec_tcom.ts_recov_short_time;
 				op_tcommit();
 				if (0 != dollar_tlevel)
 				{	/* op_tcommit restarted the transaction - do update process special handling for tpretry */
@@ -831,13 +840,16 @@ bool	upd_open_files(upd_proc_ctl **upd_db_files)
 			rts_error(VARLSTCNT(6) ERR_REPLEN_JNLDISABLE, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(curr->gd));
 		else
 			repl_enabled = TRUE;
+		if (recvpool.upd_proc_local->updateresync)
+		{
+			TP_CHANGE_REG(curr->gd);
+			wcs_flu(WCSFLU_FLUSH_HDR);
+		}
 		prev = curr;
 		curr = curr->next;
 		prev->next = *upd_db_files;
 		*upd_db_files = prev;
 	}
-	if (recvpool.upd_proc_local->updateresync)
-		wcs_flu(TRUE);
 	if (NULL == *upd_db_files)
 		gtm_putmsg(VARLSTCNT(3) ERR_NOREPLCTDREG, 1, gld_fn);
 	return TRUE;

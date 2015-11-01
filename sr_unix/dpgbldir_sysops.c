@@ -55,8 +55,8 @@ mstr *get_name(mstr *ms)
 	pblk.def1_size = sizeof(DEF_GDR_EXT) - 1;
 	status = parse_file(ms,&pblk);
 	if (!(status & 1))
-		rts_error(VARLSTCNT(7) ERR_ZGBLDIRACC, 4, ms->len, ms->addr,
-			dollar_zgbldir.str.len, dollar_zgbldir.str.addr, status);
+		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, ms->len, ms->addr,
+			 LEN_AND_LIT(""), dollar_zgbldir.str.len, dollar_zgbldir.str.addr, status);
 
 	new = (mstr *)malloc(sizeof(mstr));
 	new->len = pblk.b_esl;
@@ -97,8 +97,8 @@ bool comp_gd_addr(gd_addr *gd_ptr, file_pointer *file_ptr)
 
 	FSTAT_FILE(file_ptr->fd, &buf, fstat_res);
 	if (-1 == fstat_res)
-		rts_error(VARLSTCNT(7) ERR_ZGBLDIRACC, 4, file_ptr->v.len, file_ptr->v.addr, dollar_zgbldir.str.len,
-			dollar_zgbldir.str.addr, errno);
+		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr, LEN_AND_LIT(""),
+			dollar_zgbldir.str.len, dollar_zgbldir.str.addr, errno);
 	return is_gdid_stat_identical(gd_ptr->id, &buf);
 }
 
@@ -110,8 +110,8 @@ void fill_gd_addr_id(gd_addr *gd_ptr, file_pointer *file_ptr)
 	gd_ptr->id = (gd_id *) malloc(sizeof(gd_id));	/* Need to convert to gd_id_ptr_t during the 64-bit port */
 	FSTAT_FILE(file_ptr->fd, &buf, fstat_res);
 	if (-1 == fstat_res)
-		rts_error(VARLSTCNT(7) ERR_ZGBLDIRACC, 4, file_ptr->v.len, file_ptr->v.addr, dollar_zgbldir.str.len,
-			dollar_zgbldir.str.addr, errno);
+		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr, LEN_AND_LIT(""),
+			dollar_zgbldir.str.len, dollar_zgbldir.str.addr, errno);
 	set_gdid_from_stat(gd_ptr->id, &buf);
 	return;
 }
@@ -132,8 +132,8 @@ void file_read(file_pointer *file_ptr, int4 size, uchar_ptr_t buff, int4 pos)
 		if (-1 == save_errno)
 			rts_error(VARLSTCNT(1) ERR_IOEOF);
 		else
-			rts_error(VARLSTCNT(7) ERR_ZGBLDIRACC, 4, file_ptr->v.len, file_ptr->v.addr, dollar_zgbldir.str.len,
-				dollar_zgbldir.str.addr, save_errno);
+			rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr, LEN_AND_LIT(""),
+				dollar_zgbldir.str.len, dollar_zgbldir.str.addr, save_errno);
 	return;
 }
 

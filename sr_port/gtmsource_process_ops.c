@@ -185,7 +185,7 @@ int gtmsource_alloc_filter_buff(int bufsiz)
 		repl_filter_buff = (uchar_ptr_t)malloc(bufsiz);
 		if (old_filter_buff)
 		{
-			memcpy(repl_filter_buff, old_filter_buff, repl_filter_bufsiz);
+			longcpy(repl_filter_buff, old_filter_buff, repl_filter_bufsiz);
 			free(old_filter_buff);
 		}
 		repl_filter_bufsiz = bufsiz;
@@ -208,7 +208,8 @@ int gtmsource_alloc_msgbuff(int maxbuffsize)
 		gtmsource_msgp = (repl_msg_ptr_t)malloc(maxbuffsize);
 		if (oldmsgp)
 		{
-			memcpy((uchar_ptr_t)gtmsource_msgp, (uchar_ptr_t)oldmsgp, gtmsource_msgbufsiz); /* Copy the existing data */
+			longcpy((uchar_ptr_t)gtmsource_msgp, (uchar_ptr_t)oldmsgp, gtmsource_msgbufsiz);
+									/* Copy the existing data */
 			free(oldmsgp);
 		}
 		gtmsource_msgbufsiz = maxbuffsize;
@@ -272,7 +273,6 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				remote_jnl_ver = ((*start_flags & START_FLAG_HASINFO) ?
 						  ((repl_start_msg_ptr_t)&msg)->jnl_ver : JNL_VER_EARLIEST_REPL);
 				assert(JNL_VER_EARLIEST_REPL <= jnl_ver && JNL_VER_EARLIEST_REPL <= remote_jnl_ver);
-				assert(JNL_VER_THIS >= jnl_ver && JNL_VER_THIS >= remote_jnl_ver);
 				REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n", jnl_ver, remote_jnl_ver);
 				return (SS_NORMAL);
 			} else if (REPL_FETCH_RESYNC == msg.type)

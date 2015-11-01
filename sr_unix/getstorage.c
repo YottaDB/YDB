@@ -14,7 +14,7 @@
 #include "gtm_ulimit.h"
 #include "gtm_unistd.h"
 
-#if defined(__MVS__) || defined(__linux__)
+#if defined(__MVS__) || defined(__linux__) || defined(__sparc)
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <errno.h>

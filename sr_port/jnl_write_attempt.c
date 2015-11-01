@@ -93,7 +93,11 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 #error UNSUPPORTED PLATFORM
 #endif
 		if (SS_NORMAL == status)
+		{
+			if (jb->free == jb->dsk && jb->dskaddr < threshold) /* there's nothing in the buffer to write, */
+				status = ERR_JNLMEMDSK;			    /* but this process still isn't satisfied */
 			break;
+		}
 		if ((writer != CURRENT_WRITER) || (1 == *lcnt))
 		{
 			writer = CURRENT_WRITER;
@@ -137,11 +141,6 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			status = ERR_JNLPROCSTUCK;
 			break;
 		}
-		if (jb->free == jb->dsk && jb->dskaddr < threshold)
-		{	/* there's nothing in the buffer to write, but this process still isn't satisfied */
-			status = ERR_JNLMEMDSK;
-			break;
-		}
 		break;
 	}
 	if ((threshold > jb->freeaddr) || (csa->now_crit && jb->dskaddr > jb->freeaddr))
@@ -167,6 +166,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 	error_def(ERR_JNLPROCSTUCK);
 	error_def(ERR_JNLWRTDEFER);
 	error_def(ERR_JNLFLUSHNOPROG);
+	error_def(ERR_JNLFLUSH);
 	error_def(ERR_TEXT);
 
 	jb = jpc->jnl_buff;
@@ -189,9 +189,11 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 				proc_stuck_cnt = 0;
 				continue;
 			}
+			jpc->status = SS_NORMAL;
+			jnl_send_oper(jpc, ERR_JNLFLUSH);
 			send_msg(VARLSTCNT(8) ERR_JNLFLUSHNOPROG, 2, JNL_LEN_STR(csa->hdr),
 				 ERR_TEXT, 2, LEN_AND_LIT("Could not flush all the buffered journal data"));
-			GTMASSERT;
+			GTMASSERT; /* too many attempts to flush journal data */
 		}
 		if ((ERR_JNLCNTRL == status) || (ERR_JNLMEMDSK == status))
 		{
@@ -210,7 +212,8 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 				grab_crit(jpc->region);	/* ??? is this subject to any possible deadlocks ??? */
 			jnlfile_lost = FALSE;
 			if (jb->dskaddr > jb->freeaddr || threshold > jb->freeaddr || jb->free != (jb->freeaddr % jb->size))
-			{
+			{ /* if it's possible to recover from JNLCNTRL, or JNLMEMDSK errors, do it here.
+			   * jnl_file_lost is disruptive - Vinaya, June 05, 2001 */
 				jnlfile_lost = TRUE;
 				jnl_file_lost(jpc, status);
 			}

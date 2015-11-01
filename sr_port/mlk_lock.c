@@ -101,20 +101,19 @@ uint4 mlk_lock(mlk_pvtblk *p,
 			mlk_garbage_collect(ctl, siz, p);
 		blocked = mlk_shrblk_find(p, &d, auxown);
 		if (!d)
-		{
+		{	/* Needed to create a shrblk but no space was available */
 			if (FALSE == was_crit)
 				rel_crit(p->region);
 			return retval;	/* Resource starve */
 		}
 		if (d->owner)
-		{
+		{	/* The lock already exists */
 			if (d->owner == process_id && d->auxowner == auxown)
-			{
+			{	/* We are already the owner */
 				p->nodptr = d;
 				retval = 0;
-			}
-			else
-			{
+			} else
+			{	/* Someone else has it. Block on it */
 				if (new)
 					mlk_prcblk_add(p->region, ctl, d, process_id);
 				p->nodptr = d;
@@ -122,16 +121,16 @@ uint4 mlk_lock(mlk_pvtblk *p,
 				csa->hdr->trans_hist.lock_sequence++;
 			}
 		} else
-		{
+		{	/* Lock was not previously owned */
 			if (blocked)
-			{
+			{	/* We can't have it right now because of child or parent locks */
 				if (new)
 					mlk_prcblk_add(p->region, ctl, d, process_id);
 				p->nodptr = d;
 				p->sequence = d->sequence;
 				csa->hdr->trans_hist.lock_sequence++;
-			}else
-			{
+			} else
+			{	/* The lock is graciously granted */
 				if (!new)
 					mlk_prcblk_delete(ctl, d, process_id);
 				d->owner = process_id;

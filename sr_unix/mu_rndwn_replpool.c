@@ -52,9 +52,9 @@
 LITREF char             gtm_release_name[];
 LITREF int4             gtm_release_name_len;
 
-boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int shmid)
+boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int shm_id)
 {
-	int			status, save_errno, semflgs;
+	int			semval, status, save_errno;
 	char			*insname;
 	boolean_t		sem_created = FALSE;
 	sm_uc_ptr_t		start_addr;
@@ -62,63 +62,77 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int sh
 	struct shmid_ds		shm_buf;
 	union semun		semarg;
 
+	error_def(ERR_REPLPOOLINST);
 	error_def(ERR_REPLACCSEM);
+	error_def(ERR_SYSCALL);
 	error_def(ERR_TEXT);
 
+	assert(NUM_SRC_SEMS == NUM_RECV_SEMS);
+	/* assert that the same rundown logic can be used for both jnlpool and recvpool segments */
+	assert(NUM_SRC_SEMS == NUM_RECV_SEMS);
+	assert(JNL_POOL_ACCESS_SEM == RECV_POOL_ACCESS_SEM);
+	if (INVALID_SHMID == shm_id)
+		return TRUE;
 	semarg.buf = &semstat;
 	insname = replpool_id->instname;
-	semflgs = RWDALL;
-	if (0 == sem_id || (-1 == semctl(sem_id, 0, IPC_STAT, semarg)))
+	if (INVALID_SEMID == sem_id || (-1 == semctl(sem_id, 0, IPC_STAT, semarg)))
 	{
-		semflgs |= IPC_CREAT;
-		assert(NUM_SRC_SEMS == NUM_RECV_SEMS);
-		if (-1 == (sem_id = init_sem_set_source(IPC_PRIVATE, NUM_SRC_SEMS, semflgs)))
+		if (INVALID_SEMID == (sem_id = init_sem_set_source(IPC_PRIVATE, NUM_SRC_SEMS, RWDALL | IPC_CREAT)))
 		{
 			save_errno = errno;
-			util_out_print("Error creating semaphore for instance name !AD, !AD", TRUE,
-					LEN_AND_STR(insname), LEN_AND_STR(STRERROR(save_errno)));
+			gtm_putmsg(VARLSTCNT(5) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(insname));
+			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM, save_errno);
+			return FALSE;
 		}
 		sem_created = TRUE;
 	} else
 		set_sem_set_src(sem_id);
-	/* assert that the same rundown logic can be used for both jnlpool and recvpool segments */
-	assert(NUM_SRC_SEMS == NUM_RECV_SEMS);
-	assert(JNL_POOL_ACCESS_SEM == RECV_POOL_ACCESS_SEM);
-	status = grab_sem(SOURCE, JNL_POOL_ACCESS_SEM);
+	status = grab_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
 	if (SS_NORMAL != status)
 	{
 		save_errno = errno;
-		util_out_print("Error during semop for replpool access semaphore (id = !UL) for instance name !AD, !AD", TRUE,
-				sem_id, LEN_AND_STR(insname), LEN_AND_STR(STRERROR(save_errno)));
-		if (sem_created)
-		{
-			if (-1 == semctl(sem_id, NUM_SRC_SEMS, IPC_RMID, 0))
-			{
-				save_errno = errno;
-				util_out_print("Error removing replpool access semaphore (id = !UL) for instance name !AD, !AD",
-						TRUE, sem_id, LEN_AND_STR(insname), LEN_AND_STR(STRERROR(save_errno)));
-			}
-		}
+		gtm_putmsg(VARLSTCNT(5) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(insname));
+		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM, save_errno);
+		CLNUP_REPLPOOL_ACC_SEM(sem_id, insname);
 		return FALSE;
 	}
-	if (0 == shmid || -1 == shmctl(shmid, IPC_STAT, &shm_buf))
-	{
-		CLNUP_REPLPOOL_ACC_SEM(sem_id, insname);
-		return TRUE;
-	}
-	if (-1 == (sm_long_t)(start_addr = shmat(shmid, 0, 0)))
+	if (-1 == (semval = semctl(sem_id, SRC_SERV_COUNT_SEM, GETVAL)))
 	{
 		save_errno = errno;
-		util_out_print("Error attaching to replpool segment (id = !UL) for replication instance !AD, !AD", TRUE,
-				shmid, LEN_AND_STR(insname), LEN_AND_STR(STRERROR(save_errno)));
+		gtm_putmsg(VARLSTCNT(5) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(insname));
+		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM, save_errno);
+		CLNUP_REPLPOOL_ACC_SEM(sem_id, insname);
+		return FALSE;
+	}
+	if (0 < semval)
+	{
+		util_out_print("Replpool semaphore (id = !UL) for replication instance !AD is in use by another process.",
+				TRUE, sem_id, LEN_AND_STR(insname));
+		CLNUP_REPLPOOL_ACC_SEM(sem_id, insname);
+		return FALSE;
+	}
+	if (-1 == shmctl(shm_id, IPC_STAT, &shm_buf))
+	{
+		save_errno = errno;
+		gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id, RTS_ERROR_STRING(insname));
+		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmctl()"), CALLFROM, save_errno);
 		CLNUP_REPLPOOL_ACC_SEM(sem_id, insname);
 		return FALSE;
 	}
 	if (0 != shm_buf.shm_nattch) /* It must be zero before I attach to it */
 	{
 		util_out_print("Replpool segment (id = !UL) for replication instance !AD is in use by another process.",
-				TRUE, shmid, LEN_AND_STR(insname));
-		MU_RNDWN_REPLPOOL_RETURN(FALSE);
+				TRUE, shm_id, LEN_AND_STR(insname));
+		CLNUP_REPLPOOL_ACC_SEM(sem_id, insname);
+		return FALSE;
+	}
+	if (-1 == (sm_long_t)(start_addr = (sm_uc_ptr_t) do_shmat(shm_id, 0, 0)))
+	{
+		save_errno = errno;
+		gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id, RTS_ERROR_STRING(insname));
+		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmat()"), CALLFROM, save_errno);
+		CLNUP_REPLPOOL_ACC_SEM(sem_id, insname);
+		return FALSE;
 	}
 		/* assert that the identifiers are at the top of replpool control structure */
 	assert(0 == offsetof(jnlpool_ctl_struct, jnlpool_id));
@@ -129,35 +143,38 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int sh
 		if (!memcmp(replpool_id->label, GDS_RPL_LABEL, GDS_LABEL_SZ - 3))
 			util_out_print(
 				"Incorrect version for the replpool segment (id = !UL) belonging to replication instance !AD",
-					TRUE, shmid, LEN_AND_STR(insname));
+					TRUE, shm_id, LEN_AND_STR(insname));
 		else
 			util_out_print("Incorrect replpool format for the segment (id = !UL) belonging to replication instance !AD",
-					TRUE, shmid, LEN_AND_STR(insname));
+					TRUE, shm_id, LEN_AND_STR(insname));
 		MU_RNDWN_REPLPOOL_RETURN(FALSE);
 	}
 	if (memcmp(replpool_id->now_running, gtm_release_name, gtm_release_name_len + 1))
 	{
 		util_out_print("Attempt to access with version !AD, while already using !AD for replpool segment (id = !UL)"
 				" belonging to replication instance !AD.", TRUE, gtm_release_name_len, gtm_release_name,
-				LEN_AND_STR(replpool_id->now_running), shmid, LEN_AND_STR(insname));
+				LEN_AND_STR(replpool_id->now_running), shm_id, LEN_AND_STR(insname));
 		MU_RNDWN_REPLPOOL_RETURN(FALSE);
 	}
 	if (-1 == shmdt((caddr_t)start_addr))
 	{
-		util_out_print("Error detaching from shared memory segment (id = !UL) belonging to the replication instance !AD",
-				TRUE, shmid, LEN_AND_STR(insname));
-		MU_RNDWN_REPLPOOL_RETURN(FALSE);
+		save_errno = errno;
+		gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id, RTS_ERROR_STRING(insname));
+		gtm_putmsg(VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmdt()"), CALLFROM, save_errno);
+		CLNUP_REPLPOOL_ACC_SEM(sem_id, insname);
+		return FALSE;
 	}
-	if (0 != shm_rmid(shmid))
+	if (0 != shm_rmid(shm_id))
 	{
-		util_out_print("Error deleting replpool segment (id = !UL) belonging to the replication instance !AD",
-				TRUE, shmid, LEN_AND_STR(insname));
+		gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id, RTS_ERROR_STRING(insname));
+		gtm_putmsg(VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shm_ctl()"), CALLFROM);
 		MU_RNDWN_REPLPOOL_RETURN(FALSE);
 	}
 	if (0 != sem_rmid(sem_id))
 	{
-		util_out_print("Error removing replpool access semaphore (id = !UL) for replication instance !AD", TRUE,
-				sem_id, LEN_AND_STR(insname));
+		gtm_putmsg(VARLSTCNT(5) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(insname));
+		gtm_putmsg(VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM);
+		return FALSE;
 	}
 	return TRUE;
 }

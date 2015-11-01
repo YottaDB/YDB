@@ -11,6 +11,9 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+#include "gtm_stdlib.h"
+
 #include <netinet/in.h>		/* required for gtmsource.h */
 #include <arpa/inet.h>		/* required for gtmsource.h */
 #ifdef VMS
@@ -55,7 +58,7 @@
 #include "gtmsource.h"
 #include "zwrite.h"
 #include "cache.h"
-#include "masscomp.h"
+#include "objlabel.h"
 #include "op.h"
 #include "dpgbldir.h"
 #include "preemptive_ch.h"
@@ -64,10 +67,23 @@
 #include "dm_setup.h"
 #include "util.h"
 #include "tp_restart.h"
+#include "dollar_zlevel.h"
+#include "error_trap.h"
+#include "golevel.h"
+#include "getzposition.h"
+#include "send_msg.h"
 
 #define MUMPS_INDIR_FRAME frame_pointer->type == 0
 #define DUMPABLE_ERROR_DUMP_FILE_NAME "GTM_FATAL_ERROR"
 #define DUMPABLE_ERROR_DUMP_FILE_TYPE "ZSHOW_DMP"
+#define ERROR_RTN_FRM_CTXT 	(repeat_error || NULL == error_last_frame_err || 		\
+					error_last_frame_err->mpc != CODE_ADDRESS(ERROR_RTN))
+#define SAVE_CURR_FRM_CTXT \
+{							\
+	error_last_mpc_err = frame_pointer->mpc; 	\
+	error_last_ctxt_err = frame_pointer->ctxt; 	\
+	error_last_frame_err = frame_pointer; 		\
+}
 
 GBLREF spdesc           stringpool, rts_stringpool, indr_stringpool;
 GBLREF volatile int4	outofband;
@@ -80,7 +96,7 @@ GBLREF unsigned char	*stackwarn, *tpstackwarn;
 GBLREF unsigned char	*stacktop, *tpstacktop;
 GBLREF unsigned char	*msp, *tp_sp;
 GBLREF mv_stent		*mv_chain;
-GBLREF stack_frame	*frame_pointer, *zyerr_frame;
+GBLREF stack_frame	*frame_pointer, *zyerr_frame, *error_frame;
 GBLREF tp_frame		*tp_pointer;
 GBLREF io_desc		*active_device;
 GBLREF lv_val		*active_lv;
@@ -97,13 +113,20 @@ GBLREF int		mumps_status;
 GBLREF mstr		*err_act;
 GBLREF tp_region	*tp_reg_list;		/* Chained list of regions used in this transaction not cleared on tp_restart */
 GBLREF void		(*tp_timeout_clear_ptr)(void);
-GBLREF int4		gtmDebugLevel;		/* Debug level */
+GBLREF uint4		gtmDebugLevel;		/* Debug level */
 GBLREF uint4		process_id;
 GBLREF jnlpool_addrs	jnlpool;
 GBLREF boolean_t	pool_init;
 GBLREF boolean_t	created_core;
 GBLREF boolean_t	dont_want_core;
 GBLREF mval		dollar_zstatus, dollar_zerror;
+GBLREF mval		dollar_etrap;
+GBLREF int		error_level;
+GBLREF int4		error_last_ecode;
+GBLREF unsigned char	*error_last_mpc_err;
+GBLREF unsigned char	*error_last_ctxt_err;
+GBLREF stack_frame	*error_last_frame_err;
+GBLREF unsigned char	*error_last_b_line;
 GBLREF volatile int4	gtmMallocDepth;
 GBLREF int4		exi_condition;
 #ifdef VMS
@@ -121,6 +144,7 @@ boolean_t clean_mum_tstart(void)
    * zyerr_frame. MUM_TSTART then transfers control to the $ZTRAP frame */
 
 	stack_frame	*save_zyerr_frame, *fp;
+	boolean_t	save_check_flag;
 
 	if (NULL != zyerr_frame)
 	{
@@ -144,7 +168,7 @@ boolean_t clean_mum_tstart(void)
 
 CONDITION_HANDLER(mdb_condition_handler)
 {
-	unsigned char		*cp, *b_line, *context, *sp_base;
+	unsigned char		*cp, *context, *sp_base;
 	unsigned char		dump_file_name[50], *dump_file_name_ptr;
 	boolean_t		dm_action;	/* did the error occur on a action from direct mode */
 	boolean_t		trans_action;	/* did the error occur during "transcendental" code */
@@ -156,9 +180,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 	gd_addr			*addr_ptr;
 	sgmnt_addrs		*csa;
 	io_pair			dev_in_use;
-	mval			outfile, parms, zshowall, *save_zstatus;
+	mval			outfile, parms, zshowall, *save_zstatus, zpos;
 	stack_frame		*fp;
 	boolean_t		error_in_zyerror;
+	boolean_t		repeat_error;
 
 	static unsigned char dumpable_error_dump_file_parms[2] = {iop_newversion, iop_eol};
 	static unsigned char dumpable_error_dump_file_noparms[1] = {iop_eol};
@@ -183,8 +208,12 @@ CONDITION_HANDLER(mdb_condition_handler)
 	error_def(ERR_GTMASSERT);
 	error_def(ERR_TPTIMEOUT);
 	error_def(ERR_OUTOFSPACE);
+	error_def(ERR_REPEATERROR);
+	error_def(ERR_TPNOTACID);
 
 	START_CH;
+	if (repeat_error = (ERR_REPEATERROR == SIGNAL)) /* assignment and comparison */
+		SIGNAL = error_last_ecode;
 	preemptive_ch(SEVERITY);
 	assert((NULL == cs_addrs) || (FALSE == cs_addrs->read_lock));
 	if ((int)ERR_UNSOLCNTERR == SIGNAL)
@@ -218,18 +247,15 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 * all sorts of linking overlaps.
 		 * ----------------------------------------------------
 		 */
-#ifdef VMS
-		/* Prep structures for potential use by tp_restart's condition handler */
-		if (!tp_restart_fail_sig)
-			tp_restart_fail_sig = (struct chf$signal_array *)malloc((TPRESTART_ARG_CNT + 1) * sizeof(int));
-		assert(FALSE == tp_restart_fail_sig_used);
-#endif
+		VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
 		tp_restart(1);
 		lvzwrite_block.curr_subsc = lvzwrite_block.subsc_count = 0;
-#ifdef VMS
-		if (!tp_restart_fail_sig_used)	/* If tp_restart ran clean */
+#ifdef UNIX
+		if (ERR_TPRETRY == SIGNAL)		/* (signal value undisturbed) */
+#elif defined VMS
+		if (!tp_restart_fail_sig_used)		/* If tp_restart ran clean */
 #else
-		if (ERR_TPRETRY == SIGNAL)      /* (signal value undisturbed) */
+#error unsupported platform
 #endif
 		{
 			/* ------------------------------------
@@ -245,7 +271,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		else
 		{	/* Otherwise tp_restart had a signal that we must now deal with -- replace the TPRETRY
 			   information with that saved from tp_restart. */
-			/* Assert that we have room for these arguments */
+			/* Assert that we have room for these arguments - the array malloc is in tp_restart */
 			assert(TPRESTART_ARG_CNT >= tp_restart_fail_sig->chf$is_sig_args);
 			memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * sizeof(int));
 			tp_restart_fail_sig_used = FALSE;
@@ -270,7 +296,12 @@ CONDITION_HANDLER(mdb_condition_handler)
 			/* Set ZSTATUS so it will be echo'd properly in the dump */
 			src_line_d.addr = src_line;
 			src_line_d.len = 0;
-			SET_ZSTATUS(NULL);
+			if (!repeat_error)
+			{
+				SET_ZSTATUS(NULL);
+			}
+			if ((0 != dollar_etrap.str.len) && ERROR_RTN_FRM_CTXT)
+				SAVE_CURR_FRM_CTXT;
 			/* File name to write zshow results to. For Unix, append process id to aid in uniqueness */
 			dump_file_name_ptr = dump_file_name;
 			memcpy(dump_file_name_ptr, DUMPABLE_ERROR_DUMP_FILE_NAME, sizeof(DUMPABLE_ERROR_DUMP_FILE_NAME) - 1);
@@ -336,11 +367,17 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 * -----------------------------------------------------------
 	 */
 	if ((SUCCESS != SEVERITY) && (INFO != SEVERITY))
-	{
+	{	/* Note the existence of similar code in op_dmode.c and op_zsystem.c.
+		 * Any changes here should be reflected there too. We don't have a macro for this because
+		 * 	(a) This code is considered pretty much stable.
+		 * 	(b) Making it a macro makes it less readable.
+		 */
 		if ((CDB_STAGNATE <= t_tries) && (0 < dollar_tlevel))
 		{
-			assert(CDB_STAGNATE + 1 >= t_tries);
+			assert(CDB_STAGNATE == t_tries);
 			t_tries = CDB_STAGNATE - 1;
+			getzposition(&zpos);
+			send_msg(VARLSTCNT(4) ERR_TPNOTACID, 2, zpos.str.len, zpos.str.addr);
 		}
 		ENABLE_AST
 		for (addr_ptr = get_next_gdr(0); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
@@ -419,17 +456,24 @@ CONDITION_HANDLER(mdb_condition_handler)
 				indr_stringpool = stringpool;	/* update indr_stringpool */
 				stringpool = rts_stringpool;	/* change for set_zstatus */
 			}
-			b_line = (uchar_ptr_t)SET_ZSTATUS(0);
+			if (!repeat_error)
+			{
+				error_last_b_line = (uchar_ptr_t)SET_ZSTATUS(0);
+			}
+			if (0 != dollar_etrap.str.len && ERROR_RTN_FRM_CTXT)
+				SAVE_CURR_FRM_CTXT;
 			if (sp_base != rts_stringpool.base)
 			{
 				rts_stringpool = stringpool;	/* update rts_stringpool */
 				stringpool = indr_stringpool;	/* change back */
 			}
-			assert(NULL != b_line);
+			assert(NULL != error_last_b_line);
 			assert(NULL != (unsigned char *)restart_pc);
 			frame_pointer->mpc = (unsigned char *)restart_pc;
 			frame_pointer->ctxt = restart_ctxt;
 			err_act = NULL;
+			error_level = dollar_zlevel() - 1;
+			error_last_ecode = SIGNAL;
 			if (std_dev_outbnd && io_std_device.in && io_std_device.in->type == tt &&
 				io_std_device.in->error_handler.len)
 			{
@@ -443,6 +487,24 @@ CONDITION_HANDLER(mdb_condition_handler)
 			{
 				proc_act_type = SFT_ZTRAP;
 				err_act = &dollar_ztrap.str;
+			} else	if (0 != dollar_etrap.str.len)
+			{
+				if (NULL != error_frame)
+				{
+					for (fp = frame_pointer;  fp && fp < error_frame;  fp = fp->old_frame_pointer)
+					{
+						IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(fp);
+						fp->ctxt = CONTEXT(pseudo_ret);
+						fp->mpc = CODE_ADDRESS(pseudo_ret);
+					}
+					assert(fp == error_frame);
+					IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(error_frame);
+					error_frame->mpc = CODE_ADDRESS(ERROR_RTN);
+					error_frame->ctxt = CONTEXT(ERROR_RTN);
+					proc_act_type = 0;
+				} else
+					proc_act_type = SFT_ZTRAP;
+				err_act = &dollar_etrap.str;
 			} else
 			{
 				PRN_ERROR;
@@ -480,11 +542,12 @@ CONDITION_HANDLER(mdb_condition_handler)
 		mv_chain->mv_st_cont.mvs_stck.mvs_stck_val = stacktop;
 		mv_chain->mv_st_cont.mvs_stck.mvs_stck_addr = &stacktop;
 	}
-	b_line = 0;
+	if (!repeat_error)
+		error_last_b_line = 0;
 	/* ----------------------------------------------------------------
 	 * error from direct mode actions does not set $zstatus and is not
-	 * restarted (b_line = 0); error from transcendental code does set
-	 * $zstatus but does not restart the line
+	 * restarted (error_last_b_line = 0); error from transcendental
+	 * code does set $zstatus but does not restart the line
 	 * ----------------------------------------------------------------
 	 */
 	if (!dm_action)
@@ -495,13 +558,18 @@ CONDITION_HANDLER(mdb_condition_handler)
 			indr_stringpool = stringpool;	/* update indr_stringpool */
 			stringpool = rts_stringpool;	/* change for set_zstatus */
 		}
-		b_line = (uchar_ptr_t)SET_ZSTATUS(&context);
+		if (!repeat_error)
+		{
+			error_last_b_line = (uchar_ptr_t)SET_ZSTATUS(&context);
+		}
+		if ((0 != dollar_etrap.str.len) && ERROR_RTN_FRM_CTXT)
+			SAVE_CURR_FRM_CTXT;
+		assert(NULL != error_last_b_line);
 		if (sp_base != rts_stringpool.base)
 		{
 			rts_stringpool = stringpool;	/* update rts_stringpool */
 			stringpool = indr_stringpool;	/* change back */
 		}
-		assert(NULL != b_line);
 	}
 	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
 	{
@@ -533,14 +601,21 @@ CONDITION_HANDLER(mdb_condition_handler)
 			if ((unsigned char *)fp->rvector + fp->rvector->ptext_ptr <= fp->mpc &&
 				fp->mpc < (unsigned char *)fp->rvector + fp->rvector->vartab_ptr)
 			{
-				fp->mpc = b_line;
-				fp->ctxt = context;
+				if (dollar_ztrap.str.len > 0)
+				{
+					/* GT.M specific error trapping
+					 * retries the line with the error
+					 */
+					fp->mpc = error_last_b_line;
+					fp->ctxt = context;
+				}
 				break;
 			} else
 			{
 				fp->ctxt = CONTEXT(pseudo_ret);
 				fp->mpc = CODE_ADDRESS(pseudo_ret);
 			}
+
 		}
 	}
 	/* ----------------------------------------------------------------
@@ -557,10 +632,12 @@ CONDITION_HANDLER(mdb_condition_handler)
 			   and unmark the frame.
 			*/
 			IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(frame_pointer);
-			frame_pointer->mpc = b_line;
+			frame_pointer->mpc = error_last_b_line;
 			frame_pointer->ctxt = context;
 		}
 		err_act = NULL;
+		error_level = dollar_zlevel() - 1;
+		error_last_ecode = SIGNAL;
 		if (err_dev && err_dev->error_handler.len && ((int)ERR_TPTIMEOUT != SIGNAL))
 		{
 			proc_act_type = SFT_DEV_ACT;
@@ -569,6 +646,24 @@ CONDITION_HANDLER(mdb_condition_handler)
 		{
 			proc_act_type = SFT_ZTRAP;
 			err_act = &dollar_ztrap.str;
+		} else	if (0 != dollar_etrap.str.len)
+		{
+			if (NULL != error_frame)
+			{
+				for (fp = frame_pointer;  fp && fp < error_frame;  fp = fp->old_frame_pointer)
+				{
+					IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(fp);
+					fp->ctxt = CONTEXT(pseudo_ret);
+					fp->mpc = CODE_ADDRESS(pseudo_ret);
+				}
+				proc_act_type = 0;
+				assert(fp == error_frame);
+				IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(error_frame);
+				error_frame->mpc = CODE_ADDRESS(ERROR_RTN);
+				error_frame->ctxt = CONTEXT(ERROR_RTN);
+			} else
+				proc_act_type = SFT_ZTRAP;
+			err_act = &dollar_etrap.str;
 		}
 		if (clean_mum_tstart())
 			MUM_TSTART;
@@ -584,7 +679,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	{
 		if (trans_action || dm_action)
 		{
-			trans_code_cleanup(SIGNAL);
+			trans_code_cleanup();
 			MUM_TSTART;
 		} else
 		{

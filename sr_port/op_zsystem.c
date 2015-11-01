@@ -32,6 +32,7 @@
 #include "jnl.h"
 #include "tp.h"
 #include "send_msg.h"
+#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
 #include "op.h"
 #include "change_reg.h"
 #include "setterm.h"
@@ -62,7 +63,11 @@ void op_zsystem(mval *v)
 	error_def(ERR_TPNOTACID);
 
 	if (0 < dollar_tlevel)
-	{
+	{	/* Note the existence of similar code in op_dmode.c and mdb_condition_handler.c.
+		 * Any changes here should be reflected there too. We don't have a macro for this because
+		 * 	(a) This code is considered pretty much stable.
+		 * 	(b) Making it a macro makes it less readable.
+		 */
 		for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 		{	/* the mdb_condition_handler does all regions in all global directories
 			 * this should produce the same result more quickly but the difference should be noted */
@@ -70,11 +75,13 @@ void op_zsystem(mval *v)
 			if (csa->now_crit)
 				rel_crit(tr->reg);
 		}
-		if (CDB_STAGNATE < t_tries)
+		if (CDB_STAGNATE <= t_tries)
 		{
+			assert(CDB_STAGNATE == t_tries);
 			t_tries = CDB_STAGNATE - 1;
 			getzposition(&zpos);
-			send_msg(VARLSTCNT(4) ERR_TPNOTACID, 2, zpos.str.addr, zpos.str.len);
+			gtm_putmsg(VARLSTCNT(4) ERR_TPNOTACID, 2, zpos.str.len, zpos.str.addr);
+			send_msg(VARLSTCNT(4) ERR_TPNOTACID, 2, zpos.str.len, zpos.str.addr);
 		}
 	}
 	MV_FORCE_STR(v);

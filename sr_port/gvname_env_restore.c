@@ -38,15 +38,21 @@ GBLREF sgm_info         *sgm_info_ptr;
 
 void gvname_env_restore(gvname_info *curr_gvname_info)
 {
+	DEBUG_ONLY(boolean_t	is_bg_or_mm;)
+
 	gv_target = curr_gvname_info->s_gv_target;
 	gv_cur_region = curr_gvname_info->s_gv_cur_region;
+	DEBUG_ONLY(is_bg_or_mm = (dba_bg == gv_cur_region->dyn.addr->acc_meth || dba_mm == gv_cur_region->dyn.addr->acc_meth);)
 	cs_addrs = curr_gvname_info->s_cs_addrs;
-	cs_data = cs_addrs->hdr;
+	assert((is_bg_or_mm && cs_addrs) || (dba_cm == gv_cur_region->dyn.addr->acc_meth));
+	if (cs_addrs) /* cs_addrs might be NULL for dba_cm region */
+		cs_data = cs_addrs->hdr;
 	assert(gv_currkey->top <= curr_gvname_info->s_gv_currkey->top);
 	gv_currkey->end = curr_gvname_info->s_gv_currkey->end;
 	gv_currkey->prev = curr_gvname_info->s_gv_currkey->prev;
 	memcpy(gv_currkey->base, curr_gvname_info->s_gv_currkey->base, curr_gvname_info->s_gv_currkey->end + 1);
 	sgm_info_ptr = curr_gvname_info->s_sgm_info_ptr;
-	assert((!dollar_tlevel || sgm_info_ptr) || (dollar_tlevel || !sgm_info_ptr));
+	assert((is_bg_or_mm && ((dollar_tlevel && sgm_info_ptr) || (!dollar_tlevel && !sgm_info_ptr))) ||
+	       dba_cm == gv_cur_region->dyn.addr->acc_meth);
 
 }

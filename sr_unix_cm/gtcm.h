@@ -14,7 +14,7 @@
  *
  *	Include file for the GTCM server.
  *
- *  $Header: /cvsroot/sanchez-gtm/gtm/sr_unix_cm/gtcm.h,v 1.1.1.1 2001/05/16 14:01:53 marcinim Exp $
+ *  $Header:$
  *
  */
 

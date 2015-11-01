@@ -37,6 +37,7 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 	d_tt_struct	*tt_ptr;
 	int		buff_left, status;
 	error_def(ERR_NOPRINCIO);
+	error_def(ERR_TERMWRITE);
 
 	tt_ptr = io_ptr->dev_sp;
 	assert(tt_ptr->write_active == FALSE);
@@ -85,7 +86,7 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 					stop_image_no_core();
 				}
 			}
-			rts_error(VARLSTCNT(1) status);
+			rts_error(VARLSTCNT(3) ERR_TERMWRITE, 0, status);
 		}
 	}
 }

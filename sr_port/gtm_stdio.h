@@ -19,7 +19,7 @@
 #define FDOPEN				fdopen
 #define FGETS(strg,n,strm,fgets_res)	(fgets_res = fgets(strg,n,strm))
 #define Fopen				fopen
-#define GETS(buffer,gets_res)		(gets_res = gets(buffer))
+#define GETS(buffer,gets_res)		syntax error
 #define PERROR				perror
 #define	POPEN				popen
 #define TEMPNAM				tempnam

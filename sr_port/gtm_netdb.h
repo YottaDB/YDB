@@ -15,6 +15,8 @@
 
 #include <netdb.h>
 
+#define MAX_GETHOST_TRIES	8
 #define GETHOSTBYNAME		gethostbyname
+#define GETHOSTBYADDR		gethostbyaddr
 
 #endif

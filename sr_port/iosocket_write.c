@@ -24,8 +24,7 @@
 #include "iotcproutine.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
-
-#define	ONE_COMMA		"1,"
+#include "dollarx.h"
 
 GBLREF io_pair			io_curr_device;
 GBLREF tcp_library_struct	tcp_routines;
@@ -34,67 +33,65 @@ void	iosocket_write(mstr *v)
 {
 	io_desc		*iod;
 	char		*out;
-	int		inlen, outlen, size;
+	int		inlen, len, status;
 	d_socket_struct *dsocketptr;
 	socket_struct	*socketptr;
-	char		*errptr;
-	int4		errlen;
 
 	error_def(ERR_SOCKWRITE);
 	error_def(ERR_TEXT);
 	error_def(ERR_CURRSOCKOFR);
 
 	iod = io_curr_device.out;
-
 	assert(gtmsocket == iod->type);
-
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
-
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
 	{
 		rts_error(VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
 		return;
 	}
-
 	socketptr->lastop = TCP_WRITE;
 	memcpy(dsocketptr->dollar_device, "0", sizeof("0"));
-	inlen = v->len;
-	outlen = iod->width - iod->dollar.x;
-
-	if (!iod->wrap && inlen > outlen)
-		inlen = outlen;
-	if (!inlen)
-		return;
-	for (out = v->addr;  ;  out += size)
+	if (0 != (inlen = v->len))
 	{
-		if (outlen > inlen)
-			outlen = inlen;
-		if ((size = tcp_routines.aa_send(socketptr->sd, out, outlen, (socketptr->urgent ? MSG_OOB : 0))) == -1)
+		for (out = v->addr;  ; out += len)
 		{
-			iod->dollar.za = 9;
-			memcpy(dsocketptr->dollar_device, ONE_COMMA, sizeof(ONE_COMMA));
-			errptr = (char *)STRERROR(errno);
-			errlen = strlen(errptr);
-			memcpy(&dsocketptr->dollar_device[sizeof(ONE_COMMA) - 1], errptr, errlen);
-			if ((iod->error_handler.len > 0) && (socketptr->ioerror))
-				rts_error(VARLSTCNT(6) ERR_SOCKWRITE, 0, ERR_TEXT, 2, errlen, errptr);
+			if (!iod->wrap)
+				len = inlen;
 			else
+			{
+				if ((iod->dollar.x >= iod->width) && (START == iod->esc_state))
+				{
+					/* Should this really be iosocket_Wteol() (for FILTER)? IF we call iosocket_wteol(),
+					 * there will be recursion iosocket_Write -> iosocket_Wteol ->iosocket_Write */
+					DOTCPSEND(socketptr->sd, socketptr->delimiter[0].addr, socketptr->delimiter[0].len,
+							(socketptr->urgent ? MSG_OOB : 0), status);
+					if (0 != status)
+					{
+						SOCKERROR(iod, dsocketptr, socketptr, ERR_SOCKWRITE, status);
+						return;
+					}
+					iod->dollar.y++;
+					iod->dollar.x = 0;
+				}
+				if ((START != iod->esc_state) || ((int)(iod->dollar.x + inlen) <= (int)iod->width))
+					len = inlen;
+				else
+					len = iod->width - iod->dollar.x;
+			}
+			assert(0 != len);
+			DOTCPSEND(socketptr->sd, out, len, (socketptr->urgent ? MSG_OOB : 0), status);
+			if (0 != status)
+			{
+				SOCKERROR(iod, dsocketptr, socketptr, ERR_SOCKWRITE, status);
 				return;
+			}
+			dollarx(iod, (uchar_ptr_t)out, (uchar_ptr_t)out + len);
+			inlen -= len;
+			if (0 >= inlen)
+				break;
 		}
-		assert(size == outlen);
-		iod->dollar.x += size;
-		if ((inlen -= size) <= 0)
-			break;
-
-		iod->dollar.x = 0;	/* don't use wteol to terminate wrapped records for fixed. */
-		iod->dollar.y++;	/* \n is reserved as an end-of-rec delimiter for variable format */
-		if (iod->length)	/* and fixed format requires no padding for wrapped records */
-			iod->dollar.y %= iod->length;
-
-		outlen = iod->width;
+		iod->dollar.za = 0;
 	}
-	iod->dollar.za = 0;
-
 	return;
 }

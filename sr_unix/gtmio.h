@@ -147,7 +147,7 @@
 #endif
 
 
-#ifndef __linux__
+#if !defined(__linux__)
 #define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC) \
 { \
 	int status; \
@@ -166,6 +166,15 @@
 			FDESC = -1; \
 		} \
 	} \
+}
+#elif defined (Linux390)
+/* fcntl on Linux390 2.2.16 sometimes returns EINVAL */
+#define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC) \
+{ \
+	int status; \
+	struct flock lock;    /* arg to lock the file thru fnctl */   \
+	while (-1 == (FDESC = OPEN(FNAME, FFLAG, 0666)) && EINTR == errno)    \
+	;  \
 }
 #else
 /* A special handling was needed for linux due to its inability to lock
@@ -202,6 +211,7 @@
 }
 #endif
 
+#ifndef Linux390
 #define CLOSE_OBJECT_FILE(FDESC, RC) \
 { \
 	struct flock lock;    /* arg to unlock the file thru fnctl */   \
@@ -213,6 +223,12 @@
 	} while (-1 == (RC = fcntl(FDESC, F_SETLK, &lock)) && EINTR == errno); \
 	CLOSEFILE(FDESC, RC); \
 }
+#else
+#define CLOSE_OBJECT_FILE(FDESC, RC) \
+{ \
+	CLOSEFILE(FDESC, RC); \
+	}
+#endif	
 
 /* This is the workaround for a glitch in read locking in zlink:
  * OPEN_OBJECT_FILE -> 1. open the file, and 2. read lock it.
@@ -421,6 +437,7 @@ for (cntr=0; cntr < MAX_FILE_OPEN_TRIES; cntr++) \
 	sm_uc_ptr_t 	gtmioBuff; \
 	gtmioBuffLen = FBUFF_LEN; \
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
+	assert(0 != gtmioBuffLen);	\
 	for (;;) \
         { \
 		if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen))) \

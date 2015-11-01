@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_stdlib.h"		/* for GETENV */
+
 #include <sys/ipc.h>
 #include <sys/mman.h>
 #include <errno.h>
@@ -49,6 +51,7 @@
 #include "mupipbckup.h"
 #include "cache.h"
 #include "gtmmsg.h"
+#include "error.h"		/* for gtm_fork_n_core() prototype */
 
 /* Include prototypes */
 #include "util.h"
@@ -70,7 +73,10 @@
 #include "wcs_timer_start.h"
 #include "caller_id.h"
 #include "add_inter.h"
+#include "gtmimagename.h"
+#include "gtcm_jnl_switched.h"
 
+GBLDEF	cache_rec_ptr_t		get_space_fail_cr;	/* gbldefed to be accessible in a pro core */
 
 GBLREF volatile boolean_t	crit_in_flux;
 GBLREF bool             	certify_all_blocks;
@@ -89,7 +95,9 @@ GBLREF volatile int4 		fast_lock_count;
 GBLREF bool             	unhandled_stale_timer_pop;
 GBLREF boolean_t		*lseekIoInProgress_flags;
 GBLREF boolean_t        	block_saved;
+GBLREF boolean_t        	write_after_image;
 GBLREF boolean_t        	dse_running;
+GBLREF enum gtmImageTypes	image_type;
 
 #define MAX_CYCLES      2
 
@@ -402,7 +410,8 @@ enum cdb_sc     mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
 		else
 		{
 			/* It has been built; Update tn in the block and copy from private memory to shared space */
-			assert(dse_running);
+			/* It's actually dse_chng_bhead which needs dse_running flag, it's ok for now */
+			assert(dse_running || write_after_image);
                         assert(((blk_hdr_ptr_t)cs->new_buff)->tn == effective_tn);
                         memcpy(db_addr[0], cs->new_buff, ((blk_hdr_ptr_t)cs->new_buff)->bsiz);
 		}
@@ -419,7 +428,8 @@ enum cdb_sc     mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                 } else
                 {
 			/* It has been built; Update tn in the block and copy from private memory to shared space */
-                        assert(dse_running || 0 < dollar_tlevel);
+			/* It's actually dse_chng_bhead which needs dse_running flag, it's ok for now */
+                        assert(dse_running || write_after_image || 0 < dollar_tlevel);
                         assert(dse_running || ctn == effective_tn);
                         if (!dse_running)
 				((blk_hdr_ptr_t)db_addr[0])->tn = ((blk_hdr_ptr_t)cs->new_buff)->tn = ctn;
@@ -572,6 +582,8 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
         assert(0 <= cs->blk);
 	INCR_DB_CSH_COUNTER(cs_addrs, n_bg_updates, 1);
         bt = bt_put(gv_cur_region, cs->blk);
+	if (NULL == bt)		/* for NULL return, we would have already done secshr_db_clnup() in bt_put */
+		return cdb_sc_cacheprob;
 	if (cs->write_type & GDS_WRITE_KILL)
 		bt->killtn = ctn;
         cr = (cache_rec_ptr_t)bt->cache_index;
@@ -585,12 +597,12 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                         cr = db_csh_getn(cs->blk);
                         if ((cache_rec_ptr_t)CR_NOTVALID == cr)
                         {
-                                /* should do a premptive dump of the transaction here in the style of secshr_db_clnup */
+				assert(FALSE);
 				secshr_db_clnup(NORMAL_TERMINATION);
                                 SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
-                                BG_TRACE_PRO(wcb_t_end_sysops_cr1);
-                                send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_cr1"),
-					process_id, ctn, REG_LEN_STR(gv_cur_region));
+                                BG_TRACE_PRO(wcb_t_end_sysops_nocr_invcr);
+                                send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_nocr_invcr"),
+					process_id, ctn, DB_LEN_STR(gv_cur_region));
                                 return cdb_sc_cacheprob;
                         }
                         assert(NULL != cr);
@@ -600,12 +612,12 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
 			cr->data_invalid = TRUE;                /* the buffer has just been identified and is still empty */
                 } else if ((cache_rec_ptr_t)CR_NOTVALID == cr)
                 {
-                        /* should do a premptive dump of the transaction here in the style of secshr_db_clnup */
+			assert(FALSE);
 			secshr_db_clnup(NORMAL_TERMINATION);
                         SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
-                        BG_TRACE_PRO(wcb_t_end_sysops_cr2);
-                        send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_cr2"),
-                                process_id, ctn, REG_LEN_STR(gv_cur_region));
+                        BG_TRACE_PRO(wcb_t_end_sysops_cr_invcr);
+                        send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_cr_invcr"),
+                                process_id, ctn, DB_LEN_STR(gv_cur_region));
                         return cdb_sc_cacheprob;
                 } else if (-1 != cr->read_in_progress)
                 {
@@ -629,19 +641,13 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                                         RELEASE_BUFF_READ_LOCK(cr);
                                                 } else
                                                 {
-                                                        /* should do a crit reset and return an error?
-                                                         * what if it has already committed blocks?
-                                                         * should /can this be moved to t_end and tp_tend?
-                                                         */
                                                         assert(FALSE);
-                                                        /* should do a premptive dump of the transaction here
-                                                         * in the style of secshr_db_clnup */
 							secshr_db_clnup(NORMAL_TERMINATION);
                                                         SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
-                                                        BG_TRACE_PRO(wcb_t_end_sysops_wait1);
+                                                        BG_TRACE_PRO(wcb_t_end_sysops_rip_wait);
                                                         send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6,
-                                                                LEN_AND_LIT("wcb_t_end_sysops_wait1"),
-                                                                process_id, ctn, REG_LEN_STR(gv_cur_region));
+                                                                LEN_AND_LIT("wcb_t_end_sysops_rip_wait"),
+                                                                process_id, ctn, DB_LEN_STR(gv_cur_region));
                                                         return cdb_sc_cacheprob;
                                                 }
                                         } else
@@ -739,21 +745,13 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                                                         RELEASE_BUFF_READ_LOCK(cr);
                                                                 } else
                                                                 {
-                                                                        /* should do a crit reset and return an error?
-                                                                         * what if it has already committed blocks?
-                                                                         * should /can this be moved to t_end and tp_tend?
-                                                                         */
                                                                         assert(FALSE);
-                                                                        /* should do a premptive dump of the transaction here
-                                                                         * in the style of secshr_db_clnup */
 									secshr_db_clnup(NORMAL_TERMINATION);
                                                                         SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
-                                                                        BG_TRACE_PRO(wcb_t_end_sysops_wait2);
+                                                                        BG_TRACE_PRO(wcb_t_end_sysops_dirtyripwait);
                                                                         send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6,
-                                                                                LEN_AND_LIT("wcb_t_end_sysops_wait2"),
-                                                                                process_id, ctn, gv_cur_region->rname_len,
-										gv_cur_region->rname);
-
+                                                                                LEN_AND_LIT("wcb_t_end_sysops_dirtyripwait"),
+                                                                                process_id, ctn, DB_LEN_STR(gv_cur_region));
                                                                         return cdb_sc_cacheprob;
                                                                 }
                                                         } else
@@ -882,7 +880,8 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
 		else
 		{
 			/* It has been built; Update tn in the block and copy from private memory to shared space */
-			assert(dse_running);
+			/* It's actually dse_chng_bhead which needs dse_running flag, it's ok for now */
+			assert(dse_running || write_after_image);
                         assert(((blk_hdr_ptr_t)cs->new_buff)->tn == effective_tn);
                         memcpy(blk_ptr, cs->new_buff, ((blk_hdr_ptr_t)cs->new_buff)->bsiz);
 		}
@@ -899,7 +898,8 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                 } else
                 {
 			/* It has been built; Update tn in the block and copy from private memory to shared space */
-                        assert(dse_running || 0 < dollar_tlevel);
+			/* It's actually dse_chng_bhead which needs dse_running flag, it's ok for now */
+                        assert(dse_running || write_after_image || 0 < dollar_tlevel);
                         assert(dse_running || ctn == effective_tn);
                         if (!dse_running)
 				((blk_hdr *)blk_ptr)->tn = ((blk_hdr_ptr_t)cs->new_buff)->tn = ctn;
@@ -1100,6 +1100,7 @@ uint4	jnl_ensure_open(void)
 		gd_id	save_jnl_gdid;
 	)
 
+	assert(cs_addrs->now_crit);
         assert(NULL !=  cs_addrs->jnl);
         if (NOJNL == cs_addrs->jnl->channel)
         {
@@ -1112,6 +1113,8 @@ uint4	jnl_ensure_open(void)
                 close(cs_addrs->jnl->channel);
                 cs_addrs->jnl->channel = NOJNL;
                 cs_addrs->jnl->pini_addr = 0;
+		if (GTCM_GNP_SERVER_IMAGE == image_type)
+			gtcm_jnl_switched();
                 jnl_status = jnl_file_open(gv_cur_region, 0 == cs_data->jnl_file.u.inode, 0);
         }
 	return jnl_status;
@@ -1216,7 +1219,7 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 
                 assert(csa->now_crit);          /* must be crit to play with queues when not the writer */
 
-                BG_TRACE_ANY(csa, spcfc_buffer_flush);
+                BG_TRACE_PRO_ANY(csa, spcfc_buffer_flush);
 
                 ++fast_lock_count;                      /* Disable wcs_stale for duration */
                 if (dba_bg == csd->acc_meth)            /* Determine queue base to use */
@@ -1265,7 +1268,7 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 						for (count = 0; 0 != cr->dirty && 0 != csa->nl->wcs_active_lvl &&
 							     max_count > count; count++)
 						{
-							DEBUG_ONLY(BG_TRACE_ANY(csa, spcfc_buffer_flush_retries));
+							BG_TRACE_PRO_ANY(csa, spcfc_buffer_flush_retries);
 							JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0, save_errno);
 						}
 						/* Usually we want to sleep only if we need to wait on someone else
@@ -1281,11 +1284,14 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 							return TRUE;
 						else
 							wcs_backoff(lcnt);
-						BG_TRACE_ANY(csa, spcfc_buffer_flush_loop);
+						BG_TRACE_PRO_ANY(csa, spcfc_buffer_flush_loop);
 					}
 					if (0 == cr->dirty)
 						return TRUE;
 					assert(FALSE);                  /* We have failed */
+					get_space_fail_cr = cr;
+					if (GETENV("gtm_environment_init"))
+						gtm_fork_n_core();	/* take a snapshot in case running in-house */
 					return FALSE;
 				} else
 				{	/* buffer was locked */
@@ -1300,7 +1306,7 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
                         }
                         if (0 != k)
                                 wcs_backoff(k);
-			performCASLatchCheck(&base->latch);
+			performCASLatchCheck(&base->latch, k);
                 }
                 --fast_lock_count;
                 assert(0 <= fast_lock_count);
@@ -1312,6 +1318,9 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 		rts_error(VARLSTCNT(7) ERR_WAITDSKSPACE, 4, process_id, to_wait, DB_LEN_STR(reg), save_errno);
 	else
 		assert(FALSE);
+	get_space_fail_cr = cr;
+	if (GETENV("gtm_environment_init"))
+		gtm_fork_n_core();	/* take a snapshot in case running in-house */
         return FALSE;
 }
 

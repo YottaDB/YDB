@@ -29,6 +29,7 @@ typedef enum
 	SRC_SERV_COUNT_SEM,	/* Source sever holds it while alive */
 	SRC_SERV_OPTIONS_SEM,	/* For options change, since it is done through the shared memory */
 	DUMMY_SEM,		/* added just to make the number of semaphores same as in recvpool */
+	SOURCE_ID_SEM,
 	NUM_SRC_SEMS
 } source_sem_type;
 
@@ -38,6 +39,7 @@ typedef enum
 	RECV_SERV_COUNT_SEM,	/* Receiver sever holds it while alive */
 	UPD_PROC_COUNT_SEM,	/* Update process holds it while alive */
 	RECV_SERV_OPTIONS_SEM,	/* For options change, since it is done through the shared memory */
+	RECV_ID_SEM,
 	NUM_RECV_SEMS
 } recv_sem_type;
 
@@ -65,6 +67,8 @@ void 		get_lock_recvpool_ftok_sems(boolean_t, boolean_t);
 void 		get_lock_jnlpool_ftok_sems(boolean_t, boolean_t);
 void 		set_sem_set_src(int semid);
 void 		set_sem_set_recvr(int semid);
+int 		grab_sem_all_source(void);	/* rollback needs this */
+int 		grab_sem_all_receive(void);	/* rollback needs this */
 #endif
 
 #endif /* _REPL_SEM_H */

@@ -10,12 +10,12 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "hashdef.h"
 #include "cmidef.h"
 #include "cmmdef.h"
+#include "gtcm_find_region.h"
 
-cm_region_list *gtcm_find_region(cnx, rnum)
-connection_struct *cnx;
-unsigned char rnum;
+cm_region_list *gtcm_find_region(connection_struct *cnx, unsigned char rnum)
 {
 	error_def(CMERR_REGNTFND);
 	cm_region_list *ptr;

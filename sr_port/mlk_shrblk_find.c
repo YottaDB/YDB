@@ -35,14 +35,14 @@ bool mlk_find_blocking_child_lock(mlk_pvtblk *p, mlk_shrblk_ptr_t child, uint4 a
 		 * too.
 		 */
 		if (d->owner && (d->owner != process_id || d->auxowner != auxown))
-		{
+		{	/* If owned and not owned by us check if owner is alive */
 			if (is_proc_alive(d->owner, d->image_count))
-			{
+			{	/* Signal that this lock request is blocked by this node */
 				p->blocked = d;
+				p->blk_sequence = d->sequence;
 				blocked = TRUE;
-			}
-			else
-			{
+			} else
+			{	/* Owner is dead so release this node */
 				d->owner = 0;
 				d->auxowner = 0;
 			}
@@ -84,36 +84,19 @@ bool mlk_shrblk_find(mlk_pvtblk *p,
 		{
 			for (d = (mlk_shrblk_ptr_t)R2A(*chld_of_pnt), dhead = d , cop1 = 0; ; d = (mlk_shrblk_ptr_t)R2A(d->rsib))
 			{
-				if (i < 1)
-				{
-					if (d->owner && (d->owner != process_id || d->auxowner != auxown))
-					{
-						if (is_proc_alive(d->owner, d->image_count))
-						{
-							p->blocked = d;
-							blocked = TRUE;
-						}
-						else
-						{
-							d->owner = 0;
-							d->auxowner = 0;
-						}
-					}
-					break;
-				}
 				dsub = (mlk_shrsub_ptr_t)R2A(d->value);
 				j = memvcmp(cp, slen, dsub->data, dsub->length);
 				if (!j)
-				{
+				{	/* We found the right node */
 					if (d->owner && (d->owner != process_id || d->auxowner != auxown))
-					{
+					{	/* If owned and not owned by us check if owner is alive */
 						if (is_proc_alive(d->owner, d->image_count))
-						{
+						{	/* Signal that this lock request is blocked by this node */
 							p->blocked = d;
+							p->blk_sequence = d->sequence;
 							blocked = TRUE;
-						}
-						else
-						{
+						} else
+						{	/* Owner is dead so release this node */
 							d->owner = 0;
 							d->auxowner = 0;
 						}
@@ -121,28 +104,27 @@ bool mlk_shrblk_find(mlk_pvtblk *p,
 					break;
 				}
 				if (j < 0)
-				{
+				{	/* Insert new sibling to left of existing sibling */
 					if (d == dhead)	/* New entry will be first in list */
 						cop1 = chld_of_pnt;
 					d0 = (mlk_shrblk_ptr_t)R2A(d->lsib);
 					d1 = d;
 					if (!(d = mlk_shrblk_create(p, cp, slen, pnt, cop1, i)))
 					{
-						return TRUE;
+						return TRUE;	/* resource starve -- no room for new shrblk */
 					}
 					A2R(d->lsib, d0);
 					A2R(d->rsib, d1);
 					A2R(d0->rsib, d);
 					A2R(d1->lsib, d);
 					break;
-				}
-				else if ((mlk_shrblk_ptr_t)R2A(d->rsib) == dhead)
-				{
+				} else if ((mlk_shrblk_ptr_t)R2A(d->rsib) == dhead)
+				{	/* Insert new sibling to right of existing sibling */
 					d1 = (mlk_shrblk_ptr_t)R2A(d->rsib);
 					d0 = d;
 					if (!(d = mlk_shrblk_create(p, cp, slen, pnt, cop1, i)))
 					{
-						return TRUE;
+						return TRUE;	/* resource starve -- no room for new shrblk */
 					}
 					A2R(d->lsib, d0);
 					A2R(d->rsib, d1);
@@ -152,6 +134,7 @@ bool mlk_shrblk_find(mlk_pvtblk *p,
 				}
 			}
 		}
+		/* When we get to the last "subscript", it's node is our lock target */
 		if (i == 1)
 			*ret = d;
 	}

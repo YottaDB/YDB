@@ -11,8 +11,19 @@
 
 #include "mdef.h"
 
-#include <varargs.h>
+#ifdef VMS
+#include <descrip.h>	/* for GTM_ENV_TRANSLATE */
+#endif
 
+#ifdef EARLY_VARARGS
+#include <varargs.h>
+#endif
+#include <limits.h>	/*for GTM_ENV_TRANSLATE */
+
+#include "error.h"
+#ifndef EARLY_VARARGS
+#include <varargs.h>
+#endif
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -24,6 +35,12 @@
 #include "mlk_pvtblk_insert.h"
 #include "mlk_pvtblk_create.h"
 #include "dpgbldir.h"
+
+/*the header files below are for environment translation*/
+#ifdef UNIX
+#include "fgncalsp.h"
+#endif
+#include "gtm_env_xlate_init.h"
 
 /*
  * ---------------------------------------------------------
@@ -42,7 +59,8 @@
  *		3-n. Variable length list of pointers to mvals in this nref.
  * ---------------------------------------------------------
  */
-GBLREF gd_addr	*gd_header;
+GBLREF gd_addr		*gd_header;
+static mstr     	gtmgbldir_mstr;
 
 void	mlk_pvtblk_create (va_list subptr)
 {
@@ -50,36 +68,46 @@ void	mlk_pvtblk_create (va_list subptr)
 	int		i, len;
 	int4		rlen;			/* Roundup each length to get clear len for mlk_shrsub */
 	unsigned char	*cp;
-	mval		*extgbl, *mp_temp;
+	mval		*extgbl1, *extgbl2, *mp_temp, val_xlated;
 	int		subcnt;
 	mlk_pvtblk	*r;
 	gd_region	*reg;
 	sgmnt_addrs	*sa;
 	gd_addr		*gld;
 
+
 	/* Get count of mvals */
 	subcnt = va_arg(subptr, int);
 	assert (subcnt >= 2);
 
-	extgbl = va_arg(subptr, mval *);
+	extgbl1 = va_arg(subptr, mval *);
 	subcnt--;
-	if (extgbl)
+	if (extgbl1)
 	{
-		gld = zgbldir(extgbl);
-		va_arg(subptr, int); subcnt--;	/* ignore second argument in extended ref */
-	}
-	else
-	{
+		MV_FORCE_STR(extgbl1);
+		extgbl2 = va_arg(subptr, mval *);
+		subcnt--;
+		MV_FORCE_STR(extgbl2);
+		GTM_ENV_TRANSLATE(extgbl1, extgbl2);
+		if (extgbl1->str.len)
+			gld = zgbldir(extgbl1);
+		else
+		{
+			assert(gd_header);
+			gld = gd_header;
+		}
+	} else
 		gld = gd_header;
-	}
 
-	mp = subptr;
+	VAR_COPY(mp, subptr);
 	mp_temp = va_arg(mp, mval *);
+	MV_FORCE_STR(mp_temp);
 	reg = mlk_region_lookup((mp_temp), gld);
 
 		/* Add up the sizes of all MVAL strings */
 	for (len = 0, rlen=0, i = 0;  i < subcnt;  mp_temp=va_arg(mp, mval *), i++)
 	{
+		MV_FORCE_STR(mp_temp);
 		assert((mp_temp)->mvtype & MV_STR);
 		assert((mp_temp)->str.len < 256);
 		len += (mp_temp)->str.len;
@@ -101,9 +129,10 @@ void	mlk_pvtblk_create (va_list subptr)
 	cp = &r->value[0];
 
 		/* Copy all strings into the buffer one after another */
-	for (i = 0, mp = subptr;  i < subcnt;  i++)
+	for (i = 0, VAR_COPY(mp, subptr);  i < subcnt;  i++)
 	{
 		mp_temp = va_arg( mp, mval *);
+		MV_FORCE_STR(mp_temp);
 		len = (mp_temp)->str.len;
 		*cp++ = len;
 		memcpy(cp, (mp_temp)->str.addr, len);

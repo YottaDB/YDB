@@ -14,10 +14,10 @@
 	s %("up")="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	s %("$zso")=$zso
 	s %("$io")=$io
-	s $zso="_"_$j_".ged"
+	s $zso=$select($zv'["VMS":".",1:"[]")_"_"_$j_".ged"
 	s %("zlbeg")=$zl
 beg	;
-	n $zt  s $zt=$s($d(%zdebug):"b",1:"zg "_$zl_":beg")
+	n $et  s $et=$s($d(%zdebug):"b",1:"s $ec="""" zg "_$zl_":beg")
 	u 0:(ctrap=$c(3))
 	f  r !,"Edit ^",%("global"),! q:%("global")=""  d
  .		i $e(%("global"))'="^" s %("global")="^"_%("global")
@@ -55,7 +55,7 @@ main	;
 	q
 	;
 zwr	;
-	n $zt s $zt=$s($d(%zdebug):"b",1:"goto continue")
+	n $et s $et=$s($d(%zdebug):"b",1:"s $ec="""" goto continue")
 	o $zso:(newversion:exc="":noreadonly)
 	u $zso zwr @%("global")
 continue
@@ -72,8 +72,8 @@ stor	;
 	do work
 	q
 istor	;
-	n $zt
-	s $zt="do istorerr"
+	n $et
+	s $et="do istorerr"
 	i '$l($tr(%," ")) q
 	i $e(%)'="^" s %="^"_%
 	i $e(%,1,%("glbl lngth"))=$e(%("global"),1,%("glbl lngth")) do
@@ -93,6 +93,7 @@ istorerr;
 	w !,"invalid syntax: ",%,!,"return to continue: "  r %:30,!
 	zed $zso
 	open $zso:(read:rewind)
+	s $ec=""
 	zg %("storlvl"):stor
 work	;
 	s %=%("local")
@@ -167,8 +168,8 @@ checkerr;
 	q
 	;
 kill	;
-	n $zt
-	s $zt="q"
+	n $et
+	s $et="s $ec="""" q"
 	s %=(%("a")_$e(%("local"),2,9999))
 	if $d(@%)'[0 d killcheck
 	f  s %=$q(@%) q:%=""  d killcheck

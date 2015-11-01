@@ -11,9 +11,15 @@
 
 #include "mdef.h"
 
-/* Linux/gcc needs stdio before varargs due to stdarg */
-#include "gtm_stdio.h"
+/* LinuxIA32/gcc needs stdio before varargs due to stdarg */
+/* Linux390/gcc needs varargs before stdarg */
+#ifdef EARLY_VARARGS
 #include <varargs.h>
+#endif
+#include "gtm_stdio.h"
+#ifndef EARLY_VARARGS
+#include <varargs.h>
+#endif
 #include "gtm_syslog.h"
 #include <errno.h>
 
@@ -25,17 +31,6 @@
 #include "util_format.h"
 #include "util_out_print_vaparm.h"
 
-
-
-#define	NOFLUSH		0
-#define FLUSH		1
-#define RESET		2
-#define OPER		4
-#define SPRINT		5
-#define HEX8		8
-#define HEX16		16
-
-#define OUT_BUFF_SIZE	2048
 #define GETFAOVALDEF(faocnt, var, type, result, defval) \
 	if (faocnt > 0) {result = (type)va_arg(var, type); faocnt--;} else result = defval;
 
@@ -90,7 +85,7 @@ static	boolean_t	first_syslog = TRUE;
  *			    arguments already incorporated into buff
  */
 
-caddr_t util_format (caddr_t message, va_list fao, caddr_t buff, int4 size, int faocnt)
+caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int faocnt)
 {
 	desc_struct	*d;
 	signed char	schar;
@@ -105,7 +100,7 @@ caddr_t util_format (caddr_t message, va_list fao, caddr_t buff, int4 size, int 
 	unsigned char	numa[22];
 	unsigned char	*numptr;
 
-	last_va_list_ptr = fao;
+	VAR_COPY(last_va_list_ptr, fao);
 	outptr = buff;
 	outtop = outptr + size - 5;	/* 5 bytes to prevent writing across border 	*/
 	/* 5 comes from line 268 -- 278			*/
@@ -117,13 +112,13 @@ caddr_t util_format (caddr_t message, va_list fao, caddr_t buff, int4 size, int 
 		{
 			if (schar == '\0')
 			{
-				last_va_list_ptr = fao;
+				VAR_COPY(last_va_list_ptr, fao);
 				return outptr;
 			}
 			*outptr++ = schar;
 			if (outptr >= outtop)
 			{
-				last_va_list_ptr = fao;
+				VAR_COPY(last_va_list_ptr, fao);
 				return outptr;
 			}
 		}
@@ -260,16 +255,23 @@ caddr_t util_format (caddr_t message, va_list fao, caddr_t buff, int4 size, int 
 								assert(FALSE);
 						}
 					else
+					{
+						GETFAOVALDEF(faocnt, fao, int4, int_val, 0);
 						switch(type2)
 						{
 							case 'B':
+								int_val = int_val & 0xFF;
+								break;
 							case 'W':
+								int_val = int_val & 0xFFFF;
+								break;
 							case 'L':
-								GETFAOVALDEF(faocnt, fao, int4, int_val, 0);
+								int_val = int_val & 0xFFFFFFFF;
 								break;
 							default:
 								assert(FALSE);
 						}
+					}
 					switch (type)
 					{
 						case 'S':		/* Signed value. Give sign if need to */
@@ -283,15 +285,22 @@ caddr_t util_format (caddr_t message, va_list fao, caddr_t buff, int4 size, int 
 							numptr = i2asc(numptr, int_val);
 							break;
 						case 'X':		/* Hex */
-							if (0 != field_width)
-							{
-								i2hex(int_val, numptr, field_width);
-								numptr += field_width;
-							} else
-							{
-								length = i2hex_nofill(int_val, numptr, HEX8);
-								numptr += length;
+							switch (type2)
+							{ /* length is number of ascii hex chars */
+								case 'B':
+							        	length = sizeof(short);
+							         	break;
+								case 'W':
+									length = sizeof(int4);
+							                break;
+							        case 'L':
+						               		length = sizeof(int4) + sizeof(int4);
+						                       	break;
+								default:
+									assert(FALSE);
 							}
+							i2hex(int_val, numptr, length);
+							numptr += length;
 							break;
 						default:
 							assert(FALSE);
@@ -323,22 +332,29 @@ caddr_t util_format (caddr_t message, va_list fao, caddr_t buff, int4 size, int 
 					memset(outptr, (('Z' == type) ? '0' : ' '), field_width - length);
 					outptr += field_width - length;
 				}
-				memcpy(outptr, numa, length);
-				outptr += length;
+				if ((field_width > 0) && (field_width < length))
+				{
+					memset(outptr, '*', field_width);
+					outptr += field_width;
+				} else
+				{
+					memcpy(outptr, numa, length);
+					outptr += length;
+				}
 		}
 	}
-	last_va_list_ptr = fao;
+	VAR_COPY(last_va_list_ptr, fao);
 	return outptr;
 }
 
-void	util_out_close (void)
+void	util_out_close(void)
 {
 
 	if ((NULL != util_outptr) && (util_outptr != util_outbuff))
 		util_out_print("", FLUSH);
 }
 
-void	util_out_send_oper (char *addr, unsigned int len)
+void	util_out_send_oper(char *addr, unsigned int len)
 /* 1st arg: address of system log message */
 /* 2nd arg: length of system long message (not used in Unix implementation) */
 {
@@ -460,4 +476,3 @@ void util_cond_newline(void)
 	if (NULL != io_std_device.out && 0 < io_std_device.out->dollar.x && util_outptr != util_outbuff)
 		FPRINTF(stderr, "\n");
 }
-

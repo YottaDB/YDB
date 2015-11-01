@@ -47,8 +47,6 @@
 
 #define DEFAULT_SHUTDOWN_TIMEOUT	30
 
-#define MAX_TRIES			8
-
 #define GTMSOURCE_CONN_PARMS_LEN ((10 + 1) * GTMSOURCE_CONN_PARMS_COUNT - 1)
 
 GBLREF	gtmsource_options_t	gtmsource_options;
@@ -162,7 +160,7 @@ int gtmsource_get_opt(void)
 			} else
 			{
 				for (tries = 0;
-		     	     	     tries < MAX_TRIES &&
+		     	     	     tries < MAX_GETHOST_TRIES &&
 		     	     	     !(sec_hostentry = GETHOSTBYNAME(gtmsource_options.secondary_host)) &&
 		     	     	     h_errno == TRY_AGAIN;
 		     	     	     tries++);

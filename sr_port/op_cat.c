@@ -31,7 +31,7 @@ va_dcl
 	VAR_START(var);
 	srcargs = va_arg(var,int4) - 1;
 	dst = va_arg(var, mval *);
-	argbase = var;
+	VAR_COPY(argbase, var);
 	/* determine if garbage collection is required */
 	maxlen = 0;
 	for (i = 0; i < srcargs ; i++)
@@ -48,7 +48,7 @@ va_dcl
 		stp_gcol(maxlen);
 	base = cp = stringpool.free;
 	/* if the first string is at the end of the stringpool, then don't recopy the first string */
-	var = argbase;
+	VAR_COPY(var, argbase);
 	in = va_arg(var, mval *);
 	if (MV_IS_STRING(in)  &&  (unsigned char *)in->str.addr + in->str.len == cp)
 	{

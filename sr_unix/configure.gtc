@@ -41,6 +41,12 @@ else
 	deliver_gtcm="no"
 fi
 
+if [ -f gtcm_gnp_server ]; then
+	deliver_gtcm_gnp="yes"
+else
+	deliver_gtcm_gnp="no"
+fi
+
 # Binaries
 binaries="mupip mumps lke dse gtm_dmna geteuid ftok semstat2"
 
@@ -58,6 +64,10 @@ if [ $deliver_gtcm = "yes" ]; then
 	if [ -f gtcm_gcore ]; then
 		binaries="$binaries gtcm_gcore"
 	fi
+fi
+
+if [ $deliver_gtcm_gnp = "yes" ]; then
+	binaries="$binaries gtcm_gnp_server"
 fi
 
 # Other files

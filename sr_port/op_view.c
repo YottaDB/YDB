@@ -11,11 +11,19 @@
 
 #include "mdef.h"
 
-/* gcc/Linux needs stdio before varargs until stdio.h removed from error.h */
+/* gcc/LinuxIA32 needs stdio before varargs until stdio.h removed from error.h */
+/* gcc/Linux390 needs varargs before stdio */
+#ifdef EARLY_VARARGS
+#include <varargs.h>
+#endif
 #ifdef __GNUC__
 #include "gtm_stdio.h"
 #endif
+#ifndef EARLY_VARARGS
 #include <varargs.h>
+#endif
+
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -35,6 +43,7 @@
 #include "change_reg.h"
 #include "patcode.h"
 #include "mprof.h"
+#include "cmidef.h"
 #include "gvcmz.h"
 #include "testpt.h"
 #include "mvalconv.h"
@@ -68,6 +77,7 @@ GBLREF symval		*curr_symval;
 GBLREF trans_num	local_tn;	/* transaction number for THIS PROCESS */
 GBLREF short		dollar_tlevel;
 GBLREF boolean_t	lv_dupcheck;
+GBLREF int4		zdir_form;
 
 #define MAX_YDIRTSTR 32
 #define ZDEFMIN 1024
@@ -109,8 +119,8 @@ va_dcl
 	error_def(ERR_COLLATIONUNDEF);
 	error_def(ERR_COLLDATAEXISTS);
 	error_def(ERR_ISOLATIONSTSCHNG);
-	error_def(ERR_TRACEOFF);
-
+	error_def(ERR_TRACEON);
+	error_def(ERR_INVZDIRFORM);
 
 	VAR_START(var);
 	numarg = va_arg(var, int4);
@@ -391,7 +401,7 @@ va_dcl
                  if (testvalue)
 		 {
 			if (numarg < 2)
-				rts_error(VARLSTCNT(1) ERR_TRACEOFF);
+				rts_error(VARLSTCNT(1) ERR_TRACEON);
 			arg = va_arg(var, mval *);
 			MV_FORCE_STR(arg);
                         turn_tracing_on(arg);
@@ -408,6 +418,18 @@ va_dcl
 			}
                  }
                  break;
+	case VTK_ZDIR_FORM:
+		 VMS_ONLY(
+			if (NULL != arg)
+			{
+		 		testvalue = MV_FORCE_INT(parmblk.value);
+				if (!IS_VALID_ZDIR_FORM(testvalue))
+					rts_error(VARLSTCNT(3) ERR_INVZDIRFORM, 1, testvalue);
+			} else
+				testvalue = ZDIR_FORM_FULLPATH;
+		 	zdir_form = testvalue;
+		 )
+		 break;
 	default:
 		rts_error(VARLSTCNT(1) ERR_VIEWCMD);
 	}

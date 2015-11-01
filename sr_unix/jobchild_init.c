@@ -15,6 +15,8 @@
 #include <errno.h>
 
 #include "rtnhdr.h"
+#include "startup.h"
+#include "gtm_startup.h"
 #include "stack_frame.h"
 #include "job_addr.h"
 #include "compiler.h"
@@ -26,6 +28,7 @@
 #include "gcall.h"
 #include "jobchild_init.h"
 #include "callg.h"
+#include "invocation_mode.h"
 
 #define FILE_NAME_SIZE	255
 
@@ -33,10 +36,11 @@ GBLREF	mval		dollar_zmode;
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	uint4		process_id;
 
-static CONDITION_HANDLER(job_init_ch)
+CONDITION_HANDLER(job_init_ch)
 {
+	START_CH;
 	PRN_ERROR;
-	EXIT(-1);
+	NEXTCH;
 }
 
 /*
@@ -56,7 +60,7 @@ void jobchild_init(void)
 	unsigned char	*transfer_addr;
 	rhdtyp		*base_addr;
 	unsigned short	i, arg_len;
-	char		run_file_name[FILE_NAME_SIZE + 2], *c, *c1, ch;
+	char		run_file_name[FILE_NAME_SIZE + 2], *c;
 	gcall_args	job_arglist;
 	mval		job_args[MAX_ACTUALS];
 	error_def	(ERR_RUNPARAMERR);
@@ -113,7 +117,7 @@ void jobchild_init(void)
 	} else
 	{
 		/* If we are not a child, setup a dummy mumps routine */
-		if (cli_present("RUN"))
+		if (MUMPS_RUN == invocation_mode)
 		{
 			mstr	routine, label;
 			int	offset;
@@ -121,43 +125,9 @@ void jobchild_init(void)
 			arg_len = FILE_NAME_SIZE;
 			if (!cli_get_str("INFILE", run_file_name, &arg_len))
 				rts_error(VARLSTCNT(1) ERR_RUNPARAMERR);
-
-			offset = 0;
-			routine.addr = label.addr = run_file_name;
-			for (i = 0, c = run_file_name;  i < arg_len;  i++)
-			{
-				ch = *c++;
-				if (ch == '^'  ||  ch == '+')
-				{
-					label.len = i;
-
-					if (ch == '+')
-					{
-						offset = STRTOL(c, &c1, 10);
-						if (c == c1 ||*c1 != '^')
-							rts_error(VARLSTCNT(1) ERR_RUNPARAMERR);
-						c = c1 + 1;
-					}
-					routine.addr = c;
-					routine.len = &run_file_name[arg_len] - c;
-					break;
-				}
-			}
-			if (routine.addr == run_file_name)
-			{
-				routine.len = arg_len;
-				routine.addr = run_file_name;
-				label.len = 0;
-			}
-			if (is_ident(&routine) != 1)
-				rts_error(VARLSTCNT(1) ERR_RUNPARAMERR);
-			if (label.len && !is_ident(&label))
-				rts_error(VARLSTCNT(1) ERR_RUNPARAMERR);
-
-			routine.len = routine.len > sizeof(mident) ? sizeof(mident) : routine.len;
-			label.len = label.len > sizeof(mident) ? sizeof(mident) : label.len;
+			lref_parse((uchar_ptr_t)run_file_name, &routine, &label, &offset);
 			job_addr(&routine, &label, offset, (char **)&base_addr, (char **)&transfer_addr);
-		} else
+		} else /* direct mode */
 		{
 			base_addr = make_dmode();
 			transfer_addr = (unsigned char *)base_addr + base_addr->ptext_ptr;
@@ -168,25 +138,7 @@ void jobchild_init(void)
 		dollar_zmode.str.addr = &interactive_mode_buf[0];
 		dollar_zmode.str.len = sizeof(interactive_mode_buf) -1;
 	}
-
-	assert(base_addr->current_rhead_ptr == 0);
-	base_frame(base_addr);
-
-#if	defined(__osf__) || defined (__MVS__)
-	new_stack_frame(base_addr, base_addr->linkage_ptr, transfer_addr);
-	frame_pointer->literal_ptr = base_addr->literal_ptr;	/* new_stack_frame doesn't initialize this field */
-
-#else
-	/*
-	 * Assume everything that is not OSF/1 (Digital Unix) is either:
-	 *
-	 *	(1) AIX/6000 and uses the following calculation to determine the context pointer value, or
-	 *	(2) doesn't need a context pointer
-	 */
-	new_stack_frame(base_addr, (uchar_ptr_t)base_addr + sizeof(rhdtyp), transfer_addr);
-
-#endif
-
+	gtm_init_env(base_addr, transfer_addr);
 	if (job_arglist.callargs)
 	{
 		callg((int(*)())push_parm, &job_arglist);

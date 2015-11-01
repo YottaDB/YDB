@@ -26,6 +26,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "util.h"
 #include "is_proc_alive.h"

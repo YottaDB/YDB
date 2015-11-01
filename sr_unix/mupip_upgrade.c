@@ -57,6 +57,7 @@
 #include "mu_upgrd_adjust_blkptr.h"
 #include "ipcrmid.h"
 #include "mupip_upgrade_standalone.h"
+#include "mutex.h"
 
 #define NOFLUSH 0
 #define FLUSH 1
@@ -195,6 +196,11 @@ void mupip_upgrade(void)
 		new_head->max_update_array_size = new_head->max_non_bm_update_array_size
                                        = ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(new_head), UPDATE_ARRAY_ALIGN_SIZE);
 		new_head->max_update_array_size += ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE);
+		new_head->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
+		new_head->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
+		new_head->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
+		new_head->semid = INVALID_SEMID;
+		new_head->shmid = INVALID_SHMID;
                 /* writing header */
                 LSEEKWRITE(fd, 0, new_head, new_hdr_size, status);
                 if (0 != status)

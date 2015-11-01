@@ -80,6 +80,7 @@ void	db_csh_ref(sgmnt_addrs *cs_addrs)
 		else
 			INTERLOCK_INIT(cr);
 
+		cr->cycle++;	/* increment cycle whenever buffer's blk number changes (for tp_hist) */
 		cr->blk = CR_BLKEMPTY;
 
 		if  (!is_mm)

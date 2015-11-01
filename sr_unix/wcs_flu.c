@@ -35,15 +35,17 @@
 #include "wcs_sleep.h"
 #include "wcs_flu.h"
 #include "wcs_recover.h"
+#include "gtm_string.h"
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	uint4		process_id;
 GBLREF	sgmnt_addrs	*cs_addrs;
 
-#define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart)									\
+#define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart)							\
 if (cnl->in_wtstart)												\
 {														\
 	DEBUG_ONLY(int4	in_wtstart;) 	/* temporary for debugging purposes */					\
+	error_def(ERR_WRITERSTUCK);										\
 														\
 	assert(csa->now_crit);											\
 	csd->wc_blocked = TRUE;		/* to stop all active writers */					\
@@ -58,14 +60,17 @@ if (cnl->in_wtstart)												\
 			csd->wc_blocked = FALSE;								\
 			if (!was_crit)										\
 				rel_crit(gv_cur_region);							\
+			send_msg(VARLSTCNT(5) ERR_WRITERSTUCK, 3, cnl->in_wtstart, DB_LEN_STR(gv_cur_region));	\
 			return FALSE;										\
 		}												\
 		if (-1 == shmctl(udi->shmid, IPC_STAT, &shm_buf))						\
 		{												\
 			save_errno = errno;									\
 			if (1 == lcnt)										\
-				send_msg(VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(gv_cur_region),		\
-						ERR_TEXT, 2, RTS_ERROR_TEXT("wcs_flu() ipc_stat"), save_errno);	\
+			{											\
+                		send_msg(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region));		\
+				send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmctl()"), CALLFROM, save_errno);\
+			} 											\
 		} else if (1 == shm_buf.shm_nattch)								\
 		{												\
 			assert(FALSE == csa->in_wtstart  &&  0 <= cnl->in_wtstart);				\
@@ -94,13 +99,12 @@ bool wcs_flu(bool options)
 	cache_que_head_ptr_t	crq;
         struct shmid_ds         shm_buf;
 
-        error_def(ERR_CRITSEMFAIL);
-        error_def(ERR_TEXT);
 	error_def(ERR_JNLFILOPN);
 	error_def(ERR_WAITDSKSPACE);
 	error_def(ERR_OUTOFSPACE);
-	error_def(ERR_TEXT);
 	error_def(ERR_WCBLOCKED);
+	error_def(ERR_SYSCALL);
+	error_def(ERR_DBFILERR);
 
 
 	jnl_status = 0;
@@ -282,7 +286,7 @@ bool wcs_flu(bool options)
 				GTMASSERT;
 			}
 			wcs_sleep(1);	/* since it is a short lock, sleep the minimum */
-			performCASLatchCheck(&jb->io_in_prog_latch);
+			performCASLatchCheck(&jb->io_in_prog_latch, lcnt);
 		}
 		jb->need_db_fsync = TRUE;	/* for comments on need_db_fsync, see jnl_output_sp.c */
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);

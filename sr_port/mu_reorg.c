@@ -157,7 +157,18 @@ Input/Output Parameter:
 boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int index_fill_factor, int data_fill_factor, int reorg_op)
 {
 	boolean_t		end_of_tree = FALSE, complete_merge, detailed_log;
-	int			rec_size, max_reorg_level, level;
+	int			rec_size;
+	/*
+	 *
+	 * "level" is the level of the working block.
+	 * "pre_order_successor_level" is pre_order successor level except in the case
+	 * where we are in a left-most descent of the tree
+	 * in which case pre_order_successor_level will be the maximum height of that subtree
+	 * until we reach the leaf level block .
+	 * In other words, pre_order_successor_level and level variable controls the iterative pre-order traversal.
+	 * We start reorg from the (root_level - 1) to 0. That is, level = pre_order_successor_level:-1:0.
+	 */
+	int			pre_order_successor_level, level;
 	static block_id		dest_blk_id = 0;
 	int			tkeysize;
 	int			blks_killed, blks_processed, blks_reused, blks_coalesced, blks_split, blks_swapped,
@@ -170,12 +181,13 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 	srch_hist		*rtsib_hist;
 	jnl_buffer_ptr_t	jbp;
 	trans_num		ret_tn;
-
 	error_def(ERR_MUREORGFAIL);
 	error_def(ERR_DBRDONLY);
+	error_def(ERR_GBLNOEXIST);
+	error_def(ERR_MAXBTLEVEL);
+
 	t_err = ERR_MUREORGFAIL;
 	kill_set_tail = &kill_set_list;
-
 	/* Initialization for current global */
 	op_gvname(VARLSTCNT(1) gn);
 	/* Cannot proceed for read-only data files */
@@ -227,7 +239,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 	d_toler = (double) DATA_FILL_TOLERANCE * blk_size / 100.0;
 	i_toler = (double) INDEX_FILL_TOLERANCE * blk_size / 100.0;
 	blks_killed = blks_processed = blks_reused = lvls_reduced = blks_coalesced = blks_split = blks_swapped = 0;
-	level = MAX_BT_DEPTH;
+	pre_order_successor_level = level = MAX_BT_DEPTH + 1; /* Just some high value to initialize */
 
 	/* --- more detailed debugging information --- */
 	if (detailed_log = reorg_op & DETAIL)
@@ -262,18 +274,42 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					assert(CDB_STAGNATE > t_tries);
 					t_retry(status);
 					continue;
-				} else if (((gv_currkey->end + 1) != gv_target->hist.h[0].curr_rec.match) &&
-                                        (sizeof(blk_hdr) >= ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz))
+				} else if (gv_currkey->end + 1 != gv_target->hist.h[0].curr_rec.match)
                                 {
-					util_out_print("Global no longer exists", FLUSH);
-					reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
-						file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
-					return TRUE;
+					if (sizeof(blk_hdr) == ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz
+						&& 1 == gv_target->hist.depth)
+					{
+						if (cs_addrs->now_crit)
+						{
+							t_abort(); /* Release crit earliest possible */
+							gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
+							reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
+								file_extended, lvls_reduced,
+								blks_coalesced, blks_split, blks_swapped);
+							return TRUE; /* It is not an error that global was killed */
+						} else
+						{
+							assert(CDB_STAGNATE > t_tries);
+							t_retry(status);
+							continue;
+						}
+					}
                                 }
-				if (MAX_BT_DEPTH == level) /* will be executed first time only */
-					level = max_reorg_level = gv_target->hist.depth - 1;
-				if (gv_target->hist.depth == level)
-					break;
+				if (gv_target->hist.depth <= level)
+				{
+					/* Will come here
+					 * 	1) first iteration of the for loop (since level == MAX_BT_DEPTH + 1) or,
+					 *	2) tree depth decreased for mu_reduce_level or, M-kill
+					 */
+					pre_order_successor_level = gv_target->hist.depth - 1;
+					if (MAX_BT_DEPTH + 1 != level)
+					{
+						/* break the loop when tree depth decreased (case 2) */
+						level = pre_order_successor_level;
+						break;
+					}
+					level = pre_order_successor_level;
+				}
 				max_fill = (0 == level)? d_max_fill : i_max_fill;
 				toler = (0 == level)? d_toler:i_toler;
 				cur_blk_size =  ((blk_hdr_ptr_t)(gv_target->hist.h[level].buffaddr))->bsiz;
@@ -284,7 +320,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					status = mu_split(level, i_max_fill, d_max_fill, &cnt1, &cnt2);
 					if (cdb_sc_maxlvl == status)
 					{
-						util_out_print("Reorg aborted for this global. Maximum Level reached.", TRUE);
+						gtm_putmsg(VARLSTCNT(4) ERR_MAXBTLEVEL, 2, gn->str.len, gn->str.addr);
 						reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
 							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
 						return FALSE;
@@ -319,14 +355,13 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					t_retry(status);
 					continue;
 				}
-				if (0 == level)
-					max_reorg_level = rtsib_hist->depth - 1;
 				if (cdb_sc_endtree == status)
 				{
 					if (0 == level)
 						end_of_tree = TRUE;
 					break;
-				}
+				} else if (0 == level)
+					pre_order_successor_level = rtsib_hist->depth - 1;
 				/* COALESCE WITH RTSIB */
 				kill_set_list.used = 0;
 				if (cur_blk_size < max_fill - toler && 0 == (reorg_op & NOCOALESCE))
@@ -446,16 +481,28 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					assert(CDB_STAGNATE > t_tries);
 					t_retry(status);
 					continue;
-				}
-				else if (( gv_currkey->end + 1 != gv_target->hist.h[0].curr_rec.match) &&
-					(sizeof(blk_hdr) >= ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz))
-				{
-					util_out_print("Global no longer exists", FLUSH);
-					reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
-						file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
-					return TRUE;
-				}
-				if (gv_target->hist.depth == level)
+				} else if (gv_currkey->end + 1 != gv_target->hist.h[0].curr_rec.match)
+                                {
+					if (sizeof(blk_hdr) == ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz
+						&& 1 == gv_target->hist.depth)
+					{
+						if (cs_addrs->now_crit)
+						{
+							t_abort(); /* Release crit earliest possible */
+							gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
+							reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
+								file_extended, lvls_reduced,
+								blks_coalesced, blks_split, blks_swapped);
+							return TRUE; /* It is not an error that global was killed */
+						} else
+						{
+							assert(CDB_STAGNATE > t_tries);
+							t_retry(status);
+							continue;
+						}
+					}
+                                }
+				if (gv_target->hist.depth <= level)
 					break;
 				/* swap working block with appropriate dest_blk_id block.
 				   Historys are sent as gv_target->hist and reorg_gv_target->hist */
@@ -532,10 +579,10 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 		if (end_of_tree)
 			break;
 		if (0 < level)
-			level--; /* go to children */
+			level--; /* Order of reorg is root towards leaf */
 		else
 		{
-			level = max_reorg_level;
+			level = pre_order_successor_level;
 			memcpy(&gv_currkey->base[0], &gv_currkey_next_reorg->base[0], gv_currkey_next_reorg->end + 1);
 			gv_currkey->end =  gv_currkey_next_reorg->end;
 			cs_data->reorg_restart_block = dest_blk_id;
@@ -561,15 +608,27 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				assert(CDB_STAGNATE > t_tries);
 				t_retry(status);
 				continue;
-			} else if (((gv_currkey->end + 1) != gv_target->hist.h[0].curr_rec.match) &&
-                                       (sizeof(blk_hdr) >= ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz))
+			} else if (gv_currkey->end + 1 != gv_target->hist.h[0].curr_rec.match)
 			{
-				util_out_print("Global no longer exists", FLUSH);
-				reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
-					file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
-				return TRUE;
+				if (sizeof(blk_hdr) == ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz
+					&& 1 == gv_target->hist.depth)
+				{
+					if (cs_addrs->now_crit)
+					{
+						t_abort(); /* Release crit earliest possible */
+						gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
+						reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
+							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
+						return TRUE; /* It is not an error that global was killed */
+					} else
+					{
+						assert(CDB_STAGNATE > t_tries);
+						t_retry(status);
+						continue;
+					}
+				}
 			}
-			if (gv_target->hist.depth == level)
+			if (gv_target->hist.depth <= level)
 				break;
 			/* History is passed in gv_target->hist */
 			status = mu_reduce_level(&kill_set_list);

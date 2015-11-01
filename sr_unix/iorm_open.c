@@ -41,6 +41,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	error_def(ERR_TEXT);
 
 	iod = dev_name->iod;
+	size = 0;
 	p_offset = 0;
 	assert((params) *(pp->str.addr + p_offset) < (unsigned char)n_iops);
 	assert(NULL != iod);
@@ -64,13 +65,12 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		d_rm->lastop = RM_NOOP;
 		assert(0 <= fd);
 		d_rm->fildes = fd;
-		write(fd, "", 0);
 		for (p_offset = 0; iop_eol != *(pp->str.addr + p_offset); )
 		{
 			if (iop_append == (ch = *(pp->str.addr + p_offset++)))
 			{
 				if (!d_rm->fifo && (off_t)-1 == (size = lseek(fd, (off_t)0, SEEK_END)))
-					rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, dev_name->len, dev_name->dollar_io,
+					rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 						  ERR_TEXT, 2, LEN_AND_LIT("Error setting file pointer to end of file"), errno);
 				break;
 			}
@@ -79,17 +79,20 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		}
 		FSTAT_FILE(fd, &statbuf, fstat_res);
 		if (-1 == fstat_res)
-			rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
+			rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
 					LEN_AND_LIT("Error in fstat"), errno);
-		if (!d_rm->fifo && (off_t)-1 == (size = lseek(fd, (off_t)0, SEEK_CUR)))
-			rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, dev_name->len, dev_name->dollar_io,
+		if (!d_rm->fifo)
+		{
+			if ((off_t)-1 == (size = lseek(fd, (off_t)0, SEEK_CUR)))
+				rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 				  ERR_TEXT, 2, LEN_AND_LIT("Error setting file pointer to the current position"), errno);
-		if (size == statbuf.st_size)
-			iod->dollar.zeof = TRUE;
+			if (size == statbuf.st_size)
+				iod->dollar.zeof = TRUE;
+		}
 		if (1 == fd)
 			d_rm->filstr = NULL;
 		else if (NULL == (d_rm->filstr = FDOPEN(fd, "r")) && NULL == (d_rm->filstr = FDOPEN(fd, "w")))
-			rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, dev_name->len, dev_name->dollar_io,
+			rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 				  ERR_TEXT, 2, LEN_AND_LIT("Error in stream open"), errno);
 	}
 	iorm_use(iod, pp);

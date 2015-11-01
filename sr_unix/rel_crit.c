@@ -26,13 +26,13 @@
 #include "have_crit_any_region.h"
 #include "caller_id.h"
 
+GBLREF	short 			crash_count;
 GBLREF	volatile boolean_t	crit_in_flux;
-GBLREF	boolean_t	forced_exit;
-GBLREF	int		process_exiting;
-GBLREF	uint4 		process_id;
-GBLREF	short 		crash_count;
-GBLREF	gd_region 	*gv_cur_region;
-GBLREF	volatile int	suspend_status;
+GBLREF	VSIG_ATOMIC_T		forced_exit;
+GBLREF	gd_region 		*gv_cur_region;
+GBLREF	int			process_exiting;
+GBLREF	uint4 			process_id;
+GBLREF	volatile int		suspend_status;
 
 DEBUG_ONLY(
 GBLREF	sgmnt_addrs		*cs_addrs;	/* for TP_CHANGE_REG macro */

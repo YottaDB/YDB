@@ -19,12 +19,14 @@
 #include "op.h"
 #include "sgnl.h"
 #include "gvcst_queryget.h"
+#include "gvcmx.h"
+#include "stringpool.h"
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_region	*gv_cur_region;
 GBLREF bool		gv_curr_subsc_null;
-GBLREF gv_key		*gv_currkey;
-LITREF mval literal_null;
+GBLREF gv_key		*gv_currkey, *gv_altkey;
+LITREF mval		literal_null;
 
 boolean_t op_gvqueryget(mval *key, mval *val)
 {
@@ -37,10 +39,18 @@ boolean_t op_gvqueryget(mval *key, mval *val)
 	 	if (gv_target->root == 0)		/* global does not exist */
 			gotit = FALSE;
 		else
-		 	gotit = gvcst_queryget(key, val);
-	} else
+		 	gotit = gvcst_queryget(val);
+	} else if (gv_cur_region->dyn.addr->acc_meth == dba_cm)
+		gotit = gvcmx_query(val);
+	else
 		GTMASSERT;
-	if (!gotit)
+	if (gotit)
+	{
+		key->mvtype = MV_STR;
+		key->str.addr = (char *)gv_altkey->base;
+		key->str.len = gv_altkey->end + 1;
+		s2pool(&key->str);
+	} else
 	{
 		*key = literal_null;
 		*val = literal_null;

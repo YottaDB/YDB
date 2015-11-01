@@ -65,7 +65,7 @@ GBLREF lvzwrite_struct	lvzwrite_block;
 GBLREF mliteral		literal_chain;
 GBLREF mstr		*comline_base, dollar_zsource, **stp_array;
 GBLREF mval		dollar_zgbldir, dollar_zstatus, dollar_ztrap, zstep_action, dollar_zstep;
-GBLREF mval		dollar_ecode, dollar_etrap, dollar_zerror, dollar_zyerror;
+GBLREF mval		dollar_etrap, dollar_zerror, dollar_zyerror;
 GBLREF mv_stent		*mv_chain;
 GBLREF sgm_info		*first_sgm_info;
 GBLREF spdesc		indr_stringpool, rts_stringpool, stringpool;
@@ -125,9 +125,10 @@ CONDITION_HANDLER(stp_gcol_ch)
 	/* If we cannot alloc memory while doing a forced expansion, disable all cases of forced expansion henceforth */
 	error_def(ERR_MEMORY);
 	error_def(ERR_VMSMEMORY);
+	error_def(ERR_MEMORYRECURSIVE);
 
 	START_CH;
-	if ((ERR_MEMORY == SIGNAL || ERR_VMSMEMORY == SIGNAL) && forced_expansion)
+	if ((ERR_MEMORY == SIGNAL || ERR_VMSMEMORY == SIGNAL || ERR_MEMORYRECURSIVE == SIGNAL) && forced_expansion)
 	{
 		disallow_forced_expansion = TRUE;
 		UNWIND(NULL, NULL);
@@ -310,9 +311,6 @@ void stp_gcol(int space_needed)
 		x = MV_STPG_GET(&zstep_action);
 		if (x)
 			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&dollar_ecode);
-		if (x)
-			MV_STPG_PUT(x);
 		x = MV_STPG_GET(&dollar_etrap);
 		if (x)
 			MV_STPG_PUT(x);
@@ -461,10 +459,10 @@ void stp_gcol(int space_needed)
 	n = stringpool.top - stringpool.free; /* Available space after compaction */
 	assert(n >= n1);
 	space_reclaimed = n - n1; /* Space reclaimed due to compaction */
-	if (space_needed)
+	if (space_needed && STP_RECLAIMLIMIT > space_reclaimed)
 	{
 		(*spc_needed_passes)++;
-		if (space_reclaimed < STP_MINRECLAIM)
+		if (STP_MINRECLAIM > space_reclaimed)
 			(*low_reclaim_passes)++;
 		else
 		{

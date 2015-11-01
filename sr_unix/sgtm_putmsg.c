@@ -10,6 +10,17 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+/* gcc/LinuxIA32 needs stdio.h before varargs.h until removed from error.h */
+/* gcc/Linux390 needs varargs before stdarg in stdio */
+#ifdef EARLY_VARARGS
+#include <varargs.h>
+#include "gtm_stdio.h"
+#else
+#include "gtm_stdio.h"
+#include <varargs.h>
+#endif
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -18,9 +29,6 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 
-/* gcc/Linux needs stdio.h before varargs.h until removed from error.h */
-#include "gtm_stdio.h"
-#include <varargs.h>
 #include "gtmmsg.h"
 
 #include "error.h"
@@ -87,7 +95,7 @@ va_dcl
                                    = 0;
 
                 util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
-		var = last_va_list_ptr;
+		VAR_COPY(var, last_va_list_ptr);
  		arg_count -= fao_count;
 
 		if (0 >= arg_count)

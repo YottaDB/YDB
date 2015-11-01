@@ -289,4 +289,12 @@
 	} while(-1 == RC && EINTR == errno);	\
 }
 
+#define SIGPROCMASK(FUNC, NEWSET, OLDSET, RC)		\
+{							\
+	do						\
+	{						\
+	  RC = sigprocmask(FUNC, NEWSET, OLDSET);	\
+	} while (-1 == RC && EINTR == errno);		\
+}
+
 #endif

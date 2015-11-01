@@ -11,7 +11,7 @@
 %G	;GT.M %G utility - global lister
 	;
 	n %in,%ZL,%ZD
-        i '$d(%zdebug) n $zt s $zt="zg "_$zl_":ERR^%G" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%G")
+        i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%G" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%G")
 	f  d  q:$l(%ZD)
         . r !,"Output device: <terminal>: ",%ZD,!
         . i '$l(%ZD) s %ZD=$p q
@@ -33,10 +33,11 @@ base	f  r !,"List ^",%in,! q:%in=""  d
 	. s:%in="*" %in="?.E(*)"
 	. s:$p(%in,"(")="*" $p(%in,"(")="?.E"
 	. s:$e(%in)'="^" %in="^"_%in
-	. n $zt s $zt="ZG "_$ZL_":badzwr"
+	. n $et s $et="ZG "_$ZL_":badzwr"
 	. u %ZD zwr @%in u $p
 	. q
-badzwr	. u $p w !,"Invalid global specification :  ",%in,!
+badzwr	. u $p w !,$p($zs,",",3,99),!
+	. s $ec=""
 	d EXIT
 	q
 help	i "dD"[$e(%in,2),$l(%in)=2 d ^%GD u $p:(ctrap=$c(3):exc="zg "_($zl-2)_":LOOP^%G") q
@@ -54,6 +55,7 @@ help	i "dD"[$e(%in,2),$l(%in)=2 d ^%GD u $p:(ctrap=$c(3):exc="zg "_($zl-2)_":LOO
 	w !?16,"expressed as [expr]:[expr] e.g 1:10 ""a"":""d""",!
 	q
 ERR	u $p w !,$p($zs,",",2,99),!
+	s $ecode=""
 	; Warning - Fall-through
 EXIT	i $d(%ZD),%ZD'=$p c %ZD
 	u $p:(ctrap="":exc="")

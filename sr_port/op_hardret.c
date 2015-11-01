@@ -24,11 +24,15 @@ void	op_hardret(void)
 
 	dmode = unwind_nocounts();
 	assert(frame_pointer->old_frame_pointer);
-	if (frame_pointer->old_frame_pointer->old_frame_pointer)
-	{	op_unwind();
-	}
-	if (dmode)
-	{	dm_setup();
-	}
+	assert(SFT_COUNT == frame_pointer->type);
+
+	/* QUIT in dmode should
+	   + re-install SFT_DM frame that would have been unwound by unwind_nocounts
+	   + not unwind the associated SFT_COUNT frame that lies below SFT_DM frame
+	   to re-enter dmode and to preserve all mvals associated with level-1. */
+	if (!dmode)
+		op_unwind();
+	else
+		dm_setup();
 	return;
 }/* eor */

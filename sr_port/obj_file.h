@@ -21,7 +21,7 @@ void close_object_file(void);
 void create_object_file(rhdtyp *rhead);
 void obj_init(void);
 
-#include "obj_filesp.h"
+#include <obj_filesp.h>
 
 #endif
 

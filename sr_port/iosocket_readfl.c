@@ -25,13 +25,6 @@
 #include "eintr_wrappers.h"
 static int fcntl_res;
 #endif
-#ifndef DEBUG_ONLY
-#ifdef 	DEBUG
-#define DEBUG_ONLY(X)	X
-#else
-#define DEBUG_ONLY(X)
-#endif
-#endif
 #include "gt_timer.h"
 #include "io.h"
 #include "iotimer.h"
@@ -55,7 +48,7 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 {
 	bool		ret;
 	boolean_t 	timed, vari, more_data, terminator, term_mode;
-	int		flags, len, real_errno;
+	int		flags, len, real_errno, save_errno;
 	short int	i;
 	io_desc		*iod;
 	d_socket_struct	*dsocketptr;
@@ -68,11 +61,14 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	unsigned char	inchar;
 	int 		ii;
 	ssize_t		status;
-	DEBUG_ONLY(int 	debugpoint = 0;)
+
 	error_def(ERR_IOEOF);
 	error_def(ERR_TEXT);
 	error_def(ERR_CURRSOCKOFR);
 	error_def(ERR_NOSOCKETINDEV);
+	error_def(ERR_GETSOCKOPTERR);
+	error_def(ERR_SETSOCKOPTERR);
+
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 	if (0 == width)
@@ -89,7 +85,6 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	iod = io_curr_device.in;
 	assert(dev_open == iod->state);
 	assert(gtmsocket == iod->type);
-	iod->dollar.zeof = FALSE;
 	dsocketptr = (d_socket_struct *)(iod->dev_sp);
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	if (0 >= dsocketptr->n_socket)
@@ -147,10 +142,20 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			/* set blocking I/O */
 			FCNTL2(socketptr->sd, F_GETFL, flags);
 			if (flags < 0)
-				rts_error(VARLSTCNT(1) errno);
+			{
+				save_errno = errno;
+				errptr = (char *)STRERROR(errno);
+				rts_error(VARLSTCNT(7) ERR_GETSOCKOPTERR, 5, LEN_AND_LIT("F_GETFL FOR NON BLOCKING I/O"),
+						save_errno, LEN_AND_STR(errptr));
+			}
 			FCNTL3(socketptr->sd, F_SETFL, flags & (~(O_NDELAY | O_NONBLOCK)), fcntl_res);
 			if (fcntl_res < 0)
-				rts_error(VARLSTCNT(1) errno);
+			{
+				save_errno = errno;
+				errptr = (char *)STRERROR(errno);
+				rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("F_SETFL FOR NON BLOCKING I/O"),
+						save_errno, LEN_AND_STR(errptr));
+			}
 #endif
 			sys_get_curr_time(&cur_time);
 			add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
@@ -193,25 +198,17 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			}
 			if (!terminator)
 				more_data = TRUE;
-		}
-		else if (-2 == status)				/* lost connection */
-		{
-			status = EOF;
-			real_errno = 0;
-			DEBUG_ONLY(debugpoint = 1;)
-		}
-		else if (EINTR == errno && !out_of_time)	/* unrelated timer popped */
+		} else if (EINTR == errno && !out_of_time)	/* unrelated timer popped */
 		{
 			status = 0;
 			continue;
-		}
-		else
-			real_errno = errno;
-		if ((outofband) || (status > 0 && terminator))
+		} else
 		{
-			DEBUG_ONLY(debugpoint = 2;)
+			real_errno = errno;
 			break;
 		}
+		if (outofband || (status > 0 && terminator))
+			break;
 		if (timed)
 		{
 			if (msec_timeout > 0)
@@ -222,39 +219,17 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				{
 					out_of_time = TRUE;
 					cancel_timer(timer_id);
-					DEBUG_ONLY(debugpoint = 4;)
 					break;
 				}
-			} else
-			{
-				if (!more_data)
-				{
-					DEBUG_ONLY(debugpoint = 5;)
-					break;
-				}
-			}
-		}
-		if (EOF == status)
-		{
-			DEBUG_ONLY(debugpoint = 6;)
-			break;
+			} else if (!more_data)
+				break;
 		}
 		if (vari)
 		{
-			if (TRUE != term_mode && 0 != i && !more_data)
-			{
-				DEBUG_ONLY(debugpoint = 7;)
+			if (!term_mode && 0 != i && !more_data)
 				break;
-			}
-		}
-		else
-		{
-			if (i >= width)
-			{
-				DEBUG_ONLY(debugpoint = 8;)
-				break;
-			}
-		}
+		} else if (i >= width)
+			break;
 	}
 	if (EINTR == real_errno)
 		status = 0;	/* don't treat a <CTRL-C> or timeout as an error */
@@ -265,12 +240,15 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 #ifdef UNIX
 			FCNTL3(socketptr->sd, F_SETFL, flags, fcntl_res);
 			if (fcntl_res < 0)
-				rts_error(VARLSTCNT(1) errno);
+			{
+				save_errno = errno;
+				errptr = (char *)STRERROR(errno);
+				rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("F_SETFL FOR RESTORING SOCKET OPTIONS"),
+					  	save_errno, LEN_AND_STR(errptr));
+			}
 #endif
 			if (out_of_time)
-			{
 				ret = FALSE;
-			}
 			else
 				cancel_timer(timer_id);
 		} else if ((i < width) && !(term_mode && terminator))
@@ -295,6 +273,7 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	len = sizeof("1,") - 1;
 	if (status >= 0)
 	{	/* no real problems */
+		iod->dollar.zeof = FALSE;
 		iod->dollar.za = 0;
 		memcpy(dsocketptr->dollar_device, "0", sizeof("0"));
 	} else
@@ -306,10 +285,11 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		errptr = (char *)STRERROR(real_errno);
 		errlen = strlen(errptr);
 		memcpy(&dsocketptr->dollar_device[len], errptr, errlen);
-		if (((iod->error_handler.len > 0) && socketptr->ioerror) || (TRUE == iod->dollar.zeof))
+		if (iod->dollar.zeof || -1 == status || 0 < iod->error_handler.len)
 		{
 			iod->dollar.zeof = TRUE;
-			rts_error(VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, errlen, errptr);
+			if (socketptr->ioerror)
+				rts_error(VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, errlen, errptr);
 		} else
 			iod->dollar.zeof = TRUE;
 	}

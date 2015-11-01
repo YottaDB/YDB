@@ -216,8 +216,8 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 					if (r_epid != cr->r_epid)
 						GTMASSERT;
 					RELEASE_BUFF_READ_LOCK(cr);
- 					send_msg(VARLSTCNT(6) ERR_BUFRDTIMEOUT, 4, process_id, r_epid, DB_LEN_STR(gv_cur_region));
-					cr->r_epid = 0;
+					send_msg(VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id,
+								cr->blk, cr, r_epid, DB_LEN_STR(gv_cur_region));
 					continue;
 				} else
 					INTERLOCK_INIT(cr);

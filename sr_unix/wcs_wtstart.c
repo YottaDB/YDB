@@ -20,6 +20,7 @@
 
 #include "aswp.h"
 #include "copy.h"
+#include "dskspace_msg_timer.h"		/* needed for dskspace_msg_timer() declaration and DSKSPACE_MSG_INTERVAL macro value */
 #include "error.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -27,6 +28,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsblk.h"
+#include "gdsbml.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "gdscc.h"
@@ -44,18 +46,26 @@
 #include "wcs_flu.h"
 #include "add_inter.h"
 #include "wcs_recover.h"
+#include "gtm_string.h"
 
 GBLREF	boolean_t		*lseekIoInProgress_flags;	/* needed for the LSEEK* macros in gtmio.h */
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			process_id;
-GBLREF	volatile int4		jnl_fsync_in_prog;
+
+/* In case of a disk-full situation, we want to print a message every 1 minute. We maintain two global variables to that effect.
+ * dskspace_msg_counter and save_dskspace_msg_counter. If we encounter a disk-full situation and both those variables are different
+ * we start a timer dskspace_msg_timer() that pops after a minute and increments one of the variables dskspace_msg_counter.
+ * Since we want the first disk-full situation to also log a message, we initialise them to different values.
+ */
+static 	volatile uint4 		save_dskspace_msg_counter = 0;
+GBLDEF	volatile uint4		dskspace_msg_counter = 1;	/* not static since used in dskspace_msg_timer.c */
 
 void	wcs_sync_epoch(TID tid, int4 hd_len, jnl_private_control **jpcptr);
 
 int4	wcs_wtstart(gd_region *region, int4 writes)
 {
 	blk_hdr_ptr_t		bp;
-	boolean_t               need_jnl_sync, queue_empty, got_lock;
+	boolean_t               need_jnl_sync, queue_empty, got_lock, bmp_status;
 	cache_que_head_ptr_t	ahead;		/* serves dual purpose since cache_que_head = mmblk_que_head */
 	cache_state_rec_ptr_t	csr, csrfirst;	/* serves dual purpose for MM and BG */
 						/* since mmblk_state_rec is equal to the top of cache_state_rec */
@@ -94,7 +104,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		BG_TRACE_ANY(csa, wrt_blocked);
 		return err_status;
 	}
-
 	/* If *this* process is already in wtstart, we won't interrupt it do it again */
 	if (csa->in_wtstart)
 	{
@@ -175,13 +184,12 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				queue_empty = !SUB_ENT_FROM_ACTIVE_QUE_CNT(&cnl->wcs_active_lvl, &cnl->wc_var_lock);
 				continue;
 			}
-			/* If journalling, write only if the journal file is up to date and no jnl-switches occurred */
+			/* If journaling, write only if the journal file is up to date and no jnl-switches occurred */
 			if (JNL_ENABLED(csd))
                         {
                                 jb = jpc->jnl_buff;
                                 need_jnl_sync = (csr->jnl_addr > jb->fsync_dskaddr);
                                 assert(!need_jnl_sync || jpc->channel != NOJNL || cnl->wcsflu_pid != process_id);
-				jnl_fsync_in_prog++;
 				got_lock = FALSE;
                                 if ((csr->jnl_addr > jb->dskaddr) ||
 				    (need_jnl_sync && (NOJNL == jpc->channel ||
@@ -190,10 +198,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				     )
 				    )
                                 {
-					jnl_fsync_in_prog--;
-					assert(0 <= jnl_fsync_in_prog);
-					if (0 > jnl_fsync_in_prog)
-						jnl_fsync_in_prog = 0;
                                         if (need_jnl_sync)
                                                 BG_TRACE_PRO_ANY(csa, n_jnl_fsync_tries);
 					n = INSQTI((que_ent_ptr_t)csr, (que_head_ptr_t)ahead);
@@ -218,10 +222,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 						if (-1 == fsync(jpc->channel))
 						{
 							assert(FALSE);
-							jnl_fsync_in_prog--;
-							assert(0 <= jnl_fsync_in_prog);
-							if (0 > jnl_fsync_in_prog)
-								jnl_fsync_in_prog = 0;
 							send_msg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(region),
 								ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), errno);
 							RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);
@@ -237,10 +237,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					}
                                         RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);
                                 }
-				jnl_fsync_in_prog--;
-				assert(0 <= jnl_fsync_in_prog);
-				if (0 > jnl_fsync_in_prog)
-					jnl_fsync_in_prog = 0;
                         }
 		}
 		LOCK_BUFF_FOR_WRITE(csr, n, &cnl->db_latch);
@@ -255,6 +251,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			{
 				csr->epid = process_id;
 				bp = (blk_hdr_ptr_t)(GDS_ANY_REL2ABS(csa, csr->buffaddr));
+				VALIDATE_BM_BLK(csr->blk, bp, csa, region, bmp_status);	/* bmp_status holds bmp buffer's validity */
 #ifdef FULLBLOCKWRITES
 				size = csd->blk_size;
 #else
@@ -313,15 +310,15 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				/* note: this will be automatically retried after csd->flush_time[0] msec, if this was called
 				 * through a timer-pop, otherwise, error should be handled (including ignored) by the caller.
 				 */
-				if ((error_message_loop_count > 60000) || (0 == error_message_loop_count))
+				if (dskspace_msg_counter != save_dskspace_msg_counter)
 				{	/* first time and every minute */
-					error_message_loop_count = 0;
 					send_msg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
 						ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
 					gtm_putmsg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
 						ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
+					save_dskspace_msg_counter = dskspace_msg_counter;
+					start_timer((TID)&dskspace_msg_timer, DSKSPACE_MSG_INTERVAL, dskspace_msg_timer, 0, NULL);
 				}
-				error_message_loop_count += csd->flush_time[0];
 				assert(ENOSPC == save_errno); 	/* Out-of-space should not be considered severe error */
 				err_status = save_errno;
 				break;
@@ -352,6 +349,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		if (0 == n2)
 			BG_TRACE_ANY(csa, wrt_noblks_wrtn);
 	)
+	assert(cnl->in_wtstart > 0 && csa->in_wtstart);
 	DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
 	csa->in_wtstart = FALSE;			/* This process can write again */
 	if (queue_empty)			/* Active queue has become empty. */

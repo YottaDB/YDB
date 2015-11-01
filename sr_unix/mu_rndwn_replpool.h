@@ -13,5 +13,7 @@
 #define MU_RNDWN_REPLPOOL_INCLUDED
 
 boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int shmid);
+boolean_t mu_replpool_grab_sem(void);
+boolean_t mu_replpool_remove_sem(void);
 
 #endif /* MU_RNDWN_REPLPOOL_INCLUDED */

@@ -33,6 +33,7 @@
 #include "repl_dbg.h"
 #include "error.h"
 #include "gtm_stdio.h"
+#include "gtm_string.h"
 #include "cli.h"
 #include "iosp.h"
 #include "repl_log.h"
@@ -49,6 +50,7 @@
 #include "sgtm_putmsg.h"
 #include "repl_comm.h"
 #include "repl_instance.h"
+#include "ftok_sems.h"
 
 GBLDEF boolean_t	gtmsource_logstats = FALSE, gtmsource_pool2file_transition = FALSE;
 GBLDEF int		gtmsource_filter = NO_FILTER;
@@ -76,7 +78,6 @@ GBLREF unsigned char	*gtmsource_tcombuff_start;
 GBLREF uchar_ptr_t	repl_filter_buff;
 GBLREF int		repl_filter_bufsiz;
 GBLREF int		gtmsource_srv_count;
-GBLREF gd_region	*ftok_sem_reg;
 
 int gtmsource()
 {
@@ -88,7 +89,6 @@ int gtmsource()
 	pid_t           pid, ppid, procgp, sempid;
 	seq_num		resync_seqno;
 	char		print_msg[1024];
-	unix_db_info	*udi;
 
 	error_def(ERR_NOTALLDBOPN);
 	error_def(ERR_JNLPOOLSETUP);
@@ -165,8 +165,7 @@ int gtmsource()
 	else if (0 != pid)
 	{
 		/* Parent */
-		rel_jnlpool_ftok_sems(FALSE, FALSE);
-		rel_sem_immediate(SOURCE, SRC_SERV_COUNT_SEM);
+		rel_sem(SOURCE, SRC_SERV_COUNT_SEM);
 		while (0 == (semval = get_sem_info(SOURCE, SRC_SERV_COUNT_SEM, SEM_INFO_VAL)) && is_proc_alive(pid, 0))
 		{
 			/* To take care of reassignment of PIDs, the while
@@ -178,12 +177,12 @@ int gtmsource()
 		}
 		if (0 <= semval)
 		{
-			if (0 != (save_errno = rel_sem_immediate(SOURCE, SRC_SERV_OPTIONS_SEM)))
+			if (0 != (save_errno = rel_sem(SOURCE, SRC_SERV_OPTIONS_SEM)))
 				rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("Error in rel_sem_immediate"), save_errno);
-			if (0 != (save_errno = rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM)))
+					RTS_ERROR_LITERAL("Error in rel_sem"), save_errno);
+			if (0 != (save_errno = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM)))
 				rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("Error in rel_sem_immediate"), save_errno);
+					RTS_ERROR_LITERAL("Error in rel_sem"), save_errno);
 		}
 		/*
 		 * If the parent is killed (or crashes) between the fork
@@ -194,10 +193,6 @@ int gtmsource()
 		 */
 		gtmsource_exit(1 == semval ? SRV_ALIVE : SRV_ERR);
 	}
-	/* We know parent released ftok_sem so reset followings */
-	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-	udi->grabbed_ftok_sem = FALSE;
-	ftok_sem_reg = NULL;
 
 	is_src_server = TRUE;
 	process_id = getpid();
@@ -220,7 +215,7 @@ int gtmsource()
 	/* We use the same code dse uses to open all regions but we must make sure
 	 * they are all open before proceeding.
 	 */
-	all_files_open = region_init(TRUE);
+	all_files_open = region_init(FALSE);
 	if (!all_files_open)
 	{
 		gtm_putmsg(VARLSTCNT(1) ERR_NOTALLDBOPN);
@@ -230,8 +225,10 @@ int gtmsource()
 		gtmsource_seqno_init();
 
 #ifndef REPL_DEBUG_NOBACKGROUND
-	lock_jnlpool_ftok_sems(TRUE, FALSE);
-	rel_jnlpool_ftok_sems(FALSE, FALSE);
+	if (!ftok_sem_get(jnlpool.jnlpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE))
+		rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
+	if (!ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, FALSE))
+		rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	/* Lock the source server count semaphore. Its value should be atmost 1. */
 	do
 	{

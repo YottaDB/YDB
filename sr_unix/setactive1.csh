@@ -56,7 +56,7 @@ if ( $?gtm_ver_noecho == 0 ) then
 endif
 
 
-set setactive_p1 = `echo $1 | tr "a-z" "A-Z"`
+set setactive_p1 = `echo $1 | tr '[a-z]' '[A-Z]'`
 set setactive_p2 = "$2"
 set setactive_interact = "$3"
 

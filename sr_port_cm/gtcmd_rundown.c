@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "hashdef.h"
 
 #include "cmidef.h"
 #include "cmmdef.h"
@@ -21,13 +22,19 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashdef.h"
+#include "change_reg.h"
+#include "gds_rundown.h"
+#include "dpgbldir.h"
+#include "wcs_timer_start.h"
+#include "gtcmd.h"
 
 GBLREF cm_region_head		*reglist;
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_addrs		*cs_addrs;
-GBLREF short			gtcm_ast_avail;
-GBLREF jnl_process_vector	*prc_vec;
+GBLREF sgmnt_data_ptr_t		cs_data;
+#ifdef VMS
+GBLREF short		gtcm_ast_avail;
+#endif
 
 void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 {
@@ -39,12 +46,10 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 	for (ptr = cnx->region_root;  ptr;)
 	{
 		region = ptr->reghead;
-		gv_cur_region = region->reg;
-		change_reg();
-		if ((ptr->pini_addr && clean_exit) && (TRUE == JNL_ENABLED(cs_addrs->hdr)) && (NOJNL != cs_addrs->jnl->channel))
+		TP_CHANGE_REG(region->reg);
+		if (ptr->pini_addr && clean_exit && JNL_ENABLED(cs_addrs->hdr) && (NOJNL != cs_addrs->jnl->channel))
 		{
 			cs_addrs->jnl->pini_addr = ptr->pini_addr;
-			prc_vec = cnx->pvec;
 			grab_crit(gv_cur_region);
 			jnl_put_jrt_pfin(cs_addrs);
 			rel_crit(gv_cur_region);
@@ -52,22 +57,11 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 		if (0 == --region->refcnt)
 		{	/* free up only as little as needed to facilitate structure reuse when the region is opened again */
 			assert(region->head.fl == region->head.bl);
-			gtcm_ast_avail++;
+			VMS_ONLY(gtcm_ast_avail++);
 			if (JNL_ALLOWED(cs_addrs->hdr))
 				cs_addrs->jnl->pini_addr = 0;
-			prc_vec = cnx->pvec;
-			assert(NULL != prc_vec);
 			gds_rundown();
-			for (h = ((htab_desc *)(region->reg_hash))->base, htop = h + ((htab_desc *)(region->reg_hash))->size;
-				h < htop;  h++)
-			{
-				if (h->ptr)
-				{
-					free(((gv_namehead *)h->ptr)->alt_hist);
-					free(h->ptr);
-				}
-			}
-			free(((htab_desc*)(region->reg_hash))->base);
+			gd_ht_kill(region->reg_hash, TRUE);	/* TRUE to free up the table and the gv_targets it holds too */
 			free(FILE_INFO(gv_cur_region)->s_addrs.dir_tree->alt_hist);
 			free(FILE_INFO(gv_cur_region)->s_addrs.dir_tree);
 			cm_del_gdr_ptr(gv_cur_region);

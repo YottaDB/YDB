@@ -20,6 +20,8 @@ GBLREF symval		*curr_symval;
 GBLREF sbs_blk		*sbs_blk_hdr;
 GBLREF boolean_t	dollar_truth;
 GBLREF lv_val		*active_lv;
+GBLREF mval		dollar_etrap;
+GBLREF mval		dollar_ztrap;
 
 mval	*unw_mv_ent(mv_stent *mv_st_ent)
 {
@@ -35,6 +37,14 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 	{
 	case MVST_MSAV:
 		*mv_st_ent->mv_st_cont.mvs_msav.addr = mv_st_ent->mv_st_cont.mvs_msav.v;
+		if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_etrap)
+		{
+			dollar_ztrap.str.len = 0;
+		}
+		if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_ztrap)
+		{
+			dollar_etrap.str.len = 0;
+		}
 		return 0;
 	case MVST_MVAL:
 	case MVST_IARR:

@@ -130,7 +130,8 @@ typedef struct	mlk_pvtblk_struct	/* one of these entries exists for each nref wh
 							 * if lock processing is underway, or permanent, in which case the chain
 							 * represents owned locks. */
 	struct gd_region_struct	*region;		/* pointer to the database region in which the lock belongs */
-	uint4			sequence;		/* see sequence in mlk_shrbk for description */
+	uint4			sequence;		/* shrblk sequence for nodptr node (node we want) */
+	uint4			blk_sequence;		/* shrblk sequence for blocked node (node preventing our lock) */
 	mlk_tp			*tp;			/* pointer to saved tp information */
 	uint4			total_length;		/* the total length of the 'value' string. */
 	uint4			total_len_padded;	/* Length with padding to 4 bytes for each substring */

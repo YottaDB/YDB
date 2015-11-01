@@ -136,6 +136,12 @@ void mupip_rundown(void)
 					exit_status = ERR_MUNOTALLSEC;
 		}
 	} else
+	{
 		exit_status = mu_rndwn_all();
+		if (SS_NORMAL == exit_status)
+			exit_status = mu_rndwn_sem_all();
+		else
+			mu_rndwn_sem_all();
+	}
 	mupip_exit(exit_status);
 }

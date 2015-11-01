@@ -111,13 +111,12 @@ static	bool	process_list(ctl_list *ctl)
 		if ((!mur_options.selection  ||  mur_do_record(ctl))  &&  !mur_forward_process(ctl))
 		{
 			*ctl->rab = save;
+			purge_list();
 			return FALSE;
 		}
 	}
 	*ctl->rab = save;
-	reinitialize_list(rab_buddy_list);
-	reinitialize_list(jnl_rec_buddy_list);
-	jnl_list_head = jnl_list_tail = NULL;
+	purge_list();
 	return TRUE;
 }
 

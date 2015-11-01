@@ -8,8 +8,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-#ifndef __GTCMTR_KILL_H__
-#define __GTCMTR_KILL_H__
+#ifndef GTCMTR_KILL_H_INCLUDED
+#define GTCMTR_KILL_H_INCLUDED
 
 bool gtcmtr_kill(void);
 

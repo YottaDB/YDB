@@ -56,7 +56,12 @@ CONDITION_HANDLER(t_ch)
 		}
 	)
 	ENABLE_AST;
-	if ((0 != dollar_tlevel || cs_addrs->now_crit) && t_commit_cleanup(cdb_sc_uperr, SIGNAL) && SIGNAL)
+	/* We could go through all regions involved in the TP and check for crit on only those regions - instead we use an existing 
+	 * function: have_crit_any_region().  If the design assumption that all crits held at transaction commit time are 
+	 * transaction related holds true, the result is the same and efficiency doesn't matter (too much) in exception handling.
+	 */
+	if (((!dollar_tlevel && cs_addrs->now_crit) || (dollar_tlevel && have_crit_any_region(FALSE)))
+		&& t_commit_cleanup(cdb_sc_uperr, SIGNAL) && SIGNAL)
 	{
 		for (hist_index = 0;  hist_index < t_tries;  hist_index++)
 			local_hist[hist_index] = t_fail_hist[hist_index];

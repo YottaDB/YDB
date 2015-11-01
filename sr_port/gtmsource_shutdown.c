@@ -47,6 +47,9 @@
 #include "is_proc_alive.h"
 #include "repl_comm.h"
 #include "repl_log.h"
+#ifdef UNIX
+#include "ftok_sems.h"
+#endif
 
 #define	GTMSOURCE_WAIT_FOR_SHUTDOWN	(1000 - 1) /* ms, almost 1 s */
 
@@ -64,6 +67,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 	uint4		savepid;
 	int		status;
 
+	UNIX_ONLY(error_def(ERR_JNLPOOLSETUP);)
 	/*
 	 * Significance of shutdown field in gtmsource_local:
 	 * This field is initially set to NO_SHUTDOWN. When a command to shut
@@ -81,7 +85,10 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 	 */
 	repl_log(stdout, TRUE, TRUE, "Initiating shut down\n");
 	call_on_signal = NULL;		/* Don't reenter on error */
-	UNIX_ONLY(get_lock_jnlpool_ftok_sems(FALSE, FALSE);)
+	UNIX_ONLY(
+		if (!ftok_sem_lock(jnlpool.jnlpool_dummy_reg, FALSE, FALSE))
+			rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
+	)
 	/* Grab the jnlpool access control lock and jnlpool option write lock */
 	if (!auto_shutdown || gtmsource_srv_count)
 	{
@@ -132,6 +139,10 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 		}
 	}
 
+	/*
+	 * gtmsource_ipc_cleanup will not be successful unless source server has completely exited.
+	 * It relies on SRC_SERV_COUNT_SEM value.
+	 */
 	if (FALSE == gtmsource_ipc_cleanup(auto_shutdown, &exit_status))
 	{
 		/* Release rundown, count, and option semaphores */
@@ -143,7 +154,8 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 	UNIX_ONLY(
 	else if (NORMAL_SHUTDOWN == exit_status)
 		repl_inst_jnlpool_reset();
-	rel_jnlpool_ftok_sems(TRUE, FALSE);
+	if (!ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, FALSE))
+		rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	)
 	return (exit_status);
 }

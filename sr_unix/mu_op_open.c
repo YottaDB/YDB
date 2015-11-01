@@ -13,11 +13,13 @@
 
 #include "gtm_fcntl.h"
 #include "gtm_stdio.h"
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
+#include "gtm_string.h"
+#include "gtm_unistd.h"
 #include "gtm_stat.h"
 #include "gtm_iconv.h"
+
+#include <errno.h>
+#include <sys/ioctl.h>
 
 #include "io.h"
 #include "iosp.h"
@@ -350,9 +352,10 @@ error_def(ERR_SYSCALL);
 	active_device = naml->iod;
 	if (dev_never_opened == naml->iod->state)
 	{
-		naml->iod->wrap = TRUE;
-		naml->iod->width = 80;
-		naml->iod->length = 55;
+		naml->iod->wrap = DEFAULT_IOD_WRAP;
+		naml->iod->width = DEFAULT_IOD_WIDTH;
+		naml->iod->length = DEFAULT_IOD_LENGTH;
+		naml->iod->write_filter = 0; /* MUPIP should not use FILTER */
 	}
 	if (dev_open != naml->iod->state)
 	{

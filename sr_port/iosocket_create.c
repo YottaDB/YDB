@@ -20,11 +20,16 @@
  *	6. socketptr->state (initialized to created)
  */
 #include "mdef.h"
-#include <sys/socket.h>
-#include <netinet/in.h>
+
+#include "gtm_ctype.h"
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
+
+#include <errno.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
 #include "io.h"
 #include "iotcproutine.h"
 #include "iotcpdef.h"
@@ -39,18 +44,19 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize)
 	socket_struct	*socketptr;
 	bool		passive = FALSE;
 	unsigned short	port;
-	int		ii;
-	char 		temp_addr[SA_MAXLITLEN], addr[SA_MAXLEN], tcp[4];
+	int		ii, save_errno;
+	char 		temp_addr[SA_MAXLITLEN], addr[SA_MAXLEN], tcp[4], *errptr;
 	error_def(ERR_INVPORTSPEC);
 	error_def(ERR_INVADDRSPEC);
 	error_def(ERR_PROTNOTSUP);
+	error_def(ERR_TEXT);
 	socketptr = (socket_struct *)malloc(sizeof(socket_struct));
 	memset(socketptr, 0, sizeof(socket_struct));
-	if (SSCANF(sockaddr, "%[^:]:%hu:%[^:]", temp_addr, &port, tcp) < 3)
+	if (SSCANF(sockaddr, "%[^:]:%hu:%3[^:]", temp_addr, &port, tcp) < 3)
 	{
 		passive = TRUE;
 		socketptr->local.sin.sin_addr.s_addr = INADDR_ANY;
-		if(SSCANF(sockaddr, "%hu:%[^:]", &port, tcp) < 2)
+		if(SSCANF(sockaddr, "%hu:%3[^:]", &port, tcp) < 2)
 		{
 			free(socketptr);
 			rts_error(VARLSTCNT(1) ERR_INVPORTSPEC);
@@ -62,10 +68,9 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize)
 	}
 	else
 	{
-		ii = 0;
-		while(ISDIGIT(temp_addr[ii++]) || '.' == temp_addr[ii - 1])
+		for (ii = 0; ISDIGIT(temp_addr[ii]) || '.' == temp_addr[ii]; ii++)
 			;
-		if (temp_addr[ii - 1] != '\0')
+		if (temp_addr[ii] != '\0')
 		{
 			SPRINTF(socketptr->remote.saddr_lit, "%s", temp_addr);
 			SPRINTF(addr, "%s", iotcp_name2ip(temp_addr));
@@ -74,8 +79,9 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize)
 			SPRINTF(addr, "%s", temp_addr);
 		if (-1 == (socketptr->remote.sin.sin_addr.s_addr = tcp_routines.aa_inet_addr(addr)))
 		{
+			errptr = (char *)STRERROR(errno);
 			free(socketptr);
-			rts_error(VARLSTCNT(1) ERR_INVADDRSPEC);
+			rts_error(VARLSTCNT(6) ERR_INVADDRSPEC, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
 			return NULL;
 		}
 		socketptr->remote.sin.sin_port = GTM_HTONS(port);

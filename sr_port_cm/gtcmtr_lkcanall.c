@@ -12,13 +12,18 @@
 #include "mdef.h"
 #include "mlkdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
+#include "gtcmtr_lk.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
 
 GBLREF mlk_pvtblk *mlk_cm_root;
 GBLREF unsigned short cm_cmd_lk_ct;
 GBLREF connection_struct *curr_entry;
 
-bool gtcmtr_lkcanall()
+bool gtcmtr_lkcanall(void)
 {
 	cm_region_list *reg_walk;
 	unsigned char *ptr, laflag;

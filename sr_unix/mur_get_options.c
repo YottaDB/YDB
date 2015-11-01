@@ -34,7 +34,7 @@ GBLREF  seq_num		resync_jnl_seqno;
 error_def(ERR_MUPCLIERR);
 error_def(ERR_DBFILERR);
 
-static	char	default_since_time[] = "0 0:0:30",
+static	char	default_since_time[] = "0 0:0:00",
 		default_lookback_time[] = "0 0:5:00";
 
 void	mur_get_options(void)
@@ -92,6 +92,7 @@ void	mur_get_options(void)
 		if (!cli_get_num("FETCHRESYNC", &mur_options.fetchresync))
 			mupip_exit(ERR_MUPCLIERR);
 	}
+	mur_options.preserve_jnl = cli_present("PRESERVE_JNL") == CLI_PRESENT;
 	if ((status  = cli_present("EPOCHLIMIT")) == CLI_PRESENT)
 	{
 		if (!cli_get_num("EPOCHLIMIT", &mur_options.epoch_limit))

@@ -17,6 +17,7 @@
 #include "cgp.h"
 #include "mdq.h"
 #include "cmd_qlf.h"
+#include "objlabel.h"	/* needed for masscomp.h */
 #include "masscomp.h"
 #include "stringpool.h"
 #include "parse_file.h"
@@ -107,7 +108,7 @@ void create_object_file(rhdtyp *rhead)
 
 	set_psect(GTM_CODE, 0);
 	hdr.a_magic = OMAGIC;
-	hdr.a_stamp = STAMP13;
+	hdr.a_stamp = OBJ_LABEL;
 	hdr.a_entry = 0;
 	hdr.a_bss = 0;
 	hdr.a_text = code_size;

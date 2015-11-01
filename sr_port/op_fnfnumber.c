@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"
 #include "stringpool.h"
 #include "op.h"
 
@@ -22,13 +23,12 @@
 
 GBLREF spdesc stringpool;
 
-void op_fnfnumber(mval *src,mval *fmt,mval *dst)
+void op_fnfnumber(mval *src, mval *fmt, mval *dst)
 {
-	mval temp;
-	unsigned char fncode,*ch,*cp, *ff, *ff_top;
-	short int t;
-	unsigned char sign;
-	short int ct,paren;
+	mval		temp;
+	unsigned char	fncode, sign, *ch, *cp, *ff, *ff_top, *t;
+	int 		ct, x, y, z, xx;
+	boolean_t	comma, paren;
 	error_def(ERR_FNARGINC);
 	error_def(ERR_FNUMARG);
 
@@ -44,12 +44,13 @@ void op_fnfnumber(mval *src,mval *fmt,mval *dst)
 	   conversions are possible without destroying the source
 	*/
 	temp = *src;
-	/* if the source operand is not a cannonical number, force conversion
+	/* if the source operand is not a canonical number, force conversion
 	*/
 	MV_FORCE_STR(&temp);
 	MV_FORCE_STR(fmt);
 	if (fmt->str.len == 0)
-	{	*dst = temp;
+	{
+		*dst = temp;
 		return;
 	}
 	temp.mvtype = MV_STR;
@@ -61,44 +62,43 @@ void op_fnfnumber(mval *src,mval *fmt,mval *dst)
 	{
 		switch(*ff++)
 		{
-		case '+':
-			fncode |= PLUS;
-			break;
-		case  '-':
-			fncode |= MINUS;
-			break;
-		case  ',':
-			fncode |= COMMA;
-			break;
-		case  'T':
-		case  't':
-			fncode |= TRAIL;
-			break;
-		case  'P':
-		case  'p':
-			fncode |= PAREN;
-			break;
-		default:
-			rts_error(VARLSTCNT(6) ERR_FNUMARG, 4, fmt->str.len, fmt->str.addr, 1, --ff);
+			case '+':
+				fncode |= PLUS;
+				break;
+			case  '-':
+				fncode |= MINUS;
+				break;
+			case  ',':
+				fncode |= COMMA;
+				break;
+			case  'T':
+			case  't':
+				fncode |= TRAIL;
+				break;
+			case  'P':
+			case  'p':
+				fncode |= PAREN;
+				break;
+			default:
+				rts_error(VARLSTCNT(6) ERR_FNUMARG, 4, fmt->str.len, fmt->str.addr, 1, --ff);
 			break;
 		}
 	}
-	if ((fncode & PAREN) != 0 && (fncode & FNERROR) != 0)
-	{	rts_error(VARLSTCNT(4) ERR_FNARGINC, 2, fmt->str.len, fmt->str.addr);
-	}
+	if (0 != (fncode & PAREN) && 0 != (fncode & FNERROR))
+		rts_error(VARLSTCNT(4) ERR_FNARGINC, 2, fmt->str.len, fmt->str.addr);
 	else
 	{
 		sign = 0;
 		paren = FALSE;
-		if (*ch == '-')
+		if ('-' == *ch)
 		{
 			sign = '-';
 			ch++;
 			ct--;
 		}
-		if ((fncode & PAREN) != 0)
+		if (0 != (fncode & PAREN))
 		{
-			if (sign == '-')
+			if ('-' == sign)
 			{
 				*cp++ = '(';
 				sign = 0;
@@ -106,19 +106,21 @@ void op_fnfnumber(mval *src,mval *fmt,mval *dst)
 			}
 			else *cp++ = ' ';
 		}
-		if ((fncode & PLUS) != 0 && sign == 0)
-			sign = '+';
-		if ((fncode & MINUS) != 0 && sign == '-')
+		/* Only add '+' if > 0 */
+		if (0 != (fncode & PLUS) && 0 == sign)
+		{	/* Need to make into num and check for int 0 in case was preprocessed by op_fnj3() */
+			MV_FORCE_NUM(&temp);
+			if (0 == (temp.mvtype & MV_INT) || 0 != temp.m[1])
+				sign = '+';
+		}
+		if (0 != (fncode & MINUS) && '-' == sign)
 			sign = 0;
-		if ((fncode & TRAIL) == 0 && sign != 0)
+		if (0 == (fncode & TRAIL) && 0 != sign)
 			*cp++ = sign;
-		if ((fncode & COMMA) != 0)
+		if (0 != (fncode & COMMA))
 		{
-			unsigned char *t;
-			short int x,y,z,xx;
-			short int comma = FALSE;
-
-			for (x = 0, t = ch; *t != '.' && ++x < ct; t++) ;
+			comma = FALSE;
+			for (x = 0, t = ch; '.' != *t && ++x < ct; t++) ;
 			z = x;
 			if ((y = x % 3) > 0)
 			{
@@ -132,26 +134,25 @@ void op_fnfnumber(mval *src,mval *fmt,mval *dst)
 					*cp++ = ',';
 				else
 					comma = TRUE;
-				memcpy (cp,ch,3);
+				memcpy(cp, ch, 3);
 			}
 			if (z < ct)
 			{
 				xx = ct - z;
-				memcpy (cp,ch,xx);
+				memcpy(cp, ch, xx);
 				cp += xx;
 			}
-		}
-		else
+		} else
 		{
-			memcpy (cp,ch,ct);
+			memcpy(cp, ch, ct);
 			cp += ct;
 		}
-		if ((fncode & TRAIL) != 0)
+		if (0 != (fncode & TRAIL))
 		{
 			if (sign != 0) *cp++ = sign;
 			else *cp++ = ' ';
 		}
-		if ((fncode & PAREN) != 0)
+		if (0 != (fncode & PAREN))
 		{
 			if (paren) *cp++ = ')';
 			else *cp++ = ' ';

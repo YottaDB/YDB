@@ -13,7 +13,7 @@
 get()	q $v("YLCT")
 	;
 set(lct)
-	n ok,$zt
-	s $zt="s ok=0",ok=1
+	n ok,$et
+	s $et="s $ec="""" s ok=0",ok=1
 	i ok v "YLCT":lct
 	q ok

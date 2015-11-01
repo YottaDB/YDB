@@ -17,6 +17,7 @@
  */
 
 #include "mdef.h"
+#include "gtm_string.h"
 #include "mlkdef.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -30,6 +31,7 @@
 #include "lke.h"
 #include "lke_getcli.h"
 #include "lke_cleartree.h"
+#include "gtmmsg.h"
 
 #define NOFLUSH 0
 #define FLUSH	1
@@ -52,6 +54,8 @@ void	lke_clear(void)
 	mlk_ctldata_ptr_t	ctl;
 	mstr		reg, node, one_lock;
 
+	error_def(ERR_UNIMPLOP);
+	error_def(ERR_TEXT);
 
 	/* Get all command parameters */
 	reg.addr = regbuf;
@@ -80,8 +84,15 @@ void	lke_clear(void)
 			/* If distributed database, the region is located on another node */
 			if (gv_cur_region->dyn.addr->acc_meth == dba_cm)
 			{
+#if defined(LKE_WORKS_OK_WITH_CM)
 				locks = gtcmtr_lke_clearreq(gv_cur_region->dyn.addr->cm_blk, gv_cur_region->cmx_regnum,
 							    all, interactive, pid, &node);
+#else
+				gtm_putmsg(VARLSTCNT(10) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
+						LEN_AND_LIT("GT.CM region - locks must be cleared on the local node"),
+						ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
+				continue;
+#endif
 				/*** Used to be:
 				util_out_print(NULL, RESET);
 				util_out_print("!AD", NOFLUSH, REG_LEN_STR(gv_cur_region));
@@ -90,27 +101,27 @@ void	lke_clear(void)
 				***/
 			} else  if (gv_cur_region->dyn.addr->acc_meth == dba_bg  ||
 				    gv_cur_region->dyn.addr->acc_meth == dba_mm)
-				{	/* Local region */
-					cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
-					ctl = (mlk_ctldata_ptr_t)cs_addrs->lock_addrs[0];
+			{	/* Local region */
+				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
+				ctl = (mlk_ctldata_ptr_t)cs_addrs->lock_addrs[0];
 
-					/* Prevent any modifications of locks while we are clearing */
-					if (cs_addrs->critical != NULL)
-						crash_count = cs_addrs->critical->crashcnt;
-					grab_crit(gv_cur_region);
+				/* Prevent any modifications of locks while we are clearing */
+				if (cs_addrs->critical != NULL)
+					crash_count = cs_addrs->critical->crashcnt;
+				grab_crit(gv_cur_region);
 
-					locks = ctl->blkroot == 0 ? FALSE
-								  : lke_cleartree(gv_cur_region, NULL, ctl,
-								 		 (mlk_shrblk_ptr_t)R2A(ctl->blkroot),
-										  all, interactive, pid, one_lock);
+				locks = ctl->blkroot == 0 ? FALSE
+							  : lke_cleartree(gv_cur_region, NULL, ctl,
+									 (mlk_shrblk_ptr_t)R2A(ctl->blkroot),
+									  all, interactive, pid, one_lock);
 
-					rel_crit(gv_cur_region);
-				} else
-				{
-					util_out_print(NULL, RESET);
-					util_out_print("Region is not BG, MM, or CM", FLUSH);
-					locks = TRUE;
-				}
+				rel_crit(gv_cur_region);
+			} else
+			{
+				util_out_print(NULL, RESET);
+				util_out_print("Region is not BG, MM, or CM", FLUSH);
+				locks = TRUE;
+			}
 
 			if (!locks)
 			{

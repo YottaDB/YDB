@@ -9,10 +9,13 @@
  *								*
  ****************************************************************/
 
-#ifndef __CALLG_H__
-#define __CALLG_H__
+#ifndef CALLG_H
+#define CALLG_H
 
+/* defined as macro on MVS */
+#ifndef callg
 int callg(int(*)(), void *);
+#endif
 void callg_signal(void *);
 
 #endif

@@ -14,7 +14,7 @@
  *
  *	Include file specific to various systems.
  *
- *  $Header: /cvsroot/sanchez-gtm/gtm/sr_unix_cm/gtcm_sysenv.h,v 1.1.1.1 2001/05/16 14:01:54 marcinim Exp $
+ *  $Header:$
  *
  */
 
@@ -166,9 +166,9 @@ typedef int	 omi_fd;
 #define BSD_LOG
 #define BSD_MFD
 
-#if (defined(__linux__) || defined(__osf__))
+#if (defined(__linux__) || defined(__osf__)) && !defined(__s390__)
 #define LTL_END
-#else /* defined(__hpux__) */
+#else /* defined(__hpux__)  or Linux390 */
 #define BIG_END
 #endif
 

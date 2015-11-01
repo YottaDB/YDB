@@ -12,13 +12,26 @@
 #ifndef PROBE_included
 #define PROBE_included
 
-#ifdef UNIX
+/* Only VAX has a non-boolean return code due to the secvector mechanism. */
+#if defined(VAX)
+uint4		probe(uint4 len, sm_uc_ptr_t addr, boolean_t write);
+#elif defined(UNIX)
 boolean_t	probe(uint4 len, void *addr, boolean_t write);
-#elif VMS
+#else
 boolean_t	probe(uint4 len, sm_uc_ptr_t addr, boolean_t write);
 #endif
 
+/* GTM_PROBE is defined to call the probe() function. In VAX, probe() resides in GTMSECSHR
+ * and might return a status code (actually from change_mode.mar) which should not be confused
+ * with the output of the probe() call. Hence the check for TRUE == probe().
+ */
+
+#ifdef VAX
+#define 	GTM_PROBE(X, Y, Z) 	(TRUE == probe((X), (Y), (Z)))
+#else
 #define 	GTM_PROBE(X, Y, Z) 	(probe((X), (Y), (Z)))
+#endif
+
 #define 	WRITE			TRUE
 #define 	READ			FALSE
 

@@ -27,6 +27,7 @@
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
+#include "gtm_string.h"
 #include "gtm_sem.h"
 
 #include "gt_timer.h"
@@ -68,19 +69,16 @@
 #include "is_raw_dev.h"
 #include "gv_match.h"
 #include "do_semop.h"
-#include "gtm_uname.h"
 #include "gvcmy_open.h"
-#include "semwt2long_handler.h"
 #include "wcs_sleep.h"
 #include "do_shmat.h"
 #include "send_msg.h"
+#include "gtmmsg.h"
 
 #define ATTACH_TRIES   		10
 #define DEFEXT          	"*.dat"
-#define MAX_NODE_NAME  		32
 #define MAX_RES_TRIES  	 	620
 #define MEGA_BOUND      	(1024 * 1024)
-#define MAX_SEM_WT      	(1000 * 30)		/* 30 second wait for DSE to acquire access control semaphore */
 #define EIDRM_SLEEP_INT		500
 #define EIDRM_MAX_SLEEPS	20
 
@@ -89,7 +87,6 @@ GBLREF  uint4                   process_id;
 GBLREF  gd_region               *gv_cur_region;
 GBLREF  boolean_t               sem_incremented;
 GBLREF  boolean_t               mupip_jnl_recover;
-GBLREF  volatile boolean_t 	semwt2long;
 GBLREF	ipcs_mesg		db_ipcs;
 LITREF  char                    gtm_release_name[];
 LITREF  int4                    gtm_release_name_len;
@@ -112,8 +109,7 @@ gd_region *dbfilopn (gd_region *reg)
         unix_db_info    *udi;
         parse_blk       pblk;
         mstr            file;
-        char            *fnptr, node_name[MAX_NODE_NAME + 1], fbuff[MAX_FBUFF + 1];
-        short           nodelen;
+        char            *fnptr, fbuff[MAX_FBUFF + 1];
         struct stat     buf;
         gd_region       *prev_reg;
         gd_segment      *seg;
@@ -155,9 +151,12 @@ gd_region *dbfilopn (gd_region *reg)
         status = parse_file(&file, &pblk);
         if (!(status & 1))
         {
-                free(seg->file_cntl->file_info);
-                free(seg->file_cntl);
-                seg->file_cntl = 0;
+                if (GTCM_GNP_SERVER_IMAGE != image_type)
+		{
+			free(seg->file_cntl->file_info);
+                	free(seg->file_cntl);
+                	seg->file_cntl = 0;
+		}
                 rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
         }
         assert(pblk.b_esl < sizeof(seg->fname));
@@ -166,29 +165,19 @@ gd_region *dbfilopn (gd_region *reg)
         seg->fname[pblk.b_esl] = 0;
         seg->fname_len = pblk.b_esl;
         if (pblk.fnb & F_HAS_NODE)
-        {
+        {	/* Remote node specification given */
                 assert(pblk.b_node && pblk.l_node[pblk.b_node - 1] == ':');
-                node_name[MAX_NODE_NAME] = 0;
-                gtm_uname(node_name, MAX_NODE_NAME);
-#ifdef LOCALCM
-                nodelen = 0;
-#else
-                nodelen = strlen(node_name);
-#endif
-                if (pblk.b_node - 1 != nodelen || memcmp(seg->fname, node_name, nodelen))
-                {
-                        gvcmy_open(reg, &pblk);
-                        return (gd_region *)-1;
-                }
+		gvcmy_open(reg, &pblk);
+		return (gd_region *)-1;
         }
         fnptr = (char *)seg->fname + pblk.b_node;
         udi = FILE_INFO(reg);
         udi->raw = raw;
         udi->fn = (char *)fnptr;
 	OPENFILE(fnptr, O_RDWR, udi->fd);
-        udi->ftok_semid = -1;
-        udi->semid = -1;
-	udi->shmid = -1;
+        udi->ftok_semid = INVALID_SEMID;
+        udi->semid = INVALID_SEMID;
+	udi->shmid = INVALID_SHMID;
         udi->sem_ctime = 0;
 	udi->shm_ctime = 0;
 	((sgmnt_addrs *)&FILE_INFO(reg)->s_addrs)->read_write = TRUE;
@@ -198,9 +187,12 @@ gd_region *dbfilopn (gd_region *reg)
                 if (udi->fd == -1)
                 {
                         errno_save = errno;
-                        free(seg->file_cntl->file_info);
-                        free(seg->file_cntl);
-                        seg->file_cntl = 0;
+                	if (GTCM_GNP_SERVER_IMAGE != image_type)
+			{
+				free(seg->file_cntl->file_info);
+				free(seg->file_cntl);
+				seg->file_cntl = 0;
+			}
                         rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno_save);
                 }
                 reg->read_only = TRUE;
@@ -244,17 +236,17 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
         char            	machine_name[MAX_MCNAMELEN];
         file_control    	*fc;
 	DEBUG_ONLY( gd_region   *r_save;)
-	int			gethostname_res, stat_res, mm_prot, sem_pid;
+	int			gethostname_res, stat_res, mm_prot;
         int4            	status, semval;
         sm_long_t       	status_l;
         sgmnt_addrs     	*csa;
         sgmnt_data_ptr_t        csd;
-        struct sembuf   	sop[3], ftok_sop[3];
+        struct sembuf   	sop[3];
         struct stat     	stat_buf;
 	union semun		semarg;
 	struct semid_ds		semstat;
 	struct shmid_ds         shmstat;
-        uint4           	lcnt, sopcnt, ftok_sopcnt;
+        uint4           	sopcnt;
         unix_db_info    	*udi;
 #ifdef periodic_timer_removed
         void            	periodic_flush_check();
@@ -266,7 +258,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	error_def(ERR_DBIDMISMATCH);
 	error_def(ERR_NLMISMATCHCALC);
 	error_def(ERR_REQRUNDOWN);
-	error_def(ERR_SEMWT2LONG);
+	error_def(ERR_SYSCALL);
 
         assert(tsd->acc_meth == dba_bg  ||  tsd->acc_meth == dba_mm);
 	is_bg = (dba_bg == tsd->acc_meth);
@@ -274,7 +266,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
         udi = FILE_INFO(reg);
         memset(machine_name, 0, sizeof(machine_name));
         if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, gethostname_res))
-                rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to get the hostname"), errno);
+                rts_error(VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Unable to get the hostname"), errno);
 	assert(strlen(machine_name) < MAX_MCNAMELEN);
         csa = &udi->s_addrs;
         csa->db_addrs[0] = csa->db_addrs[1] = csa->lock_addrs[0] = NULL;   /* to help in dbinit_ch  and gds_rundown */
@@ -305,134 +297,88 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
         dbsecspc(reg, tsd); 	/* Find db segment size */
 	if (!mupip_jnl_recover)
 	{
-		semarg.buf = &semstat;
-		if (0 == udi->semid)
+		if (INVALID_SEMID == udi->semid)
 		{
-			if (0 != udi->sem_ctime || 0 != udi->shmid || 0 != udi->shm_ctime)
+			if (0 != udi->sem_ctime || INVALID_SHMID != udi->shmid || 0 != udi->shm_ctime)
 			/* We must have somthing wrong in protocol or, code, if this happens */
 				GTMASSERT;
 			/*
 			 * Create new semaphore using IPC_PRIVATE. System guarantees a unique id.
 			 */
-			if (-1 == (udi->semid = semget(IPC_PRIVATE, 2, RWDALL | IPC_CREAT)))
+			if (-1 == (udi->semid = semget(IPC_PRIVATE, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT)))
+			{
+				udi->semid = INVALID_SEMID;
 				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-					ERR_TEXT, 2, RTS_ERROR_TEXT("Error with database control semget"), errno);
+					ERR_TEXT, 2, LEN_AND_LIT("Error with database control semget"), errno);
+			}
 			new_ipc = TRUE;
 			tsd->semid = udi->semid;
-			if (-1 == semctl(udi->semid, 0, IPC_STAT, semarg))
+			semarg.val = GTM_ID;
+			/*
+			 * Following will set semaphore number 2 (=FTOK_SEM_PER_ID - 1)  value as GTM_ID.
+			 * In case we have orphaned semaphore for some reason, mupip rundown will be
+			 * able to identify GTM semaphores from the value and can remove.
+			 */
+			if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, SETVAL, semarg))
 				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-					ERR_TEXT, 2, RTS_ERROR_TEXT("Error with database control semctl"), errno);
+					ERR_TEXT, 2, LEN_AND_LIT("Error with database control semctl SETVAL"), errno);
+			/*
+			 * Warning: We must read the sem_ctime using IPC_STAT after SETVAL, which changes it.
+			 *	    We must NOT do any more SETVAL after this. Our design is to use
+			 *	    sem_ctime as creation time of semaphore.
+			 */
+			semarg.buf = &semstat;
+			if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, IPC_STAT, semarg))
+				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+					ERR_TEXT, 2, LEN_AND_LIT("Error with database control semctl IPC_STAT"), errno);
 			tsd->sem_ctime.ctime = udi->sem_ctime = semarg.buf->sem_ctime;
-		}
-		else
+		} else
 		{
-			if (0 == udi->shmid)
+			if (INVALID_SHMID == udi->shmid)
 				/* if mu_rndwn_file gets standalone access of this region and
-				 * somehow mupip process crashes, we can have semid != 0 but shmid == 0
+				 * somehow mupip process crashes, we can have semid != -1 but shmid == -1
 				 */
-				rts_error(VARLSTCNT(9) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg),
-					LEN_AND_STR(tsd->machine_name), ERR_TEXT, 2,
-					RTS_ERROR_TEXT("semid is non-zero but shmid is zero"));
-			if(-1 == semctl(udi->semid, 0, IPC_STAT, semarg))
-				/* but file header has non-zero semid but semaphore does not exists */
+				rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
+						ERR_TEXT, 2, LEN_AND_LIT("semid is valid but shmid is invalid"));
+			semarg.buf = &semstat;
+			if (-1 == semctl(udi->semid, 0, IPC_STAT, semarg))
+				/* file header has valid semid but semaphore does not exists */
 				rts_error(VARLSTCNT(6) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name));
-			else
-			{
-				if (semarg.buf->sem_ctime != tsd->sem_ctime.ctime)
-					rts_error(VARLSTCNT(9) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg),
-						LEN_AND_STR(tsd->machine_name), ERR_TEXT, 2,
-						RTS_ERROR_TEXT("sem_ctime does not match"));
-			}
+			else if (semarg.buf->sem_ctime != tsd->sem_ctime.ctime)
+				rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
+						ERR_TEXT, 2, LEN_AND_LIT("sem_ctime does not match"));
 			if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
 				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-					ERR_TEXT, 2, RTS_ERROR_TEXT("Error with database control shmctl"), errno);
-			else
-			{
-				if (shmstat.shm_ctime != tsd->shm_ctime.ctime)
-					rts_error(VARLSTCNT(9) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg),
-						LEN_AND_STR(tsd->machine_name), ERR_TEXT, 2,
-						RTS_ERROR_TEXT("shm_ctime does not match"));
-			}
+					ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl"), errno);
+			else if (shmstat.shm_ctime != tsd->shm_ctime.ctime)
+				rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
+					ERR_TEXT, 2, LEN_AND_LIT("shm_ctime does not match"));
 		}
-		/* ftok_sem_get also grabs ftok_sem, almost in the same fashion */
-		for (status = -1, lcnt = 0;  -1 == status;  lcnt++)
+		/* We already have ftok semaphore of this region, so just plainly do semaphore operation */
+		/* This is the database access control semaphore for any region */
+		sop[0].sem_num = 0; sop[0].sem_op = 0;	/* Wait for 0 */
+		sop[1].sem_num = 0; sop[1].sem_op = 1;	/* Lock */
+		sopcnt = 2;
+		if (!read_only)
 		{
-			/*
-			 * This is the database access control semaphore for any region
-			 */
-			sop[0].sem_num = 0; sop[0].sem_op = 0;	/* Wait for 0 */
-			sop[1].sem_num = 0; sop[1].sem_op = 1;	/* Lock */
-			sopcnt = 2;
-			if (!read_only)
-			{
-				sop[2].sem_num = 1; sop[2].sem_op  = 1;	 /* increment r/w access counter */
-				sopcnt = 3;
-			}
-			if (DSE_IMAGE == image_type)
-			{
-				sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = SEM_UNDO | IPC_NOWAIT;
-				status = semop(udi->semid, sop, sopcnt);
-				if (-1 == status)
-				{
-					if (EAGAIN == errno)
-					{
-						sem_pid = semctl(udi->semid, 0, GETPID);
-						if (-1 == sem_pid)
-						{
-							if (EINVAL == errno)		/* the sem might have been deleted */
-								continue;
-							else
-								rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
-						}
-						util_out_print("Access control semaphore for region !AD is held by pid, !UL. "
-							       "An attempt will be made in the next 30 seconds to grab it.",
-							       TRUE, DB_LEN_STR(reg), sem_pid);
-						semwt2long = FALSE;
-						start_timer((TID)semwt2long_handler, MAX_SEM_WT, semwt2long_handler, 0, NULL);
-					} else if (((EINVAL != errno) && (EIDRM != errno) && (EINTR != errno)) ||
-						(MAX_RES_TRIES < lcnt))
-						rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
-					else
-						continue;
-				} else
-					break;
-			}
-			sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = SEM_UNDO;
-			status = semop(udi->semid, sop, sopcnt);
-			if (-1 == status)
-			{
-				if (DSE_IMAGE != image_type)
-				{
-					if (((EINVAL != errno) && (EIDRM != errno) && (EINTR != errno)) || (MAX_RES_TRIES < lcnt))
-						/* issue rts_error, if it is neither EINVAL nor EIDRM nor EINTR error.  */
-						rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
-				} else
-				{
-					if (EINTR == errno && semwt2long)
-					{
-						sem_pid = semctl(udi->semid, 0, GETPID);
-						if (-1 != sem_pid)
-							rts_error(VARLSTCNT(5) ERR_SEMWT2LONG, 3,  DB_LEN_STR(reg), sem_pid);
-						else
-							rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
-					} else if (((EINVAL != errno) && (EIDRM != errno) && (EINTR != errno)) ||
-						(MAX_RES_TRIES < lcnt))
-					{
-						/* issue rts_error, if it is neither EINVAL nor EIDRM nor EINTR error.  */
-						cancel_timer((TID)semwt2long_handler);
-						rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
-					}
-				}
-			} else if (DSE_IMAGE == image_type)
-				cancel_timer((TID)semwt2long_handler);
-		} /* end for loop */
+			sop[2].sem_num = 1; sop[2].sem_op  = 1;	 /* increment r/w access counter */
+			sopcnt = 3;
+		}
+		sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = SEM_UNDO | IPC_NOWAIT;
+		SEMOP(udi->semid, sop, sopcnt, status);
+		if (-1 == status)
+		{
+			errno_save = errno;
+			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, errno_save);
+		}
 	} else /* for mupip_jnl_recover we were already in mu_rndwn_file and got "semid" semaphore  */
 	{
-		/* udi->shmid should never be zero, if you returned from mu_rndwn_file.
-		 * Since, these are new code, I prefer extra checking. Once code becomes stable,
-		 * we should remove GTMASSERTs and can make them assert
-		 */
-		if (0 != udi->shmid || 0 != udi->shm_ctime)
+		if (INVALID_SEMID == udi->semid || 0 == udi->sem_ctime)
+			/* make sure mu_rndwn_file() has reset created semaphore for standalone access */
+			GTMASSERT;
+		if (INVALID_SHMID != udi->shmid || 0 != udi->shm_ctime)
+			/* make sure mu_rndwn_file() has reset shared memory */
 			GTMASSERT;
 		new_ipc = TRUE;
 	}
@@ -448,15 +394,21 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		/*
 		 * Create new shared memory using IPC_PRIVATE. System guarantees a unique id.
 		 */
-		if (-1 == (status_l = udi->shmid = shmget(IPC_PRIVATE, reg->sec_size, RWDALL)))
+#ifdef __MVS__
+		if (-1 == (status_l = udi->shmid = shmget(IPC_PRIVATE, ROUND_UP(reg->sec_size, MEGA_BOUND),
+			__IPC_MEGA | IPC_CREAT | IPC_EXCL | RWDALL)))
+#else
+		if (-1 == (status_l = udi->shmid = shmget(IPC_PRIVATE, reg->sec_size, RWDALL | IPC_CREAT)))
+#endif
 		{
+			udi->shmid = status_l = INVALID_SHMID;
 			rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				  ERR_TEXT, 2, RTS_ERROR_TEXT("Error with database shmget"), errno);
+				  ERR_TEXT, 2, LEN_AND_LIT("Error with database shmget"), errno);
 		}
 		tsd->shmid = udi->shmid;
 		if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
 			rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				ERR_TEXT, 2, RTS_ERROR_TEXT("Error with database control shmctl"), errno);
+				ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl"), errno);
 		tsd->shm_ctime.ctime = udi->shm_ctime = shmstat.shm_ctime;
 	}
 #ifdef DEBUG_DB64
@@ -468,7 +420,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
         if (-1 == status_l)
 	{
                 rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-                          ERR_TEXT, 2, RTS_ERROR_TEXT("Error attaching to database shared memory"), errno);
+                          ERR_TEXT, 2, LEN_AND_LIT("Error attaching to database shared memory"), errno);
 	}
 	csa->nl = (node_local_ptr_t)csa->db_addrs[0];
 	csa->critical = (mutex_struct_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
@@ -476,7 +428,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 #ifdef CACHELINE_SIZE
 	assert(0 == ((int)csa->critical & (CACHELINE_SIZE - 1)));
 #endif
-	if (!read_only && JNL_ALLOWED(tsd))
+	if (JNL_ALLOWED(tsd)) /* The buffer should be initialized irrespective of read/write process */
 		csa->jnl->jnl_buff = (jnl_buffer_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SPACE + JNL_NAME_EXP_SIZE);
 	csa->backup_buffer = (backup_buff_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SPACE + JNL_SHARE_SIZE(tsd));
 	csa->lock_addrs[0] = (sm_uc_ptr_t)csa->backup_buffer + BACKUP_BUFFER_SIZE + 1;
@@ -537,7 +489,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
                 csa->nl->highest_lbm_blk_changed = -1;
                 csa->nl->wcs_timers = -1;
                 csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
-                csa->nl->dbfid.u = FILE_INFO(reg)->fileid;            /* save what file we initialized this storage for */
+                csa->nl->unique_id.uid = FILE_INFO(reg)->fileid;            /* save what file we initialized this storage for */
 		/* save pointers in csa to access shared memory */
 		csa->nl->critical = (sm_off_t)((sm_uc_ptr_t)csa->critical - (sm_uc_ptr_t)csa->nl);
 		if (JNL_ALLOWED(csd))
@@ -567,7 +519,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
                                 if (0 != errno_save)
                                 {
                                         rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-                                                  ERR_TEXT, 2, RTS_ERROR_TEXT("Error with database write"), errno_save);
+                                                  ERR_TEXT, 2, LEN_AND_LIT("Error with database write"), errno_save);
                                 }
                         }
                         if (csa->jnl)
@@ -591,8 +543,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		STAT_FILE((char *)csa->nl->fname, &stat_buf, stat_res);
 		if (-1 == stat_res)
                 	rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
-		memset(csa->nl->unique_id, 0, UNIQUE_ID_SIZE);
-		stat_to_id(&stat_buf, csa->nl->unique_id);
+		set_gdid_from_stat(&csa->nl->unique_id.uid, &stat_buf);
         } else
         {
                 if (strcmp(csa->nl->machine_name, machine_name))       /* machine names do not match */
@@ -606,11 +557,13 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		 * guaranteed to not exceed MAX_FN_LEN, we should have a terminating '\0' atleast at csa->nl->fname[MAX_FN_LEN]
 		 */
 		assert(csa->nl->fname[MAX_FN_LEN] == '\0');	/* Note: the first '\0' in csa->nl->fname can be much earlier */
-                if (FALSE == is_gdid_gdid_identical(&FILE_INFO(reg)->fileid, &csa->nl->dbfid.u) ||
+                if (FALSE == is_gdid_gdid_identical(&FILE_INFO(reg)->fileid, &csa->nl->unique_id.uid) ||
 						csa->nl->creation_date_time != csd->creation.date_time)
 		{
-			send_msg(VARLSTCNT(6) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid);
-			rts_error(VARLSTCNT(6) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid);
+			send_msg(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
+				ERR_TEXT, 2, LEN_AND_LIT("Fileid of database file doesn't match fileid in shared memory"));
+			rts_error(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
+				ERR_TEXT, 2, LEN_AND_LIT("Fileid of database file doesn't match fileid in shared memory"));
 		}
 		/* Check whether cs_addrs->nl->fname exists. If not, then it is a serious condition. Error out. */
 		STAT_FILE((char *)csa->nl->fname, &stat_buf, stat_res);
@@ -619,33 +572,36 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
                         send_msg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid, errno);
                         rts_error(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid, errno);
 		}
-		/* Check whether csa->nl->fname and csa->nl->dbfid are in sync. If not its a serious condition. Error out. */
-		if (FALSE == is_gdid_stat_identical(&csa->nl->dbfid.u, &stat_buf))
+		/* Check whether csa->nl->fname and csa->nl->unique_id.uid are in sync.
+		 * If not its a serious condition. Error out. */
+		if (FALSE == is_gdid_stat_identical(&csa->nl->unique_id.uid, &stat_buf))
 		{
-			send_msg(VARLSTCNT(6) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid);
-			rts_error(VARLSTCNT(6) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid);
+			send_msg(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
+				ERR_TEXT, 2, LEN_AND_LIT("Database filename and fileid in shared memory are not in sync"));
+			rts_error(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
+				ERR_TEXT, 2, LEN_AND_LIT("Database filename and fileid in shared memory are not in sync"));
 		}
 		/* verify pointers from our calculation vs. the copy in shared memory */
 		if (csa->nl->critical != (sm_off_t)((sm_uc_ptr_t)csa->critical - (sm_uc_ptr_t)csa->nl))
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
-				  ERR_NLMISMATCHCALC, 4, RTS_ERROR_TEXT("critical"),
+				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("critical"),
 				  	(uint4)((sm_uc_ptr_t)csa->critical - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->critical);
 		if ((JNL_ALLOWED(csd)) &&
 		    (csa->nl->jnl_buff != (sm_off_t)((sm_uc_ptr_t)csa->jnl->jnl_buff - (sm_uc_ptr_t)csa->nl)))
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
-				  ERR_NLMISMATCHCALC, 4, RTS_ERROR_TEXT("journal buffer"),
+				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("journal buffer"),
 				  	(uint4)((sm_uc_ptr_t)csa->jnl->jnl_buff - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->jnl_buff);
 		if (csa->nl->backup_buffer != (sm_off_t)((sm_uc_ptr_t)csa->backup_buffer - (sm_uc_ptr_t)csa->nl))
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
-				  ERR_NLMISMATCHCALC, 4, RTS_ERROR_TEXT("backup buffer"),
+				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("backup buffer"),
 				  (uint4)((sm_uc_ptr_t)csa->backup_buffer - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->backup_buffer);
 		if ((is_bg) && (csa->nl->hdr != (sm_off_t)((sm_uc_ptr_t)csd - (sm_uc_ptr_t)csa->nl)))
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
-				  ERR_NLMISMATCHCALC, 4, RTS_ERROR_TEXT("file header"),
+				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("file header"),
 				  	(uint4)((sm_uc_ptr_t)csd - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->hdr);
 		if (csa->nl->lock_addrs != (sm_off_t)((sm_uc_ptr_t)csa->lock_addrs[0] - (sm_uc_ptr_t)csa->nl))
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
-				  ERR_NLMISMATCHCALC, 4, RTS_ERROR_TEXT("lock address"),
+				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("lock address"),
 				  (uint4)((sm_uc_ptr_t)csa->lock_addrs[0] - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->lock_addrs);
                 if (JNL_ENABLED(csd) && NULL != csa->jnl)
                         csa->jnl->channel = NOJNL;
@@ -653,7 +609,8 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
         if (-1 == (semval = semctl(udi->semid, 1, GETVAL))) /* semval = number of process attached */
         {
 		errno_save = errno;
-		rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno_save);
+		gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl()"), CALLFROM, errno_save);
 	}
 	if (!read_only && 1 == semval)
 	{
@@ -671,10 +628,9 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		if (0 != errno_save)
 		{
 			rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				  ERR_TEXT, 2, RTS_ERROR_TEXT("Error with database header flush"), errno_save);
+				  ERR_TEXT, 2, LEN_AND_LIT("Error with database header flush"), errno_save);
 		}
-	}
-	else if (read_only && new_ipc)
+	} else if (read_only && new_ipc)
 	{
 		/*
 		 * For read-only process if shared memory and semaphore created for first time,
@@ -689,7 +645,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		db_ipcs.fn[reg->dyn.addr->fname_len] = 0;
 		if (0 != send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0))
 			rts_error(VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				  ERR_TEXT, 2, RTS_ERROR_TEXT("gtmsecshr failed to update database file header"));
+				  ERR_TEXT, 2, LEN_AND_LIT("gtmsecshr failed to update database file header"));
 
 	}
 	++csa->nl->ref_cnt;         /* This value is changed under control of the init/rundown semaphore only */
@@ -697,8 +653,11 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	{
  		/* Release control lockout now that it is init'd */
 		if (0 != (errno_save = do_semop(udi->semid, 0, -1, SEM_UNDO)))
-			rts_error(VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-			ERR_TEXT, 2, RTS_ERROR_TEXT("releasing init semaphore"), errno_save);
+		{
+			errno_save = errno;
+			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, errno_save);
+		}
 		sem_incremented = FALSE;
 	}
 	/* Release ftok semaphore lock so that any other ftok conflicted database can continue now */

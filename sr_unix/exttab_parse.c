@@ -10,12 +10,17 @@
  ****************************************************************/
 
 #include "mdef.h"
-
-/* gcc/Linux requires stdarg which is included by stdio before varargs */
+/* gcc/LinuxIA32 needs stdio before varargs until stdio.h removed from error.h */
+/* gcc/Linux390 needs varargs before stdio */
+#ifdef EARLY_VARARGS
+#include <varargs.h>
+#endif
 #include "gtm_stdio.h"
 #include <errno.h>
 #include "gtm_stdlib.h"
+#ifndef EARLY_VARARGS
 #include <varargs.h>
+#endif
 
 #include "gtm_ctype.h"
 #include "gtm_stat.h"
@@ -23,6 +28,7 @@
 #include "gtmxc_types.h"
 #include "rtnhdr.h"
 #include "fgncal.h"
+#include "gtmci.h"
 #include "eintr_wrappers.h"
 
 #define	CR			0x0A		/* Carriage return */
@@ -35,15 +41,34 @@
 #define	POINTER_SIZE		6
 #define	MAX_DIGITS		10
 
-int	ext_source_line_num;
-int	ext_source_line_len;
-int	ext_source_column;
-char	ext_source_line[MAX_SRC_LINE];
-char	*ext_table_file_name;
-bool	star_found;
+static 	int	ext_source_line_num;
+static  int	ext_source_line_len;
+static  int	ext_source_column;
+static  char	ext_source_line[MAX_SRC_LINE];
+static  char	*ext_table_file_name;
+static  bool	star_found;
 
-void ext_stx_error();
-int scan_array_bound(char **b,int curr_type);
+static  void 	ext_stx_error();
+static 	int 	scan_array_bound(char **b,int curr_type);
+static int	parm_space_needed[] =
+{
+	0,
+	0,
+	sizeof(void *),
+	sizeof(xc_long_t),
+	sizeof(xc_ulong_t),
+	sizeof(xc_float_t),
+	sizeof(xc_double_t),
+	sizeof(xc_long_t *) + sizeof(xc_long_t),
+	sizeof(xc_ulong_t *) + sizeof(xc_ulong_t),
+	sizeof(xc_string_t *) + sizeof(xc_string_t),
+	sizeof(xc_float_t *) + sizeof(xc_float_t),
+	sizeof(xc_char_t *),
+	sizeof(xc_char_t **) + sizeof(xc_char_t *),
+	sizeof(xc_double_t *) + sizeof(xc_double_t),
+	sizeof(xc_pointertofunc_t),
+	sizeof(xc_pointertofunc_t *) + sizeof(xc_pointertofunc_t)
+};
 
 /* manage local get_memory'ed space (the space is never returned) */
 static void	*get_memory(int n)
@@ -95,6 +120,14 @@ static char	*scan_ident(char *c)
 	return (b == c) ? 0 : b;
 }
 
+static char	*scan_labelref(char *c)
+{
+	char	*b = c;
+	for ( ;(ISALNUM(*b) || '_' == *b || '^' == *b); b++,ext_source_column++)
+		;
+	return (b == c) ? 0 : b;
+}
+
 static enum xc_types	scan_keyword (char **c)
 {
 	static struct
@@ -107,26 +140,34 @@ static enum xc_types	scan_keyword (char **c)
 
 		{"void",		xc_void,	xc_notfound,	xc_notfound		},
 
-		{"long",		xc_long,	xc_long_star,	xc_notfound		},
+		{"gtm_long_t",		xc_long,	xc_long_star,	xc_notfound		},
 		{"xc_long_t",		xc_long,	xc_long_star,	xc_notfound		},
+		{"long",		xc_long,	xc_long_star,	xc_notfound		},
 
-		{"ulong",		xc_ulong,	xc_ulong_star,	xc_notfound		},
+		{"gtm_ulong_t",		xc_ulong,	xc_ulong_star,	xc_notfound		},
 		{"xc_ulong_t",		xc_ulong,	xc_ulong_star,	xc_notfound		},
+		{"ulong",		xc_ulong,	xc_ulong_star,	xc_notfound		},
 
+		{"gtm_status_t",	xc_status,	xc_notfound,	xc_notfound		},
 		{"xc_status_t",		xc_status,	xc_notfound,	xc_notfound		},
 
-		{"char",		xc_notfound,	xc_char_star,	xc_char_starstar	},
+		{"gtm_char_t",		xc_notfound,	xc_char_star,	xc_char_starstar	},
 		{"xc_char_t",		xc_notfound,	xc_char_star,	xc_char_starstar	},
+		{"char",		xc_notfound,	xc_char_star,	xc_char_starstar	},
 
-		{"string",		xc_notfound,	xc_string_star,	xc_notfound		},
+		{"gtm_string_t",	xc_notfound,	xc_string_star,	xc_notfound		},
 		{"xc_string_t",		xc_notfound,	xc_string_star,	xc_notfound		},
+		{"string",		xc_notfound,	xc_string_star,	xc_notfound		},
 
-		{"float",		xc_notfound,	xc_float_star,	xc_notfound		},
-		{"xc_float_t",		xc_notfound,	xc_float_star,	xc_notfound		},
+		{"gtm_float_t",		xc_float,	xc_float_star,	xc_notfound		},
+		{"xc_float_t",		xc_float,	xc_float_star,	xc_notfound		},
+		{"float",		xc_float,	xc_float_star,	xc_notfound		},
 
-		{"double",		xc_notfound,	xc_double_star,	xc_notfound		},
-		{"xc_double_t",		xc_notfound,	xc_double_star,	xc_notfound		},
+		{"gtm_double_t",	xc_double,	xc_double_star,	xc_notfound		},
+		{"xc_double_t",		xc_double,	xc_double_star,	xc_notfound		},
+		{"double",		xc_double,	xc_double_star,	xc_notfound		},
 
+		{"gtm_pointertofunc_t", xc_pointertofunc, xc_pointertofunc_star, xc_notfound	},
 		{"xc_pointertofunc_t", 	xc_pointertofunc, xc_pointertofunc_star, xc_notfound	}
 	};
 
@@ -160,7 +201,7 @@ static enum xc_types	scan_keyword (char **c)
 	return xc_notfound;
 }
 
-int scan_array_bound(char **b,int curr_type)
+static 	int scan_array_bound(char **b,int curr_type)
 {
 	char 	number[MAX_DIGITS];
 	char	*c;
@@ -176,6 +217,8 @@ int scan_array_bound(char **b,int curr_type)
 				0, /* status */
 				0, /* long */
 				0, /* unsigned long */
+				0, /* float */
+				0, /* double */
 				1, /* Pointer to long */
 				1, /* Pointer to unsigned long */
 				1, /* Pointer to string */
@@ -212,6 +255,7 @@ static char	*read_table (char *b,int l,FILE *f)
 {
 	char	*t;
 
+	ext_source_column = 0;
 	FGETS(b, l, f, t);
 	if (NULL == t)
 	{
@@ -282,23 +326,6 @@ struct extcall_package_list	*exttab_parse (mval *package)
 	enum xc_types	ret_tok, parameter_types[MAXIMUM_PARAMETERS], pr;
 	char		str_buffer[MAX_NAME_LENGTH], *tbp, *end;
 	FILE		*ext_table_file_handle;
-	static int	parm_space_needed[] =
-			{
-				0,
-				0,
-				sizeof(void *),
-				sizeof(xc_long_t),
-				sizeof(xc_ulong_t),
-				sizeof(xc_long_t *) + sizeof(xc_long_t),
-				sizeof(xc_ulong_t *) + sizeof(xc_ulong_t),
-				sizeof(xc_string_t *) + sizeof(xc_string_t),
-				sizeof(xc_float_t *) + sizeof(xc_float_t),
-				sizeof(xc_char_t *),
-				sizeof(xc_char_t **) + sizeof(xc_char_t *),
-				sizeof(xc_double_t *) + sizeof(xc_double_t),
-				sizeof(xc_pointertofunc_t),
-				sizeof(xc_pointertofunc_t *) + sizeof(xc_pointertofunc_t)
-			};
 	struct extcall_package_list	*pak;
 	struct extcall_entry_list	*entry_ptr;
 
@@ -342,6 +369,7 @@ struct extcall_package_list	*exttab_parse (mval *package)
 		/* Package's external call table could not be found */
 		rts_error(VARLSTCNT(4) ERR_ZCCTOPN, 2, LEN_AND_STR(ext_table_file_name));
 	}
+	ext_source_line_num = 0;
 	/* pick-up name of shareable library */
 	tbp = read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle);
 	if (NULL == tbp)
@@ -506,7 +534,129 @@ struct extcall_package_list	*exttab_parse (mval *package)
 	return pak;
 }
 
-void ext_stx_error(va_alist)
+callin_entry_list*	citab_parse (void)
+{
+	int			parameter_count, i, fclose_res;
+	uint4			inp_mask, out_mask, mask;
+	mstr			labref, callnam;
+	enum xc_types		ret_tok, parameter_types[MAXIMUM_PARAMETERS], pr;
+	char			str_buffer[MAX_NAME_LENGTH], *tbp, *end;
+	FILE			*ext_table_file_handle;
+	callin_entry_list	*entry_ptr, *save_entry_ptr = 0;
+
+	error_def(ERR_CITABENV);
+	error_def(ERR_CITABOPN);
+	error_def(ERR_CIENTNAME);
+	error_def(ERR_COLON);
+	error_def(ERR_CIRTNTYP);
+	error_def(ERR_CIRCALLNAME);
+	error_def(ERR_CIDIRECTIVE);
+	error_def(ERR_CIRPARMNAME);
+	error_def(ERR_CIPARTYPE);
+	error_def(ERR_CIUNTYPE);
+	error_def(ERR_SYSCALL);
+
+	ext_table_file_name = GETENV(CALLIN_ENV_NAME);
+	if (!ext_table_file_name) /* environment variable not set */
+		rts_error(VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(CALLIN_ENV_NAME));
+
+	ext_table_file_handle = Fopen(ext_table_file_name, "r");
+	if (!ext_table_file_handle) /* call-in table not found */
+		rts_error(VARLSTCNT(11) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name), ERR_SYSCALL, 5, LEN_AND_LIT("fopen"), CALLFROM, errno);
+
+	ext_source_line_num = 0;
+	while (read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle))
+	{
+		if (!*(tbp = scan_space(str_buffer)))
+			continue;
+		if (!(end = scan_ident(tbp)))
+			ext_stx_error(ERR_CIRCALLNAME, ext_table_file_name);
+		callnam.addr = tbp;
+		callnam.len = end - tbp;
+		tbp = scan_space(end);
+		if (':' != *tbp++)
+			ext_stx_error(ERR_COLON, ext_table_file_name);
+		ret_tok = scan_keyword(&tbp); /* return type */
+		switch (ret_tok) /* return type valid ? */
+		{
+		case xc_void:
+		case xc_long:
+		case xc_ulong:
+		case xc_float:
+		case xc_double:
+		case xc_char_star:
+		case xc_long_star:
+		case xc_ulong_star:
+		case xc_float_star:
+		case xc_double_star:
+		case xc_string_star:
+			break;
+		default:
+			ext_stx_error(ERR_CIRTNTYP, ext_table_file_name);
+		}
+		labref.addr = tbp;
+		if ((end = scan_labelref(tbp)))
+			labref.len = end - tbp;
+		else
+			ext_stx_error(ERR_CIENTNAME, ext_table_file_name);
+		tbp = scan_space(end);
+		inp_mask = out_mask = 0;
+		for (parameter_count = 0; (*tbp && ')' != *tbp); parameter_count++)
+		{
+			/* must have comma if this is not the first parameter, otherwise '(' */
+			if (((0 == parameter_count)?'(':',') != *tbp++)
+				ext_stx_error(ERR_CIRPARMNAME, ext_table_file_name);
+			tbp = scan_space(tbp);
+			if ((0 == parameter_count) && (*tbp == ')')) /* special case () */
+				break;
+			/* looking for an I, a O or an IO */
+			mask = (1 << parameter_count);
+			inp_mask |= ('I' == *tbp) ? (tbp++, mask) : 0;
+			out_mask |= ('O' == *tbp) ? (tbp++, mask) : 0;
+			if ((!(inp_mask & mask) && !(out_mask & mask)) || (':' != *tbp++))
+				ext_stx_error(ERR_CIDIRECTIVE, ext_table_file_name);
+			switch ((pr = scan_keyword(&tbp))) /* valid param type? */
+			{
+			case xc_long:
+			case xc_ulong:
+			case xc_float:
+			case xc_double:
+				if (out_mask & mask)
+					ext_stx_error(ERR_CIPARTYPE, ext_table_file_name);
+				/* fall-thru */
+			case xc_char_star:
+			case xc_long_star:
+			case xc_ulong_star:
+			case xc_float_star:
+			case xc_double_star:
+			case xc_string_star:
+				break;
+			default:
+				ext_stx_error(ERR_CIUNTYPE, ext_table_file_name);
+			}
+			parameter_types[parameter_count] = pr;
+			tbp = scan_space(tbp);
+		}
+		if (!*tbp)
+			ext_stx_error(ERR_CIRPARMNAME, ext_table_file_name);
+		entry_ptr = get_memory(sizeof(callin_entry_list));
+		entry_ptr->next_entry = save_entry_ptr;
+		save_entry_ptr = entry_ptr;
+		entry_ptr->return_type = ret_tok;
+		entry_ptr->argcnt = parameter_count;
+		entry_ptr->input_mask = inp_mask;
+		entry_ptr->output_mask = out_mask;
+		entry_ptr->parms = get_memory(parameter_count * sizeof(entry_ptr->parms[0]));
+		for (i = 0 ;  i < parameter_count ;  i++)
+			entry_ptr->parms[i] = parameter_types[i];
+		put_mstr(&labref, &entry_ptr->label_ref);
+		put_mstr(&callnam, &entry_ptr->call_name);
+	}
+	FCLOSE(ext_table_file_handle, fclose_res);
+	return entry_ptr;
+}
+
+static void ext_stx_error(va_alist)
 va_dcl
 {
 	va_list	args, sav_arg;

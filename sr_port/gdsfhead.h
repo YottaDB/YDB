@@ -17,20 +17,6 @@
 
 #include <sys/types.h>
 
-typedef struct
-{
-	int4	fl;		/* forward link - relative offset from beginning of this element to next element in queue */
-	int4	bl;		/* backward link - relative offset from beginning of this element to previous element in queue */
-} que_ent;			/* this structure is intended to be identical to the first two items in a cache_que_head */
-
-typedef struct
-{
-	int4	fl;		/* forward link - relative offset from beginning of this element to next element in queue */
-	int4	bl;		/* backward link - relative offset from beginning of this element to previous element in queue */
-	global_latch_t	latch;	/* required for platforms without atomic operations to modify both fl and bl concurrently;
-				 * unused on platforms with such instructions. */
-} que_head, cache_que_head, mmblk_que_head;
-
 #define CACHE_STATE_OFF sizeof(que_ent)
 
 /* all this record's fields should exactly be the first members of the cache_rec in the same order */
@@ -210,9 +196,6 @@ typedef struct
 # endif
 #endif
 
-typedef que_ent		*que_ent_ptr_t;
-typedef que_head 	*que_head_ptr_t;
-
 typedef cache_que_head	*cache_que_head_ptr_t;
 typedef cache_rec 	*cache_rec_ptr_t;
 typedef cache_rec	**cache_rec_ptr_ptr_t;
@@ -251,7 +234,7 @@ void verify_queue(que_head_ptr_t qhdr);
 	cache_rec_ptr_t		cache_start;									\
 	int4			bufindx;									\
 	sm_uc_ptr_t		bufstart;									\
-	GBLREF	boolean_t	dse_running;									\
+	GBLREF	boolean_t	dse_running, write_after_image;								\
 														\
 	assert(gds_t_write != cse->mode && gds_t_writemap != cse->mode || cse->old_block); 			\
 									/* don't miss writing a PBLK */		\
@@ -265,7 +248,7 @@ void verify_queue(que_head_ptr_t qhdr);
 			bufindx = (cse->old_block - bufstart) / csd->blk_size;					\
 			assert(bufindx < csd->n_bts);								\
 			assert(cse->blk == cache_start[bufindx].blk);						\
-			assert(dse_running || cache_start[bufindx].in_cw_set);					\
+			assert(dse_running || write_after_image || cache_start[bufindx].in_cw_set);				\
 		} else												\
 		{												\
 			assert(cse->old_block == csa->db_addrs[0] + cse->blk * csd->blk_size			\
@@ -309,8 +292,6 @@ void verify_queue(que_head_ptr_t qhdr);
 				break;								\
 		}										\
 	}											\
-	assert(NULL == gv_cur_region || FALSE == gv_cur_region->open				\
-		|| &FILE_INFO(gv_cur_region)->s_addrs == cs_addrs && cs_addrs->hdr == cs_data);	\
 }
 
 #define	TP_CHANGE_REG_IF_NEEDED(reg)								\
@@ -373,8 +354,9 @@ enum db_ver
 #define JNL_NAME_SIZE	        256        /* possibly expanded when opened */
 #define JNL_NAME_EXP_SIZE	1024       /* MAXPATHLEN, before jnl_buffer in shared memory */
 
-#define BLKS_PER_LMAP	512
-#define MAXTOTALBLKS	MASTER_MAP_SIZE * 8 * BLKS_PER_LMAP
+#define BLKS_PER_LMAP		512
+#define MAXTOTALBLKS		MASTER_MAP_SIZE * 8 * BLKS_PER_LMAP
+#define	IS_BITMAP_BLK(blk)	(ROUND_DOWN2(blk, BLKS_PER_LMAP) == blk)	/* TRUE if blk is a bitmap */
 
 #define BITS_PER_UCHAR	8
 
@@ -589,7 +571,7 @@ typedef struct sgmnt_data_struct
 	unsigned short	jnl_deq;
 	short		jnl_buffer_size;	/* in pages */
 	bool		jnl_before_image;
-	unsigned char	jnl_state;		/* Current journalling state */
+	unsigned char	jnl_state;		/* Current journaling state */
 	bool		filler_glob_sec_init[1];/* glob_sec_init field moved to node_local */
 	unsigned char	jnl_file_len;		/* journal file name length */
 	unsigned char	jnl_file_name[JNL_NAME_SIZE];	/* journal file name */
@@ -693,7 +675,7 @@ typedef struct sgmnt_data_struct
 	char		filler2_db_latch[16];	/* moved to node_local */
 	char		filler_3k_192[48];	/* 3k + 192 - cache line on HPPA */
         char            filler_4k[832];         /* Fill out so map sits on 8K boundary */
-	char		filler_unique_id[UNIQUE_ID_SIZE];
+	char		filler_unique_id[32];
         char            machine_name[MAX_MCNAMELEN];
  	int4		flush_trigger;
 	int4		cache_hits;
@@ -1169,6 +1151,8 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 	KIP_FLAG = FALSE;					\
 	DECR_CNT(&CSD->kill_in_prog, &CSA->nl->wc_var_lock);	\
 }
+#define INVALID_SEMID -1
+#define INVALID_SHMID -1
 
 bt_rec_ptr_t bt_put(gd_region *r, int4 block);
 void bt_que_refresh(gd_region *greg);

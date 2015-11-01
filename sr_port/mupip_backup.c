@@ -173,10 +173,6 @@ void mupip_backup(void)
 	error_def(ERR_MUNOACTION);
 	error_def(ERR_MUNOFINISH);
 	error_def(ERR_BACKUP2MANYKILL);
-	error_def(ERR_JNLNAMLEN);
-	error_def(ERR_BUFFLUFAILED);
-        error_def(ERR_JNLWRNNOTCHG);
-        error_def(ERR_WCBLOCKED);
         error_def(ERR_MUSELFBKUP);
 
 	/* ==================================== STEP 1. Initialization ======================================= */
@@ -579,7 +575,7 @@ void mupip_backup(void)
 						gtm_putmsg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_addrs->hdr),
 								DB_LEN_STR(gv_cur_region));
 						util_out_print("!/Journal file !AD not closed (jnl_ensure_open failed) :", TRUE,
-								jnl_info.jnl_len, jnl_info.jnl);
+								JNL_LEN_STR(cs_addrs->hdr));
 						rptr->not_this_time = give_up_after_create_tempfile;
 						rel_crit(rptr->reg);
 						continue;
@@ -608,7 +604,7 @@ void mupip_backup(void)
 					prev_jnl_fn_len = cs_data->jnl_file_len;
 					memcpy(prev_jnl_fn, cs_data->jnl_file_name, prev_jnl_fn_len);
 					assert(JNL_MIN_ALIGNSIZE == jnl_info.alignsize);
-					if (SS_NORMAL != (status = set_jnl_file_close()))
+					if (SS_NORMAL != (status = set_jnl_file_close(FALSE)))
 					{
 						util_out_print("!/Journal file !AD not closed:",
 							TRUE, jnl_info.jnl_len, jnl_info.jnl);
@@ -691,8 +687,8 @@ void mupip_backup(void)
 			rptr->backup_hdr->trans_hist.header_open_tn = rptr->backup_hdr->trans_hist.curr_tn;
 			memset(rptr->backup_hdr->machine_name, 0, MAX_MCNAMELEN);
 			rptr->backup_hdr->repl_state = repl_closed;
-			rptr->backup_hdr->semid = 0;
-			rptr->backup_hdr->shmid = 0;
+			rptr->backup_hdr->semid = INVALID_SEMID;
+			rptr->backup_hdr->shmid = INVALID_SHMID;
 			rptr->backup_hdr->sem_ctime.ctime = 0;
 			rptr->backup_hdr->shm_ctime.ctime = 0;
 			if (jnl_options[jnl_off])

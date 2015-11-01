@@ -59,7 +59,8 @@ void mlk_wake_pending(mlk_ctldata_ptr_t ctl,
 	if (!d->pending)
 		return;
 	ctl->wakeups++;
-	BG_TRACE_PRO_ANY(csa, mlock_wakeups);		/* Record halted slumbers */
+	d->sequence = csa->hdr->trans_hist.lock_sequence++;	/* This node is being awakened (GTCM) */
+	BG_TRACE_PRO_ANY(csa, mlock_wakeups);			/* Record halted slumbers */
 	if (reg->dyn.addr->acc_meth == dba_bg &&
 		csa->hdr->clustered)
 	{

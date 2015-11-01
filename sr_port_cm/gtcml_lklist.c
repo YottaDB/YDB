@@ -18,12 +18,18 @@
 #include "filestruct.h"
 #include "mlkdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "locklits.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
+#include "mlk_pvtblk_equ.h"
+#include "copy.h"
 
 GBLREF connection_struct *curr_entry;
 
-void gtcml_lklist()
+void gtcml_lklist(void)
 {
 	cm_region_list *reg_ref, *gtcm_find_region();
 	unsigned char *ptr, regnum, laflag, list_len, i, translev, subcnt;
@@ -42,7 +48,7 @@ void gtcml_lklist()
 	for (i = 0; i < list_len; i++)
 	{
 		new = TRUE;
-		len = *((unsigned short *)ptr);
+		GET_USHORT(len, ptr);
 		ptr += sizeof(unsigned short);
 		regnum = *ptr++;
 		reg_ref = gtcm_find_region(curr_entry,regnum);

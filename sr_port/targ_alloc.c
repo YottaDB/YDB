@@ -42,7 +42,8 @@ gv_namehead *targ_alloc(int keysize)
 	gvt->write_local_tn = (trans_num)0;
 	gvt->noisolation = FALSE;
 	gvt->alt_hist = (srch_hist *)malloc(sizeof(srch_hist));
-	for (index = 0; index < MAX_BT_DEPTH; index++)
+	/* Initialize the 0:MAX_BT_DEPTH. Otherwise, memove of the array in mu_reorg can cause problem */
+	for (index = 0; index <= MAX_BT_DEPTH; index++)
 	{
 		gvt->hist.h[index].level = index;	/* needed in TP to know what level a history element is */
 		gvt->hist.h[index].blk_target = gvt;

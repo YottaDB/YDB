@@ -36,35 +36,35 @@ GBLREF sgmnt_data		mu_int_data;
 GBLREF uint4			mu_int_errknt;
 GBLREF sgmnt_data_ptr_t		cs_data;
 
-boolean_t mu_int_reg(gd_region *reg)
+void mu_int_reg(gd_region *reg, boolean_t *return_value)
 {
 	int			lcnt;
 	sgmnt_addrs     	*csa;
 	cache_que_head_ptr_t    crq, crqwip;
-	boolean_t		return_value;
 
 	error_def(ERR_BUFFLUFAILED);
 	error_def(ERR_DBRDONLY);
+	*return_value = FALSE;
 
-	ESTABLISH_RET(mu_int_reg_ch, FALSE);
+	ESTABLISH(mu_int_reg_ch);
 	if (dba_usr == reg->dyn.addr->acc_meth)
 	{
 		util_out_print("!/Can't integ region !AD; not GTC format", TRUE,  REG_LEN_STR(reg));
 		mu_int_errknt++;
-		return FALSE;
+		return;
 	}
 	gv_cur_region = reg;
 	if (reg_cmcheck(reg))
 	{
 		util_out_print("!/Can't integ region across network", TRUE);
 		mu_int_errknt++;
-		return FALSE;
+		return;
 	}
 	gvcst_init(gv_cur_region);
 	if (gv_cur_region->was_open)
 	{	/* already open under another name */
 		gv_cur_region->open = FALSE;
-		return FALSE;
+		return;
 	}
 	change_reg();
 
@@ -73,7 +73,7 @@ boolean_t mu_int_reg(gd_region *reg)
 		util_out_print("!/MM database is read only. MM database cannot be frozen without write access.", TRUE);
 		gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 		mu_int_errknt++;
-		return FALSE;
+		return;
 	}
 
 	if (FALSE == region_freeze(gv_cur_region, TRUE, FALSE))
@@ -81,7 +81,7 @@ boolean_t mu_int_reg(gd_region *reg)
 		util_out_print("!/Database for region !AD is already frozen, not integing", TRUE, gv_cur_region->rname_len,
 				gv_cur_region->rname);
 		mu_int_errknt++;
-		return FALSE;
+		return;
 	}
 	if (gv_cur_region->read_only)
 	{
@@ -103,7 +103,7 @@ boolean_t mu_int_reg(gd_region *reg)
 					gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("INTEG"),
 						DB_LEN_STR(gv_cur_region));
 					mu_int_errknt++;
-					return FALSE;
+					return;
 				}
 			}
 #endif
@@ -116,16 +116,16 @@ boolean_t mu_int_reg(gd_region *reg)
 			util_out_print("!/Database requires flushing, which can't be performed without write access",TRUE);
 			gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 			mu_int_errknt++;
-			return FALSE;
+			return;
 		}
 	} else  if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH))
 	{
 		gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("INTEG"), DB_LEN_STR(gv_cur_region));
 		mu_int_errknt++;
-		return FALSE;
+		return;
 	}
 	longcpy((uchar_ptr_t)&mu_int_data, (uchar_ptr_t)cs_data, sizeof(sgmnt_data));
-	return_value = mu_int_fhead();
+	*return_value = mu_int_fhead();
 	REVERT;
-	return return_value;
+	return;
 }

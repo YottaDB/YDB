@@ -25,17 +25,20 @@
 #endif
 #include "util.h"
 
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF gd_region	*gv_cur_region;
-GBLREF uint4		process_id;
-GBLREF short		crash_count;
+GBLREF sgmnt_addrs		*cs_addrs;
+GBLREF gd_region		*gv_cur_region;
+GBLREF uint4			process_id;
+GBLREF short			crash_count;
+GBLREF gd_addr			*original_header;
 
 #define MAX_UTIL_LEN 80
 void dse_crit(void)
 {
-	int		util_len;
-	char		util_buff[MAX_UTIL_LEN];
-	boolean_t	crash = FALSE, cycle = FALSE, owner = FALSE;
+	int			util_len, crit_count;
+	char			util_buff[MAX_UTIL_LEN];
+	boolean_t		crash = FALSE, cycle = FALSE, owner = FALSE;
+	gd_region		*save_region, *r_local, *r_top;
+
 	error_def(ERR_DBRDONLY);
 
 	crash = ((cli_present("CRASH") == CLI_PRESENT) || (cli_present("RESET") == CLI_PRESENT));
@@ -128,6 +131,31 @@ void dse_crit(void)
 		util_len += 2;
 		util_buff[util_len] = 0;
 		util_out_print(util_buff, TRUE);
+		return;
+	}
+	if (cli_present("ALL") == CLI_PRESENT)
+	{
+		crit_count = 0;
+		save_region = gv_cur_region;
+		for (r_local = original_header->regions, r_top = r_local + original_header->n_regions; r_local < r_top; r_local++)
+		{
+			if (!r_local->open || r_local->was_open)
+				continue;
+			gv_cur_region = r_local;
+			tp_change_reg();
+			if (cs_addrs->nl->in_crit)
+			{
+				crit_count++;
+				UNIX_ONLY(util_out_print("Database !AD : CRIT Owned by pid [!UL]", TRUE,
+						DB_LEN_STR(gv_cur_region), cs_addrs->nl->in_crit);)
+				VMS_ONLY(util_out_print("Database !AD : CRIT owned by pid [0x!XL]", TRUE,
+						DB_LEN_STR(gv_cur_region), cs_addrs->nl->in_crit);)
+			}
+		}
+		if (0 == crit_count)
+			util_out_print("CRIT is currently unowned on all regions", TRUE);
+		gv_cur_region = save_region;
+		tp_change_reg();
 		return;
 	}
 	if (cs_addrs->nl->in_crit)

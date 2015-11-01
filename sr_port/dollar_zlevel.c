@@ -16,7 +16,7 @@
 
 GBLREF stack_frame	*frame_pointer;
 
-int dollar_zlevel(void)
+int dollar_zlevel()
 {
 	int		count;
        	stack_frame	*fp;
@@ -27,6 +27,5 @@ int dollar_zlevel(void)
 			continue;
 		count++;
 	}
-	assert(0 < count); /* $ZLEVEL should be atleast 1 */
 	return (count);
 }

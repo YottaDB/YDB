@@ -11,8 +11,8 @@
 %gbldef	; ; ;Global Collation Control
 	;
 kill(gname)
-	n $zt
-	s $zt="g error"
+	n $et
+	s $et="g error"
 	i '$$edit(.gname) q 0
 	i "BGMM"'[$v("GVACCESS_METHOD",$v("REGION",gname)) zm 150376418:$v("REGION",gname); DBREMOTE
 	i $d(@gname) zm 150373626	;Error if there is data in the global
@@ -22,8 +22,8 @@ kill(gname)
 	q 1
 	;
 set(gname,nct,act)
-	n ver,$zt
-	s $zt="g error"
+	n ver,$et
+	s $et="g error"
 	i '$$edit(.gname) q 0
 	i "BGMM"'[$v("GVACCESS_METHOD",$v("REGION",gname)) zm 150376418:$v("REGION",gname); DBREMOTE
 	i $d(@gname) zm 150373626 		;Error if there is data in the global
@@ -38,8 +38,8 @@ set(gname,nct,act)
 	q 1
 	;
 get(gname)
-	n t,tl,$zt
-	s $zt="g error"
+	n t,tl,$et
+	s $et="g error"
 	i '$$edit(.gname) q 0
 	i "BGMM"'[$v("GVACCESS_METHOD",$v("REGION",gname)) zm 150376418:$v("REGION",gname); DBREMOTE
 	s t=$e($v("YDIRTREE",$e(gname,2,9)),5,999),tl=$l(t)	;remove circumflex, take at most 8 chars
@@ -52,4 +52,5 @@ edit(gname)
 	i gname'?1"^"1E.AN zm 150373218
 	q 1
 	;
-error	q 0
+error	s $ec=""
+	q 0

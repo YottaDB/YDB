@@ -32,3 +32,12 @@ va_dcl
 	gtm_putmsg_list(var);
 	util_out_print("",TRUE);
 }
+
+void gtm_putmsg_noflush(va_alist)
+va_dcl
+{
+	va_list var;
+
+	VAR_START(var);
+	gtm_putmsg_list(var);
+}

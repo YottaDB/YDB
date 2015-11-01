@@ -15,7 +15,7 @@
 	n cnt1,cnt2,cnt3,flen,fnd,gtmvt,h,i,o,out,outd,p,r,rl,sx,tics,x,xn,%ZC,%ZD,%ZF,%ZR
 	w !,"Routine Search for Every occurrence",!
 	s %ZC=0,(cnt1,cnt2,cnt3)=0,(out,outd)=1
-	i '$d(%zdebug) n $zt s $ZT="zg "_$zl_":ERR^%RCE" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%RCE")
+	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%RCE" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%RCE")
 	d MAIN^%RCE
 	u $p:(ctrap="":exc="")
 	q

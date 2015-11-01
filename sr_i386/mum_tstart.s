@@ -29,5 +29,6 @@ ENTRY mum_tstart
 	je	l1
 	call	trans_code
 l1:	getframe
+	leal    xfer_table,%ebx
 	call	inst_flush	# smw 99/11/24 is this needed
 	ret

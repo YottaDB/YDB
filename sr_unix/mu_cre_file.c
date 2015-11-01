@@ -32,7 +32,6 @@
 #include "send_msg.h"
 #include "is_raw_dev.h"
 #include "disk_block_available.h"
-#include "gtm_uname.h"
 #include "mucregini.h"
 #include "mu_cre_file.h"
 #include "gtmmsg.h"
@@ -41,7 +40,6 @@
 #define EXIT_WRN	2
 #define EXIT_INF	1
 #define EXIT_NRM	0
-#define MAX_NODE_NAME	32
 #define BLK_SIZE (((gd_segment*)gv_cur_region->dyn.addr)->blk_size)
 
 #define CLEANUP(XX)	{				\
@@ -71,8 +69,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 unsigned char mu_cre_file(void)
 {
 	char		*cc = NULL, path[MAX_FBUFF + 1], errbuff[512];
-	unsigned char	buff[DISK_BLOCK_SIZE], node_name[MAX_NODE_NAME + 1];
-	short		nodelen;
+	unsigned char	buff[DISK_BLOCK_SIZE];
 	int		fd = -1, i, lower, upper, status, padded_len, padded_vbn, norm_vbn;
 	uint4		raw_dev_size;		/* size of a raw device, in bytes */
 	int4		ref_size, save_errno;
@@ -114,16 +111,10 @@ unsigned char mu_cre_file(void)
 	}
 	path[pblk.b_esl] = 0;
 	if (pblk.fnb & F_HAS_NODE)
-	{
+	{	/* Remote node specification given */
 		assert(pblk.b_node);
-		node_name[MAX_NODE_NAME] = 0;
-		gtm_uname((char *)node_name, MAX_NODE_NAME);
-		nodelen = strlen((char *)node_name);
-		if (pblk.b_node - 1 != nodelen || memcmp(pblk.l_node, node_name, nodelen))
-		{
-			PRINTF("Database file for region %s not created; cannot create across network.\n", path);
-			return EXIT_WRN;
-		}
+		PRINTF("Database file for region %s not created; cannot create across network.\n", path);
+		return EXIT_WRN;
 	}
 	udi = &udi_struct;
 	udi->raw = is_raw_dev(pblk.l_dir);
@@ -212,6 +203,8 @@ unsigned char mu_cre_file(void)
 	cs_data = (sgmnt_data_ptr_t)malloc(sizeof(sgmnt_data));
 	memset(cs_data, 0, sizeof(*cs_data));
 	cs_data->createinprogress = TRUE;
+	cs_data->semid = INVALID_SEMID;
+	cs_data->shmid = INVALID_SHMID;
 	/* We want our datablocks to start on what would be a block boundary within the file so pad the fileheader
 	   if necessary to make this happen.
 	*/

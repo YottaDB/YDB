@@ -23,6 +23,7 @@
 #include "fix_pages.h"
 #include "io.h"
 #include "inst_flush.h"
+#include "gtm_string.h"
 
 #ifdef __MVS__		/* need to adjust for load address inst. (temporary) */
 #define SIZEOF_LA	4
@@ -110,9 +111,10 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 			if (find_line_addr(routine, &lab->str, offset + 1) == line_offset_addr)
 				dec_err(VARLSTCNT(1) ERR_COMMENT);
 			proc_act_type = SFT_ZBRK_ACT;
-			op_commarg(act, indir_linetail);
+			/* Force creation of new cache record we can steal with _nocache */
+			op_commarg(act, indir_linetail_nocache);
 			proc_act_type = 0;
-			obj = cache_get(indir_linetail, &act->str);
+			obj = cache_get(indir_linetail_nocache, &act->str);
 			csp = ((ihdtyp *)(obj->addr))->indce;	/* Cache entry for this object code */
 			if (csp->temp_elem)			/* Going to be released when unwound? */
 				++csp->refcnt;			/* .. this will keep it around */

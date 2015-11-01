@@ -212,7 +212,7 @@ void	mur_extract_null(jnl_record *rec)
 {
 	int			extract_len;
 	char			*ptr;
-	jnl_process_vector	*pv = &rec->val.jrec_pini.process_vector;
+	jnl_process_vector	*pv = &rec->val.jrec_pini.process_vector[CURR_JPV];
 	jnl_proc_time		*ref_time = &pv->jpv_time;
 
 	extract_len = 0;
@@ -228,6 +228,7 @@ void	mur_extract_null(jnl_record *rec)
 	}
 
 	extract_len = exttime(rec->val.jrec_null.short_time, ref_time, extract_len);
+	extract_len = exttime(rec->val.jrec_null.recov_short_time, ref_time, extract_len);
 	EXTINT(0);
 	EXTQW(rec->val.jrec_null.jnl_seqno);
 	EXTINT(rec->val.jrec_null.tn);
@@ -266,6 +267,7 @@ void	detailed_extract_set(
 		strcpy(mur_extract_buff + extract_len, "ZTSTART\\");
 		extract_len = strlen(mur_extract_buff);
 		extract_len = exttime(rec->val.jrec_fkill.short_time, ref_time, extract_len);
+		extract_len = exttime(rec->val.jrec_fkill.recov_short_time, ref_time, extract_len);
 		goto common;
 
 	case JRT_TKILL:
@@ -281,6 +283,7 @@ void	detailed_extract_set(
 
 	common:
 		extract_len = exttime(rec->val.jrec_fkill.short_time, ref_time, extract_len);
+		extract_len = exttime(rec->val.jrec_fkill.recov_short_time, ref_time, extract_len);
 		EXTINT(pid);
 		jnlext_write(mur_extract_buff, extract_len + 1);
 		if (is_updproc)
@@ -349,6 +352,7 @@ void	detailed_extract_set(
 	}
 
 	extract_len = exttime(rec->val.jrec_kill.short_time, ref_time, strlen(mur_extract_buff));
+	extract_len = exttime(rec->val.jrec_kill.recov_short_time, ref_time, extract_len);
 
 	EXTINT(pid);
 	EXTQW(rec->val.jrec_kill.jnl_seqno);
@@ -423,7 +427,7 @@ void	detailed_extract_set(
 void	mur_extract_align(jnl_record *rec)
 {
 	int			extract_len;
-	jnl_process_vector	*pv = &rec->val.jrec_pini.process_vector;
+	jnl_process_vector	*pv = &rec->val.jrec_pini.process_vector[CURR_JPV];
 	jnl_proc_time		*ref_time = &pv->jpv_time;
 
 	assert (mur_options.detail);

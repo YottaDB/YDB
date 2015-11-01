@@ -56,10 +56,21 @@ bool lk_check_own(mlk_pvtblk *x)
 	grab_crit(x->region);           /* check on process that owns lock */
 	ret_val = FALSE;
 
-	if (x->nodptr && BLOCKING_PROC_ALIVE(x,time,icount,status))
-	{	/* process that owned lock has died, free lock */
-		x->blocked->owner = 0;
-		csa->hdr->trans_hist.lock_sequence++;
+	if (x->blocked->owner)
+	{	/* There is an owner for the blocking node */
+		if (x->blocked->sequence != x->blk_sequence)
+		{	/* The node we were blocking on has been reused for something else so
+			   we are no longer blocked on it and can pretend that the process
+			   holding the lock went away */
+			ret_val = TRUE;
+		} else if (BLOCKING_PROC_ALIVE(x, time, icount, status))
+		{	/* process that owned lock has died, free lock. */
+			x->blocked->owner = 0;
+			csa->hdr->trans_hist.lock_sequence++;
+			ret_val = TRUE;
+		}
+	} else
+	{	/* There is no owner. Take credit for freeing it.. */
 		ret_val = TRUE;
 	}
 	rel_crit(x->region);

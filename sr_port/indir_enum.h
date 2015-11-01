@@ -9,7 +9,7 @@
  *								*
  ****************************************************************/
 
-#define INDIR(a,b) a
+#define INDIR(a,b,c) a
 enum indir_enum {
 #include "indir.h"
 };

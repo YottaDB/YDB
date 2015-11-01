@@ -10,12 +10,18 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "mlkdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
+#include "gtcmtr_lk.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
 
 GBLREF connection_struct *curr_entry;
 
-bool gtcmtr_lkreqnode()
+bool gtcmtr_lkreqnode(void)
 {
 	unsigned char *ptr;
 

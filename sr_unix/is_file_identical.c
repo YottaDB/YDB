@@ -76,18 +76,6 @@ bool is_gdid_stat_identical(gd_id_ptr_t fid, struct stat *stat_buf)
 		return FALSE;
 }
 
-bool is_gdid_gdid_identical(gd_id_ptr_t fid_1, gd_id_ptr_t fid_2)
-{
-#if defined(__osf__) || defined(_AIX)
-	if (fid_1->device == fid_2->device && fid_1->inode == fid_2->inode && fid_1->st_gen == fid_2->st_gen)
-#else
-	if (fid_1->device == fid_2->device && fid_1->inode == fid_2->inode)
-#endif
-		return TRUE;
-	else
-		return FALSE;
-}
-
 void set_gdid_from_stat(gd_id_ptr_t fid, struct stat *stat_buf)
 {
 	assert(sizeof(gd_id) <= sizeof(gds_file_id));
@@ -106,7 +94,7 @@ void set_gdid_from_stat(gd_id_ptr_t fid, struct stat *stat_buf)
 /*
  * Here we create a unique_id for a file.
  */
-boolean_t filename_to_id(char *filename, char *unique_id)
+boolean_t filename_to_id(gd_id_ptr_t fid, char *filename)
 {
         struct stat	filestat;
 	int		stat_res;
@@ -114,27 +102,6 @@ boolean_t filename_to_id(char *filename, char *unique_id)
 	STAT_FILE(filename, &filestat, stat_res);
 	if (stat_res)
 		return FALSE;
-	stat_to_id(&filestat, unique_id);
+	set_gdid_from_stat(fid, &filestat);
 	return TRUE;
-}
-
-/*
- * Here we create a unique_id from a file's filestat.
- */
-void stat_to_id(struct stat *filestat, char *unique_id)
-{
-	unsigned char	*ptr;
-	gd_id_ptr_t	fid;
-
-	fid = (gd_id_ptr_t)unique_id;
-	fid->inode = filestat->st_ino;
-	fid->device = filestat->st_dev;
-	fid->st_gen = 0;
-#if defined(__osf__) || defined(_AIX)
-#ifdef _AIX
-	if (FS_REMOTE == filestat->st_flag)
-#endif
-		fid->st_gen = filestat->st_gen;
-#else
-#endif
 }

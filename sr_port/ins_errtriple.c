@@ -27,5 +27,5 @@ void ins_errtriple(int4 in_error)
 	assert(curtchain->exorder.bl == pos_in_chain.exorder.bl);
 	triptr = newtriple(OC_RTERROR);
 	triptr->operand[0] = put_ilit(in_error);
-
+	triptr->operand[1] = put_ilit(FALSE);	/* not a subroutine reference */
 }

@@ -13,7 +13,10 @@
 
 #ifdef UNIX
 #include "aswp.h"
+#elif defined(VMS)
+#include <descrip.h>
 #endif
+
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gdskill.h"
@@ -36,6 +39,8 @@
 #ifdef UNIX
 #include "process_deferred_stale.h"
 #endif
+#include "repl_msg.h"		/* for gtmsource.h */
+#include "gtmsource.h"		/* for jnlpool_addrs structure definition */
 
 GBLREF uint4		t_err;
 GBLREF unsigned char	cw_set_depth;
@@ -49,6 +54,7 @@ GBLREF sgm_info		*first_sgm_info;
 GBLREF cache_rec_ptr_t	cr_array[((MAX_BT_DEPTH * 2) - 1) * 2];	/* Maximum number of blocks that can be in transaction */
 GBLREF unsigned int	cr_array_index;
 GBLREF boolean_t        unhandled_stale_timer_pop;
+GBLREF jnlpool_addrs	jnlpool;
 
 #define	CACHE_REC_CLEANUP(cr)			\
 	assert(!cr->in_tend);			\
@@ -59,8 +65,9 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 {
 	boolean_t	update_underway;
 	cache_rec_ptr_t	cr;
-	sgm_info	*si;
       	cw_set_element	*first_cse;
+	sgm_info	*si;
+	sgmnt_addrs	*csa;
 
 	error_def(ERR_TPFAIL);
 
@@ -114,6 +121,12 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			cs_addrs->t_commit_crit = FALSE;
 			if (t_tries < CDB_STAGNATE)
 				rel_crit(gv_cur_region);
+		}
+		if ((CDB_STAGNATE > t_tries) && (NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
+		{
+			csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+			if (csa->now_crit)
+				rel_lock(jnlpool.jnlpool_dummy_reg);
 		}
 		UNIX_ONLY(
 			if ((t_tries < CDB_STAGNATE) && unhandled_stale_timer_pop)

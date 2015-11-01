@@ -236,6 +236,8 @@ void dse_maps(void)
 					cse->new_buff = non_tp_jfb_buff_ptr;
 					gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, cs_addrs->ti->curr_tn);
 					cse->done = TRUE;
+					if (0 == cs_addrs->jnl->pini_addr)
+						jnl_put_jrt_pini(cs_addrs);
 					jnl_write_aimg_rec(cs_addrs, cse->blk, (blk_hdr_ptr_t)cse->new_buff);
 				}
 				else

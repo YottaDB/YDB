@@ -80,8 +80,8 @@ bool	mur_sort_files(ctl_list **jnl_file_list_ptr)
 					return FALSE;
 				matched = TRUE;
 				curr->db_id = curr_sorted->db_id;
-				if (curr->eov_timestamp < curr_sorted->bov_timestamp
-					|| (curr->eov_timestamp == curr_sorted->bov_timestamp
+				if (CMP_JNL_PROC_TIME(curr->eov_timestamp, curr_sorted->bov_timestamp) < 0
+					|| (CMP_JNL_PROC_TIME(curr->eov_timestamp, curr_sorted->bov_timestamp) == 0
 						&& curr->eov_tn <= curr_sorted->bov_tn))
 					break;
 			} else if (matched) /* This file applied to the same database file as the previous sorted file

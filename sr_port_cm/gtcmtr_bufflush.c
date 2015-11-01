@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -19,23 +20,30 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "copy.h"
+#include "format_targ_key.h"
+#include "gtcm_find_region.h"
+#include "gtcm_bind_name.h"
+#include "gvcst_put.h"
+#include "gtcmtr_bufflush.h"
+
 #define LCL_BUF_SIZE 256
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gv_key		*gv_currkey;
 GBLREF connection_struct *curr_entry;
-GBLREF jnl_process_vector *prc_vec;
+GBLREF jnl_process_vector *originator_prc_vec;
 
-bool gtcmtr_bufflush()
+bool gtcmtr_bufflush(void)
 {
-	cm_region_list	*reg_ref, *gtcm_find_region();
+	cm_region_list	*reg_ref;
 	mval		v;
 	short		n;
 	unsigned short	num_trans, data_len;
-	char		buff[LCL_BUF_SIZE], *format_targ_key(), *end;
+	unsigned char	buff[LCL_BUF_SIZE], *end;
 	unsigned char	*ptr, regnum, len, cc, prv;
 	static readonly gds_file_id file;
 
@@ -69,23 +77,11 @@ bool gtcmtr_bufflush()
 			rts_error(VARLSTCNT(11) ERR_KEY2BIG, 4, n, (int4)gv_cur_region->max_key_size,
 				REG_LEN_STR(gv_cur_region), 0, ERR_GVIS, 2, end - buff, buff);
 		}
-		gtcm_bind_name(reg_ref->reghead);
+		gtcm_bind_name(reg_ref->reghead, TRUE);
 		if (JNL_ENABLED(cs_addrs->hdr))
 		{
-			prc_vec = curr_entry->pvec;
-			if ((0 == cs_addrs->jnl->pini_addr) || (0 == reg_ref->pini_addr))
-			{
-				grab_crit(gv_cur_region);
-				jnl_ensure_open();
-				if (!reg_ref->pini_addr)
-				{
-					cs_addrs->jnl->pini_addr = 0;
-					jnl_put_jrt_pini(cs_addrs);
-					reg_ref->pini_addr = cs_addrs->jnl->pini_addr;
-				}
-				rel_crit(gv_cur_region);
-			}
 			cs_addrs->jnl->pini_addr = reg_ref->pini_addr;
+			originator_prc_vec = curr_entry->pvec;
 		}
 		GET_USHORT(data_len, ptr);
 		ptr += sizeof(short);
@@ -99,6 +95,8 @@ bool gtcmtr_bufflush()
 				REG_LEN_STR(gv_cur_region), 0, ERR_GVIS, 2, end - buff, buff);
 		}
 		gvcst_put(&v);
+		if (JNL_ENABLED(cs_addrs->hdr))
+			reg_ref->pini_addr = cs_addrs->jnl->pini_addr; /* In case  journal switch occurred */
 		ptr += data_len;
 	}
 	ptr = curr_entry->clb_ptr->mbf;

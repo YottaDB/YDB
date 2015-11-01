@@ -35,4 +35,5 @@ struct startup_vector
 	int4		break_message_mask;
 	int4		labels;
 	int4		lvnullsubs;
+	int4		zdir_form;
 };

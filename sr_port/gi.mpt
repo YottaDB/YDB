@@ -16,7 +16,7 @@
 	;callable entry point
 	;
 	w !,"Global Input Utility",!
-	i '$d(%zdebug) n $zt s $zt="zg "_$zl_":ERR^%GI" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%GI")
+	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%GI" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%GI")
 	n d,g,n,sav,x,y,%ZD,fmt
 	f  d  q:$l(%ZD)
 	. r !,"Input device: <terminal>: ",%ZD,!
@@ -54,6 +54,7 @@ eof	u $p
 	;
 ERR	u $p w !,$p($zs,",",2,99),!
 	; Warning - Fall-though
+	s $ec=""
 EXIT	i $d(%ZD),%ZD'=$p c %ZD
 	u $p:(ctrap="":exc="")
 	q

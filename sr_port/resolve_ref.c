@@ -10,43 +10,51 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_stdio.h"
+
 #include "compiler.h"
 #include "mdq.h"
 #include "opcode.h"
 #include "cmd_qlf.h"
 #include "mmemory.h"
 #include "resolve_lab.h"
+#include "cdbg_dump.h"
+#include "gtmdbglvl.h"
 
-GBLREF int4 source_error_found;
-GBLREF bool run_time;
-GBLREF triple t_orig;
-GBLREF mlabel *mlabtab;
+GBLREF int4	source_error_found;
+GBLREF bool	run_time;
+GBLREF triple	t_orig;
+GBLREF mlabel	*mlabtab;
 GBLREF command_qualifier cmd_qlf;
+GBLREF uint4	gtmDebugLevel;
 
 int resolve_ref(int errknt)
 {
-	triple *x,*y,*z;
-	tbp *p;
-	mline *mxl;
-	mlabel *mlbx;
+	triple	*x,*y,*z;
+	tbp	*p;
+	mline	*mxl;
+	mlabel	*mlbx;
 	oprtype *n;
 	int4	in_error;
 	int	actcnt;
 	error_def(ERR_LABELMISSING);
 	error_def(ERR_LABELUNKNOWN);
-	error_def	(ERR_FMLLSTPRESENT);
-	error_def	(ERR_FMLLSTMISSING);
-	error_def	(ERR_ACTLSTTOOLONG);
+	error_def(ERR_FMLLSTPRESENT);
+	error_def(ERR_FMLLSTMISSING);
+	error_def(ERR_ACTLSTTOOLONG);
 
 	if (errknt && !(cmd_qlf.qlf & CQ_IGNORE))
 	{
 		assert(!run_time);
-		walktree((mvar *)mlabtab,resolve_lab,(char *)&errknt);
-	}
-	else
+		walktree((mvar *)mlabtab, resolve_lab, (char *)&errknt);
+	} else
 	{
-		dqloop(&t_orig,exorder,x)
+		COMPDBG(printf(" ************************************* Begin resolve_ref scan ******************************\n"););
+		dqloop(&t_orig, exorder, x)
 		{
+			COMPDBG(printf(" ************************ Triple Start **********************\n"););
+			COMPDBG(cdbg_dump_triple(x, 0););
 			for (n = x->operand ; n < &(x->operand[2]) ; n++)
 			{
 				if (n->oprclass == INDR_REF)
@@ -60,7 +68,7 @@ int resolve_ref(int errknt)
 				case TJMP_REF:
 					p = (tbp *) mcalloc(sizeof(tbp));
 					p->bpt = x;
-					dqins(&n->oprval.tref->jmplist,que,p);
+					dqins(&n->oprval.tref->jmplist, que, p);
 					continue;
 				case MNXL_REF:
 					mxl = n->oprval.mlin->child;
@@ -87,29 +95,25 @@ int resolve_ref(int errknt)
 						{
 							n->oprclass = TJMP_REF;
 							n->oprval.tref = y;
-						}
-						else
+						} else
 						{
 							errknt++;
-							stx_error(ERR_FMLLSTPRESENT, 2, mid_len(&mlbx->mvname)
-								,&mlbx->mvname);
+							stx_error(ERR_FMLLSTPRESENT, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
 							source_error_found = 0;
-							y = maketriple(OC_RTERROR);
+							y = newtriple(OC_RTERROR);
 							y->operand[0] = put_ilit(ERR_FMLLSTPRESENT);
-							ins_triple(y);
+							y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
 							n->oprval.tref = y;
 							n->oprclass = TJMP_REF;
 						}
-					}
-					else
+					} else
 					{
 						errknt++;
-						stx_error(ERR_LABELMISSING, 2, mid_len(&mlbx->mvname)
-							,&mlbx->mvname);
+						stx_error(ERR_LABELMISSING, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
 						source_error_found = 0;
-						y = maketriple(OC_RTERROR);
+						y = newtriple(OC_RTERROR);
 						y->operand[0] = put_ilit(ERR_LABELUNKNOWN);
-						ins_triple(y);
+						y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
 						n->oprval.tref = y;
 						n->oprclass = TJMP_REF;
 					}
@@ -139,43 +143,36 @@ int resolve_ref(int errknt)
 						if (mlbx->formalcnt == NO_FORMALLIST)
 						{
 							errknt++;
-							stx_error(ERR_FMLLSTMISSING, 2, mid_len(&mlbx->mvname)
-								,&mlbx->mvname);
+							stx_error(ERR_FMLLSTMISSING, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
 							source_error_found = 0;
-							y = maketriple(OC_RTERROR);
+							y = newtriple(OC_RTERROR);
 							y->operand[0] = put_ilit(ERR_FMLLSTMISSING);
-							ins_triple(y);
+							y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
 							n->oprval.tref = y;
 							n->oprclass = TJMP_REF;
-						}
-						else
-						if (mlbx->formalcnt < actcnt)
+						} else if (mlbx->formalcnt < actcnt)
 						{
 							errknt++;
-							stx_error(ERR_ACTLSTTOOLONG, 2, mid_len(&mlbx->mvname)
-								,&mlbx->mvname);
+							stx_error(ERR_ACTLSTTOOLONG, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
 							source_error_found = 0;
-							y = maketriple(OC_RTERROR);
+							y = newtriple(OC_RTERROR);
 							y->operand[0] = put_ilit(ERR_ACTLSTTOOLONG);
-							ins_triple(y);
+							y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
 							n->oprval.tref = y;
 							n->oprclass = TJMP_REF;
-						}
-						else
+						} else
 						{
 							n->oprclass = TJMP_REF;
 							n->oprval.tref = y;
 						}
-					}
-					else
+					} else
 					{
 						errknt++;
-						stx_error(ERR_LABELMISSING, 2, mid_len(&mlbx->mvname)
-							,&mlbx->mvname);
+						stx_error(ERR_LABELMISSING, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
 						source_error_found = 0;
-						y = maketriple(OC_RTERROR);
+						y = newtriple(OC_RTERROR);
 						y->operand[0] = put_ilit(ERR_LABELUNKNOWN);
-						ins_triple(y);
+						y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
 						n->oprval.tref = y;
 						n->oprclass = TJMP_REF;
 					}
@@ -185,10 +182,12 @@ int resolve_ref(int errknt)
 					{
 						assert(y->operand[0].oprclass == TRIP_REF);
 						*n = y->operand[0];
+						COMPDBG(printf(" ** p1: operand at 0x%08lx replaced by operand at 0x%08lx\n",
+							       n, &y->operand[0]););
 					}
 					p = (tbp *) mcalloc(sizeof(tbp));
 					p->bpt = x;
-					dqins(&n->oprval.tref->backptr,que,p);
+					dqins(&n->oprval.tref->backptr, que, p);
 					continue;
 				}
 			}
@@ -199,10 +198,12 @@ int resolve_ref(int errknt)
 				{
 					assert(y->operand[0].oprclass == TRIP_REF);
 					*n = y->operand[0];
+					COMPDBG(printf(" ** p2: operand at 0x%08lx replaced by operand at 0x%08lx\n",
+						       n, &y->operand[0]););
 				}
 				p = (tbp *) mcalloc(sizeof(tbp));
 				p->bpt = x;
-				dqins(&n->oprval.tref->backptr,que,p);
+				dqins(&n->oprval.tref->backptr, que, p);
 			}
 		}
 	}

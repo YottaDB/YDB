@@ -11,11 +11,12 @@
 %GD	;GT.M %GD utility - global directory
 	;
 	n %ZG,%ZL
-        i '$d(%zdebug) n $zt s $zt="zg "_$zl_":ERR^%GD" u $p:(ctrap=$c(3):exc="k %ZG zg "_$zl_":LOOP^%GD")
+        i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%GD" u $p:(ctrap=$c(3):exc="k %ZG zg "_$zl_":LOOP^%GD")
 	w !,"Global Directory",!
 	d GD^%GSEL,EXIT
 	q
 ERR	u $p w !,$p($zs,",",2,99),!
+	s $ec=""
 	; Warning: Fall-through!
 EXIT	u $p:(ctrap="":exc="")
 	q

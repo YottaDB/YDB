@@ -16,18 +16,19 @@
 #include "mv_stent.h"
 #include "rtnhdr.h"
 #include "stack_frame.h"
-
-#ifdef sparc
-#include "cachectl.h"
-#include "cacheflush.h"
-#endif
+#include "tp_frame.h"
 #include "op.h"
+#include "gtm_string.h"
 
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF stack_frame	*frame_pointer;
+GBLREF tp_frame		*tp_pointer;
 GBLREF symval		*curr_symval;
+GBLREF short		dollar_tlevel;
 
+/* Note this module follows the same basic pattern as gtm_newintrisic which handles
+   the same function but for intrinsic vars instead of local vars. */
 void op_newvar(uint4 arg1)
 {
 	mv_stent 	*mv_st_ent, *mvst_tmp, *mvst_prev;
@@ -37,6 +38,7 @@ void op_newvar(uint4 arg1)
 	lv_val		*new;
 	mident		*varname;
 	mvs_ntab_struct *ptab;
+	tp_frame	*tpp;
 	int		indx;
 
 	error_def(ERR_STACKOFLOW);
@@ -46,22 +48,18 @@ void op_newvar(uint4 arg1)
 	hte = ht_get(&curr_symval->h_symtab, (mname *)varname);
 	assert(hte);	/* variable must be defined and fetched by this point */
 	if (frame_pointer->type & SFT_COUNT)
-	{
-		if (varname > (mident *)stacktop && varname < (mident *)frame_pointer)
-		{
-			PUSH_MV_STENT(MVST_NVAL);
-			mv_st_ent = mv_chain;
-			new = mv_st_ent->mv_st_cont.mvs_nval.mvs_val = lv_getslot(curr_symval);
-			ptab = &mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab;
-			varname = &mv_st_ent->mv_st_cont.mvs_nval.name;
-			memcpy(varname, &(((vent *)frame_pointer->vartab_ptr)[arg1]), sizeof(*varname));
-		} else
-		{
-			PUSH_MV_STENT(MVST_PVAL);
-			mv_st_ent = mv_chain;
-			new = mv_st_ent->mv_st_cont.mvs_pval.mvs_val = lv_getslot(curr_symval);
-			ptab = &mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab;
-		}
+	{	/* Current (youngest) frame is NOT an indirect frame.
+		   If the var being new'd exists in an earlier frame, we need to save
+		   that value so it can be restored when we exit this frame. Since this
+		   is a counted frame, just create a stack entry to save the old value.
+		   If there was no previous entry, we will destroy the entry when we pop
+		   off this frame (make it undefined again).
+		*/
+		PUSH_MV_STENT(MVST_PVAL);
+		mv_st_ent = mv_chain;
+		new = mv_st_ent->mv_st_cont.mvs_pval.mvs_val = lv_getslot(curr_symval);
+		ptab = &mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab;
+
 		/* save symtab that's older than the current frame */
 		if (frame_pointer->l_symtab > (mval **)frame_pointer)
 			ptab->lst_addr = (lv_val **)&frame_pointer->l_symtab[arg1];
@@ -70,16 +68,29 @@ void op_newvar(uint4 arg1)
 		frame_pointer->l_symtab[arg1] = (mval *)new;
 		assert(0 <= arg1);
 	} else
-	{
+	{	/* Current (youngest) frame IS an indirect frame.
+		   The situation is more complex because this is not a true stackframe.
+		   It has full access to the base "counted" frame's vars and any new
+		   done here must behave as if it were done in the base/counted frame.
+		   To accomplish this, we actually find the base frame we are executing
+		   in, then shift all frames younger than that up by the size of the mvstent
+		   entry we need to save/restore the value being new'd and then go into
+		   each frame modified and fixup all the addresses.
+		 */
 		fp = frame_pointer;
 		fp_prev = fp->old_frame_pointer;
 		assert(fp_prev);
+		/* Find relevant base (counted) frame */
 		while (!(fp_prev->type & SFT_COUNT))
 		{
 			fp = fp_prev;
 			fp_prev = fp->old_frame_pointer;
 			assert(fp_prev);
 		}
+		/* top is beginning of earliest indirect stackframe before counted base frame.
+		   It is the point where we will shift to make room to insert an mv_stent into
+		   the base frame.
+		*/
 		top = (unsigned char *)(fp + 1);
 		old_sp = msp;
 		msp -= mvs_size[MVST_NVAL];
@@ -93,10 +104,12 @@ void op_newvar(uint4 arg1)
 	   		else
 	   			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
 	   	}
-		memcpy(msp, old_sp, top - (unsigned char *)old_sp);
+		/* Ready, set, shift the younger indirect frames to make room for mv_stent */
+		memmove(msp, old_sp, top - (unsigned char *)old_sp);
 		mv_st_ent = (mv_stent *)(top - mvs_size[MVST_NVAL]);
 		mv_st_ent->mv_st_type = MVST_NVAL;
 		frame_pointer = (stack_frame *)((char *)frame_pointer - mvs_size[MVST_NVAL]);
+		/* adjust all the pointers in all the stackframes that were moved */
 		for (fp_fix = frame_pointer;  fp_fix != fp_prev;  fp_fix = fp_fix->old_frame_pointer)
 		{
 			if ((unsigned char *)fp_fix->l_symtab < top && (unsigned char *)fp_fix->l_symtab > stacktop)
@@ -110,12 +123,26 @@ void op_newvar(uint4 arg1)
 				fp_fix->old_frame_pointer =
 					(stack_frame *)((char *)fp_fix->old_frame_pointer - mvs_size[MVST_NVAL]);
 		}
-		if ((unsigned char *)mv_chain >= top)
+		/* Adjust stackframe and mvstent pointers in relevant tp_frame blocks */
+		assert((NULL == tp_pointer && 0 == dollar_tlevel) || (NULL != tp_pointer && 0 != dollar_tlevel));
+		for (tpp = tp_pointer; (tpp && ((unsigned char *)tpp->fp < top)); tpp = tpp->old_tp_frame)
 		{
+			if ((unsigned char *)tpp->fp > stacktop)
+				tpp->fp = (struct stack_frame_struct *)((char *)tpp->fp - mvs_size[MVST_NVAL]);
+			/* Note low check for < top may be superfluous here but without a test case to verify, I
+			   feel better leaving it in. SE 8/2001 */
+			if ((unsigned char *)tpp->mvc < top && (unsigned char *)tpp->mvc > stacktop)
+				tpp->mvc = (struct mv_stent_struct *)((char *)tpp->mvc - mvs_size[MVST_NVAL]);
+		}
+		/* Put new mvstent entry on (into) the mvstent chain */
+		if ((unsigned char *)mv_chain >= top)
+		{	/* Just put new entry on end of chain which preceeds our base frame */
 			mv_st_ent->mv_st_next = (char *)mv_chain - (char *)mv_st_ent;
 			mv_chain = mv_st_ent;
 		} else
-		{
+		{	/* One of the indirect frames has mv_stents associated with it so we have to find
+			   the appropriate insertion point for this frame.
+			*/
 			fp = (stack_frame *)((char *)fp - mvs_size[MVST_NVAL]);
 			mv_chain = (mv_stent *)((char *)mv_chain - mvs_size[MVST_NVAL]);
 			mvst_tmp = mv_chain;

@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -24,8 +26,7 @@
 #include "gvusr.h"
 
 GBLREF gv_namehead	*gv_target;
-GBLREF gv_key		*gv_currkey;
-GBLREF gv_key		*gv_altkey;
+GBLREF gv_key		*gv_currkey, *gv_altkey;
 GBLREF spdesc		stringpool;
 GBLREF gd_region	*gv_cur_region;
 GBLREF bool		gv_curr_subsc_null;
@@ -42,15 +43,18 @@ void op_gvquery (mval *v)
 	char			*extnamsrc, *extnamdst, *extnamtop;
 	int			maxlen;
 	char			extnamdelim[] = "^|\"\"|";
+	mval			val;
 
+	/* We want to turn QUERY into QUERYGET for all types of access methods so that we can cache the value of the key returned 
+	 * by $QUERY. The value is very likely to be used shortly after $QUERY - Vinaya, Aug 13, 2001 */
 	acc_meth = gv_cur_region->dyn.addr->acc_meth;
 	if (gv_curr_subsc_null)
-		*(&gv_currkey->base[0] + gv_currkey->prev) = 01;
+		gv_currkey->base[gv_currkey->prev] = 01;
 	else
-	{	*(&gv_currkey->base[0] + gv_currkey->end) = 1;
-		*(&gv_currkey->base[0] + gv_currkey->end + 1) = 0;
-		*(&gv_currkey->base[0] + gv_currkey->end + 2) = 0;
-		gv_currkey->end += 2;
+	{ /* Note, gv_currkey->prev isn't changed here. We rely on this in gtcmtr_query to distinguish different forms of the key */
+		gv_currkey->base[gv_currkey->end++]= 1;
+		gv_currkey->base[gv_currkey->end++] = 0;
+		gv_currkey->base[gv_currkey->end] = 0;
 	}
 	if (acc_meth == dba_bg || acc_meth == dba_mm)
 	{	if (gv_target->root == 0)	/* global does not exist */
@@ -58,7 +62,7 @@ void op_gvquery (mval *v)
 		else
 			found = gvcst_query();
 	} else if (acc_meth == dba_cm)
-		found = gvcmx_query();
+		found = gvcmx_query(&val); /* val ignored currently - Vinaya Aug 13, 2001*/
 	else
 	{
 		assert(acc_meth == dba_usr);

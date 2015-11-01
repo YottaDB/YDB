@@ -12,20 +12,23 @@
 #include "mdef.h"
 #include "mlkdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
+#include "gt_timer.h"
 #include "gtcmlkdef.h"
 #include "locklits.h"
+#include "gtcml.h"
 
-GBLREF connection_struct *curr_entry;
-GBLREF mlk_pvtblk *mlk_cm_root;
-GBLREF unsigned short cm_cmd_lk_ct;
+GBLREF connection_struct	*curr_entry;
+GBLREF mlk_pvtblk		*mlk_cm_root;
+GBLREF unsigned short		cm_cmd_lk_ct;
 
-unsigned char gtcml_dolock()
+unsigned char gtcml_dolock(void)
 {
-	cm_region_list *reg_walk, *bck_out;
-	unsigned char return_val;
-	unsigned char *ptr, laflag;
-	char granted, gtcml_lock(), gtcml_incrlock(), gtcml_zallocate();
+	cm_region_list	*reg_walk, *bck_out;
+	unsigned char	return_val;
+	unsigned char	*ptr, laflag;
+	char		granted;
 
 	ptr = curr_entry->clb_ptr->mbf;
 	ptr++; /* jump over header */
@@ -44,12 +47,17 @@ unsigned char gtcml_dolock()
 			reg_walk->blkd = 0;
 			switch(laflag)
 			{
-				case CM_LOCKS:		granted = gtcml_lock(reg_walk);
-						break;
-				case CM_ZALLOCATES:	granted = gtcml_zallocate(reg_walk);
-						break;
-				case INCREMENTAL:	granted = gtcml_incrlock(reg_walk);
-						break;
+				case CM_LOCKS:
+					granted = gtcml_lock(reg_walk);
+					break;
+				case CM_ZALLOCATES:
+					granted = gtcml_zallocate(reg_walk);
+					break;
+				case INCREMENTAL:
+					granted = gtcml_incrlock(reg_walk);
+					break;
+				default:
+					GTMASSERT;
 			}
 			if (granted == GRANTED)
 			{

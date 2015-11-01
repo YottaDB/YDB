@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"
 #include "gtm_time.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -22,6 +23,8 @@
 #include "jnl_write.h"
 
 GBLREF	jnl_process_vector	*prc_vec;
+GBLREF	boolean_t		forw_phase_recovery;
+GBLREF	uint4			cur_logirec_short_time;
 
 void	jnl_put_jrt_pfin(sgmnt_addrs *csa)
 {
@@ -30,7 +33,11 @@ void	jnl_put_jrt_pfin(sgmnt_addrs *csa)
 	assert(csa->now_crit);
 	assert(csa->jnl->pini_addr != 0);
 	memcpy(&pfin_record.process_vector, prc_vec, sizeof(jnl_process_vector));
-	JNL_WHOLE_TIME(pfin_record.process_vector.jpv_time);
+	if (!forw_phase_recovery)
+	{
+		JNL_WHOLE_TIME(pfin_record.process_vector.jpv_time);
+	} else
+		cur_logirec_short_time = MID_TIME(pfin_record.process_vector.jpv_time);
 	pfin_record.tn = csa->hdr->trans_hist.curr_tn;
 	pfin_record.pini_addr = csa->jnl->pini_addr;
 	jnl_write(csa->jnl, JRT_PFIN, (jrec_union *)&pfin_record, NULL, NULL);

@@ -63,8 +63,9 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	temp_region = gv_cur_region; 	/* save gv_cur_region wherever there is scope for it to be changed */
 	gv_cur_region = reg; /* dbfilop needs gv_cur_region */
 	udi = FILE_INFO(reg);
-	if (!udi || 0 >= udi->ftok_semid || 0 >= udi->semid)
+	if (!udi || INVALID_SEMID == udi->ftok_semid || INVALID_SEMID == udi->semid)
 	{
+		assert(FALSE);
 		gv_cur_region = temp_region;
 		return FALSE;
 	}
@@ -72,12 +73,12 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	fc = reg->dyn.addr->file_cntl;
 	fc->op = FC_OPEN;
 	status = dbfilop(fc);
+	gv_cur_region = temp_region;
 	if (SS_NORMAL != status)
 	{
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
                 return FALSE;
 	}
-	gv_cur_region = temp_region;
 	if (!ftok_sem_lock(reg, FALSE, immediate))
 		return FALSE;
 	/*
@@ -89,7 +90,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	LSEEKREAD(udi->fd, (off_t)0, csd, sizeof(*csd), status);
 	if (0 != status)
 	{
-		gtm_putmsg(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+		gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 		CLOSEFILE(udi->fd, status);
 		if (-1 == status)
 			gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
@@ -97,14 +98,14 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	}
 	if (!reg->read_only)
 	{
-		csd->semid = 0;
-		csd->shmid = 0;
+		csd->semid = INVALID_SEMID;
+		csd->shmid = INVALID_SHMID;
 		csd->sem_ctime.ctime = 0;
 		csd->shm_ctime.ctime = 0;
 		LSEEKWRITE(udi->fd, (off_t)0, csd, sizeof(*csd), status);
 		if (0 != status)
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+			gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 			CLOSEFILE(udi->fd, status);
 			if (-1 == status)
 				gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
@@ -112,8 +113,8 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 		}
 	} else
 	{
-		db_ipcs.semid = 0;
-		db_ipcs.shmid = 0;
+		db_ipcs.semid = INVALID_SEMID;
+		db_ipcs.shmid = INVALID_SHMID;
 		db_ipcs.sem_ctime = 0;
 		db_ipcs.shm_ctime = 0;
 		get_full_path((char *)reg->dyn.addr->fname, reg->dyn.addr->fname_len,
@@ -121,7 +122,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 		db_ipcs.fn[db_ipcs.fn_len] = 0;
 		if (0 != (status = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0)))
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+			gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 			CLOSEFILE(udi->fd, status);
 			if (-1 == status)
 				gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
@@ -139,11 +140,10 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	}
 	if (!ftok_sem_release(reg, TRUE, immediate))
 		return FALSE;
-	udi->semid = -1;
-	udi->shmid = -1;
+	udi->semid = INVALID_SEMID;
+	udi->shmid = INVALID_SHMID;
 	udi->sem_ctime = 0;
 	udi->shm_ctime = 0;
-	udi->ftok_semid = -1;
 	free(csd);
 	standalone_reg = NULL;
 	return TRUE;

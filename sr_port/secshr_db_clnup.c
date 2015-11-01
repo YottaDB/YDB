@@ -231,7 +231,7 @@ void secshr_db_clnup(boolean_t termination_mode)
 				}
 				if (csd->acc_meth == dba_bg)
 				{
-					if (!GTM_PROBE(reg->sec_size, csa->nl, WRITE))
+					if ((0 == reg->sec_size) || !GTM_PROBE(reg->sec_size, csa->nl, WRITE))
 					{
 						SECSHR_ACCOUNTING(3);
 						SECSHR_ACCOUNTING(__LINE__);
@@ -241,7 +241,13 @@ void secshr_db_clnup(boolean_t termination_mode)
 					CHECK_LATCH(&csa->acc_meth.bg.cache_state->cacheq_active.latch);
 					start_cr = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
 					max_bts = csd->n_bts;
-					/* Should we add a probe here in case value in cache_array got trashed? */
+					if (!GTM_PROBE(max_bts * sizeof(cache_rec), start_cr, WRITE))
+					{
+						SECSHR_ACCOUNTING(3);
+						SECSHR_ACCOUNTING(__LINE__);
+						SECSHR_ACCOUNTING(start_cr);
+						continue;
+					}
 					cr_top = start_cr + max_bts;
 					for (cr = start_cr;  cr < cr_top;  cr++)
 					{	/* walk write cache looking for incomplete writes and reads issued by self */
@@ -253,9 +259,12 @@ void secshr_db_clnup(boolean_t termination_mode)
 						UNIX_ONLY(assert(rundown_process_id);)
 						if ((cr->r_epid == rundown_process_id) && (0 == cr->dirty)
 								&& (FALSE == cr->in_cw_set))
+						{
+							cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 							cr->blk = CR_BLKEMPTY;
 							/* don't mess with ownership the I/O may not yet be cancelled; ownership
 							 * will be cleared by whoever gets stuck waiting for the buffer */
+						}
 					}
 				}
 				first_cw_set = cs = NULL;
@@ -407,6 +416,7 @@ void secshr_db_clnup(boolean_t termination_mode)
 								continue;
 							}
 							cr = clru++;
+							cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 							cr->blk = cs->blk;
 							cr->jnl_addr = cs->jnl_freeaddr;
 							cr->stopped = TRUE;
@@ -499,12 +509,12 @@ void secshr_db_clnup(boolean_t termination_mode)
 									if (((nxt = cs + 1) < cs_top)
 										&& (gds_t_write_root == nxt->mode))
 									{
-										if ((cs->ins_off >
-										((blk_hdr *)blk_ptr)->bsiz - sizeof(block_id))
+										if ((nxt->ins_off >
+										     ((blk_hdr *)blk_ptr)->bsiz - sizeof(block_id))
 											|| (nxt->ins_off < (sizeof(blk_hdr)
 												 + sizeof(rec_hdr)))
 											|| (0 > (short)nxt->index)
-											|| ((cs - cw_set_addrs) > nxt->index))
+											|| ((cs - cw_set_addrs) <= nxt->index))
 										{
 											SECSHR_ACCOUNTING(7);
 											SECSHR_ACCOUNTING(__LINE__);
@@ -721,7 +731,8 @@ void secshr_db_clnup(boolean_t termination_mode)
 				}
 #endif
 			}	/* For all regions */
-		}	/* if gd_header is accessible */
+		} else		/* if gd_header is accessible */
+			break;
 	}	/* For all glds */
 	if (jnlpool_reg_addrs && (GTM_PROBE(sizeof(jnlpool_reg_addrs), jnlpool_reg_addrs, READ)))
 	{

@@ -45,19 +45,22 @@ void mu_upgrd_ctrlc_handler(int sig)
   -------------------------------------------------------------------------*/
 bool mu_upgrd_confirmed(bool flag)
 {
-	char str[4], ustr[4];
+	char str[4];
 	char cstr[2][10]={"abort", "continue"};
+	int  index = 0;
 
 	util_out_print("-------------------------------------------------------------------------", FLUSH);
-	if (flag) util_out_print("You must have a backup before you proceed!!", FLUSH);
+	if (flag)
+	{
+		util_out_print("You must have a backup before you proceed!!", FLUSH);
+		index = 1; /* In case TRUE is not 1, but > 1 */
+	}
 	util_out_print("An abnormal termination will damage the database while doing the upgrade !!", FLUSH);
 	util_out_print("-------------------------------------------------------------------------", FLUSH);
-	util_out_print("Are you ready to !AD?(Yes/No):", FLUSH, LEN_AND_STR(cstr[flag]));
+	util_out_print("Are you ready to !AD? [y/n]:", FLUSH, LEN_AND_STR(cstr[index]));
 	SCANF("%s",str);
-	lower_to_upper((uchar_ptr_t)ustr, (uchar_ptr_t)str, 4);
-	if (strncmp(ustr,"YES",3)==0)
+	if (str[0] == 'y' || str[0] == 'Y')
 		return TRUE;
 	else
 		return FALSE;
 }
-

@@ -30,21 +30,19 @@ LITREF mval		*fndata_table[2][2];
 
 void op_gvdata(mval *v)
 {
-	int x;
+	mint x;
 
 	if (gv_curr_subsc_null && gv_cur_region->null_subs == FALSE)
 		sgnl_gvnulsubsc();
 
 	x = 0;
 	if (gv_cur_region->dyn.addr->acc_meth == dba_bg || gv_cur_region->dyn.addr->acc_meth == dba_mm)
-	{ 	if (gv_target->root)
-		{	x = gvcst_data();
-		}
-	}
-	else if (gv_cur_region->dyn.addr->acc_meth == dba_cm)
-	{	x = gvcmx_data();
-	} else
-	{	x = gvusr_data();
-	}
+	{
+		if (gv_target->root)
+			x = gvcst_data();
+	} else if (gv_cur_region->dyn.addr->acc_meth == dba_cm)
+		x = gvcmx_data();
+	else
+		x = gvusr_data();
 	*v = *fndata_table[x / 10][x & 1];
 }

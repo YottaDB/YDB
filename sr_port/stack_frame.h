@@ -61,9 +61,11 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFF_INDCE	(1 << 0)	/* This frame is executing an indirect cache entry */
 #define SFF_ZTRAP_ERR 	(1 << 1)	/* error occured during $ZTRAP compilation */
 #define SFF_DEV_ACT_ERR	(1 << 2)	/* compilation error occured in device exception handler */
+#define SFF_CI		(1 << 3)	/* call-in base frame */
 #define SFF_INDCE_OFF   	~(SFF_INDCE)		/* Mask to turn off SFF_INDCE */
 #define SFF_ZTRAP_ERR_OFF	~(SFF_ZTRAP_ERR)	/* Mask to turn off SFF_ZTRAP_ERR */
 #define SFF_DEV_ACT_ERR_OFF	~(SFF_DEV_ACT_ERR)	/* Mask to turn off SFF_DEV_ACT_ERR */
+#define SFF_CI_OFF		~(SFF_CI)		/* Mask to turn off SFF_CI */
 
 void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr);
 void new_stack_frame_sp(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr);

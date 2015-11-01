@@ -94,9 +94,12 @@ short	iorm_rdone (mint *v, int4 timeout)
 		 * the check for EINTR below is valid and should not be converted to an EINTR
 		 * wrapper macro, since it might be a timeout.
 		 */
-		while((EOF == (status = getc (rm_ptr->filstr))) && (EINTR == errno) && !out_of_time);
+		while((EOF == (status = getc(rm_ptr->filstr))) && (EINTR == errno) && !out_of_time);
 		if (EOF != status)
+		{
 			inchar = (unsigned char) status;
+			status = 1;		/* one character returned */
+		}
 		else if (errno == 0)
 			status = 0;
 		else if (errno == EINTR  &&  out_of_time)

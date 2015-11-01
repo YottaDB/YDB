@@ -10,9 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "copy.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
+#include "gtm_string.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
@@ -20,8 +22,13 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "gtcmtr_put.h"
+#include "format_targ_key.h"
+#include "gtcm_find_region.h"
+#include "gtcm_bind_name.h"
+#include "gvcst_put.h"
 
 #define LCL_BUF_SIZE 256
 
@@ -29,13 +36,13 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gv_key		*gv_currkey;
 GBLREF connection_struct *curr_entry;
-GBLREF jnl_process_vector *prc_vec;
+GBLREF jnl_process_vector *originator_prc_vec;
 
 bool gtcmtr_put(void)
 {
-	cm_region_list	*gtcm_find_region(), *reg_ref;
+	cm_region_list	*reg_ref;
 	mval		v;
-	char		buff[LCL_BUF_SIZE], *format_targ_key(), *end;
+	unsigned char	buff[LCL_BUF_SIZE], *end;
 	unsigned char	*ptr, regnum;
 	short		n;
 	unsigned short	top, len;
@@ -44,40 +51,27 @@ bool gtcmtr_put(void)
 	error_def(ERR_KEY2BIG);
 	error_def(ERR_REC2BIG);
 	error_def(ERR_GVIS);
+	error_def(ERR_DBPRIVERR);
 
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(*ptr == CMMS_Q_PUT);
 	ptr++;
-	len = *((unsigned short *)ptr);
+	GET_USHORT(len, ptr);
 	ptr += sizeof(unsigned short);
 	regnum = *ptr++;
 	reg_ref = gtcm_find_region(curr_entry,regnum);
 	len--; /* subtract size of regnum */
-	top = gv_currkey->top;
-	memcpy(gv_currkey, ptr, len);
-	gv_currkey->top = top;
-	ptr += len;
-	gtcm_bind_name(reg_ref->reghead);
-
+	CM_GET_GVCURRKEY(ptr, len);
+	gtcm_bind_name(reg_ref->reghead, TRUE);
+	if (gv_cur_region->read_only)
+		rts_error(VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	if (JNL_ENABLED(cs_addrs->hdr))
 	{
-		prc_vec = curr_entry->pvec;
-		assert(NULL != prc_vec);
-		if ((0 == cs_addrs->jnl->pini_addr) || (0 == reg_ref->pini_addr))
-		{
-			grab_crit(gv_cur_region);
-			jnl_ensure_open();
-			if (!reg_ref->pini_addr)
-			{
-				cs_addrs->jnl->pini_addr = 0;
-				jnl_put_jrt_pini(cs_addrs);
-				reg_ref->pini_addr = cs_addrs->jnl->pini_addr;
-			}
-			rel_crit(gv_cur_region);
-		}
+		originator_prc_vec = curr_entry->pvec;
 		cs_addrs->jnl->pini_addr = reg_ref->pini_addr;
 	}
-	len = *((unsigned short *)ptr)++;
+	GET_USHORT(len, ptr);
+	ptr += sizeof(unsigned short);
 	v.mvtype = MV_STR;
 	v.str.len = len;
 	v.str.addr = (char *)ptr;
@@ -96,9 +90,9 @@ bool gtcmtr_put(void)
 			(int4)gv_cur_region->max_rec_size, REG_LEN_STR(gv_cur_region),
 			0, ERR_GVIS, 2, end - buff, buff);
 	}
-
 	gvcst_put(&v);
-
+	if (JNL_ENABLED(cs_addrs->hdr))
+		reg_ref->pini_addr = cs_addrs->jnl->pini_addr; /* In case  journal switch occurred */
 	ptr = curr_entry->clb_ptr->mbf;
 	*ptr++ = CMMS_R_PUT;
 	curr_entry->clb_ptr->cbl = S_HDRSIZE;

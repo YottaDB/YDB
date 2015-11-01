@@ -15,6 +15,7 @@
 #include "iotimer.h"
 #include "locklits.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "tp_frame.h"
 #include "op.h"

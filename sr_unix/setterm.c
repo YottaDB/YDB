@@ -46,7 +46,7 @@ void setterm(io_desc *ioptr)
 	{
 		save_errno = errno;
 		if (gtm_isanlp(tt_ptr->fildes) == 0)
-			rts_error(VARLSTCNT(3) ERR_TCSETATTR, tt_ptr->fildes, save_errno);
+			rts_error(VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 	}
 	return;
 }
@@ -85,7 +85,7 @@ void iott_mterm(io_desc *ioptr)
 	t.c_iflag &= ~(ICRNL);
 	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status);
 	if (0 != status)
-		rts_error(VARLSTCNT(3) ERR_TCSETATTR, tt_ptr->fildes, errno);
+		rts_error(VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, errno);
 	return;
 }
 

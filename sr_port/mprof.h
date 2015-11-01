@@ -83,8 +83,8 @@ struct mprof_tree{
 	struct 	trace_entry	e;
 	struct  mprof_tree 	*link[2];
 	struct mprof_tree	*loop_link;
-	signed  int 		bal;	/* Balance factor */
-	unsigned int		cache; 	/* Used during insertion */
+	int 		bal;	/* Balance factor */
+	unsigned int	cache; 	/* Used during insertion */
 };
 
 typedef struct  stack_frame_prof_struct
@@ -94,8 +94,8 @@ typedef struct  stack_frame_prof_struct
 	char            label_name[9];
 	char		filler[2];
 	int		dummy_stack_count;
-	signed long   	usr_time;
-	signed long   	sys_time;
+	unsigned long   usr_time;
+	unsigned long   sys_time;
 } stack_frame_prof;
 
 #ifdef VMS
@@ -106,11 +106,11 @@ struct tms {
 #endif
 
 char 	*pcalloc(unsigned int);
-int	turn_tracing_on(mval *glvn);
-int	turn_tracing_off(mval *);
-void    get_entryref_information(boolean_t, struct trace_entry *);
+void	turn_tracing_on(mval *glvn);
+void	turn_tracing_off(mval *);
+void	get_entryref_information(boolean_t, struct trace_entry *);
 void	new_prof_frame(int);
-void	parse_glvn(mval *);
+void	parse_gvn(mval *);
 void 	mprof_tree_walk(struct mprof_tree *);
 void 	*mprof_tree_find_node(struct mprof_tree *, struct trace_entry);
 void	pcurrpos(int inside_for_loop);

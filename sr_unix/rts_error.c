@@ -11,9 +11,16 @@
 
 #include "mdef.h"
 
-/* gcc/Linux needs stdio.h before varargs until removed from error.h */
-#include "gtm_stdio.h"
+/* gcc/LinuxIA32 needs stdio.h before varargs until removed from error.h */
+/* gcc/Linux390 needs varargs before stdarg in stdio */
+#ifdef EARLY_VARARGS
 #include <varargs.h>
+#endif
+#include "gtm_stdio.h"
+#ifndef EARLY_VARARGS
+#include <varargs.h>
+#endif
+
 #include "gtm_putmsg_list.h"
 #include <errno.h>
 
@@ -26,7 +33,6 @@ GBLREF boolean_t	dont_want_core;
 
 #define FLUSH	1
 #define RESET	2
-
 
 /* ----------------------------------------------------------------------------------------
  *  WARNING:	For chained error messages, all messages MUST be followed by an fao count;
@@ -52,7 +58,7 @@ va_dcl
 		gtm_errno = errno;
 
 	VAR_START(var);
-	VAR_START(varl);
+	VAR_COPY(varl, var);
 	argcnt = va_arg(varl, int);
 	msgid = va_arg(varl, int);
 

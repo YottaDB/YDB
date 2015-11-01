@@ -10,12 +10,18 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "mlkdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
+#include "gtcmtr_lk.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
 
 GBLREF connection_struct *curr_entry;
 
-bool gtcmtr_lkrequest()
+bool gtcmtr_lkrequest(void)
 {
 	unsigned char *ptr, return_val;
 
@@ -26,6 +32,7 @@ bool gtcmtr_lkrequest()
 	if (curr_entry->new_msg)
 	{
 		curr_entry->transnum = *ptr;
+		curr_entry->last_cancelled = CM_NOLKCANCEL;
 		gtcml_lkhold();
 		gtcml_lklist();
 	}

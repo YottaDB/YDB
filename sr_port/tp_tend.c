@@ -20,6 +20,7 @@
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
 #endif
+#include "gtm_string.h"
 
 #include "cdb_sc.h"
 #include "gdsroot.h"
@@ -62,10 +63,8 @@
 #include "bg_update.h"
 #include "wcs_get_space.h"
 #include "wcs_timer_start.h"
+#include "send_msg.h"
 #include "add_inter.h"
-
-GBLDEF	gv_namehead		*tp_fail_hist[CDB_MAX_TRIES];
-GBLDEF	block_id		t_fail_hist_blk[CDB_MAX_TRIES];
 
 LITREF	int			jnl_fixed_size[];
 
@@ -78,6 +77,7 @@ GBLREF	sgm_info		*first_sgm_info, *sgm_info_ptr;
 GBLREF	tp_region		*tp_reg_list;
 GBLREF	bool			tp_kill_bitmaps;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
+GBLREF	int4			n_pvtmods, n_blkmods;
 GBLREF	int			t_tries;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -96,6 +96,9 @@ GBLREF	seq_num			max_resync_seqno;
 DEBUG_ONLY(GBLREF uint4		cumul_index;
 	   GBLREF uint4		cu_jnl_index;
 	  )
+GBLREF	boolean_t		copy_jnl_record;
+GBLREF	struct_jrec_tcom 	mur_jrec_fixed_tcom;
+GBLREF	int4			tprestart_syslog_delta;
 
 boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse);
 enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse);
@@ -126,6 +129,8 @@ bool	tp_tend(bool crit_only)
 	boolean_t		yes_jnl_no_repl, first_time;
 	uint4			jnl_status, leafmods, indexmods;
 	uint4			total_jnl_rec_size;
+
+	error_def(ERR_DLCKAVOIDANCE);
 
 	assert(dollar_tlevel > 0);
 	assert(0 == jnl_fence_ctl.level);
@@ -222,6 +227,32 @@ bool	tp_tend(bool crit_only)
 					BG_TRACE_ANY(tcsa, tp_crit_retries);
 				}
 			)
+			/* Note that there are three ways a deadlock can occur.
+			 * 	(a) If we are not in the final retry and we already hold crit on some region.
+			 * 	(b) If we are in the final retry and we don't hold crit on some region.
+			 * 	(c) If we are in the final retry and we hold crit on a frozen region that we want to update.
+			 * 		This is possible if we did a tp_grab_crit through one of the gvcst_* routines
+			 * 		when we first encountered the region in the TP transaction and it wasn't locked down
+			 * 		although it was frozen then.
+			 *	The first two cases we don't know of any way they can happen. Case (c) though can happen.
+			 *	Nevertheless, we restart for all the three and in dbg version assert so we get some information.
+			 */
+			if (!crit_only)		/* do crit check only for tp_tend through op_commit, not for tp_restart case */
+			{
+				tcsa = &FILE_INFO(tr->reg)->s_addrs;
+				if ((CDB_STAGNATE > t_tries) ? tcsa->now_crit :
+								(!tcsa->now_crit || (update_trans && tcsa->hdr->freeze)))
+				{
+					send_msg(VARLSTCNT(8) ERR_DLCKAVOIDANCE, 6, DB_LEN_STR(tr->reg),
+								tcsa->ti->curr_tn, t_tries, dollar_trestart, tcsa->now_crit);
+					assert(FALSE);
+					status = cdb_sc_needcrit;	/* break the possible deadlock by signalling a restart */
+					t_fail_hist[t_tries] = status;
+					TP_RETRY_ACCOUNTING(csd, status);
+					TP_TRACE_HIST(CR_BLKEMPTY, NULL);
+					return FALSE;
+				}
+			}
 			if (update_trans)
 			{
 				TP_CHANGE_REG_IF_NEEDED(tr->reg);
@@ -284,7 +315,8 @@ bool	tp_tend(bool crit_only)
 		}
 		/* the following section verifies that the optimistic concurrency was justified */
 		history_validated = TRUE;
-		DEBUG_ONLY(n_blkmods = n_pvtmods = 0);
+		if (tprestart_syslog_delta)
+			n_blkmods = n_pvtmods = 0;
 		for (t1 = si->first_tp_hist;  t1 != si->last_tp_hist; t1++)
 		{
 			if (is_mm)
@@ -334,14 +366,18 @@ bool	tp_tend(bool crit_only)
 									status = cdb_sc_blkmod;
 							}
 						} else
-						{
-							if (!t1->blk_target->noisolation)
+						{	/* For a non-isolated global, if the leaf block isn't part of the cw-set,
+							 * this means that it was involved in an M-kill that freed the data-block
+							 * from the B-tree. In this case, if the leaf-block has changed since
+							 * we did our read of the block, we have to redo the M-kill. But since
+							 * redo of that M-kill might involve much more than just leaf-level block
+							 * changes, we be safe and do a restart. If the need for NOISOLATION
+							 * optimization for M-kills is felt, we need to revisit this.
+							 */
+							if (!t1->blk_target->noisolation || !cse)
 								status = cdb_sc_blkmod;
-							else if (cse)
-							{	/* For a non-isolated global, if the leaf block isn't
-								 * part of the cw_set, although its shared copy has
-								 * changed, we don't need to restart.
-								 */
+							else
+							{
 								assert(cse->write_type || cse->recompute_list_head);
 								leafmods++;
 								if (indexmods || cse->write_type
@@ -351,13 +387,14 @@ bool	tp_tend(bool crit_only)
 						}
 						if (cdb_sc_normal != status)
 						{
-							DEBUG_ONLY(
+							if (tprestart_syslog_delta)
+							{
 								n_blkmods++;
 								if (t1->ptr)
 									n_pvtmods++;
 								if (1 != n_blkmods)
 									continue;
-							)
+							}
 							status = cdb_sc_blkmod;
 							TP_RETRY_ACCOUNTING(csd, status);
 							TP_TRACE_HIST_MOD(t1->blk_num, tp_get_target(t1->buffaddr),
@@ -375,8 +412,8 @@ bool	tp_tend(bool crit_only)
 				}
 				assert(CYCLE_PVT_COPY != t1->cycle);
 				if (t1->ptr)
-				{	/* do cycle check only if blk has cse and hasn't been built or we have BI journalling.
-					 * The BI journalling check is to ensure that the PBLK we write hasn't been recycled.
+				{	/* do cycle check only if blk has cse and hasn't been built or we have BI journaling.
+					 * The BI journaling check is to ensure that the PBLK we write hasn't been recycled.
 					 */
 					if ((NULL == bt) || (CR_NOTVALID == bt->cache_index))
 						cr = db_csh_get(t1->blk_num);
@@ -417,7 +454,7 @@ bool	tp_tend(bool crit_only)
 					}
 					/* The only case cr can be NULL at this point of code is when
 					 *	t1->ptr->new_buff is non-NULL and the block is not in the cache AND
-					 *	we don't have before-image journalling. In this case bg_update will
+					 *	we don't have before-image journaling. In this case bg_update will
 					 *	do a db_csh_getn() and appropriately set in_cw_set field to be TRUE
 					 *	so we shouldn't be manipulating those fields in that case.
 					 */
@@ -638,17 +675,17 @@ bool	tp_tend(bool crit_only)
 						if (-1 == jnl_file_extend(csa->jnl, total_jnl_rec_size))
 						{
 							assert (!JNL_ENABLED(csd));
-							t_fail_hist[t_tries] = cdb_sc_jnlclose;
+							status = t_fail_hist[t_tries] = cdb_sc_jnlclose;
 							TP_TRACE_HIST(CR_BLKEMPTY, NULL);
-							t_commit_cleanup(t_fail_hist[t_tries], 0);
+							t_commit_cleanup(status, 0);
 							goto failed;
 						}
 					}
 					if (csa->jnl_before_image != csa->jnl->jnl_buff->before_images)
 					{
-						t_fail_hist[t_tries] = cdb_sc_jnlstatemod;
+						status = t_fail_hist[t_tries] = cdb_sc_jnlstatemod;
 						TP_TRACE_HIST(CR_BLKEMPTY, NULL);
-						t_commit_cleanup(t_fail_hist[t_tries], 0);
+						t_commit_cleanup(status, 0);
 						goto failed;
 					}
 					/* jnl_put_jrt_pini will use gbl_jrec_time to fill in the time of the pini record.
@@ -665,9 +702,10 @@ bool	tp_tend(bool crit_only)
 							{
 								SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 								BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_jnl_wcsflu);
-								status = cdb_sc_cacheprob;
+								status = t_fail_hist[t_tries] = cdb_sc_cacheprob;
 								TP_RETRY_ACCOUNTING(csd, status);
 								TP_TRACE_HIST(CR_BLKEMPTY, NULL);
+								t_commit_cleanup(status, 0);
 								goto failed;
 							}
 						}
@@ -691,7 +729,7 @@ bool	tp_tend(bool crit_only)
 					if (jnl_fence_ctl.region_count != 0)
 						++jnl_fence_ctl.region_count;
 					for (jfb = si->jnl_head;  NULL != jfb; jfb = jfb->next)
-						jnl_write_logical(csa, jfb);
+							jnl_write_logical(csa, jfb);
 				} else
 					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
 			}	/* if (journaling) */
@@ -737,23 +775,47 @@ bool	tp_tend(bool crit_only)
 				INCR_KIP(csd, csa, si->kip_incremented);
 		} /* for (si ... ) */
 		/* the next section marks the transaction complete in the journal */
+		if (!copy_jnl_record) /* Update process should operate on GLD, and can be different */
+		{
+			tcom_record.participants = jnl_fence_ctl.region_count;
+			QWASSIGN(tcom_record.jnl_seqno, seq_num_zero);
+		} else
+		{
+			tcom_record.participants = mur_jrec_fixed_tcom.participants;
+			QWASSIGN(tcom_record.jnl_seqno, mur_jrec_fixed_tcom.jnl_seqno);
+		}
 		QWASSIGN(tcom_record.token, jnl_fence_ctl.token);
-		tcom_record.participants = jnl_fence_ctl.region_count;
-		QWASSIGN(tcom_record.jnl_seqno, seq_num_zero);
 		if (TRUE == replication)
 		{
 			QWINCRBY(temp_jnlpool_ctl->jnl_seqno, seq_num_one);
 			if (is_updproc)
 				QWINCRBY(max_resync_seqno, seq_num_one);
 		}
-		/* Note that only those regions that are actively journalling will appear in the following list: */
+		/* Note that only those regions that are actively journaling will appear in the following list: */
 		for (csa = jnl_fence_ctl.fence_list;  (sgmnt_addrs *) - 1 != csa;  csa = csa->next_fenced)
 		{
 			assert(((sgm_info *)(csa->sgm_info_ptr))->first_cw_set);
 			tcom_record.tn = csa->ti->curr_tn - 1;
+			if (is_updproc)
+			{	/* recov_short_time for update process means the time at which update was done on primary */
+				tcom_record.tc_recov_short_time = mur_jrec_fixed_tcom.tc_recov_short_time;
+				tcom_record.ts_recov_short_time = mur_jrec_fixed_tcom.ts_recov_short_time;
+			} else
+			{
+				tcom_record.tc_recov_short_time = gbl_jrec_time;
+				tcom_record.ts_recov_short_time = gbl_jrec_time;
+			}
 			tcom_record.pini_addr = csa->jnl->pini_addr;
-			tcom_record.tc_short_time = gbl_jrec_time;
-			tcom_record.rec_seqno = rec_seqno;
+			if (!copy_jnl_record)
+			{
+				tcom_record.ts_short_time = tcom_record.tc_short_time = gbl_jrec_time;
+				tcom_record.rec_seqno = rec_seqno;
+			} else
+			{
+				tcom_record.tc_short_time = mur_jrec_fixed_tcom.tc_short_time;
+				tcom_record.ts_short_time = mur_jrec_fixed_tcom.ts_short_time;
+				tcom_record.rec_seqno = mur_jrec_fixed_tcom.rec_seqno;
+			}
 			if (REPL_ENABLED(csa->hdr))
 			{
 				QWASSIGN(csa->hdr->reg_seqno, temp_jnlpool_ctl->jnl_seqno);

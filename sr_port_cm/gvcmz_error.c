@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "hashdef.h"
 #include "cmidef.h"
 #include "cmmdef.h"
 #include "gdsroot.h"
@@ -18,16 +19,16 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "zwrite.h"
+#include "gtm_string.h"
 #include "gvcmz.h"
 
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	gv_key		*gv_currkey;
-GBLREF	gvzwrite_struct	gvzwrite_block;
+GBLREF gd_region *gv_cur_region;
+GBLREF gv_key *gv_currkey;
 
-void gvcmz_error(char code,uint4 status)
-{	int4 err[6],*ptr;
-	bool gv_error;
+void gvcmz_error(char code, uint4 status)
+{
+	int	err[6], *ptr;
+	bool	gv_error;
 	error_def(ERR_GVDATAFAIL);
 	error_def(ERR_GVGETFAIL);
 	error_def(ERR_GVKILLFAIL);
@@ -39,7 +40,8 @@ void gvcmz_error(char code,uint4 status)
 	error_def(ERR_NETFAIL);
 
 	switch(code)
-	{	case CMMS_L_LKCANALL:
+	{
+		case CMMS_L_LKCANALL:
 		case CMMS_L_LKCANCEL:
 		case CMMS_L_LKDELETE:
 		case CMMS_L_LKREQIMMED:
@@ -54,13 +56,7 @@ void gvcmz_error(char code,uint4 status)
 		default:
 			gv_cur_region->open = FALSE;
 			gv_cur_region->dyn.addr->acc_meth = dba_bg;
-			gv_currkey->end = 0;
-			gv_currkey->base[0] = '\0';
-			if (NULL != gvzwrite_block.old_key)
-			{
-				((gv_key *)gvzwrite_block.old_key)->end = 0;
-				((gv_key *)gvzwrite_block.old_key)->base[0] = '\0';
-			}
+			memset(gv_currkey->base,0,gv_currkey->end + 1);
 			break;
 	}
 	ptr = &err[1];
@@ -111,11 +107,12 @@ void gvcmz_error(char code,uint4 status)
 		break;
 	}
 	if (gv_error)
-	{	*ptr++ = 2;
+	{
+		*ptr++ = 2;
 		*ptr++ = 9;
 		*ptr++ = (int)"Net error";
 	}
 	*ptr++  = status;
 	err[0] = ptr - err - 1;
-	gvcmz_neterr((char *)err);
+	gvcmz_neterr(&err[0]);
 }

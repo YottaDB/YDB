@@ -28,6 +28,24 @@
 #define IO_ESC			0x1b
 #define MAX_DEV_TYPE_LEN	7
 
+#define CHAR_FILTER 128
+#define ESC1 1
+#define ESC2 2
+#define ESC_MASK (ESC1+ESC2)
+
+#define START 	0
+#define AFTESC 	1
+#define SEQ1 	2
+#define SEQ2 	3
+#define SEQ3 	4
+#define SEQ4 	5
+#define FINI 	6
+#define BADESC 	7
+
+#define DEFAULT_IOD_LENGTH	55
+#define DEFAULT_IOD_WIDTH	80
+#define DEFAULT_IOD_WRAP	TRUE
+
 typedef unsigned char params;
 
 /*
@@ -87,13 +105,14 @@ typedef struct io_desc_struct
 		unsigned short	za;
 		unsigned char	zb[ESC_LEN];
 	}dollar;
-	unsigned char			    esc_state;
-	void				    *dev_sp;
-	struct dev_dispatch_struct	    *disp_ptr;
-	iconv_t				    input_conv_cd;
-	iconv_t				    output_conv_cd;
-	enum code_set_type		    in_code_set;
-	enum code_set_type		    out_code_set;
+	unsigned char			esc_state;
+	void				*dev_sp;
+	struct dev_dispatch_struct	*disp_ptr;
+	iconv_t				input_conv_cd;
+	iconv_t				output_conv_cd;
+	enum code_set_type		in_code_set;
+	enum code_set_type		out_code_set;
+	int4				write_filter;
 }io_desc;
 
 typedef struct io_log_name_struct
@@ -107,6 +126,8 @@ typedef struct io_log_name_struct
 
 io_log_name *get_log_name(mstr *v, bool insert);
 
+/* wttab is not used in the IO dispatch, but used in the user defined dispatch for ious*. Even though all the entries are NULL in
+ * the IO dispatch table are NULL in the IO dispatch tables, they have to remain. */
 typedef struct dev_dispatch_struct
 {
 	short	(*open)(io_log_name *, mval *, int, mval *, int4);
@@ -155,13 +176,11 @@ void io_init_name(void);
 #define xx_dlr_device(X)	void X##_dlr_device(mstr *d)
 #define xx_dlr_key(X)		void X##_dlr_key(mstr *d)
 
-/* Following definitions has a pattern that most of the routines follow. Only exceptions are:
- *      1. ionl_flush() does NOT exist ==> ioxxnonl() and explicitly defines ionl_null()
- *      2. ioff_open() is an extra routine
+/* Following definitions have a pattern that most of the routines follow. Only exception is:
+ *      1. ioff_open() is an extra routine
  */
 
 #define ioxx(X) ioxx_##X(tt);ioxx_##X(mt);ioxx_##X(rm);ioxx_##X(mb);ioxx_##X(nl);ioxx_##X(us);ioxx_##X(tcp);ioxx_##X(socket)
-#define ioxxnonl(X) ioxx_##X(tt);ioxx_##X(mt);ioxx_##X(rm);ioxx_##X(mb);ioxx_##X(us);ioxx_##X(tcp);ioxx_##X(socket)
 #define xxdlr(X) xx_iocontrol(X);xx_dlr_device(X);xx_dlr_key(X)
 
 /* prototypes for dispatch functions */
@@ -171,22 +190,19 @@ ioxx(close);
 ioxx(rdone);
 ioxx(use);
 ioxx(read);
-ioxxnonl(readfl);
+ioxx(readfl);
 ioxx(write);
 ioxx(wtone);
 ioxx(wteol);
 ioxx(wtff);
-ioxx(wttab);
 ioxx(dummy);
-ioxxnonl(flush);
+ioxx(flush);
 xxdlr(nil);
 xxdlr(ious);
 xxdlr(iotcp);
 xxdlr(iosocket);
-ioxx_open(nl);
 ioxx_open(ff);
-void ionl_null(io_desc *iod);
-
+ioxx_wttab(us);
 /* iott_ prototypes */
 uchar_ptr_t iott_escape(uchar_ptr_t strin, uchar_ptr_t strtop, io_desc *io_ptr);
 
@@ -231,6 +247,13 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive);
 int iomb_dataread (int timeout);
 
 bool same_device_check(mstr tname, char *buf);
+
+#define	iotype(O,X,Y) 								\
+{ 										\
+	O##_open, X##_close, X##_use, X##_read, X##_rdone, X##_write, 		\
+	X##_wtone, X##_wteol, X##_wtff, NULL, X##_flush, X##_readfl,		\
+	Y##_iocontrol, Y##_dlr_device, Y##_dlr_key 				\
+}
 
 #ifdef __sparc
 int outc(char ch);

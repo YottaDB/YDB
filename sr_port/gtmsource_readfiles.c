@@ -64,6 +64,7 @@
 #include "repl_sp.h"
 #include "is_file_identical.h"
 #include "repl_log.h"
+#include "longcpy.h"
 
 #define LOG_WAIT_FOR_JNL_RECS_PERIOD	(10 * 1000) /* ms */
 #define LOG_WAIT_FOR_JNLOPEN_PERIOD	(10 * 1000) /* ms */
@@ -518,9 +519,9 @@ static	int adjust_for_eof_or_extension(repl_ctl_element *ctl)
 				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNL_RECS);
 				if ((total_wait_for_jnl_recs += GTMSOURCE_WAIT_FOR_JNL_RECS) % LOG_WAIT_FOR_JNL_RECS_PERIOD == 0)
 				{
-					repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for file \
-						 extension or EOF to be written to journal file %s while attempting to read \
-						 transaction "INT8_FMT". Check for problems with journaling\n",
+					repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for file "
+						 "extension or EOF to be written to journal file %s while attempting to read "
+						 "transaction "INT8_FMT". Check for problems with journaling\n",
 						 total_wait_for_jnl_recs, ctl->jnl_fn, INT8_PRINT(ctl->seqno));
 				}
 			}
@@ -816,7 +817,7 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 	if (b->reclen > *bufsiz)
 		increase_buffer(buff, bufsiz, b->reclen);
 	assert(b->reclen <= *bufsiz);
-	memcpy(*buff, b->recbuff, b->reclen);
+	longcpy(*buff, b->recbuff, b->reclen);
 	*buff += b->reclen;
 	readlen += b->reclen;
 	*bufsiz -= b->reclen;
@@ -852,12 +853,12 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 				assert(b->reclen <= *bufsiz);
 				if (rectype != JRT_TCOM && rectype != JRT_ZTCOM)
 				{
-					memcpy(*buff, b->recbuff, b->reclen);
+					longcpy(*buff, b->recbuff, b->reclen);
 					*buff += b->reclen;
 					readlen += b->reclen;
 				} else
 				{
-					memcpy(gtmsource_tcombuffp, b->recbuff, b->reclen);
+					longcpy(gtmsource_tcombuffp, b->recbuff, b->reclen);
 					gtmsource_tcombuffp += b->reclen;
 					tot_tcom_len += b->reclen;
 					/* End of transaction in this file */
@@ -892,9 +893,9 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNL_RECS);
 			if ((total_wait_for_jnl_recs += GTMSOURCE_WAIT_FOR_JNL_RECS) % LOG_WAIT_FOR_JNL_RECS_PERIOD == 0)
 			{
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal record(s)\
-					 to be written to journal file %s while attempting to read transaction "INT8_FMT". \
-					 Check for problems with journaling\n", total_wait_for_jnl_recs, ctl->jnl_fn,
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal record(s)"
+					 " to be written to journal file %s while attempting to read transaction "INT8_FMT". "
+					 "Check for problems with journaling\n", total_wait_for_jnl_recs, ctl->jnl_fn,
 					 INT8_PRINT(ctl->seqno));
 			}
 		} else
@@ -1039,9 +1040,9 @@ static	int read_and_merge(uchar_ptr_t buff, int maxbufflen, seq_num read_jnl_seq
 			gtmsource_poll_actions(TRUE);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNLOPEN);
 			if ((total_wait_for_jnlopen += GTMSOURCE_WAIT_FOR_JNLOPEN) % LOG_WAIT_FOR_JNLOPEN_PERIOD == 0)
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal file(s) \
-					 to be opened, or updated while attempting to read transaction "INT8_FMT". Check for \
-					 problems with journaling\n", total_wait_for_jnlopen, INT8_PRINT(read_jnl_seqno));
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal file(s) "
+					 "to be opened, or updated while attempting to read transaction "INT8_FMT". Check for "
+					 "problems with journaling\n", total_wait_for_jnlopen, INT8_PRINT(read_jnl_seqno));
 		}
 		read_len = read_regions(&buff, &buff_avail, pass > 1, &brkn_trans, read_jnl_seqno);
 		if (brkn_trans)
@@ -1054,7 +1055,7 @@ static	int read_and_merge(uchar_ptr_t buff, int maxbufflen, seq_num read_jnl_seq
 	if (tot_tcom_len > 0)
 	{	/* Copy all the TCOM records to the end of the buffer */
 		assert(tot_tcom_len <= ((uchar_ptr_t)gtmsource_msgp + gtmsource_msgbufsiz - buff));
-		memcpy(buff, gtmsource_tcombuff_start, tot_tcom_len);
+		longcpy(buff, gtmsource_tcombuff_start, tot_tcom_len);
 		total_read += tot_tcom_len;
 	}
 	return (total_read);
@@ -1341,7 +1342,7 @@ int gtmsource_readfiles(uchar_ptr_t buff, int *data_len, int maxbufflen)
 	return (0);
 }
 
-int 	scavenge_closed_jnl_files(seq_num ack_seqno)	/* currently  not used */
+static	int scavenge_closed_jnl_files(seq_num ack_seqno)	/* currently  not used */
 {	/* Run thru the repl_ctl_list and scavenge for those journal files which are no longer required for
 	 * replication (the receiver side has acknowledged that it has successfully processed journal recs upto
 	 * and including those with JNL_SEQNO ack_seqno). Close these journal files and report to the operator

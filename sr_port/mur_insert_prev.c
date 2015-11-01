@@ -28,6 +28,7 @@ GBLREF	mur_opt_struct	mur_options;
 GBLREF	int		mur_extract_bsize;
 GBLREF	char		*log_rollback;
 
+
 bool	mur_insert_prev(ctl_list *ctl, ctl_list **jnl_files)
 {
 	ctl_list	*curr;
@@ -74,6 +75,11 @@ bool	mur_insert_prev(ctl_list *ctl, ctl_list **jnl_files)
 	curr->repl_state = ctl->repl_state;
 	curr->tab_ptr = ctl->tab_ptr;
 	curr->rab = mur_rab_create(MINIMUM_BUFFER_SIZE);
+	/* When we are processing previous generation file, database should have before image journaled
+	 * Assign before image flag of previous generation to be the same as latest generation opened */
+	curr->before_image = ctl->before_image;
+	/* Initiate hashtable for the previous generation also, used in pini_addr tracking */
+	init_hashtab(&curr->pini_in_use, MUR_PINI_IN_USE_INIT_ELEMS);
 	if (SS_NORMAL != (status = mur_fopen(curr->rab, curr->jnl_fn, curr->jnl_fn_len)))
 	{
 		gtm_putmsg(VARLSTCNT(1) status);

@@ -258,7 +258,7 @@ GBLDEF smTraceItem smFrees[MAXSMTRACE];			/* Array of recent releasers */
 GBLDEF volatile unsigned int smTn;			/* Storage management (wrappable) transaction number */
 #endif
 
-GBLREF	int4		gtmDebugLevel;			/* Debug level (0 = using default sm module so with
+GBLREF	uint4		gtmDebugLevel;			/* Debug level (0 = using default sm module so with
 							   a DEBUG build, even level 0 implies basic debugging) */
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	volatile int4	gtmMallocDepth;			/* Recursion indicator. Volatile so it gets stored immediately */

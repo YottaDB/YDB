@@ -73,12 +73,24 @@ int m_new(void)
 			advancewindow();
 			if (window_token == TK_IDENT)
 				if ((n = namelook(svn_index, svn_names, window_ident.c)) >= 0)
-					if (svn_data[n].opcode == SV_ZTRAP)
+				{
+					tmp = maketriple(OC_NEWINTRINSIC);
+					switch(svn_data[n].opcode)
 					{
-						advancewindow();
-						newtriple(OC_NEWZT);
-						return TRUE;
+						case SV_ZTRAP:
+						case SV_ETRAP:
+						case SV_ESTACK:
+						case SV_ZYERROR:
+							tmp->operand[0] = put_ilit(svn_data[n].opcode);
+							break;
+						default:
+							stx_error(ERR_INVSVN);
+							return FALSE;
 					}
+					advancewindow();
+					ins_triple(tmp);
+					return TRUE;
+				}
 			stx_error(ERR_INVSVN);
 			return FALSE;
 		case TK_EOL:

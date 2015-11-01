@@ -63,10 +63,11 @@ int4 load_and_clear(sm_int_ptr_t);
 #define RELEASE_LATCH_GLOBAL(a) release_spinlock(a)
 #define SET_LATCH_GLOBAL(a, b)	{RELEASE_LATCH_GLOBAL(a); SET_LATCH(a, b);}
 
-#elif defined(__sparc)
+#elif defined(__sparc) && defined(SPARCV8_NO_CAS)
 /* For Sun sparc, we use the extra word of the latch for a micro lock for compswap. Future
    iterations of this should make use of the CAS (compare and swap) instruction newly available
    in the Sparc Version 9 instruction set.
+   These *_GLOBAL macros are used only from compswap.c (currently)
 */
 #define GET_LATCH_GLOBAL(a)	aswp(&(a)->latch_word, GLOBAL_LOCK_IN_USE)
 #define RELEASE_LATCH_GLOBAL(a) aswp(&(a)->latch_word, GLOBAL_LOCK_AVAILABLE)

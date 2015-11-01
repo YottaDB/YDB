@@ -11,7 +11,7 @@
 %GSE	;GT.M %GSE utility - global search
 	;
 	n c,i,g,gn,gtmvt,m,n,p,rl,s,sl,sx,tics,x,%ZD,%ZG
-	i '$d(%zdebug) n $zt s $zt="zg "_$zl_":ERR^%GSE" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%GSE")
+	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%GSE" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%GSE")
 	w !,"Global Search for Every occurrence",!
 	d base
 	q
@@ -69,6 +69,7 @@ GTMVT()	; true if a video
 ERR	i $d(%ZD),%ZD'=$p c %ZD
 	u $p w !,$p($zs,",",2,99),!
 	u $p:(ctrap="":exc="")
+	s $ec=""
 	q
 LOOP	i $d(%ZD),%ZD'=$p c %ZD
 	d base

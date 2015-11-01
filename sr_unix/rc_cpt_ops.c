@@ -44,7 +44,7 @@ GBLDEF int		rc_read_stamp;
 error_def(ERR_DBFILERR);
 error_def(ERR_TEXT);
 
-static int		rc_shmid = 0, rc_sem = 0;
+static int		rc_shmid = INVALID_SHMID, rc_sem = INVALID_SEMID;
 static rc_cp_table	*rc_cpt = 0;
 
 static int rc_init_ipc(void);
@@ -171,6 +171,7 @@ static int rc_init_ipc(void)
 	}
 	if ((rc_shmid = shmget(rc_key, sizeof(rc_cp_table) , RWDALL)) == -1)
 	{
+		rc_shmid = INVALID_SHMID;
 		PERROR("Error with rc shmget");
 		return errno;
 	}
@@ -185,7 +186,7 @@ static int rc_init_ipc(void)
 		PERROR("Error with rc semget");
 		(void) shmdt((char *)rc_cpt);
 		rc_cpt = 0;
-		rc_sem = 0;
+		rc_sem = INVALID_SEMID;
 		return old_errno;
 	}
 	return 0;
@@ -289,6 +290,7 @@ int rc_cpt_inval(void)
 		}
 		if ((rc_shmid = shmget(rc_key, sizeof(rc_cp_table) , RWDALL)) == -1)
 		{
+			rc_shmid = INVALID_SHMID;
 			PERROR("Error with rc shmget");
 			return errno;
 		}
@@ -303,7 +305,7 @@ int rc_cpt_inval(void)
 			PERROR("Error with rc semget");
 			(void) shmdt((char *)rc_cpt);
 			rc_cpt = 0;
-			rc_sem = 0;
+			rc_sem = INVALID_SEMID;
 			return old_errno;
 		}
 	}
@@ -363,6 +365,7 @@ int mupip_rundown_cpt()
 	}
 	if ((rc_shmid = shmget(rc_key, sizeof(rc_cp_table), RWDALL)) == -1)
 	{	/* no RC CPT - okay to reset RC values */
+		rc_shmid = INVALID_SHMID;
 		return 0;
 	}
 	if (shmctl(rc_shmid, IPC_STAT, &shm_buf) == -1)
@@ -382,7 +385,7 @@ int mupip_rundown_cpt()
 		{
 			PERROR("Warning- can't access RC CPT semaphore");
 			rc_cpt = 0;
-			rc_sem = 0;
+			rc_sem = INVALID_SEMID;
 			return 0;
 		}
 		if (semctl(rc_sem, 0, IPC_RMID, 0) == -1)
@@ -475,6 +478,7 @@ int rc_create_cpt(void)
 	}
 	if ((rc_shmid = shmget(rc_key, sizeof(rc_cp_table) ,IPC_CREAT |  RWDALL)) == -1)
 	{
+		rc_shmid = INVALID_SHMID;
 		PERROR("Error with rc shmget");
 		return errno;
 	}
@@ -489,7 +493,7 @@ int rc_create_cpt(void)
 		PERROR("Error with rc semget");
 		(void) shmdt((char *)rc_cpt);
 		rc_cpt = 0;
-		rc_sem = 0;
+		rc_sem = INVALID_SEMID;
 		return old_errno;
 	}
 	sop[0].sem_num = sop[1].sem_num = 0;

@@ -72,10 +72,10 @@ bool	mur_do_record(ctl_list *ctl)
 	case JRT_PFIN:
 	case JRT_EOF:
 
-		assert(&rec->val.jrec_pini.process_vector == &rec->val.jrec_pfin.process_vector);
-		assert(&rec->val.jrec_pini.process_vector == &rec->val.jrec_eof.process_vector);
+		assert(&rec->val.jrec_pini.process_vector[CURR_JPV] == &rec->val.jrec_pfin.process_vector);
+		assert(&rec->val.jrec_pini.process_vector[CURR_JPV] == &rec->val.jrec_eof.process_vector);
 
-		pv = &rec->val.jrec_pini.process_vector;
+		pv = &rec->val.jrec_pini.process_vector[CURR_JPV];
 
 		break;
 

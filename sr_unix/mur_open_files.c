@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
@@ -76,6 +77,7 @@ GBLDEF	char		*mur_extract_buff;
 GBLDEF	int		mur_extract_bsize;
 
 GBLREF	boolean_t	mupip_jnl_recover;
+GBLREF	boolean_t	copy_jnl_record;
 GBLREF	int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF	int4		gv_keysize;
 GBLREF	mur_opt_struct	mur_options;
@@ -88,6 +90,7 @@ GBLREF	seq_num		seq_num_zero;
 GBLREF	seq_num		max_resync_seqno;
 GBLDEF	uint4		dbrdwr_status;
 GBLREF	jnl_proc_time	min_jnl_rec_time;
+GBLREF	boolean_t	got_repl_standalone_access;
 
 static	sgmnt_data_ptr_t	csd;
 
@@ -121,8 +124,11 @@ void mur_open_files_error(ctl_list *curr, int fd)
 		free(curr->gd);
 		curr->gd = NULL;
 	}
-	if (mur_options.update)
+	if (NULL != csd)
+	{
 		free(csd);
+		csd = NULL;
+	}
 }
 
 /*
@@ -182,6 +188,14 @@ bool	mur_open_files(ctl_list **jnl_files)
 	{
 		mupip_jnl_recover = TRUE;
 		csd = (sgmnt_data_ptr_t)malloc(ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE));
+	}
+	if (mur_options.rollback)
+	{
+		/* Rundown the Jnlpool and Recvpool */
+		if (repl_inst_get_name((char *)replpool_id.instname, &full_len, sizeof(replpool_id.instname)) &&
+			!mu_rndwn_repl_instance(&replpool_id))
+				return FALSE;
+		got_repl_standalone_access = mu_replpool_grab_sem();
 	}
 	/* Open all of the journal files */
 	for (curr = *jnl_files;  curr != NULL;  curr = curr->next)
@@ -259,8 +273,15 @@ bool	mur_open_files(ctl_list **jnl_files)
 			{
 				if (prev->gd->dyn.addr->fname_len == fn_len  &&
 					memcmp(prev->gd->dyn.addr->fname, fn, fn_len) == 0)
-				{
-					/* It is;  just reuse the same info */
+				{	/* It is;  just reuse the same info */
+					/* Initialize the hashtable for pini records tracking by Idem potency
+					 * recover/rollback for multiple generations pointing to the same database
+					 * file, if the database has before image enabled for the earlier generation
+					 * curr->before_image should be true */
+					assert(!prev->before_image || JNL_ALLOWED(csd) && csd->jnl_before_image);
+					curr->before_image = prev->before_image;
+					if (curr->before_image)
+						init_hashtab(&curr->pini_in_use, MUR_PINI_IN_USE_INIT_ELEMS);
 					curr->gd = prev->gd;
 					curr->db_ctl = prev->db_ctl;
 					curr->db_tn = prev->db_tn;
@@ -281,7 +302,7 @@ bool	mur_open_files(ctl_list **jnl_files)
 			if (prev != curr)
 				continue;
 
-			/* Open the database, turn journalling off, and then close it */
+			/* Open the database, turn jurnaling off, and then close it */
 
 			curr->tab_ptr = (void *)malloc(sizeof(htab_desc));
 			ht_init((htab_desc *)curr->tab_ptr, 0);
@@ -311,11 +332,6 @@ bool	mur_open_files(ctl_list **jnl_files)
 				return FALSE;
 			}
 		}
-		/* Rundown the Jnlpool and Recvpool for rollback */
-		if (mur_options.rollback &&
-			repl_inst_get_name((char *)replpool_id.instname, &full_len, sizeof(replpool_id.instname)) &&
-				!mu_rndwn_repl_instance(&replpool_id))
-					return FALSE;
 		if ((status = mur_fread_eof(curr->rab, curr->jnl_fn, curr->jnl_fn_len)) != SS_NORMAL)
 		{
 			gtm_putmsg(VARLSTCNT(1) status);
@@ -398,7 +414,7 @@ bool	mur_open_files(ctl_list **jnl_files)
 			}
 			if (!mur_options.forward && csd->jnl_state == jnl_notallowed)
 			{
-				util_out_print("Journalling is not enabled for database file !AZ ", TRUE, fn);
+				util_out_print("jurnaling is not enabled for database file !AZ ", TRUE, fn);
 				db_ipcs_reset(curr->gd, TRUE);
 				mur_open_files_error(curr, db_fd);
 				return FALSE;
@@ -421,10 +437,20 @@ bool	mur_open_files(ctl_list **jnl_files)
 				if (QWLT(max_resync_seqno, csd->resync_seqno))
 					QWASSIGN(max_resync_seqno, csd->resync_seqno);
 			}
-			csd->jnl_state = jnl_notallowed;
+			csa = &FILE_INFO(curr->gd)->s_addrs;
+			/* Enable jurnaling for recover to write journal records only if before image journalling is enabled
+			 * for database file */
+			if (JNL_ALLOWED(csd) && csd->jnl_before_image)
+			{
+				copy_jnl_record = TRUE;
+				csd->jnl_state = jnl_open;
+				csa->jnl_before_image = csd->jnl_before_image;
+				curr->before_image = TRUE;
+				init_hashtab(&curr->pini_in_use, MUR_PINI_IN_USE_INIT_ELEMS);
+			} else
+				csd->jnl_state = jnl_notallowed;
 			csd->repl_state = repl_closed;
 			memset(csd->machine_name, 0, MAX_MCNAMELEN);
-
 			curr->db_tn = csd->trans_hist.curr_tn;
 			curr->turn_around_tn = csd->trans_hist.curr_tn;
 			curr->jnl_tn = (trans_num)-1;
@@ -467,8 +493,11 @@ bool	mur_open_files(ctl_list **jnl_files)
 		util_out_print("MUR-I-DEBUG : MaxRegionSeqno = !AD [0x!AD] ", TRUE,
 					ptr-qwstring, qwstring, ptr1 - qwstring1, qwstring1);
 	}
-	if (mur_options.update)
+	if (NULL != csd)
+	{
 		free(csd);
+		csd = NULL;
+	}
 	if ((losttrans_file_info = (fi_type *)mur_options.losttrans_file_info) != NULL)
 	{
 		if (losttrans_file_info->fn_len == 0)
@@ -499,7 +528,7 @@ bool	mur_open_files(ctl_list **jnl_files)
                                 losttrans_file_info->fn, rename_fn, rename_len, info_status);
 		if((status = (*op_open_ptr)(&op_val, &op_pars, 0, 0)) == 0)
 		{
-			gtm_putmsg(VARLSTCNT(1)errno);
+			gtm_putmsg(VARLSTCNT(1) errno);
 			util_out_print("Error opening Losttrans file !AD ", TRUE,
 					losttrans_file_info->fn_len, losttrans_file_info->fn);
 			return FALSE;
@@ -539,7 +568,7 @@ bool	mur_open_files(ctl_list **jnl_files)
 		op_val.str.addr = (char *)extr_file_info->fn;
 		if((status = (*op_open_ptr)(&op_val, &op_pars, 0, 0)) == 0)
 		{
-			gtm_putmsg(VARLSTCNT(1)errno);
+			gtm_putmsg(VARLSTCNT(1) errno);
 			util_out_print("Error opening Extract file !AD ", TRUE, extr_file_info->fn_len, extr_file_info->fn);
 			return FALSE;
 		}
@@ -553,7 +582,7 @@ bool	mur_open_files(ctl_list **jnl_files)
 	{
 		if (mur_options.before_time <= 0)
 			mur_options.before_time += max_time; /* add delta time */
-		if (mur_options.before_time < mur_options.since_time)
+		if (!mur_options.forward && mur_options.before_time < mur_options.since_time)
 		{
 			util_out_print("-BEFORE time precedes -SINCE or -AFTER time", TRUE);
 			return FALSE;

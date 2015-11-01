@@ -10,20 +10,15 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "io.h"
-#include "iottdef.h"
+
+GBLREF io_pair io_curr_device;
 
 void ionl_wtff(void)
 {
-	GBLREF io_pair io_curr_device;
-	mstr	temp;
-	char p[1];
-
-	p[0] = '\14';
-	temp.len = 1;
-	temp.addr = p;
 	io_curr_device.out->esc_state = START;
-	ionl_write(&temp);
+	io_curr_device.out->dollar.zeof = FALSE;
 	io_curr_device.out->dollar.x = 0;
 	io_curr_device.out->dollar.y = 0;
 	return;

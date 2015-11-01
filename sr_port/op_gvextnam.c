@@ -11,6 +11,17 @@
 
 #include "mdef.h"
 
+#ifdef VMS
+#include <descrip.h>	/* for GTM_ENV_TRANSLATE */
+#endif
+
+#include <limits.h>	/* for GTM_ENV_TRANSLATE */
+
+#ifdef EARLY_VARARGS
+#include <varargs.h>
+#endif
+
+#include "error.h"	/* for GTM_ENV_TRANSLATE */
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -25,7 +36,16 @@
 #include "dpgbldir.h"
 #include "sgnl.h"
 #include "mvalconv.h"
-#include <varargs.h>
+
+#ifndef EARLY_VARARGS
+#include <varargs.h>	/* needs to be after the above include files otherwise linux/x86 gcc complains */
+#endif
+
+/*the header files below are for environment translation*/
+#ifdef UNIX
+#include "fgncalsp.h"
+#endif
+#include "gtm_env_xlate_init.h"
 
 GBLREF bool		gv_curr_subsc_null;
 GBLREF gv_key		*gv_currkey;
@@ -34,9 +54,10 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF bool		transform;
 GBLREF gd_addr		*gd_targ_addr;
 GBLREF mstr             extnam_str;
+GBLREF mval		dollar_zgbldir;
+GBLREF gd_addr		*gd_header;
 
 static int	extnam_str_alloc = 0;
-static mstr	gtmgbldir_mstr;
 
 void op_gvextnam(va_alist)
 va_dcl
@@ -45,7 +66,7 @@ va_dcl
 	int		count, len;
 	bool		was_null, is_null;
 	mstr		*tmp_mstr_ptr;
-	mval		*val;
+	mval		*val, *val1, *val2, val_xlated;
 	short		max_key;
 	unsigned char	buff[MAX_KEY_SZ + 1], *end;
 
@@ -54,18 +75,23 @@ va_dcl
 
 	VAR_START(var);
 	count = va_arg(var,int4);
-	val = va_arg(var, mval *);
-	MV_FORCE_STR(val);
+	val1 = va_arg(var, mval *);
+	val2 = va_arg(var, mval *);
+	MV_FORCE_STR(val1);
+	MV_FORCE_STR(val2);
+	GTM_ENV_TRANSLATE(val1, val2);
+
 	assert(!extnam_str_alloc || (NULL != extnam_str.addr));
-	if (val->str.len)
-		tmp_mstr_ptr = &val->str;
-	else if (gtmgbldir_mstr.len)
-		tmp_mstr_ptr = &gtmgbldir_mstr;
-	else
+	if (val1->str.len)
 	{
-		gtmgbldir_mstr.addr = DEF_GDR;
-		gtmgbldir_mstr.len = sizeof(DEF_GDR) - 1;
-		tmp_mstr_ptr = get_name(&gtmgbldir_mstr);
+		tmp_mstr_ptr = &val1->str;
+		gd_targ_addr = zgbldir(val1);
+	} else
+	{
+		tmp_mstr_ptr = &dollar_zgbldir.str;
+		if (!gd_header)
+			gvinit();
+		gd_targ_addr = gd_header;
 	}
 	extnam_str.len = tmp_mstr_ptr->len;
 	if (extnam_str.len > extnam_str_alloc)
@@ -76,13 +102,11 @@ va_dcl
 		extnam_str.addr = (char *)malloc(extnam_str_alloc);
 	}
 	memcpy(extnam_str.addr, tmp_mstr_ptr->addr, tmp_mstr_ptr->len);
-	gd_targ_addr = zgbldir(val);
 	if (gv_target)
 	{
 		assert(INVALID_GV_TARGET != gv_target);
 		gv_target->clue.end = 0;
 	}
-	val = va_arg(var, mval *);	/* ignore 2nd argument of ^[x,y]z */
 	val = va_arg(var, mval *);
 	if (!MV_IS_STRING(val))
 		GTMASSERT;

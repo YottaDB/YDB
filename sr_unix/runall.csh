@@ -169,9 +169,16 @@ gtcm_play gtcm_play
 omi_sx_play gtcm_play
 gtcm_shmclean gtcm_shmclean
 gtcm_pkdisp gtcm_pkdisp
+gtcm_gnp_server gtcm_gnp_server
+gtcm_gnp_clitab gtcm_gnp_server
 LABEL
 
-foreach value (dse lke mupip gtcm stub $gt_ar_ascii_name)
+# find all libnames other than mumps
+pushd $gtm_tools >& /dev/null
+set comlist_liblist = `ls *.list | sed 's/.list//' | sed 's/^lib//'`
+popd >& /dev/null
+
+foreach value ($comlist_liblist)
 	cat $gtm_tools/lib$value.list | awk '{print "lib'${value}'.a", $1, " "}' >>! ${TMP_DIR}_list
 end
 
@@ -238,7 +245,8 @@ if (!(-z ${TMP_DIR}_inc_files)) then
 		if (! -z ${TMP_DIR}_inc_file_diff) then
 			cp -f ${TMP_DIR}_inc_files ${TMP_DIR}_inc_file_temp
 			foreach value (`cat ${TMP_DIR}_inc_file_diff`)
-				ls -1 | grep -E '(\.h$|\.si$)' | xargs grep -l "^[ 	]*#[ 	]*include[ 	]*\"$value\"" >>&! ${TMP_DIR}_inc_files
+				ls -1 | grep -E '(\.h$|\.si$)' | \
+					xargs grep -l "^[ 	]*#[ 	]*include[ 	]*\"$value\"" >>&! ${TMP_DIR}_inc_files
 			end
 			sort -u ${TMP_DIR}_inc_files >&! ${TMP_DIR}_inc_files_sorted
 			mv ${TMP_DIR}_inc_files_sorted ${TMP_DIR}_inc_files
@@ -253,7 +261,8 @@ if (!(-z ${TMP_DIR}_inc_files)) then
 	echo "...... Searching for --------> #INCLUDEing Source Files ...... "
 	pushd $gtm_src >& /dev/null
 	foreach value (`cat ${TMP_DIR}_inc_files`)
-		ls -1 | grep -E '(\.c$|\.msg$|\.s$)' | xargs grep -l "^[ 	]*#[ 	]*include[ 	]*\"$value\"" >>&! ${TMP_DIR}_src_files
+		ls -1 | grep -E '(\.c$|\.msg$|\.s$)' | \
+			xargs grep -l "^[ 	]*#[ 	]*include[ 	]*\"$value\"" >>&! ${TMP_DIR}_src_files
 	end
 	popd >& /dev/null
 endif
@@ -298,6 +307,7 @@ foreach file (`cat ${TMP_DIR}_src_files`)
 		set ext = "c"
 	endif
 	set file = $file:r		# take the non-extension part for the obj file
+	set objfile = ${file}.o
 
 	alias runall_cc gt_cc_${RUNALL_IMAGE}
 	alias gt_as $gt_as_assembler $gt_as_options_common $gt_as_option_I $RUNALL_EXTRA_AS_FLAGS
@@ -317,20 +327,21 @@ foreach file (`cat ${TMP_DIR}_src_files`)
 			runall_cc -DFILE_TCP $RUNALL_EXTRA_CC_FLAGS $gtm_src/omi_sx_play.c
 		endif
 	else if ($ext == "msg") then
-		echo "$gtm_src/$file.$ext   ---->  $gtm_obj/$file.c  ---->  $gtm_obj/$file.o"
+		echo "$gtm_src/$file.$ext   ---->  $gtm_obj/${file}_ctl.c  ---->  $gtm_obj/${file}_ctl.o"
 		# gtm_startup_chk requires gtm_dist setup
+		rm -f ${file}_ctl.c ${file}_ansi.h	# in case an old version is lying around
 		set real_gtm_dist = "$gtm_dist"
 		setenv gtm_dist "$gtm_root/$gtm_curpro/pro"
-		$gtm_root/$gtm_curpro/pro/mumps -direct << gtm_end > /dev/null
-		    Set \$ZROUTINES="$gtm_obj($gtm_pct)"
-		    do ^msg
-$gtm_src/$file.msg
-halt
-gtm_end
+		setenv gtmroutines "$gtm_obj($gtm_pct)"
+		$gtm_root/$gtm_curpro/pro/mumps -run msg $gtm_src/$file.msg Unix
 		setenv gtm_dist "$real_gtm_dist"
 		unset real_gtm_dist
-		mv $file $gtm_src/$file.c
-		runall_cc $RUNALL_EXTRA_CC_FLAGS $gtm_src/$file.c
+		mv ${file}_ctl.c $gtm_src/${file}_ctl.c
+		if ( -f ${file}_ansi.h ) then
+			mv -f ${file}_ansi.h $gtm_inc
+		endif
+		runall_cc $RUNALL_EXTRA_CC_FLAGS $gtm_src/${file}_ctl.c
+		set objfile = ${file}_ctl.o
 	endif
 	if ($status == 1) then
 		goto cleanup
@@ -341,7 +352,7 @@ gtm_end
 		if ("$library" == "") then
 			set library="libmumps.a"
 		endif
-		echo $file.o >> ${TMP_DIR}_lib_.$library
+		echo $objfile >> ${TMP_DIR}_lib_.$library
 	else
 		if ("$library[1]" != "$library") then
 			echo $library[2] >> ${TMP_DIR}_main_.misc

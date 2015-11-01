@@ -25,6 +25,6 @@
 
 void *do_shmat(int4 shmid, const void *shmaddr, int4 shmflg)
 {
-	return(shmat((int)shmid, shmaddr, (int)shmflg));
+	return(shmat((int)shmid, shmaddr, SHMAT_ARG((int)shmflg)));
 }
 

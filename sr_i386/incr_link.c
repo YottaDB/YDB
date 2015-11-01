@@ -20,6 +20,7 @@
 #include "rtnhdr.h"
 #include "compiler.h"
 #include "urx.h"
+#include "objlabel.h"	/* needed for masscomp.h */
 #include "masscomp.h"
 #include "gtmio.h"
 #include "incr_link.h"
@@ -58,7 +59,7 @@ bool incr_link(int file_desc)
 
 /*
 	read_size = read(file_desc, &file_hdr, sizeof(file_hdr));
-	if (read_size != sizeof(file_hdr) || file_hdr.a_magic != OMAGIC || file_hdr.a_stamp != STAMP13)
+	if (read_size != sizeof(file_hdr) || file_hdr.a_magic != OMAGIC || file_hdr.a_stamp != OBJ_LABEL)
 		zl_error(file_desc, ERR_INVOBJ, 0, 0);
 */
 	DOREADRL(file_desc, &file_hdr, sizeof(file_hdr), read_size);
@@ -73,7 +74,7 @@ bool incr_link(int file_desc)
 			zl_error(file_desc, ERR_INVOBJ, RTS_ERROR_TEXT("reading file header"));
 	else if (OMAGIC != file_hdr.a_magic)
 		zl_error(file_desc, ERR_INVOBJ, RTS_ERROR_TEXT("bad magic"));
-	else if (STAMP13 != file_hdr.a_stamp)
+	else if (OBJ_LABEL != file_hdr.a_stamp)
 		return FALSE;	/* wrong version */
 
 	assert (file_hdr.a_bss == 0);

@@ -23,6 +23,7 @@
 #include "sgnl.h"
 #include "mvalconv.h"
 #include "follow.h"
+#include "gtm_string.h"
 
 #define eb_less(u, v)	(numcmp(u, v) < 0)
 
@@ -48,8 +49,8 @@ void gvzwr_var(uint4 data, int4 n)
 	zwr_sub = (zwr_sub_lst *)gvzwrite_block.sub;
 	if ((0 == gvzwrite_block.subsc_count) && (0 == n))
 		zwr_sub->subsc_list[n].subsc_type = ZWRITE_ASTERISK;
-	if ((data == 1 || data == 11) &&
-		(!gvzwrite_block.subsc_count || (zwr_sub->subsc_list[n].subsc_type == ZWRITE_ASTERISK) ||
+	if ((1 == data || 11 == data) &&
+		(!gvzwrite_block.subsc_count || (ZWRITE_ASTERISK == zwr_sub->subsc_list[n].subsc_type) ||
 		(n && !(gvzwrite_block.mask >> n))))
 			gvzwr_out();
 	if (data <= 1 || (gvzwrite_block.subsc_count && (n >= gvzwrite_block.subsc_count)
@@ -59,20 +60,23 @@ void gvzwr_var(uint4 data, int4 n)
 	assert(data > 1);
 	end = gv_currkey->end;
 	prev = gv_currkey->prev;
-	if (n < gvzwrite_block.subsc_count && zwr_sub->subsc_list[n].subsc_type == ZWRITE_VAL)
+	if (n < gvzwrite_block.subsc_count && (ZWRITE_VAL == zwr_sub->subsc_list[n].subsc_type))
 	{
 		mval2subsc(zwr_sub->subsc_list[n].first, gv_currkey);
 		op_gvdata(&subdata);
-		if (MV_FORCE_INT(&subdata) && ((int4)MV_FORCE_INT(&subdata) != 10 || n < gvzwrite_block.subsc_count - 1))
-			gvzwr_var((int4)MV_FORCE_INT(&subdata), n+1);
-		else  if (gvzwrite_block.fixed)
+		if (MV_FORCE_INT(&subdata) && ((10 != (int4)MV_FORCE_INT(&subdata)) || n < gvzwrite_block.subsc_count - 1))
+		{
+			save_gv_curr_subsc_null = gv_curr_subsc_null;
+			gvzwr_var((int4)MV_FORCE_INT(&subdata), n + 1);
+			gv_curr_subsc_null = save_gv_curr_subsc_null;
+		} else if (gvzwrite_block.fixed)
 			sgnl_gvundef();
 	} else
 	{
 		seen_null = 0;
 		if (n < gvzwrite_block.subsc_count
 			&& zwr_sub->subsc_list[n].first
-			&& zwr_sub->subsc_list[n].subsc_type != ZWRITE_PATTERN)
+			&& ZWRITE_PATTERN != zwr_sub->subsc_list[n].subsc_type)
 		{
 			mv = *zwr_sub->subsc_list[n].first;
 			mval2subsc(&mv, gv_currkey);
@@ -84,7 +88,7 @@ void gvzwr_var(uint4 data, int4 n)
 			mval2subsc(&literal_null, gv_currkey);
 			gv_curr_subsc_null = TRUE;
 			op_gvorder(&mv);
-			if (mv.str.len == 0)
+			if (0 == mv.str.len)
 			{
 				if (!gv_cur_region->null_subs || seen_null)
 					loop_condition = 0;
@@ -102,19 +106,19 @@ void gvzwr_var(uint4 data, int4 n)
 				op_gvdata(&subdata);
 			}
 		}
-		for (;loop_condition;)
+		while (loop_condition)
 		{
 			do_lev = (MV_FORCE_INT(&subdata) ? TRUE : FALSE);
 			if (n < gvzwrite_block.subsc_count)
 			{
-				if (zwr_sub->subsc_list[n].subsc_type == ZWRITE_PATTERN)
+				if (ZWRITE_PATTERN == zwr_sub->subsc_list[n].subsc_type)
 				{
 					if (!do_pattern(&mv, zwr_sub->subsc_list[n].first))
 						do_lev = FALSE;
-				} else  if (zwr_sub->subsc_list[n].subsc_type != ZWRITE_ALL)
+				} else if (ZWRITE_ALL != zwr_sub->subsc_list[n].subsc_type)
 				{
 					if (do_lev && zwr_sub->subsc_list[n].first)
-				 	{
+					{
 						if (MV_IS_CANONICAL(&mv))
 						{
 							if (!MV_IS_CANONICAL(zwr_sub->subsc_list[n].first)
@@ -165,14 +169,14 @@ void gvzwr_var(uint4 data, int4 n)
 				gv_currkey->prev = prev1;
 				gv_currkey->base[end1] = 0;
 			}
-			if (seen_null == 1)
+			if (1 == seen_null)
 			{
 				assert(gv_curr_subsc_null);
-				gv_curr_subsc_null = 0;
+				gv_curr_subsc_null = FALSE;
 				seen_null = 2;				/* set flag to indicate null sub processed */
 			}
 			op_gvorder(&mv);
-			if (mv.str.len == 0)
+			if (0 == mv.str.len)
 			{
 				if (!gv_cur_region->null_subs || seen_null)
 					break;

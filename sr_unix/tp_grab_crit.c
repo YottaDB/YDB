@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include <signal.h>	/* for VSIG_ATOMIC_T type */
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -26,12 +28,12 @@
 #include "have_crit_any_region.h"
 #include "caller_id.h"
 
+GBLREF	short 			crash_count;
 GBLREF	volatile boolean_t	crit_in_flux;
-GBLREF	uint4 		process_id;
-GBLREF	short 		crash_count;
-GBLREF	boolean_t	forced_exit;
-GBLREF	gd_region 	*gv_cur_region;
-GBLREF	boolean_t	mutex_salvaged;
+GBLREF	VSIG_ATOMIC_T		forced_exit;
+GBLREF	gd_region 		*gv_cur_region;
+GBLREF	boolean_t		mutex_salvaged;
+GBLREF	uint4 			process_id;
 
 DEBUG_ONLY(
 GBLREF	sgmnt_addrs		*cs_addrs;	/* for TP_CHANGE_REG macro */
@@ -87,7 +89,7 @@ bool	tp_grab_crit(gd_region *reg)
 			SET_TRACEABLE_VAR(csa->hdr->wc_blocked, TRUE);
 			BG_TRACE_PRO_ANY(csa, wcb_tp_grab_crit);
 			send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_tp_grab_crit"),
-				process_id, csa->ti->curr_tn, REG_LEN_STR(reg));
+				process_id, csa->ti->curr_tn, DB_LEN_STR(reg));
 		}
 		crit_in_flux = FALSE;
 	}

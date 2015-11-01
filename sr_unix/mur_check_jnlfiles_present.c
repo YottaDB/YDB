@@ -84,7 +84,7 @@ bool mur_check_jnlfiles_present(ctl_list **jnl_files)
 		header = (jnl_file_header *)hdr_buffer;
 		if (!mur_options.rollback)
 		{
-			if (header->bov_timestamp < MID_TIME(min_jnl_rec_time))
+			if (CMP_JNL_PROC_TIME(header->bov_timestamp, min_jnl_rec_time) < 0)
 				continue;
 		} else if (QWLE(header->start_seqno, consist_jnl_seqno))
 			continue;
@@ -119,7 +119,8 @@ bool mur_check_jnlfiles_present(ctl_list **jnl_files)
 					status = errno;
 					util_out_print("Error closing Journal file !AZ - status : ", TRUE, prev_fn);
 					mur_output_status(status);
-				}
+				} else
+					fd = -1;	/* reset fd to indicate file is closed since it is used later */
 				prev_header = (jnl_file_header *)prev_hdr_buffer;
 				if ((FALSE == mur_jnlhdr_bov_check(prev_header, prev_fn_len, prev_fn))
 						|| (FALSE == mur_jnlhdr_multi_bov_check(prev_header, prev_fn_len, prev_fn,
@@ -133,7 +134,8 @@ bool mur_check_jnlfiles_present(ctl_list **jnl_files)
 				memcpy(header, prev_header, hdr_len);
 				if (mur_options.rollback && QWLE(header->start_seqno, consist_jnl_seqno))
 					break;
-				else if (!mur_options.rollback && header->bov_timestamp < mur_options.lookback_time)
+				else if (!mur_options.rollback &&
+							CMP_JNL_PROC_TIME(header->bov_timestamp, mur_options.lookback_time) < 0)
 					break;
 				else
 					continue;
@@ -149,8 +151,8 @@ bool mur_check_jnlfiles_present(ctl_list **jnl_files)
 					gtm_putmsg(VARLSTCNT(4) ERR_JNLNOTFOUND, 2, prev_fn_len, prev_fn);
 				} else
 				{
-					util_out_print("Journal file !AZ -> Start Timestamp = !UL is greater than Lookback",
-							FALSE, fn, header->bov_timestamp);
+					util_out_print("Journal file !AZ -> Start Timestamp = [0x!16@XJ] is greater than Lookback",
+							FALSE, fn, &header->bov_timestamp);
 					util_out_print("Time specified - Recovery not possible ", TRUE);
 					gtm_putmsg(VARLSTCNT(4) ERR_JNLNOTFOUND, 2, prev_fn_len, prev_fn);
 				}

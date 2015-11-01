@@ -33,17 +33,3 @@ if [ -f $HOME/.profile ]; then
 	$echo ". $gtm_dist/gtmprofile" >> $HOME/.profile
     fi
 fi
-
-if [ ! -f mumps.gld ]; then
-$echo "Copying the default global directory to your current directory."
-$echo ""
-
-cp $gtm_dist/mumps.gld .
-fi
-
-if [ ! -f mumps.dat ]; then
-$echo "Creating a new database for use with GT.M."
-$echo ""
-
-$gtm_dist/mupip create
-fi

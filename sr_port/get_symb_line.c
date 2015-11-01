@@ -14,39 +14,40 @@
 #include "stack_frame.h"
 
 GBLREF stack_frame	*frame_pointer;
+GBLREF unsigned char	*error_last_mpc_err;
+GBLREF unsigned char	*error_last_ctxt_err;
+GBLREF stack_frame	*error_last_frame_err;
 
 unsigned char *get_symb_line (unsigned char *out, unsigned char **b_line, unsigned char **ctxt)
 {
 	bool		line_reset;
 	stack_frame	*fp;
 	unsigned char	*addr, *out_addr;
+	unsigned char	*fpmpc, *fpctxt;
 
 	line_reset = FALSE;
 	for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
 	{
-		if ((unsigned char *) fp->rvector + fp->rvector->ptext_ptr <= fp->mpc &&
-			fp->mpc < (unsigned char *) fp->rvector + fp->rvector->vartab_ptr)
+		fpmpc = (fp == error_last_frame_err) ? error_last_mpc_err : fp->mpc;
+		fpctxt = (fp == error_last_frame_err) ? error_last_ctxt_err : fp->ctxt;
+		if ((unsigned char *) fp->rvector + fp->rvector->ptext_ptr <= fpmpc &&
+			fpmpc < (unsigned char *) fp->rvector + fp->rvector->vartab_ptr)
 		{
-			if (ctxt != 0) *ctxt = fp->ctxt;
+			if (ctxt != 0)
+				*ctxt = fpctxt;
 			if (line_reset)
-			{	addr = fp->mpc + 1;
-			}
-			/* this may be dead code: examine relation with if above */
-			else if ((unsigned char*) fp->rvector + fp->rvector->current_rhead_ptr == fp->mpc)
-			{	addr = fp->mpc + 1;
-			}
+				addr = fpmpc + 1;
+			else if ((unsigned char*) fp->rvector + fp->rvector->current_rhead_ptr == fpmpc)
+				addr = fpmpc + 1;	/* this may be dead code: examine relation with if above */
 			else
-			{	addr = fp->mpc;
-			}
+				addr = fpmpc;
 			out_addr = symb_line (addr, out, b_line, fp->rvector);
 			assert (out < out_addr);
 			return out_addr;
-		}
-		else
+		} else
 		{
 			if (fp->type & SFT_ZTRAP || fp->type & SFT_DEV_ACT)
-			{	line_reset = TRUE;
-			}
+				line_reset = TRUE;
 		}
 	}
 	GTMASSERT;

@@ -62,7 +62,6 @@ int gtm_chk_dist(char *image)
 	char		save_ch = DIR_SEPARATOR;
 
 	error_def(ERR_DISTPATHMAX);
-	error_def(ERR_GTM_DIST);
 	error_def(ERR_SYSCALL);
 	error_def(ERR_GTMDISTUNDEF);
 	error_def(ERR_FILEPARSE);
@@ -124,12 +123,6 @@ int gtm_chk_dist(char *image)
 	 */
 		save_ch = prefix[pblk.b_dir];
 		prefix[pblk.b_dir] = 0;
-	}
-	if (!is_file_identical(prefix, pbuff))
-	{
-		if (DIR_SEPARATOR != save_ch)
-			prefix[pblk.b_dir] = save_ch;
-		rts_error(VARLSTCNT(4) ERR_GTM_DIST, 2, pblk.b_name, pblk.l_name);
 	}
 	if (DIR_SEPARATOR != save_ch)
 		prefix[pblk.b_dir] = save_ch;

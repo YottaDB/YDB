@@ -52,7 +52,6 @@ LITDEF unsigned char filter_index[27] =
 
 GBLREF bool		ctrlc_on;
 GBLREF char		*CURSOR_ADDRESS, *CLR_EOL, *CLR_EOS;
-GBLREF unsigned char	write_filter;
 GBLREF io_pair		io_std_device;
 GBLREF io_pair		io_curr_device;
 GBLREF bool		prin_out_dev_failure;
@@ -62,7 +61,7 @@ LITREF unsigned char	io_params_size[];
 
 void iott_use(io_desc *iod, mval *pp)
 {
-	bool		flush_input;
+	boolean_t	flush_input;
 	char		dc1;
 	int		fil_type;
 	unsigned char	ch, len;
@@ -82,6 +81,7 @@ void iott_use(io_desc *iod, mval *pp)
 	error_def(ERR_NOPRINCIO);
 	error_def(ERR_TCGETATTR);
 	error_def(ERR_TCSETATTR);
+	error_def(ERR_SYSCALL);
 
 	p_offset = 0;
 	assert(iod->state == dev_open);
@@ -202,21 +202,21 @@ void iott_use(io_desc *iod, mval *pp)
 					switch (fil_type)
 					{
 					case 0:
-						write_filter |= CHAR_FILTER;
+						iod->write_filter |= CHAR_FILTER;
 						break;
 					case 1:
-						write_filter |= ESC1;
+						iod->write_filter |= ESC1;
 						break;
 					case 2:
-						write_filter &= ~CHAR_FILTER;
+						iod->write_filter &= ~CHAR_FILTER;
 						break;
 					case 3:
-						write_filter &= ~ESC1;
+						iod->write_filter &= ~ESC1;
 						break;
 					}
 					break;
 				case iop_nofilter:
-					write_filter = 0;
+					iod->write_filter = 0;
 					break;
 				case iop_flush:
 					flush_input = TRUE;
@@ -359,7 +359,12 @@ void iott_use(io_desc *iod, mval *pp)
 		temp_ptr->term_ctrl = mask_in;
 		memcpy(&temp_ptr->mask_term, &mask_term, sizeof(io_termmask));
 		if (flush_input)
-			iott_flush(d_in);
+		{
+			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
+			if (0 != status)
+				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LIT_AND_LEN("tcflush input"),
+					CALLFROM, status);
+		}
 	}
 	return;
 }

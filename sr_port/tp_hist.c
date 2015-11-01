@@ -46,11 +46,14 @@ GBLREF gv_namehead	*gv_target, *gv_target_list;
 GBLREF sgm_info		*sgm_info_ptr;
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF trans_num	local_tn;	/* transaction number for THIS PROCESS */
 GBLREF void		*hash_entry;	/* updated by add_hashtab_ent(). see comment in tp_hist for more details */
+GBLREF trans_num	local_tn;	/* transaction number for THIS PROCESS */
+GBLREF int4		n_pvtmods, n_blkmods;
 GBLREF unsigned int	t_tries;
 GBLREF uint4		t_err;
-
+GBLREF int4		tprestart_syslog_delta;
+GBLREF	boolean_t	is_updproc;
+GBLREF	boolean_t	mupip_jnl_recover;
 
 void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1);
 
@@ -76,15 +79,18 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	assert(hist1 != &gv_target->hist);
 	/* Ideally, store_history should be computed separately for blk_targets of gv_target->hist and hist1,
 	 * i.e. within the outer for loop below. But this is not needed since if t_err is ERR_GVPUTFAIL,
-	 * store_history is TRUE in both cases and if not, we should have the same target for both the histories
-	 * and hence the same value for !blk_target->noisolation and hence the same value for store_history.
-	 * We assert this is the case below.
+	 * store_history is TRUE both for gv_target->hist and hist1 (which is cs_addrs->dir_tree if non-NULL)
+	 * (in the latter case, TRUE because cs_addrs->dir_tree always has NOISOLATION turned off) and if not,
+	 * we should have the same blk_target for both the histories and hence the same value for
+	 * !blk_target->noisolation and hence the same value for store_history. We assert this is the case below.
 	 */
-	assert(ERR_GVPUTFAIL == t_err || !hist1 || hist1->h[0].blk_target == gv_target);
+	assert(ERR_GVPUTFAIL == t_err && (NULL == hist1 || hist1 == &cs_addrs->dir_tree->hist && !cs_addrs->dir_tree->noisolation)
+			|| !hist1 || hist1->h[0].blk_target == gv_target);
 
 	for (hist = &gv_target->hist; hist != NULL && cdb_sc_normal == status; hist = (hist == &gv_target->hist) ? hist1 : NULL)
 	{	/* this loop execute once or twice: 1st for gv_target and then for hist1, if any */
-		DEBUG_ONLY(n_blkmods = n_pvtmods = 0);
+		if (tprestart_syslog_delta)
+			n_blkmods = n_pvtmods = 0;
 		for (t1 = hist->h; HIST_TERMINATOR != (blk = t1->blk_num); t1++)
 		{
 			if (si->start_tn > t1->tn)
@@ -124,18 +130,25 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				assert(is_mm || t1->cr || t1->first_tp_srch_status);
 				ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(t1->first_tp_srch_status, si);
 				t2 = t1->first_tp_srch_status ? t1->first_tp_srch_status : t1;
-				if (t2->tn <= ((blk_hdr_ptr_t)t2->buffaddr)->tn
-					VMS_ONLY(|| t2->cr && t2->cr->twin &&
-						((cache_rec_ptr_t)GDS_ANY_REL2ABS(cs_addrs, t2->cr->twin))->bt_index))
+				/* Note that we are comparing transaction numbers directly from the buffer instead of
+				 * going through the bt or blk queues. This is done to speed up processing. But the effect
+				 * is that we might encounter a situation where the buffer's contents hasn't been modified,
+				 * but the block might actually have been changed i.e. in VMS a twin buffer might have been
+				 * created or the "blk" field in the cache-record corresponding to this buffer might have
+				 * been made CR_BLKEMPTY etc. In these cases, we rely on the fact that the cycle for the
+				 * buffer would have been incremented thereby saving us in the cycle check later.
+				 */
+				if (t2->tn <= ((blk_hdr_ptr_t)t2->buffaddr)->tn)
 				{
 					assert(CDB_STAGNATE > t_tries);
-					DEBUG_ONLY(
+					if (tprestart_syslog_delta)
+					{
 						n_blkmods++;
 						if (t2->ptr || t1->ptr)
 							n_pvtmods++;
 						if (1 != n_blkmods)
 							continue;
-					)
+					}
 					TP_TRACE_HIST_MOD(t2->blk_num, t2->blk_target, tp_blkmod_tp_hist,
 						cs_addrs->hdr, t2->tn, ((blk_hdr_ptr_t)t2->buffaddr)->tn, t2->level);
 					status = cdb_sc_blkmod;
@@ -165,7 +178,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				 * even for BG due to the recent big-read TP changes).
 				 *
 				 * Also note that created and existing blocks are added in the hashtable
-				 * "sgm_info-ptr->blks_in_use". Since the add_hashtab_ent() routine expects
+				 * "sgm_info_ptr->blks_in_use". Since the add_hashtab_ent() routine expects
 				 * a pointer to the srch_blk_status element in the first_tp_hist array
 				 * where we are going to copy over the block's history, and since we want to have
 				 * common code wherever possible for both created and existing blocks, we pass in
@@ -189,7 +202,10 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 									(void *)blk, (void *)(si->last_tp_hist)))
 				{	/* not a duplicate block */
 					if (++si->num_of_blks > si->tp_hist_size)
+					{	/* catch the case where MUPIP recover or update process gets into this situation */
+						assert(!mupip_jnl_recover && !is_updproc);
 						rts_error(VARLSTCNT(4) ERR_TRANS2BIG, 2, REG_LEN_STR(gv_cur_region));
+					}
 					if (!chain.flag)
 					{
 						/* Either history has a clue or not.
@@ -216,10 +232,16 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						memcpy(si->last_tp_hist, t1, sizeof(srch_blk_status));
 						t1->first_tp_srch_status = si->last_tp_hist;
 						si->last_tp_hist++;
+						/* Ensure that if for a non-isolated global, we end up adding a leaf-level block
+						 * which has no corresponding cse to the history, we are doing an M-kill.
+						 * To be more specific we are doing an M-kill that freed up the data block from
+						 * 	the B-tree, but that checking involves more coding.
+						 */
+						assert(!t1->blk_target->noisolation || t1->level || t1->ptr ||
+								ERR_GVKILLFAIL == t_err);
 					}
 				} else
-				{
-					/* While it is always true that in this part of the code atmost one of
+				{	/* While it is always true that in this part of the code atmost one of
 					 * local_hash_entry and chain.flag will be non-NULL, it is almost always
 					 * true that exactly one of them is non-NULL. There is a very rare case
 					 * when both of them can be NULL. That is when two histories are passed
@@ -247,13 +269,11 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						t1->ptr->low_tlevel == local_hash_entry->ptr);
 					if (local_hash_entry && t1->ptr)
 					{
-						if (!local_hash_entry->ptr)
-						{
-							assert(t1->cr || is_mm);
-							local_hash_entry->cr = t1->cr;
-							local_hash_entry->cycle = t1->cycle;
-							local_hash_entry->buffaddr = t1->buffaddr;
-						}
+						assert(is_mm || local_hash_entry->ptr ||
+								t1->first_tp_srch_status == local_hash_entry
+									&& t1->cycle == local_hash_entry->cycle
+									&& t1->cr == local_hash_entry->cr
+									&& t1->buffaddr == local_hash_entry->buffaddr);
 						local_hash_entry->ptr = t1->ptr;
 					}
 				}

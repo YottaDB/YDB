@@ -12,6 +12,8 @@
 #ifndef GTM_SEM_INCLUDED
 #define GTM_SEM_INCLUDED
 
+#define FTOK_SEM_PER_ID 3
+
 union   semun {
 	int     val;
 	struct  semid_ds *buf;

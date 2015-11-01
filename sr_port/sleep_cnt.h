@@ -27,4 +27,5 @@
 #define TIME_TO_FLUSH           10      		/* milliseconds */
 #define MAX_FSYNC_WAIT_CNT     	1150			/* 2 mins of total wait for fsync, before GTMASSERTing */
 #define	MAXJNLQIOLOCKWAIT	4000			/* 20sec = 4000 5-msec waits to see if io_in_prog lock is free in wcs_flu */
-#define	PRC_STATE_CNT		(1000/MAXSLPTIME)	/* check process death state apprx. every 1 sec while trying to grab */
+#define LOOP_CNT_SEND_WAKEUP	300			/* When loops hit multiple of this count, they can send
+							   a wakeup (resume/continue) to the process */

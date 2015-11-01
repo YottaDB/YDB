@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include <varargs.h>
 #include "gtm_string.h"
 #include "cmd_qlf.h"
 #include "compiler.h"
@@ -17,7 +18,6 @@
 #include "io.h"
 #include "list_file.h"
 #include "gtmmsg.h"
-#include <varargs.h>
 #include "util_format.h"
 
 GBLREF char 			source_file_name[];
@@ -148,7 +148,7 @@ va_dcl
 	{
 		cnt = va_arg(args, int);
 		assert(cnt == 2);
-		sav_arg = args;
+		VAR_COPY(sav_arg, args);
 		arg1 = va_arg(args, int);
 		arg2 = va_arg(args, int);
 		if (warn)

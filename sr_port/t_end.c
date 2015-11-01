@@ -108,6 +108,8 @@ DEBUG_ONLY(GBLREF uint4		cumul_index;
 	   GBLREF uint4		cu_jnl_index;
 	  )
 
+GBLREF boolean_t		write_after_image;
+
 LITREF int			jnl_fixed_size[];
 
 /* This macro isn't enclosed in parantheses to allow for optimizations */
@@ -519,14 +521,6 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 							{	/* Flush the cache. Since we are in crit, defer syncing epoch */
 								if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH))
 								{
-									if (REPL_ENABLED(csd) && cw_depth
-											&& (run_time || is_db_updater))
-									{
-										QWINCRBYDW(jnlpool_ctl->write_addr,
-												jnlpool_ctl->jnlpool_size);
-											/* to refresh any history */
-										rel_lock(jnlpool.jnlpool_dummy_reg);
-									}
 									SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 									BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_jnl_wcsflu);
 									status = cdb_sc_cacheprob;
@@ -561,9 +555,10 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 									cs->jnl_freeaddr = 0;
 							}
 						}
-						if (dse_running)
+						if (dse_running || write_after_image)
 						{	/* Write after image record for DSE */
-							assert(1 == cw_set_depth); /* DSE changes only one block at a time */
+							assert(write_after_image || 1 == cw_set_depth); /* DSE changes only one
+													block at a time */
 							cs = cw_set;
 							jnl_write_aimg_rec(csa, cs->blk, (blk_hdr_ptr_t)cs->new_buff);
 						} else if (mu_reorg_process || 0 == cw_depth

@@ -22,7 +22,6 @@
 #include "stringpool.h"
 #include "namelook.h"
 
-GBLREF unsigned char write_filter;
 LITREF nametabent filter_names[];
 LITREF unsigned char filter_index[27];
 LITREF unsigned char io_params_size[];
@@ -64,21 +63,21 @@ void ionl_use(io_desc *iod, mval *pp)
 			switch (fil_type)
 			{
 				case 0:
-					write_filter |= CHAR_FILTER;
+					iod->write_filter |= CHAR_FILTER;
 					break;
 				case 1:
-					write_filter |= ESC1;
+					iod->write_filter |= ESC1;
 					break;
 				case 2:
-					write_filter &= ~CHAR_FILTER;
+					iod->write_filter &= ~CHAR_FILTER;
 					break;
 				case 3:
-					write_filter &= ~ESC1;
+					iod->write_filter &= ~ESC1;
 					break;
 			}
 			break;
 		case iop_nofilter:
-			write_filter = 0;
+			iod->write_filter = 0;
 			break;
 		case iop_length:
 			GET_USHORT(length, pp->str.addr + p_offset);

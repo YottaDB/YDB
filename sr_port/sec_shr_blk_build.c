@@ -36,6 +36,12 @@ int sec_shr_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	array = (blk_segment *)cse->upd_addr;
 	if (!(GTM_PROBE(sizeof(blk_segment), array, READ)) || !(GTM_PROBE(sizeof(blk_hdr), base_addr, WRITE)))
 		return FALSE;
+
+	/* block transaction number needs to be modified first. see comment in gvcst_blk_build as to why */
+	((blk_hdr*)base_addr)->tn = ctn;
+	((blk_hdr*)base_addr)->bsiz = array->len;
+	((blk_hdr*)base_addr)->levl = cse->level;
+
 	if (cse->forward_process)
 	{
 		ptr = base_addr + sizeof(blk_hdr);
@@ -65,8 +71,5 @@ int sec_shr_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 			memmove(ptr, seg->addr, seg->len);
 		}
 	}
-	((blk_hdr*)base_addr)->bsiz = array->len;
-	((blk_hdr*)base_addr)->levl = cse->level;
-	((blk_hdr*)base_addr)->tn = ctn;
 	return TRUE;
 }

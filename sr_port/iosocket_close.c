@@ -17,10 +17,14 @@
  *
  */
 #include "mdef.h"
-#include <sys/socket.h>
-#include <netinet/in.h>
+
+#include "gtm_string.h"
 #include "gtm_iconv.h"
 #include "gtm_stdio.h"
+
+#include <sys/socket.h>
+#include <netinet/in.h>
+
 #include "copy.h"
 #include "io_params.h"
 #include "io.h"
@@ -102,8 +106,10 @@ void iosocket_close(io_desc *iod, mval *pp)
 	{
 		socketptr = dsocketptr->socket[ii];
 		tcp_routines.aa_close(socketptr->sd);
-		iosocket_delimiter((char *)0, 0, socketptr, TRUE); /* free the delimiter space */
+		iosocket_delimiter((unsigned char *)NULL, 0, socketptr, TRUE); /* free the delimiter space */
 		free(socketptr->buffer);
+		if (NULL != socketptr->zff.addr)
+			free(socketptr->zff.addr);
 		free(socketptr);
 		if (dsocketptr->current_socket >= ii)
 			dsocketptr->current_socket--;

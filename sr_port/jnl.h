@@ -16,26 +16,57 @@
 #include "jnlsp.h"
 #endif
 
+#define JPV_LEN_NODE		16
+#define JPV_LEN_USER		12
+#define JPV_LEN_PRCNAM		16
+#define JPV_LEN_TERMINAL	15
+
+enum jpv_types
+{
+        CURR_JPV = 0,
+        ORIG_JPV,
+        SRVR_JPV,
+        JPV_COUNT
+};
+
+typedef struct jnl_process_vector_struct	/* name needed since this is used in cmmdef.h for "pvec" member */
+{
+	uint4		jpv_pid;			/* Process id */
+	int4		jpv_image_count;		/* Image activations [VMS only] */
+	jnl_proc_time	jpv_time;			/* Journal record timestamp;  also used for process termination time */
+	jnl_proc_time	jpv_login_time;			/* Used for process initialization time */
+	char		jpv_node[JPV_LEN_NODE],		/* Node name */
+			jpv_user[JPV_LEN_USER],		/* User name */
+			jpv_prcnam[JPV_LEN_PRCNAM],	/* Process name */
+			jpv_terminal[JPV_LEN_TERMINAL];	/* Login terminal */
+	unsigned char	jpv_mode;			/* a la JPI$_MODE [VMS only] */
+	int4		filler;
+	/* sizeof(jnl_process_vector) must be a multiple of sizeof(int4) */
+} jnl_process_vector;
+
 /* If you update JNL_LABEL_TEXT, you need to JNL_VER_THIS and repl_internal_filter array.
  * Also need to follow a set of directions (yet to be written 12/7/2000 -- nars) in case a new set of filters need to be written.
  */
-#define JNL_LABEL_TEXT		"GDSJNL11" /* update JNL_VER_THIS and repl_internal_filter array if you update JNL_LABEL_TEXT */
-#define JNL_VER_THIS		'\013' /* from GDSJNL11, octal equivalent of decimal 11 */
+#define JNL_LABEL_TEXT		"GDSJNL12" /* update JNL_VER_THIS and repl_internal_filter array if you update JNL_LABEL_TEXT */
+#define JNL_VER_THIS		'\014' /* from GDSJNL11, octal equivalent of decimal 11 */
 #define JNL_VER_EARLIEST_REPL	'\007' /* from GDSJNL07 (V4.1-000E), octal equivalent of decimal 07 */
 #define	ALIGN_KEY		0xfedcba98
 
 #define JNL_ALLOC_DEF		100
 #define JNL_ALLOC_MIN		10
-/* #define JNL_ALLOC_MAX		16777216  moved to jnlsp.h */
+
 #ifdef UNIX
 #define JNL_BUFFER_DEF		ROUND_UP2(128, IO_BLOCK_SIZE / DISK_BLOCK_SIZE)
 #else
 #define JNL_BUFFER_DEF		128
 #endif
+
 /*	JNL_BUFFER_MIN	database block size / 512 + 1	*/
 #define JNL_BUFFER_MAX		2000
+
 /*	JNL_EXTEND_DEF	allocation size / 10		*/
 #define JNL_EXTEND_DEF_PERC	0.1
+
 #define JNL_EXTEND_MIN		0
 #define JNL_EXTEND_MAX		65535
 #define JNL_MIN_WRITE		32768
@@ -50,6 +81,9 @@
 #define JNL_REC_START_BNDRY	8
 #define MAX_JNL_REC_SIZE	(DISK_BLOCK_SIZE * 32)
 #define MAX_YIELD_LIMIT		2048
+
+/* Have a minimum jnl-file-auto-switch-limit of 64 align boundaries (currently each align boundary is 16K) */
+#define	JNL_AUTOSWITCHLIMIT_MIN	(64 * JNL_MIN_ALIGNSIZE / DISK_BLOCK_SIZE)
 
 /* options (sizeof(char)) to wcs_flu() (currently flush_hdr, write_epoch, sync_epoch) are bit-wise ored */
 #define	WCSFLU_NONE		0
@@ -85,7 +119,7 @@
 #define	MAX_EPOCH_INTERVAL	32767	/* in seconds. Amounts to nearly 10 hours. Don't want to keep db stale so long */
 
 #define JNL_ENABLED(X)		((X)->jnl_state == jnl_open)		/* If TRUE, journal records are to be written */
-#define JNL_ALLOWED(X)		((X)->jnl_state != jnl_notallowed)	/* If TRUE, journalling is allowed for the file */
+#define JNL_ALLOWED(X)		((X)->jnl_state != jnl_notallowed)	/* If TRUE, journaling is allowed for the file */
 #define REPL_ENABLED(X)		((X)->repl_state == repl_open)		/* If TRUE, replication records are to be written */
 
 #define MUEXTRACT_TYPE(A) 	(((A)[0]-'0')*10 + ((A)[1]-'0')) /* A is a character pointer */
@@ -149,6 +183,7 @@ typedef struct
 		int4		dev_specific;
 	}			iosb;
 	int4			alignsize;		/* alignment size for JRT_ALIGN */
+ 	uint4			autoswitchlimit;	/* limit in disk blocks (max 4GB) when jnl should be auto switched */
 	volatile int4		qiocnt,			/* Number of qio's issued */
 				bytcnt,			/* Number of bytes written */
 				errcnt,			/* Number of errors during writing */
@@ -199,7 +234,7 @@ typedef struct jnl_private_control_struct
 	vms_lock_sb		*jnllsb;		/* VMS only */
 	boolean_t		free_update_inprog;	/* M VMS only */
 	int4			regnum;			/* M index for 'tokens' */
-	uint4			pini_addr,		/* virtual on-disk address for JRT_PINI record, if journalling */
+	uint4			pini_addr,		/* virtual on-disk address for JRT_PINI record, if journaling */
 				lastwrite,		/* M used by jnl_wait */
 				new_freeaddr;
 	int4			temp_free;		/* M Temp copy of free relative index until full write done */
@@ -261,7 +296,7 @@ typedef struct
 				who_opened;
 	uint4			end_of_data;
 	int4			max_record_length;
-	uint4			bov_timestamp,
+	jnl_proc_time		bov_timestamp,
 				eov_timestamp;
 	bool			before_images;
 	bool			crash;
@@ -271,11 +306,20 @@ typedef struct
 	int4			epoch_interval;	/* Time between successive epochs in epoch-seconds */
 	unsigned short		data_file_name_length;
 	unsigned short		prev_jnl_file_name_length;
+	unsigned short		forw_phase_jnl_file_len; /* Length of forward phase journal file name */
+	unsigned short		filler_short;	/* To make sure we have 4/8 byte alignment for the next field */
 	char			data_file_name[JNL_NAME_SIZE];
 	char			prev_jnl_file_name[JNL_NAME_SIZE];
+	char			forw_phase_jnl_file_name[JNL_NAME_SIZE];	/* Forward phase journal file name */
 	int4			repl_state;	/* To state whether replication is turned on for this journal file */
 	seq_num			start_seqno;	/* the reg_seqno when this journal file was created */
 	trans_num		bov_tn, eov_tn;
+	uint4			ftruncate_len;	/* Length upto which jurnal file was truncated (turn around point stop address) */
+	uint4			forw_phase_eof_addr;	/* Eof address and Last record of newly created forw_phase journal file, */
+	uint4			forw_phase_last_record;	/* Used incase rollback is interrupted during forward phase */
+	uint4			forw_phase_stop_addr;	/* The last stop addr in forward phase journal file name,
+							 * Used incase of rollback is interrupted during forward phase */
+ 	uint4			autoswitchlimit;	/* limit in disk blocks (max 4GB) when jnl should be auto switched */
 } jnl_file_header;
 
 typedef struct
@@ -295,7 +339,8 @@ typedef struct
 	bool			before_images;
 	bool			filler_bool[3];
 	int4			alignsize;
-	int4			epoch_interval;	/* Time between successive epochs in epoch-seconds */
+ 	uint4			autoswitchlimit;	/* limit in disk blocks (max 4GB) when jnl should be auto switched */
+	int4			epoch_interval;		/* Time between successive epochs in epoch-seconds */
 	char			*prev_jnl;
 	int4			filler_int4;
 	int4			prev_jnl_len;
@@ -312,7 +357,7 @@ typedef struct
 
 typedef struct
 {
-	jnl_process_vector	process_vector;
+	jnl_process_vector	process_vector[JPV_COUNT];
 } struct_jrec_pini;
 
 typedef struct
@@ -329,6 +374,8 @@ typedef struct
 	trans_num		tn;
 	int4			rec_seqno;
 	seq_num			jnl_seqno;
+	uint4			tc_recov_short_time;
+	uint4			ts_recov_short_time;
 	token_num		token;
 	uint4			participants;
 	uint4			ts_short_time;
@@ -341,6 +388,8 @@ typedef struct
 	trans_num		tn;
 	int4			rec_seqno;
 	seq_num			jnl_seqno;
+	uint4			recov_short_time;
+	uint4			filler_null;
 } struct_jrec_null;
 
 typedef struct
@@ -350,6 +399,8 @@ typedef struct
 	trans_num		tn;
 	int4			rec_seqno;
 	seq_num			jnl_seqno;
+	uint4			recov_short_time;
+	uint4			filler_int4;
 	jnl_string		mumps_node;
 	/* Note: for SET, mumps data follows mumps_node */
 } struct_jrec_kill_set;
@@ -361,6 +412,8 @@ typedef struct 		/* this should be the same as jrec_kill_set_struct except for m
 	trans_num		tn;
 	int4			rec_seqno;
 	seq_num			jnl_seqno;
+	uint4			recov_short_time;
+	uint4			filler_int4;
 } fixed_jrec_kill_set;
 
 typedef struct
@@ -370,6 +423,8 @@ typedef struct
 	trans_num		tn;
 	int4			rec_seqno;
 	seq_num			jnl_seqno;
+	uint4			recov_short_time;
+	uint4			filler_int4;
 	token_num		token;
 	char			jnl_tid[8];
 	jnl_string		mumps_node;
@@ -383,6 +438,8 @@ typedef struct		/* this should be the same as jrec_tp_kill_set_struct except for
 	trans_num		tn;
 	int4			rec_seqno;
 	seq_num			jnl_seqno;
+	uint4			recov_short_time;
+	int4			filler_int4; /* To make the next field token to start at 8 byte boundary */
 	token_num		token;
 	char			jnl_tid[8];
 } fixed_jrec_tp_kill_set;
@@ -402,8 +459,18 @@ typedef struct
 	uint4			short_time;
 	block_id		blknum;
 	unsigned short		bsiz;
+	unsigned short 		filler_short;
 	char			blk_contents[1];	/* Actually blk_contents[bsiz] */
 } struct_jrec_pblk;
+
+typedef struct
+{
+	uint4			pini_addr;
+	uint4			short_time;
+	block_id		blknum;
+	unsigned short		bsiz;
+	unsigned short 		filler_short; /* To make next field at 8 byte alingement and to fix Unaligned access errors */
+} fixed_jrec_pblk;
 
 typedef struct
 {
@@ -412,8 +479,22 @@ typedef struct
         trans_num               tn;
         block_id                blknum;
         unsigned short          bsiz;
+	unsigned short 		filler_short; /* To make the 8 byte alignment requirement. It's ok to have 6 byte filler for the */
+	unsigned int		filler_int; /* AIMG record as it's written less frequently */
         char                    blk_contents[1];        /* Actually blk_contents[bsiz] */
 } struct_jrec_after_image;
+
+typedef struct
+{
+        uint4                   pini_addr;
+        uint4                   short_time;
+        trans_num               tn;
+        block_id                blknum;
+        unsigned short          bsiz;
+	unsigned short 		filler_short; /* To make the 8 byte alignment requirement. It's ok to have 6 byte filler for the
+						AIMG record as it's written less frequently */
+	unsigned int		filler_int;
+} fixed_jrec_after_image;
 
 typedef struct
 {
@@ -430,7 +511,7 @@ typedef struct
 	uint4			pini_addr;
 	uint4			short_time;
 	trans_num		tn;
-	int4			filler_int4;	/* to make the next field (jnl_seqno) 8-byte aligned */
+	int4			filler_int4; /* To make the next field token to start at 8 byte boundary */
 	seq_num			jnl_seqno;
 } struct_jrec_epoch;
 
@@ -509,38 +590,39 @@ typedef struct jnl_format_buff_struct
 } jnl_format_buffer;
 
 /* jnl_ prototypes */
-int4 jnl_record_length(jnl_record *rec, int4 top);
-int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size); /***type int added***/
-void  jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat);
-uint4 jnl_qio_start(jnl_private_control *jpc);
-uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold);
-void jnl_format(jnl_format_buffer *jfb);
-void jnl_prc_vector(jnl_process_vector *pv);
-void jnl_send_oper(jnl_private_control *jpc, uint4 status);
-void jnl_setver(void);
-void jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *hdr_buffer);
-void jnl_extr_init(void);
-void jnlext_write(char *buffer, int length);
-uint4 cre_jnl_file(jnl_create_info *info);
-uint4 jnl_ensure_open(void);
-void  set_jnl_info(gd_region *reg, jnl_create_info *set_jnl_info);
+int4	jnl_record_length(jnl_record *rec, int4 top);
+int	jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size); /***type int added***/
+void	jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat);
+uint4	jnl_qio_start(jnl_private_control *jpc);
+uint4	jnl_write_attempt(jnl_private_control *jpc, uint4 threshold);
+void	jnl_format(jnl_format_buffer *jfb);
+void	jnl_prc_vector(jnl_process_vector *pv);
+void	jnl_send_oper(jnl_private_control *jpc, uint4 status);
+void	jnl_setver(void);
+void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *hdr_buffer);
+void	jnl_extr_init(void);
+void	jnlext_write(char *buffer, int length);
+uint4	cre_jnl_file(jnl_create_info *info);
+uint4	jnl_ensure_open(void);
+void	set_jnl_info(gd_region *reg, jnl_create_info *set_jnl_info);
+int 	exttime(uint4 time, jnl_proc_time *ref_time, int extract_len);
 
 #ifdef VMS
-uint4 set_jnl_file_close(void);
-void finish_active_jnl_qio(void);
-void jnl_start_ast(jnl_private_control *jpc);
-uint4 jnl_permit_ast(jnl_private_control *jpc);
-void jnl_qio_end(jnl_private_control *jpc);
+uint4	set_jnl_file_close(boolean_t in_jnlfilext);
+void	finish_active_jnl_qio(void);
+void	jnl_start_ast(jnl_private_control *jpc);
+uint4	jnl_permit_ast(jnl_private_control *jpc);
+void	jnl_qio_end(jnl_private_control *jpc);
 #endif
 
-void detailed_extract_tcom(jnl_record *rec, uint4 pid, jnl_proc_time *ref_time);
-void wcs_defer_wipchk_ast(jnl_private_control *jpc);
+void	detailed_extract_tcom(jnl_record *rec, uint4 pid, jnl_proc_time *ref_time);
+void	wcs_defer_wipchk_ast(jnl_private_control *jpc);
 
-int4 mupip_set_jnlfile_aux(jnl_file_header *header);
+int4	mupip_set_jnlfile_aux(jnl_file_header *header);
 
-char *ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec);
+char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec);
 char    *ext2jnl(char *ptr, jnl_record *rec);
-char *jnl2extcvt(jnl_record *rec, int4 jnl_len, char *ext_buff);
+char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char *ext_buff);
 char    *jnl2ext(char *jnl_buff, char *ext_buff);
 
 #define JREC_PREFIX_SIZE	sizeof(jrec_prefix)
@@ -549,9 +631,11 @@ char    *jnl2ext(char *jnl_buff, char *ext_buff);
 				(ROUND_UP(JNL_NAME_EXP_SIZE + sizeof(jnl_buffer), OS_PAGE_SIZE)		\
                                 + ROUND_UP(((sgmnt_data_ptr_t)X)->jnl_buffer_size * DISK_BLOCK_SIZE, 	\
 					OS_PAGE_SIZE)) : 0)
-    /*  pass address of jnl_buffer to get address of expanded jnl file name */
+
+/* pass address of jnl_buffer to get address of expanded jnl file name */
 #define JNL_NAME_EXP_PTR(X) ((sm_uc_ptr_t)(X) - JNL_NAME_EXP_SIZE)
 #define JNL_GDID_PVT(sa)        (sa->jnl->fileid)
+
 /* Given a journal record, get_jnl_seqno returns the jnl_seqno field
  * NOTE : All replication type records have the same first fields
  * pini_addr, short_time, tn, rec_seqno and jnl_seqno.
@@ -559,6 +643,7 @@ char    *jnl2ext(char *jnl_buff, char *ext_buff);
  * Modify this function if need be when changing any jrec structure.
  */
 #define get_jnl_seqno(j)	((IS_REPL_RECTYPE(REF_CHAR(&(j)->jrec_type))) ? (j)->val.jrec_kill.jnl_seqno : seq_num_zero)
+
 /* Given a journal record, get_tn returns the tn field
  * NOTE : All replication type records have the same first fields
  * pini_addr, short_time, tn, rec_seqno and jnl_seqno.
@@ -581,5 +666,15 @@ char    *jnl2ext(char *jnl_buff, char *ext_buff);
 		cse->done = TRUE;							\
 	}										\
 }
+
+#define JNL_FILE_FIRST_RECORD	ROUND_UP(sizeof(jnl_file_header), DISK_BLOCK_SIZE)
+#define	HDR_LEN			ROUND_UP(sizeof(jnl_file_header), DISK_BLOCK_SIZE)
+#define PINI_RECLEN		ROUND_UP(JREC_PREFIX_SIZE + sizeof(jrec_pini) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
+#define EPOCH_RECLEN		ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_epoch) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
+#define PFIN_RECLEN		ROUND_UP(JREC_PREFIX_SIZE + sizeof(jrec_pfin) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
+#define	EOF_RECLEN		ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_eof) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
+#define EOF_BACKPTR		ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_eof), JNL_REC_START_BNDRY)
+#define EPOCH_BACKPTR		ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_epoch), JNL_REC_START_BNDRY)
+#define	EPOCH_SIZE		1000	/* to be changed later when we allow the user to modify it */
 
 #endif

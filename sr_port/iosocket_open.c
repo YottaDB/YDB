@@ -10,14 +10,16 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <errno.h>
-#include <time.h>
-#include <sys/socket.h>
-#ifdef __MVS__
-#include <arpa/inet.h>
-#endif
-#include <netinet/in.h>
+
+#include "gtm_string.h"
 #include "gtm_stdio.h"
+#include "gtm_socket.h"
+#include "gtm_inet.h"
+#include "gtm_time.h"
+
+#include <errno.h>
+#include <netinet/in.h>
+
 #include "copy.h"
 #include "gt_timer.h"
 #include "io.h"
@@ -33,14 +35,15 @@
 GBLREF 	tcp_library_struct	tcp_routines;
 GBLREF	d_socket_struct		*socket_pool;
 LITREF 	unsigned char		io_params_size[];
+
 short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 timepar)
 {
 	char			addr[SA_MAXLITLEN], *errptr, sockaddr[SA_MAXLITLEN],
 				temp_addr[SA_MAXLITLEN],dev_type[MAX_DEV_TYPE_LEN];
-	unsigned char		ch, delimiter_blen, len, *c, *next, *top;
-	short			length, width, handle_len;
+	unsigned char		ch, len, *c, *next, *top;
+	short			handle_len;
 	unsigned short		port;
-	int4			errlen, msec_timeout, real_errno, p_offset = 0;
+	int4			errlen, msec_timeout, real_errno, p_offset = 0, zff_len, delimiter_len;
 	int			ii, rv, size, on = 1, temp_1 = -2;
 	ABS_TIME		cur_time, end_time;
 	io_desc			*ioptr;
@@ -52,14 +55,12 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	boolean_t		attach_specified = FALSE,
 				listen_specified = FALSE,
 				connect_specified = FALSE,
-				delimiter_specified = FALSE,
-				nodelimiter_specified = FALSE,
 				ioerror_specified = FALSE,
 				delay_specified = FALSE,
 				nodelay_specified = FALSE,
 				ibfsize_specified = FALSE;
-	char 			delimiter_buffer[MAX_N_DELIMITER * (MAX_DELIM_LEN + 1)],
-				ioerror, ip[3], tcp[4],
+	unsigned char 		delimiter_buffer[MAX_N_DELIMITER * (MAX_DELIM_LEN + 1)], zff_buffer[MAX_ZFF_LEN];
+	char			ioerror, ip[3], tcp[4],
 				sock_handle[MAX_HANDLE_LEN], delimiter[MAX_DELIM_LEN + 1];
 	error_def(ERR_DELIMSIZNA);
 	error_def(ERR_ADDRTOOLONG);
@@ -67,6 +68,9 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	error_def(ERR_ABNCOMPTINC);
 	error_def(ERR_DEVPARINAP);
 	error_def(ERR_ILLESOCKBFSIZE);
+	error_def(ERR_ZFF2MANY);
+	error_def(ERR_DELIMWIDTH);
+
 	ioptr = dev->iod;
 	assert((params) *(pp->str.addr + p_offset) < (unsigned char)n_iops);
 	assert(ioptr != 0);
@@ -75,7 +79,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	if ((ioptr->state == dev_closed) && mspace && mspace->str.len && mspace->str.addr)
 	{
 		lower_to_upper((uchar_ptr_t)dev_type, (uchar_ptr_t)mspace->str.addr, mspace->str.len);
-		if (6 != mspace->str.len || 0 != memcmp(dev_type, "SOCKET", 6))
+		if (STR_LIT_LEN("SOCKET") != mspace->str.len || 0 != memcmp(dev_type, "SOCKET", STR_LIT_LEN("SOCKET")))
 		{
 			if (ioptr->dev_sp)
 				free(ioptr->dev_sp);
@@ -100,23 +104,21 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	ioptr->dollar.zeof = FALSE;
 	newdsocket = *dsocketptr;
 	memcpy(newdsocket.dollar_device, "0", sizeof("0"));
+	zff_len = -1; /* indicates neither ZFF nor ZNOFF specified */
+	delimiter_len = -1; /* indicates neither DELIM nor NODELIM specified */
 	while (iop_eol != (ch = *(pp->str.addr + p_offset++)))
 	{
 		switch  (ch)
 		{
 		case	iop_delimiter:
-			delimiter_specified = TRUE;
-			delimiter_blen = *(pp->str.addr + p_offset);
-			if (delimiter_blen <= (MAX_DELIM_LEN + 1) * MAX_N_DELIMITER)
-			{
-				memset(delimiter_buffer, 0, (MAX_DELIM_LEN + 1) * MAX_N_DELIMITER);
-				memcpy(delimiter_buffer, pp->str.addr + p_offset + 1, delimiter_blen);
-			}
+			delimiter_len = (int4)(unsigned char)*(pp->str.addr + p_offset);
+			if (((MAX_DELIM_LEN + 1) * MAX_N_DELIMITER) >= delimiter_len)
+				memcpy(delimiter_buffer, (pp->str.addr + p_offset + 1), delimiter_len);
 			else
 				rts_error(VARLSTCNT(1) ERR_DELIMSIZNA);
 			break;
 		case	iop_nodelimiter:
-			nodelimiter_specified = TRUE;
+			delimiter_len = 0;
 			break;
 		case	iop_zdelay:
 			delay_specified = TRUE;
@@ -142,8 +144,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
                         {
                                 memset(sockaddr, 0, sizeof(sockaddr));
                                 memcpy(sockaddr, pp->str.addr + p_offset + 1, len);
-                        }
-                        else
+                        } else
 				rts_error(VARLSTCNT(1) ERR_ADDRTOOLONG);
                         break;
 		case	iop_connect:
@@ -153,8 +154,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			{
 				memset(sockaddr, 0, sizeof(sockaddr));
                                 memcpy(sockaddr, pp->str.addr + p_offset + 1, len);
-			}
-			else
+			} else
 				rts_error(VARLSTCNT(1) ERR_ADDRTOOLONG);
 			break;
 		case	iop_ioerror:
@@ -170,39 +170,47 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			attach_specified = TRUE;
 			handle_len = (short)(*(pp->str.addr + p_offset));
 			if (handle_len > MAX_HANDLE_LEN)
-			{
 				handle_len = MAX_HANDLE_LEN;
-			}
 			memcpy(sock_handle, pp->str.addr + p_offset + 1, handle_len);
 			break;
 		case	iop_socket:
 			rts_error(VARLSTCNT(1) ERR_DEVPARINAP);
 			break;
+		case	iop_zff:
+			if (MAX_ZFF_LEN >= (zff_len = (int4)(unsigned char)*(pp->str.addr + p_offset)))
+				memcpy(zff_buffer, (char *)(pp->str.addr + p_offset + 1), zff_len);
+			else
+				rts_error(VARLSTCNT(1) ERR_ZFF2MANY, zff_len, MAX_ZFF_LEN);
+			break;
+		case	iop_znoff:
+			zff_len = 0;
+			break;
+		case iop_wrap:
+			ioptr->wrap = TRUE;
+			break;
+		case iop_nowrap:
+			ioptr->wrap = FALSE;
+			break;
 		default:
 			break;
 		}
 		p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-			(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+				(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 	}
-
         if (listen_specified && connect_specified)
         {
-		rts_error(VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("CONNECT"),
-			LEN_AND_LIT("ZLISTEN"), LEN_AND_LIT("OPEN"));
+		rts_error(VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("CONNECT"), LEN_AND_LIT("ZLISTEN"), LEN_AND_LIT("OPEN"));
                 return FALSE;
         }
 	if (delay_specified && nodelay_specified)
 	{
-		rts_error(VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("DELAY"),
-			LEN_AND_LIT("NODELAY"), LEN_AND_LIT("OPEN"));
+		rts_error(VARLSTCNT(8) ERR_ABNCOMPTINC, 6, LEN_AND_LIT("DELAY"), LEN_AND_LIT("NODELAY"), LEN_AND_LIT("OPEN"));
 		return FALSE;
 	}
 	if (listen_specified || connect_specified)
 	{
 		if (NULL == (socketptr = iosocket_create(sockaddr, bfsize)))
-		{
 			return FALSE;
-		}
 		assert(listen_specified == socketptr->passive);
 		if (ioerror_specified)
 			socketptr->ioerror = ('T' == ioerror || 't' == ioerror);
@@ -218,14 +226,15 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 				rts_error(VARLSTCNT(4) ERR_SOCKETEXIST, 2, handle_len, sock_handle);
                   		return FALSE;
                 	}
-		}
-		else
+		} else
 			iosocket_handle(sock_handle, &handle_len, TRUE, dsocketptr);
 		socketptr->handle_len = handle_len;
 		memcpy(socketptr->handle, sock_handle, handle_len);
                 /* parse the delimiter: delimiter_buffer ==> socketptr->delimiter[...] */
-                if (delimiter_specified || nodelimiter_specified)
-                        iosocket_delimiter(delimiter_buffer, delimiter_blen, socketptr, nodelimiter_specified);
+                if (0 <= delimiter_len)
+                        iosocket_delimiter(delimiter_buffer, delimiter_len, socketptr, (0 == delimiter_len));
+		if (ioptr->wrap && 0 != socketptr->n_delimiter && ioptr->width < socketptr->delimiter[0].len)
+			rts_error(VARLSTCNT(4) ERR_DELIMWIDTH, 2, ioptr->width, socketptr->delimiter[0].len);
 		/* connects newdsocket and socketptr (the new socket) */
                 socketptr->dev = &newdsocket;
                 newdsocket.socket[newdsocket.n_socket++] = socketptr;
@@ -237,7 +246,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
        	{
 		if (socketptr->sd > 0)
 			(void)tcp_routines.aa_close(socketptr->sd);
-		iosocket_delimiter((char *)0, 0, socketptr, TRUE);
+		iosocket_delimiter((unsigned char *)NULL, 0, socketptr, TRUE);
 		free(socketptr);
 		return FALSE;
 	}
@@ -246,7 +255,13 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	{
 		socketptr->dev = dsocketptr;
 		*dsocketptr = newdsocket;
- 		/* memcpy(dsocketptr, &newdsocket, sizeof(d_socket_struct)); */
+	}
+	if (0 <= zff_len && /* ZFF or ZNOFF specified */
+	    0 < (socketptr->zff.len = zff_len)) /* assign the new ZFF len, might be 0 from ZNOFF, or ZFF="" */
+	{ /* ZFF="non-zero-len-string" specified */
+		if (NULL == socketptr->zff.addr) /* we rely on socketptr->zff.addr being set to 0 in iosocket_create() */
+			socketptr->zff.addr = (char *)malloc(MAX_ZFF_LEN);
+		memcpy(socketptr->zff.addr, zff_buffer, zff_len);
 	}
        	ioptr->state = dev_open;
 	return TRUE;

@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"
+#include "hashdef.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gtm_facility.h"
@@ -19,6 +21,9 @@
 #include "filestruct.h"
 #include "cmidef.h"
 #include "cmmdef.h"
+#include "gtcmd.h"
+#include "targ_alloc.h"
+#include "dpgbldir.h"
 
 #define DIR_ROOT 1
 
@@ -31,14 +36,13 @@ void gtcmd_cst_init(cm_region_head *ptr)
 {
 	gv_namehead	*g;
 	gv_key          *temp_key;
-	void		gvcst_init();
 	error_def(CMERR_CMEXCDASTLM);
 
-	if (gtcm_ast_avail > 0)
+	if (VMS_ONLY(gtcm_ast_avail > 0) UNIX_ONLY(TRUE))
 		gvcst_init(ptr->reg);
 	else
 		rts_error(VARLSTCNT(1) CMERR_CMEXCDASTLM);
-	gtcm_ast_avail--;
+	VMS_ONLY(gtcm_ast_avail--);
 	if (((ptr->reg->max_rec_size + MAX_NUM_SUBSC_LEN + 4) & (-4)) > gv_keysize)
 	{
 		gv_keysize = (ptr->reg->max_rec_size + MAX_NUM_SUBSC_LEN + 4) & (-4);

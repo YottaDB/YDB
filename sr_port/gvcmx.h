@@ -12,13 +12,13 @@
 #ifndef GVCMX_INCLUDED
 #define GVCMX_INCLUDED
 
-int gvcmx_data(void);
-int gvcmx_get(mval *v);
-int gvcmx_order(void);
-int gvcmx_query(void);
-int gvcmx_reqremlk(unsigned char c, int4 timeout);
-int gvcmx_resremlk(unsigned char c);
-int gvcmx_zprevious(void);
+mint gvcmx_data(void);
+bool gvcmx_get(mval *v);
+bool gvcmx_order(void);
+bool gvcmx_query(mval *val);
+bool gvcmx_reqremlk(unsigned char laflag, int4 time);
+bool gvcmx_resremlk(unsigned char c);
+bool gvcmx_zprevious(void);
 void gvcmx_canremlk(void);
 void gvcmx_kill(bool so_subtree);
 void gvcmx_put(mval *v);

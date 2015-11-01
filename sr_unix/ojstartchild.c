@@ -36,6 +36,15 @@
 #include "compiler.h"
 #include "job_addr.h"
 #include "util.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "dpgbldir.h"
+#include "gtmio.h"
+#include "jnl.h"
 
 #define MAX_CMD_LINE	8192	/* Maximum command line length */
 #define MAX_PATH	 128	/* Maximum file path length */
@@ -53,6 +62,7 @@ GBLREF	bool			jobpid;		/* job's output files should have the pid appended to the
 GBLREF	volatile boolean_t    	ojtimeout;
 GBLREF	boolean_t    		job_try_again;
 GBLREF	uint4			process_id;
+GBLREF	int			mutex_sock_fd;
 #if !defined(__MVS__) && !defined(__linux__)
 GBLREF	int			sys_nerr;
 #endif
@@ -139,6 +149,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	job_parm		*jp;
 	rhdtyp			*base_addr;
 	struct sigaction	act, old_act;
+	unix_db_info		*udi;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
+	gd_region		*r_top, *r_local;
+	gd_addr			*addr_ptr;
 
 #ifdef	__osf__
 /* These must be O/S-compatible 64-bit pointers for OSF/1.  */
@@ -247,7 +262,39 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		sigaction(SIGTERM, &old_act, 0);		/* restore the SIGTERM handler */
 
 		joberr = joberr_io;
+
+		/* Run down any open flat files to reclaim their file descriptors */
 		io_rundown(RUNDOWN_EXCEPT_STD);
+
+		/* Run through the list of databases to simply close them out (still open by parent) */
+		for (addr_ptr = get_next_gdr(0); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+		{
+			for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top;
+			     r_local++)
+			{
+				if (r_local->open && !r_local->was_open &&
+				    (dba_bg == r_local->dyn.addr->acc_meth || dba_mm == r_local->dyn.addr->acc_meth))
+				{
+					udi = (unix_db_info *)(r_local->dyn.addr->file_cntl->file_info);
+					csa = &udi->s_addrs;
+					csd = csa->hdr;
+					/* Close journal file if open */
+					if (JNL_ENABLED(csd) && NULL != csa->jnl && NOJNL != csa->jnl->channel)
+					{
+						CLOSEFILE(csa->jnl->channel, rc);
+					}
+					CLOSEFILE(udi->fd, rc);
+				}
+			}
+		}
+#ifndef MUTEX_MSEM_WAKE
+		/* We don't need the parent's mutex socket anymore either (if we are using the socket) */
+		if (-1 != mutex_sock_fd)
+		{
+			CLOSEFILE(mutex_sock_fd, rc);
+			mutex_sock_fd = -1;
+		}
+#endif
 		DUP2(1, 2, rc); /* equate stdout, stderr */
 		if (-1 == rc)
 			rts_error(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,

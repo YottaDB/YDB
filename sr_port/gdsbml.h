@@ -20,6 +20,19 @@
 #define BML_BITS_PER_BLK	2
 #define BM_SIZE(bplm)		(sizeof(blk_hdr) + ((bplm) * BML_BITS_PER_BLK)/8)
 
+#define	VALIDATE_BM_BLK(blk, bp, csa, region, status)								\
+{														\
+	error_def(ERR_DBBMLCORRUPT);										\
+	if (IS_BITMAP_BLK(blk) && ((LCL_MAP_LEVL != (bp)->levl) || (BM_SIZE(csa->hdr->bplmap) != (bp)->bsiz)))	\
+	{													\
+		send_msg(VARLSTCNT(9) ERR_DBBMLCORRUPT, 7, DB_LEN_STR(region), 					\
+				blk, (bp)->bsiz, (bp)->levl, (bp)->tn, csa->ti->curr_tn);			\
+		status = FALSE;											\
+		assert(FALSE);											\
+	} else													\
+		status = TRUE;											\
+}
+
 #define NO_FREE_SPACE		-1
 /* MAP_RD_FAIL is hard coded into the file BML_GET_FREE.MAR */
 #define MAP_RD_FAIL		-2

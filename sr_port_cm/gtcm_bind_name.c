@@ -20,6 +20,10 @@
 #include "hashdef.h"
 #include "cmidef.h"
 #include "cmmdef.h"
+#include "gtcm_bind_name.h"
+#include "gv_xform_key.h"
+#include "targ_alloc.h"
+#include "gvcst_root_search.h"
 
 #define DIR_ROOT 1
 
@@ -28,15 +32,17 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_data	*cs_data;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gv_namehead	*gv_target;
+GBLREF cm_region_head	*curr_cm_reg_head;
 
-void gtcm_bind_name(cm_region_head *rh)
+void gtcm_bind_name(cm_region_head *rh, boolean_t xform)
 {
-	ht_entry		*hte_ptr, *ht_put();
+	ht_entry		*hte_ptr;
 	char			stashed;
 	register unsigned char	*c0, *c_top;
 	unsigned int		idx;
 	mname			lcl_name;
 
+	curr_cm_reg_head = rh;
 	gv_cur_region = rh->reg;
 	for (c0 = (unsigned char *)&lcl_name, c_top = c0 + sizeof(lcl_name), idx = 0;
 		gv_currkey->base[idx] && idx < sizeof(lcl_name.txt);  idx++)
@@ -54,9 +60,9 @@ void gtcm_bind_name(cm_region_head *rh)
 	}
 	else
 		GTMASSERT;
-	if ((NULL == gv_target->root) || (DIR_ROOT == gv_target->root))
+	if ((!gv_target->root) || (DIR_ROOT == gv_target->root))
 		gvcst_root_search();
-	if (gv_target->collseq || gv_target->nct)
+	if ((gv_target->collseq || gv_target->nct) && xform)
 		gv_xform_key(gv_currkey, FALSE);
 	return;
 }

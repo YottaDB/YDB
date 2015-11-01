@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "stringpool.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -40,7 +42,7 @@ GBLREF uint4		t_err;
 GBLREF unsigned int	t_tries;
 GBLREF spdesc		stringpool;
 
-boolean_t gvcst_queryget(mval *key, mval *val)
+boolean_t gvcst_queryget(mval *val)
 {
 	error_def(ERR_GVQUERYGETFAIL);
 
@@ -150,10 +152,6 @@ boolean_t gvcst_queryget(mval *key, mval *val)
 				val->str.addr = (char *)stringpool.free;
 				val->str.len = data_len;
 				stringpool.free += data_len;
-				key->mvtype = MV_STR;
-				key->str.addr = (char *)gv_altkey->base;
-				key->str.len = gv_altkey->end + 1;
-				s2pool(&key->str);
 			}
 			return found;
 		}

@@ -109,7 +109,8 @@ bool	gvcst_order(void)
 				assert(gv_altkey->end < gv_altkey->top);
 				/* store new subscipt */
 				c1 = gv_altkey->base;
-				alt_top = gv_altkey->base + gv_altkey->top;
+				alt_top = gv_altkey->base + gv_altkey->top - 1;
+					/* Make alt_top one less than gv_altkey->top to allow double-null at end of a key-name */
 				/* 4/17/96
 				 * HP compiler bug work-around.  The original statement was
 				 * c2 = (unsigned char *)CST_BOK(rp) + bh->curr_rec.match - rp->cmpc;

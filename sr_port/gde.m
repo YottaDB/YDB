@@ -12,7 +12,7 @@ gde:	;base module - d DEBUG^GDE to debug
 	i $$set^%LCLCOL(0)
 	s (debug,runtime)=0
 DBG:	;transfer point for DEBUG and "runtime" %gde
-	s $zt=$s(debug:"b:$zs'[""%GDE""!allerrs  ",1:"")_"g:(""%GDE%NONAME""[$p($p($zs,"","",3),""-"")) SHOERR^GDE d ABORT^GDE"
+	s $et=$s(debug:"b:$zs'[""%GDE""!allerrs  ",1:"")_"g:(""%GDE%NONAME""[$p($p($zs,"","",3),""-"")) SHOERR^GDE d ABORT^GDE"
 	s io=$io,useio="io",comlevel=0,combase=$zl,resume(0)=$zl_":INTERACT"
 	i $$set^%PATCODE("M")
 	d GDEINIT^GDEINIT,GDEMSGIN^GDEMSGIN,GDFIND^GDESETGD,CREATE^GDEGET:create,LOAD^GDEGET:'create
@@ -41,7 +41,7 @@ CTRL
 	;
 comexit: i 'update d QUIT^GDEQUIT
 	i $$ALL^GDEVERIF,$$GDEPUT^GDEPUT  h
-DBGCOMX u $i:exception="" s $zt="" zm (gdeerr("VERIFY")\2*2):"FAILED"
+DBGCOMX u $i:exception="" s $et="" zm (gdeerr("VERIFY")\2*2):"FAILED"
 	h
 comfile:
 	d GETTOK^GDESCAN,TFSPEC^GDEPARSE
@@ -62,7 +62,7 @@ SHOERR
 	zg @resume(comlevel)
 	q
 ABORT
-	s abortzs=$zs,abort="GDEDUMP.DMP",$zt=""
+	s abortzs=$zs,abort="GDEDUMP.DMP",$et=""
         o abort:(newversion:noreadonly) u abort zsh "*" c abort
         u @useio
         i $d(gdeerr) zm gdeerr("GDECHECK") Write $ZMessage($Select($ZVersion'["VMS"&(256>abortzs):+abortzs,1:+abortzs\8*8+4)),! ; make fatal except native UNIX

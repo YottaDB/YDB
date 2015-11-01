@@ -13,40 +13,35 @@
 
 #include "mdef.h"
 
-#include <sys/socket.h>
+#include "gtm_socket.h"
+#include "gtm_string.h"
+
 #include <netinet/in.h>
 
+#include "io.h"
+#include "iottdef.h"
 #include "iotcpdef.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 
-boolean_t iosocket_delimiter(char *delimiter_buffer,
-				unsigned char delimiter_blen,
-				socket_struct *socketptr,
-				boolean_t rm)
+boolean_t iosocket_delimiter(unsigned char *delimiter_buffer, int4 delimiter_len, socket_struct *socketptr, boolean_t rm)
 {
-	int counter, ii;
-	char 	*c, *top;
-	char	delimiter[MAX_DELIM_LEN + 1];
+	int		counter, ii;
+	unsigned char	*c, *top, delimiter[MAX_DELIM_LEN + 1];
 
 	error_def(ERR_DELIMSIZNA);
 
 	/* free the previous delimiters if any */
-
 	for (ii = 0; ii < socketptr->n_delimiter; ii++)
 		free(socketptr->delimiter[ii].addr);
 	socketptr->n_delimiter = 0;
-
+	socketptr->delim0containsLF = FALSE;
 	if (rm)
-	{
 		return TRUE;
-	}
-
 	/* fill in the new delimiters */
-
 	counter = ii = 0;
 	c = &delimiter_buffer[0];
-	top = c + delimiter_blen;
+	top = c + delimiter_len;
 	while ((c < top) && (ii < MAX_N_DELIMITER))
 	{
 		switch(delimiter[counter++] = *c++)
@@ -66,6 +61,10 @@ boolean_t iosocket_delimiter(char *delimiter_buffer,
 			/* escape */
 			delimiter[counter - 1] = *c++;
 			break;
+		case NATIVE_LF :
+			if (0 == ii)
+				socketptr->delim0containsLF = TRUE;
+			break;
 		default:
 			/* look at the next character */
 			break;
@@ -83,7 +82,5 @@ boolean_t iosocket_delimiter(char *delimiter_buffer,
 			return FALSE;
 		}
 	}
-
 	return TRUE;
 }
-

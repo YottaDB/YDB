@@ -10,10 +10,15 @@
  ****************************************************************/
 
 #include "mdef.h"
+#ifdef EARLY_VARARGS
+#include <varargs.h>
+#endif
 #include "fao_parm.h"
 #include "error.h"
 #include "msg.h"
+#ifndef EARLY_VARARGS
 #include <varargs.h>
+#endif
 #include "util.h"
 #include "util_out_print_vaparm.h"
 #include "gtmmsg.h"

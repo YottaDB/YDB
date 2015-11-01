@@ -77,11 +77,11 @@ struct e_table {
 		};
 
 struct st_tb {
-		bool		s[2 * MAX_SYM][MAX_SYM];
+		bool		s[2 * MAX_SYM][CHAR_CLASSES];
 	     };
 
 struct trns_tb {
-		short int	t[2 * MAX_SYM][MAX_SYM];
+		short int	t[2 * MAX_SYM][CHAR_CLASSES];
 	       };
 
 struct c_trns_tb {

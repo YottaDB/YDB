@@ -22,7 +22,7 @@
 #define PUTENV	putenv
 #define STRTOL	strtol
 #define STRTOUL	strtoul
-#ifdef __linux__
+#if defined(__linux__) && !defined(Linux390)
 /* only needed until glibc 2.1.3 aka post RH 6.1 */
 int gtm_system(const char *);
 #define SYSTEM	gtm_system

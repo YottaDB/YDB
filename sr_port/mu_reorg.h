@@ -30,8 +30,12 @@
 /*********************************************************************
 	block_number is used for swap
  *********************************************************************/
-#define INCR_BLK_NUM(block_number)      (block_number)++; \
-        if ( 0 == ( (block_number) & 0x1FF ) ) (block_number)++
+#define INCR_BLK_NUM(block_number)      		\
+	(block_number)++; 				\
+        if (IS_BITMAP_BLK(block_number)) 		\
+		(block_number)++;			\
+	assert(!IS_BITMAP_BLK(block_number));
+
 /* DECR_BLK_NUM has no check for bit-map because it is always followed by INCR_BLK_NUM */
 #define DECR_BLK_NUM(block_number)      (block_number)--
 

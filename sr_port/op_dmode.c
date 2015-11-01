@@ -33,10 +33,12 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "send_msg.h"
+#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
 #include "op.h"
 #include "change_reg.h"
 #include "dm_read.h"
 #include "tp_change_reg.h"
+#include "getzposition.h"
 
 GBLREF io_pair		io_curr_device;
 GBLREF io_pair		io_std_device;
@@ -53,7 +55,7 @@ GBLREF tp_region	*tp_reg_list;
 void	op_dmode(void)
 {
 	gd_region	*save_reg;
-	mval		prompt, dummy, *input_line;
+	mval		prompt, dummy, *input_line, zpos;
 	tp_region	*tr;
 	static io_pair	save_device;
 	static bool	dmode_intruptd;
@@ -66,6 +68,7 @@ void	op_dmode(void)
 	static bool	kill = FALSE;
 	error_def(ERR_NOTPRINCIO);
 	error_def(ERR_NOPRINCIO);
+	error_def(ERR_TPNOTACID);
 
 	dummy.mvtype = dummy.str.len = 0;
 	input_line = push_mval(&dummy);
@@ -113,7 +116,11 @@ void	op_dmode(void)
 	old_errno = 0;
 #endif
 	if (0 < dollar_tlevel)
-	{
+	{	/* Note the existence of similar code in op_zsystem.c and mdb_condition_handler.c.
+		 * Any changes here should be reflected there too. We don't have a macro for this because
+		 * 	(a) This code is considered pretty much stable.
+		 * 	(b) Making it a macro makes it less readable.
+		 */
 		save_reg = gv_cur_region;
 		for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 		{
@@ -128,6 +135,9 @@ void	op_dmode(void)
 		{
 			assert(CDB_STAGNATE == t_tries);
 			t_tries = CDB_STAGNATE - 1;
+			getzposition(&zpos);
+			gtm_putmsg(VARLSTCNT(4) ERR_TPNOTACID, 2, zpos.str.len, zpos.str.addr);
+			send_msg(VARLSTCNT(4) ERR_TPNOTACID, 2, zpos.str.len, zpos.str.addr);
 		}
 	} else  if (cs_addrs && cs_addrs->now_crit)
 		GTMASSERT;

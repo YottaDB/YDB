@@ -38,6 +38,7 @@
 #include "repl_log.h"
 #include "repl_dbg.h"
 #include "gtm_stdio.h"
+#include "gtm_string.h"
 #include "repl_errno.h"
 #include "gtm_event_log.h"
 #include "repl_sem.h"
@@ -53,6 +54,9 @@
 #include "gtmsource.h"
 #include "gtmmsg.h"
 #include "sgtm_putmsg.h"
+#ifdef UNIX
+#include "ftok_sems.h"
+#endif
 
 GBLDEF boolean_t		gtmrecv_fetchreysnc;
 GBLDEF boolean_t		gtmrecv_logstats = FALSE;
@@ -226,7 +230,7 @@ int gtmrecv(void)
 	gtmrecv_local->listen_port = gtmrecv_options.listen_port;
 #ifdef REPL_RECVR_HELP_UPD
 	gvinit();
-	region_init(TRUE);
+	region_init(FALSE);
 #endif
 	if (!recvpool_ctl->fresh_start) /* Coming up after a crash, reset Update process read */
 		gtmrecv_local->restart = GTMRECV_RCVR_RESTARTED;
@@ -283,8 +287,10 @@ int gtmrecv(void)
 	 * Since we can have ftok collisions with someone else, we cannot gaurantee that current count is one.
 	 * So just increment semaphore number 1 after grabbing semaphore number 0. Then release semaphore 0.
 	 */
-	lock_recvpool_ftok_sems(TRUE, FALSE);
-	rel_recvpool_ftok_sems(FALSE, FALSE);
+	if (!ftok_sem_get(recvpool.recvpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE))
+		rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
+	if (!ftok_sem_release(recvpool.recvpool_dummy_reg, FALSE, FALSE))
+		rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
 #endif
 	/* Lock the receiver server count semaphore. Its value should be atmost 1. */
 	if (0 > grab_sem_immediate(RECV, RECV_SERV_COUNT_SEM))

@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 #include "compiler.h"
-#include "masscomp.h"
+#include "objlabel.h"
 #include "rtnhdr.h"
 #include "cgp.h"
 #include "stringpool.h"
@@ -62,7 +62,7 @@ void	ind_code(mstr *obj)
 	indir_lits(itext);
 	hdr_offset = indr_base_addr - stringpool.free;		/* offset to ihdtyp */
 	emit_immed((char *)&hdr_offset, sizeof(hdr_offset));
-	validation = (OMAGIC << 16) + STAMP13;			/* Word to validate we are in right place */
+	validation = (OMAGIC << 16) + OBJ_LABEL;			/* Word to validate we are in right place */
 	emit_immed((char *)&validation, sizeof(validation));
 	runtime_base = stringpool.free;
 	cg_phase = CGP_MACHINE;

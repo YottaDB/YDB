@@ -33,7 +33,5 @@ va_dcl
 		gvinit();
 
 	VAR_START(var);
-	mlk_force_str(var);
-	VAR_START(var);
 	mlk_pvtblk_create(var);
 }

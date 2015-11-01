@@ -50,6 +50,7 @@
 GBLREF	volatile	int4	fast_lock_count;
 GBLREF	int4		process_id;
 GBLREF	gd_region	*gv_cur_region;
+GBLREF	int		num_additional_processors;
 
 #define QI_RETRY	128
 
@@ -68,29 +69,30 @@ GBLREF	gd_region	*gv_cur_region;
 
 int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 {
-	int			i, k;
+	int	retries, spins, maxspin;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
-	for (k = 0 ;  k < QI_STARVATION ;  k++)
+	maxspin = num_additional_processors ? QI_RETRY : 1;
+	for (retries = 0 ;  retries < QI_STARVATION ;  retries++)
 	{
-		for (i = 0 ;  i < QI_RETRY ;  i++)
+		for (spins = maxspin; 0 < spins; spins--)
 		{
                         if (GET_SWAPLOCK(&base->latch))
 			{
-				LOCK_HIST("OBTN", &base->latch, process_id, k);
+				LOCK_HIST("OBTN", &base->latch, process_id, retries);
 				VERIFY_QUEUE(base);
 				insqh(new, (que_ent_ptr_t)base);
 				VERIFY_QUEUE(base);
-				LOCK_HIST("RLSE", &base->latch, process_id, k);
+				LOCK_HIST("RLSE", &base->latch, process_id, retries);
                                 RELEASE_SWAPLOCK(&base->latch);
 				--fast_lock_count;
 				assert(0 <= fast_lock_count);
 				return QUEUE_INSERT_SUCCESS;
 			}
 		}
-		if (0 != k)
-			wcs_backoff(k);
-		performCASLatchCheck(&base->latch);
+		if (0 != retries)
+			wcs_backoff(retries);
+		performCASLatchCheck(&base->latch, retries);
 	}
 	DUMP_LOCKHIST();
 	--fast_lock_count;
@@ -102,29 +104,30 @@ int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 
 int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 {
-	int			i, k;
+	int	retries, spins, maxspin;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
-	for (k = 0 ;  k < QI_STARVATION ;  k++)
+	maxspin = num_additional_processors ? QI_RETRY : 1;
+	for (retries = 0 ;  retries < QI_STARVATION ;  retries++)
 	{
-		for (i = 0 ;  i < QI_RETRY ;  i++)
+		for (spins = maxspin; 0 < spins; spins--)
 		{
                         if (GET_SWAPLOCK(&base->latch))
 			{
-				LOCK_HIST("OBTN", &base->latch, process_id, k);
+				LOCK_HIST("OBTN", &base->latch, process_id, retries);
 				VERIFY_QUEUE(base);
 				insqt(new, (que_ent_ptr_t)base);
 				VERIFY_QUEUE(base);
-				LOCK_HIST("RLSE", &base->latch, process_id, k);
+				LOCK_HIST("RLSE", &base->latch, process_id, retries);
                                 RELEASE_SWAPLOCK(&base->latch);
 				--fast_lock_count;
 				assert(0 <= fast_lock_count);
 				return QUEUE_INSERT_SUCCESS;
 			}
 		}
-		if (0 != k)
-			wcs_backoff(k);
-		performCASLatchCheck(&base->latch);
+		if (0 != retries)
+			wcs_backoff(retries);
+		performCASLatchCheck(&base->latch, retries);
 	}
 	DUMP_LOCKHIST();
 	--fast_lock_count;
@@ -136,21 +139,22 @@ int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 
 que_ent_ptr_t remqhi1(que_head_ptr_t base)
 {
-	int			i, k;
-	que_ent_ptr_t		ret;
+	int		retries, spins, maxspin;
+	que_ent_ptr_t	ret;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
-	for (k = 0 ;  k < QI_STARVATION ;  k++)
+	maxspin = num_additional_processors ? QI_RETRY : 1;
+	for (retries = 0 ;  retries < QI_STARVATION ;  retries++)
 	{
-		for (i = 0 ;  i < QI_RETRY ;  i++)
+		for (spins = maxspin; 0 < spins; spins--)
 		{
                         if (GET_SWAPLOCK(&base->latch))
 			{
-				LOCK_HIST("OBTN", &base->latch, process_id, k);
+				LOCK_HIST("OBTN", &base->latch, process_id, retries);
 				VERIFY_QUEUE(base);
 				ret = (que_ent_ptr_t)remqh((que_ent_ptr_t)base);
 				VERIFY_QUEUE(base);
-				LOCK_HIST("RLSE", &base->latch, process_id, k);
+				LOCK_HIST("RLSE", &base->latch, process_id, retries);
 				if (NULL != ret)
 					ret->fl = ret->bl = 0;
                                 RELEASE_SWAPLOCK(&base->latch);
@@ -159,9 +163,9 @@ que_ent_ptr_t remqhi1(que_head_ptr_t base)
 				return ret;
 			}
 		}
-		if (0 != k)
-			wcs_backoff(k);
-		performCASLatchCheck(&base->latch);
+		if (0 != retries)
+			wcs_backoff(retries);
+		performCASLatchCheck(&base->latch, retries);
 	}
 	DUMP_LOCKHIST();
 	--fast_lock_count;
@@ -173,21 +177,22 @@ que_ent_ptr_t remqhi1(que_head_ptr_t base)
 
 que_ent_ptr_t remqti1(que_head_ptr_t base)
 {
-	int			i, k;
-	que_ent_ptr_t		ret;
+	int		retries, spins, maxspin;
+	que_ent_ptr_t	ret;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
-	for (k = 0 ;  k < QI_STARVATION ;  k++)
+	maxspin = num_additional_processors ? QI_RETRY : 1;
+	for (retries = 0 ;  retries < QI_STARVATION ;  retries++)
 	{
-		for (i = 0 ;  i < QI_RETRY ;  i++)
+		for (spins = maxspin; 0 < spins; spins--)
 		{
                         if (GET_SWAPLOCK(&base->latch))
 			{
-				LOCK_HIST("OBTN", &base->latch, process_id, k);
+				LOCK_HIST("OBTN", &base->latch, process_id, retries);
 				VERIFY_QUEUE(base);
 				ret = (que_ent_ptr_t)remqt((que_ent_ptr_t)base);
 				VERIFY_QUEUE(base);
-				LOCK_HIST("RLSE", &base->latch, process_id, k);
+				LOCK_HIST("RLSE", &base->latch, process_id, retries);
 				if (NULL != ret)
 					ret->fl = ret->bl = 0;
                                 RELEASE_SWAPLOCK(&base->latch);
@@ -196,9 +201,9 @@ que_ent_ptr_t remqti1(que_head_ptr_t base)
 				return ret;
 			}
 		}
-		if (0 != k)
-			wcs_backoff(k);
-		performCASLatchCheck(&base->latch);
+		if (0 != retries)
+			wcs_backoff(retries);
+		performCASLatchCheck(&base->latch, retries);
 	}
 	DUMP_LOCKHIST();
 	--fast_lock_count;

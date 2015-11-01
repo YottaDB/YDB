@@ -8,12 +8,13 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
 #include "mdef.h"
+#include "gt_timer.h"
+#include "gtcm_shutdown_ast.h"
 
 GBLREF bool cm_shutdown;
 
-gtcm_shutdown_ast()
+void gtcm_shutdown_ast(TID tid, int4 len, char *data)
 {
 	cm_shutdown = TRUE;
 }

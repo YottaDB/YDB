@@ -35,12 +35,12 @@ GBLREF char		*lcl_coll_xform_buff;
 void op_fnquery (va_alist)
 va_dcl
 {
-	int             	length;
-	mval            	tmp_sbs;
+	int			length;
+	mval		 	tmp_sbs;
 	va_list			var;
 	mval			*dst, *varname, *v1, *v2;
 	mval			*arg1, **argpp, *args[MAX_LVSUBSCRIPTS];
-	mval			xform_args[MAX_LVSUBSCRIPTS];  /* for lclcol */
+	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
 	mstr			format_out;
 	lv_val			*v, *node, *parent;
 	lv_sbs_srch_hist	*h1, *h2, history[MAX_LVSUBSCRIPTS];
@@ -57,8 +57,7 @@ va_dcl
 	dst = va_arg(var, mval *);
 	varname = va_arg(var, mval *);
 	v = va_arg(var, lv_val *);
-
-	assert (v);
+	assert(v);
 	if (!v->ptrs.val_ent.children)
 	{
 		dst->mvtype = MV_STR;
@@ -71,36 +70,39 @@ va_dcl
 	h1++;
 	if (local_collseq)
 		tmp_sbs.mvtype = MV_STR;
-
 	for (i = 0, node = v, argpp = &args[0];
 	     i < sbscnt;
 	     i++, argpp++, h1++)
 	{
 		*argpp = va_arg(var, mval *);
-
 		if (tbl = node->ptrs.val_ent.children)
 		{
-			assert (tbl->ident == MV_SBS);
+			assert(MV_SBS == tbl->ident);
 			MV_FORCE_DEFINED(*argpp);
-
 			if (MV_IS_STRING(*argpp))
 			{
 				if (is_num = MV_IS_CANONICAL(*argpp))
+				{
 					MV_FORCE_NUM(*argpp);
-			}
-			else
+				}
+				else if ((i + 1 == sbscnt) && (0 == (*argpp)->str.len))
+				{
+					i++;
+					break;
+				}
+			} else
 			{
-				assert (MV_IS_NUMERIC(*argpp));
-				assert (MV_IS_CANONICAL(*argpp));
+				assert(MV_IS_NUMERIC(*argpp));
+				assert(MV_IS_CANONICAL(*argpp));
 				is_num = TRUE;
 			}
 			if (is_num)
 			{
 				if (tbl->int_flag)
 				{
-					assert (tbl->num);
+					assert(tbl->num);
 					if (MV_IS_INT(*argpp) && (j = MV_FORCE_INT(*argpp)) < SBS_NUM_INT_ELE &&
-					    tbl->num->ptr.lv[j])
+						tbl->num->ptr.lv[j])
 					{
 						h1->type = SBS_BLK_TYPE_INT;
 						h1->addr.intnum = &tbl->num->ptr.lv[j];
@@ -108,21 +110,18 @@ va_dcl
 					}
 					else
 						break;
-				}
-				else
+				} else
 				{
 					if (tbl->num && lv_get_num_inx (tbl->num, (*argpp), &status))
 					{
 						h1->type = SBS_BLK_TYPE_FLT;
 						h1->addr.flt = (sbs_flt_struct *)status.ptr;
 						node = h1->addr.flt->lv;
-					}
-					else
+					} else
 						break;
 				}
-			}
-			else	/* is_string */
-			{
+			} else
+			{	/* is_string */
 				if (local_collseq)
 				{
 					/* D9607-258 changed xback to xform and added
@@ -147,12 +146,10 @@ va_dcl
 					h1->type = SBS_BLK_TYPE_STR;
 					h1->addr.str = (sbs_str_struct *)status.ptr;
 					node = h1->addr.str->lv;
-				}
-				else
+				} else
 					break;
 			}
-		}
-		else
+		} else
 			break;
 	}
 	found = FALSE;
@@ -175,43 +172,39 @@ va_dcl
 			default:
 				GTMASSERT;
 		}
-		assert (parent);
+		assert(parent);
 		if (tbl = parent->ptrs.val_ent.children)
 		{
 			found = TRUE;
 			if (num = tbl->num)
 			{
-				assert (num->cnt);
+				assert(num->cnt);
 				if (tbl->int_flag)
 				{
 					for (i = 0; !num->ptr.lv[i]; i++)
 						;
-					assert (i < SBS_NUM_INT_ELE);
+					assert(i < SBS_NUM_INT_ELE);
 					h1->type = SBS_BLK_TYPE_INT;
 					h1->addr.intnum = &num->ptr.lv[i];
-				}
-				else
+				} else
 				{
 					h1->type = SBS_BLK_TYPE_FLT;
 					h1->addr.flt = num->ptr.sbs_flt;
 				}
-			}
-			else
+			} else
 			{
 				str = tbl->str;
-				assert (str);
-				assert (str->cnt);
+				assert(str);
+				assert(str->cnt);
 				h1->type = SBS_BLK_TYPE_STR;
 				h1->addr.str = str->ptr.sbs_str;
 			}
-		}
-		else
+		} else
 		{
 			--h1;
 			--argpp;
 		}
 	}
-
 	if (!found)
 		for (;;)
 		{
@@ -221,7 +214,7 @@ va_dcl
 				dst->str.len = 0;
 				return;
 			}
-			if (q_rtsib (h1, *argpp))
+			if (q_rtsib(h1, *argpp))
 				break;
 			else
 			{
@@ -229,11 +222,10 @@ va_dcl
 				--argpp;
 			}
 		}
-	q_nxt_val_node (&h1);
-
+	q_nxt_val_node(&h1);
 	/* format the output string */
 	if (stringpool.top - stringpool.free < varname->str.len + 1)
-		stp_gcol (varname->str.len + 1);
+		stp_gcol(varname->str.len + 1);
 	PUSH_MV_STENT(MVST_MVAL);
 	v1 = &mv_chain->mv_st_cont.mvs_mval;
 	PUSH_MV_STENT(MVST_MVAL);
@@ -241,7 +233,7 @@ va_dcl
 	v1->mvtype = MV_STR;
 	v1->str.len = 0;
 	v1->str.addr = (char *)stringpool.free;
-	memcpy (stringpool.free, varname->str.addr, varname->str.len);
+	memcpy(stringpool.free, varname->str.addr, varname->str.len);
 	stringpool.free += varname->str.len;
 	*stringpool.free++ = '(';
 	for (h2 = &history[1]; h2 <= h1; h2++)
@@ -266,18 +258,18 @@ va_dcl
 					default:
 						GTMASSERT;
 				}
-				assert (parent->ptrs.val_ent.children);
-				assert (parent->ptrs.val_ent.children->num);
-				assert (parent->ptrs.val_ent.children->int_flag);
-				assert ((unsigned char *) parent->ptrs.val_ent.children->num->ptr.lv <=
-					(unsigned char *) h2->addr.intnum);
-				assert ((unsigned char *) h2->addr.intnum <
-					(unsigned char *) parent->ptrs.val_ent.children->num->ptr.lv + sizeof (sbs_blk));
+				assert(parent->ptrs.val_ent.children);
+				assert(parent->ptrs.val_ent.children->num);
+				assert(parent->ptrs.val_ent.children->int_flag);
+				assert((unsigned char *)parent->ptrs.val_ent.children->num->ptr.lv <=
+					(unsigned char *)h2->addr.intnum);
+				assert((unsigned char *)h2->addr.intnum <
+					(unsigned char *)parent->ptrs.val_ent.children->num->ptr.lv + sizeof(sbs_blk));
 				if (stringpool.top - stringpool.free < MAX_NUM_SIZE)
 				{
 					v1->str.len = (char *)stringpool.free - v1->str.addr;
-					stp_gcol (MAX_NUM_SIZE);
-					assert (v1->str.len == (char *)stringpool.free - v1->str.addr);
+					stp_gcol(MAX_NUM_SIZE);
+					assert((char *)stringpool.free - v1->str.addr == v1->str.len);
 				}
 				j = (int)(h2->addr.intnum - parent->ptrs.val_ent.children->num->ptr.lv);
 				MV_FORCE_MVAL(v2, j);
@@ -287,8 +279,8 @@ va_dcl
 				if (stringpool.top - stringpool.free < MAX_NUM_SIZE)
 				{
 					v1->str.len = (char *)stringpool.free - v1->str.addr;
-					stp_gcol (MAX_NUM_SIZE);
-					assert (v1->str.len == (char *)stringpool.free - v1->str.addr);
+					stp_gcol(MAX_NUM_SIZE);
+					assert((char *)stringpool.free - v1->str.addr == v1->str.len);
 				}
 				MV_ASGN_FLT2MVAL(*v2, h2->addr.flt->flt);
 				n2s(v2);
@@ -304,8 +296,7 @@ va_dcl
 					do_xform(local_collseq->xback, &h2->addr.str->str, &tmp_sbs.str, &length);
 					tmp_sbs.str.len = length;
 					v2->str = tmp_sbs.str;
-				}
-				else
+				} else
 					v2->str = h2->addr.str->str;
 				mval_lex(v2, &format_out);
 				if (format_out.addr != (char *)stringpool.free)
@@ -315,8 +306,8 @@ va_dcl
 					if (stringpool.top - stringpool.free < v2->str.len + 2)
 					{
 						v1->str.len = (char *)stringpool.free - v1->str.addr;
-						stp_gcol (v2->str.len + 2);
-						assert (v1->str.len == (char *)stringpool.free - v1->str.addr);
+						stp_gcol(v2->str.len + 2);
+						assert((char *)stringpool.free - v1->str.addr == v1->str.len);
 					}
 					*stringpool.free++ = '\"';
 					memcpy(stringpool.free, v2->str.addr, v2->str.len);
@@ -331,14 +322,14 @@ va_dcl
 		if (stringpool.top == stringpool.free)
 		{
 			v1->str.len = (char *)stringpool.free - v1->str.addr;
-			stp_gcol (1);
-			assert (v1->str.len == (char *) stringpool.free - v1->str.addr);
+			stp_gcol(1);
+			assert((char *)stringpool.free - v1->str.addr == v1->str.len);
 		}
-		*stringpool.free++ = ( h2 < h1 ? ',' : ')' ) ;
+		*stringpool.free++ = (h2 < h1 ? ',' : ')');
 	}
 	dst->mvtype = MV_STR;
 	dst->str.len = (char *)stringpool.free - v1->str.addr;
 	dst->str.addr = v1->str.addr;
-	POP_MV_STENT(); /* v2 */
-	POP_MV_STENT(); /* v1 */
+	POP_MV_STENT();	/* v2 */
+	POP_MV_STENT();	/* v1 */
 }

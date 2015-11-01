@@ -33,23 +33,23 @@ GBLREF mident zlink_mname;
 
 extern int errno;
 
-int get_src_line(mval *routine, mval *label, int offset, src_lin_dsc **srcret)
+int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 {
 	int		fd, n, status, *lt_ptr, size;
-	uint4 checksum, srcint;
+	uint4		checksum, srcint;
 	bool		badfmt, found, not_present;
 	mstr		src;
 	rhdtyp		*rtn_vector;
 	zro_ent		*srcdir;
 	ht_entry	*ht;
-	src_lin_dsc	*base, *current, *top;
-	uint4 srcstat, *src_tbl;
-	char	buff[MAX_SRCLINE], *c1, *c2, *c, *chkcalc;
-	char	srcnamebuf[ sizeof(mident) + 2];
+	mstr		*base, *current, *top;
+	uint4		srcstat, *src_tbl;
+	char		buff[MAX_SRCLINE], *c1, *c2, *c, *chkcalc;
+	char		srcnamebuf[ sizeof(mident) + 2];
 	error_def(ERR_TXTSRCFMT);
 
 	srcstat = 0;
-	*srcret = (src_lin_dsc *)0;
+	*srcret = (mstr *)0;
 
 	if (!rt_name_tbl.base)
 		ht_init(&rt_name_tbl, RT_TBL_SZ);
@@ -114,8 +114,8 @@ int get_src_line(mval *routine, mval *label, int offset, src_lin_dsc **srcret)
 		}
 		n = found ? rtn_vector->lnrtab_len : 0;
 		assert((found && n >= 1) || (n == 0));
-		src_tbl = (uint4 *)malloc(n * sizeof(src_lin_dsc) + sizeof(uint4));
-		base = (src_lin_dsc *)((char *)src_tbl + sizeof (uint4));
+		src_tbl = (uint4 *)malloc(n * sizeof(mstr) + sizeof(uint4));
+		base = (mstr *)((char *)src_tbl + sizeof (uint4));
 		badfmt = FALSE;
 		checksum = 0;
 		for (current = base + 1, top = base + n ; current < top ; current++)
@@ -138,38 +138,36 @@ int get_src_line(mval *routine, mval *label, int offset, src_lin_dsc **srcret)
 			if (c == c1)
 				rts_error(VARLSTCNT(1) ERR_TXTSRCFMT);
 			size = c - buff;
-			for (c2 = buff + size, c1 = buff;
-				c1 < c2 && *c1 != ' ' && *c1 != '\t' ; c1++)
-					;
-
-			/* calculate checksum */
-			for (chkcalc = buff ; chkcalc < c2 ; )
+			if (size)
 			{
-				srcint = 0;
-				if (c2 - chkcalc < sizeof (int4))
+				for (c2 = buff + size, c1 = buff;
+					c1 < c2 && *c1 != ' ' && *c1 != '\t'; c1++)
+						;
+				/* calculate checksum */
+				for (chkcalc = buff; chkcalc < c2; )
 				{
-					memcpy(&srcint, chkcalc, c2 - chkcalc);
-					chkcalc = c2;
-				} else
-				{
-					srcint = *(int4 *)chkcalc;
-					chkcalc += sizeof(int4);
+					srcint = 0;
+					if (c2 - chkcalc < sizeof (int4))
+					{
+						memcpy(&srcint, chkcalc, c2 - chkcalc);
+						chkcalc = c2;
+					} else
+					{
+						srcint = *(int4 *)chkcalc;
+						chkcalc += sizeof(int4);
+					}
+					checksum ^= srcint;
+					checksum >>= 1;
 				}
-				checksum ^= srcint;
-				checksum >>= 1;
+				current->len = size;
+				current->addr = malloc(size);
+				memcpy(current->addr, buff, size);
+			} else
+			{
+				current->addr = malloc(1);
+				current->addr[0] = ' ';
+				current->len = 1;
 			}
-                        /* Convert any tabs in linestart to spaces */
-                        for (c = c1 ; c < c2 && (*c == ' ' || *c == '\t') ; c++)
-                        {
-                                if (*c == '\t') *c = ' ';
-                        }
-			current->ls_text.len = c - c1;
-			current->text_form.len = size;
-			current->lablen = c1 - buff;
-			current->bodystart = current->lablen + current->ls_text.len;
-			current->text_form.addr = malloc (size);
-			current->ls_text.addr = current->text_form.addr + current->text_form.len;
-			memcpy(current->text_form.addr, buff, size);
 		}
 		if (found)
 		{
@@ -202,7 +200,7 @@ int get_src_line(mval *routine, mval *label, int offset, src_lin_dsc **srcret)
 		else if (n >= rtn_vector->lnrtab_len)
 			srcstat |= AFTERLASTLINE;
 		else	/* successfully located line */
-			*srcret = ((src_lin_dsc *) (src_tbl + 1)) + n;
+			*srcret = ((mstr *) (src_tbl + 1)) + n;
 	}
 	return srcstat;
 }

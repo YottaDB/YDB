@@ -12,12 +12,12 @@
 #include "mdef.h"
 
 #include "gtm_fcntl.h"
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
-
+#include "gtm_unistd.h"
 #include "gtm_stat.h"
 #include "gtm_iconv.h"
+
+#include <errno.h>
+#include <sys/ioctl.h>
 
 #include "io.h"
 #include "iosp.h"
@@ -47,7 +47,7 @@ GBLREF	mstr			sys_input;
 GBLREF	mstr			sys_output;
 GBLREF	bool			out_of_time;
 GBLREF	int4			outofband;
-extern	int			errno;
+GBLREF	int4			write_filter;
 
 bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mval *mspace)	/* timeout in seconds */
 {
@@ -405,9 +405,10 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	active_device = naml->iod;
 	if (dev_never_opened == naml->iod->state)
 	{
-		naml->iod->wrap = TRUE;
-		naml->iod->width = 80;
-		naml->iod->length = 55;
+		naml->iod->wrap = DEFAULT_IOD_WRAP;
+		naml->iod->width = DEFAULT_IOD_WIDTH;
+		naml->iod->length = DEFAULT_IOD_LENGTH;
+		naml->iod->write_filter = write_filter;
 	}
 	if (dev_open != naml->iod->state)
 	{

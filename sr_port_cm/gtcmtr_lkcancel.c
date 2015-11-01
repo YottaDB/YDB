@@ -16,11 +16,17 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
+#include "mlkdef.h"
+#include "gtcmtr_lk.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
 
 GBLREF connection_struct *curr_entry;
 
-bool gtcmtr_lkcancel()
+bool gtcmtr_lkcancel(void)
 {
 	cm_region_list *reg_walk;
 	unsigned char *ptr,action, return_val,incr;

@@ -24,23 +24,29 @@ GBLREF io_pair		io_std_device;
 
 void continue_handler(int sig, siginfo_t *info, void *context)
 {
-	void		extract_signal_info();
 	gtmsiginfo_t	sig_info;
 
 	error_def(ERR_REQ2RESUME);
 
 	assert(SIGCONT == sig);
 	extract_signal_info(sig, info, context, &sig_info);
-	if (DEFER_SUSPEND != suspend_status)
+	switch(suspend_status)
 	{
-		/* Don't bother checking if user info is available. If info isn't available, 0 will be printed for pid and uid */
-		send_msg(VARLSTCNT(4) ERR_REQ2RESUME, 2, sig_info.send_pid, sig_info.send_uid);
-		if (NOW_SUSPEND == suspend_status)
-		{
-			suspend_status = NO_SUSPEND;
-			if (io_std_device.in->type == tt)
+		case NOW_SUSPEND:
+			/* Don't bother checking if user info is available. If info isn't available,
+			   the value zero will be printed for pid and uid. Note that the following
+			   message was previously put out even when the process was not suspended but
+			   with the changes in spin locks that send continue messages "just in case",
+			   I thought it better to restrict this message to when the process was actually
+			   suspended and being continued. SE 7/01
+			*/
+			send_msg(VARLSTCNT(4) ERR_REQ2RESUME, 2, sig_info.send_pid, sig_info.send_uid);
+			if (NULL != io_std_device.in && tt == io_std_device.in->type)
 				setterm(io_std_device.in);
-		}
+			/* Fall through */
+		case DEFER_SUSPEND:
+			/* If suspend was deferred, this continue/resume overrides/cancels it */
+			suspend_status = NO_SUSPEND;
+			break;
 	}
-	return;
 }

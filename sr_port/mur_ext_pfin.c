@@ -29,11 +29,8 @@ GBLREF	char		muext_code[][2];
 
 void	mur_extract_pfin(jnl_record *rec)
 {
-	int			actual, extract_len = 0;
-	char			*ptr;
-	jnl_process_vector	*pv = &rec->val.jrec_pfin.process_vector;
-	jnl_proc_time		*ref_time = &pv->jpv_time;
-
+	int	extract_len = 0;
+	char	*ptr;
 
 	if (!mur_options.detail)
 	{
@@ -45,26 +42,7 @@ void	mur_extract_pfin(jnl_record *rec)
 		strcpy(&mur_extract_buff[extract_len], "PFIN   \\");
 		extract_len = strlen(mur_extract_buff);
 	}
-
-	EXTTIME(ref_time);
-
-	EXTINT(pv->jpv_pid);
-
-	EXTTXTVMS(pv->jpv_prcnam, JPV_LEN_PRCNAM);
-
-	EXTTXT(pv->jpv_node, JPV_LEN_NODE);
-
-	EXTTXT(pv->jpv_user, JPV_LEN_USER);
-
-	EXTINTVMS(pv->jpv_mode);
-
-	EXTTXT(pv->jpv_terminal, JPV_LEN_TERMINAL);
-
-	EXTTIMEVMS(pv->jpv_login_time);
-
-	EXTINTVMS(pv->jpv_image_count);
-
+	extract_len = extract_process_vector(&rec->val.jrec_pfin.process_vector, extract_len);
 	EXTINT(rec->val.jrec_pfin.tn);
-
 	jnlext_write(mur_extract_buff, extract_len);
 }

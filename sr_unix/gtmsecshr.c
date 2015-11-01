@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #endif
 #include <libgen.h>
+#include "gtm_sem.h"
 #include "gtm_string.h"
 #include "gtm_fcntl.h"
 #include <errno.h>
@@ -331,10 +332,12 @@ void gtmsecshr_init(void)
 		send_msg(VARLSTCNT(5) ERR_GTMSECSHRSOCKET, 3, RTS_ERROR_LITERAL("Server path"), process_id);
 		rts_error(VARLSTCNT(5) ERR_GTMSECSHRSOCKET, 3, RTS_ERROR_LITERAL("Server path"), process_id);
 	}
-	if (-1 == (secshr_sem = semget(gtmsecshr_key, 1, RWDALL | IPC_NOWAIT)))
+	if (-1 == (secshr_sem = semget(gtmsecshr_key, FTOK_SEM_PER_ID, RWDALL | IPC_NOWAIT)))
 	{
-		if (-1 == (secshr_sem = semget(gtmsecshr_key, 1, RWDALL | IPC_CREAT | IPC_NOWAIT | IPC_EXCL)))
+		secshr_sem = INVALID_SEMID;
+		if (-1 == (secshr_sem = semget(gtmsecshr_key, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT | IPC_NOWAIT | IPC_EXCL)))
 		{
+			secshr_sem = INVALID_SEMID;
 			util_out_print("semget error errno = !UL", TRUE, errno);
 			gtmsecshr_exit(SEMGETERROR, FALSE);
 		}
@@ -389,8 +392,11 @@ void gtmsecshr_exit (int exit_code, boolean_t dump)
 	gtmsecshr_sockfd = -1;
 	if (SEMAPHORETAKEN != exit_code)
 	{	/* remove semaphore */
-		if (-1 == (gtmsecshr_sem = semget(gtmsecshr_key, 1, RWDALL | IPC_NOWAIT)))
+		if (-1 == (gtmsecshr_sem = semget(gtmsecshr_key, FTOK_SEM_PER_ID, RWDALL | IPC_NOWAIT)))
+		{
+			gtmsecshr_sem = INVALID_SEMID;
 			util_out_print("error getting semaphore errno = !UL", TRUE, errno);
+		}
 		if (-1 == semctl(gtmsecshr_sem, 0, IPC_RMID, 0))
 			util_out_print("error removing semaphore errno = !UL", TRUE, errno);
 	}
@@ -677,11 +683,11 @@ int service_request(gtmsecshr_mesg *buf)
 			STAT_FILE(buf->mesg.path, &statbuf, stat_res);
 			if (-1 == stat_res)
 			{
+				buf->code = errno;
 				gtm_putmsg(VARLSTCNT(14) ERR_GTMSECSHRSRVFFILE, 7,
 					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,
 					index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index, buf->mesg.path,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to get file status"), errno);
-				buf->code = EINVAL;
 			} else if (!S_ISSOCK(statbuf.st_mode))
 			{
 				gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFFILE, 7,

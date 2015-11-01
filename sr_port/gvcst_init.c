@@ -14,6 +14,8 @@
 #include <stddef.h>		/* for offsetof macro */
 
 #include "gtm_string.h"
+
+#include "cdb_sc.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -30,33 +32,43 @@
 #include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
+#include "gtm_stdlib.h"		/* for ATOI */
 #include "cryptdef.h"
 #include "mlkdef.h"
 #include "error.h"
 #include "gt_timer.h"
 #include "gtmimagename.h"
+#include "trans_log_name.h"
+#include "gtm_logicals.h"
 #include "gvcst_init.h"
 #include "dbfilop.h"
 #include "gvcst_init_sysops.h"
 #include "set_num_additional_processors.h"
+#include "have_crit_any_region.h"
+#include "t_retry.h"
 
-GBLREF gd_region		*gv_cur_region, *db_init_region;
-GBLREF sgmnt_data_ptr_t		cs_data;
-GBLREF sgmnt_addrs		*cs_addrs;
-GBLREF boolean_t		gtcm_connection;
-GBLREF bool			licensed;
-GBLREF int4			lkid;
-GBLREF char			*update_array, *update_array_ptr;
-GBLREF int			update_array_size;
-GBLREF int			cumul_update_array_size;
-GBLREF ua_list			*first_ua, *curr_ua;
-GBLREF short			crash_count, dollar_tlevel;
-GBLREF jnl_format_buffer	*non_tp_jfb_ptr;
-GBLREF jnl_process_vector	*prc_vec;
-GBLREF unsigned char            *non_tp_jfb_buff_ptr;
-GBLREF boolean_t               	mupip_jnl_recover;
-GBLREF buddy_list		*global_tlvl_info_list;
-GBLREF enum gtmImageTypes	image_type;
+GBLREF	gd_region		*gv_cur_region, *db_init_region;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	boolean_t		gtcm_connection;
+GBLREF	bool			licensed;
+GBLREF	int4			lkid;
+GBLREF	char			*update_array, *update_array_ptr;
+GBLREF	int			update_array_size;
+GBLREF	int			cumul_update_array_size;
+GBLREF	ua_list			*first_ua, *curr_ua;
+GBLREF	short			crash_count, dollar_tlevel;
+GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
+GBLREF	jnl_process_vector	*prc_vec;
+GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
+GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF	buddy_list		*global_tlvl_info_list;
+GBLREF	enum gtmImageTypes	image_type;
+GBLREF	int			tprestart_syslog_limit;
+GBLREF	int			tprestart_syslog_delta;
+GBLREF	tp_region		*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
+GBLREF	tp_region		*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
+GBLREF	unsigned int		t_tries;
 
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
@@ -84,6 +96,13 @@ void	assert_jrec_member_offsets(void)
 	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_gzkill.pini_addr);
 	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_tzkill.pini_addr);
 	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_uzkill.pini_addr);
+	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_pblk.pini_addr);
+	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_epoch.pini_addr);
+	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_tcom.pini_addr);
+	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_ztcom.pini_addr);
+	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_null.pini_addr);
+	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_inctn.pini_addr);
+        assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_aimg.pini_addr);
 
 	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_fkill.short_time);
 	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_gkill.short_time);
@@ -106,6 +125,24 @@ void	assert_jrec_member_offsets(void)
 	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_null.short_time);
 	assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_inctn.short_time);
         assert(&jnl_record.jrec_kill.short_time == &jnl_record.jrec_aimg.short_time);
+
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_fkill.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_gkill.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_tkill.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_ukill.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_set.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_fset.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_gset.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_tset.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_uset.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_zkill.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_fzkill.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_gzkill.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_tzkill.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_uzkill.recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_tcom.tc_recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_ztcom.tc_recov_short_time);
+	assert(&jnl_record.jrec_kill.recov_short_time == &jnl_record.jrec_null.recov_short_time);
 
 	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_fkill.tn);
 	assert(&jnl_record.jrec_kill.tn	== &jnl_record.jrec_gkill.tn);
@@ -166,8 +203,8 @@ void	assert_jrec_member_offsets(void)
 	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_gzkill.token);
 	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_tzkill.token);
 	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_uzkill.token);
-	assert(&jnl_record.jrec_pini.process_vector == &jnl_record.jrec_pfin.process_vector);
-	assert(&jnl_record.jrec_pini.process_vector == &jnl_record.jrec_eof.process_vector);
+	assert(&jnl_record.jrec_pini.process_vector[CURR_JPV] == &jnl_record.jrec_pfin.process_vector);
+	assert(&jnl_record.jrec_pini.process_vector[CURR_JPV] == &jnl_record.jrec_eof.process_vector);
 }
 
 void gvcst_init (gd_region *greg)
@@ -184,6 +221,9 @@ void gvcst_init (gd_region *greg)
 	bt_rec_ptr_t		bt;
 	blk_ident		tmp_blk;
 #endif
+	mstr			log_nam, trans_log_nam;
+	char			trans_buff[MAX_FN_LEN+1];
+	static int4		first_time = TRUE;
 
 	error_def (ERR_DBCRPT);
 	error_def (ERR_DBCREIMC);
@@ -191,6 +231,20 @@ void gvcst_init (gd_region *greg)
 	error_def (ERR_BADDBVER);
 	error_def (ERR_VERMISMATCH);
 
+	/* we shouldn't have crit on any region unless we are in TP and in the final retry or we are in
+	 * mupip_set_journal trying to switch journals across all regions. Currently, there is no fine-granular
+	 * checking for mupip_set_journal, hence a coarse MUPIP_IMAGE check for image_type
+	 */
+	assert(dollar_tlevel && (CDB_STAGNATE <= t_tries) || MUPIP_IMAGE == image_type || !have_crit_any_region(FALSE));
+	if (0 < dollar_tlevel && have_crit_any_region(FALSE))
+	{	/* to avoid deadlocks with currently holding crits and the DLM lock request to be done in db_init(),
+		 * we should insert this region in the tp_reg_list and tp_restart should do the gvcst_init after
+		 * having released crit on all regions.
+		 */
+		insert_region(greg, &tp_reg_list, &tp_reg_free_list, sizeof(tp_region));
+		t_retry(cdb_sc_needcrit);
+		assert(FALSE);	/* we should never reach here since t_retry should have unwound the M-stack and restarted the TP */
+	}
 	/* check the header design assumptions */
 	assert(sizeof(th_rec) == (sizeof(bt_rec) - sizeof(bt->blkque)));
 	assert(sizeof(cache_rec) == (sizeof(cache_state_rec) + sizeof(cr->blkque)));
@@ -207,9 +261,29 @@ void gvcst_init (gd_region *greg)
 		tmp_blk.block = -1;
 		assert(MAXTOTALBLKS - 1 <= tmp_blk.block);
 	)
+	if (TRUE == first_time)
+	{
+		log_nam.addr = GTM_TPRESTART_LOG_LIMIT;
+		log_nam.len = STR_LIT_LEN(GTM_TPRESTART_LOG_LIMIT);
+		if (trans_log_name(&log_nam, &trans_log_nam, trans_buff) == SS_NORMAL)
+		{
+			tprestart_syslog_limit = ATOI(trans_log_nam.addr);
+			if (0 > tprestart_syslog_limit)
+				tprestart_syslog_limit = 0;
+		}
+		log_nam.addr = GTM_TPRESTART_LOG_DELTA;
+		log_nam.len = STR_LIT_LEN(GTM_TPRESTART_LOG_DELTA);
+		if (trans_log_name(&log_nam, &trans_log_nam, trans_buff) == SS_NORMAL)
+		{
+			tprestart_syslog_delta = ATOI(trans_log_nam.addr);
+			if (0 > tprestart_syslog_delta)
+				tprestart_syslog_delta = MAXPOSINT4;
+		}
+		first_time = FALSE;
+	}
 	if ((prev_reg = dbfilopn(greg)) != greg)
 	{
-		if (greg->dyn.addr->acc_meth == dba_cm)
+		if (NULL == prev_reg || (gd_region *)-1 == prev_reg) /* (gd_region *)-1 == prev_reg => cm region open attempted */
 			return;
 		greg->dyn.addr->file_cntl = prev_reg->dyn.addr->file_cntl;
 		memcpy(greg->dyn.addr->fname, prev_reg->dyn.addr->fname, prev_reg->dyn.addr->fname_len);
@@ -245,11 +319,11 @@ void gvcst_init (gd_region *greg)
         csa->jnl = NULL;
 	csa->persistent_freeze = FALSE;	/* want secshr_db_clnup() to clear an incomplete freeze/unfreeze codepath */
 	UNIX_ONLY(
-		FILE_INFO(greg)->semid = -1;
-		FILE_INFO(greg)->shmid = -1;
+		FILE_INFO(greg)->semid = INVALID_SEMID;
+		FILE_INFO(greg)->shmid = INVALID_SHMID;
 		FILE_INFO(greg)->sem_ctime = 0;
 		FILE_INFO(greg)->shm_ctime = 0;
-		FILE_INFO(greg)->ftok_semid = -1;
+		FILE_INFO(greg)->ftok_semid = INVALID_SEMID;
 	)
 	VMS_ONLY(
 		csa->db_addrs[0] = csa->db_addrs[1] = NULL;
@@ -362,13 +436,12 @@ void gvcst_init (gd_region *greg)
 		GTMASSERT;
 	}
 	db_common_init(greg, csa, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
-	/* initialization of prc_vec is done unconditionally irrespective of whether journalling
+	/* initialization of prc_vec is done unconditionally irrespective of whether journaling
 	 * is allowed or not because mupip recover calls mur_recover_write_epoch_rec() which in turn
-	 * calls jnl_put_jrt_pini() which needs an initialized prc_vec even though journalling
+	 * calls jnl_put_jrt_pini() which needs an initialized prc_vec even though journaling
 	 * had been disabled when recover did the call to gvcst_init() for that region
 	 */
-	if ((NULL == prc_vec)
-		VMS_ONLY(&& (GTCM_SERVER_IMAGE != image_type)))
+	if (NULL == prc_vec)
 	{
 		prc_vec = (jnl_process_vector *)malloc(sizeof(jnl_process_vector));
 		jnl_prc_vector(prc_vec);
@@ -449,7 +522,8 @@ void gvcst_init (gd_region *greg)
 	 * Only in this case, the one-time TP structure-initialization needs to be done.
 	 * Note GT.CM and DAL-calls-to-gds_rundown can require opening/closing of the same region multiple times.
 	 */
-	if (GTCM_SERVER_IMAGE != image_type)	/* currently TP is not supported for GT.CM */
+	if (GTCM_SERVER_IMAGE != image_type && GTCM_GNP_SERVER_IMAGE != image_type)
+				/* currently TP is not supported for GT.CM */
 	{
 		if (NULL == csa->sgm_info_ptr)
 		{
@@ -509,7 +583,7 @@ void gvcst_init (gd_region *greg)
 				initialize_list(si->format_buff_list, 8, DIVIDE_ROUND_UP(JNL_FORMAT_BUFF_INIT_ALLOC,8));
 			}
 		} else if (NULL != si->jnl_tail)
-		{	/* Journalling is currently disallowed although it was allowed (non-zero si->jnl_tail)
+		{	/* journaling is currently disallowed although it was allowed (non-zero si->jnl_tail)
 			 * during the prior use of this region. Free up unnecessary region-specific structures now.
 			 */
 			FREEUP_BUDDY_LIST(si->jnl_list);

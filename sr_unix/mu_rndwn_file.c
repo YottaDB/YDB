@@ -53,6 +53,8 @@
 #include "io.h"
 #include "gtmsecshr.h"
 #include "ftok_sems.h"
+#include "mu_rndwn_all.h"
+#include "error.h"
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region        *gv_cur_region;
@@ -61,6 +63,11 @@ GBLREF uint4		process_id;
 GBLREF boolean_t	mupip_jnl_recover;
 GBLREF ipcs_mesg	db_ipcs;
 GBLREF gd_region	*standalone_reg;
+static gd_region	*rundown_reg = NULL;
+static gd_region	*temp_region;
+static sgmnt_data_ptr_t	temp_cs_data;
+static sgmnt_addrs	*temp_cs_addrs;
+static boolean_t	restore_rndwn_gbl;
 
 LITREF char             gtm_release_name[];
 LITREF int4             gtm_release_name_len;
@@ -70,24 +77,38 @@ LITREF int4             gtm_release_name_len;
 GBLREF	sm_uc_ptr_t	next_smseg;
 #endif
 
+/*
+ * Description:
+ *	This routine is used for two reasons
+ *		1) get standalone access:
+ *			First uses/creates ftok semaphore.
+ *			Then create a new semaphore for that region.
+ *			Releases ftok semaphore (does not remove).
+ *		2) rundown shared memory
+ *			Uses/creates ftok semaphore.
+ * Parameters:
+ *	standalone = TRUE  => create semaphore to get standalone access
+ *	standalone = FALSE => rundown shared memory
+ * Return Value:
+ *	TRUE for success
+ *	FALSE for failure
+ */
 bool mu_rndwn_file(gd_region *reg, bool standalone)
 {
 	int			status, save_errno, sopcnt;
 	char                    now_running[MAX_REL_NAME];
-	boolean_t		rc_cpt_removed, sem_created = FALSE;
-	sgmnt_data_ptr_t	csd, tsd, temp_cs_data;
+	boolean_t		rc_cpt_removed = FALSE, sem_created = FALSE;
+	sgmnt_data_ptr_t	csd, tsd;
 	struct sembuf		sop[4];
 	struct shmid_ds		shm_buf;
 	file_control		*fc;
 	unix_db_info		*udi;
 	enum db_acc_method	acc_meth;
         struct stat     	stat_buf;
-	gd_region		*temp_region;
-	sgmnt_addrs		*temp_cs_addrs;
 	struct semid_ds		semstat;
 	union semun		semarg;
 	int			semop_res, stat_res;
-	uint4			jnl_status, status_msg;
+	uint4			status_msg;
 	gd_id			tmp_dbfid;
 
 	error_def (ERR_BADDBVER);
@@ -100,11 +121,13 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	error_def (ERR_VERMISMATCH);
 	error_def (ERR_CRITSEMFAIL);
 
+	restore_rndwn_gbl = FALSE;
 	assert(!mupip_jnl_recover || standalone);
-	jnl_status = 0;
 	temp_region = gv_cur_region; 	/* save gv_cur_region wherever there is scope for it to be changed */
-	gv_cur_region = reg;
+	rundown_reg = gv_cur_region = reg;
+#ifdef GTCM_RC
         rc_cpt_removed = mupip_rundown_cpt();
+#endif
 	tsd = (sgmnt_data_ptr_t)malloc(sizeof(*tsd));
 	fc = reg->dyn.addr->file_cntl;
 	fc->op = FC_OPEN;
@@ -118,9 +141,10 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
                 return FALSE;
 	}
 	/*
-	 * if mu_rndwn_file() is called for standalone, it's still possible for
-	 * a read only process to succeed, if the db is clean with no orphaned shared memory.
-	 * We use gtmsecshr for updating file header for semaphores we create here.
+	 * read_only process cannot rundown database.
+	 * read only process can succeed to get standalone access of the database,
+	 *	if the db is clean with no orphaned shared memory.
+	 * Note: we use gtmsecshr for updating file header for semaphores id.
 	 */
 	if (reg->read_only && !standalone)
 	{
@@ -128,13 +152,15 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		close(udi->fd);
 		return FALSE;
 	}
+	ESTABLISH(mu_rndwn_file_ch);
 	if (!ftok_sem_get(reg, TRUE, GTM_ID, !standalone))
 	{
 		close(udi->fd);
+		REVERT;
 		return FALSE;
 	}
 	/*
-	 * Now we have locked the database using ftok_sem.
+	 * Now we have standalone access of the database using ftok semaphore.
 	 * Any other ftok conflicted database will suspend there operation at this point.
 	 * At the end of this routine, we release ftok semaphore lock.
 	 */
@@ -143,6 +169,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	{
 		RNDWN_ERR("!AD -> Error reading from file.", reg);
 		close(udi->fd);
+		REVERT;
 		ftok_sem_release(reg, TRUE, TRUE);
 		return FALSE;
 	}
@@ -153,32 +180,59 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	if (standalone)
 	{
 		semarg.buf = &semstat;
-		if (0 == udi->semid || -1 == semctl(udi->semid, 0, IPC_STAT, semarg) ||
+		if (INVALID_SEMID == udi->semid || -1 == semctl(udi->semid, 0, IPC_STAT, semarg) ||
 			tsd->sem_ctime.ctime != semarg.buf->sem_ctime)
 		{
 			/*
-			 * if no database access control lock semaphore id is found, or,
-			 * id is found but ctime does not match, create new semaphore.
+			 * if no database access control semaphore id is found, or,
+			 * if semaphore id is found but ctime does not match, create new semaphore.
 			 */
-			if (-1 == (udi->semid = semget(IPC_PRIVATE, 3, RWDALL | IPC_CREAT)))
+			if (-1 == (udi->semid = semget(IPC_PRIVATE, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT)))
 			{
+				udi->semid = INVALID_SEMID;
 				RNDWN_ERR("!AD -> Error with semget with IPC_CREAT.", reg);
 				close(udi->fd);
+				REVERT;
 				ftok_sem_release(reg, TRUE, TRUE);
 				return FALSE;
 			}
-			tsd->semid = udi->semid;
 			sem_created = TRUE;
-			if (-1 == semctl(udi->semid, 0, IPC_STAT, semarg))
+			tsd->semid = udi->semid;
+			/*
+			 * Set value of semaphore number 2 ( = FTOK_SEM_PER_ID - 1) as GTM_ID.
+			 * In case we have orphaned semaphore for some reason, mupip rundown will be
+			 * able to identify GTM semaphores from the value and can remove.
+			 */
+			semarg.val = GTM_ID;
+			if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, SETVAL, semarg))
+			{
+				RNDWN_ERR("!AD -> Error with semctl with SETVAL.", reg);
+				close(udi->fd);
+				if (sem_created && -1 == semctl(udi->semid, 0, IPC_RMID))
+						RNDWN_ERR("!AD -> Error removing semaphore.", reg);
+				REVERT;
+				ftok_sem_release(reg, TRUE, TRUE);
+				return FALSE;
+			}
+			/*
+			 * Warning: We must read the sem_ctime after SETVAL, which changes it.
+			 *	    We must not do any more SETVAL after this.
+			 *	    We consider sem_ctime as creation time of semaphore.
+			 */
+			semarg.buf = &semstat;
+			if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, IPC_STAT, semarg))
 			{
 				RNDWN_ERR("!AD -> Error with semctl with IPC_STAT.", reg);
 				close(udi->fd);
+				if (sem_created && -1 == semctl(udi->semid, 0, IPC_RMID))
+						RNDWN_ERR("!AD -> Error removing semaphore.", reg);
+				REVERT;
 				ftok_sem_release(reg, TRUE, TRUE);
 				return FALSE;
 			}
 			udi->sem_ctime = tsd->sem_ctime.ctime = semarg.buf->sem_ctime;
 		}
-		/* Increment the database access control semaphore after checking it's zero */
+		/* Now lock the database using access control semaphore and increment counter */
 		sop[0].sem_num = 0; sop[0].sem_op = 0;
 		sop[1].sem_num = 0; sop[1].sem_op = 1;
 		sop[2].sem_num = 1; sop[2].sem_op = 0;
@@ -191,35 +245,46 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			if (sem_created)
 			{
 				RNDWN_ERR("!AD -> Error doing SEMOP.", reg);
+				if (-1 == semctl(udi->semid, 0, IPC_RMID))
+					RNDWN_ERR("!AD -> Error removing semaphore.", reg);
 			}
 			else
-			{
 				RNDWN_ERR("!AD -> File already open by another process.", reg);
-			}
 			close(udi->fd);
+			REVERT;
 			ftok_sem_release(reg, TRUE, TRUE);
 			return FALSE;
 		}
+		/* At this point, we have the the database access control lock.
+		 * We also incremented the counter semaphore.
+		 * We also has ftok semaphore lock acquired.
+		 */
 	}
-	/*
-	 * At this point if standalone == TRUE, we have the the database access control lock.
-	 * We also incremented number of count semaphore of the semaphore set.
+
+	/* Now try to rundown database if shared memoru segment exists.
+	 * We try this for both values of "standalone"
 	 */
-	if (0 == udi->shmid || -1 == shmctl(udi->shmid, IPC_STAT, &shm_buf) ||
-			tsd->shm_ctime.ctime != shm_buf.shm_ctime)
+	if (INVALID_SHMID == udi->shmid || -1 == shmctl(udi->shmid, IPC_STAT, &shm_buf) ||
+		tsd->shm_ctime.ctime != shm_buf.shm_ctime) /* if no shared memory exists */
 	{
-		/* The shared memory segment did not exist, nothing to 'rundown' */
 		if (rc_cpt_removed)
 		{       /* reset RC values if we've rundown the RC CPT */
 			/* attempt to force-write header */
 			tsd->rc_srv_cnt = tsd->dsid = tsd->rc_node = 0;
 			tsd->owner_node = 0;
+			REVERT;
+			ftok_sem_release(reg, TRUE, TRUE);
+			return FALSE; /* This is safer, when this code is not complete */
 		} else
 		{
-			tsd->shmid = udi->shmid = 0;
+			/* Note that if creation time does not match, we ignore that shared memory segment.
+			 * It might result in orphaned shared memory segment.
+			 */
+			tsd->shmid = udi->shmid = INVALID_SHMID;
 			tsd->shm_ctime.ctime = udi->shm_ctime = 0;
 			if (standalone)
 			{
+				/* Reset ipc fields in file header */
 				if (!reg->read_only)
 				{
 					LSEEKWRITE(udi->fd, (off_t)0, tsd, sizeof(*tsd), status);
@@ -235,8 +300,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 					db_ipcs.sem_ctime = tsd->sem_ctime.ctime;
 					db_ipcs.shmid = tsd->shmid;
 					db_ipcs.shm_ctime = tsd->shm_ctime.ctime;
-					get_full_path((char *)reg->dyn.addr->fname,  reg->dyn.addr->fname_len,
-						db_ipcs.fn, &db_ipcs.fn_len, MAX_TRANS_NAME_LEN);
+					get_full_path((char *)DB_STR_LEN(reg), db_ipcs.fn, &db_ipcs.fn_len, MAX_TRANS_NAME_LEN);
 					db_ipcs.fn[db_ipcs.fn_len] = 0;
 					if (0 != send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0))
 					{
@@ -246,9 +310,15 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 					}
 				}
 				close(udi->fd);
-				if (!ftok_sem_release(reg, FALSE, TRUE))
+				REVERT;
+				if (!ftok_sem_release(reg, FALSE, FALSE))
+				{
+					RNDWN_ERR("!AD -> Error from ftok_sem_release.", reg);
+					if (sem_created && -1 == semctl(udi->semid, 0, IPC_RMID))
+						RNDWN_ERR("!AD -> Error removing semaphore.", reg);
 					return FALSE;
-				standalone_reg = gv_cur_region;
+				}
+				standalone_reg = reg;
 				return TRUE;
 			} else
 			{
@@ -256,12 +326,13 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 				memset(tsd->machine_name, 0, MAX_MCNAMELEN);
 				tsd->freeze = 0;
 				tsd->owner_node = 0;
-				tsd->shmid = 0;
-				tsd->semid = 0;
+				tsd->shmid = INVALID_SHMID;
+				tsd->semid = INVALID_SEMID;
 				tsd->sem_ctime.ctime = 0;
 				tsd->shm_ctime.ctime = 0;
 			}
 		}
+		assert(!standalone);
 		LSEEKWRITE(udi->fd, (off_t)0, tsd, sizeof(*tsd), status);
 		if (0 != status)
 		{
@@ -270,21 +341,19 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			return FALSE;
 		}
 		close(udi->fd);
-		/*
-		 * if (standalone) we have grabbed lock on semid (database access control semaphore).
-		 * So now release ftok_semid lock, but do not decrement counter semaphore.
-		 * ftok_semid will be still on the system. Specific utilities or, exit handler
-		 * must take care of removing it after decrementing counter if possible.
-		 */
-		if (!ftok_sem_release(reg, !standalone, TRUE))
+		REVERT;
+		/* For mupip rundown (standalone = FALSE), we release/remove ftok semaphore here. */
+		if (!ftok_sem_release(reg, TRUE, TRUE))
+		{
+			RNDWN_ERR("!AD -> Error from ftok_sem_release.", reg);
+			assert(!sem_created);
 			return FALSE;
-		if (standalone)
-			standalone_reg = gv_cur_region;
+		}
 		return TRUE;
 	}
 	/*
-	 * shared memory is already open, so now find the number of users attached to it
-	 * if it is zero, it needs to be flushed to disk
+	 * shared memory already exists, so now find the number of users attached to it
+	 * if it is zero, it needs to be flushed to disk, otherwise, we cannot help.
 	 */
 	/* If we aren't alone in using it, we can do nothing */
 	if (0 != shm_buf.shm_nattch)
@@ -325,6 +394,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	temp_region = gv_cur_region;
 	temp_cs_data = cs_data;
 	temp_cs_addrs = cs_addrs;
+	restore_rndwn_gbl = TRUE;
 	gv_cur_region = reg;
 	tp_change_reg();
 #ifdef DEBUG_DB64
@@ -340,7 +410,6 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		gtm_putmsg(VARLSTCNT(8) ERR_VERMISMATCH, 6, DB_LEN_STR(reg), gtm_release_name_len,
 				gtm_release_name, LEN_AND_STR(now_running));
 		CLNUP_RNDWN(udi, reg);
-		RESET_GV_CUR_REGION;
 		return FALSE;
 	}
 	if (memcmp(cs_addrs->nl->label, GDS_LABEL, GDS_LABEL_SZ - 1))
@@ -352,7 +421,6 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			gtm_putmsg(VARLSTCNT(8) ERR_BADDBVER, 2, DB_LEN_STR(reg),
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("(from shared segment - nl)"));
 		CLNUP_RNDWN(udi, reg);
-		RESET_GV_CUR_REGION;
 		return FALSE;
 	}
 	/* Since nl is memset to 0 initially and then fname is copied over from gv_cur_region and since "fname" is
@@ -363,20 +431,21 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	STAT_FILE((char *)cs_addrs->nl->fname, &stat_buf, stat_res);
 	if (-1 == stat_res)
 	{
-		send_msg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid, errno);
-		gtm_putmsg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid, errno);
+		save_errno = errno;
+		send_msg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid, save_errno);
+		gtm_putmsg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid, save_errno);
 		CLNUP_RNDWN(udi, reg);
-		RESET_GV_CUR_REGION;
 		return FALSE;
 	}
 	/* Check whether csa->nl->fname and csa->nl->dbfid are in sync. If not its a serious condition. Error out. */
 	set_gdid_from_stat(&tmp_dbfid, &stat_buf);
-	if (FALSE == is_gdid_gdid_identical(&tmp_dbfid, &cs_addrs->nl->dbfid.u))
+	if (FALSE == is_gdid_gdid_identical(&tmp_dbfid, &cs_addrs->nl->unique_id.uid))
 	{
-		send_msg(VARLSTCNT(6) ERR_DBIDMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid);
-		gtm_putmsg(VARLSTCNT(6) ERR_DBIDMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid);
+		send_msg(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid,
+			ERR_TEXT, 2, LEN_AND_LIT("[MUPIP] Database filename and fileid in shared memory are not in sync"));
+		rts_error(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid,
+			ERR_TEXT, 2, LEN_AND_LIT("[MUPIP] Database filename and fileid in shared memory are not in sync"));
 		CLNUP_RNDWN(udi, reg);
-		RESET_GV_CUR_REGION;
 		return FALSE;
 	}
 	/* The shared section is valid and up-to-date with respect to the database file header;
@@ -409,7 +478,6 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		{
 			RNDWN_ERR("!AD -> Error with fstat.", reg);
 			CLNUP_RNDWN(udi, reg);
-			RESET_GV_CUR_REGION;
 			return FALSE;
 		}
 #ifdef DEBUG_DB64
@@ -436,7 +504,6 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		gtm_putmsg(VARLSTCNT(8) status_msg, 2, DB_LEN_STR(reg),
 			ERR_TEXT, 2, RTS_ERROR_LITERAL("(File header in the shared segment seems corrupt)"));
 		CLNUP_RNDWN(udi, reg);
-		RESET_GV_CUR_REGION;
 		return FALSE;
 	}
 	if (dba_bg == acc_meth)
@@ -445,50 +512,38 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		cs_addrs->acc_meth.mm.base_addr = (sm_uc_ptr_t)((sm_ulong_t)csd + (int)(csd->start_vbn - 1) * DISK_BLOCK_SIZE);
 	db_common_init(reg, cs_addrs, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
 
-	/* cleanup mutex stuff and grab crit -- jnl_file_close() may need */
+	/* cleanup mutex stuff */
 	cs_addrs->hdr->image_count = 0;
 	gtm_mutex_init(reg, NUM_CRIT_ENTRY, FALSE); /* it is ensured, this is the only process running */
 	cs_addrs->nl->in_crit = 0;
 	cs_addrs->now_crit = cs_addrs->read_lock = FALSE;
 
 	reg->open = TRUE;
-	grab_crit(reg);
 	if (rc_cpt_removed)
 		csd->rc_srv_cnt = csd->dsid = csd->rc_node = 0;   /* reset RC values if we've rundown the RC CPT */
+	/* WCSFLU_NONE only is done here , as we aren't sure of the state, so no EPOCH's are written.
+ 	 * If we write EPOCH, recover may get confused */
 	if (cs_addrs->nl->glob_sec_init)
-	{
-		if JNL_ENABLED(csd)
-			jnl_status = jnl_ensure_open();
-		/* we are anyway running down the file, so we expect a cleanly terminated journal file. Hence only WCSFLU_NONE */
 		wcs_flu(WCSFLU_NONE);
-		if (JNL_ENABLED(csd))
-		{
-			if(0 == jnl_status)
-				jnl_file_close(reg, TRUE, FALSE);
-			else
-				send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
-		}
-	}
 	if (JNL_ALLOWED(csd))
 	{	/* If we own it or owner died, clear the lock */
 		if (process_id == cs_addrs->jnl->jnl_buff->fsync_in_prog_latch.latch_pid)
 		{
 			RELEASE_SWAPLOCK(&cs_addrs->jnl->jnl_buff->fsync_in_prog_latch);
 		} else
-			performCASLatchCheck(&cs_addrs->jnl->jnl_buff->fsync_in_prog_latch);
+			performCASLatchCheck(&cs_addrs->jnl->jnl_buff->fsync_in_prog_latch, 0);
 		free(cs_addrs->jnl);
 	}
-	rel_crit(reg);
 	reg->open = FALSE;
 	/* Note: At this point we have write permission */
 	memset(csd->machine_name, 0, MAX_MCNAMELEN);
 	csd->owner_node = 0;
 	csd->freeze = 0;
-	csd->shmid = 0;
+	csd->shmid = INVALID_SHMID;
 	csd->shm_ctime.ctime = 0;
 	if (!standalone)
 	{
-		csd->semid = 0;
+		csd->semid = INVALID_SEMID;
 		csd->sem_ctime.ctime = 0;
 	}
 	if (dba_bg == acc_meth)
@@ -498,7 +553,6 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		{
 			RNDWN_ERR("!AD -> Error writing header to disk.", reg);
 			CLNUP_RNDWN(udi, reg);
-			RESET_GV_CUR_REGION;
 			return FALSE;
 		}
 	} else
@@ -507,14 +561,12 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		{
 			RNDWN_ERR("!AD -> Error synchronizing mapped memory.", reg);
 			CLNUP_RNDWN(udi, reg);
-			RESET_GV_CUR_REGION;
     			return FALSE;
 		}
 		if (-1 == munmap((caddr_t)cs_addrs->db_addrs[0], (size_t)stat_buf.st_size))
 		{
 			RNDWN_ERR("!AD -> Error unmapping mapped memory.", reg);
 			CLNUP_RNDWN(udi, reg);
-			RESET_GV_CUR_REGION;
 			return FALSE;
 		}
 	}
@@ -522,39 +574,52 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	{
 		RNDWN_ERR("!AD -> Error detaching from shared memory.", reg);
 		CLNUP_RNDWN(udi, reg);
-		RESET_GV_CUR_REGION;
 		return FALSE;
 	}
 	if (0 != shm_rmid(udi->shmid))
 	{
-		gtm_putmsg(VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-			ERR_TEXT, 2, RTS_ERROR_TEXT("releasing shared memory"));
+		RNDWN_ERR("!AD -> Error removing shared memory.", reg);
+		CLNUP_RNDWN(udi, reg);
 		return FALSE;
 	}
 	if (!standalone)
 	{
-		if (0 != sem_rmid(udi->semid))
+		if (is_orphaned_gtm_semaphore(udi->semid) && 0 != sem_rmid(udi->semid))
 		{
-			gtm_putmsg(VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-				ERR_TEXT, 2, RTS_ERROR_TEXT("mu_rndwn_file sem_rmid"));
+			RNDWN_ERR("!AD -> Error removing semaphore.", reg);
+			CLNUP_RNDWN(udi, reg);
 			return FALSE;
 		}
 	}
-	/*
-	 * if standalone, we have grabbed lock on database access control semaphore.
-	 * So now release ftok_semid lock so other ftok conflicted database can continue.
-	 * Also for standalone do not decrement counter semaphore.
-	 * Since ftok semaphore set will be needed again during exit, just release the lock.
-	 * So ftok semaphore will be still there with non-zero counter.
+	udi->shmid = INVALID_SHMID;
+	udi->shm_ctime = 0;
+	REVERT;
+	RESET_GV_CUR_REGION;
+	restore_rndwn_gbl = TRUE;
+	/* For mupip rundown, standalone == TRUE and we want to rlease/remove ftok semaphore.
+	 * Otherwise, just release ftok semaphore lock. counter will be one more for this process.
 	 * Exit handlers must take care of removing if necessary.
 	 */
 	if (!ftok_sem_release(reg, !standalone, !standalone))
 		return FALSE;
 	if (standalone)
-		standalone_reg = gv_cur_region;
-	udi->shmid = 0;
-	udi->shm_ctime = 0;
-	RESET_GV_CUR_REGION;
+		standalone_reg = reg;
 	close(udi->fd);
 	return TRUE;
+}
+
+CONDITION_HANDLER(mu_rndwn_file_ch)
+{
+	unix_db_info	*udi;
+
+	START_CH;
+	udi = FILE_INFO(rundown_reg);
+	if (udi->grabbed_ftok_sem)
+		ftok_sem_release(rundown_reg, FALSE, TRUE);
+	standalone_reg = NULL;
+	if (restore_rndwn_gbl)
+	{
+		RESET_GV_CUR_REGION;
+	}
+	NEXTCH;
 }

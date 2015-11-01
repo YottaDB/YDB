@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <errno.h>
 #include <unistd.h>
 
 #include "gtmio.h"	/* this has to come in before gdsfhead.h, for all "open" to be defined
@@ -35,9 +36,6 @@
 
 GBLREF	volatile int4	db_fsync_in_prog;
 GBLREF	volatile int4	jnl_qio_in_prog;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	sgmnt_addrs	*cs_addrs;	/* for assserts only */
-GBLREF	sgmnt_data_ptr_t cs_data;	/* for assserts only */
 GBLREF	uint4		process_id;
 uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write);
 void jnl_mm_timer_write(void);
@@ -62,10 +60,8 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	error_def(ERR_DBFSYNCERR);
 
 	assert(NULL != jpc);
-	udi = FILE_INFO(gv_cur_region);
+	udi = FILE_INFO(jpc->region);
 	csa = &udi->s_addrs;
-	assert(csa == cs_addrs);   /* check if aswp on HP used right one,
-				    done after to reduce window */
 	jb = jpc->jnl_buff;
 	if (jb->io_in_prog_latch.latch_pid == process_id)	/* We already have the lock? */
 		return ERR_JNLWRTNOWWRTR;			/* timer driven io in progress */
@@ -102,7 +98,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		if (-1 == fsync(udi->fd))
 		{
 			db_fsync_in_prog--;
-			rts_error(VARLSTCNT(9) ERR_DBFSYNCERR, 2, DB_LEN_STR(gv_cur_region));
+			rts_error(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(jpc->region), errno);
 		}
 		db_fsync_in_prog--;
 		assert(0 <= db_fsync_in_prog);
@@ -144,9 +140,9 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	status = jpc->status;
 	if (0 != jpc->status)
 	{
-		assert(FALSE);
 		jb->errcnt++;
 		jnl_send_oper(jpc, ERR_JNLACCESS);
+		assert(FALSE);
 	}
 	jpc->status = 0;
 	assert(jb->dsk <= jb->size);
@@ -166,7 +162,6 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	jb->dskaddr = jpc->new_dskaddr;
 	jpc->dsk_update_inprog = FALSE;
 
-	assert(csa == cs_addrs);   /* check if aswp on HP will use right one */
 	RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
 	if ((jnl_closed == csa->hdr->jnl_state) && NOJNL != csa->jnl->channel)
 	{
@@ -196,9 +191,8 @@ uint4 jnl_qio_start(jnl_private_control *jpc)
 	unix_db_info		*udi;
 
 	assert(NULL != jpc);
-	udi = FILE_INFO(gv_cur_region);
+	udi = FILE_INFO(jpc->region);
 	csa = &udi->s_addrs;
-	assert(csa == cs_addrs);
 	jb = jpc->jnl_buff;
 
 	/* this block of code (till yield()) processes the buffer upto an IO_BLOCK_SIZE alignment boundary
@@ -218,8 +212,7 @@ uint4 jnl_qio_start(jnl_private_control *jpc)
 	   * does the dirty job more efficiently */
 
 	for (yield_cnt = 0; yield_cnt < csa->hdr->yield_lmt; yield_cnt++)
-	{
-		/* yield() until someone has finished your job or no one else is active on the jnl file */
+	{	/* yield() until someone has finished your job or no one else is active on the jnl file */
 		old_freeaddr = jb->freeaddr;
 		rel_quant();
 		if (JNL_FILE_SWITCHED(jpc->region))
@@ -239,7 +232,7 @@ void jnl_mm_timer_write(void)
 {	/* While this should work by region and use baton passing to more accurately and efficiently perform its task,
 	 * it is currently a blunt instrument
 	 */
-	gd_region	*reg, *r_top, *sav_cur_region;
+	gd_region	*reg, *r_top;
 	gd_addr		*addr_ptr;
 	sgmnt_addrs	*csa;
 
@@ -249,12 +242,9 @@ void jnl_mm_timer_write(void)
 		{
 			if ((dba_mm == reg->dyn.addr->acc_meth) && reg->open)
 			{
-				sav_cur_region = gv_cur_region;
-				TP_CHANGE_REG(reg);	/* change cs data and addrs for aswp on HP */
 				csa = &FILE_INFO(reg)->s_addrs;
 				if ((NULL != csa->jnl) && (NOJNL != csa->jnl->channel))
 					jnl_qio_start(csa->jnl);
-				TP_CHANGE_REG(sav_cur_region); /* assumes cs data and addrs were in sync to start */
 			}
 		}
 	}

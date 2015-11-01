@@ -25,6 +25,33 @@
 #define SA_MAXLITLEN		128  /* maximun size of beowulf.sanchez.com */
 #define DD_BUFLEN		80
 
+#define DOTCPSEND(SDESC, SBUFF, SBUFF_LEN, SFLAGS, RC) \
+{ \
+	ssize_t		gtmioStatus; \
+	size_t		gtmioBuffLen; \
+	sm_uc_ptr_t	gtmioBuff; \
+	gtmioBuffLen = SBUFF_LEN; \
+	gtmioBuff = (sm_uc_ptr_t)(SBUFF); \
+	for (;;) \
+        { \
+		if (-1 != (gtmioStatus = tcp_routines.aa_send(SDESC, gtmioBuff, gtmioBuffLen, SFLAGS))) \
+	        { \
+			gtmioBuffLen -= gtmioStatus; \
+			if (0 == gtmioBuffLen) \
+				break; \
+			gtmioBuff += gtmioStatus; \
+	        } \
+		else if (EINTR != errno) \
+		  break; \
+        } \
+	if (-1 == gtmioStatus)	    	/* Had legitimate error - return it */ \
+		RC = errno; \
+	else if (0 == gtmioBuffLen) \
+	        RC = 0; \
+	else \
+		RC = -1;		/* Something kept us from sending what we wanted */ \
+}
+
 /* ***************************************************** */
 /* *********** structures for TCP driver *************** */
 /* ***************************************************** */

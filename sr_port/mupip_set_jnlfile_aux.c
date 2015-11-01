@@ -39,6 +39,7 @@
 
 GBLREF gd_region        *gv_cur_region;
 GBLREF boolean_t	mu_rndwn_status;
+GBLREF boolean_t	need_no_standalone;
 
 #ifdef VMS
 #define STANDALONE(x) mu_rndwn_file(TRUE)
@@ -53,7 +54,6 @@ int4 mupip_set_jnlfile_aux(jnl_file_header *header)
 	unsigned short	buf_len;
 	unsigned int	full_buf_len, prev_buf_len;
 	char		buf[JNL_NAME_SIZE], full_buf[JNL_NAME_SIZE], prev_buf[JNL_NAME_SIZE];
-	boolean_t	need_no_standalone = FALSE;
 #ifdef VMS
 	mstr		jnlfile, jnldef, *tmp;
 #endif

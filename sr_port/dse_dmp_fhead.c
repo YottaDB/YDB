@@ -22,8 +22,10 @@
 *
 *******************************************************************************/
 
-#include "gtm_string.h"
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -36,7 +38,6 @@
 #include "dse.h"
 #include "dse_puttime.h"
 #include "gtmmsg.h"
-
 
 #define MAX_UTIL_LEN    64
 
@@ -67,11 +68,20 @@ static  char    * const jtype[] =
 
 void dse_dmp_fhead (void)
 {
+	boolean_t	jnl_buff_open;
         unsigned char   util_buff[MAX_UTIL_LEN], qwstring[100], *ptr;
         int             util_len, i;
 	uint4		journal, jnl_status;
+	gds_file_id	zero_fid;
 
         journal = (uint4)cs_addrs->hdr->jnl_state;
+	VMS_ONLY(
+		memset(&zero_fid, 0, sizeof(zero_fid));
+		jnl_buff_open = (0 != memcmp(cs_addrs->hdr->jnl_file.jnl_file_id.fid, zero_fid.fid, sizeof(zero_fid.fid)));
+	)
+	UNIX_ONLY(
+		jnl_buff_open = (0 != cs_addrs->hdr->jnl_file.u.inode);
+	)
 	if (CLI_NEGATED != cli_present("BASIC"))
 	{
 		util_out_print("!/File            !AD", TRUE, gv_cur_region->dyn.addr->fname_len,
@@ -142,8 +152,9 @@ void dse_dmp_fhead (void)
 
 		util_out_print("  Reference count       !12UL", FALSE, cs_addrs->nl->ref_cnt);
 		util_out_print("      ", FALSE);
-		util_out_print("  Journaling            !AD", TRUE,12, (journal) ?
-				((journal == jnl_closed) ? "      CLOSED" : "        OPEN") : "  DISALLOWED");
+		util_out_print("  Journaling           !AD", TRUE,13, (journal) ?
+				((journal == jnl_closed) ? "          OFF" :
+				 	(jnl_buff_open ? "           ON" : "[inactive] ON")) : "     DISABLED");
 		if (journal)
 		{
 			util_out_print("  Before imaging               !AD", FALSE, 5,
@@ -239,7 +250,7 @@ void dse_dmp_fhead (void)
 	}
 	if (NEED_TO_DUMP("JOURNAL") && (JNL_ENABLED(cs_addrs->hdr) && (NULL != cs_addrs->jnl) && (NULL != cs_addrs->jnl->jnl_buff)))
 	{
-		if (0 == (jnl_status = jnl_ensure_open()))
+		if (jnl_buff_open)
 		{
 			util_out_print(0, TRUE);
 			/* --------------------------- journal buffer --------------------------------- */
@@ -275,7 +286,7 @@ void dse_dmp_fhead (void)
 			util_out_print("      ", FALSE);
 			util_out_print("  Epoch_tn            0x!12XL", TRUE, cs_addrs->jnl->jnl_buff->epoch_tn);
 			util_out_print("  Io_in_progress               !AD", FALSE, 5,
-			 (cs_addrs->jnl->jnl_buff->UNIX_ONLY(io_in_prog_latch.latch_pid)VMS_ONLY(io_in_prog) ? " TRUE" : "FALSE"));
+			  (cs_addrs->jnl->jnl_buff->UNIX_ONLY(io_in_prog_latch.latch_pid)VMS_ONLY(io_in_prog) ? " TRUE" : "FALSE"));
 			util_out_print("      ", FALSE);
 			util_out_print("  Epoch_Interval        !12UL", TRUE, cs_addrs->jnl->jnl_buff->epoch_interval);
 			util_out_print("  Now_writer            !12UL", FALSE,
@@ -304,9 +315,7 @@ void dse_dmp_fhead (void)
 				util_out_print("  Jnl Rec Type    !5AZ      !7UL", TRUE, jtype[i],
 					cs_addrs->jnl->jnl_buff->reccnt[i - 1]);
 			}
-		} else
-			gtm_putmsg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_addrs->hdr),
-				DB_LEN_STR(gv_cur_region));
+		}
 	}
 	if (NEED_TO_DUMP("BACKUP") && (BACKUP_NOT_IN_PROGRESS != cs_addrs->nl->nbb))
 	{

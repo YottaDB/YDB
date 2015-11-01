@@ -12,13 +12,19 @@
 #include "mdef.h"
 #include "mlkdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "locklits.h"
+#include "gtcmtr_lk.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
+#include "mlk_unpend.h"
 
 GBLREF connection_struct *curr_entry;
 GBLREF mlk_pvtblk *mlk_cm_root;
 
-bool gtcmtr_lkreqimmed()
+bool gtcmtr_lkreqimmed(void)
 {
 	unsigned char *ptr, return_val;
 	cm_region_list *reg_walk;
@@ -29,6 +35,7 @@ bool gtcmtr_lkreqimmed()
 	ptr++;
 	ptr++;
 	curr_entry->transnum = *ptr;
+	curr_entry->last_cancelled = CM_NOLKCANCEL;
 
 	if (curr_entry->new_msg)
 	{

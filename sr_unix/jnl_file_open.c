@@ -82,7 +82,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 	jnl_record		*eof_record;
 	struct stat		stat_buf;
 	int			count, cwd_len, errno_save;
-	uint4			sts, status;
+	uint4			save_time, sts, status;
 	sm_uc_ptr_t		c, hdr_ptr, nameptr;
 	char			*c1, cwdbuf[JNL_NAME_EXP_SIZE], eof_buffer[EOF_RECLEN], prev_jnl_fn[JNL_NAME_SIZE],
 	  			hdr_buffer[ROUND_UP(sizeof(jnl_file_header) + (2 * sizeof(uint4)), 2 * sizeof(uint4))];
@@ -248,13 +248,15 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 			jb->before_images = header->before_images;
 			jb->epoch_tn = eof_record->val.jrec_eof.tn;
 			jb->alignsize = header->alignsize;
+			jb->autoswitchlimit = header->autoswitchlimit;
 			jb->epoch_interval = header->epoch_interval;
 			JNL_SHORT_TIME(jb->next_epoch_time);
+			save_time = jb->next_epoch_time;
 			jb->next_epoch_time += jb->epoch_interval;
 			jnl_prc_vector(&prc);
 			if ((ROUND_UP(sizeof(jnl_file_header), DISK_BLOCK_SIZE)) == header->end_of_data)
-				header->eov_timestamp = jb->next_epoch_time - jb->epoch_interval;
-			assert(header->eov_timestamp >= header->bov_timestamp);
+				header->eov_timestamp = save_time;
+			assert(CMP_JNL_PROC_TIME(header->eov_timestamp, header->bov_timestamp) >= 0);
 			memcpy(&header->who_opened, &prc, sizeof(header->who_opened));
 			assert(header->eov_tn >= header->bov_tn);
 			header->eov_tn = (trans_num)-1;		/* this gets reset for normal shutdown else stays =~ infinite */

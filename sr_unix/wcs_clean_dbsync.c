@@ -34,6 +34,7 @@
 #include "wcs_clean_dbsync.h"
 #include "tp_grab_crit.h"
 #include "wcs_flu.h"
+#include "lockconst.h"
 
 #ifdef GTM_MALLOC_RENT
 #	define	GTM_MALLOC_NO_RENT_ONLY(X)
@@ -46,9 +47,10 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	volatile boolean_t	crit_in_flux;
-GBLREF	volatile int4		db_fsync_in_prog, jnl_fsync_in_prog, jnl_qio_in_prog;
+GBLREF	volatile int4		db_fsync_in_prog, jnl_qio_in_prog;
 GBLREF	volatile int4 		fast_lock_count;
 GBLREF	volatile int4		gtmMallocDepth;		/* Recursion indicator */
+GBLREF	boolean_t	 	mupip_jnl_recover;
 
 /* Sync the filehdr (and epoch in the journal file if before imaging). The goal is to sync the database,
  * but if we find us in a situation where we need to block on someone else, then we defer this to the next round.
@@ -109,10 +111,11 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		 */
 		dbsync_defer_timer = TRUE;
 		GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);
-		if ((FALSE == lseekIoInProgress_flag)
+		if (!mupip_jnl_recover && (FALSE == lseekIoInProgress_flag)
 			GTM_MALLOC_NO_RENT_ONLY(&& 0 == gtmMallocDepth)
 			&& (FALSE == crit_in_flux) && (0 == fast_lock_count)
-			&& (!jnl_qio_in_prog)      && (!jnl_fsync_in_prog)   && (!db_fsync_in_prog)
+			&& (!jnl_qio_in_prog)      && (!db_fsync_in_prog)
+		        && (!jpc || !jpc->jnl_buff || (LOCK_AVAILABLE == jpc->jnl_buff->fsync_in_prog_latch.latch_pid))
 			&& (NULL == save_csaddrs || FALSE == save_csaddrs->now_crit) && (FALSE == csa->now_crit)
 			&& (FALSE != tp_grab_crit(reg)))
 		{

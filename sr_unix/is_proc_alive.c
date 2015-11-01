@@ -27,15 +27,20 @@
  * ----------------------------------------------
  */
 
-
 bool is_proc_alive(int4 pid, int4 imagecnt)
 {
 	int	status;
 	bool	ret;
 
+	if (0 == pid)
+	{
+		assert(FALSE);
+		return FALSE;
+	}
 	status = kill(pid, 0);		/* just checking */
 	if (status)
-	{	assert(status == -1 && (errno == EPERM || errno == ESRCH));
+	{
+		assert(status == -1 && (errno == EPERM || errno == ESRCH));
 		if (errno == ESRCH)
 			ret = FALSE;
 		else

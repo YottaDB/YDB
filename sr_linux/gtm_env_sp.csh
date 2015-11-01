@@ -35,13 +35,22 @@ if ( $?gtm_version_change == "1" ) then
 	# C definitions:
 
 #	setenv	gt_cc_options_common 	"-c -D_LARGEFILE64_SOURCE=1 -D_FILE_OFFSET_BITS=64"
-#	setenv	gt_cc_options_common	"-c -ansi -DFULLBLOCKWRITES -D_XOPEN_SOURCE=500 -D_BSD_SOURCE -D_POSIX_C_SOURCE=199506L -D_FILE_OFFSET_BITS=64"
-	# 		FULLBLOCKWRITES to make all block IO read/write the entire block to stave off prereads (assumes blind writes supported)
 	# For gcc: _BSD_SOURCE for caddr_t, others
 	#	   _XOPEN_SOURCE=500 should probably define POSIX 199309 and/or
 	#		POSIX 199506 but doesnt so...
+	#	   -fsigned-char for Linux390 but shouldn't hurt x86
+
+#	setenv	gt_cc_options_common	"-c -ansi -D_XOPEN_SOURCE=500 -D_BSD_SOURCE -D_POSIX_C_SOURCE=199506L -D_FILE_OFFSET_BITS=64 -DFULLBLOCKWRITES -fsigned-char"
+#	_GNU_SOURCE includes _XOPEN_SOURCE=400, _BSD_SOURCE, and _POSIX_C_SOURCE-199506L among others
+	setenv	gt_cc_options_common	"-c -ansi -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DFULLBLOCKWRITES -fsigned-char"
+	setenv gt_cc_options_common "$gt_cc_options_common -Wimplicit -Wmissing-prototypes"
+        set lversion=`uname -r`
+        set ltemp_ver=`echo $lversion | sed 's/./& /g'`
+        if ($ltemp_ver[3] == "2"  && $ltemp_ver[1] == "2") then
+            setenv gt_cc_options_common "$gt_cc_options_common -DNeedInAddrPort"
+        endif
+
 	# Linux gcc optimizations cause problems so do without them for now.
-	setenv	gt_cc_options_common	"-c -ansi -Wimplicit -Wmissing-prototypes -DFULLBLOCKWRITES -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE"
 	setenv	gt_cc_option_optimize	$gt_cc_option_nooptimize
 
 	# -g	generate debugging information for dbx (no longer overrides -O)
@@ -52,6 +61,11 @@ if ( $?gtm_version_change == "1" ) then
 	setenv	gt_ld_linker		"$gt_cc_compiler" # redefine to use new C compiler definition
 
 	# -M		generate link map onto standard output
+	# To expose gtm_ci, we use -rdynamic option (man dlopen).
+	# Unfortunately, -rdynamic exposes all symbols in mumps executable.
+	# Until we figure out an option to expose symbols selectively, we want to disable this option.
+	# This means Call ins won't be available on Linux. Malli Sep 28, 2001
+	# setenv	gt_ld_options_common	"-Wl,-M -rdynamic"
 	setenv	gt_ld_options_common	"-Wl,-M"
 
 	# need to re-define these in terms of new gt_ld_options_common:
@@ -61,7 +75,7 @@ if ( $?gtm_version_change == "1" ) then
 
 
 #	setenv	gt_ld_syslibs		"-lcurses -lm -lsocket -lnsl -ldl -lposix4"
-	setenv	gt_ld_syslibs		"-lcurses -lm -ldl"
+	setenv	gt_ld_syslibs		"-lncurses -lm -ldl"
 
 	# Shared library definition overrides:
 	setenv	gt_cc_shl_options	"-c"

@@ -21,6 +21,12 @@
 
 #include "daemon.h"
 #include "rc_cpt.h"
+#include "gdsroot.h"
+#include "gdsblk.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
 
 int	quiet = 0;
 
@@ -121,7 +127,8 @@ clean_mem(char *name)
 					fprintf(stderr,"shmclean: error removing semid %d\n", semid);
 					perror("shmclean");
 				}
-			}
+			} else
+				semid = INVALID_SEMID;
 			if ((m_id = shmget(msg_key, 10, RWDALL)) != -1)
 			{
 				if (!quiet)
@@ -131,7 +138,8 @@ clean_mem(char *name)
 					fprintf(stderr,"shmclean: error removing shmid %d\n", m_id);
 					perror("shmclean");
 				}
-			}
+			} else
+				m_id = INVALID_SEMID;
 		}
 	}
 }
@@ -157,7 +165,8 @@ database_clean(char *path)
 			fprintf(stderr,"shmclean: error removing shmid %d\n", shmid);
 			perror("shmclean");
 		}
-	}
+	} else
+		shmid = INVALID_SHMID;
 	if ((semid = semget(d_key, 2, 0600)) != -1)
 	{
 		if (!quiet)
@@ -167,5 +176,6 @@ database_clean(char *path)
 			fprintf(stderr,"shmclean: error removing semid %d\n", semid);
 			perror("shmclean");
 		}
-	}
+	} else
+		semid = INVALID_SEMID;
 }

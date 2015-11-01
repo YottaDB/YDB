@@ -22,8 +22,10 @@
 
 GBLREF	char	*mur_extract_buff;
 
-
-int exttime (jnl_proc_time time, jnl_proc_time *ref_time, int extract_len)
+/*
+ * Currently ref_time is unused
+ */
+int exttime (uint4 time, jnl_proc_time *ref_time, int extract_len)
 {
 	unsigned char	*ptr;
 	uint4		days;
@@ -31,7 +33,7 @@ int exttime (jnl_proc_time time, jnl_proc_time *ref_time, int extract_len)
 
 
 	/* Convert time to $Horolog format */
-	dollarh(time, &days, &seconds);
+	dollarh((time_t)time, &days, &seconds);
 	ptr = i2asc((uchar_ptr_t)&mur_extract_buff[extract_len], days);
 	*ptr++ = ',';
 	ptr = i2asc(ptr, (uint4)seconds);

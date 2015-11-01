@@ -10,10 +10,17 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#ifdef EARLY_VARARGS
+#include <varargs.h>
+#endif
+
 #include "fao_parm.h"
 #include "error.h"
 #include "op.h"
+#ifndef EARLY_VARARGS
 #include <varargs.h>
+#endif
 #include "mval2fao.h"
 
 #define FAO_BUFFER_SPACE 2048

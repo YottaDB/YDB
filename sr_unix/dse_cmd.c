@@ -137,6 +137,7 @@ static readonly CLI_ENTRY dse_change_qual[] = {
 };
 
 static readonly CLI_ENTRY dse_crit_qual[] = {
+{ "ALL",     0, 0, 0, VAL_N_A, 0, 0, 0, 0 },
 { "CRASH",   0, 0, 0, VAL_N_A, 0, 0, 0, 0 },
 { "CYCLE",   0, 0, 0, VAL_N_A, 0, 0, 0, 0 },
 { "INIT",    0, 0, 0, VAL_N_A, 0, 0, 0, 0 },

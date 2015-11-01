@@ -21,4 +21,12 @@
 #define RECVFROM	recvfrom
 #define SENDTO		sendto
 
+#if defined(__osf__) && defined(__alpha)
+#define GTM_SOCKLEN_TYPE size_t
+#elif __sparc
+#define GTM_SOCKLEN_TYPE int
+#else
+#define GTM_SOCKLEN_TYPE socklen_t
+#endif
+
 #endif

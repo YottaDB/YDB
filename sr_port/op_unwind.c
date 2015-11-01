@@ -15,7 +15,7 @@
 #include "mv_stent.h"
 #include "tp_frame.h"
 #include "cache.h"
-#include "masscomp.h"
+#include "objlabel.h"
 #include "op.h"
 
 GBLREF void		(*unw_prof_frame_ptr)(void);

@@ -307,7 +307,7 @@ static int gtmrecv_alloc_filter_buff(int bufsiz)
 		repl_filter_buff = (uchar_ptr_t)malloc(bufsiz);
 		if (old_filter_buff)
 		{
-			memcpy(repl_filter_buff, old_filter_buff, repl_filter_bufsiz);
+			longcpy(repl_filter_buff, old_filter_buff, repl_filter_bufsiz);
 			free(old_filter_buff);
 		}
 		repl_filter_bufsiz = bufsiz;
@@ -414,7 +414,7 @@ static void process_tr_buff(void)
 			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 				return;
 		}
-		memcpy(recvpool.recvdata_base + write_loc, buffp, buffered_data_len);
+		longcpy(recvpool.recvdata_base + write_loc, buffp, buffered_data_len);
 		write_loc = future_write;
 		if (write_loc > write_wrap)
 			write_wrap = write_loc;
@@ -539,7 +539,7 @@ static void process_tr_buff(void)
 				{
 					if (write_len > repl_filter_bufsiz)
 						gtmrecv_alloc_filter_buff(write_len);
-					memcpy(repl_filter_buff, recvpool.recvdata_base + write_off, write_len);
+					longcpy(repl_filter_buff, recvpool.recvdata_base + write_off, write_len);
 				}
 				assert(write_len <= repl_filter_bufsiz);
 				if ((gtmrecv_filter & EXTERNAL_FILTER) &&
@@ -790,7 +790,7 @@ static void do_main_loop(boolean_t crash_restart)
 					if (0 == data_len)
 					{
 						/* Heartbeat msg contents start from buffp - msg_len */
-						memcpy(heartbeat.ack_seqno, buffp - msg_len, msg_len);
+						longcpy(heartbeat.ack_seqno, buffp - msg_len, msg_len);
 						REPL_DPRINT3("Heartbeat received with time %ld SEQNO "INT8_FMT"\n",
 							     *(time_t *)&heartbeat.ack_time[0],
 							     INT8_PRINT(*(seq_num *)&heartbeat.ack_seqno[0]));
@@ -833,7 +833,6 @@ static void do_main_loop(boolean_t crash_restart)
 								     jnl_ver, remote_jnl_ver);
 							assert(JNL_VER_EARLIEST_REPL <= jnl_ver &&
 							       JNL_VER_EARLIEST_REPL <= remote_jnl_ver);
-							assert(JNL_VER_THIS >= jnl_ver && JNL_VER_THIS >= remote_jnl_ver);
 							assert((intlfltr_t)0 !=
 								repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
 										    [remote_jnl_ver - JNL_VER_EARLIEST_REPL]);

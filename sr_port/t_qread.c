@@ -58,16 +58,15 @@ GBLREF short		crash_count;
 GBLREF short		dollar_tlevel;
 GBLREF unsigned int	t_tries;
 GBLREF uint4		process_id;
-
-DEBUG_ONLY(GBLREF gv_namehead	*gv_target;)
+GBLREF boolean_t	tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
+GBLREF gv_namehead	*gv_target;
 
 #define BAD_LUCK_ABOUNDS 1
 #define	RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, newcr, newcycle)				\
 	assert((first_tp_srch_status)->cr != (newcr) || (first_tp_srch_status)->cycle != (newcycle));	\
 	(first_tp_srch_status)->cr = (newcr);								\
 	(first_tp_srch_status)->cycle = (newcycle);							\
-	(first_tp_srch_status)->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS((newcr)->buffaddr);			\
-
+	(first_tp_srch_status)->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS((newcr)->buffaddr);
 
 sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out)
 	/* cycle is used in t_end to detect if the buffer has been refreshed since the t_qread */
@@ -287,6 +286,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				if (clustered && (0 == cr->bt_index) &&
 					(cr->tn < ((th_rec *)((unsigned char *)csa->th_base + csa->th_base->tnque.fl))->tn))
 				{	/* can't rely on the buffer */
+					cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 					cr->blk = CR_BLKEMPTY;
 					break;
 				}
@@ -322,6 +322,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					{
 						if (FALSE == is_proc_alive(cr->r_epid, cr->image_count))
 						{	/* process gone: release that process's lock */
+							cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 							cr->blk = CR_BLKEMPTY;
 							RELEASE_BUFF_READ_LOCK(cr);
 						} else
@@ -336,6 +337,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						}
 					} else
 					{	/* process stopped before could set r_epid */
+						cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 						cr->blk = CR_BLKEMPTY;
 						RELEASE_BUFF_READ_LOCK(cr);
 						if (cr->read_in_progress < -1)	/* race: process released since if r_epid */

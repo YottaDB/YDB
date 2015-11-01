@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#ifndef MUTEX_MSEM_WAKE
+
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -51,3 +53,5 @@ void mutex_sock_cleanup(void)
 	}
 	DUMP_MUTEX_TRACE_CNTRS;
 }
+
+#endif /*MUTEX_MSEM_WAKE*/

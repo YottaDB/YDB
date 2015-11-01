@@ -22,7 +22,7 @@
 #include "deferred_signal_handler.h"
 #include "gtmmsg.h"
 
-GBLREF	boolean_t		forced_exit;
+GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	int4			exi_condition;
 GBLREF	void			(*call_on_signal)();
 GBLREF	int			forced_exit_err;
@@ -39,6 +39,9 @@ void deferred_signal_handler(void)
 	error_def(ERR_KILLBYSIGUINFO);
 	error_def(ERR_KILLBYSIGSINFO1);
 	error_def(ERR_KILLBYSIGSINFO2);
+
+	/* To avoid nested calls to this routine, we set forced_exit to FALSE at the very beginning */
+	forced_exit = FALSE;
 
 	/* For signals that get a delayed response so we can get out of crit, we also delay the messages.
 	 * This routine will output those delayed messages from the appropriate structures to both the

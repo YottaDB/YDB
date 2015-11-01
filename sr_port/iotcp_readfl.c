@@ -46,7 +46,7 @@ short	iotcp_readfl(mval *v, int4 width, int4 timeout)
 {
 	/* VMS uses the UCX interface; should support others that emulate it */
 	bool		ret, timed, vari;
-	int		flags, len, real_errno;
+	int		flags, len, real_errno, save_errno;
 	short int	i;
 	io_desc		*io_ptr;
 	d_tcp_struct	*tcpptr;
@@ -60,6 +60,8 @@ short	iotcp_readfl(mval *v, int4 width, int4 timeout)
 
 	error_def(ERR_IOEOF);
 	error_def(ERR_TEXT);
+	error_def(ERR_GETSOCKOPTERR);
+	error_def(ERR_SETSOCKOPTERR);
 
 #ifdef DEBUG_TCP
 	PRINTF("%s >>>\n", __FILE__);
@@ -109,10 +111,20 @@ short	iotcp_readfl(mval *v, int4 width, int4 timeout)
 			/* set blocking I/O */
 			FCNTL2(tcpptr->socket, F_GETFL, flags);
 			if (flags < 0)
-				rts_error(VARLSTCNT(1) errno);
+			{
+				save_errno = errno;
+				errptr = (char *)STRERROR(errno);
+				rts_error(VARLSTCNT(7) ERR_GETSOCKOPTERR, 5, LEN_AND_LIT("F_GETFL FOR NON BLOCKING I/O"),
+						save_errno, LEN_AND_STR(errptr));
+			}
 			FCNTL3(tcpptr->socket, F_SETFL, flags & (~(O_NDELAY | O_NONBLOCK)), fcntl_res);
 			if (fcntl_res < 0)
-				rts_error(VARLSTCNT(1) errno);
+			{
+				save_errno = errno;
+				errptr = (char *)STRERROR(errno);
+				rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("F_SETFL FOR NON BLOCKING I/O"),
+						save_errno, LEN_AND_STR(errptr));
+			}
 #endif
 			sys_get_curr_time(&cur_time);
 			add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
@@ -137,10 +149,12 @@ short	iotcp_readfl(mval *v, int4 width, int4 timeout)
 		if (status > 0)
 		{
 			status = tcp_routines.aa_recv(tcpptr->socket, (char *)(stringpool.free +  i), width - i, 0);
-			if (0 == status)	/* check the loss of connection. */
-			{
-				status = EOF;
-				real_errno = 0;
+			if ((0 == status) || ((-1 == status) && (ECONNRESET == errno || EPIPE == errno || EINVAL == errno)))
+			{ /* lost connection. */
+				if (0 == status)
+					errno = ECONNRESET;
+				real_errno = errno;
+				status = -2;
 				break;
 			}
 
@@ -178,7 +192,7 @@ short	iotcp_readfl(mval *v, int4 width, int4 timeout)
 				break;
 			}
 		}
-		if (EOF == status)
+		if (0 > status)
 			break;
 		i += status;
 		if ((vari && (0 != i)) || (i >= width))
@@ -202,7 +216,12 @@ short	iotcp_readfl(mval *v, int4 width, int4 timeout)
 			real_errno = errno;
 			FCNTL3(tcpptr->socket, F_SETFL, flags, fcntl_res);
 			if (fcntl_res < 0)
-				rts_error(VARLSTCNT(1) errno);
+			{
+				save_errno = errno;
+				errptr = (char *)STRERROR(errno);
+				rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("F_SETFL FOR RESTORING SOCKET OPTIONS"),
+					  	save_errno, LEN_AND_STR(errptr));
+			}
 			errno = real_errno;
 #endif
 			if (out_of_time && (i < width))
@@ -258,7 +277,7 @@ short	iotcp_readfl(mval *v, int4 width, int4 timeout)
 		errptr = (char *)STRERROR(errno);
 		errlen = strlen(errptr);
 		memcpy(&tcpptr->dollar_device[len], errptr, errlen);
-		if ((io_ptr->error_handler.len > 0) || (TRUE == io_ptr->dollar.zeof))
+		if (io_ptr->dollar.zeof || -1 == status || 0 < io_ptr->error_handler.len)
 		{
 			io_ptr->dollar.zeof = TRUE;
 			rts_error(VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, errlen, errptr);

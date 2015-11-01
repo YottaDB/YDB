@@ -44,7 +44,7 @@ boolean_t mu_int_blk(block_id blk, char level, boolean_t is_root, unsigned char 
 	int bot_len, unsigned char *top_key, int top_len, boolean_t eb_ok);
 boolean_t mu_int_fhead(void);
 boolean_t mu_int_init(void);
-boolean_t mu_int_reg(gd_region *reg);
+void mu_int_reg(gd_region *reg, boolean_t *return_value);
 int mu_int_getkey(unsigned char *key_buff, int keylen);
 uchar_ptr_t mu_int_read(block_id blk);
 void mu_int_err(int err, boolean_t do_path, boolean_t do_range, unsigned char *bot, int has_bot,

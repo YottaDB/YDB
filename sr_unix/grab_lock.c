@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include <signal.h>	/* for VSIG_ATOMIC_T type */
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -22,9 +25,9 @@
 #include "caller_id.h"
 
 GBLREF volatile boolean_t	crit_in_flux;
-GBLREF boolean_t	forced_exit;
-GBLREF uint4 		process_id;
-GBLREF gd_region	*gv_cur_region;
+GBLREF VSIG_ATOMIC_T		forced_exit;
+GBLREF gd_region		*gv_cur_region;
+GBLREF uint4 			process_id;
 
 DEBUG_ONLY(
 GBLREF	sgmnt_addrs		*cs_addrs;	/* for TP_CHANGE_REG macro */

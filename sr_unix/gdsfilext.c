@@ -350,6 +350,8 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			inctn_opcode = inctn_gdsfilext_mu_reorg;
 		else
 			inctn_opcode = inctn_gdsfilext_gtm;
+		if (0 == cs_addrs->jnl->pini_addr)
+			jnl_put_jrt_pini(cs_addrs);
 		jnl_write_inctn_rec(cs_addrs);
 		inctn_opcode = save_inctn_opcode;
 	}

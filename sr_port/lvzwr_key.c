@@ -10,24 +10,24 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "zwrite.h"
+#include "gtm_string.h"
 
 GBLREF lvzwrite_struct lvzwrite_block;
 
-unsigned char *lvzwr_key(buff, size)
-unsigned char *buff;
-unsigned short size;
+unsigned char *lvzwr_key(unsigned char *buff, int size)
 {
-	int n;
+	int	sub_idx;
+	mstr	sub;
 	unsigned char *cp, *cq;
 
-	cp = (unsigned char *)lvzwrite_block.curr_name;
-	for (cq = cp + sizeof(mident) ; cp < cq && *cp && size; cp++)
+	for (cp = (unsigned char *)lvzwrite_block.curr_name, cq = cp + sizeof(mident); cp < cq && *cp && size; cp++)
 	{
 		*buff++ = *cp;
 		size--;
@@ -35,27 +35,28 @@ unsigned short size;
 	if (lvzwrite_block.subsc_count)
 	{
 		if (size)
-			*buff++ = '('; size--;
-		for (n = 0 ; ; )
 		{
-			MV_FORCE_STR(((zwr_sub_lst *)lvzwrite_block.sub)->subsc_list[n].actual);
-			if (size > ((zwr_sub_lst *)lvzwrite_block.sub)->subsc_list[n].actual->str.len)
+			*buff++ = '(';
+			size--;
+		}
+		for (sub_idx = 0; ; )
+		{
+			mval_lex(((zwr_sub_lst *)lvzwrite_block.sub)->subsc_list[sub_idx].actual, &sub);
+			if (0 <= (size -= sub.len))
 			{
-				memcpy(buff, ((zwr_sub_lst *)lvzwrite_block.sub)->subsc_list[n].actual->str.addr,
-					((zwr_sub_lst *)lvzwrite_block.sub)->subsc_list[n].actual->str.len);
-				buff += ((zwr_sub_lst *)lvzwrite_block.sub)->subsc_list[n].actual->str.len;
-				size -= ((zwr_sub_lst *)lvzwrite_block.sub)->subsc_list[n].actual->str.len;
-			}
-			else
+				memcpy(buff, sub.addr, sub.len);
+				buff += sub.len;
+			} else
 				break;
-
-			if (++n < lvzwrite_block.curr_subsc && size)
-			{	*buff++ = ',';
+			if (++sub_idx < lvzwrite_block.curr_subsc && size)
+			{
+				*buff++ = ',';
 				size--;
-			}else
+			} else
 			{
 				if (size)
-				{	*buff++ = ')';
+				{
+					*buff++ = ')';
 					size--;
 				}
 				break;

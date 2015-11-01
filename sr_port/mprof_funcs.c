@@ -37,6 +37,7 @@
 #include "xfer_enum.h"
 #include "op.h"
 #include "callg.h"
+#include "gtmmsg.h"
 
 GBLREF	int			(*xfer_table[])();
 GBLREF 	boolean_t		is_tracing_on;
@@ -75,7 +76,7 @@ static struct
 	int4	count;
 	mval	*args[MAX_GVSUBSCRIPTS + 1];
 } op_gvargs;
-static mval 			gbl_to_fill;
+static mval			gbl_to_fill;
 
 #define MPROF_NULL_LABEL "^"
 #define MPROF_FOR_LOOP	"FOR_LOOP"
@@ -89,7 +90,7 @@ static mval 			gbl_to_fill;
 				strcmp((char *)tmp_trc_tbl_entry.line_num, (char *)curr_tblnd->e.line_num)))
 
 
-int	turn_tracing_on(mval *glvn)
+void	turn_tracing_on(mval *gvn)
 {
 	struct tms		curr;
 	struct trace_entry	tmp_trc_tbl_entry;
@@ -99,12 +100,17 @@ int	turn_tracing_on(mval *glvn)
 	   struct mprof_tree p = {{"*dummy**", "*dummy**", "*dummy*", 0, 0, 0}, 0 , 0 }; */
 
 	error_def(ERR_NOTGBL);
+	error_def(ERR_TRACINGON);
 	if (is_tracing_on)
-		return 0;
-	if (!glvn->str.len || '^' != *(signed char *)&glvn->str.addr[0])
-		rts_error(VARLSTCNT(4) ERR_NOTGBL, 2, glvn->str.len, glvn->str.addr);
-	/*gbl_to_fill = glvn;*/
-	memcpy(&gbl_to_fill, glvn, sizeof(gbl_to_fill));
+	{
+		gtm_putmsg(VARLSTCNT(1) ERR_TRACINGON);
+		return;
+	}
+	if (!gvn->str.len || '^' != *(signed char *)&gvn->str.addr[0])
+		rts_error(VARLSTCNT(4) ERR_NOTGBL, 2, gvn->str.len, gvn->str.addr);
+	memcpy(&gbl_to_fill, gvn, sizeof(gbl_to_fill));
+	gbl_to_fill.str.addr = (char *)malloc(gvn->str.len); /*len was already setup*/
+	memcpy(gbl_to_fill.str.addr, gvn->str.addr, gvn->str.len);
 	if (!pcavailbase)
 	{	pcavailbase = (char **) malloc(PROFCALLOC_DSBLKSIZE);
 		*pcavailbase = 0;
@@ -130,17 +136,21 @@ int	turn_tracing_on(mval *glvn)
 	for_level = 0;
 }
 
-int turn_tracing_off (mval *glvn)
+void turn_tracing_off (mval *gvn)
 {
 	if (FALSE == is_tracing_on)
-		return 0;
+		return;
+	is_tracing_on = is_tracing_ini = FALSE;
 	PRINT_PROF_TREE;
 	TIMES(&tcurr);
-	if (NULL == glvn)
-		parse_glvn(&gbl_to_fill);
-	else
-		parse_glvn(glvn);
-	is_tracing_on = is_tracing_ini = FALSE;
+	if (NULL == gvn)
+	{
+		parse_gvn(&gbl_to_fill);
+	} else
+		parse_gvn(gvn);
+	assert(0 != gbl_to_fill.str.addr);
+	free(gbl_to_fill.str.addr);
+	gbl_to_fill.str.addr = 0;
 	mprof_tree_walk(head_tblnd);
 	free(prof_stackptr);
 	pcfree();
@@ -350,11 +360,24 @@ void unw_prof_frame (void)
 	if (!prof_fp->dummy_stack_count)
 	{
 		get_entryref_information(TRUE, &tmp_trc_tbl_entry);
+		if (NULL == prof_fp)
+			return;
+		PRINT_PROF_TREE;
 		prof_fp->sys_time = curr.tms_stime - prof_fp->sys_time;
 		prof_fp->usr_time = curr.tms_utime - prof_fp->usr_time;
-		strcpy((char *)e.label_name, prof_fp->label_name);
-		strcpy((char *)e.rout_name, prof_fp->rout_name);
-		strcpy((char *)e.line_num, "*dlin*");
+		if (!memcmp(prof_fp->rout_name,"*above*",7))
+		{
+			/* it should have been filled in get_entryref_information */
+			strcpy((char *)e.label_name,(char *) tmp_trc_tbl_entry.label_name);
+			strcpy((char *)e.rout_name,(char *) tmp_trc_tbl_entry.rout_name);
+		}
+		else
+		{
+			strcpy((char *)e.label_name, prof_fp->label_name);
+			strcpy((char *)e.rout_name, prof_fp->rout_name);
+		}
+		memcpy((char *)e.line_num, "*dlin*",6);
+		e.line_num[6]='\0';
 		e.for_count = 0;
 		t = mprof_tree_insert(head_tblnd, tmp_trc_tbl_entry);
 		t->e.count += 1;
@@ -390,12 +413,6 @@ void unw_prof_frame (void)
 			/* This should only be true only if the View command is not at
 			 * the top-most stack level. In which case add profiling information
 			 * for the quit statement. */
-			if (NULL != curr_tblnd)
-			{
-				curr_tblnd->e.usr_time += (tcurr.tms_utime - tprev.tms_utime);
-				curr_tblnd->e.sys_time += (tcurr.tms_stime - tprev.tms_stime);
-				curr_tblnd->e.count += 1;
-			}
 			tprev = tcurr;
 			curr_tblnd = NULL;
 			prof_fp = (stack_frame_prof *)prof_msp;
@@ -408,6 +425,11 @@ void unw_prof_frame (void)
 			prof_fp->prev = (stack_frame_prof *)NULL;
 			prof_fp->sys_time = curr.tms_stime;
 			prof_fp->usr_time = curr.tms_utime;
+			prof_fp->prev = NULL;
+			/*tag it so that next time, it will pick up label/routine info from current loc*/
+			memcpy(prof_fp->rout_name, "*above*",7);
+			prof_fp->rout_name[7]='\0';
+			prof_fp->label_name[0] = '\0';
 			prof_fp->dummy_stack_count = 0;
 		}
 	}
@@ -593,7 +615,13 @@ void	get_entryref_information(boolean_t line, struct trace_entry *tmp_trc_tbl_en
 		memcpy((*tmp_trc_tbl_entry).rout_name, &routine->routine_name.c[0], len);
 		(*tmp_trc_tbl_entry).rout_name[len] = '\0';
 	}
-	memcpy(prof_fp->rout_name, routine->routine_name.c, len);
+	if ('\0' == *prof_fp->rout_name)
+		memcpy(prof_fp->rout_name, routine->routine_name.c, len);
+	else
+	{
+		if (!memcmp(prof_fp->rout_name,"*above*",7))
+			len = 7;
+	}
 	prof_fp->rout_name[len] = '\0';
 	if (!line)
 		return;
@@ -626,7 +654,7 @@ void	get_entryref_information(boolean_t line, struct trace_entry *tmp_trc_tbl_en
 	(*tmp_trc_tbl_entry).for_count = 0;
 }
 
-void parse_glvn(mval *glvn)
+void parse_gvn(mval *gvn)
 {
 	boolean_t 		dot_seen;
 	mval			*spt;
@@ -647,15 +675,13 @@ void parse_glvn(mval *glvn)
 	error_def(ERR_RPARENREQD);
 	error_def(ERR_TEXT);
 
-	if (FALSE == is_tracing_on)
-		return;
-	c_ref = (signed char *)&glvn->str.addr[0];
-	c_top = (signed char *)c_ref + glvn->str.len;
-	if (!glvn->str.len || '^' != *c_ref++)
-		rts_error(VARLSTCNT(4) ERR_NOTGBL, 2, glvn->str.len, glvn->str.addr);
-	if (mprof_mstr.len < 4 * glvn->str.len)
+	c_ref = (signed char *)&gvn->str.addr[0];
+	c_top = (signed char *)c_ref + gvn->str.len;
+	if (!gvn->str.len || '^' != *c_ref++)
+		rts_error(VARLSTCNT(4) ERR_NOTGBL, 2, gvn->str.len, gvn->str.addr);
+	if (mprof_mstr.len < 4 * gvn->str.len)
 	{	/* We are going to return an array of mvals pointing to global-name and subscripts.
-		 * We should never be needing more than 4 * glvn->str.len since the only expandable entity
+		 * We should never be needing more than 4 * gvn->str.len since the only expandable entity
 		 * 	that can be passed is $j which uses up atleast 3 characters (including '_' or ',')
 		 *	and expands to a maximum of 10 characters (see djbuff in getjobname.c).
 		 */
@@ -664,7 +690,7 @@ void parse_glvn(mval *glvn)
 			assert(mprof_mstr.addr);
 			free(mprof_mstr.addr);
 		}
-		mprof_mstr.len = 4 * glvn->str.len;
+		mprof_mstr.len = 4 * gvn->str.len;
 		mprof_mstr.addr = (char *)malloc(mprof_mstr.len);
 	}
 	mpsp = mprof_mstr.addr;
@@ -675,12 +701,12 @@ void parse_glvn(mval *glvn)
 	spt->str.addr = mpsp;
 	ch = *mpsp++ = *c_ref++;
 	if ((ch < 'A' || ch > 'Z') && (ch != '%') && (ch < 'a' || ch > 'z'))
-		rts_error(VARLSTCNT(4) ERR_GVINVALID, 2, glvn->str.len, glvn->str.addr);
+		rts_error(VARLSTCNT(4) ERR_GVINVALID, 2, gvn->str.len, gvn->str.addr);
 	for ( ; (c_ref < c_top) && ('(' != *c_ref); )
 	{
 		ch = *mpsp++ = *c_ref++;
 		if ((ch < 'A' || ch > 'Z')  &&  (ch < 'a' || ch > 'z')  &&  (ch < '0' || ch > '9'))
-			rts_error(VARLSTCNT(4) ERR_GVINVALID, 2, glvn->str.len, glvn->str.addr);
+			rts_error(VARLSTCNT(4) ERR_GVINVALID, 2, gvn->str.len, gvn->str.addr);
 	}
 	spt->str.len = (long)mpsp - (long)spt->str.addr;
 	op_gvargs.args[count++] = spt++;
@@ -698,7 +724,7 @@ void parse_glvn(mval *glvn)
 				for ( ; ; )
 				{
 					if (c_ref == c_top)
-						rts_error(VARLSTCNT(4) ERR_STRUNXEOR, 2, glvn->str.len, glvn->str.addr);
+						rts_error(VARLSTCNT(4) ERR_STRUNXEOR, 2, gvn->str.len, gvn->str.addr);
 					if (('\"' == *c_ref) && (*++c_ref != '\"'))
 						break;
 					*mpsp++ = *c_ref++;
@@ -706,26 +732,26 @@ void parse_glvn(mval *glvn)
 			} else if ('$' == ch)
 			{
 				if (++c_ref == c_top)
-					rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, glvn->str.len, glvn->str.addr);
+					rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, gvn->str.len, gvn->str.addr);
 				if (*c_ref != 'J' && *c_ref != 'j')
-					rts_error(VARLSTCNT(8) ERR_DLRCUNXEOR, 2, glvn->str.len, glvn->str.addr,
+					rts_error(VARLSTCNT(8) ERR_DLRCUNXEOR, 2, gvn->str.len, gvn->str.addr,
 								ERR_TEXT, 2, RTS_ERROR_TEXT("Intrinsic value passed not $j"));
 				c_ref++; 	/* Past 'J' */
-				assert(10 > dollar_job.str.len);	/* to take care of 4 * glvn->str.len allocation above */
+				assert(10 > dollar_job.str.len);	/* to take care of 4 * gvn->str.len allocation above */
 				memcpy(mpsp, dollar_job.str.addr, dollar_job.str.len);
 				mpsp += dollar_job.str.len;
 			} else
 			{
 				dot_seen = FALSE;
 				if ((ch > '9' || ch < '0')  &&  ch != '.'  &&  ch != '-'  &&  ch != '+')
-					rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, glvn->str.len, glvn->str.addr);
+					rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, gvn->str.len, gvn->str.addr);
 				if ('.' == ch)
 					dot_seen = TRUE;
 				*mpsp++ = *c_ref++;
 				for ( ; ; )
 				{
 					if (c_ref == c_top)
-						rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, glvn->str.len, glvn->str.addr);
+						rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, gvn->str.len, gvn->str.addr);
 					if (*c_ref > '9'  ||  *c_ref < '0')
 					{
 						if (*c_ref != '.')
@@ -733,7 +759,7 @@ void parse_glvn(mval *glvn)
 						else if (!dot_seen)
 							dot_seen = TRUE;
 						else
-							rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, glvn->str.len, glvn->str.addr);
+							rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, gvn->str.len, gvn->str.addr);
 					}
 					*mpsp++ = *c_ref++;
 				}
@@ -751,9 +777,9 @@ void parse_glvn(mval *glvn)
 			c_ref++;
 		}
 		if (*c_ref++ != ')')
-			rts_error(VARLSTCNT(4) ERR_RPARENREQD, 2, glvn->str.len, glvn->str.addr);
+			rts_error(VARLSTCNT(4) ERR_RPARENREQD, 2, gvn->str.len, gvn->str.addr);
 		if (c_ref < c_top)
-			rts_error(VARLSTCNT(4) ERR_EORNOTFND, 2, glvn->str.len, glvn->str.addr);
+			rts_error(VARLSTCNT(4) ERR_EORNOTFND, 2, gvn->str.len, gvn->str.addr);
 	}
 	assert((char *)mpsp <= mprof_mstr.addr + mprof_mstr.len);	/* Ensure we haven't overrun the malloced buffer */
 	curr_num_subscripts = op_gvargs.count = count;

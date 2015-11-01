@@ -54,6 +54,8 @@ enum
 	SV_STACK,		/* 41 */
 	SV_ZERROR,		/* 42 */
 	SV_ZYERROR,		/* 43 */
-	SV_NUM_SV,		/* 44 */
+	SV_SYSTEM,		/* 44 */
+	SV_REFERENCE,		/* 45 */
+	SV_NUM_SV,		/* 46 */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

@@ -36,13 +36,13 @@ va_dcl
 
 	VAR_START(var);
 	n = va_arg(var, int4);
-	sav_var = var;
+	VAR_COPY(sav_var, var);
 	for (count = 0 ; count < n ; count++)
 	{
 		vp = va_arg(var, mval *);
 		MV_FORCE_STR(vp);
 	}
-	var = sav_var;
+	VAR_COPY(var, sav_var);
 	/* format will be:
 		if n=1  KEYWORD
 		if n>1  KEYWORD(PAR1,PAR2,...PARx)

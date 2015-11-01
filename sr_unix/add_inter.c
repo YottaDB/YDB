@@ -27,31 +27,37 @@
 GBLREF	int4		process_id;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	volatile int4	fast_lock_count;		/* Used in wcs_stale */
+GBLREF	int		num_additional_processors;
 
 int4	add_inter(int val, sm_int_ptr_t addr, sm_global_latch_ptr_t latch)
 {
-	int4	ret, i;
-
+	int4	ret, tries, spins, maxspin;
 	error_def(ERR_DBCCERR);
 	error_def(ERR_ERRCALL);
 
 	++fast_lock_count;
-	for (i = 0;  i < 1000;  i++)
+	maxspin = num_additional_processors ? LOCK_SPINS : 1;
+	for (tries = 0;  LOCK_TRIES > tries; tries++)
 	{
-		if (GET_SWAPLOCK(latch))
+		for (spins = maxspin; 0 < spins; spins--)
 		{
-			*addr += val;
-			ret = *addr;
-			RELEASE_SWAPLOCK(latch);
-			--fast_lock_count;
-			assert(0 <= fast_lock_count);
-			return ret;
+			if (GET_SWAPLOCK(latch))
+			{
+				*addr += val;
+				ret = *addr;
+				RELEASE_SWAPLOCK(latch);
+				--fast_lock_count;
+				assert(0 <= fast_lock_count);
+				return ret;
+			}
 		}
-		if (0 != i)
-			wcs_backoff(i);
-		performCASLatchCheck(latch);
+		if (0 != tries)
+			wcs_backoff(tries);
+		performCASLatchCheck(latch, tries);
 	}
 	--fast_lock_count;
 	DUMP_LOCKHIST();
 	rts_error(VARLSTCNT(9) ERR_DBCCERR, 2, LEN_AND_LIT("*unknown*"), ERR_ERRCALL, 3, CALLFROM);
 }
+
+

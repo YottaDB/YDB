@@ -21,19 +21,18 @@ GBLREF char window_token;
 int m_hang(void)
 {
 	triple *triptr;
-	oprtype x;
+	oprtype ot;
 
-	switch (intexpr(&x))
+	switch (numexpr(&ot))
 	{
 	case EXPR_FAIL:
 		return FALSE;
 	case EXPR_GOOD:
 		triptr = newtriple(OC_HANG);
-		triptr->operand[0] = x;
+		triptr->operand[0] = ot;
 		return TRUE;
 	case EXPR_INDR:
-		make_commarg(&x,indir_hang);
+		make_commarg(&ot, indir_hang);
 		return TRUE;
 	}
-
 }

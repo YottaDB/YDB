@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "op.h"
 

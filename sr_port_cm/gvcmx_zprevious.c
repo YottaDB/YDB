@@ -10,14 +10,18 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "hashdef.h"
 #include "cmidef.h"
 #include "cmmdef.h"
+#include "gvcmx.h"
+#include "gvcmz.h"
+#include "mvalconv.h"
 
-bool gvcmx_zprevious()
+bool gvcmx_zprevious(void)
 {
 	mval v;
 
-	gvcmz_doop(CMMS_Q_PREV,CMMS_R_PREV,&v);
+	gvcmz_doop(CMMS_Q_PREV, CMMS_R_PREV, &v);
 	if (MV_FORCE_INT(&v))
 		return TRUE;
 	else

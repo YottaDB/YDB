@@ -17,8 +17,13 @@
 #define ZGBLDIR 	"$gtmgbldir"
 #define ZYERROR		"$gtm_zyerror"
 #define ZTRAP_FORM	"$gtm_ztrap_form"
+#define ZTRAP_NEW	"$gtm_ztrap_new"
 #define ZREPLINSTANCE	"$gtm_repl_instance"
+#define ZGTMENVXLATE	"$gtm_env_translate"
 
 #define GTM_TMP_ENV		"$gtm_tmp"
 #define GTM_LOG_ENV		"$gtm_log"
 #define DEFAULT_GTM_TMP		P_tmpdir
+
+#define	GTM_TPRESTART_LOG_LIMIT		"$gtm_tprestart_log_first"
+#define	GTM_TPRESTART_LOG_DELTA		"$gtm_tprestart_log_delta"

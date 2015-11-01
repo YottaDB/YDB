@@ -20,6 +20,7 @@
 #define ZTRAP_FORM_CODE		"code"
 #define ZTRAP_FORM_ENTRYREF	"entryref"
 #define ZTRAP_FORM_ADAPTIVE	"adaptive"
+#define ZTRAP_FORM_POP		"pop"
 
 GBLREF	int	ztrap_form;
 
@@ -27,18 +28,26 @@ void ztrap_form_init(void)
 {
 	uint4		status;
 	mstr		val, tn;
-	char		buf[1024];
+	char		buf[1024], *buf_ptr = &buf[0];
 
 	error_def(ERR_TRNLOGFAIL);
 
-	ztrap_form = ZTRAP_CODE; /* default */
+	ztrap_form = ZTRAP_CODE;	/* default */
 	val.addr = ZTRAP_FORM;
-	val.len = sizeof(ZTRAP_FORM) - 1;
+	val.len = STR_LIT_LEN(ZTRAP_FORM);
 	if (SS_NORMAL == (status = trans_log_name(&val, &tn, buf)))
 	{
-		if (0 == STRNCASECMP(buf, ZTRAP_FORM_ENTRYREF, MIN(sizeof(ZTRAP_FORM_ENTRYREF) - 1, tn.len)))
-			ztrap_form = ZTRAP_ENTRYREF;
-		else if (0 == STRNCASECMP(buf, ZTRAP_FORM_ADAPTIVE, MIN(sizeof(ZTRAP_FORM_ADAPTIVE) - 1, tn.len)))
+		if (STR_LIT_LEN(ZTRAP_FORM_POP) < tn.len && !STRNCASECMP(buf_ptr, ZTRAP_FORM_POP, STR_LIT_LEN(ZTRAP_FORM_POP)))
+		{
+			buf_ptr += STR_LIT_LEN(ZTRAP_FORM_POP);
+			tn.len -= STR_LIT_LEN(ZTRAP_FORM_POP);
+			ztrap_form |= ZTRAP_POP;
+		}
+		if (!STRNCASECMP(buf_ptr, ZTRAP_FORM_ENTRYREF, MIN(STR_LIT_LEN(ZTRAP_FORM_ENTRYREF), tn.len)))
+		{
+			ztrap_form |= ZTRAP_ENTRYREF;
+			ztrap_form &= ~ZTRAP_CODE;
+		} else if (!STRNCASECMP(buf_ptr, ZTRAP_FORM_ADAPTIVE, MIN(STR_LIT_LEN(ZTRAP_FORM_ADAPTIVE), tn.len)))
 			ztrap_form |= ZTRAP_ENTRYREF;
 	} else if (SS_NOLOGNAM != status)
 		rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(ZTRAP_FORM), status);

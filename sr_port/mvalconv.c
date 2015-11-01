@@ -12,6 +12,9 @@
 #include "mdef.h"
 #include "arit.h"
 #include "mvalconv.h"
+#include "gtm_stdio.h"	/* this is here due to the need for an sprintf,
+			 * which is in turn due the kudge that is the current double2mval routine
+			 */
 
 LITREF int4 ten_pwr[];
 
@@ -195,6 +198,20 @@ double mval2double(mval *v)
 	}
 	return x;
 }
+
+/* a (barely suitable) double2mval */
+void     double2mval(double src, mval *dst)
+{
+        char    buf[67];    /* [possible] sign, decimal-point, [up to] 64 digits, and terminator */
+	SPRINTF(buf, "%lf", src);
+	dst->mvtype = MV_STR;
+	dst->str.len = strlen(buf);
+	dst->str.addr = buf;
+	s2n(dst);
+	dst->mvtype &= ~MV_STR;
+	return;
+}
+
 
 /* converts an mval in a int4eger, on overflow to MANT_HI */
 int4 mval2i(mval *v)

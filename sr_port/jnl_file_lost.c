@@ -37,7 +37,7 @@ error_def(ERR_REPLJNLCLOSED);
 static	const	unsigned short	zero_fid[3];
 
 void jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
-{	/* Notify operator and terminate journalling */
+{	/* Notify operator and terminate journaling */
 	unsigned int	status;
 	sgmnt_addrs	*csa;
 

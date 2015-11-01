@@ -160,7 +160,7 @@ typedef struct v3_sgmnt_data_struct
 	unsigned short	jnl_deq;
 	short		jnl_buffer_size;	/* in pages */
 	bool		jnl_before_image;
-	unsigned char	jnl_state;		/* Current journalling state */
+	unsigned char	jnl_state;		/* Current journaling state */
 	bool		glob_sec_init;
 	unsigned char	jnl_file_len;		/* journal file name length */
 	unsigned char	jnl_file_name[JNL_NAME_SIZE];	/* journal file name */

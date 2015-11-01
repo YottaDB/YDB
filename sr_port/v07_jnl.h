@@ -37,7 +37,7 @@
 #define JNL_REC_START_BNDRY	8
 
 #define JNL_ENABLED(X)		((X)->jnl_state == jnl_open)		/* If TRUE, journal records are to be written */
-#define JNL_ALLOWED(X)		((X)->jnl_state != jnl_notallowed)	/* If TRUE, journalling is allowed for the file */
+#define JNL_ALLOWED(X)		((X)->jnl_state != jnl_notallowed)	/* If TRUE, journaling is allowed for the file */
 #define REPL_ENABLED(X)		((X)->repl_state == repl_open)		/* If TRUE, replication records are to be written */
 
 #define MUEXTRACT_TYPE(A) 	(((A)[0]-'0')*10 + ((A)[1]-'0')) /* A is a character pointer */
@@ -151,7 +151,7 @@ typedef struct jnl_private_control_struct
 	bool			free_update_inprog;	/* M VMS only */
 	unsigned char		regnum;			/* M index for 'tokens' */
 	unsigned char		filler_char[2];
-	uint4			pini_addr,		/* virtual on-disk address for JRT_PINI record, if journalling */
+	uint4			pini_addr,		/* virtual on-disk address for JRT_PINI record, if journaling */
 				lastwrite,		/* M used by jnl_wait */
 				new_freeaddr;
 	int4			temp_free;		/* M Temp copy of free relative index until full write done */

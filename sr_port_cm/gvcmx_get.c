@@ -10,16 +10,18 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "hashdef.h"
 #include "cmidef.h"
 #include "cmmdef.h"
+#include "gvcmx.h"
+#include "gvcmz.h"
 
-bool gvcmx_get(v)
-mval *v;
+bool gvcmx_get(mval *v)
 {
 	mval temp;
 
 	temp.mvtype = 0;
-	gvcmz_doop (CMMS_Q_GET,CMMS_R_GET, &temp);
+	gvcmz_doop(CMMS_Q_GET, CMMS_R_GET, &temp);
 	if (MV_DEFINED(&temp))
 		*v = temp;
 

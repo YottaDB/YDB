@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -113,6 +114,8 @@ va_dcl
 			is_null = ((STR_SUB_PREFIX == *(unsigned char *)val->str.addr) && (KEY_DELIMITER == *(val->str.addr + 1)));
 			if (gv_target->collseq || gv_target->nct)
 			{
+				assert(dba_cm != gv_cur_region->dyn.addr->acc_meth); /* collation transformation should be done at 
+											the server's end for CM regions */ 
 				PUSH_MV_STENT(MVST_MVAL);
 				temp = &mv_chain->mv_st_cont.mvs_mval;
 				transform = FALSE;

@@ -49,6 +49,17 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF uint4		process_id;
 GBLREF int4             image_count;
 
+#define	CLNUP_CRIT					\
+{							\
+	if (!was_crit)					\
+	{						\
+		if (nocrit_present)			\
+			cs_addrs->now_crit = FALSE;	\
+		else					\
+			rel_crit(gv_cur_region);	\
+	}						\
+}
+
 void dse_chng_fhead(void)
 {
 	int4		x, prev_tn, index_x, save_x;
@@ -64,6 +75,7 @@ void dse_chng_fhead(void)
 	error_def(ERR_FREEZE);
 	error_def(ERR_BLKSIZ512);
 	error_def(ERR_DBRDONLY);
+	error_def(ERR_SIZENOTVALID);
 
 	if (gv_cur_region->read_only)
 		rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
@@ -91,13 +103,7 @@ void dse_chng_fhead(void)
 		&& !override)
 #endif
 	{
-		if (!was_crit)
-		{
-			if (nocrit_present)
-				cs_addrs->now_crit = FALSE;
-			else
-				rel_crit(gv_cur_region);
-		}
+		CLNUP_CRIT;
                 util_out_print("Region: !AD  is frozen by another user, not releasing freeze.",
                                         TRUE, REG_LEN_STR(gv_cur_region));
                 rts_error(VARLSTCNT(4) ERR_FREEZE, 2, REG_LEN_STR(gv_cur_region));
@@ -109,79 +115,112 @@ void dse_chng_fhead(void)
 	if (CLI_PRESENT == cli_present("LOCATION"))
 	{
 		location_present = TRUE;
-		cli_get_hex("LOCATION", &location);
+		if (!cli_get_hex("LOCATION", &location))
+		{
+			CLNUP_CRIT;
+			return;
+		}
 	}
 	if (CLI_PRESENT == cli_present("HEXLOCATION"))
 	{
 		location_present = TRUE;
-		cli_get_hex("HEXLOCATION", &location);
+		if (!cli_get_hex("HEXLOCATION", &location))
+		{
+			CLNUP_CRIT;
+			return;
+		}
 	}
 	if (CLI_PRESENT == cli_present("DECLOCATION"))
 	{
 		location_present = TRUE;
-		cli_get_num("DECLOCATION", &location);
+		if (!cli_get_num("DECLOCATION", &location))
+		{
+			CLNUP_CRIT;
+			return;
+		}
 	}
 	size_present = FALSE;
 	if (CLI_PRESENT == cli_present("SIZE"))
 	{
 		size_present = TRUE;
-		cli_get_num("SIZE", &size);
+		if (!cli_get_num("SIZE", &size))
+		{
+			CLNUP_CRIT;
+			return;
+		}
 	}
 	value_present = FALSE;
 	if (CLI_PRESENT == cli_present("VALUE"))
 	{
 		value_present = TRUE;
-		cli_get_hex("VALUE", &value);
+		if (!cli_get_hex("VALUE", &value))
+		{
+			CLNUP_CRIT;
+			return;
+		}
 	}
 	if (CLI_PRESENT == cli_present("HEXVALUE"))
 	{
 		value_present = TRUE;
-		cli_get_hex("HEXVALUE", &value);
+		if (!cli_get_hex("HEXVALUE", &value))
+		{
+			CLNUP_CRIT;
+			return;
+		}
 	}
 	if (CLI_PRESENT == cli_present("DECVALUE"))
 	{
 		value_present = TRUE;
-		cli_get_num("DECVALUE", &value);
+		if (!cli_get_num("DECVALUE", &value))
+		{
+			CLNUP_CRIT;
+			return;
+		}
 	}
 	if (TRUE == location_present)
 	{
 		if (FALSE == size_present)
 			size = sizeof(int4);
-		if (sizeof(sgmnt_data) < location + size)
+		if (!((sizeof(char) == size) || (sizeof(short) == size) || (sizeof(int4) == size)))
+		{
+			CLNUP_CRIT;
+                        rts_error(VARLSTCNT(1) ERR_SIZENOTVALID);
+		}
+		if (SGMNT_HDR_LEN < location + size)
 			util_out_print("Error: Cannot modify any location outside the file-header", TRUE);
 		else  if (0 != location % size)
 			util_out_print("Error: Location !1UL [0x!1XL] should be a multiple of Size !1UL [0x!1XL] ",
 							TRUE, location, location, size, size);
 		else
 		{
-			if (1 == size)
+			if (sizeof(char) == size)
 			{
 				SPRINTF(temp_str, "!UB [0x!XB]");
-				old_value = *(char *)((char *)cs_addrs->hdr + location);
+				old_value = *(unsigned char *)((char *)cs_addrs->hdr + location);
 			}
-			else  if (2 == size)
+			else if (sizeof(short) == size)
 			{
 				SPRINTF(temp_str, "!UW [0x!XW]");
-				old_value = *(short *)((char *)cs_addrs->hdr + location);
+				old_value = *(unsigned short *)((char *)cs_addrs->hdr + location);
 			}
-			else if (4 == size)
+			else if (sizeof(int4) == size)
 			{
 				SPRINTF(temp_str, "!UL [0x!XL]");
-				old_value = *(int4 *)((char *)cs_addrs->hdr + location);
+				old_value = *(uint4 *)((char *)cs_addrs->hdr + location);
 			}
-			if (TRUE == value_present)
+			if (value_present)
 			{
-				if (1 == size)
-					*(char *)((char *)cs_addrs->hdr + location) = value;
-				else if (2 == size)
-					*(short *)((char *)cs_addrs->hdr + location) = value;
-				else if (4 == size)
-					*(int4 *)((char *)cs_addrs->hdr + location) = value;
+				if (sizeof(char) == size)
+					*(unsigned char *)((char *)cs_addrs->hdr + location) = value;
+				else if (sizeof(short) == size)
+					*(unsigned short *)((char *)cs_addrs->hdr + location) = value;
+				else if (sizeof(int4) == size)
+					*(uint4 *)((char *)cs_addrs->hdr + location) = value;
 			}
 			else
 				value = old_value;
-			SPRINTF(temp_str1,"Location %s :: Old Value = %s :: New Value = %s :: Size = !UB [0x!XB]",
-											temp_str, temp_str, temp_str);
+			SPRINTF(temp_str1, "Location !UL [0x!XL] :: Old Value = %s :: New Value = %s :: Size = !UB [0x!XB]",
+											temp_str, temp_str);
 			util_out_print(temp_str1, TRUE, location, location, old_value, old_value, value, value, size, size);
 		}
 	}
@@ -196,6 +235,7 @@ void dse_chng_fhead(void)
 		else
 		{
 			cs_addrs->hdr->blk_size = ((x/DISK_BLOCK_SIZE) + 1) * DISK_BLOCK_SIZE;
+			CLNUP_CRIT;
 			rts_error(VARLSTCNT(4) ERR_BLKSIZ512, 2, x, cs_addrs->hdr->blk_size);
 		}
 	}
@@ -230,14 +270,14 @@ void dse_chng_fhead(void)
 	{
 		buf_len = sizeof(buf);
 		cli_get_str("REG_SEQNO", buf, &buf_len);
-		seq_no = asc2l((uchar_ptr_t)buf, strlen(buf));
+		seq_no = asc2l((uchar_ptr_t)buf, buf_len);
 		QWASSIGN(cs_addrs->hdr->reg_seqno, seq_no);
 	}
 	if (CLI_PRESENT == cli_present("RESYNC_SEQNO"))
 	{
 		buf_len = sizeof(buf);
 		cli_get_str("RESYNC_SEQNO", buf, &buf_len);
-		seq_no = asc2l((uchar_ptr_t)buf, strlen(buf));
+		seq_no = asc2l((uchar_ptr_t)buf, buf_len);
 		QWASSIGN(cs_addrs->hdr->resync_seqno, seq_no);
 	}
 	if (CLI_PRESENT == cli_present("RESYNC_TN"))
@@ -423,12 +463,6 @@ void dse_chng_fhead(void)
 			cs_addrs->hdr->jnl_sync_io = FALSE;
 	}
 #endif
-	if (!was_crit)
-	{
-		if (nocrit_present)
-			cs_addrs->now_crit = FALSE;
-		else
-			rel_crit(gv_cur_region);
-	}
+	CLNUP_CRIT;
 	return;
 }

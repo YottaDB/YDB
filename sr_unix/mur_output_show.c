@@ -73,18 +73,18 @@ jnl_process_vector	*pv;
 	term_len = real_len(JPV_LEN_TERMINAL,	pv->jpv_terminal);
 }
 
-
 /* Headings and FAO specs, etc. */
 
-static	const	char	proc_header_1[] = "Host            User            PID    Terminal",
-			proc_header_2[] = "Host            User            PID    Terminal        Initialization  Termination",
-			proc_header_3[] = "Host            User            PID    Terminal        Initialization",
-			dashes_fao[] = "!#*-",
-			proc_fao_1[] = "!15AD !15AD !5ZL  !15AD",
-			proc_fao_2[] = "!15AD !15AD !5ZL  !15AD !11AD     !11AD",
-			proc_fao_3[] = "!15AD !15AD !5ZL  !15AD !11AD",
-			statistics_header[] = "Record type    Count",
-			statistics_fao[] = "   !5AZ    !7UL";
+static	const	char
+	proc_header_1[] = "Host            User            PID         Terminal",
+	proc_header_2[] = "Host            User            PID         Terminal        Initialization  Termination",
+	proc_header_3[] = "Host            User            PID         Terminal        Initialization",
+	dashes_fao[] = "!#*-",
+	proc_fao_1[] = "!15AD !15AD !10ZL  !15AD",
+	proc_fao_2[] = "!15AD !15AD !10ZL  !15AD !11AD     !11AD",
+	proc_fao_3[] = "!15AD !15AD !10ZL  !15AD !11AD",
+	statistics_header[] = "Record type    Count",
+	statistics_fao[] = "   !5AZ    !7UL";
 
 
 /* A table based on the journal record types */
@@ -98,10 +98,9 @@ static	char	* const label[] =
 
 
 
-void	mur_output_show(ctl)
-ctl_list	*ctl;
+void	mur_output_show(ctl_list *ctl)
 {
-	jnl_file_header *header;
+	jnl_file_header	*header;
 	show_list_type	*slp;
 	int		i, logout_time_len;
 	char		logout[LENGTH_OF_TIME + 1], create[LENGTH_OF_TIME + 1];
@@ -109,26 +108,37 @@ ctl_list	*ctl;
 	unsigned char	*ptr, qwstring[100];
 	unsigned char	*ptr1, qwstring1[100];
 
-
 	if (mur_options.show & SHOW_HEADER)
 	{
 		header = mur_get_file_header(ctl->rab);
 
-		util_out_print("!^Journal file name:!_!AD", TRUE, ctl->jnl_fn_len, ctl->jnl_fn);
+		util_out_print("!/Journal file name:!_!AD", TRUE, ctl->jnl_fn_len, ctl->jnl_fn);
 		util_out_print("Journal file label:!_!AD", TRUE, sizeof(JNL_LABEL_TEXT) - 1, header->label);
-		util_out_print("!^Database file name:!_!AD", TRUE, header->data_file_name_length, header->data_file_name);
+		util_out_print("!/Database file name:!_!AD", TRUE, header->data_file_name_length, header->data_file_name);
 		util_out_print("Prev jnl file name:!_!AD", TRUE, header->prev_jnl_file_name_length, header->prev_jnl_file_name);
-		util_out_print("!^Replication State:!_!AD", TRUE, 6, (header->repl_state == repl_closed ? "CLOSED" : "OPEN  "));
-		util_out_print("Align size:!_!_!SL", TRUE, header->alignsize);
+		if (header->forw_phase_jnl_file_len)
+			util_out_print("Forw phase jnl file:!_!AD", TRUE, header->forw_phase_jnl_file_len,
+						header->forw_phase_jnl_file_name);
+		if (header->before_images)
+			util_out_print("!/Before-image journal:!_ENABLED", TRUE);
+		else
+			util_out_print("!/Before-image journal:!_DISABLED", TRUE);
+
+		util_out_print("Replication State:!_!AD", TRUE, 6, (header->repl_state == repl_closed ? "CLOSED" : "OPEN  "));
+		util_out_print("!/Align size:!_!_!SL", TRUE, header->alignsize);
+		if (header->forw_phase_stop_addr)
+			util_out_print("Forw phase stopaddr:!_!SL", TRUE, header->forw_phase_stop_addr);
+		if (header->forw_phase_eof_addr)
+			util_out_print("Forw phase eof-addr:!_!SL", TRUE, header->forw_phase_eof_addr);
+		if (header->forw_phase_last_record)
+			util_out_print("Forw phase lastrecaddr:!_!SL", TRUE, header->forw_phase_last_record);
+		if (header->ftruncate_len)
+			util_out_print("Jnlfile ftrunc_len:!_!SL", TRUE, header->ftruncate_len);
 		util_out_print("Epoch Interval:!_!_!SL", TRUE, header->epoch_interval);
+		util_out_print("Jnlfile SwitchLimit:!_!UL disk-blocks", TRUE, header->autoswitchlimit);
 		ptr = i2ascl(qwstring, header->start_seqno);
 		ptr1 = i2asclx(qwstring1, header->start_seqno);
 		util_out_print("Start RegSeqNo:!_!_!AD [0x!AD]", TRUE, ptr-qwstring, qwstring, ptr1 - qwstring1, qwstring1);
-
-		if (header->before_images)
-			util_out_print("Before-image journal:!_ENABLED", TRUE);
-		else
-			util_out_print("Before-image journal:!_DISABLED", TRUE);
 
 		prep_jpv(&header->who_created);
 
@@ -148,18 +158,15 @@ ctl_list	*ctl;
 				format_time(&header->who_opened.jpv_time, create), create);
 		util_out_print(proc_header_1, TRUE);
 		util_out_print(dashes_fao, TRUE, sizeof proc_header_1 - 1);
-		util_out_print(proc_fao_1, TRUE,
-				node_len, header->who_opened.jpv_node,
-				user_len, header->who_opened.jpv_user,
-				header->who_opened.jpv_pid,
-				term_len, header->who_opened.jpv_terminal);
+		util_out_print(proc_fao_1, TRUE, node_len, header->who_opened.jpv_node, user_len, header->who_opened.jpv_user,
+				header->who_opened.jpv_pid, term_len, header->who_opened.jpv_terminal);
 	}
-
 	if (mur_options.show & SHOW_ALL_PROCESSES)
 	{
 		heading_printed = FALSE;
 
 		for (slp = ctl->show_list;  slp != NULL;  slp = slp->next)
+		{
 			if (SOME_TIME(slp->jpv.jpv_time))
 			{
 				if (!heading_printed)
@@ -173,27 +180,20 @@ ctl_list	*ctl;
 					util_out_print(dashes_fao, TRUE, sizeof proc_header_2 - 1);
 					heading_printed = TRUE;
 				}
-
 				if (slp->jpv.jpv_login_time == 0)
 					slp->jpv.jpv_login_time = slp->jpv.jpv_time;
-
 				prep_jpv(&slp->jpv);
-
-				util_out_print(proc_fao_2, TRUE,
-						node_len, slp->jpv.jpv_node,
-						user_len, slp->jpv.jpv_user,
-						slp->jpv.jpv_pid,
-						term_len, slp->jpv.jpv_terminal,
-						login_time_len, login,
+				util_out_print(proc_fao_2, TRUE, node_len, slp->jpv.jpv_node, user_len, slp->jpv.jpv_user,
+						slp->jpv.jpv_pid, term_len, slp->jpv.jpv_terminal, login_time_len, login,
 						format_time(&slp->jpv.jpv_time, logout), logout);
 			}
+		}
 	}
-
 	if (mur_options.show & SHOW_ACTIVE_PROCESSES)
 	{
 		heading_printed = FALSE;
-
 		for (slp = ctl->show_list;  slp != NULL;  slp = slp->next)
+		{
 			if (!SOME_TIME(slp->jpv.jpv_time))
 			{
 				if (!heading_printed)
@@ -207,23 +207,17 @@ ctl_list	*ctl;
 					util_out_print(dashes_fao, TRUE, sizeof proc_header_3 - 1);
 					heading_printed = TRUE;
 				}
-
 				prep_jpv(&slp->jpv);
-
-				util_out_print(proc_fao_3, TRUE,
-						node_len, slp->jpv.jpv_node,
-						user_len, slp->jpv.jpv_user,
-						slp->jpv.jpv_pid,
-						term_len, slp->jpv.jpv_terminal,
-						login_time_len, login);
+				util_out_print(proc_fao_3, TRUE, node_len, slp->jpv.jpv_node, user_len, slp->jpv.jpv_user,
+						slp->jpv.jpv_pid, term_len, slp->jpv.jpv_terminal, login_time_len, login);
 			}
+		}
 	}
-
 	if (mur_options.show & SHOW_BROKEN)
 	{
 		heading_printed = FALSE;
-
 		for (slp = ctl->show_list;  slp != NULL;  slp = slp->next)
+		{
 			if (slp->broken)
 			{
 				if (!heading_printed)
@@ -237,20 +231,15 @@ ctl_list	*ctl;
 					util_out_print(dashes_fao, TRUE, sizeof proc_header_3 - 1);
 					heading_printed = TRUE;
 				}
-
 				prep_jpv(&slp->jpv);
-
-				util_out_print(proc_fao_3, TRUE,
-						node_len, slp->jpv.jpv_node,
-						user_len, slp->jpv.jpv_user,
-						slp->jpv.jpv_pid,
-						term_len, slp->jpv.jpv_terminal,
-						login_time_len, login);
+				util_out_print(proc_fao_3, TRUE, node_len, slp->jpv.jpv_node, user_len, slp->jpv.jpv_user,
+						slp->jpv.jpv_pid, term_len, slp->jpv.jpv_terminal, login_time_len, login);
 			}
+		}
 
 		heading_printed = FALSE;
-
 		for (slp = ctl->show_list;  slp != NULL;  slp = slp->next)
+		{
 			if (slp->broken  &&  slp->recovered)
 			{
 				if (!heading_printed)
@@ -263,17 +252,14 @@ ctl_list	*ctl;
 
 				prep_jpv(&slp->jpv);
 
-				util_out_print(proc_fao_3, TRUE,
-						node_len, slp->jpv.jpv_node,
-						user_len, slp->jpv.jpv_user,
-						slp->jpv.jpv_pid,
-						term_len, slp->jpv.jpv_terminal,
-						login_time_len, login);
+				util_out_print(proc_fao_3, TRUE, node_len, slp->jpv.jpv_node, user_len, slp->jpv.jpv_user,
+						slp->jpv.jpv_pid, term_len, slp->jpv.jpv_terminal, login_time_len, login);
 			}
+		}
 
 		heading_printed = FALSE;
-
 		for (slp = ctl->show_list;  slp != NULL;  slp = slp->next)
+		{
 			if (mur_multi_missing(slp->jpv.jpv_pid))
 			{
 				if (!heading_printed)
@@ -291,16 +277,12 @@ ctl_list	*ctl;
 
 				prep_jpv(&slp->jpv);
 
-				util_out_print(proc_fao_2, TRUE,
-						node_len, slp->jpv.jpv_node,
-						user_len, slp->jpv.jpv_user,
-						slp->jpv.jpv_pid,
-						term_len, slp->jpv.jpv_terminal,
-						login_time_len, login,
+				util_out_print(proc_fao_2, TRUE, node_len, slp->jpv.jpv_node, user_len, slp->jpv.jpv_user,
+						slp->jpv.jpv_pid, term_len, slp->jpv.jpv_terminal, login_time_len, login,
 						logout_time_len, logout);
 			}
+		}
 	}
-
 	if (mur_options.show & SHOW_STATISTICS)
 	{
 		util_out_print("!/Summary of records processed in journal file !AD:", TRUE, ctl->jnl_fn_len, ctl->jnl_fn);

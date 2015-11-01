@@ -44,10 +44,16 @@
 #include "gtm_sem.h"
 #include "gtm_unistd.h"
 #include "gtmmsg.h"
+#include "gtm_ipc.h"
+#include "eintr_wrappers.h"
+#include "ftok_sems.h"
+#include "mu_rndwn_all.h"
+#include "util.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	gd_region		*gv_cur_region;
+GBLREF	gd_region		*ftok_sem_reg;
 
 #define TMP_BUF_LEN     50
 
@@ -61,10 +67,9 @@ GBLREF	gd_region		*gv_cur_region;
  */
 boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id)
 {
-	boolean_t		flag1, flag2;
+	boolean_t		jnlpool_stat = TRUE, recvpool_stat = TRUE;
 	char			*instname, shmid_buff[TMP_BUF_LEN];
 	gd_region		*r_save;
-	int			status = 0;
 	repl_inst_fmt		repl_instance;
 	static	gd_region	*reg = NULL;
 	struct semid_ds		semstat;
@@ -92,67 +97,62 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id)
 	memcpy((char *)reg->dyn.addr->fname, instname, reg->dyn.addr->fname_len + 1);
 	udi = FILE_INFO(reg);
 	udi->fn = (char *)reg->dyn.addr->fname;
+	/* Lock replication instance using ftok semaphore */
+	if (!ftok_sem_get(reg, TRUE, REPLPOOL_ID, TRUE))
+		return FALSE;
+	repl_inst_get((char *)instname, &repl_instance);
+	semarg.buf = &semstat;
 	/*
 	 * --------------------------
 	 * First rundown Journal pool
 	 * --------------------------
 	 */
-	/* Lock jnlpool using ftok semaphore */
-	get_lock_jnlpool_ftok_sems(TRUE, TRUE);
-	/* read jnlpool semaphore and shared memory id from instance file */
-	repl_inst_get((char *)instname, &repl_instance);
-	semarg.buf = &semstat;
-	if (0 != repl_instance.jnlpool_semid)
+	if (INVALID_SEMID != repl_instance.jnlpool_semid)
 		if ((-1 == semctl(repl_instance.jnlpool_semid, 0, IPC_STAT, semarg)) ||
 	 		(semarg.buf->sem_ctime != repl_instance.jnlpool_semid_ctime))
-			repl_instance.jnlpool_semid = 0;
-	if (0 != repl_instance.jnlpool_shmid)
+			repl_instance.jnlpool_semid = INVALID_SEMID;
+	if (INVALID_SHMID != repl_instance.jnlpool_shmid)
 		if ((-1 == shmctl(repl_instance.jnlpool_shmid, IPC_STAT, &shmstat)) ||
 	 		(shmstat.shm_ctime != repl_instance.jnlpool_shmid_ctime))
-			repl_instance.jnlpool_shmid = 0;
-	/* Rundown Journal pool */
-	flag1 = mu_rndwn_replpool(replpool_id, repl_instance.jnlpool_semid, repl_instance.jnlpool_shmid);
-	if (repl_instance.jnlpool_shmid)
+			repl_instance.jnlpool_shmid = INVALID_SHMID;
+	if (INVALID_SHMID != repl_instance.jnlpool_shmid)
 	{
+		jnlpool_stat = mu_rndwn_replpool(replpool_id, repl_instance.jnlpool_semid, repl_instance.jnlpool_shmid);
 		ret_ptr = i2asc((uchar_ptr_t)shmid_buff, repl_instance.jnlpool_shmid);
 		*ret_ptr = '\0';
-		gtm_putmsg(VARLSTCNT(6) (flag1 ? ERR_MUJPOOLRNDWNSUC : ERR_MUJPOOLRNDWNFL),
+		gtm_putmsg(VARLSTCNT(6) (jnlpool_stat ? ERR_MUJPOOLRNDWNSUC : ERR_MUJPOOLRNDWNFL),
 			4, LEN_AND_STR(shmid_buff), LEN_AND_STR(replpool_id->instname));
 	}
-	/* Reset instance file for journal pool semid and shmid */
-	repl_inst_jnlpool_reset();
-	/* Release jnlpool ftok semaphore lock */
-	rel_jnlpool_ftok_sems(TRUE, TRUE);
-
+	if (jnlpool_stat)
+		/* Reset instance file for jnlpool info */
+		repl_inst_jnlpool_reset();
 	/*
 	 * --------------------------
 	 * Now rundown Receivpool
 	 * --------------------------
 	 */
-	/* For instnace is same for both receive and journal pool */
 	recvpool.recvpool_dummy_reg = reg;
-	if (0 != repl_instance.recvpool_semid)
+	if (INVALID_SEMID != repl_instance.recvpool_semid)
 		if ((-1 == semctl(repl_instance.recvpool_semid, 0, IPC_STAT, semarg)) ||
 	 		(semarg.buf->sem_ctime != repl_instance.recvpool_semid_ctime))
-			repl_instance.recvpool_semid = 0;
-	if (0 != repl_instance.recvpool_shmid)
+			repl_instance.recvpool_semid = INVALID_SEMID;
+	if (INVALID_SHMID != repl_instance.recvpool_shmid)
 		if ((-1 == shmctl(repl_instance.recvpool_shmid, IPC_STAT, &shmstat)) ||
 	 		(shmstat.shm_ctime != repl_instance.recvpool_shmid_ctime))
-			repl_instance.recvpool_shmid = 0;
-	/* Lock receivpool using ftok semaphore */
-	get_lock_recvpool_ftok_sems(TRUE, TRUE);
-	flag2 = mu_rndwn_replpool(replpool_id, repl_instance.recvpool_semid, repl_instance.recvpool_shmid);
-	if (repl_instance.recvpool_shmid)
+			repl_instance.recvpool_shmid = INVALID_SHMID;
+	if (INVALID_SHMID != repl_instance.recvpool_shmid)
 	{
+		recvpool_stat = mu_rndwn_replpool(replpool_id, repl_instance.recvpool_semid, repl_instance.recvpool_shmid);
 		ret_ptr = i2asc((uchar_ptr_t)shmid_buff, repl_instance.recvpool_shmid);
 		*ret_ptr = '\0';
-		gtm_putmsg(VARLSTCNT(6) (flag2 ? ERR_MURPOOLRNDWNSUC : ERR_MURPOOLRNDWNFL),
+		gtm_putmsg(VARLSTCNT(6) (recvpool_stat ? ERR_MURPOOLRNDWNSUC : ERR_MURPOOLRNDWNFL),
 			4, LEN_AND_STR(shmid_buff), LEN_AND_STR(replpool_id->instname));
 	}
-	/* Reset instance file for receive pool semid and shmid */
-	repl_inst_recvpool_reset();
+	if (recvpool_stat)
+		/* Reset instance file for recvpool info */
+		repl_inst_recvpool_reset();
 	/* Release recvpool ftok semaphore lock */
-	rel_recvpool_ftok_sems(TRUE, TRUE);
-
-	return (flag1 && flag2);
+	if (!ftok_sem_release(reg, TRUE, TRUE))
+		return FALSE;
+	return (jnlpool_stat && recvpool_stat);
 }

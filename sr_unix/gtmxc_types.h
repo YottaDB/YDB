@@ -43,6 +43,18 @@ typedef struct
 }	xc_string_t;
 
 
+xc_status_t 	gtm_ci ();
+
 #ifdef __osf__
 #pragma pointer_size (restore)
 #endif
+
+/* new types for external/call-in user - xc_* types still valid for backward compatibility */
+typedef xc_status_t	gtm_status_t;
+typedef xc_long_t	gtm_long_t;
+typedef xc_ulong_t	gtm_ulong_t;
+typedef xc_float_t	gtm_float_t;
+typedef xc_double_t	gtm_double_t;
+typedef xc_char_t	gtm_char_t;
+typedef xc_string_t	gtm_string_t;
+typedef xc_pointertofunc_t	gtm_pointertofunc_t;

@@ -74,7 +74,7 @@ endif
 #
 #####################################################################################
 
-set buildaux_auxillaries = "gde dse geteuid gtm_dmna gtmsecshr lke mupip gtcm_server"
+set buildaux_auxillaries = "gde dse geteuid gtm_dmna gtmsecshr lke mupip gtcm_server gtcm_gnp_server"
 set buildaux_utilities = "semstat2 ftok gtcm_pkdisp gtcm_shmclean gtcm_play dummy"
 set buildaux_executables = "$buildaux_auxillaries $buildaux_utilities"
 set buildaux_validexecutable = 0
@@ -85,8 +85,19 @@ end
 
 set new_auxillarylist = ""
 foreach auxillary ( $argv[4-] )
-	if ( "$auxillary" == "gtcm") then
+	if ( "$auxillary" == "lke") then
+		set new_auxillarylist = "$new_auxillarylist lke gtcm_gnp_server"
+	else if ( "$auxillary" == "gnpclient") then
+		$shell $gtm_tools/buildshr.csh $1 $2 /usr/library/$1/$2
+	else if ( "$auxillary" == "gnpserver") then
+		set new_auxillarylist = "$new_auxillarylist gtcm_gnp_server"
+	else if ( "$auxillary" == "cmisockettcp") then
+		set new_auxillarylist = "$new_auxillarylist gtcm_gnp_server"
+		$shell $gtm_tools/buildshr.csh $1 $2 /usr/library/$1/$2
+	else if ( "$auxillary" == "gtcm") then
 		set new_auxillarylist = "$new_auxillarylist gtcm_server gtcm_play gtcm_shmclean gtcm_pkdisp"
+	else if ( "$auxillary" == "stub") then
+		set new_auxillarylist = "$new_auxillarylist dse mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean"
 	else if ("$auxillary" == "mumps") then
 		$shell $gtm_tools/buildshr.csh $1 $2 /usr/library/$1/$2
 		if ($#argv == 4) then
@@ -111,7 +122,7 @@ else
 			endif
 		end
 	end
-	if ( $buildaux_validexecutable == 0 ) then
+	if ( $buildaux_validexecutable == 0 && "$new_auxillarylist" != "" ) then
 		echo "buildaux-E-AuxUnknown -- Auxillary, ""$argv[4-]"", is not a valid one"
 		echo "buildaux-I-usage, Usage: $shell buildaux.csh <version> <image type> <target directory> [auxillary-list]"
 		set buildaux_status = `expr $buildaux_status + 1`
@@ -157,7 +168,8 @@ if ( $buildaux_dse == 1 ) then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/dse.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/dse	-L$gtm_obj $gtm_obj/{dse,dse_cmd}.o \
-			$gt_ld_sysrtns -ldse -lmumps -lstub $gt_ld_gtmrpc_library_option $gt_ld_syslibs >& $gtm_map/dse.map
+			$gt_ld_sysrtns -ldse -lmumps -lstub \
+			$gt_ld_gtmrpc_library_option $gt_ld_syslibs >& $gtm_map/dse.map
 	if ( $status != 0  ||  ! -x $3/dse ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkdse, Failed to link dse (see ${dollar_sign}gtm_map/dse.map)" \
@@ -185,7 +197,7 @@ if ( $buildaux_gtm_dmna == 1 ) then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtm_dmna.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtm_dmna	-L$gtm_obj $gtm_obj/daemon.o \
-			$gt_ld_sysrtns -lmumps -lstub $gt_ld_syslibs >& $gtm_map/gtm_dmna.map
+			$gt_ld_sysrtns -lmumps $gt_ld_syslibs >& $gtm_map/gtm_dmna.map
 	if ( $status != 0  ||  ! -x $3/gtm_dmna ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgtm_dmna, Failed to link gtm_dmna (see ${dollar_sign}gtm_map/gtm_dmna.map)" \
@@ -215,7 +227,8 @@ if ( $buildaux_lke == 1 ) then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/lke.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/lke	-L$gtm_obj $gtm_obj/{lke,lke_cmd}.o \
-			$gt_ld_sysrtns -llke -lmumps -lstub $gt_ld_gtmrpc_library_option $gt_ld_syslibs >& $gtm_map/lke.map
+			$gt_ld_sysrtns -llke -lmumps -lgnpclient -lmumps -lgnpclient -lcmisockettcp \
+			$gt_ld_gtmrpc_library_option $gt_ld_syslibs >& $gtm_map/lke.map
 	if ( $status != 0  ||  ! -x $3/lke ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linklke, Failed to link lke (see ${dollar_sign}gtm_map/lke.map)" \
@@ -233,7 +246,8 @@ if ( $buildaux_mupip == 1 ) then
 		set hpux_callg = "$gtm_obj/callg.o"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/mupip	-L$gtm_obj $gtm_obj/{mupip,mupip_cmd}.o \
-		$hpux_callg $gt_ld_sysrtns -lmupip -lmumps -lstub $gt_ld_gtmrpc_library_option $gt_ld_syslibs >& $gtm_map/mupip.map
+		$hpux_callg $gt_ld_sysrtns -lmupip -lmumps -lstub \
+		$gt_ld_gtmrpc_library_option $gt_ld_syslibs >& $gtm_map/mupip.map
 	if ( $status != 0  ||  ! -x $3/mupip ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkmupip, Failed to link mupip (see ${dollar_sign}gtm_map/mupip.map)" \
@@ -259,6 +273,27 @@ if ( $buildaux_gtcm_server == 1 ) then
 			>> $gtm_log/error.`basename $gtm_exe`.log
 	endif
 endif
+
+if ( $buildaux_gtcm_gnp_server == 1 ) then
+	set aix_loadmap_option = ''
+	if ( $HOSTOS == "AIX") then
+		set aix_loadmap_option = "-bloadmap:$gtm_map/gtcm_gnp_server.loadmap"
+	endif
+	set hpux_callg = ''
+	if ( $HOSTOS == "HP-UX") then
+		set hpux_callg = "$gtm_obj/callg.o"
+	endif
+	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_gnp_server -L$gtm_obj \
+		$gtm_obj/gtcm_gnp_server.o $gtm_obj/gtcm_gnp_clitab.o $hpux_callg $gt_ld_sysrtns \
+		-lgnpserver -llke -lmumps -lcmisockettcp -lstub \
+		$gt_ld_gtmrpc_library_option $gt_ld_syslibs >& $gtm_map/gtcm_gnp_server.map
+	if ( $status != 0  ||  ! -x $3/gtcm_gnp_server) then
+		set buildaux_status = `expr $buildaux_status + 1`
+		echo "buildaux-E-linkgtcm_gnp_server, Failed to link gtcm_gnp_server (see ${dollar_sign}gtm_map/gtcm_gnp_server.map)" \
+			>> $gtm_log/error.`basename $gtm_exe`.log
+	endif
+endif
+
 
 if ( $buildaux_gtcm_play == 1 ) then
 	set aix_loadmap_option = ''

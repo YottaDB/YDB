@@ -11,7 +11,7 @@
 %GCE	;GT.M %GCE utility - global change every occurrence
 	;
 	n c,g,gn,m,n,ns,os,s,sc,sn,%ZD,%ZG
-	i '$d(%zdebug) n $zt s $zt="zg "_$zl_":ERR^%GCE" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%GCE")
+	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%GCE" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%GCE")
 	w !,"Global Change Every occurrence",!
 	d base
 	q
@@ -72,6 +72,7 @@ cur	w ! s g=""
 ERR	i $d(%ZD),%ZD'=$p c %ZD
 	u $p w !,$p($zs,",",2,99),!
 	u $p:(ctrap="":exc="")
+	s $ec=""
 	q
 LOOP	i $d(%ZD),%ZD'=$p c %ZD
 	d base

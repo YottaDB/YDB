@@ -17,7 +17,7 @@
 #include "sbs_blk.h"
 #include "mv_stent.h"
 #include "rtnhdr.h"
-#include "masscomp.h"
+#include "objlabel.h"
 #include "cache.h"
 #include "stack_frame.h"
 #include "op.h"
@@ -54,7 +54,7 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	frame_pointer->vartab_len = frame_pointer->rvector->vartab_len;
 	frame_pointer->mpc = transfer_addr;
 	frame_pointer->ctxt = context;
-#if defined(__alpha) || defined(__MVS__)
+#if defined(__alpha) || defined(__MVS__) || defined(__s390__)
 	frame_pointer->literal_ptr = (int4 *)0;
 #endif
 	frame_pointer->temp_mvals = frame_pointer->rvector->temp_mvals;

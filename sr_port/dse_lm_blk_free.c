@@ -25,7 +25,6 @@ int4 dse_lm_blk_free(int4 blk, sm_uc_ptr_t base_addr)
 	sm_uc_ptr_t 	ptr;
 	unsigned char	valid;
 	int4		bits;
-	error_def(ERR_BITMAPSBAD);
 
 	blk /= BML_BITS_PER_BLK;
 	ptr = base_addr + (blk * BML_BITS_PER_BLK) / 8;
@@ -43,7 +42,5 @@ int4 dse_lm_blk_free(int4 blk, sm_uc_ptr_t base_addr)
 			break;
 	}
 	bits = valid & 3;
-	if (bits == 2)
-		rts_error(VARLSTCNT(1) ERR_BITMAPSBAD);
 	return bits;
 }

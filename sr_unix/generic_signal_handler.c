@@ -39,13 +39,13 @@
  */
 GBLDEF siginfo_t	exi_siginfo;
 
-#if defined(__osf__) || defined(_AIX)
+#if defined(__osf__) || defined(_AIX) || defined(Linux390)
 GBLDEF struct sigcontext exi_context;
 #else
 GBLDEF ucontext_t	exi_context;
 #endif
 
-GBLREF	boolean_t		forced_exit;
+GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	int4			forced_exit_err;
 GBLREF	int4			exi_condition;
 GBLREF	enum gtmImageTypes	image_type;
@@ -84,7 +84,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		memset(&exi_siginfo, 0, sizeof(*info));
 	if (NULL != context)
 	{
-#if defined(__osf__) || defined(_AIX)
+#if defined(__osf__) || defined(_AIX) || defined(Linux390)
 		exi_context = *(struct sigcontext *)context;
 #else
 		exi_context = *(ucontext_t *)context;

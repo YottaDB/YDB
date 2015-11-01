@@ -11,13 +11,19 @@
 
 #include "mdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "mlkdef.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
+#include "mlk_unlock.h"
+#include "mlk_pvtblk_delete.h"
 
 GBLREF mlk_pvtblk *mlk_cm_root;
 GBLREF connection_struct *curr_entry;
 
-void gtcml_unlock()
+void gtcml_unlock(void)
 {
 	mlk_pvtblk **prior;
 

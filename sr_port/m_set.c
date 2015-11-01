@@ -21,7 +21,7 @@
 #include "advancewindow.h"
 #include "namelook.h"
 #include "cmd.h"
-
+#include "svnames.h"
 
 GBLDEF bool		temp_subs;
 GBLREF triple		*curtchain;
@@ -40,296 +40,397 @@ int m_set(void)
 	error_def(ERR_EQUAL);
 	error_def(ERR_COMMA);
 	error_def(ERR_SVNOSET);
-	int		index;
-	int		first_val, last_val;
+	int		index, setop;
+	int		first_val_lit, last_val_lit;
 	boolean_t	first_is_lit, last_is_lit, got_lparen, delim1char, is_extract;
 	opctype		put_oc;
-	oprtype		v, delimval, *sb1, *result, resptr;
-	triple		*delimiter, *first, *put, *get, *last, *obp, *s, *sub, *s0, *s1, tmpchain;
+	oprtype		v, delimval, firstval, lastval, *sb1, *result, resptr;
+	triple		*delimiter, *first, *put, *get, *last, *obp, *s, *sub, *s0, *s1, setchain, getchain;
 	triple		*jmptrp1, *jmptrp2;
 
 	temp_subs = delim1char = is_extract = FALSE;
-	dqinit(&tmpchain, exorder);
+	dqinit(&setchain, exorder);
 	result = (oprtype *) mcalloc(sizeof(oprtype));
 	resptr = put_indr(result);
 	jmptrp1 = jmptrp2 = 0;
 	sub = (triple *)0;
+	delimiter = last = NULL;
 
 	if (got_lparen = (window_token == TK_LPAREN))
 	{
 		advancewindow();
 		temp_subs = TRUE;
 	}
+
+	/* Some explanation: The triples generated that are related to the lefthand side of the
+	   SET are put on the setchain triple list rather than curtchain. This is because that
+	   although they are generated first, they need to be evaluated and executed last so they
+	   will be added to curtchain after the righthand side has been completed.
+	*/
+
 	for (;;)
 	{
 		switch (window_token)
 		{
-		case TK_IDENT:
-			if (!lvn(&v, OC_PUTINDX, 0))
-				return FALSE;
-			if (v.oprval.tref->opcode == OC_PUTINDX)
-			{
-				dqdel(v.oprval.tref,exorder);
-				dqins(tmpchain.exorder.bl,exorder,v.oprval.tref);
-				sub = v.oprval.tref;
-				put_oc = OC_PUTINDX;
-			}
-			put = maketriple(OC_STO);
-			put->operand[0] = v;
-			put->operand[1] = resptr;
-			dqins(tmpchain.exorder.bl,exorder,put);
-			break;
-		case TK_CIRCUMFLEX:
-			s1 = curtchain->exorder.bl;
-			if (!gvn())
-				return FALSE;
-			for (sub = curtchain->exorder.bl; sub != s1 ; sub = sub->exorder.bl)
-			{
-				put_oc = sub->opcode;
-				if (put_oc == OC_GVNAME || put_oc == OC_GVNAKED || put_oc == OC_GVEXTNAM)
-					break;
-			}
-			assert(put_oc == OC_GVNAME || put_oc == OC_GVNAKED || put_oc == OC_GVEXTNAM);
-			dqdel(sub,exorder);
-			dqins(tmpchain.exorder.bl,exorder,sub);
-			put = maketriple(OC_GVPUT);
-			put->operand[0] = resptr;
-			dqins(tmpchain.exorder.bl,exorder,put);
-			break;
-		case TK_ATSIGN:
-			if (!indirection(&v))
-				return FALSE;
-			if (!got_lparen && window_token != TK_EQUAL)
-			{
-				put = newtriple(OC_COMMARG);
-				put->operand[0] = v;
-				put->operand[1] = put_ilit(indir_set);
-				ins_triple(put);
-				return TRUE;
-			}
-			put = maketriple(OC_INDSET);
-			put->operand[0] = v;
-			put->operand[1] = resptr;
-			dqins(tmpchain.exorder.bl,exorder,put);
-			break;
-		case TK_DOLLAR:
-			advancewindow();
-			if (window_token != TK_IDENT)
-			{
-				stx_error(ERR_VAREXPECTED);
-				return FALSE;
-			}
-			if (director_token != TK_LPAREN)
-			{	/* Look for extrinsic vars */
-				if ((index = namelook(svn_index, svn_names, window_ident.c)) < 0)
-				{
-					stx_error(ERR_INVSVN);
-					return FALSE;
-				}
-				advancewindow();
-				if (!svn_data[index].can_set)
-				{
-					stx_error(ERR_SVNOSET);
-					return FALSE;
-				}
-				put = maketriple(OC_SVPUT);
-				put->operand[0] = put_ilit(svn_data[index].opcode);
-				put->operand[1] = resptr;
-				dqins(tmpchain.exorder.bl,exorder,put);
-				break;
-			}
-			/* Only 2 function names allowed on left side: $Piece and $Extract */
-			index = namelook(fun_index, fun_names, window_ident.c);
-			is_extract = (OC_FNEXTRACT == fun_data[index].opcode);
-			if (index < 0 || (!is_extract && fun_data[index].opcode != OC_FNPIECE) || got_lparen)
-			{
-				stx_error(ERR_VAREXPECTED);
-				return FALSE;
-			}
-			advancewindow();
-			advancewindow();
-			if (!is_extract)
-			{
-				s = maketriple(OC_SETPIECE);
-				delimiter = newtriple(OC_PARAMETER);
-				s->operand[1] = put_tref(delimiter);
-				first = newtriple(OC_PARAMETER);
-				delimiter->operand[1] = put_tref(first);
-			} else
-			{
-				s = maketriple(OC_SETEXTRACT);
-				first = newtriple(OC_PARAMETER);
-				s->operand[1] = put_tref(first);
-			}
-			switch (window_token)
-			{
 			case TK_IDENT:
 				if (!lvn(&v, OC_PUTINDX, 0))
-				{
-					stx_error(ERR_VAREXPECTED);
 					return FALSE;
-				}
 				if (v.oprval.tref->opcode == OC_PUTINDX)
 				{
-					dqdel(v.oprval.tref,exorder);
-					dqins(tmpchain.exorder.bl,exorder,v.oprval.tref);
+					dqdel(v.oprval.tref, exorder);
+					dqins(setchain.exorder.bl, exorder, v.oprval.tref);
 					sub = v.oprval.tref;
 					put_oc = OC_PUTINDX;
 				}
-				get = maketriple(OC_FNGET);
-				get->operand[0] = v;
 				put = maketriple(OC_STO);
 				put->operand[0] = v;
-				put->operand[1] = put_tref(s);
-				break;
-			case TK_ATSIGN:
-				if (!indirection(&v))
-				{
-					stx_error(ERR_VAREXPECTED);
-					return FALSE;
-				}
-				get = maketriple(OC_INDGET);
-				get->operand[0] = v;
-				get->operand[1] = put_str(0,0);
-				put = maketriple(OC_INDSET);
-				put->operand[0] = v;
-				put->operand[1] = put_tref(s);
+				put->operand[1] = resptr;
+				dqins(setchain.exorder.bl, exorder, put);
 				break;
 			case TK_CIRCUMFLEX:
 				s1 = curtchain->exorder.bl;
 				if (!gvn())
 					return FALSE;
-				for (sub = curtchain->exorder.bl; sub != s1 ; sub = sub->exorder.bl)
+				for (sub = curtchain->exorder.bl; sub != s1; sub = sub->exorder.bl)
 				{
 					put_oc = sub->opcode;
 					if (put_oc == OC_GVNAME || put_oc == OC_GVNAKED || put_oc == OC_GVEXTNAM)
 						break;
 				}
 				assert(put_oc == OC_GVNAME || put_oc == OC_GVNAKED || put_oc == OC_GVEXTNAM);
-				dqdel(sub,exorder);
-				dqins(tmpchain.exorder.bl,exorder,sub);
-				get = maketriple(OC_FNGVGET);
-				get->operand[0] = put_str(0,0);
+				dqdel(sub, exorder);
+				dqins(setchain.exorder.bl, exorder, sub);
 				put = maketriple(OC_GVPUT);
-				put->operand[0] = put_tref(s);
+				put->operand[0] = resptr;
+				dqins(setchain.exorder.bl, exorder, put);
+				break;
+			case TK_ATSIGN:
+				if (!indirection(&v))
+					return FALSE;
+				if (!got_lparen && window_token != TK_EQUAL)
+				{
+					put = newtriple(OC_COMMARG);
+					put->operand[0] = v;
+					put->operand[1] = put_ilit(indir_set);
+					return TRUE;
+				}
+				put = maketriple(OC_INDSET);
+				put->operand[0] = v;
+				put->operand[1] = resptr;
+				dqins(setchain.exorder.bl, exorder,put);
+				break;
+			case TK_DOLLAR:
+				advancewindow();
+				if (window_token != TK_IDENT)
+				{
+					stx_error(ERR_VAREXPECTED);
+					return FALSE;
+				}
+				if (director_token != TK_LPAREN)
+				{	/* Look for extrinsic vars */
+					if ((index = namelook(svn_index, svn_names, window_ident.c)) < 0)
+					{
+						stx_error(ERR_INVSVN);
+						return FALSE;
+					}
+					advancewindow();
+					if (!svn_data[index].can_set)
+					{
+						stx_error(ERR_SVNOSET);
+						return FALSE;
+					}
+					if (SV_ETRAP != svn_data[index].opcode && SV_ZTRAP != svn_data[index].opcode)
+					{	/* Setting of $ZTRAP or $ETRAP must go through opp_svput because they
+						   may affect the stack pointer. All others directly to op_svput().
+						*/
+						put = maketriple(OC_SVPUT);
+					} else
+						put = maketriple(OC_PSVPUT);
+					put->operand[0] = put_ilit(svn_data[index].opcode);
+					put->operand[1] = resptr;
+					dqins(setchain.exorder.bl, exorder, put);
+					break;
+				}
+				/* Only 2 function names allowed on left side: $Piece and $Extract */
+				index = namelook(fun_index, fun_names, window_ident.c);
+				if (0 > index || got_lparen)
+				{	/* function not found or appears in set list where only a var can be */
+					stx_error(ERR_VAREXPECTED);
+					return FALSE;
+				}
+				if (OC_FNPIECE == fun_data[index].opcode)
+					setop = OC_SETPIECE;
+				else if (OC_FNEXTRACT == fun_data[index].opcode)
+				{
+					is_extract = TRUE;
+					setop = OC_SETEXTRACT;
+				} else
+				{
+					stx_error(ERR_VAREXPECTED);
+					return FALSE;
+				}
+				advancewindow();
+				advancewindow();
+				/* Although we see the get (target) variable first, we need to save it's processing
+				   on another chain -- the getchain -- because the retrieval of the target is bypassed
+				   and the naked indicator is not reset if the first/last parameters are not set in a logical
+				   manner (must be > 0 and first <= last). So the evaluation order is delimiter (if $piece),
+				   first, last and then target.
+				*/
+				dqinit(&getchain, exorder);
+				/* Set up primary action triple now since it is ref'd by the put triples
+				   generated below.
+				*/
+				s = maketriple(setop);
+				/* Even for SETPIECE and SETEXTRACT, the SETPIECE/SETEXTRACT opcodes
+				   do not do the final store, they only create the final value TO be
+				   stored so generate the triples that will actually do the store now.
+				*/
+				switch (window_token)
+				{
+					case TK_IDENT:
+						if (!lvn(&v, OC_PUTINDX, 0))
+						{
+							stx_error(ERR_VAREXPECTED);
+							return FALSE;
+						}
+						if (v.oprval.tref->opcode == OC_PUTINDX)
+						{
+							dqdel(v.oprval.tref, exorder);
+							dqins(getchain.exorder.bl, exorder, v.oprval.tref);
+							sub = v.oprval.tref;
+							put_oc = OC_PUTINDX;
+						}
+						get = maketriple(OC_FNGET);
+						get->operand[0] = v;
+						put = maketriple(OC_STO);
+						put->operand[0] = v;
+						put->operand[1] = put_tref(s);
+						break;
+					case TK_ATSIGN:
+						if (!indirection(&v))
+						{
+							stx_error(ERR_VAREXPECTED);
+							return FALSE;
+						}
+						get = maketriple(OC_INDGET);
+						get->operand[0] = v;
+						get->operand[1] = put_str(0, 0);
+						put = maketriple(OC_INDSET);
+						put->operand[0] = v;
+						put->operand[1] = put_tref(s);
+						break;
+					case TK_CIRCUMFLEX:
+						s1 = curtchain->exorder.bl;
+						if (!gvn())
+							return FALSE;
+						for (sub = curtchain->exorder.bl; sub != s1 ; sub = sub->exorder.bl)
+						{
+							put_oc = sub->opcode;
+							if (put_oc == OC_GVNAME || put_oc == OC_GVNAKED || put_oc == OC_GVEXTNAM)
+								break;
+						}
+						assert(put_oc == OC_GVNAME || put_oc == OC_GVNAKED || put_oc == OC_GVEXTNAM);
+						dqdel(sub, exorder);
+						dqins(getchain.exorder.bl, exorder, sub);
+						get = maketriple(OC_FNGVGET);
+						get->operand[0] = put_str(0, 0);
+						put = maketriple(OC_GVPUT);
+						put->operand[0] = put_tref(s);
+						break;
+					default:
+						stx_error(ERR_VAREXPECTED);
+						return FALSE;
+				}
+				s->operand[0] = put_tref(get);
+				/* Code to fetch args for "get" triple are on getchain. Put get there now too. */
+				dqins(getchain.exorder.bl, exorder, get);
+				chktchain(&getchain);
+				/* From now on, put things on setchain */
+				first = maketriple(OC_PARAMETER);
+				if (!is_extract)
+				{	/* Set $piece */
+					delimiter = maketriple(OC_PARAMETER);
+					s->operand[1] = put_tref(delimiter);
+					delimiter->operand[1] = put_tref(first);
+					/* Process delimiter string ($piece only) */
+					if (window_token != TK_COMMA)
+					{
+						stx_error(ERR_COMMA);
+						return FALSE;
+					}
+					advancewindow();
+					if (!strexpr(&delimval))
+						return FALSE;
+					assert(delimval.oprclass == TRIP_REF);
+					/* Remove delimiter code gen from curtchain. It will be put on curtchain later
+					   if it is not being passed in as a literal. */
+					dqdel(delimval.oprval.tref, exorder);
+				} else
+				{	/* Set $Extract */
+					s->operand[1] = put_tref(first);
+				}
+
+				/* Process first integer value */
+				if (window_token != TK_COMMA)
+					firstval = put_ilit(1);
+				else
+				{
+					advancewindow();
+					if (!intexpr(&firstval))
+						return FALSE;
+					assert(firstval.oprclass == TRIP_REF);
+					/* Remove first parm code gen from curtchain and put on setchain. Even though delimiter
+					   is not on the chain yet, the out-of-order execution of the args will be ok. Note that
+					   the put_ilit() call above puts the literal argument on the curtchain but since it is
+					   a literal, does not generate any real code and does not affect the naked indicator,
+					   this should not be a problem.
+					*/
+					dqdel(firstval.oprval.tref, exorder);
+					/* Put first code gen and first triple on the setchain */
+					dqins(setchain.exorder.bl, exorder, firstval.oprval.tref);
+				}
+				first->operand[0] = firstval;
+				dqins(setchain.exorder.bl, exorder, first);
+				if (first_is_lit = (firstval.oprval.tref->opcode == OC_ILIT))
+				{
+					assert(firstval.oprval.tref->operand[0].oprclass  == ILIT_REF);
+					first_val_lit = firstval.oprval.tref->operand[0].oprval.ilit;
+				}
+				if (window_token != TK_COMMA)
+				{	/* There is no "last" value. Only if 1 char literal delimiter and
+					   no "last" value can we generate shortcut code to op_setp1 entry
+					   instead of op_setpiece.
+					*/
+					if (!is_extract && delimval.oprval.tref->opcode == OC_LIT &&
+					    delimval.oprval.tref->operand[0].oprval.mlit->v.str.len == 1)
+					{
+						s->opcode = OC_SETP1;
+						delimiter->operand[0] =
+							put_ilit((uint4)*delimval.oprval.tref->operand[0].oprval.mlit->v.str.addr);
+						delim1char = TRUE;
+						/* Now can add in delimiter triple itself */
+						dqins(setchain.exorder.bl, exorder, delimiter);
+					} else
+					{
+						if (!is_extract)
+						{	/* Need larger delimiter code. Put it on setchain now */
+							delimiter->operand[0] = delimval;
+							dqins(setchain.exorder.bl, exorder, delimval.oprval.tref);
+							/* Now can add in delimiter triple itself */
+							dqins(setchain.exorder.bl, exorder, delimiter);
+						}
+						last = maketriple(OC_PARAMETER);
+						first->operand[1] = put_tref(last);
+						last->operand[0] = first->operand[0];
+						dqins(setchain.exorder.bl, exorder, last);
+					}
+					/* Generate test sequences for first/last to bypass the set operation if
+					   first/last are not in a usable form */
+					if (first_is_lit)
+					{
+						if (first_val_lit < 1)
+						{
+							jmptrp1 = maketriple(OC_JMP);
+							dqins(setchain.exorder.bl, exorder, jmptrp1);
+						} /* note else no test necessary since first == last and are > 0 */
+					} else
+					{	/* Generate test for first being <= 0 */
+						jmptrp1 = maketriple(OC_COBOOL);
+						jmptrp1->operand[0] = first->operand[0];
+						dqins(setchain.exorder.bl, exorder, jmptrp1);
+						jmptrp1 = maketriple(OC_JMPLEQ);
+						dqins(setchain.exorder.bl, exorder, jmptrp1);
+					}
+				} else
+				{	/* There IS a last value */
+					if (!is_extract)
+					{	/* Need larger delimiter code. Put it on setchain now */
+						delimiter->operand[0] = delimval;
+						dqins(setchain.exorder.bl, exorder, delimval.oprval.tref);
+						/* Now can add in delimiter triple itself */
+						dqins(setchain.exorder.bl, exorder, delimiter);
+					}
+					last = maketriple(OC_PARAMETER);
+					first->operand[1] = put_tref(last);
+					advancewindow();
+					if (!intexpr(&lastval))
+						return FALSE;
+					assert(lastval.oprclass == TRIP_REF);
+					/* Remove last parm code gen from curtchain and put on setchain */
+					dqdel(lastval.oprval.tref, exorder);
+					/* Put first code gen and first triple on the setchain */
+					dqins(setchain.exorder.bl, exorder, lastval.oprval.tref);
+					dqins(setchain.exorder.bl, exorder, last);
+					last->operand[0] = lastval;
+
+					/* Generate inline code to test first/last for usability and if found
+					   lacking, branch around the getchain and the actual store so we avoid
+					   setting the naked indicator so far as the target gvn is concerned. If
+					   the case was something like: Set $Piece(^x(1),^(2),^(3),^(4))=42, the
+					   standard is unclear as to what would happen and all bets are off.
+					*/
+					if (last_is_lit = (lastval.oprval.tref->opcode == OC_ILIT))
+					{	/* Case 1: last is a literal */
+						assert(lastval.oprval.tref->operand[0].oprclass  == ILIT_REF);
+						last_val_lit = lastval.oprval.tref->operand[0].oprval.ilit;
+						if (last_val_lit < 1 || (first_is_lit && first_val_lit > last_val_lit))
+						{	/* .. and first is a literal and one or both of them is no good
+							   so unconditionally branch around the whole thing. I think this
+							   leaves dead code but I'm not sure and also not worried about it
+							*/
+							jmptrp1 = maketriple(OC_JMP);
+							dqins(setchain.exorder.bl, exorder, jmptrp1);
+						} /* else case actually handled at next 'if' .. */
+					} else
+					{	/* Last is not literal. Do test if it is greater than 0 */
+						jmptrp1 = maketriple(OC_COBOOL);
+						jmptrp1->operand[0] = last->operand[0];
+						dqins(setchain.exorder.bl, exorder, jmptrp1);
+						jmptrp1 = maketriple(OC_JMPLEQ);
+						dqins(setchain.exorder.bl, exorder, jmptrp1);
+					}
+					if (!last_is_lit || !first_is_lit)
+					{	/* Compare to check that last >= first */
+						jmptrp2 = maketriple(OC_VXCMPL);
+						jmptrp2->operand[0] = first->operand[0];
+						jmptrp2->operand[1] = last->operand[0];
+						dqins(setchain.exorder.bl, exorder, jmptrp2);
+						jmptrp2 = maketriple(OC_JMPGTR);
+						dqins(setchain.exorder.bl, exorder, jmptrp2);
+					}
+				}
+				chktchain(&setchain);
+				/* Now that the tests are done, we can add the get chain in.  We must do
+				   this manually as there are no macros to deal with adding a chain with a
+				   header being part of the chain (i.e. curtchain is a pointer, not a real
+				   element like setchain is).
+				*/
+				obp = setchain.exorder.bl;	/* Maintain ptr to end of setchain list */
+				setchain.exorder.bl = getchain.exorder.bl;
+				getchain.exorder.bl->exorder.fl = &setchain;
+				obp->exorder.fl = getchain.exorder.fl;
+				getchain.exorder.fl->exorder.bl = obp;
+				chktchain(&setchain);
+				if (window_token != TK_RPAREN)
+				{
+					stx_error(ERR_RPARENMISSING);
+					return FALSE;
+				}
+				advancewindow();
+				dqins(setchain.exorder.bl, exorder, s);
+				dqins(setchain.exorder.bl, exorder, put);
+				chktchain(&setchain);
+				/* Put result operand on the chain. End of chain depends on whether or not
+				   we are calling the shortcut or the full set-piece code */
+				if (delim1char)
+					first->operand[1] = resptr;
+				else
+					last->operand[1] = resptr;
 				break;
 			default:
 				stx_error(ERR_VAREXPECTED);
 				return FALSE;
-			}
-			s->operand[0] = put_tref(get);
-			dqins(tmpchain.exorder.bl,exorder,get);
-
-			if (!is_extract)
-			{	/* Process delimiter string ($piece only) */
-				if (window_token != TK_COMMA)
-				{
-					stx_error(ERR_COMMA);
-					return FALSE;
-				}
-				advancewindow();
-				if (!strexpr(&delimval))
-					return FALSE;
-				assert(delimval.oprclass == TRIP_REF);
-			}
-
-			/* Process first integer value */
-			if (window_token != TK_COMMA)
-				first->operand[0] = put_ilit(1);
-			else
-			{
-				advancewindow();
-				if (!intexpr(&(first->operand[0])))
-					return FALSE;
-			}
-			assert(first->operand[0].oprclass == TRIP_REF);
-			if (first_is_lit = (first->operand[0].oprval.tref->opcode == OC_ILIT))
-			{
-				assert(first->operand[0].oprval.tref->operand[0].oprclass  == ILIT_REF);
-				first_val = first->operand[0].oprval.tref->operand[0].oprval.ilit;
-			}
-			if (window_token != TK_COMMA)
-			{
-				/* Only if 1 char literal delimiter and no "last" value can we generate
-				   shortcut code to op_setp1 entry instead of op_setpiece */
-				if (!is_extract && window_token != TK_COMMA && delimval.oprval.tref->opcode == OC_LIT &&
-				    delimval.oprval.tref->operand[0].oprval.mlit->v.str.len == 1)
-				{
-					s->opcode = OC_SETP1;
-					delimiter->operand[0] =
-						put_ilit((uint4) *delimval.oprval.tref->operand[0].oprval.mlit->v.str.addr);
-					delim1char = TRUE;
-				} else
-				{
-					if (!is_extract)
-						delimiter->operand[0] = delimval;
-					last = newtriple(OC_PARAMETER);
-					first->operand[1] = put_tref(last);
-					last->operand[0] = first->operand[0];
-				}
-				if (first_is_lit)
-				{
-					if (first_val < 1)
-						jmptrp1 = newtriple(OC_JMP);
-				} else
-				{
-					jmptrp1 = newtriple(OC_COBOOL);
-					if (delim1char)
-						jmptrp1->operand[0] = first->operand[0];
-					else
-						jmptrp1->operand[0] = last->operand[0];
-					jmptrp1 = newtriple(OC_JMPLEQ);
-				}
-			} else
-			{
-				if (!is_extract)
-					delimiter->operand[0] = delimval;
-				last = newtriple(OC_PARAMETER);
-				first->operand[1] = put_tref(last);
-				advancewindow();
-				if (!intexpr(&(last->operand[0])))
-					return FALSE;
-
-				/* NOTE: This is a "by-hand" compile time constant evaluation */
-				assert(last->operand[0].oprclass == TRIP_REF);
-				if (last_is_lit = (last->operand[0].oprval.tref->opcode == OC_ILIT))
-				{
-					assert(last->operand[0].oprval.tref->operand[0].oprclass  == ILIT_REF);
-					last_val = last->operand[0].oprval.tref->operand[0].oprval.ilit;
-					if (last_val < 1 || (first_is_lit && first_val > last_val))
-						jmptrp1 = newtriple(OC_JMP);
-				} else
-				{
-					jmptrp1 = newtriple(OC_COBOOL);
-					jmptrp1->operand[0] = last->operand[0];
-					jmptrp1 = newtriple(OC_JMPLEQ);
-				}
-				if (!last_is_lit || !first_is_lit)
-				{
-					jmptrp2 = newtriple(OC_VXCMPL);
-					jmptrp2->operand[0] = first->operand[0];
-					jmptrp2->operand[1] = last->operand[0];
-					jmptrp2 = newtriple(OC_JMPGTR);
-				}
-			}
-			if (window_token != TK_RPAREN)
-			{
-				stx_error(ERR_RPARENMISSING);
-				return FALSE;
-			}
-			advancewindow();
-			dqins(tmpchain.exorder.bl,exorder,s);
-			dqins(tmpchain.exorder.bl,exorder,put);
-			/* Put result operand on the chain. End of chain depends on whether or not
-			   we are calling the shortcut or the full set-piece code */
-			if (delim1char)
-				first->operand[1] = resptr;
-			else
-				last->operand[1] = resptr;
-			break;
-		default:
-			stx_error(ERR_VAREXPECTED);
-			return FALSE;
 		}
 		if (!got_lparen)
 			break;
@@ -357,8 +458,8 @@ int m_set(void)
 	if (!expr(result))
 		return FALSE;
 	obp = curtchain->exorder.bl;
-	dqadd(obp, &tmpchain, exorder);   /*this is a violation of info hiding*/
-
+	dqadd(obp, &setchain, exorder);   /*this is a violation of info hiding*/
+	chktchain(curtchain)
 	if (sub)
 	{
 		sb1 = &sub->operand[1];

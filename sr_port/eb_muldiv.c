@@ -106,7 +106,11 @@ int4	eb_mul (int4 v[], int4 u[], int4 p[])	/* p = u*v */
 				prod[i+j] = acc % RADIX;
 				carry     = acc / RADIX;
 			}
-			prod[i+j] = carry;
+			if ( 9 > i+j)
+				prod[i+j] = carry;
+			else
+				if (0 != carry)
+					assert(FALSE);
 		}
 	}
 

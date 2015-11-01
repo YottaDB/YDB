@@ -10,6 +10,6 @@
  ****************************************************************/
 
 #define MLK_LOGIN(x)
-#define BLOCKING_PROC_ALIVE(w,x,y,z) (!is_proc_alive(w->nodptr->owner, 0))
+#define BLOCKING_PROC_ALIVE(w,x,y,z) (!is_proc_alive(w->blocked->owner, 0))
 #define PENDING_PROC_ALIVE(w,x,y,z) (!is_proc_alive(w->process_id, 0))
 #define PROC_ALIVE(w,x,y,z) (!is_proc_alive(w->owner, 0))

@@ -15,7 +15,7 @@
 
 LITDEF char *oc_tab_graphic[] =
 {
-#define OPCODE_DEF(A,B) "A",
+#define OPCODE_DEF(A,B) #A,
 #include "opcode_def.h"
 };
 #undef OPCODE_DEF

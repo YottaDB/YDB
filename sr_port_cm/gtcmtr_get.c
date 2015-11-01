@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"
+#include "copy.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -17,41 +19,51 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
+#include "gtcm_bind_name.h"
+#include "gvcst_get.h"
+#include "gtcm_find_region.h"
+#include "gtcmtr_get.h"
 
 GBLREF connection_struct *curr_entry;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey;
 
-bool gtcmtr_get()
+bool gtcmtr_get(void)
 {
-	void		gtcm_bind_name();
-	bool		gvcst_get();
 	unsigned char	*ptr, regnum;
-	unsigned short	top, len;
+	unsigned short	top, len, temp_short;
 	mval		v;
-	cm_region_list	*reg_ref, *gtcm_find_region();
+	cm_region_list	*reg_ref;
 
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(CMMS_Q_GET == *ptr);
 	ptr++;
-	len = *((unsigned short *)ptr);
-	ptr += sizeof(short);
+	GET_USHORT(len, ptr);
+	ptr += sizeof(unsigned short);
 	regnum = *ptr++;
 	len--;	/* subtract size of regnum */
 	reg_ref = gtcm_find_region(curr_entry, regnum);
-	top = gv_currkey->top;
-	memcpy(gv_currkey, ptr, len);
-	gv_currkey->top = top;
-	gtcm_bind_name(reg_ref->reghead);
+	CM_GET_GVCURRKEY(ptr, len);
+	gtcm_bind_name(reg_ref->reghead, TRUE);
 	ptr = curr_entry->clb_ptr->mbf;
 	if (gv_target->root ? gvcst_get(&v) : FALSE)
 	{
+		temp_short = (unsigned short)v.str.len;
+		assert((int4)temp_short == v.str.len); /* ushort <- int4 assignment lossy? */
+		if (curr_entry->clb_ptr->mbl < 1 +  /* msg header */
+					       sizeof(temp_short) + /* size of length of $GET return value */
+					       temp_short) /* length of $GET return value */
+		{ /* resize buffer */
+			cmi_realloc_mbf(curr_entry->clb_ptr, 1 + sizeof(temp_short) + temp_short);
+			ptr = curr_entry->clb_ptr->mbf;
+		}
 		*ptr++ = CMMS_R_GET;
-		*((unsigned short *)ptr) = v.str.len;
-		ptr += sizeof(short);
-		memcpy(ptr, v.str.addr, v.str.len);
-		ptr += v.str.len;
+		PUT_USHORT(ptr, temp_short);
+		ptr += sizeof(unsigned short);
+		memcpy(ptr, v.str.addr, temp_short);
+		ptr += temp_short;
 	} else
 		*ptr++ = CMMS_R_UNDEF;
 	curr_entry->clb_ptr->cbl = ptr - curr_entry->clb_ptr->mbf;

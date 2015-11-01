@@ -57,12 +57,13 @@ GBLDEF unsigned char	jnl_ver, remote_jnl_ver;
 GBLDEF intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1][JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
 	/* This should be a square matrix. If you add a row, make sure you add a column too.	*/
-	/* 	 07	  		   08,	    09,	     10,      11			*/
-	/* 07 */{IF_NONE,		   IF_NONE, IF_NONE, IF_NONE, (intlfltr_t)jnl_v07tov11},
-	/* 08 */{IF_NONE,		   IF_NONE, IF_NONE, IF_NONE, IF_NONE},
-	/* 09 */{IF_NONE,		   IF_NONE, IF_NONE, IF_NONE, IF_NONE},
-	/* 10 */{IF_NONE,		   IF_NONE, IF_NONE, IF_NONE, IF_NONE},
-	/* 11 */{(intlfltr_t)jnl_v11tov07, IF_NONE, IF_NONE, IF_NONE, IF_NONE},
+	/* 07	  		   	   08,	    09,	     10,      11,			12*/
+	/* 07 */{IF_NONE,		   IF_NONE, IF_NONE, IF_NONE, (intlfltr_t)jnl_v07tov11, (intlfltr_t)jnl_v07tov12},
+	/* 08 */{IF_NONE,		   IF_NONE, IF_NONE, IF_NONE, IF_NONE,	                IF_NONE                 },
+	/* 09 */{IF_NONE,		   IF_NONE, IF_NONE, IF_NONE, IF_NONE,	                IF_NONE                 },
+	/* 10 */{IF_NONE,		   IF_NONE, IF_NONE, IF_NONE, IF_NONE,	                IF_NONE                 },
+	/* 11 */{(intlfltr_t)jnl_v11tov07, IF_NONE, IF_NONE, IF_NONE, IF_NONE,	                (intlfltr_t)jnl_v11tov12},
+	/* 12 */{(intlfltr_t)jnl_v12tov07, IF_NONE, IF_NONE, IF_NONE, (intlfltr_t)jnl_v12tov11,	IF_NONE                 },
 };
 GBLDEF unsigned int	jnl_source_datalen, jnl_dest_maxdatalen;
 GBLDEF unsigned char	jnl_source_rectype, jnl_dest_maxrectype;

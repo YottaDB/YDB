@@ -13,5 +13,8 @@
 #define MU_RNDWN_ALL_INCLUDED
 
 int mu_rndwn_all(void);
+int mu_rndwn_sem_all(void);
+int parse_sem_id(char *);
+boolean_t is_orphaned_gtm_semaphore(int);
 
 #endif /* MU_RNDWN_ALL_INCLUDED */

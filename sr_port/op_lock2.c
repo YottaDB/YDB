@@ -13,6 +13,7 @@
 
 #include "cdb_sc.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "gdsroot.h"
 #include "gt_timer.h"

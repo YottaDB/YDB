@@ -14,7 +14,7 @@
  *
  *	Include file for the GTCM server (OMI code).
  *
- *  $Header: /cvsroot/sanchez-gtm/gtm/sr_unix_cm/omi.h,v 1.1.1.1 2001/05/16 14:01:54 marcinim Exp $
+ *  $Header:$
  *
  */
 

@@ -29,9 +29,10 @@
 
 # PUBLIC	zl_lab_err
 ENTRY zl_lab_err
+	pushl	$0
 	pushl	ERR_LABELUNKNOWN
 	call	op_rterror
-	addl	$4,%esp
+	addl	$8,%esp
 	getframe
 	ret
 # zl_lab_err ENDP

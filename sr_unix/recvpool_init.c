@@ -41,6 +41,8 @@
 #include "mu_gv_cur_reg_init.h"
 #include "gtmmsg.h"
 #include "gtm_sem.h"
+#include "ipcrmid.h"
+#include "ftok_sems.h"
 
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int			recvpool_shmid;
@@ -61,8 +63,7 @@ void recvpool_init(recvpool_user pool_user,
 	char		instname[MAX_FN_LEN + 1];
         char           	machine_name[MAX_MCNAMELEN];
 	gd_region	*r_save, *reg;
-	int		status, lcnt;
-	int		semflgs;
+	int		status, save_errno;
 	union semun	semarg;
 	struct semid_ds	semstat;
 	struct shmid_ds	shmstat;
@@ -86,76 +87,107 @@ void recvpool_init(recvpool_user pool_user,
 	gv_cur_region = r_save;
 	udi = FILE_INFO(reg);
 	if (!repl_inst_get_name(instname, &full_len, MAX_FN_LEN + 1))
-	{
-		gtm_putmsg(VARLSTCNT(1) ERR_REPLINSTUNDEF);
-		rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
-	}
+		rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
 	memcpy((char *)reg->dyn.addr->fname, instname, full_len);
 	reg->dyn.addr->fname_len = full_len;
 	udi->fn = (char *)reg->dyn.addr->fname;
-	semarg.buf = &semstat;
 	/*
-	 * First of all, we grab ftok semaphore for receiv pool of the instance.
-	 * Then we create/attach to receivpool. Once we are done with recvvpool_init, we release ftok semaphore
+	 * First grab ftok semaphore for replication instance file.  Once we have it locked,
+	 * no one else can start up or, shut down replication for this instance.
+	 * We will release ftok semaphore when initialization is done.
 	 */
-	get_lock_recvpool_ftok_sems(TRUE, FALSE);
+	if (!ftok_sem_get(recvpool.recvpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE))
+		rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
 	repl_inst_get(instname, &repl_instance);
-	if (0 == repl_instance.recvpool_semid)
+	if (INVALID_SEMID == repl_instance.recvpool_semid)
 	{
-		if (0 != repl_instance.recvpool_shmid)
+		if (INVALID_SHMID != repl_instance.recvpool_shmid)
 			GTMASSERT;
-		new_ipc = TRUE;
 		if (GTMRECV != pool_user || !gtmrecv_startup)
 			 rts_error(VARLSTCNT(4) ERR_NORECVPOOL, 2, full_len, udi->fn);
+		new_ipc = TRUE;
 	}
 	else
 	{
-		if (0 == repl_instance.recvpool_shmid)
-			GTMASSERT;
+		semarg.buf = &semstat;
 		if (-1 == semctl(repl_instance.recvpool_semid, 0, IPC_STAT, semarg))
+		{
+			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
 			rts_error(VARLSTCNT(6) ERR_REPLREQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(machine_name));
+		}
 		else if (semarg.buf->sem_ctime != repl_instance.recvpool_semid_ctime)
-			rts_error(VARLSTCNT(9) ERR_REPLREQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(machine_name),
+		{
+			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
+			rts_error(VARLSTCNT(10) ERR_REPLREQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(machine_name),
 				ERR_TEXT, 2, RTS_ERROR_TEXT("recvpool sem_ctime does not match"));
-		if (-1 == shmctl(repl_instance.recvpool_shmid, IPC_STAT, &shmstat))
+		}
+		if (INVALID_SHMID == repl_instance.recvpool_shmid ||
+			(-1 == shmctl(repl_instance.recvpool_shmid, IPC_STAT, &shmstat)))
+		{
+			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
 			rts_error(VARLSTCNT(6) ERR_REPLREQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(machine_name));
+		}
 		else if (shmstat.shm_ctime != repl_instance.recvpool_shmid_ctime)
-			rts_error(VARLSTCNT(9) ERR_REPLREQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(machine_name),
+		{
+			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
+			rts_error(VARLSTCNT(10) ERR_REPLREQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(machine_name),
 				ERR_TEXT, 2, RTS_ERROR_TEXT("recvpool shm_ctime does not match"));
-		/* Receiv pool exists. We will attach to it. */
+		}
 	}
-	recvpool_shmid = udi->shmid = repl_instance.recvpool_shmid;
 	udi->semid = repl_instance.recvpool_semid;
 	udi->sem_ctime = repl_instance.recvpool_semid_ctime;
 	udi->shm_ctime = repl_instance.recvpool_shmid_ctime;
-	semflgs = RWDALL;
+	recvpool_shmid = udi->shmid = repl_instance.recvpool_shmid;
 	if (new_ipc)
 	{
-		semflgs |= IPC_CREAT;
 		assert(NUM_SRC_SEMS == NUM_RECV_SEMS);
-		if (-1 == (udi->semid = init_sem_set_recvr(IPC_PRIVATE, NUM_RECV_SEMS, semflgs)))
+		if (INVALID_SEMID == (udi->semid = init_sem_set_recvr(IPC_PRIVATE, NUM_RECV_SEMS, RWDALL | IPC_CREAT)))
 		{
+			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
 			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0,
 				  ERR_TEXT, 2,
 			          RTS_ERROR_LITERAL("Error creating recv pool"), REPL_SEM_ERRNO);
 		}
-		if (-1 == semctl(udi->semid, 0, IPC_STAT, semarg))
+		/*
+		 * Following will set semaphore RECV_ID_SEM value as GTM_ID.
+		 * In case we have orphaned semaphore for some reason, mupip rundown will be
+		 * able to identify GTM semaphores checking the value and can remove.
+		 */
+		semarg.val = GTM_ID;
+		if (-1 == semctl(udi->semid, RECV_ID_SEM, SETVAL, semarg))
+		{
+			save_errno = errno;
+			remove_sem_set(RECV);		/* Remove what we created */
+			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
 			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				 RTS_ERROR_LITERAL("Error with recvpool semctl"), errno);
+				 RTS_ERROR_LITERAL("Error with recvpool semctl"), save_errno);
+		}
+		/*
+		 * Warning: We must read the sem_ctime using IPC_STAT after SETVAL, which changes it.
+		 *	    We must NOT do any more SETVAL after this. Our design is to use
+		 *	    sem_ctime as creation time of semaphore.
+		 */
+		semarg.buf = &semstat;
+		if (-1 == semctl(udi->semid, RECV_ID_SEM, IPC_STAT, semarg))
+		{
+			save_errno = errno;
+			remove_sem_set(RECV);		/* Remove what we created */
+			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
+			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+				 RTS_ERROR_LITERAL("Error with recvpool semctl"), save_errno);
+		}
 		udi->sem_ctime = semarg.buf->sem_ctime;
 	} else
 		set_sem_set_recvr(udi->semid);
-	/* First go for the access control lock and bump the access
-	 * counter semaphore */
-	for (status = -1, lcnt = 0;  SS_NORMAL != status; lcnt++)
+	/* First go for the access control lock */
+	status = grab_sem(RECV, RECV_POOL_ACCESS_SEM);
+	if (0 != status)
 	{
-		/* The purpose of this loop is to deal with possibility
-	 	 * that the semaphores may be deleted as they are attached */
-		status = grab_sem(RECV, RECV_POOL_ACCESS_SEM);
-		if ((SS_NORMAL != status) && (((EINVAL != errno) && (EIDRM != errno) && (EINTR != errno)) ||
-					      (MAX_RES_TRIES < lcnt)))
-			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0,
-				  ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with receive pool semaphores"), REPL_SEM_ERRNO);
+		if (new_ipc)
+			remove_sem_set(RECV);
+		ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
+		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0,
+			ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with receive pool semaphores"), REPL_SEM_ERRNO);
 	}
 	shm_created = FALSE;
 	if (new_ipc)
@@ -167,18 +199,40 @@ void recvpool_init(recvpool_user pool_user,
 #else
 		if (-1 == (udi->shmid = recvpool_shmid = shmget(IPC_PRIVATE, gtmrecv_options.buffsize, IPC_CREAT | RWDALL)))
 #endif
+		{
+			udi->shmid = recvpool_shmid = INVALID_SHMID;
+			save_errno = errno;
+			remove_sem_set(RECV);		/* Remove what we created */
+			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
 			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("Error with receive pool creation"), errno);
+				RTS_ERROR_LITERAL("Error with receive pool creation"), save_errno);
+		}
 		if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
+		{
+			save_errno = errno;
+			if (0 != shm_rmid(udi->shmid))
+				gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+					 RTS_ERROR_LITERAL("Error removing recvpool "), errno);
+			remove_sem_set(RECV);		/* Remove what we created */
+			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
 			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				 RTS_ERROR_LITERAL("Error with recvpool shmctl"), errno);
+				 RTS_ERROR_LITERAL("Error with recvpool shmctl"), save_errno);
+		}
 		udi->shm_ctime = shmstat.shm_ctime;
 		shm_created = TRUE;
 	}
 	status_l = (sm_long_t)(recvpool.recvpool_ctl = (recvpool_ctl_ptr_t)do_shmat(recvpool_shmid, 0, 0));
 	if (-1 == status_l)
+	{
+		save_errno = errno;
+		if (new_ipc)
+			remove_sem_set(RECV);
+		else
+			rel_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);
+		ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
 		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Error with receive pool shmat"), errno);
+			RTS_ERROR_LITERAL("Error with receive pool shmat"), save_errno);
+	}
 	if (shm_created)
 		recvpool.recvpool_ctl->initialized = FALSE;
 	recvpool.upd_proc_local = (upd_proc_local_ptr_t)((sm_uc_ptr_t)recvpool.recvpool_ctl + sizeof(recvpool_ctl_struct));
@@ -189,8 +243,15 @@ void recvpool_init(recvpool_user pool_user,
 	if (!recvpool.recvpool_ctl->initialized)
 	{
 		if (GTMRECV != pool_user || !gtmrecv_startup)
+		{
+			if (new_ipc)
+				remove_sem_set(RECV);
+			else
+				rel_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);
+			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
 			rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Receive pool has not been initialized"));
+		}
 		/* Initialize the shared memory fields */
 		QWASSIGNDW(recvpool.recvpool_ctl->start_jnl_seqno, 0);
 		recvpool.recvpool_ctl->recvdata_base_off = RECVDATA_BASE_OFF;
@@ -227,8 +288,16 @@ void recvpool_init(recvpool_user pool_user,
 	}
  	/* If startup, lock out checkhealth and receiver startup */
 	if (GTMRECV == pool_user && lock_opt_sem && 0 != grab_sem(RECV, RECV_SERV_OPTIONS_SEM))
+	{
+		save_errno = REPL_SEM_ERRNO;
+		if (new_ipc)
+			remove_sem_set(RECV);
+		else
+			rel_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);
+		ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
 		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
- 	  		  RTS_ERROR_LITERAL("Error with receive pool options semaphore"), REPL_SEM_ERRNO);
+ 	  		  RTS_ERROR_LITERAL("Error with receive pool options semaphore"), save_errno);
+	}
 	/* Release control lockout now that it is initialized */
 	rel_sem(RECV, RECV_POOL_ACCESS_SEM);
 	repl_instance.recvpool_shmid = udi->shmid;
@@ -236,6 +305,7 @@ void recvpool_init(recvpool_user pool_user,
 	repl_instance.recvpool_semid_ctime = udi->sem_ctime;
 	repl_instance.recvpool_shmid_ctime = udi->shm_ctime;
 	repl_inst_put(instname, &repl_instance);
-	rel_recvpool_ftok_sems(FALSE, FALSE);
+	if (!ftok_sem_release(recvpool.recvpool_dummy_reg, FALSE, FALSE))
+		rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
 	return;
 }

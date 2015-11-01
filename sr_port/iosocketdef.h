@@ -25,10 +25,26 @@
 #define MAX_N_SOCKET			64
 #define MAX_N_DELIMITER			64
 #define MAX_DELIM_LEN			64
+#define MAX_ZFF_LEN			64
 #define DEFAULT_LISTEN_DEPTH		1
 #define	DEFAULT_SOCKET_BUFFER_SIZE	0x400
 #define	MAX_SOCKET_BUFFER_SIZE		0x100000
 #define	MAX_INTERNAL_SOCBUF_SIZE	0x100000
+
+#define	ONE_COMMA			"1,"
+
+#define SOCKERROR(iod, dsocketptr, socketptr, gtmerror, syserror) \
+{ \
+	int	errlen; \
+	char	*errptr; \
+	iod->dollar.za = 9; \
+	memcpy(dsocketptr->dollar_device, ONE_COMMA, sizeof(ONE_COMMA)); \
+	errptr = (char *)STRERROR(syserror); \
+	errlen = strlen(errptr); \
+	memcpy(&dsocketptr->dollar_device[sizeof(ONE_COMMA) - 1], errptr, errlen); \
+	if (socketptr->ioerror) \
+		rts_error(VARLSTCNT(6) gtmerror, 0, ERR_TEXT, 2, errlen, errptr); \
+}
 
 enum socket_state
 {
@@ -70,11 +86,13 @@ typedef struct socket_struct_type
 	int				bufsiz;	/* OS internal buffer size */
         int4                            n_delimiter;
         mstr                            delimiter[MAX_N_DELIMITER];
+	boolean_t			delim0containsLF;
 	size_t				buffer_size;			/* size of the buffer for this socket */
 	size_t				buffered_length;		/* length of stuff buffered for this socket */
 	size_t				buffered_offset;		/* offset of the buffered stuff to buffer head */
 	char				*buffer;			/* pointer to the the buffer of this socket */
 	boolean_t			nodelay;
+	mstr				zff;
 } socket_struct;
 
 typedef struct d_socket_struct_type
@@ -88,10 +106,10 @@ typedef struct d_socket_struct_type
 
 boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz);
 boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz);
-boolean_t iosocket_delimiter(char *delimiter_buffer, unsigned char delimiter_blen, 	 socket_struct *socketptr, boolean_t rm);
-boolean_t iosocket_switch(char *handle, short handle_len, d_socket_struct *from, 	 d_socket_struct *to);
-int4 iosocket_handle(char *handle, short *len, boolean_t newhandle, 	 d_socket_struct *dsocketptr);
+boolean_t iosocket_delimiter(unsigned char *delimiter_buffer, int4 delimiter_len, socket_struct *socketptr, boolean_t rm);
+boolean_t iosocket_switch(char *handle, short handle_len, d_socket_struct *from, d_socket_struct *to);
+int4 iosocket_handle(char *handle, short *len, boolean_t newhandle, d_socket_struct *dsocketptr);
 socket_struct *iosocket_create(char *sockaddr, uint4 bfsize);
-ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, int flags, 	 ABS_TIME *time_for_read);
+ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, int flags, ABS_TIME *time_for_read);
 
 #endif

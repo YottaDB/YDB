@@ -13,7 +13,9 @@
 
 #include <sys/socket.h>
 #include <netinet/in.h>
+
 #include "mdef.h"
+
 #include "io.h"
 #include "gt_timer.h"
 #include "iotcpdef.h"
@@ -24,11 +26,18 @@ GBLREF io_pair		io_curr_device;
 void iosocket_wtff(void)
 {
 	io_desc		*iod;
+	socket_struct	*socketptr;
+	d_socket_struct	*dsocketptr;
 
 	iod = io_curr_device.out;
+	assert(gtmsocket == iod->type);
+	iod->esc_state = START;
+	dsocketptr = (d_socket_struct *)iod->dev_sp;
+	socketptr = dsocketptr->socket[dsocketptr->current_socket];
+	if (socketptr->zff.len)
+		iosocket_write(&socketptr->zff);
 	iosocket_flush(iod);
 	iod->dollar.x = 0;
 	iod->dollar.y = 0;
-
 	return;
 }

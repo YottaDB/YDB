@@ -21,11 +21,6 @@ uint4	a_trsize;	/* size of text relocation */
 uint4	a_drsize;	/* size of data relocation */
 };
 
-#define	OMAGIC	0407		/* old impure format */
-
-#define STAMP13 4		/* stamp - v1.3 */
-				/* (Note: further version stamps would be 2,3,4...) */
-
 /*
  * Format of a relocation datum.
  */

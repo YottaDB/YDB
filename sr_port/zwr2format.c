@@ -93,7 +93,8 @@ boolean_t zwr2format(mstr *src, mstr *des)
 			case 1:
 				for (counter = 0, digit = TRUE; digit && (counter < MAX_DIGIT_NUM);)
 				{
-				        digit = ISDIGIT(ch = *cp++);
+					ch = *cp++;
+				        digit = ISDIGIT(ch);
 					buff[counter++] = ch;
 				}
 				buff[--counter] = 0;

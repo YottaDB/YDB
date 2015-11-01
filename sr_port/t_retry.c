@@ -35,20 +35,18 @@
 #include "wcs_sleep.h"
 
 
-GBLREF gd_region	*gv_cur_region;
-GBLREF gv_key		*gv_currkey;
-GBLREF gv_namehead	*gv_target;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF short 		crash_count, dollar_tlevel;
+GBLREF gd_region	*gv_cur_region;
+GBLREF gv_key		*gv_currkey;
+GBLREF gv_namehead	*gv_target;
 GBLREF tp_frame		*tp_pointer;
 GBLREF trans_num	start_tn;
 GBLREF unsigned char	cw_set_depth, t_fail_hist[CDB_MAX_TRIES];
-GBLREF unsigned int	t_tries;
-GBLREF gv_namehead	*tp_fail_hist[CDB_MAX_TRIES];
-GBLREF block_id		t_fail_hist_blk[CDB_MAX_TRIES];
-GBLREF uint4		t_err;
 GBLREF boolean_t	mu_reorg_process;
+GBLREF unsigned int	t_tries;
+GBLREF uint4		t_err;
 
 DEBUG_ONLY(GBLREF uint4 cumul_index;
 	   GBLREF uint4 cu_jnl_index;
@@ -139,10 +137,8 @@ void t_retry(enum cdb_sc failure)
 		/* for TP, do the minimum; most of the logic is in tp_retry, because it is also invoked directly from t_commit */
 		t_fail_hist[t_tries] = failure;
 		TP_RETRY_ACCOUNTING(cs_addrs->hdr, failure);
-		DEBUG_ONLY(
-			if (cdb_sc_blkmod != failure)
-				TP_TRACE_HIST(CR_BLKEMPTY, gv_target);
-		)
+		if (cdb_sc_blkmod != failure)
+			TP_TRACE_HIST(CR_BLKEMPTY, gv_target);
 		gv_target->clue.end = 0;
 		INVOKE_RESTART;
 	}

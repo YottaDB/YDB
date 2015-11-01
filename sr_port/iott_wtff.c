@@ -10,9 +10,12 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "io.h"
 #include "iottdef.h"
 #include "io_params.h"
+
+GBLREF io_pair io_curr_device;
 
 static readonly unsigned char home_param_list[] =
 {
@@ -23,16 +26,10 @@ static readonly unsigned char home_param_list[] =
 	(unsigned char)iop_clearscreen,
 	(unsigned char)iop_eol
 };
-
-GBLREF io_pair io_curr_device;
+static readonly mval home_params = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(home_param_list) - 1, (char *)home_param_list, 0, 0);
 
 void iott_wtff(void)
 {
-	mval	home_params;
-
-	home_params.mvtype = MV_STR;
-	home_params.str.len = sizeof(home_param_list) - 1;
-	home_params.str.addr = (char *)home_param_list;	/* mstrs should hold unsigned chars, but until then stop compile warning */
 	io_curr_device.out->esc_state = START;
 	iott_use(io_curr_device.out, &home_params);
 }

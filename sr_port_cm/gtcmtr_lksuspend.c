@@ -10,13 +10,19 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "mlkdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "locklits.h"
+#include "gtcmtr_lk.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
 
 GBLREF connection_struct *curr_entry;
 
-bool gtcmtr_lksuspend()
+bool gtcmtr_lksuspend(void)
 {
 	unsigned char *ptr;
 	cm_region_list *reg_walk;

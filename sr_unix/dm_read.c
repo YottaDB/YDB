@@ -705,6 +705,7 @@ void 	write_str(unsigned char *str, unsigned short len, unsigned short cur_x, bo
 	int	fildes = ((d_tt_struct *)((io_curr_device.in)->dev_sp)) -> fildes;
 	io_desc *io_ptr = io_curr_device.in;
 
+	assert(width);
 	number_of_lines_up = (cur_x + len) / width;
 	number_of_chars_left = (cur_x + len) % width - (cur_x) % width;
 
@@ -716,8 +717,8 @@ void 	write_str(unsigned char *str, unsigned short len, unsigned short cur_x, bo
 			cur_width = width - cur_x;
 		else
 			cur_width = width;
-
-	    	DOWRITE_A(fildes, str, cur_width);
+		if (cur_width)
+	    		DOWRITE_A(fildes, str, cur_width);
 	    	str += cur_width;
 	    	len -= cur_width;
 
@@ -731,9 +732,9 @@ void 	write_str(unsigned char *str, unsigned short len, unsigned short cur_x, bo
 		if (!AUTO_RIGHT_MARGIN || EAT_NEWLINE_GLITCH)
 	    		DOWRITE(fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));
     	}
-
-	DOWRITE_A(fildes, str, len);
-
+	assert(len || number_of_lines_up);
+	if (len)
+		DOWRITE_A(fildes, str, len);
 	if (!move)
 	{
 		write_loop(fildes, (unsigned char *)CURSOR_UP, number_of_lines_up);
@@ -810,14 +811,12 @@ void	write_loop(int fildes, unsigned char *str, int num_times)
 		{
 			DOWRITE(fildes, str, strlen((char *)str));
 		}
-	}
-	else
+	} else if (num_times)
 	{
 		for (i = 0;  i < num_times;  i++)
 		{
 			strcat((char *)string, (char *)str);
 		}
-
 		DOWRITE(fildes, string, size_required);
 	}
 }

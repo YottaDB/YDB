@@ -11,46 +11,70 @@
 
 #include "mdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
+#include "gt_timer.h"
+#include "gtcmd.h"
+#include "mlkdef.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
+#include "gtcmtr_terminate.h"
+#include "gtcmtr_terminate_free.h"
 
 GBLREF connection_struct *curr_entry;
 GBLREF int4		gtcm_users;
-GBLREF short		gtcm_ast_avail;
+#ifdef VMS
+GBLREF short	gtcm_ast_avail;
+#endif
 GBLREF struct CLB	*proc_to_clb[];
 
 bool gtcmtr_terminate(bool cm_err)
 {
-	void 		gtcmd_rundown(),cmi_close(),gtcmtr_terminate_free();
+#ifdef VMS
 	unsigned char	*mbuffer;
+#endif
 	uint4		status;
+	struct CLB	*clb;
 
 	if (curr_entry)
 	{
-		VMS_ONLY(
-			status = sys$cantim(curr_entry,0);
-			if (!(status & 1))
-				rts_error(VARLSTCNT(1) status);
-		)
+		cancel_timer((TID)curr_entry);
 		gtcml_lkrundown();
 		gtcmd_rundown(curr_entry, cm_err);
-		if (curr_entry->clb_ptr)
-		{	mbuffer = curr_entry->clb_ptr->mbf;
-			cmi_close(curr_entry->clb_ptr);
-			curr_entry->clb_ptr = NULL;
-                        proc_to_clb[curr_entry->procnum] = NULL;
-			if (mbuffer)
-				free(mbuffer);
-		}
 		if (curr_entry->pvec)
 		{
 			free(curr_entry->pvec);
 			curr_entry->pvec = NULL;
 		}
 		curr_entry->region_root = NULL;	/* make sure you can't access any regions through this entry... just in case */
-		free(curr_entry);
+		if (curr_entry->clb_ptr)
+		{
+			clb = curr_entry->clb_ptr;
+			VMS_ONLY(mbuffer = clb->mbf;)
+			curr_entry->clb_ptr = NULL;
+			cmi_close(clb);
+			/*
+			 * The freeing of the buffer is automatically
+			 * handled by cmi_free_clb on UNIX.
+			 */
+#ifdef VMS
+			if (mbuffer)
+				free(mbuffer);
+#endif
+                        proc_to_clb[curr_entry->procnum] = NULL;
+			/*
+			 * Unix cmi_close doesn't free the clb.
+			 */
+			UNIX_ONLY(cmi_free_clb(clb));
+		}
+		/*
+		 * The connection struct is part of the memory allocated by
+		 * cmi_init on UNIX.  The cmi_free_clb has already dealt with it.
+		 */
+		VMS_ONLY(free(curr_entry));
 		curr_entry = NULL;
 	}
 	gtcm_users--;
-	gtcm_ast_avail++;
+	VMS_ONLY(gtcm_ast_avail++);
 	return CM_NOOP;
 }

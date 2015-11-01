@@ -117,10 +117,10 @@ ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, i
 					bytesread = socketptr->buffered_offset = maxlength;
 				}
 			}
-		}
-		else if (0 == bytesread)
-		{
-			/* ----- lost of connection ------- */
+		} else if ((0 == bytesread) || ((-1 == bytesread) && (ECONNRESET == errno || EPIPE == errno || EINVAL == errno)))
+		{ /* ----- lost connection ------- */
+			if (0 == bytesread)
+				errno = ECONNRESET;
 			return (ssize_t)(-2);
 		}
 		return bytesread;

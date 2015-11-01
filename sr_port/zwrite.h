@@ -62,4 +62,4 @@ void gvzwr_var(uint4 data, int4 n);
 void lvzwr_arg(int t, mval *a1, mval *a2);
 void lvzwr_init(bool t, mval *val);
 void lvzwr_out(mval *val);
-unsigned char *lvzwr_key(unsigned char *buff, unsigned short size);
+unsigned char *lvzwr_key(unsigned char *buff, int size);

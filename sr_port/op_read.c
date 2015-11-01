@@ -39,8 +39,7 @@ int op_read(mval *v, int4 timeout)
 	stat = (io_curr_device.in->disp_ptr->read)(v, timeout);
 	stringpool.free += v->str.len;
 	assert(stringpool.free <= stringpool.top);
-
-	if (DEFAULT_CODE_SET != active_device->in_code_set)
+	if (DEFAULT_CODE_SET != io_curr_device.in->in_code_set)
 	{
 		cnt = insize = outsize = v->str.len;
 		assert(stringpool.free >= stringpool.base);
@@ -53,12 +52,9 @@ int op_read(mval *v, int4 timeout)
 		stringpool.free += cnt;
 		assert(stringpool.free >= stringpool.base);
 		assert(stringpool.free <= stringpool.top);
-
-		ICONVERT(active_device->input_conv_cd, (unsigned char **)&v->str.addr, &insize, &temp_ch, &outsize);
-
+		ICONVERT(io_curr_device.in->input_conv_cd, (unsigned char **)&v->str.addr, &insize, &temp_ch, &outsize);
 		v->str.addr = start_ptr;
 	}
-
 	active_device = 0;
 	if (NO_M_TIMEOUT != timeout)
 		return(stat);

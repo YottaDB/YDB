@@ -40,7 +40,12 @@ int4 bml_init(block_id bml)
 	uint4		status;
 
 	size = BM_SIZE(cs_data->bplmap);
+#ifdef FULLBLOCKWRITES
+	ptr = (blk_hdr_ptr_t)malloc(((cs_addrs->hdr->blk_size) + 1) & ~1); /* The malloc should be blk_hdr_size as size is used
+										in bml_newmap and that modifies bsiz */
+#else
 	ptr = (blk_hdr_ptr_t)malloc((size + 1) & ~1);
+#endif
 	bml_newmap(ptr, size, ((JNL_ENABLED(cs_data) && cs_addrs->jnl && cs_addrs->jnl->jnl_buff &&
 					cs_addrs->jnl->jnl_buff->before_images) ?  0 : cs_data->trans_hist.curr_tn));
 	/* status holds the status of any error return from dsk_write */

@@ -219,10 +219,17 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		/* key_len = length of 1st key value (including subscript) for dest_blk_id */
 		GET_KEY_LEN(key_len, rec_base + sizeof(rec_hdr));
                 if (1 >= key_len_dir || 2 >= key_len || MAX_KEY_SZ < key_len)
-                {
-			assert(t_tries < CDB_STAGNATE);
-                        return cdb_sc_blkmod;
-                }
+		{
+			/*
+			 * Earlier used to restart here always. But dest_blk_id can be a block,
+			 * which is just killed and still marked busy.
+			 * Skip it, if we are in last retry.
+			 */
+			if (CDB_STAGNATE <= t_tries)
+				continue;
+			else
+				return cdb_sc_blkmod;
+		}
                 memcpy(&(dest_gv_currkey->base[0]), rec_base + sizeof(rec_hdr), key_len_dir);
                 dest_gv_currkey->base[key_len_dir] = 0;
                 dest_gv_currkey->end = key_len_dir;

@@ -113,7 +113,7 @@ bool mur_brktrans_open_files(ctl_list *ctl)
 		op_val.str.addr = (char *)brktrans_file_info->fn;
 		if((status = (*op_open_ptr)(&op_val, &op_pars, 0, 0)) == 0)
 		{
-			gtm_putmsg(VARLSTCNT(1)errno);
+			gtm_putmsg(VARLSTCNT(1) errno);
 			util_out_print("Error opening Broken trans file !AD ", TRUE,
 						brktrans_file_info->fn_len, brktrans_file_info->fn);
 			return FALSE;

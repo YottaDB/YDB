@@ -70,6 +70,15 @@ typedef struct
 # error Unsupported platform
 #endif
 
+#define UNIQUE_ID_SIZE sizeof(gd_id)
+
+typedef union
+{
+	gd_id 		uid;
+	char		file_id[UNIQUE_ID_SIZE];
+} unique_file_id;
+
+
 /* Since it is possible that a block_id/unix_file_id/gd_id may live in shared memory, define a
    shared memory pointer type to it so the pointer will be 64 bits if necessary. */
 
@@ -104,7 +113,32 @@ typedef struct
 {
 	uint4	low, high;
 } date_time;
+/*
+ * Note: For AIX we do not need to check FS_REMOTE == st_flag. Because st_gen is already set to 0
+ * or, appropriate non-zero value.
+ */
+#ifdef UNIX
+#if defined(__osf__) || defined(_AIX)
+#define gdid_cmp(A, B) 							\
+	(((A)->inode != (B)->inode)					\
+		? ((A)->inode > (B)->inode ? 1 : -1)			\
+		: ((A)->device != (B)->device) 				\
+			? ((A)->device > (B)->device ? 1 : -1)		\
+			: ((A)->st_gen != (B)->st_gen)			\
+				? ((A)->st_gen > (B)->st_gen ? 1 : -1)	\
+				: 0)
+#else
+#define gdid_cmp(A, B) 							\
+	(((A)->inode != (B)->inode)					\
+		? ((A)->inode > (B)->inode ? 1 : -1)			\
+		: ((A)->device != (B)->device) 				\
+			? ((A)->device > (B)->device ? 1 : -1)		\
+			: 0)
+#endif
+#define is_gdid_gdid_identical(A, B) (0 == gdid_cmp(A, B) ? TRUE: FALSE)
+#endif
 
+/* Prototypes below */
 block_id get_dir_root(void);
 boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn,
 	unsigned int *full_len, int max_len);
@@ -113,5 +147,4 @@ void gvinit(void);
 void global_name(unsigned char prefix[], gds_file_id *fil,
 	unsigned char *buff);
 #endif
-
 #endif

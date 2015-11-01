@@ -1,5 +1,4 @@
 /****************************************************************
- *								*
  *	Copyright 2001 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,6 +9,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -39,9 +40,12 @@
 #include "getzposition.h"
 #include "getzprocess.h"
 #include "get_ret_targ.h"
+#include "mv_stent.h"
 #include "dollar_zlevel.h"
 #include "gtmmsg.h"
-
+#include "error_trap.h"
+#include "setzdir.h"
+#include "get_reference.h"
 
 #define ESC_OFFSET		4
 #define MAX_COMMAND_LINE_LENGTH	255
@@ -53,6 +57,7 @@ GBLDEF mstr		dollar_zcompile;
 
 GBLREF mval		dollar_zdir;
 GBLREF stack_frame	*frame_pointer;
+GBLREF mval		dollar_estack_delta;
 GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
 GBLREF io_log_name	*io_root_log_name;
@@ -71,10 +76,11 @@ GBLREF int4		dollar_zcstatus;
 GBLREF int4		dollar_zeditor;
 GBLREF short		dollar_tlevel;
 GBLREF short		dollar_trestart;
-GBLREF mval		dollar_ecode;
 GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_zerror;
 GBLREF mval		dollar_zyerror;
+GBLREF mval		dollar_system;
+GBLREF int4		zdir_form;
 
 LITREF mval		literal_zero,literal_one;
 LITREF char		gtm_release_name[];
@@ -88,6 +94,7 @@ void op_svget(int varnum, mval *v)
 
 	error_def(ERR_UNIMPLOP);
 	error_def(ERR_TEXT);
+	error_def(ERR_ZDIROUTOFSYNC);
 
 	switch (varnum)
 	{
@@ -136,6 +143,12 @@ void op_svget(int varnum, mval *v)
 		break;
 	case SV_JOB:
 		*v = dollar_job;
+		break;
+	case SV_REFERENCE:
+		get_reference(v);
+		break;
+	case SV_SYSTEM:
+		*v = dollar_system;
 		break;
 	case SV_STORAGE:
 		i2mval(v, getstorage());
@@ -207,7 +220,12 @@ void op_svget(int varnum, mval *v)
 		s2pool(&(v->str));
 		break;
 	case SV_ZDIR:
-		*v = dollar_zdir;
+		setzdir(NULL, v);
+		if (v->str.len != dollar_zdir.str.len || 0 != memcmp(v->str.addr, dollar_zdir.str.addr, v->str.len))
+			gtm_putmsg(VARLSTCNT(6) ERR_ZDIROUTOFSYNC, 4, v->str.len, v->str.addr,
+					dollar_zdir.str.len, dollar_zdir.str.addr);
+		SKIP_DEVICE_IF_NOT_NEEDED(v);
+		s2pool(&(v->str));
 		break;
 	case SV_ZSTEP:
 		*v = dollar_zstep;
@@ -273,14 +291,11 @@ void op_svget(int varnum, mval *v)
 		MV_FORCE_MVAL(v, (NULL == get_ret_targ()) ? 0 : 1);
 		break;
 	case SV_ECODE:
-		v->mvtype = MV_STR;
-		v->str = dollar_ecode.str;
-		s2pool(&(v->str));
+		dollar_ecode_build(-1, v);
 		break;
 	case SV_ESTACK:
-		gtm_putmsg(VARLSTCNT(1) MAKE_MSG_WARNING(ERR_UNIMPLOP));
-		gtm_putmsg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("$ESTACK"));
-		MV_FORCE_MVAL(v, 0); /* till 'tis implemented */
+		count = (dollar_zlevel() - 1) - dollar_estack_delta.m[0];
+		MV_FORCE_MVAL(v, count);
 		break;
 	case SV_ETRAP:
 		v->mvtype = MV_STR;

@@ -12,8 +12,8 @@
 #include "mdef.h"
 #include "gtm_time.h"
 
-#include <unistd.h>
 
+#include "gtm_unistd.h"
 #include "aswp.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -31,11 +31,12 @@
 #include "performcaslatchcheck.h"
 #include "wcs_sleep.h"
 #include "jnl_write.h"
+#include "gtm_string.h"
 
-#define	HDR_LEN		ROUND_UP(sizeof(jnl_file_header), 8)
 GBLREF	boolean_t	mupip_jnl_recover;
 GBLREF	boolean_t	jnlfile_truncation;
 GBLREF	uint4		process_id;
+GBLREF	boolean_t	recovery_success;
 
 
 
@@ -47,11 +48,11 @@ GBLREF	uint4		process_id;
 	error_def(ERR_JNLCLOSE);										\
 														\
 	for (lcnt = 1; 												\
-	     (lcnt < JNL_MAX_FLUSH_TRIES) && (FALSE == GET_SWAPLOCK(&jb->io_in_prog_latch));				\
+	     (lcnt < JNL_MAX_FLUSH_TRIES) && (FALSE == GET_SWAPLOCK(&jb->io_in_prog_latch));			\
 	     lcnt++)												\
         {													\
 		wcs_sleep(lcnt);										\
-                performCASLatchCheck(&jb->io_in_prog_latch);							\
+                performCASLatchCheck(&jb->io_in_prog_latch, lcnt * 2);	/* lcnt*2 so do wakeup sooner */	\
         }													\
 	if (lcnt == JNL_MAX_FLUSH_TRIES)									\
 	{													\
@@ -143,11 +144,29 @@ void	jnl_file_close(gd_region *reg, bool clean, bool eov)
 			header = (jnl_file_header *)hdr_buffer;
 			assert(jnlfile_truncation || header->end_of_data <= end_of_data);
 			header->end_of_data = end_of_data;
-			JNL_SHORT_TIME(header->eov_timestamp);
-			assert(header->eov_timestamp >= header->bov_timestamp);
+			JNL_WHOLE_TIME(header->eov_timestamp);
+			assert(CMP_JNL_PROC_TIME(header->eov_timestamp, header->bov_timestamp) >=0);
 			header->eov_tn = csa->ti->curr_tn;
 			assert(header->eov_tn >= header->bov_tn);
 			header->crash = FALSE;
+			if (mupip_jnl_recover && recovery_success & 0 != header->forw_phase_jnl_file_len)
+			{
+				if (0 != (status = UNLINK(header->forw_phase_jnl_file_name)))
+				{
+					if (-1 == status)
+					{
+						status = errno;
+						gtm_putmsg(VARLSTCNT(1) status);
+					}
+					util_out_print("MUR-W-ERRDEl : Error deleting jnl file !AD", TRUE,
+						header->forw_phase_jnl_file_len, header->forw_phase_jnl_file_name);
+				}
+				header->ftruncate_len = 0;
+				header->forw_phase_stop_addr = 0;
+				header->forw_phase_last_record = 0;
+				header->forw_phase_eof_addr = 0;
+				header->forw_phase_jnl_file_len = 0;
+			}
 			LSEEKWRITE(jpc->channel, 0, (sm_uc_ptr_t)hdr_buffer, sizeof(hdr_buffer), status);
 		}
 		RELEASE_IO_IN_PROG_LOCK(jb);

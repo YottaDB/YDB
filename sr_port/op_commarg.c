@@ -22,12 +22,12 @@
 #include "do_indir_do.h"
 #include "op.h"
 
-#define INDIR(a, b) b()
+#define INDIR(a, b, c) b()
 int
 #include "indir.h"
 ;
 #undef INDIR
-#define INDIR(a, b) b
+#define INDIR(a, b, c) b
 LITDEF int (*indir_fcn[])() = {
 #include "indir.h"
 };
@@ -44,7 +44,10 @@ void	op_commarg(mval *v, unsigned char argcode)
 
 	MV_FORCE_STR(v);
 	assert(argcode >=3 && argcode < sizeof(indir_fcn) / sizeof(indir_fcn[0]));
-	if (!(obj = cache_get(argcode, &v->str)))
+
+ 	/* Note cache_get call must come first in test below because we ALWAYS want it
+ 	   to be executed to set cache_hashent for the subsequent cache_put */
+	if (!(obj = cache_get(argcode, &v->str)) || indir_linetail_nocache == argcode)
 	{
 		if (((indir_do == argcode) || (indir_goto == argcode)) &&
 		    (frame_pointer->type & SFT_COUNT) && v->str.len && (v->str.len < sizeof(mident)) &&

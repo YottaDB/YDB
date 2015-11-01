@@ -20,6 +20,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>	/* for VSIG_ATOMIC_T type */
 #include "gtm_time.h"
 
 #include "gdsroot.h"
@@ -58,16 +59,20 @@
 #include "io.h"
 #include "gtmsecshr.h"
 #include "ftok_sems.h"
+#include "gtmimagename.h"
 
 
-GBLREF bool			forced_exit;
-GBLREF boolean_t		mupip_jnl_recover;
-GBLREF boolean_t		created_core, need_core, dont_want_core, is_src_server, is_rcvr_server, is_updproc;
-GBLREF gd_region		*gv_cur_region;
-GBLREF sgmnt_addrs		*cs_addrs;
-GBLREF sgmnt_data_ptr_t		cs_data;
-GBLREF uint4			process_id;
-GBLREF ipcs_mesg		db_ipcs;
+GBLREF	VSIG_ATOMIC_T		forced_exit;
+GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF	boolean_t		created_core, need_core, dont_want_core, is_src_server, is_rcvr_server, is_updproc;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	uint4			process_id;
+GBLREF	ipcs_mesg		db_ipcs;
+GBLREF	enum gtmImageTypes	image_type;
+GBLREF	jnl_process_vector	*prc_vec;
+GBLREF	jnl_process_vector	*originator_prc_vec;
 
 static boolean_t		grabbed_access_sem;
 
@@ -101,9 +106,26 @@ void gds_rundown(void)
 	error_def(ERR_WCBLOCKED);
 	error_def(ERR_GTMASSERT);
 
+	forced_exit = FALSE;		/* Okay, we're dying already -- let rel_crit live in peace now.
+					 * If coming through a DAL, not necessarily dying. what to do then? -- nars -- 8/15/2001
+					 */
 	grabbed_access_sem = FALSE;
 	jnl_status = 0;
 	reg = gv_cur_region;			/* Local copy */
+
+	/*
+	 * early out for cluster regions
+	 * to avoid tripping the assert below.
+	 * Note:
+	 *	This early out is consistent with VMS.  It has been
+	 *	noted that all of the gtcm assignments
+	 *      to gv_cur_region should use the TP_CHANGE_REG
+	 *	macro.  This would also avoid the assert problem
+	 *	and should be done eventually.
+	 */
+	if (dba_cm == reg->dyn.addr->acc_meth)
+		return;
+
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
 	csd = csa->hdr;
@@ -150,7 +172,6 @@ void gds_rundown(void)
 		return;
 	}
 	we_are_last_user = FALSE;
-	forced_exit = FALSE;		/* Okay, we're dying already -- let rel_crit live in peace now */
 	if (!csa->persistent_freeze)
 		region_freeze(reg, FALSE, FALSE);
 	if (csa->read_lock)			/* get locks to known state */
@@ -251,6 +272,8 @@ void gds_rundown(void)
 			BG_TRACE_PRO_ANY(csa, lost_block_recovery);
 			rel_crit(reg);
 		}
+		if (((JNL_ENABLED(csd)) && (GTCM_GNP_SERVER_IMAGE == image_type)) || mupip_jnl_recover)
+			originator_prc_vec = prc_vec;
 		/* If we are the last writing user, then everything must be flushed */
 		if (we_are_last_writer)
 		{
@@ -355,8 +378,8 @@ void gds_rundown(void)
 			if (!mupip_jnl_recover && we_are_last_user)
 			{
 				/* mupip_jnl_recover will do this after mur_close_file */
-				csd->semid = 0;
-				csd->shmid = 0;
+				csd->semid = INVALID_SEMID;
+				csd->shmid = INVALID_SHMID;
 				csd->sem_ctime.ctime = 0;
 				csd->shm_ctime.ctime = 0;
 			}
@@ -390,8 +413,8 @@ void gds_rundown(void)
 	if (reg->read_only && we_are_last_user && !mupip_jnl_recover)
 	{
 		/* mupip_jnl_recover will do this after mur_close_file */
-		db_ipcs.semid = 0;
-		db_ipcs.shmid = 0;
+		db_ipcs.semid = INVALID_SEMID;
+		db_ipcs.shmid = INVALID_SHMID;
 		db_ipcs.sem_ctime = 0;
 		db_ipcs.shm_ctime = 0;
 		db_ipcs.fn_len = reg->dyn.addr->fname_len;
@@ -534,8 +557,8 @@ CONDITION_HANDLER(gds_rundown_ch)
 					  ERR_TEXT, 2, RTS_ERROR_TEXT("Error releasing access semaphore"), semop_res);
 
 	}
-	if (udi->grabbed_ftok_sem && !mupip_jnl_recover)
-		ftok_sem_release(gv_cur_region, TRUE, TRUE);
+	if (udi->grabbed_ftok_sem)
+		ftok_sem_release(gv_cur_region, !mupip_jnl_recover, TRUE);
 	gv_cur_region->open = FALSE;
 	PRN_ERROR;
 	gtm_putmsg(VARLSTCNT(4) ERR_DBRNDWN, 2, REG_LEN_STR(gv_cur_region));

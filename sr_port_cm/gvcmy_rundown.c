@@ -10,12 +10,15 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "hashdef.h"
 #include "cmidef.h"
 #include "cmmdef.h"
+#include "gvcmy_rundown.h"
+#include "gvcmy_close.h"
 
 GBLREF struct NTD *ntd_root;
 
-gvcmy_rundown()
+void gvcmy_rundown(void)
 {
 	struct CLB	*p;
 
@@ -26,5 +29,4 @@ gvcmy_rundown()
 	{
 		gvcmy_close(p);
 	}
-	return;
 }

@@ -155,7 +155,7 @@ typedef struct tp_region_struct
 {
 	struct	tp_region_struct *fPtr;			/* Next in list */
 	gd_region	*reg;				/* Region pointer */
-	char		unique_id[UNIQUE_ID_SIZE];	/* both for VMS and UNIX */
+	gd_id		file_id; 			/* both for VMS and UNIX */
 } tp_region;
 
 typedef struct ua_list_struct
@@ -172,25 +172,39 @@ typedef struct new_buff_buddy_list_struct
 	unsigned char	new_buff[1];
 }new_buff_buddy_list;
 
-#ifdef DEBUG
-GBLREF	int4		tp_fail_n;
-GBLREF	int4		tp_fail_level;
-GBLREF	block_id	t_fail_hist_blk[CDB_MAX_TRIES];
-GBLREF	gv_namehead	*tp_fail_hist[CDB_MAX_TRIES];
-GBLREF	int4		tp_fail_histtn[CDB_MAX_TRIES], tp_fail_bttn[CDB_MAX_TRIES];
-GBLREF	int4		n_pvtmods, n_blkmods;
+#define TP_TRACE_HIST(X, Y) 										\
+{													\
+	GBLREF	int4		tprestart_syslog_delta;							\
+	GBLREF	block_id	t_fail_hist_blk[CDB_MAX_TRIES];						\
+	GBLREF	gv_namehead	*tp_fail_hist[CDB_MAX_TRIES];						\
+													\
+	if (tprestart_syslog_delta)									\
+	{												\
+		t_fail_hist_blk[t_tries] = ((block_id)X); 						\
+		tp_fail_hist[t_tries] = (gv_namehead *)(((int)X & ~(-BLKS_PER_LMAP)) ? Y : NULL);	\
+	}												\
+}
 
-#define TP_TRACE_HIST(X, Y) (t_fail_hist_blk[t_tries] = ((block_id)X), \
-		tp_fail_hist[t_tries] = (gv_namehead *)(((int)X & ~(-BLKS_PER_LMAP)) ? Y : NULL))
-
-#define TP_TRACE_HIST_MOD(X, Y, n, csd, histtn, bttn, level) (t_fail_hist_blk[t_tries] = ((block_id)X),	\
-		tp_fail_hist[t_tries] = (gv_namehead *)(((int)X & ~(-BLKS_PER_LMAP)) ? Y : NULL), 	\
-		(csd)->tp_cdb_sc_blkmod[(n)]++, tp_fail_n = (n), tp_fail_level = (level),		\
-		tp_fail_histtn[t_tries] = (histtn), tp_fail_bttn[t_tries] = (bttn))
-#else
-#define TP_TRACE_HIST(X, Y)
-#define TP_TRACE_HIST_MOD(X, Y, Z, A, B, C, D)
-#endif
+#define TP_TRACE_HIST_MOD(X, Y, n, csd, histtn, bttn, level)						\
+{													\
+	GBLREF	int4		tprestart_syslog_delta;							\
+	GBLREF	int4		tp_fail_n;								\
+	GBLREF	int4		tp_fail_level;								\
+	GBLREF	block_id	t_fail_hist_blk[CDB_MAX_TRIES];						\
+	GBLREF	gv_namehead	*tp_fail_hist[CDB_MAX_TRIES];						\
+	GBLREF	int4		tp_fail_histtn[CDB_MAX_TRIES], tp_fail_bttn[CDB_MAX_TRIES];		\
+													\
+	if (tprestart_syslog_delta)									\
+	{												\
+		t_fail_hist_blk[t_tries] = ((block_id)X);						\
+		tp_fail_hist[t_tries] = (gv_namehead *)(((int)X & ~(-BLKS_PER_LMAP)) ? Y : NULL); 	\
+		(csd)->tp_cdb_sc_blkmod[(n)]++;								\
+		tp_fail_n = (n);									\
+		tp_fail_level = (level);								\
+		tp_fail_histtn[t_tries] = (histtn);							\
+		tp_fail_bttn[t_tries] = (bttn);								\
+	}												\
+}
 
 GBLREF	short	dollar_trestart;
 
@@ -237,7 +251,7 @@ GBLREF	short	dollar_trestart;
 	/* The following two computations are either rare or are needed in dse where performance		\
 	 * 	is not a concern. Hence these are recomputed everytime instead of storing in a variable.	\
 	 */													\
-	if (dse_running)											\
+	if (dse_running || write_after_image)											\
 		total_jnl_rec_size += (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_AIMG] + JREC_SUFFIX_SIZE		\
 					+ csa->hdr->blk_size							\
 					+ JREC_PREFIX_SIZE + jnl_fixed_size[JRT_ALIGN] + JREC_SUFFIX_SIZE);	\

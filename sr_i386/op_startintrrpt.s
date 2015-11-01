@@ -38,7 +38,7 @@ ENTRY op_startintrrpt
 	pushl	$0
 	call	gvcmz_neterr
 	addl	$4,%esp
-l1:	pushl	$0
+l1:	pushl	$1
 	call	async_action
 	addl    $4,%esp
 	getframe

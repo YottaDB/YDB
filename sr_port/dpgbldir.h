@@ -12,13 +12,15 @@
 #ifndef __DBGBLDIR_H__
 #define __DBGBLDIR_H__
 
-gd_addr *zgbldir(mval *v);
-gd_addr *gd_load(mstr *v);
-gd_addr *get_next_gdr(gd_addr *prev);
-void cm_add_gdr_ptr(gd_region *greg);
-void cm_del_gdr_ptr(gd_region *greg);
-boolean_t get_first_gdr_name(gd_addr *current_gd_header, mstr *log_nam);
-mstr *get_name(mstr *ms);
-void *open_gd_file(mstr *v);
+boolean_t	get_first_gdr_name(gd_addr *current_gd_header, mstr *log_nam);
+gd_addr		*zgbldir(mval *v);
+gd_addr		*gd_load(mstr *v);
+gd_addr		*get_next_gdr(gd_addr *prev);
+mstr		*get_name(mstr *ms);
+void		cm_add_gdr_ptr(gd_region *greg);
+void		cm_del_gdr_ptr(gd_region *greg);
+void		*open_gd_file(mstr *v);
+void		gd_rundown(void);
+void		gd_ht_kill(struct htab_desc_struct *table, boolean_t contents);
 
 #endif

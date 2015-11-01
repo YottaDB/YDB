@@ -28,10 +28,10 @@ void op_zprint(mval *rtn,mval *start_label,int start_int_exp,mval *end_label,int
 /*	 parser makes the second label the duplicate	*/
 /*	 of the first. (not so vice versa)		*/
 {
-	mval print_line, null_str;
-	src_lin_dsc *src1, *src2;
-	uint4 stat1, stat2;
-	rhdtyp *rtn_vector;
+	mval	print_line, null_str;
+	mstr	*src1, *src2;
+	uint4	stat1, stat2;
+	rhdtyp	*rtn_vector;
 	error_def (ERR_FILENOTFND);
 	error_def (ERR_TXTSRCMAT);
 	error_def (ERR_ZPRTLABNOTFND);
@@ -86,8 +86,8 @@ void op_zprint(mval *rtn,mval *start_label,int start_int_exp,mval *end_label,int
 	{
 		if (outofband)
 			outofband_action(TRUE);
-		print_line.str.addr = src1->text_form.addr;
-		print_line.str.len = src1->text_form.len;
+		print_line.str.addr = src1->addr;
+		print_line.str.len = src1->len;
 		op_write(&print_line);
 		op_wteol(1);
 	}

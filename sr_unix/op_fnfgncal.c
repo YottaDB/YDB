@@ -11,27 +11,31 @@
 
 #include "mdef.h"
 
+#ifdef EARLY_VARARGS
+#include <varargs.h>
+#endif
+
 #include <errno.h>
 
-#include "gtm_stdio.h"	/* this is here due to the need for an sprintf,
-			 * which is in turn due the kudge that is the current double2mval routine
-			 */
 #include "gtm_stdlib.h"
 
+#ifndef EARLY_VARARGS
 #include "varargs.h"
+#endif
 #include "stringpool.h"
 #include "copy.h"
 #include "rtnhdr.h"
+#include "stack_frame.h"
+#include "op.h"
 #include "fgncal.h"
+#include "gtmci.h"
 #include "gtmxc_types.h"
 #include "mvalconv.h"
 #include "mstrcmp.h"
 #include "gt_timer.h"
 #include "callg.h"
 #include "underr.h"
-
-
-
+#include "callintogtmxfer.h"
 
 /******************************************************************************
  *
@@ -98,15 +102,10 @@
  ******************************************************************************/
 
 static struct extcall_package_list	*extcall_package_root = 0;
-#define MAX_ADDR_SIZE			32
-#define MAX_ADDR_ENV_SIZE		64
-#define GTM_CALLIN_START_ENV		"GTM_CALLIN_START="
-#define GTM_CALLIN_START_ENV_LEN	17
-
-GBLREF spdesc stringpool;
-GBLREF int    (*callintogtm_vectortable[])();
-GBLDEF unsigned char	gtmvectortable_address[MAX_ADDR_SIZE];
-GBLDEF unsigned char	gtmvectortable_env[MAX_ADDR_ENV_SIZE];
+GBLREF stack_frame      *frame_pointer;
+GBLREF unsigned char    *msp;
+GBLREF spdesc 		stringpool;
+GBLREF int    		(*callintogtm_vectortable[])();
 error_def(ERR_ZCRTENOTF);
 error_def(ERR_ZCUSRRTN);
 error_def(ERR_ZCARGMSMTCH);
@@ -114,20 +113,6 @@ error_def(ERR_UNIMPLOP);
 error_def(ERR_ZCMAXPARAM);
 
 static	int			call_table_initialized = 0;
-
-/* a (barely suitable) double2mval */
-static void	double2mval(double src, mval *dst)
-{
-	char	buf[67];	/* [possible] sign, decimal-point, [up to] 64 digits, and terminator */
-
-	SPRINTF(buf, "%lf", src);
-	dst->mvtype = MV_STR;
-	dst->str.len = strlen(buf);
-	dst->str.addr = buf;
-	s2n(dst);
-	dst->mvtype &= ~MV_STR;
-	return;
-}
 
 /* routine to convert external return values to mval's */
 static void	extarg2mval(void *src, enum xc_types typ, mval *dst)
@@ -266,8 +251,6 @@ va_dcl
 	int4		n, *free_space_pointer;
 	uint4		m1, status;
 	char		*cp, *free_string_pointer;
-	unsigned char	*env_top, *address_top;
-	uint4		address_len;
 	int		pre_alloc_size;
 	char		*gtmvectortable_temp, *tmp_buff_ptr, str_buffer[MAX_NAME_LENGTH];
 	char		*xtrnl_table_name;
@@ -286,7 +269,7 @@ va_dcl
 	/* As we may have to pass the M input parameters more than once, save the
 	current var_args var pointer */
 	VAR_START(var);
-	save_var = var;
+	VAR_COPY(save_var, var);
 	assert(n_mvals == argcnt + 5);
 	assert(MV_IS_STRING(package));	/* package and routine are literal strings */
 	assert(MV_IS_STRING(extref));
@@ -316,27 +299,10 @@ va_dcl
 		if (0 == mstrcmp(&(entry_ptr->entry_name), &(extref->str)))
 			break;
 	}
-
 	if (call_table_initialized == FALSE)
 	{
 		call_table_initialized = TRUE;
-		/* The address of the vector table containing pointers
-		 * to gt_timers functions is of type unsigned int which
-		 * is o.k in current GT.M implementations, however when
-		 * GT.M migrates to a fully 64 port this part of the code
-		 * might have be re-visited.
-		 */
-		address_top = i2asc(gtmvectortable_address, (uint4 )&callintogtm_vectortable[0]);
-		*address_top = '\0';
-		address_len = (uint4 )(address_top - &gtmvectortable_address[0]);
-		env_top =  &gtmvectortable_env[0];
-		memcpy(env_top, GTM_CALLIN_START_ENV, GTM_CALLIN_START_ENV_LEN);
-		memcpy((env_top + GTM_CALLIN_START_ENV_LEN), gtmvectortable_address, address_len);
-		*(env_top + GTM_CALLIN_START_ENV_LEN + address_len) = '\0';
-		if (PUTENV((char *)gtmvectortable_env))
-		{
-			rts_error(VARLSTCNT(1) errno);
-		}
+		init_callin_functable();
 	}
 	/* entry not found */
 	if ((NULL == entry_ptr) || (NULL == entry_ptr->fcn))
@@ -347,7 +313,7 @@ va_dcl
 	/* compute size of parameter block */
 	n = entry_ptr->parmblk_size;	/* This is enough for the parameters and the fixed length entries */
 	/* Now, add enough for the char *'s and the char **'s */
-	for (i = 0, var = save_var, m1 = entry_ptr->input_mask;  i < argcnt;  i++, m1 = m1 >> 1)
+	for (i = 0, VAR_COPY(var, save_var), m1 = entry_ptr->input_mask;  i < argcnt;  i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		/* if it is an input value of char* or char **, add the length */
@@ -383,7 +349,7 @@ va_dcl
 	free_space_pointer = (int4 *)((char *)param_list + sizeof(int) + sizeof(void *)*argcnt);
 	free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
 	/* load-up the parameter list */
-	for (i = 0, var = save_var, m1 = entry_ptr->input_mask;  i < argcnt;  i++, m1 = m1 >> 1)
+	for (i = 0, VAR_COPY(var, save_var), m1 = entry_ptr->input_mask;  i < argcnt;  i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		/* Verify that all input values are defined */
@@ -479,10 +445,18 @@ va_dcl
 	}
 	param_list->n = argcnt;
 	status = callg(entry_ptr->fcn, param_list);
+
+	if (frame_pointer->flags & SFF_CI)
+	{ /* exit from the residual call-in environment */
+		op_unwind(); /* SFF_CI */
+		op_unwind(); /* base frame of this call-in environment */
+		frame_pointer = *(stack_frame**)msp;
+		msp += sizeof(frame_pointer);
+	}
 	/* NOTE: ADD RETURN STATUS CALCUATIONS HERE */
 	/* compute space requirement for return values */
 	n = 0;
-	for (i = 0, var = save_var, m1 = mask & entry_ptr->output_mask;  i < argcnt;  i++, m1 = m1 >> 1)
+	for (i = 0, VAR_COPY(var, save_var), m1 = mask & entry_ptr->output_mask;  i < argcnt;  i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		if (m1 & 1)
@@ -493,7 +467,7 @@ va_dcl
 	if (stringpool.free + n > stringpool.top)
 		stp_gcol(n);
 	/* convert return values */
-	for (i = 0, var = save_var, m1 = mask & entry_ptr->output_mask;  i < argcnt;  i++, m1 = m1 >> 1)
+	for (i = 0, VAR_COPY(var, save_var), m1 = mask & entry_ptr->output_mask;  i < argcnt;  i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		if (m1 & 1)

@@ -17,25 +17,26 @@
 #include "gdsfhead.h"
 #include "locklits.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "mlkdef.h"
+#include "gt_timer.h"
+#include "gtcmlkdef.h"
+#include "gtcml.h"
+#include "mlk_unpend.h"
 
-GBLREF mlk_pvtblk *mlk_cm_root;
-GBLREF unsigned short cm_cmd_lk_ct;
-GBLREF connection_struct *curr_entry;
+GBLREF mlk_pvtblk		*mlk_cm_root;
+GBLREF unsigned short		cm_cmd_lk_ct;
+GBLREF connection_struct	*curr_entry;
 
-void gtcml_lkrundown()
+void gtcml_lkrundown(void)
 {
 	cm_region_list	*reg_walk;
 	unsigned char	*ptr, laflag;
 	unsigned short	top,len;
 	uint4		status;
 
-	VMS_ONLY(
-		status = sys$cantim(curr_entry,0);	/* Cancel any outstanding lock starvation timer */
-		if (!(status & 1))
-			rts_error(VARLSTCNT(1) status);
-	)
+	cancel_timer((TID)curr_entry);	/* Cancel any outstanding lock starvation timer */
 	reg_walk = curr_entry->region_root;
 	curr_entry->state = 0;
 	while (reg_walk)
@@ -44,7 +45,8 @@ void gtcml_lkrundown()
 		if (reg_walk->lockdata)
 		{
 			if (reg_walk->blkd)
-			{	mlk_unpend(reg_walk->blkd);
+			{
+				mlk_unpend(reg_walk->blkd);
 				reg_walk->blkd = 0;
 			}
 			mlk_cm_root = reg_walk->lockdata;

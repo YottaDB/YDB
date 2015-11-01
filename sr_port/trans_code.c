@@ -13,19 +13,30 @@
 #include "error.h"
 #include "indir_enum.h"
 #include "rtnhdr.h"
+#include "mv_stent.h"
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "op.h"
 #include "mprof.h"
+#include "golevel.h"
+#include "mvalconv.h"
+#include "svnames.h"
+#include "error_trap.h"
 
-GBLREF stack_frame	*frame_pointer, *zyerr_frame;
+#define POP_SPECIFIED 	((ztrap_form & ZTRAP_POP) && (level2go = MV_FORCE_INT(&ztrap_pop2level))) /* note: assignment */
+#define IS_ETRAP	(err_act == &dollar_etrap.str)
+
+GBLREF stack_frame	*frame_pointer, *zyerr_frame, *error_frame, *error_last_frame_err;
 GBLREF unsigned char	proc_act_type;
 GBLREF spdesc		rts_stringpool, stringpool, indr_stringpool;
 GBLREF mstr		*err_act;
 GBLREF boolean_t	is_tracing_on;
-GBLREF mval		dollar_zyerror, dollar_ztrap, zyerror_ztrap;
+GBLREF mval		dollar_zyerror, dollar_ztrap, ztrap_pop2level;
 GBLREF int		ztrap_form;
 GBLREF bool 		compile_time;
+GBLREF mval		dollar_etrap;
+GBLREF unsigned char	*msp, *stackwarn, *stacktop;
+GBLREF mv_stent		*mv_chain;
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMCHECK);
@@ -79,35 +90,48 @@ void trans_code_finish(void)
 	{
 		dummy.mvtype = MV_STR;
 		dummy.str = dollar_zyerror.str;
-		dummy_ptr = push_mval(&dummy);
 		ESTABLISH(zyerr_ch);
-		op_commarg(dummy_ptr, indir_do);
+		op_commarg(&dummy, indir_do);
 		REVERT;
-		op_newzyerror(); /* for user's convenience */
+		op_newintrinsic(SV_ZYERROR); /* for user's convenience */
 		assert(NULL == zyerr_frame);
 		zyerr_frame = frame_pointer;
 	}
+
 	return;
 }
 
 CONDITION_HANDLER(trans_code_ch)
 {
+	mval		dummy;
+	int		level2go;
+
 	/* Treat $ZTRAP (and DEVICE exception action) as the target entryref for an implicit GOTO */
 	START_CH;
 	if (DUMPABLE || /* fatal error; we test for STACKOFLOW as part of DUMPABLE test */
-	    (int)ERR_STACKCRIT == SIGNAL || /* successfully compiled $ZTRAP code but encountered STACK error while attempting
+	    (int)ERR_STACKCRIT == SIGNAL || /* successfully compiled ${Z,E}TRAP code but encountered STACK error while attempting
 					       to push new frame, OR, STACK error while executing $ZTRAP entryref */
 	    !(ztrap_form & ZTRAP_ENTRYREF) || /* user doesn't want ENTRYREF form for $ZTRAP */
-	    !(ztrap_form & ZTRAP_CODE)) /* error during ENTRYREF processing */
+	    !(ztrap_form & ZTRAP_CODE) || /* error during $ZTRAP ENTRYREF processing */
+	    IS_ETRAP) /* error compiling $ETRAP code */
 	{
 		NEXTCH;
 	}
+	compile_time = FALSE;
 	assert(SFT_ZTRAP == proc_act_type || SFT_DEV_ACT == proc_act_type); /* are trans_code and this function in sync? */
 	assert(NULL != indr_stringpool.base); /* indr_stringpool must have been initialized by now */
 	if (indr_stringpool.base == stringpool.base)
 	{ /* switch to run time stringpool */
 		indr_stringpool = stringpool;
 		stringpool = rts_stringpool;
+	}
+	if (POP_SPECIFIED)
+	{ /* pop to the level of last 'set $ztrap' */
+		golevel(level2go);
+		/* previous dummy_ptr would have been popped out */
+		dummy.mvtype = MV_STR;
+		dummy.str = *err_act;
+		dummy_ptr = push_mval(&dummy);
 	}
 	op_commarg(dummy_ptr, indir_goto);
 	trans_code_finish();
@@ -117,16 +141,38 @@ CONDITION_HANDLER(trans_code_ch)
 void trans_code(void)
 {
 	mval		dummy;
+	int		level2go;
 
 	assert(err_act);
 	if (stringpool.base != rts_stringpool.base)
 		stringpool = rts_stringpool;
+	assert(SFT_ZTRAP == proc_act_type || SFT_DEV_ACT == proc_act_type);
+	/* The frame_pointer->mpc of error-causing M routine should always be set
+	 * to 'error_return' irrespective of the validity of $etrap code to make sure
+	 * the error-occuring frame is always unwound and the new error is rethrown
+	 * at one level below */
+	if (IS_ETRAP)
+	{
+		assert(error_last_frame_err == frame_pointer);
+		frame_pointer->mpc = CODE_ADDRESS(ERROR_RTN);
+		frame_pointer->ctxt = CONTEXT(ERROR_RTN);
+		error_frame = frame_pointer;
+
+		PUSH_MV_STENT(MVST_STCK);
+		mv_chain->mv_st_cont.mvs_stck.mvs_stck_val = NULL;
+		mv_chain->mv_st_cont.mvs_stck.mvs_stck_addr = (unsigned char **)&error_last_frame_err;
+		PUSH_MV_STENT(MVST_STCK);
+		mv_chain->mv_st_cont.mvs_stck.mvs_stck_val = NULL;
+		mv_chain->mv_st_cont.mvs_stck.mvs_stck_addr = (unsigned char **)&error_frame;
+	}
+	if (!(ztrap_form & ZTRAP_CODE) && !IS_ETRAP && POP_SPECIFIED)
+		golevel(level2go);
 	dummy.mvtype = MV_STR;
 	dummy.str = *err_act;
 	dummy_ptr = push_mval(&dummy);
-	assert(SFT_ZTRAP == proc_act_type || SFT_DEV_ACT == proc_act_type);
+
 	ESTABLISH(trans_code_ch);
-	op_commarg(dummy_ptr, (ztrap_form & ZTRAP_CODE) ? indir_linetail : indir_goto);
+	op_commarg(dummy_ptr, ((ztrap_form & ZTRAP_CODE) || IS_ETRAP) ? indir_linetail : indir_goto);
 	REVERT;
 	trans_code_finish();
 	return;

@@ -1,3 +1,4 @@
+:
 #################################################################
 #								#
 #	Copyright 2001 Sanchez Computer Associates, Inc.	#
@@ -8,7 +9,6 @@
 #	the license, please stop and do not read further.	#
 #								#
 #################################################################
-:
 arch=ARCH
 gtm_dist=GTMDIST
 echo=ECHO

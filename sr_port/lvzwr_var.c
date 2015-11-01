@@ -30,6 +30,7 @@
 #include "patcode.h"
 #include "mvalconv.h"
 #include "follow.h"
+#include "gtm_string.h"
 
 #define eb_less(u, v)    (numcmp(u, v) < 0)
 
@@ -90,6 +91,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 			{
 				unsigned char buff[512], *end;
 
+				lvzwrite_block.curr_subsc++;
 				end = lvzwr_key(buff, sizeof(buff));
 				zwr_sub->subsc_list[n].actual = (mval *)0;
 				lvzwrite_block.curr_subsc = lvzwrite_block.subsc_count = 0;

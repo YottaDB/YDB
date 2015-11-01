@@ -105,7 +105,7 @@ bool	mur_lookback_process(ctl_list *ctl)
 	case JRT_ZTCOM:
 
 		if ((pv = mur_get_pini_jpv(ctl, rec->val.jrec_tcom.pini_addr)) != NULL)
-			mur_decrement_multi(pv->jpv_pid, rec->val.jrec_tcom.token);
+			mur_decrement_multi(pv->jpv_pid, rec->val.jrec_tcom.token, rec->val.jrec_tcom.jnl_seqno);
 
 		return TRUE;
 	}

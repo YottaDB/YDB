@@ -49,17 +49,13 @@
 #include "mupip_recover.h"
 
 #define USER_STACK_SIZE	16384	/* (16 * 1024) */
-#define EPOCH_RECLEN    ROUND_UP(JREC_PREFIX_SIZE + sizeof(jrec_epoch) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
-#define PFIN_RECLEN	ROUND_UP(JREC_PREFIX_SIZE + sizeof(jrec_pfin) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
-#define PINI_RECLEN	ROUND_UP(JREC_PREFIX_SIZE + sizeof(jrec_pini) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
-
-#define	EPOCH_SIZE	1000	/* to be changed later when we allow the user to modify it */
 
 #ifdef UNIX
 #define INIT_PID	1
 #endif
 
 GBLDEF	boolean_t	brktrans;
+GBLDEF	boolean_t	losttrans;
 GBLDEF	mur_opt_struct	mur_options;
 GBLDEF	bool		mur_error_allowed;
 GBLDEF	int4		mur_error_count;
@@ -68,7 +64,6 @@ GBLDEF	int4		n_regions;
 GBLDEF	seq_num		stop_rlbk_seqno;
 GBLDEF	seq_num		max_reg_seqno;
 GBLDEF  seq_num		resync_jnl_seqno;
-GBLDEF	seq_num		consist_jnl_seqno;
 GBLDEF  seq_num		min_epoch_jnl_seqno;
 GBLDEF	seq_num		max_epoch_jnl_seqno;
 GBLDEF	broken_struct	*broken_array;
@@ -77,6 +72,7 @@ GBLDEF	char		*log_rollback = NULL;
 GBLDEF	ctl_list	*jnl_files;
 GBLDEF	jnl_proc_time	min_jnl_rec_time;
 
+GBLREF	seq_num		consist_jnl_seqno;
 GBLREF  seq_num		max_resync_seqno;
 GBLREF	int4		gv_keysize;
 GBLREF	gv_key		*gv_currkey, *gv_altkey;
@@ -101,6 +97,9 @@ GBLREF	boolean_t	dont_want_core;
 GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
 GBLREF	boolean_t	tp_restart_fail_sig_used;
 #endif
+GBLREF	boolean_t	recovery_success;
+GBLREF	uint4		cur_logirec_short_time;
+GBLREF	boolean_t	forw_phase_recovery;
 
 error_def(ERR_ASSERT);
 error_def(ERR_EPOCHLIMGT);
@@ -143,32 +142,28 @@ CONDITION_HANDLER(mupip_recover_ch)
 	PRN_ERROR;	/* Flush out the error message that is driving us */
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
-		VMS_ONLY(
-			/* Prep structures for potential use by tp_restart's condition handler */
-			if (!tp_restart_fail_sig)
-				tp_restart_fail_sig = (struct chf$signal_array *)malloc((TPRESTART_ARG_CNT + 1) * sizeof(int));
-			assert(FALSE == tp_restart_fail_sig_used);
-		)
+		VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
 		tp_restart(1);			/* This SHOULD generate an error (TPFAIL or other) */
-		VMS_ONLY(
-			if (!tp_restart_fail_sig_used)	/* If tp_restart ran clean */
-		)
-		UNIX_ONLY(
-			if (ERR_TPRETRY == SIGNAL)      /* (signal value undisturbed) */
-		)
-			{
-				GTMASSERT;		/* It should *not* run clean */
-			}
-		VMS_ONLY(
-			else
-			{	/* Otherwise tp_restart had a signal that we must now deal with -- replace the TPRETRY
-				   information with that saved from tp_restart. */
-				assert(TPRESTART_ARG_CNT >= tp_restart_fail_sig->chf$is_sig_args);
-					/* Assert we have room for these arguments */
-				memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * sizeof(int));
-				tp_restart_fail_sig_used = FALSE;
-			}
-		)
+#ifdef UNIX
+		if (ERR_TPRETRY == SIGNAL)		/* (signal value undisturbed) */
+#elif defined VMS
+		if (!tp_restart_fail_sig_used)	/* If tp_restart ran clean */
+#else
+#error unsupported platform
+#endif
+		{
+			GTMASSERT;		/* It should *not* run clean */
+		}
+#ifdef VMS
+		else
+		{	/* Otherwise tp_restart had a signal that we must now deal with -- replace the TPRETRY
+			   information with that saved from tp_restart. */
+			/* Assert we have room for these arguments - the array malloc is in tp_restart */
+			assert(TPRESTART_ARG_CNT >= tp_restart_fail_sig->chf$is_sig_args);
+			memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * sizeof(int));
+			tp_restart_fail_sig_used = FALSE;
+		}
+#endif
 	}
 	if (SEVERITY == SEVERE || DUMP || SEVERITY == ERROR)
 	{
@@ -347,7 +342,7 @@ void	mupip_recover(void)
 				{	/* Include previous generation journal files only when lookback/since time
 					 * is specified to be less than any default time and if mur_options.chain is TRUE.
 					 */
-					if (ctl->rab->pvt->jfh->bov_timestamp >= MID_TIME(min_jnl_rec_time))
+					if (CMP_JNL_PROC_TIME(ctl->rab->pvt->jfh->bov_timestamp, min_jnl_rec_time) >=0)
 					{	/* Only one generation and not many updates */
      						if (!mur_options.chain
 							|| ((0 == ctl->rab->pvt->jfh->prev_jnl_file_name_length)
@@ -586,6 +581,17 @@ check_pblk:
 	if (NULL != mur_options.losttrans_file_info)
 		util_out_print("MUR-I-LOSTTRANSSTART : Starting Phase for Extracting Lost Transactions", TRUE);
 	/* Do forward processing */
+	/* Note that if all regions have before-imaging disabled, we dont need to invoke mur_crejnl_forwphase_file()
+	 * but we let it decide that since anyway it scans the ctl list
+	 */
+	if (mur_options.update && !mur_crejnl_forwphase_file(&jnl_files))
+	{
+		mur_close_files();
+		mupip_exit(ERR_NORECOVERERR);
+	}
+	/* Initialize to TRUE so that recover copies original time stamps during forward phase
+ 	 * while writing newly generated logical records */
+	forw_phase_recovery = TRUE;
 	mur_forward_buddy_list_init();
         if (((mur_error_count <= mur_options.error_limit  ||  mur_error_allowed)  &&
 		(mur_options.update  ||  NULL != mur_options.extr_file_info)  ||
@@ -632,9 +638,15 @@ check_pblk:
 		{
 			if (ctl->bypass)
 				continue;
+			/* Initialize cur_logirec_short_time to the time of the turn around epoch record.
+			 * Ideally we should never be writing an EPOCH record without writing a logical record (which
+			 * 	would update cur_logirec_short_time appropriately) but for clean flow, we do the initialization.
+			 */
+			cur_logirec_short_time = ctl->turn_around_epoch_time;
 			if (mur_options.update)
 			{
 				brktrans = FALSE;
+				losttrans = FALSE;
 				gv_target->gd_reg = gv_cur_region = ctl->gd;
 				gv_target->clue.prev = gv_target->clue.end = 0;
 				gv_target->root = 0;
@@ -652,7 +664,21 @@ check_pblk:
 					cs_addrs->dir_tree->gd_reg = gv_cur_region;
 				}
 			}
-			if (mur_options.forward  ||  0 == ctl->stop_addr)
+			/* Check that if ctl's region has before-imaging, then stop_addr is > 0 and the converse.
+			 * Note that the above is true irrespective of whether we are doing forward or backward recovery.
+			 * For forward recovery, stop_addr is guaranteed to be non-zero by mur_crejnl_forwphase_file().
+			 * 	In case db's jnl-file-name is same as the first ctl->jnl_fn, stop_addr will point to
+			 * 		the offset of the first valid jnl-record in the forw-phase file.
+			 * 	In the other case, stop_addr will be HDR_LEN.
+			 * 	Note that for forward recovery, stop_addr will be non-zero only if the jnl-file has
+			 * 		before-imaged journal records and journalling is enabled.
+			 * For backward recovery, stop_addr can be non-zero even if ctl->before_image is FALSE in the
+			 * 	case that before-imaging is disabled before recovery.
+			 */
+			assert(!mur_options.update  && (!ctl->before_image || (0 != ctl->stop_addr))
+			    || !mur_options.forward && (0 != ctl->stop_addr)
+			    ||  mur_options.forward && (0 != ctl->stop_addr || !ctl->before_image));
+			if (0 == ctl->stop_addr)
 				status = mur_get_first(ctl->rab);
 			else
 				status = mur_next(ctl->rab, ctl->stop_addr);
@@ -662,14 +688,10 @@ check_pblk:
 				gtm_putmsg(VARLSTCNT(4) ERR_BLKCNTEDITFAIL, 2, DB_LEN_STR(gv_cur_region));
 		}
 	}
-	if (mur_options.update && !mur_options.rollback && mur_options.verify)
-		mur_recover_write_epoch_rec(&jnl_files);
 	/* Output any reports requested by SHOW options */
 	if (mur_options.show  &&  (mur_error_count <= mur_options.error_limit  ||  mur_error_allowed))
 		for (ctl = jnl_files;  NULL != ctl;  ctl = ctl->next)
 			mur_output_show(ctl);
-	if (mur_options.rollback)
-		mur_rollback_truncate(&last_jnl_file);
 	/* Moved out of mur_close_files() as it can be called as clean_up routine incase of abnormal mupip_recover termination */
 	if (mur_options.update)
 	{
@@ -677,6 +699,9 @@ check_pblk:
 			send_msg(VARLSTCNT(6) ERR_ENDRECOVERY, 4, DB_LEN_STR(ctl->gd), ctl->jnl_fn_len, ctl->jnl_fn);
 	}
 	/* Done */
+	assert(0 <= mur_error_count);	/* never gets decremented anywhere, better be positive */
+	if (mur_options.update)
+		recovery_success = TRUE;	/* Set it to true so that jnl_file_close will delete the forw_phase_files */
 	mur_close_files();
 	if (mur_wrn_count > 0)
 		mupip_exit(ERR_MURCLOSEWRN);

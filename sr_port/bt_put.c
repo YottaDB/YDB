@@ -24,6 +24,8 @@
 #include "relqop.h"
 #include "wcs_recover.h"
 #include "wcs_get_space.h"
+#include "io.h" 		/* for gtmsecshr.h */
+#include "gtmsecshr.h"		/* for NORMAL_TERMINATION macro */
 
 #ifdef DEBUG
 static int4 entry_count=0;
@@ -69,14 +71,15 @@ bt_rec_ptr_t bt_put(gd_region *r, int4 block)
 					{
 						if (FALSE == csd->wc_blocked)
 						{
+							assert(FALSE);
+							secshr_db_clnup(NORMAL_TERMINATION);
 							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 							BG_TRACE_PRO_ANY(csa, wcb_bt_put);
 							send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bt_put"),
-								process_id, lcl_tn, REG_LEN_STR(r));
-							assert(FALSE);
-							wcs_recover(r);
+								process_id, lcl_tn, DB_LEN_STR(r));
+							return NULL;
 						} else
-							GTMASSERT;
+							GTMASSERT;	/* we are in wcs_recover() already */
 					}
 				}
 				p->cache_index = CR_NOTVALID;

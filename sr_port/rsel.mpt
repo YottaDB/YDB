@@ -14,7 +14,7 @@
         ;invoke CALL^%RSEL to maintain the array %ZR with the input %ZR, %ZE specifies extensions .m or .o[bj]
         ;
 SRC
-        n $zt s $ZT=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL")
+        n $et s $et=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL")
         n add,beg,cnt,ctrap,d,delim,end,exc,from,i,k,last,mtch,pct,r,rd,rdf,out,scwc,stop,strt,to,%ZE
         s %ZE=".m"
 	k %ZR
@@ -22,7 +22,7 @@ SRC
         d init,main
         q
 OBJ
-        n $zt s $ZT=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL")
+        n $et s $et=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL")
         n add,beg,cnt,ctrap,d,delim,end,exc,from,i,k,last,mtch,pct,r,rd,rdf,out,scwc,stop,strt,to,%ZE
         s %ZE=$s($zver["VMS":".obj",1:".o")
 	k %ZR
@@ -30,7 +30,7 @@ OBJ
         d init,main
         q
 RD
-        n $zt s $ZT=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL")
+        n $et s $et=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL")
         n add,beg,cnt,ctrap,d,delim,end,exc,from,i,k,last,mtch,pct,r,rd,rdf,out,scwc,stop,strt,to
 	w !,"Routine directory"
         d init
@@ -164,4 +164,5 @@ help
         q
 err
         u $p:(ctrap=ctrap:exception=exc) w !,$p($ZS,",",2,999),!
+	s $ec=""
         q

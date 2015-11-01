@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-
+#ifndef MUTEX_MSEM_WAKE
 #include <sys/ipc.h>
 #include "gtm_socket.h"
 #include <sys/un.h>
@@ -171,3 +171,5 @@ unsigned char *pid2ascx(unsigned char *pid_str, pid_t pid)
 	}
 	return(pid_str);
 }
+
+#endif /*MUTEX_MSEM_WAKE*/

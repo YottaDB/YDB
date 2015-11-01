@@ -36,6 +36,7 @@ int m_job(void)
 	error_def(ERR_MAXACTARG);
 	error_def(ERR_RTNNAME);
 	error_def(ERR_COMMAORRPARENEXP);
+	error_def(ERR_JOBACTREF);
 
 	label = put_str(zero_ident.c,sizeof(mident));
 	offset = put_ilit((mint)0);
@@ -77,6 +78,11 @@ int m_job(void)
 			if (argcnt > MAX_ACTUALS)
 			{
 				stx_error(ERR_MAXACTARG);
+				return FALSE;
+			}
+			if (TK_PERIOD == window_token)
+			{
+				stx_error(ERR_JOBACTREF);
 				return FALSE;
 			}
 			if (!expr(&argval))

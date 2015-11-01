@@ -158,6 +158,23 @@ typedef struct
 	unsigned short		opr_type;
 } toktabtype;
 
+#ifdef DEBUG
+#  define COMPDBG(x) if (gtmDebugLevel & GDL_DebugCompiler) {x}
+#else
+#  define COMPDBG(x)
+#endif
+#ifdef DEBUG_TRIPLES
+#  define chktchain(x) 										\
+{												\
+	triple *tp;										\
+	for (tp = (x)->exorder.fl; tp != (x); tp = tp->exorder.fl)				\
+		if (tp->exorder.bl->exorder.fl != tp || tp->exorder.fl->exorder.bl != tp)	\
+			GTMASSERT;								\
+}
+#else
+#  define chktchain(x)
+#endif
+
 
 #define MAX_SRCLINE	2048	/* maximum length of a program source or indirection line */
 
@@ -290,8 +307,12 @@ int f_one_mval( oprtype *a, opctype op);
 int f_order(oprtype *a, opctype op);
 int f_order1( oprtype *a, opctype op);
 int f_piece( oprtype *a, opctype op);
+int f_qlength(oprtype *a, opctype op);
+int f_qsubscript(oprtype *a, opctype op);
 int f_query ( oprtype *a, opctype op);
+int f_reverse(oprtype *a, opctype op);
 int f_select( oprtype *a, opctype op );
+int f_stack(oprtype *a, opctype op);
 int f_text( oprtype *a, opctype op );
 int f_translate( oprtype *a, opctype op );
 int f_two_mstrs( oprtype *a, opctype op);

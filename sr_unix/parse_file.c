@@ -11,19 +11,20 @@
 
 #include "mdef.h"
 
+#include "gtm_inet.h"		/* for struct in_addr */
 #include "gtm_stat.h"
 #include "gtm_string.h"
+#include "gtm_unistd.h"
+#include "gtm_netdb.h"
 
 #include "parse_file.h"
 #include "io.h"
 #include "iosp.h"
 #include "eintr_wrappers.h"
-#include "gtm_uname.h"
 #include "trans_log_name.h"
+#include "setzdir.h"
 
-GBLREF mval dollar_zdir;
-
-#define MAX_NODE_NAME 32
+#define LOCALHOSTNAME "localhost"
 
 enum	parse_state
 {
@@ -34,23 +35,29 @@ enum	parse_state
 	SLASH
 };
 
+GBLREF mval	dollar_zdir;
+
 int4	parse_file (mstr *file, parse_blk *pblk)
 {
 	struct stat		statbuf;
-	mstr			trans, def_trans, tmp;
-	int			status, diff;
-	short			nodelen;
+	struct hostent		*hostinfo;
+	mstr			trans, tmp;
+	int			status, diff, local_node_len, query_node_len, node_name_len;
 	parse_blk		def;
-	char			node_name[MAX_NODE_NAME + 1];
+	char			local_node_name[MAX_HOST_NAME_LEN + 1], query_node_name[MAX_HOST_NAME_LEN + 1];
 	char			*base, *ptr, *top, *del, *node, *name, *ext, ch;
+	char			**hostaddrlist;
 	char			def_string[MAX_FBUFF + 1];
-	bool			hasnode, hasdir, hasname, hasext, wilddir, wildname;
+	boolean_t		hasnode, hasdir, hasname, hasext, wilddir, wildname;
 	enum parse_state	state;
+	struct in_addr		query_ip, localhost_ip, *local_ip;
+	mval			def_trans;
 
 	error_def(ERR_PARNORMAL);
 	error_def(ERR_PARBUFSM);
 	error_def(ERR_PARTRNLNM);
 	error_def(ERR_FILENOTFND);
+	error_def(ERR_SYSCALL);
 
 	pblk->fnb = 0;
 	assert(pblk->buff_size <= MAX_FBUFF);
@@ -59,7 +66,7 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 
 	memset(&def, 0, sizeof(def));	/* initial the defaults to zero */
 	if (pblk->def1_size > 0)
-	{
+	{	/* Parse default filespec if supplied */
 		def.fop = F_SYNTAXO;
 		def.buffer = def_string;
 		def.buff_size = MAX_FBUFF;
@@ -77,22 +84,24 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 	}
 
 	wildname = wilddir = hasnode = hasdir = hasname = hasext = FALSE;
-
 	node = base = ptr = trans.addr;
 	top = ptr + trans.len;
 	if (trans.len == 0  ||  *ptr != '/')
-	{
-		def_trans = dollar_zdir.str;
+	{	/* No file given, no full path given, or a nodename was specified */
+		setzdir(NULL, &def_trans); /* Default current directory if none given */
+		assert(0 == dollar_zdir.str.len || /* dollar_zdir not initialized yet, possible thru main() -> gtm_chk_dist() */
+		       (def_trans.str.len == dollar_zdir.str.len && /* check if cwd and cached value are the same */
+			0 == memcmp(def_trans.str.addr, dollar_zdir.str.addr, def_trans.str.len)));
 		if (pblk->fop & F_PARNODE)
-		{
+		{	/* What we have could be a nodename */
 			assert(pblk->fop & F_SYNTAXO);
 			while (node < top)
 			{
 				ch = *node++;
-				if (ch == ':')
+				if (':' == ch)		/* We have nodeness */
 					break;
-				if (ch == '/')
-				{
+				if ('/' == ch)
+				{	/* Not a node - bypass node checking */
 					node = top;
 					break;
 				}
@@ -101,39 +110,85 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 			if (node < top)
 			{
 				hasnode = TRUE;
-				ptr = base = node;
+				ptr = base = node;	/* Update pointers past node name */
 
-				node_name[MAX_NODE_NAME] = 0;
-				gtm_uname(node_name, MAX_NODE_NAME);
-				nodelen = strlen(node_name);
-				if (node - trans.addr - 1 != nodelen  ||  memcmp(trans.addr, node_name, nodelen) != 0)
-				{
-					/* if a non-local node, don't apply any defaults */
-					pblk->l_node = trans.addr; pblk->b_node = node - trans.addr;
-					pblk->l_dir = base; pblk->b_dir = top - base;
+				/* See if the desired (query) node is the local node */
+				node_name_len = node - trans.addr;	/* Scanned node including ':' */
+				query_node_len = node_name_len - 1;	/* Pure name length, no ':' on end */
+				assert(MAX_HOST_NAME_LEN >= query_node_len);
+				assert(0 < query_node_len);
+				assert(':' == *(trans.addr + query_node_len));
+				memcpy(query_node_name, trans.addr, query_node_len);
+				query_node_name[query_node_len] = 0;
+				local_ip = NULL;	/* null value needed in case can't find query node (remote default) */
+				if (NULL != (hostinfo = gethostbyname(query_node_name)))
+				{	/* We know about this node -- check further */
+					query_ip = *(struct in_addr *)hostinfo->h_addr;
+					/* See if is a "localhost" (127.0.0.1 usually) node */
+					if (NULL != (hostinfo = gethostbyname(LOCALHOSTNAME)))
+					{
+						localhost_ip = *(struct in_addr *)hostinfo->h_addr;
+						if (0 == memcmp(&localhost_ip, &query_ip, sizeof(struct in_addr)))
+							local_ip = &localhost_ip;
+					}
+					if (!local_ip)
+					{	/* Have not yet established this as a local node -- check further */
+						if (-1 == (status = gethostname(local_node_name, MAX_HOST_NAME_LEN)))
+							rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("gethostname"),
+								  CALLFROM, errno);
+						if (NULL == (hostinfo = gethostbyname(local_node_name)))
+							rts_error(VARLSTCNT(7) ERR_SYSCALL, 5, LEN_AND_LIT("gethostbyname"),
+								  CALLFROM);
+						for (hostaddrlist = hostinfo->h_addr_list; ; hostaddrlist++)
+						{
+							local_ip = (struct in_addr *)*hostaddrlist;
+							if (!local_ip)		/* End of list -- must be remote */
+								break;
+							if (0 == memcmp(&query_ip, local_ip, sizeof(struct in_addr)))
+								break;		/* Tiz truly a local node */
+						}
+					}
+				} /* Else, unknown nodename -- treat as remote (probably fail later) */
+
+				if (!local_ip)		/* Not local (or an unknown) host given */
+				{	/* Remote node specified -- don't apply any defaults */
+					pblk->l_node = trans.addr;
+					pblk->b_node = node_name_len;
+					pblk->l_dir = base;
+					pblk->b_dir = top - base;
 					pblk->l_name = pblk->l_ext = base + pblk->b_dir;
 					pblk->b_esl = pblk->b_node + pblk->b_dir;
 					pblk->b_name = pblk->b_ext = 0;
 					pblk->fnb |= (hasnode << V_HAS_NODE);
 					return ERR_PARNORMAL;
 				}
-				if (*base == '/')
-					def_trans.len = 0;
+
+				/* Remove local node name from filename buffer */
+				assert(0 < trans.len - node_name_len);
+				memmove(trans.addr, node, trans.len - node_name_len);
+				ptr = base = node -= node_name_len;
+				top -= node_name_len;
+				trans.len -= node_name_len;
+				if ('/' == *base)	/* No default directory if full path given */
+					def_trans.str.len = 0;
+			} else
+			{	/* Supplied text was not a node -- reset pointer back to beginning for rescan */
+				node = trans.addr;
 			}
-			node = trans.addr;
 		}
 
-		if (def_trans.len + trans.len > pblk->buff_size)
+		/* If parse buffer is not large enough, return error */
+		if (def_trans.str.len + trans.len > pblk->buff_size)
 			return ERR_PARBUFSM;
 
-		if (def_trans.len > 0)
+		/* Construct full filename to parse prefixing given filename with default path prefix */
+		if (0 < def_trans.str.len)
 		{
-			memmove(ptr + def_trans.len, ptr, trans.len);
-			memcpy(ptr, def_trans.addr, def_trans.len);
-			assert(ptr[def_trans.len - 1] == '/');
-
-			ptr += def_trans.len;
-			top += def_trans.len;
+			memmove(ptr + def_trans.str.len, ptr, trans.len);
+			memcpy(ptr, def_trans.str.addr, def_trans.str.len);
+			assert('/' == ptr[def_trans.str.len - 1]);
+			ptr += def_trans.str.len;
+			top += def_trans.str.len;
 		}
 	}
 
@@ -142,13 +197,12 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 	for (;ptr < top;)
 	{
 		ch = *ptr;
-		if (ch == '.')
-		{
+		if ('.' == ch)
+		{	/* Could be /./ or /../ or name.name */
 			ptr++;
-			state = (state == DOT1) ? ((state == DOT2) ? NAME : DOT2) : DOT1;
-		}
-		else if (ch == '/')
-		{
+			state = (DOT1 == state) ? ((DOT2 == state) ? NAME : DOT2) : DOT1;
+		} else if (ch == '/')
+		{	/* We must still be doing the path */
 			ptr++;
 
 			hasdir = TRUE;
@@ -157,78 +211,79 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 			wilddir |= wildname;
 			wildname = FALSE;
 
-			if (state != DOT1  &&  state != DOT2  &&  state != SLASH)
-			{
+			if (DOT1 != state  &&  DOT2 != state && SLASH != state)
+			{	/* No dots seen recently so scan as if this is start of filename */
 				state = SLASH;
 				name = ptr;
 				continue;
 			}
-			if (state == DOT1)
+			if (DOT1 == state)
+			{	/* Just remove "./" chars from path */
 				del = ptr - 2;
-			else if (state == DOT2)
-			{
+			} else if (DOT2 == state)
+			{	/* Have xx/../ construct. Remove /../ and previous level directory from path */
 				del = ptr - 4;		/* /../ characters being removed */
-				assert (*del == '/');
+				assert ('/' == *del);
 				if (del > base)
 				{
 					del--;
-					while (*del != '/')
+					while ('/' != *del)
 						del--;
 				}
-				assert(del >= base  &&  *del == '/');
+				assert(del >= base && '/' == *del);
 				del++;
-			}
-			else if (state == SLASH)
-			{
+			} else if (SLASH == state)
+			{	/* Remove duplicate slash from path */
 				del = ptr - 1;
-				while (ptr < top  &&  *ptr == '/')
+				while (ptr < top && '/' == *ptr)
 					ptr++;
 			}
-			memcpy (del, ptr, top - ptr);
+			memmove(del, ptr, top - ptr);
 			diff = ptr - del;
-			ptr -= diff; top -= diff;
+			ptr -= diff;
+			top -= diff;
 			state = SLASH;
 			name = ptr;
-		}
-		else
-		{
+		} else
+		{	/* Hopeful of filename */
 			hasname = TRUE;
-			while (ptr < top)
+			while (ptr < top)	/* Do small scan looking for filename end */
 			{
 				ch = *ptr;
-				if (ch == '/')
-					break;
-				if (ch == '.')
-				{
+				if ('/' == ch)
+					break;	/* Ooops, still doing path */
+				if ('.' == ch)
+				{/* Filename has an extension */
 					hasext = TRUE;
 					ext = ptr;
-				}
-				else if (ch == '?'  ||  ch == '*')
+				} else if ('?' == ch || '*' == ch)
 					wildname = TRUE;
 				ptr++;
 			}
 			state = NAME;
 		}
 	}
-	if (state == SLASH  ||  state == DOT1  ||  state == DOT2)
+	/* Handle scan end with non-normal state */
+	if (SLASH == state || DOT1 == state || DOT2 == state)
 	{
-		assert(!hasname  &&  !hasext);
+		assert(!hasname && !hasext);
 		hasdir = TRUE;
 		if (state == DOT1)
-		{
-			top--; ptr--;
+		{	/* Ignore ./ */
+			top--;
+			ptr--;
 		}
-		if (state == DOT2)
-		{
+		if (DOT2 == state)
+		{	/* ignore ../ plus last directory level specified */
 			del = ptr - 3;		/* on the end */
-			assert (*del == '/');
+			assert ('/' == *del);
 			if (del > base)
 			{
 				del--;
-				while (*del != '/')
+				while ('/' == *del)
 					del--;
 			}
-			assert(del >= base  &&  *del == '/');
+			assert(del >= base && '/' == *del);
 			del++;
 			ptr = top = del;
 			name = ptr;
@@ -240,7 +295,7 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 		assert(!hasext);
 		name = ptr;
 		if (def.fnb & F_HAS_NAME)
-		{
+		{	/* Use default filename if we didn't find one */
 			diff = name - node;
 			if (def.b_name + diff > pblk->buff_size)
 				return ERR_PARBUFSM;
@@ -253,7 +308,7 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 	{
 		ext = ptr;
 		if (def.fnb & F_HAS_EXT)
-		{
+		{	/* Use default file extension if we didn't find one */
 			diff = ext - node;
 			if (def.b_ext + diff > pblk->buff_size)
 				return ERR_PARBUFSM;
@@ -268,7 +323,7 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 	{
 		diff = name - base;
 		diff = def.b_dir - diff;
-		if (pblk->b_node + def.b_dir + pblk->b_name + pblk->b_ext > pblk->buff_size)
+		if (def.b_dir + pblk->b_name + pblk->b_ext > pblk->buff_size)
 			return ERR_PARBUFSM;
 		if (diff > 0)
 			memmove(name + diff, name, pblk->b_name + pblk->b_ext);
@@ -279,8 +334,7 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 		name += diff;
 	}
 	pblk->b_dir = name - base;
-	pblk->b_esl = pblk->b_node + ptr - base;
-	pblk->l_node = node;
+	pblk->b_esl = ptr - base;
 	pblk->l_dir = base;
 	pblk->l_name = base + pblk->b_dir;
 	pblk->l_ext = pblk->l_name + pblk->b_name;
@@ -290,17 +344,16 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 	pblk->fnb |= (hasext << V_HAS_EXT);
 	pblk->fnb |= (wildname << V_WILD_NAME);
 	pblk->fnb |= (wilddir << V_WILD_DIR);
-	pblk->fnb |= (hasnode << V_HAS_NODE);
 
 	if (!(pblk->fop & F_SYNTAXO)  &&  !wilddir)
 	{
-		assert(pblk->l_dir[pblk->b_dir - 1] == '/');
+		assert('/' == pblk->l_dir[pblk->b_dir - 1]);
 		if (pblk->b_dir > 1)
 		{
 			pblk->l_dir[pblk->b_dir - 1] = 0;
 			STAT_FILE(pblk->l_dir, &statbuf, status);
 			pblk->l_dir[pblk->b_dir - 1] = '/';
-			if (status == -1  ||  !(statbuf.st_mode & S_IFDIR))
+			if (-1 == status || !(statbuf.st_mode & S_IFDIR))
 				return ERR_FILENOTFND;
 		}
 	}

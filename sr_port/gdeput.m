@@ -40,7 +40,7 @@ GDEPUT()
 	s rec=rec_$$num2bin(4,filesize)								; end
 	s rec=hdrlab_$$num2bin(4,$l(hdrlab)+4+filesize)_rec
 	i create zm gdeerr("GDCREATE"):file
-	e  s x=file  s:$ZVersion["VMS" $p(x,";",2)=$p(x,";",2)+1  zm gdeerr("GDUPDATE"):x
+	e  s:$ZVersion["VMS" $p(file,";",2)=$p(file,";",2)+1  zm gdeerr("GDUPDATE"):file
 	s gdexcept="s gdeputzs=$zs  zgoto "_$zl_":writeerr^GDEPUT"
 	i $ZVersion["VMS"  s tempfile=$p(file,";",1)_"inprogress"
 	e  s tempfile=file_"inprogress"
@@ -63,7 +63,9 @@ GDEPUT()
 	. f  s s=$o(tmpseg(am,s)) q:'$l(s)  s rec=rec_$tr($j($l(tmpseg(am,s)),3)," ",0),rec=rec_tmpseg(am,s)
 	u tempfile
 	f  s record=$e(rec,1,512),rec=$e(rec,513,9999) q:'$l(record)  w record,!
-	u @useio  o file  c file:delete  c tempfile:rename=file
+	u @useio
+	i $ZV'["VMS" o file c file:delete
+	c tempfile:rename=file
 	q 1
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
@@ -157,7 +159,7 @@ fatal:(msgno)
 	q msgno\8*8+4
 	;
 error1:
-	s $zt="d ABORT^GDE"
+	s $et="d ABORT^GDE"
 	c tempfile:delete
 	zm $$fatal(gdeerr("VERIFY")):"FAILED"
 	;

@@ -9,6 +9,12 @@
  *								*
  ****************************************************************/
 
+/*  There is code that depends on the sequence in which entries
+ *  appear in this table.
+ *  Please add new entries only at the end of this table
+ *  (and, please, avoid deleting any lines).
+ */
+
 XFER(xf_sto,op_sto),
 XFER(xf_cat,op_cat),
 XFER(xf_linefetch,op_linefetch),
@@ -162,7 +168,7 @@ XFER(xf_extexfun,op_extexfun),
 XFER(xf_zhelp,op_zhelp),
 XFER(xf_fnp1,op_fnp1),
 XFER(xf_zg1,op_zg1),
-XFER(xf_newzt,op_newzt),
+XFER(xf_newintrinsic,opp_newintrinsic),
 XFER(xf_gvzwithdraw,op_gvzwithdraw),
 XFER(xf_lvzwithdraw,op_lvzwithdraw),
 XFER(xf_pattern,op_pattern),
@@ -233,4 +239,10 @@ XFER(xf_inddevparms,opp_inddevparms),
 XFER(xf_merge, op_merge),
 XFER(xf_merge_arg, op_merge_arg),
 XFER(xf_indmerge, opp_indmerge),
-XFER(xf_m_srchindx, op_m_srchindx)
+XFER(xf_m_srchindx, op_m_srchindx),
+XFER(xf_fnstack1,op_fnstack1),
+XFER(xf_fnstack2,op_fnstack2),
+XFER(xf_fnqlength,op_fnqlength),
+XFER(xf_fnqsubscript,op_fnqsubscript),
+XFER(xf_fnreverse,op_fnreverse),
+XFER(xf_psvput,opp_svput)

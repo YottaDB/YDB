@@ -12,6 +12,6 @@
 #ifndef __TRANS_CODE_CLEANUP_H__
 #define __TRANS_CODE_CLEANUP_H__
 
-void trans_code_cleanup(int signal);
+void trans_code_cleanup(void);
 
 #endif

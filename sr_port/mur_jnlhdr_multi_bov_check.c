@@ -32,17 +32,18 @@ bool	mur_jnlhdr_multi_bov_check(jnl_file_header *prev_header, int prev_jnl_fn_le
 	assert(header->eov_tn > 0);
 	assert(prev_header->bov_tn > 0);
 	assert(prev_header->eov_tn > 0);
-	if ((header->eov_timestamp > prev_header->bov_timestamp && prev_header->eov_timestamp > header->bov_timestamp)
+	if ((CMP_JNL_PROC_TIME(header->eov_timestamp, prev_header->bov_timestamp) > 0 &&
+	     		CMP_JNL_PROC_TIME(prev_header->eov_timestamp, header->bov_timestamp) > 0)
 	     || (header->eov_tn > prev_header->bov_tn && prev_header->eov_tn > header->bov_tn)
-	     || (header->eov_timestamp > prev_header->bov_timestamp && header->eov_tn < prev_header->eov_tn)
-	     || (prev_header->eov_timestamp > header->bov_timestamp && prev_header->eov_tn < header->eov_tn))
+	     || (CMP_JNL_PROC_TIME(header->eov_timestamp, prev_header->bov_timestamp) > 0 && header->eov_tn < prev_header->eov_tn)
+	     || (CMP_JNL_PROC_TIME(prev_header->eov_timestamp, header->bov_timestamp) > 0 && prev_header->eov_tn < header->eov_tn))
 	{
 		util_out_print("Journal files !AD and !AD", TRUE, prev_jnl_fn_len, prev_jnl_fn, jnl_fn_len, jnl_fn);
 		util_out_print("  apply to the same database file, but are discontinuous", TRUE);
-		util_out_print("   -->  prev_header->bov_timestamp [!UL], prev_header->eov_timestamp [!UL]",
-				TRUE, prev_header->bov_timestamp, prev_header->eov_timestamp);
-		util_out_print("   -->  header->bov_timestamp        [!UL], header->eov_timestamp        [!UL]",
-				TRUE, header->bov_timestamp, header->eov_timestamp);
+		util_out_print("   -->  prev_header->bov_timestamp [0x!16@XJ], prev_header->eov_timestamp [0x!16@XJ]",
+				TRUE, &prev_header->bov_timestamp, &prev_header->eov_timestamp);
+		util_out_print("   -->  header->bov_timestamp        [0x!16@XJ], header->eov_timestamp        [0x!16@XJ]",
+				TRUE, &header->bov_timestamp, &header->eov_timestamp);
 		util_out_print("   -->  prev_header->bov_tn        [!UL], prev_header->eov_tn        [!UL]",
 				TRUE, prev_header->bov_tn, prev_header->eov_tn);
 		util_out_print("   -->  header->bov_tn               [!UL], header->eov_tn               [!UL]",
@@ -51,18 +52,19 @@ bool	mur_jnlhdr_multi_bov_check(jnl_file_header *prev_header, int prev_jnl_fn_le
 		return FALSE;
 	}
 	if (ordered && ((prev_header->bov_tn > header->bov_tn)
-			|| (prev_header->bov_timestamp > header->bov_timestamp)
+			|| CMP_JNL_PROC_TIME(prev_header->bov_timestamp, header->bov_timestamp) > 0
 			|| ((FALSE == prev_header->crash)
-				&& (FALSE == header->crash)
-				&& (prev_header->eov_tn > header->bov_tn || prev_header->eov_timestamp > header->bov_timestamp))))
+			&& (FALSE == header->crash)
+			&& (prev_header->eov_tn > header->bov_tn ||
+				CMP_JNL_PROC_TIME(prev_header->eov_timestamp, header->bov_timestamp) > 0))))
 	{
 		util_out_print("Journal files !AD and !AD", TRUE, prev_jnl_fn_len, prev_jnl_fn, jnl_fn_len, jnl_fn);
 		util_out_print("  apply to the same database file, but are out-of-order", TRUE);
 		util_out_print("The previous journal file (former) is ahead of the current journal file (latter)", TRUE);
-		util_out_print("   -->  prev_header->bov_timestamp [!UL], prev_header->eov_timestamp [!UL]",
-				TRUE, prev_header->bov_timestamp, prev_header->eov_timestamp);
-		util_out_print("   -->  header->bov_timestamp        [!UL], header->eov_timestamp        [!UL]",
-				TRUE, header->bov_timestamp, header->eov_timestamp);
+		util_out_print("   -->  prev_header->bov_timestamp [0x!16@XJ], prev_header->eov_timestamp [0x!16@XJ]",
+				TRUE, &prev_header->bov_timestamp, &prev_header->eov_timestamp);
+		util_out_print("   -->  header->bov_timestamp        [0x!16@XJ], header->eov_timestamp        [0x!16@XJ]",
+				TRUE, &header->bov_timestamp, &header->eov_timestamp);
 		util_out_print("   -->  prev_header->bov_tn        [!UL], prev_header->eov_tn        [!UL]",
 				TRUE, prev_header->bov_tn, prev_header->eov_tn);
 		util_out_print("   -->  header->bov_tn               [!UL], header->eov_tn               [!UL]",

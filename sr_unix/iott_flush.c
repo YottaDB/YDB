@@ -21,6 +21,7 @@
 #include "gt_timer.h"
 #include "send_msg.h"
 #include "iott_flush_time.h"
+#include "deferred_events.h"
 
 GBLREF io_pair	io_curr_device;
 GBLREF io_pair	io_std_device;
@@ -65,9 +66,8 @@ void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
 					stop_image_no_core();
 				}
 			}
-			rts_error(VARLSTCNT(1) status);
+			xfer_set_handlers(tt_write_error_event, tt_write_error_set, status);
 		}
-
 	}
 	tt_ptr->write_active = new_write_flag;
 }
@@ -96,7 +96,7 @@ void iott_flush_time(TID id, int4 hd_len, io_desc **io_ptr_parm)
 	tt_ptr = io_ptr->dev_sp;
 
 	assert(tt_ptr->timer_set);
-	if (FALSE == tt_ptr->write_active)	/* If not in write code, do flush */
+	if (FALSE == tt_ptr->write_active && !prin_out_dev_failure) /* If not in write code and no failure already, do flush */
 	{
 		tt_ptr->timer_set = FALSE;
 		tt_ptr->write_active = TRUE;

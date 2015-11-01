@@ -168,8 +168,10 @@ ctl_list *get_rollback_jnlfiles(void)
 			}
 			return FALSE;
 		}
-
-		if (!JNL_ENABLED(csd) && !mur_options.forward)
+		assert(!mur_options.forward);
+		if (mur_options.rollback && !JNL_ENABLED(csd))
+			continue;
+		else if (!mur_options.rollback && mur_options.update && !JNL_ALLOWED(csd))
 			continue;
 		temp_ctl = ctl;
 		ctl = ctl->next

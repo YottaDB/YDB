@@ -16,10 +16,11 @@
 GBLREF int 		(* volatile xfer_table[])();
 GBLREF bool 		neterr_pending;
 GBLREF int4 		outofband;
+GBLREF int 		iott_write_error;
 
 void op_zst_over(void)
 {
-	if (!neterr_pending && !outofband)
+	if (!neterr_pending && 0 == outofband && 0 == iott_write_error)
 	{
 		xfer_table[xf_linefetch] = op_linefetch;
 		xfer_table[xf_linestart] = op_linestart;

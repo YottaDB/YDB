@@ -10,16 +10,23 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_stdio.h"
+#include "gtm_string.h"
+
+#include "gtmdbglvl.h"
 #include "compiler.h"
 #include "mdq.h"
 #include "opcode.h"
 #include "alloc_reg.h"
+#include "cdbg_dump.h"
 
 #define MAX_TEMP_COUNT 128
 
-GBLREF int mvmax;
+GBLREF int	mvmax;
 LITREF octabstruct oc_tab[];
-GBLREF triple t_orig;
+GBLREF triple	t_orig;
+GBLREF uint4	gtmDebugLevel;
 
 GBLDEF int4 sa_temps[VALUED_REF_TYPES];
 GBLDEF int4 sa_temps_offset[VALUED_REF_TYPES];
@@ -35,22 +42,24 @@ LITDEF int4 sa_class_sizes[VALUED_REF_TYPES] =
 
 void alloc_reg(void)
 {
-
-	triple *x, *y, *ref;
-	tbp *b;
+	triple	*x, *y, *ref;
+	tbp	*b;
 	oprtype *j;
 	opctype opc, opx;
-	char tempcont[VALUED_REF_TYPES][MAX_TEMP_COUNT],dest_type;
-	int r, c, temphigh[VALUED_REF_TYPES];
-	unsigned short oct;
+	char	tempcont[VALUED_REF_TYPES][MAX_TEMP_COUNT],dest_type;
+	int	r, c, temphigh[VALUED_REF_TYPES];
+	unsigned int oct;
 	int4	size;
 	error_def(ERR_TMPSTOREMAX);
 
 	memset(&tempcont[0][0], 0, sizeof(tempcont));
 	memset(&temphigh[0], -1, sizeof(temphigh));
 	temphigh[TVAR_REF] = mvmax - 1;
+	COMPDBG(printf(" \n\n\n\n************************************** Begin alloc_reg scan *******************************\n"););
 	dqloop(&t_orig, exorder, x)
 	{
+		COMPDBG(printf(" ************************ Triple Start **********************\n"););
+		COMPDBG(cdbg_dump_triple(x, 0););
 		opc = x->opcode;
 		switch (opc)
 		{
@@ -64,6 +73,7 @@ void alloc_reg(void)
 			if (opx == OC_LINESTART || opx == OC_LINEFETCH || opx == OC_ISFORMAL)
 			{
 				opc = x->opcode = OC_NOOP;
+				COMPDBG(printf("   ** Converting triple to NOOP **\n"););
 				continue;	/* continue, because 'normal' NOOP continues from this switch */
 			}
 			break;
@@ -125,7 +135,9 @@ void alloc_reg(void)
 			j++;
 		}
 		if (x->opcode == OC_PASSTHRU)
-		{	x->opcode = OC_NOOP;
+		{
+			COMPDBG(printf(" *** OC_PASSTHRU opcode being NOOP'd\n"););
+			x->opcode = OC_NOOP;
 			continue;
 		}
 		if (!(dest_type = x->destination.oprclass))

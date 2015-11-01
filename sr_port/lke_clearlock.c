@@ -26,6 +26,7 @@
 #include "filestruct.h"
 #include "mlkdef.h"
 #include "cmidef.h"
+#include "hashdef.h"
 #include "cmmdef.h"
 #include "util.h"
 #include "lke.h"

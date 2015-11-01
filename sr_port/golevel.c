@@ -49,16 +49,18 @@ void golevel(int4 level)
         }
         for (ret_targ = NULL; unwind--; )
         {
-                while (tp_pointer && tp_pointer->fp <= frame_pointer)
-                        op_trollback(-1);
-                if (0 == unwind)
-                        ret_targ = get_ret_targ();
-                op_unwind();
-        }
-        if (NULL != ret_targ)
-        {
-                *ret_targ = literal_null;
-                ret_targ->mvtype |= MV_RETARG;
-        }
+		while (tp_pointer && tp_pointer->fp <= frame_pointer)
+               	        op_trollback(-1);
+		if (0 == unwind)
+		{
+			ret_targ = get_ret_targ();
+	       		if (NULL != ret_targ)
+	       		{
+	       		        *ret_targ = literal_null;
+	       		        ret_targ->mvtype |= MV_RETARG;
+	       		}
+		}
+		op_unwind();
+	}
         return;
 }

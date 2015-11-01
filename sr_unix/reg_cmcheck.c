@@ -18,15 +18,13 @@
 #include "gdsfhead.h"
 #include "parse_file.h"
 #include "is_raw_dev.h"
-#include "gtm_uname.h"
 
 #define MAX_NODE_NAME 32
 
 bool reg_cmcheck(gd_region *reg)
 {
 	gd_segment	*seg;
-	short		nodelen;
-	char		node_name[MAX_NODE_NAME + 1], fbuff[MAX_FBUFF + 1];
+	char		fbuff[MAX_FBUFF + 1];
 	parse_blk	pblk;
 	mstr		file;
 	int		status;
@@ -62,13 +60,9 @@ bool reg_cmcheck(gd_region *reg)
 	seg->fname[pblk.b_esl] = 0;
 	seg->fname_len = pblk.b_esl;
 	if (pblk.fnb & F_HAS_NODE)
-	{	assert(pblk.b_node && pblk.l_node[pblk.b_node - 1] == ':');
-		node_name[MAX_NODE_NAME] = 0;
-		gtm_uname(node_name, MAX_NODE_NAME);
-		nodelen = strlen(node_name);
-		if (pblk.b_node - 1 != nodelen || memcmp(seg->fname, node_name, nodelen))
-		{	return TRUE;
-		}
+	{
+		assert(pblk.b_node && ':' == pblk.l_node[pblk.b_node - 1]);
+		return TRUE;
 	}
 	return FALSE;
 }

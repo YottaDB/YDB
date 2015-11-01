@@ -31,6 +31,7 @@ void zyerror_init(void)
 	val.len = sizeof(ZYERROR) - 1;
 	if (SS_NORMAL == (status = trans_log_name(&val, &tn, buf)))
 	{
+		dollar_zyerror.mvtype = MV_STR;
 		dollar_zyerror.str.len = tn.len;
 		dollar_zyerror.str.addr = buf;
 		s2pool(&dollar_zyerror.str);

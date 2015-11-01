@@ -10,264 +10,31 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "stringpool.h"
+#include "zshow.h"
 
 GBLREF spdesc stringpool;
 
-static readonly char dollarch[] = "$C(";
-static readonly char quote_dch[] = "\"_$C(";
-static readonly char close_paren_quote[] = ")_\"";
-
-void mval_lex(mval *v,mstr *output)
+/* WARNING!!! - the it is left to the caller of this routine to protect the stringpool if appropriate */
+void mval_lex(mval *v, mstr *output)
 {
-	unsigned char *cp,*top,*stp;
-	int fastate, space_needed;
-	bool isctl;
-	int ch, n;
-	mstr one;
-	char *numptr, buff[3];	/* numeric conversion buffer */
-	mstr tmpmstr;
+	int space_needed, des_len;
 
 	MV_FORCE_STR(v);
 	if (MV_IS_CANONICAL(v))
-	{
 		*output = v->str;
-	}else
-	{
-		space_needed = 0;
-		fastate = -1;
-		for (cp = (unsigned char *)v->str.addr , top = cp + v->str.len ; top > cp ; )
-		{
-			space_needed++;
-			ch = *cp++;
-			if (ch < 0x20 || ch == '\"' || ch > 0x7e)
-			{
-				/* special character formatting required
-				fa for processing controlled by state variable fastate
-					int ch = -1 means end of string
-					isctl means is a control character
-				*/
-				assert(v->str.len);
-				space_needed = 0;
-				fastate = 0;
-				cp = (unsigned char *)v->str.addr;
-				do
-				{
-					if (cp >= top)
-					{	ch = -1;
-						cp++;
-					}
-					else
-					{
-						ch = *cp++;
-						isctl = (ch < 0x20 || ch > 0x7e);
-					}
-					switch (fastate)
-					{
-					case 0:	/* first time through */
-						if (isctl)
-						{
-							space_needed += sizeof(dollarch) - 1;
-							n = ch / 100;
-							if (n)
-								space_needed++;
-							n = ch / 10;
-							if (n)
-								space_needed++;
-							space_needed++;
-							fastate = 2;
-						} else
-						{
-							space_needed++;
-							tmpmstr.addr = (char *)cp - 1;
-							fastate = 1;
-							if (ch == '\"')
-								space_needed++;
-						}
-						break;
-					case 1:	/* graphic characters */
-						if (ch == -1 || isctl)
-						{
-							tmpmstr.len = (char *) cp - tmpmstr.addr - 1;
-							space_needed += tmpmstr.len;
-							if (!isctl)
-								space_needed++;
-							else
-							{
-								space_needed += sizeof(quote_dch)-1;
-								n = ch / 100;
-								if (n)
-									space_needed++;
-								n = ch / 10;
-								if (n)
-									space_needed++;
-								space_needed++;
-								fastate = 2;
-							}
-						} else if (ch == '\"')
-						{
-							tmpmstr.len = (char *)cp - tmpmstr.addr;
-							space_needed += tmpmstr.len;
-							tmpmstr.addr = (char *)cp - 1;
-						}
-						break;
-					case 2:	/* subsequent non-graphics*/
-						if (ch == -1)
-						{	space_needed++;
-						} else if (isctl || ch == '\"')
-						{
-							space_needed++;		/* comma */
-							n = ch / 100;
-							if (n)
-								space_needed++;
-							n = ch / 10;
-							if (n)
-								space_needed++;
-							space_needed++;
-						} else
-						{
-							space_needed += sizeof(close_paren_quote) - 1;
-							tmpmstr.addr = (char *)cp - 1;
-							fastate = 1;
-						}
-						break;
-					default:
-						assert(FALSE);
-						break;
-					}
-				} while (ch != -1);
-			}
-		}
-		if (fastate == -1)			/* no translation needed */
-			space_needed += 2;		/* quotation marks */
+	else
+	{	/* worst case is every other character is non-graphic
+		 * to cover cases of odd numbers of characters, allow for every one
+		 * quotes are only doubled */
+		space_needed = ((sizeof("_$C(255)_") - 1) * v->str.len) + sizeof("\"\"") - 1;
 		if (stringpool.free + space_needed > stringpool.top)
 			stp_gcol(space_needed);
-		stp = stringpool.free;
-
-		if (fastate == -1)			/* no translation needed */
-		{
-			assert(space_needed == v->str.len + 2);
-			*stp++ = '"';
-			memcpy(stp, v->str.addr, v->str.len);
-			stp += v->str.len;
-			*stp++ = '"';
-			output->addr = (char *)stringpool.free;
-			output->len = v->str.len + 2;
-		}
-		else
-		{	/* special character formatting required
-			fa for processing controlled by state variable fastate
-				int ch = -1 means end of string
-				isctl means is a control character
-			*/
-			fastate = 0;
-			cp = (unsigned char *)v->str.addr;
-			do
-			{
-				if (cp >= top)
-				{	ch = -1;
-					cp++;
-				}
-				else
-				{
-					ch = *cp++;
-					isctl = (ch < 0x20 || ch > 0x7e);
-				}
-				switch (fastate)
-				{
-				case 0:	/* first time through */
-					if (isctl)
-					{
-						memcpy(stp, dollarch, sizeof(dollarch)-1);
-						stp += sizeof(dollarch)-1;
-						n = ch / 100;
-						if (n)
-						{	*stp++ = n + '0';
-							ch -= n * 100;
-						}
-						n = ch / 10;
-						if (n)
-						{	*stp++ = n + '0';
-							ch -= n * 10;
-						}
-						*stp++ = ch + '0';
-						fastate = 2;
-					} else
-					{
-						*stp++ = '"';
-						tmpmstr.addr = (char *)cp - 1;
-						fastate = 1;
-						if (ch == '\"')
-							*stp++ = '"';
-					}
-					break;
-				case 1:	/* graphic characters */
-					if (ch == -1 || isctl)
-					{
-						tmpmstr.len = (char *) cp - tmpmstr.addr - 1;
-						memcpy(stp, tmpmstr.addr, tmpmstr.len);
-						stp += tmpmstr.len;
-						if (!isctl)
-							*stp++ = '"';
-						else
-						{
-							memcpy(stp, quote_dch, sizeof(quote_dch)-1);
-							stp += sizeof(quote_dch)-1;
-							n = ch / 100;
-							if (n)
-							{	*stp++ = n + '0';
-								ch -= n * 100;
-							}
-							n = ch / 10;
-							if (n)
-							{	*stp++ = n + '0';
-								ch -= n * 10;
-							}
-							*stp++ = ch + '0';
-							fastate = 2;
-						}
-					} else if (ch == '\"')
-					{
-						tmpmstr.len = (char *)cp - tmpmstr.addr;
-						memcpy(stp, tmpmstr.addr, tmpmstr.len);
-						stp += tmpmstr.len;
-						tmpmstr.addr = (char *)cp - 1;
-					}
-					break;
-				case 2:	/* subsequent non-graphics*/
-					if (ch == -1)
-					{
-						*stp++ = ')';
-					} else if (isctl || ch == '\"')
-					{
-						*stp++ = ',';
-						n = ch / 100;
-						if (n)
-						{	*stp++ = n + '0';
-							ch -= n * 100;
-						}
-						n = ch / 10;
-						if (n)
-						{	*stp++ = n + '0';
-							ch -= n * 10;
-						}
-						*stp++ = ch + '0';
-					} else
-					{
-						memcpy(stp, close_paren_quote, sizeof(close_paren_quote) - 1);
-						stp += sizeof(close_paren_quote) - 1;
-						tmpmstr.addr = (char *)cp - 1;
-						fastate = 1;
-					}
-					break;
-				default:
-					assert(FALSE);
-					break;
-				}
-			} while (ch != -1);
-			output->addr = (char *)stringpool.free;
-			output->len = stp - stringpool.free;
-			assert(space_needed == output->len);
-		}
+		output->addr = stringpool.free;
+		format2zwr((sm_uc_ptr_t)v->str.addr, v->str.len, (unsigned char *)output->addr, &des_len);
+		output->len = des_len; /* need a temporary des_len since output->len is short on the VAX
+					* and format2zwr expects an (int *) as the last parameter */
+		assert(space_needed >= output->len);
 	}
 }

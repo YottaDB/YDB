@@ -75,9 +75,11 @@ typedef struct mv_stent_struct
 } mv_stent;
 
 mval *unw_mv_ent(mv_stent *mv_st_ent);
+void unw_mv_ent_n(int n);
 
 #define MVST_MSAV 0	/* An mval and an address to store it at pop time, used only
-			   by NEW $ZT.  This is important because the return addr is fixed,
+			   by NEW $ZTRAP, $ETRAP and $ESTACK.
+			   This is important because the return addr is fixed,
 			   and no extra work is required to resolve it. */
 #define MVST_MVAL 1	/* An mval which will be dropped at pop time */
 #define MVST_STAB 2	/* A symbol table */

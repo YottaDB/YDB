@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gtm_facility.h"
@@ -61,7 +62,10 @@ jnl_process_vector	*mur_get_pini_jpv(ctl_list *ctl, uint4 pini_addr)
 	ctl->pini_list = p;
 
 	p->pini_addr = pini_addr;
-	memcpy(&p->jpv, &pini_rec->val.jrec_pini.process_vector, sizeof(jnl_process_vector));
-
+	if (0 == pini_rec->val.jrec_pini.process_vector[SRVR_JPV].jpv_pid
+			&& 0 ==  pini_rec->val.jrec_pini.process_vector[SRVR_JPV].jpv_image_count)
+		memcpy(&p->jpv, &pini_rec->val.jrec_pini.process_vector[ORIG_JPV], sizeof(jnl_process_vector));
+	else
+		memcpy(&p->jpv, &pini_rec->val.jrec_pini.process_vector[SRVR_JPV], sizeof(jnl_process_vector));
 	return &p->jpv;
 }

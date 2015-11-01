@@ -9,7 +9,7 @@
  *								*
  ****************************************************************/
 
-/* int gtm_bintim(char *s, int4 *timep)
+/* int gtm_bintim(char *s, jnl_proc_time *timep)
  *
  * Converts an absolute or relative time to the UNIX internal format (seconds
  * past 1970)
@@ -41,12 +41,21 @@
 #include <time.h>
 
 #include "gtm_ctype.h"
+#include "gtm_string.h"
 #include "gtm_stdio.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "gtm_string.h"
+#include "filestruct.h"
+#include "jnl.h"	/* jnl_proc_time needs this. jnl.h needs some of the above */
 #include "gtm_bintim.h"
 
 static int getmon (char *month);
 
-int gtm_bintim (char *s, int4 *timep)
+int gtm_bintim (char *s, jnl_proc_time *timep)
 {
     time_t	now;
     struct tm	time_tm, *now_tm;

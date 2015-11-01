@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"
 
 #include <netinet/in.h> /* Required for gtmsource.h */
 #include <arpa/inet.h>
@@ -49,6 +50,7 @@ GBLREF	sm_uc_ptr_t		jnldata_base;
 GBLREF	bool			run_time;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	boolean_t		forw_phase_recovery;
 
 LITREF	int			jnl_fixed_size[];
 
@@ -57,7 +59,8 @@ LITREF	int			jnl_fixed_size[];
 #define	JNL_SPACE_AVAILABLE(jb, lcl_dskaddr)							\
 (												\
 	assert((jb)->dskaddr <= (jb)->freeaddr),						\
-	assert((jb)->dskaddr + (jb)->size >= (jb)->freeaddr),					\
+	/* the following assert is an || to take care of 4G value overflows or 0 underflows */  \
+	assert(((jb)->freeaddr <= (jb)->size) || (jb)->dskaddr >= (jb)->freeaddr - (jb)->size),	\
 	((jb)->size - ((jb)->freeaddr - ((lcl_dskaddr = (jb)->dskaddr) & JNL_WRT_START_MASK)))	\
 )
 #else
@@ -174,6 +177,13 @@ void	jnl_write(jnl_private_control *jpc,
 			assert(FALSE);
 			return;
 		}
+		if (0 == csa->jnl->pini_addr && JRT_PINI != rectype)
+		{	/* This can happen only if jnl got switched in jnl_file_extend above.
+			 * We can't proceed now since the jnl record that we are writing now contains pini_addr	information
+			 * 	pointing to the older journal which is inappropriate if written into the new journal.
+			 */
+			GTMASSERT;
+		}
 	}
 	if (n_with_align != n)
 	{	/* Write a JRT_ALIGN record. This code can be combined with the one below this if ().
@@ -205,12 +215,19 @@ void	jnl_write(jnl_private_control *jpc,
 		case JRT_GZKILL:
 		case JRT_TZKILL:
 		case JRT_UZKILL:
-			assert(gbl_jrec_time == ((fixed_jrec_tp_kill_set *)(fjlist_header->buff + JREC_PREFIX_SIZE))->short_time);
-			/* caution : explicit fallthrough. the above are rectypes that go through jnl_write_logical. */
+			assert(forw_phase_recovery || (gbl_jrec_time ==
+				((fixed_jrec_tp_kill_set *)(fjlist_header->buff + JREC_PREFIX_SIZE))->short_time));
+			align_rec.jrec_align.short_time = (forw_phase_recovery ? ((fixed_jrec_tp_kill_set *)
+							(fjlist_header->buff + JREC_PREFIX_SIZE))->short_time : gbl_jrec_time);
+			break;
 		case JRT_ZTCOM:
 		case JRT_PBLK:
 		case JRT_TCOM:
-			align_rec.jrec_align.short_time = gbl_jrec_time;
+			assert(&fixed_section->jrec_kill.short_time == &fixed_section->jrec_pblk.short_time);
+			assert(&fixed_section->jrec_kill.short_time == &fixed_section->jrec_tcom.tc_short_time);
+			assert(&fixed_section->jrec_kill.short_time == &fixed_section->jrec_ztcom.tc_short_time);
+			align_rec.jrec_align.short_time = (forw_phase_recovery ? fixed_section->jrec_kill.short_time
+									: gbl_jrec_time);
 			break;
 		case JRT_EPOCH:
 		case JRT_NULL:
@@ -218,11 +235,28 @@ void	jnl_write(jnl_private_control *jpc,
 		case JRT_AIMG:
 			align_rec.jrec_align.short_time = fixed_section->jrec_fkill.short_time;
 			break;
-		case JRT_PINI:
 		case JRT_PFIN:
 		case JRT_EOF:
-			UNIX_ONLY(align_rec.jrec_align.short_time = fixed_section->jrec_pini.process_vector.jpv_time);
-			VMS_ONLY (align_rec.jrec_align.short_time = fixed_section->jrec_pini.process_vector.jpv_time.mid_time);
+			align_rec.jrec_align.short_time = MID_TIME(fixed_section->jrec_pini.process_vector[CURR_JPV].jpv_time);
+			break;
+		case JRT_PINI:
+			if (!forw_phase_recovery)
+			{
+				align_rec.jrec_align.short_time =
+					MID_TIME(fixed_section->jrec_pini.process_vector[CURR_JPV].jpv_time);
+			} else
+			{
+				if (0 == fixed_section->jrec_pini.process_vector[SRVR_JPV].jpv_pid
+					&& 0 ==  fixed_section->jrec_pini.process_vector[SRVR_JPV].jpv_image_count)
+				{
+					align_rec.jrec_align.short_time =
+						MID_TIME(fixed_section->jrec_pini.process_vector[ORIG_JPV].jpv_time);
+				} else
+				{
+					align_rec.jrec_align.short_time =
+						MID_TIME(fixed_section->jrec_pini.process_vector[SRVR_JPV].jpv_time);
+				}
+			}
 			break;
 		default:
 			GTMASSERT;

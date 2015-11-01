@@ -18,7 +18,9 @@
 #include <sys/time.h>
 #include <errno.h>
 #include <unistd.h>
+#include <signal.h> /* for kill() */
 
+#include "gtm_sem.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -29,6 +31,7 @@
 #include "eintr_wrappers.h"
 #include "mu_rndwn_file.h"
 #include "gtm_string.h"
+#include "gtm_stdlib.h"
 #include "error.h"
 #include "io.h"
 #include "gtm_fcntl.h"
@@ -47,7 +50,6 @@
 #include "semwt2long_handler.h"
 
 
-GBLREF boolean_t		mupip_jnl_recover;
 GBLREF gd_region		*gv_cur_region;
 GBLREF uint4			process_id;
 GBLREF enum gtmImageTypes	image_type;
@@ -58,8 +60,10 @@ GBLREF volatile boolean_t 	semwt2long;
 static struct sembuf		ftok_sop[3];
 static int			ftok_sopcnt;
 
-#define MAX_SEM_WT      	(1000 * 30)		/* 30 second wait for DSE to acquire access control semaphore */
+#define MAX_SEM_DSE_WT      	(1000 * 30)		/* 30 second wait to acquire access control semaphore */
+#define MAX_SEM_WT      	(1000 * 60)		/* 60 second wait to acquire access control semaphore */
 #define MAX_RES_TRIES  	 	620
+#define OLD_VERSION_SEM_PER_SET 2
 
 /*
  * Description:
@@ -67,22 +71,26 @@ static int			ftok_sopcnt;
  * 	Create semaphore set of id "ftok_semid" using that project_id, if it does not exist.
  * 	Then it will lock ftok_semid.
  * Parameters:
- * 	IF incr_cnt == TRUE, it will increment counter semaphore.
- * 	IF immidate == TRUE, it will use IPC_NOWAIT flag.
+ *	reg		: Regions structure
+ * 	incr_cnt	: IF incr_cnt == TRUE, it will increment counter semaphore.
+ *	project_id	: Project id for ftok call.
+ * 	immediate	: IF immediate == TRUE, it will use IPC_NOWAIT flag.
  * Return Value: TRUE, if succsessful
  *	         FALSE, if fails.
  */
 boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boolean_t immediate)
 {
-	int			sem_pid, semflag;
+	int			sem_wait_time, sem_pid, save_errno;
         int4            	status;
         uint4           	lcnt;
         unix_db_info    	*udi;
+	union semun		semarg;
 
 	error_def(ERR_FTOKERR);
-	error_def(ERR_TEXT);
         error_def(ERR_CRITSEMFAIL);
 	error_def(ERR_SEMWT2LONG);
+	error_def(ERR_SEMKEYINUSE);
+	error_def(ERR_SYSCALL);
 
 	assert(reg);
         udi = FILE_INFO(reg);
@@ -90,111 +98,139 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 	assert(NULL == ftok_sem_reg);
         if (-1 == (udi->key = FTOK(udi->fn, project_id)))
 	{
-                gtm_putmsg(VARLSTCNT(9) ERR_FTOKERR, 2, DB_LEN_STR(reg),
-			ERR_TEXT, 2, RTS_ERROR_TEXT("Error getting ftok"), errno);
+                gtm_putmsg(VARLSTCNT(5) ERR_FTOKERR, 2, DB_LEN_STR(reg), errno);
 		return FALSE;
 	}
-	semflag = SEM_UNDO | (immediate ? IPC_NOWAIT : 0);
 	/*
-	 * the purpose of this loop is to deal with possibility that the semaphores may
-	 * be deleted as they are attached.
+	 * The purpose of this loop is to deal with possibility that the semaphores might
+	 * be deleted by someone else after the semget call below but before semop locks it.
 	 */
 	for (status = -1, lcnt = 0;  -1 == status;  lcnt++)
 	{
-		if (-1 == (udi->ftok_semid = semget(udi->key, 2, RWDALL | IPC_CREAT)))
+		if (-1 == (udi->ftok_semid = semget(udi->key, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT)))
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_FTOKERR, 2, DB_LEN_STR(reg), errno);
+			udi->ftok_semid = INVALID_SEMID;
+			save_errno = errno;
+			if (EINVAL == save_errno)
+			{
+				/* Possibly the key is in use by older GTM version */
+				if (-1 != semget(udi->key, OLD_VERSION_SEM_PER_SET, RALL))
+					gtm_putmsg(VARLSTCNT(4) ERR_SEMKEYINUSE, 1, udi->key, errno);
+			}
+			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM, save_errno);
+			return FALSE;
+		}
+		/*
+		 * Following will set semaphore number 2 ( = FTOK_SEM_PER_ID - 1)  value as GTM_ID.
+		 * In case we have orphaned semaphore for some reason, mupip rundown will be
+		 * able to identify GTM semaphores from the value GTM_ID and will remove.
+		 */
+		semarg.val = GTM_ID;
+		if (-1 == semctl(udi->ftok_semid, FTOK_SEM_PER_ID - 1, SETVAL, semarg))
+		{
+			save_errno = errno;
+			if (EINVAL == save_errno && MAX_RES_TRIES >= lcnt)
+					continue;
+			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl()"), CALLFROM, save_errno);
 			return FALSE;
 		}
 		ftok_sop[0].sem_num = 0; ftok_sop[0].sem_op = 0;	/* Wait for 0 (unlocked) */
 		ftok_sop[1].sem_num = 0; ftok_sop[1].sem_op = 1;	/* Then lock it */
-		ftok_sopcnt = 2;
 		if (incr_cnt)
 		{
 			ftok_sop[2].sem_num = 1; ftok_sop[2].sem_op = 1;	/* increment counter semaphore */
 			ftok_sopcnt = 3;
-		}
-		if (DSE_IMAGE == image_type)
-		{
-			assert(incr_cnt);
-			/* First try non-blocking */
-			ftok_sop[0].sem_flg = ftok_sop[1].sem_flg = ftok_sop[2].sem_flg = SEM_UNDO | IPC_NOWAIT;
-			status = semop(udi->ftok_semid, ftok_sop, ftok_sopcnt);
-			if (-1 == status)
-			{
-				if (EAGAIN == errno)	/* Someone else is holding it */
-				{
-					sem_pid = semctl(udi->ftok_semid, 0, GETPID);
-					if (-1 == sem_pid)
-					{
-						if (EINVAL == errno)		/* the sem might have been deleted */
-							continue;
-						else
-						{
-							gtm_putmsg(VARLSTCNT(9) ERR_CRITSEMFAIL, 2,
-								DB_LEN_STR(reg), ERR_TEXT, 2,
-								RTS_ERROR_TEXT("semop/semctl of ftok_semid failed"), errno);
-							return FALSE;
-						}
-					}
-					util_out_print("Semaphore ftok_sop for region !AD is held by pid, !UL. "
-						       "An attempt will be made in the next 30 seconds to grab it.",
-						       TRUE, DB_LEN_STR(reg), sem_pid);
-					semwt2long = FALSE;
-					start_timer((TID)semwt2long_handler, MAX_SEM_WT, semwt2long_handler, 0, NULL);
-				} else if (((EINVAL != errno) && (EIDRM != errno) && (EINTR != errno)) || (MAX_RES_TRIES < lcnt))
-				{
-					gtm_putmsg(VARLSTCNT(9) ERR_CRITSEMFAIL, 2,
-						DB_LEN_STR(reg), ERR_TEXT, 2,
-						RTS_ERROR_TEXT("db_init semop of ftok_semid"), errno);
-					return FALSE;
-				}
-				else
-					continue;
-			} else
-				break;
-		}
-		ftok_sop[0].sem_flg = ftok_sop[1].sem_flg = ftok_sop[2].sem_flg = semflag;
+		} else
+			ftok_sopcnt = 2;
+		assert(DSE_IMAGE != image_type || incr_cnt);
+		/* First try is always non-blocking */
+		ftok_sop[0].sem_flg = ftok_sop[1].sem_flg = ftok_sop[2].sem_flg = SEM_UNDO | IPC_NOWAIT;
 		status = semop(udi->ftok_semid, ftok_sop, ftok_sopcnt);
 		if (-1 == status)
 		{
-			if (DSE_IMAGE != image_type)
+			save_errno = errno;
+			if (immediate)
 			{
-				if (((EINVAL != errno) && (EIDRM != errno) && (EINTR != errno)) || (MAX_RES_TRIES < lcnt))
-				{
-					/* issue gtm_putmsg, if it is not EINVAL, EIDRM or, EINTR error.  */
-					gtm_putmsg(VARLSTCNT(9) ERR_CRITSEMFAIL, 2,
-						DB_LEN_STR(reg), ERR_TEXT, 2,
-						RTS_ERROR_TEXT("db_init semop of ftok_semid"), errno);
-					return FALSE;
-				}
-				/* else continue */
-			} else
+				gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+				gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
+					RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
+				return FALSE;
+			}
+			if (EAGAIN == save_errno)	/* Someone else is holding it */
 			{
-				if (EINTR == errno && semwt2long)
+				sem_pid = semctl(udi->ftok_semid, 0, GETPID);
+				if (-1 == sem_pid)
 				{
-					/* Timer popped. DSE will give up. */
-					sem_pid = semctl(udi->ftok_semid, 0, GETPID);
-					if (-1 != sem_pid)
+					if (EINVAL == errno)		/* the sem might have been deleted */
+						continue;
+					else
 					{
-						gtm_putmsg(VARLSTCNT(5) ERR_SEMWT2LONG, 3,  DB_LEN_STR(reg), sem_pid);
-						return FALSE;
-					} else
-					{
-						gtm_putmsg(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
+						gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+						gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
+							RTS_ERROR_LITERAL("semop() and semctl()"), CALLFROM, errno);
 						return FALSE;
 					}
-				} else if (((EINVAL != errno) && (EIDRM != errno) && (EINTR != errno)) || (MAX_RES_TRIES < lcnt))
+				}
+				if (DSE_IMAGE != image_type)
+					sem_wait_time = MAX_SEM_WT;
+				else {
+					sem_wait_time = MAX_SEM_DSE_WT;
+					util_out_print("FTOK semaphore for region !AD is held by pid, !UL. "
+						       "An attempt will be made in the next !SL seconds to grab it.",
+						       TRUE, DB_LEN_STR(reg), sem_pid, sem_wait_time/1000);
+				}
+				semwt2long = FALSE;
+				start_timer((TID)semwt2long_handler, sem_wait_time, semwt2long_handler, 0, NULL);
+				/*** drop thru ***/
+			} else if (((EINVAL != save_errno) && (EIDRM != save_errno) && (EINTR != save_errno)) ||
+				(MAX_RES_TRIES < lcnt))
+			{
+				gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+				gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
+				return FALSE;
+			} else
+				continue;
+		} else
+			break;
+		/* We already started a timer. Now try semop not using IPC_NOWAIT (that is, blocking semop)*/
+		ftok_sop[0].sem_flg = ftok_sop[1].sem_flg = ftok_sop[2].sem_flg = SEM_UNDO;
+		status = semop(udi->ftok_semid, ftok_sop, ftok_sopcnt);
+		if (-1 == status)
+		{
+			save_errno = errno;
+			if (EINTR == save_errno && semwt2long)
+			{
+				/* Timer popped */
+				sem_pid = semctl(udi->ftok_semid, 0, GETPID);
+				if (-1 != sem_pid)
 				{
-					/* issue gtm_putmsg, if it is neither EINVAL nor EIDRM nor EINTR error.  */
-					cancel_timer((TID)semwt2long_handler);
-					gtm_putmsg(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
+					gtm_putmsg(VARLSTCNT(5) ERR_SEMWT2LONG, 3,  DB_LEN_STR(reg), sem_pid);
+					DEBUG_ONLY(kill(sem_pid, 11);)
+					assert(DSE_IMAGE == image_type); /* We want to debug why reorg/gtm fails here */
+					return FALSE;
+				} else
+				{
+					gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+					gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
+						RTS_ERROR_LITERAL("semop() and semctl()"), CALLFROM, save_errno);
 					return FALSE;
 				}
-				/* else continue */
+			} else if (((EINVAL != save_errno) && (EIDRM != save_errno) && (EINTR != save_errno)) ||
+				(MAX_RES_TRIES < lcnt))
+			{
+				cancel_timer((TID)semwt2long_handler);
+				gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+				gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
+				return FALSE;
 			}
-		} else if (DSE_IMAGE == image_type)
+			/* else continue */
+		} else
+		{
 			cancel_timer((TID)semwt2long_handler);
+			break;
+		}
 	} /* end for loop */
 	ftok_sem_reg = reg;
 	udi->grabbed_ftok_sem = TRUE;
@@ -205,8 +241,10 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
  * Description:
  * 	Assumes that ftok semaphore already exists. Just lock it.
  * Parameters:
- * 	IF incr_cnt == TRUE, it will increment counter semaphore.
- * 	IF immidate == TRUE, it will use IPC_NOWAIT flag.
+ *	reg		: Regions structure
+ * 	incr_cnt	: IF incr_cnt == TRUE, it will increment counter semaphore.
+ *	project_id	: Project id for ftok call.
+ * 	immediate	: IF immediate == TRUE, it will use IPC_NOWAIT flag.
  * Return Value: TRUE, if succsessful
  *	         FALSE, if fails.
  */
@@ -216,13 +254,13 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 	unix_db_info		*udi;
 
 	error_def(ERR_CRITSEMFAIL);
-	error_def(ERR_TEXT);
+	error_def(ERR_SYSCALL);
 
 	assert(reg);
         udi = FILE_INFO(reg);
 	assert(!udi->grabbed_ftok_sem);
 	assert(NULL == ftok_sem_reg);
-	assert(-1 != udi->ftok_semid && -1 != udi->semid && -1 != udi->shmid);
+	assert(INVALID_SEMID != udi->ftok_semid);
 	ftok_sopcnt = 0;
 	semflag = SEM_UNDO | (immediate ? IPC_NOWAIT : 0);
 	if (!udi->grabbed_ftok_sem)
@@ -233,41 +271,39 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 		 */
 		ftok_sop[0].sem_num = 0; ftok_sop[0].sem_op = 0;	/* Wait for 0 (unlocked) */
 		ftok_sop[1].sem_num = 0; ftok_sop[1].sem_op = 1;	/* Then lock it */
-		ftok_sop[0].sem_flg = ftok_sop[1].sem_flg = SEM_UNDO | IPC_NOWAIT;
 		ftok_sopcnt = 2;
 	} else if (!incr_cnt)
 		return TRUE;
 	if (incr_cnt)
 	{
-		ftok_sop[ftok_sopcnt].sem_num = 1; ftok_sop[ftok_sopcnt].sem_op = 1;
-				/* increment counter for this semaphore */
-		ftok_sop[ftok_sopcnt].sem_flg = SEM_UNDO | IPC_NOWAIT;
+		ftok_sop[ftok_sopcnt].sem_num = 1; ftok_sop[ftok_sopcnt].sem_op = 1; /* increment counter */
 		ftok_sopcnt++;
 	}
+	ftok_sop[0].sem_flg = ftok_sop[1].sem_flg = ftok_sop[2].sem_flg = SEM_UNDO | IPC_NOWAIT;
 	SEMOP(udi->ftok_semid, ftok_sop, ftok_sopcnt, status);
 	if (-1 == status)	/* We couldn't get it in one shot -- see if we already have it */
 	{
 		save_errno = errno;
 		if (semctl(udi->ftok_semid, 0, GETPID) == process_id)
 		{
-			gtm_putmsg(VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-				ERR_TEXT, 2, RTS_ERROR_TEXT("ftok_semid lock is owned by itself"), save_errno);
+			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl()"), CALLFROM, save_errno);
 			return FALSE;
 		}
 		if (EAGAIN != save_errno)
 		{
-			gtm_putmsg(VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-				ERR_TEXT, 2, RTS_ERROR_TEXT("SEMOP/semctl failed on ftok_semid"), save_errno);
+			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
 			return FALSE;
 		}
-		ftok_sop[0].sem_flg = ftok_sop[1].sem_flg = semflag;
-		if (incr_cnt)
-			ftok_sop[2].sem_flg = semflag;
-		/* Try again - blocking this time */
+		/* Try again - IPC_NOWAIT is set TRUE, if immediate is TRUE */
+		ftok_sop[0].sem_flg = ftok_sop[1].sem_flg = ftok_sop[2].sem_flg = semflag;
 		SEMOP(udi->ftok_semid, ftok_sop, ftok_sopcnt, status);
 		if (-1 == status)			/* We couldn't get it at all.. */
 		{
-			gtm_putmsg(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
+			save_errno = errno;
+			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
 			return FALSE;
 		}
 	}
@@ -280,8 +316,9 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
  * Description:
  * 	Assumes that ftok semaphore was already locked. Now release it.
  * Parameters:
+ *	reg		: Regions structure
  * 	IF decr_count == TRUE, it will decrement counter semaphore.
- * 	IF immidate == TRUE, it will use IPC_NOWAIT flag.
+ * 	IF immediate == TRUE, it will use IPC_NOWAIT flag.
  * Return Value: TRUE, if succsessful
  *	         FALSE, if fails.
  */
@@ -289,14 +326,15 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_count, boolean_t imme
 {
 	int		ftok_semval, semflag, save_errno;
 	unix_db_info 	*udi;
-	error_def (ERR_CRITSEMFAIL);
-	error_def (ERR_TEXT);
+
+	error_def(ERR_CRITSEMFAIL);
+	error_def(ERR_SYSCALL);
 
 	assert(NULL != reg);
 	assert(reg == ftok_sem_reg);
 	udi = FILE_INFO(reg);
 	assert(udi->grabbed_ftok_sem);
-	assert(udi && -1 != udi->ftok_semid);
+	assert(udi && INVALID_SEMID != udi->ftok_semid);
 	/* if we dont have the ftok semaphore, return true even if decr_cnt was requested */
 	if (!udi->grabbed_ftok_sem)
 		return TRUE;
@@ -305,33 +343,35 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_count, boolean_t imme
 	{
 		if (-1 == (ftok_semval = semctl(udi->ftok_semid, 1, GETVAL)))
 		{
-			gtm_putmsg(VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-				ERR_TEXT, 2, RTS_ERROR_TEXT("ftok_sem_release semctl failed"), errno);
+			save_errno = errno;
+			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl()"), CALLFROM, save_errno);
 			return FALSE;
 		}
 		if (1 >= ftok_semval)	/* checking against 0, in case already we decremented semaphore number 1 */
 		{
 			if (0 != sem_rmid(udi->ftok_semid))
 			{
-				gtm_putmsg(VARLSTCNT(8) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-					ERR_TEXT, 2, RTS_ERROR_TEXT("ftok_sem_release sem_rmid"));
+				gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+				gtm_putmsg(VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("sem_rmid()"), CALLFROM);
 				return FALSE;
 			}
+			udi->ftok_semid = INVALID_SEMID;
 			ftok_sem_reg = NULL;
 			udi->grabbed_ftok_sem = FALSE;
 			return TRUE;
 		}
 		if (0 != (save_errno = do_semop(udi->ftok_semid, 1, -1, semflag)))
 		{
-			gtm_putmsg(VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-			ERR_TEXT, 2, RTS_ERROR_TEXT("ftok_sem_release do_semop on count semaphore"), save_errno);
+			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
 			return FALSE;
 		}
 	}
 	if (0 != (save_errno = do_semop(udi->ftok_semid, 0, -1, semflag)))
 	{
-		gtm_putmsg(VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
-			ERR_TEXT, 2, RTS_ERROR_TEXT("ftok_sem_release do_semop"), save_errno);
+		gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
 		return FALSE;
 	}
 	udi->grabbed_ftok_sem = FALSE;

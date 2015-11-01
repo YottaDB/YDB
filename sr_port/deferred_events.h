@@ -19,6 +19,7 @@ enum deferred_event
 	outofband_event,
 	network_error_event,
 	zstp_or_zbrk_event,
+	tt_write_error_event,
 	DEFERRED_EVENTS
 };
 
@@ -96,6 +97,7 @@ void ctrly_set(int4);
 
 void tp_timeout_defer(int4);
 
+void tt_write_error_set(int4);
 
 /* ------------------------------------------------------------------
  * Perform action corresponding to the first async event that

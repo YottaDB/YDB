@@ -17,7 +17,7 @@
 	;callable entry point
 	;
 	w !,"Routine Input Utility - Converts RO file to *.m files.",!
-	i '$d(%zdebug) n $zt s $zt="zg "_$zl_":ERR^%RI" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%RI")
+	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%RI" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%RI")
 	n d,dir,ff,l,r,x,y,%ZD,ff
 	r !,"Formfeed delimited <No>? ",x
 	s ff=$s($e($tr(x,"u","U"))="Y":$c(13,12),1:"")
@@ -54,6 +54,7 @@ eof	u $p
 	q
 	;
 ERR	u $p w !,$p($zs,",",2,99),!
+	s $ec=""
 	; Warning - Fall-though
 EXIT	i $d(%ZD),%ZD'=$p c %ZD
 	u $p:(ctrap="":exc="")

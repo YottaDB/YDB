@@ -10,21 +10,18 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "hashdef.h"
 #include "cmidef.h"
 #include "cmmdef.h"
+#include "gvcmx.h"
+#include "gvcmz.h"
 
 GBLREF bool zdefactive;
 
-void gvcmx_put(v)
-mval	*v;
+void gvcmx_put(mval *v)
 {
-	void gvcmz_bunch(), gvcmz_doop();
-
 	if (zdefactive)
-	{	gvcmz_bunch(v);
-	}
+		gvcmz_bunch(v);
 	else
-	{	gvcmz_doop(CMMS_Q_PUT,CMMS_R_PUT,v);
-	}
-	return;
+		gvcmz_doop(CMMS_Q_PUT, CMMS_R_PUT, v);
 }

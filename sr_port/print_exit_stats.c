@@ -17,7 +17,7 @@
 #include "op.h"
 #include "cache.h"
 
-GBLREF	int4		gtmDebugLevel;			/* Debug level (0 = using default sm module so with
+GBLREF	uint4		gtmDebugLevel;			/* Debug level (0 = using default sm module so with
 							   a DEBUG build, even level 0 implies basic debugging) */
 
 void print_exit_stats(void)

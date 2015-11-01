@@ -15,6 +15,7 @@
 #include "gtm_stdio.h"
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include "gtm_unistd.h"
 
 #include "compiler.h"
@@ -32,6 +33,7 @@
 #include "jmp_opto.h"
 #include "mlabel2xtern.h"
 #include "cg_var.h"
+#include "gtm_string.h"
 
 GBLREF bool		run_time;
 GBLREF command_qualifier cmd_qlf;
@@ -43,12 +45,6 @@ GBLREF char		module_name[];
 
 GBLDEF int4		curr_addr, code_size;
 GBLDEF char		cg_phase;	/* code generation phase */
-GBLDEF int		stdin_fd;
-GBLDEF int		stderr_fd;
-GBLDEF int		stdout_fd;
-#if defined(__osf__) && defined(DEBUG)
-char	tmpfile_name[1024];
-#endif
 
 void	cg_lab (mlabel *l, int4 base);
 
@@ -80,53 +76,8 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	comp_lits(&rhead);
 	if ((cmd_qlf.qlf & CQ_MACHINE_CODE))
 	{
-#ifdef UNIX
-		int dup2_res;
-#endif
-#if defined(__osf__) && defined(DEBUG)
-		memcpy(tmpfile_name, "/tmp/output.lis",15);
-		*(i2asc((uchar_ptr_t)&tmpfile_name[15], (unsigned int)getpid())) = 0;
-#ifdef UNIX
-		OPENFILE3(tmpfile_name, O_CREAT | O_RDWR, 0666, stderr_fd);
-		if (-1 == stderr_fd)
-#else
-		if ((stderr_fd = OPEN3(tmpfile_name, O_CREAT | O_RDWR, 0666)) == -1)
-#endif
-			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Error in open in obj_code"), errno);
-
-		stdin_fd = stdout_fd = stderr_fd;
-
-#ifdef UNIX
-		DUP2(stderr_fd, 0, dup2_res);
-		if (-1 == dup2_res)
-#else
-		if (dup2(stderr_fd, 0) == -1)
-#endif
-			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Error in dup2(stdin) in obj_code"), errno);
-
-#ifdef UNIX
-		DUP2(stderr_fd, 2, dup2_res);
-		if (-1 == dup2_res)
-#else
-		if (dup2(stderr_fd, 2) == -1)
-#endif
-			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Error in dup2(stderr) in obj_code"), errno);
-
-#ifdef UNIX
-		DUP2(stdout_fd, 1, dup2_res);
-		if (-1 == dup2_res)
-#else
-		if (dup2(stdout_fd, 1) == -1)
-#endif
-			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Error in dup2(stdout) in obj_code"), errno);
-#endif
 		cg_phase = CGP_ASSEMBLY;
 		code_gen();
-
-#if defined(__osf__) && defined(DEBUG)
-		if (UNLINK(tmpfile_name) == -1)
-			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Error in unlink in obj_code"), errno);
-#endif
 	}
 	if (!(cmd_qlf.qlf & CQ_OBJECT))
 		return;
@@ -187,7 +138,7 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 			}
 		}
 	}
-#ifndef __MVS__		/* assert not valid for instructions on OS390 */
+#if !defined(__MVS__) && !defined(__s390__)	/* assert not valid for instructions on OS390 */
 	assert (code_size == psect_use_tab[GTM_CODE]);
 #endif
 	emit_literals();

@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 #include "op.h"
+#include "cmidef.h"
 #include "gvcmz.h"
 
 GBLREF bool		remlkreq;

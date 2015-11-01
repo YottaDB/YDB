@@ -38,7 +38,7 @@ void  resetterm(io_desc *iod)
 		{
 			save_errno = errno;
 			if (gtm_isanlp(ttptr->fildes) == 0)
-				rts_error(VARLSTCNT(3) ERR_TCSETATTR, ttptr->fildes, save_errno);
+				rts_error(VARLSTCNT(4) ERR_TCSETATTR, 1, ttptr->fildes, save_errno);
 		}
 	}
 	return;

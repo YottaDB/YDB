@@ -17,11 +17,12 @@
 			      * mdefsp.h */
 #define STP_INITSIZE	(12 * STP_PAGE_SIZE) /* initial size of string pool */
 #define STP_MAXSIZE	(400 * STP_PAGE_SIZE) /* maximum size of string pool */
-#define STP_INCREMENT	(8 * STP_PAGE_SIZE) /* amount to grow string pool, also used as minimum stringpool size */
+#define STP_INCREMENT	(4 * STP_PAGE_SIZE) /* amount to grow string pool, also used as minimum stringpool size */
 #define STP_MINFREE	(4 * STP_PAGE_SIZE) /* minimum amount which will cause a 'grow' next time */
 #define STP_MAXITEMS	8192	/* maximum number of mval's for garbage collection */
-#define STP_MAXGEOMGROWTH (32 * 1024 * 1024) /* let the stringpool grow geometrically till the size reaches STP_MAXGEOMGROWTH, after
+#define STP_MAXGEOMGROWTH (16 * 1024 * 1024) /* let the stringpool grow geometrically till the size reaches STP_MAXGEOMGROWTH, after
 					      * which, grow linearly */
+#define STP_RECLAIMLIMIT (2 * 1024 * 1024) /* if the space reclaimed is more than this amount, don't do forced expansion */
 #define STP_LIMITFRCDEXPN  STP_MAXGEOMGROWTH /* no forced expansions of any kind after the stringpool size grows to this limit */
 #define STP_GEOMGROWTH_FACTOR	2
 #define STP_MINRECLAIM	((stringpool.top - stringpool.base) >> 2) /* atleast 25% of the current size */

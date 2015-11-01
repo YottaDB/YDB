@@ -51,7 +51,7 @@
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	recvpool_addrs		recvpool;
 
-static struct	sembuf	sop[2];
+static struct	sembuf	sop[5];
 static		int	sem_set_id[NUM_SEM_SETS] = {0, 0};
 static		int	sem_info_id_map[SEM_NUM_INFOS] = { GETVAL, GETPID };
 
@@ -92,6 +92,42 @@ int grab_sem(int set_index, int sem_num)
 	sop[1].sem_num = sem_num;
 	sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO;
 	SEMOP(sem_set_id[set_index], sop, 2, rc);
+	return rc;
+}
+
+int grab_sem_all_source()
+{
+	int rc;
+
+	sop[0].sem_op  = 0; /* Wait for 0 */
+	sop[0].sem_num = JNL_POOL_ACCESS_SEM;
+	sop[1].sem_op  = 1; /* Increment it */
+	sop[1].sem_num = JNL_POOL_ACCESS_SEM;
+	sop[2].sem_op  = 1; /* Increment it */
+	sop[2].sem_num = SRC_SERV_COUNT_SEM;
+	sop[3].sem_op  = 1; /* Increment it */
+	sop[3].sem_num = SRC_SERV_OPTIONS_SEM;
+	sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = sop[3].sem_flg = SEM_UNDO;
+	SEMOP(sem_set_id[SOURCE], sop, 4, rc);
+	return rc;
+}
+
+int grab_sem_all_receive()
+{
+	int rc;
+
+	sop[0].sem_op  = 0; /* Wait for 0 */
+	sop[0].sem_num = RECV_POOL_ACCESS_SEM;
+	sop[1].sem_op  = 1; /* Increment it */
+	sop[1].sem_num = RECV_POOL_ACCESS_SEM;
+	sop[2].sem_op  = 1; /* Increment it */
+	sop[2].sem_num = RECV_SERV_COUNT_SEM;
+	sop[3].sem_op  = 1; /* Increment it */
+	sop[3].sem_num = UPD_PROC_COUNT_SEM;
+	sop[4].sem_op  = 1; /* Increment it */
+	sop[4].sem_num = RECV_SERV_OPTIONS_SEM;
+	sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = sop[3].sem_flg = sop[4].sem_flg = SEM_UNDO;
+	SEMOP(sem_set_id[RECV], sop, 5, rc);
 	return rc;
 }
 
@@ -137,70 +173,4 @@ int remove_sem_set(int set_index)
 	if (!rc) /* successful removal of sem set */
 		sem_set_id[set_index] = 0;
 	return rc;
-}
-
-/* This will create ftok semaphore and then lock jnlpool */
-void get_lock_jnlpool_ftok_sems(boolean_t incr_cnt, boolean_t immediate)
-{
-	error_def(ERR_TEXT);
-	error_def(ERR_JNLPOOLSETUP);
-
-	if (!ftok_sem_get(jnlpool.jnlpool_dummy_reg, incr_cnt, JNLPOOL_ID, immediate))
-		rts_error(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error from ftok_sem_get in get_lock_jnlpool_ftok_sems"));
-}
-
-/* This will create ftok semaphore and then lock recvpool */
-void get_lock_recvpool_ftok_sems(boolean_t incr_cnt, boolean_t immediate)
-{
-	error_def(ERR_TEXT);
-	error_def(ERR_RECVPOOLSETUP);
-
-	if (!ftok_sem_get(recvpool.recvpool_dummy_reg, incr_cnt, RECVPOOL_ID, immediate))
-		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error from ftok_sem_get in get_lock_recvpool_ftok_sems"));
-}
-
-/* This will lock jnlpool using ftok semaphore. We assume semaphore already exists */
-void lock_jnlpool_ftok_sems(boolean_t incr_cnt, boolean_t immediate)
-{
-	error_def(ERR_TEXT);
-	error_def(ERR_JNLPOOLSETUP);
-
-	if (!ftok_sem_lock(jnlpool.jnlpool_dummy_reg, incr_cnt, immediate))
-		rts_error(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error from ftok_sem_lock in lock_jnlpool_ftok_sems"));
-}
-
-/* This will lock recvpool using ftok semaphore. We assume semaphore already exists */
-void lock_recvpool_ftok_sems(boolean_t incr_cnt, boolean_t immediate)
-{
-	error_def(ERR_TEXT);
-	error_def(ERR_RECVPOOLSETUP);
-
-	if (!ftok_sem_lock(recvpool.recvpool_dummy_reg, incr_cnt, immediate))
-		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error from ftok_sem_lock in lock_recvpool_ftok_sems"));
-}
-
-/* release jnlpool lock */
-void rel_jnlpool_ftok_sems(boolean_t decr_cnt, boolean_t immediate)
-{
-	error_def(ERR_TEXT);
-	error_def(ERR_JNLPOOLSETUP);
-
-	if (!ftok_sem_release(jnlpool.jnlpool_dummy_reg, decr_cnt, immediate))
-		rts_error(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error from ftok_sem_release in rel_jnlpool_ftok_lock"));
-}
-
-/* release recvpool lock */
-void rel_recvpool_ftok_sems(boolean_t decr_cnt, boolean_t immediate)
-{
-	error_def(ERR_TEXT);
-	error_def(ERR_RECVPOOLSETUP);
-
-	if (!ftok_sem_release(recvpool.recvpool_dummy_reg, decr_cnt, immediate))
-		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error from ftok_sem_release in rel_recvpool_ftok_lock"));
 }

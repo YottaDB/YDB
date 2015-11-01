@@ -11,6 +11,11 @@
 
 #include "mdef.h"
 
+#include "gtm_unistd.h"
+#include "gtm_string.h"
+
+#include <limits.h>
+
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gdskill.h"
@@ -39,6 +44,10 @@
 #include "getzposition.h"
 #include "dollar_zlevel.h"
 #include "get_ret_targ.h"
+#include "error_trap.h"
+#include "setzdir.h"
+#include "get_reference.h"
+#include "sgtm_putmsg.h"
 
 #define ESC_OFFSET 		4
 #define MAX_COMMAND_LINE_LENGTH 255
@@ -57,8 +66,10 @@ static readonly char job_text[] = "$JOB";
 static readonly char key_text[] = "$KEY";
 static readonly char principal_text[] = "$PRINCIPAL";
 static readonly char quit_text[] = "$QUIT";
+static readonly char reference_text[] = "$REFERENCE";
 static readonly char stack_text[] = "$STACK";
 static readonly char storage_text[] = "$STORAGE";
+static readonly char system_text[] = "$SYSTEM";
 static readonly char test_text[] = "$TEST";
 static readonly char tlevel_text[] = "$TLEVEL";
 static readonly char trestart_text[] = "$TRESTART";
@@ -87,6 +98,7 @@ static readonly char zsystem_text[] = "$ZSYSTEM";
 static readonly char ztrap_text[] = "$ZTRAP";
 static readonly char zversion_text[] = "$ZVERSION";
 static readonly char zyerror_text[] = "$ZYERROR";
+static readonly char arrow_text[] = "->";
 
 GBLREF mval		dollar_zdir;
 GBLREF mval		dollar_zmode;
@@ -109,10 +121,11 @@ GBLREF int4		dollar_zcstatus;
 GBLREF int4		dollar_zeditor;
 GBLREF short		dollar_tlevel;
 GBLREF short		dollar_trestart;
-GBLREF mval		dollar_ecode;
 GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_zerror;
 GBLREF mval		dollar_zyerror;
+GBLREF mval		dollar_system;
+GBLREF int4		zdir_form;
 
 LITREF mval		literal_zero,literal_one;
 LITREF char		gtm_release_name[];
@@ -121,19 +134,21 @@ LITREF int4		gtm_release_name_len;
 void zshow_svn(zshow_out *output)
 {
 	mstr		x;
-	mval		var;
+	mval		var, zdir;
 	io_log_name	*tl;
        	stack_frame	*fp;
 	int 		count, save_dollar_zlevel;
 	char		*c1, *c2;
+	char		zdir_error[3 * GTM_MAX_DIR_LEN + 128]; /* PATH_MAX + "->" + GTM-W-ZDIROUTOFSYNC, <text of ZDIROUTOFSYNC> */
+
+	error_def(ERR_ZDIROUTOFSYNC);
 
 	/* SV_DEVICE */
 		get_dlr_device(&var);
 		ZS_VAR_EQU(&x, device_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ECODE */
-		var.mvtype = MV_STR;
-		var.str = dollar_ecode.str;
+		dollar_ecode_build(-1, &var);
 		ZS_VAR_EQU(&x, ecode_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ESTACK should go here */
@@ -196,6 +211,10 @@ void zshow_svn(zshow_out *output)
 		MV_FORCE_MVAL(&var, count);
 		ZS_VAR_EQU(&x, quit_text);
 		mval_write(output, &var, TRUE);
+	/* SV_REFERENCE */
+		get_reference(&var);
+		ZS_VAR_EQU(&x, reference_text);
+		mval_write(output, &var, TRUE);
 	/* SV_STACK */
 		count = (save_dollar_zlevel = dollar_zlevel()) - 1;
 		MV_FORCE_MVAL(&var, count);
@@ -204,6 +223,11 @@ void zshow_svn(zshow_out *output)
 	/* SV_STORAGE */
 		i2mval(&var, getstorage());
 		ZS_VAR_EQU(&x, storage_text);
+		mval_write(output, &var, TRUE);
+	/* SV_SYSTEM */
+		var.mvtype = MV_STR;
+		var.str = dollar_system.str;
+		ZS_VAR_EQU(&x, system_text);
 		mval_write(output, &var, TRUE);
 	/* SV_TEST */
 		i2mval(&var, (int)op_dt_get());
@@ -258,7 +282,18 @@ void zshow_svn(zshow_out *output)
 		mval_write(output, &var, TRUE);
 	/* SV_ZDIR */
 		ZS_VAR_EQU(&x, zdirectory_text);
-		mval_write(output, &dollar_zdir, TRUE);
+		setzdir(NULL, &zdir);
+		if (zdir.str.len != dollar_zdir.str.len || 0 != memcmp(zdir.str.addr, dollar_zdir.str.addr, zdir.str.len))
+		{
+			memcpy(zdir_error, zdir.str.addr, zdir.str.len);
+			memcpy(&zdir_error[zdir.str.len], arrow_text, STR_LIT_LEN(arrow_text));
+			sgtm_putmsg(&zdir_error[zdir.str.len + STR_LIT_LEN(arrow_text)], VARLSTCNT(6) ERR_ZDIROUTOFSYNC, 4,
+					zdir.str.len, zdir.str.addr, dollar_zdir.str.len, dollar_zdir.str.addr);
+			zdir.str.addr = zdir_error;
+			zdir.str.len = strlen(zdir_error) - 1; /* eliminate trailing '\n' */
+		}
+		SKIP_DEVICE_IF_NOT_NEEDED(&zdir);
+		mval_write(output, &zdir, TRUE);
 	/* SV_ZEDITOR */
 		MV_FORCE_MVAL(&var, dollar_zeditor);
 		ZS_VAR_EQU(&x, zeditor_text);

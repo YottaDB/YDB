@@ -29,7 +29,7 @@ typedef	struct urx_labref_type
 
 /* urx_addr_type and associated prototypes can vary by chip or platform */
 
-#include "urxsp.h"
+#include <urxsp.h>
 
 urx_rtnref *urx_putrtn (char *rtn, char rtnlen, urx_rtnref *anchor);
 void urx_free(urx_rtnref *anchor);

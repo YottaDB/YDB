@@ -11,12 +11,13 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gdsroot.h"
+#include "gdsbt.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
-#include "gdsbt.h"
-#include "gdsfhead.h"
 #include "gdsblk.h"
+#include "gdsfhead.h"
 #include "min_max.h"		/* needed for gdsblkops.h */
 #include "gdsblkops.h"
 #include "gdscc.h"
@@ -39,46 +40,62 @@
 #include "dbfilop.h"
 #include "targ_alloc.h"
 #include "gvcst_blk_build.h"
+#include "hashtab.h"
 
-GBLREF	bool		gv_curr_subsc_null;
-GBLREF	cw_set_element	cw_set[];
-GBLREF	gv_key		*gv_currkey;
-GBLREF	gv_namehead	*gv_target;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	sgmnt_data_ptr_t cs_data;
-GBLREF	short		dollar_trestart;
-GBLREF	short		dollar_tlevel;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	mur_opt_struct	mur_options;
-GBLREF	char		*update_array, *update_array_ptr;
-GBLREF	int		update_array_size;
-GBLREF	srch_hist	dummy_hist;
-GBLREF	unsigned char	*non_tp_jfb_buff_ptr;
+GBLREF	fixed_jrec_tp_kill_set 	mur_jrec_fixed_field;
+GBLREF	struct_jrec_tcom 	mur_jrec_fixed_tcom;
+GBLREF	bool			gv_curr_subsc_null;
+GBLREF	cw_set_element		cw_set[];
+GBLREF	gv_key			*gv_currkey;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF  sgmnt_data_ptr_t 	cs_data;
+GBLREF	short           	dollar_trestart;
+GBLREF	short			dollar_tlevel;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF  mur_opt_struct  	mur_options;
+GBLREF	boolean_t		write_after_image;
+GBLREF	jnl_fence_control	jnl_fence_ctl; /* Needed to set the token, optimize jnl_write_logical for recover */
+GBLREF	boolean_t		losttrans, brktrans;
+GBLREF 	uint4			cur_logirec_short_time;	/* see comment in gbldefs.c for usage */
+
+/* The record handling is totally changed due to recover writing journal records, all constant fields are now copied to global
+structure, which is subsequently used in mur_jnl_write_logical ( equivalent of jnl_write_logical) */
 
 void	mur_output_record(ctl_list *ctl)
 {
-	blk_segment	*bs1, *bs_ptr;
-	boolean_t	set_or_kill_record = FALSE;
-	char		stashed;
-	cw_set_element	*cse;
-	ht_entry	*h;
-	int4		blk_seg_cnt, blk_size;	/* needed for the BLK_* macros */
-	jnl_record	*rec;
-	mname		lcl_name;
-	mstr_len_t	*data_len;
-	mval		v;
-	sm_uc_ptr_t	blk_ptr, aimg_blk_ptr;
-	unsigned char	*c, *c_top, *in, *in_top, level;
-	unsigned short	bsize;
+	mval			v;
+	int			cycle, temp_int;
+	int4			blk_size;
+	mstr_len_t		*data_len;
+	jnl_record		*rec;
+	sm_uc_ptr_t		blk_ptr;
+	mname			lcl_name;
+	char			stashed;
+	unsigned char		*c, *c_top, *in, *in_top;
+	ht_entry		*h, *ht_put ();
+	boolean_t		set_or_kill_record = FALSE;
+	uint4			dbfilop();
+	uint4			pini_addr, new_pini_addr, dummy;
+	fixed_jrec_tp_kill_set	*jrec;
 
 	error_def(ERR_MURAIMGFAIL);
-
 	rec = (jnl_record *)ctl->rab->recbuff;
+	assert(!brktrans && !losttrans); /* We shouldn't be here if brktrans or losttrans */
 
 	switch (REF_CHAR(&rec->jrec_type))
 	{
 	case JRT_TCOM:
+		if (ctl->before_image)
+		{
+			mur_jrec_fixed_tcom.tc_short_time = rec->val.jrec_tcom.tc_short_time;
+			mur_jrec_fixed_tcom.rec_seqno = rec->val.jrec_tcom.rec_seqno;
+			mur_jrec_fixed_tcom.jnl_seqno = rec->val.jrec_tcom.jnl_seqno;
+			jnl_fence_ctl.token = rec->val.jrec_tcom.token;
+			mur_jrec_fixed_tcom.participants = rec->val.jrec_tcom.participants;
+			mur_jrec_fixed_tcom.ts_short_time = rec->val.jrec_tcom.ts_short_time;
+		}
 		op_tcommit();
 		return;
 
@@ -86,13 +103,23 @@ void	mur_output_record(ctl_list *ctl)
 	case JRT_TKILL:
 	case JRT_TZKILL:
 		v.mvtype = MV_STR;
-		v.str.len = 0;
-		v.str.addr = NULL;
+		/* Copy the tid field from the original tset record only if before image flag is set */
+		if (ctl->before_image)
+		{
+			v.str.len = strlen(rec->val.jrec_tset.jnl_tid);
+			if (0 != v.str.len)
+				v.str.addr = (char *)rec->val.jrec_tset.jnl_tid;
+			else
+				v.str.addr = NULL;
+		} else
+		{
+			v.str.len = 0;
+			v.str.addr = NULL;
+		}
 		op_tstart(TRUE, TRUE, &v, -1);
 		tp_set_sgm();
 		break;
 	}
-
 	switch (REF_CHAR(&rec->jrec_type))
 	{
 	case JRT_SET:
@@ -103,6 +130,11 @@ void	mur_output_record(ctl_list *ctl)
 		memcpy(gv_currkey->base, rec->val.jrec_set.mumps_node.text, rec->val.jrec_set.mumps_node.length);
 		gv_currkey->base[rec->val.jrec_set.mumps_node.length] = '\0';
 		gv_currkey->end = rec->val.jrec_set.mumps_node.length;
+		if (ctl->before_image)
+		{
+			jrec = (fixed_jrec_tp_kill_set *)&rec->val.jrec_set;
+			COPY_MUR_JREC_FIXED_FIELDS(mur_jrec_fixed_field, jrec);
+		}
 		set_or_kill_record = TRUE;
 		break;
 
@@ -110,13 +142,13 @@ void	mur_output_record(ctl_list *ctl)
 		assert(ctl->gd == gv_cur_region);
 		assert(cs_addrs == (sgmnt_addrs *)&FILE_INFO(ctl->gd)->s_addrs);
 		assert(cs_data == cs_addrs->hdr);
+		if (!mur_options.forward)
+			return;
 		switch(rec->val.jrec_inctn.opcode)
 		{
 			case inctn_bmp_mark_free_gtm: /* KILL record will take care of this */
-				return;
 			case inctn_gdsfilext_gtm: /* forward recovery will automatically extend for corresponding SET record */
-				if (mur_options.forward)
-					return;
+				return;
 			case inctn_gdsfilext_mu_reorg:
 			case inctn_bmp_mark_free_mu_reorg:
 			case inctn_mu_reorg:
@@ -156,11 +188,27 @@ void	mur_output_record(ctl_list *ctl)
 		memcpy(gv_currkey->base, rec->val.jrec_fset.mumps_node.text, rec->val.jrec_fset.mumps_node.length);
 		gv_currkey->base[rec->val.jrec_fset.mumps_node.length] = '\0';
 		gv_currkey->end = rec->val.jrec_fset.mumps_node.length;
+		if (ctl->before_image)
+		{
+			jrec = (fixed_jrec_tp_kill_set *)&rec->val.jrec_fset;
+			COPY_MUR_JREC_FIXED_FIELDS(mur_jrec_fixed_field, jrec);
+			QWASSIGN(jnl_fence_ctl.token, rec->val.jrec_fset.token);
+		}
 		set_or_kill_record = TRUE;
 		break;
 	}
+
 	if (set_or_kill_record)
 	{
+		if (ctl->before_image)
+		{
+			pini_addr = rec->val.jrec_kill.pini_addr;
+			new_pini_addr = (uint4)lookup_hashtab_ent(ctl->pini_in_use, (void *)pini_addr, &dummy);
+			/* new_pini_addr might not be in the hashtable if the corresponding PINI record lies before
+			 * the turnaround point. In that case we can use the pini_addr from the journal record directly.
+			 */
+			cs_addrs->jnl->pini_addr = new_pini_addr ? new_pini_addr : rec->val.jrec_kill.pini_addr;
+		}
 		for (c = (unsigned char *)&lcl_name, c_top = c + sizeof(lcl_name),
 				in = (unsigned char *)gv_currkey->base, in_top = in + sizeof(mname); in < in_top && *in; )
 			*c++ = *in++;
@@ -182,7 +230,6 @@ void	mur_output_record(ctl_list *ctl)
 			h->ptr = (char *)gv_target;
 			memcpy(&gv_target->gvname, &lcl_name, sizeof(mident));
 		}
-
 		if (gv_target->root == 0 || gv_target->root == DIR_ROOT)
 		{
 			assert(gv_target != cs_addrs->dir_tree);
@@ -206,42 +253,24 @@ void	mur_output_record(ctl_list *ctl)
 		return;
 
 	case JRT_AIMG:
+		if (ctl->before_image)
+		{
+			pini_addr = rec->val.jrec_kill.pini_addr;
+			new_pini_addr = (uint4)lookup_hashtab_ent(ctl->pini_in_use, (void *)pini_addr, &dummy);
+			/* new_pini_addr might not be in the hashtable if the corresponding PINI record lies before
+			 * the turnaround point. In that case we can use the pini_addr from the journal record directly.
+			 */
+			cs_addrs->jnl->pini_addr = new_pini_addr ? new_pini_addr : rec->val.jrec_kill.pini_addr;
+		}
 		assert(ctl->gd == gv_cur_region);
 		assert(cs_addrs == (sgmnt_addrs *)&FILE_INFO(ctl->gd)->s_addrs);
 		assert(cs_data == cs_addrs->hdr);
 		assert(!dollar_tlevel);
 		if (!mur_options.apply_after_image)
 			return;
-		/* Applying an after image record should use t_begin/t_end mechanisms instead of just copying over
-		 * the aimg block into the t_qread buffer. This is because there are lots of other things like
-		 * making the cache-record become dirty in case of BG and some others to do in case of MM.
-		 * Therefore, it is best to call t_end().
-		 */
-		assert(update_array);
-		/* reset new block mechanism */
-		update_array_ptr = update_array;
-		assert(!cs_addrs->now_crit);
-		blk_size = cs_addrs->hdr->blk_size;
-		t_begin_crit(ERR_MURAIMGFAIL);	/* this grabs crit */
-		if (NULL == (blk_ptr = t_qread(rec->val.jrec_aimg.blknum, &dummy_hist.h[0].cycle, &dummy_hist.h[0].cr)))
-			GTMASSERT;
-		aimg_blk_ptr = (sm_uc_ptr_t)&rec->val.jrec_aimg.blk_contents[0];
-		/* The two macros GET_USHORT and GET_CHAR are required currently to fix the unaligned acces errors due to
-			dereferencing bsiz and will be fixed with a change to journal record struct as part of idem_potency
-			recover changes */
-
-		GET_USHORT(bsize, &((blk_hdr_ptr_t)aimg_blk_ptr)->bsiz);
-		BLK_INIT(bs_ptr, bs1);
-		BLK_SEG(bs_ptr, (uchar_ptr_t)aimg_blk_ptr + sizeof(blk_hdr),
-					(int)bsize - sizeof(blk_hdr));
-		if (!BLK_FINI(bs_ptr, bs1))
-			GTMASSERT;
-		GET_CHAR(level, &((blk_hdr_ptr_t)aimg_blk_ptr)->levl);
-		t_write(rec->val.jrec_aimg.blknum, (unsigned char *)bs1, 0, 0,
-					blk_ptr, level, TRUE, FALSE);
-		BUILD_AIMG_IF_JNL_ENABLED(cs_addrs, cs_data, non_tp_jfb_buff_ptr, cse);
-		t_end(&dummy_hist, 0);
-		assert(!cs_addrs->now_crit);
+		write_after_image = TRUE;
+		mur_put_aimg_rec(rec);
+		write_after_image = FALSE;
 		return;
 
 	case JRT_SET:

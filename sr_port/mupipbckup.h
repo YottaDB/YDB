@@ -41,8 +41,7 @@ typedef struct backup_reg_list_struct
 {
 	struct 	backup_reg_list_struct	*fPtr;
 	struct 	gd_region_struct 	*reg;
-	key_t           		ftok;
-	char                            unique_id[UNIQUE_ID_SIZE];
+	gd_id           		unique_file_id;		/* both for VMS and UNIX */
 	mstr 				backup_file;
 	short 				crashcnt;
 	backup_proc_status		not_this_time;

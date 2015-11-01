@@ -681,7 +681,7 @@ bool cli_get_value(char *entry, char val_buf[])
  *	FALSE	- otherwise
  * --------------------------------------------------
  */
-bool cli_negated(char *entry) 		/* entity */
+boolean_t cli_negated(char *entry) 		/* entity */
 {
 	CLI_ENTRY	*pparm;
 	char		local_str[MAX_LINE];
@@ -706,6 +706,7 @@ bool cli_get_parm(char *entry, char val_buf[])
 	char		local_str[MAX_LINE];
 	int		eof;
 	char		*gets_res;
+	int		fgets_len;
 
 	assert(0 != gpcmd_parm_vals);
 	strncpy(local_str, entry, sizeof(local_str) - 1);
@@ -737,7 +738,14 @@ bool cli_get_parm(char *entry, char val_buf[])
 		if (0 == parm_ary[match_ind][0])
 		{
 			PRINTF("%s", (gpcmd_parm_vals + match_ind)->prompt);
-			GETS((char *)parm_ary[match_ind], gets_res);
+			FGETS((char *)parm_ary[match_ind], MAX_LINE, stdin, gets_res);
+			if (gets_res)
+			{
+				fgets_len = strlen(gets_res);
+				/* chop off newline */
+				if (parm_ary[match_ind][fgets_len-1] == '\n')
+					parm_ary[match_ind][fgets_len-1] = '\0';
+			}
 		}
 		else if ((char)-1 == parm_ary[match_ind][0])
 		{

@@ -52,7 +52,6 @@ static readonly char space_text[] = {' '};
 GBLREF bool ctrlc_on;
 GBLREF io_log_name *io_root_log_name;
 GBLREF io_pair *io_std_device;
-GBLREF unsigned char write_filter;
 
 void zshow_devices(zshow_out *output)
 {
@@ -207,14 +206,14 @@ void zshow_devices(zshow_out *output)
 					MV_FORCE_MVAL(&m,(int) l->iod->pair.out->length) ;
 					mval_write(output, &m, FALSE);
 					ZS_ONE_OUT(&v,space_text);
-					if (write_filter)
+					if (l->iod->write_filter)
 					{
 						bool twoparms = FALSE;
 
 						ZS_PARM_EQU(&v,zshow_fil);
-						if (write_filter & CHAR_FILTER)
+						if (l->iod->write_filter & CHAR_FILTER)
 						{
-							if (write_filter & ESC1)
+							if (l->iod->write_filter & ESC1)
 							{
 								twoparms = TRUE;
 								ZS_ONE_OUT(&v,lparen_text);
@@ -225,7 +224,7 @@ void zshow_devices(zshow_out *output)
 								ZS_ONE_OUT(&v,space_text);
 							}
 						}
-						if (write_filter & ESC1)
+						if (l->iod->write_filter & ESC1)
 							ZS_STR_OUT(&v,filesc_text);
 						if (twoparms)
 							ZS_ONE_OUT(&v,rparen_text);

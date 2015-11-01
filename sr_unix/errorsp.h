@@ -15,7 +15,6 @@
 #include <setjmp.h>
 
 #include "gtm_stdio.h"
-#include "merror.h"
 
 #define CONDITION_HANDLER(name)	ch_ret_type name(int arg)
 #define MAX_HANDLERS 20
@@ -71,6 +70,8 @@ LITREF err_ctl			merrors_ctl;
 
 #define GETLASTBYTE(X)		(X & 0xf)
 
+#define ERROR_RTN		error_return
+
 /* The CHTRACEPOINT macros are in place for CH debugging if necessary */
 #ifdef DEBUG
 #  ifdef DEBUG_CH
@@ -90,14 +91,17 @@ void ch_trace_point() {return;}
 					util_out_print(0, 1, 0); /* flush msg buffer */	\
 				}
 
+/* With the introduction of call-ins, there could be multiple mdb_condition_handlers
+ * stacked up in chnd stack. The active context should be reset to the youngest
+ * mdb_condition_handler created by the current gtm/call-in invocation */
 #define MUM_TSTART		{					\
                                         CHTRACEPOINT;			\
-                                        chnd[0].ch_active = FALSE; 	\
-                                        chnd[1].ch_active = FALSE; 	\
+					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--)	; \
+					assert(ctxt->ch == &mdb_condition_handler && FALSE == ctxt->save_active_ch->ch_active); \
+                                        ctxt->ch_active = FALSE; 	\
 					restart = mum_tstart;		\
-					ctxt = &chnd[1];		\
 					active_ch = ctxt;		\
-					longjmp(chnd[1].jmp, 1);	\
+					longjmp(ctxt->jmp, 1);		\
 				}
 
 #define ESTABLISH_RET(x,ret)	{					\
@@ -231,7 +235,7 @@ void stop_image_no_core(void);
 
 #define PROCDIE(x)		_exit(x)
 #define EXIT(x)			{					\
-					exit(x);			\
+						exit(x);		\
 				}
 
 #define DUMP			(   SIGNAL == (int)ERR_ASSERT		\
@@ -276,5 +280,7 @@ CONDITION_HANDLER(omi_dbms_ch);
 CONDITION_HANDLER(rc_dbms_ch);
 CONDITION_HANDLER(read_source_ch);
 CONDITION_HANDLER(source_ch);
+CONDITION_HANDLER(gtmci_init_ch);
+CONDITION_HANDLER(gtmci_ch);
 
 #endif

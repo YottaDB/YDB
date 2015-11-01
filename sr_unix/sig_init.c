@@ -18,6 +18,7 @@
 #include "continue_handler.h"
 #include "sig_init.h"
 #include "suspsigs_handler.h"
+#include "gtmci_signals.h"
 
 GBLREF boolean_t	disable_sigcont;
 
@@ -25,7 +26,6 @@ void	null_handler(int sig);
 
 void	sig_init(void (*signal_handler)(), void (*ctrlc_handler)())
 {
-	int			i;
 	struct sigaction 	ignore, act;
 
 	memset(&act, 0, sizeof(act));
@@ -33,8 +33,8 @@ void	sig_init(void (*signal_handler)(), void (*ctrlc_handler)())
 	ignore = act;
 	ignore.sa_handler = SIG_IGN;
 
-	for (i = 1; i <= NSIG; i++)
-		sigaction(i, &ignore, 0);
+	/* init all gtm handlers and save (possibly) external handlers */
+	sig_save_ext(&ignore);
 
         /* --------------------------------------------------------------
 	 * Tandem hack:  rather than ignore SIGHUP, we must catch it
@@ -140,6 +140,7 @@ void	sig_init(void (*signal_handler)(), void (*ctrlc_handler)())
 #else
 	disable_sigcont = TRUE;
 #endif
+	sig_save_gtm(); /* record all gtm handlers */
 }
 
 /* Provide null signal handler */

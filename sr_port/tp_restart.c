@@ -12,6 +12,11 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+
+#ifdef VMS
+#include <descrip.h>
+#endif
+
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gdskill.h"
@@ -44,8 +49,9 @@
 #include "tp_unwind.h"
 #include "wcs_backoff.h"
 #include "wcs_mm_recover.h"
-#include "trans_log_name.h"
 #include "tp_restart.h"
+#include "repl_msg.h"		/* for gtmsource.h */
+#include "gtmsource.h"		/* for jnlpool_addrs structure definition */
 
 error_def(ERR_TLVLZERO);
 error_def(ERR_TPFAIL);
@@ -55,14 +61,14 @@ error_def(ERR_TRESTLOC);
 
 #define	MAX_TRESTARTS	16
 
-#ifdef DEBUG
-static	int	tprestart_syslog_limit = 0;			/* limit TPRESTARTs */
-static	int	tprestart_syslog_delta = 100000; 		/* limit TPRESTARTs */
-static	int	num_tprestart = 0;
-GBLDEF	int4	tp_fail_histtn[CDB_MAX_TRIES], tp_fail_bttn[CDB_MAX_TRIES];
-GBLDEF	int4	tp_fail_n, tp_fail_level;
-GBLDEF	int4	n_pvtmods, n_blkmods;
-#endif
+static	int		num_tprestart = 0;
+GBLDEF	int		tprestart_syslog_limit;			/* limit TPRESTARTs */
+GBLDEF	int4		tprestart_syslog_delta; 		/* limit TPRESTARTs */
+GBLDEF	int4		tp_fail_histtn[CDB_MAX_TRIES], tp_fail_bttn[CDB_MAX_TRIES];
+GBLDEF	int4		tp_fail_n, tp_fail_level;
+GBLDEF	int4		n_pvtmods, n_blkmods;
+GBLDEF	gv_namehead	*tp_fail_hist[CDB_MAX_TRIES];
+GBLDEF	block_id	t_fail_hist_blk[CDB_MAX_TRIES];
 
 GBLREF	short		dollar_tlevel, dollar_trestart;
 GBLREF	int		dollar_truth;
@@ -77,11 +83,10 @@ GBLREF	tp_region	*tp_reg_list;		/* Chained list of regions used in this transact
 GBLREF	mv_stent	*mv_chain;
 GBLREF	unsigned char	*msp, *stackbase, *stacktop, t_fail_hist[CDB_MAX_TRIES];
 GBLREF	sgm_info	*first_sgm_info;
-GBLREF	gv_namehead	*tp_fail_hist[CDB_MAX_TRIES];
-GBLREF	block_id	t_fail_hist_blk[CDB_MAX_TRIES];
 GBLREF	unsigned int	t_tries;
 GBLREF	int		process_id;
 GBLREF	gd_region	*gv_cur_region;
+GBLREF	jnlpool_addrs	jnlpool;
 GBLREF	bool		run_time;
 GBLREF	bool		caller_id_flag;
 GBLREF	trans_num	local_tn;	/* transaction number for THIS PROCESS */
@@ -99,10 +104,11 @@ CONDITION_HANDLER(tp_restart_ch)
 	   far more subterfuge is required. We will save the signal information and paramters and overlay the
 	   TPRETRY signal information with it so that the signal will be handled properly. */
 #ifdef VMS
-	assert(NULL != tp_restart_fail_sig);
-	assert(FALSE == tp_restart_fail_sig_used);
 	assert(TPRESTART_ARG_CNT >= sig->chf$is_sig_args);
+	if (NULL == tp_restart_fail_sig)
+		tp_restart_fail_sig = (struct chf$signal_array *)malloc((TPRESTART_ARG_CNT + 1) * sizeof(int));
 	memcpy(tp_restart_fail_sig, sig, (sig->chf$is_sig_args + 1) * sizeof(int));
+	assert(FALSE == tp_restart_fail_sig_used);
 	tp_restart_fail_sig_used = TRUE;
 #endif
 	UNWIND(NULL, NULL);
@@ -123,10 +129,8 @@ void	tp_restart(int newlevel)
 	tp_region		*tr;
 	static gv_namehead	*noplace;
 	mval			bangHere, beganHere;
-	mstr			log_nam, trans_log_nam;
-	char			trans_buff[MAX_FN_LEN+1];
-	static int4		first_time = TRUE;
 	sgmnt_addrs		*csa;
+	int4			num_closed = 0;
 
 	ESTABLISH(tp_restart_ch);
 	assert(1 == newlevel);
@@ -138,14 +142,25 @@ void	tp_restart(int newlevel)
 
 	/* Increment restart counts for each region in this transaction */
 	for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
-		FILE_INFO(tr->reg)->s_addrs.hdr->n_tp_retries[t_tries]++;
-
-	if (cdb_sc_normal != t_fail_hist[t_tries])
 	{
-#if defined(DEBUG)
+		if (tr->reg->open)
+			FILE_INFO(tr->reg)->s_addrs.hdr->n_tp_retries[t_tries]++;
+		else
+		{
+			assert(cdb_sc_needcrit == t_fail_hist[t_tries]);
+			assert(!num_closed);	/* we can have at the most 1 region not opened in the whole tp_reg_list */
+			num_closed++;
+		}
+	}
+
+	if (tprestart_syslog_delta && (num_tprestart++ < tprestart_syslog_limit
+				|| 0 == ((num_tprestart - tprestart_syslog_limit) % tprestart_syslog_delta)))
+	{
 		if (NULL != tp_fail_hist[t_tries])
 		{
-			for (cp = tp_fail_hist[t_tries]->clue.base, top = 0; (0 != *cp) && (sizeof(mident) >= top); cp++, top++)
+			for (cp = tp_fail_hist[t_tries]->clue.base, top = 0;
+				(0 != *cp) && (sizeof(mident) >= top);
+					cp++, top++)
 				;
 		} else
 		{
@@ -158,41 +173,30 @@ void	tp_restart(int newlevel)
 			tp_fail_hist[t_tries] = noplace;
 			top = noplace->clue.end;
 		}
-		if (TRUE == first_time)
+		caller_id_flag = FALSE;		/* don't want caller_id in the operator log */
+		assert(0 == cdb_sc_normal);
+		if (cdb_sc_normal == t_fail_hist[t_tries])
+			t_fail_hist[t_tries] = '0';	/* temporarily reset just for pretty printing */
+		if (cdb_sc_blkmod != t_fail_hist[t_tries])
 		{
-			log_nam.addr = "$TPRESTART_SYSLOG_LIMIT";
-			log_nam.len = sizeof("$TPRESTART_SYSLOG_LIMIT") - 1;
-			if (trans_log_name(&log_nam, &trans_log_nam, trans_buff) == SS_NORMAL)
-				tprestart_syslog_limit = ATOI(trans_log_nam.addr);
+			send_msg(VARLSTCNT(14) ERR_TPRESTART, 12, t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries],
+				(int)top, tp_fail_hist[t_tries]->clue.base, 0, 0, 0, 0,
+				(NULL != sgm_info_ptr) ? sgm_info_ptr->num_of_blks : 0,
+				(NULL != sgm_info_ptr) ? sgm_info_ptr->cw_set_depth : 0, local_tn);
+		} else
+		{
+			send_msg(VARLSTCNT(14) ERR_TPRESTART, 12, t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries],
+				(int)top, tp_fail_hist[t_tries]->clue.base, n_pvtmods, n_blkmods, tp_fail_level,
+				tp_fail_n, sgm_info_ptr->num_of_blks, sgm_info_ptr->cw_set_depth, local_tn);
+		}
+		if ('0' == t_fail_hist[t_tries])
+			t_fail_hist[t_tries] = cdb_sc_normal;	/* get back to where it was */
+		caller_id_flag = TRUE;
+		n_pvtmods = n_blkmods = 0;
+	}
 
-			log_nam.addr = "$TPRESTART_SYSLOG_DELTA";
-			log_nam.len = sizeof("$TPRESTART_SYSLOG_DELTA") - 1;
-			if (trans_log_name(&log_nam, &trans_log_nam, trans_buff) == SS_NORMAL)
-				tprestart_syslog_delta = ATOI(trans_log_nam.addr);
-			if (0 == tprestart_syslog_delta)
-				tprestart_syslog_delta = 1;
-			first_time = FALSE;
-		}
-		if (num_tprestart++ < tprestart_syslog_limit || 0 == (num_tprestart % tprestart_syslog_delta))
-		{
-			caller_id_flag = FALSE;		/* don't want caller_id in the operator log */
-			if (cdb_sc_blkmod != t_fail_hist[t_tries])
-			{
-				send_msg(VARLSTCNT(14) ERR_TPRESTART, 12, t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries],
-					(int)top, tp_fail_hist[t_tries]->clue.base, 0, 0, 0, 0,
-					sgm_info_ptr->num_of_blks, sgm_info_ptr->cw_set_depth, local_tn);
-			}
-			else
-			{
-				send_msg(VARLSTCNT(14) ERR_TPRESTART, 12, t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries],
-					(int)top, tp_fail_hist[t_tries]->clue.base, n_pvtmods, n_blkmods, tp_fail_level,
-					tp_fail_n, sgm_info_ptr->num_of_blks, sgm_info_ptr->cw_set_depth, local_tn);
-			}
-			caller_id_flag = TRUE;
-			n_pvtmods = n_blkmods = 0;
-		}
-#endif
-	/* the following code is parallel, but not identical, to code in t_retry, which should be maintained in parallel */
+	if (cdb_sc_normal != t_fail_hist[t_tries])
+	{	/* the following code is parallel, but not identical, to code in t_retry, which should be maintained in parallel */
 		switch (t_fail_hist[t_tries])
 		{
 		case cdb_sc_helpedout:
@@ -224,7 +228,16 @@ void	tp_restart(int newlevel)
 			 */
 			assert(CDB_STAGNATE == t_tries);
 			for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
-				rel_crit(tr->reg);	/* to ensure deadlock safe order, release all regions before retry */
+			{	/* regions might not have been opened if we t_retried in gvcst_init(). dont rel_crit in that case */
+				if (tr->reg->open)
+					rel_crit(tr->reg);  /* to ensure deadlock safe order, release all regions before retry */
+			}
+			if ((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
+			{
+				csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+				if (csa->now_crit)
+					rel_lock(jnlpool.jnlpool_dummy_reg);
+			}
 			wcs_backoff(dollar_trestart * TP_DEADLOCK_FACTOR); /* Sleep so needed locks have a chance to get released */
 			break;
 		case cdb_sc_jnlclose:
@@ -252,10 +265,25 @@ void	tp_restart(int newlevel)
 			}
 		}
 		if ((CDB_STAGNATE <= t_tries))
-		{
+		{	/* If there are any regions that haven't yet been opened, open them before attempting for crit on all.
+			 * This is safe to do now since we don't hold any crit locks now so we can't create a deadlock.
+			 */
+			if (num_closed)
+			{
+				for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
+				{	/* to open region use gv_init_reg() instead of gvcst_init() since that does extra
+					 * manipulations with gv_keysize, gv_currkey and gv_altkey.
+					 */
+					if (!tr->reg->open)
+					{
+						gv_init_reg(tr->reg);
+						assert(tr->reg->open);
+					}
+				}
+			}
 			(void)tp_tend(TRUE);	/* call tp_tend just to grab crits */
 			/* pick up all MM extension information */
-			for (si = first_sgm_info; si != NULL; si = si->next_sgm_info)
+			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
 				if (dba_mm == si->gv_cur_region->dyn.addr->acc_meth)
 				{
 					TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
@@ -266,7 +294,7 @@ void	tp_restart(int newlevel)
 	}
 	tl = dollar_tlevel;
 	tf = tp_pointer;
-	while(tl > newlevel)
+	while (tl > newlevel)
 	{
 		tf = tf->old_tp_frame;
 		--tl;
@@ -284,7 +312,7 @@ void	tp_restart(int newlevel)
 	tp_unwind(newlevel, TRUE);
 	gd_header = tp_pointer->gd_header;
 	gv_target = tp_pointer->orig_gv_target;
-	if (gv_target != NULL)
+	if (NULL != gv_target)
 		gv_cur_region = gv_target->gd_reg;
 	else
 		gv_cur_region = NULL;
@@ -316,7 +344,6 @@ void	tp_restart(int newlevel)
 	assert(MAX_TRESTARTS > dollar_trestart);	/* a magic number just to ensure we dont do too many restarts */
 	if (!dollar_trestart)		/* in case of a wrap */
 		dollar_trestart--;
-
 	dollar_truth = tp_pointer->dlr_t;
 	dollar_zgbldir = tp_pointer->zgbldir;
 	assert((mv_chain <= (mv_stent *)stackbase) && (mv_chain > (mv_stent *)stacktop));

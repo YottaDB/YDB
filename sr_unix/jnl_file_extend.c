@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -89,11 +91,11 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	{
 		old_end = jpc->jnl_buff->filesize + total_jnl_rec_size;
 		/* assert(0 == (old_end & ~JNL_WRT_START_MASK));	file must always be an even number of blocks */
-		if ((JNL_ALLOC_MAX - (old_end / DISK_BLOCK_SIZE) + 1) <= (EXTEND_WARNING_FACTOR * new_blocks))
+		if ((jpc->jnl_buff->autoswitchlimit - (old_end / DISK_BLOCK_SIZE) + 1) <= (EXTEND_WARNING_FACTOR * new_blocks))
 		{	/* close to max */
-			if ((JNL_ALLOC_MAX - (old_end / DISK_BLOCK_SIZE) + 1) <= new_blocks)
+			if ((jpc->jnl_buff->autoswitchlimit - (old_end / DISK_BLOCK_SIZE) + 1) <= new_blocks)
 			{	/* reaching max */
-				if ((JNL_ALLOC_MAX - (old_end / DISK_BLOCK_SIZE) + 1) <= 0)
+				if ((jpc->jnl_buff->autoswitchlimit - (old_end / DISK_BLOCK_SIZE) + 1) <= 0)
 				{	/* the file somehow exceeded the design, probably compromising integrity - trigger close */
 					jpc->status = ERR_JNLFILETOOBIG;
 					new_blocks = -1;
@@ -137,13 +139,13 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 								gv_cur_region->dyn.addr->fname, status);
 						}
 						assert(JNL_ENABLED(csa->hdr));
-						jnl_status = jnl_file_open(gv_cur_region, TRUE, 0);	/* sets jpc->status */
+						/* call jnl_ensure_open instead of jnl_file_open to make sure
+						 * 	cs_addrs->jnl->pini_addr is set to 0
+						 */
+						jnl_status = jnl_ensure_open();	/* sets jpc->status */
 						if (jnl_status != 0)
 							rts_error(VARLSTCNT(6) jnl_status, 4, csa->hdr->jnl_file_len,
-									csa->hdr->jnl_file_name,
-									gv_cur_region->dyn.addr->fname_len,
-									gv_cur_region->dyn.addr->fname);
-						jnl_put_jrt_pini(csa);
+									csa->hdr->jnl_file_name, DB_LEN_STR(gv_cur_region));
 					} else
 					{
 						jpc->status = ERR_JNLEXTEND;
@@ -153,7 +155,7 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				}
 			} else
 				send_msg(VARLSTCNT(5) ERR_JNLSPACELOW, 3, JNL_LEN_STR(csa->hdr),
-					JNL_ALLOC_MAX - (old_end / DISK_BLOCK_SIZE) + 1 - new_blocks);
+					jpc->jnl_buff->autoswitchlimit - (old_end / DISK_BLOCK_SIZE) + 1 - new_blocks);
 		}
 	} else
 	{

@@ -15,12 +15,19 @@
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <errno.h>
+#include "gtm_sem.h"
 #include "gtm_stdio.h"
 #include "iosp.h"
 #include "eintr_wrappers.h"
 #include "ipcrmid.h"
 #include "util.h"
 #include "mupip_upgrade_standalone.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
 
 
 /* Lock a file using semaphore.
@@ -36,7 +43,7 @@ boolean_t mupip_upgrade_standalone(char *fn, int *semid)
 	struct sembuf	sop[4];
 	int		key, semop_res, sems;
 
-	*semid = 0;
+	*semid = INVALID_SEMID;
 	if ((key = FTOK(fn, 1)) == -1) /* V3.2 and V4.0x had project id = 1 */
 	{
 		util_out_print("Error with ftok", TRUE);
@@ -48,7 +55,7 @@ boolean_t mupip_upgrade_standalone(char *fn, int *semid)
 		util_out_print("File is locked by another user", TRUE);
 		return FALSE;
 	}
-	if ((sems = semget(key, 3, RWDALL | IPC_CREAT | IPC_NOWAIT)) == -1)
+	if ((sems = semget(key, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT | IPC_NOWAIT)) == -1)
 	{
 		util_out_print("Error with semget", TRUE);
 		return FALSE;

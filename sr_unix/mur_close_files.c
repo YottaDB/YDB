@@ -17,6 +17,7 @@
 #include "gtm_fcntl.h"
 #include <unistd.h>
 #include "gtm_stat.h"
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -41,6 +42,8 @@
 #include "ipcrmid.h"
 #include "gtmmsg.h"
 #include "ftok_sems.h"
+#include "mu_rndwn_replpool.h"
+#include "mu_rndwn_repl_instance.h"
 
 GBLREF	int4		mur_wrn_count;
 GBLREF	mur_opt_struct	mur_options;
@@ -50,6 +53,8 @@ GBLREF	ctl_list	*jnl_files;
 GBLREF	boolean_t	set_resync_to_region;
 GBLREF	seq_num		seq_num_zero;
 GBLREF	void            (*call_on_signal)();
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	boolean_t	got_repl_standalone_access;
 
 void	mur_close_files(void)
 {
@@ -58,7 +63,6 @@ void	mur_close_files(void)
 	bool		go;
 	struct shmid_ds	shm_buf;
 	sgmnt_data	csd;
-	static char	jnl_file_error[]="Error turning journaling back on for database !AD\n";
 	char		*db_fn;
 	int		db_fn_len, status;
 	mval		val, pars;
@@ -67,15 +71,14 @@ void	mur_close_files(void)
 	unsigned char	*ptr1, qwstring1[100];
 	unsigned char	*ptr2, qwstring2[100];
 	unsigned char	*ptr3, qwstring3[100];
+	jnl_file_header *header;
 
 	error_def(ERR_DBFILERR);
 	error_def(ERR_TEXT);
+	error_def(ERR_JNLSTRESTFL);
 
 	call_on_signal = NULL;	/* Do not recurs via call_on_signal if there is an error */
         db_fn_len = 0;
-
-	if (mur_options.rollback && mur_options.fetchresync && CLI_PRESENT != cli_present("RESYNC"))
-		gtmrecv_wait_for_detach();
 
 	for (ctl_ptr = jnl_files;  ctl_ptr;  ctl_ptr = ctl_ptr->next)
 	{
@@ -106,6 +109,18 @@ void	mur_close_files(void)
 			if (gv_cur_region->open)	/* Cannot close what is not open */
 			{
 				tp_change_reg();
+				/* The assignment below is needed for recover/rollback as it no longer uses the obsolete code in
+					mur_rollback_truncate/mur_recover_write_epoch_rec, where it was done earlier */
+				if (ctl_ptr->before_image)
+				{
+					cs_addrs->jnl->pini_addr = 0; /* Stop simulation of GTM process journal record writing */
+					cs_addrs->hdr->reg_seqno = consist_jnl_seqno; /* to write proper jnl_seqno in
+												epoch record */
+					header = (jnl_file_header *)mur_get_file_header(ctl_ptr->rab);
+					if (header->crash && header->update_disabled)
+						set_resync_to_region = TRUE;  /* Set resync_to_region seqno for a crash
+											and update_disable case */
+				}
 				gds_rundown();
 				if (-1 != (fd = OPEN(db_fn, O_RDWR)))
 				{
@@ -173,8 +188,7 @@ void	mur_close_files(void)
 						}
 					} else
 					{
-						mur_output_status(errno);
-						util_out_print(jnl_file_error, TRUE, db_fn_len, db_fn);
+						gtm_putmsg(VARLSTCNT(4) ERR_JNLSTRESTFL, 2, db_fn_len, db_fn);
 						mur_wrn_count++;
 					}
 					close(fd);
@@ -242,5 +256,7 @@ void	mur_close_files(void)
 		val.str.addr = (char *) (((unix_file_info *)(mur_options.brktrans_file_info))->fn);
 		op_close(&val, &pars);
 	}
+	if (mur_options.rollback && got_repl_standalone_access)
+		mu_replpool_remove_sem();
 	return;
 }

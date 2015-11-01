@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "cdb_sc.h"
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -46,6 +48,7 @@ GBLREF unsigned int	t_tries;
 GBLREF boolean_t        mu_reorg_process;
 GBLREF srch_blk_status	*first_tp_srch_status;	/* overriding value of srch_blk_status given by t_qread in case of TP */
 GBLREF trans_num	local_tn;		/* transaction number for THIS PROCESS */
+GBLREF boolean_t	tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
 
 #ifdef DEBUG
 GBLDEF char gvcst_search_clue;
@@ -351,15 +354,17 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 		{
 			do
 			{
+				--n0;
 				if ((0 == (*c2++ = *c1++)) && (0 == *c1))
 					break;
-			} while (--n0);
+			} while (n0);
 		}
 		if (0 == n0)
 		{
 			assert(CDB_STAGNATE > t_tries);
 			return status;
 		}
+		assert(c2 < &pTarg->first_rec->base[pTarg->first_rec->top]);	/* make sure we don't exceed allocated bounds */
 		*c2 = *c1;
 		if (NULL == pNonStar)
 			*((short *)pTarg->last_rec->base) = 0xffff;
@@ -401,15 +406,17 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			{
 				do
 				{
+					--n0;
 					if ((0 == (*c2++ = *c1++)) && (0 == *c1))
 						break;
-				} while (--n0);
+				} while (n0);
 			}
 			if (0 == n0)
 			{
 				assert(CDB_STAGNATE > t_tries);
 				return status;
 			}
+			assert(c2 < &pTarg->last_rec->base[pTarg->last_rec->top]); /* make sure we don't exceed allocated bounds */
 			*c2 = *c1;
 		}
 		memcpy(&pTarg->clue, pKey, KEY_COPY_SIZE(pKey));

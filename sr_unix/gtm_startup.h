@@ -12,6 +12,9 @@
 #ifndef GTM_STARTUP_INCLUDED
 #define GTM_STARTUP_INCLUDED
 
-void gtm_startup(struct startup_vector *svec);
+void 	gtm_startup(struct startup_vector *svec);
+void	init_gtm(void);
+void 	gtm_init_env(rhdtyp* base_addr, unsigned char* transfer_addr);
+void 	lref_parse(unsigned char* lref, mstr* rtn, mstr* lab, int* offset);
 
 #endif /* GTM_STARTUP_INCLUDED */

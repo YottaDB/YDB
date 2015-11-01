@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -18,18 +19,25 @@
 #include "gdsfhead.h"
 #include "gdscc.h"
 #include "gdsbml.h"
+
+#include "send_msg.h"		/* prototypes */
 #include "gvcst_map_build.h"
 
-GBLREF bool  run_time;
+GBLREF	bool		run_time;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	sgmnt_addrs	*cs_addrs;
 
 void gvcst_map_build(uint4 *array,
 		     sm_uc_ptr_t base_addr,
 		     cw_set_element *cs,
 		     trans_num ctn)
 {
-	boolean_t	busy;
+	boolean_t	busy, status;
 	uint4		ret, (*bml_func)();
 
+	VALIDATE_BM_BLK(cs->blk, (blk_hdr_ptr_t)base_addr, cs_addrs, gv_cur_region, status);
+	if (!status)
+		GTMASSERT;	/* it is not a valid bitmap block */
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	base_addr += sizeof(blk_hdr);
 

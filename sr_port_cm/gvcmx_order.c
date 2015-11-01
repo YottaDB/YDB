@@ -10,14 +10,18 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "hashdef.h"
 #include "cmidef.h"
 #include "cmmdef.h"
+#include "gvcmx.h"
+#include "gvcmz.h"
+#include "mvalconv.h"
 
-bool gvcmx_order()
+bool gvcmx_order(void)
 {
 	mval v;
 
-	gvcmz_doop(CMMS_Q_ORDER,CMMS_R_ORDER,&v);
+	gvcmz_doop(CMMS_Q_ORDER, CMMS_R_ORDER, &v);
 	if (MV_FORCE_INT(&v))
 		return TRUE;
 	else

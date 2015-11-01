@@ -64,10 +64,9 @@ void iosocket_flush(io_desc *iod)
                 iod->dollar.za = 9;
                 memcpy(dsocketptr->dollar_device, "1,", sizeof("1,") - 1);
                 memcpy(&dsocketptr->dollar_device[sizeof("1,") - 1], errptr, errlen);
-                if ((iod->error_handler.len > 0) && (socketptr->ioerror))
-                        rts_error(VARLSTCNT(6) ERR_SOCKWRITE, 0, ERR_TEXT, 2, errlen, errptr);
-                else
-                        return;
+		if (socketptr->ioerror)
+			rts_error(VARLSTCNT(6) ERR_SOCKWRITE, 0, ERR_TEXT, 2, errlen, errptr);
+		return;
         }
 
 #endif

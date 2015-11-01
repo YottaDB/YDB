@@ -10,7 +10,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %GC	;GT.M %GC utility - global copy
 	;
-	n %GI,%GO,%SC,$zt s %ZL=$zl,$zt="zg "_$ZL_":ERR^%GC"
+	n %GI,%GO,%SC,$et s %ZL=$zl,$et="zg "_$ZL_":ERR^%GC"
 	u 0:(ctrap=$c(3):exc="zg "_$ZL_":RESTART^%GC")
 	w !,"Global copy",!
 RESTART	r !,"Show copied nodes <Yes>? ",%SC s %SC=($tr(%SC,"yes","YES")=$e("YES",1,$l(%SC)))
@@ -43,4 +43,5 @@ help	i $l(ix)=2,"Dd"[$e(ix,2) d ^%GD u 0:flush q
 	q
 ERR	w !,$p($zs,",",2,99),!
 	u 0:(ctrap="":exc="")
+	s $ec=""
 	q
