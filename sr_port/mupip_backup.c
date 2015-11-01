@@ -15,6 +15,7 @@
 # include "gtm_fcntl.h"
 # include "gtm_stat.h"
 # include "gtm_unistd.h"
+# include <sys/shm.h>
 #elif defined(VMS)
 # include <rms.h>
 # include <iodef.h>
@@ -51,11 +52,20 @@
 #include "interlock.h"
 #include "lockconst.h"
 #include "sleep_cnt.h"
+
 #if defined(UNIX)
 #include "eintr_wrappers.h"
 #include "gtmio.h"		/* for OPENFILE macro */
 #include "repl_sp.h"		/* for F_CLOSE macro */
+#include "gtm_ipc.h"
+#include "repl_instance.h"
+#include "mu_gv_cur_reg_init.h"
+#include "ftok_sems.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include "do_shmat.h"		/* for do_shmat() prototype */
 #endif
+
 #include "gtm_file_stat.h"
 #include "util.h"
 #include "gtm_caseconv.h"
@@ -93,6 +103,8 @@ static  const   unsigned short  zero_fid[3];
 #endif
 
 GBLDEF  boolean_t	backup_started;
+GBLDEF  boolean_t	backup_interrupted;
+
 GBLREF 	bool		record;
 GBLREF 	bool		error_mupip;
 GBLREF 	bool		file_backed_up;
@@ -121,6 +133,14 @@ GBLREF	jnl_gbls_t	jgbl;
 GBLREF	void            (*call_on_signal)();
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 
+#ifdef UNIX
+GBLREF	backup_reg_list	*mu_repl_inst_reg_list;
+GBLREF	jnlpool_addrs	jnlpool;
+#endif
+
+LITREF char             gtm_release_name[];
+LITREF int4             gtm_release_name_len;
+
 static char	* const jnl_parms[] =
 {
 	"DISABLE",
@@ -143,7 +163,10 @@ void mupip_backup_call_on_signal(void)
 				 * just in case we came here because of an interrupt (e.g. SIGTERM) while a malloc was in progress.
 				 */
 	if (backup_started)
+	{	/* Cleanup that which we have messed */
+		backup_interrupted = TRUE;
 		mubclnup(NULL, need_to_del_tempfile);
+	}
 }
 
 void mupip_backup(void)
@@ -152,14 +175,14 @@ void mupip_backup(void)
 	char			*tempdirname, *tempfilename, *ptr;
 	uint4			level, blk, status, ret;
 	unsigned short		s_len, length, ntries;
-	int4			size, gds_ratio, buff_size, i, crit_counter;
+	int4			size, gds_ratio, buff_size, i, crit_counter, save_errno, rv;
 	uint4			ustatus;
 	size_t			backup_buf_size;
 	trans_num		tn;
 	shmpool_buff_hdr_ptr_t	sbufh_p;
 	shmpool_blk_hdr_ptr_t	sblkh_p, next_sblkh_p;
 	static boolean_t	once = TRUE;
-	backup_reg_list		*rptr, *clnup_ptr;
+	backup_reg_list		*rptr, *rrptr, *clnup_ptr;
 	boolean_t		inc_since_inc , inc_since_rec, result, newjnlfiles, gotit, tn_specified,
 				replication_on, newjnlfiles_specified, keep_prev_link, bkdbjnl_disable_specified,
 				bkdbjnl_off_specified;
@@ -171,8 +194,9 @@ void mupip_backup(void)
 	char			*jnl_str_ptr, rep_str[256], jnl_str[256], entry[256],
 				full_jnl_fn[JNL_NAME_SIZE], prev_jnl_fn[JNL_NAME_SIZE];
 	int			ccnt, index, comparison, num, jnl_fstat;
-	mstr			tempdir_log, tempdir_trans, *file, tempdir_full, filestr;
+	mstr			tempdir_log, tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
 	uint4			jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status;
+	boolean_t		jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
 
 #if defined(VMS)
 	struct FAB		temp_fab;
@@ -188,41 +212,55 @@ void mupip_backup(void)
 	int			fstat_res, fclose_res, tmpfd;
 	int			sync_io_status;
 	boolean_t		sync_io, sync_io_specified;
+	gd_region		*r_save, *reg;
+	gd_segment		*seg;
+	char			instfilename[MAX_FN_LEN + 1], *errptr;
+	unsigned int		full_len;
+	unix_db_info		*udi;
+	repl_inst_hdr		repl_instance;
+	unsigned char		*cmdptr, command[MAX_FN_LEN * 2 + 5]; /* 5 == sizeof("cp") + 2 (space) + 1 (NULL) */
+	struct shmid_ds		shm_buf;
+	int4			shm_id;
+	replpool_identifier	replpool_id;
+	sm_uc_ptr_t		start_addr;
+	seq_num			jnl_seqno;
 #else
 # error UNSUPPORTED PLATFORM
 #endif
-	boolean_t		jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
 
-
+	error_def(ERR_BACKUP2MANYKILL);
 	error_def(ERR_BACKUPCTRL);
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_FREEZECTRL);
-	error_def(ERR_DBRDONLY);
+	error_def(ERR_DBCCERR);
 	error_def(ERR_DBFILERR);
+	error_def(ERR_DBRDONLY);
+	error_def(ERR_ERRCALL);
+	error_def(ERR_FILEEXISTS);
+	error_def(ERR_FILEPARSE);
+	error_def(ERR_FREEZECTRL);
+	error_def(ERR_JNLDISABLE);
+	error_def(ERR_JNLFNF);
+	error_def(ERR_JNLPOOLSETUP);
+	error_def(ERR_JNLSTATE);
 	error_def(ERR_MUNOACTION);
 	error_def(ERR_MUNOFINISH);
-	error_def(ERR_BACKUP2MANYKILL);
-        error_def(ERR_MUSELFBKUP);
-        error_def(ERR_JNLNOCREATE);
-        error_def(ERR_JNLCREATE);
-	error_def(ERR_PREVJNLLINKCUT);
-	error_def(ERR_JNLSTATE);
-	error_def(ERR_REPLSTATE);
-	error_def(ERR_FILEEXISTS);
-	error_def(ERR_JNLDISABLE);
-	error_def(ERR_FILEPARSE);
-	error_def(ERR_JNLFNF);
-	error_def(ERR_NOTRNDMACC);
 	error_def(ERR_MUNOSTRMBKUP);
-	error_def(ERR_DBCCERR);
-	error_def(ERR_ERRCALL);
-	error_def(ERR_REPLSTATEERR);
-	error_def(ERR_TEXT);
+	error_def(ERR_MUPCLIERR);
+	error_def(ERR_NOTRNDMACC);
+	error_def(ERR_PREVJNLLINKCUT);
+	error_def(ERR_REPLINSTUNDEF);
 	error_def(ERR_REPLJNLCNFLCT);
+	error_def(ERR_REPLPOOLINST);
+	error_def(ERR_REPLSTATE);
+	error_def(ERR_REPLSTATEERR);
+	error_def(ERR_SYSCALL);
+	error_def(ERR_TEXT);
+        error_def(ERR_JNLCREATE);
+        error_def(ERR_JNLNOCREATE);
+        error_def(ERR_MUSELFBKUP);
 
 	/* ==================================== STEP 1. Initialization ======================================= */
 
-	backup_started = FALSE;
+	backup_started = backup_interrupted = FALSE;
 	ret = SS_NORMAL;
 	jnl_str_ptr = &jnl_str[0];
 	halt_ptr = grlist = NULL;
@@ -362,6 +400,37 @@ void mupip_backup(void)
 		gtm_putmsg(VARLSTCNT(1) ERR_BACKUPCTRL);
 		mupip_exit(ERR_MUNOFINISH);
 	}
+	UNIX_ONLY(
+		assert((NULL != grlist) || (NULL != mu_repl_inst_reg_list));
+		if (NULL != mu_repl_inst_reg_list)
+		{	/* Check that backup destination file for replication instance is different from the backup
+			 * destination file for other regions that were specified.
+			 */
+			replinstfile = &(mu_repl_inst_reg_list->backup_file);
+			replinstfile->addr[replinstfile->len] = '\0';
+			if (CLI_PRESENT != cli_present("REPLACE"))
+			{	/* make sure backup files do not already exist */
+				if (FILE_PRESENT == (fstat_res = gtm_file_stat(replinstfile, NULL, NULL, FALSE, &ustatus)))
+				{
+					gtm_putmsg(VARLSTCNT(4) ERR_FILEEXISTS, 2, LEN_AND_STR((char *)replinstfile->addr));
+					error_mupip = TRUE;
+				} else if (FILE_STAT_ERROR == fstat_res)
+					gtm_putmsg(VARLSTCNT(1) ustatus);
+			}
+			for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
+			{
+				file = &(rptr->backup_file);
+				file->addr[file->len] = '\0';
+				if (!STRCMP(replinstfile->addr, file->addr))
+				{
+					util_out_print("Cannot backup replication instance file and database region !AD "
+						"to the same destination file !AZ", TRUE, REG_LEN_STR(rptr->reg),
+						replinstfile->addr);
+					error_mupip = TRUE;
+				}
+			}
+		}
+	)
 	for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
 	{
 		file = &(rptr->backup_file);
@@ -384,6 +453,18 @@ void mupip_backup(void)
 						gtm_putmsg(VARLSTCNT(1) ustatus);
 				}
 			)
+			for (rrptr = (backup_reg_list *)(grlist);  rrptr != rptr;  rrptr = rrptr->fPtr)
+			{
+				rfile = &(rrptr->backup_file);
+				assert('\0' == rfile->addr[rfile->len]);
+				if (!STRCMP(file->addr, rfile->addr))
+				{
+					util_out_print("Cannot backup database regions !AD and !AD to the same "
+						"destination file !AZ",
+						TRUE, REG_LEN_STR(rrptr->reg), REG_LEN_STR(rptr->reg), file->addr);
+					error_mupip = TRUE;
+				}
+			}
 		} else if (!incremental)
 		{ 	/* non-incremental backups to "exec" and "tcp" are not supported*/
 			gtm_putmsg(VARLSTCNT(1) ERR_NOTRNDMACC);
@@ -415,13 +496,12 @@ void mupip_backup(void)
 		tempdir_trans_len = 0;
 
 	for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
-	{
-		/* restore the original length since we are looping thru regions */
+	{	/* restore the original length since we are looping thru regions */
 		tempdir_trans.len = tempdir_trans_len;
 		file = &(rptr->backup_file);
 		file->addr[file->len] = '\0';
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
-				break;
+			break;
 		if ((dba_bg != rptr->reg->dyn.addr->acc_meth) && (dba_mm != rptr->reg->dyn.addr->acc_meth))
 		{
 			util_out_print("Region !AD is not a BG or MM databases", TRUE, REG_LEN_STR(rptr->reg));
@@ -465,8 +545,7 @@ void mupip_backup(void)
 		}
 		rptr->backup_hdr = (sgmnt_data_ptr_t)malloc(size);
 		if (TRUE == online)
-		{
-			/* determine the directory name and prefix for the temp file */
+		{	/* determine the directory name and prefix for the temp file */
 			memset(tempnam_prefix, 0, MAX_FN_LEN);
 			memcpy(tempnam_prefix, gv_cur_region->rname, gv_cur_region->rname_len);
 			SPRINTF(&tempnam_prefix[gv_cur_region->rname_len], "_%x", process_id);
@@ -655,6 +734,32 @@ void mupip_backup(void)
 		gtm_putmsg(VARLSTCNT(1) ERR_BACKUPCTRL);
 		mupip_exit(ERR_MUNOFINISH);
 	}
+	UNIX_ONLY(
+		if (NULL != mu_repl_inst_reg_list)
+		{	/* Grab ftok semaphore of the replication instance file before taking a backup. But before that
+			 * initialize the region corresponding to the instance file.
+			 */
+			assert(NULL == jnlpool.jnlpool_dummy_reg);
+			r_save = gv_cur_region;
+			mu_gv_cur_reg_init();
+			jnlpool.jnlpool_dummy_reg = reg = gv_cur_region;
+			gv_cur_region = r_save;
+			ASSERT_IN_RANGE(MIN_RN_LEN, sizeof(JNLPOOL_DUMMY_REG_NAME) - 1, MAX_RN_LEN);
+			MEMCPY_LIT(reg->rname, JNLPOOL_DUMMY_REG_NAME);
+			reg->rname_len = STR_LIT_LEN(JNLPOOL_DUMMY_REG_NAME);
+			reg->rname[reg->rname_len] = '\0';
+			if (!repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1))
+				rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
+			udi = FILE_INFO(reg);
+			seg = reg->dyn.addr;
+			memcpy((char *)seg->fname, instfilename, full_len);
+			udi->fn = (char *)seg->fname;
+			seg->fname_len = full_len;
+			seg->fname[full_len] = '\0';
+			if (!ftok_sem_get(jnlpool.jnlpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE))
+				rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
+		}
+	)
 	if (online)
 	{
 		for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
@@ -690,6 +795,119 @@ void mupip_backup(void)
 							 * timestamps in the journal files. This reduces the probability of
 							 * occurrence of D9D12-002410 --- nars -- 2004/01/02 */
 		backup_started = TRUE;
+#ifdef UNIX
+		if (NULL != mu_repl_inst_reg_list)
+		{	/* Backup the replication instance file. To do this there is no need to attach to the journal pool.
+			 * All that is needed is a system "cp" command of the instance file to the destination file.
+			 * After that we need to update a few fields in the file header to make it correspond to the
+			 * databases and reflect the fact that this is a cleanly shutdown instance file.
+			 */
+			cmdptr = &command[0];
+			memcpy(cmdptr, "cp ", 3);
+			cmdptr += 3;
+			memcpy(cmdptr, seg->fname, seg->fname_len);
+			cmdptr[seg->fname_len] = ' ';
+			cmdptr += seg->fname_len + 1;
+			memcpy(cmdptr, mu_repl_inst_reg_list->backup_file.addr, mu_repl_inst_reg_list->backup_file.len);
+			cmdptr += mu_repl_inst_reg_list->backup_file.len;
+			*cmdptr = '\0';
+			if (0 != (rv = SYSTEM((char *)command)))
+			{
+				if (-1 == rv)
+				{
+					save_errno = errno;
+					errptr = (char *)STRERROR(save_errno);
+					util_out_print("system : !AZ", TRUE, errptr);
+				}
+				util_out_print("Error doing !AD", TRUE, cmdptr - command, command);
+				error_mupip = TRUE;
+				goto repl_inst_bkup_done;
+			}
+			repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+			jnlpool.repl_inst_filehdr = &repl_instance;
+			shm_id = repl_instance.jnlpool_shmid;
+			/* If the journal pool does not exist, it means the instance file is not in use and hence to back it
+			 * up, we only need to copy it to the destination file (already done). No other cleanup is needed.
+			 */
+			if (INVALID_SEMID != shm_id)
+			{	/* The journal pool exists. Note down the current journal seqno from there and copy that onto
+				 * the backed up instance file header. Also clean up other fields in the backed up instance file
+				 * header.
+				 */
+				if (-1 == shmctl(shm_id, IPC_STAT, &shm_buf))
+				{
+					save_errno = errno;
+					gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id, RTS_ERROR_STRING(instfilename));
+					gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
+						RTS_ERROR_LITERAL("shmctl()"), CALLFROM, save_errno);
+					error_mupip = TRUE;
+					goto repl_inst_bkup_done;
+				}
+				if (-1 == (sm_long_t)(start_addr = (sm_uc_ptr_t) do_shmat(shm_id, 0, 0)))
+				{
+					save_errno = errno;
+					gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id, RTS_ERROR_STRING(instfilename));
+					gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmat()"), CALLFROM, save_errno);
+					error_mupip = TRUE;
+					goto repl_inst_bkup_done;
+				}
+				memcpy((void *)&replpool_id, (void *)start_addr, sizeof(replpool_identifier));
+				if (memcmp(replpool_id.label, GDS_RPL_LABEL, GDS_LABEL_SZ - 1))
+				{
+					if (!memcmp(replpool_id.label, GDS_RPL_LABEL, GDS_LABEL_SZ - 3))
+						util_out_print("Incorrect version for the journal pool shared memory segment"
+							" (id = !UL) belonging to replication instance !AD",
+							TRUE, shm_id, LEN_AND_STR(instfilename));
+					else
+						util_out_print("Incorrect format for the journal pool shared memory segment"
+							" (id = !UL) belonging to replication instance !AD",
+							TRUE, shm_id, LEN_AND_STR(instfilename));
+					error_mupip = TRUE;
+					goto repl_inst_bkup_done;
+				}
+				if (memcmp(replpool_id.now_running, gtm_release_name, gtm_release_name_len + 1))
+				{
+					util_out_print("Attempt to access with version !AD, while already using !AD for "
+						"journal pool shared memory segment (id = !UL) belonging to replication "
+						"instance file !AD.", TRUE, gtm_release_name_len, gtm_release_name,
+						LEN_AND_STR(replpool_id.now_running), shm_id, LEN_AND_STR(instfilename));
+					error_mupip = TRUE;
+					goto repl_inst_bkup_done;
+				}
+				jnl_seqno = ((jnlpool_ctl_ptr_t)start_addr)->jnl_seqno;
+				if (-1 == shmdt((caddr_t)start_addr))
+				{
+					save_errno = errno;
+					gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id, RTS_ERROR_STRING(instfilename));
+					gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmdt()"), CALLFROM, save_errno);
+					error_mupip = TRUE;
+					goto repl_inst_bkup_done;
+				}
+				assert(0 != jnl_seqno);
+				/* All the cleanup we want is exactly done by the "repl_inst_triple_truncate" function. But
+				 * we dont want to clean the instance file. We want to instead clean the backed up instance file.
+				 * To that effect, temporarily change "udi->fn" to reflect the backed up file so all the changes
+				 * get flushed there. Restore it after the function call.
+				 */
+				udi->fn = (char *)mu_repl_inst_reg_list->backup_file.addr;
+				repl_inst_triple_truncate(jnl_seqno);	/* Flush updated file header to backed up instance file */
+				udi->fn = (char *)seg->fname;
+			} else
+				jnl_seqno = jnlpool.repl_inst_filehdr->jnl_seqno;
+repl_inst_bkup_done:
+			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
+			if (!error_mupip)
+			{
+				util_out_print("Replication Instance file !AD backed up in file !AD", TRUE,
+					LEN_AND_STR(instfilename),
+					mu_repl_inst_reg_list->backup_file.len, mu_repl_inst_reg_list->backup_file.addr);
+				util_out_print("Journal Seqnos up to 0x!16@XJ are backed up.", TRUE, &jnl_seqno);
+				util_out_print("", TRUE);
+			} else
+				util_out_print("Error backing up replication instance file !AD. Moving on to other backups.",
+					TRUE, LEN_AND_STR(instfilename));
+		}
+#endif
 		jgbl.dont_reset_gbl_jrec_time = TRUE;
 		for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,8 +26,7 @@
 
 #include "mdef.h"
 
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
+#include "gtm_inet.h"	/* Required for gtmsource.h */
 
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
@@ -53,17 +52,17 @@
 #include "have_crit.h"
 #include "mutex_deadlock_check.h"
 
-GBLREF	short		dollar_tlevel;
-GBLREF	unsigned int	t_tries;
-GBLREF	tp_region	*tp_reg_list;		/* Chained list of regions used in this transaction */
-GBLREF	uint4		crit_deadlock_check_cycle;
-GBLREF	boolean_t	is_replicator;
-GBLREF	boolean_t	mu_reorg_process;
-GBLREF	jnlpool_addrs	jnlpool;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	boolean_t	in_mutex_deadlock_check;
-GBLREF	volatile int4	crit_count;
+GBLREF	short			dollar_tlevel;
+GBLREF	unsigned int		t_tries;
+GBLREF	tp_region		*tp_reg_list;		/* Chained list of regions used in this transaction */
+GBLREF	uint4			crit_deadlock_check_cycle;
+GBLREF	boolean_t		is_replicator;
+GBLREF	boolean_t		mu_reorg_process;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	volatile boolean_t	in_mutex_deadlock_check;
+GBLREF	volatile int4		crit_count;
 
 void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr)
 {
@@ -157,6 +156,15 @@ void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr)
 		/* Release crit in regions not legitimately part of this TP/non-TP transaction */
 		have_crit(CRIT_RELEASE | CRIT_NOT_TRANS_REG);
 	}
+	/* Reset "crit_count" before resetting "in_mutex_deadlock_check" to FALSE. The order of the sets is important.
+	 * The periodic dbsync timer "wcs_clean_dbsync" depends on this order to correctly check if mainline code is
+	 * interruptible. If the order were reversed and "in_mutex_deadlock_check" set to FALSE first, it is possible
+	 * if "wcs_clean_dbsync" gets invoked before the reset of "crit_count" that it will see BOTH "in_mutex_deadlock_check"
+	 * set to FALSE as well as "crit_count" set to 0 in which case it will conclude this as ok to interrupt when actually
+	 * it is NOT (since the call stack will still have mutex* routines and we want to avoid reentrancy issues there).
+	 * Because the ordering is important, to avoid compiler optimizer from prefetching them out of order, we declare
+	 * both "crit_count" and "in_mutex_deadlock_check" as "volatile".
+	 */
 	crit_count = save_crit_count;
 	in_mutex_deadlock_check = FALSE;
 }

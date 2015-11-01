@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,12 +12,13 @@
 #include "mdef.h"
 
 #include "gtm_ipc.h"
+#include "gtm_unistd.h"
+#include "gtm_string.h"
+#include "gtm_inet.h"
+#include "gtm_fcntl.h"
+
 #include <sys/sem.h>
 #include <errno.h>
-#include <fcntl.h>
-#include "gtm_unistd.h"
-#include <arpa/inet.h>
-#include "gtm_string.h"
 #include <stddef.h>
 
 #include "gdsroot.h"
@@ -59,21 +60,19 @@ GBLREF	gd_region		*gv_cur_region;
  */
 boolean_t mu_replpool_grab_sem(boolean_t immediate)
 {
-	char			instname[MAX_FN_LEN + 1];
+	char			instfilename[MAX_FN_LEN + 1];
 	gd_region		*r_save;
 	static gd_region 	*replreg;
 	int			status, save_errno;
 	union semun		semarg;
 	struct semid_ds		semstat;
-	repl_inst_fmt		repl_instance;
+	repl_inst_hdr		repl_instance;
 	unix_db_info		*udi;
 	unsigned int		full_len;
 
-	error_def(ERR_REPLREQRUNDOWN);
 	error_def(ERR_REPLINSTUNDEF);
 	error_def(ERR_RECVPOOLSETUP);
 	error_def(ERR_JNLPOOLSETUP);
-	error_def(ERR_NORECVPOOL);
 	error_def(ERR_REPLFTOKSEM);
 	error_def(ERR_TEXT);
 
@@ -85,16 +84,17 @@ boolean_t mu_replpool_grab_sem(boolean_t immediate)
 		gv_cur_region = r_save;
 	}
 	jnlpool.jnlpool_dummy_reg = replreg;
-	if (!repl_inst_get_name(instname, &full_len, MAX_FN_LEN + 1))
+	recvpool.recvpool_dummy_reg = replreg;
+	if (!repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1))
 		rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
 	assert(full_len);
-	memcpy((char *)replreg->dyn.addr->fname, instname, full_len);
+	memcpy((char *)replreg->dyn.addr->fname, instfilename, full_len);
 	replreg->dyn.addr->fname_len = full_len;
 	udi = FILE_INFO(replreg);
 	udi->fn = (char *)replreg->dyn.addr->fname;
 	if (!ftok_sem_get(replreg, TRUE, REPLPOOL_ID, immediate))
-		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instname);
-	repl_inst_get(instname, &repl_instance);
+		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instfilename);
+	repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
 	/*
 	 * --------------------------
 	 * First semaphores of jnlpool
@@ -140,7 +140,6 @@ boolean_t mu_replpool_grab_sem(boolean_t immediate)
 	 * --------------------------
 	 */
 	assert(NUM_SRC_SEMS == NUM_RECV_SEMS);
-	recvpool.recvpool_dummy_reg = replreg;
 	if (-1 == (udi->semid = init_sem_set_recvr(IPC_PRIVATE, NUM_RECV_SEMS, RWDALL | IPC_CREAT)))
 	{
 		remove_sem_set(SOURCE);
@@ -180,16 +179,18 @@ boolean_t mu_replpool_grab_sem(boolean_t immediate)
 	}
 	repl_instance.recvpool_semid = udi->semid;
 	repl_instance.recvpool_semid_ctime = udi->sem_ctime;
-
-	repl_inst_put(instname, &repl_instance);
-	/*
-	 * Now release jnlpool/recvpool ftok semaphore
-	 */
-	if (!ftok_sem_release(replreg, TRUE, immediate))
+	/* Initialize jnlpool.repl_inst_filehdr as it is used later by gtmrecv_fetchresync() */
+	assert(NULL == jnlpool.repl_inst_filehdr);
+	jnlpool.repl_inst_filehdr = (repl_inst_hdr_ptr_t)malloc(sizeof(repl_inst_hdr));
+	memcpy(jnlpool.repl_inst_filehdr, &repl_instance, sizeof(repl_inst_hdr));
+	/* Flush changes to the replication instance file header to disk */
+	repl_inst_write(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+	/* Now release jnlpool/recvpool ftok semaphore */
+	if (!ftok_sem_release(replreg, FALSE, immediate))
 	{
 		remove_sem_set(SOURCE);
 		remove_sem_set(RECV);
-		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instname);
+		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instfilename);
 	}
 	return TRUE;
 }

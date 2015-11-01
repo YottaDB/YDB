@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,7 +98,7 @@ int mu_rndwn_all(void)
 		if (validate_db_shm_entry(entry, fname, &tmp_exit_status))
 		{
 			mu_gv_cur_reg_init();
-			strcpy((char *)gv_cur_region->dyn.addr->fname, fname);
+			STRCPY(gv_cur_region->dyn.addr->fname, fname);
 			gv_cur_region->dyn.addr->fname_len = strlen(fname);
 			if (mu_rndwn_file(gv_cur_region, FALSE))
 			{
@@ -117,7 +117,7 @@ int mu_rndwn_all(void)
 			gtm_putmsg(VARLSTCNT(6) (JNLPOOL_SEGMENT == replpool_id.pool_type) ?
 				(ret_status ? ERR_MUJPOOLRNDWNSUC : ERR_MUJPOOLRNDWNFL) :
 				(ret_status ? ERR_MURPOOLRNDWNSUC : ERR_MURPOOLRNDWNFL),
-				4, LEN_AND_STR(shmid_buff), LEN_AND_STR(replpool_id.instname));
+				4, LEN_AND_STR(shmid_buff), LEN_AND_STR(replpool_id.instfilename));
 			if (!ret_status)
 				exit_status = ERR_MUNOTALLSEC;
 		}
@@ -273,14 +273,14 @@ boolean_t validate_replpool_shm_entry(char *entry, replpool_id_ptr_t replpool_id
 		}
 		/*
 		 * If we can open instance file, we can use it to rundown the replication instance.
-		 * We do this checking here, because later repl_inst_get() will issue rts_eror(), if it cannot open.
-		 * We do not want to change repl_inst_get(), which is used by others too.
+		 * We do this checking here, because later "repl_inst_read" will issue "rts_error", if it cannot open.
+		 * We do not want to change "repl_inst_read", which is used by others too.
 		 * As a result currently, mupip rundown will not continue to next shared memory segment
 		 * for this kind of transient error.
 		 * We need to change all rts_error() to gtm_putmsg() in the code path of mupip rundown
 		 * for future enhancement. - Layek - 5/1/1.
 		 */
-		OPENFILE(replpool_id->instname, O_RDONLY, fd);	/* check if we can open it */
+		OPENFILE(replpool_id->instfilename, O_RDONLY, fd);	/* check if we can open it */
 		if (-1 == fd)
 		{
 			shmdt((void *)start_addr);

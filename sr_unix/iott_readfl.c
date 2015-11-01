@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -262,7 +262,6 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				instr = outlen = 0;
 				io_ptr->dollar.za = 9;
 				std_dev_outbndset(INPUT_CHAR);	/* it needs ASCII?	*/
-				outofband = 0;
 				SEND_KEYPAD_LOCAL
 				if (!msec_timeout)
 					iott_rterm(io_ptr);

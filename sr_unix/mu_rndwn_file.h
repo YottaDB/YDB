@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -108,21 +108,6 @@ typedef struct shm_parms_struct{
 		do_semop((sem_id), 0, -1, IPC_NOWAIT | SEM_UNDO);				\
 }
 
-#define CLNUP_REPLPOOL_ACC_SEM(sem_id, insname)										\
-{															\
-	if (sem_created)												\
-	{														\
-		if (-1 == semctl(sem_id, 0, IPC_RMID))									\
-			gtm_putmsg(VARLSTCNT(10) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(insname), ERR_TEXT, 2, 	\
-					LEN_AND_LIT("Error removing semaphore"), errno);				\
-	} else														\
-	{														\
-		if (-1 == do_semop(sem_id, 0, -1, IPC_NOWAIT | SEM_UNDO))						\
-			gtm_putmsg(VARLSTCNT(10) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(insname), ERR_TEXT, 2, 	\
-					LEN_AND_LIT("Error releasing semaphore"), errno);				\
-	}														\
-}
-
 #define CONVERT_TO_NUM(ENTRY)						\
 {									\
 	if (!parm)							\
@@ -144,11 +129,5 @@ typedef struct shm_parms_struct{
 	free(parm);							\
 }
 
-#define MU_RNDWN_REPLPOOL_RETURN(RETVAL)				\
-{									\
-	shmdt((void *)start_addr);					\
-	CLNUP_REPLPOOL_ACC_SEM(sem_id, insname);			\
-	return RETVAL;							\
-}
 bool mu_rndwn_file(gd_region *reg, bool standalone);
 #endif

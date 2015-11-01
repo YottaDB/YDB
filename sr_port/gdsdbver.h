@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,12 +43,14 @@ enum db_ver
 
 /* Database minor version as an enum quantity. This is an ever increasing number that may skip actual
    releases as it is only added to when a file-header field is added or changed or if there is a
-   significant API difference in the version.
+   significant API difference in the version. Note these entries need corresponding updates in
+   db_auto_upgrade.c.
 */
 enum mdb_ver
 {
 	GDSMV4,		/* Applies to all V4 versions (no minor versions defined) */
 	GDSMV50000,
+	GDSMV51000,	/* Multi-site available */
 	GDSMVLAST
 };
 #define GDSMVCURR (GDSMVLAST - 1)

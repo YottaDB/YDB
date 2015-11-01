@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,13 +19,24 @@
 #define BLK_RECYCLED		0x03
 #define BML_BITS_PER_BLK	2
 
-/* sets the bitmap status (BLK_BUSY|BLK_FREE etc.) of the "blknum"th block in "bml_status", given the bitmap block buffer "bp" */
+/* returns the bitmap status (BLK_BUSY|BLK_FREE|etc.) of the "blknum"th block within the local bitmap block "bp" in bml_status */
 #define	GET_BM_STATUS(bp, blknum, bml_status)								\
 {													\
 	sm_uc_ptr_t	ptr;										\
 													\
-	ptr = ((sm_uc_ptr_t)(bp) + sizeof(blk_hdr) + (blknum * BML_BITS_PER_BLK / 8));			\
-	bml_status = (*ptr >> ((blknum * BML_BITS_PER_BLK) % 8)) & ((1 << BML_BITS_PER_BLK) - 1);	\
+	ptr = ((sm_uc_ptr_t)(bp) + sizeof(blk_hdr) + ((blknum * BML_BITS_PER_BLK) / BITS_PER_UCHAR));			\
+	bml_status = (*ptr >> ((blknum * BML_BITS_PER_BLK) % BITS_PER_UCHAR)) & ((1 << BML_BITS_PER_BLK) - 1);	\
+}
+
+/* sets bitmap status (BLK_BUSY|BLK_FREE etc.) for the "blknum"th block within the local bitmap block "bp" from new_bml_status */
+#define	SET_BM_STATUS(bp, blknum, new_bml_status)								\
+{													\
+	sm_uc_ptr_t	ptr;										\
+													\
+	assert(2 == BML_BITS_PER_BLK);									\
+	ptr = ((sm_uc_ptr_t)(bp) + sizeof(blk_hdr) + ((blknum * BML_BITS_PER_BLK) / BITS_PER_UCHAR));			\
+	*ptr = (*ptr & ~(0x03 << ((blknum * BML_BITS_PER_BLK) % BITS_PER_UCHAR)))			\
+		| ((new_bml_status & 0x03) << ((blknum * BML_BITS_PER_BLK) % BITS_PER_UCHAR));		\
 }
 
 #define	BM_MINUS_BLKHDR_SIZE(bplm)	((bplm) / (BITS_PER_UCHAR / BML_BITS_PER_BLK))

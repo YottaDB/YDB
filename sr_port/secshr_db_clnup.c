@@ -52,6 +52,7 @@
 #include "compswap.h"
 #ifdef UNIX
 #include "mutex.h"
+#include "repl_instance.h"	/* needed for JNLDATA_BASE_OFF macro */
 #endif
 #include "sec_shr_blk_build.h"
 #include "sec_shr_map_build.h"

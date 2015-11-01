@@ -86,9 +86,7 @@ GBLREF	uint4			gtmDebugLevel;
 #  define next_smseg	NULL
 #endif
 
-#ifdef DEBUG
-  GBLREF boolean_t		in_wcs_recover;	/* TRUE if in wcs_recover(), used by bt_put() */
-#endif
+GBLREF volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
 
 void wcs_recover(gd_region *reg)
 {
@@ -128,7 +126,8 @@ void wcs_recover(gd_region *reg)
 	csd = csa->hdr;
 	assert(csa->now_crit || csd->clustered);
 	CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
-	DEBUG_ONLY(in_wcs_recover = TRUE;)	/* used by bt_put() called below */
+	assert(!in_wcs_recover);	/* should not be called if we are already in "wcs_recover" for another region */
+	in_wcs_recover = TRUE;	/* used by bt_put() called below */
 	/* ??? this should probably issue an error and
 	 * grab crit on the assumption that it is properly called and something will presently release it */
 	csd->wc_blocked = TRUE;
@@ -599,7 +598,7 @@ void wcs_recover(gd_region *reg)
 	}
 	csa->wbuf_dqd = 0;	/* reset this so the wcs_wtstart below will work */
 	csd->wc_blocked = FALSE;
-	DEBUG_ONLY(in_wcs_recover = FALSE;)
+	in_wcs_recover = FALSE;
 	if (!reg->read_only)
 		DCLAST_WCS_WTSTART(reg, 0, dummy_errno);
 	TP_CHANGE_REG(save_reg);

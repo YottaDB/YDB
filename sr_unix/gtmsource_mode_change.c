@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
+ *	Copyright 2006 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
-GBLREF	boolean_t		update_disable;
+GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 
 int gtmsource_mode_change(int to_mode)
 {
@@ -47,38 +47,43 @@ int gtmsource_mode_change(int to_mode)
 	int		exit_status;
 	int		status, detach_status, remove_status;
 
-	/* Grab the jnlpool jnlpool option write lock */
-	if (0 > grab_sem(SOURCE, SRC_SERV_OPTIONS_SEM))
-	{
-		repl_log(stderr, FALSE, TRUE,
-		  "Error grabbing jnlpool access control/jnlpool option write lock : %s. Could not change mode\n", REPL_SEM_ERROR);
-		return (ABNORMAL_SHUTDOWN);
-	}
-
+	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
+	repl_log(stdout, TRUE, TRUE, "Initiating %s operation on source server pid [%d] for secondary instance [%s]\n",
+		(GTMSOURCE_MODE_ACTIVE == to_mode) ? "ACTIVATE" : "DEACTIVATE",
+		jnlpool.gtmsource_local->gtmsource_pid, jnlpool.gtmsource_local->secondary_instname);
 	if (jnlpool.gtmsource_local->mode == to_mode)
 	{
 		repl_log(stderr, FALSE, TRUE, "Source Server already %s, not changing mode\n",
 				(to_mode == GTMSOURCE_MODE_ACTIVE) ? "ACTIVE" : "PASSIVE");
-		rel_sem(SOURCE, SRC_SERV_OPTIONS_SEM);
 		return (ABNORMAL_SHUTDOWN);
 	}
-
-	repl_log(stdout, FALSE, FALSE, "Initiating change of mode from %s to %s\n", (GTMSOURCE_MODE_ACTIVE == to_mode) ?
-			"PASSIVE" : "ACTIVE", (GTMSOURCE_MODE_ACTIVE == to_mode) ? "ACTIVE" : "PASSIVE");
-
+	assert(ROOTPRIMARY_UNSPECIFIED != gtmsource_options.rootprimary);
+	if ((GTMSOURCE_MODE_ACTIVE == to_mode)
+			&& (ROOTPRIMARY_SPECIFIED == gtmsource_options.rootprimary) && jnlpool.jnlpool_ctl->upd_disabled)
+	{	/* ACTIVATE is specified with ROOTPRIMARY on a journal pool that was created with PROPAGATEPRIMARY.
+		 * This is a case of transition from propagating primary to root primary. Enable updates in this journal pool
+		 * and append a triple to the replication instance file. The function "gtmsource_rootprimary_init" does just that.
+		 */
+		gtmsource_rootprimary_init(jnlpool.jnlpool_ctl->jnl_seqno);
+	}
+	grab_lock(jnlpool.jnlpool_dummy_reg);
+	/* Any ACTIVATE/DEACTIVATE versus ROOTPRIMARY/PROPAGATE incompatibilities have already been checked in the
+	 * function "jnlpool_init" so go ahead and document the impending activation/deactivation and return.
+	 * This flag will be eventually detected by the concurrently running source server which will then change mode.
+	 */
 	if (GTMSOURCE_MODE_ACTIVE == to_mode)
 	{
 		jnlpool.gtmsource_local->secondary_port = gtmsource_options.secondary_port;
 		jnlpool.gtmsource_local->secondary_inet_addr = gtmsource_options.sec_inet_addr;
-		strcpy(jnlpool.gtmsource_local->secondary, gtmsource_options.secondary_host);
+		STRCPY(jnlpool.gtmsource_local->secondary_host, gtmsource_options.secondary_host);
 		memcpy(&jnlpool.gtmsource_local->connect_parms[0], &gtmsource_options.connect_parms[0],
 				sizeof(gtmsource_options.connect_parms));
 	}
-	if ('\0' != gtmsource_options.log_file[0] && 0 != strcmp(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file))
+	if ('\0' != gtmsource_options.log_file[0] && 0 != STRCMP(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file))
 	{
 		repl_log(stdout, FALSE, TRUE, "Signaling change in log file from %s to %s\n",
 				jnlpool.gtmsource_local->log_file, gtmsource_options.log_file);
-		strcpy(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file);
+		STRCPY(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file);
 		jnlpool.gtmsource_local->changelog |= REPLIC_CHANGE_LOGFILE;
 	}
 	if (0 != gtmsource_options.src_log_interval && jnlpool.gtmsource_local->log_interval != gtmsource_options.src_log_interval)
@@ -88,24 +93,8 @@ int gtmsource_mode_change(int to_mode)
 		jnlpool.gtmsource_local->log_interval = gtmsource_options.src_log_interval;
 		jnlpool.gtmsource_local->changelog |= REPLIC_CHANGE_LOGINTERVAL;
 	}
-
 	jnlpool.gtmsource_local->mode = to_mode;
-	grab_lock(jnlpool.jnlpool_dummy_reg);
-	if (update_disable)
-	{
-		jnlpool.jnlpool_ctl->upd_disabled = TRUE;
-		repl_log(stdout, FALSE, TRUE, "Updates are disabled now \n");
-	}
-	else
-	{
-		jnlpool.jnlpool_ctl->upd_disabled = FALSE;
-		repl_log(stdout, FALSE, TRUE, "Updates are allowed now \n");
-	}
 	rel_lock(jnlpool.jnlpool_dummy_reg);
-
-	rel_sem(SOURCE, SRC_SERV_OPTIONS_SEM);
-
 	REPL_DPRINT1("Change mode signalled\n");
-
 	return (NORMAL_SHUTDOWN);
 }

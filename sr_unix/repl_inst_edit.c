@@ -1,0 +1,168 @@
+/****************************************************************
+ *								*
+ *	Copyright 2006 Fidelity Information Services, Inc	*
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
+ ****************************************************************/
+
+#include "mdef.h"
+
+#include "gtm_string.h"
+#include "gtm_stdio.h"
+
+#include "cli.h"
+#include "util.h"
+#include "repl_instance.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "jnl.h"		/* for JNL_WHOLE_FROM_SHORT_TIME */
+#include "buddy_list.h"		/* needed for muprec.h */
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
+#include "muprec.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include "repl_inst_dump.h"
+
+GBLREF	boolean_t	in_repl_inst_edit;	/* used by an assert in repl_inst_read/repl_inst_write */
+GBLREF	boolean_t	print_offset;		/* set to TRUE if -DETAIL is specified */
+GBLREF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst_dump.c */
+
+void	mupcli_get_offset_size_value(uint4 *offset, uint4 *size, gtm_uint64_t *value, boolean_t *value_present)
+{
+	error_def(ERR_MUPCLIERR);
+	error_def(ERR_SIZENOTVALID8);
+
+	if (!cli_get_hex("OFFSET", offset))
+		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+	if (!cli_get_hex("SIZE", size))
+		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+	if (!((sizeof(char) == *size) || (sizeof(short) == *size) || (sizeof(int4) == *size) || (sizeof(gtm_int64_t) == *size)))
+                rts_error(VARLSTCNT(1) ERR_SIZENOTVALID8);
+	if (0 > (int4)*size)
+	{
+		util_out_print("Error: SIZE specified cannot be negative", TRUE);
+		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+	}
+	if (0 != (*offset % *size))
+	{
+		util_out_print("Error: OFFSET [0x!XL] should be a multiple of Size [!UL]", TRUE, *offset, *size);
+		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+	}
+	if (CLI_PRESENT == cli_present("VALUE"))
+	{
+		*value_present = TRUE;
+		if (!cli_get_hex64("VALUE", value))
+			rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+	} else
+		*value_present = FALSE;
+}
+
+void	mupcli_edit_offset_size_value(sm_uc_ptr_t buff, uint4 offset, uint4 size, gtm_uint64_t value, boolean_t value_present)
+{
+	char		temp_str[256], temp_str1[256];
+	gtm_uint64_t	old_value;
+
+	memset(temp_str, 0, 256);
+	memset(temp_str1, 0, 256);
+	if (sizeof(char) == size)
+	{
+		SPRINTF(temp_str, "!UB [0x!XB]");
+		old_value = *(sm_uc_ptr_t)buff;
+	}
+	else if (sizeof(short) == size)
+	{
+		SPRINTF(temp_str, "!UW [0x!XW]");
+		old_value = *(sm_ushort_ptr_t)buff;
+	}
+	else if (sizeof(int4) == size)
+	{
+		SPRINTF(temp_str, "!UL [0x!XL]");
+		old_value = *(sm_uint_ptr_t)buff;
+	}
+	else if (sizeof(gtm_int64_t) == size)
+	{
+		SPRINTF(temp_str, "!@UJ [0x!@XJ]");
+		old_value = *(qw_num_ptr_t)buff;
+	}
+	if (value_present)
+	{
+		if (sizeof(char) == size)
+			*(sm_uc_ptr_t)buff = (unsigned char)value;
+		else if (sizeof(short) == size)
+			*(sm_ushort_ptr_t)buff = (unsigned short)value;
+		else if (sizeof(int4) == size)
+			*(sm_uint_ptr_t)buff = (unsigned int)value;
+		else if (sizeof(gtm_int64_t) == size)
+			*(qw_num_ptr_t)buff = value;
+	} else
+		value = old_value;
+	SPRINTF(temp_str1, "Offset !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
+		temp_str, temp_str);
+	if (sizeof(int4) >= size)
+		util_out_print(temp_str1, TRUE, offset, offset, (uint4)old_value, (uint4)old_value,
+			(uint4)value, (uint4)value, size, size);
+	else
+		util_out_print(temp_str1, TRUE, offset, offset, &old_value, &old_value,
+			&value, &value, size, size);
+}
+
+/* Description:
+ *	Edits or displays the contents of a replication instance file.
+ * Parameters:
+ 	None
+ * Return Value:
+ 	None
+ */
+void	repl_inst_edit(void)
+{
+	unsigned short		inst_fn_len;
+	char			inst_fn[MAX_FN_LEN + 1], buff_unaligned[REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE + 8];
+	char			*buff;
+	repl_inst_hdr_ptr_t	repl_instance;
+	gtmsrc_lcl_ptr_t	gtmsrclcl_ptr;
+	uint4			offset, size;
+	gtm_uint64_t		value;
+	boolean_t		value_present;
+
+	error_def(ERR_MUPCLIERR);
+
+	in_repl_inst_edit = TRUE;
+	inst_fn_len = MAX_FN_LEN;
+	if (!cli_get_str("INSTFILE", inst_fn, &inst_fn_len) || (0 == inst_fn_len))
+		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
+	inst_fn[inst_fn_len] = '\0';
+	buff = &buff_unaligned[0];
+	buff = (char *)ROUND_UP2((int4)buff, 8);
+	if (CLI_PRESENT == cli_present("SHOW"))
+	{
+		print_offset = (CLI_PRESENT == cli_present("DETAIL"));
+		repl_inst_read(inst_fn, (off_t)0, (sm_uc_ptr_t)buff, REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE);
+		util_out_print("GTM-I-MUREPLSHOW, SHOW output for replication instance file !AD", TRUE, inst_fn_len, inst_fn);
+		repl_instance = (repl_inst_hdr_ptr_t)&buff[0];
+		section_offset = 0;
+		repl_inst_dump_filehdr(repl_instance);
+		section_offset = REPL_INST_HDR_SIZE;
+		repl_inst_dump_gtmsrclcl((gtmsrc_lcl_ptr_t)&buff[REPL_INST_HDR_SIZE]);
+		section_offset = REPL_INST_TRIPLE_OFFSET;
+		repl_inst_dump_triplehist(inst_fn, repl_instance->num_triples);
+	}
+	if (CLI_PRESENT == cli_present("CHANGE"))
+	{
+		mupcli_get_offset_size_value(&offset, &size, &value, &value_present);
+		assert(size <= REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE);
+		repl_inst_read(inst_fn, (off_t)offset, (sm_uc_ptr_t)buff, size);
+		mupcli_edit_offset_size_value((sm_uc_ptr_t)buff, offset, size, value, value_present);
+		repl_inst_write(inst_fn, (off_t)offset, (sm_uc_ptr_t)buff, size);
+	}
+	in_repl_inst_edit = FALSE;
+}

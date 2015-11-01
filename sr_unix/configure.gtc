@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2005 Fidelity Information Services, Inc #
+#	Copyright 2001, 2006 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -20,15 +20,6 @@ elif [ $arch = "linux" ]; then
 	echo="/bin/echo -e"
 else
 	echo=/bin/echo
-fi
-
-# Path to the correct editor program
-if [ $arch = "sun"  -o  $arch = "solaris" ]; then
-	editor_env=/usr/ucb/vi
-elif [ $arch = "linux" ]; then
-	editor_env=/bin/vi
-else
-	editor_env=/usr/bin/vi
 fi
 
 # Options to ps
@@ -166,7 +157,6 @@ $echo ""
 cat << SEDSCRIPT > sedin$$
 s|ARCH|$arch|g
 s|ECHO|"$echo"|g
-s|EDITOR_ENV|$editor_env|g
 s|GTMDIST|$gtmdist|g
 s|SERVERID|$server_id|g
 SEDSCRIPT

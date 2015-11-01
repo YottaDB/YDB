@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2006 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,19 +110,20 @@ void updhelper_init(recvpool_user who)
 
 	is_updhelper = TRUE;
 	getjobnum();
-	recvpool_init(UPD_HELPER_READER, FALSE, FALSE);
+	VMS_ONLY(recvpool_init(UPD_HELPER_READER, FALSE, FALSE);)
+	UNIX_ONLY(recvpool_init(UPD_HELPER_READER, FALSE);)
 	upd_log_init(who);
-#ifdef VMS
-	/* Get a meaningful process name */
-	proc_prefix = (UPD_HELPER_READER == who) ? "GTMUHR" : "GTMUHW";
-	proc_name_desc.dsc$w_length = get_proc_name(STR_AND_LEN(proc_prefix), process_id, proc_name);
-	proc_name_desc.dsc$a_pointer = proc_name;
-	proc_name_desc.dsc$b_dtype = DSC$K_DTYPE_T;
-	proc_name_desc.dsc$b_class = DSC$K_CLASS_S;
-	if (SS$_NORMAL != (status = sys$setprn(&proc_name_desc)))
-		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				LEN_AND_LIT("Unable to change update helper name"), status);
-#endif
+	VMS_ONLY(
+		/* Get a meaningful process name */
+		proc_prefix = (UPD_HELPER_READER == who) ? "GTMUHR" : "GTMUHW";
+		proc_name_desc.dsc$w_length = get_proc_name(STR_AND_LEN(proc_prefix), process_id, proc_name);
+		proc_name_desc.dsc$a_pointer = proc_name;
+		proc_name_desc.dsc$b_dtype = DSC$K_DTYPE_T;
+		proc_name_desc.dsc$b_class = DSC$K_CLASS_S;
+		if (SS$_NORMAL != (status = sys$setprn(&proc_name_desc)))
+			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+					LEN_AND_LIT("Unable to change update helper name"), status);
+	)
 	upd_helper_ctl = recvpool.upd_helper_ctl;
 	for (helper = upd_helper_ctl->helper_list, helper_top = helper + MAX_UPD_HELPERS; helper < helper_top; helper++)
 	{

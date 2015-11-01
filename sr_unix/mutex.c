@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,9 @@
 #include "rel_quant.h"
 #include "add_inter.h"
 #include "mutex_deadlock_check.h"
+#include "gt_timer.h"
+#include "heartbeat_timer.h"
+#include "gtmio.h"
 
 #define QUANT_RETRY			10000
 #define QUEUE_RETRY			255
@@ -75,6 +78,8 @@ static mutex_que_entry_ptr_t	msem_slot;
 GBLREF int			mutex_sock_fd;
 GBLREF fd_set			mutex_wait_on_descs;
 #endif
+GBLREF	uint4			mutex_per_process_init_pid;
+GBLREF	boolean_t		mu_rndwn_file_dbjnl_flush;
 
 DECLARE_MUTEX_TRACE_CNTRS
 
@@ -84,7 +89,6 @@ static	boolean_t	woke_self;
 static	boolean_t	woke_none;
 static	unsigned short	next_rand[3];
 static	int		optimistic_attempts;
-static  mutex_lock_t	mutex_lock_type;
 static	int		mutex_expected_wake_instance = 0;
 
 static	enum cdb_sc	mutex_wakeup(mutex_struct_ptr_t addr);
@@ -254,7 +258,7 @@ static	void	crash_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 	} while (TRUE);
 }
 
-static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr)
+static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_lock_type)
 {
 	enum cdb_sc		status;
 	boolean_t		wakeup_status;
@@ -429,7 +433,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr)
 	} while (TRUE);
 }
 
-static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa)
+static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type)
 {
 	/* Insert this process at the tail of the wait queue and hibernate */
 	mutex_struct_ptr_t	addr;
@@ -523,7 +527,7 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa)
 						{
 							MUTEX_DPRINT3("%d: Inserted %d into wait queue\n", process_id,
 									free_slot->pid);
-							return (mutex_long_sleep(addr));
+							return (mutex_long_sleep(addr, mutex_lock_type));
 						}
 					} while (--queue_retry_counter_insq);
 					if (!(--quant_retry_counter_insq))
@@ -676,7 +680,8 @@ void	gtm_mutex_init(gd_region *reg, int n, bool crash)
 static enum cdb_sc write_lock_spin(gd_region *reg,
 			           mutex_spin_parms_ptr_t mutex_spin_parms,
 				   int crash_count,
-				   int attempt_recovery)
+				   int attempt_recovery,
+				   mutex_lock_t mutex_lock_type)
 {
 	int			write_sleep_spin_count, write_hard_spin_count;
 	sgmnt_addrs		*csa;
@@ -738,7 +743,8 @@ static enum cdb_sc write_lock_spin(gd_region *reg,
 static enum cdb_sc mutex_lock(gd_region *reg,
 			      mutex_spin_parms_ptr_t mutex_spin_parms,
 			      int crash_count,
-			      int max_lock_attempts)
+			      int max_lock_attempts,
+			      mutex_lock_t mutex_lock_type)
 {
 	int			lock_attempts;
 	sgmnt_addrs		*csa;
@@ -751,22 +757,26 @@ static enum cdb_sc mutex_lock(gd_region *reg,
 
 	error_def(ERR_MUTEXLCKALERT);
 
+	/* Check that "mutex_per_process_init" has happened before we try to grab crit and that it was done with our current
+	 * pid (i.e. ensure that even in the case where parent did the mutex init with its pid and did a fork, the child process
+	 * has done a reinitialization with its pid). The only exception is if we are in "mu_rndwn_file" in which case we
+	 * know for sure there is no other pid accessing the database shared memory.
+	 */
+	assert(mutex_per_process_init_pid == process_id || (0 == mutex_per_process_init_pid) && mu_rndwn_file_dbjnl_flush);
 	mutex_salvaged = FALSE;
 	optimistic_attempts = 0;
 	lock_attempts = 0;
 	alert = FALSE;
 	do
 	{
-		switch(mutex_lock_type)
+		if (MUTEX_LOCK_WRITE == mutex_lock_type)
 		{
-			case MUTEX_LOCK_WRITE :
-				MUTEX_TRACE_CNTR(mutex_trc_w_atmpts);
-				status = write_lock_spin(reg, mutex_spin_parms, crash_count, alert);
-				break;
-			case MUTEX_LOCK_WRITE_IMMEDIATE :
-				return (write_lock_spin(reg, mutex_spin_parms, crash_count, FALSE));
-			default :
-				GTMASSERT;
+			MUTEX_TRACE_CNTR(mutex_trc_w_atmpts);
+			status = write_lock_spin(reg, mutex_spin_parms, crash_count, alert, mutex_lock_type);
+		} else
+		{
+			assert(MUTEX_LOCK_WRITE_IMMEDIATE == mutex_lock_type);
+			return (write_lock_spin(reg, mutex_spin_parms, crash_count, FALSE, mutex_lock_type));
 		}
 		if (cdb_sc_normal == status || cdb_sc_critreset == status)
 			return (status);
@@ -790,7 +800,7 @@ static enum cdb_sc mutex_lock(gd_region *reg,
 			alert_heartbeat_counter = 0;
 #endif
 		}
-		if (cdb_sc_dbccerr == mutex_sleep(csa))
+		if (cdb_sc_dbccerr == mutex_sleep(csa, mutex_lock_type))
 			return (cdb_sc_dbccerr);
 	} while (TRUE);
 }
@@ -798,15 +808,13 @@ static enum cdb_sc mutex_lock(gd_region *reg,
 enum cdb_sc mutex_lockw(gd_region *reg, mutex_spin_parms_ptr_t mutex_spin_parms, int crash_count)
 {
 	MUTEX_TRACE_CNTR(mutex_trc_lockw);
-	mutex_lock_type = MUTEX_LOCK_WRITE;
-	return (mutex_lock(reg, mutex_spin_parms, crash_count, MUTEX_MAX_WRITE_LOCK_ATTEMPTS));
+	return (mutex_lock(reg, mutex_spin_parms, crash_count, MUTEX_MAX_WRITE_LOCK_ATTEMPTS, MUTEX_LOCK_WRITE));
 }
 
 enum cdb_sc mutex_lockwim(gd_region *reg, mutex_spin_parms_ptr_t mutex_spin_parms, int crash_count)
 {
 	MUTEX_TRACE_CNTR(mutex_trc_lockwim);
-	mutex_lock_type = MUTEX_LOCK_WRITE_IMMEDIATE;
-	return (mutex_lock(reg, mutex_spin_parms, crash_count, 0)); /* Don't care for last argument */
+	return (mutex_lock(reg, mutex_spin_parms, crash_count, 0, MUTEX_LOCK_WRITE_IMMEDIATE));
 }
 
 enum cdb_sc mutex_unlockw(gd_region *reg, int crash_count)
@@ -888,4 +896,40 @@ void mutex_salvage(gd_region *reg)
 			continue_proc(holder_pid);
 		}
 	}
+}
+
+/* Do the per process initialization of mutex stuff. This function should be invoked only once per process. The only
+ * exception is the receiver server which could invoke this twice. Once through the receiver server startup command when
+ * it does "jnlpool_init" and the second through the child receiver server process initialization. The second initialization
+ * is needed to set the mutex structures up to correspond to the child process id (and not the parent pid). The function below
+ * has to be coded to ensure that the second call nullifies any effects of the first call.
+ */
+void	mutex_per_process_init(void)
+{
+	int4	status;
+
+	assert(process_id != mutex_per_process_init_pid);
+	mutex_seed_init();
+	/* The heartbeat timer is used
+	 * 	1) To periodically check if we have older generation journal files open and if so to close them.
+	 *	2) By mutex logic to approximately measure the time spent sleeping while waiting for CRIT or MSEMLOCK.
+	 * Linux currently does not support MSEMs. It uses the heartbeat timer only for (1).
+	 */
+	if (0 == mutex_per_process_init_pid)
+		start_timer((TID)&heartbeat_timer, HEARTBEAT_INTERVAL, heartbeat_timer, 0, NULL);
+#ifndef MUTEX_MSEM_WAKE
+	else
+	{	/* Close socket opened by the first call. But dont delete the socket file as the parent process will do that. */
+		assert(-1 != mutex_sock_fd);
+		if (-1 != mutex_sock_fd)
+		{
+			CLOSEFILE(mutex_sock_fd, status);
+			mutex_sock_fd = -1;
+		}
+	}
+	assert(-1 == mutex_sock_fd);
+	mutex_sock_init();
+	assert(-1 != mutex_sock_fd);
+#endif
+	mutex_per_process_init_pid = process_id;
 }

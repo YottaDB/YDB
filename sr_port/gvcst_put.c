@@ -89,6 +89,7 @@ GBLREF	mval			*post_incr_mval;
 GBLREF	boolean_t		is_dollar_incr;
 GBLREF	int4			update_trans;
 GBLREF	boolean_t		pre_incr_update_trans;	/* copy of "sgm_info_ptr->update_trans" before the $INCR */
+GBLREF	jnlpool_addrs		jnlpool;
 
 #ifdef DEBUG
 GBLREF	boolean_t		skip_block_chain_tail_check;
@@ -128,7 +129,8 @@ static	boolean_t	gvcst_put_blk(mval *val, boolean_t *extra_block_split_req);
 void	gvcst_put(mval *val)
 {
 	boolean_t	extra_block_split_req;
-	sm_uc_ptr_t	jnlpool_instname;
+	sm_uc_ptr_t	jnlpool_instfilename;
+	unsigned char	instfilename_copy[MAX_FN_LEN + 1];
 
 	error_def(ERR_SCNDDBNOUPD);
 	error_def(ERR_REPLINSTMISMTCH);
@@ -143,12 +145,29 @@ void	gvcst_put(mval *val)
 		if (!cs_addrs->replinst_matches_db)
 		{
 			if (jnlpool_ctl->upd_disabled && !is_updproc)
+			{	/* Updates are disabled in this journal pool. Detach from journal pool and issue error. */
+				assert(NULL != jnlpool.jnlpool_ctl);
+				jnlpool_detach();
+				assert(NULL == jnlpool.jnlpool_ctl);
+				assert(FALSE == pool_init);
 				rts_error(VARLSTCNT(1) ERR_SCNDDBNOUPD);
-			UNIX_ONLY(jnlpool_instname = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.instname;)
-			VMS_ONLY(jnlpool_instname = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.gtmgbldir;)
-			if (STRCMP(cs_addrs->nl->replinstname, jnlpool_instname))
-				rts_error(VARLSTCNT(8) ERR_REPLINSTMISMTCH, 6, LEN_AND_STR(jnlpool_instname),
-					DB_LEN_STR(gv_cur_region), LEN_AND_STR(cs_addrs->nl->replinstname));
+			}
+			UNIX_ONLY(jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.instfilename;)
+			VMS_ONLY(jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.gtmgbldir;)
+			if (STRCMP(cs_addrs->nl->replinstfilename, jnlpool_instfilename))
+			{	/* Replication instance file mismatch. Issue error. But before that detach from journal pool.
+				 * Copy replication instance file name in journal pool to temporary memory before detaching.
+				 */
+				UNIX_ONLY(assert(sizeof(instfilename_copy) == sizeof(jnlpool_ctl->jnlpool_id.instfilename));)
+				VMS_ONLY(assert(sizeof(instfilename_copy) == sizeof(jnlpool_ctl->jnlpool_id.gtmgbldir));)
+				memcpy(&instfilename_copy[0], jnlpool_instfilename, sizeof(instfilename_copy));
+				assert(NULL != jnlpool.jnlpool_ctl);
+				jnlpool_detach();
+				assert(NULL == jnlpool.jnlpool_ctl);
+				assert(FALSE == pool_init);
+				rts_error(VARLSTCNT(8) ERR_REPLINSTMISMTCH, 6, LEN_AND_STR(instfilename_copy),
+					DB_LEN_STR(gv_cur_region), LEN_AND_STR(cs_addrs->nl->replinstfilename));
+			}
 			cs_addrs->replinst_matches_db = TRUE;
 		}
 	}
@@ -515,7 +534,11 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 		next_rec_shrink1 = next_rec_shrink;
 		/* Potential size of the current block including the new/updated record */
 		new_blk_size = cur_blk_size + delta;
-		assert(new_blk_size >= new_blk_size_single);
+		/* It is possible due to concurrency issues (for example if the buffer that we are planning on updating
+		 * in shared memory got reused for a different block) that "new_blk_size" is lesser than "new_blk_size_single"
+		 * In those cases, we will go into the non-block-split case but eventually we will restart.
+		 */
+		assert((new_blk_size >= new_blk_size_single) || (CDB_STAGNATE > t_tries));
 		if ((new_blk_size <= blk_fill_size) || (new_blk_size <= new_blk_size_single))
 		{	/* Update can be done without overflowing the block's fillfactor OR the record to be updated
 			 * is the only record in the new block. Do not split block in either case. This means we might

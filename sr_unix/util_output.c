@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,6 +66,12 @@ static	boolean_t	first_syslog = TRUE;
  *	the 8 byte item is passed rather than the item itself. This is what allows us to print 8 byte values in the
  *	non-Alpha 32 bit parameter worlds. These types are documented in the VMS System services manual under SYS$FAO.
  *	There are several other types that are supported on VMS but only these two were added on Unix.
+ *
+ *	In addition this implements another directive
+ *
+ *		!RmAC	!RmAD	!RmAF	!RmAS	!RmAZ
+ *
+ *	This implements the !mAx equivalent but does right-justification of the string instead of left-justification.
  */
 
 /*
@@ -101,6 +107,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 	qw_num_ptr_t	val_ptr;
 	unsigned char	numa[22];
 	unsigned char	*numptr;
+	boolean_t	right_justify;
 
 	VAR_COPY(last_va_list_ptr, fao);
 	outptr = buff;
@@ -129,6 +136,12 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 
 		field_width = 0;	/* Default values */
 		repeat_count = 1;
+		right_justify = FALSE;
+		if ('R' == *message)
+		{
+			right_justify = TRUE;
+			++message;
+		}
 		/* Look for a field width (or repeat count) */
 		if (*message == '#')
 		{
@@ -221,6 +234,13 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 				max_chars = MIN((outtop - outptr - 1),
 						(0 == field_width ? length : MIN(field_width, length)));
 
+				assert(0 <= field_width);
+				assert(0 <= max_chars);
+				if (right_justify)
+				{
+					for (i = field_width - max_chars;  i > 0;  --i)
+						*outptr++ = ' ';
+				}
 				for (i = 0;  i < max_chars;  ++i, ++c)
 					if (type2 == 'F'  &&  (*c < ' '  ||  *c > '~'))
 						*outptr++ = '.';
@@ -228,11 +248,11 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 						--i;	/* Don't count nul characters */
 					else
 						*outptr++ = *c;
-
-				assert(0 <= field_width);
-				assert(0 <= max_chars);
-				for (i = field_width - max_chars;  i > 0;  --i)
-					*outptr++ = ' ';
+				if (!right_justify)
+				{
+					for (i = field_width - max_chars;  i > 0;  --i)
+						*outptr++ = ' ';
+				}
 				continue;
 
 			default:	/* Rest of numeric types come here */

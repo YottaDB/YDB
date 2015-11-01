@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,6 +55,7 @@
 #include "repl_sp.h"
 #include "jnl_write.h"
 #ifdef UNIX
+#include "repl_instance.h"
 #include "gtmio.h"
 #endif
 
@@ -221,28 +222,39 @@ int updproc(void)
 	 * this flag always set to FALSE does not hurt.
 	 */
 	memset((uchar_ptr_t)&recvpool, 0, sizeof(recvpool)); /* For util_base_ch and mupip_exit */
-	if (updproc_init(&gld_db_files, &start_jnl_seqno) == UPDPROC_EXISTS) /* we got the global
-												directory header already */
+	if (updproc_init(&gld_db_files, &start_jnl_seqno) == UPDPROC_EXISTS) /* we got the global directory header already */
 		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Update Process already exists"));
 	/* Initialization of all the relevant global datastructures and allocation for TP */
 	mu_gv_stack_init(&mstack_ptr);
 	recvpool.upd_proc_local->read = 0;
 	recvpool.recvpool_ctl->std_null_coll = secondary_side_std_null_coll;
 	jnl_seqno = start_jnl_seqno;
+	UNIX_ONLY(
+		recvpool.recvpool_ctl->max_dualsite_resync_seqno = jgbl.max_dualsite_resync_seqno;
+	)
 	recvpool.recvpool_ctl->jnl_seqno = jnl_seqno;
 	recvpool.upd_proc_local->read_jnl_seqno = jnl_seqno;
 	if (repl_allowed)
-	{
-		if (jnlpool_ctl->jnl_seqno > start_jnl_seqno && jnlpool_ctl->upd_disabled)
-		{
-			repl_log(updproc_log_fp, TRUE, TRUE,
-				"JNLSEQNO last updated by  update process = "INT8_FMT" "INT8_FMTX" \n",
-				INT8_PRINT(start_jnl_seqno), INT8_PRINTX(start_jnl_seqno));
-			repl_log(updproc_log_fp, TRUE, TRUE,
-				"JNLSEQNO of last transaction written to journal pool = "INT8_FMT" "INT8_FMTX" \n",
-				INT8_PRINT(jnlpool_ctl->jnl_seqno), INT8_PRINTX(jnlpool_ctl->jnl_seqno));
-			rts_error(VARLSTCNT(1) ERR_SECONDAHEAD);
-		}
+	{	/* Check if the secondary is ahead of the primary */
+		VMS_ONLY(
+			if (jnlpool_ctl->jnl_seqno > start_jnl_seqno && jnlpool_ctl->upd_disabled)
+			{
+				repl_log(updproc_log_fp, TRUE, TRUE,
+					"JNLSEQNO last updated by  update process = "INT8_FMT" "INT8_FMTX" \n",
+					INT8_PRINT(start_jnl_seqno), INT8_PRINTX(start_jnl_seqno));
+				repl_log(updproc_log_fp, TRUE, TRUE,
+					"JNLSEQNO of last transaction written to journal pool = "INT8_FMT" "INT8_FMTX" \n",
+					INT8_PRINT(jnlpool_ctl->jnl_seqno), INT8_PRINTX(jnlpool_ctl->jnl_seqno));
+				rts_error(VARLSTCNT(1) ERR_SECONDAHEAD);
+			}
+		)
+		UNIX_ONLY(
+			/* The SECONDAHEAD check is performed in the receiver server after it has connected with the source
+			 * server. This is because the check is relevant only if the source server is dualsite. That is
+			 * not known now but instead at connection time. Hence the deferred check.
+			 */
+			assert(jnlpool_ctl->jnl_seqno == start_jnl_seqno);
+		)
 	}
 	while (updproc_continue)
 		updproc_actions(gld_db_files);
@@ -259,7 +271,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	int4			upd_rec_seqno = 0; /* the total no of journal reocrds excluding TCOM records */
 	int4			tupd_num; /* the number of tset/tkill/tzkill records encountered */
 	int4			tcom_num; /* the number of tcom records encountered */
-	seq_num			jnl_seqno; /* the current jnl_seq no of the Update process */
+	seq_num			jnl_seqno, tmpseqno; /* the current jnl_seq no of the Update process */
 	bool			is_valid_hist();
 	int			key_len, rec_len, backptr;
 	char			fn[MAX_FN_LEN];
@@ -281,6 +293,11 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	sgmnt_data_ptr_t	csd;
 	char	           	gv_mname[MAX_KEY_SZ];
 	static	seq_num		seqnum_diff = 0;
+
+	UNIX_ONLY(
+		repl_triple		triple;
+		repl_triple_jnl_ptr_t	triplecontent;
+	)
 
 	error_def(ERR_TPRETRY);
 
@@ -400,8 +417,73 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		}
 		rec = (jnl_record *)readaddrs;
 		rectype = rec->prefix.jrec_type;
-		assert(IS_REPLICATED(rectype));
 		rec_len = rec->prefix.forwptr;
+		assert(IS_REPLICATED(rectype));
+		UNIX_ONLY(
+			if (JRT_TRIPLE == rectype)
+			{	/* Source server has sent a REPL_NEW_TRIPLE message in the middle of logical journal records.
+				 * Construct the triple from the input message and add it to the replication instance file.
+				 */
+				repl_log(updproc_log_fp, TRUE, TRUE, "Processing REPL_NEW_TRIPLE message\n");
+				triplecontent = (repl_triple_jnl_ptr_t)readaddrs;
+				memset(&triple, 0, sizeof(triple));
+				triple.start_seqno = triplecontent->start_seqno;
+				memcpy(triple.root_primary_instname, triplecontent->instname, MAX_INSTNAME_LEN - 1);
+				triple.root_primary_cycle = triplecontent->cycle;
+				memcpy(triple.rcvd_from_instname, triplecontent->rcvd_from_instname, MAX_INSTNAME_LEN - 1);
+				repl_log(updproc_log_fp, TRUE, TRUE, "New Triple Content : Start Seqno = %llu [0x%llx] : "
+					"Root Primary = [%s] : Cycle = [%d] : Received from instance = [%s]\n",
+					triple.start_seqno, triple.start_seqno, triple.root_primary_instname,
+					triple.root_primary_cycle, triple.rcvd_from_instname);
+				if (sizeof(repl_triple_jnl_t) != rec_len)
+				{
+					bad_trans_type = upd_bad_triple_len;
+					assert(FALSE);
+				} else if (triple.start_seqno != recvpool.upd_proc_local->read_jnl_seqno)
+				{
+					bad_trans_type = upd_bad_triple_start_seqno1;
+					assert(FALSE);
+				} else if (triple.start_seqno > recvpool_ctl->jnl_seqno)
+				{
+					bad_trans_type = upd_bad_triple_start_seqno2;
+					assert(FALSE);
+				} else
+					bad_trans_type = upd_good_record;
+				if (upd_good_record != bad_trans_type)
+				{	/* Signal a BADTRANS */
+					repl_log(updproc_log_fp, TRUE, TRUE,
+						"-> Bad trans :: bad_trans_type = %ld type = %ld len = %ld "
+						"start_seqno = %llu [0x%llx] upd_read_seqno = %llu [0x%llx] "
+						"recvpool_jnl_seqno = %llu [0x%llx]\n",
+						bad_trans_type, rectype, rec_len, triple.start_seqno, triple.start_seqno,
+						recvpool.upd_proc_local->read_jnl_seqno, recvpool.upd_proc_local->read_jnl_seqno,
+						recvpool_ctl->jnl_seqno, recvpool_ctl->jnl_seqno);
+					upd_proc_local->bad_trans = TRUE;
+					assert(0 == dollar_tlevel);
+					if (0 < dollar_tlevel)
+					{
+						repl_log(updproc_log_fp, TRUE, TRUE, "OP_TROLLBACK IS CALLED "
+							"-->Bad trans :: dollar_tlevel = %ld\n", dollar_tlevel);
+						op_trollback(0);
+					}
+					readaddrs = recvpool.recvdata_base;
+					upd_proc_local->read = 0;
+					temp_read = 0;
+					temp_write = 0;
+					upd_rec_seqno = tupd_num = tcom_num = 0;
+					continue;
+				}
+				/* Now that we have constructed the triple, add it to the instance file. */
+				repl_inst_ftok_sem_lock();
+				repl_inst_triple_add(&triple);
+				repl_inst_ftok_sem_release();
+				/* Update pointers to indicate this record is now processed and move on to the next. */
+				readaddrs += rec_len;
+				temp_read += rec_len;
+				upd_proc_local->read = temp_read;
+				continue;
+			}
+		)
 		/* NOTE: All journal sequence number fields are at same offset */
 		if (ROUND_DOWN2(rec_len, JNL_REC_START_BNDRY) != rec_len)
 		{	/* We need that so REC_LEN_FROM_SUFFIX does not access unaligned int */
@@ -532,9 +614,16 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						JNL_LEN_STR(csa->hdr), DB_LEN_STR(gv_cur_region));
 				temp_jnlpool_ctl->jnl_seqno++;
 				csa->hdr->reg_seqno = temp_jnlpool_ctl->jnl_seqno;
-				csa->hdr->resync_seqno = temp_jnlpool_ctl->jnl_seqno;
-				csa->hdr->resync_tn = csa->ti->curr_tn;
-				csa->hdr->old_resync_seqno = temp_jnlpool_ctl->jnl_seqno;
+				VMS_ONLY(
+					csa->hdr->resync_seqno = temp_jnlpool_ctl->jnl_seqno;
+					csa->hdr->resync_tn = csa->ti->curr_tn;
+					csa->hdr->old_resync_seqno = temp_jnlpool_ctl->jnl_seqno;
+				)
+				UNIX_ONLY(
+					assert(REPL_PROTO_VER_UNINITIALIZED != gtmrecv_local->last_valid_remote_proto_ver);
+					if (REPL_PROTO_VER_DUALSITE == gtmrecv_local->last_valid_remote_proto_ver)
+						csa->hdr->dualsite_resync_seqno = temp_jnlpool_ctl->jnl_seqno;
+				)
 				/* the following statements should be atomic */
 				jnl_header = (jnldata_hdr_ptr_t)(jnlpool.jnldata_base + jnlpool_ctl->write);
 				jnl_header->jnldata_len = temp_jnlpool_ctl->write - jnlpool_ctl->write +
@@ -624,15 +713,10 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		}
 		if (upd_good_record != bad_trans_type)
 		{
-			if (IS_REPLICATED(rectype))
-				repl_log(updproc_log_fp, TRUE, TRUE,
-		 "-> Bad trans :: bad_trans_type = %ld type = %ld len = %ld backptr = %ld jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-				rectype, rec_len, backptr, bad_trans_type, INT8_PRINT(rec->jrec_null.jnl_seqno),
-				INT8_PRINTX(rec->jrec_null.jnl_seqno));
-			else
-				repl_log(updproc_log_fp, TRUE, TRUE,
-		 "-> Bad trans :: bad_trans_type = %ld type = %ld len = %ld backptr = %ld jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-					rectype, rec_len, backptr, bad_trans_type, INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
+			tmpseqno = IS_REPLICATED(rectype) ? rec->jrec_null.jnl_seqno : jnl_seqno;
+			repl_log(updproc_log_fp, TRUE, TRUE,
+				"-> Bad trans :: bad_trans_type = %ld type = %ld len = %ld backptr = %ld jnl_seqno = %llu "
+				"[0x%llx]\n", bad_trans_type, rectype, rec_len, backptr, tmpseqno, tmpseqno);
 			upd_proc_local->bad_trans = TRUE;
 			if (0 < dollar_tlevel)
 			{
@@ -651,9 +735,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		{
 			if (jnl_seqno - lastlog_seqno >= log_interval)
 			{
-				repl_log(updproc_log_fp, TRUE, TRUE,
-					"Rectype = %d Committed Jnl seq no is : "INT8_FMT" "INT8_FMTX" \n",
-					rectype, INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
+				repl_log(updproc_log_fp, TRUE, TRUE, "Rectype = %d Committed Jnl seq no is : "
+					INT8_FMT" "INT8_FMTX" \n", rectype, INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
 				lastlog_seqno = jnl_seqno;
 			}
 			upd_proc_local->read_jnl_seqno = ++jnl_seqno;

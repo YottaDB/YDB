@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,9 @@
 #if defined(UNIX)
 #include "mu_rndwn_replpool.h"
 #include "ftok_sems.h"
+#include "repl_instance.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
 #endif
 #include "util.h"
 
@@ -73,6 +76,10 @@ GBLREF	char		*jnl_state_lit[];
 GBLREF	char		*repl_state_lit[];
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 
+#ifdef UNIX
+GBLREF	jnlpool_addrs	jnlpool;
+#endif
+
 void	mur_close_files(void)
 {
 	reg_ctl_list		*rctl, *rctl_top;
@@ -84,29 +91,38 @@ void	mur_close_files(void)
 	int4			status;
 	char 			*head_jnl_fn, *rename_fn, fn[MAX_FN_LEN];
 	int 			rename_fn_len;
-	boolean_t		set_resync_to_region = FALSE;
 	file_control		*fc;
 #if defined(VMS)
+	boolean_t		set_resync_to_region = FALSE;
 	vms_gds_info		*gds_info;
 	io_status_block_disk	iosb;
 	short			channel;
 #elif defined(UNIX)
 	int			channel;
+	int			idx;
+	unix_db_info		*udi;
+	gtmsrc_lcl		gtmsrc_lcl_array[NUM_GTMSRC_LCL];
 #endif
 
-	error_def(ERR_PREMATEOF);
-	error_def(ERR_JNLSTRESTFL);
-	error_def(ERR_SETREG2RESYNC);
-	error_def(ERR_JNLSTATE);
-	error_def(ERR_REPLSTATE);
 	error_def(ERR_FILERENAME);
-	error_def(ERR_RENAMEFAIL);
-	error_def(ERR_JNLREAD);
+	error_def(ERR_JNLACTINCMPLT);
 	error_def(ERR_JNLBADLABEL);
+	error_def(ERR_JNLREAD);
+	error_def(ERR_JNLSTATE);
+	error_def(ERR_JNLSTRESTFL);
+	error_def(ERR_JNLSUCCESS);
 	error_def(ERR_JNLWRERR);
 	error_def(ERR_MUJNLSTAT);
-	error_def(ERR_JNLSUCCESS);
-	error_def(ERR_JNLACTINCMPLT);
+	error_def(ERR_PREMATEOF);
+	error_def(ERR_RENAMEFAIL);
+	error_def(ERR_REPLSTATE);
+
+	UNIX_ONLY(
+		error_def(ERR_REPLFTOKSEM);
+	)
+	VMS_ONLY(
+		error_def(ERR_SETREG2RESYNC);
+	)
 
 	call_on_signal = NULL;	/* Do not recurs via call_on_signal if there is an error */
 	process_exiting = TRUE;	/* Signal function "free" (in gtm_malloc_src.h) not to bother with frees as we are any exiting.
@@ -114,7 +130,7 @@ void	mur_close_files(void)
 				 * just in case we came here because of an interrupt (e.g. SIGTERM) while a malloc was in progress.
 				 */
 	csd = &csd_temp;
-	JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* For jnl_write* routnies we need this */
+	JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* For jnl_write* routines we need this */
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_full_total; rctl < rctl_top; rctl++)
 	{
 		if (NULL != rctl->csa)
@@ -127,11 +143,14 @@ void	mur_close_files(void)
 			{	/* to write proper jnl_seqno in epoch record */
 				assert(murgbl.stop_rlbk_seqno >= murgbl.resync_seqno);
 				assert(murgbl.stop_rlbk_seqno >= murgbl.consist_jnl_seqno);
-				if (murgbl.consist_jnl_seqno) /* can be zero if this command is a no-operation */
+				UNIX_ONLY(assert(murgbl.consist_jnl_seqno);)
+				if (murgbl.consist_jnl_seqno) /* can be zero if this command is a no-operation in VMS */
 					jgbl.mur_jrec_seqno = cs_addrs->hdr->reg_seqno = murgbl.consist_jnl_seqno;
-				if (rctl->jctl->jfh->crash && rctl->jctl->jfh->update_disabled)
-					/* Set resync_to_region seqno for a crash and update_disable case */
-					set_resync_to_region = TRUE;
+				VMS_ONLY(
+					if (rctl->jctl->jfh->crash && rctl->jctl->jfh->update_disabled)
+						/* Set resync_to_region seqno for a crash and update_disable case */
+						set_resync_to_region = TRUE;
+				)
 			}
 			assert(NULL != rctl->csa->nl);
 			assert(!mur_options.update || rctl->csa->nl->donotflush_dbjnl);
@@ -158,19 +177,44 @@ void	mur_close_files(void)
 						gtm_putmsg(VARLSTCNT(8) ERR_JNLSTATE, 6, LEN_AND_LIT(FILE_STR),
 							DB_LEN_STR(gv_cur_region),
 							LEN_AND_STR(jnl_state_lit[csd->jnl_state]));
-					if (NULL != rctl->jctl && mur_options.rollback && murgbl.consist_jnl_seqno)
-					{
-						if (set_resync_to_region)
+					UNIX_ONLY(
+						if (NULL != rctl->jctl && mur_options.rollback)
 						{
-							csd->resync_seqno = csd->reg_seqno;
-							if (mur_options.verbose)
-								gtm_putmsg(VARLSTCNT(6) ERR_SETREG2RESYNC, 4,
-								&csd->resync_seqno, &csd->reg_seqno, DB_LEN_STR(rctl->gd));
+							assert(murgbl.consist_jnl_seqno);
+							csd->reg_seqno = murgbl.consist_jnl_seqno;
+							/* Ensure zqgblmod_seqno never goes above the current reg_seqno. Also
+							 * ensure it gets set to non-zero value if instance was former root
+							 * primary and this is a fetchresync rollback.
+							 */
+							if ((csd->zqgblmod_seqno > murgbl.consist_jnl_seqno)
+								|| (!csd->zqgblmod_seqno
+									&& mur_options.fetchresync_port && murgbl.was_rootprimary))
+							{
+								csd->zqgblmod_seqno = murgbl.consist_jnl_seqno;
+								csd->zqgblmod_tn = csd->trans_hist.curr_tn;
+							}
+							if (REPL_PROTO_VER_DUALSITE == murgbl.remote_proto_ver)
+							{	/* Primary is Dualsite. Update "dualsite_resync_seqno" if needed */
+								if (csd->dualsite_resync_seqno > murgbl.consist_jnl_seqno)
+									csd->dualsite_resync_seqno = murgbl.consist_jnl_seqno;
+							}
 						}
-						csd->reg_seqno = murgbl.consist_jnl_seqno;
-						if (csd->resync_seqno > murgbl.consist_jnl_seqno)
-							csd->resync_seqno = murgbl.consist_jnl_seqno;
-					}
+					)
+					VMS_ONLY(
+						if (NULL != rctl->jctl && mur_options.rollback && murgbl.consist_jnl_seqno)
+						{
+							if (set_resync_to_region)
+							{
+								csd->resync_seqno = csd->reg_seqno;
+								if (mur_options.verbose)
+									gtm_putmsg(VARLSTCNT(6) ERR_SETREG2RESYNC, 4,
+									&csd->resync_seqno, &csd->reg_seqno, DB_LEN_STR(rctl->gd));
+							}
+							csd->reg_seqno = murgbl.consist_jnl_seqno;
+							if (csd->resync_seqno > murgbl.consist_jnl_seqno)
+								csd->resync_seqno = murgbl.consist_jnl_seqno;
+						}
+					)
 					csd->intrpt_recov_resync_seqno = 0;
 					csd->intrpt_recov_tp_resolve_time = 0;
 					csd->intrpt_recov_jnl_state = jnl_notallowed;
@@ -306,8 +350,36 @@ void	mur_close_files(void)
 	}
 	mur_close_file_extfmt();
 #if defined(UNIX)
+	/* If rollback, we better have the standalone lock. The only exception is if we could not get standalone access
+	 * (due to some other process still accessing the instance file and/or db/jnl). In that case "clean_exit" should be FALSE.
+	 */
+	assert(!mur_options.rollback || murgbl.repl_standalone || !murgbl.clean_exit);
 	if (mur_options.rollback && murgbl.repl_standalone)
 	{
+		if (murgbl.clean_exit && murgbl.consist_jnl_seqno)
+		{	/* The database has been successfully rolled back by the MUPIP JOURNAL ROLLBACK command.
+			 * Virtually truncate the triple history in the replication instance file if necessary.
+			 * Before that we need to get the ftok lock on the instance file as the truncate function requires that.
+			 */
+			repl_inst_ftok_sem_lock();
+			repl_inst_triple_truncate(murgbl.consist_jnl_seqno);
+				/* The above also updates "repl_inst_filehdr->jnl_seqno" and "repl_inst_filehdr->crash" */
+			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+			/* Reset seqnos in "gtmsrc_lcl" in case it is greater than seqno that the db is being rolled back to */
+			repl_inst_read(udi->fn, (off_t)REPL_INST_HDR_SIZE, (sm_uc_ptr_t)gtmsrc_lcl_array, GTMSRC_LCL_SIZE);
+			for (idx = 0; idx < NUM_GTMSRC_LCL; idx++)
+			{	/* Check if the slot is being used and only then check the resync_seqno */
+				if ('\0' != gtmsrc_lcl_array[idx].secondary_instname[0])
+				{
+					if (gtmsrc_lcl_array[idx].resync_seqno > murgbl.consist_jnl_seqno)
+						gtmsrc_lcl_array[idx].resync_seqno = murgbl.consist_jnl_seqno;
+					if (gtmsrc_lcl_array[idx].connect_jnl_seqno > murgbl.consist_jnl_seqno)
+						gtmsrc_lcl_array[idx].connect_jnl_seqno = murgbl.consist_jnl_seqno;
+				}
+			}
+			repl_inst_write(udi->fn, (off_t)REPL_INST_HDR_SIZE, (sm_uc_ptr_t)gtmsrc_lcl_array, GTMSRC_LCL_SIZE);
+			repl_inst_ftok_sem_release();
+		}
 		mu_replpool_remove_sem(FALSE);
 		murgbl.repl_standalone = FALSE;
 	}

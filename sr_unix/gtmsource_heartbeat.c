@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,12 +12,12 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_time.h"
+#include "gtm_inet.h"	/* Required for gtmsource.h */
+#include "gtm_stdio.h"
 
-#include <time.h>
 #include <sys/time.h>
 #include <errno.h>
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
 #endif
@@ -36,7 +36,6 @@
 #include "repl_dbg.h"
 #include "repl_log.h"
 #include "repl_errno.h"
-#include "gtm_stdio.h"
 #include "iosp.h"
 #include "gt_timer.h"
 #include "gtmsource_heartbeat.h"
@@ -129,7 +128,7 @@ int gtmsource_stop_heartbeat(void)
 	return (SS_NORMAL);
 }
 
-boolean_t gtmsource_is_heartbeat_overdue(time_t *now, repl_heartbeat_msg_t *overdue_heartbeat)
+boolean_t gtmsource_is_heartbeat_overdue(time_t *now, repl_heartbeat_msg_ptr_t overdue_heartbeat)
 {
 
 	repl_heartbeat_que_entry_t	*heartbeat_element;
@@ -169,6 +168,7 @@ int gtmsource_send_heartbeat(time_t *now)
 	int				tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int				status;					/* needed for REPL_{SEND,RECV}_LOOP */
 	unsigned char			seq_num_str[32], *seq_num_ptr;
+	gtmsource_local_ptr_t		gtmsource_local;
 
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
@@ -208,7 +208,7 @@ int gtmsource_send_heartbeat(time_t *now)
 	{
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while attempting to send heartbeat\n");
 		repl_close(&gtmsource_sock_fd);
-		gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+		gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 		return (SS_NORMAL);
 	}
 	if (EREPL_SEND == repl_errno)
@@ -222,7 +222,7 @@ int gtmsource_send_heartbeat(time_t *now)
 	GTMASSERT;
 }
 
-int gtmsource_process_heartbeat(repl_heartbeat_msg_t *heartbeat_msg)
+int gtmsource_process_heartbeat(repl_heartbeat_msg_ptr_t heartbeat_msg)
 {
 	repl_heartbeat_que_entry_t	*heartbeat_element;
 	seq_num				ack_seqno;
@@ -231,7 +231,6 @@ int gtmsource_process_heartbeat(repl_heartbeat_msg_t *heartbeat_msg)
 	unsigned char			seq_num_str[32], *seq_num_ptr;
 
 	QWASSIGN(ack_seqno, *(seq_num *)&heartbeat_msg->ack_seqno[0]);
-
 	REPL_DPRINT4("HEARTBEAT received with time %ld SEQNO "INT8_FMT" at %ld\n",
 		     *(time_t *)&heartbeat_msg->ack_time[0], INT8_PRINT(ack_seqno), time(NULL));
 

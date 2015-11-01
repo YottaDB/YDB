@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,5 +76,6 @@ int get_send_sock_buff_size(int sockfd, int *buflen);
 int get_recv_sock_buff_size(int sockfd, int *buflen);
 int set_send_sock_buff_size(int sockfd, int buflen);
 int set_recv_sock_buff_size(int sockfd, int buflen);
+void repl_log_conn_info(int sock_fd, FILE *log_fp);
 
 #endif /* REPL_COMM_H */

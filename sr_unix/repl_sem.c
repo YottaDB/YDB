@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,12 +11,12 @@
 
 #include "mdef.h"
 
+#include "gtm_inet.h"
+#include "gtm_fcntl.h"
+#include "gtm_unistd.h"
+
 #include <sys/sem.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <sys/mman.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
 
 #include "gdsroot.h"
@@ -50,6 +50,7 @@
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	recvpool_addrs		recvpool;
+GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 
 static struct	sembuf	sop[5];
 static		int	sem_set_id[NUM_SEM_SETS] = {0, 0};
@@ -64,27 +65,38 @@ boolean_t sem_set_exists(int which_set)
 int init_sem_set_source(sem_key_t key, int nsems, permissions_t sem_flags)
 {
 	sem_set_id[SOURCE] = semget(key, nsems, sem_flags);
+	holds_sem[SOURCE][JNL_POOL_ACCESS_SEM] = FALSE;
+	holds_sem[SOURCE][SRC_SERV_COUNT_SEM] = FALSE;
 	return sem_set_id[SOURCE];
 }
 void set_sem_set_src(int semid)
 {
 	sem_set_id[SOURCE] = semid;
+	holds_sem[SOURCE][JNL_POOL_ACCESS_SEM] = FALSE;
+	holds_sem[SOURCE][SRC_SERV_COUNT_SEM] = FALSE;
 }
 int init_sem_set_recvr(sem_key_t key, int nsems, permissions_t sem_flags)
 {
 	sem_set_id[RECV] = semget(key, nsems, sem_flags);
+	holds_sem[RECV][RECV_POOL_ACCESS_SEM] = FALSE;
+	holds_sem[RECV][RECV_SERV_COUNT_SEM] = FALSE;
+	holds_sem[RECV][UPD_PROC_COUNT_SEM] = FALSE;
 	return sem_set_id[RECV];
 }
 void set_sem_set_recvr(int semid)
 {
 	sem_set_id[RECV] = semid;
+	holds_sem[RECV][RECV_POOL_ACCESS_SEM] = FALSE;
+	holds_sem[RECV][RECV_SERV_COUNT_SEM] = FALSE;
+	holds_sem[RECV][UPD_PROC_COUNT_SEM] = FALSE;
 }
-
 
 int grab_sem(int set_index, int sem_num)
 {
 	int rc;
 
+	assert(NUM_SRC_SEMS == NUM_RECV_SEMS);	/* holds_sem[][] relies on this as it uses NUM_SRC_SEMS in the array definition */
+	assert(!holds_sem[set_index][sem_num]);
 	ASSERT_SET_INDEX;
 	sop[0].sem_op  = 0; /* Wait for 0 */
 	sop[0].sem_num = sem_num;
@@ -92,6 +104,20 @@ int grab_sem(int set_index, int sem_num)
 	sop[1].sem_num = sem_num;
 	sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO;
 	SEMOP(sem_set_id[set_index], sop, 2, rc);
+	if (0 == rc)
+		holds_sem[set_index][sem_num] = TRUE;
+	return rc;
+}
+
+int incr_sem(int set_index, int sem_num)
+{
+	int rc;
+
+	ASSERT_SET_INDEX;
+	sop[0].sem_op  = 1; /* Increment it */
+	sop[0].sem_num = sem_num;
+	sop[0].sem_flg = SEM_UNDO;
+	SEMOP(sem_set_id[set_index], sop, 1, rc);
 	return rc;
 }
 
@@ -99,16 +125,20 @@ int grab_sem_all_source()
 {
 	int rc;
 
+	assert(!holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	sop[0].sem_op  = 0; /* Wait for 0 */
 	sop[0].sem_num = JNL_POOL_ACCESS_SEM;
 	sop[1].sem_op  = 1; /* Increment it */
 	sop[1].sem_num = JNL_POOL_ACCESS_SEM;
 	sop[2].sem_op  = 1; /* Increment it */
 	sop[2].sem_num = SRC_SERV_COUNT_SEM;
-	sop[3].sem_op  = 1; /* Increment it */
-	sop[3].sem_num = SRC_SERV_OPTIONS_SEM;
-	sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = sop[3].sem_flg = SEM_UNDO;
-	SEMOP(sem_set_id[SOURCE], sop, 4, rc);
+	sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = SEM_UNDO;
+	SEMOP(sem_set_id[SOURCE], sop, 3, rc);
+	if (0 == rc)
+	{
+		holds_sem[SOURCE][JNL_POOL_ACCESS_SEM] = TRUE;
+		holds_sem[SOURCE][SRC_SERV_COUNT_SEM] = TRUE;
+	}
 	return rc;
 }
 
@@ -116,6 +146,7 @@ int grab_sem_all_receive()
 {
 	int rc;
 
+	assert(!holds_sem[RECV][RECV_POOL_ACCESS_SEM]);
 	sop[0].sem_op  = 0; /* Wait for 0 */
 	sop[0].sem_num = RECV_POOL_ACCESS_SEM;
 	sop[1].sem_op  = 1; /* Increment it */
@@ -128,6 +159,13 @@ int grab_sem_all_receive()
 	sop[4].sem_num = RECV_SERV_OPTIONS_SEM;
 	sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = sop[3].sem_flg = sop[4].sem_flg = SEM_UNDO;
 	SEMOP(sem_set_id[RECV], sop, 5, rc);
+	if (0 == rc)
+	{
+		holds_sem[RECV][RECV_POOL_ACCESS_SEM] = TRUE;
+		holds_sem[RECV][RECV_SERV_COUNT_SEM] = TRUE;
+		holds_sem[RECV][UPD_PROC_COUNT_SEM] = TRUE;
+		holds_sem[RECV][RECV_SERV_OPTIONS_SEM] = TRUE;
+	}
 	return rc;
 }
 
@@ -136,25 +174,45 @@ int grab_sem_immediate(int set_index, int sem_num)
 	int rc;
 
 	ASSERT_SET_INDEX;
+	assert(!holds_sem[set_index][sem_num]);
 	sop[0].sem_op  = 0; /* Wait for 0 */
 	sop[0].sem_num = sem_num;
 	sop[1].sem_op  = 1; /* Increment it */
 	sop[1].sem_num = sem_num;
 	sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO | IPC_NOWAIT;
 	SEMOP(sem_set_id[set_index], sop, 2, rc);
+	if (0 == rc)
+		holds_sem[set_index][sem_num] = TRUE;
 	return rc;
 }
 
 int rel_sem(int set_index, int sem_num)
 {
+	int	rc;
+
 	ASSERT_SET_INDEX;
-	return(do_semop(sem_set_id[set_index], sem_num, -1, SEM_UNDO));
+	assert(holds_sem[set_index][sem_num]);
+	rc = do_semop(sem_set_id[set_index], sem_num, -1, SEM_UNDO);
+	if (0 == rc)
+		holds_sem[set_index][sem_num] = FALSE;
+	return rc;
+}
+
+int decr_sem(int set_index, int sem_num)
+{
+	return rel_sem(set_index, sem_num);
 }
 
 int rel_sem_immediate(int set_index, int sem_num)
 {
+	int	rc;
+
 	ASSERT_SET_INDEX;
-	return(do_semop(sem_set_id[set_index], sem_num, -1, SEM_UNDO | IPC_NOWAIT));
+	assert(holds_sem[set_index][sem_num]);
+	rc = do_semop(sem_set_id[set_index], sem_num, -1, SEM_UNDO | IPC_NOWAIT);
+	if (0 == rc)
+		holds_sem[set_index][sem_num] = FALSE;
+	return rc;
 }
 
 int get_sem_info(int set_index, int sem_num, sem_info_type info_id)
@@ -166,11 +224,15 @@ int get_sem_info(int set_index, int sem_num, sem_info_type info_id)
 
 int remove_sem_set(int set_index)
 {
-	int rc;
+	int rc, i;
 
 	ASSERT_SET_INDEX;
 	rc = sem_rmid(sem_set_id[set_index]);
 	if (!rc) /* successful removal of sem set */
+	{
 		sem_set_id[set_index] = 0;
+		for (i = 0; i < NUM_SRC_SEMS; i++)
+			holds_sem[set_index][i] = FALSE;
+	}
 	return rc;
 }

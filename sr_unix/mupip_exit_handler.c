@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,8 +85,6 @@ GBLREF int			gtmrecv_statslog_fd;
 GBLREF FILE			*gtmrecv_statslog_fp;
 GBLREF int			updproc_log_fd;
 GBLREF int			updhelper_log_fd;
-GBLREF int			gtmsource_srv_count;
-GBLREF int			gtmrecv_srv_count;
 GBLREF gd_region		*standalone_reg;
 GBLREF gd_region		*gv_cur_region;
 GBLREF gd_region		*ftok_sem_reg;
@@ -99,6 +97,7 @@ void mupip_exit_handler(void)
 {
 	char		err_log[1024];
         unix_db_info   	*udi;
+	FILE		*fp;
 
 	if (exit_handler_active)	/* Don't recurse if exit handler exited */
 		return;
@@ -170,16 +169,26 @@ void mupip_exit_handler(void)
 				ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
 		}
 	}
-	/* log the exit of replication servers */
+	/* Log the exit of replication servers. In case they are exiting abnormally, their log file pointers
+	 * might not be set up. In that case, use "stderr" for logging.
+	 */
 	if (is_src_server)
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server exiting...\n");
-	else if (is_rcvr_server)
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Receiver server exiting...\n");
-	else if (is_updproc)
-		repl_log(updproc_log_fp, TRUE, TRUE, "Update process exiting...\n");
-	else if (is_updhelper)
-		repl_log(updhelper_log_fp, TRUE, TRUE, "Helper exiting...\n");
-	else
+	{
+		fp = (NULL != gtmsource_log_fp) ? gtmsource_log_fp : stderr;
+		repl_log(fp, TRUE, TRUE, "Source server exiting...\n\n");
+	} else if (is_rcvr_server)
+	{
+		fp = (NULL != gtmrecv_log_fp) ? gtmrecv_log_fp : stderr;
+		repl_log(fp, TRUE, TRUE, "Receiver server exiting...\n\n");
+	} else if (is_updproc)
+	{
+		fp = (NULL != updproc_log_fp) ? updproc_log_fp : stderr;
+		repl_log(fp, TRUE, TRUE, "Update process exiting...\n\n");
+	} else if (is_updhelper)
+	{
+		fp = (NULL != updhelper_log_fp) ? updhelper_log_fp : stderr;
+		repl_log(fp, TRUE, TRUE, "Helper exiting...\n\n");
+	} else
 		mu_reset_term_characterstics(); /* the replication servers use files for output/error, not terminal */
 	util_out_close();
 	close_repl_logfiles();

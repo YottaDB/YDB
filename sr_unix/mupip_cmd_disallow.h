@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@ boolean_t cli_disallow_mupip_integ(void);
 boolean_t cli_disallow_mupip_journal(void);
 boolean_t cli_disallow_mupip_reorg(void);
 boolean_t cli_disallow_mupip_replicate(void);
+boolean_t cli_disallow_mupip_replic_editinst(void);
 boolean_t cli_disallow_mupip_replic_receive(void);
 boolean_t cli_disallow_mupip_replic_source(void);
 boolean_t cli_disallow_mupip_replic_updhelper(void);

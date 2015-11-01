@@ -35,6 +35,7 @@ gtmsource_exit
 gtmsource_flush_fh
 gtmsource_get_opt
 gtmsource_heartbeat
+gtmsource_jnlpool
 gtmsource_mode_change
 gtmsource_poll_actions
 gtmsource_process
@@ -42,7 +43,7 @@ gtmsource_process_ops
 gtmsource_readfiles
 gtmsource_readpool
 gtmsource_reinit_logseqno
-gtmsource_secnd_update
+gtmsource_rootprimary_init
 gtmsource_seqno_init
 gtmsource_showbacklog
 gtmsource_shutdown
@@ -53,13 +54,13 @@ jnl2ext
 jnl_setver
 jnl_v12tov15
 jnl_v12tov16
+jnl_v12tov17
 jnl_v15tov12
 jnl_v15tov16
+jnl_v15tov17
 jnl_v16tov12
 jnl_v16tov15
 jnl_v16tov16
-jnl_v12tov17
-jnl_v15tov17
 jnl_v17tov12
 jnl_v17tov15
 jnl_v17tov17
@@ -197,6 +198,9 @@ read_db_files_from_gld
 recvpool_init
 repl_comm
 repl_filter
+repl_inst_create
+repl_inst_dump
+repl_inst_edit
 repl_ipc_cleanup
 repl_log
 repl_log_init

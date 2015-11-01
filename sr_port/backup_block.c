@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,15 +56,10 @@ boolean_t backup_block(block_id blk, cache_rec_ptr_t backup_cr, sm_uc_ptr_t back
 	sbufh_p = cs_addrs->shmpool_buffer;
 	assert(bsiz <= sbufh_p->blk_size);
 
-	/* Obtain block from shared memory pool. If we can't get the block, then backup will be
-	   effectively terminated.
-	*/
+	/* Obtain block from shared memory pool. If we can't get the block, then backup will be effectively terminated. */
 	sblkh_p = shmpool_blk_alloc(gv_cur_region, SHMBLK_BACKUP);
 	if ((shmpool_blk_hdr_ptr_t)-1 == sblkh_p)
-	{
-		assert(FALSE);	/* Backup died for whatever reason */
-		return FALSE;	/* Backup failure already dealt with in shmpool_blk_alloc() */
-	}
+		return FALSE;	/* Backup died for whatever reason. Backup failure already dealt with in shmpool_blk_alloc() */
 
 	/* Fill the block we have been assigned in before marking it valid */
 	sblkh_p->blkid = blk;

@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2001, 2003 Sanchez Computer Associates, Inc.  *
+ *      Copyright 2001, 2006 Fidelity Information Services, Inc  *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -47,3 +47,6 @@ JNL_TABLE_ENTRY (JRT_TZKILL, mur_extract_set,  "TZKILL ", ZKILLREC|TUPDREC, FALS
 JNL_TABLE_ENTRY (JRT_UZKILL, mur_extract_set,  "UZKILL ", ZKILLREC|UUPDREC, FALSE, TRUE)   /* 24: Like TZKILL, but not the first */
 JNL_TABLE_ENTRY (JRT_INCTN,  mur_extract_inctn,"INCTN  ", NA,               TRUE,  FALSE)  /* 25: Increment curr_tn only, no logical update */
 JNL_TABLE_ENTRY (JRT_AIMG,   mur_extract_blk,  "AIMG   ", NA,               FALSE, FALSE)  /* 26: After-image physical journal transaction */
+JNL_TABLE_ENTRY (JRT_TRIPLE, NULL,             "TRIPLE ", NA,               TRUE,  TRUE)   /* 27: A REPL_NEW_TRIPLE message minus the 8-byte message
+											    *     header ("type" and "len"). Only used in the
+											    *     replication pipe. Never part of a journal file. */

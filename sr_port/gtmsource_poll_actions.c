@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,13 +77,13 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Shutdown signalled\n");
 		gtmsource_end(); /* Won't return */
 	}
-	if (GTMSOURCE_CHANGING_MODE !=  gtmsource_state && GTMSOURCE_MODE_PASSIVE == gtmsource_local->mode)
+	if (GTMSOURCE_CHANGING_MODE != gtmsource_state && GTMSOURCE_MODE_PASSIVE == gtmsource_local->mode)
 	{
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Changing mode from ACTIVE to PASSIVE\n");
 		gtmsource_state = GTMSOURCE_CHANGING_MODE;
+		UNIX_ONLY(gtmsource_local->gtmsource_state = gtmsource_state;)
 		return (SS_NORMAL);
 	}
-
 	if (poll_secondary && GTMSOURCE_CHANGING_MODE != gtmsource_state && GTMSOURCE_WAITING_FOR_CONNECTION != gtmsource_state)
 	{
 		now = gtmsource_now;
@@ -100,6 +100,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 			repl_close(&gtmsource_sock_fd);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 			gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+			UNIX_ONLY(gtmsource_local->gtmsource_state = gtmsource_state;)
 			return (SS_NORMAL);
 		}
 
@@ -111,7 +112,6 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 				return (SS_NORMAL);
 		}
 	}
-
 	if (0 != gtmsource_local->changelog)
 	{
 		if (gtmsource_local->changelog & REPLIC_CHANGE_LOGINTERVAL)

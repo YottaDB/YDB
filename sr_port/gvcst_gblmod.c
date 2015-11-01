@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,9 +50,14 @@ bool	gvcst_gblmod(mval *v)
 		gblmod = TRUE;
 		if (cdb_sc_normal == (status = gvcst_search(gv_currkey, NULL)))
 		{
-			if (cs_addrs->hdr->resync_tn >= ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->tn)
-				gblmod = FALSE;
-
+			VMS_ONLY(
+				if (cs_addrs->hdr->resync_tn >= ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->tn)
+					gblmod = FALSE;
+			)
+			UNIX_ONLY(
+				if (cs_addrs->hdr->zqgblmod_tn > ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->tn)
+					gblmod = FALSE;
+			)
 			if (0 == dollar_tlevel)
 			{
 				if ((trans_num)0 == t_end(&gv_target->hist, NULL))

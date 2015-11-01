@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,8 @@
 
 #include "mdef.h"
 
-#include <string.h>
 #include "gtm_string.h"
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 
 #include "stp_parms.h"
 #include "gdsroot.h"
@@ -50,10 +49,10 @@
 #include "repl_instance.h"
 #include "mu_rndwn_repl_instance.h"
 
-GBLDEF bool		in_backup;
-GBLREF tp_region	*grlist;
-GBLREF gd_region	*gv_cur_region;
-GBLREF boolean_t	mu_star_specified;
+GBLDEF	bool		in_backup;
+GBLREF	tp_region	*grlist;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	boolean_t	mu_star_specified;
 
 #define	TMP_BUF_LEN	50
 
@@ -131,7 +130,7 @@ void mupip_rundown(void)
 		}
 		if (region && mu_star_specified)		/* rundown repl pools belonging to this global directory */
 		{
-			if (repl_inst_get_name((char *)replpool_id.instname, &full_len, sizeof(replpool_id.instname)))
+			if (repl_inst_get_name((char *)replpool_id.instfilename, &full_len, sizeof(replpool_id.instfilename)))
 				if (!mu_rndwn_repl_instance(&replpool_id, TRUE))
 					exit_status = ERR_MUNOTALLSEC;
 		}

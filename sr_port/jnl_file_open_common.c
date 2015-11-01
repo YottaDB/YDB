@@ -196,8 +196,10 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	jb->next_epoch_time = MID_TIME(prc_vec->jpv_time) + jb->epoch_interval;
 	memcpy(&header.who_opened, prc_vec, sizeof(jnl_process_vector));
 	header.crash = TRUE;	/* in case this processes is crashed, this will remain TRUE */
-	if (REPL_ENABLED(csd) && pool_init)
-		header.update_disabled = jnlpool_ctl->upd_disabled;
+	VMS_ONLY(
+		if (REPL_ENABLED(csd) && pool_init)
+			header.update_disabled = jnlpool_ctl->upd_disabled;
+	)
 	DO_FILE_WRITE(jpc->channel, 0, &header, JNL_HDR_LEN, jpc->status, jpc->status2);
 	if (SS_NORMAL != jpc->status)
 		return ERR_JNLWRERR;

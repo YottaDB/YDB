@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,6 +75,7 @@ boolean_t mu_int_fhead(void)
 			mu_int_err(ERR_DBINCRVER, 0, 0, 0, 0, 0, 0, 0);
 		return FALSE;
 	}
+	UNIX_ONLY(CHECK_DB_ENDIAN(mu_data, gv_cur_region->dyn.addr->fname_len, gv_cur_region->dyn.addr->fname));
 	if (mu_data->start_vbn < DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data), DISK_BLOCK_SIZE))
 	{
 		mu_int_err(ERR_DBSVBNMIN, 0, 0, 0, 0, 0, 0, 0);

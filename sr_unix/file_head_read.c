@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,6 +81,7 @@ boolean_t file_head_read(char *fn, sgmnt_data_ptr_t header, int4 len)
  		CLOSEFILE(fd, save_errno);
 		return FALSE;
 	}
+	CHECK_DB_ENDIAN(header, strlen(fn), fn);
 	assert(MASTER_MAP_SIZE_MAX >= MASTER_MAP_SIZE(header));
 	assert(SGMNT_HDR_LEN == len || SIZEOF_FILE_HDR(header) <= len);
 	if (SIZEOF_FILE_HDR(header) <= len)

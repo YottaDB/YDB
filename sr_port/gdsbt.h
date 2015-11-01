@@ -289,9 +289,9 @@ typedef struct node_local_struct
 			 */
 	boolean_t	donotflush_dbjnl; /* whether database and journal can be flushed to disk or not (TRUE for mupip recover) */
 	int4		n_pre_read;
-	char		replinstname[MAX_FN_LEN + 1];	/* 256 : Name of the replication instance corresponding to this database.
-							 *       In VMS, this is the name of the corresponding global directory.
-							 */
+	char		replinstfilename[MAX_FN_LEN + 1];/* 256 : Name of the replication instance file corresponding to this db.
+							  *       In VMS, this is the name of the corresponding global directory.
+							  */
 } node_local;
 
 #ifdef DEBUG

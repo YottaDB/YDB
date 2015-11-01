@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,13 +32,25 @@
 #include "str_match.h"
 #include "mu_getlst.h"
 
-GBLDEF	mstr		directory;
-GBLDEF	bool 		is_directory;
-GBLREF 	bool		error_mupip;
-GBLREF 	bool		in_backup;
-GBLREF	gd_addr 	*gd_header;
-GBLREF	tp_region	*grlist;
-GBLREF	boolean_t	mu_star_specified;
+GBLDEF	mstr			directory;
+GBLDEF	bool			is_directory;
+
+GBLREF 	bool			error_mupip;
+GBLREF 	bool			in_backup;
+GBLREF	gd_addr			*gd_header;
+GBLREF	tp_region		*grlist;
+GBLREF	boolean_t		mu_star_specified;
+GBLREF	backup_reg_list		*mu_repl_inst_reg_list;
+GBLREF	unsigned int		parms_cnt;			/* Number of parameters specified in command line */
+
+#define	CHECK_IF_NOT_ABSENT(QUALIFIER)										\
+{														\
+	if (CLI_ABSENT != cli_present(QUALIFIER))								\
+	{													\
+		util_out_print(QUALIFIER " cannot be specified without specifying a backup region", TRUE);	\
+		mupip_exit(ERR_MUPCLIERR);									\
+	}													\
+}
 
 void mu_getlst(char *name, int4 size)
 {
@@ -48,21 +60,67 @@ void mu_getlst(char *name, int4 size)
 	tp_region	*list;
 	boolean_t	matched;
 
-	error_def(ERR_MUNODBNAME);
 	error_def(ERR_MUBCKNODIR);
 	error_def(ERR_MUNOACTION);
+	error_def(ERR_MUNODBNAME);
+	error_def(ERR_MUPCLIERR);
 	error_def(ERR_TEXT);
 
 	mu_star_specified = FALSE;
 	assert(size > 0);
 	rlen = sizeof(rbuff);
 	flen = sizeof(fbuff);
-	if (!cli_get_str(name, rbuff, &rlen))
-		mupip_exit(ERR_MUNODBNAME);
-	if (in_backup && ((!cli_get_str("SAVE_DIR", fbuff, &flen)) || (0 == flen)))
-		mupip_exit(ERR_MUBCKNODIR);
 
 	is_directory = FALSE;
+	if (!in_backup)
+	{
+		if (!cli_get_str(name, rbuff, &rlen))
+			mupip_exit(ERR_MUNODBNAME);
+	} else
+	{
+		if (CLI_PRESENT == cli_present("REPLINSTANCE"))
+		{	/* Region corresponding to the replication instance file has been specified. */
+			if (0 == parms_cnt)
+			{	/* No REG_NAME or SAVE_DIR parameter specified in command line. Disable other backup qualifiers. */
+				CHECK_IF_NOT_ABSENT("BKUPDBJNL");
+				CHECK_IF_NOT_ABSENT("BYTESTREAM");
+				CHECK_IF_NOT_ABSENT("COMPREHENSIVE");
+				CHECK_IF_NOT_ABSENT("DATABASE");
+				CHECK_IF_NOT_ABSENT("DBG");
+				CHECK_IF_NOT_ABSENT("INCREMENTAL");
+				CHECK_IF_NOT_ABSENT("JOURNAL");
+				CHECK_IF_NOT_ABSENT("NETTIMEOUT");
+				CHECK_IF_NOT_ABSENT("NEWJNLFILES");
+				CHECK_IF_NOT_ABSENT("ONLINE");
+				CHECK_IF_NOT_ABSENT("RECORD");
+				CHECK_IF_NOT_ABSENT("REPLICATION");
+				CHECK_IF_NOT_ABSENT("SINCE");
+				CHECK_IF_NOT_ABSENT("TRANSACTION");
+			}
+			assert(NULL == mu_repl_inst_reg_list);
+			if (NULL == mu_repl_inst_reg_list)
+				mu_repl_inst_reg_list = malloc(sizeof(backup_reg_list));
+			if ((!cli_get_str("REPLINSTANCE", fbuff, &flen)) || (0 == flen))
+			{
+				util_out_print("Error parsing REPLINSTANCE qualifier", TRUE);
+				mupip_exit(ERR_MUPCLIERR);
+			}
+			if (FALSE == mubgetfil(mu_repl_inst_reg_list, fbuff, flen))
+				return;
+			/* Do not let the db region backup destination list be affected if -replinstance had directory specified */
+			is_directory = FALSE;
+		}
+		if ((0 == parms_cnt) && mu_repl_inst_reg_list)
+		{	/* -REPLINSTANCE was specified and no other parameters were specified. Do not bother prompting
+			 * the user to enter values for REG_NAME and SAVE_DIR parameters. */
+			return;
+		}
+		if (!cli_get_str(name, rbuff, &rlen))
+			mupip_exit(ERR_MUNODBNAME);
+		flen = sizeof(fbuff);	/* reset max_buflen to original before call to "cli_get_str" */
+		if ((!cli_get_str("SAVE_DIR", fbuff, &flen)) || (0 == flen))
+			mupip_exit(ERR_MUBCKNODIR);
+	}
 	for (c1 = c2 = rbuff, c3 = c4 = fbuff;;)
 	{
 		for (; *c2 && (*c2 != ','); c2++) /* locate a reg spec */
@@ -90,10 +148,8 @@ void mu_getlst(char *name, int4 size)
 					if ((FALSE == in_backup) || (0 != ((backup_reg_list *)list)->backup_file.len))
 						continue;
 					if (TRUE == is_directory)
-					{
-						assert(NULL != grlist->fPtr);
 						mubexpfilnam(directory.addr, directory.len, (backup_reg_list *)list);
-					} else
+					else
 					{
 						for (; *c4 && (*c4 != ',');  c4++) /* locate a file spec */
 							;

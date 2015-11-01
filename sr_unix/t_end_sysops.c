@@ -84,6 +84,7 @@ GBLDEF	int4			*get_space_fail_array;	/* gbldefed to be accessilbe in a pro core 
 GBLDEF	int4			get_space_fail_arridx;	/* gbldefed to be accessilbe in a pro core */
 
 GBLREF	volatile int4		crit_count;
+GBLREF	volatile boolean_t	in_mutex_deadlock_check;
 GBLREF	bool			certify_all_blocks;
 GBLREF	bool			run_time;
 GBLREF	uint4			process_id;
@@ -1421,6 +1422,9 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	   We don't want to do expensive IO flushing if:
 	   1) We are in the midst of lseek/read/write IO. This could reset an lseek.
 	   2) We are aquiring crit in any of our regions.
+	      Note that the function "mutex_deadlock_check" resets crit_count to 0 temporarily even though we
+	      might actually be in the midst of acquiring crit. Therefore we should not interrupt mainline code
+	      if we are in the "mutex_deadlock_check" as otherwise it presents reentrancy issues.
 	   3) We have crit in any region. Assumption is that if region we were in was not crit, we're clear.
 	      This is not strictly true in some special TP cases on the final retry if the previous retry did
 	      not get far enough into the transaction to cause all regions to be locked down but this case is
@@ -1428,7 +1432,7 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	   4) We are in a "fast lock".
 	   **************************************************************************************************/
 	GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);
-	if ((0 == crit_count)
+	if ((0 == crit_count) && !in_mutex_deadlock_check
 		NOPIO_ONLY(&& (FALSE == lseekIoInProgress_flag))
 		&& (NULL == check_csaddrs || FALSE == check_csaddrs->now_crit)
 		&& (0 == fast_lock_count))

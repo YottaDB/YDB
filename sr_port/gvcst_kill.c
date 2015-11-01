@@ -76,6 +76,7 @@ GBLREF	boolean_t		need_kip_incr;
 GBLREF	boolean_t		is_replicator;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	int4			update_trans;
+GBLREF	jnlpool_addrs		jnlpool;
 
 void	gvcst_kill(bool do_subtree)
 {
@@ -93,7 +94,8 @@ void	gvcst_kill(bool do_subtree)
 	srch_hist		*alt_hist;
 	srch_blk_status		*left,*right;
 	srch_rec_status		*left_rec_stat, local_srch_rec;
-	sm_uc_ptr_t		jnlpool_instname;
+	sm_uc_ptr_t		jnlpool_instfilename;
+	unsigned char		instfilename_copy[MAX_FN_LEN + 1];
 
 	error_def(ERR_SCNDDBNOUPD);
 	error_def(ERR_REPLINSTMISMTCH);
@@ -106,12 +108,29 @@ void	gvcst_kill(bool do_subtree)
 		if (!cs_addrs->replinst_matches_db)
 		{
 			if (jnlpool_ctl->upd_disabled && !is_updproc)
+			{	/* Updates are disabled in this journal pool. Detach from journal pool and issue error. */
+				assert(NULL != jnlpool.jnlpool_ctl);
+				jnlpool_detach();
+				assert(NULL == jnlpool.jnlpool_ctl);
+				assert(FALSE == pool_init);
 				rts_error(VARLSTCNT(1) ERR_SCNDDBNOUPD);
-			UNIX_ONLY(jnlpool_instname = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.instname;)
-			VMS_ONLY(jnlpool_instname = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.gtmgbldir;)
-			if (STRCMP(cs_addrs->nl->replinstname, jnlpool_instname))
-				rts_error(VARLSTCNT(8) ERR_REPLINSTMISMTCH, 6, LEN_AND_STR(jnlpool_instname),
-					DB_LEN_STR(gv_cur_region), LEN_AND_STR(cs_addrs->nl->replinstname));
+			}
+			UNIX_ONLY(jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.instfilename;)
+			VMS_ONLY(jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.gtmgbldir;)
+			if (STRCMP(cs_addrs->nl->replinstfilename, jnlpool_instfilename))
+			{	/* Replication instance file mismatch. Issue error. But before that detach from journal pool.
+				 * Copy replication instance file name in journal pool to temporary memory before detaching.
+				 */
+				UNIX_ONLY(assert(sizeof(instfilename_copy) == sizeof(jnlpool_ctl->jnlpool_id.instfilename));)
+				VMS_ONLY(assert(sizeof(instfilename_copy) == sizeof(jnlpool_ctl->jnlpool_id.gtmgbldir));)
+				memcpy(&instfilename_copy[0], jnlpool_instfilename, sizeof(instfilename_copy));
+				assert(NULL != jnlpool.jnlpool_ctl);
+				jnlpool_detach();
+				assert(NULL == jnlpool.jnlpool_ctl);
+				assert(FALSE == pool_init);
+				rts_error(VARLSTCNT(8) ERR_REPLINSTMISMTCH, 6, LEN_AND_STR(instfilename_copy),
+					DB_LEN_STR(gv_cur_region), LEN_AND_STR(cs_addrs->nl->replinstfilename));
+			}
 			cs_addrs->replinst_matches_db = TRUE;
 		}
 	}

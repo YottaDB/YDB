@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,9 +48,6 @@ static	const	char	statistics_fao[] = "   !5AZ    !7UL";
 static  const   char	statistics_header[] = "!/Record type    Count";
 static  const   char 	dashes_fao[] = "!#*-";
 
-#define	LONG_TIME_FORMAT	0
-#define	SHORT_TIME_FORMAT	1
-
 #define DOUBLE_ARG(X)	X,X
 
 #define	PRINT_SHOW_HEADER(jctl)												\
@@ -72,7 +69,7 @@ static	const	char proc_fao[] =
 #define	TIME_DISPLAY_FAO	"!20AD"
 
 /* Convert a time value to a string in the TIME_FORMAT_STRING's format.  this routine currently does not handle $h printing */
-static int	format_time(jnl_proc_time proc_time, char *string, int string_len, int time_format)
+int	format_time(jnl_proc_time proc_time, char *string, int string_len, int time_format)
 {
 	jnl_proc_time	long_time;
 
@@ -126,7 +123,7 @@ static	const	char proc_fao[] =
 #define	TIME_DISPLAY_FAO	" !19AD"
 
 /* Convert a time value to a string in the TIME_FORMAT_STRING's format */
-static int	format_time(jnl_proc_time proc_time, char *string, int string_len, int time_format)
+int	format_time(jnl_proc_time proc_time, char *string, int string_len, int time_format)
 {
 	time_t		short_time, seconds;
 	struct tm	*tsp;
@@ -200,7 +197,9 @@ void	mur_show_header(jnl_ctl_list * jctl)
 	assert(!REPL_WAS_ENABLED(hdr));
 	util_out_print(" Replication State                        !8AD", TRUE, 8,
 		(hdr->repl_state == repl_closed ? "  CLOSED" : (hdr->repl_state == repl_open ? "    OPEN" : "WAS_OPEN")));
+#ifdef VMS
 	util_out_print(" Updates Disabled on Secondary               !AD", TRUE, 5, (hdr->update_disabled ? " TRUE" : "FALSE"));
+#endif
 	util_out_print(" Jnlfile SwitchLimit              !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->autoswitchlimit));
 	util_out_print(" Jnlfile Allocation               !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->jnl_alq));
 	util_out_print(" Jnlfile Extension                !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->jnl_deq));
@@ -319,7 +318,15 @@ void	mur_output_show()
 				util_out_print((caddr_t)statistics_header, TRUE);
 				util_out_print((caddr_t)dashes_fao, TRUE, STR_LIT_LEN(statistics_header));
 				for (rectype = JRT_BAD;  rectype < JRT_RECTYPES;  ++rectype)
-					util_out_print((caddr_t)statistics_fao, TRUE, jrt_label[rectype], jctl->jnlrec_cnt[rectype]);
+				{
+					if (JRT_TRIPLE == rectype)
+					{
+						assert(0 == jctl->jnlrec_cnt[rectype]);
+						continue;
+					}
+					util_out_print((caddr_t)statistics_fao, TRUE,
+						jrt_label[rectype], jctl->jnlrec_cnt[rectype]);
+				}
 			}
 			jctl = jctl->next_gen;
 			if ((CLI_PRESENT == cli_present("SHOW")) || !first_time)

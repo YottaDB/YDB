@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,24 +47,33 @@
 #include "util.h"
 #include "ftok_sems.h"
 #include "semwt2long_handler.h"
+#include "repl_sem.h"
+#include "jnl.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include "gtmrecv.h"
 
-GBLREF gd_region		*gv_cur_region;
-GBLREF uint4			process_id;
-GBLREF enum gtmImageTypes	image_type;
-GBLREF boolean_t		sem_incremented;
-GBLREF gd_region		*ftok_sem_reg;
-GBLREF volatile boolean_t 	semwt2long;
-GBLREF boolean_t		gtm_environment_init;
-GBLREF gd_region		*standalone_reg;
-GBLREF int4			exi_condition;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	uint4			process_id;
+GBLREF	enum gtmImageTypes	image_type;
+GBLREF	boolean_t		sem_incremented;
+GBLREF	gd_region		*ftok_sem_reg;
+GBLREF	volatile boolean_t	semwt2long;
+GBLREF	boolean_t		gtm_environment_init;
+GBLREF	gd_region		*standalone_reg;
+GBLREF	int4			exi_condition;
+GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	recvpool_addrs		recvpool;
+GBLREF	jnl_gbls_t		jgbl;
 
 static struct sembuf		ftok_sop[3];
 static int			ftok_sopcnt;
 
-#define MAX_SEM_DSE_WT      	(1000 * 30)		/* 30 second wait to acquire access control semaphore */
-#define MAX_SEM_WT      	(1000 * 60)		/* 60 second wait to acquire access control semaphore */
-#define MAX_RES_TRIES  	 	620
-#define OLD_VERSION_SEM_PER_SET 2
+#define	MAX_SEM_DSE_WT		(1000 * 30)		/* 30 second wait to acquire access control semaphore */
+#define	MAX_SEM_WT		(1000 * 60)		/* 60 second wait to acquire access control semaphore */
+#define	MAX_RES_TRIES		620
+#define	OLD_VERSION_SEM_PER_SET 2
 
 /*
  * Description:
@@ -81,25 +90,31 @@ static int			ftok_sopcnt;
  */
 boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boolean_t immediate)
 {
-	int			sem_wait_time, sem_pid, save_errno;
-        int4            	status;
-        uint4           	lcnt;
-        unix_db_info    	*udi;
-	union semun		semarg;
+	int		sem_wait_time, sem_pid, save_errno;
+	int4		status;
+	uint4		lcnt;
+	unix_db_info	*udi;
+	union semun	semarg;
 
 	error_def(ERR_FTOKERR);
-        error_def(ERR_CRITSEMFAIL);
+	error_def(ERR_CRITSEMFAIL);
 	error_def(ERR_SEMWT2LONG);
 	error_def(ERR_SEMKEYINUSE);
 	error_def(ERR_SYSCALL);
 
 	assert(reg);
-        udi = FILE_INFO(reg);
+	/* The ftok semaphore should never be requested on the replication instance file while already holding the
+	 * journal pool access semaphore as it can lead to deadlocks (the right order is get ftok semaphore first
+	 * and then get the access semaphore). The only exception is MUPIP ROLLBACK due to an issue that is documented
+	 * in C9F10-002759. Assert that below.
+	 */
+	assert((reg != jnlpool.jnlpool_dummy_reg) || jgbl.mur_rollback || !holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
+	udi = FILE_INFO(reg);
 	assert(!udi->grabbed_ftok_sem);
 	assert(NULL == ftok_sem_reg);
-        if (-1 == (udi->key = FTOK(udi->fn, project_id)))
+	if (-1 == (udi->key = FTOK(udi->fn, project_id)))
 	{
-                gtm_putmsg(VARLSTCNT(5) ERR_FTOKERR, 2, DB_LEN_STR(reg), errno);
+		gtm_putmsg(VARLSTCNT(5) ERR_FTOKERR, 2, DB_LEN_STR(reg), errno);
 		return FALSE;
 	}
 	/*
@@ -263,7 +278,13 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 	error_def(ERR_SYSCALL);
 
 	assert(reg);
-        udi = FILE_INFO(reg);
+	/* The ftok semaphore should never be requested on the replication instance file while already holding the
+	 * journal pool access semaphore as it can lead to deadlocks (the right order is get ftok semaphore first
+	 * and then get the access semaphore). The only exception is MUPIP ROLLBACK due to an issue that is documented
+	 * in C9F10-002759. Assert that below.
+	 */
+	assert((reg != jnlpool.jnlpool_dummy_reg) || jgbl.mur_rollback || !holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
+	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
 	assert(!csa->now_crit);
 	/* The following two asserts are to ensure we never hold more than one FTOK semaphore at any point in time.
@@ -328,10 +349,50 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 
 /*
  * Description:
+ * 	Assumes that ftok semaphore id already exists. Increment only the COUNTER SEMAPHORE in that semaphore set.
+ * Parameters:
+ *	reg		: Regions structure
+ * Return Value: TRUE, if succsessful
+ *	         FALSE, if fails.
+ */
+boolean_t ftok_sem_incrcnt(gd_region *reg)
+{
+	int			semflag, save_errno, status;
+	unix_db_info		*udi;
+	sgmnt_addrs		*csa;
+
+	error_def(ERR_CRITSEMFAIL);
+	error_def(ERR_SYSCALL);
+
+	assert(NULL != reg);
+	assert(NULL == ftok_sem_reg);	/* assert that we never hold more than one FTOK semaphore at any point in time */
+	udi = FILE_INFO(reg);
+	csa = &udi->s_addrs;
+	assert(!csa->now_crit);
+	assert(INVALID_SEMID != udi->ftok_semid);
+	semflag = SEM_UNDO;
+	ftok_sopcnt = 0;
+	ftok_sop[ftok_sopcnt].sem_num = 1;
+	ftok_sop[ftok_sopcnt].sem_op = 1; /* increment counter */
+	ftok_sop[ftok_sopcnt].sem_flg = SEM_UNDO;
+	ftok_sopcnt++;
+	SEMOP(udi->ftok_semid, ftok_sop, ftok_sopcnt, status);
+	if (-1 == status)	/* We couldn't get it in one shot -- see if we already have it */
+	{
+		save_errno = errno;
+		gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+/*
+ * Description:
  * 	Assumes that ftok semaphore was already locked. Now release it.
  * Parameters:
  *	reg		: Regions structure
- * 	IF decr_count == TRUE, it will decrement counter semaphore.
+ * 	IF decr_cnt == TRUE, it will decrement counter semaphore.
  * 	IF immediate == TRUE, it will use IPC_NOWAIT flag.
  * Return Value: TRUE, if succsessful
  *	         FALSE, if fails.
@@ -339,7 +400,7 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
  * 	 or decrement the counter. We are already holding the control semaphore.
  *	 So never we need to pass IPC_NOWAIT. But we need to analyze before we change code.
  */
-boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_count, boolean_t immediate)
+boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immediate)
 {
 	int		ftok_semval, semflag, save_errno;
 	unix_db_info 	*udi;
@@ -360,7 +421,7 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_count, boolean_t imme
 	if (!udi->grabbed_ftok_sem)
 		return TRUE;
 	semflag = SEM_UNDO | (immediate ? IPC_NOWAIT : 0);
-	if (decr_count)
+	if (decr_cnt)
 	{
 		if (-1 == (ftok_semval = semctl(udi->ftok_semid, 1, GETVAL)))
 		{

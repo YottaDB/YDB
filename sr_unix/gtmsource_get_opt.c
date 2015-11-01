@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
+ *	Copyright 2006 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,10 @@
 #include "gtm_stdio.h"
 #include "util.h"
 #include "repl_log.h"
+#include "gtmmsg.h"		/* for "gtm_putmsg" prototype */
+#include "gtm_logicals.h"	/* for GTM_REPL_INSTSECONDARY */
+#include "trans_log_name.h"
+#include "iosp.h"		/* for SS_NORMAL */
 
 #define MAX_SECONDARY_LEN 	(MAX_HOST_NAME_LEN + 11) /* +11 for ':' and
 							  * port number */
@@ -50,54 +54,99 @@
 #define GTMSOURCE_CONN_PARMS_LEN ((10 + 1) * GTMSOURCE_CONN_PARMS_COUNT - 1)
 
 GBLREF	gtmsource_options_t	gtmsource_options;
-GBLREF	boolean_t		update_disable;
 
 int gtmsource_get_opt(void)
 {
-	boolean_t	secondary, dotted_notation;
-	int		tries, index = 0;
-	unsigned short	secondary_len;
-	char		secondary_sys[MAX_SECONDARY_LEN], *c;
-	struct hostent	*sec_hostentry;
-
-	boolean_t	log, log_interval_specified;
-	unsigned short	log_file_len;
-
-	boolean_t	buffsize_status;
-
-	boolean_t	filter;
-	unsigned short	filter_cmd_len;
-
-	int		timeout_status;
-
-	unsigned short	statslog_val_len;
-	char		statslog_val[4]; /* "ON" or "OFF" */
-
-	unsigned short	update_val_len;
-	char		update_val[sizeof("DISABLE")]; /* "ENABLE" or "DISABLE" */
-
-	unsigned short	connect_parms_str_len;
-	char		*connect_parms_str, tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
+	boolean_t	secondary, dotted_notation, log, log_interval_specified, buffsize_status, filter, connect_parms_badval;
 	char		*connect_parm_token_str, *connect_parm;
-	int		connect_parms_index;
-	boolean_t	connect_parms_badval;
+	char		*connect_parms_str, tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
+	char		secondary_sys[MAX_SECONDARY_LEN], *c, inst_name[MAX_FN_LEN + 1];
+	char		statslog_val[4]; /* "ON" or "OFF" */
+	char		update_val[sizeof("DISABLE")]; /* "ENABLE" or "DISABLE" */
+	int		tries, index = 0, timeout_status, connect_parms_index;
+	mstr		log_nam, trans_name;
+	struct hostent	*sec_hostentry;
+	unsigned short	log_file_len, filter_cmd_len;
+	unsigned short	secondary_len, inst_name_len, statslog_val_len, update_val_len, connect_parms_str_len;
+
+	error_def(ERR_REPLINSTSECLEN);
+	error_def(ERR_REPLINSTSECUNDF);
 
 	memset((char *)&gtmsource_options, 0, sizeof(gtmsource_options));
-
-	gtmsource_options.start = (cli_present("START") == CLI_PRESENT);
-	gtmsource_options.shut_down = (cli_present("SHUTDOWN") == CLI_PRESENT);
-	gtmsource_options.activate = (cli_present("ACTIVATE") == CLI_PRESENT);
-	gtmsource_options.deactivate = (cli_present("DEACTIVATE") == CLI_PRESENT);
-	gtmsource_options.checkhealth = (cli_present("CHECKHEALTH") == CLI_PRESENT);
-	gtmsource_options.statslog = (cli_present("STATSLOG") == CLI_PRESENT);
-	gtmsource_options.showbacklog = (cli_present("SHOWBACKLOG") == CLI_PRESENT);
-	gtmsource_options.changelog = (cli_present("CHANGELOG") == CLI_PRESENT);
-	gtmsource_options.stopsourcefilter = (cli_present("STOPSOURCEFILTER") == CLI_PRESENT);
-	gtmsource_options.update = (cli_present("UPDATE") == CLI_PRESENT);
-
+	gtmsource_options.start = (CLI_PRESENT == cli_present("START"));
+	gtmsource_options.shut_down = (CLI_PRESENT == cli_present("SHUTDOWN"));
+	gtmsource_options.activate = (CLI_PRESENT == cli_present("ACTIVATE"));
+	gtmsource_options.deactivate = (CLI_PRESENT == cli_present("DEACTIVATE"));
+	gtmsource_options.checkhealth = (CLI_PRESENT == cli_present("CHECKHEALTH"));
+	gtmsource_options.statslog = (CLI_PRESENT == cli_present("STATSLOG"));
+	gtmsource_options.showbacklog = (CLI_PRESENT == cli_present("SHOWBACKLOG"));
+	gtmsource_options.changelog = (CLI_PRESENT == cli_present("CHANGELOG"));
+	gtmsource_options.stopsourcefilter = (CLI_PRESENT == cli_present("STOPSOURCEFILTER"));
+	gtmsource_options.needrestart = (CLI_PRESENT == cli_present("NEEDRESTART"));
+	gtmsource_options.losttncomplete = (CLI_PRESENT == cli_present("LOSTTNCOMPLETE"));
+	gtmsource_options.jnlpool = (CLI_PRESENT == cli_present("JNLPOOL"));
+	secondary = (CLI_PRESENT == cli_present("SECONDARY"));
+	gtmsource_options.rootprimary = ROOTPRIMARY_UNSPECIFIED; /* to indicate unspecified state */
+	if (CLI_PRESENT == cli_present("ROOTPRIMARY"))
+		gtmsource_options.rootprimary = ROOTPRIMARY_SPECIFIED;
+	else if (CLI_PRESENT == cli_present("PROPAGATEPRIMARY"))
+		gtmsource_options.rootprimary = PROPAGATEPRIMARY_SPECIFIED;
+	else
+	{	/* Neither ROOTPRIMARY nor PROPAGATEPRIMARY specified. Assume default values.
+		 * Assume ROOTPRIMARY for -START -SECONDARY (active source server start) and -ACTIVATE commands.
+		 * Assume PROPAGATEPRIMARY for -START -PASSIVE (passive source server start) and -DEACTIVATE commands.
+		 */
+		if ((gtmsource_options.start && secondary) || gtmsource_options.activate)
+			gtmsource_options.rootprimary = ROOTPRIMARY_SPECIFIED;
+		if ((gtmsource_options.start && !secondary) || gtmsource_options.deactivate)
+			gtmsource_options.rootprimary = PROPAGATEPRIMARY_SPECIFIED;
+	}
+	gtmsource_options.instsecondary = (CLI_PRESENT == cli_present("INSTSECONDARY"));
+	if (gtmsource_options.instsecondary)
+	{	/* -INSTSECONDARY is specified in the command line. */
+		inst_name_len = sizeof(inst_name);;
+		if (!cli_get_str("INSTSECONDARY", &inst_name[0], &inst_name_len))
+		{
+			util_out_print("Error parsing INSTSECONDARY qualifier", TRUE);
+			return(-1);
+		}
+	} else
+	{	/* Check if environment variable "gtm_repl_instsecondary" is defined.
+		 * Do that only if any of the following qualifiers is present as these are the only ones that require it.
+		 * 	START, ACTIVATE, DEACTIVATE, STOPSOURCEFILTER, CHANGELOG, STATSLOG, NEEDRESTART
+		 */
+		if (gtmsource_options.start || gtmsource_options.activate || gtmsource_options.deactivate
+			|| gtmsource_options.stopsourcefilter || gtmsource_options.changelog
+			|| gtmsource_options.statslog || gtmsource_options.needrestart)
+		{
+			log_nam.addr = GTM_REPL_INSTSECONDARY;
+			log_nam.len = sizeof(GTM_REPL_INSTSECONDARY) - 1;
+			trans_name.addr = &inst_name[0];
+			if (SS_NORMAL == trans_log_name(&log_nam, &trans_name, inst_name))
+			{
+				gtmsource_options.instsecondary = TRUE;
+				inst_name_len = trans_name.len;
+			} else
+			{
+				gtm_putmsg(VARLSTCNT(1) ERR_REPLINSTSECUNDF);
+				return (-1);
+			}
+		}
+	}
+	if (gtmsource_options.instsecondary)
+	{	/* Secondary instance name specified either through -INSTSECONDARY or "gtm_repl_instsecondary" */
+		inst_name[inst_name_len] = '\0';
+		if ((MAX_INSTNAME_LEN <= inst_name_len) || (0 == inst_name_len))
+		{
+			gtm_putmsg(VARLSTCNT(4) ERR_REPLINSTSECLEN, 2, inst_name_len, inst_name);
+			return (-1);
+		}
+		assert((inst_name_len + 1) <= MAX_INSTNAME_LEN);
+		memcpy(gtmsource_options.secondary_instname, inst_name, inst_name_len + 1);	/* copy terminating '\0' as well */
+	}
 	if (gtmsource_options.start || gtmsource_options.activate)
 	{
-		if (secondary = (CLI_PRESENT == cli_present("SECONDARY")))
+		if (secondary)
 		{
 			secondary_len = MAX_SECONDARY_LEN;
 			if (!cli_get_str("SECONDARY", secondary_sys, &secondary_len))
@@ -221,9 +270,7 @@ int gtmsource_get_opt(void)
 			gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT] =
 				gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD];
 	}
-
-	if (gtmsource_options.start || gtmsource_options.statslog || gtmsource_options.changelog || gtmsource_options.activate ||
-	    gtmsource_options.deactivate)
+	if (gtmsource_options.start || gtmsource_options.statslog || gtmsource_options.changelog || gtmsource_options.activate)
 	{
 		log = (cli_present("LOG") == CLI_PRESENT);
 		log_interval_specified = (CLI_PRESENT == cli_present("LOG_INTERVAL"));
@@ -248,10 +295,9 @@ int gtmsource_get_opt(void)
 		}
 		if (gtmsource_options.start && 0 == gtmsource_options.src_log_interval)
 			gtmsource_options.src_log_interval = LOGTRNUM_INTERVAL;
-		/* For changelog/activate/deactivate, interval == 0 implies don't change log interval already established */
+		/* For changelog/activate, interval == 0 implies don't change log interval already established */
 		/* We ignore interval specification for statslog, Vinaya 2005/02/07 */
 	}
-
 	if (gtmsource_options.start)
 	{
 		assert(secondary || CLI_PRESENT == cli_present("PASSIVE"));
@@ -280,7 +326,6 @@ int gtmsource_get_opt(void)
 		} else
 			gtmsource_options.filter_cmd[0] = '\0';
 	}
-
 	if (gtmsource_options.shut_down)
 	{
 		if ((timeout_status = cli_present("TIMEOUT")) == CLI_PRESENT)
@@ -300,7 +345,6 @@ int gtmsource_get_opt(void)
 		else /* TIMEOUT not specified */
 			gtmsource_options.shutdown_time = DEFAULT_SHUTDOWN_TIMEOUT;
 	}
-
 	if (gtmsource_options.statslog)
 	{
 		statslog_val_len = 4; /* max(strlen("ON"), strlen("OFF")) + 1 */
@@ -310,42 +354,13 @@ int gtmsource_get_opt(void)
 			return(-1);
 		}
 		UNIX_ONLY(cli_strupper(statslog_val);)
-		if (0 == strcmp(statslog_val, "ON"))
+		if (0 == STRCMP(statslog_val, "ON"))
 			gtmsource_options.statslog = TRUE;
-		else if (0 == strcmp(statslog_val, "OFF"))
+		else if (0 == STRCMP(statslog_val, "OFF"))
 			gtmsource_options.statslog = FALSE;
 		else
 		{
 			util_out_print("Invalid value for STATSLOG qualifier, should be either ON or OFF", TRUE);
-			return(-1);
-		}
-	}
-
-	if (gtmsource_options.activate)
-		update_disable = FALSE;
-	if (gtmsource_options.deactivate || (gtmsource_options.start && GTMSOURCE_MODE_PASSIVE == gtmsource_options.mode))
-		update_disable = TRUE;
-
-	if (gtmsource_options.update)
-	{
-		update_val_len = sizeof(update_val);
-		if (!cli_get_str("UPDATE", update_val, &update_val_len))
-		{
-			util_out_print("Error parsing UPDATE qualifier", TRUE);
-			return(-1);
-		}
-		UNIX_ONLY(cli_strupper(update_val);)
-		if (strcmp(update_val, "ENABLE") == 0)
-		{
-			util_out_print("Update are now enabled", TRUE);
-			update_disable = FALSE;
-		} else if (strcmp(update_val, "DISABLE") == 0)
-		{
-			util_out_print("Update are now disabled", TRUE);
-			update_disable = TRUE;
-		} else
-		{
-			util_out_print("Invalid value for UPDATE qualifier, should be either ENABLE or DISABLE", TRUE);
 			return(-1);
 		}
 	}

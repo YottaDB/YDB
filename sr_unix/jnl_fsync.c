@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	jnl_buffer_ptr_t	jb;
 	uint4			lcnt, saved_dsk_addr, saved_status;
 	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
 	int4			lck_state;
 	int			fsync_ret, save_errno;
 
@@ -55,6 +56,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 
 	if ((NOJNL != jpc->channel) && !JNL_FILE_SWITCHED(jpc))
 	{
+		csd = csa->hdr;
 		for (lcnt = 1; fsync_addr > jb->fsync_dskaddr && !JNL_FILE_SWITCHED(jpc); lcnt++)
 		{
 			if (MAX_FSYNC_WAIT_CNT / 2 == lcnt)	/* half way into max.patience*/
@@ -70,8 +72,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 				jpc->status = SS_NORMAL;
 				jnl_send_oper(jpc, ERR_JNLFSYNCLSTCK);
 				jpc->status = saved_status ;
-				send_msg(VARLSTCNT(4) ERR_FSYNCTIMOUT, 2, jpc->region->jnl_file_len,
-										jpc->region->jnl_file_name);
+				send_msg(VARLSTCNT(4) ERR_FSYNCTIMOUT, 2, JNL_LEN_STR(csd));
 				GTMASSERT;
 			}
 			BG_TRACE_PRO_ANY(csa, n_jnl_fsync_tries);
@@ -97,11 +98,9 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 				{
 					save_errno = errno;
 					assert(FALSE);
-					send_msg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2,
-						JNL_LEN_STR(jpc->region),
+					send_msg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), save_errno);
-					rts_error(VARLSTCNT(9) ERR_JNLFSYNCERR, 2,
-						JNL_LEN_STR(jpc->region),
+					rts_error(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), save_errno);
 				} else
 				{

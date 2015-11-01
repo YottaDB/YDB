@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,12 @@
 #include "gtmmsg.h"
 #include "mupip_recover.h"
 
+#ifdef UNIX
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include "repl_instance.h"
+#endif
+
 GBLREF	int4			gv_keysize;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	gd_region		*gv_cur_region;
@@ -63,6 +69,10 @@ GBLREF 	jnl_gbls_t		jgbl;
 GBLREF 	mur_gbls_t		murgbl;
 GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF  jnl_process_vector	*prc_vec;
+
+#ifdef UNIX
+GBLREF	jnlpool_addrs		jnlpool;
+#endif
 
 void		gtm_ret_code();
 
@@ -122,15 +132,23 @@ void	mupip_recover(void)
 	seq_num 		losttn_seqno, min_broken_seqno;
 	reg_ctl_list		*rctl;
 	jnl_ctl_list		*jctl;
-	error_def		(ERR_MUNOACTION);
-	error_def		(ERR_BLKCNTEDITFAIL);
-	error_def		(ERR_MUJNLSTAT);
-	error_def		(ERR_MUJNLNOTCOMPL);
-	error_def		(ERR_RLBKJNSEQ);
-	error_def		(ERR_JNLACTINCMPLT);
-	error_def		(ERR_MUPJNLINTERRUPT);
-	error_def		(ERR_MUINFOUINT4);
-	error_def		(ERR_MUINFOUINT8);
+
+#ifdef UNIX
+	seq_num			max_reg_seqno, replinst_seqno;
+	unix_db_info		*udi;
+
+	error_def(ERR_REPLINSTDBMATCH);
+#endif
+
+	error_def(ERR_BLKCNTEDITFAIL);
+	error_def(ERR_JNLACTINCMPLT);
+	error_def(ERR_MUINFOUINT4);
+	error_def(ERR_MUINFOUINT8);
+	error_def(ERR_MUJNLNOTCOMPL);
+	error_def(ERR_MUJNLSTAT);
+	error_def(ERR_MUNOACTION);
+	error_def(ERR_MUPJNLINTERRUPT);
+	error_def(ERR_RLBKJNSEQ);
 
 	ESTABLISH(mupip_recover_ch);
 	/* PHASE 1: Process user input, open journal files, create rctl for phase 2 */
@@ -166,6 +184,35 @@ void	mupip_recover(void)
 		} else if (rctl->recov_interrupted) /* it is not necessary to do interrupted recover processing */
 			murgbl.intrpt_recovery = TRUE; /* Recovery was interrupted at some point */
 	}
+	UNIX_ONLY(
+		max_reg_seqno = 0;
+		for (regno = 0; regno < reg_total; regno++)
+		{
+			rctl = &mur_ctl[regno];
+			jctl = rctl->jctl;
+			assert(NULL == jctl->next_gen);
+			assert(!mur_options.update || (NULL != rctl->csd));
+			assert(!mur_options.rollback || mur_options.update);
+			if (mur_options.rollback && (rctl->csd->reg_seqno > max_reg_seqno))
+				max_reg_seqno = rctl->csd->reg_seqno;
+		}
+		assert(!mur_options.fetchresync_port || mur_options.rollback);
+		/* If rollback, check if jnl seqno in db and instance file match. Do that only if this is not interrupted
+		 * rollback AND if the replication instance file AND all the journal files were cleanly shutdown.
+		 */
+		if (mur_options.rollback && !intrrupted_recov_processing && all_gen_properly_closed)
+		{
+			assert(NULL != jnlpool.repl_inst_filehdr);
+			replinst_seqno = jnlpool.repl_inst_filehdr->jnl_seqno;
+			if (!jnlpool.repl_inst_filehdr->crash && (0 != replinst_seqno) && (max_reg_seqno != replinst_seqno))
+			{
+				udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+				gtm_putmsg(VARLSTCNT(6) ERR_REPLINSTDBMATCH, 4,
+					LEN_AND_STR(udi->fn), &replinst_seqno, &max_reg_seqno);
+				mupip_exit(ERR_MUNOACTION);
+			}
+		}
+	)
 	if (all_gen_properly_closed && !murgbl.intrpt_recovery && !mur_options.forward
 		&& ((!mur_options.rollback && !mur_options.since_time_specified &&
 			!mur_options.lookback_time_specified && !mur_options.lookback_opers_specified)
@@ -173,7 +220,14 @@ void	mupip_recover(void)
 	{ 	/* We do not need to do unnecessary processing */
 		if (mur_options.show)
 			mur_output_show();
-		murgbl.clean_exit = TRUE;
+		murgbl.clean_exit = TRUE;		 /* "mur_close_files" (invoked from "mupip_exit_handler") relies on this */
+		UNIX_ONLY(
+			if (mur_options.rollback)
+			{
+				assert(max_reg_seqno);
+				murgbl.consist_jnl_seqno = max_reg_seqno;/* "mur_close_files" relies on this */
+			}
+		)
 		mupip_exit(SS_NORMAL);
 	}
 	if (murgbl.intrpt_recovery && mur_options.update && mur_options.forward)
@@ -190,32 +244,70 @@ void	mupip_recover(void)
 		if (!mur_jctl_from_next_gen())
 			mupip_exit(ERR_MUNOACTION);
 	}
-	jgbl.max_resync_seqno = 0; 		/* jgbl.max_resync_seqno must be calculated before gtmrecv_fetchresync() call */
+	/* The current resync_seqno of this replication instance needs to be calculated before the call to "gtmrecv_fetchresync" */
+	VMS_ONLY(jgbl.max_resync_seqno = 0;)
+	UNIX_ONLY(jgbl.max_dualsite_resync_seqno = 0;)
 	for (regno = 0; regno < reg_total; regno++)
 	{
 		rctl = &mur_ctl[regno];
 		jctl = rctl->jctl;
 		assert(NULL == jctl->next_gen);
-		if (mur_options.fetchresync_port && rctl->csd->resync_seqno > jgbl.max_resync_seqno)
-			jgbl.max_resync_seqno = rctl->csd->resync_seqno;
+		VMS_ONLY(
+			if (mur_options.fetchresync_port && rctl->csd->resync_seqno > jgbl.max_resync_seqno)
+				jgbl.max_resync_seqno = rctl->csd->resync_seqno;
+		)
+		UNIX_ONLY(
+			if (mur_options.fetchresync_port && rctl->csd->dualsite_resync_seqno > jgbl.max_dualsite_resync_seqno)
+				jgbl.max_dualsite_resync_seqno = rctl->csd->dualsite_resync_seqno;
+		)
 	}
 	if (mur_options.fetchresync_port)
 	{
 		JNL_PUT_MSG_PROGRESS("FETCHRESYNC processing started");
-		if (SS_NORMAL != gtmrecv_fetchresync(mur_options.fetchresync_port, &murgbl.resync_seqno))
-			mupip_exit(ERR_MUNOACTION);
+		VMS_ONLY(
+			if (SS_NORMAL != gtmrecv_fetchresync(mur_options.fetchresync_port, &murgbl.resync_seqno))
+				mupip_exit(ERR_MUNOACTION);
+		)
+		UNIX_ONLY(
+			if (SS_NORMAL != gtmrecv_fetchresync(mur_options.fetchresync_port, &murgbl.resync_seqno, max_reg_seqno))
+				mupip_exit(ERR_MUNOACTION);
+		)
 		if (mur_options.verbose)
 			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("Gtmrecv_fetchresync returned resync_seqno"),
 				&murgbl.resync_seqno, &murgbl.resync_seqno);
-
-		if (jgbl.max_resync_seqno < murgbl.resync_seqno)
-		{
-			murgbl.resync_seqno = jgbl.max_resync_seqno;
-			if (mur_options.verbose)
-				gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4,
-					LEN_AND_LIT("Resync_seqno is reset to max_resync_seqno"),
-					&murgbl.resync_seqno, &murgbl.resync_seqno);
-		}
+		UNIX_ONLY(
+			if (REPL_PROTO_VER_DUALSITE == murgbl.remote_proto_ver)
+			{
+				if (murgbl.resync_seqno > jgbl.max_dualsite_resync_seqno)
+				{
+					murgbl.resync_seqno = jgbl.max_dualsite_resync_seqno;
+					if (mur_options.verbose)
+						gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4,
+							LEN_AND_LIT("Resync_seqno is reset to max_dualsite_resync_seqno"),
+							&murgbl.resync_seqno, &murgbl.resync_seqno);
+				}
+			} else
+			{
+				if (murgbl.resync_seqno > max_reg_seqno)
+				{
+					murgbl.resync_seqno = max_reg_seqno;
+					if (mur_options.verbose)
+						gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4,
+							LEN_AND_LIT("Resync_seqno is reset to max_reg_seqno"),
+							&murgbl.resync_seqno, &murgbl.resync_seqno);
+				}
+			}
+		)
+		VMS_ONLY(
+			if (jgbl.max_resync_seqno < murgbl.resync_seqno)
+			{
+				murgbl.resync_seqno = jgbl.max_resync_seqno;
+				if (mur_options.verbose)
+					gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4,
+						LEN_AND_LIT("Resync_seqno is reset to max_resync_seqno"),
+						&murgbl.resync_seqno, &murgbl.resync_seqno);
+			}
+		)
 		murgbl.stop_rlbk_seqno = murgbl.resync_seqno;
 	} else if (mur_options.resync_specified)
 		murgbl.stop_rlbk_seqno = murgbl.resync_seqno;

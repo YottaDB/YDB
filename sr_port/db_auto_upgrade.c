@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,5 +51,28 @@ void db_auto_upgrade(gd_region *reg)
 		csd->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
 	/* zero is a legitimate value for csd->mutex_spin_parms.mutex_spin_sleep_mask; so can't detect if need re-initialization */
 
+	/* Auto upgrade based on minor database version number. This code currently only does auto upgrade and does not
+	   do auto downgrade although that certainly is possible to implement if necessary. For now, if the current version
+	   is at a lower level than the minor db version, we do nothing.
+
+	   Note the purpose of the minor_dbver field is so that some part of gtm (either runtime, or conversion utility) some
+	   time and several versions down the road from now knows by looking at this field what fields in the fileheader are
+	   valid so it is important that the minor db version be updated each time the fileheader is updated and this routine
+	   correspondingly updated. SE 5/2006.
+	*/
+	if (csd->minor_dbver < GDSMVLAST)
+	{	/* In general, the method for adding new versions is:
+		   1) If the top case is for the most previous version (and has a break in it), the break is no longer appropriate
+		      since at minimum, the minor_dbver value needs updating.
+		   2) Update (or add) a case for the previous version to update any necessary fields.
+		*/
+		switch(csd->minor_dbver)
+		{
+			case GDSMV51000:		/* Multi-site replication available */
+				break;			/* Nothing to do for this version */
+			default:			/* V5.0 */
+				csd->minor_dbver = GDSMVLAST;
+		}
+	}
 	return;
 }

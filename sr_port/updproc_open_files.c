@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,12 +91,14 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 	error_def(ERR_NOREPLCTDREG);
 	error_def(ERR_NULLCOLLDIFF);
 
-	lcl_seqno = jgbl.max_resync_seqno = 0;
+	lcl_seqno = 0;
+	VMS_ONLY(jgbl.max_resync_seqno = 0;)
+	UNIX_ONLY(jgbl.max_dualsite_resync_seqno = 0;)
 	/*
 	 *	Open all of the database files
 	 */
-	/* Unix and VMS have different field names for now, but will both be soon changed to instname instead of gtmgbldir */
-	UNIX_ONLY(gld_fn = (sm_uc_ptr_t)recvpool.recvpool_ctl->recvpool_id.instname;)
+	/* Unix and VMS have different field names for now, but will both be soon changed to instfilename instead of gtmgbldir */
+	UNIX_ONLY(gld_fn = (sm_uc_ptr_t)recvpool.recvpool_ctl->recvpool_id.instfilename;)
 	VMS_ONLY(gld_fn = (sm_uc_ptr_t)recvpool.recvpool_ctl->recvpool_id.gtmgbldir;)
 	secondary_side_std_null_coll = -1;
 	for (curr = *gld_db_files, *gld_db_files = NULL;  NULL != curr;)
@@ -128,23 +130,31 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 		}
 		repl_log(updproc_log_fp, TRUE, TRUE, " Process %u Opening File -- %s :: reg_seqno = "INT8_FMT" "INT8_FMTX" \n",
 			process_id, fn, INT8_PRINT(csa->hdr->reg_seqno), INT8_PRINTX(csa->hdr->reg_seqno));
-		/* The assignment of Seqno needs to be done before checking the state of replication since receiver
-			server expects the update process to write Seqno in the recvpool before initiating
-			communication with the source server */
-		if (!(recvpool.upd_proc_local->updateresync))
-		{
-			if (lcl_seqno < csa->hdr->resync_seqno)
-				lcl_seqno = csa->hdr->resync_seqno;
-		} else
-		{
-			csa->hdr->resync_seqno = csa->hdr->reg_seqno;
+		UNIX_ONLY(
+			/* The assignment of Seqno needs to be done before checking the state of replication since receiver server
+			 * expects the update process to write Seqno in the recvpool before initiating communication with the
+			 * source server.
+			 */
+			if (recvpool.upd_proc_local->updateresync)
+				csa->hdr->dualsite_resync_seqno = csa->hdr->reg_seqno;
 			if (lcl_seqno < csa->hdr->reg_seqno)
 				lcl_seqno = csa->hdr->reg_seqno;
-		}
-		/* jgbl.max_resync_seqno should be set only after the test for updateresync because resync_seqno gets modified
-			to reg_seqno in case receiver is started with -updateresync option */
-		if (jgbl.max_resync_seqno < csa->hdr->resync_seqno)
-			jgbl.max_resync_seqno = csa->hdr->resync_seqno;
+			if (jgbl.max_dualsite_resync_seqno < csa->hdr->dualsite_resync_seqno)
+				jgbl.max_dualsite_resync_seqno = csa->hdr->dualsite_resync_seqno;
+		)
+		VMS_ONLY(
+			/* The assignment of Seqno needs to be done before checking the state of replication since receiver
+				server expects the update process to write Seqno in the recvpool before initiating
+				communication with the source server */
+			if (recvpool.upd_proc_local->updateresync)
+				csa->hdr->resync_seqno = csa->hdr->reg_seqno;
+			if (lcl_seqno < csa->hdr->resync_seqno)
+				lcl_seqno = csa->hdr->resync_seqno;
+			/* jgbl.max_resync_seqno should be set only after the test for updateresync because resync_seqno gets
+			 * modified to reg_seqno in case receiver is started with -updateresync option */
+			if (jgbl.max_resync_seqno < csa->hdr->resync_seqno)
+				jgbl.max_resync_seqno = csa->hdr->resync_seqno;
+		)
 		repl_log(updproc_log_fp, TRUE, TRUE, "             -------->  start_jnl_seqno = "INT8_FMT" "INT8_FMTX"\n",
 			INT8_PRINT(lcl_seqno), INT8_PRINTX(lcl_seqno));
 		if (!REPL_ALLOWED(csd))
@@ -155,11 +165,13 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 			GTMASSERT;
 		else
 			repl_allowed = TRUE;
-		if (recvpool.upd_proc_local->updateresync)
-		{
-			TP_CHANGE_REG(curr->gd);
-			wcs_flu(WCSFLU_FLUSH_HDR);
-		}
+		VMS_ONLY(
+			if (recvpool.upd_proc_local->updateresync)
+			{
+				TP_CHANGE_REG(curr->gd);
+				wcs_flu(WCSFLU_FLUSH_HDR);
+			}
+		)
 		prev = curr;
 		curr = curr->next;
 		prev->next = *gld_db_files;

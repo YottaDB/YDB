@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,23 +54,23 @@
 #include "repl_log.h"
 #include "repl_comm.h"
 
-GBLREF jnlpool_addrs 	jnlpool;
-GBLREF jnlpool_ctl_ptr_t jnlpool_ctl;
-GBLREF uint4		process_id;
-GBLREF int		gtmsource_sock_fd;
-GBLREF int		gtmsource_log_fd;
-GBLREF FILE		*gtmsource_log_fp;
-GBLREF int		gtmsource_filter;
-GBLREF boolean_t	gtmsource_logstats;
-GBLREF int		gtmsource_statslog_fd;
-GBLREF FILE		*gtmsource_statslog_fp;
-GBLREF unsigned char	*gtmsource_tcombuff_start;
-GBLREF qw_num		repl_source_data_sent;
-GBLREF qw_num		repl_source_msg_sent;
-GBLREF seq_num		seq_num_zero;
-GBLREF repl_msg_ptr_t	gtmsource_msgp;
-GBLREF uchar_ptr_t	repl_filter_buff;
-GBLREF boolean_t	pool_init;
+GBLREF jnlpool_addrs		jnlpool;
+GBLREF jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF uint4			process_id;
+GBLREF int			gtmsource_sock_fd;
+GBLREF int			gtmsource_log_fd;
+GBLREF FILE			*gtmsource_log_fp;
+GBLREF int			gtmsource_filter;
+GBLREF boolean_t		gtmsource_logstats;
+GBLREF int			gtmsource_statslog_fd;
+GBLREF FILE			*gtmsource_statslog_fp;
+GBLREF unsigned char		*gtmsource_tcombuff_start;
+GBLREF qw_num			repl_source_data_sent;
+GBLREF qw_num			repl_source_msg_sent;
+GBLREF seq_num			seq_num_zero;
+GBLREF repl_msg_ptr_t		gtmsource_msgp;
+GBLREF uchar_ptr_t		repl_filter_buff;
+GBLREF boolean_t		pool_init;
 
 int gtmsource_end1(boolean_t auto_shutdown)
 {
@@ -90,24 +90,31 @@ int gtmsource_end1(boolean_t auto_shutdown)
 	QWASSIGN(log_seqno, jnlpool.gtmsource_local->read_jnl_seqno);
 	QWASSIGN(log_seqno1, jnlpool.jnlpool_ctl->jnl_seqno);
 	jnlpool.gtmsource_local->gtmsource_pid = 0;
-	/* Detach from journal pool */
-	UNIX_ONLY(
-		if (jnlpool.jnlpool_ctl && 0 > SHMDT(jnlpool.jnlpool_ctl))
-			repl_log(gtmsource_log_fp, FALSE, TRUE, "Error detaching from journal pool : %s\n", REPL_STR_ERROR);
-	)
-	VMS_ONLY(
-		if (jnlpool.jnlpool_ctl)
-		{
-			if (SS$_NORMAL != (status = detach_shm(jnlpool.shm_range)))
-				repl_log(stderr, TRUE, TRUE, "Error detaching from jnlpool : %s\n", REPL_STR_ERROR);
-			jnlpool.jnlpool_ctl = NULL;
-			if (!auto_shutdown && (SS$_NORMAL != (status = signoff_from_gsec(jnlpool.shm_lockid))))
-				repl_log(stderr, TRUE, TRUE, "Error dequeueing lock on jnlpool global section : %s\n",
+	jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_DUMMY_STATE;
+	if (!auto_shutdown)
+	{	/* Detach from journal pool */
+		UNIX_ONLY(
+			if (jnlpool.jnlpool_ctl && 0 > SHMDT(jnlpool.jnlpool_ctl))
+				repl_log(gtmsource_log_fp, FALSE, TRUE, "Error detaching from journal pool : %s\n", REPL_STR_ERROR);
+		)
+		VMS_ONLY(
+			if (jnlpool.jnlpool_ctl)
+			{
+				if (SS$_NORMAL != (status = detach_shm(jnlpool.shm_range)))
+					repl_log(stderr, TRUE, TRUE, "Error detaching from jnlpool : %s\n", REPL_STR_ERROR);
+				jnlpool.jnlpool_ctl = NULL;
+				if (!auto_shutdown && (SS$_NORMAL != (status = signoff_from_gsec(jnlpool.shm_lockid))))
+					repl_log(stderr, TRUE, TRUE, "Error dequeueing lock on jnlpool global section : %s\n",
 														REPL_STR_ERROR);
-		}
-	)
-	jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
-	pool_init = FALSE;
+			}
+		)
+		jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
+		jnlpool.repl_inst_filehdr = NULL;
+		jnlpool.gtmsrc_lcl_array = NULL;
+		jnlpool.gtmsource_local_array = NULL;
+		jnlpool.jnldata_base = NULL;
+		pool_init = FALSE;
+	}
 	gtmsource_free_msgbuff();
 	gtmsource_free_tcombuff();
 	gtmsource_free_filter_buff();

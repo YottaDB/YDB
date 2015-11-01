@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@
 #include "util.h"
 #include "repl_log.h"
 
-GBLDEF	gtmrecv_options_t	gtmrecv_options;
+GBLREF	gtmrecv_options_t	gtmrecv_options;
 
 int gtmrecv_get_opt(void)
 {

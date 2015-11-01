@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,14 +25,15 @@ enum
 
 typedef enum
 {
-	JNL_POOL_ACCESS_SEM,	/* For Startup / Shutdown */
+	JNL_POOL_ACCESS_SEM,	/* For Startup / Shutdown / Options-change */
 	SRC_SERV_COUNT_SEM,	/* Source sever holds it while alive */
-	SRC_SERV_OPTIONS_SEM,	/* For options change, since it is done through the shared memory */
-	DUMMY_SEM,		/* added just to make the number of semaphores same as in recvpool */
+	DUMMY_SEM1,		/* added just to make the number of semaphores same as in recvpool */
+	DUMMY_SEM2,		/* added just to make the number of semaphores same as in recvpool */
 	SOURCE_ID_SEM,
 	NUM_SRC_SEMS
 } source_sem_type;
 
+/* The need for the options semaphore is documented towards the end of Section 6.2.6 of the design spec for C9F06-002729 */
 typedef enum
 {
 	RECV_POOL_ACCESS_SEM,	/* For Startup / Shutdown */
@@ -69,6 +70,8 @@ void 		set_sem_set_src(int semid);
 void 		set_sem_set_recvr(int semid);
 int 		grab_sem_all_source(void);	/* rollback needs this */
 int 		grab_sem_all_receive(void);	/* rollback needs this */
+int		incr_sem(int set_index, int sem_num);
+int		decr_sem(int set_index, int sem_num);
 #endif
 
 #endif /* _REPL_SEM_H */

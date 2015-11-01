@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,8 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "gdskill.h"
+#include "gdscc.h"
 #include "filestruct.h"
 #include "iosp.h"
 #include "repl_shutdcode.h"
@@ -44,6 +46,9 @@
 #include "repl_sp.h"
 #include "cli.h"
 #include "jnl.h"
+#include "buddy_list.h"
+#include "hashtab_int4.h"
+#include "tp.h"
 #include "repl_filter.h"
 #include "error.h"
 #include "eintr_wrappers.h"
@@ -57,22 +62,31 @@
 #ifdef UNIX
 #include "ftok_sems.h"
 #endif
+#include "dpgbldir.h"		/* for "get_next_gdr" */
+#include "init_secshr_addrs.h"
+#include "mutex.h"
 
-GBLDEF boolean_t		gtmrecv_fetchreysnc;
-GBLDEF boolean_t		gtmrecv_logstats = FALSE;
-GBLDEF int			gtmrecv_filter = NO_FILTER;
-GBLDEF seq_num			gtmrecv_resync_seqno;
-GBLREF void                      (*call_on_signal)();
+GBLDEF	boolean_t		gtmrecv_fetchreysnc;
+GBLDEF	boolean_t		gtmrecv_logstats = FALSE;
+GBLDEF	int			gtmrecv_filter = NO_FILTER;
 
-GBLREF uint4			process_id;
-GBLREF recvpool_addrs		recvpool;
-GBLREF int			recvpool_shmid;
-GBLREF gtmrecv_options_t	gtmrecv_options;
-GBLREF int			gtmrecv_log_fd;
-GBLREF FILE			*gtmrecv_log_fp;
-GBLREF boolean_t        	is_rcvr_server;
-GBLREF int			gtmrecv_srv_count;
-GBLREF uint4			log_interval;
+GBLREF	void			(*call_on_signal)();
+GBLREF	uint4			process_id;
+GBLREF	cw_set_element		cw_set[];
+GBLREF	unsigned char		cw_set_depth;
+GBLREF	sgm_info		*first_sgm_info;
+GBLREF	recvpool_addrs		recvpool;
+GBLREF	int			recvpool_shmid;
+GBLREF	gtmrecv_options_t	gtmrecv_options;
+GBLREF	int			gtmrecv_log_fd;
+GBLREF	FILE			*gtmrecv_log_fp;
+GBLREF	boolean_t		is_rcvr_server;
+GBLREF	int			gtmrecv_srv_count;
+GBLREF	uint4			log_interval;
+GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	IN_PARMS		*cli_lex_in_ptr;
+GBLREF	uint4			mutex_per_process_init_pid;
 
 int gtmrecv(void)
 {
@@ -82,7 +96,7 @@ int gtmrecv(void)
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
 	uint4			gtmrecv_pid, channel;
 	int			semval, status, save_upd_status, upd_start_status, upd_start_attempts;
-	char			print_msg[1024];
+	char			print_msg[1024], tmpmsg[1024];
 	recvpool_user		pool_user = GTMRECV;
 #ifdef UNIX
 	pid_t			pid, procgp;
@@ -94,10 +108,11 @@ int gtmrecv(void)
 	$DESCRIPTOR(proc_name_desc, proc_name);
 #endif
 
-	error_def(ERR_RECVPOOLSETUP);
 	error_def(ERR_MUPCLIERR);
-	error_def(ERR_TEXT);
+	error_def(ERR_RECVPOOLSETUP);
 	error_def(ERR_REPLERR);
+	error_def(ERR_REPLINFO);
+	error_def(ERR_TEXT);
 
 	call_on_signal = gtmrecv_sigstop;
 	ESTABLISH_RET(gtmrecv_ch, SS_NORMAL);
@@ -108,9 +123,25 @@ int gtmrecv(void)
 	memset((uchar_ptr_t)&recvpool, 0, sizeof(recvpool));
 	if (-1 == gtmrecv_get_opt())
 		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
-	recvpool_init(pool_user, gtmrecv_options.start && 0 != gtmrecv_options.listen_port, gtmrecv_options.start);
+	if (gtmrecv_options.start || gtmrecv_options.shut_down)
+		jnlpool_init(GTMRECEIVE, (boolean_t)FALSE, (boolean_t *)NULL);
+	if (gtmrecv_options.shut_down)
+	{	/* Wait till shutdown time nears even before going to "recvpool_init". This is because the latter will return
+		 * with the ftok semaphore, access and options semaphore held and we do not want to be holding those locks (while
+		 * waiting for the user specified timeout to expire) as that will affect new GTM processes and/or other
+		 * MUPIP REPLIC commands that need these locks for their function.
+		 */
+		if (0 < gtmrecv_options.shutdown_time)
+		{
+			repl_log(stdout, FALSE, TRUE, "Waiting for %d seconds before signalling shutdown\n",
+				gtmrecv_options.shutdown_time);
+			LONG_SLEEP(gtmrecv_options.shutdown_time);
+		} else
+			repl_log(stdout, FALSE, TRUE, "Signalling immediate shutdown\n");
+	}
+	recvpool_init(pool_user, gtmrecv_options.start && 0 != gtmrecv_options.listen_port);
 	/*
-	 * When gtmrecv_options.start is TRUE, shm field recvpool.recvpool_ctl->fresh_start is updated in recvpool_init()
+	 * When gtmrecv_options.start is TRUE, shm field recvpool.recvpool_ctl->fresh_start is updated in "recvpool_init"
 	 *	recvpool.recvpool_ctl->fresh_start == TRUE ==> fresh start, and
 	 *	recvpool.recvpool_ctl->fresh_start == FALSE ==> start after a crash
 	 */
@@ -213,9 +244,20 @@ int gtmrecv(void)
 			gtmrecv_exit(gtmrecv_statslog() - NORMAL_SHUTDOWN);
 		}
 	} /* (pool_user != GTMRECV) */
+	assert(!holds_sem[RECV][RECV_POOL_ACCESS_SEM]);
+	assert(holds_sem[RECV][RECV_SERV_OPTIONS_SEM]);
 	is_rcvr_server = TRUE;
 	process_id = getpid();
-	strcpy(gtmrecv_local->log_file, gtmrecv_options.log_file);
+	/* Reinvoke secshr related initialization with the child's pid */
+	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
+		  &jnlpool.jnlpool_dummy_reg);
+	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
+	 * Note that the initialization would already have been done by the parent receiver startup command but we need to
+	 * redo the initialization with the child process id.
+	 */
+	assert(mutex_per_process_init_pid && mutex_per_process_init_pid != process_id);
+	mutex_per_process_init();
+	STRCPY(gtmrecv_local->log_file, gtmrecv_options.log_file);
 	gtmrecv_local->log_interval = log_interval = gtmrecv_options.rcvr_log_interval;
 	upd_proc_local->log_interval = gtmrecv_options.upd_log_interval;
 	upd_helper_ctl->start_helpers = FALSE;
@@ -242,13 +284,24 @@ int gtmrecv(void)
 #endif
 	gtm_event_log_init();
 	gtmrecv_local->recv_serv_pid = process_id;
+	assert(NULL != jnlpool.jnlpool_ctl);
+	jnlpool.jnlpool_ctl->gtmrecv_pid = process_id;
 	gtmrecv_local->listen_port = gtmrecv_options.listen_port;
+	/* Log receiver server startup command line first */
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "%s %s\n", cli_lex_in_ptr->argv[0], cli_lex_in_ptr->in_str);
+
+	assert(NULL != jnlpool.repl_inst_filehdr);
+	SPRINTF(tmpmsg, "GTM Replication Receiver Server with Pid [%d] started on replication instance [%s]",
+		process_id, jnlpool.repl_inst_filehdr->this_instname);
+	sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
+	gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
 	if (recvpool_ctl->fresh_start)
 		QWASSIGNDW(recvpool_ctl->jnl_seqno, 0); /* Update process will initialize this to a non-zero value */
 	else
 	{	/* Coming up after a crash, reset Update process read.  This is done by setting gtmrecv_local->restart.
 		 * This will trigger update process to reset recvpool_ctl->jnl_seqno too.
-		*/
+		 */
 		gtmrecv_local->restart = GTMRECV_RCVR_RESTARTED;
 	}
 	save_upd_status = upd_proc_local->upd_proc_shutdown;
@@ -259,7 +312,7 @@ int gtmrecv(void)
 	{
 		if (EREPL_UPDSTART_SEMCTL == repl_errno || EREPL_UPDSTART_BADPATH == repl_errno)
 		{
-			gtmrecv_autoshutdown();
+			gtmrecv_exit(ABNORMAL_SHUTDOWN);
 		} else if (EREPL_UPDSTART_FORK == repl_errno)
 		{
 			/* Couldn't start up update now, can try later */
@@ -280,7 +333,7 @@ int gtmrecv(void)
 			    "Too many failed attempts to fork Update Process. Aborting..."));
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
 		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLERR", print_msg);
-		gtmrecv_autoshutdown();
+		gtmrecv_exit(ABNORMAL_SHUTDOWN);
 	}
 	upd_proc_local->start_upd = UPDPROC_STARTED;
 	if (!recvpool_ctl->fresh_start)
@@ -300,14 +353,13 @@ int gtmrecv(void)
 	if (gtmrecv_options.helpers)
 		gtmrecv_helpers_init(gtmrecv_options.n_readers, gtmrecv_options.n_writers);
 #ifdef UNIX
-	/*
-	 * Child needs to increment receivpool lock couner semaphore.
-	 * Since we can have ftok collisions with someone else, we cannot gaurantee that current count is one.
-	 * So just increment semaphore number 1 after grabbing semaphore number 0. Then release semaphore 0.
+	/* It is necessary for every process that is using the ftok semaphore to increment the counter by 1. This is used
+	 * by the last process that shuts down to delete the ftok semaphore when it notices the counter to be 0.
+	 * Note that the parent receiver server startup command would have done an increment of the ftok counter semaphore
+	 * for the replication instance file. But the receiver server process (the child) that comes here would not have done
+	 * that. Do that while the parent is still waiting for our okay.
 	 */
-	if (!ftok_sem_get(recvpool.recvpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE))
-		rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
-	if (!ftok_sem_release(recvpool.recvpool_dummy_reg, FALSE, FALSE))
+	if (!ftok_sem_incrcnt(recvpool.recvpool_dummy_reg))
 		rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
 #endif
 	/* Lock the receiver server count semaphore. Its value should be atmost 1. */

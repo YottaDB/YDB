@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include <unistd.h>
+#include "gtm_unistd.h"
 
 #include "gtm_time.h"
 #include "gdsroot.h"
@@ -59,7 +59,7 @@ CONDITION_HANDLER(gtcm_exi_ch)
 		FPRINTF(gtcm_errfs, "%s: %s", time_str, util_outbuff);
 		fflush(gtcm_errfs);
 	}
-	send_msg(VARLSTCNT(3) ERR_TEXT, RTS_ERROR_TEXT("GT.CM TERMINATION RUNDOWN ERROR"));
+	send_msg(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("GT.CM TERMINATION RUNDOWN ERROR"));
 
 	PROCDIE(exi_condition);
 }

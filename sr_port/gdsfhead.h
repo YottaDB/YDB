@@ -581,9 +581,44 @@ typedef struct compswap_time_field_struct
 */
 #define cas_time time_latch.u.parts.latch_pid
 
+/* The following structure is used to determine
+   the endianess of a database header.
+*/
+
+typedef union
+{
+	struct {
+		unsigned short little_endian;
+		unsigned short big_endian;
+		} shorts;
+	uint4 word32;
+} endian32_struct;
+
+#ifdef BIGENDIAN
+#  define ENDIANTHIS		"BIG"
+#  define ENDIANOTHER		"LITTLE"
+#  define ENDIANCHECKTHIS	big_endian
+#else
+#  define ENDIANTHIS		"LITTLE"
+#  define ENDIANOTHER		"BIG"
+#  define ENDIANCHECKTHIS	little_endian
+#endif
+
+#define CHECK_DB_ENDIAN(CSD,FNLEN,FNNAME)								\
+{													\
+	error_def(ERR_DBENDIAN);									\
+	endian32_struct	check_endian;									\
+	check_endian.word32 = (CSD)->minor_dbver;							\
+	if (!check_endian.shorts.ENDIANCHECKTHIS)							\
+		rts_error(VARLSTCNT(6) ERR_DBENDIAN, 4, FNLEN, FNNAME, ENDIANOTHER, ENDIANTHIS);	\
+}
+
 /* This is the structure describing a segment. It is used as a database file header (for MM or BG access methods).
  * The overloaded fields for MM and BG are n_bts, bt_buckets. */
 
+/* ***NOTE*** If the field minor_dbver is updated, please also update gdsdbver.h and db_auto_upgrade.c appropriately
+   (see db_auto_upgrade for reasons and description). SE 5/2006
+*/
 typedef struct sgmnt_data_struct
 {
 	/************* MOSTLY STATIC DATABASE STATE FIELDS **************************/
@@ -616,12 +651,12 @@ typedef struct sgmnt_data_struct
 						 * they use the file. The flag can only be reset by the DSE utility.
 						 */
 	enum mdb_ver	minor_dbver;		/* Minor DB version field that is incremented when minor changes to this
-						   file-header or API changes occur.
+						   file-header or API changes occur. See note at top of sgmnt_data.
 						*/
 	uint4		jnl_checksum;
 	char		filler_128[8];
 	/************* FIELDS SET AT CREATION TIME ********************************/
-	file_info	created;		/* Who created this file */
+	char		filler_created[52];	/* Now unused .. was "file_info created" */
 	boolean_t	createinprogress;	/* TRUE only if MUPIP CREATE is in progress. FALSE otherwise */
 	gtm_time8	creation;		/* time when the database file was created */
 
@@ -726,12 +761,31 @@ typedef struct sgmnt_data_struct
 	int4		rc_node;
 	char		filler_ccp_rc[8];	/* to ensure this section has 64-byte multiple size */
 	/************* REPLICATION RELATED FIELDS ****************/
+	/* VMS does not yet have multi-site replication functionality. Hence the two sets of fields in this section. */
+#ifdef VMS
 	seq_num		reg_seqno;		/* the jnl seqno of the last update to this region -- 8-byte aligned */
 	seq_num		resync_seqno;		/* the resync-seqno to be sent to the secondary */
 	trans_num	resync_tn;		/* db tn corresponding to resync_seqno - used in losttrans handling */
 	seq_num		old_resync_seqno;	/* to find out if transactions were sent from primary to secondary */
 	int4		repl_state;		/* state of replication whether open/closed/was_open */
 	char		filler_repl[28];		/* to ensure this section has 64-byte multiple size */
+#else
+	seq_num		reg_seqno;		/* the jnl seqno of the last update to this region -- 8-byte aligned */
+	seq_num		pre_multisite_resync_seqno;	/* previous resync-seqno field now moved to the replication instance file */
+	trans_num	zqgblmod_tn;		/* db tn corresponding to zqgblmod_seqno - used in losttrans handling */
+	seq_num		zqgblmod_seqno;		/* minimum resync seqno of ALL -fetchresync rollbacks that happened on a secondary
+						 * (that was formerly a root primary) AFTER the most recent
+						 * MUPIP REPLIC -LOSTTNCOMPLETE command */
+	int4		repl_state;		/* state of replication whether open/closed/was_open */
+	boolean_t	multi_site_open;	/* Set to TRUE the first time a process opens the database using
+						 * a GT.M version that supports multi-site replication. FALSE until then */
+	seq_num		dualsite_resync_seqno;	/* Last known seqno communicated with the other side of the replication pipe.
+						 * This field is maintained as long as the other side is still running a
+						 * dual-site GT.M version. Once all replication instances in a configuration
+						 * are upgraded to the multi-site GT.M version, this field is no longer used.
+						 */
+	char		filler_repl[16];	/* to ensure this section has 64-byte multiple size */
+#endif
 	/************* TP RELATED FIELDS ********************/
 	int4		n_tp_retries[12];	/* indexed by t_tries; incremented by 1 for all regions in restarting TP */
 	int4		n_tp_retries_conflicts[12];/* indexed by t_tries and incremented for conflicting region in TP */
@@ -1405,7 +1459,7 @@ typedef struct
 	char		gtmgbldir[MAX_FN_LEN + 1];	/* Identify which instance of this shared pool corresponds to */
 #else
 	int4		repl_pool_key_filler;		/* makes sure the size of the structure is a multiple of 8 */
-	char		instname[MAX_FN_LEN + 1];	/* Identify which instance this shared pool corresponds to */
+	char		instfilename[MAX_FN_LEN + 1];	/* Identify which instance file this shared pool corresponds to */
 #endif
 } replpool_identifier;
 

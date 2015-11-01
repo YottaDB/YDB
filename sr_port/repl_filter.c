@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,8 @@
 #include "gtm_ipc.h"
 #include <sys/mman.h>
 #include <sys/shm.h>
+#elif defined(VMS)
+#include <descrip.h>
 #endif
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
@@ -45,6 +47,7 @@
 #include "eintr_wrappers.h"
 #include "repl_sp.h"
 #include "gtmmsg.h"
+#include "gtmio.h"
 
 GBLREF uchar_ptr_t	repl_filter_buff;
 GBLREF int		repl_filter_bufsiz;
@@ -71,10 +74,9 @@ LITREF int		jrt_update[JRT_RECTYPES];
 
 static	pid_t	repl_filter_pid = -1;
 static int 	repl_srv_filter_fd[2] = {-1, -1}, repl_filter_srv_fd[2] = {-1, -1};
-static FILE 	*repl_srv_filter_write_fp = NULL, *repl_srv_filter_read_fp = NULL, *repl_filter_srv_write_fp = NULL,
-		*repl_filter_srv_read_fp = NULL;
 static char 	*extract_buff;
 static char	*extr_rec;
+static char	*srv_buff_start, *srv_buff_end, *srv_line_start, *srv_line_end, *srv_read_end;
 
 static struct_jrec_null	null_jnlrec;
 
@@ -93,107 +95,70 @@ void jnl_extr_init(void)
 	gv_currkey->base[0] = '\0';
 }
 
+static void repl_filter_close_all_pipes(void)
+{
+	int	close_res;
+
+	if (-1 != repl_srv_filter_fd[READ_END])
+	{
+		F_CLOSE(repl_srv_filter_fd[READ_END], close_res);
+		repl_srv_filter_fd[READ_END] = -1;
+	}
+	if (-1 != repl_srv_filter_fd[WRITE_END])
+	{
+		F_CLOSE(repl_srv_filter_fd[WRITE_END], close_res);
+		repl_srv_filter_fd[WRITE_END] = -1;
+	}
+	if (-1 != repl_filter_srv_fd[READ_END])
+	{
+		F_CLOSE(repl_filter_srv_fd[READ_END], close_res);
+		repl_filter_srv_fd[READ_END] = -1;
+	}
+	if (-1 != repl_filter_srv_fd[WRITE_END])
+	{
+		F_CLOSE(repl_filter_srv_fd[WRITE_END], close_res);
+		repl_filter_srv_fd[WRITE_END] = -1;
+	}
+
+}
+
 int repl_filter_init(char *filter_cmd)
 {
-	int		fcntl_res, status, argc, delim_count;
+	int		fcntl_res, status, argc, delim_count, close_res;
 	char		cmd[4096], *delim_p;
 	char_ptr_t	arg_ptr, argv[MAX_FILTER_ARGS];
 	error_def(ERR_REPLFILTER);
 	error_def(ERR_TEXT);
 
 	REPL_DPRINT1("Initializing FILTER\n");
-	if (-1 != repl_srv_filter_fd[READ_END])
-		close(repl_srv_filter_fd[READ_END]);
-	if (-1 != repl_srv_filter_fd[WRITE_END])
-		close(repl_srv_filter_fd[WRITE_END]);
-	if (-1 != repl_filter_srv_fd[READ_END])
-		close(repl_filter_srv_fd[READ_END]);
-	if (-1 != repl_filter_srv_fd[WRITE_END])
-		close(repl_filter_srv_fd[WRITE_END]);
+	repl_filter_close_all_pipes();
 	/* Set up pipes for filter I/O */
 	/* For Server -> Filter */
 	OPEN_PIPE(repl_srv_filter_fd, status);
 	if (0 > status)
 	{
-		close(repl_srv_filter_fd[READ_END]);
-		close(repl_srv_filter_fd[WRITE_END]);
+		repl_filter_close_all_pipes();
 		gtm_putmsg(VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Could not create pipe for Server->Filter I/O"), ERRNO);
 		repl_errno = EREPL_FILTERSTART_PIPE;
 		return(FILTERSTART_ERR);
 	}
-	/*********
-	FCNTL3(repl_srv_filter_fd[READ_END], F_SETFL, O_NONBLOCK | O_NDELAY, fcntl_res);
-	if (0 > fcntl_res)
-	{
-		gtm_putmsg(VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Could not make Server->Filter I/O non-blocking"), ERRNO);
-		return(FILTERSTART_ERR);
-	}
-	*********/
-	/****************
-	FCNTL3(repl_srv_filter_fd[WRITE_END], F_SETFL, O_NONBLOCK | O_NDELAY, fcntl_res);
-	if (0 > fcntl_res)
-	{
-		gtm_putmsg(VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Could not make Server->Filter I/O non-blocking"), ERRNO);
-		return(FILTERSTART_ERR);
-	}
-	*****************/
-	if (NULL == (repl_srv_filter_write_fp = FDOPEN(repl_srv_filter_fd[WRITE_END], "w")))
-		GTMASSERT;
-	if (0 != SETVBUF(repl_srv_filter_write_fp, NULL, _IOLBF, 0)) /* Make the output of the server line buffered */
-		GTMASSERT;
-	if (NULL == (repl_srv_filter_read_fp = FDOPEN(repl_srv_filter_fd[READ_END], "r")))
-		GTMASSERT;
-	if (0 != SETVBUF(repl_srv_filter_read_fp, NULL, _IOLBF, 0)) /* Make the input to the filter line buffered */
-		GTMASSERT;
 	/* For Filter -> Server */
 	OPEN_PIPE(repl_filter_srv_fd, status);
 	if (0 > status)
 	{
-		close(repl_srv_filter_fd[READ_END]);
-		close(repl_srv_filter_fd[WRITE_END]);
-		close(repl_filter_srv_fd[READ_END]);
-		close(repl_filter_srv_fd[WRITE_END]);
+		repl_filter_close_all_pipes();
 		gtm_putmsg(VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Could not create pipe for Server->Filter I/O"), ERRNO);
 		repl_errno = EREPL_FILTERSTART_PIPE;
 		return(FILTERSTART_ERR);
 	}
-	/***************
-	FCNTL3(repl_filter_srv_fd[READ_END], F_SETFL, O_NONBLOCK | O_NDELAY, fcntl_res);
-	if (0 > fcntl_res)
-	{
-		gtm_putmsg(VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Could not make Filter->Server I/O non-blocking"), ERRNO);
-		return(FILTERSTART_ERR);
-	}
-	***************/
-	/****************
-	FCNTL3(repl_filter_srv_fd[WRITE_END], F_SETFL, O_NONBLOCK | O_NDELAY, fcntl_res);
-	if (0 > fcntl_res)
-	{
-		gtm_putmsg(VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Could not make Filter->Server I/O non-blocking"), ERRNO);
-		return(FILTERSTART_ERR);
-	}
-	*****************/
-	if (NULL == (repl_filter_srv_write_fp = FDOPEN(repl_filter_srv_fd[WRITE_END], "w")))
-		GTMASSERT;
-	if (0 != SETVBUF(repl_filter_srv_write_fp, NULL, _IOLBF, 0)) /* Make the output of the filter line buffered */
-		GTMASSERT;
-	if (NULL == (repl_filter_srv_read_fp = FDOPEN(repl_filter_srv_fd[READ_END], "r")))
-		GTMASSERT;
-	if (0 != SETVBUF(repl_filter_srv_read_fp, NULL, _IOLBF, 0)) /* Make the input to the server line buffered */
-		GTMASSERT;
 	/* Parse the filter_cmd */
 	repl_log(stdout, FALSE, TRUE, "Filter command is %s\n", filter_cmd);
 	strcpy(cmd, filter_cmd);
 	if (NULL == (arg_ptr = strtok(cmd, FILTER_CMD_ARG_DELIM_TOKENS)))
 	{
-		close(repl_srv_filter_fd[READ_END]);
-		close(repl_filter_srv_fd[WRITE_END]);
+		repl_filter_close_all_pipes();
 		gtm_putmsg(VARLSTCNT(6) ERR_REPLFILTER, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Null filter command specified"));
 		repl_errno = EREPL_FILTERSTART_NULLCMD;
 		return(FILTERSTART_ERR);
@@ -203,7 +168,7 @@ int repl_filter_init(char *filter_cmd)
 		argv[argc] = arg_ptr;
 	argv[argc] = NULL;
 	REPL_DPRINT2("Arg %d is NULL\n", argc);
-#ifdef REPL_DEBUG
+	REPL_DEBUG_ONLY(
 	{
 		int index;
 		for (index = 0; argv[index]; index++)
@@ -212,13 +177,14 @@ int repl_filter_init(char *filter_cmd)
 		}
 		REPL_DPRINT2("Filter argc %d\n", index);
 	}
-#endif
+	)
 	if (0 < (repl_filter_pid = UNIX_ONLY(fork)VMS_ONLY(vfork)()))
-	{
-		/* Server */
+	{ /* Server */
 		UNIX_ONLY(
-			close(repl_srv_filter_fd[READ_END]);
-			close(repl_filter_srv_fd[WRITE_END]);
+			F_CLOSE(repl_srv_filter_fd[READ_END], close_res); /* SERVER: WRITE only on server -> filter pipe */
+			repl_srv_filter_fd[READ_END] = -1;
+			F_CLOSE(repl_filter_srv_fd[WRITE_END], close_res); /* SERVER: READ only on filter -> server pipe */
+			repl_filter_srv_fd[WRITE_END] = -1;
 		)
 		memset((char *)&null_jnlrec, 0, NULL_RECLEN);
 		null_jnlrec.prefix.jrec_type = JRT_NULL;
@@ -226,25 +192,25 @@ int repl_filter_init(char *filter_cmd)
 		null_jnlrec.prefix.forwptr = null_jnlrec.suffix.backptr = NULL_RECLEN;
 		assert(NULL == extr_rec);
 		jnl_extr_init();
-		extr_rec = malloc(ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE));
+		extr_rec = malloc(ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE) + 1); /* +1 to accommodate terminating null */
 		assert(MAX_EXTRACT_BUFSIZ > ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE));
-		extract_buff = malloc(MAX_EXTRACT_BUFSIZ);
+		extract_buff = malloc(MAX_EXTRACT_BUFSIZ + 1); /* +1 to accommodate terminating null */
+		srv_line_start = srv_line_end = srv_read_end = srv_buff_start = malloc(MAX_EXTRACT_BUFSIZ + 1);
+		srv_buff_end = srv_buff_start + MAX_EXTRACT_BUFSIZ + 1;
 		return(SS_NORMAL);
 	}
 	if (0 == repl_filter_pid)
-	{
-		/* Filter */
+	{ /* Filter */
 		UNIX_ONLY(
-			close(repl_srv_filter_fd[WRITE_END]);
-			close(repl_filter_srv_fd[READ_END]);
-			/* Make the stdin/stdout of the filter line buffered */
-			if (0 != SETVBUF(stdin, NULL, _IOLBF, 0))
-				GTMASSERT;
-			if (0 != SETVBUF(stdout, NULL, _IOLBF, 0))
-				GTMASSERT;
+			F_CLOSE(repl_srv_filter_fd[WRITE_END], close_res); /* FILTER: READ only on server -> filter pipe */
+			repl_srv_filter_fd[WRITE_END] = -1;
+			F_CLOSE(repl_filter_srv_fd[READ_END], close_res); /* FILTER: WRITE only on filter -> server pipe */
+			repl_filter_srv_fd[READ_END] = -1;
+			/* Make the server->filter pipe stdin for filter */
 			DUP2(repl_srv_filter_fd[READ_END], 0, status);
 			if (0 > status)
 				GTMASSERT;
+			/* Make the filter->server pipe stdout for filter */
 			DUP2(repl_filter_srv_fd[WRITE_END], 1, status);
 			if (0 > status)
 				GTMASSERT;
@@ -252,13 +218,12 @@ int repl_filter_init(char *filter_cmd)
 		VMS_ONLY(decc$set_child_standard_streams(repl_srv_filter_fd[READ_END], repl_filter_srv_fd[WRITE_END], -1));
 		/* Start the filter */
 		if (0 > EXECV(argv[0], argv))
-		{
-			close(repl_srv_filter_fd[READ_END]);
-			close(repl_filter_srv_fd[WRITE_END]);
+		{ /* exec error, close all pipe fds */
+			repl_filter_close_all_pipes();
 			VMS_ONLY(
 				/* For vfork(), there is no real child process. So, both ends of both the pipes have to be closed */
-				close(repl_srv_filter_fd[WRITE_END]);
-				close(repl_filter_srv_fd[READ_END]);
+				F_CLOSE(repl_srv_filter_fd[WRITE_END], close_res);
+				F_CLOSE(repl_filter_srv_fd[READ_END], close_res);
 			)
 			gtm_putmsg(VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Could not exec filter"), ERRNO);
 			repl_errno = EREPL_FILTERSTART_EXEC;
@@ -288,6 +253,7 @@ static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len)
 		if (NULL == (extr_end = jnl2extcvt((jnl_record *)tr, tr_len, extract_buff)))
 			GTMASSERT;
 		extr_len = extr_end - extract_buff;
+		extract_buff[extr_len] = '\0';
 	} else
 	{
 		is_nontp = TRUE;
@@ -295,15 +261,15 @@ static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len)
 		strcpy(extract_buff, FILTER_EOT);
 		extr_len = strlen(FILTER_EOT);
 	}
-#ifdef REPL_DEBUG
+	REPL_DEBUG_ONLY(
 	if (QWNE(tr_num, seq_num_zero))
 	{
-		REPL_DPRINT3("Extract for tr %ld : %s", tr_num, extract_buff);
+		REPL_DPRINT3("Extract for tr %llu :\n%s\n", tr_num, extract_buff);
 	} else
 	{
 		REPL_DPRINT1("Sending FILTER_EOT\n");
 	}
-#endif
+	)
 	for (send_ptr = extract_buff, send_len = extr_len; send_len > 0; send_ptr += sent_len, send_len -= sent_len)
 	{
 		/* the check for EINTR below is valid and should not be converted to an EINTR wrapper macro, because EAGAIN
@@ -334,37 +300,103 @@ static void wait_for_filter_input(void)
 	return;
 }
 
+static int repl_filter_recv_line(char *line, int *line_len, int max_line_len)
+{ /* buffer input read from repl_filter_srv_fd[READ_END], return one line at a time; line separator is '\n' */
+
+	int	l_len, r_len, buff_remaining, save_errno;
+
+	for (; ;)
+	{
+		for (; srv_line_end < srv_read_end && '\n' != *srv_line_end; srv_line_end++)
+			;
+		if (srv_line_end < srv_read_end) /* newline found */
+		{
+			*line_len = l_len = srv_line_end - srv_line_start + 1; /* include '\n' in length */
+			if (l_len <= max_line_len)
+			{
+				memcpy(line, srv_line_start, l_len);
+				srv_line_start = ++srv_line_end; /* move past '\n' for next line */
+				assert(srv_line_end <= srv_read_end);
+				REPL_EXTRA_DPRINT3("repl_filter: newline found, srv_line_end: 0x%x srv_read_end: 0x%x\n",
+							srv_line_end, srv_read_end);
+				return SS_NORMAL;
+			}
+			return (repl_errno = EREPL_FILTERNOSPC);
+		}
+		/* newline not found, may have to read more data */
+		assert(srv_line_end == srv_read_end);
+		l_len = srv_read_end - srv_line_start;
+		memmove(srv_buff_start, srv_line_start, l_len);
+		REPL_EXTRA_DPRINT4("repl_filter: moving %d bytes from 0x%x to 0x%x\n", l_len, srv_line_start, srv_buff_start);
+		srv_line_start = srv_buff_start;
+		srv_line_end = srv_read_end = srv_line_start + l_len;
+		if (0 < (buff_remaining = srv_buff_end - srv_read_end))
+		{
+			while (-1 == (r_len = read(repl_filter_srv_fd[READ_END], srv_read_end, buff_remaining)) &&
+					(EINTR == errno || EAGAIN == errno || ENOMEM == errno))
+				;
+			if (0 < r_len) /* successful read */
+			{
+				srv_read_end += r_len;
+				REPL_EXTRA_DPRINT5("repl_filter: b %d srv_line_start: 0x%x srv_line_end: 0x%x srv_read_end: 0x%x\n",
+							r_len, srv_line_start, srv_line_end, srv_read_end);
+				assert(srv_line_end < srv_read_end);
+				continue; /* continue looking for new line */
+			}
+			save_errno = errno;
+			if (0 == r_len) /* EOF */
+				return (repl_errno = EREPL_FILTERNOTALIVE);
+			/* (0 > r_len) => error */
+			repl_errno = EREPL_FILTERRECV;
+			return save_errno;
+		}
+		/* srv_read_end == srv_buff_end => buffer is full but no new-line; since we allocated enough buffer for the largest
+		 * possible logical record, this should be a bad conversion from the filter */
+		return (repl_errno = EREPL_FILTERBADCONV);
+	}
+}
+
 static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len)
 {
 	/* Receive the transaction tr_num into buffer tr. Return the length of the transaction received in tr_len */
-	int		firstrec_len, tcom_len, rec_cnt, extr_len, extr_reclen;
+	int		firstrec_len, tcom_len, rec_cnt, extr_len, extr_reclen, status;
+	int		eof, err, save_errno;
 	unsigned char	seq_num_str[32], *seq_num_ptr;
 	char		*extr_ptr, *tr_end, *fgets_res;
-
-	/* This routine should do non-blocking read() instead of fgets (will wait till \n is found in input) to detect failure
-	 * of filter. When more input is expected, and there is none available, server should check if the filter is alive. */
-	/* wait_for_filter_input(); */
+	char		c[ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE)];
 
 	assert(NULL != extr_rec);
-	/* First record should be TSTART or NULL */
-	FGETS(extr_rec, ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE), repl_filter_srv_read_fp, fgets_res);
-	REPL_DPRINT3("Filter output for "INT8_FMT" : %s", INT8_PRINT(tr_num), extr_rec);
-	if (!('0' == extr_rec[0] && ('8' == extr_rec[1] || '0' == extr_rec[1])))
-		return (repl_errno = EREPL_FILTERBADCONV);
-	firstrec_len = strlen(extr_rec);
-	memcpy(extract_buff, extr_rec, firstrec_len + 1); /* + 1 to include the terminating '\0' */
-	extr_len = firstrec_len;
-	rec_cnt = 0;
-	if (!is_null && ('0' != extr_rec[0] || '0' != extr_rec[1]))
+	if (SS_NORMAL != (status = repl_filter_recv_line(extr_rec, &firstrec_len, ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE))))
 	{
-		while ('0' != extr_rec[0] || '9' != extr_rec[1])
+		if (EREPL_FILTERNOSPC == repl_errno)
+			GTMASSERT; /* why didn't we pre-allocate enough memory? */
+		return status;
+	}
+	extr_rec[firstrec_len] = '\0';
+	if (!('0' == extr_rec[0] && ('8' == extr_rec[1] || '0' == extr_rec[1]))) /* First record should be TSTART or NULL */
+		return (repl_errno = EREPL_FILTERBADCONV);
+	memcpy(extract_buff, extr_rec, firstrec_len + 1); /* include terminating null */
+	extr_reclen = extr_len = firstrec_len;
+	rec_cnt = 0;
+	REPL_DEBUG_ONLY(extr_rec[extr_reclen] = '\0';)
+	REPL_DPRINT6("Filter output for "INT8_FMT" :\nrec_cnt: %d\textr_reclen: %d\textr_len: %d\t%s", INT8_PRINT(tr_num),
+			rec_cnt, extr_reclen, extr_len, extr_rec);
+	if (!is_null && ('0' != extr_rec[0] || '0' != extr_rec[1])) /* if not NULL record */
+	{
+		while ('0' != extr_rec[0] || '9' != extr_rec[1]) /* while not TCOM record */
 		{
-			FGETS(extr_rec, ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE), repl_filter_srv_read_fp, fgets_res);
-			REPL_DPRINT2("%s", extr_rec);
-			extr_reclen = strlen(extr_rec);
+			if (SS_NORMAL != (status = repl_filter_recv_line(extr_rec, &extr_reclen,
+									 ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE))))
+			{
+				if (EREPL_FILTERNOSPC == repl_errno)
+					GTMASSERT; /* why didn't we pre-allocate enough memory? */
+				return status;
+			}
 			memcpy(extract_buff + extr_len, extr_rec, extr_reclen);
 			extr_len += extr_reclen;
 			rec_cnt++;
+			REPL_DEBUG_ONLY(extr_rec[extr_reclen] = '\0';)
+			REPL_DPRINT5("rec_cnt: %d\textr_reclen: %d\textr_len: %d\t%s", rec_cnt, extr_reclen, extr_len, extr_rec);
 		}
 		tcom_len = extr_reclen;
 		rec_cnt--;
@@ -376,15 +408,12 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len)
 		{
 			if (1 == rec_cnt)
 			{
-				/* Eliminate the dummy TSTART */
-				extr_ptr = extract_buff + firstrec_len;
+				extr_ptr = extract_buff + firstrec_len; /* Eliminate the dummy TSTART */
 				extr_len -= firstrec_len;
-				/* Eliminate the dummy TCOMMIT */
-				/* extr_ptr[extr_len - tcom_len] = '\0'; ??? */
-				extr_len -= tcom_len;
+				extr_len -= tcom_len; /* Eliminate the dummy TCOMMIT */
 			}
 		}
-		extr_ptr[extr_len] = '\0';	/* For safety */
+		extr_ptr[extr_len] = '\0'; /* terminate with null for ext2jnlcvt */
 		if (NULL == (tr_end = ext2jnlcvt(extr_ptr, extr_len, (jnl_record *)tr)))
 			return (repl_errno = EREPL_FILTERBADCONV);
 		*tr_len = tr_end - (char *)&tr[0];
@@ -416,10 +445,11 @@ int repl_stop_filter(void)
 
 	REPL_DPRINT1("Stopping filter\n");
 	repl_filter_send(seq_num_zero, NULL, 0);
-	close(repl_srv_filter_fd[WRITE_END]);
-	close(repl_filter_srv_fd[READ_END]);
-	repl_srv_filter_fd[READ_END] = repl_filter_srv_fd[READ_END] = repl_srv_filter_fd[WRITE_END] =
-		repl_filter_srv_fd[WRITE_END] = -1;
+	repl_filter_close_all_pipes();
+	free(extr_rec);
+	free(extract_buff);
+	free(srv_buff_start);
+	extr_rec = extract_buff = srv_buff_start = NULL;
 	repl_log(stdout, TRUE, TRUE, "Waiting for Filter to Stop\n");
 	WAITPID(repl_filter_pid, &filter_exit_status, 0, waitpid_res); /* Release the defunct filter */
 	repl_log(stdout, TRUE, TRUE, "Filter Stopped\n");
@@ -447,6 +477,10 @@ void repl_filter_error(seq_num filter_seqno, int why)
 
 		case EREPL_FILTERBADCONV :
 			rts_error(VARLSTCNT(3) ERR_FILTERBADCONV, 1, &filter_seqno);
+			break;
+
+		case EREPL_FILTERRECV :
+			rts_error(VARLSTCNT(4) ERR_FILTERCOMM, 1, &filter_seqno, why);
 			break;
 
 		default :

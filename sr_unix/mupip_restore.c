@@ -193,6 +193,7 @@ void mupip_restore(void)
 		mu_gv_cur_reg_free();
 		mupip_exit(ERR_MUPRESTERR);
 	}
+	CHECK_DB_ENDIAN(old_data, n_len, db_name);
 
 	curr_tn = old_data->trans_hist.curr_tn;
 	old_blk_size = old_data->blk_size;

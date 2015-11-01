@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,8 @@
 #include "file_head_read.h"	/* for file_head_read() prototype */
 #include "is_file_identical.h"	/* for filename_to_id() prototype */
 
+GBLREF	boolean_t		in_mupip_ftok;		/* Used by an assert in repl_inst_read */
+
 /*
  * This reads file header and prints the semaphore/shared memory id
  * This is different than ftok utility.
@@ -50,8 +52,8 @@ void mupip_ftok (void)
 	int		semid, shmid;
 	unsigned int	full_len;
 	unsigned short	fn_len; /* cli library expects unsigned short */
-	char		fn[MAX_FN_LEN + 1], instname[MAX_FN_LEN + 1];
-	repl_inst_fmt	repl_instance;
+	char		fn[MAX_FN_LEN + 1], instfilename[MAX_FN_LEN + 1];
+	repl_inst_hdr	repl_instance;
 	gd_id		fid;
 	sm_uc_ptr_t	fid_ptr, fid_top;
 
@@ -71,11 +73,13 @@ void mupip_ftok (void)
 	recvpool = (CLI_PRESENT == cli_present("RECVPOOL"));
 	if (jnlpool || recvpool)
 	{
-		if (!repl_inst_get_name(instname, &full_len, sizeof(instname)))
+		if (!repl_inst_get_name(instfilename, &full_len, sizeof(instfilename)))
 			rts_error(VARLSTCNT(6) ERR_REPLINSTUNDEF, 0,
 				ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("$gtm_repl_instance not defined"));
-		repl_inst_get(instname, &repl_instance);
+		in_mupip_ftok = TRUE;
+		repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+		in_mupip_ftok = FALSE;
 		if (jnlpool)
 		{
 			semid = repl_instance.jnlpool_semid;

@@ -34,20 +34,39 @@
 #include "util.h"
 #include "gtmmsg.h"
 #include "memcoherency.h"
+#include "shmpool.h"
+
+#ifdef UNIX
+#include "ftok_sems.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+#endif
 
 GBLREF 	spdesc 		stringpool;
 GBLREF 	tp_region 	*grlist;
 GBLREF	tp_region	*halt_ptr;
 GBLREF	bool		online;
 GBLREF  bool            error_mupip;
+GBLREF	boolean_t	backup_interrupted;
+
+#ifdef UNIX
+GBLREF	backup_reg_list	*mu_repl_inst_reg_list;
+GBLREF	jnlpool_addrs	jnlpool;
+#endif
 
 void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 {
+	sgmnt_addrs	*csa;
 	backup_reg_list *ptr, *next;
 	uint4		status;
+	boolean_t	had_lock;
 #ifdef VMS
 	struct FAB	temp_fab;
+#else
+	unix_db_info	*udi;
 #endif
+
+	error_def(ERR_FORCEDHALT);
 
 	assert(stage >= need_to_free_space && stage < num_of_clnup_stage);
 
@@ -80,15 +99,29 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 				{	/* Stop temporary file from growing if we made it active */
 					if (keep_going == ptr->not_this_time)
 					{
-						FILE_INFO(ptr->reg)->s_addrs.nl->nbb = BACKUP_NOT_IN_PROGRESS;
-						/* Ideally, we should grab/release crit here but given that this is cleanup
-						   code in the event of an error, that seems risky for what we are trying to
-						   accomplish. The worst that will happen if a process does not see this flag
-						   change is it will try to write to the temporary file and possibly find it
-						   gone in which case it will record the error and keep running. The error is
-						   irrelevant as stopping the backup was what we are trying to do anyway.
+						csa = &FILE_INFO(ptr->reg)->s_addrs;
+						csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
+						/* Make sure all running processes have a chance to see this backup
+						   state change so they won't be trying to flush when we go to delete
+						   the temporary files (mostly an issue on VMS).
+
+						   This operation notifies other processes by:
+						   1) Using a compswap lock with builtin memory barriers so other
+						      processors know the memory state change.
+						   2) Processes obtaining the lock after we release it will do their
+						      own memory barrier operation and see the change.
+						   3) By grabbing the lock, we are assured that anyone else getting the
+						      lock after us will also be checking the errno flag AFTER getting the
+						      lock (see backup_buffer_flush()) and see no flush is necessary.
 						*/
-						SHM_WRITE_MEMORY_BARRIER;
+						if (!(had_lock = shmpool_lock_held_by_us(ptr->reg)))
+							shmpool_lock_hdr(ptr->reg);
+
+						if (backup_interrupted && 0 == csa->shmpool_buffer->backup_errno)
+							/* Needs a non-zero value to stop the backup */
+							csa->shmpool_buffer->backup_errno = ERR_FORCEDHALT;
+						if (!had_lock)
+							shmpool_unlock_hdr(ptr->reg);
 					}
 					/* get rid of the temporary file */
 #if defined(UNIX)
@@ -135,5 +168,20 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 			ptr = next;
 		}
 	}
+	UNIX_ONLY(
+		/* Release FTOK lock on the replication instance file if holding it */
+		assert((NULL == jnlpool.jnlpool_dummy_reg) || (NULL != mu_repl_inst_reg_list));
+		if ((NULL != mu_repl_inst_reg_list) && (NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
+		{
+			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+			assert(NULL != udi);
+			if (NULL != udi)
+			{
+				if (udi->grabbed_ftok_sem)
+					ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
+				assert(!udi->grabbed_ftok_sem);
+			}
+		}
+	)
 	return;
 }

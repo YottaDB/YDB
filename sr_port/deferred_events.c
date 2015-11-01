@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,10 @@
 
 #include "mdef.h"
 
+#ifdef VMS
+#include "efn.h"
+#include <ssdef.h>
+#endif
 
 #include "xfer_enum.h"
 #include "tp_timeout.h"
@@ -46,6 +50,7 @@ GBLREF volatile short   num_deferred;
 #else
 GBLREF volatile int4    num_deferred;
 #endif
+GBLREF volatile int4	ctrap_action_is, outofband;
 
 /* =============================================================================
  * FILE-SCOPE VARIABLES
@@ -70,10 +75,10 @@ GBLREF volatile int4    num_deferred;
  */
 
 #if defined(UNIX)
-static volatile int4 		xfer_table_events[DEFERRED_EVENTS];
+volatile int4 			xfer_table_events[DEFERRED_EVENTS];
 #define	INCR_CNT_SP(X,Y)	INCR_CNT(X,Y)
 #elif defined(VMS)
-static volatile short 		xfer_table_events[DEFERRED_EVENTS];
+volatile short 			xfer_table_events[DEFERRED_EVENTS];
 #define INCR_CNT_SP(X,Y)	(++*X)
 #else
 # error "Unsupported Platform"
@@ -84,7 +89,7 @@ GBLREF  global_latch_t		defer_latch;
  * Act only on first recieved.
  * -------------------------------------------------------
  */
-static volatile int4	first_event = no_event;
+GBLDEF	volatile int4	first_event = no_event;
 
 /* =============================================================================
  * EXPORTED FUNCTIONS
@@ -221,6 +226,7 @@ boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 p
 			       first_event);
 	}
 #endif
+ 	assert(no_event != first_event);
 	return is_first_event;
 }
 
@@ -308,6 +314,7 @@ boolean_t xfer_reset_handlers(int4 event_type)
 {
 	int4		e_type;
 	boolean_t	reset_type_is_set_type;
+	int4		status;
 	int 		e, ei, e_tot=0;
 
 	error_def(ERR_DEFEREVENT);
@@ -327,8 +334,7 @@ boolean_t xfer_reset_handlers(int4 event_type)
 		xfer_table[xf_linefetch] = op_mproflinefetch;
 		xfer_table[xf_linestart] = op_mproflinestart;
 		xfer_table[xf_forloop] = op_mprofforloop;
-	}
-	else
+	} else
 	{
 		xfer_table[xf_linefetch] = op_linefetch;
 		xfer_table[xf_linestart] = op_linestart;
@@ -405,32 +411,34 @@ boolean_t xfer_reset_handlers(int4 event_type)
 	 */
 	first_event = no_event;
 	num_deferred = 0;
-
-/* ******************************************************************
- * There is a race here:
- * If a new event interrupts after previous line and before
- * corresponding assignment in next loop, it will be missed.
- * For most events, we're going to an M handler anyway, so it won't
- * matter (assuming the handler would handle all pending events).
- * But if not going to an M handler (e.g. if resetting zbreak/zstep),
- * could miss another event.
- *
- * Better (to avoid missing any events):
- *      aswp xfer_table_events elements (as described above), and
- * check here if still zero. If not, must have missed that event
- * since aswp, possibly before num_deferred was reset => never set
- * xfer_table => should do that now.
- *      If more than one is nonzero, choose first arbitrarily
- * unless first_event is now set -- unless it is, we've lost track of
- * which event was first.
- * ******************************************************************
- */
-
-	/* --------------------------------------------
-	 * Clear to allow new events to
-	 * be reset only after we're all done.
-	 * --------------------------------------------
+	ctrap_action_is = 0;
+	outofband = 0;
+	VMS_ONLY(
+		status = sys$clref(efn_outofband);
+		assert(SS$_WASSET == status);
+		if ((SS$_WASSET != status) && (SS$_WASCLR != status))
+			GTMASSERT;
+	)
+	/* ******************************************************************
+	 * There is a race here:
+	 * If a new event interrupts after previous line and before
+	 * corresponding assignment in next loop, it will be missed.
+	 * For most events, we're going to an M handler anyway, so it won't
+	 * matter (assuming the handler would handle all pending events).
+	 * But if not going to an M handler (e.g. if resetting zbreak/zstep),
+	 * could miss another event.
+	 *
+	 * Better (to avoid missing any events):
+	 *      aswp xfer_table_events elements (as described above), and
+	 * check here if still zero. If not, must have missed that event
+	 * since aswp, possibly before num_deferred was reset => never set
+	 * xfer_table => should do that now.
+	 *      If more than one is nonzero, choose first arbitrarily
+	 * unless first_event is now set -- unless it is, we've lost track of
+	 * which event was first.
+	 * ******************************************************************
 	 */
+	/* Clear to allow new events to be reset only after we're all done. */
 	for (e_type = 1; DEFERRED_EVENTS > e_type; e_type++)
 	{
 		xfer_table_events[e_type] = FALSE;
@@ -445,35 +453,47 @@ boolean_t xfer_reset_handlers(int4 event_type)
  */
 void async_action(bool lnfetch_or_start)
 {
-        /* Double-check that we should be here:
-	 */
-        assert (0<num_deferred);
+	/* Double-check that we should be here: */
+	assert(0 < num_deferred);
 
 	switch(first_event)
 	{
 	case (outofband_event):
+		if (0 == outofband)
+		{	/* This function can be invoked only by a op_*intrrpt* transfer table function. Those transfer table
+			 * functions should be active only for a short duration between the occurrence of an outofband event
+			 * and the handling of it at a logical boundary (next M-line). We dont expect to be running with
+			 * those transfer table functions for more than one M-line. If "outofband" is set to 0, the call to
+			 * "outofband_action" below will do nothing and we will end up running with the op_*intrrpt* transfer
+			 * table functions indefinitely. In this case M-FOR loops are known to return incorrect results which
+			 * might lead to application integrity issues. It is therefore considered safer to GTMASSERT as we
+			 * will at least have the core for analysis.
+			 */
+			GTMASSERT;
+		}
 		outofband_action(lnfetch_or_start);
 		break;
 	case (tt_write_error_event):
-#ifdef UNIX
-		xfer_reset_if_setter(tt_write_error_event);
-		iott_wrterr();
-#endif /* VMS tt error processing is done in op_*intrrpt */
+		UNIX_ONLY(
+			xfer_reset_if_setter(tt_write_error_event);
+			iott_wrterr();
+		)
+		/* VMS tt error processing is done in op_*intrrpt */
 		break;
 	case (network_error_event):
-       		/* -------------------------------------------------------
+		/* -------------------------------------------------------
 		 * Network error not implemented here yet. Need to move
 		 * from mdb_condition_handler after review.
 		 * -------------------------------------------------------
 		 */
 	case (zstp_or_zbrk_event):
-       		/* -------------------------------------------------------
+		/* -------------------------------------------------------
 		 * ZStep/Zbreak events not implemented here yet. Need to
 		 * move here after review.
 		 * -------------------------------------------------------
 		 */
 	default:
-		 assert(FALSE);
+		GTMASSERT;	/* see above GTMASSERT for comment as to why this is needed */
 	}
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -178,6 +178,7 @@ void mupip_downgrade(void)
 			gtm_putmsg(VARLSTCNT(4) ERR_BADDBVER, 2, db_fn_len, db_fn);
 		mupip_exit(ERR_MUNODWNGRD);
 	}
+	UNIX_ONLY(CHECK_DB_ENDIAN(&csd, db_fn_len, db_fn));
 	/* It is V5.x version: So proceed with downgrade */
 	if (csd.createinprogress)
 	{

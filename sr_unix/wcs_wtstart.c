@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -236,7 +236,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 						if (-1 == fsync(jpc->channel))
 						{
 							assert(FALSE);
-							send_msg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(region),
+							send_msg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 								 ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), errno);
 							RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);
 							if (NULL == csrfirst)

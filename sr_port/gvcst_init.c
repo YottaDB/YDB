@@ -78,6 +78,7 @@ GBLREF	sm_uc_ptr_t		reformat_buffer;
 GBLREF	int			reformat_buffer_len;
 GBLREF	volatile int		reformat_buffer_in_use;	/* used only in DEBUG mode */
 GBLREF	volatile int4		fast_lock_count;
+GBLREF	boolean_t		new_dbinit_ipc;
 
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
@@ -277,6 +278,8 @@ void gvcst_init (gd_region *greg)
 		csa->lock_addrs[0] = csa->lock_addrs[1] = NULL;
 	)
 	UNSUPPORTED_PLATFORM_CHECK;
+	UNIX_ONLY(new_dbinit_ipc = FALSE;) /* dbinit_ch relies on this flag. Reset it before establishing condition handler
+					    * just in case this was set to TRUE by a previous "gvcst_init". */
         ESTABLISH(dbinit_ch);
 
 	temp_cs_data = (sgmnt_data_ptr_t)cs_data_buff;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,16 +66,19 @@ boolean_t cli_disallow_dse_cache(void)
 	boolean_t	p1, p2, p3, p4;
 
 	*cli_err_str_ptr = 0;
-	disallow_return_value = !(d_c_cli_present("CHANGE")
-					|| d_c_cli_present("RECOVER")
-					|| d_c_cli_present("SHOW")
-					|| d_c_cli_present("VERIFY"));
-	CLI_DIS_CHECK_N_RESET;
 
 	p1 = d_c_cli_present("CHANGE");
 	p2 = d_c_cli_present("RECOVER");
 	p3 = d_c_cli_present("SHOW");
 	p4 = d_c_cli_present("VERIFY");
+
+	/* any DSE CACHE command should contain at LEAST one of the above qualifiers */
+	disallow_return_value = !(p1 || p2 || p3 || p4);
+	CLI_DIS_CHECK;	/* Note CLI_DIS_CHECK_N_RESET is not used as we want to reuse the computed error string (cli_err_str_ptr)
+			 * for the next check as well in case it fails. Note that this can be done only if both checks use
+			 * exactly the same set of qualifiers (which is TRUE in this case). */
+
+	/* any DSE CACHE command should contain at MOST one of the above qualifiers */
 	disallow_return_value = cli_check_any2(VARLSTCNT(4) p1, p2, p3, p4);
 	CLI_DIS_CHECK_N_RESET;
 

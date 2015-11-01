@@ -88,6 +88,7 @@ GBLREF	ipcs_mesg		db_ipcs;
 GBLREF	node_local_ptr_t	locknl;
 GBLREF	boolean_t		new_dbinit_ipc;
 GBLREF	boolean_t		gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
+GBLREF	uint4			mutex_per_process_init_pid;
 
 #ifndef MUTEX_MSEM_WAKE
 GBLREF	int 	mutex_sock_fd;
@@ -235,7 +236,6 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd)
 
 void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 {
-	static boolean_t	mutex_init_done = FALSE;
 	boolean_t       	is_bg, read_only;
 	char            	machine_name[MAX_MCNAMELEN];
 	file_control    	*fc;
@@ -496,7 +496,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		}
 		db_csh_ref(csa);
 		shmpool_buff_init(reg);
-		strcpy(csa->nl->machine_name, machine_name);					/* machine name */
+		STRCPY(csa->nl->machine_name, machine_name);					/* machine name */
 		assert(MAX_REL_NAME > gtm_release_name_len);
 		memcpy(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
 		memcpy(csa->nl->label, GDS_LABEL, GDS_LABEL_SZ - 1);				/* GDS label */
@@ -549,6 +549,16 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		if (read_only)
 			csa->nl->remove_shm = TRUE;	/* gds_rundown can remove shmem if first process has read-only access */
 		db_auto_upgrade(reg);
+		if (FALSE == csd->multi_site_open)
+		{	/* first time database is opened after upgrading to a GTM version that supports multi-site replication */
+			csd->zqgblmod_seqno = 0;
+			csd->zqgblmod_tn = 0;
+			csd->dualsite_resync_seqno = csd->pre_multisite_resync_seqno;
+			assert(csd->dualsite_resync_seqno);
+			if (!csd->dualsite_resync_seqno)
+				csd->dualsite_resync_seqno = 1;
+			csd->multi_site_open = TRUE;
+		}
 		csa->nl->glob_sec_init = TRUE;
 		STAT_FILE((char *)csa->nl->fname, &stat_buf, stat_res);
 		if (-1 == stat_res)
@@ -567,7 +577,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 #endif
 	} else
 	{
-		if (strcmp(csa->nl->machine_name, machine_name))       /* machine names do not match */
+		if (STRCMP(csa->nl->machine_name, machine_name))       /* machine names do not match */
 		{
 			if (csa->nl->machine_name[0])
 				rts_error(VARLSTCNT(6) ERR_CLSTCONFLICT, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name));
@@ -642,7 +652,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		 * semaphore, shared memory id and semaphore creation time to disk.
 		 */
 		csa->nl->remove_shm = FALSE;
-		strcpy(csd->machine_name, machine_name);
+		STRCPY(csd->machine_name, machine_name);
 		LSEEKWRITE(udi->fd, (off_t)0, (sm_uc_ptr_t)csd, sizeof(sgmnt_data), errno_save);
 		if (0 != errno_save)
 		{
@@ -714,19 +724,8 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	if (!ftok_sem_release(reg, FALSE, FALSE))
 		rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 	/* Do the per process initialization of mutex stuff */
-	if (!mutex_init_done) /* If not already done */
-	{
-		mutex_seed_init();
-		/* The heartbeat timer is used
-		 * 	1) To periodically check if we have older generation journal files open and if so to close them.
-		 *	2) By mutex logic to approximately measure the time spent sleeping while waiting for CRIT or MSEMLOCK.
-		 * Linux currently does not support MSEMs. It uses the heartbeat timer only for (1).
-		 */
-		start_timer((TID)&heartbeat_timer, HEARTBEAT_INTERVAL, heartbeat_timer, 0, NULL);
-#ifndef MUTEX_MSEM_WAKE
-		mutex_sock_init();
-#endif
-		mutex_init_done = TRUE;
-	}
+	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
+	if (!mutex_per_process_init_pid)
+		mutex_per_process_init();
 	return;
 }

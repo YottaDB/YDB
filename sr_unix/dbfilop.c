@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include <errno.h>
+#include <stddef.h>
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -39,6 +40,7 @@ uint4 dbfilop(file_control *fc)
 	struct stat		stat_buf;
 	int4			save_errno;
 	int			fstat_res;
+	sgmnt_data_ptr_t	csd;
 
 	error_def(ERR_DBFILOPERR);
 	error_def(ERR_DBNOTGDS);
@@ -63,8 +65,17 @@ uint4 dbfilop(file_control *fc)
 					else
 						rts_error(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(udi->fn), save_errno);
 				}
-				if ((1 == fc->op_pos) && (0 != memcmp(fc->op_buff, GDS_LABEL, GDS_LABEL_SZ - 3)))
-					rts_error(VARLSTCNT(4) ERR_DBNOTGDS, 2, LEN_AND_STR(udi->fn));
+				if (1 == fc->op_pos)
+				{
+					if (0 != memcmp(fc->op_buff, GDS_LABEL, GDS_LABEL_SZ - 3))
+						rts_error(VARLSTCNT(4) ERR_DBNOTGDS, 2, LEN_AND_STR(udi->fn));
+					if (0 == memcmp(fc->op_buff, GDS_LABEL, GDS_LABEL_SZ - 1))	/* current GDS */
+					{
+						csd = (sgmnt_data_ptr_t)fc->op_buff;
+						if (offsetof(sgmnt_data, minor_dbver) < fc->op_len)
+							CHECK_DB_ENDIAN((sgmnt_data_ptr_t)fc->op_buff, strlen(udi->fn), udi->fn);
+					}
+				}
 				break;
 		case FC_WRITE:
 				if ((1 == fc->op_pos) && ((0 != memcmp(fc->op_buff, GDS_LABEL, GDS_LABEL_SZ - 1))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,14 +11,15 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+#include "gtm_inet.h"
+#include "gtm_stdio.h"
+
 #if !defined(__MVS__) && !defined(VMS)
 #include <sys/param.h>
 #endif
 #include <sys/time.h>
 #include <errno.h>
-#include "gtm_string.h"
-#include <netinet/in.h> /* Required for gtmsource.h */
-#include <arpa/inet.h>
 #ifdef UNIX
 #include <sys/sem.h>
 #endif
@@ -36,27 +37,27 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "repl_dbg.h"
-#include "error.h"
-#include "gtm_stdio.h"
 #include "repl_shutdcode.h"
 #include "repl_sem.h"
 #include "util.h"
+#include "repl_log.h"
 
-GBLREF jnlpool_addrs 	jnlpool;
-GBLREF boolean_t	update_disable;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	gtmsource_options_t	gtmsource_options;
+GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 
-int gtmsource_secnd_update(boolean_t print_message)
+int gtmsource_stopfilter(void)
 {
-	if (grab_sem(SOURCE, SRC_SERV_OPTIONS_SEM) < 0)
+	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
+	repl_log(stderr, TRUE, TRUE,
+		"Initiating STOPSOURCEFILTER operation on source server pid [%d] for secondary instance [%s]\n",
+		jnlpool.gtmsource_local->gtmsource_pid, jnlpool.gtmsource_local->secondary_instname);
+	if ('\0' == jnlpool.gtmsource_local->filter_cmd[0])
 	{
-		util_out_print("Error grabbing jnlpool option write lock. Could not initiate change log", TRUE);
-		return(ABNORMAL_SHUTDOWN);
+		util_out_print("No filter currently active", TRUE);
+		return (ABNORMAL_SHUTDOWN);
 	}
-	grab_lock(jnlpool.jnlpool_dummy_reg);
-	jnlpool.jnlpool_ctl->upd_disabled = update_disable;
-	rel_lock(jnlpool.jnlpool_dummy_reg);
-	rel_sem(SOURCE, SRC_SERV_OPTIONS_SEM);
-	if (print_message)
-		util_out_print("Updates are now !AZ", TRUE, update_disable ? "disabled" : "enabled");
-	return(NORMAL_SHUTDOWN);
+	jnlpool.gtmsource_local->filter_cmd[0] = '\0';
+	util_out_print("Stop filter initiated", TRUE);
+	return (NORMAL_SHUTDOWN);
 }

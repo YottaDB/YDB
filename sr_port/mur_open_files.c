@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,8 +42,6 @@
 #include "dpgbldir_sysops.h"
 #include "gbldirnam.h"
 #include "repl_sem.h"
-#include "repl_msg.h"
-#include "gtmsource.h"
 #include "gtmrecv.h"
 #endif
 #include "mu_rndwn_file.h"
@@ -59,6 +57,8 @@
 #include "tp_change_reg.h"
 #include "gds_rundown.h"
 #include "is_file_identical.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
 
 GBLREF  int		mur_regno;
 GBLREF	jnl_ctl_list	*mur_jctl;
@@ -66,6 +66,7 @@ GBLREF	reg_ctl_list	*mur_ctl;
 GBLREF	mur_opt_struct	mur_options;
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF	gd_region	*gv_cur_region;
+GBLREF	jnlpool_addrs	jnlpool;
 
 #define            		STAR_QUOTE "\"*\""
 boolean_t mur_open_files()
@@ -171,14 +172,16 @@ boolean_t mur_open_files()
 	if (mur_options.rollback)
 	{	/* Rundown the Jnlpool and Recvpool */
 #if defined(UNIX)
-		if (!repl_inst_get_name((char *)replpool_id.instname, &full_len, sizeof(replpool_id.instname)))
+		if (!repl_inst_get_name((char *)replpool_id.instfilename, &full_len, sizeof(replpool_id.instfilename)))
 		{
 			gtm_putmsg(VARLSTCNT(1) ERR_REPLINSTUNDEF);
 			return FALSE;
 		}
 		if (!mu_rndwn_repl_instance(&replpool_id, FALSE))
 			return FALSE;	/* mu_rndwn_repl_instance will have printed appropriate message in case of error */
+		assert(NULL == jnlpool.repl_inst_filehdr);
 		murgbl.repl_standalone = mu_replpool_grab_sem(FALSE);
+		assert(NULL != jnlpool.repl_inst_filehdr);
 #elif defined(VMS)
 		gbldir_mstr.addr = DEF_GDR;
 		gbldir_mstr.len = sizeof(DEF_GDR) - 1;
@@ -197,7 +200,7 @@ boolean_t mur_open_files()
 			set_gdid_from_file((gd_id_ptr_t)&file_id, replpool_id.gtmgbldir, tran_name->len);
 			global_name("GT$P", &file_id, res_name); /* P - Stands for Journal Pool */
 			res_name[res_name[0] + 1] = '\0';
-			strcpy(replpool_id.repl_pool_key, &res_name[1]);
+			STRCPY(replpool_id.repl_pool_key, &res_name[1]);
 			replpool_id.pool_type = JNLPOOL_SEGMENT;
 			sgmnt_found = FALSE;
 			if (mu_rndwn_replpool(&replpool_id, FALSE, &sgmnt_found) && sgmnt_found)
@@ -211,7 +214,7 @@ boolean_t mur_open_files()
 			}
 			global_name("GT$R", &file_id, res_name); /* R - Stands for Recv Pool */
 			res_name[res_name[0] + 1] = '\0';
-			strcpy(replpool_id.repl_pool_key, &res_name[1]);
+			STRCPY(replpool_id.repl_pool_key, &res_name[1]);
 			replpool_id.pool_type = RECVPOOL_SEGMENT;
 			sgmnt_found = FALSE;
 			if (mu_rndwn_replpool(&replpool_id, FALSE, &sgmnt_found) && sgmnt_found)

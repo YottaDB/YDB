@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2006 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -193,9 +193,8 @@ int gtmrecv_helpers_init(int n_readers, int n_writers)
 				writer_count++;
 		} else /* UPDPROC_START_ERR == status */
 		{
-			if (EREPL_UPDSTART_BADPATH == repl_errno) /* receiver server lost gtm_dist environment, bad situation */
-				gtmrecv_autoshutdown();
-			if (EREPL_UPDSTART_EXEC == repl_errno) /* in forked child, could not exec, should exit */
+			if ((EREPL_UPDSTART_BADPATH == repl_errno) /* receiver server lost gtm_dist environment, bad situation */
+					|| (EREPL_UPDSTART_EXEC == repl_errno)) /* in forked child, could not exec, should exit */
 				gtmrecv_exit(ABNORMAL_SHUTDOWN);
 			error_count++;
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,8 +15,8 @@
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <errno.h>
-#include <unistd.h>
 
+#include "gtm_unistd.h"
 #include "gtm_string.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -55,6 +55,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	file_control		*fc;
 	unix_db_info		*udi;
 	gd_region		*temp_region;
+	char			sgmnthdr_unaligned[SGMNT_HDR_LEN + 8], *sgmnthdr_8byte_aligned;
 
 	error_def (ERR_TEXT);
 	error_def (ERR_CRITSEMFAIL);
@@ -73,7 +74,9 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 		gv_cur_region = temp_region;
 		return FALSE;
 	}
-	csd = (sgmnt_data_ptr_t)malloc(sizeof(*csd));
+	sgmnthdr_8byte_aligned = &sgmnthdr_unaligned[0];
+	sgmnthdr_8byte_aligned = (char *)ROUND_UP2((unsigned long)sgmnthdr_8byte_aligned, 8);
+	csd = (sgmnt_data_ptr_t)&sgmnthdr_8byte_aligned[0];
 	fc = reg->dyn.addr->file_cntl;
 	fc->op = FC_OPEN;
 	status = dbfilop(fc);
@@ -90,7 +93,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	 * At the end of this routine, we release ftok semaphore.
 	 * Now read file header and continue with main operation of this routine.
 	 */
-	LSEEKREAD(udi->fd, (off_t)0, csd, sizeof(*csd), status);
+	LSEEKREAD(udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
 	if (0 != status)
 	{
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
@@ -105,7 +108,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 		csd->shmid = INVALID_SHMID;
 		csd->sem_ctime.ctime = 0;
 		csd->shm_ctime.ctime = 0;
-		LSEEKWRITE(udi->fd, (off_t)0, csd, sizeof(*csd), status);
+		LSEEKWRITE(udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
 		if (0 != status)
 		{
 			gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
@@ -151,7 +154,6 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	udi->shmid = INVALID_SHMID;
 	udi->sem_ctime = 0;
 	udi->shm_ctime = 0;
-	free(csd);
 	assert((reg != standalone_reg) || (NULL == standalone_reg));	/* ftok_sem_release() should have NULLified it */
 	standalone_reg = NULL;		/* just in case */
 	return TRUE;

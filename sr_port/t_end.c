@@ -47,6 +47,10 @@
 #include "cws_insert.h"
 #include "min_max.h"
 
+#ifdef UNIX
+#include "gtmrecv.h"
+#endif
+
 /* Include prototypes */
 #include "t_qread.h"
 #include "t_retry.h"
@@ -126,6 +130,10 @@ GBLREF	boolean_t		mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified
 GBLREF	trans_num		mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block processed by REORG UP/DOWNGRADE */
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
+
+#ifdef UNIX
+GBLREF	recvpool_addrs		recvpool;
+#endif
 
 /* This macro isn't enclosed in parantheses to allow for optimizations */
 #define VALIDATE_CYCLE(history)						\
@@ -882,8 +890,21 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 					QWASSIGN(csa->hdr->reg_seqno, tjpl->jnl_seqno);
 					if (is_updproc)
 					{
-						QWINCRBY(jgbl.max_resync_seqno, seq_num_one);
-						QWASSIGN(csa->hdr->resync_seqno, jgbl.max_resync_seqno);
+						VMS_ONLY(
+							QWINCRBY(jgbl.max_resync_seqno, seq_num_one);
+							QWASSIGN(csa->hdr->resync_seqno, jgbl.max_resync_seqno);
+						)
+						UNIX_ONLY(
+							assert(REPL_PROTO_VER_UNINITIALIZED !=
+								recvpool.gtmrecv_local->last_valid_remote_proto_ver);
+							if (REPL_PROTO_VER_DUALSITE ==
+								recvpool.gtmrecv_local->last_valid_remote_proto_ver)
+							{
+								QWINCRBY(jgbl.max_dualsite_resync_seqno, seq_num_one);
+								QWASSIGN(csa->hdr->dualsite_resync_seqno,
+									jgbl.max_dualsite_resync_seqno);
+							}
+						)
 					}
 				}
 			} else

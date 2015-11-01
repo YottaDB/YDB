@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -78,7 +78,7 @@
  . Quit
  For  Use in Quit:$ZEOF  Read msg Do:$Extract(msg,1)?1u
  . New delim,i1,lomsg
- . Set cnt=cnt+1 If cnt>4095
+ . Set cnt=cnt+1 If cnt>4095 Do
  . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . Write !,"Cannot process more than 4095 messages."
  . . Write !,"Overflow occurred at:",!,msg
@@ -163,7 +163,7 @@ hdr New year
  Write "/****************************************************************",!
  Write " *",$Char(9,9,9,9,9,9,9,9),"*",!
  Write " *",$Char(9),"Copyright 2001"
- Write:year'=2001 ",",year Write " Sanchez Computer Associates, Inc.",$Char(9),"*",!
+ Write:year'=2001 ",",year Write " Fidelity Information Services, Inc",$Char(9),"*",!
  Write " *",$Char(9,9,9,9,9,9,9,9),"*",!
  Write " *",$Char(9),"This source code contains the intellectual property",$Char(9),"*",!
  Write " *",$Char(9),"of its copyright holder(s), and is made available",$Char(9),"*",!

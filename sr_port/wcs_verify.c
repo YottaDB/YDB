@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -253,7 +253,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 			assert(expect_damage);
 			ret = FALSE;
 			send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg),
-				th, th->blk, RTS_ERROR_TEXT("tnque"), th->tnque.bl, (sm_uc_ptr_t)th_prev - (sm_uc_ptr_t)th);
+				th, th->blk, RTS_ERROR_TEXT("tnque.bl"), th->tnque.bl, (sm_uc_ptr_t)th_prev - (sm_uc_ptr_t)th);
 		}
 		if (th->tn != 0)
 		{
@@ -293,6 +293,14 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 			ret = FALSE;
 			send_msg(VARLSTCNT(8) ERR_DBFHEADERR, 6, DB_LEN_STR(reg),
 				RTS_ERROR_TEXT("th->flushing"), th->flushing, FALSE);
+		}
+		if (0 == th->tnque.fl)
+		{	/* No point proceeding to next iteration of loop as "th + th->tnque.fl" will be the same as "th" */
+			assert(expect_damage);
+			ret = FALSE;
+			send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg),
+				th, th->blk, RTS_ERROR_TEXT("tnque.fl"), th->tnque.fl, -1);
+			break;
 		}
 	}
 	if (cnt != 1)
@@ -353,7 +361,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 				assert(expect_damage);
 				ret = FALSE;
 				send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), bt, bt->blk,
-					RTS_ERROR_TEXT("btque"), bt->blkque.bl, (sm_uc_ptr_t)bt_prev - (sm_uc_ptr_t)bt);
+					RTS_ERROR_TEXT("bt->blkque.bl"), bt->blkque.bl, (sm_uc_ptr_t)bt_prev - (sm_uc_ptr_t)bt);
 			}
 			if ((int)(bt->blk) != BT_NOTVALID)
 			{
@@ -367,7 +375,20 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 				if (CR_NOTVALID != bt->cache_index)
 				{
 					cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
-					if (cr->blk != bt->blk)
+					/* Before checking if "cr->blk" is the same as "bt->blk", check if "cr" is valid */
+					if (CR_NOT_IN_RANGE(cr, cr_lo, cr_hi))
+					{
+						assert(expect_damage);
+						ret = FALSE;
+						send_msg(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
+							bt, bt->blk, cr, RTS_ERROR_TEXT("bt->cache_index"), cr_lo, cr_hi);
+					} else if (CR_NOT_ALIGNED(cr, cr_lo))
+					{
+						assert(expect_damage);
+						ret = FALSE;
+						send_msg(VARLSTCNT(11) ERR_DBADDRALIGN, 9, DB_LEN_STR(reg), bt, bt->blk,
+							RTS_ERROR_TEXT("bt->cache_index"), cr, cr_lo, sizeof(cache_rec));
+					} else if (cr->blk != bt->blk)
 					{
 						assert(expect_damage);
 						ret = FALSE;
@@ -377,7 +398,15 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 					}
 				}
 			}
-			blkque_array[bt - bt_lo] = TRUE; /* note the fact that this bt's blkque validity is already checked */
+			blkque_array[bt - bt_lo] = TRUE; /* note the fact that this bt's blkque hash validity is already checked */
+			if (0 == bt->blkque.fl)
+			{	/* No point proceeding to next iteration of loop as "bt + bt->blkque.fl" will be the same as "bt" */
+				assert(expect_damage);
+				ret = FALSE;
+				send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), bt, bt->blk,
+					RTS_ERROR_TEXT("bt->blkque.fl"), bt->blkque.fl, -1);
+				break;
+			}
 		}
 		if (cnt == 0)
 		{
@@ -717,7 +746,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 				assert(expect_damage);
 				ret = FALSE;
 				send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cr, cr->blk,
-					RTS_ERROR_TEXT("crque"), cr->blkque.bl, (sm_uc_ptr_t)cr_prev - (sm_uc_ptr_t)cr);
+					RTS_ERROR_TEXT("cr->blkque.bl"), cr->blkque.bl, (sm_uc_ptr_t)cr_prev - (sm_uc_ptr_t)cr);
 			}
 			if (((int)(cr->blk) != CR_BLKEMPTY) && ((cr_qbase + (cr->blk % csd->bt_buckets)) != cr0))
 			{
@@ -750,7 +779,15 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 					cr->blk = CR_BLKEMPTY;
 				}
 			}
-			blkque_array[cr - cr_lo] = TRUE; /* note the fact that this cr's blkque validity is already checked */
+			blkque_array[cr - cr_lo] = TRUE; /* note the fact that this cr's blkque hash validity is already checked */
+			if (0 == cr->blkque.fl)
+			{	/* No point proceeding to next iteration of loop as "cr + cr->blkque.fl" will be the same as "cr" */
+				assert(expect_damage);
+				ret = FALSE;
+				send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cr, cr->blk,
+					RTS_ERROR_TEXT("cr->blkque.fl"), cr->blkque.fl, -1);
+				break;
+			}
 		}
 		if (cnt == 0)
 		{
@@ -818,8 +855,8 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, 0,
-				RTS_ERROR_TEXT("active queue"), cstt->state_que.bl, (sm_uc_ptr_t)cstt_prev - (sm_uc_ptr_t)cstt);
+			send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, cstt->blk,
+				RTS_ERROR_TEXT("active queue.bl"), cstt->state_que.bl, (sm_uc_ptr_t)cstt_prev - (sm_uc_ptr_t)cstt);
 		}
 		if (0 == cstt->dirty)
 		{
@@ -843,6 +880,14 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		 */
 		if (caller_is_wcs_recover)
 			cstt->dirty = FAKE_DIRTY;	/* change the flag to indicate it was found in a state queue */
+		if (0 == cstt->state_que.fl)
+		{	/* No point proceeding to next iteration of loop as "cstt + cstt->state_que.fl" will be same as "cstt" */
+			assert(expect_damage);
+			ret = FALSE;
+			send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, cstt->blk,
+				RTS_ERROR_TEXT("active queue.fl"), cstt->state_que.fl, -1);
+			break;
+		}
 	}
 	if (cnt == 0)
 	{
@@ -894,18 +939,18 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, 0,
-				RTS_ERROR_TEXT("wip queue"), cstt->state_que.bl, (sm_uc_ptr_t)cstt_prev - (sm_uc_ptr_t)cstt);
+			send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, cstt->blk,
+				RTS_ERROR_TEXT("wip queue.bl"), cstt->state_que.bl, (sm_uc_ptr_t)cstt_prev - (sm_uc_ptr_t)cstt);
 		}
-/*	secondary failure @ ipb - not yet determined if it was a legal state or a recover problem
-		if (cstt->epid == 0)
-		{
-			assert(expect_damage);
-			ret = FALSE;
-			send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
-				cr, cstt->blk, RTS_ERROR_TEXT("wip cr->epid"), cstt->epid, -1, CALLFROM);
-		}
-*/
+		/* Secondary failure @ ipb - not yet determined if it was a legal state or a recover problem
+		 *	if (cstt->epid == 0)
+		 *	{
+		 *		assert(expect_damage);
+		 *		ret = FALSE;
+		 *		send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
+		 *			cr, cstt->blk, RTS_ERROR_TEXT("wip cr->epid"), cstt->epid, -1, CALLFROM);
+		 *	}
+		 */
 		if (0 == cstt->dirty)
 		{
 			assert(expect_damage);
@@ -928,6 +973,14 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		 */
 		if (caller_is_wcs_recover)
 			cstt->dirty = FAKE_DIRTY;	/* change the flag to indicate it was found in a state queue */
+		if (0 == cstt->state_que.fl)
+		{
+			assert(expect_damage);
+			ret = FALSE;
+			send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, cstt->blk,
+				RTS_ERROR_TEXT("wip queue.fl"), cstt->state_que.fl, -1);
+			break;
+		}
 	}
 	if (cnt == 0)
 	{

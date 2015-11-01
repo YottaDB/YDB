@@ -26,11 +26,13 @@
 
 #include "heartbeat_timer.h"
 #include "gt_timer.h"
-
+#include "gtmimagename.h"
+#include "gtcm_jnl_switched.h"
 #include "dpgbldir.h"
 
 GBLREF	volatile uint4		heartbeat_counter;
 GBLREF	boolean_t		is_src_server;
+GBLREF	enum gtmImageTypes	image_type;
 
 void heartbeat_timer(void)
 {
@@ -70,6 +72,8 @@ void heartbeat_timer(void)
 					F_CLOSE(jpc->channel, rc);
 					jpc->channel = NOJNL;
 					jpc->pini_addr = 0;
+					if (GTCM_GNP_SERVER_IMAGE == image_type)
+						gtcm_jnl_switched();
 				}
 			}
 		}

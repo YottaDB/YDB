@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
+ *	Copyright 2006 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -119,6 +119,13 @@ typedef struct
 						 * wraps. Used for detecting space used in the receive pool */
 	uint4			initialized;	/* Boolean, has receive pool been initialized? */
 	uint4			fresh_start;	/* Boolean, fresh_start or crash_start? */
+	repl_triple		last_rcvd_triple;	/* Triple info from the last received REPL_NEW_TRIPLE message */
+	repl_triple		last_valid_triple;	/* Triple info corresponding to last logical record written into
+							 * receive pool by the receiver. This is almost always the same as
+							 * last_rcvd_triple except in the window between receiving a
+							 * new triple and the first logical records corresponding to it.
+							 */
+	volatile seq_num	max_dualsite_resync_seqno; /* Resync Seqno of this instance assuming remote primary is dualsite */
 } recvpool_ctl_struct;
 
 /*
@@ -166,6 +173,19 @@ typedef struct
 	volatile uint4	restart;		/* Used by receiver server to coordinate crash restart with update process */
 	volatile uint4	changelog;		/* Boolean - change the log file */
 	volatile uint4	log_interval;		/* Interval (in seqnos) at which receiver logs its progress */
+	char		remote_proto_ver;	/* Protocol version of the source server. Need to be signed in order to be able to
+						 * do signed comparisons of this with the macros REPL_PROTO_VER_DUALSITE (0)
+						 * and REPL_PROTO_VER_UNINITIALIZED (-1) */
+	char		last_valid_remote_proto_ver;/* Protocol version of the last source server that communicated with
+						 * this receiver server. This is a copy of "remote_proto_ver" taken whenever
+						 * the receiver server establishes connection with the source server. It is
+						 * almost always the same as "remote_proto_ver" except when the receiver has
+						 * lost connection with the source server in which case the latter will
+						 * be uninitialized while the former will stay unchanged. Need to be signed in
+						 * order to be able to do signed comparisons of this with the macros
+						 * REPL_PROTO_VER_DUALSITE (0) and REPL_PROTO_VER_UNINITIALIZED (-1).
+						 */
+	char		filler_align_16[6];	/* Make it 16 byte aligned before big character arrays begin */
 	char		filter_cmd[MAX_FILTER_CMD_LEN];	/* Receiver filters incoming records using this process */
 	char		log_file[MAX_FN_LEN + 1];	/* File to log receiver progress */
 	char		statslog_file[MAX_FN_LEN + 1];	/* File to log statistics */
@@ -321,7 +341,7 @@ void	gtmrecv_free_filter_buff(void);
 int	is_updproc_alive(void);
 int	is_srv_alive(int srv_type);
 int	is_recv_srv_alive(void);
-void	recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup, boolean_t lock_opt_sem);
+void	recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup);
 void	gtmrecv_reinit_logseqno(void);
 int	gtmrecv_helpers_init(int n_readers, int n_writers);
 int	gtmrecv_start_helpers(int n_readers, int n_writers);

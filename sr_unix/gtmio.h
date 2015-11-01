@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,8 @@
  * CLOSEFILE	Loop until close succeeds for fails with other than EINTR.
  * LSEEKREAD	Performs either pread() or an lseek()/ read() combination. In
  *		the latter case, sets global variable to warn off async IO routines.
+ * LSEEKREAD_AVAILABLE	Same as LSEEKREAD except it has an extra parameter where the number of bytes
+ *			ACTUALLY READ are stored irrespective of whether all REQUESTED BYTES were read or not.
  * LSEEKWRITE	Same as LSEEKREAD but for WRITE.
  * DOREADRC	Performs read, returns code 0 if okay, otherwise returns errno.
  * DOREADRL     Performs read but returns length read or -1 if errno is set.
@@ -316,6 +318,42 @@ for (cntr = 0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
 		RC = -1;		/* Something kept us from reading what we wanted */ \
 }
 
+/* The below macro is almost the same as LSEEKREAD except it has an extra parameter where the number of
+ * bytes ACTUALLY READ are stored irrespective of whether all REQUESTED BYTES were read or not.
+ */
+#define LSEEKREAD_AVAILABLE(FDESC, FPTR, FBUFF, FBUFF_LEN, ACTUAL_READLEN, RC)			\
+{												\
+	ssize_t			gtmioStatus;							\
+	size_t			gtmioBuffLen;							\
+	off_t			gtmioPtr;							\
+	sm_uc_ptr_t 		gtmioBuff;							\
+												\
+	gtmioBuffLen = (FBUFF_LEN); 								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF); 							\
+	gtmioPtr = (off_t)(FPTR);								\
+	for (;;)										\
+        {											\
+		if (-1 != (gtmioStatus = pread(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr)))	\
+		{										\
+			gtmioBuffLen -= gtmioStatus;						\
+			if (0 == gtmioBuffLen || 0 == gtmioStatus)				\
+			        break;								\
+			gtmioBuff += gtmioStatus;						\
+			gtmioPtr += gtmioStatus;						\
+			continue;								\
+		}										\
+		if (EINTR != errno)								\
+			break;									\
+        }											\
+	(ACTUAL_READLEN) = (FBUFF_LEN) - gtmioBuffLen;						\
+	if (0 == gtmioBuffLen)									\
+		RC = 0;										\
+	else if (-1 == gtmioStatus)    	/* Had legitimate error - return it */			\
+		RC = errno;									\
+	else											\
+		RC = -1;		/* Something kept us from reading what we wanted */	\
+}
+
 #define LSEEKWRITE(FDESC, FPTR, FBUFF, FBUFF_LEN, RC) \
 { \
 	ssize_t			gtmioStatus; \
@@ -408,6 +446,48 @@ for (cntr = 0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
 	else \
 		RC = -1;		/* Something kept us from reading what we wanted */ \
 	SET_LSEEK_FLAG(FDESC, FALSE);	/* Reason this is last is so max optimization occurs */ \
+}
+
+/* The below macro is almost the same as LSEEKREAD except it has an extra parameter where the number of
+ * bytes ACTUALLY READ are stored irrespective of whether all REQUESTED BYTES were read or not.
+ */
+#define LSEEKREAD_AVAILABLE(FDESC, FPTR, FBUFF, FBUFF_LEN, ACTUAL_READLEN, RC)			\
+{												\
+	GBLREF boolean_t	*lseekIoInProgress_flags;					\
+	ssize_t			gtmioStatus;							\
+	size_t			gtmioBuffLen;							\
+	off_t			gtmioPtr;							\
+	sm_uc_ptr_t 		gtmioBuff;							\
+												\
+	SET_LSEEK_FLAG(FDESC, TRUE);								\
+	gtmioBuffLen = FBUFF_LEN;								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
+	gtmioPtr = (off_t)(FPTR);								\
+	for (;;)										\
+        {											\
+		if (-1 != (gtmioStatus = (ssize_t)lseek(FDESC, gtmioPtr, SEEK_SET)))		\
+		{										\
+			if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))		\
+			{									\
+				gtmioBuffLen -= gtmioStatus;					\
+				if (0 == gtmioBuffLen || 0 == gtmioStatus)			\
+				        break;							\
+				gtmioBuff += gtmioStatus;					\
+				gtmioPtr += gtmioStatus;					\
+				continue;							\
+			}									\
+		}										\
+		if (EINTR != errno)								\
+			break;									\
+        }											\
+	(ACTUAL_READLEN) = (FBUFF_LEN) - gtmioBuffLen;						\
+	if (0 == gtmioBuffLen)									\
+		RC = 0;										\
+	else if (-1 == gtmioStatus)    	/* Had legitimate error - return it */			\
+		RC = errno;									\
+	else											\
+		RC = -1;		/* Something kept us from reading what we wanted */	\
+	SET_LSEEK_FLAG(FDESC, FALSE);	/* Reason this is last is so max optimization occurs */	\
 }
 
 #define LSEEKWRITE(FDESC, FPTR, FBUFF, FBUFF_LEN, RC) \

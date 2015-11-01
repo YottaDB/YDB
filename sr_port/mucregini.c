@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,6 @@
 GBLREF 	gd_region		*gv_cur_region;
 GBLREF 	sgmnt_data_ptr_t	cs_data;
 GBLREF 	sgmnt_addrs		*cs_addrs;
-GBLREF	seq_num			seq_num_one;
 
 void mucregini(int4 blk_init_size)
 {
@@ -139,10 +138,23 @@ void mucregini(int4 blk_init_size)
 	 * Note that even though gv_cur_region->jnl_state is jnl_notallowed, gv_cur_region->jnl_file_len can be non-zero
 	 */
 	cs_data->jnl_file_len = JNL_ALLOWED(cs_data) ? gv_cur_region->jnl_file_len : 0;
-	QWASSIGN(cs_data->reg_seqno, seq_num_one);
-	QWASSIGN(cs_data->resync_seqno, seq_num_one);
-	QWASSIGN(cs_data->old_resync_seqno, seq_num_one);
-	cs_data->resync_tn = 1;
+	cs_data->reg_seqno = 1;
+	VMS_ONLY(
+		cs_data->resync_seqno = 1;
+		cs_data->old_resync_seqno = 1;
+		cs_data->resync_tn = 1;
+	)
+	UNIX_ONLY(
+		/* zqgblmod_seqno is initialized to 0 at db creation time (to ensure that $ZQGBLMOD will unconditionally return
+		 * the safe value of TRUE by default). This default value of 0 is also relied upon by the source server logic
+		 * when updating this as part of a fetchresync rollback. Initialize zqgblmod_tn to 0 to correspond to the seqno.
+		 */
+		cs_data->zqgblmod_seqno = 0;
+		cs_data->zqgblmod_tn = 0;
+		cs_data->dualsite_resync_seqno = 1;
+		assert(!cs_data->multi_site_open);
+		cs_data->multi_site_open = TRUE;
+	)
 	cs_data->repl_state = repl_closed;              /* default */
 	if (cs_data->jnl_file_len)
 	{

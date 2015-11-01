@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -208,7 +208,6 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 			if (INPUT_CHAR < ' '  &&  ((1 << INPUT_CHAR) & tt_ptr->enbld_outofbands.mask))
 			{
 				std_dev_outbndset(INPUT_CHAR);
-				outofband = 0;
 				if (timed)
 				{
 					if (msec_timeout == 0)

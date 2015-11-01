@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,7 @@
 
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	boolean_t		mupip_jnl_recover;
-GBLREF	boolean_t		created_core, need_core, dont_want_core, is_src_server, is_rcvr_server, is_updproc;
+GBLREF	boolean_t		created_core, need_core, dont_want_core, is_src_server, is_updproc;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -97,6 +97,7 @@ GBLREF	enum gtmImageTypes	image_type;
 GBLREF	jnl_process_vector	*prc_vec;
 GBLREF	jnl_process_vector	*originator_prc_vec;
 GBLREF 	jnl_gbls_t		jgbl;
+GBLREF	boolean_t		dse_running;
 
 static boolean_t		grabbed_access_sem;
 
@@ -399,9 +400,14 @@ void gds_rundown(void)
 							jnl_put_jrt_pini(csa);
 						if (0 != jpc->pini_addr)
 							jnl_put_jrt_pfin(csa);
-						/* if not the last writer and no pending flush timer left, do jnl flush now */
+						/* If not the last writer and no pending flush timer left, do jnl flush now */
 						if (!we_are_last_writer && (0 > csa->nl->wcs_timers))
+						{
 							jnl_flush(reg);
+							assert(jpc->jnl_buff->freeaddr == jpc->jnl_buff->dskaddr);
+							jnl_fsync(gv_cur_region, jpc->jnl_buff->dskaddr);
+							assert(jpc->jnl_buff->fsync_dskaddr == jpc->jnl_buff->dskaddr);
+						}
 						jnl_file_close(reg, we_are_last_writer, FALSE);
 					} else
 						send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
@@ -497,7 +503,6 @@ void gds_rundown(void)
 	/* If file is still not in good shape, die here and now before we get rid of our storage */
 	if (csa->wbuf_dqd)
 		GTMASSERT;
-	assert (!is_rcvr_server);
 	ipc_deleted = FALSE;
 	/* If we are the very last user, remove shared storage id and the semaphores */
 	if (we_are_last_user)

@@ -76,6 +76,10 @@
 #include "jobexam_process.h"
 #include "jobinterrupt_process_cleanup.h"
 
+#ifdef UNIX
+#include "ftok_sems.h"
+#endif
+
 GBLREF	spdesc		stringpool, rts_stringpool, indr_stringpool;
 GBLREF	volatile int4	outofband;
 GBLREF	volatile bool	std_dev_outbnd;
@@ -178,6 +182,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 	boolean_t		error_in_zyerror;
 	boolean_t		repeat_error, etrap_handling;
 	int			level;
+
+#ifdef UNIX
+	unix_db_info		*udi;
+#endif
 
 	static unsigned char dumpable_error_dump_file_parms[2] = {iop_newversion, iop_eol};
 	static unsigned char dumpable_error_dump_file_noparms[1] = {iop_eol};
@@ -376,6 +384,22 @@ CONDITION_HANDLER(mdb_condition_handler)
 				}
 			}
 		}
+		UNIX_ONLY(
+			/* Release FTOK lock on the replication instance file if holding it (possible if error in jnlpool_init) */
+			assert((NULL == jnlpool.jnlpool_dummy_reg) || jnlpool.jnlpool_dummy_reg->open);
+			if ((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
+			{
+				udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+				assert(NULL != udi);
+				if (NULL != udi)
+				{
+					if (udi->grabbed_ftok_sem)
+						ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, FALSE);
+					assert(!udi->grabbed_ftok_sem);
+				}
+			}
+		)
+		/* Release crit lock on journal pool if holding it */
 		if (pool_init) /* atleast one region replicated and we have done jnlpool init */
 		{
 			csa = (sgmnt_addrs *)&FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;

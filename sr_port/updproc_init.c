@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,12 +61,15 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 	error_def(ERR_RECVPOOLSETUP);
 	error_def(ERR_TEXT);
 
-	recvpool_init(UPDPROC, FALSE, FALSE);
+	VMS_ONLY(recvpool_init(UPDPROC, FALSE, FALSE);)
+	UNIX_ONLY(recvpool_init(UPDPROC, FALSE);)
+	/* The log file can be initialized only after having attached to the receive pool as the update process log file name
+	 * is derived from the receiver server log file name which is in turn available only in the receive pool.
+	 */
 	upd_log_init(UPDPROC);
-
-	/*
-	 * Lock the update process count semaphore. Its value should
-	 * be atmost 1
+	/* Lock the update process count semaphore. Its value should be atmost 1. The call to grab the update process
+	 * COUNT semaphore can be done only after attaching to the receive pool as that is what initializes the semaphore
+	 * set id which is in turn used by the "grab_sem_immediate" function.
 	 */
 	if (0 != grab_sem_immediate(RECV, UPD_PROC_COUNT_SEM))
 	{
@@ -76,7 +79,6 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Receive pool semop error"), REPL_SEM_ERRNO);
 	}
-
 	v.mvtype = MV_STR; /* get the desired global directory */
         v.str.len = 0;
         gd_header = zgbldir(&v);

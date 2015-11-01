@@ -43,6 +43,15 @@
 #include "stringpool.h"		/* for GET_CURR_TIME_IN_DOLLARH_AND_ZDATE macro */
 #include "op.h"
 
+/* In mdef.h the definition of ENDIANTHIS is defined to either "BIG" or "LITTLE", however, unique in this module
+   is the need for a right adjusted version of ENDIANTHIS should the value happen to be "BIG". Rather than complicate
+   things in general, just override it for this module.
+*/
+#ifdef BIGENDIAN
+#  undef ENDIANTHIS
+#  define ENDIANTHIS "   BIG"
+#endif
+
 #define MAX_UTIL_LEN    	64
 #define NEXT_EPOCH_TIME_SPACES	"                   " /* 19 spaces, we have 19 character field width to output Next Epoch Time */
 
@@ -211,17 +220,23 @@ void dse_dmp_fhead (void)
 		util_out_print("  Replication State           !AD", FALSE, 13,
 			(csd->repl_state == repl_closed ? "          OFF"
 			: (csd->repl_state == repl_open ? "           ON" : " [WAS_ON] OFF")));
-#ifndef __vax
 		util_out_print("  Region Seqno    0x!16@XJ", TRUE, &csd->reg_seqno);
-		util_out_print("  Resync Seqno           0x!16@XJ", FALSE, &csd->resync_seqno);
-#else
-		util_out_print("  Region Seqno    0x00000000!8@XJ", TRUE, &csd->reg_seqno);
-		util_out_print("  Resync Seqno           0x00000000!8@XJ", FALSE, &csd->resync_seqno);
-#endif
-		util_out_print("  Resync trans    0x!16@XJ", TRUE, &csd->resync_tn);
+		VMS_ONLY(
+			util_out_print("  Resync Seqno           0x!16@XJ", FALSE, &csd->resync_seqno);
+			util_out_print("  Resync trans    0x!16@XJ", TRUE, &csd->resync_tn);
+		)
+		UNIX_ONLY(
+			util_out_print("  Zqgblmod Seqno         0x!16@XJ", FALSE, &csd->zqgblmod_seqno);
+			util_out_print("  Zqgblmod Trans  0x!16@XJ", TRUE, &csd->zqgblmod_tn);
+		)
+		util_out_print("  Endian Format                      !6AZ", TRUE, ENDIANTHIS);
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump if -/ALL as if part of above display */
+                util_out_print(0, TRUE);
+		UNIX_ONLY(
+			util_out_print("  Dualsite Resync Seqno  0x!16@XJ", TRUE, &csd->dualsite_resync_seqno);
+		)
 		util_out_print("  Blks Last Record Backup        0x!8XL", FALSE, csd->last_rec_bkup_last_blk);
 		util_out_print("  Blks Last Stream Backup 0x!8XL", TRUE, csd->last_inc_bkup_last_blk);
 		util_out_print("  Blks Last Comprehensive Backup 0x!8XL", FALSE, csd->last_com_bkup_last_blk);
@@ -295,28 +310,28 @@ void dse_dmp_fhead (void)
 		jb = jpc->jnl_buff;
 		util_out_print(0, TRUE);
 		/* --------------------------- journal buffer --------------------------------- */
-		util_out_print("  Jnl Buffer Size       !12UL", FALSE, jb->size);
+		util_out_print("  Jnl Buffer Size         0x!8XL", FALSE, jb->size);
 		util_out_print("      ", FALSE);
-		util_out_print("  Dskaddr               !12UL", TRUE, jb->dskaddr);
-		util_out_print("  Free                  !12UL", FALSE, jb->free);
+		util_out_print("  Dskaddr                 0x!8XL", TRUE, jb->dskaddr);
+		util_out_print("  Free                    0x!8XL", FALSE, jb->free);
 		util_out_print("      ", FALSE);
-		util_out_print("  Freeaddr              !12UL", TRUE, jb->freeaddr);
-		util_out_print("  Dsk                   !12UL", FALSE, jb->dsk);
+		util_out_print("  Freeaddr                0x!8XL", TRUE, jb->freeaddr);
+		util_out_print("  Dsk                     0x!8XL", FALSE, jb->dsk);
 		util_out_print("      ", FALSE);
-		util_out_print("  Wrtsize               !12UL", TRUE, jb->wrtsize);
+		util_out_print("  Wrtsize                 0x!8XL", TRUE, jb->wrtsize);
 		util_out_print("  Journal checksum seed   0x!8XL", FALSE, csd->jnl_checksum);
 		util_out_print("      ", FALSE);
-		util_out_print("  Min_write_size        !12UL", TRUE, jb->min_write_size);
-		util_out_print("  bytcnt                !12UL", FALSE, jb->bytcnt);
+		util_out_print("  Min_write_size          0x!8XL", TRUE, jb->min_write_size);
+		util_out_print("  bytcnt                  0x!8XL", FALSE, jb->bytcnt);
 		util_out_print("      ", FALSE);
-		util_out_print("  Max_write_size        !12UL", TRUE, jb->max_write_size);
+		util_out_print("  Max_write_size          0x!8XL", TRUE, jb->max_write_size);
 		util_out_print("  Before image                 !AD", FALSE, 5, (jb->before_images ? " TRUE" : "FALSE"));
 		util_out_print("      ", FALSE);
 		util_out_print("  Filesize              !12UL", TRUE, jb->filesize);
 		util_out_print("  Iosb.cond             !12UW", FALSE, jb->iosb.cond);
 		util_out_print("      ", FALSE);
 		util_out_print("  qiocnt                !12UL", TRUE, jb->qiocnt);
-		util_out_print("  Iosb.length           !12UW", FALSE, jb->iosb.length);
+		util_out_print("  Iosb.length                 0x!4XW", FALSE, jb->iosb.length);
 		util_out_print("      ", FALSE);
 		util_out_print("  errcnt                !12UL", TRUE, jb->errcnt);
 		util_out_print("  Iosb.dev_specific     !12UL", FALSE, jb->iosb.dev_specific);

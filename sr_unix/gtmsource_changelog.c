@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
+ *	Copyright 2006 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,29 +36,27 @@
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
+GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 
 int gtmsource_changelog(void)
 {
 	uint4	changelog_desired = 0, changelog_accepted = 0;
 
-	if (0 > grab_sem(SOURCE, SRC_SERV_OPTIONS_SEM))
-	{
-		util_out_print("Error grabbing jnlpool option write lock. Could not initiate change log", TRUE);
-		return (ABNORMAL_SHUTDOWN);
-	}
+	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
+	repl_log(stderr, TRUE, TRUE, "Initiating CHANGELOG operation on source server pid [%d] for secondary instance [%s]\n",
+		jnlpool.gtmsource_local->gtmsource_pid, jnlpool.gtmsource_local->secondary_instname);
 	if (0 != jnlpool.gtmsource_local->changelog)
 	{
 		util_out_print("Change log is already in progress. Not initiating change in log file or log interval", TRUE);
-		rel_sem(SOURCE, SRC_SERV_OPTIONS_SEM);
 		return (ABNORMAL_SHUTDOWN);
 	}
 	if ('\0' != gtmsource_options.log_file[0]) /* trigger change in log file */
 	{
 		changelog_desired |= REPLIC_CHANGE_LOGFILE;
-		if (0 != strcmp(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file))
+		if (0 != STRCMP(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file))
 		{
 			changelog_accepted |= REPLIC_CHANGE_LOGFILE;
-			strcpy(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file);
+			STRCPY(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file);
 			util_out_print("Change log initiated with file !AD", TRUE, LEN_AND_STR(gtmsource_options.log_file));
 		} else
 			util_out_print("Log file is already !AD. Not initiating change in log file", TRUE,
@@ -80,6 +78,5 @@ int gtmsource_changelog(void)
 		jnlpool.gtmsource_local->changelog = changelog_accepted;
 	else
 		util_out_print("No change to log file or log interval", TRUE);
-	rel_sem(SOURCE, SRC_SERV_OPTIONS_SEM);
 	return ((0 != changelog_accepted && changelog_accepted == changelog_desired) ? NORMAL_SHUTDOWN : ABNORMAL_SHUTDOWN);
 }

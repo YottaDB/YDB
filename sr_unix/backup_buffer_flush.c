@@ -61,6 +61,12 @@ boolean_t backup_buffer_flush(gd_region *reg)
 		return FALSE;
 	}
 
+	if (0 != sbufh_p->backup_errno)
+	{	/* Since this is signal/mupip initiated, the proper message will be (or already has been) output on exit. */
+		shmpool_unlock_hdr(reg);
+		return FALSE;		/* Async error state change (perhaps mupip stop) -- nothing to do if backup is dying */
+	}
+
 	/* See if there are any buffers needing flushing. Note that we are holding the shmpool lock across
 	 * the IO we will be doing. This simplifies the backup logic substantialy. If we released and obtained
 	 * the lock for each buffer we dequeue (to allow other processes to proceed while we are doing IO) it

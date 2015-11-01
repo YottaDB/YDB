@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,6 +72,7 @@
 #include "min_max.h"
 #include "error.h"
 #include "repl_tr_good.h"
+#include "repl_instance.h"
 
 #define LOG_WAIT_FOR_JNL_RECS_PERIOD	(10 * 1000) /* ms */
 #define LOG_WAIT_FOR_JNLOPEN_PERIOD	(10 * 1000) /* ms */
@@ -90,6 +91,8 @@ GBLREF	seq_num			seq_num_zero, seq_num_one;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	FILE			*gtmsource_log_fp;
 GBLREF	FILE			*gtmsource_statslog_fp;
+GBLREF	gtmsource_state_t	gtmsource_state;
+
 LITREF	int			jrt_update[JRT_RECTYPES];
 LITREF	boolean_t		jrt_is_replicated[JRT_RECTYPES];
 
@@ -355,7 +358,7 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 	 */
 	reg_ctl_end->jnl_fn[reg_ctl_end->jnl_fn_len] = '\0'; /* For safety */
 	jnl_fn[jnl_fn_len] = '\0';
-	if (strcmp(reg_ctl_end->jnl_fn, jnl_fn) != 0) /* Name has changed */
+	if (STRCMP(reg_ctl_end->jnl_fn, jnl_fn) != 0) /* Name has changed */
 	{
 		REPL_DPRINT3("Detected name change of %s to %s\n", reg_ctl_end->jnl_fn, jnl_fn);
 		reg_ctl_end->jnl_fn_len = reg_ctl_end->reg->jnl_file_len = jnl_fn_len;
@@ -755,6 +758,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 	memcpy(*buff, b->recbuff, b->reclen);
 	*buff += b->reclen;
 	readlen += b->reclen;
+	assert(readlen % JNL_WRT_END_MODULUS == 0);
 	*bufsiz -= b->reclen;
 	rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
 	assert(IS_REPLICATED(rectype));
@@ -793,6 +797,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 					memcpy(*buff, b->recbuff, b->reclen);
 					*buff += b->reclen;
 					readlen += b->reclen;
+					assert(readlen % JNL_WRT_END_MODULUS == 0);
 				} else
 				{
 					memcpy(tcombuffp, b->recbuff, b->reclen);
@@ -828,9 +833,9 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 			if ((total_wait_for_jnl_recs += GTMSOURCE_WAIT_FOR_JNL_RECS) % LOG_WAIT_FOR_JNL_RECS_PERIOD == 0)
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal record(s)"
-					 " to be written to journal file %s while attempting to read transaction "INT8_FMT". "
+					 " to be written to journal file %s while attempting to read seqno %llu [0x%llx]. "
 					 "Check for problems with journaling\n", total_wait_for_jnl_recs, ctl->jnl_fn,
-					 INT8_PRINT(ctl->seqno));
+					 ctl->seqno, ctl->seqno);
 			}
 		} else
 		{
@@ -1220,19 +1225,21 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNLOPEN);
 			if ((total_wait_for_jnlopen += GTMSOURCE_WAIT_FOR_JNLOPEN) % LOG_WAIT_FOR_JNLOPEN_PERIOD == 0)
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal file(s) "
-					 "to be opened, or updated while attempting to read transaction "INT8_FMT". Check for "
-					 "problems with journaling\n", total_wait_for_jnlopen, INT8_PRINT(read_jnl_seqno));
+					 "to be opened, or updated while attempting to read seqno %llu [0x%llx]. Check for "
+					 "problems with journaling\n", total_wait_for_jnlopen, read_jnl_seqno, read_jnl_seqno);
 		}
 		read_len = read_regions(&buff, &buff_avail, pass > 1, &brkn_trans, read_jnl_seqno);
 		if (brkn_trans)
 			rts_error(VARLSTCNT(3) MAKE_MSG_SEVERE(ERR_REPLBRKNTRANS), 1, &read_jnl_seqno);
 		total_read += read_len;
+		assert(total_read % JNL_WRT_END_MODULUS == 0);
 	}
 	if (tot_tcom_len > 0)
 	{	/* Copy all the TCOM records to the end of the buffer */
 		assert(tot_tcom_len <= ((unsigned char *)gtmsource_msgp + gtmsource_msgbufsiz - buff));
 		memcpy(buff, gtmsource_tcombuff_start, tot_tcom_len);
 		total_read += tot_tcom_len;
+		assert(total_read % JNL_WRT_END_MODULUS == 0);
 	}
 	return (total_read);
 }
@@ -1432,6 +1439,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 						if ((read_len = read_transaction(ctl, buff, buff_avail, read_jnl_seqno)) < 0)
 							assert(repl_errno == EREPL_JNLEARLYEOF);
 						cumul_read += read_len;
+						assert(cumul_read % JNL_WRT_END_MODULUS == 0);
 					}
 					found = TR_FOUND;
 				} else if (QWLT(read_jnl_seqno, ctl->seqno))
@@ -1475,82 +1483,132 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 		for ( ; ctl->next != NULL && ctl->next->reg == region; prev_ctl = ctl, ctl = ctl->next)
 			;
 	}
+	assert(!*brkn_trans);
 	return (cumul_read);
 }
 
 int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, boolean_t read_multiple)
 {
-
-	int4			read_size, read_state, first_tr_len, tot_tr_len;
+	int4			read_size, read_state, first_tr_len, tot_tr_len, loopcnt;
 	unsigned char		seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
 	jnlpool_ctl_ptr_t	jctl;
 	gtmsource_local_ptr_t	gtmsource_local;
-	seq_num			read_jnl_seqno, jnl_seqno;
+	seq_num			read_jnl_seqno, max_read_seqno;
 	qw_num			read_addr;
 	uint4			jnlpool_size;
 	static int4		max_tr_size = MAX_TR_BUFFSIZE; /* Will generally be less than initial gtmsource_msgbufsiz;
 								* allows for space to accommodate the last transaction */
+	boolean_t		file2pool;
 
 	jctl = jnlpool.jnlpool_ctl;
 	gtmsource_local = jnlpool.gtmsource_local;
 	jnlpool_size = jctl->jnlpool_size;
-	jnl_seqno = jctl->jnl_seqno;
-	read_jnl_seqno = gtmsource_local->read_jnl_seqno;
-	read_state = gtmsource_local->read_state;
+	max_read_seqno = jctl->jnl_seqno;
+	/* Note that we are fetching the value of "jctl->jnl_seqno" without a lock on the journal pool. This means we could
+	 * get an inconsistent 8-byte value (i.e. neither the pre-update nor the post-update value) which is possible if a
+	 * concurrent GT.M process updates this 8-byte field in a sequence of two 4-byte operations instead of one
+	 * atomic operation (possible in architectures where 8-byte operations are not native) AND if the pre-update and
+	 * post-update value differ in their most significant 4-bytes. Since that is considered a virtually impossible
+	 * rare occurrence and since we want to avoid the overhead of doing a "grab_lock", we dont do that here.
+	 */
 	assert(buff == (unsigned char *)gtmsource_msgp + REPL_MSG_HDRLEN); /* else increasing buffer space will not work */
 	assert(maxbufflen == gtmsource_msgbufsiz - REPL_MSG_HDRLEN);
-	tot_tr_len = 0;
 	assert(REPL_MSG_HDRLEN == sizeof(jnldata_hdr_struct));
-	read_addr = gtmsource_local->read_addr;
-	first_tr_len = read_size = read_and_merge(buff, maxbufflen, read_jnl_seqno++) + REPL_MSG_HDRLEN;
-	max_tr_size = MAX(max_tr_size, read_size);
+	DEBUG_ONLY(loopcnt = 0;)
 	do
 	{
-		tot_tr_len += read_size;
-		REPL_DPRINT5("File read seqno : %llu Tr len : %d Total tr len : %d Maxbufflen : %d\n", read_jnl_seqno - 1,
-				read_size - REPL_MSG_HDRLEN, tot_tr_len, maxbufflen);
-		if (gtmsource_save_read_jnl_seqno < read_jnl_seqno)
-		{
-			read_addr += read_size;
-			if (jnlpool_size >= (jctl->early_write_addr - read_addr)) /* No more overflow, switch to READ_POOL */
-			{ /* To avoid the expense of memory barrier in jnlpool_hasnt_overflowed(), we use a possibly stale
-			   * value of early_write_addr to check if we can switch back to pool. The consequence
-			   * is that we may switch back and forth between file and pool read if we are in a situation wherein a
-			   * GTM process races with source server, writing transactions into the pool right when the source server
-			   * concludes that it can read from pool. We think this condition is rare enough that the expense
-			   * of re-opening the files (due to the transition) and re-positioning read pointers is considered
-			   * living with when compared with the cost of a memory barrier. We can reduce the expense by
-			   * not clearing the file information for every transition back to pool. We can wait for a certain
-			   * period of time (say 15 minutes) before we close all files. */
-				gtmsource_local->read = read_addr % jnlpool_size;
-				gtmsource_local->read_state = read_state = READ_POOL;
-				break;
-			}
-			REPL_DPRINT3("Readfiles : after sync with pool read_seqno: %llu read_addr: %llu\n", read_jnl_seqno,
-					read_addr);
+		DEBUG_ONLY(loopcnt++);
+		file2pool = FALSE;
+		if (max_read_seqno > gtmsource_local->next_triple_seqno)
+			max_read_seqno = gtmsource_local->next_triple_seqno; /* Do not read more than next triple's boundary */
+		assert(MAX_SEQNO != max_read_seqno);
+		read_jnl_seqno = gtmsource_local->read_jnl_seqno;
+		assert(read_jnl_seqno <= max_read_seqno);
+		if (read_jnl_seqno == gtmsource_local->next_triple_seqno)
+		{	/* Should signal a REPL_NEW_TRIPLE message to be sent first before sending any more seqnos across */
+			gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_SEND_NEW_TRIPLE;
+			return 0;
 		}
-		if (read_multiple)
+		read_addr = gtmsource_local->read_addr;
+		first_tr_len = read_size = read_and_merge(buff, maxbufflen, read_jnl_seqno++) + REPL_MSG_HDRLEN;
+		tot_tr_len = 0;
+		max_tr_size = MAX(max_tr_size, read_size);
+		do
 		{
-			if (tot_tr_len < max_tr_size && read_jnl_seqno < jnl_seqno)
-			{ /* Limit the read by the buffer length, or until there is no more to be read. If not limited by the
-			   * buffer length, the buffer will keep growing due to logic that expands the buffer when needed */
-				/* recompute buff and maxbufflen as buffer may have expanded during read_and_merge */
-				buff = (unsigned char *)gtmsource_msgp + tot_tr_len + REPL_MSG_HDRLEN;
-				maxbufflen = gtmsource_msgbufsiz - tot_tr_len - REPL_MSG_HDRLEN;
-				read_size = read_and_merge(buff, maxbufflen, read_jnl_seqno++) + REPL_MSG_HDRLEN;
-				max_tr_size = MAX(max_tr_size, read_size);
-				/* don't use buff to assign type and len as buffer may have expanded, use gtmsource_msgp instead */
-				((repl_msg_ptr_t)((unsigned char *)gtmsource_msgp + tot_tr_len))->type = REPL_TR_JNL_RECS;
-				((repl_msg_ptr_t)((unsigned char *)gtmsource_msgp + tot_tr_len))->len  = read_size;
-				continue;
+			tot_tr_len += read_size;
+			REPL_DPRINT5("File read seqno : %llu Tr len : %d Total tr len : %d Maxbufflen : %d\n", read_jnl_seqno - 1,
+					read_size - REPL_MSG_HDRLEN, tot_tr_len, maxbufflen);
+			if (gtmsource_save_read_jnl_seqno < read_jnl_seqno)
+			{
+				read_addr += read_size;
+				if (jnlpool_size >= (jctl->early_write_addr - read_addr))
+				{	/* No more overflow, switch to READ_POOL.  To avoid the expense of memory barrier
+					 * in jnlpool_hasnt_overflowed(), we use a possibly stale value of early_write_addr
+					 * to check if we can switch back to pool. The consequence is that we may switch
+					 * back and forth between file and pool read if we are in a situation wherein a GTM
+					 * process races with source server, writing transactions into the pool right when
+					 * the source server concludes that it can read from pool. We think this condition
+					 * is rare enough that the expense of re-opening the files (due to the transition)
+					 * and re-positioning read pointers is considered liveable when compared with the
+					 * cost of a memory barrier. We can reduce the expense by not clearing the file
+					 * information for every transition back to pool. We can wait for a certain period
+					 * of time (say 15 minutes) before we close all files.
+					 */
+					file2pool = TRUE;
+					break;
+				}
+				REPL_DPRINT3("Readfiles : after sync with pool read_seqno: %llu read_addr: %llu\n",
+					read_jnl_seqno, read_addr);
 			}
-			REPL_DPRINT6("Readfiles : tot_tr_len %d max_tr_size %d read_jnl_seqno %llu jnl_seqno %llu "
-				     "gtmsource_msgbufsize : %d; stop multiple reads\n", tot_tr_len, max_tr_size, read_jnl_seqno,
-				     jnl_seqno, gtmsource_msgbufsiz);
+			if (read_multiple)
+			{
+				if ((tot_tr_len < max_tr_size) && (read_jnl_seqno < max_read_seqno))
+				{	/* Limit the read by the buffer length, or until there is no more to be read. If not
+					 * limited by the buffer length, the buffer will keep growing due to logic that expands
+					 * the buffer when needed. Recompute buff and maxbufflen as buffer may have expanded
+					 * during read_and_merge
+					 */
+					buff = (unsigned char *)gtmsource_msgp + tot_tr_len + REPL_MSG_HDRLEN;
+					maxbufflen = gtmsource_msgbufsiz - tot_tr_len - REPL_MSG_HDRLEN;
+					read_size = read_and_merge(buff, maxbufflen, read_jnl_seqno++) + REPL_MSG_HDRLEN;
+					max_tr_size = MAX(max_tr_size, read_size);
+					/* Don't use buff to assign type and len as buffer may have expanded.
+					 * Use gtmsource_msgp instead */
+					((repl_msg_ptr_t)((unsigned char *)gtmsource_msgp + tot_tr_len))->type = REPL_TR_JNL_RECS;
+					((repl_msg_ptr_t)((unsigned char *)gtmsource_msgp + tot_tr_len))->len  = read_size;
+					continue;
+				}
+				REPL_DPRINT6("Readfiles : tot_tr_len %d max_tr_size %d read_jnl_seqno %llu max_read_seqno %llu "
+					"gtmsource_msgbufsize : %d; stop multiple reads\n", tot_tr_len, max_tr_size,
+					read_jnl_seqno, max_read_seqno, gtmsource_msgbufsiz);
+			}
+			break;
+		} while (TRUE);
+		assert(read_jnl_seqno <= max_read_seqno);
+		if ((gtmsource_local->next_triple_num < gtmsource_local->num_triples)
+			|| (gtmsource_local->num_triples == jnlpool.repl_inst_filehdr->num_triples))
+		{	/* We are either sending seqnos of a triple that is not the last one in the instance file OR
+			 * we are sending seqnos of the last triple (that is open-ended) but there has been no more triples
+			 * concurrently added to this instance file compared to what is in our private memory. In either case,
+			 * it is safe to send these seqnos without worrying about whether a new triple needs to be sent first.
+			 */
+			break;
+		} else
+		{	/* Set the next triple's start_seqno and redo the read with the new "gtmsource_local->next_triple_seqno" */
+			assert(MAX_SEQNO == gtmsource_local->next_triple_seqno);
+			gtmsource_set_next_triple_seqno(TRUE);
+			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+				return 0; /* Connection got reset in "gtmsource_set_next_triple_seqno" */
 		}
-		break;
 	} while (TRUE);
+	if (file2pool)
+	{
+		gtmsource_local->read = read_addr % jnlpool_size;
+		gtmsource_local->read_state = read_state = READ_POOL;
+	} else
+		read_state = gtmsource_local->read_state;
 	gtmsource_local->read_addr = read_addr;
+	assert(read_jnl_seqno <= gtmsource_local->next_triple_seqno);
 	gtmsource_local->read_jnl_seqno = read_jnl_seqno;
 #ifdef GTMSOURCE_ALWAYS_READ_FILES
 	gtmsource_local->read_state = read_state = READ_FILE;
@@ -1558,8 +1616,8 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	if (read_state == READ_POOL)
 	{
 		gtmsource_ctl_close(); /* no need to keep files open now that we are going to read from pool */
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server now reading from journal pool at transaction %llu\n",
-				read_jnl_seqno);
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server now reading from journal pool at seqno %llu [0x%llx]\n",
+				read_jnl_seqno, read_jnl_seqno);
 		REPL_DPRINT3("Readfiles : after switch to pool, read_addr : "INT8_FMT" read : %u\n",
 				INT8_PRINT(read_addr), gtmsource_local->read);
 	}
@@ -1627,37 +1685,75 @@ static	int scavenge_closed_jnl_files(seq_num ack_seqno)	/* currently  not used *
 	return 0;
 }
 
-int gtmsource_update_resync_tn(seq_num resync_seqno)
+/* This function resets "zqgblmod_seqno" and "zqgblmod_tn" in all replicated database file headers to correspond to the
+ * "resync_seqno" passed in as input. This shares some of its code with the function "repl_inst_reset_zqgblmod_seqno_and_tn".
+ * Any changes there might need to be reflected here.
+ */
+int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 {
-	repl_ctl_element	*ctl, *prev_ctl;
+	repl_ctl_element	*ctl, *next_ctl, *old_ctl;
 	gd_region		*region;
 	sgmnt_addrs		*csa;
-	int			read_size;
 	unsigned char		seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
+	boolean_t		was_crit;
+	seq_num			start_seqno, max_zqgblmod_seqno;
+	trans_num		bov_tn;
 
-	REPL_DPRINT2("UPDATING RESYNC TN with seqno "INT8_FMT"\n", INT8_PRINT(resync_seqno));
+	error_def(ERR_NOPREVLINK);
+
 	gtmsource_ctl_close();
 	gtmsource_ctl_init();
-	read_size = read_and_merge((unsigned char *)&gtmsource_msgp->msg[0], gtmsource_msgbufsiz - REPL_MSG_HDRLEN, resync_seqno);
-	for (ctl = repl_ctl_list->next, prev_ctl = repl_ctl_list; ctl != NULL; )
+	max_zqgblmod_seqno = 0;
+	for (ctl = repl_ctl_list->next; ctl != NULL; ctl = next_ctl)
 	{
-		for (region = ctl->reg;
-		     ctl != NULL && ctl->reg == region && (ctl->file_state == JNL_FILE_OPEN || ctl->file_state == JNL_FILE_CLOSED);
-			prev_ctl = ctl, ctl = ctl->next)
-		     ;
-		if (ctl == NULL || ctl->reg != region || prev_ctl->reg == region)
+		next_ctl = ctl->next;
+		assert((NULL == next_ctl) || (ctl->reg != next_ctl->reg));
+		repl_log(gtmsource_log_fp, TRUE, FALSE, "Updating ZQGBLMOD SEQNO and TN for Region [%s]\n", ctl->reg->rname);
+		first_read(ctl);
+		do
 		{
-			csa = &FILE_INFO(region)->s_addrs;
-			csa->hdr->resync_tn = prev_ctl->tn;
-			REPL_DPRINT3("RESYNC TN for %s is %d\n", prev_ctl->jnl_fn, prev_ctl->tn);
-		} else
-		{	/* The only ctl entry for this region is empty or unread */
-			assert(FILE_INFO(region)->s_addrs.hdr->resync_tn == 1);
-		}
-		/* Move to the next region */
-		for (; ctl != NULL && ctl->reg == region;
-		       prev_ctl = ctl, ctl = ctl->next);
+			assert(ctl->first_read_done);
+			start_seqno = ctl->repl_buff->fc->jfh->start_seqno;
+			repl_log(gtmsource_log_fp, TRUE, FALSE, "Region [%s] : Journal file [%s] : Start Seqno : [%llx]\n",
+				ctl->reg->rname, ctl->jnl_fn, start_seqno);
+			if (start_seqno <= resync_seqno)
+				break;
+			if (0 == open_prev_gener(&old_ctl, ctl, resync_seqno))	/* this automatically does a "first_read" */
+			{	/* Previous journal file link was NULL. Issue error. */
+				rts_error(VARLSTCNT(4) ERR_NOPREVLINK, 2, ctl->jnl_fn_len, ctl->jnl_fn);
+			}
+			assert(old_ctl->next == ctl);
+			assert(ctl->prev == old_ctl);
+			ctl = old_ctl;
+		} while (TRUE);
+		assert(NULL != ctl);
+		csa = &FILE_INFO(ctl->reg)->s_addrs;
+		assert(REPL_ALLOWED(csa->hdr));
+		bov_tn = ctl->repl_buff->fc->jfh->bov_tn;
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Assigning Region [%s] : Resync Seqno [%llx] : ZQGBLMOD SEQNO [%llx] "
+			": ZQGBLMOD TN : [%llx]\n", ctl->reg->rname, resync_seqno, start_seqno, bov_tn);
+		/* Although csa->hdr->zqgblmod_seqno is only modified by the source server (while holding the ftok semaphore
+		 * on the replication instance file), it is read by fileheader_sync() which does it while holding region crit.
+		 * To avoid the latter from reading an inconsistent value (i.e. neither the pre-update nor the post-update value,
+		 * which is possible if the 8-byte operation is not atomic but a sequence of two 4-byte operations AND if the
+		 * pre-update and post-update value differ in their most significant 4-bytes) we grab crit. We could have used
+		 * the QWCHANGE_IS_READER_CONSISTENT macro (which checks for most significant 4-byte differences) instead to
+		 * determine if it is really necessary to grab crit. But since the update to zqgblmod_seqno is a rare operation,
+		 * we decide to play it safe.
+		 */
+		if (FALSE == (was_crit = csa->now_crit))
+			grab_crit(ctl->reg);
+		csa->hdr->zqgblmod_seqno = start_seqno;
+		csa->hdr->zqgblmod_tn = bov_tn;
+		if (FALSE == was_crit)
+			rel_crit(ctl->reg);
+		if (max_zqgblmod_seqno < start_seqno)
+			max_zqgblmod_seqno = start_seqno;
 	}
+	assert(!jnlpool.jnlpool_ctl->max_zqgblmod_seqno || jnlpool.jnlpool_ctl->max_zqgblmod_seqno > resync_seqno);
+	assert(0 < max_zqgblmod_seqno);
+	assert(resync_seqno >= max_zqgblmod_seqno);
+	jnlpool.jnlpool_ctl->max_zqgblmod_seqno = max_zqgblmod_seqno;
 	gtmsource_ctl_close(); /* close all structures now that we are done; if we have to read from journal files; we'll open
 				* the structures again */
 	return (SS_NORMAL);

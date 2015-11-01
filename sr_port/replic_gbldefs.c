@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,5 @@ GBLDEF	boolean_t	null_subs_xform;
 GBLDEF	boolean_t	primary_side_std_null_coll;
 GBLDEF	boolean_t	secondary_side_std_null_coll;
 GBLDEF	seq_num		lastlog_seqno;
-GBLDEF	uint4		log_interval;
 GBLDEF	qw_num		trans_sent_cnt, last_log_tr_sent_cnt, trans_recvd_cnt, last_log_tr_recvd_cnt;
 GBLDEF	upd_helper_entry_ptr_t	helper_entry;

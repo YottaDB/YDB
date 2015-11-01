@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -599,4 +599,13 @@ void shmpool_unlock_hdr(gd_region *reg)
 	DEBUG_ONLY(locknl = NULL);
 	--fast_lock_count;
 	assert(0 <= fast_lock_count);
+}
+
+/* If the shmpool lock is held by this process return true .. else false. */
+boolean_t shmpool_lock_held_by_us(gd_region *reg)
+{
+	sgmnt_addrs		*csa;
+
+	csa = &FILE_INFO(reg)->s_addrs;
+	return GLOBAL_LATCH_HELD_BY_US(&csa->shmpool_buffer->shmpool_crit_latch);
 }

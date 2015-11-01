@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -289,7 +289,7 @@ void dse_chng_fhead(void)
 		{
 			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
 			for (index_x=0; index_x < GDSVLAST ; index_x++)
-				if (0 == strcmp(buf, gtm_dbversion_table[index_x]))
+				if (0 == STRCMP(buf, gtm_dbversion_table[index_x]))
 				{
 					cs_addrs->hdr->certified_for_upgrade_to = index_x;
 					break;
@@ -305,7 +305,7 @@ void dse_chng_fhead(void)
 		{
 			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
 			for (index_x=0; index_x < GDSVLAST ; index_x++)
-				if (0 == strcmp(buf, gtm_dbversion_table[index_x]))
+				if (0 == STRCMP(buf, gtm_dbversion_table[index_x]))
 				{
 					cs_addrs->hdr->desired_db_format = index_x;
 					cs_addrs->hdr->fully_upgraded = FALSE;
@@ -398,17 +398,21 @@ void dse_chng_fhead(void)
 	}
 	/* ---------- End ------ CURRENT_TN/MAX_TN/WARN_MAX_TN processing -------- */
 	if (CLI_PRESENT == cli_present("REG_SEQNO") && cli_get_hex64("REG_SEQNO", (gtm_uint64_t *)&seq_no))
-	{
 		cs_addrs->hdr->reg_seqno = seq_no;
-	}
-	if (CLI_PRESENT == cli_present("RESYNC_SEQNO") && cli_get_hex64("RESYNC_SEQNO", (gtm_uint64_t *)&seq_no))
-	{
-		cs_addrs->hdr->resync_seqno = seq_no;
-	}
-	if (CLI_PRESENT == cli_present("RESYNC_TN") && cli_get_hex64("RESYNC_TN", &tn))
-	{
-		cs_addrs->hdr->resync_tn = tn;
-	}
+	VMS_ONLY(
+		if (CLI_PRESENT == cli_present("RESYNC_SEQNO") && cli_get_hex64("RESYNC_SEQNO", (gtm_uint64_t *)&seq_no))
+			cs_addrs->hdr->resync_seqno = seq_no;
+		if (CLI_PRESENT == cli_present("RESYNC_TN") && cli_get_hex64("RESYNC_TN", &tn))
+			cs_addrs->hdr->resync_tn = tn;
+	)
+	UNIX_ONLY(
+		if (CLI_PRESENT == cli_present("ZQGBLMOD_SEQNO") && cli_get_hex64("ZQGBLMOD_SEQNO", (gtm_uint64_t *)&seq_no))
+			cs_addrs->hdr->zqgblmod_seqno = seq_no;
+		if (CLI_PRESENT == cli_present("ZQGBLMOD_TN") && cli_get_hex64("ZQGBLMOD_TN", &tn))
+			cs_addrs->hdr->zqgblmod_tn = tn;
+		if (CLI_PRESENT == cli_present("DUALSITE_RESYNC_SEQNO") && cli_get_hex64("DUALSITE_RESYNC_SEQNO", &seq_no))
+			cs_addrs->hdr->dualsite_resync_seqno = seq_no;
+	)
 	if (CLI_PRESENT == cli_present("STDNULLCOLL"))
 	{
 		if ( -1 != (x = cli_t_f_n("STDNULLCOLL")))
@@ -532,7 +536,7 @@ void dse_chng_fhead(void)
 		if (cli_get_str("ONLINE_NBB", buf, &buf_len))
 		{
 			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
-			if (0 == strcmp(buf, "NOT_IN_PROGRESS"))
+			if (0 == STRCMP(buf, "NOT_IN_PROGRESS"))
 				cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
 			else
 			{
@@ -557,7 +561,7 @@ void dse_chng_fhead(void)
                 if (cli_get_str("KILL_IN_PROG", buf, &buf_len))
                 {
                         lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
-                        if (0 == strcmp(buf, "NONE"))
+                        if (0 == STRCMP(buf, "NONE"))
                                 cs_addrs->hdr->kill_in_prog = 0;
                         else
                         {
@@ -582,12 +586,12 @@ void dse_chng_fhead(void)
 		if (cli_get_str("MACHINE_NAME", buf, &buf_len))
 		{
 			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
-			if (0 == strcmp(buf, "CURRENT"))
+			if (0 == STRCMP(buf, "CURRENT"))
 			{
 				memset(cs_addrs->hdr->machine_name, 0, MAX_MCNAMELEN);
 				GETHOSTNAME(cs_addrs->hdr->machine_name, MAX_MCNAMELEN, gethostname_res);
 			}
-			else if (0 == strcmp(buf, "CLEAR"))
+			else if (0 == STRCMP(buf, "CLEAR"))
 				memset(cs_addrs->hdr->machine_name, 0, MAX_MCNAMELEN);
 			else
 				util_out_print("Invalid value for the machine_name qualifier", TRUE);

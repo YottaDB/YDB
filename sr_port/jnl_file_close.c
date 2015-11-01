@@ -45,6 +45,8 @@
 #include "repl_sp.h"	/* F_CLOSE */
 #include "iosp.h"	/* for SS_NORMAL */
 #include "ccp.h"
+#include "send_msg.h"
+#include "eintr_wrappers.h"
 
 #if defined(VMS)
 GBLREF	short	astq_dyn_avail;
@@ -55,19 +57,23 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 {
 	jnl_file_header		header;
 	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jb;
 	struct_jrec_eof		eof_record;
 	off_jnl_t		eof_addr;
 	uint4			status;
-	int			rc;
+	int			rc, save_errno;
 
-	error_def(ERR_PREMATEOF);
 	error_def(ERR_JNLCLOSE);
+	error_def(ERR_JNLFSYNCERR);
 	error_def(ERR_JNLWRERR);
+	error_def(ERR_PREMATEOF);
+	error_def(ERR_TEXT);
 
 	csa = &FILE_INFO(reg)->s_addrs;
-	assert(csa->now_crit || (csa->hdr->clustered && (CCST_CLOSED == csa->nl->ccp_state)));
+	csd = csa->hdr;
+	assert(csa->now_crit || (csd->clustered && (CCST_CLOSED == csa->nl->ccp_state)));
 	ASSERT_JNLFILEID_NOT_NULL(csa)
 	jpc = csa->jnl;
 #if defined(UNIX)
@@ -109,8 +115,19 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 			header.crash = FALSE;
 			DO_FILE_WRITE(jpc->channel, 0, &header, JNL_HDR_LEN, jpc->status, jpc->status2);
 			if (SYSCALL_ERROR(jpc->status))
-				rts_error(VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csa->hdr), jpc->status);
-
+				rts_error(VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
+			UNIX_ONLY(
+				GTM_FSYNC(jpc->channel, rc);
+				if (-1 == rc)
+				{
+					save_errno = errno;
+					send_msg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
+						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync during jnl_file_close"), save_errno);
+					assert(FALSE);
+					rts_error(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
+						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync during jnl_file_close"), save_errno);
+				}
+			)
 		}
 		/* jnl_file_id should be nullified only after the jnl file header has been written to disk.
 		 * Nullifying the jnl_file_id signals that the jnl file has been switched. The replication source server
@@ -129,6 +146,6 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	{
 		status = jpc->status;	/* jnl_send_oper resets jpc->status, so save it */
 		jnl_send_oper(jpc, ERR_JNLCLOSE);
-		rts_error(VARLSTCNT(5) ERR_JNLCLOSE, 2, JNL_LEN_STR(csa->hdr), status);
+		rts_error(VARLSTCNT(5) ERR_JNLCLOSE, 2, JNL_LEN_STR(csd), status);
 	}
 }

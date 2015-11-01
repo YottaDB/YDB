@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,12 +12,13 @@
 #include "mdef.h"
 
 #include "gtm_ipc.h"
+#include "gtm_unistd.h"
+#include "gtm_string.h"
+#include "gtm_inet.h"
+#include "gtm_fcntl.h"
+
 #include <sys/sem.h>
 #include <errno.h>
-#include <fcntl.h>
-#include "gtm_unistd.h"
-#include <arpa/inet.h>
-#include "gtm_string.h"
 #include <stddef.h>
 
 #include "gdsroot.h"
@@ -58,7 +59,7 @@ GBLREF	gd_region		*gv_cur_region;
  */
 boolean_t mu_replpool_remove_sem(boolean_t immediate)
 {
-	char            *instname;
+	char            *instfilename;
 	gd_region	*replreg;
 	unix_db_info	*udi;
 	unsigned int	full_len;
@@ -71,20 +72,23 @@ boolean_t mu_replpool_remove_sem(boolean_t immediate)
 	 * JNL POOL SEMAPHORES
 	 */
 	replreg = jnlpool.jnlpool_dummy_reg;
-	assert(replreg);
-	instname = (char *)replreg->dyn.addr->fname;
+	assert(NULL != replreg);
+	instfilename = (char *)replreg->dyn.addr->fname;
 	full_len = replreg->dyn.addr->fname_len;
 	if (0 == full_len)
 		return TRUE;
-	if (!ftok_sem_get(replreg, TRUE, REPLPOOL_ID, immediate))
-		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instname);
+	/* "mu_replpool_grab_sem" would have already created the ftok semaphore and incremented the counter.
+	 * So use "ftok_sem_lock" instead of "ftok_sem_get" and do not increment the counter.
+	 */
+	if (!ftok_sem_lock(replreg, FALSE, FALSE))
+		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instfilename);
 	if (0 != remove_sem_set(SOURCE))
 	{
 		save_errno = REPL_SEM_ERRNO;
 		if (!ftok_sem_release(replreg, TRUE, TRUE))
-			gtm_putmsg(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instname);
+			gtm_putmsg(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instfilename);
 		udi = FILE_INFO(replreg);
-		rts_error(VARLSTCNT(6) ERR_REPLACCSEM, 3, udi->semid, full_len, instname, save_errno);
+		rts_error(VARLSTCNT(6) ERR_REPLACCSEM, 3, udi->semid, full_len, instfilename, save_errno);
 	}
 	repl_inst_jnlpool_reset();
 	/*
@@ -96,12 +100,13 @@ boolean_t mu_replpool_remove_sem(boolean_t immediate)
 	{
 		save_errno = REPL_SEM_ERRNO;
 		if (!ftok_sem_release(replreg, TRUE, TRUE))
-			gtm_putmsg(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instname);
+			gtm_putmsg(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instfilename);
 		udi = FILE_INFO(replreg);
-		rts_error(VARLSTCNT(6) ERR_REPLACCSEM, 3, udi->semid, full_len, instname, save_errno);
+		rts_error(VARLSTCNT(6) ERR_REPLACCSEM, 3, udi->semid, full_len, instfilename, save_errno);
 	}
 	repl_inst_recvpool_reset();
+	/* Release ftok semaphore and decrement counter that was incremented in "mu_replpool_grab_sem" now that we are exiting */
 	if (!ftok_sem_release(replreg, TRUE, immediate))
-		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instname);
+		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instfilename);
 	return TRUE;
 }

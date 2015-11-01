@@ -253,8 +253,8 @@ int4 timeout2msec(int4 timeout);
 #define	STR_LIT_LEN(LITERAL)		(sizeof(LITERAL) - 1)
 #define	LITERAL_AND_LENGTH(LITERAL)	(LITERAL), (sizeof(LITERAL) - 1)
 #define	LENGTH_AND_LITERAL(LITERAL)	(sizeof(LITERAL) - 1), (LITERAL)
-#define	STRING_AND_LENGTH(STRING)	(STRING), (strlen((char *)STRING))
-#define	LENGTH_AND_STRING(STRING)	(strlen((char *)STRING)), (STRING)
+#define	STRING_AND_LENGTH(STRING)	(STRING), (strlen((char *)(STRING)))
+#define	LENGTH_AND_STRING(STRING)	(strlen((char *)(STRING))), (STRING)
 
 #define	LEN_AND_LIT(LITERAL)		LENGTH_AND_LITERAL(LITERAL)
 #define	LIT_AND_LEN(LITERAL)		LITERAL_AND_LENGTH(LITERAL)
@@ -264,10 +264,10 @@ int4 timeout2msec(int4 timeout);
 #define	MEMCMP_LIT(SOURCE, LITERAL)	memcmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
 #define MEMCPY_LIT(TARGET, LITERAL)	memcpy(TARGET, LITERAL, sizeof(LITERAL) - 1)
 #define	STRNCMP_LIT(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
-#define	STRNCMP_STR(SOURCE, STRING)	strncmp(SOURCE, STRING, strlen((char *)STRING))
+#define	STRNCMP_STR(SOURCE, STRING)	strncmp(SOURCE, STRING, strlen((char *)(STRING)))
 
-#define	STRCPY(SOURCE, DEST)		strcpy((char *)SOURCE, (char *)DEST)
-#define	STRCMP(SOURCE, DEST)		strcmp((char *)SOURCE, (char *)DEST)
+#define	STRCPY(SOURCE, DEST)		strcpy((char *)(SOURCE), (char *)(DEST))
+#define	STRCMP(SOURCE, DEST)		strcmp((char *)(SOURCE), (char *)(DEST))
 
 /* *********************************************************************************************************** */
 /*		   Frequently used len + str combinations in macro form.				       */
@@ -384,6 +384,9 @@ typedef struct
 } global_latch_t;
 #define latch_image_count latch_word
 
+#define GLOBAL_LATCH_HELD_BY_US(latch) (process_id == (latch)->u.parts.latch_pid \
+                                        VMS_ONLY(&& image_count == (latch)->u.parts.latch_image_count))
+
 typedef	union gtm_time8_struct
 {
 	time_t	ctime;		/* For current GTM code sem_ctime field corresponds to creation time */
@@ -435,12 +438,17 @@ typedef que_head *	que_head_ptr_t;
 	uint4	value[2];
  } non_native_uint8;
 
+#  define	BIG_ENDIAN_MARKER	'B'	/* to denote BIG-ENDIAN machine */
+#  define	LITTLE_ENDIAN_MARKER	'L'	/* to denote LITTLE-ENDIAN machine */
+
 #ifdef BIGENDIAN
 #  define	msb_index		0
 #  define	lsb_index		1
+#  define	NODE_ENDIANNESS		BIG_ENDIAN_MARKER
 #  else
 #  define	msb_index		1
 #  define	lsb_index		0
+#  define	NODE_ENDIANNESS		LITTLE_ENDIAN_MARKER
 #endif
 
 #ifdef INT8_SUPPORTED
@@ -587,6 +595,8 @@ typedef que_head *	que_head_ptr_t;
 						seq_num_strx[seq_num_ptrx - &seq_num_strx[0]] = '\0', seq_num_strx)
 #  define	INT8_ONLY(x)
 #endif
+
+#define	MAX_SEQNO	((seq_num)-1)	/* actually 0xFFFFFFFFFFFFFFFF (max possible seqno) */
 
 /* Define some basic types for shared memory (sm) access depending on whether the platform we are    */
 /* using is capable of supporting 32 or 64 bit pointers or not.					     */
@@ -912,5 +922,40 @@ typedef gtm_uint64_t	gtm_off_t;
 #define QWCHANGE_IS_READER_CONSISTENT(FROM8, TO8)	(((non_native_uint8 *)&(FROM8))->value[msb_index]	\
 							 == ((non_native_uint8 *)&(TO8))->value[msb_index])
 #endif
+
+#ifdef UNIX	/* Replication instance file related structures */
+
+/* The below macros and typedef are required in "repl_instance.h", "gtmsource.h", "gtmrecv.h" and "repl_msg.h".
+ * They are hence included in this common header file
+ */
+#define	MAX_INSTNAME_LEN	16	/* Max Length of the replication instance name including terminating null character '\0' */
+#define	NUM_GTMSRC_LCL		16	/* number of gtmsrc_lcl structures in the replication instance file */
+#define	REPL_INST_HDR_SIZE	(sizeof(repl_inst_hdr))
+#define	GTMSRC_LCL_SIZE		(sizeof(gtmsrc_lcl) * NUM_GTMSRC_LCL)			/* size of the gtmsrc_lcl array */
+#define	GTMSOURCE_LOCAL_SIZE	(sizeof(gtmsource_local_struct) * NUM_GTMSRC_LCL)	/* size of the gtmsource_local array */
+#define	REPL_INST_TRIPLE_OFFSET	(REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE)
+
+#define	MAX_NODENAME_LEN	16	/* used by repl_instance.h. A similar macro JPV_LEN_NODE is defined in jnl.h */
+
+typedef struct repl_triple_struct
+{	/* Each repl_triple is uniquely defined by the following 3 fields */
+	unsigned char	root_primary_instname[MAX_INSTNAME_LEN];/* the root primary instance that generated the seqnos */
+	seq_num		start_seqno;				/* the first seqno generated in this triple by the root primary */
+	uint4		root_primary_cycle;			/* a copy of the "root_primary_cycle" field in the instance file
+								 * header of the root primary when it generated the seqno
+								 * "start_seqno". This is needed to distinguish two invocations
+								 * of the same instance
+								 */
+	time_t		created_time;				/* Time when triple was written to this file */
+	unsigned char	rcvd_from_instname[MAX_INSTNAME_LEN];	/* NULL if this triple was written by a source server (i.e. this
+								 * instance was a root primary then). Non-NULL if this was written
+								 * by the update process (on receipt of a REPL_NEW_TRIPLE record).
+								 * In this case this field holds the instance name of the immediate
+								 * primary that sent this REPL_NEW_TRIPLE record.
+								 */
+	unsigned char	filler_64[16];				/* for future expansion */
+} repl_triple;
+
+#endif	/* Replication instance file related structures */
 
 #endif /* MDEF_included */

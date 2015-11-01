@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,12 +12,13 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
+
+#include "gtm_unistd.h"
+#include "gtm_fcntl.h"
+#include "gtm_inet.h"
+
 #ifdef UNIX
-#include <sys/ipc.h>
+#include "gtm_ipc.h"
 #include <sys/sem.h>
 #elif defined(VMS)
 #include <ssdef.h>
@@ -38,6 +39,10 @@
 #include "error.h"
 #include "dpgbldir.h"
 
+#ifdef UNIX
+#include "ftok_sems.h"
+#endif
+
 GBLREF	gd_addr		*gd_header;
 GBLREF	jnlpool_addrs	jnlpool;
 
@@ -46,6 +51,10 @@ CONDITION_HANDLER(gtmsource_ch)
 	gd_addr		*addr_ptr;
 	gd_region	*reg_local, *reg_top;
 	sgmnt_addrs	*csa;
+
+#ifdef UNIX
+	unix_db_info	*udi;
+#endif
 
 	error_def(ERR_ASSERT);
 	error_def(ERR_CTRLC);
@@ -77,6 +86,16 @@ CONDITION_HANDLER(gtmsource_ch)
 			if (csa && csa->now_crit)
 				rel_lock(jnlpool.jnlpool_dummy_reg);
 		}
+		UNIX_ONLY(
+			/* Release FTOK lock on the replication instance file if holding it */
+			if (NULL != jnlpool.jnlpool_dummy_reg)
+			{
+				udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+				if (udi->grabbed_ftok_sem)
+					ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, FALSE);
+				assert(!udi->grabbed_ftok_sem);
+			}
+		)
        		NEXTCH;
 	}
 	/* warning, info, or success */

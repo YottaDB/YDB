@@ -384,7 +384,11 @@ typedef struct
  	uint4			autoswitchlimit;/* Limit in disk blocks (max 4GBytes) when jnl should be auto switched */
 	uint4			jnl_alq;	/* initial allocation (in blocks) */
 	uint4			jnl_deq;	/* extension (in blocks) */
+#ifdef VMS
 	boolean_t		update_disabled;/* If the secondary side has database update disabled. For rollback. */
+#else
+	boolean_t		filler_update_disabled;	/* obsoleted as part of multi-site replication changes */
+#endif
 	int4			max_phys_reclen;/* Maximum journal record size in binary form (on disk). We need this in case
 						   database is not available */
 	int4			max_logi_reclen;/* Maximum record size of a logical record (on disk). We need this in case
@@ -700,7 +704,8 @@ typedef struct
 {
 	token_seq_t           	mur_jrec_token_seq;	/* always set for fenced transaction or replication */
 	token_num         	mur_jrec_seqno;		/* This is jnl_seqno. For ZTP mur_jrec_token_seq will have token */
-	seq_num			max_resync_seqno;	/* for update process and rollback fetchresync */
+	VMS_ONLY(seq_num	max_resync_seqno;)	/* for update process and rollback fetchresync */
+	UNIX_ONLY(seq_num	max_dualsite_resync_seqno;)	/* for update process and rollback fetchresync */
 	int         		mur_jrec_participants;
 	jnl_tm_t           	gbl_jrec_time;
 	boolean_t       	forw_phase_recovery;

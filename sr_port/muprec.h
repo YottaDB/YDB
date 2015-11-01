@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,14 @@
 
 #include "muprecsp.h" /* non-portable interface prototype */
 
-#define JNL_EXTR_LABEL		"GDSJEX01"
-#define JNL_DET_EXTR_LABEL	"GDSJDX02"
+/* The Unix journal extract format is higher than VMS due to the multi-site replication changes */
+#ifdef VMS
+#	define JNL_EXTR_LABEL		"GDSJEX01"
+#	define JNL_DET_EXTR_LABEL	"GDSJDX02"
+#else
+#	define JNL_EXTR_LABEL		"GDSJEX03"	/* format of the simple journal extract */
+#	define JNL_DET_EXTR_LABEL	"GDSJDX03"	/* format of the detailed journal extract */
+#endif
 
 #define EXTQW(I)							\
 {									\
@@ -141,14 +147,19 @@
 	assert(20 < time_str_len);									\
 }
 
-#define	REL2ABSTIME(deltatime, basetime, roundup)							\
+#define	REL2ABSTIME(deltatime, basetime, roundup)						\
 	deltatime = mur_rel2abstime(deltatime, basetime, roundup);
 
 #endif
 
-#define IS_VALID_RECTYPE(JREC)											\
-(														\
-	(JREC)->prefix.jrec_type > JRT_BAD && (JREC)->prefix.jrec_type < JRT_RECTYPES /* valid rectype */	\
+/* Note that JRT_TRIPLE is NOT considered a valid rectype by this macro. This is because this macro is not used
+ * by the update process and receiver server, the only processes which see this journal record type. Anyone
+ * else that sees this record type (update process reader, mupip journal etc.) should treat this as an invalid record type.
+ */
+#define IS_VALID_RECTYPE(JREC)									\
+(												\
+	((JREC)->prefix.jrec_type > JRT_BAD) && ((JREC)->prefix.jrec_type < JRT_RECTYPES)	\
+		&& (JRT_TRIPLE != (JREC)->prefix.jrec_type) /* valid rectype */			\
 )
 
 #define IS_VALID_LEN_FROM_PREFIX(JREC, JFH)							\
@@ -213,6 +224,9 @@
 #define STR_BRKNEXTR	"Broken transactions extract"
 #define STR_LOSTEXTR	"Lost transactions extract"
 
+#define	LONG_TIME_FORMAT	0
+#define	SHORT_TIME_FORMAT	1
+
 enum mur_error
 {
 	MUR_DUPTOKEN = 1,
@@ -268,6 +282,16 @@ typedef struct
 	char			*extr_buff;
 	jnl_process_vector	*prc_vec;		/* for recover process */
 	void			*file_info[TOT_EXTR_TYPES];/* for a pointer to a structure described in filestruct.h */
+#ifdef UNIX
+	boolean_t		was_rootprimary;	/* Whether this instance was previously a root primary. Set by
+							 * "gtmrecv_fetchresync" */
+	char			remote_proto_ver;	/* Protocol version of the source server with which a -FETCHRESYNC
+							 * rollback communicates. Need to be "signed char" in order to be
+							 * able to do signed comparisons of this with the macros
+							 * REPL_PROTO_VER_DUALSITE (0) and REPL_PROTO_VER_UNINITIALIZED (-1)
+							 */
+	char			filler_align_4[3];
+#endif
 } mur_gbls_t;
 
 typedef struct
@@ -507,7 +531,6 @@ typedef struct
 	}
 
 /* Prototypes */
-int			gtmrecv_fetchresync(int port, seq_num *resync_seqno);
 void			jnlext_write(fi_type *file_info, char *buffer, int length);
 uint4			mur_apply_pblk(boolean_t apply_intrpt_pblk);
 boolean_t 		mur_back_process(boolean_t apply_pblk, seq_num *pre_resolve_seqno);
@@ -550,13 +573,18 @@ void			mur_rem_jctls(reg_ctl_list *rctl);
 boolean_t		mur_report_error(enum mur_error code);
 #if defined(UNIX)
 multi_struct 		*mur_token_lookup(token_num token, uint4 pid, off_jnl_t rec_time, enum rec_fence_type fence);
+int			gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno);
 #elif defined(VMS)
 multi_struct 		*mur_token_lookup(token_num token, uint4 pid, int4 image_count,
 									off_jnl_t rec_time, enum rec_fence_type fence);
+int			gtmrecv_fetchresync(int port, seq_num *resync_seqno);
 #endif
 void 			mur_tp_resolve_time(jnl_tm_t max_lvrec_time);
 void			mur_show_header(jnl_ctl_list *jctl);
 boolean_t		mur_select_rec(void);
 void			mur_sort_files(void);
 boolean_t		mur_ztp_lookback(void);
+
+int	format_time(jnl_proc_time proc_time, char *string, int string_len, int time_format);
+
 #endif /* MUPREC_H_INCLUDED */

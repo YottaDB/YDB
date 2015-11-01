@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,6 +92,8 @@ void mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance);
 void mutex_sock_init(void);
 void mutex_sock_cleanup(void);
 unsigned char *pid2ascx(unsigned char *pid_str, pid_t pid);
+
+void mutex_per_process_init(void);
 
 #ifdef MUTEX_MSEM_WAKE
 #ifdef POSIX_MSEM

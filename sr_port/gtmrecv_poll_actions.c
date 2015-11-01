@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -392,7 +392,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		} else
 		{
 			REPL_DPRINT1("gtmrecv_poll_actions : Setting gtmrecv_wait_for_jnl_seqno to TRUE because bad trans sent\n");
-			gtmrecv_wait_for_jnl_seqno = TRUE;
+			gtmrecv_wait_for_jnl_seqno = TRUE;/* set this to TRUE to break out and go back to a fresh "do_main_loop" */
 			gtmrecv_bad_trans_sent = TRUE;
 			QWASSIGN(recvpool_ctl->jnl_seqno, upd_proc_local->read_jnl_seqno); /* This was the bad transaction */
 			upd_proc_local->bad_trans = FALSE;

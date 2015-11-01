@@ -175,22 +175,22 @@ void dse_cache(void)
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->acc_meth.bg.cache_state));
 			cr_que_lo = &csa->acc_meth.bg.cache_state->cache_array[0];
 			util_out_print("Region !AD :  cache_que_header   = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo), sizeof(cache_rec), csa->hdr->bt_buckets);
+					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo), csa->hdr->bt_buckets, sizeof(cache_rec));
 			util_out_print("Region !AD :  cache_record       = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo + csa->hdr->bt_buckets),
-					sizeof(cache_rec), csa->hdr->n_bts);
+					csa->hdr->n_bts, sizeof(cache_rec));
 			util_out_print("Region !AD :  global_buffer      = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg),
 					ROUND_UP2(DB_ABS2REL(cr_que_lo + csa->hdr->bt_buckets + csa->hdr->n_bts), OS_PAGE_SIZE),
-					csa->hdr->blk_size, csa->hdr->n_bts);
+					csa->hdr->n_bts, csa->hdr->blk_size);
 			util_out_print("Region !AD :  db_file_header     = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->hdr));
 			util_out_print("Region !AD :  bt_que_header      = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_header), sizeof(bt_rec), csa->hdr->bt_buckets);
+					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_header), csa->hdr->bt_buckets, sizeof(bt_rec));
 			util_out_print("Region !AD :  th_base            = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->th_base));
 			util_out_print("Region !AD :  bt_record          = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_base), sizeof(bt_rec), csa->hdr->n_bts);
+					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_base), csa->hdr->n_bts, sizeof(bt_rec));
 			util_out_print("Region !AD :  shared_memory_size = 0x!XL",
 					TRUE, REG_LEN_STR(reg), reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
 		}

@@ -86,6 +86,7 @@
 #include "error_trap.h"
 #include "patcode.h"	/* for pat_everything and sizeof_pat_everything */
 #include "source_file.h"	/* for REV_TIME_BUFF_LEN */
+#include "mupipbckup.h"
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
@@ -103,7 +104,9 @@
 #include "invocation_mode.h"
 #include "fgncal.h"
 #include "parse_file.h"		/* for MAX_FBUFF */
+#include "repl_sem.h"
 #endif
+
 #include "jnl_typedef.h"
 
 #ifdef VMS
@@ -154,7 +157,6 @@ GBLDEF	bool		error_mupip = FALSE,
 GBLDEF	boolean_t	is_updproc = FALSE,
 			is_updhelper = FALSE,
 			mupip_jnl_recover = FALSE,
-			set_resync_to_region = FALSE,
 			repl_allowed = FALSE,
 			unhandled_stale_timer_pop = FALSE,
 			gtcm_connection = FALSE,
@@ -319,7 +321,8 @@ GBLDEF	boolean_t		tp_restart_fail_sig_used;
 GBLDEF	volatile	int4		fast_lock_count = 0;	/* Used in wcs_stale */
 
 /* REPLICATION RELATED GLOBALS */
-GBLDEF gtmsource_options_t      gtmsource_options;
+GBLDEF	gtmsource_options_t	gtmsource_options;
+GBLDEF	gtmrecv_options_t	gtmrecv_options;
 
 GBLDEF	unsigned char		*profstack_base, *profstack_top, *prof_msp, *profstack_warn;
 GBLDEF	unsigned char		*prof_stackptr;
@@ -446,6 +449,7 @@ GBLDEF	volatile int4		gtmMallocDepth;		/* Recursion indicator */
 GBLDEF	d_socket_struct		*socket_pool;
 GBLDEF	boolean_t		disable_sigcont = FALSE;
 GBLDEF	boolean_t		mu_star_specified;
+GBLDEF	backup_reg_list		*mu_repl_inst_reg_list;
 
 #ifndef VMS
 GBLDEF	volatile int		suspend_status = NO_SUSPEND;
@@ -726,8 +730,9 @@ GBLDEF	uint4	gtm_memory_noaccess_defined;	/* count of the number of GTM_MEMORY_N
 GBLDEF	uint4	gtm_memory_noaccess[GTM_MEMORY_NOACCESS_COUNT];	/* see VMS gtm_env_init_sp.c */
 #endif
 
+GBLDEF	volatile boolean_t	in_wcs_recover = FALSE;	/* TRUE if in wcs_recover(), used by "bt_put" and "generic_exit_handler" */
+
 #ifdef DEBUG
-GBLDEF	boolean_t	in_wcs_recover = FALSE;	/* TRUE if in wcs_recover(), used by bt_put() */
 /* Following definitions are related to white_box testing */
 GBLDEF	boolean_t	gtm_white_box_test_case_enabled = FALSE;
 GBLDEF	int		gtm_white_box_test_case_number = 0;
@@ -790,12 +795,24 @@ GBLDEF	uint4		region_open_count;		/* Number of region "opens" we have executed *
 
 GBLDEF	uint4		gtm_blkupgrade_flag = UPGRADE_IF_NEEDED;	/* by default upgrade only if necessary */
 GBLDEF	boolean_t	disk_blk_read;
-#ifdef UNIX
-GBLDEF	uint4		gtm_principal_editing_defaults;	/* ext_cap flags if tt */
-#endif
 
 GBLDEF	boolean_t	gtm_dbfilext_syslog_disable = FALSE;	/* by default, log every file extension message */
 
 GBLDEF	int4		cws_reorg_remove_index;			/* see mu_swap_blk.c for comments on the need for these two */
 GBLDEF	block_id	cws_reorg_remove_array[CWS_REORG_REMOVE_ARRAYSIZE];
+
+GBLDEF	uint4		log_interval;
+
+#ifdef UNIX
+GBLDEF	uint4		gtm_principal_editing_defaults;	/* ext_cap flags if tt */
+GBLDEF	boolean_t	in_repl_inst_edit = FALSE;	/* used by an assert in repl_inst_read/repl_inst_write */
+GBLDEF	boolean_t	in_repl_inst_create;		/* used by repl_inst_read/repl_inst_write */
+GBLDEF	boolean_t	holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];	/* whether a particular replication semaphore is being held
+								 * by the current process or not. */
+GBLDEF	boolean_t	print_offset;		/* Set to TRUE if -DETAIL is specified in MUPIP REPLIC -JNLPOOL or -EDITINST */
+GBLDEF	boolean_t	in_mupip_ftok;		/* Used by an assert in repl_inst_read */
+GBLDEF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst_dump.c */
+
+GBLDEF	uint4		mutex_per_process_init_pid;	/* pid that invoked "mutex_per_process_init" */
+#endif
 

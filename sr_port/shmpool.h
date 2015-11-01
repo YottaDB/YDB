@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,5 +71,6 @@ void	  shmpool_abandoned_blk_chk(gd_region *reg, boolean_t force);
 boolean_t shmpool_lock_hdr(gd_region *reg);
 boolean_t shmpool_lock_hdr_nowait(gd_region *reg);
 void	  shmpool_unlock_hdr(gd_region *reg);
+boolean_t shmpool_lock_held_by_us(gd_region *reg);
 
 #endif

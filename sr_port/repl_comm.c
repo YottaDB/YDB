@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,8 @@
 #include "min_max.h"
 #include "rel_quant.h"
 #include "repl_log.h"
+#include "iotcpdef.h"
+#include "gtmmsg.h"
 
 /* These statistics are useful and should perhaps be collected - Vinaya 2003/08/18
  *
@@ -314,4 +316,50 @@ int set_send_sock_buff_size(int sockfd, int buflen)
 int set_recv_sock_buff_size(int sockfd, int buflen)
 {
 	return set_sock_buff_size(sockfd, buflen, SO_RCVBUF);
+}
+
+void repl_log_conn_info(int sock_fd, FILE *log_fp)
+{
+	struct sockaddr_in	local, remote;
+	GTM_SOCKLEN_TYPE	len;
+	int			errlen, save_errno;
+	char			*errptr, local_ip[16], remote_ip[16];
+	in_port_t		local_port, remote_port;
+	error_def(ERR_GETSOCKNAMERR);
+	error_def(ERR_TEXT);
+
+	len = sizeof(local);
+	if (0 == getsockname(sock_fd, (struct sockaddr *)&local, &len))
+	{
+		local_port = ntohs(local.sin_port);
+		strcpy(local_ip, inet_ntoa(local.sin_addr));
+	} else
+	{
+		save_errno = errno;
+		errptr = (char *)STRERROR(save_errno);
+		errlen = strlen(errptr);
+		gtm_putmsg(VARLSTCNT(9) ERR_GETSOCKNAMERR, 3, save_errno, errlen, errptr, ERR_TEXT, 2,
+				LIT_AND_LEN("LOCAL"));
+
+		local_port = -1;
+		strcpy(local_ip, "*UNKNOWN*");
+	}
+	len = sizeof(remote);
+	if (0 == getpeername(sock_fd, (struct sockaddr *)&remote, &len))
+	{
+		remote_port = ntohs(remote.sin_port);
+		strcpy(remote_ip, inet_ntoa(remote.sin_addr));
+	} else
+	{
+		save_errno = errno;
+		errptr = (char *)STRERROR(save_errno);
+		errlen = strlen(errptr);
+		gtm_putmsg(VARLSTCNT(9) ERR_GETSOCKNAMERR, 3, save_errno, errlen, errptr, ERR_TEXT, 2,
+				LIT_AND_LEN("REMOTE"));
+		remote_port = -1;
+		strcpy(remote_ip, "*UNKNOWN*");
+	}
+	repl_log(log_fp, TRUE, TRUE, "Connection information:: Local: %s:%d Remote: %s:%d\n", local_ip, local_port,
+			remote_ip, remote_port);
+	return;
 }

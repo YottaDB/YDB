@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,8 @@ LITREF  int4	gtm_release_name_len;
 /* Downgrade header from v5.0-000 to v4.x */
 void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 {
+	error_def(ERR_MUINFOUINT8);
+
 	memset(v15_csd, 0, sizeof(v15_sgmnt_data));
 	MEMCPY_LIT(v15_csd->label, GDS_LABEL_GENERIC);
 	MEMCPY_LIT((v15_csd->label + sizeof(GDS_LABEL_GENERIC) - 1), GDS_V40);
@@ -67,7 +69,6 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 	v15_csd->max_update_array_size = csd->max_update_array_size;	/* This is filler for some early V4 versions */
 	v15_csd->max_non_bm_update_array_size = csd->max_non_bm_update_array_size;/* This is filler for some early V4 versions */
 	v15_csd->file_corrupt = csd->file_corrupt;
-	memcpy(&v15_csd->created, &csd->created, sizeof(csd->created));
 	v15_csd->createinprogress = csd->createinprogress;
 	time(&v15_csd->creation.date_time);	/* No need to propagate previous value */
 	v15_csd->last_inc_backup = csd->last_inc_backup;
@@ -117,9 +118,23 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 	v15_csd->rc_node = csd->rc_node;
 
 	v15_csd->reg_seqno = csd->reg_seqno;
-	v15_csd->resync_seqno = csd->resync_seqno;
-	v15_csd->resync_tn = csd->resync_tn;
-	v15_csd->old_resync_seqno = csd->old_resync_seqno;
+	VMS_ONLY(
+		v15_csd->resync_seqno = csd->resync_seqno;
+		v15_csd->old_resync_seqno = csd->old_resync_seqno;
+		v15_csd->resync_tn = csd->resync_tn;
+	)
+	UNIX_ONLY(
+		v15_csd->resync_seqno = csd->dualsite_resync_seqno;
+		if (0 == csd->zqgblmod_seqno)
+		{	/* Special value 0 of zqgblmod_seqno in multisite version corresponds to resync seqno of 1 in dualsite */
+			v15_csd->old_resync_seqno = 1;
+			v15_csd->resync_tn = 1;
+		} else
+		{
+			v15_csd->old_resync_seqno = csd->zqgblmod_seqno;
+			v15_csd->resync_tn = csd->zqgblmod_tn;
+		}
+	)
 	if (REPL_WAS_ENABLED(csd))
 		v15_csd->repl_state = repl_closed;
 	else
@@ -139,6 +154,8 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 		v15_csd->yield_lmt = csd->yield_lmt;
 		memcpy(v15_csd->jnl_file_name, csd->jnl_file_name, JNL_NAME_SIZE);
 		PRINT_JNL_FIELDS(v15_csd);
+		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("Resync sequence number"),
+					&v15_csd->resync_seqno, &v15_csd->resync_seqno);
 	}
 	memcpy(v15_csd->reorg_restart_key, csd->reorg_restart_key, sizeof(csd->reorg_restart_key));
 	memcpy(v15_csd->machine_name, csd->machine_name, MAX_MCNAMELEN);

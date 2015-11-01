@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,17 +33,34 @@
 #include "iosp.h"
 #include "gtmmsg.h"
 #include "gtm_rename.h"
+#include "repl_instance.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+
+/* This function creates a file to hold either journal extract or broken transaction or lost transaction data.
+ * The headerline of the file created will contain one of the following
+ *
+ *	Created by MUPIP JOURNAL -EXTRACT  --> EXTRACTLABEL<sp>EXTRACT
+ *	Created by MUPIP JOURNAL -RECOVER  --> EXTRACTLABEL<sp>RECOVER
+ *	Created by MUPIP JOURNAL -ROLLBACK --> EXTRACTLABEL<sp>ROLLBACK<sp>[PRIMARY|SECONDARY]<sp>INSTANCENAME
+ *
+ *	EXTRACTLABEL = NORMAL-EXTRACT-LABEL | DETAILED-EXTRACT-LABEL	// see muprec.h
+ *	<sp> : Space
+ *	RECOVER, EXTRACT, ROLLBACK, PRIMARY, SECONDARY : literal strings that appear as is.
+ *	INSTANCENAME : Name of the replication instance
+ */
 
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF	mur_opt_struct	mur_options;
 GBLREF	jnl_ctl_list	*mur_jctl;
+GBLREF	jnlpool_addrs	jnlpool;
 GBLREF	int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 
 int4 mur_cre_file_extfmt(int recstat)
 {
 	fi_type			*file_info;
 	char			*ptr, rename_fn[MAX_FN_LEN];
-	int			rename_fn_len, base_len, fn_exten_size;
+	int			rename_fn_len, base_len, fn_exten_size, extrlen, tmplen;
 	uint4			status;
 	mval			op_val, op_pars;
 	static readonly	char 	*fn_exten[] = {EXT_MJF, EXT_BROKEN, EXT_LOST};
@@ -94,15 +111,48 @@ int4 mur_cre_file_extfmt(int recstat)
 		return ERR_FILENOTCREATE;
 	}
 	/* Write file version info for the file created here. See C9B08-001729 */
+	extrlen = 0;
 	if (!mur_options.detail)
 	{
-		memcpy(murgbl.extr_buff, JNL_EXTR_LABEL, sizeof(JNL_EXTR_LABEL) - 1);
-		jnlext_write(file_info, murgbl.extr_buff, sizeof(JNL_EXTR_LABEL));
+		tmplen = STR_LIT_LEN(JNL_EXTR_LABEL);
+		memcpy(murgbl.extr_buff, JNL_EXTR_LABEL, tmplen);
 	} else
 	{
-		memcpy(murgbl.extr_buff, JNL_DET_EXTR_LABEL, sizeof(JNL_DET_EXTR_LABEL) - 1);
-		jnlext_write(file_info, murgbl.extr_buff, sizeof(JNL_DET_EXTR_LABEL));
+		tmplen = STR_LIT_LEN(JNL_DET_EXTR_LABEL);
+		memcpy(murgbl.extr_buff, JNL_DET_EXTR_LABEL, tmplen);
 	}
+	extrlen += tmplen;
+	if (LOST_TN == recstat)
+	{
+		if (mur_options.update)
+		{
+			if (mur_options.rollback)
+				ptr = " ROLLBACK";
+			else
+				ptr = " RECOVER";
+		} else
+			ptr = " EXTRACT";
+		tmplen = strlen(ptr);
+		memcpy(&murgbl.extr_buff[extrlen], ptr, tmplen);
+		extrlen += tmplen;
+		if (mur_options.rollback)
+		{
+			if (mur_options.fetchresync_port && murgbl.was_rootprimary)
+				ptr = " PRIMARY ";
+			else
+				ptr = " SECONDARY ";
+			tmplen = strlen(ptr);
+			memcpy(&murgbl.extr_buff[extrlen], ptr, tmplen);
+			extrlen += tmplen;
+			assert(NULL != jnlpool.repl_inst_filehdr);
+			ptr = (char *)&jnlpool.repl_inst_filehdr->this_instname[0];
+			tmplen = strlen(ptr);
+			memcpy(&murgbl.extr_buff[extrlen], ptr, tmplen);
+			extrlen += tmplen;
+		}
+	}
+	murgbl.extr_buff[extrlen++] = '\\';
+	jnlext_write(file_info, murgbl.extr_buff, extrlen);
 	gtm_putmsg(VARLSTCNT(6) ERR_FILECREATE, 4, LEN_AND_STR(ext_file_type[recstat]), file_info->fn_len, file_info->fn);
 	return SS_NORMAL;
 }

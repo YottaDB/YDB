@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +21,10 @@
 #include "filestruct.h"
 #include "mupipbckup.h"
 #include "util.h"
+#include "repl_instance.h"
 
-GBLREF	bool	error_mupip;
+GBLREF	bool		error_mupip;
+GBLREF	backup_reg_list	*mu_repl_inst_reg_list;
 
 void mubexpfilnam(char *dirname, unsigned int dirlen, backup_reg_list *list)
 {
@@ -30,19 +32,29 @@ void mubexpfilnam(char *dirname, unsigned int dirlen, backup_reg_list *list)
 	mstr	file;
 	char	tmp_mstr_addr[MAX_FN_LEN];
 
+	error_def(ERR_REPLINSTUNDEF);
+
 	file.len = MAX_FN_LEN;
 	file.addr = tmp_mstr_addr;
-	if (!mupfndfil(list->reg, &file))
-	{
-		util_out_print("Backup not finished because of the above error.", TRUE);
-		error_mupip = TRUE;
-		return;
+	if (list != mu_repl_inst_reg_list)
+	{	/* Database region */
+		if (!mupfndfil(list->reg, &file))
+		{
+			util_out_print("Backup not finished because of the above error.", TRUE);
+			error_mupip = TRUE;
+			return;
+		}
+	} else
+	{	/* Replication instance region */
+		if (!repl_inst_get_name(file.addr, &file.len, MAX_FN_LEN))
+			rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
 	}
 	for (c1 = file.addr + file.len; (*c1 != '/') && (c1 != file.addr); c1--)
-                ;
+		;
 	list->backup_file.len = dirlen + (file.len - (c1 - file.addr));
 	list->backup_file.addr = (char *)malloc(list->backup_file.len + 1);
 	memcpy(list->backup_file.addr, dirname, dirlen);
 	memcpy(list->backup_file.addr + dirlen, c1, (file.len - (c1 - file.addr)));
+	list->backup_file.addr[list->backup_file.len] = '\0';
 	return;
 }

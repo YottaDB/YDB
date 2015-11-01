@@ -72,6 +72,10 @@
 #include "wbox_test_init.h"
 #include "cert_blk.h"
 
+#ifdef UNIX
+#include "gtmrecv.h"
+#endif
+
 GBLREF	short			dollar_tlevel;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -99,6 +103,10 @@ GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF	bool			certify_all_blocks;
 GBLREF	gv_namehead		*gv_target;
+
+#ifdef UNIX
+GBLREF	recvpool_addrs		recvpool;
+#endif
 
 boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse);
 enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse);
@@ -958,7 +966,16 @@ boolean_t	tp_tend(boolean_t crit_only)
 		assert(!jgbl.forw_phase_recovery);
 		QWINCRBY(tjpl->jnl_seqno, seq_num_one);
 		if (is_updproc)
-			QWINCRBY(jgbl.max_resync_seqno, seq_num_one);
+		{
+			VMS_ONLY(
+				QWINCRBY(jgbl.max_resync_seqno, seq_num_one);
+			)
+			UNIX_ONLY(
+				assert(REPL_PROTO_VER_UNINITIALIZED != recvpool.gtmrecv_local->last_valid_remote_proto_ver);
+				if (REPL_PROTO_VER_DUALSITE == recvpool.gtmrecv_local->last_valid_remote_proto_ver)
+					QWINCRBY(jgbl.max_dualsite_resync_seqno, seq_num_one);
+			)
+		}
 	}
 	/* Note that only those regions that are actively journaling will appear in the following list: */
 	for (csa = jnl_fence_ctl.fence_list;  (sgmnt_addrs *) -1 != csa;  csa = csa->next_fenced)
@@ -970,9 +987,18 @@ boolean_t	tp_tend(boolean_t crit_only)
 		tcom_record.prefix.checksum = INIT_CHECKSUM_SEED;
 		if (REPL_ENABLED(csa))
 		{
-			QWASSIGN(csa->hdr->reg_seqno, tjpl->jnl_seqno);
+			csa->hdr->reg_seqno = tjpl->jnl_seqno;
 			if (is_updproc)
-				QWASSIGN(csa->hdr->resync_seqno, jgbl.max_resync_seqno);
+			{
+				VMS_ONLY(
+					QWASSIGN(csa->hdr->resync_seqno, jgbl.max_resync_seqno);
+				)
+				UNIX_ONLY(
+					assert(REPL_PROTO_VER_UNINITIALIZED != recvpool.gtmrecv_local->last_valid_remote_proto_ver);
+					if (REPL_PROTO_VER_DUALSITE == recvpool.gtmrecv_local->last_valid_remote_proto_ver)
+						QWASSIGN(csa->hdr->dualsite_resync_seqno, jgbl.max_dualsite_resync_seqno);
+				)
+			}
 		}
 		TP_CHANGE_REG_IF_NEEDED(jpc->region);
 		/* Note tcom_record.jnl_tid was set in op_tstart() or updproc() */

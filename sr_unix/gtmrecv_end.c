@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,21 +52,25 @@
 #endif
 #include "repl_log.h"
 #include "is_proc_alive.h"
+#include "gtmsource.h"
 
-GBLREF uint4			process_id;
-GBLREF recvpool_addrs		recvpool;
-GBLREF int			gtmrecv_filter;
-GBLREF boolean_t		gtmrecv_logstats;
-GBLREF int			gtmrecv_listen_sock_fd;
-GBLREF int			gtmrecv_sock_fd;
-GBLREF int			gtmrecv_log_fd;
-GBLREF int			gtmrecv_statslog_fd;
-GBLREF FILE			*gtmrecv_log_fp;
-GBLREF FILE			*gtmrecv_statslog_fp;
-GBLREF qw_num                  	repl_recv_data_recvd;
-GBLREF qw_num                  	repl_recv_data_processed;
-GBLREF repl_msg_ptr_t		gtmrecv_msgp;
-GBLREF uchar_ptr_t		repl_filter_buff;
+GBLREF	uint4			process_id;
+GBLREF	recvpool_addrs		recvpool;
+GBLREF	int			gtmrecv_filter;
+GBLREF	boolean_t		gtmrecv_logstats;
+GBLREF	int			gtmrecv_listen_sock_fd;
+GBLREF	int			gtmrecv_sock_fd;
+GBLREF	int			gtmrecv_log_fd;
+GBLREF	int			gtmrecv_statslog_fd;
+GBLREF	FILE			*gtmrecv_log_fp;
+GBLREF	FILE			*gtmrecv_statslog_fp;
+GBLREF	qw_num			repl_recv_data_recvd;
+GBLREF	qw_num			repl_recv_data_processed;
+GBLREF	repl_msg_ptr_t		gtmrecv_msgp;
+GBLREF	uchar_ptr_t		repl_filter_buff;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	boolean_t		pool_init;
 
 int gtmrecv_endupd(void)
 {
@@ -135,12 +139,39 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 		{
 			if (SS$_NORMAL != (status = detach_shm(recvpool.shm_range)))
 				repl_log(stderr, TRUE, TRUE, "Error detaching from recvpool : %s\n", REPL_STR_ERROR);
-			recvpool.recvpool_ctl = NULL;
 			if (!auto_shutdown && (SS$_NORMAL != (status = signoff_from_gsec(recvpool.shm_lockid))))
 				repl_log(stderr, TRUE, TRUE, "Error dequeueing lock on recvpool global section : %s\n",
 														REPL_STR_ERROR);
 		}
 	)
+	recvpool.recvpool_ctl = NULL;
+	assert((NULL != jnlpool_ctl) && (jnlpool_ctl == jnlpool.jnlpool_ctl));
+	if (NULL != jnlpool.jnlpool_ctl)
+	{	/* Reset fields that might have been initialized by the receiver server after connecting to the primary.
+		 * It is ok not to hold the journal pool lock while updating jnlpool_ctl fields since this will be the
+		 * only process updating those fields.
+		 */
+		jnlpool.jnlpool_ctl->primary_instname[0] = '\0';
+		jnlpool.jnlpool_ctl->primary_is_dualsite = FALSE;
+		jnlpool.jnlpool_ctl->gtmrecv_pid = 0;
+		/* Also take this opportunity to detach from the journal pool except in the auto_shutdown case. This is because
+		 * the fields "jnlpool_ctl->repl_inst_filehdr->recvpool_semid" and "jnlpool_ctl->repl_inst_filehdr->recvpool_shmid"
+		 * need to be reset by "gtmrecv_jnlpool_reset" (called from "gtmrecv_shutdown") which is invoked a little later.
+		 */
+		if (!auto_shutdown)
+		{
+			UNIX_ONLY(
+				if (0 > SHMDT(jnlpool.jnlpool_ctl))
+					repl_log(stderr, TRUE, TRUE, "Error detaching from Journal Pool : %s\n", REPL_STR_ERROR);
+			)
+			jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
+			jnlpool.repl_inst_filehdr = NULL;
+			jnlpool.gtmsrc_lcl_array = NULL;
+			jnlpool.gtmsource_local_array = NULL;
+			jnlpool.jnldata_base = NULL;
+			pool_init = FALSE;
+		}
+	}
 	gtmrecv_free_msgbuff();
 	gtmrecv_free_filter_buff();
 	recvpool.recvpool_ctl = NULL;
@@ -151,7 +182,7 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 		close(gtmrecv_sock_fd);
 	QWDECRBYDW(log_seqno, 1);
 	QWDECRBYDW(log_seqno1, 1);
-	repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Last recvd tr num : %llu  Tr Total : %llu  Msg Total : %llu\n",
+	repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Last recvd tr num : %llu  Tr Total : %llu  Msg Total : %llu\n",
 			log_seqno, repl_recv_data_processed, repl_recv_data_recvd);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Last tr num processed by update process : %llu\n", log_seqno1);
 	gtm_event_log_close();

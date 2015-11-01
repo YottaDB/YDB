@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -15,7 +15,7 @@
         ;
 SRC
         n $et s $et=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL")
-        n add,beg,cnt,ctrap,d,delim,end,exc,from,i,k,last,mtch,pct,r,rd,rdf,out,scwc,stop,strt,to,%ZE
+        n add,beg,cnt,ctrap,d,delim,end,exc,from,i,k,last,mtch,pct,r,rd,rdf,out,scwc,stack,stop,strt,to,%ZE
         s %ZE=".m"
 	k %ZR
 	i $d(%ZRSET) k ^%RSET($j)
@@ -23,7 +23,7 @@ SRC
         q
 OBJ
         n $et s $et=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL")
-        n add,beg,cnt,ctrap,d,delim,end,exc,from,i,k,last,mtch,pct,r,rd,rdf,out,scwc,stop,strt,to,%ZE
+        n add,beg,cnt,ctrap,d,delim,end,exc,from,i,k,last,mtch,pct,r,rd,rdf,out,scwc,stack,stop,strt,to,%ZE
         s %ZE=$s($zver["VMS":".obj",1:".o")
 	k %ZR
 	i $d(%ZRSET) k ^%RSET($j)
@@ -31,7 +31,7 @@ OBJ
         q
 RD
         n $et s $et=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL")
-        n add,beg,cnt,ctrap,d,delim,end,exc,from,i,k,last,mtch,pct,r,rd,rdf,out,scwc,stop,strt,to,%ZRSET
+        n add,beg,cnt,ctrap,d,delim,end,exc,from,i,k,last,mtch,pct,r,rd,rdf,out,scwc,stack,stop,strt,to,%ZRSET
 	w !,"Routine directory"
         d init
         s (out,rd,rdf)=1
@@ -40,7 +40,7 @@ RD
 	i rdf s %ZR="*" d work W !,"Total of ",cnt," routine",$s(cnt=1:".",1:"s."),!
         q
 CALL
-        n add,beg,cnt,ctrap,d,delim,end,exc,from,i,k,last,mtch,pct,r,rd,rdf,out,scwc,stop,strt,to n:'$d(%ZE) %ZE
+        n add,beg,cnt,ctrap,d,delim,end,exc,from,i,k,last,mtch,pct,r,rd,rdf,out,scwc,stack,stop,strt,to n:'$d(%ZE) %ZE
         i $g(%ZE)'[".o" s %ZE=".m"
         d init
 	i $d(%ZRSET) d  i $l($g(^%RSET($j))) s out=0 d main s ^%RSET($j)=cnt q
@@ -49,6 +49,11 @@ CALL
         . i $d(%ZR)>1 s r="" f  s r=$o(%ZR(r)) q:'$l(r)  s cnt=cnt+1
         d main
         q
+SILENT(patt,label)
+        n $et s $et=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL")
+	i ""=$g(label) s label="SRC"
+	d @label
+	q
 init
 	i $zver["VMS" d
 	. s delim=",",scwc="%",from="abcdefghijklmnopqrstuvwxyz !""#$&'()+'-./;<=>?@[]\^_`{}|~",to="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -94,10 +99,13 @@ main
         u:'$d(%zdebug) $p:(ctrap=$c(3):exception="zg "_$zl_":main^%RSEL")
 	s mtch="__" d start(0)
         f  d  q:'$l(%ZR)
-        . r !,"Routine: ",%ZR,! q:'$l(%ZR)
+	. zsh "s":stack                                                                                   ; get the current stack
+	. i $p(stack("S",1),"^",2)=$p($g(stack("S",4)),"^",2) s %ZR=patt,patt="",out=0 k stack q:'$l(%ZR) ; if silent, don't prompt
+        . e  r !,"Routine: ",%ZR,! q:'$l(%ZR)
         . i $e(%ZR)="?" d help q
         . d work
-        . w !,$s(rd:"T",1:"Current t"),"otal of ",cnt," routine",$s(cnt=1:".",1:"s."),!
+	. i '$d(stack) q                                                                    ; if silent, don't output count
+        . e  w !,$s(rd:"T",1:"Current t"),"otal of ",cnt," routine",$s(cnt=1:".",1:"s."),!
 	i $D(%ZRSET) s ^%RSET($j)=cnt k %ZR
 	e  s %ZR=cnt
         u $p:(ctrap=ctrap:exception=exc)

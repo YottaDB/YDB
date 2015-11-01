@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,10 +27,11 @@
 
 #ifdef DEBUG
 static	int4		entry_count = 0;
-GBLREF	boolean_t	in_wcs_recover;	/* TRUE if in wcs_recover(), used by bt_put() */
 #endif
 
-GBLREF	uint4		process_id;
+GBLREF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
+
+GBLREF	uint4			process_id;
 
 bt_rec_ptr_t bt_put(gd_region *r, int4 block)
 {

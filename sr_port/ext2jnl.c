@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -190,7 +190,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 		rec->jrec_tcom.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 		return ((char_ptr_t)rec) + TCOM_RECLEN;
 	}
-	ptr = strtok(NULL, "\\");		/* get the key-value and data also */
+	ptr += (strlen(ptr) + 1); /* get the key-value and data also; can't use strtok since there might be '\\' in the subscript */
 	assert(IS_SET_KILL_ZKILL(rectype));
 	assert(NULL != ptr);
 

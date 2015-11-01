@@ -47,6 +47,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	volatile int4		crit_count;
+GBLREF	volatile boolean_t	in_mutex_deadlock_check;
 GBLREF	volatile int4		db_fsync_in_prog, jnl_qio_in_prog;
 GBLREF	volatile int4 		fast_lock_count;
 GBLREF	volatile int4		gtmMallocDepth;		/* Recursion indicator */
@@ -58,7 +59,7 @@ GBLREF	boolean_t	 	mupip_jnl_recover;
 void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 {
 	boolean_t		dbsync_defer_timer;
-        gd_region               *reg, *save_region;
+	gd_region               *reg, *save_region;
 	jnl_private_control	*jpc;
 	node_local_ptr_t	cnl;
 	sgmnt_addrs		*csa, *check_csaddrs, *save_csaddrs;
@@ -80,7 +81,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	save_csaddrs = cs_addrs;
 	save_csdata = cs_data;
 	/* Save to see if we are in crit anywhere */
-        check_csaddrs = ((NULL == save_region || FALSE == save_region->open) ?  NULL : (&FILE_INFO(save_region)->s_addrs));
+	check_csaddrs = ((NULL == save_region || FALSE == save_region->open) ?  NULL : (&FILE_INFO(save_region)->s_addrs));
 	/* Note the non-usage of TP_CHANGE_REG_IF_NEEDED macros since this routine can be timer driven. */
 	TP_CHANGE_REG(reg);
 	csd = csa->hdr;
@@ -104,14 +105,17 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		 *   1) We are in the midst of lseek/read/write IO. This could reset an lseek.
 		 *   2) We are aquiring/releasing crit in any region (Strictly speaking it is enough
 		 *		to check this in the current region, but doesn't harm us much).
-             	 *   3) We have crit in the current region or we need to wait to obtain crit.
+		 *	Note that the function "mutex_deadlock_check" resets crit_count to 0 temporarily even though we
+		 *	might actually be in the midst of acquiring crit. Therefore we should not interrupt mainline code
+		 *	if we are in the "mutex_deadlock_check" as otherwise it presents reentrancy issues.
+		 *   3) We have crit in the current region or we need to wait to obtain crit.
 		 *   	At least one reason why we should not wait to obtain crit is because the timeout mechanism
 		 *   	for the critical section is currently (as of 2004 May) driven by heartbeat on Tru64, AIX,
 		 *   	Solaris and HPUX. The periodic heartbeat handler cannot pop as it is a SIGALRM
 		 *   	handler and cannot nest while we are already in a SIGALRM handler for the wcs_clean_dbsync.
 		 *   	Were this to happen, we could end up waiting for crit, not being able to interrupt the wait
 		 *   	with a timeout resulting in a hang until crit became available.
-           	 *   4) We are in a "fast lock".
+		 *   4) We are in a "fast lock".
 		 *   5) We are in gtm_malloc. Don't want to recurse on malloc.
 		 * Other deadlock causing conditions that need to be taken care of
 		 *   1) We already have either the fsync_in_prog or the io_in_prog lock.
@@ -121,9 +125,10 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);
 		if (!mupip_jnl_recover NOPIO_ONLY(&& (FALSE == lseekIoInProgress_flag))
 			GTM_MALLOC_NO_RENT_ONLY(&& 0 == gtmMallocDepth)
-			&& (0 == crit_count)       && (0 == fast_lock_count)
+			&& (0 == crit_count) && !in_mutex_deadlock_check
+			&& (0 == fast_lock_count)
 			&& (!jnl_qio_in_prog)      && (!db_fsync_in_prog)
-		        && (!jpc || !jpc->jnl_buff || (LOCK_AVAILABLE == jpc->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid))
+			&& (!jpc || !jpc->jnl_buff || (LOCK_AVAILABLE == jpc->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid))
 			&& (NULL == check_csaddrs || FALSE == check_csaddrs->now_crit) && (FALSE == csa->now_crit)
 			&& (FALSE != tp_grab_crit(reg)))
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,9 +73,8 @@
  * =============================================================================
  */
 
-/* The transfer table */
-GBLREF int 			(* volatile xfer_table[])();
-GBLREF volatile int4		outofband;
+GBLREF int 		(* volatile xfer_table[])();	/* The transfer table */
+GBLREF volatile int4	outofband;
 
 void tptimeout_set(int4 dummy_param);
 
@@ -97,7 +96,7 @@ static boolean_t 		in_timed_tn = FALSE;
 /*	"Did timeout succeed in setting xfer_table?"
  * 	 (vs. lose to another event)
  */
-static volatile boolean_t 	tp_timeout_set_xfer = FALSE;
+GBLDEF	volatile boolean_t 	tp_timeout_set_xfer = FALSE;
 
 
 /* =============================================================================
@@ -150,12 +149,13 @@ void tptimeout_set(int4 dummy_param)
 		xfer_table[xf_forchk1] = op_startintrrpt;
 		xfer_table[xf_forloop] = op_forintrrpt;
 		outofband = tptimeout;
-#if defined (VMS)
-		status = sys$setef(efn_outofband);
-		if (status != SS$_WASCLR && status != SS$_WASSET)
-			GTMASSERT;
-		sys$wake(0,0);
-#endif
+		VMS_ONLY(
+			status = sys$setef(efn_outofband);
+			assert(SS$_WASCLR == status);
+			if (status != SS$_WASCLR && status != SS$_WASSET)
+				GTMASSERT;
+			sys$wake(0,0);
+		)
 	}
 }
 
@@ -233,8 +233,6 @@ void tp_clear_timeout(void)
 		 * --------------------------------------------
 		 */
 		in_timed_tn = FALSE;
-		if (outofband)
-			outofband = 0;
 
 		/* -----------------------------------------------------
 		 * Should clear xfer settings only if set them.
@@ -259,9 +257,7 @@ void tp_clear_timeout(void)
 #endif
 			assert(tp_timeout_check);
 			tp_timeout_set_xfer = FALSE;
-
-		}
-		else
+		} else
 		{
 			/* ----------------------------------------------------
 			 * Get here only if clearing TP timer when a

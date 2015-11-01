@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,10 +53,12 @@ void jobinterrupt_set(int4 dummy_val)
 {
 	int4	status;
 
-	VMS_ONLY(status = sys$setef(efn_outofband);
-		 if (SS$_WASCLR != status && SS$_WASSET != status)
-		         GTMASSERT;
-		 )
+	VMS_ONLY(
+		status = sys$setef(efn_outofband);
+		assert(SS$_WASCLR == status);
+		if (SS$_WASCLR != status && SS$_WASSET != status)
+			GTMASSERT;
+	)
 	if (jobinterrupt != outofband)
 	{	/* We need jobinterrupt out of band processing at our earliest convenience */
 		outofband = jobinterrupt;
