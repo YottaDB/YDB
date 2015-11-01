@@ -19,10 +19,10 @@
 
 typedef struct lv_sbs_tbl_struct
 {
-       	unsigned char	       		ident;
+       	UNICODE_ONLY(unsigned short	ident;)
+       	NON_UNICODE_ONLY(unsigned char	ident;)
        	bool   	       	       	       	int_flag;
        	unsigned char	       		level;
-	unsigned char	     		filler;
 	struct sbs_blk_struct		*str;
        	struct sbs_blk_struct		*num;
 	struct lv_val_struct		*lv;
@@ -63,7 +63,8 @@ typedef struct lv_blk_struct
 
 typedef struct symval_struct
 {
-       	unsigned char		ident;
+       	UNICODE_ONLY(unsigned short	ident;)
+       	NON_UNICODE_ONLY(unsigned char	ident;)
 	unsigned char		tp_save_all;
 	struct
 	{

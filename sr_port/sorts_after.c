@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +48,8 @@ int	sorts_after (mval *lhs, mval *rhs)
 		mstr	tmstr2;
 		MAXSTR_BUFF_DECL(tmp);
 
+		MV_FORCE_STR(lhs);	/* just in case lhs is not of type MV_STR, force it to be as do_xform uses the str part */
+		MV_FORCE_STR(rhs);	/* just in case rhs is not of type MV_STR, force it to be as do_xform uses the str part */
 		ALLOC_XFORM_BUFF(&lhs->str);
 		tmstr1.len = max_lcl_coll_xform_bufsiz;
 		tmstr1.addr = lcl_coll_xform_buff;
@@ -63,7 +65,6 @@ int	sorts_after (mval *lhs, mval *rhs)
 		cmp = memcmp(tmstr1.addr, tmstr2.addr, length1 <= length2 ? length1 : length2);
 		return cmp != 0 ? cmp : length1 - length2;
 	}
-
 	if (nm_iscan(lhs) != 0)
 	{
 		/* lhs is a number */
@@ -77,7 +78,6 @@ int	sorts_after (mval *lhs, mval *rhs)
 			return 1;
 		return -1;
 	}
-
 	/* lhs is a string */
 	if (nm_iscan(rhs) != 0)
 	{
@@ -87,7 +87,6 @@ int	sorts_after (mval *lhs, mval *rhs)
 			return -1;
 		return 1;
 	}
-
 	/* lhs and rhs are both strings */
 	return memvcmp(lhs->str.addr, lhs->str.len, rhs->str.addr, rhs->str.len);
 }

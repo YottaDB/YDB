@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +22,7 @@
  */
 boolean_t add_atom(int	*count,
 	uint4		pattern_mask,
-	void		*strlit_buff,
-	int4		strlen,
+	pat_strlit	*strlit_buff,
 	boolean_t	infinite,
 	int		*min,
 	int		*max,
@@ -41,8 +40,9 @@ boolean_t add_atom(int	*count,
 {
 	uint4		*patmaskptr;
 	gtm_uint64_t	bound;
+	int4		bytelen;
 
-	if ((pattern_mask & PATM_STRLIT) && !strlen && *count)
+	if ((pattern_mask & PATM_STRLIT) && !strlit_buff->bytelen && *count)
 	{	/* A special case is a pattern like xxx?1N5.7""2A . Since there is an infinite number of empty strings between
 		 * any two characters in a string, a pattern atom that counts repetitions of the fixed string "" can be ignored.
 		 * That is, such an atom can only be ignored if it is not the only one in the pattern...
@@ -50,9 +50,15 @@ boolean_t add_atom(int	*count,
 		return TRUE;
 	}
 	if (*count && !*(size - 1))
-	{	/* If the previous atom was an n.m"", it should be removed. In such a case, the last two values
-		 * in the 'outchar' array are PATM_STRLIT (pattern mask) and 0 (stringlength). */
-		*outchar_ptr -= 2;
+	{	/* If the previous atom was an n.m"", it should be removed. In such a case, the last four values
+		 * in the 'outchar' array are PATM_STRLIT (pattern mask), 0 (bytelen), 0 (charlen), flags (ASCII and no BADCHAR). */
+		assert(3 == PAT_STRLIT_PADDING);
+		assert(PATM_STRLIT == *(*outchar_ptr - (PAT_STRLIT_PADDING + 1)));
+		assert(0 == *(*outchar_ptr - 3));				/* bytelen */
+		assert(0 == *(*outchar_ptr - 2));				/* charlen */
+		assert(!((*(*outchar_ptr - 1)) & PATM_STRLIT_NONASCII));	/* flags - ascii */
+		assert(!((*(*outchar_ptr - 1)) & PATM_STRLIT_BADCHAR));		/* flags - no badchar */
+		*outchar_ptr -= (PAT_STRLIT_PADDING + 1);
 		(*count)--;
 		assert(0 == *count);
 		min--;
@@ -64,7 +70,7 @@ boolean_t add_atom(int	*count,
 		lower_bound = BOUND_MULTIPLY(lower_bound, altmin, bound);
 		upper_bound = BOUND_MULTIPLY(upper_bound, altmax, bound);
 	}
-	if (*count && pat_compress(pattern_mask, strlit_buff, strlen, infinite, *last_infinite_ptr, *lastpatptr_ptr))
+	if (*count && pat_compress(pattern_mask, strlit_buff, infinite, *last_infinite_ptr, *lastpatptr_ptr))
 	{
 		min--;
 		max--;
@@ -86,12 +92,13 @@ boolean_t add_atom(int	*count,
 			*size = 1;
 		} else
 		{
-			*outchar_ptr += DIVIDE_ROUND_UP(strlen, sizeof(uint4)) + 1;
+			bytelen = strlit_buff->bytelen;
+			*outchar_ptr += DIVIDE_ROUND_UP(bytelen, sizeof(uint4)) + PAT_STRLIT_PADDING;
 			if (*outchar_ptr - *fstchar_ptr > MAX_PATTERN_LENGTH)
 				return FALSE;
 			*patmaskptr++ = pattern_mask;
-			memcpy(patmaskptr, strlit_buff, strlen + sizeof(uint4));
-			*size = strlen;
+			memcpy(patmaskptr, strlit_buff, bytelen + PAT_STRLIT_PADDING * sizeof(uint4));
+			*size = strlit_buff->charlen;
 		}
 		(*count)++;
 	}

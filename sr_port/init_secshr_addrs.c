@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,7 @@ void init_secshr_addrs(gd_addr_fn_ptr getnxtgdr, cw_set_element *cwsetaddrs, sgm
 	first_sgm_info_addrs = firstsiaddrs;
 	cw_depth_addrs = cwsetdepthaddrs;
 	rundown_process_id = epid;
+	assert(rundown_process_id);
 	rundown_image_count = icnt;
 	rundown_os_page_size = ((0 != gtmospagesize) && ((gtmospagesize / DEF_PGSZ) * DEF_PGSZ) == gtmospagesize) ? gtmospagesize
 														  : DEF_PGSZ;

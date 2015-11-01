@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2001, 2002 Sanchez Computer Associates, Inc.  *
+ *      Copyright 2001, 2006 Fidelity Information Services, Inc  *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -20,6 +20,8 @@
 #include "error.h"
 #include "gtm_env_xlate_init.h"
 #include "stringpool.h"
+
+GBLREF mstr	env_gtm_env_xlate;
 
 void gtm_env_xlate_init(void)
 {

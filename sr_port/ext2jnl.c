@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include <stddef.h> /* for offsetof() macro */
+#include "gtm_ctype.h"
 
 #include "mlkdef.h"
 #include "gtm_string.h"
@@ -65,8 +66,7 @@ char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec)
 
 char	*ext2jnl(char *ptr, jnl_record *rec)
 {
-	unsigned char	*pool_save;
-	char		*ret, ch;
+	unsigned char	*pool_save, ch, chtmp;
 	int		keylength, keystate, len, i, reclen, temp_reclen;
 	bool		keepgoing;
 	mstr		src, des;
@@ -194,82 +194,9 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	assert(IS_SET_KILL_ZKILL(rectype));
 	assert(NULL != ptr);
 
-	/* this part is lifted from go_load. later think of having a common routine */
 	len = strlen(ptr);
-	keylength = 0;					/* determine length of key */
-	keystate  = 0;
-	keepgoing = TRUE;
-	while((keylength < len) && keepgoing)		/* slightly different here from go_load since we can get kill records too */
-	{
-		ch = *(ptr + keylength);
-		keylength++;
-		switch (keystate)
-		{
-		case 0:						/* in global name */
-			if ('=' == ch)					/* end of key */
-			{
-				keylength--;
-				keepgoing = FALSE;
-			}
-			else if ('(' == ch)				/* start of subscripts */
-				keystate = 1;
-			break;
-		case 1:						/* in subscripts area, but out of "..." or $C(...) */
-			switch (ch)
-			{
-			case ')':					/* end of subscripts ==> end of key */
-				keepgoing = FALSE;
-				break;
-			case '"':					/* step into "..." */
-				keystate = 2;
-				break;
-			case '$':					/* step into $C(...) */
-				assert(('C' == *(ptr + keylength)) || ('c' == *(ptr + keylength)));
-				assert('(' == *(ptr + keylength + 1));
-				keylength += 2;
-				keystate = 3;
-				break;
-			}
-			break;
-		case 2:						/* in "..." */
-			if ('"' == ch)
-			{
-				switch (*(ptr + keylength))
-				{
-				case '"':				/* "" */
-					keylength++;
-					break;
-				case '_':				/* _$C(...) */
-					assert('$' == *(ptr + keylength + 1));
-					assert(('c' == *(ptr + keylength + 2)) || ('C' == *(ptr + keylength + 2)));
-					assert('(' == *(ptr + keylength + 3));
-					keylength += 4;
-					keystate = 3;
-					break;
-				default:				/* step out of "..." */
-					keystate = 1;
-				}
-			}
-			break;
-		case 3:						/* in $C(...) */
-			if (')' == ch)
-			{
-				if ('_' == *(ptr + keylength))		/* step into "..." */
-				{
-					assert('"' == *(ptr + keylength + 1));
-					keylength += 2;
-					keystate = 2;
-					break;
-				}
-				else
-					keystate = 1;			/* step out of $C(...) */
-			}
-			break;
-		default:
-			assert(FALSE);
-			break;
-		}
-	}
+	keylength = zwrkeylength(ptr, len); /* determine length of key */
+
 	REPL_DPRINT2("ext2jnl source:KEY=DATA:%s\n", ptr);
 	assert(keylength <= len);
 	str2gvkey_nogvfunc(ptr, keylength, gv_currkey);

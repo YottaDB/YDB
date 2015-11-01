@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -151,6 +151,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 	socketptr->local.port = GTM_NTOHS(socketptr->remote.sin.sin_port);
 	*/
 	socketptr->state = socket_connected;
+	socketptr->first_read = socketptr->first_write = TRUE;
 	/* update dollar_key */
         len = sizeof(ESTABLISHED) - 1;
         memcpy(&dsocketptr->dollar_key[0], ESTABLISHED, len);
@@ -158,7 +159,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
         memcpy(&dsocketptr->dollar_key[len], socketptr->handle, socketptr->handle_len);
         len += socketptr->handle_len;
         dsocketptr->dollar_key[len++] = '|';
-	memcpy(&dsocketptr->dollar_key[len], socketptr->remote.saddr_ip, strlen(socketptr->remote.saddr_ip));
+	MEMCPY_STR(&dsocketptr->dollar_key[len], socketptr->remote.saddr_ip);
 	len += strlen(socketptr->remote.saddr_ip);
 	dsocketptr->dollar_key[len] = '\0';
 	return TRUE;

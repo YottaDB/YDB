@@ -77,8 +77,10 @@ static readonly CLI_ENTRY dse_cache_qual[] = {
 };
 
 static readonly CLI_ENTRY dse_all_qual[] = {
+{ "ALL",          0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
 { "BUFFER_FLUSH", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
 { "CRITINIT",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
+{ "DUMP",         0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
 { "FREEZE",       0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
 { "OVERRIDE",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
 { "REFERENCE",    0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },

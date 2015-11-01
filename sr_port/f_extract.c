@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,10 @@
 
 GBLREF char window_token;
 
+/* Note this function compiler routine is used for all of $EXTRACT,
+   $ZEXTRACT, and $ZSUBSTR since the format of the call is identical
+   in all instances as the function is similar.
+*/
 int f_extract(oprtype *a, opctype op)
 {
 	triple *first, *last, *r;
@@ -28,17 +32,21 @@ int f_extract(oprtype *a, opctype op)
 	last = newtriple(OC_PARAMETER);
 	r->operand[1] = put_tref(first);
 	first->operand[1] = put_tref(last);
+#ifndef UNICODE_SUPPORTED
+	if (OC_FNEXTRACT != op)
+		GTMASSERT;
+#endif
 	if (window_token != TK_COMMA)
 	{
-		first->operand[0] = last->operand[0] = put_ilit(1);
-	}
-	else
+		first->operand[0] = put_ilit(1);
+		last->operand[0] = put_ilit((OC_FNZSUBSTR == op) ? MAXPOSINT4 : 1);
+	} else
 	{
 		advancewindow();
 		if (!intexpr(&(first->operand[0])))
 			return FALSE;
 		if (window_token != TK_COMMA)
-			last->operand[0] = first->operand[0];
+			last->operand[0] = (OC_FNZSUBSTR == op) ? put_ilit(MAXPOSINT4) : first->operand[0];
 		else
 		{
 			advancewindow();

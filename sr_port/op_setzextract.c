@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,8 @@ GBLREF spdesc		stringpool;
  *	none
  * ----------------------------------------------------------
  */
-void op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst)
+
+void op_setzextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 {
 	int		srclen, padlen, pfxlen, sfxoff, sfxlen, strlen;
 	unsigned char	*srcptr, *pfx, *straddr;

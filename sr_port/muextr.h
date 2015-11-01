@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@ typedef struct coll_hdr_struct
 #define GOQ_BLK_SIZE		2048
 #define FORMAT_STR_MAX_SIZE 50
 #define LABEL_STR_MAX_SIZE 128
+#define EXTR_DEFAULT_LABEL	"GT.M MUPIP EXTRACT"
 
 #define BIN_HEADER_VERSION	"4"
 #define BIN_HEADER_LABEL	"GDS BINARY EXTRACT LEVEL "BIN_HEADER_VERSION

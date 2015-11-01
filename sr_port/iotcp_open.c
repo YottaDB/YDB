@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,10 +24,9 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <fcntl.h>
-#include <time.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include "gtm_fcntl.h"
+#include "gtm_time.h"
+#include "gtm_socket.h"
 #include "gtm_inet.h"
 #include "gtm_ctype.h"
 #include "gtm_string.h"
@@ -65,7 +64,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 				p_offset = 0,
 				temp_1 = -2;
 	TID			timer_id;
-	ABS_TIME		cur_time, end_time, time_for_read, save_time_for_read;
+	ABS_TIME		cur_time, end_time, time_for_read, lcl_time_for_read;
 	d_tcp_struct		*tcpptr, newtcp;
 	io_desc			*ioptr;
 	struct sockaddr_in	peer;		/* socket address + port */
@@ -204,7 +203,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 				return	FALSE;	/* could not create listening socket */
 			timer_id = (TID)iotcp_open;
 			out_of_time = FALSE;
-			time_for_read.at_sec = ((NO_M_TIMEOUT == timeout) ? 0 : 1);
+			time_for_read.at_sec = ((0 == timeout) ? 0 : 1);
 			time_for_read.at_usec = 0;
 			if (NO_M_TIMEOUT == timeout)
 			{
@@ -230,9 +229,9 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 				 * Note: the check for EINTR from the select below should remain, as aa_select is a
 				 * function, and not all callers of aa_select behave the same when EINTR is returned.
 				 */
-                                save_time_for_read = time_for_read;
-				status = tcp_routines.aa_select(lsock + 1, (void *)&tcp_fd, (void *)0, (void *)0, &time_for_read);
-                                time_for_read = save_time_for_read;
+                                lcl_time_for_read = time_for_read;
+				status = tcp_routines.aa_select(lsock + 1, (void *)&tcp_fd, (void *)0, (void *)0,
+								&lcl_time_for_read);
 				if (0 > status)
 				{
 					if (EINTR == errno && FALSE == out_of_time)
@@ -258,10 +257,6 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 					} else
 						break;
 				}
-#ifdef __linux__
-				time_for_read.at_sec = ((NO_M_TIMEOUT == timeout) ? 0 : 1);
-				time_for_read.at_usec = 0;
-#endif
 			}
 			if (timed)
 			{

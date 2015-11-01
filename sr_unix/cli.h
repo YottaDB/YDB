@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +9,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __CLI_H__
-#define __CLI_H__
+#ifndef CLI_H
+#define CLI_H
 
 /*
  * -----------------------------------------------------------
@@ -123,10 +123,12 @@ typedef struct
 /* include platform independent prototypes */
 
 #include "cliif.h"
+#include "gtm_stdio.h"
 
 void cli_strlwr(char *sp);
 int cli_is_id(char *p);
 void skip_white_space(void);
 int cli_has_space(char *p);
+char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str);
 
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,9 @@
 #define LOGICAL_TRUE	"TRUE"
 #define LOGICAL_YES	"YES"
 
-boolean_t logical_truth_value(mstr *logical, boolean_t *is_defined);
+#define LOGICAL_FALSE	"FALSE"
+#define LOGICAL_NO	"NO"
+
+boolean_t logical_truth_value(mstr *logical, boolean_t negate, boolean_t *is_defined);
 
 #endif /* LOGICAL_TRUTH_VALUE_H_INCLUDED */

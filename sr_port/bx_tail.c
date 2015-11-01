@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,7 +94,7 @@ oprtype *addr;          address to jmp
 		sense = ! sense;
 		/* caution: fall through */
 	case OC_CONTAIN:
-		bx_relop(t, OC_CONTAIN, sense ? OC_JMPEQU : OC_JMPNEQ, addr);
+		bx_relop(t, OC_CONTAIN, sense ? OC_JMPNEQ : OC_JMPEQU, addr);
 		break;
 	case OC_NGT:
 		sense = ! sense;

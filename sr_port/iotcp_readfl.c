@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,15 +13,12 @@
 
 #include <errno.h>
 #include "gtm_stdio.h"
-#include <time.h>
-#ifdef __MVS__
-#include <sys/time.h>
-#endif
-#include <netinet/in.h>
+#include "gtm_time.h"
+#include "gtm_inet.h"
 #include "gtm_string.h"
 
 #ifdef UNIX
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #include "eintr_wrappers.h"
 static int fcntl_res;
 #endif
@@ -43,7 +40,7 @@ GBLREF	spdesc			stringpool;
 GBLREF	tcp_library_struct	tcp_routines;
 GBLREF	int4			outofband;
 
-short	iotcp_readfl(mval *v, int4 width, int4 timeout)
+int	iotcp_readfl(mval *v, int4 width, int4 timeout)
 /* 0 == width is a flag that the caller is read and the length is not actually fixed */
 /* timeout in seconds */
 {
@@ -56,7 +53,7 @@ short	iotcp_readfl(mval *v, int4 width, int4 timeout)
 	int4		status;
 	int4		msec_timeout;	/* timeout in milliseconds */
 	TID		timer_id;
-	ABS_TIME	cur_time, end_time, time_for_read, save_time_for_read, zero;
+	ABS_TIME	cur_time, end_time, time_for_read, lcl_time_for_read, zero;
 	fd_set		tcp_fd;
 	char		*errptr;
 	int4		errlen;
@@ -145,10 +142,9 @@ short	iotcp_readfl(mval *v, int4 width, int4 timeout)
 		 * the check for EINTR below is valid and should not be converted to an EINTR
 		 * wrapper macro, since it might be a timeout.
 		 */
-                save_time_for_read = time_for_read;
-		status = tcp_routines.aa_select(tcpptr->socket + 1, (void *)(&tcp_fd), (void *)0, (void *)0, &time_for_read);
-                time_for_read = save_time_for_read;
-
+		lcl_time_for_read = time_for_read;
+		status = tcp_routines.aa_select(tcpptr->socket + 1, (void *)(&tcp_fd), (void *)0, (void *)0,
+							&lcl_time_for_read);
 		if (status > 0)
 		{
 			status = tcp_routines.aa_recv(tcpptr->socket, (char *)(stringpool.free +  i), width - i, 0);
@@ -199,10 +195,6 @@ short	iotcp_readfl(mval *v, int4 width, int4 timeout)
 		i += status;
 		if ((vari && (0 != i)) || (i >= width))
 			break;
-#ifdef __linux__
-		time_for_read.at_sec = ((0 == timeout) ? 0 : 1);
-		time_for_read.at_usec = 0;
-#endif
 	}
 	if (EINTR == real_errno)
 		status = 0;	/* don't treat a <CTRL-C> or timeout as an error */
@@ -286,5 +278,5 @@ short	iotcp_readfl(mval *v, int4 width, int4 timeout)
 		} else
 			io_ptr->dollar.zeof = TRUE;
 	}
-	return ((short)ret);
+	return (ret);
 }

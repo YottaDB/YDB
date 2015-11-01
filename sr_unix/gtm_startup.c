@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,9 +48,7 @@
 #include "gtmsource.h"
 #include "gtm_env_xlate_init.h"
 #include "callintogtmxfer.h"
-#ifdef __sun
 #include "xfer_enum.h"
-#endif
 #include "cache.h"
 #include "op.h"
 #include "gt_timer.h"
@@ -86,6 +84,9 @@
 #include "gtm_logicals.h"	/* for DISABLE_ALIGN_STRINGS */
 #include "suspsigs_handler.h"
 #include "logical_truth_value.h"
+#include "gtm_utf8.h"
+#include "gtm_icu_api.h"	/* for u_strToUpper and u_strToLower */
+#include "gtm_conv.h"
 
 #ifdef __sun
 #define PACKAGE_ENV_TYPE  "GTMXC_RPC"  /* env var to use rpc instead of xcall */
@@ -103,7 +104,7 @@ GBLREF stack_frame 	*frame_pointer;
 GBLREF unsigned char 	*stackbase, *stacktop, *stackwarn, *msp;
 GBLREF unsigned char	*fgncal_stack;
 GBLREF mv_stent		*mv_chain;
-GBLREF int		(* volatile xfer_table[])();
+GBLREF xfer_entry_t	xfer_table[];
 GBLREF mval		dollar_system;
 GBLREF mval		dollar_ztrap;
 GBLREF mval		dollar_zstatus;
@@ -132,18 +133,23 @@ GBLREF jnlpool_addrs	jnlpool;
 GBLREF boolean_t	is_replicator;
 GBLREF void		(*ctrlc_handler_ptr)();
 GBLREF boolean_t	mstr_native_align;
+GBLREF boolean_t	gtm_utf8_mode;
+GBLREF boolean_t	utf8_patnumeric;
+GBLREF mstr		dollar_zchset;
+GBLREF mstr		dollar_zpatnumeric;
+GBLREF casemap_t	casemaps[];
+
 OS_PAGE_SIZE_DECLARE
+
+error_def(ERR_COLLATIONUNDEF);
 
 void gtm_startup(struct startup_vector *svec)
 /* Note: various references to data copied from *svec could profitably be referenced directly */
 {
-        error_def (ERR_COLLATIONUNDEF);
 	unsigned char	*mstack_ptr;
 	void		gtm_ret_code();
 	static readonly unsigned char init_break[1] = {'B'};
 	int4		lct;
-	mstr		val;
-	boolean_t	ret, is_defined;
 	int		i;
 	static char 	other_mode_buf[] = "OTHER";
 	mstr		log_name;
@@ -184,10 +190,12 @@ void gtm_startup(struct startup_vector *svec)
 	compile_time = FALSE;
 	run_time = TRUE;
 
+	gtm_utf8_init(); /* Initialize the runtime for Unicode */
+
 	/* Initialize alignment requirement for the runtime stringpool */
 	log_name.addr = DISABLE_ALIGN_STRINGS;
 	log_name.len = STR_LIT_LEN(DISABLE_ALIGN_STRINGS);
-	/* mstr_native_align = logical_truth_value(&log_name, NULL) ? FALSE : TRUE; */
+	/* mstr_native_align = logical_truth_value(&log_name, FALSE, NULL) ? FALSE : TRUE; */
 	mstr_native_align = FALSE; /* TODO: remove this line and uncomment the above line */
 
 	is_replicator = TRUE;	/* as GT.M goes through t_end() and can write jnl records to the jnlpool for replicated db */
@@ -202,13 +210,13 @@ void gtm_startup(struct startup_vector *svec)
 	cache_init();
 #ifdef __sun
         if (NULL != GETENV(PACKAGE_ENV_TYPE))	/* chose xcall (default) or rpc zcall */
-            xfer_table[xf_fnfgncal] = (int (*)())op_fnfgncal_rpc;  /* using RPC */
+            xfer_table[xf_fnfgncal] = (xfer_entry_t)op_fnfgncal_rpc;  /* using RPC */
 #endif
 	msp -= sizeof(stack_frame);
 	frame_pointer = (stack_frame *) msp;
 	memset(frame_pointer,0, sizeof(stack_frame));
 	frame_pointer->temps_ptr = (unsigned char *) frame_pointer;
-	frame_pointer->ctxt = CONTEXT(gtm_ret_code);
+	frame_pointer->ctxt = GTM_CONTEXT(gtm_ret_code);
 	frame_pointer->mpc = CODE_ADDRESS(gtm_ret_code);
 	frame_pointer->type = SFT_COUNT;
 	frame_pointer->rvector = (rhdtyp*)malloc(sizeof(rhdtyp));
@@ -285,4 +293,33 @@ void gtm_startup(struct startup_vector *svec)
 	fnpca.fnpcsteal = &fnpca.fnpcs[0];		/* Starting place to look for cache reuse */
 	fnpca.fnpcmax = &fnpca.fnpcs[FNPC_MAX - 1];	/* The last element */
 	return;
+}
+
+void gtm_utf8_init(void)
+{
+	if (!gtm_utf8_mode)
+	{ /* Unicode is not enabled (i.e. $ZCHSET="M"). All standard functions must be byte oriented */
+		xfer_table[xf_fnascii] = (xfer_entry_t)&op_fnzascii;
+		xfer_table[xf_fnchar] = (xfer_entry_t)&op_fnzchar;
+		xfer_table[xf_fnextract] = (xfer_entry_t)&op_fnzextract;
+		xfer_table[xf_setextract] = (xfer_entry_t)&op_setzextract;
+		xfer_table[xf_fnfind] = (xfer_entry_t)&op_fnzfind;
+		xfer_table[xf_fnj2] = (xfer_entry_t)&op_fnzj2;
+		xfer_table[xf_fnlength] = (xfer_entry_t)&op_fnzlength;
+		xfer_table[xf_fnpopulation] = (xfer_entry_t)&op_fnzpopulation;
+		xfer_table[xf_fnpiece] = (xfer_entry_t)&op_fnzpiece;
+		xfer_table[xf_fnp1] = (xfer_entry_t)&op_fnzp1;
+		xfer_table[xf_setpiece] = (xfer_entry_t)&op_setzpiece;
+		xfer_table[xf_setp1] = (xfer_entry_t)&op_setzp1;
+		xfer_table[xf_fntranslate] = (xfer_entry_t)&op_fnztranslate;
+		xfer_table[xf_fnreverse] = (xfer_entry_t)&op_fnzreverse;
+		return;
+	}
+	dollar_zchset.len = STR_LIT_LEN(UTF8_NAME);
+	dollar_zchset.addr = UTF8_NAME;
+	if (utf8_patnumeric)
+	{
+		dollar_zpatnumeric.len = STR_LIT_LEN(UTF8_NAME);
+		dollar_zpatnumeric.addr = UTF8_NAME;
+	}
 }

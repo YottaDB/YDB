@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2005 Fidelity Information Services, Inc #
+#	Copyright 2001, 2006 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -97,7 +97,8 @@ foreach auxillary ( $argv[4-] )
 	else if ( "$auxillary" == "gtcm") then
 		set new_auxillarylist = "$new_auxillarylist gtcm_server gtcm_play gtcm_shmclean gtcm_pkdisp"
 	else if ( "$auxillary" == "stub") then
-		set new_auxillarylist = "$new_auxillarylist dse mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean"
+		set new_auxillarylist = "$new_auxillarylist dse mupip gtcm_server gtcm_gnp_server gtcm_play"
+		set new_auxillarylist = "$new_auxillarylist gtcm_pkdisp gtcm_shmclean"
 	else if ("$auxillary" == "mumps") then
 		$shell $gtm_tools/buildshr.csh $1 $2 ${gtm_root}/$1/$2
 		if ($#argv == 4) then
@@ -148,10 +149,55 @@ if ( $buildaux_gde == 1 ) then
 
 		# Compile all of the *.m files once so the $gtm_dist directory can remain protected.
 		mumps *.m
+		if ($status != 0) then
+			set buildaux_status = `expr $buildaux_status + 1`
+			echo "buildaux-E-compile_M, Failed to compile .m programs in M mode" \
+				>> $gtm_log/error.`basename $gtm_exe`.log
+		endif
+
+		if (`uname` == "AIX") then
+			setenv LIBPATH /usr/local/lib
+			set library_path = "$LIBPATH"
+		else
+			setenv LD_LIBRARY_PATH "/usr/local/lib:/usr/lib"
+			set library_path = `echo $LD_LIBRARY_PATH | sed 's/:/ /g'`
+		endif
+		set utflocale = `locale -a | grep -i en_us | grep -i utf | grep '8$'`
+		if (! -e utf8) then
+			foreach libpath ($library_path)
+				set found_icu = (0 != `\ls -1 $libpath/* | grep "libicu.*36.*" | wc -l`)
+				if ($found_icu) then
+					break
+				endif
+			end
+			if ($found_icu && $utflocale != "") then
+				mkdir utf8
+			endif
+		endif
+		if (-e utf8) then
+			setenv LC_CTYPE $utflocale
+			unsetenv LC_ALL
+			setenv gtm_chset UTF-8	# switch to "UTF-8" mode
+			rm -f utf8/*.m
+			cp *.m utf8
+			cd utf8
+			../mumps *.m
+			if ($status != 0) then
+				set buildaux_status = `expr $buildaux_status + 1`
+				echo "buildaux-E-compile_UTF8, Failed to compile .m programs in UTF-8 mode" \
+					>> $gtm_log/error.`basename $gtm_exe`.log
+			endif
+			cd ..
+			setenv LC_CTYPE C
+			unsetenv gtm_chset	# switch back to "M" mode
+		endif
 
 		# Don't deliver the GDE sources except with a dbg release.
 		if ( "$gtm_exe" != "$gtm_dbg" ) then
 			rm GDE*.m
+			if (-e utf8) then
+				rm utf8/GDE*.m
+			endif
 		endif
 	popd
 endif
@@ -256,8 +302,8 @@ if ( $buildaux_gtcm_gnp_server == 1 ) then
 		$gt_ld_syslibs >& $gtm_map/gtcm_gnp_server.map
 	if ( $status != 0  ||  ! -x $3/gtcm_gnp_server) then
 		set buildaux_status = `expr $buildaux_status + 1`
-		echo "buildaux-E-linkgtcm_gnp_server, Failed to link gtcm_gnp_server (see ${dollar_sign}gtm_map/gtcm_gnp_server.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
+		echo "buildaux-E-linkgtcm_gnp_server, Failed to link gtcm_gnp_server" \
+			"(see ${dollar_sign}gtm_map/gtcm_gnp_server.map)" >> $gtm_log/error.`basename $gtm_exe`.log
 	endif
 endif
 
@@ -340,8 +386,8 @@ if ( $buildaux_dbcertify == 1 ) then
 	if ( $HOSTOS == "AIX") then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/dbcertify.loadmap"
 	endif
-	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/dbcertify -L$gtm_obj $gtm_obj/{dbcertify,dbcertify_cmd}.o \
-		$gt_ld_sysrtns -ldbcertify -lmupip -lmumps -lstub $gt_ld_aio_syslib \
+	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/dbcertify -L$gtm_obj \
+		$gtm_obj/{dbcertify,dbcertify_cmd}.o $gt_ld_sysrtns -ldbcertify -lmupip -lmumps -lstub $gt_ld_aio_syslib \
 		$gt_ld_syslibs >& $gtm_map/dbcertify.map
 	if ( $status != 0  ||  ! -x $3/dbcertify ) then
 		set buildaux_status = `expr $buildaux_status + 1`

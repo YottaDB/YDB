@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,11 @@
 #include "suspsigs_handler.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
+
 GBLDEF block_id			patch_curr_blk;
 GBLREF gd_region		*gv_cur_region;
 GBLREF gd_binding		*gd_map;
@@ -88,6 +93,7 @@ GBLREF uint4			process_id;
 GBLREF jnlpool_addrs		jnlpool;
 GBLREF char			cli_err_str[];
 GBLREF boolean_t        	write_after_image;
+GBLREF boolean_t		gtm_utf8_mode;
 
 static bool	dse_process(int argc);
 static void display_prompt(void);
@@ -97,6 +103,7 @@ int main(int argc, char *argv[])
 	static char	prompt[]="DSE> ";
 
 	image_type = DSE_IMAGE;
+	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */
 	dse_running = TRUE;
 	write_after_image = TRUE;	/* In case it calls it changes a block, we write after image */
@@ -105,6 +112,8 @@ int main(int argc, char *argv[])
 	op_open_ptr = op_open;
 	patch_curr_blk = get_dir_root();
 	err_init(util_base_ch);
+	if (gtm_utf8_mode)
+		gtm_icu_init();	 /* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	sig_init(generic_signal_handler, dse_ctrlc_handler, suspsigs_handler);
 	atexit(util_exit_handler);
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@
 #include "iosp.h"
 #include "mlkdef.h"
 #include "lke.h"
+#include "util.h"
 
 /*
  * -----------------------------------------------
@@ -35,14 +36,10 @@
 bool lke_get_answ(char *prompt)
 {
 	char buff[11], *bp = buff;
-	char *fgets_res;
 
 	PRINTF(prompt);
-	if (FGETS(buff, 10, stdin, fgets_res) != 0)
+	if (NULL != (bp = util_input(buff, 10, stdin, TRUE)))
 	{
-		while (ISSPACE(*bp))
-			bp++;
-
 		if (*bp == 'Y' || *bp == 'y')
 			return (TRUE);
 	}

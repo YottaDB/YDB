@@ -252,6 +252,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	struct statvfs		dbvfs;
 	uint4           	sopcnt;
 	unix_db_info    	*udi;
+	char			now_running[MAX_REL_NAME];
 
 	error_def(ERR_CLSTCONFLICT);
 	error_def(ERR_CRITSEMFAIL);
@@ -260,6 +261,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	error_def(ERR_NLMISMATCHCALC);
 	error_def(ERR_REQRUNDOWN);
 	error_def(ERR_SYSCALL);
+	error_def(ERR_VERMISMATCH);
 
 	assert(tsd->acc_meth == dba_bg  ||  tsd->acc_meth == dba_mm);
 	is_bg = (dba_bg == tsd->acc_meth);
@@ -419,6 +421,28 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			  ERR_TEXT, 2, LEN_AND_LIT("Error attaching to database shared memory"), errno);
 	}
 	csa->nl = (node_local_ptr_t)csa->db_addrs[0];
+	/* If shared memory is already initialized, do VERMISMATCH check BEFORE referencing any other fields in shared memory. */
+	if (!new_dbinit_ipc && csa->nl->glob_sec_init && memcmp(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1))
+	{	/* Copy csa->nl->now_running into a local variable before passing to rts_error() due to the following issue.
+		 * In VMS, a call to rts_error() copies only the error message and its arguments (as pointers) and
+		 *  transfers control to the topmost condition handler which is dbinit_ch() in this case. dbinit_ch()
+		 *  does a PRN_ERROR only for SUCCESS/INFO (VERMISMATCH is neither of them) and in addition
+		 *  nullifies csa->nl as part of its condition handling. It then transfers control to the next level condition
+		 *  handler which does a PRN_ERROR but at that point in time, the parameter csa->nl->now_running is no longer
+		 *  accessible and hence no parameter substitution occurs (i.e. the error message gets displayed with plain !ADs).
+		 * In UNIX, this is not an issue since the first call to rts_error() does the error message
+		 *  construction before handing control to the topmost condition handler. But it does not hurt to do the copy.
+		 */
+		assert(strlen(csa->nl->now_running) < sizeof(now_running));
+		memcpy(now_running, csa->nl->now_running, sizeof(now_running));
+		now_running[sizeof(now_running) - 1] = '\0';	/* protection against bad values of csa->nl->now_running */
+		/* for DSE, change VERMISMATCH to be INFO (instead of the more appropriate WARNING) as we want the
+		 * condition handler (dbinit_ch) to do a CONTINUE (which it does only for severity levels SUCCESS or INFO)
+		 * and resume processing in gvcst_init.c instead of detaching from shared memory.
+		 */
+		rts_error(VARLSTCNT(8) MAKE_MSG_TYPE(ERR_VERMISMATCH, ((DSE_IMAGE != image_type) ? ERROR : INFO)), 6,
+			DB_LEN_STR(reg), gtm_release_name_len, gtm_release_name, LEN_AND_STR(now_running));
+	}
 	csa->critical = (mutex_struct_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
 	assert(((int)csa->critical & 0xf) == 0); 			/* critical should be 16-byte aligned */
 #ifdef CACHELINE_SIZE

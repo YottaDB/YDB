@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	;
+;	Copyright 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -12,8 +12,8 @@ map:	;create maps for put and show, names for get and show
 PUTMAKE
 	k lexnams n t1
 	d SHOWMAKE
-	s s1=$tr($j("",SIZEOF("mident"))," ",$c(255)),t1=$tr($j("",SIZEOF("mident"))," ",$c(0))
-	f  s s2=s1,s1=$o(map(s1),-1),map(s2_$e(t1,$l(s2)+1,SIZEOF("mident")))=map(s1) q:s1="$"  k map(s1)
+	s s1=$ztr($j("",SIZEOF("mident"))," ",$zch(255)),t1=$tr($j("",SIZEOF("mident"))," ",$c(0))
+	f  s s2=s1,s1=$o(map(s1),-1),map(s2_$e(t1,$zl(s2)+1,SIZEOF("mident")))=map(s1) q:s1="$"  k map(s1)
 	s map("#)"_$e(t1,3,SIZEOF("mident")))=map("#)"),map("%"_$e(t1,2,SIZEOF("mident")))=map("$")
 	f s2="#","#)","$" k map(s2)
  	q
@@ -33,7 +33,7 @@ SHOWMAKE
 SHOWNAM
 	n lexnams,t1,map
 	d SHOWMAKE
-	s s1=$tr($j("",SIZEOF("mident"))," ",$c(255)),t1=$tr($j("",SIZEOF("mident"))," ",$c(0))
+	s s1=$ztr($j("",SIZEOF("mident"))," ",$zch(255)),t1=$tr($j("",SIZEOF("mident"))," ",$c(0))
 	f  s s2=s1,s1=$o(map(s1),-1),map(s2)=map(s1) q:s1="$"  k map(s1)
 	k map("#") i '$$MAP2NAM(.map) zm gdeerr("GDECHECK")\2*2
  	q
@@ -44,7 +44,7 @@ MAP2NAM(list)
 	s x=$o(list(x))
 	i x="%" s list("$")=list("%") k list("%")
 	e  q:x'="$" 0
-	s s=$tr($j("",SIZEOF("mident"))," ",$c(255)),x=$o(list(""),-1) q:x'=s 0
+	s s=$ztr($j("",SIZEOF("mident"))," ",$zch(255)),x=$o(list(""),-1) q:x'=s 0
 	k ar,nams s nams=0,ar(0,s)="",x=$o(list(x),-1)
 	i x'="$",list(x)'=list(s) s xp="z" f  q:xp=""  s xn=xp_"*",(nams(xn),ar(1,xn))="",xp=$$lexprev(xp)
 	f  q:x="$"  d  s x=$o(list(x),-1)
@@ -61,16 +61,16 @@ MAP2NAM(list)
 	f xl=1:1:SIZEOF("mident") d  q:'ok
 	. f  s x=$o(ar(xl,x)) q:x=""  d  q:'ok
 	. . s xt=$o(list(x))
-	. . i '$l(xt) s ok=0 q
+	. . i '$zl(xt) s ok=0 q
 	. . s xv=list(xt)
-	. . i '$l(xv) s ok=0 q
+	. . i '$zl(xv) s ok=0 q
 	. . s xn=$$lexnext($e(x,1,xl))
-	. . f l=xl-1:-1:0 s (xp,xs)=$e(x,1,l) d  q:$l(xp)
-	. . . f  s xp=$o(ar(l,xp)) q:'$l(xp)  s xr=$s('l:"$",$e(xp,1,l)'=xs:xt,1:$o(list(xp))) i xs']xr!'$l(xr)!'l q
-	. . . s:'$l(xr) xp="" q:'$l(xp)
+	. . f l=xl-1:-1:0 s (xp,xs)=$e(x,1,l) d  q:$zl(xp)
+	. . . f  s xp=$o(ar(l,xp)) q:'$zl(xp)  s xr=$s('l:"$",$e(xp,1,l)'=xs:xt,1:$o(list(xp))) i xs']xr!'$zl(xr)!'l q
+	. . . s:'$zl(xr) xp="" q:'$zl(xp)
 	. . . i xt=xr&(xl>1) s xp=" " q
 	. . . s xp=list(xr)
-	. . . i '$l(xp) s ok=0 q
+	. . . i '$zl(xp) s ok=0 q
 	. . . i xv=xp k nams(x)
 	i 'ok q 0
 	f  s x=$o(nams(x)) q:x=""  s xn=$o(list(x)),nams(x)=list(xn),nams=nams+1

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1989,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1989, 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -20,4 +20,15 @@ INT	n %S
 	r !,"String: ",%S w !,"Upper: ",$$FUNC(%S),!
 	q
 FUNC(s)
-	q $tr(s,"abcdefghijklmnopqrstuvwxyzàáâãäåæçèéêëìíîïñòóôõö÷øùúûüı","ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖ×ØÙÚÛÜİ")
+	new returnM,returnUTF8,ret,index
+	i ($zver["VMS")!($ZCHSET="M") do  quit ret
+	.	s returnM="set ret=$tr(s,""abcdefghijklmnopqrstuvwxyz"
+	.	for index=224:1:239,241:1:253 s returnM=returnM_$char(index)
+	.	s returnM=returnM_""","
+	.	s returnM=returnM_"""ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	.	for index=192:1:207,209:1:221 s returnM=returnM_$char(index)
+	.	s returnM=returnM_""")"
+	.	xecute returnM
+	s returnUTF8="set ret=$zconvert(s,""U"")"
+	xecute returnUTF8
+	q ret

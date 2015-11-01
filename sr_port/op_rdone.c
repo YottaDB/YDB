@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,7 @@ int op_rdone(mval *v, int4 timeout)
 	assert(sizeof(mint) == sizeof(x));
 	stat = (io_curr_device.in->disp_ptr->rdone)((mint *)&x, timeout);
 
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 	if (DEFAULT_CODE_SET != active_device->in_code_set)
 	{
 		insize = outsize = 1;
@@ -52,6 +53,7 @@ int op_rdone(mval *v, int4 timeout)
 		ICONVERT(active_device->input_conv_cd, &temp_buf_ptr, &insize, &temp_buf_ptr, &outsize); /* 	in-place conv */
 		x = start_ptr[0];
 	}
+#endif
 
 	MV_FORCE_MVAL(v, x);
 	active_device = 0;

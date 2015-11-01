@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -178,8 +178,8 @@ IOP_DESC(160, iop_ioerror, IOP_VAR_SIZE, IOP_OPEN_OK | IOP_USE_OK, IOP_SRC_STR),
 IOP_DESC(161, iop_attach, IOP_VAR_SIZE, IOP_OPEN_OK | IOP_USE_OK, IOP_SRC_STR),
 IOP_DESC(162, iop_detach, IOP_VAR_SIZE, IOP_USE_OK, IOP_SRC_STR),
 IOP_DESC(163, iop_zlisten, IOP_VAR_SIZE, IOP_OPEN_OK | IOP_CLOSE_OK | IOP_USE_OK, IOP_SRC_STR),
-IOP_DESC(164, iop_ipchset, IOP_VAR_SIZE, IOP_OPEN_OK|IOP_USE_OK, IOP_SRC_STR),
-IOP_DESC(165, iop_opchset, IOP_VAR_SIZE, IOP_OPEN_OK|IOP_USE_OK, IOP_SRC_STR),
+IOP_DESC(164, iop_ipchset, IOP_VAR_SIZE, IOP_OPEN_OK, IOP_SRC_STR),
+IOP_DESC(165, iop_opchset, IOP_VAR_SIZE, IOP_OPEN_OK, IOP_SRC_STR),
 IOP_DESC(166, iop_nodelimiter, 0, IOP_OPEN_OK | IOP_USE_OK, 0),
 IOP_DESC(167, iop_zdelay, 0, IOP_OPEN_OK | IOP_USE_OK, 0),
 IOP_DESC(168, iop_znodelay, 0, IOP_OPEN_OK | IOP_USE_OK, 0),
@@ -194,4 +194,11 @@ IOP_DESC(176, iop_znowrap, 0, IOP_OPEN_OK|IOP_USE_OK, 0),
 IOP_DESC(177, iop_bigrecord, 0, IOP_OPEN_OK, 0),
 IOP_DESC(178, iop_nobigrecord, 0, IOP_OPEN_OK, 0),
 IOP_DESC(179, iop_rfm, IOP_VAR_SIZE, IOP_OPEN_OK, IOP_SRC_STR),
-IOP_DESC(180, n_iops, 0, 0, 0)
+IOP_DESC(180, iop_m, 0, IOP_OPEN_OK, 0),
+IOP_DESC(181, iop_utf8, 0, IOP_OPEN_OK, 0),
+IOP_DESC(182, iop_utf16, 0, IOP_OPEN_OK, 0),
+IOP_DESC(183, iop_utf16be, 0, IOP_OPEN_OK, 0),
+IOP_DESC(184, iop_utf16le, 0, IOP_OPEN_OK, 0),
+IOP_DESC(185, iop_pad, sizeof(int4), IOP_OPEN_OK, IOP_SRC_INT),
+IOP_DESC(186, iop_chset, IOP_VAR_SIZE, IOP_OPEN_OK, IOP_SRC_STR),
+IOP_DESC(187, n_iops, 0, 0, 0)

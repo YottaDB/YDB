@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,7 @@
 #include "gtm_string.h"
 
 #include <errno.h>
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_iconv.h"
 #include "gtm_stdio.h"
@@ -45,6 +45,8 @@
 #include "mu_outofband_setup.h"
 #include "gtmmsg.h"
 #include "mvalconv.h"
+#include "gtm_conv.h"
+#include "gtm_utf8.h"
 
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF bool		mu_ctrlc_occurred;
@@ -57,6 +59,7 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF io_pair          io_curr_device;
 GBLREF io_desc          *active_device;
 GBLREF gv_namehead	*gv_target;
+LITREF mstr		chset_names[];
 
 LITDEF mval	mu_bin_datefmt	= DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(BIN_HEADER_DATEFMT) - 1, BIN_HEADER_DATEFMT, 0, 0);
 
@@ -122,11 +125,12 @@ void mu_extract(void)
 	gd_region			*reg, *region_top;
 	mu_extr_stats			global_total, grand_total;
 	uint4				item_code, devbufsiz, maxfield;
-	unsigned short			label_len, n_len, ch_set_len;
-	unsigned char			*outbuf, *outptr;
+	unsigned short			label_len, n_len, ch_set_len, buflen;
+	unsigned char			*outbuf, *outptr, *chptr, *leadptr;
 	struct stat                     statbuf;
 	mval				val, curr_gbl_name, op_val, op_pars;
-	enum code_set_type		saved_out_set;
+	mstr				chset_mstr;
+	gtm_chset_t 			saved_out_set;
 	static unsigned char		ochset_set = FALSE;
 	static readonly unsigned char	open_params_list[] =
 	{
@@ -160,17 +164,23 @@ void mu_extract(void)
 
 	if (CLI_PRESENT == cli_present("OCHSET"))
 	{
-		if (TRUE == cli_get_str("OCHSET", ch_set_name, &ch_set_len))
+		ch_set_len = sizeof(ch_set_name);
+		if (cli_get_str("OCHSET", ch_set_name, &ch_set_len))
 		{
 			if (0 == ch_set_len)
-			{
-				mupip_exit(ERR_MUNOACTION);		/*	need to change to OPCHSET error when added	*/
-			}
+				mupip_exit(ERR_MUNOACTION);	/* need to change to OPCHSET error when added */
 			ch_set_name[ch_set_len] = '\0';
+#ifdef KEEP_zOS_EBCDIC
 			if ( (iconv_t)0 != active_device->output_conv_cd)
 				ICONV_CLOSE_CD(active_device->output_conv_cd);
 			if (DEFAULT_CODE_SET != active_device->out_code_set)
 				ICONV_OPEN_CD(active_device->output_conv_cd, INSIDE_CH_SET, ch_set_name);
+#else
+			chset_mstr.addr = ch_set_name;
+			chset_mstr.len = ch_set_len;
+			SET_ENCODING(active_device->ochset, &chset_mstr);
+			get_chset_desc(&chset_names[active_device->ochset]);
+#endif
 			ochset_set = TRUE;
 		}
 	}
@@ -189,8 +199,14 @@ void mu_extract(void)
 	if (0 == memcmp(format_buffer, "ZWR", n_len))
 	        format = MU_FMT_ZWR;
 	else if (0 == memcmp(format_buffer, "GO", n_len))
+	{
+		if (gtm_utf8_mode)
+		{
+			util_out_print("Extract error: GO format is not supported in UTF-8 mode. Use ZWR format.", TRUE);
+			mupip_exit(ERR_MUPCLIERR);
+		}
 	        format = MU_FMT_GO;
-	else if (0 == memcmp(format_buffer, "BINARY", n_len))
+	} else if (0 == memcmp(format_buffer, "BINARY", n_len))
 		format = MU_FMT_BINARY;
 	else
 	{
@@ -274,8 +290,10 @@ void mu_extract(void)
 		outbuf = (unsigned char *)malloc(sizeof(BIN_HEADER_LABEL) + sizeof(BIN_HEADER_DATEFMT) - 1 +
 				4 * BIN_HEADER_NUMSZ + BIN_HEADER_LABELSZ);
 		outptr = outbuf;
-		memcpy(outptr, BIN_HEADER_LABEL, sizeof(BIN_HEADER_LABEL) - 1);
-		outptr += sizeof(BIN_HEADER_LABEL) - 1;
+
+		MEMCPY_LIT(outptr, BIN_HEADER_LABEL);
+		outptr += STR_LIT_LEN(BIN_HEADER_LABEL);
+
 		stringpool.free = stringpool.base;
 		op_horolog(&val);
 		stringpool.free = stringpool.base;
@@ -288,27 +306,48 @@ void mu_extract(void)
 		WRITE_NUMERIC(reg_max_key);
 		WRITE_NUMERIC(reg_std_null_coll);
 
-		label_len = sizeof(label_buff);
-		if (FALSE == cli_get_str("LABEL", label_buff, &label_len))
+		if (gtm_utf8_mode)
 		{
-			label_len = 19;
-			memcpy(outptr, "GT.M MUPIP EXTRACT", label_len);
+			MEMCPY_LIT(outptr, UTF8_NAME);
+			label_len = STR_LIT_LEN(UTF8_NAME);
+			outptr[label_len++] = ' ';
 		} else
-			memcpy(outptr, label_buff, label_len);
-		if (label_len < BIN_HEADER_LABELSZ)
+			label_len = 0;
+		buflen = sizeof(label_buff);
+		if (FALSE == cli_get_str("LABEL", label_buff, &buflen))
 		{
-			outptr += label_len;
-			for (iter = label_len;  iter < BIN_HEADER_LABELSZ;  iter++)
-				*outptr++ = ' ';
+			MEMCPY_LIT(&outptr[label_len], EXTR_DEFAULT_LABEL);
+			buflen = STR_LIT_LEN(EXTR_DEFAULT_LABEL);
 		} else
-			outptr += BIN_HEADER_LABELSZ;
+			memcpy(&outptr[label_len], label_buff, buflen);
+		label_len += buflen;
+		if (label_len > BIN_HEADER_LABELSZ)
+		{ /* Label size exceeds the space, so truncate the label and back off to
+		     the valid beginning (i.e. to the leading byte) of the last character
+		     that can entirely fit in the space */
+			label_len = BIN_HEADER_LABELSZ;
+			chptr = &outptr[BIN_HEADER_LABELSZ];
+			UTF8_LEADING_BYTE(chptr, outptr, leadptr);
+			assert(chptr - leadptr < 4);
+			if (leadptr < chptr)
+				label_len -= (chptr - leadptr);
+		}
+		outptr += label_len;
+		for (iter = label_len;  iter < BIN_HEADER_LABELSZ;  iter++)
+			*outptr++ = ' ';
+
 		label_len = outptr - outbuf;
 		if (!ochset_set)
 		{
+#ifdef KEEP_zOS_EBCDIC
 			/* extract ascii header for binary by default */
 			/* Do we need to restore it somewhere? */
 			saved_out_set = (io_curr_device.out)->out_code_set;
 			(io_curr_device.out)->out_code_set = DEFAULT_CODE_SET;
+#else
+			saved_out_set = (io_curr_device.out)->ochset;
+			(io_curr_device.out)->ochset = CHSET_M;
+#endif
 		}
 		op_val.str.addr = (char *)(&label_len);
 		op_val.str.len = sizeof(label_len);
@@ -322,8 +361,14 @@ void mu_extract(void)
 		label_len = sizeof(label_buff);
 		if (FALSE == cli_get_str("LABEL", label_buff, &label_len))
 		{
-			label_len = 18;
-			memcpy(label_buff, "GT.M MUPIP EXTRACT", label_len);
+			MEMCPY_LIT(label_buff, EXTR_DEFAULT_LABEL);
+			label_len = STR_LIT_LEN(EXTR_DEFAULT_LABEL);
+		}
+		if (gtm_utf8_mode)
+		{
+			label_buff[label_len++] = ' ';
+			MEMCPY_LIT(&label_buff[label_len], UTF8_NAME);
+			label_len += STR_LIT_LEN(UTF8_NAME);
 		}
 		label_buff[label_len++] = '\n';
 		op_val.mvtype = MV_STR;

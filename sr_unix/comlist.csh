@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2005 Fidelity Infromation Services, Inc #
+#	Copyright 2001, 2006 Fidelity Infromation Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -292,6 +292,11 @@ set eol_anchor = '$'
 set gi = ($gtm_inc)
 set gs = ($gtm_src)
 
+# Irrespective of the gtm_chset value from the user environment, all
+# M objects generated in $gtm_dist (GDE*.o, _*.o, ttt.o) must be
+# compiled with gtm_chset="M".
+unsetenv gtm_chset
+
 #############################################################
 #
 #  Generate the error message definition files.
@@ -556,7 +561,8 @@ set gtmshr_size = `ls -l $gtm_exe/libgtmshr$gt_ld_shl_suffix |awk '{print $5}'`
 
 if ( "$HOSTOS" != "SunOS" ) then
  	if ($mupip_size > $gtmshr_size) then
-	echo "comlist-E-mupip_size, ${dollar_sign}gtm_dist/mupip is larger than ${dollar_sign}gtm_dist/libgtmshr$gt_ld_shl_suffix" >> $gtm_log/error.`basename $gtm_exe`.log
+	echo "comlist-E-mupip_size, ${dollar_sign}gtm_dist/mupip is larger than ${dollar_sign}gtm_dist/libgtmshr$gt_ld_shl_suffix" \
+		>> $gtm_log/error.`basename $gtm_exe`.log
 	endif
 endif
 
@@ -604,6 +610,27 @@ chmod 775 *
 touch $gtm_dist/gtmhelp.dmp
 chmod a+rw $gtm_dist/gtmhelp.dmp
 
+# Create a mirror image (using soft links) of $gtm_dist under $gtm_dist/utf8 if it exists.
+if (-e $gtm_exe/utf8) then	# would have been created by buildaux.csh while building GDE
+	pushd $gtm_exe
+	foreach file (*)
+		# Skip directories
+		if (-d $file) then
+			continue
+		endif
+		# Skip soft linking .o files
+		set extension = $file:e
+		if ($extension == "o") then
+			continue
+		endif
+		# Soft link everything else
+		if (-e utf8/$file) then
+			rm -f utf8/$file
+		endif
+		ln -s ../$file utf8/$file
+	end
+	popd
+endif
 
 comlist.END:
 

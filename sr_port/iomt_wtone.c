@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,12 +12,16 @@
 #include "mdef.h"
 #include "io.h"
 
-void iomt_wtone(unsigned char ch)
+GBLREF boolean_t gtm_utf8_mode;
+
+void iomt_wtone(int ch)
 {
 	mstr	temp;
+	char	c;
 
+	c = (int)ch;
 	temp.len = 1;
-	temp.addr = (char *)&ch;
+	temp.addr = &c;
 	iomt_write(&temp);
 	return;
 }

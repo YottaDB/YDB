@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,5 +16,6 @@ void 	gtm_startup(struct startup_vector *svec);
 void	init_gtm(void);
 void 	gtm_init_env(rhdtyp* base_addr, unsigned char* transfer_addr);
 void 	lref_parse(unsigned char* lref, mstr* rtn, mstr* lab, int* offset);
+void	gtm_utf8_init(void);
 
 #endif /* GTM_STARTUP_INCLUDED */

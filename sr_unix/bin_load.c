@@ -37,6 +37,7 @@
 #include "mvalconv.h"
 #include "mu_gvis.h"
 #include "gtmmsg.h"
+#include "gtm_utf8.h"
 
 GBLREF bool		mupip_DB_full;
 GBLREF bool		mu_ctrly_occurred;
@@ -75,7 +76,7 @@ void bin_load(uint4 begin, uint4 end)
 	unsigned short	len, rec_len, next_cmpc;
 	int		current, last, length, max_blk_siz, max_key, status, subsc_len;
 	uint4		iter, max_data_len, max_subsc_len, key_count, rec_count, global_key_count;
-	boolean_t	need_xlation, new_gvn;
+	boolean_t	need_xlation, new_gvn, utf8_extract;
 	rec_hdr		*rp, *next_rp;
 	mval		v, tmp_mval;
 	mstr		mstr_src, mstr_dest;
@@ -94,6 +95,7 @@ void bin_load(uint4 begin, uint4 end)
 	error_def(ERR_COLLTYPVERSION);
 	error_def(ERR_COLLATIONUNDEF);
 	error_def(ERR_OLDBINEXTRACT);
+	error_def(ERR_LOADINVCHSET);
 
 	tmp_gvkey = (gv_key *)malloc(sizeof(gv_key) + MAX_KEY_SZ - 1);
 	assert(4 == sizeof(coll_hdr));
@@ -114,6 +116,18 @@ void bin_load(uint4 begin, uint4 end)
 		rts_error(VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
+
+	/* check if extract was generated in UTF-8 mode */
+	utf8_extract = (0 == MEMCMP_LIT(&ptr[len - BIN_HEADER_LABELSZ], UTF8_NAME)) ? TRUE : FALSE;
+	if ((utf8_extract && !gtm_utf8_mode) || (!utf8_extract && gtm_utf8_mode))
+	{ /* extract CHSET doesn't match $ZCHSET */
+		if (utf8_extract)
+			rts_error(VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("UTF-8"));
+		else
+			rts_error(VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
+		mupip_exit(ERR_LDBINFMT);
+	}
+
 	util_out_print("Label = !AD\n", TRUE, len, ptr);
 	new_gvn = FALSE;
 	if (hdr_lvl > '3')

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -116,7 +116,12 @@ unsigned char *n2s(mval *mv_ptr)
 	mv_ptr->mvtype |= MV_STR;
 	mv_ptr->mvtype &= ~MV_NUM_APPROX;
 	mv_ptr->str.addr = (char *)start;
-	mv_ptr->str.len = cp - start;
+	NON_UNICODE_ONLY(mv_ptr->str.len = cp - start);
+#ifdef UNICODE_SUPPORTED
+	/* Numerics are not unicode so cheaply set "unicode" length same as ascii length */
+	mv_ptr->str.len = mv_ptr->str.char_len = cp - start;
+	mv_ptr->mvtype |= MV_UTF_LEN;
+#endif
 	stringpool.free = cp;
 	return cp;
 }

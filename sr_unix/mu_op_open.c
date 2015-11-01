@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,12 +38,15 @@
 #include "mmemory.h"
 #include "mu_op_open.h"
 #include "trans_log_name.h"
+#include "gtm_conv.h"
+#include "gtm_utf8.h"
 
 #define  LOGNAME_LEN 255
 
 GBLREF dev_dispatch_struct  	io_dev_dispatch_mupip[];
 GBLREF bool			licensed;
 GBLREF int4			lkid,lid;
+LITREF mstr			chset_names[];
 
 LITREF	unsigned char		io_params_size[];
 GBLREF	bool			run_time;
@@ -106,6 +109,7 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 	uint4		status;
 	int4		size;
 	mstr		tn;		/* translated name */
+	mstr		chset_mstr;
 	int		oflag;
 	unsigned char	ch;
 	int		file_des;
@@ -117,8 +121,9 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 	int		fstat_res;
 	int		save_errno;
 	int		p_offset;
+	boolean_t	ichset_specified, ochset_specified;
 
-error_def(ERR_SYSCALL);
+	error_def(ERR_SYSCALL);
 
 	mt_ptr = NULL;
 	char_or_block_special = FALSE;
@@ -155,9 +160,7 @@ error_def(ERR_SYSCALL);
 			}
 		}
 		if ((n_io_dev_types == tl->iod->type) && mspace && mspace->str.len)
-		{
 			tl->iod->type = us;
-		}
 		if (n_io_dev_types == tl->iod->type)
 		{
 			if (0 == memvcmp(tn.addr, tn.len, sys_input.addr, sys_input.len))
@@ -166,8 +169,8 @@ error_def(ERR_SYSCALL);
 				FSTAT_FILE(file_des, &outbuf, fstat_res);
 				if (-1 == fstat_res)
 				{
-				  save_errno = errno;
-				  rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
+					save_errno = errno;
+					rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
 						  RTS_ERROR_LITERAL("fstat()"),
 						  CALLFROM, save_errno);
 				}
@@ -178,12 +181,12 @@ error_def(ERR_SYSCALL);
 					file_des = 1;
 					FSTAT_FILE(file_des, &outbuf, fstat_res);
 					if (-1 == fstat_res)
-				{
-				  save_errno = errno;
-				  rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
-						  RTS_ERROR_LITERAL("fstat()"),
-						  CALLFROM, save_errno);
-				}
+					{
+						save_errno = errno;
+						rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
+							  RTS_ERROR_LITERAL("fstat()"),
+							  CALLFROM, save_errno);
+					}
 				} else  if (0 == memvcmp(tn.addr, tn.len, "/dev/null", 9))
 					tl->iod->type = nl;
 				else  if ((-1 == Stat(buf, &outbuf)) && (n_io_dev_types == tl->iod->type))
@@ -193,10 +196,10 @@ error_def(ERR_SYSCALL);
 						tl->iod->type = rm;
 					else
 					{
-				  	     save_errno = errno;
-					     rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
-						  RTS_ERROR_LITERAL("fstat()"),
-						  CALLFROM, save_errno);
+						save_errno = errno;
+						rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
+							  RTS_ERROR_LITERAL("fstat()"),
+							  CALLFROM, save_errno);
 					}
 				}
 			}
@@ -233,6 +236,7 @@ error_def(ERR_SYSCALL);
 		oflag |= (O_RDWR | O_CREAT | O_NOCTTY);
 		size = 0;
 		p_offset = 0;
+		ichset_specified = ochset_specified = FALSE;
 		while(iop_eol != *(pp->str.addr + p_offset))
 		{
 			assert((params) *(pp->str.addr + p_offset) < (params)n_iops);
@@ -264,31 +268,63 @@ error_def(ERR_SYSCALL);
 					oflag  |= O_WRONLY | O_CREAT;
 					break;
 				case iop_ipchset:
+#ifdef KEEP_zOS_EBCDIC
+					if ( (iconv_t)0 != naml->iod->input_conv_cd )
 					{
-						if ( (iconv_t)0 != naml->iod->input_conv_cd )
-						{
-							ICONV_CLOSE_CD(naml->iod->input_conv_cd);
-						}
-						SET_CODE_SET(naml->iod->in_code_set,
-								(char *)(pp->str.addr + p_offset + 1));
-						if (DEFAULT_CODE_SET != naml->iod->in_code_set)
-							ICONV_OPEN_CD(naml->iod->input_conv_cd,
-								(char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
-						break;
+						ICONV_CLOSE_CD(naml->iod->input_conv_cd);
 					}
+					SET_CODE_SET(naml->iod->in_code_set,
+						     (char *)(pp->str.addr + p_offset + 1));
+					if (DEFAULT_CODE_SET != naml->iod->in_code_set)
+						ICONV_OPEN_CD(naml->iod->input_conv_cd,
+							      (char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
+					break;
+#endif
+					if (gtm_utf8_mode)
+					{
+						chset_mstr.addr = (char *)(pp->str.addr + p_offset + 1);
+                                                chset_mstr.len = *(pp->str.addr + p_offset);
+						SET_ENCODING(naml->iod->ichset, &chset_mstr);
+						ichset_specified = TRUE;
+					}
+					break;
+
 				case iop_opchset:
+#ifdef KEEP_zOS_EBCDIC
+					if ( (iconv_t)0 != naml->iod->output_conv_cd)
 					{
-						if ( (iconv_t)0 != naml->iod->output_conv_cd)
-						{
-							ICONV_CLOSE_CD(naml->iod->output_conv_cd);
-						}
-						SET_CODE_SET(naml->iod->out_code_set,
-								(char *)(pp->str.addr + p_offset + 1));
-						if (DEFAULT_CODE_SET != naml->iod->out_code_set)
-							ICONV_OPEN_CD(naml->iod->output_conv_cd, INSIDE_CH_SET,
-								(char *)(pp->str.addr + p_offset + 1));
-						break;
+						ICONV_CLOSE_CD(naml->iod->output_conv_cd);
 					}
+					SET_CODE_SET(naml->iod->out_code_set,
+						     (char *)(pp->str.addr + p_offset + 1));
+					if (DEFAULT_CODE_SET != naml->iod->out_code_set)
+						ICONV_OPEN_CD(naml->iod->output_conv_cd, INSIDE_CH_SET,
+							      (char *)(pp->str.addr + p_offset + 1));
+					break;
+#endif
+					if (gtm_utf8_mode)
+					{
+                                                chset_mstr.addr = (char *)(pp->str.addr + p_offset + 1);
+                                                chset_mstr.len = *(pp->str.addr + p_offset);
+                                                SET_ENCODING(naml->iod->ochset, &chset_mstr);
+                                                ochset_specified = TRUE;
+					}
+					break;
+				case iop_m:
+				case iop_utf8:
+				case iop_utf16:
+				case iop_utf16be:
+				case iop_utf16le:
+					if (gtm_utf8_mode)
+					{
+						naml->iod->ichset = naml->iod->ochset =
+							(iop_m       == ch) ? CHSET_M :
+							(iop_utf8    == ch) ? CHSET_UTF8 :
+							(iop_utf16   == ch) ? CHSET_UTF16 :
+							(iop_utf16be == ch) ? CHSET_UTF16BE : CHSET_UTF16LE;
+						ichset_specified = ochset_specified = TRUE;
+					}
+					break;
 				default:
 					break;
 			}
@@ -297,21 +333,29 @@ error_def(ERR_SYSCALL);
 			else
 				p_offset += io_params_size[ch];
 		}
+		if (!ichset_specified)
+			naml->iod->ichset = (gtm_utf8_mode) ? CHSET_UTF8 : CHSET_M;
+		if (!ochset_specified)
+			naml->iod->ochset = (gtm_utf8_mode) ? CHSET_UTF8 : CHSET_M;
+		if (CHSET_M != naml->iod->ichset && CHSET_UTF16 != naml->iod->ichset)
+			get_chset_desc(&chset_names[naml->iod->ichset]);
+		if (CHSET_M != naml->iod->ochset && CHSET_UTF16 != naml->iod->ochset)
+			get_chset_desc(&chset_names[naml->iod->ochset]);
 		/* RW permissions for owner and others as determined by umask. */
 		umask_orig = umask(000);	/* determine umask (destructive) */
 		(void)umask(umask_orig);	/* reset umask */
 		umask_creat = 0666 & ~umask_orig;
-               /*
-                * the check for EINTR below is valid and should not be converte d to an EINTR
-                * wrapper macro, due to the other errno values being checked.
-                */
+		/*
+		 * the check for EINTR below is valid and should not be converte d to an EINTR
+		 * wrapper macro, due to the other errno values being checked.
+		 */
 		while ((-1 == (file_des = OPEN4(buf, oflag, umask_creat, size))))
 		{
 			if (   EINTR == errno
-			    || ETXTBSY == errno
-			    || ENFILE == errno
-			    || EBUSY == errno
-			    || ((mb == naml->iod->type) && (ENXIO == errno)))
+			       || ETXTBSY == errno
+			       || ENFILE == errno
+			       || EBUSY == errno
+			       || ((mb == naml->iod->type) && (ENXIO == errno)))
 				continue;
 			else
 				break;
@@ -322,19 +366,21 @@ error_def(ERR_SYSCALL);
 	}
 
 	assert (tcp != naml->iod->type);
+#ifdef KEEP_zOS_EBCDIC
 	SET_CODE_SET(naml->iod->in_code_set, OUTSIDE_CH_SET);
 	if (DEFAULT_CODE_SET != naml->iod->in_code_set)
 		ICONV_OPEN_CD(naml->iod->input_conv_cd, OUTSIDE_CH_SET, INSIDE_CH_SET);
 	SET_CODE_SET(naml->iod->out_code_set, OUTSIDE_CH_SET);
 	if (DEFAULT_CODE_SET != naml->iod->out_code_set)
 		ICONV_OPEN_CD(naml->iod->output_conv_cd, INSIDE_CH_SET, OUTSIDE_CH_SET);
+#endif
 
 	/* smw 99/12/18 not possible to be -1 here */
 	if (-1 == file_des)
 	{
 		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
-			RTS_ERROR_LITERAL("open()"),
-			CALLFROM, save_errno);
+			  RTS_ERROR_LITERAL("open()"),
+			  CALLFROM, save_errno);
 	}
 
 	if (n_io_dev_types == naml->iod->type)
@@ -375,6 +421,6 @@ error_def(ERR_SYSCALL);
 
 	if (run_time)
 		return (status);
-	else
-		return TRUE;
+
+	return TRUE;
 }

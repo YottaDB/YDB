@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,15 +19,6 @@
 #include "util.h"
 #include "gtmmsg.h"
 #include "error.h"
-
-#define UNKNOWN_SYSERR "unknown system error"
-#define COPY_DLLERR_MSG							\
-{									\
-	if ((dummy_err_str = dlerror()) != NULL)			\
-		strncpy(err_str, dummy_err_str, sizeof(err_str));	\
-	else								\
-		memcpy(err_str, UNKNOWN_SYSERR, sizeof(UNKNOWN_SYSERR));\
-}
 
 /* below comments applicable only to tru64 */
 /* dlsym() is bound to return short pointer because of -taso loader flag. GTMASSERT on this assumption.
@@ -63,7 +54,7 @@ void_ptr_t fgn_getpak(char *package_name, int msgtype)
 		if (SUCCESS != msgtype)
 		{
 			assert(!(msgtype & ~SEV_MSK));
-			COPY_DLLERR_MSG;
+			COPY_DLLERR_MSG(dummy_err_str, err_str);
 			rts_error(VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNOOPEN, msgtype), 2, LEN_AND_STR(package_name),
 				ERR_TEXT, 2, LEN_AND_STR(err_str));
 		}
@@ -92,7 +83,7 @@ fgnfnc fgn_getrtn(void_ptr_t package_handle, mstr *entry_name, int msgtype)
 		if (SUCCESS != msgtype)
 		{
 			assert(!(msgtype & ~SEV_MSK));
-			COPY_DLLERR_MSG;
+			COPY_DLLERR_MSG(dummy_err_str, err_str);
 			rts_error(VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNORTN, msgtype), 2, LEN_AND_STR(entry_name->addr),
 				ERR_TEXT, 2, LEN_AND_STR(err_str));
 		}
@@ -125,7 +116,7 @@ void fgn_closepak(void_ptr_t package_handle, int msgtype)
 	if (0 != status && SUCCESS != msgtype)
 	{
 		assert(!(msgtype & ~SEV_MSK));
-		COPY_DLLERR_MSG;
+		COPY_DLLERR_MSG(dummy_err_str, err_str);
 		rts_error(VARLSTCNT(6) MAKE_MSG_TYPE(ERR_DLLNOCLOSE, msgtype), 0, ERR_TEXT, 2, LEN_AND_STR(err_str));
 	}
 }

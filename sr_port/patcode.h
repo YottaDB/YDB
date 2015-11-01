@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,22 +13,20 @@
 #define PATCODE_H_DEFINED
 /* pattern operator constants */
 
-#define PATM_N (1 << 0)
-#define PATM_P (1 << 1)
-#define PATM_L (1 << 2)
-#define PATM_U (1 << 3)
-#define PATM_C (1 << 4)
+#define PATM_N			(1 << 0)
+#define PATM_P			(1 << 1)
+#define PATM_L			(1 << 2)
+#define PATM_U			(1 << 3)
+#define PATM_C			(1 << 4)
+#define PATM_UTF8_ALPHABET	(1 << 5) /* Unicode characters that are alphabets but not cased (i.e. neither L nor U) */
+#define PATM_UTF8_NONBASIC	(1 << 6) /* Unicode characters that fall in neither of the 5 basic classes (N,P,L,U,C) */
 
-#define	PAT_BASIC_CLASSES	5	/* the canonic classes above (defined by the M standard) */
+#define	PAT_BASIC_CLASSES	7	/* the 5 canonic classes (defined by the M standard) plus the two PATM_UTF8_* classes */
 
-/* Bits 5, 6, and 7 are reserved for:
- *      5   (32)   user-defined pattern
- *      6   (64)   DFA evaluation (Deterministic Finite Automaton)
- *      7  (128)   string literal
- */
+#define PATM_STRLIT		(1 << 7)
 
-#define PATM_A (PATM_L | PATM_U)
-#define PATM_E 0x1FFFF1F	/* E matches **any** pattern code... */
+#define PATM_A (PATM_L | PATM_U | PATM_UTF8_ALPHABET)
+#define PATM_E 0x1FFFF7F	/* E matches **any** pattern code... */
 
 /* Additional user-definable codes for Internationalization */
 /*      PATM_A              already used for Alphabetic characters */
@@ -71,33 +69,36 @@
 #define PAT_YZMAXNUM	4	/* maximum number of YxxxY and ZxxxZ pattern codes */
 #define PAT_YZMAXLEN	8	/* maximum number of characters in name of YxxxY pattern code */
 
-#define PATM_CODELIST	"NPLUCBDFGHIJKMOQRSTVWX"
-#define PATM_STRLIT	128
+/* PATM_UTF8_ALPHABET and PATM_UTF8_NONBASIC are assigned an external name of 0 and 1 below as we have run out of alphabets */
+#define PATM_CODELIST	"NPLUCBDFGHIJKMOQRSTVWX01"
 #define PATM_DFA	254		/* Deterministic Finite Automaton */
 #define PATM_ACS	255
-#define PATM_SHORTFLAGS	0x1F		/* original 5 flags */
-#define PATM_LONGFLAGS	0x1FFFF1F	/* 22 flags */
+#define PATM_SHORTFLAGS	0x7F		/* original 5 flags + the two recently introduced PATM_UTF8_* flags */
+#define PATM_LONGFLAGS	0x1FFFF7F	/* 24 flags (including the two recently introduced PATM_UTF8_* flags) */
 #define PATM_I18NFLAGS	0x1FFFF00	/* flags introduced with Internationalization */
 
 #define MAX_DFA_SPACE 170
 
 #define PAT_MAX_REPEAT		MAX_STRLEN
 #define MAX_PATTERN_ATOMS	50
-#define	MAX_PATOBJ_LENGTH	1024
-#define MAX_PATTERN_LENGTH	MAX_PATOBJ_LENGTH - (3 * MAX_PATTERN_ATOMS) - 3 /* maximum length (in integers) of compiled pattern
-										 * code excluding count,tot_min,tot_max and
-										 * min,max,size arrays that come at the tail.
-										 * 3 * MAX_PATTERN_ATOMS is for min, max, size
-										 * arrays and 3 is for count, tot_min, tot_max
-										 */
-#define PATENTS 256
-#define CHAR_CLASSES 22
+#define	MAX_PATOBJ_LENGTH	2048
+#define	MAX_PATTERN_OVERHEAD	((3 * MAX_PATTERN_ATOMS) + 3) * 4/* maximum length (in integers) of compiled pattern code
+								  * excluding count,tot_min,tot_max and min,max,size arrays
+								  * that come at the tail. 3 * MAX_PATTERN_ATOMS is for
+								  * min, max, size arrays and 3 is for count, tot_min, tot_max
+								  * 4 is to convert the size into bytes.
+								  */
+#define MAX_PATTERN_LENGTH	(MAX_PATOBJ_LENGTH - MAX_PATTERN_OVERHEAD)
+#define PATENTS		256	/* Size of the builtin pattern/typemask table in M mode */
+#define PATENTS_UTF8	128	/* Size of the builtin pattern/typemask table in UTF-8 mode */
+#define CHAR_CLASSES 24
+#define	PAT_STRLIT_PADDING	3	/* # of int4s for storing bytelen, charlen, flags in PATM_STRLIT type */
 
 #define MAX_SYM	16
 #define FST	0
 #define LST	1
 
-#define MAX_DFA_STRLEN 6
+#define MAX_DFA_STRLEN 8	/* needs to be > PAT_BASIC_CLASSES */
 #define MAX_DFA_REP    10
 
 /* The macro to perform 64-bit multiplication without losing precision due to overflow with 32-bit
@@ -174,6 +175,18 @@ typedef struct ptstr_struct {
 	uint4	buff[MAX_PATOBJ_LENGTH];
 } ptstr;
 
+/* The following flags are the attributes of the pattern string literal (PATM_STRLIT) */
+#define PATM_STRLIT_NONASCII	(1 << 0) /* whether the string contains non-ASCII (multi-byte) characters */
+#define PATM_STRLIT_BADCHAR	(1 << 1) /* whether the string contains malformed UTF8 byte sequences */
+
+typedef struct patstrlit_struct
+{
+	int4		bytelen;	/* number of bytes in the buffer */
+	int4		charlen;	/* number of characters (single or multi-byte) in the PATM_STRLIT */
+	uint4		flags;		/* various attributes about the pattern string literal */
+	unsigned char	buff[MAX_PATTERN_LENGTH - 2];
+} pat_strlit;
+
 /* The following structure caches the evaluation status of whether a pattern string matches a given <strptr, strlen>.
  * This remembering enables us to avoid recomputation (and hence a lot of CPU cycles) in case the same need arises again.
  * Least frequently used pte_csh structures (i.e. having the smallest "count" field) will be preempted for new entries.
@@ -182,7 +195,7 @@ typedef struct ptstr_struct {
 typedef struct pte_csh_struct {
 	char		*patptr;
 	char		*strptr;
-	int4		len;
+	int4		charlen;
 	int		repcnt;	/* recursion level */
 	uint4		count;	/* indicates frequency of access. The least "count" valued entry gets pre-empted */
 	boolean_t	match;
@@ -254,6 +267,7 @@ typedef struct pte_csh_struct {
 int	do_patalt(
 		uint4		*firstalt,
 		unsigned char	*strptr,
+		unsigned char	*strtop,
 		int4		repmin,
 		int4		repmax,
 		int		totchar,
@@ -299,8 +313,7 @@ boolean_t pat_unwind(
 boolean_t add_atom(
 		int		*count,
 		uint4		pattern_mask,
-		void		*strlit_buff,
-		int4		strlen,
+		pat_strlit	*strlit_buff,
 		boolean_t	infinite,
 		int		*min,
 		int		*max,
@@ -318,8 +331,7 @@ boolean_t add_atom(
 
 int pat_compress(
 		uint4		pattern_mask,
-		void		*strlit_buff,
-		int4		strlen,
+		pat_strlit	*strlit_buff,
 		boolean_t	infinite,
 		boolean_t	last_infinite,
 		uint4		*lastpatptr);

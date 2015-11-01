@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"
 
 #include "mlkdef.h"
 #include "gdsroot.h"
@@ -32,8 +33,9 @@ static unsigned int	work_buff_length;
 
 boolean_t dse_fdmp(sm_uc_ptr_t data, int len)
 {
-	unsigned char	*key_char_ptr, temp[MAX_ZWR_KEY_SZ], *temp_char_ptr, *top, *work_char_ptr;
-	int 		dest_len;
+	unsigned char	*key_char_ptr, temp[MAX_ZWR_KEY_SZ], *temp_char_ptr, *work_char_ptr;
+	int 		dest_len, chlen;
+	int4		ch;
 
 	if (work_buff_length < ZWR_EXP_RATIO(gv_cur_region->max_rec_size))
 	{
@@ -45,23 +47,24 @@ boolean_t dse_fdmp(sm_uc_ptr_t data, int len)
 	work_char_ptr = work_buff;
 	*work_char_ptr++ = '^';
 	for (key_char_ptr = (uchar_ptr_t)patch_comp_key; *key_char_ptr ; key_char_ptr++)
+	{
 		if (PRINTABLE(*key_char_ptr))
 			*work_char_ptr++ = *key_char_ptr;
 		else
 			return FALSE;
+	}
 	key_char_ptr++;
 	if (*key_char_ptr)
 	{
 		*work_char_ptr++ = '(';
 		for (;;)
 		{
-			top = gvsub2str(key_char_ptr, temp, TRUE);
-			for (temp_char_ptr = temp; temp_char_ptr < top ;temp_char_ptr++)
-			{
-				if (!PRINTABLE(*temp_char_ptr))
-					return FALSE;
-				*work_char_ptr++ = *temp_char_ptr;
-			}
+			work_char_ptr = gvsub2str(key_char_ptr, work_char_ptr, TRUE);
+			/* Removed unnecessary checks for printable characters (PRINTABLE()) here
+			 * since the data being written into files (OPENed files) would have been
+			 * passed through ZWR translation which would have taken care of converting
+			 * to $CHAR() or $ZCHAR() */
+
 			for (; *key_char_ptr ; key_char_ptr++)
 				;
 			key_char_ptr++;

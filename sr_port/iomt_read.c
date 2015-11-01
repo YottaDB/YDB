@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +23,9 @@
 GBLREF spdesc   stringpool;
 GBLREF io_pair  io_curr_device;
 
-short iomt_read (mval *v, int4 t)
+int iomt_read(mval *v, int4 t)
 {
-	error_def (ERR_MTRDTHENWRT);
+	error_def(ERR_MTRDTHENWRT);
 	io_desc        *dv;
 	d_mt_struct    *mt_ptr;
 
@@ -33,12 +33,12 @@ short iomt_read (mval *v, int4 t)
 	FPRINTF(stderr, ">> iomt_read\n");
 #endif
 
-	assert (stringpool.free >= stringpool.base);
-	assert (stringpool.free <= stringpool.top);
+	assert(stringpool.free >= stringpool.base);
+	assert(stringpool.free <= stringpool.top);
 	dv = io_curr_device.in;
 	mt_ptr = (d_mt_struct *) dv->dev_sp;
 	if (stringpool.free + mt_ptr->record_sz > stringpool.top)
-		stp_gcol (mt_ptr->record_sz);
+		stp_gcol(mt_ptr->record_sz);
 	v->str.addr = (char *) stringpool.free;
 
 #ifdef UNIX
@@ -46,38 +46,36 @@ short iomt_read (mval *v, int4 t)
 	{
 		uint4   status;
 
-		status = iomt_reopen (dv, MT_M_READ, FALSE);
+		status = iomt_reopen(dv, MT_M_READ, FALSE);
 		if (status != SS_NORMAL)
-		{
 			return (status);
-		}
 	}
 #endif
 	switch (mt_ptr->last_op)
 	{
-	case mt_rewind:
-		if (mt_ptr->labeled == MTLAB_DOS11)
-			iomt_rddoslab (dv);
-		else if (mt_ptr->labeled == MTLAB_ANSI)
-			iomt_rdansistart (dv);
-		/* CAUTION: FALL THROUGH  */
-	case mt_null:
-		if (iomt_readblk (dv))
-		{
+		case mt_rewind:
+			if (mt_ptr->labeled == MTLAB_DOS11)
+				iomt_rddoslab (dv);
+			else if (mt_ptr->labeled == MTLAB_ANSI)
+				iomt_rdansistart (dv);
+			/* CAUTION: FALL THROUGH  */
+		case mt_null:
+			if (iomt_readblk(dv))
+			{
+				if (mt_ptr->stream)
+					iomt_rdstream(mt_ptr->record_sz, v->str.addr, dv);
+				else
+					iomt_getrec(dv);
+			}
+			break;
+		case mt_read:
 			if (mt_ptr->stream)
-				iomt_rdstream (mt_ptr->record_sz, v->str.addr, dv);
+				iomt_rdstream(mt_ptr->record_sz, v->str.addr, dv);
 			else
-				iomt_getrec (dv);
-		}
-		break;
-	case mt_read:
-		if (mt_ptr->stream)
-			iomt_rdstream (mt_ptr->record_sz, v->str.addr, dv);
-		else
-			iomt_getrec (dv);
-		break;
-	default:
-		rts_error (VARLSTCNT (1) ERR_MTRDTHENWRT);
+				iomt_getrec(dv);
+			break;
+		default:
+			rts_error(VARLSTCNT (1) ERR_MTRDTHENWRT);
 	}
 	if (io_curr_device.in->dollar.zeof)
 	{
@@ -85,7 +83,7 @@ short iomt_read (mval *v, int4 t)
 		return TRUE;
 	}
 	if (!mt_ptr->stream)
-		memcpy (v->str.addr, mt_ptr->rec.addr, mt_ptr->rec.len);
+		memcpy(v->str.addr, mt_ptr->rec.addr, mt_ptr->rec.len);
 	v->str.len = mt_ptr->rec.len;
 	io_curr_device.in->dollar.x = 0;
 	io_curr_device.in->dollar.y++;

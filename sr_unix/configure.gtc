@@ -12,7 +12,6 @@
 
 . ./arch.gtc
 
-
 # Path to the correct echo program
 if [ $arch = "sun"  -o  $arch = "solaris" ]; then
 	echo=/usr/5bin/echo
@@ -162,9 +161,31 @@ s|SERVERID|$server_id|g
 SEDSCRIPT
 for i in $pathmods
 do
-	sed -f sedin$$ $i > `basename $i .gtc`
+	dest=`basename $i .gtc`
+	sed -f sedin$$ $i > $dest
+	if [ -e "utf8" ]; then
+		cd utf8
+		ln -s ../$dest $dest
+		cd ..
+	fi
 done
 rm sedin$$
+
+# Create $gtmdist/utf8 if this platform can support "UTF-8" mode.
+if [ -e "utf8" ]; then
+	if [ ! -e $gtmdist/utf8 ]; then
+		mkdir $gtmdist/utf8
+	fi
+fi
+
+# Install COPYING if it is applicable
+file=COPYING
+if [ -e $file ]; then
+	cp $file $gtmdist
+	if [ -e "utf8" ]; then
+		ln -s ../$file $gtmdist/utf8/$file
+	fi
+fi
 
 # Install the .cshrc and .profile files
 cp gtmprofile gtmcshrc $gtmdist
@@ -196,8 +217,10 @@ do
 		install -g bin -o $owner -m 755 $i $gtmdist
 	elif [ $arch = "ibm" ]; then
 		/usr/bin/install -f $gtmdist -M 755 -O $owner -G bin $i
+	elif [ -x /usr/sbin/install ]; then
+		/usr/sbin/install -f $gtmdist -m 755 -u $owner -g bin $i $gtmdist
 	else
-		install -f $gtmdist -m 755 -u $owner -g bin $i
+		install -f $gtmdist -m 755 -u $owner -g bin $i $gtmdist
 	fi
 #		strip $gtmdist/$i >/dev/null 2>&1
 done
@@ -227,6 +250,30 @@ fi
 # Install GDE, GTMHELP, and all the percent routines
 cp *.o *.m $gtmdist
 
+# Install a mirror image (using soft links) of $gtmdist under $gtmdist/utf8 if this platform can support "UTF-8" mode.
+if [ -e "utf8" ]; then
+	cd utf8
+	for file in *
+	do
+		# Skip directories
+		if [ -d $file ]; then
+			continue
+		fi
+		# Install .o files
+		base="`basename $file .o`"
+		if [ "$base" != "$file" ]; then
+			cp $file $gtmdist/utf8
+		else
+			# Soft link everything else
+			if [ -e $gtmdist/utf8/$file ]; then
+				rm -f $gtmdist/utf8/$file
+			fi
+			ln -s ../$file $gtmdist/utf8/$file
+		fi
+	done
+	cd ..
+fi
+
 $echo ""
 $echo "All of the GTC MUMPS routines are distributed with uppercase names."
 $echo "You can create lowercase copies of these routines if you wish, but"
@@ -239,6 +286,9 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	$echo ""
 	$echo "Creating lowercase versions of the MUMPS routines."
 	(cd $gtmdist; ./lowerc_cp *.m)
+	if [ -e $gtmdist/utf8 ]; then
+		(cd $gtmdist/utf8; ./lowerc_cp *.m)
+	fi
 fi
 
 gtmroutines=$gtmdist
@@ -251,7 +301,31 @@ export gtmgbldir
 $echo ""
 $echo "Compiling all of the MUMPS routines. This may take a moment."
 $echo ""
+
+# Ensure we are NOT in UTF-8 mode
+gtm_chset="M"
+export gtm_chset
 (cd $gtmdist; ./mumps -nowarning *.m)
+if [ -e $gtmdist/utf8 ]; then
+	# Ensure we ARE in UTF-8 mode
+	utflocale=`locale -a | grep -i en_us | grep -i utf | grep '8$'`
+	if [ $utflocale = "" ]; then
+		utflocale="C"
+	fi
+	LC_CTYPE=$utflocale
+	export LC_CTYPE
+	unset LC_ALL
+	gtm_chset="UTF-8"
+	export gtm_chset
+	if [ $arch = "ibm" ]; then
+		export LIBPATH=/usr/local/lib/
+	else
+		export LD_LIBRARY_PATH=/usr/local/lib/
+	fi
+	(export gtm_dist=$gtmdist/utf8; cd $gtm_dist; ./mumps -nowarning *.m)
+	gtm_chset="M"
+	export gtm_chset
+fi
 
 chmod 0644 $gtmdist/*.m
 chmod 0644 $gtmdist/*.o
@@ -260,17 +334,26 @@ chown $owner $gtmdist/*.o
 chgrp bin $gtmdist/*.m
 chgrp bin $gtmdist/*.o
 
-export gtm_dist
-export gtmgbldir
-export gtmroutines
+if [ -e $gtmdist/utf8 ]; then
+	chmod 0644 $gtmdist/*.m
+	chmod 0644 $gtmdist/*.o
+	chown $owner $gtmdist/*.m
+	chown $owner $gtmdist/*.o
+	chgrp bin $gtmdist/*.m
+	chgrp bin $gtmdist/*.o
+fi
 
 gtm_dist=$gtmdist
-gtmroutines=$gtmdist
+export gtm_dist
 
+gtmroutines=$gtmdist
+export gtmroutines
 
 # Create the global diretories for the help databases.
 
 gtmgbldir=$gtmdist/gtmhelp.gld
+export gtmgbldir
+
 $gtmdist/mumps -direct <<GDE.in1
 Do ^GDE
 Change -segment DEFAULT	-block=2048	-file=$gtmdist/gtmhelp.dat
@@ -278,8 +361,9 @@ Change -region DEFAULT	-record=1020	-key=255
 Exit
 GDE.in1
 
-
 gtmgbldir=$gtmdist/gdehelp.gld
+export gtmgbldir
+
 $gtmdist/mumps -direct <<GDE.in2
 Do ^GDE
 Change -segment DEFAULT	-block=2048	-file=$gtmdist/gdehelp.dat
@@ -303,6 +387,12 @@ chmod 0444 $gtmdist/*.gld
 # $other_object_files, $csh_script_files should be removed unconditionally
 \rm -rf $other_object_files $csh_script_files
 
+if [ -e utf8 ]; then
+	cd utf8
+	\rm -rf $other_object_files $csh_script_files
+	cd ..
+fi
+
 $echo ""
 $echo "Installation completed. Would you like all the temporary files"
 $echo "removed from this directory? (y or n) \c"
@@ -311,5 +401,13 @@ read resp
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
 		*.gtc gtm* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid \
-		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.*
+		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.* COPYING
+	if [ -e utf8 ]; then
+		cd utf8
+		\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
+			*.gtc gtm* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid \
+			esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.* COPYING
+		cd ..
+		rm -rf utf8
+	fi
 fi

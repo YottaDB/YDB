@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,10 +34,14 @@
 #include "mvalconv.h"
 #include "format_targ_key.h"
 #include "gtm_maxstr.h"
+#ifdef UNICODE_SUPPORTED
+#include "gtm_utf8.h"
+#endif
 
-#define F_SUBSC_LEN 3
-#define N_SUBSC_LEN 5
-#define MIN_DATASIZE 40
+#define F_SUBSC_LEN		 3
+#define N_SUBSC_LEN		 5
+#define MIN_DATASIZE		40
+#define	ZSHOW_SPACE_INDENT	10	/* # of spaces every following line of zshow output is indented with */
 
 GBLREF	io_pair		io_curr_device;
 GBLREF	spdesc		stringpool;
@@ -47,13 +51,18 @@ GBLREF	mv_stent	*mv_chain;
 GBLREF	unsigned char    *msp, *stackwarn, *stacktop;
 GBLREF	int		process_exiting;
 
-void zshow_output(zshow_out *out, mstr *str)
+void zshow_output(zshow_out *out, const mstr *str)
 {
 	mval		*mv, lmv;
 	lv_val		*temp;
-	char		buff, *ptr1, *ptr2;
+	char		buff, *strptr, *strnext, *strtop, *strbase, *leadptr;
 	unsigned char	*kend, kbuff[MAX_ZWR_KEY_SZ];
-	int		key_ovrhd, len, buff_len;
+	int		key_ovrhd, len, outlen, buff_len, str_processed, chcnt, char_len, disp_len, n_spaces;
+	int		device_width, inchar_width, cumul_width;
+	boolean_t	utf8_active;
+#ifdef UNICODE_SUPPORTED
+	wint_t		codepoint;
+#endif
 
 	error_def(ERR_ZSHOWGLOSMALL);
 	error_def(ERR_STACKOFLOW);
@@ -65,7 +74,7 @@ void zshow_output(zshow_out *out, mstr *str)
 	if (NULL != str)
 	{
 		buff_len = out->ptr - out->buff;
-		MAXSTR_BUFF_ALLOC(str->len, out->buff, buff_len);
+		out->size = MAXSTR_BUFF_ALLOC(str->len, out->buff, buff_len);
 		out->ptr = out->buff + buff_len;
 	}
 	switch (out->type)
@@ -73,45 +82,78 @@ void zshow_output(zshow_out *out, mstr *str)
 	case ZSHOW_DEVICE:
 		if (!process_exiting)
 		{	/* Only if not exiting in case we are called from mdb_condition_handler
-			   with stack overflwo */
+			 * with stack overflow */
 			PUSH_MV_STENT(MVST_MVAL);
 			mv = &mv_chain->mv_st_cont.mvs_mval;
 		} else
 			mv = &lmv;
-		if (!out->len)
-			out->len = io_curr_device.out->width;
 		if (str)
 		{
 			len = str->len;
-			ptr1 = str->addr;
+			strptr = str->addr;
+			char_len = UNICODE_ONLY((gtm_utf8_mode) ? UTF8_LEN_STRICT(strptr, len) :) len;
+			disp_len = UNICODE_ONLY((gtm_utf8_mode) ? gtm_wcswidth(strptr, len, FALSE, 1) :) len;
+			str_processed = 0;
 		}
-		if (str && ((int)str->len + (out->ptr - out->buff) > out->len))
+		device_width = io_curr_device.out->width;
+		/* Do not indent if width is < the indentation length or if remaining width cannot accommodate one character */
+		n_spaces = (device_width > (ZSHOW_SPACE_INDENT UNICODE_ONLY(+ (gtm_utf8_mode ? GTM_MB_DISP_LEN_MAX : 0)))
+			? ZSHOW_SPACE_INDENT : 0);
+		if (str && (disp_len + out->displen > device_width))
 		{
-			ptr2 = str->addr + str->len;
-			for (; ptr1 != ptr2; )
+			for (; (len > 0) && (disp_len + out->displen > device_width); )
 			{
-				len = ptr2 - ptr1;
-				if (len > out->len - (out->ptr - out->buff))
-					len = out->len - (out->ptr - out->buff);
-				else
-					break;
-				memcpy(out->ptr, ptr1, len);
-				ptr1 += len;
-				out->ptr += len;
+				assert(len <= out->size - (out->ptr - out->buff));
+				strbase = strptr = str->addr + str_processed;
+				strtop = str->addr + str->len;
+				if (!gtm_utf8_mode)
+				{
+					outlen = device_width - out->len;
+					chcnt = outlen;
+					strptr += outlen;
+					disp_len -= outlen;
+				}
+#ifdef UNICODE_SUPPORTED
+				else {
+					utf8_active = (CHSET_M != io_curr_device.out->ichset); /* needed by GTM_IO_WCWIDTH macro */
+					cumul_width = out->displen;
+					for (chcnt = 0; chcnt < char_len; ++chcnt)
+					{
+						strnext = UTF8_MBTOWC(strptr, strtop, codepoint);
+						GTM_IO_WCWIDTH(codepoint, inchar_width);
+						if ((cumul_width + inchar_width) > device_width)
+							break;
+						cumul_width += inchar_width;
+						disp_len -= inchar_width;
+						strptr = strnext;
+					}
+					outlen = strptr - strbase;
+				}
+#endif
+				memcpy(out->ptr, strbase, outlen);
+				out->ptr += outlen;
+				str_processed += outlen;
+				len = strtop - strptr;
+				char_len -= chcnt;
+				assert((UNICODE_ONLY((gtm_utf8_mode) ? UTF8_LEN_STRICT(strptr, len) :) len) == char_len);
 				mv->str.addr = out->buff;
 				mv->str.len = out->ptr - out->buff;
 				mv->mvtype = MV_STR;
 				op_write(mv);
 				op_wteol(1);
-				out->ptr = out->buff + 10;
-				memset(out->buff, ' ', 10);
+				out->ptr = out->buff + n_spaces;
+				memset(out->buff, ' ', n_spaces);
+				out->len = n_spaces;
+				out->displen = n_spaces;
 				out->line_num++;
 			}
 		}
 		if (str)
 		{
-			memcpy(out->ptr, ptr1, len);
+			memcpy(out->ptr, str->addr + str_processed, len);
 			out->ptr += len;
+			out->len += char_len;
+			out->displen += disp_len;
 		}
 		if (out->flush && out->ptr != out->buff)
 		{
@@ -121,6 +163,8 @@ void zshow_output(zshow_out *out, mstr *str)
 			op_write(mv);
 			op_wteol(1);
 			out->ptr = out->buff;
+			out->len = 0;
+			out->displen = 0;
 			out->line_num++;
 		}
 		if (!process_exiting)
@@ -136,8 +180,6 @@ void zshow_output(zshow_out *out, mstr *str)
 		} else
 			mv = &lmv;
 
-		if (!out->len)
-			out->len = MAX_SRCLINE;
 		if (out->code && out->code != out->curr_code)
 		{
 			if (stringpool.top - stringpool.free < 1)
@@ -147,7 +189,7 @@ void zshow_output(zshow_out *out, mstr *str)
 			mv->mvtype = MV_STR;
 			*mv->str.addr = out->code;
 			stringpool.free++;
-			if (out->out_var.lv.child = op_srchindx(VARLSTCNT(2) out->out_var.lv.lvar, mv))
+			if ((out->out_var.lv.child = op_srchindx(VARLSTCNT(2) out->out_var.lv.lvar, mv)))
 			{
 				bool	lvundef;
 
@@ -171,21 +213,30 @@ void zshow_output(zshow_out *out, mstr *str)
 		if (str)
 		{
 			len = str->len;
-			ptr1 = str->addr;
+			strptr = str->addr;
+			str_processed = 0;
 		}
-		if (str && ((int)str->len + (out->ptr - out->buff) > out->len))
+		if (str && ((int)str->len + (out->ptr - out->buff) > MAX_SRCLINE))
 		{
-			ptr2 = str->addr + str->len;
-			for (; ptr1 != ptr2; )
+			strtop = str->addr + str->len;
+			for (; strptr != strtop; )
 			{
-				len = ptr2 - ptr1;
-				if (len > out->len - (out->ptr - out->buff))
-					len = out->len - (out->ptr - out->buff);
-				else
+				len = strtop - strptr;
+				if (len <= MAX_SRCLINE - (out->ptr - out->buff))
 					break;
-				memcpy(out->ptr, ptr1, len);
-				ptr1 += len;
+				len = MAX_SRCLINE - (out->ptr - out->buff);
+				strbase = str->addr + str_processed;
+#ifdef UNICODE_SUPPORTED
+				if (gtm_utf8_mode)
+				{ /* terminate at the proper character boundary within MAX_SRCLINE bytes */
+					UTF8_LEADING_BYTE(strbase + len, strbase, leadptr);
+					len = leadptr - strbase;
+				}
+#endif
+				memcpy(out->ptr, strbase, len);
+				strptr += len;
 				out->ptr += len;
+				str_processed += len;
 				mv->str.addr = 0;
 				mv->str.len = 0;
 				MV_FORCE_MVAL(mv, out->line_num);
@@ -209,7 +260,7 @@ void zshow_output(zshow_out *out, mstr *str)
 		}
 		if (str)
 		{
-			memcpy(out->ptr, ptr1, len);
+			memcpy(out->ptr, str->addr + str_processed, len);
 			out->ptr += len;
 		}
 		if (out->flush && out->ptr != out->buff)
@@ -273,21 +324,30 @@ void zshow_output(zshow_out *out, mstr *str)
 		if (str)
 		{
 			len = str->len;
-			ptr1 = str->addr;
+			strptr = str->addr;
+			str_processed = 0;
 		}
 		if (str && ((int)str->len + (out->ptr - out->buff) > out->len))
 		{
-			ptr2 = str->addr + str->len;
-			for (; ptr1 != ptr2; )
+			strtop = str->addr + str->len;
+			for (; strptr != strtop; )
 			{
-				len = ptr2 - ptr1;
-				if (len > out->len - (out->ptr - out->buff))
-					len = out->len - (out->ptr - out->buff);
-				else
+				len = strtop - strptr;
+				if (len <= out->len - (out->ptr - out->buff))
 					break;
-				memcpy(out->ptr, ptr1, len);
-				ptr1 += len;
+				len = out->len - (out->ptr - out->buff);
+				strbase = str->addr + str_processed;
+#ifdef UNICODE_SUPPORTED
+				if (gtm_utf8_mode)
+				{ /* terminate at the proper character boundary within out->len bytes */
+					UTF8_LEADING_BYTE(strbase + len, strbase, leadptr);
+					len = leadptr - strbase;
+				}
+#endif
+				memcpy(out->ptr, strbase, len);
+				strptr += len;
 				out->ptr += len;
+				str_processed += len;
 				MV_FORCE_MVAL(mv, out->line_num);
 				if (out->line_num != 1)
 					op_gvnaked(VARLSTCNT(1) mv);
@@ -316,7 +376,7 @@ void zshow_output(zshow_out *out, mstr *str)
 		}
 		if (str)
 		{
-			memcpy(out->ptr, ptr1, len);
+			memcpy(out->ptr, str->addr + str_processed, len);
 			out->ptr += len;
 		}
 		if (out->flush && out->ptr != out->buff)

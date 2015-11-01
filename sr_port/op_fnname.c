@@ -132,7 +132,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 		}
 		/* Reserve enough space for naked reference. Include space for ^() and a maximum of sub_count ',' separators for
 		 * subscripts specified as arguments to $NAME() in addition to those in the naked reference */
-		space_needed = (STR_LIT_LEN("^()") + MAX_ZWR_INFLATION * MAX_KEY_SZ + sub_count);
+		space_needed = (STR_LIT_LEN("^()") + ZWR_EXP_RATIO(MAX_KEY_SZ) + sub_count);
 		TEST_FAKE_STRINGPOOL_FULL;
 		if (space_needed > stringpool.top - stringpool.free)
 			stp_gcol(space_needed);

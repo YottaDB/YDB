@@ -25,11 +25,19 @@
 #include "util.h"
 #include "util_format.h"
 #include "util_out_print_vaparm.h"
+#include "gtmimagename.h"
+
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
+
 
 #define GETFAOVALDEF(faocnt, var, type, result, defval) \
 	if (faocnt > 0) {result = (type)va_arg(var, type); faocnt--;} else result = defval;
 
-GBLREF	io_pair		io_std_device;
+GBLREF	io_pair			io_std_device;
+GBLREF	enum gtmImageTypes	image_type;
 GBLDEF	char		*util_outptr, util_outbuff[OUT_BUFF_SIZE];
 GBLDEF	va_list		last_va_list_ptr;
 static	boolean_t	first_syslog = TRUE;
@@ -97,17 +105,17 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 	desc_struct	*d;
 	signed char	schar;
 	unsigned char	type, type2;
-	caddr_t		c, outptr, outtop;
+	caddr_t		c, ctop, outptr, outtop, message_next, message_top;
 	uchar_ptr_t 	ret_ptr;
 	unsigned char	uchar;
 	short		sshort, *s;
 	unsigned short	ushort;
-	int		i, length, max_chars, field_width, repeat_count, int_val;
+	int		i, length, field_width, repeat_count, int_val, ch, chlen, chwidth, cwidth;
 	boolean_t	indirect;
 	qw_num_ptr_t	val_ptr;
 	unsigned char	numa[22];
 	unsigned char	*numptr;
-	boolean_t	right_justify;
+	boolean_t	right_justify, isprintable;
 
 	VAR_COPY(last_va_list_ptr, fao);
 	outptr = buff;
@@ -192,22 +200,33 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 
 			case '*':
 				assert(!indirect);
+				if (repeat_count > 0)
+				{
+					message_top = message + strlen(message);
+					assert(message < message_top);
+					chlen = (!gtm_utf8_mode) ? 1 :
+						((caddr_t)UTF8_MBNEXT(message, message_top) - message);
+				} else
+					chlen = 0;
 				while ((repeat_count-- > 0) && (outptr < outtop))
-					*outptr++ = *message;
-				++message;
+				{
+					memcpy(outptr, message, chlen);
+					outptr += chlen;
+				}
+				message += chlen;
 				continue;
 
 			case 'A':
 				assert(!indirect);
 				switch(type2 = *message++)
 				{
-					case 'C':
+					case 'C': /* a string with length in the first byte */
 						GETFAOVALDEF(faocnt, fao, caddr_t, c, NULL);
 						length = c ? *c++ : 0;
 						break;
 
 					case 'D':
-					case 'F':
+					case 'F': /* string with length and addr parameters */
 						GETFAOVALDEF(faocnt, fao, int4, length, 0);
 						GETFAOVALDEF(faocnt, fao, caddr_t, c, NULL);
 						break;
@@ -226,31 +245,57 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 						}
 						break;
 
-					case 'Z':
+					case 'Z': /* null teminated string */
 						GETFAOVALDEF(faocnt, fao, caddr_t, c, NULL);
 						length = c ? strlen(c) : 0;
 				}
-
-				max_chars = MIN((outtop - outptr - 1),
-						(0 == field_width ? length : MIN(field_width, length)));
-
+				/* Since gtmsecshr does not load ICU libraries (since dlopen() with LD_LIBRARY_PATH
+				 * does not work for root setuid executables), avoid calling gtm_wcswidth() and
+				 * U_ISPRINT() from gtmsecshr and thus non-zero widths used in util_out_print()
+				 * from gtmsecshr will not be treated as column widths but as character lengths.
+				 * This is a safe limitation since no message from gtmsecshr specifies width yet.
+				 */
+				assert(!gtm_utf8_mode || (GTMSECSHR_IMAGE == image_type) || (NULL != gtm_wcswidth_fnptr));
+				cwidth = (!gtm_utf8_mode || GTMSECSHR_IMAGE == image_type)
+					? length : (*gtm_wcswidth_fnptr)((unsigned char *)c, length, FALSE, 1);
+				if (0 < field_width && cwidth > field_width)
+					cwidth = field_width;
+				assert(0 <= cwidth); /* since all unprintable and illegal characters are ignored */
 				assert(0 <= field_width);
-				assert(0 <= max_chars);
 				if (right_justify)
 				{
-					for (i = field_width - max_chars;  i > 0;  --i)
+					for (i = field_width - cwidth;  i > 0 && outptr < outtop - 1;  --i)
 						*outptr++ = ' ';
 				}
-				for (i = 0;  i < max_chars;  ++i, ++c)
-					if (type2 == 'F'  &&  (*c < ' '  ||  *c > '~'))
+				for (i = 0, ctop = c + length;  (i < cwidth && outptr < outtop  - 1);  c += chlen)
+				{
+					if (!gtm_utf8_mode)
+					{
+						ch = *c;
+						chlen = 1;
+						chwidth = (ch < ' '  ||  ch > '~') ? -1 : 1;
+					} else
+					{
+						chlen = (caddr_t)UTF8_MBTOWC(c, ctop, ch) - c;
+						chwidth = (GTMSECSHR_IMAGE != image_type) ? UTF8_WCWIDTH(ch): chlen;
+					}
+					if (type2 == 'F'  &&  -1 == chwidth) /* not printable */
+					{
 						*outptr++ = '.';
-					else if (*c == '\0')
-						--i;	/* Don't count nul characters */
-					else
-						*outptr++ = *c;
+						++i;
+					} else if ('\0' != ch && chlen <= outtop - outptr - 1)
+					{
+						memcpy(outptr, c, chlen);
+						outptr += chlen;
+						if (0 <= chwidth)
+							i += chwidth;
+						else /* treat unprintable characters as having a width of 1 */
+							++i;
+					}
+				}
 				if (!right_justify)
 				{
-					for (i = field_width - max_chars;  i > 0;  --i)
+					for (i = field_width - cwidth;  i > 0 && outptr < outtop - 1;  --i)
 						*outptr++ = ' ';
 				}
 				continue;
@@ -365,8 +410,6 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 					}
 				}
 				length = numptr - numa;		/* Length of asciified number */
-				max_chars = MIN((outtop - outptr - 1),
-						(0 == field_width ? length : MIN(field_width, length)));
 				if (length < field_width)
 				{
 					memset(outptr, (('Z' == type) ? '0' : ' '), field_width - length);

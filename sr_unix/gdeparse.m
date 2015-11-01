@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	;
+;	Copyright 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -44,15 +44,16 @@ list:(lhead)
 TNUMBER
 	d GETTOK^GDESCAN
 	i toktype'="TKNUMLIT" zm gdeerr("VALUEBAD"):token:"number"
+	i $l(token)'=$zl(token) zm gdeerr("NONASCII"):token:"number"			; error if the token has non-ascii numbers
 	s value=token
 	q
 TFSPEC
 	k filespec
 	i ntoktype="TKEOL" zm gdeerr("QUALREQD"):"file specification"
-	i ntoktype="TKSTRLIT" s filespec=$e(ntoken,2,$l(ntoken)-1)
+	i ntoktype="TKSTRLIT" s filespec=$ze(ntoken,2,$zl(ntoken)-1)
 	e  d TFSPECP
  	d GETTOK^GDESCAN			; put the scanner back on track
-	i $l(filespec)>(SIZEOF("file_spec")-1) zm gdeerr("VALUEBAD"):filespec:"file specification"
+	i $zl(filespec)>(SIZEOF("file_spec")-1) zm gdeerr("VALUEBAD"):filespec:"file specification"
 	i '$l($zparse(filespec,"","","","SYNTAX_ONLY")) zm gdeerr("VALUEBAD"):filespec:"file specification"
 	s @("value="_$s($l(filexfm):filexfm,1:filespec))	; do system specific file name translation
 	q
@@ -88,6 +89,7 @@ NAME
 	f i=0:1 s c=$e(comline,cp1+i) q:c'?.1"%".1AN.1"*"!'$l(c)
 	s NAME=$e(comline,cp1,cp1+i-1),cp=cp1+i d GETTOK^GDESCAN			; put the scanner back on track
 	i '$l(NAME) zm gdeerr("VALUEBAD"):token:"name"
+	i $l(NAME)'=$zl(NAME) zm gdeerr("NONASCII"):NAME:"name"				; error if the name is non-ascii
 	i NAME'="*" s x=$e(NAME) i x'="%",x'?1A zm gdeerr("NAMSTARTBAD"):NAME
 	i $e(NAME,2,999)'?.AN.1"*" zm gdeerr("VALUEBAD"):NAME:"name"
 	i $l(NAME)>PARNAMLN zm gdeerr("VALTOOLONG"):NAME:PARNAMLN:"name"
@@ -100,6 +102,7 @@ REGION
 	f i=0:1 s c=$e(comline,cp1+i) q:c'?.1AN.1"$".1"_"!'$l(c)
 	s REGION=$tr($e(comline,cp1,cp1+i-1),lower,upper),cp=cp1+i d GETTOK^GDESCAN		; put the scanner back on track
 	i '$l(REGION) zm gdeerr("VALUEBAD"):token:renpref_"region"
+	i $l(REGION)'=$zl(REGION) zm gdeerr("NONASCII"):REGION:"region"		; error if the name of the region is non-ascii
 	i REGION=defreg q
 	s x=$e(REGION) i x'?1A zm gdeerr("PREFIXBAD"):REGION:renpref_"region"
 	i $l(REGION)>PARREGLN zm gdeerr("VALTOOLONG"):REGION:PARREGLN:renpref_"region"
@@ -112,6 +115,7 @@ SEGMENT
 	f i=0:1 s c=$e(comline,cp1+i) q:c'?.1AN.1"$".1"_"!'$l(c)
 	s SEGMENT=$tr($e(comline,cp1,cp1+i-1),lower,upper),cp=cp1+i d GETTOK^GDESCAN		; put the scanner back on track
 	i '$l(SEGMENT) zm gdeerr("VALUEBAD"):token:renpref_"segment"
+	i $l(SEGMENT)'=$zl(SEGMENT) zm gdeerr("NONASCII"):SEGMENT:"segment"	; error if the name of the segment is non-ascii
 	i SEGMENT=defseg q
 	s x=$e(SEGMENT) i x'?1A zm gdeerr("PREFIXBAD"):SEGMENT:renpref_"segment"
 	i $l(SEGMENT)>PARSEGLN zm gdeerr("VALTOOLONG"):SEGMENT:PARSEGLN:renpref_"segment"

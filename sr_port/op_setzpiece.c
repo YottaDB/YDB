@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,7 @@
 #include "stringpool.h"
 #include "op.h"
 #include "matchc.h"
+#include "fnpc.h"
 
 GBLREF spdesc stringpool;
 
@@ -27,12 +28,16 @@ GBLREF spdesc stringpool;
  *	without modifying the original code structure.
  *	Labels of format lnn in the comments are those of the
  *	original code.
+ *
+ *      Note also this module is a near copy of op_fnpiece.c
+ *	differing only in that it calls matchb() instead of
+ *	matchc() to do matching.
  * ----------------------------------------------------------
  */
 
 /*
  * ----------------------------------------------------------
- * Set piece procedure.
+ * Set $zpiece procedure.
  * Set pieces first through last to expr.
  *
  * Arguments:
@@ -47,11 +52,13 @@ GBLREF spdesc stringpool;
  *	none
  * ----------------------------------------------------------
  */
-void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *dst)
+void op_setzpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *dst)
 {
-	int match_res, len, src_len, str_len, delim_cnt;
-	int first_src_ind, second_src_ind;
-	unsigned char *match_ptr, *src_str, *str_addr, *tmp_str;
+	int 		match_res, len, src_len, str_len, delim_cnt;
+	int 		first_src_ind, second_src_ind;
+	unsigned char 	*match_ptr, *src_str, *str_addr, *tmp_str;
+	delimfmt	unichar;
+
 	error_def(ERR_MAXSTRLEN);
 
 	/* --- code start --- */
@@ -63,7 +70,7 @@ void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *
 	MV_FORCE_STR(del);
 
 	/* Null delimiter */
-	if (del->str.len == 0)
+	if (0 == del->str.len)
 	{
 		if (first && src->mvtype)
 		{
@@ -76,13 +83,21 @@ void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *
 		return;
 	}
 
-	/* Valid delimiter */
 	MV_FORCE_STR(expr);
 	if (! MV_DEFINED(src))
 	{
 		first_src_ind = 0;
 		second_src_ind = -1;
 		goto moveit;
+	}
+
+	/* Valid delimiter -  See if we can take a short cut to op_fnzp1. If so, the delimiter value needs to be reformated */
+	if (1 == second_src_ind && 1 == del->str.len)
+	{	/* Count of pieces to retrieve is 1 so see what we can do quickly */
+		unichar.unichar_val = 0;
+		unichar.unibytes_val[0] = *del->str.addr;
+		op_setzp1(src, unichar.unichar_val, expr, last, dst);	/* Use "last" since it has not been modified */
+		return;
 	}
 
 	/* We have a valid src with something in it */
@@ -95,12 +110,11 @@ void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *
 	/* skip all pieces before start one */
 	while (first > 0)
 	{
-		match_ptr = matchc(del->str.len, (uchar_ptr_t)del->str.addr,
-			src_len, src_str, &match_res);
+		match_ptr = matchb(del->str.len, (uchar_ptr_t)del->str.addr,
+				   src_len, src_str, &match_res);
 		src_len -= (match_ptr - src_str);
 		src_str = match_ptr;
-		/* if match not found */
-		if (match_res)
+		if (0 == match_res) /* if match not found */
 			goto l80;
 		first--;
 	}
@@ -111,23 +125,22 @@ void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *
 
 	first_src_ind = match_ptr - (unsigned char *)src->str.addr;
 	do {
-		match_ptr = matchc(del->str.len, (uchar_ptr_t)del->str.addr,
-			src_len, src_str, &match_res);
+		match_ptr = matchb(del->str.len, (uchar_ptr_t)del->str.addr,
+				   src_len, src_str, &match_res);
 		src_len -= (match_ptr - src_str);
 		src_str = match_ptr;
-			/* if match not found */
-		if (match_res)
+		if (0 == match_res) /* if match not found */
 			goto l90;
 	} while (--second_src_ind > 0);
 
 	second_src_ind = match_ptr - (unsigned char *)src->str.addr - del->str.len;
 	goto moveit;
-l80:
+  l80:
 	first_src_ind = match_ptr - (unsigned char *)src->str.addr;
-l90:
+  l90:
 	second_src_ind = -1;
 
-moveit:
+  moveit:
 	delim_cnt = first;
 
 	/* Calculate total string len. */

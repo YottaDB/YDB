@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,7 @@
 #include "gtm_limits.h"
 #include "min_max.h"
 #include "gtmdbglvl.h"
+#include "cmd_qlf.h"	/* needed for CQ_UTF8 */
 
 #define RELOCATE(field, type, base) field = (type)((unsigned char *)(field) + (unsigned int)(base))
 #define RELREAD 50			/* number of relocation entries to buffer */
@@ -70,6 +71,7 @@ static rhdtyp		*hdr;
 GBLREF mident_fixed	zlink_mname;
 GBLREF mach_inst	jsb_action[JSB_ACTION_N_INS];
 GBLREF uint4		gtmDebugLevel;
+GBLREF  boolean_t	gtm_utf8_mode;
 
 typedef struct	res_list_struct
 {
@@ -79,9 +81,10 @@ typedef struct	res_list_struct
 				symnum;
 } res_list;
 
-void		res_free (res_list *root);
-boolean_t	addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl);
-void		zl_error (int4 file, zro_ent *zroe, int4 err, int4 len, char *addr, int4 len2, char *addr2);
+void		res_free(res_list *root);
+boolean_t	addr_fix(int file, unsigned char *shdr, urx_rtnref *urx_lcl);
+void		zl_error(int4 file, zro_ent *zroe, int4 err, int4 len, char *addr, int4 len2, char *addr2);
+void		zl_error_hskpng(int4 file);
 
 bool	incr_link (int file_desc, zro_ent *zro_entry)
 {
@@ -102,9 +105,12 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	int		name_buf_len;
 	char		marker[sizeof(JSB_MARKER) - 1];
 
+	error_def(ERR_DLLCHSETM);
+	error_def(ERR_DLLCHSETUTF8);
+	error_def(ERR_DLLVERSION);
 	error_def(ERR_INVOBJ);
 	error_def(ERR_LOADRUNNING);
-	error_def(ERR_DLLVERSION);
+	error_def(ERR_TEXT);
 
 	urx_lcl_anchor.len = 0;
 	urx_lcl_anchor.addr = 0;
@@ -168,18 +174,46 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 			     pre-V5 routine header was an 8-byte char array, so read the routine name in the old
 			     format */
 				int len;
-				pre_v5_routine_name = (pre_v5_mident *)&hdr->routine_name;
+				pre_v5_routine_name = (pre_v5_mident *)((char*)hdr + PRE_V5_RTNHDR_RTNOFF);
 				for (len = 0; len < sizeof(pre_v5_mident) && pre_v5_routine_name->c[len]; len++)
 					;
 				zl_error(0, zro_entry, ERR_DLLVERSION, len, &(pre_v5_routine_name->c[0]),
 				 	zro_entry->str.len, zro_entry->str.addr);
 			}
-			else {
-				zl_error(0, zro_entry, ERR_DLLVERSION, hdr->routine_name.len, hdr->routine_name.addr,
+			else { /* Note: routine_name field has not been relocated yet, so compute its absolute
+				  address in the shared library and use it */
+				zl_error(0, zro_entry, ERR_DLLVERSION, hdr->routine_name.len, (char *)shdr +
+					(unsigned int)hdr->literal_text_adr + (unsigned int)hdr->routine_name.addr,
 				 	zro_entry->str.len, zro_entry->str.addr);
 			}
 		}
 		return FALSE;
+	}
+
+	if (((hdr->compiler_qlf & CQ_UTF8) && !gtm_utf8_mode) || (!(hdr->compiler_qlf & CQ_UTF8) && gtm_utf8_mode))
+	{ /* object file compiled with a different $ZCHSET is being used */
+		if (shlib)	/* Shared library cannot recompile so this is always an error */
+		{ /* Note: routine_name field has not been relocated yet, so compute its absolute address
+		     in the shared library and use it */
+			if ((hdr->compiler_qlf & CQ_UTF8) && !gtm_utf8_mode)
+			{
+				zl_error(0, zro_entry, ERR_DLLCHSETUTF8, hdr->routine_name.len, (char *)shdr +
+					(unsigned int)hdr->literal_text_adr + (unsigned int)hdr->routine_name.addr,
+					 zro_entry->str.len, zro_entry->str.addr);
+			} else
+			{
+				zl_error(0, zro_entry, ERR_DLLCHSETM, hdr->routine_name.len, (char *)shdr +
+					(unsigned int)hdr->literal_text_adr + (unsigned int)hdr->routine_name.addr,
+					 zro_entry->str.len, zro_entry->str.addr);
+			}
+		}
+		zl_error_hskpng(file_desc);
+		if ((hdr->compiler_qlf & CQ_UTF8) && !gtm_utf8_mode)
+			rts_error(VARLSTCNT(6) ERR_INVOBJ, 0,
+				ERR_TEXT, 2, LEN_AND_LIT("Object compiled with CHSET=UTF-8 which is different from $ZCHSET"));
+		else
+			rts_error(VARLSTCNT(6) ERR_INVOBJ, 0,
+				ERR_TEXT, 2, LEN_AND_LIT("Object compiled with CHSET=M which is different from $ZCHSET"));
 	}
 	/* Read in and/or relocate the pointers to the various sections. To understand the size calculations
 	   being done note that the contents of the various xxx_adr pointers in the routine header are
@@ -633,6 +667,20 @@ void	res_free (res_list *root)
 
 void	zl_error (int4 file, zro_ent *zroe, int4 err, int4 len, char *addr, int4 len2, char *addr2)
 {
+	zl_error_hskpng(file);
+	/* 0, 2, or 4 arguments */
+	if (0 == len)
+		rts_error(VARLSTCNT(1) err);
+	else
+		if (0 == len2)
+			rts_error(VARLSTCNT(4) err, 2, len, addr);
+		else
+			rts_error(VARLSTCNT(6) err, 4, len, addr, len2, addr2);
+}
+
+/* ZL_ERROR-housekeeping */
+void	zl_error_hskpng(int4 file)
+{
 	if (!shlib)
 	{	/* Only non shared library links have these areas to free */
 		if (hdr)
@@ -645,12 +693,4 @@ void	zl_error (int4 file, zro_ent *zroe, int4 err, int4 len, char *addr, int4 le
 			free(sect_rw_nonrel);
 		close(file);
 	}
-	/* 0, 2, or 4 arguments */
-	if (0 == len)
-		rts_error(VARLSTCNT(1) err);
-	else
-		if (0 == len2)
-			rts_error(VARLSTCNT(4) err, 2, len, addr);
-		else
-			rts_error(VARLSTCNT(6) err, 4, len, addr, len2, addr2);
 }

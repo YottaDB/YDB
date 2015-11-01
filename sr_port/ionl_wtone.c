@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,14 +12,14 @@
 #include "mdef.h"
 #include "io.h"
 
-void ionl_wtone(unsigned char v)
+void ionl_wtone(int v)
 {
 	mstr temp;
-	char p[1];
+	char p;
 
-	p[0] = v;
+	p = (char)v;
 	temp.len = 1;
-	temp.addr = p;
+	temp.addr = &p;
 	ionl_write(&temp);
 	return;
 }

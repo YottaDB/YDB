@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@ int op_read(mval *v, int4 timeout)
 	stat = (io_curr_device.in->disp_ptr->read)(v, timeout);
 	stringpool.free += v->str.len;
 	assert(stringpool.free <= stringpool.top);
+#ifdef KEEP_zOS_EBCDIC
 	if (DEFAULT_CODE_SET != io_curr_device.in->in_code_set)
 	{
 		cnt = insize = outsize = v->str.len;
@@ -55,6 +56,7 @@ int op_read(mval *v, int4 timeout)
 		ICONVERT(io_curr_device.in->input_conv_cd, (unsigned char **)&v->str.addr, &insize, &temp_ch, &outsize);
 		v->str.addr = start_ptr;
 	}
+#endif
 	active_device = 0;
 	if (NO_M_TIMEOUT != timeout)
 		return(stat);

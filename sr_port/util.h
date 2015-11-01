@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,9 @@ void util_in_open(struct dsc$descriptor_s *file_prompt);
 void util_out_open(struct dsc$descriptor_s *file_prompt);
 void util_log_open(char *filename, uint4 len);
 #else
+#include "gtm_stdio.h"		/* for FILE * */
 void util_in_open(void *);
+char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leading_spaces);
 #endif
 
 #define OUT_BUFF_SIZE	2048

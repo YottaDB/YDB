@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,10 @@
 #include <errno.h>
 #include "gtm_stdio.h"
 #include "gtm_string.h"
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
 
 #include "cli.h"
 #include "eintr_wrappers.h"
@@ -31,57 +35,85 @@ GBLREF char	**cmd_arg;
 
 GBLDEF IN_PARMS *cli_lex_in_ptr;
 
+#ifdef UNICODE_SUPPORTED
+GBLREF	boolean_t	gtm_utf8_mode;
+#define CLI_GET_CHAR(PTR, BUFEND, CHAR) (gtm_utf8_mode ? UTF8_MBTOWC(PTR, BUFEND, CHAR) : (CHAR = (wint_t)*(PTR), (PTR) + 1))
+#define CLI_PUT_CHAR(PTR, CHAR) (gtm_utf8_mode ? UTF8_WCTOMB(CHAR, PTR) : (*(PTR) = CHAR, (PTR) + 1))
+#define CLI_ISSPACE(CHAR) (gtm_utf8_mode ? U_ISSPACE(CHAR) : ISSPACE((int)CHAR))
+#else
+#define CLI_GET_CHAR(PTR, BUFEND, CHAR) (CHAR = (int)*(PTR), (PTR) + 1)
+#define CLI_PUT_CHAR(PTR, CHAR) (*(PTR) = CHAR, (PTR) + 1)
+#define CLI_ISSPACE(CHAR) ISSPACE(CHAR)
+#endif
+
 static int tok_string_extract(void)
 {
 	int		token_len;
 	boolean_t	have_quote, first_quote;
-	char		*in_sp, *out_sp;
+	uchar_ptr_t	in_sp, out_sp, in_next, last_in_next,
+			bufend;	/* really one past last byte of buffer */
+#ifdef UNICODE_SUPPORTED
+	wint_t		ch;
+#else
+	int		ch;
+#endif
 
 	assert(cli_lex_in_ptr);
-	in_sp = cli_lex_in_ptr->tp;
-	out_sp = cli_token_buf;
+	in_sp = (uchar_ptr_t)cli_lex_in_ptr->tp;
+	bufend = (uchar_ptr_t)&cli_lex_in_ptr->in_str[0] + cli_lex_in_ptr->buflen;
+	out_sp = (uchar_ptr_t)cli_token_buf;
 	token_len = 0;
 	have_quote = FALSE;
+	in_next = CLI_GET_CHAR(in_sp, bufend, ch);
 	for ( ; ;)
 	{
-		while (*in_sp && !ISSPACE((int)*in_sp) && *in_sp != '-')
+		while (ch && !CLI_ISSPACE(ch) && ch != '-')
 		{
-			if (*in_sp == '"')
+			last_in_next = in_next;
+			if (ch == '"')
 			{
 				if (!have_quote)
 				{
 					have_quote = TRUE;
-					in_sp++;
+					in_next = CLI_GET_CHAR(in_next, bufend, ch);
 				} else
 				{
-					if (*++in_sp == '"')
-					{
-						*out_sp++ = *in_sp++;	/* double quote, one goes in string, still have quote */
+					in_next = CLI_GET_CHAR(in_next, bufend, ch);
+					if (ch == '"')
+					{ /* double quote, one goes in string, still have quote */
+						out_sp = CLI_PUT_CHAR(out_sp, ch);
+						in_next = CLI_GET_CHAR(in_next, bufend, ch);
 						token_len++;
 					} else
 						have_quote = FALSE;
 				}
 			} else
 			{
-				*out_sp++ = *in_sp++;
+				out_sp = CLI_PUT_CHAR(out_sp, ch);
+				in_next = CLI_GET_CHAR(in_next, bufend, ch);
 				token_len++;
 			}
 		}
 
-
-		if (*in_sp == '\0')
-		   break;
+		if (ch == '\0')
+		{
+			in_sp = last_in_next;	/* Points to start of null char so scan ends next call */
+			break;
+		}
 
 		if (have_quote)
 		{
-			*out_sp++ = *in_sp++;
+			out_sp = CLI_PUT_CHAR(out_sp, ch);
+			in_next = CLI_GET_CHAR(in_next, bufend, ch);
 			token_len++;
 			continue;
 		}
+		in_sp = in_next;
 		break;
 	}
-	*out_sp = '\0';
-	cli_lex_in_ptr->tp = in_sp;
+	ch = 0;
+	out_sp = CLI_PUT_CHAR(out_sp, ch);
+	cli_lex_in_ptr->tp = (char *)in_sp;
 
 	return (token_len);
 }
@@ -150,19 +182,6 @@ void cli_str_setup(int length, char *addr)
 
 /*
  * ----------------------------
- * Convert string to lower case
- * ----------------------------
- */
-void cli_strlwr(char *sp)
-{
-	int c;
-
-	while (c = *sp)
-		*sp++ = TOLOWER(c);
-}
-
-/*
- * ----------------------------
  * Convert string to upper case
  * ----------------------------
  */
@@ -172,29 +191,6 @@ void cli_strupper(char *sp)
 
 	while (c = *sp)
 		*sp++ = TOUPPER(c);
-}
-
-/*
- * -------------------------------------------------------
- * Check if string is an identifier
- * (consists of at least one alpha character followed by
- * alphanumerics or underline characters in any order)
- *
- * Return:
- *	TRUE	- identifier
- *	FALSE	- otherwise
- * -------------------------------------------------------
- */
-int cli_is_id(char *p)
-{
-	if (!ISALPHA(*p))
-		return (FALSE);
-
-	while (*p && (ISALPHA(*p) || ISDIGIT(*p) || *p == '_' ))
-		p++;
-
-	if (*p) return (FALSE);
-	else return (TRUE);
 }
 
 
@@ -241,7 +237,7 @@ int cli_is_qualif(char *p)
 
 /*
  * -------------------------------------------------------
- * Check if token is an assignmet symbol
+ * Check if token is an assignment symbol
  *
  * Return:
  *	TRUE	- assignment
@@ -265,15 +261,32 @@ int cli_is_assign(char *p)
 
 void	skip_white_space(void)
 {
-	char	*in_sp;
+	uchar_ptr_t	in_sp;
+#ifdef UNICODE_SUPPORTED
+	wint_t	ch;
+	uchar_ptr_t	next_sp, bufend;
+#endif
 
 	assert(cli_lex_in_ptr);
-	in_sp = cli_lex_in_ptr->tp;
+	in_sp = (uchar_ptr_t)cli_lex_in_ptr->tp;
+#ifdef UNICODE_SUPPORTED
+	if (gtm_utf8_mode)
+	{
+		bufend = (uchar_ptr_t)(cli_lex_in_ptr->in_str + cli_lex_in_ptr->buflen);
+		for ( ; ; )
+		{
+			next_sp = UTF8_MBTOWC(in_sp, bufend, ch);
+			if (!U_ISSPACE(ch))
+				break;
+			in_sp = next_sp;
+		}
+	}
+	else
+#endif
+		while(ISSPACE((int)*in_sp))
+			in_sp++;
 
-	while(ISSPACE((int)*in_sp))
-		in_sp++;
-
-	cli_lex_in_ptr->tp = in_sp;
+	cli_lex_in_ptr->tp = (char *)in_sp;
 }
 
 
@@ -290,38 +303,172 @@ void	skip_white_space(void)
 static int	tok_extract (void)
 {
 	int	token_len;
-	char	*in_sp, *out_sp;
+	uchar_ptr_t	in_sp, in_next, out_sp, bufend;
+#ifdef UNICODE_SUPPORTED
+	wint_t		ch;
+#else
+	int		ch;
+#endif
 
 	assert(cli_lex_in_ptr);
-	in_sp = cli_lex_in_ptr->tp;
+	skip_white_space();	/* Skip leading blanks */
+	in_sp = (uchar_ptr_t)cli_lex_in_ptr->tp;
+	bufend = (uchar_ptr_t)&cli_lex_in_ptr->in_str[0] + cli_lex_in_ptr->buflen;
 
-	out_sp = cli_token_buf;
+	out_sp = (uchar_ptr_t)cli_token_buf;
 	token_len = 0;
 
-		/* Skip leading blanks */
-	while(ISSPACE((int) *in_sp))
-		in_sp++;
-
-	if (*in_sp == '-' || *in_sp == '=')
+	in_next = CLI_GET_CHAR(in_sp, bufend, ch);
+	if ('-' == ch || '=' == ch)
 	{
-		*out_sp++ = *in_sp++;
+		out_sp = CLI_PUT_CHAR(out_sp, ch);
+		in_sp = in_next;		/* advance one character */
 		token_len = 1;
-	} else
+	} else if (ch)				/* only if something there */
 	{
-		while(*in_sp && !ISSPACE((int) *in_sp)
-		  && *in_sp != '-'
-		  && *in_sp != '=')
+		/* smw to fix embedded -, need to know token type */
+		/* smw if quotable, need to unicode isspace */
+		while(ch && !CLI_ISSPACE(ch)
+		  && ch != '-'
+		  && ch != '=')
 		{
-			*out_sp++ = *in_sp++;
+			out_sp = CLI_PUT_CHAR(out_sp, ch);
+			in_sp = in_next;
+			in_next = CLI_GET_CHAR(in_next, bufend, ch);
 			token_len++;
 		}
 	}
-	*out_sp = '\0';
-	cli_lex_in_ptr->tp = in_sp;
+	ch = 0;
+	out_sp = CLI_PUT_CHAR(out_sp, ch);
+	cli_lex_in_ptr->tp = (char *)in_sp;
 
 	return(token_len);
 }
 
+static void cli_lex_in_expand(int in_len)
+{
+	IN_PARMS	*new_cli_lex_in_ptr;
+
+	new_cli_lex_in_ptr = (IN_PARMS *)malloc(sizeof(IN_PARMS) + in_len);
+	new_cli_lex_in_ptr->argc = cli_lex_in_ptr->argc;
+	new_cli_lex_in_ptr->argv = cli_lex_in_ptr->argv;
+	new_cli_lex_in_ptr->buflen = in_len;		/* in_str[1] accounts for null */
+	free(cli_lex_in_ptr);
+	cli_lex_in_ptr = new_cli_lex_in_ptr;
+}
+
+char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
+{
+	size_t	in_len;
+	char	cli_fgets_buffer[MAX_LINE], *destbuffer, *retptr;
+#ifdef UNICODE_SUPPORTED
+	int		mbc_len, u16_off, destsize;
+	int32_t		mbc_dest_len;
+	UErrorCode	errorcode;
+	UChar		*uc_fgets_ret;
+	UChar32		uc32_cp;
+	UChar		cli_fgets_Ubuffer[MAX_LINE];
+	UFILE		*u_fp;
+#endif
+
+#ifdef UNICODE_SUPPORTED
+	if (gtm_utf8_mode)
+	{
+		cli_fgets_Ubuffer[0] = 0;
+		if (!cli_lex_str)
+			assert(MAX_LINE >= buffersize);
+		u_fp = u_finit(fp, NULL, UTF8_NAME);
+		if (NULL != u_fp)
+		{
+			do
+			{	/* no f_ferror */
+				uc_fgets_ret = u_fgets(cli_fgets_Ubuffer,
+					(int32_t)(sizeof(cli_fgets_Ubuffer) / sizeof(UChar)) - 1, u_fp);
+			} while (NULL == uc_fgets_ret && !u_feof(u_fp) && ferror(fp) && EINTR == errno);
+			if (NULL == uc_fgets_ret)
+			{
+				if (cli_lex_str)
+					cli_lex_in_ptr->tp = NULL;
+				u_fclose(u_fp);
+				return NULL;
+			}
+			in_len = u_strlen(cli_fgets_Ubuffer);
+			in_len = trim_U16_line_term(cli_fgets_Ubuffer, in_len);
+			for (u16_off = 0, mbc_len = 0; u16_off < in_len; )
+			{
+				U16_NEXT(cli_fgets_Ubuffer, u16_off, in_len, uc32_cp);
+				mbc_len += U8_LENGTH(uc32_cp);
+				if (!cli_lex_str && mbc_len >= buffersize)
+				{	/* can't expand */
+					mbc_len = buffersize - 1;
+					cli_fgets_Ubuffer[u16_off] = 0;
+					U16_BACK_1(cli_fgets_Ubuffer, 0, u16_off);
+					in_len = u16_off + 1;	/* offset to length */
+					break;
+				}
+			}
+			if (cli_lex_str)
+			{
+				if (mbc_len > cli_lex_in_ptr->buflen)
+					cli_lex_in_expand(mbc_len);		/* for terminating null */
+				destsize = cli_lex_in_ptr->buflen + 1;
+				destbuffer = cli_lex_in_ptr->in_str;
+			} else
+			{	/* very unlikely parm is larger than MAX_LINE even i UTF-8 */
+				if (mbc_len >= buffersize)
+					destsize = buffersize - 1;	/* for null */
+				else
+					destsize = buffersize;
+				destbuffer = buffer;
+			}
+			errorcode = U_ZERO_ERROR;
+			u_strToUTF8(destbuffer, destsize, &mbc_dest_len, cli_fgets_Ubuffer, in_len + 1, &errorcode);
+			if (U_FAILURE(errorcode))
+				if (U_BUFFER_OVERFLOW_ERROR == errorcode)
+				{	/* truncate so null terminated */
+					destbuffer[destsize - 1] = 0;
+					retptr = destbuffer;
+				} else
+					retptr = NULL;
+			else
+				retptr = destbuffer;	/* Repoint to new home */
+			if (cli_lex_str)
+				cli_lex_in_ptr->tp = retptr;
+			u_fclose(u_fp);
+		} else if (cli_lex_str)
+			cli_lex_in_ptr->tp = NULL;
+	} else
+	{
+#endif
+		cli_fgets_buffer[0] = '\0';
+		FGETS_FILE(cli_fgets_buffer, sizeof(cli_fgets_buffer), fp, retptr);
+		if (NULL != retptr)
+		{
+			in_len = strlen(cli_fgets_buffer);
+			if (cli_lex_str)
+			{
+				if (cli_lex_in_ptr->buflen < in_len)
+					cli_lex_in_expand(in_len);
+				destbuffer = cli_lex_in_ptr->in_str;
+			} else
+			{
+				assert(sizeof(cli_fgets_buffer) >= buffersize);
+				destbuffer = buffer;
+			}
+			retptr = destbuffer;	/* return proper buffer */
+			if ('\n' == cli_fgets_buffer[in_len - 1])
+				cli_fgets_buffer[in_len - 1] = '\0';	 /* replace NL */
+			memcpy(destbuffer, cli_fgets_buffer, in_len);
+			if (cli_lex_str)
+				cli_lex_in_ptr->tp = destbuffer;
+		} else if (cli_lex_str)
+			cli_lex_in_ptr->tp = NULL;
+#ifdef UNICODE_SUPPORTED
+	}
+#endif
+
+	return retptr;
+}
 
 /*
  * -------------------------------------------------------
@@ -377,24 +524,10 @@ int	cli_gettoken (int *eof)
 	if (NULL == cli_lex_in_ptr->tp || strlen(cli_lex_in_ptr->tp) < 1)
 	{
 		cli_token_buf[0] = '\0';
-		FGETS_FILE(cli_token_buf, MAX_LINE, stdin, cli_lex_in_ptr->tp);
+		cli_lex_in_ptr->tp = cli_fgets(cli_lex_in_ptr->in_str, MAX_LINE, stdin, TRUE);
     		if (NULL != cli_lex_in_ptr->tp)
-    		{
-			in_len = strlen(cli_token_buf);
-			if (cli_lex_in_ptr->buflen < in_len)
-			{
-				new_cli_lex_in_ptr = (IN_PARMS *)malloc(sizeof(IN_PARMS) + in_len);
-				new_cli_lex_in_ptr->argc = cli_lex_in_ptr->argc;
-				new_cli_lex_in_ptr->argv = cli_lex_in_ptr->argv;
-				new_cli_lex_in_ptr->buflen = in_len;
-				free(cli_lex_in_ptr);
-				cli_lex_in_ptr = new_cli_lex_in_ptr;
-			}
-			memcpy(cli_lex_in_ptr->in_str, cli_token_buf, in_len);
-			cli_lex_in_ptr->in_str[in_len - 1] = '\0';
-			cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;	/* Repoint to new home from cli_token_buf */
       			*eof = 0;
-           	} else
+           	else
 	    	{
 	      		*eof = EOF;
 	      		return (0);
@@ -492,24 +625,10 @@ int cli_get_string_token(int *eof)
 	if (NULL == cli_lex_in_ptr->tp || strlen(cli_lex_in_ptr->tp) < 1)
 	{
 		cli_token_buf[0] = '\0';
-		FGETS_FILE(cli_token_buf, MAX_LINE, stdin, cli_lex_in_ptr->tp);
+		cli_lex_in_ptr->tp = cli_fgets(cli_lex_in_ptr->in_str, MAX_LINE, stdin, TRUE);
     		if (NULL != cli_lex_in_ptr->tp)
-    		{
-			in_len = strlen(cli_token_buf);
-			if (cli_lex_in_ptr->buflen < in_len)
-			{
-				new_cli_lex_in_ptr = (IN_PARMS *)malloc(sizeof(IN_PARMS) + in_len);
-				new_cli_lex_in_ptr->argc = cli_lex_in_ptr->argc;
-				new_cli_lex_in_ptr->argv = cli_lex_in_ptr->argv;
-				new_cli_lex_in_ptr->buflen = in_len;
-				free(cli_lex_in_ptr);
-				cli_lex_in_ptr = new_cli_lex_in_ptr;
-			}
-			memcpy(cli_lex_in_ptr->in_str, cli_token_buf, in_len);
-			cli_lex_in_ptr->in_str[in_len - 1] = '\0';
-			cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;	/* Repoint to new home from cli_token_buf */
       			*eof = 0;
-           	} else
+           	else
 		{
 			*eof = EOF;
 			return (0);
@@ -533,8 +652,27 @@ int cli_get_string_token(int *eof)
  */
 int cli_has_space(char *p)
 {
-	while (*p && *p != ' ')
-		p++;
+#ifdef UNICODE_SUPPORTED
+	uchar_ptr_t	local_p, next_p, bufend;
+	wint_t	ch;
+
+	if (gtm_utf8_mode)
+	{
+		local_p = (uchar_ptr_t)p;
+		bufend = local_p + strlen(p);
+		while (local_p)
+		{
+			next_p = UTF8_MBTOWC(local_p, bufend, ch);
+			if (!ch || U_ISSPACE(ch))
+				break;
+			local_p = next_p;
+		}
+		p = (char *)local_p;
+	}
+	else
+#endif
+		while (*p && !ISSPACE(*p))
+			p++;
 
 	return ((*p) ? (TRUE) : (FALSE));
 }

@@ -154,7 +154,6 @@ void gvcst_init (gd_region *greg)
 	mstr			log_nam, trans_log_nam;
 	char			trans_buff[MAX_FN_LEN + 1];
 	static int4		first_time = TRUE;
-	char			now_running[MAX_REL_NAME];
 	unique_file_id		*greg_fid, *reg_fid;
 	gd_addr			*addr_ptr;
 	tp_region		*tr;
@@ -167,7 +166,6 @@ void gvcst_init (gd_region *greg)
 	error_def(ERR_DBCREINCOMP);
 	error_def(ERR_DBNOTGDS);
 	error_def(ERR_BADDBVER);
-	error_def(ERR_VERMISMATCH);
 	error_def(ERR_MMNODYNUPGRD);
 	error_def(ERR_DBVERPERFWARN1);
 	error_def(ERR_DBVERPERFWARN2);
@@ -278,8 +276,8 @@ void gvcst_init (gd_region *greg)
 		csa->lock_addrs[0] = csa->lock_addrs[1] = NULL;
 	)
 	UNSUPPORTED_PLATFORM_CHECK;
-	UNIX_ONLY(new_dbinit_ipc = FALSE;) /* dbinit_ch relies on this flag. Reset it before establishing condition handler
-					    * just in case this was set to TRUE by a previous "gvcst_init". */
+	new_dbinit_ipc = FALSE; /* dbinit_ch relies on this flag. Reset it before establishing condition handler
+				 * just in case this was set to TRUE by a previous "gvcst_init". */
         ESTABLISH(dbinit_ch);
 
 	temp_cs_data = (sgmnt_data_ptr_t)cs_data_buff;
@@ -372,27 +370,6 @@ void gvcst_init (gd_region *greg)
 	crash_count = csa->critical->crashcnt;
 	csa->regnum = ++region_open_count;
 	csd = csa->hdr;
-	if (memcmp(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1))
-	{	/* Copy csa->nl->now_running into a local variable before passing to rts_error() due to the following issue.
-		 * In VMS, a call to rts_error() copies only the error message and its arguments (as pointers) and
-		 *  transfers control to the topmost condition handler which is dbinit_ch() in this case. dbinit_ch()
-		 *  does a PRN_ERROR only for SUCCESS/INFO (VERMISMATCH is neither of them) and in addition
-		 *  nullifies csa->nl as part of its condition handling. It then transfers control to the next level condition
-		 *  handler which does a PRN_ERROR but at that point in time, the parameter csa->nl->now_running is no longer
-		 *  accessible and hence no parameter substitution occurs (i.e. the error message gets displayed with plain !ADs).
-		 * In UNIX, this is not an issue since the first call to rts_error() does the error message
-		 *  construction before handing control to the topmost condition handler. But it does not hurt to do the copy.
-		 */
-		assert(strlen(csa->nl->now_running) < sizeof(now_running));
-		memcpy(now_running, csa->nl->now_running, sizeof(now_running));
-		now_running[sizeof(now_running) - 1] = '\0';	/* protection against bad values of csa->nl->now_running */
-		/* for DSE, change VERMISMATCH to be INFO (instead of the more appropriate WARNING) as we want the
-		 * condition handler (dbinit_ch) to do a CONTINUE (which it does only for severity levels SUCCESS or INFO)
-		 * and resume processing in gvcst_init.c instead of detaching from shared memory.
-		 */
-		rts_error(VARLSTCNT(8) MAKE_MSG_TYPE(ERR_VERMISMATCH, ((DSE_IMAGE != image_type) ? ERROR : INFO)), 6,
-			DB_LEN_STR(greg), gtm_release_name_len, gtm_release_name, LEN_AND_STR(now_running));
-	}
 	/* set csd and fill in selected fields */
 	switch (greg->dyn.addr->acc_meth)
 	{

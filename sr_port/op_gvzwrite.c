@@ -43,7 +43,7 @@ void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 	output.code = 'V';
 	output.type = ZSHOW_DEVICE;
 	output.buff = &buff[0];
-	output.len = sizeof(buff);
+	output.size = sizeof(buff);
 	output.ptr = output.buff;
 
 	VAR_START(var, pat);

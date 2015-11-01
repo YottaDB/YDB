@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -28,26 +28,26 @@
 
 # PUBLIC	op_forcenum
 ENTRY op_forcenum
-	testb	$mval_m_nm,mval_b_mvtype(%edx)
+	testw	$mval_m_nm,mval_w_mvtype(%edx)
 	jne	l10
 	pushl	%eax
 	pushl	%edx
 	call	s2n
 	popl	%edx
 	popl	%eax
-l10:	testb	$mval_m_str,mval_b_mvtype(%edx)
+l10:	testw	$mval_m_str,mval_w_mvtype(%edx)
 	je	l20
-	testb	$mval_m_num_approx,mval_b_mvtype(%edx)
+	testw	$mval_m_num_approx,mval_w_mvtype(%edx)
 	je	l40
-l20:	testb	$mval_m_int_without_nm,mval_b_mvtype(%edx)
+l20:	testw	$mval_m_int_without_nm,mval_w_mvtype(%edx)
 	je	l30
-	movb	$mval_m_int,mval_b_mvtype(%eax)
+	movw	$mval_m_int,mval_w_mvtype(%eax)
 	movl	mval_l_m1(%edx),%edx
 	movl	%edx,mval_l_m1(%eax)
 	ret
 
 l30:	pushl	%ebx
-	movb	$mval_m_nm,mval_b_mvtype(%eax)
+	movw	$mval_m_nm,mval_w_mvtype(%eax)
 	movb	mval_b_exp(%edx),%bl
 	movb	%bl,mval_b_exp(%eax)
 

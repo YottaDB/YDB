@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,18 +27,19 @@ typedef struct
 } list_params;
 
 /* command qualifer bit masks */
-#define CQ_LIST			(1<<0)
-#define CQ_MACHINE_CODE		(1<<1)
-#define CQ_CROSS_REFERENCE	(1<<2)
-#define CQ_DEBUG		(1<<3)
-#define CQ_OBJECT		(1<<4)
-#define CQ_WARNINGS		(1<<5)
-#define CQ_IGNORE		(1<<6)
-#define CQ_LOWER_LABELS		(1<<7)
-#define CQ_LINE_ENTRY		(1<<8)
-#define CQ_CE_PREPROCESS        (1<<9)
-#define CQ_INLINE_LITERALS	(1<<10)
-#define CQ_ALIGN_STRINGS	(1<<11)
+#define CQ_LIST			(1 << 0)
+#define CQ_MACHINE_CODE		(1 << 1)
+#define CQ_CROSS_REFERENCE	(1 << 2)
+#define CQ_DEBUG		(1 << 3)
+#define CQ_OBJECT		(1 << 4)
+#define CQ_WARNINGS		(1 << 5)
+#define CQ_IGNORE		(1 << 6)
+#define CQ_LOWER_LABELS		(1 << 7)
+#define CQ_LINE_ENTRY		(1 << 8)
+#define CQ_CE_PREPROCESS        (1 << 9)
+#define CQ_INLINE_LITERALS	(1 << 10)
+#define CQ_ALIGN_STRINGS	(1 << 11)
+#define CQ_UTF8			(1 << 12)
 
 /* TODO: add CQ_ALIGN_STRINGS to the default list below when alignment is supported */
 #define CQ_DEFAULT (CQ_WARNINGS | CQ_OBJECT | CQ_IGNORE | CQ_LOWER_LABELS | CQ_LINE_ENTRY | CQ_INLINE_LITERALS)

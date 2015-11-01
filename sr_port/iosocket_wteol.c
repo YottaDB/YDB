@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ void	iosocket_wteol(int4 val, io_desc *io_ptr)
 		for (eol_cnt = val; eol_cnt--; )
 		{
 			io_ptr->dollar.x = 0; /* so that iosocket_write doesn't try to wrap (based on escape state and width) */
-			iosocket_write(&socketptr->delimiter[0]);
+			iosocket_write_real(&socketptr->odelimiter0, FALSE);
 		}
 	}
 	/* $X is maintained in VMS without the below assignment (resetting to 0) because the NATIVE_TTEOL is \015\012

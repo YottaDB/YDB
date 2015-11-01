@@ -126,6 +126,7 @@ mupip_ctrl
 mupip_cvtgbl
 mupip_cvtpgm
 mupip_downgrade
+mupip_endiancvt
 mupip_exit
 mupip_exit_handler
 mupip_extend

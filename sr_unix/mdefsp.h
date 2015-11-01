@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@ typedef uint4 mach_inst;
 #define INT8_SUPPORTED
 #define	INT8_FMT		"%llu"
 #define	INT8_FMTX		"[0x%llx]"
+#define UNICODE_SUPPORTED
 
 /* Starting off life as debugging parms and now we need them for the
    short term so define them here */
@@ -109,7 +110,7 @@ typedef unsigned short	in_port_t;
 	int		unknown;
 } func_desc; */
 
-#define	CONTEXT(func)		(unsigned char *)func
+#define	GTM_CONTEXT(func)	(unsigned char *)func
 
 #define SSM_SIZE		256*1024*1024	/* Segments on 256M boundary */
 #define SHMAT_ADDR_INCS 	SSM_SIZE
@@ -147,7 +148,7 @@ typedef struct
 
 typedef struct
 {
-	unsigned int	mvtype   : 8;
+	unsigned int	mvtype   : 16;
 #ifdef	BIGENDIAN
 	unsigned int	sgn      : 1;
 	unsigned int	e        : 7;
@@ -155,18 +156,18 @@ typedef struct
 	unsigned int	e        : 7;
 	unsigned int	sgn      : 1;
 #endif
-	unsigned int	fnpc_indx: 16;  /* Index to fnpc_work area this mval is using */
-	mstr	str;
+	unsigned int	fnpc_indx: 8;	/* Index to fnpc_work area this mval is using */
 	int4	m[2];
+	mstr	str;
 } mval ;
 
 
 #ifdef BIGENDIAN
 #define DEFINE_MVAL_LITERAL(TYPE, EXPONENT, SIGN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, SIGN, EXPONENT, 0xffff, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH}
+	{TYPE, SIGN, EXPONENT, 0xff, MANT_LOW, MANT_HIGH, 0, LENGTH, ADDRESS}
 #else
 #define DEFINE_MVAL_LITERAL(TYPE, EXPONENT, SIGN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, EXPONENT, SIGN, 0xffff, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH}
+	{TYPE, EXPONENT, SIGN, 0xff, MANT_LOW, MANT_HIGH, 0, LENGTH, ADDRESS}
 #endif
 
 #define VAR_START(a, b)	va_start(a, b)
@@ -178,8 +179,8 @@ typedef struct
 #endif
 
 #define CODE_ADDRESS(func)	(unsigned char *)func
-#ifndef CONTEXT
-#define	CONTEXT(func)		0	/* not used on this target */
+#ifndef GTM_CONTEXT
+#define	GTM_CONTEXT(func)	0	/* not used on this target */
 #endif
 
 /* PSECT in which the address of the module is defined: */

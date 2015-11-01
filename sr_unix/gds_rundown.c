@@ -99,13 +99,15 @@ GBLREF	jnl_process_vector	*originator_prc_vec;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		dse_running;
 
+LITREF  char                    gtm_release_name[];
+LITREF  int4                    gtm_release_name_len;
+
 static boolean_t		grabbed_access_sem;
 
 void gds_rundown(void)
 {
-
 	bool			is_mm, we_are_last_user, we_are_last_writer;
-	boolean_t		ipc_deleted, remove_shm, cancelled_timer, cancelled_dbsync_timer;
+	boolean_t		ipc_deleted, remove_shm, cancelled_timer, cancelled_dbsync_timer, vermismatch;
 	now_t			now;	/* for GET_CUR_TIME macro */
 	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	gd_region		*reg;
@@ -255,17 +257,23 @@ void gds_rundown(void)
 	csa->ref_cnt--;		/* Currently journaling logic in gds_rundown() in VMS relies on this order to detect last writer */
 	assert(!csa->ref_cnt);
 	--csa->nl->ref_cnt;
+	if (memcmp(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1))
+	{	/* VERMISMATCH condition. Possible only if DSE */
+		assert(dse_running);
+		vermismatch = TRUE;
+	} else
+		vermismatch = FALSE;
 	if (-1 == shmctl(udi->shmid, IPC_STAT, &shm_buf))
 	{
 		save_errno = errno;
 		rts_error(VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
 			ERR_TEXT, 2, RTS_ERROR_TEXT("gds_rundown shmctl"), save_errno);
 	} else
-		we_are_last_user =  (1 == shm_buf.shm_nattch);
+		we_are_last_user =  (1 == shm_buf.shm_nattch) && !vermismatch;
 	assert(!mupip_jnl_recover || we_are_last_user); /* recover => one user */
 	if (-1 == (semval = semctl(udi->semid, 1, GETVAL)))
 		rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
-	we_are_last_writer = (1 == semval && FALSE == reg->read_only);	/* There's one writer left and I am it */
+	we_are_last_writer = (1 == semval) && (FALSE == reg->read_only) && !vermismatch;/* There's one writer left and I am it */
 	assert(!(mupip_jnl_recover && !reg->read_only) || we_are_last_writer); /* recover + R/W region => one writer */
 	if (-1 == (ftok_semval = semctl(udi->ftok_semid, 1, GETVAL)))
 		rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
@@ -277,7 +285,7 @@ void gds_rundown(void)
 	 */
 	if (csa->nl->donotflush_dbjnl)
 		csa->wbuf_dqd = 0;	/* ignore csa->wbuf_dqd status as we do not care about the cache contents */
-	else if (!reg->read_only)
+	else if (!reg->read_only && !vermismatch)
 	{	/* If we had an orphaned block and were interrupted, set wc_blocked so we can invoke wcs_recover */
 		if (csa->wbuf_dqd)
 		{
@@ -493,7 +501,7 @@ void gds_rundown(void)
 	 * If csa->nl->donotflush_dbjnl is TRUE, it means we can safely remove shared memory without compromising data
 	 * 	integrity as a reissue of recover will restore the database to a consistent state.
 	 */
-	remove_shm = (csa->nl->remove_shm || csa->nl->donotflush_dbjnl);
+	remove_shm = !vermismatch && (csa->nl->remove_shm || csa->nl->donotflush_dbjnl);
 	status = shmdt((caddr_t)csa->nl);
 	csa->nl = NULL; /* dereferencing nl after detach is not right, so we set it to NULL so that we can test before dereference*/
 	if (-1 == status)
@@ -507,6 +515,7 @@ void gds_rundown(void)
 	/* If we are the very last user, remove shared storage id and the semaphores */
 	if (we_are_last_user)
 	{	/* remove shared storage, only if last writer to rundown did a successful wcs_flu() */
+		assert(!vermismatch);
 		if (remove_shm)
 		{
 			ipc_deleted = TRUE;

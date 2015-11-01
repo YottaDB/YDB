@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,14 +18,43 @@
 #include "gt_timer.h"
 #include "iotcpdef.h"
 #include "iosocketdef.h"
+#include "gtm_utf8.h"
 
-void iosocket_wtone(unsigned char ch)
+GBLREF io_pair	io_curr_device;
+
+void iosocket_wtone(int ch)
 {
 	mstr	temp;
+	char	c, uni_c[4], *endptr;
+	io_desc	*iod;
 
-	temp.len = 1;
-	temp.addr = (char *)&ch;
-	iosocket_write(&temp);
-
+	if (CHSET_M == io_curr_device.out->ochset)
+	{
+		c = (char)ch;
+		temp.len = 1;
+		temp.addr = (char *)&c;
+	} else
+	{
+		switch(io_curr_device.out->ochset)
+		{
+			case CHSET_UTF8:
+				endptr = (char *)UTF8_WCTOMB(ch, uni_c);
+				break;
+			case CHSET_UTF16: /* unspecified endian format implies Big Endian */
+			case CHSET_UTF16BE:
+				endptr = UTF16BE_WCTOMB(ch, uni_c);
+				break;
+			case CHSET_UTF16LE:
+				endptr = UTF16LE_WCTOMB(ch, uni_c);
+				break;
+			default:
+				GTMASSERT;
+		}
+		temp.addr = uni_c;
+		temp.len = endptr - uni_c;
+		assert(0 < temp.len); /* we validated the code point already in op_wtone() */
+	}
+	UNICODE_ONLY(temp.char_len = 1);
+	iosocket_write_real(&temp, TRUE);
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,10 +53,16 @@
 #include "gtm_env_init.h"
 #include "dbcertify.h"
 
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
+
 GBLDEF	phase_static_area	*psa_gbl;			/* Global anchor for static area */
 
 GBLREF  enum gtmImageTypes      image_type;
 GBLREF	uint4			process_id;
+GBLREF	boolean_t		gtm_utf8_mode;
 #ifdef VMS
 GBLREF	desblk			exi_blk;
 GBLREF	int4			exi_condition;
@@ -66,10 +72,15 @@ int UNIX_ONLY(main)VMS_ONLY(dbcertify)(int argc, char **argv)
 {
 	/* Initialization of scaffolding we run on */
 	image_type = DBCERTIFY_IMAGE;
+	UNICODE_ONLY(gtm_wcswidth_fnptr = gtm_wcswidth;)
 	gtm_env_init();
 	psa_gbl = malloc(sizeof(*psa_gbl));
 	memset(psa_gbl, 0, sizeof(*psa_gbl));
 	UNIX_ONLY(err_init(dbcertify_base_ch));
+	UNICODE_ONLY(
+	if (gtm_utf8_mode)
+		gtm_icu_init();	 /* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
+	)
 	UNIX_ONLY(sig_init(dbcertify_signal_handler, dbcertify_signal_handler, NULL));
 	VMS_ONLY(util_out_open(0));
 	VMS_ONLY(SET_EXIT_HANDLER(exi_blk, dbcertify_exit_handler, exi_condition));	/* Establish exit handler */

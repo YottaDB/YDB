@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ void base_frame(rhdtyp *base_address)
 	*(stack_frame **)((stack_frame *)msp + 1) = frame_pointer;
 	frame_pointer = (stack_frame *)msp;
 	memset(frame_pointer, 0, sizeof(stack_frame));
-	frame_pointer->ctxt = CONTEXT(gtm_ret_code);
+	frame_pointer->ctxt = GTM_CONTEXT(gtm_ret_code);
 	frame_pointer->mpc = CODE_ADDRESS(gtm_ret_code);
 	frame_pointer->rvector = base_address;
 	frame_pointer->temps_ptr = (unsigned char *)frame_pointer;

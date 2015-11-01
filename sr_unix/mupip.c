@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,6 +61,11 @@
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "suspsigs_handler.h"
 
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
+
 GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLDEF	bool			in_backup;
 GBLREF	bool			licensed;
@@ -81,6 +86,7 @@ GBLREF uint4			process_id;
 GBLREF jnlpool_addrs		jnlpool;
 GBLREF spdesc   		rts_stringpool, stringpool;
 GBLREF char			cli_err_str[];
+GBLREF boolean_t		gtm_utf8_mode;
 
 void display_prompt(void);
 
@@ -89,8 +95,11 @@ int main (int argc, char **argv)
 	int		res;
 
 	image_type = MUPIP_IMAGE;
+	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */
 	err_init(util_base_ch);
+	if (gtm_utf8_mode)
+		gtm_icu_init();	 /* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	sig_init(generic_signal_handler, NULL, suspsigs_handler);	/* Note: no ^C handler is defined (yet) */
 	atexit(mupip_exit_handler);
         SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);

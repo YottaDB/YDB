@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,14 +17,14 @@
 #include "iombdef.h"
 #include "stringpool.h"
 
-GBLREF spdesc 		stringpool;
+GBLREF spdesc 	stringpool;
+GBLREF io_pair	io_curr_device;
 
-short iomb_read(mval *v,int4 t)
+int iomb_read(mval *v,int4 t)
 {
-GBLREF io_pair io_curr_device;
-io_desc *io_ptr;
-d_mb_struct *mb_ptr;
-short status;
+	io_desc 	*io_ptr;
+	d_mb_struct	*mb_ptr;
+	int 		status;
 
 
 	assert(stringpool.free >= stringpool.base);
@@ -37,8 +37,8 @@ short status;
 	status = TRUE;
 	assert (io_ptr->state == dev_open);
 	if (mb_ptr->in_top == mb_ptr->in_pos)
-	{	    status = iomb_dataread(t);
-	}
+		status = iomb_dataread(t);
+
 	memcpy(v->str.addr,mb_ptr->in_pos,(v->str.len = mb_ptr->in_top - mb_ptr->in_pos));
 	mb_ptr->in_pos = mb_ptr->in_top = mb_ptr->inbuf;
 	io_ptr->dollar.x = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,8 @@
 #include "gt_timer.h"
 #include "iosocketdef.h"
 
+GBLREF  int4	gtm_max_sockets;
+
 boolean_t iosocket_switch(char *handle, short handle_len, d_socket_struct *from, d_socket_struct *to)
 {
 	int4 		index, ii;
@@ -30,14 +32,14 @@ boolean_t iosocket_switch(char *handle, short handle_len, d_socket_struct *from,
 
 	error_def(ERR_SOCKNOTFND);
 	error_def(ERR_SOCKETEXIST);
+	error_def(ERR_SOCKMAX);
 
 	if ((NULL == from) ||
 		(0 > (index = iosocket_handle(handle, &handle_len, FALSE, from))))
 	{
 		rts_error(VARLSTCNT(4) ERR_SOCKNOTFND, 2, handle_len, handle);
 		return FALSE;
-	}
-	else
+	} else
 	{
 		/* attach the socket to "to" and set it to current */
 
@@ -47,6 +49,11 @@ boolean_t iosocket_switch(char *handle, short handle_len, d_socket_struct *from,
 			rts_error(VARLSTCNT(4) ERR_SOCKETEXIST, 2, handle_len, handle);
 			return FALSE;
 		}
+                if (gtm_max_sockets <= to->n_socket)
+                {
+                        rts_error(VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
+                        return FALSE;
+                }
 		socketptr = from->socket[index];
 		socketptr->dev = to;
 		to->socket[to->n_socket++] = socketptr;
@@ -55,9 +62,7 @@ boolean_t iosocket_switch(char *handle, short handle_len, d_socket_struct *from,
 		/* detach it from "from" */
 
 		if (from->current_socket >= index)
-		{
 			from->current_socket--;
-		}
 
 		for(ii = index; ii < from->n_socket - 1; ii++)
 		{
@@ -66,6 +71,5 @@ boolean_t iosocket_switch(char *handle, short handle_len, d_socket_struct *from,
 		from->n_socket--;
 		from->socket[from->n_socket] = NULL;
 	}
-
 	return TRUE;
 }

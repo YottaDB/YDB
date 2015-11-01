@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,10 +36,16 @@
 #include "invocation_mode.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
+
 GBLREF enum gtmImageTypes	image_type;
 GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF char			cli_token_buf[];
 GBLREF char			cli_err_str[];
+GBLREF boolean_t		gtm_utf8_mode;
 
 #ifdef __osf__
 	/* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
@@ -66,8 +72,11 @@ int gtm_main (int argc, char **argv, char **envp)
 
 	gtmenvp = envp;
 	image_type = GTM_IMAGE;
+	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */
 	err_init(stop_image_conditional_core);
+	if (gtm_utf8_mode)
+		gtm_icu_init();	 /* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	cli_lex_setup(argc, argv);
 	/*	put the arguments into buffer, then clean up the token buffer
 		cli_gettoken() copies all arguments except the first one argv[0]
@@ -87,7 +96,7 @@ int gtm_main (int argc, char **argv, char **envp)
 	*/
 	ptr = cli_lex_in_ptr->in_str;
 	memmove(strlen("MUMPS ") + ptr, ptr, strlen(ptr) + 1);
-	memcpy(ptr, "MUMPS ", strlen("MUMPS "));
+	MEMCPY_LIT(ptr, "MUMPS ");
 
 	/*	reset the argument buffer pointer, it's changed in cli_gettoken() call above    */
 	/*	do NOT reset to 0(NULL) to avoid fetching cmd line args into buffer again       */

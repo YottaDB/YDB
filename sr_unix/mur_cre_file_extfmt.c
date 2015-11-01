@@ -36,6 +36,7 @@
 #include "repl_instance.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#include "gtm_utf8.h"
 
 /* This function creates a file to hold either journal extract or broken transaction or lost transaction data.
  * The headerline of the file created will contain one of the following
@@ -111,17 +112,15 @@ int4 mur_cre_file_extfmt(int recstat)
 		return ERR_FILENOTCREATE;
 	}
 	/* Write file version info for the file created here. See C9B08-001729 */
-	extrlen = 0;
 	if (!mur_options.detail)
 	{
-		tmplen = STR_LIT_LEN(JNL_EXTR_LABEL);
-		memcpy(murgbl.extr_buff, JNL_EXTR_LABEL, tmplen);
+		MEMCPY_LIT(murgbl.extr_buff, JNL_EXTR_LABEL);
+		extrlen = STR_LIT_LEN(JNL_EXTR_LABEL);
 	} else
 	{
-		tmplen = STR_LIT_LEN(JNL_DET_EXTR_LABEL);
-		memcpy(murgbl.extr_buff, JNL_DET_EXTR_LABEL, tmplen);
+		MEMCPY_LIT(murgbl.extr_buff, JNL_DET_EXTR_LABEL);
+		extrlen = STR_LIT_LEN(JNL_DET_EXTR_LABEL);
 	}
-	extrlen += tmplen;
 	if (LOST_TN == recstat)
 	{
 		if (mur_options.update)
@@ -150,6 +149,12 @@ int4 mur_cre_file_extfmt(int recstat)
 			memcpy(&murgbl.extr_buff[extrlen], ptr, tmplen);
 			extrlen += tmplen;
 		}
+	}
+	if (gtm_utf8_mode)
+	{
+		murgbl.extr_buff[extrlen++] = ' ';
+		MEMCPY_LIT(&murgbl.extr_buff[extrlen], UTF8_NAME);
+		extrlen += STR_LIT_LEN(UTF8_NAME);
 	}
 	murgbl.extr_buff[extrlen++] = '\\';
 	jnlext_write(file_info, murgbl.extr_buff, extrlen);

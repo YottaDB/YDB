@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,10 +11,16 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "patcode.h"
 #include "copy.h"
 #include "min_max.h"
-#include "gtm_string.h"
+
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"	/* needed by *TYPEMASK* macros defined in gtm_utf8.h */
+#include "gtm_utf8.h"
+#endif
 
 GBLREF	uint4		pat_allmaskbits;
 GBLREF	uint4		*pattern_typemask;
@@ -31,6 +37,7 @@ GBLREF	pte_csh		*cur_pte_csh_array;			/* copy of pte_csh_array corresponding to 
 GBLREF	int4		cur_pte_csh_size;			/* copy of pte_csh_cur_size corresponding to curalt_depth */
 GBLREF	int4		cur_pte_csh_entries_per_len;		/* copy of pte_csh_entries_per_len corresponding to curalt_depth */
 GBLREF	int4		cur_pte_csh_tail_count;			/* copy of pte_csh_tail_count corresponding to curalt_depth */
+GBLREF	boolean_t	gtm_utf8_mode;
 
 /* This procedure executes at "run-time". After a pattern in a MUMPS program has been compiled (by patstr and
  * 	its helper-procedures), this procedure can be called to evaluate "variable-length" patterns.
@@ -50,25 +57,27 @@ int do_pattern(mval *str, mval *pat)
 {
 	int4		count, total_min, total_max;
 	int4		alt_rep_min, alt_rep_max, min_incr, max_incr;
-	int4		len, length;
-	unsigned char	*ptop;
-	boolean_t	success, attempt;
-	int		atom, unit, idx, index, fixed_count;
-	uint4		z_diff, *rpt, *rtop;
+	int4		bytelen, charlen, length, pbytelen, strbytelen;
+	boolean_t	success, attempt, pvalid, strvalid;
+	int		atom, unit, idx, index, hasfixed;
+	uint4		z_diff, *rpt, *rtop, rept;
 	uint4		repeat[MAX_PATTERN_ATOMS];
 	uint4		*patidx[MAX_PATTERN_ATOMS];
 	unsigned char	*stridx[MAX_PATTERN_ATOMS];
-	unsigned char	*strptr, *pstr, *strbot, *strtop;
+	unsigned char	*strptr, *strtop, *strnext, *pstr, *ptop, *pnext;
 	uint4		code, tempuint;
 	uint4		*dfa_ptr, dfa_val;
 	uint4		*patptr;
-	uint4		mbit;
+	uint4		mbit, flags;
 	int4		*min, *max, *size;
 	int4		mintmp, maxtmp, sizetmp;
 	int		alt, bit;
 	char		buf[CHAR_CLASSES];
 	boolean_t	pte_csh_init;
 	boolean_t	match;
+	UNICODE_ONLY(
+	wint_t		utf8_codepoint;
+	)
 
 	error_def(ERR_PATNOTFOUND);
 
@@ -89,6 +98,7 @@ int do_pattern(mval *str, mval *pat)
 	patptr++;
 	patidx[0] = patptr + 1;
 	stridx[0] = (unsigned char *)str->str.addr;
+	strtop = stridx[0] + str->str.len;
 	GET_ULONG(tempuint, patptr);
 	patptr += tempuint;
 	GET_LONG(count, patptr);
@@ -97,25 +107,36 @@ int do_pattern(mval *str, mval *pat)
 	patptr++;
 	GET_LONG(total_max, patptr);
 	patptr++;
-	length = str->str.len;
+	/* "length" actually denotes character length; Get it from the appropriate field in the mstr */
+	if (!gtm_utf8_mode)
+		length = str->str.len;
+	UNICODE_ONLY(
+	else
+	{
+		MV_FORCE_LEN(str); /* to set str.char_len if not already done; also issues BADCHAR error if appropriate */
+		length = str->str.char_len;
+	}
+	)
 	if (length < total_min || length > total_max)
 		return FALSE;
-
 	min = (int4 *)patptr;
 	patptr += count;
 	max = (int4 *)patptr;
 	patptr += count;
 	if (MIN_SPLIT_N_MATCH_COUNT <= count)
 	{
-		fixed_count = 0;	/* this is an approximate indicator of the number of patterns processable by do_patfixed
-					 * approximate because alternations of fixed length cannot be processed by do_patfixed */
+		hasfixed = FALSE;
 		for (index = 0; index < count; index++)
 		{
 			GET_LONG(maxtmp, max + index);
 			GET_LONG(mintmp, min + index);
-			fixed_count += ((maxtmp == mintmp) ? TRUE : FALSE);
+			if (maxtmp == mintmp)
+			{
+				hasfixed = TRUE;
+				break;
+			}
 		}
-		if (fixed_count && (DO_PATSPLIT_FAIL != (match = do_patsplit(str, pat))))
+		if (hasfixed && (DO_PATSPLIT_FAIL != (match = do_patsplit(str, pat))))
 			return match;
 	}
 	size = (int4 *)patptr;
@@ -138,6 +159,7 @@ int do_pattern(mval *str, mval *pat)
 			{
 				GET_ULONG(code, patptr);
 				patptr++;
+				rept = *rpt;
 				if (code & PATM_ALT)
 				{	/* pattern alternation */
 					GET_LONG(alt_rep_min, patptr);
@@ -150,17 +172,29 @@ int do_pattern(mval *str, mval *pat)
 					assert(alt_rep_max || !maxtmp);
 					min_incr = mintmp ? mintmp / alt_rep_min : 0;
 					max_incr = maxtmp ? maxtmp / alt_rep_max : 0;
-					if (*rpt)
+					if (rept)
 					{
 						if (FALSE == pte_csh_init)
 						{
 							PTE_CSH_INCR_CURALT_DEPTH(curalt_depth);
 							pte_csh_init = TRUE;
 						}
-						if (do_patalt(patptr, strptr, alt_rep_min, alt_rep_max, *rpt, 1,
+						if (do_patalt(patptr, strptr, strtop, alt_rep_min, alt_rep_max, rept, 1,
 													min_incr, max_incr))
-							strptr += *rpt;
-						else
+						{
+							if (!gtm_utf8_mode)
+								strptr += rept;
+							UNICODE_ONLY(
+							else
+							{
+								for (unit = 0; unit < rept; unit++)
+								{
+									assert(strptr < strtop); /* below macro relies on this */
+									strptr = UTF8_MBNEXT(strptr, strtop);
+								}
+							}
+							)
+						} else
 							goto CALC;
 					}
 					/* make sure that patptr points to the next patcode after the alternation */
@@ -176,46 +210,86 @@ int do_pattern(mval *str, mval *pat)
 				{	/* meta character pat atom */
 					if (!(code & pat_allmaskbits))
 					{	/* current table has no characters with this pattern code */
-						len = 0;
-						for (bit = 0; bit < 32; bit++)
+						bytelen = 0;
+						for (bit = 0; bit < PAT_MAX_BITS; bit++)
 						{
 							mbit = (1 << bit);
 							if ((mbit & code & PATM_LONGFLAGS) && !(mbit & pat_allmaskbits))
-								buf[len++] = codelist[patmaskseq(mbit)];
+								buf[bytelen++] = codelist[patmaskseq(mbit)];
 						}
-						rts_error(VARLSTCNT(4) ERR_PATNOTFOUND, 2, len, buf);
+						rts_error(VARLSTCNT(4) ERR_PATNOTFOUND, 2, bytelen, buf);
 					}
-					for (unit = 0; unit < *rpt; unit++)
+					if (!gtm_utf8_mode)
 					{
-						if (!(code & pattern_typemask[*strptr++]))
-							goto CALC;
+						for (unit = 0; unit < rept; unit++)
+						{
+							if (!(code & pattern_typemask[*strptr++]))
+								goto CALC;
+						}
 					}
+					UNICODE_ONLY(
+					else
+					{
+						for (unit = 0; unit < rept; unit++)
+						{
+							assert(strptr < strtop);	/* PATTERN_TYPEMASK macro relies on this */
+							if (!(code & PATTERN_TYPEMASK(strptr, strtop, strnext, utf8_codepoint)))
+								goto CALC;
+							strptr = strnext;
+						}
+					}
+					)
 				} else if (code == PATM_DFA)
 				{	/* Discrete Finite Automaton pat atom */
-					GET_LONG(len, patptr);
+					GET_LONG(bytelen, patptr);
 					patptr++;
 					dfa_ptr = patptr;
-					strbot = strtop = strptr;
-					strtop += *rpt;
-					while (strptr < strtop)
+					for (unit = 0; unit < rept; )
 					{
 						GET_ULONG(dfa_val, dfa_ptr);
 						if (!(dfa_val & PATM_STRLIT))
 						{
-							success = (dfa_val & pattern_typemask[*strptr]);
-							dfa_ptr++;
+							if (!gtm_utf8_mode)
+							{
+								success = (dfa_val & pattern_typemask[*strptr]);
+								strnext = strptr + 1;
+							}
+							UNICODE_ONLY(
+							else
+							{
+								success = (dfa_val &
+									PATTERN_TYPEMASK(strptr, strtop, strnext, utf8_codepoint));
+							}
+							)
 						} else
 						{
 							dfa_ptr++;
 							GET_ULONG(dfa_val, dfa_ptr);
-							dfa_ptr++;
-							success = (dfa_val == *strptr);
+							/* Only ASCII characters are currently allowed for DFA STRLITs.
+							 * Assert that below.
+							 */
+							assert(IS_ASCII(dfa_val));
+							if (!gtm_utf8_mode)
+							{
+								success = (dfa_val == *strptr);
+								strnext = strptr + 1;
+							}
+							UNICODE_ONLY(
+							else
+							{
+								UTF8_VALID(strptr, strtop, strbytelen);
+								success = ((1 == strbytelen) && (dfa_val == *strptr));
+								strnext = strptr + strbytelen;
+							}
+							)
 						}
+						dfa_ptr++;
 						if (success)
 						{
 							GET_ULONG(dfa_val, dfa_ptr);
 							dfa_ptr = patptr + dfa_val;
-							strptr++;
+							strptr = strnext;
+							unit++;
 							GET_ULONG(dfa_val, dfa_ptr);
 							if (dfa_val == PATM_ACS)
 								break;
@@ -227,7 +301,7 @@ int do_pattern(mval *str, mval *pat)
 								break;
 						}
 					}
-					if (strptr < strtop)
+					if (unit < rept)
 						goto CALC;
 					else
  					{
@@ -243,32 +317,83 @@ int do_pattern(mval *str, mval *pat)
 						if (dfa_val != PATM_ACS)
 							goto CALC;
 					}
-					patptr += len;
+					patptr += bytelen;
 				} else
 				{	/* STRLIT pat atom */
-					GET_LONG(len, patptr);
+					assert(3 == PAT_STRLIT_PADDING);
+					GET_LONG(bytelen, patptr);	/* get bytelen */
 					patptr++;
-					if (len == 1)
+					GET_LONG(charlen, patptr);	/* get charlen */
+					patptr++;
+					GET_ULONG(flags, patptr);	/* get flags */
+					patptr++;
+					if (bytelen == 1)
 					{
-						for (unit = 0; unit < *rpt; unit++)
+						if (!gtm_utf8_mode)
 						{
-							if (*(unsigned char *)patptr != *strptr++)
-								goto CALC;
-						}
-						patptr++;
-					} else if (len > 0)
-					{
-						ptop = (unsigned char *)patptr + len;
-						for (unit = 0; unit < *rpt; unit++)
-						{
-							pstr = (unsigned char *)patptr;
-							while (pstr < ptop)
+							for (unit = 0; unit < rept; unit++)
 							{
-								if (*pstr++ != *strptr++)
+								if (*(unsigned char *)patptr != *strptr++)
 									goto CALC;
 							}
 						}
-						patptr += DIVIDE_ROUND_UP(len, sizeof(*patptr));
+						UNICODE_ONLY(
+						else
+						{
+							for (unit = 0; unit < rept; unit++)
+							{
+								if ((1 != (UTF8_VALID(strptr, strtop, strbytelen), strbytelen))
+										|| (*(unsigned char *)patptr != *strptr++))
+									goto CALC;
+							}
+						}
+						)
+						patptr++;
+					} else if (bytelen > 0)
+					{
+						if (!gtm_utf8_mode)
+						{
+							ptop = (unsigned char *)patptr + bytelen;
+							for (unit = 0; unit < rept; unit++)
+							{
+								pstr = (unsigned char *)patptr;
+								while (pstr < ptop)
+								{
+									if (*pstr++ != *strptr++)
+										goto CALC;
+								}
+							}
+						}
+						UNICODE_ONLY(
+						else
+						{
+							pstr = (unsigned char *)patptr;
+							ptop = pstr + bytelen;
+							for (unit = 0; unit < rept; unit++)
+							{
+								pstr = (unsigned char *)patptr;
+								for ( ; pstr < ptop; )
+								{
+									pvalid = UTF8_VALID(pstr, ptop, pbytelen);
+										/* sets pbytelen */
+									assert(pvalid);
+									strvalid = UTF8_VALID(strptr, strtop, strbytelen);
+										/* sets strbytelen */
+									if (pbytelen != strbytelen)
+										goto CALC;
+									DEBUG_ONLY(strnext = strptr + pbytelen);
+									pnext = pstr + pbytelen;
+									do
+									{
+										if (*pstr++ != *strptr++)
+											goto CALC;
+									} while (pstr < pnext);
+									assert(strptr == strnext);
+								}
+							}
+						}
+						)
+						patptr += DIVIDE_ROUND_UP(bytelen, sizeof(*patptr));
 					}
 				}
 				idx++;

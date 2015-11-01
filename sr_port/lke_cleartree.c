@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,6 @@
 #include "lke_clearlock.h"
 
 #define KDIM	64		/* max number of subscripts */
-#define	SDIM	256		/* max subscript size */
 
 GBLREF VSIG_ATOMIC_T	util_interrupt;
 
@@ -51,7 +50,7 @@ bool	lke_cleartree(
 {
 	mlk_shrblk_ptr_t	node, oldnode, start[KDIM];
 	unsigned char	subscript_offset[KDIM];
-	static char	name_buffer[SDIM];
+	static char	name_buffer[MAX_ZWR_KEY_SZ + 1];
 	static MSTR_DEF(name, 0, name_buffer);
 	int		depth = 0;
 	bool		locks = FALSE, locked, deleted;

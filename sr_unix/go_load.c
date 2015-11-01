@@ -34,6 +34,7 @@
 #include "mupip_put_gvdata.h"
 #include "str2gvkey.h"
 #include "gtmmsg.h"
+#include "gtm_utf8.h"
 
 GBLREF bool	mupip_error_occurred;
 GBLREF bool	mu_ctrly_occurred;
@@ -55,12 +56,13 @@ void go_load(uint4 begin, uint4 end)
 	uint4	        iter, max_data_len, max_subsc_len, key_count, max_rec_size;
 	mstr            src, des;
 	unsigned char   *rec_buff, ch;
-	boolean_t	format_error = FALSE, keepgoing;
+	boolean_t	utf8_extract, format_error = FALSE;
 
 	error_def(ERR_LOADCTRLY);
 	error_def(ERR_LOADEOF);
 	error_def(ERR_LOADFILERR);
 	error_def(ERR_MUNOFINISH);
+	error_def(ERR_LOADINVCHSET);
 
 	gvinit();
 
@@ -75,8 +77,21 @@ void go_load(uint4 begin, uint4 end)
 		return;
 	}
 	if (len >= 0)
+	{
 		util_out_print("!AD", TRUE, len, ptr);
-	else
+		utf8_extract = ((len >= STR_LIT_LEN(UTF8_NAME)) &&
+				(0 == MEMCMP_LIT(ptr + len - STR_LIT_LEN("UTF-8"), "UTF-8"))) ? TRUE : FALSE;
+		if ((utf8_extract && !gtm_utf8_mode) || (!utf8_extract && gtm_utf8_mode))
+		{ /* extract CHSET doesn't match $ZCHSET */
+			if (utf8_extract)
+				gtm_putmsg(VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("UTF-8"));
+			else
+				gtm_putmsg(VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
+			mupip_error_occurred = TRUE;
+			free(rec_buff);
+			return;
+		}
+	} else
 		mupip_exit(ERR_LOADFILERR);
 	len = mu_load_get(&ptr);
 	if (mupip_error_occurred)
@@ -145,79 +160,8 @@ void go_load(uint4 begin, uint4 end)
 			continue;
 		if (MU_FMT_GO != fmt)
 		{
-			keylength = 0;					/* determine length of key */
-			keystate  = 0;
-			keepgoing = TRUE;
-			while((keylength < len - 1) && keepgoing)	/* 1 == sizeof(=), since ZWR allows '^x(1,2)='*/
-			{
-				ch = *(ptr + keylength);
-				keylength++;
-				switch (keystate)
-				{
-				case 0:						/* in global name */
-					if ('=' == ch)				/* end of key */
-					{
-						keylength--;
-						keepgoing = FALSE;
-					} else if ('(' == ch)			/* start of subscripts */
-						keystate = 1;
-					break;
-				case 1:						/* in subscript area, but out of "..." or $C(...) */
-					switch (ch)
-					{
-					case ')':					/* end of subscripts ==> end of key */
-						assert('=' == *(ptr + keylength));
-						keepgoing = FALSE;
-						break;
-					case '"':					/* step into "..." */
-						keystate = 2;
-						break;
-					case '$':					/* step into $C(...) */
-						assert(('C' == *(ptr + keylength)) || ('c' == *(ptr + keylength)));
-						assert('(' == *(ptr + keylength + 1));
-						keylength += 2;
-						keystate = 3;
-						break;
-					}
-					break;
-				case 2:						/* in "..." */
-					if ('"' == ch)
-					{
-						switch (*(ptr + keylength))
-						{
-						case '"':				/* "" */
-							keylength++;
-							break;
-						case '_':				/* _$C(...) */
-							assert('$' == *(ptr + keylength + 1));
-							assert(('c' == *(ptr + keylength + 2)) || ('C' == *(ptr + keylength + 2)));
-							assert('(' == *(ptr + keylength + 3));
-							keylength += 4;
-							keystate = 3;
-							break;
-						default:				/* step out of "..." */
-							keystate = 1;
-						}
-					}
-					break;
-				case 3:						/* in $C(...) */
-					if (')' == ch)
-					{
-						if ('_' == *(ptr + keylength))		/* step into "..." */
-						{
-							assert('"' == *(ptr + keylength + 1));
-							keylength += 2;
-							keystate = 2;
-							break;
-						} else
-							keystate = 1;			/* step out of $C(...) */
-					}
-					break;
-				default:
-					assert(FALSE);
-					break;
-				}
-			}
+			/* Determine the ZWR key length. -1 (sizeof(=)) is needed since ZWR allows '^x(1,2)='*/
+			keylength = zwrkeylength(ptr, len - 1);
 			go_call_db(GO_PUT_SUB, ptr, keylength);
 			if (mupip_error_occurred)
 			{

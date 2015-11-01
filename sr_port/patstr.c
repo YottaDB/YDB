@@ -19,9 +19,14 @@
 #include "copy.h"
 #include "min_max.h"
 
-GBLREF	uint4		mapbit[];
+#ifdef UNICODE_SUPPORTED
+#include "gtm_utf8.h"	/* needed for UTF8_MBNEXT macro */
+#endif
 
-LITREF	char		ctypetab[NUM_ASCII_CHARS];
+GBLREF	uint4		mapbit[];
+GBLREF	boolean_t	gtm_utf8_mode;
+
+LITREF	char		ctypetab[NUM_CHARS];
 LITREF	uint4		typemask[PATENTS];
 
 typedef struct
@@ -74,14 +79,11 @@ typedef struct
 
 int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 {
-	struct	{
-			int4		len;
-			unsigned char	buff[MAX_PATTERN_LENGTH - 2];
-		}		strlit;
+	pat_strlit		strlit;
 	boolean_t		infinite, split_atom, done, dfa, fixed_len, prev_fixed_len;
-	int4			lower_bound, upper_bound, str_ptr;
+	int4			lower_bound, upper_bound, alloclen;
 	gtm_uint64_t		bound;
-	unsigned char		*inchar, curchar, symbol;
+	unsigned char		curchar, symbol, *inchar, *in_top, *buffptr;
 	uint4			pattern_mask, last_leaf_mask, y_max, mbit;
 	uint4			*patmaskptr;
 	int			atom_map, count, total_min, total_max;
@@ -104,7 +106,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	int			seq;
 	int			altmin, altmax;
 	int			saw_delimiter = 0;
-	int4			altlen;
+	int4			altlen, bytelen;
 	int4			allmask;
 	boolean_t		last_infinite;
 	boolean_t		done_free;
@@ -139,6 +141,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	lv_ptr = &leaves;
 	exp_ptr = &expand;
 	inchar = (unsigned char *)instr->addr;
+	in_top = (unsigned char *)&inchar[instr->len];
 	curchar = *inchar++;
 	altactive = 0;
 	for (;;)
@@ -194,6 +197,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 							&last_infinite, &fstchar, &outchar, &lastpatptr))
 						{
 							instr->addr = (char *)inchar;
+							assert(FALSE);
 							return ERR_PATMAXLEN;
 						}
 					}
@@ -259,36 +263,72 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			}
 			instr->addr = (char *)inchar;
 			if (count >= MAX_PATTERN_ATOMS)
+			{
+				assert(FALSE);
 				return ERR_PATMAXLEN;
+			}
 		}
 		if (!altend)
 		{
 			if ('\"' == curchar)
 			{
 				pattern_mask = PATM_STRLIT;
-				str_ptr = 0;
+				strlit.bytelen= 0;
+				strlit.charlen= 0;
+				strlit.flags = 0;
+				alloclen = (sizeof(strlit.buff) / sizeof(strlit.buff[0]));
+				buffptr = &strlit.buff[0];
 				for (;;)
 				{
-					if ((curchar = *inchar++) < SP || curchar >= DEL)
-					{
-						instr->addr = (char *)inchar;
-						return ERR_PATLIT;
-					}
+					curchar = *inchar;
 					if ('\"' == curchar)
 					{
-						if ((curchar = *inchar++) != '\"')
+						if ((curchar = *++inchar) != '\"')
+						{
+							inchar++;
 							break;
+						}
 					}
-					if (str_ptr >= (sizeof(strlit.buff) / sizeof(strlit.buff[0])))
+					if (!gtm_utf8_mode)
+					{
+						if (!IS_ASCII(curchar))
+						{
+							++inchar;
+							instr->addr = (char *)inchar;
+							return ERR_PATLIT;
+						}
+						bytelen = 1;
+					}
+					UNICODE_ONLY(
+					else
+					{
+						if (!UTF8_VALID(inchar, in_top, bytelen))
+						{
+							++inchar;
+							instr->addr = (char *)inchar;
+							return ERR_PATLIT;
+						}
+						if (!IS_ASCII(curchar))
+							strlit.flags |= PATM_STRLIT_NONASCII;
+						assert(1 <= bytelen);
+					}
+					)
+					strlit.bytelen += bytelen;
+					if (strlit.bytelen >= alloclen)
 					{
 						instr->addr = (char *)inchar;
+						assert(FALSE);
 						return ERR_PATMAXLEN;
 					}
-					strlit.buff[str_ptr++] = curchar;
-					pattern_mask |= typemask[curchar];
+					do
+					{
+						*buffptr++ = *inchar++;
+					} while (0 < --bytelen);
+					strlit.charlen++;
 				}
-				strlit.len =  str_ptr;
-				if (!strlit.len)
+				assert((strlit.flags & PATM_STRLIT_NONASCII) || strlit.bytelen == strlit.charlen);
+				assert((strlit.flags & PATM_STRLIT_NONASCII) || !(strlit.flags & PATM_STRLIT_BADCHAR));
+				if (!strlit.charlen)
 				{
 					lower_bound = upper_bound = 0;
 					infinite = FALSE;
@@ -304,6 +344,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						&last_infinite, &fstchar, &outchar, &lastpatptr))
 					{
 						instr->addr = (char *)inchar;
+						assert(FALSE);
 						return ERR_PATMAXLEN;
 					}
 					dfa = FALSE;
@@ -402,10 +443,11 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			done = TRUE;
 			/* DFAs can be used within alternations, but not at the nesting level where the alternations themselves
 			 * occur. Also, strings with a length of 0 characters should not be processed within DFAs, since there
-			 * are no character cells to hold the mask and flag bits that the DFA code needs...
+			 * are no character cells to hold the mask and flag bits that the DFA code needs. Also strings with
+			 * non-ASCII UTF-8 byte sequences are currently not processed through the DFA logic.
 			 */
 			if (infinite && !any_alt && !dfa
-				&& (!(pattern_mask & PATM_STRLIT) || strlit.len)
+				&& (!(pattern_mask & PATM_STRLIT) || (strlit.charlen && !(strlit.flags & PATM_STRLIT_NONASCII)))
 				&& ((outchar - &obj->buff[0]) <= (MAX_PATTERN_LENGTH / 2)))
 			{
 				dfa = TRUE;
@@ -419,12 +461,13 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			if (!dfa)
 			{
 				if (count >= MAX_PATTERN_ATOMS ||
-					!add_atom(&count, pattern_mask, &strlit, strlit.len, infinite,
+					!add_atom(&count, pattern_mask, &strlit, infinite,
 						&min[count], &max[count], &size[count],
 						&total_min, &total_max, lower_bound, upper_bound, altmin, altmax,
 						&last_infinite, &fstchar, &outchar, &lastpatptr))
 				{
 					instr->addr = (char *)inchar;
+					assert(FALSE);
 					return ERR_PATMAXLEN;
 				}
 				if (pattern_mask & PATM_ALT)
@@ -503,9 +546,12 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						pattern_mask = cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET];
 						if (pattern_mask & PATM_STRLIT)
 						{
-							strlit.len = cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET + 1];
-							memcpy(strlit.buff, &cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET + 2],
-														strlit.len);
+							assert(3 == PAT_STRLIT_PADDING);
+							strlit.bytelen = cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET + 1];
+							strlit.charlen = cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET + 2];
+							strlit.flags = cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET + 3];
+							memcpy(strlit.buff, &cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET
+										+ PAT_STRLIT_PADDING + 1], strlit.bytelen);
 						}
 					} else
 					{
@@ -526,12 +572,14 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			} else
 			{
 				leafcnt = charpos = MAX(lower_bound, 1);
-				if (pattern_mask & PATM_STRLIT)
+				if ((pattern_mask & PATM_STRLIT) && !(strlit.flags & PATM_STRLIT_NONASCII))
 				{
-					charpos *= strlit.len;
+					assert(strlit.charlen == strlit.bytelen);
+					charpos *= strlit.bytelen;
 					leafcnt = MAX(charpos, leafcnt);
 				}
 				if ((lower_bound > MAX_DFA_REP)
+					|| ((pattern_mask & PATM_STRLIT) && (strlit.flags & PATM_STRLIT_NONASCII))
 					|| (!infinite && lower_bound != upper_bound)
 					|| ((leaf_num + leafcnt) >= (MAX_SYM - 1))
 					|| (charpos > MAX_DFA_STRLEN))
@@ -560,6 +608,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 							&last_infinite, &fstchar, &outchar, &lastpatptr))
 						{
 							instr->addr = (char *)inchar;
+							assert(FALSE);
 							return ERR_PATMAXLEN;
 						}
 					}
@@ -574,15 +623,19 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						memset(&exp_temp[0], 0, sizeof(exp_temp));
 						min[atom_map] = lower_bound;
 						max[atom_map] = upper_bound;
-						size[atom_map] = strlit.len;
+						size[atom_map] = strlit.bytelen;
 						atom_map++;
-						min_dfa += lower_bound * strlit.len;
+						min_dfa += lower_bound * strlit.bytelen;
 						cursize = MAX(lower_bound, 1);
 						for (seqcnt = 0; seqcnt < cursize; seqcnt++)
 						{
-							for (charpos = 0; charpos < strlit.len; charpos++)
+							for (charpos = 0; charpos < strlit.bytelen; charpos++)
 							{
 								symbol = strlit.buff[charpos];
+								/* It is ok to use typemask[] below because we are guaranteed
+								 * that "symbol" is a 1-byte valid ASCII character. Assert that.
+								 */
+								assert(!(strlit.flags & PATM_STRLIT_NONASCII) && IS_ASCII(symbol));
 								bitpos = patmaskseq(typemask[symbol]);
 								if (expand.num_e[bitpos] + exp_temp[bitpos] == 0)
 									exp_temp[bitpos]++;
@@ -651,10 +704,15 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 							bitpos = 0;
 							leaves.nullable[leaf_num] = infinite;
 							/* Check all PAT_MAX_BITS bits if there are flags for internationalization,
-							 * otherwise, check only the original PAT_BASIC_CLASSES bits (C, L, N, P, U)
+							 * otherwise, check only the original PAT_BASIC_CLASSES bits
+							 * (C, L, N, P, U, 0, 1) where
+							 *	0 = PATM_UTF8_ALPHABET, 1 = PATM_UTF8_NONBASIC
 							 */
-							chidx = (pattern_mask & PATM_I18NFLAGS) ? PAT_MAX_BITS: PAT_BASIC_CLASSES;
-							if (PATM_E == pattern_mask)
+							if (PATM_E != pattern_mask)
+							{
+								chidx = (pattern_mask & PATM_I18NFLAGS)
+									? PAT_MAX_BITS : PAT_BASIC_CLASSES;
+							} else
 								chidx = PAT_BASIC_CLASSES;
 							for (bit = 0; bit < chidx; bit++)
 							{
@@ -701,6 +759,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 							&last_infinite, &fstchar, &outchar, &lastpatptr))
 						{
 							instr->addr = (char *)inchar;
+							assert(FALSE);
 							return ERR_PATMAXLEN;
 						}
 					}

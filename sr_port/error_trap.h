@@ -1,5 +1,5 @@
 /****************************************************************
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,7 +70,7 @@ typedef	struct {
 	unsigned char		*error_last_b_line;	/* ptr to beginning of line where error occurred */
 	struct stack_frame_struct *first_ecode_error_frame;	/* "frame_pointer" at the time of adding the first ECODE */
 	unsigned char		*error_rtn_addr;	/* CODE_ADDRESS(ERROR_RTN) */
-	unsigned char		*error_rtn_ctxt;	/* CONTEXT(ERROR_RTN) */
+	unsigned char		*error_rtn_ctxt;	/* GTM_CONTEXT(ERROR_RTN) */
 	error_ret_fnptr		error_return_addr;	/* CODE_ADDRESS(ERROR_RETURN) */
 } dollar_ecode_type;
 

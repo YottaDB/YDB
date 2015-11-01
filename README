@@ -1,6 +1,7 @@
 The make file enclosed (sr_unix/comlist.mk) will build GT.M from source.  
-The only prerequisite is GNU make and Linux x86.   GNU make  3.79.1 and 
-Redhat 7.2 were used to do the test builds for this distribution.
+The prerequisites are GNU make, Linux x86, tcsh and Unicode include files.
+Unicode include files are automatically installed if ICU 3.6 is installed. 
+GNU make 3.79.1 and RHEL 3.0 were used to do the test builds for this distribution.
 
 To build a production version GT.M for linux do the following steps:
 1. cd <gtm-directory> 	#<gtm-directory> is where all sr_* directories copied/checked out.

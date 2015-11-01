@@ -151,7 +151,6 @@
 !	ERR_REPEATERROR		internal error (not displayed to the users)
 !	ERR_TPRETRY		internal error (not displayed to the users)
 !	ERR_INVDBGLVL		referenced only if "gtmdbglvl" is set to non-zero value (which is a debugging feature)
-!	ERR_LEFTOVERGBLSEC	referenced only if #define DEBUG is TRUE (i.e. for debug builds only)
 !	ERR_DEFEREVENT		referenced only if #define DEBUG is TRUE (i.e. for debug builds only)
 !	ERR_FREEZEID		referenced only if #define DEBUG_FREEZE is TRUE.
 !	ERR_MUDESTROYFAIL	referenced only if #define IPCRM_FOR_SANCHEZ_ONLY is TRUE.
@@ -163,6 +162,7 @@
 !	ERR_ZDEFOFLOW		functionality not documented (GT.CM related weirdness)
 !	ERR_WILLEXPIRE		error triggered by the license management code which has been since disabled.
 !	ERR_RBWRNNOTCHG		not seen by user since return status of mupip_set_file (that triggers this) is not displayed.
+!
 !
 ! ----- Buffer to introduce new undocumented error messages without affecting UNUSEDMSGnnn match with corresponding line numbers.
 !
@@ -607,8 +607,8 @@ REQDVIEWPARM	<Required View parameter is missing>/error/fao=0!/ansi=0
 COLLFNMISSING	<Routine !AD is not found for collation sequence !UL>/error/fao=3!/ansi=0
 JNLACTINCMPLT	<Mupip journal action might be incomplete>/warning/fao=0!/ansi=0
 NCTCOLLDIFF	<Source and destination for MERGE cannot have different numerical collation type>/error/fao=0!/ansi=0
-DLRCUNXEOR	<!_!AD!/!_!_!_unexpected end of record in $CHAR() subscript>/error/fao=2!/ansi=0
-DLRCTOOBIG	<!_!AD!/!_!_!_$CHAR() value cannot be greater than 255>/error/fao=2!/ansi=0
+DLRCUNXEOR	<!_!AD!/!_!_!_unexpected end of record in $CHAR()/$ZCHAR() subscript>/error/fao=2!/ansi=0
+DLRCTOOBIG	<!_!AD!/!_!_!_!AD value cannot be greater than 255>/error/fao=4!/ansi=0
 WCERRNOTCHG	<Not all specified database files were changed>/error/fao=0!/ansi=0
 WCWRNNOTCHG	<Not all specified database files were changed>/warning/fao=0!/ansi=0
 ZCWRONGDESC	<A string longer than 65535 is passed via 32-bit descriptor>/error/fao=0!/ansi=0
@@ -624,7 +624,7 @@ COLLTYPVERSION	<Collation type !UL, version !UL mismatch>/error/fao=2!/ansi=0
 LVNULLSUBS	<Null subscripts not allowed in local variables>/error/fao=0!/ansi=0
 GVREPLERR	<Error replicating global in region !AD>/error/fao=2!/ansi=0
 MTIOERR		<I/O Error with magnetic tape device !AD>/error/fao=2!/ansi=0
-RMWIDTHPOS	<File record size must be greater than zero>/error/fao=0!/ansi=72
+RMWIDTHPOS	<File record size or width must be greater than zero>/error/fao=0!/ansi=72
 OFFSETINV	<Entry point !AD+!SL not valid>/error/fao=3!/ansi=13
 JOBPARTOOLONG	<Total parameter length is too long for job command>/error/fao=0!/ansi=0
 JOBPARM		<Error accessing job parameters>/error/fao=0!/ansi=0
@@ -653,7 +653,7 @@ INVBITSTR	<Invalid bit string>/error/fao=0!/ansi=0
 INVBITPOS	<Invalid position in the bit string>/error/fao=0!/ansi=0
 PARNORMAL	<Parse successful>/success/fao=0!/ansi=0
 PARBUFSM	<Parse buffer too small>/error/fao=0!/ansi=0
-RMWIDTHTOOBIG	<File record size too big>/error/fao=0!/ansi=72
+RMWIDTHTOOBIG	<File record size or width too big>/error/fao=0!/ansi=72
 PATTABNOTFND	<Pattern table !AD not found>/error/fao=2!/ansi=0
 OBJFILERR	<Error with object file I/O on file !AD>/error/fao=2!/ansi=0
 SRCFILERR	<Error with source file I/O on file !AD>/error/fao=2!/ansi=0
@@ -836,7 +836,7 @@ DBVERPERFWARN1	<Performance warning: Database !AD is running in compatibility mo
 FILEIDGBLSEC	<File ID in global section does not match with the database file !AD>/error/fao=2!/ansi=0
 GBLSECNOTGDS	<Global Section !AD is not a GT.M global section>/error/fao=2!/ansi=0
 BADGBLSECVER	<Global Section !AD does not match the current database version>/error/fao=2!/ansi=0
-LEFTOVERGBLSEC	<Database access is suspended due to leftover global section !AD>/error/fao=2!/ansi=0
+RECSIZENOTEVEN	<RECORDSIZE [!UL] needs to be a multiple of 2 if ICHSET or OCHSET is UTF-16, UTF-16LE or UTF-16BE>/error/fao=1!/ansi=0
 BUFFLUFAILED	<Error flushing buffers from MUPIP !AD for database file !AD>/error/fao=4!/ansi=0
 MUQUALINCOMP	<Incompatible qualifiers - FILE and REGION>/error/fao=0!/ansi=0
 DISTPATHMAX	<$gtm_dist path is greater than maximum (!UL)>/error/fao=1!/ansi=0
@@ -1260,6 +1260,20 @@ JNLPOOLBADSLOT	<Source server slot for secondary instance !AD is in an inconsist
 NOENDIANCVT	<Unable to convert the endian format of file !AD due to !AD>/error/fao=4!/ansi=0
 ENDIANCVT	<Converted database file !AD from !AZ endian to !AZ endian on a !AZ endian system>/info/fao=5!/ansi=0
 DBENDIAN	<Database file !AD is !AZ endian on a !AZ endian system>/error/fao=4!/ansi=0
+BADCHSET	<!AD is not a valid character mapping in this context>/error/fao=2!/ansi=0
+BADCASECODE	<!AD is not a valid case conversion code>/error/fao=2!/ansi=0
+BADCHAR		<$ZCHAR(!AD) is not a valid character in the !AD encoding form>/error/fao=4!/ansi=0
+DLRCILLEGAL	<!_!AD!/!_!_!_Illegal $CHAR() value !UL>/error/fao=3!/ansi=0
+NONUTF8CHSET	<Incorrect character set (!AD).  Locale must be set to use UTF-8 character set>/error/fao=2!/ansi=0
+INVDLRCVAL	<Invalid $CHAR() value !UL>/error/fao=1!/ansi=0
+INVICUVER	<Symbol !AD not found in the ICU libraries. ICU version !AD must be used>/error/fao=4!/ansi=0
+LOADINVCHSET	<Extract file CHSET (!AD) is incompatible with gtm_chset>/error/fao=2!/ansi=0
+DLLCHSETM	<Routine !AD in library !AD was compiled with CHSET=M which is different from $ZCHSET. Recompile with CHSET=UTF-8 and re-link.>/error/fao=4!/ansi=0
+DLLCHSETUTF8	<Routine !AD in library !AD was compiled with CHSET=UTF-8 which is different from $ZCHSET. Recompile with CHSET=M and re-link.>/error/fao=4!/ansi=0
+BOMMISMATCH	<!AD Byte Order Marker found when !AD character set specified>/error/fao=4!/ansi=0
+WIDTHTOOSMALL	<WIDTH should be at least 2 when device ICHSET or OCHSET is UTF-8 or UTF-16>/error/fao=0!/ansi=0
+SOCKMAX		<Attempt to exceed maximum sockets (!UL) for the SOCKET device>/error/fao=1!/ansi=80
+PADCHARINVALID	<PAD deviceparameter cannot be greater than 127>/error/fao=0!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

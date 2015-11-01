@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,6 @@ GBLREF	int4	expand_hashtab_depth;
 
 #	define HT_KEY_T				uint4
 #	define HT_ENT				ht_ent_int4
-#	define SIZE_OF_HT_ENT			8
 #	define HASH_TABLE			hash_table_int4
 #	define HTENT_KEY_MATCH(tabent, hkey)	((tabent)->key == (*hkey))
 #	define FIND_HASH(hkey, hash)		COMPUTE_HASH_INT4(hkey, hash)
@@ -60,7 +59,6 @@ GBLREF	int4	expand_hashtab_depth;
 
 #	define HT_KEY_T				gtm_uint64_t
 #	define HT_ENT				ht_ent_int8
-#	define SIZE_OF_HT_ENT			16
 #	define HASH_TABLE			hash_table_int8
 #	define HTENT_KEY_MATCH(tabent, hkey)	((tabent)->key == (*hkey))
 #	define FIND_HASH(hkey, hash)		COMPUTE_HASH_INT8(hkey, hash)
@@ -79,9 +77,8 @@ GBLREF	int4	expand_hashtab_depth;
 
 #	define HT_KEY_T				mname_entry
 #	define HT_ENT				ht_ent_mname
-#	define SIZE_OF_HT_ENT			16
 #	define HASH_TABLE			hash_table_mname
-#	define HTENT_KEY_MATCH(tabent, hkey)	\
+#	define HTENT_KEY_MATCH(tabent, hkey)									\
 		(    ((tabent)->key.hash_code == (hkey)->hash_code)						\
 		  && ((tabent)->key.var_name.len == (hkey)->var_name.len)					\
 		  && (0 == memcmp((tabent)->key.var_name.addr, (hkey)->var_name.addr, (hkey)->var_name.len))	\
@@ -106,7 +103,6 @@ GBLREF	int4	expand_hashtab_depth;
 #	define HT_KEY_T				icode_str
 #	define HT_ENT				ht_ent_objcode
 #	define HASH_TABLE			hash_table_objcode
-#	define SIZE_OF_HT_ENT			16
 #	define HTENT_KEY_MATCH(tabent, hkey)							\
 		(    ((tabent)->key.code == (hkey)->code)					\
 		  && ((tabent)->key.str.len == (hkey)->str.len)					\
@@ -227,7 +223,6 @@ void INIT_HASHTAB(HASH_TABLE *table, int minsize)
  		cur_ht_size = ht_sizes[index];
 	if (cur_ht_size)
 	{
-		assert(sizeof(HT_ENT) == SIZE_OF_HT_ENT);
 		table->base = (void *)malloc(cur_ht_size * sizeof(HT_ENT));
 		memset((char *)table->base, 0, cur_ht_size * sizeof(HT_ENT));
 		table->size = cur_ht_size;

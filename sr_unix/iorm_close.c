@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,6 +93,16 @@ void iorm_close(io_desc *iod, mval *pp)
 	iod->dollar.x = 0;
 	iod->dollar.y = 0;
 	rm_ptr->lastop = RM_NOOP;
+	if (rm_ptr->inbuf)
+	{
+		free(rm_ptr->inbuf);
+		rm_ptr->inbuf = NULL;
+	}
+	if (rm_ptr->outbuf)
+	{
+		free(rm_ptr->outbuf);
+		rm_ptr->outbuf = NULL;
+	}
 
 	/* Do the close first. If the fclose() is done first and we are being called from io_rundown just prior to the execv
 	   in a newly JOBbed off process, the fclose() does an implied fflush() which is known to do an lseek() which resets

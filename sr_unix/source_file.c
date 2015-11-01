@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -129,6 +129,7 @@ bool	open_source_file (void)
 	static readonly unsigned char open_params_list[] =
         {
 		(unsigned char)iop_readonly,
+		(unsigned char)iop_m,
                 (unsigned char)iop_eol
         };
 

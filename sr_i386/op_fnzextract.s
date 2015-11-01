@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -10,7 +10,7 @@
 #################################################################
 
 #	PAGE	,132
-	.title	op_fnextract.s
+	.title	op_fnzextract.s
 
 #	.386
 #	.MODEL	FLAT, C
@@ -18,16 +18,16 @@
 .include "linkage.si"
 	.INCLUDE	"mval_def.si"
 
-	.sbttl	op_fnextract
+	.sbttl	op_fnzextract
 #	PAGE	+
 # ------------------------------------
-# op_fnextract.s
+# op_fnzextract.s
 #
 # Mumps $Extract function
 # ------------------------------------
 
 # --------------------------------
-#	op_fnextract (int last, int first, mval *src, mval *dest)
+#	op_fnzextract (int last, int first, mval *src, mval *dest)
 # --------------------------------
 #	esi - src mval
 #	edi - dest mval
@@ -44,8 +44,8 @@ dest	=	20
 	.text
 .extern	n2s
 
-# PUBLIC	op_fnextract
-ENTRY op_fnextract
+# PUBLIC	op_fnzextract
+ENTRY op_fnzextract
 	enter	$0,$0
 	pushl	%edi
 	pushl	%esi
@@ -60,7 +60,7 @@ ENTRY op_fnextract
 	movl	$1,%eax			# if first < 1, then first = 1
 l10:	movl	last(%ebp),%edx		# edx - last
 	movl	dest(%ebp),%edi		# edi - last
-	movb	$mval_m_str,mval_b_mvtype(%edi)	# always a string
+	movw	$mval_m_str,mval_w_mvtype(%edi)	# always a string
 	movl	mval_l_strlen(%esi),%ecx	# ecx - src. str. len.
 	cmpl	%eax,%ecx		# if left index > str. len,
 						# then null result
@@ -84,6 +84,6 @@ retlab:	popl	%ebx
 	popl	%edi
 	leave
 	ret
-# op_fnextract ENDP
+# op_fnzextract ENDP
 
 # END

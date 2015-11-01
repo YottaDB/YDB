@@ -109,7 +109,7 @@ void	op_dmode(void)
 #endif
 
 	*((int4 **)&restart_pc) = (int4 *)CODE_ADDRESS(call_dm);
-	*((int4 **)&restart_ctxt) = (int4 *)CONTEXT(call_dm);
+	*((int4 **)&restart_ctxt) = (int4 *)GTM_CONTEXT(call_dm);
 	op_wteol(1);
 
 #ifdef UNIX

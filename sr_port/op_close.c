@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,10 +70,12 @@ void op_close(mval *v, mval *p)
 	if (io_curr_device.out == ciod)
 		io_curr_device.out = io_std_device.out;
 
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 	if (DEFAULT_CODE_SET != ciod->in_code_set)
 		ICONV_CLOSE_CD(ciod->input_conv_cd);
 	if (DEFAULT_CODE_SET != ciod->out_code_set)
 		ICONV_CLOSE_CD(ciod->output_conv_cd);
+#endif
 
 	(ciod->disp_ptr->close)(ciod, p);
 	active_device = 0;

@@ -112,12 +112,14 @@ int gtmsource_get_opt(void)
 		}
 	} else
 	{	/* Check if environment variable "gtm_repl_instsecondary" is defined.
-		 * Do that only if any of the following qualifiers is present as these are the only ones that require it.
-		 * 	START, ACTIVATE, DEACTIVATE, STOPSOURCEFILTER, CHANGELOG, STATSLOG, NEEDRESTART
+		 * Do that only if any of the following qualifiers is present as these are the only ones that honour it.
+		 * 	Mandatory : START, ACTIVATE, DEACTIVATE, STOPSOURCEFILTER, CHANGELOG, STATSLOG, NEEDRESTART,
+		 *	Optional  : CHECKHEALTH, SHOWBACKLOG or SHUTDOWN
 		 */
 		if (gtmsource_options.start || gtmsource_options.activate || gtmsource_options.deactivate
 			|| gtmsource_options.stopsourcefilter || gtmsource_options.changelog
-			|| gtmsource_options.statslog || gtmsource_options.needrestart)
+			|| gtmsource_options.statslog || gtmsource_options.needrestart
+			|| gtmsource_options.checkhealth || gtmsource_options.showbacklog || gtmsource_options.shut_down)
 		{
 			log_nam.addr = GTM_REPL_INSTSECONDARY;
 			log_nam.len = sizeof(GTM_REPL_INSTSECONDARY) - 1;
@@ -126,7 +128,7 @@ int gtmsource_get_opt(void)
 			{
 				gtmsource_options.instsecondary = TRUE;
 				inst_name_len = trans_name.len;
-			} else
+			} else if (!gtmsource_options.checkhealth && !gtmsource_options.showbacklog && !gtmsource_options.shut_down)
 			{
 				gtm_putmsg(VARLSTCNT(1) ERR_REPLINSTSECUNDF);
 				return (-1);

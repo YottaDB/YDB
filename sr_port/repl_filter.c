@@ -363,7 +363,6 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len)
 	int		eof, err, save_errno;
 	unsigned char	seq_num_str[32], *seq_num_ptr;
 	char		*extr_ptr, *tr_end, *fgets_res;
-	char		c[ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE)];
 
 	assert(NULL != extr_rec);
 	if (SS_NORMAL != (status = repl_filter_recv_line(extr_rec, &firstrec_len, ZWR_EXP_RATIO(MAX_LOGI_JNL_REC_SIZE))))

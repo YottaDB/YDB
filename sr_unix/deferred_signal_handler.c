@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@ GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	gtmImageName		gtmImageNames[];
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		gtm_quiet_halt;
 
 void deferred_signal_handler(void)
 {
@@ -42,6 +43,7 @@ void deferred_signal_handler(void)
 	error_def(ERR_KILLBYSIGUINFO);
 	error_def(ERR_KILLBYSIGSINFO1);
 	error_def(ERR_KILLBYSIGSINFO2);
+	error_def(ERR_FORCEDHALT);
 
 	/* To avoid nested calls to this routine, we set forced_exit to FALSE at the very beginning */
 	forced_exit = FALSE;
@@ -78,8 +80,8 @@ void deferred_signal_handler(void)
 			 process_id, signal_info.signal, signal_info.int_iadr);
 		gtm_putmsg(VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
 			   process_id, signal_info.signal, signal_info.int_iadr);
-	} else
-	{
+	} else if (ERR_FORCEDHALT != forced_exit_err || !gtm_quiet_halt)
+	{	/* No HALT messages if quiet halt is requested */
 		send_msg(VARLSTCNT(1) forced_exit_err);
 		gtm_putmsg(VARLSTCNT(1) forced_exit_err);
 	}

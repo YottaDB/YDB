@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -90,6 +90,7 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 	MAXSTR_BUFF_INIT;
 	output.type = type;
 	output.buff = &buff[0];
+	output.size = sizeof(buff);
 	output.ptr = output.buff;
 	for ( ; i ; i--, ptr++)
 	{	output.line_num = 1;

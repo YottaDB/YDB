@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,13 +19,18 @@
 #include "iosp.h"
 #include "logical_truth_value.h"
 
-boolean_t logical_truth_value(mstr *log, boolean_t *is_defined)
+/* returns the truth value based on the sense indicated by 'negate'.
+ * If negate is FALSE (i.e. in regular mode),
+ * 	returns TRUE if the env variable/logical log is defined and evaluates to "TRUE" (or part thereof),
+ * 	or "YES" (or part thereof), or a non zero integer
+ * 	returns FALSE otherwise
+ * If negate is TRUE(i.e. in negative mode),
+ * 	returns TRUE if the env variable/logical log is defined and evaluates to "FALSE" (or part thereof),
+ * 	or "NO" (or part thereof), or a zero integer
+ * 	returns FALSE otherwise
+ */
+boolean_t logical_truth_value(mstr *log, boolean_t negate, boolean_t *is_defined)
 {
-	/* return
-	 * TRUE if the env variable/logical log is defined and evaluates to "TRUE" (or part thereof), or "YES" (or part thereof),
-	 * 	or a non zero integer
-	 * FALSE otherwise
-	 */
 	uint4		status;
 	mstr		tn;
 	char		buf[1024];
@@ -41,6 +46,8 @@ boolean_t logical_truth_value(mstr *log, boolean_t *is_defined)
 	{
 		if (NULL != is_defined)
 			*is_defined = TRUE;
+		if (tn.len <= 0)
+			return FALSE;
 		for (is_num = TRUE, zero = TRUE, index = 0; index < tn.len; index++)
 		{
 			if (!isdigit(buf[index]))
@@ -50,9 +57,17 @@ boolean_t logical_truth_value(mstr *log, boolean_t *is_defined)
 			}
 			zero = (zero && ('0' == buf[index]));
 		}
-		return (!is_num ? (0 == STRNCASECMP(buf, LOGICAL_TRUE, MIN(sizeof(LOGICAL_TRUE) - 1, tn.len)) ||
-		    		   0 == STRNCASECMP(buf, LOGICAL_YES, MIN(sizeof(LOGICAL_YES) - 1, tn.len)))
+		if (!negate)
+		{ /* regular mode */
+			return (!is_num ? (0 == STRNCASECMP(buf, LOGICAL_TRUE, MIN(STR_LIT_LEN(LOGICAL_TRUE), tn.len)) ||
+		    		   0 == STRNCASECMP(buf, LOGICAL_YES, MIN(STR_LIT_LEN(LOGICAL_YES), tn.len)))
 				: !zero);
+		} else
+		{ /* negative mode */
+			return (!is_num ? (0 == STRNCASECMP(buf, LOGICAL_FALSE, MIN(STR_LIT_LEN(LOGICAL_FALSE), tn.len)) ||
+		    		   0 == STRNCASECMP(buf, LOGICAL_NO, MIN(STR_LIT_LEN(LOGICAL_NO), tn.len)))
+				: zero);
+		}
 	} else if (SS_NOLOGNAM == status)
 		return (FALSE);
 	rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, log->len, log->addr, status);

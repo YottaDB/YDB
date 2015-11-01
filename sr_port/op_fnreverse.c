@@ -1,5 +1,5 @@
 /****************************************************************
- *      Copyright 2001, 2004 Sanchez Computer Associates, Inc.        *
+ *      Copyright 2001, 2006 Fidelity Information Services, Inc        *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -27,7 +27,55 @@ GBLREF spdesc stringpool;
  *	none
  * -----------------------------------------------
  */
+#ifdef UNICODE_SUPPORTED
+#include "gtm_utf8.h"
+GBLREF	boolean_t	badchar_inhibit;
+
+/* Unicode character-oriented $REVERSE (for $ZCHSET="UTF-8") */
 void op_fnreverse(mval *src, mval *dst)
+{
+	unsigned char	*srcptr, *srctop, *dstptr, *dsttop;
+	int		char_len, chlen;
+
+	MV_FORCE_STR(src);
+	if (stringpool.free + src->str.len > stringpool.top)
+		stp_gcol(src->str.len);
+
+        dstptr = stringpool.free + src->str.len;
+        srcptr = (unsigned char *)src->str.addr;
+        srctop = (unsigned char *)src->str.addr + src->str.len;
+	for (char_len = 0; srcptr < srctop; srcptr += chlen, ++char_len)
+	{
+		if (!UTF8_VALID(srcptr, srctop, chlen) && !badchar_inhibit)
+			utf8_badchar(0, srcptr, srctop, 0, NULL);
+		assert(chlen > 0 && chlen <= 4);
+		switch (chlen) /* byte length of next character */
+		{ /* NOTE: all fall-thru's below */
+			case 4: *--dstptr = srcptr[3];
+			case 3: *--dstptr = srcptr[2];
+			case 2: *--dstptr = srcptr[1];
+			case 1: *--dstptr = srcptr[0];
+				break;
+		}
+	}
+	assert(dstptr == stringpool.free);
+        stringpool.free += src->str.len;
+	MV_INIT_STRING(dst, src->str.len, dstptr);
+
+	/* set character length of both source and destination mvals */
+	dst->mvtype |= MV_UTF_LEN;
+	dst->str.char_len = char_len;
+	assert(!(MV_UTF_LEN & src->mvtype) || char_len == src->str.char_len);
+	if (!(MV_UTF_LEN & src->mvtype))
+	{
+		src->mvtype |= MV_UTF_LEN;
+		src->str.char_len = char_len;
+	}
+}
+#endif /* UNICODE_SUPPORTED */
+
+/* byte-oriented $REVERSE (for $ZCHSET="M") */
+void op_fnzreverse(mval *src, mval *dst)
 {
 	int	lcnt;
         char    *in, *out;

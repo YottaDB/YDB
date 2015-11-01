@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,6 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
 
 #include <signal.h>
 
@@ -32,6 +31,12 @@
 #include "print_target.h"
 #include "op.h"
 
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
+
+
 GBLDEF bool             wide_out;
 GBLDEF char             patch_comp_key[MAX_KEY_SZ + 1];
 GBLDEF unsigned char    patch_comp_count;
@@ -46,12 +51,13 @@ GBLREF int              patch_fdmp_recs;
 
 sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_t b_top)
 {
-	sm_uc_ptr_t	r_top, key_top, cptr0, cptr1;
+	sm_uc_ptr_t	r_top, key_top, cptr0, cptr1, cptr_top, cptr_base = NULL, cptr_next = NULL;
 	char		key_buf[MAX_KEY_SZ + 1], *temp_ptr, *temp_key, util_buff[MAX_UTIL_LEN];
+	char		*prefix_str, *space_str, *dot_str, *format_str;
 	unsigned char	cc;
 	short int	size;
-	int4		util_len, head;
-	int		buf_len;
+	int4		util_len, head, ch;
+	int		buf_len, field_width, chlen, fastate, chwidth = 0;
 	block_id	blk_id;
 
 	if (rp >= b_top)
@@ -139,18 +145,28 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 		util_out_print(0, TRUE);
 		if (CLI_PRESENT != head)
 		{
+			prefix_str = "           |";
+			if (wide_out)
+			{
+				format_str = "   !AD";
+				dot_str = "   .";
+				space_str = "    ";
+				field_width = 4;
+			} else
+			{
+				format_str = "  !AD";
+				dot_str = "  .";
+				space_str = "   ";
+				field_width = 3;
+			}
+			fastate = 0;
 			for (cptr0 = rp;  cptr0 < r_top;  cptr0 += 20)
 			{
 				if (util_interrupt)
-				{
-					/* return, rather than signal ERR_CTRLC so
-					 * that the calling routine can deal with
-					 * that signal and do the appropriate
-					 * cleanup.
-					 */
+				{ /* return, rather than signal ERR_CTRLC so that the calling routine
+				     can deal with that signal and do the appropriate cleanup */
 					return NULL;
 				}
-
 				util_len = 8;
 				i2hex_blkfill(cptr0 - bp, (uchar_ptr_t)util_buff, 8);
 				MEMCPY_LIT(&util_buff[util_len], " : |");
@@ -159,53 +175,66 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 				util_out_print(util_buff, FALSE);
 				for (cptr1 = cptr0;  cptr1 < (cptr0 + 20);  cptr1++)
 				{
-					if (wide_out)
+					if (cptr1 < r_top)
 					{
-						if (cptr1 < r_top)
-						{
-							i2hex_blkfill(*(sm_uc_ptr_t)cptr1, (uchar_ptr_t)util_buff, 4);
-							util_buff[4] = 0;
-							util_out_print(util_buff, FALSE);
-						} else
-							util_out_print("    ", FALSE);
+						i2hex_blkfill(*(sm_uc_ptr_t)cptr1, (uchar_ptr_t)util_buff, field_width);
+						util_buff[field_width] = 0;
+						util_out_print(util_buff, FALSE);
 					} else
-					{
-						if (cptr1 < r_top)
-						{
-							i2hex_blkfill(*(sm_uc_ptr_t)cptr1, (uchar_ptr_t)util_buff, 3);
-							util_buff[3] = 0;
-							util_out_print(util_buff, FALSE);
-						} else
-							util_out_print("   ", FALSE);
-					}
+						util_out_print(space_str, FALSE);
 				}
-				if (wide_out)
+				util_out_print("|", TRUE);
+				util_out_print(prefix_str, FALSE);
+				for (cptr1 = cptr0, cptr_top = cptr0 + 20;  cptr1 < cptr_top;  cptr1++)
 				{
-					util_out_print("|    |", FALSE);
-					for (cptr1 = cptr0;  cptr1 < (cptr0 + 20);  cptr1++)
+					switch (fastate)
 					{
-						if (cptr1 < r_top)
-						{
+					case 0: /* prints single-byte characters or intepret
+						   multi-byte characters */
+						if (cptr1 >= r_top)
+							util_out_print(space_str, FALSE);
+						else if (!gtm_utf8_mode || IS_ASCII(*cptr1))
+						{ /* single-byte characters */
 							if (PRINTABLE(*(sm_uc_ptr_t)cptr1))
-								util_out_print("!AD", FALSE, 1, cptr1);
+								util_out_print(format_str, FALSE, 1, cptr1);
 							else
-								util_out_print(".", FALSE);
-						} else
-							util_out_print(" ", FALSE);
-					}
-				} else
-				{	util_out_print("|", TRUE);
-					util_out_print("           |", FALSE);
-					for (cptr1 = cptr0;  cptr1 < (cptr0 + 20);  cptr1++)
-					{
-						if (cptr1 < r_top)
-						{
-							if (PRINTABLE(*(sm_uc_ptr_t)cptr1))
-								util_out_print("  !AD", FALSE, 1, cptr1);
-							else
-								util_out_print("  .", FALSE);
-						} else
-							util_out_print("   ", FALSE);
+								util_out_print(dot_str, FALSE);
+						}
+#ifdef UNICODE_SUPPORTED
+						else { /* multi-byte characters */
+							cptr_next = UTF8_MBTOWC(cptr1, r_top, ch);
+							chlen = cptr_next - cptr1;
+							if (WEOF == ch || !U_ISPRINT(ch))
+							{ /* illegal or non-printable characters */
+								cptr1--;
+								fastate = 1;
+							} else
+							{ /* multi-byte printable characters */
+								cptr_base = cptr1;
+								chwidth = UTF8_WCWIDTH(ch);
+								assert(chwidth >= 0 && chwidth <= 2);
+								cptr1--;
+								fastate = 2;
+							}
+						}
+#endif
+						break;
+
+					case 1: /* illegal or non-printable characters */
+						util_out_print(dot_str, FALSE);
+						if (--chlen <= 0)
+							fastate = 0;
+						break;
+
+					case 2: /* printable multi-byte characters */
+						if (chlen-- > 1) /* fill leading bytes with spaces */
+							util_out_print(space_str, FALSE);
+						else {
+							util_out_print("!AD", FALSE, field_width - chwidth, space_str);
+							util_out_print("!AD", FALSE, cptr_next - cptr_base, cptr_base);
+							fastate = 0;
+						}
+						break;
 					}
 				}
 				util_out_print("|", TRUE);

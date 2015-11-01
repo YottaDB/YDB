@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,10 +55,18 @@ void	dse_dmp(void)
 			util_out_print("Error:  must open an output file before dump.", TRUE);
 			return;
 		}
+		if (gtm_utf8_mode && (GLO_FMT == glo_present))
+		{
+			util_out_print("Error:  GLO format is not supported in UTF-8 mode. Use ZWR format.", TRUE);
+			return;
+		}
 		if (OPEN_FMT == dse_dmp_format)
 		{
 			dse_dmp_format = (glo_present ? GLO_FMT : ZWR_FMT);
-			dse_fdmp_output(LIT_AND_LEN("; DSE EXTRACT"));
+			if (!gtm_utf8_mode)
+				dse_fdmp_output(LIT_AND_LEN("; DSE EXTRACT"));
+			else
+				dse_fdmp_output(LIT_AND_LEN("; DSE EXTRACT UTF-8"));
 			dse_fdmp_output(STR_AND_LEN(format_label[dse_dmp_format]));
 		} else if ((glo_present ? GLO_FMT : ZWR_FMT) != dse_dmp_format)
 		{

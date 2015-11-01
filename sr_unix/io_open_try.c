@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,8 @@
 #include "outofband.h"
 #include "wake_alarm.h"
 #include "stringpool.h"
+#include "gtm_conv.h"
+#include "gtm_utf8.h"
 
 #define  LOGNAME_LEN 255
 /* avoid calling getservbyname for shell and Kerberos shell */
@@ -55,6 +57,7 @@ GBLREF	mstr			sys_output;
 GBLREF	bool			out_of_time;
 GBLREF	int4			outofband;
 GBLREF	int4			write_filter;
+LITREF	mstr			chset_names[];
 
 bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mval *mspace)	/* timeout in seconds */
 {
@@ -78,12 +81,13 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	unsigned char	dev_type[MAX_DEV_TYPE_LEN];
 	d_mt_struct	*mt_ptr;
 	iosb		io_status_blk;
+	mstr		chset_mstr;
 	int		umask_orig, umask_creat;
 	int		char_or_block_special;
 	int		stat_res;
 	int		fstat_res;
 
-	int		p_offset;
+	int		p_offset, len;
 	boolean_t	mknod_err , stat_err;
 	int 		save_mknod_err, save_stat_err;
 
@@ -96,6 +100,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 #else
 	int		sockoptlen;
 #endif
+	boolean_t	ichset_specified, ochset_specified;
 
 	mt_ptr = NULL;
 	char_or_block_special = FALSE;
@@ -142,16 +147,16 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 				else  if (iop_sequential == ch)
 					tl->iod->type = rm;
 				p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-					(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+					     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 			}
 			if (ff == tl->iod->type)
 			{
 				/* fifo with RW permissions for owner, group, other */
 				if ((-1 != MKNOD(buf, FIFO_PERMISSION, 0))
 #ifdef __MVS__
-					|| (EEXIST == errno)
+				    || (EEXIST == errno)
 #endif
-					)
+				    )
 				{
 					tl->iod->dollar.zeof = TRUE;
 #ifdef __MVS__
@@ -176,7 +181,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		{
 			lower_to_upper(dev_type, (uchar_ptr_t)mspace->str.addr, mspace->str.len);
 			if (((sizeof("TCP") - 1) == mspace->str.len)
-				&& (0 == MEMCMP_LIT(dev_type, "TCP")))
+			    && (0 == MEMCMP_LIT(dev_type, "TCP")))
 				tl->iod->type = tcp;
 			else if (((sizeof("SOCKET") - 1) == mspace->str.len)
 				 && (0 == MEMCMP_LIT(dev_type, "SOCKET")))
@@ -238,24 +243,24 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 						tl->iod->type = rm;
 						break;
 					case S_IFSOCK:
-/*	If SOCK_STREAM, AF_INET, and not [kr]shell port assume we were
-	started by inetd.
-	We are not able to trigger exception until active_device set
-	and exception parsed which is not done for fd == 0/1 which
-	is from io_init called from gtm_startup before condition handlers
-	are setup so we can't report errors, just will be treated as rm.
-	Note the fall through if the above conditions are not true to
-	maintain compatibility for rshd startup PER 3252.
-	28-JUL-1995 14:24:31 FERTIG REPLACE IO_OPEN_TRY.C(18)
-	"PER 3252: fix problems starting up mumps from an ""rsh"" or ""remsh"""
-*/
+						/*	If SOCK_STREAM, AF_INET, and not [kr]shell port assume we were
+							started by inetd.
+							We are not able to trigger exception until active_device set
+							and exception parsed which is not done for fd == 0/1 which
+							is from io_init called from gtm_startup before condition handlers
+							are setup so we can't report errors, just will be treated as rm.
+							Note the fall through if the above conditions are not true to
+							maintain compatibility for rshd startup PER 3252.
+							28-JUL-1995 14:24:31 FERTIG REPLACE IO_OPEN_TRY.C(18)
+							"PER 3252: fix problems starting up mumps from an ""rsh"" or ""remsh"""
+						*/
 						sockoptlen = sizeof(sockoptval);
 						sockstat = getsockopt(file_des, SOL_SOCKET, SO_TYPE, &sockoptval, &sockoptlen);
 						if (!sockstat && SOCK_STREAM == sockoptval)
 						{
 							socknamelen = sizeof(sockname);
 							sockstat = getsockname(file_des,
-								(struct sockaddr *)&sockname, &socknamelen);
+									       (struct sockaddr *)&sockname, &socknamelen);
 							if (!sockstat && AF_INET == sockname.sin_family)
 							{
 								sockport = ntohs(sockname.sin_port);
@@ -283,7 +288,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	active_device = naml->iod;
 
 	if ((-2 == file_des) && (dev_open != naml->iod->state) && (us != naml->iod->type)
-		&& (tcp != naml->iod->type) && (gtmsocket != naml->iod->type))
+	    && (tcp != naml->iod->type) && (gtmsocket != naml->iod->type))
 	{
 		oflag |= (O_RDWR | O_CREAT | O_NOCTTY);
 #ifdef __MVS__
@@ -292,18 +297,19 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 #endif
 		size = 0;
 		p_offset = 0;
+		ichset_specified = ochset_specified = FALSE;
 		while(iop_eol != *(pp->str.addr + p_offset))
 		{
 			assert((params) *(pp->str.addr + p_offset) < (params)n_iops);
 			switch ((ch = *(pp->str.addr + p_offset++)))
 			{
 				case iop_exception:
-					{
+				{
 					naml->iod->error_handler.len = *(pp->str.addr + p_offset);
 					naml->iod->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
 					s2pool(&naml->iod->error_handler);
 					break;
-					}
+				}
 				case iop_allocation:
 					if (rm == naml->iod->type)
 					{
@@ -330,38 +336,44 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 					oflag  |= O_WRONLY | O_CREAT;
 					break;
 				case iop_ipchset:
+#ifdef KEEP_zOS_EBCDIC
+					if ( (iconv_t)0 != naml->iod->input_conv_cd )
 					{
-						if ( (iconv_t)0 != naml->iod->input_conv_cd )
-						{
-							ICONV_CLOSE_CD(naml->iod->input_conv_cd);
-						}
-						SET_CODE_SET(naml->iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
-						if (DEFAULT_CODE_SET != naml->iod->in_code_set)
-							ICONV_OPEN_CD(naml->iod->input_conv_cd,
-								(char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
-						break;
+						ICONV_CLOSE_CD(naml->iod->input_conv_cd);
 					}
+					SET_CODE_SET(naml->iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
+					if (DEFAULT_CODE_SET != naml->iod->in_code_set)
+						ICONV_OPEN_CD(naml->iod->input_conv_cd,
+							      (char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
+#endif
+					break;
 				case iop_opchset:
+#ifdef KEEP_zOS_EBCDIC
+					if ( (iconv_t)0 != naml->iod->output_conv_cd)
 					{
-						if ( (iconv_t)0 != naml->iod->output_conv_cd)
-						{
-							ICONV_CLOSE_CD(naml->iod->output_conv_cd);
-						}
-						SET_CODE_SET(naml->iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
-						if (DEFAULT_CODE_SET != naml->iod->out_code_set)
-							ICONV_OPEN_CD(naml->iod->output_conv_cd, INSIDE_CH_SET,
-								(char *)(pp->str.addr + p_offset + 1));
-						break;
+						ICONV_CLOSE_CD(naml->iod->output_conv_cd);
 					}
+					SET_CODE_SET(naml->iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
+					if (DEFAULT_CODE_SET != naml->iod->out_code_set)
+						ICONV_OPEN_CD(naml->iod->output_conv_cd, INSIDE_CH_SET,
+							      (char *)(pp->str.addr + p_offset + 1));
+#endif
+					break;
+				case iop_m:
+				case iop_utf8:
+				case iop_utf16:
+				case iop_utf16be:
+				case iop_utf16le:
+					break;
 				default:
 					break;
 			}
 			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-				(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+				     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 		}
 
 		/* Check the saved error from mknod() for fifo, also saved error from fstat() or stat()
-		  so error handler (if set)  can handle it */
+		   so error handler (if set)  can handle it */
 		if (ff == tl->iod->type  && mknod_err)
 			rts_error(VARLSTCNT(1) save_mknod_err);
 		/* Error from either stat() or fstat() function */
@@ -386,12 +398,13 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 			if (outofband)
 				outofband_action(FALSE);
 			if (   EINTR == errno
-			    || ETXTBSY == errno
-			    || ENFILE == errno
-			    || EBUSY == errno
-			    || ((mb == naml->iod->type) && (ENXIO == errno)))
+			       || ETXTBSY == errno
+			       || ENFILE == errno
+			       || EBUSY == errno
+			       || ((mb == naml->iod->type) && (ENXIO == errno)))
 				continue;
 			else
+			{
 #ifdef __MVS__
 				if (EINVAL == errno && ff == tl->iod->type && (oflag & O_RDONLY) && (oflag & O_WRONLY))
 				{
@@ -406,10 +419,10 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 						if (outofband)
 							outofband_action(FALSE);
 						if (   EINTR == errno
-							|| ETXTBSY == errno
-							|| ENFILE == errno
-							|| EBUSY == errno
-							|| ((mb == naml->iod->type) && (ENXIO == errno)))
+						       || ETXTBSY == errno
+						       || ENFILE == errno
+						       || EBUSY == errno
+						       || ((mb == naml->iod->type) && (ENXIO == errno)))
 							continue;
 						else
 							break;
@@ -426,10 +439,10 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
                                                 if (outofband)
                                                         outofband_action(FALSE);
                                                 if (   EINTR == errno
-                                                        || ETXTBSY == errno
-                                                        || ENFILE == errno
-                                                        || EBUSY == errno
-                                                        || ((mb == naml->iod->type) && (ENXIO == errno)))
+						       || ETXTBSY == errno
+						       || ENFILE == errno
+						       || EBUSY == errno
+						       || ((mb == naml->iod->type) && (ENXIO == errno)))
                                                         continue;
                                                 else
                                                         break;
@@ -437,6 +450,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 				}
 #endif
 				break;
+			}
 		}
 
 		if (out_of_time && (-1 == file_des))
@@ -445,6 +459,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	if (timed && !out_of_time)
 		cancel_timer(timer_id);
 
+#ifdef KEEP_zOS_EBCDIC
 	if ((tcp != naml->iod->type) && (gtmsocket != naml->iod->type))
 	{
 		SET_CODE_SET(naml->iod->in_code_set, OUTSIDE_CH_SET);
@@ -453,8 +468,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		SET_CODE_SET(naml->iod->out_code_set, OUTSIDE_CH_SET);
 		if (DEFAULT_CODE_SET != naml->iod->out_code_set)
 			ICONV_OPEN_CD(naml->iod->output_conv_cd, INSIDE_CH_SET, OUTSIDE_CH_SET);
-	}
-	else
+	} else
 	{
 		SET_CODE_SET(naml->iod->out_code_set, INSIDE_CH_SET);
 		if (DEFAULT_CODE_SET != naml->iod->out_code_set)
@@ -463,6 +477,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		if (DEFAULT_CODE_SET != naml->iod->in_code_set)
 			ICONV_OPEN_CD(naml->iod->input_conv_cd, INSIDE_CH_SET, OUTSIDE_CH_SET);
 	}
+#endif
 
 	if (-1 == file_des)
 		rts_error(VARLSTCNT(1) errno);
@@ -502,7 +517,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		(tl->iod->pair.out)->pair.out = (tl->iod->pair.out);
 		if (file_des_w > -1)
 		{
-			io_desc	*io_ptr;
+			io_desc		*io_ptr;
  			d_rm_struct	*d_rm;
 			io_log_name	dev_name;	/*	dummy	*/
 
@@ -512,14 +527,15 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 			assert(io_ptr->state >= 0 && io_ptr->state < n_io_dev_states);
 			assert(io_ptr->type == ff);
 			if (!(d_rm = (d_rm_struct *) io_ptr->dev_sp))
-			{	io_ptr->dev_sp = (void*)malloc(sizeof(d_rm_struct));
+			{
+				io_ptr->dev_sp = (void*)malloc(sizeof(d_rm_struct));
 				d_rm = (d_rm_struct *) io_ptr->dev_sp;
 				io_ptr->state = dev_closed;
-                		d_rm->stream = FALSE;
-                		io_ptr->width = DEF_RM_WIDTH;
-                		io_ptr->length = DEF_RM_LENGTH;
-                		d_rm->fixed = FALSE;
-                		d_rm->noread = FALSE;
+				d_rm->stream = FALSE;
+				io_ptr->width = DEF_RM_WIDTH;
+				io_ptr->length = DEF_RM_LENGTH;
+				d_rm->fixed = FALSE;
+				d_rm->noread = FALSE;
 			}
 			d_rm->fifo = TRUE;
 			io_ptr->type = rm;
@@ -528,7 +544,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 			if (TRUE == status_w)
 				(tl->iod->pair.out)->state = dev_open;
 			else	if (dev_open == (tl->iod->pair.out)->state)
-					(tl->iod->pair.out)->state = dev_closed;
+				(tl->iod->pair.out)->state = dev_closed;
 		}
 		if (0 == file_des_w)
 			(tl->iod->pair.out)->dollar.zeof = TRUE;

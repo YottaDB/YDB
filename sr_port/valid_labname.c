@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +12,6 @@
 #include "mdef.h"
 #include "toktyp.h"
 #include "valid_mname.h"
-
-LITREF	char	ctypetab[NUM_ASCII_CHARS];
 
 boolean_t valid_labname(mstr *targ)
 {

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,3 +64,4 @@
 #define TK_SQLFIELDNAME 51
 
 #define	NUM_ASCII_CHARS	128
+#define	NUM_CHARS	256	/* number of single-byte characters (includes ASCII and non-ASCII) */

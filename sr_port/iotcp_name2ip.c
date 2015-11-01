@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,29 +21,19 @@
 
 #include "mdef.h"
 
-#include <sys/socket.h>
+#include "gtm_socket.h"
 #include "gtm_netdb.h"
-#include <netinet/in.h>
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
 #include "io.h"
 
-
 char *iotcp_name2ip(char *name)
-{
-  struct   hostent 	host, *host_ptr;
-  struct   in_addr 	inaddr;
-  char     		local_name[80];
-  char     		ip[16];
+{ /* only ASCII range characters allowed in hostnames, we are not using libidn to resolve hostnames that might have international
+     characters in their name */
 
-  SPRINTF(local_name, "%s", name);
+	struct   hostent	*host_ptr;
 
-  if (NULL == (host_ptr = GETHOSTBYNAME(local_name)))
-      return NULL;
-
-  host = *host_ptr;
-
-  inaddr = *((struct in_addr *)host.h_addr_list[0]);
-
-  return INET_NTOA(inaddr);
+	if (NULL == (host_ptr = GETHOSTBYNAME(name)))
+		return NULL;
+	return INET_NTOA(*((struct in_addr *)host_ptr->h_addr_list[0]));
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +21,7 @@
  * For instance both .E.N and .N.E could be simplified to .E
  */
 int pat_compress(uint4	pattern_mask,
-	void		*strlit_buff,
-	int4		strlen,
+	pat_strlit	*strlit_buff,
 	boolean_t	infinite,
 	boolean_t	last_infinite,
 	uint4		*lastpatptr)
@@ -37,8 +36,8 @@ int pat_compress(uint4	pattern_mask,
 		if (lastpat_mask == pattern_mask)
 		{
 			if (pattern_mask & PATM_STRLIT)
-			{
-				if (!memcmp(lastpatptr + 1, strlit_buff, strlen + sizeof(int4)))
+			{	/* PATM_STRLIT pattern consists of PAT_STRLIT_PADDING int4s that contain padding information */
+				if (!memcmp(lastpatptr + 1, strlit_buff, strlit_buff->bytelen + PAT_STRLIT_PADDING * sizeof(int4)))
 					return TRUE;
 			} else
 				return TRUE;

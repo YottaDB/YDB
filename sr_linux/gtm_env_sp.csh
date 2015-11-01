@@ -67,7 +67,7 @@ if ( $?gtm_version_change == "1" ) then
 # -fno-defer-pop to prevent problems with assembly/generated code with optimization
 # -fno-strict-aliasing since we don't comply with the rules
 # -ffloat-store for consistent results avoiding rounding differences
-	setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store"
+	setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store -march=i686"
 
 	# -g	generate debugging information for dbx (no longer overrides -O)
 	setenv	gt_cc_option_debug	"-g"

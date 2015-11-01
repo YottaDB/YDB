@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,6 +63,7 @@ GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	gtmImageName		gtmImageNames[];
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	void			(*call_on_signal)();
+GBLREF	boolean_t		gtm_quiet_halt;
 
 void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
@@ -138,8 +139,11 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				return;
 			}
 			exit_state = EXIT_IMMED;
-			send_msg(VARLSTCNT(1) forced_exit_err);
-			gtm_putmsg(VARLSTCNT(1) forced_exit_err);
+			if (ERR_FORCEDHALT != forced_exit_err || !gtm_quiet_halt)
+			{
+				send_msg(VARLSTCNT(1) forced_exit_err);
+				gtm_putmsg(VARLSTCNT(1) forced_exit_err);
+			}
 			dont_want_core = TRUE;
 			break;
 		case SIGQUIT:	/* Handle SIGQUIT specially which we ALWAYS want to defer if possible as it is always sent */

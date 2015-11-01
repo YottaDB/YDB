@@ -56,7 +56,9 @@ GBLREF boolean_t 	local_collseq_stdnull;
 GBLREF int4		zdate_form;
 GBLREF int4		zdir_form;
 GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
+GBLREF boolean_t	badchar_inhibit;
 GBLREF int		gv_fillfactor;
+GBLREF int4		gtm_max_sockets;
 
 LITREF mval literal_zero;
 LITREF mval literal_one;
@@ -99,6 +101,11 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	view_arg_convert(vtp, arg, &parmblk);
 	switch (vtp->keycode)
 	{
+#ifdef UNICODE_SUPPORTED
+		case VTK_BADCHAR:
+			n = badchar_inhibit ? 0 : 1;
+			break;
+#endif
 		case VTK_RCHITS:
 			n = 0;
 			break;
@@ -424,6 +431,9 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			break;
 		case VTK_FILLFACTOR:
 			n = gv_fillfactor;
+			break;
+		case VTK_MAXSOCKETS:
+			n = gtm_max_sockets;
 			break;
 		default:
 			rts_error(VARLSTCNT(1) ERR_VIEWFN);

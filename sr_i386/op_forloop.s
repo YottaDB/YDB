@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -55,10 +55,10 @@ ENTRY op_forloop
 	mv_force_num %esi, l1
 	movl	indx(%ebp),%esi
 	movl	step(%ebp),%edi
-	movb	mval_b_mvtype(%esi),%al
-	movb	mval_b_mvtype(%edi),%dl
-	andb	%dl,%al
-	testb	$mval_m_int_without_nm,%al
+	movw	mval_w_mvtype(%esi),%ax
+	movw	mval_w_mvtype(%edi),%dx
+	andw	%dx,%ax
+	testw	$mval_m_int_without_nm,%ax
 	je	L66
 	movl	mval_l_m1(%esi),%eax
 	addl	mval_l_m1(%edi),%eax
@@ -66,7 +66,7 @@ ENTRY op_forloop
 	jge	L68
 	cmpl	$-MANT_HI,%eax
 	jle	L67
-	movb	$mval_m_int,mval_b_mvtype(%esi)
+	movw	$mval_m_int,mval_w_mvtype(%esi)
 	movl	%eax,mval_l_m1(%esi)
 	jmp	L63
 
@@ -75,7 +75,7 @@ L67:	movb	$mval_esign_mask,mval_b_exp(%esi)	# set sign bit
 	jmp	L69
 
 L68:	movb	$0,mval_b_exp(%esi)			# clear sign bit
-L69:	movb	$mval_m_nm,mval_b_mvtype(%esi)
+L69:	movw	$mval_m_nm,mval_w_mvtype(%esi)
 	orb	$69,mval_b_exp(%esi)			# set exponent field
 	movl	%eax,%ebx
 	movl	$0,%edx
@@ -95,7 +95,7 @@ L66:	pushl	%esi
 	addl	$16,%esp
 	movl	indx(%ebp),%esi
 L63:	movl	step(%ebp),%edi
-	testb	$mval_m_int_without_nm,mval_b_mvtype(%edi)
+	testw	$mval_m_int_without_nm,mval_w_mvtype(%edi)
 	jne	a
 	cmpb	$0,mval_b_exp(%edi)
 	jl	b
@@ -109,10 +109,10 @@ a2:	movl	term(%ebp),%edi
 b:	movl	%esi,%edi		# if step is negative, reverse compare
 	movl	term(%ebp),%esi
 e:	# compare indx and term
-	movb	mval_b_mvtype(%esi),%al
-	movb	mval_b_mvtype(%edi),%dl
-	andb	%dl,%al
-	testb	$2,%al
+	movw	mval_w_mvtype(%esi),%ax
+	movw	mval_w_mvtype(%edi),%dx
+	andw	%dx,%ax
+	testw	$2,%ax
 	je	ccmp
 	movl	mval_l_m1(%esi),%eax
 	subl	mval_l_m1(%edi),%eax
@@ -126,10 +126,10 @@ ccmp:	pushl	%edi
 tcmp:	jle	d
 	movl	indx(%ebp),%esi
 	movl	step(%ebp),%edi
-	movb	mval_b_mvtype(%esi),%al
-	movb	mval_b_mvtype(%edi),%dl
-	andb	%dl,%al
-	testb	$mval_m_int_without_nm,%al
+	movw	mval_w_mvtype(%esi),%ax
+	movw	mval_w_mvtype(%edi),%dx
+	andw	%dx,%ax
+	testw	$mval_m_int_without_nm,%ax
 	je	l66
 	movl	mval_l_m1(%esi),%eax
 	subl	mval_l_m1(%edi),%eax
@@ -137,7 +137,7 @@ tcmp:	jle	d
 	jge	l68
 	cmpl	$-MANT_HI,%eax
 	jle	l67
-	movb	$mval_m_int,mval_b_mvtype(%esi)
+	movw	$mval_m_int,mval_w_mvtype(%esi)
 	movl	%eax,mval_l_m1(%esi)
 	jmp	l63
 
@@ -146,7 +146,7 @@ l67:	movb	$mval_esign_mask,mval_b_exp(%esi)	# set sign bit
 	jmp	l69
 
 l68:	movb	$0,mval_b_exp(%esi)			# clear sign bit
-l69:	movb	$mval_m_nm,mval_b_mvtype(%esi)
+l69:	movw	$mval_m_nm,mval_w_mvtype(%esi)
 	orb	$69,mval_b_exp(%esi)			# set exponent field
 	movl	%eax,%ebx
 	movl	$0,%edx

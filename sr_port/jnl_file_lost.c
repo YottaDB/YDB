@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,7 @@ void jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 	{
 		csa->hdr->repl_state = repl_was_open;
 		reg_seqno = csa->hdr->reg_seqno;
-		jnlseqno  = jnlpool.jnlpool_ctl->jnl_seqno;
+		jnlseqno = (NULL != jnlpool.jnlpool_ctl) ? jnlpool.jnlpool_ctl->jnl_seqno : MAX_SEQNO;
 		send_msg(VARLSTCNT(8) ERR_REPLJNLCLOSED, 6, &reg_seqno, &reg_seqno, &jnlseqno, &jnlseqno, DB_LEN_STR(jpc->region));
 	}
 #ifdef VMS

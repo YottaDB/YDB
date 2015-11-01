@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@ void	ecode_init(void)
 	dollar_ecode.top = dollar_ecode.begin + DOLLAR_ECODE_ALLOC;
 	dollar_ecode.array = (dollar_ecode_struct *)malloc(sizeof(dollar_ecode_struct) * DOLLAR_ECODE_MAXINDEX);
 	dollar_ecode.error_rtn_addr = CODE_ADDRESS(ERROR_RTN);
-	dollar_ecode.error_rtn_ctxt = CONTEXT(ERROR_RTN);
+	dollar_ecode.error_rtn_ctxt = GTM_CONTEXT(ERROR_RTN);
 	dollar_ecode.error_return_addr = (error_ret_fnptr)ERROR_RETURN;
 
 	dollar_stack.begin = (char *)malloc(DOLLAR_STACK_ALLOC);

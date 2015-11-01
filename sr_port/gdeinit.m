@@ -11,6 +11,7 @@
 gdeinit: ;set up local variables and arrays
 GDEINIT
 
+	i $ZVER'["VMS" view "BADCHAR"
 	s renpref=""
 	s log=0,logfile="GDELOG.LOG",BOL=""
 	s ZERO=$c(0),ONE=$c(1),TRUE=ONE,FALSE=ZERO,TAB=$c(9)

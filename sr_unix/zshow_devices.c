@@ -34,11 +34,12 @@
 #include "nametabtyp.h"
 #include "mvalconv.h"
 
-LITREF nametabent dev_param_names[];
-LITREF unsigned char dev_param_index[];
-LITREF zshow_index zshow_param_index[];
+LITREF mstr	     	chset_names[];
+LITREF nametabent	dev_param_names[];
+LITREF unsigned char	dev_param_index[];
+LITREF zshow_index	zshow_param_index[];
 
-static readonly char space_text[] = {' '};
+static readonly char	space_text[] = {' '};
 
 #define ZS_ONE_OUT(V,TEXT) ((V)->str.len = 1, (V)->str.addr = (TEXT), zshow_output(output,&(V)->str))
 #define ZS_STR_OUT(V,TEXT) ((V)->str.len = sizeof((TEXT)) - 1, (V)->str.addr = (TEXT), zshow_output(output,&(V)->str))
@@ -51,9 +52,10 @@ static readonly char space_text[] = {' '};
 			(V)->str.addr = (char *)dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
 			zshow_param_index[(TEXT)].offset ].name, zshow_output(output,&(V)->str), ZS_ONE_OUT((V),equal_text))
 
-GBLREF bool ctrlc_on;
-GBLREF io_log_name *io_root_log_name;
-GBLREF io_pair *io_std_device;
+GBLREF bool		ctrlc_on;
+GBLREF io_log_name	*io_root_log_name;
+GBLREF io_pair		*io_std_device;
+GBLREF boolean_t	gtm_utf8_mode;
 
 void zshow_devices(zshow_out *output)
 {
@@ -68,7 +70,7 @@ void zshow_devices(zshow_out *output)
 	socket_struct	*socketptr;
 	io_termmask	*mask_out;
 	int4		i, j, ii, jj;
-	bool		first;
+	boolean_t	first;
 	sm_uc_ptr_t	delim_buff_sm;
 	unsigned short  delim_len_sm;
 	mstr		delim;
@@ -110,6 +112,8 @@ void zshow_devices(zshow_out *output)
 	static readonly char zbfsize_text[] = "ZBFSIZE=";
 	static readonly char zibfsize_text[] = "ZIBFSIZE=";
 	static readonly char port_text[] = "PORT=";
+	static readonly char ichset_text[] = "ICHSET=";
+	static readonly char ochset_text[] = "OCHSET=";
 	static readonly char zsh_socket_state[][10] =
 					{       "CONNECTED"
 					        ,"LISTENING"
@@ -189,7 +193,7 @@ void zshow_devices(zshow_out *output)
 						ZS_PARM_SP(&v,zshow_nowrap);
 					}
 					mask_out = &tt_ptr->mask_term;
-					if (mask_out->mask[0] != TERM_MSK)
+					if (!tt_ptr->default_mask_term)
 					{
 						ZS_PARM_EQU(&v,zshow_term);
 						ZS_STR_OUT(&v,dollarc_text);
@@ -250,6 +254,38 @@ void zshow_devices(zshow_out *output)
 						ZS_PARM_SP(&v, zshow_noinse);
 					if (tt_ptr->canonical)
 						ZS_STR_OUT(&v, "CANONICAL ");
+					switch(l->iod->ichset)
+					{
+						case CHSET_M:
+							if (gtm_utf8_mode)
+							{
+								ZS_STR_OUT(&v, ichset_text);
+								zshow_output(output, &chset_names[l->iod->ichset]);
+								ZS_ONE_OUT(&v, space_text);
+							}
+							break;
+						case CHSET_UTF8:
+							assert(gtm_utf8_mode);
+							break;
+						default:
+							GTMASSERT;
+					}
+					switch(l->iod->ochset)
+       					{
+						case CHSET_M:
+							if (gtm_utf8_mode)
+							{
+								ZS_STR_OUT(&v, ochset_text);
+								zshow_output(output, &chset_names[l->iod->ochset]);
+								ZS_ONE_OUT(&v, space_text);
+							}
+							break;
+						case CHSET_UTF8:
+							assert(gtm_utf8_mode);
+							break;
+						default:
+							GTMASSERT;
+					}
 					break;
 				case rm:
 					ZS_STR_OUT(&v,rmsfile_text);
@@ -262,7 +298,24 @@ void zshow_devices(zshow_out *output)
 					{
 						ZS_PARM_SP(&v,zshow_read);
 					}
-					if (l->iod->width != DEF_RM_WIDTH)
+					if (CHSET_M != l->iod->ichset || CHSET_M != l->iod->ochset)
+					{
+						if (!rm_ptr->def_recsize)
+						{
+							ZS_PARM_EQU(&v,zshow_rec);
+							MV_FORCE_MVAL(&m, (int)rm_ptr->recordsize);
+							mval_write(output, &m, FALSE);
+							ZS_ONE_OUT(&v,space_text);
+						}
+						if (!rm_ptr->def_width)
+						{
+							ZS_PARM_EQU(&v,zshow_width);
+							MV_FORCE_MVAL(&m, (int)l->iod->width);
+							mval_write(output, &m, FALSE);
+							ZS_ONE_OUT(&v,space_text);
+						}
+					}
+					else if (l->iod->width != DEF_RM_WIDTH)
 					{
 						ZS_PARM_EQU(&v,zshow_rec);
 						MV_FORCE_MVAL(&m,(int) l->iod->width);
@@ -272,6 +325,54 @@ void zshow_devices(zshow_out *output)
 					if (!l->iod->wrap)
 					{
 						ZS_PARM_SP(&v,zshow_nowrap);
+					}
+					switch(l->iod->ichset)
+					{
+						case CHSET_M:
+							if (gtm_utf8_mode)
+							{
+								ZS_STR_OUT(&v, ichset_text);
+								zshow_output(output, &chset_names[l->iod->ichset]);
+								ZS_ONE_OUT(&v, space_text);
+							}
+							break;
+						case CHSET_UTF8:
+							assert(gtm_utf8_mode);
+							break;
+						case CHSET_UTF16:
+						case CHSET_UTF16BE:
+						case CHSET_UTF16LE:
+							assert(gtm_utf8_mode);
+							ZS_STR_OUT(&v, ichset_text);
+							zshow_output(output, &chset_names[l->iod->ichset]);
+							ZS_ONE_OUT(&v, space_text);
+							break;
+						default:
+							GTMASSERT;
+					}
+					switch(l->iod->ochset)
+       					{
+						case CHSET_M:
+							if (gtm_utf8_mode)
+							{
+								ZS_STR_OUT(&v, ochset_text);
+								zshow_output(output, &chset_names[l->iod->ochset]);
+								ZS_ONE_OUT(&v, space_text);
+							}
+							break;
+						case CHSET_UTF8:
+							assert(gtm_utf8_mode);
+							break;
+						case CHSET_UTF16:
+						case CHSET_UTF16BE:
+						case CHSET_UTF16LE:
+							assert(gtm_utf8_mode);
+							ZS_STR_OUT(&v, ochset_text);
+							zshow_output(output, &chset_names[l->iod->ochset]);
+							ZS_ONE_OUT(&v, space_text);
+							break;
+						default:
+							GTMASSERT;
 					}
 					break;
 				case mb:
@@ -342,6 +443,54 @@ void zshow_devices(zshow_out *output)
 						ZS_ONE_OUT(&v, space_text);
 		/* socket state */		ZS_STR_OUT(&v, zsh_socket_state[socketptr->state]);
 						ZS_ONE_OUT(&v, space_text);
+		/* socket IO mode */		switch(l->iod->ichset)
+						{
+							case CHSET_M:
+								if (gtm_utf8_mode)
+								{
+									ZS_STR_OUT(&v, ichset_text);
+									zshow_output(output, &chset_names[l->iod->ichset]);
+									ZS_ONE_OUT(&v, space_text);
+								}
+								break;
+							case CHSET_UTF8:
+								assert(gtm_utf8_mode);
+								break;
+							case CHSET_UTF16:
+							case CHSET_UTF16BE:
+							case CHSET_UTF16LE:
+								assert(gtm_utf8_mode);
+								ZS_STR_OUT(&v, ichset_text);
+								zshow_output(output, &chset_names[l->iod->ichset]);
+								ZS_ONE_OUT(&v, space_text);
+								break;
+							default:
+								GTMASSERT;
+						}
+						switch(l->iod->ochset)
+                                                {
+                                                        case CHSET_M:
+                                                                if (gtm_utf8_mode)
+                                                                {
+                                                                        ZS_STR_OUT(&v, ochset_text);
+                                                                        zshow_output(output, &chset_names[l->iod->ochset]);
+                                                                        ZS_ONE_OUT(&v, space_text);
+                                                                }
+                                                                break;
+                                                        case CHSET_UTF8:
+								assert(gtm_utf8_mode);
+                                                                break;
+                                                        case CHSET_UTF16:
+                                                        case CHSET_UTF16BE:
+                                                        case CHSET_UTF16LE:
+								assert(gtm_utf8_mode);
+                                                                ZS_STR_OUT(&v, ochset_text);
+								zshow_output(output, &chset_names[l->iod->ochset]);
+                                                                ZS_ONE_OUT(&v, space_text);
+                                                                break;
+                                                        default:
+                                                                GTMASSERT;
+                                                }
 		/* socket type */		if (socketptr->passive)
 						{
 							ZS_STR_OUT(&v, passive_text);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +12,10 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <string.h>
 #include <sys/un.h>
 
 #include "gtm_stdio.h"
+#include "gtm_string.h"
 #include "gtm_ipc.h"
 #include "gtm_stat.h"
 #include "gtm_unistd.h"
@@ -30,7 +30,6 @@
 #include "getjobnum.h"
 #include "gtmmsg.h"
 #include "trans_log_name.h"
-
 
 GBLREF struct sockaddr_un 	gtmsecshr_sock_name;
 GBLREF struct sockaddr_un 	gtmsecshr_cli_sock_name;
@@ -48,6 +47,10 @@ static char			gtmsecshr_path[MAX_TRANS_NAME_LEN];
 static char hex_table[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
 
 unsigned char		*mypid2ascx(unsigned char *, pid_t);
+
+#ifndef SUN_LEN
+#define SUN_LEN(x)	sizeof(*x)
+#endif
 
 int4 gtmsecshr_pathname_init(int caller)
 {
@@ -156,7 +159,7 @@ int4 gtmsecshr_sock_init(int caller)
 		gtmsecshr_cli_sock_name.sun_family = AF_UNIX;
 		memcpy(gtmsecshr_cli_sock_name.sun_path, gtmsecshr_sockpath, gtmsecshr_sockpath_len);
 		strcpy(gtmsecshr_cli_sock_name.sun_path + gtmsecshr_sockpath_len, (char *)mypid2ascx(pid_str, process_id));
-		gtmsecshr_cli_sockpath_len = sizeof(gtmsecshr_cli_sock_name);
+		gtmsecshr_cli_sockpath_len = SUN_LEN(&gtmsecshr_cli_sock_name);
 	}
 
 	id_str[i2hex_nofill((unsigned int)gtmsecshr_key, (uchar_ptr_t )id_str, MAX_ID_LEN)] = 0;
@@ -165,7 +168,7 @@ int4 gtmsecshr_sock_init(int caller)
 	gtmsecshr_sockpath_len += id_str_len;
 	gtmsecshr_sock_name.sun_family = AF_UNIX;
 	memcpy(gtmsecshr_sock_name.sun_path, gtmsecshr_sockpath, gtmsecshr_sockpath_len);
-	gtmsecshr_sockpath_len = sizeof(gtmsecshr_sock_name);
+	gtmsecshr_sockpath_len = SUN_LEN(&gtmsecshr_sock_name);
 
 	if (-1 == (gtmsecshr_sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)))
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,8 @@ LITREF	uint4	typemask[PATENTS];
 static	uint4	classmask[CHAR_CLASSES] =
 {
 	PATM_N, PATM_P, PATM_L, PATM_U, PATM_C, PATM_B, PATM_D, PATM_F, PATM_G, PATM_H, PATM_I,
-	PATM_J, PATM_K, PATM_M, PATM_O, PATM_Q, PATM_R, PATM_S, PATM_T, PATM_V, PATM_W, PATM_X
+	PATM_J, PATM_K, PATM_M, PATM_O, PATM_Q, PATM_R, PATM_S, PATM_T, PATM_V, PATM_W, PATM_X,
+	PATM_UTF8_ALPHABET, PATM_UTF8_NONBASIC
 };
 
 /* This procedure is part of the MUMPS compiler. The function of this procedure is to build the data structures that
@@ -449,7 +450,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 			for (maskcls = 0; leaves->letter[0][maskcls] >= 0; maskcls++)
 				;
 			check_1dim_array_bound(leaves->letter[0], maskcls);
-			*outchar_ptr += 1 + ((maskcls + sizeof(uint4) - 1) / sizeof(uint4));
+			*outchar_ptr += PAT_STRLIT_PADDING + ((maskcls + sizeof(uint4) - 1) / sizeof(uint4));
 		} else
 		{
 			for (numexpand = 0; leaves->letter[0][numexpand] >= 0; numexpand++)
@@ -461,7 +462,13 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 		*locoutchar++ = pattern_mask;
 		if (PATM_STRLIT & pattern_mask)
 		{
-			*locoutchar++ = maskcls;
+			*locoutchar++ = maskcls;	/* bytelen */
+ 			*locoutchar++ = maskcls;	/* charlen */
+
+			*locoutchar++ = 0;		/* both NONASCII and BADCHAR flags are absent since this is
+							   indeed a valid ASCII string or else we would not have come
+							   to dfa_calc (and hence there are no bad chars) */
+			assert(3 == PAT_STRLIT_PADDING);
 			textstring = (unsigned char *)locoutchar;	/* change pointer type */
 			for (numexpand = 0; numexpand < maskcls; numexpand++)
 				*textstring++ = leaves->letter[0][numexpand];

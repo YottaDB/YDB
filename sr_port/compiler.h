@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -340,6 +340,7 @@ int f_two_mstrs(oprtype *a, opctype op);
 int f_two_mval(oprtype *a, opctype op);
 int f_view(oprtype *a, opctype op);
 int f_zcall(oprtype *a, opctype op);
+int f_zchar(oprtype *a, opctype op);
 int f_zdate(oprtype *a, opctype op);
 int f_zechar(oprtype *a, opctype op);
 int f_zgetsyi(oprtype *a, opctype op);
@@ -352,5 +353,8 @@ int f_zsigproc(oprtype *a, opctype op);
 int f_zsqlexpr (oprtype *a, opctype op);
 int f_zsqlfield (oprtype *a, opctype op);
 int f_ztrnlnm(oprtype *a, opctype op);
+int f_zconvert(oprtype *a, opctype op);
+int f_zwidth(oprtype *a, opctype op);
+int f_zsubstr(oprtype *a, opctype op);
 
 #endif /* COMPILER_H_INCLUDED */

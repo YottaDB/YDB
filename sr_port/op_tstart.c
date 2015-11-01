@@ -44,6 +44,11 @@
 #include "hashtab.h"
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
 
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"	/* needed by *TYPEMASK* macros defined in gtm_utf8.h */
+#include "gtm_utf8.h"
+#endif
+
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_TPMIXUP);
@@ -80,6 +85,7 @@ GBLREF  gd_region		*gv_cur_region;
 GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		tp_in_use;
+GBLREF	boolean_t		gtm_utf8_mode;
 
 #define NORESTART -1
 #define ALLLOCAL  -2
@@ -112,7 +118,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	stack_frame		*fp, *fp_fix;
 	tp_frame		*tf;
 	tp_var			*restore_ent;
-	unsigned char		*old_sp, *top, *tstack_ptr;
+	unsigned char		*old_sp, *top, *tstack_ptr, *ptrstart, *ptrend, *ptrinvalidbegin;
 	va_list			varlst, lvname;
 	tp_region		*tr, *tr_next;
 	sgm_info		*si;
@@ -178,8 +184,28 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		memset(tcom_record.jnl_tid, 0, TID_STR_SIZE);
 		if (0 != tid->str.len)
 		{
-			if (tid->str.len > TID_STR_SIZE)
-				tid->str.len = TID_STR_SIZE;
+			if (!gtm_utf8_mode)
+			{
+				if (tid->str.len > TID_STR_SIZE)
+					tid->str.len = TID_STR_SIZE;
+			}
+			UNICODE_ONLY(
+			else
+			{	/* In UTF8 mode, take only as many valid multi-byte characters as can fit in TID_STR_SIZE */
+				if (gtm_utf8_mode)
+				{
+					MV_FORCE_LEN(tid); /* issues BADCHAR error if appropriate */
+					if (tid->str.len > TID_STR_SIZE)
+					{
+						ptrstart = (unsigned char *)tid->str.addr;
+						ptrend = ptrstart + TID_STR_SIZE;
+						UTF8_LEADING_BYTE(ptrend, ptrstart, ptrinvalidbegin)
+						tid->str.len = ptrinvalidbegin - ptrstart;
+					}
+				}
+			}
+			)
+			assert(TID_STR_SIZE >= tid->str.len);
 			memcpy(tcom_record.jnl_tid, (char *)tid->str.addr, tid->str.len);
 			if ((TP_BATCH_SHRT == tid->str.len) || (TP_BATCH_LEN == tid->str.len))
 			{

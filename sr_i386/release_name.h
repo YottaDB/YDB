@@ -9,6 +9,6 @@
  *								*
  ****************************************************************/
 
-#define GTM_RELEASE_NAME 	"GT.M V5.1-000 Linux x86"
+#define GTM_RELEASE_NAME 	"GT.M V5.2-000 Linux x86"
 #define GTM_PRODUCT 		"GT.M"
-#define GTM_VERSION		"V5.1"
+#define GTM_VERSION		"V5.2"

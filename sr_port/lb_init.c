@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@ GBLREF	short int		last_source_column;
 GBLREF	char			*lexical_ptr;
 GBLREF	struct ce_sentinel_desc	*ce_def_list;
 
-LITREF char	ctypetab[NUM_ASCII_CHARS];
+LITREF char	ctypetab[NUM_CHARS];
 
 void lb_init(void)
 {

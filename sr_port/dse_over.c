@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,9 @@
 #include "gvcst_blk_build.h"
 #include "ebc_xlat.h"
 #include "t_abort.h"
+#include "stringpool.h"
+#include "gtm_conv.h"
+#include "gtm_utf8.h"
 
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF gd_region        *gv_cur_region;
@@ -48,25 +51,35 @@ GBLREF srch_hist	dummy_hist;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
 GBLREF block_id		patch_curr_blk;
+GBLREF gtm_chset_t	dse_over_chset;
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 GBLREF iconv_t		dse_over_cvtcd;
+#endif
 GBLREF cw_set_element   cw_set[];
 GBLREF unsigned char    *non_tp_jfb_buff_ptr;
+GBLREF UConverter	*chset_desc[];
+LITREF mstr		chset_names[];
+GBLREF spdesc		stringpool;
 
 void dse_over(void)
 {
+	static char 	*data = NULL;
+	static int	data_size;
         block_id        blk;
-	char 		data[MAX_LINE];
 	uchar_ptr_t	lbp;
         uint4		offset;
 	int		data_len, size;
 	blk_segment	*bs1, *bs_ptr;
 	cw_set_element  *cse;
 	int4		blk_seg_cnt, blk_size;
-	unsigned char	*cvt_src_ptr, *cvt_dst_ptr;
-	unsigned int	insize, outsize;
-	char		chset_name[MAX_CHSET_NAME];
+        unsigned char   *cvt_src_ptr, *cvt_dst_ptr;
+        unsigned int    insize, outsize;
+        char            chset_name[MAX_CHSET_NAME];
+	mstr		chset_mstr;
 	unsigned short	name_len = 0;
 	srch_blk_status	blkhist;
+	mstr		cvt_src;
+	int		cvt_len;
 
 	error_def(ERR_DBRDONLY);
 	error_def(ERR_DSEBLKRDFAIL);
@@ -96,6 +109,7 @@ void dse_over(void)
 		if (cli_get_str("OCHSET", chset_name, &name_len) && 0 != name_len)
 		{
 			chset_name[name_len] = 0;
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 			if ( (iconv_t)0 != dse_over_cvtcd )
 			{
 				ICONV_CLOSE_CD(dse_over_cvtcd);
@@ -104,14 +118,24 @@ void dse_over(void)
 				dse_over_cvtcd = (iconv_t)0;
 			else
 				ICONV_OPEN_CD(dse_over_cvtcd, INSIDE_CH_SET, chset_name);
+#else
+			chset_mstr.addr = chset_name;
+			chset_mstr.len = name_len;
+			SET_ENCODING(dse_over_chset, &chset_mstr);
+			get_chset_desc(&chset_names[dse_over_chset]);
+#endif
 		}
 	} else
 	{
+#ifdef KEEP_zOS_EBCDIC
 		if ((iconv_t)0 != dse_over_cvtcd )
 		{
 			ICONV_CLOSE_CD(dse_over_cvtcd);
 			dse_over_cvtcd = (iconv_t)0;		/* default ASCII, no conversion	*/
 		}
+#else
+		dse_over_chset = CHSET_M;
+#endif
 	}
 	if (cli_present("OFFSET") != CLI_PRESENT)
 	{
@@ -147,15 +171,37 @@ void dse_over(void)
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
+	if (NULL == data)
+	{
+		data = malloc(MAX_LINE);
+		data_size = MAX_LINE;
+	}
 	if (FALSE == dse_data(&data[0], &data_len))
 	{
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 	cvt_src_ptr = cvt_dst_ptr = (unsigned char *)data;
 	insize = outsize = (unsigned int)data_len;
 	if ((iconv_t)0 != dse_over_cvtcd)
 		ICONVERT(dse_over_cvtcd, &cvt_src_ptr, &insize, &cvt_dst_ptr, &outsize);         /*      in-place conversion     */
+#else
+	cvt_src.len = (unsigned int)data_len;
+	cvt_src.addr = data;
+	if (CHSET_M != dse_over_chset)
+	{
+		cvt_len = gtm_conv(chset_desc[dse_over_chset], chset_desc[CHSET_UTF8], &cvt_src, NULL, NULL);
+		if (cvt_len > data_size)
+		{
+			free(data);
+			data = malloc(cvt_len);
+			data_size = cvt_len;
+		}
+		memcpy(data, stringpool.free, cvt_len);
+		data_len = cvt_len;
+	}
+#endif
 	if (offset + data_len > size)
 	{
 		util_out_print("Error:  data will not fit in block at given offset.", TRUE);

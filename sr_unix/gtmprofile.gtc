@@ -10,6 +10,11 @@
 #################################################################
 gtm_dist="GTMDIST"; export gtm_dist
 gtmgbldir="mumps.gld"; export gtmgbldir
+if [ "$gtm_chset" = "UTF-8" ] ; then
+        if [ -e $gtm_dist/utf8 ] ; then
+                gtm_dist="$gtm_dist/utf8"; export gtm_dist
+        fi
+fi
 gtmroutines=". $gtm_dist"; export gtmroutines
 gtm="$gtm_dist/mumps -direct"; export gtm
 mupip="$gtm_dist/mupip"; export mupip

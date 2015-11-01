@@ -73,6 +73,7 @@ GBLREF int4		zdate_form;
 GBLREF int4		zdir_form;
 GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF boolean_t 	local_collseq_stdnull;
+GBLREF boolean_t	badchar_inhibit;
 GBLREF int		gv_fillfactor;
 
 #define MAX_YDIRTSTR 32
@@ -109,7 +110,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	static readonly char msg2[] = "Disabled";
 	static readonly char msg3[] = "Enabled";
 	static readonly char lv_msg1[] =
-		"Caution: Sanchez reserved local variable string pointer duplicate check diagnostic has been";
+		"Caution: GT.M reserved local variable string pointer duplicate check diagnostic has been";
 	static readonly char upper[] = "UPPER";
 	static readonly char lower[] = "LOWER";
 
@@ -143,6 +144,14 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	view_arg_convert(vtp, arg, &parmblk);
 	switch(vtp->keycode)
 	{
+#ifdef UNICODE_SUPPORTED
+		case VTK_BADCHAR:
+			badchar_inhibit = FALSE;
+			break;
+		case VTK_NOBADCHAR:
+			badchar_inhibit = TRUE;
+			break;
+#endif
 		case VTK_BREAKMSG:
 			break_message_mask = MV_FORCE_INT(parmblk.value);
 			break;

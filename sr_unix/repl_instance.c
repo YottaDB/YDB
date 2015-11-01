@@ -129,20 +129,16 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, int4 buflen)
 	 */
 	assert((NULL == jnlpool.jnlpool_dummy_reg) || (NULL == recvpool.recvpool_dummy_reg)
 		|| jnlpool.jnlpool_dummy_reg == recvpool.recvpool_dummy_reg);
-	DEBUG_ONLY(
-		reg = jnlpool.jnlpool_dummy_reg;
-		if (NULL == reg)
-			reg = recvpool.recvpool_dummy_reg;
-	)
+	reg = jnlpool.jnlpool_dummy_reg;
+	if (NULL == reg)
+		reg = recvpool.recvpool_dummy_reg;
 	assert((NULL == reg) && (in_repl_inst_create || in_repl_inst_edit || in_mupip_ftok)
 		|| (NULL != reg) && !in_repl_inst_create && !in_repl_inst_edit && !in_mupip_ftok);
-	DEBUG_ONLY(
-		if (NULL != reg)
-		{
-			udi = FILE_INFO(reg);
-			assert(udi->grabbed_ftok_sem);
-		}
-	)
+	if (NULL != reg)
+	{
+		udi = FILE_INFO(reg);
+		assert(udi->grabbed_ftok_sem);
+	}
 	OPENFILE(fn, O_RDONLY, fd);
 	if (-1 == fd)
 		rts_error(VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
@@ -162,8 +158,12 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, int4 buflen)
 		if (GDS_REPL_INST_LABEL_SZ <= actual_readlen)
 		{	/* Have read the entire label in the instance file header. Check if it is the right version */
 			if (memcmp(buff, GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ - 1))
+			{
+				if ((NULL != reg) && (udi->grabbed_ftok_sem))
+					ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 				rts_error(VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
 					GDS_REPL_INST_LABEL_SZ - 1, GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ - 1, buff);
+			}
 		}
 	}
 	assert((0 == status) || in_repl_inst_edit);

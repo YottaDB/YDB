@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@ void i2flt(mflt *v, int i);
 void double2mval(mval *dst, double src);
 double mval2double(mval *v);
 int4 mval2i(mval *v);
-uint4 mval2si(mval *v);
+uint4 mval2ui(mval *v);
 bool isint (mval *v);
 
 #endif

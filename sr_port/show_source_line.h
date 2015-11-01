@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,8 @@
 #ifndef SHOW_SOURCE_LINE_INCLUDED
 #define SHOW_SOURCE_LINE_INCLUDED
 
-void show_source_line(void);
+#define ARROW	"^-----"
+
+void show_source_line(char* buf, boolean_t warn);
 
 #endif /* SHOW_SOURCE_LINE_INCLUDED */

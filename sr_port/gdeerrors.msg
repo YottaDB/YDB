@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	!
+!	Copyright 2001, 2006 Fidelity Information Services, Inc	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -66,4 +66,5 @@ GDREADERR	<Error reading Global Directory: !AD>/info/fao=2
 GDNOTSET	<Global Directory not changed because the current GD cannot be written>/info/fao=0
 INVGBLDIR	<Invalid Global Directory spec: !AD.!/Continuing with !AD>/info/fao=4
 WRITEERROR	<Cannot exit because of write failure.  Reason for failure: !AD>/info/fao=2
+NONASCII	<!AD is illegal for a !AD as it contains non-ASCII characters>/error/fao=4
 	.end

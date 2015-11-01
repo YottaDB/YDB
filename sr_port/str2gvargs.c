@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,9 +20,13 @@
 #include "gdsfhead.h"
 #include "subscript.h"
 #include "str2gvargs.h"
+#include "zshow.h"
+#ifdef UNICODE_SUPPORTED
+#include "gtm_utf8.h"
+#endif
 
 static mval subsc[MAX_GVSUBSCRIPTS]; 	/* At return, op_gvargs elements will be pointing to elements of this array, hence static */
-static mstr subsc_buffer = {0, NULL}; 	/* Buffer space (subsc_buffer.addr) will be allocated on the first call.
+static MSTR_DEF(subsc_buffer, 0, NULL); /* Buffer space (subsc_buffer.addr) will be allocated on the first call.
 					 * Buffer space to hold string mvals in subsc; we don't want to use stringpool because
 					 * this module is called from both DDPGVUSR and GTMSHR, and stringpool is not set up in
 					 * DDPGVUSR. In addition, if we use stringpool, we might have to garbage collect, which
@@ -33,11 +37,11 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 { /* IMPORTANT : op_gvargs will point to static area which gets overwritten by the next call to this function. Callers should
      make a copy of op_gvargs if necessary */
 
-	char		*p1, *p2, *c_top, *c_ref, ch, *subsc_ptr;
+	char		*p1, *p2, *c_top, *c_ref, ch, *subsc_ptr, *dstptr, *strnext;
 	int		count;
 	mval		*spt;
-	int 		dollarc_val;
-	boolean_t	naked, concat, dot_seen;
+	int 		chcode, chlen, chtmp;
+	boolean_t	naked, concat, dot_seen, dollarzch, isdolar;
 	error_def(ERR_NOTGBL);
 	error_def(ERR_GVINVALID);
 	error_def(ERR_LPARENREQD);
@@ -47,6 +51,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 	error_def(ERR_DLRCTOOBIG);
 	error_def(ERR_EORNOTFND);
 	error_def(ERR_RPARENREQD);
+	error_def(ERR_DLRCILLEGAL);
 
 	assert(sizeof(op_gvargs->count) == sizeof(op_gvargs->args[0]));
 	naked = FALSE;
@@ -58,7 +63,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 	{
 		if (NULL != subsc_buffer.addr)
 			free(subsc_buffer.addr);
-		subsc_buffer.len = ((MAX_ZWR_INFLATION * MAX_KEY_SZ) < len ? len : (MAX_ZWR_INFLATION * MAX_KEY_SZ));
+		subsc_buffer.len = (ZWR_EXP_RATIO(MAX_KEY_SZ) < len ? len : ZWR_EXP_RATIO(MAX_KEY_SZ));
 		subsc_buffer.addr = malloc(subsc_buffer.len);
 	}
 	spt = subsc;
@@ -132,35 +137,64 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 				}
 			} else if ('$' == ch)
 			{
-				if (3 > c_top - ++cp || 'C' != toupper(*cp) || '(' != *(++cp))
-					rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 				cp++;
+				chtmp = toupper(*cp);
+				isdolar = (3 <= c_top - cp && 'C' == chtmp || '(' == cp[1]);
+				if (!isdolar)
+					isdolar = (5 <= c_top - cp && 'Z' == chtmp && 'C' == cp[1] && 'H' == cp[2] && '(' == cp[3]);
+				if (!isdolar)
+					rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
+
+				if ('Z' == chtmp)
+				{
+					dollarzch = TRUE;
+					cp += 4;
+				} else
+				{
+					dollarzch = FALSE;
+					cp += 2;
+				}
 				for (; ;)
 				{
-					dollarc_val = 0;
-					if (!ISDIGIT(*cp))
+					A2I(cp, c_top, chcode);
+					if (0 > chcode)
 						rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
-					do
+
+					dstptr = (!concat) ? subsc_ptr : p1;
+
+					if (!gtm_utf8_mode || dollarzch)
 					{
-						dollarc_val *= 10;
-						dollarc_val += *cp - '0';
-						if (dollarc_val > 255)
-							rts_error(VARLSTCNT(4) ERR_DLRCTOOBIG, 2, len, c_ref);
-						if (++cp == c_top)
-							rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
-					} while (ISDIGIT(*cp));
+						if (255 < chcode)
+						{
+							if (dollarzch)
+								rts_error(VARLSTCNT(6) ERR_DLRCTOOBIG, 4, len, c_ref,
+										LEN_AND_LIT("$CHAR()"));
+							else
+								rts_error(VARLSTCNT(6) ERR_DLRCTOOBIG, 4, len, c_ref,
+										LEN_AND_LIT("$ZCHAR()"));
+						}
+						*dstptr = chcode;
+						chlen = 1;
+					}
+#ifdef UNICODE_SUPPORTED
+					else {
+						strnext = (char *)UTF8_WCTOMB(chcode, dstptr);
+						chlen = strnext - dstptr;
+						if (0 == chlen)
+							rts_error(VARLSTCNT(5) ERR_DLRCILLEGAL, 3, len, c_ref, chcode);
+					}
+#endif
 					if (!concat)
 					{
 						spt->str.addr = subsc_ptr;
-						*spt->str.addr = dollarc_val;
-						spt->str.len = 1;
-						subsc_ptr++;
+						spt->str.len = chlen;
+						subsc_ptr += chlen;
 						p1 = subsc_ptr;
 					} else
 					{
-						*p1++ = dollarc_val;
-						spt->str.len++;
-						subsc_ptr++;
+						p1 += chlen;
+						spt->str.len += chlen;
+						subsc_ptr += chlen;
 					}
 					if (',' == *cp)
 					{

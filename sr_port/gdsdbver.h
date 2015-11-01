@@ -50,7 +50,9 @@ enum mdb_ver
 {
 	GDSMV4,		/* Applies to all V4 versions (no minor versions defined) */
 	GDSMV50000,
-	GDSMV51000,	/* Multi-site available */
+	GDSMV51000,	/* Multi-site available (for databases created by V51000 - see V51000ALT */
+	GDSMV51000ALT,	/* Upgrade from a previous version upgraded to this value for V51000 due to bug */
+	GDSMV52000,	/* Unicode .. no real header changes but db contents could be unusable by previous versions */
 	GDSMVLAST
 };
 #define GDSMVCURR (GDSMVLAST - 1)

@@ -61,9 +61,11 @@ enum
 	SV_ZJOB,                /* 48 */
 	SV_ZDATE_FORM, 		/* 49 */
 	SV_ZTEXIT,		/* 50 */
-	SV_NUM_SV,		/* 51 */
-	SV_ZALLOCSTOR,		/* 52 */
-	SV_ZREALSTOR,		/* 53 */
-	SV_ZUSEDSTOR,		/* 54 */
+	SV_ZALLOCSTOR,		/* 51 */
+	SV_ZREALSTOR,		/* 52 */
+	SV_ZUSEDSTOR,		/* 53 */
+	SV_ZCHSET,		/* 54 */
+	SV_ZPATNUMERIC,		/* 55 */
+	SV_NUM_SV,		/* count - should be next to last SV entry just prior to dummy entry below */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,10 @@
 
 #include "mdef.h"
 
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include <errno.h>
-#include <string.h>
 
 #include "rtnhdr.h"
 #include "compiler.h"
@@ -25,6 +24,7 @@
 #include "gtmio.h"
 #include "incr_link.h"
 #include "min_max.h"	/* MIDENT_CMP needs MIN */
+#include "cmd_qlf.h"	/* needed for CQ_UTF8 */
 
 /* INCR_LINK - read and process a mumps object module.  Link said module to
  	currently executing image */
@@ -35,6 +35,7 @@ LITREF int4 gtm_release_name_len;
 static char 		*code;
 GBLREF mident_fixed 	zlink_mname;
 GBLREF unsigned char 	*zl_lab_err;
+GBLREF  boolean_t	gtm_utf8_mode;
 
 #define RELREAD 50	/* number of relocation entries to buffer */
 typedef struct res_list_struct
@@ -45,7 +46,7 @@ typedef struct res_list_struct
 
 void res_free(res_list *root);
 bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code);
-void zl_error(int4 file, int4 err, int4 len, char *addr);
+void zl_error(int4 file, int4 err, int4 err2, int4 len, char *addr);
 
 bool incr_link(int file_desc)
 {
@@ -59,8 +60,10 @@ bool incr_link(int file_desc)
 	urx_rtnref	urx_lcl_anchor;
 	int		order;
 	struct exec 	file_hdr;
+
 	error_def(ERR_INVOBJ);
 	error_def(ERR_LOADRUNNING);
+	error_def(ERR_TEXT);
 
 	urx_lcl_anchor.len = 0;
 	urx_lcl_anchor.addr = 0;
@@ -74,14 +77,14 @@ bool incr_link(int file_desc)
 		if (-1 == read_size)
 		{
 			save_errno = errno < sys_nerr ? (0 <= errno ? errno : 0) : 0;
-			zl_error(file_desc, ERR_INVOBJ, strlen(STRERROR(save_errno)),
+			zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, strlen(STRERROR(save_errno)),
 					STRERROR(save_errno));
 		}
 		else
-			zl_error(file_desc, ERR_INVOBJ, RTS_ERROR_TEXT("reading file header"));
+			zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, RTS_ERROR_TEXT("reading file header"));
 	}
 	else if (OMAGIC != file_hdr.a_magic)
-		zl_error(file_desc, ERR_INVOBJ, RTS_ERROR_TEXT("bad magic"));
+		zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, RTS_ERROR_TEXT("bad magic"));
 	else if (OBJ_LABEL != file_hdr.a_stamp)
 		return FALSE;	/* wrong version */
 
@@ -94,16 +97,21 @@ bool incr_link(int file_desc)
 		if (-1 == read_size)
 		{
 			save_errno = errno < sys_nerr ? (0 <= errno ? errno : 0) : 0;
-			zl_error(file_desc, ERR_INVOBJ, strlen(STRERROR(save_errno)),
+			zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, strlen(STRERROR(save_errno)),
 					STRERROR(save_errno));
 		}
 		else
-			zl_error(file_desc, ERR_INVOBJ, RTS_ERROR_TEXT("reading code"));
+			zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, RTS_ERROR_TEXT("reading code"));
 	}
 	hdr = (rhdtyp *)code;
 	if (memcmp(&hdr->jsb[0], "GTM_CODE", sizeof(hdr->jsb)))
-		zl_error(file_desc, ERR_INVOBJ, RTS_ERROR_TEXT("missing GTM_CODE"));
-
+		zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, RTS_ERROR_TEXT("missing GTM_CODE"));
+	if ((hdr->compiler_qlf & CQ_UTF8) && !gtm_utf8_mode)
+		zl_error(file_desc, ERR_INVOBJ, ERR_TEXT,
+			RTS_ERROR_TEXT("Object compiled with CHSET=UTF-8 which is different from $ZCHSET"));
+	if (!(hdr->compiler_qlf & CQ_UTF8) && gtm_utf8_mode)
+		zl_error(file_desc, ERR_INVOBJ, ERR_TEXT,
+			RTS_ERROR_TEXT("Object compiled with CHSET=M which is different from $ZCHSET"));
 	literal_ptr = code + file_hdr.a_text;
 	for (cnt = hdr->vartab_len, curvar = VARTAB_ADR(hdr); cnt; --cnt, ++curvar)
 	{ /* relocate the variable table */
@@ -117,14 +125,14 @@ bool incr_link(int file_desc)
 	if (!addr_fix(file_desc, &file_hdr, &urx_lcl_anchor, hdr))
 	{
 		urx_free(&urx_lcl_anchor);
-		zl_error(file_desc, ERR_INVOBJ, RTS_ERROR_TEXT("address fixup failure"));
+		zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, RTS_ERROR_TEXT("address fixup failure"));
 	}
 	if (!zlput_rname (hdr))
 	{
 		urx_free(&urx_lcl_anchor);
 		/* Copy routine name to local variable because zl_error free's it.  */
 		memcpy(&module_name[0], hdr->routine_name.addr, hdr->routine_name.len);
-		zl_error(file_desc, ERR_LOADRUNNING, hdr->routine_name.len, &module_name[0]);
+		zl_error(file_desc, 0, ERR_LOADRUNNING, hdr->routine_name.len, &module_name[0]);
 	}
 	urx_add (&urx_lcl_anchor);
 
@@ -407,17 +415,24 @@ void res_free(res_list *root)
 }
 
 
-/* ZL_ERROR - perform cleanup and signal errors found in zlinking a mumps
-	object module */
-
-void zl_error(int4 file, int4 err, int4 len, char *addr)
+/* ZL_ERROR - perform cleanup and signal errors found in zlinking a mumps object module
+ * err - an error code that accepts no arguments and
+ * err2 - an error code that accepts two arguments (!AD) */
+void zl_error(int4 file, int4 err, int4 err2, int4 len, char *addr)
 {
 	if (code)
+	{
 		free(code);
-
+		code = NULL;
+	}
 	close(file);
-	if (!len)
+
+	if (0 != err && 0 != err2)
+		rts_error(VARLSTCNT(6) err, 0, err2, 2, len, addr);
+	else if (0 != err)
 		rts_error(VARLSTCNT(1) err);
-	else
-		rts_error(VARLSTCNT(4) err, 2, len, addr);
+	else {
+		assert(0 != err2);
+		rts_error(VARLSTCNT(4) err2, 2, len, addr);
+	}
 }

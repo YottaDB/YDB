@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,16 @@
 #define MAX_TABLINE_LEN		1024	/* maximum length of a line estimated to be sufficient
 					   to specify MAXIMUM_PARAMETERS parameters in the
 					   callin/xcall table */
+
+#define	UNKNOWN_SYSERR 		"unknown system error"
+#define COPY_DLLERR_MSG(err_ptr, err_buf)					\
+{										\
+	if ((err_ptr = dlerror()) != NULL)					\
+		strncpy(err_buf, err_ptr, sizeof(err_buf));			\
+	else									\
+		memcpy(err_buf, UNKNOWN_SYSERR, sizeof(UNKNOWN_SYSERR));	\
+}
+
 typedef int4	(*fgnfnc)();
 
 struct extcall_string

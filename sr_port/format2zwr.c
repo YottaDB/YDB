@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,13 +8,6 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
-/*
- * This routine does almost the same formatting as zwrite. The reason for not
- * using zwrite directly is because zwrite is much more complex than we need
- * here.
- */
-
 #include "mdef.h"
 
 #include "gtm_string.h"
@@ -22,92 +15,169 @@
 #include "mlkdef.h"
 #include "zshow.h"
 #include "patcode.h"
-#include "compiler.h"	/* for CHARMAXARGS */
+#include "compiler.h"		/* for CHARMAXARGS */
 
-GBLREF uint4 *pattern_typemask;
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"	/* U_ISPRINT() needs this header */
+#include "gtm_utf8.h"
+#endif
 
-static readonly char dollarch[] = "$C(";
-static readonly char quote_dch[] = "\"_$C(";
-static readonly char comma[] = ",";
-static readonly char close_paren_quote[] = ")_\"";
-static readonly char close_paren_dollarch[] = ")_$C(";
+GBLREF	uint4		*pattern_typemask;
+GBLREF	boolean_t	gtm_utf8_mode;
 
+/* Routine to convert a string to ZWRITE format. Used by the utiltities.
+ * NOTE: this routine does almost the same formatting as mval_write(). The reason
+ * for not using mval_write() is because it is much more complex than we need
+ * here. Moreover, this version is more efficient due to the availability of
+ * pre-allocated destination buffer */
 int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 {
-        sm_uc_ptr_t cp;
-	int ch;
-	int  fastate = 0, ncommas;
-	bool isctl;
+        sm_uc_ptr_t	cp;
+	int4		ch;
+	int		fastate = 0, ncommas, dstlen, chlen;
+	boolean_t	isctl, isill;
+	uchar_ptr_t	srctop, strnext, tmpptr;
 
-	*des_len = 0;
+	dstlen = *des_len = 0;
 
 	if (src_len > 0)
 	{
-	        /* deals with the first character */
-	        ch = *src;
-		isctl = ((pattern_typemask[ch] & PATM_C) != 0);
-		if (isctl)
-		{
-		        memcpy(des + *des_len, dollarch, sizeof(dollarch) - 1);
-			*des_len += sizeof(dollarch) - 1;
-		        i2a(des, des_len, ch);
-			fastate = 2;
-			ncommas = 0;
-	        }
-		else
-		{
-		        *(des + (*des_len)++) = '"';
-			if ('"' == ch)
-			        *(des + (*des_len)++) = '"';
-			*(des + (*des_len)++) = ch;
-			fastate = 1;
-		}
-
+		srctop = src + src_len;
+		fastate = 0;
 		/* deals with the other characters */
-		for(cp = src + 1; cp < src + src_len; cp++)
+		for (cp = src; cp < srctop; cp += chlen)
 		{
-		        ch = *cp;
-		        isctl = ((pattern_typemask[ch] & PATM_C) != 0);
+			if (!gtm_utf8_mode)
+			{
+		        	ch = *cp;
+				isctl = ((pattern_typemask[ch] & PATM_C) != 0);
+				isill = FALSE;
+				chlen = 1;
+			}
+#ifdef UNICODE_SUPPORTED
+			else {
+				strnext = UTF8_MBTOWC(cp, srctop, ch);
+				isill = (WEOF == ch) ? (ch = *cp, TRUE) : FALSE;
+				if (!isill)
+					isctl = !U_ISPRINT(ch);
+				chlen = strnext - cp;
+			}
+#endif
 			switch(fastate)
 			{
-			case 1:
-			        if(isctl)
+			case 0:	/* beginning of the string */
+			case 1: /* beginning of a new substring followed by a graphic character */
+				if (isill)
 			        {
-					memcpy(des + *des_len, quote_dch, sizeof(quote_dch) - 1);
-					*des_len += sizeof(quote_dch) - 1;
-					i2a(des, des_len, ch);
+					if (dstlen > 0)
+					{
+						des[dstlen++] = '"';
+						des[dstlen++] = '_';
+					}
+					MEMCPY_LIT(des + dstlen, DOLLARZCH);
+					dstlen += STR_LIT_LEN(DOLLARZCH);
+					I2A(des, dstlen, ch);
+					fastate = 3;
+					ncommas = 0;
+			        } else if (isctl)
+			        {
+					if (dstlen > 0)
+					{ /* close previous string with quote and prepare for concatenation */
+						des[dstlen++] = '"';
+						des[dstlen++] = '_';
+					}
+					MEMCPY_LIT(des + dstlen, DOLLARCH);
+					dstlen += STR_LIT_LEN(DOLLARCH);
+					I2A(des, dstlen, ch);
 					fastate = 2;
 					ncommas = 0;
-			        }
-				else
-				{
+			        } else
+				{ /* graphic characters */
+					if (0 == fastate) /* the initial quote in the beginning */
+					{
+		        			des[dstlen++] = '"';
+						fastate = 1;
+					}
 				        if ('"' == ch)
-					        *(des + (*des_len)++) = '"';
-					*(des + (*des_len)++) = ch;
+						des[dstlen++] = '"';
+					if (!gtm_utf8_mode)
+						des[dstlen++] = ch;
+					else {
+						memcpy(&des[dstlen], cp, chlen);
+						dstlen += chlen;
+					}
 				}
 				break;
-			case 2:
-				if((isctl) || ('"' == ch))
+			case 2: /* subsequent characters following a non-graphic character in the
+				   form of $CHAR(x,) */
+				if (isill)
+				{
+					MEMCPY_LIT(des + dstlen, CLOSE_PAREN_DOLLARZCH);
+					dstlen += STR_LIT_LEN(CLOSE_PAREN_DOLLARZCH);
+					I2A(des, dstlen, ch);
+					fastate = 3;
+				} else if(isctl)
 				{
 					ncommas++;
 					if (CHARMAXARGS == ncommas)
 					{
 						ncommas = 0;
-						memcpy(des + *des_len, close_paren_dollarch, sizeof(close_paren_dollarch) - 1);
-						*des_len += sizeof(close_paren_dollarch) - 1;
-					}
-					else
+						MEMCPY_LIT(des + dstlen, CLOSE_PAREN_DOLLARCH);
+						dstlen += STR_LIT_LEN(CLOSE_PAREN_DOLLARCH);
+					} else
 					{
- 						memcpy(des + *des_len, comma, sizeof(comma) - 1);
-						*des_len += sizeof(comma) - 1;
+						MEMCPY_LIT(des + dstlen, COMMA);
+						dstlen += STR_LIT_LEN(COMMA);
 					}
-					i2a(des, des_len, ch);
-				}
-				else
+					I2A(des, dstlen, ch);
+				} else
 				{
-					memcpy(des + *des_len, close_paren_quote, sizeof(close_paren_quote) - 1);
-					*des_len += sizeof(close_paren_quote) - 1;
-					*(des + (*des_len)++) = ch;
+					MEMCPY_LIT(des + dstlen, CLOSE_PAREN_QUOTE);
+					dstlen += STR_LIT_LEN(CLOSE_PAREN_QUOTE);
+					if (!gtm_utf8_mode)
+						des[dstlen++] = ch;
+					else {
+						memcpy(&des[dstlen], cp, chlen);
+						dstlen += chlen;
+					}
+				        if ('"' == ch)
+						des[dstlen++] = '"';
+					fastate = 1;
+				}
+				break;
+			case 3: /* subsequent characters following an illegal character in the form of $ZCHAR(x,) */
+				if(isill)
+				{
+					ncommas++;
+					if (CHARMAXARGS == ncommas)
+					{
+						ncommas = 0;
+						MEMCPY_LIT(des + dstlen, CLOSE_PAREN_DOLLARZCH);
+						dstlen += STR_LIT_LEN(CLOSE_PAREN_DOLLARZCH);
+					} else
+					{
+						MEMCPY_LIT(des + dstlen, COMMA);
+						++dstlen;
+					}
+					I2A(des, dstlen, ch);
+				} else if (isctl)
+				{
+					MEMCPY_LIT(des + dstlen, CLOSE_PAREN_DOLLARCH);
+					dstlen += STR_LIT_LEN(CLOSE_PAREN_DOLLARCH);
+					I2A(des, dstlen, ch);
+					fastate = 2;
+				} else
+				{
+					MEMCPY_LIT(des + dstlen, CLOSE_PAREN_QUOTE);
+					dstlen += STR_LIT_LEN(CLOSE_PAREN_QUOTE);
+					if (!gtm_utf8_mode)
+						des[dstlen++] = ch;
+					else {
+						memcpy(&des[dstlen], cp, chlen);
+						dstlen += chlen;
+					}
+				        if ('"' == ch)
+						des[dstlen++] = '"';
 					fastate = 1;
 				}
 				break;
@@ -121,24 +191,22 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 		switch(fastate)
 		{
 		case 1:
-		        *(des + (*des_len)++) = '"';
+		        des[dstlen++] = '"';
 			break;
 		case 2:
-			*(des + (*des_len)++) = ')';
+		case 3:
+		        des[dstlen++] = ')';
 			break;
 		default:
 			assert(FALSE);
 			break;
 		}
-	}
-	else
+	} else
 	{
-		*des++ = '"';
-		*des++ = '"';
-		*des_len = 2;
+		des[0] = des[1] = '"';
+		dstlen = 2;
 	}
-
+	*des_len = dstlen;
 	return 0;
 }
-
 

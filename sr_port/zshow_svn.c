@@ -77,6 +77,7 @@ static readonly char y_text[] = "$Y";
 static readonly char za_text[] = "$ZA";
 static readonly char zallocstor_text[] = "$ZALLOCSTOR";
 static readonly char zb_text[] = "$ZB";
+static readonly char zchset_text[] = "$ZCHSET";
 static readonly char zcmdline_text[] = "$ZCMDLINE";
 static readonly char zcompile_text[] = "$ZCOMPILE";
 static readonly char zcstatus_text[] = "$ZCSTATUS";
@@ -93,6 +94,7 @@ static readonly char zjob_text[] = "$ZJOB";
 static readonly char zlevel_text[] = "$ZLEVEL";
 static readonly char zmaxtptime_text[] = "$ZMAXTPTIME";
 static readonly char zmode_text[] = "$ZMODE";
+static readonly char zpatnumeric_text[] = "$ZPATNUMERIC";
 static readonly char zproc_text[] = "$ZPROCESS";
 static readonly char zprompt_text[] = "$ZPROMPT";
 static readonly char zpos_text[] = "$ZPOSITION";
@@ -141,6 +143,8 @@ GBLREF int4		zdate_form;
 GBLREF int		totalAlloc;
 GBLREF int		totalRmalloc;
 GBLREF int		totalUsed;
+GBLREF mstr		dollar_zchset;
+GBLREF mstr		dollar_zpatnumeric;
 
 LITREF mval		literal_zero,literal_one;
 LITREF char		gtm_release_name[];
@@ -292,6 +296,11 @@ void zshow_svn(zshow_out *output)
 		var.str.len = (char *)c1 - var.str.addr;
 		ZS_VAR_EQU(&x, zb_text);
 		mval_write(output, &var, TRUE);
+	/* SV_ZCHSET */
+		var.mvtype = MV_STR;
+		var.str = dollar_zchset;
+		ZS_VAR_EQU(&x, zchset_text);
+		mval_write(output, &var, TRUE);
 	/* SV_ZCMDLINE */
 		get_command_line(&var, TRUE);	/* TRUE to indicate we want $ZCMDLINE (i.e. processed not actual command line) */
 		ZS_VAR_EQU(&x, zcmdline_text);
@@ -381,6 +390,11 @@ void zshow_svn(zshow_out *output)
 	/* SV_ZMODE */
 		ZS_VAR_EQU(&x, zmode_text);
 		mval_write(output, &dollar_zmode, TRUE);
+	/* SV_ZPATNUMERIC */
+		var.mvtype = MV_STR;
+		var.str = dollar_zpatnumeric;
+		ZS_VAR_EQU(&x, zpatnumeric_text);
+		mval_write(output, &var, TRUE);
 	/* SV_ZPOS */
 		getzposition(&var);
 		ZS_VAR_EQU(&x, zpos_text);

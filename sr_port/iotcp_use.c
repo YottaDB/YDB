@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +13,8 @@
 
 #include "gtm_string.h"
 
-#include <unistd.h>
-#include <netinet/in.h>
+#include "gtm_unistd.h"
+#include "gtm_inet.h"
 #include "gtm_iconv.h"
 #include "gtm_stdio.h"
 
@@ -85,27 +85,27 @@ void	iotcp_use(io_desc *iod, mval *pp)
 			s2pool(&iod->error_handler);
 			break;
 		case iop_ipchset:
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
+			if ( (iconv_t)0 != iod->input_conv_cd )
 			{
-				if ( (iconv_t)0 != iod->input_conv_cd )
-				{
-					ICONV_CLOSE_CD(iod->input_conv_cd);
-				}
-				SET_CODE_SET(iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
-				if (DEFAULT_CODE_SET != iod->in_code_set)
-					ICONV_OPEN_CD(iod->input_conv_cd, INSIDE_CH_SET, (char *)(pp->str.addr + p_offset + 1));
-                        	break;
+				ICONV_CLOSE_CD(iod->input_conv_cd);
 			}
+			SET_CODE_SET(iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
+			if (DEFAULT_CODE_SET != iod->in_code_set)
+				ICONV_OPEN_CD(iod->input_conv_cd, INSIDE_CH_SET, (char *)(pp->str.addr + p_offset + 1));
+#endif
+			break;
                 case iop_opchset:
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
+			if ( (iconv_t)0 != iod->output_conv_cd )
 			{
-				if ( (iconv_t)0 != iod->output_conv_cd )
-				{
-					ICONV_CLOSE_CD(iod->output_conv_cd);
-				}
-				SET_CODE_SET(iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
-				if (DEFAULT_CODE_SET != iod->out_code_set)
-					ICONV_OPEN_CD(iod->output_conv_cd, (char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
-                        	break;
+				ICONV_CLOSE_CD(iod->output_conv_cd);
 			}
+			SET_CODE_SET(iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
+			if (DEFAULT_CODE_SET != iod->out_code_set)
+				ICONV_OPEN_CD(iod->output_conv_cd, (char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
+#endif
+			break;
 		default:
 			break;
 		}

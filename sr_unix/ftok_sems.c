@@ -228,7 +228,6 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 				if (-1 != sem_pid)
 				{
 					gtm_putmsg(VARLSTCNT(5) ERR_SEMWT2LONG, 3,  DB_LEN_STR(reg), sem_pid);
-					DEBUG_ONLY(kill(sem_pid, 11);)
 					assert(DSE_IMAGE == image_type); /* We want to debug why reorg/gtm fails here */
 					return FALSE;
 				} else

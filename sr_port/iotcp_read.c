@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,7 @@
 #include "mdef.h"
 #include "io.h"
 
-short	iotcp_read (mval *v, int4 timeout)
+int	iotcp_read (mval *v, int4 timeout)
 {
         return iotcp_readfl(v, 0, timeout);	/* 0 means not fixed length */
 }

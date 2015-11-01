@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,18 +18,46 @@
 #include "gt_timer.h"
 #include "iotcpdef.h"
 #include "iosocketdef.h"
+#include "gtm_utf8.h"
 
-short	iosocket_rdone(mint *v, int4 timeout)
+GBLREF io_pair	io_curr_device;
+
+int	iosocket_rdone(mint *v, int4 timeout)
 {
-	mval	tmp;
-	short	ret;
+	mval		tmp;
+	int		ret, codepoint;
+	io_desc		*iod;
+	gtm_chset_t	ichset;
 
 	ret = iosocket_readfl(&tmp, 1, timeout);
 	if (ret)
 	{
-		*v = (int4)*(unsigned char *)(tmp.str.addr);
+		if (0 < tmp.str.len)
+		{
+			ichset = io_curr_device.in->ichset;
+			switch(ichset)
+			{
+				case CHSET_M:
+					codepoint = tmp.str.addr[0];
+					break;
+				case CHSET_UTF8:
+					UTF8_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
+					break;
+				case CHSET_UTF16BE:
+					UTF16BE_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
+					break;
+				case CHSET_UTF16LE:
+					UTF16LE_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
+					break;
+				default:
+					GTMASSERT;
+			}
+			UNICODE_ONLY(assert(WEOF != codepoint));
+		} else
+			/* Null length string returns 0 */
+			codepoint = 0;
+		*v = codepoint;
 	} else
 		*v = -1;
-
 	return ret;
 }

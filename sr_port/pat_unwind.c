@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,10 +38,7 @@ boolean_t pat_unwind(
 	uint4		**outchar_ptr,
 	uint4		**lastpatptr_ptr)
 {
-	struct {
-		int4	 	len;
-		unsigned char	lit_buf[MAX_DFA_STRLEN];
-		}  	str_lit;
+	pat_strlit	strlit;
 	uint4		pattern_mask;
 	int		minim, maxim, leaf_cnt, charpos, offset, atom_map;
 	boolean_t	infinite;
@@ -57,9 +54,8 @@ boolean_t pat_unwind(
 			{
 				for (charpos = 0; leaves->letter[leaf_cnt][charpos] >= 0; charpos++)
 				{
-					assert(MAX_DFA_STRLEN > (offset + charpos));
-					str_lit.lit_buf[offset + charpos] = leaves->letter[leaf_cnt][charpos];
-					pattern_mask |= typemask[leaves->letter[leaf_cnt][charpos]];
+					assert((sizeof(strlit.buff) / sizeof(strlit.buff[0])) > (offset + charpos));
+					strlit.buff[offset + charpos] = leaves->letter[leaf_cnt][charpos];
 				}
 				leaf_cnt++;
 			}
@@ -76,9 +72,14 @@ boolean_t pat_unwind(
 		minim = min[atom_map];
 		maxim = max[atom_map];
 		leaf_cnt += MAX(minim - 1, 0) * size[atom_map];
-		str_lit.len = offset;
+		strlit.bytelen = offset;
+ 		/* Since multi-byte characters currently dont go through DFA logic, the bytelen is guaranteed to be charlen */
+ 		strlit.charlen = offset;
+		/* Since non-ascii characters in strings currently dont go through DFA logic, it is guaranteed to be an ascii
+		 * string with no badchars */
+		strlit.flags = 0;
 		if ((MAX_PATTERN_ATOMS <= *count)
-				|| !add_atom(count, pattern_mask, &str_lit, offset, infinite,
+				|| !add_atom(count, pattern_mask, &strlit, infinite,
 					&min[*count], &max[*count], &size[*count], total_min, total_max,
 					minim, maxim, altmin, altmax, last_infinite_ptr, fstchar_ptr, outchar_ptr, lastpatptr_ptr))
 			return FALSE;

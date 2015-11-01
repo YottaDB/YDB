@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	;
+;	Copyright 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -13,7 +13,7 @@ GDEPUT()
 	n rec,gds,cregs,csegs,cregcnt,csegcnt,maxrecsize,mapcnt,map
 	d PUTMAKE^GDEMAP
 	s s="",gdeputzs=""
-	f mapcnt=0:1 s s=$o(map(s)) q:'$l(s)  s cregs(map(s))=""
+	f mapcnt=0:1 s s=$o(map(s)) q:'$zl(s)  s cregs(map(s))=""
 	s maxrecsize=0
 	f cregcnt=0:1 s s=$o(cregs(s)) q:'$l(s)  d
 	. s csegs(regs(s,"DYNAMIC_SEGMENT"))=s i maxrecsize<regs(s,"RECORD_SIZE") s maxrecsize=regs(s,"RECORD_SIZE")
@@ -44,11 +44,13 @@ GDEPUT()
 	s gdexcept="s gdeputzs=$zs  zgoto "_$zl_":writeerr^GDEPUT"
 	i $ZVersion["VMS"  s tempfile=$p(file,";",1)_"inprogress"
 	e  s tempfile=file_"inprogress"
-	s chset=$SELECT($ZV["OS390":"ISO8859-1",1:"")
+	; "The below check for OS390 needs to be changed when z/OS port is resurrected"
+	;if zchset is UTF-8 open in raw mode to avoid BADCHAR errors
+	s chset=$SELECT($ZV["OS390":"ISO8859-1",$ZV["VMS":"",$ZCHSET="UTF-8":"M",1:"")
 	o tempfile:(rewind:noreadonly:newversion:recordsize=512:fixed:blocksize=512:exception=gdexcept:ochset=chset)
 ; maps
 	s s=""
-	f  s s=$o(map(s)) q:'$l(s)  d map
+	f  s s=$o(map(s)) q:'$zl(s)  d map
 ; cregs
 	f  s s=$o(cregs(s)) q:'$l(s)  d cregion
 ; csegs
@@ -62,7 +64,7 @@ GDEPUT()
 	f i=2:1:$l(accmeth,"\") s am=$p(accmeth,"\",i) s s="" d
 	. f  s s=$o(tmpseg(am,s)) q:'$l(s)  s rec=rec_$tr($j($l(tmpseg(am,s)),3)," ",0),rec=rec_tmpseg(am,s)
 	u tempfile
-	f  s record=$e(rec,1,512),rec=$e(rec,513,9999) q:'$l(record)  w record,!
+	f  s record=$ze(rec,1,512),rec=$ze(rec,513,9999) q:'$zl(record)  w record,!
 	u @useio
 	i $ZV'["VMS" o file c file:delete
 	c tempfile:rename=file
@@ -77,7 +79,7 @@ fdatum:
 	q
 map:
 	d writerec
-	i $l(s)'=SIZEOF("mident") d error1
+	i $zl(s)'=SIZEOF("mident") d error1
 	s rec=rec_s_$$num2bin(4,cregs(map(s),"offset"))
 	q
 cregion:
@@ -99,18 +101,18 @@ cregion:
 	s rec=rec_$tr($j("",4)," ",ZERO)							;filler
 	s rec=rec_$$num2bin(1,regs(s,"COLLATION_DEFAULT"))
 	s rec=rec_$$num2bin(1,regs(s,"STDNULLCOLL"))
-	s rec=rec_$$num2bin(1,$l(regs(s,"FILE_NAME")))
-	s rec=rec_regs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$l(regs(s,"FILE_NAME")))," ",ZERO)
+	s rec=rec_$$num2bin(1,$zl(regs(s,"FILE_NAME")))
+	s rec=rec_regs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$zl(regs(s,"FILE_NAME")))," ",ZERO)
 	s rec=rec_$tr($j("",8)," ",ZERO)							; reserved
 	q
 csegment:
 	d writerec
-	s ref=$l(rec)
+	s ref=$zl(rec)
 	s am=segs(s,"ACCESS_METHOD")
 	s rec=rec_$$num2bin(2,$l(s))
 	s rec=rec_s_$tr($j("",MAXSEGLN-$l(s))," ",ZERO)
-	s rec=rec_$$num2bin(2,$l(segs(s,"FILE_NAME")))
-	s rec=rec_segs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$l(segs(s,"FILE_NAME")))," ",ZERO)
+	s rec=rec_$$num2bin(2,$zl(segs(s,"FILE_NAME")))
+	s rec=rec_segs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$zl(segs(s,"FILE_NAME")))," ",ZERO)
 	s rec=rec_$$num2bin(2,segs(s,"BLOCK_SIZE"))
 	s rec=rec_$$num2bin(2,segs(s,"EXTENSION_COUNT"))
 	s rec=rec_$$num2bin(4,segs(s,"ALLOCATION"))
@@ -137,17 +139,17 @@ num2bin:(l,n)
 	;
 num2tiny:(num)
 	i (num<0)!(num'<256) d error1
-	q $c(num)
+	q $zch(num)
 	;
 num2shrt:(num)
 	i (num<0)!(num'<TWO(16)) d error1
-	i endian=TRUE q $c(num\256,num#256)
-	e  q $c(num#256,num\256)
+	i endian=TRUE q $zch(num\256,num#256)
+	e  q $zch(num#256,num\256)
 	;
 num2long:(num)
 	i (num<0)!(num'<TWO(32)) d error1
-	i endian=TRUE q $c(num/16777216,num/65536#256,num/256#256,num#256)
-	e  q $c(num#256,num/256#256,num/65536#256,num/16777216)
+	i endian=TRUE q $zch(num/16777216,num/65536#256,num/256#256,num#256)
+	e  q $zch(num#256,num/256#256,num/65536#256,num/16777216)
 
 num2error:()
 	d error1
@@ -164,8 +166,8 @@ error1:
 	zm $$fatal(gdeerr("VERIFY")):"FAILED"
 	;
 writerec:
-	i $l(rec)<512 q
-	s record=$e(rec,1,512),rec=$e(rec,513,9999)
+	i $zl(rec)<512 q
+	s record=$ze(rec,1,512),rec=$ze(rec,513,9999)
 	u tempfile w record,! u @useio
 	q
 	;

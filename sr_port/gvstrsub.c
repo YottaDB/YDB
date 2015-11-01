@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,117 +10,51 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "collseq.h"
 #include "gdsfhead.h"
-#include "patcode.h"
 #include "do_xform.h"
 #include "gvstrsub.h"
+#include "zshow.h"
 
 GBLREF	gv_namehead	*gv_target;
-GBLREF	uint4		*pattern_typemask;
 GBLREF	bool		transform;
 
 unsigned char *gvstrsub(unsigned char *src, unsigned char *target)
 {
-	int length, n;
-	char buf[256], buf1[256], *ptr;
-	unsigned char *ch1;
-	unsigned char x;
+	int		length, n, target_len;
+	char		buf[MAX_KEY_SZ + 1], buf1[MAX_KEY_SZ + 1], *ptr;
+	unsigned char	*str;
 	mstr		mstr_x;
 	mstr		mstr_tmp;
-	unsigned char order1,  order2;
-	bool dollar_c,  was_dollar_c,  string;
 
-	n = 0;
 	ptr = buf;
-	ch1 = src;
-	while (*ch1)
+	for (n = 0, str = src; *str; ++n, ++str)
 	{
-		n++;
-                if (*ch1 == 1)
+                if (*str == 1)
                 {
-                        ch1++;
-                        *ptr++ = *ch1 - 1;
+                        str++;
+                        *ptr++ = *str - 1;
                 }
                 else
-                        *ptr++ = *ch1;
-                ch1++;
+                        *ptr++ = *str;
 	}
-
 	if (transform && gv_target && gv_target->collseq)
 	{
 		mstr_x.len = n;
 		mstr_x.addr = buf;
-		mstr_tmp.len = 256;
+		mstr_tmp.len = sizeof(buf1);
 		mstr_tmp.addr = buf1;
 		do_xform(gv_target->collseq, XBACK, &mstr_x, &mstr_tmp, &length);
 		n = length;
-		ch1 = (unsigned char *)buf1;
-	}
-	else
-	{	ch1 = (unsigned char *)buf;
-	}
-
-	if (n == 0)	/* fake open quotation mark to balance close quotation at end of loop */
-			/* (n==0) => loop will not be executed and, hence, won't generate open quotation mark */
-		*target++ = '"';
-
-	string = was_dollar_c = dollar_c = FALSE;
-	for (; n > 0; n--)
-	{
-		x = *ch1;
-		ch1++;
-		if (!(dollar_c = ((pattern_typemask[ x ] & PATM_C) != 0)))
-		{
-			if (was_dollar_c)
-			{
-				*target++ = ')';
-				*target++ = '_';
-				was_dollar_c = FALSE;
-			}
-			if (!string)
-			{	string = TRUE;
-				*target++ = '"';
-			}
-			*target++ = x;
-			if (x == '\"')
-				*target++ = x;
-		}
-
-		if (dollar_c)
-		{
-			if (!was_dollar_c)
-			{
-				if (string)
-				{
-					*target++ = '"';
-					*target++ = '_';
-				}
-				*target++ = '$';
-				*target++ = 'C';
-				*target++ = '(';
-			}
-			else
-				*target++ = ',';
-
-			if (order1 = x/100)
-				*target++ = order1 + 48;
-			if ((order2 = (x - (order1 * 100))/10) || order1)
-				*target++ = order2 + 48;
-			*target++ = x - (order1 * 100) - (order2 * 10) + 48;
-			was_dollar_c = TRUE;
-			string = FALSE;
-		}
-	}
-
-	if (was_dollar_c)
-		*target++ = ')';	/* close up "$C(..." at end of string by making it "$C(...)" */
-	else
-		*target++ = '"';	/* close up "\"..." at end of string by making it "\"...\"" */
-
-	return target;
+		str = (unsigned char *)mstr_tmp.addr; /* mstr_tmp.addr is used just in case it is
+							 reallocated in the XBACK routine */
+	} else
+		str = (unsigned char *)buf;
+	format2zwr((sm_uc_ptr_t)str, n, target, &target_len);
+	return target + target_len;
 }

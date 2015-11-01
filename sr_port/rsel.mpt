@@ -114,7 +114,11 @@ work
         i rd s add=1,cnt=0,r=%ZR k %ZR s %ZR=r ; This behavior is a bit odd
         e  i "'-"[$e(%ZR) s add=0,r=$e(%ZR,2,999)
         e  s add=1,r=%ZR
-        s r=$tr(r,from,to),end=$p(r,":",2),beg=$p(r,":"),rdf=0  ; strip out invalid characters, and, in VMS, xlate lower to upper
+        s r=$tr(r,from,to)	; strip out invalid characters, and, in VMS, xlate lower to upper
+	; In addition, filter out "all" non-ascii characters (irrespective of M or UTF-8)
+	n r1,c s r1="" f k=1:1:$l(r) s c=$e(r,k) if $a(c)<128 s r1=r1_c
+	s r=r1
+	s end=$p(r,":",2),beg=$p(r,":"),rdf=0
         i end=beg!'$l(end) q:'$l(beg)  s stop=last                                          ; if all stripped out, done
 	s:'$l(beg) beg="*" s pct=$e(beg)                                                    ; CAUTION: ELSE on next line
         e  s strt=$$mask(beg),stop=$$mask(end) i $l($p(stop,"$")) q:stop']strt              ; if end before begining, done

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,10 @@
 #include "op.h"
 #include "format_targ_key.h"
 
+#ifdef UNICODE_SUPPORTED
+#include "gtm_utf8.h"
+#endif
+
 GBLREF gv_key		*gv_currkey;
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF gd_region    	*gv_cur_region;
@@ -40,7 +44,7 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 	char		*end;
 	short int	max_key;
 	unsigned short 	buf_len;
-	int  		key_len, dlr_num, dlr_len, parse_dlr_char(char *, char *, char *);
+	int  		key_len, dlr_num, dlr_len;
 	mval 		key_subsc;
 
 	error_def(ERR_GVSUBOFLOW);
@@ -175,22 +179,32 @@ int parse_dlr_char(char *src, char *top, char *dlr_subsc)
 {
 	int		indx = 0, dlr_len, dlr_val, harlen;
 	char 		lcl_buf[MAX_KEY_SZ + 1];
-	char 		*tmp_buf;
+	char 		*tmp_buf, *strnext;
+	boolean_t	dlrzchar = FALSE;
 
 	tmp_buf = src;
 
-	if (*tmp_buf != 'c' && *tmp_buf != 'C')
-		return 0;
-	tmp_buf++;
-	if (*tmp_buf == 'h' || *tmp_buf == 'H')
+	if ('Z' == TOUPPER(*tmp_buf))
 	{
-		harlen = strlen("har");
-		if (top - tmp_buf <= harlen)
-			return 0;
-		if (STRNCASECMP(tmp_buf, "har", harlen))
-			return 0;
-		tmp_buf += harlen;
+		dlrzchar = TRUE;
+		tmp_buf++;
 	}
+	if ('C' != TOUPPER(*tmp_buf++))
+		return 0;
+	if ('H' == TOUPPER(*tmp_buf))
+	{
+		if (top - tmp_buf <= STR_LIT_LEN("har") || STRNCASECMP(tmp_buf, "har", STR_LIT_LEN("har")))
+		{
+			if (!dlrzchar)
+				return 0;
+			tmp_buf++;
+		}
+		else
+			tmp_buf += STR_LIT_LEN("har");
+
+	} else if (dlrzchar)
+		return 0;
+
 	if (*tmp_buf++ != '(')
 		return 0;
 	if (!ISDIGIT(*tmp_buf))
@@ -203,8 +217,22 @@ int parse_dlr_char(char *src, char *top, char *dlr_subsc)
 		{
 			lcl_buf[indx] = '\0';
 			dlr_val = ATOI(lcl_buf);
-			dlr_val = (dlr_val > 255) ? 255 : dlr_val;
-			*dlr_subsc++ = (unsigned char)dlr_val;
+			if (0 > dlr_val)
+				return 0;
+			if (!gtm_utf8_mode || dlrzchar)
+			{
+				if (255 < dlr_val)
+					return 0;
+				*dlr_subsc++ = dlr_val;
+			}
+#ifdef UNICODE_SUPPORTED
+			else {
+				strnext = (char *)UTF8_WCTOMB(dlr_val, dlr_subsc);
+				if (strnext == dlr_subsc)
+					return 0;
+				dlr_subsc = strnext;
+			}
+#endif
 			indx = 0;
 			if (')' == *tmp_buf)
 			{

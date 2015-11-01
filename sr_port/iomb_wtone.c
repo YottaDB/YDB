@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,14 +12,14 @@
 #include "mdef.h"
 #include "io.h"
 
-void iomb_wtone(unsigned char v)
+void iomb_wtone(int v)
 {
-mstr	temp;
-char p[1];
+	mstr	temp;
+	char 	p[1];
 
-p[0] = v;
-temp.len = 1;
-temp.addr = p;
-iomb_write(&temp);
-return;
+	p[0] = (char)v;
+	temp.len = 1;
+	temp.addr = p;
+	iomb_write(&temp);
+	return;
 }

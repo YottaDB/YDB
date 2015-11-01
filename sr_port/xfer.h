@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -127,7 +127,7 @@ XFER(xf_lckdecr, op_decrlock),
 XFER(xf_lvpatwrite, op_lvpatwrite),
 XFER(xf_lvzwrite, op_lvzwrite),
 XFER(xf_open, op_open),
-XFER(xf_population, op_population),
+XFER(xf_fnpopulation, op_fnpopulation),
 XFER(xf_rdone, op_rdone),
 XFER(xf_readfl, op_readfl),
 XFER(xf_rhdaddr, op_rhdaddr),
@@ -254,4 +254,24 @@ XFER(xf_fnzjobexam, op_fnzjobexam),
 XFER(xf_fnzsigproc, op_fnzsigproc),
 XFER(xf_fnincr, op_fnincr),
 XFER(xf_gvincr, op_gvincr),
-XFER(xf_indincr, opp_indincr)
+XFER(xf_indincr, opp_indincr),
+XFER(xf_setzextract, op_setzextract),
+XFER(xf_setzp1, op_setzp1),
+XFER(xf_setzpiece, op_setzpiece),
+XFER(xf_fnzascii, op_fnzascii),
+XFER(xf_fnzchar, op_fnzchar),
+XFER(xf_fnzextract, op_fnzextract),
+XFER(xf_fnzfind, op_fnzfind),
+XFER(xf_fnzj2, op_fnzj2),
+XFER(xf_fnzlength, op_fnzlength),
+XFER(xf_fnzpopulation, op_fnzpopulation),
+XFER(xf_fnzpiece, op_fnzpiece),
+XFER(xf_fnzp1, op_fnzp1),
+XFER(xf_fnztranslate, op_fnztranslate),
+#ifdef UNICODE_SUPPORTED
+XFER(xf_fnzconvert2, op_fnzconvert2),
+XFER(xf_fnzconvert3, op_fnzconvert3),
+XFER(xf_fnzwidth, op_fnzwidth),
+XFER(xf_fnzsubstr, op_fnzsubstr),
+#endif
+XFER(xf_fnzechar, op_fnzechar)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,11 +14,11 @@
 #if defined(UNIX)
 #include "gtm_stdio.h"
 #include <errno.h>
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #include <signal.h>
-#include <sys/stat.h>
-#include <sys/times.h>
-#include <unistd.h>
+#include "gtm_stat.h"
+#include "gtm_times.h"
+#include "gtm_unistd.h"
 #elif defined(VMS)
 #include <ssdef.h>
 #include <descrip.h>
@@ -50,8 +50,7 @@ GBLREF 	mval			dollar_job;
 GBLREF	uint4			process_id;
 GBLREF	int * volatile		var_on_cstack_ptr;	/* volatile so that nothing gets optimized out */
 
-static const mident		above_routine = {STR_LIT_LEN("*above*"), "*above*"};
-
+static const MIDENT_DEF(above_routine, sizeof("*above*") - 1, "*above*");
 
 #define	MAX_MPROF_STACK_LEVEL	1024
 #ifdef 	MPROF_DEBUGGING

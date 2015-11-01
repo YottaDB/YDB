@@ -16,6 +16,10 @@
 #include "copy.h"
 #include "patcode.h"
 
+#ifdef UNICODE_SUPPORTED
+#include "gtm_utf8.h"
+#endif
+
 /* see corresponding GBLDEFs in gbldefs.c for comments on the caching mechanism */
 GBLREF	int4		curalt_depth;					/* depth of alternation nesting */
 GBLREF	int4		do_patalt_calls[PTE_MAX_CURALT_DEPTH];		/* number of calls to do_patalt() */
@@ -30,6 +34,7 @@ GBLREF	pte_csh		*cur_pte_csh_array;			/* copy of pte_csh_array corresponding to 
 GBLREF	int4		cur_pte_csh_size;			/* copy of pte_csh_cur_size corresponding to curalt_depth */
 GBLREF	int4		cur_pte_csh_entries_per_len;		/* copy of pte_csh_entries_per_len corresponding to curalt_depth */
 GBLREF	int4		cur_pte_csh_tail_count;			/* copy of pte_csh_tail_count corresponding to curalt_depth */
+GBLREF	boolean_t	gtm_utf8_mode;
 
 /* Example compiled pattern for an alternation pattern
  *	Pattern = P0_P1
@@ -83,29 +88,29 @@ GBLREF	int4		cur_pte_csh_tail_count;			/* copy of pte_csh_tail_count correspondi
  *	0x00000001	<-- size[1]
  */
 
-/* returns index in cur_pte_csh_array that holds the desired <patstr, strptr, len, repcnt> tuple..
+/* returns index in cur_pte_csh_array that holds the desired <patstr, strptr, charlen, repcnt> tuple..
  * return PTE_NOT_FOUND otherwise.
  */
-static	int	pte_csh_present(char *patptr, char *strptr, int4 len, int repcnt)
+static	int	pte_csh_present(char *patptr, char *strptr, int4 charlen, int repcnt)
 {
 	int4		index;
 	pte_csh		*tmp_pte, *pte_top;
 
 	assert(PTE_MAX_CURALT_DEPTH > curalt_depth);
-	index = ((PTE_STRLEN_CUTOFF > len) ? len : PTE_STRLEN_CUTOFF) * cur_pte_csh_entries_per_len;
+	index = ((PTE_STRLEN_CUTOFF > charlen) ? charlen : PTE_STRLEN_CUTOFF) * cur_pte_csh_entries_per_len;
 	assert(cur_pte_csh_size > index);
 	tmp_pte = cur_pte_csh_array + index;
-	pte_top = tmp_pte + ((PTE_STRLEN_CUTOFF > len) ? cur_pte_csh_entries_per_len : cur_pte_csh_tail_count);
+	pte_top = tmp_pte + ((PTE_STRLEN_CUTOFF > charlen) ? cur_pte_csh_entries_per_len : cur_pte_csh_tail_count);
 	assert(pte_top <= (cur_pte_csh_array + cur_pte_csh_size));
 	for (; tmp_pte < pte_top; tmp_pte++)
 	{
 		if ((tmp_pte->strptr != strptr) || (tmp_pte->patptr != patptr)
-				|| (tmp_pte->len != len) || (tmp_pte->repcnt != repcnt))
+				|| (tmp_pte->charlen != charlen) || (tmp_pte->repcnt != repcnt))
 		{
 			if (NULL != tmp_pte->strptr)
 				continue;
 			else
-				break;	/* the first NULL value means all further entries for this "len" are NULL */
+				break;	/* the first NULL value means all further entries for this "charlen" are NULL */
 		}
 		tmp_pte->count++;
 		return (int)tmp_pte->match;
@@ -113,17 +118,17 @@ static	int	pte_csh_present(char *patptr, char *strptr, int4 len, int repcnt)
 	return (int)PTE_NOT_FOUND;
 }
 
-static	void	pte_csh_insert(char *patptr, char *strptr, int4 len, int repcnt, boolean_t match)
+static	void	pte_csh_insert(char *patptr, char *strptr, int4 charlen, int repcnt, boolean_t match)
 {
 	int4		index;
 	pte_csh		*tmp_pte, *pte_top, *min_pte, *free_pte;
 
 	assert(PTE_MAX_CURALT_DEPTH > curalt_depth);
-	assert(PTE_NOT_FOUND == pte_csh_present(patptr, strptr, len, repcnt));
-	index = ((PTE_STRLEN_CUTOFF > len) ? len : PTE_STRLEN_CUTOFF) * cur_pte_csh_entries_per_len;
+	assert(PTE_NOT_FOUND == pte_csh_present(patptr, strptr, charlen, repcnt));
+	index = ((PTE_STRLEN_CUTOFF > charlen) ? charlen : PTE_STRLEN_CUTOFF) * cur_pte_csh_entries_per_len;
 	assert(cur_pte_csh_size > index);
 	tmp_pte = cur_pte_csh_array + index;
-	pte_top = tmp_pte + ((PTE_STRLEN_CUTOFF > len) ? cur_pte_csh_entries_per_len : cur_pte_csh_tail_count);
+	pte_top = tmp_pte + ((PTE_STRLEN_CUTOFF > charlen) ? cur_pte_csh_entries_per_len : cur_pte_csh_tail_count);
 	assert(pte_top <= (cur_pte_csh_array + cur_pte_csh_size));
 	min_pte = tmp_pte;
 	free_pte = NULL;
@@ -147,21 +152,22 @@ static	void	pte_csh_insert(char *patptr, char *strptr, int4 len, int repcnt, boo
 	min_pte->count = 0;	/* give little priority to the rest by setting count to 1 less than the others */
 	min_pte->patptr = patptr;
 	min_pte->strptr = strptr;
-	min_pte->len = len;
+	min_pte->charlen = charlen;
 	min_pte->repcnt = repcnt;
 	min_pte->match = match;
 }
 
-int do_patalt(uint4 *firstalt, unsigned char *strptr, int4 repmin, int4 repmax, int totchar, int repcnt,
+int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int4 repmin, int4 repmax, int totchar, int repcnt,
 											int4 min_incr, int4 max_incr)
 {
 	boolean_t	fixed;
 	int4		alt_tot_min, alt_tot_max, new_pte_csh_size, tmp_do_patalt_calls;
 	uint4		*cur_alt, tempuint;
 	uint4		*patptr;
-	int		match, alt_size, length, pat_found;
+	int		match, alt_size, charlen, bytelen, pat_found;
 	mval		alt_pat, alt_str;
 	pte_csh		*tmp_pte, *src_pte, *dst_pte, *free_pte;
+	unsigned char	*strtmp, *strnext;
 
 	if (PTE_MAX_CURALT_DEPTH > curalt_depth)
 	{	/* try to find it in the current pattern evaluation cache (cur_pte_csh_array) itself */
@@ -246,10 +252,38 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, int4 repmin, int4 repmax, 
 			 */
 			if (totchar && (0 == alt_tot_min))
 				alt_tot_min = 1;	/* avoid zero min length when non-zero string still needs to be matched */
-			for (length = alt_tot_min; !match && (length <= alt_tot_max); length++)
+			if (!gtm_utf8_mode)
+			{	/* each character is 1 byte so charlen and bytelen is same */
+				charlen = alt_tot_min;
+				bytelen = alt_tot_min;
+			}
+			UNICODE_ONLY(
+			else
+			{	/* skip alt_tot_min characters */
+				strtmp = strptr;
+				for (charlen = 0; charlen < alt_tot_min; charlen++)
+				{
+					assert(strtmp < strtop);
+					strtmp = UTF8_MBNEXT(strtmp, strtop);
+				}
+				bytelen = strtmp - strptr;
+			}
+			)
+			UNICODE_ONLY(
+				if (gtm_utf8_mode)
+					alt_str.mvtype |= MV_UTF_LEN;	/* avoid recomputing "char_len" in do_pattern/do_patfixed */
+			)
+			for ( ; !match && (charlen <= alt_tot_max); charlen++)
 			{
-				alt_str.str.len = length;
-				match = length ? (fixed ? do_patfixed(&alt_str, &alt_pat)
+				alt_str.str.len = bytelen;
+				UNICODE_ONLY(
+					if (gtm_utf8_mode)
+					{
+						assert(utf8_len(&alt_str.str) == charlen);
+						alt_str.str.char_len = charlen;	/* set "char_len" */
+					}
+				)
+				match = charlen ? (fixed ? do_patfixed(&alt_str, &alt_pat)
 							: do_pattern(&alt_str, &alt_pat))
 						: TRUE;
 				/* max_incr and min_incr aid us in an earlier backtracking optimization.
@@ -258,7 +292,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, int4 repmin, int4 repmax, 
 				 *	with the first alternation choice 1l
 				 * say the recursive second do_patalt() call then matches a substring of the now beginning
 				 *	input string "b" with the first alternation choice 1l again
-				 * the recursively called third do_patalt() now can be rest assured that the remaining string
+				 * the recursively called third do_patalt() now can rest assured that the remaining string
 				 *	can't be matched by the alternation. This is because it has only 11 chances left
 				 *	(note the maximum is .13) and each time the maximum length it can match is 2 (the
 				 *	maximum length of all the alternation choices which is 2l) which leaves it with a
@@ -268,13 +302,31 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, int4 repmin, int4 repmax, 
 				 * since at each level, the choices examined are 6, we are saving nearly (6 to the power of 11)
 				 *	choice examinations (11 for the levels that we avoid with the optimization)
 				 */
-				if (match && ((length < totchar) || (repcnt < repmin)))
+				if (match && ((charlen < totchar) || (repcnt < repmin)))
 					match &= ((repcnt < repmax)
-							&& ((totchar - length) <= (repmax - repcnt) * max_incr)
-							&& ((totchar - length) >= (repmin - repcnt) * min_incr))
-						? do_patalt(firstalt, &strptr[length], repmin, repmax,
-									totchar - length, repcnt + 1, min_incr, max_incr)
+							&& ((totchar - charlen) <= (repmax - repcnt) * max_incr)
+							&& ((totchar - charlen) >= (repmin - repcnt) * min_incr))
+						? do_patalt(firstalt, &strptr[bytelen], strtop, repmin, repmax,
+									totchar - charlen, repcnt + 1, min_incr, max_incr)
 						: FALSE;
+				if (!match)
+				{	/* update "bytelen" to correspond to "charlen + 1" */
+					if (!gtm_utf8_mode)
+						bytelen++;
+					UNICODE_ONLY(
+					else
+					{
+						assert((strtmp < strtop) || (charlen == alt_tot_max));
+						if (strtmp < strtop)
+						{
+							strnext = UTF8_MBNEXT(strtmp, strtop);
+							assert(strnext > strtmp);
+							bytelen += strnext - strtmp;
+							strtmp = strnext;
+						}
+					}
+					)
+				}
 			}
 		}
 		patptr += alt_size;

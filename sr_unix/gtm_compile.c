@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include <string.h>
+#include "gtm_string.h"
 
 #include "stp_parms.h"
 #include "stringpool.h"
@@ -73,7 +73,7 @@ int	gtm_compile (void)
 	memset(frame_pointer,0, sizeof(stack_frame));
 	frame_pointer->temps_ptr = (unsigned char *) frame_pointer;
 	frame_pointer->mpc = CODE_ADDRESS(gtm_ret_code);
-	frame_pointer->ctxt = CONTEXT(gtm_ret_code);
+	frame_pointer->ctxt = GTM_CONTEXT(gtm_ret_code);
 	frame_pointer->type = SFT_COUNT;
 	frame_pointer->rvector = (rhdtyp*)malloc(sizeof(rhdtyp));
 	memset(frame_pointer->rvector,0,sizeof(rhdtyp));

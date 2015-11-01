@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -950,7 +950,8 @@ bool cli_get_parm(char *entry, char val_buf[])
 		if (NULL == parm_ary[match_ind])
 		{
 			PRINTF("%s", (gpcmd_parm_vals + match_ind)->prompt);
-			FGETS(local_str, MAX_LINE, stdin, gets_res);
+		/* smw FGETS(local_str, MAX_LINE, stdin, gets_res);	*/
+			gets_res = cli_fgets(local_str, MAX_LINE, stdin, FALSE);
 			if (gets_res)
 			{
 				parm_len = strlen(gets_res);
@@ -976,7 +977,7 @@ bool cli_get_parm(char *entry, char val_buf[])
 			}
 		} else if ((char *)-1 == parm_ary[match_ind])
 			return(FALSE);
-		memcpy(val_buf, parm_ary[match_ind], strlen(parm_ary[match_ind]) + 1);
+		strcpy(val_buf, parm_ary[match_ind]);
 		if (!cli_look_next_token(&eof) || (0 == cli_gettoken(&eof)))
 			parm_ary[match_ind] = (char *)-1;
 		else

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,7 +9,21 @@
  *								*
  ****************************************************************/
 
-/* gtm_ctype.h - interlude to <ctype.h> system header file.  */
+/* gtm_ctype.h - interlude to <ctype.h> system header file.	*/
+
+#if defined(__osf__) && defined(__alpha)
+
+/* On Tru64, <ctype.h> contains declarations of arrays of 64-bit pointers
+ * in system library routines.  The following pragma's are necessary
+ * to ensure that references to those arrays declare them as 64-bit
+ * pointer arrays, even if the including C program is compiled with
+  * 32-bit pointer options.
+*/
+
+#pragma pointer_size (save)
+#pragma pointer_size (long)
+
+#endif
 
 #ifndef GTM_CTYPEH
 #define GTM_CTYPEH
@@ -66,8 +80,8 @@
 #endif
 #define ISUPPER	isupper
 
-#ifdef ISXDIGIt
-#undef ISXDIGIt
+#ifdef ISXDIGIT
+#undef ISXDIGIT
 #endif
 #define ISXDIGIT isxdigit
 
@@ -80,5 +94,11 @@
 #undef TOUPPER
 #endif
 #define TOUPPER	toupper
+
+#if defined(__osf__) && defined(__alpha)
+
+#pragma pointer_size (restore)
+
+#endif
 
 #endif

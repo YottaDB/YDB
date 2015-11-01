@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -54,22 +54,23 @@ SFT_ZINTR		=	0x100
 	pushl	msf_mpc_off(%edx)
 .endm
 	.sbttl	g_msf.si
-mrt_hdr_size		=	72
 mrt_jsb			=	0
-mrt_src_len		=	8
-mrt_src_addr		=	12
-mrt_rtn_len		=	16
-mrt_rtn_addr		=	20
-mrt_var_ptr		=	24
-mrt_var_len		=	28
-mrt_lab_ptr		=	32
-mrt_lab_len		=	36
-mrt_lnr_ptr		=	40
-mrt_lnr_len		=	44
-mrt_ptxt_ptr		=	48
-mrt_checksum		=	52
-mrt_compiler_qlf	=	56
-mrt_oldr_ptr		=	60
-mrt_curr_ptr		=	64
-mrt_tmp_mv		=	68
-mrt_tmp_sz		=	70
+mrt_src_len		=	12
+mrt_src_addr		=	16
+mrt_rtn_len		=	24
+mrt_rtn_addr		=	28
+mrt_var_ptr		=	32
+mrt_var_len		=	36
+mrt_lab_ptr		=	40
+mrt_lab_len		=	44
+mrt_lnr_ptr		=	48
+mrt_lnr_len		=	52
+mrt_ptxt_ptr		=	56
+mrt_checksum		=	60
+mrt_compiler_qlf	=	64
+mrt_oldr_ptr		=	68
+mrt_curr_ptr		=	72
+mrt_tmp_mv		=	76
+mrt_tmp_sz		=	78
+
+mrt_hdr_size		=	80

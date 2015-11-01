@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,11 @@
 #include "gt_timer.h"		/* for prealloc_gt_timers() prototype */
 #include "cli.h"
 
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
+
 #ifndef lint
 static char rcsid[] = "$Header:$";
 #endif
@@ -86,12 +91,13 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	gd_addr 		*get_next_gdr();
 	int		  	pid;
 	char			msg[256];
-	int			save_errno;
+	int			save_errno, maxfds;
 
 	/*  Disassociate from the rest of the universe */
 	get_page_size();
 	is_replicator = TRUE;	/* as GT.CM OMI goes through t_end() and can write jnl records to the jnlpool for replicated db */
 	image_type = GTCM_SERVER_IMAGE;
+	gtm_wcswidth_fnptr = gtm_wcswidth;
 
 	if (NULL != getenv("GTCM_GDSCERT"))
 		certify_all_blocks = TRUE;
@@ -166,11 +172,13 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	licensed = TRUE;
 	getjobnum();
 	getzdir();
-	if ((gtcm_ast_avail = getmaxfds()) < 0)
+	if ((maxfds = getmaxfds()) < 0)
 	{
 		gtcm_rep_err("Unable to get system resource limits", errno);
 		exit(errno);
 	}
+	assert(sizeof(gtcm_ast_avail) == 2);	/* check that short is size 2 bytes as following code relies on that */
+	gtcm_ast_avail = (maxfds > MAXINT2) ? MAXINT2 : maxfds;
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;
 	curr_pattern = pattern_list = &mumps_pattern;

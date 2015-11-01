@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +13,10 @@
 #include "gtm_unistd.h"
 
 #include <signal.h>
-#include <string.h>
+#include "gtm_string.h"
 #include <errno.h>
+#include <wctype.h>
+#include <wchar.h>
 
 #include "io.h"
 #include "iottdef.h"
@@ -24,11 +26,15 @@
 #include "error.h"
 #include "dollarx.h"
 #include "iott_flush_time.h"
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
 
-GBLREF io_pair	io_curr_device;
-GBLREF io_pair	io_std_device;
-GBLREF bool	prin_out_dev_failure;
-
+GBLREF io_pair		io_curr_device;
+GBLREF io_pair		io_std_device;
+GBLREF bool		prin_out_dev_failure;
+GBLREF boolean_t	gtm_utf8_mode;
 
 void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen);
 
@@ -96,10 +102,14 @@ void iott_write(mstr *v)
 {
 	unsigned	str_len;
 	unsigned	len;
-	int		status;
+	int		status, this_width, char_width, avail_width;
 	char		*str;
+	unsigned char	*ptr, *ptrnext, *ptrtop;
 	io_desc		*io_ptr, *flush_parm;
 	d_tt_struct	*tt_ptr;
+	boolean_t	utf8_active = FALSE;
+	wint_t		codepoint;
+	error_def(ERR_TERMWRITE);
 
 	str_len = v->len;
 	if (0 != str_len)
@@ -107,6 +117,7 @@ void iott_write(mstr *v)
 		str = v->addr;
 		io_ptr = io_curr_device.out;
 		tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
+		UNICODE_ONLY(utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ochset) : FALSE;)
 		for (;  ;)
 		{
 			if (FALSE == io_ptr->wrap)
@@ -119,10 +130,40 @@ void iott_write(mstr *v)
 					io_ptr->dollar.y++;
 					io_ptr->dollar.x = 0;
 				}
-				if ((START != io_ptr->esc_state) || ((io_ptr->dollar.x + str_len) <= io_ptr->width))
-					len = str_len;
+				if (START != io_ptr->esc_state)
+					len = str_len;			/* write all if in escape sequence */
+#ifdef UNICODE_SUPPORTED
+				else if (utf8_active)
+				{
+					ptrtop = (unsigned char *)str + str_len;
+					avail_width = io_ptr->width - io_ptr->dollar.x;
+					for (this_width = 0, ptr = (unsigned char *)str; ptr < ptrtop; ptr = ptrnext)
+					{
+						ptrnext = UTF8_MBTOWC(ptr, ptrtop, codepoint);
+						if (WEOF == codepoint)
+							UTF8_BADCHAR(0, ptr, ptrtop, 0, NULL);
+						GTM_IO_WCWIDTH(codepoint, char_width);
+						if ((this_width + char_width) > avail_width)
+							break;
+						this_width += char_width;
+					}
+					len = ptr - (unsigned char *)str;
+					if (0 == len)
+					{
+						if (char_width <= io_ptr->width)
+						{
+							io_ptr->dollar.x = io_ptr->width;	/* force wrap */
+							continue;
+						} else
+							rts_error(VARLSTCNT(1) ERR_TERMWRITE);
+					}
+				}
+#endif
 				else
-					len = io_ptr->width - io_ptr->dollar.x;
+					if ((io_ptr->dollar.x + str_len) <= io_ptr->width)
+						len = str_len;
+					else
+						len = io_ptr->width - io_ptr->dollar.x;
 			}
 			assert(0 != len);
 			iott_write_buffered_text(io_ptr, str, len);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "compiler.h"
 #include "mdq.h"
 #include "opcode.h"
@@ -23,10 +26,17 @@
 #include "cmd.h"
 #include "svnames.h"
 
+#ifdef UNICODE_SUPPORTED
+#include "gtm_utf8.h"
+#endif
+
 GBLDEF bool		temp_subs;
 GBLREF triple		*curtchain;
 GBLREF char		director_token, window_token;
 GBLREF mident		window_ident;
+GBLREF boolean_t	gtm_utf8_mode;
+GBLREF boolean_t	badchar_inhibit;
+
 LITREF unsigned char	svn_index[], fun_index[];
 LITREF nametabent	svn_names[], fun_names[];
 LITREF svn_data_type	svn_data[];
@@ -34,22 +44,29 @@ LITREF fun_data_type	fun_data[];
 
 int m_set(void)
 {
+	int		index, setop, delimlen;
+	int		first_val_lit, last_val_lit;
+	boolean_t	first_is_lit, last_is_lit, got_lparen, delim1char, is_extract, valid_char;
+	opctype		put_oc;
+	oprtype		v, delimval, firstval, lastval, *sb1, *result, resptr;
+	triple		*delimiter, *first, *put, *get, *last, *obp, *s, *sub, *s0, *s1, targchain;
+	triple		*jmptrp1, *jmptrp2;
+	mint		delimlit;
+	mval		*delim_mval;
+	union
+	{
+		uint4		unichar_val;
+		unsigned char	unibytes_val[4];
+	} unichar;
+
 	error_def(ERR_INVSVN);
 	error_def(ERR_VAREXPECTED);
 	error_def(ERR_RPARENMISSING);
 	error_def(ERR_EQUAL);
 	error_def(ERR_COMMA);
 	error_def(ERR_SVNOSET);
-	int		index, setop;
-	int		first_val_lit, last_val_lit;
-	boolean_t	first_is_lit, last_is_lit, got_lparen, delim1char, is_extract;
-	opctype		put_oc;
-	oprtype		v, delimval, firstval, lastval, *sb1, *result, resptr;
-	triple		*delimiter, *first, *put, *get, *last, *obp, *s, *sub, *s0, *s1, targchain;
-	triple		*jmptrp1, *jmptrp2;
-	mint		delimlit;
 
-	temp_subs = delim1char = is_extract = FALSE;
+	temp_subs = FALSE;
 	dqinit(&targchain, exorder);
 	result = (oprtype *)mcalloc(sizeof(oprtype));
 	resptr = put_indr(result);
@@ -71,6 +88,7 @@ int m_set(void)
 
 	for (;;)
 	{
+		delim1char = is_extract = FALSE;
 		switch (window_token)
 		{
 			case TK_IDENT:
@@ -152,23 +170,34 @@ int m_set(void)
 					dqins(targchain.exorder.bl, exorder, put);
 					break;
 				}
-				/* Only 2 function names allowed on left side: $Piece and $Extract */
+				/* Only 4 function names allowed on left side: $[Z]Piece and $[Z]Extract */
 				index = namelook(fun_index, fun_names, window_ident.addr, window_ident.len);
 				if (0 > index || got_lparen)
 				{	/* function not found or appears in set list where only a var can be */
 					stx_error(ERR_VAREXPECTED);
 					return FALSE;
 				}
-				if (OC_FNPIECE == fun_data[index].opcode)
-					setop = OC_SETPIECE;
-				else if (OC_FNEXTRACT == fun_data[index].opcode)
+				switch(fun_data[index].opcode)
 				{
-					is_extract = TRUE;
-					setop = OC_SETEXTRACT;
-				} else
-				{
-					stx_error(ERR_VAREXPECTED);
-					return FALSE;
+					case OC_FNPIECE:
+						setop = OC_SETPIECE;
+						break;
+					case OC_FNEXTRACT:
+						is_extract = TRUE;
+						setop = OC_SETEXTRACT;
+						break;
+#ifdef UNICODE_SUPPORTED
+					case OC_FNZPIECE:
+						setop = OC_SETZPIECE;
+						break;
+					case OC_FNZEXTRACT:
+						is_extract = TRUE;
+						setop = OC_SETZEXTRACT;
+						break;
+#endif
+					default:
+						stx_error(ERR_VAREXPECTED);
+						return FALSE;
 				}
 				advancewindow();
 				advancewindow();
@@ -182,7 +211,7 @@ int m_set(void)
 				   generated below.
 				*/
 				s = maketriple(setop);
-				/* Even for SETPIECE and SETEXTRACT, the SETPIECE/SETEXTRACT opcodes
+				/* Even for SET[Z]PIECE and SET[Z]EXTRACT, the SETxxxxx opcodes
 				   do not do the final store, they only create the final value TO be
 				   stored so generate the triples that will actually do the store now.
 				   Note we are still building triples on the original curtchain.
@@ -249,12 +278,12 @@ int m_set(void)
 				chktchain(&targchain);
 
 				if (!is_extract)
-				{	/* Set $piece */
+				{	/* Set $[z]piece */
 					delimiter = newtriple(OC_PARAMETER);
 					s->operand[1] = put_tref(delimiter);
 					first = newtriple(OC_PARAMETER);
 					delimiter->operand[1] = put_tref(first);
-					/* Process delimiter string ($piece only) */
+					/* Process delimiter string ($[z]piece only) */
 					if (window_token != TK_COMMA)
 					{
 						stx_error(ERR_COMMA);
@@ -265,7 +294,7 @@ int m_set(void)
 						return FALSE;
 					assert(delimval.oprclass == TRIP_REF);
 				} else
-				{	/* Set $Extract */
+				{	/* Set $[Z]Extract */
 					first = newtriple(OC_PARAMETER);
 					s->operand[1] = put_tref(first);
 				}
@@ -287,20 +316,69 @@ int m_set(void)
 				}
 				if (window_token != TK_COMMA)
 				{	/* There is no "last" value. Only if 1 char literal delimiter and
-					   no "last" value can we generate shortcut code to op_setp1 entry
-					   instead of op_setpiece.
+					   no "last" value can we generate shortcut code to op_set[z]p1 entry
+					   instead of op_set[z]piece. Note if UTF8 mode is in effect, then this
+					   optimization applies if the literal is one unicode char which may in
+					   fact be up to 4 bytes but will still be passed as a single unsigned
+					   integer.
 					*/
-					if (!is_extract && delimval.oprval.tref->opcode == OC_LIT &&
-					    delimval.oprval.tref->operand[0].oprval.mlit->v.str.len == 1)
-					{	/* This reference to a one character literal needs to be turned into
-						   an explict literal instead */
-						delimlit =
-							(mint)*delimval.oprval.tref->operand[0].oprval.mlit->v.str.addr;
-						delimiter->operand[0] = put_ilit(delimlit);
-						s->opcode = OC_SETP1;
-						delim1char = TRUE;
-					} else
+					if (!is_extract)
 					{
+						delim_mval = &delimval.oprval.tref->operand[0].oprval.mlit->v;
+						valid_char = TRUE;	/* Basic assumption unles proven otherwise */
+ 						if (delimval.oprval.tref->opcode == OC_LIT &&
+						    (1 == (gtm_utf8_mode ?
+							   MV_FORCE_LEN(delim_mval) : delim_mval->str.len)))
+						{	/* Single char delimiter for set $piece */
+							UNICODE_ONLY(
+							if (gtm_utf8_mode)
+							{	/* We have a supposed single char delimiter but it must be a
+								   valid utf8 char to be used by op_setp1() and MV_FORCE_LEN
+								   won't tell us that.
+								*/
+								valid_char = UTF8_VALID(delim_mval->str.addr,
+											(delim_mval->str.addr
+											 + delim_mval->str.len),
+											delimlen);
+								if (!valid_char && !badchar_inhibit)
+									UTF8_BADCHAR(0, delim_mval->str.addr,
+										(delim_mval->str.addr + delim_mval->str.len),
+											 0, NULL);
+							}
+							);
+							if (valid_char || 1 == delim_mval->str.len)
+							{	/* This reference to a one character literal or a single byte
+								   invalid utf8 character that needs to be turned into an explict
+								   formated integer literal instead */
+								unichar.unichar_val = 0;
+								if (!gtm_utf8_mode)
+								{	/* Single byte delimiter */
+									assert(1 == delim_mval->str.len);
+									UNIX_ONLY(s->opcode = OC_SETZP1);
+									VMS_ONLY(s->opcode = OC_SETP1);
+									unichar.unibytes_val[0] = *delim_mval->str.addr;
+								}
+								UNICODE_ONLY(
+								else
+								{	/* Potentially multiple bytes in one int */
+									assert(sizeof(int) >= delim_mval->str.len);
+									memcpy(unichar.unibytes_val,
+									       delim_mval->str.addr,
+									       delim_mval->str.len);
+									s->opcode = OC_SETP1;
+								}
+								);
+								delimlit = (mint)unichar.unichar_val;
+								delimiter->operand[0] = put_ilit(delimlit);
+								delim1char = TRUE;
+							}
+						}
+					}
+					if (!delim1char)
+					{	/* Was not handled as a single char delim by code above either bcause it
+						   was (1) not set $piece, or (2) was not a single char delim or (3) it was
+						   not a VALID utf8 single char delim and badchar was inhibited.
+						*/
 						if (!is_extract)
 							delimiter->operand[0] = delimval;
 						last = newtriple(OC_PARAMETER);

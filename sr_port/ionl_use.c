@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -133,6 +133,7 @@ void ionl_use(io_desc *iod, mval *pp)
 		}
 		case iop_ipchset:
 			{
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 				if ( (iconv_t)0 != iod->input_conv_cd )
 				{
 					ICONV_CLOSE_CD(iod->input_conv_cd);
@@ -140,10 +141,12 @@ void ionl_use(io_desc *iod, mval *pp)
 				SET_CODE_SET(iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
 				if (DEFAULT_CODE_SET != iod->in_code_set)
 					ICONV_OPEN_CD(iod->input_conv_cd, (char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
+#endif
                         	break;
 			}
                 case iop_opchset:
 			{
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 				if ( (iconv_t) 0 != iod->output_conv_cd )
 				{
 					ICONV_CLOSE_CD(iod->output_conv_cd);
@@ -151,6 +154,7 @@ void ionl_use(io_desc *iod, mval *pp)
 				SET_CODE_SET(iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
 				if (DEFAULT_CODE_SET != iod->out_code_set)
 					ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET, (char *)(pp->str.addr + p_offset + 1));
+#endif
                         	break;
 			}
 		}

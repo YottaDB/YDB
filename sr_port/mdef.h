@@ -13,32 +13,35 @@
 #define MDEF_included
 
 /* mstr needs to be defined before including "mdefsp.h".  */
-#ifndef __vax
-typedef struct
-{
-	unsigned int	len;
-	char		*addr;
-} mstr;
 typedef unsigned int mstr_len_t;
-#define GET_MSTR_LEN(X,Y)	GET_ULONG(X,Y)
-#define PUT_MSTR_LEN(X,Y)	PUT_ULONG(X,Y)
-#else
-/* Vax version of mstr has short length still */
+#ifndef __vms
 typedef struct
 {
-	unsigned short	len;
+	unsigned int	char_len;	/* Character length */
+	mstr_len_t	len;
 	char		*addr;
 } mstr;
-typedef unsigned short mstr_len_t;
-#define GET_MSTR_LEN(X,Y)	GET_USHORT(X,Y)
-#define PUT_MSTR_LEN(X,Y)	PUT_USHORT(X,Y)
+#  define MSTR_CONST(name, string)		mstr name = {0, LEN_AND_LIT(string)}
+#  define MSTR_DEF(name, length, string)	mstr name = {0, length, string}
+#  define MIDENT_CONST(name, string)            mident name = {0, LEN_AND_LIT(string)}
+#  define MIDENT_DEF(name, length, string)      mident name = {0, length, string}
+#else
+typedef struct
+{
+	mstr_len_t	len;		/* Byte length */
+	char		*addr;
+} mstr;
+#  define MSTR_CONST(name, string)		mstr name = {LEN_AND_LIT(string)}
+#  define MSTR_DEF(name, length, string)	mstr name = {length, string}
+#  define MIDENT_CONST(name, string)            mident name = {LEN_AND_LIT(string)}
+#  define MIDENT_DEF(name, length, string)      mident name = {length, string}
 #endif
-#define MSTR_CONST(name,string)		mstr name = { LEN_AND_LIT(string) }
-#define MSTR_DEF(name,length,string)	mstr name = { length, string }
 
+#define GET_MSTR_LEN(X, Y)	GET_ULONG(X, Y)
+#define PUT_MSTR_LEN(X, Y)	PUT_ULONG(X, Y)
 #define MSTR_CMP(x, y, result) 	(((result) = memcmp((x)->addr, (y)->addr, MIN((x)->len, (y)->len))) ?\
 								(result) : ((result) = (x)->len - (y)->len))
-#define MSTR_EQ(x,y)		(((x)->len == (y)->len) && !memcmp((x)->addr, (y)->addr, (x)->len))
+#define MSTR_EQ(x, y)		(((x)->len == (y)->len) && !memcmp((x)->addr, (y)->addr, (x)->len))
 
 #include <sys/types.h>
 
@@ -86,8 +89,8 @@ typedef struct
 } mident_fixed;
 #define mid_len(name)		strlen(&(name)->c[0])	/* callers of mid_len should include gtm_string.h as well */
 
-#define MIDENT_CMP(x,y,result)	MSTR_CMP(x,y,result)
-#define MIDENT_EQ(x,y)		MSTR_EQ(x,y)
+#define MIDENT_CMP(x,y,result)	MSTR_CMP(x, y, result)
+#define MIDENT_EQ(x,y)		MSTR_EQ(x, y)
 
 #ifdef INT8_NATIVE
 #	define NATIVE_WSIZE	8
@@ -116,6 +119,7 @@ typedef struct
 
 typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of type long */
 
+/* Bit definitions for mval type (mvtype) */
 #define MV_NM		 1
 #define MV_INT		 2
 #define MV_NUM_MASK	 3
@@ -125,10 +129,13 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 #define MV_SYM		32
 #define MV_SUBLIT	64
 #define MV_RETARG      128
+#define MV_UTF_LEN     256
+
 #define MV_XBIAS	62
 #define MV_XZERO	 0
 #define MV_BIAS	      1000
 #define MV_BIAS_PWR	 3
+
 #define NR_REG		16
 #ifndef TRUE
 #define TRUE		 1
@@ -152,13 +159,41 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 
 #define MAX_NUM_SIZE			64
 #define MAX_FORM_NUM_SUBLEN		128	/* this is enough to hold the largest numeric subscript */
-#define PERIODIC_FLUSH_CHECK_INTERVAL (30 * 1000)
-#define MAX_ARGS	256 /* in formallist */
-/* the macro ZWR_EXP_RATIO returns the maximum size of the extracted record given the internal subscript representation length
- * worst case is every other character is non-graphic. e.g. $C(128)_"A"_$C(128)
- * to cover cases of odd numbers of characters, add some buffer
+#define PERIODIC_FLUSH_CHECK_INTERVAL	(30 * 1000)
+#define MAX_ARGS			256 /* in formallist */
+
+#define MAX_KEY_SZ	255		/* maximum database key size */
+/* The macro ZWR_EXP_RATIO returns the inflated length when converting the internal subscript
+ * representation (byte) length to ZWR representation.
+ * In "M" mode,
+ * 	Worst case is every other character is non-graphic. e.g. $C(128)_"A"_$C(128).
+ * In "UTF-8" mode,
+ * 	Worst case is with a non-graphic character and every other character is an illegal
+ * 	character. Here are the expansion ratios for different ranges of characters.
+ * 	------------------------------------------------------------------------------
+ * 		Byte pattern			max. expanded 	   input byte	ratio
+ * 						output length         length
+ * 	------------------------------------------------------------------------------
+ * 		$C(129)_$ZCH(128)_		18			2	 9
+ * 		$C(1536)_$ZCH(128)_		19			3	 7
+ * 		$C(65279)_$ZCH(128)_		20			4	 5
+ * 		$C(917585)_$ZCH(128)_		21			5	 6
+ * 		$C(1114111)_$ZCH(128)_		22			5	 6
+ * 	------------------------------------------------------------------------------
+ * To cover cases of odd numbers of characters, add some buffer.
+ *
+ * MAX_ZWR_KEY_SZ, on the other hand, needs to be a compile-time constant since it's used in
+ * temporary allocation on the stack
  */
-#define ZWR_EXP_RATIO(X)	((X) * 6 + 8)
+GBLREF	boolean_t		gtm_utf8_mode;
+#ifdef UNICODE_SUPPORTED
+#define ZWR_EXP_RATIO(X)	((!gtm_utf8_mode) ? (((X) * 6 + 7)) : ((X) * 9 + 11))
+#define MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 9 + 11)
+#else
+#define ZWR_EXP_RATIO(X)	((X) * 6 + 7)
+#define MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 6 + 7)
+#endif
+
 
 unsigned char *n2s(mval *mv_ptr);
 char *s2n(mval *u);
@@ -186,6 +221,30 @@ char *s2n(mval *u);
 #define MV_IS_STRING(X)		(((X)->mvtype & MV_STR) != 0)
 #define MV_DEFINED(X)		(((X)->mvtype & (MV_STR | MV_NM)) != 0)
 #define MV_IS_CANONICAL(X)	(((X)->mvtype & MV_NM) ? (((X)->mvtype & MV_NUM_APPROX) == 0) : (bool)nm_iscan(X))
+#define MV_INIT(X)		((X)->mvtype = 0, (X)->fnpc_indx = 0xff)
+#define MV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR, (X)->fnpc_indx = 0xff,		\
+				      (X)->str.len = LEN, (X)->str.addr = (char *)ADDR)
+
+#define	ASCII_MAX		(unsigned char)0x7F
+#define	IS_ASCII(X)		((uint4)(X) <= ASCII_MAX)	/* X can be greater than 255 hence the typecast to uint4 */
+
+#ifdef UNICODE_SUPPORTED
+#	define	MV_FORCE_LEN(X) ((!((X)->mvtype & MV_UTF_LEN)) 							\
+				 ? (utf8_len(&(X)->str), ((X)->mvtype |= MV_UTF_LEN), (X)->str.char_len)	\
+				 : (X)->str.char_len)
+
+/* MV_FORCE_LEN_STRICT() is used to ensure that mval is valid in addition to computing the char_len.
+ * Note that the validation is always forced even if MV_UTF_LEN is set since the previously computed
+ * char_len might have been evaluated in VIEW "NOBADCHAR" setting. */
+#	define	MV_FORCE_LEN_STRICT(X) (((X)->str.char_len = UTF8_LEN_STRICT((X)->str.addr, (X)->str.len)), 	\
+					 ((X)->mvtype |= MV_UTF_LEN), (X)->str.char_len)
+
+#	define	MV_IS_SINGLEBYTE(X)	(((X)->mvtype & MV_UTF_LEN) && ((X)->str.len == (X)->str.char_len))
+#else
+#	define MV_FORCE_LEN(X)		((X)->str.len)
+#	define MV_FORCE_LEN_STRICT(X)	((X)->str.len)
+#	define MV_IS_SINGLEBYTE(X)	(TRUE)	/* all characters are single-byte in non-Unicode platforms */
+#endif
 
 #define DISK_BLOCK_SIZE		512
 #define LOG2_DISK_BLOCK_SIZE	9
@@ -263,6 +322,7 @@ int4 timeout2msec(int4 timeout);
 
 #define	MEMCMP_LIT(SOURCE, LITERAL)	memcmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
 #define MEMCPY_LIT(TARGET, LITERAL)	memcpy(TARGET, LITERAL, sizeof(LITERAL) - 1)
+#define MEMCPY_STR(TARGET, STRING)	memcpy(TARGET, STRING, strlen(STRING))
 #define	STRNCMP_LIT(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
 #define	STRNCMP_STR(SOURCE, STRING)	strncmp(SOURCE, STRING, strlen((char *)(STRING)))
 
@@ -339,6 +399,17 @@ int m_usleep(int useconds);
 #	else
 #		define NON_USHBIN_UNIX_ONLY(X)
 #	endif
+#endif
+
+/* Unicode. Although most (all?) Unix platforms currently support Unicode, that may
+   not always be the case so a separate contingent is defined.
+*/
+#ifdef UNICODE_SUPPORTED
+#	define UNICODE_ONLY(X) X
+#	define NON_UNICODE_ONLY(X)
+#else
+#	define UNICODE_ONLY(X)
+#	define NON_UNICODE_ONLY(X) X
 #endif
 
 /* Note: LONG_SLEEP *MUST*NOT* be the sleep() function because use of the sleep() function in
@@ -781,7 +852,7 @@ typedef enum
 
 #define NOLICENSE	/* cheap way to obsolete it */
 
-/* i2 conversation functions */
+/* integer conversion functions */
 void i2hex(unsigned int val, uchar_ptr_t dest, int len);
 void i2hexl(qw_num val, uchar_ptr_t dest, int len);
 void i2hex_blkfill(int num, uchar_ptr_t addr, int len);
@@ -792,12 +863,46 @@ int i2hexl_nofill(qw_num num, uchar_ptr_t addr, int len);
 uchar_ptr_t i2ascl(uchar_ptr_t p, qw_num n);
 uchar_ptr_t i2asclx(uchar_ptr_t p, qw_num n);
 uchar_ptr_t i2asc(uchar_ptr_t p, unsigned int n);
-int i2a(unsigned char *des, int *des_len, int num);
-/* asc conversation functions */
+
+/* ascii conversion functions */
 int4 asc2i(uchar_ptr_t p, int4 len);
 qw_num asc2l(uchar_ptr_t p, int4 len);
 unsigned int asc_hex2i(char *p, int len);
-/* double conversation */
+
+/* This macro converts an integer to a decimal string (a more efficient alternative to i2asc).
+ * It is used by format2zwr() which is called a lot during MUPIP EXTRACT (which can be time-consuming
+ * for a big database), hence the need to make it efficient.
+ */
+#define I2A(des, des_len, num)										\
+{													\
+	if ((unsigned)(num) < 1000)									\
+	{ /* perform light-weight conversion of numbers upto 3 digits */				\
+        	int 	n1, n2; /* digits at the 10th and 100th decimal positions respectively */	\
+		n2 = ((num) / 100) % 10;								\
+		if (0 != n2)										\
+			(des)[(des_len)++] = n2 + '0';							\
+		n1 = ((num) / 10) % 10;									\
+		if (0 != n1 || 0 != n2)									\
+			(des)[(des_len)++] = n1 + '0';							\
+		(des)[(des_len)++] = ((num) % 10) + '0';						\
+	} else 												\
+		des_len += i2asc((uchar_ptr_t)((des) + des_len), num) - (uchar_ptr_t)((des) + des_len);	\
+}
+
+/* This macro converts a decimal string to a number (a more efficient alternative to asc2i).
+ * It is used by zwr2format() and str2gvargs which is called a lot during MUPIP LOAD (can be time-consuming for a big database).
+ */
+#define A2I(cp, end, num)											\
+{														\
+	unsigned char *cpbase = (unsigned char*)(cp);								\
+														\
+	for (num = 0; (cp) < (end) && *((unsigned char*)cp) >= '0' && *((unsigned char*)cp) <= '9'; ++(cp))	\
+		num = (num) * 10 + (*((unsigned char*)cp) - '0');						\
+	if (cpbase == ((unsigned char*)cp))									\
+		num = -1;											\
+}
+
+/* double conversion */
 void double2s(double *dp, mval *v);
 
 int skpc(char c, int length, char *string);
@@ -885,7 +990,6 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #error Unsupported platform
 #endif
 
-#define FORMATZWR_CONVERSION_FACTOR (sizeof("_$c()_") - 1)
 #define EXIT_NRM	0
 #define EXIT_INF	1
 #define EXIT_WRN	2
@@ -896,10 +1000,6 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define MAX_FN_LEN	255
 #define MAX_TRANS_NAME_LEN	257
 
-#define MAX_ZWR_INFLATION	6 	/* Inflation of key length when converting to ZWR representation.
-					 * The worst case is that every other character is a non-graphic with a 3 digit code
-					 * e.g. "a"_$c(127)_"a"_$C(127)...
-					 * which leads to (n / 2 * 4) + n / 2 * 8) = n / 2 * 12 = n * 6 */
 typedef uint4 		jnl_tm_t;
 typedef uint4 		off_jnl_t;
 typedef int4 		sm_off_t;
@@ -908,6 +1008,7 @@ typedef gtm_uint64_t	gtm_off_t;
 #define MAXUINT8	((gtm_uint64_t)-1)
 #define MAXUINT4	((uint4)-1)
 #define MAXUINT2	((unsigned short)-1)
+#define	MAXINT2		(MAXUINT2/2)
 
 /* On platforms that support native 8 byte operations (such as Alpha), an assignment to an 8 byte field is atomic. On other
  * platforms, an 8 byte assignment is a sequence of 4 byte operations. On such platforms, use this macro to determine if the
@@ -957,5 +1058,18 @@ typedef struct repl_triple_struct
 } repl_triple;
 
 #endif	/* Replication instance file related structures */
+
+/* Enumerator codes for supported CHSETs in GT.M */
+typedef enum
+{
+	CHSET_M,
+	CHSET_UTF8,
+	CHSET_UTF16,
+	CHSET_UTF16LE,
+	CHSET_UTF16BE,
+	CHSET_MAX_IDX		/* maximum number of CHSETs supported */
+} gtm_chset_t;
+
+#define	IS_UTF16_CHSET(chset)	((CHSET_UTF16 == (chset)) || (CHSET_UTF16LE == (chset)) || (CHSET_UTF16BE == (chset)))
 
 #endif /* MDEF_included */

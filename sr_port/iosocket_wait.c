@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@
 #define READ	"READ"
 GBLREF tcp_library_struct	tcp_routines;
 GBLREF volatile int4		outofband;
+GBLREF int4			gtm_max_sockets;
 
 boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 {
@@ -52,9 +53,12 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
         int4            	errlen, ii, msec_timeout;
 	int			rv, size, max_fd;
 	short			len;
+
         error_def(ERR_SOCKACPT);
         error_def(ERR_SOCKWAIT);
         error_def(ERR_TEXT);
+	error_def(ERR_SOCKMAX);
+
 	/* check for validity */
         assert(iod->type == gtmsocket);
         dsocketptr = (d_socket_struct *)iod->dev_sp;
@@ -95,16 +99,14 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 			}
 			utimeout.tv_sec = cur_time.at_sec;
 			utimeout.tv_usec = cur_time.at_usec;
-		}
-		else
+		} else
 			break;	/* either other error or done */
 	}
 	if (rv == 0)
 	{
 		dsocketptr->dollar_key[0] = '\0';
 		return FALSE;
-	}
-	else  if (rv < 0)
+	} else  if (rv < 0)
 	{
 		errptr = (char *)STRERROR(errno);
 		errlen = strlen(errptr);
@@ -121,6 +123,11 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	assert(ii < dsocketptr->n_socket);
 	if (socket_listening == socketptr->state)
 	{
+	        if (gtm_max_sockets <= dsocketptr->n_socket)
+                {
+                        rts_error(VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
+                        return FALSE;
+                }
 		size = sizeof(struct sockaddr_in);
 		rv = tcp_routines.aa_accept(socketptr->sd, &peer, &size);
 		if (rv == -1)
@@ -139,14 +146,11 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		newsocketptr->remote.port = GTM_NTOHS(peer.sin_port);
 		newsocketptr->state = socket_connected;
 		newsocketptr->passive = FALSE;
-		for (ii = 0; ii < newsocketptr->n_delimiter; ii++)
-		{
-			newsocketptr->delimiter[ii].addr = (char *)malloc(socketptr->delimiter[ii].len);
-			memcpy(newsocketptr->delimiter[ii].addr, socketptr->delimiter[ii].addr, socketptr->delimiter[ii].len);
-		}
+		iosocket_delimiter_copy(socketptr, newsocketptr);
 		newsocketptr->buffer = (char *)malloc(socketptr->buffer_size);
 		newsocketptr->buffer_size = socketptr->buffer_size;
 		newsocketptr->buffered_length = socketptr->buffered_offset = 0;
+		newsocketptr->first_read = newsocketptr->first_write = TRUE;
 		/* put the new-born socket to the list and create a handle for it */
 		iosocket_handle(newsocketptr->handle, &newsocketptr->handle_len, TRUE, dsocketptr);
 		dsocketptr->socket[dsocketptr->n_socket++] = newsocketptr;
@@ -157,11 +161,10 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		memcpy(&dsocketptr->dollar_key[len], newsocketptr->handle, newsocketptr->handle_len);
 		len += newsocketptr->handle_len;
 		dsocketptr->dollar_key[len++] = '|';
-		memcpy(&dsocketptr->dollar_key[len], newsocketptr->remote.saddr_ip, strlen(newsocketptr->remote.saddr_ip));
+		MEMCPY_STR(&dsocketptr->dollar_key[len], newsocketptr->remote.saddr_ip);
 		len += strlen(newsocketptr->remote.saddr_ip);
 		dsocketptr->dollar_key[len] = '\0';
-	}
-	else
+	} else
 	{
 		assert(socket_connected == socketptr->state);
 		dsocketptr->current_socket = ii;
@@ -171,7 +174,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		memcpy(&dsocketptr->dollar_key[len], socketptr->handle, socketptr->handle_len);
                 len += socketptr->handle_len;
                 dsocketptr->dollar_key[len++] = '|';
-                memcpy(&dsocketptr->dollar_key[len], socketptr->remote.saddr_ip, strlen(socketptr->remote.saddr_ip));
+                MEMCPY_STR(&dsocketptr->dollar_key[len], socketptr->remote.saddr_ip);
                 len += strlen(socketptr->remote.saddr_ip);
                 dsocketptr->dollar_key[len] = '\0';
 	}

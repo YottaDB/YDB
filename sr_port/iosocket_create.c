@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,11 +22,11 @@
  */
 #include "mdef.h"
 
+#include <errno.h>
 #include "gtm_ctype.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
-
-#include <errno.h>
+#include "gtm_netdb.h"
 #include "gtm_socket.h"
 #include "gtm_inet.h"
 
@@ -47,7 +47,9 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 	unsigned short	port;
 	int		ii, save_errno, tmplen;
 	GTM_SOCKLEN_TYPE	socknamelen;
-	char 		temp_addr[SA_MAXLITLEN], addr[SA_MAXLEN], tcp[4], *errptr;
+	char 		temp_addr[SA_MAXLITLEN], addr[SA_MAXLEN], tcp[4], *adptr;
+	const char	*errptr;
+
 	error_def(ERR_INVPORTSPEC);
 	error_def(ERR_INVADDRSPEC);
 	error_def(ERR_PROTNOTSUP);
@@ -71,23 +73,34 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 			socketptr->local.sin.sin_port = GTM_HTONS(port);
 			socketptr->local.sin.sin_family = AF_INET;
 			socketptr->local.port = port;
-		}
-		else
+		} else
 		{
-			for (ii = 0; ISDIGIT(temp_addr[ii]) || '.' == temp_addr[ii]; ii++)
-				;
+			for (ii = 0; ISDIGIT(temp_addr[ii]) || '.' == temp_addr[ii]; ii++) /* NOTE: only ASCII digits allowed for */
+				;							   /* dotted notation address */
 			if (temp_addr[ii] != '\0')
 			{
 				SPRINTF(socketptr->remote.saddr_lit, "%s", temp_addr);
-				SPRINTF(addr, "%s", iotcp_name2ip(temp_addr));
-			}
-			else
+				adptr = iotcp_name2ip(temp_addr);
+				if (NULL == adptr)
+				{
+#ifndef __hpux
+					errptr = HSTRERROR(h_errno);
+					rts_error(VARLSTCNT(6) ERR_INVADDRSPEC, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
+#else
+					/* Grumble grumble HPUX doesn't have hstrerror() */
+					rts_error(VARLSTCNT(1) ERR_INVADDRSPEC);
+#endif
+					free(socketptr);
+					return NULL;
+				}
+
+				SPRINTF(addr, "%s", adptr);
+			} else
 				SPRINTF(addr, "%s", temp_addr);
 			if (-1 == (socketptr->remote.sin.sin_addr.s_addr = tcp_routines.aa_inet_addr(addr)))
-			{
-				errptr = (char *)STRERROR(errno);
+			{	/* Errno not set by inet_addr() */
 				free(socketptr);
-				rts_error(VARLSTCNT(6) ERR_INVADDRSPEC, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
+				rts_error(VARLSTCNT(1) ERR_INVADDRSPEC);
 				return NULL;
 			}
 			socketptr->remote.sin.sin_port = GTM_HTONS(port);

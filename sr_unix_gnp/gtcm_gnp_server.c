@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,6 @@
 #include "gtm_limits.h"
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
-#include "gtm_inet.h"
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
 #include "gtm_time.h"
@@ -80,7 +79,13 @@
 #include "util.h"
 #include "getzdir.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
+#include "gtm_icu_api.h"
 #include "suspsigs_handler.h"
+
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
 
 #ifdef __osf__
 #pragma pointer_size (save)
@@ -127,6 +132,7 @@ GBLREF enum gtmImageTypes	image_type;
 GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF char			cli_token_buf[];
 GBLREF boolean_t		is_replicator;
+GBLREF boolean_t		gtm_utf8_mode;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -372,6 +378,7 @@ int main(int argc, char **argv, char **envp)
 	error_def(ERR_TEXT);
 
 	image_type = GTCM_GNP_SERVER_IMAGE;
+	gtm_wcswidth_fnptr = gtm_wcswidth;
 	is_replicator = TRUE;	/* as GT.CM GNP goes through t_end() and can write jnl records to the jnlpool for replicated db */
 	gtm_env_init();	/* read in all environment variables */
 	gtmenvp = envp;
@@ -381,6 +388,8 @@ int main(int argc, char **argv, char **envp)
 	assert(0 == offsetof(gv_key, top)); /* for integrity of CM_GET_GVCURRKEY */
 	assert(2 == offsetof(gv_key, end)); /* for integrity of CM_GET_GVCURRKEY */
 	assert(4 == offsetof(gv_key, prev)); /* for integrity of CM_GET_GVCURRKEY */
+	if (gtm_utf8_mode)
+		gtm_icu_init();	 /* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	/* read comments in gtm.c for cli magic below */
 	cli_lex_setup(argc, argv);
 	if (1 < argc)

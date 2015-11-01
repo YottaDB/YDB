@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	;
+;	Copyright 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -128,7 +128,7 @@ RQUALS(rquals)
 	i '$d(verified) n verified s verified=1
 	s s=""
 	f  s s=$o(rquals(s)) q:'$l(s)  d regelm
-	i $d(rquals("FILE_NAME")),$l(rquals("FILE_NAME"))>(SIZEOF("file_spec")-1) s verified=0
+	i $d(rquals("FILE_NAME")),$zl(rquals("FILE_NAME"))>(SIZEOF("file_spec")-1) s verified=0
 	i  zm $$info(gdeerr("VALTOOLONG")):rquals("FILE_NAME"):SIZEOF("file_spec")-1:"Journal filename",gdeerr("REGIS"):REGION
 	s s="KEY_SIZE",s=$s($d(rquals(s)):rquals(s),$d(regs(REGION,s)):regs(REGION,s),1:tmpreg(s))
 	s x="RECORD_SIZE",x=$s($d(rquals(x)):rquals(x),$d(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))

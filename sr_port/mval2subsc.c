@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,10 +98,11 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 		{
 			mstr_ch.len = tmp_len;
 			mstr_ch.addr = (char *)in_ptr;
-			mstr_buf1.len = MAX_KEY_SZ + 1;
+			mstr_buf1.len = sizeof(buf1);
 			mstr_buf1.addr = (char *)buf1;
 			do_xform(gv_target->collseq, XFORM, &mstr_ch, &mstr_buf1, &tmp_len);
-			in_ptr = buf1;
+			in_ptr = (unsigned char*)mstr_buf1.addr; /* mstr_buf1.addr is used just in case it is
+								    reallocated by the XFORM routine */
 		}
 		if ((unsigned char *)((int)out_key->end + tmp_len + 3) > (unsigned char *)(out_key->top - MAX_NUM_SUBSC_LEN))
 		{

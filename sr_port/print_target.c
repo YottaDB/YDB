@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,12 +21,19 @@
 #include "gvsub2str.h"
 #include "print_target.h"
 
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
+
 GBLREF gd_region       *gv_cur_region;
+LITDEF char 		spaces[] = "    ";
 
 void print_target(unsigned char *c)
 {
-	unsigned char	ctemp, *p, *ptop, *ptop1, *ptr, *ptr1, *top;
+	unsigned char	ctemp, *p, *ptop, *ptop1, *ptr, *ptr1, *top, *p_next;
 	unsigned char	buff[MAX_ZWR_KEY_SZ + sizeof("?.0")];
+	int4		ch;
 	boolean_t	bad_sub = FALSE;
 	boolean_t	is_string;
 
@@ -80,9 +87,25 @@ void print_target(unsigned char *c)
 			*top++ = '*';					/* to keep the garbage short and identified as garbage */
 		}
 		*top = 0;
-		for (p = buff;  p < top;  p++)
-			if (!PRINTABLE(*p))
-				*p = '.';
+		if (!gtm_utf8_mode)
+		{
+			for (p = buff;  p < top;  ++p)
+				if (!PRINTABLE(*p))
+					*p = '.';
+		}
+#ifdef UNICODE_SUPPORTED
+		else {
+			for (p = buff;  p < top;  p = p_next)
+			{
+				p_next = UTF8_MBTOWC(p, top, ch);
+				if (WEOF == ch || !U_ISPRINT(ch))
+				{ /* non-printable or illegal characters */
+					for (; p < p_next; ++p)
+						*p = '.';
+				}
+			}
+		}
+#endif
 		util_out_print("!AD", FALSE, p - buff, buff);
 		if (is_string)
 			util_out_print("\"", FALSE);

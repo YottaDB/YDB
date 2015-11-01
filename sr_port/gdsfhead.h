@@ -956,7 +956,6 @@ typedef struct
 #define MAX_RN_LEN	MAX_MIDENT_LEN
 #define MIN_SN_LEN	1
 #define MAX_SN_LEN	MAX_MIDENT_LEN
-#define MAX_KEY_SZ	255
 #define STR_SUB_PREFIX  0x0FF
 #define SUBSCRIPT_STDCOL_NULL 0x01
 #define STR_SUB_ESCAPE  0X01
@@ -965,7 +964,6 @@ typedef struct
 #define NEG_MNTSSA_END  0x0FF
 #define KEY_DELIMITER   0X00
 #define MIN_DB_BLOCKS	10	/* this should be maintained in conjunction with the mimimum allocation in GDEINIT.M */
-#define MAX_ZWR_KEY_SZ		ZWR_EXP_RATIO(MAX_KEY_SZ)
 
 /* definition for NULL_SUBSCRIPTS */
 #define NEVER		0

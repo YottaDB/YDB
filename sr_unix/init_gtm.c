@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,7 @@
 #include "jobchild_init.h"
 #include "cli_parse.h"
 #include "invocation_mode.h"
+#include "fnpc.h"
 
 GBLREF void		(*tp_timeout_start_timer_ptr)(int4 tmout_sec);
 GBLREF void		(*tp_timeout_clear_ptr)(void);
@@ -63,6 +64,7 @@ void init_gtm(void)
 	assert(sizeof(boolean_t) == 4); /* generated code passes 4 byte arguments, run time rtn might be expecting boolean_t arg */
 	assert(BITS_PER_UCHAR == 8);
 	assert(sizeof(enum db_ver) == sizeof(int4));
+	assert(254 >= FNPC_MAX);	/* The value 255 is reserved */
 
 	tp_timeout_start_timer_ptr = tp_start_timer;
 	tp_timeout_clear_ptr = tp_clear_timeout;

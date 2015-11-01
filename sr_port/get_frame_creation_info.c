@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,9 +25,16 @@ GBLREF	stack_frame		*frame_pointer;
 GBLREF	spdesc			stringpool;
 GBLREF	mv_stent		*mv_chain;
 
+#ifdef UNIX
+LITDEF 	mstr	createdby_text[3] = {{0, LEN_AND_LIT("DO")}, {0, LEN_AND_LIT("XECUTE")}, {0, LEN_AND_LIT("$$")}};
+#endif
+
+#ifdef VMS
+LITDEF 	mstr	createdby_text[3] = {{LEN_AND_LIT("DO")}, {LEN_AND_LIT("XECUTE")}, {LEN_AND_LIT("$$")}};
+#endif
+
 void	get_frame_creation_info(int level, int cur_zlevel, mval *result)
 {
-	mstr		createdby_text[3] = {LEN_AND_LIT("DO"), LEN_AND_LIT("XECUTE"), LEN_AND_LIT("$$")};
 	int		count;
 	stack_frame	*fp, *previous;
 	mv_stent	*mvc;

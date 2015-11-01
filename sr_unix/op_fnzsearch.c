@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,17 +32,19 @@
 #include "zroutines.h"
 #include "mvalconv.h"
 
-GBLDEF lv_val	*zsrch_var, *zsrch_dir1, *zsrch_dir2;
-GBLREF spdesc	stringpool;
+GBLDEF	lv_val		*zsrch_var, *zsrch_dir1, *zsrch_dir2;
+
+GBLREF	spdesc		stringpool;
+GBLREF	boolean_t	gtm_utf8_mode;
 
 LITREF mval	literal_null;
 
-static mval	ind_val;	/* Subscript for variable tree search */
-static lv_val	*ind_var;	/* Variable tree holding existing search context */
+static	mval	ind_val;	/* Subscript for variable tree search */
+static	lv_val	*ind_var;	/* Variable tree holding existing search context */
 
-static CONDITION_HANDLER(dir_ch);
-static int pop_top (lv_val *src, mval *res);
-void dir_srch (parse_blk *pfil);
+static		CONDITION_HANDLER(dir_ch);
+static int	pop_top (lv_val *src, mval *res);
+void		dir_srch (parse_blk *pfil);
 
 int op_fnzsearch (mval *file, mint indx, mval *ret)
 {
@@ -237,6 +239,11 @@ void dir_srch (parse_blk *pfil)
 				{
 					compare.str.addr = &dent->d_name[0];
 					compare.str.len = strlen(&dent->d_name[0]);
+					UNICODE_ONLY(
+						if (gtm_utf8_mode)
+							compare.mvtype &= ~MV_UTF_LEN;	/* to force "char_len" to be recomputed
+											 * in do_pattern */
+					)
 					assert(compare.str.len);
 					if (   dent->d_name[0] == '.'
 					    && (compare.str.len == 1  ||  (compare.str.len == 2  &&  dent->d_name[1] == '.'))   )
@@ -314,6 +321,10 @@ void dir_srch (parse_blk *pfil)
 			{
 				compare.str.addr = &dent->d_name[0];
 				compare.str.len = strlen(&dent->d_name[0]);
+				UNICODE_ONLY(
+					if (gtm_utf8_mode)
+						compare.mvtype &= ~MV_UTF_LEN;/* force "char_len" to be recomputed in do_pattern */
+				)
 				if (   dent->d_name[0] == '.'
 				    && (compare.str.len == 1  ||  (compare.str.len == 2  &&  dent->d_name[1] == '.')))
 				{

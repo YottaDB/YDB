@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,7 @@
 #include "mdef.h"
 #include "toktyp.h"
 
-LITREF	char	ctypetab[NUM_ASCII_CHARS];
+LITREF	char	ctypetab[NUM_CHARS];
 
 char	is_ident(mstr *v)
 {

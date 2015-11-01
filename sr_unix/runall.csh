@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -331,6 +331,11 @@ if ($listonly) then
 	echo ""
 	goto cleanup
 endif
+
+# Irrespective of the gtm_chset value from the user environment, all
+# M objects generated in $gtm_dist (GDE*.o, _*.o, ttt.o) must be
+# compiled with gtm_chset="M".
+unsetenv gtm_chset
 
 echo ""
 echo "****************************** COMPILING *********************************"

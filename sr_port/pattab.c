@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -121,7 +121,7 @@ static	int		pat_linenum = 0;
 static	int		token;
 static	unsigned char	ident[MAXPATNAM + 1];
 static	int		idlen;
-static	int		number;
+static	int		number, max_patents;
 static	char		*ch = NULL;
 static	char		patline[MAXPATNAM + 2];
 
@@ -163,7 +163,7 @@ void dump_tables(void)
 	for (patp = &pattern_list; NULL != *patp; patp = &(*patp)->flink)
 	{
 		util_out_print("!/Pattern Table \"!AD\":!/", TRUE, LEN_AND_STR((*patp)->name));
-		for (mx = 0; mx < PATENTS; mx++)
+		for (mx = 0; mx < max_patents; mx++)
 		{
 			if (mx >= 32 && mx < 127)
 			{
@@ -211,10 +211,17 @@ int initialize_pattern_table(void)
 	static MSTR_CONST(pat_file,  PAT_FILE);
 	static MSTR_CONST(pat_table, PAT_TABLE);
 
+	/* Initialize the pattern/typemask table size. Note that in UTF-8 mode, we
+	 * only use the lower half of the table (0 - 127). Although we do not extend
+	 * user-defined patcodes for multi-byte characters, we still need to allow
+	 * user defined patcodes for the entire ASCII charset (0 - 127) in UTF-8 mode.
+	 */
+	max_patents = (gtm_utf8_mode ? PATENTS_UTF8 : PATENTS);
+
 	/* Initialize pattern/typemask structures and pat_allmaskbits for default typemask */
 	curr_pattern = pattern_list = &mumps_pattern;
 	pattern_typemask = mumps_pattern.typemask = (uint4 *)&(typemask[0]);
-	for (pat_allmaskbits = 0, letter = 0; letter < PATENTS; letter++)
+	for (pat_allmaskbits = 0, letter = 0; letter < max_patents; letter++)
 		pat_allmaskbits |= pattern_typemask[letter];	/* used in do_patfixed/do_pattern */
 
 	/* Locate default pattern file and load it. */
@@ -237,7 +244,7 @@ int initialize_pattern_table(void)
 int load_pattern_table(int name_len,char *file_name)
 {
 	unsigned char	newtabnam[MAXPATNAM + 1], newYZnam[PAT_YZMAXNUM][PAT_YZMAXLEN];
-	int		code, cmp, cnt, mx, newtable[PATENTS], newnamlen, newYZlen[PAT_YZMAXNUM];
+	int		code, cmp, cnt, newtable[PATENTS], newnamlen, newYZlen[PAT_YZMAXNUM];
 	int		newYZnum = -1;	/* number of ANSI user-defined patcodes */
 	pattern		*newpat, **patp ;
 
@@ -272,7 +279,7 @@ int load_pattern_table(int name_len,char *file_name)
 			while (T_NL == (token = pat_lex()))
 				;
 			/* Process PATCODE directives */
-			memset(&newtable[0], 0, sizeof(newtable));
+			memset(&newtable[0], 0, max_patents * sizeof(newtable[0]));
 			for (cnt = 0; cnt < PAT_YZMAXNUM; cnt++)
 				newYZlen[cnt] = 0;
 			newYZnum = -1;
@@ -333,10 +340,10 @@ int load_pattern_table(int name_len,char *file_name)
 				/* Process character list setting the code's flag into the typemask */
 				if (T_NUMBER == token)
 				{
-					if (number >= PATENTS)
+					if (number >= max_patents)
 					{
 						util_out_print("Character code greater than !UL encountered (!UL)",
-							TRUE, PATENTS, number);
+							TRUE, max_patents - 1, number);
 						pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 					}
 					newtable[number] |= mapbit[code];
@@ -348,10 +355,10 @@ int load_pattern_table(int name_len,char *file_name)
 								TRUE, idlen, ident);
 							pattab_error(name_len, file_name, pat_linenum); /* error does not return */
 						}
-						if (number >= PATENTS)
+						if (number >= max_patents)
 						{
 							util_out_print("Character code greater than !UL encountered (!UL)",
-								TRUE, PATENTS, number);
+								TRUE, max_patents - 1, number);
 							pattab_error(name_len, file_name, pat_linenum); /* error does not return */
 						}
 						newtable[number] |= mapbit[code];
@@ -379,8 +386,8 @@ int load_pattern_table(int name_len,char *file_name)
 			newpat->flink = (*patp);
 			newpat->namlen = newnamlen;
 			memcpy(newpat->name, newtabnam, newnamlen + 1);
-			newpat->typemask = (uint4 *) malloc(sizeof(typemask));
-			memcpy(newpat->typemask, newtable, sizeof(typemask));
+			newpat->typemask = (uint4 *) malloc(max_patents * sizeof(typemask[0]));
+			memcpy(newpat->typemask, newtable, max_patents * sizeof(typemask[0]));
 			newpat->patYZnam = (unsigned char *) malloc(sizeof(newYZnam));
 			memcpy(newpat->patYZnam, newYZnam, sizeof(newYZnam));
 			newpat->patYZlen = (int *) malloc(sizeof(newYZlen));
@@ -552,7 +559,7 @@ int setpattab(mstr *table_name)
 				pattern_typemask = (*patp)->typemask;
 				curr_pattern = (*patp);
 				/* reset pat_allmaskbits to correspond to the currently active pattern_typemask */
-				for (pat_allmaskbits = 0, letter = 0; letter < PATENTS; letter++)
+				for (pat_allmaskbits = 0, letter = 0; letter < max_patents; letter++)
 					pat_allmaskbits |= pattern_typemask[letter];
 				return TRUE;
 			}

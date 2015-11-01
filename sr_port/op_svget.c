@@ -90,6 +90,8 @@ GBLREF mval		dollar_ztexit;
 GBLREF int		totalAlloc;
 GBLREF int		totalRmalloc;
 GBLREF int		totalUsed;
+GBLREF mstr		dollar_zchset;
+GBLREF mstr		dollar_zpatnumeric;
 
 LITREF mval		literal_zero,literal_one;
 LITREF char		gtm_release_name[];
@@ -357,6 +359,14 @@ void op_svget(int varnum, mval *v)
 		case SV_ZUSEDSTOR:
 			count = totalUsed;
 			MV_FORCE_MVAL(v, count);
+			break;
+		case SV_ZCHSET:
+			v->mvtype = MV_STR;
+			v->str = dollar_zchset;
+			break;
+		case SV_ZPATNUMERIC:
+			v->mvtype = MV_STR;
+			v->str = dollar_zpatnumeric;
 			break;
 		default:
 			GTMASSERT;

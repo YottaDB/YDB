@@ -46,68 +46,71 @@ LITREF	toktabtype	tokentable[];
 /* note that svn_index array provides indexes into this array for each letter of the
    alphabet so changes here should be reflected there.
 */
-LITDEF nametabent svn_names[] = {
-	{ 1,"D" }, { 6,"DEVICE" }
-	,{ 2,"EC" }, { 5,"ECODE" }
-	,{ 2,"ES" }, { 6,"ESTACK" }
-	,{ 2,"ET" }, { 5,"ETRAP" }
-	,{ 1,"H" }, { 7,"HOROLOG" }
-	,{ 1,"I" }, { 2,"IO" }
-	,{ 1,"J" }, { 3,"JOB" }
-	,{ 1,"K" }, { 3,"KEY" }
-	,{ 1,"P" }, { 8,"PRINCIPA*" }
-	,{ 1,"Q" }, { 4,"QUIT" }
-	,{ 1,"R" }, { 8,"REFERENC*" }
-	,{ 1,"S" }, { 7,"STORAGE" }
-	,{ 2,"ST" }, { 5,"STACK" }
-	,{ 2,"SY" }, { 6,"SYSTEM" }
-	,{ 1,"T" }, { 4,"TEST" }
+LITDEF nametabent svn_names[] =
+{
+         { 1, "D" }, { 6, "DEVICE" }
+	,{ 2, "EC" }, { 5, "ECODE" }
+	,{ 2, "ES" }, { 6, "ESTACK" }
+	,{ 2, "ET" }, { 5, "ETRAP" }
+	,{ 1, "H" }, { 7, "HOROLOG" }
+	,{ 1, "I" }, { 2, "IO" }
+	,{ 1, "J" }, { 3, "JOB" }
+	,{ 1, "K" }, { 3, "KEY" }
+	,{ 1, "P" }, { 8, "PRINCIPA*" }
+	,{ 1, "Q" }, { 4, "QUIT" }
+	,{ 1, "R" }, { 8, "REFERENC*" }
+	,{ 1, "S" }, { 7, "STORAGE" }
+	,{ 2, "ST" }, { 5, "STACK" }
+	,{ 2, "SY" }, { 6, "SYSTEM" }
+	,{ 1, "T" }, { 4, "TEST" }
 	,{ 2, "TL"}, { 6, "TLEVEL"}
 	,{ 2, "TR"}, { 8, "TRESTART"}
-	,{ 1,"X" }
-	,{ 1,"Y" }
-	,{ 2,"ZA" }
-	,{ 3,"ZAL*"}
-	,{ 2,"ZB" }
-	,{ 2,"ZC" }
-	,{ 3,"ZCM*" }
-	,{ 3,"ZCO*" }
-	,{ 3,"ZCS*" }
-	,{ 3,"ZDA*" }
-	,{ 2,"ZD*" }
-	,{ 2,"ZE" }
-	,{ 3,"ZED*" }
-	,{ 3,"ZEO*" }
-	,{ 3,"ZER*" }
-	,{ 2,"ZG*" }
-	,{ 4,"ZINI*"}
-	,{ 4,"ZINT*"}
-	,{ 3,"ZIO" }
-	,{ 2,"ZJ" }, { 4,"ZJOB" }
-	,{ 2,"ZL*" }
-	,{ 8,"ZMAXTPTI*" }
-	,{ 3,"ZMO*" }
-	,{ 4,"ZPOS*" }
-	,{ 5,"ZPROC*" }
-	,{ 5,"ZPROM*" }
-	,{ 3,"ZRE*" }
-	,{ 3,"ZRO*" }
-	,{ 3,"ZSO*" }
-	,{ 2,"ZS" }, { 4,"ZSTA*" }
-	,{ 5,"ZSTEP"}
-	,{ 3,"ZSY*"}
-	,{ 3,"ZTE" }, { 6,"ZTEXIT"}
-	,{ 2,"ZT*" }
-	,{ 3,"ZUS*" }
-	,{ 2,"ZV*" }
-	,{ 4,"ZYER*" }
+	,{ 1, "X" }
+	,{ 1, "Y" }
+	,{ 2, "ZA" }
+	,{ 3, "ZAL*"}
+	,{ 2, "ZB" }
+	,{ 2, "ZC" }
+	,{ 3, "ZCH" }, { 6, "ZCHSET" }
+	,{ 3, "ZCM*" }
+	,{ 3, "ZCO*" }
+	,{ 3, "ZCS*" }
+	,{ 3, "ZDA*" }
+	,{ 2, "ZD*" }
+	,{ 2, "ZE" }
+	,{ 3, "ZED*" }
+	,{ 3, "ZEO*" }
+	,{ 3, "ZER*" }
+	,{ 2, "ZG*" }
+	,{ 4, "ZINI*"}
+	,{ 4, "ZINT*"}
+	,{ 3, "ZIO" }
+	,{ 2, "ZJ" }, { 4, "ZJOB" }
+	,{ 2, "ZL*" }
+	,{ 8, "ZMAXTPTI*" }
+	,{ 3, "ZMO*" }
+	,{ 5, "ZPATN" }, {8, "ZPATNUME*" }
+	,{ 4, "ZPOS*" }
+	,{ 5, "ZPROC*" }
+	,{ 5, "ZPROM*" }
+	,{ 3, "ZRE*" }
+	,{ 3, "ZRO*" }
+	,{ 3, "ZSO*" }
+	,{ 2, "ZS" }, { 4, "ZSTA*" }
+	,{ 5, "ZSTEP"}
+	,{ 3, "ZSY*"}
+	,{ 3, "ZTE" }, { 6, "ZTEXIT"}
+	,{ 2, "ZT*" }
+	,{ 3, "ZUS*" }
+	,{ 2, "ZV*" }
+	,{ 4, "ZYER*" }
 };
 
 /* Indexes into svn_names array for each letter of the alphabet */
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 74	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 78	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -136,6 +139,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZALLOCSTOR, FALSE, ALL_SYS }
 	,{ SV_ZB, FALSE, ALL_SYS }
 	,{ SV_ZC, FALSE, ALL_SYS }
+	,{ SV_ZCHSET, FALSE, ALL_SYS }, { SV_ZCHSET, FALSE, ALL_SYS }
 	,{ SV_ZCMDLINE, FALSE, ALL_SYS }
 	,{ SV_ZCOMPILE, TRUE, ALL_SYS }
 	,{ SV_ZCSTATUS, FALSE, ALL_SYS}
@@ -153,6 +157,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZLEVEL, FALSE, ALL_SYS }
 	,{ SV_ZMAXTPTIME, TRUE, ALL_SYS }
 	,{ SV_ZMODE, FALSE, ALL_SYS }
+	,{ SV_ZPATNUMERIC, FALSE, ALL_SYS }, { SV_ZPATNUMERIC, FALSE, ALL_SYS }
 	,{ SV_ZPOS, FALSE, ALL_SYS }
 	,{ SV_ZPROC, FALSE, ALL_SYS }
 	,{ SV_PROMPT, TRUE, ALL_SYS }
@@ -176,7 +181,7 @@ LITDEF svn_data_type svn_data[] =
  */
 LITDEF nametabent fun_names[] =
 {
-	{1, "A"}, {5, "ASCII"}
+	 {1, "A"}, {5, "ASCII"}
 	,{1, "C"}, {4, "CHAR"}
 	,{1, "D"}, {4, "DATA"}
 	,{1, "E"}, {7, "EXTRACT"}
@@ -201,6 +206,7 @@ LITDEF nametabent fun_names[] =
 	,{1, "T"}, {4, "TEXT"}
 	,{2, "TR"}, {8, "TRANSLAT*"}
 	,{1, "V*"}
+	,{2, "ZA"}, {6, "ZASCII"}
 	,{7, "ZBITAND"}
 	,{8, "ZBITCOUN*"}
 	,{8, "ZBITFIND"}
@@ -212,33 +218,44 @@ LITDEF nametabent fun_names[] =
 	,{7, "ZBITSTR"}
 	,{7, "ZBITXOR"}
 	,{2, "ZC"}, {5, "ZCALL"}
+	,{3, "ZCH"}, {5, "ZCHAR"}
+	,{3, "ZCO"}, {8, "ZCONVERT"}
 	,{2, "ZD"}, {5, "ZDATE"}
+	,{2, "ZE"}, {8, "ZEXTRACT"}
 	,{6, "ZECHAR"}
+	,{2, "ZF"}, {5, "ZFIND"}
 	,{5, "ZFILE"}, {8, "ZFILEATT*"}
 	,{7, "ZGETDVI"}
 	,{7, "ZGETJPI"}
 	,{7, "ZGETLKI"}
 	,{7, "ZGETSYI"}
 	,{5, "ZINCR"}, {8, "ZINCREME*"}
+	,{2, "ZJ"}, {8, "ZJUSTIFY"}
 	,{8, "ZJOBEXAM"}
+	,{2, "ZL"}, {7, "ZLENGTH"}
 	,{5, "ZLKID"}
 	,{2, "ZM"}, {8, "ZMESSAGE"}
-	,{6, "ZPARSE"}
-	,{4, "ZPID"}
 	,{2, "ZP"}, {8, "ZPREVIOU*"}
+	,{6, "ZPARSE"}
+	,{3, "ZPI"}, {6, "ZPIECE"}
+	,{4, "ZPID"}
 	,{5, "ZPRIV"}, {8, "ZPRIVILE*"}
 	,{2, "ZQ"}, {8, "ZQGBLMOD"}
 	,{7, "ZSEARCH"}
 	,{7, "ZSETPRV"}
 	,{8, "ZSIGPROC"}
+	,{4, "ZSUB"}, {7, "ZSUBSTR"}
+	,{3, "ZTR"}, {8, "ZTRANSLA*"}
 	,{7, "ZTRNLNM"}
+	,{2, "ZW"}, {6, "ZWIDTH"}
 };
 
 /* Index into fun_names array where entries that start with each letter of the alphabet begin. */
-LITDEF unsigned char fun_index[27] = {
+LITDEF unsigned char fun_index[27] =
+{
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
-	39, 43, 47, 47, 48, 48, 48, 48, 87	/* s t u v w x y z ~ */
+	39, 43, 47, 47, 48, 48, 48, 48, 109	/* s t u v w x y z ~ */
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -269,6 +286,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNTEXT, ALL_SYS }, { OC_FNTEXT, ALL_SYS }
 	,{ OC_FNTRANSLATE, ALL_SYS }, { OC_FNTRANSLATE, ALL_SYS }
 	,{ OC_FNVIEW, ALL_SYS }
+	,{ OC_FNZASCII, UNIX_OS }, { OC_FNZASCII, UNIX_OS }
 	,{ OC_FNZBITAND, ALL_SYS }
 	,{ OC_FNZBITCOUN, ALL_SYS }
 	,{ OC_FNZBITFIND, ALL_SYS }
@@ -284,26 +302,36 @@ LITDEF fun_data_type fun_data[] =
 #else
 	,{ OC_FNZCALL, VMS_OS }, { OC_FNZCALL, VMS_OS }
 #endif
+	,{ OC_FNZCHAR, UNIX_OS }, { OC_FNZCHAR, UNIX_OS }
+	,{ OC_FNZCONVERT2, UNIX_OS }, { OC_FNZCONVERT2, UNIX_OS }
 	,{ OC_FNZDATE, ALL_SYS }, { OC_FNZDATE, ALL_SYS }
+	,{ OC_FNZEXTRACT, UNIX_OS }, { OC_FNZEXTRACT, UNIX_OS }
         ,{ OC_FNCHAR, ALL_SYS }
+	,{ OC_FNZFIND, UNIX_OS }, { OC_FNZFIND, UNIX_OS }
 	,{ OC_FNZFILE, VMS_OS }, { OC_FNZFILE, VMS_OS }
 	,{ OC_FNZGETDVI, VMS_OS }
 	,{ OC_FNZGETJPI, ALL_SYS }
 	,{ OC_FNZGETLKI, VMS_OS }
 	,{ OC_FNZGETSYI, VMS_OS }
 	,{ OC_FNINCR, ALL_SYS }, { OC_FNINCR, ALL_SYS }
+	,{ OC_FNZJ2, UNIX_OS }, { OC_FNZJ2, UNIX_OS}
 	,{ OC_FNZJOBEXAM, ALL_SYS }
+	,{ OC_FNZLENGTH, UNIX_OS }, { OC_FNZLENGTH, UNIX_OS}
 	,{ OC_FNZLKID, VMS_OS}
 	,{ OC_FNZM, ALL_SYS }, { OC_FNZM, ALL_SYS }
-	,{ OC_FNZPARSE, ALL_SYS }
-	,{ OC_FNZPID, VMS_OS }
 	,{ OC_FNZPREVIOUS, ALL_SYS }, { OC_FNZPREVIOUS, ALL_SYS }
+	,{ OC_FNZPARSE, ALL_SYS }
+	,{ OC_FNZPIECE, UNIX_OS }, { OC_FNZPIECE, UNIX_OS }
+	,{ OC_FNZPID, VMS_OS }
 	,{ OC_FNZPRIV, VMS_OS }, { OC_FNZPRIV, VMS_OS }
 	,{ OC_FNZQGBLMOD, ALL_SYS }, { OC_FNZQGBLMOD, ALL_SYS }
 	,{ OC_FNZSEA, ALL_SYS }
 	,{ OC_FNZSETPRV, VMS_OS }
 	,{ OC_FNZSIGPROC, ALL_SYS }
+	,{ OC_FNZSUBSTR, UNIX_OS }, { OC_FNZSUBSTR, UNIX_OS }
+	,{ OC_FNZTRANSLATE, UNIX_OS }, { OC_FNZTRANSLATE, UNIX_OS }
 	,{ OC_FNZTRNLNM, ALL_SYS }
+	,{ OC_FNZWIDTH, UNIX_OS }, { OC_FNZWIDTH, UNIX_OS }
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -334,6 +362,7 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =
 	f_text, f_text,
 	f_translate, f_translate,
 	f_view,
+	f_ascii, f_ascii,
 	f_two_mval,
 	f_one_mval,
 	f_fnzbitfind,
@@ -345,26 +374,36 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =
 	f_fnzbitstr,
 	f_two_mval,
 	f_zcall, f_zcall,
+	f_zchar, f_zchar,
+	f_zconvert, f_zconvert,
 	f_zdate, f_zdate,
-	f_zechar,
+	f_extract, f_extract,
+	f_zchar,
+	f_find, f_find,
 	f_two_mstrs, f_two_mstrs,
 	f_two_mstrs,
 	f_mint_mstr,
 	f_two_mstrs,
 	f_zgetsyi,
 	f_incr, f_incr,
+	f_justify, f_justify,
 	f_zjobexam,
+	f_length, f_length,
 	f_mint,
 	f_mint, f_mint,
-	f_zparse,
-	f_mint,
 	f_zprevious, f_zprevious,
+	f_zparse,
+	f_piece, f_piece,
+	f_mint,
 	f_mstr, f_mstr,
 	f_zqgblmod, f_zqgblmod,
 	f_zsearch,
 	f_mstr,
 	f_zsigproc,
-	f_ztrnlnm
+	f_extract, f_extract,		/* $ZSUBSTR */
+	f_translate, f_translate,
+	f_ztrnlnm,
+	f_zwidth, f_zwidth
 };
 
 int expritem(oprtype *a)

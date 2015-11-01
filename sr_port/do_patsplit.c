@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,12 @@
 #include "copy.h"
 #include "min_max.h"
 #include "gtm_string.h"
+
+#ifdef UNICODE_SUPPORTED
+#include "gtm_utf8.h"
+#endif
+
+GBLREF	boolean_t	gtm_utf8_mode;
 
 /* This routine tries to split the pattern-string P into substrings LFR where F is a fixed length pattern-atom of P
  * 	and L and R are the pattern substrings in P on the left and right side of F.
@@ -33,11 +39,12 @@ int do_patsplit(mval *str, mval *pat)
 {
 	int4		count, total_min, total_max;
 	int4		min[MAX_PATTERN_ATOMS], max[MAX_PATTERN_ATOMS], size[MAX_PATTERN_ATOMS];
-	int4		len, length, fixed_len;
+	int4		bytelen, charlen, charstoskip, fixedcharlen, leftcharlen, rightcharlen, deltalen, numchars;
+	int4		strbytelen, strcharlen;
 	int4		alt_rep_min, alt_rep_max;
 	int4		alt;
 	uint4		tempuint;
-	uint4		code;
+	uint4		code, flags;
 	uint4		*patptr, *patptr_start, *patptr_end, *fixed_patptr, *right_patptr, *tmp_patptr;
 	ptstr		left_ptstr, right_ptstr, fixed_ptstr;
 	mval		left_pat, right_pat, fixed_pat, left_str, right_str, fixed_str;
@@ -46,7 +53,7 @@ int do_patsplit(mval *str, mval *pat)
 	boolean_t	fixed[2];	/* fixed[0] is for the left, fixed[1] is for the right */
 	int4		tot_min[2], tot_max[2], cnt[2];	/* index 0 is for left, index 1 is for right */
 	int4		offset;
-	char		*strptr, *strtop;
+	unsigned char	*strptr, *strtop, *rightptr, *rightnext, *fixedptr, *fixednext, *maxfixedptr;
 	boolean_t	match;		/* match status of input pattern with input string */
 	gtm_uint64_t	bound;
 
@@ -67,8 +74,13 @@ int do_patsplit(mval *str, mval *pat)
 	patptr++;
 	GET_LONG(total_max, patptr);
 	patptr++;
-	length = str->str.len;
-	assert(length >= total_min && length <= total_max);
+	UNICODE_ONLY(
+	if (gtm_utf8_mode)
+	{
+		MV_FORCE_LEN(str);	/* to set str.char_len if not already done */
+		assert(str->str.char_len >= total_min && str->str.char_len <= total_max);
+	}
+	)
 	assert(count <= MAX_PATTERN_ATOMS);
 	memcpy(&min[0], patptr, sizeof(*patptr) * count);
 	patptr += count;
@@ -106,17 +118,22 @@ int do_patsplit(mval *str, mval *pat)
 		} else if (code == PATM_DFA)
 		{	/* Discrete Finite Automaton pat atom */
 			assert(min[index] != max[index]);	/* DFA should never be fixed length */
-			GET_LONG(len, patptr);
+			GET_LONG(bytelen, patptr);
 			patptr++;
-			patptr += len;
+			patptr += bytelen;
 			fixed[right] = FALSE;
 		} else
 		{
 			if (code & PATM_STRLIT)
 			{	/* STRLIT pat atom */
-				GET_LONG(len, patptr);
+				assert(3 == PAT_STRLIT_PADDING);
+				GET_LONG(bytelen, patptr);
 				patptr++;
-				patptr += DIVIDE_ROUND_UP(len, sizeof(*patptr));
+				GET_LONG(charlen, patptr);
+				patptr++;
+				GET_ULONG(flags, patptr);
+				patptr++;
+				patptr += DIVIDE_ROUND_UP(bytelen, sizeof(*patptr));
 			}
 			if ((min[index] == max[index]) && (bound = (gtm_uint64_t)min[index] * size[index]))
 			{	/* fixed_length */
@@ -192,9 +209,9 @@ int do_patsplit(mval *str, mval *pat)
 	memcpy(patptr, fixed_patptr, (char *)right_patptr - (char *)fixed_patptr);
 	patptr += right_patptr - fixed_patptr;
 	*patptr++ = 1;						/* count */
-	fixed_len = min[fixed_index] * size[fixed_index];	/* tot_min and tot_max */
-	*patptr++ = fixed_len;
-	*patptr++ = fixed_len;
+	fixedcharlen = min[fixed_index] * size[fixed_index];	/* tot_min and tot_max */
+	*patptr++ = fixedcharlen;
+	*patptr++ = fixedcharlen;
 	*patptr++ = min[fixed_index];				/* min[0] */
 	*patptr++ = size[fixed_index];				/* size[0] */
 	fixed_pat.mvtype = MV_STR;
@@ -225,38 +242,119 @@ int do_patsplit(mval *str, mval *pat)
 		right_pat.str.len = (char *)patptr - (char *)&right_ptstr.buff[0];
 		right_pat.str.addr = (char *)&right_ptstr.buff[0];
 	}
+	strbytelen = str->str.len;
+	strptr = (unsigned char *)str->str.addr;
+	strtop = strptr + strbytelen;
+	if (!gtm_utf8_mode)
+		strcharlen = str->str.len;
+	UNICODE_ONLY(
+	else
+		strcharlen = str->str.char_len;
+	)
+	/* Determine "maxfixedptr" */
+	if (strcharlen > (tot_min[1] + tot_max[0] + fixedcharlen))
+		charstoskip = tot_max[0];
+	else
+		charstoskip = strcharlen - tot_min[1] - fixedcharlen;
+	if (!gtm_utf8_mode)
+		strptr += charstoskip;
+	UNICODE_ONLY(
+	else
+	{
+		for ( ; 0 < charstoskip; charstoskip--)
+		{
+			assert(strptr < strtop); /* below macro relies on this */
+			strptr = UTF8_MBNEXT(strptr, strtop);
+		}
+	}
+	)
+	maxfixedptr = strptr;
+	/* Determine "fixedptr" */
+	strptr = (unsigned char *)str->str.addr;
+	if (strcharlen > (tot_min[0] + tot_max[1] + fixedcharlen))
+		charstoskip = strcharlen - tot_max[1] - fixedcharlen;
+	else
+		charstoskip = tot_min[0];
+	leftcharlen = charstoskip;
+	if (!gtm_utf8_mode)
+		strptr += charstoskip;
+	UNICODE_ONLY(
+	else
+	{
+		for ( ; 0 < charstoskip; charstoskip--)
+		{
+			assert(strptr < strtop); /* below macro relies on this */
+			strptr = UTF8_MBNEXT(strptr, strtop);
+		}
+	}
+	)
+	fixedptr = strptr;
+	/* Set "left_str" */
 	left_str.mvtype = MV_STR;
 	left_str.str.addr = str->str.addr;
-	fixed_str.mvtype = MV_STR;
-	fixed_str.str.len = fixed_len;
+	/* Set "right_str" */
 	right_str.mvtype = MV_STR;
-
-	if (str->str.len > (tot_min[0] + tot_max[1] + fixed_len))
-		strptr = str->str.addr + str->str.len - tot_max[1] - fixed_len;
-	else
-		strptr = str->str.addr + tot_min[0];
-	if (str->str.len > (tot_min[1] + tot_max[0] + fixed_len))
-		strtop = str->str.addr + tot_max[0];
-	else
-		strtop = str->str.addr + str->str.len - tot_min[1] - fixed_len;
-	/* Try to match the fixed pattern string and for each match, try matching the left and right input strings */
-	for (match = FALSE; !match && (strptr <= strtop); strptr++)
+	/* Set "fixed_str" */
+	fixed_str.mvtype = MV_STR;
+	if (!gtm_utf8_mode)
 	{
-		fixed_str.str.addr = strptr;
+		fixed_str.str.len = fixedcharlen;
+		rightptr = fixedptr + fixedcharlen;
+	}
+	UNICODE_ONLY(
+	else
+	{
+		left_str.mvtype |= MV_UTF_LEN;	/* avoid recomputing "char_len" in do_patfixed below */
+		right_str.mvtype |= MV_UTF_LEN;	/* avoid recomputing "char_len" in do_patfixed below */
+		fixed_str.mvtype |= MV_UTF_LEN;	/* avoid recomputing "char_len" in do_patfixed below */
+		fixed_str.str.char_len = fixedcharlen;
+		/* skip fixedcharlen characters */
+		assert(fixedptr == strptr);
+		for (numchars = 0; numchars < fixedcharlen; numchars++)
+		{
+			assert(strptr < strtop);
+			strptr = UTF8_MBNEXT(strptr, strtop);
+		}
+		rightptr = strptr;
+	}
+	)
+	deltalen = 0;
+	/* Try to match the fixed pattern string and for each match, try matching the left and right input strings */
+	for (match = FALSE; !match && (fixedptr <= maxfixedptr); fixedptr = fixednext, rightptr = rightnext, leftcharlen++)
+	{
+		fixed_str.str.addr = (char *)fixedptr;
+		fixed_str.str.len = rightptr - fixedptr;
+		if (!gtm_utf8_mode)
+		{
+			fixednext = fixedptr + 1;
+			rightnext = rightptr + 1;
+		}
+		UNICODE_ONLY(
+		else
+		{
+			assert(fixedptr < strtop);
+			fixednext = UTF8_MBNEXT(fixedptr, strtop);
+			assert((rightptr < strtop) || (fixedptr == maxfixedptr) && (fixednext > maxfixedptr));
+			if (rightptr < strtop)
+				rightnext = UTF8_MBNEXT(rightptr, strtop);
+		}
+		)
 		if (!do_patfixed(&fixed_str, &fixed_pat))
 			continue;
 		assert(cnt[0] || cnt[1]); /* fixed_pat takes only one pattern atom and non-zero rest are in cnt[0] and cnt[1] */
 		if (cnt[0])
 		{
-			left_str.str.len = strptr - str->str.addr;
+			left_str.str.len = fixedptr - (unsigned char *)left_str.str.addr;
+			UNICODE_ONLY(left_str.str.char_len = leftcharlen;)
 			match = fixed[0] ? do_patfixed(&left_str, &left_pat) : do_pattern(&left_str, &left_pat);
 			if (!match)
 				continue;
 		}
 		if (cnt[1])
 		{
-			right_str.str.addr = strptr + fixed_len;
-			right_str.str.len = str->str.addr + str->str.len - right_str.str.addr;
+			right_str.str.addr = (char *)rightptr;
+			UNICODE_ONLY(right_str.str.char_len = strcharlen - leftcharlen - fixedcharlen;)
+			right_str.str.len = strtop - rightptr;
 			match = (fixed[1] ? do_patfixed(&right_str, &right_pat) : do_pattern(&right_str, &right_pat));
 		}
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -385,8 +385,10 @@ bool	mubfilcpy (backup_reg_list *list)
 	memcpy(command + 4 + tempfilelen, file->addr, file->len);
 	command[4 + tempfilelen + file->len] = 0;
 	if (debug_mupip)
-		util_out_print("MUPIP INFO:     !AD", TRUE,
+	{
+		util_out_print("MUPIP INFO:   !AD", TRUE,
 			       sizeof("mv  ") - 1 + tempfilelen + file->len, command);
+	}
 	if (0 != (rv = SYSTEM((char *)command)))
 	{
 		if (-1 == rv)

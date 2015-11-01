@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,9 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#ifndef IO_H
+#define IO_H
 
 #ifdef USING_ICONV
 #define _OSF_SOURCE
@@ -18,6 +21,7 @@
 #include <sys/types.h>
 #endif
 #endif
+
 #define INSERT			TRUE
 #define NO_INSERT		FALSE
 #define IO_SEQ_WRT		1
@@ -44,6 +48,8 @@
 #define DEFAULT_IOD_LENGTH	55
 #define DEFAULT_IOD_WIDTH	80
 #define DEFAULT_IOD_WRAP	TRUE
+
+#define BADCHAR_DEVICE_MSG "BADCHAR error raised on input"
 
 typedef unsigned char params;
 
@@ -72,11 +78,13 @@ enum io_dev_state
 	n_io_dev_states
 };
 
+#ifdef VMS
 enum code_set_type
 {
 	ascii,
 	ebcdic
 };
+#endif
 
 typedef struct
 {
@@ -107,12 +115,36 @@ typedef struct io_desc_struct
 	unsigned char			esc_state;
 	void				*dev_sp;
 	struct dev_dispatch_struct	*disp_ptr;
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 	iconv_t				input_conv_cd;
 	iconv_t				output_conv_cd;
 	enum code_set_type		in_code_set;
 	enum code_set_type		out_code_set;
+#endif
+	gtm_chset_t			ichset;
+	gtm_chset_t			ochset;
 	int4				write_filter;
 }io_desc;
+
+/*
+ * ICHSET: UTF-16
+ * First READ: BOM
+ * Transition to UTF-16BE or UTF-16LE based on BOM
+ *
+ * ICHSET: UTF-16
+ * First READ: Not BOM
+ * Transition to UTF-16BE per Unicode standard
+ *
+ * ICHSET: UTF-16LE (or UTF-16BE)
+ * First READ: BOM or not BOM
+ * Do nothing, assume input is in specified endian format. Pass input to application (if BOM present, it is treated as ZWNBS)
+ *
+ * OCHSET: UTF-16
+ * First WRITE: Transition to UTF-16BE, write BOM
+ *
+ * OCHSET: UTF-16LE (or UTF-16BE)
+ * First WRITE: Do not WRITE BOM. All output in specified endian format
+ */
 
 typedef struct io_log_name_struct
 {
@@ -132,15 +164,15 @@ typedef struct dev_dispatch_struct
 	short	(*open)(io_log_name *, mval *, int, mval *, int4);
 	void	(*close)(io_desc *, mval *);
 	void	(*use)(io_desc *, mval *);
-	short	(*read)(mval *, int4);
-	short	(*rdone)(mint *, int4);
+	int	(*read)(mval *, int4);
+	int	(*rdone)(mint *, int4);
 	void	(*write)(mstr *);
-	void	(*wtone)(unsigned char);
+	void	(*wtone)(int);
 	void	(*wteol)(int4, io_desc *);
 	void	(*wtff)(void);
 	void	(*wttab)(int4);
 	void	(*flush)(io_desc *);
-	short	(*readfl)(mval *, int4, int4);
+	int	(*readfl)(mval *, int4, int4);
 	void	(*iocontrol)(mstr *);
 	void	(*dlr_device)(mstr *);
 	void	(*dlr_key)(mstr *);
@@ -162,15 +194,15 @@ void io_init_name(void);
 #define ioxx_dummy(X)		short io##X##_dummy(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
 #define ioxx_close(X)		void io##X##_close(io_desc *iod, mval *pp)
 #define ioxx_use(X)		void io##X##_use(io_desc *iod, mval *pp)
-#define ioxx_read(X)		short io##X##_read(mval *v, int4 t)
-#define ioxx_rdone(X)		short io##X##_rdone (mint *v, int4 timeout)
+#define ioxx_read(X)		int io##X##_read(mval *v, int4 t)
+#define ioxx_rdone(X)		int io##X##_rdone (mint *v, int4 timeout)
 #define ioxx_write(X)		void io##X##_write(mstr *v)
-#define ioxx_wtone(X)		void io##X##_wtone(unsigned char c)
+#define ioxx_wtone(X)		void io##X##_wtone(int c)
 #define ioxx_wteol(X)		void io##X##_wteol(int4 cnt, io_desc *iod)
 #define ioxx_wtff(X)		void io##X##_wtff(void)
 #define ioxx_wttab(X)		void io##X##_wttab(int4 x)
 #define ioxx_flush(X)		void io##X##_flush(io_desc *iod)
-#define ioxx_readfl(X)		short io##X##_readfl(mval *v, int4 width, int4 timeout)
+#define ioxx_readfl(X)		int io##X##_readfl(mval *v, int4 width, int4 timeout)
 #define xx_iocontrol(X)		void X##_iocontrol(mstr *d)
 #define xx_dlr_device(X)	void X##_dlr_device(mstr *d)
 #define xx_dlr_key(X)		void X##_dlr_key(mstr *d)
@@ -274,6 +306,9 @@ dev_dispatch_struct *io_get_fgn_driver(mstr *s);
 #define TAB_BUF_SZ	128
 
 LITREF unsigned char spaces_block[];
+
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
+
 LITREF unsigned char ebcdic_spaces_block[];
 
 #define SPACES_BLOCK ((ascii != io_curr_device.out->out_code_set) ? \
@@ -295,7 +330,7 @@ LITREF unsigned char ebcdic_spaces_block[];
 
 #define SET_CODE_SET(CODE_SET, CODE_SET_STR)
 
-#endif
+#endif /* __MVS__ */
 
 #define ICONV_OPEN_CD(DESC_CD, CODE_SRC, CODE_TARGET)		\
 {								\
@@ -316,3 +351,25 @@ LITREF unsigned char ebcdic_spaces_block[];
 	else if (ASCII_TO_EBCDIC == CD)				\
 		asc_to_ebc(*(DEST), *(SRC), *(IN_LEN_PTR));	\
 }
+
+#else /* !KEEP_zOS_EBCDIC && !VMS*/
+
+#define SPACES_BLOCK spaces_block
+#define RM_SPACES_BLOCK spaces_block
+
+#endif /* KEEP_zOS_EBCDIC || VMS */
+
+#define SET_ENCODING(CHSET, CHSET_MSTR)												\
+{																\
+	int 	chset_idx;													\
+	error_def(ERR_BADCHSET);												\
+																\
+	chset_idx = verify_chset(CHSET_MSTR);											\
+		;														\
+	if (0 <= chset_idx)													\
+		(CHSET) = chset_idx;												\
+	else															\
+		rts_error(VARLSTCNT(4) ERR_BADCHSET, 2, (CHSET_MSTR)->len, (CHSET_MSTR)->addr);					\
+}
+
+#endif /* IO_H */

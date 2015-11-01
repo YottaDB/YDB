@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,10 @@
 #include "cmd_qlf.h"
 #include "cli.h"
 
-GBLREF command_qualifier glb_cmd_qlf;
-GBLDEF list_params lst_param;
+GBLDEF list_params 		lst_param;
+
+GBLREF command_qualifier 	glb_cmd_qlf;
+GBLREF boolean_t		gtm_utf8_mode;
 
 void get_cmd_qlf(command_qualifier *qualif)
 {
@@ -28,6 +30,8 @@ void get_cmd_qlf(command_qualifier *qualif)
 
 	qualif->qlf = glb_cmd_qlf.qlf;
 	qualif->object_file.mvtype = qualif->list_file.mvtype = qualif->ceprep_file.mvtype = 0;
+	if (gtm_utf8_mode)
+		qualif->qlf |= CQ_UTF8;		/* Mark as being compiled in UTF8 mode */
 	if (cli_present("OBJECT") == CLI_PRESENT)
 	{
 		qualif->qlf |= CQ_OBJECT;

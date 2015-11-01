@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,16 +10,43 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "io.h"
+#ifdef UNICODE_SUPPORTED
+#include "gtm_utf8.h"
+#endif
 
-void iott_wtone(unsigned char v)
+GBLREF	io_pair		io_curr_device;
+GBLREF	boolean_t	gtm_utf8_mode;
+LITREF	mstr		chset_names[];
+
+void iott_wtone(int v)
 {
-mstr temp;
-char p[1];
+	mstr	temp;
+	char	p[1];
+#ifdef UNICODE_SUPPORTED
+	unsigned char	utf_buf[GTM_MB_LEN_MAX], *up;
+#endif
+	io_desc	*iod;
+	UNICODE_ONLY(error_def(ERR_BADCHSET);)
 
-p[0] = v;
-temp.len = 1;
-temp.addr = p;
-iott_write(&temp);
-return;
+	if (!gtm_utf8_mode UNICODE_ONLY(|| CHSET_M == io_curr_device.out->ochset))
+	{
+		p[0] = (char)v;
+		temp.len = 1;
+		temp.addr = p;
+		UNICODE_ONLY(temp.char_len = 1;)
+	}
+#ifdef UNICODE_SUPPORTED
+	else if (CHSET_UTF8 == io_curr_device.out->ochset)
+	{
+		up = UTF8_WCTOMB(v, utf_buf);
+		temp.len = up - utf_buf;
+		temp.addr = (char *)&utf_buf;
+	} else
+		rts_error(VARLSTCNT(4) ERR_BADCHSET, 2, chset_names[io_curr_device.out->ochset].len,
+				chset_names[io_curr_device.out->ochset].addr);
+#endif
+	iott_write(&temp);
+	return;
 }

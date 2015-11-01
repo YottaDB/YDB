@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,10 +39,12 @@
 #include "getzdir.h"
 #include "gtm_newintrinsic.h"
 
-#define PROMPTBUF "GTM>           "
-
-GBLDEF char		prombuf[] = PROMPTBUF;
-GBLDEF MSTR_DEF(gtmprompt, 4, &prombuf[0]);
+#define DEFAULT_PROMPT	"GTM>"
+/* The prompt buffer size (31) below would allow at least 8 Unicode characters, but since most
+ * commonly used Unicode characters only occupy upto 3 bytes, the buffer would at least accommodate
+ * 10 Unicode characters in a prompt */
+GBLDEF char		prombuf[MAX_MIDENT_LEN] = DEFAULT_PROMPT;
+GBLDEF MSTR_DEF(gtmprompt, STR_LIT_LEN(DEFAULT_PROMPT), &prombuf[0]);
 
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
@@ -72,8 +74,7 @@ GBLREF boolean_t	dollar_ztexit_bool;
 void op_svput(int varnum, mval *v)
 {
 	int		i, ok, state;
-	error_def(ERR_UNIMPLOP);
-	error_def(ERR_TEXT);
+	char		*vptr;
 	error_def(ERR_INVECODEVAL);
 	error_def(ERR_SETECODE);
 	error_def(ERR_SYSTEMVALUE);
@@ -179,8 +180,20 @@ void op_svput(int varnum, mval *v)
 		break;
 	case SV_PROMPT:
 		MV_FORCE_STR(v);
-		gtmprompt.len = v->str.len < sizeof(prombuf) ? v->str.len : sizeof(prombuf);
-		memcpy(gtmprompt.addr,v->str.addr,gtmprompt.len);
+		MV_FORCE_LEN_STRICT(v); /* Ensure that direct mode prompt will not have BADCHARs,
+					   otherwise the BADCHAR error may fill up the filesystem */
+		if (v->str.len <= sizeof(prombuf))
+			gtmprompt.len = v->str.len;
+		else if (!gtm_utf8_mode)
+			gtmprompt.len = sizeof(prombuf);
+#ifdef UNICODE_SUPPORTED
+		else
+		{
+			UTF8_LEADING_BYTE(v->str.addr + sizeof(prombuf), v->str.addr, vptr);
+			gtmprompt.len = vptr - v->str.addr;
+		}
+#endif
+		memcpy(gtmprompt.addr, v->str.addr, gtmprompt.len);
 		break;
 	case SV_ECODE:
 		MV_FORCE_STR(v);

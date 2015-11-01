@@ -45,6 +45,7 @@ void op_lvzwrite(UNIX_ONLY_COMMA(int4 count) int4 arg1, ...)
 	output.code = 'V';
 	output.type = ZSHOW_DEVICE;
 	output.buff = &buff[0];
+	output.size = sizeof(buff);
 	output.ptr = output.buff;
 	out = &output;
 	count--;

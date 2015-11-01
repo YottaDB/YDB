@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,7 @@
 
 static	int	patmask_seq[] =
 {
-     -1, 0,  1,  2,  3,  4, -1, -1, -1,
+     -1, 0,  1,  2,  3,  4, 22, 23, -1,
 	 5,  6,  7,  8,  9, 10, 11, 12,
 	13, 14, 15, 16, 17, 18, 19, 20,
 	21, -1, -1, -1, -1, -1, -1, -1

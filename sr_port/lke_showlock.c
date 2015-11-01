@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,11 +42,11 @@
 #include "lke.h"
 #include "is_proc_alive.h"
 #include "real_len.h"		/* for real_len() prototype */
+#include "zshow.h"
+#include "val_iscan.h"
 
-#define FLUSH		1
 #define LNAM		24
 #define NDIM		32		/* max node name size */
-#define SDIM		256		/* max subscript size */
 #define	CLNTNODE_LIT	" : CLNTNODE = "
 #define CLNTPID_LIT	" : CLNTPID = "
 
@@ -85,37 +85,40 @@ bool	lke_showlock(
 	mlk_prcblk_ptr_t r;
 	mlk_shrsub_ptr_t value;
 	short		len1;
-	int4		len2;
+	int 		len2;
 	bool		lock = FALSE, owned;
 	int4		f[7], gtcmbufidx, item, ret;
 	uint4		status;
-	char		*msg, format[64], gtcmbuf[64];	/* gtcmbuf[] is to hold ": CLNTNODE = %s : CLNTPID = %s" */
+	char		*msg, save_ch, format[64], gtcmbuf[64];	/* gtcmbuf[] is to hold ": CLNTNODE = %s : CLNTPID = %s" */
+	static	mval	subsc = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0);
 	VMS_ONLY(
 		char		sysinfo[NDIM];
 		$DESCRIPTOR	(sysinfo_dsc, sysinfo);
 	)
 
-	/* ~~~ the following is to exclude any quotes if present ~~~~~	*/
-	if ((NULL != one_lock.addr) && ('"' == *(unsigned char *)(one_lock.addr)))
-	{
-		one_lock.addr++;
-		one_lock.len--;
-		one_lock.len--;
-	}
 	value = (mlk_shrsub_ptr_t)R2A(tree->value);
 	if (0 == name->len)
-	{
+	{ /* unsubscripted lock name can never have control characters, so no ZWR translation needed */
 		memcpy(name->addr, value->data, value->length);
-		f[0] = name->len
-		     = value->length;
+		f[0] = name->len = value->length;
 		name->addr[name->len++] = '(';
 	} else
-	{
+	{ /* perform ZWR translation on the subscript */
 		len1 = name->len - 1;
 		if (')' == name->addr[len1])
 			name->addr[len1] = ',';
-		memcpy(&name->addr[name->len], value->data, value->length);
-		name->len += value->length;
+		subsc.str.len = value->length;
+		subsc.str.addr = (char *)value->data;
+		if (val_iscan(&subsc))
+		{ /* avoid printing enclosed quotes for canonical numbers */
+			save_ch = name->addr[len1];
+			format2zwr((sm_uc_ptr_t)value->data, value->length, (unsigned char*)&name->addr[len1], &len2);
+			assert(name->addr[len1 + len2 - 1] == '"');
+			name->addr[len1] = save_ch;
+			len2 -= 2; /* exclude the enclosing quotes */
+		} else
+			format2zwr((sm_uc_ptr_t)value->data, value->length, (unsigned char*)&name->addr[name->len], &len2);
+		name->len += len2;
 		name->addr[name->len++] = ')';
 		f[0] = name->len;
 	}

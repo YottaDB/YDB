@@ -34,6 +34,14 @@
 #define	ZTRAP_NEW			"$gtm_ztrap_new"
 #define	ZYERROR				"$gtm_zyerror"
 #define	DISABLE_ALIGN_STRINGS		"$gtm_disable_alignstr"
+#define GTM_MAX_SOCKETS			"$gtm_max_sockets"
+#define GTM_QUIET_HALT			"$gtm_quiet_halt"
+
+/* Environment variables for Unicode functionality */
+#define GTM_CHSET_ENV			"$gtm_chset"
+#define GTM_PATNUMERIC_ENV		"$gtm_patnumeric"
+#define GTM_BADCHAR_ENV			"$gtm_badchar"
+#define GTM_ICU_MINOR_ENV		"$gtm_icu_minorver"
 
 #define	GTM_GVDUPSETNOOP		"$gtm_gvdupsetnoop"
 #define	GTM_GDSCERT			"$gtm_gdscert"

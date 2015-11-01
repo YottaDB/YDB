@@ -55,8 +55,9 @@
 #define MAX_UTIL_LEN    	64
 #define NEXT_EPOCH_TIME_SPACES	"                   " /* 19 spaces, we have 19 character field width to output Next Epoch Time */
 
-GBLREF sgmnt_addrs      *cs_addrs;
-GBLREF gd_region        *gv_cur_region;
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	boolean_t	dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */
 
 GBLDEF mval dse_dmp_time_fmt = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, STR_LIT_LEN(DSE_DMP_TIME_FMT), DSE_DMP_TIME_FMT, 0, 0);
 
@@ -67,18 +68,19 @@ LITREF	char		*gtm_dbversion_table[];
 	util_out_print(TEXT"  0x!8XL        Transaction =   0x!16@XJ", TRUE, (csd->VARIABLE##_cntr),	\
 		(&csd->VARIABLE##_tn));
 
-#define SHOW_DB_CSH_STAT(COUNTER, TEXT1, TEXT2)									\
-	if (csd->COUNTER.curr_count || csd->COUNTER.cumul_count)				\
-	{													\
-		util_out_print(TEXT1"  0x!8XL      "TEXT2"  0x!8XL", TRUE, (csd->COUNTER.curr_count), \
-				(csd->COUNTER.cumul_count + csd->COUNTER.curr_count));	\
+#define SHOW_DB_CSH_STAT(COUNTER, TEXT1, TEXT2)								\
+	if (csd->COUNTER.curr_count || csd->COUNTER.cumul_count)					\
+	{												\
+		util_out_print(TEXT1"  0x!8XL      "TEXT2"  0x!8XL", TRUE, (csd->COUNTER.curr_count),	\
+				(csd->COUNTER.cumul_count + csd->COUNTER.curr_count));			\
 	}
 
 /* NEED_TO_DUMP is only for the qualifiers other than "BASIC" and "ALL".
 	file_header is not dumped only if "NOBASIC" is explicitly specified */
 
-#define	NEED_TO_DUMP(string)				\
-	(CLI_PRESENT == cli_present(string) || CLI_PRESENT == cli_present("ALL") && CLI_NEGATED != cli_present(string))
+#define	NEED_TO_DUMP(string)													\
+	(is_dse_all ? (CLI_PRESENT == cli_present("ALL"))									\
+		: (CLI_PRESENT == cli_present(string) || CLI_PRESENT == cli_present("ALL") && CLI_NEGATED != cli_present(string)))
 
 void dse_dmp_fhead (void)
 {
@@ -95,7 +97,10 @@ void dse_dmp_fhead (void)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jb;
 	shmpool_buff_hdr_ptr_t	bptr;
+	boolean_t		is_dse_all;
 
+	is_dse_all = dse_all_dump;
+	dse_all_dump = FALSE;
 	csa = cs_addrs;
 	csd = csa->hdr;
         jnl_state = (uint4)csd->jnl_state;
@@ -106,7 +111,7 @@ void dse_dmp_fhead (void)
 	UNIX_ONLY(
 		jnl_buff_open = (0 != csa->nl->jnl_file.u.inode);
 	)
-	if (CLI_NEGATED != cli_present("BASIC"))
+	if (is_dse_all || (CLI_NEGATED != cli_present("BASIC")))
 	{
 		util_out_print("!/File            !AD", TRUE, gv_cur_region->dyn.addr->fname_len,
 			&gv_cur_region->dyn.addr->fname[0]);
@@ -268,7 +273,7 @@ void dse_dmp_fhead (void)
 	if (NEED_TO_DUMP("TPRETRIES"))
 	{
                 util_out_print(0, TRUE);
-		for (index = 0; index <= sizeof(csd->n_tp_retries)/sizeof(csd->n_tp_retries[0]); index++)
+		for (index = 0; index < ARRAYSIZE(csd->n_tp_retries); index++)
 			util_out_print("  Total TP Retries [!2UL] !12UL     Cnflct TP Retries [!2UL] !12UL",
 				TRUE, index, csd->n_tp_retries[index], index, csd->n_tp_retries_conflicts[index]);
 	}

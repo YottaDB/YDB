@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 #ifndef VALID_MNAME_H
 #define VALID_MNAME_H
+
+LITREF char 		ctypetab[NUM_CHARS];
 
 #define VALID_MNAME_FCHAR(mchar) ((unsigned char)(mchar) < NUM_ASCII_CHARS && (ctypetab[mchar] == TK_UPPER || \
 		ctypetab[mchar] == TK_LOWER || ctypetab[mchar] == TK_PERCENT))

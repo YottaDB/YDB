@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,7 +89,7 @@ void trans_code_cleanup(void)
 		*/
 		IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(fp);
 		fp->mpc = CODE_ADDRESS(pseudo_ret);
-		fp->ctxt = CONTEXT(pseudo_ret);
+		fp->ctxt = GTM_CONTEXT(pseudo_ret);
 	}
 	transform = TRUE;
 	if (err)

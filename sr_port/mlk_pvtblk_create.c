@@ -12,13 +12,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
-#ifdef VMS
-#include <descrip.h>	/* for GTM_ENV_TRANSLATE */
-#endif
-
 #include <stdarg.h>
-#include "gtm_limits.h"	/*for GTM_ENV_TRANSLATE */
 
 #include "error.h"
 #include "gdsroot.h"
@@ -87,7 +81,7 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 		MV_FORCE_STR(extgbl1);
 		extgbl2 = va_arg(subptr, mval *);
 		subcnt--;
-		GTM_ENV_TRANSLATE(extgbl1, extgbl2);
+		extgbl1 = gtm_env_translate(extgbl1, extgbl2, &val_xlated);
 		if (extgbl1->str.len)
 			gld = zgbldir(extgbl1);
 		else

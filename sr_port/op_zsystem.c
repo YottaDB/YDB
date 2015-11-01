@@ -39,6 +39,7 @@
 #include "getzposition.h"
 
 #define	ZSYSTEMSTR	"ZSYSTEM"
+#define	MAXZSYSSTRLEN	4096	/* maximum command line length supported by most Unix shells */
 
 GBLREF int4		dollar_zsystem;			/* exit status of child */
 GBLREF short		dollar_tlevel;
@@ -54,7 +55,7 @@ void op_zsystem(mval *v)
 	sgmnt_addrs	*csa;
 	tp_region	*tr;
 #ifdef UNIX
-	char		*sh, cmd_buf[238], *cmd;
+	char		*sh, cmd_buf[MAXZSYSSTRLEN], *cmd;
 #elif defined VMS
 	uint4		status;
 	$DESCRIPTOR(d_cmd,"");
@@ -91,8 +92,8 @@ void op_zsystem(mval *v)
 	}
 	MV_FORCE_STR(v);
 #ifdef UNIX
-	if (v->str.len > 205) /* 32 char for shell name, 206 for ZSYSTEM command */
-		rts_error(VARLSTCNT(4) ERR_INVSTRLEN, 2, v->str.len, 205);
+	if (v->str.len > (MAXZSYSSTRLEN - 32 - 1)) /* 32 char for shell name, remaining for ZSYSTEM command */
+		rts_error(VARLSTCNT(4) ERR_INVSTRLEN, 2, v->str.len, (MAXZSYSSTRLEN - 32 - 1));
 	/* get SHELL environment */
 	sh = GETENV("SHELL");
 	/* use bourn shell as default */

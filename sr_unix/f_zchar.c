@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@
 #include "io.h"
 #include "iosp.h"
 #ifdef __MVS__
-#include <unistd.h>
+#include "gtm_unistd.h"
 #endif
 #include "advancewindow.h"
 #include "ebc_xlat.h"
@@ -29,14 +29,20 @@
 GBLREF char window_token;
 GBLREF spdesc stringpool;
 
-int f_zechar( oprtype *a, opctype op )
+int f_zchar(oprtype *a, opctype op)
 {
-	triple *root, *last, *curr;
-	oprtype argv[CHARMAXARGS], *argp;
-	mval v;
-	bool all_lits;
-	char *c;
-	int argc, i;
+	triple 		*root, *last, *curr;
+	oprtype 	argv[CHARMAXARGS], *argp;
+	mval 		v;
+	boolean_t 	all_lits;
+	char 		*c;
+	int 		argc, i;
+	unsigned char	*tmp_ptr;
+	unsigned int	tmp_len;
+#ifdef KEEP_zOS_EBCDIC
+	iconv_t		tmp_cvt_cd;
+#endif
+
 	error_def(ERR_FCHARMAXARGS);
 	error_def(ERR_TEXT);
 
@@ -56,18 +62,15 @@ int f_zechar( oprtype *a, opctype op )
 			break;
 		advancewindow();
 		if (argc >= CHARMAXARGS)
-		{	stx_error(ERR_FCHARMAXARGS);
+		{
+			stx_error(ERR_FCHARMAXARGS);
 			return FALSE;
 		}
 	}
 	if (all_lits)
 	{
-		iconv_t		tmp_cvt_cd;
-		unsigned char	*tmp_ptr;
-		unsigned int	tmp_len;
-
-		if (stringpool.top - stringpool.free < argc)
-			stp_gcol(argc);
+		if (stringpool.top - stringpool.free < (argc + 1))
+			stp_gcol(argc + 1);
 		v.mvtype = MV_STR;
 		v.str.addr = c = (char *) stringpool.free;
 		argp = &argv[0];
@@ -79,22 +82,24 @@ int f_zechar( oprtype *a, opctype op )
 		}
 		*c = '\0';
 		v.str.len = c - v.str.addr;
-		tmp_ptr = (unsigned char *)v.str.addr;
-		tmp_len = v.str.len;
-		ICONV_OPEN_CD(tmp_cvt_cd, "IBM-1047", "ISO8859-1");
-		ICONVERT(tmp_cvt_cd, &tmp_ptr, &tmp_len, &tmp_ptr, &tmp_len);
-		ICONV_CLOSE_CD(tmp_cvt_cd);
+#ifdef KEEP_zOS_EBCDIC
+		if (OC_FNZECHAR == op)
+		{
+			tmp_ptr = (unsigned char *)v.str.addr;
+			tmp_len = v.str.len;
+			ICONV_OPEN_CD(tmp_cvt_cd, "IBM-1047", "ISO8859-1");
+			ICONVERT(tmp_cvt_cd, &tmp_ptr, &tmp_len, &tmp_ptr, &tmp_len);
+			ICONV_CLOSE_CD(tmp_cvt_cd);
+		}
+#endif
 		stringpool.free =(unsigned char *)  c;
 		s2n(&v);
 		*a = put_lit(&v);
 		return TRUE;
 	}
 	root = maketriple(op);
-	root->operand[0] = put_ilit(argc + 2);
-	curr = newtriple(OC_PARAMETER);
-	curr->operand[0] = put_ilit(1);		/*	1: need ebcdic/ascii convert	*/
-	root->operand[1] = put_tref(curr);
-	last = curr;
+	root->operand[0] = put_ilit(argc + 1);
+	last = root;
 	argp = &argv[0];
 	for (; argc > 0 ;argc--, argp++)
 	{

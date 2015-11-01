@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +60,11 @@
 #include "file_head_write.h"
 #include "suspsigs_handler.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
+
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
 
 #define TIME_FORMAT	"_%Y%j%H%M%S"	/* .yearjuliendayhoursminutesseconds */
 
@@ -159,6 +164,7 @@ int main(void)
 	error_def(ERR_TEXT);
 
 	image_type = GTMSECSHR_IMAGE;
+	gtm_wcswidth_fnptr = NULL;
 	gtm_env_init();	/* read in all environment variables */
 	err_init(gtmsecshr_cond_hndlr);
 	gtmsecshr_init();

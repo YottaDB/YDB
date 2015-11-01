@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ void iosocket_wtff(void)
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	if (socketptr->zff.len)
-		iosocket_write(&socketptr->zff);
+		iosocket_write_real(&socketptr->zff, FALSE);
 	iosocket_flush(iod);
 	iod->dollar.x = 0;
 	iod->dollar.y = 0;

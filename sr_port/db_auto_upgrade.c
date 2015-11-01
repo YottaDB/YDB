@@ -60,7 +60,7 @@ void db_auto_upgrade(gd_region *reg)
 	   valid so it is important that the minor db version be updated each time the fileheader is updated and this routine
 	   correspondingly updated. SE 5/2006.
 	*/
-	if (csd->minor_dbver < GDSMVLAST)
+	if (csd->minor_dbver < GDSMVCURR)
 	{	/* In general, the method for adding new versions is:
 		   1) If the top case is for the most previous version (and has a break in it), the break is no longer appropriate
 		      since at minimum, the minor_dbver value needs updating.
@@ -69,9 +69,10 @@ void db_auto_upgrade(gd_region *reg)
 		switch(csd->minor_dbver)
 		{
 			case GDSMV51000:		/* Multi-site replication available */
+			case GDSMV52000:		/* Unicode */
 				break;			/* Nothing to do for this version */
-			default:			/* V5.0 */
-				csd->minor_dbver = GDSMVLAST;
+			default:
+				csd->minor_dbver = GDSMVCURR;
 		}
 	}
 	return;

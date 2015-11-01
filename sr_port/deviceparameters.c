@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,8 @@ LITDEF nametabent dev_param_names[] =
 	,{2,"CA"}, {4,"CANT*"}
 	,{4,"CANO*"}
 	,{2,"CE*"}
-	,{2,"CH*"}
+	,{3,"CHA*"}
+	,{3,"CHS*"}
 	,{3,"CLE*"}
 	,{3,"CLI"}
 	,{4,"CONN*"}
@@ -96,6 +97,7 @@ LITDEF nametabent dev_param_names[] =
 	,{4,"LOGQ*"}
 	,{3,"LOW*"}
 
+	,{1,"M"}
 	,{3,"MOU*"}
 
 	,{2,"NA*"}
@@ -162,6 +164,7 @@ LITDEF nametabent dev_param_names[] =
 	,{2,"P6"}
 	,{2,"P7"}
 	,{2,"P8"}
+        ,{3,"PAD"}
 	,{3,"PAG*"}
 	,{4,"PASS*"}
 	,{4,"PAST*"}
@@ -248,36 +251,39 @@ LITDEF nametabent dev_param_names[] =
 LITDEF	unsigned char dev_param_index[27] =
 {
 /*	A    B    C    D    E    F    G    H    I    J    K    L    M    N   */
-	0,   5,   9,   23,  29,  42,  54,  56,  60,  64,  64,  64,  72,  73,
+	0,   5,   9,   24,  30,  43,  55,  57,  61,  65,  65,  65,  73,  75,
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	133, 138, 154, 155, 168, 180, 189, 195, 196, 211, 212, 213, 227
+	135, 140, 157, 158, 171, 183, 192, 198, 199, 214, 215, 216, 230
 };
 /* Offset of string within letter in dev_param_names */
 /* maintained in conjunction with zshow_params.h   = offset in letter, letter  */
 LITDEF zshow_index zshow_param_index[] =
 {
-/*	ALLO     BLOC   CONV    CTRA    DELE   EBCD   EDIT    EXCE    EXTE    FIELD  FIL    FIXED   HOST     INSE   LAB */
-	{2,0},   {2,1}, {9,2},  {13,2}, {1,3}, {1,4}, {4,4},  {9,4},  {11,4}, {2,5}, {5,5}, {8,5},  {3,7},   {1,8}, {1,11},
-/*	LENG     NOCENE  NOECHO  NOEDIT   NOESCA   NOHOST   NOINSE     */
-	{3,11},  {7,13}, {13,13}, {15,13}, {17,13}, {25,13}, {27,13},
-/*	NOPAST   NOREADS  NOTTSY   NOTYPE   NOWRAP   PAST    PRMMBX  RCHK    */
-	{33,13}, {38,13}, {49,13}, {51,13}, {57,13}, {10,15}, {14,15}, {1,17},
-/*      READ    READS	REC      SHAR    TERM    TTSY    TYPE     UIC     WAIT    WCHK    WIDTH   WRITE  */
-	{2,17}, {4,17},	{5,17},	 {4,18}, {1,19}, {6,19}, {8,19},  {1,20}, {2,22}, {4,22}, {6,22}, {10,22}
+/*	ALLO     BLOC     CONV     CTRA     DELE     EBCD     EDIT    EXCE     EXTE     FIELD   FIL     FIXED   HOST */
+	{2,0},   {2,1},   {10,2},  {14,2},  {1,3},   {1,4},   {4,4},  {9,4},   {11,4},  {2,5},  {5,5},  {8,5},  {3,7},
+/*      ICHSET   INSE     LAB */
+	{0,8},   {1,8},   {1,11},
+/*	LENG     NOCENE   NOECHO   NOEDIT   NOESCA   NOHOST   NOINSE     */
+	{3,11},  {7,13},  {13,13}, {15,13}, {17,13}, {25,13}, {27,13},
+/*	NOPAST   NOREADS  NOTTSY   NOTYPE   NOWRAP   OCHSET   PAD     PAST     PRMMBX   RCHK    */
+	{33,13}, {38,13}, {49,13}, {51,13}, {57,13}, {1,14},  {9,15}, {11,15}, {15,15}, {1,17},
+/*      READ     READS	  REC      SHAR     TERM     TTSY     TYPE    UIC      WAIT     WCHK    WIDTH   WRITE  */
+	{2,17},  {4,17},  {5,17},  {4,18},  {1,19},  {6,19},  {8,19}, {1,20},  {2,22},  {4,22}, {6,22}, {10,22}
 };
 
-int deviceparameters(oprtype *c,char who_calls)
+int deviceparameters(oprtype *c, char who_calls)
 {
-	oprtype x;
-	oprtype cat_list[n_iops];
-	int cat_cnt;
-	mval tmpmval;
-	triple *ref, *parm;
-	int n;
-	int status;
-	char parstr[MAXDEVPARLEN];
-	char *parptr;
-	boolean_t is_parm_list;
+	oprtype 	x;
+	oprtype 	cat_list[n_iops];
+	int		cat_cnt;
+	mval		tmpmval;
+	triple		*ref, *parm;
+	int		n;
+	int		status;
+	char		parstr[MAXDEVPARLEN];
+	char		*parptr;
+	boolean_t	is_parm_list;
+
 	error_def(ERR_RPARENMISSING);
 	error_def(ERR_DEVPARUNK);
 	error_def(ERR_DEVPARINAP);
@@ -298,6 +304,7 @@ int deviceparameters(oprtype *c,char who_calls)
 		,iop_canonical
 		,iop_cenable
 		,iop_characteristic
+		,iop_chset
 		,iop_clearscreen
 		,iop_cli
 		,iop_connect
@@ -350,6 +357,7 @@ int deviceparameters(oprtype *c,char who_calls)
 		,iop_logqueue
 		,iop_lowercase
 
+		,iop_m
 		,iop_mount
 
 		,iop_name
@@ -416,6 +424,7 @@ int deviceparameters(oprtype *c,char who_calls)
 		,iop_p6
 		,iop_p7
 		,iop_p8
+		,iop_pad
 		,iop_page
 		,iop_passall
 		,iop_pasthru

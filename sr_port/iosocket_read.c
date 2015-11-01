@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 #include "iotcpdef.h"
 #include "iosocketdef.h"
 
-short	iosocket_read(mval *v, int4 timeout)
+int	iosocket_read(mval *v, int4 timeout)
 {
 	return iosocket_readfl(v, 0, timeout); /* 0 means not fixed length */
 }

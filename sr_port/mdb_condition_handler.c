@@ -63,6 +63,7 @@
 #include "op.h"
 #include "dpgbldir.h"
 #include "preemptive_ch.h"
+#include "compiler.h"		/* needed for MAX_SRCLINE */
 #include "show_source_line.h"
 #include "trans_code_cleanup.h"
 #include "dm_setup.h"
@@ -171,6 +172,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	boolean_t		dm_action;	/* did the error occur on a action from direct mode */
 	boolean_t		trans_action;	/* did the error occur during "transcendental" code */
 	char			src_line[MAX_ENTRYREF_LEN];
+	char			source_line_buff[MAX_SRCLINE + sizeof(ARROW)];
 	mstr			src_line_d;
 	io_desc			*err_dev;
 	tp_region		*tr;
@@ -440,13 +442,13 @@ CONDITION_HANDLER(mdb_condition_handler)
 				dm_setup();
 		} else  if (frame_pointer->type & SFT_DM)
 		{
-			frame_pointer->ctxt = CONTEXT(call_dm);
+			frame_pointer->ctxt = GTM_CONTEXT(call_dm);
 			frame_pointer->mpc = CODE_ADDRESS(call_dm);
 		} else
 		{
 			/* Do cleanup on indirect frames prior to reset */
 			IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(frame_pointer);
-			frame_pointer->ctxt = CONTEXT(pseudo_ret);
+			frame_pointer->ctxt = GTM_CONTEXT(pseudo_ret);
 			frame_pointer->mpc = CODE_ADDRESS(pseudo_ret);
 		}
 		PRN_ERROR;
@@ -550,13 +552,13 @@ CONDITION_HANDLER(mdb_condition_handler)
 				MUM_TSTART;
 		} else  if (frame_pointer->type & SFT_DM)
 		{
-			frame_pointer->ctxt = CONTEXT(call_dm);
+			frame_pointer->ctxt = GTM_CONTEXT(call_dm);
 			frame_pointer->mpc = CODE_ADDRESS(call_dm);
 		} else
 		{
 			/* Do cleanup on indirect frames prior to reset */
 			IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(frame_pointer);
-			frame_pointer->ctxt = CONTEXT(pseudo_ret);
+			frame_pointer->ctxt = GTM_CONTEXT(pseudo_ret);
 			frame_pointer->mpc = CODE_ADDRESS(pseudo_ret);
 		}
 		PRN_ERROR;
@@ -671,7 +673,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 				break;
 			} else
 			{
-				fp->ctxt = CONTEXT(pseudo_ret);
+				fp->ctxt = GTM_CONTEXT(pseudo_ret);
 				fp->mpc = CODE_ADDRESS(pseudo_ret);
 			}
 		}
@@ -762,7 +764,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		*/
 		PRN_ERROR;
 		if (compile_time && ((int)ERR_LABELMISSING) != SIGNAL)
-			show_source_line();
+			show_source_line(source_line_buff, TRUE);
 	}
 	if (!dm_action && !trans_action && (0 != src_line_d.len))
 	{

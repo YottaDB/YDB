@@ -78,7 +78,7 @@
 #include "gtmimagename.h"
 #include "iotcpdef.h"
 #include "gt_timer.h"
-#include "iosocketdef.h"	/* needed for socket_pool */
+#include "iosocketdef.h"	/* needed for socket_pool and MAX_N_SOCKETS*/
 #include "ctrlc_handler_dummy.h"
 #include "unw_prof_frame_dummy.h"
 #include "op.h"
@@ -115,6 +115,11 @@
 
 #include "gds_blk_upgrade.h"	/* for UPGRADE_IF_NEEDED flag */
 #include "cws_insert.h"		/* for CWS_REORG_ARRAYSIZE */
+
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
 
 #define DEFAULT_ZERROR_STR	"Unprocessed $ZERROR, see $ZSTATUS"
 #define DEFAULT_ZERROR_LEN	(sizeof(DEFAULT_ZERROR_STR) - 1)
@@ -191,8 +196,8 @@ GBLDEF	mstr		*comline_base,
 			dollar_zsource,
 			*err_act,
 			**stp_array,
-			extnam_str = {0, NULL},
-			env_gtm_env_xlate = {0, NULL};
+			extnam_str,
+			env_gtm_env_xlate;
 GBLDEF MSTR_CONST(default_sysid, "gtm_sysid");
 GBLDEF int              (*gtm_env_xlate_entry)() = NULL;
 GBLDEF void             (*gtm_sigusr1_handler)() = NULL;
@@ -257,17 +262,20 @@ GBLDEF	boolean_t	core_in_progress;	/* creating core NOW */
 GBLDEF	boolean_t	dont_want_core;		/* Higher level flag overrides need_core set by lower level rtns */
 GBLDEF	boolean_t	exit_handler_active;	/* recursion prevention */
 GBLDEF	boolean_t	block_saved;
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 GBLDEF	iconv_t		dse_over_cvtcd = (iconv_t)0;
+#endif
+GBLDEF	gtm_chset_t	dse_over_chset = CHSET_M;
 GBLDEF	short int	last_source_column;
 GBLDEF	char		window_token;
 GBLDEF	mval		window_mval;
 GBLDEF	char		director_token;
 GBLDEF	mval		director_mval;
-LITDEF	mident 		zero_ident = {0, NULL};	/* the null mident */
+LITDEF	MIDENT_DEF(zero_ident, 0, NULL);		/* the null mident */
 static char 		ident_buff1[sizeof(mident_fixed)];
 static char 		ident_buff2[sizeof(mident_fixed)];
-GBLDEF	mident		window_ident = {0, &ident_buff1[0]};	/* the current identifier */
-GBLDEF	mident		director_ident = {0, &ident_buff2[0]};	/* the look-ahead identifier */
+GBLDEF	MIDENT_DEF(window_ident, 0, &ident_buff1[0]);	/* the current identifier */
+GBLDEF	MIDENT_DEF(director_ident, 0, &ident_buff2[0]);	/* the look-ahead identifier */
 GBLDEF	char		*lexical_ptr;
 GBLDEF	int4		aligned_source_buffer[MAX_SRCLINE / sizeof(int4) + 1];
 GBLDEF	unsigned char	*source_buffer = (unsigned char *)aligned_source_buffer;
@@ -519,6 +527,13 @@ GBLDEF	uint4		*pattern_typemask;
 GBLDEF	pattern		*pattern_list;
 GBLDEF	pattern		*curr_pattern;
 
+/* Unicode related data */
+GBLDEF	boolean_t	gtm_utf8_mode;		/* Is GT.M running with Unicode Character Set ? */
+GBLDEF	boolean_t	utf8_patnumeric;	/* Should patcode N match non-ASCII numbers in pattern match ? */
+GBLDEF	boolean_t	badchar_inhibit = FALSE;/* Suppress malformed UTF-8 characters by default */
+GBLDEF  MSTR_DEF(dollar_zchset, 1, "M");
+GBLDEF  MSTR_DEF(dollar_zpatnumeric, 1, "M");
+
 /* Standard MUMPS pattern-match table.
  * This table holds the current pattern-matching attributes of each ASCII character.
  * Bits 0..23 of each entry correspond with the pattern-match characters, A..X.
@@ -544,32 +559,38 @@ GBLDEF	readonly uint4	mapbit[] =
 
 LITDEF	uint4	typemask[PATENTS] =
 {
-	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,
-	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,
-	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,
-	PATM_C, PATM_C, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,
-	PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_N, PATM_N,
-	PATM_N, PATM_N, PATM_N, PATM_N, PATM_N, PATM_N, PATM_N, PATM_N, PATM_P, PATM_P,
-	PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,
-	PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,
-	PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,
-	PATM_U, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_L, PATM_L, PATM_L,
-	PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,
-	PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,
-	PATM_L, PATM_L, PATM_L, PATM_P, PATM_P, PATM_P, PATM_P, PATM_C, PATM_C, PATM_C,
-	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,
-	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,
-	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,
-	PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,
-	PATM_L, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,
-	PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_L, PATM_P, PATM_P, PATM_P,
-	PATM_P, PATM_P, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,
-	PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_P, PATM_U,
-	PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,
-	PATM_U, PATM_U, PATM_P, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,
-	PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,
-	PATM_P, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,
-	PATM_L, PATM_L, PATM_L, PATM_L, PATM_P, PATM_C
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,	/* hex 00-07 : ASCII characters */
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,	/* hex 08-0F : ASCII characters */
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,	/* hex 10-17 : ASCII characters */
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,	/* hex 18-1F : ASCII characters */
+	PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,	/* hex 20-27 : ASCII characters */
+	PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,	/* hex 28-2F : ASCII characters */
+	PATM_N, PATM_N, PATM_N, PATM_N, PATM_N, PATM_N, PATM_N, PATM_N,	/* hex 30-37 : ASCII characters */
+	PATM_N, PATM_N, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,	/* hex 38-3F : ASCII characters */
+	PATM_P, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,	/* hex 40-47 : ASCII characters */
+	PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,	/* hex 48-4F : ASCII characters */
+	PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,	/* hex 50-57 : ASCII characters */
+	PATM_U, PATM_U, PATM_U, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,	/* hex 58-5F : ASCII characters */
+	PATM_P, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,	/* hex 60-67 : ASCII characters */
+	PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,	/* hex 68-6F : ASCII characters */
+	PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,	/* hex 70-77 : ASCII characters */
+	PATM_L, PATM_L, PATM_L, PATM_P, PATM_P, PATM_P, PATM_P, PATM_C,	/* hex 78-7F : ASCII characters */
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,	/* hex 80-87 : non-ASCII characters */
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,	/* hex 88-8F : non-ASCII characters */
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,	/* hex 90-97 : non-ASCII characters */
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,	/* hex 98-9F : non-ASCII characters */
+	PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,	/* hex A0-A7 : non-ASCII characters */
+	PATM_P, PATM_P, PATM_L, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,	/* hex A8-AF : non-ASCII characters */
+	PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,	/* hex B0-B7 : non-ASCII characters */
+	PATM_P, PATM_P, PATM_L, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,	/* hex B8-BF : non-ASCII characters */
+	PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,	/* hex C0-C7 : non-ASCII characters */
+	PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,	/* hex C8-CF : non-ASCII characters */
+	PATM_P, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,	/* hex D0-D7 : non-ASCII characters */
+	PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_P, PATM_L,	/* hex D8-DF : non-ASCII characters */
+	PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,	/* hex E0-E7 : non-ASCII characters */
+	PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,	/* hex E8-EF : non-ASCII characters */
+	PATM_P, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,	/* hex F0-F7 : non-ASCII characters */
+	PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_P, PATM_C	/* hex F8-FF : non-ASCII characters */
 };
 
 GBLDEF	uint4		pat_allmaskbits;	/* universal set of valid pattern bit codes for currently active pattern table */
@@ -770,8 +791,8 @@ GBLDEF	int		mvmax, mlmax, mlitmax;
 GBLDEF	int4	expand_hashtab_depth;	/* number of nested calls to expand_hashtab_* routines in the current stack trace */
 #endif
 static	char		routine_name_buff[sizeof(mident_fixed)], module_name_buff[sizeof(mident_fixed)];
-GBLDEF	mident		routine_name = {0, &routine_name_buff[0]};
-GBLDEF	mident		module_name = {0, &module_name_buff[0]};
+GBLDEF	MIDENT_DEF(routine_name, 0, &routine_name_buff[0]);
+GBLDEF	MIDENT_DEF(module_name, 0, &module_name_buff[0]);
 GBLDEF	char		rev_time_buf[REV_TIME_BUFF_LEN];
 GBLDEF	unsigned short	source_name_len;
 UNIX_ONLY(GBLDEF unsigned char	source_file_name[MAX_FBUFF + 1];)
@@ -814,5 +835,69 @@ GBLDEF	boolean_t	in_mupip_ftok;		/* Used by an assert in repl_inst_read */
 GBLDEF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst_dump.c */
 
 GBLDEF	uint4		mutex_per_process_init_pid;	/* pid that invoked "mutex_per_process_init" */
+GBLDEF	boolean_t	gtm_quiet_halt;		/* Suppress FORCEDHALT message */
 #endif
 
+#ifdef UNICODE_SUPPORTED
+/* Unicode line terminators.  In addition to the following
+ * codepoints, the sequence CR LF is considered a single
+ * line terminator.
+ */
+LITDEF UChar32 u32_line_term[] =
+{
+	0x000A,			/* Line Feed */
+	0x000D,			/* Carraige Return */
+	0x0085,			/* Next Line - EBCDIC mostly */
+	0x000C,			/* Form Feed */
+	UTF_LINE_SEPARATOR,	/* Line Separator */
+	UTF_PARA_SEPARATOR,	/* Paragraph Separator */
+	0x0000
+};
+
+/* Given the first byte in a UTF-8 representation, the following array returns the total number of bytes in the encoding
+ *	00-7F : 1 byte
+ *	C2-DF : 2 bytes
+ *	E0-EF : 3 bytes
+ *	F0-F4 : 4 bytes
+ *  All others: 1 byte
+ * For details on the UTF-8 encoding see gtm_utf8.h
+ */
+LITDEF unsigned int utf8_bytelen[] =
+{
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* 00-1F */
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* 20-3F */
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* 40-5F */
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* 60-7F */
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* 80-9F */
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* A0-BF */
+	1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, /* C0-DF */
+	3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* E0-FF */
+};
+
+/* Given the first byte in a UTF-8 representation, the following array returns the number of bytes to follow
+ *	00-7F :  0 byte
+ *	C2-DF :  1 byte
+ *	E0-EF :  2 bytes
+ *	F0-F4 :  3 bytes
+ *  All others: -1 bytes
+ * For details on the UTF-8 encoding see gtm_utf8.h
+ */
+LITDEF signed int utf8_followlen[] =
+{
+	 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 00-1F */
+	 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 20-3F */
+	 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 40-5F */
+	 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 60-7F */
+	-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, /* 80-9F */
+	-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, /* A0-BF */
+	-1,-1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* C0-DF */
+	 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, /* E0-FF */
+};
+
+GBLDEF	gtm_wcswidth_fnptr_t	gtm_wcswidth_fnptr;	/* see comment in gtm_utf8.h about this typedef */
+#endif
+
+GBLDEF	uint4			gtm_max_sockets;	/* Maximum sockets per socket device supported by this process */
+GBLDEF	d_socket_struct		*newdsocket;		/* Commonly used temp socket area */
+
+GBLDEF	boolean_t		dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */

@@ -57,6 +57,18 @@ boolean_t cli_disallow_dse_all(void)
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = d_c_cli_present("CRITINIT") && (d_c_cli_present("SEIZE") || d_c_cli_present("RELEASE"));
 	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = d_c_cli_present("DUMP") && (d_c_cli_present("BUFFER_FLUSH")
+								|| d_c_cli_present("CRITINIT")
+								|| d_c_cli_present("FREEZE")
+								|| d_c_cli_present("OVERRIDE")
+								|| d_c_cli_present("REFERENCE")
+								|| d_c_cli_present("RELEASE")
+								|| d_c_cli_present("RENEW")
+								|| d_c_cli_present("SEIZE")
+								|| d_c_cli_present("WCINIT"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = d_c_cli_present("ALL") && !d_c_cli_present("DUMP");
+	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
 

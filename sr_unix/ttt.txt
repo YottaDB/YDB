@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -184,9 +184,9 @@ OC_FNJ3:	pushab	val.0
 		pushl	val.2
 		pushab	val.1
 		calls	#4,xfer.xf_fnj3
-OC_FNLENGTH:	movab	val.0,r0
-		movab	val.1,r1
-		jsb	xfer.xf_fnlength
+OC_FNLENGTH:	pushab	val.0
+		pushab	val.1
+		calls	#2,xfer.xf_fnlength
 OC_FNLVNAME:	pushab	val.0
 		pushab	val.1
 		calls	#2,xfer.xf_fnlvname
@@ -215,19 +215,21 @@ OC_FNORDER:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#3,xfer.xf_fnorder
-OC_FNP1:	pushl	val.4
-		pushab	val.0
+OC_FNP1:	pushab	val.0
 		pushl	val.3
 		pushl	val.2
 		pushab	val.1
-		calls	#5,xfer.xf_fnp1
-OC_FNPIECE:	pushl	val.5
-		pushab	val.0
+		calls	#4,xfer.xf_fnp1
+OC_FNPIECE:	pushab	val.0
 		pushl	val.4
 		pushl	val.3
 		pushab	val.2
 		pushab	val.1
-		calls	#6,xfer.xf_fnpiece
+		calls	#5,xfer.xf_fnpiece
+OC_FNPOPULATION: pushab	val.0
+		pushab	val.2
+		pushab	val.1
+		calls	#3,xfer.xf_fnpopulation
 OC_FNQLENGTH:	pushab	val.0
 		pushab	val.1
 		calls	#2,xfer.xf_fnqlength
@@ -265,6 +267,10 @@ OC_FNTRANSLATE:	pushab	val.0
 OC_FNVIEW:	irepab	val.2
 		pushab	val.0
 		calls	val.1,xfer.xf_fnview
+OC_FNZASCII:	pushab	val.0
+		pushab	val.1
+		pushl	val.2
+		calls	#3,xfer.xf_fnzascii
 OC_FNZBITAND:	pushab	val.2
 		pushab	val.1
 		pushab	val.0
@@ -307,16 +313,41 @@ OC_FNZBITXOR:	pushab	val.2
 OC_FNZCALL:	irepab	val.2
 		pushab	val.0
 		calls	val.1,xfer.xf_fnzcall
+OC_FNZCHAR:	irepl	val.2
+		pushab	val.0
+		calls	val.1,xfer.xf_fnzchar
+OC_FNZCONVERT2: pushab  val.0                   ; destination mval
+                pushab  val.2                   ; "U"/"L"/"T"
+                pushab  val.1                   ; string
+                calls   #3,xfer.xf_fnzconvert2
+OC_FNZCONVERT3: pushab  val.0                   ; Destination mval
+                pushab  val.3                   ; target chset
+                pushab  val.2                   ; src chset
+                pushab  val.1                   ; string
+                calls   #4,xfer.xf_fnzconvert3
 OC_FNZDATE:	pushab	val.0
 		pushab	val.4
 		pushab	val.3
 		pushab	val.2
 		pushab	val.1
 		calls	#5,xfer.xf_fnzdate
+OC_FNZECHAR:	irepl	val.2
+		pushab	val.0
+		calls	val.1,xfer.xf_fnzechar
+OC_FNZEXTRACT:	pushab	val.0
+		pushab	val.1
+		pushl	val.2
+		pushl	val.3
+		calls	#4,xfer.xf_fnzextract
 OC_FNZFILE:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#3,xfer.xf_fnzfile
+OC_FNZFIND:	pushab	val.0
+		pushl	val.3
+		pushab	val.2
+		pushab	val.1
+		calls	#4,xfer.xf_fnzfind
 OC_FNZGETDVI:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
@@ -333,15 +364,27 @@ OC_FNZGETSYI:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#3,xfer.xf_fngetsyi
+OC_FNZJ2:	pushab	val.0
+		pushl	val.2
+		pushab	val.1
+		calls	#3,xfer.xf_fnzj2
 OC_FNZJOBEXAM:	pushab	val.0
 		pushab	val.1
 		calls	#2,xfer.xf_fnzjobexam
+OC_FNZLENGTH:	pushab	val.0
+		pushab	val.1
+		calls	#2,xfer.xf_fnzlength
 OC_FNZLKID:	pushab	val.0
 		pushl	val.1
 		calls	#2,xfer.xf_fnzlkid
 OC_FNZM:	pushab	val.0
 		pushl	val.1
 		calls	#2,xfer.xf_fnzm
+OC_FNZP1:	pushab	val.0
+		pushl	val.3
+		pushl	val.2
+		pushab	val.1
+		calls	#4,xfer.xf_fnzp1
 OC_FNZPARSE:	pushab	val.0
 		pushab	val.5
 		pushab	val.4
@@ -352,6 +395,16 @@ OC_FNZPARSE:	pushab	val.0
 OC_FNZPID:	pushab	val.0
 		pushl	val.1
 		calls	#2,xfer.xf_fnzpid
+OC_FNZPIECE:	pushab	val.0
+		pushl	val.4
+		pushl	val.3
+		pushab	val.2
+		pushab	val.1
+		calls	#5,xfer.xf_fnzpiece
+OC_FNZPOPULATION: pushab	val.0
+		pushab	val.2
+		pushab	val.1
+		calls	#3,xfer.xf_fnzpopulation
 OC_FNZPREVIOUS:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
@@ -372,6 +425,16 @@ OC_FNZSIGPROC:	pushab	val.0
 		pushl	val.2
 		pushl	val.1
 		calls	#3,xfer.xf_fnzsigproc
+OC_FNZSUBSTR:   pushab  val.0                   ; Destination mval
+                pushl   val.3                   ; max byte length
+                pushl   val.2                   ; starting character position
+                pushab  val.1                   ; string
+                calls   #4,xfer.xf_fnzsubstr
+OC_FNZTRANSLATE: pushab	val.0
+		pushab	val.3
+		pushab	val.2
+		pushab	val.1
+		calls	#4,xfer.xf_fnztranslate
 OC_FNZTRNLNM:	pushab	val.0
 		pushab	val.6
 		pushab	val.5
@@ -380,6 +443,9 @@ OC_FNZTRNLNM:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#7,xfer.xf_fnztrnlnm
+OC_FNZWIDTH:    pushab  val.0                   ; destination mval
+                pushab  val.1                   ; string
+                calls   #2,xfer.xf_fnzwidth
 OC_FOLLOW:	movab	val.1,r0
 		movab	val.2,r1
 		jsb	xfer.xf_follow
@@ -498,6 +564,9 @@ OC_INDLVADR:	pushab	val.1
 OC_INDLVARG:	pushab	val.0
 		pushab	val.1
 		jsb	xfer.xf_indlvarg
+OC_INDMERGE:	pushab	val.1
+		pushab	val.2
+		jsb	xfer.xf_indmerge
 OC_INDNAME:	irepab	val.2
 		pushab	val.0
 		calls	val.1,xfer.xf_indname
@@ -620,6 +689,16 @@ OC_LVZWITHDRAW:	pushab	val.1
 OC_LVZWRITE:	jsb 	xfer.xf_restartpc
 		irepab	val.2
 		calls	val.1,xfer.xf_lvzwrite
+OC_M_SRCHINDX:	irepab	val.2
+		calls	val.1,xfer.xf_m_srchindx
+		movl	r0,addr.0
+OC_MERGE:	calls	#0,xfer.xf_merge
+OC_MERGE_GVARG: pushl	#0
+		pushl	val.1
+		calls	#2,xfer.xf_merge_arg
+OC_MERGE_LVARG: pushab	val.2
+		pushl	val.1
+		calls	#2,xfer.xf_merge_arg
 OC_MOD:		pushab	val.0
 		pushab	val.2
 		pushab	val.1
@@ -651,10 +730,6 @@ OC_OPEN:	jsb 	xfer.xf_restartpc
 OC_PATTERN:	movab	val.1,r0
 		movab	val.2,r1
 		jsb	xfer.xf_pattern
-OC_POPULATION:	pushab	val.0
-		pushab	val.2
-		pushab	val.1
-		calls	#3,xfer.xf_population
 OC_PUTINDX:	irepab	val.2
 		calls	val.1,xfer.xf_putindx
 		movl	r0,addr.0
@@ -715,6 +790,25 @@ OC_SETZBRK:	pushl	val.5
 		pushab	val.1
 		pushab	val.3
 		calls	#5,xfer.xf_setzbrk
+OC_SETZEXTRACT:	pushab	val.0
+		pushl	val.3
+		pushl	val.2
+		pushab	val.4
+		pushab	val.1
+		calls	#5,xfer.xf_setzextract
+OC_SETZP1:	pushab	val.0
+		pushl	val.3
+		pushab	val.4
+		pushl	val.2
+		pushab	val.1
+		calls	#5,xfer.xf_setzp1
+OC_SETZPIECE:	pushab	val.0
+		pushl	val.4
+		pushl	val.3
+		pushab	val.5
+		pushab	val.2
+		pushab	val.1
+		calls	#6,xfer.xf_setzpiece
 OC_SORTS_AFTER:	movab	val.1,r0
 		movab	val.2,r1
 		jsb	xfer.xf_sorts_after
@@ -833,16 +927,3 @@ OC_ZSYSTEM:	jsb 	xfer.xf_restartpc
 OC_ZTCOMMIT:	pushl	val.1
 		calls	#1,xfer.xf_ztcommit
 OC_ZTSTART:	calls	#0,xfer.xf_ztstart
-OC_MERGE:	calls	#0,xfer.xf_merge
-OC_MERGE_GVARG: pushl	#0
-		pushl	val.1
-		calls	#2,xfer.xf_merge_arg
-OC_MERGE_LVARG: pushab	val.2
-		pushl	val.1
-		calls	#2,xfer.xf_merge_arg
-OC_INDMERGE:	pushab	val.1
-		pushab	val.2
-		jsb	xfer.xf_indmerge
-OC_M_SRCHINDX:	irepab	val.2
-		calls	val.1,xfer.xf_m_srchindx
-		movl	r0,addr.0

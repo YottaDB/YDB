@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -48,7 +48,7 @@ ENTRY op_fnget
 	popl	%edi
 	ret
 
-l5:	movb	$mval_m_str,mval_b_mvtype(%eax)		# string type
+l5:	movw	$mval_m_str,mval_w_mvtype(%eax)		# string type
 	movl	$0,mval_l_strlen(%eax)			# dest. str. len. = 0
 	ret
 # op_fnget ENDP

@@ -12,16 +12,9 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
-#ifdef VMS
-#include <descrip.h>	/* for GTM_ENV_TRANSLATE */
-#endif
-
-#include "gtm_limits.h"	/* for GTM_ENV_TRANSLATE */
-
 #include <stdarg.h>
 
-#include "error.h"	/* for GTM_ENV_TRANSLATE */
+#include "error.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -76,7 +69,7 @@ void op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...)
 	VMS_ONLY(va_count(count);)
 	val2 = va_arg(var, mval *);
 	MV_FORCE_STR(val1);
-	GTM_ENV_TRANSLATE(val1, val2);
+	val1 = gtm_env_translate(val1, val2, &val_xlated);
 
 	assert(!extnam_str_alloc || (NULL != extnam_str.addr));
 	if (val1->str.len)

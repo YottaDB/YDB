@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,7 @@
 #include "gtm_string.h"
 #include "gtm_fcntl.h"
 
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include <errno.h>
 #include "gtm_stat.h"
 #include "gtm_iconv.h"
@@ -34,6 +34,8 @@
 #include "stringpool.h"
 #include "util.h"
 #include "op.h"
+#include "gtm_utf8.h"
+#include "gtm_conv.h"
 
 GBLREF int	sys_nerr;
 
@@ -44,7 +46,7 @@ GBLREF int	sys_nerr;
 
 GBLREF int	(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF spdesc stringpool;
-GBLREF iconv_t          dse_over_cvtcd;
+GBLREF gtm_chset_t	dse_over_chset;
 
 #ifdef	__osf__
 #pragma pointer_size (restore)
@@ -54,7 +56,6 @@ static int	patch_fd;
 static char	patch_ofile[256];
 static short	patch_len;
 static char     ch_set_name[MAX_CHSET_NAME];
-static short    ch_set_len;
 
 GBLREF enum dse_fmt	dse_dmp_format;
 
@@ -65,6 +66,7 @@ void	dse_open (void)
 
 	mval            val;
 	mval            pars;
+	mstr		chset_mstr;
 	int		cnt;
 	static readonly unsigned char open_params_list[2] =
 	{
@@ -102,6 +104,7 @@ void	dse_open (void)
 
 		if (CLI_PRESENT == cli_present("OCHSET"))
 		{
+			cli_len = sizeof(ch_set_name);
 			if (cli_get_str("OCHSET", ch_set_name, &cli_len))
 			{
 				if (0 == cli_len)
@@ -109,17 +112,27 @@ void	dse_open (void)
 					util_out_print("Error: must specify a charactor set name.",TRUE);
 					return;
 				}
-				ch_set_name[cli_len] = 0;
-				ch_set_len = cli_len;
-				if ( (iconv_t)0 != dse_over_cvtcd )
-				{
-					ICONV_CLOSE_CD(dse_over_cvtcd);
-				}
-				ICONV_OPEN_CD(dse_over_cvtcd, INSIDE_CH_SET, ch_set_name);
-			}
-		} else	if ( (iconv_t) 0 == dse_over_cvtcd )
-				ICONV_OPEN_CD(dse_over_cvtcd, INSIDE_CH_SET, OUTSIDE_CH_SET);
-
+#ifdef KEEP_zOS_EBCDIC
+                                ch_set_name[cli_len] = 0;
+                                ch_set_len = cli_len;
+                                if ( (iconv_t)0 != dse_over_cvtcd )
+                                {
+                                        ICONV_CLOSE_CD(dse_over_cvtcd);
+                                }
+                                ICONV_OPEN_CD(dse_over_cvtcd, INSIDE_CH_SET, ch_set_name);
+#else
+                                chset_mstr.addr = ch_set_name;
+                                chset_mstr.len = cli_len;
+                                SET_ENCODING(dse_over_chset, &chset_mstr);
+#endif
+                        }
+                } else
+#ifdef KEEP_zOS_EBCDIC
+			if ( (iconv_t) 0 == dse_over_cvtcd )
+                                ICONV_OPEN_CD(dse_over_cvtcd, INSIDE_CH_SET, OUTSIDE_CH_SET);
+#else
+		        dse_over_chset = CHSET_M;
+#endif
 		dse_dmp_format = OPEN_FMT;
 	} else
 	{

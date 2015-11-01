@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,11 +77,12 @@ void iott_use(io_desc *iod, mval *pp)
 	int		p_offset;
 
 	error_def(ERR_DEVPARMNEG);
-	error_def(ERR_TTINVFILTER);
 	error_def(ERR_NOPRINCIO);
+	error_def(ERR_SYSCALL);
 	error_def(ERR_TCGETATTR);
 	error_def(ERR_TCSETATTR);
-	error_def(ERR_SYSCALL);
+	error_def(ERR_TTINVFILTER);
+	error_def(ERR_WIDTHTOOSMALL);
 
 	p_offset = 0;
 	assert(iod->state == dev_open);
@@ -275,6 +276,7 @@ void iott_use(io_desc *iod, mval *pp)
 					break;
 				case iop_terminator:
 					memcpy(&mask_term.mask[0], (pp->str.addr + p_offset), sizeof(io_termmask));
+					temp_ptr = (d_tt_struct *)d_in->dev_sp;
 					if (mask_term.mask[0] == NUL &&
 						mask_term.mask[1] == NUL &&
 						mask_term.mask[2] == NUL &&
@@ -283,9 +285,20 @@ void iott_use(io_desc *iod, mval *pp)
 						mask_term.mask[5] == NUL &&
 						mask_term.mask[6] == NUL &&
 						mask_term.mask[7] == NUL)
-						mask_term.mask[0] = TERM_MSK;
+					{
+						temp_ptr->default_mask_term = TRUE;
+						if (CHSET_UTF8 == d_in->ichset)
+						{
+							mask_term.mask[0] = TERM_MSK_UTF8_0;
+							mask_term.mask[4] = TERM_MSK_UTF8_4;
+						} else
+							mask_term.mask[0] = TERM_MSK;
+					} else
+						temp_ptr->default_mask_term = FALSE;
 						break;
 				case iop_noterminator:
+					temp_ptr = (d_tt_struct *)d_in->dev_sp;
+					temp_ptr->default_mask_term = FALSE;
 					memset(&mask_term.mask[0], 0, sizeof(io_termmask));
 					break;
 				case iop_ttsync:
@@ -310,6 +323,9 @@ void iott_use(io_desc *iod, mval *pp)
 					GET_LONG(width, pp->str.addr + p_offset);
 					if (0 > width)
 						rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+					/* Do not allow a WIDTH of 1 if UTF mode (ICHSET or OCHSET is not M) */
+					if ((1 == width) && ((CHSET_M != d_in->ochset) || (CHSET_M != d_in->ichset)))
+						rts_error(VARLSTCNT(1) ERR_WIDTHTOOSMALL);
 					if (0 == width)
 					{
 						d_out->wrap = FALSE;
@@ -349,6 +365,7 @@ void iott_use(io_desc *iod, mval *pp)
 					break;
 				case iop_ipchset:
 					{
+#ifdef KEEP_zOS_EBCDIC
 						if ( (iconv_t)0 != iod->input_conv_cd )
 						{
 							ICONV_CLOSE_CD(iod->input_conv_cd);
@@ -357,10 +374,12 @@ void iott_use(io_desc *iod, mval *pp)
 						if (DEFAULT_CODE_SET != iod->in_code_set)
 							ICONV_OPEN_CD(iod->input_conv_cd,
 								(char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
+#endif
                                         	break;
 					}
                                 case iop_opchset:
 					{
+#ifdef KEEP_zOS_EBCDIC
 						if ( (iconv_t)0 != iod->output_conv_cd)
 						{
 							ICONV_CLOSE_CD(iod->output_conv_cd);
@@ -369,6 +388,7 @@ void iott_use(io_desc *iod, mval *pp)
 						if (DEFAULT_CODE_SET != iod->out_code_set)
 							ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET,
 								(char *)(pp->str.addr + p_offset + 1));
+#endif
                                         	break;
 					}
 			}

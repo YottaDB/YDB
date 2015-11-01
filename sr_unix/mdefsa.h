@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,12 +42,24 @@
 #define	GTMSECSHR_NAME		"gtmsecshr"
 #define GTMSECSHR_NAMELEN	(sizeof(GTMSECSHR_NAME) - 1)
 
+#define	ICU_LIBFLAGS		(RTLD_NOW | RTLD_GLOBAL)
+
 #ifdef __hpux
-#define GTMSHR_IMAGE_NAME	"libgtmshr.sl"
+#	define GTMSHR_IMAGE_NAME	"libgtmshr.sl"
+#	define	ICU_LIBNAME		"libicuio.sl"
 #elif defined(__MVS__)
-#define GTMSHR_IMAGE_NAME	"libgtmshr.dll"
+#	define GTMSHR_IMAGE_NAME	"libgtmshr.dll"
+#	define	ICU_LIBNAME		"libicuio.dll"
 #else
-#define GTMSHR_IMAGE_NAME	"libgtmshr.so"
+#	define GTMSHR_IMAGE_NAME	"libgtmshr.so"
+#	ifdef _AIX
+	/* Conventionally, AIX archives shared objects into a static library.
+	 * So we need to link with a member of the library instead of the
+	 * library itself */
+#		define	ICU_LIBNAME	"libicuio.a(libicuio36."
+#	else
+#		define	ICU_LIBNAME	"libicuio.so"
+#	endif
 #endif
 
 #define GTM_MAIN_FUNC		"gtm_main"

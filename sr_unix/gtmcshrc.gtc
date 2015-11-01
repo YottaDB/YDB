@@ -10,6 +10,11 @@
 #################################################################
 setenv gtm_dist 'GTMDIST'
 setenv gtmgbldir 'mumps.gld'
+if ($?gtm_chset) then
+	if (($gtm_chset == "UTF-8") && (-e $gtm_dist/utf8)) then
+		setenv gtm_dist $gtm_dist/utf8
+	endif
+endif
 setenv gtmroutines ". $gtm_dist"
 alias gtm '$gtm_dist/mumps -direct'
 alias mupip '$gtm_dist/mupip'

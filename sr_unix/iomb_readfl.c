@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,7 @@
 
 GBLREF io_pair io_curr_device;
 
-short iomb_readfl(mval *v, int4 length, int4 t)
+int iomb_readfl(mval *v, int4 length, int4 t)
 {
     int 	status;
     io_desc 	*io_ptr;

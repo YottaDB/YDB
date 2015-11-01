@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -17,7 +17,7 @@
 	;
 	w !,"Global Output Utility",!
 	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%GO" u $p:(ctrap=$c(3):exc="zg "_$zl_":EXIT^%GO")
-	n g,gn,m,n,%ZD,%ZG,%ZH,fmt
+	n g,gn,m,n,%ZD,%ZG,%ZH,fmt,fmtdone
 	d ^%GSEL
 	i %ZG=0 w !,"No globals selected" q
 	r !,"Header Label: ",%ZH,!
@@ -43,13 +43,14 @@ noopen	. w !,$p($ZS,",",2,999),! c %ZD s %ZD=""
 	u %ZD w %ZH,!,"GT.M ",$zd($h,"DD-MON-YEAR 24:60:SS")  w:fmt " ZWR"  w !
 	s gn="",(m,n)=0
 	f  s gn=$o(%ZG(gn)) q:gn=""  s g=gn d
+	. s fmtdone=0
 	. u $p w:$x>70 ! w gn,?$x\10+1*10 u %ZD i $p=%ZD w !
 	. s m=m+1
-	. i $d(@g)'[0 w g  d   s n=n+1
-	 . . i fmt  w "="  d fw(@g)
-	 . . e  w !,@g,!
+	. i $d(@g)'[0 d   s n=n+1
+	 . . i fmt  zwr @g s fmtdone=1
+	 . . e  w g,!,@g,!
 	. f  s g=$q(@g) q:g=""  d
- 	 . . i fmt  zwr @g
+ 	 . . i fmt zwr:'fmtdone @g	; don't zwr if already done for unsubscripted global. It takes care for subscripts too
 	 . . e  w g,!,@g,!
 	 . . s n=n+1
 	u %ZD w !!

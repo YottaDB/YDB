@@ -5,6 +5,7 @@ lke_exit
 lke_fileio
 lke_getansw
 lke_getcli
+lke_getki
 lke_help
 lke_setgdr
 lke_show

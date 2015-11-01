@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,8 +37,17 @@
 
 #endif
 
-#define GETHOSTNAME(name,namelen,gethostname_res)		\
+#ifndef UNICODE_SUPPORTED
+#define GETHOSTNAME(name,namelen,gethostname_res)			\
 	(gethostname_res = gethostname(name, namelen))
+#else
+#include "gtm_utf8.h"
+GBLREF	boolean_t	gtm_utf8_mode;
+#define GETHOSTNAME(name,namelen,gethostname_res)					\
+	(gethostname_res = gethostname(name, namelen),					\
+	gtm_utf8_mode ? gtm_utf8_trim_invalid_tail((unsigned char *)name, namelen) : 0,	\
+	gethostname_res)
+#endif
 
 #define LINK		link
 

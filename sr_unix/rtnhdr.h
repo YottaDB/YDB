@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,12 +54,18 @@ typedef struct
 typedef struct	rhead_struct
 {
 	char			jsb[RHEAD_JSB_SIZE];	/* GTM_CODE object marker */
-	mstr			src_full_name;		/* (#) fully qualified path of routine source code */
-	mident			routine_name;		/* external routine name */
 	void_ptr_t		shlib_handle;		/* Null if header not for shared object. Non-zero means header is
 							   describing shared library resident routine and this is its handle.
 							   Note this is an 8 byte field on Tru64 (hence its position near top). */
-	uint4			objlabel;		/* Object code level/label (see objlable.h) */
+	mstr			src_full_name;		/* (#) fully qualified path of routine source code */
+	uint4			compiler_qlf;		/* bit flags of compiler qualifiers used (see cmd_qlf.h) */
+	uint4			objlabel;		/* Object code level/label (see objlable.h).
+							   Note: this field must be the 10th word (11th on Tru64) on 32-bit
+							   environments so that incr_link() can deference object label from old
+							   (pre-V5 32-bit) objects as well. In 64-bit environments though, this
+							   situation wouldn't occur since dlopen() would/should have failed
+							   when a 32-bit shared library is loaded */
+	mident			routine_name;		/* external routine name */
 	var_tabent		*vartab_adr;		/* (#) address of variable table (offset in original rtnhdr) */
 	int4			vartab_len;		/* (#) number of variable table entries */
 	lab_tabent		*labtab_adr;		/* address of label table (offset in original rtnhdr) */
@@ -80,7 +86,6 @@ typedef struct	rhead_struct
 	int4			checksum;		/* verification value */
 	int4			temp_mvals;		/* (#) temp_mvals value of current module version */
 	int4			temp_size;		/* (#) temp_size value of current module version */
-	uint4			compiler_qlf;		/* bit flags of compiler qualifiers used (see cmd_qlf.h) */
 	struct rhead_struct	*current_rhead_adr;	/* (#) address of routine header of current module version */
 	struct rhead_struct	*old_rhead_adr;		/* (#) chain of replaced routine headers */
 } rhdtyp;
@@ -91,6 +96,9 @@ typedef struct
 	mident		rt_name;	/* The name of the routine (in the literal text pool) */
 	rhdtyp		*rt_adr;	/* Pointer to its routine header */
 } rtn_tabent;
+
+/* byte offset of the routine_name field in the routine headers of pre-V5 releases */
+#define PRE_V5_RTNHDR_RTNOFF	24
 
 /* Macros for accessing routine header fields in a portable way */
 #define VARTAB_ADR(rtnhdr) ((rtnhdr)->vartab_adr)

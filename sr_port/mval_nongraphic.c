@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@ void mval_nongraphic(zshow_out *output,char *cp, int len, int num)
 {
 	/* sub-program for mval_write() */
 	mval tmpmval;
-	char buff[3];
+	char buff[10];	/* sufficient to hold all possible Unicode code point values */
 	char *ptr;
 	int n, m;
 
@@ -30,7 +30,7 @@ void mval_nongraphic(zshow_out *output,char *cp, int len, int num)
 		*--ptr = (n % 10) + '0';
 		n /= 10;
 		if (!n)
-		break;
+			break;
 	}
 	tmpmval.str.addr = ptr;
 	tmpmval.str.len = buff - ptr + sizeof(buff);

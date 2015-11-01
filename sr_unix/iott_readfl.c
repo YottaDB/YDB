@@ -12,6 +12,8 @@
 #include "mdef.h"
 
 #include <errno.h>
+#include <wctype.h>
+#include <wchar.h>
 #include "gtm_string.h"
 
 #include "iotcp_select.h"
@@ -30,6 +32,11 @@
 #include "error.h"
 #include "std_dev_outbndset.h"
 #include "wake_alarm.h"
+#include "min_max.h"
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
 
 GBLDEF	int4		spc_inp_prc;			/* dummy: not used currently */
 GBLDEF	bool		ctrlu_occurred;			/* dummy: not used currently */
@@ -41,6 +48,11 @@ GBLREF	bool		prin_in_dev_failure;
 GBLREF	spdesc		stringpool;
 GBLREF	int4		outofband;
 GBLREF	int4		ctrap_action_is;
+GBLREF	boolean_t	gtm_utf8_mode;
+
+#ifdef UNICODE_SUPPORTED
+LITREF	UChar32		u32_line_term[];
+#endif
 
 GBLREF	int		AUTO_RIGHT_MARGIN, EAT_NEWLINE_GLITCH;
 GBLREF	char		*CURSOR_UP, *CURSOR_DOWN, *CURSOR_LEFT, *CURSOR_RIGHT, *CLR_EOL;
@@ -50,16 +62,8 @@ GBLREF	char		*KEY_INSERT;
 GBLREF	char		*KEYPAD_LOCAL, *KEYPAD_XMIT;
 
 #ifdef __MVS__
-LITREF	unsigned char	ebcdic_lower_to_upper_table[];
-LITREF	unsigned char	e2a[];
-#	define	INPUT_CHAR	asc_inchar
-#	define	GETASCII(OUTPARM, INPARM)	{OUTPARM = e2a[INPARM];}
-#	define	NATIVE_CVT2UPPER(OUTPARM, INPARM)	{OUTPARM = ebcdic_lower_to_upper_table[INPARM];}
 #	define SEND_KEYPAD_LOCAL
 #else
-#	define	INPUT_CHAR	inchar
-#	define	GETASCII(OUTPARM, INPARM)
-#	define NATIVE_CVT2UPPER(OUTPARM, INPARM)       {OUTPARM = lower_to_upper_table[INPARM];}
 #	define	SEND_KEYPAD_LOCAL					\
 		if (edit_mode && NULL != KEYPAD_LOCAL && (keypad_len = strlen(KEYPAD_LOCAL)))	/* embedded assignment */	\
 			DOWRITE(tt_ptr->fildes, KEYPAD_LOCAL, keypad_len);
@@ -72,19 +76,78 @@ static readonly char		dc1 = 17;
 static readonly char		dc3 = 19;
 static readonly unsigned char	eraser[3] = { NATIVE_BS, NATIVE_SP, NATIVE_BS };
 
-short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
+#ifdef UNICODE_SUPPORTED
+
+/* Maintenance of $ZB on a badchar error and returning partial data (if any) */
+void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
+			 int delimlen, unsigned char *delimptr, unsigned char *strend)
 {
-	boolean_t	ret, nonzerotimeout, timed, insert_mode, edit_mode;
-	uint4		mask;
-	unsigned char	inchar, *temp, switch_char;
-#ifdef __MVS__
-	unsigned char	asc_inchar;
+        int             i, tmplen, len;
+        unsigned char   *delimend, *outptr, *outtop;
+	wint_t		*curptr32;
+        io_desc         *iod;
+
+        if (0 < datalen && NULL != dataptr32)
+        {       /* Return how much input we got */
+		if (gtm_utf8_mode)
+		{
+			outptr = stringpool.free;
+			outtop = ((unsigned char *)dataptr32);
+			curptr32 = dataptr32;
+			for (i = 0; i < datalen && outptr < outtop; i++, curptr32++)
+				outptr = UTF8_WCTOMB(*curptr32, outptr);
+			vmvalptr->str.len = outptr - stringpool.free;
+		} else
+			vmvalptr->str.len = datalen;
+		vmvalptr->str.addr = (char *)stringpool.free;
+		stringpool.free += vmvalptr->str.len;	/* The BADCHAR error after this won't do this for us */
+        }
+        if (NULL != strend && NULL != delimptr)
+        {       /* First find the end of the delimiter (max of 4 bytes) */
+                if (0 == delimlen)
+		{
+			for (delimend = delimptr; 4 >= delimlen && delimend < strend; ++delimend, ++delimlen)
+			{
+				if (UTF8_VALID(delimend, strend, tmplen))
+					break;
+			}
+                }
+                if (0 < delimlen)
+                {       /* Set $ZB with the failing badchar */
+                        iod = io_curr_device.in;
+                        memcpy(iod->dollar.zb, delimptr, MIN(delimlen, ESC_LEN - 1));
+                        iod->dollar.zb[MIN(delimlen, ESC_LEN - 1)] = '\0';
+                }
+        }
+}
 #endif
-	int		dx, msk_in, msk_num, outlen, rdlen, save_errno, selstat, status, width;
-	int		instr, keypad_len, dx_start, backspace, delete;
+
+int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
+{
+	boolean_t	ret, nonzerotimeout, timed, insert_mode, edit_mode, utf8_active;
+	uint4		mask;
+	wint_t		inchar, *current_32_ptr, *buffer_32_start, switch_char;
+	unsigned char	inbyte, *outptr, *outtop;
+#ifdef __MVS__
+	wint_t		asc_inchar;
+#endif
+	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
+	unsigned char	*current_ptr;		/* insert next character into buffer here */
+	unsigned char	*buffer_start;		/* beginning of non UTF8 buffer */
+	int		msk_in, msk_num, rdlen, save_errno, selstat, status, ioptr_width, i, utf8_more;
+	int		exp_length;
+	int		inchar_width;		/* display width of inchar */
+	int		delchar_width;		/* display width of deleted char */
+	int		delta_width;		/* display width change for replaced char */
+	int		dx, dx_start;		/* local dollar X, starting value */
+	int		dx_instr, dx_outlen;	/* wcwidth of string to insert point, whole string */
+	int		dx_prev, dx_cur, dx_next;/* wcwidth of string to char BEFORE, AT and AFTER the insert point */
+	int		instr;			/* insert point in input string */
+	int		outlen;			/* total characters in line so far */
+	int		keypad_len, backspace, delete;
 	int		up, down, right, left, insert_key;
 	boolean_t	escape_edit;
-	int4		msec_timeout;			/* timeout in milliseconds */
+	int4		msec_timeout;		/* timeout in milliseconds */
 	io_desc		*io_ptr;
 	d_tt_struct	*tt_ptr;
 	io_terminator	outofbands;
@@ -105,10 +168,14 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	tt_ptr = (d_tt_struct *)(io_ptr->dev_sp);
 	assert(dev_open == io_ptr->state);
 	iott_flush(io_curr_device.out);
-	width = io_ptr->width;
-	if (stringpool.free + length > stringpool.top)
-		stp_gcol (length);
+	ioptr_width = io_ptr->width;
+	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
+	/* if utf8_active, need room for multi byte characters plus wint_t buffer */
+	exp_length = utf8_active ? ((sizeof(wint_t) * length) + (GTM_MB_LEN_MAX * length) + sizeof(gtm_int64_t)) : length;
+	if (stringpool.free + exp_length > stringpool.top)
+		stp_gcol (exp_length);
 	instr = outlen = 0;
+	utf8_more = 0;
 	/* ---------------------------------------------------------
 	 * zb_ptr is be used to fill-in the value of $zb as we go
 	 * If we drop-out with error or otherwise permaturely,
@@ -124,7 +191,12 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	v->str.len = 0;
 	dx_start = (int)io_ptr->dollar.x;
 	ret = TRUE;
-	temp = stringpool.free;
+	buffer_start = current_ptr = stringpool.free;
+	if (utf8_active)
+	{
+		current_32_ptr = (wint_t *)ROUND_UP2((int4)(stringpool.free + (GTM_MB_LEN_MAX * length)), sizeof(gtm_int64_t));
+		buffer_32_start = current_32_ptr;
+	}
 	mask = tt_ptr->term_ctrl;
 	mask_term = tt_ptr->mask_term;
 	/* keep test in next line in sync with test in iott_rdone.c */
@@ -163,9 +235,10 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 			}
 		}
 #endif
-		dx_start = (dx_start + width) % width;	/* normalize within width */
+		dx_start = (dx_start + ioptr_width) % ioptr_width;	/* normalize within width */
 	}
 	dx = dx_start;
+	dx_instr = dx_outlen = 0;
 	nonzerotimeout = FALSE;
 	if (NO_M_TIMEOUT == timeout)
 	{
@@ -222,7 +295,7 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				break;
 			}
 			continue;	/* select() timeout; keep going */
-		} else if (0 < (rdlen = read(tt_ptr->fildes, &inchar, 1)))	/* This read is protected */
+		} else if (0 < (rdlen = read(tt_ptr->fildes, &inbyte, 1)))	/* This read is protected */
 		{
 			assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));
 			/* --------------------------------------------------
@@ -233,7 +306,7 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 			prin_in_dev_failure = FALSE;
 			if (tt_ptr->canonical)
 			{
-				if (0 == inchar)
+				if (0 == inbyte)
 				{
 					/* --------------------------------------
 					 * This means that the device has hungup
@@ -243,16 +316,92 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 					io_ptr->dollar.x = 0;
 					io_ptr->dollar.za = 9;
 					io_ptr->dollar.y++;
+					tt_ptr->discard_lf = FALSE;
 					if (io_ptr->error_handler.len > 0)
 						rts_error(VARLSTCNT(1) ERR_IOEOF);
 					break;
 				} else
 					io_ptr->dollar.zeof = FALSE;
 			}
-			if (mask & TRM_CONVERT)
-				NATIVE_CVT2UPPER(inchar, inchar);
+#ifdef UNICODE_SUPPORTED
+			if (utf8_active)
+			{
+				if (tt_ptr->discard_lf)
+				{	/* saw CR last time so ignore following LF */
+					tt_ptr->discard_lf = FALSE;
+					if (NATIVE_LF == inbyte)
+						continue;
+				}
+				if (utf8_more)
+				{	/* needed extra bytes */
+					*more_ptr++ = inbyte;
+					if (--utf8_more)
+						continue;	/* get next byte */
+					UTF8_MBTOWC(more_buf, more_ptr, inchar);
+					if (WEOF == inchar)
+					{	/* invalid char */
+						io_ptr->dollar.za = 9;
+						iott_readfl_badchar(v, buffer_32_start, outlen,
+								    (more_ptr - more_buf), more_buf, more_ptr);
+						utf8_badchar(more_ptr - more_buf, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
+						break;
+					}
+				} else if (0 < (utf8_more = UTF8_MBFOLLOW(&inbyte)))	/* assignment */
+				{
+					more_ptr = more_buf;
+					if (0 > utf8_more)
+					{	/* invalid character */
+						io_ptr->dollar.za = 9;
+						*more_ptr++ = inbyte;
+						iott_readfl_badchar(v, buffer_32_start, outlen, 1, more_buf, more_ptr);
+						utf8_badchar(1, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
+						break;
+					} else if (GTM_MB_LEN_MAX < utf8_more)
+					{	/* too big to be valid */
+						io_ptr->dollar.za = 9;
+						*more_ptr++ = inbyte;
+						iott_readfl_badchar(v, buffer_32_start, outlen, 1, more_buf, more_ptr);
+						utf8_badchar(1, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
+						break;
+					} else
+					{
+						*more_ptr++ = inbyte;
+						continue;	/* get next byte */
+					}
+				} else
+				{	/* single byte */
+					more_ptr = more_buf;
+					*more_ptr++ = inbyte;
+					UTF8_MBTOWC(more_buf, more_ptr, inchar);
+					if (WEOF == inchar)
+					{	/* invalid char */
+						io_ptr->dollar.za = 9;
+						iott_readfl_badchar(v, buffer_32_start, outlen, 1, more_buf, more_ptr);
+						utf8_badchar(1, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
+						break;
+					}
+				}
+				if (!tt_ptr->done_1st_read)
+				{
+					tt_ptr->done_1st_read = TRUE;
+					if (BOM_CODEPOINT == inchar)
+						continue;
+				}
+				if (mask & TRM_CONVERT)
+					inchar = u_toupper(inchar);
+				GTM_IO_WCWIDTH(inchar, inchar_width);
+			} else
+			{
+#endif
+				if (mask & TRM_CONVERT)
+					NATIVE_CVT2UPPER(inbyte, inbyte);
+				inchar = inbyte;
+				inchar_width = 1;
+#ifdef UNICODE_SUPPORTED
+			}
+#endif
                         GETASCII(asc_inchar,inchar);
-			if (!edit_mode && (dx >= width) && io_ptr->wrap && !(mask & TRM_NOECHO))
+			if (!edit_mode && (dx >= ioptr_width) && io_ptr->wrap && !(mask & TRM_NOECHO))
 			{
 				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));
 				dx = 0;
@@ -271,14 +420,14 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 			if (((0 != (mask & TRM_ESCAPE)) || edit_mode)
 			     && ((NATIVE_ESC == inchar) || (START != io_ptr->esc_state)))
 			{
-				if (zb_ptr >= zb_top)
-				{	/* $zb overflow */
+				if (zb_ptr >= zb_top UNICODE_ONLY(|| (utf8_active && ASCII_MAX < inchar)))
+				{	/* $zb overflow or not ASCII in utf8 mode */
 					io_ptr->dollar.za = 2;
 					break;
 				}
-				*zb_ptr++ = inchar;
+				*zb_ptr++ = (unsigned char)inchar;
 				iott_escape(zb_ptr - 1, zb_ptr, io_ptr);
-				*(zb_ptr - 1) = INPUT_CHAR;     /* need to store ASCII value    */
+				*(zb_ptr - 1) = (unsigned char)INPUT_CHAR;     /* need to store ASCII value    */
 				if (FINI == io_ptr->esc_state && !edit_mode)
 					break;
 				if (BADESC == io_ptr->esc_state)
@@ -292,46 +441,78 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				 */
 			} else
 			{	/* SIMPLIFY THIS! */
-				msk_num = (uint4)INPUT_CHAR / NUM_BITS_IN_INT4;
-				msk_in = (1 << ((uint4)INPUT_CHAR % NUM_BITS_IN_INT4));
-				if (msk_in & mask_term.mask[msk_num])
-				{
-					*zb_ptr++ = INPUT_CHAR;
+				if (!utf8_active || ASCII_MAX >= INPUT_CHAR)
+				{	/* may need changes to allow terminator > MAX_ASCII and/or LS and PS if default_mask_term */
+					msk_num = (uint4)INPUT_CHAR / NUM_BITS_IN_INT4;
+					msk_in = (1 << ((uint4)INPUT_CHAR % NUM_BITS_IN_INT4));
+					if (msk_in & mask_term.mask[msk_num])
+					{
+						*zb_ptr++ = (unsigned char)INPUT_CHAR;
+						if (utf8_active && ASCII_CR == INPUT_CHAR)
+							tt_ptr->discard_lf = TRUE;
+						break;
+					}
+				} else if (utf8_active && tt_ptr->default_mask_term && (u32_line_term[U32_LT_NL] == INPUT_CHAR ||
+					u32_line_term[U32_LT_LS] == INPUT_CHAR || u32_line_term[U32_LT_PS] == INPUT_CHAR))
+				{	/* UTF and default terminators and Unicode terminators above ASCII_MAX */
+					zb_ptr = UTF8_WCTOMB(INPUT_CHAR, zb_ptr);
 					break;
 				}
 				assert(0 <= instr);
-				assert(0 <= dx);
+				assert(!edit_mode || 0 <= dx);
 				assert(outlen >= instr);
 				if ((int)inchar == tt_ptr->ttio_struct->c_cc[VERASE]
 					&& !(mask & TRM_PASTHRU))
 				{
-					if (0 < instr)
+					if (0 < instr && (edit_mode || 0 < dx))
 					{
+						dx_prev = compute_dx(BUFF_ADDR(0), instr - 1, ioptr_width, dx_start);
+						delchar_width = dx_instr - dx_prev;
 						if (edit_mode)
 						{
 							if (!(mask & TRM_NOECHO))
-								move_cursor_left(dx);
-							dx = (dx - 1 + width) % width;
+								move_cursor_left(dx, delchar_width);
+							dx = (dx - delchar_width + ioptr_width) % ioptr_width;
 						} else
-							dx--;
-						stringpool.free[outlen] = ' ';
+							dx -= delchar_width;
+						instr--;
+						dx_instr -= delchar_width;
+						STORE_OFF(' ', outlen);
+						outlen--;
+						if (!(mask & TRM_NOECHO) && edit_mode)
+						{
+							IOTT_COMBINED_CHAR_CHECK;
+						}
+						MOVE_BUFF(instr, BUFF_ADDR(instr + 1), outlen - instr);
 						if (!(mask & TRM_NOECHO))
 						{
 							if (!edit_mode)
-								DOWRITERC(tt_ptr->fildes, eraser, sizeof(eraser), status)
-							else
-								status = write_str(temp, outlen - instr + 1, dx, FALSE);
+							{
+								for (i = 0; i < delchar_width; i++)
+								{
+									DOWRITERC(tt_ptr->fildes, eraser,
+										sizeof(eraser), status)
+									if (0 != status)
+										break;
+								}
+							} else
+							{	/* First write spaces on all the display columns that
+								 * the current string occupied. Then overwrite that
+								 * with the new string. This way we are guaranteed all
+								 * display columns are clean.
+								 */
+								status = write_str_spaces(dx_outlen - dx_instr, dx, FALSE);
+								if (0 == status)
+									status = write_str(BUFF_ADDR(instr),
+											outlen - instr, dx, FALSE, FALSE);
+							}
 							if (0 != status)
 							{
 								term_error_line = __LINE__;
 								goto term_error;
 							}
 						}
-						temp--;
-						instr--;
-						outlen--;
-						if (outlen > instr)
-							memmove(temp, temp + 1, outlen - instr);
+						dx_outlen = compute_dx(BUFF_ADDR(0), outlen, ioptr_width, dx_start);
 					}
 				} else
 				{
@@ -346,8 +527,8 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 							int	num_lines_above;
 							int	num_chars_left;
 
-							num_lines_above = (instr + dx_start) /
-										io_ptr->width;
+							num_lines_above = (dx_instr + dx_start) /
+										ioptr_width;
 							num_chars_left = dx - dx_start;
 							if (!(mask & TRM_NOECHO))
 							{
@@ -358,8 +539,7 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 									goto term_error;
 								}
 							}
-							instr = 0;
-							temp = stringpool.free;
+							instr = dx_instr = 0;
 							dx = dx_start;
 							break;
 						}
@@ -369,9 +549,17 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 							int	num_chars_left;
 
 							num_lines_above =
-								(instr + dx_start) / io_ptr->width -
-									(outlen + dx_start) / io_ptr->width;
-							num_chars_left = dx - (outlen + dx_start) % io_ptr->width;
+								(dx_instr + dx_start) / ioptr_width -
+									(dx_outlen + dx_start) / ioptr_width;
+							/* For some reason, a CURSOR_DOWN ("\n") seems to reposition the cursor
+							 * at the beginning of the next line rather than maintain the vertical
+							 * position. Therefore if we are moving down, we need to calculate
+							 * the num_chars_left differently to accommodate this.
+							 */
+							if (0 <= num_lines_above)
+								num_chars_left = dx - (dx_outlen + dx_start) % ioptr_width;
+							else
+								num_chars_left = - ((dx_outlen + dx_start) % ioptr_width);
 							if (!(mask & TRM_NOECHO))
 							{
 								if (0 != move_cursor(tt_ptr->fildes, num_lines_above,
@@ -382,25 +570,28 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 								}
 							}
 							instr = outlen;
-							temp = stringpool.free + outlen;
-							dx = (outlen + dx_start) % io_ptr->width;
+							dx_instr = dx_outlen;
+							dx = (dx_outlen + dx_start) % ioptr_width;
 							break;
 						}
 						case EDIT_LEFT:	/* ctrl B  left one */
 						{
 							if (instr != 0)
 							{
+								dx_prev = compute_dx(BUFF_ADDR(0), instr - 1,
+												ioptr_width, dx_start);
+								inchar_width = dx_instr - dx_prev;
 								if (!(mask & TRM_NOECHO))
 								{
-									if (0 != move_cursor_left(dx))
+									if (0 != move_cursor_left(dx, inchar_width))
 									{
 										term_error_line = __LINE__;
 										goto term_error;
 									}
 								}
-								temp--;
 								instr--;
-								dx = (dx - 1 + io_ptr->width) % io_ptr->width;
+								dx = (dx - inchar_width + ioptr_width) % ioptr_width;
+								dx_instr -= inchar_width;
 							}
 							break;
 						}
@@ -408,32 +599,36 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 						{
 							if (instr < outlen)
 							{
+								dx_next = compute_dx(BUFF_ADDR(0), instr + 1,
+												ioptr_width, dx_start);
+								inchar_width = dx_next - dx_instr;
 								if (!(mask & TRM_NOECHO))
 								{
-									if (0 != move_cursor_right(dx))
+									if (0 != move_cursor_right(dx, inchar_width))
 									{
 										term_error_line = __LINE__;
 										goto term_error;
 									}
 								}
-								temp++;
 								instr++;
-								dx = (dx + 1) % io_ptr->width;
+								dx = (dx + inchar_width) % ioptr_width;
+								dx_instr += inchar_width;
 							}
 							break;
 						}
 						case EDIT_DEOL:	/* ctrl K  delete to end of line */
 						{
-							memset(temp, ' ', outlen - instr);
 							if (!(mask & TRM_NOECHO))
 							{
-								if (0 != write_str(temp, outlen - instr, dx, FALSE))
+								if (0 != write_str_spaces(dx_outlen - dx_instr, dx, FALSE))
 								{
 									term_error_line = __LINE__;
 									goto term_error;
 								}
 							}
+							SET_BUFF(instr, ' ', outlen - instr);
 							outlen = instr;
+							dx_outlen = dx_instr;
 							break;
 						}
 						case EDIT_ERASE:	/* ctrl U  delete whole line */
@@ -441,16 +636,16 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 							int	num_lines_above;
 							int	num_chars_left;
 
-							num_lines_above = (instr + dx_start) /
-											io_ptr->width;
+							num_lines_above = (dx_instr + dx_start) /
+											ioptr_width;
 							num_chars_left = dx - dx_start;
-							memset(stringpool.free, ' ', outlen);
+							SET_BUFF(0, ' ', outlen);
 							if (!(mask & TRM_NOECHO))
 							{
 								status = move_cursor(tt_ptr->fildes,
 									num_lines_above, num_chars_left);
-								if (0 != status || 0 != write_str(stringpool.free, outlen,
-										dx_start, FALSE))
+								if (0 != status
+									|| 0 != write_str_spaces(dx_outlen, dx_start, FALSE))
 								{
 									term_error_line = __LINE__;
 									goto term_error;
@@ -459,67 +654,136 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 							instr = 0;
 							outlen = 0;
 							dx = dx_start;
-							temp = stringpool.free;
+							dx_instr = dx_outlen = 0;
 							break;
 						}
 						case EDIT_DELETE:	/* ctrl D delete char */
 						{
 							if (instr < outlen)
 							{
-								stringpool.free [outlen] = ' ';
+								STORE_OFF(' ', outlen);
+								outlen--;
 								if (!(mask & TRM_NOECHO))
 								{
-									if (0 != write_str(temp + 1, outlen - instr, dx, FALSE))
+									IOTT_COMBINED_CHAR_CHECK;
+								}
+								MOVE_BUFF(instr, BUFF_ADDR(instr + 1), outlen - instr);
+								if (!(mask & TRM_NOECHO))
+								{	/* First write spaces on all the display columns that
+									 * the current string occupied. Then overwrite that
+									 * with the new string. This way we are guaranteed all
+									 * display columns are clean.
+									 */
+									if (0 != write_str_spaces(dx_outlen - dx_instr, dx, FALSE))
+									{
+										term_error_line = __LINE__;
+										goto term_error;
+									}
+									if (0 != write_str(BUFF_ADDR(instr), outlen - instr,
+												dx, FALSE, FALSE))
 									{
 										term_error_line = __LINE__;
 										goto term_error;
 									}
 								}
-								memmove(temp, temp + 1, outlen - instr);
-								outlen--;
+								dx_outlen = compute_dx(BUFF_ADDR(0), outlen,
+												ioptr_width, dx_start);
 							}
 							break;
 						}
 						default:
 						{
-							if (insert_mode && (outlen > instr))
-								memmove(temp + 1, temp, outlen - instr);
-							*temp = inchar;
+							if (outlen > instr)
+							{
+								if (insert_mode)
+									MOVE_BUFF(instr + 1, BUFF_ADDR(instr), outlen - instr)
+								else if (edit_mode && !insert_mode)
+								{	/* only needed if edit && !insert_mode && not at end */
+									GTM_IO_WCWIDTH(GET_OFF(instr), delchar_width);
+									delta_width = inchar_width - delchar_width;
+								}
+							}
+							STORE_OFF(inchar, instr);
 							if (!(mask & TRM_NOECHO))
 							{
 								if (!edit_mode)
 								{
-									DOWRITERC(tt_ptr->fildes, &inchar, 1, status);
 									term_error_line = __LINE__;
+									status = iott_write_raw(tt_ptr->fildes,
+											BUFF_ADDR(instr), 1);
+									if (0 <= status)
+									    status = 0;
+									else
+									    status = errno;
 								} else if (instr == outlen)
 								{
-									status = write_str(temp, 1, dx, TRUE);
 									term_error_line = __LINE__;
+									status = write_str(BUFF_ADDR(instr), 1, dx, FALSE, FALSE);
 								} else
-								{
-									status = write_str(temp,
-										outlen - instr + (insert_mode ? 1 : 0), dx, FALSE);
-									if (0 != status || 0 != (status = move_cursor_right(dx)))
+								{	/* First write spaces on all the display columns that the
+									 * current string occupied. Then overwrite that with the
+									 * new string. This way we are guaranteed all display
+									 * columns are clean. Note that this space overwrite is
+									 * needed even in case of insert mode because due to
+									 * differing wide-character alignments before and after
+									 * the insert, it is possible that a column might be left
+									 * empty in the post insert write of the new string even
+									 * though it had something displayed before.
+									 */
+									term_error_line = __LINE__;
+									status = write_str_spaces(dx_outlen - dx_instr, dx, FALSE);
+									if (0 == status)
 									{
 										term_error_line = __LINE__;
+										status = write_str(BUFF_ADDR(instr),
+											outlen - instr + (insert_mode ? 1 : 0),
+											dx, FALSE, FALSE);
 									}
 								}
 								if (0 != status)
 									goto term_error;
 							}
-							temp++;
 							if (insert_mode || instr == outlen)
 								outlen++;
 							instr++;
+							if (edit_mode)
+							{	/* Compute value of dollarx at the new cursor position */
+								dx_cur = compute_dx(BUFF_ADDR(0), instr, ioptr_width, dx_start);
+								inchar_width = dx_cur - dx_instr;
+								if (!(mask & TRM_NOECHO))
+								{
+									term_error_line = __LINE__;
+									status = move_cursor_right(dx, inchar_width);
+									if (0 != status)
+										goto term_error;
+								}
+							}
 							if (!edit_mode)
-								dx++;
-							else
-								dx = (dx + 1) % io_ptr->width;
+							{
+								dx += inchar_width;
+								dx_instr += inchar_width;
+								dx_outlen += inchar_width;
+							} else if (insert_mode || instr >= outlen)
+							{	/* at end  or insert */
+								dx = (dx + inchar_width) % ioptr_width;
+								dx_instr = dx_cur;
+								dx_outlen = compute_dx(BUFF_ADDR(0), outlen,
+											ioptr_width, dx_start);
+							} else
+							{	/* replaced character */
+								dx = (dx + inchar_width) % ioptr_width;
+								dx_instr = dx_cur;
+								dx_outlen = compute_dx(BUFF_ADDR(0), outlen,
+											ioptr_width, dx_start);
+							}
 							break;
 						}
 					}
 				}
 			}
+			/* Ensure that the actual display position of the current character matches the computed value */
+			assert(!edit_mode || dx_instr == compute_dx(BUFF_ADDR(0), instr, ioptr_width, dx_start));
+			assert(!edit_mode || dx_outlen == compute_dx(BUFF_ADDR(0), outlen, ioptr_width, dx_start));
 		} else if (0 == rdlen)
 		{
 			if (0 < selstat)
@@ -591,61 +855,76 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 			{
 				if (instr > 0)
 				{
-					int temp_dx = dx;
-					dx = (dx - 1 + io_ptr->width) % io_ptr->width;
-					stringpool.free[outlen] = ' ';
+					dx_prev = compute_dx(BUFF_ADDR(0), instr - 1, ioptr_width, dx_start);
+					delchar_width = dx_instr - dx_prev;
 					if (!(mask & TRM_NOECHO))
 					{
-						status = move_cursor_left(temp_dx);
-						if (0 != status || 0 != write_str(temp, outlen - instr + 1, dx, FALSE))
+						term_error_line = __LINE__;
+						status = move_cursor_left(dx, delchar_width);
+					}
+					dx = (dx - delchar_width + ioptr_width) % ioptr_width;
+					instr--;
+					dx_instr -= delchar_width;
+					STORE_OFF(' ', outlen);
+					outlen--;
+					if (!(mask & TRM_NOECHO))
+					{
+						IOTT_COMBINED_CHAR_CHECK;
+					}
+					MOVE_BUFF(instr, BUFF_ADDR(instr + 1), outlen - instr);
+					if (!(mask & TRM_NOECHO))
+					{	/* First write spaces on all the display columns that the current string occupied.
+						 * Then overwrite that with the new string. This way we are guaranteed all
+						 * display columns are clean.
+						 */
+						if (0 == status)
 						{
 							term_error_line = __LINE__;
-							goto term_error;
+							status = write_str_spaces(dx_outlen - dx_instr, dx, FALSE);
 						}
+						if (0 == status)
+						{
+							term_error_line = __LINE__;
+							status = write_str(BUFF_ADDR(instr), outlen - instr, dx, FALSE, FALSE);
+						}
+						if (0 != status)
+							goto term_error;
 					}
-					temp--;
-					instr--;
-					outlen--;
-					memmove(temp, temp + 1, outlen - instr);
+					dx_outlen = compute_dx(BUFF_ADDR(0), outlen, ioptr_width, dx_start);
 				}
 				escape_edit = TRUE;
 			}
-
 			if (up == 0  ||  down == 0)
-			{
-				/* move cursor to start of field */
+			{	/* move cursor to start of field */
 				if (0 < instr)
 				{
-					if (0 != move_cursor(tt_ptr->fildes, ((instr + dx_start) / io_ptr->width), (dx - dx_start)))
+					if (0 != move_cursor(tt_ptr->fildes, ((dx_instr + dx_start) / ioptr_width),
+						(dx - dx_start)))
 					{
 						term_error_line = __LINE__;
 						goto term_error;
 					}
 				}
-				temp = stringpool.free;
 				instr = tt_ptr->recall_buff.len;
 				if (length < instr)
 					instr = length;	/* restrict to length of read */
 				if (0 != instr)
-				{
-					memcpy(temp, tt_ptr->recall_buff.addr, instr);
-					if (0 != write_str(temp, instr, dx_start, TRUE))
+				{	/* need to blank old output first */
+					SET_BUFF(instr, ' ', outlen);
+					if (0 != write_str_spaces(dx_outlen, dx_start, FALSE))
 					{
 						term_error_line = __LINE__;
 						goto term_error;
 					}
-					temp += instr;
-				}
-				dx = (unsigned)(instr + dx_start) % io_ptr->width;
-				if (instr < outlen)
-				{	/* need to blank old output if longer */
-					memset(temp, ' ', outlen - instr);
-					if (0 != write_str(temp, outlen - instr, dx, FALSE))
+					MOVE_BUFF(0, tt_ptr->recall_buff.addr, instr);
+					if (0 != write_str(BUFF_ADDR(0), instr, dx_start, TRUE, FALSE))
 					{
 						term_error_line = __LINE__;
 						goto term_error;
 					}
 				}
+				dx_instr = dx_outlen = tt_ptr->recall_width;
+				dx = (unsigned)(dx_instr + dx_start) % ioptr_width;
 				outlen = instr;
 				escape_edit = TRUE;
 			} else if (   !(mask & TRM_NOECHO)
@@ -654,25 +933,29 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 			{
 				if (right == 0)
 				{
-					if (0 != move_cursor_right(dx))
+					dx_next = compute_dx(BUFF_ADDR(0), instr + 1, ioptr_width, dx_start);
+					inchar_width = dx_next - dx_instr;
+					if (0 != move_cursor_right(dx, inchar_width))
 					{
 						term_error_line = __LINE__;
 						goto term_error;
 					}
-					temp++;
 					instr++;
-					dx = (dx + 1) % io_ptr->width;
+					dx = (dx + inchar_width) % ioptr_width;
+					dx_instr += inchar_width;
 				}
 				if (left == 0)
 				{
-					if (0 != move_cursor_left(dx))
+					dx_prev = compute_dx(BUFF_ADDR(0), instr - 1, ioptr_width, dx_start);
+					inchar_width = dx_instr - dx_prev;
+					if (0 != move_cursor_left(dx, inchar_width))
 					{
 						term_error_line = __LINE__;
 						goto term_error;
 					}
-					temp--;
 					instr--;
-					dx = (dx - 1 + io_ptr->width) % io_ptr->width;
+					dx = (dx - inchar_width + ioptr_width) % ioptr_width;
+					dx_instr -= inchar_width;
 				}
 			}
 			if (0 == insert_key)
@@ -705,7 +988,7 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	if (!msec_timeout)
 	{
 		iott_rterm(io_ptr);
-		if (0 == outlen)
+		if (0 == outlen && ((io_ptr->dollar.zb + 1) == zb_ptr)) /* No input and no delimiter seen */
 			ret = FALSE;
 	}
 	if (mask & TRM_READSYNC)
@@ -724,28 +1007,40 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		io_ptr->dollar.za = 9;
 		return(FALSE);
 	}
-	v->str.len = outlen;
+#ifdef UNICODE_SUPPORTED
+	if (utf8_active)
+	{
+		outptr = stringpool.free;
+		outtop = ((unsigned char *)buffer_32_start);
+		current_32_ptr = buffer_32_start;
+		for (i = 0; i < outlen && outptr < outtop; i++, current_32_ptr++)
+			outptr = UTF8_WCTOMB(*current_32_ptr, outptr);
+		v->str.len = outptr - stringpool.free;
+	} else
+#endif
+		v->str.len = outlen;
 	v->str.addr = (char *)stringpool.free;
 	if (edit_mode)
 	{	/* store in recall buffer */
-		if (v->str.len > tt_ptr->recall_size)
+		if ((BUFF_CHAR_SIZE * outlen) > tt_ptr->recall_size)
 		{
 			if (tt_ptr->recall_buff.addr)
 				free(tt_ptr->recall_buff.addr);
-			tt_ptr->recall_buff.addr = malloc(v->str.len);
-			tt_ptr->recall_size = v->str.len;
+			tt_ptr->recall_size = BUFF_CHAR_SIZE * outlen;
+			tt_ptr->recall_buff.addr = malloc(tt_ptr->recall_size);
 		}
-		memcpy(tt_ptr->recall_buff.addr, v->str.addr, v->str.len);
-		tt_ptr->recall_buff.len = v->str.len;
+		tt_ptr->recall_width = dx_outlen;
+		tt_ptr->recall_buff.len = outlen;
+		memcpy(tt_ptr->recall_buff.addr, BUFF_ADDR(0), BUFF_CHAR_SIZE * outlen);
 	}
 	if (!(mask & TRM_NOECHO))
 	{
-		if ((io_ptr->dollar.x += v->str.len) >= io_ptr->width && io_ptr->wrap)
+		if ((io_ptr->dollar.x += dx_outlen) >= ioptr_width && io_ptr->wrap)
 		{
-			io_ptr->dollar.y += (io_ptr->dollar.x / io_ptr->width);
+			io_ptr->dollar.y += (io_ptr->dollar.x / ioptr_width);
 			if (io_ptr->length)
 				io_ptr->dollar.y %= io_ptr->length;
-			io_ptr->dollar.x %= io_ptr->width;
+			io_ptr->dollar.x %= ioptr_width;
 			if (0 == io_ptr->dollar.x)
 				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));
 		}
@@ -755,6 +1050,7 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 term_error:
 	save_errno = errno;
 	io_ptr->dollar.za = 9;
+	tt_ptr->discard_lf = FALSE;
 	SEND_KEYPAD_LOCAL	/* to turn keypad off if possible */
 	if (!msec_timeout)
 		iott_rterm(io_ptr);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +22,7 @@
 #if defined(UNIX)
 #define GET_CONFIRM(X,Y) {PRINTF("CONFIRMATION: ");FGETS((X), (Y), stdin, fgets_res);Y = strlen(X);}
 
-#include <sys/ipc.h>
-
+#include "gtm_ipc.h"
 
 GBLREF uint4	user_id;
 #elif defined(VMS)
@@ -54,13 +53,14 @@ GBLREF uint4	user_id;
 #endif
 #include "wcs_flu.h"
 
-GBLREF block_id		patch_curr_blk;
-GBLREF gd_addr		*gd_header;
-GBLREF gd_region	*gv_cur_region;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF short		crash_count;
-GBLREF uint4		process_id;
-GBLREF gd_addr          *original_header;
+GBLREF	block_id	patch_curr_blk;
+GBLREF	gd_addr		*gd_header;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	short		crash_count;
+GBLREF	uint4		process_id;
+GBLREF	gd_addr		*original_header;
+GBLREF	boolean_t	dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */
 
 void dse_all(void)
 {
@@ -73,15 +73,16 @@ void dse_all(void)
 	int4		stat;
 	char		confirm[256];
 	unsigned short	len;
-	bool		ref=FALSE;
-	bool		crit=FALSE;
-	bool		wc=FALSE;
-	bool		flush=FALSE;
-	bool		freeze=FALSE;
-	bool		nofreeze=FALSE;
-	bool		override=FALSE;
-	bool		seize=FALSE;
-	bool		release=FALSE;
+	boolean_t	ref = FALSE;
+	boolean_t	crit = FALSE;
+	boolean_t	wc = FALSE;
+	boolean_t	flush = FALSE;
+	boolean_t	freeze = FALSE;
+	boolean_t	nofreeze = FALSE;
+	boolean_t	seize = FALSE;
+	boolean_t	release = FALSE;
+	boolean_t	dump = FALSE;
+	bool		override = FALSE;
 	gd_addr         *temp_gdaddr;
 	gd_binding      *map;
 #ifdef UNIX
@@ -92,9 +93,11 @@ void dse_all(void)
 	error_def(ERR_FREEZE);
         error_def(ERR_DBRDONLY);
 
-        if (gv_cur_region->read_only)
-                rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
-
+	old_addrs = cs_addrs;
+	old_region = gv_cur_region;
+	old_block = patch_curr_blk;
+	temp_gdaddr = gd_header;
+	gd_header = original_header;
 	if (cli_present("RENEW") == CLI_PRESENT)
 	{
 		crit = ref = wc = nofreeze = TRUE;
@@ -138,12 +141,11 @@ void dse_all(void)
 		}
                 if (cli_present("OVERRIDE") == CLI_PRESENT)
                         override = TRUE;
+                if (cli_present("DUMP") == CLI_PRESENT)
+			dump = TRUE;
 	}
-	old_addrs = cs_addrs;
-	old_region = gv_cur_region;
-	old_block = patch_curr_blk;
-	temp_gdaddr = gd_header;
-	gd_header = original_header;
+        if (!dump && gv_cur_region->read_only)
+                rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	region_list = NULL;
 	for (i = 0, ptr = gd_header->regions; i < gd_header->n_regions; i++, ptr++)
 	{
@@ -158,73 +160,84 @@ void dse_all(void)
 				ptr->rname_len, &ptr->rname[0]);
 			continue;
 		}
-		/* put on region list in order of ftok value so processed in same order that
-		   crits are obtained */
-		csa = &FILE_INFO(ptr)->s_addrs;
-		insert_region(ptr, &(region_list), NULL, sizeof(tp_region));
-	}
-	/* Now run the list of regions in the sorted ftok order to execute the desired commands */
-	for (rg = region_list; NULL != rg; rg = rg->fPtr)
-	{
-		gv_cur_region = rg->reg;
-		switch(gv_cur_region->dyn.addr->acc_meth)
+		if (dump)
 		{
-		case dba_mm:
-		case dba_bg:
+			gv_cur_region = ptr;
 			cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
-			break;
-		default:
-			GTMASSERT;
-		}
-		patch_curr_blk = get_dir_root();
-
-		if (crit)
+			dse_all_dump = TRUE;
+			dse_dmp_fhead();
+			assert(!dse_all_dump);	/* should have been reset by "dse_dmp_fhead" */
+		} else
 		{
-			UNIX_ONLY(gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY, TRUE);)
-			VMS_ONLY(mutex_init(cs_addrs->critical, NUM_CRIT_ENTRY, TRUE);)
-			cs_addrs->nl->in_crit = 0;
-			cs_addrs->now_crit = cs_addrs->read_lock = FALSE;
+			/* put on region list in order of ftok value so processed in same order that crits are obtained */
+			csa = &FILE_INFO(ptr)->s_addrs;
+			insert_region(ptr, &(region_list), NULL, sizeof(tp_region));
 		}
-		if (cs_addrs->critical)
-			crash_count = cs_addrs->critical->crashcnt;
-
-		if (freeze)
+	}
+	if (!dump)
+	{	/* Now run the list of regions in the sorted ftok order to execute the desired commands */
+		for (rg = region_list; NULL != rg; rg = rg->fPtr)
 		{
-		        while (FALSE == region_freeze(gv_cur_region, TRUE, override))
-                		hiber_start(1000);
-		}
-		if (seize)
-                        grab_crit(gv_cur_region);
-		if (wc)
-		{
-			if (FALSE == seize)
-				grab_crit(gv_cur_region);
-			bt_init(cs_addrs);
-			if (cs_addrs->hdr->acc_meth == dba_bg)
+			gv_cur_region = rg->reg;
+			switch(gv_cur_region->dyn.addr->acc_meth)
 			{
-				bt_refresh(cs_addrs);
-				db_csh_ini(cs_addrs);
-				db_csh_ref(cs_addrs);
+			case dba_mm:
+			case dba_bg:
+				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
+				break;
+			default:
+				GTMASSERT;
 			}
-			if((FALSE == seize) || (TRUE == release))
+			patch_curr_blk = get_dir_root();
+
+			if (crit)
+			{
+				UNIX_ONLY(gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY, TRUE);)
+				VMS_ONLY(mutex_init(cs_addrs->critical, NUM_CRIT_ENTRY, TRUE);)
+				cs_addrs->nl->in_crit = 0;
+				cs_addrs->now_crit = cs_addrs->read_lock = FALSE;
+			}
+			if (cs_addrs->critical)
+				crash_count = cs_addrs->critical->crashcnt;
+
+			if (freeze)
+			{
+				while (FALSE == region_freeze(gv_cur_region, TRUE, override))
+					hiber_start(1000);
+			}
+			if (seize)
+				grab_crit(gv_cur_region);
+			if (wc)
+			{
+				if (FALSE == seize)
+					grab_crit(gv_cur_region);
+				bt_init(cs_addrs);
+				if (cs_addrs->hdr->acc_meth == dba_bg)
+				{
+					bt_refresh(cs_addrs);
+					db_csh_ini(cs_addrs);
+					db_csh_ref(cs_addrs);
+				}
+				if ((FALSE == seize) || (TRUE == release))
+					rel_crit(gv_cur_region);
+			}
+			if (flush)
+				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
+			if (release && cs_addrs->now_crit)
 				rel_crit(gv_cur_region);
+			else if (release && !cs_addrs->now_crit)
+			{
+				util_out_print("Current process does not own the Region: !AD.",TRUE, REG_LEN_STR(gv_cur_region));
+			}
+			if (nofreeze)
+			{
+				if (!region_freeze(gv_cur_region,FALSE, override))
+					util_out_print("Region: !AD is frozen by another user, not releasing freeze",TRUE,
+						REG_LEN_STR(gv_cur_region));
+			}
+			if (ref)
+				cs_addrs->nl->ref_cnt = 1;
 		}
-		if (flush)
-			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-		if (release && cs_addrs->now_crit)
-			rel_crit(gv_cur_region);
-                else if (release && !cs_addrs->now_crit)
-		{
-                        util_out_print("Current process does not own the Region: !AD.",TRUE, REG_LEN_STR(gv_cur_region));
-		}
-		if (nofreeze)
-		{
-			if (!region_freeze(gv_cur_region,FALSE, override))
-				util_out_print("Region: !AD is frozen by another user, not releasing freeze",TRUE,
-					REG_LEN_STR(gv_cur_region));
-		}
-		if (ref)
-			cs_addrs->nl->ref_cnt = 1;
 	}
 	cs_addrs = old_addrs;
 	gv_cur_region = old_region;

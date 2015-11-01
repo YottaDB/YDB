@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -31,9 +31,9 @@ ENTRY op_exfunret
 	popl	%eax
 	popl	%edx
 	pushl	%eax
-	movb	mval_b_mvtype(%edx),%al
-	andb	$~mval_m_retarg,mval_b_mvtype(%edx)
-	andb	$mval_m_retarg,%al
+	movw	mval_w_mvtype(%edx),%ax
+	andw	$~mval_m_retarg,mval_w_mvtype(%edx)
+	andw	$mval_m_retarg,%ax
 	jne	l1
 	pushl	ERR_QUITARGREQD
 	pushl	$1

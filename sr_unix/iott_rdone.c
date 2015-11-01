@@ -12,6 +12,8 @@
 #include "mdef.h"
 
 #include <errno.h>
+#include <wctype.h>
+#include <wchar.h>
 #include <signal.h>
 #include "gtm_string.h"
 
@@ -19,6 +21,7 @@
 
 #include "io.h"
 #include "iottdef.h"
+#include "iott_edit.h"
 #include "trmdef.h"
 #include "iotimer.h"
 #include "gt_timer.h"
@@ -29,6 +32,10 @@
 #include "error.h"
 #include "std_dev_outbndset.h"
 #include "wake_alarm.h"
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
 
 GBLREF	int4		outofband;
 GBLREF	io_pair		io_curr_device;
@@ -36,40 +43,33 @@ GBLREF	io_pair		io_std_device;
 GBLREF	bool		prin_in_dev_failure;
 GBLREF	int4		ctrap_action_is;
 GBLREF	bool		out_of_time;
+GBLREF	boolean_t	gtm_utf8_mode;
 
-#ifdef __MVS__
-LITREF	unsigned char	ebcdic_lower_to_upper_table[];
-LITREF	unsigned char	e2a[];
-#define	INPUT_CHAR	asc_inchar
-#define	GETASCII(OUTPARM, INPARM)	{OUTPARM = e2a[INPARM];}
-#define	NATIVE_CVT2UPPER(OUTPARM, INPARM)	{OUTPARM = ebcdic_lower_to_upper_table[INPARM];}
-#else
-#define	INPUT_CHAR	inchar
-#define	GETASCII(OUTPARM, INPARM)
-#define NATIVE_CVT2UPPER(OUTPARM, INPARM)       {OUTPARM = lower_to_upper_table[INPARM];}
-#endif
 LITREF	unsigned char	lower_to_upper_table[];
 
-short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
+int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 {
-	bool		ret = FALSE, timed, zerotimeout;
-	unsigned char	inchar;
+	boolean_t	ret = FALSE, timed, utf8_active;
+	unsigned char	inbyte;
+	wint_t		inchar;
 #ifdef __MVS__
-	unsigned char	asc_inchar;
+	wint_t		asc_inchar;
 #endif
 	char		dc1, dc3;
 	short int	i;
 	io_desc		*io_ptr;
 	d_tt_struct	*tt_ptr;
 	TID		timer_id;
-	int		rdlen, selstat, status;
+	int		rdlen, selstat, status, utf8_more, inchar_width;
 	int4		msec_timeout;		/* timeout in milliseconds */
 	uint4		mask;
 	int		msk_in, msk_num;
 	unsigned char	*zb_ptr, *zb_top;
+	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
 	fd_set		input_fd;
 	struct timeval	input_timeval;
 	struct timeval	save_input_timeval;
+	ABS_TIME	cur_time, end_time;
 
 	error_def(ERR_CTRAP);
 	error_def(ERR_IOEOF);
@@ -84,6 +84,8 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 	dc1 = (char) 17;
 	dc3 = (char) 19;
 	mask = tt_ptr->term_ctrl;
+	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
+	utf8_more = 0;
 
 	/* ---------------------------------------------------------
 	 * zb_ptr will be used to fill-in the value of $zb as we go
@@ -92,20 +94,16 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 
 	zb_ptr = io_ptr->dollar.zb;
 	zb_top = zb_ptr + sizeof(io_ptr->dollar.zb) - 1;
-
 	/* ----------------------------------------------------
 	 * If we drop-out with error or otherwise permaturely,
 	 * consider $zb to be null.
 	 * ----------------------------------------------------
 	 */
-
 	*zb_ptr = 0;
 	io_ptr->esc_state = START;
 	io_ptr->dollar.za = 0;
-
 	if (mask & TRM_NOTYPEAHD)
 		TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
-
 	if (mask & TRM_READSYNC)
 	{
 		DOWRITERC(tt_ptr->fildes, &dc1, 1, status);
@@ -115,83 +113,63 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 			rts_error(VARLSTCNT(1) status);
 		}
 	}
-
 	out_of_time = FALSE;
-	zerotimeout = FALSE;
-
 	if (timeout == NO_M_TIMEOUT)
 	{
 		timed = FALSE;
+		input_timeval.tv_sec  = 100;
 		msec_timeout = NO_M_TIMEOUT;
-	}
-	else
+	} else
 	{
 		timed = TRUE;
+		input_timeval.tv_sec  = timeout;
 		msec_timeout = timeout2msec(timeout);
-
-		if (msec_timeout == 0)
-		{
+		if (0 == msec_timeout)
 			iott_mterm(io_ptr);
-			zerotimeout = TRUE;
+		else
+		{
+   			sys_get_curr_time(&cur_time);
+			add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
 		}
 	}
-
+	input_timeval.tv_usec = 0;
 	do
 	{
 		if (outofband)
 		{
-			if (timed)
-			{
-				if (msec_timeout == 0)
-					iott_rterm(io_ptr);
-			}
+			if (timed && (0 == msec_timeout))
+				iott_rterm(io_ptr);
 			outofband_action(FALSE);
 			break;
 		}
-
 		FD_ZERO(&input_fd);
 		FD_SET(tt_ptr->fildes, &input_fd);
 		assert(FD_ISSET(tt_ptr->fildes, &input_fd) != 0);
-
-		if (timed)
-			input_timeval.tv_sec  = timeout;
-		else
-			input_timeval.tv_sec  = 100;
-
-		input_timeval.tv_usec = 0;
-
-		/*
-		 * the checks for EINTR below are valid and should not be converted to EINTR
+		/* the checks for EINTR below are valid and should not be converted to EINTR
 		 * wrapper macros, since the select/read is not retried on EINTR.
 		 */
-                save_input_timeval = input_timeval;
+		save_input_timeval = input_timeval;	/* take a copy and pass it because select() below might change it */
 		selstat = select(tt_ptr->fildes + 1, (void *)&input_fd, (void *)NULL, (void *)NULL, &input_timeval);
-                input_timeval = save_input_timeval;
-		if (selstat < 0)
+		if (0 > selstat)
 		{
-			if (errno != EINTR)
+			if (EINTR != errno)
 			{
 				io_ptr->dollar.za = 9;
-				if (timed)
-				{
-					if (0 == msec_timeout)
-						iott_rterm(io_ptr);
-				}
+				if (timed && (0 == msec_timeout))
+					iott_rterm(io_ptr);
 				rts_error(VARLSTCNT(1) errno);
 				break;
 			}
-		}
-		else if (selstat == 0)
+		} else if (0 == selstat)
 		{
 			if (timed)
 			{
-				wake_alarm();	/* sets out_of_time to be true for
-							zero as well as non-zero timeouts */
+				wake_alarm();	/* sets out_of_time to be true for zero as well as non-zero timeouts */
 				break;
 			}
 			continue;	/* select() timeout; try again */
 		}
-		else if ((rdlen = read(tt_ptr->fildes, &inchar, 1)) == 1)	/* This read is protected */
+		else if ((rdlen = read(tt_ptr->fildes, &inbyte, 1)) == 1)	/* This read is protected */
 		{
 			assert(FD_ISSET(tt_ptr->fildes, &input_fd) != 0);
 
@@ -202,15 +180,91 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 			 */
 			prin_in_dev_failure = FALSE;
 
-			if (mask & TRM_CONVERT)
-				NATIVE_CVT2UPPER(inchar, inchar);
+#ifdef UNICODE_SUPPORTED
+			if (utf8_active)
+			{
+				if (tt_ptr->discard_lf)
+				{	/* saw CR last time so ignore following LF */
+					tt_ptr->discard_lf = FALSE;
+					if (NATIVE_LF == inbyte)
+						continue;
+				}
+				if (utf8_more)
+				{	/* needed extra bytes */
+					*more_ptr++ = inbyte;
+					if (--utf8_more)
+						continue;	/* get next byte */
+					UTF8_MBTOWC(more_buf, more_ptr, inchar);
+					if (WEOF == inchar)
+					{	/* invalid char */
+						io_ptr->dollar.za = 9;
+						/* No data to return */
+						iott_readfl_badchar(NULL, NULL, 0,
+								    (more_ptr- more_buf), more_buf, more_ptr);
+						utf8_badchar(more_ptr - more_buf, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
+						break;
+					}
+				} else
+				{
+					more_ptr = more_buf;
+					if (0 < (utf8_more = UTF8_MBFOLLOW(&inbyte)))	/* assignment */
+					{
+						if (0 > utf8_more)
+						{	/* invalid character */
+							io_ptr->dollar.za = 9;
+							*more_ptr++ = inbyte;
+							 /* No data to return */
+							iott_readfl_badchar(NULL, NULL, 0, 1, more_buf, more_ptr);
+							utf8_badchar(1, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
+							break;
+						} else if (GTM_MB_LEN_MAX < utf8_more)
+						{	/* too big to be valid */
+							io_ptr->dollar.za = 9;
+							*more_ptr++ = inbyte;
+							 /* No data to return */
+							iott_readfl_badchar(NULL, NULL, 0, 1, more_buf, more_ptr);
+							utf8_badchar(1, more_buf, more_ptr, 0, NULL);   /* ERR_BADCHAR */
+							break;
+						} else
+						{
+							*more_ptr++ = inbyte;
+							continue;	/* get next byte */
+						}
+					} else
+					{	/* single byte */
+						*more_ptr++ = inbyte;
+						UTF8_MBTOWC(more_buf, more_ptr, inchar);
+						if (WEOF == inchar)
+						{	/* invalid char */
+							io_ptr->dollar.za = 9;
+							 /* No data to return */
+							iott_readfl_badchar(NULL, NULL, 0, 1, more_buf, more_ptr);
+							utf8_badchar(1, more_buf, more_ptr, 0, NULL);   /* ERR_BADCHAR */
+							break;
+						}
+					}
+				}
+				if (mask & TRM_CONVERT)
+					inchar = u_toupper(inchar);
+				GTM_IO_WCWIDTH(inchar, inchar_width);
+			} else
+			{
+#endif
+				if (mask & TRM_CONVERT)
+					NATIVE_CVT2UPPER(inbyte, inbyte);
+				inchar = inbyte;
+				inchar_width = 1;
+#ifdef UNICODE_SUPPORTED
+			}
+#endif
+
 			GETASCII(asc_inchar, inchar);
 			if (INPUT_CHAR < ' '  &&  ((1 << INPUT_CHAR) & tt_ptr->enbld_outofbands.mask))
 			{
 				std_dev_outbndset(INPUT_CHAR);
 				if (timed)
 				{
-					if (msec_timeout == 0)
+					if (0 == msec_timeout)
 				  		iott_rterm(io_ptr);
 				}
 				rts_error(VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
@@ -224,7 +278,7 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 				ret = FALSE;
 				do
 				{
-					if (zb_ptr >= zb_top)
+					if (zb_ptr >= zb_top UNICODE_ONLY(|| (utf8_active && ASCII_MAX < inchar)))
 					{
 						/* -------------
 						 * $zb overflow
@@ -234,10 +288,10 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 						io_ptr->dollar.za = 2;
 						break;
 					}
-					*zb_ptr++ = inchar;
+					*zb_ptr++ = (unsigned char)inchar;
 					iott_escape(zb_ptr - 1, zb_ptr, io_ptr);
 					/*	RESTORE_DOLLARZB(asc_inchar);	*/
-					*(zb_ptr - 1) = INPUT_CHAR;	/* need to store ASCII value	*/
+					*(zb_ptr - 1) = (unsigned char)INPUT_CHAR;	/* need to store ASCII value	*/
 					if (io_ptr->esc_state == FINI)
 					{
 						ret = TRUE;
@@ -271,18 +325,25 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 			}
 			else
 			{
+/* may need to deal with terminators > ASCII_MAX and/or LS and PS if default_mask_term */
 				ret = TRUE;
-				msk_num = (uint4)INPUT_CHAR / NUM_BITS_IN_INT4;
-				msk_in = (1 << ((uint4)INPUT_CHAR % NUM_BITS_IN_INT4));
+				if (!utf8_active || ASCII_MAX >= INPUT_CHAR)
+				{
+					msk_num = (uint4)INPUT_CHAR / NUM_BITS_IN_INT4;
+					msk_in = (1 << ((uint4)INPUT_CHAR % NUM_BITS_IN_INT4));
+				} else
+					msk_num = msk_in = 0;		/* force to not match terminator */
 				if ((!(msk_in & tt_ptr->mask_term.mask[msk_num]))  &&  (!(mask & TRM_NOECHO)))
 				{
-					DOWRITERC(tt_ptr->fildes, &inchar, 1, status);
-					if (0 != status)
+					status = iott_write_raw(tt_ptr->fildes,
+						utf8_active ? (void *)&inchar : (void *)&inbyte, 1);
+					if (0 >= status)
 					{
+						status = errno;
 						io_ptr->dollar.za = 9;
 						if (timed)
 						{
-							if (msec_timeout == 0)
+							if (0 == msec_timeout)
 								iott_rterm(io_ptr);
 						}
 						rts_error(VARLSTCNT(1)  status);
@@ -290,33 +351,26 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 				}
 				break;
 			}
-		}
-		else if (rdlen < 0)
+		} else if (rdlen < 0)
 		{
 			if (errno != EINTR)
 			{
 				io_ptr->dollar.za = 9;
-				if (timed)
-				{
-					if (msec_timeout == 0)
-						iott_rterm(io_ptr);
-				}
+				if (timed && (0 == msec_timeout))
+					iott_rterm(io_ptr);
 				rts_error(VARLSTCNT(1) errno);
 				break;
 			}
-		}
-		else
+		} else
 		/* ------------
 		 * rdlen == 0
 		 * ------------
 		 */
-		{
-			/* ---------------------------------------------------------
+		{	/* ---------------------------------------------------------
 			 * select() says there's something to read, but
 			 * read() found zero characters; assume connection dropped.
 			 * ---------------------------------------------------------
 			 */
-
 			if (io_curr_device.in == io_std_device.in)
 			{
 				if (!prin_in_dev_failure)
@@ -331,8 +385,7 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 			{
 				io_ptr->dollar.za = 9;
 				rts_error(VARLSTCNT(1) ERR_IOEOF);
-			}
-			else
+			} else
 			{
 				io_ptr->dollar.zeof = TRUE;
 				io_ptr->dollar.za   = 0;
@@ -341,11 +394,23 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 			}
 			break;
 		}
+		if (timed && (0 != msec_timeout))
+		{
+			sys_get_curr_time(&cur_time);
+			cur_time = sub_abs_time(&end_time, &cur_time);
+			if (0 > cur_time.at_sec)
+			{
+				ret = FALSE;
+				break;
+			}
+			input_timeval.tv_sec = cur_time.at_sec;
+			input_timeval.tv_usec = cur_time.at_usec;
+		}
 	} while (!out_of_time);
 
 	if (timed)
 	{
-   		if (msec_timeout == 0)
+   		if (0 == msec_timeout)
 	    		iott_rterm(io_ptr);
 	}
 
@@ -372,12 +437,27 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 		if ((TT_EDITING & tt_ptr->ext_cap) && !((TRM_PASTHRU|TRM_NOECHO) & mask))
 		{	/* keep above test in sync with iott_readfl */
 			assert(tt_ptr->recall_buff.addr);
-			tt_ptr->recall_buff.addr[0] = INPUT_CHAR;
-			tt_ptr->recall_buff.len = 1;
+			if (!utf8_active)
+			{
+				tt_ptr->recall_buff.addr[0] = INPUT_CHAR;
+				tt_ptr->recall_buff.len = 1;
+			}
+#ifdef UNICODE_SUPPORTED
+			else
+			{
+				memcpy(tt_ptr->recall_buff.addr, &INPUT_CHAR, sizeof(INPUT_CHAR));
+				tt_ptr->recall_buff.len = sizeof(INPUT_CHAR);
+			}
+#endif
+			tt_ptr->recall_width = inchar_width;
 		}
 		/* SIMPLIFY THIS! */
-		msk_num = (uint4)INPUT_CHAR / NUM_BITS_IN_INT4;
-		msk_in = (1 << ((uint4)INPUT_CHAR % NUM_BITS_IN_INT4));
+		if (!utf8_active || ASCII_MAX >= INPUT_CHAR)
+		{	/* may need changes to allow terminator > MAX_ASCII and/or LS and PS if default_mask_term */
+			msk_num = (uint4)INPUT_CHAR / NUM_BITS_IN_INT4;
+			msk_in = (1 << ((uint4)INPUT_CHAR % NUM_BITS_IN_INT4));
+		} else
+			msk_num = msk_in = 0;		/* force no match to terminator */
 		if (msk_in & tt_ptr->mask_term.mask[msk_num])
 		{
 			*zb_ptr++ = INPUT_CHAR;
@@ -389,7 +469,7 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 		}
 		if ((!(msk_in & tt_ptr->mask_term.mask[msk_num])) && (!(mask & TRM_NOECHO)))
 		{
-			if ((io_ptr->dollar.x += 1) >= io_ptr->width && io_ptr->wrap)
+			if ((io_ptr->dollar.x += inchar_width) >= io_ptr->width && io_ptr->wrap)
 			{
 				io_ptr->dollar.y = ++(io_ptr->dollar.y);
 				if (io_ptr->length)
@@ -401,5 +481,5 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 		}
 	}
 
-	return((short) ret);
+	return ret;
 }

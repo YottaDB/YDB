@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,7 @@ void op_write(mval *v)
 	MV_FORCE_STR(v);
 	active_device = io_curr_device.out;
 
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 	if (DEFAULT_CODE_SET != active_device->out_code_set)
 	{
 		cnt = insize = outsize = v->str.len;
@@ -50,11 +51,14 @@ void op_write(mval *v)
 
 		v->str.addr = start_ptr;
 	}
+#endif
 
 	(io_curr_device.out->disp_ptr->write)(&v->str);
 
+#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 	if (DEFAULT_CODE_SET != active_device->out_code_set)
 		v->str.addr = save_ptr;
+#endif
 
 	active_device = 0;
 	return;

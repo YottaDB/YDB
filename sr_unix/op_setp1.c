@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,16 +11,17 @@
 
 #include "mdef.h"
 
-#ifndef __vax
-
 #include "gtm_string.h"
 #include "stringpool.h"
 #include "min_max.h"
 #include "fnpc.h"
 #include "op.h"
+#include "gtm_utf8.h"
 
 GBLREF fnpc_area	fnpca;			/* The $piece cache area */
 GBLREF spdesc		stringpool;
+GBLREF boolean_t	gtm_utf8_mode;		/* We are indeed doing the UTF8 thang */
+GBLREF boolean_t	badchar_inhibit;	/* No BADCHAR errors should be signaled */
 
 #ifdef DEBUG
 GBLREF	boolean_t	setp_work;
@@ -40,7 +41,7 @@ GBLREF	int		cs_small_pcs;			/* chars scanned by small scan */
 /*
  * ----------------------------------------------------------
  * Fast path setpiece when delimiter is one (lit) char replacing
- * a single piece (last is same as first).
+ * a single piece (last is same as first). Unicode flavor.
  *
  * Arguments:
  *	src	- source mval
@@ -56,25 +57,30 @@ GBLREF	int		cs_small_pcs;			/* chars scanned by small scan */
 void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 {
 	int		len, pfx_str_len, sfx_start_offset, sfx_str_len, rep_str_len, str_len, delim_cnt, pfx_scan_offset;
-	int		cpy_cache_lines;
-	unsigned char	ldelim, lc, *start_sfx, *str_addr, *end_pfx, *end_src, *start_pfx;
-	boolean_t	do_scan;
+	int		dlmlen, cpy_cache_lines, mblen;
+	unsigned char	*start_sfx, *str_addr, *end_pfx, *end_src, *start_pfx;
+	boolean_t	do_scan, delim_last_scan, valid_char;
 	mval		dummymval;	/* It's value is not used but is part of the call to op_fnp1() */
 	fnpc		*cfnpc, *pfnpc;
+	delimfmt	ldelim;
 
 	error_def(ERR_MAXSTRLEN);
 
-	ldelim = delim;		/* Local copy (in unsigned char format) */
+	assert(gtm_utf8_mode);
 	do_scan = FALSE;
 	cpy_cache_lines = -1;
+	ldelim.unichar_val = delim;
+        if (!UTF8_VALID(ldelim.unibytes_val, (ldelim.unibytes_val + sizeof(ldelim.unibytes_val)), dlmlen) &&
+			!badchar_inhibit)
+	{ /* The delimiter is a bad character so error out if badchar not inhibited */
+		UTF8_BADCHAR(0, ldelim.unibytes_val, ldelim.unibytes_val + sizeof(ldelim.unibytes_val), 0, NULL);
+	}
 
 	MV_FORCE_STR(expr);	/* Expression to put into piece place */
 	if (MV_DEFINED(src))
 	{
 		/* We have 3 possible scenarios:
-
-		   1) If length of src is too small to cause cacheing by op_fnp1, then just do
-		   the work ourselves with no cacheing.
+		   1) The source string is null. Nothing to do but proceed to building output.
 		   2) If the requested piece is larger than can be cached by op_fnp1, call fnp1
 		   for the maximum piece possible, use the cache info to "prime the pump" and
 		   then process the rest of the string ourselves.
@@ -83,13 +89,17 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 		   the fnpc cache.
 		*/
 		MV_FORCE_STR(src);	/* Make sure is string prior to length check */
-		if (FNPC_STRLEN_MIN < src->str.len && FNPC_ELEM_MAX >= ind)
+		if (0 == src->str.len)
+		{	/* We have a null source string */
+			pfx_str_len = sfx_str_len = sfx_start_offset = 0;
+			delim_cnt = ind - 1;
+		} else if (FNPC_ELEM_MAX >= ind)
 		{	/* 3) Best of all possible cases. The op_fnp1 can do most of our work for us
 			   and we can preload the cache on the new string to help its subsequent
 			   uses along as well.
 			*/
 			SETWON;
-			op_fnp1(src, delim, ind, &dummymval, FALSE);
+			op_fnp1(src, delim, ind, &dummymval);
 			SETWOFF;
 			cfnpc = &fnpca.fnpcs[src->fnpc_indx - 1];
 			assert(cfnpc->last_str.addr == src->str.addr);
@@ -103,8 +113,8 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 			{	/* #1 The piece we want is totally within the cache which is good news */
 				pfx_str_len = cfnpc->pstart[ind - 1];
 				delim_cnt = 0;
-				sfx_start_offset = cfnpc->pstart[ind] - 1;			/* Include delimiter */
-				rep_str_len = cfnpc->pstart[ind] - cfnpc->pstart[ind - 1] - 1;	/* Replace string length */
+				sfx_start_offset = cfnpc->pstart[ind] - dlmlen;				/* Include delimiter */
+				rep_str_len = cfnpc->pstart[ind] - cfnpc->pstart[ind - 1] - dlmlen;	/* Replace string length */
 				sfx_str_len = src->str.len - pfx_str_len - rep_str_len;
 				cpy_cache_lines = ind - 1;
 			} else
@@ -113,19 +123,19 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 				   to be the number of missing pieces so the delimiters can be put in as part of the
 				   prefix when we build the new string.
 				*/
-				pfx_str_len = cfnpc->pstart[cfnpc->npcs] - 1;
+				pfx_str_len = cfnpc->pstart[cfnpc->npcs] - dlmlen;
 				delim_cnt = ind - cfnpc->npcs;
 				sfx_start_offset = 0;
 				sfx_str_len = 0;
 				cpy_cache_lines = cfnpc->npcs;
 			}
-		} else if (FNPC_STRLEN_MIN < src->str.len)
+		} else
 		{	/* 2) We have a element that would not be able to be in the fnpc cache. Go ahead
 			   and call op_fnp1 to get cache info up to the maximum and then we will continue
 			   the scan on our own.
 			*/
 			SETWON;
-			op_fnp1(src, delim, FNPC_ELEM_MAX, &dummymval, FALSE);
+			op_fnp1(src, delim, FNPC_ELEM_MAX, &dummymval);
 			SETWOFF;
 			cfnpc = &fnpca.fnpcs[src->fnpc_indx - 1];
 			assert(cfnpc->last_str.addr == src->str.addr);
@@ -136,7 +146,7 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 			{	/* We ran out of text so the scan is complete. This is basically the same
 				   as case #2 above.
 				*/
-				pfx_str_len = cfnpc->pstart[cfnpc->npcs] - 1;
+				pfx_str_len = cfnpc->pstart[cfnpc->npcs] - dlmlen;
 				delim_cnt = ind - cfnpc->npcs;
 				sfx_start_offset = 0;
 				sfx_str_len = 0;
@@ -151,7 +161,7 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 					do_scan = TRUE;
 				} else
 				{	/* Special case -- no more text to scan */
-					pfx_str_len = cfnpc->pstart[FNPC_ELEM_MAX] - 1;
+					pfx_str_len = cfnpc->pstart[FNPC_ELEM_MAX] - dlmlen;
 					sfx_start_offset = 0;
 					sfx_str_len = 0;
 				}
@@ -159,12 +169,6 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 				cpy_cache_lines = FNPC_ELEM_MAX;
 			}
 
-		} else
-		{	/* 1) We have a short string where no cacheing happens. Do the scanning work ourselves */
-			MV_FORCE_STR(src);
-			do_scan = TRUE;
-			pfx_scan_offset = 0;
-			delim_cnt = ind;
 		}
 	} else
 	{	/* Source is not defined -- treat as a null string */
@@ -193,8 +197,32 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 			do
 			{
 				end_pfx = start_sfx;
-				while (start_sfx < end_src && (lc = *start_sfx) != ldelim) start_sfx++;
-				start_sfx++;
+				delim_last_scan = FALSE;		/* Whether delimiter is last character scanned */
+				while (start_sfx < end_src)
+				{
+					valid_char = UTF8_VALID(start_sfx, end_src, mblen); /* Length of next char */
+					if (!valid_char)
+					{	/* Next character is not valid unicode. If badchar error is not inhibited,
+						   signal it now. If it is inhibited, just treat the character as a single
+						   character and continue.
+						*/
+						if (!badchar_inhibit)
+							utf8_badchar(0, start_sfx, end_src, 0, NULL);
+						assert(1 == mblen);
+					}
+					/* Getting mblen first allows us to do quick length compare before the
+					   heavier weight memcmp call.
+					*/
+					assert(0 < mblen);
+					if (mblen == dlmlen && 0 == memcmp(start_sfx, ldelim.unibytes_val, dlmlen))
+					{
+						delim_last_scan == TRUE;
+						break;
+					}
+					/* Increment ptrs by size of found char */
+					start_sfx += mblen;
+				}
+				start_sfx += dlmlen;
 				delim_cnt--;
 			} while (0 < delim_cnt && start_sfx < end_src);
 
@@ -202,15 +230,15 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 			   that the last character in the buffer is the last delimiter we were looking
 			   for.
 			*/
-			if (0 == delim_cnt || start_sfx < end_src || lc != ldelim)
-				--start_sfx;				/* Back up suffix to include delimiter char */
+			if (0 == delim_cnt || start_sfx < end_src || !delim_last_scan)
+				start_sfx -= dlmlen;			/* Back up suffix to include delimiter char */
 
 			/* If we scanned to the end (no text left) and still have delimiters to
 			   find, the entire src text should be part of the prefix */
 			if (start_sfx >= end_src && 0 < delim_cnt)
 			{
 				end_pfx = start_sfx;
-				if (lc == ldelim)			/* if last char was delim, reduce delim cnt */
+				if (delim_last_scan)			/* if last char was delim, reduce delim cnt */
 					--delim_cnt;
 			}
 
@@ -238,7 +266,7 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 	}
 
 	/* Calculate total string len. delim_cnt has needed padding delimiters for null fields */
-	str_len = expr->str.len + pfx_str_len + delim_cnt + sfx_str_len;
+	str_len = expr->str.len + pfx_str_len + (delim_cnt * dlmlen) + sfx_str_len;
 	if (str_len > MAX_STRLEN)
 		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 	if (str_len > (stringpool.top - stringpool.free))
@@ -255,7 +283,10 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 
 	/* copy delimiters */
 	while (delim_cnt-- > 0)
-		*str_addr++ = ldelim;
+	{
+		memcpy(str_addr, ldelim.unibytes_val, dlmlen);
+		str_addr += dlmlen;
+	}
 
 	/* copy expression */
 	if (0 < expr->str.len)
@@ -304,4 +335,3 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 		dst->fnpc_indx = -1;
 	}
 }
-#endif

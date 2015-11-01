@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1991, 2003 Sanchez Computer Associates, Inc.	;
+;	Copyright 1991, 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -10,7 +10,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %GI	;service@greystone.com %GO;19920722 21:35;global input
 	;Load globals into database
-	;possible enhancements:
+	;Possible enhancements:
 	;selection and/or exclusion by key list, range and/or wildcard
 	;optional confirmation by global name
 	;callable entry point

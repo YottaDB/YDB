@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -29,7 +29,7 @@
 # PUBLIC	op_equnul
 ENTRY op_equnul
 	mv_if_notdefined %eax, l3
-	testb	$mval_m_str,mval_b_mvtype(%eax)
+	testw	$mval_m_str,mval_w_mvtype(%eax)
 	je	l2
 	cmpl	$0,mval_l_strlen(%eax)
 	jne	l2

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1989,2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 1989, 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -28,7 +28,7 @@ COPY	n c,ix
 	s c=0
 	i '$d(%SC) n %SC s %SC=0
 	i $d(@%GI)'[0 s @%GO=@%GI s c=c+1 i %SC w !,%GO,"=",@%GI
-	f  s %GI=$q(@%GI) q:%GI=""  s c=c+1,ix="("_$p(%GI,"(",2),@(%GO_ix)=@%GI i %SC w !,%GO_ix,"=",@%GI
+	f  s %GI=$q(@%GI) q:%GI=""  s c=c+1,ix="("_$p(%GI,"(",2,999),@(%GO_ix)=@%GI i %SC w !,%GO_ix,"=",@%GI
 	w !,"Total ",c," nodes copied.",!
 	q
 help	i $l(ix)=2,"Dd"[$e(ix,2) d ^%GD u 0:flush q

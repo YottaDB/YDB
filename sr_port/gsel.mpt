@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987, 2004 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2006 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -11,7 +11,7 @@
 %GSEL	;GT.M %GSEL utility - global select into a local array
 	;invoke ^%GSEL to create %ZG - a local array of existing globals, interactively
 	;
-	n add,beg,cnt,end,g,gd,gdf,k,out,pat,stp
+	n add,beg,cnt,end,g,gd,gdf,k,out,pat,stp,i,c,g1
 	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%GSEL" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%GSEL")
 	d init,main
 	u $p:(ctrap="":exc="")
@@ -21,7 +21,7 @@ GD	n add,beg,cnt,end,g,gd,gdf,k,out,pat,stp
 	d main
 	i gdf s %ZG="*" d setup,it w !,"Total of ",cnt," global",$s(cnt=1:".",1:"s."),!
 	q
-CALL	n add,beg,cnt,end,g,gd,gdf,k,out,pat,stp
+CALL	n add,beg,cnt,end,g,gd,gdf,k,out,pat,stp,i,c,g1
 	s (cnt,gd)=0
 	i $d(%ZG)>1 s g="" f  s g=$o(%ZG(g)) q:'$l(g)  s cnt=cnt+1
 	i $g(%ZG)'?.N s out=0 d setup,it s %ZG=cnt q
@@ -45,6 +45,8 @@ setup	i gd s add=1,cnt=0,g=%ZG k %ZG s %ZG=g
 	e  s add=1,g=%ZG
 	s g=$tr(g,"? !""#$&'()+'-./;<=>@[]\^_`{}|~","%")
 	s g=$tr(g,$c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,127))
+	s g1="" f i=1:1:$l(g) s c=$e(g,i) if $a(c)<128 s g1=g1_c ; Filter out "all" non-ascii characters (be it M or UTF-8)
+	s g=g1
 	s end=$p(g,":",2),beg=$p(g,":")
 	i end=beg s end=""
 	q

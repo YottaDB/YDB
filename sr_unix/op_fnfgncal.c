@@ -357,7 +357,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 		{
 		case xc_ulong:
 			if (m1 & 1)
-				param_list->arg[i] = (void *)mval2si(v);
+				param_list->arg[i] = (void *)mval2ui(v);
 			/* Note: output xc_long and xc_ulong is error */
 			break;
 		case xc_long:
@@ -399,7 +399,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 			break;
 		case xc_ulong_star:
 			param_list->arg[i] = free_space_pointer;
-			*((uint4 *)free_space_pointer) = (m1 & 1) ? (uint4)mval2si(v) : 0;
+			*((uint4 *)free_space_pointer) = (m1 & 1) ? (uint4)mval2ui(v) : 0;
 			free_space_pointer++;
 			break;
 		case xc_string_star:

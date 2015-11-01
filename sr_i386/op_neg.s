@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -38,14 +38,14 @@ ENTRY op_neg
 	popl	%edx
 	popl	%eax
 numer:	mv_if_notint %edx, float
-	movb	$mval_m_int,mval_b_mvtype(%eax)
+	movw	$mval_m_int,mval_w_mvtype(%eax)
 	movl	mval_l_m1(%edx),%edx
 	negl	%edx
 	movl	%edx,mval_l_m1(%eax)
 	ret
 
 float:	pushl	%ebx		# need a temp register
-	movb	$mval_m_nm,mval_b_mvtype(%eax)
+	movw	$mval_m_nm,mval_w_mvtype(%eax)
 	movb	mval_b_exp(%edx),%bl
 	xorb	$mval_esign_mask,%bl		# flip the sign bit
 	movb	%bl,mval_b_exp(%eax)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,7 @@
 #include "gtm_unistd.h"
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
+#include "gtm_string.h"
 
 #include "io.h"
 #include "iormdef.h"
@@ -26,7 +27,6 @@ short ioff_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 {
 	io_desc		*iod;
  	d_rm_struct	*d_rm;
-	short		iorm_open();
 
 	iod = dev_name->iod;
 	assert((params) *(pp->str.addr) < (unsigned char) n_iops);
@@ -35,13 +35,19 @@ short ioff_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	assert(iod->type == ff);
 	if (!(d_rm = (d_rm_struct *) iod->dev_sp))
 	{	iod->dev_sp = (void*)malloc(sizeof(d_rm_struct));
+		memset(iod->dev_sp, 0, sizeof(d_rm_struct));
 		d_rm = (d_rm_struct *) iod->dev_sp;
 		iod->state = dev_closed;
                 d_rm->stream = FALSE;
                 iod->width = DEF_RM_WIDTH;
                 iod->length = DEF_RM_LENGTH;
+		d_rm->recordsize = DEF_RM_RECORDSIZE;
+		d_rm->def_width = d_rm->def_recsize = TRUE;
                 d_rm->fixed = FALSE;
                 d_rm->noread = FALSE;
+		d_rm->padchar = DEF_RM_PADCHAR;
+		d_rm->inbuf = NULL;
+		d_rm->outbuf = NULL;
 	}
 	d_rm->fifo = TRUE;
 	iod->type = rm;

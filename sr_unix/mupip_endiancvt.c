@@ -125,6 +125,7 @@ void mupip_endiancvt(void)
 	char			db_name[MAX_FN_LEN + 1], *t_name;
 	sgmnt_data		*old_data, *new_data;
 	int4			status, save_errno;
+	int			rc;
 	uint4			swap_uint4;
 	enum db_ver		swap_dbver;
 	trans_num		curr_tn;
@@ -174,7 +175,7 @@ void mupip_endiancvt(void)
 	if (0 != save_errno)
 	{
 		free(old_data);
-		close(db_fd);
+		CLOSEFILE(db_fd, rc);
 		util_out_print("Error reading database file !AD header. Aborting endiancvt.", TRUE, n_len, db_name);
 		if (-1 != save_errno)
 		{
@@ -188,7 +189,7 @@ void mupip_endiancvt(void)
 	{
 		util_out_print("Database file !AD has an unrecognizable format", TRUE, n_len, db_name);
 		free(old_data);
-		close(db_fd);
+		CLOSEFILE(db_fd, rc);
 		mupip_exit(ERR_MUNOACTION);
 	}
 	check_error = NULL;
@@ -274,7 +275,7 @@ void mupip_endiancvt(void)
 		{
 			mu_gv_cur_reg_free();
 			free(old_data);
-			close(db_fd);
+			CLOSEFILE(db_fd, rc);
 			gtm_putmsg(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, n_len, db_name);
 			mupip_exit(ERR_MUNOACTION);
 		}
@@ -282,7 +283,7 @@ void mupip_endiancvt(void)
 		{
 			mu_gv_cur_reg_free();
 			free(old_data);
-			close(db_fd);
+			CLOSEFILE(db_fd, rc);
 			gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, n_len, db_name);
 			mupip_exit(ERR_MUNOACTION);
 		}
@@ -360,7 +361,7 @@ void mupip_endiancvt(void)
 			mu_gv_cur_reg_free();
 		}
 		free(old_data);
-		close(db_fd);
+		CLOSEFILE(db_fd, rc);
 		mupip_exit(ERR_MUNOACTION);
 	}
 	from_endian = endian_check.shorts.big_endian ? "BIG" : "LITTLE";
@@ -374,7 +375,7 @@ void mupip_endiancvt(void)
 	} else
 		util_out_print("Converting to new file !AD", TRUE, outdb_len, outdb);
 	util_out_print("Proceed [yes/no] ?", TRUE);
-	FGETS(conf_buff, MAX_CONF_RESPONSE, stdin, response);
+	response = util_input(conf_buff, MAX_CONF_RESPONSE, stdin, TRUE);
 	if (NULL == response || ('Y' != conf_buff[0] && 'y' != conf_buff[0]))
 	{
 		if (endian_native)
@@ -383,7 +384,7 @@ void mupip_endiancvt(void)
 			mu_gv_cur_reg_free();
 		}
 		free(old_data);
-		close(db_fd);
+		CLOSEFILE(db_fd, rc);
 		mupip_exit(ERR_MUNOACTION);
 	}
 	new_data = (sgmnt_data *)malloc(sizeof(sgmnt_data));
@@ -413,7 +414,7 @@ void mupip_endiancvt(void)
 			}
 			free(new_data);
 			free(old_data);
-			close(db_fd);
+			CLOSEFILE(db_fd, rc);
 			mupip_exit(save_errno);
 		}
 		new_data->file_corrupt = endian_native ? GTM_BYTESWAP_32(TRUE) : TRUE;
@@ -422,8 +423,8 @@ void mupip_endiancvt(void)
 		{
 			free(new_data);
 			free(old_data);
-			close(outdb_fd);
-			close(db_fd);
+			CLOSEFILE(outdb_fd, rc);
+			CLOSEFILE(db_fd, rc);
 			if (endian_native)
 			{
 				db_ipcs_reset(gv_cur_region, FALSE);
@@ -450,8 +451,8 @@ void mupip_endiancvt(void)
 		{
 			free(new_data);
 			free(old_data);
-			close(outdb_fd);
-			close(db_fd);
+			CLOSEFILE(outdb_fd, rc);
+			CLOSEFILE(db_fd, rc);
 			if (endian_native)
 			{
 				db_ipcs_reset(gv_cur_region, FALSE);
@@ -473,8 +474,8 @@ void mupip_endiancvt(void)
 		{
 			free(new_data);
 			free(old_data);
-			close(outdb_fd);
-			close(db_fd);
+			CLOSEFILE(outdb_fd, rc);
+			CLOSEFILE(db_fd, rc);
 			if (endian_native)
 			{
 				db_ipcs_reset(gv_cur_region, FALSE);
@@ -507,9 +508,9 @@ void mupip_endiancvt(void)
 		}
 		free(new_data);
 		free(old_data);
-		close(db_fd);
+		CLOSEFILE(db_fd, rc);
 		if (outdb_specified)
-			close(outdb_fd);
+			CLOSEFILE(outdb_fd, rc);
 		mupip_exit(ERR_MUNOFINISH);	/* endian_process issued specific message */
 	}
 	new_data->file_corrupt = endian_native ? GTM_BYTESWAP_32(FALSE) : FALSE;
@@ -519,8 +520,8 @@ void mupip_endiancvt(void)
 		free(new_data);
 		free(old_data);
 		if (outdb_specified)
-			close(outdb_fd);
-		close(db_fd);
+			CLOSEFILE(outdb_fd, rc);
+		CLOSEFILE(db_fd, rc);
 		if (endian_native)
 		{
 			db_ipcs_reset(gv_cur_region, FALSE);
@@ -544,12 +545,29 @@ void mupip_endiancvt(void)
 		db_ipcs_reset(gv_cur_region, FALSE);
 		mu_gv_cur_reg_free();
 	}
-	gtm_putmsg(VARLSTCNT(7) ERR_ENDIANCVT, 5, n_len, db_name, from_endian, to_endian, ENDIANTHIS);
 	free(new_data);
 	free(old_data);
-	close(db_fd);
+	GTM_FSYNC((outdb_specified ? outdb_fd : db_fd), rc);
+	if (-1 == rc)
+	{
+		save_errno = errno;
+		assert(FALSE);
+		if (-1 != save_errno)
+		{
+			errptr = (char *)STRERROR(save_errno);
+			util_out_print("fsync : !AZ : !AZ", TRUE, (outdb_specified ? "outdb_fd" : "db_fd"), errptr);
+			mupip_exit(save_errno);
+		} else
+		{
+			util_out_print("fsync : !AZ : unexpected error", TRUE, (outdb_specified ? "outdb_fd" : "db_fd"));
+			mupip_exit(ERR_MUNOFINISH);
+		}
+	}
+	CLOSEFILE(db_fd, rc);
 	if (outdb_specified)
-		close(outdb_fd);
+		CLOSEFILE(outdb_fd, rc);
+	/* Display success message only after all data has been synced to disk and the file descriptors closed */
+	gtm_putmsg(VARLSTCNT(7) ERR_ENDIANCVT, 5, n_len, db_name, from_endian, to_endian, ENDIANTHIS);
  	mupip_exit(SS_NORMAL);
 }
 
@@ -845,7 +863,8 @@ int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_dat
 				memcpy(blk_buff[buff_new], blk_buff[buff_old], bsize);
 				endian_cvt_blk_hdr((blk_hdr_ptr_t)blk_buff[buff_new], new_is_native, BLK_RECYCLED == lbm_status);
 				endian_cvt_blk_recs(info, blk_buff[buff_new], (blk_hdr_ptr_t)blk_buff[buff_native], blk_num);
-				LSEEKWRITE(info->inplace ? info->db_fd : info->outdb_fd, dbptr, blk_buff[buff_new], bsize, save_errno);
+				LSEEKWRITE(info->inplace ? info->db_fd : info->outdb_fd, dbptr, blk_buff[buff_new], bsize,
+					save_errno);
 				if (0 != save_errno)
 				{
 					free(blk_buff[0]);

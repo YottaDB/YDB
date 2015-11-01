@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,9 +15,11 @@
 */
 
 #include "mdef.h"
+#include "gtm_string.h"
 #include "cli.h"
 #include "lke_getcli.h"
 #include "util.h"
+
 /*
  * ------------------------------------------------------
  * Get command line parameters
@@ -35,6 +37,8 @@ int4 lke_getcli(bool *all,
 {
 	int4		status;
 	unsigned short	len;
+	int		keylen;
+	char		one_lockbuf[MAX_ZWR_KEY_SZ + 1];
 
 	status = TRUE;
 /*
@@ -89,12 +93,16 @@ int4 lke_getcli(bool *all,
 	if (cli_present("LOCK") == CLI_PRESENT)
 	{
 		len = one_lock->len;
-		if (!cli_get_str("LOCK", one_lock->addr, &len))
-		{	util_out_print("Error getting LOCK parameter",TRUE);
+		if (!cli_get_str("LOCK", one_lock->addr, &len) || -1 == (keylen = lke_getki(one_lock->addr, len, one_lockbuf)))
+		{
+			util_out_print("Error getting LOCK parameter",TRUE);
 			one_lock->len = 0;
 			status = FALSE;
 		} else
-			one_lock->len = len;
+		{
+			one_lock->len = keylen;
+			memcpy(one_lock->addr, one_lockbuf, keylen);
+		}
 	}
 	else
 	{

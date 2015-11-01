@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -86,8 +86,9 @@ if ( $?gtm_version_change == "1" ) then
 	setenv	gt_cc_option_DBTABLD	"-DNOLIBGTMSHR"	# define NOLIBGTMSHR macro to statically link mumps for bta image
 
 	setenv	gt_cc_option_DDEBUG	"-DDEBUG"	# define DEBUG compilation-time macro
-	setenv	gt_cc_option_I		""		# specify header (include) file directory/ies
-							#   (set by gtmsrc.csh during version command)
+
+	# specify header (include) file directory/ies (set by gtmsrc.csh during version command)
+	setenv	gtm_inc_list 		"/usr/local/include $gtm_inc_list"	# Add ICU library headers path
 	setenv	gt_cc_option_debug	"-g"		# generate debugger information
 	setenv	gt_cc_option_nooptimize	""		# don't optimize generated code
 	setenv	gt_cc_option_optimize	"-O"		# optimize generated code

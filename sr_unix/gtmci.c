@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include <stdarg.h>
 #include "gtm_stdio.h"
 #include <errno.h>
@@ -36,6 +37,11 @@
 #include "gtm_savetraps.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
+#ifdef UNICODE_SUPPORTED
+#include "gtm_icu_api.h"
+#include "gtm_utf8.h"
+#endif
+
 GBLREF	parmblk_struct 		*param_list;
 GBLREF  stack_frame     	*frame_pointer;
 GBLREF  unsigned char		*msp;
@@ -50,7 +56,8 @@ GBLDEF 	unsigned int		nested_level;		/* current nested depth of callin environme
 GBLREF  mval			dollar_zstatus;
 GBLREF  unsigned char		*fgncal_stack;
 GBLREF  short			dollar_tlevel;
-GBLREF enum gtmImageTypes	image_type;
+GBLREF  enum gtmImageTypes	image_type;
+GBLREF  boolean_t		gtm_utf8_mode;
 
 static  callin_entry_list	*ci_table = NULL;
 
@@ -302,7 +309,7 @@ int gtm_ci (const char *c_rtn_name, ...)
 				case xc_long_star:
 					*va_arg(var, gtm_long_t*) = mval2i(arg_ptr); break;
 				case xc_ulong_star:
-					*va_arg(var, gtm_ulong_t*) = mval2si(arg_ptr); break;
+					*va_arg(var, gtm_ulong_t*) = mval2ui(arg_ptr); break;
 				case xc_float_star:
 					*va_arg(var, gtm_float_t*) = mval2double(arg_ptr); break;
 				case xc_double_star:
@@ -342,8 +349,11 @@ int gtm_init()
 	if (!gtm_startup_active)
 	{ /* call-in invoked from C as base. GT.M hasn't been started up yet. */
 		image_type = GTM_IMAGE;
+		gtm_wcswidth_fnptr = gtm_wcswidth;
 		gtm_env_init();	/* read in all environment variables */
 		err_init(stop_image_conditional_core);
+		if (gtm_utf8_mode)
+			gtm_icu_init(); /* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 		cli_lex_setup(0, NULL);
 		/* Initialize msp to the maximum so if errors occur during GT.M startup below,
 		 * the unwind logic in gtmci_ch() will get rid of the whole stack. */

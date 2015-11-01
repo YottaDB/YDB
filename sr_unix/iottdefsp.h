@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,10 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#ifdef UNICODE_SUPPORTED
+#include "gtm_utf8.h"
+#endif
 
 #define ASCII_ESC 		27	/*	this ASCII value is needed on any platform	*/
 #define EBCDIC_ESC		39
@@ -30,8 +34,12 @@
 #define NATIVE_LF		ASCII_LF
 #define NATIVE_FF		ASCII_FF
 #define NATIVE_BS		ASCII_BS
-#define NATIVE_TTEOL		((ascii != io_ptr->out_code_set) ? EBCDIC_TTEOL : ASCII_TTEOL)
 #define NATIVE_VT		VT
+#ifdef KEEP_zOS_EBCDIC
+#define NATIVE_TTEOL		((ascii != io_ptr->out_code_set) ? EBCDIC_TTEOL : ASCII_TTEOL)
+#else
+#define NATIVE_TTEOL		ASCII_TTEOL
+#endif
 
 /* Editing control characters */
 #define CTRL_A	'\001'

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -53,18 +53,18 @@ mval_m_retarg		=	0x080
 #smw 99/10/19 gcc on Linux doesn't do the above
 #
 #	Length of mval in bytes
-mval_byte_len		=	20
+mval_byte_len		=	24
 
 #	Offsets of type, exp, strlen, stradd, num in mval structure
-mval_b_mvtype		=	0
-mval_b_exp		=	1
-mval_l_strlen		=	4
-mval_a_straddr		=	8
+mval_w_mvtype		=	0
+mval_b_exp		=	2
+mval_l_strlen		=	16
+mval_a_straddr		=	20
 
 #	Address offset of number in mval
-mvalnm_offs		=	12
-mval_l_m0		=	12
-mval_l_m1		=	16
+mvalnm_offs		=	4
+mval_l_m0		=	4
+mval_l_m1		=	8
 mval_esign_mask		=	0x080
 
 MV_BIAS			=	1000		# 10**3
@@ -84,7 +84,7 @@ top			=	8
 #	mv_force_str(mval, label)
 # ---------------------------------------
 .macro	mv_force_str	mval, label
-	testb	$mval_m_str,mval_b_mvtype(\mval)
+	testw	$mval_m_str,mval_w_mvtype(\mval)
 	jne	\label
 	pushl	\mval
 	call	n2s
@@ -97,7 +97,7 @@ top			=	8
 #	mv_force_num(mval, label)
 # ---------------------------------------
 .macro	mv_force_num	mval, label
-	testb	$mval_m_nm,mval_b_mvtype(\mval)
+	testw	$mval_m_nm,mval_w_mvtype(\mval)
 	jne	\label
 	pushl	\mval
 	call	s2n
@@ -110,7 +110,7 @@ top			=	8
 #	mv_force_str_if_num_approx(mval, label)
 # ---------------------------------------
 .macro	mv_force_str_if_num_approx	mval, label
-	testb	$mval_m_num_approx,mval_b_mvtype(\mval)
+	testw	$mval_m_num_approx,mval_w_mvtype(\mval)
 	je	\label
 	pushl	\mval
 	call	n2s
@@ -123,7 +123,7 @@ top			=	8
 #	mv_i2mval(int, mval)
 # ---------------------------------------
 .macro	mv_i2mval	int, mval
-	movb	$mval_m_int,mval_b_mvtype(\mval)
+	movw	$mval_m_int,mval_w_mvtype(\mval)
 	movl	\int,%eax
 	imull	$MV_BIAS,%eax,%eax
 	movl	%eax,mval_l_m1(\mval)
@@ -134,7 +134,7 @@ top			=	8
 #	mv_if_string(mval,label)
 # ---------------------------------------
 .macro	mv_if_string	mval, label
-	testb	$mval_m_str,mval_b_mvtype(\mval)
+	testw	$mval_m_str,mval_w_mvtype(\mval)
 	jne	\label
 .endm
 
@@ -143,7 +143,7 @@ top			=	8
 #	mv_if_number(mval,label)
 # ---------------------------------------
 .macro	mv_if_number	mval, label
-	testb	$mval_m_nm,mval_b_mvtype(\mval)
+	testw	$mval_m_nm,mval_w_mvtype(\mval)
 	jne	\label
 .endm
 
@@ -152,7 +152,7 @@ top			=	8
 #	mv_if_int(mval,label)
 # ---------------------------------------
 .macro	mv_if_int	mval, label
-	testb	$mval_m_int_without_nm,mval_b_mvtype(\mval)
+	testw	$mval_m_int_without_nm,mval_w_mvtype(\mval)
 	jne	\label
 .endm
 
@@ -161,7 +161,7 @@ top			=	8
 #	mv_if_notstring(mval,label)
 # ---------------------------------------
 .macro	mv_if_notstring	mval, label
-	testb	$mval_m_str,mval_b_mvtype(\mval)
+	testw	$mval_m_str,mval_w_mvtype(\mval)
 	je	\label
 .endm
 
@@ -170,7 +170,7 @@ top			=	8
 #	mv_if_notnumber(mval,label)
 # ---------------------------------------
 .macro	mv_if_notnumber	mval, label
-	testb	$mval_m_nm,mval_b_mvtype(\mval)
+	testw	$mval_m_nm,mval_w_mvtype(\mval)
 	je	\label
 .endm
 
@@ -179,7 +179,7 @@ top			=	8
 #	mv_if_notint(mval,label)
 # ---------------------------------------
 .macro	mv_if_notint	mval, label
-	testb	$mval_m_int_without_nm,mval_b_mvtype(\mval)
+	testw	$mval_m_int_without_nm,mval_w_mvtype(\mval)
 	je	\label
 .endm
 
@@ -188,7 +188,7 @@ top			=	8
 #	mv_if_defined(mval,label)
 # ---------------------------------------
 .macro	mv_if_defined	mval, label
-	testb	$(mval_m_str+mval_m_nm),mval_b_mvtype(\mval)
+	testw	$(mval_m_str+mval_m_nm),mval_w_mvtype(\mval)
 	jne	\label
 .endm
 
@@ -197,7 +197,7 @@ top			=	8
 #	mv_if_notdefined(mval,label)
 # ---------------------------------------
 .macro	mv_if_notdefined mval, label
-	testb	$(mval_m_str+mval_m_nm),mval_b_mvtype(\mval)
+	testw	$(mval_m_str+mval_m_nm),mval_w_mvtype(\mval)
 	je	\label
 .endm
 
@@ -210,9 +210,9 @@ top			=	8
 #	mv_if_canonical(mval,mainlabel, tmp_label1, tmp_label2)
 # -------------------------------------------------------------
 .macro	mv_if_canonical	mval, mainlabel, tmp_label1, tmp_label2
-	testb	$mval_m_nm,mval_b_mvtype(\mval)
+	testw	$mval_m_nm,mval_w_mvtype(\mval)
 	je	\tmp_label1
-	testb	$mval_m_num_approx,mval_b_mvtype(\mval)
+	testw	$mval_m_num_approx,mval_w_mvtype(\mval)
 	jne	\tmp_label2
 	jmp	\mainlabel
 

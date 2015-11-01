@@ -42,10 +42,10 @@ void	op_div(mval *u, mval *v, mval *q);
 void	op_exp(mval *u, mval* v, mval *p);
 int4	op_fnfind(mval *src, mval *del, mint first, mval *dst);
 void	op_fnfnumber(mval *src,mval *fmt,mval *dst);
-void	op_fnj2(mval *src,int len,mval *dst);
-void	op_fnj3(mval *src,int width,int fract,mval *dst);
+void	op_fnj2(mval *src, int len, mval *dst);
+void	op_fnj3(mval *src, int width, int fract, mval *dst);
 void	op_fnlvname(mval *src, mval *dst);
-void	op_fnlvnameo2(mval *src,mval *dst,mval *direct);
+void	op_fnlvnameo2(mval *src, mval *dst, mval *direct);
 #ifdef __sun
 void	op_fnfgncal(uint4 n_mvals, ...);
 int	op_fnfgncal_rpc(unsigned int n_mvals, ...); /* typ to keep the compiler happy as set into xfer_table, which is int */
@@ -62,12 +62,14 @@ void	op_fnlvprvname(mval *src, mval *dst);
 void	op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...);
 void	op_fnqlength(mval *name, mval *subscripts);
 void	op_fnqsubscript(mval *name, int seq, mval *subscript);
+void	op_fnpopulation(mval *arg1, mval *arg2, mval *dst);
 void	op_fnrandom(int4 interval, mval *ret);
 void	op_fnreverse(mval *src, mval *dst);
 void	op_fnstack1(int level, mval *result);
 void	op_fnstack2(int level, mval *info, mval *result);
 void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...);
-void	op_fnpiece(mval *src, mval *del, int first, int last, mval *dst, boolean_t srcisliteral);
+UNIX_ONLY(void op_fnpiece(mval *src, mval *del, int first, int last, mval *dst);)
+VMS_ONLY( void op_fnpiece(mval *src, mval *del, int first, int last, mval *dst, boolean_t srcisliteral);)
 void	op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...);
 void	op_fntext(mval *label, int int_exp, mval *rtn, mval *ret);
 void	op_fnzbitand(mval *dst, mval *bitstr1, mval *bitstr2);
@@ -80,7 +82,7 @@ void	op_fnzjobexam(mval *prelimSpec, mval *finalSpec);
 void	op_fnzsigproc(int processid, int signum, mval *retcode);
 void	op_fnzlkid(mint boolex, mval *retval);
 void	op_fnzqgblmod(mval *v);
-void	op_fnztrnlnm(mval *name,mval *table,int4 ind,mval *mode,mval *case_blind,mval *item,mval *ret);
+void	op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blind, mval *item, mval *ret);
 #ifdef __sun
 void	op_fnzcall(unsigned int n_mvals, ...);
 #elif defined(VMS)
@@ -100,7 +102,7 @@ void	op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...);
 void	op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...);
 void	op_gvnext(mval *v);
 void	op_gvorder(mval *v);
-void	op_gvo2(mval *dst,mval *direct);
+void	op_gvo2(mval *dst, mval *direct);
 void	op_gvput(mval *var);
 void	op_gvquery(mval *v);
 void	op_gvrectarg(mval *v);
@@ -120,7 +122,6 @@ void	op_mul(mval *u, mval *v, mval *p);
 void	op_newvar(uint4 arg1);
 void	op_newintrinsic(int intrtype);
 void	op_oldvar(void);
-void	op_population(mval *arg1, mval *arg2, mval *dst);
 void	op_rterror(int4 sig, boolean_t subrtn);
 void	op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst);
 void	op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *dst);
@@ -140,7 +141,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...);
 void	op_write(mval *v);
 void	op_wteol(int4 n);
 void	op_wtff(void);
-void	op_wtone(unsigned char c);
+void	op_wtone(int c);
 void	op_wttab(mint x);
 void	op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...);
 void	op_xnew(UNIX_ONLY_COMMA(unsigned int argcnt_arg) mval *s_arg, ...);
@@ -154,7 +155,7 @@ void	op_zhelp_xfr(mval *subject, mval *lib);
 void	op_zlink(mval *v, mval *quals);
 void	op_zmess(UNIX_ONLY(unsigned int cnt) VMS_ONLY(int4 errnum), ...);
 void	op_zprevious(mval *v);
-void	op_zprint(mval *rtn,mval *start_label,int start_int_exp,mval *end_label,int end_int_exp);
+void	op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label, int end_int_exp);
 void	op_zst_break(void);
 void	op_zstep(uint4 code, mval *action);
 void	op_zsystem(mval *v);
@@ -188,13 +189,14 @@ void	op_fnget2(mval *dst, mval *src, mval *defval);
 void	op_fngetdvi(mval *device, mval *keyword, mval *ret);
 void	op_fngetlki(mval *lkid_mval, mval *keyword, mval *ret);
 int	op_fngvget2(mval *res, mval *val, mval *optional);
-void	op_fnp1(mval *src, int del, int trgpcidx, mval *dst, boolean_t srcisliteral);
+UNIX_ONLY(void	op_fnp1(mval *src, int del, int trgpcidx, mval *dst);)
+VMS_ONLY( void	op_fnp1(mval *src, int del, int trgpcidx, mval *dst, boolean_t srcisliteral);)
 #ifdef DEBUG
 void	print_fnpc_stats(void);
 #endif
 void	op_fntranslate(mval *src,mval *in_str,mval *out_str,mval *dst);
 void	op_fnzbitfind(mval *dst, mval *bitstr, int truthval, int pos);
-void	op_fnzbitnot(mval *dst,mval *bitstr);
+void	op_fnzbitnot(mval *dst, mval *bitstr);
 void	op_fnzbitset(mval *dst, mval *bitstr, int pos, int truthval);
 void	op_fnzbitxor(mval *dst, mval *bitstr1, mval *bitstr2);
 void	op_fnzfile(mval *name,mval *key,mval *ret);
@@ -229,5 +231,27 @@ void	op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst);
 void	op_trestart(int newlevel);
 void	op_zst_over(void);
 void	op_zstepret(void);
-
+void    op_fnextract (int last, int first, mval *src, mval *dest);
+void	op_fnlength(mval *a1, mval *a0);
+void	op_fnzascii(int4 num, mval *in, mval *out);
+void	op_fnzchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...);
+UNIX_ONLY(void	op_fnzp1(mval *src, int del, int trgpcidx, mval *dst);)
+VMS_ONLY( void	op_fnzp1(mval *src, int del, int trgpcidx, mval *dst, boolean_t srcisliteral);)
+void	op_fnztranslate(mval *src, mval *in_str ,mval *out_str, mval *dst);
+void	op_setzextract(mval *src, mval *expr, int schar, int echar, mval *dst);
+void    op_fnzextract (int last, int first, mval *src, mval *dest);
+void	op_fnzpopulation(mval *arg1, mval *arg2, mval *dst);
+void	op_setzp1(mval *src, int delim, mval *expr, int ind, mval *dst);
+void	op_setzpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *dst);
+UNIX_ONLY(void	op_fnzpiece(mval *src, mval *del, int first, int last, mval *dst);)
+VMS_ONLY( void	op_fnzpiece(mval *src, mval *del, int first, int last, mval *dst, boolean_t srcisliteral);)
+int4	op_fnzfind(mval *src, mval *del, mint first, mval *dst);
+void	op_fnzj2(mval *src,int len,mval *dst);
+void	op_fnzlength(mval *a1, mval *a0);
+UNIX_ONLY(void	op_fnzconvert2(mval* str, mval* kase, mval* dst);)
+UNIX_ONLY(void 	op_fnzconvert3(mval* str, mval* from_chset, mval* to_chset, mval* dst);)
+UNIX_ONLY(void	op_fnzsubstr(mval* src, int start, int bytelen, mval* dest);)
+UNIX_ONLY(void	op_fnzwidth(mval* str, mval* dst);)
+void	op_fnzechar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...);
+void	op_fnzreverse(mval *src, mval *dst);
 #endif
