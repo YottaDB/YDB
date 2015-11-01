@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -149,15 +149,15 @@ if (log_rollback)
 		}
 
 		ctl->turn_around_tn = rec->val.jrec_epoch.tn;
-		if (rec_time > JNL_M_TIME(since_time)  ||  mur_options.forward)
+		if (rec_time > MUR_OPT_MID_TIME(since_time)  ||  mur_options.forward)
 			break;
 
 		/* We've reached the SINCE time */
 
 		/* Start counting LOOKBACK_LIMIT operations from here */
-		ctl->reached_lookback_limit = rec_time < JNL_M_TIME(lookback_time)  ||
+		ctl->reached_lookback_limit = rec_time < MUR_OPT_MID_TIME(lookback_time)  ||
 			(mur_options.lookback_opers_specified && ctl->lookback_count >= mur_options.lookback_opers);
-		MID_TIME(ctl->lookback_time) = rec_time;
+		JNL_WHOLE_FROM_SHORT_TIME(ctl->lookback_time, rec_time);
 		/* proceed will be TRUE until we have reached the turn-around point */
 		proceed = ctl->broken_entries > 0  &&  !ctl->reached_lookback_limit;
 		/* If interrupted recovery, make sure we go back to ftruncate_len irrespective of the earlier proceed decision */
@@ -271,7 +271,7 @@ if (log_rollback)
 		assert(QWEQ(token, rec->val.jrec_fzkill.token));
 		assert(QWEQ(token, rec->val.jrec_tzkill.token));
 
-		if (!mur_options.before  ||  rec_time <= JNL_M_TIME(before_time))
+		if (!mur_options.before  ||  rec_time <= MUR_OPT_MID_TIME(before_time))
 		{
 			if ((curr = mur_lookup_current(ctl, pini_addr)) == NULL)
 			{
@@ -360,7 +360,7 @@ if (log_rollback)
 			assert(QWEQ(token, rec->val.jrec_ukill.token));
 			assert(QWEQ(token, rec->val.jrec_gzkill.token));
 			assert(QWEQ(token, rec->val.jrec_uzkill.token));
-			if (!mur_options.before  ||  rec_time <= JNL_M_TIME(before_time))
+			if (!mur_options.before  ||  rec_time <= MUR_OPT_MID_TIME(before_time))
 			{
 				if ((curr = mur_lookup_current(ctl, pini_addr)) == NULL)
 				{
@@ -423,7 +423,7 @@ if (log_rollback)
 		QWASSIGN(token, rec->val.jrec_tcom.token);
 		assert(QWEQ(token, rec->val.jrec_ztcom.token));
 
-		if (!mur_options.before  ||  rec_time <= JNL_M_TIME(before_time))
+		if (!mur_options.before  ||  rec_time <= MUR_OPT_MID_TIME(before_time))
 			mur_cre_current(ctl, pini_addr, token, pv, FALSE);
 
 		if (1 < rec->val.jrec_tcom.participants  &&  participants < rec->val.jrec_tcom.participants)
@@ -439,8 +439,8 @@ if (log_rollback)
 
 	if (!mur_options.rollback && mur_options.show  &&
 		(JRT_ALIGN == REF_CHAR(&rec->jrec_type)  ||  JRT_NULL == REF_CHAR(&rec->jrec_type)  ||
-			((!mur_options.before  ||  rec_time <= JNL_M_TIME(before_time))  &&
-			 (!mur_options.since  ||  rec_time >= JNL_M_TIME(since_time)))))
+			((!mur_options.before  ||  rec_time <= MUR_OPT_MID_TIME(before_time))  &&
+			 (!mur_options.since  ||  rec_time >= MUR_OPT_MID_TIME(since_time)))))
 		mur_do_show(ctl);
 
 	return proceed;

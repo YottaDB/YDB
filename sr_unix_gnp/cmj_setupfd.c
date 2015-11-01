@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,9 @@
 #endif
 #include <sys/ioctl.h>
 #include <netinet/in.h>
+#ifndef __MVS__
 #include <netinet/tcp.h>
+#endif
 #include <errno.h>
 #include "eintr_wrappers.h"
 
@@ -44,9 +46,12 @@ cmi_status_t cmj_setupfd(int fd)
 			(const void *)&on, sizeof(on));
 	if (rval < 0)
 		return (cmi_status_t)errno;
+#ifdef TCP_NODELAY
+	/* z/OS only does setsockop on SOL and IP */
 	rval = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
 			(const void *)&on, sizeof(on));
 	if (rval < 0)
 		return (cmi_status_t)errno;
+#endif
 	return SS_NORMAL;
 }

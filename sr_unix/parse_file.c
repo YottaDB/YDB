@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,6 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 
 	error_def(ERR_PARNORMAL);
 	error_def(ERR_PARBUFSM);
-	error_def(ERR_PARTRNLNM);
 	error_def(ERR_FILENOTFND);
 	error_def(ERR_SYSCALL);
 
@@ -121,11 +120,11 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 				memcpy(query_node_name, trans.addr, query_node_len);
 				query_node_name[query_node_len] = 0;
 				local_ip = NULL;	/* null value needed in case can't find query node (remote default) */
-				if (NULL != (hostinfo = gethostbyname(query_node_name)))
+				if (NULL != (hostinfo = GETHOSTBYNAME(query_node_name)))
 				{	/* We know about this node -- check further */
 					query_ip = *(struct in_addr *)hostinfo->h_addr;
 					/* See if is a "localhost" (127.0.0.1 usually) node */
-					if (NULL != (hostinfo = gethostbyname(LOCALHOSTNAME)))
+					if (NULL != (hostinfo = GETHOSTBYNAME(LOCALHOSTNAME)))
 					{
 						localhost_ip = *(struct in_addr *)hostinfo->h_addr;
 						if (0 == memcmp(&localhost_ip, &query_ip, sizeof(struct in_addr)))
@@ -133,10 +132,11 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 					}
 					if (!local_ip)
 					{	/* Have not yet established this as a local node -- check further */
-						if (-1 == (status = gethostname(local_node_name, MAX_HOST_NAME_LEN)))
+						GETHOSTNAME(local_node_name, MAX_HOST_NAME_LEN, status);
+						if (-1 == status)
 							rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("gethostname"),
 								  CALLFROM, errno);
-						if (NULL == (hostinfo = gethostbyname(local_node_name)))
+						if (NULL == (hostinfo = GETHOSTBYNAME(local_node_name)))
 							rts_error(VARLSTCNT(7) ERR_SYSCALL, 5, LEN_AND_LIT("gethostbyname"),
 								  CALLFROM);
 						for (hostaddrlist = hostinfo->h_addr_list; ; hostaddrlist++)

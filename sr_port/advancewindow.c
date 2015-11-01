@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,27 +10,29 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "compiler.h"
 #include "toktyp.h"
 #include "stringpool.h"
 #include "gtm_caseconv.h"
 #include "advancewindow.h"
 
-LITREF char ctypetab[128];
+LITREF	char		ctypetab[NUM_ASCII_CHARS];
 
-GBLREF unsigned char *source_buffer;
-GBLREF short int source_column;
-GBLREF bool s2n_intlit;
-GBLREF short int last_source_column;
-GBLREF char window_token;
-GBLREF mval window_mval;
-GBLREF mident window_ident;
-GBLREF char director_token;
-GBLREF mval director_mval;
-GBLREF mident director_ident;
-GBLREF char *lexical_ptr;
-
-GBLREF spdesc stringpool;
+GBLREF	unsigned char	*source_buffer;
+GBLREF	short int	source_column;
+GBLREF	bool		s2n_intlit;
+GBLREF	short int	last_source_column;
+GBLREF	char		window_token;
+GBLREF	mval		window_mval;
+GBLREF	mident		window_ident;
+GBLREF	char		director_token;
+GBLREF	mval		director_mval;
+GBLREF	mident		director_ident;
+GBLREF	char		*lexical_ptr;
+GBLREF	spdesc		stringpool;
 
 static readonly unsigned char apos_ok[] =
 {

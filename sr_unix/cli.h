@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,8 +42,15 @@
 #define NON_NEG		0	/* Non Negatable */
 #define NEG		1	/* Negatable */
 
+#define CLI_ABSENT	0
 #define CLI_PRESENT	1
 #define CLI_NEGATED	2
+#define CLI_DEFAULT	3	/* default present: The present field is only one
+				 * bit, therefore, 3 is euqiv. to 1, i.e. CLI_PRESENT
+				 * (since there is not CLI_DEFAULT on VMS,
+				 * cli_present() should not return CLI_DEFAULT).
+				 */
+#define DEFA_PRESENT	(char *) CLI_PRESENT	/* default present */
 
 /*
  * ------------------------------------------------------
@@ -67,6 +74,10 @@ typedef struct cmd_parm_tag {
 			*parms;			/* Qualifiers */
 	struct cmd_parm_struct
 			*parm_values;		/* Parameters */
+	struct cmd_parm_tag
+			*qual_vals;			/* Extra Qualifiers */
+	boolean_t	(*disallow_func)(void);		/* Ptr to disallow function */
+	char		*dfault_str;
 	unsigned 	required : 2;		/* Value required flag. Values :
 							0 - disallowed,
 							1 - optional
@@ -79,7 +90,7 @@ typedef struct cmd_parm_tag {
 							VAL_NUM - Number
 							VAL_TIME - Time */
 	unsigned 	hex_num : 1;		/* Number is hex */
-	unsigned 	present : 1;		/* Arg. is present on command line */
+	unsigned 	present : 2;		/* Arg. is present on command line */
 	unsigned 	negated : 1;		/* Arg. negated on command line */
 	char		*pval_str;		/* Value string */
 } CLI_ENTRY;

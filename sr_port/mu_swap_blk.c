@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -197,8 +197,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			if (sizeof(blk_hdr) >= ((blk_hdr_ptr_t)tblk_ptr)->bsiz)
 			{
 				/* if (CDB_STAGNATE <= t_tries) */
-				if (cw_stagnate)
-					del_hashtab_ent(&cw_stagnate, (void *)child1, &dummy);
+				del_hashtab_ent(&cw_stagnate, (void *)child1, &dummy);
 				break;
 			}
                         nslevel--;
@@ -209,8 +208,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (sizeof(blk_hdr) >= ((blk_hdr_ptr_t)tblk_ptr)->bsiz)
 		{
 			/* if (CDB_STAGNATE <= t_tries) */
-			if (cw_stagnate)
-				del_hashtab_ent(&cw_stagnate, (void *)(dest_blk_id), &dummy);
+			del_hashtab_ent(&cw_stagnate, (void *)(dest_blk_id), &dummy);
 			continue;
 		}
 
@@ -239,8 +237,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			if  (in_exclude_list(&(dest_gv_currkey->base[0]), key_len_dir - 1, exclude_glist_ptr))
 			{
 				/* if (CDB_STAGNATE <= t_tries) */
-				if (cw_stagnate)
-					del_hashtab_ent(&cw_stagnate, (void *)(dest_blk_id), &dummy);
+				del_hashtab_ent(&cw_stagnate, (void *)(dest_blk_id), &dummy);
 				continue;
 			}
 		}

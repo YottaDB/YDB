@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "stringpool.h"
 #include "gdsroot.h"
 #include "gdsblk.h"

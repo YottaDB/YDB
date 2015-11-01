@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "advancewindow.h"
 #include "cache.h"
 #include "compiler.h"

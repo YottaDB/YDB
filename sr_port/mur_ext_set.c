@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,8 +53,7 @@ static	char		*rec_buff;
 
 void	mur_extract_set(
 			jnl_record	*rec,
-			uint4   	pid,
-			jnl_proc_time	*ref_time)
+			uint4   	pid)
 {
 	enum jnl_record_type	rectype;
 	short			temp_short;
@@ -85,7 +84,7 @@ void	mur_extract_set(
 		EXT2BYTES(&muext_code[MUEXT_TSTART][0]); /* TSTART */
 
 	common:
-		extract_len = exttime(rec->val.jrec_fkill.short_time, ref_time, 3);
+		EXTTIME(rec->val.jrec_fkill.short_time);
 		EXTINT(pid);
 
 		EXTQW(rec->val.jrec_tset.jnl_seqno);
@@ -133,7 +132,7 @@ void	mur_extract_set(
 		EXT2BYTES(&muext_code[MUEXT_SET][0]); /* SET */
 	}
 
-	extract_len = exttime(rec->val.jrec_kill.short_time, ref_time, 3);
+	EXTTIME(rec->val.jrec_kill.short_time);
 
 	EXTINT(pid);
 
@@ -212,23 +211,20 @@ void	mur_extract_null(jnl_record *rec)
 {
 	int			extract_len;
 	char			*ptr;
-	jnl_process_vector	*pv = &rec->val.jrec_pini.process_vector[CURR_JPV];
-	jnl_proc_time		*ref_time = &pv->jpv_time;
 
 	extract_len = 0;
 	if (!mur_options.detail)
 	{
 		EXT2BYTES(&muext_code[MUEXT_NULL][0]);
-	}
-	else
+	} else
 	{
 		extract_len = strlen(mur_extract_buff);
 		strcpy(mur_extract_buff + extract_len, "NULL   \\");
 		extract_len = strlen(mur_extract_buff);
 	}
 
-	extract_len = exttime(rec->val.jrec_null.short_time, ref_time, extract_len);
-	extract_len = exttime(rec->val.jrec_null.recov_short_time, ref_time, extract_len);
+	EXTTIME(rec->val.jrec_null.short_time);
+	EXTTIME(rec->val.jrec_null.recov_short_time);
 	EXTINT(0);
 	EXTQW(rec->val.jrec_null.jnl_seqno);
 	EXTINT(rec->val.jrec_null.tn);
@@ -237,8 +233,7 @@ void	mur_extract_null(jnl_record *rec)
 
 void	detailed_extract_set(
 			jnl_record	*rec,
-			uint4   	pid,
-			jnl_proc_time	*ref_time)
+			uint4   	pid)
 {
 	enum jnl_record_type	rectype;
 	short			temp_short;
@@ -266,8 +261,8 @@ void	detailed_extract_set(
 		extract_len = strlen(mur_extract_buff);
 		strcpy(mur_extract_buff + extract_len, "ZTSTART\\");
 		extract_len = strlen(mur_extract_buff);
-		extract_len = exttime(rec->val.jrec_fkill.short_time, ref_time, extract_len);
-		extract_len = exttime(rec->val.jrec_fkill.recov_short_time, ref_time, extract_len);
+		EXTTIME(rec->val.jrec_fkill.short_time);
+		EXTTIME(rec->val.jrec_fkill.recov_short_time);
 		goto common;
 
 	case JRT_TKILL:
@@ -282,8 +277,8 @@ void	detailed_extract_set(
 		EXTTXT(rec->val.jrec_tset.jnl_tid, sizeof(jn_tid));
 
 	common:
-		extract_len = exttime(rec->val.jrec_fkill.short_time, ref_time, extract_len);
-		extract_len = exttime(rec->val.jrec_fkill.recov_short_time, ref_time, extract_len);
+		EXTTIME(rec->val.jrec_fkill.short_time);
+		EXTTIME(rec->val.jrec_fkill.recov_short_time);
 		EXTINT(pid);
 		jnlext_write(mur_extract_buff, extract_len + 1);
 		if (is_updproc)
@@ -292,8 +287,7 @@ void	detailed_extract_set(
 		{
 			memcpy(mur_extract_buff, "                       ", 23);
 			extract_len = 23;
-		}
-		else
+		} else
 			extract_len = 0;
 	}
 
@@ -351,8 +345,9 @@ void	detailed_extract_set(
 		break;
 	}
 
-	extract_len = exttime(rec->val.jrec_kill.short_time, ref_time, strlen(mur_extract_buff));
-	extract_len = exttime(rec->val.jrec_kill.recov_short_time, ref_time, extract_len);
+	extract_len = strlen(mur_extract_buff);
+	EXTTIME(rec->val.jrec_kill.short_time);
+	EXTTIME(rec->val.jrec_kill.recov_short_time);
 
 	EXTINT(pid);
 	EXTQW(rec->val.jrec_kill.jnl_seqno);
@@ -427,17 +422,16 @@ void	detailed_extract_set(
 void	mur_extract_align(jnl_record *rec)
 {
 	int			extract_len;
-	jnl_process_vector	*pv = &rec->val.jrec_pini.process_vector[CURR_JPV];
-	jnl_proc_time		*ref_time = &pv->jpv_time;
 
 	assert (mur_options.detail);
 	extract_len = strlen(mur_extract_buff);
 	strcpy(mur_extract_buff + extract_len, "ALIGN  \\");
-	extract_len = exttime(rec->val.jrec_align.short_time, ref_time, strlen(mur_extract_buff));
+	extract_len = strlen(mur_extract_buff);
+	EXTTIME(rec->val.jrec_align.short_time);
 	jnlext_write(mur_extract_buff, extract_len);
 }
 
-void	mur_extract_pblk(jnl_record *rec, uint4 pid, jnl_proc_time *ref_time)
+void	mur_extract_pblk(jnl_record *rec, uint4 pid)
 {
 	int	extract_len;
 	blk_hdr	pblk_head;
@@ -446,7 +440,8 @@ void	mur_extract_pblk(jnl_record *rec, uint4 pid, jnl_proc_time *ref_time)
 	assert (mur_options.detail);
 	extract_len = strlen(mur_extract_buff);
 	strcpy(mur_extract_buff + extract_len, "PBLK   \\");
-	extract_len = exttime(rec->val.jrec_pblk.short_time, ref_time, strlen(mur_extract_buff));
+	extract_len = strlen(mur_extract_buff);
+	EXTTIME(rec->val.jrec_pblk.short_time);
 	EXTINT(pid);
 	EXTINT(rec->val.jrec_pblk.blknum);
 	EXTINT(rec->val.jrec_pblk.bsiz);
@@ -455,53 +450,50 @@ void	mur_extract_pblk(jnl_record *rec, uint4 pid, jnl_proc_time *ref_time)
 	jnlext_write(mur_extract_buff, extract_len);
 }
 
-void	mur_extract_epoch(jnl_record *rec, uint4 pid, jnl_proc_time *ref_time)
+void	mur_extract_epoch(jnl_record *rec, uint4 pid)
 {
 	int	extract_len;
 	char	*ptr;
 
 	assert (mur_options.detail);
-	if (ref_time == NULL)
-		ref_time = (jnl_proc_time *)malloc(sizeof(jnl_proc_time));
 	extract_len = strlen(mur_extract_buff);
 	strcpy(mur_extract_buff + extract_len, "EPOCH  \\");
-	extract_len = exttime(rec->val.jrec_epoch.short_time, ref_time, strlen(mur_extract_buff));
+	extract_len = strlen(mur_extract_buff);
+	EXTTIME(rec->val.jrec_epoch.short_time);
 	EXTINT(pid);
 	EXTQW(rec->val.jrec_epoch.jnl_seqno);
 	EXTINT(rec->val.jrec_epoch.tn);
 	jnlext_write(mur_extract_buff, extract_len);
 }
 
-void    mur_extract_inctn(jnl_record *rec, uint4 pid, jnl_proc_time *ref_time)
+void    mur_extract_inctn(jnl_record *rec, uint4 pid)
 {
         int     extract_len;
         char    *ptr;
 
 	if (!mur_options.detail)
 		return;
-	if (ref_time == NULL)
-		ref_time = (jnl_proc_time *)malloc(sizeof(jnl_proc_time));
 	extract_len = strlen(mur_extract_buff);
        	strcpy(mur_extract_buff + extract_len, "INCTN  \\");
-        extract_len = exttime(rec->val.jrec_inctn.short_time, ref_time, strlen(mur_extract_buff));
+	extract_len = strlen(mur_extract_buff);
+        EXTTIME(rec->val.jrec_inctn.short_time);
 	EXTINT(pid);
 	EXTINT(rec->val.jrec_inctn.tn);
 	EXTINT(rec->val.jrec_inctn.opcode);
 	jnlext_write(mur_extract_buff, extract_len);
 }
 
-void	mur_extract_aimg(jnl_record *rec, uint4 pid, jnl_proc_time *ref_time)
+void	mur_extract_aimg(jnl_record *rec, uint4 pid)
 {
 	int	extract_len;
 	char	*ptr;
 
 	if (!mur_options.detail)
 		return;
-	if (ref_time == NULL)
-		ref_time = (jnl_proc_time *)malloc(sizeof(jnl_proc_time));
 	extract_len = strlen(mur_extract_buff);
 	strcpy(mur_extract_buff + extract_len, "AIMG   \\");
-	extract_len = exttime(rec->val.jrec_aimg.short_time, ref_time, strlen(mur_extract_buff));
+	extract_len = strlen(mur_extract_buff);
+	EXTTIME(rec->val.jrec_aimg.short_time);
 	EXTINT(pid);
 	EXTINT(rec->val.jrec_aimg.tn);
 	EXTINT(rec->val.jrec_aimg.blknum);

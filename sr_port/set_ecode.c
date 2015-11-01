@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "error.h"
 #include "mvalconv.h"
 #include "dollar_zlevel.h"

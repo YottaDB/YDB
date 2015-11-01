@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,7 +98,8 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	int			status, save_errno, sopcnt;
 	char                    now_running[MAX_REL_NAME];
 	boolean_t		rc_cpt_removed = FALSE, sem_created = FALSE;
-	sgmnt_data_ptr_t	csd, tsd;
+	sgmnt_data		tsd_memory;
+	sgmnt_data_ptr_t	csd, tsd = NULL;
 	struct sembuf		sop[4];
 	struct shmid_ds		shm_buf;
 	file_control		*fc;
@@ -128,7 +129,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 #ifdef GTCM_RC
         rc_cpt_removed = mupip_rundown_cpt();
 #endif
-	tsd = (sgmnt_data_ptr_t)malloc(sizeof(*tsd));
+	tsd = (sgmnt_data_ptr_t)&tsd_memory;
 	fc = reg->dyn.addr->file_cntl;
 	fc->op = FC_OPEN;
 	status = dbfilop(fc);
@@ -257,11 +258,11 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		}
 		/* At this point, we have the the database access control lock.
 		 * We also incremented the counter semaphore.
-		 * We also has ftok semaphore lock acquired.
+		 * We also have the ftok semaphore lock acquired.
 		 */
 	}
 
-	/* Now try to rundown database if shared memoru segment exists.
+	/* Now rundown database if shared memory segment exists.
 	 * We try this for both values of "standalone"
 	 */
 	if (INVALID_SHMID == udi->shmid || -1 == shmctl(udi->shmid, IPC_STAT, &shm_buf) ||
@@ -276,8 +277,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			ftok_sem_release(reg, TRUE, TRUE);
 			return FALSE; /* This is safer, when this code is not complete */
 		} else
-		{
-			/* Note that if creation time does not match, we ignore that shared memory segment.
+		{	/* Note that if creation time does not match, we ignore that shared memory segment.
 			 * It might result in orphaned shared memory segment.
 			 */
 			tsd->shmid = udi->shmid = INVALID_SHMID;
@@ -300,7 +300,14 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 					db_ipcs.sem_ctime = tsd->sem_ctime.ctime;
 					db_ipcs.shmid = tsd->shmid;
 					db_ipcs.shm_ctime = tsd->shm_ctime.ctime;
-					get_full_path((char *)DB_STR_LEN(reg), db_ipcs.fn, &db_ipcs.fn_len, MAX_TRANS_NAME_LEN);
+					if (!get_full_path((char *)DB_STR_LEN(reg), db_ipcs.fn, &db_ipcs.fn_len,
+											MAX_TRANS_NAME_LEN, &status_msg))
+					{
+						gtm_putmsg(VARLSTCNT(1) status_msg);
+						RNDWN_ERR("!AD -> get_full_path failed.", reg);
+						CLNUP_RNDWN(udi, reg);
+						return FALSE;
+					}
 					db_ipcs.fn[db_ipcs.fn_len] = 0;
 					if (0 != send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0))
 					{
@@ -319,10 +326,13 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 					return FALSE;
 				}
 				standalone_reg = reg;
-				return TRUE;
+				return TRUE; /* For "standalone" and "no shared memory existing", we exit here */
 			} else
-			{
-				/* Not standalone */
+			{	/* We are here for not standalone (basically the "mupip rundown" command).
+				 * We have not created any new semaphore and no shared memory was existing.
+				 * So just reset the file header ipc fields and exit.
+				 */
+				assert(!sem_created);
 				memset(tsd->machine_name, 0, MAX_MCNAMELEN);
 				tsd->freeze = 0;
 				tsd->owner_node = 0;
@@ -349,7 +359,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			assert(!sem_created);
 			return FALSE;
 		}
-		return TRUE;
+		return TRUE; /* For "!standalone" and "no shared memory existing", we exit here */
 	}
 	/*
 	 * shared memory already exists, so now find the number of users attached to it
@@ -489,6 +499,12 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		csd = cs_addrs->hdr = (sgmnt_data_ptr_t)cs_addrs->db_addrs[0];
 		cs_addrs->db_addrs[1] = cs_addrs->db_addrs[0] + stat_buf.st_size - 1;
 	}
+	if (sem_created)
+	{
+		csd->semid = tsd->semid;
+		csd->sem_ctime.ctime = tsd->sem_ctime.ctime;
+	}
+	assert(JNL_ALLOWED(csd) == JNL_ALLOWED(tsd));
 	/* Check to see that the fileheader in the shared segment is valid, so we won't endup flushing garbage to db file */
 	/* Check the label in the header - keep adding any further appropriate checks in future here */
 	if (memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,9 +32,9 @@ LITDEF int (*indir_fcn[])() = {
 #include "indir.h"
 };
 
-GBLREF char window_token;
-GBLREF stack_frame *frame_pointer;
-GBLREF unsigned char 	proc_act_type;
+GBLREF char		window_token;
+GBLREF stack_frame	*frame_pointer;
+GBLREF unsigned short 	proc_act_type;
 
 void	op_commarg(mval *v, unsigned char argcode)
 {

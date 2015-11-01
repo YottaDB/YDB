@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
 
@@ -84,13 +85,10 @@ GBLREF	boolean_t 		kip_incremented;
 GBLREF	boolean_t		need_kip_incr;
 DEBUG_ONLY(GBLREF uint4		cumul_index;)
 
-LITREF	int			jnl_fixed_size[];
-
-
 void	gvcst_kill(bool do_subtree)
 {
 	bool			clue, flush_cache, left_extra, right_extra;
-	boolean_t		actual_update;
+	boolean_t		actual_update, next_fenced_was_null, jnl_enabled;
 	char			temp[4096], temp1[4096], *temp_ptr;
 	cw_set_element		*tp_cse;
 	enum cdb_sc		cdb_status;
@@ -113,6 +111,8 @@ void	gvcst_kill(bool do_subtree)
 	{
 		kill_set_head.next_kill_set = NULL;
 		t_begin(ERR_GVKILLFAIL, TRUE);
+		if (jnl_fence_ctl.level)	/* next_fenced_was_null is reliable only if we are in ZTransaction */
+			next_fenced_was_null = (NULL == cs_addrs->next_fenced) ? TRUE : FALSE;
 	} else if (NULL == sgm_info_ptr->first_cw_set)
 			t_begin(ERR_GVKILLFAIL, TRUE);
 	else
@@ -216,7 +216,7 @@ void	gvcst_kill(bool do_subtree)
 					actual_update = TRUE;
 				if (cdb_sc_normal == cdb_status)
 					left_extra = FALSE;
-				else  if (cdb_sc_delete_parent == cdb_status)
+				else if (cdb_sc_delete_parent == cdb_status)
 				{
 					left_extra = TRUE;
 					cdb_status = cdb_sc_normal;
@@ -231,7 +231,7 @@ void	gvcst_kill(bool do_subtree)
 					actual_update = TRUE;
 				if (cdb_sc_normal == cdb_status)
 					right_extra = FALSE;
-				else  if (cdb_sc_delete_parent == cdb_status)
+				else if (cdb_sc_delete_parent == cdb_status)
 				{
 					right_extra = TRUE;
 					cdb_status = cdb_sc_normal;
@@ -245,7 +245,7 @@ void	gvcst_kill(bool do_subtree)
 			actual_update = cw_set_depth;	/* for non-TP, tp_cse is NULL even if cw_set_depth is non-zero */
 		} else
 			assert(!actual_update || sgm_info_ptr->cw_set_depth);
-		if (actual_update && JNL_ENABLED(cs_data))
+		if ((jnl_enabled = JNL_ENABLED(cs_addrs)) && actual_update)
 		{	/* Maintain journal records only if the kill actually resulted in an update. */
 			if (0 == dollar_tlevel)
 				jfb = non_tp_jfb_ptr; /* Already malloced in gvcst_init() */
@@ -266,21 +266,17 @@ void	gvcst_kill(bool do_subtree)
 				ja->operation = JNL_ZKILL;
 			if (0 == dollar_tlevel)
 			{
-				assert(jnl_fixed_size[JRT_FKILL]  == jnl_fixed_size[JRT_GKILL]);
-				assert(jnl_fixed_size[JRT_KILL]   == jnl_fixed_size[JRT_ZKILL]);
-				assert(jnl_fixed_size[JRT_FZKILL] == jnl_fixed_size[JRT_GZKILL]);
-				assert(jnl_fixed_size[JRT_FKILL]  == jnl_fixed_size[JRT_FZKILL]);
-				if (jnl_fence_ctl.level == 0)
-					cumul_jnl_rec_len = JREC_PREFIX_SIZE + jnl_fixed_size[JRT_KILL] + JREC_SUFFIX_SIZE;
-				else
-					cumul_jnl_rec_len = JREC_PREFIX_SIZE + jnl_fixed_size[JRT_FKILL] + JREC_SUFFIX_SIZE;
-			}
-			else
+				assert(JRT_FKILL_FIXED_SIZE == JRT_GKILL_FIXED_SIZE);
+				assert(JRT_KILL_FIXED_SIZE  == JRT_ZKILL_FIXED_SIZE);
+				assert(JRT_FZKILL_FIXED_SIZE == JRT_GZKILL_FIXED_SIZE);
+				assert(JRT_FKILL_FIXED_SIZE  == JRT_FZKILL_FIXED_SIZE);
+				cumul_jnl_rec_len = ((jnl_fence_ctl.level == 0) ? KILL_RECLEN : FKILL_RECLEN);
+			} else
 			{
-				assert(jnl_fixed_size[JRT_TKILL]  == jnl_fixed_size[JRT_UKILL]);
-				assert(jnl_fixed_size[JRT_TZKILL] == jnl_fixed_size[JRT_UZKILL]);
-				assert(jnl_fixed_size[JRT_TKILL]  == jnl_fixed_size[JRT_TZKILL]);
-				cumul_jnl_rec_len += JREC_PREFIX_SIZE + jnl_fixed_size[JRT_TKILL] + JREC_SUFFIX_SIZE;
+				assert(JRT_TKILL_FIXED_SIZE  == JRT_UKILL_FIXED_SIZE);
+				assert(JRT_TZKILL_FIXED_SIZE == JRT_UZKILL_FIXED_SIZE);
+				assert(JRT_TKILL_FIXED_SIZE  == JRT_TZKILL_FIXED_SIZE);
+				cumul_jnl_rec_len += TKILL_RECLEN;
 			}
 			cumul_jnl_rec_len += ja->key->end + sizeof(ja->key->end);
 			cumul_jnl_rec_len = ROUND_UP(cumul_jnl_rec_len, JNL_REC_START_BNDRY);
@@ -300,6 +296,16 @@ void	gvcst_kill(bool do_subtree)
 				need_kip_incr = TRUE;
 			if (0 == t_end(&gv_target->hist, alt_hist))
 			{
+				if (jnl_fence_ctl.level && next_fenced_was_null && actual_update && jnl_enabled)
+				{	/* If ZTransaction and first KILL and the kill resulted in an update
+					 * Note that "jnl_enabled" is used above instead of JNL_ENABLED(cs_addrs) since the
+					 * 	latter might have changed inside the call to t_end() above.
+					 */
+					assert(NULL != cs_addrs->next_fenced);
+					assert(jnl_fence_ctl.fence_list == cs_addrs);
+					jnl_fence_ctl.fence_list = cs_addrs->next_fenced;
+					cs_addrs->next_fenced = NULL;
+				}
 				need_kip_incr = FALSE;
 				assert(!kip_incremented);
 				continue;

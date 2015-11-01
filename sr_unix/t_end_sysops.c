@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,6 +98,7 @@ GBLREF boolean_t        	block_saved;
 GBLREF boolean_t        	write_after_image;
 GBLREF boolean_t        	dse_running;
 GBLREF enum gtmImageTypes	image_type;
+GBLREF boolean_t		gtm_environment_init;
 
 #define MAX_CYCLES      2
 
@@ -1290,7 +1291,7 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 						return TRUE;
 					assert(FALSE);                  /* We have failed */
 					get_space_fail_cr = cr;
-					if (GETENV("gtm_environment_init"))
+					if (gtm_environment_init)
 						gtm_fork_n_core();	/* take a snapshot in case running in-house */
 					return FALSE;
 				} else
@@ -1319,7 +1320,7 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	else
 		assert(FALSE);
 	get_space_fail_cr = cr;
-	if (GETENV("gtm_environment_init"))
+	if (gtm_environment_init)
 		gtm_fork_n_core();	/* take a snapshot in case running in-house */
         return FALSE;
 }
@@ -1340,11 +1341,14 @@ void    wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	else
         	save_csaddrs = &FILE_INFO(save_region)->s_addrs;	/* Save to see if we are in crit anywhere */
         reg = *region;				/* Region addr needing some synching */
+	assert(reg->open);
 	TP_CHANGE_REG(reg);
         csa = cs_addrs;
-        csd = cs_data;
-        if (dba_mm == csd->acc_meth  &&  csa->total_blks != csa->ti->total_blks)        /* don't write if MM and file extended */
-        {
+        csd = cs_data; /* csa and csd might be NULL if region has been closed; we expect all timers for a closed region to have
+			  been cancelled. But, for safety, we return if csd happens to be NULL */
+	assert(NULL != csd);
+        if (NULL == csd || (dba_mm == csd->acc_meth && csa->total_blks != csa->ti->total_blks)) /* csd == NULL <=> csa == NULL */
+        { /* don't write if region has been closed, or acc meth is MM and file extended */
                 if (save_region != gv_cur_region)
                 {
 			TP_CHANGE_REG(save_region);

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -79,10 +79,8 @@ set aix_loadmap_option = ''
 if ( $HOSTOS == "AIX") then
 	set aix_loadmap_option = "-bloadmap:$gtm_map/mumps.loadmap"
 endif
-# force the linker to retain gtmci.o & dependent modules even if not referenced.
-set gtmci_options = "-Wl,-u,gtm_ci $gt_ld_options_symbols"
 
-gt_ld $gt_ld_options $gtmci_options $aix_loadmap_option ${gt_ld_option_output}$3/mumps -L$gtm_obj $gtm_obj/{gtm,mumps_clitab}.o $gt_ld_sysrtns \
+gt_ld $gt_ld_options $gt_ld_ci_options $aix_loadmap_option ${gt_ld_option_output}$3/mumps -L$gtm_obj $gtm_obj/{gtm,mumps_clitab}.o $gt_ld_sysrtns \
 		-lmumps -lgnpclient -lcmisockettcp $gt_ld_gtmrpc_library_option $gt_ld_syslibs >& $gtm_map/mumps.map
 if ( $status != 0  ||  ! -x $3/mumps ) then
 	set buildshr_status = `expr $buildshr_status + 1`

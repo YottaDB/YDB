@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,14 @@ GBLREF global_list	*trees;
 #define TEXT3 ":"
 #define TEXT4 ", "
 
+#if defined(UNIX)
+#define	NEWLINE	"\n"
+#elif defined(VMS)
+#define	NEWLINE	"\r\n"
+#else
+#error UNSUPPORTED_PLATFORM
+#endif
+
 void	mu_int_err(
 		int err,
 		boolean_t do_path,
@@ -59,6 +67,8 @@ void	mu_int_err(
 	mu_int_errknt++;
 	mu_int_plen--;
 	util_len=0;
+	memcpy(&util_buff[util_len], NEWLINE, sizeof(NEWLINE) - 1);
+	util_len += sizeof(NEWLINE) - 1;
 	i2hex_blkfill(mu_int_path[mu_int_plen], &util_buff[util_len], BLOCK_WINDOW);
 	util_len += BLOCK_WINDOW;
 	memcpy(&util_buff[util_len], TEXT1, sizeof(TEXT1) - 1);	/* OFFSET_WINDOW + 1 spaces */

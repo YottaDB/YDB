@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,7 +75,7 @@ tp_region	*insert_region(	gd_region	*reg,
 	gv_cur_region = reg;
 	if (TRUE != reg->open)
 	{
-		if (NULL == mupfndfil(reg))
+		if (!mupfndfil(reg, NULL))
 		{
 			gv_cur_region = temp_reg;
 			return NULL;
@@ -112,7 +112,7 @@ tp_region	*insert_region(	gd_region	*reg,
 #elif defined(UNIX)
 	if (!reg->open)
 	{
-		if (NULL == mupfndfil(reg))
+		if (!mupfndfil(reg, NULL))
 			return NULL;
 		if (!filename_to_id(&local_id.uid, (char *)reg->dyn.addr->fname))
 			return NULL;

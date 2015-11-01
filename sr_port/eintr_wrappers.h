@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -102,12 +102,12 @@
 	} while(-1 == RC && EINTR == errno);	\
 }
 
-#define FGETS_FILE(BUF, LEN, FDESC, RC)		\
+#define FGETS_FILE(BUF, LEN, FP, RC)		\
 {						\
 	do					\
 	{					\
-	   FGETS(BUF, LEN, FDESC, RC);		\
-	} while(0 == RC && EINTR == errno);	\
+	   FGETS(BUF, LEN, FP, RC);		\
+	} while(NULL == RC && !feof(FP) && ferror(FP) && EINTR == errno);	\
 }
 
 #define FSTAT_FILE(FDESC, INFO, RC)		\

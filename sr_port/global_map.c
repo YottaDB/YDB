@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,43 +13,67 @@
 #include "mstrcmp.h"
 #include "global_map.h"
 
-void global_map(mstr map[],mstr *beg,mstr *end)
+/* "map[]" is assumed to be an array of mstrs whose last mstr has a NULL value for its "addr" field.
+ * "map[]" contains even number of mstrs, each consecutive pair of mstrs (starting from map[0]) point to a range of names.
+ * Also "map[]" is an array of strings arranged in non-decreasing alphabetical order.
+ * Thus "map[]" is an array representing a set of ranges starting from the smallest to the largest.
+ * "beg" and "end" are the end-points of the range (both inclusive) to be inserted into this sorted range set.
+ * Note that a point is represented as a range whose begin and end are the same.
+ */
+
+void global_map(mstr map[], mstr *beg, mstr *end)
 {
-	mstr *u,*v,t1,t2,t3;
-	assert(mstrcmp(beg,end) <= 0);
-	for (u = map ; u->addr ; u++)
-		if (mstrcmp(u,beg) >= 0)
+	mstr	*left, *right, rangestart, rangeend, tmpmstr;
+
+	assert(mstrcmp(beg, end) <= 0);
+	for (left = map; left->addr; left++)
+		if (mstrcmp(left, beg) >= 0)
 			break;
-	for (v = u ; v->addr ; v++)
-		if (mstrcmp(v,end) > 0)
+	/* left now points to the first mstr in the array that is >= beg */
+	for (right = left; right->addr; right++)
+		if (mstrcmp(right, end) > 0)
 			break;
-	if (u == v)
-	{
-		if ((u - map) & 1)
-			return ;
-		t1 = *beg;
-		t2 = *end;
-		while (u->addr)
-		{
-			t3 = *u;
-			*u++ = t1;
-			t1 = t3;
-			t3 = *u;
-			*u++ = t2;
-			t2 = t3;
+	/* right now points to the first mstr in the array that is > end */
+	if (left == right)
+	{	/* the usual case where {beg, end} has no or complete intersections with any existing range in map[].
+		 * in the case of complete intersection return.
+		 * in case of no intersection, insert {beg, end} maintaining sorted order by shifting all higher existing ranges
+		 * 	two positions to the right */
+		if ((right - map) & 1)
+			return;
+		rangestart = *beg;
+		rangeend = *end;
+		while (left->addr)
+		{	/* {rangestart, rangeend} is the current range to be inserted */
+			tmpmstr = *left;
+			*left++ = rangestart;
+			rangestart = tmpmstr;
+			tmpmstr = *left;
+			*left++ = rangeend;
+			rangeend = tmpmstr;
 		}
-		*u++ = t1;
-		*u++ = t2;
-		u->addr = 0;
-		return ;
+		*left++ = rangestart;
+		*left++ = rangeend;
+		left->addr = 0;
+		return;
 	}
-	if (((u - map) & 1) == 0)
-		*u++ = *beg;
-	if (((v - map) & 1) == 0)
-		*--v = *end;
+	/* case where {beg, end} has partial intersections with existing ranges in map[].
+	 * replace intersecting ranges with one union range e.g. replace {1, 10} {5, 15} {12, 20} with {1, 20}
+	 */
+	if (((left - map) & 1) == 0)
+		*left++ = *beg;
+	if (((right - map) & 1) == 0)
+		*(--right) = *end;
+	if (left == right) /* possible if {beg, end} is exactly equal to an existing range in map[] */
+		return;
 	do
 	{
-		*u++ = *v;
-	} while ((v++)->addr);
-	return ;
+		*left++ = *right;
+	} while ((right++)->addr);
+	/* note that replacing atleast 2 existing ranges with {begin, end} into one union range will cause a reduction
+	 * in the number of ranges in map[] effectively causing higher-valued ranges on the right to shift left.
+	 * In that case, we have to be also left-shift the null-valued mstr.addr, hence the ++ is done in the check
+	 * for (right++)->addr in the "while" above instead of having "*left++ = *right++" in the loop.
+	 */
+	return;
 }

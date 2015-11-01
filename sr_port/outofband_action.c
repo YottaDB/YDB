@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_stdio.h"
 #include "io.h"
 #include "rtnhdr.h"
 #include "stack_frame.h"
@@ -28,8 +30,11 @@ void outofband_action(bool lnfetch_or_start)
 	error_def(ERR_CTRAP);
 	error_def(ERR_CTRLC);
 	error_def(ERR_CTRLY);
+	error_def(ERR_JOBINTRRQST);
+
 	if (outofband)
-	{	if (io_std_device.in->type == tt)
+	{
+		if (io_std_device.in->type == tt)
 			iott_flush(io_std_device.in);
 		if (lnfetch_or_start)
 		{
@@ -55,8 +60,12 @@ void outofband_action(bool lnfetch_or_start)
 				 */
 				(*tp_timeout_action_ptr)();
 				break;
-			default:      GTMASSERT;
-				      break;
+			case (jobinterrupt):
+				rts_error(VARLSTCNT(1) ERR_JOBINTRRQST);
+				break;
+			default:
+				GTMASSERT;
+				break;
 		}
 	}
 }

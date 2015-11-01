@@ -12,6 +12,8 @@
 /* ch_overrun -- condition handler overrun -- default condition handler for Unix -- no normal return from this module */
 #include "mdef.h"
 
+#include "gtm_stdlib.h"	/* for exit() usage in MUMPS_EXIT macro */
+
 #include "error.h"
 #include "send_msg.h"
 #include "gtmmsg.h"

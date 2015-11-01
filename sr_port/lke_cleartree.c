@@ -17,6 +17,9 @@
  */
 
 #include "mdef.h"
+
+#include <signal.h>
+
 #include "mlkdef.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -33,6 +36,7 @@
 #define KDIM	64		/* max number of subscripts */
 #define	SDIM	256		/* max subscript size */
 
+GBLREF VSIG_ATOMIC_T	util_interrupt;
 
 bool	lke_cleartree(
 		      gd_region		*region,
@@ -52,6 +56,7 @@ bool	lke_cleartree(
 	int		depth = 0;
 	bool		locks = FALSE, locked, deleted;
 
+	error_def(ERR_CTRLC);
 
 	node = start[0]
 	     = tree;
@@ -104,6 +109,7 @@ bool	lke_cleartree(
 			     = (mlk_shrblk_ptr_t)R2A(node->children);
 			subscript_offset[depth] = name.len;
 		}
+		if (util_interrupt)
+			rts_error(VARLSTCNT(1) ERR_CTRLC);
 	}
-
 }

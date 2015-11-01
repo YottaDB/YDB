@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,8 +93,7 @@ int gtmrecv(void)
 #endif
 
 	error_def(ERR_RECVPOOLSETUP);
-	error_def(ERR_REPLPARSE);
-	error_def(ERR_REPLLOG);
+	error_def(ERR_MUPCLIERR);
 	error_def(ERR_TEXT);
 	error_def(ERR_REPLERR);
 
@@ -106,7 +105,7 @@ int gtmrecv(void)
 #endif
 	memset((uchar_ptr_t)&recvpool, 0, sizeof(recvpool));
 	if (-1 == gtmrecv_get_opt())
-		rts_error(VARLSTCNT(1) ERR_REPLPARSE);
+		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
 	recvpool_init(pool_user, gtmrecv_options.start && !gtmrecv_options.updateonly, gtmrecv_options.start);
 	/*
 	 * When gtmrecv_options.start is TRUE, shm field recvpool.recvpool_ctl->fresh_start is updated in recvpool_init()

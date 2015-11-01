@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,7 @@
 #include "mlkdef.h"
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
+#include "gtm_string.h"
 #include "stp_parms.h"
 #include "iosp.h"
 #include "error.h"
@@ -56,6 +57,7 @@
 #include "getjobname.h"
 #include "getjobnum.h"
 #include "sig_init.h"
+#include "gtmmsg.h"
 
 GBLREF VSIG_ATOMIC_T		util_interrupt;
 GBLREF bool			licensed;
@@ -68,6 +70,7 @@ GBLREF cw_set_element   	cw_set[];
 GBLREF unsigned char    	cw_set_depth;
 GBLREF uint4			process_id;
 GBLREF jnlpool_addrs		jnlpool;
+GBLREF char			cli_err_str[];
 
 
 static bool lke_process(int argc);
@@ -138,6 +141,14 @@ static bool lke_process(int argc)
 			REVERT;
 			return FALSE;
 		}
+	} else if (res)
+	{
+		if (1 < argc)
+		{
+			REVERT;
+			rts_error(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
+		} else
+			gtm_putmsg(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
 	}
 	if (func)
 	{
@@ -146,13 +157,8 @@ static bool lke_process(int argc)
 		if (flag)
 			close_fileio(save_stderr);
 	}
-	if (argc > 1)
-	{
-		REVERT;
-		return FALSE;
-	}
 	REVERT;
-	return TRUE;
+	return(1 >= argc);
 }
 
 static void display_prompt(void)

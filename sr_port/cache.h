@@ -54,6 +54,14 @@ typedef struct cache_table
 	}												\
 }
 
+#ifdef DEBUG
+#  define DBG_INCR_CNT(x) ++x
+#  define DBG_DECR_CNT(x) --x
+#else
+#  define DBG_INCR_CNT(x)
+#  define DBG_DECR_CNT(x)
+#endif
+
 void cache_del(unsigned char code, mstr *source, mstr *object);
 void cache_init(void);
 void cache_put(unsigned char code, mstr *source, mstr *object);

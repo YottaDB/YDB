@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -213,34 +215,34 @@ uint4	mur_forward(ctl_list *ctl)
 			case JRT_UZKILL:
 				pini_addr = rec->val.jrec_set.pini_addr;
 				if (0 != pini_addr  &&  (pv = mur_get_pini_jpv(ctl, pini_addr)) != NULL)
-					detailed_extract_set(rec, pv->jpv_pid, &pv->jpv_time);
+					detailed_extract_set(rec, pv->jpv_pid);
 				else
-					detailed_extract_set(rec, 0, NULL);
+					detailed_extract_set(rec, 0);
 				break;
 
 			case JRT_TCOM:
 			case JRT_ZTCOM:
 				pini_addr = rec->val.jrec_tcom.pini_addr;
 				if (0 != pini_addr  &&  (pv = mur_get_pini_jpv(ctl, pini_addr)) != NULL)
-					detailed_extract_tcom(rec, pv->jpv_pid, &pv->jpv_time);
+					detailed_extract_tcom(rec, pv->jpv_pid);
 				else
-					detailed_extract_tcom(rec, 0, NULL);
+					detailed_extract_tcom(rec, 0);
 				break;
 
 			case JRT_PBLK:
 				pini_addr = rec->val.jrec_pblk.pini_addr;
 				if (0 != pini_addr  &&  (pv = mur_get_pini_jpv(ctl, pini_addr)) != NULL)
-					mur_extract_pblk(rec, pv->jpv_pid, &pv->jpv_time);
+					mur_extract_pblk(rec, pv->jpv_pid);
 				else
-					mur_extract_pblk(rec, 0, NULL);
+					mur_extract_pblk(rec, 0);
 				break;
 
 			case JRT_AIMG:
 				pini_addr = rec->val.jrec_aimg.pini_addr;
 				if (0 != pini_addr  &&  (pv = mur_get_pini_jpv(ctl, pini_addr)) != NULL)
-					mur_extract_aimg(rec, pv->jpv_pid, &pv->jpv_time);
+					mur_extract_aimg(rec, pv->jpv_pid);
 				else
-					mur_extract_aimg(rec, 0, NULL);
+					mur_extract_aimg(rec, 0);
 				break;
 
 			case JRT_EPOCH:
@@ -248,15 +250,15 @@ uint4	mur_forward(ctl_list *ctl)
 				if (0 == pini_addr  ||  (pv = mur_get_pini_jpv(ctl, pini_addr)) == NULL)
 					pv = &ctl->rab->pvt->jfh->who_created;/* Make pv to be the one which created the journal
 										 file as first creation will have pini_addr zero */
-					mur_extract_epoch(rec, pv->jpv_pid, &pv->jpv_time);
+					mur_extract_epoch(rec, pv->jpv_pid);
 				break;
 
 			case JRT_INCTN:
 				pini_addr = rec->val.jrec_inctn.pini_addr;
 				if (0 != pini_addr  &&  (pv = mur_get_pini_jpv(ctl, pini_addr)) != NULL)
-					mur_extract_inctn(rec, pv->jpv_pid, &pv->jpv_time);
+					mur_extract_inctn(rec, pv->jpv_pid);
 				else
-					mur_extract_inctn(rec, 0, NULL);
+					mur_extract_inctn(rec, 0);
 				break;
 			case JRT_NULL:
 			case JRT_ALIGN:

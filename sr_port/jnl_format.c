@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,7 +97,7 @@ void	jnl_format(jnl_format_buffer *jfb)
 		jfb->buff = local_buffer;
 		memcpy(((fixed_jrec_tp_kill_set *)(local_buffer + JREC_PREFIX_SIZE))->jnl_tid, (uchar_ptr_t)jn_tid, sizeof(jn_tid));
 		/* assume an align record will be written while computing maximum jnl-rec size requirements */
-		sgm_info_ptr->total_jnl_record_size += jrec_size + JREC_PREFIX_SIZE + jnl_fixed_size[JRT_ALIGN] + JREC_SUFFIX_SIZE;
+		sgm_info_ptr->total_jnl_rec_size += jrec_size + ALIGN_RECLEN;
 	}
 	jfb->record_size = jrec_size;
 	jfb->rectype = rectype;

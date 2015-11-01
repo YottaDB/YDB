@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "mrout2xtern.h"
 
 void mrout2xtern(unsigned char *src, unsigned char *dst)

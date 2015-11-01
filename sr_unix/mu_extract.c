@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include "gtm_unistd.h"
@@ -61,7 +63,8 @@ GBLREF gv_namehead	*gv_target;
 LITDEF mval	mu_bin_datefmt	= DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(BIN_HEADER_DATEFMT) - 1, BIN_HEADER_DATEFMT, 0, 0);
 
 static readonly unsigned char	datefmt_txt[] = "DD-MON-YEAR  24:60:SS";
-static readonly unsigned char	gt_lit[] = "EXTRACT TOTAL";
+static readonly unsigned char	gt_lit[] = "TOTAL";
+static readonly unsigned char	select_text[] = "SELECT";
 static readonly mval		datefmt = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(datefmt_txt) - 1, (char *)datefmt_txt, 0, 0);
 static readonly mval		null_str = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, 0, 0, 0);
 static char			outfilename[256];
@@ -96,10 +99,11 @@ CONDITION_HANDLER(mu_extract_handler1)
 
 void mu_extract(void)
 {
+	int 				stat_res, truncate_res;
 	int				reg_max_rec, reg_max_key, reg_max_blk, iter, format, local_errno, perm, int_nlen;
-	boolean_t			freeze = FALSE, logqualifier, out_raw;
-	char				format_buffer[50], opname[16], ch_set_name[MAX_CHSET_NAME], cli_buff[2560],
-					label_buff[128];
+	boolean_t			freeze = FALSE, logqualifier, out_raw, success;
+	char				format_buffer[FORMAT_STR_MAX_SIZE],  ch_set_name[MAX_CHSET_NAME], cli_buff[MAX_LINE],
+					label_buff[LABEL_STR_MAX_SIZE], gbl_name_buff[sizeof(mident) + 2]; /* 2 for null and '^' */
 	glist				gl_head, *gl_ptr;
 	mu_extr_stats			global_total, grand_total;
 	uint4				item_code, devbufsiz, maxfield;
@@ -128,12 +132,13 @@ void mu_extract(void)
 	coll_hdr	extr_collhdr;
 
 	error_def(ERR_NOSELECT);
-	error_def(ERR_MUPIPCHECK);
+	error_def(ERR_GTMASSERT);
 	error_def(ERR_EXTRACTCTRLY);
 	error_def(ERR_EXTRACTFILERR);
 	error_def(ERR_MUPCLIERR);
 	error_def(ERR_MUNOACTION);
 	error_def(ERR_MUNOFINISH);
+	error_def(ERR_RECORDSTAT);
 
         /* Initialize all local character arrays to zero before using */
 
@@ -154,7 +159,7 @@ void mu_extract(void)
 				mupip_exit(ERR_MUNOACTION);		/*	need to change to OPCHSET error when added	*/
 			}
 			ch_set_name[ch_set_len] = '\0';
-			if ( (iconv_t) 0 != active_device->output_conv_cd )
+			if ( (iconv_t)0 != active_device->output_conv_cd)
 				ICONV_CLOSE_CD(active_device->output_conv_cd);
 			if (DEFAULT_CODE_SET != active_device->out_code_set)
 				ICONV_OPEN_CD(active_device->output_conv_cd, INSIDE_CH_SET, ch_set_name);
@@ -184,15 +189,14 @@ void mu_extract(void)
 		util_out_print("Extract error: bad format type", TRUE);
 		mupip_exit(ERR_MUPCLIERR);
 	}
-	strcpy(opname, "SELECT");
 	n_len = sizeof(cli_buff);
-	if (FALSE == cli_get_str("SELECT", cli_buff, &n_len))
+	if (FALSE == cli_get_str(select_text, cli_buff, &n_len))
 	{
 		n_len = 1;
 		cli_buff[0] = '*';
 	}
 	/* gv_select will select globals */
-        gv_select(cli_buff, n_len, freeze, opname, &gl_head, &reg_max_rec, &reg_max_key, &reg_max_blk);
+        gv_select(cli_buff, n_len, freeze, select_text, &gl_head, &reg_max_rec, &reg_max_key, &reg_max_blk);
  	if (!gl_head.next)
         {
                 rts_error(VARLSTCNT(1) ERR_NOSELECT);
@@ -219,7 +223,7 @@ void mu_extract(void)
 	}
 	if (-1 == Stat((char *)outfilename, &statbuf))
         {
-		if ( ENOENT != errno )
+		if (ENOENT != errno)
 		{
 			local_errno = errno;
 			perror("Error opening output file");
@@ -251,7 +255,7 @@ void mu_extract(void)
 		outbuf = (unsigned char *)malloc(sizeof(BIN_HEADER_LABEL) + sizeof(BIN_HEADER_DATEFMT) - 1 +
 				3 * BIN_HEADER_NUMSZ + BIN_HEADER_LABELSZ);
 		outptr = outbuf;
-		memcpy(outptr, LIT_AND_LEN(BIN_HEADER_LABEL));
+		memcpy(outptr, BIN_HEADER_LABEL, sizeof(BIN_HEADER_LABEL) - 1);
 		outptr += sizeof(BIN_HEADER_LABEL) - 1;
 		stringpool.free = stringpool.base;
 		op_horolog(&val);
@@ -263,15 +267,9 @@ void mu_extract(void)
 		stringpool.free = stringpool.base;
 		n2s(&val);
 		if (val.mvtype & MV_NUM_APPROX)
-		{
-			rts_error(VARLSTCNT(1) ERR_MUPIPCHECK);
-			mupip_exit(ERR_MUPIPCHECK);
-		}
+			GTMASSERT;
 		if (val.str.len > BIN_HEADER_NUMSZ)
-		{
-			rts_error(VARLSTCNT(1) ERR_MUPIPCHECK);
-			mupip_exit(ERR_MUPIPCHECK);
-		}
+			GTMASSERT;
 		for (iter = val.str.len;  iter < BIN_HEADER_NUMSZ;  iter++)
 			*outptr++ = '0';
 		memcpy(outptr, val.str.addr, val.str.len);
@@ -280,15 +278,9 @@ void mu_extract(void)
 		stringpool.free = stringpool.base;
 		n2s(&val);
 		if (val.mvtype & MV_NUM_APPROX)
-		{
-			rts_error(VARLSTCNT(1) ERR_MUPIPCHECK);
-			mupip_exit(ERR_MUPIPCHECK);
-		}
+			GTMASSERT;
 		if (val.str.len > BIN_HEADER_NUMSZ)
-		{
-			rts_error(VARLSTCNT(1) ERR_MUPIPCHECK);
-			mupip_exit(ERR_MUPIPCHECK);
-		}
+			GTMASSERT;
 		for (iter = val.str.len; iter < BIN_HEADER_NUMSZ; iter++)
 			*outptr++ = '0';
 		memcpy(outptr, val.str.addr, val.str.len);
@@ -297,15 +289,9 @@ void mu_extract(void)
 		stringpool.free = stringpool.base;
 		n2s(&val);
 		if (val.mvtype & MV_NUM_APPROX)
-		{
-			rts_error(VARLSTCNT(1) ERR_MUPIPCHECK);
-			mupip_exit(ERR_MUPIPCHECK);
-		}
+			GTMASSERT;
 		if (val.str.len > BIN_HEADER_NUMSZ)
-		{
-			rts_error(VARLSTCNT(1) ERR_MUPIPCHECK);
-			mupip_exit(ERR_MUPIPCHECK);
-		}
+			GTMASSERT;
 		for (iter = val.str.len;  iter < BIN_HEADER_NUMSZ;  iter++)
 			*outptr++ = '0';
 		memcpy(outptr, val.str.addr, val.str.len);
@@ -367,29 +353,20 @@ void mu_extract(void)
 		}
 		op_wteol(1);
 	}
-
 	REVERT;
 
 	ESTABLISH(mu_extract_handler1);
-
-	for (gl_ptr = gl_head.next;  gl_ptr;  gl_ptr = gl_ptr->next)
+	success = TRUE;
+	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
 	{
 		if (mu_ctrly_occurred)
 			break;
 		if (mu_ctrlc_occurred)
 		{
-			memcpy(label_buff, gl_ptr->name.str.addr, gl_ptr->name.str.len);
-			label_buff[ gl_ptr->name.str.len] = 0;
-			if ((MU_FMT_GO == format) || (MU_FMT_ZWR == format))
-			{
-				PRINTF("%s\t Key Cnt: %d  max subsc len: %d  max data len: %d  max rec len: %d\n",
-					label_buff, global_total.recknt, global_total.keylen, global_total.datalen,
-					global_total.reclen);
-			} else
-			{
-				PRINTF("%s\t Key Cnt: %d  max rec size: %d\n",
-					label_buff, global_total.recknt, global_total.reclen);
-			}
+			gbl_name_buff[0]='^';
+			memcpy(&gbl_name_buff[1], gl_ptr->name.str.addr, gl_ptr->name.str.len);
+			gtm_putmsg(VARLSTCNT(8) ERR_RECORDSTAT, 6, gl_ptr->name.str.len + 1, gbl_name_buff,
+				global_total.recknt, global_total.keylen, global_total.datalen, global_total.reclen);
 			mu_ctrlc_occurred = FALSE;
 		}
 		gv_bind_name(gd_header, &gl_ptr->name.str);
@@ -407,21 +384,16 @@ void mu_extract(void)
 			op_val.str.len = sizeof(extr_collhdr);
 			op_write(&op_val);
 		}
-		mu_extr_gblout(&gl_ptr->name, &global_total, format);
+		/* Note: Do not change the order of the expression below.
+		 * Otherwise if success is FALSE, mu_extr_gblout() will not be called at all.
+		 * We want mu_extr_gblout() to be called irrespective of the value of success */
+		success = mu_extr_gblout(&gl_ptr->name, &global_total, format) && success;
 		if (logqualifier)
 		{
-			memcpy(label_buff, gl_ptr->name.str.addr, gl_ptr->name.str.len);
-			label_buff[ gl_ptr->name.str.len] = 0;
-			if ((MU_FMT_GO == format) || (MU_FMT_ZWR == format))
-			{
-				PRINTF("%s\t Key Cnt: %d  max subsc len: %d  max data len: %d  max rec len: %d\n",
-					label_buff, global_total.recknt, global_total.keylen, global_total.datalen,
-					global_total.reclen);
-			} else
-			{
-				PRINTF("%s\t Key Cnt: %d  max rec size: %d\n",
-					label_buff, global_total.recknt, global_total.reclen);
-			}
+			gbl_name_buff[0]='^';
+			memcpy(&gbl_name_buff[1], gl_ptr->name.str.addr, gl_ptr->name.str.len);
+			gtm_putmsg(VARLSTCNT(8) ERR_RECORDSTAT, 6, gl_ptr->name.str.len + 1, gbl_name_buff,
+				global_total.recknt, global_total.keylen, global_total.datalen, global_total.reclen);
 			mu_ctrlc_occurred = FALSE;
 		}
 		grand_total.recknt += global_total.recknt;
@@ -445,15 +417,10 @@ void mu_extract(void)
 		gtm_putmsg(VARLSTCNT(1) ERR_EXTRACTCTRLY);
 		mupip_exit(ERR_MUNOFINISH);
 	}
-	if ((MU_FMT_GO == format) || (MU_FMT_ZWR == format))
+	gtm_putmsg(VARLSTCNT(8) ERR_RECORDSTAT, 6, LEN_AND_LIT(gt_lit),
+		grand_total.recknt, grand_total.keylen, grand_total.datalen, grand_total.reclen);
+	if (MU_FMT_BINARY == format)
 	{
-		PRINTF("%s\t Key Cnt: %d  max subsc len: %d  max data len: %d  max rec len: %d\n",
-			gt_lit, grand_total.recknt, grand_total.keylen, grand_total.datalen, grand_total.reclen);
-	} else
-	{
-		int stat_res, truncate_res;
-		PRINTF("%s\t Key Cnt: %d  max rec size: %d\n",
-			gt_lit, grand_total.recknt, grand_total.reclen);
 		/*      truncate the last newline charactor flushed by op_close */
 		STAT_FILE((char *)outfilename, &statbuf, stat_res);
 		if (-1 == stat_res)
@@ -462,5 +429,5 @@ void mu_extract(void)
 		if (-1 == truncate_res)
 			rts_error(VARLSTCNT(1) errno);
 	}
-	mupip_exit(SS_NORMAL);
+	mupip_exit(success ? SS_NORMAL : ERR_MUNOFINISH);
 }

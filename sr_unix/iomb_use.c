@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include <errno.h>
 #include "gtm_iconv.h"
 #include "gtm_unistd.h"

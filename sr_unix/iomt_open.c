@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,11 @@
  */
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_stdio.h"
+
+#include <errno.h>
+
 #include "copy.h"
 #include "io.h"
 #include "iottdef.h"
@@ -291,7 +295,7 @@ iomt_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
 		if (newmt.block_sz / newmt.record_sz * newmt.record_sz != newmt.block_sz)
 		{
 			iomt_closesp(fd);
-			rts_error(VARLSTCNT(1) ERR_MTFIXRECSZ);
+			rts_error(VARLSTCNT(3) ERR_MTFIXRECSZ, newmt.block_sz, newmt.record_sz);
 		}
 	} else
 	{
@@ -324,9 +328,9 @@ iomt_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
 		/* get mag tape characteristics */
 		if (!iomt_info(&newmt))
 		{
+			status = errno;
 			iomt_closesp(fd);
-			rts_error(VARLSTCNT(4) ERR_MTIOERR, 2,
-				ioptr->trans_name->len, ioptr->trans_name->dollar_io);
+			rts_error(VARLSTCNT(5) ERR_MTIOERR, 2, ioptr->trans_name->len, ioptr->trans_name->dollar_io, status);
 		}
 	}
 	if ((int4)newmt.block_sz < newmt.cap.block_size)

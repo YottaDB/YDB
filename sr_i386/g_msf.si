@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -25,7 +25,7 @@ msf_vartab_len_off	=	24
 msf_temp_mvals_off	=	26
 msf_old_frame_off	=	28
 msf_typ_off		=	32
-msf_flags_off		=	33
+msf_flags_off		=	34
 
 SFT_COUNT		=	0x01
 SFT_DM			=	0x02
@@ -35,6 +35,7 @@ SFT_DEV_ACT		=	0x10
 SFT_ZTRAP		=	0x20
 SFT_EXTFUN		=	0x40
 SFT_ZSTEP_ACT		=	0x80
+SFT_ZINTR		=	0x100
 
 	.sbttl	g_msf.si    putframe
 .macro putframe

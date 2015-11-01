@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mlkdef.h"
@@ -18,6 +21,7 @@
 
 #define ZTRAP_FRAME		"    ($ZTRAP)"
 #define ZBRK_FRAME		"    (ZBREAK)"
+#define ZINTR_FRAME		"    ($ZINTERRUPT) "
 #define DEVERR_FRAME		"    (Device Error)"
 #define DIR_MODE_MESS		"    (Direct mode) "
 #define UNK_LOC_MESS		"        Indirection"
@@ -30,9 +34,7 @@ void zshow_stack(zshow_out *output)
 {
 	bool		line_reset;
 	unsigned char	*addr;
-	short		nocount_frames[64];
-	short		*nfp;
-	short		*nfp_top;
+	unsigned short	nocount_frames[64], *nfp, *nfp_top;
 	stack_frame	*fp;
 	mstr 		v;
 	unsigned char	buff[132];
@@ -44,7 +46,7 @@ void zshow_stack(zshow_out *output)
 	line_reset = FALSE;
 	for (fp = frame_pointer; fp->old_frame_pointer; fp = fp->old_frame_pointer)
 	{
-		if (!(fp->type & SFT_COUNT))
+		if (!(fp->type & SFT_COUNT) || (fp->type & SFT_ZINTR))
 		{
 			*nfp++ = fp->type;
 			if (fp->type & SFT_ZTRAP || fp->type & SFT_DEV_ACT || HAS_TRANS_CODE_ERR(fp))
@@ -59,9 +61,12 @@ void zshow_stack(zshow_out *output)
 			}
 			if ((unsigned char*)fp->rvector + fp->rvector->current_rhead_ptr == fp->mpc)
 				addr = fp->mpc + 1;
+			/*The equality check in the second half of the expression below is to
+			  account for the delay-slot in HP-UX for implicit quits. Not an issue here,
+			  but added for uniformity. */
 			else if (line_reset &&
 				((unsigned char *) fp->rvector + fp->rvector->ptext_ptr <= fp->mpc &&
-				fp->mpc < (unsigned char *) fp->rvector + fp->rvector->vartab_ptr))
+				fp->mpc <= (unsigned char *) fp->rvector + fp->rvector->vartab_ptr))
 			{
 				addr = fp->mpc + 1;
 				line_reset = FALSE;
@@ -94,6 +99,10 @@ void zshow_stack(zshow_out *output)
 						break;
 					case SFT_DM:
 						memcpy(&buff[v.len], DIR_MODE_MESS, sizeof(DIR_MODE_MESS) - 1);
+						v.len += sizeof(DIR_MODE_MESS) - 1;
+						break;
+					case (SFT_COUNT | SFT_ZINTR):
+						memcpy(&buff[v.len], ZINTR_FRAME, sizeof(ZINTR_FRAME) - 1);
 						v.len += sizeof(DIR_MODE_MESS) - 1;
 						break;
 					default:

@@ -1,7 +1,7 @@
 #! /usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -84,9 +84,9 @@ if (-e $dst_ver) then
 		set move_args = "compulsory"
 	endif
 	if ($?move_args)  then
-		set save_ver = `ls -ld /usr/library/$dst_ver | awk '{if (length($7)==1) $7="0"_$7; time=$6"_"$7"_"$8; print toupper(time)}' | sed 's/://g'`
-		echo "Renaming /usr/library/${dst_ver} to /usr/library/${dst_ver}_${save_ver}"
-		mv /usr/library/$dst_ver /usr/library/${dst_ver}_${save_ver}
+		set save_ver = `ls -ld ${gtm_root}/$dst_ver | awk '{if (length($7)==1) $7="0"_$7; time=$6"_"$7"_"$8; print toupper(time)}' | sed 's/://g'`
+		echo "Renaming ${gtm_root}/${dst_ver} to $gtm_root}/${dst_ver}_${save_ver}"
+		mv ${gtm_root}/$dst_ver ${gtm_root}/${dst_ver}_${save_ver}
 	else
 		echo "Deleting existing $dst_dir directory structure"
 		rm -rf $dst_ver
@@ -129,6 +129,9 @@ set gtm_s_l390 = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_l390 sr_l
 set platform_library = "$platform_name"
 if ( "s390" == $MACHTYPE && "linux" == $platform_library ) then
 	set platform_library = "l390"
+endif
+if ( "z/OS" == $MACHTYPE ) then
+	set platform_library = "os390"
 endif
 
 ########### Copy sources from platform-specific directories into appropriate version-subdirectories ############

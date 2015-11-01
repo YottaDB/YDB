@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@
 #include "copy.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "gvcst_blk_build.h"
@@ -35,6 +35,7 @@
 
 /* Include prototypes */
 #include "t_qread.h"
+#include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 
 GBLREF bool             certify_all_blocks;
@@ -205,7 +206,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 						break;
 					}
 					if (CDB_STAGNATE <= t_tries || mu_reorg_process)
-						cws_insert(srch_status->cr->blk);
+						CWS_INSERT(srch_status->cr->blk);
 					srch_status->cr->refer = TRUE;
 				}
 			}

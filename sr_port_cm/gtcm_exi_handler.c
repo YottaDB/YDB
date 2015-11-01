@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,28 +40,21 @@ GBLREF	connection_struct	*curr_entry;
 GBLREF	int4			EXICONDITION;
 GBLREF	uint4			process_id;
 
-#define MAX_GTCM_EXI_LOOPCNT	4096
-
 void gtcm_exi_handler()
 {
-	int 		lcnt;
 	struct CLB	*p, *pn;
 	error_def(ERR_UNKNOWNFOREX);
 	error_def(ERR_GTCMEXITLOOP);
 
 	ESTABLISH(gtcm_exi_ch);
 	if (ntd_root)
-	{
-		for (p = (struct CLB *)RELQUE2PTR(ntd_root->cqh.fl), lcnt = 0;
-			(p != (struct CLB *)ntd_root) && (MAX_GTCM_EXI_LOOPCNT > lcnt); p = pn, lcnt++)
-		{
-			/* Get the forward link, in case a close removes the current entry */
+	{	/* Need a way to detect cycles in the loop below (C9C02-001908) */
+		for (p = (struct CLB *)RELQUE2PTR(ntd_root->cqh.fl); (p != (struct CLB *)ntd_root); p = pn)
+		{	/* Get the forward link, in case a close removes the current entry */
 			pn = (struct CLB *)RELQUE2PTR(p->cqe.fl);
 			curr_entry = (connection_struct*)(p->usr);
 			gtcmtr_terminate(FALSE);
 		}
-		if (MAX_GTCM_EXI_LOOPCNT <= lcnt)
-			send_msg(VARLSTCNT(1) ERR_GTCMEXITLOOP);
 	}
 	print_exit_stats();
 	VMS_ONLY(

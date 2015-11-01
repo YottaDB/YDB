@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,19 +110,21 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		BG_TRACE_ANY(csa, wrt_busy);
 		return err_status;			/* Already here, get out */
 	}
-	csa->in_wtstart = TRUE;				/* Tell ourselves we're here */
+	cnl = csa->nl;
+	csa->in_wtstart = TRUE;				/* Tell ourselves we're here and make the csa->in_wtstart (private copy) */
+	INCR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);	/* and cnl->in_wtstart (shared copy) assignments as close as possible.   */
+	assert(cnl->in_wtstart > 0 && csa->in_wtstart);
 
 	max_ent = csd->n_bts;
 	if (0 == (max_writes = writes))			/* If specified writes to do, use that.. */
 		max_writes = csd->n_wrt_per_flu;	/* else, max writes is how many blocks there are */
-	cnl = csa->nl;
 	jpc = csa->jnl;
 	assert(csa == cs_addrs);
-	assert(!JNL_ENABLED(csd) || NULL != jpc);
+	assert(!JNL_ALLOWED(csd) || NULL != jpc);	/* if journaling is allowed, we better have non-null csa->jnl */
 
 	if (dba_bg == csd->acc_meth)
 	{
-		if (JNL_ENABLED(csd)  &&  NULL != jpc && (NOJNL != jpc->channel))
+		if (JNL_ENABLED(csd) && (NULL != jpc) && (NOJNL != jpc->channel))
 		{
 			if (SS_NORMAL != (err_status = jnl_qio_start(jpc)))
 			{
@@ -142,7 +144,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	}
 	assert(((sm_long_t)ahead & 7) == 0);
 	queue_empty = FALSE;
-	INCR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
 
 	for (n1 = n2 = 0, csrfirst = NULL;  n1 < max_ent  &&  n2 < max_writes  &&  !csd->wc_blocked ;  ++n1)
 	{

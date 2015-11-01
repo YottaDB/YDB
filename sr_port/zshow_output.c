@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "hashdef.h"
 #include "lv_val.h"
 #include "subscript.h"
@@ -48,7 +51,7 @@ void zshow_output(zshow_out *out, mstr *str)
 	char		buff, *ptr1, *ptr2;
 	unsigned char	*kend, kbuff[MAX_KEY_SZ + 1];
 	int		key_ovrhd, len;
-	error_def(ERR_ZSHOWBADOUT);
+
 	error_def(ERR_ZSHOWGLOSMALL);
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
@@ -339,7 +342,7 @@ void zshow_output(zshow_out *out, mstr *str)
 		}
 		break;
 	default:
-		rts_error(VARLSTCNT(1) ERR_ZSHOWBADOUT);
+		GTMASSERT;
 		break;
 	}
 	out->curr_code = out->code;

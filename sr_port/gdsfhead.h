@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -358,8 +358,6 @@ enum db_ver
 #define MAXTOTALBLKS		MASTER_MAP_SIZE * 8 * BLKS_PER_LMAP
 #define	IS_BITMAP_BLK(blk)	(ROUND_DOWN2(blk, BLKS_PER_LMAP) == blk)	/* TRUE if blk is a bitmap */
 
-#define BITS_PER_UCHAR	8
-
 #define	STEP_FACTOR			64		/* the factor by which flush_trigger is incremented/decremented */
 #define	MIN_FLUSH_TRIGGER(n_bts)	((n_bts)/4)	/* the minimum flush_trigger as a function of n_bts */
 #define	MAX_FLUSH_TRIGGER(n_bts)	((n_bts)*15/16)	/* the maximum flush_trigger as a function of n_bts */
@@ -597,8 +595,8 @@ typedef struct sgmnt_data_struct
 	int4		rc_srv_cnt;		/* Count of RC servers accessing database */
 	short		dsid;			/* DSID value, non-zero when being accessed by RC */
 	short		rc_node;
-	key_t		filler_ftok;		/* Unused */
-	int4		filler_nbb;		/* Next backup block -- for online backup */
+	int4		autoswitchlimit;	/* limit in disk blocks (max 4GB) when jnl should be auto switched */
+	int4		epoch_interval;		/* Time between successive epochs in epoch-seconds */
 	int4		n_tp_retries[7];	/* indexed by t_tries and incremented by 1 for all regions in restarting TP */
 	/* The need for having tab_bg_trc_rec_fixed.h and tab_bg_trc_rec_variable.h is because
 	 * of now_running and kill_in_prog coming in between the bg_trc_rec fields.
@@ -627,7 +625,7 @@ typedef struct sgmnt_data_struct
 #include "tab_db_csh_acct_rec.h"
 #undef TAB_DB_CSH_ACCT_REC
 	unsigned char	reorg_restart_key[256];         /* 1st key of a leaf block where reorg was done last time */
-	char		filler_2k[4];
+	int4		alignsize;		/* alignment size for JRT_ALIGN */
 	block_id	reorg_restart_block;
 	/******* following three members (jnl_file, dbfid, filler_ino_t) together occupy 64 bytes on all platforms *******/
 	union
@@ -647,11 +645,11 @@ typedef struct sgmnt_data_struct
 #endif
 	/*************************************************************************************/
 
-	mutex_spin_parms_struct	mutex_spin_parms; /* Unix only */
-	int4		mutex_filler1;		/* Unix only */
-	int4		mutex_filler2;		/* Unix only */
-	int4		mutex_filler3;		/* Unix only */
-	int4		mutex_filler4;		/* Unix only */
+	mutex_spin_parms_struct	mutex_spin_parms;
+	int4		mutex_filler1;
+	int4		mutex_filler2;
+	int4		mutex_filler3;
+	int4		mutex_filler4;
 	/* semid/shmid/sem_ctime/shm_ctime are UNIX only */
 	int4		semid;			/* Since int may not be of fixed size, int4 is used */
 	int4		shmid;			/* Since int may not be of fixed size, int4 is used */
@@ -955,6 +953,8 @@ typedef struct	sgmnt_addrs_struct
 	int4		pblk_align_jrecsize;	/* maximum size of a PBLK record with corresponding ALIGN record */
 	int4		min_total_tpjnl_rec_size;	/* minimum journal space requirement for a TP transaction */
 	int4		min_total_nontpjnl_rec_size;	/* minimum journal space requirement for a non-TP transaction */
+	int4		jnl_state;		/* journaling state: it can be 0, 1 or 2 (same as enum jnl_state_codes in jnl.h) */
+	int4		repl_state;		/* state of replication whether "on" or "off" */
 } sgmnt_addrs;
 
 
@@ -1154,6 +1154,33 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 #define INVALID_SEMID -1
 #define INVALID_SHMID -1
 
+#if defined(UNIX)
+#define DB_FSYNC(reg, udi, csa, db_fsync_in_prog)						\
+{												\
+	error_def(ERR_DBFSYNCERR);								\
+	BG_TRACE_PRO_ANY(csa, n_db_fsyncs);							\
+	if (csa->now_crit)									\
+		BG_TRACE_PRO_ANY(csa, n_db_fsyncs_in_crit);					\
+	db_fsync_in_prog++;									\
+	if (-1 == fsync(udi->fd))								\
+	{											\
+		db_fsync_in_prog--;								\
+		rts_error(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), errno);		\
+	}											\
+	db_fsync_in_prog--;									\
+	assert(0 <= db_fsync_in_prog);								\
+}
+
+#define STANDALONE(x) mu_rndwn_file(x, TRUE)
+#define DBFILOP_FAIL_MSG(status, msg)	gtm_putmsg(VARLSTCNT(5) msg, 2, DB_LEN_STR(gv_cur_region), status);
+#elif defined(VMS)
+#define STANDALONE(x) mu_rndwn_file(TRUE)
+#define DBFILOP_FAIL_MSG(status, msg)	gtm_putmsg(VARLSTCNT(7) msg, 2, DB_LEN_STR(gv_cur_region), status, \
+						0, FILE_INFO(gv_cur_region)->fab->fab$l_stv);
+#else
+#error unsupported platform
+#endif
+
 bt_rec_ptr_t bt_put(gd_region *r, int4 block);
 void bt_que_refresh(gd_region *greg);
 void bt_init(sgmnt_addrs *cs);
@@ -1169,7 +1196,7 @@ void rel_crit(gd_region *reg);
 void rel_lock(gd_region *reg);
 void gv_init_reg(gd_region *reg);
 void gvcst_init(gd_region *greg);
-mstr *mupfndfil(gd_region *reg);
+boolean_t mupfndfil(gd_region *reg, mstr *mstr_addr);
 enum cdb_sc rel_read_crit(gd_region *reg, short crash_ct);
 
 bool wcs_verify(gd_region *reg, boolean_t expect_damage);

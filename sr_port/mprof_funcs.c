@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,8 +48,9 @@ GBLREF 	unsigned char 		*prof_stackptr;
 GBLREF 	stack_frame_prof 	*prof_fp;
 GBLREF 	mval			dollar_job;
 GBLREF	uint4			process_id;
+GBLREF	int * volatile		var_on_cstack_ptr;	/* volatile so that nothing gets optimized out */
 
-#define	MAX_MPROF_STACK_LEVEL	256
+#define	MAX_MPROF_STACK_LEVEL	1024
 #ifdef 	MPROF_DEBUGGING
 #define PRINT_PROF_TREE		mprof_tree_print(head_tblnd,0,1)
 #define PRINT_PROF_TREE_ELEM	mprof_tree_print(curr_tblnd,0,-1)
@@ -77,7 +78,9 @@ static struct
 	mval	*args[MAX_GVSUBSCRIPTS + 1];
 } op_gvargs;
 static mval			gbl_to_fill;
+static int			overflowed_levels;
 
+#define OVERFLOW_STRING	":INCOMPLETE DATA: MAXTRACELEVEL"
 #define MPROF_NULL_LABEL "^"
 #define MPROF_FOR_LOOP	"FOR_LOOP"
 #define UPDATE_TIME(x)	x->e.usr_time += (tcurr.tms_utime - tprev.tms_utime);\
@@ -88,6 +91,8 @@ static mval			gbl_to_fill;
 #define SAME_LINE	(0 == (	strcmp((char *)tmp_trc_tbl_entry.rout_name, (char *)curr_tblnd->e.rout_name) ||  \
 				strcmp((char *)tmp_trc_tbl_entry.label_name, (char *)curr_tblnd->e.label_name) ||  \
 				strcmp((char *)tmp_trc_tbl_entry.line_num, (char *)curr_tblnd->e.line_num)))
+#define RTS_ERROR_VIEWNOTFOUND(x)	rts_error(VARLSTCNT(8) ERR_VIEWNOTFOUND, 2, gvn->str.len, gvn->str.addr, \
+						ERR_TEXT, 2, RTS_ERROR_STRING(x));
 
 
 void	turn_tracing_on(mval *gvn)
@@ -108,6 +113,7 @@ void	turn_tracing_on(mval *gvn)
 	}
 	if (!gvn->str.len || '^' != *(signed char *)&gvn->str.addr[0])
 		rts_error(VARLSTCNT(4) ERR_NOTGBL, 2, gvn->str.len, gvn->str.addr);
+	parse_gvn(gvn);
 	memcpy(&gbl_to_fill, gvn, sizeof(gbl_to_fill));
 	gbl_to_fill.str.addr = (char *)malloc(gvn->str.len); /*len was already setup*/
 	memcpy(gbl_to_fill.str.addr, gvn->str.addr, gvn->str.len);
@@ -140,14 +146,11 @@ void turn_tracing_off (mval *gvn)
 {
 	if (FALSE == is_tracing_on)
 		return;
-	is_tracing_on = is_tracing_ini = FALSE;
 	PRINT_PROF_TREE;
 	TIMES(&tcurr);
-	if (NULL == gvn)
-	{
-		parse_gvn(&gbl_to_fill);
-	} else
+	if (NULL != gvn)
 		parse_gvn(gvn);
+	is_tracing_on = is_tracing_ini = FALSE;
 	assert(0 != gbl_to_fill.str.addr);
 	free(gbl_to_fill.str.addr);
 	gbl_to_fill.str.addr = 0;
@@ -199,7 +202,7 @@ void    pcurrpos(int inside_for_loop)
 	}
 	if (NULL != curr_tblnd)
 	{
-		if ((MPROF_OUTOFFOR + MPROF_INTOFOR) & inside_for_loop_state)
+		if ((MPROF_OUTOFFOR | MPROF_INTOFOR) & inside_for_loop_state)
 		{
 			/*either on the way out of FOR, or into FOR (or another iteration)*/
 			LINK_NEW(curr_tblnd);
@@ -317,8 +320,47 @@ void pcfree(void)
 
 void	new_prof_frame(int dummy)
 {
+	/*****************************************************************************************
+	The time for frames accounts for the time spent within that frame,
+	i.e. does not include time spent within other frames called from this frame.
+	As an example:
+	d l1	|			t0
+		|
+		|
+		| d l2	|		t1
+			|
+			|
+			|
+			| q		t2
+		|
+		|
+		|
+		|
+		| q			t3
+
+	Results should be:
+		l1 frame:
+		(t3-t2)+(t1-t0)
+
+			l2 frame
+			(t2-t1)
+
+	Calculations:
+	at t0: 	prof_fp(l1)	=t0 (in new_prof_frame)
+	at t1:	prof_fp(l1)	=t1-t0  (in new_prof_frame)
+		prof_fp(l2)	=t1
+	at t2:	in unw_prof_frame:
+		prof_fp(l2)	=t2-t1  and it is saved back into the tree
+		prof_fp(l1)	=t2-(prev.value)=t2-(t1-t0)
+	at t3:  in unw_prof_frame:
+		prof_fp(l1)	=t3-(cur_value of prof_fp(l1))
+				=t3-(t2-(t1-t0))=t3-t2+t1-t0
+				=(t3-t2)+(t1-t0)
+	******************************************************************************************/
 	stack_frame_prof	*psf;
 	struct tms		curr;
+
+	error_def(ERR_MAXTRACELEVEL);
 
 	if (dummy)
 	{
@@ -327,6 +369,14 @@ void	new_prof_frame(int dummy)
 			currnd_stk[line_prof_stack] = curr_tblnd;
 			time_stack[line_prof_stack] = tprev;
 			loop_info_stk[line_prof_stack] = inside_for_loop_state;
+		} else
+		{
+			if (!overflowed_levels)
+			{
+				gtm_putmsg(VARLSTCNT(3) ERR_MAXTRACELEVEL, 1, MAX_MPROF_STACK_LEVEL);
+				overflowed_levels++;
+			}
+			return;
 		}
 		curr_tblnd = NULL;
 		TIMES(&curr);
@@ -354,6 +404,12 @@ void unw_prof_frame (void)
 	struct tms		curr;
 	stack_frame		*save_fp;
 
+	if (line_prof_stack >= MAX_MPROF_STACK_LEVEL)
+	{
+		line_prof_stack--;
+		assert(overflowed_levels);
+		return;
+	}
 	TIMES(&curr);
 	if (NULL == prof_fp)
 		return;
@@ -380,16 +436,13 @@ void unw_prof_frame (void)
 		e.line_num[6]='\0';
 		e.for_count = 0;
 		t = mprof_tree_insert(head_tblnd, tmp_trc_tbl_entry);
-		t->e.count += 1;
+		/*update count and timing of quit statements (implicit or explicit)*/
+		t->e.count++;
+		t->e.usr_time += (curr.tms_utime - tprev.tms_utime);
+		t->e.sys_time += (curr.tms_stime - tprev.tms_stime);
 		t = mprof_tree_insert(head_tblnd, e);
-		t->e.count += 1;
-		/* A hack because the sys_time and the user time are
-		 * improperly maintained in the system. It has been discovered
-		 * that the cpu-time used by the process decreases, and in all cases
-		 * the absolute value is taken.
-		 */
-		prof_fp->sys_time = (prof_fp->sys_time < 0) ? -prof_fp->sys_time : prof_fp->sys_time;
-		prof_fp->usr_time = (prof_fp->usr_time < 0) ? -prof_fp->usr_time : prof_fp->usr_time;
+		/*update count and timing (from prof_fp) of frame I'm leaving*/
+		t->e.count++;
 		assert(prof_fp->sys_time >= 0 && prof_fp->usr_time >= 0);
 		t->e.sys_time += prof_fp->sys_time;
 		t->e.usr_time += prof_fp->usr_time;
@@ -403,10 +456,11 @@ void unw_prof_frame (void)
 				line_prof_stack--;
 			} else
 				GTMASSERT;
+			/* move back up to parent frame */
 			prof_msp = (unsigned char *)prof_fp + sizeof(stack_frame_prof);
 			prof_fp = prof_fp->prev;
-			prof_fp->sys_time += curr.tms_stime;
-			prof_fp->usr_time += curr.tms_utime;
+			prof_fp->sys_time = curr.tms_stime - prof_fp->sys_time;
+			prof_fp->usr_time = curr.tms_utime - prof_fp->usr_time;
 		}
 		else
 		{
@@ -446,14 +500,12 @@ void	crt_gbl(struct mprof_tree *p, int info_level)
 	/* Write the data into the global
 	 */
 	char		*c_top, *c_ref, ch;
-	int		count, arg_index, subsc_len, start_point;
+	int		count, arg_index, subsc_len, start_point, tmp_str_len;
 	mval		data;
 	char		dataval[56];
 	unsigned char	subsval[4];
 	unsigned char	*tmpnum, *end;
 	mval		*spt;
-
-	error_def(ERR_GVINVALID);
 
 	if (0 == p->e.count)
 		return;
@@ -540,7 +592,16 @@ void	crt_gbl(struct mprof_tree *p, int info_level)
 	}
 	data.mvtype = MV_STR;
 	data.str.len = (((int )tmpnum - start_point) > 0) ? ((int )tmpnum - start_point) : (start_point - (int )tmpnum);
-	data.str.addr = (char *)pcalloc(data.str.len);
+
+	if ((overflowed_levels) && !(strcmp((char *)p->e.line_num, "*dlin*")))
+	{
+		tmp_str_len = data.str.len;
+		data.str.len += sizeof(OVERFLOW_STRING) - 1;
+		data.str.addr = (char *)pcalloc(data.str.len);
+		memcpy(dataval + tmp_str_len, OVERFLOW_STRING, data.str.len);
+
+	} else
+		data.str.addr = (char *)pcalloc(data.str.len);
 	memcpy(data.str.addr, dataval, data.str.len);
 	op_gvput(&data);
 	return;
@@ -562,8 +623,11 @@ void	get_entryref_information(boolean_t line, struct trace_entry *tmp_trc_tbl_en
 	line_reset = FALSE;
 	for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
 	{
+		/*The equality check in the second half of the expression below is to
+		  account for the delay-slot in HP-UX for implicit quits.
+		  */
 		if ((unsigned char *) fp->rvector + fp->rvector->ptext_ptr <= fp->mpc &&
-			fp->mpc < (unsigned char *) fp->rvector + fp->rvector->vartab_ptr)
+			fp->mpc <= (unsigned char *) fp->rvector + fp->rvector->vartab_ptr)
 		{
 			if (line_reset || ((unsigned char*) fp->rvector + fp->rvector->current_rhead_ptr == fp->mpc))
 				addr = fp->mpc + 1;
@@ -665,14 +729,8 @@ void parse_gvn(mval *gvn)
 	static mstr		mprof_mstr;
 
 	error_def(ERR_NOTGBL);
-	error_def(ERR_LPARENREQD);
-	error_def(ERR_GVINVALID);
-	error_def(ERR_NUMUNXEOR);
 	error_def(ERR_STRUNXEOR);
-	error_def(ERR_DLRCUNXEOR);
-	error_def(ERR_DLRCTOOBIG);
-	error_def(ERR_EORNOTFND);
-	error_def(ERR_RPARENREQD);
+	error_def(ERR_VIEWNOTFOUND);
 	error_def(ERR_TEXT);
 
 	c_ref = (signed char *)&gvn->str.addr[0];
@@ -694,19 +752,18 @@ void parse_gvn(mval *gvn)
 		mprof_mstr.addr = (char *)malloc(mprof_mstr.len);
 	}
 	mpsp = mprof_mstr.addr;
-	TIMES(&tcurr);
 	/* Parse the global variable passed to insert the information */
 	spt = &subsc[0];
 	spt->mvtype = MV_STR;
 	spt->str.addr = mpsp;
 	ch = *mpsp++ = *c_ref++;
 	if ((ch < 'A' || ch > 'Z') && (ch != '%') && (ch < 'a' || ch > 'z'))
-		rts_error(VARLSTCNT(4) ERR_GVINVALID, 2, gvn->str.len, gvn->str.addr);
+		RTS_ERROR_VIEWNOTFOUND("Invalid global name");
 	for ( ; (c_ref < c_top) && ('(' != *c_ref); )
 	{
 		ch = *mpsp++ = *c_ref++;
 		if ((ch < 'A' || ch > 'Z')  &&  (ch < 'a' || ch > 'z')  &&  (ch < '0' || ch > '9'))
-			rts_error(VARLSTCNT(4) ERR_GVINVALID, 2, gvn->str.len, gvn->str.addr);
+			RTS_ERROR_VIEWNOTFOUND("Invalid global name");
 	}
 	spt->str.len = (long)mpsp - (long)spt->str.addr;
 	op_gvargs.args[count++] = spt++;
@@ -714,7 +771,7 @@ void parse_gvn(mval *gvn)
 	/* Process subscripts if any */
 	if (c_ref++ < c_top)
 	{
-		for ( ; ; )
+		for ( ; c_ref < c_top; )
 		{
 			spt->mvtype = MV_STR;
 			ch = *c_ref;
@@ -724,19 +781,35 @@ void parse_gvn(mval *gvn)
 				for ( ; ; )
 				{
 					if (c_ref == c_top)
-						rts_error(VARLSTCNT(4) ERR_STRUNXEOR, 2, gvn->str.len, gvn->str.addr);
-					if (('\"' == *c_ref) && (*++c_ref != '\"'))
-						break;
+						RTS_ERROR_VIEWNOTFOUND("Right parenthesis expected");
+					if ('\"' == *c_ref)
+					{
+						if (++c_ref == c_top)
+							RTS_ERROR_VIEWNOTFOUND("Right parenthesis expected");
+						if (*c_ref != '\"')
+							break;
+					}
 					*mpsp++ = *c_ref++;
 				}
 			} else if ('$' == ch)
 			{
 				if (++c_ref == c_top)
-					rts_error(VARLSTCNT(4) ERR_DLRCUNXEOR, 2, gvn->str.len, gvn->str.addr);
+					RTS_ERROR_VIEWNOTFOUND("Intrinsic value is incomplete");
 				if (*c_ref != 'J' && *c_ref != 'j')
-					rts_error(VARLSTCNT(8) ERR_DLRCUNXEOR, 2, gvn->str.len, gvn->str.addr,
-								ERR_TEXT, 2, RTS_ERROR_TEXT("Intrinsic value passed not $j"));
+					RTS_ERROR_VIEWNOTFOUND("Intrinsic value passed is not $j");
 				c_ref++; 	/* Past 'J' */
+				if ((c_ref < c_top) && (ISALPHA(*c_ref)))
+				{
+					ch = *c_ref;
+					if (c_top >= c_ref + 2)
+					{
+						if ((('O' == ch  || 'o' == ch) && ('B' == *(c_ref + 1) || 'b' == *(c_ref + 1))))
+							c_ref += 2;
+						else
+							RTS_ERROR_VIEWNOTFOUND("Intrinsic value passed is not $j");
+					} else
+						RTS_ERROR_VIEWNOTFOUND("Intrinsic value is incomplete");
+				}
 				assert(10 > dollar_job.str.len);	/* to take care of 4 * gvn->str.len allocation above */
 				memcpy(mpsp, dollar_job.str.addr, dollar_job.str.len);
 				mpsp += dollar_job.str.len;
@@ -744,14 +817,14 @@ void parse_gvn(mval *gvn)
 			{
 				dot_seen = FALSE;
 				if ((ch > '9' || ch < '0')  &&  ch != '.'  &&  ch != '-'  &&  ch != '+')
-					rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, gvn->str.len, gvn->str.addr);
+					RTS_ERROR_VIEWNOTFOUND("Improperly formatted numeric subscript");
 				if ('.' == ch)
 					dot_seen = TRUE;
 				*mpsp++ = *c_ref++;
 				for ( ; ; )
 				{
 					if (c_ref == c_top)
-						rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, gvn->str.len, gvn->str.addr);
+						RTS_ERROR_VIEWNOTFOUND("Right parenthesis expected");
 					if (*c_ref > '9'  ||  *c_ref < '0')
 					{
 						if (*c_ref != '.')
@@ -759,11 +832,13 @@ void parse_gvn(mval *gvn)
 						else if (!dot_seen)
 							dot_seen = TRUE;
 						else
-							rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, gvn->str.len, gvn->str.addr);
+							RTS_ERROR_VIEWNOTFOUND("Improperly formatted numeric subscript");
 					}
 					*mpsp++ = *c_ref++;
 				}
 			}
+			if (c_ref == c_top)
+				RTS_ERROR_VIEWNOTFOUND("Right parenthesis expected");
 			if ('_' == *c_ref)
 			{
 				c_ref++;
@@ -776,10 +851,13 @@ void parse_gvn(mval *gvn)
 			spt->str.addr = mpsp;
 			c_ref++;
 		}
-		if (*c_ref++ != ')')
-			rts_error(VARLSTCNT(4) ERR_RPARENREQD, 2, gvn->str.len, gvn->str.addr);
-		if (c_ref < c_top)
-			rts_error(VARLSTCNT(4) ERR_EORNOTFND, 2, gvn->str.len, gvn->str.addr);
+		assert(c_ref <= c_top);
+		if (c_ref >= c_top)
+			RTS_ERROR_VIEWNOTFOUND("Right parenthesis expected");
+		if (*c_ref != ')')
+			RTS_ERROR_VIEWNOTFOUND("Right parenthesis expected");
+		if (++c_ref < c_top)
+			RTS_ERROR_VIEWNOTFOUND("There are trailing characters after the global name");
 	}
 	assert((char *)mpsp <= mprof_mstr.addr + mprof_mstr.len);	/* Ensure we haven't overrun the malloced buffer */
 	curr_num_subscripts = op_gvargs.count = count;
@@ -798,3 +876,13 @@ void	get_cputime (struct tms *curr)
 	curr->tms_stime = 0;
 }
 #endif
+
+void stack_leak_check(void)
+{
+	int	var_on_cstack;
+
+	if (NULL == var_on_cstack_ptr)
+		var_on_cstack_ptr = &var_on_cstack;
+	if (&var_on_cstack != var_on_cstack_ptr)
+		GTMASSERT;
+}

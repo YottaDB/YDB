@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@
 #include "getzdir.h"
 #include "gtm_compile.h"
 #include "patcode.h"
+#include "print_exit_stats.h"
 
 GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
 GBLREF stack_frame	 	*frame_pointer;
@@ -108,6 +109,7 @@ int	gtm_compile (void)
 		compile_source_file(len, source_file_string);
 		len = MAX_FBUFF;
 	}
+	print_exit_stats();
 	io_rundown(NORMAL_RUNDOWN);
 	if (!(dollar_zcstatus & 1))
 		return -1;

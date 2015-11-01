@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "urx.h"
 
 urx_rtnref *urx_putrtn (char *rtn, char rtnlen, urx_rtnref *anchor)

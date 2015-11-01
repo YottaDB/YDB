@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "copy.h"
 #include "gtm_string.h"
 #include "gdsroot.h"
@@ -27,6 +28,7 @@
 #include "gtcmtr_initproc.h"
 #include "gtcm_protocol.h"
 #include "gtcm_is_query_queryget.h"
+#include "gtcm_err_compat.h"		/* for gtcm_err_compat() prototype */
 #ifdef VMS
 #include "jpv_v10to12.h"
 #endif

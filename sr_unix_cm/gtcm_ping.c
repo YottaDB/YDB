@@ -16,6 +16,9 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
+#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_unistd.h"		/* for getpid() */
+
 #include <errno.h>
 #if defined(sun) || defined(mips)
 #include <sys/time.h>
@@ -194,7 +197,7 @@ int get_ping_rsp()
 /* in_cksum --
  *	Checksum routine for Internet Protocol family headers (C Version)
  */
-in_cksum(u_short *addr, int len)
+int in_cksum(u_short *addr, int len)
 {
 	register int nleft = len;
 	register u_short *w = addr;

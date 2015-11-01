@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include <stddef.h>
 
 #include "gdsroot.h"

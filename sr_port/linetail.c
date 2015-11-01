@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,8 +32,10 @@ int linetail(void)
 		if (window_token == TK_EOL)
 			return TRUE;
 		if (!cmd())
-		{	if (curtchain->exorder.bl->exorder.bl->opcode != OC_RTERROR)
-			{	source_error_found ? stx_error(source_error_found) : stx_error(ERR_CMD);
+		{
+			if (curtchain->exorder.bl->exorder.bl->exorder.bl->opcode != OC_RTERROR)
+			{	/* If rterror is last triple generated (has two args), then error already raised */
+				source_error_found ? stx_error(source_error_found) : stx_error(ERR_CMD);
 			}
 			assert(curtchain->exorder.bl->exorder.fl == curtchain);
 			assert(source_error_found);

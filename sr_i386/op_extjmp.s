@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -49,7 +49,7 @@ l1:	movl	(%eax),%eax
 	pushl	$0
 	pushl	%edx
 	call	flush_jmp
-	addl	$8,%esp
+	addl	$12,%esp
 	getframe
 	ret
 

@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gtm_facility.h"
@@ -19,6 +22,7 @@
 #include "lockconst.h"
 #include "wcs_recover.h"
 #include "dse.h"
+#include "tp_change_reg.h"	/* for tp_change_reg() prototype */
 
 #ifdef UNIX
 #include "mutex.h"

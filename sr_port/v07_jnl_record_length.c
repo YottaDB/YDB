@@ -19,6 +19,10 @@
 #include "v07_jnl.h"
 #include "v07_copy.h"
 
+#ifdef UNIX
+int	rts_error();
+#endif
+
 LITDEF	int	v07_jnl_fixed_size[JRT_RECTYPES] =
 {
 #define JNL_TABLE_ENTRY(rectype, extract_rtn, label, size)	size,

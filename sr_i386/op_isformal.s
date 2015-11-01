@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -30,9 +30,9 @@
 # PUBLIC	op_isformal
 ENTRY op_isformal
 	movl	frame_pointer,%edx
-	movb	msf_typ_off(%edx),%al
-	andb	$~SFT_EXTFUN,msf_typ_off(%edx)
-	andb	$SFT_EXTFUN,%al
+	movw	msf_typ_off(%edx),%ax
+	andw	$~SFT_EXTFUN,msf_typ_off(%edx)
+	andw	$SFT_EXTFUN,%ax
 	je	l1
 	ret
 

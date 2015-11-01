@@ -363,7 +363,7 @@ void iott_use(io_desc *iod, mval *pp)
 			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
 			if (0 != status)
 				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LIT_AND_LEN("tcflush input"),
-					CALLFROM, status);
+					CALLFROM, errno);
 		}
 	}
 	return;

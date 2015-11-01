@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gtm_facility.h"

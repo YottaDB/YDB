@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,9 @@
 #include <errno.h>
 
 #include "gtm_string.h"
+#include "gtm_unistd.h"
+#include "gtmio.h"
+#include "eintr_wrappers.h"
 #include "iotimer.h"
 #include "job.h"
 #include "joberr.h"
@@ -33,10 +36,12 @@
 #include "outofband.h"
 #include "op.h"
 #include "io.h"
+#include "mvalconv.h"
 
 GBLDEF	short			jobcnt		= 0;
 GBLDEF	volatile boolean_t	ojtimeout	= TRUE;
 
+GBLREF  uint4		dollar_zjob;
 GBLREF	int4		outofband;
 GBLREF	int		dollar_truth;
 GBLREF	boolean_t	job_try_again;
@@ -79,6 +84,8 @@ va_dcl
 	boolean_t	timed, single_attempt, non_exit_return;
 	unsigned char	buff[128], *c;
 	int4		status, exit_stat, term_sig, stop_sig;
+	pid_t		zjob_pid = 0; /* zjob_pid should exactly match in type with child_pid(ojstartchild.c) */
+	int		pipe_fds[2], pipe_status;
 #ifdef _BSD
 	union wait	wait_stat;
 #else
@@ -103,13 +110,21 @@ va_dcl
 	timeout = va_arg(var, int4);	/* in seconds */
 	argcnt -= 5;
 
-	routine->str.len = mid_len((mident *)routine->str.addr);
-
+	/* initialize $zjob = 0, in case JOB fails */
+	dollar_zjob = 0;
+	/* create a pipe to channel the PID of the jobbed off process(J) from middle level
+	 * process(M) to the current process (P) */
+	OPEN_PIPE(pipe_fds, pipe_status);
+	if (-1 == pipe_status)
+	{
+		rts_error(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Error creating pipe"), errno);
+	}
 	jobcnt++;
 	command.addr = &combuf[0];
 
 	/* Setup job parameters by parsing param_buf and using label, offset, routine, & timeout).  */
-	job_params.routine = routine->str;
+	job_params.routine.addr = routine->str.addr;
+	job_params.routine.len = mid_len((mident *)routine->str.addr);
 	job_params.label = label->str;
 	job_params.offset = offset;
 	ojparams(param_buf->str.addr, &job_params);
@@ -159,7 +174,7 @@ va_dcl
 	{
 		job_try_again = FALSE;
 		non_exit_return = FALSE;
-		status = ojstartchild(&job_params, argcnt, &non_exit_return);
+		status = ojstartchild(&job_params, argcnt, &non_exit_return, pipe_fds);
 		if (status && !non_exit_return)
 		{
 			/* check if it was a try_again kind of failure */
@@ -185,6 +200,17 @@ va_dcl
 		free(job_params.parms);
 	if (timed && !ojtimeout)
 		cancel_timer((TID)&tid);
+
+	/* the child process (M), that wrote to pipe, would have been exited by now */
+	CLOSEFILE(pipe_fds[1], pipe_status); /* close the write-end to make the following read non-blocking */
+	assert(sizeof(pid_t) == sizeof(zjob_pid));
+	DOREADRC(pipe_fds[0], &zjob_pid, sizeof(zjob_pid), pipe_status); /* read jobbed off PID from pipe */
+	if (0 < pipe_status) /* empty pipe (pipe_status == -1) is ignored and not reported as error */
+	{
+		rts_error(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Error reading from pipe"), errno);
+	}
+	CLOSEFILE(pipe_fds[0], pipe_status); /* release the pipe */
+
 	if (status)
 	{
 		if (timed)					/* $test should be modified only for timed job commands */
@@ -235,6 +261,9 @@ va_dcl
 	{
 		if (timed)
 			dollar_truth = 1;
+
+		assert(0 < zjob_pid);
+		dollar_zjob = zjob_pid;
 		return TRUE;
 	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,9 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_dirent.h"
+
 #include <errno.h>
 #include "gtm_stat.h"
 
@@ -152,7 +154,7 @@ void dir_srch (parse_blk *pfil)
 	lv_val		*dir1, *dir2, *tmp;
 	mstr		tn;
 	short		p2_len;
-	char		filb[MAX_FBUFF + 1], patb[MAX_PATOBJ_LENGTH], *c, *lastd, *top, *p2, *c1, ch;
+	char		filb[MAX_FBUFF + 1], patb[sizeof(ptstr)], *c, *lastd, *top, *p2, *c1, ch;
 	mval		pat_mval, sub, compare;
 	bool		wildname, seen_wd;
 	struct dirent 	*dent;
@@ -168,7 +170,8 @@ void dir_srch (parse_blk *pfil)
 
 	ESTABLISH(dir_ch);
 	pat_mval.mvtype = MV_STR;
-	pat_mval.str.addr = patb;
+	pat_mval.str.addr = patb;	/* patb should be sizeof(ptstr.buff) but instead is sizeof(ptstr) since the C compiler
+					 * complains about the former and the latter is just 4 bytes more */
 	pat_mval.str.len = 0;
 	sub.mvtype = MV_STR;
 	sub.str.len = 0;

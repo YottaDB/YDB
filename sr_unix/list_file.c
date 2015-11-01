@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 #include "gtm_time.h"
 
 #include "io.h"
@@ -63,7 +65,7 @@ void open_list_file(void)
 	memset(&pblk, 0, sizeof(pblk));
 	pblk.def1_size = mid_len((mident *)module_name);
 	memcpy(&list_name[0], module_name, pblk.def1_size);
-	memcpy(&list_name[0] + pblk.def1_size, LIT_AND_LEN(LISTEXT));
+	memcpy(&list_name[0] + pblk.def1_size, LISTEXT, sizeof(LISTEXT) - 1);
 	pblk.def1_size += sizeof(LISTEXT) - 1;
 	pblk.def1_buf = list_name;
 	pblk.buffer = &fname[0];
@@ -128,7 +130,7 @@ void list_cmd(void)
 
 
 LITDEF char gtm_copy_right[] = "\
-  Copyright 1985  Greystone Technology Corp.";
+  Copyright 1985, 2002 Sanchez Computer Associates, Inc.";
 
 LITREF char gtm_release_name[];
 LITREF int4 gtm_release_name_len;

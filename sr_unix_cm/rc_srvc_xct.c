@@ -27,6 +27,9 @@ static char     rcsid[] = "$Header:$";
 #endif
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "gtcm.h"
 #include "omi.h"
 #include "rc.h"

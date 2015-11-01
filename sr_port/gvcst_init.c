@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,8 @@
 #include "have_crit_any_region.h"
 #include "t_retry.h"
 
+#define CWS_INITIAL_SIZE        32
+
 GBLREF	gd_region		*gv_cur_region, *db_init_region;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -69,6 +71,7 @@ GBLREF	int			tprestart_syslog_delta;
 GBLREF	tp_region		*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
 GBLREF	tp_region		*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
 GBLREF	unsigned int		t_tries;
+GBLREF	hashtab			*cw_stagnate;
 
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
@@ -76,11 +79,12 @@ LITREF int			jnl_fixed_size[];
 
 void	assert_jrec_member_offsets(void);
 
-/* The following function hs been moved from jnl_write_logical.c to make sure that offsets are correct */
+/* The following function has been moved from jnl_write_logical.c to make sure that offsets are correct */
 
 void	assert_jrec_member_offsets(void)
 {
-	jrec_union	jnl_record;
+	jrec_union		jnl_record;
+	enum jnl_record_type	rectype;
 
 	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_fkill.pini_addr);
 	assert(&jnl_record.jrec_kill.pini_addr == &jnl_record.jrec_gkill.pini_addr);
@@ -205,6 +209,50 @@ void	assert_jrec_member_offsets(void)
 	assert(&jnl_record.jrec_fkill.token == &jnl_record.jrec_uzkill.token);
 	assert(&jnl_record.jrec_pini.process_vector[CURR_JPV] == &jnl_record.jrec_pfin.process_vector);
 	assert(&jnl_record.jrec_pini.process_vector[CURR_JPV] == &jnl_record.jrec_eof.process_vector);
+
+	/* these asserts ensure that JREC_PREFIX_SIZE, JREC_SUFFIX_SIZE and jnl_fixed_size[] for all journal records
+	 * are a multiple of JNL_REC_START_BNDRY (which is 8 currently). this prevents the need for explicit ROUND_UP
+	 * done in the definition of the respective xxxx_RECLEN (EOF_RECLEN etc.) macros in jnl.h
+	 * the 8-byte multiple assumption is hard-coded in the codebase in lots of places and hence this assert at startup.
+	 */
+	assert(ROUND_UP(JREC_PREFIX_SIZE, JNL_REC_START_BNDRY) == JREC_PREFIX_SIZE);
+	assert(ROUND_UP(JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY) == JREC_SUFFIX_SIZE);
+
+	assert(ROUND_UP(AIMG_RECLEN,  JNL_REC_START_BNDRY) == AIMG_RECLEN );
+	assert(ROUND_UP(ALIGN_RECLEN, JNL_REC_START_BNDRY) == ALIGN_RECLEN);
+	assert(ROUND_UP(EOF_RECLEN,   JNL_REC_START_BNDRY) == EOF_RECLEN  );
+	assert(ROUND_UP(EPOCH_RECLEN, JNL_REC_START_BNDRY) == EPOCH_RECLEN);
+	assert(ROUND_UP(INCTN_RECLEN, JNL_REC_START_BNDRY) == INCTN_RECLEN);
+	assert(ROUND_UP(NULL_RECLEN,  JNL_REC_START_BNDRY) == NULL_RECLEN );
+	assert(ROUND_UP(PBLK_RECLEN,  JNL_REC_START_BNDRY) == PBLK_RECLEN );
+	assert(ROUND_UP(PFIN_RECLEN,  JNL_REC_START_BNDRY) == PFIN_RECLEN );
+	assert(ROUND_UP(PINI_RECLEN,  JNL_REC_START_BNDRY) == PINI_RECLEN );
+	assert(ROUND_UP(TCOM_RECLEN,  JNL_REC_START_BNDRY) == TCOM_RECLEN );
+	assert(ROUND_UP(ZTCOM_RECLEN, JNL_REC_START_BNDRY) == ZTCOM_RECLEN);
+
+	assert(ROUND_UP(SET_RECLEN,   JNL_REC_START_BNDRY) == SET_RECLEN  );
+	assert(ROUND_UP(TSET_RECLEN,  JNL_REC_START_BNDRY) == TSET_RECLEN );
+	assert(ROUND_UP(USET_RECLEN,  JNL_REC_START_BNDRY) == USET_RECLEN );
+	assert(ROUND_UP(FSET_RECLEN,  JNL_REC_START_BNDRY) == FSET_RECLEN );
+	assert(ROUND_UP(GSET_RECLEN,  JNL_REC_START_BNDRY) == GSET_RECLEN );
+
+	assert(ROUND_UP(KILL_RECLEN,  JNL_REC_START_BNDRY) == KILL_RECLEN );
+	assert(ROUND_UP(TKILL_RECLEN, JNL_REC_START_BNDRY) == TKILL_RECLEN);
+	assert(ROUND_UP(UKILL_RECLEN, JNL_REC_START_BNDRY) == UKILL_RECLEN);
+	assert(ROUND_UP(FKILL_RECLEN, JNL_REC_START_BNDRY) == FKILL_RECLEN);
+	assert(ROUND_UP(GKILL_RECLEN, JNL_REC_START_BNDRY) == GKILL_RECLEN);
+
+	assert(ROUND_UP(ZKILL_RECLEN,  JNL_REC_START_BNDRY) == ZKILL_RECLEN );
+	assert(ROUND_UP(TZKILL_RECLEN, JNL_REC_START_BNDRY) == TZKILL_RECLEN);
+	assert(ROUND_UP(UZKILL_RECLEN, JNL_REC_START_BNDRY) == UZKILL_RECLEN);
+	assert(ROUND_UP(FZKILL_RECLEN, JNL_REC_START_BNDRY) == FZKILL_RECLEN);
+	assert(ROUND_UP(GZKILL_RECLEN, JNL_REC_START_BNDRY) == GZKILL_RECLEN);
+
+	for (rectype = JRT_BAD; rectype < JRT_RECTYPES; rectype++)
+		assert(ROUND_UP(jnl_fixed_size[rectype], JNL_REC_START_BNDRY) == jnl_fixed_size[rectype]);
+
+	assert(ROUND_UP(EOF_BACKPTR  , JNL_REC_START_BNDRY) == EOF_BACKPTR  );
+	assert(ROUND_UP(EPOCH_BACKPTR, JNL_REC_START_BNDRY) == EPOCH_BACKPTR);
 }
 
 void gvcst_init (gd_region *greg)
@@ -225,11 +273,13 @@ void gvcst_init (gd_region *greg)
 	char			trans_buff[MAX_FN_LEN+1];
 	static int4		first_time = TRUE;
 
-	error_def (ERR_DBCRPT);
-	error_def (ERR_DBCREIMC);
+	error_def (ERR_DBFLCORRP);
+	error_def (ERR_DBCREINCOMP);
 	error_def (ERR_DBNOTGDS);
 	error_def (ERR_BADDBVER);
 	error_def (ERR_VERMISMATCH);
+
+	init_hashtab(&cw_stagnate, CWS_INITIAL_SIZE);
 
 	/* we shouldn't have crit on any region unless we are in TP and in the final retry or we are in
 	 * mupip_set_journal trying to switch journals across all regions. Currently, there is no fine-granular
@@ -248,7 +298,11 @@ void gvcst_init (gd_region *greg)
 	/* check the header design assumptions */
 	assert(sizeof(th_rec) == (sizeof(bt_rec) - sizeof(bt->blkque)));
 	assert(sizeof(cache_rec) == (sizeof(cache_state_rec) + sizeof(cr->blkque)));
-	assert_jrec_member_offsets();
+	/* Comment this line out until we start supporting journal record sizes of 64K */
+	/* assert(MAX_DB_BLK_SIZE <= MAX_JNL_REC_SIZE);	*/ /* Ensure a PBLK record can accommodate a full GDS block */
+	/* Ensure minimum align size can support the maximum journal record size */
+	assert(MAX_JNL_REC_SIZE <= (DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE));
+	DEBUG_ONLY(assert_jrec_member_offsets();)
         set_num_additional_processors();
 
 	DEBUG_ONLY(
@@ -356,9 +410,9 @@ void gvcst_init (gd_region *greg)
 		temp_cs_data->owner_node = 0;
 	}
 	if (temp_cs_data->createinprogress)
-		rts_error(VARLSTCNT(4) ERR_DBCREIMC, 2, DB_LEN_STR(greg));
+		rts_error(VARLSTCNT(4) ERR_DBCREINCOMP, 2, DB_LEN_STR(greg));
 	if (temp_cs_data->file_corrupt && !mupip_jnl_recover)
-		rts_error(VARLSTCNT(4) ERR_DBCRPT, 2, DB_LEN_STR(greg));
+		rts_error(VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(greg));
 	assert(greg->dyn.addr->acc_meth != dba_cm);
 	if (greg->dyn.addr->acc_meth != temp_cs_data->acc_meth)
 		greg->dyn.addr->acc_meth = temp_cs_data->acc_meth;
@@ -449,9 +503,7 @@ void gvcst_init (gd_region *greg)
 	/* Compute the maximum journal space requirements for a PBLK (including possible ALIGN record).
 	 * Use this constant in the TOTAL_TPJNL_REC_SIZE and TOTAL_NONTP_JNL_REC_SIZE macros instead of recomputing.
 	 */
-	csa->pblk_align_jrecsize = (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_PBLK] + JREC_SUFFIX_SIZE
-					+ csd->blk_size
-					+ JREC_PREFIX_SIZE + jnl_fixed_size[JRT_ALIGN] + JREC_SUFFIX_SIZE);
+	csa->pblk_align_jrecsize = PBLK_RECLEN + csd->blk_size + ALIGN_RECLEN;
 	segment_update_array_size = UA_SIZE(csd);
 
 	if (first_ua == NULL)
@@ -485,7 +537,7 @@ void gvcst_init (gd_region *greg)
 		}
 	}
 	assert(global_tlvl_info_list || !csa->sgm_info_ptr);
-	if (JNL_ALLOWED(csd))
+	if (JNL_ALLOWED(csa))
 	{
 		if (NULL == non_tp_jfb_ptr)
 		{
@@ -497,26 +549,19 @@ void gvcst_init (gd_region *greg)
 		/* csa->min_total_tpjnl_rec_size represents the minimum journal buffer space needed for a TP
 		 * 	transaction. It is a conservative estimate assuming an align record will be written for
 		 *	every jnl record written and assuming a PINI will be written every TP transaction.
-		 * csa->total_jnl_record_size is initialized/reinitialized  to this value here and in tp_clean_up().
+		 * si->total_jnl_rec_size is initialized/reinitialized  to this value here and in tp_clean_up().
 		 * The purpose of this field is to avoid recomputation of a constant value in tp_clean_up().
 		 * In addition to this, space requirements for whatever journal records get formatted as part of
 		 *	jnl_format() need to be taken into account.
-		 *	This is done in jnl_format() where si->total_jnl_record_size is appropriately incremented.
+		 *	This is done in jnl_format() where si->total_jnl_rec_size is appropriately incremented.
 		 */
-		csa->min_total_tpjnl_rec_size =
-				(JREC_PREFIX_SIZE + jnl_fixed_size[JRT_PINI] + JREC_SUFFIX_SIZE)
-					+ (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_ALIGN] + JREC_SUFFIX_SIZE)
-					+ (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_TCOM] + JREC_SUFFIX_SIZE)
-					+ (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_ALIGN] + JREC_SUFFIX_SIZE);
+		csa->min_total_tpjnl_rec_size = PINI_RECLEN + ALIGN_RECLEN + TCOM_RECLEN + ALIGN_RECLEN;
 		/* Similarly csa->min_total_nontpjnl_rec_size represents the minimum journal buffer space needed
 		 *	for a non-TP transaction. It is a conservative estimate assuming an align record will be
 		 *	written for every jnl record written and also assumes a PINI will be written.
 		 * The second ALIGN record accounted below corresponds to the logical jnl record in non_tp_jfb_ptr.
 		 */
-		 csa->min_total_nontpjnl_rec_size =
-				(JREC_PREFIX_SIZE + jnl_fixed_size[JRT_PINI] + JREC_SUFFIX_SIZE)
-					+ (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_ALIGN] + JREC_SUFFIX_SIZE)
-					+ (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_ALIGN] + JREC_SUFFIX_SIZE);
+		csa->min_total_nontpjnl_rec_size = PINI_RECLEN + ALIGN_RECLEN + ALIGN_RECLEN;
 	}
 	/* For the first open of this region we are guaranteed that csa->sgm_info_ptr is NULL.
 	 * Only in this case, the one-time TP structure-initialization needs to be done.
@@ -564,9 +609,9 @@ void gvcst_init (gd_region *greg)
 			si = csa->sgm_info_ptr;
 		si->gv_cur_region = greg;
 		si->start_tn = csa->ti->curr_tn;
-		if (JNL_ALLOWED(csd))
+		if (JNL_ALLOWED(csa))
 		{
-			si->total_jnl_record_size = csa->min_total_tpjnl_rec_size;	/* Reinitialize total_jnl_record_size */
+			si->total_jnl_rec_size = csa->min_total_tpjnl_rec_size;	/* Reinitialize total_jnl_rec_size */
 			/* Since the following jnl-mallocs are independent of any dynamically-changeable parameter of the
 			 * database, we can as well use the existing malloced jnl structures if at all they exist.
 			 */

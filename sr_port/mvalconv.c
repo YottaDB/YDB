@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "arit.h"
 #include "mvalconv.h"
 #include "gtm_stdio.h"	/* this is here due to the need for an sprintf,

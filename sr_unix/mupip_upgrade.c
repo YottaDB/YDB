@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -127,7 +127,7 @@ void mupip_upgrade(void)
 	/* get file status */
 	FSTAT_FILE(fd, &stat_buf, fstat_res);
 	if (-1 == fstat_res)
-		rts_error(VARLSTCNT(4) ERR_DBOPNERR, fn_len, fn, errno);
+		rts_error(VARLSTCNT(5) ERR_DBOPNERR, 2, fn_len, fn, errno);
 	old_file_len = stat_buf.st_size;
 
 	/* Prepare v3.x file header buffer */
@@ -170,6 +170,8 @@ void mupip_upgrade(void)
 	}
 	else
 	{
+		/* Note: We assume that if the V4.x header and current GT.M file header
+		 *       has same field names, they are at same offset */
 		/* READ the header from file again as V4.x header */
                 LSEEKREAD(fd, 0, new_head, new_hdr_size, status);
                 if (0 != status)
@@ -201,6 +203,28 @@ void mupip_upgrade(void)
 		new_head->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
 		new_head->semid = INVALID_SEMID;
 		new_head->shmid = INVALID_SHMID;
+		if (JNL_ALLOWED(new_head))
+		{	/* Following 3 are new fields starting from V43001.
+			 * Initialize them appropriately.
+			 */
+			new_head->epoch_interval = DEFAULT_EPOCH_INTERVAL;
+			new_head->alignsize = DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE;
+			if (!new_head->jnl_alq)
+				new_head->jnl_alq = JNL_ALLOC_DEF;
+			/* note new_head->jnl_deq is carried over without any change even if it is zero since a zero
+			 * jnl file extension size is supported starting V43001
+			 */
+			new_head->autoswitchlimit = ALIGNED_ROUND_DOWN(JNL_ALLOC_MAX, new_head->jnl_alq, new_head->jnl_deq);
+			/* following field is assumed as non-zero by set_jnl_info starting V43001A */
+			if (JNL_ALLOWED(new_head) && !new_head->jnl_buffer_size)
+				new_head->jnl_buffer_size = JNL_BUFFER_DEF;
+		} else
+		{
+			new_head->epoch_interval = 0;
+			new_head->alignsize = 0;
+			new_head->autoswitchlimit = 0;
+		}
+		new_head->yield_lmt = DEFAULT_YIELD_LIMIT;
                 /* writing header */
                 LSEEKWRITE(fd, 0, new_head, new_hdr_size, status);
                 if (0 != status)

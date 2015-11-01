@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,9 +44,7 @@ typedef unsigned short mstr_len_t;
 /* constant needed for FIFO - OS390 redefines in mdefsp.h */
 #define FIFO_PERMISSION		010666 /* fifo with RW permissions for owner, group, other */
 
-#if !defined(__MVS__)
 #include <inttypes.h>
-#endif
 #include "mdefsa.h"
 #include "v11_mdefsp.h"
 
@@ -255,23 +253,29 @@ typedef struct
 	volatile int4	hp_latch_space[4];	/* Used for HP load_and_clear locking instructions per HP whitepaper on spinlocks */
 } global_latch_t;
 
+#ifndef GTM_INT64T_DEFINED
+#define GTM_INT64T_DEFINED
+   typedef	uint64_t		gtm_uint64_t;
+   typedef	int64_t			gtm_int64_t;
+#endif
+
 #ifdef INT8_SUPPORTED
-   typedef	uint64_t		qw_num;
-   typedef	uint64_t		seq_num;	/* Define 8-byte sequence number */
-   typedef	uint64_t		token_num;	/* Define 8-byte token number */
-   typedef	uint64_t		qw_off_t;	/* quad-word offset */
+   typedef	gtm_uint64_t		qw_num;
+   typedef	gtm_uint64_t		seq_num;	/* Define 8-byte sequence number */
+   typedef	gtm_uint64_t		token_num;	/* Define 8-byte token number */
+   typedef	gtm_uint64_t		qw_off_t;	/* quad-word offset */
 #  define	DWASSIGNQW(A,B)		(A)=(uint4)(B)
 #  define	QWASSIGN(A,B)		(A)=(B)
-#  define	QWASSIGNDW(A,B)		QWASSIGN((A),(uint64_t)(B))
-#  define	QWASSIGN2DW(A,B,C)	QWASSIGN((A),(uint64_t)(B) << 32 | C)
+#  define	QWASSIGNDW(A,B)		QWASSIGN((A),(gtm_uint64_t)(B))
+#  define	QWASSIGN2DW(A,B,C)	QWASSIGN((A),(gtm_uint64_t)(B) << 32 | (C))
 #  define	QWADD(A,B,C)		(A)=(B)+(C)
 #  define	QWSUB(A,B,C)		(A)=(B)-(C)
-#  define	QWADDDW(A,B,C)		(A)=(B)+(uint64_t)(C)
-#  define	QWSUBDW(A,B,C)		(A)=(B)-(uint64_t)(C)
+#  define	QWADDDW(A,B,C)		(A)=(B)+(gtm_uint64_t)(C)
+#  define	QWSUBDW(A,B,C)		(A)=(B)-(gtm_uint64_t)(C)
 #  define	QWINCRBY(A,B)		(A)+=(B)
 #  define	QWDECRBY(A,B)		(A)-=(B)
-#  define	QWINCRBYDW(A,B)		(A)+=(uint64_t)(B)
-#  define	QWDECRBYDW(A,B)		(A)-=(uint64_t)(B)
+#  define	QWINCRBYDW(A,B)		(A)+=(gtm_uint64_t)(B)
+#  define	QWDECRBYDW(A,B)		(A)-=(gtm_uint64_t)(B)
 #  define	QWMULBYDW(A,B,C)	(A)=(B)*(C)
 #  define	QWDIVIDEBYDW(A,B,Q,R)	{(R)=(A)%(B); (Q)=(A)/(B);}
 #  define	QWMODDW(A,B)		((A)%(B))
@@ -442,9 +446,9 @@ typedef struct
   typedef vint_ptr_t sm_vint_ptr_t;	/* Define 64 bit pointer to volatile int */
   typedef uint_ptr_t sm_uint_ptr_t;	/* Define 64 bit pointer to uint */
   typedef vuint_ptr_t sm_vuint_ptr_t;	/* Define 64 bit pointer to volatile uint */
-  typedef int64_t sm_off_t;		/* Define 64 bit offset type */
-  typedef int64_t sm_long_t;		/* Define 64 bit integer type */
-  typedef uint64_t sm_ulong_t;		/* Define 64 bit unsigned integer type */
+  typedef gtm_int64_t sm_off_t;		/* Define 64 bit offset type */
+  typedef gtm_int64_t sm_long_t;	/* Define 64 bit integer type */
+  typedef gtm_uint64_t sm_ulong_t;	/* Define 64 bit unsigned integer type */
   typedef global_latch_t *sm_global_latch_ptr_t; /* Define 64 bit pointer to hp_latch */
 #  ifdef __osf__
 #    pragma pointer_size(restore)

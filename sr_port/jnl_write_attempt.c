@@ -29,6 +29,10 @@
 #include "is_proc_alive.h"
 #include "compswap.h"
 #include "is_file_identical.h"
+#ifdef UNIX
+#include "gtmmsg.h"
+GBLREF boolean_t		gtm_environment_init;
+#endif
 
 GBLREF	uint4		process_id;
 
@@ -241,6 +245,16 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			{
 				send_msg(VARLSTCNT(8) ERR_JNLFLUSHNOPROG, 2, JNL_LEN_STR(csa->hdr), ERR_TEXT, 2,
 					LEN_AND_LIT("Progress prevented by a process stuck flushing journal data"));
+				UNIX_ONLY(
+					if (gtm_environment_init)
+					{
+						/* We do this, because we often do not check syslogs */
+						gtm_putmsg(VARLSTCNT(8) ERR_JNLFLUSHNOPROG, 2, JNL_LEN_STR(csa->hdr), ERR_TEXT, 2,
+							LEN_AND_LIT("Progress prevented by a process stuck flushing journal data"));
+						proc_stuck_cnt = 0;
+						continue;
+					}
+				)
 				GTMASSERT;
 			}
 		}

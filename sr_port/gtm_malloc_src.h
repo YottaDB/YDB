@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,8 @@
  ****************************************************************/
 
 /* Storage manager for "smaller" pieces of storage. Uses power-of-two
-   "buddy" system as described by Knuth.
+   "buddy" system as described by Knuth. Currently manages pieces of
+   size 2K - sizeof(header).
 
    This include file is included in both gtm_malloc.c and gtm_malloc_dbg.c.
    See the headers of those modules for explanations of how the storage
@@ -21,7 +22,7 @@
    If this variable is set to a non-zero value, the debugging environment
    is enabled. The debugging features turned on will correspond to the bit
    values defined gtmdbglvl.h. Note that this mechanism is versatile enough
-   that non-storagemanagment debugging could also be hooked in here. The
+   that non-storage-managment debugging is also hooked in here. The
    debugging desired is a mask for the features desired. For example, if the
    value 4 is set, then tracing is enabled. If the value is set to 6, then
    both tracing and statistics are enabled. Because the code is expanded
@@ -30,7 +31,6 @@
    a "debug" version to be installed in order to chase a corruption or other
    problem.
 */
-
 
 #include "mdef.h"
 
@@ -41,18 +41,27 @@
 
 #include "gtm_stdio.h"
 #include "gtm_string.h"
+#include "eintr_wrappers.h"
 #include "gtmdbglvl.h"
 #include "io.h"
 #include "iosp.h"
 #include "min_max.h"
+#include "mdq.h"
 #include "error.h"
 #include "trans_log_name.h"
 #include "gtmmsg.h"
+#include "print_exit_stats.h"
+#include "gtm_logicals.h"
 
 /* To debug this routine effectively, normally static routines are turned into
    GBLDEFs. */
-#define STATICD static
-#define STATICR static
+#ifdef DEBUG
+#  define STATICD
+#  define STATICR
+#else
+#  define STATICD static
+#  define STATICR static
+#endif
 
 /* We are the redefined versions so use real versions in this module */
 #undef malloc
@@ -111,25 +120,32 @@
 #endif
 
 #ifdef DEBUG
-enum ElemState {Allocated = 0x1010, Free = 0x1F1F};	/* States a storage element may be in (more complex
-							   and thus less likely to occur naturally) */
+/* States a storage element may be in. Debug version has values less likely to occur naturally
+   although the possibilities are limited with only one byte of information. */
+enum ElemState {Allocated = 0x42, Free = 0x24};
 #else
-enum ElemState {Allocated, Free};			/* States a storage element may be in */
+enum ElemState {Allocated, Free};
 #endif
 
 /* Each allocated block has the following structure. The actual address
    returned to the user for 'malloc' and supplied by the user for 'free'
    is actually the storage beginning at the 'userStorage.userStart' area.
-   This holds true even for storage that is truely malloc'd. Note that for
-   VMS, the allocated length is kept even in the pro header. For Unix though,
-   we only keep the allocated length for debug mode. This is because of the
-   requirement of lib$free_vm routine needing the release size.
+   This holds true even for storage that is truely malloc'd. Note that true
+   allocated length is kept even in the pro header.
 */
 typedef struct storElemStruct
-{
-	short	state;					/* State of this block */
-	short	queueIndex;				/* Index into TwoTable for this size of element */
-	int	realLen;				/* Real (total) length of allocation */
+{	/* While the following chars and short are not the best for performance, they enable us
+	   to keep the header size to 8 bytes in a pro build. This is important since our minimum
+	   allocation size is 16 bytes leaving 8 bytes for data. Also I have not researched what
+	   they are, there are a bunch of 8 byte allocates in GT.M that if we were to go to a 16
+	   byte header would make the minimum block size 32 bytes thus doubling the storage
+	   requirements for these small blocks. SE 03/2002
+	*/
+	signed char	queueIndex;			/* Index into TwoTable for this size of element */
+	unsigned char	state;				/* State of this block */
+	unsigned short	extHdrOffset;			/* For MAXTWO sized elements: offset to the
+							   header that describes the extent */
+	int		realLen;			/* Real (total) length of allocation */
 #ifdef DEBUG
 	struct	storElemStruct	*fPtr;			/* Next storage element on free/allocated queue */
 	struct	storElemStruct	*bPtr;			/* Previous storage element on free/allocated queue */
@@ -156,35 +172,62 @@ typedef struct storElemStruct
 #endif
 } storElem;
 
+/* At the end of each block is this header which is used to track when all of the elements that
+   a block of real allocated storage was broken into have become free. At that point, we can return
+   the chunk to the OS.
+*/
+typedef struct storExtHdrStruct
+{
+	struct
+	{
+		struct storExtHdrStruct	*fl, *bl;	/* In case we need to visit the entire list */
+	} links;
+	unsigned char	*extentStart;			/* First byte of real extent (not aligned) */
+	storElem	*elemStart;			/* Start of array of MAXTWO elements */
+	int		elemsAllocd;			/* MAXTWO sized element count. When 0 this block is free */
+} storExtHdr;
+
 #define MAXTWO 2048
-#define STOR_EXTENDS 16
+/* How many "MAXTWO" elements to allocate at one time. This minimizes the waste since our subblocks must
+   be aligned on a suitable power of two boundary for the buddy-system to work properly
+*/
+#define ELEMS_PER_EXTENT 16
+
 #define MAXDEFERQUEUES 10
 #ifdef DEBUG
+#  define STOR_EXTENTS_KEEP 1 /* Keep only one extent in debug for maximum testing */
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
 #  define MINTWO 64
 #  define MAXINDEX 5
 #  define STE_FP(p) p->fPtr
 #  define STE_BP(p) p->bPtr
 #else
+#  define STOR_EXTENTS_KEEP 5
 #  define INITIAL_DEBUG_LEVEL GDL_None
 #  define MINTWO 16
 #  define MAXINDEX 7
 #  define STE_FP(p) p->userStorage.links.fPtr
 #  define STE_BP(p) p->userStorage.links.bPtr
 #endif
-
+/* We define two constants here: EXTENT_USED is the amount of storage that we will actually
+   be using. But since this storage must be aligned on a MAXTWO boundary, we allocate one extra
+   extent in EXTENT_SIZE so we are guarranteed that our alignment can be done.
+*/
+#define EXTENT_SIZE ((MAXTWO * (ELEMS_PER_EXTENT + 1)) + sizeof(storExtHdr))
+#define EXTENT_USED (MAXTWO * ELEMS_PER_EXTENT + sizeof(storExtHdr))
 /* Following are values used in queueIndex in a storage element. Note that both
    values must be less than zero for the current code to function correctly. */
 #define QUEUE_ANCHOR		-1
 #define REAL_MALLOC		-2
 
 /* Define number of malloc and free calls we will keep track of */
-#define MAXSMTRACE 32
+#define MAXSMTRACE 128
 
 /* Structure where malloc and free call trace information is kept */
 typedef struct
 {
 	unsigned char	*smAddr;	/* Addr allocated or released */
+	unsigned int	smSize;		/* Size allcoated or freed */
 	unsigned char	*smCaller;	/* Who called malloc/free */
 	unsigned int	smTn;		/* What transaction it was */
 } smTraceItem;
@@ -197,9 +240,9 @@ typedef struct
 #  define SET_MAX(max, tst) {max = MAX(max, tst);}
 #  define SET_ELEM_MAX(qtype, idx) SET_MAX(qtype##ElemMax[idx], qtype##ElemCnt[idx])
 #  define TRACE_MALLOC(addr,len) {if (GDL_SmTrace & gtmDebugLevel) \
-                                          FPRINTF(stderr,"Malloc at %x of %d bytes from %lx\n", addr, len, (caddr_t)caller_id());}
-#  define TRACE_FREE(addr)       {if (GDL_SmTrace & gtmDebugLevel) \
-                                          FPRINTF(stderr,"Free at %x from %lx\n", addr, (caddr_t)caller_id());}
+                                          FPRINTF(stderr,"Malloc at %x of %d bytes from %lx\n", addr, len, CALLERID);}
+#  define TRACE_FREE(addr,len)       {if (GDL_SmTrace & gtmDebugLevel) \
+                                          FPRINTF(stderr,"Free at %x of %d bytes from %lx\n", addr, len, CALLERID);}
 #else
 #  define INCR_CNTR(x)
 #  define INCR_SUM(x, y)
@@ -208,7 +251,20 @@ typedef struct
 #  define SET_MAX(max, tst)
 #  define SET_ELEM_MAX(qtype, idx)
 #  define TRACE_MALLOC(addr, len)
-#  define TRACE_FREE(addr)
+#  define TRACE_FREE(addr, len)
+#endif
+#ifdef DEBUG_SM
+#  define DEBUGSM(x) (printf x, fflush(stdout))
+# else
+#  define DEBUGSM(x)
+#endif
+/* Note we use unsigned char * instead of caddr_t for all references to caller_id so the caller id
+   is always 4 bytes. On Tru64, caddr_t is 8 bytes which will throw off the size of our
+   storage header in debug mode */
+#ifdef GTM_MALLOC_DEBUG
+#  define CALLERID (smCallerId)
+#else
+#  define CALLERID ((unsigned char *)caller_id())
 #endif
 
 /* Define "routines" to enqueue and dequeue storage elements. Use define so we don't
@@ -231,9 +287,27 @@ typedef struct
 	  DECR_CNTR(qtype##ElemCnt[elem->queueIndex]);	\
 }
 
+#define GET_QUEUED_ELEMENT(sizeIndex, uStor, qHdr, sEHdr) \
+{							\
+	qHdr = &freeStorElemQs[sizeIndex];		\
+	uStor = STE_FP(qHdr);	      			/* First element on queue */ \
+	if (QUEUE_ANCHOR != uStor->queueIndex)		/* Does element exist? (Does queue point to itself?) */ \
+	{						\
+		DEQUEUE_STOR_ELEM(free, uStor);		/* It exists, dequeue it for use */ \
+		if (MAXINDEX == sizeIndex)		\
+		{	/* Allocating a MAXTWO block. Increment use counter for this subblock's block */ \
+			sEHdr = (storExtHdr *)((char *)uStor + uStor->extHdrOffset); \
+			++sEHdr->elemsAllocd;		\
+		}					\
+	} else						\
+		uStor = findStorElem(sizeIndex);	\
+	assert(0 == ((unsigned long)uStor & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */ \
+}
+
+
 #ifdef INT8_SUPPORTED
 #  define ChunkSize 8
-#  define ChunkType int64_t
+#  define ChunkType gtm_int64_t
 #  define ChunkValue 0xdeadbeefdeadbeefLL
 #else
 #  define ChunkSize 4
@@ -242,16 +316,9 @@ typedef struct
 #endif
 #define AddrMask (ChunkSize - 1)
 
-/* Define name of environment-variable/VMS-logical to use */
-#ifdef VMS
-#define GTM_DEBUG_LEVEL_ENVLOG "GTM$DBGLVL"
-#else
-#define GTM_DEBUG_LEVEL_ENVLOG "$gtmdbglvl"
-#endif
-
 #ifdef DEBUG
 /* For debug builds, keep track of the last MAXSMTRACE mallocs and frees. */
-GBLDEF volatile int smLastAllocIndex;			/* Index to entry of last malloc-er */
+GBLDEF volatile int smLastMallocIndex;			/* Index to entry of last malloc-er */
 GBLDEF volatile int smLastFreeIndex;			/* Index to entry of last free-er */
 GBLDEF smTraceItem smMallocs[MAXSMTRACE];		/* Array of recent allocators */
 GBLDEF smTraceItem smFrees[MAXSMTRACE];			/* Array of recent releasers */
@@ -262,6 +329,8 @@ GBLREF	uint4		gtmDebugLevel;			/* Debug level (0 = using default sm module so wi
 							   a DEBUG build, even level 0 implies basic debugging) */
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	volatile int4	gtmMallocDepth;			/* Recursion indicator. Volatile so it gets stored immediately */
+/* This var allows us to call ourselves but still have callerid info */
+GBLREF	unsigned char	*smCallerId;			/* Caller of top level malloc/free */
 
 STATICD	boolean_t	gtmSmInitialized;		/* Initialized indicator */
 
@@ -279,13 +348,15 @@ STATICD readonly struct
 /* Arrays allocated with size of MAXINDEX + 2 are sized to hold an extra
    entry for "real malloc" type allocations. */
 
-STATICD uint4 TwoTable[MAXINDEX + 2] = {64, 128, 256, 512, 1024, 2048, 0xFFFFFFFF};		/* Powers of two element sizes */
-STATICD unsigned char markerChar[4] = {0xde, 0xad, 0xbe, 0xef};
+STATICD readonly uint4 TwoTable[MAXINDEX + 2] = {64, 128, 256, 512, 1024, 2048, 0xFFFFFFFF};		/* Powers of two element sizes */
+STATICD readonly unsigned char markerChar[4] = {0xde, 0xad, 0xbe, 0xef};
 #else
-STATICD uint4 TwoTable[MAXINDEX + 2] = {16, 32, 64, 128, 256, 512, 1024, 2048, 0xFFFFFFFF};	/* Powers of two element sizes */
+STATICD readonly uint4 TwoTable[MAXINDEX + 2] = {16, 32, 64, 128, 256, 512, 1024, 2048, 0xFFFFFFFF};	/* Powers of two element sizes */
 #endif
-STATICD storElem	freeStorElemQs[MAXINDEX + 1];		/* Need full element as queue anchor for dbl-linked
+STATICD storElem	freeStorElemQs[MAXINDEX + 1];	/* Need full element as queue anchor for dbl-linked
 							   list since ptrs not at top of element */
+STATICD storExtHdr	storExtHdrQ;			/* List of storage blocks we allocate here */
+STATICD int		curExtents;			/* Number of current extents */
 #ifdef GTM_MALLOC_REENT
 STATICD storElem *deferFreeQueues[MAXDEFERQUEUES];	/* Where deferred (nested) frees are queued for later processing */
 STATICD boolean_t deferFreeExists;			/* A deferred free is pending on a queue */
@@ -294,34 +365,31 @@ STATICD boolean_t deferFreeExists;			/* A deferred free is pending on a queue */
 #ifdef DEBUG
 STATICD storElem allocStorElemQs[MAXINDEX + 2];		/* The extra element is for queueing "real" malloc'd entries */
 #  ifdef INT8_SUPPORTED
-STATICD unsigned char backfillMarkC[8] = {0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef};
+STATICD readonly unsigned char backfillMarkC[8] = {0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef};
 #  else
-STATICD unsigned char backfillMarkC[4] = {0xde, 0xad, 0xbe, 0xef};
+STATICD readonly unsigned char backfillMarkC[4] = {0xde, 0xad, 0xbe, 0xef};
 #  endif
 #endif
 
 #ifdef DEBUG
 /* Define variables used to instrument how our algorithm works */
-GBLDEF	int	totalMallocs;				/* Total malloc requests */
-GBLDEF	int	totalFrees;				/* Total free requests */
-GBLDEF	int	totalExtends;				/* Times we allocated more storage */
-GBLDEF	int	totalRmalloc;				/* Total storage currently (real) malloc'd (includes extend blocks) */
-GBLDEF	int	rmallocMax;				/* Maximum value of totalRmalloc */
-GBLDEF	int	mallocCnt[MAXINDEX + 2];		/* Malloc count satisfied by each queue size */
-GBLDEF	int	freeCnt[MAXINDEX + 2];			/* Free count for element in each queue size */
-GBLDEF	int	elemSplits[MAXINDEX + 2];		/* Times a given queue size block was split */
-GBLDEF	int	elemCombines[MAXINDEX + 2];		/* Times a given queue block was formed by buddies being recombined */
-GBLDEF	int	freeElemCnt[MAXINDEX + 2];		/* Current count of elements on the free queue */
-GBLDEF	int	allocElemCnt[MAXINDEX + 2];		/* Current count of elements on the allocated queue */
-GBLDEF	int	freeElemMax[MAXINDEX + 2];		/* Maximum number of blocks on the free queue */
-GBLDEF	int	allocElemMax[MAXINDEX + 2];		/* Maximum number of blocks on the allocated queue */
-GMR_ONLY(GBLDEF	int	reentMallocs;)			/* Total number of reentrant mallocs made */
-GMR_ONLY(GBLDEF	int	deferFreePending;)		/* Total number of frees that were deferred */
-
-/* Routine definition(s) for debug mode only */
-boolean_t backfillChk(unsigned char *ptr, int len);
+STATICD	int	totalMallocs;				/* Total malloc requests */
+STATICD	int	totalFrees;				/* Total free requests */
+STATICD	int	totalRmalloc;				/* Total storage currently (real) malloc'd (includes extent blocks) */
+STATICD int	totalExtents;				/* Times we allocated more storage */
+STATICD int	maxExtents;				/* Highwater mark of extents */
+STATICD	int	rmallocMax;				/* Maximum value of totalRmalloc */
+STATICD	int	mallocCnt[MAXINDEX + 2];		/* Malloc count satisfied by each queue size */
+STATICD	int	freeCnt[MAXINDEX + 2];			/* Free count for element in each queue size */
+STATICD	int	elemSplits[MAXINDEX + 2];		/* Times a given queue size block was split */
+STATICD	int	elemCombines[MAXINDEX + 2];		/* Times a given queue block was formed by buddies being recombined */
+STATICD	int	freeElemCnt[MAXINDEX + 2];		/* Current count of elements on the free queue */
+STATICD	int	allocElemCnt[MAXINDEX + 2];		/* Current count of elements on the allocated queue */
+STATICD	int	freeElemMax[MAXINDEX + 2];		/* Maximum number of blocks on the free queue */
+STATICD	int	allocElemMax[MAXINDEX + 2];		/* Maximum number of blocks on the allocated queue */
+GMR_ONLY(STATICD	int	reentMallocs;)		/* Total number of reentrant mallocs made */
+GMR_ONLY(STATICD	int	deferFreePending;)	/* Total number of frees that were deferred */
 #endif
-
 
 /* Macro to return an index into the TwoTable for a given size (round up to next power of two)
    Use the size2Index table to get the proper index. This table is indexed by the number of
@@ -333,12 +401,17 @@ boolean_t backfillChk(unsigned char *ptr, int len);
 #  define GetSizeIndex(size) (size2Index[(size - 1) / MINTWO])
 #endif
 
-
+/* Internal prototypes */
+STATICR void gtmSmInit(void);
 storElem *findStorElem(int sizeIndex);
 #ifdef DEBUG
 void backfill(unsigned char *ptr, int len);
 void verifyFreeStorage(void);
 void verifyAllocatedStorage(void);
+boolean_t backfillChk(unsigned char *ptr, int len);
+#else
+void *gtm_malloc_dbg(size_t);
+void gtm_free_dbg(void *);
 #endif
 
 /* Initialize the storage manangement system. Things to initialize:
@@ -353,7 +426,7 @@ void verifyAllocatedStorage(void);
      retrieve it's value if yes. */
 STATICR void gtmSmInit(void)
 {
-	char		*cLvl;
+	char		*ascNum;
 	storElem	*uStor;
 	int		i, sizeIndex, testSize, blockSize;
 	unsigned int	status;
@@ -363,8 +436,13 @@ STATICR void gtmSmInit(void)
 	error_def(ERR_TRNLOGFAIL);
 	error_def(ERR_INVDBGLVL);
 
-	/* Initialize size table used to get a storage queue index */
 	assert(MINTWO == TwoTable[0]);
+	/* Check that the storage queue offset in a storage element has sufficient reach
+	   to cover an extent.
+	*/
+	assert(((EXTENT_USED - sizeof(storExtHdr)) <= ((1 << (sizeof(uStor->extHdrOffset) * 8)) - 1)));
+
+	/* Initialize size table used to get a storage queue index */
 	sizeIndex = 0;
 	testSize = blockSize = MINTWO;
 	for (i = 0; i < SIZETABLEDIM; i++, testSize += blockSize)
@@ -387,6 +465,7 @@ STATICR void gtmSmInit(void)
 		uStor->queueIndex = QUEUE_ANCHOR;
 	}
 #endif
+	dqinit(&storExtHdrQ, links);
 	gtmSmInitialized = TRUE;
 
 	/* See if a debug level has been specified */
@@ -401,7 +480,13 @@ STATICR void gtmSmInit(void)
 	}
 	if (SS_NOLOGNAM != status)
 	{	/* We have a value, convert to numeric */
-		i = asc2i((uchar_ptr_t)dbgVal.addr, dbgVal.len);
+		ascNum = dbgVal.addr;
+		if (1 < dbgVal.len && '0' == *ascNum++ && 'x' == *ascNum++)
+			/* We have a hex value */
+			i = (int)asc_hex2i(ascNum, dbgVal.len - 2);
+		else
+			/* Hope we have a decimal value */
+			i = asc2i((uchar_ptr_t)dbgVal.addr, dbgVal.len);
 		if (-1 == i)
 		{
 			gtm_putmsg(VARLSTCNT(6) ERR_INVDBGLVL, 4, dbgVal.len, dbgVal.addr, envLog.len, envLog.addr);
@@ -426,8 +511,9 @@ STATICR void gtmSmInit(void)
    before. */
 storElem *findStorElem(int sizeIndex)
 {
+	unsigned char	*uStorAlloc;
 	storElem	*uStor, *uStor2, *qHdr;
-	size_t		allocSize;
+	storExtHdr	*sEHdr;
 	int		hdrSize;
 	unsigned int	i;
 
@@ -437,18 +523,10 @@ storElem *findStorElem(int sizeIndex)
 	++sizeIndex;
 	if (MAXINDEX >= sizeIndex)
 	{	/* We have more queues to search */
-		qHdr = &freeStorElemQs[sizeIndex];
-		uStor = STE_FP(qHdr);	      			/* First element on queue */
-		if (QUEUE_ANCHOR != uStor->queueIndex)		/* Does element exist? (Does queue point to itself?) */
-		{
-			DEQUEUE_STOR_ELEM(free, uStor);		/* It exists, dequeue it for use */
-		} else
-			uStor = findStorElem(sizeIndex);
-		assert(0 == ((unsigned long)uStor & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */
+		GET_QUEUED_ELEMENT(sizeIndex, uStor, qHdr, sEHdr);
 
 		/* We have a larger than necessary element now so break it in half and put
 		   the second half on the queue one size smaller than us */
-
 		INCR_CNTR(elemSplits[sizeIndex]);
 		--sizeIndex;					/* Dealing now with smaller element queue */
 		assert(sizeIndex >= 0 && sizeIndex < MAXINDEX);
@@ -465,27 +543,40 @@ storElem *findStorElem(int sizeIndex)
 #endif
 		ENQUEUE_STOR_ELEM(free, sizeIndex, uStor2);	/* Place on free queue */
 	} else
-	{	/* Nothing left to search, [real]malloc a new ALIGNED chunk of storage and put it on our queues */
-		INCR_CNTR(totalExtends);
-		allocSize = (MAXTWO * (STOR_EXTENDS + 1));	/* Gives us room to round to power 2 boundary */
-		MALLOC(allocSize,uStor2);
+	{	/* Nothing left to search, [real]malloc a new ALIGNED block of storage and put it on our queues */
+		++curExtents;
+		SET_MAX(maxExtents, curExtents);
+		INCR_CNTR(totalExtents);
+		/* Allocate size for one more subblock than we want. This guarrantees us that we can put our subblocks
+		   on a power of two boundary necessary for buddy alignment
+		*/
+		MALLOC(EXTENT_SIZE, uStorAlloc);
+		uStor2 = (storElem *)uStorAlloc;
 		uStor = (storElem *)(((unsigned long)(uStor2) + MAXTWO - 1) & -MAXTWO); /* Make addr "MAXTWO" byte aligned */
-		INCR_SUM(totalRmalloc, allocSize);
+		INCR_SUM(totalRmalloc, EXTENT_SIZE);
 		SET_MAX(rmallocMax, totalRmalloc);
+		sEHdr = (storExtHdr *)((char *)uStor + (ELEMS_PER_EXTENT * MAXTWO));
+		DEBUGSM(("debugsm: Allocating extent at 0x%08lx\n", uStor));
 
-		/* If the storage given to us was aligned, we have STOR_EXTENDS+1 blocks, else we have
-		   STOR_EXTENDS blocks. We won't put the first element on the queue since that block is
-		   being returned to be split. */
+		/* If the storage given to us was aligned, we have ELEMS_PER_EXTENT+1 blocks, else we have
+		   ELEMS_PER_EXTENT blocks. We won't put the first element on the queue since that block is
+		   being returned to be split.
+		*/
 		if (uStor == uStor2)
+		{
 			i = 0;		/* The storage was suitably aligned, we get an extra block free */
-		else
+			sEHdr = (storExtHdr *)((char *)sEHdr + MAXTWO);
+		} else
 			i = 1;		/* The storage was not aligned. Have planned number of blocks with some waste */
-		for (uStor2 = uStor; STOR_EXTENDS > i; ++i)
+		assert(((char *)sEHdr + sizeof(*sEHdr)) <= ((char *)uStorAlloc + EXTENT_SIZE));
+		for (uStor2 = uStor; ELEMS_PER_EXTENT > i; ++i)
 		{	/* Place all but first entry on the queue */
 			uStor2 = (storElem *)((unsigned long)uStor2 + MAXTWO);
 			assert(0 == ((unsigned long)uStor2 & (TwoTable[MAXINDEX] - 1)));	/* Verify alignment */
 			uStor2->state = Free;
 			uStor2->queueIndex = MAXINDEX;
+			uStor2->extHdrOffset = (char *)sEHdr - (char *)uStor2;
+			assert(EXTENT_USED > uStor2->extHdrOffset);
 #ifdef DEBUG
 			memcpy(uStor2->headMarker, markerChar, sizeof(markerChar));
 			/* Backfill entire block on free queue so we can detect trouble
@@ -496,8 +587,14 @@ storElem *findStorElem(int sizeIndex)
 #endif
 			ENQUEUE_STOR_ELEM(free, MAXINDEX, uStor2);	/* Place on free queue */
 		}
+		uStor->extHdrOffset = (char *)sEHdr - (char *)uStor;
 		uStor->state = Free;
 		sizeIndex = MAXINDEX;
+		/* Set up storage block header */
+		sEHdr->extentStart = uStorAlloc;
+		sEHdr->elemStart = uStor;
+		sEHdr->elemsAllocd = 1;
+		dqins(&storExtHdrQ, links, sEHdr);
 	}
 
 	assert(sizeIndex >= 0 && sizeIndex <= MAXINDEX);
@@ -547,10 +644,11 @@ void *gtm_malloc(size_t size)
 {
 	unsigned char	*retVal;
 	storElem 	*uStor, *qHdr;
+	storExtHdr	*sEHdr;
 	size_t		tSize;
 	int		sizeIndex, i, hdrSize;
 	unsigned char	*trailerMarker;
-	GMR_ONLY(boolean_t reentered;)
+	boolean_t	reentered;
 
 	VMS_ONLY(error_def(ERR_VMSMEMORY);)
 	UNIX_ONLY(error_def(ERR_MEMORY);)
@@ -573,10 +671,9 @@ void *gtm_malloc(size_t size)
 			assert((hdrSize + sizeof(markerChar)) < MINTWO);
 
 			++gtmMallocDepth;				/* Nesting depth of memory calls */
-#ifdef GTM_MALLOC_REENT
 			reentered = (1 < gtmMallocDepth);
-#else
-			if (1 < gtmMallocDepth)
+#ifndef GTM_MALLOC_REENT
+			if (reentered)
 			{
 				--gtmMallocDepth;
 				assert(FALSE);
@@ -624,15 +721,7 @@ void *gtm_malloc(size_t size)
 				{	/* Use our memory manager for smaller pieces */
 					sizeIndex = GetSizeIndex(tSize);		/* Get index to size we need */
 					assert(sizeIndex >= 0 && sizeIndex <= MAXINDEX);
-					qHdr = &freeStorElemQs[sizeIndex];
-					uStor = STE_FP(qHdr);	      	      /* First element on queue */
-					if (QUEUE_ANCHOR!=uStor->queueIndex)/* Does element exist? (Does queue point to itself?) */
-					{
-						DEQUEUE_STOR_ELEM(free,uStor);/* It exists, dequeue it for use */
-					}
-					else
-						uStor = findStorElem(sizeIndex); /* Need to go find bigger 'un and split it */
-					assert(0 == ((unsigned long)uStor & (TwoTable[sizeIndex] - 1))); /* Verify alignment */
+					GET_QUEUED_ELEMENT(sizeIndex, uStor, qHdr, sEHdr);
 					uStor->realLen = TwoTable[sizeIndex];
 				} else
 				{	/* Use regular malloc to obtain the piece */
@@ -652,7 +741,7 @@ void *gtm_malloc(size_t size)
 				uStor->state = Allocated;
 #ifdef DEBUG
 				/* Fill in extra debugging fields in header */
-				uStor->allocatedBy = (unsigned char *)caller_id();			/* Who allocated us */
+				uStor->allocatedBy = CALLERID;				/* Who allocated us */
 				uStor->allocLen = size;					/* User requested size */
 				memcpy(uStor->headMarker, markerChar, sizeof(markerChar));
 				trailerMarker = (unsigned char *)&uStor->userStorage.userStart + size;	/* Where to put trailer */
@@ -685,12 +774,13 @@ void *gtm_malloc(size_t size)
 			}
 #ifdef DEBUG
 			/* Record this transaction in debugging history */
-			++smLastAllocIndex;
-			if (MAXSMTRACE <= smLastAllocIndex)
-				smLastAllocIndex = 0;
-			smMallocs[smLastAllocIndex].smAddr = retVal;
-			smMallocs[smLastAllocIndex].smCaller = (unsigned char *)caller_id();
-			smMallocs[smLastAllocIndex].smTn = smTn;
+			++smLastMallocIndex;
+			if (MAXSMTRACE <= smLastMallocIndex)
+				smLastMallocIndex = 0;
+			smMallocs[smLastMallocIndex].smAddr = retVal;
+			smMallocs[smLastMallocIndex].smSize = size;
+			smMallocs[smLastMallocIndex].smCaller = CALLERID;
+			smMallocs[smLastMallocIndex].smTn = smTn;
 #endif
 			TRACE_MALLOC(retVal, size);
 
@@ -704,11 +794,17 @@ void *gtm_malloc(size_t size)
 		} else  /* Storage mgmt has not been initialized */
 		{
 			gtmSmInit();
-			return (void *)gtm_malloc(size);/* reinvoke recursively to do actual malloc work now that we are init'd */
+			/* Reinvoke gtm_malloc now that we are initialized. Note that this one time (the first
+			   call to malloc), we will not record the proper caller id in the storage header or in
+			   the traceback table. The caller will show up as gtm_malloc(). However, all subsequent
+			   calls will be correct.
+			*/
+			return (void *)gtm_malloc(size);
 		}
 #ifndef DEBUG
 	} else
 	{	/* We have a non-DEBUG module but debugging is turned on so redirect the call to the appropriate module */
+		smCallerId = (unsigned char *)caller_id();
 		return (void *)gtm_malloc_dbg(size);
 	}
 #endif
@@ -718,8 +814,9 @@ void *gtm_malloc(size_t size)
 void gtm_free(void *addr)
 {
 	storElem 	*uStor, *buddyElem;
+	storExtHdr	*sEHdr;
 	unsigned char	*trailerMarker;
-	int 		sizeIndex, hdrSize, saveIndex, dqIndex;
+	int 		sizeIndex, hdrSize, saveIndex, dqIndex, saveSize, freedElemCnt;
 
 	error_def(ERR_MEMORYRECURSIVE);
 	VMS_ONLY(error_def(ERR_VMSMEMORY);)
@@ -782,16 +879,20 @@ void gtm_free(void *addr)
 		if (GDL_SmAllocVerf & gtmDebugLevel)
 			verifyAllocatedStorage();
 #endif
-		TRACE_FREE(addr);
 		INCR_CNTR(totalFrees);
 		if ((unsigned char *)addr != &NullStruct.nullStr[0])
 		{
 			hdrSize = offsetof(storElem, userStorage);
 			uStor = (storElem *)((unsigned long)addr - hdrSize);		/* Backup ptr to element header */
 			sizeIndex = uStor->queueIndex;
-
 #ifdef DEBUG
-			/* Extra checking for debugging */
+			TRACE_FREE(addr, uStor->allocLen);
+			saveSize = uStor->allocLen;
+			/* Extra checking for debugging. Note that these sanity checks are only done in debug
+			   mode. The thinking is that we will bypass the checks in the general case for speed but
+			   if we really need to chase a storage related problem, we should switch to the debug version
+			   in the field to turn on these and other checks.
+			*/
 			assert(Allocated == uStor->state);
 			assert(0 == memcmp(uStor->headMarker, markerChar, sizeof(markerChar)));
 			trailerMarker = (unsigned char *)&uStor->userStorage.userStart + uStor->allocLen;/* Where trailer was put */
@@ -853,8 +954,44 @@ void gtm_free(void *addr)
 					backfill((unsigned char *)uStor + hdrSize, TwoTable[sizeIndex] - hdrSize);
 #endif
 				ENQUEUE_STOR_ELEM(free, sizeIndex, uStor);
+				if (MAXINDEX == sizeIndex)
+				{	/* Freeing/Coagulating a MAXTWO block. Decrement use counter for this element's block */
+					sEHdr = (storExtHdr *)((char *)uStor + uStor->extHdrOffset);
+					--sEHdr->elemsAllocd;
+					assert(0 <= sEHdr->elemsAllocd);
+					/* Check for an extent being ripe for return to the system. Requirements are:
+					     1) All subblocks must be free (elemsAllocd == 0).
+					     2) There must be more than STOR_EXTENTS_KEEP extents already allocated.
+					   If these conditions are met, we will dequeue each individual element from
+					   it's queue and release the entire extent in a (real) free.
+					*/
+					if (STOR_EXTENTS_KEEP < curExtents && 0 == sEHdr->elemsAllocd)
+					{	/* Release this extent */
+						DEBUGSM(("debugsm: Extent being freed from 0x%08lx\n", sEHdr->elemStart));
+						DEBUG_ONLY(freedElemCnt = 0);
+						for (uStor = sEHdr->elemStart;
+						     (char *)uStor < (char *)sEHdr;
+						     uStor = (storElem *)((char *)uStor + MAXTWO))
+						{
+							DEBUG_ONLY(++freedElemCnt);
+							assert(Free == uStor->state);
+							assert(MAXINDEX == uStor->queueIndex);
+							DEQUEUE_STOR_ELEM(free, uStor);
+							DEBUGSM(("debugsm: ... element removed from free q 0x%08lx\n", uStor));
+						}
+						assert(ELEMS_PER_EXTENT <= freedElemCnt);	/* one loop to free them all */
+						assert((char *)uStor == (char *)sEHdr);
+						dqdel(sEHdr, links);
+						FREE(EXTENT_SIZE, sEHdr->extentStart);
+						--curExtents;
+						assert(curExtents);
+					}
+				}
+
 			} else
 			{
+				TRACE_FREE(addr, 0);
+				DEBUG_ONLY(saveSize = 0);
 				assert(REAL_MALLOC == sizeIndex);		/* Better be a real malloc type block */
 				INCR_CNTR(freeCnt[MAXINDEX + 1]);		/* Count free of malloc */
 				DECR_SUM(totalRmalloc, uStor->realLen);
@@ -867,7 +1004,8 @@ void gtm_free(void *addr)
 		if (MAXSMTRACE <= smLastFreeIndex)
 			smLastFreeIndex = 0;
 		smFrees[smLastFreeIndex].smAddr = addr;
-		smFrees[smLastFreeIndex].smCaller = (unsigned char *)caller_id();
+		smFrees[smLastFreeIndex].smSize = saveSize;
+		smFrees[smLastFreeIndex].smCaller = CALLERID;
 		smFrees[smLastFreeIndex].smTn = smTn;
 #endif
 		--gtmMallocDepth;
@@ -880,6 +1018,7 @@ void gtm_free(void *addr)
 	} else
 	{	/* If not a debug module and debugging is enabled, reroute call to
 		   the debugging version. */
+		smCallerId = (unsigned char *)caller_id();
 		gtm_free_dbg(addr);
 	}
 #endif
@@ -1016,9 +1155,10 @@ void verifyFreeStorage(void)
 			assert(0 == ((unsigned long)uStor & (TwoTable[i] - 1)));			/* Verify alignment */
 			assert(Free == uStor->state);							/* Verify state */
 			assert(0 == memcmp(uStor->headMarker, markerChar, sizeof(markerChar)));		/* Verify metadata marker */
+			assert(MAXINDEX != i || EXTENT_USED > uStor->extHdrOffset);
 			if (GDL_SmChkFreeBackfill & gtmDebugLevel)
 			{	/* Use backfill check method for verifying freed storage is untouched */
-					assert(backfillChk((unsigned char *)uStor + hdrSize, TwoTable[i] - hdrSize));
+				assert(backfillChk((unsigned char *)uStor + hdrSize, TwoTable[i] - hdrSize));
 			}
 		}
 	}
@@ -1046,6 +1186,7 @@ void verifyAllocatedStorage(void)
 			assert(0 == memcmp(uStor->headMarker, markerChar, sizeof(markerChar)));	/* Verify metadata markers */
 			trailerMarker = (unsigned char *)&uStor->userStorage.userStart+uStor->allocLen;/* Where  trailer was put */
 			assert(0 == memcmp(trailerMarker, markerChar, sizeof(markerChar)));
+			assert(MAXINDEX != i || EXTENT_USED > uStor->extHdrOffset);
 			if (GDL_SmChkAllocBackfill & gtmDebugLevel)
 			{	/* Use backfill check method for after-allocation metadata */
 				assert(backfillChk(trailerMarker + sizeof(markerChar),
@@ -1057,17 +1198,25 @@ void verifyAllocatedStorage(void)
 
 
 /*  ** still under ifdef DEBUG ** */
-/* Routine to print the end-of-process info -- either allocation statistics or malloc trace dump */
+/* Routine to print the end-of-process info -- either allocation statistics or malloc trace dump.
+   Note that the use of FPRINTF here instead of util_out_print is historical. The output was at one
+   time going to stdout and util_out_print goes to stderr. If necessary or desired, these could easily
+   be changed to use util_out_print instead of FPRINTF
+*/
 void printMallocInfo(void)
 {
-	int i, j;
+	storElem	*eHdr, *uStor;
+	int 		i, j;
 
 	if (GDL_SmStats & gtmDebugLevel)
 	{
 		FPRINTF(stderr,"\nMalloc small storage performance:\n");
 		FPRINTF(stderr,
-			"Total mallocs: %d, total frees: %d, total extends: %d, total rmalloc bytes: %d, max rmalloc bytes: %d\n",
-			totalMallocs, totalFrees, totalExtends, totalRmalloc, rmallocMax);
+			"Total mallocs: %d, total frees: %d, total extents: %d, total rmalloc bytes: %d, max rmalloc bytes: %d\n",
+			totalMallocs, totalFrees, totalExtents, totalRmalloc, rmallocMax);
+		FPRINTF(stderr,
+			"Maximum extents: %d, Current extents: %d, Released extents: %d\n", maxExtents, curExtents,
+			(totalExtents - curExtents));
 		GMR_ONLY(FPRINTF(stderr,"Total reentrant mallocs: %d, total deferred frees: %d\n", reentMallocs, deferFreePending);)
 		FPRINTF(stderr,"\nQueueSize   Mallocs     Frees    Splits  Combines    CurCnt    MaxCnt    CurCnt    MaxCnt\n");
 		FPRINTF(stderr,  "                                                      Free      Free      Alloc     Alloc\n");
@@ -1085,25 +1234,43 @@ void printMallocInfo(void)
 	if (GDL_SmDumpTrace & gtmDebugLevel)
 	{
 		FPRINTF(stderr,"\nMalloc Storage Traceback:\n");
-		FPRINTF(stderr,"TransNumber   AllocAddr  CallerAddr\n");
-		for (i = 0,j = smLastAllocIndex; i < MAXSMTRACE; ++i,--j)/* Loop through entire table, start with last elem used */
+		FPRINTF(stderr,"TransNumber   AllocAddr        Size   CallerAddr\n");
+		FPRINTF(stderr,"------------------------------------------------\n");
+		for (i = 0,j = smLastMallocIndex; i < MAXSMTRACE; ++i,--j)/* Loop through entire table, start with last elem used */
 		{
 			if (0 > j)					   /* Wrap as necessary */
 				j = MAXSMTRACE - 1;
 			if (0 != smMallocs[j].smTn)
-				FPRINTF(stderr,"%9d      %8lx   %8lx\n", smMallocs[j].smTn, smMallocs[j].smAddr,
-					smMallocs[j].smCaller);
+				FPRINTF(stderr,"%9d    0x%08lx  %10d   0x%08lx\n", smMallocs[j].smTn, smMallocs[j].smAddr,
+					smMallocs[j].smSize, smMallocs[j].smCaller);
 		}
 		FPRINTF(stderr,"\n\nFree Storage Traceback:\n");
-		FPRINTF(stderr,"TransNumber    FreeAddr  CallerAddr\n");
+		FPRINTF(stderr,"TransNumber    FreeAddr        Size   CallerAddr\n");
 		for (i = 0, j = smLastFreeIndex; i < MAXSMTRACE; ++i, --j)/* Loop through entire table, start with last elem used */
 		{
 			if (0 > j)					  /* Wrap as necessary */
 				j = MAXSMTRACE - 1;
 			if (0 != smFrees[j].smTn)
-				FPRINTF(stderr,"%9d      %8lx   %8lx\n", smFrees[j].smTn, smFrees[j].smAddr, smFrees[j].smCaller);
+				FPRINTF(stderr,"%9d    0x%08lx  %10d   0x%08lx\n", smFrees[j].smTn, smFrees[j].smAddr,
+					smFrees[j].smSize, smFrees[j].smCaller);
 		}
 		FPRINTF(stderr,"\n");
 	}
+	if (GDL_SmDump & gtmDebugLevel)
+	{
+		FPRINTF(stderr,"\nMalloc Storage Dump:\n");
+		FPRINTF(stderr,"Malloc Addr      Alloc From     Malloc Size\n");
+		FPRINTF(stderr,"-------------------------------------------\n");
+		/* Looping for each allocated queue */
+		for (eHdr = &allocStorElemQs[0], i = 0; i <= (MAXINDEX + 1); ++i, ++eHdr)
+		{
+			for (uStor = STE_FP(eHdr); uStor->queueIndex != QUEUE_ANCHOR; uStor = STE_FP(uStor))
+			{
+				FPRINTF(stderr, "0x%08lx       0x%08lx      %10d\n", &uStor->userStorage.userStart,
+					uStor->allocatedBy, uStor->allocLen);
+			}
+		}
+	}
+
 }
 #endif

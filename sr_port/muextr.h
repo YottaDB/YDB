@@ -37,6 +37,8 @@ typedef struct coll_hdr_struct
 #define MU_FMT_GOQ		2
 #define MU_FMT_ZWR		3
 #define GOQ_BLK_SIZE		2048
+#define FORMAT_STR_MAX_SIZE 50
+#define LABEL_STR_MAX_SIZE 128
 
 #define BIN_HEADER_LABEL	"GDS BINARY EXTRACT LEVEL 3"
 #define BIN_HEADER_DATEFMT	"YEARMMDD2460SS"
@@ -53,10 +55,51 @@ char *mu_extr_ident(mstr *a);
 void  mu_extract(void);
 int mu_extr_getblk(unsigned char *ptr);		/***type int added***/
 #ifdef UNIX
-void mu_extr_gblout(mval *gn, mu_extr_stats *st, int format);
+#define WRITE_BIN_EXTR_BLK(BUFF, BSIZE)		\
+{						\
+	mval	val;				\
+	val.mvtype = MV_STR;			\
+	val.str.addr = (char *)(&BSIZE);	\
+	val.str.len = sizeof(BSIZE);		\
+	op_write(&val);				\
+	val.mvtype = MV_STR;			\
+	val.str.addr = (char *)(BUFF);		\
+	val.str.len = BSIZE;			\
+	op_write(&val);				\
+}
+#define WRITE_EXTR_LINE(BUFF, BSIZE)		\
+{						\
+	mval	val;				\
+	val.mvtype = MV_STR;			\
+	val.str.addr = (char *)(BUFF);		\
+	val.str.len = BSIZE;			\
+	op_write(&val);				\
+	op_wteol(1);				\
+}
+boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format);
 #elif defined(VMS)
-#include <rms.h>
-void mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int format);
+#define WRITE_BIN_EXTR_BLK(PTR, SIZE) 			\
+{							\
+	int status;					\
+	(outrab)->rab$l_rbf = (unsigned char *)(PTR);	\
+	(outrab)->rab$w_rsz = (SIZE);			\
+	status = sys$put((outrab));			\
+	if (!(status & 1)) 				\
+	{						\
+		rts_error(VARLSTCNT(1) status);		\
+		mupip_exit(status);			\
+	}						\
+}
+#define WRITE_EXTR_LINE(PTR, SIZE) 			\
+{							\
+	int status;					\
+	(outrab)->rab$l_rbf = (unsigned char *)(PTR);	\
+	(outrab)->rab$w_rsz = (SIZE);			\
+	status = sys$put((outrab));			\
+	if (status != RMS$_NORMAL) \
+		rts_error(VARLSTCNT(1) status);		\
+}
+boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int format);
 #else
 #error UNSUPPORTED PLATFORM
 #endif

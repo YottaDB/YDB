@@ -16,19 +16,23 @@
  *
  */
 
-#ifndef lint
-static char rcsid[] = "$Header:$";
-#endif
+#include "mdef.h"
+
+#include "gtm_stdio.h"
+#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_time.h"		/* for time() */
 
 #include <sys/types.h>
 #include <signal.h>
-#include "gtm_stdio.h"
 #include <fcntl.h>
 #include <errno.h>
 
-#include "mdef.h"
 #include "gtcm.h"
 #include "error.h"
+
+#ifndef lint
+static char rcsid[] = "$Header:$";
+#endif
 
 GBLDEF short		 gtcm_ast_avail;
 GBLDEF int4		 gtcm_exi_condition;

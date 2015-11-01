@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,10 +76,13 @@
 #include "zyerror_init.h"
 #include "ztrap_form_init.h"
 #include "ztrap_new_init.h"
+#include "zdate_form_init.h"
+#include "dollar_system_init.h"
 #include "sig_init.h"
 #include "gtm_startup.h"
 #include "svnames.h"
 #include "gtmci_signals.h"
+#include "jobinterrupt_init.h"
 
 #ifdef __sun
 #define PACKAGE_ENV_TYPE  "GTMXC_RPC"  /* env var to use rpc instead of xcall */
@@ -131,13 +134,9 @@ void gtm_startup(struct startup_vector *svec)
 	unsigned char	*mstack_ptr;
 	void		gtm_ret_code();
 	static readonly unsigned char init_break[1] = {'B'};
-	static readonly unsigned char init_sysid[] = "47,$gtm_sysid";
-	char		*env_sysid;
 	int4		lct;
 	int		i;
-#ifdef __sun
-        char            *gtmxc_rpc = 0;
-#endif
+
 	assert(svec->argcnt == sizeof(*svec));
 	get_page_size();
 	rtn_fst_table = rtn_names = (rtn_tables *) svec->rtn_start;
@@ -178,13 +177,9 @@ void gtm_startup(struct startup_vector *svec)
 	zcall_init();
 	cmd_qlf.qlf = glb_cmd_qlf.qlf;
 	cache_init();
-/* on sun we determined if xcall or rpc zcall is used. default is xcall */
 #ifdef __sun
-        gtmxc_rpc = (char*)GETENV(PACKAGE_ENV_TYPE);  /* using RPC? */
-        if (gtmxc_rpc)
-        {
-            xfer_table[xf_fnfgncal] = op_fnfgncal_rpc;
-        }
+        if (NULL != GETENV(PACKAGE_ENV_TYPE))	/* chose xcall (default) or rpc zcall */
+            xfer_table[xf_fnfgncal] = op_fnfgncal_rpc;  /* using RPC */
 #endif
 	msp -= sizeof(stack_frame);
 	frame_pointer = (stack_frame *) msp;
@@ -212,6 +207,7 @@ void gtm_startup(struct startup_vector *svec)
 	atexit(gtmci_exit_handler);
 	atexit(gtm_exit_handler);
 	io_init(TRUE);
+	jobinterrupt_init();
 	getzdir();
 	dpzgbini();
 	/* a base addr of 0 indicates a gtm_init call from an rpc server */
@@ -227,23 +223,10 @@ void gtm_startup(struct startup_vector *svec)
 	zyerror_init();
 	ztrap_form_init();
 	ztrap_new_init();
+	zdate_form_init(svec);
+	dollar_system_init(svec);
 	init_callin_functable();
 	gtm_env_xlate_init();
-	env_sysid = getenv("gtm_sysid");
-	dollar_system.mvtype = MV_STR;
-	if (!env_sysid)
-	{
-		dollar_system.str.len = strlen(init_sysid);
-		dollar_system.str.addr = &init_sysid[0];
-	} else
-	{
-		dollar_system.str.addr = stringpool.free;
-		memcpy(dollar_system.str.addr, "47,", 3);
-		stringpool.free += 3;
-		dollar_system.str.len = 3 + strlen(env_sysid);
-		memcpy(stringpool.free, env_sysid, strlen(env_sysid));
-		stringpool.free += strlen(env_sysid);
-	}
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	curr_pattern = pattern_list = &mumps_pattern;
 	pattern_typemask = mumps_pattern.typemask;

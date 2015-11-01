@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,9 @@ enum
 	SV_ZYERROR,		/* 43 */
 	SV_SYSTEM,		/* 44 */
 	SV_REFERENCE,		/* 45 */
-	SV_NUM_SV,		/* 46 */
+	SV_ZINTERRUPT,		/* 46 */
+	SV_ZININTERRUPT,	/* 47 */
+	SV_ZJOB,                /* 48 */
+	SV_NUM_SV,		/* 49 */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

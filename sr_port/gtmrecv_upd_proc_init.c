@@ -77,7 +77,6 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 #endif
 
 	error_def(ERR_RECVPOOLSETUP);
-	error_def(ERR_REPLLOG);
 	error_def(ERR_TEXT);
 
 	/* Check if the update process is alive */

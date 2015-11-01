@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -36,8 +36,8 @@
 # PUBLIC	opp_zstepret
 ENTRY opp_zstepret
 	movl	frame_pointer,%eax
-	movb	msf_typ_off(%eax),%dl
-	testb	$1,%dl
+	movw	msf_typ_off(%eax),%dx
+	testw	$1,%dx
 	je	l1
 	movl	zstep_level,%edx
 	cmpl	%eax, %edx
@@ -50,8 +50,8 @@ l1:	jmp	opp_ret
 ENTRY opp_zstepretarg
 	pushl	%eax
 	movl	frame_pointer,%eax
-	movb	msf_typ_off(%eax),%dl
-	testb	$1,%dl
+	movw	msf_typ_off(%eax),%dx
+	testw	$1,%dx
 	je	l2
 	movl	zstep_level,%edx
 	cmpl	%eax, %edx
@@ -230,8 +230,8 @@ l10:	call	op_zst_over
 # PUBLIC	opp_zst_over_ret
 ENTRY opp_zst_over_ret
 	movl	frame_pointer,%eax
-	movb	msf_typ_off(%eax),%dl
-	testb	$1,%dl
+	movw	msf_typ_off(%eax),%dx
+	testw	$1,%dx
 	je	l11
 	movl	zstep_level,%edx
 	movl	msf_old_frame_off(%eax),%eax
@@ -245,8 +245,8 @@ l11:	jmp	opp_ret
 ENTRY opp_zst_over_retarg
 	pushl	%eax
 	movl	frame_pointer,%eax
-	movb	msf_typ_off(%eax),%dl
-	testb	$1,%dl
+	movw	msf_typ_off(%eax),%dx
+	testw	$1,%dx
 	je	l12
 	movl	zstep_level,%edx
 	movl	msf_old_frame_off(%eax),%eax

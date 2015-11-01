@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -32,17 +34,8 @@
 
 #define MSGBUF_SIZE 256
 
-#ifdef VMS
-#define STANDALONE(x) mu_rndwn_file(TRUE)
-#elif defined(UNIX)
-#define STANDALONE(x) mu_rndwn_status = mu_rndwn_file(x, TRUE)
-#else
-#error unsupported platform
-#endif
-
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_data		mu_int_data;
-GBLREF boolean_t		mu_rndwn_status;
 
 boolean_t mu_int_init(void)
 {
@@ -62,27 +55,11 @@ boolean_t mu_int_init(void)
 	gv_cur_region->dyn.addr->fname_len = sizeof(gv_cur_region->dyn.addr->fname);
 	if (!cli_get_str("WHAT", (char *)gv_cur_region->dyn.addr->fname, &gv_cur_region->dyn.addr->fname_len))
 		mupip_exit(ERR_MUNODBNAME);
-#ifdef VMS /* On VMS mu_rndwn_file() expects the file tobe opened already */
-	/* open file */
-	fc = gv_cur_region->dyn.addr->file_cntl;
-	fc->file_type = dba_bg;
-	fc->op = FC_OPEN;
-	status = dbfilop(fc);
-	if (SS_NORMAL != status)
+	if (!STANDALONE(gv_cur_region))
 	{
-		gtm_putmsg(VARLSTCNT(1) status);
-		return FALSE;
-	}
-#endif
-	STANDALONE(gv_cur_region);
-	if (!(standalone = mu_rndwn_status))
-	{
-		gtm_putmsg(VARLSTCNT(4) ERR_MUSTANDALONE, 2,
-			DB_LEN_STR(gv_cur_region));
+		gtm_putmsg(VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(gv_cur_region));
 		return (FALSE);
 	}
-#ifdef UNIX
-	/* open file */
 	fc = gv_cur_region->dyn.addr->file_cntl;
 	fc->file_type = dba_bg;
 	fc->op = FC_OPEN;
@@ -92,7 +69,6 @@ boolean_t mu_int_init(void)
 		gtm_putmsg(VARLSTCNT(1) status);
 		return FALSE;
 	}
-#endif
 	native_size = mu_file_size(fc);
 	if (native_size < DIVIDE_ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE) + MIN_DB_BLOCKS)
 	{

@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_stat.h"
@@ -149,10 +150,10 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		{
 			lower_to_upper((uchar_ptr_t)mspace->str.addr, (uchar_ptr_t)mspace->str.addr, mspace->str.len);
 			if (((sizeof("TCP") - 1) == mspace->str.len)
-				&& (0 == memcmp(mspace->str.addr, LIT_AND_LEN("TCP"))))
+				&& (0 == memcmp(mspace->str.addr, "TCP", sizeof("TCP") - 1)))
 				tl->iod->type = tcp;
 			else if (((sizeof("SOCKET") - 1) == mspace->str.len)
-				&& (0 == memcmp(mspace->str.addr, LIT_AND_LEN("SOCKET"))))
+				&& (0 == memcmp(mspace->str.addr, "SOCKET", sizeof("SOCKET") - 1)))
 				tl->iod->type = gtmsocket;
 			else
 				tl->iod->type = us;

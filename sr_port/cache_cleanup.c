@@ -15,18 +15,15 @@
 #include "cache.h"
 #include "rtnhdr.h"
 #include "stack_frame.h"
+#include "cache_cleanup.h"
 
-#ifdef DEBUG
 GBLREF int	cache_temp_cnt;
-#define DBG_DECR_CNT(x) --x
-#else
-#define DBG_DECR_CNT(x)
-#endif
 
 void cache_cleanup(stack_frame *sf)
 {
-	ihdtyp	*irtnhdr;
-	int4	*vp;
+	ihdtyp		*irtnhdr;
+	cache_entry	*indce;
+	int4		*vp;
 
 	assert(sf->ctxt);
 	vp = (int4 *)sf->ctxt;
@@ -35,15 +32,22 @@ void cache_cleanup(stack_frame *sf)
 	{	/* Frame is one of ours */
 		vp--;
 		irtnhdr = (ihdtyp *)((char *)vp + *vp);
-		assert(0 < irtnhdr->indce->refcnt);
-		irtnhdr->indce->refcnt--;	/* This usage of this cache entry is done */
-		if (0 == irtnhdr->indce->refcnt && irtnhdr->indce->temp_elem)
+		indce = irtnhdr->indce;
+		assert(0 < indce->refcnt);
+		indce->refcnt--;	/* This usage of this cache entry is done */
+		if (0 == indce->refcnt && indce->temp_elem)
 		{	/* Temp element to be freed */
-			dqdel(irtnhdr->indce, linkq);
-			dqdel(irtnhdr->indce, linktemp);
-			if (irtnhdr->indce->obj.len)
-				free(irtnhdr->indce->obj.addr);
-			free(irtnhdr->indce);
+			if (indce->linkq.fl)
+			{	/* Cache entries orphaned by op_setzbrk won't be on queues */
+				dqdel(indce, linkq);
+			}
+			if (indce->linktemp.fl)
+			{
+				dqdel(indce, linktemp);
+			}
+			if (indce->obj.len)
+				free(indce->obj.addr);
+			free(indce);
 			assert(cache_temp_cnt);
 			DBG_DECR_CNT(cache_temp_cnt);
 		}

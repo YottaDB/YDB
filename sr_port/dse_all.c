@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "gtm_stdio.h"
 #include "util.h"
 #include "cli.h"

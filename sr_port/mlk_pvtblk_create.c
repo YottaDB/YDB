@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #ifdef VMS
 #include <descrip.h>	/* for GTM_ENV_TRANSLATE */
 #endif
@@ -18,7 +20,7 @@
 #ifdef EARLY_VARARGS
 #include <varargs.h>
 #endif
-#include <limits.h>	/*for GTM_ENV_TRANSLATE */
+#include "gtm_limits.h"	/*for GTM_ENV_TRANSLATE */
 
 #include "error.h"
 #ifndef EARLY_VARARGS
@@ -87,7 +89,6 @@ void	mlk_pvtblk_create (va_list subptr)
 		MV_FORCE_STR(extgbl1);
 		extgbl2 = va_arg(subptr, mval *);
 		subcnt--;
-		MV_FORCE_STR(extgbl2);
 		GTM_ENV_TRANSLATE(extgbl1, extgbl2);
 		if (extgbl1->str.len)
 			gld = zgbldir(extgbl1);

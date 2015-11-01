@@ -1,5 +1,5 @@
 /****************************************************************
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,6 +65,7 @@ GBLREF io_log_name	*dollar_principal;
 GBLREF mval		dollar_ztrap;
 GBLREF mval		dollar_zgbldir;
 GBLREF mval		dollar_job;
+GBLREF uint4		dollar_zjob;
 GBLREF mval		dollar_zstatus;
 GBLREF mval		dollar_zstep;
 GBLREF char		*zro_root;  /* ACTUALLY some other pointer type! */
@@ -80,6 +81,8 @@ GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_zerror;
 GBLREF mval		dollar_zyerror;
 GBLREF mval		dollar_system;
+GBLREF mval		dollar_zinterrupt;
+GBLREF boolean_t	dollar_zininterrupt;
 GBLREF int4		zdir_form;
 
 LITREF mval		literal_zero,literal_one;
@@ -315,6 +318,17 @@ void op_svget(int varnum, mval *v)
 		v->mvtype = MV_STR;
 		v->str = dollar_zyerror.str;
 		s2pool(&(v->str));
+		break;
+	case SV_ZINTERRUPT:
+		v->mvtype = MV_STR;
+		v->str = dollar_zinterrupt.str;
+		s2pool(&(v->str));
+		break;
+	case SV_ZININTERRUPT:
+		MV_FORCE_MVAL(v, dollar_zininterrupt);
+		break;
+        case SV_ZJOB:
+		MV_FORCE_ULONG_MVAL(v, dollar_zjob);
 		break;
 	default:
 		GTMASSERT;

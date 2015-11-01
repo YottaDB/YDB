@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_time.h"
 
@@ -86,7 +87,7 @@ void	compile_source_file(unsigned short flen, char *faddr)
 			memcpy(source_file_name, ret.str.addr, source_name_len);
 			source_file_name[source_name_len] = 0;
 			p = &source_file_name[plen.p.pblk.b_dir];
-			if (plen.p.pblk.b_dir >= sizeof("/dev/") - 1  &&  !memcmp(source_file_name, LIT_AND_LEN("/dev/")))
+			if (plen.p.pblk.b_dir >= sizeof("/dev/") - 1  &&  !memcmp(source_file_name, "/dev/", sizeof("/dev/") - 1))
 			{
 				tt_so_do_once = TRUE;
 			}
@@ -175,8 +176,8 @@ bool	open_source_file (void)
 	if (tt_so_do_once)
 	{
 		clock = time(0);
-		memcpy(&routine_name[0], LIT_AND_LEN("MDEFAULT"));
-		memcpy(&module_name[0], LIT_AND_LEN("MDEFAULT"));
+		memcpy(&routine_name[0], "MDEFAULT", sizeof("MDEFAULT") - 1);
+		memcpy(&module_name[0], "MDEFAULT", sizeof("MDEFAULT") - 1);
 	}
 	else
 	{

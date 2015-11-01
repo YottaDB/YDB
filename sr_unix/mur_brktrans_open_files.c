@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -100,7 +100,7 @@ bool mur_brktrans_open_files(ctl_list *ctl)
 		if (header->max_record_length > mur_extract_bsize)
 			 mur_extract_bsize = header->max_record_length;
 		if (mur_extract_bsize == 0)
-			mur_extract_bsize = 10240; /* Hard coded ??? */
+			mur_extract_bsize = DEFAULT_EXTR_BUFSIZE;
 		if (RENAME_FAILED == rename_file_if_exists(brktrans_file_info->fn, brktrans_file_info->fn_len,
                         &info_status, rename_fn, &rename_len))
                         gtm_putmsg(VARLSTCNT(7) ERR_RENAMEFAIL, 5, brktrans_file_info->fn_len,

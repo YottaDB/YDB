@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -167,7 +167,7 @@ LOOP_INDEX:
 		# named in gtm_verno (the version was probably specified by a code letter); look for it now.
 		foreach setactive_device ($gtm_gtmdev)
 			if ( "$setactive_device" == "NULL" ) then
-				set setactive_device = "/usr/"
+				set setactive_device = "`dirname ~library`/"
 			endif
 
 			if ( -d $setactive_device/$gtm_topdir/$gtm_verno ) then

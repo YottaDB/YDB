@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "io.h"
 #include "iosp.h"
 #include "io_params.h"

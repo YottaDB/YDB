@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@
 #include "iosp.h"
 #include "interlock.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "gdsbgtr.h"
@@ -40,9 +40,14 @@
 #include "mm_read.h"
 #include "is_proc_alive.h"
 #include "cache.h"
+#include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 #include "wcs_sleep.h"
 #include "add_inter.h"
+#ifdef UNIX
+#include "io.h"			/* needed by gtmsecshr.h */
+#include "gtmsecshr.h"		/* for continue_proc */
+#endif
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
 GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a failure (no buffer filled) and the real
@@ -71,7 +76,7 @@ GBLREF gv_namehead	*gv_target;
 sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out)
 	/* cycle is used in t_end to detect if the buffer has been refreshed since the t_qread */
 {
-	uint4			status, duint4;
+	uint4			status, duint4, blocking_pid;
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
 	bool			clustered, was_crit;
@@ -173,7 +178,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				*cr_out = first_tp_srch_status->cr;
 				first_tp_srch_status->cr->refer = TRUE;
 				if (CDB_STAGNATE <= t_tries)	/* mu_reorg doesn't use TP else should have an || for that */
-					cws_insert(blk);
+					CWS_INSERT(blk);
 				return (sm_uc_ptr_t)first_tp_srch_status->buffaddr;
 			} else
 			{	/* Block was already part of the read-set of this transaction, but got recycled. Allow for
@@ -301,6 +306,21 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				{	/* keep the parantheses for the if (although single line) since the following is a macro */
 					RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, cr, *cycle);
 				}
+				/* Note that at this point we expect t_qread() to return a <cr,cycle> combination that
+				 * corresponds to "blk" passed in. It is crucial to get an accurate value for both the fields
+				 * since tp_hist() relies on this for its intermediate validation. There is one possibility
+				 * wherein t_qread() might return an out-of-date cache-record. If we were doing the db_csh_get()
+				 * above (in t_qread itself) and located the cache-record which before coming here (and taking a
+				 * copy of cr->cycle a few lines above) was made an older twin by another process in bg_update
+				 * (note this can happen in VMS only) which has already incremented the cycle, we will end up
+				 * having a copy of the old cache-record with its incremented cycle number and hence will succeed
+				 * in tp_hist validation although we don't want to. But this is liveable for now since the
+				 * only issue with false validations in tp_hist is signalling a FALSE GVUNDEF (anything
+				 * else will get caught in tp_tend in the final validation necessitating a restart) and if a
+				 * key doesn't exist in the old twin and gets created only in the new twin, it was created as part
+				 * of a transaction concurrent with ours and hence theoretically the key didn't exist at the
+				 * beginning of our transaction and hence it is an arguably legitimate UNDEF.
+				 */
 				return (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr);
 			}
 			if (blk != cr->blk)
@@ -318,9 +338,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				} else  if (cr->read_in_progress >= 0)
 				{
 					BG_TRACE_PRO(t_qread_buf_owner_stuck);
-					if (0 != cr->r_epid)
+					if (0 != (blocking_pid = cr->r_epid))
 					{
-						if (FALSE == is_proc_alive(cr->r_epid, cr->image_count))
+						if (FALSE == is_proc_alive(blocking_pid, cr->image_count))
 						{	/* process gone: release that process's lock */
 							cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 							cr->blk = CR_BLKEMPTY;
@@ -329,11 +349,13 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						{
 							rel_crit(gv_cur_region);
 							send_msg(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region));
-							send_msg(VARLSTCNT(9) ERR_BUFOWNERSTUCK, 7, process_id, cr->r_epid,
+							send_msg(VARLSTCNT(9) ERR_BUFOWNERSTUCK, 7, process_id, blocking_pid,
 								cr->blk, cr->blk, (lcnt / BUF_OWNER_STUCK),
 								cr->read_in_progress, cr->rip_latch.latch_pid);
 							if ((4 * BUF_OWNER_STUCK) <= lcnt)
 								GTMASSERT;
+							/* Kickstart the process taking a long time in case it was suspended */
+							UNIX_ONLY(continue_proc(blocking_pid));
 						}
 					} else
 					{	/* process stopped before could set r_epid */

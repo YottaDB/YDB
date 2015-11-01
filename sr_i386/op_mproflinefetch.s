@@ -25,6 +25,7 @@
 
 	.text
 .extern	fetch
+.extern	stack_leak_check
 .extern pcurrpos
 
 MPR_LINEFETCH	=	0x4
@@ -39,6 +40,7 @@ ENTRY op_mproflinefetch
 	addl 	$4,%esp
 	popl	%eax
 	leal	(%esp,%eax,4),%esp
+	call	stack_leak_check
 	movl	frame_pointer,%eax
 	pushl	msf_mpc_off(%eax)
 	ret

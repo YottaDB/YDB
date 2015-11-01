@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 
 #include "gtmio.h"	/* this has to come in before gdsfhead.h, for all "open" to be defined
 				to "open64", including the open in header files */
+#include "gtm_unistd.h"	/* fsync() needs this */
 #include "aswp.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -57,7 +58,6 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	error_def(ERR_JNLACCESS);
 	error_def(ERR_JNLWRTDEFER);
 	error_def(ERR_JNLWRTNOWWRTR);
-	error_def(ERR_DBFSYNCERR);
 
 	assert(NULL != jpc);
 	udi = FILE_INFO(jpc->region);
@@ -91,17 +91,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	 */
 	if (jb->need_db_fsync)
 	{
-		BG_TRACE_PRO_ANY(csa, n_db_fsyncs);
-		if (csa->now_crit)
-			BG_TRACE_PRO_ANY(csa, n_db_fsyncs_in_crit);
-		db_fsync_in_prog++;
-		if (-1 == fsync(udi->fd))
-		{
-			db_fsync_in_prog--;
-			rts_error(VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(jpc->region), errno);
-		}
-		db_fsync_in_prog--;
-		assert(0 <= db_fsync_in_prog);
+		DB_FSYNC(jpc->region, udi, csa, db_fsync_in_prog);
 		jb->need_db_fsync = FALSE;
 	}
 	free = jb->free;

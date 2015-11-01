@@ -233,10 +233,17 @@ void		wcs_recover(gd_region *reg)
 			assert((0 != cr->bt_index) || (0 != cr_alt->bt_index));		/* at least one non-zero */
 			cr_alt->twin = cr->twin = 0;
 		}
-		if (JNL_ENABLED(csd) && (cr->jnl_addr > csa->jnl->jnl_buff->freeaddr))
+		if (JNL_ENABLED(csd))
 		{
-			assert(0 == cr->dirty);
-			cr->jnl_addr = csa->jnl->jnl_buff->freeaddr;
+			if (cr->jnl_addr > csa->jnl->jnl_buff->freeaddr)
+			{
+				assert(0 == cr->dirty);
+				cr->jnl_addr = csa->jnl->jnl_buff->freeaddr;
+			}
+		} else
+		{
+			assert(0 == cr->jnl_addr);
+			cr->jnl_addr = 0;		/* just be safe */
 		}
 		if (cr->stopped)
 		{	/* cache record attached to a buffer built by secshr_db_clnup: finish work; clearest case: do it 1st */

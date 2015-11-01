@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,12 +21,11 @@
 #include "gdskill.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"          /* needed for tp.h */
-#include "buddy_list.h"               /* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h */
+#include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "tp_frame.h"
 #include "tp_timeout.h"
-#include "mlk_rollback.h"
 #include "tp_unwind.h"
 #include "op.h"
 
@@ -60,11 +59,10 @@ void	op_trollback(short rb_levels)		/* rb_levels -> # of transaction levels by w
          	 * updated blocks). This is typically needed for a restart.
 	 	 */
 		tp_clean_up(TRUE);
-		mlk_rollback(newlevel);
 		for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 			if (TRUE == FILE_INFO(tr->reg)->s_addrs.now_crit)
 				rel_crit(tr->reg);			/* release any crit regions */
-		tp_unwind(newlevel, FALSE);
+		tp_unwind(newlevel, ROLLBACK_INVOCATION);
 		dollar_trestart = 0;
 		if (gv_currkey != NULL)
 		{
@@ -76,7 +74,6 @@ void	op_trollback(short rb_levels)		/* rb_levels -> # of transaction levels by w
 	} else
 	{
 		tp_incr_clean_up(newlevel);
-		mlk_rollback(newlevel);
-		tp_unwind(newlevel, FALSE);
+		tp_unwind(newlevel, ROLLBACK_INVOCATION);
 	}
 }

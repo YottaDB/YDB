@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,13 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "gtm_unistd.h"
+
+#include "gtm_string.h"
+
 #include "io.h"
+#include "gtm_logicals.h"
+
+#include "gtm_unistd.h"
 
 GBLDEF mstr	sys_input;
 GBLDEF mstr	sys_output;
@@ -44,14 +49,13 @@ void io_init_name(void)
 		sys_output.addr = (char *)malloc(i);
 		memcpy(sys_output.addr,temp, i);
 		sys_output.len = i - 1;
-	}
-	else
+	} else
 	{
 		sys_output.addr = "&";
 		sys_output.len = 1;
 	}
-	gtm_principal.addr = "$gtmprincipal";
-	gtm_principal.len = 13;
+	gtm_principal.addr = GTM_PRINCIPAL;
+	gtm_principal.len = STR_LIT_LEN(GTM_PRINCIPAL);
 	return;
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,6 @@
 
 #define LOG_WAIT_FOR_JNL_RECS_PERIOD	(10 * 1000) /* ms */
 #define LOG_WAIT_FOR_JNLOPEN_PERIOD	(10 * 1000) /* ms */
-#define EOF_RECLEN			ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_eof) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
 
 #define LSEEK_ERR_STR		"Error in lseek"
 #define LSEEK_ERR_LEN		(sizeof(LSEEK_ERR_STR) - 1)
@@ -109,8 +108,6 @@ static	int			first_read(repl_ctl_element*);
 static	int 			update_max_seqno_info(repl_ctl_element *ctl);
 static	int			adjust_for_eof_or_extension(repl_ctl_element *ctl);
 static	int 			scavenge_closed_jnl_files(seq_num ack_seqno);
-
-LITREF	int			jnl_fixed_size[];
 
 static	int repl_read_file(repl_buff_t *rb)
 {
@@ -407,20 +404,22 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 #ifdef VMS
 	short           	iosb[4];
 #endif
+	repl_buff_t		*rb;
 
 	error_def(ERR_REPLFILIOERR);
 	error_def(ERR_TEXT);
 
 	csa = &FILE_INFO(ctl->reg)->s_addrs;
-	fc = ctl->repl_buff->fc;
+	rb = ctl->repl_buff;
+	assert(rb->buffindex == REPL_MAINBUFF);
+	fc = rb->fc;
 	prev_eof_addr = fc->eof_addr;
 	*eof_change = 0;
 	new_eof_addr = csa->jnl->jnl_buff->dskaddr;
 	if (is_gdid_gdid_identical(&fc->id, JNL_GDID_PTR(csa)))
 	{
 		REPL_DPRINT3("Update EOF : New EOF addr from SHM for %s is %u\n", ctl->jnl_fn, new_eof_addr);
-	}
-	else
+	} else
 	{
 		REPL_DPRINT2("Update EOF : New EOF addr will be found from jnl file hdr for %s\n", ctl->jnl_fn);
 		UNIX_ONLY(
@@ -440,10 +439,27 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 		new_eof_addr = fc->jfh->end_of_data + EOF_RECLEN;
 		REPL_DPRINT3("Update EOF : New EOF addr from jfh for %s is %u\n", ctl->jnl_fn, new_eof_addr);
 	}
-	UNIX_ONLY(assert(new_eof_addr >= prev_eof_addr);)
+	/* ensure that new_eof_addr is not less than prev_eof_addr.
+	 * the only scenario where this need not be TRUE is the following case
+	 * 	(i) if new_eof_addr == (journal file header's end_of_data + size of eof record) and
+	 *	(ii) if prev_eof_addr == the next REPL_BLKSIZE boundary (since source server reads in chunks of REPL_BLKSIZE)
+	 * in the above case, source server's read of REPL_BLKSIZE bytes while trying to read at offset end_of_data would
+	 * 	have succeeded since the whole REPL_BLKSIZE block has been allocated in the journal file both in Unix and VMS.
+	 * but only the first EOF_RECLEN bytes of that block is valid data.
+	 * the assert below effectively checks that new_eof_addr indeed includes only the eof record
+	 * 	at a DISK_BLOCK_SIZE aligned boundary in Unix and VMS.
+	 */
+	assert(EOF_RECLEN < DISK_BLOCK_SIZE);
+	assert((new_eof_addr >= prev_eof_addr)
+		|| ((0 == ((new_eof_addr - EOF_RECLEN) % DISK_BLOCK_SIZE))
+			&& (DIVIDE_ROUND_UP(prev_eof_addr, REPL_BLKSIZE(rb)) == DIVIDE_ROUND_UP(new_eof_addr, REPL_BLKSIZE(rb)))));
 	fc->eof_addr = new_eof_addr;
+	/* eof_change calculated below is not used anywhere. In case it needs to be used, the below calculation
+	 * 	has to be reexamined in light of the above assert involving new_eof_addr and prev_eof_addr
+	 * although the code below is dead for now, it can be used for future performance enhancements.
+	 */
 	*eof_change = new_eof_addr > prev_eof_addr ? (int4)(new_eof_addr - prev_eof_addr) : -(int4)(prev_eof_addr - new_eof_addr);
-		/* Above computation was done that way because the variables involved are unsigned */
+		/* Above computation done that way because the variables involved are unsigned */
 	return (SS_NORMAL);
 }
 
@@ -468,8 +484,8 @@ static	int force_file_read(repl_ctl_element *ctl)
 	assert(rectype > JRT_BAD && rectype <= JRT_RECTYPES);
 	if (rectype != JRT_EOF) /* Can't be stale */
 		return (SS_NORMAL);
-	assert(b->reclen == (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_EOF] + JREC_SUFFIX_SIZE));
-	assert(b->readaddr - b->recaddr >= (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_EOF] + JREC_SUFFIX_SIZE));
+	assert(b->reclen == EOF_RECLEN);
+	assert(b->readaddr - b->recaddr >= EOF_RECLEN);
 	b->buffremaining += (b->readaddr - b->recaddr);
 	REPL_DPRINT3("FORCE FILE READ : Changing EOF_ADDR from %u to %u\n", fc->eof_addr, b->readaddr);
 	b->readaddr = fc->eof_addr = b->recaddr;
@@ -597,7 +613,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
  			     ctl->jnl_fn, INT8_PRINT(ctl->max_seqno), INT8_PRINT(reg_seqno));
  		return (SS_NORMAL);
  	}
-	rb->buffindex = REPL_SCRATCHBUFF;
+	rb->buffindex = REPL_SCRATCHBUFF;	/* temporarily set to scratch buffer */
 	b = &rb->buff[rb->buffindex];
 	dskread = ROUND_DOWN(fc->eof_addr, REPL_BLKSIZE(rb));
 	if (dskread == fc->eof_addr)
@@ -650,6 +666,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 			}
 		}
 	}
+	rb->buffindex = REPL_MAINBUFF;	/* reset back to the main buffer */
 	if (max_seqno_found)
 	{
 		QWASSIGN(ctl->max_seqno, max_seqno);
@@ -700,7 +717,7 @@ static	int first_read(repl_ctl_element *ctl)
 	error_def(ERR_JNLBADALIGN);
 
 	rb = ctl->repl_buff;
-	rb->buffindex = REPL_MAINBUFF;
+	assert(rb->buffindex == REPL_MAINBUFF);
 	b = &rb->buff[rb->buffindex];
 	fc = rb->fc;
 	/* Ignore the existing contents of the buffer */
@@ -809,7 +826,7 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 	error_def(ERR_TEXT);
 
 	rb = ctl->repl_buff;
-	rb->buffindex = REPL_MAINBUFF;
+	assert(rb->buffindex == REPL_MAINBUFF);
 	b = &rb->buff[rb->buffindex];
 	fc = rb->fc;
 	ctl->read_complete = FALSE;
@@ -929,7 +946,7 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 	error_def(ERR_JNLBADALIGN);
 
 	rb = ctl->repl_buff;
-	rb->buffindex = REPL_MAINBUFF;
+	assert(rb->buffindex == REPL_MAINBUFF);
 	b = &rb->buff[rb->buffindex];
 	assert(lo_addr >= JNL_FILE_FIRST_RECORD);
 	if (lo_addr != b->readaddr)
@@ -1336,8 +1353,11 @@ int gtmsource_readfiles(uchar_ptr_t buff, int *data_len, int maxbufflen)
 	jnlpool.gtmsource_local->read_state = READ_FILE;
 #endif
 	if (jnlpool.gtmsource_local->read_state == READ_POOL)
+	{
+		gtmsource_ctl_close(); /* no need to keep files open now that we are going to read from pool */
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server now reading from journal pool. Tr num = "INT8_FMT"\n",
 				INT8_PRINT(jnlpool.gtmsource_local->read_jnl_seqno));
+	}
 	*data_len = read_size;
 	return (0);
 }

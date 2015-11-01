@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,7 +75,8 @@ boolean_t mur_crejnl_forwphase_file(ctl_list **jnl_files)
 	char			*cmd, cmd_string[MAX_LINE], bkup_jnl_file_name[MAX_FN_LEN], rolled_bk_jnl_file_name[MAX_FN_LEN],
 				rename_fn[MAX_FN_LEN];
 	char			writes[WRITE_SIZE], *errptr, temp_jnl_file_name[MAX_FN_LEN];
-	char			*jeb_buff, zeroes[DISK_BLOCK_SIZE];
+	char			zeroes[DISK_BLOCK_SIZE + JNL_REC_START_BNDRY];
+					/* + JNL_REC_START_BNDRY to ensure we have 8-byte aligned 512-byte block */
 	int			temp_jnl_fd, temp_jnl_file_name_len, ftruncate_res, bkup_jnl_file_name_len, rv,
 				rolled_bk_jnl_file_name_len, rename_len, jnl_rename_len, alignsize;
 	union
@@ -95,13 +96,13 @@ boolean_t mur_crejnl_forwphase_file(ctl_list **jnl_files)
 	struct mur_file_control	*fc;
 	uint4			jnl_status;
 	boolean_t		optcre_forwphase;
+	struct stat		stat_buf;
+	int			fstat_res;
 
 	error_def(ERR_NEWJNLFILECREATE);
 	error_def(ERR_JNLCLOSE);
 	error_def(ERR_JNLREADEOF);
 	error_def(ERR_RENAMEFAIL);
-
-	jeb_buff = (char *)malloc(EOF_RECLEN);	/* guarantees 8-byte alignment, local char array doesn't do that */
 
 	for (ctl = *jnl_files;  ctl != NULL;  ctl = ctl->next)
 	{
@@ -192,7 +193,6 @@ boolean_t mur_crejnl_forwphase_file(ctl_list **jnl_files)
 					util_out_print(errptr, TRUE, save_errno);
 					util_out_print("MUR-E-JNLOPNERR : Error opening journal file !AD ", TRUE,
 								ctl->jnl_fn_len, ctl->jnl_fn);
-					free(jeb_buff);
 					return FALSE;
 				}
 				length = WRITE_SIZE;
@@ -282,6 +282,14 @@ boolean_t mur_crejnl_forwphase_file(ctl_list **jnl_files)
 				ctl->stop_addr = header->forw_phase_stop_addr; /* This offset used later for EOF backpointering */
 				forw_phase_eof_addr = header->forw_phase_eof_addr;
 			}
+			FSTAT_FILE(fc->fd, &stat_buf, fstat_res);
+			if (0 != fstat_res)
+			{
+				save_errno = errno;
+				errptr = (char *)STRERROR(save_errno);
+				util_out_print(errptr, TRUE, save_errno);
+				util_out_print("MUR-W-ERRFSTAT : Failed to FSTAT file !AD", TRUE, ctl->jnl_fn_len, ctl->jnl_fn);
+			}
 			FTRUNCATE(fc->fd, ftruncate_len, ftruncate_res);
 			if (0 != ftruncate_res)
 			{
@@ -327,8 +335,10 @@ boolean_t mur_crejnl_forwphase_file(ctl_list **jnl_files)
 				header->forw_phase_eof_addr = forw_phase_eof_addr;
 				header->forw_phase_jnl_file_len = temp_jnl_file_name_len;
 				memcpy(header->forw_phase_jnl_file_name, temp_jnl_file_name, temp_jnl_file_name_len);
+				header->forw_phase_jnl_file_name[temp_jnl_file_name_len] = 0;
 				header->data_file_name_length = gv_cur_region->dyn.addr->fname_len;
 				memcpy(header->data_file_name, gv_cur_region->dyn.addr->fname, gv_cur_region->dyn.addr->fname_len);
+				header->data_file_name[gv_cur_region->dyn.addr->fname_len] = 0;
 			}
 			JNL_SHORT_TIME(header->eov_timestamp);
 			header->eov_tn = cs_addrs->ti->curr_tn;
@@ -343,7 +353,11 @@ boolean_t mur_crejnl_forwphase_file(ctl_list **jnl_files)
 		if (fc->eof_addr < lastaddr)
 			GTMASSERT;
 		/* Write an EOF record */
-		eof_record = (jnl_record *)jeb_buff;
+		assert(sizeof(zeroes) >= DISK_BLOCK_SIZE);
+		memset(zeroes, 0, sizeof(zeroes));
+		assert(EOF_RECLEN <= DISK_BLOCK_SIZE);
+		eof_record = (jnl_record *)ROUND_UP((uint4)zeroes, JNL_REC_START_BNDRY);/* ensure 8-byte alignment for EOF record */
+		assert(0 == ((int)eof_record) % JNL_REC_START_BNDRY);
 		eof_record->jrec_type = JRT_EOF;
 		if (lastaddr <= JNL_FILE_FIRST_RECORD)
 			eof_record->jrec_backpointer = DISK_BLOCK_SIZE;
@@ -355,11 +369,23 @@ boolean_t mur_crejnl_forwphase_file(ctl_list **jnl_files)
 		eof_suffix = (jrec_suffix *)((char *)eof_record + EOF_BACKPTR);
 		eof_suffix->backptr = EOF_BACKPTR;
 		eof_suffix->suffix_code = JNL_REC_TRAILER;
-		LSEEKWRITE(fc->fd, eof_rec_offset, eof_record, EOF_RECLEN, status);
+		LSEEKWRITE(fc->fd, eof_rec_offset, eof_record, DISK_BLOCK_SIZE, status);
+			/* write DISK_BLOCK_SIZE above instead of just EOF_RECLEN to make sure we have 512-byte aligned filesize */
 		if (0 != status)
 		{
 			util_out_print(" Error Writing to Journal file !AD", TRUE, ctl->jnl_fn_len, ctl->jnl_fn);
 			return FALSE;
+		}
+		if (!optcre_forwphase)
+		{	/* restore filesize to what it was before the FTRUNCATE */
+			assert(sizeof(zeroes) >= DISK_BLOCK_SIZE);
+			memset(zeroes, 0, sizeof(zeroes));
+			LSEEKWRITE(fc->fd, (stat_buf.st_size - DISK_BLOCK_SIZE), zeroes, DISK_BLOCK_SIZE, status);
+			if (0 != status)
+			{
+				util_out_print(" Error Writing to End of Journal file !AD", TRUE, ctl->jnl_fn_len, ctl->jnl_fn);
+				return FALSE;
+			}
 		}
 		if (TRUE == ctl->concat_next)
 		{
@@ -387,10 +413,12 @@ boolean_t mur_crejnl_forwphase_file(ctl_list **jnl_files)
 			{
 				ctl->jnl_fn_len = temp_jnl_file_name_len;
 				memcpy(ctl->jnl_fn, temp_jnl_file_name, temp_jnl_file_name_len);
+				ctl->jnl_fn[temp_jnl_file_name_len] = 0;
 			} else
 			{
 				ctl->jnl_fn_len = header->forw_phase_jnl_file_len;
 				memcpy(ctl->jnl_fn, header->forw_phase_jnl_file_name, ctl->jnl_fn_len);
+				ctl->jnl_fn[ctl->jnl_fn_len] = 0;
 				OPENFILE3(ctl->jnl_fn, O_RDWR, 0600, temp_jnl_fd);
 				if (-1 == temp_jnl_fd)
 				{
@@ -399,7 +427,6 @@ boolean_t mur_crejnl_forwphase_file(ctl_list **jnl_files)
 					util_out_print(errptr, TRUE, save_errno);
 					util_out_print("MUR-E-JNLOPNERR : Error opening journal file !AD ", TRUE,
 								ctl->jnl_fn_len, ctl->jnl_fn);
-					free(jeb_buff);
 					return FALSE;
 				}
 			}
@@ -425,6 +452,5 @@ boolean_t mur_crejnl_forwphase_file(ctl_list **jnl_files)
 			ctl->rab->pvt->eof_addr = eof_rec_offset + EOF_RECLEN; /* the journal file, since we read same file again */
 		}
 	}
-	free(jeb_buff);
 	return TRUE;
 }

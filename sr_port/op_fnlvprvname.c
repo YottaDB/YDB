@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "hashdef.h"
 #include "lv_val.h"
 #include "stringpool.h"

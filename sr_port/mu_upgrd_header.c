@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,9 +39,7 @@
 #include "min_max.h"          /* needed for gdsblkops.h and MIN,MAX usage in this module */
 #include "gdsblkops.h"
 #include "timers.h"
-#ifdef UNIX
 #include "mutex.h"
-#endif
 #include "mu_upgrd.h"
 #include "mu_upgrd_header.h"
 
@@ -136,8 +134,29 @@ void mu_upgrd_header(v3_sgmnt_data *old_head, sgmnt_data *new_head)
 	new_head->jnl_alq = old_head->jnl_alq;
 	new_head->jnl_deq = old_head->jnl_deq;
 	new_head->jnl_buffer_size = old_head->jnl_buffer_size;
+	if (JNL_ALLOWED(new_head) && !new_head->jnl_buffer_size)
+		new_head->jnl_buffer_size = JNL_BUFFER_DEF;
 	new_head->jnl_before_image = old_head->jnl_before_image;
 	new_head->jnl_state = old_head->jnl_state;
+	if (JNL_ALLOWED(old_head))
+	{	/* Following 3 are new fields starting from V43001.
+		 * Initialize them appropriately.
+		 */
+		new_head->epoch_interval = DEFAULT_EPOCH_INTERVAL;
+		new_head->alignsize = DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE;
+		if (!new_head->jnl_alq)
+			new_head->jnl_alq = JNL_ALLOC_DEF;
+		/* note new_head->jnl_deq is carried over without any change even if it is zero since a zero
+		 * jnl file extension size is supported starting V43001
+		 */
+		new_head->autoswitchlimit = ALIGNED_ROUND_DOWN(JNL_ALLOC_MAX, new_head->jnl_alq, new_head->jnl_deq);
+	} else
+	{
+		new_head->epoch_interval = 0;
+		new_head->alignsize = 0;
+		new_head->autoswitchlimit = 0;
+	}
+	new_head->yield_lmt = DEFAULT_YIELD_LIMIT;
 	/* new_head->filler_glob_sec_init[0] */
 	new_head->jnl_file_len = old_head->jnl_file_len;
 	UPGRADE_MEM(jnl_file_name);
@@ -236,10 +255,10 @@ void mu_upgrd_header(v3_sgmnt_data *old_head, sgmnt_data *new_head)
 	INIT_BG_TRC_REC(wc_blocked_tpckh_hist1_nonnullbt);
 	/* filler_2k[896];   */
 
-#ifdef UNIX
 	new_head->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
 	new_head->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
 	new_head->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
+#ifdef UNIX
 	new_head->semid = INVALID_SEMID;
 	new_head->shmid = INVALID_SHMID;
 #endif

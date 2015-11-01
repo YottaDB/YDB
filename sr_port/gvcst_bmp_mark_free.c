@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,9 @@
 	Note ks must be already sorted
 */
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "cdb_sc.h"
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -38,14 +41,13 @@
 #include "mm_read.h"
 #include "gvcst_bmp_mark_free.h"
 
-GBLREF char		*update_array, *update_array_ptr;
-GBLREF cw_set_element	cw_set[];
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF unsigned char	rdfail_detail;
-GBLREF sgm_info		*sgm_info_ptr;
-GBLREF inctn_opcode_t   inctn_opcode;
-GBLREF boolean_t        mu_reorg_process;
+GBLREF	char			*update_array, *update_array_ptr;
+GBLREF	cw_set_element		cw_set[];
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	unsigned char		rdfail_detail;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	boolean_t		mu_reorg_process;
 
 trans_num gvcst_bmp_mark_free(kill_set *ks)
 {
@@ -56,21 +58,11 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 	int4		cycle;
 	cache_rec_ptr_t	cr;
 	srch_hist	alt_hist;
-	inctn_opcode_t  save_inctn_opcode;
 	sm_uc_ptr_t	bmp;
 	trans_num	ret_tn = 0;
 
 	error_def(ERR_GVKILLFAIL);
-	if (JNL_ENABLED(cs_data))
-        {
-                /* This function is called for TP/non-TP/reorg. They have set inctn_opcode and
-                 * do not expect to change. So save it before using the global.   */
-                save_inctn_opcode = inctn_opcode;
-                if (mu_reorg_process)
-                        inctn_opcode = inctn_bmp_mark_free_mu_reorg;
-                else
-                        inctn_opcode = inctn_bmp_mark_free_gtm;
-        }
+
 	alt_hist.h[0].blk_num = 0;	/* need for calls to T_END for bitmaps */
 	for (blk = &ks->blk[0], blk_top = &ks->blk[ks->used]; blk < blk_top;  blk = next_blk)
 	{
@@ -120,8 +112,5 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 			break;
 		}
 	}       /* for (all blocks in the kill_set */
-	if (JNL_ENABLED(cs_data))
-                inctn_opcode = save_inctn_opcode;
-
 	return ret_tn;
 }

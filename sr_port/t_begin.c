@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,10 +21,11 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "t_begin.h"
+#include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 
 GBLDEF short 		crash_count;
@@ -53,7 +54,7 @@ void t_begin (uint4 err, bool update_transaction) 	/* err --> error code for cur
 	/* If we use a clue then we must consider the oldest tn in the search
 	 * 	history to be the start tn for this transaction.
 	 */
-	cws_reset();
+	CWS_RESET;
 	update_trans = update_transaction;
 	t_err = err;
 

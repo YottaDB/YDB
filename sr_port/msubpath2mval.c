@@ -49,11 +49,11 @@ int msubpath2mval(unsigned char *inbuff, int maxelem, mval *mvarray)
 
     /* parse off @ */
     if (*inbuff++ != '@')
-	return NULL;
+	return 0;
 
     mvcount = 0;
     if (*inbuff != '(')
-	return NULL;
+	return 0;
 
     /* <subscript> ::= { <sublit> | [ + | - ] <numlit>  } */
     do
@@ -61,13 +61,13 @@ int msubpath2mval(unsigned char *inbuff, int maxelem, mval *mvarray)
 	inbuff++;
 	inbuff = parse_subsc(inbuff,&mvarray[mvcount]);
 	if (!inbuff)
-	    return NULL;
+	    return 0;
 	mvcount++;
     }
     while ( *inbuff == ',' && mvcount < maxelem);
 
     if (*inbuff != ')')
-	return NULL;
+	return 0;
 
     return mvcount;
 }

@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -43,16 +45,17 @@ void dse_wcreinit (void)
 #ifdef UNIX
 	char	*fgets_res;
 #endif
-	error_def(ERR_DSENOTBG);
 	error_def(ERR_DSEWCINITCON);
 	error_def(ERR_DSEINVLCLUSFN);
+	error_def(ERR_DSEONLYBGMM);
         error_def(ERR_DBRDONLY);
 
         if (gv_cur_region->read_only)
                 rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 
 	if (cs_addrs->hdr->clustered)
-	{	rts_error(VARLSTCNT(1) ERR_DSEINVLCLUSFN);
+	{
+		rts_error(VARLSTCNT(1) ERR_DSEINVLCLUSFN);
 		return;
 	}
 	if (cs_addrs->critical)
@@ -60,11 +63,13 @@ void dse_wcreinit (void)
 	len = sizeof(confirm);
 	GET_CONFIRM(confirm,len);
 	if (confirm[0] != 'Y' && confirm[0] != 'y')
-	{	rts_error(VARLSTCNT(1) ERR_DSEWCINITCON);
+	{
+		rts_error(VARLSTCNT(1) ERR_DSEWCINITCON);
 		return;
 	}
 	if (cs_addrs->hdr->acc_meth != dba_bg && cs_addrs->hdr->acc_meth != dba_mm)
-	{	rts_error(VARLSTCNT(1) ERR_DSENOTBG);
+	{
+		rts_error(VARLSTCNT(4) ERR_DSEONLYBGMM, 2, LEN_AND_LIT("WCINIT"));
 		return;
 	}
 	grab_crit(gv_cur_region);

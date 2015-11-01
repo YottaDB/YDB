@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -72,6 +72,7 @@ fi
 
 # Other files
 hlpfiles="gdehelp.dat gtmhelp.dat"
+awkfiles="repl_sort_add_seq.awk repl_sort_rem_tran.awk"
 if [ $arch = "sco" ]; then
 	ofiles="$hlpfiles esnecil"
 elif [ $arch = "sun"  -o  $arch = "solaris" ]; then
@@ -82,6 +83,8 @@ elif [ $arch = "dux"  -o  $arch = "hp"  -o  $arch = "ibm" -o $arch = "linux" ]; 
 else
 	ofiles="$hlpfiles"
 fi
+
+ofiles="$ofiles $awkfiles"
 
 # Directories
 if [ $arch = "sun"  -o  $arch = "solaris" ]; then
@@ -310,7 +313,6 @@ Change -region DEFAULT	-record=1020	-key=255
 Exit
 GDE.in2
 
-
 # Create the dump file for ZHELP
 
 touch $gtmdist/gtmhelp.dmp
@@ -319,6 +321,10 @@ chmod a+rw $gtmdist/gtmhelp.dmp
 other_object_files="CHK2LEV.o CHKOP.o GENDASH.o GENOUT.o GETNEAR.o GTMHELP.o GTMHLPLD.o LOAD.o LOADOP.o"
 other_object_files="$other_object_files LOADVX.o MSG.o TTTGEN.o TTTSCAN.o UNLOAD.o"
 csh_script_files="lowerc.csh lowerc_cp.csh upperc.csh upperc_cp.csh"
+
+# make database files read only
+chmod 0444 $gtmdist/*.dat
+chmod 0444 $gtmdist/*.gld
 
 # $other_object_files, $csh_script_files should be removed unconditionally
 \rm -rf $other_object_files $csh_script_files
@@ -331,5 +337,5 @@ read resp
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
 		*.gtc gtm* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid \
-		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.*
+		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.* $awkfiles
 fi

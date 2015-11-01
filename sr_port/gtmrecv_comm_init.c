@@ -11,7 +11,9 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_socket.h"
+
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/time.h>

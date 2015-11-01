@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -82,14 +84,16 @@ gd_addr *zgbldir(mval *v)
 		tran_name = get_name(&v->str);
 	gd_ptr = gd_load(tran_name);
 	name = (gdr_name *)malloc(sizeof(gdr_name));
-	if (name->name.len = v->str.len)
-		name->name = *tran_name;
-	else
-	{	/* free up memory allocated for mstr and its addr field in get_name */
-		assert(tran_name->len);
-		free(tran_name->addr);
-		free(tran_name);
+	if (name->name.len = v->str.len)	/* Note embedded assignment */
+	{
+		name->name.addr = (char *)malloc(v->str.len);
+		memcpy(name->name.addr, v->str.addr, v->str.len);
 	}
+	/* free up memory allocated for mstr and its addr field in get_name */
+	assert(tran_name->len);
+	free(tran_name->addr);
+	free(tran_name);
+
 	if (gdr_name_head)
 		name->link = (struct gdr_name *)gdr_name_head;
 	else

@@ -56,6 +56,7 @@ GBLREF enum gtmImageTypes	image_type;
 GBLREF boolean_t		sem_incremented;
 GBLREF gd_region		*ftok_sem_reg;
 GBLREF volatile boolean_t 	semwt2long;
+GBLREF boolean_t		gtm_environment_init;
 
 static struct sembuf		ftok_sop[3];
 static int			ftok_sopcnt;
@@ -174,7 +175,12 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 					}
 				}
 				if (DSE_IMAGE != image_type)
-					sem_wait_time = MAX_SEM_WT;
+				{
+					if (!gtm_environment_init)
+						sem_wait_time = MAX_SEM_WT;
+					else
+						sem_wait_time = 604800; /* one week, that is, infinite wait */
+				}
 				else {
 					sem_wait_time = MAX_SEM_DSE_WT;
 					util_out_print("FTOK semaphore for region !AD is held by pid, !UL. "

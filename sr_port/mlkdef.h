@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,7 @@ typedef struct	mlk_tp_struct
 	unsigned int		level : 9;	/* incremental lock level */
 	unsigned int		zalloc : 1;	/* if true, there is a ZALLOC posted for this lock */
 	unsigned int		tplevel : 8;	/* $TLEVEL when this was stacked */
-	unsigned int		unused : 18;	/* ** Reserved ** */
+	unsigned int		unused : 14;	/* ** Reserved ** */
 } mlk_tp;
 
 typedef struct				/* One of these nodes is required for each process which is blocked on a lock */

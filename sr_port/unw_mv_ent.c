@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,13 +15,26 @@
 #include "lv_val.h"
 #include "mv_stent.h"
 #include "sbs_blk.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "dpgbldir.h"
+#include "dpgbldir_sysops.h"
+#include "op.h"
 
 GBLREF symval		*curr_symval;
 GBLREF sbs_blk		*sbs_blk_hdr;
 GBLREF boolean_t	dollar_truth;
 GBLREF lv_val		*active_lv;
+GBLREF gv_key           *gv_currkey;
+GBLREF gv_namehead      *gv_target;
+GBLREF gd_addr          *gd_header;
 GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_ztrap;
+GBLREF mval             dollar_zgbldir;
+GBLREF volatile boolean_t	dollar_zininterrupt;
 
 mval	*unw_mv_ent(mv_stent *mv_st_ent)
 {
@@ -40,10 +53,21 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 		if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_etrap)
 		{
 			dollar_ztrap.str.len = 0;
-		}
-		if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_ztrap)
-		{
+		} else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_ztrap)
 			dollar_etrap.str.len = 0;
+		else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_zgbldir)
+		{
+	        	if (dollar_zgbldir.str.len != 0)
+				gd_header = zgbldir(&dollar_zgbldir);
+			else
+			{
+				dpzgbini();
+				gd_header = NULL;
+			}
+			if (gv_currkey)
+				gv_currkey->base[0] = 0;
+			if (gv_target)
+				gv_target->clue.end = 0;
 		}
 		return 0;
 	case MVST_MVAL:
@@ -121,6 +145,12 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 		return 0;
 	case MVST_TPHOLD:
 		return 0;	/* just a place holder for TP */
+	case MVST_ZINTR:
+		/* Restore environment to pre-$zinterrupt evocation */
+		dollar_zininterrupt = FALSE;
+		dollar_truth = (boolean_t)mv_st_ent->mv_st_cont.mvs_zintr.saved_dollar_truth;
+		op_gvrectarg(&mv_st_ent->mv_st_cont.mvs_zintr.savtarg);
+		return 0;
 	default:
 		GTMASSERT;
 		return 0;

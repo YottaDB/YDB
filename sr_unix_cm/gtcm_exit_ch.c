@@ -16,13 +16,15 @@
  *
  */
 
+#include "mdef.h"
+
+#include "error.h"
+#include "gtcm.h"
+#include "util.h"	/* for util_out_print() prototype */
+
 #ifndef lint
 static char rcsid[] = "$Header:$";
 #endif
-
-#include "mdef.h"
-#include "error.h"
-#include "gtcm.h"
 
 GBLREF int4	 gtcm_exi_condition;
 

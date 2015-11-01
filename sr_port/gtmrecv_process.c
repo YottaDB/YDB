@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,7 @@
 #include "repl_log.h"
 #include "gtmsource.h"
 #include "sgtm_putmsg.h"
+#include "longcpy.h"		/* for longcpy() prototype */
 
 #define RECVBUFF_REPLMSGLEN_FACTOR 		8
 
@@ -590,6 +591,7 @@ static void do_main_loop(boolean_t crash_restart)
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_REPLWARN);
 	error_def(ERR_REPLTRANS2BIG);
+	error_def(ERR_UNIMPLOP);
 	error_def(ERR_TEXT);
 
 	recvpool_ctl = recvpool.recvpool_ctl;
@@ -860,6 +862,18 @@ static void do_main_loop(boolean_t crash_restart)
 									repl_filter_bufsiz = 0;
 								}
 							}
+							VMS_ONLY
+							(
+							 	/* No customer has a version prior to V4.3-001 running replication
+								 * in production. We expect customers who want to run replication
+								 * to upgrade to V4.3-001. We don't want to write internal filters
+								 * to support rolling upgrades b/n a prior version and V4.3-001.
+								 * Vinaya Feb 27, 2002 */
+								if (V13_JNL_VER > remote_jnl_ver)
+									rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
+									  	LEN_AND_LIT("Rolling upgrade not supported between"
+										            "these two GT.M versions"));
+							)
 
 							/* Don't send any more stopsourcefilter, or updateresync messages */
 							gtmrecv_options.stopsourcefilter = FALSE;

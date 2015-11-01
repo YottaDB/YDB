@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 #include "gtm_iconv.h"
 #include "gtm_stdlib.h"
 

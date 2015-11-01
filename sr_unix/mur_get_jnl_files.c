@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include <unistd.h>
 #include "gtm_fcntl.h"
 #include <errno.h>

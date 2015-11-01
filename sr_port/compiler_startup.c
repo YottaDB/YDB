@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "compiler.h"
 #include "opcode.h"
 #include "cmd_qlf.h"

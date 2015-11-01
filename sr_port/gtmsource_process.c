@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -334,12 +336,13 @@ int gtmsource_process(void)
 		 	continue;
 		}
 
-		if (QWLT(gtmsource_local->read_jnl_seqno, sav_read_jnl_seqno))
+		if (QWLT(gtmsource_local->read_jnl_seqno, sav_read_jnl_seqno) && NULL != repl_ctl_list)
 		{
 			/* The journal files may have been positioned ahead of
 			 * the read_jnl_seqno for the next read. Indicate that
 			 * they have to be repositioned into the past.
 			 */
+			assert(READ_FILE == gtmsource_local->read_state);
 			gtmsource_set_lookback();
 		}
 

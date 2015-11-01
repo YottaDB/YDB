@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,6 +61,23 @@
 #include "ftok_sems.h"
 #include "gtmimagename.h"
 
+#define CANCEL_DB_TIMERS(region)						\
+{										\
+	sgmnt_addrs	*csa;							\
+										\
+	csa = &FILE_INFO(region)->s_addrs;					\
+	if (csa->timer)								\
+	{									\
+		cancel_timer((TID)region);					\
+		if (NULL != csa->nl)						\
+			DECR_CNT(&csa->nl->wcs_timers, &csa->nl->wc_var_lock);	\
+	}									\
+	if (csa->dbsync_timer)							\
+	{									\
+		cancel_timer((TID)csa);						\
+		csa->dbsync_timer = FALSE;					\
+	}									\
+}
 
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	boolean_t		mupip_jnl_recover;
@@ -153,6 +170,7 @@ void gds_rundown(void)
                         }
 */
 			shmdt((caddr_t)csa->nl);
+			csa->nl = NULL;
 		}
 		REVERT;
 		return;
@@ -171,6 +189,8 @@ void gds_rundown(void)
 		REVERT;
 		return;
 	}
+	/* Cancel any pending flush timer for this region by this task */
+	CANCEL_DB_TIMERS(reg);
 	we_are_last_user = FALSE;
 	if (!csa->persistent_freeze)
 		region_freeze(reg, FALSE, FALSE);
@@ -243,17 +263,7 @@ void gds_rundown(void)
 		rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
 	/* Certain things are only done for writing tasks */
 	if (!reg->read_only)
-	{	/* Cancel any pending flush timer for this region by this task */
-		if (csa->timer)
-		{
-			cancel_timer((TID)reg);
-			DECR_CNT(&csa->nl->wcs_timers, &csa->nl->wc_var_lock);
-		}
-		if (csa->dbsync_timer)
-		{
-			cancel_timer((TID)csa);
-			csa->dbsync_timer= FALSE;
-		}
+	{
 		/* If we had an orphaned block and were interrupted, set wc_blocked so we can invoke wcs_recover */
 		if (csa->wbuf_dqd)
 		{
@@ -451,6 +461,7 @@ void gds_rundown(void)
 	 */
 	remove_shm = csa->nl->remove_shm;
 	status = shmdt((caddr_t)csa->nl);
+	csa->nl = NULL; /* dereferencing nl after detach is not right, so we set it to NULL so that we can test before dereference*/
 	if (-1 == status)
 		send_msg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_TEXT, 2, LEN_AND_LIT("Error during shmdt"), errno);
 	reg->open = FALSE;
@@ -483,6 +494,7 @@ void gds_rundown(void)
 			if (0 != sem_rmid(udi->semid))
 				rts_error(VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 					ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"));
+			grabbed_access_sem = FALSE;
 		}
 	} else
 	{
@@ -496,6 +508,7 @@ void gds_rundown(void)
 		if (0 != (save_errno = do_semop(udi->semid, 0, -1, SEM_UNDO)))
 			rts_error(VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
 				ERR_TEXT, 2, RTS_ERROR_TEXT("gds_rundown rundown semaphore release"), save_errno);
+		grabbed_access_sem = FALSE;
 	}
 	if (!ftok_sem_release(reg, !mupip_jnl_recover, FALSE))
 			rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
@@ -544,12 +557,19 @@ CONDITION_HANDLER(gds_rundown_ch)
 		gtm_fork_n_core();
 	}
 	udi = FILE_INFO(gv_cur_region);
+	csa = &udi->s_addrs;
+	/* We got here on an error and are going to close the region. Cancel any pending flush timer for this region by this task*/
+	CANCEL_DB_TIMERS(gv_cur_region);
 	/* release the access control semaphore, if you hold it */
 	if (grabbed_access_sem)
 	{
-		csa = &udi->s_addrs;
 		if (csa->now_crit)		/* Might hold crit if wcs_flu or other failure */
-			rel_crit(gv_cur_region);
+		{
+			if (NULL != csa->nl)
+				rel_crit(gv_cur_region); /* also sets csa->now_crit to FALSE */
+			else
+				csa->now_crit = FALSE;
+		}
 		sem_pid = semctl(udi->semid, 0, GETPID);
 		assert(sem_pid == process_id);
 		if (0 != (semop_res = do_semop(udi->semid, 0, -1, SEM_UNDO | IPC_NOWAIT)))

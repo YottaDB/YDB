@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,7 @@
 
 GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF char			cli_token_buf[];
+GBLREF char			cli_err_str[];
 
 #ifdef __osf__
 	/* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
@@ -60,7 +61,7 @@ int main (int argc, char **argv, char **envp)
 
 {
 	char		*ptr;
-	int             eof;
+	int             eof, parse_ret;
 
 	gtmenvp = envp;
 	err_init(stop_image_conditional_core);
@@ -90,7 +91,9 @@ int main (int argc, char **argv, char **envp)
 	/*	cli_lex_in_ptr->tp is the pointer to indicate current position in the buffer    */
 	/*	cli_lex_in_ptr->in_str                                                          */
 	cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
-	parse_cmd();
+	parse_ret = parse_cmd();
+	if (parse_ret && (EOF != parse_ret))
+		rts_error(VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
 
 	if (cli_present("DIRECT_MODE"))
 		invocation_mode = MUMPS_DIRECT;

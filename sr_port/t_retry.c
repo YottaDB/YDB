@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002  Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,13 +23,15 @@
 #include "error.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "tp_frame.h"
 #include "sleep_cnt.h"
 #include "t_retry.h"
 #include "format_targ_key.h"
+#include "send_msg.h"
+#include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 #include "wcs_recover.h"
 #include "wcs_sleep.h"
@@ -63,16 +65,17 @@ void t_retry(enum cdb_sc failure)
 	error_def(ERR_GVIS);
 	error_def(ERR_TPRETRY);
 	error_def(ERR_GVPUTFAIL);
+	UNIX_ONLY(error_def(ERR_GVFAILCORE);)
 
 	t_fail_hist[t_tries] = (unsigned char)failure;
 	if (mu_reorg_process)
-		cws_reset();
+		CWS_RESET;
 	if (0 == dollar_tlevel)
 	{
 		cs_addrs->hdr->n_retries[t_tries]++;
 		if (cs_addrs->critical)
 			crash_count = cs_addrs->critical->crashcnt;
-		if (cdb_sc_jnlclose == failure)
+		if (cdb_sc_jnlclose == failure || cdb_sc_jnlstatemod == failure)
 			t_tries--;
 		if ((CDB_STAGNATE <= ++t_tries) || (cdb_sc_future_read == failure) || (cdb_sc_helpedout == failure))
 		{
@@ -100,7 +103,11 @@ void t_retry(enum cdb_sc failure)
 
 					if (cdb_sc_gbloflow == failure)
 						rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
-
+					UNIX_ONLY(send_msg(VARLSTCNT(9) t_err, 2, t_tries, t_fail_hist,
+							   ERR_GVIS, 2, end-buff, buff, ERR_GVFAILCORE));
+					UNIX_ONLY(gtm_fork_n_core());
+					VMS_ONLY(send_msg(VARLSTCNT(8) t_err, 2, t_tries, t_fail_hist,
+							   ERR_GVIS, 2, end-buff, buff));
 					rts_error(VARLSTCNT(8) t_err, 2, t_tries, t_fail_hist, ERR_GVIS, 2, end-buff, buff);
 				}
 			}

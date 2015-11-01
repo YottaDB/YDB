@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -24,7 +26,7 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "cli.h"
@@ -39,6 +41,7 @@
 #include "bit_clear.h"
 #include "t_write.h"
 #include "gvcst_blk_build.h"
+#include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 #include "jnl_write_aimg_rec.h"
 #include "mm_update.h"
@@ -65,7 +68,6 @@ GBLREF boolean_t	block_saved;
 GBLREF boolean_t        unhandled_stale_timer_pop;
 GBLREF unsigned char    *non_tp_jfb_buff_ptr;
 
-void    cws_reset(void);
 
 void dse_maps(void)
 {
@@ -214,7 +216,7 @@ void dse_maps(void)
                 for (blk_index = 0, bml_index = 0;  blk_index < cs_addrs->ti->total_blks;
                                                                 blk_index += bplmap, bml_index++)
                 {
-                        cws_reset();
+			CWS_RESET;
                         cw_set_depth = 0;
                         update_array_ptr = update_array;
                         assert(cs_addrs->ti->early_tn == cs_addrs->ti->curr_tn);
@@ -239,10 +241,8 @@ void dse_maps(void)
 					if (0 == cs_addrs->jnl->pini_addr)
 						jnl_put_jrt_pini(cs_addrs);
 					jnl_write_aimg_rec(cs_addrs, cse->blk, (blk_hdr_ptr_t)cse->new_buff);
-				}
-				else
-					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data),
-						DB_LEN_STR(gv_cur_region));
+				} else
+					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
 			}
                         if (dba_bg == cs_addrs->hdr->acc_meth)
                                 bg_update(cw_set, cw_set + cw_set_depth, cs_addrs->ti->curr_tn, cs_addrs->ti->curr_tn, dummysi);

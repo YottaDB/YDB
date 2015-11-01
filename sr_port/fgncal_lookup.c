@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,15 +18,15 @@
 #include "fgncal.h"
 #include "underr.h"
 
-LITREF char ctypetab[128];
-GBLREF symval *curr_symval;
+LITREF	char	ctypetab[NUM_ASCII_CHARS];
+GBLREF	symval	*curr_symval;
 
 mval *fgncal_lookup(mval *x)
 {
-	char	new, len, y, in, *i, *i_top, *c, *c_top;
-	mident	name;
-	ht_entry *q;
-	mval	*ret_val;
+	char		new, len, y, in, *i, *i_top, *c, *c_top;
+	mident		name;
+	ht_entry	*q;
+	mval		*ret_val;
 
 	MV_FORCE_DEFINED(x);
 	ret_val = (mval *) 0;

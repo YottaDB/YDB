@@ -30,14 +30,12 @@ MPR_LINESTART	=	0x8
 
 # PUBLIC	op_mproflinestart
 ENTRY op_mproflinestart
-	putframe
-	pushl	$MPR_LINESTART
-	call	pcurrpos
-	addl 	$4,%esp
-	getframe
 	movl	frame_pointer,%edx
 	movl	(%esp),%eax
 	movl	%eax,msf_mpc_off(%edx)
+	pushl	$MPR_LINESTART
+	call	pcurrpos
+	addl 	$4,%esp
 	ret
 # op_mproflinestart ENDP
 

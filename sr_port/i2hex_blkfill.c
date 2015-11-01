@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 void i2hex_blkfill(int num, uchar_ptr_t addr, int len)
 {
 	unsigned char	buff[8];

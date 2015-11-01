@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,6 @@ bt_rec_ptr_t bt_put(gd_region *r, int4 block)
 	uint4			lcnt;
 
 	error_def(ERR_BTFAIL);
-	error_def(ERR_THFAIL);
 	error_def(ERR_WCFAIL);
 	error_def(ERR_WCBLOCKED);
 
@@ -94,7 +93,7 @@ bt_rec_ptr_t bt_put(gd_region *r, int4 block)
 			insqt((que_ent_ptr_t)p, (que_ent_ptr_t)hdr);
 			th = (th_rec_ptr_t)remqh((que_ent_ptr_t)csa->th_base);
 			if (EMPTY_QUEUE == (sm_long_t)th)
-				rts_error(VARLSTCNT(3) ERR_THFAIL, 1, 1);
+				GTMASSERT;
 			break;
 		}
 		if (p->blk == block)
@@ -102,7 +101,7 @@ bt_rec_ptr_t bt_put(gd_region *r, int4 block)
 			q0 = (bt_rec_ptr_t)((sm_uc_ptr_t)p + p->tnque.fl);
 			th = (th_rec_ptr_t)remqt((que_ent_ptr_t)((sm_uc_ptr_t)q0 + sizeof(th->tnque)));
 			if (EMPTY_QUEUE == (sm_long_t)th)
-				rts_error(VARLSTCNT(3) ERR_THFAIL, 1, 2);
+				GTMASSERT;
 			break;
 		}
 		if (0 == p->blkque.fl)

@@ -17,15 +17,15 @@
  *
  */
 
-#ifndef lint
-static char rcsid[] = "$Header:$";
-#endif
+#include "mdef.h"
+
+#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdio.h"
+#include "gtm_unistd.h"		/* for getpid() */
 
 #include <sys/types.h>
 #include <signal.h>
-#include "gtm_stdio.h"
 
-#include "mdef.h"
 #include "gtcm.h"
 #include "stp_parms.h"
 #include "patcode.h"
@@ -40,6 +40,15 @@ static char rcsid[] = "$Header:$";
 #include "gdscc.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#include "cache.h"		/* for cache_init() prototype */
+#include "getjobnum.h"		/* for getjobnum() prototype */
+#include "getmaxfds.h"		/* for getmaxfds() prototype */
+#include "getzdir.h"		/* for getzdir() prototype */
+#include "gt_timer.h"		/* for prealloc_gt_timers() prototype */
+
+#ifndef lint
+static char rcsid[] = "$Header:$";
+#endif
 
 GBLREF int				errno;
 GBLREF short 				gtcm_ast_avail;

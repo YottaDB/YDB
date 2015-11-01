@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "mmemory.h"
 
 #define MC_DSBLKSIZE 8180

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,9 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_fcntl.h"
+
 #include <unistd.h>
 #include <errno.h>
 #include "gtm_stat.h"
@@ -77,15 +79,18 @@ void *open_gd_file(mstr *v)
 	*((char*)((char*)fp->v.addr + v->len)) = 0;	/* Null terminate string */
 	if ((fp->fd = OPEN(fp->v.addr, O_RDONLY)) == -1)
 	{
-		if (dollar_zgbldir.str.len && dollar_zgbldir.str.len == fp->v.len &&
+		if (dollar_zgbldir.str.len &&
+			dollar_zgbldir.str.len == fp->v.len &&
 			!memcmp(dollar_zgbldir.str.addr, fp->v.addr, fp->v.len))
-			dollar_zgbldir.str.len = 0;
-		if (dollar_zgbldir.str.len)
-			rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, fp->v.len, fp->v.addr,
-				LEN_AND_LIT("Continuing with "), dollar_zgbldir.str.len, dollar_zgbldir.str.addr, errno);
-		else
-			rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, fp->v.len, fp->v.addr,
-				LEN_AND_LIT("Cannot continue"),  dollar_zgbldir.str.len, dollar_zgbldir.str.addr, errno);
+			rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6,
+				fp->v.len, fp->v.addr,
+				LEN_AND_LIT("Cannot continue"),
+				LEN_AND_LIT(""), errno);
+		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6,
+			fp->v.len, fp->v.addr,
+			LEN_AND_LIT("Retaining "),
+			dollar_zgbldir.str.len,
+			dollar_zgbldir.str.addr, errno);
 	}
 	return (void *)fp;
 }

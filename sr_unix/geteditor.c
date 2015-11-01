@@ -11,9 +11,10 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_stdlib.h"
-
 #include "gtm_stat.h"
+
 #include "eintr_wrappers.h"
 #include "geteditor.h"
 

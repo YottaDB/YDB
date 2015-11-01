@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,891 +10,462 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "copy.h"
 #include "patcode.h"
-#include "add_atom.h"
-
 #include "compiler.h"
-#include "stringpool.h"
+#include "gtm_string.h"
 
-GBLREF spdesc stringpool;
-GBLREF unsigned char  *outchar;
-LITREF uint4 typemask[256];
+/* the following macro checks that a 1 dimensional array reference is valid i.e. array[index] is within defined limits */
+#define check_1dim_array_bound(array, index)    assert((index) < (sizeof(array) / sizeof(array[0])))
 
-short int dfa_calc(leaves,leaf_num,expand)
+/* the following macro checks that a 2 dimensional array reference is valid i.e. array[row][col] is within defined limits */
+#define check_2dim_array_bound(array, row, col)                         \
+{                                                                       \
+        assert((row) < (sizeof(array) / sizeof(array[0])));             \
+        assert((col) < (sizeof(array[0]) / sizeof(array[0][0])));       \
+}
 
-struct leaf	*leaves;
-short int	leaf_num;
-struct e_table  *expand;
+/* Note: in various places, dfa_calc() makes a reference to the array 'typemask'.  dfa_calc() is executed at compile-time.
+ * The content of the array typemask is static, but, at run-time, the pointer that is used to access the typemask array
+ * 	(pattern_typemask) may change whenever a program executes the command View "PATCODE":tablename.
+ * As a result, the pattern masks that the GT.M compiler uses may differ from the ones that are in operation at run-time.
+ */
+LITREF	uint4	typemask[PATENTS];
 
+static	uint4	classmask[CHAR_CLASSES] =
 {
-	unsigned char		x,*patmaskptr;
-	unsigned char		patcode;
-	uint4		patmask;
-	short int 		offset[2 + (2 * MAX_SYM)],pos_offset[CHAR_CLASSES],
-				a,i,j,k,l,m,n,
-				fst[2][2],lst[2][2],
-				alpha_num,state_num,node_num,sym_num;
+	PATM_N, PATM_P, PATM_L, PATM_U, PATM_C, PATM_B, PATM_D, PATM_F, PATM_G, PATM_H, PATM_I,
+	PATM_J, PATM_K, PATM_M, PATM_O, PATM_Q, PATM_R, PATM_S, PATM_T, PATM_V, PATM_W, PATM_X
+};
 
-	long int		o;
+/* This procedure is part of the MUMPS compiler. The function of this procedure is to build the data structures that
+ * will be used to drive the DFA engine that can evaluate certain pattern matches. Note that this routine operates
+ * at compile-time, and that all data structures built in this procedure are compiled at the end into a terse string
+ * of values that will be passed to do_pattern (through patstr). do_pattern(), which operates at run-time will
+ * interpret this string of values and do the actual DFA work (DFA = Discrete Finite Automaton).
+ */
+int dfa_calc(struct leaf *leaves, short int leaf_num, struct e_table *expand, uint4 **fstchar_ptr, uint4 **outchar_ptr)
+{
+	uint4			*locoutchar;
+	uint4			pattern_mask;
+	unsigned char		*textstring;
+	short int 		offset[2 * (MAX_SYM + 1)];
+	short int		pos_offset[CHAR_CLASSES];
+	short int		fst[2][2], lst[2][2];
+	int4			charcls, maskcls, numexpand, count, clsnum, maxcls, clsposlis;
+	int4			state_num, node_num, sym_num, expseq, seq;
 	struct node		nodes;
-	struct st_tb		fpos,states;
-	struct trns_tb		d_trans,pos_lis;
+				/* EdM: comment for reviewers:
+				 * 'states' is currently defined as a boolean_t.
+				 * In the original version it was a bool (== char).
+				 * Since comparisons on this array are done using
+				 * memcmp, and the only values assigned to elements
+				 * in this array are TRUE and FALSE (1 and 0),
+				 * we might consider declaring states as a 'char'
+				 * array after all...
+				 */
+	boolean_t		states[2 * MAX_SYM][CHAR_CLASSES];
+	boolean_t		fpos[2 * MAX_SYM][CHAR_CLASSES];
+	short int		d_trans[2 * MAX_SYM][CHAR_CLASSES];
+	short int		pos_lis[2 * MAX_SYM][CHAR_CLASSES];
 	struct c_trns_tb	c_trans;
 
-	patmaskptr = outchar;
+	/* Note: in various places, this procedure makes a reference to the array 'typemask'.
+	 * This procedure is executed at compile-time. The contents of the array typemask is static, but, at
+	 * run-time, the pointer that is used to access the array pattern_typemask may change whenever a program
+	 * executes the command View "PATCODE":tablename.  As a result, the pattern masks that the GT.M compiler
+	 * uses may  differ from the ones that are in operation at run-time.
+	 */
+	locoutchar = *outchar_ptr;
 	if (leaf_num > 1)
 	{
-		patcode = PATM_DFA;
-		patmask = 0;
-		alpha_num = 0;
-		node_num = 0;
+		pattern_mask = PATM_DFA;
 		state_num = 1;
-
+		check_1dim_array_bound(leaves->nullable, leaf_num);
 		leaves->nullable[leaf_num] = FALSE;
-		leaves->letter[leaf_num][0] = ADD;
+		leaves->letter[leaf_num][0] = DFABIT;
 		leaves->letter[leaf_num][1] = -1;
-
-		pos_offset[EXP_N] = 0;
-		alpha_num += expand->num_e[EXP_N];
-		pos_offset[EXP_P] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_P];
-		pos_offset[EXP_L] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_L];
-		pos_offset[EXP_U] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_U];
-		pos_offset[EXP_C] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_C];
-		pos_offset[EXP_B] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_B];
-		pos_offset[EXP_D] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_D];
-		pos_offset[EXP_F] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_F];
-		pos_offset[EXP_G] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_G];
-		pos_offset[EXP_H] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_H];
-		pos_offset[EXP_I] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_I];
-		pos_offset[EXP_J] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_J];
-		pos_offset[EXP_K] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_K];
-		pos_offset[EXP_M] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_M];
-		pos_offset[EXP_O] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_O];
-		pos_offset[EXP_Q] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_Q];
-		pos_offset[EXP_R] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_R];
-		pos_offset[EXP_S] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_S];
-		pos_offset[EXP_T] = alpha_num;
-
-		alpha_num += expand->num_e[EXP_T];
-
-		memset(&nodes.nullable[0],0,sizeof(struct node));
-		memset(&fpos.s[0][0],0,sizeof(struct st_tb));
-		memset(&states.s[0][0],0,sizeof(struct st_tb));
-		memset(&d_trans.t[0][0],128,sizeof(struct trns_tb));
-		memset(&pos_lis.t[0][0],128,sizeof(struct trns_tb));
-		memset(&c_trans.c[0],0,sizeof(short int) * MAX_SYM * 2);
-		memset(&offset[0],0,sizeof(short int) * ((2 * MAX_SYM) + 2));
-		memset(&fst[0][0], 0, sizeof(fst));
-		memset(&lst[0][0], 0, sizeof(lst));
-
-		a = 0;
-		l = 0;
-		m = 0;
+		pos_offset[0] = 0;
+		for (seq = 1; seq < CHAR_CLASSES; seq++)
+			pos_offset[seq] = pos_offset[seq - 1] + expand->num_e[seq - 1];
+		memset(&nodes.nullable[0], 0, sizeof(nodes));
+		memset(&fpos[0][0], 0, sizeof(fpos));
+		memset(&states[0][0], 0, sizeof(states));
+		memset(&d_trans[0][0], 128, sizeof(d_trans));
+		memset(&pos_lis[0][0], 128, sizeof(pos_lis));
+		memset(&c_trans.c[0], 0, sizeof(short int) * MAX_SYM * 2);
+		memset(offset, 0, sizeof(offset));
+		memset(fst, 0, sizeof(fst));
+		memset(lst, 0, sizeof(lst));
+		charcls = 0;
+		clsnum = 0;
+		maxcls = 0;
 		nodes.nullable[0] = leaves->nullable[0] & leaves->nullable[1];
-		states.s[state_num][a]=TRUE;
-
-		for (i=0;leaves->letter[0][i] >= 0;i++)
+		states[state_num][charcls] = TRUE;
+		for (maskcls = 0; leaves->letter[0][maskcls] >= 0; maskcls++)
 		{
-			if (leaves->letter[0][i] < ADD)
+			check_1dim_array_bound(leaves->letter[0], maskcls);
+			if (!(leaves->letter[0][maskcls] & DFABIT))
 			{
-				fpos.s[a][a+1] = TRUE;
-				lst[FST][FST] = a;
-				lst[FST][LST] = a;
-				assert(leaves->letter[0][i] >= 0 && leaves->letter[0][i] < sizeof(typemask));
-
-				/* Note: the following code makes a pattern-compile-time reference to typemask.
-				   This is likely to be inadequate.
-				*/
-				o = typemask[leaves->letter[0][i]];
-				switch (o)
-				{
-					case PATM_N: o = EXP_N;
-						     break;
-					case PATM_P: o = EXP_P;
-						     break;
-					case PATM_L: o = EXP_L;
-						     break;
-					case PATM_U: o = EXP_U;
-						     break;
-					case PATM_C: o = EXP_C;
-						     break;
-					case PATM_B: o = EXP_B;
-						     break;
-					case PATM_D: o = EXP_D;
-						     break;
-					case PATM_F: o = EXP_F;
-						     break;
-					case PATM_G: o = EXP_G;
-						     break;
-					case PATM_H: o = EXP_H;
-						     break;
-					case PATM_I: o = EXP_I;
-						     break;
-					case PATM_J: o = EXP_J;
-						     break;
-					case PATM_K: o = EXP_K;
-						     break;
-					case PATM_M: o = EXP_M;
-						     break;
-					case PATM_O: o = EXP_O;
-						     break;
-					case PATM_Q: o = EXP_Q;
-						     break;
-					case PATM_R: o = EXP_R;
-						     break;
-					case PATM_S: o = EXP_S;
-						     break;
-					case PATM_T: o = EXP_T;
-						     break;
-				}
-				for (j = 1;expand->meta_c[o][j] != leaves->letter[0][i];j++)
+				check_2dim_array_bound(fpos, charcls, charcls + 1);
+				fpos[charcls][charcls + 1] = TRUE;
+				lst[FST][FST] = charcls;
+				lst[FST][LST] = charcls;
+				assert(leaves->letter[0][maskcls] >= 0 && leaves->letter[0][maskcls] < sizeof(typemask));
+				seq = patmaskseq(typemask[leaves->letter[0][maskcls]]);
+				if (seq < 0)
+					seq = 0;
+				for (numexpand = 1; expand->meta_c[seq][numexpand] != leaves->letter[0][maskcls]; numexpand++)
 					;
-				for (k = 0;pos_lis.t[pos_offset[o] + j][k] >= 0;k++)
+				check_1dim_array_bound(pos_lis, (pos_offset[seq] + numexpand));
+				for (count = 0; pos_lis[pos_offset[seq] + numexpand][count] >= 0; count++)
 					;
-				pos_lis.t[pos_offset[o] + j][k]=a;
-				a++;
-			}
-			else
+				check_2dim_array_bound(pos_lis, (pos_offset[seq] + numexpand), count);
+				pos_lis[pos_offset[seq] + numexpand][count] = charcls;
+				charcls++;
+			} else
 			{
-				o = leaves->letter[0][i] - ADD;
-				switch (o)
+				seq = patmaskseq(leaves->letter[0][maskcls]);
+				if (seq < 0)
 				{
-					case PATM_N: o = EXP_N;
-						     x = expand->num_e[EXP_N];
-						     break;
-					case PATM_P: o = EXP_P;
-						     x = expand->num_e[EXP_P];
-						     break;
-					case PATM_L: o = EXP_L;
-						     x = expand->num_e[EXP_L];
-						     break;
-					case PATM_U: o = EXP_U;
-						     x = expand->num_e[EXP_U];
-						     break;
-					case PATM_C: o = EXP_C;
-						     x = expand->num_e[EXP_C];
-						     break;
-					case PATM_B: o = EXP_B;
-						     x = expand->num_e[EXP_B];
-						     break;
-					case PATM_D: o = EXP_D;
-						     x = expand->num_e[EXP_D];
-						     break;
-					case PATM_F: o = EXP_F;
-						     x = expand->num_e[EXP_F];
-						     break;
-					case PATM_G: o = EXP_G;
-						     x = expand->num_e[EXP_G];
-						     break;
-					case PATM_H: o = EXP_H;
-						     x = expand->num_e[EXP_H];
-						     break;
-					case PATM_I: o = EXP_I;
-						     x = expand->num_e[EXP_I];
-						     break;
-					case PATM_J: o = EXP_J;
-						     x = expand->num_e[EXP_J];
-						     break;
-					case PATM_K: o = EXP_K;
-						     x = expand->num_e[EXP_K];
-						     break;
-					case PATM_M: o = EXP_M;
-						     x = expand->num_e[EXP_M];
-						     break;
-					case PATM_O: o = EXP_O;
-						     x = expand->num_e[EXP_O];
-						     break;
-					case PATM_Q: o = EXP_Q;
-						     x = expand->num_e[EXP_Q];
-						     break;
-					case PATM_R: o = EXP_R;
-						     x = expand->num_e[EXP_R];
-						     break;
-					case PATM_S: o = EXP_S;
-						     x = expand->num_e[EXP_S];
-						     break;
-					case PATM_T: o = EXP_T;
-						     x = expand->num_e[EXP_T];
-						     break;
-					default:     x = 0;
-				}
-				for (j = 0;j < x;j++)
+					seq = 0;
+					expseq = 0;
+				} else
+					expseq = expand->num_e[seq];
+				for (numexpand = 0; numexpand < expseq; numexpand++)
 				{
-					states.s[state_num][a] = TRUE;
-					fst[FST][LST] = a;
-					lst[FST][LST] = a;
-					for (k = 0; pos_lis.t[pos_offset[o] + j][k] >= 0;k++)
+					states[state_num][charcls] = TRUE;
+					fst[FST][LST] = charcls;
+					lst[FST][LST] = charcls;
+					for (count = 0; pos_lis[pos_offset[seq] + numexpand][count] >= 0; count++)
 						;
-					pos_lis.t[pos_offset[o] + j][k] = a;
-					a++;
+					check_2dim_array_bound(pos_lis, (pos_offset[seq] + numexpand), count);
+					pos_lis[pos_offset[seq] + numexpand][count] = charcls;
+					charcls++;
 				}
 			}
 		}
-
-		fst[LST][FST] = a;
-		fst[LST][LST] = a;
-		lst[LST][FST] = a;
-
+		fst[LST][FST] = charcls;
+		fst[LST][LST] = charcls;
+		lst[LST][FST] = charcls;
 		if(!leaves->nullable[1])
-		{	nodes.last[0][a] = TRUE;
-			m = a;
-		}
-
-		for (i = 0;leaves->letter[1][i] >= 0;i++)
 		{
-			if (leaves->letter[1][i] < ADD)
+			nodes.last[0][charcls] = TRUE;
+			maxcls = charcls;
+		}
+		for (maskcls = 0; leaves->letter[1][maskcls] >= 0; maskcls++)
+		{
+			check_1dim_array_bound(leaves->letter[1], maskcls);
+			if (!(leaves->letter[1][maskcls] & DFABIT))
 			{
-				fpos.s[a][a+1] = TRUE;
-				lst[LST][FST] = a;
-				lst[LST][LST] = a;
-				assert(leaves->letter[1][i] >= 0 && leaves->letter[1][i] < sizeof(typemask));
-
-				/* Note: the following code makes a pattern-compile-time reference to typemask.
-				   This is likely to be inadequate.
-				*/
-				o = typemask[leaves->letter[1][i]];
-				switch (o)
-				{
-					case PATM_N: o = EXP_N;
-						     break;
-					case PATM_P: o = EXP_P;
-						     break;
-					case PATM_L: o = EXP_L;
-						     break;
-					case PATM_U: o = EXP_U;
-						     break;
-					case PATM_C: o = EXP_C;
-						     break;
-					case PATM_B: o = EXP_B;
-						     break;
-					case PATM_D: o = EXP_D;
-						     break;
-					case PATM_F: o = EXP_F;
-						     break;
-					case PATM_G: o = EXP_G;
-						     break;
-					case PATM_H: o = EXP_H;
-						     break;
-					case PATM_I: o = EXP_I;
-						     break;
-					case PATM_J: o = EXP_J;
-						     break;
-					case PATM_K: o = EXP_K;
-						     break;
-					case PATM_M: o = EXP_M;
-						     break;
-					case PATM_O: o = EXP_O;
-						     break;
-					case PATM_Q: o = EXP_Q;
-						     break;
-					case PATM_R: o = EXP_R;
-						     break;
-					case PATM_S: o = EXP_S;
-						     break;
-					case PATM_T: o = EXP_T;
-						     break;
-					default:     o = 0;
-				}
-				for (j = 1; expand->meta_c[o][j] != leaves->letter[1][i];j++)
+				check_2dim_array_bound(fpos, charcls, charcls + 1);
+				fpos[charcls][charcls + 1] = TRUE;
+				lst[LST][FST] = charcls;
+				lst[LST][LST] = charcls;
+				assert(leaves->letter[1][maskcls] >= 0 && leaves->letter[1][maskcls] < sizeof(typemask));
+				seq = patmaskseq(typemask[leaves->letter[1][maskcls]]);
+				if (seq < 0)
+					seq = 0;
+				for (numexpand = 1; expand->meta_c[seq][numexpand] != leaves->letter[1][maskcls]; numexpand++)
 					;
-				for (k = 0; pos_lis.t[pos_offset[o] + j][k] >= 0;k++)
+				check_1dim_array_bound(pos_lis, (pos_offset[seq] + numexpand));
+				for (count = 0; pos_lis[pos_offset[seq] + numexpand][count] >= 0; count++)
 					;
-				pos_lis.t[pos_offset[o] + j][k] = a;
-				a++;
-			}
-			else
+				check_2dim_array_bound(pos_lis, (pos_offset[seq] + numexpand), count);
+				pos_lis[pos_offset[seq] + numexpand][count] = charcls;
+				charcls++;
+			} else
 			{
-				o = leaves->letter[1][i] - ADD;
-				switch (o)
+				seq = patmaskseq(leaves->letter[1][maskcls]);
+				if (seq < 0)
 				{
-					case PATM_N: o = EXP_N;
-						     x = expand->num_e[EXP_N];
-						     break;
-					case PATM_P: o = EXP_P;
-						     x = expand->num_e[EXP_P];
-						     break;
-					case PATM_L: o = EXP_L;
-						     x = expand->num_e[EXP_L];
-						     break;
-					case PATM_U: o = EXP_U;
-						     x = expand->num_e[EXP_U];
-						     break;
-					case PATM_C: o = EXP_C;
-						     x = expand->num_e[EXP_C];
-						     break;
-					case PATM_B: o = EXP_B;
-						     x = expand->num_e[EXP_B];
-						     break;
-					case PATM_D: o = EXP_D;
-						     x = expand->num_e[EXP_D];
-						     break;
-					case PATM_F: o = EXP_F;
-						     x = expand->num_e[EXP_F];
-						     break;
-					case PATM_G: o = EXP_G;
-						     x = expand->num_e[EXP_G];
-						     break;
-					case PATM_H: o = EXP_H;
-						     x = expand->num_e[EXP_H];
-						     break;
-					case PATM_I: o = EXP_I;
-						     x = expand->num_e[EXP_I];
-						     break;
-					case PATM_J: o = EXP_J;
-						     x = expand->num_e[EXP_J];
-						     break;
-					case PATM_K: o = EXP_K;
-						     x = expand->num_e[EXP_K];
-						     break;
-					case PATM_M: o = EXP_M;
-						     x = expand->num_e[EXP_M];
-						     break;
-					case PATM_O: o = EXP_O;
-						     x = expand->num_e[EXP_O];
-						     break;
-					case PATM_Q: o = EXP_Q;
-						     x = expand->num_e[EXP_Q];
-						     break;
-					case PATM_R: o = EXP_R;
-						     x = expand->num_e[EXP_R];
-						     break;
-					case PATM_S: o = EXP_S;
-						     x = expand->num_e[EXP_S];
-						     break;
-					case PATM_T: o = EXP_T;
-						     x = expand->num_e[EXP_T];
-						     break;
-					default:     x = 0;
-				}
-				for (j = 0;j < x;j++)
+					seq = 0;
+					expseq = 0;
+				} else
+					expseq = expand->num_e[seq];
+				for (numexpand = 0; numexpand < expseq; numexpand++)
 				{
-					nodes.last[0][a] = TRUE;
-					fst[LST][LST] = a;
-					lst[LST][LST] = a;
-					for (k = 0; pos_lis.t[pos_offset[o] + j][k] >= 0;k++)
+					nodes.last[0][charcls] = TRUE;
+					fst[LST][LST] = charcls;
+					lst[LST][LST] = charcls;
+					check_1dim_array_bound(pos_lis, (pos_offset[seq] + numexpand));
+					for (count = 0; pos_lis[pos_offset[seq] + numexpand][count] >= 0; count++)
 						;
-					pos_lis.t[pos_offset[o] + j][k] = a;
-					a++;
+					check_2dim_array_bound(pos_lis, (pos_offset[seq] + numexpand), count);
+					pos_lis[pos_offset[seq] + numexpand][count] = charcls;
+					charcls++;
 				}
 			}
 		}
-
 		if (leaves->nullable[0])
 		{
-			for(j = lst[FST][FST];j <= lst[FST][LST];j++)
+			assert((2 * MAX_SYM) > lst[FST][LST]);
+			assert(CHAR_CLASSES > fst[LST][LST]);
+			for (numexpand = lst[FST][FST]; numexpand <= lst[FST][LST]; numexpand++)
 			{
-				for(k = fst[FST][FST];k <= fst[FST][LST];k++)
+				for (count = fst[FST][FST]; count <= fst[FST][LST]; count++)
 				{
-					fpos.s[j][k] = TRUE;
+					check_2dim_array_bound(fpos, numexpand, count);
+					fpos[numexpand][count] = TRUE;
 				}
 			}
-
-			for (j = fst[LST][FST];j <= fst[LST][LST];j++)
-			{
-				states.s[state_num][j] = TRUE;
-			}
+			for (numexpand = fst[LST][FST]; numexpand <= fst[LST][LST]; numexpand++)
+				states[state_num][numexpand] = TRUE;
 		}
-
 		if (leaves->nullable[1])
 		{
-			nodes.last[0][a - 1] = TRUE;
-			for(j = lst[LST][FST]; j <= lst[LST][LST];j++)
+			nodes.last[0][charcls - 1] = TRUE;
+			for (numexpand = lst[LST][FST]; numexpand <= lst[LST][LST]; numexpand++)
 			{
-				for(k = fst[LST][FST]; k <= fst[LST][LST];k++)
+				for (count = fst[LST][FST]; count <= fst[LST][LST]; count++)
 				{
-					fpos.s[j][k] = TRUE;
+					check_2dim_array_bound(fpos, numexpand, count);
+					fpos[numexpand][count] = TRUE;
 				}
 			}
-
-			for (j = lst[FST][FST]; j <=  lst[FST][LST];j++)
-			{
-				nodes.last[0][j] = TRUE;
-			}
-			m = a;
+			for (numexpand = lst[FST][FST]; numexpand <= lst[FST][LST]; numexpand++)
+				nodes.last[0][numexpand] = TRUE;
+			maxcls = charcls;
 		}
-
-		for(j = lst[FST][FST]; j <= lst[FST][LST];j++)
+		for (numexpand = lst[FST][FST]; numexpand <= lst[FST][LST]; numexpand++)
 		{
-			for(k = fst[LST][FST]; k <= fst[LST][LST];k++)
+			for (count = fst[LST][FST]; count <= fst[LST][LST]; count++)
 			{
-				fpos.s[j][k] = TRUE;
+				check_2dim_array_bound(fpos, numexpand, count);
+				fpos[numexpand][count] = TRUE;
 			}
 		}
-
 		if (!leaves->nullable[1])
-		{	l = lst[LST][FST];
-		}
-
-		node_num++;
-
-		for ( ;node_num < leaf_num ;node_num++)
+			clsnum = lst[LST][FST];
+		for (node_num = 1; node_num < leaf_num; node_num++)
 		{
 			nodes.nullable[node_num] = nodes.nullable[node_num - 1] &
-						    leaves->nullable[node_num + 1];
-
+						   leaves->nullable[node_num + 1];
 			if (leaves->nullable[node_num + 1])
 			{
-				for (i = 0;i < a;i++)
+				for (maskcls = 0; maskcls < charcls; maskcls++)
 				{
-					nodes.last[node_num][i] = nodes.last[node_num - 1][i];
+					check_2dim_array_bound(nodes.last, node_num, maskcls);
+					nodes.last[node_num][maskcls] = nodes.last[node_num - 1][maskcls];
 				}
-			}
-
-			else
-			{	nodes.last[node_num][a] = TRUE;
-				m = a;
-			}
-
-			fst[LST][FST] = a;
-			fst[LST][LST] = a;
-			lst[LST][FST] = a;
-
-			for (i = 0;leaves->letter[node_num + 1][i] >= 0;i++)
+			} else
 			{
-				if (leaves->letter[node_num + 1][i] < ADD)
+				nodes.last[node_num][charcls] = TRUE;
+				maxcls = charcls;
+			}
+			fst[LST][FST] = charcls;
+			fst[LST][LST] = charcls;
+			lst[LST][FST] = charcls;
+			for (maskcls = 0; leaves->letter[node_num + 1][maskcls] >= 0; maskcls++)
+			{
+				check_1dim_array_bound(leaves->letter[node_num + 1], maskcls);
+				if (!(leaves->letter[node_num + 1][maskcls] & DFABIT))
 				{
-					fpos.s[a][a + 1] = TRUE;
-					lst[LST][FST] = a;
-					lst[LST][LST] = a;
-					assert(leaves->letter[node_num + 1][i] >= 0 &&
-					       leaves->letter[node_num + 1][i] < sizeof(typemask));
-					o = typemask[leaves->letter[node_num + 1][i]];
-					switch (o)
-					{
-						case PATM_N: o = EXP_N;
-							     break;
-						case PATM_P: o = EXP_P;
-							     break;
-						case PATM_L: o = EXP_L;
-							     break;
-						case PATM_U: o = EXP_U;
-							     break;
-						case PATM_C: o = EXP_C;
-							     break;
-						case PATM_B: o = EXP_B;
-							     break;
-						case PATM_D: o = EXP_D;
-							     break;
-						case PATM_F: o = EXP_F;
-							     break;
-						case PATM_G: o = EXP_G;
-							     break;
-						case PATM_H: o = EXP_H;
-							     break;
-						case PATM_I: o = EXP_I;
-							     break;
-						case PATM_J: o = EXP_J;
-							     break;
-						case PATM_K: o = EXP_K;
-							     break;
-						case PATM_M: o = EXP_M;
-							     break;
-						case PATM_O: o = EXP_O;
-							     break;
-						case PATM_Q: o = EXP_Q;
-							     break;
-						case PATM_R: o = EXP_R;
-							     break;
-						case PATM_S: o = EXP_S;
-							     break;
-						case PATM_T: o = EXP_T;
-							     break;
-						default:     o = 0;
-					}
-					for (j = 1;expand->meta_c[o][j] != leaves->letter[node_num + 1][i];j++)
+					check_2dim_array_bound(fpos, charcls, charcls + 1);
+					fpos[charcls][charcls + 1] = TRUE;
+					lst[LST][FST] = charcls;
+					lst[LST][LST] = charcls;
+					assert(leaves->letter[node_num + 1][maskcls] >= 0 &&
+					       leaves->letter[node_num + 1][maskcls] < sizeof(typemask));
+					seq = patmaskseq(typemask[leaves->letter[node_num + 1][maskcls]]);
+					if (seq < 0)
+						seq = 0;
+					for (numexpand = 1;
+						expand->meta_c[seq][numexpand] != leaves->letter[node_num + 1][maskcls];
+						numexpand++)
 						;
-					for (k = 0;pos_lis.t[pos_offset[o] + j][k] >= 0;k++)
+					check_1dim_array_bound(pos_lis, (pos_offset[seq] + numexpand));
+					for (count = 0; pos_lis[pos_offset[seq] + numexpand][count] >= 0; count++)
 						;
-					pos_lis.t[pos_offset[o] + j][k] = a;
-					a++;
-				}
-				else
+					check_2dim_array_bound(pos_lis, (pos_offset[seq] + numexpand), count);
+					pos_lis[pos_offset[seq] + numexpand][count] = charcls;
+					charcls++;
+				} else
 				{
-					o = leaves->letter[node_num + 1][i] - ADD;
-					switch (o)
+					seq = patmaskseq(leaves->letter[node_num + 1][maskcls]);
+					if (seq < 0)
 					{
-						case PATM_N: o = EXP_N;
-							     x = expand->num_e[EXP_N];
-							     break;
-						case PATM_P: o = EXP_P;
-							     x = expand->num_e[EXP_P];
-							     break;
-						case PATM_L: o = EXP_L;
-							     x = expand->num_e[EXP_L];
-							     break;
-						case PATM_U: o = EXP_U;
-							     x = expand->num_e[EXP_U];
-							     break;
-						case PATM_C: o = EXP_C;
-							     x = expand->num_e[EXP_C];
-							     break;
-						case PATM_B: o = EXP_B;
-							     x = expand->num_e[EXP_B];
-							     break;
-						case PATM_D: o = EXP_D;
-							     x = expand->num_e[EXP_D];
-							     break;
-						case PATM_F: o = EXP_F;
-							     x = expand->num_e[EXP_F];
-							     break;
-						case PATM_G: o = EXP_G;
-							     x = expand->num_e[EXP_G];
-							     break;
-						case PATM_H: o = EXP_H;
-							     x = expand->num_e[EXP_H];
-							     break;
-						case PATM_I: o = EXP_I;
-							     x = expand->num_e[EXP_I];
-							     break;
-						case PATM_J: o = EXP_J;
-							     x = expand->num_e[EXP_J];
-							     break;
-						case PATM_K: o = EXP_K;
-							     x = expand->num_e[EXP_K];
-							     break;
-						case PATM_M: o = EXP_M;
-							     x = expand->num_e[EXP_M];
-							     break;
-						case PATM_O: o = EXP_O;
-							     x = expand->num_e[EXP_O];
-							     break;
-						case PATM_Q: o = EXP_Q;
-							     x = expand->num_e[EXP_Q];
-							     break;
-						case PATM_R: o = EXP_R;
-							     x = expand->num_e[EXP_R];
-							     break;
-						case PATM_S: o = EXP_S;
-							     x = expand->num_e[EXP_S];
-							     break;
-						case PATM_T: o = EXP_T;
-							     x = expand->num_e[EXP_T];
-							     break;
-						default:     x = 0;
-					}
-					for (j = 0;j < x;j++)
+						seq = 0;
+						expseq = 0;
+					} else
+						expseq = expand->num_e[seq];
+					for (numexpand = 0; numexpand < expseq; numexpand++)
 					{
-						nodes.last[node_num][a] = TRUE;
+						nodes.last[node_num][charcls] = TRUE;
 						if (nodes.nullable[node_num - 1])
-						{	states.s[state_num][a] = TRUE;
-						}
-						fst[LST][LST] = a;
-						lst[LST][LST] = a;
-						for (k = 0; pos_lis.t[pos_offset[o] + j][k] >= 0;k++)
+							states[state_num][charcls] = TRUE;
+						fst[LST][LST] = charcls;
+						lst[LST][LST] = charcls;
+						for (count = 0; pos_lis[pos_offset[seq] + numexpand][count] >= 0; count++)
 							;
-						pos_lis.t[pos_offset[o] + j][k] = a;
-						a++;
+						check_2dim_array_bound(pos_lis, (pos_offset[seq] + numexpand), count);
+						pos_lis[pos_offset[seq] + numexpand][count] = charcls;
+						charcls++;
 					}
 				}
 			}
-
 			if (nodes.nullable[node_num - 1])
 			{
-				for (j = fst[LST][FST];j <= fst[LST][LST];j++)
+				for (numexpand = fst[LST][FST]; numexpand <= fst[LST][LST]; numexpand++)
 				{
-				states.s[state_num][j] = TRUE;
+					check_1dim_array_bound(states[state_num], numexpand);
+					states[state_num][numexpand] = TRUE;
 				}
 			}
 			if (leaves->nullable[node_num + 1])
 			{
-				nodes.last[node_num][a - 1] = TRUE;
-				for(j = lst[LST][FST];j <= lst[LST][LST];j++)
+				nodes.last[node_num][charcls - 1] = TRUE;
+				for (numexpand = lst[LST][FST]; numexpand <= lst[LST][LST]; numexpand++)
 				{
-					for(k = fst[LST][FST];k <= fst[LST][LST];k++)
+					for (count = fst[LST][FST]; count <= fst[LST][LST]; count++)
 					{
-						fpos.s[j][k] = TRUE;
+						check_2dim_array_bound(fpos, numexpand, count);
+						fpos[numexpand][count] = TRUE;
 					}
 				}
-				m = a;
+				maxcls = charcls;
 			}
-
-			for(j = l;j < m;j++)
-			{
-				for(k = fst[LST][FST]; k <= fst[LST][LST];k++)
-				{
-					if (nodes.last[node_num - 1][j])
-					{	fpos.s[j][k] = TRUE;
-					}
-				}
-			}
-
+			for (numexpand = clsnum; numexpand < maxcls; numexpand++)
+				for (count = fst[LST][FST]; count <= fst[LST][LST]; count++)
+					if (nodes.last[node_num - 1][numexpand])
+						fpos[numexpand][count] = TRUE;
 			if (!leaves->nullable[node_num + 1])
-			{	l = lst[LST][FST];
-			}
+				clsnum = lst[LST][FST];
 		}
-
-		sym_num = a;
+		sym_num = charcls;
 		state_num++;
-
-		o = 1;
-		while (o < state_num)
+		check_1dim_array_bound(offset, state_num + 1);
+		for (seq = 1; seq < state_num; seq++)
 		{
-			a = 0;
-			offset[o + 1]++;
-			offset[o + 1] += offset[o];
-			for (i = 0;i < CHAR_CLASSES;i++)
+			charcls = 0;
+			offset[seq + 1]++;
+			offset[seq + 1] += offset[seq];
+			for (maskcls = 0; maskcls < CHAR_CLASSES; maskcls++)
 			{
-				if (expand->num_e[i] > 0)
+				if (expand->num_e[maskcls] > 0)
 				{
-					for (j = 0;j < expand->num_e[i];j++)
+					for (numexpand = 0; numexpand < expand->num_e[maskcls]; numexpand++)
 					{
-						m = 0;
-						while (pos_lis.t[a + j][m] >= 0)
+						for  (maxcls = 0; pos_lis[charcls + numexpand][maxcls] >= 0; maxcls++)
 						{
-							n = pos_lis.t[a + j][m];
-							if (states.s[o][n])
+							clsposlis = pos_lis[charcls + numexpand][maxcls];
+							if (states[seq][clsposlis])
 							{
-								for(l = 0;l <= sym_num;l++)
+								for (clsnum = 0; clsnum <= sym_num; clsnum++)
 								{
-									states.s[state_num][l] |=  fpos.s[n][l];
+									check_1dim_array_bound(states[state_num], clsnum);
+									states[state_num][clsnum] |= fpos[clsposlis][clsnum];
 								}
 							}
-							m++;
 						}
-						for (k = 0; memcmp(states.s[k],states.s[state_num],sym_num+1) && k<state_num;k++)
+						check_1dim_array_bound(states, state_num);
+						for (count = 0;
+							memcmp(states[count], states[state_num], (sym_num + 1) * sizeof(boolean_t))
+								&& (count < state_num);
+							count++)
 							;
-
-						if (k > 0)
+						if (count > 0)
 						{
-							if (j == 0)
+							if (0 == numexpand)
 							{
-								d_trans.t[o][a] = k;
-
-								for (l = 0 ;l < c_trans.c[o] && c_trans.trns[o][l] != k ;l++)
+								d_trans[seq][charcls] = count;
+								for (clsnum = 0;
+									(clsnum < c_trans.c[seq])
+										&& (c_trans.trns[seq][clsnum] != count);
+									clsnum++)
 									;
-
-								if (l == c_trans.c[o])
+								check_1dim_array_bound(c_trans.p_msk[seq], clsnum);
+								if (clsnum == c_trans.c[seq])
 								{
-									switch (i)
-									{
-										case EXP_N: c_trans.p_msk[o][l] = PATM_N;
-											    break;
-										case EXP_P: c_trans.p_msk[o][l] = PATM_P;
-											    break;
-										case EXP_L: c_trans.p_msk[o][l] = PATM_L;
-											    break;
-										case EXP_U: c_trans.p_msk[o][l] = PATM_U;
-											    break;
-										case EXP_C: c_trans.p_msk[o][l] = PATM_C;
-											    break;
-										case EXP_B: c_trans.p_msk[o][l] = PATM_B;
-											    break;
-										case EXP_D: c_trans.p_msk[o][l] = PATM_D;
-											    break;
-										case EXP_F: c_trans.p_msk[o][l] = PATM_F;
-											    break;
-										case EXP_G: c_trans.p_msk[o][l] = PATM_G;
-											    break;
-										case EXP_H: c_trans.p_msk[o][l] = PATM_H;
-											    break;
-										case EXP_I: c_trans.p_msk[o][l] = PATM_I;
-											    break;
-										case EXP_J: c_trans.p_msk[o][l] = PATM_J;
-											    break;
-										case EXP_K: c_trans.p_msk[o][l] = PATM_K;
-											    break;
-										case EXP_M: c_trans.p_msk[o][l] = PATM_M;
-											    break;
-										case EXP_O: c_trans.p_msk[o][l] = PATM_O;
-											    break;
-										case EXP_Q: c_trans.p_msk[o][l] = PATM_Q;
-											    break;
-										case EXP_R: c_trans.p_msk[o][l] = PATM_R;
-											    break;
-										case EXP_S: c_trans.p_msk[o][l] = PATM_S;
-											    break;
-										case EXP_T: c_trans.p_msk[o][l] = PATM_T;
-											    break;
-									}
-									c_trans.trns[o][l] = k;
-									offset[o + 1] += 2;
-									c_trans.c[o]++;
-								}
-								else
-								{
-									switch (i)
-									{
-										case EXP_N: c_trans.p_msk[o][l] |= PATM_N;
-											    break;
-										case EXP_P: c_trans.p_msk[o][l] |= PATM_P;
-											    break;
-										case EXP_L: c_trans.p_msk[o][l] |= PATM_L;
-											    break;
-										case EXP_U: c_trans.p_msk[o][l] |= PATM_U;
-											    break;
-										case EXP_C: c_trans.p_msk[o][l] |= PATM_C;
-											    break;
-										case EXP_B: c_trans.p_msk[o][l] |= PATM_B;
-											    break;
-										case EXP_D: c_trans.p_msk[o][l] |= PATM_D;
-											    break;
-										case EXP_F: c_trans.p_msk[o][l] |= PATM_F;
-											    break;
-										case EXP_G: c_trans.p_msk[o][l] |= PATM_G;
-											    break;
-										case EXP_H: c_trans.p_msk[o][l] |= PATM_H;
-											    break;
-										case EXP_I: c_trans.p_msk[o][l] |= PATM_I;
-											    break;
-										case EXP_J: c_trans.p_msk[o][l] |= PATM_J;
-											    break;
-										case EXP_K: c_trans.p_msk[o][l] |= PATM_K;
-											    break;
-										case EXP_M: c_trans.p_msk[o][l] |= PATM_M;
-											    break;
-										case EXP_O: c_trans.p_msk[o][l] |= PATM_O;
-											    break;
-										case EXP_Q: c_trans.p_msk[o][l] |= PATM_Q;
-											    break;
-										case EXP_R: c_trans.p_msk[o][l] |= PATM_R;
-											    break;
-										case EXP_S: c_trans.p_msk[o][l] |= PATM_S;
-											    break;
-										case EXP_T: c_trans.p_msk[o][l] |= PATM_T;
-									}
-								}
-							}
-
-							else if (d_trans.t[o][a] != k)
+									c_trans.p_msk[seq][clsnum] = classmask[maskcls];
+									check_1dim_array_bound(c_trans.trns[seq], clsnum);
+									c_trans.trns[seq][clsnum] = count;
+									offset[seq + 1] += 2;
+									c_trans.c[seq]++;
+								} else
+									c_trans.p_msk[seq][clsnum] |= classmask[maskcls];
+							} else if (d_trans[seq][charcls] != count)
 							{
-								d_trans.t[o][a + j] = k;
-								offset[o + 1] += 3;
+								d_trans[seq][charcls + numexpand] = count;
+								offset[seq + 1] += 3;
 							}
-
-							if (k == state_num)
-							{	state_num++;
-							}
+							if (count == state_num)
+								state_num++;
 							else
-							{	memset(states.s[state_num],0,sym_num + 1);
-							}
+								memset(states[state_num], 0, (sym_num + 1) * sizeof(boolean_t));
 						}
 					}
-					a += expand->num_e[i];
+					charcls += expand->num_e[maskcls];
 				}
 			}
-
-			o++;
 		}
-
-		outchar += offset[state_num] + PATSTRLIT;
-		if ((outchar - stringpool.free > MAX_DFA_SPACE) ||
-		    (offset[state_num] + PATSTRLIT > MAX_PATTERN_LENGTH/2))
+		*outchar_ptr += offset[state_num] + 2;
+		if ((*outchar_ptr - *fstchar_ptr > MAX_DFA_SPACE) ||
+		    ((offset[state_num] + 1) > (MAX_PATTERN_LENGTH / 2)))
 			return -1;
-
-		*patmaskptr++ = PATM_DFA;
-		*patmaskptr++ = (unsigned char) offset[state_num];
-
-		for (o = 1; o < state_num;o++)
+		*locoutchar++ = PATM_DFA;
+		*locoutchar++ = offset[state_num];
+		for (seq = 1; seq < state_num; seq++)
 		{
-			a = 0;
-			for (j = 0;j < CHAR_CLASSES;j++)
+			charcls = 0;
+			for (numexpand = 0; numexpand < CHAR_CLASSES; numexpand++)
 			{
-				if (expand->num_e[j] > 1)
+				if (expand->num_e[numexpand] > 1)
 				{
-					for (k = 1;k < expand->num_e[j];k++)
+					for (count = 1; count < expand->num_e[numexpand]; count++)
 					{
-						if (d_trans.t[o][a + k] >= 0)
+						check_2dim_array_bound(d_trans, seq, charcls + count);
+						if (d_trans[seq][charcls + count] >= 0)
 						{
-							*patmaskptr++ = PATM_STRLIT;
-							*patmaskptr++ = expand->meta_c[j][k];
-							*patmaskptr++ = (unsigned char) offset[d_trans.t[o][a + k]];
+							*locoutchar++ = PATM_STRLIT;
+							*locoutchar++ = expand->meta_c[numexpand][count];
+							*locoutchar++ = offset[d_trans[seq][charcls + count]];
 						}
 					}
 				}
-				a += expand->num_e[j];
+				charcls += expand->num_e[numexpand];
 			}
-
-			for (j = 0 ;j < c_trans.c[o] ;j++)
+			for (numexpand = 0; numexpand < c_trans.c[seq]; numexpand++)
 			{
-				*patmaskptr++ = c_trans.p_msk[o][j];
-				*patmaskptr++ = (unsigned char) offset[c_trans.trns[o][j]];
+				check_2dim_array_bound(c_trans.p_msk, seq, numexpand);
+				*locoutchar++ = c_trans.p_msk[seq][numexpand];
+				check_2dim_array_bound(c_trans.trns, seq, numexpand);
+				check_1dim_array_bound(offset, c_trans.trns[seq][numexpand]);
+				*locoutchar++ = offset[c_trans.trns[seq][numexpand]];
 			}
-
-			if (states.s[o][sym_num])
-			{	*patmaskptr++ = PATM_ACS;
-			}
-			else
-			{	*patmaskptr++ = PATM_DFA;
-			}
+			*locoutchar++ = (states[seq][sym_num]) ? PATM_ACS : PATM_DFA;
 		}
+		assert(MAX_DFA_SPACE >= (locoutchar - *fstchar_ptr));
 		return 1;
-	}
-	else
+	} else
 	{
-		patcode = patmask = 0;
-		outchar += PATSIZE;
-		i = 1;
-
-		if (leaves->letter[0][0] < ADD)
+		pattern_mask = 0;
+		*outchar_ptr += 1;
+		maskcls = 1;
+		if (!(leaves->letter[0][0] & DFABIT))
 		{
-			patcode = PATM_STRLIT;
-			for (i = 0;leaves->letter[0][i] >= 0;i++)
+			pattern_mask = PATM_STRLIT;
+			for (maskcls = 0; leaves->letter[0][maskcls] >= 0; maskcls++)
 				;
-			outchar += i + 1;
-		}
-		else
+			check_1dim_array_bound(leaves->letter[0], maskcls);
+			*outchar_ptr += 1 + ((maskcls + sizeof(uint4) - 1) / sizeof(uint4));
+		} else
 		{
-			for (j = 0;leaves->letter[0][j] >= 0;j++)
-				patmask |= (unsigned char)leaves->letter[0][j];
+			for (numexpand = 0; leaves->letter[0][numexpand] >= 0; numexpand++)
+				pattern_mask |= leaves->letter[0][numexpand];
+			check_1dim_array_bound(leaves->letter[0], numexpand);
 		}
-
-		if (outchar - stringpool.free > MAX_PATTERN_LENGTH)
-		{
+		if (*outchar_ptr - *fstchar_ptr > MAX_PATTERN_LENGTH)
 			return -1;
-		}
-
-		if (patcode < PATM_STRLIT && patmask & PATM_I18NFLAGS)
+		*locoutchar++ = pattern_mask;
+		if (PATM_STRLIT & pattern_mask)
 		{
-			PUT_LONG(patmaskptr, patmask);
-			*patmaskptr |= PATM_USRDEF;
-			patmaskptr += sizeof(int4);
+			*locoutchar++ = maskcls;
+			textstring = (unsigned char *)locoutchar;	/* change pointer type */
+			for (numexpand = 0; numexpand < maskcls; numexpand++)
+				*textstring++ = leaves->letter[0][numexpand];
 		}
-		else
-			*patmaskptr++ = patcode | patmask;
-
-		if (patcode ==  PATM_STRLIT)
-		{
-			*patmaskptr++ = (unsigned char) i;
-			for (j = 0;j < i;j++)
-			{
-				*patmaskptr++ = (unsigned char) leaves->letter[0][j];
-			}
-		}
-		return i;
+		return maskcls;
 	}
 }

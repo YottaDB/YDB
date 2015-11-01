@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,13 +10,12 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <errno.h>
 
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-#ifdef VMS
 #include "gtm_string.h"
-#endif
+
+#include <errno.h>
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -57,7 +56,6 @@ void mupip_extend(void)
 	error_def(ERR_DBOPNERR);
 	error_def(ERR_MUNOACTION);
 	error_def(ERR_MUNODBNAME);
-	error_def(ERR_MUSTANDALONE);
 	error_def(ERR_NOREGION);
 	error_def(ERR_DBRDONLY);
 	error_def(ERR_JNLFILOPN);

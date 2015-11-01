@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "rtnhdr.h"
 #include "stack_frame.h"
 
@@ -30,8 +33,11 @@ unsigned char *get_symb_line (unsigned char *out, unsigned char **b_line, unsign
 	{
 		fpmpc = (fp == error_last_frame_err) ? error_last_mpc_err : fp->mpc;
 		fpctxt = (fp == error_last_frame_err) ? error_last_ctxt_err : fp->ctxt;
+		/*The equality check in the second half of the following expression is to
+		  account for the delay-slot in HP-UX for implicit quits. Not an issue here,
+		  but added for uniformity. */
 		if ((unsigned char *) fp->rvector + fp->rvector->ptext_ptr <= fpmpc &&
-			fpmpc < (unsigned char *) fp->rvector + fp->rvector->vartab_ptr)
+			fpmpc <= (unsigned char *) fp->rvector + fp->rvector->vartab_ptr)
 		{
 			if (ctxt != 0)
 				*ctxt = fpctxt;

@@ -9,15 +9,20 @@
  *								*
  ****************************************************************/
 
+#include "mdef.h"
+
+#include "gtm_string.h"
+#include "gtm_stdio.h"
+#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_unistd.h"		/* for read() */
+
+#include <fcntl.h>
+
+#include "omi.h"
+
 #ifndef lint
 static char rcsid[] = "$Header:$";
 #endif
-
-#include "gtm_stdio.h"
-#include <fcntl.h>
-
-#include "mdef.h"
-#include "omi.h"
 
 GBLREF char	*omi_oprlist[];
 

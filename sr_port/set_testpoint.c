@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "testpt.h"
 
 GBLDEF testpt_struct testpoint;

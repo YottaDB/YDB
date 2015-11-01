@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #ifdef EARLY_VARARGS
 #include <varargs.h>
 #endif

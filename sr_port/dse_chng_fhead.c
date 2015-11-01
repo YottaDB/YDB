@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -315,15 +315,30 @@ void dse_chng_fhead(void)
 		cs_addrs->hdr->last_inc_backup = x;
 	if ((CLI_PRESENT == cli_present("WAIT_DISK")) && (cli_get_num("WAIT_DISK", &x)))
 		cs_addrs->hdr->wait_disk_space = (x >= 0 ? x : 0);
-#ifdef UNIX
-	if ((CLI_PRESENT == cli_present("MUTEX_HARD_SPIN_COUNT")) && (cli_get_num("MUTEX_HARD_SPIN_COUNT", &x)))
-		cs_addrs->hdr->mutex_spin_parms.mutex_hard_spin_count = x;
-	if ((CLI_PRESENT == cli_present("MUTEX_SLEEP_SPIN_COUNT")) && (cli_get_num("MUTEX_SLEEP_SPIN_COUNT", &x)))
-		cs_addrs->hdr->mutex_spin_parms.mutex_sleep_spin_count = x;
-	if ((CLI_PRESENT == cli_present("MUTEX_SPIN_SLEEP_TIME")) && (cli_get_num("MUTEX_SPIN_SLEEP_TIME", &x)))
+	if (((CLI_PRESENT == cli_present("HARD_SPIN_COUNT")) && cli_get_num("HARD_SPIN_COUNT", &x))
+	      UNIX_ONLY( || ((CLI_PRESENT == cli_present("MUTEX_HARD_SPIN_COUNT")) && cli_get_num("MUTEX_HARD_SPIN_COUNT", &x)))
+	   ) /* Unix should be backward compatible, accept MUTEX_ prefix qualifiers as well */
+	{
+		if (0 < x)
+			cs_addrs->hdr->mutex_spin_parms.mutex_hard_spin_count = x;
+		else
+			util_out_print("Error: HARD SPIN COUNT should be a non zero positive number", TRUE);
+	}
+	if (((CLI_PRESENT == cli_present("SLEEP_SPIN_COUNT")) && cli_get_num("SLEEP_SPIN_COUNT", &x))
+	      UNIX_ONLY( || ((CLI_PRESENT == cli_present("MUTEX_SLEEP_SPIN_COUNT")) && cli_get_num("MUTEX_SLEEP_SPIN_COUNT", &x)))
+	   ) /* Unix should be backward compatible, accept MUTEX_ prefix qualifiers as well */
+	{
+		if (0 < x)
+			cs_addrs->hdr->mutex_spin_parms.mutex_sleep_spin_count = x;
+		else
+			util_out_print("Error: SLEEP SPIN COUNT should be a non zero positive number", TRUE);
+	}
+	if (((CLI_PRESENT == cli_present("SPIN_SLEEP_TIME")) && cli_get_num("SPIN_SLEEP_TIME", &x))
+	      UNIX_ONLY( || ((CLI_PRESENT == cli_present("MUTEX_SPIN_SLEEP_TIME")) && cli_get_num("MUTEX_SPIN_SLEEP_TIME", &x)))
+	   ) /* Unix should be backward compatible, accept MUTEX_ prefix qualifiers as well */
 	{
 		if (x < 0)
-			util_out_print("Error: MUTEX SPIN SLEEP TIME should be non negative", TRUE);
+			util_out_print("Error: SPIN SLEEP TIME should be non negative", TRUE);
 		else
 		{
 			save_x = x;
@@ -335,12 +350,11 @@ void dse_chng_fhead(void)
 			else
 				x = (1 << index_x) - 1;
 			if (x > 999999)
-				util_out_print("Error: MUTEX SPIN SLEEP TIME should be less than one million micro seconds", TRUE);
+				util_out_print("Error: SPIN SLEEP TIME should be less than one million micro seconds", TRUE);
 			else
 				cs_addrs->hdr->mutex_spin_parms.mutex_spin_sleep_mask = x;
 		}
 	}
-#endif
 	if ((CLI_PRESENT == cli_present("B_RECORD")) && (cli_get_hex("B_RECORD", &x)))
 		cs_addrs->hdr->last_rec_backup = x;
 	if (cs_addrs->hdr->clustered)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,9 +61,10 @@ boolean_t repl_inst_get_name(char *fn, unsigned int *fn_len, unsigned int bufsiz
 {
 	char		temp_inst_fn[MAX_FN_LEN+1];
 	mstr		log_nam, trans_name;
+	uint4		ustatus;
 
 	error_def(ERR_TEXT);
-	error_def(ERR_ZREPLINST);
+	error_def(ERR_REPLINSTACC);
 
 	log_nam.addr = ZREPLINSTANCE;
 	log_nam.len = sizeof(ZREPLINSTANCE) - 1;
@@ -71,10 +72,10 @@ boolean_t repl_inst_get_name(char *fn, unsigned int *fn_len, unsigned int bufsiz
 	if (SS_NORMAL != trans_log_name(&log_nam, &trans_name, temp_inst_fn))
 		return FALSE;
 	temp_inst_fn[trans_name.len] = '\0';
-	if (!get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize))
+	if (!get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize, &ustatus))
 	{
-		gtm_putmsg(VARLSTCNT(8) ERR_ZREPLINST, 2, trans_name.len, trans_name.addr,
-			ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"));
+		gtm_putmsg(VARLSTCNT(9) ERR_REPLINSTACC, 2, trans_name.len, trans_name.addr,
+			ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"), ustatus);
 		return FALSE;
 	}
 	return TRUE;
@@ -99,7 +100,7 @@ void repl_inst_create(void)
 
 	error_def(ERR_REPLINSTUNDEF);
 	error_def(ERR_TEXT);
-	error_def(ERR_ZREPLINST);
+	error_def(ERR_REPLINSTACC);
 	error_def(ERR_REPLREQRUNDOWN);
 
 	if (!repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN+1))
@@ -124,7 +125,7 @@ void repl_inst_create(void)
 				LEN_AND_STR(machine_name));
 		}
 	} else if (ENOENT != errno) /* some error happened */
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, inst_fn_len, inst_fn, errno);
+		rts_error(VARLSTCNT(5) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, errno);
 	memset(&repl_instance, 0, sizeof(repl_inst_fmt));
 	memcpy(&repl_instance.label[0], GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ);
 	repl_instance.jnlpool_semid = INVALID_SEMID;
@@ -134,13 +135,13 @@ void repl_inst_create(void)
 	ptr = (char *)&repl_instance;
 	OPENFILE3(inst_fn, O_CREAT | O_RDWR, 0666, fd);
 	if (-1 == fd)
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, inst_fn_len, inst_fn, errno);
+		rts_error(VARLSTCNT(5) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, errno);
 	LSEEKWRITE(fd, (off_t)(0), ptr, sizeof(repl_inst_fmt), status);
 	if (0 != status)
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, inst_fn_len, inst_fn, status);
+		rts_error(VARLSTCNT(5) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, status);
 	CLOSEFILE(fd, status);
 	if (0 != status)
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, inst_fn_len, inst_fn, status);
+		rts_error(VARLSTCNT(5) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, status);
 }
 
 
@@ -158,23 +159,23 @@ void repl_inst_get(char *inst_fn, repl_inst_fmt *repl_instance)
 	int		status, fd;
 
 	error_def(ERR_TEXT);
-	error_def(ERR_ZREPLINST);
+	error_def(ERR_REPLINSTACC);
 	error_def(ERR_REPLINSTINCORRV);
 
 	ptr = (char *)repl_instance;
 	if (-1 == (fd = (OPEN(inst_fn, O_RDONLY))))
 	{
 		status = errno;
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), status);
+		rts_error(VARLSTCNT(5) ERR_REPLINSTACC, 2, LEN_AND_STR(inst_fn), status);
 	}
 	LSEEKREAD(fd, (off_t)(0), ptr, sizeof(repl_inst_fmt), status);
 	if (0 != status)
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), status);
+		rts_error(VARLSTCNT(5) ERR_REPLINSTACC, 2, LEN_AND_STR(inst_fn), status);
 	if (memcmp(&repl_instance->label[0], GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ))
 		rts_error(VARLSTCNT(1) ERR_REPLINSTINCORRV);
 	CLOSEFILE(fd, status);
 	if (0 != status)
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), status);
+		rts_error(VARLSTCNT(5) ERR_REPLINSTACC, 2, LEN_AND_STR(inst_fn), status);
 }
 
 /*
@@ -191,20 +192,20 @@ void repl_inst_put(char *inst_fn, repl_inst_fmt *repl_instance)
 	int		status, fd;
 
 	error_def(ERR_TEXT);
-	error_def(ERR_ZREPLINST);
+	error_def(ERR_REPLINSTACC);
 
 	ptr = (char *)repl_instance;
 	if (-1 == (fd = (OPEN(inst_fn, O_RDWR))))
 	{
 		status = errno;
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), status);
+		rts_error(VARLSTCNT(5) ERR_REPLINSTACC, 2, LEN_AND_STR(inst_fn), status);
 	}
 	LSEEKWRITE(fd, (off_t)(0), ptr, sizeof(repl_inst_fmt), status);
 	if (0 != status)
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), status);
+		rts_error(VARLSTCNT(5) ERR_REPLINSTACC, 2, LEN_AND_STR(inst_fn), status);
 	CLOSEFILE(fd, status);
 	if (0 != status)
-		rts_error(VARLSTCNT(5) ERR_ZREPLINST, 2, LEN_AND_STR(inst_fn), status);
+		rts_error(VARLSTCNT(5) ERR_REPLINSTACC, 2, LEN_AND_STR(inst_fn), status);
 }
 
 /*

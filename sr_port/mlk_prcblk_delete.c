@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "mlkdef.h"
 #include "mlk_prcblk_delete.h"
 

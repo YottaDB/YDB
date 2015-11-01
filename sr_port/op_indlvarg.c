@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,8 +17,8 @@
 #include "cache.h"
 #include "op.h"
 
-GBLREF mval **ind_result_sp, **ind_result_top;
-LITREF char ctypetab[128];
+GBLREF	mval	**ind_result_sp, **ind_result_top;
+LITREF	char	ctypetab[NUM_ASCII_CHARS];
 
 void	op_indlvarg(mval *v, mval *dst)
 {
@@ -28,6 +28,7 @@ void	op_indlvarg(mval *v, mval *dst)
 	triple		*ref;
 	char		*c, *c_top;
 	int4		y;
+
 	error_def(ERR_INDMAXNEST);
 	error_def(ERR_VAREXPECTED);
 

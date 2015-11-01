@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,129 +45,149 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 error_def(ERR_JNLEXTEND);
 error_def(ERR_JNLREADEOF);
 error_def(ERR_JNLSPACELOW);
-error_def(ERR_JNLFILETOOBIG);
-error_def(ERR_DBFILERR);
 error_def(ERR_NEWJNLFILECREATE);
 error_def(ERR_DSKSPACEFLOW);
-error_def(ERR_JNLDBERR);
-
+error_def(ERR_JNLFILEXTERR);
+error_def(ERR_JNLCREATERR);
+error_def(ERR_DBFILERR);
 
 int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 {
 	file_control		*fc;
+	boolean_t		need_extend;
+	jnl_buffer_ptr_t     	jb;
 	jnl_create_info 	jnl_info;
-	off_t			old_end;
+	uint4			new_alq;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	char			*buff, *fn,
-				full_db_fn[MAX_FN_LEN], jnl_file_name[JNL_NAME_SIZE], prev_jnl_fn[JNL_NAME_SIZE];
+	char			*buff, *fn, full_db_fn[MAX_FN_LEN], jnl_file_name[JNL_NAME_SIZE], prev_jnl_fn[JNL_NAME_SIZE];
+	char			zero_disk_block[DISK_BLOCK_SIZE];
 	unsigned short		fn_len;
 	int4			blk, wrt_size;
 	int4			cond = 0;
-	uint4			dbfilop(), jnl_status = 0, status, save_errno;
+	uint4			jnl_status = 0, status, save_errno;
 	int			new_blocks, result;
 	GTM_BAVAIL_TYPE		avail_blocks;
+	uint4			aligned_tot_jrec_size, count;
 
 	csa = &FILE_INFO(jpc->region)->s_addrs;
 	csd = csa->hdr;
 	assert(csa == cs_addrs && csd == cs_data);
 	assert(csa->now_crit);
 	assert(jpc->region == gv_cur_region);
-	if (!JNL_ENABLED(csa->hdr) || (NOJNL == jpc->channel)
+	if (!JNL_ENABLED(csa) || (NOJNL == jpc->channel)
 		|| !is_gdid_gdid_identical(&csa->jnl->fileid, &csd->jnl_file.u))
 			GTMASSERT;	/* crit and messing with the journal file - how could it have vanished? */
-	new_blocks = ROUND_UP(DIVIDE_ROUND_UP(total_jnl_rec_size, DISK_BLOCK_SIZE), csa->hdr->jnl_deq);
-	jpc->status = 0;
-	if (0 != (save_errno = disk_block_available(jpc->channel, &avail_blocks, TRUE)))
-		send_msg(VARLSTCNT(5) ERR_JNLDBERR, 2, JNL_LEN_STR(csa->hdr), save_errno);
-	else
+	if (!csd->jnl_deq)
 	{
-		if ((new_blocks * EXTEND_WARNING_FACTOR) > avail_blocks)
-			send_msg(VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, JNL_LEN_STR(csa->hdr),
-					(uint4)(avail_blocks - ((new_blocks <= avail_blocks) ? new_blocks : 0)));
-	}
-
-	if (0 < new_blocks)
+		assert(DIVIDE_ROUND_UP(total_jnl_rec_size, DISK_BLOCK_SIZE) <= csd->jnl_alq);
+		new_blocks = csd->jnl_alq;
+	} else
+		new_blocks = ROUND_UP(DIVIDE_ROUND_UP(total_jnl_rec_size, DISK_BLOCK_SIZE), csd->jnl_deq);
+	jpc->status = SS_NORMAL;
+	jb = jpc->jnl_buff;
+	assert(0 <= new_blocks);
+	DEBUG_ONLY(count = 0);
+	for (need_extend = new_blocks; need_extend; )
 	{
-		old_end = jpc->jnl_buff->filesize + total_jnl_rec_size;
-		/* assert(0 == (old_end & ~JNL_WRT_START_MASK));	file must always be an even number of blocks */
-		if ((jpc->jnl_buff->autoswitchlimit - (old_end / DISK_BLOCK_SIZE) + 1) <= (EXTEND_WARNING_FACTOR * new_blocks))
-		{	/* close to max */
-			if ((jpc->jnl_buff->autoswitchlimit - (old_end / DISK_BLOCK_SIZE) + 1) <= new_blocks)
-			{	/* reaching max */
-				if ((jpc->jnl_buff->autoswitchlimit - (old_end / DISK_BLOCK_SIZE) + 1) <= 0)
-				{	/* the file somehow exceeded the design, probably compromising integrity - trigger close */
-					jpc->status = ERR_JNLFILETOOBIG;
-					new_blocks = -1;
-				} else
-				{	/* time for a new file */
-					memset(&jnl_info, 0, sizeof(jnl_info));
-					jnl_info.prev_jnl = &prev_jnl_fn[0];
-					set_jnl_info(gv_cur_region, &jnl_info);
-					fc = gv_cur_region->dyn.addr->file_cntl;
-					assert((JNL_ENABLED(csa->hdr) && (NOJNL != jpc->channel)
-						&& is_gdid_gdid_identical(&csa->jnl->fileid, &csd->jnl_file.u)));
-					jnl_status = jnl_ensure_open();
-					if (0 == jnl_status)
-					{
-						wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH);
-						jnl_file_close(gv_cur_region, TRUE, TRUE);
-					} else
-					{
-						rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),
-							DB_LEN_STR(gv_cur_region));
-					}
-					if (0 == cre_jnl_file(&jnl_info))
-					{
-						memcpy(csd->jnl_file_name, jnl_info.jnl, jnl_info.jnl_len);
-						csd->jnl_file_name[jnl_info.jnl_len] = '\0';
-						csd->jnl_file_len = jnl_info.jnl_len;
-						csd->jnl_buffer_size = jnl_info.buffer;
-						csd->jnl_alq = jnl_info.alloc;
-						csd->jnl_deq = jnl_info.extend;
-						csd->jnl_before_image = jnl_info.before_images;
-						csd->trans_hist.header_open_tn = jnl_info.tn;
-						send_msg(VARLSTCNT(3) ERR_NEWJNLFILECREATE, 2,
-							JNL_LEN_STR(csa->hdr));
-						fc->op = FC_WRITE;
-						fc->op_buff = (sm_uc_ptr_t)csd;
-						status = dbfilop(fc);
-						if (SS_NORMAL != status)
-						{
-							send_msg(VARLSTCNT(5) ERR_DBFILERR, 2,
-								gv_cur_region->dyn.addr->fname_len,
-								gv_cur_region->dyn.addr->fname, status);
-						}
-						assert(JNL_ENABLED(csa->hdr));
-						/* call jnl_ensure_open instead of jnl_file_open to make sure
-						 * 	cs_addrs->jnl->pini_addr is set to 0
-						 */
-						jnl_status = jnl_ensure_open();	/* sets jpc->status */
-						if (jnl_status != 0)
-							rts_error(VARLSTCNT(6) jnl_status, 4, csa->hdr->jnl_file_len,
-									csa->hdr->jnl_file_name, DB_LEN_STR(gv_cur_region));
-					} else
-					{
-						jpc->status = ERR_JNLEXTEND;
-						send_msg(VARLSTCNT(5) ERR_JNLEXTEND, 2,
-							JNL_LEN_STR(csa->hdr), jnl_info.status);
-					}
+		DEBUG_ONLY(count++);
+		/* usually we will do the loop just once where we do the file extension.
+		 * rarely we might need to do an autoswitch instead after which again rarely
+		 * 	we might need to do an extension on the new journal to fit in the transaction's	journal requirements.
+		 * therefore we should do this loop a maximum of twice. hence the assert below.
+		 */
+		assert(count <= 2);
+		need_extend = FALSE;
+		if (0 != (save_errno = disk_block_available(jpc->channel, &avail_blocks, TRUE)))
+			send_msg(VARLSTCNT(5) ERR_JNLFILEXTERR, 2, JNL_LEN_STR(csd), save_errno);
+		else
+		{
+			if ((new_blocks * EXTEND_WARNING_FACTOR) > avail_blocks)
+				send_msg(VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, JNL_LEN_STR(csd),
+						(uint4)(avail_blocks - ((new_blocks <= avail_blocks) ? new_blocks : 0)));
+		}
+		new_alq = jb->filesize + new_blocks;
+		/* ensure current journal file size is well within autoswitchlimit --> design constraint */
+		assert(jb->autoswitchlimit >= jb->filesize);
+		if (jb->autoswitchlimit < (jb->filesize + (EXTEND_WARNING_FACTOR * new_blocks)))	/* close to max */
+			send_msg(VARLSTCNT(5) ERR_JNLSPACELOW, 3, JNL_LEN_STR(csd), jb->autoswitchlimit - jb->filesize);
+		if (jb->autoswitchlimit < new_alq)
+		{	/* reached max */
+			/* ensure new jnl file can hold the entire current transaction's journal record requirements */
+			assert(jb->autoswitchlimit >= MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size));
+			/* time for a new file */
+			memset(&jnl_info, 0, sizeof(jnl_info));
+			jnl_info.prev_jnl = &prev_jnl_fn[0];
+			set_jnl_info(gv_cur_region, &jnl_info);
+			assert((JNL_ENABLED(csa) && (NOJNL != jpc->channel)
+				&& is_gdid_gdid_identical(&csa->jnl->fileid, &csd->jnl_file.u)));
+			jnl_status = jnl_ensure_open();
+			if (0 == jnl_status)
+			{
+				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH);
+				jnl_file_close(gv_cur_region, TRUE, TRUE);
+			} else
+				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+			if (0 == cre_jnl_file(&jnl_info))
+			{
+				assert(0 == memcmp(csd->jnl_file_name, jnl_info.jnl, jnl_info.jnl_len));
+				assert(csd->jnl_file_name[jnl_info.jnl_len] == '\0');
+				assert(csd->jnl_file_len == jnl_info.jnl_len);
+				assert(csd->jnl_buffer_size == jnl_info.buffer);
+				assert(csd->jnl_alq == jnl_info.alloc);
+				assert(csd->jnl_deq == jnl_info.extend);
+				assert(csd->jnl_before_image == jnl_info.before_images);
+				csd->trans_hist.header_open_tn = jnl_info.tn;	/* needed for successful jnl_file_open() */
+				send_msg(VARLSTCNT(3) ERR_NEWJNLFILECREATE, 2, JNL_LEN_STR(csd));
+				fc = gv_cur_region->dyn.addr->file_cntl;
+				fc->op = FC_WRITE;
+				fc->op_buff = (sm_uc_ptr_t)csd;
+				status = dbfilop(fc);
+				if (SS_NORMAL != status)
+					send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
+				assert(JNL_ENABLED(csa));
+				/* call jnl_ensure_open instead of jnl_file_open to make sure jpc->pini_addr is set to 0 */
+				jnl_status = jnl_ensure_open();	/* sets jpc->status */
+				if (0 != jnl_status)
+					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+				aligned_tot_jrec_size = ALIGNED_ROUND_UP(MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size),
+										csd->jnl_alq, csd->jnl_deq);
+				if (aligned_tot_jrec_size > csd->jnl_alq)
+				{	/* need to extend more than initial allocation in the new journal file
+					 * to accommodate the current transaction.
+					 */
+					new_blocks = aligned_tot_jrec_size - csd->jnl_alq;
+					assert(new_blocks);
+					assert(0 == new_blocks % csd->jnl_deq);
+					need_extend = TRUE;
 				}
 			} else
-				send_msg(VARLSTCNT(5) ERR_JNLSPACELOW, 3, JNL_LEN_STR(csa->hdr),
-					jpc->jnl_buff->autoswitchlimit - (old_end / DISK_BLOCK_SIZE) + 1 - new_blocks);
+			{
+				send_msg(VARLSTCNT(5) ERR_JNLCREATERR, 2, JNL_LEN_STR(csd), jnl_info.status);
+				new_blocks = -1;
+			}
+		} else
+		{
+			jb->filesize += new_blocks;
+			assert(DISK_BLOCK_SIZE == sizeof(zero_disk_block));
+			memset(zero_disk_block, 0, DISK_BLOCK_SIZE);
+			/* do type cast to off_t below to take care of 32-bit overflows due to multiplication by DISK_BLOCK_SIZE */
+			LSEEKWRITE(jpc->channel, (((off_t)jb->filesize) - 1) * DISK_BLOCK_SIZE,
+							zero_disk_block, DISK_BLOCK_SIZE, status);
+			if (0 != status)
+			{
+				new_blocks = -1;
+				jpc->status = status;
+			}
+			assert(!need_extend);	/* ensure we won't go through the for loop again */
 		}
-	} else
-	{
-		new_blocks = -1;
-		jpc->status = ERR_JNLREADEOF;
+		if (0 >= new_blocks)
+			break;
 	}
-	if ((0 == jpc->status) && (0 < new_blocks))
-		jpc->jnl_buff->filesize += new_blocks * DISK_BLOCK_SIZE;
-	else
+	if (0 >= new_blocks)
 	{
+		jpc->status = ERR_JNLREADEOF;
 		jnl_file_lost(jpc, ERR_JNLEXTEND);
-		new_blocks = -1;
 	}
 	return new_blocks;
 }

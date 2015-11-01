@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,66 +12,76 @@
 #include "mdef.h"
 
 #include "patcode.h"
-#include "add_atom.h"
 #include "min_max.h"
 
-LITREF uint4	typemask[256];
+LITREF uint4	typemask[PATENTS];
 
-typedef	short int	short_int;
-typedef	short_int	pattern_array[MAX_PATTERN_ATOMS];
-
-bool pat_unwind(short_int *count, struct leaf *leaves, short_int leaf_num, short_int *total, short_int *total_max,
-		pattern_array min, pattern_array max, pattern_array size)
+/* This procedure is part of the MUMPS compiler. Under certain circumstances, procedure patstr will decide that a
+ * pattern is a candidate for optimized processing using a DFA method. In such cases, procedure dfa_calc is called
+ * to compile the instructions for do_pattern to execute the DFA evaluation. When, later, either dfa_calc or patstr
+ * decides that the rest of the pattern invalidates the DFA strategy, this procedure is called to undo the compilation
+ * for the DFA engine and build the data that would "normally" have been compiled for the pattern segment in question.
+ */
+boolean_t pat_unwind(
+	short int		*count,
+	struct leaf		*leaves,
+	short int		leaf_num,
+	short int		*total_min,
+	short int		*total_max,
+	short int		min[],
+	short int		max[],
+	short int		size[],
+	int			altmin,
+	int			altmax,
+	boolean_t		*last_infinite_ptr,
+	uint4			**fstchar_ptr,
+	uint4			**outchar_ptr,
+	uint4			**lastpatptr_ptr)
 {
 	struct {
-		unsigned char 	len;
+		int4	 	len;
 		unsigned char	lit_buf[MAX_DFA_STRLEN];
 		}  	str_lit;
-	unsigned char	x;
-	short int	i, j, k, l, m, atom_map;
-	bool		infinite;
+	uint4		pattern_mask;
+	short int	minim, maxim, leaf_cnt, charpos, offset, atom_map;
+	boolean_t	infinite;
 
-	k = 0;
-	atom_map = *count;
-	while ( k < leaf_num )
+	assert(MAX_SYM > leaf_num);
+	for (atom_map = *count, leaf_cnt = 0; leaf_cnt < leaf_num; atom_map++)
 	{
-		infinite = leaves->nullable[k];
-		if (leaves->letter[k][0] < ADD)
+		infinite = leaves->nullable[leaf_cnt];
+		if (!(leaves->letter[leaf_cnt][0] & DFABIT))
 		{
-			m = 0;
-			x = PATM_STRLIT;
-			while (m < size[atom_map])
+			pattern_mask = PATM_STRLIT;
+			for (offset = 0; offset < size[atom_map]; offset += charpos)
 			{
-				for (l = 0; leaves->letter[k][l] >= 0; l++)
+				for (charpos = 0; leaves->letter[leaf_cnt][charpos] >= 0; charpos++)
 				{
-					str_lit.lit_buf[m + l] = leaves->letter[k][l];
-					x |= typemask[leaves->letter[k][l]];
+					assert(MAX_DFA_STRLEN > (offset + charpos));
+					str_lit.lit_buf[offset + charpos] = leaves->letter[leaf_cnt][charpos];
+					pattern_mask |= typemask[leaves->letter[leaf_cnt][charpos]];
 				}
-				m += l;
-				k++;
+				leaf_cnt++;
 			}
-		}
-		else
+		} else
 		{
-			x = 0;
-			for (l = 0; leaves->letter[k][l] >= 0; l++)
-				x |= (unsigned char) leaves->letter[k][l];
-			k++;
+			pattern_mask = 0;
+			for (charpos = 0; leaves->letter[leaf_cnt][charpos] >= 0; charpos++)
+			{
+				assert(MAX_DFA_STRLEN > charpos);
+				pattern_mask |= leaves->letter[leaf_cnt][charpos];
+			}
+			leaf_cnt++;
 		}
-		i = min[atom_map];
-		j = max[atom_map];
-		k += MAX(i - 1,0) * size[atom_map];
-		str_lit.len = m;
-		if (*count < MAX_PATTERN_ATOMS &&
-/* Achtung!  What should patcode be? */
-		     add_atom(count, 0, x, &str_lit, m, infinite,
-			&min[*count], &max[*count], &size[*count], total, total_max, i, j))
-		{
-			atom_map++;
-		}
-		else
-		{	return FALSE;
-		}
+		minim = min[atom_map];
+		maxim = max[atom_map];
+		leaf_cnt += MAX(minim - 1, 0) * size[atom_map];
+		str_lit.len = offset;
+		if ((MAX_PATTERN_ATOMS <= *count)
+				|| !add_atom(count, pattern_mask, &str_lit, offset, infinite,
+					&min[*count], &max[*count], &size[*count], total_min, total_max,
+					minim, maxim, altmin, altmax, last_infinite_ptr, fstchar_ptr, outchar_ptr, lastpatptr_ptr))
+			return FALSE;
 	}
 	return TRUE;
 }

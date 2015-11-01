@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "cache.h"
 #include "mdq.h"
@@ -23,7 +25,6 @@
 #include "fix_pages.h"
 #include "io.h"
 #include "inst_flush.h"
-#include "gtm_string.h"
 
 #ifdef __MVS__		/* need to adjust for load address inst. (temporary) */
 #define SIZEOF_LA	4
@@ -34,7 +35,8 @@
 GBLREF z_records	zbrk_recs;
 GBLREF mident		zlink_mname;
 GBLREF stack_frame	frame_pointer;
-GBLREF unsigned char	proc_act_type;
+GBLREF unsigned short	proc_act_type;
+GBLREF int		cache_temp_cnt;
 
 void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 	/* act == action associated with ZBREAK */
@@ -69,9 +71,16 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 		{
 			if (z_ptr->action)
 			{
-				if (z_ptr->action->obj.len)
-					free(z_ptr->action->obj.addr);
-				free(z_ptr->action);
+				if (z_ptr->action->refcnt)
+				{	/* This frame is active. Mark it as temp so gets released when sf is unwound */
+					z_ptr->action->temp_elem = TRUE;
+					DBG_INCR_CNT(cache_temp_cnt);
+				} else
+				{
+					if (z_ptr->action->obj.addr)
+						free(z_ptr->action->obj.addr);
+					free(z_ptr->action);
+				}
 			}
 			addr = (zb_code *)(z_ptr->mpc);
 			*addr = z_ptr->m_opcode;
@@ -100,6 +109,19 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 			addr = find_line_call(addr);
 			if (0 != (z_ptr = (zbrk_struct *)zr_find(&zbrk_recs, (char *)addr)))
 			{
+				if (z_ptr->action)
+				{
+					if (z_ptr->action->refcnt)
+					{	/* This frame is active. Mark it as temp so gets released when sf is unwound */
+						z_ptr->action->temp_elem = TRUE;
+						DBG_INCR_CNT(cache_temp_cnt);
+					} else
+					{
+						if (z_ptr->action->obj.addr)
+							free(z_ptr->action->obj.addr);
+						free(z_ptr->action);
+					}
+				}
 				assert((zb_code *)(z_ptr->mpc) == addr);
 				*addr = z_ptr->m_opcode;
 				inst_flush(addr, sizeof(*addr));
@@ -110,10 +132,8 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 		{
 			if (find_line_addr(routine, &lab->str, offset + 1) == line_offset_addr)
 				dec_err(VARLSTCNT(1) ERR_COMMENT);
-			proc_act_type = SFT_ZBRK_ACT;
 			/* Force creation of new cache record we can steal with _nocache */
 			op_commarg(act, indir_linetail_nocache);
-			proc_act_type = 0;
 			obj = cache_get(indir_linetail_nocache, &act->str);
 			csp = ((ihdtyp *)(obj->addr))->indce;	/* Cache entry for this object code */
 			if (csp->temp_elem)			/* Going to be released when unwound? */
@@ -147,26 +167,34 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 			*/
 			if (z_ptr->action)
 			{
-				if (z_ptr->action->obj.addr)
+				if (z_ptr->action->refcnt)
+				{	/* This frame is active. Mark it as temp so gets released when sf is unwound */
+					z_ptr->action->temp_elem = TRUE;
+					DBG_INCR_CNT(cache_temp_cnt);
+					z_ptr->action = (cache_entry *)malloc(sizeof(cache_entry));
+				} else if (z_ptr->action->obj.addr)
 					free(z_ptr->action->obj.addr);
 			} else
 				z_ptr->action = (cache_entry *)malloc(sizeof(cache_entry));
 			*z_ptr->action = *csp;			/* Make copy of cache entry */
-			dqdel(csp, linkq);
+			dqdel(csp, linkq);			/* Remove entry from hash queue it was on */
 			if (csp->temp_elem)
 			{	/* was a temp elem which must be released */
 				assert(1 == csp->refcnt);
 				z_ptr->action->temp_elem = FALSE;
+				z_ptr->action->refcnt = 0;
 				dqdel(csp, linktemp);
-				free(csp);			/* Remove entry from hash queue it was on */
+				free(csp);
 			} else
 			{	/* normal cache entry. Lobotomize it so don't have two entries pointing to same memory */
 				assert(0 == csp->refcnt);
 				memset(csp, 0, sizeof(*csp));
 			}
 			/* Make this cached object code point back to it's new "cache entry". */
-			((ihdtyp *)(z_ptr->action->obj.addr))->indce = z_ptr->action;	/* Set backward link to this cache entry */
+			((ihdtyp *)(z_ptr->action->obj.addr))->indce = z_ptr->action;
 			z_ptr->count = cnt;
+			z_ptr->action->linkq.fl = 0;		/* So nobody tries to dequeue it */
+			z_ptr->action->linktemp.fl = 0;
 		} else
 			GTMASSERT;
 	}

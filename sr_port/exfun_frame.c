@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mprof.h"
@@ -42,7 +45,7 @@ void exfun_frame (void)
 	{
 		if (msp <= stacktop)
 		{
-			msp = msp;
+			msp = msp_save;
 			rts_error(VARLSTCNT(1) ERR_STACKOFLOW);
 		} else
 			rts_error(VARLSTCNT(1) ERR_STACKCRIT);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,6 +63,8 @@
 #include "outofband.h"
 #include "gtmmsg.h"
 #include "format_targ_key.h"
+#include "sgnl.h"
+#include "util.h"
 
 #define UNDO_ACTIVE_LV										\
 {												\
@@ -88,7 +90,7 @@ GBLREF lv_val		*active_lv;
 
 void op_merge(void)
 {
-	boolean_t		found;
+	boolean_t		found, check_for_null_subs;
 	lv_val			*dst_lv;
 	mval 			*mkey, *value, *subsc;
 	int			org_glvn1_keysz, org_glvn2_keysz, delta2, dollardata;
@@ -98,9 +100,6 @@ void op_merge(void)
 	unsigned char  		buff[MAX_STRLEN], *endbuff;
 	zshow_out		output;
 
-	error_def(ERR_GVNDUNDEF);
-	error_def(ERR_LVNDUNDEF);
-	error_def(ERR_MERGEDESCTMP);
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
 	error_def(ERR_MAXNRSUBSCRIPTS);
@@ -159,6 +158,8 @@ void op_merge(void)
 					op_gvput(value);
 				}
 			}
+			check_for_null_subs = mglvnp->gblp[IND2]->s_gv_cur_region->null_subs &&
+				!mglvnp->gblp[IND1]->s_gv_cur_region->null_subs;
 			/* Traverse descendant of ^gvn2 and copy into ^gvn1 */
 			for (; ;)
 			{
@@ -175,23 +176,25 @@ void op_merge(void)
 				gv_currkey->base[gv_currkey->end + 1] = 0;
 				gv_currkey->base[gv_currkey->end + 2] = 0;
 				gv_currkey->end += 2;
-				/* Do $QUERY and $GET of current glvn2. Result will be in mkey and value respectively.
-				   mkey->str contains data as database format. So no conversion necessary */
+				/* Do atomic $QUERY and $GET of current glvn2:
+				 * mkey is a mstr which contains $QUERY result in database format (So no conversion necessary)
+				 * value is a mstr which contains $GET result
+				 */
 				if (!op_gvqueryget(mkey, value))
 					break;
-				if (mkey->str.len < gvn2_org_key->end + 1)
-					break;
-				ptr = (unsigned char *)mkey->str.addr +  gvn2_org_key->end - 1;
-				if (0 != *ptr || memcmp(mkey->str.addr, gvn2_org_key->base, gvn2_org_key->end - 1))
-					break;
 				assert(MV_IS_STRING(mkey));
-				delta2 = mkey->str.len - org_glvn2_keysz; /* length increase of key */
+				if (mkey->str.len < org_glvn2_keysz)
+					break;
+				if (0 != *((unsigned char *)mkey->str.addr +  gvn2_org_key->end - 1) ||
+					memcmp(mkey->str.addr, gvn2_org_key->base, gvn2_org_key->end - 1))
+					break; 					/* mkey is not under the sub-tree */
+				delta2 = mkey->str.len - org_glvn2_keysz; 	/* length increase of source key */
 				assert (0 < delta2);
-				/* Create next mkey for ^glvn2 */
+				/* Save the new source key for next iteration */
 				memcpy(mglvnp->gblp[IND2]->s_gv_currkey->base + org_glvn2_keysz - 2,
 					mkey->str.addr + org_glvn2_keysz - 2, delta2 + 2);
 				mglvnp->gblp[IND2]->s_gv_currkey->end = mkey->str.len - 1;
-				/* Create destinition key under ^glvn1 */
+				/* Create the destination key for this iteration (under ^glvn1) */
 				gvname_env_restore(mglvnp->gblp[IND1]);
 				if (gv_cur_region->max_key_size < org_glvn1_keysz + delta2)
 				{
@@ -199,9 +202,35 @@ void op_merge(void)
 						endbuff = &buff[MAX_KEY_SZ];
 					rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, endbuff - buff, buff);
 				}
+				assert(gv_currkey->end == org_glvn1_keysz - 1);
+				memcpy(gv_currkey->base + org_glvn1_keysz - 2,
+					mkey->str.addr + org_glvn2_keysz - 2, delta2 + 2);
+				gv_currkey->end = org_glvn1_keysz + delta2 - 1;
+				if (check_for_null_subs)
+				{
+					ptr2 = gv_currkey->base + gv_currkey->end - 1;
+					for (ptr = gv_currkey->base + org_glvn1_keysz - 2; ptr < ptr2; )
+					{
+						if (KEY_DELIMITER == *ptr++ &&
+							STR_SUB_PREFIX == *ptr && KEY_DELIMITER == *(ptr + 1))
+							/* Note: For sgnl_gvnulsubsc/rts_error
+							 * 	 we do not restore proper naked indicator.
+							 * The standard states that the effect of a MERGE command
+							 * on the naked indicator is that the naked indicator will be changed
+							 * as if a specific SET command would have been executed.
+							 * The standard also states that the effect on the naked indicator
+							 * will only take be visible after the MERGE command has completed.
+							 * So, if there is an error during the execution of a MERGE command,
+							 * the standard allows the naked indicator to reflect any intermediate
+							 * state. This provision was made intentionally, otherwise it would
+							 * have become nearly impossible to create a fully standard
+							 * implementation. : From Ed de Moel : 2/1/2 */
+
+							sgnl_gvnulsubsc();
+
+					}
+				}
 				/* Now put value of ^glvn2 descendant into corresponding descendant under ^glvn1 */
-				memcpy(gv_currkey->base + org_glvn1_keysz - 2, mkey->str.addr + org_glvn2_keysz - 2, delta2 + 2);
-				gv_currkey->end += delta2;
 				op_gvput(value);
 			}
 			gvname_env_restore(mglvnp->gblp[IND1]);	 /* naked indicator is restored into gv_currkey */
@@ -236,7 +265,7 @@ void op_merge(void)
 				gv_currkey->base[gv_currkey->end + 2] = 0;
 				gv_currkey->end += 2;
 				/* Do $QUERY and $GET of current glvn2. Result will be in mkey and value respectively.
-				   mkey->str contains data as database format. So no conversion necessary */
+				 * mkey->str contains data as database format. So no conversion necessary */
 				if (!op_gvqueryget(mkey, value))
 					break;
 				if (mkey->str.len < gvn2_org_key->end + 1)
@@ -250,7 +279,7 @@ void op_merge(void)
 				/* Create next key for ^glvn2 */
 				memcpy(gv_currkey->base + org_glvn2_keysz - 2, mkey->str.addr + org_glvn2_keysz - 2, delta2 + 2);
 				gv_currkey->end = mkey->str.len - 1;
-				/* Now we will add subscripts to create the key */
+				/* Now add subscripts to create the entire key */
 				dst_lv =  mglvnp->lclp[IND1];
 				ptr = (unsigned char *)gv_currkey->base + org_glvn2_keysz - 1;
 				assert(*ptr);
@@ -258,10 +287,7 @@ void op_merge(void)
 				{
 					if (MV_SBS == dst_lv->ptrs.val_ent.parent.sbs->ident &&
 						MAX_LVSUBSCRIPTS <= dst_lv->ptrs.val_ent.parent.sbs->level)
-					{
-						gtm_putmsg(VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-						rts_error(VARLSTCNT(1) ERR_MERGEINCOMPL);
-					}
+						rts_error(VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
 					ptr2 = gvsub2str(ptr, buff, FALSE);
 					subsc->mvtype = MV_STR;
 					subsc->str.addr = (char *)buff;

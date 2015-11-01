@@ -10,7 +10,10 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 #include "gtm_time.h"
+
 #include "op.h"
 #include "mvalconv.h"
 

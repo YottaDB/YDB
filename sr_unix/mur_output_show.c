@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,8 @@
 
 #include "mdef.h"
 
-#include <time.h>
+#include "gtm_string.h"
+#include "gtm_time.h"
 #include "gtm_stdio.h"
 
 #include "gdsroot.h"
@@ -134,7 +135,7 @@ void	mur_output_show(ctl_list *ctl)
 			util_out_print("Forw phase lastrecaddr:!_!SL", TRUE, header->forw_phase_last_record);
 		if (header->ftruncate_len)
 			util_out_print("Jnlfile ftrunc_len:!_!SL", TRUE, header->ftruncate_len);
-		util_out_print("Epoch Interval:!_!_!SL", TRUE, header->epoch_interval);
+		util_out_print("Epoch Interval:!_!_!UL", TRUE, EPOCH_SECOND2SECOND(header->epoch_interval));
 		util_out_print("Jnlfile SwitchLimit:!_!UL disk-blocks", TRUE, header->autoswitchlimit);
 		ptr = i2ascl(qwstring, header->start_seqno);
 		ptr1 = i2asclx(qwstring1, header->start_seqno);
@@ -167,7 +168,7 @@ void	mur_output_show(ctl_list *ctl)
 
 		for (slp = ctl->show_list;  slp != NULL;  slp = slp->next)
 		{
-			if (SOME_TIME(slp->jpv.jpv_time))
+			if (!IS_ZERO_PROC_TIME(slp->jpv.jpv_time))
 			{
 				if (!heading_printed)
 				{
@@ -194,7 +195,7 @@ void	mur_output_show(ctl_list *ctl)
 		heading_printed = FALSE;
 		for (slp = ctl->show_list;  slp != NULL;  slp = slp->next)
 		{
-			if (!SOME_TIME(slp->jpv.jpv_time))
+			if (IS_ZERO_PROC_TIME(slp->jpv.jpv_time))
 			{
 				if (!heading_printed)
 				{
@@ -270,7 +271,7 @@ void	mur_output_show(ctl_list *ctl)
 					heading_printed = TRUE;
 				}
 
-				if (SOME_TIME(slp->jpv.jpv_time))
+				if (!IS_ZERO_PROC_TIME(slp->jpv.jpv_time))
 					logout_time_len = format_time(&slp->jpv.jpv_time, logout);
 				else
 					logout_time_len = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,15 +20,14 @@
 
 /* gets the full path name for a given file name. Prepends the CWD, even if the file does not exist */
 
-boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, unsigned int *full_len, int max_len)
+boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, unsigned int *full_len, int max_len, uint4 *status)
 {
 	char	*cptr, *c1;
 	char	cwdbuf[MAX_FN_LEN + 1];
 	int	cwd_len;
 	int	i, length;
 	char	*getcwd_res;
-
-	error_def(ERR_GETCWD);
+	error_def(ERR_FILENAMETOOLONG);
 
 	if ('/' == *orig_fn)
 	{
@@ -38,7 +37,10 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 	} else
 	{
 		if (NULL == GETCWD(cwdbuf, sizeof(cwdbuf), getcwd_res))
-			rts_error(VARLSTCNT(5) ERR_GETCWD, 2, orig_len, orig_fn, errno);
+		{
+			*status = errno;
+			return FALSE;
+		}
 		cwd_len = strlen(cwdbuf);
 		cptr = orig_fn;
 		if (('.' == *cptr)  &&  ('.' == *(cptr + 1)))
@@ -54,15 +56,21 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 				while ('/' != *c1)
 					--c1;
 			if ((length = (c1 - cwdbuf) + orig_len - (cptr - orig_fn)) + 1 > max_len)
+			{
+				*status = ERR_FILENAMETOOLONG;
 				return FALSE;
+			}
 			memcpy(full_fn, cwdbuf, c1 - cwdbuf);
 			memcpy(full_fn + (c1 - cwdbuf), cptr, orig_len - (cptr - orig_fn));
 		} else
 		{
-			if ('.' == *cptr)
+			if ('.' == *cptr && '/' == (*(cptr + 1)))
 				cptr += 2;
 			if ((length = cwd_len + 1 + orig_len - (cptr - orig_fn)) + 1 > max_len)
+			{
+				*status = ERR_FILENAMETOOLONG;
 				return FALSE;
+			}
 			strcpy(full_fn, cwdbuf);
 			full_fn[cwd_len] = '/';
 			memcpy(full_fn + cwd_len + 1, cptr, orig_len - (cptr - orig_fn));

@@ -46,6 +46,8 @@
 #define GTMSECSHR_NAMELEN	(sizeof(GTMSECSHR_NAME) - 1)
 #define	ROOTUID			0	/*	also defined in gtmsecshr.h	*/
 
+
+GBLREF boolean_t	gtm_environment_init;
 static char		pbuff[MAX_FBUFF];
 static int		plen = 0;
 static char 		mbuff[MAX_FBUFF];
@@ -99,8 +101,8 @@ int gtm_chk_dist(char *image)
 	if ((!(pblk.fnb & F_HAS_DIR) && !pblk.b_dir) || (DIR_SEPARATOR != pblk.l_dir[0]))
 	{
 		if (NULL == GETCWD(pre_buff, MAX_FBUFF, prefix))
-			rts_error(VARLSTCNT(7) ERR_SYSCALL, 5,
-					LEN_AND_LIT("getcwd"), CALLFROM);
+			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("getcwd"), CALLFROM, errno);
 
 		prefix_len = strlen(prefix);
 		if(MAX_FBUFF < prefix_len + pblk.b_esl + 1)
@@ -126,6 +128,8 @@ int gtm_chk_dist(char *image)
 	}
 	if (DIR_SEPARATOR != save_ch)
 		prefix[pblk.b_dir] = save_ch;
+	if (GETENV("gtm_environment_init"))
+		gtm_environment_init = TRUE;
 
 	return 0;
 }

@@ -11,10 +11,11 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+#include "gtm_stdio.h"
+
 #include <fcntl.h>
 #include <unistd.h>
-
-#include "gtm_stdio.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"

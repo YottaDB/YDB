@@ -16,16 +16,14 @@
  *
  */
 
-#ifndef lint
-static char rcsid[] = "$Header:$";
-#endif
-
-#include <errno.h>
-#ifdef DEBUG
-#include "gtm_stdio.h"
-#include <fcntl.h>
-#endif /* defined(DEBUG) */
 #include "mdef.h"
+
+#include "gtm_string.h"
+#include "gtm_unistd.h"		/* for execlp() and fork() */
+#include "gtm_stdlib.h"		/* for exit() */
+
+#include <sys/wait.h>		/* for wait() */
+
 #include "gtcm.h"
 
 #if defined(sun) || defined(mips)
@@ -38,6 +36,17 @@ static char rcsid[] = "$Header:$";
 #	endif
 #endif
 
+#include <errno.h>
+#ifdef DEBUG
+#include "gtm_stdio.h"
+#include <fcntl.h>
+#endif /* defined(DEBUG) */
+
+#include "gt_timer.h"	/* for cancel_timer() and start_timer() atleast */
+
+#ifndef lint
+static char rcsid[] = "$Header:$";
+#endif
 
 GBLREF int	psock;
 GBLREF int 	conn_timeout;

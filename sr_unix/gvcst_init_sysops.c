@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -383,12 +383,6 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		new_ipc = TRUE;
 	}
         sem_incremented = TRUE;
-        if (JNL_ALLOWED(tsd))
-	{
-		csa->jnl = (jnl_private_control *)malloc(sizeof(*csa->jnl));
-		memset(csa->jnl, 0, sizeof(*csa->jnl));
-		csa->jnl->region = reg;
-	}
 	if (new_ipc)
 	{
 		/*
@@ -428,8 +422,23 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 #ifdef CACHELINE_SIZE
 	assert(0 == ((int)csa->critical & (CACHELINE_SIZE - 1)));
 #endif
-	if (JNL_ALLOWED(tsd)) /* The buffer should be initialized irrespective of read/write process */
+	/* Note: Here we check jnl_sate from database file and
+	 * its value cannot change without standalone access.
+	 * In other words it is not necessary to read shared memory for the test (jnl_state != jnl_notallowed) */
+	csa->jnl_state = tsd->jnl_state;
+	csa->jnl_before_image = tsd->jnl_before_image;
+	csa->repl_state = tsd->repl_state;
+	/* The jnl_buff buffer should be initialized irrespective of read/write process */
+	if (JNL_ALLOWED(csa))
+	{
+		csa->jnl = (jnl_private_control *)malloc(sizeof(*csa->jnl));
+		memset(csa->jnl, 0, sizeof(*csa->jnl));
+		csa->jnl->channel = NOJNL;
+		csa->jnl->region = reg;
 		csa->jnl->jnl_buff = (jnl_buffer_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SPACE + JNL_NAME_EXP_SIZE);
+	}
+	else
+		csa->jnl = NULL;
 	csa->backup_buffer = (backup_buff_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SPACE + JNL_SHARE_SIZE(tsd));
 	csa->lock_addrs[0] = (sm_uc_ptr_t)csa->backup_buffer + BACKUP_BUFFER_SIZE + 1;
 	csa->lock_addrs[1] = csa->lock_addrs[0] + LOCK_SPACE_SIZE(tsd) - 1;
@@ -492,7 +501,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
                 csa->nl->unique_id.uid = FILE_INFO(reg)->fileid;            /* save what file we initialized this storage for */
 		/* save pointers in csa to access shared memory */
 		csa->nl->critical = (sm_off_t)((sm_uc_ptr_t)csa->critical - (sm_uc_ptr_t)csa->nl);
-		if (JNL_ALLOWED(csd))
+		if (JNL_ALLOWED(csa))
 			csa->nl->jnl_buff = (sm_off_t)((sm_uc_ptr_t)csa->jnl->jnl_buff - (sm_uc_ptr_t)csa->nl);
 		csa->nl->backup_buffer = (sm_off_t)((sm_uc_ptr_t)csa->backup_buffer - (sm_uc_ptr_t)csa->nl);
 		csa->nl->hdr = (sm_off_t)((sm_uc_ptr_t)csd - (sm_uc_ptr_t)csa->nl);
@@ -522,10 +531,6 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
                                                   ERR_TEXT, 2, LEN_AND_LIT("Error with database write"), errno_save);
                                 }
                         }
-                        if (csa->jnl)
-                                csa->jnl->channel = NOJNL;
-                        if (JNL_ALLOWED(csd))
-                                memset(&csd->jnl_file, 0, sizeof(csd->jnl_file));
                 }
                 reg->dyn.addr->ext_blk_count = csd->extension_size;
                 mlk_shr_init(csa->lock_addrs[0], csd->lock_space_size, csa, (FALSE == read_only));
@@ -539,6 +544,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		)
 		if (read_only)
 			csa->nl->remove_shm = TRUE;	/* gds_rundown can remove shmem if first process has read-only access */
+		db_auto_upgrade(reg);
 		csa->nl->glob_sec_init = TRUE;
 		STAT_FILE((char *)csa->nl->fname, &stat_buf, stat_res);
 		if (-1 == stat_res)
@@ -586,7 +592,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
 				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("critical"),
 				  	(uint4)((sm_uc_ptr_t)csa->critical - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->critical);
-		if ((JNL_ALLOWED(csd)) &&
+		if ((JNL_ALLOWED(csa)) &&
 		    (csa->nl->jnl_buff != (sm_off_t)((sm_uc_ptr_t)csa->jnl->jnl_buff - (sm_uc_ptr_t)csa->nl)))
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
 				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("journal buffer"),
@@ -603,8 +609,6 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
 				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("lock address"),
 				  (uint4)((sm_uc_ptr_t)csa->lock_addrs[0] - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->lock_addrs);
-                if (JNL_ENABLED(csd) && NULL != csa->jnl)
-                        csa->jnl->channel = NOJNL;
         }
         if (-1 == (semval = semctl(udi->semid, 1, GETVAL))) /* semval = number of process attached */
         {
@@ -613,33 +617,27 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl()"), CALLFROM, errno_save);
 	}
 	if (!read_only && 1 == semval)
-	{
-		/*
-		 * For read-write process flush file header to write machine_name,
+	{	/* For read-write process flush file header to write machine_name,
 		 * semaphore, shared memory id and semaphore creation time to disk.
 		 */
 		csa->nl->remove_shm = FALSE;
 		strcpy(csd->machine_name, machine_name);
-		LSEEKWRITE(udi->fd,
-			(off_t)0,
-			(sm_uc_ptr_t)csd,
-			sizeof(sgmnt_data),
-			errno_save);
+		if (JNL_ALLOWED(csa))
+			memset(&csd->jnl_file, 0, sizeof(csd->jnl_file));
+		LSEEKWRITE(udi->fd, (off_t)0, (sm_uc_ptr_t)csd, sizeof(sgmnt_data), errno_save);
 		if (0 != errno_save)
 		{
 			rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 				  ERR_TEXT, 2, LEN_AND_LIT("Error with database header flush"), errno_save);
 		}
 	} else if (read_only && new_ipc)
-	{
-		/*
-		 * For read-only process if shared memory and semaphore created for first time,
+	{	/* For read-only process if shared memory and semaphore created for first time,
 		 * semaphore and shared memory id, and semaphore creation time are written to disk.
 		 */
-		db_ipcs.semid = csd->semid;
-		db_ipcs.shmid = csd->shmid;
-		db_ipcs.sem_ctime = csd->sem_ctime.ctime;
-		db_ipcs.shm_ctime = csd->shm_ctime.ctime;
+		db_ipcs.semid = tsd->semid;	/* use tsd instead of csd in order for MM to work too */
+		db_ipcs.shmid = tsd->shmid;
+		db_ipcs.sem_ctime = tsd->sem_ctime.ctime;
+		db_ipcs.shm_ctime = tsd->shm_ctime.ctime;
 		db_ipcs.fn_len = reg->dyn.addr->fname_len;
 		memcpy(db_ipcs.fn, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
 		db_ipcs.fn[reg->dyn.addr->fname_len] = 0;

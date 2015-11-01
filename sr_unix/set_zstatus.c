@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,9 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_stdio.h"
+
 #include "error.h"
 #include "min_max.h"
 #include "stringpool.h"
@@ -21,31 +23,40 @@
 #include "stack_frame.h"
 #include "mvalconv.h"
 #include "error_trap.h"
+#include "trans_code_cleanup.h"
+#include "util.h"
+#include "gtmmsg.h"
 
-#define OUT_BUFF_SIZE	2048
-
-GBLREF mval		dollar_zstatus;
-GBLREF mval		dollar_zerror;
-GBLREF stack_frame	*zyerr_frame;
+GBLREF mval		dollar_zstatus, dollar_zerror;
+GBLREF mval		dollar_ztrap, dollar_etrap;
+GBLREF stack_frame	*zyerr_frame, *frame_pointer;
 GBLREF char		*util_outptr, util_outbuff[OUT_BUFF_SIZE];
+GBLREF mstr             *err_act;
 
-char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp)
+unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp)
 {
-	char	*b_line;	/* beginning of line (used to restart line) */
-	mval	val;		/* pointer to dollar_zstatus */
-	char	sev, zstatus_buff[OUT_BUFF_SIZE];
-	char	*zstatus_bptr;
-	int	len, util_len, tmp_len;
-	mval	*status_loc;
+	unsigned char	*b_line;	/* beginning of line (used to restart line) */
+	mval		val;		/* pointer to dollar_zstatus */
+	unsigned char	zstatus_buff[2*OUT_BUFF_SIZE];
+	unsigned char	*zstatus_bptr, *zstatus_iter;
+	int		util_len, save_arg;
+	mval		*status_loc;
+	boolean_t 	trans_frame;
 
+	trans_frame = !(SFT_DM & frame_pointer->type) && ((!(frame_pointer->type & SFT_COUNT || 0 == frame_pointer->type)) ||
+		(SFT_ZINTR & frame_pointer->type));
+	if (trans_frame)
+	{
+		save_arg = arg;
+		SET_ERR_CODE(frame_pointer, arg);
+	}
 	b_line = 0;
 	/* get the line address of the last "known" MUMPS code that was executed.  MUMPS indirection
 	 * consitutes MUMPS code that is "unknown" is the sense that there is no line address for it.
 	 */
 	MV_FORCE_MVAL(&val, arg);
 	n2s(&val);
-	src->len = get_symb_line((uchar_ptr_t)src->addr, (unsigned char **)&b_line, (unsigned char **) ctxtp)
-			- (uchar_ptr_t)src->addr;
+	src->len = get_symb_line((unsigned char*)src->addr, &b_line, ctxtp) - (unsigned char*)src->addr;
 	memcpy(zstatus_buff, val.str.addr, val.str.len);
 	zstatus_bptr = zstatus_buff + val.str.len;
 	*zstatus_bptr++ = ',';
@@ -55,16 +66,33 @@ char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp)
 		zstatus_bptr += src->len;
 		*zstatus_bptr++ = ',';
 	}
-	*util_outptr = 0;
+	zstatus_iter = zstatus_bptr;
 	util_len = util_outptr  - util_outbuff;
-	len = MIN(OUT_BUFF_SIZE - util_len, util_len);
-	memcpy(zstatus_bptr, util_outbuff, len);
-	for (tmp_len = 0 ; tmp_len < len; zstatus_bptr++, tmp_len++)
+	if (trans_frame)
+	{ /* currently no inserted message (arg) needs arguments.  The following code needs
+	     to be changed if any new parametered message is added */
+		util_outbuff[0] = '-';
+		memcpy(&zstatus_buff[OUT_BUFF_SIZE], util_outbuff, util_len); /* save original message */
+		util_out_print(NULL, RESET); /* clear any pending msgs and reset util_out_buff */
+		gtm_putmsg_noflush(VARLSTCNT(1) arg);
+
+		memcpy(zstatus_bptr, util_outbuff, util_outptr - util_outbuff);
+		zstatus_bptr += (util_outptr - util_outbuff);
+		*zstatus_bptr++ = ',';
+		memcpy(zstatus_bptr, &zstatus_buff[OUT_BUFF_SIZE], util_len);
+
+		/* restore original message into util_outbuf */
+		memcpy(util_outbuff, &zstatus_buff[OUT_BUFF_SIZE], util_len);
+		util_outbuff[0] = '%';
+		util_outptr = util_outbuff + util_len;
+		arg = save_arg;
+	} else
+		memcpy(zstatus_bptr, util_outbuff, util_len);
+	zstatus_bptr += util_len;
+	for (; zstatus_iter < zstatus_bptr; zstatus_iter++)
 	{
-		if ('\n' == *zstatus_bptr)
-		{
-			*zstatus_bptr = ',';
-		}
+		if ('\n' == *zstatus_iter)
+			*zstatus_iter = ',';
 	}
 	status_loc = (NULL == zyerr_frame) ? &dollar_zstatus : &dollar_zerror;
 	status_loc->str.len = zstatus_bptr - zstatus_buff;

@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "urx.h"
 
 void urx_putlab (lab, lablen, rtn, addr)

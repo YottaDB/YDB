@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,10 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
+#include "gtm_string.h"
 
 #include <netinet/in.h> /* Required for gtmsource.h */
 #include <arpa/inet.h>
@@ -42,6 +44,7 @@
 
 /* Include prototypes */
 #include "t_write.h"
+#include "t_write_root.h"
 #include "t_end.h"
 #include "t_retry.h"
 #include "t_begin.h"
@@ -69,16 +72,11 @@ GBLREF	uint4			t_err, process_id;
 GBLREF	cw_set_element		cw_set[];
 GBLREF	unsigned char		cw_set_depth;
 GBLREF 	unsigned int		t_tries;
-GBLREF	uint4			cumul_jnl_rec_len;
-GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	bool			run_time, is_db_updater;
 GBLREF	boolean_t		pool_init;
 GBLREF	boolean_t		horiz_growth;
 GBLREF	int4			prev_first_off, prev_next_off;
-DEBUG_ONLY(GBLREF uint4		cumul_index;)
-
-LITREF	int			jnl_fixed_size[];
-
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	boolean_t		is_updproc;
 GBLREF	ua_list			*first_ua, *curr_ua;
 GBLREF	char			*update_array, *update_array_ptr;
@@ -86,8 +84,12 @@ GBLREF	int			gv_fillfactor,
                                 update_array_size,
 				cumul_update_array_size,	/* the current total size of the update array */
                                 rc_set_fragment;	/* Contains offset within data at which data fragment starts */
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	uint4			cumul_jnl_rec_len;
+GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF  jnl_format_buffer       *non_tp_jfb_ptr;
 GBLREF  inctn_opcode_t          inctn_opcode;
+DEBUG_ONLY(GBLREF uint4		cumul_index;)
 
 static	block_id	lcl_root;
 static	int4		blk_size, blk_fill_size;
@@ -98,37 +100,41 @@ static	bool	        gvcst_put_blk(mval *v, bool *extra_block_split_req);
 void	gvcst_put(mval *v)
 {
 	bool			extra_block_split_req;
-	jnl_action		*ja;
-	jnl_format_buffer	*jfb;
 	char			temp[4096], temp1[4096], *ptr;
 	short			temp_short;
+	int			save_t_tries;
+	jnl_format_buffer	*jfb;
+	jnl_action		*ja;
+	boolean_t       	new_tn;
 	error_def(ERR_SCNDDBNOUPD);
 
 	if (FALSE == pool_init  &&  REPL_ENABLED(cs_data)  &&  (run_time || is_db_updater))
 		jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
 	if (REPL_ENABLED(cs_data) && pool_init && jnlpool_ctl->upd_disabled && !is_updproc)
 		rts_error(VARLSTCNT(1) ERR_SCNDDBNOUPD);
-	do {
-		blk_size = cs_data->blk_size;
-		blk_fill_size = (blk_size * gv_fillfactor) / 100 - cs_data->reserved_bytes;
-		if ((0 == dollar_tlevel)  ||  (NULL == sgm_info_ptr->first_cw_set))
-			t_begin(ERR_GVPUTFAIL, TRUE);
-		else
-			t_err = ERR_GVPUTFAIL;
-		lcl_root = gv_target->root;
-		if (JNL_ENABLED(cs_data))
+	blk_size = cs_data->blk_size;
+	blk_fill_size = (blk_size * gv_fillfactor) / 100 - cs_data->reserved_bytes;
+	for (new_tn = TRUE; ; )
+	{
+		if (new_tn)
+		{
+			if ((0 == dollar_tlevel) || (NULL == sgm_info_ptr->first_cw_set))
+				t_begin(ERR_GVPUTFAIL, TRUE);
+			else
+				t_err = ERR_GVPUTFAIL;
+			lcl_root = gv_target->root;
+		}
+		if (JNL_ENABLED(cs_addrs) && (new_tn || (cdb_sc_jnlstatemod == t_fail_hist[save_t_tries])))
 		{
 			if (0 == dollar_tlevel)
 			{
 				jfb = non_tp_jfb_ptr; /* already malloced in gvcst_init() */
-				assert(jnl_fixed_size[JRT_FSET] == jnl_fixed_size[JRT_GSET]);
-					/* the below needs to be an '=' rather than a '+=' till this gets moved out of the do loop.
-						this is because the extra_block_split_req case can cause a multiple-execution of
-						this code but will result in identical journal records which is not what we want */
-				if (jnl_fence_ctl.level == 0)
-					cumul_jnl_rec_len = JREC_PREFIX_SIZE + jnl_fixed_size[JRT_SET] + JREC_SUFFIX_SIZE;
-				else
-					cumul_jnl_rec_len = JREC_PREFIX_SIZE + jnl_fixed_size[JRT_FSET] + JREC_SUFFIX_SIZE;
+				assert(JRT_FSET_FIXED_SIZE == JRT_GSET_FIXED_SIZE);
+				/* the below needs to be an '=' rather than a '+=' till this gets moved out of the do loop.
+				 * this is because the extra_block_split_req case can cause a multiple-execution of
+				 * this code but will result in identical journal records which is not what we want
+				 */
+				cumul_jnl_rec_len = ((0 == jnl_fence_ctl.level) ? SET_RECLEN : FSET_RECLEN);
 			} else
 			{
 				jfb = (jnl_format_buffer *)get_new_element(sgm_info_ptr->jnl_list, 1);
@@ -136,8 +142,8 @@ void	gvcst_put(mval *v)
 				assert(NULL == *sgm_info_ptr->jnl_tail);
 				*sgm_info_ptr->jnl_tail = jfb;
 				sgm_info_ptr->jnl_tail = &jfb->next;
-				assert(jnl_fixed_size[JRT_TSET] == jnl_fixed_size[JRT_USET]);
-				cumul_jnl_rec_len += JREC_PREFIX_SIZE + jnl_fixed_size[JRT_TSET] + JREC_SUFFIX_SIZE;
+				assert(JRT_TSET_FIXED_SIZE == JRT_USET_FIXED_SIZE);
+				cumul_jnl_rec_len += TSET_RECLEN;
 			}
 			ja = &(jfb->ja);
 			ja->key = gv_currkey;
@@ -148,9 +154,16 @@ void	gvcst_put(mval *v)
 			cumul_jnl_rec_len = ROUND_UP(cumul_jnl_rec_len, JNL_REC_START_BNDRY);
 			DEBUG_ONLY(cumul_index++;)
 		}
-		while(!gvcst_put_blk(v, &extra_block_split_req))
-			;
-	} while (extra_block_split_req);
+		save_t_tries = t_tries;
+		if (gvcst_put_blk(v, &extra_block_split_req))
+		{
+			if (!extra_block_split_req)
+				break;
+			else
+				new_tn = TRUE;
+		} else
+			new_tn = FALSE;		/* new_tn is FALSE only if we need to do a retry */
+	}
 }
 
 static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
@@ -1110,17 +1123,8 @@ static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
 					cse->new_buff = NULL;
 				assert(!dollar_tlevel || !cse->high_tlevel);
 				if (0 == dollar_tlevel)
-				{
-					/* "t_write_root" */
-					cse = &cw_set[cw_set_depth++];
-					assert(CDB_CW_SET_SIZE > cw_set_depth);
-					cse->blk = -1;
-					cse->mode = gds_t_write_root;
-					cse->ins_off = ins_off2;
-					cse->index = ins_chain_index;
-					cse->reference_cnt = 0;
-				 	cse->forward_process = FALSE;
-					cse->first_copy = TRUE;
+				{	/* create a sibling cw-set-element to store ins_off2/ins_chain_index */
+					t_write_root(ins_off2, ins_chain_index);
 				} else
 				{
 					bh->ptr = cse;
@@ -1140,8 +1144,7 @@ static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
 				succeeded = TRUE;
 			}
 		}
-		/*
-		 * -----------------------------------------------------------------------------------------------------
+		/* -----------------------------------------------------------------------------------------------------
 		 * We have to maintain information for future recomputation if and only if the following are satisfied
 		 *	1) The block is a leaf-level block
 		 *	2) We are in TP (indicated by non-null cse)
@@ -1207,5 +1210,6 @@ static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
 retry:
 	RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
 	t_retry(status);
+	assert(0 == dollar_tlevel);
 	return FALSE;
 }

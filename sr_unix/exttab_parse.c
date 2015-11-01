@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 /* gcc/LinuxIA32 needs stdio before varargs until stdio.h removed from error.h */
 /* gcc/Linux390 needs varargs before stdio */
 #ifdef EARLY_VARARGS
@@ -562,8 +565,8 @@ callin_entry_list*	citab_parse (void)
 
 	ext_table_file_handle = Fopen(ext_table_file_name, "r");
 	if (!ext_table_file_handle) /* call-in table not found */
-		rts_error(VARLSTCNT(11) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name), ERR_SYSCALL, 5, LEN_AND_LIT("fopen"), CALLFROM, errno);
-
+		rts_error(VARLSTCNT(11) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name),
+					ERR_SYSCALL, 5, LEN_AND_LIT("fopen"), CALLFROM, errno);
 	ext_source_line_num = 0;
 	while (read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle))
 	{

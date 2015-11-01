@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "parse_file.h"
 #include "gtm_caseconv.h"
 #include "stringpool.h"

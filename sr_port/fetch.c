@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,11 @@
 
 GBLREF stack_frame *frame_pointer;
 
+#ifndef __MVS__
 void fetch(va_alist)
+#else
+void gtm_fetch(va_alist)
+#endif
 va_dcl
 {
 	va_list		var;
@@ -55,4 +59,3 @@ va_dcl
 		}
 	}
 }
-

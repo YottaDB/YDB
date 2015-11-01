@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,10 +36,6 @@
 #include "mu_cre_file.h"
 #include "gtmmsg.h"
 
-#define EXIT_ERR	4
-#define EXIT_WRN	2
-#define EXIT_INF	1
-#define EXIT_NRM	0
 #define BLK_SIZE (((gd_segment*)gv_cur_region->dyn.addr)->blk_size)
 
 #define CLEANUP(XX)	{				\
@@ -72,7 +68,7 @@ unsigned char mu_cre_file(void)
 	unsigned char	buff[DISK_BLOCK_SIZE];
 	int		fd = -1, i, lower, upper, status, padded_len, padded_vbn, norm_vbn;
 	uint4		raw_dev_size;		/* size of a raw device, in bytes */
-	int4		ref_size, save_errno;
+	int4		blocks_for_create, blocks_for_extension, save_errno;
 	GTM_BAVAIL_TYPE	avail_blocks;
 	file_control	fc;
 	mstr		file;
@@ -132,7 +128,7 @@ unsigned char mu_cre_file(void)
 			SPRINTF_AND_PERROR("Error reading header for file %s\n");
 			return EXIT_ERR;
 		}
-		if (!memcmp(buff,GDS_LABEL,sizeof(GDS_LABEL) - 1))
+		if (!memcmp(buff, GDS_LABEL, STR_LIT_LEN(GDS_LABEL)))
 		{
 			char rsp[80];
 			PRINTF("Database already exists on device %s\n", path);
@@ -177,24 +173,26 @@ unsigned char mu_cre_file(void)
 		}
 		seg = gv_cur_region->dyn.addr;
 
-		/* ref_size is in the unit of DISK_BLOCK_SIZE */
-		ref_size = (DIVIDE_ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE) + 1)
-				+ seg->blk_size / DISK_BLOCK_SIZE *
-					((DIVIDE_ROUND_UP(seg->allocation, BLKS_PER_LMAP - 1)) + seg->allocation);
-		if ((uint4)avail_blocks < ref_size)
+		/* blocks_for_create is in the unit of DISK_BLOCK_SIZE */
+		blocks_for_create = DIVIDE_ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE) + 1 +
+					(seg->blk_size / DISK_BLOCK_SIZE *
+					 ((DIVIDE_ROUND_UP(seg->allocation, BLKS_PER_LMAP - 1)) + seg->allocation));
+		if ((uint4)avail_blocks < blocks_for_create)
 		{
-			gtm_putmsg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), ref_size, (uint4)avail_blocks);
-			send_msg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), ref_size, (uint4)avail_blocks);
+			gtm_putmsg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), blocks_for_create, (uint4)avail_blocks);
+			send_msg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), blocks_for_create, (uint4)avail_blocks);
 			CLEANUP(EXIT_ERR);
 			return EXIT_ERR;
 		}
-		ref_size += seg->blk_size / DISK_BLOCK_SIZE *
-				((DIVIDE_ROUND_UP(EXTEND_WARNING_FACTOR * seg->ext_blk_count, BLKS_PER_LMAP - 1))
-				 	+ EXTEND_WARNING_FACTOR * seg->ext_blk_count);
-		if ((uint4)avail_blocks < ref_size)
+		blocks_for_extension = (seg->blk_size / DISK_BLOCK_SIZE *
+					((DIVIDE_ROUND_UP(EXTEND_WARNING_FACTOR * seg->ext_blk_count, BLKS_PER_LMAP - 1))
+				 	  + EXTEND_WARNING_FACTOR * seg->ext_blk_count));
+		if ((uint4)(avail_blocks - blocks_for_create) < blocks_for_extension)
 		{
-			gtm_putmsg(VARLSTCNT(6) ERR_LOWSPACECRE, 4, LEN_AND_STR(path), ref_size, (uint4)avail_blocks);
-			send_msg(VARLSTCNT(6) ERR_LOWSPACECRE, 4, LEN_AND_STR(path), ref_size, (uint4)avail_blocks);
+			gtm_putmsg(VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path), EXTEND_WARNING_FACTOR, blocks_for_extension,
+					DISK_BLOCK_SIZE, (uint4)(avail_blocks - blocks_for_create));
+			send_msg(VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path), EXTEND_WARNING_FACTOR, blocks_for_extension,
+					DISK_BLOCK_SIZE, (uint4)(avail_blocks - blocks_for_create));
 		}
 	}
 	gv_cur_region->dyn.addr->file_cntl = &fc;

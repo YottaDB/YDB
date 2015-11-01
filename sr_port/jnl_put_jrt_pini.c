@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,8 +34,6 @@ GBLREF  uint4			cur_logirec_short_time;	/* see comment in gbldefs.c for usage */
 GBLREF	enum gtmImageTypes 	image_type;
 GBLREF  boolean_t               forw_phase_recovery;
 
-LITREF	int			jnl_fixed_size[];
-
 void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 {
 	struct_jrec_pini	pini_record;
@@ -53,22 +51,15 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 		if (dollar_tlevel && csa->ti->early_tn != csa->ti->curr_tn)
 		{	/* in the commit phase of a transaction */
 			assert(csa->ti->early_tn == csa->ti->curr_tn + 1);
-			/* The JNL_WHOLE_TIME done below isn't necessary in Unix since it is anyway going to be overridden
-			 * by the MID_TIME call one step later. In VMS, WHOLE_TIME fills in an 8-byte value while MID_TIME fills
-			 * in only the middle 4-bytes hence both are necessary.
-			 */
-			VMS_ONLY(JNL_WHOLE_TIME(prc_vec->jpv_time);)
-			MID_TIME(prc_vec->jpv_time) = gbl_jrec_time; /* Reset mid_time to correspond to gbl_jrec_time for GTM */
+			JNL_WHOLE_FROM_SHORT_TIME(prc_vec->jpv_time, gbl_jrec_time);
 		} else
 		{	/* For Non TP, it is possible that gbl_jrec_time is already set in t_end() to a timestamp value (which
 			 * will be used while writing the PBLK record in t_end) and we get a later value for prc_vec->jpv_time
 			 * (possible in rare timing situations) which results in PINI record getting written with a later
 			 * timestamp than a later written PBLK record i.e. an out-of-order timestamp in the journal file.
 			 * So reset gbl_jrec_time to be the latest, all later records use this time */
-			VMS_ONLY(JNL_WHOLE_TIME(prc_vec->jpv_time);)
-			VMS_ONLY(gbl_jrec_time = MID_TIME(prc_vec->jpv_time);)
-			UNIX_ONLY(JNL_WHOLE_TIME(gbl_jrec_time);)
-			UNIX_ONLY(prc_vec->jpv_time = gbl_jrec_time;)
+			JNL_WHOLE_TIME(prc_vec->jpv_time);
+			gbl_jrec_time = MID_TIME(prc_vec->jpv_time);
 		}
 	}
 
@@ -110,5 +101,5 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 			cur_logirec_short_time = MID_TIME(pini_record.process_vector[SRVR_JPV].jpv_time);
 	}
 	jnl_write(csa->jnl, JRT_PINI, (jrec_union *)&pini_record, NULL, NULL);
-	csa->jnl->pini_addr = csa->jnl->jnl_buff->freeaddr - JREC_PREFIX_SIZE - JREC_SUFFIX_SIZE - jnl_fixed_size[JRT_PINI];
+	csa->jnl->pini_addr = csa->jnl->jnl_buff->freeaddr - PINI_RECLEN;
 }

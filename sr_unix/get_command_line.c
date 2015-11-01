@@ -11,7 +11,9 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_ctype.h"
+
 #include "stringpool.h"
 #include "get_command_line.h"
 

@@ -392,4 +392,16 @@ int		omi_lkextnam (omi_conn *, uns_short, char *, char *);
 void		omi_dbms_ch  ();
 void		omi_dump_pkt (omi_conn *);
 
+#ifdef __STDC__
+#define P(X) X
+#else /* defined(__STDC__) */
+#define P(X) ()
+#endif /* !defined(__STDC__) */
+
+int		get_ping_rsp  P(());
+int		icmp_ping     P((int conn));
+int		init_ping     P(());
+int		in_cksum      P((u_short *addr, int len));
+
+#undef P
 #endif /* !defined(OMI_H) */

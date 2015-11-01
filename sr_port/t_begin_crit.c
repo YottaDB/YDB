@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,8 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "t_begin_crit.h"
+#include "hashtab.h"		/* needed for cws_insert.h */
+#include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 
 GBLDEF	srch_hist		dummy_hist;
@@ -37,7 +39,7 @@ GBLREF	unsigned int		t_tries;
 void t_begin_crit(uint4 err)
 /* err - error code for current gvcst_routine */
 {
-	cws_reset();
+	CWS_RESET;
 	start_tn = cs_addrs->ti->curr_tn;
 	cw_set_depth = 0;
 	t_tries = CDB_STAGNATE;

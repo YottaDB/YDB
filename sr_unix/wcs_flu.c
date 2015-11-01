@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,8 @@
 #include <sys/mman.h>
 #include <sys/shm.h>
 
+#include "gtm_string.h"
+#include "gtm_unistd.h"	/* fsync() needs this */
 #include "aswp.h"		/* for ASWP */
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -35,11 +37,11 @@
 #include "wcs_sleep.h"
 #include "wcs_flu.h"
 #include "wcs_recover.h"
-#include "gtm_string.h"
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	uint4		process_id;
 GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	volatile int4	db_fsync_in_prog;	/* for DB_FSYNC macro usage */
 
 #define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart)							\
 if (cnl->in_wtstart)												\
@@ -85,7 +87,7 @@ if (cnl->in_wtstart)												\
 bool wcs_flu(bool options)
 {
 	bool			ret = TRUE, success, was_crit;
-	boolean_t		fix_in_wtstart, flush_hdr, jnl_enabled, sync_epoch, write_epoch;
+	boolean_t		fix_in_wtstart, flush_hdr, jnl_enabled, sync_epoch, write_epoch, need_db_fsync;
 	unsigned int		lcnt, pass;
 	int			save_errno, wtstart_errno;
 	jnl_buffer_ptr_t	jb;
@@ -111,6 +113,7 @@ bool wcs_flu(bool options)
 	flush_hdr = options & WCSFLU_FLUSH_HDR;
 	write_epoch = options & WCSFLU_WRITE_EPOCH;
 	sync_epoch = options & WCSFLU_SYNC_EPOCH;
+	need_db_fsync = options & WCSFLU_FSYNC_DB;
 	udi = FILE_INFO(gv_cur_region);
 	csa = &udi->s_addrs;
 	csd = csa->hdr;
@@ -307,5 +310,7 @@ bool wcs_flu(bool options)
 		 */
 		jnl_wait(gv_cur_region);
 	}
+	if (need_db_fsync && JNL_ALLOWED(csd))
+		DB_FSYNC(gv_cur_region, udi, csa, db_fsync_in_prog);
 	return ret;
 }

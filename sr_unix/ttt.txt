@@ -1,3 +1,13 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+;	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 OC_ADD:		pushab	val.0
 		pushab	val.2
 		pushab	val.1
@@ -311,6 +321,9 @@ OC_FNZGETSYI:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#3,xfer.xf_fngetsyi
+OC_FNZJOBEXAM:	pushab	val.0
+		pushab	val.1
+		calls	#2,xfer.xf_fnzjobexam
 OC_FNZLKID:	pushab	val.0
 		pushl	val.1
 		calls	#2,xfer.xf_fnzlkid
@@ -343,6 +356,10 @@ OC_FNZSEA:	pushab	val.0
 OC_FNZSETPRV:	pushab	val.0
 		pushab	val.1
 		calls	#2,xfer.xf_fnzsetprv
+OC_FNZSIGPROC:	pushab	val.0
+		pushl	val.2
+		pushl	val.1
+		calls	#3,xfer.xf_fnzsigproc
 OC_FNZTRNLNM:	pushab	val.0
 		pushab	val.6
 		pushab	val.5
@@ -644,6 +661,8 @@ OC_RHDADDR1:	pushl	#0
 		pushab	val.1
 		calls	#2,xfer.xf_rhdaddr
 		movl	r0,addr.0
+; Note if OC_RTERROR call changes, linetail.c and eval_expr.c will also need
+; to change due to it dereferencing the backpoints to get to the opcode.
 OC_RTERROR:	pushl	val.2
 		pushl	val.1
 		jsb	xfer.xf_rterror

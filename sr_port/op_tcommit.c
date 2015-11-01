@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -138,7 +138,9 @@ void    op_tcommit(void)
 					 */
                                         last_cw_set_before_maps = si->last_cw_set;
                                         for (cse = si->first_cw_set;  NULL != cse;  cse = cse->next_cw_set)
-                                        {
+                                        {	/* assert to ensure we haven't missed out on resetting jnl_freeaddr for any cse
+						 * in t_write/t_create/t_write_map/t_write_root/mu_write_map [D9B11-001991] */
+						assert(0 == cse->jnl_freeaddr);
 						TRAVERSE_TO_LATEST_CSE(cse);
                                                 if (gds_t_create == cse->mode)
                                                 {
@@ -195,7 +197,7 @@ void    op_tcommit(void)
 								TP_RETRY_ACCOUNTING(csd, status);
 								break;  /* transaction must attempt restart */
 							}
-							if (JNL_ENABLED(csd) && csa->jnl_before_image && (blk_used))
+							if (JNL_ENABLED(csa) && csa->jnl_before_image && (blk_used))
 							{
 								cse->old_block = t_qread(new_blk,
 										(sm_int_ptr_t)&cse->cycle, &cse->cr);
@@ -320,10 +322,10 @@ void    op_tcommit(void)
 			cs_addrs = (sgmnt_addrs *)0;
 			cs_data = (sgmnt_data_ptr_t)0;
 		}
+		/* Cancel or clear any pending TP timeout only if real commit (i.e. outermost commit) */
+		(*tp_timeout_clear_ptr)();
         } else       /* an intermediate commit */
 		tp_incr_commit();
         assert(0 < dollar_tlevel);
-	/* Cancel or clear any pending TP timeout. */
-	(*tp_timeout_clear_ptr)();
-        tp_unwind(dollar_tlevel - 1, FALSE);
+        tp_unwind(dollar_tlevel - 1, COMMIT_INVOCATION);
 }

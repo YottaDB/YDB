@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,8 @@ void mlk_wake_pending(mlk_ctldata_ptr_t ctl,
 	sm_uint_ptr_t 		empty_slot, ctop;
 	sgmnt_addrs		*csa;
 	boolean_t		remote_pid;
-	int 			crit_wake_res, lcnt;
+	int 			crit_wake_res; /* also used in macro DO_CRIT_WAKE */
+	int 			lcnt;
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	if (!d->pending)
@@ -94,7 +95,10 @@ void mlk_wake_pending(mlk_ctldata_ptr_t ctl,
 		{
 			next = (pr->next) ? (mlk_prcblk_ptr_t)R2A(pr->next) : 0;	/* in case it's deleted */
 			DO_CRIT_WAKE;
-			if (next)
+
+			/* Wake one process to keep things orderly, if it loses its way, others
+			 * will jump in after a timout */
+			if (GONE == crit_wake_res && next)
 				pr = next;
 			else
 				break;

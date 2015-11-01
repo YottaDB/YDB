@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -90,7 +90,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 	error_def(ERR_DBPTRNOTPOS);
 	error_def(ERR_DBPTRMX);
 	error_def(ERR_DBPTRMAP);
-	error_def(ERR_DBBMLEVL);
+	error_def(ERR_DBLVLINC);
 	error_def(ERR_DBBMSIZE);
 	error_def(ERR_DBBMBARE);
 	error_def(ERR_DBBMINV);
@@ -127,7 +127,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 	{
 		if ((unsigned char)blk_levl != LCL_MAP_LEVL)
 		{
-			rts_error_func(ERR_DBBMLEVL, util_buff);
+			rts_error_func(MAKE_MSG_INFO(ERR_DBLVLINC), util_buff);
 			return FALSE;
 		}
 		if (blk_size != BM_SIZE(bplmap))
@@ -393,5 +393,5 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 
 void rts_error_func(int err, uchar_ptr_t buff)
 {
-	rts_error(VARLSTCNT(4) MAKE_MSG_INFO(err), 2, LEN_AND_STR(buff));
+	rts_error(VARLSTCNT(4) MAKE_MSG_INFO(err), 2, LEN_AND_STR((char_ptr_t)buff));
 }

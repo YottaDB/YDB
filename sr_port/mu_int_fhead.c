@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -23,7 +25,6 @@
 #include "mupint.h"
 #include "mu_file_size.h"
 #include "gtmmsg.h"
-
 
 GBLDEF unsigned char		*mu_int_locals;
 GBLDEF unsigned char		*mu_int_master;
@@ -46,7 +47,7 @@ boolean_t mu_int_fhead(void)
 	error_def(ERR_DBINCRVER);
 	error_def(ERR_DBSVBNMIN);
 	error_def(ERR_DBFLCORRP);
-	error_def(ERR_DBCRENCOMP);
+	error_def(ERR_DBCREINCOMP);
 	error_def(ERR_DBBSIZZRO);
 	error_def(ERR_DBSZGT64K);
 	error_def(ERR_DBNOTMLTP);
@@ -66,7 +67,7 @@ boolean_t mu_int_fhead(void)
 
 
 	mu_data = &mu_int_data;
-	if (memcmp(mu_data->label,LIT_AND_LEN(GDS_LABEL)))
+	if (MEMCMP_LIT(mu_data->label, GDS_LABEL))
 	{
 		if (memcmp(mu_data->label, GDS_LABEL, sizeof(GDS_LABEL) - 2))
 			mu_int_err(ERR_DBNOTDB, 0, 0, 0, 0, 0, 0, 0);
@@ -83,7 +84,7 @@ boolean_t mu_int_fhead(void)
 		mu_int_err(ERR_DBFLCORRP, 0, 0, 0, 0, 0, 0, 0);
 	if (mu_data->createinprogress)
 	{
-		mu_int_err(ERR_DBCRENCOMP, 0, 0, 0, 0, 0, 0, 0);
+		mu_int_err(ERR_DBCREINCOMP, 0, 0, 0, 0, 0, 0, 0);
 		return FALSE;
 	}
 	/* CHECK: 0 < blk_size <= 64K; blk_size is a multiple of DISK_BLOCK_SIZE */

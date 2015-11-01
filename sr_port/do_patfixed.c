@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,104 +10,110 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "patcode.h"
 #include "copy.h"
 
-GBLREF uint4    *pattern_typemask;
+GBLREF	uint4	pat_allmaskbits;
+GBLREF	uint4	*pattern_typemask;
+GBLDEF	char	codelist[] = PATM_CODELIST;
+
+/* This procedure executes at "run-time".  After a pattern in a MUMPS program has been compiled (by patstr and its
+ *  	helper-procedures), this procedure is called to evaluate "fixed-length" patterns.
+ * 	i.e. for each pattern atom, the lower-bound is equal to the upper-bound such as 3N2A5N.
+ * For patterns with a variable length, procedure do_pattern() is called to do the evaluation.
+ */
 
 int do_patfixed(mval *str, mval *pat)
 {
-	unsigned short int	count, total;
-	unsigned short int	*min;
-	unsigned char		*p, *ptop;
-	short int		i, j;
-	unsigned short int	len, length, *r, *rtop, repeat;
-	unsigned char		*s, *pstr;
-	uint4			code;
+	int4			count, tempint;
+	int4			*min, *reptr, *rtop;
+	int4			repeat;
+	int4			*ptop;
+	int			bit;
+	int			letter;
+	int			repcnt;
+	int			len;
+	unsigned char		*strptr, *pstr;
+	uint4			code, tempuint, patstream_len;
+	uint4			*patptr;
+	uint4			mbit;
+	char			buf[CHAR_CLASSES];
 
-	/***************************************************************************/
-	/*			      Set up information.			   */
-	/***************************************************************************/
+	error_def(ERR_PATNOTFOUND);
+
+	/* set up information */
 	MV_FORCE_STR(str);
-	p =  (unsigned char *)pat->str.addr;
-	p++;
-	p += *p;
-
-	GET_SHORT(count, p);
-	p += sizeof(short int);
-	GET_SHORT(total, p);
-	p += sizeof(short int);
-
-	length = str->str.len;
-	if (total != length)
+	patptr =  (uint4 *)pat->str.addr;
+	DEBUG_ONLY(
+		GET_ULONG(tempuint, patptr);
+		assert(tempuint);	/* ensure first uint4 is non-zero indicating fixed length pattern string */
+	)
+	patptr++;
+	GET_ULONG(tempuint, patptr);
+	DEBUG_ONLY(patstream_len = tempuint);
+	patptr += tempuint;
+	GET_LONG(count, patptr);
+	assert(MAX_PATTERN_ATOMS > count);
+	patptr++;
+	GET_ULONG(tempuint, patptr);
+	patptr++;
+	if (tempuint != str->str.len)
 		return FALSE;
+	patptr++;
+	min = (int4 *)patptr;
+	rtop = min + count; /* Note: the compiler generates: rtop = min + sizeof(int4) * count */
 
-	p += sizeof(short int);
-	i = sizeof(short int) * count;
-	min = (unsigned short int *)p;
-	rtop = min + count;
-
-	/***************************************************************************/
-	/*			      attempt a match.				   */
-	/***************************************************************************/
-	s = (unsigned char *)str->str.addr;
-	p = (unsigned char *)pat->str.addr + sizeof(short int);
-
-	for (r = min; r < rtop ; r++)
+	/* attempt a match */
+	strptr = (unsigned char *)str->str.addr;
+	patptr = (uint4 *)pat->str.addr;
+	patptr += 2;
+	for (reptr = min; reptr < rtop ; reptr++)
 	{
-		GET_SHORT(repeat, r);
-		code = *p++;
-		/*******************************/
-		/*  Meta character pat atom.   */
-		/*******************************/
-		if (code < PATM_STRLIT)
-		{
-			if (code < PATM_USRDEF)
-			{
-				/* [KMK] assert(code != 0); */
-			} else
-			{
-				code = GET_LONG(code, (p - 1));
-				p += 3;
-				code &= PATM_LONGFLAGS;
+		GET_LONG(repeat, reptr);
+		GET_ULONG(code, patptr);
+		assert(code);
+		patptr++;
+		if (!(code & PATM_STRLIT))
+		{	/* meta character pat atom */
+			if (!(code & pat_allmaskbits))
+			{	/* current table has no characters with this pattern code */
+				len = 0;
+				for (bit = 0; bit < 32; bit++)
+				{
+					mbit = (1 << bit);
+					if ((mbit & code & PATM_LONGFLAGS) && !(mbit & pat_allmaskbits))
+						buf[len++] = codelist[patmaskseq(mbit)];
+				}
+				rts_error(VARLSTCNT(4) ERR_PATNOTFOUND, 2, len, buf);
 			}
-			for (j = 0; j < repeat ;j++)
+			for (repcnt = 0; repcnt < repeat; repcnt++)
 			{
-				if (!(code & pattern_typemask[*s++]))
+				if (!(code & pattern_typemask[*strptr++]))
 					return FALSE;
 			}
-		}
-		/*******************************/
-		/*  STRLIT pat atom.	       */
-		/*******************************/
-		else
-		{
-			len = *p++;
-			if (len == 1)
+		} else
+		{	/* STRLIT pat atom */
+			GET_LONG(len, patptr);
+			patptr++;
+			/* ensure pattern atom length is within limits of the complete pattern stream */
+			assert((0 <= len)
+					&& ((patptr + DIVIDE_ROUND_UP(len, sizeof(*patptr)))
+						<= ((uint4 *)(pat->str.addr) + patstream_len + 2)));
+			if (1 == len)
 			{
-				for (j=0;j < repeat;j++)
-				{
-					if (*p != *s++)
-					{
+				pstr = (unsigned char *)patptr;
+				for (repcnt = 0; repcnt < repeat; repcnt++)
+					if (*pstr != *strptr++)
 						return FALSE;
-					}
-				}
-				p++;
+				patptr++;
 			} else if (len > 0)
 			{
-				ptop = p+len;
-				for (j=0;j < repeat;j++)
-				{
-					pstr = p;
-					while (pstr < ptop)
-					{
-						if (*pstr++ != *s++)
-						{
+				for (repcnt = 0; repcnt < repeat; repcnt++)
+					for (letter = 0, pstr = (unsigned char *)patptr; letter < len; letter++)
+						if (*pstr++ != *strptr++)
 							return FALSE;
-						}
-					}
-				}
-				p += len;
+				patptr += DIVIDE_ROUND_UP(len, sizeof(*patptr));
 			}
 		}
 	}

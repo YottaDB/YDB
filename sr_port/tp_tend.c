@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,8 +66,6 @@
 #include "send_msg.h"
 #include "add_inter.h"
 
-LITREF	int			jnl_fixed_size[];
-
 GBLREF	short			dollar_tlevel;
 GBLREF	bool			update_trans;
 GBLREF	gd_region		*gv_cur_region;
@@ -126,11 +124,12 @@ bool	tp_tend(bool crit_only)
 	struct_jrec_tcom	tcom_record;
 	jnldata_hdr_ptr_t	jnl_header;
 	int			repl_tp_region_count = 0;
-	boolean_t		yes_jnl_no_repl, first_time;
+	boolean_t		yes_jnl_no_repl, first_time, release_crit;
 	uint4			jnl_status, leafmods, indexmods;
 	uint4			total_jnl_rec_size;
 
 	error_def(ERR_DLCKAVOIDANCE);
+	error_def(ERR_JNLTRANS2BIG);
 
 	assert(dollar_tlevel > 0);
 	assert(0 == jnl_fence_ctl.level);
@@ -160,6 +159,14 @@ bool	tp_tend(bool crit_only)
 			continue;
 		} else
 			no_sets = FALSE;
+		if (JNL_ENABLED(csa))
+		{	/* compute the total journal record size requirements before grab_crit().
+			 * there is code later that will check for state changes from now to then
+			 */
+			TOTAL_TPJNL_REC_SIZE(total_jnl_rec_size, si, csa);
+			/* compute current transaction's maximum journal space needs in number of disk blocks */
+			si->tot_jrec_size = MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size);
+		}
 	}	/* for (si ... ) */
 	if (no_sets && (FALSE == crit_only))
 	{
@@ -279,6 +286,13 @@ bool	tp_tend(bool crit_only)
 		REVERT;
 		return TRUE;
 	}
+	/* Any retry transition where the destination state is the 3rd retry, we don't want to release crit,
+	 * i.e. for 2nd to 3rd retry transition or 3rd to 3rd retry transition.
+	 * Therefore we need to release crit only if (CDB_STAGNATE - 1) > t_tries
+	 * But 2nd to 3rd retry transition doesn't occur if in the 2nd retry we get jnlstatemod or jnlclose retry code.
+	 * Hence the variable release_crit to track the above.
+	 */
+	release_crit = (CDB_STAGNATE - 1) > t_tries;
 	for (si = first_sgm_info;  (cdb_sc_normal == status) && (NULL != si);  si = si->next_sgm_info)
 	{
 		leafmods = indexmods = 0;
@@ -286,6 +300,30 @@ bool	tp_tend(bool crit_only)
 		TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
 		csa = cs_addrs;
 		csd = cs_data;
+		if (JNL_ALLOWED(csa))
+		{
+			if ((csa->jnl_state != csd->jnl_state) || (csa->jnl_before_image != csd->jnl_before_image))
+			{
+				for (si = first_sgm_info;  NULL != si;  si = si->next_sgm_info)
+				{
+					TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
+					cs_addrs->jnl_state = cs_data->jnl_state;
+					cs_addrs->jnl_before_image = cs_data->jnl_before_image;
+				}
+				status = cdb_sc_jnlstatemod;
+				if ((CDB_STAGNATE - 1) == t_tries)
+					release_crit = TRUE;
+				goto failed;
+			}
+			if (JNL_ENABLED(csa))
+			{	/* check if current transaction's journal size needs are greater than max jnl file size */
+				if (si->tot_jrec_size > csd->autoswitchlimit)
+				{	/* can't fit in current transaction's journal records into one journal file */
+					rts_error(VARLSTCNT(6) ERR_JNLTRANS2BIG, 4, si->tot_jrec_size,
+							JNL_LEN_STR(csd), csd->autoswitchlimit);
+				}
+			}
+		}
 		is_mm = dba_mm == csd->acc_meth;
 		if (!is_mm)
 			tnque_earliest_tn = ((th_rec_ptr_t)((sm_uc_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn;
@@ -435,7 +473,7 @@ bool	tp_tend(bool crit_only)
 						TP_TRACE_HIST(t1->blk_num, tp_get_target(t1->buffaddr));
 						break;
 					}
-					if (!t1->ptr->new_buff || (JNL_ENABLED(csd) && csa->jnl_before_image))
+					if (!t1->ptr->new_buff || (JNL_ENABLED(csa) && csa->jnl_before_image))
 					{
 						if ((NULL == cr) || (cr->cycle != t1->cycle) ||
 							((sm_long_t)GDS_ANY_REL2ABS(csa, cr->buffaddr) != (sm_long_t)t1->buffaddr))
@@ -479,6 +517,8 @@ bool	tp_tend(bool crit_only)
 				continue;
 			for (cse = si->first_cw_bitmap; NULL != cse; cse = cse->next_cw_set)
 			{
+				assert(0 == cse->jnl_freeaddr);	/* ensure haven't missed out resetting jnl_freeaddr for any cse in
+								 * t_write/t_create/{t,mu}_write_map/t_write_root [D9B11-001991] */
 				TRAVERSE_TO_LATEST_CSE(cse);
 				assert(0 == ((off_chain *)&cse->blk)->flag);
 				assert(!cse || !cse->high_tlevel);
@@ -571,7 +611,7 @@ bool	tp_tend(bool crit_only)
 		is_mm = dba_mm == csa->hdr->acc_meth;
 		ctn = csa->ti->curr_tn;
 		yes_jnl_no_repl = FALSE;
-		if (JNL_ENABLED(csd))
+		if (JNL_ENABLED(csa))
 		{
 			if (csa->jnl_before_image)
 			{
@@ -608,7 +648,7 @@ bool	tp_tend(bool crit_only)
 					}
 				}
 			}
-			if (REPL_ENABLED(csd))
+			if (REPL_ENABLED(csa))
 			{
 				replication = TRUE;
 				repl_tp_region_count++;
@@ -636,8 +676,7 @@ bool	tp_tend(bool crit_only)
 				assert(temp_jnlpool_ctl->write == temp_jnlpool_ctl->jnlpool_size);
 				temp_jnlpool_ctl->write = 0;
 			}
-			cumul_jnl_rec_len += (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_TCOM] + JREC_SUFFIX_SIZE)
-					* repl_tp_region_count + sizeof(jnldata_hdr_struct);
+			cumul_jnl_rec_len += TCOM_RECLEN * repl_tp_region_count + sizeof(jnldata_hdr_struct);
 			DEBUG_ONLY(cumul_index += repl_tp_region_count;)
 			assert(cumul_jnl_rec_len % JNL_REC_START_BNDRY == 0);
 			assert(QWEQ(jnlpool_ctl->early_write_addr, jnlpool_ctl->write_addr));
@@ -657,7 +696,7 @@ bool	tp_tend(bool crit_only)
 			ctn = csa->ti->curr_tn;
 			assert(ctn == csa->ti->early_tn);
 			csa->ti->early_tn = ctn + 1;
-			if (JNL_ENABLED(csd))
+			if (JNL_ENABLED(csa))
 			{
 				if (first_time)
 				{
@@ -668,25 +707,26 @@ bool	tp_tend(bool crit_only)
 				if (jnl_status == 0)
 				{
 					jbp = csa->jnl->jnl_buff;
-					TOTAL_TPJNL_REC_SIZE(total_jnl_rec_size, si, csa);
-					if ((jbp->freeaddr + total_jnl_rec_size) > jbp->filesize)
+					/* si->tmp_cw_set_depth is a copy of si->cw_set_depth at the time of
+					 * 	TOTAL_TPJNL_REC_SIZE calculation;
+					 * ensure it has not changed until now when the actual jnl record write occurs.
+					 * same case with csa->jnl_before_images & jbp->before_images.
+					 */
+					assert(si->cw_set_depth == si->tmp_cw_set_depth);
+					assert(jbp->before_images == csa->jnl_before_image);
+					if (DISK_BLOCKS_SUM(jbp->freeaddr, si->total_jnl_rec_size) > jbp->filesize)
 					{	/* Moved here to prevent jnlrecs split across multiple generation journal files. */
 						jnl_flush(csa->jnl->region);
-						if (-1 == jnl_file_extend(csa->jnl, total_jnl_rec_size))
+						if (-1 == jnl_file_extend(csa->jnl, si->total_jnl_rec_size))
 						{
-							assert (!JNL_ENABLED(csd));
+							assert((!JNL_ENABLED(csd)) && JNL_ENABLED(csa));
 							status = t_fail_hist[t_tries] = cdb_sc_jnlclose;
 							TP_TRACE_HIST(CR_BLKEMPTY, NULL);
 							t_commit_cleanup(status, 0);
+							if ((CDB_STAGNATE - 1) == t_tries)
+								release_crit = TRUE;
 							goto failed;
 						}
-					}
-					if (csa->jnl_before_image != csa->jnl->jnl_buff->before_images)
-					{
-						status = t_fail_hist[t_tries] = cdb_sc_jnlstatemod;
-						TP_TRACE_HIST(CR_BLKEMPTY, NULL);
-						t_commit_cleanup(status, 0);
-						goto failed;
 					}
 					/* jnl_put_jrt_pini will use gbl_jrec_time to fill in the time of the pini record.
 					 * see comment in jnl_put_pini.c about difference between tp_tend and t_end in this regard.
@@ -731,7 +771,10 @@ bool	tp_tend(bool crit_only)
 					for (jfb = si->jnl_head;  NULL != jfb; jfb = jfb->next)
 							jnl_write_logical(csa, jfb);
 				} else
+				{
+					csa->ti->early_tn = ctn;
 					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+				}
 			}	/* if (journaling) */
 			csa->prev_free_blks = csa->ti->free_blocks;
 			csa->t_commit_crit = TRUE;
@@ -869,7 +912,7 @@ failed:
 	   critical locks we have obtained. Take this moment of non-critness to check if we
 	   had an unhandled IO timer pop. */
 	do_deferred_writes = FALSE;
-	if ((cdb_sc_normal == status) || ((CDB_STAGNATE - 1) > t_tries))
+	if ((cdb_sc_normal == status) || release_crit)
 	{
 		/* Release regions  */
 		for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
@@ -917,19 +960,20 @@ failed:
 enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
 {
 	blk_segment	*bs1, *bs_ptr;
-	sm_uc_ptr_t	cp1, buffaddr;
 	boolean_t	new_rec;
+	cache_rec_ptr_t cr;
+	char		*va;
+	enum cdb_sc	status;
 	gv_key		*pKey;
 	int4		blk_size, blk_fill_size, cur_blk_size, blk_seg_cnt, delta, n, new_rec_size, next_rec_shrink;
 	int4		rec_cmpc, segment_update_array_size, target_key_size;
 	key_cum_value	*kv, *kvhead;
-	char		*va;
 	mstr		value;
 	off_chain	chain1;
 	rec_hdr_ptr_t	curr_rec_hdr, next_rec_hdr, rp;
-	unsigned short	rec_size;
-	enum cdb_sc	status;
+	sm_uc_ptr_t	cp1, buffaddr;
 	srch_blk_status temp_srch_blk_status, *bh;
+	unsigned short	rec_size;
 
 	assert(cs_addrs->now_crit && dollar_tlevel && sgm_info_ptr);
 	assert(!cse->level && cse->blk_target && !cse->first_off && !cse->write_type);
@@ -939,6 +983,18 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
 	cse->first_copy = TRUE;
 	bh = &temp_srch_blk_status;
 	*bh = *hist1;
+	if (dba_bg == cs_addrs->hdr->acc_meth)
+	{	/* For BG method, modify history with uptodate cache-record, buffer and cycle information.
+		 * This is necessary in case history contains an older twin cr or a cr which has since been recycled
+		 */
+		cr = db_csh_get(bh->blk_num);
+		assert(CR_NOTVALID != (sm_long_t)cr);
+		if (NULL == cr || CR_NOTVALID == (sm_long_t)cr || 0 <= cr->read_in_progress)
+			return cdb_sc_lostcr;
+		bh->cr = cr;
+		bh->cycle = cr->cycle;
+		bh->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+	}
 	buffaddr = bh->buffaddr;
 	for (kvhead = kv = cse->recompute_list_head; kv; kv = kv->next)
 	{
@@ -1081,7 +1137,7 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 			return FALSE;
 		cse->blk = bml + free_bit;
 		assert(cse->blk < total_blks);
-		if (!blk_used || !JNL_ENABLED(cs_data) || !cs_addrs->jnl_before_image)
+		if (!blk_used || !JNL_ENABLED(cs_addrs) || !cs_addrs->jnl_before_image)
 			cse->old_block = NULL;
 		else
 		{

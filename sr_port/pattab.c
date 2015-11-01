@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,26 +13,66 @@
 	Returns success as a Boolean.  A sample pattern table definition
 	file follows:
 
+	PATSTART
+	   PATTABLE EDM
+	      PATCODE c
+		 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,-
+		 24,25,26,27,28,29,30,31,127,128,129,130,131,132,133,134,135,136,-
+		 137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,-
+		 153,154,155,156,157,158,159,255
+	      PATCODE n
+		 48,49,50,51,52,53,54,55,56,57
+	      PATCODE u
+		 65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,-
+		 86,87,88,89,90,192,193,194,195,196,197,198,199,200,201,202,203,-
+		 204,205,206,207,209,210,211,212,213,214,215,216,217,218,219,220,-
+		 221
+	      PATCODE K
+		 66,67,68,70,71,72,74,75,76,77,78,80,81,82,83,84,86,87,88,89,90,-
+		 98,99,100,102,103,104,106,107,108,109,110,112,113,114,115,116,-
+		 118,119,120,121,122
+	      PATCODE l
+		 97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,-
+		 114,115,116,117,118,119,120,121,122,170,186,223,224,225,226,227,-
+		 228,229,230,231,232,233,234,235,236,237,238,239,241,242,243,244,-
+		 245,246,247,248,249,250,251,252,253
+	      PATCODE p
+		 32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,58,59,60,61,62,-
+		 63,64,91,92,93,94,95,96,123,124,125,126,160,161,162,163,164,165,-
+		 166,167,168,169,171,172,173,174,175,176,177,178,179,180,181,182,-
+		 183,184,185,187,188,189,190,191,208,222,240,254
+	      PATCODE V
+		 65,69,73,79,85,89,-
+		 97,101,105,111,117,121
+	PATEND
+
+	Note that this table does not include a definition for pattern codes A and E.
+	A is implicitly defined as the union of L and U, and E is implicitly defined as the union of all other classes.
+
 	;  This is a test of the GT.M/I18N user-definable pattern-
 	;  match table definition.
 	;
 	patsTaRt
 			   PattaBLE Example
-		PATCODE A
+		PATCODE A		; WARNING: patcodes A and E cannot be re-defined
 		42, 46,	43, 75 -	; comments after continuation
 		, 5, -
 		63, 91, 92, 93		; comments at end of directive
-		PATcode e		; This is an explicit E code defn
+		PATcode u		; This is an explicit U code definition
 		92, 127, 128, 255
+		PaTcOdE V		; GT.M specific user-defined code
+		102, 104, 109, 121
+		patcode YcntY
+		65, 69, 73, 79, 85	; ANSI user-defined patcode
 	PaTeNd
 */
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #ifdef VMS
-/* #include <descrip.h> */
 #include <lnmdef.h>
-/* #include <ssdef.h> */
 #include <fab.h>
 #include <rab.h>
 #include <rmsdef.h>
@@ -40,9 +80,7 @@
 #include "vmsdtype.h"
 
 #else
-
 #include "gtm_stdio.h"
-
 #endif
 
 #include "patcode.h"
@@ -54,52 +92,38 @@
 #include "util.h"
 #include "trans_log_name.h"
 
-
 #define	MAXPATNAM	256
-
-#ifndef NULL
-#	define NULL		((void *) 0)
-#endif
-
 #define	MAX_FILE	256
 
 #ifdef VMS
-#define PAT_FILE	"GTM_PATTERN_FILE"
+#define	PAT_FILE	"GTM_PATTERN_FILE"
 #define	PAT_TABLE	"GTM_PATTERN_TABLE"
 #else
-#define PAT_FILE	"$gtm_pattern_file"
+#define	PAT_FILE	"$gtm_pattern_file"
 #define	PAT_TABLE	"$gtm_pattern_table"
 
 #endif
 
 enum {T_EOF = 256, T_NL, T_SYNTAX, T_NUMBER, T_IDENT, K_PATSTART, K_PATEND, K_PATTABLE, K_PATCODE};
 
-LITREF uint4 typemask[PATENTS];
+GBLREF	uint4		mapbit[];
+GBLREF	uint4		pat_allmaskbits;
+LITREF	uint4		typemask[PATENTS];
 
-/* This table holds the current pattern-matching attributes of each
-   ASCII character.  Bits 0..21 of each entry correspond with the
-   pattern-match characters, A..U.
-*/
-static int		pat_linenum = 0;
-GBLDEF uint4		*pattern_typemask;
+GBLREF	uint4		*pattern_typemask;
+GBLREF	pattern		*pattern_list;
+GBLREF	pattern		*curr_pattern;
+GBLREF	pattern		mumps_pattern;
 
-/* Standard MUMPS pattern-match table.
-*/
-GBLDEF pattern mumps_pattern = {
-	(void *) 0,		/* flink */
-	(void *) 0,		/* typemask */
-	1,			/* namlen */
-	{'M', '\0'}		/* name */
-};
+LITREF unsigned char lower_to_upper_table[];
 
-static readonly uint4	mapbit[] =
-{	PATM_A, PATM_B, PATM_C, PATM_D, PATM_E, PATM_F, PATM_G, PATM_H,
-	PATM_I, PATM_J, PATM_K, PATM_L, PATM_M, PATM_N, PATM_O, PATM_P,
-	PATM_Q, PATM_R, PATM_S, PATM_T, PATM_U
-};
-
-GBLDEF pattern *pattern_list;
-GBLDEF pattern *curr_pattern;
+static	int		pat_linenum = 0;
+static	int		token;
+static	unsigned char	ident[MAXPATNAM + 1];
+static	int		idlen;
+static	int		number;
+static	char		*ch = NULL;
+static	char		patline[MAXPATNAM + 2];
 
 #ifdef VMS
 static struct FAB	fab;
@@ -108,27 +132,16 @@ static struct RAB	rab;
 static FILE		*patfile;
 #endif
 
-static int		token;
-static unsigned char	ident[MAXPATNAM + 1];
-static int		idlen;
-static int		number;
-
-static char		*ch = NULL;
-static char		patline[MAXPATNAM + 2];
-
-LITREF unsigned char lower_to_upper_table[];
-
 #ifdef DEBUG
 void dump_tables(void);
 #endif
 
-static void close_patfile(void);
-static int getaline(void);
-static int open_patfile(int name_len,char *file_name);
-static int pat_lex(void);
-static int patcmp(unsigned char *str1, unsigned char *str2);
-static void pattab_error(int name_len,char *file_name,int linenum);
-
+static	void	close_patfile(void);
+static	int	getaline(void);
+static	int	open_patfile(int name_len, char *file_name);
+static	int	pat_lex(void);
+static	int	patcmp(unsigned char *str1, unsigned char *str2);
+static	void	pattab_error(int name_len, char *file_name, int linenum);
 
 static void close_patfile(void)
 {
@@ -147,7 +160,7 @@ void dump_tables(void)
 	char	mout;
 	pattern	**patp;
 
-	for (patp = &pattern_list; *patp != NULL; patp = &(*patp)->flink)
+	for (patp = &pattern_list; NULL != *patp; patp = &(*patp)->flink)
 	{
 		util_out_print("!/Pattern Table \"!AD\":!/", TRUE, LEN_AND_STR((*patp)->name));
 		for (mx = 0; mx < PATENTS; mx++)
@@ -171,12 +184,14 @@ static int getaline(void)
 
 #ifdef VMS
 	status = sys$get(&rab);
-	if (status == RMS$_EOF) return 0;
+	if (RMS$_EOF == status)
+		return 0;
 	patline[rab.rab$w_rsz] = '\n';
 	patline[rab.rab$w_rsz + 1] = '\0';
 #else
 	char		*fgets_res;
-	if (FGETS(patline, sizeof(patline), patfile, fgets_res) == NULL) return 0;
+	if (NULL == FGETS(patline, sizeof(patline), patfile, fgets_res))
+		return 0;
 #endif
 	return 1;
 }
@@ -190,139 +205,175 @@ int getpattabnam(mstr *outname)
 
 int initialize_pattern_table(void)
 {
-	char			buffer[MAX_TRANS_NAME_LEN];
-	int			status;
-	static MSTR_CONST(pat_file,	PAT_FILE);
-	static MSTR_CONST(pat_table,	PAT_TABLE);
-	mstr			transnam;
-	mstr			patname;
-	int			result;
+	char	buffer[MAX_TRANS_NAME_LEN];
+	int	status, letter;
+	mstr	patname, transnam;
+	static MSTR_CONST(pat_file,  PAT_FILE);
+	static MSTR_CONST(pat_table, PAT_TABLE);
 
-	/* Initialize pattern/typemask structures. */
+	/* Initialize pattern/typemask structures and pat_allmaskbits for default typemask */
 	curr_pattern = pattern_list = &mumps_pattern;
 	pattern_typemask = mumps_pattern.typemask = &(typemask[0]);
+	for (pat_allmaskbits = 0, letter = 0; letter < PATENTS; letter++)
+		pat_allmaskbits |= pattern_typemask[letter];	/* used in do_patfixed/do_pattern */
 
 	/* Locate default pattern file and load it. */
         status = trans_log_name(&pat_file,&transnam,buffer);
-	if (status != SS_NORMAL) return 0;
-	if (!load_pattern_table(transnam.len, transnam.addr)) return 0;
+	if (SS_NORMAL != status)
+		return 0;
+	if (!load_pattern_table(transnam.len, transnam.addr))
+		return 0;
 
 	/* Establish default pattern table. */
 	status = trans_log_name(&pat_table,&transnam,buffer);
 
-	if (status != SS_NORMAL) return 0;
+	if (SS_NORMAL != status)
+		return 0;
 	patname.len = transnam.len;
 	patname.addr = transnam.addr;
-	setpattab(&patname, &result);
-	return result;
+	return setpattab(&patname);
 }
 
 int load_pattern_table(int name_len,char *file_name)
 {
-	int		code, cmp;
-	int		mx, newtable[PATENTS], newnamlen;
-	unsigned char	newtabnam[MAXPATNAM + 1];
+	unsigned char	newtabnam[MAXPATNAM + 1], newYZnam[PAT_YZMAXNUM][PAT_YZMAXLEN];
+	int		code, cmp, cnt, mx, newtable[PATENTS], newnamlen, newYZlen[PAT_YZMAXNUM];
+	int		newYZnum = -1;	/* number of ANSI user-defined patcodes */
 	pattern		*newpat, **patp ;
-	error_def	(ERR_ILLPATCODEREDEF);
 
-	if (!open_patfile(name_len, file_name)) return 0;
+	if (!open_patfile(name_len, file_name))
+		return 0;
 	pat_linenum = 1;
-	while ((token = pat_lex()) == T_NL);
-	if (token == K_PATSTART)
+	while (T_NL == (token = pat_lex()))
+		;
+	if (K_PATSTART == token)
 	{
-		if ((token = pat_lex()) != T_NL)
+		if (T_NL != (token = pat_lex()))
 		{
-			pattab_error(name_len, file_name, pat_linenum);
-			return 0;
+			util_out_print("Unrecognized text at end of line", TRUE);
+			pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 		}
-		while ((token = pat_lex()) == T_NL);
-		while (token == K_PATTABLE)
-		{
-			/* Set up a pattern table record. */
-			if ((token = pat_lex()) != T_IDENT)
+		while (T_NL == (token = pat_lex()))
+			;
+		while (K_PATTABLE == token)
+		{	/* Set up a pattern table record. */
+			if (T_IDENT != (token = pat_lex()))
 			{
-				pattab_error(name_len, file_name, pat_linenum);
-				return 0;
+				util_out_print("Identifier expected, found !AD", TRUE, idlen, ident);
+				pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 			}
 			newnamlen = idlen;
 			memcpy(newtabnam, ident, newnamlen + 1);
-			if ((token = pat_lex()) != T_NL)
+			if (T_NL != (token = pat_lex()))
 			{
-				pattab_error(name_len, file_name, pat_linenum);
-				return 0;
+				util_out_print("Unrecognized text at end of line", TRUE);
+				pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 			}
-			while ((token = pat_lex()) == T_NL);
-
+			while (T_NL == (token = pat_lex()))
+				;
 			/* Process PATCODE directives */
 			memset(&newtable[0], 0, sizeof(newtable));
-			while (token == K_PATCODE)
+			for (cnt = 0; cnt < PAT_YZMAXNUM; cnt++)
+				newYZlen[cnt] = 0;
+			newYZnum = -1;
+			while (K_PATCODE == token)
 			{
-				if ((token = pat_lex()) != T_IDENT || idlen != 1)
+				if (T_IDENT != (token = pat_lex()))
 				{
-					pattab_error(name_len, file_name, pat_linenum);
-					return 0;
+					util_out_print("Identifier expected, found !AD", TRUE, idlen, ident);
+					pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 				}
-				code = lower_to_upper_table[ident[0]] - 'A';
-				if (code > ('U' - 'A'))
+				code = lower_to_upper_table[ident[0]];
+				if (idlen > 1)
 				{
-					pattab_error(name_len, file_name, pat_linenum);
-					return 0;
-				}
-				if (code == ('E' - 'A') || code == ('A' - 'A'))
+					if (((code != 'Y') && (code != 'Z')) || (ident[0] != ident[idlen - 1]))
+					{
+						util_out_print("User-defined pattern code (!AD) not delimited by Y or Z",
+							TRUE, idlen, ident);
+						pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
+					}
+					if (idlen > PAT_YZMAXLEN)
+					{
+						util_out_print("Length of pattern code name (!AD) longer than maximum !UL",
+									TRUE, idlen, ident, PAT_YZMAXLEN);
+						pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
+					}
+					newYZnum++;
+					if (newYZnum >= PAT_YZMAXNUM)
+					{
+						util_out_print("Number of user-defined patcodes exceeds maximum (!UL)",
+													TRUE, PAT_YZMAXNUM);
+						pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
+					}
+					newYZlen[newYZnum] = idlen;
+					memcpy(newYZnam[newYZnum], ident, idlen);
+					code = newYZnum + 'Y';
+					util_out_print("WARNING: Pattern code !AD not yet implemented", TRUE, idlen, ident);
+				} else
 				{
-					rts_error(VARLSTCNT(4) ERR_ILLPATCODEREDEF, 2, name_len, file_name);
-					close_patfile();
-					return 0;
+					if (code > 'X')
+					{
+						util_out_print("Invalid pattern letter (!AD)", TRUE, idlen, ident);
+						pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
+					}
+					if ((code == 'E') || (code == 'A'))
+					{
+						util_out_print("Attempt to redefine pattern code !AD", TRUE, idlen, ident);
+						pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
+					}
 				}
-				if ((token = pat_lex()) != T_NL)
+				code = code - 'A';
+				if (T_NL != (token = pat_lex()))
 				{
-					pattab_error(name_len, file_name, pat_linenum);
-					return 0;
+					util_out_print("Unrecognized text at end of line", TRUE);
+					pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 				}
-				while ((token = pat_lex()) == T_NL);
-
+				while (T_NL == (token = pat_lex()))
+					;
 				/* Process character list setting the code's flag into the typemask */
-				if (token == T_NUMBER)
+				if (T_NUMBER == token)
 				{
 					if (number >= PATENTS)
 					{
-						pattab_error(name_len, file_name, pat_linenum);
-						return 0;
+						util_out_print("Character code greater than !UL encountered (!UL)",
+							TRUE, PATENTS, number);
+						pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 					}
 					newtable[number] |= mapbit[code];
-					while ((token = pat_lex()) == ',')
+					while (',' == (token = pat_lex()))
 					{
-						if ((token = pat_lex()) != T_NUMBER)
+						if (T_NUMBER != (token = pat_lex()))
 						{
-							pattab_error(name_len, file_name, pat_linenum);
-							return 0;
+							util_out_print("Numeric character code expected, found !AD",
+								TRUE, idlen, ident);
+							pattab_error(name_len, file_name, pat_linenum); /* error does not return */
 						}
 						if (number >= PATENTS)
 						{
-							pattab_error(name_len, file_name, pat_linenum);
-							return 0;
+							util_out_print("Character code greater than !UL encountered (!UL)",
+								TRUE, PATENTS, number);
+							pattab_error(name_len, file_name, pat_linenum); /* error does not return */
 						}
 						newtable[number] |= mapbit[code];
 					}
-					if (token != T_NL)
+					if (T_NL != token)
 					{
-						pattab_error(name_len, file_name, pat_linenum);
-						return 0;
+						util_out_print("Unrecognized text at end of line", TRUE);
+						pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 					}
-					while ((token = pat_lex()) == T_NL);
+					while (T_NL == (token = pat_lex()))
+						;
 				}
 			}
-
 			for (patp = &pattern_list; (*patp) ; patp = &(*patp)->flink)
-			{	cmp = patcmp(newtabnam, (uchar_ptr_t)(*patp)->name);
-				if (cmp == 0)
-				{		/* don't read in same table name twice */
-					pattab_error(name_len, file_name, pat_linenum);
-					return 0;
-				}
-				else if (cmp < 0)
-				{	break;
-				}
+			{
+				cmp = patcmp(newtabnam, (uchar_ptr_t)(*patp)->name);
+				if (0 == cmp)
+				{	/* don't read in same table name twice */
+					util_out_print("Cannot load table !AD twice", TRUE, newnamlen, newtabnam);
+					pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
+				} else if (cmp < 0)
+					break;
 			}
 			newpat = (pattern *) malloc(sizeof(pattern) + newnamlen);
 			newpat->flink = (*patp);
@@ -330,51 +381,61 @@ int load_pattern_table(int name_len,char *file_name)
 			memcpy(newpat->name, newtabnam, newnamlen + 1);
 			newpat->typemask = (uint4 *) malloc(sizeof(typemask));
 			memcpy(newpat->typemask, newtable, sizeof(typemask));
+			newpat->patYZnam = (unsigned char *) malloc(sizeof(newYZnam));
+			memcpy(newpat->patYZnam, newYZnam, sizeof(newYZnam));
+			newpat->patYZlen = (int *) malloc(sizeof(newYZlen));
+			memcpy(newpat->patYZlen, newYZlen, sizeof(newYZlen));
+			newpat->patYZnum = newYZnum;
 			(*patp) = newpat;
 		}
-		if (token != K_PATEND)
+		if (K_PATEND != token)
 		{
-			pattab_error(name_len, file_name, pat_linenum);
-			return 0;
+			util_out_print("End of definition marker (PATEND) expected", TRUE);
+			pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 		}
-		while ((token = pat_lex()) == T_NL);
-		if (token != T_EOF)
+		while (T_NL == (token = pat_lex()))
+			;
+		if (T_EOF != token)
 		{
-			pattab_error(name_len, file_name, pat_linenum);
-			return 0;
+			util_out_print("Unrecognized text following end of definitions", TRUE);
+			pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 		}
 		close_patfile();
 		return 1;
-	}
-	else
-	{
-		pattab_error(name_len, file_name, pat_linenum);
-		return 0;
-	}
+	} else
+		pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 }
 
-static int open_patfile(int name_len,char *file_name)
+static int open_patfile(int name_len, char *file_name)
 {
-	int	status;
+	int		status;
+	unsigned char	*name_copy;
 
 #ifdef VMS
 	fab = cc$rms_fab;
 	fab.fab$l_fna = file_name;
 	fab.fab$b_fns = name_len;
 	status = sys$open(&fab);
-	if (!(status & 1)) return 0;
+	if (!(status & 1))
+		return 0;
 	rab = cc$rms_rab;
 	rab.rab$l_fab = &fab;
 	rab.rab$l_ubf = patline;
 	rab.rab$w_usz = sizeof(patline);
 	status = sys$connect(&rab);
-	if (status != RMS$_NORMAL) return 0;
+	if (RMS$_NORMAL != status)
+		return 0;
 #else
-	patfile = Fopen(file_name, "r");
-	if (patfile == NULL) return 0;
+	name_copy = malloc(name_len + 1);
+	memcpy(name_copy, file_name, name_len);
+	name_copy[name_len] = '\0';
+	patfile = Fopen(name_copy, "r");
+	free(name_copy);
+	if (NULL == patfile)
+		return 0;
 #endif
-
-	if (getaline()) ch = patline;
+	if (getaline())
+		ch = patline;
 	return 1;
 }
 
@@ -383,29 +444,26 @@ static int pat_lex(void)
 	int	continuation = 0;
 	char	*id;
 
-	/* Has EOF already been encountered?
-	*/
-	if (ch == NULL) return T_EOF;
+	if (NULL == ch)
+		return T_EOF;	/* EOF already seen */
 
-	/* Process whitespace.
-	*/
+	/* process whitespace */
 skip_whitespace:
-	while (*ch <= ' ' || *ch == ';')
+	while ((' ' >= *ch) || (';' == *ch))
 	{
-		if (*ch == '\n' || *ch == ';')
+		if (('\n' == *ch) || (';' == *ch))
 		{
-			if (!getaline()) ch = NULL;
-			else ch = patline;
+			ch = getaline() ? patline : NULL;
 			pat_linenum++;
-			if (!continuation) return T_NL;
+			if (!continuation)
+				return T_NL;
 			continuation = 0;
-		} else ch++;
+		} else
+			ch++;
 	}
-
-	if (continuation) return continuation;
-
-	/* Process lexeme.
-	*/
+	if (continuation)
+		return continuation;
+	/* process lexeme */
 	switch (*ch) {
 	case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
 	case 'G': case 'H': case 'I': case 'J': case 'K': case 'L':
@@ -424,18 +482,20 @@ skip_whitespace:
 			idlen++;
 		} while (typemask[*ch] & (PATM_A | PATM_N));
 		*id++ = '\0';
-		if (patcmp(ident, (uchar_ptr_t)"PATCODE") == 0) return K_PATCODE;
-		if (patcmp(ident, (uchar_ptr_t)"PATTABLE") == 0) return K_PATTABLE;
-		if (patcmp(ident, (uchar_ptr_t)"PATSTART") == 0) return K_PATSTART;
-		if (patcmp(ident, (uchar_ptr_t)"PATEND") == 0) return K_PATEND;
+		if (patcmp(ident, (uchar_ptr_t)"PATCODE") == 0)
+			return K_PATCODE;
+		if (patcmp(ident, (uchar_ptr_t)"PATTABLE") == 0)
+			return K_PATTABLE;
+		if (patcmp(ident, (uchar_ptr_t)"PATSTART") == 0)
+			return K_PATSTART;
+		if (patcmp(ident, (uchar_ptr_t)"PATEND") == 0)
+			return K_PATEND;
 		return T_IDENT;
 	case '0': case '1': case '2': case '3': case '4':
 	case '5': case '6': case '7': case '8': case '9':
 		number = *ch++ - '0';
 		while (typemask[*ch] & PATM_N)
-		{
 			number = 10 * number + *ch++ - '0';
-		}
 		return T_NUMBER;
 		break;
 	case '-':
@@ -451,10 +511,11 @@ static int patcmp(unsigned char *str1,unsigned char *str2)
 {
 	int		cmp;
 
-	while (*str2 != '\0')
+	while ('\0' != *str2)
 	{
 		cmp = lower_to_upper_table[*str1++] - lower_to_upper_table[*str2++];
-		if (cmp != 0) return cmp;
+		if (0 != cmp)
+			return cmp;
 	}
 	return *str1;
 }
@@ -463,40 +524,39 @@ static void pattab_error(int name_len,char *file_name,int linenum)
 {
 	error_def	(ERR_PATTABSYNTAX);
 
+	close_patfile();
 	rts_error(VARLSTCNT(5) ERR_PATTABSYNTAX, 3, name_len, file_name, linenum);
 }
 
-void setpattab(mstr *table_name,int *result)
+int setpattab(mstr *table_name)
 {
-	int		mx;
+	int		letter;
 	pattern		**patp;
 	unsigned char	ptnam[MAXPATNAM + 1];
 
-	/* Set to No match at start. */
-	*result = 0;
-
 	if (table_name->len <= MAXPATNAM)
-	{
-		/* Null-terminate the pattern table name. */
+	{	/* null-terminate the pattern table name. */
 		if (table_name->len)
-		{	memcpy(ptnam, table_name->addr, table_name->len);
+		{
+			memcpy(ptnam, table_name->addr, table_name->len);
 			ptnam[table_name->len] = '\0';
-		}
-		else
+		} else
 		{	/* Default table name */
 			ptnam[0] = 'M';
 			ptnam[1] = 0;
 		}
-
-		for (patp = &pattern_list; *patp != NULL; patp = &(*patp)->flink)
+		for (patp = &pattern_list; NULL != *patp; patp = &(*patp)->flink)
 		{
-			if (patcmp(ptnam, (unsigned char *)((*patp)->name)) == 0)
+			if (0 == patcmp(ptnam, (unsigned char *)((*patp)->name)))
 			{
 				pattern_typemask = (*patp)->typemask;
 				curr_pattern = (*patp);
-				*result = 1;
-				break;
+				/* reset pat_allmaskbits to correspond to the currently active pattern_typemask */
+				for (pat_allmaskbits = 0, letter = 0; letter < PATENTS; letter++)
+					pat_allmaskbits |= pattern_typemask[letter];
+				return TRUE;
 			}
 		}
 	}
+	return FALSE;
 }

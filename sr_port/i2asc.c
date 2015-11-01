@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 GBLREF	seq_num		seq_num_zero;
 
 uchar_ptr_t i2asc(uchar_ptr_t p, unsigned int n)

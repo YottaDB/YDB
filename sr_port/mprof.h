@@ -123,6 +123,7 @@ void	mprof_tree_print(struct mprof_tree *tree,int tabs,int longl);
 void    get_cputime(struct tms *);
 #endif
 void	crt_gbl(struct mprof_tree *p, int info_level);
+void	stack_leak_check(void);
 
 /* functions required for the transfer table manipulations*/
 int op_mproflinefetch(), op_mproflinestart();

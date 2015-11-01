@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 #include "mlkdef.h"
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
+#include "gtm_string.h"
 #include "stp_parms.h"
 #include "error.h"
 #include "min_max.h"
@@ -61,6 +62,7 @@
 #include "getjobname.h"
 #include "getjobnum.h"
 #include "sig_init.h"
+#include "gtmmsg.h"
 
 GBLDEF block_id			patch_curr_blk;
 GBLREF gd_region		*gv_cur_region;
@@ -84,6 +86,7 @@ GBLREF cw_set_element   	cw_set[];
 GBLREF unsigned char    	cw_set_depth;
 GBLREF uint4			process_id;
 GBLREF jnlpool_addrs		jnlpool;
+GBLREF char			cli_err_str[];
 
 static bool	dse_process(int argc);
 static void display_prompt(void);
@@ -160,15 +163,22 @@ static bool	dse_process(int argc)
 			REVERT;
 			return FALSE;
 		}
+	} else if (res)
+	{
+		if (1 < argc)
+		{
+			/*Here we need to REVERT since otherwise we stay in dse in a loop
+			  The design of dse needs to be changed to act like VMS (which is:
+			  if there is an error in the dse command (dse dumpoa), go to command
+			  prompt, but UNIX exits*/
+			REVERT;
+			rts_error(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
+		} else
+			gtm_putmsg(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
 	}
 	if (func)
 		func();
 
-	if (argc > 1)
-	{
-		REVERT;
-		return FALSE;
-	}
 	REVERT;
-	return TRUE;
+	return(1 >= argc);
 }

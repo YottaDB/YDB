@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,7 @@ static	char	default_since_time[] = "0 0:0:00",
 void	mur_get_options(void)
 {
 	int4		status;
+	uint4		ustatus;
 	unsigned short	length, buf_len;
 	char		*c, *ctop, *c1, qual_buffer[MAX_LINE], full_db_fn[MAX_FN_LEN + 1], buf[32];
 	char		bool_buff[8]; /* To hold string TRUE or, FALSE */
@@ -68,7 +69,7 @@ void	mur_get_options(void)
 		mur_options.update = TRUE;
 	if (CLI_PRESENT == cli_present("RESYNC"))
 	{
-		if (CLI_PRESENT == !cli_present("LOSTTRANS"))
+		if (!mur_options.losttrans)
 		{
 			util_out_print("-LOSTTRANS must be specified with -RESYNC", TRUE);
 			mupip_exit(ERR_MUPCLIERR);
@@ -84,7 +85,7 @@ void	mur_get_options(void)
 	}
 	if ((status  = cli_present("FETCHRESYNC")) == CLI_PRESENT)
 	{
-		if (!cli_present("LOSTTRANS") == CLI_PRESENT)
+		if (!mur_options.losttrans)
 		{
 			util_out_print("-LOSTTRANS must be specified with -FETCHRESYNC", TRUE);
 			mupip_exit(ERR_MUPCLIERR);
@@ -348,10 +349,10 @@ void	mur_get_options(void)
 				rl_ptr->next = rl_ptr1;
 			rl_ptr = rl_ptr1;
 			*c = '\0';
-			if (!get_full_path(c1, c - c1, full_db_fn, &full_len, sizeof(full_db_fn)))
+			if (!get_full_path(c1, c - c1, full_db_fn, &full_len, sizeof(full_db_fn), &ustatus))
 			{
 				util_out_print("Invalid -REDIRECT qualifier value: Unable to find full pathname", TRUE);
-				rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, c - c1, c1);
+				rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, c - c1, c1, ustatus);
 			}
 			rl_ptr->org_name_len = full_len;
 			rl_ptr->org_name = (char *)malloc(rl_ptr->org_name_len + 1);
@@ -360,10 +361,10 @@ void	mur_get_options(void)
 			for (c1 = ++c;  *c != '\0'  &&  *c != ',';  ++c)
 				;
 			*c = '\0';
-			if (!get_full_path(c1, c - c1, full_db_fn, &full_len, sizeof(full_db_fn)))
+			if (!get_full_path(c1, c - c1, full_db_fn, &full_len, sizeof(full_db_fn), &ustatus))
 			{
 				util_out_print("Invalid -REDIRECT qualifier value: Unable to find full pathname", TRUE);
-				rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, c - c1, c1);
+				rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, c - c1, c1, ustatus);
 			}
 			rl_ptr->new_name_len = full_len;
 			rl_ptr->new_name = (char *)malloc(rl_ptr->new_name_len + 1);
@@ -582,22 +583,12 @@ void	mur_get_options(void)
 		}
 		mur_options.selection = TRUE;
 	}
-	if (mur_options.forward)
-		mur_options.apply_after_image = FALSE;
-	else
-		mur_options.apply_after_image = TRUE;
+	mur_options.apply_after_image = !mur_options.forward;
 	/* DSE has after image records.
 	   Following undocmented option will allow users to force the appropriate action,
 	   instead of default behavior */
-	if ((status = cli_present("AFTER_IMAGE_APPLY")) == CLI_PRESENT)
-	{
-		length = sizeof(bool_buff);
-		if (cli_get_str("AFTER_IMAGE_APPLY", bool_buff, &length))
-		{
-			if (0 == strcmp(bool_buff, "TRUE"))
-				mur_options.apply_after_image = TRUE;
-			else if (0 == strcmp(bool_buff, "FALSE"))
-				mur_options.apply_after_image = FALSE;
-		}
-	}
+	if (CLI_PRESENT == (status = cli_present("APPLY_AFTER_IMAGE")))
+		mur_options.apply_after_image = TRUE;
+	else if (CLI_NEGATED == status)
+		mur_options.apply_after_image = FALSE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include <limits.h>
+
 #include "compiler.h"
 #include "opcode.h"
 #include "cache.h"
@@ -24,14 +27,17 @@ static readonly opctype indir_opcode[] = {
 };
 #undef INDIR
 
-void op_indfun(mval *v,unsigned char argcode, mval *dst)
+void op_indfun(mval *v, mint code, mval *dst)
 {
 	bool		rval;
 	mstr		*obj, object;
 	oprtype		x;
+	unsigned char	argcode;
 
 	error_def(ERR_INDMAXNEST);
 
+	argcode = (unsigned char)code;
+	assert(UCHAR_MAX >= code); /* if not, the assignment to argcode is lossy */
 	assert(indir_opcode[argcode]);
 	MV_FORCE_STR(v);
 	if (!(obj = cache_get(argcode, &v->str)))

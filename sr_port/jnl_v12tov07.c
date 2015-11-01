@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include <stddef.h>
 
 #include "gdsroot.h"
@@ -39,7 +41,8 @@ int jnl_v12tov07(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	 *					       07			        12
 	 *------------------------------------------------------------------------------------------------------------
 	 * {tcom,ztcom}.token			4 bytes				8 bytes
-	 * {tcom,ztcom}.participants		NA				Shifted by 8 bytes due to addition of orig_tc_short_time
+	 * {tcom,ztcom}.participants		NA				Shifted by 8 bytes due to addition
+	 * 										of orig_tc_short_time
 	 * {tcom,ztcom}.ts_short_time		same as above
 	 * An addtional field orig_ts_short_time is added.
 	 * mumps data value for SET type	ushort(2 bytes), char[]		uint(4 bytes), char[]

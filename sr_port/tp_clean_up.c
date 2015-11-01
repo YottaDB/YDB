@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -212,7 +212,7 @@ void	tp_clean_up(boolean_t rollback_flag)
       			reinitialize_list(si->tlvl_info_list);		/* reinitialize the tlvl_info buddy_list */
 			si->first_cw_set = si->last_cw_set = si->first_cw_bitmap = NULL;
 			si->cw_set_depth = 0;
-			si->total_jnl_record_size = cs_addrs->min_total_tpjnl_rec_size;	/* Reinitialize total_jnl_record_size */
+			si->total_jnl_rec_size = cs_addrs->min_total_tpjnl_rec_size;	/* Reinitialize total_jnl_rec_size */
 			si->last_tp_hist = si->first_tp_hist;		/* reinitialize the tp history */
 			si->fresh_start = TRUE;
 			si->tlvl_info_head = NULL;

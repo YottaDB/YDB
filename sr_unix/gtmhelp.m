@@ -1,3 +1,13 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+;	Copyright 2002 Sanchez Computer Associates, Inc.	;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 gtmhelp(subtopic,gbldir)
 	;
 	;
@@ -8,8 +18,9 @@ gtmhelp(subtopic,gbldir)
 	set $zgbldir=gbldir
 	set COUNT=0,NOTFOUND=0
 	do parse(subtopic)
-	for  do display quit:COUNT<0 
-	set $zgbldir=%gbldir
+	for  do display quit:COUNT<0
+	if ($zsearch(%gbldir)'="") set $zgbldir=%gbldir
+	else  set $zgbldir=""
 	quit
 	;
 	;
@@ -33,7 +44,7 @@ display
 	write $$CLEAR
 	if $$MATCH do
  .		if NOTFOUND do
- ..			write !!,"Sorry, no Documentation on " 
+ ..			write !!,"Sorry, no Documentation on "
  ..			for i=COUNT+1:1:NEW+COUNT write TOPIC(i)," "
  ..			set NOTFOUND=0
  ..			quit
@@ -44,8 +55,8 @@ display
  ..			set x=""
  ..			set subref=$name(@MATCH(MATCH)@("s"))
  ..			for   set x=$order(@subref@(x)) quit:x=""  do
- ...				write $$FORMAT(0) 
- ...				write @subref@(x) 
+ ...				write $$FORMAT(0)
+ ...				write @subref@(x)
  ...				write $$COLUMNS(subref,x)
  ...				do qualifiers($name(@subref@(x)))
  ...				quit
@@ -56,10 +67,10 @@ display
  .		if subtopic="" set COUNT=COUNT-1
  .		if subtopic'="" do parse(subtopic)
  .		quit
-	else  do   
+	else  do
  .		set NOTFOUND=1
  .		for i=1:1:COUNT write TOPIC(i)," "
- .		for i=1:1:NEW set COUNT=COUNT-1 
+ .		for i=1:1:NEW set COUNT=COUNT-1
  .		quit
 	quit
 	;
@@ -70,7 +81,7 @@ print(ref,i);
 	write !,@ref
  	set y=""
  	for  set y=$order(@ref@(y)) q:(y="s")!(y="")  do
- .		write $$FORMAT(1) 
+ .		write $$FORMAT(1)
  .		w !,@ref@(y)
  	if $data(@ref)>1 do
  .		set subref=$name(@ref@("s")),x=""
@@ -98,7 +109,7 @@ recursiv(ref,level)
  .		quit
 	set ref=$name(@ref@("s",TOPIC(level)))
 	if TOPIC(level)'="" do:$data(@ref)
- .		if level=COUNT do 
+ .		if level=COUNT do
  ..			set MATCH=MATCH+1
  ..			set MATCH(MATCH)=ref
  ..			quit
@@ -109,7 +120,7 @@ recursiv(ref,level)
 	for  set x=$o(@ref) quit:(x="")!("\"_x'[("\"_TOPIC(level)))  do
  .		set ref=$name(@ref,(level*2)-1)
  .		set ref=$name(@ref@(x))
- .		if level=COUNT do 
+ .		if level=COUNT do
  ..			for j=1:1:COUNT set PROMPT(j)=@$name(@ref,j*2)
  ..		 	set MATCH=MATCH+1
  ..			set MATCH(MATCH)=ref
@@ -161,7 +172,7 @@ FORMAT(newlines)
 	if $y>($$PAGE-newlines-3) do
  .		read !!,"Press RETURN to continue ...",dummy
  .		write $$CLEAR
- .		quit 
+ .		quit
 	quit ""
 COLUMNS(subref,x)
 	if $x+12'>$$WIDTH write ?$x\12+1*12

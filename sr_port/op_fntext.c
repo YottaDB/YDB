@@ -11,6 +11,9 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
+
 #include "error.h"
 #include "rtnhdr.h"
 #include "srcline.h"

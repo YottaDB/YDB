@@ -18,6 +18,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "mlkdef.h"
 #include "gdsroot.h"
 #include "gdsblk.h"

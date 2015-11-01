@@ -9,8 +9,12 @@
  *								*
  ****************************************************************/
 
-#include <errno.h>
 #include "mdef.h"
+
+#include "gtm_string.h"
+
+#include <errno.h>
+
 #include "compiler.h"
 #include "rtnhdr.h"
 #include "obj_gen.h"

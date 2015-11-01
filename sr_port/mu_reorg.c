@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -181,6 +181,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 	srch_hist		*rtsib_hist;
 	jnl_buffer_ptr_t	jbp;
 	trans_num		ret_tn;
+
 	error_def(ERR_MUREORGFAIL);
 	error_def(ERR_DBRDONLY);
 	error_def(ERR_GBLNOEXIST);
@@ -407,7 +408,8 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						if (0 < kill_set_list.used)     /* decrease kill_in_prog */
 						{
 							gvcst_kill_sort(&kill_set_list);
-							ret_tn = gvcst_bmp_mark_free(&kill_set_list);
+							GVCST_BMP_MARK_FREE(&kill_set_list, ret_tn, inctn_mu_reorg,
+									inctn_bmp_mark_free_mu_reorg, inctn_opcode, cs_addrs)
 							DECR_KIP(cs_data, cs_addrs, kip_incremented);
 							if (detailed_log)
 								log_detailed_log("KIL", &(gv_target->hist), NULL, level,
@@ -538,7 +540,8 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						if (detailed_log)
 							log_detailed_log("SWA", &(gv_target->hist), NULL, level, NULL, ret_tn);
 						gvcst_kill_sort(&kill_set_list);
-						ret_tn = gvcst_bmp_mark_free(&kill_set_list);
+						GVCST_BMP_MARK_FREE(&kill_set_list, ret_tn, inctn_mu_reorg,
+								inctn_bmp_mark_free_mu_reorg, inctn_opcode, cs_addrs)
 						DECR_KIP(cs_data, cs_addrs, kip_incremented);
 						if (detailed_log)
 							log_detailed_log("KIL", &(gv_target->hist), NULL, level,
@@ -650,7 +653,8 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				if (detailed_log)
 					log_detailed_log("RDL", &(gv_target->hist), NULL, level, NULL, ret_tn);
 				gvcst_kill_sort(&kill_set_list);
-				ret_tn = gvcst_bmp_mark_free(&kill_set_list);
+				GVCST_BMP_MARK_FREE(&kill_set_list, ret_tn, inctn_mu_reorg,
+						inctn_bmp_mark_free_mu_reorg, inctn_opcode, cs_addrs)
 				DECR_KIP(cs_data, cs_addrs, kip_incremented);
 				if (detailed_log)
 					log_detailed_log("KIL", &(gv_target->hist), NULL, level, &kill_set_list, ret_tn);

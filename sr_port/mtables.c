@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,8 +25,7 @@
 #	endif
 #endif
 
-
-char LITDEF ctypetab[128] = {
+char LITDEF ctypetab[NUM_ASCII_CHARS] = {
  TK_EOL,TK_ERROR,TK_ERROR,TK_ERROR,TK_ERROR,TK_ERROR,TK_ERROR,TK_ERROR
 ,TK_ERROR,TK_SPACE,TK_ERROR,TK_ERROR,TK_EOR,TK_ERROR,TK_ERROR,TK_ERROR
 ,TK_ERROR,TK_ERROR,TK_ERROR,TK_ERROR,TK_ERROR,TK_ERROR,TK_ERROR,TK_ERROR
@@ -118,7 +117,8 @@ LITDEF unsigned char mvs_size[] =
 		MV_SIZE(mvs_stck),
 		MV_SIZE(mvs_nval),
 		MV_SIZE(mvs_tval),
-		MV_SIZE(mvs_tp_holder)
+		MV_SIZE(mvs_tp_holder),
+		MV_SIZE(mvs_zintr)
 	};
 
 static readonly unsigned char localpool[3] = {'1' , '1' , '0'};

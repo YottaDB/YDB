@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include <sys/mman.h>
 #include <errno.h>
 #include <unistd.h>

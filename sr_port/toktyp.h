@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,3 +62,5 @@
 #define TK_SORTS_AFTER 49
 #define TK_NSORTS_AFTER 50
 #define TK_SQLFIELDNAME 51
+
+#define	NUM_ASCII_CHARS	128

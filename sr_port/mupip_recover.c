@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -207,7 +207,7 @@ void	mupip_recover(void)
 	jrec_suffix		*suffix_ptr;
 	mval			v;
 	seq_num			tempqw_seqno;	/* Used for temporary manipulation */
-	uint4			i, status, tempdw;
+	uint4			i, status, tempdw, lookup_lookback_time;
 	unsigned char		*mstack_ptr;
 	int			epoch_limit;
 
@@ -257,7 +257,7 @@ void	mupip_recover(void)
 			QWASSIGN(resync_jnl_seqno, max_resync_seqno);
 		QWASSIGN(consist_jnl_seqno, resync_jnl_seqno);
 	}
-	if (!mur_options.forward && mur_options.update && (!mur_options.rollback || mur_options.fetchresync))
+	if (!mur_options.forward && mur_options.update && ((!mur_options.rollback && mur_options.chain) || mur_options.fetchresync))
 	{
 		/* Check to see whether we have all the journal files that satisfy consist_jnl_seqno
 			criteria in case of fetchresync or resync */
@@ -394,7 +394,7 @@ void	mupip_recover(void)
 						if (mur_options.rollback && QWLE(rec->val.jrec_epoch.jnl_seqno, consist_jnl_seqno))
 							break;
 						else if (!mur_options.rollback
-							   && rec->val.jrec_epoch.short_time < MID_TIME(mur_options.lookback_time))
+							   && rec->val.jrec_epoch.short_time < MUR_OPT_MID_TIME(lookback_time))
 							break;
 					}
 				}
@@ -503,10 +503,11 @@ void	mupip_recover(void)
 		/* assert(!mur_multi_extant()  ||  !mur_options.rollback); */
 		if (mur_multi_extant()  &&  !mur_options.rollback)
 		{
-			MID_TIME(min_lookback_time) = mur_lookup_lookback_time();
-			if (MID_TIME(min_lookback_time) < MID_TIME(mur_options.lookback_time))
+			lookup_lookback_time = mur_lookup_lookback_time();
+			JNL_WHOLE_FROM_SHORT_TIME(min_lookback_time, lookup_lookback_time);
+			if (lookup_lookback_time < MUR_OPT_MID_TIME(lookback_time))
 			{
-				MID_TIME(mur_options.lookback_time) = MID_TIME(min_lookback_time);
+				mur_options.lookback_time = min_lookback_time;
 				for (ctl = last_jnl_file; NULL != ctl; ctl = ctl->prev)
 					if (MID_TIME(min_lookback_time) < MID_TIME(ctl->lookback_time))
 						ctl->reached_lookback_limit = FALSE;
@@ -581,6 +582,8 @@ check_pblk:
 	if (NULL != mur_options.losttrans_file_info)
 		util_out_print("MUR-I-LOSTTRANSSTART : Starting Phase for Extracting Lost Transactions", TRUE);
 	/* Do forward processing */
+	forw_phase_recovery = TRUE;	/* Initialize to TRUE so that recover copies original time stamps during forward phase
+ 	 				 * while writing newly generated logical records */
 	/* Note that if all regions have before-imaging disabled, we dont need to invoke mur_crejnl_forwphase_file()
 	 * but we let it decide that since anyway it scans the ctl list
 	 */
@@ -589,9 +592,6 @@ check_pblk:
 		mur_close_files();
 		mupip_exit(ERR_NORECOVERERR);
 	}
-	/* Initialize to TRUE so that recover copies original time stamps during forward phase
- 	 * while writing newly generated logical records */
-	forw_phase_recovery = TRUE;
 	mur_forward_buddy_list_init();
         if (((mur_error_count <= mur_options.error_limit  ||  mur_error_allowed)  &&
 		(mur_options.update  ||  NULL != mur_options.extr_file_info)  ||

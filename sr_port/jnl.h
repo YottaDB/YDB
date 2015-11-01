@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,10 +9,10 @@
  *								*
  ****************************************************************/
 
-#ifndef __JNL_H__
-#define __JNL_H__
+#ifndef JNL_H_INCLUDED
+#define JNL_H_INCLUDED
 
-#ifndef JNL_S_TIME
+#ifndef JNLSP_H_INCLUDED
 #include "jnlsp.h"
 #endif
 
@@ -47,19 +47,13 @@ typedef struct jnl_process_vector_struct	/* name needed since this is used in cm
 /* If you update JNL_LABEL_TEXT, you need to JNL_VER_THIS and repl_internal_filter array.
  * Also need to follow a set of directions (yet to be written 12/7/2000 -- nars) in case a new set of filters need to be written.
  */
-#define JNL_LABEL_TEXT		"GDSJNL12" /* update JNL_VER_THIS and repl_internal_filter array if you update JNL_LABEL_TEXT */
-#define JNL_VER_THIS		'\014' /* from GDSJNL11, octal equivalent of decimal 11 */
+#define JNL_LABEL_TEXT		"GDSJNL14" /* update JNL_VER_THIS and repl_internal_filter array if you update JNL_LABEL_TEXT */
+#define JNL_VER_THIS		'\016' /* octal equivalent of JNL_LABEL_TEXT */
 #define JNL_VER_EARLIEST_REPL	'\007' /* from GDSJNL07 (V4.1-000E), octal equivalent of decimal 07 */
-#define	ALIGN_KEY		0xfedcba98
+#define	ALIGN_KEY		0xdeadbeef
 
 #define JNL_ALLOC_DEF		100
 #define JNL_ALLOC_MIN		10
-
-#ifdef UNIX
-#define JNL_BUFFER_DEF		ROUND_UP2(128, IO_BLOCK_SIZE / DISK_BLOCK_SIZE)
-#else
-#define JNL_BUFFER_DEF		128
-#endif
 
 /*	JNL_BUFFER_MIN	database block size / 512 + 1	*/
 #define JNL_BUFFER_MAX		2000
@@ -71,50 +65,39 @@ typedef struct jnl_process_vector_struct	/* name needed since this is used in cm
 #define JNL_EXTEND_MAX		65535
 #define JNL_MIN_WRITE		32768
 #define JNL_MAX_WRITE		65536
-#define JNL_EXT_DEF		".MJL"
 #define JNL_REC_TRAILER		0xFE
 #define	JNL_WRT_START_MODULUS	512
 #define JNL_WRT_START_MASK	~(JNL_WRT_START_MODULUS - 1)
 #define	JNL_WRT_END_MODULUS	8
 #define JNL_WRT_END_MASK	~(JNL_WRT_END_MODULUS - 1)
-#define	JNL_MIN_ALIGNSIZE	16384
+#define	JNL_MIN_ALIGNSIZE	32
+#define	JNL_MAX_ALIGNSIZE	32	/* should ideally be 8388608, but not possible until MUPIP RECOVER supports it */
 #define JNL_REC_START_BNDRY	8
 #define MAX_JNL_REC_SIZE	(DISK_BLOCK_SIZE * 32)
+
+#define MIN_YIELD_LIMIT		0
 #define MAX_YIELD_LIMIT		2048
+#define DEFAULT_YIELD_LIMIT	8
 
 /* Have a minimum jnl-file-auto-switch-limit of 64 align boundaries (currently each align boundary is 16K) */
-#define	JNL_AUTOSWITCHLIMIT_MIN	(64 * JNL_MIN_ALIGNSIZE / DISK_BLOCK_SIZE)
+#define	JNL_AUTOSWITCHLIMIT_MIN	(64 * JNL_MIN_ALIGNSIZE)
+
+#define	ALQ_DEQ_AUTO_OVERRIDE_INVALID	2	/* some positive value other than 0 or 1 which gets checked in jnl_file_open */
 
 /* options (sizeof(char)) to wcs_flu() (currently flush_hdr, write_epoch, sync_epoch) are bit-wise ored */
 #define	WCSFLU_NONE		0
 #define	WCSFLU_FLUSH_HDR	1
 #define	WCSFLU_WRITE_EPOCH	2
 #define	WCSFLU_SYNC_EPOCH	4
+#define	WCSFLU_FSYNC_DB		8	/* Currently used only in Unix wcs_flu() */
 
-/* In Unix the unit epoch-second is a second, but in VMS approx. 152.5 epoch-seconds make up a second.
- * This is done due to the following. In VMS, time is a 64-bit quantity whose unit is in 100 nanoseconds.
- * To convert it to a unit of time that has more relevance to the user (the most desirable would be a second)
- * 	and not lose many CPU cycles in the process, we extract the middle 32-bits. This gives us a unit
- *	(which we now refer to as an epoch-second) which is 64K times 100 nanoseconds which is 1/152.5th of a second.
- * Note that we approximate this to be 152 for computation considerations and this may cause an epoch-timer
- *	scheduled to come out say every 1000 seconds to every 996 seconds (note this is only in VMS).
- * Also note that the user interface for epoch-interval is in seconds both in terms of input and output. Only
- *	the internal representation is different.
- */
-
-#ifdef VMS
-#define	SECOND2EPOCH_SECOND	152		/* = 100 nanoseconds / 64K */
+#ifdef DEBUG
+#define	DEFAULT_EPOCH_INTERVAL_IN_SECONDS	30 /* exercise epoch-syncing code relatively more often in DBG */
 #else
-#define SECOND2EPOCH_SECOND	1
+#define	DEFAULT_EPOCH_INTERVAL_IN_SECONDS	300
 #endif
 
-/* Have epoch-interval of 30 seconds in PRO and 300 seconds in DBG */
-
-#ifndef DEBUG
-#define	DEFAULT_EPOCH_INTERVAL	300*SECOND2EPOCH_SECOND		/* in epoch-seconds */
-#else
-#define	DEFAULT_EPOCH_INTERVAL	 30*SECOND2EPOCH_SECOND 	/* exercise epoch-syncing code relatively more often in DBG */
-#endif
+#define DEFAULT_EPOCH_INTERVAL	SECOND2EPOCH_SECOND(DEFAULT_EPOCH_INTERVAL_IN_SECONDS)
 
 #define	MAX_EPOCH_INTERVAL	32767	/* in seconds. Amounts to nearly 10 hours. Don't want to keep db stale so long */
 
@@ -131,6 +114,12 @@ typedef struct jnl_process_vector_struct	/* name needed since this is used in cm
 #else
 #define THREE_LOW_BYTES(x)	((uchar_ptr_t)(&x))
 #endif
+
+#define JNL_S_TIME(rec, jrec_type)			MID_TIME((rec)->val.jrec_type.process_vector.jpv_time)
+#define JNL_S_TIME_PINI(rec, jrec_type, which_pv)	MID_TIME((rec)->val.jrec_type.process_vector[which_pv].jpv_time)
+#define MUR_OPT_MID_TIME(opt)				MID_TIME(mur_options.opt)
+#define CMP_JNL_PROC_TIME(W1, W2)			((long)(MID_TIME(W1) - MID_TIME(W2)))
+#define EXTTIME(S)					extract_len = exttime(S, mur_extract_buff, extract_len)
 
 enum jnl_record_type
 {
@@ -166,7 +155,7 @@ typedef struct
 	volatile int4		free;		/* relative index of first byte to write in buffer */
 	volatile uint4		freeaddr,	/* virtual on-disk address which will correspond to free, when it is written */
 				lastaddr,	/* previous freeaddr */
-				filesize;	/* highest virtual address available in the file */
+				filesize;	/* highest virtual address available in the file (units in disk-blocks) */
 						/* end mainline QUAD */
 	volatile int4		blocked;
 	volatile uint4	 	fsync_dskaddr;  /* dskaddr upto which fsync is done */
@@ -182,7 +171,8 @@ typedef struct
 		unsigned short	length;
 		int4		dev_specific;
 	}			iosb;
-	int4			alignsize;		/* alignment size for JRT_ALIGN */
+	/* alignsize is removed and log2_of_alignsize introduced */
+	uint4         		log2_of_alignsize;       /* Ceiling of log2(alignsize) */
  	uint4			autoswitchlimit;	/* limit in disk blocks (max 4GB) when jnl should be auto switched */
 	volatile int4		qiocnt,			/* Number of qio's issued */
 				bytcnt,			/* Number of bytes written */
@@ -246,6 +236,10 @@ typedef struct jnl_private_control_struct
 	volatile boolean_t	qio_active;		/* jnl buffer write in progress in THIS process (recursion indicator) */
 	boolean_t		fd_mismatch;
 	volatile boolean_t	sync_io;		/* TRUE if the process is using O_SYNC/O_DSYNC for this jnl (UNIX) */
+	boolean_t		alq_deq_auto_override;	/* set in jnl_file_open() and reset in set_jnl_info() */
+	uint4			jnl_alq;		/* copies of journal allocation/extension/autoswitchlimit */
+	uint4			jnl_deq;		/*	to be restored whenever a journal switch occurs   */
+	uint4			autoswitchlimit;	/*	during forward phase of journal recovery/rollback */
 } jnl_private_control;
 
 typedef enum
@@ -314,12 +308,14 @@ typedef struct
 	int4			repl_state;	/* To state whether replication is turned on for this journal file */
 	seq_num			start_seqno;	/* the reg_seqno when this journal file was created */
 	trans_num		bov_tn, eov_tn;
-	uint4			ftruncate_len;	/* Length upto which jurnal file was truncated (turn around point stop address) */
+	uint4			ftruncate_len;	/* Length upto which journal file was truncated (turn around point stop address) */
 	uint4			forw_phase_eof_addr;	/* Eof address and Last record of newly created forw_phase journal file, */
 	uint4			forw_phase_last_record;	/* Used incase rollback is interrupted during forward phase */
 	uint4			forw_phase_stop_addr;	/* The last stop addr in forward phase journal file name,
 							 * Used incase of rollback is interrupted during forward phase */
  	uint4			autoswitchlimit;	/* limit in disk blocks (max 4GB) when jnl should be auto switched */
+	uint4			jnl_alq;		/* initial allocation (in blocks) */
+	uint4			jnl_deq;		/* extension (in blocks) */
 } jnl_file_header;
 
 typedef struct
@@ -330,8 +326,7 @@ typedef struct
 				buffer;
 	trans_num		tn;
 	char			*fn,
-				*jnl,
-				*jnl_def;
+				*jnl;
 	short			rsize,
 				fn_len,
 				jnl_len,
@@ -339,10 +334,10 @@ typedef struct
 	bool			before_images;
 	bool			filler_bool[3];
 	int4			alignsize;
- 	uint4			autoswitchlimit;	/* limit in disk blocks (max 4GB) when jnl should be auto switched */
+ 	int4			autoswitchlimit;	/* limit in disk blocks (max 4GB or 8388608, hence int4)
+							 * when jnl should be auto switched */
 	int4			epoch_interval;		/* Time between successive epochs in epoch-seconds */
 	char			*prev_jnl;
-	int4			filler_int4;
 	int4			prev_jnl_len;
 	int4			repl_state;
 	seq_num			reg_seqno;
@@ -589,6 +584,49 @@ typedef struct jnl_format_buff_struct
 	jnl_action			ja;
 } jnl_format_buffer;
 
+typedef struct set_jnl_options_struct
+{
+	int			cli_journal, cli_enable, cli_on, cli_replic_on;
+	boolean_t		alignsize_specified,
+				allocation_specified,
+				autoswitchlimit_specified,
+				image_type_specified,	/* beofre/nobefore option specified */
+				buffer_size_specified,
+				epoch_interval_specified,
+				extension_specified,
+				filename_specified,
+				sync_io_specified,
+				yield_limit_specified;
+	/* since jnl_create_info does not have following fields, we need them here */
+	boolean_t		sync_io;
+	int4			yield_limit;
+} set_jnl_options;
+
+/* rlist_state needed to be moved here to use with mu_set_reglist */
+enum rlist_state {
+	NONALLOCATED,
+	ALLOCATED,
+	DEALLOCATED
+};
+
+/* mu_set_reglist needed to be moved here for the journal specific fields */
+/* ATTN: the first four items in this structure need to be identical to those
+ *	 in structure tp_region in tp.h.
+ */
+typedef struct mu_set_reglist
+{
+	struct mu_set_reglist	*fPtr;		/* all fields after this are used for mupip_set_journal.c */
+	gd_region		*reg;
+	char			unique_id[UNIQUE_ID_SIZE];
+	enum rlist_state	state;
+	sgmnt_data_ptr_t 	sd;
+	bool			exclusive;	/* standalone access is required for this region */
+	int			fd;
+	enum jnl_state_codes	jnl_new_state;
+	enum repl_state_codes	repl_new_state;
+	boolean_t		before_images;
+} mu_set_rlist;
+
 /* jnl_ prototypes */
 int4	jnl_record_length(jnl_record *rec, int4 top);
 int	jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size); /***type int added***/
@@ -596,6 +634,7 @@ void	jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat);
 uint4	jnl_qio_start(jnl_private_control *jpc);
 uint4	jnl_write_attempt(jnl_private_control *jpc, uint4 threshold);
 void	jnl_format(jnl_format_buffer *jfb);
+void	jnl_format_set(mval *v);
 void	jnl_prc_vector(jnl_process_vector *pv);
 void	jnl_send_oper(jnl_private_control *jpc, uint4 status);
 void	jnl_setver(void);
@@ -605,25 +644,26 @@ void	jnlext_write(char *buffer, int length);
 uint4	cre_jnl_file(jnl_create_info *info);
 uint4	jnl_ensure_open(void);
 void	set_jnl_info(gd_region *reg, jnl_create_info *set_jnl_info);
-int 	exttime(uint4 time, jnl_proc_time *ref_time, int extract_len);
+int 	exttime(uint4 time, char *buffer, int extract_len);
 
 #ifdef VMS
-uint4	set_jnl_file_close(boolean_t in_jnlfilext);
 void	finish_active_jnl_qio(void);
 void	jnl_start_ast(jnl_private_control *jpc);
 uint4	jnl_permit_ast(jnl_private_control *jpc);
 void	jnl_qio_end(jnl_private_control *jpc);
 #endif
 
-void	detailed_extract_tcom(jnl_record *rec, uint4 pid, jnl_proc_time *ref_time);
+void	detailed_extract_tcom(jnl_record *rec, uint4 pid);
 void	wcs_defer_wipchk_ast(jnl_private_control *jpc);
-
-int4	mupip_set_jnlfile_aux(jnl_file_header *header);
-
+boolean_t  mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info *jnl_info);
+uint4	mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *jnl_info, mu_set_rlist *rptr);
+uint4	set_jnl_file_close(boolean_t in_jnlfilext);
+void	mupip_set_journal_fname(jnl_create_info *jnl_info);
+uint4	mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname);
 char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec);
-char    *ext2jnl(char *ptr, jnl_record *rec);
+char	*ext2jnl(char *ptr, jnl_record *rec);
 char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char *ext_buff);
-char    *jnl2ext(char *jnl_buff, char *ext_buff);
+char	*jnl2ext(char *jnl_buff, char *ext_buff);
 
 #define JREC_PREFIX_SIZE	sizeof(jrec_prefix)
 #define JREC_SUFFIX_SIZE	sizeof(jrec_suffix)
@@ -667,14 +707,95 @@ char    *jnl2ext(char *jnl_buff, char *ext_buff);
 	}										\
 }
 
-#define JNL_FILE_FIRST_RECORD	ROUND_UP(sizeof(jnl_file_header), DISK_BLOCK_SIZE)
+/* define xxx_FIXED_SIZE macros to reflect the fixed size component of each journal record type */
+#define	JRT_AIMG_FIXED_SIZE	sizeof(fixed_jrec_after_image)
+#define	JRT_ALIGN_FIXED_SIZE	sizeof(struct_jrec_align)
+#define	JRT_EOF_FIXED_SIZE	sizeof(struct_jrec_eof)
+#define	JRT_EPOCH_FIXED_SIZE	sizeof(struct_jrec_epoch)
+#define	JRT_INCTN_FIXED_SIZE	sizeof(struct_jrec_inctn)
+#define	JRT_NULL_FIXED_SIZE	sizeof(struct_jrec_null)
+#define	JRT_PBLK_FIXED_SIZE	sizeof(fixed_jrec_pblk)
+#define	JRT_PFIN_FIXED_SIZE	sizeof(struct_jrec_pfin)
+#define	JRT_PINI_FIXED_SIZE	sizeof(struct_jrec_pini)
+#define	JRT_TCOM_FIXED_SIZE	sizeof(struct_jrec_tcom)
+#define	JRT_ZTCOM_FIXED_SIZE	sizeof(struct_jrec_tcom)
+
+#define	JRT_SET_FIXED_SIZE	sizeof(fixed_jrec_kill_set)
+#define	JRT_TSET_FIXED_SIZE	sizeof(fixed_jrec_tp_kill_set)
+#define	JRT_USET_FIXED_SIZE	sizeof(fixed_jrec_tp_kill_set)
+#define	JRT_FSET_FIXED_SIZE	sizeof(fixed_jrec_tp_kill_set)
+#define	JRT_GSET_FIXED_SIZE	sizeof(fixed_jrec_tp_kill_set)
+
+#define	JRT_KILL_FIXED_SIZE	sizeof(fixed_jrec_kill_set)
+#define	JRT_TKILL_FIXED_SIZE	sizeof(fixed_jrec_tp_kill_set)
+#define	JRT_UKILL_FIXED_SIZE	sizeof(fixed_jrec_tp_kill_set)
+#define	JRT_FKILL_FIXED_SIZE	sizeof(fixed_jrec_tp_kill_set)
+#define	JRT_GKILL_FIXED_SIZE	sizeof(fixed_jrec_tp_kill_set)
+
+#define	JRT_ZKILL_FIXED_SIZE	sizeof(fixed_jrec_kill_set)
+#define	JRT_TZKILL_FIXED_SIZE	sizeof(fixed_jrec_tp_kill_set)
+#define	JRT_UZKILL_FIXED_SIZE	sizeof(fixed_jrec_tp_kill_set)
+#define	JRT_FZKILL_FIXED_SIZE	sizeof(fixed_jrec_tp_kill_set)
+#define	JRT_GZKILL_FIXED_SIZE	sizeof(fixed_jrec_tp_kill_set)
+
+/* define xxx_RECLEN macros to reflect the journal record length of each journal record type */
+#define	AIMG_RECLEN		(JREC_PREFIX_SIZE + JRT_AIMG_FIXED_SIZE  + JREC_SUFFIX_SIZE)
+#define	ALIGN_RECLEN		(JREC_PREFIX_SIZE + JRT_ALIGN_FIXED_SIZE + JREC_SUFFIX_SIZE)
+#define	EOF_RECLEN		(JREC_PREFIX_SIZE + JRT_EOF_FIXED_SIZE   + JREC_SUFFIX_SIZE)
+#define	EPOCH_RECLEN		(JREC_PREFIX_SIZE + JRT_EPOCH_FIXED_SIZE + JREC_SUFFIX_SIZE)
+#define	INCTN_RECLEN		(JREC_PREFIX_SIZE + JRT_INCTN_FIXED_SIZE + JREC_SUFFIX_SIZE)
+#define	NULL_RECLEN		(JREC_PREFIX_SIZE + JRT_NULL_FIXED_SIZE  + JREC_SUFFIX_SIZE)
+#define	PBLK_RECLEN		(JREC_PREFIX_SIZE + JRT_PBLK_FIXED_SIZE  + JREC_SUFFIX_SIZE)
+#define	PFIN_RECLEN		(JREC_PREFIX_SIZE + JRT_PFIN_FIXED_SIZE  + JREC_SUFFIX_SIZE)
+#define	PINI_RECLEN		(JREC_PREFIX_SIZE + JRT_PINI_FIXED_SIZE  + JREC_SUFFIX_SIZE)
+#define	TCOM_RECLEN		(JREC_PREFIX_SIZE + JRT_TCOM_FIXED_SIZE  + JREC_SUFFIX_SIZE)
+#define	ZTCOM_RECLEN		(JREC_PREFIX_SIZE + JRT_ZTCOM_FIXED_SIZE + JREC_SUFFIX_SIZE)
+
+#define	SET_RECLEN		(JREC_PREFIX_SIZE + JRT_SET_FIXED_SIZE   + JREC_SUFFIX_SIZE)
+#define	TSET_RECLEN		(JREC_PREFIX_SIZE + JRT_TSET_FIXED_SIZE  + JREC_SUFFIX_SIZE)
+#define	USET_RECLEN		(JREC_PREFIX_SIZE + JRT_USET_FIXED_SIZE  + JREC_SUFFIX_SIZE)
+#define	FSET_RECLEN		(JREC_PREFIX_SIZE + JRT_FSET_FIXED_SIZE  + JREC_SUFFIX_SIZE)
+#define	GSET_RECLEN		(JREC_PREFIX_SIZE + JRT_GSET_FIXED_SIZE  + JREC_SUFFIX_SIZE)
+
+#define	KILL_RECLEN		(JREC_PREFIX_SIZE + JRT_KILL_FIXED_SIZE  + JREC_SUFFIX_SIZE)
+#define	TKILL_RECLEN		(JREC_PREFIX_SIZE + JRT_TKILL_FIXED_SIZE + JREC_SUFFIX_SIZE)
+#define	UKILL_RECLEN		(JREC_PREFIX_SIZE + JRT_UKILL_FIXED_SIZE + JREC_SUFFIX_SIZE)
+#define	FKILL_RECLEN		(JREC_PREFIX_SIZE + JRT_FKILL_FIXED_SIZE + JREC_SUFFIX_SIZE)
+#define	GKILL_RECLEN		(JREC_PREFIX_SIZE + JRT_GKILL_FIXED_SIZE + JREC_SUFFIX_SIZE)
+
+#define	ZKILL_RECLEN		(JREC_PREFIX_SIZE + JRT_ZKILL_FIXED_SIZE  + JREC_SUFFIX_SIZE)
+#define	TZKILL_RECLEN		(JREC_PREFIX_SIZE + JRT_TZKILL_FIXED_SIZE + JREC_SUFFIX_SIZE)
+#define	UZKILL_RECLEN		(JREC_PREFIX_SIZE + JRT_UZKILL_FIXED_SIZE + JREC_SUFFIX_SIZE)
+#define	FZKILL_RECLEN		(JREC_PREFIX_SIZE + JRT_FZKILL_FIXED_SIZE + JREC_SUFFIX_SIZE)
+#define	GZKILL_RECLEN		(JREC_PREFIX_SIZE + JRT_GZKILL_FIXED_SIZE + JREC_SUFFIX_SIZE)
+
+#define	JNL_FILE_FIRST_RECORD	ROUND_UP(sizeof(jnl_file_header), DISK_BLOCK_SIZE)
 #define	HDR_LEN			ROUND_UP(sizeof(jnl_file_header), DISK_BLOCK_SIZE)
-#define PINI_RECLEN		ROUND_UP(JREC_PREFIX_SIZE + sizeof(jrec_pini) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
-#define EPOCH_RECLEN		ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_epoch) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
-#define PFIN_RECLEN		ROUND_UP(JREC_PREFIX_SIZE + sizeof(jrec_pfin) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
-#define	EOF_RECLEN		ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_eof) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
-#define EOF_BACKPTR		ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_eof), JNL_REC_START_BNDRY)
-#define EPOCH_BACKPTR		ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_epoch), JNL_REC_START_BNDRY)
+#define	EOF_BACKPTR		(JREC_PREFIX_SIZE + JRT_EOF_FIXED_SIZE)
+#define	EPOCH_BACKPTR		(JREC_PREFIX_SIZE + JRT_EPOCH_FIXED_SIZE)
 #define	EPOCH_SIZE		1000	/* to be changed later when we allow the user to modify it */
 
-#endif
+/* the maximum required journal file size (in 512-byte blocks) if the current transaction was the only one in a fresh journal file
+ * JNL_FILE_FIRST_RECORD takes into account the size of the journal file header
+ * DISK_BLOCK_SIZE takes into account the first epoch record and
+ * 	the DISK_BLOCK_SIZE-aligned EOF record that gets written as part of a cre_jnl_file()
+ */
+#define	MAX_REQD_JNL_FILE_SIZE(tot_jrec_size)											\
+	DIVIDE_ROUND_UP((JNL_FILE_FIRST_RECORD + DISK_BLOCK_SIZE + ROUND_UP(tot_jrec_size, DISK_BLOCK_SIZE)), DISK_BLOCK_SIZE)
+
+/* this macro aligns the input size to account that journal file sizes can increase only in multiples of the extension size */
+#define	ALIGNED_ROUND_UP(tmp_tot_jrec_size, jnl_alq, jnl_deq)					\
+	(((tmp_tot_jrec_size) <= (jnl_alq) || !(jnl_deq))					\
+	 	? (jnl_alq) 									\
+		: ((jnl_alq) + ROUND_UP((tmp_tot_jrec_size) - (jnl_alq), (jnl_deq))))
+
+/* this macro aligns the input size to account that journal file sizes can increase only in multiples of the extension size */
+#define	ALIGNED_ROUND_DOWN(tmp_tot_jrec_size, jnl_alq, jnl_deq)					\
+	(((tmp_tot_jrec_size) <= (jnl_alq) || !(jnl_deq))					\
+	 	? (jnl_alq) 									\
+		: ((jnl_alq) + ROUND_DOWN((tmp_tot_jrec_size) - (jnl_alq), (jnl_deq))))
+
+/* the following macro uses 8-byte quantities (gtm_uint64_t) to perform additions that might cause a 4G overflow */
+#define	DISK_BLOCKS_SUM(freeaddr, jrec_size)	DIVIDE_ROUND_UP((((gtm_uint64_t)(freeaddr)) + (jrec_size)), DISK_BLOCK_SIZE)
+
+#endif /* JNL_H_INCLUDED */

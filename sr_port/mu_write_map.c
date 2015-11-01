@@ -54,5 +54,7 @@ void mu_write_map(block_id blk,			/*  block number being written */
 	cs->upd_addr = upd_addr;
 	cs->tn = tn;
 	cs->level = LCL_MAP_LEVL;
+	cs->jnl_freeaddr = 0;		/* reset jnl_freeaddr that previous transaction might have filled in */
+	cs->write_type = GDS_WRITE_PLAIN;
  	cw_map_depth++;
 }

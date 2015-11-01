@@ -28,6 +28,8 @@
 ***************************************************************************************/
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "cdb_sc.h"
 #include "gdsroot.h"
 #include "gdsbt.h"

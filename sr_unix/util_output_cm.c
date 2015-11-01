@@ -10,7 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
+
 #include "hashdef.h"
 #include "cmidef.h"
 #include "cmmdef.h"

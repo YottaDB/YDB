@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "stp_parms.h"
 #include "stringpool.h"
 #include "cmd_qlf.h"

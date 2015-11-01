@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,9 +38,9 @@
 #include "gtmsource.h"
 #include "is_file_identical.h"
 #include "gtmmsg.h"
+#include "send_msg.h"
 
 #define BACKPTR		ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_eof), JNL_REC_START_BNDRY)
-#define	EOF_RECLEN	ROUND_UP(JREC_PREFIX_SIZE + sizeof(struct_jrec_eof) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY)
 
 #ifdef BIGENDIAN
 # define EOF_SUFFIX	((BACKPTR << 8) + JNL_REC_TRAILER)
@@ -51,6 +51,9 @@
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	boolean_t		pool_init;
 GBLREF	uint4			process_id;
+GBLREF  jnl_process_vector      *prc_vec;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	boolean_t		forw_phase_recovery;
 
 error_def(ERR_FILEIDMATCH);
 error_def(ERR_JNLACCESS);
@@ -69,6 +72,7 @@ error_def(ERR_JNLTRANSGTR);
 error_def(ERR_JNLTRANSLSS);
 error_def(ERR_JNLWRERR);
 error_def(ERR_IOEOF);
+error_def(ERR_PREVJNLLINKCUT);
 
 uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for compatibility with VMS version */
 {
@@ -123,6 +127,10 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 				memset(&create, 0, sizeof(create));
 				create.prev_jnl = &prev_jnl_fn[0];
 				set_jnl_info(reg, &create);
+				/* Note: set_jnl_info does a redundant memcpy for previous journal file link.
+				 * We should try to avoid it. But this is unusual code path and
+				 * so performance issue can be ignored */
+				create.prev_jnl_len = 0;
 				if (0 != cre_jnl_file(&create))
 				{
 					jpc->status = create.status;
@@ -133,6 +141,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 					jpc->status = 0;
 					sts = 0;
 				}
+				send_msg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
 			}
 			if (csd->jnl_sync_io)
 			{
@@ -242,18 +251,43 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 				retry = FALSE;
 				continue;
 			}
-			jb->filesize = stat_buf.st_size;
+			assert(((off_t)stat_buf.st_size) % DISK_BLOCK_SIZE == 0);
+			jb->filesize = DIVIDE_ROUND_DOWN(((off_t)stat_buf.st_size), DISK_BLOCK_SIZE);
 			jb->min_write_size = JNL_MIN_WRITE;
 			jb->max_write_size = JNL_MAX_WRITE;
 			jb->before_images = header->before_images;
 			jb->epoch_tn = eof_record->val.jrec_eof.tn;
-			jb->alignsize = header->alignsize;
+			LOG2_OF_INTEGER(header->alignsize, jb->log2_of_alignsize);
 			jb->autoswitchlimit = header->autoswitchlimit;
+			assert(forw_phase_recovery || header->autoswitchlimit == csd->autoswitchlimit);
+			assert(forw_phase_recovery || header->jnl_alq == csd->jnl_alq);
+			assert(forw_phase_recovery || header->jnl_deq == csd->jnl_deq);
+			if (forw_phase_recovery
+				&& (csd->autoswitchlimit != header->autoswitchlimit
+					|| csd->jnl_alq != header->jnl_alq
+					|| csd->jnl_deq != header->jnl_deq))
+			{	/* update csd's jnl_alq/jnl_deq/autoswitchlimit values to reflect current journal file's settings
+				 * at the same time saving csd's values for use from the next newly created jnl file onwards */
+				assert(FALSE == jpc->alq_deq_auto_override);
+				jpc->alq_deq_auto_override = TRUE;
+				jpc->jnl_alq = csd->jnl_alq;
+				jpc->jnl_deq = csd->jnl_deq;
+				jpc->autoswitchlimit = csd->autoswitchlimit;
+				assert(csd->autoswitchlimit == ALIGNED_ROUND_UP(csd->autoswitchlimit, csd->jnl_alq, csd->jnl_deq));
+				csd->autoswitchlimit = header->autoswitchlimit;
+				csd->jnl_alq = header->jnl_alq;
+				csd->jnl_deq = header->jnl_deq;
+			}
+			assert(jb->autoswitchlimit == csd->autoswitchlimit);
+			assert(csd->autoswitchlimit >= csd->jnl_alq);
+			assert(ALIGNED_ROUND_UP(csd->autoswitchlimit, csd->jnl_alq, csd->jnl_deq) == csd->autoswitchlimit);
+			assert(csd->autoswitchlimit);
 			jb->epoch_interval = header->epoch_interval;
 			JNL_SHORT_TIME(jb->next_epoch_time);
 			save_time = jb->next_epoch_time;
 			jb->next_epoch_time += jb->epoch_interval;
-			jnl_prc_vector(&prc);
+			memcpy(&prc, prc_vec, sizeof(jnl_process_vector));
+			JNL_WHOLE_TIME(prc.jpv_time);
 			if ((ROUND_UP(sizeof(jnl_file_header), DISK_BLOCK_SIZE)) == header->end_of_data)
 				header->eov_timestamp = save_time;
 			assert(CMP_JNL_PROC_TIME(header->eov_timestamp, header->bov_timestamp) >= 0);

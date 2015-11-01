@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,8 +65,19 @@ bool gtcmtr_put(void)
 	gtcm_bind_name(reg_ref->reghead, TRUE);
 	if (gv_cur_region->read_only)
 		rts_error(VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
-	if (JNL_ENABLED(cs_addrs->hdr))
-	{
+	if (JNL_ALLOWED(cs_addrs))
+	{	/* we need to copy client's specific prc_vec into the global variable in order that the gvcst* routines
+		 *	do the right job. actually we need to do this only if JNL_ENABLED(cs_addrs), but since it is not
+		 *	easy to re-execute the following two assignments in case gvcst_put()'s call to t_end() encounters a
+		 *	cdb_sc_jnlstatemod retry code, we choose the easier approach of executing the following segment
+		 *	if JNL_ALLOWED(cs_addrs) is TRUE instead of checking for JNL_ENABLED(cs_addrs) to be TRUE.
+		 * this approach has the overhead that we will be doing the following assignments even though JNL_ENABLED
+		 * 	might not be TRUE but since the following two are just pointer copies, it is not considered a big overhead.
+		 * this approach ensures that the jnl_put_jrt_pini() gets the appropriate prc_vec for writing into the
+		 * 	journal record in case JNL_ENABLED turns out to be TRUE in t_end() time.
+		 * note that the value of JNL_ALLOWED(cs_addrs) cannot be changed on the fly without obtaining standalone access
+		 * 	and hence the correctness of prc_vec whenever it turns out necessary is guaranteed.
+		 */
 		originator_prc_vec = curr_entry->pvec;
 		cs_addrs->jnl->pini_addr = reg_ref->pini_addr;
 	}
@@ -91,7 +102,7 @@ bool gtcmtr_put(void)
 			0, ERR_GVIS, 2, end - buff, buff);
 	}
 	gvcst_put(&v);
-	if (JNL_ENABLED(cs_addrs->hdr))
+	if (JNL_ALLOWED(cs_addrs))
 		reg_ref->pini_addr = cs_addrs->jnl->pini_addr; /* In case  journal switch occurred */
 	ptr = curr_entry->clb_ptr->mbf;
 	*ptr++ = CMMS_R_PUT;

@@ -19,6 +19,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #undef memcmp
 int gtm_memcmp (const void *a, const void *b, size_t len)
 {

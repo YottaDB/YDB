@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,8 @@
 #include "repl_instance.h"
 #include "mupip_ftok.h"
 #include "mupip_exit.h"
+#include "file_head_read.h"	/* for file_head_read() prototype */
+#include "is_file_identical.h"	/* for filename_to_id() prototype */
 
 /*
  * This reads file header and prints the semaphore/shared memory id
@@ -50,6 +52,8 @@ void mupip_ftok (void)
 	unsigned short	fn_len; /* cli library expects unsigned short */
 	char		fn[MAX_FN_LEN + 1], instname[MAX_FN_LEN + 1];
 	repl_inst_fmt	repl_instance;
+	gd_id		fid;
+	sm_uc_ptr_t	fid_ptr, fid_top;
 
 	error_def(ERR_MUPCLIERR);
 	error_def(ERR_MUNOACTION);
@@ -88,8 +92,14 @@ void mupip_ftok (void)
 		semid = header.semid;
 		shmid = header.shmid;
 	}
-	PRINTF("Output Format - \n\t%s  ::  %s  ::  %s \n\n", "File", "Semaphore Id", "Share Memory Id");
-	PRINTF("Output - \n");
-	PRINTF("%20s  ::  %d  [ 0x%x ]  ::  %d  [ 0x%x ] \n", fn, semid, semid, shmid, shmid);
+	PRINTF("%20s  ::  %23s  ::  %23s  ::  %20s\n", "File", "Semaphore Id", "Shared Memory Id", "FileId");
+	PRINTF("---------------------------------------------------------------------------------------------------------------\n");
+	PRINTF("%20s  ::  %10d [0x%.8x]  ::  %10d [0x%.8x]  ::  0x", fn, semid, semid, shmid, shmid);
+	fid_ptr = (sm_uc_ptr_t)&fid;
+	filename_to_id((gd_id_ptr_t)fid_ptr, fn);
+	fid_top = fid_ptr + sizeof(fid);
+	for ( ; fid_ptr < fid_top; fid_ptr++)
+		PRINTF("%.2x", *(sm_uc_ptr_t)fid_ptr);
+	PRINTF("\n");
 	mupip_exit(SS_NORMAL);
 }

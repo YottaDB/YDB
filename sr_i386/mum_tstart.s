@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -25,7 +25,7 @@
 
 ENTRY mum_tstart
 	addl	$4,%esp		# back up over return address
-	cmpb	$0,proc_act_type
+	cmpw	$0,proc_act_type
 	je	l1
 	call	trans_code
 l1:	getframe

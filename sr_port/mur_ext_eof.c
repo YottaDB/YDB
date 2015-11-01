@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,46 +26,32 @@ GBLREF	char		*mur_extract_buff;
 GBLREF	mur_opt_struct	mur_options;
 GBLREF	char		muext_code[][2];
 
-
-
 void	mur_extract_eof(jnl_record *rec)
 {
-	int			actual, extract_len = 0;
+	int			actual, extract_len;
 	char			*ptr;
-	jnl_process_vector	*pv = &rec->val.jrec_eof.process_vector;
-	jnl_proc_time		*ref_time = &pv->jpv_time;
+	jnl_process_vector	*pv;
 
-
+	pv = &rec->val.jrec_eof.process_vector;
+	extract_len = 0;
 	if (!mur_options.detail)
 	{
 		EXT2BYTES(&muext_code[MUEXT_EOF][0]);
-	}
-	else
+	} else
 	{
 		extract_len = strlen(mur_extract_buff);
 		strcpy(&mur_extract_buff[extract_len], "EOF    \\");
 		extract_len = strlen(mur_extract_buff);
 	}
-
-	EXTTIME(ref_time);
-
+	EXTTIME(MID_TIME(pv->jpv_time));
 	EXTINT(pv->jpv_pid);
-
 	EXTTXTVMS(pv->jpv_prcnam, JPV_LEN_PRCNAM);
-
 	EXTTXT(pv->jpv_node, JPV_LEN_NODE);
-
 	EXTTXT(pv->jpv_user, JPV_LEN_USER);
-
 	EXTINTVMS(pv->jpv_mode);
-
 	EXTTXT(pv->jpv_terminal, JPV_LEN_TERMINAL);
-
-	EXTTIMEVMS(pv->jpv_login_time);
-
+	EXTTIMEVMS(MID_TIME(pv->jpv_login_time));
 	EXTINTVMS(pv->jpv_image_count);
-
 	EXTINT(rec->val.jrec_eof.tn);
-
 	jnlext_write(mur_extract_buff, extract_len);
 }

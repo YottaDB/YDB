@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,6 @@ void tt_write_error_set(int4 error_status)
 	xfer_table[xf_linestart] = op_startintrrpt;
 	xfer_table[xf_zbfetch] = op_fetchintrrpt;
 	xfer_table[xf_zbstart] = op_startintrrpt;
-	xfer_table[xf_forchk1] = op_forintrrpt;
+	xfer_table[xf_forchk1] = op_startintrrpt;
 	xfer_table[xf_forloop] = op_forintrrpt;
 }

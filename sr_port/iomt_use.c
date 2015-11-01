@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 #include "gtm_iconv.h"
+#include "gtm_string.h"
 
 #include "copy.h"
 #include "io_params.h"
@@ -56,6 +57,7 @@ void iomt_use(io_desc *iod, mval *pp)
 	unsigned char	ch, len;
 	int		lab_type;
 	unsigned short	length, width;
+	signed short	skips;
 	d_mt_struct	*mt_ptr, *out_ptr;
 	io_desc		*d_in, *d_out;
 	mident		tab;
@@ -122,8 +124,6 @@ void iomt_use(io_desc *iod, mval *pp)
 			break;
 		case iop_length:
 			GET_USHORT(length, (pp->str.addr + p_offset));
-			if (length < 0)
-				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
 			iod->length = length;
 			break;
 		case iop_width:
@@ -148,8 +148,8 @@ void iomt_use(io_desc *iod, mval *pp)
 			out_ptr->wrap = FALSE;
 			break;
 		case iop_skipfile:
-			GET_USHORT(length, (pp->str.addr + p_offset));
-			iomt_skipfile(iod, length);
+			GET_SHORT(skips, (pp->str.addr + p_offset));
+			iomt_skipfile(iod, skips);
 			break;
 		case iop_unload:
 			assert(FALSE);
@@ -161,8 +161,8 @@ void iomt_use(io_desc *iod, mval *pp)
 			iomt_erase(iod);
 			break;
 		case iop_space:
-			GET_USHORT(length, (pp->str.addr + p_offset));
-			iomt_skiprecord(iod, length);
+			GET_SHORT(skips, (pp->str.addr + p_offset));
+			iomt_skiprecord(iod, skips);
 			break;
 		case iop_writeof:
 			iomt_eof(iod);

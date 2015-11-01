@@ -18,9 +18,10 @@
 
 #include "mdef.h"
 
-#include <stddef.h>
-
+#include "gtm_string.h"
 #include "gtm_stdio.h"
+
+#include <stddef.h>
 
 #include "gdsroot.h"
 #include "gdsblk.h"

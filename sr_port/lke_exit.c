@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_stdlib.h"		/* for exit() */
+
 #include "error.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"

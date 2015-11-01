@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 /* LinuxIA32/gcc needs stdio before varargs due to stdarg */
 /* Linux390/gcc needs varargs before stdarg */
@@ -468,11 +470,14 @@ va_dcl
 	util_out_print_vaparm(message, flush, var, MAXPOSINT4);
 }
 
-/* If $x of the standard output device is non-zero, put out a new line. Specifically
-   this is used in the PRN_ERROR macro to put a newline char prior to flushing a buffer
-   with an error message in it. */
-void util_cond_newline(void)
+/* If $x of the standard output device is non-zero, and we are going to flush a buffer,
+   put out a new line and then do the buffer flush. Called and used only by PRN_ERROR
+   macro.
+*/
+void util_cond_flush(void)
 {
 	if (NULL != io_std_device.out && 0 < io_std_device.out->dollar.x && util_outptr != util_outbuff)
 		FPRINTF(stderr, "\n");
+	if (util_outptr != util_outbuff)
+		util_out_print(NULL, FLUSH);
 }

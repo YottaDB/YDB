@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,7 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage);
 #ifdef VMS
 void mubexpfilnam(backup_reg_list *list);
 #elif defined(UNIX)
-void mubexpfilnam(char *dirname, unsigned short dirlen, backup_reg_list *list);
+void mubexpfilnam(char *dirname, unsigned int dirlen, backup_reg_list *list);
 #else
 #error Unsupported Platform
 #endif

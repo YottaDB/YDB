@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "rtnhdr.h"
 #include "fgncal.h"
@@ -61,7 +63,13 @@ fgnfnc fgn_getrtn(void_ptr_t package_handle, mstr *entry_name)
 	error_def(ERR_TEXT);
 
 	if (!(sym_addr = dlsym(package_handle, entry_name->addr)))
-	{
+	{	/* the reason for gtm_putmsg is that PROFILE has several routines listed in
+		 * the external call table that are not in the shared library. PROFILE folks would rather see
+		 * info/warning messages for such routines at shared library open time, than error out.
+		 * These unimplemented routines, they say were not being called from the application and wouldn't
+		 * cause any application failures. If we fail to open the shared libary, or we fail to locate a
+		 * routine that is called from the application, we issue rts_error message (in extab_parse.c)
+		 */
 		gtm_putmsg(VARLSTCNT(4) ERR_DLLNORTN, 2, RTS_ERROR_STRING(entry_name->addr));
 		PRN_DLERROR;
 	} else

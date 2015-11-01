@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +13,7 @@
 
 #include "gtm_unistd.h"
 #include "gtm_string.h"
-
-#include <limits.h>
+#include "gtm_limits.h"
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -85,7 +84,10 @@ static readonly char zeditor_text[] = "$ZEDITOR";
 static readonly char zeof_text[] = "$ZEOF";
 static readonly char zerror_text[] = "$ZERROR";
 static readonly char zgbldir_text[] = "$ZGBLDIR";
+static readonly char zininterrupt_text[] = "$ZININTERRUPT";
+static readonly char zinterrupt_text[] = "$ZINTERRUPT";
 static readonly char zio_text[] = "$ZIO";
+static readonly char zjob_text[] = "$ZJOB";
 static readonly char zlevel_text[] = "$ZLEVEL";
 static readonly char zmode_text[] = "$ZMODE";
 static readonly char zproc_text[] = "$ZPROCESS";
@@ -112,6 +114,7 @@ GBLREF io_log_name	*dollar_principal;
 GBLREF mval		dollar_ztrap;
 GBLREF mval		dollar_zgbldir;
 GBLREF mval		dollar_job;
+GBLREF uint4		dollar_zjob;
 GBLREF mval		dollar_zstatus;
 GBLREF char		*zro_root;  /* ACTUALLY some other pointer type! */
 GBLREF mstr		gtmprompt;
@@ -125,6 +128,8 @@ GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_zerror;
 GBLREF mval		dollar_zyerror;
 GBLREF mval		dollar_system;
+GBLREF mval		dollar_zinterrupt;
+GBLREF boolean_t	dollar_zininterrupt;
 GBLREF int4		zdir_form;
 
 LITREF mval		literal_zero,literal_one;
@@ -309,6 +314,15 @@ void zshow_svn(zshow_out *output)
 	/* SV_ZGBLDIR */
 		ZS_VAR_EQU(&x, zgbldir_text);
 		mval_write(output, &dollar_zgbldir, TRUE);
+	/* SV_ZININTERRUPT */
+		MV_FORCE_MVAL(&var, dollar_zininterrupt);
+		ZS_VAR_EQU(&x, zininterrupt_text);
+		mval_write(output, &var, TRUE);
+	/* SV_ZINTERRUPT */
+		var.mvtype = MV_STR;
+		var.str = dollar_zinterrupt.str;
+		ZS_VAR_EQU(&x, zinterrupt_text);
+		mval_write(output, &var, TRUE);
 	/* SV_ZIO */
 		var.mvtype = MV_STR;
 		/* NOTE:	This is **NOT** equivalent to :
@@ -327,6 +341,10 @@ void zshow_svn(zshow_out *output)
 			}
 		}
 		ZS_VAR_EQU(&x, zio_text);
+		mval_write(output, &var, TRUE);
+	/* SV_ZJOB */
+		MV_FORCE_ULONG_MVAL(&var, dollar_zjob);
+		ZS_VAR_EQU(&x, zjob_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZLEVEL */
 		MV_FORCE_MVAL(&var, save_dollar_zlevel);

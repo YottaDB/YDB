@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "error.h"
 #include "rtnhdr.h"
 #include "i386.h"
@@ -42,7 +45,9 @@ rhdtyp *make_dmode(void)
 	*code++ = I386_INS_CALL_Jv;
 	*((int4 *)code) = (int4)((unsigned char *)dm_setup - (code + sizeof(int4)));
 	code += sizeof(int4);
-	*code++ = I386_INS_JMP_Jv;
+	*code++ = I386_INS_CALL_Jv; /* this should be a CALL to maintain uniformity between transfer to mum_tstart from baseframe
+				       and transfers to mum_tstart from error processing (MUM_TSTART marco in
+				       mdb_condition_handler) */
 	*((int4 *)code) = (int4)((unsigned char *)mum_tstart - (code + sizeof(int4)));
 	code += sizeof(int4);
 	*code++ = I386_INS_JMP_Jv;

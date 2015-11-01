@@ -16,9 +16,7 @@
  *
  */
 
-#ifndef lint
-static char rcsid[] = "$Header:$";
-#endif
+#include "mdef.h"
 
 #include <errno.h>
 
@@ -27,11 +25,15 @@ static char rcsid[] = "$Header:$";
 #endif
 #include "gtm_unistd.h"
 #include "gtm_string.h"
+#include "gtm_time.h"		/* for time() */
 
-#include "mdef.h"
 #include "omi.h"
 #include "gtcm.h"
 #include "error.h"
+
+#ifndef lint
+static char rcsid[] = "$Header:$";
+#endif
 
 GBLREF int4	omi_errno;
 GBLREF char	*omi_pklog;

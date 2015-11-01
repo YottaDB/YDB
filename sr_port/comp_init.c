@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "stp_parms.h"
 #include "compiler.h"
@@ -40,11 +42,10 @@ GBLREF bool		transform;
 
 void comp_init(mstr *src)
 {
-
 	error_def(ERR_INDRMAXLEN);
 
-	if ((unsigned)src->len > MAX_SRCLINE - 1)
-		rts_error(VARLSTCNT(1) ERR_INDRMAXLEN);
+	if ((unsigned)src->len >= MAX_SRCLINE)
+		rts_error(VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
 	memcpy(source_buffer,src->addr,src->len);
 	source_buffer[src->len + 1] = source_buffer[src->len] = 0;
 	compile_time = TRUE;

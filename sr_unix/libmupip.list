@@ -67,6 +67,7 @@ mu_gvis
 mu_int_blk
 mu_int_ch
 mu_int_err
+mu_int_fhead
 mu_int_getkey
 mu_int_init
 mu_int_maps
@@ -85,6 +86,7 @@ mupip_exit
 mupip_exit_handler
 mupip_extend
 mupip_freeze
+mupip_ftok
 mupip_help
 mupip_integ
 mupip_load_ch
@@ -96,9 +98,13 @@ mupip_rundown
 mupip_set
 mupip_set_file
 mupip_set_jnl_ch
-mupip_set_jnl_file
+mupip_set_jnl_cleanup
+mupip_set_jnlfile
 mupip_set_jnlfile_aux
 mupip_set_journal
+mupip_set_journal_fname
+mupip_set_journal_newstate
+mupip_set_journal_parse
 mupip_stop
 mupip_upgrade
 mu_put_gvdata
@@ -146,6 +152,7 @@ mur_read_file
 mur_report_error
 mur_sort_and_checktn
 mur_sort_files
+mu_signal_process
 mu_split
 mu_swap_blk
 mu_write_map

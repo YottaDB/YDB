@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gdsblk.h"
@@ -162,6 +164,7 @@ cw_set_element *t_write (
 		cse->first_copy = first_copy;
 	cse->done = FALSE;
 	cse->forward_process = forward;
+	cse->jnl_freeaddr = 0;		/* reset jnl_freeaddr that previous transaction might have filled in */
 	cse->t_level = dollar_tlevel;
 	cse->write_type |= (ERR_GVKILLFAIL == t_err) ? GDS_WRITE_KILL : GDS_WRITE_PLAIN;
 	prev_first_off = prev_next_off = PREV_OFF_INVALID;

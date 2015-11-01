@@ -40,7 +40,7 @@ ENTRY op_startintrrpt
 	addl	$4,%esp
 l1:	pushl	$1
 	call	async_action
-	addl    $4,%esp
+	addl    $8,%esp # 4 bytes to burn return pc, 4 more to remove arg to async_action
 	getframe
 	ret
 # op_startintrrpt ENDP

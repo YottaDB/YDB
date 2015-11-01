@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,8 @@
 
 #include "gtm_string.h"
 
+#include <math.h> /* needed for handling of epoch_interval (EPOCH_SECOND2SECOND macro uses ceil) */
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -38,12 +40,19 @@
 #include "dse.h"
 #include "dse_puttime.h"
 #include "gtmmsg.h"
+#include "stringpool.h"
+#include "op.h"
 
-#define MAX_UTIL_LEN    64
+#define MAX_UTIL_LEN    	64
+#define DSE_DMP_TIME_FMT	"DD MON YEAR 24:60:SS"
+#define NEXT_EPOCH_TIME_SPACES	"                   " /* 19 spaces, we have 19 character field width to output Next Epoch Time */
 
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF gd_region        *gv_cur_region;
+GBLREF spdesc		stringpool;
+LITREF mval		literal_null;
 
+static mval dse_dmp_time_fmt = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, STR_LIT_LEN(DSE_DMP_TIME_FMT), DSE_DMP_TIME_FMT, 0, 0);
 
 static  char    * const jtype[] =
 {
@@ -69,12 +78,14 @@ static  char    * const jtype[] =
 void dse_dmp_fhead (void)
 {
 	boolean_t	jnl_buff_open;
-        unsigned char   util_buff[MAX_UTIL_LEN], qwstring[100], *ptr;
-        int             util_len, i;
-	uint4		journal, jnl_status;
+        unsigned char   util_buff[MAX_UTIL_LEN], buffer[MAXNUMLEN], *ptr;
+        int             util_len, jrt, time_len;
+	uint4		jnl_status;
+	enum jnl_state_codes		jnl_state;
 	gds_file_id	zero_fid;
+	mval		time_val, zdate_time;
 
-        journal = (uint4)cs_addrs->hdr->jnl_state;
+        jnl_state = (uint4)cs_addrs->hdr->jnl_state;
 	VMS_ONLY(
 		memset(&zero_fid, 0, sizeof(zero_fid));
 		jnl_buff_open = (0 != memcmp(cs_addrs->hdr->jnl_file.jnl_file_id.fid, zero_fid.fid, sizeof(zero_fid.fid)));
@@ -87,6 +98,18 @@ void dse_dmp_fhead (void)
 		util_out_print("!/File            !AD", TRUE, gv_cur_region->dyn.addr->fname_len,
 			&gv_cur_region->dyn.addr->fname[0]);
 		util_out_print("Region          !AD", TRUE, gv_cur_region->rname_len, &gv_cur_region->rname[0]);
+		op_horolog(&time_val); /* returns $H value in stringpool */
+		assert(MAXNUMLEN >= time_val.str.len);
+		memcpy(buffer, time_val.str.addr, time_val.str.len); /* if op_fnzdate calls stp_gcol, time_val might get corrupt
+									because it is not known to stp_gcol. To prevent problems,
+									copy from stringpool to local buffer */
+		time_val.str.addr = (char*)buffer;
+		stringpool.free -= time_val.str.len; /* now that we've made a copy, we don't need time_val in stringpool */
+		op_fnzdate(&time_val, &dse_dmp_time_fmt, &literal_null, &literal_null, &zdate_time); /* returns zdate formatted
+												        string in stringpool */
+		util_out_print("Date/Time       !AD [$H = !AD]", TRUE, zdate_time.str.len, zdate_time.str.addr,
+				time_val.str.len, time_val.str.addr);
+		stringpool.free -= zdate_time.str.len; /* we don't need zdate_time in stringpool anymore, also to prevent stpgcol */
 		util_out_print("  Access method                   !AD", FALSE, 2,
 			(cs_addrs->hdr->acc_meth == dba_mm) ? "MM" : "BG");
 		util_out_print("      ", FALSE);
@@ -152,18 +175,25 @@ void dse_dmp_fhead (void)
 
 		util_out_print("  Reference count       !12UL", FALSE, cs_addrs->nl->ref_cnt);
 		util_out_print("      ", FALSE);
-		util_out_print("  Journaling           !AD", TRUE,13, (journal) ?
-				((journal == jnl_closed) ? "          OFF" :
+		util_out_print("  Wait Disk             !12UL", TRUE, cs_addrs->hdr->wait_disk_space);
+		util_out_print("  Journal State        !AD", (jnl_notallowed == jnl_state), 13,
+				(jnl_notallowed != jnl_state) ?
+				((jnl_state == jnl_closed) ? "          OFF" :
 				 	(jnl_buff_open ? "           ON" : "[inactive] ON")) : "     DISABLED");
-		if (journal)
+		if (jnl_notallowed != jnl_state)
 		{
-			util_out_print("  Before imaging               !AD", FALSE, 5,
-				(cs_addrs->hdr->jnl_before_image) ? " TRUE" : "FALSE");
 			util_out_print("      ", FALSE);
-			util_out_print("  Journal Allocation    !12UL", TRUE, cs_addrs->hdr->jnl_alq);
-			util_out_print("  Journal Buffer Size   !12UL", FALSE, cs_addrs->hdr->jnl_buffer_size);
+			util_out_print("  Journal Before imaging       !AD", TRUE, 5,
+				(cs_addrs->hdr->jnl_before_image) ? " TRUE" : "FALSE");
+			util_out_print("  Journal Allocation    !12UL", FALSE, cs_addrs->hdr->jnl_alq);
 			util_out_print("      ", FALSE);
 			util_out_print("  Journal Extension     !12UL", TRUE, cs_addrs->hdr->jnl_deq);
+			util_out_print("  Journal Buffer Size   !12UL", FALSE, cs_addrs->hdr->jnl_buffer_size);
+			util_out_print("      ", FALSE);
+			util_out_print("  Journal Alignsize     !12UL", TRUE, cs_addrs->hdr->alignsize);
+			util_out_print("  Journal AutoSwitchLimit !10UL", FALSE, cs_addrs->hdr->autoswitchlimit);
+			util_out_print("      ", FALSE);
+			util_out_print("  Journal Epoch Interval!12UL", TRUE, EPOCH_SECOND2SECOND(cs_addrs->hdr->epoch_interval));
 #ifdef UNIX
 			util_out_print("  Journal Yield Limit   !12UL", FALSE, cs_addrs->hdr->yield_lmt);
 			util_out_print("      ", FALSE);
@@ -174,8 +204,6 @@ void dse_dmp_fhead (void)
 		}
 		if (BACKUP_NOT_IN_PROGRESS != cs_addrs->nl->nbb)
 			util_out_print("  Online Backup NBB     !12UL", TRUE, cs_addrs->nl->nbb);
-
-#ifdef UNIX
 		/* Mutex Stuff */
 		util_out_print("  Mutex Hard Spin Count !12UL", FALSE, cs_addrs->hdr->mutex_spin_parms.mutex_hard_spin_count);
 		util_out_print("      ", FALSE);
@@ -184,11 +212,10 @@ void dse_dmp_fhead (void)
 			(cs_addrs->hdr->mutex_spin_parms.mutex_spin_sleep_mask == 0) ?
 				0 : (cs_addrs->hdr->mutex_spin_parms.mutex_spin_sleep_mask + 1));
 		util_out_print("      ", FALSE);
-#endif
 		util_out_print("  KILLs in progress     !12UL", TRUE, cs_addrs->hdr->kill_in_prog);
 		util_out_print("  Replication State           !AD", FALSE, 6,
-			(cs_addrs->hdr->repl_state == repl_closed)? "CLOSED" : "  OPEN");
-		ptr = i2asclx(qwstring, cs_addrs->hdr->reg_seqno);
+			(cs_addrs->hdr->repl_state == repl_closed)? "   OFF" : "    ON");
+		ptr = i2asclx(buffer, cs_addrs->hdr->reg_seqno);
 #ifndef __vax
 		util_out_print("        Region Seqno    0x!16@XJ", TRUE, &cs_addrs->hdr->reg_seqno);
 		util_out_print("  Resync Seqno    0x!16@XJ", FALSE, &cs_addrs->hdr->resync_seqno);
@@ -197,7 +224,6 @@ void dse_dmp_fhead (void)
 		util_out_print("  Resync Seqno    0x00000000!8@XJ", FALSE, &cs_addrs->hdr->resync_seqno);
 #endif
 		util_out_print("        Resync transaction      0x!8XL", TRUE, cs_addrs->hdr->resync_tn);
-		util_out_print("  Wait Disk             !12UL", TRUE, cs_addrs->hdr->wait_disk_space);
 	}
 	if (NEED_TO_DUMP("DB_CSH"))
 	{
@@ -281,14 +307,19 @@ void dse_dmp_fhead (void)
 			util_out_print("  errcnt                !12UL", TRUE, cs_addrs->jnl->jnl_buff->errcnt);
 			util_out_print("  Iosb.dev_specific     !12UL", FALSE, cs_addrs->jnl->jnl_buff->iosb.dev_specific);
 			util_out_print("      ", FALSE);
-			util_out_print("  Next Epoch_Time       !12UL", TRUE, cs_addrs->jnl->jnl_buff->next_epoch_time);
+			time_len = exttime(cs_addrs->jnl->jnl_buff->next_epoch_time, (char *)buffer, 0);
+			assert(STR_LIT_LEN(NEXT_EPOCH_TIME_SPACES) >= time_len);
+			util_out_print("  Next Epoch_Time!AD!AD", TRUE, STR_LIT_LEN(NEXT_EPOCH_TIME_SPACES) - time_len + 1,
+					NEXT_EPOCH_TIME_SPACES, time_len - 1, buffer); /* -1 to avoid printing \ at end of $H
+											* format time returned by exttime */
 			util_out_print("  Blocked Process       !12UL", FALSE, cs_addrs->jnl->jnl_buff->blocked);
 			util_out_print("      ", FALSE);
-			util_out_print("  Epoch_tn            0x!12XL", TRUE, cs_addrs->jnl->jnl_buff->epoch_tn);
+			util_out_print("  Epoch_tn                0x!8XL", TRUE, cs_addrs->jnl->jnl_buff->epoch_tn);
 			util_out_print("  Io_in_progress               !AD", FALSE, 5,
 			  (cs_addrs->jnl->jnl_buff->UNIX_ONLY(io_in_prog_latch.latch_pid)VMS_ONLY(io_in_prog) ? " TRUE" : "FALSE"));
 			util_out_print("      ", FALSE);
-			util_out_print("  Epoch_Interval        !12UL", TRUE, cs_addrs->jnl->jnl_buff->epoch_interval);
+			util_out_print("  Epoch_Interval        !12UL", TRUE,
+					EPOCH_SECOND2SECOND(cs_addrs->jnl->jnl_buff->epoch_interval));
 			util_out_print("  Now_writer            !12UL", FALSE,
 				       (cs_addrs->jnl->jnl_buff->UNIX_ONLY(io_in_prog_latch.latch_pid)VMS_ONLY(now_writer)));
 			util_out_print("      ", FALSE);
@@ -298,22 +329,22 @@ void dse_dmp_fhead (void)
 			util_out_print("      ", FALSE);
 			util_out_print("  fsync pid             !12SL", TRUE,
 				       (cs_addrs->jnl->jnl_buff->fsync_in_prog_latch.latch_pid));
-			util_out_print("  fsync addrs         0x!12XL", FALSE, cs_addrs->jnl->jnl_buff->fsync_dskaddr);
+			util_out_print("  fsync addrs             0x!8XL", FALSE, cs_addrs->jnl->jnl_buff->fsync_dskaddr);
 			util_out_print("      ", FALSE);
 			util_out_print("  Need_db_fsync                !AD", TRUE, 5,
 				(cs_addrs->jnl->jnl_buff->need_db_fsync ? " TRUE" : "FALSE"));
-			for (i = JRT_BAD + 1; i + 1 < JRT_RECTYPES; i++)
+			for (jrt = JRT_BAD + 1; jrt < JRT_RECTYPES - 1; jrt++)
 			{
-				util_out_print("  Jnl Rec Type    !5AZ      !7UL      ", FALSE, jtype[i],
-					cs_addrs->jnl->jnl_buff->reccnt[i - 1]);
-				i++;
-				util_out_print("  Jnl Rec Type    !5AZ      !7UL", TRUE, jtype[i],
-					cs_addrs->jnl->jnl_buff->reccnt[i - 1]);
+				util_out_print("  Jnl Rec Type    !5AZ      !7UL      ", FALSE, jtype[jrt],
+					cs_addrs->jnl->jnl_buff->reccnt[jrt - 1]);
+				jrt++;
+				util_out_print("  Jnl Rec Type    !5AZ      !7UL", TRUE, jtype[jrt],
+					cs_addrs->jnl->jnl_buff->reccnt[jrt - 1]);
 			}
-			if (i != JRT_RECTYPES)
+			if (jrt != JRT_RECTYPES)
 			{
-				util_out_print("  Jnl Rec Type    !5AZ      !7UL", TRUE, jtype[i],
-					cs_addrs->jnl->jnl_buff->reccnt[i - 1]);
+				util_out_print("  Jnl Rec Type    !5AZ      !7UL", TRUE, jtype[jrt],
+					cs_addrs->jnl->jnl_buff->reccnt[jrt - 1]);
 			}
 		}
 	}

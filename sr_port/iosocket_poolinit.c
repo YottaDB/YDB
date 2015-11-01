@@ -13,6 +13,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

@@ -12,6 +12,8 @@
 /* Perform necessary functions for signal handling that was deferred */
 #include "mdef.h"
 
+#include "gtm_stdlib.h"		/* for exit() */
+
 #include <signal.h>
 
 #include "error.h"

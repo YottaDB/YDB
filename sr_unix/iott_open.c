@@ -87,7 +87,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			save_errno = errno;
 			if (gtm_isanlp(tt_ptr->fildes) == 0)
-				rts_error(VARLSTCNT(3) ERR_TCGETATTR, tt_ptr->fildes, save_errno);
+				rts_error(VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		if (run_time)
 			setterm(ioptr);

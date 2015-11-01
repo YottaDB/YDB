@@ -9,8 +9,11 @@
  *								*
  ****************************************************************/
 
-#include "gtm_stdio.h"
 #include "mdef.h"
+
+#include "gtm_string.h"
+#include "gtm_stdio.h"
+
 #include "io.h"
 #include "iottdef.h"
 #include "iomtdef.h"

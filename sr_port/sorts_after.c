@@ -22,6 +22,9 @@
  */
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "collseq.h"
 #include "hashdef.h"
 #include "lv_val.h"

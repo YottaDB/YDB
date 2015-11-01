@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,14 +12,13 @@
 #include "mdef.h"
 #include "toktyp.h"
 
-LITREF char ctypetab[128];
+LITREF	char	ctypetab[NUM_ASCII_CHARS];
 
-char is_ident(v)
-mstr *v;
+char	is_ident(mstr *v)
 {
 	int4		y;
 	char		*c, *c_top, ret;
-        signed char	ch;
+	signed char	ch;
 	bool		dig_start;
 
 	ret = TRUE;
@@ -28,35 +27,36 @@ mstr *v;
 	if (!v->len || (ch = *c++) < 0)
 		ret = 0;
 	else
-	switch (y = ctypetab[ch])
 	{
-	case TK_LOWER:
-	case TK_PERCENT:
-	case TK_UPPER:
-	case TK_DIGIT:
-		dig_start = y == TK_DIGIT;
-		for ( ; c < c_top; c++)
-		{	ch = *c;
-			if (ch < 0)
-				break;
-			y = ctypetab[ch];
-			if (y != TK_DIGIT && dig_start)
-			{	break;
+		switch (y = ctypetab[ch])
+		{
+		case TK_LOWER:
+		case TK_PERCENT:
+		case TK_UPPER:
+		case TK_DIGIT:
+			dig_start = y == TK_DIGIT;
+			for ( ; c < c_top; c++)
+			{
+				ch = *c;
+				if (ch < 0)
+					break;
+				y = ctypetab[ch];
+				if (y != TK_DIGIT && dig_start)
+					break;
+				if (y != TK_DIGIT && y != TK_UPPER && y != TK_LOWER)
+					break;
 			}
-			if (y != TK_DIGIT && y != TK_UPPER && y != TK_LOWER)
-			{	break;
+			if (c == c_top)
+			{	/* we have an ident */
+				ret = 1 + dig_start;
 			}
+			else
+			{	ret = 0;
+			}
+			break;
+		default:
+			ret = 0;
 		}
-		if (c == c_top)
-		{	/* we have an ident */
-			ret = 1 + dig_start;
-		}
-		else
-		{	ret = 0;
-		}
-		break;
-	default:
-		ret = 0;
 	}
 	return ret;
 }

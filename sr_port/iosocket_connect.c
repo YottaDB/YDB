@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,6 +77,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 					RTS_ERROR_LITERAL("SO_REUSEADDR"), errno, errlen, errptr);
                 	return FALSE;
         	}
+#ifdef TCP_NODELAY
 		temp_1 = socketptr->nodelay ? 1 : 0;
 		if (-1 == tcp_routines.aa_setsockopt(socketptr->sd,
 				IPPROTO_TCP, TCP_NODELAY, &temp_1, sizeof(temp_1)))
@@ -87,6 +88,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 					RTS_ERROR_LITERAL("TCP_NODELAY"), errno, errlen, errptr);
                 	return FALSE;
         	}
+#endif
 		if (update_bufsiz)
 		{
 			if (-1 == tcp_routines.aa_setsockopt(socketptr->sd,

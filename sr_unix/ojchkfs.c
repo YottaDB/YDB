@@ -11,9 +11,10 @@
 
 #include "mdef.h"
 
-#include <string.h>
-#include <fcntl.h>
+#include "gtm_string.h"
 #include "gtm_stdio.h"
+
+#include <fcntl.h>
 #include "job.h"
 #include "eintr_wrappers.h"
 
@@ -35,40 +36,30 @@ extern unsigned char a2e[];
  *	TRUE  - good filespec (and file exist, if exist flag is ON)
  * --------------------------------------------------------
  */
-int4	ojchkfs (addr, len, exist)
-char	*addr;
-int4	len;
-bool	exist;
+int4	ojchkfs (char *addr, int4 len, bool exist)
 {
 	char	*fnp, es[MAX_FILSPC_LEN];
 	int	fclose_res;
 	FILE	*fp;
 
-/*
- * First, check for a legal filespec
- */
+	/* First, check for a legal filespec */
 	if (len > MAX_FILSPC_LEN)
 		return(FALSE);
 
 	strncpy(es, addr, len);
-	*(es+len) = '\0';
+	*(es + len) = '\0';
 
-		/* If directory path exist, skip it */
+	/* If directory path exist, skip it */
 	if (fnp = strrchr(es, SLSH))
 		fnp += 1;
 	else
 		fnp = es;
-
-		/* filename should be <= 14 chars int4 */
-	if (strlen(fnp) > 14)
-		return(FALSE);
-
 	if (!exist)
 		return(TRUE);
 
 	if ((fp = Fopen(es, "r")) == 0)
 		return (FALSE);
-
 	FCLOSE(fp, fclose_res);
+
 	return(TRUE);
 }

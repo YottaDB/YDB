@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,6 +83,7 @@
 #include "op.h"
 #include "gtmsecshr.h"
 #include "error_trap.h"
+#include "patcode.h"	/* for pat_everything and sizeof_pat_everything */
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
@@ -109,7 +110,7 @@ GBLDEF	sgmnt_addrs		*cs_addrs;
 GBLDEF	seq_num		start_jnl_seqno;
 GBLDEF	seq_num		max_resync_seqno;
 GBLDEF	seq_num		consist_jnl_seqno;
-GBLDEF	unsigned char	proc_act_type;
+GBLDEF	unsigned short	proc_act_type;
 GBLDEF	volatile bool	ctrlc_pending;
 GBLDEF	volatile int4	ctrap_action_is;
 GBLDEF	bool		out_of_time;
@@ -180,7 +181,9 @@ GBLDEF	mstr		*comline_base,
 			**stp_array,
 			extnam_str = {0, NULL},
 			env_gtm_env_xlate = {0, NULL};
+GBLDEF MSTR_CONST(default_sysid, "gtm_sysid");
 GBLDEF int              (*gtm_env_xlate_entry)() = NULL;
+GBLDEF void             (*gtm_sigusr1_handler)() = NULL;
 GBLDEF	mval		dollar_zgbldir,
 			dollar_zstatus,
 			dollar_zstep = DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX, 0, 0, 1, "B", 0, 0),
@@ -192,6 +195,9 @@ GBLDEF	mval		dollar_zgbldir,
 			dollar_etrap,
 			dollar_zerror = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, DEFAULT_ZERROR_LEN, DEFAULT_ZERROR_STR, 0, 0),
 			dollar_zyerror;
+GBLDEF  uint4		dollar_zjob;
+GBLDEF	mval		dollar_zinterrupt;
+GBLDEF	boolean_t	dollar_zininterrupt;
 GBLDEF	ecode_list	dollar_ecode_base = {0, 0, NULL, NULL},
 			*dollar_ecode_list = &dollar_ecode_base;
 GBLDEF	int		error_level = 0;		/* execution level where last error occurred */
@@ -216,6 +222,7 @@ GBLDEF	gv_namehead	*gv_target;
 GBLDEF	gv_namehead	*gv_target_list;
 GBLDEF	int4		exi_condition;
 GBLDEF	uint4		gtmDebugLevel;
+GBLDEF	caddr_t		smCallerId;			/* Caller of top level malloc/free */
 GBLDEF	int		process_exiting;
 GBLDEF	int4		dollar_zsystem;
 GBLDEF	int4		dollar_zeditor;
@@ -424,6 +431,8 @@ GBLDEF	volatile boolean_t	semwt2long;
 
 #ifdef UNIX
 GBLDEF	unsigned int		invocation_mode = MUMPS_COMPILE; /* how mumps has been invoked */
+GBLDEF	char			cli_err_str[MAX_STRLEN] = "";   /* Parse Error message buffer */
+GBLDEF	char			*cli_err_str_ptr = NULL;
 #endif
 
 /* this array is indexed by file descriptor */
@@ -439,7 +448,6 @@ GBLDEF	int			gtm_errno = -1;		/* holds the errno (unix) in case of an rts_error 
 GBLDEF	int4			error_condition = 0;
 GBLDEF	global_tlvl_info	*global_tlvl_info_head;
 GBLDEF	buddy_list		*global_tlvl_info_list;
-GBLDEF	boolean_t		rename_changes_jnllink = TRUE;
 GBLDEF	boolean_t		job_try_again;
 GBLDEF	volatile int4		gtmMallocDepth;		/* Recursion indicator */
 GBLDEF	d_socket_struct		*socket_pool;
@@ -491,10 +499,139 @@ GBLDEF	struct_jrec_tcom 	mur_jrec_fixed_tcom;	/* For copying tcom journal record
 GBLDEF	boolean_t		write_after_image = FALSE;	/* true for after-image jnlrecord writing by recover/rollback */
 GBLDEF	boolean_t		got_repl_standalone_access = FALSE;
 GBLDEF	int			iott_write_error;
-GBLDEF  boolean_t               recovery_success = FALSE; /* To Indicate successful recovery */
+GBLDEF	boolean_t		recovery_success = FALSE; /* To Indicate successful recovery */
 GBLDEF	int4			write_filter;
+GBLDEF	int4			zdate_form = 0;
 GBLDEF	boolean_t		need_no_standalone = FALSE;
 GBLDEF	boolean_t		forw_phase_recovery = FALSE; /* To inidicate the forward phase recovery */
 
 GBLDEF	int4	zdir_form = ZDIR_FORM_FULLPATH; /* $ZDIR shows full path including DEVICE and DIRECTORY */
 GBLDEF	mval	dollar_zdir = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0);
+
+GBLDEF	int * volatile		var_on_cstack_ptr = NULL; /* volatile pointer to int; volatile so that nothing gets optimized out */
+GBLDEF	boolean_t		gtm_environment_init = FALSE;
+GBLDEF	hashtab			*cw_stagnate = NULL;
+
+#ifdef VMS
+#ifdef INT8_SUPPORTED
+GBLDEF const jnl_proc_time jnl_min_delta_time = 0xFFFFFFFFFFFFFFFFll;	      /* time of 100 ns, the least possible time */
+#else /* ! INT8_SUPPORTED */						      /* quantity on VMS. If user specifies 0 as the */
+GBLDEF const jnl_proc_time jnl_min_delta_time = {0xFFFF, 0xFFFFFFFF, 0xFFFF}; /* delta time for any mupip recover time qualifier, */
+#endif /* INT8_SUPPORTED */						      /* we use this value instead of 0 because a time */
+#endif /* VMS */							      /* value of 0 is interpreted as the VMS system zero */
+									      /* time 17-NOV-1858 00:00:00.00 */
+
+GBLDEF	uint4		pat_everything[] = { 0, 2, PATM_E, 1, 0, PAT_MAX_REPEAT, 0, PAT_MAX_REPEAT, 1 }; /* pattern = ".e" */
+GBLDEF	uint4		sizeof_pat_everything = sizeof(pat_everything);
+
+GBLDEF	uint4		*pattern_typemask;
+GBLDEF	pattern		*pattern_list;
+GBLDEF	pattern		*curr_pattern;
+
+/* Standard MUMPS pattern-match table.
+ * This table holds the current pattern-matching attributes of each ASCII character.
+ * Bits 0..23 of each entry correspond with the pattern-match characters, A..X.
+ */
+GBLDEF pattern mumps_pattern = {
+	(void *) 0,		/* flink */
+	(void *) 0,		/* typemask */
+	(void *) 0,		/* pat YZ name array */
+	(void *) 0,		/* pat YZ name-length array */
+	-1,			/* number of YZ patcodes */
+	1,			/* namlen */
+	{'M', '\0'}		/* name */
+};
+
+/* mapbit is used by pattab.c and patstr.c. Note that patstr.c uses only entries until PATM_X */
+GBLDEF	readonly uint4	mapbit[] =
+{
+	PATM_A, PATM_B, PATM_C, PATM_D, PATM_E, PATM_F, PATM_G, PATM_H,
+	PATM_I, PATM_J, PATM_K, PATM_L, PATM_M, PATM_N, PATM_O, PATM_P,
+	PATM_Q, PATM_R, PATM_S, PATM_T, PATM_U, PATM_V, PATM_W, PATM_X,
+	PATM_YZ1, PATM_YZ2, PATM_YZ3, PATM_YZ4
+};
+
+LITDEF	uint4	typemask[PATENTS] =
+{
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,
+	PATM_C, PATM_C, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,
+	PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_N, PATM_N,
+	PATM_N, PATM_N, PATM_N, PATM_N, PATM_N, PATM_N, PATM_N, PATM_N, PATM_P, PATM_P,
+	PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,
+	PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,
+	PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,
+	PATM_U, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_L, PATM_L, PATM_L,
+	PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,
+	PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,
+	PATM_L, PATM_L, PATM_L, PATM_P, PATM_P, PATM_P, PATM_P, PATM_C, PATM_C, PATM_C,
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,
+	PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C, PATM_C,
+	PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,
+	PATM_L, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P,
+	PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_P, PATM_L, PATM_P, PATM_P, PATM_P,
+	PATM_P, PATM_P, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,
+	PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_P, PATM_U,
+	PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U, PATM_U,
+	PATM_U, PATM_U, PATM_P, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,
+	PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,
+	PATM_P, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L, PATM_L,
+	PATM_L, PATM_L, PATM_L, PATM_L, PATM_P, PATM_C
+};
+
+GBLDEF	uint4		pat_allmaskbits;	/* universal set of valid pattern bit codes for currently active pattern table */
+
+/* globals related to caching of pattern evaluation match result.
+ * for a given <strptr, strlen, patptr, depth> tuple, we store the evaluation result.
+ * in the above,
+ *	<strptr, strlen>	uniquely identifies a substring of the input string.
+ *	<patptr>		identifies the pattern atom that we are matching with
+ *	<depth>			identifies the recursion depth of do_patalt() for this pattern atom ("repcnt" in code)
+ * note that <depth> is a necessity in the above because the same alternation pattern atom can have different
+ *	match or not-match status for the same input string depending on the repetition count usage of the pattern atom
+ * after a series of thoughts on an efficient structure for storing pattern evaluation, finally arrived at a simple
+ *	array of structures wherein for a given length (strlen) we have a fixed number of structures available.
+ * we allocate an array of structures, say, 1024 structures.
+ * this is a simple 1-1 mapping, wherein
+ *	for length 0, the available structures are the first 32 structures of the array,
+ *	for length 1, the available structures are the second 32 structures of the array.
+ *	...
+ *	for length 47, the available structures are the 47th 32 structures of the array.
+ *	for length 48 and above, the available structures are all the remaining structures of the array.
+ * whenever any new entry needs to be cached and there is no room among the available structures, we preempt the
+ *	most unfrequently used cache entry (to do this we do keep a count of every entry's frequency of usage)
+ * the assumption is that substrings of length > 48 (an arbitrary reasonable small number) won't be used
+ *	so frequently so that they have lesser entries to fight for among themselves than lower values of length.
+ * with the above caching in place, the program segment below took 15 seconds.
+ * it was found that if the array size is increased to 16384 (as opposed to 1024 as above) and the available
+ *	structures for each length increased proportionally (i.e. 16 times = 16*32 structures instead of 32 as above)
+ *	the performance improved to the extent of taking 3 seconds.
+ * but this raised an interesting question, that of "size" vs. "time" tradeoff.
+ * with increasing array size, we get better "time" performance due to better caching.
+ * but that has an overhead of increased "size" (memory) usage.
+ * to arrive at a compromise, a dynamic algorithm emerged. the process will allocate a small array
+ *	beginning at 1024 entries and grow to a max of 16384 entries as and when it deems the hit ratio is not good.
+ * the array only grows, i.e. there is no downsizing algorithm at play.
+ * the dynamic algorithm addresses to an extent both the "size" and "time" issues and finishes the below in 1 second.
+ * #defines for the dynamic algorithm growth can be found in patcode.h
+ */
+GBLDEF	int4		curalt_depth = -1;				/* depth of alternation nesting */
+GBLDEF	int4		do_patalt_calls[PTE_MAX_CURALT_DEPTH];		/* number of calls to do_patalt() */
+GBLDEF	int4		do_patalt_hits[PTE_MAX_CURALT_DEPTH];		/* number of pte_csh hits in do_patalt() */
+GBLDEF	int4		do_patalt_maxed_out[PTE_MAX_CURALT_DEPTH];	/* no. of pte_csh misses after maxing on allocation size */
+
+GBLDEF	pte_csh		*pte_csh_array[PTE_MAX_CURALT_DEPTH];		/* pte_csh array (per curalt_depth) */
+GBLDEF	int4		pte_csh_cur_size[PTE_MAX_CURALT_DEPTH];		/* current pte_csh size (per curalt_depth) */
+GBLDEF	int4		pte_csh_alloc_size[PTE_MAX_CURALT_DEPTH];	/* current allocated pte_csh size (per curalt_depth) */
+GBLDEF	int4		pte_csh_entries_per_len[PTE_MAX_CURALT_DEPTH];	/* current number of entries per len */
+GBLDEF	int4		pte_csh_tail_count[PTE_MAX_CURALT_DEPTH];	/* count of non 1-1 corresponding pte_csh_array members */
+
+GBLDEF	pte_csh		*cur_pte_csh_array;			/* copy of pte_csh_array corresponding to curalt_depth */
+GBLDEF	int4		cur_pte_csh_size;			/* copy of pte_csh_cur_size corresponding to curalt_depth */
+GBLDEF	int4		cur_pte_csh_entries_per_len;		/* copy of pte_csh_entries_per_len corresponding to curalt_depth */
+GBLDEF	int4		cur_pte_csh_tail_count;			/* copy of pte_csh_tail_count corresponding to curalt_depth */
+
+GBLDEF	readonly char	*before_image_lit[] = {"NOBEFORE_IMAGES", "BEFORE_IMAGES"};
+GBLDEF	readonly char	*jnl_state_lit[] = {"DISABLED", "OFF", "ON"};

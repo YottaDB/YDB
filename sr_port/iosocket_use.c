@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -153,7 +153,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), len);
 				sockaddr[len] = '\0';
                         } else
-				rts_error(VARLSTCNT(1) ERR_ADDRTOOLONG);
+				rts_error(VARLSTCNT(6) ERR_ADDRTOOLONG, 4, len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
                         break;
 		case iop_delimiter:
 			n_specified++;
@@ -198,7 +198,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), len);
 				sockaddr[len] = '\0';
                         } else
-				rts_error(VARLSTCNT(1) ERR_ADDRTOOLONG);
+				rts_error(VARLSTCNT(6) ERR_ADDRTOOLONG, 4, len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
                         break;
 		case iop_socket:
 			n_specified++;
@@ -378,6 +378,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		/* these changes apply to only pre-existing sockets */
 		if (bfsize_specified)
 			newsocket.buffer_size = bfsize;
+#ifdef TCP_NODELAY
 		nodelay = newsocket.nodelay ? 1 : 0;
 		if ((socketptr->nodelay != newsocket.nodelay) &&
 				(-1 == tcp_routines.aa_setsockopt(newsocket.sd, IPPROTO_TCP,
@@ -388,6 +389,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
                 	rts_error(VARLSTCNT(7) ERR_SETSOCKOPTERR, 5, LEN_AND_LIT("TCP_NODELAY"), save_errno, LEN_AND_STR(errptr));
 			return;
 		}
+#endif
 		if ((socketptr->bufsiz != newsocket.bufsiz) &&
 				(-1 == tcp_routines.aa_setsockopt(newsocket.sd, SOL_SOCKET,
 						SO_RCVBUF, &newsocket.bufsiz, sizeof(newsocket.bufsiz))))

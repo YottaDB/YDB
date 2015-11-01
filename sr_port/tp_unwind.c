@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "mv_stent.h"
 #include "rtnhdr.h"
 #include "stack_frame.h"
@@ -19,7 +20,8 @@
 #include "lv_val.h"
 #include "op.h"
 #include "tp_unwind.h"
-#include "mlk_pvtblk_delete.h"
+#include "mlk_pvtblk_delete.h"	/* for prototype */
+#include "mlk_unlock.h"		/* for prototype */
 
 error_def(ERR_STACKUNDERFLO);
 
@@ -32,9 +34,7 @@ GBLREF	unsigned char	*tp_sp, *tpstackbase, *tpstacktop;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
 GBLREF	short		dollar_tlevel;
 
-
-
-void	tp_unwind(short newlevel, bool restore)
+void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type)
 {
 	mlk_pvtblk	**prior, *mlkp;
 	mlk_tp		*oldlock, *nextlock;
@@ -42,6 +42,9 @@ void	tp_unwind(short newlevel, bool restore)
 	lv_val		*save_lv, *curr_lv;
 	tp_var		*restore_ent;
 	mv_stent	*mvc;
+	boolean_t	restore_lv, rollback_locks;
+
+	restore_lv = (invocation_type == RESTART_INVOCATION);
 
 	assert(tp_sp <= tpstackbase  &&  tp_sp > tpstacktop);
 	assert(tp_pointer <= (tp_frame *)tpstackbase  &&  tp_pointer > (tp_frame *)tpstacktop);
@@ -63,7 +66,7 @@ void	tp_unwind(short newlevel, bool restore)
 
 			/* In order to restart sub-transactions, this would have to maintain
 			   the chain that currently is not built by op_tstart() */
-			if (restore)
+			if (restore_lv)
 			{
 				if ((NULL == curr_lv->tp_var) && (NULL != curr_lv->ptrs.val_ent.children))
 					lv_killarray(curr_lv->ptrs.val_ent.children);
@@ -101,7 +104,7 @@ void	tp_unwind(short newlevel, bool restore)
 			|| (tp_pointer < (tp_frame *)tpstacktop)))
 				rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
 	}
-	if ((0 != newlevel) && restore)
+	if ((0 != newlevel) && restore_lv)
 	{	/* Restore current context */
 		for (restore_ent = tp_pointer->vars;  NULL != restore_ent;  restore_ent = restore_ent->next)
 		{
@@ -115,16 +118,38 @@ void	tp_unwind(short newlevel, bool restore)
 				curr_lv->ptrs.val_ent.children->lv = curr_lv;
 		}
 	}
+	rollback_locks = (invocation_type != COMMIT_INVOCATION);
 	for (prior = &mlk_pvt_root, mlkp = *prior;  NULL != mlkp;  mlkp = *prior)
 	{
 		if (mlkp->granted)
 		{	/* This was a pre-existing lock */
-			for (oldlock = mlkp->tp;  (NULL != oldlock) && ((int)oldlock->tplevel >= newlevel);  oldlock = nextlock)
-			{
+			for (oldlock = mlkp->tp;  (NULL != oldlock) && ((int)oldlock->tplevel > newlevel);  oldlock = nextlock)
+			{	/* Remove references to the lock from levels being unwound */
 				nextlock = oldlock->next;
 				free(oldlock);
 			}
-			mlkp->tp = oldlock;
+			if (rollback_locks)
+			{
+				if (NULL == oldlock)
+				{	/* Lock did not exist at the tp level being unwound to */
+					mlk_unlock(mlkp);
+					mlk_pvtblk_delete(prior);
+					continue;
+				} else
+				{	/* Lock still exists but restore lock state as it was when the transaction started. */
+					mlkp->level = oldlock->level;
+					mlkp->zalloc = oldlock->zalloc;
+				}
+			}
+			if (NULL != oldlock && oldlock->tplevel == newlevel)
+			{	/* Remove lock reference from level being unwound to,
+				 * now that any {level,zalloc} state information has been restored.
+				 */
+				assert(NULL == oldlock->next || oldlock->next->tplevel < newlevel);
+				mlkp->tp = oldlock->next;	/* update root reference pointer */
+				free(oldlock);
+			} else
+				mlkp->tp = oldlock;	/* update root reference pointer */
 			prior = &mlkp->next;
 		} else
 			mlk_pvtblk_delete(prior);

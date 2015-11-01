@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -152,11 +152,11 @@
 { \
 	int status; \
 	struct flock lock;    /* arg to lock the file thru fnctl */   \
-	while (-1 == (FDESC = OPEN(FNAME, FFLAG, 0666)) && EINTR == errno)    \
+	while (-1 == (FDESC = OPEN3(FNAME, FFLAG, 0666)) && EINTR == errno)    \
 	;  \
 	if (-1 != FDESC)  {  \
 		do { \
-			lock.l_type = (((FFLAG) & O_WRONLY) || ((FFLAG) & O_RDWR)) ? F_WRLCK : F_RDLCK;\
+			lock.l_type = ((O_WRONLY == ((FFLAG) & O_ACCMODE)) || (O_RDWR == ((FFLAG) & O_ACCMODE))) ? F_WRLCK : F_RDLCK;\
 			lock.l_whence = SEEK_SET; /*locking offsets from file beginning*/ \
 			lock.l_start = lock.l_len = 0; /* lock the whole file */\
 			lock.l_pid = getpid(); \
@@ -173,7 +173,7 @@
 { \
 	int status; \
 	struct flock lock;    /* arg to lock the file thru fnctl */   \
-	while (-1 == (FDESC = OPEN(FNAME, FFLAG, 0666)) && EINTR == errno)    \
+	while (-1 == (FDESC = OPEN3(FNAME, FFLAG, 0666)) && EINTR == errno)    \
 	;  \
 }
 #else
@@ -191,7 +191,7 @@
 	struct statfs buf; \
 	int status; \
 	struct flock lock;    /* arg to lock the file thru fnctl */   \
-	while (-1 == (FDESC = OPEN(FNAME, FFLAG, 0666)) && EINTR == errno)    \
+	while (-1 == (FDESC = OPEN3(FNAME, FFLAG, 0666)) && EINTR == errno)    \
 	;  \
 	if (-1 != FDESC)  {  \
 		if (-1 != fstatfs(FDESC, &buf) && NFS_SUPER_MAGIC != buf.f_type) /*is not on NFS?*/\

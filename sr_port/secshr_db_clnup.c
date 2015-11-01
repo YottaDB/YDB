@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,13 +60,15 @@
 
 #define FLUSH 1
 
-/* SECSHR_ACCOUNTING macro assumes csd is dereferencible */
-
-#define		SECSHR_ACCOUNTING(value)					\
-{										\
-	if (csd->secshr_ops_index < sizeof(csd->secshr_ops_array))		\
-		csd->secshr_ops_array[csd->secshr_ops_index] = (uint4)(value);	\
-	csd->secshr_ops_index++;						\
+/* SECSHR_ACCOUNTING macro assumes csd is dereferencible and uses "csa", "csd" and "is_bg" */
+#define		SECSHR_ACCOUNTING(value)						\
+{											\
+	if (csa->read_write || is_bg)							\
+	{										\
+		if (csd->secshr_ops_index < sizeof(csd->secshr_ops_array))		\
+			csd->secshr_ops_array[csd->secshr_ops_index] = (uint4)(value);	\
+		csd->secshr_ops_index++;						\
+	}										\
 }
 
 /* IMPORTANT : SECSHR_PROBE_REGION sets csa */
@@ -85,7 +87,8 @@
 		continue; /* would be nice to notify the world of a problem but where and how? */	\
 	csa = &(FILE_INFO((reg)))->s_addrs;								\
 	if (!GTM_PROBE(sizeof(sgmnt_addrs), csa, READ))							\
-		continue; /* would be nice to notify the world of a problem but where and how? */
+		continue; /* would be nice to notify the world of a problem but where and how? */	\
+	assert(reg->read_only && !csa->read_write || !reg->read_only && csa->read_write);
 
 #ifdef UNIX
 #  ifdef DEBUG_CHECK_LATCH
@@ -137,7 +140,7 @@ bool secshr_tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
 void secshr_db_clnup(boolean_t termination_mode)
 {
 	unsigned char		*chain_ptr;
-	boolean_t		jnlpool_reg, tp_update_underway;
+	boolean_t		is_bg, jnlpool_reg, tp_update_underway;
 	int			max_bts;
 	unsigned int		lcnt;
 	cache_rec_ptr_t		clru, cr, cr_top, start_cr;
@@ -182,7 +185,9 @@ void secshr_db_clnup(boolean_t termination_mode)
 				csd = csa->hdr;
 				if (!GTM_PROBE(sizeof(sgmnt_data), csd, WRITE))
 					continue; /* would be nice to notify the world of a problem but where and how? */
-				csd->secshr_ops_index = 0;	/* start accounting */
+				is_bg = (csd->acc_meth == dba_bg);
+				if (csa->read_write || is_bg)		/* cannot update csd if MM and read-only */
+					csd->secshr_ops_index = 0;	/* start accounting otherwise */
 				SECSHR_ACCOUNTING(3);	/* 3 is the number of arguments following including self */
 				SECSHR_ACCOUNTING(__LINE__);
 				SECSHR_ACCOUNTING(rundown_process_id);
@@ -229,7 +234,7 @@ void secshr_db_clnup(boolean_t termination_mode)
 					if (csa->nl->wcsflu_pid == rundown_process_id)
 						csa->nl->wcsflu_pid = 0;
 				}
-				if (csd->acc_meth == dba_bg)
+				if (is_bg)
 				{
 					if ((0 == reg->sec_size) || !GTM_PROBE(reg->sec_size, csa->nl, WRITE))
 					{
@@ -256,7 +261,7 @@ void secshr_db_clnup(boolean_t termination_mode)
 								cr->wip_stopped = TRUE;
 						)
 						CHECK_LATCH(&cr->rip_latch);
-						UNIX_ONLY(assert(rundown_process_id);)
+						assert(rundown_process_id);
 						if ((cr->r_epid == rundown_process_id) && (0 == cr->dirty)
 								&& (FALSE == cr->in_cw_set))
 						{
@@ -338,7 +343,7 @@ void secshr_db_clnup(boolean_t termination_mode)
 				}
 				if (NULL != first_cw_set)
 				{
-					if (csd->acc_meth == dba_bg)
+					if (is_bg)
 					{
 						clru = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, csa->nl->cur_lru_cache_rec_off);
 						lcnt = 0;
@@ -390,7 +395,7 @@ void secshr_db_clnup(boolean_t termination_mode)
 							csd->trans_hist.free_blocks -= cs->reference_cnt;
 						if ((gds_t_committed == cs->mode) || (gds_t_write_root == cs->mode))
 							continue;	/* already processed */
-						if (csd->acc_meth == dba_bg)
+						if (is_bg)
 						{
 							for (; lcnt++ < max_bts;)
 							{	/* find any available cr */
@@ -670,7 +675,7 @@ void secshr_db_clnup(boolean_t termination_mode)
 				}
 				if (csa->now_crit)
 				{
-					if (dba_bg == csd->acc_meth)
+					if (is_bg)
 						csd->wc_blocked = TRUE;
 					if (csa->ti->curr_tn == csa->ti->early_tn - 1)
 					{

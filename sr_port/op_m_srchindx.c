@@ -47,8 +47,6 @@ va_dcl
 	static lvname_info_ptr	lvn_info = NULL;
 	unsigned char           buff[MAX_STRLEN], *endbuff;
 
-	error_def(ERR_LVNDUNDEF);
-
 	if (!lvn_info)
 		lvn_info = (lvname_info_ptr) malloc(sizeof(struct lvname_info_struct));
 	VAR_START(var);

@@ -37,32 +37,33 @@
 #endif /* !defined(__STDC__) */
 
 /*  Routines */
-void		 gtcm_prsopt   P((int, char **));
-int		 gtcm_maxfds   P((void));
-int		 gtcm_bgn_net  P((omi_conn_ll *));
-void		 gtcm_end_net  P((omi_conn_ll *));
-void		 gtcm_loop     P((omi_conn_ll *));
-int		 gtcm_cn_acpt  P((omi_conn_ll *, int));
-void		 gtcm_cn_disc  P((omi_conn *, omi_conn_ll *));
-int		 gtcm_term     P((int));
-void		 gtcm_exit_ch  P((int));
-void		 gtcm_exit     P((void));
-int		 gtcm_dmpstat  P((int));
-void		 gtcm_rep_err  P((char *, int));
-int		 omi_srvc_xact P((omi_conn *));
-int		 rc_srvc_xact  P((omi_conn *, char *));
+void		gtcm_init     P((int argc, char_ptr_t argv[]));
+void		gtcm_prsopt   P((int, char **));
+int		gtcm_maxfds   P((void));
+int		gtcm_bgn_net  P((omi_conn_ll *));
+void		gtcm_end_net  P((omi_conn_ll *));
+void		gtcm_loop     P((omi_conn_ll *));
+int		gtcm_cn_acpt  P((omi_conn_ll *, int));
+void		gtcm_cn_disc  P((omi_conn *, omi_conn_ll *));
+int		gtcm_term     P((int));
+void		gtcm_exit_ch  P((int));
+void		gtcm_exit     P((void));
+int		gtcm_dmpstat  P((int));
+void		gtcm_rep_err  P((char *, int));
+int		omi_srvc_xact P((omi_conn *));
+int		rc_srvc_xact  P((omi_conn *, char *));
 char		*gtcm_hname    P((struct sockaddr_in *));
-void		 gtcm_cpktdmp  P((char *, int, char *));
-void		 gtcm_pktdmp   P((char *, int, char *));
-void	 	 init_hist     P((void));
-void		 init_omi_hist P((int));
-void		 save_omi_req  P((char *, int));
-void		 save_omi_rsp  P((char *, int));
-void		 init_rc_hist  P((int));
-void		 save_rc_req   P((char *, int));
-void		 save_rc_rsp   P((char *, int));
-void	 	 dump_omi_rq   P((void));
-void	 	 dump_rc_hist  P((void));
+void		gtcm_cpktdmp  P((char *, int, char *));
+void		gtcm_pktdmp   P((char *, int, char *));
+void		init_hist     P((void));
+void		init_omi_hist P((int));
+void		save_omi_req  P((char *, int));
+void		save_omi_rsp  P((char *, int));
+void		init_rc_hist  P((int));
+void		save_rc_req   P((char *, int));
+void		save_rc_rsp   P((char *, int));
+void		dump_omi_rq   P((void));
+void		dump_rc_hist  P((void));
 
 #undef P
 

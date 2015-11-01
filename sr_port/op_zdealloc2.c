@@ -69,9 +69,7 @@ void op_zdealloc2(int4 timeout, uint4 auxown)
 			if (!(*prior)->granted)
 			{	/* if entry was never granted, delete list entry */
 				mlk_pvtblk_delete(prior);
-			}
-
-			else  if ((*prior)->nodptr->auxowner != auxown)
+			} else if ((*prior)->nodptr && (*prior)->nodptr->auxowner != auxown)
 			{	/*if its not for this sub-entity skip it*/
 				prior = &((*prior)->next);
 			}
@@ -97,7 +95,7 @@ void op_zdealloc2(int4 timeout, uint4 auxown)
 			{	/* if entry was never granted, delete list entry */
 				mlk_pvtblk_delete(prior);
 			}
-			else  if ((*prior)->nodptr->auxowner != auxown)
+			else  if ((*prior)->nodptr && (*prior)->nodptr->auxowner != auxown)
 			{	/*if its not for this sub-entity skip it*/
 				prior = &((*prior)->next);
 			} else  if (!(*prior)->level)

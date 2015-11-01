@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include <unistd.h>
 #include <netinet/in.h>
 #include "gtm_iconv.h"

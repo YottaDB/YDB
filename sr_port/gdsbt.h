@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,8 +27,6 @@
 #define MAX_LOCK_SPACE 1000 	/* need to change these whenever global directory defaults change */
 #define MIN_LOCK_SPACE 10
 
-#define MIN_FN_LEN	1
-#define MAX_FN_LEN	255
 #define MAX_REL_NAME	36
 #define MAX_MCNAMELEN   256
 
@@ -178,12 +176,12 @@ typedef struct
 #endif
 } mutex_struct;
 
-typedef struct {
+typedef struct { /* keep this structure and member offsets defined in sr_avms/mutex.mar in sync */
 	int4	mutex_hard_spin_count;
 	int4	mutex_sleep_spin_count;
 	int4	mutex_spin_sleep_mask;
 	int4	filler1;
-} mutex_spin_parms_struct; /* Unix only */
+} mutex_spin_parms_struct;
 
 enum crit_ops
 {	crit_ops_gw = 1,	/* grab [write] crit */
@@ -339,38 +337,7 @@ typedef node_local *node_local_ptr_t;
 # endif
 #endif
 
-/* Functional interface. For Unix definitions see file mutex.h */
-
 #include "cdb_sc.h"
-
-#ifdef VMS
-
-/*
- * Initialize a mutex with n que entries. If crash is TRUE, then this is
- * a "crash" reinitialization;  otherwise it's a "clean" initialization.
- */
-void		mutex_init(mutex_struct_ptr_t addr, int n, bool crash);
-
-/* mutex_lockw - write access to mutex at addr */
-enum	cdb_sc	mutex_lockw(mutex_struct_ptr_t addr, short crash_count, uint4 *write_lock);
-
-/*
- * mutex_lockwim - write access to mutex at addr; if cannot lock,
- *                 immediately return cdb_sc_nolock
- */
-enum	cdb_sc	mutex_lockwim(mutex_struct_ptr_t addr, short crash_count, uint4 *write_lock);
-
-/*
- * mutex_lockw_ccp - write access to mutex at addr; if cannot lock,
- *                   queue CCP for "wakeup" and return
- *                   cdb_sc_nolock (do NOT hiber)
- */
-enum	cdb_sc	mutex_lockw_ccp(mutex_struct_ptr_t addr, short crash_count, uint4 *write_lock, void *super_crit);
-
-/* mutex_unlockw - unlock write access to mutex at addr */
-enum	cdb_sc	mutex_unlockw(mutex_struct_ptr_t addr, short crash_count, uint4 *write_lock);
-
-#endif
 
 bt_rec_ptr_t bt_get(int4 block);
 void wait_for_block_flush(bt_rec *bt, block_id block);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,10 +23,11 @@
 #include "filestruct.h"
 #include "copy.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "longcpy.h"
 #include "tp.h"
+#include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 
 #define MMBLK_OFFSET(BLK)     													\
@@ -282,7 +283,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 		}
 	}
 	gv_target->read_local_tn = local_tn;
-	cws_reset();
+	CWS_RESET;
 	return status;
 }
 

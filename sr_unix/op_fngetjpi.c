@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include <unistd.h>
 #include "stringpool.h"
 #include "gtm_times.h"

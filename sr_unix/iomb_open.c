@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "copy.h"
 #include "io.h"
 #include "iombdef.h"

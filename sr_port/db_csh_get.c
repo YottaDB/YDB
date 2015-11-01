@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,8 @@
 #include "gdsfhead.h"
 #include "gdsbgtr.h"
 #include "cache.h"
+#include "hashtab.h"		/* needed for cws_insert.h */
+#include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 
 GBLREF sgmnt_addrs	*cs_addrs;
@@ -86,13 +88,14 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 			{
 				if (!is_mm)
 				{
-				    if (CDB_STAGNATE <= t_tries || mu_reorg_process)
-					    cws_insert(block);
-				    /* setting refer outside of crit may not prevent its replacement, but that's an inefficiency,
-				     * not a tragedy because of concurrency checks in t_end or tp_tend; the real problem is to
-				     * ensure that the cache_rec layout is such that this assignment does not damage other fields.
-				     */
-				    cr->refer = TRUE;
+					if (CDB_STAGNATE <= t_tries || mu_reorg_process)
+						CWS_INSERT(block);
+					/* setting refer outside of crit may not prevent its replacement, but that's an
+					 * inefficiency, not a tragedy because of concurrency checks in t_end or tp_tend;
+					 * the real problem is to ensure that the cache_rec layout is such that this
+					 * assignment does not damage other fields.
+					 */
+					cr->refer = TRUE;
 				}
 				return cr;
 			}

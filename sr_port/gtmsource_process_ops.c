@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,8 +47,8 @@
 #include "repl_filter.h"
 #include "repl_log.h"
 #include "sgtm_putmsg.h"
+#include "longcpy.h"		/* for longcpy() prototype */
 
-LITREF	int			jnl_fixed_size[];
 GBLREF	gd_addr			*gd_header;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	int			gtmsource_sock_fd;
@@ -71,6 +71,7 @@ GBLREF	unsigned char		jnl_ver, remote_jnl_ver;
 GBLREF	uchar_ptr_t		repl_filter_buff;
 GBLREF	int			repl_filter_bufsiz;
 GBLREF	boolean_t		gtmsource_pool2file_transition;
+GBLREF  repl_ctl_element        *repl_ctl_list;
 
 void gtmsource_init_sec_addr(struct sockaddr_in *secondary_addr)
 {
@@ -162,7 +163,7 @@ int gtmsource_alloc_tcombuff(void)
 	/* Allocate buffer for TCOM, ZTCOM records */
 	int	max_tcombufsiz;
 
-	max_tcombufsiz = gd_header->n_regions * (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_TCOM] + JREC_SUFFIX_SIZE);
+	max_tcombufsiz = gd_header->n_regions * TCOM_RECLEN;
 
 	if (!gtmsource_tcombuff_start &&
 	    NULL == (gtmsource_tcombuff_start = (unsigned char *)malloc(max_tcombufsiz)))
@@ -232,6 +233,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
+	error_def(ERR_UNIMPLOP);
 
 	status = SS_NORMAL;
 	for (; SS_NORMAL == status;)
@@ -272,8 +274,19 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				/* V4.2+ versions have jnl ver in the start msg */
 				remote_jnl_ver = ((*start_flags & START_FLAG_HASINFO) ?
 						  ((repl_start_msg_ptr_t)&msg)->jnl_ver : JNL_VER_EARLIEST_REPL);
-				assert(JNL_VER_EARLIEST_REPL <= jnl_ver && JNL_VER_EARLIEST_REPL <= remote_jnl_ver);
 				REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n", jnl_ver, remote_jnl_ver);
+				assert(JNL_VER_EARLIEST_REPL <= jnl_ver && JNL_VER_EARLIEST_REPL <= remote_jnl_ver);
+				VMS_ONLY
+				(
+					/* No customer has a pre V4.3-001 version running replication in production. We expect
+					 * customers who want to run replication to upgrade to V4.3-001. We don't want to write
+					 * internal filters to support rolling upgrades b/n pre V4.3-001 and V4.3-001.
+					 * Vinaya Feb 27, 2002 */
+					if (V13_JNL_VER > remote_jnl_ver)
+						rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
+							LEN_AND_LIT("Rolling upgrade not supported between"
+								    "these two GT.M versions"));
+				)
 				return (SS_NORMAL);
 			} else if (REPL_FETCH_RESYNC == msg.type)
 			{
@@ -333,7 +346,6 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 		gtmsource_local->read_state = READ_POOL;
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Update resync received, source server now reading from journal pool\n");
 		gtmsource_ctl_close();
-		gtmsource_ctl_init();
 		REPL_DPRINT1("Received START_FLAG_UPDATERESYNC\n");
 	}
 
@@ -534,10 +546,10 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen)
 
 		case READ_FILE:
 
-			if (READ_POOL == prev_read_state || gtmsource_pool2file_transition)
+			if (READ_POOL == prev_read_state || gtmsource_pool2file_transition /* read_pool -> read_file transition */
+			    || NULL == repl_ctl_list) /* files not opened */
 			{
-				/* Transition from READ_POOL to READ_FILE.
-				 * Close all the file read related structures
+				/* Close all the file read related structures
 				 * and start afresh. The idea here is that
 				 * most of the file read info might be stale
 				 * 'cos there is usually a long gap between

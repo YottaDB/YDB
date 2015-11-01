@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,10 +20,10 @@
 #include "op.h"
 #include "do_indir_do.h"
 
-LITREF char ctypetab[128];
-GBLREF stack_frame *frame_pointer;
-GBLREF command_qualifier cmd_qlf;
-GBLREF  boolean_t	is_tracing_on;
+LITREF	char			ctypetab[NUM_ASCII_CHARS];
+GBLREF	stack_frame		*frame_pointer;
+GBLREF	command_qualifier	cmd_qlf;
+GBLREF	boolean_t		is_tracing_on;
 
 int do_indir_do(mval *v, unsigned char argcode)
 {

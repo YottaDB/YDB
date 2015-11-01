@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -31,9 +31,10 @@
  ;
  Set in=$ZPARSE(fn,"","",".msg")
  Set out=$ZPARSE(fn,"NAME"),txt=$ZPARSE(out,"","[]",".c")
- Set txt=$TRanslate(txt,"C","c"),l=$Length(txt),outansi=txt
- Set:$Extract(txt,l-1,l)=".c" outansi=$Extract(txt,1,l-2)
- Set:$Extract(txt,l-2,l)=".c;" outansi=$Extract(txt,1,l-3)
+ Set l=$Length(txt),outansi=txt
+ set ext=$Select(vms:".C",1:".c"),extl=ext_";"
+ Set:$Extract(txt,l-1,l)=ext outansi=$Extract(txt,1,l-2)
+ Set:$Extract(txt,l-2,l)=extl outansi=$Extract(txt,1,l-3)
  Set out=outansi_"_ctl.c",outansi=outansi_"_ansi.h"
  Set fn=$ZPARSE(fn,"NAME")
  Set fn=$TRanslate(fn,up,lo)
@@ -161,7 +162,7 @@ hdr New year
  Write "/****************************************************************",!
  Write " *",$Char(9,9,9,9,9,9,9,9),"*",!
  Write " *",$Char(9),"Copyright 2001"
- Write:year'=2001 "-",year Write " Sanchez Computer Associates, Inc.",$Char(9),"*",!
+ Write:year'=2001 ",",year Write " Sanchez Computer Associates, Inc.",$Char(9),"*",!
  Write " *",$Char(9,9,9,9,9,9,9,9),"*",!
  Write " *",$Char(9),"This source code contains the intellectual property",$Char(9),"*",!
  Write " *",$Char(9),"of its copyright holder(s), and is made available",$Char(9),"*",!

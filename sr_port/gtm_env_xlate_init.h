@@ -43,6 +43,7 @@ error_def(ERR_TEXT);
 			struct dsc$descriptor   filename;						\
 			struct dsc$descriptor   entry_point;						\
 		)											\
+		MV_FORCE_STR(VAL2);									\
 		if (NULL == gtm_env_xlate_entry) 							\
 		{											\
 		UNIX_ONLY(										\

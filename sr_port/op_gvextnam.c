@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,13 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #ifdef VMS
 #include <descrip.h>	/* for GTM_ENV_TRANSLATE */
 #endif
 
-#include <limits.h>	/* for GTM_ENV_TRANSLATE */
+#include "gtm_limits.h"	/* for GTM_ENV_TRANSLATE */
 
 #ifdef EARLY_VARARGS
 #include <varargs.h>
@@ -78,7 +80,6 @@ va_dcl
 	val1 = va_arg(var, mval *);
 	val2 = va_arg(var, mval *);
 	MV_FORCE_STR(val1);
-	MV_FORCE_STR(val2);
 	GTM_ENV_TRANSLATE(val1, val2);
 
 	assert(!extnam_str_alloc || (NULL != extnam_str.addr));

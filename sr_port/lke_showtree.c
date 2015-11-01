@@ -17,7 +17,12 @@
  */
 
 #include "mdef.h"
+
+#include <signal.h>
+
+#include "gtm_string.h"
 #include "gtm_stdio.h"
+
 #include "mlkdef.h"
 #include "cmidef.h"
 #include "lke.h"
@@ -25,6 +30,7 @@
 #define KDIM	64		/* max number of subscripts */
 #define	SDIM	256		/* max subscript size */
 
+GBLREF VSIG_ATOMIC_T	util_interrupt;
 
 void lke_show_memory(mlk_shrblk_ptr_t bhead, char *prefix)
 {
@@ -62,6 +68,7 @@ bool	lke_showtree(struct CLB 	*lnk,
 	int		depth = 0;
 	bool		locks = FALSE;
 
+	error_def(ERR_CTRLC);
 
 	if (memory)
 	{
@@ -108,6 +115,7 @@ bool	lke_showtree(struct CLB 	*lnk,
 			     = (mlk_shrblk_ptr_t)R2A(node->children);
 			subscript_offset[depth] = name.len;
 		}
+		if (util_interrupt)
+			rts_error(VARLSTCNT(1) ERR_CTRLC);
 	}
-
 }

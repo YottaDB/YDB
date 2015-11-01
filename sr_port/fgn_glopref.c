@@ -13,6 +13,9 @@
 	for locks.
 */
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "stringpool.h"
 #include "rtnhdr.h"
 #include "fgncal.h"

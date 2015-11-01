@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,5 +15,6 @@
 gd_region *dbfilopn (gd_region *reg);
 void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd);
 void db_init(gd_region *reg, sgmnt_data_ptr_t tsd);
+void db_auto_upgrade(gd_region *reg);
 
 #endif

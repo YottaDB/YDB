@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
 #include "mdq.h"
 #include "advancewindow.h"
 #include "cmd.h"
-#include "pattern.h"
+#include "compile_pattern.h"
 #include "mvalconv.h"
 
 GBLREF char window_token;
@@ -32,8 +32,8 @@ GBLREF mident window_ident;
 GBLREF char director_token;
 GBLREF short int source_column;
 GBLREF short int last_source_column;
-GBLREF unsigned char pat_everything[];
-GBLREF unsigned char sizeof_pat_everything;
+GBLREF uint4 pat_everything[];
+GBLREF uint4 sizeof_pat_everything;
 
 /******	CAUTION !!! ******
  *	All occurrences of put_lit should be replaced by put_ilit.  In order to maintain object
@@ -123,7 +123,7 @@ int m_zwrite(void)
 	case TK_QUESTION:
 		advancewindow();
 		source_column = last_source_column;
-		if (!pattern(&name,FALSE))
+		if (!compile_pattern(&name,FALSE))
 			return FALSE;
 		if (op == OC_LVZWRITE)
 			op = OC_LVPATWRITE;
@@ -211,7 +211,7 @@ int m_zwrite(void)
 			case TK_QUESTION:
 				advancewindow();
 				source_column = last_source_column;
-				if (!pattern(&limit,FALSE))
+				if (!compile_pattern(&limit,FALSE))
 					return FALSE;
 				if (window_token != TK_COMMA && window_token != TK_RPAREN)
 				{	stx_error(ERR_ZWRSPONE);

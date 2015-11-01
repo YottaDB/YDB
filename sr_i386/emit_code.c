@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,6 @@
 #include "emit_code.h"
 
 #define BUFFERED_CODE_SIZE 50
-#define NUM_STORED_OPERANDS 256
 #define LONG_JUMP_OFFSET (0x7ffffffc)
 
 #define XFER_BYTE_INST_SIZE 3
@@ -85,7 +84,7 @@ GBLDEF uint4	txtrel_cnt;	/* count of text relocation records */
 void trip_gen(triple *ct)
 {
 	oprtype		**sopr, *opr;	/* triple operand */
-	oprtype		*saved_opr[NUM_STORED_OPERANDS];
+	oprtype		*saved_opr[MAX_ARGS];
 	unsigned short	oct;
 	short		tp;	/* template pointer */
 	short		*tsp;	/* template short pointer */
@@ -120,8 +119,8 @@ void trip_gen(triple *ct)
 				continue;
 			}
 			*sopr++ = opr;
-			if (sopr >= &saved_opr[NUM_STORED_OPERANDS])
-				rts_error(VARLSTCNT(1) ERR_MAXARGCNT);
+			if (sopr >= &saved_opr[MAX_ARGS])
+				rts_error(VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS);
 		}
 		opr++;
 	}

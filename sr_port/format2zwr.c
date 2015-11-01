@@ -16,6 +16,9 @@
  */
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "mlkdef.h"
 #include "zshow.h"
 #include "patcode.h"

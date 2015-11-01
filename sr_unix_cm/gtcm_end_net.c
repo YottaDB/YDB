@@ -25,6 +25,10 @@ static char rcsid[] = "$Header:$";
 #endif /* defined(DEBUG) */
 
 #include "mdef.h"
+
+#include "gtm_unistd.h"		/* for close() */
+#include "gtm_time.h"		/* for ctime() and time() */
+
 #include "gtcm.h"
 
 GBLREF char	*omi_oprlist[];

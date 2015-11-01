@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,12 @@ typedef struct
 	parm_blk	*mvs_parmlist;
 } mvs_parm_struct;
 
+typedef struct
+{
+	int		saved_dollar_truth;
+	mval		savtarg;
+} mvs_zintr_struct;
+
 typedef struct mv_stent_struct
 {
 	unsigned int mv_st_type : 4;
@@ -63,6 +69,7 @@ typedef struct mv_stent_struct
 		} mvs_iarr;
 		mvs_ntab_struct mvs_ntab;
 		mvs_parm_struct mvs_parm;
+		mvs_zintr_struct mvs_zintr;
 		mvs_pval_struct mvs_pval;
 		mvs_nval_struct mvs_nval;
 		struct {
@@ -77,9 +84,9 @@ typedef struct mv_stent_struct
 mval *unw_mv_ent(mv_stent *mv_st_ent);
 void unw_mv_ent_n(int n);
 
-#define MVST_MSAV 0	/* An mval and an address to store it at pop time, used only
-			   by NEW $ZTRAP, $ETRAP and $ESTACK.
-			   This is important because the return addr is fixed,
+#define MVST_MSAV 0	/* An mval and an address to store it at pop time, most
+			   often used to save/restore new'd intrinsic variables.
+			   This is important because the restore addr is fixed,
 			   and no extra work is required to resolve it. */
 #define MVST_MVAL 1	/* An mval which will be dropped at pop time */
 #define MVST_STAB 2	/* A symbol table */
@@ -91,6 +98,7 @@ void unw_mv_ent_n(int n);
 #define MVST_NVAL 8	/* A temporary mval for indirect news */
 #define MVST_TVAL 9	/* Saved value of $T, to be restored upon QUITing */
 #define MVST_TPHOLD 10	/* Place holder for MUMPS stack pertaining to TSTART */
+#define MVST_ZINTR  11  /* Environmental save for $zinterrupt */
 
 #define MV_SIZE(X) (sizeof(*mv_chain) - sizeof(mv_chain->mv_st_cont) + sizeof(mv_chain->mv_st_cont.X))
 

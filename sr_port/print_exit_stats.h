@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,5 +13,8 @@
 #define __PRINT_EXIT_STATS_H__
 
 void print_exit_stats(void);
+/* Some routines used only by this routine */
+void printMallocInfo(void);
+void print_fnpc_stats(void);
 
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,16 +11,18 @@
 
 #include "mdef.h"
 
-#include <netinet/in.h>
 #include "gtm_inet.h"
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
+#include "gtm_time.h"
+
+#include <netinet/in.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+
 #include "cli.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -72,6 +74,7 @@ error_def(ERR_MUSTANDALONE);
 error_def(ERR_DBPRIVERR);
 error_def(ERR_STARTRECOVERY);
 error_def(ERR_RENAMEFAIL);
+error_def(ERR_DBFRZRESETSUC);
 
 GBLDEF	char		*mur_extract_buff;
 GBLDEF	int		mur_extract_bsize;
@@ -156,14 +159,14 @@ bool	mur_open_files(ctl_list **jnl_files)
 {
 	ctl_list		*curr, *prev;
 	jnl_file_header		*header;
-	jnl_proc_time		max_time = 0;
+	jnl_proc_time		max_time;
 	jnl_record		*rec;
 	redirect_list		*rl_ptr;
 	sgmnt_addrs		*csa;
 	fi_type			*extr_file_info;
 	fi_type			*losttrans_file_info;
 	char			*c, *c1, *ctop, fn[MAX_FN_LEN], rename_fn[MAX_FN_LEN];
-	bool 			standalone = FALSE, crash_occurred = FALSE;
+	bool 			standalone = FALSE, crash_occurred = FALSE, reg_frz_status = FALSE;
 	int			db_fd, fn_len, rename_len;
 	int4			info_status;
 	uint4			status;
@@ -184,6 +187,13 @@ bool	mur_open_files(ctl_list **jnl_files)
 
 	error_def(ERR_TEXT);
 
+	DEBUG_ONLY(
+		JNL_WHOLE_TIME(max_time);
+		/* The following assert is to make sure we get some fix for overflow of Unix signed time_t (year 2038).
+		 * This assert will fail in year 2035 */
+		assert(max_time < UNIX_TIME_T_OVERFLOW_WARN_THRESHOLD);
+	)
+	max_time = 0;
 	if (mur_options.update)
 	{
 		mupip_jnl_recover = TRUE;
@@ -236,7 +246,7 @@ bool	mur_open_files(ctl_list **jnl_files)
 			if (header->max_record_length > mur_extract_bsize)
 				mur_extract_bsize = header->max_record_length;
 			if (mur_extract_bsize == 0)
-				mur_extract_bsize = 10240;
+				mur_extract_bsize = DEFAULT_EXTR_BUFSIZE;
 		}
 		if (mur_options.extr_file_info != NULL)
 		{
@@ -244,7 +254,7 @@ bool	mur_open_files(ctl_list **jnl_files)
 				mur_extract_bsize = header->max_record_length;
 		}
 		if (mur_extract_bsize == 0)
-			mur_extract_bsize = 10240;
+			mur_extract_bsize = DEFAULT_EXTR_BUFSIZE;
 
 		if (mur_options.update)
 		{
@@ -327,7 +337,6 @@ bool	mur_open_files(ctl_list **jnl_files)
 			if (FALSE == standalone)
 			{
 				gtm_putmsg(VARLSTCNT(4) ERR_MUSTANDALONE, 2, fn_len, fn);
-				db_ipcs_reset(curr->gd, TRUE);
 				mur_open_files_error(curr, NO_FD_OPEN);
 				return FALSE;
 			}
@@ -478,6 +487,14 @@ bool	mur_open_files(ctl_list **jnl_files)
 				mur_open_files_error(curr, NO_FD_OPEN);
 				return FALSE;
 			}
+			if ((csa->hdr->freeze))
+			{
+				/* region_freeze should release freeze here as it's passed with override = TRUE */
+				reg_frz_status = region_freeze(curr->gd, FALSE, TRUE);
+				assert (0 == csa->hdr->freeze);
+				assert(FALSE != reg_frz_status);
+				gtm_putmsg(VARLSTCNT(4) ERR_DBFRZRESETSUC, 2, fn_len, fn);
+			}
 			if (!mur_options.forward)
 				curr->db_ctl->file_info = curr->gd->dyn.addr->file_cntl->file_info;
 			csa = &FILE_INFO(curr->gd)->s_addrs;
@@ -534,7 +551,7 @@ bool	mur_open_files(ctl_list **jnl_files)
 			return FALSE;
 		}
 		CHMOD(losttrans_file_info->fn, 0666);
-		mur_extract_buff = (char *)malloc(mur_extract_bsize + 256);
+		mur_extract_buff = (char *)malloc(mur_extract_bsize);
 	}
 
 	/* Open the extraction file, if specified */
@@ -572,7 +589,7 @@ bool	mur_open_files(ctl_list **jnl_files)
 			util_out_print("Error opening Extract file !AD ", TRUE, extr_file_info->fn_len, extr_file_info->fn);
 			return FALSE;
 		}
-		mur_extract_buff = (char *)malloc(mur_extract_bsize + 256);
+		mur_extract_buff = (char *)malloc(mur_extract_bsize);
 	}
 
 	/* Convert any delta times specified in the command line, and validate that all times are consistent. */

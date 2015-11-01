@@ -58,6 +58,7 @@ void t_write_map (
 	cs->ins_off = 0;
 	cs->index = 0;
 	cs->reference_cnt = 0;
+	cs->jnl_freeaddr = 0;		/* reset jnl_freeaddr that previous transaction might have filled in */
 	cs->upd_addr = upd_addr;
 	cs->tn = tn;
 	cs->level = LCL_MAP_LEVL;

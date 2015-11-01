@@ -14,11 +14,10 @@
 #ifdef UNIX
 #include <errno.h>
 #include "gtm_stdio.h"
-
+#include "gtmio.h"
 #elif defined(VMS)
 #include <rms.h>
 #include <ssdef.h>
-
 #else
 #error UNSUPPORTED PLATFORM
 #endif
@@ -34,25 +33,20 @@
 #include "cdb_sc.h"
 #include "copy.h"
 #include "mlkdef.h"
-
-#ifdef UNIX
-#include "gtmio.h"
-#include "val_print.h"
-
-#elif defined(VMS)
-#include "msg.h"
-#include "outrab_print.h"
-
-#else
-#error UNSUPPORTED PLATFORM
-#endif
 #include "op.h"
 #include "gvcst_expand_key.h"
 #include "format_targ_key.h"
 #include "zshow.h"
+#include "gtmmsg.h"
+#include "min_max.h"
 
+/* Following two are estimates for allocating memory. These values might be higher than needed just to be safe. */
 #define KEY_BUFF_SIZE       512
 #define MAX_EXPAND_TIMES    7
+#define INTEG_ERROR_RETURN {									\
+			gtm_putmsg(VARLSTCNT(4) ERR_EXTRFAIL, 2, gn->str.len, gn->str.addr); 	\
+			return FALSE;								\
+	}
 
 GBLREF bool		mu_ctrlc_occurred;
 GBLREF bool		mu_ctrly_occurred;
@@ -61,225 +55,147 @@ GBLREF gv_namehead	*gv_target;
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
 
-static readonly unsigned char gt_lit[] = "EXTRACT TOTAL";
+static readonly unsigned char gt_lit[] = "TOTAL";
 
 #ifdef UNIX
-void mu_extr_gblout(mval *gn, mu_extr_stats *st, int format)
+boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format)
 #elif defined(VMS)
-void mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int format)
+boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int format)
 #else
 #error UNSUPPORTED PLATFORM
 #endif
 {
-	int		status, gname_size, n, src_len, des_len, max_zwr_len, fmtd_key_len;
+	boolean_t 	beg_key;
+	int		gname_size, data_len, des_len, fmtd_key_len;
 	short		out_size;
 	unsigned short	rec_size;
+	sm_uc_ptr_t 	cp1, blktop, rectop;
 	blk_hdr_ptr_t 	bp;
-	rec_hdr_ptr_t 	rp, toprec;
-	sm_uc_ptr_t 	cp1, src;
-	unsigned char  	*key_buffer, *des, *cp2, *zwr_buffer;
-	bool 		done;
-	static unsigned char	*private_blk = NULL;
+	rec_hdr_ptr_t 	rp;
+	unsigned char  	*keytop, *cp2, last, current;
+	static gv_key	*beg_gv_currkey; 	/* this is used to check key out of order condition */
+	static unsigned char	*private_blk = NULL, *zwr_buffer = NULL, *key_buffer = NULL;
 	static uint4	private_blksz = 0;
-#ifdef UNIX
-	mval		val;
-#elif defined(VMS)
-	msgtype		*msg;
-	error_def(ERR_KEYCNT);
-	error_def(ERR_BINSTATS);
-	msg = malloc(sizeof(msgtype) + 2 * FAO_ARG);
-#else
-#error UNSUPPORTED PLATFORM
-#endif
+	static int	max_zwr_len = 0;
 
-	max_zwr_len = KEY_BUFF_SIZE + MAX_EXPAND_TIMES * cs_addrs->hdr->max_rec_size + 1;
-	zwr_buffer = (unsigned char *)malloc(max_zwr_len);
-	key_buffer = (unsigned char *)malloc(KEY_BUFF_SIZE);
+	error_def(ERR_EXTRFAIL);
+	error_def(ERR_RECORDSTAT);
+
+	op_gvname(VARLSTCNT(1) gn);	/* op_gvname() must be done before any usage of cs_addrs or, gv_currkey */
+	if (NULL == key_buffer)
+		key_buffer = (unsigned char *)malloc(KEY_BUFF_SIZE);
+	if (KEY_BUFF_SIZE + MAX_EXPAND_TIMES * cs_addrs->hdr->max_rec_size + 1 > max_zwr_len)
+	{
+		if (NULL != zwr_buffer)
+			free (zwr_buffer);
+		max_zwr_len = KEY_BUFF_SIZE + MAX_EXPAND_TIMES * cs_addrs->hdr->max_rec_size + 1;
+		zwr_buffer = (unsigned char *)malloc(max_zwr_len);
+	}
 	assert(0 < cs_data->blk_size);
 	if (cs_data->blk_size > private_blksz)
 	{
 		if (NULL != private_blk)
 			free(private_blk);
-		private_blk = (unsigned char *)malloc(cs_data->blk_size);
 		private_blksz = cs_data->blk_size;
+		private_blk = (unsigned char *)malloc(private_blksz);
 	}
-	st->recknt = st->reclen = st->keylen = st->datalen = 0;
-	op_gvname(VARLSTCNT(1) gn);
+	if (NULL == beg_gv_currkey)
+		beg_gv_currkey = (gv_key *)malloc(sizeof(gv_key) + MAX_KEY_SZ);
+	memcpy(beg_gv_currkey->base, gv_currkey->base, (sizeof(gv_key) + gv_currkey->end));
 	gname_size = gv_currkey->end;
-	for (done = FALSE ; !done ; )
+	keytop = &gv_currkey->base[gv_currkey->top];
+	st->recknt = st->reclen = st->keylen = st->datalen = 0;
+	for ( ; ; )
 	{
-		memset(private_blk, 0, private_blksz);
+		if (mu_ctrly_occurred)
+			return FALSE;
+		if (mu_ctrlc_occurred)
+		{
+			gtm_putmsg(VARLSTCNT(8) ERR_RECORDSTAT, 6, LEN_AND_LIT(gt_lit),
+				st->recknt, st->keylen, st->datalen, st->reclen);
+			mu_ctrlc_occurred = FALSE;
+		}
 		if (!mu_extr_getblk(private_blk))
 			break;
 		bp = (blk_hdr_ptr_t)private_blk;
-		assert (0 == bp->levl);
-		if (bp->bsiz <= sizeof(blk_hdr))
-			continue;
-		if (gv_target->hist.h[0].curr_rec.match < gname_size)
+		if (bp->bsiz == sizeof(blk_hdr))
 			break;
-		rp = (rec_hdr_ptr_t)(gv_target->hist.h[0].curr_rec.offset + (sm_uc_ptr_t) bp);
-		toprec = (rec_hdr_ptr_t)(bp->bsiz + (sm_uc_ptr_t) bp);
-		cp1 = (sm_uc_ptr_t)(rp + 1);
+		if (0 != bp->levl || bp->bsiz < sizeof(blk_hdr) || bp->bsiz > cs_data->blk_size ||
+			gv_target->hist.h[0].curr_rec.match < gname_size)
+			INTEG_ERROR_RETURN
+		/* Note that rp may not be the beginning of a block */
+		rp = (rec_hdr_ptr_t)(gv_target->hist.h[0].curr_rec.offset + (sm_uc_ptr_t)bp);
+		blktop = (sm_uc_ptr_t)bp + bp->bsiz;
 		if (format == MU_FMT_BINARY)
 		{
-			if (mu_ctrly_occurred)
-			{
-			        free(key_buffer);
-				free(zwr_buffer);
-#ifdef VMS
-				free(msg);
-#endif
-				return;
-			}
-			if (mu_ctrlc_occurred)
-			{
-#ifdef UNIX
-				PRINTF("%s\t Key Cnt: %d  max rec size: %d\n",
-					gt_lit, st->recknt, st->reclen);
-#elif defined(VMS)
-				MSG_PRINT(6, 1, ERR_BINSTATS, st->recknt, st->reclen, 0, 0, 0);
-#else
-#error UNSUPPORTED PLATFORM
-#endif
-				mu_ctrlc_occurred = FALSE;
-			}
-			assert ((sm_uc_ptr_t) rp == (sm_uc_ptr_t) bp + sizeof (blk_hdr));
-			out_size = (sm_uc_ptr_t) toprec - (sm_uc_ptr_t) rp;
-#ifdef UNIX
-			VAL_PRINT(MV_STR, (char *)(&out_size), sizeof(out_size));
-			/* output records of current block */
-			VAL_PRINT(MV_STR, (char *)rp, out_size);
-#elif defined(VMS)
-			OUTRAB_PRINT(outrab, (unsigned char *) rp, out_size);
-#endif
+			out_size = blktop - (sm_uc_ptr_t)rp;
+			WRITE_BIN_EXTR_BLK(rp, out_size); /* output records of current block */
+		}
+		for (beg_key = TRUE; (sm_uc_ptr_t)rp < blktop; rp = (rec_hdr_ptr_t)rectop)
+		{ 	/* Start scanning a block */
 			GET_USHORT(rec_size, &rp->rsiz);
-			while ((rec_hdr_ptr_t)((sm_uc_ptr_t) rp + rec_size) < toprec)
+			rectop = (sm_uc_ptr_t)rp + rec_size;
+			if (rectop > blktop || rp->cmpc > gv_currkey->end ||
+				(((unsigned char *)rp != private_blk + sizeof(blk_hdr)) && rp->cmpc < gname_size))
+				INTEG_ERROR_RETURN
+			cp1 = (sm_uc_ptr_t)(rp + 1);
+			cp2 = gv_currkey->base + rp->cmpc;
+			for (;;)
 			{
-				st->recknt++;
-				if (st->reclen < rec_size)
-					st->reclen = rec_size;
-				rp = (rec_hdr_ptr_t)((sm_uc_ptr_t) rp + rec_size);
-				GET_USHORT(rec_size, &rp->rsiz);
+				if (cp2 >= keytop || cp1 >= rectop)
+					INTEG_ERROR_RETURN
+				if (0 == (*cp2++ = *cp1++))
+				{
+					if (cp2 >= keytop || cp1 >= rectop)
+						INTEG_ERROR_RETURN
+					if (0 == (*cp2++ = *cp1++))
+						break;
+				}
+			}
+			gv_currkey->end = cp2 - gv_currkey->base - 1;
+			if (beg_key)
+			{ 	/* beg_gv_currkey usually the first key of a block,
+				   but for concurrency conflict it could be any key */
+				beg_key = FALSE;
+				memcpy(beg_gv_currkey->base, gv_currkey->base, gv_currkey->end + 1);
+				beg_gv_currkey->end = gv_currkey->end;
 			}
 			st->recknt++;
 			if (st->reclen < rec_size)
 				st->reclen = rec_size;
-			assert ((rec_hdr_ptr_t)((sm_uc_ptr_t) rp + rec_size) == toprec);
-			if (gvcst_expand_key (bp, (sm_uc_ptr_t) rp - (sm_uc_ptr_t) bp, gv_currkey)
-				!= cdb_sc_normal)
-				break;
-			if (st->keylen < gv_currkey->end)
-				st->keylen = gv_currkey->end;
-			n = rec_size - (gv_currkey->end - rp->cmpc) - sizeof(rec_hdr) - 1;
-			if (st->datalen < n)
-				st->datalen = n;
-
-			gv_currkey->base[gv_currkey->end] = 1;
-			gv_currkey->base[gv_currkey->end + 1] = 0;
-			gv_currkey->base[gv_currkey->end + 2] = 0;
-			gv_currkey->end += 2;
-
-		}
-		else
-		{
-			assert((MU_FMT_ZWR == format) || (MU_FMT_GO == format));
-			/** ONLY NEED TO COPY AFTER MATCH **/
-			cp2 = gv_currkey->base + rp->cmpc;
-			for (;;)
-				if ((*cp2++ = *cp1++) == 0)
-					if ((*cp2++ = *cp1++) == 0)
-						break;
-			gv_currkey->end = cp2 - gv_currkey->base - 1;
-			for (;;)
+			if (st->keylen < gv_currkey->end + 1)
+				st->keylen = gv_currkey->end + 1;
+			data_len = rec_size - (cp1 - (sm_uc_ptr_t)rp);
+			if (0 > data_len)
+				INTEG_ERROR_RETURN
+			if (st->datalen < data_len)
+				st->datalen = data_len;
+			if (MU_FMT_BINARY != format)
 			{
-				if (mu_ctrly_occurred)
-				{
-				        free(key_buffer);
-					free(zwr_buffer);
-#ifdef VMS
-					free(msg);
-#endif
-					return;
-				}
-				if (mu_ctrlc_occurred)
-				{
-#ifdef UNIX
-					PRINTF("%s\t Key Cnt: %d  max subsc len: %d  max data len: %d  max rec len: %d\n",
-						gt_lit, st->recknt, st->keylen, st->datalen, st->reclen);
-#elif defined(VMS)
-					MSG_PRINT(8, 1, ERR_KEYCNT, 6, st->recknt, st->keylen, st->datalen, st->reclen);
-#endif
-					mu_ctrlc_occurred = FALSE;
-				}
-				st->recknt++;
-				n = gv_currkey->end;
-				if (st->keylen < n)
-					st->keylen = n;
 				cp2 = (unsigned char *)format_targ_key(key_buffer, KEY_BUFF_SIZE, gv_currkey, TRUE);
 				fmtd_key_len = cp2 - key_buffer;
-				GET_USHORT(rec_size, &rp->rsiz);
-				if (st->reclen < rec_size)
-					st->reclen = rec_size;
-				n = rec_size - (cp1 - (sm_uc_ptr_t) rp);
 				if (MU_FMT_ZWR == format)
 				{
 					memcpy(zwr_buffer, key_buffer, fmtd_key_len);
 					memcpy(zwr_buffer + fmtd_key_len, "=", 1);
-					src = cp1;
-					src_len = n;
 					des_len = 0;
-					des = zwr_buffer + fmtd_key_len + 1;
-					format2zwr(src, src_len, des, &des_len);
-					if (st->datalen < src_len)
-						st->datalen = src_len;
-#ifdef UNIX
-					VAL_PRINT(MV_STR, (char *)zwr_buffer, (fmtd_key_len + des_len + 1));
-					op_wteol(1);
-#elif defined(VMS)
-					OUTRAB_PRINT2(outrab, zwr_buffer, (fmtd_key_len + des_len + 1));
-#endif
+					format2zwr(cp1, data_len, zwr_buffer + fmtd_key_len + 1, &des_len);
+					WRITE_EXTR_LINE(zwr_buffer, (fmtd_key_len + des_len + 1));
 				}
-				else
+				else if (MU_FMT_GO == format)
 				{
-				        if (st->datalen < n)
-					        st->datalen = n;
-#ifdef UNIX
-					VAL_PRINT(MV_STR, (char *)key_buffer, fmtd_key_len);
-					op_wteol(1);
-					VAL_PRINT(MV_STR, (char *)cp1, n);
-					op_wteol(1);
-#elif defined(VMS)
-					OUTRAB_PRINT2(outrab, key_buffer, fmtd_key_len);
-					OUTRAB_PRINT2(outrab, cp1, n);
-#endif
-				}
-				rp = (rec_hdr_ptr_t)((sm_uc_ptr_t) rp + rec_size);
-				if (rp >= toprec)
-					break;
-				cp1 = (sm_uc_ptr_t)(rp + 1);
-				cp2 = gv_currkey->base + rp->cmpc;
-				for (;;)
-					if ((*cp2++ = *cp1++) == 0)
-						if ((*cp2++ = *cp1++) == 0)
-							break;
-				gv_currkey->end = cp2 - gv_currkey->base - 1;
-				if (rp->cmpc < gname_size)
-				{
-					done = TRUE;
-					break;
+					WRITE_EXTR_LINE(key_buffer, fmtd_key_len);
+					WRITE_EXTR_LINE(cp1, data_len);
 				}
 			}
-			cp1 = &gv_currkey->base[gv_currkey->end];
-			gv_currkey->end += 2;
-			*cp1++ = 1;
-			*cp1++ = 0;
-			*cp1++ = 0;
-		}
-	}
-#ifdef VMS
-	free(msg);
-#endif
-	free(key_buffer);
-	free(zwr_buffer);
-	return;
+		} /* End scanning a block */
+		if ((sm_uc_ptr_t)rp != blktop ||
+			(memcmp(gv_currkey->base, beg_gv_currkey->base, MIN(gv_currkey->end, beg_gv_currkey->end)) < 0))
+			INTEG_ERROR_RETURN
+		gv_currkey->base[gv_currkey->end] = 1;
+		gv_currkey->base[gv_currkey->end + 1] = 0;
+		gv_currkey->base[gv_currkey->end + 2] = 0;
+		gv_currkey->end += 2;
+	} /* end outmost for */
+	return TRUE;
 }

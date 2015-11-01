@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,7 @@
 #include <signal.h>
 #endif
 
+#include "gtm_stdio.h"
 #include "ast.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -33,6 +34,7 @@
 #include "gdsfhead.h"
 #include "gdscc.h"
 #include "gdskill.h"
+#include "gt_timer.h"
 #include "filestruct.h"
 #include "gtmdbglvl.h"
 #include "error.h"
@@ -53,7 +55,6 @@
 #include "tp_timeout.h"
 #include "xfer_enum.h"
 #include "mlkdef.h"
-#include "zshow.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "zwrite.h"
@@ -72,10 +73,9 @@
 #include "golevel.h"
 #include "getzposition.h"
 #include "send_msg.h"
+#include "jobexam_process.h"
+#include "jobinterrupt_process_cleanup.h"
 
-#define MUMPS_INDIR_FRAME frame_pointer->type == 0
-#define DUMPABLE_ERROR_DUMP_FILE_NAME "GTM_FATAL_ERROR"
-#define DUMPABLE_ERROR_DUMP_FILE_TYPE "ZSHOW_DMP"
 #define ERROR_RTN_FRM_CTXT 	(repeat_error || NULL == error_last_frame_err || 		\
 					error_last_frame_err->mpc != CODE_ADDRESS(ERROR_RTN))
 #define SAVE_CURR_FRM_CTXT \
@@ -106,7 +106,7 @@ GBLREF mval		dollar_ztrap;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF volatile bool	neterr_pending;
 GBLREF int		(* volatile xfer_table[])();
-GBLREF unsigned char	proc_act_type;
+GBLREF unsigned short	proc_act_type;
 GBLREF mval		**ind_result_array, **ind_result_sp;
 GBLREF mval		**ind_source_array, **ind_source_sp;
 GBLREF int		mumps_status;
@@ -136,6 +136,11 @@ GBLREF boolean_t	tp_restart_fail_sig_used;
 GBLREF int		merge_args;
 GBLREF lvzwrite_struct	lvzwrite_block;
 GBLREF int		process_exiting;
+GBLREF volatile boolean_t	dollar_zininterrupt;
+
+#define GTMFATAL_ERROR_DUMP_FILENAME "GTM_FATAL_ERROR"
+static readonly mval gtmfatal_error_filename = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(GTMFATAL_ERROR_DUMP_FILENAME) - 1,
+							 GTMFATAL_ERROR_DUMP_FILENAME, 0, 0);
 
 boolean_t clean_mum_tstart(void);
 
@@ -169,7 +174,6 @@ boolean_t clean_mum_tstart(void)
 CONDITION_HANDLER(mdb_condition_handler)
 {
 	unsigned char		*cp, *context, *sp_base;
-	unsigned char		dump_file_name[50], *dump_file_name_ptr;
 	boolean_t		dm_action;	/* did the error occur on a action from direct mode */
 	boolean_t		trans_action;	/* did the error occur during "transcendental" code */
 	char			src_line[50];
@@ -179,8 +183,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	gd_region		*reg_top, *reg_save, *reg_local;
 	gd_addr			*addr_ptr;
 	sgmnt_addrs		*csa;
-	io_pair			dev_in_use;
-	mval			outfile, parms, zshowall, *save_zstatus, zpos;
+	mval			zpos, dummy_mval;
 	stack_frame		*fp;
 	boolean_t		error_in_zyerror;
 	boolean_t		repeat_error;
@@ -210,6 +213,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	error_def(ERR_OUTOFSPACE);
 	error_def(ERR_REPEATERROR);
 	error_def(ERR_TPNOTACID);
+	error_def(ERR_JOBINTRRQST);
 
 	START_CH;
 	if (repeat_error = (ERR_REPEATERROR == SIGNAL)) /* assignment and comparison */
@@ -228,7 +232,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		neterr_pending = TRUE;
 		xfer_table[xf_linefetch] = op_fetchintrrpt;
 		xfer_table[xf_linestart] = op_startintrrpt;
-		xfer_table[xf_forchk1] = op_forintrrpt;
+		xfer_table[xf_forchk1] = op_startintrrpt;
 		xfer_table[xf_forloop] = op_forintrrpt;
 		CONTINUE;
 	}
@@ -239,6 +243,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 * Easy solution is following one line code
 	 */
 	merge_args = 0;
+	if ((SUCCESS != SEVERITY) && (INFO != SEVERITY))
+		lvzwrite_block.curr_subsc = lvzwrite_block.subsc_count = 0;
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
 		/* ----------------------------------------------------
@@ -249,7 +255,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 */
 		VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
 		tp_restart(1);
-		lvzwrite_block.curr_subsc = lvzwrite_block.subsc_count = 0;
 #ifdef UNIX
 		if (ERR_TPRETRY == SIGNAL)		/* (signal value undisturbed) */
 #elif defined VMS
@@ -289,6 +294,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		*/
 		process_exiting = TRUE;		/* So zshow doesn't push stuff on stack to "protect" it when
 						   we potentially already have a stack overflow */
+		cancel_timer(0);		/* No interruptions now that we are dying */
 		if (UNIX_ONLY(0 == gtmMallocDepth && ((SIGBUS != exi_condition && SIGSEGV != exi_condition) ||
 						      (GDL_ZSHOWDumpOnSignal & gtmDebugLevel)))
 		    VMS_ONLY((SS$_ACCVIO != SIGNAL) || (GDL_ZSHOWDumpOnSignal & gtmDebugLevel)))
@@ -302,43 +308,20 @@ CONDITION_HANDLER(mdb_condition_handler)
 			}
 			if ((0 != dollar_etrap.str.len) && ERROR_RTN_FRM_CTXT)
 				SAVE_CURR_FRM_CTXT;
-			/* File name to write zshow results to. For Unix, append process id to aid in uniqueness */
-			dump_file_name_ptr = dump_file_name;
-			memcpy(dump_file_name_ptr, DUMPABLE_ERROR_DUMP_FILE_NAME, sizeof(DUMPABLE_ERROR_DUMP_FILE_NAME) - 1);
-			dump_file_name_ptr += sizeof(DUMPABLE_ERROR_DUMP_FILE_NAME) - 1;
-			UNIX_ONLY(*dump_file_name_ptr++ = '_');
-			UNIX_ONLY(dump_file_name_ptr = i2asc(dump_file_name_ptr, process_id));
-			*dump_file_name_ptr++ = '.';
-			memcpy(dump_file_name_ptr, DUMPABLE_ERROR_DUMP_FILE_TYPE, sizeof(DUMPABLE_ERROR_DUMP_FILE_TYPE) - 1);
-			dump_file_name_ptr += sizeof(DUMPABLE_ERROR_DUMP_FILE_TYPE) - 1;
-
-			outfile.mvtype = MV_STR;
-			outfile.str.addr = (char *)dump_file_name;
-			outfile.str.len = dump_file_name_ptr - dump_file_name;
-			/* Parms of file to be created (newversion) */
-			parms.mvtype = MV_STR;
-			parms.str.addr = (char *)dumpable_error_dump_file_parms;
-			parms.str.len = sizeof(dumpable_error_dump_file_parms);
-			/* Open, use, and zshow into new file, then close and reset current io device */
-			op_open(&outfile, &parms, 0, 0);
-			dev_in_use = io_curr_device;
-			op_use(&outfile, &parms);
-			zshowall.mvtype = MV_STR;
-			zshowall.str.addr = "*";
-			zshowall.str.len = 1;
-			op_zshow(&zshowall, ZSHOW_DEVICE, NULL);
-			parms.str.addr = (char *)dumpable_error_dump_file_noparms;
-			parms.str.len = sizeof(dumpable_error_dump_file_noparms);
-			op_close(&outfile, &parms);
-			io_curr_device = dev_in_use;
+			/* On Unix, we need to push out our error now before we potentially overlay it in jobexam_process() */
+			UNIX_ONLY(PRN_ERROR);
+			/* Create dump file */
+			jobexam_process(&gtmfatal_error_filename, &dummy_mval);
+		} else
+		{
+			UNIX_ONLY(PRN_ERROR);
 		}
 
 		/* If we are about to core/exit on a stack over flow, only do the core part if a debug
-		   flag requests this behaviour. Otherwise, supress the core and write out a special
-		   file with the contents of ZSHOW "*" in it. */
+		   flag requests this behaviour. Otherwise, supress the core and just exit.
+		*/
 		if ((int)ERR_STACKOFLOW == SIGNAL && !(GDL_DumpOnStackOFlow & gtmDebugLevel))
 		{
-			UNIX_ONLY(PRN_ERROR);	/* Needed on UNIX to force msg out */
 			MUMPS_EXIT;	/* Do a clean exit rather than messy core exit */
 		}
 		gtm_dump();
@@ -406,7 +389,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 	ind_source_sp = ind_source_array;
 	dm_action = frame_pointer->old_frame_pointer->type & SFT_DM  ||
 					compile_time && frame_pointer->type & SFT_DM;
-	trans_action = proc_act_type || !(frame_pointer->type & SFT_COUNT || MUMPS_INDIR_FRAME);
+	/* The errors are said to be transcendental when they occur during compilation/execution
+	 * of the error trap ({z,e}trap, device exception) or $zinterrupt. The errors in other
+	 * indirect code frames (zbreak, zstep, xecute etc.) aren't defined to be trancendental
+	 * and will be treated  as if they occured in a regular code frame. */
+	trans_action = proc_act_type || (frame_pointer->type & SFT_ZTRAP) || (frame_pointer->type & SFT_DEV_ACT);
 	src_line_d.addr = src_line;
 	src_line_d.len = 0;
 	flush_pio();
@@ -458,7 +445,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			}
 			if (!repeat_error)
 			{
-				error_last_b_line = (uchar_ptr_t)SET_ZSTATUS(0);
+				error_last_b_line = SET_ZSTATUS(0);
 			}
 			if (0 != dollar_etrap.str.len && ERROR_RTN_FRM_CTXT)
 				SAVE_CURR_FRM_CTXT;
@@ -530,6 +517,17 @@ CONDITION_HANDLER(mdb_condition_handler)
 				io_curr_device.out->trans_name->dollar_io);
 		}
 		MUM_TSTART;
+	} else  if ((int)ERR_JOBINTRRQST == SIGNAL)
+	{
+		assert(NULL != (unsigned char *)restart_pc);
+		frame_pointer->mpc = (unsigned char *)restart_pc;
+		frame_pointer->ctxt = restart_ctxt;
+		assert(!dollar_zininterrupt);
+		dollar_zininterrupt = TRUE;	/* Note done before outofband is cleared to prevent nesting */
+		outofband_clear();
+		proc_act_type = SFT_ZINTR | SFT_COUNT;	/* trans_code will invoke jobinterrupt_process for us */
+		MUM_TSTART;
+
 	} else  if ((int)ERR_STACKCRIT == SIGNAL)
 	{
 		assert(msp > stacktop);
@@ -560,7 +558,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		}
 		if (!repeat_error)
 		{
-			error_last_b_line = (uchar_ptr_t)SET_ZSTATUS(&context);
+			error_last_b_line = SET_ZSTATUS(&context);
 		}
 		if ((0 != dollar_etrap.str.len) && ERROR_RTN_FRM_CTXT)
 			SAVE_CURR_FRM_CTXT;
@@ -594,12 +592,26 @@ CONDITION_HANDLER(mdb_condition_handler)
 	{
 		for (fp = frame_pointer;  fp;  fp = fp->old_frame_pointer)
 		{
+			/* See if this is a $ZINTERRUPT frame. If yes, we want to restart *this* line
+			   at the beginning. Since it is always an indirect frame, we can use the context
+			   pointer to start over. Only do this if $ZTRAP is active though. $ETRAP does
+			   things somewhat differently in that the current frame is always returned from.
+			*/
+			if ((0 < dollar_ztrap.str.len) && (SFT_ZINTR & fp->type))
+			{
+				assert(SFF_INDCE & fp->flags);
+				fp->mpc = fp->ctxt;
+				break;
+			}
 			/* Do cleanup on indirect frames prior to reset */
 			IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(fp);
 
 			/* mpc points to PTEXT */
+			/*The equality check in the second half of the expression below is to
+			  account for the delay-slot in HP-UX for implicit quits. Not an issue here,
+			  but added for uniformity. */
 			if ((unsigned char *)fp->rvector + fp->rvector->ptext_ptr <= fp->mpc &&
-				fp->mpc < (unsigned char *)fp->rvector + fp->rvector->vartab_ptr)
+				fp->mpc <= (unsigned char *)fp->rvector + fp->rvector->vartab_ptr)
 			{
 				if (dollar_ztrap.str.len > 0)
 				{
@@ -615,7 +627,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 				fp->ctxt = CONTEXT(pseudo_ret);
 				fp->mpc = CODE_ADDRESS(pseudo_ret);
 			}
-
 		}
 	}
 	/* ----------------------------------------------------------------
@@ -668,9 +679,14 @@ CONDITION_HANDLER(mdb_condition_handler)
 		if (clean_mum_tstart())
 			MUM_TSTART;
 	}
-	PRN_ERROR;
-	if (compile_time && ((int)ERR_LABELMISSING) != SIGNAL)
-		show_source_line();
+	if ((SFT_ZINTR | SFT_COUNT) != proc_act_type || 0 == error_last_b_line)
+	{	/* No user console error for $zinterrupt compile problems and if not direct mode. Accomplish
+		   this by bypassing the code inside this if which *will* be executed for most cases
+		*/
+		PRN_ERROR;
+		if (compile_time && ((int)ERR_LABELMISSING) != SIGNAL)
+			show_source_line();
+	}
 	if (!dm_action && !trans_action && (0 != src_line_d.len))
 	{
 		if (MSG_OUTPUT)
@@ -678,8 +694,13 @@ CONDITION_HANDLER(mdb_condition_handler)
 	} else
 	{
 		if (trans_action || dm_action)
-		{
-			trans_code_cleanup();
+		{	/* If true transcendental, do trans_code_cleanup. If our counted frame that
+			   is masquerading as a transcendental frame, run jobinterrupt_process_clean
+			*/
+			if (!(SFT_ZINTR & proc_act_type))
+				trans_code_cleanup();
+			else
+				jobinterrupt_process_cleanup();
 			MUM_TSTART;
 		} else
 		{

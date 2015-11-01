@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -154,7 +154,7 @@ typedef int	 omi_fd;
 
 /* defined(SUNOS) */
 
-#elif (defined(__hpux) || defined(__linux__) || defined(__osf__))
+#elif (defined(__hpux) || defined(__linux__) || defined(__osf__)) || defined(__MVS__)
 
 #define OMI
 
@@ -168,7 +168,7 @@ typedef int	 omi_fd;
 
 #if (defined(__linux__) || defined(__osf__)) && !defined(__s390__)
 #define LTL_END
-#else /* defined(__hpux__)  or Linux390 */
+#else /* defined(__hpux__)  or Linux390  or zOS */
 #define BIG_END
 #endif
 
@@ -185,7 +185,7 @@ typedef int	 omi_fd;
 #include <sys/time.h>
 #include <syslog.h>
 
-/* defined(__hpux || __linux__ || __osf__) */
+/* defined(__hpux || __linux__ || __osf__ || __MVS__) */
 
 #elif defined(_AIX)
 

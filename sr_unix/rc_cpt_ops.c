@@ -11,8 +11,10 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_ipc.h"
+
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <errno.h>

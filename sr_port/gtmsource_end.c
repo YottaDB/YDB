@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_unistd.h"		/* for close() */
+
 #ifdef UNIX
 #include <sys/ipc.h>
 #include <sys/shm.h>

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,9 +15,13 @@
 
 #define GTCM_HIST_C
 
-#include <signal.h>
-#include <time.h>
 #include "mdef.h"
+
+#include "gtm_string.h"
+#include "gtm_stdio.h"		/* for sprintf() atleast */
+#include "gtm_time.h"
+#include <signal.h>
+
 #include "gtcm.h"
 
 GBLREF omi_conn *curr_conn;
@@ -111,13 +115,13 @@ void save_rc_rsp(char *buff, int len)
 void dump_omi_rq(void)
 {
     char	msg[256];
-    char	*then = ctime(&omi_hist[omi_hist_num].timestamp);
+    char	*then = GTM_CTIME(&omi_hist[omi_hist_num].timestamp);
     omi_conn	*temp;
 
     then[24] = '\0';
     if (omi_hist_num < 0)   /* no history? */
 	return;
-    sprintf(msg,
+    SPRINTF(msg,
 	    "OMI Rq dump: %d / %s Lg size %d conn %d",
 	    omi_hist[omi_hist_num].timestamp, then,
 	    omi_hist[omi_hist_num].req_len, omi_hist[omi_hist_num].conn);
@@ -138,16 +142,16 @@ void dump_rc_hist(void)
 		if (rc_hist[i].timestamp)
 		{
 			char msg[256];
-			char *then = ctime(&rc_hist[i].timestamp);
+			char *then = GTM_CTIME(&rc_hist[i].timestamp);
 			then[24] = '\0'; /* eliminate newline */
 			if (rc_hist[i].toobigflag)
 			{
-				sprintf(msg,
+				SPRINTF(msg,
 				"RC Rq history: %d / %s Lg size %d conn %d",
 					rc_hist[i].timestamp, then,
 					rc_hist[i].req_len, rc_hist[i].conn);
 				gtcm_pktdmp(rc_hist[i].req, 0, msg);
-				sprintf(msg,
+				SPRINTF(msg,
 				"RC Aq history: %d / %s Lg size %d conn %d",
 					rc_hist[i].timestamp, then,
 					rc_hist[i].rsp_len, rc_hist[i].conn);
@@ -155,14 +159,14 @@ void dump_rc_hist(void)
 			}
 			else
 			{
-				sprintf(msg,
+				SPRINTF(msg,
 				"RC Rq history: %d / %s size %d conn %d",
 					rc_hist[i].timestamp, then,
 					rc_hist[i].req_len, rc_hist[i].conn);
 				gtcm_pktdmp(rc_hist[i].req,
 					    rc_hist[i].req_len,
 					    msg);
-				sprintf(msg,
+				SPRINTF(msg,
 				"RC Aq history: %d / %s size %d conn %d",
 					rc_hist[i].timestamp, then,
 					rc_hist[i].rsp_len, rc_hist[i].conn);
@@ -171,6 +175,5 @@ void dump_rc_hist(void)
 					    msg);
 			}
 		}
-	}
-	while (i != rc_hist_num);
+	} while (i != rc_hist_num);
 }

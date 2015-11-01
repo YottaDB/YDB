@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@
 
 GBLREF	int4		error_last_ecode;
 GBLREF	stack_frame	*frame_pointer, *error_frame;
-GBLREF	unsigned char	proc_act_type;
+GBLREF	unsigned short	proc_act_type;
 GBLREF	unsigned char	*error_last_mpc_err;
 GBLREF	unsigned char	*error_last_ctxt_err;
 GBLREF	stack_frame	*error_last_frame_err;

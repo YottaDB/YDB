@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,12 +19,12 @@
 #include "cache.h"
 #include "op.h"
 
-GBLREF bool undef_inhibit;
-GBLREF symval *curr_symval;
-GBLREF mval **ind_result_sp, **ind_result_top;
+GBLREF	bool	undef_inhibit;
+GBLREF	symval	*curr_symval;
+GBLREF	mval	**ind_result_sp, **ind_result_top;
 
-LITREF char ctypetab[128];
-LITREF mval literal_null;
+LITREF	char	ctypetab[NUM_ASCII_CHARS];
+LITREF	mval	literal_null;
 
 void	op_indglvn(mval *v,mval *dst)
 {
@@ -36,6 +36,7 @@ void	op_indglvn(mval *v,mval *dst)
 	ht_entry 	*q;
 	int4		y;
 	mident		ident;
+
 	error_def(ERR_INDMAXNEST);
 	error_def(ERR_UNDEF);
 

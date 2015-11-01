@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,9 +78,12 @@ LITDEF nametabent svn_names[] = {
 	,{ 3,"ZEO*" }
 	,{ 3,"ZER*" }
 	,{ 2,"ZG*" }
+	,{ 4,"ZINI*"}
+	,{ 4,"ZINT*"}
 	,{ 3,"ZIO" }
+	,{ 2,"ZJ" }, { 4,"ZJOB" }
 	,{ 2,"ZL*" }
-	,{ 8, "ZMAXTPTI" }
+	,{ 8,"ZMAXTPTI" }
 	,{ 3,"ZMO*" }
 	,{ 4,"ZPOS*" }
 	,{ 5,"ZPROC*" }
@@ -98,57 +101,60 @@ LITDEF nametabent svn_names[] = {
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 64	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 68	/* s t u v w x y z ~ */
 };
 /* These entries correspond to the entries in the svn_names array */
 LITDEF svn_data_type svn_data[] =
 {
 	{ SV_DEVICE, FALSE, ALL_SYS }, { SV_DEVICE, FALSE, ALL_SYS }
-	,{ SV_ECODE,TRUE,ALL_SYS }, { SV_ECODE,TRUE,ALL_SYS }
-	,{ SV_ESTACK,FALSE,ALL_SYS }, { SV_ESTACK,FALSE,ALL_SYS }
-	,{ SV_ETRAP,TRUE,ALL_SYS }, { SV_ETRAP,TRUE,ALL_SYS }
-	,{ SV_HOROLOG,FALSE,ALL_SYS }, { SV_HOROLOG,FALSE,ALL_SYS }
-	,{ SV_IO,FALSE,ALL_SYS }, { SV_IO,FALSE,ALL_SYS }
-	,{ SV_JOB,FALSE,ALL_SYS }, { SV_JOB,FALSE,ALL_SYS }
-	,{ SV_KEY,FALSE, ALL_SYS }, { SV_KEY,FALSE, ALL_SYS }
-	,{ SV_PRINCIPAL,FALSE,ALL_SYS }, { SV_PRINCIPAL,FALSE,ALL_SYS }
-	,{ SV_QUIT,FALSE,ALL_SYS }, { SV_QUIT,FALSE,ALL_SYS }
-	,{ SV_REFERENCE,FALSE,ALL_SYS }, { SV_REFERENCE,FALSE,ALL_SYS }
-	,{ SV_STORAGE,FALSE,ALL_SYS }, { SV_STORAGE,FALSE,ALL_SYS }
-	,{ SV_STACK,FALSE,ALL_SYS }, { SV_STACK,FALSE,ALL_SYS }
-	,{ SV_SYSTEM,FALSE,ALL_SYS }, { SV_SYSTEM,FALSE,ALL_SYS }
-	,{ SV_TEST,FALSE,ALL_SYS }, { SV_TEST,FALSE,ALL_SYS }
-	,{ SV_TLEVEL,FALSE,ALL_SYS }, { SV_TLEVEL,FALSE,ALL_SYS }
-	,{ SV_TRESTART,FALSE,ALL_SYS }, { SV_TRESTART,FALSE,ALL_SYS }
-	,{ SV_X,TRUE,ALL_SYS }
-	,{ SV_Y,TRUE,ALL_SYS }
-	,{ SV_ZA,FALSE,ALL_SYS }
-	,{ SV_ZB,FALSE,ALL_SYS }
-	,{ SV_ZC,FALSE,ALL_SYS }
-	,{ SV_ZCMDLINE,FALSE,ALL_SYS }
-	,{ SV_ZCOMPILE,TRUE,ALL_SYS }
+	,{ SV_ECODE, TRUE, ALL_SYS }, { SV_ECODE, TRUE, ALL_SYS }
+	,{ SV_ESTACK, FALSE, ALL_SYS }, { SV_ESTACK, FALSE, ALL_SYS }
+	,{ SV_ETRAP, TRUE, ALL_SYS }, { SV_ETRAP, TRUE, ALL_SYS }
+	,{ SV_HOROLOG, FALSE, ALL_SYS }, { SV_HOROLOG, FALSE, ALL_SYS }
+	,{ SV_IO, FALSE, ALL_SYS }, { SV_IO, FALSE, ALL_SYS }
+	,{ SV_JOB, FALSE, ALL_SYS }, { SV_JOB, FALSE, ALL_SYS }
+	,{ SV_KEY, FALSE, ALL_SYS }, { SV_KEY, FALSE, ALL_SYS }
+	,{ SV_PRINCIPAL, FALSE, ALL_SYS }, { SV_PRINCIPAL, FALSE, ALL_SYS }
+	,{ SV_QUIT, FALSE, ALL_SYS }, { SV_QUIT, FALSE, ALL_SYS }
+	,{ SV_REFERENCE, FALSE, ALL_SYS }, { SV_REFERENCE, FALSE, ALL_SYS }
+	,{ SV_STORAGE, FALSE, ALL_SYS }, { SV_STORAGE, FALSE, ALL_SYS }
+	,{ SV_STACK, FALSE, ALL_SYS }, { SV_STACK, FALSE, ALL_SYS }
+	,{ SV_SYSTEM, FALSE, ALL_SYS }, { SV_SYSTEM, FALSE, ALL_SYS }
+	,{ SV_TEST, FALSE, ALL_SYS }, { SV_TEST, FALSE, ALL_SYS }
+	,{ SV_TLEVEL, FALSE, ALL_SYS }, { SV_TLEVEL, FALSE, ALL_SYS }
+	,{ SV_TRESTART, FALSE, ALL_SYS }, { SV_TRESTART, FALSE, ALL_SYS }
+	,{ SV_X, TRUE, ALL_SYS }
+	,{ SV_Y, TRUE, ALL_SYS }
+	,{ SV_ZA, FALSE, ALL_SYS }
+	,{ SV_ZB, FALSE, ALL_SYS }
+	,{ SV_ZC, FALSE, ALL_SYS }
+	,{ SV_ZCMDLINE, FALSE, ALL_SYS }
+	,{ SV_ZCOMPILE, TRUE, ALL_SYS }
 	,{ SV_ZCSTATUS, FALSE, ALL_SYS}
-	,{ SV_ZDIR,TRUE,ALL_SYS }
-	,{ SV_ZERROR,TRUE,ALL_SYS }
+	,{ SV_ZDIR, TRUE, ALL_SYS }
+	,{ SV_ZERROR, TRUE, ALL_SYS }
 	,{ SV_ZEDITOR, FALSE, ALL_SYS }
-	,{ SV_ZEOF,FALSE,ALL_SYS }
-	,{ SV_ZERROR,TRUE,ALL_SYS }
-	,{ SV_ZGBLDIR,TRUE,ALL_SYS }
-	,{ SV_ZIO,FALSE,ALL_SYS }
-	,{ SV_ZLEVEL,FALSE,ALL_SYS }
-	,{ SV_ZMAXTPTIME,TRUE,ALL_SYS }
-	,{ SV_ZMODE,FALSE,ALL_SYS }
-	,{ SV_ZPOS, FALSE,ALL_SYS }
-	,{ SV_ZPROC,FALSE,ALL_SYS }
-	,{ SV_PROMPT, TRUE,ALL_SYS }
-	,{ SV_ZROUTINES,TRUE,ALL_SYS }
-	,{ SV_ZSOURCE,TRUE,ALL_SYS }
-	,{ SV_ZSTATUS,TRUE,ALL_SYS },{ SV_ZSTATUS,TRUE,ALL_SYS }
-	,{ SV_ZSTEP,TRUE,ALL_SYS }
-	,{ SV_ZSYSTEM,FALSE,ALL_SYS }
-	,{ SV_ZTRAP,TRUE,ALL_SYS }
-	,{ SV_ZVERSION,FALSE,ALL_SYS }
-	,{ SV_ZYERROR,TRUE,ALL_SYS }
+	,{ SV_ZEOF, FALSE, ALL_SYS }
+	,{ SV_ZERROR, TRUE, ALL_SYS }
+	,{ SV_ZGBLDIR, TRUE, ALL_SYS }
+	,{ SV_ZININTERRUPT, FALSE, ALL_SYS}
+	,{ SV_ZINTERRUPT, TRUE, ALL_SYS}
+	,{ SV_ZIO, FALSE, ALL_SYS }
+	,{ SV_ZJOB, FALSE, ALL_SYS }, { SV_ZJOB, FALSE, ALL_SYS }
+	,{ SV_ZLEVEL, FALSE, ALL_SYS }
+	,{ SV_ZMAXTPTIME, TRUE, ALL_SYS }
+	,{ SV_ZMODE, FALSE, ALL_SYS }
+	,{ SV_ZPOS, FALSE, ALL_SYS }
+	,{ SV_ZPROC, FALSE, ALL_SYS }
+	,{ SV_PROMPT, TRUE, ALL_SYS }
+	,{ SV_ZROUTINES, TRUE, ALL_SYS }
+	,{ SV_ZSOURCE, TRUE, ALL_SYS }
+	,{ SV_ZSTATUS, TRUE, ALL_SYS },{ SV_ZSTATUS, TRUE, ALL_SYS }
+	,{ SV_ZSTEP, TRUE, ALL_SYS }
+	,{ SV_ZSYSTEM, FALSE, ALL_SYS }
+	,{ SV_ZTRAP, TRUE, ALL_SYS }
+	,{ SV_ZVERSION, FALSE, ALL_SYS }
+	,{ SV_ZYERROR, TRUE, ALL_SYS }
 };
 
 /* note that fun_index array provides indexes into this array for each letter of the
@@ -156,137 +162,141 @@ LITDEF svn_data_type svn_data[] =
 */
 LITDEF nametabent fun_names[] =
 {
-	{ 1,"A" }, { 5,"ASCII" }
-	,{ 1,"C" }, { 4,"CHAR" }
-	,{ 1,"D" }, { 4,"DATA" }
-	,{ 1,"E" }, { 7,"EXTRACT"}
-	,{ 1,"F" }, { 4,"FIND"}
-	,{ 2,"FN" }, { 7,"FNUMBER" }
-	,{ 1,"G" }, { 3,"GET"}
-	,{ 1,"J" }, { 7,"JUSTIFY" }
-	,{ 1,"L" }, { 6,"LENGTH" }
-	,{ 1,"N" }
-	,{ 2,"NA"}, { 4,"NAME"}
-	,{ 4,"NEXT" }
-	,{ 1,"O" }, { 5,"ORDER" }
-	,{ 1,"P" }, { 5,"PIECE" }
-	,{ 2,"QL" }, { 7,"QLENGTH" }
-	,{ 2,"QS" }, { 8,"QSUBSCRI*" }
-	,{ 1,"Q" }, { 5,"QUERY" }
-	,{ 1,"R" }, { 6,"RANDOM" }
-	,{ 2,"RE" }, { 7,"REVERSE" }
-	,{ 1,"S" }, { 6,"SELECT" }
-	,{ 2,"ST" }, { 5,"STACK" }
-	,{ 1,"T" }, { 4,"TEXT" }
-	,{ 2,"TR" }, { 8,"TRANSLAT*"}
-	,{ 1,"V*" }
-	,{7,"ZBITAND"}
-	,{8,"ZBITCOUN"}
-	,{8,"ZBITFIND"}
-	,{7,"ZBITGET"}
-	,{7,"ZBITLEN"}
-	,{7,"ZBITNOT"}
-	,{6,"ZBITOR"}
-	,{7,"ZBITSET"}
-	,{7,"ZBITSTR"}
-	,{7,"ZBITXOR"}
-	,{ 2,"ZC" }, { 5,"ZCALL" }
-	,{ 2,"ZD" }, { 5,"ZDATE" }
-	,{ 6,"ZECHAR" }
-	,{ 5,"ZFILE" }, { 8,"ZFILEATT*" }
-	,{ 7,"ZGETDVI" }
-	,{ 7,"ZGETJPI" }
-	,{ 7,"ZGETLKI" }
-	,{ 7,"ZGETSYI" }
-	,{ 5,"ZLKID" }
-	,{ 2,"ZM" }, { 8,"ZMESSAGE" }
-	,{ 6,"ZPARSE" }
-	,{ 4,"ZPID" }
-	,{ 2,"ZP" }, { 8,"ZPREVIOU*" }
-	,{ 5,"ZPRIV" }, { 8,"ZPRIVILE*" }
-	,{ 2,"ZQ" }, { 8,"ZQGBLMOD" }
-	,{ 7,"ZSEARCH" }
-	,{ 7,"ZSETPRV" }
-	,{ 7,"ZTRNLNM" }
+	{1, "A"}, {5, "ASCII"}
+	,{1, "C"}, {4, "CHAR"}
+	,{1, "D"}, {4, "DATA"}
+	,{1, "E"}, {7, "EXTRACT"}
+	,{1, "F"}, {4, "FIND"}
+	,{2, "FN"}, {7, "FNUMBER"}
+	,{1, "G"}, {3, "GET"}
+	,{1, "J"}, {7, "JUSTIFY"}
+	,{1, "L"}, {6, "LENGTH"}
+	,{1, "N"}
+	,{2, "NA"}, {4, "NAME"}
+	,{4, "NEXT"}
+	,{1, "O"}, {5, "ORDER"}
+	,{1, "P"}, {5, "PIECE"}
+	,{2, "QL"}, {7, "QLENGTH"}
+	,{2, "QS"}, {8, "QSUBSCRI*"}
+	,{1, "Q"}, {5, "QUERY"}
+	,{1, "R"}, {6, "RANDOM"}
+	,{2, "RE"}, {7, "REVERSE"}
+	,{1, "S"}, {6, "SELECT"}
+	,{2, "ST"}, {5, "STACK"}
+	,{1, "T"}, {4, "TEXT"}
+	,{2, "TR"}, {8, "TRANSLAT*"}
+	,{1, "V*"}
+	,{7, "ZBITAND"}
+	,{8, "ZBITCOUN"}
+	,{8, "ZBITFIND"}
+	,{7, "ZBITGET"}
+	,{7, "ZBITLEN"}
+	,{7, "ZBITNOT"}
+	,{6, "ZBITOR"}
+	,{7, "ZBITSET"}
+	,{7, "ZBITSTR"}
+	,{7, "ZBITXOR"}
+	,{2, "ZC"}, {5, "ZCALL"}
+	,{2, "ZD"}, {5, "ZDATE"}
+	,{6, "ZECHAR"}
+	,{5, "ZFILE"}, {8, "ZFILEATT*"}
+	,{7, "ZGETDVI"}
+	,{7, "ZGETJPI"}
+	,{7, "ZGETLKI"}
+	,{7, "ZGETSYI"}
+	,{8, "ZJOBEXAM"}
+	,{5, "ZLKID"}
+	,{2, "ZM"}, {8, "ZMESSAGE"}
+	,{6, "ZPARSE"}
+	,{4, "ZPID"}
+	,{2, "ZP"}, {8, "ZPREVIOU*"}
+	,{5, "ZPRIV"}, {8, "ZPRIVILE*"}
+	,{2, "ZQ"}, {8, "ZQGBLMOD"}
+	,{7, "ZSEARCH"}
+	,{7, "ZSETPRV"}
+	,{8, "ZSIGPROC"}
+	,{7, "ZTRNLNM"}
 };
 /* Index into fun_names array where entries that start with each letter of
    the alphabet begin. */
 LITDEF unsigned char fun_index[27] = {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	14, 16, 16, 18, 18, 22, 24, 26, 32,	/* j k l m n o p q r */
-	36, 40, 44, 44, 45, 45, 45, 45, 80	/* s t u v w x y z ~ */
+	36, 40, 44, 44, 45, 45, 45, 45, 82	/* s t u v w x y z ~ */
 };
 /* Each entry corresponds to an entry in fun_names */
 LITDEF fun_data_type fun_data[] =
 {
-	 { OC_FNASCII,ALL_SYS }, { OC_FNASCII,ALL_SYS }
-        ,{ OC_FNCHAR,ALL_SYS }, { OC_FNCHAR,ALL_SYS }
-	,{ OC_FNDATA,ALL_SYS }, { OC_FNDATA,ALL_SYS }
-	,{ OC_FNEXTRACT,ALL_SYS }, { OC_FNEXTRACT,ALL_SYS }
-	,{ OC_FNFIND,ALL_SYS }, { OC_FNFIND,ALL_SYS }
-	,{ OC_FNFNUMBER,ALL_SYS }, { OC_FNFNUMBER,ALL_SYS }
-	,{ OC_FNGET,ALL_SYS }, { OC_FNGET,ALL_SYS }
-	,{ OC_FNJ2,ALL_SYS }, { OC_FNJ2,ALL_SYS }
-	,{ OC_FNLENGTH,ALL_SYS }, { OC_FNLENGTH,ALL_SYS }
-	,{ OC_FNNEXT,ALL_SYS }
-	,{ OC_FNNAME,ALL_SYS }, { OC_FNNAME,ALL_SYS }
-	,{ OC_FNNEXT,ALL_SYS }
-	,{ OC_FNORDER,ALL_SYS }, {OC_FNORDER,ALL_SYS }
-	,{ OC_FNPIECE,ALL_SYS }, { OC_FNPIECE,ALL_SYS }
-	,{ OC_FNQLENGTH,ALL_SYS }, { OC_FNQLENGTH,ALL_SYS }
-	,{ OC_FNQSUBSCR,ALL_SYS }, { OC_FNQSUBSCR,ALL_SYS }
-	,{ OC_FNQUERY,ALL_SYS }, { OC_FNQUERY,ALL_SYS }
-	,{ OC_FNRANDOM,ALL_SYS }, { OC_FNRANDOM,ALL_SYS }
-	,{ OC_FNREVERSE,ALL_SYS }, { OC_FNREVERSE,ALL_SYS }
-	,{ OC_PASSTHRU,ALL_SYS }, { OC_PASSTHRU,ALL_SYS }
-	,{ OC_FNSTACK1,ALL_SYS }, { OC_FNSTACK1,ALL_SYS }
-	,{ OC_FNTEXT,ALL_SYS }, { OC_FNTEXT,ALL_SYS }
-	,{ OC_FNTRANSLATE,ALL_SYS }, { OC_FNTRANSLATE,ALL_SYS }
-	,{ OC_FNVIEW,ALL_SYS }
-	,{ OC_FNZBITAND,ALL_SYS }
-	,{ OC_FNZBITCOUN,ALL_SYS }
-	,{ OC_FNZBITFIND,ALL_SYS }
-	,{ OC_FNZBITGET,ALL_SYS }
-	,{ OC_FNZBITLEN,ALL_SYS }
-	,{ OC_FNZBITNOT,ALL_SYS }
-	,{ OC_FNZBITOR,ALL_SYS }
-	,{ OC_FNZBITSET,ALL_SYS }
-	,{ OC_FNZBITSTR,ALL_SYS }
-	,{ OC_FNZBITXOR,ALL_SYS }
-	,{ OC_FNZCALL,VMS_OS }, { OC_FNZCALL,VMS_OS }
-	,{ OC_FNZDATE,ALL_SYS }, { OC_FNZDATE,ALL_SYS }
-        ,{ OC_FNCHAR,ALL_SYS }
-	,{ OC_FNZFILE,VMS_OS }, { OC_FNZFILE,VMS_OS }
-	,{ OC_FNZGETDVI,VMS_OS }
-	,{ OC_FNZGETJPI,ALL_SYS }
-	,{ OC_FNZGETLKI,VMS_OS }
-	,{ OC_FNZGETSYI,VMS_OS }
-	,{ OC_FNZLKID,VMS_OS}
-	,{ OC_FNZM,ALL_SYS }, { OC_FNZM,ALL_SYS }
-	,{ OC_FNZPARSE,ALL_SYS }
+	 { OC_FNASCII, ALL_SYS }, { OC_FNASCII, ALL_SYS }
+        ,{ OC_FNCHAR, ALL_SYS }, { OC_FNCHAR, ALL_SYS }
+	,{ OC_FNDATA, ALL_SYS }, { OC_FNDATA, ALL_SYS }
+	,{ OC_FNEXTRACT, ALL_SYS }, { OC_FNEXTRACT, ALL_SYS }
+	,{ OC_FNFIND, ALL_SYS }, { OC_FNFIND, ALL_SYS }
+	,{ OC_FNFNUMBER, ALL_SYS }, { OC_FNFNUMBER, ALL_SYS }
+	,{ OC_FNGET, ALL_SYS }, { OC_FNGET, ALL_SYS }
+	,{ OC_FNJ2, ALL_SYS }, { OC_FNJ2, ALL_SYS }
+	,{ OC_FNLENGTH, ALL_SYS }, { OC_FNLENGTH, ALL_SYS }
+	,{ OC_FNNEXT, ALL_SYS }
+	,{ OC_FNNAME, ALL_SYS }, { OC_FNNAME, ALL_SYS }
+	,{ OC_FNNEXT, ALL_SYS }
+	,{ OC_FNORDER, ALL_SYS }, {OC_FNORDER, ALL_SYS }
+	,{ OC_FNPIECE, ALL_SYS }, { OC_FNPIECE, ALL_SYS }
+	,{ OC_FNQLENGTH, ALL_SYS }, { OC_FNQLENGTH, ALL_SYS }
+	,{ OC_FNQSUBSCR, ALL_SYS }, { OC_FNQSUBSCR, ALL_SYS }
+	,{ OC_FNQUERY, ALL_SYS }, { OC_FNQUERY, ALL_SYS }
+	,{ OC_FNRANDOM, ALL_SYS }, { OC_FNRANDOM, ALL_SYS }
+	,{ OC_FNREVERSE, ALL_SYS }, { OC_FNREVERSE, ALL_SYS }
+	,{ OC_PASSTHRU, ALL_SYS }, { OC_PASSTHRU, ALL_SYS }
+	,{ OC_FNSTACK1, ALL_SYS }, { OC_FNSTACK1, ALL_SYS }
+	,{ OC_FNTEXT, ALL_SYS }, { OC_FNTEXT, ALL_SYS }
+	,{ OC_FNTRANSLATE, ALL_SYS }, { OC_FNTRANSLATE, ALL_SYS }
+	,{ OC_FNVIEW, ALL_SYS }
+	,{ OC_FNZBITAND, ALL_SYS }
+	,{ OC_FNZBITCOUN, ALL_SYS }
+	,{ OC_FNZBITFIND, ALL_SYS }
+	,{ OC_FNZBITGET, ALL_SYS }
+	,{ OC_FNZBITLEN, ALL_SYS }
+	,{ OC_FNZBITNOT, ALL_SYS }
+	,{ OC_FNZBITOR, ALL_SYS }
+	,{ OC_FNZBITSET, ALL_SYS }
+	,{ OC_FNZBITSTR, ALL_SYS }
+	,{ OC_FNZBITXOR, ALL_SYS }
+	,{ OC_FNZCALL, VMS_OS }, { OC_FNZCALL, VMS_OS }
+	,{ OC_FNZDATE, ALL_SYS }, { OC_FNZDATE, ALL_SYS }
+        ,{ OC_FNCHAR, ALL_SYS }
+	,{ OC_FNZFILE, VMS_OS }, { OC_FNZFILE, VMS_OS }
+	,{ OC_FNZGETDVI, VMS_OS }
+	,{ OC_FNZGETJPI, ALL_SYS }
+	,{ OC_FNZGETLKI, VMS_OS }
+	,{ OC_FNZGETSYI, VMS_OS }
+	,{ OC_FNZJOBEXAM, ALL_SYS }
+	,{ OC_FNZLKID, VMS_OS}
+	,{ OC_FNZM, ALL_SYS }, { OC_FNZM, ALL_SYS }
+	,{ OC_FNZPARSE, ALL_SYS }
 	,{ OC_FNZPID, VMS_OS }
-	,{ OC_FNZPREVIOUS,ALL_SYS }, { OC_FNZPREVIOUS,ALL_SYS }
-	,{ OC_FNZPRIV,VMS_OS }, { OC_FNZPRIV,VMS_OS }
-	,{ OC_FNZQGBLMOD,ALL_SYS }, { OC_FNZQGBLMOD,ALL_SYS }
-	,{ OC_FNZSEA,ALL_SYS }
-	,{ OC_FNZSETPRV,VMS_OS }
-	,{ OC_FNZTRNLNM,ALL_SYS }
+	,{ OC_FNZPREVIOUS, ALL_SYS }, { OC_FNZPREVIOUS, ALL_SYS }
+	,{ OC_FNZPRIV, VMS_OS }, { OC_FNZPRIV, VMS_OS }
+	,{ OC_FNZQGBLMOD, ALL_SYS }, { OC_FNZQGBLMOD, ALL_SYS }
+	,{ OC_FNZSEA, ALL_SYS }
+	,{ OC_FNZSETPRV, VMS_OS }
+	,{ OC_FNZSIGPROC, ALL_SYS }
+	,{ OC_FNZTRNLNM, ALL_SYS }
 };
 
 LITDEF int (*fun_parse[])(oprtype *, opctype) =
 {
-	f_ascii,f_ascii,f_char,f_char,f_data,f_data,f_extract
-	,f_extract,f_find,f_find,f_fnumber,f_fnumber,f_get,f_get
-	,f_justify,f_justify,f_length,f_length,f_next,f_name, f_name, f_next,f_order
-	,f_order,f_piece,f_piece,f_qlength,f_qlength,f_qsubscript,f_qsubscript
-	,f_query,f_query,f_mint,f_mint,f_reverse,f_reverse,f_select,f_select
-	,f_stack,f_stack,f_text,f_text,f_translate,f_translate,f_view
-	,f_two_mval,f_one_mval,f_fnzbitfind,f_fnzbitget,f_one_mval
-	,f_one_mval,f_two_mval,f_fnzbitset,f_fnzbitstr,f_two_mval
-	,f_zcall,f_zcall,f_zdate,f_zdate,f_zechar
-	,f_two_mstrs,f_two_mstrs,f_two_mstrs,f_mint_mstr,f_two_mstrs
-	,f_zgetsyi,f_mint,f_mint,f_mint,f_zparse,f_mint,f_zprevious,f_zprevious,f_mstr,f_mstr
-	,f_zqgblmod,f_zqgblmod,f_zsearch,f_mstr,f_ztrnlnm
+	f_ascii, f_ascii, f_char, f_char, f_data, f_data, f_extract
+	, f_extract, f_find, f_find, f_fnumber, f_fnumber, f_get, f_get
+	, f_justify, f_justify, f_length, f_length, f_next, f_name, f_name, f_next, f_order
+	, f_order, f_piece, f_piece, f_qlength, f_qlength, f_qsubscript, f_qsubscript
+	, f_query, f_query, f_mint, f_mint, f_reverse, f_reverse, f_select, f_select
+	, f_stack, f_stack, f_text, f_text, f_translate, f_translate, f_view
+	, f_two_mval, f_one_mval, f_fnzbitfind, f_fnzbitget, f_one_mval
+	, f_one_mval, f_two_mval, f_fnzbitset, f_fnzbitstr, f_two_mval
+	, f_zcall, f_zcall, f_zdate, f_zdate, f_zechar
+	, f_two_mstrs, f_two_mstrs, f_two_mstrs, f_mint_mstr, f_two_mstrs, f_zgetsyi
+	, f_zjobexam, f_mint, f_mint, f_mint, f_zparse, f_mint, f_zprevious, f_zprevious, f_mstr, f_mstr
+	, f_zqgblmod, f_zqgblmod, f_zsearch, f_mstr, f_zsigproc, f_ztrnlnm
 };
 
 

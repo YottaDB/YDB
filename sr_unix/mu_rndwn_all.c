@@ -51,6 +51,7 @@
 #include "cliif.h"
 #include "mu_rndwn_repl_instance.h"
 #include "send_msg.h"
+#include "do_shmat.h"	/* for do_shmat() prototype */
 
 GBLREF gd_region        *gv_cur_region;
 

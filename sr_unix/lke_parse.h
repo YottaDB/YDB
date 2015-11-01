@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,6 @@
 #define MAX_CMD_LEN	10	/* Max Command name string length */
 #define MAX_OPT_LEN	15	/* Max Option name string length */
 #define MAX_ERR_STR	80	/* Max error string length */
-#define MAX_LINE	256	/* Max line len */
 
 #define N_A	0		/* value type not applicable */
 #define STR	1		/* String value type */

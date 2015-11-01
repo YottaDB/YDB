@@ -10,6 +10,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "error_trap.h"
 #include "stringpool.h"
 

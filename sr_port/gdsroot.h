@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -140,8 +140,8 @@ typedef struct
 
 /* Prototypes below */
 block_id get_dir_root(void);
-boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn,
-	unsigned int *full_len, int max_len);
+boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, unsigned int *full_len,
+										int max_len, uint4 *status);
 void gvinit(void);
 #ifdef VMS
 void global_name(unsigned char prefix[], gds_file_id *fil,

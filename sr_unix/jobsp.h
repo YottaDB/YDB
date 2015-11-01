@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -100,7 +100,7 @@ typedef enum
 } jp_type;
 
 bool ojchildioset(job_params_type *jparms);
-int ojstartchild(job_params_type *jparms, int argcnt, boolean_t *non_exit_return);
+int ojstartchild(job_params_type *jparms, int argcnt, boolean_t *non_exit_return, int pipe_fds[]);
 void ojparams(char *p, job_params_type *job_params);
 void ojgetch_env(job_params_type *jparms);
 

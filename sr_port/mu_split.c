@@ -38,6 +38,7 @@ mu_split.c:
 /* Include prototypes */
 #include "t_qread.h"
 #include "t_write.h"
+#include "t_write_root.h"
 #include "t_create.h"
 #include "mupip_reorg.h"
 
@@ -615,16 +616,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			}
 			cse = t_write(gv_target->hist.h[level].blk_num, (unsigned char *)bs_ptr1, ins_off, left_index,
 				gv_target->hist.h[level].buffaddr, level + 1, TRUE, FALSE);
-			/* "t_write_root" */
-			cse = &cw_set[cw_set_depth++];
-			assert(CDB_CW_SET_SIZE > cw_set_depth);
-			cse->blk = -1;
-			cse->mode = gds_t_write_root;
-			cse->ins_off = ins_off2;
-			cse->index = right_index;
-			cse->reference_cnt = 0;
-			cse->first_copy = TRUE;
-			cse->forward_process = FALSE;
+			t_write_root(ins_off2, right_index);	/* create a sibling cw-set-element to store ins_off2/right_index */
 			(*lvls_increased)++;
 			break;
 		}

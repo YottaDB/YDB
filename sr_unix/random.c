@@ -11,9 +11,12 @@
 
 #include "mdef.h"
 
-#include <stdlib.h>
+#include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_time.h"
+
+#include <stdlib.h>
+
 #include "random.h"
 
 #define MAXNUM 2147483561L

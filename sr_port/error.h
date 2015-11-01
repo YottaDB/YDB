@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,6 +62,7 @@ CONDITION_HANDLER(gtmsource_ch);
 CONDITION_HANDLER(gvcmy_open_ch);
 CONDITION_HANDLER(gvcmz_netopen_ch);
 CONDITION_HANDLER(gvzwrite_ch);
+CONDITION_HANDLER(jobexam_dump_ch);
 CONDITION_HANDLER(iob_io_error);
 CONDITION_HANDLER(io_init_ch);
 CONDITION_HANDLER(iomt_ch);

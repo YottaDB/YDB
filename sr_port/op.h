@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,9 +40,6 @@ void op_decrlock(int4 timeout);
 void op_dmoe(void);
 void op_div(mval *u, mval *v, mval *q);
 void op_exp(mval *u, mval* v, mval *p);
-#ifdef __sun
-void op_fnfgncal_rpc();
-#endif
 int4 op_fnfind(mval *src, mval *del, mint first, mval *dst);
 void op_fnfnumber(mval *src,mval *fmt,mval *dst);
 void op_fnj2(mval *src,int len,mval *dst);
@@ -50,7 +47,9 @@ void op_fnj3(mval *src,int width,int fract,mval *dst);
 void op_fnlvname(mval *src, mval *dst);
 void op_fnlvnameo2(mval *src,mval *dst,mval *direct);
 void op_fnfgncal();
-void op_fnfgncal_rpc();
+#ifdef __sun
+int op_fnfgncal_rpc();	/* typ to keep the compiler happy as set into xfer_table, which is int */
+#endif
 void op_fngvget(mval *v, mval *def);
 void op_fngetjpi(mint *jpid,mval *kwd,mval *ret);
 void op_fnlvprvname(mval *src, mval *dst);
@@ -71,6 +70,8 @@ void op_fnzbitget(mval *dst, mval *bitstr, int pos);
 void op_fnzbitlen(mval *dst, mval *bitstr);
 void op_fnzbitor(mval *dst, mval *bitstr1, mval *bitstr2);
 void op_fnzbitstr(mval *bitstr, int size, int truthval);
+void op_fnzjobexam(mval *prelimSpec, mval *finalSpec);
+void op_fnzsigproc(int processid, int signum, mval *retcode);
 void op_fnzlkid(mint boolex, mval *retval);
 void op_fnzqgblmod(mval *v);
 void op_fnztrnlnm(mval *name,mval *table,int4 ind,mval *mode,mval *case_blind,mval *item,mval *ret);
@@ -158,8 +159,11 @@ int op_linefetch(), op_linestart(), op_zbfetch(), op_zbstart(), op_ret(), op_ret
 int opp_ret();
 int op_zst_fet_over(), op_zst_st_over(), op_zstzb_st_over(), opp_zstepret(), opp_zstepretarg();
 int op_zstzb_fet_over(), opp_zst_over_ret(), opp_zst_over_retarg();
+#ifndef __MVS__
 void fetch();
-
+#else
+void gtm_fetch();
+#endif
 void add_mvals(mval *u, mval *v, int subtraction, mval *result);
 void op_bindparm();
 void op_add(mval *u, mval *v, mval *s);
@@ -196,7 +200,7 @@ void op_igetsrc(mval *v);
 int op_lock2(int4 timeout, unsigned char laflag);
 void op_inddevparms(mval *devpsrc, int4 ok_iop_parms, mval *devpiopl);
 void op_indfnname(mval *dst, mval *target, int value);
-void op_indfun(mval *v,unsigned char argcode, mval *dst);
+void op_indfun(mval *v, mint argcode, mval *dst);
 void op_indget(mval *dst, mval *target, mval *value);
 void op_indglvn(mval *v,mval *dst);
 void op_indlvadr(mval *target);

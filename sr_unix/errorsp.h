@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,10 +86,7 @@ void ch_trace_point() {return;}
 #  define CHTRACEPOINT
 #endif
 
-#define PRN_ERROR		{							\
-                                        util_cond_newline();				\
-					util_out_print(0, 1, 0); /* flush msg buffer */	\
-				}
+#define PRN_ERROR		util_cond_flush();
 
 /* With the introduction of call-ins, there could be multiple mdb_condition_handlers
  * stacked up in chnd stack. The active context should be reset to the youngest
@@ -248,7 +245,7 @@ void stop_image_no_core(void);
 				 ( SEVERITY == SEVERE && IS_GTM_ERROR(SIGNAL)   \
 					&& SIGNAL != (int)ERR_OUTOFSPACE) )
 
-char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp);
+unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp);
 
 #define SET_ZSTATUS(ctxt)	set_zstatus(&src_line_d, SIGNAL, ctxt);
 
@@ -268,7 +265,7 @@ void gtm_dump_core(void);
 void gtm_fork_n_core(void);
 void ch_cond_core(void);
 void ch_overrun(void);
-void util_cond_newline(void);
+void util_cond_flush(void);
 CONDITION_HANDLER(dbopen_ch);
 CONDITION_HANDLER(gtmsecshr_cond_hndlr);
 CONDITION_HANDLER(mu_extract_handler);

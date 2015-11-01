@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,8 +64,8 @@ GBLREF hashtab		*stp_duptbl;
 GBLREF lvzwrite_struct	lvzwrite_block;
 GBLREF mliteral		literal_chain;
 GBLREF mstr		*comline_base, dollar_zsource, **stp_array;
-GBLREF mval		dollar_zgbldir, dollar_zstatus, dollar_ztrap, zstep_action, dollar_zstep;
-GBLREF mval		dollar_etrap, dollar_zerror, dollar_zyerror;
+GBLREF mval		dollar_etrap, dollar_system, dollar_zerror, dollar_zgbldir, dollar_zstatus, dollar_zstep, dollar_ztrap;
+GBLREF mval		dollar_zyerror, zstep_action, dollar_zinterrupt;
 GBLREF mv_stent		*mv_chain;
 GBLREF sgm_info		*first_sgm_info;
 GBLREF spdesc		indr_stringpool, rts_stringpool, stringpool;
@@ -293,6 +293,12 @@ void stp_gcol(int space_needed)
 					MV_STPG_PUT(x);
 			}
 		}
+		x = MV_STPG_GET(&dollar_etrap);
+		if (x)
+			MV_STPG_PUT(x);
+		x = MV_STPG_GET(&dollar_system);
+		if (x)
+			MV_STPG_PUT(x);
 		x = STR_STPG_GET(&dollar_zsource);
 		if (x)
 			MV_STPG_PUT(x);
@@ -305,13 +311,13 @@ void stp_gcol(int space_needed)
 		x = MV_STPG_GET(&dollar_zgbldir);
 		if (x)
 			MV_STPG_PUT(x);
+		x = MV_STPG_GET(&dollar_zinterrupt);
+		if (x)
+			MV_STPG_PUT(x);
 		x = MV_STPG_GET(&dollar_zstep);
 		if (x)
 			MV_STPG_PUT(x);
 		x = MV_STPG_GET(&zstep_action);
-		if (x)
-			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&dollar_etrap);
 		if (x)
 			MV_STPG_PUT(x);
 		x = MV_STPG_GET(&dollar_zerror);
@@ -384,6 +390,9 @@ void stp_gcol(int space_needed)
 			case MVST_NVAL:
 			case MVST_TPHOLD:
 				continue;
+			case MVST_ZINTR:
+				m = &mvs->mv_st_cont.mvs_zintr.savtarg;
+				break;
 			default:
 				GTMASSERT;
 			}

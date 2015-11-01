@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"
 #include "mdq.h"
 #include "cache.h"
 #include "rtnhdr.h"
@@ -17,13 +18,7 @@
 #include "cacheflush.h"
 
 GBLREF cache_entry	*cache_entry_base, *cache_entry_top, *cache_hashent, *cache_stealp, cache_temps;
-
-#ifdef DEBUG
-GBLREF int	cache_temp_cnt;
-#define DBG_INCR_CNT(x) ++x
-#else
-#define DBG_INCR_CNT(x)
-#endif
+GBLREF int		cache_temp_cnt;
 
 void cache_put(unsigned char code, mstr *source, mstr *object)
 {
@@ -34,9 +29,11 @@ void cache_put(unsigned char code, mstr *source, mstr *object)
 	for (csp = cache_stealp, trips = -1; ; csp++)
 	{
 		if (csp == cache_stealp)
-		{	/* Allow two complete trips through. Must find reusable entry or else. */
+		{	/* Allow two complete trips through. Try to find reusable entry */
 			if (0 < trips++)
-			{
+			{	/* No reusable entry was found. Create a temporary extention entry.
+				   This entry will be freed when stackframe is unwound
+				*/
 				csp = (cache_entry *)malloc(sizeof(*csp));
 				memset((char *)csp, 0, sizeof(*csp));
 				dqins(&cache_temps, linktemp, csp);
@@ -66,7 +63,7 @@ void cache_put(unsigned char code, mstr *source, mstr *object)
 	dqins(cache_hashent, linkq, csp);
 
 	/* If a buffer exists and is big enough, use it, else replace it */
-	if (NULL != csp->obj.len && csp->real_obj_len < object->len)
+	if (0 != csp->obj.len && csp->real_obj_len < object->len)
 	{
 		free(csp->obj.addr);
 		csp->obj.len = 0;

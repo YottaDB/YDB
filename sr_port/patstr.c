@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,43 +11,107 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "compiler.h"
 #include "patcode.h"
-#include "add_atom.h"
-#include "stringpool.h"
 #include "toktyp.h"
 #include "copy.h"
 #include "min_max.h"
-#include "patstr.h"
 
-LITREF char	ctypetab[128];
-GBLREF spdesc	stringpool;
+GBLREF	uint4		mapbit[];
 
-LITREF uint4    	typemask[256];
-GBLDEF unsigned char	*outchar, *lastpatptr;
-GBLDEF bool		last_infinite;
+LITREF	char		ctypetab[NUM_ASCII_CHARS];
+LITREF	uint4		typemask[PATENTS];
 
-int patstr(mstr *instr, mval *obj)
+typedef struct
 {
-	/* this routine contains a hack to redirect the scanner.  repair requires
-		redefining the scanner/environment interaction */
+	unsigned char	*next;
+	ptstr		altpat;
+} alternation;
 
-	struct {
-			unsigned char	len;
+/*  This procedure is part of the MUMPS compiler.  The function of this procedure is to parse a pattern specification
+ *  and compile it into a data structure that will be used by the run-time engine to actually attempt to match the pattern.
+ *
+ *  The data structure that is built in 'obj' to describe the pattern is stored in units of [unsigned int4]s.
+ *  However it is treated as an mstr with a character count by all but the specifically pattern match modules.
+ *
+ *  The contents of the table looks like:
+ *
+ *  [0]		flag: non-zero if the pattern is "fixed" (3n1"abc"5a is "fixed", 3.5n is not)
+ *  [1]		counter: amount of space used for pattern masks and string-buffers (in units of cell-size)
+ *  [...]	space for additional buffers. If the pattern contains strings, the text for those strings are stored in this space.
+ *			If the pattern contains "alternations", the specifications of these are stored in this area.
+ *			Each "alternation" specifier is a (recursive) instance of this table.
+ *  [n]		counter: number of pattern specifications
+ *  [n+1]	total number of characters in specified patterns
+ *  [n+2]	maximum number of characters in specified patterns
+ *  [n+3]	min[0]: first element of array containing the minimum numbers for the repeat-counts
+ *	...
+ *  [n+3+count-1]
+ *
+ *    *** only if pattern is not "fixed" ***
+ *               [m] = [n+3+count]
+ *  [m]          max[0]: first element of array containing the maximum numbers for the repeat-counts
+ *	...
+ *  [m+count-1]
+ *
+ *    *** always ***
+ *               [p] = [n+3+count+count] or [n+3+count]
+ *  [p]          size[0]: first element of array containing sizes
+ *	...
+ *  [p+count-1]
+ *
+ *======================================================================
+ *
+ * Pattern specifications are compiled by this procedure (patstr).
+ * Run-time evaluation occurs through one of three possible evaluators:
+ *   1. For "fixed" patterns: do_patfixed ("Fixed" patterns look like 3a2n1p)
+ *   2. Other patterns go through do_pattern (These are patterns like 1.3a2.5n1.6p)
+ *   3. A special case are patterns that have more than 1 pattern code with an indeterminate upper bound
+ *      Those patterns are processed using the DFA algorithm.
+ */
+
+int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
+{
+	struct	{
+			int4		len;
 			unsigned char	buff[MAX_PATTERN_LENGTH - 2];
-		} 		strlit;
-	bool			infinite, split_atom, done, dfa, fixed_len;
-	int4	        	lower_bound, upper_bound;
-	unsigned char		str_ptr, *patmaskptr, patcode, *inchar, ch, x, y_max, last_leaf_code;
-	uint4			patmask, last_leaf_mask;
-	short int		atom_map, count, total, total_max;
+		}		strlit;
+	boolean_t		infinite, split_atom, done, dfa, fixed_len, prev_fixed_len;
+	int4			lower_bound, upper_bound;
+	unsigned char		str_ptr, *inchar, curchar, symbol;
+	uint4			pattern_mask, last_leaf_mask, y_max, mbit;
+	uint4			*patmaskptr;
+	short int		atom_map, count, total_min, total_max;
 	short int		min[MAX_PATTERN_ATOMS], max[MAX_PATTERN_ATOMS], size[MAX_PATTERN_ATOMS];
 	struct leaf		leaves, *lv_ptr;
 	struct e_table		expand, *exp_ptr;
 	short int		exp_temp[CHAR_CLASSES];
 	short int		leaf_num, curr_leaf_num, min_dfa, curr_min_dfa, sym_num;
-	short int 		i, j, l, m;
-	long int		k;
+	short int 		seqcnt, charpos, leafcnt, cursize;
+	int4			bitpos;
+	alternation		init_alt;
+	alternation		*cur_alt;
+	mstr			alttail;
+	int4			status;
+	int4			altactive = 0;
+	int4			altend;
+	char			*saveinstr;
+	int			chidx;
+	int			bit;
+	int			seq;
+	int			altmin, altmax;
+	int			saw_delimiter = 0;
+	int4			altlen;
+	int4			allmask;
+	boolean_t		last_infinite;
+	boolean_t		done_free;
+	unsigned char		*let_go;
+	uint4			*fstchar, *outchar, *lastpatptr;
+	int			any_alt = FALSE;
+	int			altcount, altsimplify;
+	int			low_in, high_in, size_in, jump;
 
 	error_def(ERR_PATCODE);
 	error_def(ERR_PATUPPERLIM);
@@ -55,702 +119,552 @@ int patstr(mstr *instr, mval *obj)
 	error_def(ERR_PATLIT);
 	error_def(ERR_PATMAXLEN);
 
-	if (stringpool.top - stringpool.free < MAX_PATOBJ_LENGTH)
-		stp_gcol(MAX_PATOBJ_LENGTH);
-
-	outchar = stringpool.free + 2 * sizeof(char);
-	last_leaf_code = *outchar = 0;
-	last_leaf_mask = 0;
+	memset(&leaves, 0, sizeof(leaves));
+	memset(&expand, 0, sizeof(expand));
+	init_alt.next = NULL;
+	init_alt.altpat.len = 0;
+	done_free = TRUE;
+	fstchar = &obj->buff[0];
+	saveinstr = (char *) &instr->addr[0];
+	for (allmask = 0, chidx = 'A'; chidx <= 'X'; chidx++)
+		allmask |= mapbit[chidx - 'A'];
+	outchar = &obj->buff[0] + PAT_MASK_BEGIN_OFFSET; /* Note: + PAT_MASK_BEGIN_OFFSET * sizeof (uint4) */
+	last_leaf_mask = *outchar = 0;
 	patmaskptr = lastpatptr = outchar;
-
 	infinite = last_infinite = FALSE;
 	dfa = split_atom = FALSE;
 	fixed_len = TRUE;
-
-	count = total = total_max = atom_map = 0;
+	count = total_min = total_max = atom_map = 0;
 	lv_ptr = &leaves;
 	exp_ptr = &expand;
-
 	inchar = (unsigned char *)instr->addr;
-	ch = *inchar++;
-
+	curchar = *inchar++;
+	altactive = 0;
 	for (;;)
 	{
-		instr->addr = (char*)inchar;
-		switch(ctypetab[ch])
+		altend = 0;
+		prev_fixed_len = fixed_len;
+		if ((NULL != relay) && !saw_delimiter)
 		{
-		case TK_PERIOD:
-			lower_bound = 0;
-			fixed_len = FALSE;
-			break;
-		case TK_DIGIT:
-			lower_bound = ch - '0';
-			while (ctypetab[ch = *inchar++] == TK_DIGIT)
-				if ((lower_bound = lower_bound * 10 + (ch - '0'))
-					> PAT_MAX_REPEAT)
-				{
-					lower_bound = PAT_MAX_REPEAT;
-				}
-			infinite = FALSE;
-			break;
-		default:
-			if (dfa)
+			if ((',' == curchar) || (')' == curchar))
 			{
-				patmaskptr = outchar;
-				m = dfa_calc(lv_ptr, leaf_num, exp_ptr);
-				if (m >= 0)
+				*relay = (inchar - 1);
+				altend = 1;
+			}
+		}
+		saw_delimiter = 0;
+		if (!altactive || altend)
+		{
+			instr->addr = (char*)inchar;
+			switch(ctypetab[curchar])
+			{
+			case TK_PERIOD:
+				lower_bound = 0;
+				fixed_len = FALSE;
+				break;
+			case TK_DIGIT:
+				lower_bound = curchar - '0';
+				while (ctypetab[curchar = *inchar++] == TK_DIGIT)
+					if ((lower_bound = lower_bound * 10 + (curchar - '0'))
+						> PAT_MAX_REPEAT)
+						lower_bound = PAT_MAX_REPEAT;
+				infinite = FALSE;
+				break;
+			default:
+				if (dfa)
 				{
-					min[count] = min_dfa;
-					max[count] = PAT_MAX_REPEAT;
-					size[count] = m;
-					total = MIN((total + (min[count] * size[count])),PAT_MAX_REPEAT);
-					total_max = MIN((total_max + (max[count] * size[count])),PAT_MAX_REPEAT);
-					lastpatptr = patmaskptr;
-					last_infinite = TRUE;
-					count++;
-				}
-				else
-				{
-					outchar = patmaskptr;
-					if (!pat_unwind(&count, lv_ptr, leaf_num, &total, &total_max,
-						&min[0], &max[0], &size[0]))
+					patmaskptr = outchar;
+					cursize = dfa_calc(lv_ptr, leaf_num, exp_ptr, &fstchar, &outchar);
+					if (cursize >= 0)
 					{
-						return ERR_PATMAXLEN;
+						min[count] = min_dfa;
+						max[count] = PAT_MAX_REPEAT;
+						size[count] = cursize;
+						total_min = MIN((total_min + (min[count] * size[count])), PAT_MAX_REPEAT);
+						total_max = MIN((total_max + (max[count] * size[count])), PAT_MAX_REPEAT);
+						lastpatptr = patmaskptr;
+						last_infinite = TRUE;
+						count++;
+					} else
+					{
+						outchar = patmaskptr;
+						if (!pat_unwind(&count, lv_ptr, leaf_num, &total_min, &total_max,
+							&min[0], &max[0], &size[0], altmin, altmax,
+							&last_infinite, &fstchar, &outchar, &lastpatptr))
+						{
+							instr->addr = (char *)inchar;
+							return ERR_PATMAXLEN;
+						}
 					}
 				}
-			}
-			if (outchar == stringpool.free + 2 * sizeof(char))
-			{
-				return ERR_PATCODE;
-			}
-			patmaskptr = stringpool.free;
-			*patmaskptr++ = fixed_len;
-			*patmaskptr = outchar - patmaskptr;
-			PUT_SHORT(outchar, count);
-			outchar += sizeof(short int);
-			PUT_SHORT(outchar, total);
-			outchar += sizeof(short int);
-			PUT_SHORT(outchar, total_max);
-			outchar += sizeof(short int);
-
-			i = count * sizeof(short int);
-			memcpy(outchar,min,i);
-			outchar += i;
-
-			if (!fixed_len)
-			{
-				memcpy(outchar,max,i);
-				outchar += i;
-			}
-
-			memcpy(outchar,size,i);
-			outchar += i;
-
-			obj->mvtype = MV_STR;
-			obj->str.addr = (char *) stringpool.free;
-			obj->str.len = outchar - stringpool.free;
-			stringpool.free = outchar;
-			instr->addr = (char *)inchar;
-			return 0;
-		}
-		if (ch != '.')
-		{	upper_bound = lower_bound;
-		}
-		else
-		{
-			fixed_len = FALSE;
-			if (ctypetab[ch = *inchar++] != TK_DIGIT)
-			{
-				if (lower_bound > 0)
-				{ split_atom = TRUE;
+				if (outchar == &obj->buff[PAT_MASK_BEGIN_OFFSET])
+				{
+					instr->addr = (char *)inchar;
+					return ERR_PATCODE;
 				}
-				else
-				{ infinite = TRUE;
-				  upper_bound = PAT_MAX_REPEAT;
-				}
+				patmaskptr = &obj->buff[0];
+				*patmaskptr++ = fixed_len;
+				*patmaskptr = outchar - patmaskptr; /* unit is sizeof(uint4) */
+				*outchar++ = count;
+				*outchar++ = total_min;
+				*outchar++ = total_max;
+				for (seqcnt = 0; seqcnt < count; seqcnt++)
+					*outchar++ = min[seqcnt];
+				if (!fixed_len)
+					for (seqcnt = 0; seqcnt < count; seqcnt++)
+						*outchar++ = max[seqcnt];
+				for (seqcnt = 0; seqcnt < count; seqcnt++)
+					*outchar++ = size[seqcnt];
+				obj->len = outchar - &obj->buff[0];
+				instr->addr = (char *)inchar;
+				return 0;
 			}
+			if (curchar != '.')
+				upper_bound = lower_bound;
 			else
 			{
-				instr->addr = (char *)inchar;
-				upper_bound = ch - '0';
-				while (ctypetab[ch = *inchar++] == TK_DIGIT)
-				{	if ((upper_bound = upper_bound * 10 + (ch - '0'))
-						> PAT_MAX_REPEAT)
+				fixed_len = FALSE;
+				if (ctypetab[curchar = *inchar++] != TK_DIGIT)
+				{
+					if (lower_bound > 0)
+					{	/* A pattern atom like 5.A will be split into two atoms:
+						 * 	 (i) the first will be a fixed length one (5A);
+						 * 	(ii) the second one will be a completely indefinite one (.A).
+						 * This split allows the run-time engine to separate out the
+						 * 	fixed part from the indefinite part.
+						 */
+						split_atom = TRUE;
+					} else
 					{
+						infinite = TRUE;
 						upper_bound = PAT_MAX_REPEAT;
 					}
-				}
-				if (upper_bound < lower_bound)
-				{
-					return ERR_PATUPPERLIM;
-				}
-			}
-		}
-		instr->addr = (char *)inchar;
-
-		if (count >= MAX_PATTERN_ATOMS)
-		{
-			return ERR_PATMAXLEN;
-		}
-		if (ch == '"')
-		{
-			patcode = PATM_STRLIT;
-			patmask = 0;
-			str_ptr = 0;
-			for (;;)
-			{
-				if ((ch = *inchar++) < SP || ch >= DEL)
+				} else
 				{
 					instr->addr = (char *)inchar;
-					return ERR_PATLIT;
-				}
-				if (ch == '\"')
-				{	if ((ch = *inchar++) != '\"')
-					{	break;
+					upper_bound = curchar - '0';
+					while (ctypetab[curchar = *inchar++] == TK_DIGIT)
+					{
+						if ((upper_bound = upper_bound * 10 + (curchar - '0')) > PAT_MAX_REPEAT)
+							upper_bound = PAT_MAX_REPEAT;
+					}
+					if (upper_bound < lower_bound)
+					{
+						instr->addr = (char *)inchar;
+						return ERR_PATUPPERLIM;
 					}
 				}
-				if (str_ptr >= MAX_PATTERN_LENGTH - 2)
+			}
+			instr->addr = (char *)inchar;
+			if (count >= MAX_PATTERN_ATOMS)
+				return ERR_PATMAXLEN;
+		}
+		if (!altend)
+		{
+			if ('\"' == curchar)
+			{
+				pattern_mask = PATM_STRLIT;
+				str_ptr = 0;
+				for (;;)
+				{
+					if ((curchar = *inchar++) < SP || curchar >= DEL)
+					{
+						instr->addr = (char *)inchar;
+						return ERR_PATLIT;
+					}
+					if ('\"' == curchar)
+					{
+						if ((curchar = *inchar++) != '\"')
+							break;
+					}
+					if (str_ptr >= MAX_PATTERN_LENGTH - 2)
+					{
+						instr->addr = (char *)inchar;
+						return ERR_PATMAXLEN;
+					}
+					strlit.buff[str_ptr++] = curchar;
+					pattern_mask |= typemask[curchar];
+				}
+				strlit.len =  str_ptr;
+				if (!strlit.len)
+				{
+					lower_bound = upper_bound = 0;
+					infinite = FALSE;
+					fixed_len = prev_fixed_len;
+					split_atom = FALSE;
+				}
+			} else if ('(' == curchar)
+			{	/* start of 'alternation' */
+				if (dfa)
+				{
+					if (!pat_unwind(&count, lv_ptr, leaf_num, &total_min, &total_max,
+						&min[0], &max[0], &size[0], altmin, altmax,
+						&last_infinite, &fstchar, &outchar, &lastpatptr))
+					{
+						instr->addr = (char *)inchar;
+						return ERR_PATMAXLEN;
+					}
+					dfa = FALSE;
+				}
+				pattern_mask = PATM_ALT;
+				cur_alt = &init_alt;
+				alttail.addr = inchar;
+				alttail.len = instr->len - (int4)((char *)inchar - saveinstr);
+				status = patstr(&alttail, &cur_alt->altpat, &inchar);
+				if (status)
+				{
+					instr->addr = (char *)alttail.addr;
+					return status;
+				}
+				saw_delimiter = 1;
+				altlen = cur_alt->altpat.buff[PAT_LEN_OFFSET];
+				altmin = cur_alt->altpat.buff[PAT_TOT_MIN_OFFSET(altlen)];
+				altmax = cur_alt->altpat.buff[PAT_TOT_MAX_OFFSET(altlen)];
+				altcount = 1;
+				any_alt = TRUE;
+				curchar = *inchar++;
+				altactive = 1;
+				continue;
+			} else if (',' == curchar)
+			{	/* separator between alternate possibilities */
+				/* The malloc that is requested here will be freed below when the alternation is
+				 * added to the output data structure (just below the call to add_atom).
+				 */
+				if (!altactive)
 				{
 					instr->addr = (char *)inchar;
-					return ERR_PATMAXLEN;
+					return ERR_PATCLASS;
 				}
-				strlit.buff[str_ptr++] = ch;
-				patcode |= typemask[ch];
-			}
-				strlit.len =  str_ptr;
-		}
-		else
-		{
-			patcode = 0;
-			for (patmask = 0 ;; ch = *inchar++)
-			{
-				switch (ch)
+				cur_alt->next = (unsigned char *)malloc(sizeof(alternation));
+				cur_alt = (alternation *)cur_alt->next;
+				cur_alt->next = NULL;
+				done_free = FALSE;
+				alttail.addr = inchar;
+				alttail.len = instr->len - (int4)((char *)inchar - saveinstr);
+				status = patstr(&alttail, &cur_alt->altpat, &inchar);
+				if (status)
 				{
-				case 'A':
-				case 'a':
-					patmask |= PATM_A;
-					continue;
-				case 'C':
-				case 'c':
-					patmask |= PATM_C;
-					continue;
-				case 'E':
-				case 'e':
-					patmask |= PATM_E;
-					continue;
-				case 'L':
-				case 'l':
-					patmask |= PATM_L;
-					continue;
-				case 'N':
-				case 'n':
-					patmask |= PATM_N;
-					continue;
-				case 'P':
-				case 'p':
-					patmask |= PATM_P;
-					continue;
-				case 'U':
-				case 'u':
-					patmask |= PATM_U;
-					continue;
-				case 'B':
-				case 'b':
-					patmask |= PATM_B;
-					continue;
-				case 'D':
-				case 'd':
-					patmask |= PATM_D;
-					continue;
-				case 'F':
-				case 'f':
-					patmask |= PATM_F;
-					continue;
-				case 'G':
-				case 'g':
-					patmask |= PATM_G;
-					continue;
-				case 'H':
-				case 'h':
-					patmask |= PATM_H;
-					continue;
-				case 'I':
-				case 'i':
-					patmask |= PATM_I;
-					continue;
-				case 'J':
-				case 'j':
-					patmask |= PATM_J;
-					continue;
-				case 'K':
-				case 'k':
-					patmask |= PATM_K;
-					continue;
-				case 'M':
-				case 'm':
-					patmask |= PATM_M;
-					continue;
-				case 'O':
-				case 'o':
-					patmask |= PATM_O;
-					continue;
-				case 'Q':
-				case 'q':
-					patmask |= PATM_Q;
-					continue;
-				case 'R':
-				case 'r':
-					patmask |= PATM_R;
-					continue;
-				case 'S':
-				case 's':
-					patmask |= PATM_S;
-					continue;
-				case 'T':
-				case 't':
-					patmask |= PATM_T;
-					continue;
-				default:
-					if (ctypetab[ch] == TK_UPPER || ctypetab[ch] == TK_LOWER)
+					instr->addr = (char *)alttail.addr;
+					return status;
+				}
+				saw_delimiter = 1;
+				altlen = cur_alt->altpat.buff[PAT_LEN_OFFSET];
+				if (cur_alt->altpat.buff[PAT_TOT_MIN_OFFSET(altlen)] < altmin)
+					altmin = cur_alt->altpat.buff[PAT_TOT_MIN_OFFSET(altlen)];
+				if (cur_alt->altpat.buff[PAT_TOT_MAX_OFFSET(altlen)] > altmax)
+					altmax = cur_alt->altpat.buff[PAT_TOT_MAX_OFFSET(altlen)];
+				altcount++;
+				curchar = *inchar++;
+				continue;
+			} else if (')' == curchar)
+			{	/* end of 'alternation' */
+				if (!altactive)
+				{
+					instr->addr = (char *)inchar;
+					return ERR_PATCLASS;
+				}
+				altactive = 0;
+				curchar = *inchar++;
+			} else
+			{
+				for (pattern_mask = 0; ; curchar = *inchar++)
+				{
+					chidx = (curchar > 'Z') ? curchar - 'a' : curchar - 'A';
+					if ((0 <= chidx) && (chidx <= 'X' - 'A'))
 					{
+						pattern_mask |= mapbit[chidx];
+						continue;
+					} else if (('Y' - 'A' == chidx) || ('Z' - 'A' == chidx))
+					{	/* YxxxY and ZxxxZ codes not yet implemented */
 						instr->addr = (char *)inchar;
 						return ERR_PATCLASS;
 					}
+					assert(TK_UPPER != ctypetab[curchar] && TK_LOWER != ctypetab[curchar]);
 					break;
 				}
-				break;
-			}
-			if (patmask == 0)
-			{
-				instr->addr = (char *)inchar;
-				return ERR_PATCLASS;
+				if (0 == pattern_mask)
+				{
+					instr->addr = (char *)inchar;
+					return ERR_PATCLASS;
+				}
 			}
 		}
 		if (split_atom)
 		{
+			assert(FALSE == infinite);
 			upper_bound = lower_bound;
 		}
-
 		done = FALSE;
-		while(!done)
+		while (!done)
 		{
 			done = TRUE;
-
-			if (infinite && !dfa && outchar - stringpool.free <= MAX_PATTERN_LENGTH / 2)
-			{	dfa = TRUE;
-				last_leaf_code = 0;
+			/* DFAs can be used within alternations, but not at the nesting level where the alternations themselves
+			 * occur. Also, strings with a length of 0 characters should not be processed within DFAs, since there
+			 * are no character cells to hold the mask and flag bits that the DFA code needs...
+			 */
+			if (infinite && !any_alt && !dfa
+				&& (!(pattern_mask & PATM_STRLIT) || strlit.len)
+				&& ((outchar - &obj->buff[0]) <= (MAX_PATTERN_LENGTH / 2)))
+			{
+				dfa = TRUE;
 				last_leaf_mask = 0;
 				leaf_num = 0;
 				sym_num = 0;
 				min_dfa = 0;
 				atom_map = count;
-				memset(expand.num_e,0,(CHAR_CLASSES)*sizeof(short int));
+				memset(expand.num_e, 0, CHAR_CLASSES * sizeof(short int));
 			}
-
 			if (!dfa)
 			{
 				if (count >= MAX_PATTERN_ATOMS ||
-				     !add_atom(&count, patcode, patmask, &strlit, strlit.len, infinite,
+					!add_atom(&count, pattern_mask, &strlit, strlit.len, infinite,
 						&min[count], &max[count], &size[count],
-						&total, &total_max, lower_bound, upper_bound))
+						&total_min, &total_max, lower_bound, upper_bound, altmin, altmax,
+						&last_infinite, &fstchar, &outchar, &lastpatptr))
 				{
+					instr->addr = (char *)inchar;
 					return ERR_PATMAXLEN;
 				}
-			}
-
-			else
-			{
-				l = j = MAX(lower_bound,1);
-				if (patcode >= PATM_STRLIT)
-				{	j *= strlit.len;
-					l = MAX(j,l);
+				if (pattern_mask & PATM_ALT)
+				{	/* If the alternation contains only one alternative (altcount == 1) AND
+					 * that alternative contains only one pattern atom, AND that atom is not an
+					 * alternation itself, the alternation can be reduced to that atom.
+					 * The boundaries of the compressed atom will be the products of the
+					 * boundaries of the alternation and those of the atom within the alternation
+					 * (lower*lower and upper*upper) E.g. 10.20(.5AN) is the same as .100AN
+					 *
+					 * Such a simplification can be made if:
+					 *    => the inner lower limit is 0 or 1
+					 *    		e.g. 2.3(0.2L) = 0.6L
+					 *    			0 = 0 + 0 + 0
+					 *    			1 = 0 + 0 + 1
+					 *    			2 = 0 + 1 + 1
+					 *    			3 = 1 + 1 + 1
+					 *    			4 = 1 + 1 + 2
+					 *    			5 = 1 + 2 + 2
+					 *    			6 = 2 + 2 + 2
+					 *    		e.g. 2.3(1.2L) = 2.6L
+					 *    			2 =     1 + 1
+					 *    			3 = 1 + 1 + 1
+					 *    			4 = 1 + 1 + 2
+					 *    			5 = 1 + 2 + 2
+					 *    			6 = 2 + 2 + 2
+					 *    		Note that lower limit 1 case is the same as the lower limit 0 case
+					 *    			except for not counting "0" as one match.
+					 *
+					 *    => or the outer lower and upper limit are the same (not a range)
+					 *    		e.g. 4(4.5L) = 16.20L
+					 *    			16 = 4 + 4 + 4 + 4
+					 *    			17 = 4 + 4 + 4 + 5
+					 *    			18 = 4 + 4 + 5 + 5
+					 *    			19 = 4 + 5 + 5 + 5
+					 *    			20 = 5 + 5 + 5 + 5
+					 */
+					altsimplify = ((1 == altcount) && cur_alt) ? TRUE : FALSE;
+					if (altsimplify && (cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET] & PATM_ALT))
+						altsimplify = FALSE;
+					if (altsimplify)
+					{
+						jump = cur_alt->altpat.buff[PAT_LEN_OFFSET];
+						if (1 != cur_alt->altpat.buff[PAT_COUNT_OFFSET(jump)])
+							altsimplify = FALSE;
+					}
+					if (altsimplify)
+					{
+						assert(0 == cur_alt->altpat.buff[0] || 1 == cur_alt->altpat.buff[0]);
+						size_in = cur_alt->altpat.buff[
+								PAT_SIZE_BEGIN_OFFSET(cur_alt->altpat.buff[0], jump, 1)];
+						high_in = cur_alt->altpat.buff[
+								PAT_MAX_BEGIN_OFFSET(cur_alt->altpat.buff[0], jump, 1)];
+						low_in = cur_alt->altpat.buff[
+								PAT_MIN_BEGIN_OFFSET(cur_alt->altpat.buff[0], jump, 1)];
+						if (!size_in)
+							size_in = 1;
+						if ((1 != low_in) && (0 != low_in) && (lower_bound != upper_bound))
+							altsimplify = FALSE;
+					}
+					if (altsimplify)
+					{
+						size[count - 1] = size_in;
+						min[count - 1] = MIN((low_in * lower_bound), PAT_MAX_REPEAT);
+						lower_bound = min[count - 1];
+						if (!cur_alt->altpat.buff[0])
+							fixed_len = FALSE;
+						if (!fixed_len)
+						{
+							max[count - 1] = MIN((high_in * upper_bound), PAT_MAX_REPEAT);
+							upper_bound = max[count - 1];
+						}
+						outchar--;
+						for (seq = PAT_MASK_BEGIN_OFFSET; seq <= jump; seq++)
+							*outchar++ = cur_alt->altpat.buff[seq];
+						pattern_mask = cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET];
+						if (pattern_mask & PATM_STRLIT)
+						{
+							strlit.len = cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET + 1];
+							memcpy(strlit.buff, &cur_alt->altpat.buff[PAT_MASK_BEGIN_OFFSET + 2],
+														strlit.len);
+						}
+					} else
+					{
+						fixed_len = FALSE;
+						*outchar++ = lower_bound;
+						*outchar++ = upper_bound;
+						for (cur_alt = &init_alt; cur_alt; )
+						{
+							*outchar++ = cur_alt->altpat.len;
+							for (seq = 0; seq < cur_alt->altpat.len; seq++)
+								*outchar++ = cur_alt->altpat.buff[seq];
+							cur_alt = (alternation *)cur_alt->next;
+						}
+						*outchar++ = 0;
+						done_free = TRUE;
+					}
 				}
-
-				if (lower_bound > MAX_DFA_REP ||
-				   (!infinite && lower_bound != upper_bound) ||
-				    leaf_num + l >= MAX_SYM - 1 ||
-				    j > MAX_DFA_STRLEN)
+			} else
+			{
+				leafcnt = charpos = MAX(lower_bound, 1);
+				if (pattern_mask & PATM_STRLIT)
+				{
+					charpos *= strlit.len;
+					leafcnt = MAX(charpos, leafcnt);
+				}
+				if ((lower_bound > MAX_DFA_REP)
+					|| (!infinite && lower_bound != upper_bound)
+					|| ((leaf_num + leafcnt) >= (MAX_SYM - 1))
+					|| (charpos > MAX_DFA_STRLEN))
 				{
 					patmaskptr = outchar;
- 					m = dfa_calc(lv_ptr, leaf_num, exp_ptr);
-					if (m >= 0)
+					cursize = dfa_calc(lv_ptr, leaf_num, exp_ptr, &fstchar, &outchar);
+					if (cursize >= 0)
 					{
 						min[count] = min_dfa;
 						max[count] = PAT_MAX_REPEAT;
-						size[count] = m;
-						total = MIN((total + (min[count] * size[count])),PAT_MAX_REPEAT);
-						total_max = MIN((total_max + (max[count] * size[count])),PAT_MAX_REPEAT);
+						size[count] = cursize;
+						total_min = MIN((total_min + (min[count] * size[count])), PAT_MAX_REPEAT);
+						total_max = MIN((total_max + (max[count] * size[count])), PAT_MAX_REPEAT);
 						lastpatptr = patmaskptr;
 						last_infinite = TRUE;
 						count++;
-					}
-					else
+					} else
 					{
 						outchar = patmaskptr;
-						if (!pat_unwind(&count, lv_ptr, leaf_num, &total, &total_max,
-							&min[0], &max[0], &size[0]))
+						if (!pat_unwind(&count, lv_ptr, leaf_num, &total_min, &total_max,
+							&min[0], &max[0], &size[0], altmin, altmax,
+							&last_infinite, &fstchar, &outchar, &lastpatptr))
 						{
+							instr->addr = (char *)inchar;
 							return ERR_PATMAXLEN;
 						}
 					}
 					dfa = FALSE;
 					done = FALSE;
-				}
-				else
+				} else
 				{
 					curr_min_dfa = min_dfa;
 					curr_leaf_num = leaf_num;
-					if (patcode >= PATM_STRLIT)
+					if (pattern_mask & PATM_STRLIT)
 					{
-						memset(&exp_temp[0],0,sizeof(exp_temp));
+						memset(&exp_temp[0], 0, sizeof(exp_temp));
 						min[atom_map] = lower_bound;
 						max[atom_map] = upper_bound;
 						size[atom_map] = strlit.len;
 						atom_map++;
 						min_dfa += lower_bound * strlit.len;
-						m = MAX(lower_bound,1);
-						for (i = 0;i < m;i++)
+						cursize = MAX(lower_bound, 1);
+						for (seqcnt = 0; seqcnt < cursize; seqcnt++)
 						{
-							for (j = 0;j < strlit.len;j++)
+							for (charpos = 0; charpos < strlit.len; charpos++)
 							{
-								x = strlit.buff[j];
-								k = typemask[x];
-								switch (k)
-								{
-									case PATM_N: k = EXP_N;
-										     break;
-									case PATM_P: k = EXP_P;
-										     break;
-									case PATM_L: k = EXP_L;
-										     break;
-									case PATM_U: k = EXP_U;
-										     break;
-									case PATM_C: k = EXP_C;
-										     break;
-									case PATM_B: k = EXP_B;
-										     break;
-									case PATM_D: k = EXP_D;
-										     break;
-									case PATM_F: k = EXP_F;
-										     break;
-									case PATM_G: k = EXP_G;
-										     break;
-									case PATM_H: k = EXP_H;
-										     break;
-									case PATM_I: k = EXP_I;
-										     break;
-									case PATM_J: k = EXP_J;
-										     break;
-									case PATM_K: k = EXP_K;
-										     break;
-									case PATM_M: k = EXP_M;
-										     break;
-									case PATM_O: k = EXP_O;
-										     break;
-									case PATM_Q: k = EXP_Q;
-										     break;
-									case PATM_R: k = EXP_R;
-										     break;
-									case PATM_S: k = EXP_S;
-										     break;
-									case PATM_T: k = EXP_T;
-										     break;
-								}
-								if ( expand.num_e[k] + exp_temp[k] == 0)
-								{	exp_temp[k]++;
-								}
-
-								for (l = 1;l < expand.num_e[k] + exp_temp[k] &&
-									expand.meta_c[k][l] != x;l++)
+								symbol = strlit.buff[charpos];
+								bitpos = patmaskseq(typemask[symbol]);
+								if (expand.num_e[bitpos] + exp_temp[bitpos] == 0)
+									exp_temp[bitpos]++;
+								for (leafcnt = 1;
+									leafcnt < expand.num_e[bitpos] + exp_temp[bitpos] &&
+										expand.meta_c[bitpos][leafcnt] != symbol;
+									leafcnt++)
 									;
-								if (l == expand.num_e[k] + exp_temp[k])
-								{	exp_temp[k]++;
-								}
-								expand.meta_c[k][l] = x;
+								if (leafcnt == expand.num_e[bitpos] + exp_temp[bitpos])
+									exp_temp[bitpos]++;
+								expand.meta_c[bitpos][leafcnt] = symbol;
 								if (!infinite)
 								{
-									leaves.letter[leaf_num][0] = x;
+									leaves.letter[leaf_num][0] = symbol;
 									leaves.letter[leaf_num][1] = -1;
 									leaves.nullable[leaf_num++] = FALSE;
-								}
-								else
-									leaves.letter[leaf_num][j] = x;
+								} else
+									leaves.letter[leaf_num][charpos] = symbol;
 							}
 							if (infinite)
 							{
-								leaves.letter[leaf_num][j] = -1;
+								leaves.letter[leaf_num][charpos] = -1;
 								leaves.nullable[leaf_num++] = infinite;
 							}
 						}
-						last_leaf_code = PATM_STRLIT;
-						last_leaf_mask = 0;
+						last_leaf_mask = PATM_STRLIT;
 						last_infinite = infinite;
-
 						sym_num = 0;
-						for (l = 0; l < leaf_num;l++)
+						for (leafcnt = 0; leafcnt < leaf_num; leafcnt++)
 						{
-							for (j = 0; leaves.letter[l][j] >= 0; j++)
+							for (charpos = 0; leaves.letter[leafcnt][charpos] >= 0; charpos++)
 							{
-								if (leaves.letter[l][j] < ADD)
-								{	sym_num++;
-								}
+								if (!(leaves.letter[leafcnt][charpos] & DFABIT))
+									sym_num++;
 								else
 								{
-									k = leaves.letter[l][j] - ADD;
-									switch (k)
-									{
-										case PATM_N: k = EXP_N;
-											     break;
-										case PATM_P: k = EXP_P;
-											     break;
-										case PATM_L: k = EXP_L;
-											     break;
-										case PATM_U: k = EXP_U;
-											     break;
-										case PATM_C: k = EXP_C;
-											     break;
-										case PATM_B: k = EXP_B;
-											     break;
-										case PATM_D: k = EXP_D;
-											     break;
-										case PATM_F: k = EXP_F;
-											     break;
-										case PATM_G: k = EXP_G;
-											     break;
-										case PATM_H: k = EXP_H;
-											     break;
-										case PATM_I: k = EXP_I;
-											     break;
-										case PATM_J: k = EXP_J;
-											     break;
-										case PATM_K: k = EXP_K;
-											     break;
-										case PATM_M: k = EXP_M;
-											     break;
-										case PATM_O: k = EXP_O;
-											     break;
-										case PATM_Q: k = EXP_Q;
-											     break;
-										case PATM_R: k = EXP_R;
-											     break;
-										case PATM_S: k = EXP_S;
-											     break;
-										case PATM_T: k = EXP_T;
-											     break;
-									}
-									sym_num += expand.num_e[k] + exp_temp[k];
+									bitpos = patmaskseq(leaves.letter[leafcnt][charpos]);
+									sym_num += expand.num_e[bitpos] + exp_temp[bitpos];
 								}
 							}
 						}
-					}
-
-					else
+					} else
 					{
-						if ((last_leaf_code < PATM_STRLIT) && infinite && last_infinite)
+						if (!(last_leaf_mask & PATM_STRLIT) && infinite && last_infinite)
 						{
-							y_max = MAX(patmask,last_leaf_mask);
-							if ((last_leaf_mask & patmask) &&
-					 		   ((last_leaf_mask | patmask) == y_max))
+							y_max = MAX(pattern_mask, last_leaf_mask);
+							if ((last_leaf_mask & pattern_mask) &&
+							   ((last_leaf_mask | pattern_mask) == y_max))
 							{
 								if (last_leaf_mask == y_max)
-								{
 									continue;
-								}
 								leaf_num--;
 								atom_map--;
 							}
 						}
-
 						min[atom_map] = lower_bound;
 						max[atom_map] = upper_bound;
 						size[atom_map] = 1;
 						atom_map++;
 						min_dfa += lower_bound;
-						j = MAX(lower_bound,1);
-
+						charpos = MAX(lower_bound, 1);
 						last_infinite = infinite;
-
-						for (i = 0;i < j;i++)
+						last_leaf_mask = pattern_mask;
+						for (seqcnt = 0; seqcnt < charpos; seqcnt++)
 						{
-							k = 0;
-							last_leaf_code = patcode;
-							last_leaf_mask = patmask;
+							bitpos = 0;
 							leaves.nullable[leaf_num] = infinite;
-
-							if (patmask & PATM_N)
+							/* Check all PAT_MAX_BITS bits if there are flags for internationalization,
+							 * otherwise, check only the original PAT_BASIC_CLASSES bits (C, L, N, P, U)
+							 */
+							chidx = (pattern_mask & PATM_I18NFLAGS) ? PAT_MAX_BITS: PAT_BASIC_CLASSES;
+							if (PATM_E == pattern_mask)
+								chidx = PAT_BASIC_CLASSES;
+							for (bit = 0; bit < chidx; bit++)
 							{
-								if (expand.num_e[EXP_N] == 0)
-								{	expand.num_e[EXP_N]++;
-								}
-								sym_num += expand.num_e[EXP_N];
-								leaves.letter[leaf_num][k++] = ADD_N;
-							}
-
-							if (patmask & PATM_P)
-							{
-								if (expand.num_e[EXP_P] == 0)
-								{	expand.num_e[EXP_P]++;
-								}
-								sym_num += expand.num_e[EXP_P];
-								leaves.letter[leaf_num][k++] = ADD_P;
-							}
-
-							if (patmask & PATM_L)
-							{
-								if (expand.num_e[EXP_L] == 0)
-								{	expand.num_e[EXP_L]++;
-								}
-								sym_num += expand.num_e[EXP_L];
-								leaves.letter[leaf_num][k++] = ADD_L;
-							}
-
-							if (patmask & PATM_U)
-							{
-								if (expand.num_e[EXP_U] == 0)
-								{	expand.num_e[EXP_U]++;
-								}
-								sym_num += expand.num_e[EXP_U];
-								leaves.letter[leaf_num][k++] = ADD_U;
-							}
-
-							if (patmask & PATM_C)
-							{
-								if (expand.num_e[EXP_C] == 0)
-								{	expand.num_e[EXP_C]++;
-								}
-								sym_num += expand.num_e[EXP_C];
-								leaves.letter[leaf_num][k++] = ADD_C;
-							}
-
-							if (patmask & PATM_I18NFLAGS)
-							{
-								if (patmask & PATM_B)
+								mbit = 1 << bit;
+								if ((allmask & mbit) && (pattern_mask & mbit))
 								{
-									if (expand.num_e[EXP_B] == 0)
-									{	expand.num_e[EXP_B]++;
-									}
-									sym_num += expand.num_e[EXP_B];
-									leaves.letter[leaf_num][k++] = ADD_B;
-								}
-
-								if (patmask & PATM_D)
-								{
-									if (expand.num_e[EXP_D] == 0)
-									{	expand.num_e[EXP_D]++;
-									}
-									sym_num += expand.num_e[EXP_D];
-									leaves.letter[leaf_num][k++] = ADD_D;
-								}
-
-								if (patmask & PATM_F)
-								{
-									if (expand.num_e[EXP_F] == 0)
-									{	expand.num_e[EXP_F]++;
-									}
-									sym_num += expand.num_e[EXP_F];
-									leaves.letter[leaf_num][k++] = ADD_F;
-								}
-
-								if (patmask & PATM_G)
-								{
-									if (expand.num_e[EXP_G] == 0)
-									{	expand.num_e[EXP_G]++;
-									}
-									sym_num += expand.num_e[EXP_G];
-									leaves.letter[leaf_num][k++] = ADD_G;
-								}
-
-								if (patmask & PATM_H)
-								{
-									if (expand.num_e[EXP_H] == 0)
-									{	expand.num_e[EXP_H]++;
-									}
-									sym_num += expand.num_e[EXP_H];
-									leaves.letter[leaf_num][k++] = ADD_H;
-								}
-
-								if (patmask & PATM_I)
-								{
-									if (expand.num_e[EXP_I] == 0)
-									{	expand.num_e[EXP_I]++;
-									}
-									sym_num += expand.num_e[EXP_I];
-									leaves.letter[leaf_num][k++] = ADD_I;
-								}
-
-								if (patmask & PATM_J)
-								{
-									if (expand.num_e[EXP_J] == 0)
-									{	expand.num_e[EXP_J]++;
-									}
-									sym_num += expand.num_e[EXP_J];
-									leaves.letter[leaf_num][k++] = ADD_J;
-								}
-
-								if (patmask & PATM_K)
-								{
-									if (expand.num_e[EXP_K] == 0)
-									{	expand.num_e[EXP_K]++;
-									}
-									sym_num += expand.num_e[EXP_K];
-									leaves.letter[leaf_num][k++] = ADD_K;
-								}
-
-								if (patmask & PATM_M)
-								{
-									if (expand.num_e[EXP_M] == 0)
-									{	expand.num_e[EXP_M]++;
-									}
-									sym_num += expand.num_e[EXP_M];
-									leaves.letter[leaf_num][k++] = ADD_M;
-								}
-
-								if (patmask & PATM_O)
-								{
-									if (expand.num_e[EXP_O] == 0)
-									{	expand.num_e[EXP_O]++;
-									}
-									sym_num += expand.num_e[EXP_O];
-									leaves.letter[leaf_num][k++] = ADD_O;
-								}
-
-								if (patmask & PATM_Q)
-								{
-									if (expand.num_e[EXP_Q] == 0)
-									{	expand.num_e[EXP_Q]++;
-									}
-									sym_num += expand.num_e[EXP_Q];
-									leaves.letter[leaf_num][k++] = ADD_Q;
-								}
-
-								if (patmask & PATM_R)
-								{
-									if (expand.num_e[EXP_R] == 0)
-									{	expand.num_e[EXP_R]++;
-									}
-									sym_num += expand.num_e[EXP_R];
-									leaves.letter[leaf_num][k++] = ADD_R;
-								}
-
-								if (patmask & PATM_S)
-								{
-									if (expand.num_e[EXP_S] == 0)
-									{	expand.num_e[EXP_S]++;
-									}
-									sym_num += expand.num_e[EXP_S];
-									leaves.letter[leaf_num][k++] = ADD_S;
-								}
-
-								if (patmask & PATM_T)
-								{
-									if (expand.num_e[EXP_T] == 0)
-									{	expand.num_e[EXP_T]++;
-									}
-									sym_num += expand.num_e[EXP_T];
-									leaves.letter[leaf_num][k++] = ADD_T;
+									seq = patmaskseq((uint4)mbit);
+									if (expand.num_e[seq] == 0)
+										expand.num_e[seq]++;
+									sym_num += expand.num_e[seq];
+									assert(MAX_DFA_STRLEN >= bitpos);
+									leaves.letter[leaf_num][bitpos++] = DFABIT | mbit;
 								}
 							}
-							leaves.letter[leaf_num][k] = -1;
+							assert(MAX_DFA_STRLEN >= bitpos);
+							leaves.letter[leaf_num][bitpos] = -1;
 							leaf_num++;
 						}
 					}
@@ -758,39 +672,38 @@ int patstr(mstr *instr, mval *obj)
 				if (sym_num >= MAX_SYM - 1)
 				{
 					patmaskptr = outchar;
-					m = dfa_calc(lv_ptr, curr_leaf_num, exp_ptr);
-					if (m >= 0)
+					cursize = dfa_calc(lv_ptr, curr_leaf_num, exp_ptr, &fstchar, &outchar);
+					if (cursize >= 0)
 					{
 						min[count] = curr_min_dfa;
 						max[count] = PAT_MAX_REPEAT;
-						size[count] = m;
-						total = MIN((total + (min[count] * size[count])),PAT_MAX_REPEAT);
-						total_max = MIN((total_max + (max[count] * size[count])),PAT_MAX_REPEAT);
+						size[count] = cursize;
+						total_min = MIN((total_min + (min[count] * size[count])), PAT_MAX_REPEAT);
+						total_max = MIN((total_max + (max[count] * size[count])), PAT_MAX_REPEAT);
 						lastpatptr = patmaskptr;
 						last_infinite = TRUE;
 						count++;
-					}
-					else
+					} else
 					{
 						outchar = patmaskptr;
-						if (!pat_unwind(&count, lv_ptr, curr_leaf_num, &total, &total_max,
-							&min[0], &max[0], &size[0]))
+						if (!pat_unwind(&count, lv_ptr, curr_leaf_num, &total_min, &total_max,
+							&min[0], &max[0], &size[0], altmin, altmax,
+							&last_infinite, &fstchar, &outchar, &lastpatptr))
 						{
+							instr->addr = (char *)inchar;
 							return ERR_PATMAXLEN;
 						}
 					}
 					dfa = FALSE;
 					done = FALSE;
 					continue;
-				}
-				else
+				} else
 				{
-					if (last_leaf_code == PATM_STRLIT)
-						for (i=0;i < CHAR_CLASSES;i++)
-							expand.num_e[i] += exp_temp[i];
+					if (last_leaf_mask & PATM_STRLIT)
+						for (seqcnt = 0; seqcnt < CHAR_CLASSES; seqcnt++)
+							expand.num_e[seqcnt] += exp_temp[seqcnt];
 				}
 			}
-
 			if (split_atom)
 			{
 				lower_bound = 0;
@@ -800,5 +713,14 @@ int patstr(mstr *instr, mval *obj)
 				done = FALSE;
 			}
 		}
+		for (cur_alt = &init_alt; cur_alt; )
+		{
+			let_go = (cur_alt != (alternation *)&init_alt) ? (unsigned char *)cur_alt : NULL;
+			cur_alt = (alternation *)cur_alt->next;
+			if (let_go)
+				free(let_go);
+		}
+		init_alt.next = NULL;
+		init_alt.altpat.len = 0;
 	}
 }

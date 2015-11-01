@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 #include "mlkdef.h"
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
+#include "gtm_string.h"
 #include "iosp.h"
 #include "error.h"
 #include "min_max.h"
@@ -58,6 +59,7 @@
 #include "getzdir.h"
 #include "mu_term_setup.h"
 #include "sig_init.h"
+#include "gtmmsg.h"
 
 GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLDEF	bool			in_backup;
@@ -78,6 +80,7 @@ GBLREF unsigned char    	cw_set_depth;
 GBLREF uint4			process_id;
 GBLREF jnlpool_addrs		jnlpool;
 GBLREF spdesc   		rts_stringpool, stringpool;
+GBLREF char			cli_err_str[];
 
 void display_prompt(void);
 
@@ -116,6 +119,14 @@ int main (int argc, char **argv)
 	{	func = 0;
 		if ((res = parse_cmd()) == EOF)
 			break;
+		else if (res)
+		{
+			if (1 < argc)
+				rts_error(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
+			else
+				gtm_putmsg(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
+
+		}
 		if (func)
 			func();
 		if (argc > 1)		/* Non-interactive mode, exit after command */

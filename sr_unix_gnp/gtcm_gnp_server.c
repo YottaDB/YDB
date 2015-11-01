@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -101,6 +101,7 @@
 #endif
 
 GBLDEF char **gtmenvp;
+GBLREF char cli_err_str[];
 
 #ifdef __osf__
 #pragma pointer_size (restore)
@@ -363,7 +364,7 @@ int main(int argc, char **argv, char **envp)
 {
 	int4			timout;
 	cmi_status_t		status;
-	int			eof, arg_index;
+	int			eof, arg_index, parse_ret;
 	mstr			name1, name2;
 	mstr			node_name;
 	cmi_descriptor		service_descr, log_path_descr;
@@ -395,7 +396,9 @@ int main(int argc, char **argv, char **envp)
 	memmove(ptr + sizeof("GTCM_GNP_SERVER ") - 1, ptr, strlen(ptr));
 	memcpy(ptr, "GTCM_GNP_SERVER ", sizeof("GTCM_GNP_SERVER ") - 1);
 	cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
-	parse_cmd();
+	parse_ret = parse_cmd();
+	if (parse_ret && (EOF != parse_ret))
+		rts_error(VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
 	service_len = (unsigned short)sizeof(service);
 	CMI_DESC_SET_POINTER(&service_descr, service);
 	service[0] = '\0';

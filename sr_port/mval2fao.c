@@ -21,6 +21,9 @@
  */
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "fao_parm.h"
 #include <varargs.h>
 #include "underr.h"

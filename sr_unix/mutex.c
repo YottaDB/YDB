@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,12 +13,14 @@
 
 #include "mdef.h"
 
+#include "gtm_time.h"	/* for time() */
+#include "gtm_socket.h"
+#include "gtm_stdlib.h"
+
 #include <errno.h>
 #include <unistd.h>
-#include "gtm_socket.h"
 #include <sys/un.h>
 #include <iotcp_select.h>
-#include <sys/time.h>
 #if defined(__sparc) || defined(__hpux) || defined(__MVS__) || defined(__linux__)
 #include <limits.h>
 #else
@@ -27,7 +29,6 @@
 #ifdef MUTEX_MSEM_WAKE
 #include <sys/mman.h>
 #endif
-#include "gtm_stdlib.h"
 
 #include "aswp.h"
 #include "gdsroot.h"
@@ -244,7 +245,7 @@ static	void	crash_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 	} while (TRUE);
 }
 
-static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, int lock_attempts)
+static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr)
 {
 	enum cdb_sc		status;
 	boolean_t		wakeup_status;
@@ -415,7 +416,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, int lock_attempts)
 	} while (TRUE);
 }
 
-static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, int lock_attempts)
+static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa)
 {
 	/* Insert this process at the tail of the wait queue and hibernate */
 	void			rel_quant();
@@ -507,7 +508,7 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, int lock_attempts)
 						{
 							MUTEX_DPRINT3("%d: Inserted %d into wait queue\n", process_id,
 									free_slot->pid);
-							return (mutex_long_sleep(addr, lock_attempts));
+							return (mutex_long_sleep(addr));
 						}
 					} while (--queue_retry_counter_insq);
 					if (!(--quant_retry_counter_insq))
@@ -732,6 +733,7 @@ static enum cdb_sc mutex_lock(gd_region *reg,
 #ifdef MUTEX_MSEM_WAKE
 	uint4			alert_heartbeat_counter = 0;
 #endif
+	uint4			in_crit_pid;
 
 	error_def(ERR_MUTEXLCKALERT);
 
@@ -763,17 +765,19 @@ static enum cdb_sc mutex_lock(gd_region *reg,
 		alert = (lock_attempts >= max_lock_attempts);
 #endif
 		csa = &FILE_INFO(reg)->s_addrs;
-		if (cdb_sc_dbccerr == mutex_sleep(csa, ++lock_attempts))
-			return (cdb_sc_dbccerr);
+		++lock_attempts;
 		if (alert)
 		{
-			send_msg(VARLSTCNT(5) ERR_MUTEXLCKALERT, 3, DB_LEN_STR(reg),
-					csa->nl->in_crit); /* Alert the admin */
+			in_crit_pid = csa->nl->in_crit;
+			if (in_crit_pid)
+				send_msg(VARLSTCNT(5) ERR_MUTEXLCKALERT, 3, DB_LEN_STR(reg), in_crit_pid); /* Alert the admin */
 			lock_attempts = 0;
 #ifdef MUTEX_MSEM_WAKE
 			alert_heartbeat_counter = 0;
 #endif
 		}
+		if (cdb_sc_dbccerr == mutex_sleep(csa))
+			return (cdb_sc_dbccerr);
 	} while (TRUE);
 }
 

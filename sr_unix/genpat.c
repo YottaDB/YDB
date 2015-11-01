@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,12 +10,14 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "patcode.h"
 #include "compiler.h"
-#include "patstr.h"
 
 /* This routine translates system specific wildcarded strings into MUMPS patterns,
-	and generates the internal pattern matching literal string into the stringpool
+	and generates the internal pattern matching literal string into a local buffer
 	by calling the PATSTR() hook into the compiler.  The result can be passed
 	directly to DO_PATTERN() to match input.
 
@@ -30,7 +32,7 @@ void genpat(mstr *input, mval *patbuf)
 	bool		patopen;
 	char		source_buffer[MAX_SRCLINE];
 	char		*top, *fpat, *pat_str;
-	mval		pat_mval;
+	ptstr		pat_ptstr;
 	mstr		instr;
 
 	pat_str = source_buffer;
@@ -71,10 +73,9 @@ void genpat(mstr *input, mval *patbuf)
 	*pat_str++ = ' ';
 	instr.addr = source_buffer;
 	instr.len = pat_str - source_buffer;
-	if (status = patstr(&instr, &pat_mval))
-	{	rts_error(VARLSTCNT(1) status);
-	}
-	assert(pat_mval.mvtype == MV_STR && pat_mval.str.len <= MAX_PATOBJ_LENGTH);
-	memcpy(patbuf->str.addr, pat_mval.str.addr, pat_mval.str.len);
-	patbuf->str.len = pat_mval.str.len;
+	if (status = patstr(&instr, &pat_ptstr, NULL))
+		rts_error(VARLSTCNT(1) status);
+	assert(pat_ptstr.len <= MAX_PATOBJ_LENGTH);
+	patbuf->str.len = pat_ptstr.len * sizeof(uint4);
+	memcpy(patbuf->str.addr, &pat_ptstr.buff[0], patbuf->str.len);
 }

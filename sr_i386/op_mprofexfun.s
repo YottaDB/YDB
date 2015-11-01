@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -104,7 +104,7 @@ cont:	call	exfun_frame_sp
 	call	push_parm		# push_parm ($T, ret_value, mask, argc [,arg1, arg2, ...]);
 done:	movl	sav_msf(%ebp),%eax
 	movl	%eax,frame_pointer
-	orb	$SFT_EXTFUN,msf_typ_off(%eax)
+	orw	$SFT_EXTFUN,msf_typ_off(%eax)
 	movl	msf_temps_ptr_off(%eax),%edi
 retlab:	leal	sav_ebx(%ebp),%esp
 	movl	rtn_pc(%ebp),%edx

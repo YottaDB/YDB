@@ -12,6 +12,9 @@
  /* Add a cntrl-C handler for mupip upgrade */
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "mu_upgrd.h"
 #include "mu_upgrd_sig_init.h"
 

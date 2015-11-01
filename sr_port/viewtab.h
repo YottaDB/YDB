@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +57,7 @@ VIEWTAB("YCOLLATE",	VTP_VALUE, 		VTK_YCOLLATE, 	MV_NM),
 VIEWTAB("YDIRTREE",	VTP_VALUE, 		VTK_YDIRTREE, 	MV_STR),
 VIEWTAB("YDIRTVAL",	VTP_VALUE, 		VTK_YDIRTVAL, 	MV_STR),
 VIEWTAB("YLCT",		VTP_NULL | VTP_VALUE, 	VTK_YLCT, 	MV_NM),
+VIEWTAB("ZDATE_FORM",	VTP_NULL | VTP_VALUE, 	VTK_ZDATE_FORM, MV_NM),
 VIEWTAB("ZDEFBUFFER",	VTP_DBREGION, 		VTK_ZDEFBUFF, 	MV_NM),
 VIEWTAB("ZDEFCOUNT",	VTP_DBREGION, 		VTK_ZDEFCNT, 	MV_NM),
 VIEWTAB("ZDEFER",	VTP_NULL | VTP_VALUE, 	VTK_ZDEFER, 	MV_NM),

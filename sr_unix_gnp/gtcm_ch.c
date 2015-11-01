@@ -73,7 +73,7 @@ CONDITION_HANDLER(gtcm_ch)
 		*util_outptr = '\n';
 		*(util_outptr + 1) = 0;
 	}
-	msgptr = util_outbuff;
+	msgptr = (unsigned char *)util_outbuff;
 	assert(msglen);
 	if (gtcm_errfile)
 	{

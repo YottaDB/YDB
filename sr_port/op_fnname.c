@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -162,6 +165,5 @@ va_dcl
 	dst->mvtype = MV_STR;
 	dst->str.len = stringpool.free - sptr;
 	dst->str.addr = (char *)sptr;
-	stringpool.free += dst->str.len;
 	assert(space_needed >= dst->str.len);
 }

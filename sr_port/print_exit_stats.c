@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,12 +17,12 @@
 #include "op.h"
 #include "cache.h"
 
-GBLREF	uint4		gtmDebugLevel;			/* Debug level (0 = using default sm module so with
-							   a DEBUG build, even level 0 implies basic debugging) */
+GBLREF	uint4		gtmDebugLevel;		/* Debug level (0 = using default sm module so with
+						   a DEBUG build, even level 0 implies basic debugging) */
 
 void print_exit_stats(void)
 {
-	if ((GDL_SmStats | GDL_SmDumpTrace) & gtmDebugLevel)
+	if ((GDL_SmStats | GDL_SmDumpTrace | GDL_SmDump) & gtmDebugLevel)
 		printMallocInfo();
 #if !defined(__vax) && defined(DEBUG)
 	if (GDL_PrintPieceStats & gtmDebugLevel)

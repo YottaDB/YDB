@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,10 @@
 
 #undef MIN
 #undef MAX
+#undef ABS
 
-#define MIN(a,b) 				((a)<(b) ? (a):(b))
-#define MAX(a,b) 				((a)>(b) ? (a):(b))
+#define MIN(a,b) 	((a) < (b) ? (a) : (b))
+#define MAX(a,b) 	((a) > (b) ? (a) : (b))
+#define	ABS(a)		((a) > 0 ? (a) : -(a))
 
 #endif

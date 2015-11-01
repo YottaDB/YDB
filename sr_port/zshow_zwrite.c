@@ -22,8 +22,8 @@
 #include "op.h"
 #include "mvalconv.h"
 
-GBLREF unsigned char pat_everything[];
-GBLREF unsigned char sizeof_pat_everything;
+GBLREF uint4 pat_everything[];
+GBLREF uint4 sizeof_pat_everything;
 
 void zshow_zwrite(zshow_out *output)
 {

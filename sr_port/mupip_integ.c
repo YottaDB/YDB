@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -160,7 +160,7 @@ void mupip_integ(void)
 	error_def(ERR_DBRBNNEG);
 	error_def(ERR_DBRBNTOOLRG);
 	error_def(ERR_DBRBNLBMN);
-	error_def(ERR_DBREGION);
+	error_def(ERR_DBNOREGION);
 	error_def(ERR_DBTNRESETINC);
 	error_def(ERR_DBTNRESET);
 	error_def(ERR_DBTNLTCTN);
@@ -171,7 +171,8 @@ void mupip_integ(void)
  	gv_altkey = (gv_key *)malloc(sizeof(gv_key) + MAX_KEY_SZ - 1);
 	if (CLI_PRESENT == (cli_status = cli_present("MAXKEYSIZE")))
 	{
-		if (0 == cli_get_num("MAXKEYSIZE", &disp_maxkey_errors))
+		assert(sizeof(disp_maxkey_errors) == sizeof(int4));
+		if (0 == cli_get_num("MAXKEYSIZE", (int4 *)&disp_maxkey_errors))
 			mupip_exit(ERR_MUPCLIERR);
 		if (disp_maxkey_errors < 1)
 			disp_maxkey_errors = 1;
@@ -181,7 +182,8 @@ void mupip_integ(void)
 		disp_maxkey_errors = DEFAULT_ERR_LIMIT;
 	if (CLI_PRESENT == (cli_status = cli_present("TRANSACTION")))
 	{
-		if (0 == cli_get_num("TRANSACTION", &disp_trans_errors))
+		assert(sizeof(disp_trans_errors) == sizeof(int4));
+		if (0 == cli_get_num("TRANSACTION", (int4 *)&disp_trans_errors))
 			mupip_exit(ERR_MUPCLIERR);
 		if (disp_trans_errors < 1)
 			disp_trans_errors = 1;
@@ -191,7 +193,8 @@ void mupip_integ(void)
 		disp_trans_errors = DEFAULT_ERR_LIMIT;
 	if (CLI_PRESENT == (cli_status = cli_present("MAP")))
 	{
-		if (0 == cli_get_num("MAP", &disp_map_errors))
+		assert(sizeof(disp_map_errors) == sizeof(int4));
+		if (0 == cli_get_num("MAP", (int4 *)&disp_map_errors))
 			mupip_exit(ERR_MUPCLIERR);
 		if (disp_map_errors < 1)
 			disp_map_errors = 1;
@@ -201,7 +204,8 @@ void mupip_integ(void)
 		disp_map_errors = DEFAULT_ERR_LIMIT;
 	if (CLI_PRESENT == cli_present("ADJACENCY"))
 	{
-		if (0 == cli_get_num("ADJACENCY", &muint_adj))
+		assert(sizeof(muint_adj) == sizeof(int4));
+		if (0 == cli_get_num("ADJACENCY", (int4 *)&muint_adj))
 			mupip_exit(ERR_MUPCLIERR);
 	} else
 		muint_adj = DEFAULT_ADJACENCY;
@@ -222,7 +226,7 @@ void mupip_integ(void)
                 {
 			error_mupip = TRUE;
 			mu_int_errknt++;
-			mu_int_err(ERR_DBREGION, 0, 0, 0, 0, 0, 0, 0);
+			mu_int_err(ERR_DBNOREGION, 0, 0, 0, 0, 0, 0, 0);
                         mupip_exit(ERR_MUNOACTION);
                 }
 		rptr = grlist;
@@ -248,7 +252,7 @@ void mupip_integ(void)
 			break;
 		if (region)
 		{
-			if ((NULL == rptr) || (FALSE == mupfndfil(rptr->reg)))
+			if ((NULL == rptr) || (!mupfndfil(rptr->reg, NULL)))
 			{
 				mu_int_errknt++;
 				rptr = rptr->fPtr;

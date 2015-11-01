@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_ctype.h"
 
 #include "stp_parms.h"
@@ -29,9 +30,6 @@
 
 GBLREF gd_addr 		*gd_header;
 GBLREF gd_region 	*gv_cur_region;
-
-#define EXIT_MASK 7
-#define EXIT_NRM 0
 
 void mupip_create(void)
 {

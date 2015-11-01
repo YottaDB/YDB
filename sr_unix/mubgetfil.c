@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #ifdef __MVS__
 #include <errno.h>
 #else

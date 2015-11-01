@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 #include "indir_enum.h"
 #include "toktyp.h"
 #include "cache.h"
-#include "pattern.h"
+#include "compile_pattern.h"
 #include "op.h"
 
 GBLREF short int source_column;
@@ -34,7 +34,7 @@ void	op_indpat(mval *v, mval *dst)
 	{
 		comp_init(&v->str);
 		source_column = 1;	/* to coordinate with scanner redirection*/
-		rval = pattern(&x,window_token == TK_ATSIGN);
+		rval = compile_pattern(&x,window_token == TK_ATSIGN);
 		if (comp_fini(rval, &object, OC_IRETMVAL, &x, v->str.len))
 		{
 			cache_put(indir_pattern, &v->str, &object);

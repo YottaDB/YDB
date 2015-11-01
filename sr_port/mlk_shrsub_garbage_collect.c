@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "mlkdef.h"
 #include "copy.h"
 #include "mlk_shrsub_garbage_collect.h"

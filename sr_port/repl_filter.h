@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,10 +25,19 @@
 #define NO_FILTER			0
 #define INTERNAL_FILTER			0x00000001
 #define EXTERNAL_FILTER			0x00000002
+#define JNL_EXTRACT_DELIM		'\\'
+#define TCOM_EXTR_JNLSEQNO_FIELDNUM	4
+#define FILTER_EOT			"99\n"
 
 typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
 
-#define IF_NONE				((intlfltr_t)(-1))
+#define IF_NONE		((intlfltr_t)(-1))
+#define IF_07TO11	(intlfltr_t)jnl_v07tov11
+#define IF_07TO12	(intlfltr_t)jnl_v07tov12
+#define IF_11TO07	(intlfltr_t)jnl_v11tov07
+#define IF_11TO12	(intlfltr_t)jnl_v11tov12
+#define IF_12TO07	(intlfltr_t)jnl_v12tov07
+#define IF_12TO11	(intlfltr_t)jnl_v12tov11
 
 extern int jnl_v07tov11(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
 extern int jnl_v07tov12(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
@@ -58,6 +67,7 @@ GBLREF intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1]
  * In all error cases, conv_len will be the offset at which processing was stopped.
  */
 
+#define V07_JNL_VER			'\07'
 #define V07_JREC_TYPE_OFFSET		0
 #define V07_TCOM_TOKEN_OFFSET		24
 #define V07_TCOM_PARTICIPANTS_OFFSET	28
@@ -67,6 +77,7 @@ GBLREF intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1]
 #define V07_JREC_SUFFIX_SIZE		8
 #define V07_MUMPS_NODE_OFFSET		(2 * sizeof(uint4) + sizeof(trans_num) + sizeof(int4) + sizeof(seq_num))
 
+#define V11_JNL_VER			'\013'
 #define V11_JREC_TYPE_OFFSET		0
 #define V11_TCOM_TOKEN_OFFSET		24
 #define V11_TCOM_PARTICIPANTS_OFFSET	32
@@ -77,6 +88,7 @@ GBLREF intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1]
 #define V11_JREC_SUFFIX_SIZE		8
 #define V11_MUMPS_NODE_OFFSET	 	V07_MUMPS_NODE_OFFSET
 
+#define V12_JNL_VER			'\014'
 #define V12_JRT_RECTYPES		27
 #define V12_JREC_PREFIX_SIZE		8
 #define V12_JREC_SUFFIX_SIZE		8
@@ -87,6 +99,8 @@ GBLREF intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1]
 #define V12_TCOM_PARTICIPANTS_OFFSET	(V12_TCOM_TOKEN_OFFSET + sizeof(token_num))
 #define TP_TOKEN_TID_SIZE		(sizeof(token_num) + sizeof(jn_tid))
 #define	TOKEN_PARTICIPANTS_TS_SHORT_TIME_SIZE (sizeof(token_num) + 2 * sizeof(uint4))
+
+#define V13_JNL_VER			'\015'
 
 int repl_filter_init(char *filter_cmd);
 int repl_filter(seq_num tr_num, unsigned char *tr, int *tr_len, int bufsize);

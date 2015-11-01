@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,17 +20,15 @@
 static char rcsid[] = "$Header:$";
 #endif
 
+#include "mdef.h"
 #include <sys/types.h>
 #include <signal.h>
 #include "gtm_stdio.h"
-#include <time.h>
-#include <mdef.h>
+#include "gtm_time.h"
 #include "gtcm.h"
+#include "eintr_wrappers.h"
 
-
-int
-gtcm_dmpstat(sig)
-    int			 sig;
+int gtcm_dmpstat(int sig)
 {
     extern omi_conn_ll	*omi_conns;
     extern int		 omi_pid;
@@ -46,8 +44,9 @@ gtcm_dmpstat(sig)
     time_t		 t;
     time_t		 uptime, uphours, upmins, upsecs;
     time_t		 itime, ihours, imins, isecs;
+    int			status;
 
-    if (!(fp = fopen(GTCM_STAT, "a")))
+    if (!(fp = Fopen(GTCM_STAT, "a")))
 	return -1;
 
     t = time((time_t *)0);
@@ -61,63 +60,63 @@ gtcm_dmpstat(sig)
     imins = (itime % 3600) / 60;
     isecs = itime % 60;
 
-    fprintf(fp, "%s", ctime(&t));
-    OMI_DBG((omi_debug, "%s", ctime(&t)));
-    fprintf(fp, "%d\n", omi_pid);
+    FPRINTF(fp, "%s", GTM_CTIME(&t));
+    OMI_DBG((omi_debug, "%s", GTM_CTIME(&t)));
+    FPRINTF(fp, "%d\n", omi_pid);
     OMI_DBG((omi_debug, "%d\n", omi_pid));
-    fprintf(fp, "Up time:  %d:%.2d:%.2d\n",uphours,upmins,upsecs);
+    FPRINTF(fp, "Up time:  %d:%.2d:%.2d\n",uphours,upmins,upsecs);
     OMI_DBG((omi_debug, "Up time:  %d:%.2d:%.2d\n",uphours,upmins,upsecs));
     if (uptime != itime)
     {
-	fprintf(fp, "Time since last stat dump:  %d:%.2d:%.2d\n",ihours,imins,
+	FPRINTF(fp, "Time since last stat dump:  %d:%.2d:%.2d\n",ihours,imins,
 		isecs);
 	OMI_DBG((omi_debug, "Time since last stat dump:  %d:%.2d:%.2d\n",
 		 ihours,imins,isecs));
     }
-    fprintf(fp, "Good connections: %d\n", omi_conns->stats.conn);
+    FPRINTF(fp, "Good connections: %d\n", omi_conns->stats.conn);
     OMI_DBG((omi_debug, "Good connections: %d\n", omi_conns->stats.conn));
-    fprintf(fp, "Bad connections: 0\n");
+    FPRINTF(fp, "Bad connections: 0\n");
     OMI_DBG((omi_debug, "Bad connections: 0\n"));
-    fprintf(fp, "Good disconnects: %d\n",
+    FPRINTF(fp, "Good disconnects: %d\n",
 	    omi_conns->stats.disc - omi_conns->stats.clos);
     OMI_DBG((omi_debug, "Good disconnects: %d\n",
 	     omi_conns->stats.disc - omi_conns->stats.clos));
-    fprintf(fp, "Bad disconnects: %d\n", omi_conns->stats.clos);
+    FPRINTF(fp, "Bad disconnects: %d\n", omi_conns->stats.clos);
     OMI_DBG((omi_debug, "Bad disconnects: %d\n", omi_conns->stats.clos));
-    fprintf(fp, "Number of transactions: %ld\n", omi_nxact);
+    FPRINTF(fp, "Number of transactions: %ld\n", omi_nxact);
     OMI_DBG((omi_debug, "Number of transactions: %ld\n", omi_nxact));
     if (uptime)
     {
-	fprintf(fp, "Avg. transactions/sec: %ld\n", omi_nxact/uptime);
+	FPRINTF(fp, "Avg. transactions/sec: %ld\n", omi_nxact/uptime);
 	OMI_DBG((omi_debug, "Avg. transactions/sec: %ld\n", omi_nxact/uptime));
     }
     if (gtcm_stime)
     {
-	fprintf(fp, "transactions since last stat dump: %ld\n", omi_nxact2);
+	FPRINTF(fp, "transactions since last stat dump: %ld\n", omi_nxact2);
 	OMI_DBG((omi_debug, "transactions since last stat dump: %ld\n",
 		 omi_nxact2));
 	if (itime)
 	{
-	    fprintf(fp, "Avg. transactions/sec since last stat dump: %ld\n",
+	    FPRINTF(fp, "Avg. transactions/sec since last stat dump: %ld\n",
 		    omi_nxact2/itime);
 	    OMI_DBG((omi_debug,
 		     "Avg. transactions/sec since last stat dump: %ld\n",
 		     omi_nxact2/itime));
 	}
     }
-    fprintf(fp, "Number of errors: %ld\n", omi_nerrs);
+    FPRINTF(fp, "Number of errors: %ld\n", omi_nerrs);
     OMI_DBG((omi_debug, "Number of errors: %ld\n", omi_nerrs));
-    fprintf(fp, "Number of bytes received: %ld\n", omi_brecv);
+    FPRINTF(fp, "Number of bytes received: %ld\n", omi_brecv);
     OMI_DBG((omi_debug, "Number of bytes received: %ld\n", omi_brecv));
-    fprintf(fp, "Number of bytes sent: %ld\n", omi_bsent);
+    FPRINTF(fp, "Number of bytes sent: %ld\n", omi_bsent);
     OMI_DBG((omi_debug, "Number of bytes sent: %ld\n", omi_bsent));
-    fprintf(fp, "\n");
+    FPRINTF(fp, "\n");
 
     gtcm_ltime = t;
     omi_nxact2 = 0;
 
     fflush(fp);
-    fclose(fp);
+    FCLOSE(fp, status);
 
     return 0;
 

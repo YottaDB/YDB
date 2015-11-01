@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -29,7 +29,14 @@ ENTRY op_pattern
 	pushl	%edx
 	pushl	%eax
 	movl	mval_a_straddr(%edx),%eax
-	cmpb	$0,(%eax)
+	#
+	# This is an array of unaligned ints. If the first word is zero, then call do_pattern
+	# instead of do_patfixed. Only the low order byte is significant and so it is the only
+	# one we need to test. We would do this in assembly because (1) we need the assmembly
+	# routine anyway to save the return value into $TEST and (2) it saves an extra level of
+	# call linkage at the C level to do the decision here.
+	#
+	cmpb	$0,(%eax) # little endian compare of low order byte
 	je	l1
 	call	do_patfixed
 	jmp	l2

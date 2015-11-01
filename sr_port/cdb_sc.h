@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ enum cdb_sc
 	cdb_sc_losthist,	/* 'E'  t_end or tp_tend (both mm or bg) - tn could not be verified from history */
 	cdb_sc_mapfail,		/* 'F'  t_end or op_tcommit (from bm_getfree) failed to acquire new block */
 	cdb_sc_lostcr,		/* 'G'  gvcst_...sib, t_end, tp_tend, tp_check_hist - found cache buffer modified */
-	cdb_sc_mkblk,		/* 'H'  Composing a local block failed, from gvcst_kill (5) gvcst_put (10), mu_reorg (5) */
+	cdb_sc_mkblk,		/* 'H'  Composing a local block failed, from gvcst_kill (3) gvcst_put (14) */
 	cdb_sc_rdfail,		/* 'I'  t_qread found block number requested is outside size of file as described by fileheader */
 	cdb_sc_badlvl,		/* 'J'  gvcst_search found a child block didn't have the next block level below its parent */
 	cdb_sc_cacheprob,	/* 'K'  db_csh_get, ... found a cache control problem */
@@ -64,7 +64,7 @@ enum cdb_sc
 	cdb_sc_blknumerr,	/* 'e'  t_qread or op_tcommit - block number is impossible */
 	cdb_sc_blksplit,	/* 'f'  recompute_upd_array recognized that the block needs to be split */
 	cdb_sc_toomanyrecompute,/* 'g'	more than 25% of the blocks in read-set need to be recomputed */
-	cdb_sc_jnlstatemod,	/* 'h'  journal state is modified during an operation */
+	cdb_sc_jnlstatemod,	/* 'h'  csd->jnl_state changed or csd->jnl_before_image changed since beginning of the transaction */
 	cdb_sc_unfreeze_getcrit	/* 'i'	gdsfilext found region frozen. Wait for unfreeze and reattempt crit */
 };
 

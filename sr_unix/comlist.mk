@@ -422,12 +422,14 @@ else
 	@$(gt-as)
 endif
 
+ifndef gt_cc_before_as
 %.o:%.c
 ifeq ($(verbose),1)
 	$(gt_cc_compiler) -c $(gt_cc_options) $< -o $@
 else
 	@echo $<
 	@$(gt_cc_compiler) -c $(gt_cc_options) $< -o $@
+endif
 endif
 
 omi_sx_play.c: omi_srvc_xct.c

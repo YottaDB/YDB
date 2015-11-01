@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,6 +77,7 @@ GBLREF symval		*curr_symval;
 GBLREF trans_num	local_tn;	/* transaction number for THIS PROCESS */
 GBLREF short		dollar_tlevel;
 GBLREF boolean_t	lv_dupcheck;
+GBLREF int4		zdate_form;
 GBLREF int4		zdir_form;
 
 #define MAX_YDIRTSTR 32
@@ -279,7 +280,7 @@ va_dcl
 			tmpstr = parmblk.value->str;
 		else
 			tmpstr.len = 0;
-		setpattab(&tmpstr, &status);
+		status = setpattab(&tmpstr);
 		if (0 == status)
 			rts_error(VARLSTCNT(4) ERR_PATTABNOTFND, 2, parmblk.value->str.len, parmblk.value->str.addr);
 		break;
@@ -430,6 +431,9 @@ va_dcl
 		 	zdir_form = testvalue;
 		 )
 		 break;
+	case VTK_ZDATE_FORM:
+		zdate_form = (0 != MV_FORCE_INT(parmblk.value));
+		break;
 	default:
 		rts_error(VARLSTCNT(1) ERR_VIEWCMD);
 	}

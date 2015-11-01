@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "urx.h"
 
 bool urx_getlab (char *lab, char lablen, urx_rtnref *rtn, urx_labref **lp0p, urx_labref **lp1p)

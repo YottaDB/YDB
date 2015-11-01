@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_time.h"		/* for time() in JNL_WHOLE_TIME() macro */
 
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -40,7 +41,6 @@ GBLREF  jnl_process_vector	*prc_vec;
 GBLREF	jnl_process_vector	*originator_prc_vec;
 GBLREF	jnl_process_vector	*server_prc_vec;
 GBLREF	fixed_jrec_tp_kill_set 	mur_jrec_fixed_field;
-LITREF	int			jnl_fixed_size[];
 
 static	void	(* const extraction_routine[])() =
 {
@@ -119,7 +119,7 @@ bool	mur_forward_process(ctl_list *ctl)
 				pini_addr = ctl->rab->dskaddr;
 				if (ctl->consist_stop_addr)
 					pini_addr += (ctl->consist_stop_addr - ctl->stop_addr);
-				jnl_prc_vector(prc_vec);
+				JNL_WHOLE_TIME(prc_vec->jpv_time);
 				assert(NULL == originator_prc_vec);
 				assert(NULL == server_prc_vec);
 				originator_prc_vec = &rec->val.jrec_pini.process_vector[ORIG_JPV];
@@ -272,7 +272,7 @@ bool	mur_forward_process(ctl_list *ctl)
 		assert(&rec->val.jrec_set.jnl_seqno ==  &rec->val.jrec_tzkill.jnl_seqno);
 		assert(&rec->val.jrec_set.jnl_seqno ==  &rec->val.jrec_uzkill.jnl_seqno);
 
-		ret_val = !mur_options.before  ||  rec_time <= JNL_M_TIME(before_time);
+		ret_val = !mur_options.before  ||  rec_time <= MUR_OPT_MID_TIME(before_time);
 
 		switch (rectype)
 		{
@@ -368,8 +368,8 @@ bool	mur_forward_process(ctl_list *ctl)
 
 	if (ret_val  &&  mur_options.extr_file_info != NULL  &&  !mur_options.detail  &&
 	    (!mur_options.forward  ||
-	     (!mur_options.before  ||  rec_time <= JNL_M_TIME(before_time))  &&
-	     (!mur_options.since  ||  rec_time >= JNL_M_TIME(since_time))))
+	     (!mur_options.before  ||  rec_time <= MUR_OPT_MID_TIME(before_time))  &&
+	     (!mur_options.since  ||  rec_time >= MUR_OPT_MID_TIME(since_time))))
 	{
 		extract = extraction_routine[rectype];
 		assert(extract != NULL);

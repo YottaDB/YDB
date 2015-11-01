@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -145,7 +145,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
                                 memset(sockaddr, 0, sizeof(sockaddr));
                                 memcpy(sockaddr, pp->str.addr + p_offset + 1, len);
                         } else
-				rts_error(VARLSTCNT(1) ERR_ADDRTOOLONG);
+				rts_error(VARLSTCNT(6) ERR_ADDRTOOLONG, 4, len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
                         break;
 		case	iop_connect:
 			connect_specified = TRUE;
@@ -155,7 +155,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 				memset(sockaddr, 0, sizeof(sockaddr));
                                 memcpy(sockaddr, pp->str.addr + p_offset + 1, len);
 			} else
-				rts_error(VARLSTCNT(1) ERR_ADDRTOOLONG);
+				rts_error(VARLSTCNT(6) ERR_ADDRTOOLONG, 4, len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
 			break;
 		case	iop_ioerror:
 			ioerror_specified = TRUE;

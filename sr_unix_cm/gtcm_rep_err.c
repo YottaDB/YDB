@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,12 +21,16 @@ static char rcsid[] = "$Header:$";
 #endif
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 #include "gtm_stdio.h"
+#include "gtm_stdlib.h"
+#include "gtm_syslog.h"
+#include "gtm_time.h"
+
 #include "gtcm.h"
 #include "fao_parm.h"
-#include "gtm_syslog.h"
-
-#include <time.h>
+#include "eintr_wrappers.h"
 
 GBLREF char 		util_outbuff[], *util_outptr;
 GBLREF char		*omi_service;
@@ -40,7 +44,8 @@ void gtcm_rep_err(char *msg, int errcode)
     unsigned int faol[MAX_FAO_PARMS];
     void	gtm_getmsg(), util_out_print();
     time_t	now;
-    char *gtm_dist, *getenv(), *ctime(), fileName[256];
+    int		status;
+    char *gtm_dist, fileName[256];
 
     msgstr.addr = outbuf;
     msgstr.len = sizeof(outbuf);
@@ -53,17 +58,17 @@ void gtcm_rep_err(char *msg, int errcode)
     util_out_print("!/",FALSE);
     *util_outptr++ = 0;
 
-    if (gtm_dist=getenv("gtm_dist"))
-	    sprintf(fileName,"%s/log/gtcm_server.erlg", gtm_dist);
+    if (gtm_dist = GETENV("gtm_dist"))
+	    SPRINTF(fileName,"%s/log/gtcm_server.erlg", gtm_dist);
     else
 	    strcpy(fileName,"/usr/tmp/gtcm_server.erlg");
 
-    if ((fp = fopen(fileName, "a")))
+    if ((fp = Fopen(fileName, "a")))
     {
 		now=time(0);
-		fprintf(fp,"%s",ctime(&now));
-		fprintf(fp,"server(%s)  %s:  %s", omi_service, msg, util_outbuff);
-		fclose(fp);
+		FPRINTF(fp, "%s", GTM_CTIME(&now));
+		FPRINTF(fp,"server(%s)  %s:  %s", omi_service, msg, util_outbuff);
+		FCLOSE(fp, status);
     }
 
 #ifdef BSD_LOG

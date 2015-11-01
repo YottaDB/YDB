@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,6 @@
 #define BLK_SZ			512
 #define BACKUP_BLOCKS		(BACKUP_CHUNK_SIZE/BLK_SZ)
 #define MAX_GBL_NAME_LEN	15
-#define MAX_STR_LEN		255
 #ifdef __MVS__
 #define TMPDIR_ACCESS_MODE	R_OK | W_OK | X_OK
 #else

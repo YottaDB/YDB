@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -158,7 +160,7 @@ boolean_t mu_int_blk(
 	error_def(ERR_DBRSIZMN);
 	error_def(ERR_DBRSIZMX);
 	error_def(ERR_DBLRCINVSZ);
-	error_def(ERR_DBNONZCOMP);
+	error_def(ERR_DBSTARCMP);
 	error_def(ERR_DBCMPNZRO);
 	error_def(ERR_DBINVGBL);
 	error_def(ERR_DBCOMPTOOLRG);
@@ -294,17 +296,15 @@ boolean_t mu_int_blk(
 		if (level && (rec_top == blk_top))
 		{
 			is_top = TRUE;
-			if (level && (sizeof(rec_hdr) + sizeof(block_id) != rec_size))
+			if (sizeof(rec_hdr) + sizeof(block_id) != rec_size)
 			{
-				mu_int_err(ERR_DBLRCINVSZ, TRUE, TRUE, buff, comp_length, top_key,
-					top_len, (unsigned int)blk_levl);
+				mu_int_err(ERR_DBLRCINVSZ, TRUE, TRUE, buff, comp_length, top_key, top_len, (unsigned int)blk_levl);
 				free(blk_base);
 				return FALSE;
 			}
-			if (level && rec_cmpc)
+			if (rec_cmpc)
 			{
-				mu_int_err(ERR_DBNONZCOMP, TRUE, TRUE, buff, comp_length,
-					top_key, top_len, (unsigned int)blk_levl);
+				mu_int_err(ERR_DBSTARCMP, TRUE, TRUE, buff, comp_length, top_key, top_len, (unsigned int)blk_levl);
 				free(blk_base);
 				return FALSE;
 			}

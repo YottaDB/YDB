@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,12 +81,10 @@
 #include "wcs_flu.h"
 #include "repl_log.h"
 #include "tp_restart.h"
+#include "gtmmsg.h"	/* for gtm_putmsg() prototype */
 
 #define USER_STACK_SIZE		16384			/* (16 * 1024) */
 #define MINIMUM_BUFFER_SIZE	(DISK_BLOCK_SIZE * 32)
-
-
-LITREF  int			jnl_fixed_size[];
 
 GBLREF	gd_binding		*gd_map;
 GBLREF	gd_binding              *gd_map_top;
@@ -561,8 +559,7 @@ void updproc_actions(void)
 			QWASSIGN(temp_jnlpool_ctl->write, jnlpool_ctl->write);
 			QWASSIGN(temp_jnlpool_ctl->jnl_seqno, jnlpool_ctl->jnl_seqno);
 			assert(QWMODDW(temp_jnlpool_ctl->write_addr, temp_jnlpool_ctl->jnlpool_size) == temp_jnlpool_ctl->write);
-			cumul_jnl_rec_len = sizeof(jnldata_hdr_struct)
-					+ JREC_PREFIX_SIZE + jnl_fixed_size[JRT_NULL] + JREC_SUFFIX_SIZE;
+			cumul_jnl_rec_len = sizeof(jnldata_hdr_struct) + NULL_RECLEN;
 			temp_jnlpool_ctl->write += sizeof(jnldata_hdr_struct);
 			if (temp_jnlpool_ctl->write >= temp_jnlpool_ctl->jnlpool_size)
 			{
@@ -783,7 +780,6 @@ bool	upd_open_files(upd_proc_ctl **upd_db_files)
 	unsigned char	seq_num_str[32], *seq_num_ptr;
 	unsigned char	seq_num_strx[32], *seq_num_ptrx;
 
-	error_def(ERR_REPLEN_JNLDISABLE);
 	error_def(ERR_NOREPLCTDREG);
 
 	QWASSIGN(start_jnl_seqno, seq_num_zero);
@@ -837,7 +833,7 @@ bool	upd_open_files(upd_proc_ctl **upd_db_files)
 			curr = curr->next;
 			continue;
 		} else if (!JNL_ENABLED(csd))
-			rts_error(VARLSTCNT(6) ERR_REPLEN_JNLDISABLE, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(curr->gd));
+			assert(FALSE);
 		else
 			repl_enabled = TRUE;
 		if (recvpool.upd_proc_local->updateresync)

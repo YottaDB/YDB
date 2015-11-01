@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "cdb_sc.h"		/* atleast for cdb_sc_* codes */
 #include "copy.h"		/* atleast for the GET_USHORT macros */
@@ -39,6 +41,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	short			dollar_tlevel;
 GBLREF	unsigned char		rdfail_detail;
+GBLREF	inctn_opcode_t		inctn_opcode;
 
 void	gvcst_expand_free_subtree(kill_set *ks_head)
 {
@@ -57,6 +60,8 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	unsigned short		temp_ushort;
+	trans_num		ret_tn;
+	inctn_opcode_t		save_inctn_opcode;
 
 	error_def(ERR_GVKILLFAIL);
 
@@ -133,7 +138,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 		save_dollar_tlevel = dollar_tlevel;
 		assert(1 >= dollar_tlevel);
 		dollar_tlevel = 0;	/* temporarily for gvcst_bmp_mark_free */
-		gvcst_bmp_mark_free(ks);
+		GVCST_BMP_MARK_FREE(ks, ret_tn, inctn_invalid_op, inctn_bmp_mark_free_gtm, inctn_opcode, csa)
 		dollar_tlevel = save_dollar_tlevel;
 	}
 	free(temp_buff);

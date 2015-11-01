@@ -13,6 +13,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include <sys/types.h>
 #ifndef __MVS__
 #  include <sys/param.h>
@@ -207,10 +209,10 @@ void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsigin
 		if (NULL != context->sregs)
 		{
                 	gtmsi->int_iadr = (caddr_t)context->sregs->regs.psw.addr;
-                	gtmsi->infotype |= GTMSIGINFO_ILOC; 
+                	gtmsi->infotype |= GTMSIGINFO_ILOC;
 		}
 
-#else      
+#else
 # ifndef REG_EIP
 #   define REG_EIP EIP
 # endif

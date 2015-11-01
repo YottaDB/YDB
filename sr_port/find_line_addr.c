@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "rtnhdr.h"
 #include "cmd_qlf.h"
 #include "gtm_caseconv.h"

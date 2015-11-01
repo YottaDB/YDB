@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,7 @@
 #include "op_merge.h"
 #include "op.h"
 #include "gtmmsg.h"
+#include "sgnl.h"
 
 GBLREF lvzwrite_struct	lvzwrite_block;
 GBLREF zshow_out	*zwr_output;
@@ -45,6 +46,8 @@ GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey;
 GBLREF int		merge_args;
 GBLREF merge_glvn_ptr	mglvnp;
+GBLREF gd_region	*gv_cur_region;
+GBLREF bool		gv_curr_subsc_null;
 
 
 void lvzwr_out( mval *val)
@@ -104,6 +107,8 @@ void lvzwr_out( mval *val)
 				subscp = ((zwr_sub_lst *)lvzwrite_block.sub)->subsc_list[n].actual;
 				MV_FORCE_STR(subscp);
 				mval2subsc(subscp, gv_currkey);
+				if (!subscp->str.len && !gv_cur_region->null_subs)
+					sgnl_gvnulsubsc();
 			}
 			MV_FORCE_STR(val);
 			op_gvput(val);
@@ -113,10 +118,7 @@ void lvzwr_out( mval *val)
 			dst_lv = mglvnp->lclp[IND1];
 			if (MV_SBS == dst_lv->ptrs.val_ent.parent.sbs->ident && MAX_LVSUBSCRIPTS
 				< dst_lv->ptrs.val_ent.parent.sbs->level + lvzwrite_block.curr_subsc)
-			{
-				gtm_putmsg(VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-				rts_error(VARLSTCNT(1) ERR_MERGEINCOMPL);
-			}
+				rts_error(VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
 			/*
 			 * Followings are not efficient. Saving mval * for each level we last worked on,
 			 * we can skip some of the op_putindx calls.

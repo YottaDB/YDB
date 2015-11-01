@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,17 +52,15 @@ int extract_process_vector(jnl_process_vector *pv, int extract_len)
 {
 	int			actual;
 	char			*ptr;
-	jnl_proc_time		*ref_time;
 
-	ref_time = &pv->jpv_time;
-	EXTTIME(ref_time);
+	EXTTIME(MID_TIME(pv->jpv_time));
 	EXTINT(pv->jpv_pid);
 	EXTTXTVMS(pv->jpv_prcnam, JPV_LEN_PRCNAM);
 	EXTTXT(pv->jpv_node, JPV_LEN_NODE);
 	EXTTXT(pv->jpv_user, JPV_LEN_USER);
 	EXTINTVMS(pv->jpv_mode);
 	EXTTXT(pv->jpv_terminal, JPV_LEN_TERMINAL);
-	EXTTIMEVMS(pv->jpv_login_time);
+	EXTTIMEVMS(MID_TIME(pv->jpv_login_time));
 	EXTINTVMS(pv->jpv_image_count);
 	return extract_len;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include <stddef.h>
 
@@ -58,7 +60,7 @@ int jnl_v07tov11(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	jlen = *jnl_len;
 	while (0 < jlen)
 	{
-		if (0 < (reclen = v07_jnl_record_length(jb, jlen)))
+		if (0 < (reclen = v07_jnl_record_length((jnl_record *)jb, jlen)))
 		{
 			if (reclen <= jlen)
 			{

@@ -15,6 +15,10 @@
 
 #include "mdef.h"
 
+#include "gtm_stdlib.h"
+#include "gtm_unistd.h"		/* for close() */
+#include "gtm_time.h"		/* for ctime() and time() */
+
 #ifndef lint
 static char rcsid[] = "$Header:$";
 #endif

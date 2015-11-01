@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include <sys/sem.h>
 #include "gtm_fcntl.h"
 #include <unistd.h>

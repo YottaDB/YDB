@@ -41,6 +41,7 @@ GBLREF  mv_stent         	*mv_chain;
 GBLREF	int			mumps_status;
 GBLREF 	void			(*restart)();
 GBLREF 	boolean_t		gtm_startup_active;
+GBLREF	int * volatile		var_on_cstack_ptr;	/* volatile so that nothing gets optimized out */
 static  callin_entry_list	*ci_table = 0;
 
 static callin_entry_list* get_entry(const char* call_name)
@@ -68,6 +69,7 @@ va_dcl
 	gtm_string_t		*mstr_parm;
 	parmblk_struct 		param_blk;
 	void 			op_extcall(), op_extexfun(), flush_pio(void);
+	int			*save_var_on_cstack_ptr;
 
 	error_def(ERR_CIRCALLNAME);
 	error_def(ERR_CINOENTRY);
@@ -201,7 +203,10 @@ va_dcl
 	REVERT;
 
 	ESTABLISH_RET(stop_image_conditional_core, -1);
+	save_var_on_cstack_ptr = var_on_cstack_ptr;
+	var_on_cstack_ptr = NULL; /* reset var_on_cstack_ptr for the new M environment */
 	ci_start(); /* kick off execution */
+	var_on_cstack_ptr = save_var_on_cstack_ptr; /* restore the old environment's var_on_cstack_ptr */
 	REVERT;
 
 	ESTABLISH_RET(gtmci_ch, -1);

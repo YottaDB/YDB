@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,12 +22,13 @@
 #include "mvalconv.h"
 #include "svnames.h"
 #include "error_trap.h"
+#include "jobinterrupt_process.h"
 
 #define POP_SPECIFIED 	((ztrap_form & ZTRAP_POP) && (level2go = MV_FORCE_INT(&ztrap_pop2level))) /* note: assignment */
 #define IS_ETRAP	(err_act == &dollar_etrap.str)
 
 GBLREF stack_frame	*frame_pointer, *zyerr_frame, *error_frame, *error_last_frame_err;
-GBLREF unsigned char	proc_act_type;
+GBLREF unsigned short	proc_act_type;
 GBLREF spdesc		rts_stringpool, stringpool, indr_stringpool;
 GBLREF mstr		*err_act;
 GBLREF boolean_t	is_tracing_on;
@@ -143,6 +144,11 @@ void trans_code(void)
 	mval		dummy;
 	int		level2go;
 
+	if (SFT_ZINTR & proc_act_type)
+	{	/* Need different translator EP */
+		jobinterrupt_process();
+		return;
+	}
 	assert(err_act);
 	if (stringpool.base != rts_stringpool.base)
 		stringpool = rts_stringpool;

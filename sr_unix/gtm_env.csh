@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -106,7 +106,9 @@ if ( $?gtm_version_change == "1" ) then
 	setenv	gt_ld_options_bta	"$gt_ld_options_common"
 	setenv	gt_ld_options_dbg	"$gt_ld_options_common"
 	setenv	gt_ld_options_pro	"$gt_ld_options_common"
-	setenv	gt_ld_options_symbols	"$gt_ld_options_common"
+	setenv	gt_ld_options_symbols	""
+# force the linker to retain gtmci.o & dependent modules even if not referenced.
+	setenv gt_ld_ci_u_option	"-Wl,-u,gtm_ci"
 
 	setenv	gt_ld_syslibs		"-lcurses -lm"	# system libraries needed for link (in addition to defaults)
 	setenv	gt_ld_sysrtns		""		# system routines needed for link (in addition to defaults)
@@ -219,3 +221,7 @@ endif
 if ( -f $gtm_tools/gtm_env_sp.csh ) then
 	source $gtm_tools/gtm_env_sp.csh
 endif
+
+# Allow platform specific gt_ld_ci related symbol changes
+# force the linker to retain gtmci.o & dependent modules even if not referenced.
+	setenv gt_ld_ci_options "$gt_ld_ci_u_option $gt_ld_options_symbols"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,15 +12,24 @@
 #include "mdef.h"
 #include "cli.h"
 
+/*************************************************************
+ * NOTE
+ * This file might have lines longer than 132 characters
+ * since the command tables are being initialized.
+ *
+ * Entries need to be made in sorted order (lexicographic) within
+ * each table.
+ ************************************************************/
+
 static readonly CLI_ENTRY gtcm_gnp_qual[] = {
-{ "LOG", 0, 0, 0, VAL_REQ, 1, NON_NEG, VAL_STR, 0},
-{ "SERVICE", 0, 0, 0, VAL_REQ, 1, NON_NEG, VAL_STR, 0},
-{ "TIMEOUT", 0, 0, 0, VAL_REQ, 1, NON_NEG, VAL_NUM, 0},
-{ "TRACE", 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0},
-{ 0, 0, 0, 0, 0, 0, 0, 0, 0}
+{ "LOG", 0, 0, 0, 0, 0, 0, VAL_REQ, 1, NON_NEG, VAL_STR, 0},
+{ "SERVICE", 0, 0, 0, 0, 0, 0, VAL_REQ, 1, NON_NEG, VAL_STR, 0},
+{ "TIMEOUT", 0, 0, 0, 0, 0, 0, VAL_REQ, 1, NON_NEG, VAL_NUM, 0},
+{ "TRACE", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0},
+{ 0 }
 };
 
 GBLDEF CLI_ENTRY cmd_ary[] = {
-{ "GTCM_GNP_SERVER", 0, gtcm_gnp_qual, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_LIST, 0},
-{ 0, 0, 0, 0, 0, 0, 0, 0, 0}
+{ "GTCM_GNP_SERVER", 0, gtcm_gnp_qual, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0},
+{ 0 }
 };

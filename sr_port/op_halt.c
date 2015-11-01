@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_stdlib.h"		/* for exit() */
+
 #ifdef VMS
 #  include <ssdef.h>
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -140,14 +140,15 @@ void	jnl_write(jnl_private_control *jpc,
 		n += blk_ptr->bsiz;
 	jb->bytcnt += n;
 	n = ROUND_UP(n, JNL_REC_START_BNDRY);
-	n_with_align = n + JREC_PREFIX_SIZE + jnl_fixed_size[JRT_ALIGN] + JREC_SUFFIX_SIZE;
+	n_with_align = n + ALIGN_RECLEN;
 	assert(0 == n_with_align % JNL_REC_START_BNDRY);
-	assert(n_with_align < jb->alignsize);
-	if (JRT_EOF == rectype  ||  jb->freeaddr / jb->alignsize == (jb->freeaddr + n_with_align - 1) / jb->alignsize)
+	assert(n_with_align < (1 << jb->log2_of_alignsize));
+	if (((jb->freeaddr >> jb->log2_of_alignsize) == ((jb->freeaddr + n_with_align - 1) >> jb->log2_of_alignsize))
+			|| (JRT_EOF == rectype))
 		n_with_align = n;	/* don't write JRT_ALIGN for EOF record */
 	else
 	{
-		align_rec_filler_length = ROUND_UP(jb->freeaddr, jb->alignsize) - jb->freeaddr - n_with_align + n;
+		align_rec_filler_length = ROUND_UP(jb->freeaddr, 1 << jb->log2_of_alignsize) - jb->freeaddr - n_with_align + n;
 		n_with_align += align_rec_filler_length;
 	}
 	UNIX_ONLY(assert(!jb->blocked));
@@ -167,7 +168,7 @@ void	jnl_write(jnl_private_control *jpc,
 		}
 	}
 	jb->blocked = 0;
-	if (jb->filesize < (jb->freeaddr + n_with_align)) /* not enough room in jnl file, extend it. */
+	if (jb->filesize < DISK_BLOCKS_SUM(jb->freeaddr, n_with_align)) /* not enough room in jnl file, extend it. */
 	{	/* We should never reach here if we are called from t_end/tp_tend */
 		assert(!run_time || csa->ti->early_tn == csa->ti->curr_tn);
 		jnl_flush(jpc->region);
@@ -195,8 +196,7 @@ void	jnl_write(jnl_private_control *jpc,
 		jnl_putstr(jpc, (uchar_ptr_t)THREE_LOW_BYTES(offset), 3);
 		offset = 0;
 		jnl_putstr(jpc, (uchar_ptr_t)&offset, 4);	/* write the filler_prefix */
-		assert(0 != jb->freeaddr % jb->alignsize);	/* we can use the ROUND_UP macro below because we know
-								 * that freeaddr should not be an exact multiple of alignsize */
+		assert(jb->freeaddr % (1 << jb->log2_of_alignsize));
 		align_rec.jrec_align.align_str.align_string.length = align_rec_filler_length;
 		switch(rectype)
 		{
@@ -262,14 +262,14 @@ void	jnl_write(jnl_private_control *jpc,
 			GTMASSERT;
 			break;
 		}
-		jnl_putstr(jpc, (uchar_ptr_t)&align_rec, jnl_fixed_size[JRT_ALIGN]);
+		jnl_putstr(jpc, (uchar_ptr_t)&align_rec, JRT_ALIGN_FIXED_SIZE);
 		jnl_putstr(jpc, (uchar_ptr_t)jb, align_rec_filler_length);
 		offset = ALIGN_KEY;
 		jnl_putstr(jpc, (uchar_ptr_t)&offset, 4);	/* write the filler_suffix */
 		offset = n_with_align - n - JREC_SUFFIX_SIZE;	/* don't count the suffix */
 		jnl_putstr(jpc, (uchar_ptr_t)THREE_LOW_BYTES(offset), 3);
 		jnl_putchar(jpc, JNL_REC_TRAILER);
-		assert(0 == ((jb->freeaddr + offset + JREC_SUFFIX_SIZE) % jb->alignsize));
+		assert(0 == ((jb->freeaddr + offset + JREC_SUFFIX_SIZE) % (1 << jb->log2_of_alignsize)));
 		assert(jb->buff[jb->free] == JRT_ALIGN);
 		assert(jb->free < jpc->temp_free  ||  jpc->temp_free < jb->dsk);
 		assert(jb->freeaddr >= jb->dskaddr);

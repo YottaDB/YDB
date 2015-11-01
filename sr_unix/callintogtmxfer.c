@@ -11,9 +11,11 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+#include "gtm_stdlib.h"
+
 #include <errno.h>
 
-#include "gtm_stdlib.h"
 #include "callintogtmxfer.h"
 
 typedef	int	(*int_fptr)();

@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/stat.h>
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -21,6 +22,8 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "iosp.h"
+#include "gdsfilext.h"		/* for gdsfilext() prototype */
+#include "mu_file_size.h"	/* for mu_file_size() prototype */
 
 GBLREF 	gd_region		*gv_cur_region;
 GBLREF	sgmnt_data_ptr_t 	cs_data;

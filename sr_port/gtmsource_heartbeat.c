@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include <time.h>
 #include <sys/time.h>
 #include <errno.h>

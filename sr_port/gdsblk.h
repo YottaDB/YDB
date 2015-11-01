@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,7 @@
 #define MIN_DATA_SIZE           1 + 2     /*    1 byte of key + 2 nulls for terminator     */
 #define MAX_EXTN_COUNT          65535
 #define MIN_EXTN_COUNT          0
+#define	MAX_DB_BLK_SIZE		((1 << 16) - 512)	/* 64Kb - 512 (- 512 to take care of VMS's max I/O capabilities) */
 
 #if defined(__alpha) && defined(__vms)
 # pragma member_alignment save

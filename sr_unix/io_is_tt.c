@@ -9,8 +9,11 @@
  *								*
  ****************************************************************/
 #include "mdef.h"
+
+#include "gtm_string.h"
 #include "gtm_unistd.h"
 #include "gtm_stat.h"
+
 #include "io.h"
 
 GBLREF mstr	sys_input;

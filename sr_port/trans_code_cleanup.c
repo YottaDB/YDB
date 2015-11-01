@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@
 #include "error.h"
 #include "error_trap.h"
 
-GBLREF unsigned char	proc_act_type;
+GBLREF unsigned short	proc_act_type;
 GBLREF stack_frame	*frame_pointer;
 GBLREF spdesc		stringpool;
 GBLREF spdesc		rts_stringpool;
@@ -37,10 +37,9 @@ void trans_code_cleanup(void)
 	error_def(ERR_STACKCRIT);
 	error_def(ERR_ERRWZTRAP);
 	error_def(ERR_ERRWETRAP);
-	error_def(ERR_ERRWZBRK);
 	error_def(ERR_ERRWIOEXC);
-	error_def(ERR_ERRWEXC);
 
+	assert(!(SFT_ZINTR & proc_act_type));
 	/* With no extra ztrap frame being pushed onto stack, we may miss error(s)
 	 * during trans_code if we don't check proc_act_type in addition to
 	 * frame_pointer->type below.
@@ -82,29 +81,7 @@ void trans_code_cleanup(void)
 		}
 		if (fp->type)
 		{
-			switch (fp->type)
-			{
-			case SFT_ZBRK_ACT:
-				err = (int)ERR_ERRWZBRK;
-				break;
-			case SFT_DEV_ACT:
-				err = (int)ERR_ERRWIOEXC;
-				break;
-			case SFT_ZTRAP:
-				if (0 < dollar_ztrap.str.len)
-					err = (int)ERR_ERRWZTRAP;
-				else
-				{
-					assert(0 < dollar_etrap.str.len);
-					err = (int)ERR_ERRWETRAP;
-				}
-				break;
-			case SFT_ZSTEP_ACT:
-				err = (int) ERR_ERRWEXC;
-				break;
-			default:
-				GTMASSERT;
-			}
+			SET_ERR_CODE(fp, err);
 		}
 		/* If this frame is indicated for cache cleanup, do that cleanup
 		   now before we get rid of the pointers used by that cleanup.

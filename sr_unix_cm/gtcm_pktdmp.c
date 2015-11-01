@@ -9,14 +9,16 @@
  *								*
  ****************************************************************/
 
-#include <time.h>
+#include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_stat.h"
 #include "gtm_stdlib.h"
 
+#include <time.h>
+
 #include "gtcm_sysenv.h"
-#include "mdef.h"
 #include "gtcm.h"
 #include "omi.h"
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,19 +30,15 @@
 #include "iosp.h"
 #include "jnl.h"
 #include "gdsbml.h"
-
-#ifdef UNIX
 #include "mutex.h"
-#endif
 #include "mupip_exit.h"
 #include "mucblkini.h"
 #include "mucregini.h"
 #include "gtmmsg.h"
+#include "gtm_file_stat.h"
 
 #define WCR_SIZE_PER_BUF 	0
-#define OUT_BUFF_SIZE 		2048
 #define BLK_SIZE (((gd_segment*)gv_cur_region->dyn.addr)->blk_size)
-
 
 GBLREF 	gd_region		*gv_cur_region;
 GBLREF 	sgmnt_data_ptr_t	cs_data;
@@ -57,15 +53,20 @@ void mucregini(int4 blk_init_size)
 	th_index_ptr_t 		th;
 	unsigned char		*base;
 	collseq			*csp;
+	uint4			ustatus;
+	mstr 			jnlfile, jnldef, tmpjnlfile;
+
 	error_def(ERR_COLLATIONUNDEF);
 	error_def(ERR_COLLTYPVERSION);
 	error_def(ERR_GVIS);
 	error_def(ERR_DBFILERR);
 	error_def(ERR_MUNOACTION);
 	error_def(ERR_TEXT);
+	error_def(ERR_FILEPARSE);
 
 	memcpy(cs_data->label, GDS_LABEL, sizeof(GDS_LABEL) - 1);
 	cs_data->bplmap = BLKS_PER_LMAP;
+	assert(BLK_SIZE <= MAX_DB_BLK_SIZE);
 	cs_data->blk_size = BLK_SIZE;
 	i = cs_data->trans_hist.total_blks;
 	cs_data->trans_hist.free_blocks = i - DIVIDE_ROUND_UP(i, BLKS_PER_LMAP) - 2;
@@ -95,15 +96,22 @@ void mucregini(int4 blk_init_size)
 	cs_data->flush_done = TRUE;
 	cs_data->defer_time = gv_cur_region->dyn.addr->defer_time;
 	cs_data->jnl_alq = gv_cur_region->jnl_alq;
+	if (cs_data->jnl_state && !cs_data->jnl_alq)
+		cs_data->jnl_alq = JNL_ALLOC_DEF;
 	cs_data->jnl_deq = gv_cur_region->jnl_deq;
 	cs_data->jnl_before_image = gv_cur_region->jnl_before_image;
 	cs_data->jnl_state = gv_cur_region->jnl_state;
+	cs_data->epoch_interval = JNL_ALLOWED(cs_data) ? DEFAULT_EPOCH_INTERVAL : 0;
+	cs_data->alignsize = JNL_ALLOWED(cs_data) ? (DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE) : 0;
+	cs_data->autoswitchlimit = JNL_ALLOWED(cs_data) ? ALIGNED_ROUND_DOWN(JNL_ALLOC_MAX, cs_data->jnl_alq, cs_data->jnl_deq) : 0;
 #ifdef UNIX
 	assert(!(IO_BLOCK_SIZE % DISK_BLOCK_SIZE));
 	cs_data->jnl_buffer_size = ROUND_UP(gv_cur_region->jnl_buffer_size, IO_BLOCK_SIZE / DISK_BLOCK_SIZE);
 #else
 	cs_data->jnl_buffer_size = gv_cur_region->jnl_buffer_size;
 #endif
+	if (JNL_ALLOWED(cs_data) && !cs_data->jnl_buffer_size)
+		cs_data->jnl_buffer_size = JNL_BUFFER_DEF;
 	cs_data->def_coll = gv_cur_region->def_coll;
 	if (cs_data->def_coll)
 	{
@@ -124,13 +132,28 @@ void mucregini(int4 blk_init_size)
 	/* mupip_set_journal() relies on cs_data->jnl_file_len being 0 if cs_data->jnl_state is jnl_notallowed.
 	 * Note that even though gv_cur_region->jnl_state is jnl_notallowed, gv_cur_region->jnl_file_len can be non-zero
 	 */
-	cs_data->jnl_file_len = (jnl_notallowed != cs_data->jnl_state) ? gv_cur_region->jnl_file_len : 0;
+	cs_data->jnl_file_len = JNL_ALLOWED(cs_data) ? gv_cur_region->jnl_file_len : 0;
 	QWASSIGN(cs_data->reg_seqno, seq_num_one);
 	QWASSIGN(cs_data->resync_seqno, seq_num_one);
 	QWASSIGN(cs_data->old_resync_seqno, seq_num_one);
 	cs_data->resync_tn = 1;
 	cs_data->repl_state = repl_closed;              /* default */
-	memcpy(cs_data->jnl_file_name,gv_cur_region->jnl_file_name, gv_cur_region->jnl_file_len);
+	if (cs_data->jnl_file_len)
+	{
+		tmpjnlfile.addr = cs_data->jnl_file_name;
+		tmpjnlfile.len = sizeof(cs_data->jnl_file_name);
+		jnlfile.addr = gv_cur_region->jnl_file_name;
+		jnlfile.len = gv_cur_region->jnl_file_len;
+		jnldef.addr = JNL_EXT_DEF;
+		jnldef.len = sizeof(JNL_EXT_DEF) - 1;
+		if (FILE_STAT_ERROR == gtm_file_stat(&jnlfile, &jnldef, &tmpjnlfile, TRUE, &ustatus))
+		{
+			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2,
+				gv_cur_region->jnl_file_len, gv_cur_region->jnl_file_name, ustatus);
+			mupip_exit(ERR_MUNOACTION);
+		}
+		cs_data->jnl_file_len = tmpjnlfile.len;
+	}
 	cs_addrs->hdr = cs_data;
 	cs_addrs->ti = &cs_data->trans_hist;
 	th = cs_addrs->ti;
@@ -152,13 +175,10 @@ void mucregini(int4 blk_init_size)
 	else
 		cs_data->flush_time[0] = TIM_FLU_MOD_MM;
 	cs_data->flush_time[1] = -1;
-	cs_data->yield_lmt = 256;
-
-#ifdef UNIX
+	cs_data->yield_lmt = DEFAULT_YIELD_LIMIT;
 	cs_data->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
 	cs_data->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
 	cs_data->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
-#endif
 	time(&cs_data->creation.date_time);
 	cs_addrs->bmm = cs_data->master_map;
 	bmm_init();

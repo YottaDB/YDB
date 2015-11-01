@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_stdlib.h"		/* for exit() */
+
 #include <unistd.h>
 #include <errno.h>
 #include "gtm_stdio.h"

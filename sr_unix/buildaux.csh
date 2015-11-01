@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -88,18 +88,18 @@ foreach auxillary ( $argv[4-] )
 	if ( "$auxillary" == "lke") then
 		set new_auxillarylist = "$new_auxillarylist lke gtcm_gnp_server"
 	else if ( "$auxillary" == "gnpclient") then
-		$shell $gtm_tools/buildshr.csh $1 $2 /usr/library/$1/$2
+		$shell $gtm_tools/buildshr.csh $1 $2 ${gtm_root}/$1/$2
 	else if ( "$auxillary" == "gnpserver") then
 		set new_auxillarylist = "$new_auxillarylist gtcm_gnp_server"
 	else if ( "$auxillary" == "cmisockettcp") then
 		set new_auxillarylist = "$new_auxillarylist gtcm_gnp_server"
-		$shell $gtm_tools/buildshr.csh $1 $2 /usr/library/$1/$2
+		$shell $gtm_tools/buildshr.csh $1 $2 ${gtm_root}/$1/$2
 	else if ( "$auxillary" == "gtcm") then
 		set new_auxillarylist = "$new_auxillarylist gtcm_server gtcm_play gtcm_shmclean gtcm_pkdisp"
 	else if ( "$auxillary" == "stub") then
 		set new_auxillarylist = "$new_auxillarylist dse mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean"
 	else if ("$auxillary" == "mumps") then
-		$shell $gtm_tools/buildshr.csh $1 $2 /usr/library/$1/$2
+		$shell $gtm_tools/buildshr.csh $1 $2 ${gtm_root}/$1/$2
 		if ($#argv == 4) then
 			exit $buildaux_status
 		endif

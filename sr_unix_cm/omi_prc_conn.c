@@ -21,7 +21,10 @@ static char rcsid[] = "$Header:$";
 #endif
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 #include "gtm_stdio.h"
+
 #include "gtcm.h"
 #include "omi.h"
 #include <pwd.h>
@@ -44,20 +47,15 @@ static char rcsid[] = "$Header:$";
 
 GBLREF int	authenticate;
 
-int
-omi_prc_conn(cptr, xend, buff, bend)
-    omi_conn	*cptr;
-    char	*xend;
-    char	*buff;
-    char	*bend;
+int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 {
-    omi_si	 si, eightbit, chartran, ss_len, ext_cnt;
-    omi_li	 li_min, li_max, ext;
-    uns_short	 li_val;
-    int		 len, i;
+    omi_si	si, eightbit, chartran, ss_len, ext_cnt;
+    omi_li	li_min, li_max, ext;
+    uns_short	li_val;
+    int		len, i;
     char	*bptr, *eptr;
     char	*ag_name, *ag_pass, *s;
-    char *gtcm_hname();
+
     bptr = buff;
 
 /*  Version numbers */

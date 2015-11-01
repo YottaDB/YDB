@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,11 +14,6 @@
 #include <time.h>
 #include <sys/time.h>
 #include "dollarh.h"
-
-#define MINUTE	60
-#define HOUR	MINUTE*60	/* one hour in seconds 60 * 60 */
-#define DAYS	47117		/* correction for 1841 - 1970 */
-#define ONEDAY	86400		/* seconds */
 
 GBLREF bool	run_time;
 

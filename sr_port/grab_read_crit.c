@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@
 #include "filestruct.h"
 #include "tp_change_reg.h"
 #include "caller_id.h"
+#include "mutex.h"
 #include "grab_read_crit.h"
 
 GBLREF	uint4		process_id;
@@ -30,7 +31,6 @@ enum cdb_sc 	grab_read_crit(gd_region *reg, short crash_ct)
 	int4		coidx;
 	enum cdb_sc	status;
 	gd_region	*r_save;
-	mutex_spin_parms_ptr_t	mutex_spin_parms;
 
 	csa = &FILE_INFO(reg)->s_addrs;
 
@@ -41,10 +41,9 @@ enum cdb_sc 	grab_read_crit(gd_region *reg, short crash_ct)
 	gv_cur_region = reg;
 	tp_change_reg();
 #if defined(UNIX)
-	mutex_spin_parms = (mutex_spin_parms_ptr_t)&csa->hdr->mutex_spin_parms;
-	status = mutex_lockr(reg, mutex_spin_parms, crash_ct);
+	status = mutex_lockr(reg, &csa->hdr->mutex_spin_parms, crash_ct);
 #elif defined(VMS)
-	status = mutex_lockr(csa->critical, crash_ct, &csa->read_lock);
+	status = MUTEX_LOCKR(csa->critical, crash_ct, &csa->read_lock, &csa->hdr->mutex_spin_parms);
 #endif
 	gv_cur_region = r_save; /* restore gv_cur_region */
 	tp_change_reg();

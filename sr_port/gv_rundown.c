@@ -95,44 +95,47 @@ void gv_rundown(void)
 				 * Ideally the following memory freeing code should go to gds_rundown, but
 				 * GT.CM calls gds_rundown() and we want to reuse memory for GT.CM.
 				 */
-				if (cs_addrs->dir_tree)
+				if (NULL != cs_addrs)
 				{
-					free(cs_addrs->dir_tree->alt_hist);
-					free(cs_addrs->dir_tree);
-				}
-				if (cs_addrs->sgm_info_ptr)
-				{
-					si = cs_addrs->sgm_info_ptr;
-					assert(si->gv_cur_region == gv_cur_region);
-					if (si->jnl_tail)
+					if (cs_addrs->dir_tree)
 					{
-						FREEUP_BUDDY_LIST(si->format_buff_list);
-						FREEUP_BUDDY_LIST(si->jnl_list);
+						free(cs_addrs->dir_tree->alt_hist);
+						free(cs_addrs->dir_tree);
 					}
-					FREEUP_BUDDY_LIST(si->recompute_list);
-					FREEUP_BUDDY_LIST(si->new_buff_list);
-					FREEUP_BUDDY_LIST(si->tlvl_info_list);
-					FREEUP_BUDDY_LIST(si->tlvl_cw_set_list);
-					FREEUP_BUDDY_LIST(si->cw_set_list);
-					free_hashtab(&si->blks_in_use);
-					if (si->cr_array_size)
+					if (cs_addrs->sgm_info_ptr)
 					{
-						assert(NULL != si->cr_array);
-						free(si->cr_array);
+						si = cs_addrs->sgm_info_ptr;
+						assert(si->gv_cur_region == gv_cur_region);
+						if (si->jnl_tail)
+						{
+							FREEUP_BUDDY_LIST(si->format_buff_list);
+							FREEUP_BUDDY_LIST(si->jnl_list);
+						}
+						FREEUP_BUDDY_LIST(si->recompute_list);
+						FREEUP_BUDDY_LIST(si->new_buff_list);
+						FREEUP_BUDDY_LIST(si->tlvl_info_list);
+						FREEUP_BUDDY_LIST(si->tlvl_cw_set_list);
+						FREEUP_BUDDY_LIST(si->cw_set_list);
+						free_hashtab(&si->blks_in_use);
+						if (si->cr_array_size)
+						{
+							assert(NULL != si->cr_array);
+							free(si->cr_array);
+						}
+						if (si->first_tp_hist)
+							free(si->first_tp_hist);
+						free(si);
 					}
-					if (si->first_tp_hist)
-						free(si->first_tp_hist);
-					free(si);
-				}
-				if (cs_addrs->jnl)
-				{
-					assert(cs_addrs->jnl->region == gv_cur_region);
-					if (cs_addrs->jnl->jnllsb)
+					if (cs_addrs->jnl)
 					{
-						UNIX_ONLY(assert(FALSE));
-						free(cs_addrs->jnl->jnllsb);
+						assert(cs_addrs->jnl->region == gv_cur_region);
+						if (cs_addrs->jnl->jnllsb)
+						{
+							UNIX_ONLY(assert(FALSE));
+							free(cs_addrs->jnl->jnllsb);
+						}
+						free(cs_addrs->jnl);
 					}
-					free(cs_addrs->jnl);
 				}
 				assert(gv_cur_region->dyn.addr->file_cntl->file_info);
 				VMS_ONLY(

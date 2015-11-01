@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,4 +35,5 @@
 #define GDL_PrintIndCacheStats	0x00001000	/* (4096) Print indirect cacheing stats */
 #define GDL_PrintPieceStats	0x00002000	/* (8192) Print stats on $Piece cacheing (debug only) */
 #define GDL_DebugCompiler	0x00004000	/* (16384) Turn on compiler debugging */
+#define GDL_SmDump		0x00008000	/* (32768) Do full blown storage dump -- only useful in debug mode */
 #endif

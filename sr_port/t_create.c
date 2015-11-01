@@ -80,14 +80,15 @@ block_index t_create (
 	cse->reference_cnt = 0;
 	cse->level = level;
 	cse->first_copy = TRUE;
-        cse->done = FALSE;
-        cse->new_buff = 0;
+	cse->jnl_freeaddr = 0;		/* reset jnl_freeaddr that previous transaction might have filled in */
+	cse->done = FALSE;
+	cse->new_buff = 0;
 	cse->write_type = GDS_WRITE_PLAIN;
-        cse->t_level = dollar_tlevel;
+	cse->t_level = dollar_tlevel;
 	cse->low_tlevel = NULL;
 	cse->high_tlevel = NULL;
-        if (dollar_tlevel == 0)
-	    return(cw_set_depth++);
-        else
-            return(sgm_info_ptr->cw_set_depth++);
+	if (dollar_tlevel == 0)
+		return(cw_set_depth++);
+	else
+		return(sgm_info_ptr->cw_set_depth++);
 }

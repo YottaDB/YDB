@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,7 @@ GBLREF gd_region	*standalone_reg;
 boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 {
 	int			status;
+	uint4			ustatus;
 	sgmnt_data_ptr_t	csd;
 	file_control		*fc;
 	unix_db_info		*udi;
@@ -58,6 +59,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	error_def (ERR_TEXT);
 	error_def (ERR_CRITSEMFAIL);
 	error_def (ERR_DBFILERR);
+	error_def (ERR_FILEPARSE);
 
 	assert(reg);
 	temp_region = gv_cur_region; 	/* save gv_cur_region wherever there is scope for it to be changed */
@@ -117,8 +119,12 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 		db_ipcs.shmid = INVALID_SHMID;
 		db_ipcs.sem_ctime = 0;
 		db_ipcs.shm_ctime = 0;
-		get_full_path((char *)reg->dyn.addr->fname, reg->dyn.addr->fname_len,
-			db_ipcs.fn, (unsigned int *)&db_ipcs.fn_len, MAX_TRANS_NAME_LEN);
+		if (!get_full_path((char *)reg->dyn.addr->fname, reg->dyn.addr->fname_len,
+			db_ipcs.fn, (unsigned int *)&db_ipcs.fn_len, MAX_TRANS_NAME_LEN, &ustatus))
+		{
+			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, DB_LEN_STR(reg), ustatus);
+			return FALSE;
+		}
 		db_ipcs.fn[db_ipcs.fn_len] = 0;
 		if (0 != (status = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0)))
 		{

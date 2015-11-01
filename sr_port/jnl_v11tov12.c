@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include <stddef.h>
 
@@ -39,7 +41,8 @@ int jnl_v11tov12(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	/* Differences between ver 11, and 12 :
 	 *					       11			        12
 	 *------------------------------------------------------------------------------------------------------------
-	 * {tcom,ztcom}.participants		NA				Shifted by 8 bytes due to addition of orig_tc_short_time
+	 * {tcom,ztcom}.participants		NA				Shifted by 8 bytes due to
+	 * 										addition of orig_tc_short_time
 	 * {tcom,ztcom}.ts_short_time		same as above
 	 * An addtional field orig_ts_short_time is added.
 	 */
@@ -56,7 +59,7 @@ int jnl_v11tov12(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	jlen = *jnl_len;
 	while (0 < jlen)
 	{
-		if (0 < (reclen = v11_jnl_record_length(jb, jlen)))
+		if (0 < (reclen = v11_jnl_record_length((jnl_record *)jb, jlen)))
 		{
 			if (reclen <= jlen)
 			{

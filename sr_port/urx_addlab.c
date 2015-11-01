@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "urx.h"
 
 urx_labref **urx_addlab (urx_labref **lp0, urx_labref *lp)

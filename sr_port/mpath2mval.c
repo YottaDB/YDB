@@ -47,7 +47,7 @@ int mpath2mval(unsigned char *inbuff, int maxelem, mval *mvarray)
 
     /* parse off ^ <name> */
     if (*inbuff++ != '^')
-	return NULL;
+	return 0;
 
     /* <name> ::= { % | <alpha> } [ alpha | digit ]* */
     name = inbuff;
@@ -63,7 +63,7 @@ int mpath2mval(unsigned char *inbuff, int maxelem, mval *mvarray)
 	stringpool.free = dest;
     }
     else
-	return NULL;
+	return 0;
 
     mvcount = 1;
     if (*inbuff != '(')
@@ -75,13 +75,13 @@ int mpath2mval(unsigned char *inbuff, int maxelem, mval *mvarray)
 	inbuff++;
 	inbuff = parse_subsc(inbuff,&mvarray[mvcount]);
 	if (!inbuff)
-	    return NULL;
+	    return 0;
 	mvcount++;
     }
     while ( *inbuff == ',' && mvcount < maxelem);
 
     if (*inbuff != ')')
-	return NULL;
+	return 0;
 
     return mvcount;
 }

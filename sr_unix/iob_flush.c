@@ -23,6 +23,9 @@
 
 */
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include <errno.h>
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"

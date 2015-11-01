@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "hashdef.h"
 #include "lv_val.h"
 #include "toktyp.h"
@@ -20,10 +21,10 @@
 #include "op.h"
 #include "underr.h"
 
-GBLREF symval *curr_symval;
-LITREF char ctypetab[128];
-GBLREF char	window_token;
-GBLREF mval **ind_source_sp, **ind_source_top;
+GBLREF	symval	*curr_symval;
+GBLREF	char	window_token;
+GBLREF	mval	**ind_source_sp, **ind_source_top;
+LITREF	char	ctypetab[NUM_ASCII_CHARS];
 
 void	op_indset(mval *target, mval *value)
 {

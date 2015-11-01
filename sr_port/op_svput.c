@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,7 @@
 #include "mvalconv.h"
 #include "zroutines.h"
 #include "dpgbldir.h"
+#include "dpgbldir_sysops.h"
 #include "underr.h"
 #include "gtmmsg.h"
 #include "ztrap_save_ctxt.h"
@@ -36,6 +37,7 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "getzdir.h"
+#include "gtm_newintrinsic.h"
 
 #define PROMPTBUF "GTM>           "
 
@@ -60,6 +62,7 @@ GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_zerror;
 GBLREF mval		dollar_zyerror;
 GBLREF mval		dollar_system;
+GBLREF mval		dollar_zinterrupt;
 GBLREF boolean_t	ztrap_new;
 GBLREF stack_frame	*error_frame;
 GBLREF unsigned char	*error_last_mpc_err;
@@ -105,14 +108,28 @@ void op_svput(int varnum, mval *v)
 		dollar_zstep = *v;
 		break;
 	case SV_ZGBLDIR:
-		gd_header = zgbldir(v);
-		dollar_zgbldir.str.len = v->str.len;
-		dollar_zgbldir.str.addr = v->str.addr;
-		s2pool(&dollar_zgbldir.str);
-		if (gv_currkey)
-			gv_currkey->base[0] = 0;
-		if (gv_target)
-			gv_target->clue.end = 0;
+		MV_FORCE_STR(v);
+		if (!(dollar_zgbldir.str.len == v->str.len &&
+		    !memcmp(dollar_zgbldir.str.addr, v->str.addr,
+		    dollar_zgbldir.str.len)))
+		{
+			if(v->str.len == 0)
+			{
+			        /* set $zgbldir="" */
+	   			dpzgbini();
+				gd_header = NULL;
+	       		} else
+			{
+	   			gd_header = zgbldir(v);
+	   			dollar_zgbldir.str.len = v->str.len;
+	   			dollar_zgbldir.str.addr = v->str.addr;
+	  			s2pool(&dollar_zgbldir.str);
+			}
+		   	if (gv_currkey)
+				gv_currkey->base[0] = 0;
+		   	if (gv_target)
+				gv_target->clue.end = 0;
+		}
 		break;
 	case SV_ZMAXTPTIME:
 		dollar_zmaxtptime = mval2i(v);
@@ -145,7 +162,7 @@ void op_svput(int varnum, mval *v)
 			dollar_etrap.str = v->str;
 		} else /* Ensure that $ETRAP and $ZTRAP are not both active at the same time */
 			if (dollar_etrap.str.len > 0)
-				op_newintrinsic(SV_ETRAP);
+				gtm_newintrinsic(&dollar_etrap);
 		if (ztrap_form & ZTRAP_POP)
 			ztrap_save_ctxt();
 		break;
@@ -231,7 +248,7 @@ void op_svput(int varnum, mval *v)
 			dollar_ztrap.str = v->str;
 		} else /* Ensure that $ETRAP and $ZTRAP are not both active at the same time */
 			if (dollar_ztrap.str.len > 0)
-				op_newintrinsic(SV_ZTRAP);
+				gtm_newintrinsic(&dollar_ztrap);
 		break;
 	case SV_ZERROR:
 		MV_FORCE_STR(v);
@@ -261,6 +278,11 @@ void op_svput(int varnum, mval *v)
 	case SV_ZDIR:
 		setzdir(v, NULL); /* change directory to v */
 		getzdir(); /* update dollar_zdir with current working directory */
+		break;
+	case SV_ZINTERRUPT:
+		MV_FORCE_STR(v);
+		dollar_zinterrupt.mvtype = MV_STR;
+		dollar_zinterrupt.str = v->str;
 		break;
 	default:
 		GTMASSERT;

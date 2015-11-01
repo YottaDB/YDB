@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_fcntl.h"
 #include "gtm_stat.h"
 #include "gtm_stdio.h"

@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "zbreak.h"
 
 char *zr_get_free(z_records *z_ptr, char *addr)

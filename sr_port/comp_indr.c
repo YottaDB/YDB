@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"

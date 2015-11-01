@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -21,6 +24,7 @@
 #include "error.h"
 #include "rc_oflow.h"
 #include "gtcm.h"
+#include "gvcst_put.h"		/* for gvcst_put() prototype */
 
 GBLREF rc_oflow	*rc_overflow;
 GBLREF gv_key 		*gv_currkey;

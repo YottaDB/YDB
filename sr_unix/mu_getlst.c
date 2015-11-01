@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -38,11 +40,9 @@ GBLREF	gd_addr 	*gd_header;
 GBLREF	tp_region	*grlist;
 GBLREF	boolean_t	mu_star_specified;
 
-#define	MAX_STR_LEN 256
-
 void mu_getlst(char *name, int4 size)
 {
-	char		*c1, *c2, *c3, *c4, rbuff[MAX_STR_LEN], fbuff[MAX_STR_LEN];
+	char		*c1, *c2, *c3, *c4, rbuff[MAX_FN_LEN + 1], fbuff[MAX_FN_LEN + 1];
 	unsigned short	rlen, flen, i;
 	gd_region	*reg;
 	tp_region	*list;

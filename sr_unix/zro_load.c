@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 #include "gtm_stat.h"
 #include "gtm_stdlib.h"
+
 #include "io.h"
 #include "iosp.h"
 #include "zroutines.h"
@@ -70,7 +73,7 @@ void zro_load (mstr *str)
 		if (toktyp != ZRO_IDN)
 			rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FSEXP);
 		if (oi + 1 >= ZRO_MAX_ENTS)
-			rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_MAXARGCNT);
+			rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
 		if (tok.len >= sizeof (tranbuf))
 			rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FILEPARSE, 2, tok.len, tok.addr);
 		pblk.buff_size = MAX_FBUFF;
@@ -108,7 +111,8 @@ void zro_load (mstr *str)
 				if (toktyp != ZRO_IDN)
 					rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FSEXP);
 				if (si >= ZRO_MAX_ENTS)
-					rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_MAXARGCNT);
+					rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr,
+							ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
 				if (tok.len >= sizeof (tranbuf))
 					rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
 						ERR_FILEPARSE, 2, tok.len, tok.addr);
@@ -140,7 +144,7 @@ void zro_load (mstr *str)
 		if (toktyp == ZRO_DEL || toktyp == ZRO_EOL)
 		{
 			if (si >= ZRO_MAX_ENTS)
-				rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_MAXARGCNT);
+				rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
 			array[oi + 1].count = 1;
 			array[si] = array[oi];
 			array[si].type = ZRO_TYPE_SOURCE;

@@ -12,7 +12,10 @@
 /*** STUB FILE ***/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 #include "gtm_stdlib.h"
+
 #include "stringpool.h"
 #include "nametabtyp.h"
 #include "op.h"

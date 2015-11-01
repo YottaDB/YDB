@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,7 @@
 #include "opcode.h"
 #include "toktyp.h"
 #include "advancewindow.h"
-#include "pattern.h"
+#include "compile_pattern.h"
 
 GBLDEF triple *expr_start, *expr_start_orig;
 GBLDEF bool shift_gvrefs;
@@ -36,8 +36,9 @@ int eval_expr(oprtype *a)
 	error_def(ERR_EXPR);
 
 	if (!expratom(&x1))
-	{
-		stx_error(ERR_EXPR);
+	{	/* If didn't already add an error of our own, do so now with catch all expression error */
+		if (curtchain->exorder.bl->exorder.bl->exorder.bl->opcode != OC_RTERROR)
+			stx_error(ERR_EXPR);
 		return EXPR_FAIL;
 	}
 	while (i = tokentable[window_token].bo_type)
@@ -85,7 +86,7 @@ int eval_expr(oprtype *a)
 					ind_pat = TRUE;
 					advancewindow();
 				}
-				if (!pattern(&x2,ind_pat))
+				if (!compile_pattern(&x2,ind_pat))
 					return EXPR_FAIL;
 			} else
 			{

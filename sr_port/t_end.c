@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,8 +110,6 @@ DEBUG_ONLY(GBLREF uint4		cumul_index;
 
 GBLREF boolean_t		write_after_image;
 
-LITREF int			jnl_fixed_size[];
-
 /* This macro isn't enclosed in parantheses to allow for optimizations */
 #define VALIDATE_CYCLE(history)						\
 if (history)								\
@@ -147,10 +145,13 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 	trans_num		start_ctn, save_early_tn, valid_thru, ctn, tnque_earliest_tn;
 	unsigned char		cw_depth;
 	jnldata_hdr_ptr_t	jnl_header;
-	uint4			total_jnl_rec_size;
+	uint4			total_jnl_rec_size, tmp_cumul_jnl_rec_len, tmp_cw_set_depth;
+	uint4			tot_jrec_size;
+	uint4			jnl_alq, jnl_deq;
 
 	error_def(ERR_GVKILLFAIL);
 	error_def(ERR_NOTREPLICATED);
+	error_def(ERR_JNLTRANS2BIG);
 
 	assert(hist1 != hist2);
 	csa = cs_addrs;
@@ -187,13 +188,14 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 		cw_depth = 0;				/* freeing a block from gvcst_kill or, reorg */
 	else
 		cw_depth = cw_set_depth;
-	csa->jnl_before_image = csd->jnl_before_image;
 	if (0 != cw_depth)
 	{
 		for (cs = cw_set, cs_top = cw_set + cw_depth;
 		     (cs < cs_top) && (gds_t_write_root != cs->mode);
 		     cs++)
 		{
+			assert(0 == cs->jnl_freeaddr);	/* ensure haven't missed out resetting jnl_freeaddr for any cse in
+							 * t_write/t_create/t_write_map/t_write_root/mu_write_map [D9B11-001991] */
 			if (gds_t_create == cs->mode)
 			{
 				int_depth = (int)cw_set_depth;
@@ -209,7 +211,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					}
 					break;
 				}
-				if (!blk_used  ||  !(JNL_ENABLED(csd)  &&  csa->jnl_before_image))
+				if (!blk_used || !(JNL_ENABLED(csa) && csa->jnl_before_image))
 					cs->old_block = 0;
 				else
 				{
@@ -224,6 +226,16 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 				cs->mode = gds_t_acquired;
 			}
 		}
+	}
+	if (JNL_ENABLED(csa))
+	{	/* compute the total journal record size requirements before grab_crit().
+		 * there is code later that will check for state changes from now to then and if so do a recomputation
+		 */
+		assert(!cw_map_depth || cw_set_depth < cw_map_depth);
+		tmp_cw_set_depth = cw_map_depth ? cw_map_depth : cw_set_depth;
+		TOTAL_NONTPJNL_REC_SIZE(total_jnl_rec_size, non_tp_jfb_ptr, csa, tmp_cw_set_depth);
+		/* compute current transaction's maximum journal space needs in number of disk blocks */
+		tot_jrec_size = MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size);
 	}
 	block_saved = FALSE;
 	if (cdb_sc_normal == status)
@@ -255,7 +267,28 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 			} else
 				grab_crit(gv_cur_region);
 		}
-		assert (csd == csa->hdr);
+		if (JNL_ALLOWED(csa))
+		{
+			if ((csa->jnl_state != csd->jnl_state) || (csa->jnl_before_image != csd->jnl_before_image))
+			{ 	/* csd->jnl_state changed or csd->jnl_before_image changed since last time
+				 * we set csa->jnl_before_image and csa->jnl_state */
+				assert(CDB_STAGNATE > t_tries);
+				csa->jnl_before_image = csd->jnl_before_image;
+				csa->jnl_state = csd->jnl_state;
+				status = cdb_sc_jnlstatemod;
+				REVERT;
+				goto failed;
+			}
+			if (JNL_ENABLED(csa))
+			{	/* check if current transaction's journal size needs are greater than max jnl file size */
+				if (tot_jrec_size > csd->autoswitchlimit)
+				{	/* can't fit in current transaction's journal records into one journal file */
+					rts_error(VARLSTCNT(6) ERR_JNLTRANS2BIG, 4, tot_jrec_size,
+							JNL_LEN_STR(csd), csd->autoswitchlimit);
+				}
+			}
+		}
+		assert(csd == csa->hdr);
 		valid_thru = ctn = csa->ti->curr_tn;
 		if (!is_mm)
 			tnque_earliest_tn = ((th_rec_ptr_t)((sm_uc_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn;
@@ -347,6 +380,8 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 				cw_set_depth = cw_map_depth;
 			for (cs = &cw_set[cw_depth], cs_top = &cw_set[cw_set_depth]; cs < cs_top; cs++)
 			{
+				assert(0 == cs->jnl_freeaddr);	/* ensure haven't missed out resetting jnl_freeaddr for any cse in
+								 * t_write/t_create/{t,mu}_write_map/t_write_root [D9B11-001991] */
 				if (is_mm)
 				{
 					if (cs->tn <= ((blk_hdr_ptr_t)(cs->old_block))->tn)
@@ -417,7 +452,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 		assert(csd == csa->hdr);
 		if ((cdb_sc_normal == status) && (0 != cw_set_depth))
 		{
-			if (!is_mm && JNL_ENABLED(csd) && csa->jnl_before_image)
+			if (!is_mm && JNL_ENABLED(csa) && csa->jnl_before_image)
 			{
 				for (cs = cw_set, cs_top = cs + cw_set_depth;  cs < cs_top;  ++cs)
 				{	/* Read old block for creates before got crit,
@@ -449,7 +484,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 			}
 			if (cdb_sc_normal == status)
 			{
-				if (REPL_ENABLED(csd) && cw_depth && (run_time || is_db_updater)
+				if (REPL_ENABLED(csa) && cw_depth && (run_time || is_db_updater)
 								&& inctn_invalid_op == inctn_opcode)
 				{
 					grab_lock(jnlpool.jnlpool_dummy_reg);
@@ -458,7 +493,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					QWASSIGN(temp_jnlpool_ctl->jnl_seqno, jnlpool_ctl->jnl_seqno);
 					INT8_ONLY(assert(temp_jnlpool_ctl->write ==
 								temp_jnlpool_ctl->write_addr % temp_jnlpool_ctl->jnlpool_size);)
-					cumul_jnl_rec_len += sizeof(jnldata_hdr_struct);
+					tmp_cumul_jnl_rec_len = cumul_jnl_rec_len + sizeof(jnldata_hdr_struct);
 					temp_jnlpool_ctl->write += sizeof(jnldata_hdr_struct);
 					if (temp_jnlpool_ctl->write >= temp_jnlpool_ctl->jnlpool_size)
 					{
@@ -466,13 +501,13 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 						temp_jnlpool_ctl->write = 0;
 					}
 					assert(QWEQ(jnlpool_ctl->early_write_addr, jnlpool_ctl->write_addr));
-					QWADDDW(jnlpool_ctl->early_write_addr, jnlpool_ctl->write_addr, cumul_jnl_rec_len);
+					QWADDDW(jnlpool_ctl->early_write_addr, jnlpool_ctl->write_addr, tmp_cumul_jnl_rec_len);
 				}
 				assert(cw_set_depth < CDB_CW_SET_SIZE);
 				assert(csa->ti->early_tn == csa->ti->curr_tn);
 				start_ctn = csa->ti->curr_tn;
 				csa->ti->early_tn = start_ctn + 1;
-				if (JNL_ENABLED(csd))
+				if (JNL_ENABLED(csa))
 				{
 					/* The JNL_SHORT_TIME done below should be done before any journal writing activity on the
 					 * journal file. This is because at this stage, we have early_tn != curr_tn and hence
@@ -486,29 +521,29 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					 */
 					JNL_SHORT_TIME(gbl_jrec_time);
 					jnl_status = jnl_ensure_open();
+					assert((csa->jnl_state == csd->jnl_state) &&
+						(csa->jnl_before_image == csd->jnl_before_image));
 					if (jnl_status == 0)
 					{
 						jbp = csa->jnl->jnl_buff;
-						TOTAL_NONTPJNL_REC_SIZE(total_jnl_rec_size, non_tp_jfb_ptr, csa, cw_set_depth);
-						if ((jbp->freeaddr + total_jnl_rec_size) > jbp->filesize)
+						/* tmp_cw_set_depth was used to do TOTAL_NONTPJNL_REC_SIZE calculation;
+						 * ensure it has not changed until now when the actual jnl record write occurs.
+						 * same case with csa->jnl_before_images & jbp->before_images.
+						 */
+						assert(cw_set_depth == tmp_cw_set_depth);
+						assert(jbp->before_images == csa->jnl_before_image);
+						if (DISK_BLOCKS_SUM(jbp->freeaddr, total_jnl_rec_size) > jbp->filesize)
 						{	/* Moved as part of change to prevent journal records splitting
 							 * across multiple generation journal files. */
 							jnl_flush(csa->jnl->region);
 							if (jnl_file_extend(csa->jnl, total_jnl_rec_size) == -1)
 							{
-								assert (!JNL_ENABLED(csd));
+								assert((!JNL_ENABLED(csd)) && (JNL_ENABLED(csa)));
 								status = cdb_sc_jnlclose;
 								t_commit_cleanup(status, 0);
 								REVERT;
 								goto failed;
 							}
-						}
-						if (csa->jnl_before_image != csa->jnl->jnl_buff->before_images)
-						{
-							status = cdb_sc_jnlstatemod;
-							t_commit_cleanup(status, 0);
-							REVERT;
-							goto failed;
 						}
 						/* tp_tend sets gbl_jrec_time before calling jnl_put_jrt_pini. t_end doesn't.
 						 * see comment in jnl_put_pini.c related to gbl_jrec_time for the reason.
@@ -568,7 +603,10 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 						else
 							jnl_write_logical(csa, non_tp_jfb_ptr);
 					} else
+					{
+						csa->ti->early_tn = start_ctn;
 						rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+					}
 				}
 				csa->prev_free_blks = csa->ti->free_blocks;
 				csa->t_commit_crit = TRUE;
@@ -619,7 +657,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					if (!(csa->ti->curr_tn & (HEADER_UPDATE_COUNT-1)))
 						fileheader_sync(gv_cur_region);
 				}
-				if (REPL_ENABLED(csd) && cw_depth && (run_time || is_db_updater)
+				if (REPL_ENABLED(csa) && cw_depth && (run_time || is_db_updater)
 						&& inctn_invalid_op == inctn_opcode)
 				{
 					assert(QWGT(jnlpool_ctl->early_write_addr, jnlpool_ctl->write_addr));
@@ -630,11 +668,11 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 						QWINCRBY(max_resync_seqno, seq_num_one);
 						QWASSIGN(csa->hdr->resync_seqno, max_resync_seqno);
 					}
-					assert(cumul_jnl_rec_len == (temp_jnlpool_ctl->write - jnlpool_ctl->write +
+					assert(tmp_cumul_jnl_rec_len == (temp_jnlpool_ctl->write - jnlpool_ctl->write +
 						(temp_jnlpool_ctl->write > jnlpool_ctl->write ? 0 : jnlpool_ctl->jnlpool_size)));
 					/* the following statements should be atomic */
 					jnl_header = (jnldata_hdr_ptr_t)(jnlpool.jnldata_base + jnlpool_ctl->write);
-					jnl_header->jnldata_len = cumul_jnl_rec_len;
+					jnl_header->jnldata_len = tmp_cumul_jnl_rec_len;
 					jnl_header->prev_jnldata_len = jnlpool_ctl->lastwrite_len;
 					/* The following assert should be an == rather than a >= (as in tp_tend) because, we have
 					 * either one or no update.  If no update, we would have no cw_depth and we wouldn't enter
@@ -669,7 +707,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 			if (0 != cw_set_depth)
 			{
 				wcs_timer_start(gv_cur_region, TRUE);
-				if (REPL_ENABLED(csd) && dse_running)
+				if (REPL_ENABLED(csa) && dse_running)
 					send_msg(VARLSTCNT(5) ERR_NOTREPLICATED, 4, start_ctn + 1, LEN_AND_LIT("DSE"), process_id);
 			}
 		} else if (cdb_sc_cacheprob != status)

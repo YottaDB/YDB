@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_stdlib.h"		/* for exit() */
+
 #include <signal.h>
 #include <errno.h>
 

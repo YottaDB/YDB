@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -17,7 +20,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "mupipset.h"
+#include "mupip_set.h"
 #include "cli.h"
 #include "iosp.h"
 #include "error.h"
@@ -30,29 +33,25 @@
 GBLDEF	bool	region;
 GBLREF	bool	error_mupip;
 
-bool check_qual(bool file, bool reg, bool jnlfile);
-
 void mupip_set(void)
 {
-	bool		file;
-	char		db_fn[MAX_LINE], jnl_fn[MAX_LINE];
+	boolean_t	file, jnlfile;
+	char		db_fn[MAX_FN_LEN + 1], jnl_fn[JNL_NAME_SIZE];
 	unsigned short	db_fn_len, jnl_fn_len;
-	uint4		status, journal, replication, jnlfile;
+	uint4		status;
+	int 		cli_stat;
+	boolean_t	set_journal, set_replication;
 
 	error_def(ERR_MUNOACTION);
 	error_def(ERR_MUNODBNAME);
-	error_def(ERR_MUPCLIERR);
 
 	file = cli_present("FILE") == CLI_PRESENT;
 	region = cli_present("REGION") == CLI_PRESENT;
 	jnlfile = cli_present("JNLFILE") == CLI_PRESENT;
-	replication = cli_present("REPLICATION");
-
-	if (check_qual(file, region, jnlfile))
-	{
-		util_out_print("Any one of REGION, FILE or JNLFILE qualifer should (and only) be specified", TRUE);
-		mupip_exit(ERR_MUNODBNAME);
-	}
+	cli_stat =  cli_present("JOURNAL"); /* just save a call to cli_present */
+	set_journal = (CLI_PRESENT != cli_stat && CLI_NEGATED != cli_stat) ? CLI_ABSENT: cli_stat;
+	cli_stat =  cli_present("REPLICATION"); /* just save a call to cli_present */
+	set_replication = (CLI_PRESENT != cli_stat && CLI_NEGATED != cli_stat) ? CLI_ABSENT: cli_stat;
 
 	if (region)
 	{
@@ -74,10 +73,9 @@ void mupip_set(void)
 		memset(jnl_fn, 0, jnl_fn_len);
 		if (!cli_get_str("WHAT", jnl_fn, &jnl_fn_len))
 			mupip_exit(ERR_MUNOACTION);
-		status = mupip_set_jnl_file(jnl_fn);
+		status = mupip_set_jnlfile(jnl_fn, sizeof(jnl_fn));
 		mupip_exit(status);
 	}
-
 	if (cli_present("ACCESS_METHOD")   	== CLI_PRESENT  ||
 	    cli_present("EXTENSION_COUNT") 	== CLI_PRESENT  ||
 	    cli_present("GLOBAL_BUFFERS")  	== CLI_PRESENT  ||
@@ -87,36 +85,13 @@ void mupip_set(void)
 	    cli_present("DEFER_TIME")      	== CLI_PRESENT  ||
 	    cli_present("WAIT_DISK")		== CLI_PRESENT  ||
 	    cli_present("PARTIAL_RECOV_BYPASS")	== CLI_PRESENT)
-		mupip_set_file(db_fn_len, db_fn);
-
-	journal = cli_present("JOURNAL");
-
-	if (CLI_PRESENT == journal  ||  CLI_NEGATED == journal  ||  CLI_PRESENT == replication  ||  CLI_NEGATED == replication)
-		status = mupip_set_journal(journal == CLI_PRESENT, replication == CLI_PRESENT, db_fn_len, db_fn);
+	{
+		if (SS_NORMAL != (status = mupip_set_file(db_fn_len, db_fn)))
+			mupip_exit(status);
+	}
+	if (set_journal || set_replication)
+		status = mupip_set_journal(db_fn_len, db_fn);
 	else
 		status = SS_NORMAL;
-
 	mupip_exit(status);
-
-}
-
-bool check_qual(bool file, bool reg, bool jnlfile)
-{
-	if (!file && !reg && !jnlfile)
-	{
-		return TRUE;
-	} else if (file)
-	{
-		if(reg || jnlfile)
-			return TRUE;
-	} else if (reg)
-	{
-		if (file || jnlfile)
-			return TRUE;
-	} else
-	{
-		if (file || reg)
-			return TRUE;
-	}
-	return FALSE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #ifdef UNIX
 #include "gtm_stat.h"
@@ -189,7 +191,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 	{
 		tmp_jfh = (jnl_file_header *)malloc(ROUND_UP(sizeof(jnl_file_header), 8));
 		F_READ_BLK_ALIGNED(tmp_fd, 0, tmp_jfh, ROUND_UP(sizeof(jnl_file_header), 8), status);
-		if (SS_NORMAL == status && 0 != memcmp(tmp_jfh->label, LIT_AND_LEN(JNL_LABEL_TEXT)))
+		if (SS_NORMAL == status && 0 != memcmp(tmp_jfh->label, JNL_LABEL_TEXT, STR_LIT_LEN(JNL_LABEL_TEXT)))
 			status = (int4)ERR_JNLBADLABEL;
 	}
 
@@ -299,33 +301,34 @@ int repl_ctl_close(repl_ctl_element *ctl)
 
 int gtmsource_ctl_close(void)
 {
-	repl_ctl_element	*ctl, *tmp_ctl;
+	repl_ctl_element	*ctl;
 	sgmnt_addrs		*csa;
 	gd_region		*reg;
 
 	if (repl_ctl_list)
 	{
-		for (ctl = repl_ctl_list->next, reg = NULL;
-		     NULL != ctl; )
+		for (ctl = repl_ctl_list->next, reg = NULL; NULL != ctl; ctl = repl_ctl_list->next)
 		{
-			tmp_ctl = ctl;
-			ctl->prev->next = ctl->next;
-			ctl = ctl->next;
-			if (reg != tmp_ctl->reg)
+			repl_ctl_list->next = ctl->next; /* next element becomes head thereby removing this element,
+							    the current head from the list; if there is an error path that returns
+							    us to this function before all elements were freed, we won't try to
+							    free elements that have been freed already */
+			if (reg != ctl->reg)
 			{
-				csa = &FILE_INFO(tmp_ctl->reg)->s_addrs;
+				csa = &FILE_INFO(ctl->reg)->s_addrs;
 				if (csa->jnl && NOJNL != csa->jnl->channel)
 				{
 					F_CLOSE(csa->jnl->channel);
 					csa->jnl->channel = NOJNL;
-					tmp_ctl->repl_buff->fc->fd = NOJNL;
+					ctl->repl_buff->fc->fd = NOJNL;
 				}
-				reg = tmp_ctl->reg;
+				reg = ctl->reg;
 			}
-			repl_ctl_close(tmp_ctl);
+			repl_ctl_close(ctl);
 		}
-		free(repl_ctl_list);
+		ctl = repl_ctl_list;
 		repl_ctl_list = NULL;
+		free(ctl);
 	}
 	return (SS_NORMAL);
 }

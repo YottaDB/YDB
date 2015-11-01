@@ -20,6 +20,9 @@
 */
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "gtm_stdio.h"
 #include <errno.h>
 #include "error.h"

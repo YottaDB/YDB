@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,8 +92,7 @@ int gtmsource()
 
 	error_def(ERR_NOTALLDBOPN);
 	error_def(ERR_JNLPOOLSETUP);
-	error_def(ERR_REPLPARSE);
-	error_def(ERR_REPLLOG);
+	error_def(ERR_MUPCLIERR);
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
 	error_def(ERR_REPLINFO);
@@ -102,7 +101,7 @@ int gtmsource()
 	call_on_signal = gtmsource_sigstop;
 	ESTABLISH_RET(gtmsource_ch, SS_NORMAL);
 	if (-1 == gtmsource_get_opt())
-		rts_error(VARLSTCNT(1) ERR_REPLPARSE);
+		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
 	jnlpool_init(GTMSOURCE, gtmsource_options.start, &jnlpool_inited);
 	/* When gtmsource_options.start is TRUE,
 	 *	jnlpool_inited == TRUE ==> fresh start, and
@@ -316,7 +315,6 @@ int gtmsource()
 			TP_CHANGE_REG(reg);
 			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 		}
-		gtmsource_ctl_init();
 		if (SS_NORMAL != (status = gtmsource_alloc_tcombuff()))
 			rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				  RTS_ERROR_LITERAL("Error allocating initial tcom buffer space. Malloc error"), status);

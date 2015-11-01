@@ -11,6 +11,9 @@
 
 #include "mdef.h"
 
+#include "gtm_unistd.h"		/* for close() */
+#include "gtm_string.h"
+
 #ifdef UNIX
 #include <sys/ipc.h>
 #include <sys/shm.h>
@@ -25,7 +28,6 @@
 #endif
 #include <errno.h>
 #include <arpa/inet.h>
-#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -67,8 +69,6 @@ GBLREF int                     	repl_recv_data_recvd;
 GBLREF int                     	repl_recv_data_processed;
 GBLREF repl_msg_ptr_t		gtmrecv_msgp;
 GBLREF uchar_ptr_t		repl_filter_buff;
-
-error_def(ERR_REPLERR);
 
 int gtmrecv_endupd(void)
 {

@@ -16,18 +16,19 @@
  * -------- requires		cs_addrs and gv_cur_region be current.
  */
 
-#include <sys/wait.h>
 #include "mdef.h"
 
+#include "gtm_string.h"
+#include "gtm_stdio.h"
+#include "gtm_stat.h"
+#include "gtm_unistd.h"
+
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-
-#include "gtm_stdio.h"
-#include "gtm_stat.h"
-#include "gtm_unistd.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"

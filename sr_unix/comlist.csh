@@ -247,9 +247,11 @@ cp $gtm_tools/{lowerc,upperc}*.csh .
 
 chmod +x {lowerc,upperc}*
 
-
 cp $gtm_tools/*.gtc .
 mv configure{.gtc,}
+
+cp $gtm_tools/repl_sort_add_seq.awk repl_sort_add_seq.awk
+cp $gtm_tools/repl_sort_rem_tran.awk repl_sort_rem_tran.awk
 
 cp $gtm_inc/gtmxc_types.h .
 #

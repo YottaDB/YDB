@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,29 +10,30 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "compiler.h"
 #include "toktyp.h"
 #include "comp_esc.h"
 #include "advancewindow.h"
 #include "lb_init.h"
 
-GBLREF unsigned char *source_buffer;
-GBLREF short int last_source_column;
-GBLREF char *lexical_ptr;
-GBLREF struct ce_sentinel_desc *ce_def_list;
+GBLREF	unsigned char		*source_buffer;
+GBLREF	short int		last_source_column;
+GBLREF	char			*lexical_ptr;
+GBLREF	struct ce_sentinel_desc	*ce_def_list;
 
-LITREF char	ctypetab[];
-
+LITREF char	ctypetab[NUM_ASCII_CHARS];
 
 void lb_init(void)
 {
-	int		num_subs, y;
-        short int	sav_last_src_col, source_col;
-	int4		source_len, skip_count;
-	unsigned char	*cp, *cp1;
-	bool		possible_sentinel;
+	int			num_subs, y;
+	short int		sav_last_src_col, source_col;
+	int4			source_len, skip_count;
+	unsigned char		*cp, *cp1;
+	bool			possible_sentinel;
 	struct ce_sentinel_desc	*shp;
-
 
 	error_def(ERR_CETOOMANY);
 
@@ -78,16 +79,13 @@ void lb_init(void)
 				cp = cp1;
 				if (*cp == '\0')
 					break;
-			}
-			else if (*cp == '?')
+			} else if (*cp == '?')
 			{
 				for (cp1 = cp + 1; ; )
 				{
 					y = ctypetab[*cp1];
 					if (y == TK_UPPER || y == TK_LOWER || y == TK_DIGIT || y == TK_PERIOD || y == TK_ATSIGN)
-					{
 						cp1++;
-					}
 					else if (*cp1 == '\"')	/* quoted string in pattern */
 					{
 						for (cp1++; ; )
@@ -102,15 +100,11 @@ void lb_init(void)
 									cp1++;
 								else			/* character following string */
 									break;
-							}
-							else
+							} else
 								cp1++;
 						}
-					}
-					else
-					{
+					} else
 						break;
-					}
 				}
 				source_col += cp1 - cp;
 				cp = cp1;
@@ -128,8 +122,7 @@ void lb_init(void)
 					{
 						if (skip_count > 0)		/* a substitution occurred */
 							possible_sentinel = TRUE;
-					}
-					else
+					} else
 					{
 						sav_last_src_col = last_source_column;
 						last_source_column = source_col;
@@ -147,11 +140,8 @@ void lb_init(void)
 			}
 		}
 	}
-
-
 	lexical_ptr = (char *) &source_buffer[0];
 	advancewindow();
 	advancewindow();
-
 	return;
 }

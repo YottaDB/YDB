@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,23 +13,28 @@
  *	Accept a client connection.
  */
 
-#ifndef lint
-static char rcsid[] = "$Header:$";
-#endif
-
 #ifdef DEBUG
-#include "gtm_stdio.h"
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #endif /* defined(DEBUG) */
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+#include "gtm_stdio.h"
+#include "gtm_unistd.h"		/* for close() */
+#include "gtm_time.h"		/* for ctime() and time() */
 #include "gtcm.h"
 #include "rc_oflow.h"
 #include <errno.h>
+#include "eintr_wrappers.h"
 
 #ifdef BSD_TCP
 #include <arpa/inet.h>
 #endif /* defined(BSD_TCP) */
+
+#ifndef lint
+static char rcsid[] = "$Header:$";
+#endif
 
 #ifndef __linux__
 
@@ -55,7 +60,6 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	int		i;
 	omi_conn	*cptr;
 	omi_fd		fd;
-	char		*strchr(), *gtcm_hname();
 
 #ifdef BSD_TCP
 	int			sln;
@@ -149,7 +153,6 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	DEBUG_ONLY(
 		if (omi_pklog)
 		{
-			extern int	errno;
 			char		pklog[1024];
 
 			(void) sprintf(pklog, "%s.%04d", omi_pklog, cptr->stats.id);
@@ -162,11 +165,11 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 		}
 	)
 	OMI_DBG((omi_debug, "%s: connection %d from %s by user <%s> at %s", SRVR_NAME,
-		cptr->stats.id, gtcm_hname(&cptr->stats.sin), cptr->ag_name, ctime(&cptr->stats.start)));
+		cptr->stats.id, gtcm_hname(&cptr->stats.sin), cptr->ag_name, GTM_CTIME(&cptr->stats.start)));
 	option = -1;
 	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&option, sizeof(option)) < 0)
 	{
-		perror("setsockopt:");
+		PERROR("setsockopt:");
 		return -1;
 	}
 	return 0;

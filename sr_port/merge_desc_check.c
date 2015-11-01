@@ -45,7 +45,6 @@ void merge_desc_check(void)
 {
         unsigned char		buff1[MAX_STRLEN], buff2[MAX_STRLEN], *end1, *end2;
 	enum db_acc_method	acc_meth1, acc_meth2;
-	int			cmp_less;
 
 	error_def(ERR_MERGEDESC);
 
@@ -53,31 +52,26 @@ void merge_desc_check(void)
 	{
 		acc_meth1 = mglvnp->gblp[IND1]->s_gv_cur_region->dyn.addr->acc_meth;
 		acc_meth2 = mglvnp->gblp[IND2]->s_gv_cur_region->dyn.addr->acc_meth;
-		/* if ((both are bg/mm regions && dbs are same && same global) ||
-		 *     (both are cm regions && on the same remote node && same region))
-		 *   COMPARE GV_CURRKEYs
-		 * else
-		 *   NOT DESCENDANTS
+		/* if (!(both are bg/mm regions && dbs are same && same global) &&
+		 *     !(both are cm regions && on the same remote node && same region))
+		 *   NO DESCENDANTS
 		 * endif
 		 */
-		if (((dba_bg == acc_meth1 || dba_mm == acc_meth2) && (dba_bg == acc_meth1 || dba_mm == acc_meth2))
+		if (!(((dba_bg == acc_meth1 || dba_mm == acc_meth2) && (dba_bg == acc_meth1 || dba_mm == acc_meth2))
 			&& REG_EQUAL(FILE_INFO(mglvnp->gblp[IND1]->s_gv_target->gd_reg), mglvnp->gblp[IND2]->s_gv_target->gd_reg)
-			&& mglvnp->gblp[IND1]->s_gv_target->root == mglvnp->gblp[IND2]->s_gv_target->root)
-			cmp_less = 1;
-		else if (dba_cm == acc_meth1 && dba_cm == acc_meth2
-				&& mglvnp->gblp[IND1]->s_gv_cur_region->dyn.addr->cm_blk ==
-				   mglvnp->gblp[IND2]->s_gv_cur_region->dyn.addr->cm_blk
-				&& mglvnp->gblp[IND1]->s_gv_cur_region->cmx_regnum ==
-				   mglvnp->gblp[IND2]->s_gv_cur_region->cmx_regnum)
-			cmp_less = 0;
-		else
+			&& mglvnp->gblp[IND1]->s_gv_target->root == mglvnp->gblp[IND2]->s_gv_target->root) &&
+		   !(dba_cm == acc_meth1 && dba_cm == acc_meth2
+			&& mglvnp->gblp[IND1]->s_gv_cur_region->dyn.addr->cm_blk ==
+			   mglvnp->gblp[IND2]->s_gv_cur_region->dyn.addr->cm_blk
+			&& mglvnp->gblp[IND1]->s_gv_cur_region->cmx_regnum ==
+			   mglvnp->gblp[IND2]->s_gv_cur_region->cmx_regnum))
 		{
 			assert(dba_usr != acc_meth1 && dba_usr != acc_meth2); /* merge not ready for dba_usr yet */
 			return;
 		}
 		if (0 == memcmp(mglvnp->gblp[IND1]->s_gv_currkey->base, mglvnp->gblp[IND2]->s_gv_currkey->base,
-			        MIN(mglvnp->gblp[IND1]->s_gv_currkey->end - cmp_less, 
-				    mglvnp->gblp[IND2]->s_gv_currkey->end - cmp_less)))
+			        MIN(mglvnp->gblp[IND1]->s_gv_currkey->end,
+				    mglvnp->gblp[IND2]->s_gv_currkey->end)))
 		{
 			if (0 == (end1 = format_targ_key(buff1, MAX_STRLEN, mglvnp->gblp[IND1]->s_gv_currkey, TRUE)))
 				end1 = &buff1[MAX_STRLEN - 1];

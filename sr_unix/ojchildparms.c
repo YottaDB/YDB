@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,8 @@
  * ---------------------------------------------------------
  */
 #include "mdef.h"
+
+#include "gtm_string.h"
 #include "gtm_stdlib.h"
 #include "job.h"
 #include "compiler.h"
@@ -34,7 +36,7 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 	char			*sp;
 	char			parm_string[8];
 	int4			argcnt, i;
-	error_def(ERR_JOBPARM);
+
 	error_def(ERR_STRINGOFLOW);
 
 	if (jparms->directory.addr = GETENV(CWD_ENV))
@@ -93,7 +95,7 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		jparms->baspri = 0;
 
 	if (!(sp = GETENV(GTMJCNT_ENV)))
-		rts_error(VARLSTCNT(1) ERR_JOBPARM);
+		GTMASSERT;
 
 	if (argcnt = ATOL(sp))
 	{
@@ -108,9 +110,7 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 			if (sp = GETENV(parm_string))
 			{
 				if (stringpool.free + strlen(sp) > stringpool.top)
-				{
 					rts_error(VARLSTCNT(1) (ERR_STRINGOFLOW));
-				}
 				arglst[i].str.len = strlen(sp);
 				arglst[i].str.addr = (char *)stringpool.free;
 				memcpy(stringpool.free, sp, arglst[i].str.len);
@@ -118,21 +118,20 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 				arglst[i].mvtype = MV_STR;
 				g_args->argval[i] = &arglst[i];
 
-			}else
-			{
-				rts_error(VARLSTCNT(1) ERR_JOBPARM);
-			}
+			} else
+				GTMASSERT;
 			if (parm_string[6] == '9')
-			{	if (parm_string[5] == '9')
-				{	parm_string[4] = parm_string[4] + 1;
+			{
+				if (parm_string[5] == '9')
+				{
+					parm_string[4] = parm_string[4] + 1;
 					parm_string[5] = '0';
-				}else
-				{	parm_string[5] = parm_string[5] + 1;
-				}
+				} else
+					parm_string[5] = parm_string[5] + 1;
 				parm_string[6] = '0';
-			}else
+			} else
 				parm_string[6] = parm_string[6] + 1;
 		}
-	}else
+	} else
 		g_args->callargs = 0;
 }

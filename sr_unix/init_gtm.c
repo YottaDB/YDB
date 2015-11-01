@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,7 @@ GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF void		(*unw_prof_frame_ptr)(void);
 
 GBLREF enum gtmImageTypes	image_type;
+GBLREF mstr			default_sysid;
 GBLDEF boolean_t		gtm_startup_active = FALSE;
 GBLDEF void			(*restart)() = &mum_tstart;
 
@@ -64,6 +65,8 @@ void init_gtm(void)
 #endif
 	assert (sizeof(sgmnt_data) == ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE));
 	assert (sizeof(key_t) == sizeof(int4));
+	assert (sizeof(boolean_t) == 4); /* generated code passes 4 byte arguments, run time rtn might be expecting boolean_t arg */
+	assert (BITS_PER_UCHAR == 8);
 
 	tp_timeout_start_timer_ptr = tp_start_timer;
 	tp_timeout_clear_ptr = tp_clear_timeout;
@@ -88,6 +91,8 @@ void init_gtm(void)
 	svec.labels = 1;
 	svec.lvnullsubs = 1;
 	svec.base_addr = (unsigned char *)1;
+	svec.zdate_form = 0;
+	svec.sysid_ptr = &default_sysid;
 	gtm_startup(&svec);
 	gtm_startup_active = TRUE;
 }

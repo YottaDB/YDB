@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,13 +48,10 @@ void    op_ztcommit(int4 n)
         sgmnt_addrs             *csa, *next_csa;
 	uint4			tc_jrec_time;
 
-	tc_jrec_time = 0;
-
         if (n < 0)
                 rts_error(VARLSTCNT(1) ERR_TRANSMINUS);
         if (jnl_fence_ctl.level == 0  ||  n > jnl_fence_ctl.level)
                 rts_error(VARLSTCNT(1) ERR_TRANSNOSTART);
-
         assert(jnl_fence_ctl.level > 0);
         assert(dollar_tlevel == 0);
 
@@ -67,12 +64,12 @@ void    op_ztcommit(int4 n)
         {
                 ztcom_record.token = jnl_fence_ctl.token;
                 ztcom_record.participants = jnl_fence_ctl.region_count;
-		JNL_SHORT_TIME(tc_jrec_time);
 
                 /* Note that only those regions that are actively journaling will appear in the following list: */
                 for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *) - 1;  csa = csa->next_fenced)
                 {
                         grab_crit(csa->jnl->region);
+			JNL_SHORT_TIME(tc_jrec_time);	/* get current time after holding crit on the region */
 			if (!copy_jnl_record)
 			{
 				ztcom_record.pini_addr = csa->jnl->pini_addr;

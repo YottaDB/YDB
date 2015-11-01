@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "i386.h"
 #include "urx.h"
 #include "rtnhdr.h"

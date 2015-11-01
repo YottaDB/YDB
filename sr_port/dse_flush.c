@@ -28,7 +28,7 @@ GBLREF sgmnt_addrs	*cs_addrs;
 
 void dse_flush(void)
 {
-	error_def(ERR_DSEONLYBGMMFLU);
+	error_def(ERR_DSEONLYBGMM);
 	error_def(ERR_DBRDONLY);
 
 	if (gv_cur_region->read_only)
@@ -45,7 +45,7 @@ void dse_flush(void)
 		rel_crit(gv_cur_region);
 		break;
 	default:
-		rts_error(VARLSTCNT(1) ERR_DSEONLYBGMMFLU);
+		rts_error(VARLSTCNT(4) ERR_DSEONLYBGMM, 2, LEN_AND_LIT("BUFFER_FLUSH"));
 		break;
 	}
 	return;

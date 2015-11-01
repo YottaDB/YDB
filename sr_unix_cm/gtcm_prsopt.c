@@ -17,14 +17,19 @@
  *
  */
 
+#include "mdef.h"
+
+#include "gtm_string.h"
+
+
+#include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_stdio.h"
+
+#include "gtcm.h"
+
 #ifndef lint
 static char rcsid[] = "$Header:$";
 #endif
-
-#include "gtm_stdio.h"
-
-#include "mdef.h"
-#include "gtcm.h"
 
 GBLREF FILE	*omi_debug;
 GBLREF int	 omi_pkdbg;

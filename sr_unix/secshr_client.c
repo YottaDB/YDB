@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_stdlib.h"		/* for exit() */
+
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <sys/un.h>
@@ -157,7 +159,6 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 	error_def(ERR_GTMSECSHR);
 	error_def(ERR_GTMSECSHRSTARTUP);
 	error_def(ERR_GTMSECSHRSOCKET);
-	error_def(ERR_NOGTMSECSHR);
 	error_def(ERR_GTMSECSHRSRVFFILE);
 	error_def(ERR_GTMSECSHRSRVFID);
 	error_def(ERR_GTMSECSHRSRVF);
@@ -181,7 +182,7 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 		}
 		gtmsecshr_pathname.addr[gtmsecshr_pathname.len] = '\0';
 		if (-1 == Stat(gtmsecshr_pathname.addr, &stat_buf))
-			rts_error(VARLSTCNT(7) ERR_SYSCALL, 5, LEN_AND_LIT("stat"), CALLFROM);
+			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("stat"), CALLFROM, errno);
 		if ((ROOTUID != stat_buf.st_uid) ||
 			!(stat_buf.st_mode & S_ISUID))
 			rts_error(VARLSTCNT(1) ERR_GTMSECSHRPERM);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,13 +35,12 @@ GBLREF	boolean_t	tstarted;
 
 void	mur_extract_tcom(
 			 jnl_record	*rec,
-			 uint4		pid,
-			 jnl_proc_time	*ref_time)
+			 uint4		pid)
 {
 	int	actual, extract_len = 0;
 	char	*ptr;
 
-	if (REF_CHAR(&rec->jrec_type) == JRT_ZTCOM )
+	if (REF_CHAR(&rec->jrec_type) == JRT_ZTCOM)
 	{
 		EXT2BYTES(&muext_code[MUEXT_ZTCOMMIT][0]);
 	} else
@@ -49,12 +48,12 @@ void	mur_extract_tcom(
 		EXT2BYTES(&muext_code[MUEXT_TCOMMIT][0]);
 	}
 
-	if(REF_CHAR(&rec->jrec_type) == JRT_ZTCOM)
+	if (REF_CHAR(&rec->jrec_type) == JRT_ZTCOM)
 	{
-		extract_len = exttime(rec->val.jrec_ztcom.ts_short_time, ref_time, 3);
-		extract_len = exttime(rec->val.jrec_ztcom.tc_short_time, ref_time, extract_len);
+		EXTTIME(rec->val.jrec_ztcom.ts_short_time);
+		EXTTIME(rec->val.jrec_ztcom.tc_short_time);
 	} else
-		extract_len = exttime(rec->val.jrec_tcom.tc_short_time, ref_time, 3);
+		EXTTIME(rec->val.jrec_tcom.tc_short_time);
 
 	EXTINT(pid);
 
@@ -68,8 +67,7 @@ void	mur_extract_tcom(
 
 void	detailed_extract_tcom(
 			 jnl_record	*rec,
-			 uint4		pid,
-			 jnl_proc_time	*ref_time)
+			 uint4		pid)
 {
 	int	actual, extract_len;
 	char	*ptr;
@@ -81,16 +79,18 @@ void	detailed_extract_tcom(
 	{
 		extract_len = strlen(mur_extract_buff);
 		strcpy(mur_extract_buff + extract_len, "TCOMMIT\\");
-		extract_len = exttime(rec->val.jrec_tcom.tc_short_time, ref_time, strlen(mur_extract_buff));
-		extract_len = exttime(rec->val.jrec_tcom.tc_recov_short_time, ref_time, extract_len);
+		extract_len = strlen(mur_extract_buff);
+		EXTTIME(rec->val.jrec_tcom.tc_short_time);
+		EXTTIME(rec->val.jrec_tcom.tc_recov_short_time);
 	} else
 	{
 		extract_len = strlen(mur_extract_buff);
 		strcpy(mur_extract_buff + extract_len, "ZTCOMMIT\\");
-		extract_len = exttime(rec->val.jrec_ztcom.ts_short_time, ref_time, strlen(mur_extract_buff));
-		extract_len = exttime(rec->val.jrec_ztcom.ts_recov_short_time, ref_time, extract_len);
-		extract_len = exttime(rec->val.jrec_ztcom.tc_short_time, ref_time, extract_len);
-		extract_len = exttime(rec->val.jrec_ztcom.tc_recov_short_time, ref_time, extract_len);
+		extract_len = strlen(mur_extract_buff);
+		EXTTIME(rec->val.jrec_ztcom.ts_short_time);
+		EXTTIME(rec->val.jrec_ztcom.ts_recov_short_time);
+		EXTTIME(rec->val.jrec_ztcom.tc_short_time);
+		EXTTIME(rec->val.jrec_ztcom.tc_recov_short_time);
 	}
 	EXTINT(pid);
 	EXTQW(rec->val.jrec_tcom.token);

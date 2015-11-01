@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -23,6 +25,7 @@
 #include "iosp.h"
 #include "util.h"
 #include "gtmmsg.h"
+#include "hashtab.h"	/* for init_hashtab() prototype */
 
 GBLREF	mur_opt_struct	mur_options;
 GBLREF	int		mur_extract_bsize;
@@ -114,14 +117,14 @@ bool	mur_insert_prev(ctl_list *ctl, ctl_list **jnl_files)
 		if (header->max_record_length > mur_extract_bsize)
 			mur_extract_bsize = header->max_record_length;
 		if (0 == mur_extract_bsize)
-			mur_extract_bsize = DEFAULT_EXTR_BLKSIZE;
+			mur_extract_bsize = DEFAULT_EXTR_BUFSIZE;
 	}
 	if (NULL != mur_options.extr_file_info)
 	{
 		if (header->max_record_length > mur_extract_bsize)
 			mur_extract_bsize = header->max_record_length;
 		if (0 == mur_extract_bsize)
-			mur_extract_bsize = DEFAULT_EXTR_BLKSIZE;
+			mur_extract_bsize = DEFAULT_EXTR_BUFSIZE;
 	}
 	return TRUE;
 }

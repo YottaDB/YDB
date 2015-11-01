@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "arit.h"
 #include "stringpool.h"
 #include "op.h"

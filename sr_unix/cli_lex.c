@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -371,8 +371,7 @@ int	cli_gettoken (int *eof)
 	{
 
 		FGETS_FILE(cli_lex_in.in_str, MAX_LINE, stdin, cli_lex_in.tp);
-
-    		if (0 != cli_lex_in.tp)
+    		if (NULL != cli_lex_in.tp)
     		{
     			cli_lex_in.in_str[strlen(cli_lex_in.in_str)-1] = '\0';
     			cli_lex_in_ptr = &cli_lex_in;
@@ -409,7 +408,7 @@ int cli_look_next_token(int *eof)
 	int tok_len;
 	char *old_tp;
 
-	if (!strlen(cli_lex_in.tp))
+	if (((char *) NULL == cli_lex_in.tp) || (!strlen(cli_lex_in.tp)))
 		return(0);
 
 	old_tp = cli_lex_in.tp;
@@ -477,8 +476,7 @@ int cli_get_string_token(int *eof)
 	{
 
 	    FGETS_FILE(cli_lex_in.in_str, MAX_LINE, stdin, cli_lex_in.tp);
-
-	    if (0 != cli_lex_in.tp)
+	    if (NULL != cli_lex_in.tp)
 	    {
 	      cli_lex_in.in_str[strlen(cli_lex_in.in_str)-1] = '\0';
 	      cli_lex_in_ptr = &cli_lex_in;

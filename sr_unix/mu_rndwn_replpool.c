@@ -48,6 +48,7 @@
 #include "do_semop.h"
 #include "util.h"
 #include "gtmmsg.h"
+#include "do_shmat.h"	/* for do_shmat() prototype */
 
 LITREF char             gtm_release_name[];
 LITREF int4             gtm_release_name_len;
@@ -166,14 +167,16 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int sh
 	}
 	if (0 != shm_rmid(shm_id))
 	{
+		save_errno = errno;
 		gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id, RTS_ERROR_STRING(insname));
-		gtm_putmsg(VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shm_ctl()"), CALLFROM);
+		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shm_ctl()"), CALLFROM, save_errno);
 		MU_RNDWN_REPLPOOL_RETURN(FALSE);
 	}
 	if (0 != sem_rmid(sem_id))
 	{
+		save_errno = errno;
 		gtm_putmsg(VARLSTCNT(5) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(insname));
-		gtm_putmsg(VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM);
+		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM, save_errno);
 		return FALSE;
 	}
 	return TRUE;

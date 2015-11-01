@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -126,6 +126,8 @@ void job_term_handler(int sig){
  * 	Second argument is the number of parameters being passed.
  * 	The third boolean argument indicates to the caller if the return from this function was due to an exit from the
  *		middle process or due to reasons other than that. It is set to true for the latter case of return.
+ *	Fourth argument is the pair of file descriptors [opened by pipe] for the child process (M) to write PID
+ *		of the jobbed off process (J).
  *
  * Return:
  *	Exit status of child (that the parent gets by WAITing) in case the return was after an exit from the middle process.
@@ -135,7 +137,7 @@ void job_term_handler(int sig){
  * ---------------------------------------------------------------------------------------------------------------------
  */
 
-int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_return)
+int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_return, int pipe_fds[])
 {
 	char			cbuff[TEMP_BUFF_SIZE], pbuff[TEMP_BUFF_SIZE];
 	char			tbuff[MAX_CMD_LINE], tbuff2[MAX_CMD_LINE], parm_string[PARM_STRING_SIZE];
@@ -154,6 +156,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	sgmnt_data_ptr_t	csd;
 	gd_region		*r_top, *r_local;
 	gd_addr			*addr_ptr;
+	int			pipe_status;
 
 #ifdef	__osf__
 /* These must be O/S-compatible 64-bit pointers for OSF/1.  */
@@ -252,6 +255,15 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			} else
 			{
 				job_launched = TRUE;
+
+				assert(sizeof(pid_t) == sizeof(child_pid));
+				/* write child_pid into pipe to be read by parent process(P) for $ZJOB */
+				DOWRITERC(pipe_fds[1], &child_pid, sizeof(child_pid), pipe_status);
+				if (0 != pipe_status)
+				{
+					rts_error(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
+							LEN_AND_LIT("Error writing to pipe"), errno);
+				}
 				_exit(0);
 			}
 		}
@@ -266,6 +278,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		/* Run down any open flat files to reclaim their file descriptors */
 		io_rundown(RUNDOWN_EXCEPT_STD);
 
+		/* release the pipe opened by grand parent (P) */
+		CLOSEFILE(pipe_fds[0], pipe_status);
+		CLOSEFILE(pipe_fds[1], pipe_status);
+
 		/* Run through the list of databases to simply close them out (still open by parent) */
 		for (addr_ptr = get_next_gdr(0); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 		{
@@ -278,8 +294,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 					udi = (unix_db_info *)(r_local->dyn.addr->file_cntl->file_info);
 					csa = &udi->s_addrs;
 					csd = csa->hdr;
-					/* Close journal file if open */
-					if (JNL_ENABLED(csd) && NULL != csa->jnl && NOJNL != csa->jnl->channel)
+					/* Close journal file if open. Check for JNL_ALLOWED instead of JNL_ENABLED to ensure
+					 * we do not miss out on closing open journal file descriptors in the case where the
+					 * current jnl_state is "jnl_closed" but we had opened the file when it was "jnl_open".
+					 */
+					if (JNL_ALLOWED(csd) && NULL != csa->jnl && NOJNL != csa->jnl->channel)
 					{
 						CLOSEFILE(csa->jnl->channel, rc);
 					}

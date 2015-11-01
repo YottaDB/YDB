@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -29,8 +29,12 @@
 #
 ##############################################################
 
-setenv	gtm_gtmdev 	"/usr"			# List of directories containing subdirectories named gtm_topdir which
-						# may contain GT.M releases.  "NULL" => subdirectory is ~library
+if ( "HP-UX" == $HOSTOS ) then
+	setenv	gtm_gtmdev 	/usr	# List of directories containing subdirectories named gtm_topdir which
+else
+	setenv	gtm_gtmdev 	"`dirname ~library`"	# List of directories containing subdirectories named gtm_topdir which
+endif
+						# may contain GT.M releases.  "NULL" => subdirectory is home of library
 set	gtm_gtmdev_lcl = ( $gtm_gtmdev )	# Note: this must be a shell variable in order to use subscripts
 						# (see below).
 

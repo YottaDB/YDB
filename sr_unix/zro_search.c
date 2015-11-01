@@ -10,7 +10,10 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 #include "gtm_stat.h"
+
 #include <errno.h>
 #include "zroutines.h"
 #include "eintr_wrappers.h"

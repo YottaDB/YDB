@@ -21,12 +21,18 @@ static char rcsid[] = "$Header:$";
 #endif
 
 #include "mdef.h"
+
+#include "gtm_stdlib.h"		/* for exit() */
+
 #include "error.h"
 #include "gtcm.h"
 
 #ifdef GTCM_RC
 #include "rc.h"
 #endif /* defined(GTCM_RC) */
+
+#include "gv_rundown.h"		/* for gv_rundown() prototype */
+#include "op.h"			/* for op_unlock() and op_lkinit() prototype */
 
 GBLREF int4	 gtcm_exi_condition;
 

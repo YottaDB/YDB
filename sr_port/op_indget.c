@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "hashdef.h"
 #include "lv_val.h"
 #include "toktyp.h"
@@ -21,14 +22,14 @@
 #include "op.h"
 #include "underr.h"
 
-GBLREF symval *curr_symval;
-GBLREF char window_token;
-GBLREF mval **ind_source_sp, **ind_source_top;
-GBLREF mval **ind_result_sp, **ind_result_top;
-GBLREF bool shift_gvrefs;
-GBLREF triple *expr_start;
+GBLREF	symval	*curr_symval;
+GBLREF	char	window_token;
+GBLREF	mval	**ind_source_sp, **ind_source_top;
+GBLREF	mval	**ind_result_sp, **ind_result_top;
+GBLREF	bool	shift_gvrefs;
+GBLREF	triple	*expr_start;
 
-LITREF char ctypetab[128];
+LITREF	char	ctypetab[NUM_ASCII_CHARS];
 
 void	op_indget(mval *dst, mval *target, mval *value)
 {
@@ -69,8 +70,7 @@ void	op_indget(mval *dst, mval *target, mval *value)
 					}
 					q = ht_get(&curr_symval->h_symtab , (mname *)&ident);
 					if (!q || !MV_DEFINED(&((lv_val *)q->ptr)->v))
-					{	*dst = *value;
-					}
+						*dst = *value;
 					else
 					{
 						assert (q->ptr);
@@ -116,12 +116,9 @@ void	op_indget(mval *dst, mval *target, mval *value)
 					expr_start = tmpchain.exorder.bl;
 					triptr = newtriple(OC_GVRECTARG);
 					triptr->operand[0] = put_tref(expr_start);
-				}
-				else
-				{	setcurtchain(oldchain);
-				}
-			}
-			else
+				} else
+					setcurtchain(oldchain);
+			} else
 			{
 				if (rval = indirection(&v))
 				{
@@ -145,8 +142,7 @@ void	op_indget(mval *dst, mval *target, mval *value)
 			*ind_source_sp++ = value;
 			comp_indr(&object);
 		}
-	}
-	else
+	} else
 	{
 		if (ind_source_sp + 1 >= ind_source_top || ind_result_sp + 1 >= ind_result_top)
 			rts_error(VARLSTCNT(1) ERR_INDMAXNEST);

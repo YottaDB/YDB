@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,13 +11,20 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
 #include "gtm_fcntl.h"
-
 #include "gtm_unistd.h"
 #include "gtm_stat.h"
 #include "gtm_ulimit.h"
 #include "gtm_stdio.h"
 #include "gtm_time.h"
+
+/* Following 5 is only to get MAX_FN_LEN */
+#include "gdsroot.h"
+#include "gdskill.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
 #include "eintr_wrappers.h"
 #include "rename_file_if_exists.h"
 #include "send_msg.h"
@@ -27,7 +34,6 @@ GBLREF bool run_time;
 
 #define TIME_EXT_FMT "_%Y%j%H%M%S"   	/* .yearjuliendayhoursminutesseconds */
 #define TIME_EXT_LEN 14			/* 4 digit year, 3 digit joul day, 6 digit time 1 null */
-#define MAX_FN_LEN 255
 #define MAX_CHARS_APPEND 10
 
 /* --------------------------------------------------------------------------------

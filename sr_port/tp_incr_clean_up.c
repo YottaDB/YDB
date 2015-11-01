@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,8 +31,8 @@ GBLREF  sgm_info        	*sgm_info_ptr;
 GBLREF  short        		dollar_tlevel;
 GBLREF 	uint4			cumul_jnl_rec_len;
 GBLREF 	sgmnt_addrs		*cs_addrs;
+GBLREF 	sgmnt_data_ptr_t	cs_data;
 GBLREF  gd_region		*gv_cur_region;
-GBLREF  sgmnt_data_ptr_t        cs_data;
 GBLREF  global_tlvl_info	*global_tlvl_info_head;
 GBLREF  buddy_list		*global_tlvl_info_list;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
@@ -275,7 +275,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 			FREE_KILL_SET(si, temp_kill_set);
 			si->kill_set_head = si->kill_set_tail = NULL;
 		}
-		if (JNL_ENABLED(cs_data))
+		if (JNL_ENABLED(cs_addrs))
 		{
 			if (tli->tlvl_jfb_info)
 			{
@@ -326,7 +326,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 		temp_kill_set = si->kill_set_head;
 		FREE_KILL_SET(si, temp_kill_set);
 		si->kill_set_head = si->kill_set_tail = NULL;
-		if (JNL_ENABLED(cs_data))
+		if (JNL_ENABLED(cs_addrs))
 		{
 			temp_jfb = si->jnl_head;
 			FREE_JFB_INFO(si, temp_jfb);

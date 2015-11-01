@@ -10,6 +10,10 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+#include "gtm_stdlib.h"		/* for exit() */
+
 #include "stp_parms.h"
 #include "iosp.h"
 #include "cli.h"

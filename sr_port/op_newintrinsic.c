@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,11 +14,22 @@
 #include "dollar_zlevel.h"
 #include "op.h"
 #include "svnames.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "dpgbldir.h"
+#include "dpgbldir_sysops.h"
 
+GBLREF gv_key   *gv_currkey;
+GBLREF gv_namehead *gv_target;
+GBLREF gd_addr  *gd_header;
 GBLREF mval	dollar_ztrap;
 GBLREF mval	dollar_etrap;
 GBLREF mval	dollar_estack_delta;
 GBLREF mval	dollar_zyerror;
+GBLREF mval	dollar_zgbldir;
 
 /* Routine to NEW a special intrinsic variable. Note that gtm_newinstrinsic(),
    which actually does the dirty work, may shift the stack to insert the mv_stent
@@ -33,9 +44,23 @@ void op_newintrinsic(int intrtype)
 	switch(intrtype)
 	{
 		case SV_ZTRAP:
+			/* Due to the potential intermix of $ETRAP and $ZTRAP, we put a condition on the
+			   explicit NEWing of these two special variables. If "the other" trap handler
+			   definition is not null (meaning this handler is not in control) then we will
+			   ignore the NEW. This is necessary for example when a frame with $ZT set calls
+			   a routine that NEWs and sets $ET. When it unwinds, we don't want it to pop off
+			   the old "null" value for $ET which then triggers the nulling out of our current
+			   $ZT value. Note that op_svput no longer calls this routine for "implicit" NEWs
+			   but calls directly to gtm_newintrinsic instead.
+			*/
+			if (dollar_etrap.str.len)
+				return;
 			intrinsic = &dollar_ztrap;
 			break;
 		case SV_ETRAP:
+			/* See comment above for SV_ZTRAP */
+			if (dollar_ztrap.str.len)
+				return;
 			intrinsic = &dollar_etrap;
 			break;
 		case SV_ESTACK:
@@ -43,6 +68,9 @@ void op_newintrinsic(int intrtype)
 			break;
 		case SV_ZYERROR:
 			intrinsic = &dollar_zyerror;
+			break;
+		case SV_ZGBLDIR:
+			intrinsic = &dollar_zgbldir;
 			break;
 		default:	/* Only above types defined by compiler */
 			GTMASSERT;
@@ -56,6 +84,19 @@ void op_newintrinsic(int intrtype)
 		   are "normalizing" $estack to be same as $stack value.
 		*/
 		dollar_estack_delta.m[0] = dollar_zlevel() - 1;
+	} else if (SV_ZGBLDIR == intrtype)
+	{
+		if (dollar_zgbldir.str.len != 0)
+			gd_header = zgbldir(&dollar_zgbldir);
+		else
+		{
+			dpzgbini();
+        		gd_header = NULL;
+		}
+		if (gv_currkey)
+			gv_currkey->base[0] = 0;
+		if (gv_target)
+			gv_target->clue.end = 0;
 	}
         return;
 }

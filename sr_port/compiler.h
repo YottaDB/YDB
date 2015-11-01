@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -290,44 +290,46 @@ int f_char(oprtype *a, opctype op);
 int f_data(oprtype *a, opctype op);
 int f_extract(oprtype *a, opctype op);
 int f_find(oprtype *a, opctype op);
-int f_fnumber( oprtype *a, opctype op);
-int f_fnzbitfind( oprtype *a, opctype op);
-int f_fnzbitget( oprtype *a, opctype op);
-int f_fnzbitset( oprtype *a, opctype op);
-int f_fnzbitstr( oprtype *a, opctype op );
+int f_fnumber(oprtype *a, opctype op);
+int f_fnzbitfind(oprtype *a, opctype op);
+int f_fnzbitget(oprtype *a, opctype op);
+int f_fnzbitset(oprtype *a, opctype op);
+int f_fnzbitstr(oprtype *a, opctype op);
 int f_get(oprtype *a, opctype op);
-int f_justify( oprtype *a, opctype op);
-int f_length( oprtype *a, opctype op);
-int f_mint( oprtype *a, opctype op);
-int f_mint_mstr( oprtype *a, opctype op);
-int f_mstr( oprtype *a, opctype op);
+int f_justify(oprtype *a, opctype op);
+int f_length(oprtype *a, opctype op);
+int f_mint(oprtype *a, opctype op);
+int f_mint_mstr(oprtype *a, opctype op);
+int f_mstr(oprtype *a, opctype op);
 int f_name(oprtype *a, opctype op);
-int f_next( oprtype *a, opctype op);
-int f_one_mval( oprtype *a, opctype op);
+int f_next(oprtype *a, opctype op);
+int f_one_mval(oprtype *a, opctype op);
 int f_order(oprtype *a, opctype op);
-int f_order1( oprtype *a, opctype op);
-int f_piece( oprtype *a, opctype op);
+int f_order1(oprtype *a, opctype op);
+int f_piece(oprtype *a, opctype op);
 int f_qlength(oprtype *a, opctype op);
 int f_qsubscript(oprtype *a, opctype op);
-int f_query ( oprtype *a, opctype op);
+int f_query (oprtype *a, opctype op);
 int f_reverse(oprtype *a, opctype op);
-int f_select( oprtype *a, opctype op );
+int f_select(oprtype *a, opctype op);
 int f_stack(oprtype *a, opctype op);
-int f_text( oprtype *a, opctype op );
-int f_translate( oprtype *a, opctype op );
-int f_two_mstrs( oprtype *a, opctype op);
-int f_two_mval( oprtype *a, opctype op );
-int f_view( oprtype *a, opctype op );
-int f_zcall( oprtype *a, opctype op);
-int f_zdate( oprtype *a, opctype op );
-int f_zechar( oprtype *a, opctype op );
-int f_zgetsyi( oprtype *a, opctype op);
-int f_zparse( oprtype *a, opctype op);
-int f_zprevious( oprtype *a, opctype op);
+int f_text(oprtype *a, opctype op);
+int f_translate(oprtype *a, opctype op);
+int f_two_mstrs(oprtype *a, opctype op);
+int f_two_mval(oprtype *a, opctype op);
+int f_view(oprtype *a, opctype op);
+int f_zcall(oprtype *a, opctype op);
+int f_zdate(oprtype *a, opctype op);
+int f_zechar(oprtype *a, opctype op);
+int f_zgetsyi(oprtype *a, opctype op);
+int f_zjobexam(oprtype *a, opctype op);
+int f_zparse(oprtype *a, opctype op);
+int f_zprevious(oprtype *a, opctype op);
 int f_zqgblmod(oprtype *a, opctype op);
-int f_zsearch( oprtype *a, opctype op );
-int f_zsqlexpr ( oprtype *a, opctype op );
+int f_zsearch(oprtype *a, opctype op);
+int f_zsigproc(oprtype *a, opctype op);
+int f_zsqlexpr (oprtype *a, opctype op);
 int f_zsqlfield (oprtype *a, opctype op);
-int f_ztrnlnm( oprtype *a, opctype op );
+int f_ztrnlnm(oprtype *a, opctype op);
 
 int put_tval(oprtype *ref, short index);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@ boolean_t region_init(bool cm_regions)
 {
 	gd_region		*region_top;
 	boolean_t		file_open, is_cm, all_files_open;
-	error_def (ERR_DBNOFILEOPN);
+	error_def (ERR_DBNOREGION);
 
 	file_open = FALSE;
 	all_files_open = TRUE;
@@ -50,7 +50,7 @@ boolean_t region_init(bool cm_regions)
 		}
 	}
 	if (!file_open)
-		rts_error(VARLSTCNT(1) ERR_DBNOFILEOPN);
+		rts_error(VARLSTCNT(1) ERR_DBNOREGION);
 
 	/* arbitrary assignment of the first region */
 	for (gv_cur_region = gd_header->regions; gv_cur_region < region_top; gv_cur_region++)

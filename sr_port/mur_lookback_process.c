@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,7 +70,7 @@ bool	mur_lookback_process(ctl_list *ctl)
 
 	case JRT_EPOCH:
 
-		ctl->reached_lookback_limit = rec->val.jrec_epoch.short_time < JNL_M_TIME(lookback_time)  ||
+		ctl->reached_lookback_limit = rec->val.jrec_epoch.short_time < MUR_OPT_MID_TIME(lookback_time)  ||
 					      ctl->lookback_count > mur_options.lookback_opers;
 
 		return !ctl->reached_lookback_limit;

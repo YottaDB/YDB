@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -155,7 +155,6 @@ int main(void)
 	error_def(ERR_GTMSECSHRTMOUT);
 	error_def(ERR_GTMSECSHRRECVF);
 	error_def(ERR_GTMSECSHRSENDF);
-	error_def(ERR_GTMSECSHREXIT);
 	error_def(ERR_GTMSECSHRSTARTUP);
 	error_def(ERR_TEXT);
 
@@ -185,7 +184,7 @@ int main(void)
 		{
 				gtm_putmsg(VARLSTCNT(1) ERR_GTMSECSHRTMOUT);
 				loop_limit = 1;
-				gtmsecshr_exit(0,0);
+				gtmsecshr_exit(0,0);	/* doesn't return */
 		}
 		recd = 0;
 		mesg_len = 0;
@@ -264,7 +263,6 @@ int main(void)
 		if ('a' <= client_addr.sun_path[strlen(client_addr.sun_path) - 1])
 			clean_client_sockets(client_addr.sun_path);
 	}
-	rts_error(VARLSTCNT(4) MAKE_MSG_SEVERE(ERR_GTMSECSHR), 1, process_id, ERR_GTMSECSHREXIT);
 }
 
 void gtmsecshr_init(void)
@@ -515,7 +513,7 @@ void gtmsecshr_switch_log_file(int sig)
 		suffix++;
 	}
 	/* --- switch to use the new log file --- */
-	if ((-1 == rename(gtmsecshr_logpath, &newname[0]))
+	if ((-1 == RENAME(gtmsecshr_logpath, &newname[0]))
 		|| (0 > (temp_fd = OPEN3(gtmsecshr_logpath, O_RDWR | O_CREAT | O_APPEND, GTMSECSHR_PERMS)))
 		|| (-1 == dup2(temp_fd, gtmsecshr_log_file))
 		|| (-1 == dup2(temp_fd, 1))
@@ -587,7 +585,7 @@ int service_request(gtmsecshr_mesg *buf)
 	error_def(ERR_GTMSECSHRSRVFFILE);
 	error_def(ERR_TEXT);
 
-	GET_CUR_TIME;
+	GET_CUR_TIME;		/* For z/OS, repeat before using time_ptr if anything could call ascii lib in between */
 	save_code = buf->code;
 	switch(buf->code)
 	{
@@ -695,7 +693,7 @@ int service_request(gtmsecshr_mesg *buf)
 					index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index, buf->mesg.path,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("File is not a GTM mutex socket file"));
 				buf->code = EINVAL;
-			} else if (0 != memcmp(basnam, MUTEX_SOCK_FILE_PREFIX, sizeof(MUTEX_SOCK_FILE_PREFIX) - 1))
+			} else if (0 != MEMCMP_LIT(basnam, MUTEX_SOCK_FILE_PREFIX))
 			{
 				gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFFILE, 7,
 			  	 RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
@@ -768,6 +766,9 @@ int service_request(gtmsecshr_mesg *buf)
 			send_msg(VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code,
 				buf->mesg.id, ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to write database file header"));
 		}
+#ifdef __MVS__
+		GET_CUR_TIME;
+#endif
 		util_out_print("!AD [client pid !UL] database fileheader (!AD) updated", TRUE, CTIME_BEFORE_NL, time_ptr, buf->pid,
 			fn_len, fn);
 		buf->code = 0;

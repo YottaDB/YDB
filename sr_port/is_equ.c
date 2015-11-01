@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 int is_equ(mval *u,mval *v)
 {
 	char utyp, vtyp, land, lor;

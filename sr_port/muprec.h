@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +48,7 @@ int real_len(int length, char *str);
 #define	MUR_JNL_REC_BUDDY_LIST_INIT_ALLOC	  64	/* initial allocation for jnl_rec_buddy_list in mur_forward() */
 #define	MUR_RAB_BUDDY_LIST_INIT_ALLOC	  	  (1024 * 4)	/* initial allocation for jnl_rec_buddy_list in mur_forward() */
 
-#define DEFAULT_EXTR_BLKSIZE	10240
+#define DEFAULT_EXTR_BUFSIZE		(FORMATZWR_CONVERSION_FACTOR * MAX_JNL_REC_SIZE)
 #define	MUR_PINI_IN_USE_INIT_ELEMS	64		/* initial no. of elements in hash table ctl->pini_in_use */
 
 enum mur_error

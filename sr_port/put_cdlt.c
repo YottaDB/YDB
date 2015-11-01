@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "opcode.h"
 #include "compiler.h"
 #include "mmemory.h"

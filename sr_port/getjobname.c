@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "stringpool.h"
 #include "mvalconv.h"
 #include "getjobnum.h"
@@ -22,7 +25,7 @@ static char djbuff[10];	/* storage for dollar job's string form */
 void getjobname(void)
 {
 	getjobnum();
-	i2mval(&dollar_job, process_id);
+	i2usmval(&dollar_job, process_id);
 	n2s(&dollar_job);
 	assert(dollar_job.str.len <= sizeof(djbuff));
 	memcpy(djbuff,dollar_job.str.addr,dollar_job.str.len);

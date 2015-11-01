@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,7 +86,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	jpc = csa->jnl;
 	BG_TRACE_PRO_ANY(csa, n_dbsync_timers);
 	assert(csa == cs_addrs);
-	assert(!JNL_ENABLED(csd) || NULL != jpc);
+	assert(!JNL_ALLOWED(csd) || NULL != jpc);
 	/* Note that even if the active queue was emptied when this routine was called, due to
 	 * concurrent update activity, cnl->wcs_active_lvl can be non-zero when we reach here. We
 	 * defer syncing in this case to the next time the active queue becomes empty ( or when we

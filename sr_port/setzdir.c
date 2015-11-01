@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
 #include "gtm_string.h"
-
-#include <limits.h>
+#include "gtm_limits.h"
 #include <errno.h>
 
 #include "setzdir.h"

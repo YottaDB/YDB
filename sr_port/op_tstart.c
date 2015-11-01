@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,7 +81,11 @@ GBLREF  uint4			cu_jnl_index;
 #define NORESTART -1
 #define ALLLOCAL  -2
 
-static	char	gv_orig_key[TP_MAX_NEST + 1][sizeof(gv_key) + MAX_KEY_SZ + 1];
+/* Note gv_orig_key[i] is assigned to tp_pointer->orig_key which then tries to dereference the "begin", "end", "prev", "top"
+ * 	fields like it were a gv_currkey pointer. Since these members are 2-byte fields, we need atleast 2 byte alignment.
+ * We want to be safer and hence give 4-byte alignment by declaring the array as an array of integers.
+ */
+static	int4	gv_orig_key[TP_MAX_NEST + 1][DIVIDE_ROUND_UP((sizeof(gv_key) + MAX_KEY_SZ + 1), sizeof(int4))];
 
 /*** temporary ***/
 GBLREF int4	    		dollar_zmaxtptime;
@@ -346,7 +350,7 @@ va_dcl
 			global_tlvl_info_head = new_gtli;
 	}
 	/* Store the dollar_tlevel specific information */
-	for (si = first_sgm_info; si; si = si->next_sgm_info)
+	for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
 	{
 		for (prev_tli = NULL, tli = si->tlvl_info_head; tli; tli = tli->next_tlevel_info)
 			prev_tli = tli;
@@ -360,7 +364,7 @@ va_dcl
 		else
 			new_tli->tlvl_kill_used = 0;
 		new_tli->tlvl_tp_hist_info = si->last_tp_hist;
-		if (JNL_ENABLED(FILE_INFO(si->gv_cur_region)->s_addrs.hdr))
+		if (JNL_ENABLED(&FILE_INFO(si->gv_cur_region)->s_addrs))
 		{
 			for (prev_jfb = NULL, jfb = si->jnl_head; jfb; jfb = jfb->next)
 				prev_jfb = jfb;

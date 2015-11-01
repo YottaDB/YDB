@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_stdlib.h"		/* for exit() */
+
 #include "dollar_zlevel.h"
 #include "error_trap.h"
 #include "error.h"

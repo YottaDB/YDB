@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,15 +45,15 @@ typedef unsigned short mstr_len_t;
 /* constant needed for FIFO - OS390 redefines in mdefsp.h */
 #define FIFO_PERMISSION		010666 /* fifo with RW permissions for owner, group, other */
 
-#if !defined(__MVS__)
 #include <inttypes.h>
-#endif
 #include "mdefsa.h"
 #include "mdefsp.h"
 
 #if !defined(__alpha) && !defined(__sparc) && !defined(__hpux) && !defined(mips)
 #define UNALIGNED_ACCESS_SUPPORTED
 #endif
+
+#define BITS_PER_UCHAR  8 /* note, C does not require this to be 8, see <limits.h> for definitions of CHAR_BIT and UCHAR_MAX */
 
 #define MAXPOSINT4		((int4)0x7fffffff)
 #define MAX_HOST_NAME_LEN	256
@@ -96,7 +96,7 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 #define FALSE		 0
 #endif
 #ifndef NULL
-#define NULL		 0
+#define NULL		((void *) 0)
 #endif
 #define NUL		 0x00
 #define SP		 0x20
@@ -105,8 +105,7 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 #define MAX_NUM_SIZE			   64
 #define MAX_FORM_NUM_SUBLEN		  128	      /* this is enough to hold the largest numeric subscript */
 #define PERIODIC_FLUSH_CHECK_INTERVAL (30 * 1000)
-
-
+#define MAX_ARGS	256 /* in formallist */
 
 unsigned char *n2s(mval *mv_ptr);
 char *s2n(mval *u);
@@ -154,6 +153,15 @@ char *s2n(mval *u);
 /* these are the analogs of the preceeding, but are more efficient when the MODULUS is a Power Of Two */
 #define ROUND_UP2(VALUE, MODULUS)		(CHECKPOT(MODULUS) ((VALUE) + ((MODULUS) - 1)) & ~((MODULUS) - 1))
 #define ROUND_DOWN2(VALUE, MODULUS)		(CHECKPOT(MODULUS) (VALUE) & ~((MODULUS) - 1))
+
+/* LOG2_OF_INTEGER returns the ceiling of log (base 2) of number */
+#define LOG2_OF_INTEGER(number, log2_of_number)			\
+{								\
+	int    temp = (number) - 1;				\
+	for (log2_of_number = 0; 0 < temp; log2_of_number++)	\
+	   temp = (temp) >> 1; 					\
+}
+
 #define ISDIGIT(x)	( (x) >='0' && (x) <= '9' )
 #define ISALPHA(x)	( (x) >='a' && (x) <= 'z' || (x) >= 'A' && (x) <= 'Z' )
 
@@ -171,35 +179,37 @@ void ins_errtriple(int4 in_error);
 int4 timeout2msec(int4 timeout);
 
 /* the RTS_ERROR_TEXT macro will stay till all existing references to it have been renamed to RTS_ERROR_{LITERAL,STRING} */
-#define RTS_ERROR_TEXT(STRING)		LENGTH_AND_STRING(STRING)
+#define	RTS_ERROR_TEXT(STRING)		LENGTH_AND_STRING(STRING)
 
 /* for those who prefer not remembering the order of the length and the literal/string in the rts_error command line */
-#define RTS_ERROR_LITERAL(LITERAL)	LENGTH_AND_LITERAL(LITERAL)
-#define RTS_ERROR_STRING(STRING)	LENGTH_AND_STRING(STRING)
+#define	RTS_ERROR_LITERAL(LITERAL)	LENGTH_AND_LITERAL(LITERAL)
+#define	RTS_ERROR_STRING(STRING)	LENGTH_AND_STRING(STRING)
 
 /* the LITERAL version of the macro should be used over STRING whenever possible for efficiency reasons */
-#define STR_LIT_LEN(LITERAL)		(sizeof(LITERAL) - 1)
-#define LITERAL_AND_LENGTH(LITERAL)	(LITERAL), (sizeof(LITERAL) - 1)
-#define LENGTH_AND_LITERAL(LITERAL)	(sizeof(LITERAL) - 1), (LITERAL)
-#define STRING_AND_LENGTH(STRING)	(STRING), (strlen(STRING))
-#define LENGTH_AND_STRING(STRING)	(strlen(STRING)), (STRING)
+#define	STR_LIT_LEN(LITERAL)		(sizeof(LITERAL) - 1)
+#define	LITERAL_AND_LENGTH(LITERAL)	(LITERAL), (sizeof(LITERAL) - 1)
+#define	LENGTH_AND_LITERAL(LITERAL)	(sizeof(LITERAL) - 1), (LITERAL)
+#define	STRING_AND_LENGTH(STRING)	(STRING), (strlen(STRING))
+#define	LENGTH_AND_STRING(STRING)	(strlen(STRING)), (STRING)
 
 #define	LEN_AND_LIT(LITERAL)		LENGTH_AND_LITERAL(LITERAL)
 #define	LIT_AND_LEN(LITERAL)		LITERAL_AND_LENGTH(LITERAL)
 #define	STR_AND_LEN(STRING)		STRING_AND_LENGTH(STRING)
 #define	LEN_AND_STR(STRING)		LENGTH_AND_STRING(STRING)
 
+#define	MEMCMP_LIT(SOURCE, LITERAL)	memcmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
+
 /* *********************************************************************************************************** */
 /*		   Frequently used len + str combinations in macro form.				       */
 /* *********************************************************************************************************** */
-#define DB_STR_LEN(reg)			(reg)->dyn.addr->fname, (reg)->dyn.addr->fname_len
-#define DB_LEN_STR(reg)			(reg)->dyn.addr->fname_len, (reg)->dyn.addr->fname
-#define REG_STR_LEN(reg)		(reg)->rname, (reg)->rname_len
-#define REG_LEN_STR(reg)		(reg)->rname_len, (reg)->rname
-#define JNL_STR_LEN(csd)		(csd)->jnl_file_name, (csd)->jnl_file_len
-#define JNL_LEN_STR(csd)		(csd)->jnl_file_len, (csd)->jnl_file_name
+#define	DB_STR_LEN(reg)			(reg)->dyn.addr->fname, (reg)->dyn.addr->fname_len
+#define	DB_LEN_STR(reg)			(reg)->dyn.addr->fname_len, (reg)->dyn.addr->fname
+#define	REG_STR_LEN(reg)		(reg)->rname, (reg)->rname_len
+#define	REG_LEN_STR(reg)		(reg)->rname_len, (reg)->rname
+#define	JNL_STR_LEN(csd)		(csd)->jnl_file_name, (csd)->jnl_file_len
+#define	JNL_LEN_STR(csd)		(csd)->jnl_file_len, (csd)->jnl_file_name
 
-#define FAB_LEN_STR(fab)		(fab)->fab$b_fns, (fab)->fab$l_fna
+#define	FAB_LEN_STR(fab)		(fab)->fab$b_fns, (fab)->fab$l_fna
 /* *********************************************************************************************************** */
 
 
@@ -288,23 +298,29 @@ typedef que_head *	que_head_ptr_t;
 # endif
 #endif
 
+#ifndef GTM_INT64T_DEFINED
+#define GTM_INT64T_DEFINED
+   typedef	uint64_t		gtm_uint64_t;
+   typedef	int64_t			gtm_int64_t;
+#endif
+
 #ifdef INT8_SUPPORTED
-   typedef	uint64_t		qw_num;
-   typedef	uint64_t		seq_num;	/* Define 8-byte sequence number */
-   typedef	uint64_t		token_num;	/* Define 8-byte token number */
-   typedef	uint64_t		qw_off_t;	/* quad-word offset */
+   typedef	gtm_uint64_t		qw_num;
+   typedef	gtm_uint64_t		seq_num;	/* Define 8-byte sequence number */
+   typedef	gtm_uint64_t		token_num;	/* Define 8-byte token number */
+   typedef	gtm_uint64_t		qw_off_t;	/* quad-word offset */
 #  define	DWASSIGNQW(A,B)		(A)=(uint4)(B)
 #  define	QWASSIGN(A,B)		(A)=(B)
-#  define	QWASSIGNDW(A,B)		QWASSIGN((A),(uint64_t)(B))
-#  define	QWASSIGN2DW(A,B,C)	QWASSIGN((A),(uint64_t)(B) << 32 | C)
+#  define	QWASSIGNDW(A,B)		QWASSIGN((A),(gtm_uint64_t)(B))
+#  define	QWASSIGN2DW(A,B,C)	QWASSIGN((A),(gtm_uint64_t)(B) << 32 | (C))
 #  define	QWADD(A,B,C)		(A)=(B)+(C)
 #  define	QWSUB(A,B,C)		(A)=(B)-(C)
-#  define	QWADDDW(A,B,C)		(A)=(B)+(uint64_t)(C)
-#  define	QWSUBDW(A,B,C)		(A)=(B)-(uint64_t)(C)
+#  define	QWADDDW(A,B,C)		(A)=(B)+(gtm_uint64_t)(C)
+#  define	QWSUBDW(A,B,C)		(A)=(B)-(gtm_uint64_t)(C)
 #  define	QWINCRBY(A,B)		(A)+=(B)
 #  define	QWDECRBY(A,B)		(A)-=(B)
-#  define	QWINCRBYDW(A,B)		(A)+=(uint64_t)(B)
-#  define	QWDECRBYDW(A,B)		(A)-=(uint64_t)(B)
+#  define	QWINCRBYDW(A,B)		(A)+=(gtm_uint64_t)(B)
+#  define	QWDECRBYDW(A,B)		(A)-=(gtm_uint64_t)(B)
 #  define	QWMULBYDW(A,B,C)	(A)=(B)*(C)
 #  define	QWDIVIDEBYDW(A,B,Q,R)	{(R)=(A)%(B); (Q)=(A)/(B);}
 #  define	QWMODDW(A,B)		((A)%(B))
@@ -475,9 +491,9 @@ typedef que_head *	que_head_ptr_t;
   typedef vint_ptr_t sm_vint_ptr_t;	/* Define 64 bit pointer to volatile int */
   typedef uint_ptr_t sm_uint_ptr_t;	/* Define 64 bit pointer to uint */
   typedef vuint_ptr_t sm_vuint_ptr_t;	/* Define 64 bit pointer to volatile uint */
-  typedef int64_t sm_off_t;		/* Define 64 bit offset type */
-  typedef int64_t sm_long_t;		/* Define 64 bit integer type */
-  typedef uint64_t sm_ulong_t;		/* Define 64 bit unsigned integer type */
+  typedef gtm_int64_t sm_off_t;		/* Define 64 bit offset type */
+  typedef gtm_int64_t sm_long_t;	/* Define 64 bit integer type */
+  typedef gtm_uint64_t sm_ulong_t;	/* Define 64 bit unsigned integer type */
   typedef global_latch_t *sm_global_latch_ptr_t; /* Define 64 bit pointer to hp_latch */
 #  ifdef __osf__
 #    pragma pointer_size(restore)
@@ -709,4 +725,29 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #else
 #define SHMAT_ARG(X)		(X)
 #endif
+
+#define MAXNUMLEN 	128	/* from PV_N2S */
+#define CENTISECONDS	100	/* VMS lib$day returns 1/100s, we want seconds, use this factor to convert b/n the two */
+#define MINUTE		60		/* seconds in a minute */
+#define HOUR		MINUTE*60	/* one hour in seconds 60 * 60 */
+#define ONEDAY		86400		/* seconds in a day */
+
+#if defined(VMS)
+#define DAYS		6530  /* adjust VMS returned days by this amount; GTM zero time Dec 31, 1840, VMS zero time 7-NOV-1858 */
+#elif defined(UNIX)
+#define DAYS		47117 /* adjust Unix returned days (seconds converted to days); Unix zero time 1970 */
+#else
+#error Unsupported platform
+#endif
+
+#define FORMATZWR_CONVERSION_FACTOR (sizeof("_$c()_") - 1)
+#define EXIT_NRM	0
+#define EXIT_INF	1
+#define EXIT_WRN	2
+#define EXIT_ERR	4
+#define EXIT_RDONLY	8
+#define EXIT_MASK 	7
+#define MIN_FN_LEN	1
+#define MAX_FN_LEN	255
+
 #endif /* MDEF_included */

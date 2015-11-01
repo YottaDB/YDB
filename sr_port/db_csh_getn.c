@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,7 @@
 #include "filestruct.h"
 #include "interlock.h"
 #include "jnl.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "gdsbgtr.h"
@@ -32,6 +32,7 @@
 #include "relqop.h"
 #include "is_proc_alive.h"
 #include "cache.h"
+#include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 #include "wcs_sleep.h"
 #include "wcs_get_space.h"
@@ -132,7 +133,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				cr->refer = TRUE;
 				continue;
 			}
-			if (NULL != cw_stagnate  &&  NULL != lookup_hashtab_ent(cw_stagnate, (void *)cr->blk, &dummy))
+			if (NULL != lookup_hashtab_ent(cw_stagnate, (void *)cr->blk, &dummy))
 			{
 				cr->refer = TRUE;
 				continue;
@@ -169,6 +170,11 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				cr->dirty = 0;	/* something dropped the bits; fix it and proceed */
 			}
 		}
+		/* Note that before setting up a buffer for the requested block, we should make sure the cache-record's
+		 * 	read_in_progress is set. This is so that noone else in t_qread gets access to this empty buffer.
+		 * By setting up a buffer, it is meant assigning cr->blk in addition to inserting the cr in the blkques
+		 * 	through shuffqth() below.
+		 * Note that t_qread() has special code to handle read_in_progress */
 		LOCK_BUFF_FOR_READ(cr, rip);
 		if (0 != rip)
 		{
@@ -227,7 +233,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		/* no other process "owns" the block */
 		if (CDB_STAGNATE <= t_tries || mu_reorg_process)
 		{	/* this should probably use cr->in_cw_set with a condition handler to cleanup */
-			cws_insert(block);
+			CWS_INSERT(block);
 		}
 		/* We don't do the following assert in unix, since the LATCH may be released by
 		 * a writer later which need not be in crit. And that will not cause problems.

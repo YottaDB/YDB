@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,8 +43,9 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 	/* note the alignment of these next two fields is critical to correct operation of
 	   opp_ret on the VMS platforms. Any changes here need to be reflected there.
 	*/
-	unsigned char	type;
+	unsigned short	type;
 	unsigned char	flags;
+	unsigned char   filler;
 } stack_frame;
 
 /* Stack frame types */
@@ -56,6 +57,7 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFT_ZTRAP	(1 << 5)	/* ztrap frame */
 #define SFT_EXTFUN	(1 << 6)	/* extfun frame */
 #define SFT_ZSTEP_ACT	(1 << 7)	/* action frame for a zstep */
+#define SFT_ZINTR	(1 << 8)	/* $zinterrupt frame */
 
 /* Flags for flag byte */
 #define SFF_INDCE	(1 << 0)	/* This frame is executing an indirect cache entry */

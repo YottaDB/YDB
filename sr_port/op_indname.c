@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "compiler.h"
 #include "stringpool.h"
 #include <varargs.h>
@@ -45,7 +48,7 @@ va_dcl
 		stp_gcol(MAX_SRCLINE);
 	out = stringpool.free;
 	if (out + src->str.len > stringpool.top)
-		rts_error(VARLSTCNT(1) ERR_INDRMAXLEN);
+		rts_error(VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
 	if (src->str.len < 1)
 		rts_error(VARLSTCNT(1) ERR_VAREXPECTED);
 	memcpy(out , src->str.addr, src->str.len);

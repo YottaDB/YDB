@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,10 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_time.h"
-
-
 #include "gtm_unistd.h"
+#include "gtm_string.h"
+
 #include "aswp.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -31,12 +32,14 @@
 #include "performcaslatchcheck.h"
 #include "wcs_sleep.h"
 #include "jnl_write.h"
-#include "gtm_string.h"
+#include "gtmmsg.h"	/* for gtm_putmsg() prototype */
+#include "util.h"	/* for util_out_print() prototype */
 
 GBLREF	boolean_t	mupip_jnl_recover;
 GBLREF	boolean_t	jnlfile_truncation;
 GBLREF	uint4		process_id;
 GBLREF	boolean_t	recovery_success;
+GBLREF  jnl_process_vector      *prc_vec;
 
 
 
@@ -127,7 +130,8 @@ void	jnl_file_close(gd_region *reg, bool clean, bool eov)
 		RELEASE_IO_IN_PROG_LOCK(jb);
 
 		/* Write an EOF record */
-		jnl_prc_vector(&eof_record.process_vector);
+		memcpy(&eof_record.process_vector, prc_vec, sizeof(jnl_process_vector));
+		JNL_WHOLE_TIME(eof_record.process_vector.jpv_time);
 		eof_record.tn = csa->ti->curr_tn;
 		QWASSIGN(eof_record.jnl_seqno, csa->hdr->reg_seqno);
 		jnl_write(jpc, JRT_EOF, (jrec_union *)&eof_record, NULL, NULL);
@@ -151,6 +155,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool eov)
 			header->crash = FALSE;
 			if (mupip_jnl_recover && recovery_success & 0 != header->forw_phase_jnl_file_len)
 			{
+				header->forw_phase_jnl_file_name[header->forw_phase_jnl_file_len] = 0;
 				if (0 != (status = UNLINK(header->forw_phase_jnl_file_name)))
 				{
 					if (-1 == status)
@@ -158,7 +163,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool eov)
 						status = errno;
 						gtm_putmsg(VARLSTCNT(1) status);
 					}
-					util_out_print("MUR-W-ERRDEl : Error deleting jnl file !AD", TRUE,
+					util_out_print("MUR-W-ERRDEL : Error deleting jnl file !AD", TRUE,
 						header->forw_phase_jnl_file_len, header->forw_phase_jnl_file_name);
 				}
 				header->ftruncate_len = 0;

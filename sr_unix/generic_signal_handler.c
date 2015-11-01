@@ -19,7 +19,10 @@
  */
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 #include "gtm_unistd.h"
+#include "gtm_stdlib.h"		/* for exit() */
 
 #include <signal.h>
 #include <netinet/in.h>

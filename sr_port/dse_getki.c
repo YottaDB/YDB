@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -173,7 +173,7 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 
 int parse_dlr_char(char *src, char *top, char *dlr_subsc)
 {
-	int		indx = 0, dlr_len, dlr_val;
+	int		indx = 0, dlr_len, dlr_val, harlen;
 	char 		lcl_buf[MAX_KEY_SZ + 1];
 	char 		*tmp_buf;
 
@@ -184,11 +184,12 @@ int parse_dlr_char(char *src, char *top, char *dlr_subsc)
 	tmp_buf++;
 	if (*tmp_buf == 'h' || *tmp_buf == 'H')
 	{
-		if (top - tmp_buf <= strlen("har"))
+		harlen = strlen("har");
+		if (top - tmp_buf <= harlen)
 			return 0;
-		if (STRNCASECMP(tmp_buf, STR_AND_LEN("har")))
+		if (STRNCASECMP(tmp_buf, "har", harlen))
 			return 0;
-		tmp_buf += strlen("har");
+		tmp_buf += harlen;
 	}
 	if (*tmp_buf++ != '(')
 		return 0;

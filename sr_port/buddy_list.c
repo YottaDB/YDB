@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "buddy_list.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,6 @@
 #include "send_msg.h"
 #include "op.h"
 #include "io.h"
-#include "mlk_rollback.h"
 #include "targ_alloc.h"
 #include "getzposition.h"
 #include "wcs_recover.h"
@@ -58,6 +57,7 @@ error_def(ERR_TPFAIL);
 error_def(ERR_TPRESTART);
 error_def(ERR_TRESTNOT);
 error_def(ERR_TRESTLOC);
+UNIX_ONLY(error_def(ERR_GVFAILCORE);)
 
 #define	MAX_TRESTARTS	16
 
@@ -241,6 +241,7 @@ void	tp_restart(int newlevel)
 			wcs_backoff(dollar_trestart * TP_DEADLOCK_FACTOR); /* Sleep so needed locks have a chance to get released */
 			break;
 		case cdb_sc_jnlclose:
+		case cdb_sc_jnlstatemod:
 			t_tries--;
 			/* fall through */
 		default:
@@ -249,7 +250,10 @@ void	tp_restart(int newlevel)
 				hist_index = t_tries;
 				t_tries = 0;
 				assert(FALSE);
-				rts_error(VARLSTCNT(4) ERR_TPFAIL, 2, hist_index + 1, t_fail_hist);
+				UNIX_ONLY(send_msg(VARLSTCNT(5) ERR_TPFAIL, 2, hist_index, t_fail_hist, ERR_GVFAILCORE));
+				UNIX_ONLY(gtm_fork_n_core());
+				VMS_ONLY(send_msg(VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist));
+				rts_error(VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist);
 				return; /* for the compiler only -- never executed */
 			} else
 			{	/* as of this writing, this operates only between the 2nd and 3rd tries;
@@ -308,8 +312,7 @@ void	tp_restart(int newlevel)
          * updated blocks). This is typically needed for a restart.
          */
         tp_clean_up(TRUE);
-        mlk_rollback(newlevel);
-	tp_unwind(newlevel, TRUE);
+	tp_unwind(newlevel, RESTART_INVOCATION);
 	gd_header = tp_pointer->gd_header;
 	gv_target = tp_pointer->orig_gv_target;
 	if (NULL != gv_target)
@@ -319,6 +322,8 @@ void	tp_restart(int newlevel)
 	TP_CHANGE_REG(gv_cur_region);
 	dollar_tlevel = newlevel;
 	top = gv_currkey->top;
+	/* ensure proper alignment before dereferencing tp_pointer->orig_key->end */
+	assert(0 == (((unsigned long)tp_pointer->orig_key) % sizeof(tp_pointer->orig_key->end)));
 	memcpy(gv_currkey, tp_pointer->orig_key, sizeof(*tp_pointer->orig_key) + tp_pointer->orig_key->end);
 	gv_currkey->top = top;
 	tp_pointer->fp->mpc = tp_pointer->restart_pc;

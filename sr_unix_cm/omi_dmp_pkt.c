@@ -24,6 +24,9 @@ static char rcsid[] = "$Header:$";
 #include "gtm_unistd.h"
 
 #include "mdef.h"
+
+#include "gtm_string.h"
+
 #include "omi.h"
 
 GBLREF char	*omi_pklog;

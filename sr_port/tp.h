@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -121,12 +121,14 @@ typedef struct sgm_info_struct
 			num_of_blks,
 			tp_hist_size,
 			cur_tp_hist_size,
-			total_jnl_record_size,
+			total_jnl_rec_size,
 			cr_array_size;
 	boolean_t	fresh_start;
 	short		crash_count;
 	bool		backup_block_saved;
 	boolean_t	kip_incremented;
+	int		tmp_cw_set_depth;	/* used only #ifdef DEBUG. see comments for tmp_cw_set_depth in tp_tend() */
+	uint4		tot_jrec_size;		/* maximum journal space needs for this transaction */
 } sgm_info;
 
 typedef struct
@@ -225,44 +227,58 @@ GBLREF	short	dollar_trestart;
 
 #define PREV_OFF_INVALID -1
 
+/* JNL_FILE_TAIL_PRESERVE macro indicates maximum number of bytes to ensure allocated at the end of the journal file
+ * 	to store the journal records that will be written whenever the journal file gets closed.
+ * any process closing the journal file needs to at max. write a PINI, EPOCH, PFIN and EOF record.
+ * the EOF record needs to be at a 512-byte (DISK_BLOCK_SIZE) aligned boundary.
+ * (i) and each journal record might need an align record to be written too whose max. size is equal to the jnl record
+ *     therefore the size needs to be multiplied by 2.
+ * (ii) we now have to give room for twice the above space to accommodate the EOF writing by a process that closes the journal
+ *	and the EOF writing by the first process that reopens it and finds no space left and switches to a new journal.
+ * hence the multiplication by 4 i.e. 2 for each (i) and (ii).
+ */
+#define	JNL_FILE_TAIL_PRESERVE	(((4 * ALIGN_RECLEN) + PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN + DISK_BLOCK_SIZE) * 4)
+
 #define TOTAL_TPJNL_REC_SIZE(total_jnl_rec_size, si, csa)							\
 {														\
-	total_jnl_rec_size = si->total_jnl_record_size; 							\
-	if (jbp->before_images)											\
+	total_jnl_rec_size = si->total_jnl_rec_size;								\
+	DEBUG_ONLY(si->tmp_cw_set_depth = si->cw_set_depth;)	/* save a copy to check later in tp_tend() */	\
+	if (csa->jnl_before_image)										\
 		total_jnl_rec_size += (si->cw_set_depth * csa->pblk_align_jrecsize);				\
 	/* Since we have already taken into account an align record per journal record and since the size of	\
 	 * an align record will be < (size of the journal record written + fixed-size of align record)		\
 	 * we can be sure we won't need more than twice the computed space.					\
 	 */													\
 	total_jnl_rec_size *= 2;										\
+	/* give allowance for space needed at end of journal file in case journal file close is needed */	\
+	total_jnl_rec_size += JNL_FILE_TAIL_PRESERVE;								\
+	si->total_jnl_rec_size = total_jnl_rec_size;								\
 }
 
 /* This macro gives a pessimistic estimate on the total journal record size needed.
- * The side effect is that we would end up with a journal file extension when it was actually not needed.
- * But that should happen only if we are nearing 4G and hence should not be a concern.
+ * The side effect is that we might end up with a journal file extension when it was actually not needed.
  */
-#define TOTAL_NONTPJNL_REC_SIZE(total_jnl_rec_size, non_tp_jfb_ptr, csa, cw_set_depth)				\
+#define TOTAL_NONTPJNL_REC_SIZE(total_jnl_rec_size, non_tp_jfb_ptr, csa, tmp_cw_set_depth)			\
 {														\
 	total_jnl_rec_size = non_tp_jfb_ptr->record_size;							\
 	if (total_jnl_rec_size)											\
 		total_jnl_rec_size += csa->min_total_nontpjnl_rec_size;						\
-	if (jbp->before_images)											\
-		total_jnl_rec_size += (cw_set_depth * csa->pblk_align_jrecsize);				\
+	if (csa->jnl_before_image)										\
+		total_jnl_rec_size += (tmp_cw_set_depth * csa->pblk_align_jrecsize);				\
 	/* The following two computations are either rare or are needed in dse where performance		\
 	 * 	is not a concern. Hence these are recomputed everytime instead of storing in a variable.	\
 	 */													\
-	if (dse_running || write_after_image)											\
-		total_jnl_rec_size += (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_AIMG] + JREC_SUFFIX_SIZE		\
-					+ csa->hdr->blk_size							\
-					+ JREC_PREFIX_SIZE + jnl_fixed_size[JRT_ALIGN] + JREC_SUFFIX_SIZE);	\
+	if (dse_running || write_after_image)									\
+		total_jnl_rec_size += AIMG_RECLEN + csa->hdr->blk_size + ALIGN_RECLEN;				\
 	if (mu_reorg_process || 0 == cw_depth || inctn_gvcstput_extra_blk_split == inctn_opcode)		\
-		total_jnl_rec_size += (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_INCTN] + JREC_SUFFIX_SIZE) 	\
-					+ (JREC_PREFIX_SIZE + jnl_fixed_size[JRT_ALIGN] + JREC_SUFFIX_SIZE);	\
+		total_jnl_rec_size += INCTN_RECLEN + ALIGN_RECLEN;						\
 	/* Since we have already taken into account an align record per journal record and since the size of	\
 	 * an align record will be < (size of the journal record written + fixed-size of align record)		\
 	 * we can be sure we won't need more than twice the computed space.					\
 	 */													\
 	total_jnl_rec_size *= 2;										\
+	/* give allowance for space needed at end of journal file in case journal file close is needed */	\
+	total_jnl_rec_size += JNL_FILE_TAIL_PRESERVE;								\
 }
 
 #define INVALIDATE_CLUE(cse) 					\
@@ -333,7 +349,6 @@ void tp_clean_up(boolean_t rollback_flag);
 void tp_cw_list(cw_set_element **cs);
 void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
 void tp_incr_clean_up(short newlevel);
-void tp_incr_rollback(short newlevel);
 void tp_set_sgm(void);
 tp_region *insert_region(gd_region *reg, tp_region **reg_list, tp_region **reg_free_list, int4 size);
 void tp_start_timer_dummy(int4 timeout_seconds);

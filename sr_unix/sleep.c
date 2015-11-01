@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@ int m_nsleep(int nseconds)
 
 int m_sleep(int seconds)
 {
-    return sleep((unsigned int)seconds);
+    return nanosleep_func((useconds_t)(1000 * seconds));
 }
 
 int m_usleep(int useconds)
