@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -43,6 +43,12 @@ if ( $?gtm_version_change == "1" ) then
 	setenv gt_as_option_DDEBUG	""
 
 	# C definitions:
+
+	# this is a temporary "fix", until we use stdargs, rather than varargs,
+	# since that is supposed to happen soon, we will keep this fix, simple (and dirty)
+	if ("scylla" == "$HOST:r:r") then
+		setenv gt_cc_compiler "gcc-2.95"
+	endif
 
 	# generate position independent code
 	setenv 	gt_cc_shl_fpic		"-fPIC"

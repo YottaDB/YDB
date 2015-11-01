@@ -101,7 +101,7 @@ error_def(ERR_MUPCLIERR);
 void dbc_write_p1out(phase_static_area *psa, void *obuf, int olen);
 void dbc_requeue_block(phase_static_area *psa, block_id blk_num);
 void dbc_integ_error(phase_static_area *psa, block_id blk_num, char_ptr_t emsg);
-void dbc_process_block(phase_static_area *psa, int blk_num, off_t dbptr);
+void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr);
 uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t rec_p);
 
 /* Phase 1 certification process scans the dstabase */
@@ -115,7 +115,7 @@ void dbcertify_scan_phase(void)
 	char_ptr_t	errmsg;
 	unsigned char	dbfn[MAX_FN_LEN + 1];
 	unsigned short	buff_len;
-	off_t		dbptr;
+	gtm_off_t	dbptr;
 	boolean_t	outfile_present;
 	enum gdsblk_type blk_type;
 	block_id	bitmap_blk_num, last_bitmap_blk_num, blk_num;
@@ -333,14 +333,14 @@ void dbcertify_scan_phase(void)
 					psa->fc->op_buff = psa->curr_lbmap_buff;
 					dbptr = ((psa->dbc_cs_data->start_vbn - 1) * DISK_BLOCK_SIZE)
 						+ psa->dbc_cs_data->free_space
-						+ ((off_t)psa->dbc_cs_data->blk_size * bitmap_blk_num);
+						+ ((gtm_off_t)psa->dbc_cs_data->blk_size * bitmap_blk_num);
 					psa->fc->op_pos = (dbptr / DISK_BLOCK_SIZE) + 1;
 					dbcertify_dbfilop(psa);		/* Read local bitmap block (no return if error) */
 					last_bitmap_blk_num = bitmap_blk_num;
 				}
 				lm_offset = (blk_num - bitmap_blk_num) * 2;
 				dbptr = ((psa->dbc_cs_data->start_vbn - 1) * DISK_BLOCK_SIZE) + psa->dbc_cs_data->free_space
-					+ ((off_t)psa->dbc_cs_data->blk_size * blk_num);
+					+ ((gtm_off_t)psa->dbc_cs_data->blk_size * blk_num);
 				if (gvcst_blk_is_allocated(psa->curr_lbmap_buff + sizeof(v15_blk_hdr), lm_offset))
 					/* This block is in use -- process it */
 					dbc_process_block(psa, blk_num, dbptr);
@@ -455,7 +455,7 @@ void dbc_write_p1out(phase_static_area *psa, void *obuf, int olen)
 }
 
 /* Routine to process a database block */
-void dbc_process_block(phase_static_area *psa, int blk_num, off_t dbptr)
+void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 {
 	int		rec_len, rec1_cmpc, rec1_gvn_len, rec2_cmpc, key_len, blk_levl, rec1_len, rec2_len, rec2_rlen;
 	int		free_bytes, blk_len;

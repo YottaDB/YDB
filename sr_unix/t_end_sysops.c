@@ -42,6 +42,7 @@
 #include "tp.h"
 #include "gdsbgtr.h"
 #include "gtmio.h"
+#include "repl_sp.h"		/* F_CLOSE */
 #include "min_max.h"
 #include "relqueopi.h"
 #include "io.h"			/* for gtmsecshr.h */
@@ -1121,6 +1122,7 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 uint4	jnl_ensure_open(void)
 {
 	uint4			jnl_status = 0;
+	int			close_res;
 	jnl_private_control	*jpc;
 	DEBUG_ONLY(
 		gd_id	save_jnl_gdid;
@@ -1143,7 +1145,7 @@ uint4	jnl_ensure_open(void)
 	{
 		DEBUG_ONLY(save_jnl_gdid = cs_addrs->nl->jnl_file.u;)
 		/* The journal file has been changed "on the fly"; close the old one and open the new one */
-		close(jpc->channel);
+		F_CLOSE(jpc->channel, close_res);
 		jpc->channel = NOJNL;
 		jpc->pini_addr = 0;
 		if (GTCM_GNP_SERVER_IMAGE == image_type)

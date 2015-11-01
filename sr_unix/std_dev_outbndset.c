@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,6 @@
 #include "std_dev_outbndset.h"
 
 #define SHFT_MSK 0x00000001
-#define CTRL_U	21
 
 GBLREF volatile io_pair 	io_std_device;
 GBLREF volatile int4 		spc_inp_prc;

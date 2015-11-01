@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,9 +48,11 @@
 #ifdef __MVS__
 #define DOWRITE_A	__write_a
 #define DOREAD_A	__read_a
+#define	DOWRITERL_A	#error need to create as part of z/OS port and make __write_a return status and good errno
 #else
 #define DOWRITE_A	DOWRITE
 #define DOREAD_A	read
+#define	DOWRITERL_A	DOWRITERL
 #endif
 
 #define MAX_FILE_OPEN_TRIES 	20  /* polling count */
@@ -236,7 +238,7 @@
  * an empty file. So here, polling for a non-empty object file before reading.
  */
 #define POLL_OBJECT_FILE(FNAME, FDESC)			\
-for (cntr=0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
+for (cntr = 0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
 {							\
 	OPEN_OBJECT_FILE(FNAME, O_RDONLY, FDESC);	\
 	if (-1 == FDESC)				\
@@ -259,18 +261,29 @@ for (cntr=0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
 		RC = errno;					\
 }
 
-#if defined(__osf__) || defined(_AIX) || defined(__sparc) || defined(__linux__)
-/* These platforms are known to support pread/pwrite. Currently there is a problem
-   on HP/UX 11i and HP/UX 11.0 doesn't support it and MVS is unknown so those
-   platforms get the oldform. 02/2004 se.
+#if defined(__osf__) || defined(_AIX) || defined(__sparc) || defined(__linux__) || defined(__hpux)
+/* These platforms are known to support pread/pwrite. MVS is unknown and so gets the old support.
 
-   Note !! pread and pwrite do NOT set the file pointer like lseek/read/write would
+   Note !! pread and pwrite do NOT (on most platforms) set the file pointer like lseek/read/write would
    so they are NOT a drop in replacement !!
 */
 
 #define NOPIO_ONLY(X)
 
 #define GET_LSEEK_FLAG(FDESC, VAL)
+
+/* If definitions are flying around for pread/pread64, don't override them. Otherwise on HPUX
+   we need to run the 64bit versions of these calls because the POSIX version linkage to the
+   64 bit variation is broken. SE 07/2005.
+*/
+#ifdef __hpux
+# if !defined(pread) && !defined(pread64)
+#  define pread pread64
+#  define pwrite pwrite64
+# else
+#  error "** Interference with pread/pwrite defines - HPUX may have fixed their problem **"
+# endif
+#endif
 
 #define LSEEKREAD(FDESC, FPTR, FBUFF, FBUFF_LEN, RC) \
 { \

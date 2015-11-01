@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +9,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __IOTTDEF_H__
-#define __IOTTDEF_H__
+#ifndef IOTTDEF_H
+#define IOTTDEF_H
 
 #include "gtm_termios.h"
 #include "gtm_stdio.h"
@@ -28,6 +28,9 @@
 #define IOTT_FLUSH_RETRY	50
 #define IOTT_BUFF_LEN		3072
 #define IOTT_BUFF_MIN		128
+
+#define TT_EDITING		0x1000
+#define TT_NOINSERT		0x2000
 
 typedef struct
 {
@@ -62,6 +65,8 @@ typedef struct
 	volatile boolean_t	timer_set;	/* text flush timer is set */
 	volatile boolean_t	write_active;	/* we are in write -- postpone flush by timer */
 	boolean_t	canonical;
+	mstr		recall_buff;		/* if EDITING enabled */
+	int		recall_size;		/* size of recall_buff allocated */
 }d_tt_struct;
 
 void iott_flush_buffer(io_desc *ioptr, boolean_t new_write_flag);

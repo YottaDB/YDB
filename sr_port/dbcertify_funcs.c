@@ -583,7 +583,7 @@ int dbc_read_dbblk(phase_static_area *psa, int blk_num, enum gdsblk_type blk_typ
 	DBC_DEBUG(("DBC_DEBUG: Reading in database block 0x%x into blk_index %d\n", blk_num, psa->block_depth));
 	psa->fc->op = FC_READ;
 	psa->fc->op_buff = (sm_uc_ptr_t)blk_set_new_p->old_buff;
-	psa->fc->op_pos = psa->dbc_cs_data->start_vbn + (psa->dbc_cs_data->blk_size / DISK_BLOCK_SIZE * (off_t)blk_num);
+	psa->fc->op_pos = psa->dbc_cs_data->start_vbn + (psa->dbc_cs_data->blk_size / DISK_BLOCK_SIZE) * blk_num;
 	psa->fc->op_len = psa->dbc_cs_data->blk_size;	/* In case length field was modified during a file-extension */
 	dbcertify_dbfilop(psa);				/* Read data/index block (no return if error) */
 	/* Now that we know some value, call initialize again to set the values the way we want */

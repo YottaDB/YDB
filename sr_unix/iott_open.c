@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,8 @@
 
 GBLREF bool		run_time;
 GBLREF int		COLUMNS, GTM_LINES, AUTO_RIGHT_MARGIN;
+GBLREF uint4		gtm_principal_editing_defaults;
+GBLREF io_pair		io_std_device;
 LITREF unsigned char	io_params_size[];
 
 short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
@@ -112,6 +114,17 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 									* certain that there are no uses of wrap == TRUE */
 		ioptr->state = dev_open;
 		tt_ptr->tbuffp = tt_ptr->ttybuff;	/* Buffer is now empty */
+		if (!io_std_device.in || io_std_device.in == ioptr->pair.in)	/* io_std_device.in not set yet in io_init */
+			tt_ptr->ext_cap = gtm_principal_editing_defaults;
+		else
+			tt_ptr->ext_cap = 0;
+		if ((TT_EDITING & tt_ptr->ext_cap) && !tt_ptr->recall_buff.addr)
+		{
+			assert(tt_ptr->in_buf_sz);
+			tt_ptr->recall_buff.addr = malloc(tt_ptr->in_buf_sz);
+			tt_ptr->recall_size = tt_ptr->in_buf_sz;
+			tt_ptr->recall_buff.len = 0;	/* nothing in buffer */
+		}
 	}
 	return TRUE;
 }

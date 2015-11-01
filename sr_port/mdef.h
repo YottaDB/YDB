@@ -882,6 +882,7 @@ qw_num	gtm_byteswap_64(qw_num num64);
 typedef uint4 		jnl_tm_t;
 typedef uint4 		off_jnl_t;
 typedef int4 		sm_off_t;
+typedef gtm_uint64_t	gtm_off_t;
 
 #define MAXUINT8	((gtm_uint64_t)-1)
 #define MAXUINT4	((uint4)-1)

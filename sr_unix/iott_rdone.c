@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,7 @@
 
 #include <errno.h>
 #include <signal.h>
-#include <string.h>
+#include "gtm_string.h"
 
 #include "iotcp_select.h"
 
@@ -369,7 +369,13 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 
 	if (ret  &&  io_ptr->esc_state != FINI)
 	{
-		*v = inchar;
+		*v = INPUT_CHAR;
+		if ((TT_EDITING & tt_ptr->ext_cap) && !((TRM_PASTHRU|TRM_NOECHO) & mask))
+		{	/* keep above test in sync with iott_readfl */
+			assert(tt_ptr->recall_buff.addr);
+			tt_ptr->recall_buff.addr[0] = INPUT_CHAR;
+			tt_ptr->recall_buff.len = 1;
+		}
 		/* SIMPLIFY THIS! */
 		msk_num = (uint4)INPUT_CHAR / NUM_BITS_IN_INT4;
 		msk_in = (1 << ((uint4)INPUT_CHAR % NUM_BITS_IN_INT4));

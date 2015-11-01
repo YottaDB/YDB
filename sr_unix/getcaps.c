@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
  */
 
 #include "gtm_stdlib.h"
-#include <curses.h>
+#include <curses.h>		/* must be before term.h */
 #include "gtm_term.h"
 #include "getcaps.h"
 
@@ -51,9 +51,10 @@ GBLDEF	char	*KEY_DOWN;		/* down arrow key */
 GBLDEF	char	*KEY_LEFT;		/* left arrow key */
 GBLDEF	char	*KEY_RIGHT;		/* right arrow key */
 GBLDEF	char	*KEY_UP;		/* up arrow key */
+GBLDEF	char	*KEY_INSERT;		/* insert key aka KEY_IC */
 GBLDEF	char	*KEYPAD_LOCAL;		/* turn keypad off */
 GBLDEF	char	*KEYPAD_XMIT;		/* turn keypad on */
-GBLDEF  int	GTM_LINES;			/* number of rows */
+GBLDEF  int	GTM_LINES;		/* number of rows */
 
 #ifdef __MVS__
 #pragma convlit(suspend)
@@ -74,6 +75,7 @@ static	char	gtm_key_down[] = "OB";
 static	char	gtm_key_left[] = "OD";
 static	char	gtm_key_right[] = "OC";
 static	char	gtm_key_up[] = "OA";
+static	char	gtm_key_insert[] = "";
 static	char	gtm_keypad_local[] = "[?1l";
 static	char	gtm_keypad_xmit[] = "[?1h";
 static	int	gtm_lines = 24;
@@ -124,6 +126,7 @@ int	getcaps(int fildes)
 		KEY_LEFT = tigetstr("kcub1");
 		KEY_RIGHT = tigetstr("kcuf1");
 		KEY_UP = tigetstr("kcuu1");
+		KEY_INSERT = tigetstr("kich1");
 		KEYPAD_LOCAL = tigetstr("rmkx");
 		KEYPAD_XMIT = tigetstr("smkx");
 		GTM_LINES = tigetnum("lines");
@@ -177,6 +180,9 @@ int	getcaps(int fildes)
 		assert((char *)-1 != KEY_UP);
 		if (NULL == KEY_UP)
 			KEY_UP = gtm_key_up;
+		assert((char *)-1 != KEY_INSERT);
+		if (NULL == KEY_INSERT)
+			KEY_INSERT = gtm_key_insert;
 		assert((char *)-1 != KEYPAD_LOCAL);
 		if (NULL == KEYPAD_LOCAL)
 			KEYPAD_LOCAL = gtm_keypad_local;
@@ -205,6 +211,7 @@ int	getcaps(int fildes)
 		KEY_LEFT = gtm_key_left;
 		KEY_RIGHT = gtm_key_right;
 		KEY_UP = gtm_key_up;
+		KEY_INSERT = gtm_key_insert;
 		KEYPAD_LOCAL = gtm_keypad_local;
 		KEYPAD_XMIT = gtm_keypad_xmit;
 		GTM_LINES = gtm_lines;

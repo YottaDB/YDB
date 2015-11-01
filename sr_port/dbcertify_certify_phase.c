@@ -1305,7 +1305,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, 
 			DBC_DEBUG(("DBC_DEBUG: -- Block index %d being written as block 0x%x\n", blk_index, \
 				   blk_set_p->blk_num));
 			psa->fc->op_buff = blk_set_p->new_buff;
-			psa->fc->op_pos = psa->dbc_cs_data->start_vbn + blk_size / DISK_BLOCK_SIZE * (off_t)blk_set_p->blk_num;
+			psa->fc->op_pos = psa->dbc_cs_data->start_vbn + (blk_size / DISK_BLOCK_SIZE) * blk_set_p->blk_num;
 			dbcertify_dbfilop(psa);
 			if (gdsblk_create == blk_set_p->usage)
 				psa->blks_created++;

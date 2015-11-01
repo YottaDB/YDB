@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,6 +66,11 @@ void iott_close(io_desc *v, mval *pp)
 	{
 		assert(status == errno);
 		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("iott_close(CLOSEFILE)"), CALLFROM, status);
+	}
+	if (ttptr->recall_buff.addr)
+	{
+		free(ttptr->recall_buff.addr);
+		ttptr->recall_buff.addr = NULL;
 	}
 	return;
 }

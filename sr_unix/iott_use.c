@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -174,6 +174,23 @@ void iott_use(io_desc *iod, mval *pp)
 				case iop_noecho:
 					mask_in |= TRM_NOECHO;
 					break;
+				case iop_editing:
+					if (io_curr_device.in == io_std_device.in)
+					{	/* $PRINCIPAL only */
+						tt_ptr->ext_cap |= TT_EDITING;
+						if (!tt_ptr->recall_buff.addr)
+						{
+							assert(tt_ptr->in_buf_sz);
+							tt_ptr->recall_buff.addr = malloc(tt_ptr->in_buf_sz);
+							tt_ptr->recall_size = tt_ptr->in_buf_sz;
+							tt_ptr->recall_buff.len = 0;    /* nothing in buffer */
+						}
+					}
+					break;
+				case iop_noediting:
+					if (io_curr_device.in == io_std_device.in)
+						tt_ptr->ext_cap &= ~TT_EDITING;	/* $PRINCIPAL only */
+					break;
 				case iop_escape:
 					mask_in |= TRM_ESCAPE;
 					break;
@@ -224,6 +241,14 @@ void iott_use(io_desc *iod, mval *pp)
 					break;
 				case iop_nohostsync:
 					t.c_iflag &= ~IXOFF;
+					break;
+				case iop_insert:
+					if (io_curr_device.in == io_std_device.in)
+						tt_ptr->ext_cap &= ~TT_NOINSERT;	/* $PRINCIPAL only */
+					break;
+				case iop_noinsert:
+					if (io_curr_device.in == io_std_device.in)
+						tt_ptr->ext_cap |= TT_NOINSERT;	/* $PRINCIPAL only */
 					break;
 				case iop_length:
 					GET_LONG(length, pp->str.addr + p_offset);

@@ -31,6 +31,7 @@
 #include "gtmmsg.h"
 #include "iosp.h"	/* for SS_NORMAL */
 #include "gtmio.h"
+#include "repl_sp.h"	/* F_CLOSE */
 #include "interlock.h"
 #include "lockconst.h"
 #include "aswp.h"
@@ -51,7 +52,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 	uint4			sts;
 	sm_uc_ptr_t		nameptr;
 	int			fstat_res;
-	int			stat_res;
+	int			stat_res, close_res;
 	boolean_t		retry;
 
 	csa = &FILE_INFO(reg)->s_addrs;
@@ -99,7 +100,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 				{
 					jpc->status = errno;
 					sts = ERR_JNLRDERR;
-					close(jpc->channel);
+					F_CLOSE(jpc->channel, close_res);
 					jpc->channel = NOJNL;
 					break;
 				} else
@@ -143,7 +144,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 			{
 				if (jnl_closed == csd->jnl_state)
 				{	/* Operator close came in while opening */
-					close(jpc->channel);
+					F_CLOSE(jpc->channel, close_res);
 					jpc->channel = NOJNL;
 					jpc->fileid.inode = 0;
 					jpc->fileid.device = 0;
@@ -170,7 +171,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 	if (0 != sts)
 	{
 		if (NOJNL != jpc->channel)
-			close(jpc->channel);
+			F_CLOSE(jpc->channel, close_res);
 		jpc->channel = NOJNL;
 		jnl_send_oper(jpc, sts);
 	}

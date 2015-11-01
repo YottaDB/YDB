@@ -244,6 +244,12 @@ void zshow_devices(zshow_out *output)
 							ZS_ONE_OUT(&v,rparen_text);
 						ZS_ONE_OUT(&v,space_text);
 					}
+					if (TT_EDITING & tt_ptr->ext_cap)
+						ZS_PARM_SP(&v, zshow_edit);
+					if (TT_NOINSERT & tt_ptr->ext_cap)
+						ZS_PARM_SP(&v, zshow_noinse);
+					if (tt_ptr->canonical)
+						ZS_STR_OUT(&v, "CANONICAL ");
 					break;
 				case rm:
 					ZS_STR_OUT(&v,rmsfile_text);

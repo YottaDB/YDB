@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +12,10 @@
 /* WARNING: this module contains a mixture of ASCII and EBCDIC on S390*/
 #include "mdef.h"
 
-#include <string.h>
+#include "gtm_string.h"
 #include <errno.h>
 #include <signal.h>
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include "gtm_stdlib.h"
 
 #include "iotcp_select.h"
@@ -24,6 +24,7 @@
 #include "trmdef.h"
 #include "iottdef.h"
 #include "iottdefsp.h"
+#include "iott_edit.h"
 #include "stringpool.h"
 #include "comline.h"
 #include "gtmio.h"
@@ -49,6 +50,7 @@ GBLREF int		AUTO_RIGHT_MARGIN, EAT_NEWLINE_GLITCH;
 GBLREF char		*CURSOR_UP, *CURSOR_DOWN, *CURSOR_LEFT, *CURSOR_RIGHT, *CLR_EOL;
 GBLREF char		*KEY_BACKSPACE, *KEY_DC;
 GBLREF char		*KEY_DOWN, *KEY_LEFT, *KEY_RIGHT, *KEY_UP;
+GBLREF char		*KEY_INSERT;
 GBLREF char		*KEYPAD_LOCAL, *KEYPAD_XMIT;
 
 static unsigned char	cr = '\r';
@@ -73,12 +75,6 @@ static	unsigned char	recall_error_msg[][MAX_ERR_MSG_LEN] =
 	"Recall Error : No matching string"
 };
 
-void	write_str(unsigned char *str, unsigned short len, unsigned short cur_x, bool move);
-void	move_cursor_left (unsigned short col);
-void	move_cursor_right (unsigned short col);
-void	write_loop(int fildes, unsigned char *str, int num_times);
-void	move_cursor(int fildes, int num_up, int num_left);
-
 error_def(ERR_IOEOF);
 #ifdef __MVS__
 error_def(ERR_ASC2EBCDICCONV);
@@ -86,8 +82,9 @@ error_def(ERR_ASC2EBCDICCONV);
 
 void	dm_read (mval *v)
 {
-	bool		up, down, right, left;
-	int		backspace, delete;
+	int		up, down, right, left;
+	int		backspace, delete, insert_key, keypad_len;
+	boolean_t	insert_mode;
 	int		cl, index, msk_num, msk_in, selstat, status;
 	uint4		mask;
 	unsigned char	inchar, *temp;
@@ -137,6 +134,7 @@ void	dm_read (mval *v)
 	mask = tt_ptr->term_ctrl;
 	mask_term = tt_ptr->mask_term;
 	mask_term.mask[ESC / NUM_BITS_IN_INT4] &= ~(1 << ESC);
+	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);
 	DOWRITE_A(tt_ptr->fildes, &cr, 1);
 	DOWRITE_A(tt_ptr->fildes, gtmprompt.addr, gtmprompt.len);
 	j = gtmprompt.len;
@@ -145,7 +143,8 @@ void	dm_read (mval *v)
 
 	/* to turn keypad on if possible */
 #ifndef __MVS__
-	DOWRITE(tt_ptr->fildes, KEYPAD_XMIT, strlen(KEYPAD_XMIT));
+	if (NULL != KEYPAD_XMIT && (keypad_len = strlen(KEYPAD_XMIT)))	/* embedded assignment */
+		DOWRITE(tt_ptr->fildes, KEYPAD_XMIT, keypad_len);
 #endif
 
 	while (i_max < length)
@@ -446,7 +445,7 @@ void	dm_read (mval *v)
 #endif
 				switch (inchar)
 				{
-					case '':
+					case EDIT_SOL:	/* ctrl A  start of line */
 					{
 						int	num_lines_above;
 						int	num_chars_left;
@@ -460,7 +459,7 @@ void	dm_read (mval *v)
 						j = gtmprompt.len;
 						break;
 					}
-					case '':
+					case EDIT_EOL:	/* ctrl E  end of line */
 					{
 						int	num_lines_above;
 						int	num_chars_left;
@@ -475,18 +474,18 @@ void	dm_read (mval *v)
 						j = (i_max + gtmprompt.len) % io_ptr->width;
 						break;
 					}
-					case '':
+					case EDIT_LEFT:	/* ctrl B  left one */
 					{
 						if (i != 0)
 						{
 							move_cursor_left(j);
 							temp--;
 							i--;
-							j = (j - 1) % io_ptr->width;
+							j = (j - 1 + io_ptr->width) % io_ptr->width;
 						}
 						break;
 					}
-					case '':
+					case EDIT_RIGHT:	/* ctrl F  right one */
 					{
 						if (i != i_max)
 						{
@@ -497,14 +496,14 @@ void	dm_read (mval *v)
 						}
 						break;
 					}
-					case '':
+					case EDIT_DEOL:	/* ctrl K  delete to end of line */
 					{
 						memset(temp, ' ', i_max - i);
 						write_str(temp, i_max - i, j, FALSE);
 						i_max = i;
 						break;
 					}
-					case '':
+					case EDIT_ERASE:	/* ctrl U  delete whole line */
 					{
 						int	num_lines_above;
 						int	num_chars_left;
@@ -521,7 +520,7 @@ void	dm_read (mval *v)
 						temp = stringpool.free;
 						break;
 					}
-					case '':
+					case EDIT_DELETE:	/* ctrl D  delete char */
 					{
 						if (i != i_max)
 						{
@@ -534,19 +533,23 @@ void	dm_read (mval *v)
 					}
 					default:
 					{
-						memmove(temp + 1, temp, i_max - i);
-						*temp = inchar;
 						if (i == i_max)
-						{
+						{	/* at end of input */
+							*temp = inchar;
 							write_str(temp, i_max - i + 1, j, TRUE);
 						}
 						else
 						{
-							write_str(temp, i_max - i + 1, j, FALSE);
+							if (insert_mode)
+								memmove(temp + 1, temp, i_max - i);
+							*temp = inchar;
+							write_str(temp, i_max - i + (insert_mode ? 1 : 0), j, FALSE);
 							move_cursor_right(j);
 						}
 						temp++;
-						i++; i_max++;
+						if (insert_mode || i == i_max)
+							i_max++;
+						i++;
 						j = (j + 1) % io_ptr->width;
 						break;
 					}
@@ -556,16 +559,18 @@ void	dm_read (mval *v)
 
 		if (escape_length != 0  &&  io_ptr->esc_state >= FINI)
 		{
-			down = memcmp(escape_sequence, KEY_DOWN, escape_length);
-			up = memcmp(escape_sequence, KEY_UP, escape_length);
-			right = memcmp(escape_sequence, KEY_RIGHT, escape_length);
-			left = memcmp(escape_sequence, KEY_LEFT, escape_length);
-			backspace = delete = -1;
+			down = strncmp((const char *)escape_sequence, KEY_DOWN, escape_length);
+			up = strncmp((const char *)escape_sequence, KEY_UP, escape_length);
+			right = strncmp((const char *)escape_sequence, KEY_RIGHT, escape_length);
+			left = strncmp((const char *)escape_sequence, KEY_LEFT, escape_length);
+			backspace = delete = insert_key = -1;
 
 			if (KEY_BACKSPACE != NULL)
-				backspace = memcmp(escape_sequence, KEY_BACKSPACE, escape_length);
+				backspace = strncmp((const char *)escape_sequence, KEY_BACKSPACE, escape_length);
 			if (KEY_DC != NULL)
-				delete = memcmp(escape_sequence, KEY_DC, escape_length);
+				delete = strncmp((const char *)escape_sequence, KEY_DC, escape_length);
+			if (KEY_INSERT != NULL && '\0' != KEY_INSERT[0])
+				insert_key = strncmp((const char *)escape_sequence, KEY_INSERT, escape_length);
 
 			memset(escape_sequence, '\0', escape_length);
 			escape_length = 0;
@@ -582,7 +587,7 @@ void	dm_read (mval *v)
 				{
 					move_cursor_left(j);
 					j = (j - 1 + io_ptr->width) % io_ptr->width;
-					stringpool.free [i_max] = ' ';
+					stringpool.free[i_max] = ' ';
 					write_str(temp, i_max - i + 1, j, FALSE);
 					temp --;
 					i--;
@@ -591,7 +596,9 @@ void	dm_read (mval *v)
 				}
 			}
 
-			if (up == 0  ||  down == 0)
+			if (0 == insert_key)
+				insert_mode = !insert_mode;	/* toggle */
+			else if (up == 0  ||  down == 0)
 			{
 				DOWRITE_A(tt_ptr->fildes, &cr, 1);
 				DOWRITE_A(tt_ptr->fildes, gtmprompt.addr, gtmprompt.len);
@@ -646,7 +653,8 @@ void	dm_read (mval *v)
 
 	/* turn keypad off */
 #ifndef __MVS__
-	DOWRITE(tt_ptr->fildes, KEYPAD_LOCAL, strlen(KEYPAD_LOCAL));
+	if (NULL != KEYPAD_LOCAL && (keypad_len = strlen(KEYPAD_LOCAL)))	/* embedded assignment */
+		DOWRITE(tt_ptr->fildes, KEYPAD_LOCAL, keypad_len);
 #endif
 
 	if (i_max == length)
@@ -685,160 +693,4 @@ void	dm_read (mval *v)
 
 	active_device = 0;
 	return;
-}
-
-
-void 	write_str(unsigned char *str, unsigned short len, unsigned short cur_x, bool move)
-{
-	/*
-	  writes a specified string starting from the current cursor position
-	  and returns the cursor back to the same place.
-
-		str    -> the string to write
-		len    -> the length of the string
-		cur_x  -> is the current cursor's column in the window.
-		move   -> whether the cursor moves or not.
-	*/
-
-	int	k, number_of_lines_up, number_of_chars_left;
-	int	width = io_curr_device.in->width;
-	int	fildes = ((d_tt_struct *)((io_curr_device.in)->dev_sp)) -> fildes;
-	io_desc *io_ptr = io_curr_device.in;
-
-	assert(width);
-	number_of_lines_up = (cur_x + len) / width;
-	number_of_chars_left = (cur_x + len) % width - (cur_x) % width;
-
-    	for (k = 0;  k < number_of_lines_up;  k++)
-    	{
-		int	cur_width;
-
-		if (k == 0)
-			cur_width = width - cur_x;
-		else
-			cur_width = width;
-		if (cur_width)
-	    		DOWRITE_A(fildes, str, cur_width);
-	    	str += cur_width;
-	    	len -= cur_width;
-
-		/* -------------------------------------------------------------------------
-		 * for terminals that have the EAT_NEWLINE_GLITCH auto_margin doesn't work
-		 * even though AUTO_RIGHT_MARGIN may be 1. So you have to check both
-		 * before writing the TTEOL
-		 * -------------------------------------------------------------------------
-		 */
-
-		if (!AUTO_RIGHT_MARGIN || EAT_NEWLINE_GLITCH)
-	    		DOWRITE(fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));
-    	}
-	assert(len || number_of_lines_up);
-	if (len)
-		DOWRITE_A(fildes, str, len);
-	if (!move)
-	{
-		write_loop(fildes, (unsigned char *)CURSOR_UP, number_of_lines_up);
-
-		if (number_of_chars_left > 0)
-		{
-			write_loop(fildes, (unsigned char *)CURSOR_LEFT, number_of_chars_left);
-		}
-		else
-		{
-			write_loop(fildes, (unsigned char *)CURSOR_RIGHT, -number_of_chars_left);
-		}
-	}
-}
-
-
-void 	move_cursor_left(unsigned short col)
-{
-	/* -------------------------------------------------------
-	 *  moves cursor left by one column.  if col is leftmost,
-	 *  then it goes back to the end of the previous line
-	 * -------------------------------------------------------
-	 */
-
-	int	fildes = ((d_tt_struct *)((io_curr_device.in)->dev_sp)) -> fildes;
-
-
-	if (col > 0)
-	{
-		DOWRITE(fildes, CURSOR_LEFT, strlen(CURSOR_LEFT));
-	}
-	else
-	{
-		DOWRITE(fildes, CURSOR_UP, strlen(CURSOR_UP));
-		write_loop(fildes, (unsigned char *)CURSOR_RIGHT, io_curr_device.in->width - 1);
-	}
-}
-
-
-void 	move_cursor_right(unsigned short col)
-{
-	/*
-		moves cursor right by one column. if col is rightmost,
-		then it goes to the start of the next line
-	*/
-
-	int	fildes = ((d_tt_struct *)((io_curr_device.in)->dev_sp)) -> fildes;
-	io_desc *io_ptr = io_curr_device.in;
-
-
-	if (col < io_curr_device.in->width - 1)
-	{
-		DOWRITE(fildes, CURSOR_RIGHT, strlen(CURSOR_RIGHT));
-	}
-	else
-	{
-		DOWRITE(fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));
-	}
-}
-
-
-void	write_loop(int fildes, unsigned char *str, int num_times)
-{
-	int		i, size_required;
-	unsigned char	string[1024];
-	unsigned char	*temp = NULL;
-
-	*string = '\0';
-	size_required = num_times * strlen((char *)str);
-
-	if (size_required > sizeof(string))
-	{
-		for (i = 0;  i < num_times;  i++)
-		{
-			DOWRITE(fildes, str, strlen((char *)str));
-		}
-	} else if (num_times)
-	{
-		for (i = 0;  i < num_times;  i++)
-		{
-			strcat((char *)string, (char *)str);
-		}
-		DOWRITE(fildes, string, size_required);
-	}
-}
-
-
-void	move_cursor(int fildes, int num_up, int num_left)
-{
-	if (num_up < 0)
-	{
-		write_loop (fildes, (unsigned char *)CURSOR_DOWN, -num_up);
-	}
-	else if (num_up > 0)
-	{
-		write_loop (fildes, (unsigned char *)CURSOR_UP, num_up);
-	}
-
-	if (num_left < 0)
-	{
-		write_loop(fildes, (unsigned char *)CURSOR_RIGHT, -num_left);
-	}
-	else if (num_left > 0)
-	{
-		write_loop(fildes, (unsigned char *)CURSOR_LEFT, num_left);
-	}
 }

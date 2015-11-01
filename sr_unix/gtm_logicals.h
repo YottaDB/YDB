@@ -17,6 +17,7 @@
 #define	GTM_FULLBLOCKWRITES		"$gtm_fullblockwrites"
 #define	GTM_LOG_ENV			"$gtm_log"
 #define	GTM_PRINCIPAL			"$gtm_principal"
+#define	GTM_PRINCIPAL_EDITING		"$gtm_principal_editing"
 #define	GTM_SHMFLAGS			"$gtm_shmatflags"
 #define	GTM_TMP_ENV			"$gtm_tmp"
 #define	GTM_TPRESTART_LOG_DELTA		"$gtm_tprestart_log_delta"

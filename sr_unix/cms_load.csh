@@ -172,7 +172,7 @@ foreach ref_library ( $ref_libs )
 			if ($nfiles != 0) then
 				if ($mods_only == 0) then
 					echo "Copying $nfiles files of type .$ftype from $ref_library to ${gtm_ver}/${dir}"
-					\ls -1 | grep "\.$ftype"'$' | xargs -i cp $preserve_time {} $gtm_ver/${dir}
+					\ls -1 | grep "\.$ftype"'$' | xargs -i cp -f $preserve_time {} $gtm_ver/${dir}
 				else
 					# @ n_modfiles=0
 					foreach srcfile (*.$ftype)

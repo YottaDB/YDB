@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,3 +32,20 @@
 #define NATIVE_BS		ASCII_BS
 #define NATIVE_TTEOL		((ascii != io_ptr->out_code_set) ? EBCDIC_TTEOL : ASCII_TTEOL)
 #define NATIVE_VT		VT
+
+/* Editing control characters */
+#define CTRL_A	'\001'
+#define CTRL_B	'\002'
+#define CTRL_D	'\004'
+#define CTRL_E	'\005'
+#define CTRL_F	'\006'
+#define CTRL_K	'\013'
+#define CTRL_U	'\025'
+
+#define EDIT_SOL	CTRL_A
+#define EDIT_LEFT	CTRL_B
+#define EDIT_DELETE	CTRL_D
+#define EDIT_EOL	CTRL_E
+#define EDIT_RIGHT	CTRL_F
+#define EDIT_DEOL	CTRL_K
+#define EDIT_ERASE	CTRL_U

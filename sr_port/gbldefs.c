@@ -788,3 +788,6 @@ GBLDEF	uint4		region_open_count;		/* Number of region "opens" we have executed *
 
 GBLDEF	uint4		gtm_blkupgrade_flag = UPGRADE_IF_NEEDED;	/* by default upgrade only if necessary */
 GBLDEF	boolean_t	disk_blk_read;
+#ifdef UNIX
+GBLDEF	uint4		gtm_principal_editing_defaults;	/* ext_cap flags if tt */
+#endif

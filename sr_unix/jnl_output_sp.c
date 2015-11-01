@@ -33,6 +33,7 @@
 #include "is_file_identical.h"
 #include "dpgbldir.h"
 #include "rel_quant.h"
+#include "repl_sp.h"	/* F_CLOSE */
 
 GBLREF	volatile int4	db_fsync_in_prog;
 GBLREF	volatile int4	jnl_qio_in_prog;
@@ -46,7 +47,7 @@ void jnl_mm_timer_write(void);
 uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 {
 	boolean_t		was_wrapped;
-	int			tsz;
+	int			tsz, close_res;
 	jnl_buffer_ptr_t	jb;
 	int4			free;
 	sgmnt_addrs		*csa;
@@ -119,7 +120,10 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		{
 			LSEEKWRITE(jpc->channel, (off_t)jb->dskaddr, (sm_uc_ptr_t)base, tsz, jpc->status);
 			if (SS_NORMAL != jpc->status)
+			{
+				F_CLOSE(jpc->channel, close_res);
 				jpc->channel = NOJNL;
+			}
 		}
 	} else
 	{
@@ -154,7 +158,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
 	if ((jnl_closed == csa->hdr->jnl_state) && NOJNL != csa->jnl->channel)
 	{
-		close(csa->jnl->channel);
+		F_CLOSE(csa->jnl->channel, close_res);
 		csa->jnl->channel = NOJNL;
 		csa->jnl->pini_addr = 0;
 	}
