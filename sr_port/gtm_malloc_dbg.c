@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,10 +39,10 @@
 
 #  define gtm_malloc gtm_malloc_dbg
 #  define gtm_free gtm_free_dbg
-#  define gtm_sminit gtm_sminit_dbg
 #  define findStorElem findStorElem_dbg
 #  define processDeferredFrees processDeferredFrees_dbg
 #  define DEBUG
+#  define PRO_BUILD
 #  define GTM_MALLOC_DEBUG
 #  include "caller_id.h"
 #  include "gtm_malloc_src.h"

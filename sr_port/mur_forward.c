@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,13 +98,14 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	murgbl.extr_buff = (char *)malloc(murgbl.max_extr_record_length);
 	for (recstat = 0; recstat < TOT_EXTR_TYPES; recstat++)
 		extr_file_create[recstat] = TRUE;
-	jgbl.forw_phase_recovery = TRUE;
+	jgbl.dont_reset_gbl_jrec_time = jgbl.forw_phase_recovery = TRUE;
 	jgbl.mur_pini_addr_reset_fnptr = (pini_addr_reset_fnptr)mur_pini_addr_reset;
 	gv_keysize = ROUND_UP2(MAX_KEY_SZ + MAX_NUM_SUBSC_LEN, 4);
 	mu_gv_stack_init(&mstack_ptr);
 	gv_target = targ_alloc(gv_keysize);
 	murgbl.db_updated = mur_options.update;
 	murgbl.consist_jnl_seqno = 0;
+	assert(!mur_options.rollback || (losttn_seqno <= min_broken_seqno));
 	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
 	{
 		process_losttn = FALSE;
@@ -121,6 +122,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			jgbl.mur_jrec_seqno = mur_jctl->turn_around_seqno;
 			if (mur_options.rollback && murgbl.consist_jnl_seqno < jgbl.mur_jrec_seqno)
 				murgbl.consist_jnl_seqno = jgbl.mur_jrec_seqno;
+			assert(murgbl.consist_jnl_seqno <= losttn_seqno);
 			assert((NULL != rctl->jctl_turn_around) || (0 == mur_jctl->rec_offset));
 		}
 		if (mur_options.update || mur_options.extr[GOOD_TN])
@@ -157,8 +159,8 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			assert((0 == mur_options.after_time) || mur_options.forward && !mur_options.update);
 			if (rec_time < mur_options.after_time)
 				continue;
-			if (IS_REPLICATED(rectype) || JRT_EPOCH == rectype)
-				rec_token_seq = GET_REPL_JNL_SEQNO(rec);
+			if (REC_HAS_TOKEN_SEQ(rectype))
+				rec_token_seq = GET_JNL_SEQNO(rec);
 			if (!process_losttn && mur_options.rollback && rec_token_seq >= losttn_seqno)
 				process_losttn = TRUE;
 			/* Note: Broken transaction determination is done below only based on the records that got selected as
@@ -191,6 +193,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 					     (mur_options.rollback && rec_token_seq >= min_broken_seqno))
 					{	/* the above if checks are to avoid hash table lookup (performance),
 						 * when it is not needed */
+						assert(!mur_options.rollback || process_losttn);
 						status = mur_get_pini(rec->prefix.pini_addr, &plst);
 						if (SS_NORMAL != status)
 							break;
@@ -377,8 +380,10 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 				}
 				if (mur_options.update)
 				{
-					if (SS_NORMAL != (status = mur_output_record()))
+					assert(!mur_options.rollback || (rec_token_seq < losttn_seqno));
+					if (SS_NORMAL != (status = mur_output_record())) /* updates murgbl.consist_jnl_seqno */
 						break;
+					assert(!mur_options.rollback || (murgbl.consist_jnl_seqno <= losttn_seqno));
 				}
 			}
 			if (GOOD_TN != recstat || mur_options.extr[GOOD_TN])

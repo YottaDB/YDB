@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
 GBLREF io_pair		io_curr_device;
 GBLREF io_desc		*active_device;
 
-void op_wteol(short n)
+void op_wteol(int4 n)
 {
 	io_desc		*iod;
 	iod = io_curr_device.out;

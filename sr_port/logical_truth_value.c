@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 #include "iosp.h"
 #include "logical_truth_value.h"
 
-boolean_t logical_truth_value(mstr *log)
+boolean_t logical_truth_value(mstr *log, boolean_t *is_defined)
 {
 	/* return
 	 * TRUE if the env variable/logical log is defined and evaluates to "TRUE" (or part thereof), or "YES" (or part thereof),
@@ -35,8 +35,12 @@ boolean_t logical_truth_value(mstr *log)
 	error_def(ERR_TRNLOGFAIL);
 
 	tn.addr = buf;
+	if (NULL != is_defined)
+		*is_defined = FALSE;
 	if (SS_NORMAL == (status = trans_log_name(log, &tn, buf)))
 	{
+		if (NULL != is_defined)
+			*is_defined = TRUE;
 		for (is_num = TRUE, zero = TRUE, index = 0; index < tn.len; index++)
 		{
 			if (!isdigit(buf[index]))

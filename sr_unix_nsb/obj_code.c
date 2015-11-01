@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,8 @@ GBLREF mvar 		*mvartab;
 GBLREF char		module_name[];
 
 GBLDEF int4		curr_addr, code_size;
-GBLDEF char		cg_phase;	/* code generation phase */
+GBLREF char		cg_phase;	/* code generation phase */
+GBLREF char		cg_phase_last;	/* previous code generation phase */
 
 void	cg_lab (mlabel *l, int4 base);
 
@@ -69,6 +70,7 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	jmp_opto();
 	curr_addr = sizeof(rhdtyp);
 	cg_phase = CGP_APPROX_ADDR;
+	cg_phase_last = CGP_NOSTATE;
 	code_gen();
 	code_size = curr_addr;
 	cg_phase = CGP_ADDR_OPT;

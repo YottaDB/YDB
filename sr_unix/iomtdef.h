@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 
 #define MAX_VARREC_SZ 9995
 #define MAX_FIXREC_SZ 65535
+#define MAX_REC_SZ 65535	/* maximum value that can be specified for the RECORDSIZE device parameter */
 #define MAX_BLK_SZ 65535
 /* 512 is Motorola restriction */
 #define MIN_BLK_SZ 512
@@ -105,8 +106,8 @@ typedef struct
 	int4		access_id;	/* channel to access magtape 	*/
 	uint4	read_mask;
 	uint4	write_mask;
-	unsigned short	record_sz;
-	unsigned short	block_sz;
+	uint4	record_sz;
+	uint4	block_sz;
 	unsigned short	filepos;
 	unsigned short	recpos;
 	unsigned short	mode;

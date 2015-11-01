@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,6 +51,7 @@
 #include "tp_change_reg.h"
 #include "gtm_file_stat.h"
 #include "min_max.h"		/* for MAX macro */
+#include "gtm_rename.h"		/* for cre_jnl_file_intrpt_rename() prototype */
 
 #define	DB_OR_REG_SIZE	MAX(STR_LIT_LEN(FILE_STR), STR_LIT_LEN(REG_STR))
 
@@ -267,6 +268,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			max_reg_seqno = csd->reg_seqno;
 	}
 	JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* set_jnl_file_close & cre_jnl_file need it. Note we already have crit */
+	jgbl.dont_reset_gbl_jrec_time = TRUE;
 	for (rptr = grlist; (EXIT_ERR != exit_status) && NULL != rptr; rptr = rptr->fPtr)
 	{
 		gv_cur_region = rptr->reg;
@@ -358,7 +360,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				jnl_info.epoch_interval = (0 == csd->epoch_interval) ? DEFAULT_EPOCH_INTERVAL : csd->epoch_interval;
 			JNL_MAX_PHYS_LOGI_RECLEN(&jnl_info, csd);
 			jnl_info.tn = csd->trans_hist.curr_tn;
-			jnl_info.reg_seqno =  max_reg_seqno;
+			jnl_info.reg_seqno = max_reg_seqno;
 			jnl_info.prev_jnl = (char *)prev_jnl_fn;
 			jnl_info.prev_jnl_len = 0;
 			if (csd->jnl_file_len)
@@ -542,8 +544,10 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			csd->jnl_file_len = jnl_info.jnl_len;
 			csd->jnl_file_name[jnl_info.jnl_len] = 0;
 			csd->trans_hist.header_open_tn = jnl_info.tn;
+			csd->reg_seqno = jnl_info.reg_seqno;
 			UNIX_ONLY(
-				csd->jnl_sync_io = jnl_options.sync_io_specified ? jnl_options.sync_io : FALSE;
+				if (jnl_options.sync_io_specified)
+					csd->jnl_sync_io = jnl_options.sync_io;
 				csd->yield_lmt = jnl_options.yield_limit;
 			)
 		} else
@@ -578,7 +582,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			break;
 		}
 	}
-	mupip_set_jnl_cleanup();
+	jgbl.dont_reset_gbl_jrec_time = FALSE;
+	mupip_set_jnl_cleanup(TRUE);
 	if (EXIT_NRM == exit_status)
 		return (uint4)SS_NORMAL;
 	if (exit_status & EXIT_WRN)

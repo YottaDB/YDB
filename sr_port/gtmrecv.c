@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,6 +54,7 @@
 #include "gtmsource.h"
 #include "gtmmsg.h"
 #include "sgtm_putmsg.h"
+#include "gt_timer.h"
 #ifdef UNIX
 #include "ftok_sems.h"
 #endif

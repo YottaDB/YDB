@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,7 @@
 #include "io.h"
 #include "jnl.h"
 #include "lv_val.h"
+#include "subscript.h"
 #include "mdq.h"
 #include "mv_stent.h"
 #include "rtnhdr.h"
@@ -75,6 +76,9 @@ GBLREF tp_frame		*tp_pointer;
 GBLREF boolean_t        lv_dupcheck;
 GBLREF z_records	zbrk_recs;
 GBLREF boolean_t	disallow_forced_expansion, forced_expansion;
+GBLREF mval		last_fnquery_return_varname;			/* Return value of last $QUERY (on stringpool) (varname) */
+GBLREF mval		last_fnquery_return_sub[MAX_LVSUBSCRIPTS];	/* .. (subscripts) */
+GBLREF int		last_fnquery_return_subcnt;			/* .. (count of subscripts) */
 #ifndef __vax
 GBLREF fnpc_area	fnpca;
 #endif
@@ -362,6 +366,15 @@ void stp_gcol(int space_needed) /* garbage collect and create enough space for s
 		x = MV_STPG_GET(&dollar_zyerror);
 		if (x)
 			MV_STPG_PUT(x);
+		x = MV_STPG_GET(&last_fnquery_return_varname);
+		if (x)
+			MV_STPG_PUT(x);
+		for (n = 0; n < last_fnquery_return_subcnt; n++);
+		{
+			x = MV_STPG_GET(&last_fnquery_return_sub[n]);
+			if (x)
+				MV_STPG_PUT(x);
+		}
 		for (mvs = mv_chain;  mvs < (mv_stent *)stackbase;  mvs = (mv_stent *)((char *)mvs + mvs->mv_st_next))
 		{
 			switch (mvs->mv_st_type)

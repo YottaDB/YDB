@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ void op_wttab(mint col)
 
 	iod = io_curr_device.out;
 	iod->esc_state = START;
-	if ((delta = (short)col - iod->dollar.x) > 0)
+	if ((delta = col - iod->dollar.x) > 0)
 	{
 		active_device = iod;
 		if ((us == iod->type) && (NULL != (((d_us_struct*)(iod->dev_sp))->disp->wttab)))

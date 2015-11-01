@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -129,10 +129,9 @@ CONDITION_HANDLER(source_ch)
 bool	open_source_file (void)
 {
 
-	static readonly unsigned char open_params_list[5] =
+	static readonly unsigned char open_params_list[] =
         {
 		(unsigned char)iop_readonly,
-		(unsigned char)iop_recordsize, (unsigned char)0x7F, (unsigned char)0x07F,
                 (unsigned char)iop_eol
         };
 

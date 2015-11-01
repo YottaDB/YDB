@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,6 +78,7 @@ static int		stack_depth = 0;
 
 GBLREF int		curr_addr;
 GBLREF char		cg_phase;	/* code generation phase */
+GBLREF char		cg_phase_last;	/* the previous code generation phase */
 
 
 /*variables for counting the arguments*/
@@ -90,7 +91,6 @@ static struct	push_list
 } *current_push_list_ptr, *push_list_start_ptr;
 
 static int	push_list_index;
-static char	cg_phase_last = 0;
 static boolean_t ocnt_ref_seen = FALSE;
 static oprtype	*ocnt_ref_opr;
 static triple	*current_triple;

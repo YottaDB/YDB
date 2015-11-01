@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,7 @@
 #include "getjobnum.h"
 #include "sig_init.h"
 #include "gtmmsg.h"
+#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
 GBLREF VSIG_ATOMIC_T		util_interrupt;
 GBLREF bool			licensed;
@@ -80,6 +81,7 @@ int main (int argc, char *argv[])
 {
 
 	image_type = LKE_IMAGE;
+	gtm_env_init();	/* read in all environment variables */
 	licensed = TRUE;
 	err_init(util_base_ch);
 	sig_init(generic_signal_handler, lke_ctrlc_handler);

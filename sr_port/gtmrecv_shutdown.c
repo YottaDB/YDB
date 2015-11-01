@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,7 @@
 #include "repl_sem.h"
 #include "is_proc_alive.h"
 #include "repl_log.h"
+#include "gt_timer.h"
 #ifdef UNIX
 #include "ftok_sems.h"
 #endif

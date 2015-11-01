@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	!
+!	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -165,6 +165,9 @@
 !	ERR_RBWRNNOTCHG		not seen by user since return status of mupip_set_file (that triggers this) is not displayed.
 !
 ! ----- Buffer to introduce new undocumented error messages without affecting UNUSEDMSGnnn match with corresponding line numbers.
+!
+!
+!
 !
 !
 !
@@ -594,21 +597,21 @@ FILECREATE	<!AD file !AD created>/info/fao=4!/ansi=0
 FILENOTCREATE	<!AD file !AD not created>/info/fao=4!/ansi=0
 JNLPROCSTUCK	<Journal file writes blocked by process !UL>/info/fao=1!/ansi=0
 INVGLOBALQUAL	<Error in GLOBAL qualifier : Parse error at offset !UL in !AD>/error/fao=3!/ansi=0
-UNUSEDMSG590	<JNLWRNNOTCHG last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
+COLLARGLONG	<Collation sequence !UL does not contain routines for long strings>/error/fao=1!/ansi=0
 NOPINI		<PINI journal record expected but not found in journal file !AD at offset [0x!XL]>/error/fao=3!/ansi=0
 DBNOCRE		<Not all specified database files, or their associated journal files were created>/error/fao=0!/ansi=0
 JNLSPACELOW	<Journal file !AD nearing maximum size, !UL blocks to go>/info/fao=3!/ansi=0
-UNUSEDMSG594	<JNLFILETOOBIG last used in V4.3-001 (release-date 2002/04/23)>/error/fao=0!/ansi=0
+DBCOMMITCLNUP	<Pid !UL [0x!XL] handled error during commit of !AZ transaction in database file !AD>/info/fao=5!/ansi=0
 BFRQUALREQ	<The [NO]BEFORE qualifier is required for this command>/error/fao=0!/ansi=0
 REQDVIEWPARM	<Required View parameter is missing>/error/fao=0!/ansi=0
-UNUSEDMSG597	<NORECOVERINF last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
+COLLFNMISSING	<Routine !AD is not found for collation sequence !UL>/error/fao=3!/ansi=0
 JNLACTINCMPLT	<Mupip journal action might be incomplete>/warning/fao=0!/ansi=0
 UNUSEDMSG609	<last used in V4.3-001E (release-date 2003/02/15)>/error/fao=0!/ansi=0
 DLRCUNXEOR	<!_!AD!/!_!_!_unexpected end of record in $CHAR() subscript>/error/fao=2!/ansi=0
 DLRCTOOBIG	<!_!AD!/!_!_!_$CHAR() value cannot be greater than 255>/error/fao=2!/ansi=0
 WCERRNOTCHG	<Not all specified database files were changed>/error/fao=0!/ansi=0
 WCWRNNOTCHG	<Not all specified database files were changed>/warning/fao=0!/ansi=0
-UNUSEDMSG604	<WCINFNOTCHG last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
+ZCWRONGDESC	<A string longer than 65535 is passed via 32-bit descriptor>/error/fao=0!/ansi=0
 MUTNWARN	<Database file !AD is approaching 4G transaction number limit.  Renew database with MUPIP INTEG TN_RESET>/warning/fao=2!/ansi=0
 JNLNAMLEN	<Journal file name !AD: for database file !AD exceeds maximum length of !UL>/error/fao=5!/ansi=0
 LCKSTIMOUT	<DAL timed lock request expired>/warning/fao=0!/ansi=0
@@ -650,7 +653,7 @@ INVBITSTR	<Invalid bit string>/error/fao=0!/ansi=0
 INVBITPOS	<Invalid position in the bit string>/error/fao=0!/ansi=0
 PARNORMAL	<Parse successful>/success/fao=0!/ansi=0
 PARBUFSM	<Parse buffer too small>/error/fao=0!/ansi=0
-UNUSEDMSG646	<PARTRNLNM last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
+RMWIDTHTOOBIG	<File record size too big>/error/fao=0!/ansi=72
 PATTABNOTFND	<Pattern table !AD not found>/error/fao=2!/ansi=0
 OBJFILERR	<Error with object file I/O on file !AD>/error/fao=2!/ansi=0
 SRCFILERR	<Error with source file I/O on file !AD>/error/fao=2!/ansi=0
@@ -682,7 +685,7 @@ DBREMOTE	<Database region !AD is remote; perform maintenance on the server node>
 JNLREQUIRED	<Journaling is required for clustered operation with file !AD>/error/fao=2!/ansi=0
 TPMIXUP		<!AZ transaction cannot be started within !AZ transaction>/error/fao=2!/ansi=0
 HTOFLOW		<Hash table overflow, local or region name space exceeded>/error/fao=0!/ansi=0
-UNUSEDMSG688	<DBBMLEVL last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
+RMNOBIGRECORD	<File record size requires BIGRECORD parameter>/error/fao=0!/ansi=72
 DBBMSIZE	<!AD Bit map has incorrect size> /info /fao=2!/ansi=0
 DBBMBARE	<!AD Bit map does not protect itself> /info /fao=2!/ansi=0
 DBBMINV		<!AD Bit map contains an invalid pattern> /info /fao=2!/ansi=0
@@ -699,7 +702,7 @@ DBQUELINK	<Database file !AD, element location 0x!XL: blk = 0x!XL: control !AD q
 DBCRERR		<Database file !AD, cr location 0x!XL blk = 0x!XL error: !AD was 0x!XL, expecting 0x!XL> /info /fao=8!/ansi=0
 MUSTANDALONE	<Could not get exclusive access to !AD> /info /fao=2!/ansi=0
 MUNOACTION	<MUPIP unable to perform requested action> /error /fao=0!/ansi=0
-UNUSEDMSG695	<last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
+RMBIGSHARE	<File with BIGRECORD specified may only be shared if READONLY>/error/fao=0!/ansi=0
 TPRESTART	<code: !AD; blk: 0x!XL in glbl: ^!AD; pvtmods: !UL, blkmods: !UL, blklvl: !UL, type: !UL, readset: !UL, writeset: !UL, local_tn: !UL> /info /fao=12!/ansi=0
 SOCKWRITE	<Write to a TCP/IP socket failed> /error /fao=0!/ansi=0
 DBCNTRLERR	<Database file !AD: control error suspected but not found> /info /fao=2!/ansi=0
@@ -715,7 +718,7 @@ JNLWRERR	<Error writing journal file !AD.  Unable to update header.>/error/fao=2
 FILEIDMATCH	<Saved File ID does not match the current ID - the file appears to have been moved>/error/fao=0!/ansi=0
 EXTSRCLIN	<!_!AD!/!_!AD>/info/fao=4!/ansi=0
 EXTSRCLOC	<!_!_At column !UL, line !UL, source module !AD>/info/fao=4!/ansi=0
-UNUSEDMSG721	<EXTCALLRET last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
+BIGNOACL	<Existing file found when BIGRECORD specified with UDF format but no GT.M ACE, perhaps lost during COPY>/error/fao=0!/ansi=0
 ERRCALL		<Error called from !AD line !UL>/error/fao=3!/ansi=0
 ZCCTENV		<Environmental variable for external package !AD not set>/error/fao=2!/ansi=0
 ZCCTOPN		<Unable to open external call table: !AD>/error/fao=2!/ansi=0
@@ -786,11 +789,11 @@ REPLERR		<!AD>/error/fao=2!/ansi=0
 JNLNMBKNOTPRCD	<Journal file !AD does not match the current journal file !AD of database file !AD>/error/fao=6!/ansi=0
 REPLFILIOERR	<Replication subsystem file I/O error !AD>/error/fao=2!/ansi=0
 REPLBRKNTRANS	<Replication subsystem found transaction !AD broken or missing in the journal files>/error/fao=2!/ansi=0
-UNUSEDMSG792	<last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
+TTWIDTHTOOBIG	<Terminal WIDTH exceeds the maximum allowed limit>/error/fao=0!/ansi=0
 REPLLOGOPN	<Replication subsystem could not open log file !AD: !AD.  Logging done to !AD.>/error/fao=6!/ansi=0
 REPLFILTER	<Replication filter subsystem failure>/error/fao=0!/ansi=0
 GBLMODFAIL	<Global variable Conflict Test failed.  Failure code: !AD.>/error/fao=2!/ansi=0
-UNUSEDMSG796	<last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
+TTLENGTHTOOBIG	<Terminal LENGTH exceeds the maximum allowed limit>/error/fao=0!/ansi=0
 TPTIMEOUT	<Transaction timeout>/error/fao=0!/ansi=0
 DEFEREVENT	<Transfer table reset for event type !UL when set for type !UL>/info/fao=2!/ansi=0
 JNLFILNOTCHG	<Journal file not changed>/error/fao=0!/ansi=0
@@ -810,12 +813,12 @@ LISTENPASSBND	<Controlmnemonic LISTEN can be applied to PASSIVE socket in the st
 DBCLNUPINFO	<Database file !AD !/!AD>/info/fao=4!/ansi=0
 MUNODWNGRD	<MUPIP downgrade did not occur because of preceding errors>/error/fao=0!/ansi=0
 REPLTRANS2BIG	<Transaction !AD of size !UL too large to be accommodated in the !AD pool>/error/fao=5!/ansi=0
-UNUSEDMSG816	<LITERALS2LARGE last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
+RDFLTOOLONG	<Length specified for fixed length read exceeds the maximum string size>/error/fao=0!/ansi=0
 MUNOFINISH	<MUPIP unable to finish all requested actions>/error/fao=0!/ansi=0
 DBFILEXT	<Database file !AD extended from 0x!XL blocks to 0x!XL at transaction 0x!XL>/info/fao=5!/ansi=0
 JNLFSYNCERR	<Error synchronizing journal file !AD to disk>/error/fao=2!/ansi=0
 FSYNCTIMOUT	<Timed out on fsync for journal file !AD>/error/fao=2!/ansi=0
-UNUSEDMSG821	<DBRECOVERBAD last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
+ZCPREALLVALINV	<The pre-allocation value exceeded the maximum string length>/error/fao=0!/ansi=0
 NEWJNLFILECREATE	<Journal file !AD nearing maximum size.  New journal file created.>/info/fao=2!/ansi=0
 DSKSPACEFLOW	<Disk Space for file !AD nearing maximum size.  !UL blocks available.>/info/fao=3!/ansi=0
 UNUSEDMSG824	<last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0

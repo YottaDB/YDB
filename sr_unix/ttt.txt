@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -793,7 +793,8 @@ OC_ZMESS:	irepab	val.3
 		calls	val.1,xfer.xf_zmess
 OC_ZPREVIOUS:	pushab	val.0
 		calls	#1,xfer.xf_zprevious
-OC_ZPRINT:	pushl 	val.5
+OC_ZPRINT:	jsb 	xfer.xf_restartpc
+		pushl 	val.5
 		pushab	val.4
 		pushl	val.3
 		pushab	val.2

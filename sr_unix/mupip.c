@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +60,7 @@
 #include "mu_term_setup.h"
 #include "sig_init.h"
 #include "gtmmsg.h"
+#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
 GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLDEF	bool			in_backup;
@@ -89,6 +90,7 @@ int main (int argc, char **argv)
 	int		res;
 
 	image_type = MUPIP_IMAGE;
+	gtm_env_init();	/* read in all environment variables */
 	err_init(util_base_ch);
 	sig_init(generic_signal_handler, NULL);	/* Note: no ^C handler is defined (yet) */
 	atexit(mupip_exit_handler);

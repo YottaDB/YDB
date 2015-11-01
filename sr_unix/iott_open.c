@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,8 +106,8 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			} else
 				rts_error(VARLSTCNT(1) ERR_NOTERMINFODB);
 		}
-		ioptr->width = (unsigned short)COLUMNS;
-		ioptr->length = (unsigned short)GTM_LINES;
+		ioptr->width = COLUMNS;
+		ioptr->length = GTM_LINES;
 		ioptr->wrap = (0 == AUTO_RIGHT_MARGIN) ? FALSE : TRUE; /* defensive programming; till we are absolutely, positively
 									* certain that there are no uses of wrap == TRUE */
 		ioptr->state = dev_open;

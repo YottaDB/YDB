@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,6 +80,9 @@
  */
 
 #include "mdef.h"
+
+#include "gtm_stdio.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -92,6 +95,33 @@
 #include "gvcst_search_tail.h"
 
 GBLREF unsigned int	t_tries;
+GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF gd_region	*gv_cur_region;
+
+#define	INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat)	if (CDB_STAGNATE <= t_tries) gvcst_search_fail(pStat);
+
+static	void	gvcst_search_fail(srch_blk_status *pStat)
+{
+	char	buff[1024], crbuff[256], regbuff[512];
+
+	error_def(ERR_TEXT);
+
+	assert(CDB_STAGNATE <= t_tries);
+	assert((NULL != pStat) && (NULL != pStat->cr) && (NULL != cs_addrs));
+	if (NULL != pStat)
+	{
+		if (NULL != pStat->cr)
+			SPRINTF(crbuff, ": crbuff = 0x%X", pStat->cr->buffaddr);
+		else
+			crbuff[0] = '\0';
+		memcpy(regbuff, REG_STR_LEN(gv_cur_region));
+		regbuff[gv_cur_region->rname_len] = '\0';
+		SPRINTF(buff, "Possible data corruption in region %s : blk = 0x%X : buff = 0x%X : cr = 0x%X %s : "
+				"csa = 0x%X : csalock = 0x%X", regbuff, pStat->blk_num, pStat->buffaddr,
+				pStat->cr, crbuff, cs_addrs, cs_addrs->lock_addrs[0]);
+		send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(buff));
+	}
+}
 
 /*
  * --------------------------------------------------
@@ -137,6 +167,7 @@ enum cdb_sc 	gvcst_search_blk (gv_key *pKey, srch_blk_status *pStat)
 		{	/* Terminated at end of block */
 			if (pRec > pTop)		/* If record goes off the end, then block must be bad */
 			{
+				INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat);
 				assert(CDB_STAGNATE > t_tries);
 				return cdb_sc_blklenerr;
 			}
@@ -153,6 +184,7 @@ enum cdb_sc 	gvcst_search_blk (gv_key *pKey, srch_blk_status *pStat)
 		GET_USHORT(nRecLen, &((rec_hdr_ptr_t)pRec)->rsiz);
 		if (nRecLen == 0)			/* If record length is 0, then block must be bad */
 		{
+			INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat);
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_badoffset;
 		}
@@ -237,6 +269,7 @@ enum cdb_sc	gvcst_search_tail (gv_key *pKey, srch_blk_status *pStat, gv_key *pOl
 	{	/* Terminated at end of block */
 /* eob_tail: */	if (pRec > pTop)
 		{
+			INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat);
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_blklenerr;
 		}
@@ -304,6 +337,7 @@ enum cdb_sc	gvcst_search_tail (gv_key *pKey, srch_blk_status *pStat, gv_key *pOl
 			{	/* Terminated at end of block */
 				if (pRec > pTop)		/* If record goes off the end, then block must be bad */
 				{
+					INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat);
 					assert(CDB_STAGNATE > t_tries);
 					return cdb_sc_blklenerr;
 				}
@@ -321,6 +355,7 @@ enum cdb_sc	gvcst_search_tail (gv_key *pKey, srch_blk_status *pStat, gv_key *pOl
 			GET_USHORT(nRecLen, &((rec_hdr_ptr_t)pRec)->rsiz);
 			if (nRecLen == 0)		/* If record length is 0, then block must be bad */
 			{
+				INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat);
 				assert(CDB_STAGNATE > t_tries);
 				return cdb_sc_badoffset;
 			}

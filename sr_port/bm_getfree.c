@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,13 +60,11 @@
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF ua_list		*curr_ua;
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF gd_region	*gv_cur_region;
 GBLREF unsigned char	rdfail_detail;
 GBLREF short		dollar_tlevel;
-GBLREF int		update_array_size;
-GBLREF int		cumul_update_array_size;
+GBLREF uint4		update_array_size, cumul_update_array_size;
 GBLREF unsigned int	t_tries;
 
 block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw_set_element *cs, int *cw_depth_ptr)
@@ -79,7 +77,8 @@ block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw
 	int		cw_set_top, cycle, depth;
 	unsigned int	lcnt, local_maps, map_size, n_decrements = 0, total_blks;
 	trans_num	ctn;
-	int4		free_bit, offset, space_needed;
+	int4		free_bit, offset;
+	uint4		space_needed;
 	uint4		status;
 
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;

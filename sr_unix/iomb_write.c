@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,21 +21,21 @@
 #include "outofband.h"
 
 GBLREF int4	outofband;
+GBLREF io_pair	io_curr_device;
 
 void iomb_write(mstr *v)
 {
-	GBLREF	io_pair io_curr_device;
 	uint4	status, efn_mask;
 	d_mb_struct *mb_ptr;
 	char	*ch;
-	short 	len,out_len;
+	int	len, out_len;
 	error_def(ERR_MBXRDONLY);
 
 	mb_ptr = (d_mb_struct *) io_curr_device.out->dev_sp;
 	if (mb_ptr->promsk == IO_RD_ONLY)
 		rts_error(VARLSTCNT(1) ERR_MBXRDONLY);
 
-	for (ch = v->addr,len = v->len ; ;  )
+	for (ch = v->addr, len = v->len ; ;  )
 	{
 		if (len > mb_ptr->maxmsg)
 			out_len = mb_ptr->maxmsg;

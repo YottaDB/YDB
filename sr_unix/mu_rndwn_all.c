@@ -111,7 +111,7 @@ int mu_rndwn_all(void)
 				validate_replpool_shm_entry(entry, (replpool_id_ptr_t)&replpool_id, &tmp_exit_status, &shmid))
 		{
 			assert(JNLPOOL_SEGMENT == replpool_id.pool_type || RECVPOOL_SEGMENT == replpool_id.pool_type);
-			ret_status = mu_rndwn_repl_instance(&replpool_id);
+			ret_status = mu_rndwn_repl_instance(&replpool_id, TRUE);
 			ret_ptr = i2asc((uchar_ptr_t)shmid_buff, shmid);
 			*ret_ptr = '\0';
 			gtm_putmsg(VARLSTCNT(6) (JNLPOOL_SEGMENT == replpool_id.pool_type) ?

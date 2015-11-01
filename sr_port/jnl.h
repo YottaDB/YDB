@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,8 +64,8 @@
 #define MAX_YIELD_LIMIT		2048
 #define DEFAULT_YIELD_LIMIT	8
 
-/* Have a minimum jnl-file-auto-switch-limit of 64 align boundaries (currently each align boundary is 16K) */
-#define	JNL_AUTOSWITCHLIMIT_MIN	(64 * JNL_MIN_ALIGNSIZE)
+/* Have a minimum jnl-file-auto-switch-limit of 128 align boundaries (currently each align boundary is 16K) */
+#define	JNL_AUTOSWITCHLIMIT_MIN	(128 * JNL_MIN_ALIGNSIZE)
 #define	JNL_AUTOSWITCHLIMIT_DEF	8388600	/* Instead of 8388607 it is adjusted for default allocation = extension = 100 */
 
 /* options (sizeof(char)) to wcs_flu() (currently flush_hdr, write_epoch, sync_epoch) are bit-wise ored */
@@ -645,6 +645,7 @@ typedef struct
 	struct pini_list	*mur_plst;		/* pini_addr hash-table entry of currently simulating GT.M process */
 	boolean_t		mur_rollback;		/* a copy of mur_options.rollback to be accessible to runtime code */
 	boolean_t		mupip_journal;		/* the current command is a MUPIP JOURNAL command */
+	boolean_t		dont_reset_gbl_jrec_time;	/* Do not reset gbl_jrec_time */
 	pini_addr_reset_fnptr	mur_pini_addr_reset_fnptr;	/* function pointer to invoke mur_pini_addr_reset() */
 	uint4			cumul_jnl_rec_len;	/* cumulative length of the replicated journal records
 								for the current TP or non-TP transaction */
@@ -678,12 +679,12 @@ DEBUG_ONLY(
 #define REG_STR		"region"
 #define FILE_STR	"database file"
 
-#define GET_REPL_JNL_SEQNO(j)	(((jnl_record *)(j))->jrec_null.jnl_seqno)
 /* Given a journal record, get_jnl_seqno returns the jnl_seqno field
- * NOTE : Now all replication type records have the jnl_seqno at the same offset
- * Modify this function if need be when changing any journal record structure.
+ * Now all replication type records, EOF and EPOCH have the jnl_seqno at the same offset.
+ * Modify the macro GET_JNL_SEQNO if offset of jnl_seqno is changed for any journal records
  */
-#define GET_JNL_SEQNO(j)	(IS_REPLICATED(((jrec_prefix *)j)->jrec_type) ? GET_REPL_JNL_SEQNO(j) : seq_num_zero)
+#define GET_JNL_SEQNO(j)	(((jnl_record *)(j))->jrec_null.jnl_seqno)
+#define GET_REPL_JNL_SEQNO(j)	(IS_REPLICATED(((jrec_prefix *)j)->jrec_type) ? GET_JNL_SEQNO(j) : 0)
 
 /* Given a journal record, GET_TN returns the tn field
  */

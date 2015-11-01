@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,8 +52,6 @@ int4 mur_cre_file_extfmt(int recstat)
 		(unsigned char)iop_noreadonly,
 		(unsigned char)iop_nowrap,
 		(unsigned char)iop_stream,
-		(unsigned char)iop_recordsize, (unsigned char)0x07F,(unsigned char)0x07F,
-		/* recordsize is 2 bytes long, value of which is chosen to be 0x7f7f */
 		(unsigned char)iop_eol
 	};
 	error_def(ERR_FILENOTCREATE);

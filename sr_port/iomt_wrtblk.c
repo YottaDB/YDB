@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,20 +25,17 @@ LITREF unsigned char LIB_AB_ASC_EBC[];
 
 void iomt_wrtblk (io_desc *dv)
 {
-	uint4   status, status1;
-	iosb            io_status_blk;
-	d_mt_struct    *mt_ptr;
-
+	uint4		status;
+	iosb		io_status_blk;
+	d_mt_struct	*mt_ptr;
 	error_def (ERR_MTIS);
 
 #ifdef DP
 	FPRINTF(stderr, ">> iomt_wrtblk\n");
 #endif
-
 	mt_ptr = (d_mt_struct *) dv->dev_sp;
 	if (mt_ptr->ebcdic)
 		movtc (mt_ptr->block_sz, mt_ptr->buffer, LIB_AB_ASC_EBC, mt_ptr->buffer);
-
 	io_status_blk.status = 0;
 
 #ifdef UNIX
@@ -46,20 +43,16 @@ void iomt_wrtblk (io_desc *dv)
 	{
 		status = iomt_reopen (dv, MT_M_WRITE, FALSE);
 		if (status != SS_NORMAL)
-		{
 			return;
-		}
 	}
 #endif
 	status = iomt_wtlblk (mt_ptr->access_id, mt_ptr->write_mask, &io_status_blk,
 			      mt_ptr->buffer, mt_ptr->block_sz);
-
-	if ((status1 = io_status_blk.status) != SS_NORMAL)
+	if ((status != SS_NORMAL) || ((status = io_status_blk.status) != SS_NORMAL))
 	{
-		if (status1 == SS_ENDOFTAPE)
-		{
+		if (status == SS_ENDOFTAPE)
 			dv->dollar.za = 1;
-		} else
+		else
 		{
 			dv->dollar.za = 9;
 #ifdef UNIX
@@ -69,13 +62,9 @@ void iomt_wrtblk (io_desc *dv)
 #endif
 		}
 	} else
-	{
 		dv->dollar.za = 0;
-	}
-
 #ifdef DP
 	FPRINTF(stderr, "<< iomt_wrtblk\n");
 #endif
-
 	return;
 }

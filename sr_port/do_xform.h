@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,8 @@
 #ifndef DO_XFORM_INCLUDED
 #define DO_XFORM_INCLUDED
 
-void do_xform(int4 (*xfm)(), mstr *input, mstr *output, int *length);
-
+void do_xform(collseq *csp, int fc_type, mstr *input, mstr *output, int *length);
+/*
+ * fc_type would be either XFORM (0) or XBACK (1)
+ */
 #endif /* DO_XFORM_INCLUDED */

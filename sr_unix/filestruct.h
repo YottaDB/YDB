@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,4 +53,5 @@ typedef struct unix_file_info_struct
 					&& (fileinfo)->fileid.device == FILE_INFO(reg)->fileid.device)
 #endif
 
-#define WRT_STRT_PNDNG (short)65534 /* this is lifted from VMS. right now it is unused in Unix so any value is ok */
+#define WRT_STRT_PNDNG (unsigned short)65534 /* the code assumes this is non-zero, even,
+					and that VMS never uses its value for iosb.cond */

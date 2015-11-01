@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -141,24 +141,6 @@
 	   RC = msgsnd(MSGID, MSGP, MSGSZ, FLG);\
 	} while(-1 == RC && EINTR == errno);	\
 }
-
-#ifdef MUTEX_MSEM_WAKE
-#define MSEM_LOCK(SEM, CONDITION, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = msem_lock(SEM, CONDITION);	\
-	} while(-1 == RC && EINTR == errno);	\
-}
-
-#define MSEM_UNLOCK(SEM, CONDITION, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = msem_unlock(SEM, CONDITION);	\
-	} while(-1 == RC && EINTR == errno);	\
-}
-#endif
 
 #define OPEN_PIPE(FDESC, RC)			\
 {						\

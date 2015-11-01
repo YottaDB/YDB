@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,8 +38,7 @@ GBLREF gv_key 		*gv_currkey;
 GBLREF gv_namehead 	*gv_target;
 GBLREF sgmnt_data	*cs_data;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF uint4	t_err;
-GBLDEF rc_oflow	*rc_overflow;
+GBLDEF rc_oflow		*rc_overflow;
 GBLREF bool		gv_curr_subsc_null;
 GBLREF gd_region	*gv_cur_region;
 GBLREF int		rc_read_stamp;

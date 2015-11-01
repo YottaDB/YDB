@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,8 +38,6 @@
 	memcpy(murgbl.extr_buff + extract_len, LAB_TERM, LAB_TERM_SZ);				\
 	extract_len += LAB_TERM_SZ;								\
 }
-
-int real_len(int length, char *str);
 
 #define	EXTTXT(T,L)		actual = real_len(L, T);		\
 	memcpy (&murgbl.extr_buff[extract_len], T, actual);		\
@@ -461,7 +459,7 @@ typedef struct
 int			gtmrecv_fetchresync(int port, seq_num *resync_seqno);
 void			jnlext_write(fi_type *file_info, char *buffer, int length);
 uint4			mur_apply_pblk(boolean_t apply_intrpt_pblk);
-boolean_t 		mur_back_process(boolean_t apply_pblk);
+boolean_t 		mur_back_process(boolean_t apply_pblk, seq_num *pre_resolve_seqno);
 uint4 			mur_block_count_correct(void);
 int4			mur_blocks_free(void);
 void			mur_close_files(void);

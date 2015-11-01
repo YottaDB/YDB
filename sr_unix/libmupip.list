@@ -26,6 +26,7 @@ gtmsource_comm_init
 gtmsource_ctl_init
 gtmsource_end
 gtmsource_exit
+gtmsource_flush_fh
 gtmsource_get_opt
 gtmsource_heartbeat
 gtmsource_mode_change

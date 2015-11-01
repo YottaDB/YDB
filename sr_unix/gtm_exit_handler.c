@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,6 @@
 #include "gtm_stdio.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
-#include "gtmsecshr.h"
 #include "gt_timer.h"
 #ifdef UNIX
 #include "mutex.h"
@@ -43,6 +42,7 @@
 #include "mprof.h"
 #include "print_exit_stats.h"
 #include "invocation_mode.h"
+#include "secshr_db_clnup.h"
 
 GBLREF	int4		exi_condition;
 GBLREF	short		dollar_tlevel;

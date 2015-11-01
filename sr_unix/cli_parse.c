@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -130,7 +130,7 @@ int 	find_entry(char *str, CLI_ENTRY *pparm)
 		   as well, the first entry is the match returned. otherwise an error is returned
 		   since we cannot make a decision (does SE match SET or SEP). */
 
-		if (0 == (res = strncmp(sp, str, strlen(str))))
+		if (0 == (res = STRNCMP_STR(sp, str)))
 		{
 			if (-1 != match_ind)
 			{
@@ -150,7 +150,7 @@ int 	find_entry(char *str, CLI_ENTRY *pparm)
 		}
 		ind++;
 	}
-	if (-1 != match_ind && gpqual_root && 0 == strncmp(gpqual_root->name, str, strlen(str)))
+	if (-1 != match_ind && gpqual_root && 0 == STRNCMP_STR(gpqual_root->name, str))
 		return(-1);
 	return(match_ind);
 }
@@ -268,7 +268,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 		cli_get_string_token(eof);
 		if (parms_cnt >= gpcmd_verb->max_parms)
 		{
-			SNPRINTF(cli_err_str, MAX_STRLEN, "Too many parameters ");
+			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Too many parameters ");
 			return(-1);
 		}
 		if (parm_ary[parms_cnt] && ((char *)-1 != parm_ary[parms_cnt]))
@@ -287,7 +287,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	opt_str = cli_token_buf;
 	if (!pcmd_parms)
 	{
-		SNPRINTF(cli_err_str, MAX_STRLEN, "No qualifiers allowed for this command");
+		SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "No qualifiers allowed for this command");
 		return(-1);
 	}
 	/* ------------------------------------------
@@ -296,7 +296,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	 */
 	if (!cli_is_qualif(cli_token_buf))
 	{
-		SNPRINTF(cli_err_str, MAX_STRLEN, "Qualifier expected instead of : %s ", opt_str);
+		SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Qualifier expected instead of : %s ", opt_str);
 		return(-1);
 	}
 	/* -------------------------
@@ -305,7 +305,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	 */
 	if (!cli_look_next_token(eof) || 0 == cli_gettoken(eof))
 	{
-		SNPRINTF(cli_err_str, MAX_STRLEN, "Qualifier string missing %s ", opt_str);
+		SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Qualifier string missing %s ", opt_str);
 		return(-1);
 	}
 	/* ---------------------------------------
@@ -329,7 +329,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	{
 		if (cli_look_next_token(eof) && cli_is_assign(cli_token_buf))
 		{
-			SNPRINTF(cli_err_str, MAX_STRLEN,
+			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR,
 			  "Assignment is not allowed for this option : %s",
 			  pparm->name);
 			return(-1);
@@ -344,7 +344,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 		{
 	    		if (VAL_REQ == pparm->required)
 			{
-				SNPRINTF(cli_err_str, MAX_STRLEN, "Option : %s needs value", pparm->name);
+				SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Option : %s needs value", pparm->name);
 				return(-1);
 			} else
 			{
@@ -380,7 +380,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 			 */
 			if (!cli_is_assign(cli_token_buf))
 			{
-				SNPRINTF(cli_err_str, MAX_STRLEN, "Assignment missing after option : %s", pparm->name);
+				SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Assignment missing after option : %s", pparm->name);
 				return(-1);
 			}
 			/* --------------------------------------------------------
@@ -389,7 +389,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 			 */
 			if (!cli_look_next_string_token(eof) || 0 == cli_get_string_token(eof))
 			{
-				SNPRINTF(cli_err_str, MAX_STRLEN, "Unrecognized option : %s, value expected but not found",
+				SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Unrecognized option : %s, value expected but not found",
 						pparm->name);
 				cli_lex_in_ptr->tp = 0;
 				return(-1);
@@ -466,14 +466,14 @@ boolean_t cli_numeric_check(CLI_ENTRY *pparm, char *val_str)
 		{
 			if (!cli_is_hex(val_str))
 			{
-				SNPRINTF(cli_err_str, MAX_STRLEN,
+				SNPRINTF(cli_err_str, MAX_CLI_ERR_STR,
 				  "Unrecognized value: %s, HEX number expected",
 				  val_str);
 				retval = FALSE;
 			}
 		} else if (!cli_is_dcm(val_str))
 		{
-			SNPRINTF(cli_err_str, MAX_STRLEN,
+			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR,
 			  "Unrecognized value: %s, Decimal number expected",
 			  val_str);
 			retval = FALSE;
@@ -509,7 +509,7 @@ int cli_check_negated(char **opt_str_ptr, CLI_ENTRY *pcmd_parm_ptr, CLI_ENTRY **
 		/* Check that the qualifier does not have the NO prefix */
 		if (0 == (*pparm_ptr = find_cmd_param(opt_str_tmp, pcmd_parms, FALSE)))
 		{
-			SNPRINTF(cli_err_str, MAX_STRLEN, "Unrecognized option : %s", *opt_str_ptr);
+			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Unrecognized option : %s", *opt_str_ptr);
 			cli_lex_in_ptr->tp = 0;
 			return(-1);
 		} else
@@ -525,7 +525,7 @@ int cli_check_negated(char **opt_str_ptr, CLI_ENTRY *pcmd_parm_ptr, CLI_ENTRY **
 	 */
 	if (!(*pparm_ptr)->negatable && neg_flg)
 	{
-		SNPRINTF(cli_err_str, MAX_STRLEN, "Option %s may not be negated", *opt_str_ptr);
+		SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Option %s may not be negated", *opt_str_ptr);
 		return(-1);
 	}
 	return neg_flg;
@@ -597,7 +597,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 			{
 				if (val_flg)
 				{
-					SNPRINTF(cli_err_str, MAX_STRLEN,
+					SNPRINTF(cli_err_str, MAX_CLI_ERR_STR,
 					  "Assignment is not allowed for this option : %s",
 					  pparm1->name);
 					cli_lex_in_ptr->tp = 0;
@@ -608,11 +608,11 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 				if ((!val_flg) && VAL_REQ == pparm1->required)
 				{
 					if (ptr_equal)
-						SNPRINTF(cli_err_str, MAX_STRLEN,
+						SNPRINTF(cli_err_str, MAX_CLI_ERR_STR,
 						  "Unrecognized option : %s, value expected but not found",
 						  pparm1->name);
 					else
-						SNPRINTF(cli_err_str, MAX_STRLEN, "Option : %s needs value", tmp_str_ptr);
+						SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Option : %s needs value", tmp_str_ptr);
 					cli_lex_in_ptr->tp = 0;
 					return FALSE;
 				}
@@ -653,7 +653,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 				ptr_next_val = strchr(ptr_next_val, ',')+ 1;
 				if (!*ptr_next_val)
 				{
-					SNPRINTF(cli_err_str, MAX_STRLEN, "Option expected", tmp_str_ptr);
+					SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Option expected", tmp_str_ptr);
 					cli_lex_in_ptr->tp = 0;
 					return FALSE;
 
@@ -748,13 +748,13 @@ int parse_cmd(void)
 		} while (1 == res);
 	} else
 	{
-		SNPRINTF(cli_err_str, MAX_STRLEN, "Unrecognized command: %s", cmd_str);
+		SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Unrecognized command: %s", cmd_str);
 		cli_lex_in_ptr->tp = 0;
 		res = -1;
 	}
 	if ((1 > opt_cnt) && (-1 != res) && (VAL_REQ == cmd_ary[cmd_ind].required))
 	{
-		SNPRINTF(cli_err_str, MAX_STRLEN, "Command argument expected, but not found");
+		SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Command argument expected, but not found");
 		res = -1;
 	}
 	/*------------------------------------------------------
@@ -801,7 +801,7 @@ CLI_ENTRY *get_parm_entry(char *parm_str)
 	error_def(ERR_MUPCLIERR);
 
 	strncpy(local_str, parm_str, sizeof(local_str) - 1);
-	root_match = (gpqual_root && !strncmp(gpqual_root->name, local_str, strlen(local_str)));
+	root_match = (gpqual_root && !STRNCMP_STR(gpqual_root->name, local_str));
 
 	/* ---------------------------------------
 	 * search qualifier table for this option
@@ -932,7 +932,7 @@ bool cli_get_parm(char *entry, char val_buf[])
 
 	while (0 < strlen(sp = (gpcmd_parm_vals + ind)->name))
 	{
-		if (0 == (res = strncmp(sp, local_str, strlen(local_str))))
+		if (0 == (res = STRNCMP_STR(sp, local_str)))
 		{
 			if (-1 != match_ind)
 				return(FALSE);
@@ -946,12 +946,7 @@ bool cli_get_parm(char *entry, char val_buf[])
 		ind++;
 	}
 	if (-1 != match_ind)
-	{
-		/* ---------------------------
-		 * If no value, prompt for it
-		 * ---------------------------
-		 */
-
+	{	/* If no value, prompt for it */
 		if (NULL == parm_ary[match_ind])
 		{
 			PRINTF("%s", (gpcmd_parm_vals + match_ind)->prompt);
@@ -967,11 +962,8 @@ bool cli_get_parm(char *entry, char val_buf[])
 				}
 				parm_ary[match_ind] = malloc(parm_len + 1);
 				if (parm_len)
-				{
 					memcpy(parm_ary[match_ind], &local_str[0], parm_len);
-					*(parm_ary[match_ind] + parm_len + 1) = '\0';
-				} else
-					*parm_ary[match_ind] = '\0';
+				*(parm_ary[match_ind] + parm_len) = '\0';
 			} else
 			{	/* No string was returned so create a real ghost to point to.
 				   Note that this should be revisited since this is NOT what should

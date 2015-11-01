@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -102,6 +102,10 @@
 #include "fgncal.h"
 #endif
 #include "jnl_typedef.h"
+
+#ifdef VMS
+#include "gtm_logicals.h"	/* for GTM_MEMORY_NOACCESS_COUNT */
+#endif
 
 #define DEFAULT_ZERROR_STR	"Unprocessed $ZERROR, see $ZSTATUS"
 #define DEFAULT_ZERROR_LEN	(sizeof(DEFAULT_ZERROR_STR) - 1)
@@ -224,6 +228,7 @@ GBLDEF	int		process_exiting;
 GBLDEF	int4		dollar_zsystem;
 GBLDEF	int4		dollar_zeditor;
 GBLDEF	boolean_t	sem_incremented = FALSE;
+GBLDEF	boolean_t	new_dbinit_ipc = FALSE;
 GBLDEF	mval		**ind_result_array, **ind_result_sp, **ind_result_top;
 GBLDEF	mval		**ind_source_array, **ind_source_sp, **ind_source_top;
 GBLDEF	RTN_TABENT	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
@@ -262,6 +267,10 @@ GBLDEF	src_line_struct	src_head;
 GBLDEF	bool		code_generated;
 GBLDEF	short int	source_column, source_line;
 GBLDEF	bool		devctlexp;
+GBLDEF 	char		cg_phase;       /* code generation phase */
+/* Previous code generation phase: Only used by emit_code.c to initialize the push list at the
+ * beginning of each phase (bug fix: C9D12-002478) */
+GBLDEF 	char		cg_phase_last;
 
 GBLDEF	int		cmd_cnt;
 
@@ -358,9 +367,9 @@ GBLDEF	mmseg			*mmseg_head;
 GBLDEF	ua_list			*first_ua, *curr_ua;
 GBLDEF	char			*update_array, *update_array_ptr;
 GBLDEF	int			gv_fillfactor = 100,
-				update_array_size = 0,
-				cumul_update_array_size = 0,    /* the current total size of the update array */
 				rc_set_fragment;       /* Contains offset within data at which data fragment starts */
+GBLDEF	uint4			update_array_size = 0,
+				cumul_update_array_size = 0;    /* the current total size of the update array */
 GBLDEF	kill_set		*kill_set_tail;
 GBLDEF	boolean_t		pool_init = FALSE;
 GBLDEF	boolean_t		is_src_server = FALSE;
@@ -489,6 +498,7 @@ GBLDEF	mval	dollar_zdir = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0);
 GBLDEF	int * volatile		var_on_cstack_ptr = NULL; /* volatile pointer to int; volatile so that nothing gets optimized out */
 GBLDEF	boolean_t		gtm_environment_init = FALSE;
 GBLDEF	hashtab			*cw_stagnate = NULL;
+GBLDEF	boolean_t		cw_stagnate_reinitialized = FALSE;
 
 GBLDEF	uint4		pat_everything[] = { 0, 2, PATM_E, 1, 0, PAT_MAX_REPEAT, 0, PAT_MAX_REPEAT, 1 }; /* pattern = ".e" */
 GBLDEF	uint4		sizeof_pat_everything = sizeof(pat_everything);
@@ -662,8 +672,11 @@ GBLDEF cw_set_element	cw_set[CDB_CW_SET_SIZE];
 GBLDEF unsigned char	cw_set_depth, cw_map_depth;
 GBLDEF unsigned int	t_tries;
 GBLDEF uint4		t_err;
-GBLDEF bool		update_trans;
-
+GBLDEF int4		update_trans;	/* TRUE whenever a non-TP transaction needs to increment the database transaction number.
+					 * usually TRUE if cw_set_depth/cw_map_depth of the current non-TP transaction is non-zero,
+					 * but additionally TRUE in case of a redundant set in gvcst_put.c
+					 * can take on a special value T_COMMIT_STARTED in t_end/tp_tend hence is not "boolean_t"
+					 */
 GBLDEF	boolean_t	mu_rndwn_file_dbjnl_flush;	/* to indicate standalone access is available to shared memory so
 							 * wcs_recover() need not increment db curr_tn or write inctn record */
 
@@ -689,3 +702,21 @@ GBLDEF	boolean_t	is_lchar_wcs_code[] = 	/* lowercase failure codes that imply da
 #undef CDB_SC_LCHAR_ENTRY
 };
 
+GBLDEF	mval	last_fnquery_return_varname;			/* Return value of last $QUERY (on stringpool) (varname) */
+GBLDEF	mval	last_fnquery_return_sub[MAX_LVSUBSCRIPTS];	/* .. (subscripts) */
+GBLDEF	int	last_fnquery_return_subcnt	;		/* .. (count of subscripts) */
+
+GBLDEF	boolean_t	gvdupsetnoop = FALSE;	/* if TRUE, duplicate SETs do not change GDS block (and therefore no PBLK journal
+						 * records will be written) although the database transaction number will be
+						 * incremented and logical SET journal records will be written.
+						 */
+GBLDEF boolean_t	gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
+UNIX_ONLY(GBLDEF int4	gtm_shmflags;)		/* Extra flags for shmat */
+#ifdef VMS
+GBLDEF	uint4	gtm_memory_noaccess_defined;	/* count of the number of GTM_MEMORY_NOACCESS_ADDR logicals which are defined */
+GBLDEF	uint4	gtm_memory_noaccess[GTM_MEMORY_NOACCESS_COUNT];	/* see VMS gtm_env_init_sp.c */
+#endif
+
+#ifdef DEBUG
+GBLDEF	boolean_t	in_wcs_recover = FALSE;	/* TRUE if in wcs_recover(), used by bt_put() */
+#endif

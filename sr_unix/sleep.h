@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,13 @@
 
 #ifndef SLEEP_H
 #define SLEEP_H
+
+/* Note: GT.M code *MUST*NOT* make use of the sleep() function because use of the sleep() function
+   causes problems with GT.M's timers on some platforms. Specifically, the sleep() function
+   causes the SIGARLM handler to be silently deleted on Solaris systems (through Solaris 9 at least).
+   This leads to lost timer pops and has the potential for system hangs. The proper long sleep mechanism
+   is hiber_start which can be accessed through the LONG_SLEEP macro defined in mdef.h.
+ */
 
 int m_sleep(int seconds);
 int m_usleep(int useconds);

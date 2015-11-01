@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,9 +49,9 @@ void mupip_set(void)
 	region = cli_present("REGION") == CLI_PRESENT;
 	jnlfile = cli_present("JNLFILE") == CLI_PRESENT;
 	cli_stat =  cli_present("JOURNAL"); /* just save a call to cli_present */
-	set_journal = (CLI_PRESENT != cli_stat && CLI_NEGATED != cli_stat) ? CLI_ABSENT: cli_stat;
+	set_journal = ((CLI_PRESENT == cli_stat) || (CLI_NEGATED == cli_stat));
 	cli_stat =  cli_present("REPLICATION"); /* just save a call to cli_present */
-	set_replication = (CLI_PRESENT != cli_stat && CLI_NEGATED != cli_stat) ? CLI_ABSENT: cli_stat;
+	set_replication = ((CLI_PRESENT == cli_stat) || (CLI_NEGATED == cli_stat));
 
 	if (region)
 	{

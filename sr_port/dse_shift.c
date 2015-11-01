@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,10 +35,11 @@
 #include "t_end.h"
 #include "t_begin_crit.h"
 #include "gvcst_blk_build.h"
+#include "t_abort.h"
 
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF gd_region        *gv_cur_region;
-GBLREF int		update_array_size;
+GBLREF uint4		update_array_size;
 GBLREF srch_hist	dummy_hist;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
@@ -120,7 +121,7 @@ void dse_shift(void)
 	if (offset < sizeof(blk_hdr) || offset > size)
 	{
 		util_out_print("Error:  offset not in range of block.", TRUE);
-		T_ABORT(gv_cur_region, cs_addrs);
+		t_abort(gv_cur_region, cs_addrs);
 		if (lbp)
 			free(lbp);
 		return;
@@ -131,7 +132,7 @@ void dse_shift(void)
 		if (shift + size >= cs_addrs->hdr->blk_size)
 		{
 			util_out_print("Error:  block not large enough to accomodate shift.", TRUE);
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			if (lbp)
 				free(lbp);
 			return;
@@ -153,7 +154,7 @@ void dse_shift(void)
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
 		util_out_print("Error: bad blk build.", TRUE);
-		T_ABORT(gv_cur_region, cs_addrs);
+		t_abort(gv_cur_region, cs_addrs);
 		if (lbp)
 			free(lbp);
 		return;

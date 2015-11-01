@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,7 @@
 #include "io.h"
 #include "iousdef.h"
 
-void ious_wteol(short x, io_desc *iod)
+void ious_wteol(int4 x, io_desc *iod)
 {
 	assert(iod->state == dev_open);
 	((void(*)())(((d_us_struct*)(iod->dev_sp))->disp->wteol))(x);

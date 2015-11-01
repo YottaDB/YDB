@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,6 @@
 #include "is_proc_alive.h"
 #include "is_file_identical.h"
 #include "wcs_sleep.h"
-#include "wcs_backoff.h"
 #include "bm_update.h"
 #include "mm_update.h"
 #include "bg_update.h"
@@ -76,8 +75,11 @@
 #include "gtmimagename.h"
 #include "gtcm_jnl_switched.h"
 #include "cert_blk.h"
+#include "rel_quant.h"
 
 GBLDEF	cache_rec_ptr_t		get_space_fail_cr;	/* gbldefed to be accessible in a pro core */
+GBLDEF	int4			*get_space_fail_array;	/* gbldefed to be accessilbe in a pro core */
+GBLDEF	int4			get_space_fail_arridx;	/* gbldefed to be accessilbe in a pro core */
 
 GBLREF volatile int4		crit_count;
 GBLREF bool             	certify_all_blocks;
@@ -94,24 +96,16 @@ GBLREF short   			dollar_tlevel;
 GBLREF sgm_info         	*sgm_info_ptr;
 GBLREF volatile int4 		fast_lock_count;
 GBLREF bool             	unhandled_stale_timer_pop;
-GBLREF boolean_t		*lseekIoInProgress_flags;
+NOPIO_ONLY(GBLREF boolean_t	*lseekIoInProgress_flags;)
 GBLREF boolean_t        	block_saved;
 GBLREF boolean_t        	write_after_image;
 GBLREF boolean_t        	dse_running;
 GBLREF enum gtmImageTypes	image_type;
 GBLREF boolean_t		gtm_environment_init;
-GBLREF	boolean_t		is_src_server;
+GBLREF boolean_t		is_src_server;
+GBLREF int			num_additional_processors;
 
 #define MAX_CYCLES      2
-
-                                /* both values lifted from relqueopi.c */
-#define QI_RETRY        128
-
-#ifdef QI_STARVATION
-#  undef QI_STARVATION
-#endif
-
-#define QI_STARVATION   1000
 
 #ifdef DEBUG_QUEUE
 #define VERIFY_QUEUE(base)      verify_queue(base)
@@ -125,7 +119,7 @@ void    wcs_stale(TID tid, int4 hd_len, gd_region **region);
 
 void fileheader_sync(gd_region *reg)
 {
-        size_t                  flush_len, sync_size;
+        size_t                  flush_len, sync_size, rounded_flush_len;
         int4                    high_blk, save_errno;
         unix_db_info            *udi;
         sgmnt_addrs             *csa;
@@ -143,12 +137,15 @@ void fileheader_sync(gd_region *reg)
         high_blk = csa->nl->highest_lbm_blk_changed;
         csa->nl->highest_lbm_blk_changed = -1;                      /* Reset to initial value */
         flush_len = SGMNT_HDR_LEN;
-        if (0 <= high_blk)                                      /* If not negative, flush at least one map block */
-                flush_len += ((high_blk / csd->bplmap / DISK_BLOCK_SIZE / BITS_PER_UCHAR) + 1) * DISK_BLOCK_SIZE;
-#ifdef FULLBLOCKWRITES
-	flush_len = ROUND_UP(flush_len, csd->blk_size);
-#endif
-
+        if (0 <= high_blk)					/* If not negative, flush at least one map block */
+		flush_len += ((high_blk / csd->bplmap / DISK_BLOCK_SIZE / BITS_PER_UCHAR) + 1) * DISK_BLOCK_SIZE;
+	if (csa->do_fullblockwrites)
+	{	/* round flush_len up to full block length. This is safe since we know that
+		   fullblockwrite_len is a factor of sizeof(sgmnt_data)
+		*/
+		flush_len = ROUND_UP(flush_len, csa->fullblockwrite_len);
+		assert(flush_len <= sizeof(sgmnt_data));
+	}
         if (dba_mm != csd->acc_meth)
         {
                 LSEEKWRITE(udi->fd, 0, (sm_uc_ptr_t)(csa->hdr), flush_len, save_errno);
@@ -158,8 +155,7 @@ void fileheader_sync(gd_region *reg)
 					ERR_TEXT, 2, RTS_ERROR_TEXT("Error during FileHeader Flush"), save_errno);
                 }
                 return;
-        }
-        else
+        } else
         {
 #if defined(UNTARGETED_MSYNC)
 
@@ -331,8 +327,7 @@ enum cdb_sc     mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
 								{
 									LOCK_NEW_BUFF_FOR_UPDATE(mmblkr);
 									break;
-								}
-								else
+								} else
 								{
 									assert(FALSE);
 									return cdb_sc_comfail;
@@ -340,8 +335,7 @@ enum cdb_sc     mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
 							}
 							if (WRITER_STILL_OWNS_BUFF(mmblkr, n))
 								wcs_sleep(lcnt);
-						}
-						else
+						} else
 						{
 							break;
 						}
@@ -349,14 +343,12 @@ enum cdb_sc     mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                         break;
                                 }
                                 assert(lcnt <= (MAX_CYCLES * max_ent));
-                        }
-                        else if ((mmblk_rec_ptr_t)CR_NOTVALID == mmblkr)
+                        } else if ((mmblk_rec_ptr_t)CR_NOTVALID == mmblkr)
                         {
                                 /* ------------- yet to write recovery mechanisms if hashtable is corrupt ------*/
                                 /* ADD CODE LATER */
                                 assert(FALSE);
-                        }
-                        else
+                        } else
                         {
                                 for (lcnt = 1; ; lcnt++)
                                 {
@@ -369,8 +361,7 @@ enum cdb_sc     mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                                         {
                                                                 LOCK_NEW_BUFF_FOR_UPDATE(mmblkr);
                                                                 break;
-                                                        }
-                                                        else
+                                                        } else
                                                         {
                                                                 assert(FALSE);
                                                                 return cdb_sc_comfail;
@@ -378,8 +369,7 @@ enum cdb_sc     mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                                 }
                                                 if (WRITER_STILL_OWNS_BUFF(mmblkr, n))
                                                         wcs_sleep(lcnt);
-                                        }
-                                        else
+                                        } else
                                         {
                                                 break;
                                         }
@@ -414,7 +404,7 @@ enum cdb_sc     mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
 		{
 			/* It has been built; Update tn in the block and copy from private memory to shared space */
 			/* It's actually dse_chng_bhead which needs dse_running flag, it's ok for now */
-			assert(dse_running || write_after_image);
+			assert(write_after_image);
                         assert(((blk_hdr_ptr_t)cs->new_buff)->tn == effective_tn);
                         memcpy(db_addr[0], cs->new_buff, ((blk_hdr_ptr_t)cs->new_buff)->bsiz);
 		}
@@ -425,14 +415,14 @@ enum cdb_sc     mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                 assert((0 != (cs->blk & (BLKS_PER_LMAP - 1))) || (!run_time));
                 if (FALSE == cs->done)
                 {       /* if the current block has not been built (from being referenced in TP) */
-                        if (0 != cs->new_buff)
+                        if (NULL != cs->new_buff)
                                 cs->first_copy = TRUE;
                         gvcst_blk_build(cs, db_addr[0], effective_tn);
                 } else
                 {
 			/* It has been built; Update tn in the block and copy from private memory to shared space */
 			/* It's actually dse_chng_bhead which needs dse_running flag, it's ok for now */
-                        assert(dse_running || write_after_image || 0 < dollar_tlevel);
+                        assert(write_after_image || 0 < dollar_tlevel);
                         assert(dse_running || ctn == effective_tn);
                         if (!dse_running)
 				((blk_hdr_ptr_t)db_addr[0])->tn = ((blk_hdr_ptr_t)cs->new_buff)->tn = ctn;
@@ -587,7 +577,7 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
         assert(0 <= cs->blk);
 	INCR_DB_CSH_COUNTER(cs_addrs, n_bg_updates, 1);
         bt = bt_put(gv_cur_region, cs->blk);
-	if (NULL == bt)		/* for NULL return, we would have already done secshr_db_clnup() in bt_put */
+	if (NULL == bt)
 		return cdb_sc_cacheprob;
 	if (cs->write_type & GDS_WRITE_KILL)
 		bt->killtn = ctn;
@@ -599,14 +589,12 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                 if (NULL == (cr = db_csh_get(cs->blk)))
                 {       /* no cache_rec associated with the block */
 			assert(((gds_t_acquired == cs->mode) && (!read_before_image || (NULL == cs->old_block)))
-					|| (gds_t_acquired != cs->mode) && (0 != cs->new_buff));
+					|| (gds_t_acquired != cs->mode) && (NULL != cs->new_buff));
 			INCR_DB_CSH_COUNTER(cs_addrs, n_bg_update_creates, 1);
                         cr = db_csh_getn(cs->blk);
                         if ((cache_rec_ptr_t)CR_NOTVALID == cr)
                         {
 				assert(FALSE);
-				secshr_db_clnup(NORMAL_TERMINATION);
-                                SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
                                 BG_TRACE_PRO(wcb_t_end_sysops_nocr_invcr);
                                 send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_nocr_invcr"),
 					process_id, ctn, DB_LEN_STR(gv_cur_region));
@@ -620,16 +608,17 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                 } else if ((cache_rec_ptr_t)CR_NOTVALID == cr)
                 {
 			assert(FALSE);
-			secshr_db_clnup(NORMAL_TERMINATION);
-                        SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
                         BG_TRACE_PRO(wcb_t_end_sysops_cr_invcr);
                         send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_cr_invcr"),
                                 process_id, ctn, DB_LEN_STR(gv_cur_region));
                         return cdb_sc_cacheprob;
                 } else if (-1 != cr->read_in_progress)
-                {	/* wait for another process in t_qread to stop overlaying the buffer */
-                        /* this case is believed to require the reuse of a killed block that's still in the cache */
-			assert((gds_t_acquired == cs->mode) && (!read_before_image || (NULL == cs->old_block)));
+                {	/* wait for another process in t_qread to stop overlaying the buffer (possible in the following cases)
+			 * 	a) reuse of a killed block that's still in the cache
+			 * 	b) the buffer has already been constructed in private memory (cse->new_buff is non-NULL)
+			 */
+			assert(((gds_t_acquired == cs->mode) && (!read_before_image || (NULL == cs->old_block)))
+					|| (gds_t_acquired != cs->mode) && (NULL != cs->new_buff));
                         for (lcnt = 1; -1 != cr->read_in_progress; lcnt++)
                         {       /* very similar code appears elsewhere and perhaps should be common */
                                 wcs_sleep(lcnt);
@@ -648,8 +637,6 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                                 } else
                                                 {
                                                         assert(FALSE);
-							secshr_db_clnup(NORMAL_TERMINATION);
-                                                        SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
                                                         BG_TRACE_PRO(wcb_t_end_sysops_rip_wait);
                                                         send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6,
                                                                 LEN_AND_LIT("wcb_t_end_sysops_rip_wait"),
@@ -690,15 +677,13 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                                 LOCK_NEW_BUFF_FOR_UPDATE(cr);
                                                 break;
                                         } else
-                                        {       /* ??? should the above logic be used regardless of dirty
-                                                 * ??? should we be maintaining cr->epid to do a better job of this
-                                                 * ??? do restarts work correctly after blocks are already processed
-                                                 * ??? should this be a GTMASSERT
-                                                 */
-                                                DUMP_LOCKHIST();        /* Find history of the locks and relative activity */
+                                        {       /* ??? should we be maintaining cr->epid to do a better job of this */
                                                 assert(FALSE);
-                                                cr->in_tend = FALSE;
-                                                return cdb_sc_comfail;	/* should do a secshr_db_clnup()... */
+						BG_TRACE_PRO(wcb_t_end_sysops_dirtystuck1);
+						send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6,
+							LEN_AND_LIT("wcb_t_end_sysops_dirtystuck1"),
+							process_id, ctn, DB_LEN_STR(gv_cur_region));
+                                                return cdb_sc_cacheprob;
                                         }
                                 }
                                 if (WRITER_STILL_OWNS_BUFF(cr, n))
@@ -730,9 +715,12 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                 }
                                 /* Buffer is free */
                                 if (-1 != cr->read_in_progress)
-                                {	/* wait for another process in t_qread to stop overlaying the buffer */
-                                        /* this case is believed to require the reuse of a killed block that's still in the cache */
-					assert((gds_t_acquired == cs->mode) && (!read_before_image || (NULL == cs->old_block)));
+				{	/* wait for another process in t_qread to stop overlaying the buffer, possible due to
+					 * 	a) reuse of a killed block that's still in the cache OR
+					 * 	b) the buffer has already been constructed in private memory
+					 */
+					assert(((gds_t_acquired == cs->mode) && (!read_before_image || (NULL == cs->old_block)))
+							|| (gds_t_acquired != cs->mode) && (NULL != cs->new_buff));
                                         for (lcnt = 1; -1 != cr->read_in_progress; lcnt++)
                                         {
                                                 wcs_sleep(lcnt);
@@ -751,8 +739,6 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                                                 } else
                                                                 {
                                                                         assert(FALSE);
-									secshr_db_clnup(NORMAL_TERMINATION);
-                                                                        SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
                                                                         BG_TRACE_PRO(wcb_t_end_sysops_dirtyripwait);
                                                                         send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6,
                                                                                 LEN_AND_LIT("wcb_t_end_sysops_dirtyripwait"),
@@ -781,15 +767,13 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                                 LOCK_NEW_BUFF_FOR_UPDATE(cr);
                                                 break;
                                         } else
-                                        {       /* ??? should the above logic be used regardless of dirty
-                                                 * ??? should we be maintaining cr->epid to do a better job of this
-                                                 * ??? do restarts work correctly after blocks are already processed
-                                                 * ??? should this be a GTMASSERT
-                                                 */
-                                                DUMP_LOCKHIST();        /* Find history of the locks and relative activity */
+                                        {	/* ??? should we be maintaining cr->epid to do a better job of this */
                                                 assert(FALSE);
-                                                cr->in_tend = FALSE;
-                                                return cdb_sc_comfail;	/* should do a secshr_db_clnup()... */
+						BG_TRACE_PRO(wcb_t_end_sysops_dirtystuck2);
+						send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6,
+							LEN_AND_LIT("wcb_t_end_sysops_dirtystuck2"),
+							process_id, ctn, DB_LEN_STR(gv_cur_region));
+                                                return cdb_sc_cacheprob;
                                         }
                                 }
                                 if (WRITER_STILL_OWNS_BUFF(cr, n))
@@ -872,7 +856,7 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
 		else
 		{	/* It has been built; Update tn in the block and copy from private memory to shared space */
 			/* It's actually dse_chng_bhead which comes here but dse_running is close enough for now */
-			if (!dse_running && !write_after_image)
+			if (!write_after_image)
 				GTMASSERT;
 			VALIDATE_BM_BLK(cs->blk, (blk_hdr_ptr_t)blk_ptr, cs_addrs, gv_cur_region, bmp_status);
 			if (!bmp_status)
@@ -893,14 +877,14 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                 assert((0 != (cs->blk & (BLKS_PER_LMAP - 1))) || (FALSE == run_time));
                 if (FALSE == cs->done)
                 {       /* if the current block has not been built (from being referenced in TP) */
-                        if (0 != cs->new_buff)
+                        if (NULL != cs->new_buff)
                                 cs->first_copy = TRUE;
                         gvcst_blk_build(cs, blk_ptr, effective_tn);
                 } else
                 {
 			/* It has been built; Update tn in the block and copy from private memory to shared space */
 			/* It's actually dse_chng_bhead which needs dse_running flag, it's ok for now */
-                        assert(dse_running || write_after_image || 0 < dollar_tlevel);
+                        assert(write_after_image || 0 < dollar_tlevel);
                         assert(dse_running || ctn == effective_tn);
                         if (!dse_running)
 				((blk_hdr *)blk_ptr)->tn = ((blk_hdr_ptr_t)cs->new_buff)->tn = ctn;
@@ -967,8 +951,6 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                 if (INTERLOCK_FAIL == n)
 		{
 			assert(FALSE);
-			secshr_db_clnup(NORMAL_TERMINATION);
-			SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
 			BG_TRACE_PRO(wcb_bg_update_lckfail1);
 			send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bg_update_lckfail1"),
 				process_id, ctn, DB_LEN_STR(gv_cur_region));
@@ -985,8 +967,6 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                 if (INTERLOCK_FAIL == n)
 		{
 			assert(FALSE);
-			secshr_db_clnup(NORMAL_TERMINATION);
-			SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
 			BG_TRACE_PRO(wcb_bg_update_lckfail2);
 			send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bg_update_lckfail2"),
 				process_id, ctn, DB_LEN_STR(gv_cur_region));
@@ -1105,12 +1085,15 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
         sgmnt_data_ptr_t        csd;
         cache_que_head_ptr_t    q0, base;
         int4                    n, save_errno = 0, k, i, dummy_errno, max_count, count;
-        uint4                   lcnt, size, to_wait, to_msg;
+ 	int			maxspins, retries, spins;
+	uint4                   lcnt, size, to_wait, to_msg;
+	int4			wcs_active_lvl[UNIX_GETSPACEWAIT];
 
         error_def(ERR_DBFILERR);
         error_def(ERR_WAITDSKSPACE);
 
         assert((0 != needed) || (NULL != cr));
+	get_space_fail_arridx = 0;
         csa = &FILE_INFO(reg)->s_addrs;
         csd = csa->hdr;
 	if (FALSE == csa->now_crit)
@@ -1210,9 +1193,10 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
                 else
                         base = &csa->acc_meth.mm.mmblk_state->mmblkq_active;
 
-                for (k = 0; k < QI_STARVATION; k++)
-                {
-                        for (i = 0; i < QI_RETRY; i++)
+		maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
+		for (retries = LOCK_TRIES - 1; retries > 0 ; retries--)
+		{
+			for (spins = maxspins; spins > 0 ; spins--)
                         {
                                 if (GET_SWAPLOCK(&base->latch)) /* Lock queue to prevent interference */
                                 {
@@ -1220,11 +1204,10 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 
 					if (0 != cr->state_que.fl)
 					{
-						assert(FALSE == csa->wbuf_dqd);
-						csa->wbuf_dqd = TRUE;
+						csa->wbuf_dqd++;
 						q0 = (cache_que_head_ptr_t)((sm_uc_ptr_t)&cr->state_que + cr->state_que.fl);
 						shuffqth((que_ent_ptr_t)q0, (que_ent_ptr_t)base);
-						csa->wbuf_dqd = FALSE;
+						csa->wbuf_dqd--;
 						VERIFY_QUEUE(base);
 					}
 
@@ -1240,8 +1223,10 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 					 * If this didn't work, flush normal amount next time in the loop */
 
 					JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 1, save_errno);
-					for (lcnt = 1; (0 != cr->dirty) && (BUF_OWNER_STUCK > lcnt); ++lcnt)
+					for (lcnt = 1; (0 != cr->dirty) && (UNIX_GETSPACEWAIT > lcnt); ++lcnt)
 					{
+						wcs_active_lvl[lcnt] = csa->nl->wcs_active_lvl;
+						get_space_fail_arridx = lcnt;
 						max_count = ROUND_UP(csa->nl->wcs_active_lvl, csd->n_wrt_per_flu);
 						/* loop till the active queue is exhausted */
 						for (count = 0; 0 != cr->dirty && 0 != csa->nl->wcs_active_lvl &&
@@ -1252,6 +1237,8 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 						}
 						/* Usually we want to sleep only if we need to wait on someone else
 						 * i.e. (i) if we are waiting for another process' fsync to complete
+						 *		We have seen jnl_fsync() to take more than a minute.
+						 *		Hence we wait for a max. of 2 mins (UNIX_GETSPACEWAIT).
 						 *     (ii) if some concurrent writer has taken this cache-record out.
 						 *    (iii) if someone else is holding the io_in_prog lock.
 						 * Right now we know of only one case where there is no point in waiting
@@ -1262,13 +1249,14 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 						if (!cr->dirty)
 							return TRUE;
 						else
-							wcs_backoff(lcnt);
+							wcs_sleep(lcnt);
 						BG_TRACE_PRO_ANY(csa, spcfc_buffer_flush_loop);
 					}
 					if (0 == cr->dirty)
 						return TRUE;
 					assert(FALSE);                  /* We have failed */
 					get_space_fail_cr = cr;
+					get_space_fail_array = &wcs_active_lvl[0];
 					if (gtm_environment_init)
 						gtm_fork_n_core();	/* take a snapshot in case running in-house */
 					return FALSE;
@@ -1283,9 +1271,17 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 					}
                                 }
                         }
-                        if (0 != k)
-                                wcs_backoff(k);
-			performCASLatchCheck(&base->latch, k);
+			if (retries & 0x3)
+				/* On all but every 4th pass, do a simple rel_quant */
+				rel_quant();	/* Release processor to holder of lock (hopefully) */
+			else
+			{
+				/* On every 4th pass, we bide for awhile */
+				wcs_sleep(LOCK_SLEEP);
+				/* If near end of loop, see if target is dead and/or wake it up */
+				if (RETRY_CASLATCH_CUTOFF == retries)
+					performCASLatchCheck(&base->latch, LOOP_CNT_SEND_WAKEUP);
+			}
                 }
                 --fast_lock_count;
                 assert(0 <= fast_lock_count);
@@ -1298,6 +1294,7 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	else
 		assert(FALSE);
 	get_space_fail_cr = cr;
+	get_space_fail_array = &wcs_active_lvl[0];
 	if (gtm_environment_init)
 		gtm_fork_n_core();	/* take a snapshot in case running in-house */
         return FALSE;
@@ -1307,7 +1304,7 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 void    wcs_stale(TID tid, int4 hd_len, gd_region **region)
 {
         bool            need_new_timer;
-	boolean_t	lseekIoInProgress_flag;
+	NOPIO_ONLY(boolean_t	lseekIoInProgress_flag;)
         gd_region       *reg, *save_region;
         sgmnt_addrs     *csa, *save_csaddrs, *check_csaddrs;
         sgmnt_data_ptr_t        csd, save_csdata;
@@ -1349,8 +1346,8 @@ void    wcs_stale(TID tid, int4 hd_len, gd_region **region)
            4) We are in a "fast lock".
            **************************************************************************************************/
 	GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);
-	if ((FALSE == lseekIoInProgress_flag)
-		&& (0 == crit_count)
+	if ((0 == crit_count)
+	        NOPIO_ONLY(&& (FALSE == lseekIoInProgress_flag))
 		&& (NULL == check_csaddrs || FALSE == check_csaddrs->now_crit)
 		&& (0 == fast_lock_count))
         {

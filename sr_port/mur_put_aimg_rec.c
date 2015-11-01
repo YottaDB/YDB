@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,10 +33,11 @@
 /* Include prototypes */
 #include "t_qread.h"
 #include "t_write.h"
+#include "t_abort.h"
 
 GBLREF gd_region        *gv_cur_region;
 GBLREF char		*update_array, *update_array_ptr;
-GBLREF int		update_array_size;
+GBLREF uint4		update_array_size;	/* for the BLK_* macros */
 GBLREF srch_hist	dummy_hist;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
@@ -77,7 +78,7 @@ void mur_put_aimg_rec(jnl_record *rec)
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
 		util_out_print("Error: bad blk build.", TRUE);
-		T_ABORT(gv_cur_region, cs_addrs);
+		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
 	t_write(blk_num, (unsigned char *)bs1, 0, 0, (sm_uc_ptr_t)bp, ((blk_hdr_ptr_t)aimg_blk_ptr)->levl, TRUE, FALSE);

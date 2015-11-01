@@ -11,9 +11,6 @@
 
 #include "mdef.h"
 
-#ifdef UNIX
-#endif
-
 #include "gtm_string.h"
 #include "stp_parms.h"
 #include "gdsroot.h"
@@ -40,6 +37,7 @@
 #include "mupip_exit.h"
 #ifdef UNIX
 #include "ipcrmid.h"
+#include "ftok_sems.h"
 #endif
 #include "mu_getlst.h"
 #include "mu_outofband_setup.h"
@@ -633,6 +631,7 @@ void mupip_integ(void)
 	{
 		REVERT;
 #ifdef UNIX
+		db_ipcs_reset(gv_cur_region, FALSE);
 		REVERT;
 #endif
 	}

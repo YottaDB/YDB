@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,9 +20,9 @@ GBLREF io_pair io_curr_device;
 static readonly unsigned char home_param_list[] =
 {
 	(unsigned char)iop_x,
-	0, 0,
+	0, 0, 0, 0,
 	(unsigned char)iop_y,
-	0, 0,
+	0, 0, 0, 0,
 	(unsigned char)iop_clearscreen,
 	(unsigned char)iop_eol
 };

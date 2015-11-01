@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -111,7 +111,7 @@ short	iott_readfl (mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	mask = tt_ptr->term_ctrl;
 	mask_term = tt_ptr->mask_term;
 	if (mask & TRM_NOTYPEAHD)
-		TCFLUSH(tt_ptr->fildes, TCIOFLUSH, status);
+		TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
 	if (mask & TRM_READSYNC)
 	{
 		DOWRITERC(tt_ptr->fildes, &dc1, 1, status);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,9 +38,10 @@
 #include "t_end.h"
 #include "t_begin_crit.h"
 #include "gvcst_blk_build.h"
+#include "t_abort.h"
 
 GBLREF char		*update_array, *update_array_ptr;
-GBLREF int		update_array_size;
+GBLREF uint4		update_array_size;
 GBLREF gd_addr		*gd_header;
 GBLREF gd_region        *gv_cur_region;
 GBLREF srch_hist	dummy_hist;
@@ -106,13 +107,13 @@ void dse_rmrec(void)
 		if (!(rp = rp_base = skan_rnum(lbp, FALSE)))
 		{
 			free(lbp);
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 	} else if (!(rp = rp_base = skan_offset(lbp, FALSE)))
 	{
 		free(lbp);
-		T_ABORT(gv_cur_region, cs_addrs);
+		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
 	memcpy(&comp_key[0], &patch_comp_key[0], sizeof(patch_comp_key));
@@ -137,7 +138,7 @@ void dse_rmrec(void)
 				{
 					util_out_print("Error: bad blk build.",TRUE);
 					free(lbp);
-					T_ABORT(gv_cur_region, cs_addrs);
+					t_abort(gv_cur_region, cs_addrs);
 					return;
 				}
 				t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
@@ -187,7 +188,7 @@ void dse_rmrec(void)
 		{
 			util_out_print("Error: bad blk build.", TRUE);
 			free(lbp);
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);

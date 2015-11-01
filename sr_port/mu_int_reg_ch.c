@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,10 +33,6 @@ CONDITION_HANDLER(mu_int_reg_ch)
 	error_def(ERR_DBFILERR);
 	START_CH
 
-#ifdef UNIX
-	if (!region)
-		db_ipcs_reset(gv_cur_region, TRUE);
-#endif
 	mu_int_errknt++;
 	PRN_ERROR;
 	UNWIND(NULL,NULL);

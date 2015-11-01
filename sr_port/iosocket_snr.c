@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,6 +92,7 @@ ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, i
 		recvbuff = buffer;
 		recvsize = maxlength;
 	}
+	VMS_ONLY(recvsize = MIN(recvsize, VMS_MAX_TCP_IO_SIZE);)
 	/* =================================== select and recv ================================================= */
 	socketptr->buffered_length = 0;
 	FD_ZERO(&tcp_fd);

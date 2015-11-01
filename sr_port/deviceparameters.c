@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@ LITDEF nametabent dev_param_names[] =
 	,{2,"AP*"}
 	,{2,"AT*"}
 
+	,{4,"BIGR*"}
 	,{2,"BL*"}	,{4,"BLOC"}
 	,{4,"BU*"}
 
@@ -100,6 +101,7 @@ LITDEF nametabent dev_param_names[] =
 	,{2,"NA*"}
 	,{3,"NEW*"}
 	,{3,"NEX*"}
+	,{6,"NOBIGR*"}
 	,{4,"NOBU*"}
 	,{4,"NOCA*"}
 	,{4,"NOCE*"}	,{6,"NOCENE"}
@@ -180,6 +182,7 @@ LITDEF nametabent dev_param_names[] =
 	,{3,"RET*"}
 	,{3,"REW*"}
 	,{3,"RFA"}
+	,{3,"RFM"}
 
 	,{1,"S"}
 	,{3,"SEQ*"}
@@ -245,20 +248,20 @@ LITDEF nametabent dev_param_names[] =
 LITDEF	unsigned char dev_param_index[27] =
 {
 /*	A    B    C    D    E    F    G    H    I    J    K    L    M    N   */
-	0,   5,   8,   22,  28,  41,  53,  55,  59,  63,  63,  63,  71,  72,
+	0,   5,   9,   23,  29,  42,  54,  56,  60,  64,  64,  64,  72,  73,
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	131, 136, 152, 153, 165, 177, 186, 192, 193, 208, 209, 210, 224
+	133, 138, 154, 155, 168, 180, 189, 195, 196, 211, 212, 213, 227
 };
 /* Offset of string within letter in dev_param_names */
 /* maintained in conjunction with zshow_params.h   = offset in letter, letter  */
 LITDEF zshow_index zshow_param_index[] =
 {
 /*	ALLO     BLOC   CONV    CTRA    DELE   EBCD   EDIT    EXCE    EXTE    FIELD  FIL    FIXED   HOST     INSE   LAB */
-	{2,0},   {1,1}, {9,2},  {13,2}, {1,3}, {1,4}, {4,4},  {9,4},  {11,4}, {2,5}, {5,5}, {8,5},  {3,7},   {1,8}, {1,11},
+	{2,0},   {2,1}, {9,2},  {13,2}, {1,3}, {1,4}, {4,4},  {9,4},  {11,4}, {2,5}, {5,5}, {8,5},  {3,7},   {1,8}, {1,11},
 /*	LENG     NOCENE  NOECHO  NOEDIT   NOESCA   NOHOST   NOINSE     */
-	{3,11},  {6,13}, {12,13}, {14,13}, {16,13}, {24,13}, {26,13},
+	{3,11},  {7,13}, {13,13}, {15,13}, {17,13}, {25,13}, {27,13},
 /*	NOPAST   NOREADS  NOTTSY   NOTYPE   NOWRAP   PAST    PRMMBX  RCHK    */
-	{32,13}, {37,13}, {48,13}, {50,13}, {56,13}, {10,15}, {14,15}, {1,17},
+	{33,13}, {38,13}, {49,13}, {51,13}, {57,13}, {10,15}, {14,15}, {1,17},
 /*      READ    READS	REC      SHAR    TERM    TTSY    TYPE     UIC     WAIT    WCHK    WIDTH   WRITE  */
 	{2,17}, {4,17},	{5,17},	 {4,18}, {1,19}, {6,19}, {8,19},  {1,20}, {2,22}, {4,22}, {6,22}, {10,22}
 };
@@ -287,6 +290,7 @@ int deviceparameters(oprtype *c,char who_calls)
 		,iop_append
 		,iop_attach
 
+		,iop_bigrecord
 		,iop_blocksize ,iop_blocksize
 		,iop_burst
 
@@ -351,6 +355,7 @@ int deviceparameters(oprtype *c,char who_calls)
 		,iop_name
 		,iop_newversion
 		,iop_next
+		,iop_nobigrecord
 		,iop_noburst
 		,iop_nocanonical
 		,iop_nocenable ,iop_nocenable
@@ -431,6 +436,7 @@ int deviceparameters(oprtype *c,char who_calls)
 		,iop_retry
 		,iop_rewind
 		,iop_rfa
+		,iop_rfm
 
 		,iop_s_protection
 		,iop_sequential

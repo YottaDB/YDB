@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@
 #include "gtmimagename.h"
 #include "gtm_exit_handler.h"
 #include "gtm_savetraps.h"
+#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
 GBLREF	parmblk_struct 		*param_list;
 GBLREF  stack_frame     	*frame_pointer;
@@ -337,6 +338,7 @@ int gtm_init()
 	if (!gtm_startup_active)
 	{ /* call-in invoked from C as base. GT.M hasn't been started up yet. */
 		image_type = GTM_IMAGE;
+		gtm_env_init();	/* read in all environment variables */
 		err_init(stop_image_conditional_core);
 		cli_lex_setup(0, NULL);
 		/* Initialize msp to the maximum so if errors occur during GT.M startup below,

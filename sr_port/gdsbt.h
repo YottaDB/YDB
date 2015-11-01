@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,11 @@
 
 #include <sys/types.h>
 #ifdef MUTEX_MSEM_WAKE
-#include <sys/mman.h>
+#ifdef POSIX_MSEM
+#  include <semaphore.h>
+#else
+#  include <sys/mman.h>
+#endif
 #endif
 
 #define CR_NOTVALID (-1)
@@ -120,14 +124,14 @@ typedef struct
 	 * for quadword alignment requirements of remqhi and insqti.
 	 */
 	int4		mutex_wake_instance;
-	int4		filler1; /* for quadword alignment 		 */
+	int4		filler1; /* for dword alignment 		 */
 #ifdef MUTEX_MSEM_WAKE
-	msemaphore	mutex_wake_msem; /* Two ints (incidentally two int4s) */
+#ifdef POSIX_MSEM
+	sem_t		mutex_wake_msem; /* Not two ints .. somewhat larger */
 #else
-	int4		filler2; /* filler2 and 3 are to make size of    */
-	int4		filler3; /* mutex_que_entry a power of 2 -       */
-				 /* see usage of sizeof(mutex_que_entry) */
-				 /* in mutex.c:crash_initialize()	 */
+	msemaphore	mutex_wake_msem; /* Two ints (incidentally two int4s) */
+#endif
+
 #endif
 #endif
 } mutex_que_entry;
@@ -215,7 +219,7 @@ typedef struct
 #define LOCKHIST_ARRAY_SIZE	512
 
 /* Mapped space local to each node on the cluster */
-typedef struct
+typedef struct node_local_struct
 {
 	unsigned char   label[GDS_LABEL_SZ];			/* 12	signature for GDS shared memory */
 	unsigned char	fname[MAX_FN_LEN + 1];			/* 256	filename of corresponding database */

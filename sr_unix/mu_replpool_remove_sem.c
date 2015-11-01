@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,7 @@ GBLREF	gd_region		*gv_cur_region;
  * Return Value: TRUE, if succsessful
  *	         FALSE, if fails.
  */
-boolean_t mu_replpool_remove_sem()
+boolean_t mu_replpool_remove_sem(boolean_t immediate)
 {
 	char            *instname;
 	gd_region	*replreg;
@@ -76,7 +76,7 @@ boolean_t mu_replpool_remove_sem()
 	full_len = replreg->dyn.addr->fname_len;
 	if (0 == full_len)
 		return TRUE;
-	if (!ftok_sem_get(replreg, TRUE, REPLPOOL_ID, TRUE))
+	if (!ftok_sem_get(replreg, TRUE, REPLPOOL_ID, immediate))
 		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instname);
 	if (0 != remove_sem_set(SOURCE))
 	{
@@ -101,7 +101,7 @@ boolean_t mu_replpool_remove_sem()
 		rts_error(VARLSTCNT(6) ERR_REPLACCSEM, 3, udi->semid, full_len, instname, save_errno);
 	}
 	repl_inst_recvpool_reset();
-	if (!ftok_sem_release(replreg, TRUE, TRUE))
+	if (!ftok_sem_release(replreg, TRUE, immediate))
 		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instname);
 	return TRUE;
 }

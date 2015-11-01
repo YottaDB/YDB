@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,15 @@
 #include "gdsfhead.h"
 #include "cdb_sc.h"
 #include "copy.h"
-#include "gvcst_queryget.h"
+#include "filestruct.h"		/* needed for jnl.h */
+#include "gdscc.h"		/* needed for tp.h */
+#include "jnl.h"		/* needed for tp.h */
+#include "gdskill.h"		/* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h */
+#include "buddy_list.h"		/* needed for tp.h */
+#include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
+
+#include "gvcst_queryget.h"	/* prototypes */
 #include "gvcst_search.h"
 #include "gvcst_rtsib.h"
 #include "gvcst_search_blk.h"
@@ -37,14 +45,11 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey, *gv_altkey;
 GBLREF short		dollar_tlevel;
-GBLREF uint4		t_err;
 GBLREF unsigned int	t_tries;
 GBLREF spdesc		stringpool;
 
 boolean_t gvcst_queryget(mval *val)
 {
-	error_def(ERR_GVQUERYGETFAIL);
-
 	boolean_t	found, two_histories;
 	enum cdb_sc	status;
 	int		rsiz, key_size, data_len;
@@ -55,10 +60,7 @@ boolean_t gvcst_queryget(mval *val)
 	srch_hist	*rt_history;
 	DEBUG_ONLY(unsigned char *save_strp = NULL);
 
-	if (0 == dollar_tlevel)
-		t_begin(ERR_GVQUERYGETFAIL, FALSE);
-	else
-		t_err = ERR_GVQUERYGETFAIL;
+	T_BEGIN_READ_NONTP_OR_TP(ERR_GVQUERYGETFAIL);
 	assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 	for (;;)
 	{
@@ -123,18 +125,18 @@ boolean_t gvcst_queryget(mval *val)
 				assert(stringpool.top - stringpool.free >= data_len);
 				memcpy(stringpool.free, (sm_uc_ptr_t)rp + rsiz - data_len, data_len);
 				/* Assumption: t_end/tp_hist will never cause stp_gcol() call */
-				if (0 == dollar_tlevel)
+			}
+			if (0 == dollar_tlevel)
+			{
+				if (!t_end(&gv_target->hist, !two_histories ? NULL : rt_history))
+					continue;
+			} else
+			{
+				status = tp_hist(!two_histories ? NULL : rt_history);
+				if (cdb_sc_normal != status)
 				{
-					if (!t_end(&gv_target->hist, !two_histories ? NULL : rt_history))
-						continue;
-				} else
-				{
-					status = tp_hist(!two_histories ? NULL : rt_history);
-					if (cdb_sc_normal != status)
-					{
-						t_retry(status);
-						continue;
-					}
+					t_retry(status);
+					continue;
 				}
 			}
 			if (found)

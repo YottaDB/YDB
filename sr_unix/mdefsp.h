@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,8 @@ error_def(ERR_ASSERT);
 
 #define OFF_T_LONG
 #define INO_T_LONG
+#define MUTEX_MSEM_WAKE
+#define POSIX_MSEM
 #undef sssize_t
 #define sssize_t ssize_t
 #undef SHMDT
@@ -66,17 +68,19 @@ error_def(ERR_ASSERT);
 
 /* Use rc_mval2subsc only for sun until every DTM client (that needs 16-bit precision as opposed to 18-bit for GT.M) is gone */
 #define	mval2subsc	rc_mval2subsc
-#endif
+#endif /* __sparc */
 
 #ifdef __hpux
 #define CACHELINE_SIZE        64
 #define MSYNC_ADDR_INCS        OS_PAGE_SIZE
+#define MUTEX_MSEM_WAKE
+#define POSIX_MSEM
 #define USHBIN_SUPPORTED
 #define OFF_T_LONG
 /* Make sure linkage Psect is aligned on appropriate boundary. */
 #define LINKAGE_PSECT_BOUNDARY	4
 typedef uint4 mach_inst;	/* machine instruction */
-#endif
+#endif /* __hpux */
 
 #ifdef __linux__
 #define OFF_T_LONG
@@ -95,7 +99,7 @@ typedef unsigned short	in_port_t;
 #define VAR_COPY(dst,src) __va_copy(dst, src)
 #endif
 #endif
-#endif
+#endif /* __linux__ */
 
 #ifdef __s390__
 #define CACHELINE_SIZE        256
@@ -111,14 +115,14 @@ typedef unsigned short	in_port_t;
 #define SHMAT_ADDR_INCS 	SSM_SIZE
 #define MSYNC_ADDR_INCS 	OS_PAGE_SIZE
 
-#endif
+#endif /* __s390__ */
 
 #ifdef __i386
 /* Through Pentium Pro/II/III, should use CPUID to get real value perhaps */
 #define CACHELINE_SIZE        32
 #define MSYNC_ADDR_INCS        OS_PAGE_SIZE
 #undef BIGENDIAN
-#endif
+#endif /* __i386 */
 
 #define INTERLOCK_ADD(X,Y,Z)    (add_inter(Z, (sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
 

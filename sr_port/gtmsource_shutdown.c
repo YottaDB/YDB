@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,7 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "repl_dbg.h"
+#include "gt_timer.h"
 #include "gtm_stdio.h"
 #include "repl_shutdcode.h"
 #include "repl_sem.h"

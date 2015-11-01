@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@
 GBLREF	mu_set_rlist	*grlist;
 GBLREF	gd_region	*gv_cur_region;
 
-void mupip_set_jnl_cleanup(void)
+void mupip_set_jnl_cleanup(boolean_t clean_exit)
 {
 	mu_set_rlist		*rptr;
 	file_control		*fc;
@@ -77,7 +77,7 @@ void mupip_set_jnl_cleanup(void)
 				gds_info->file_cntl_lsb.lockid = 0;
 				sys$dassgn(gds_info->fab->fab$l_stv);
 			)
-			UNIX_ONLY(db_ipcs_reset(gv_cur_region, FALSE);)
+			UNIX_ONLY(db_ipcs_reset(gv_cur_region, !clean_exit);)
 		} else
 		{
  			tp_change_reg();

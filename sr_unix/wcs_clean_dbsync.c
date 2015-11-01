@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,7 @@
 #	define	GTM_MALLOC_NO_RENT_ONLY(X)	X
 #endif
 
-GBLREF	boolean_t		*lseekIoInProgress_flags;	/* needed for the LSEEK* macros in gtmio.h */
+NOPIO_ONLY(GBLREF boolean_t	*lseekIoInProgress_flags;)	/* needed for the LSEEK* macros in gtmio.h */
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -63,7 +63,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	node_local_ptr_t	cnl;
 	sgmnt_addrs		*csa, *check_csaddrs, *save_csaddrs;
 	sgmnt_data_ptr_t	csd, save_csdata;
-	boolean_t		lseekIoInProgress_flag;
+	NOPIO_ONLY(boolean_t	lseekIoInProgress_flag;)
 
 	csa = *csaptr;
 	assert(csa->dbsync_timer);	/* to ensure no duplicate dbsync timers */
@@ -113,7 +113,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		 */
 		dbsync_defer_timer = TRUE;
 		GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);
-		if (!mupip_jnl_recover && (FALSE == lseekIoInProgress_flag)
+		if (!mupip_jnl_recover NOPIO_ONLY(&& (FALSE == lseekIoInProgress_flag))
 			GTM_MALLOC_NO_RENT_ONLY(&& 0 == gtmMallocDepth)
 			&& (0 == crit_count)       && (0 == fast_lock_count)
 			&& (!jnl_qio_in_prog)      && (!db_fsync_in_prog)

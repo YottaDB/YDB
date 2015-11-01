@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,6 @@
 #ifndef GTM_DESCRIPT_INCLUDED
 #define GTM_DESCRIPT_INCLUDED
 
-/* copyright */
 int mumps_call();
 
 
@@ -22,6 +21,11 @@ typedef struct  {
 	void	*val;
 } gtm_descriptor;
 
+typedef struct  {
+	unsigned int	len;
+	unsigned int	type;
+	void		*val;
+} gtm32_descriptor;
 
 /* legal types */
 

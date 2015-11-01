@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,11 +61,12 @@
 #include "ftok_sems.h"
 #include "gtmimagename.h"
 
-#define CANCEL_DB_TIMERS(region, cancelled_timer)				\
+#define CANCEL_DB_TIMERS(region, cancelled_timer, cancelled_dbsync_timer)	\
 {										\
 	sgmnt_addrs	*csa;							\
 										\
 	cancelled_timer = FALSE;						\
+	cancelled_dbsync_timer = FALSE;						\
 	csa = &FILE_INFO(region)->s_addrs;					\
 	if (csa->timer)								\
 	{									\
@@ -78,6 +79,7 @@
 	if (csa->dbsync_timer)							\
 	{									\
 		cancel_timer((TID)csa);						\
+		cancelled_dbsync_timer = TRUE;					\
 		csa->dbsync_timer = FALSE;					\
 	}									\
 }
@@ -101,7 +103,7 @@ void gds_rundown(void)
 {
 
 	bool			is_mm, we_are_last_user, we_are_last_writer;
-	boolean_t		ipc_deleted, remove_shm, cancelled_timer;
+	boolean_t		ipc_deleted, remove_shm, cancelled_timer, cancelled_dbsync_timer;
 	now_t			now;	/* for GET_CUR_TIME macro */
 	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	gd_region		*reg;
@@ -195,7 +197,7 @@ void gds_rundown(void)
 		return;
 	}
 	/* Cancel any pending flush timer for this region by this task */
-	CANCEL_DB_TIMERS(reg, cancelled_timer);
+	CANCEL_DB_TIMERS(reg, cancelled_timer, cancelled_dbsync_timer);
 	we_are_last_user = FALSE;
 	if (!csa->persistent_freeze)
 		region_freeze(reg, FALSE, FALSE);
@@ -277,7 +279,7 @@ void gds_rundown(void)
 	 * Otherwise, if we have write access to this region, let us perform a few writing tasks.
 	 */
 	if (csa->nl->donotflush_dbjnl)
-		csa->wbuf_dqd = FALSE;	/* ignore csa->wbuf_dqd status as we do not care about the cache contents */
+		csa->wbuf_dqd = 0;	/* ignore csa->wbuf_dqd status as we do not care about the cache contents */
 	else if (!reg->read_only)
 	{	/* If we had an orphaned block and were interrupted, set wc_blocked so we can invoke wcs_recover */
 		if (csa->wbuf_dqd)
@@ -287,7 +289,7 @@ void gds_rundown(void)
 			BG_TRACE_PRO_ANY(csa, wcb_gds_rundown);
                         send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_gds_rundown"),
                                 process_id, csa->ti->curr_tn, DB_LEN_STR(reg));
-			csa->wbuf_dqd = FALSE;
+			csa->wbuf_dqd = 0;
 			wcs_recover(reg);
 			if (is_mm)
 			{
@@ -348,10 +350,13 @@ void gds_rundown(void)
 				csa->nl->remove_shm = TRUE;
 			}
 			csd->trans_hist.header_open_tn = csd->trans_hist.curr_tn;
-		} else if (cancelled_timer && (0 > csa->nl->wcs_timers)) /* Last timer is running down now, perform flush */
-		{
+		} else if ((cancelled_timer && (0 > csa->nl->wcs_timers)) || cancelled_dbsync_timer)
+		{	/* cancelled pending db or jnl flush timers - flush database and journal buffers to disk */
 			grab_crit(reg);
-			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH);
+			/* we need to sync the epoch as the fact that there is no active pending flush timer implies
+			 * there will be noone else who will flush the dirty buffers and EPOCH to disk in a timely fashion
+			 */
+			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 			rel_crit(reg);
 		}
 		/* Do rundown journal processing after buffer flushes since they require jnl to be open */
@@ -398,6 +403,9 @@ void gds_rundown(void)
 							jnl_put_jrt_pini(csa);
 						if (0 != jpc->pini_addr)
 							jnl_put_jrt_pfin(csa);
+						/* if not the last writer and no pending flush timer left, do jnl flush now */
+						if (!we_are_last_writer && (0 > csa->nl->wcs_timers))
+							jnl_flush(reg);
 						jnl_file_close(reg, we_are_last_writer, FALSE);
 					} else
 						send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
@@ -561,7 +569,7 @@ CONDITION_HANDLER(gds_rundown_ch)
 	int		semop_res;
 	unix_db_info	*udi;
 	sgmnt_addrs	*csa;
-	boolean_t	cancelled_timer;
+	boolean_t	cancelled_timer, cancelled_dbsync_timer;
 	void		rel_crit();
 
 	error_def(ERR_ASSERT);
@@ -585,7 +593,7 @@ CONDITION_HANDLER(gds_rundown_ch)
 	udi = FILE_INFO(gv_cur_region);
 	csa = &udi->s_addrs;
 	/* We got here on an error and are going to close the region. Cancel any pending flush timer for this region by this task*/
-	CANCEL_DB_TIMERS(gv_cur_region, cancelled_timer);
+	CANCEL_DB_TIMERS(gv_cur_region, cancelled_timer, cancelled_dbsync_timer);
 	/* release the access control semaphore, if you hold it */
 	if (grabbed_access_sem)
 	{

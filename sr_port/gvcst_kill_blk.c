@@ -40,7 +40,7 @@
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF gv_namehead	*gv_target;
 GBLREF char		*update_array, *update_array_ptr;
-GBLREF int		update_array_size;
+GBLREF uint4		update_array_size;	/* for the BLK_* macros */
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF unsigned int	t_tries;
 GBLREF short		dollar_tlevel;

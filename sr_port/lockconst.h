@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@
 
 int4 load_and_clear(sm_int_ptr_t);
 #define GET_LATCH_GLOBAL(a)     (GLOBAL_LOCK_AVAILABLE == *alignedaddr(&(a)->hp_latch_space) ? \
-                                        load_and_clear(&(a)->hp_latch_space) : GLOBAL_LOCK_IN_USE)
+                                        load_and_clear((sm_int_ptr_t)&(a)->hp_latch_space) : GLOBAL_LOCK_IN_USE)
         /* above tries a fast pretest before calling load_and_clear to actually
            get the latch */
 #define RELEASE_LATCH_GLOBAL(a) release_spinlock(a)
@@ -79,8 +79,3 @@ int4 load_and_clear(sm_int_ptr_t);
 
 /* perhaps this should include flush so other CPUs see the change now */
 #define SET_LATCH(a,b)                  (*((sm_int_ptr_t)a) = b)
-
-/*  For use by aswp, SLEEP is ms, total should be under a minute */
-#define LOCK_TRIES		1200    /* outer loop */
-#define LOCK_SPINS		 200    /* inner spin loop */
-#define LOCK_SLEEP		  47    /* arbitrary wait between spin loops */

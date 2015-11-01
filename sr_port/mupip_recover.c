@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,6 +72,7 @@ GBLREF 	mur_gbls_t		murgbl;
 GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF  jnl_process_vector	*prc_vec;
+GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 
 void		gtm_ret_code();
 
@@ -215,6 +216,9 @@ void	mupip_recover(void)
 	ESTABLISH(mupip_recover_ch);
 	jgbl.mupip_journal = TRUE;	/* this is a MUPIP JOURNAL command */
 	murgbl.db_updated = FALSE;
+	gvdupsetnoop = FALSE; /* disable optimization to avoid multiple updates to the database and journal for duplicate sets */
+	/* this is because, like the update process, MUPIP JOURNAL RECOVER/ROLLBACK is supposed to simulate GTM
+	 * update activity else there will be transaction-number mismatch in the database */
 	call_on_signal = mur_close_files;
 	is_standalone = TRUE;
 	DEBUG_ONLY(assert_jrec_member_offsets();)
@@ -359,7 +363,7 @@ void	mupip_recover(void)
 	 *          In addition apply PBLK for backward recover with noverify */
 	JNL_PUT_MSG_PROGRESS("Backward processing started");
 	apply_pblk = (mur_options.update && !mur_options.forward && !mur_options.verify);
-	if (!mur_back_process(apply_pblk))
+	if (!mur_back_process(apply_pblk, &losttn_seqno))
 		mupip_exit(ERR_MUNOACTION);
 	if (!mur_options.rollback)
 	{
@@ -367,8 +371,9 @@ void	mupip_recover(void)
 		 * 	min_broken_time = token with minimum time stamp of broken entries
 		 * 	ztp_broken = TRUE, if any ztp entry is broken */
 		min_broken_time = mur_process_token_table(&ztp_broken);
-		losttn_seqno = MAXUINT8;
-	}
+		min_broken_seqno = losttn_seqno = MAXUINT8;
+	} else
+		assert(0 != losttn_seqno);
        	/* Multi_region TP/ZTP resolution */
 	if (!mur_options.forward)
 	{
@@ -402,7 +407,7 @@ void	mupip_recover(void)
 
 		/* PHASE 4 : Apply PBLK
 		 *          If no ZTP is present and !mur_options.verify, this phase will effectively do nothing.
-		 *          If ZTP is present and !mur_options.verify and lookback processing changed resolve_time Then
+		 *          If ZTP is present and !mur_options.verify and lookback processing changed tp_resolve_time Then
 		 *          	This will do additional PBLK undoing
                  * 	    For mur_options.verify == true following will do complete
 		 *	    	PBLK processing (from lvrec_off to turn_around point)
@@ -436,7 +441,11 @@ void	mupip_recover(void)
 	/* PHASE 7 : Close all files, rundown and exit */
 	murgbl.clean_exit = TRUE;
 	if (mur_options.rollback)
+	{
+		assert(murgbl.consist_jnl_seqno <= losttn_seqno);
+		assert(murgbl.consist_jnl_seqno <= min_broken_seqno);
 		gtm_putmsg(VARLSTCNT(4) ERR_RLBKJNSEQ, 2, &murgbl.consist_jnl_seqno, &murgbl.consist_jnl_seqno);
+	}
 	if (murgbl.wrn_count)
 		mupip_exit(ERR_JNLACTINCMPLT);
 	else

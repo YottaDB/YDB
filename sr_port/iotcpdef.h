@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,16 +25,25 @@
 #define SA_MAXLITLEN		128  /* maximun size of beowulf.sanchez.com */
 #define DD_BUFLEN		80
 
+#ifdef VMS
+#define VMS_MAX_TCP_IO_SIZE	(64 * 1024 - 512) /* Hard limit for TCP send or recv size. On some implementations, the limit is
+						   * 64K - 1, on others it is 64K - 512. We take the conservative approach and
+						   * choose the lower limit
+						   */
+#endif
+
 #define DOTCPSEND(SDESC, SBUFF, SBUFF_LEN, SFLAGS, RC) \
 { \
 	ssize_t		gtmioStatus; \
 	size_t		gtmioBuffLen; \
+	size_t		gtmioChunk; \
 	sm_uc_ptr_t	gtmioBuff; \
 	gtmioBuffLen = SBUFF_LEN; \
 	gtmioBuff = (sm_uc_ptr_t)(SBUFF); \
 	for (;;) \
         { \
-		if (-1 != (gtmioStatus = tcp_routines.aa_send(SDESC, gtmioBuff, gtmioBuffLen, SFLAGS))) \
+		gtmioChunk = gtmioBuffLen VMS_ONLY(> VMS_MAX_TCP_IO_SIZE ? VMS_MAX_TCP_IO_SIZE : gtmioBuffLen); \
+		if ((ssize_t)-1 != (gtmioStatus = tcp_routines.aa_send(SDESC, gtmioBuff, gtmioChunk, SFLAGS))) \
 	        { \
 			gtmioBuffLen -= gtmioStatus; \
 			if (0 == gtmioBuffLen) \
@@ -44,7 +53,7 @@
 		else if (EINTR != errno) \
 		  break; \
         } \
-	if (-1 == gtmioStatus)	    	/* Had legitimate error - return it */ \
+	if ((ssize_t)-1 == gtmioStatus)    	/* Had legitimate error - return it */ \
 		RC = errno; \
 	else if (0 == gtmioBuffLen) \
 	        RC = 0; \
@@ -64,8 +73,8 @@ typedef struct
 	unsigned char	lastop;
 	int		bufsiz;			/* OS internal buffer size */
 	int		socket;			/* socket descriptor */
-	bool		width;
-	bool		length;
+	int4		width;
+	int4		length;
 	bool		passive;		/* passive connection */
 	bool		urgent;			/* urgent data mode */
 }d_tcp_struct;	/*  tcp		*/

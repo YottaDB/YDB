@@ -334,6 +334,9 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
  * 	IF immediate == TRUE, it will use IPC_NOWAIT flag.
  * Return Value: TRUE, if succsessful
  *	         FALSE, if fails.
+ * NOTE: The parameter "immediate" may not be necessary. Here we remove the semaphore
+ * 	 or decrement the counter. We are already holding the control semaphore.
+ *	 So never we need to pass IPC_NOWAIT. But we need to analyze before we change code.
  */
 boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_count, boolean_t immediate)
 {

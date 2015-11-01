@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,12 +52,12 @@ int	sorts_after (mval *lhs, mval *rhs)
 		tmstr1.len = max_lcl_coll_xform_bufsiz;
 		tmstr1.addr = lcl_coll_xform_buff;
 		assert(NULL != lcl_coll_xform_buff);
-		do_xform(local_collseq->xform, &lhs->str, &tmstr1, &length1);
+		do_xform(local_collseq, XFORM, &lhs->str, &tmstr1, &length1);
 
 		MAXSTR_BUFF_INIT_RET;
 		tmstr2.addr = tmp;
 		tmstr2.len = MAXSTR_BUFF_ALLOC(rhs->str.len, tmstr2.addr, 0);
-		do_xform(local_collseq->xform, &rhs->str, &tmstr2, &length2);
+		do_xform(local_collseq, XFORM, &rhs->str, &tmstr2, &length2);
 		MAXSTR_BUFF_FINI;
 
 		cmp = memcmp(tmstr1.addr, tmstr2.addr, length1 <= length2 ? length1 : length2);

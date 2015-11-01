@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,6 +70,7 @@
 #include "wcs_flu.h"
 #include "trans_log_name.h"
 #include "mupip_backup.h"
+#include "gtm_rename.h"		/* for cre_jnl_file_intrpt_rename() prototype */
 
 #if defined(UNIX)
 # define PATH_DELIM		'/'
@@ -139,9 +140,9 @@ void mupip_backup(void)
 	size_t		backup_buf_size;
 	trans_num	tn;
 	backup_buff_ptr_t	bptr;
+	static boolean_t	once = TRUE;
 	backup_reg_list	*rptr, *clnup_ptr;
-	static bool	once = TRUE;
-	bool		inc_since_inc , inc_since_rec, result, newjnlfiles, gotit,
+	boolean_t	inc_since_inc , inc_since_rec, result, newjnlfiles, gotit,
 			newjnlfiles_specified, keep_prev_link, bkdbjnl_disable_specified, bkdbjnl_off_specified;
 	unsigned char	since_buff[50];
 	jnl_create_info jnl_info;
@@ -166,6 +167,8 @@ void mupip_backup(void)
 #elif defined(UNIX)
 	struct stat     stat_buf;
 	int		fstat_res;
+	int		sync_io_status;
+	boolean_t	sync_io, sync_io_specified;
 #else
 # error UNSUPPORTED PLATFORM
 #endif
@@ -244,6 +247,16 @@ void mupip_backup(void)
 		newjnlfiles_specified = newjnlfiles = TRUE;
 		if (CLI_NEGATED == cli_present("NEWJNLFILES.PREVLINK"))
 			keep_prev_link = FALSE;
+		UNIX_ONLY(
+			sync_io_status = cli_present("NEWJNLFILES.SYNC_IO");
+			sync_io_specified = TRUE;
+			if (CLI_PRESENT == sync_io_status)
+				sync_io = TRUE;
+			else if (CLI_NEGATED == sync_io_status)
+				sync_io = FALSE;
+			else
+				sync_io_specified = FALSE;
+		)
 	} else if (CLI_NEGATED == cli_present("NEWJNLFILES"))
 	{
 		keep_prev_link = FALSE; /* for safety */
@@ -607,6 +620,11 @@ void mupip_backup(void)
 	if ((FALSE == mu_ctrly_occurred) && (FALSE == mu_ctrlc_occurred))
 	{
 		mup_bak_pause(); /* ? save some crit time? */
+		JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* set_jnl_file_close & cre_jnl_file need it. Note we already have crit.
+							 * This is done once outside region loop so all regions have same eov/bov
+							 * timestamps in the journal files. This reduces the probability of
+							 * occurrence of D9D12-002410 --- nars -- 2004/01/02 */
+		jgbl.dont_reset_gbl_jrec_time = TRUE;
 		for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
 		{
 			if (rptr->not_this_time > keep_going)
@@ -653,7 +671,6 @@ void mupip_backup(void)
 						set_jnl_info(gv_cur_region, &jnl_info);
 						save_no_prev_link = jnl_info.no_prev_link =  (jnl_options[jnl_noprevjnlfile] ||
 							!keep_prev_link || !JNL_ENABLED(cs_data)) ? TRUE : FALSE;
-						JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* jnl_file_close & cre_jnl_file need it */
 						VMS_ONLY(
 							gds_info = FILE_INFO(gv_cur_region);
 								/* Is it possible for gds_info to be uninitialized? */
@@ -706,6 +723,10 @@ void mupip_backup(void)
 							cs_data->jnl_before_image = jnl_info.before_images;
 							cs_data->trans_hist.header_open_tn = jnl_info.tn;
 							cs_data->jnl_state = jnl_open;
+							UNIX_ONLY(
+								if (newjnlfiles_specified && sync_io_specified)
+									cs_data->jnl_sync_io = sync_io;
+							)
 							gtm_putmsg(VARLSTCNT(10) ERR_JNLCREATE, 8, jnl_info.jnl_len, jnl_info.jnl,
 								LEN_AND_LIT("region"), REG_LEN_STR(gv_cur_region),
 								LEN_AND_STR(before_image_lit[(jnl_info.before_images ? 1 : 0)]));
@@ -754,6 +775,7 @@ void mupip_backup(void)
 				rel_crit(rptr->reg);
 			}
 		}
+		jgbl.dont_reset_gbl_jrec_time = FALSE;
 		for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
 		{
 			if (rptr->not_this_time > keep_going)

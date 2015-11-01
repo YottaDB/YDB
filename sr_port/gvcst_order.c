@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,15 @@
 #include "gdsfhead.h"
 #include "cdb_sc.h"
 #include "copy.h"
-#include "t_end.h"
+#include "filestruct.h"		/* needed for jnl.h */
+#include "gdscc.h"		/* needed for tp.h */
+#include "jnl.h"		/* needed for tp.h */
+#include "gdskill.h"		/* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h */
+#include "buddy_list.h"		/* needed for tp.h */
+#include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
+
+#include "t_end.h"		/* prototypes */
 #include "t_retry.h"
 #include "t_begin.h"
 #include "gvcst_rtsib.h"
@@ -36,7 +44,6 @@ GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey, *gv_altkey;
 GBLREF int4		gv_keysize;
 GBLREF short		dollar_tlevel;
-GBLREF uint4		t_err;
 GBLREF unsigned int	t_tries;
 
 bool	gvcst_order(void)
@@ -50,12 +57,7 @@ bool	gvcst_order(void)
 	srch_hist	*rt_history;
 	sm_uc_ptr_t	c1, c2, ctop, alt_top;
 
-	error_def(ERR_GVORDERFAIL);
-
-	if (dollar_tlevel == 0)
-		t_begin(ERR_GVORDERFAIL, FALSE);
-	else
-		t_err = ERR_GVORDERFAIL;
+	T_BEGIN_READ_NONTP_OR_TP(ERR_GVORDERFAIL);
 	for (;;)
 	{
 		assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */

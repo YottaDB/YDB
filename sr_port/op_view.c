@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,6 +79,7 @@ GBLREF short		dollar_tlevel;
 GBLREF boolean_t	lv_dupcheck;
 GBLREF int4		zdate_form;
 GBLREF int4		zdir_form;
+GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 
 #define MAX_YDIRTSTR 32
 #define ZDEFMIN 1024
@@ -187,6 +188,9 @@ va_dcl
 		else
 			WRITE_LITERAL(msg2);
 		op_wteol(1);
+		break;
+	case VTK_GVDUPSETNOOP:
+		gvdupsetnoop = (0 != MV_FORCE_INT(parmblk.value));
 		break;
 	case VTK_LVDUPCHECK:
 		outval.mvtype = MV_STR;

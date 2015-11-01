@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,14 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "cdb_sc.h"
+#include "filestruct.h"		/* needed for jnl.h */
+#include "gdscc.h"		/* needed for tp.h */
+#include "jnl.h"		/* needed for tp.h */
+#include "gdskill.h"		/* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h */
+#include "buddy_list.h"		/* needed for tp.h */
+#include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
+
 #include "t_end.h"
 #include "t_retry.h"
 #include "t_begin.h"
@@ -33,26 +41,19 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey, *gv_altkey;
 GBLREF short		dollar_tlevel;
-GBLREF uint4		t_err;
 GBLREF unsigned int	t_tries;
 
 bool gvcst_query(void)
 {
-	error_def(ERR_GVQUERYFAIL);
-
-	bool		found;
+	boolean_t	found, two_histories;
 	enum cdb_sc	status;
-	bool		two_histories;
 	blk_hdr_ptr_t	bp;
 	rec_hdr_ptr_t	rp;
 	unsigned char	*c1, *c2;
 	srch_blk_status	*bh;
 	srch_hist	*rt_history;
 
-	if (0 == dollar_tlevel)
-		t_begin(ERR_GVQUERYFAIL, FALSE);
-	else
-		t_err = ERR_GVQUERYFAIL;
+	T_BEGIN_READ_NONTP_OR_TP(ERR_GVQUERYFAIL);
 	assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 	for (;;)
 	{

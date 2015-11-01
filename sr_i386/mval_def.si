@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -70,6 +70,7 @@ mval_esign_mask		=	0x080
 MV_BIAS			=	1000		# 10**3
 MANT_LO			=	100000000	# 10**8
 MANT_HI			=	1000000000	# 10**9
+INT_HI			=	1000000		# 10**6
 
 #	Stringpool structure offsets
 base			=	0

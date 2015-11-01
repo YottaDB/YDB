@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,7 +98,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 		if ((pid = fork()) < 0)
 		{
 			char msg[256];
-			sprintf(msg,"Unable to detach %s from controlling tty", SRVR_NAME);
+			SPRINTF(msg,"Unable to detach %s from controlling tty", SRVR_NAME);
 			gtcm_rep_err(msg,errno);
 			exit(-1);
 		}
@@ -108,7 +108,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	}
 #endif				/* !defined(DEBUG) */
 
-	/*  Initialize logging */
+	/* Initialize logging */
 #ifdef BSD_LOG
 	openlog(SRVR_NAME, LOG_PID, LOG_LOCAL7);
 #endif				/* defined(BSD_LOG) */
@@ -191,7 +191,7 @@ void gtcm_fail(int sig)
 	void rc_rundown();
         struct sigaction def;
 
-	fprintf(stderr,"GT.CM terminating on signal %d, cleaning up...\n", sig);
+	FPRINTF(stderr,"GT.CM terminating on signal %d, cleaning up...\n", sig);
 	/* quickie cleanup */
 	rc_rundown();
 

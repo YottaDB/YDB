@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@
 #define MT_LITZERO ASCII_LITZERO
 #endif
 
-void iomt_wteol (short cnt, io_desc *dv)
+void iomt_wteol (int4 cnt, io_desc *dv)
 {
 	unsigned char  *cp;
 	uint4  *quadbyteptr;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -105,6 +105,7 @@ GBLREF int		(* volatile xfer_table[])();
 GBLREF mval		dollar_system;
 GBLREF mval		dollar_ztrap;
 GBLREF mval		dollar_zstatus;
+GBLREF mval		dollar_zmode;
 GBLREF bool		compile_time, run_time;
 GBLREF spdesc		stringpool;
 GBLREF spdesc		rts_stringpool;
@@ -139,6 +140,7 @@ void gtm_startup(struct startup_vector *svec)
 	static readonly unsigned char init_break[1] = {'B'};
 	int4		lct;
 	int		i;
+	static char 	other_mode_buf[] = "OTHER";
 
 	assert(svec->argcnt == sizeof(*svec));
 	get_page_size();
@@ -221,6 +223,12 @@ void gtm_startup(struct startup_vector *svec)
 	/* a base addr of 0 indicates a gtm_init call from an rpc server */
 	if (svec->base_addr)
 		jobchild_init();
+	else
+	{
+		dollar_zmode.mvtype = MV_STR;
+		dollar_zmode.str.addr = &other_mode_buf[0];
+		dollar_zmode.str.len = sizeof(other_mode_buf) -1;
+	}
 	svec->frm_ptr = (unsigned char *) frame_pointer;
 	dollar_ztrap.mvtype = MV_STR;
 	dollar_ztrap.str.len = sizeof(init_break);

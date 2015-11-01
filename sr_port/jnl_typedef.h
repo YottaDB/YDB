@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,4 +48,5 @@
 #define IS_FUPD_TUPD(rectype)		(jrt_update[rectype] & (FUPDREC | TUPDREC))
 #define IS_GUPD_UUPD(rectype)		(jrt_update[rectype] & (GUPDREC | UUPDREC))
 #define GET_REC_FENCE_TYPE(rectype) 	(!IS_FENCED(rectype)) ? NOFENCE : (IS_TP(rectype)) ? TPFENCE : ZTPFENCE
+#define REC_HAS_TOKEN_SEQ(rectype)	(IS_REPLICATED(rectype) || JRT_EPOCH == (rectype) || JRT_EOF == (rectype))
 #endif /* JNL_TYPEDEF_H_INCLUDED */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ GBLREF short			dollar_tlevel;
 GBLREF unsigned int		t_tries;
 
 
-/* Return number of regions (including jnlpool dummy region) if have or are aquiring crit
+/* Return number of regions (including jnlpool dummy region) if have or are aquiring crit or in_wtstart
  * ** NOTE **  This routine is called from signal handlers and is thus called asynchronously.
  * If CRIT_IN_COMMIT bit is set, we check for a more restrictive case of crit where we are about to commit in some region.
  * If CRIT_RELEASE bit is set, we release crit on region(s) that:
@@ -58,9 +58,7 @@ uint4 have_crit(uint4 crit_state)
 
 	error_def(ERR_MUTEXRELEASED);
 
-	/* In order to proper release the necessary regions, CRIT_RELEASE implies going
-	   through all the regions.
-	*/
+	/* in order to proper release the necessary regions, CRIT_RELEASE implies going through all the regions */
 	if (crit_state & CRIT_RELEASE)
 		crit_state |= CRIT_ALL_REGIONS;
 	if (0 != crit_count)
@@ -104,6 +102,12 @@ uint4 have_crit(uint4 crit_state)
 								 process_id, process_id,  DB_LEN_STR(r_local),
 								 dollar_tlevel, t_tries);
 						}
+						if (0 == (crit_state & CRIT_ALL_REGIONS))
+							return crit_reg_cnt;
+					}
+					if ((crit_state & HAVE_CRIT_IN_WTSTART) && csa->in_wtstart)
+					{
+						crit_reg_cnt++;
 						if (0 == (crit_state & CRIT_ALL_REGIONS))
 							return crit_reg_cnt;
 					}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,7 +70,7 @@ void jobchild_init(void)
 	error_def	(ERR_RUNPARAMERR);
 
 	static char interactive_mode_buf[] = "INTERACTIVE";
-	static char batch_mode_buf[] = "OTHER";
+	static char other_mode_buf[] = "OTHER";
 
 	error_def(ERR_TEXT);
 	ESTABLISH(job_init_ch);
@@ -114,10 +114,10 @@ void jobchild_init(void)
 		/* Set process priority */
 		if (jparms.baspri)
 			nice((int) jparms.baspri);
-		/* Set up $ZMODE to "BATCH" */
+		/* Set up $ZMODE to "OTHER" */
 		dollar_zmode.mvtype = MV_STR;
-		dollar_zmode.str.addr = &batch_mode_buf[0];
-		dollar_zmode.str.len = sizeof(batch_mode_buf) -1;
+		dollar_zmode.str.addr = &other_mode_buf[0];
+		dollar_zmode.str.len = sizeof(other_mode_buf) -1;
 	} else
 	{
 		/* If we are not a child, setup a dummy mumps routine */

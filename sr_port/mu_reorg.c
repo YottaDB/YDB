@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,6 +62,7 @@
 #include "gvcst_kill_sort.h"
 #include "gtmmsg.h"
 #include "add_inter.h"
+#include "t_abort.h"
 
 GBLREF	bool		mu_ctrlc_occurred;
 GBLREF	bool		mu_ctrly_occurred;
@@ -82,6 +83,7 @@ GBLREF	inctn_opcode_t	inctn_opcode;
 GBLREF	kill_set	*kill_set_tail;
 GBLREF	boolean_t 	kip_incremented;
 GBLREF	boolean_t 	need_kip_incr;
+GBLREF	int4		update_trans;
 
 void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *kill_set_list, trans_num tn);
 void reorg_finish(block_id dest_blk_id, int blks_processed, int blks_killed,
@@ -282,7 +284,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					{
 						if (cs_addrs->now_crit)
 						{
-							T_ABORT(gv_cur_region, cs_addrs); /* Release crit earliest possible */
+							t_abort(gv_cur_region, cs_addrs); /* do crit and other cleanup */
 							gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
 							reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
 								file_extended, lvls_reduced,
@@ -440,16 +442,25 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						memcpy(&(gv_currkey_next_reorg->base[0]), rtsib_hist->h[0].buffaddr
 							+ sizeof(blk_hdr) +sizeof(rec_hdr), tkeysize);
 						gv_currkey_next_reorg->end = tkeysize - 1;
+						inctn_opcode = inctn_invalid_op; /* temporary reset; satisfy an assert in t_end() */
+						assert(update_trans);
+						update_trans = FALSE; /* tell t_end, this is no longer an update transaction */
 						if (!(ret_tn = t_end(rtsib_hist, NULL)))
 						{
 							need_kip_incr = FALSE;
+							inctn_opcode = inctn_mu_reorg;	/* reset inctn_opcode to its default */
+							update_trans = TRUE;	/* reset update_trans to its old value */
 							assert(!kip_incremented);
 							continue;
 						}
+						/* there is no need to reset update_trans to TRUE in case of a successful t_end()
+						 * call. this is because before the next call to t_end() we should have a call to
+						 * t_begin() which will reset update_trans anyways.
+						 */
+						inctn_opcode = inctn_mu_reorg;	/* reset inctn_opcode to its default */
 						if (detailed_log)
 							log_detailed_log("NOU", rtsib_hist, NULL, level, NULL, ret_tn);
-					}
-					else
+					} else
 					{
 						assert(CDB_STAGNATE > t_tries);
 						t_retry(status);
@@ -458,7 +469,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				} /* end if (0 == level) */
 				break;
 			}/* === SPLIT-COALESCE LOOP END === */
-			T_ABORT(gv_cur_region, cs_addrs);	/* T_ABORT is called in case we have crit. */
+			t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
 		}/* === START WHILE COMPLETE_MERGE === */
 
 		if (mu_ctrlc_occurred || mu_ctrly_occurred)
@@ -489,7 +500,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					{
 						if (cs_addrs->now_crit)
 						{
-							T_ABORT(gv_cur_region, cs_addrs); /* Release crit earliest possible */
+							t_abort(gv_cur_region, cs_addrs); /* do crit and other cleanup */
 							gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
 							reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
 								file_extended, lvls_reduced,
@@ -569,7 +580,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				break;
 
 			}	/* === END OF SWAP LOOP === */
-			T_ABORT(gv_cur_region, cs_addrs);	/* T_ABORT is called in case we have crit. */
+			t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
 		}
 		if (mu_ctrlc_occurred || mu_ctrly_occurred)
 		{
@@ -616,7 +627,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				{
 					if (cs_addrs->now_crit)
 					{
-						T_ABORT(gv_cur_region, cs_addrs); /* Release crit earliest possible */
+						t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
 						gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
 						reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
 							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
@@ -663,7 +674,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 			}
 			break;
 		} 		/* main reduce level loop ends */
-		T_ABORT(gv_cur_region, cs_addrs);	/* T_ABORT is called in case we have crit. */
+		t_abort(gv_cur_region, cs_addrs); /* do crit and other cleanup */
 		if (0 == cnt1)
 			break;
 	}
@@ -683,7 +694,7 @@ void reorg_finish(block_id dest_blk_id, int blks_processed, int blks_killed,
 	int blks_reused, int file_extended, int lvls_reduced,
 	int blks_coalesced, int blks_split, int blks_swapped)
 {
-	T_ABORT(gv_cur_region, cs_addrs);
+	t_abort(gv_cur_region, cs_addrs);
 	file_extended = cs_data->trans_hist.total_blks - file_extended;
 	util_out_print("Blocks processed    : !SL ", FLUSH, blks_processed);
 	util_out_print("Blocks coalesced    : !SL ", FLUSH, blks_coalesced);

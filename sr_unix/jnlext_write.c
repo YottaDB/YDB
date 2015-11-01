@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,12 +29,11 @@
 #include "op.h"
 
 GBLREF io_pair          io_curr_device;
-static readonly unsigned char open_params_list[7] =
+static readonly unsigned char open_params_list[] =
 {
 	(unsigned char)iop_noreadonly,
 	(unsigned char)iop_nowrap,
 	(unsigned char)iop_stream,
-	(unsigned char)iop_recordsize, (unsigned char)0x07F,(unsigned char)0x07F,
 	(unsigned char)iop_eol
 };
 

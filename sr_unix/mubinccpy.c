@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,8 +114,9 @@ bool	mubinccpy (backup_reg_list *list)
 	char 			*c, addr[SA_MAXLEN + 1];
 	sgmnt_data_ptr_t	header;
 	uint4			status, total_blks, bplmap, gds_ratio, save_blks;
-	int4			size1, bsize, bm_num, blk_num, hint, lmsize, rsize, copied, timeout,
+	int4			size1, bsize, bm_num, blk_num, hint, lmsize, rsize, timeout,
 				blks_per_buff, counter, i, write_size, copysize, read_size, match;
+	off_t			copied;
 	int			db_fd, exec_fd;
 	enum db_acc_method	access;
 	blk_hdr_ptr_t		bp, bptr;

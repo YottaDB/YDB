@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,6 +97,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 			ptr += ((blk_segment *)(array + 1))->len;
 		for (  ;seg <= stop_ptr;)
 		{
+			assert(0 <= (int)seg->len);
 			memmove(ptr, seg->addr, seg->len);
 			ptr += seg->len;
 			seg++;
@@ -108,6 +109,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		ptr = base_addr + array->len;
 		while (seg != stop_ptr)
 		{
+			assert(0 <= (int)seg->len);
 			ptr -= (n = seg->len);
 			memmove(ptr, seg->addr, n);
 			seg--;

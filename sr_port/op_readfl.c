@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,11 +29,14 @@ int op_readfl(mval *v, int4 length, int4 timeout)
 	unsigned char	*temp_ch;
 	error_def(ERR_TEXT);
 	error_def(ERR_RDFLTOOSHORT);
+	error_def(ERR_RDFLTOOLONG);
 
 	if (timeout < 0)
 		timeout = 0;
 	if (length <= 0)
 		rts_error(VARLSTCNT(1) ERR_RDFLTOOSHORT);
+	if (length > MAX_STRLEN)
+		rts_error(VARLSTCNT(1) ERR_RDFLTOOLONG);
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 	if (stringpool.free + length + ESC_LEN > stringpool.top)

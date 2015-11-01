@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,18 +32,17 @@ GBLREF	bool		out_of_time;
 
 short	iorm_read (mval *v, int4 timeout) /* timeout in seconds */
 {
-	bool		ret, timed;
+	boolean_t	ret, timed;
 	int4		msec_timeout;	/* timeout in milliseconds */
 	uint4		width;
 	char		inchar, *temp;
 	int		flags;
 	int		fcntl_res;
-	short int	i;
+	int4		i;
 	io_desc		*io_ptr;
 	d_rm_struct	*rm_ptr;
 	int4		status;
 	TID		timer_id;
-
 
 	error_def(ERR_IOEOF);
 

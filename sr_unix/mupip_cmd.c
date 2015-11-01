@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -135,7 +135,8 @@ static	CLI_PARM	mup_backup_parm[] = {
 };
 
 static CLI_ENTRY mub_njnl_val_qual[] = {
-	{ "PREVLINK",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	1,	NEG,	VAL_N_A,	0 },
+	{ "PREVLINK",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
+	{ "SYNC_IO",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	0 },
 	{ 0 }
 };
 

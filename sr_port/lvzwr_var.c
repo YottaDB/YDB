@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -186,7 +186,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 					tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 					assert(NULL != lcl_coll_xform_buff);
 					tmp_sbs.str.addr = lcl_coll_xform_buff;
-					do_xform(local_collseq->xback, &s->str, &tmp_sbs.str, &length);
+					do_xform(local_collseq, XBACK, &s->str, &tmp_sbs.str, &length);
 					tmp_sbs.str.len = length;
 					s2pool(&(tmp_sbs.str));
 					mv.str = tmp_sbs.str;

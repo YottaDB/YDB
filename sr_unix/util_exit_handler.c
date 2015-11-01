@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,12 +13,11 @@
 
 
 #include "error.h"
-#include "io.h"			/* for gtmsecshr.h */
-#include "gtmsecshr.h"
 #include "gt_timer.h"
 #include "util.h"
 #include "gv_rundown.h"
 #include "print_exit_stats.h"
+#include "secshr_db_clnup.h"
 
 GBLREF boolean_t        need_core;
 GBLREF boolean_t        created_core;

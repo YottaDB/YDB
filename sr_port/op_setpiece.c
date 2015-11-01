@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -136,7 +136,7 @@ moveit:
 	if (second_src_ind >= 0)
 		str_len += (src->str.len - second_src_ind);
 
-	if (str_len >= MAX_STRLEN)
+	if (str_len > MAX_STRLEN)
 	{
 		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 		return;

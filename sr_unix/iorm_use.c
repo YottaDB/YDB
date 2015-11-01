@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,21 @@
 #include "eintr_wrappers.h"
 #include "stringpool.h"
 
+/*  Only want to do fstat() once on this file, not on evry use.
+ */
+#define FSTAT_CHECK 													\
+        if (!fstat_done)												\
+        {														\
+		FSTAT_FILE(rm_ptr->fildes, &statbuf, fstat_res);							\
+		if (-1 == fstat_res)											\
+		{													\
+			save_errno = errno;										\
+			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"), CALLFROM, save_errno);	\
+		}													\
+		mode = mode1 = statbuf.st_mode;										\
+		fstat_done = TRUE;											\
+	}
+
 typedef struct
 {
 	unsigned short mem;
@@ -37,24 +52,24 @@ LITREF unsigned char	io_params_size[];
 
 void	iorm_use(io_desc *iod, mval *pp)
 {
+	boolean_t	fstat_done;
 	unsigned char	c;
 	short		mode, mode1;
-	unsigned short	length, width;
+	int4		length, width;
 	long		size;
-	int		fstat_res;
+	int		fstat_res, save_errno;
 	d_rm_struct	*rm_ptr;
 	struct stat	statbuf;
 	int		p_offset;
 
 	error_def(ERR_DEVPARMNEG);
 	error_def(ERR_RMWIDTHPOS);
+	error_def(ERR_RMWIDTHTOOBIG);
+	error_def(ERR_SYSCALL);
 
 	p_offset = 0;
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
-	FSTAT_FILE(rm_ptr->fildes, &statbuf, fstat_res);
-	if (-1 == fstat_res)
-		rts_error(VARLSTCNT(1) errno);
-	mode = mode1 = statbuf.st_mode;
+	fstat_done = FALSE;
 	while (*(pp->str.addr + p_offset) != iop_eol)
 	{
 		assert((params) *(pp->str.addr + p_offset) < (params)n_iops);
@@ -74,21 +89,24 @@ void	iorm_use(io_desc *iod, mval *pp)
 				rm_ptr->fixed = FALSE;
 			break;
 		case iop_length:
-			GET_USHORT(length, (pp->str.addr + p_offset));
+			GET_LONG(length, (pp->str.addr + p_offset));
 			if (length < 0)
 				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
 			iod->length = length;
 			break;
 		case iop_w_protection:
+			FSTAT_CHECK;
 			mode &= ~(0x07);
 			mode |= *(pp->str.addr + p_offset);
 			break;
 		case iop_g_protection:
+			FSTAT_CHECK;
 			mode &= ~(0x07 << 3);
 			mode |= *(pp->str.addr + p_offset) << 3;
 			break;
 		case iop_s_protection:
 		case iop_o_protection:
+			FSTAT_CHECK;
 			mode &= ~(0x07 << 6);
 			mode |= *(pp->str.addr + p_offset) << 6;
 			break;
@@ -99,9 +117,11 @@ void	iorm_use(io_desc *iod, mval *pp)
 			rm_ptr->noread = FALSE;
 			break;
 		case iop_recordsize:
-			GET_USHORT(width, (pp->str.addr + p_offset));
+			GET_LONG(width, (pp->str.addr + p_offset));
 			if (width <= 0)
 				rts_error(VARLSTCNT(1) ERR_RMWIDTHPOS);
+			else if (MAX_STRLEN < width)
+				rts_error(VARLSTCNT(1) ERR_RMWIDTHTOOBIG);
 			iod->width = width;
 			break;
 		case iop_rewind:
@@ -165,9 +185,11 @@ void	iorm_use(io_desc *iod, mval *pp)
 			}
 		case iop_width:
 			assert(iod->state == dev_open);
-			GET_USHORT(width, (pp->str.addr + p_offset));
+			GET_LONG(width, (pp->str.addr + p_offset));
 			if (width <= 0)
 				rts_error(VARLSTCNT(1) ERR_RMWIDTHPOS);
+			else if (MAX_STRLEN < width)
+				rts_error(VARLSTCNT(1) ERR_RMWIDTHTOOBIG);
 			iod->width = width;
 			iod->wrap = TRUE;
 			break;
@@ -207,7 +229,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 		p_offset += ((IOP_VAR_SIZE == io_params_size[c]) ?
 			(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[c]);
 	}
-	if (mode != mode1)
+	if (fstat_done && mode != mode1)
 	{	/* if the mode has been changed by the qualifiers, reset it */
 		if (-1 == CHMOD(iod->trans_name->dollar_io, mode))
 			rts_error(VARLSTCNT(1) errno);

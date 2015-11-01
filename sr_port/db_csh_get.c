@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,9 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 	cache_rec_ptr_t			cr, cr_hash_base;
 	int				blk_hash, lcnt, ocnt, hmax;
 	bool				is_mm;
+#ifdef DEBUG
 	cache_rec_ptr_t			cr_low, cr_high;
+#endif
 
 	csa = cs_addrs;
 	csd = csa->hdr;
@@ -47,16 +49,17 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 	blk_hash = (block % hmax);
 	if (!is_mm)
 	{
-		cr_low = &csa->acc_meth.bg.cache_state->cache_array[0];
-		cr_high = cr_low + csd->bt_buckets + csd->n_bts;
+		DEBUG_ONLY(cr_low = &csa->acc_meth.bg.cache_state->cache_array[0];)
+		DEBUG_ONLY(cr_high = cr_low + csd->bt_buckets + csd->n_bts;)
 		cr_hash_base = csa->acc_meth.bg.cache_state->cache_array + blk_hash;
 	} else
 	{
-		cr_low = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array);
-		cr_high = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets + csd->n_bts);
+		DEBUG_ONLY(cr_low = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array);)
+		DEBUG_ONLY(cr_high = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets + csd->n_bts);)
 		cr_hash_base = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + blk_hash);
 	}
 	ocnt = 0;
+	csa->wbuf_dqd++;			/* Tell rundown we have an orphaned block in case of interrupt */
 	do
 	{
 		cr = cr_hash_base;
@@ -66,23 +69,21 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 		{
 			cr = (cache_rec_ptr_t)((sm_uc_ptr_t)cr + cr->blkque.fl);
 			assert(!CR_NOT_ALIGNED(cr, cr_low) && !CR_NOT_IN_RANGE(cr, cr_low, cr_high));
-			if (CR_NOT_ALIGNED(cr, cr_low) || CR_NOT_IN_RANGE(cr, cr_low, cr_high))
-			{	/* safeguard against corruption to the cache causing out-of-design values of cr->blkque.fl above */
-				BG_TRACE_PRO_ANY(csa, wc_blocked_db_csh_get_bad_cr);
-				return (cache_rec_ptr_t)CR_NOTVALID;	/* wc_blocked will be set by caller */
-			}
 			if (BT_QUEHEAD == cr->blk)
 			{	/* We have reached the end of the queue, validate we have run the queue
 				 * back around to the same queue header or we'll need to retry because the
 				 * queue changed on us.
 				 */
 				if (cr == cr_hash_base)
+				{
+					csa->wbuf_dqd--;
 					return (cache_rec_ptr_t)NULL;
+				}
 				break;			/* Retry - something changed */
 			}
 			if ((CR_BLKEMPTY != cr->blk) && ((cr->blk % hmax) != blk_hash))
 				break;			/* Retry - something changed */
-			assert((0 != cr->blkque.fl) && (0 != cr->blkque.bl));
+			assert(!csa->now_crit || (0 != cr->blkque.fl) && (0 != cr->blkque.bl));
 			if (cr->blk == block)
 			{
 				if (!is_mm)
@@ -96,6 +97,7 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 					 */
 					cr->refer = TRUE;
 				}
+				csa->wbuf_dqd--;
 				return cr;
 			}
 			lcnt--;
@@ -104,6 +106,7 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 		/* We rarely expect to come here, hence it is considered better to recompute the maximum value of ocnt (for the
 		 * termination check) instead of storing it in a local variable at the beginning of the do loop */
 	} while (ocnt < (csa->now_crit ? 1 : ENOUGH_TRIES_TO_FALL_BACK));
+	csa->wbuf_dqd--;
 
 	BG_TRACE_PRO_ANY(csa, db_csh_get_too_many_loops);
 	return (cache_rec_ptr_t)(TRUE == csa->now_crit ? (cache_rec_ptr_t)CR_NOTVALID : NULL);

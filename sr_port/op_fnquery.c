@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <varargs.h>
 #include "gtm_string.h"
 
 #include "hashdef.h"
@@ -26,13 +27,16 @@
 #include "q_rtsib.h"
 #include "q_nxt_val_node.h"
 #include "mvalconv.h"
-#include <varargs.h>
 #include "underr.h"
+#include "numcmp.h"
 
 GBLREF spdesc		stringpool;
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 GBLREF collseq		*local_collseq;
+GBLREF mval		last_fnquery_return_varname;
+GBLREF mval		last_fnquery_return_sub[MAX_LVSUBSCRIPTS];
+GBLREF int		last_fnquery_return_subcnt;
 
 void op_fnquery (va_alist)
 va_dcl
@@ -41,7 +45,7 @@ va_dcl
 	mval		 	tmp_sbs;
 	va_list			var;
 	mval			*dst, *varname, *v1, *v2;
-	mval			*arg1, **argpp, *args[MAX_LVSUBSCRIPTS];
+	mval			*arg1, **argpp, *args[MAX_LVSUBSCRIPTS], **argpp2, *lfrsbs, *argp2;
 	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
 	mstr			format_out;
 	lv_val			*v, *node, *parent;
@@ -50,7 +54,8 @@ va_dcl
 	sbs_search_status	status;
 	sbs_blk			*num, *str;
 	int			i, j, sbscnt;
-	bool			found, is_num;
+	boolean_t		found, is_num, last_sub_null, nullify_term;
+
 	error_def		(ERR_STACKOFLOW);
 	error_def		(ERR_STACKCRIT);
 
@@ -86,11 +91,52 @@ va_dcl
 				if (is_num = MV_IS_CANONICAL(*argpp))
 				{
 					MV_FORCE_NUM(*argpp);
-				}
-				else if ((i + 1 == sbscnt) && (0 == (*argpp)->str.len))
-				{
-					i++;
-					break;
+				} else if ((i + 1 == sbscnt) && (0 == (*argpp)->str.len))
+				{ 	/* The last search argument is a null string. For this situation, there is the possibility
+					   of a syntax collision if (1) the user had (for example) specified $Q(a(1,3,"") to get
+					   the first a(1,3,x) node or (2) this is the "next" element that was legitimately returned
+					   by $Query on the last call. If the element a(1,3,"") actually exists, the code whereby
+					   we simply strip off the last null search argument and continue will just find this
+					   element again. Because of this we save the mvals of the subscrips of the last $QUERY
+					   result if the result had a null last subscript. In that case, we will compare the input
+					   variable and subscripts with the last returned value. If they are identical, we will
+					   bypass the elimination of the trailing null subscript. This will allow the successor
+					   element to be found. Note that this is a single value that is kept for the entire
+					   process. Any intervening $QUery calls for other local variables will reset the check.
+					   SE 2/2004 (D9D08-002352).
+					*/
+					nullify_term = TRUE;
+					if (last_fnquery_return_varname.str.len
+					    && last_fnquery_return_varname.str.len == varname->str.len
+					    && 0 == memcmp(last_fnquery_return_varname.str.addr, varname->str.addr,
+							   varname->str.len)
+					    && sbscnt == last_fnquery_return_subcnt)
+					{	/* We have an equalvalent varname and same number subscripts */
+						for (j = 0, argpp2 = &args[0], lfrsbs = &last_fnquery_return_sub[0];
+						     j < i; j++, argpp2++, lfrsbs++)
+						{	/* For each subscript prior to the trailing null subscript */
+							argp2 = *argpp2;
+							if (MV_IS_NUMERIC(argp2) && MV_IS_NUMERIC(lfrsbs))
+							{	/* Have numeric subscripts */
+								if (0 != numcmp(argp2, lfrsbs))
+									break;	/* This subscript isn't the same */
+							} else if (MV_IS_STRING(argp2) && MV_IS_STRING(lfrsbs))
+							{	/* Should be string only in order to compare */
+								if ((argp2)->str.len == lfrsbs->str.len
+								    && 0 != memcmp((argp2)->str.addr, lfrsbs->str.addr,
+										   lfrsbs->str.len))
+									break;	/* This subscript isn't the same */
+							} else
+								break;		/* This subscript isn't even close.. */
+						}
+						if (j == i)
+							nullify_term = FALSE; 	/* We made it through the loop unscathed !! */
+					}
+					if (nullify_term)
+					{
+						i++;
+						break;
+					}
 				}
 			} else
 			{
@@ -109,8 +155,7 @@ va_dcl
 						h1->type = SBS_BLK_TYPE_INT;
 						h1->addr.intnum = &tbl->num->ptr.lv[j];
 						node = *h1->addr.intnum;
-					}
-					else
+					} else
 						break;
 				} else
 				{
@@ -136,7 +181,7 @@ va_dcl
 					tmp_sbs.str.addr = lcl_coll_xform_buff;
 					tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 					/* KMK subscript index is i+1 */
-					do_xform(local_collseq->xform /* was xback */,
+					do_xform(local_collseq, XFORM /* was xback */,
 						 &(*argpp)->str, &tmp_sbs.str,
 						 &length);
 					tmp_sbs.str.len = length;
@@ -176,7 +221,7 @@ va_dcl
 				GTMASSERT;
 		}
 		assert(parent);
-		if (tbl = parent->ptrs.val_ent.children)
+		if (tbl = parent->ptrs.val_ent.children)	/* Note assignment! */
 		{
 			found = TRUE;
 			if (num = tbl->num)
@@ -208,6 +253,9 @@ va_dcl
 			--argpp;
 		}
 	}
+	last_fnquery_return_subcnt = 0;		/* Saved last query result is irrelevant now */
+	last_fnquery_return_varname.mvtype = MV_STR;
+	last_fnquery_return_varname.str.len = 0;
 	if (!found)
 		for (;;)
 		{
@@ -226,6 +274,13 @@ va_dcl
 			}
 		}
 	q_nxt_val_node(&h1);
+
+	/* Before we start formatting for output, decide whether we will be saving mvals of our subscripts
+	   as we format. We only do this if the last subscript is a null. Bypassing it otherwise is a time
+	   saver..
+	*/
+	last_sub_null = (SBS_BLK_TYPE_STR != h1->type || 0 != h1->addr.str->str.len) ? FALSE : TRUE;
+
 	/* format the output string */
 	if (stringpool.top - stringpool.free < varname->str.len + 1)
 		stp_gcol(varname->str.len + 1);
@@ -237,6 +292,11 @@ va_dcl
 	v1->str.len = 0;
 	v1->str.addr = (char *)stringpool.free;
 	memcpy(stringpool.free, varname->str.addr, varname->str.len);
+	if (last_sub_null)
+	{
+		last_fnquery_return_varname.str.addr = (char *)stringpool.free;
+		last_fnquery_return_varname.str.len += varname->str.len;
+	}
 	stringpool.free += varname->str.len;
 	*stringpool.free++ = '(';
 	for (h2 = &history[1]; h2 <= h1; h2++)
@@ -277,6 +337,8 @@ va_dcl
 				j = (int)(h2->addr.intnum - parent->ptrs.val_ent.children->num->ptr.lv);
 				MV_FORCE_MVAL(v2, j);
 				n2s(v2);
+				if (last_sub_null)
+					last_fnquery_return_sub[last_fnquery_return_subcnt++] = *v2;
 				break;
 			case SBS_BLK_TYPE_FLT:
 				if (stringpool.top - stringpool.free < MAX_NUM_SIZE)
@@ -287,6 +349,8 @@ va_dcl
 				}
 				MV_ASGN_FLT2MVAL(*v2, h2->addr.flt->flt);
 				n2s(v2);
+				if (last_sub_null)
+					last_fnquery_return_sub[last_fnquery_return_subcnt++] = *v2;
 				break;
 			case SBS_BLK_TYPE_STR:
 				v1->str.len = (char *)stringpool.free - v1->str.addr;
@@ -297,7 +361,8 @@ va_dcl
 					assert(NULL != lcl_coll_xform_buff);
 					tmp_sbs.str.addr = lcl_coll_xform_buff;
 					tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
-					do_xform(local_collseq->xback, &h2->addr.str->str, &tmp_sbs.str, &length);
+					do_xform(local_collseq, XBACK, &h2->addr.str->str,
+							&tmp_sbs.str, &length);
 					tmp_sbs.str.len = length;
 					v2->str = tmp_sbs.str;
 				} else
@@ -315,10 +380,26 @@ va_dcl
 					}
 					*stringpool.free++ = '\"';
 					memcpy(stringpool.free, v2->str.addr, v2->str.len);
+					if (last_sub_null)
+					{
+						last_fnquery_return_sub[last_fnquery_return_subcnt].mvtype = MV_STR;
+						last_fnquery_return_sub[last_fnquery_return_subcnt].str.addr =
+							(char *)stringpool.free;
+						last_fnquery_return_sub[last_fnquery_return_subcnt++].str.len = v2->str.len;
+					}
 					stringpool.free += v2->str.len;
 					*stringpool.free++ = '\"';
 				} else
+				{
+					if (last_sub_null)
+					{
+						last_fnquery_return_sub[last_fnquery_return_subcnt].mvtype = MV_STR;
+						last_fnquery_return_sub[last_fnquery_return_subcnt].str.addr =
+							(char *)stringpool.free;
+						last_fnquery_return_sub[last_fnquery_return_subcnt++].str.len = format_out.len;
+					}
 					stringpool.free += format_out.len;
+				}
 				break;
 			default:
 				GTMASSERT;

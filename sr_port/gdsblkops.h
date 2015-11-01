@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,21 +49,42 @@ typedef struct
 				+ 2 * ROUND_UP2(sizeof(block_id), UPDATE_ELEMENT_ALIGN_SIZE) + 2 * ROUND_UP2(MAX_KEY_SZ, 8))	\
 		 + ROUND_UP2(csd->blk_size, UPDATE_ELEMENT_ALIGN_SIZE) + ROUND_UP2(BSTAR_REC_SIZE, UPDATE_ELEMENT_ALIGN_SIZE))
 
-#define UA_SIZE(X)		(X->max_update_array_size)
-#define UA_NON_BM_SIZE(X)	(X->max_non_bm_update_array_size)
+#define UA_SIZE(X)		(uint4)(X->max_update_array_size)
+#define UA_NON_BM_SIZE(X)	(uint4)(X->max_non_bm_update_array_size)
 
 #define	ENSURE_UPDATE_ARRAY_SPACE(space_needed)											\
 {																\
+	GBLREF	ua_list		*first_ua, *curr_ua;										\
+	GBLREF	short		dollar_tlevel;											\
+	ua_list		*tmpua;													\
+																\
+	assert((0 != update_array_size) && (NULL != update_array));								\
 	if (ROUND_DOWN2(update_array + update_array_size - update_array_ptr, UPDATE_ELEMENT_ALIGN_SIZE) < (space_needed))	\
 	{	/* the space remaining is too small for safety - chain on a new array */					\
-		curr_ua = curr_ua->next_ua											\
-			= (ua_list *)malloc(sizeof(ua_list));									\
-		curr_ua->next_ua = NULL;											\
-		curr_ua->update_array_size = update_array_size = MIN(MAX(cumul_update_array_size, (space_needed)), BIG_UA);	\
+		assert((NULL != first_ua) && (NULL != curr_ua) && (NULL == curr_ua->next_ua));					\
+		/* care should be taken to ensure things will work right even if malloc() errors out with ERR_MEMORY.		\
+		 * that is why multiple assignments are not done in a single line that has a malloc() call in it.		\
+		 * in addition, the field taking in the result of malloc() should be initialized to NULL before the call.	\
+		 * this is because tp_clean_up() (invoked in case of error handling) relies on the integrity of this 		\
+		 * update array linked list in order to do its cleanup.								\
+		 * Not following the above rules will cause difficult-to-debug memory related problems (even corruption) */	\
+		tmpua = (ua_list *)malloc(sizeof(ua_list));									\
+		memset(tmpua, 0, sizeof(ua_list));	/* initialize tmpua->update_array and tmpua->next_ua to NULL */		\
+		/* it is important that all parameters in the MIN-MAX calculation below be unsigned numbers */			\
+		tmpua->update_array_size = MIN(MAX(cumul_update_array_size, (space_needed)), BIG_UA);				\
+		tmpua->update_array = (char *)malloc(tmpua->update_array_size);							\
+		/* update globals only after above mallocs succeed */								\
+		update_array_size = tmpua->update_array_size;									\
 		cumul_update_array_size += update_array_size;									\
-		curr_ua->update_array = update_array 										\
-					= update_array_ptr									\
-					= (char *)malloc(update_array_size);							\
+		update_array = update_array_ptr = tmpua->update_array;								\
+		if (NULL == curr_ua) /* in PRO, don't take chances, reset first_ua/curr_ua to newly created upd array */	\
+		{														\
+			if (dollar_tlevel && (NULL != first_ua)) /* if already in TP, we will lose all updates until now	\
+								    if we reset first_ua. do not proceed in this case */	\
+				GTMASSERT;											\
+			first_ua = curr_ua = tmpua;										\
+		} else														\
+			curr_ua = curr_ua->next_ua = tmpua;									\
 	}															\
 }
 
@@ -92,7 +113,7 @@ typedef struct
 {									\
 	(BNUM)->addr = (ADDR); 						\
 	(BNUM)->len  = (LEN); 						\
-	blk_seg_cnt += (unsigned short) (LEN); 				\
+	blk_seg_cnt += (LEN); 						\
 	assert((char *)BNUM - update_array_ptr < 0); 			\
 	(BNUM)++;							\
 }

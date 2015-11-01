@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,7 +104,7 @@ short	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 	io_ptr->dollar.za = 0;
 
 	if (mask & TRM_NOTYPEAHD)
-		TCFLUSH(tt_ptr->fildes, TCIOFLUSH, status);
+		TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
 
 	if (mask & TRM_READSYNC)
 	{

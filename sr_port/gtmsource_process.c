@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,8 +69,11 @@ GBLDEF	qw_num			repl_source_lastlog_data_sent = 0;
 GBLDEF	qw_num			repl_source_lastlog_msg_sent = 0;
 GBLDEF	time_t			repl_source_prev_log_time;
 GBLDEF  time_t			repl_source_this_log_time;
-GBLREF	volatile time_t		gtmsource_now;
+GBLDEF	gd_region		*gtmsource_mru_reg;
+GBLDEF	time_t			gtmsource_last_flush_time;
+GBLDEF	seq_num			gtmsource_last_flush_reg_seq, gtmsource_last_flush_resync_seq;
 
+GBLREF	volatile time_t		gtmsource_now;
 GBLREF	int			gtmsource_sock_fd;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	gd_addr			*gd_header;
@@ -122,7 +125,7 @@ int gtmsource_process(void)
 	qw_num			trans_sent_cnt = 0;
 	qw_num			last_log_tr_sent_cnt = 0;
 	seq_num			resync_seqno, old_resync_seqno, curr_seqno, filter_seqno;
-	gd_region		*reg, *region_top;
+	gd_region		*reg, *region_top, *gtmsource_upd_reg, *old_upd_reg;
 	sgmnt_addrs		*csa;
 	boolean_t		was_crit;
 	uint4			temp_dw;
@@ -394,6 +397,23 @@ int gtmsource_process(void)
 		catchup = FALSE;
 		force_recv_check = TRUE;
 		xon_wait_logged = FALSE;
+		gtmsource_upd_reg = gtmsource_mru_reg = NULL;
+		for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
+		{
+			csa = &FILE_INFO(reg)->s_addrs;
+			if (REPL_ENABLED(csa->hdr))
+			{
+				if (NULL == gtmsource_upd_reg)
+					gtmsource_upd_reg = gtmsource_mru_reg = reg;
+				else if (csa->hdr->reg_seqno > FILE_INFO(gtmsource_mru_reg)->s_addrs.hdr->reg_seqno)
+					gtmsource_mru_reg = reg;
+			}
+		}
+		/* source server startup and change of mode flush all regions, so we are okay to consider the current state
+		 * as completely flushed */
+		gtmsource_last_flush_time = gtmsource_now;
+		gtmsource_last_flush_reg_seq = jctl->jnl_seqno;
+		gtmsource_last_flush_resync_seq = gtmsource_local->read_jnl_seqno;
 		while (TRUE)
 		{
 			gtmsource_poll_actions(TRUE);
@@ -725,19 +745,37 @@ int gtmsource_process(void)
 					}
 					send_msgp->type = REPL_TR_JNL_RECS;
 					send_msgp->len = data_len + REPL_MSG_HDRLEN;
+					/* The following loop tries to send multiple seqnos in one shot. resync_seqno gets
+					 * updated once the send is completely successful. If an error occurs in the middle
+					 * of the send, it is possible that we successfully sent a few seqnos to the other side.
+					 * In this case resync_seqno should be updated to reflect those seqnos. Not doing so
+					 * might cause the secondary to get ahead of the primary in terms of resync_seqno.
+					 * Although it is possible to determine the exact seqno where the send partially failed,
+					 * we update resync_seqno as if all seqnos were successfully sent (It is ok for the
+					 * resync_seqno on the primary side to be a little more than the actual value as long as
+					 * the secondary side has an accurate value of resync_seqno. This is because the
+					 * resync_seqno of the system is the minimum of the resync_seqno of both primary
+					 * and secondary). This is done by the call to gtmsource_flush_fh() done within the
+					 * REPL_SEND_LOOP macro as well as in the (SS_NORMAL != status) if condition below.
+					 */
 					REPL_SEND_LOOP(gtmsource_sock_fd, send_msgp, tot_tr_len, UNIX_ONLY(catchup) VMS_ONLY(TRUE),
 							&poll_immediate)
 					{
 						gtmsource_poll_actions(FALSE);
 						if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+						{
+							gtmsource_flush_fh(post_read_jnl_seqno);
 							return (SS_NORMAL);
+						}
 					}
 					if (SS_NORMAL != status)
 					{
+						gtmsource_flush_fh(post_read_jnl_seqno);
 						if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
 						{
 							repl_log(gtmsource_log_fp, TRUE, TRUE,
-									"Connection reset while sending transaction data\n");
+								"Connection reset while sending transaction data from "
+								"%llu to %llu\n", pre_read_jnl_seqno, post_read_jnl_seqno);
 							repl_close(&gtmsource_sock_fd);
 							SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 							gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
@@ -758,34 +796,28 @@ int gtmsource_process(void)
 								  RTS_ERROR_STRING(err_string));
 						}
 					}
-					region_top = gd_header->regions + gd_header->n_regions;
-					for (reg = gd_header->regions; reg < region_top; reg++)
+					/* Record the "last sent seqno" in file header of most recently updated region and one
+					 * region picked in round robin order. Updating one region is sufficient since the
+					 * system's resync_seqno is computed to be the maximum of file header resync_seqno
+					 * across all regions. We choose to update multiple regions to increase the odds of
+					 * not losing information in case of a system crash
+					 */
+					UPDATE_RESYNC_SEQNO(gtmsource_mru_reg, pre_read_jnl_seqno, post_read_jnl_seqno);
+					if (gtmsource_mru_reg != gtmsource_upd_reg)
+						UPDATE_RESYNC_SEQNO(gtmsource_upd_reg, pre_read_jnl_seqno, post_read_jnl_seqno);
+					old_upd_reg = gtmsource_upd_reg;
+					do
+					{	/* select next region in round robin order */
+						gtmsource_upd_reg++;
+						if (gtmsource_upd_reg >= gd_header->regions + gd_header->n_regions)
+							gtmsource_upd_reg = gd_header->regions; /* wrap back to first region */
+					} while (gtmsource_upd_reg != old_upd_reg && /* back to the original region? */
+							!REPL_ENABLED(FILE_INFO(gtmsource_upd_reg)->s_addrs.hdr));
+					save_now = gtmsource_now;
+					if (GTMSOURCE_FH_FLUSH_INTERVAL <= difftime(save_now, gtmsource_last_flush_time))
 					{
-						csa = &FILE_INFO(reg)->s_addrs;
-						if (REPL_ENABLED(csa->hdr))
-						{ /* Although csa->hdr->resync_seqno is only modified by the source
-						   * server and never concurrently, it is read by fileheader_sync() which
-						   * does it while in crit. To avoid the latter from reading an inconsistent
-						   * value (i.e. neither the pre-update nor the post-update value), which is
-						   * possible if the 8-byte operation is not atomic but a sequence of two
-						   * 4-byte operations AND if the pre-update and post-update value differ in
-						   * their most significant 4-bytes, we grab crit.
-						   *
-						   * For native INT8 platforms, we expect the compiler to optimize the "if" away.
-						   *
-						   * Note: the ordering of operands in the below if check is the way it is because
-						   * a. the more frequent case is QWCHANGE_IS_READER_CONSISTENT returning TRUE.
-						   * b. source server does not hold crit coming here (but we are covering the case
-						   *    when it may)
-						   */
-							if (!QWCHANGE_IS_READER_CONSISTENT(pre_read_jnl_seqno, post_read_jnl_seqno)
-									&& FALSE == (was_crit = csa->now_crit))
-								grab_crit(reg);
-							FILE_INFO(reg)->s_addrs.hdr->resync_seqno = post_read_jnl_seqno;
-							if (!QWCHANGE_IS_READER_CONSISTENT(pre_read_jnl_seqno, post_read_jnl_seqno)
-									&& FALSE == was_crit)
-								rel_crit(reg);
-						}
+						gtmsource_flush_fh(post_read_jnl_seqno);
+						gtmsource_last_flush_time = save_now;
 					}
 
 					repl_source_msg_sent += (qw_num)tot_tr_len;
@@ -848,9 +880,10 @@ int gtmsource_process(void)
 					}
 					poll_time = poll_immediate;
 				} else /* data_len == 0 */
-				{
+				{ /* nothing to send */
+					gtmsource_flush_fh(post_read_jnl_seqno);
 					poll_time = poll_wait;
-					rel_quant(); /* nothing to send, give up processor and let other processes run */
+					rel_quant(); /* give up processor and let other processes run */
 				}
 			} else /* else tot_tr_len < 0, error */
 			{

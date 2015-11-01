@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -125,8 +125,12 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				forced_exit_err = ERR_GTMSECSHRSHUTDOWN;
 			else
 				forced_exit_err = ERR_FORCEDHALT;
-			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
-			if (EXIT_PENDING_TOLERANT >= exit_state && (0 != have_crit(CRIT_HAVE_ANY_REG) || exit_handler_active))
+			/* If nothing pending AND we have crit or in wcs_wtstart() or already in exit processing, wait to
+			 * invoke shutdown. wcs_wtstart() manipulates the active queue that a concurrent process in crit
+			 * in bt_put() might be waiting for. interrupting it can cause deadlocks (see C9C11-002178).
+			 */
+			if (EXIT_PENDING_TOLERANT >= exit_state
+					&& (0 != have_crit(CRIT_HAVE_ANY_REG | HAVE_CRIT_IN_WTSTART) || exit_handler_active))
 			{
 				forced_exit = TRUE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -160,7 +164,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					GTMASSERT;
 			}
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
-			if (EXIT_PENDING_TOLERANT >= exit_state && (0 != have_crit(CRIT_HAVE_ANY_REG) || exit_handler_active))
+			if (EXIT_PENDING_TOLERANT >= exit_state
+				&& (0 != have_crit(CRIT_HAVE_ANY_REG | HAVE_CRIT_IN_WTSTART) || exit_handler_active))
 			{
 				forced_exit = TRUE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -198,7 +203,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		case SIGDANGER:
 			forced_exit_err = ERR_KRNLKILL;
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
-			if (EXIT_PENDING_TOLERANT >= exit_state && (0 != have_crit(CRIT_HAVE_ANY_REG) || exit_handler_active))
+			if (EXIT_PENDING_TOLERANT >= exit_state
+				&& (0 != have_crit(CRIT_HAVE_ANY_REG | HAVE_CRIT_IN_WTSTART) || exit_handler_active))
 			{
 				forced_exit = TRUE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -225,7 +231,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					forced_exit_err = ERR_KILLBYSIGUINFO;
 					/* If nothing pending AND we have crit or already exiting, wait to invoke shutdown */
 					if (EXIT_PENDING_TOLERANT >= exit_state
-							&& (0 != have_crit(CRIT_HAVE_ANY_REG) || exit_handler_active))
+						&& (0 != have_crit(CRIT_HAVE_ANY_REG | HAVE_CRIT_IN_WTSTART)
+											|| exit_handler_active))
 					{
 						assert(GTMSECSHR_IMAGE != image_type);
 						forced_exit = TRUE;

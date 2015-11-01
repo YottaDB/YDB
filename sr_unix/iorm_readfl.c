@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ short	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	int		flags;
 	int		fcntl_res;
 	int4		msec_timeout;	/* timeout in milliseconds */
-	short int	i;
+	int4		i;
 	io_desc		*io_ptr;
 	d_rm_struct	*rm_ptr;
 	int4		status, max_width;

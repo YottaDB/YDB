@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,14 +47,14 @@ void open_ceprep_file(void)
 		unsigned char	newversion;
 		unsigned char	wrap;
 		unsigned char	width;
-		short		v_width;
+		int4		v_width;
 		unsigned char	eol;
 	} open_params_list =
 	{
 		(unsigned char)	iop_newversion,
 		(unsigned char)	iop_wrap,
 		(unsigned char)	iop_recordsize,
-		(short)		MAX_SRCLINE,
+		(int4)		MAX_SRCLINE,
 		(unsigned char)	iop_eol
 	};
 #ifdef __ALPHA

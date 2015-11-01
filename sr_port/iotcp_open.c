@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 	char			addr[SA_MAXLEN+1], *errptr, sockaddr[SA_MAXLEN+1],
 				temp_addr[SA_MAXLEN+1], temp_ch;
 	unsigned char		ch, len;
-	short			length, width;
+	int4			length, width;
 	unsigned short		port;
 	int4			errlen, msec_timeout;
 	int			ii, status, size,
@@ -115,19 +115,19 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 		switch	(ch = *(pp->str.addr + p_offset++))
 		{
 		case	iop_width:
-			GET_SHORT(width, pp->str.addr + p_offset);
-			if	(0 == width)
+			GET_LONG(width, pp->str.addr + p_offset);
+			if (0 == width)
 				newtcp.width = TCPDEF_WIDTH;
-			else  if (width > 0)
+			else if (width > 0)
 				newtcp.width = width;
 			else
 				rts_error(VARLSTCNT(1)	ERR_DEVPARMNEG);
 			break;
 		case	iop_length:
-			GET_SHORT(length, pp->str.addr + p_offset);
-			if	(0 == length)
+			GET_LONG(length, pp->str.addr + p_offset);
+			if (0 == length)
 				newtcp.length = TCPDEF_LENGTH;
-			else  if (length >= 0)
+			else if (length > 0)
 				newtcp.length = length;
 			else
 				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);

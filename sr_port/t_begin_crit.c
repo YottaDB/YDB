@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,8 @@ GBLREF	trans_num		start_tn;
 GBLREF	uint4			t_err;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		t_tries;
+GBLREF	int4			update_trans;
+GBLREF	boolean_t		write_after_image;
 
 void t_begin_crit(uint4 err)
 /* err - error code for current gvcst_routine */
@@ -46,5 +48,10 @@ void t_begin_crit(uint4 err)
 	t_err = err;
 	if (non_tp_jfb_ptr)
 		non_tp_jfb_ptr->record_size = 0; /* re-initialize it to 0 since TOTAL_NONTPJNL_REC_SIZE macro uses it */
+	/* the only currently known callers of this routine are DSE and MUPIP RECOVER (mur_put_aimg_rec.c).
+	 * all of them set "write_after_image" to TRUE. hence the assert below.
+	 */
+	assert(write_after_image);
+	update_trans = TRUE;
 	grab_crit(gv_cur_region);
 }

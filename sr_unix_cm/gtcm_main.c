@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,7 @@
 
 #include "gtcm.h"
 #include "error.h"
+#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
 #ifndef lint
 static char rcsid[] = "$Header:$";
@@ -78,8 +79,9 @@ int main(int argc, char_ptr_t argv[])
     bool	  set_pset();
 
     ctxt = NULL;
+    gtm_env_init(); /* read in all environment variables before calling any function particularly malloc (from err_init below)*/
 
-    sprintf(image_id,"%s=gtcm_server", image_id);
+    SPRINTF(image_id,"%s=gtcm_server", image_id);
 
 #ifdef SEQUOIA
 	if (!set_pset())
@@ -106,7 +108,7 @@ int main(int argc, char_ptr_t argv[])
 	gtcm_exit();
     }
 
-    sprintf(image_id,"%s(pid=%d) %s %s %s -id %d -service %s",
+    SPRINTF(image_id,"%s(pid=%d) %s %s %s -id %d -service %s",
 	    image_id,
 	    omi_pid,
 	    ( history ? "-hist" : "" ),

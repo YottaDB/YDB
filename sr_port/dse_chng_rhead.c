@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,10 +35,11 @@
 #include "t_begin_crit.h"
 #include "gvcst_blk_build.h"
 #include "util.h"
+#include "t_abort.h"
 
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF gd_region        *gv_cur_region;
-GBLREF int		update_array_size;
+GBLREF uint4		update_array_size;
 GBLREF srch_hist	dummy_hist;
 GBLREF block_id		patch_curr_blk;
 GBLREF unsigned char	patch_comp_count;
@@ -94,12 +95,12 @@ void dse_chng_rhead(void)
 	{
 		if (!(rp = skan_rnum(bp, FALSE)))
 		{
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 	} else if (!(rp = skan_offset (bp, FALSE)))
 	{
-		T_ABORT(gv_cur_region, cs_addrs);
+		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
 	GET_SHORT(new_rec.rsiz, &((rec_hdr_ptr_t)rp)->rsiz);
@@ -108,13 +109,13 @@ void dse_chng_rhead(void)
 	{
 		if (!cli_get_hex("CMPC", &x))
 		{
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		if (x < 0 || x > 0x7f)
 		{
 			util_out_print("Error: invalid cmpc.",TRUE);
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		if (x > patch_comp_count)
@@ -126,13 +127,13 @@ void dse_chng_rhead(void)
 	{
 		if (!cli_get_hex("RSIZ", &x))
 		{
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		if (x < sizeof(rec_hdr) || x > blk_size)
 		{
 			util_out_print("Error: invalid rsiz.", TRUE);
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		new_rec.rsiz = x;
@@ -154,7 +155,7 @@ void dse_chng_rhead(void)
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
 			util_out_print("Error: bad blk build.", TRUE);
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)bp)->levl, TRUE, FALSE);

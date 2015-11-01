@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ TAB_BG_TRC_REC("  WcBlocked dirty_invcr ", wcb_t_end_sysops_dirty_invcr)
 TAB_BG_TRC_REC("  WcBlocked wtfini_fail ", wcb_t_end_sysops_wtfini_fail)
 TAB_BG_TRC_REC("  WcBlocked twin_stuck  ", wcb_t_end_sysops_twin_stuck)
 TAB_BG_TRC_REC("  DbCshGetn_WrtLtchStuck", db_csh_getn_wrt_latch_stuck)
-TAB_BG_TRC_REC("  WcBlocked db_csh_get  ", wc_blocked_db_csh_get_bad_cr)
+TAB_BG_TRC_REC("  WcBlocked secshrclnup1", wcb_secshr_db_clnup_now_crit)
 TAB_BG_TRC_REC("  WcBlocked t_qread_bt1 ", wc_blocked_t_qread_bad_bt_index1)
 TAB_BG_TRC_REC("  WcBlocked t_qread_bt2 ", wc_blocked_t_qread_bad_bt_index2)
 TAB_BG_TRC_REC("  WcBlocked tend crbt1  ", wc_blocked_t_end_crbtmismatch1)
@@ -64,3 +64,6 @@ TAB_BG_TRC_REC("  wcb_wtfini_lckfail1   ", wcb_wtfini_lckfail1)
 TAB_BG_TRC_REC("  wcb_wtfini_lckfail2   ", wcb_wtfini_lckfail2)
 TAB_BG_TRC_REC("  wcb_wtfini_lckfail3   ", wcb_wtfini_lckfail3)
 TAB_BG_TRC_REC("  wcb_wtfini_lckfail4   ", wcb_wtfini_lckfail4)
+TAB_BG_TRC_REC("  WcBlocked dirtystuck1 ", wcb_t_end_sysops_dirtystuck1)
+TAB_BG_TRC_REC("  WcBlocked dirtystuck2 ", wcb_t_end_sysops_dirtystuck2)
+TAB_BG_TRC_REC("  WcBlocked secshrclnup2", wcb_secshr_db_clnup_wbuf_dqd)

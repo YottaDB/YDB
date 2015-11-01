@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,8 +48,8 @@
 #include "t_retry.h"
 #include "gvcst_tp_init.h"
 #include "dpgbldir.h"
-
-#define CWS_INITIAL_SIZE        32
+#include "longset.h"		/* needed for cws_insert.h */
+#include "cws_insert.h"		/* for CWS_INIT macro */
 
 GBLREF	gd_region		*gv_cur_region, *db_init_region;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -58,8 +58,7 @@ GBLREF	boolean_t		gtcm_connection;
 GBLREF	bool			licensed;
 GBLREF	int4			lkid;
 GBLREF	char			*update_array, *update_array_ptr;
-GBLREF	int			update_array_size;
-GBLREF	int			cumul_update_array_size;
+GBLREF	uint4			update_array_size, cumul_update_array_size;
 GBLREF	ua_list			*first_ua, *curr_ua;
 GBLREF	short			crash_count, dollar_tlevel;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
@@ -138,7 +137,7 @@ void gvcst_init (gd_region *greg)
 	sgmnt_addrs		*csa, *prevcsa, *regcsa;
 	sgmnt_data_ptr_t	csd, temp_cs_data;
 	char			cs_data_buff[ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE)];
-	unsigned int		segment_update_array_size;
+	uint4			segment_update_array_size;
 	file_control		*fc;
 	gd_region		*prev_reg, *reg_top;
 #ifdef DEBUG
@@ -154,6 +153,7 @@ void gvcst_init (gd_region *greg)
 	gd_addr			*addr_ptr;
 	tp_region		*tr;
 	int4			prev_index;
+	ua_list			*tmp_ua;
 
 	error_def (ERR_DBFLCORRP);
 	error_def (ERR_DBCREINCOMP);
@@ -161,7 +161,7 @@ void gvcst_init (gd_region *greg)
 	error_def (ERR_BADDBVER);
 	error_def (ERR_VERMISMATCH);
 
-	init_hashtab(&cw_stagnate, CWS_INITIAL_SIZE);
+	CWS_INIT;	/* initialize the cw_stagnate hash-table */
 
 	/* we shouldn't have crit on any region unless we are in TP and in the final retry or we are in
 	 * mupip_set_journal trying to switch journals across all regions. Currently, there is no fine-granular
@@ -393,14 +393,14 @@ void gvcst_init (gd_region *greg)
 		assert(update_array == NULL);
 		assert(update_array_ptr == NULL);
 		assert(update_array_size == 0);
-		first_ua = curr_ua
-			 = (ua_list *)malloc(sizeof(ua_list));
-		first_ua->next_ua = NULL;
-		first_ua->update_array_size = update_array_size = cumul_update_array_size
-					    = segment_update_array_size;
-		first_ua->update_array = update_array
-					= update_array_ptr
-					= (char *)malloc(segment_update_array_size);
+		tmp_ua = (ua_list *)malloc(sizeof(ua_list));
+		memset(tmp_ua, 0, sizeof(ua_list));	/* initialize tmp_ua->update_array and tmp_ua->next_ua to NULL */
+		tmp_ua->update_array = (char *)malloc(segment_update_array_size);
+		tmp_ua->update_array_size = segment_update_array_size;
+		/* assign global variables only after malloc() succeeds */
+		update_array_size = cumul_update_array_size = segment_update_array_size;
+		update_array = update_array_ptr = tmp_ua->update_array;
+		first_ua = curr_ua = tmp_ua;
 	} else
 	{	/* there's already an update_array system in place */
 		assert(update_array != NULL);
@@ -411,11 +411,16 @@ void gvcst_init (gd_region *greg)
 			assert(first_ua->update_array == update_array);
 			assert(first_ua->update_array_size == update_array_size);
 			assert(first_ua->next_ua == NULL);
+			tmp_ua = first_ua;
+			first_ua = curr_ua = NULL;
 			free(update_array);
-			first_ua->update_array_size = update_array_size = cumul_update_array_size
-							= segment_update_array_size;
-			first_ua->update_array = update_array = update_array_ptr
-						= (char *)malloc(segment_update_array_size);
+			tmp_ua->update_array = update_array = update_array_ptr = NULL;
+			tmp_ua->update_array = (char *)malloc(segment_update_array_size);
+			tmp_ua->update_array_size = segment_update_array_size;
+			/* assign global variables only after malloc() succeeds */
+			update_array_size = cumul_update_array_size = segment_update_array_size;
+			update_array = update_array_ptr = tmp_ua->update_array;
+			first_ua = curr_ua = tmp_ua;
 		}
 	}
 	assert(global_tlvl_info_list || !csa->sgm_info_ptr);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -125,13 +125,8 @@ void	gtmsecshr_switch_log_file(int);
 int	gtmsecshr_open_log_file(), send_mesg2gtmsecshr(), gtmsecshr_getenv(char *, char **);
 int 	service_request(gtmsecshr_mesg *);
 int4	gtmsecshr_sock_init(int caller);
-
-#define ABNORMAL_TERMINATION	FALSE
-#define NORMAL_TERMINATION	TRUE
-void secshr_db_clnup(boolean_t normal_termination);
-void gtmsecshr_sock_cleanup(int);
-int4 gtmsecshr_pathname_init(int caller);
-int continue_proc(pid_t pid);
-
+void	gtmsecshr_sock_cleanup(int);
+int4	gtmsecshr_pathname_init(int caller);
+int	continue_proc(pid_t pid);
 
 #endif

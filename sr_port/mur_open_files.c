@@ -175,9 +175,9 @@ boolean_t mur_open_files()
 			gtm_putmsg(VARLSTCNT(1) ERR_REPLINSTUNDEF);
 			return FALSE;
 		}
-		if (!mu_rndwn_repl_instance(&replpool_id))
+		if (!mu_rndwn_repl_instance(&replpool_id, FALSE))
 			return FALSE;	/* mu_rndwn_repl_instance will have printed appropriate message in case of error */
-		murgbl.repl_standalone = mu_replpool_grab_sem();
+		murgbl.repl_standalone = mu_replpool_grab_sem(FALSE);
 #elif defined(VMS)
 		gbldir_mstr.addr = DEF_GDR;
 		gbldir_mstr.len = sizeof(DEF_GDR) - 1;

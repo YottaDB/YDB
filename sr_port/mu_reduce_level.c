@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@
 
 GBLREF gv_namehead	*gv_target;
 GBLREF sgmnt_data_ptr_t cs_data;
-GBLREF int              update_array_size;
+GBLREF uint4		update_array_size;	/* for the BLK_* macros */
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF unsigned int     t_tries;
 GBLREF uint4		t_err;

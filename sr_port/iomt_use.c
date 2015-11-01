@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,8 +56,8 @@ void iomt_use(io_desc *iod, mval *pp)
 {
 	unsigned char	ch, len;
 	int		lab_type;
-	unsigned short	length, width;
-	signed short	skips;
+	int4		length, width;
+	int4		skips;
 	d_mt_struct	*mt_ptr, *out_ptr;
 	io_desc		*d_in, *d_out;
 	mident		tab;
@@ -123,12 +123,14 @@ void iomt_use(io_desc *iod, mval *pp)
 			mt_ptr->write_mask &= ~IO_M_INHEXTGAP;
 			break;
 		case iop_length:
-			GET_USHORT(length, (pp->str.addr + p_offset));
+			GET_LONG(length, (pp->str.addr + p_offset));
+			if (length < 0)
+				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
 			iod->length = length;
 			break;
 		case iop_width:
-			GET_USHORT(width, (params *) (pp->str.addr + p_offset));
-			if ((char) width < 0)
+			GET_LONG(width, (pp->str.addr + p_offset));
+			if (width < 0)
 				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
 			if (width == 0)
 			{
@@ -148,7 +150,7 @@ void iomt_use(io_desc *iod, mval *pp)
 			out_ptr->wrap = FALSE;
 			break;
 		case iop_skipfile:
-			GET_SHORT(skips, (pp->str.addr + p_offset));
+			GET_LONG(skips, (pp->str.addr + p_offset));
 			iomt_skipfile(iod, skips);
 			break;
 		case iop_unload:
@@ -161,7 +163,7 @@ void iomt_use(io_desc *iod, mval *pp)
 			iomt_erase(iod);
 			break;
 		case iop_space:
-			GET_SHORT(skips, (pp->str.addr + p_offset));
+			GET_LONG(skips, (pp->str.addr + p_offset));
 			iomt_skiprecord(iod, skips);
 			break;
 		case iop_writeof:

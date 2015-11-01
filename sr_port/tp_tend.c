@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,7 +70,6 @@
 #include "memcoherency.h"
 
 GBLREF	short			dollar_tlevel;
-GBLREF	bool			update_trans;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -87,13 +86,14 @@ GBLREF	boolean_t		is_updproc;
 GBLREF	seq_num			seq_num_zero;
 GBLREF	seq_num			seq_num_one;
 GBLREF	int			gv_fillfactor;
-GBLREF	ua_list			*first_ua, *curr_ua;
 GBLREF	char			*update_array, *update_array_ptr;
-GBLREF	int			rc_set_fragment, update_array_size, cumul_update_array_size;
+GBLREF	int			rc_set_fragment;
+GBLREF	uint4			update_array_size, cumul_update_array_size;
 GBLREF	boolean_t		unhandled_stale_timer_pop;
-GBLREF 	jnl_gbls_t		jgbl;
+GBLREF	jnl_gbls_t		jgbl;
 GBLREF	int4			tprestart_syslog_delta;
 GBLREF	struct_jrec_tcom	tcom_record;
+GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 
 boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse);
 enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse);
@@ -101,26 +101,28 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse);
 boolean_t	tp_tend(boolean_t crit_only)
 {
 	block_id		tp_blk;
-	boolean_t		history_validated, is_mm, no_sets, was_crit, x_lock, do_deferred_writes, replication = FALSE;
+	boolean_t		history_validated, is_mm, was_crit, x_lock, do_validation;
+	boolean_t		do_deferred_writes = FALSE, replication = FALSE;
 	bt_rec_ptr_t		bt;
 	cache_rec_ptr_t		cr;
 	cw_set_element		*cse;
 	file_control		*fc;
+	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	jnl_format_buffer	*jfb;
-	sgm_info		*si, *si1;
+	sgm_info		*si, *tmpsi;
 	tp_region		*tr, *tr_last;
-	sgmnt_addrs		*csa, *tcsa;
+	sgmnt_addrs		*csa, *tmpcsa;
 	sgmnt_data_ptr_t	csd;
 	srch_blk_status		*t1;
 	trans_num		ctn, tnque_earliest_tn;
 	trans_num		valid_thru;	/* buffers touched by this transaction will be valid thru this tn */
 	enum cdb_sc		status;
 	gd_region		*save_gv_cur_region;
-	int			cw_depth, lcnt, participants;
+	int			lcnt, participants;
 	jnldata_hdr_ptr_t	jnl_header;
 	int			repl_tp_region_count = 0;
-	boolean_t		first_time, release_crit, yes_jnl_no_repl;
+	boolean_t		first_time = TRUE, release_crit, yes_jnl_no_repl, retvalue;
 	uint4			jnl_status, leafmods, indexmods;
 	uint4			total_jnl_rec_size;
 	jnlpool_ctl_ptr_t	jpl, tjpl;
@@ -132,11 +134,12 @@ boolean_t	tp_tend(boolean_t crit_only)
 	assert(0 == jnl_fence_ctl.level);
 	participants = 0;
 	status = cdb_sc_normal;
-	no_sets = TRUE;
+	/* if the transaction does no updates and the transaction history has not changed, we do not need any more validation */
+	do_validation = FALSE;	/* initially set to FALSE, but set to TRUE below */
 	jnl_status = 0;
 	if (FALSE == crit_only)
 	{
-		for (si = first_sgm_info;  NULL != si; si = si->next_sgm_info)
+		for (si = first_sgm_info;  (NULL != si); si = si->next_sgm_info)
 		{
 			sgm_info_ptr = si;
 			TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
@@ -150,23 +153,48 @@ boolean_t	tp_tend(boolean_t crit_only)
 				TP_TRACE_HIST(CR_BLKEMPTY, NULL);
 				return FALSE;
 			}
-			if (NULL == si->first_cw_set  &&  si->start_tn == csa->ti->early_tn)
-			{	/* read with no change to the transaction history */
-				/* assure we haven't overrun our history buffer and we have reasonable values for first and last */
-				assert(si->last_tp_hist - si->first_tp_hist <= si->tp_hist_size);
-				continue;
+			/* whenever si->first_cw_set is non-NULL, ensure that si->update_trans is TRUE */
+			assert((NULL == si->first_cw_set) || si->update_trans);
+			/* whenever si->first_cw_set is NULL, ensure that si->update_trans is FALSE
+			 * except when the set noop optimization is enabled */
+			assert((NULL != si->first_cw_set) || !si->update_trans || gvdupsetnoop);
+			if (!si->update_trans)
+			{
+				if (si->start_tn == csa->ti->early_tn)
+				{	/* read with no change to the transaction history. ensure we haven't overrun
+					 * our history buffer and we have reasonable values for first and last */
+					assert(si->last_tp_hist - si->first_tp_hist <= si->tp_hist_size);
+					continue;
+				} else
+					do_validation = TRUE;
 			} else
-				no_sets = FALSE;
-			if (JNL_ENABLED(csa))
+			{
+				do_validation = TRUE;
+				is_mm = (dba_mm == cs_data->acc_meth);
+				/* We are still out of crit if this is not our last attempt. If so, run the region list and check
+				 * that we have sufficient free blocks for our update. If not, get them now while we can.
+				 * We will repeat this check later in crit but it will hopefully have little or nothing to do.
+				 * bypass 1st check if already in crit -- check later
+				 */
+				if (!csa->now_crit && !is_mm && (csa->nl->wc_in_free < si->cw_set_depth + 1)
+						&& !wcs_get_space(si->gv_cur_region, si->cw_set_depth + 1, NULL))
+					assert(FALSE);	/* wcs_get_space() should have returned TRUE unconditionally in this case */
+			}
+			if (si->update_trans && JNL_ENABLED(csa))
 			{	/* compute the total journal record size requirements before grab_crit().
 				 * there is code later that will check for state changes from now to then
 				 */
 				TOTAL_TPJNL_REC_SIZE(total_jnl_rec_size, si, csa);
 				/* compute current transaction's maximum journal space needs in number of disk blocks */
 				si->tot_jrec_size = MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size);
+				/* check if current TP transaction's journal size needs are greater than max jnl file size */
+				if (si->tot_jrec_size > csd->autoswitchlimit)
+					/* can't fit in current transaction's journal records into one journal file */
+					rts_error(VARLSTCNT(6) ERR_JNLTRANS2BIG, 4, si->tot_jrec_size,
+						JNL_LEN_STR(csd), csd->autoswitchlimit);
 			}
 		}	/* for (si ... ) */
-		if (no_sets)
+		if (!do_validation)
 		{
 			if (CDB_STAGNATE <= t_tries)
 			{
@@ -179,20 +207,6 @@ boolean_t	tp_tend(boolean_t crit_only)
 					process_deferred_stale();
 			)
 			return TRUE;
-		}
-		/* We are still out of crit if this is not our last attempt. If so, run the region list and check
-		 * that we have sufficient free blocks for our update. If not, get them now while we can.
-		 * We will repeat this check later in crit but it will hopefully have little or nothing to do.
-		 */
-		for (si = first_sgm_info;  (NULL != si);  si = si->next_sgm_info)
-		{
-			TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
-			if (cs_addrs->now_crit)  /* bypass 1st check if already in crit -- check later */
-				continue;
-			is_mm = (dba_mm == cs_data->acc_meth);
-			if (!is_mm && (NULL != si->first_cw_set) && (cs_addrs->nl->wc_in_free < si->cw_set_depth + 1)
-					&& !wcs_get_space(si->gv_cur_region, si->cw_set_depth + 1, NULL))
-				assert(FALSE);	/* wcs_get_space() should have returned TRUE unconditionally in this case */
 		}
 	}
 	ESTABLISH_RET(t_ch, FALSE);
@@ -207,11 +221,12 @@ boolean_t	tp_tend(boolean_t crit_only)
 		x_lock = TRUE;		/* Assume success */
 		for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 		{	/* Track retries in debug mode */
+			tmpcsa = &FILE_INFO(tr->reg)->s_addrs;
+			tmpsi = (sgm_info *)(tmpcsa->sgm_info_ptr);
 			DEBUG_ONLY(
 				if (0 != lcnt)
 				{
-					tcsa = &FILE_INFO(tr->reg)->s_addrs;
-					BG_TRACE_ANY(tcsa, tp_crit_retries);
+					BG_TRACE_ANY(tmpcsa, tp_crit_retries);
 				}
 			)
 			/* Note that there are three ways a deadlock can occur.
@@ -226,22 +241,24 @@ boolean_t	tp_tend(boolean_t crit_only)
 			 */
 			if (!crit_only)		/* do crit check only for tp_tend through op_commit, not for tp_restart case */
 			{
-				tcsa = &FILE_INFO(tr->reg)->s_addrs;
-				if ((CDB_STAGNATE > t_tries) ? tcsa->now_crit :
-								(!tcsa->now_crit || (update_trans && tcsa->hdr->freeze)))
+				if ((CDB_STAGNATE > t_tries)
+						? tmpcsa->now_crit
+						: (!tmpcsa->now_crit || tmpsi->update_trans && tmpcsa->hdr->freeze))
 				{
 					send_msg(VARLSTCNT(8) ERR_DLCKAVOIDANCE, 6, DB_LEN_STR(tr->reg),
-								tcsa->ti->curr_tn, t_tries, dollar_trestart, tcsa->now_crit);
-					assert(FALSE);
+								tmpcsa->ti->curr_tn, t_tries, dollar_trestart, tmpcsa->now_crit);
+					/* the only possible case we know of is (c). assert to that effect */
+					assert((CDB_STAGNATE <= t_tries) && tmpcsa->now_crit
+							&& tmpsi->update_trans && tmpcsa->hdr->freeze);
 					status = cdb_sc_needcrit;	/* break the possible deadlock by signalling a restart */
 					t_fail_hist[t_tries] = status;
-					SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(tcsa, status);
-					TP_RETRY_ACCOUNTING(tcsa, tcsa->hdr, status);
+					SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(tmpcsa, status);
+					TP_RETRY_ACCOUNTING(tmpcsa, tmpcsa->hdr, status);
 					TP_TRACE_HIST(CR_BLKEMPTY, NULL);
 					return FALSE;
 				}
 			}
-			if (update_trans)
+			if (tmpsi->update_trans)
 			{
 				TP_CHANGE_REG_IF_NEEDED(tr->reg);
 				grab_crit(tr->reg);
@@ -286,7 +303,12 @@ boolean_t	tp_tend(boolean_t crit_only)
 		is_mm = (dba_mm == csd->acc_meth);
 		if (!is_mm)
 			tnque_earliest_tn = ((th_rec_ptr_t)((sm_uc_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn;
-		if (NULL != si->first_cw_set)
+		/* whenever si->first_cw_set is non-NULL, ensure that si->update_trans is TRUE */
+		assert((NULL == si->first_cw_set) || si->update_trans);
+		/* whenever si->first_cw_set is NULL, ensure that si->update_trans is FALSE
+		 * except when the set noop optimization is enabled */
+		assert((NULL != si->first_cw_set) || !si->update_trans || gvdupsetnoop);
+		if (si->update_trans)
 		{
 			if (JNL_ALLOWED(csa))
 			{
@@ -312,19 +334,11 @@ boolean_t	tp_tend(boolean_t crit_only)
 						release_crit = TRUE;
 					goto failed;
 				}
-				if (JNL_ENABLED(csa))
-				{	/* check if current transaction's journal size needs are greater than max jnl file size */
-					if (si->tot_jrec_size > csd->autoswitchlimit)
-					{	/* can't fit in current transaction's journal records into one journal file */
-						rts_error(VARLSTCNT(6) ERR_JNLTRANS2BIG, 4, si->tot_jrec_size,
-								JNL_LEN_STR(csd), csd->autoswitchlimit);
-					}
-				}
 			}
-			/* Since csa->backup_in_prog was initialized in op_tcommit only if this region had a non-zero
-			 * 	si->cw_set_depth this variable can be used below only within an if (NULL != si->first_cw_set).
+			/* Caution : since csa->backup_in_prog was initialized in op_tcommit only if si->first_cw_set was
+			 * non-NULL, it should be used in tp_tend() only within an if (NULL != si->first_cw_set)
 			 */
-			if (csa->backup_in_prog != (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb))
+			if ((NULL != si->first_cw_set) && (csa->backup_in_prog != (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb)))
 			{
 				if (!csa->backup_in_prog && !(JNL_ENABLED(csa) && csa->jnl_before_image))
 				{	/* If online backup is in progress now and before-image journaling is not enabled,
@@ -655,14 +669,13 @@ boolean_t	tp_tend(boolean_t crit_only)
 	for (si = first_sgm_info; (NULL != si); si = si->next_sgm_info)
 	{
 		si->backup_block_saved = FALSE;
-		if (NULL == si->first_cw_set)
+		if (!si->update_trans)
 			continue;
-		assert(0 != si->cw_set_depth);
+		assert((NULL == si->first_cw_set) || (0 != si->cw_set_depth));
 		sgm_info_ptr = si;
 		TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
 		csa = cs_addrs;
 		csd = cs_data;
-		is_mm = dba_mm == csa->hdr->acc_meth;
 		ctn = csa->ti->curr_tn;
 		if (REPL_ENABLED(csa))
 		{
@@ -671,7 +684,11 @@ boolean_t	tp_tend(boolean_t crit_only)
 			repl_tp_region_count++;
 		} else if (JNL_ENABLED(csa))
 			yes_jnl_no_repl = TRUE;
-		if (!is_mm && ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog))
+		is_mm = dba_mm == csa->hdr->acc_meth;
+		/* Caution : since csa->backup_in_prog was initialized in op_tcommit only if si->first_cw_set was
+		 * non-NULL, it should be used in tp_tend() only within an if (NULL != si->first_cw_set)
+		 */
+		if (!is_mm && (NULL != si->first_cw_set) && ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog))
 		{
 			for (cse = si->first_cw_set;  NULL != cse;  cse = cse->next_cw_set)
 			{	/* have already read old block for creates before we got crit, make sure
@@ -717,10 +734,59 @@ boolean_t	tp_tend(boolean_t crit_only)
 				}
 			}
 		}
+		if (JNL_ENABLED(csa))
+		{
+			if (first_time)
+			{	/* The JNL_SHORT_TIME done below should be done before any journal writing activity on the
+				 * journal file. This is because all the jnl record writing routines assume jgbl.gbl_jrec_time
+				 * initialized approporiately. Note that jnl_ensure_open() can call cre_jnl_file() which
+				 * in turn assumes jgbl.gbl_jrec_time is set. Also jnl_file_extend() can call
+				 * jnl_write_epoch_rec() which in turn assumes jgbl.gbl_jrec_time is set.
+				 * In case of forw-phase-recovery, mur_output_record() would have already set this.
+				 */
+				if (!jgbl.forw_phase_recovery)
+					JNL_SHORT_TIME(jgbl.gbl_jrec_time);
+				assert(jgbl.gbl_jrec_time);
+				first_time = FALSE;
+			}
+			jnl_status = jnl_ensure_open();
+			if (jnl_status != 0)
+			{
+				assert(csa->ti->early_tn == ctn);
+				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+			}
+			jpc = csa->jnl;
+			jbp = jpc->jnl_buff;
+			if (DISK_BLOCKS_SUM(jbp->freeaddr, si->total_jnl_rec_size) > jbp->filesize)
+			{	/* Moved here to prevent jnlrecs split across multiple generation journal files. */
+				jnl_flush(jpc->region);
+				if (-1 == jnl_file_extend(jpc, si->total_jnl_rec_size))
+				{
+					assert((!JNL_ENABLED(csd)) && JNL_ENABLED(csa));
+					status = t_fail_hist[t_tries] = cdb_sc_jnlclose;
+					TP_TRACE_HIST(CR_BLKEMPTY, NULL);
+					if ((CDB_STAGNATE - 1) == t_tries)
+						release_crit = TRUE;
+					goto failed;
+				}
+			}
+			if (jbp->before_images && (jbp->next_epoch_time <= jgbl.gbl_jrec_time))
+			{	/* Flush the cache. Since we are in crit, defer syncing the epoch */
+				if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH))
+				{
+					SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+					BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_jnl_wcsflu);
+					status = t_fail_hist[t_tries] = cdb_sc_cacheprob;
+					SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+					TP_RETRY_ACCOUNTING(csa, csd, status);
+					TP_TRACE_HIST(CR_BLKEMPTY, NULL);
+					goto failed;
+				}
+			}
+		}	/* if (journaling) */
 	}
 	if (repl_tp_region_count && yes_jnl_no_repl) /* Make this assert and DEBUG_ONLY ??? */
 		GTMASSERT;
-	/* the following section is the actual commitment of the changes */
 	assert(cdb_sc_normal == status);
 	if (replication)
 	{
@@ -737,6 +803,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 			assert(tjpl->write == tjpl->jnlpool_size);
 			tjpl->write = 0;
 		}
+		assert(jgbl.cumul_jnl_rec_len);
 		jgbl.cumul_jnl_rec_len += TCOM_RECLEN * repl_tp_region_count + sizeof(jnldata_hdr_struct);
 		DEBUG_ONLY(jgbl.cumul_index += repl_tp_region_count;)
 		assert(jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY == 0);
@@ -748,158 +815,86 @@ boolean_t	tp_tend(boolean_t crit_only)
 		 * server may read data that is overwritten (or stale). This is true only on
 		 * architectures and OSes that allow unordered memory access
 		 */
-		COMMIT_SHM_UPDATES;
+		SHM_WRITE_MEMORY_BARRIER;
 	}
-	first_time = TRUE;
+	/* There are two possible approaches that can be taken from now onwards.
+	 * 	a) Write journal and database records together for a region and move onto the next region.
+	 * 	b) Write journal records for all regions and only then move onto writing database updates for all regions.
+	 *
+	 * If journal and database updates are done together region by region, there is a problem in that if an error
+	 * occurs after one region's updates are committed (to jnl and db) or if the process gets STOP/IDed in VMS,
+	 * secshr_db_clnup() should then commit BOTH the journal and database updates of the remaining regions.
+	 * committing journal updates is not trivial in secshr_db_clnup() since it can also be invoked as a user termination
+	 * handler in VMS in which case it cannot do any I/O.
+	 *
+	 * We therefore take approach (b) below. Write journal records for all regions in one loop. Write database updates
+	 * for all regions in another loop. This way if any error occurs before database updates for any region begins in
+	 * the second loop, we cleanup the structures as if the transaction is rolled back (there is an exception to this in
+	 * that currently the journal buffers are not rolled back to undo the write of journal records but currently
+	 * MUPIP RECOVER knows to handle such records and TR C9905-001072 exists to make the source-server handle such records).
+	 * If any error occurs (or if the process gets STOP/IDed in VMS) while we are committing database updates,
+	 * secshr_db_clnup() will be invoked and will complete the updates for this TP transaction.
+	 */
+	/* the following section writes journal records in all regions */
 	for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
 	{
-		if (NULL == si->first_cw_set)
+		if (!si->update_trans)
 			continue;
-		assert(0 != si->cw_set_depth);
-		sgm_info_ptr = si;
+		assert((NULL == si->first_cw_set) || (0 != si->cw_set_depth));
 		TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
 		csa = cs_addrs;
-		csd = cs_data;
-		is_mm = dba_mm == csa->hdr->acc_meth;
 		ctn = csa->ti->curr_tn;
 		assert(ctn == csa->ti->early_tn);
 		csa->ti->early_tn = ctn + 1;
 		if (JNL_ENABLED(csa))
 		{
-			if (first_time)
+			jpc = csa->jnl;
+			jbp = jpc->jnl_buff;
+			/* si->tmp_cw_set_depth is a copy of si->cw_set_depth at TOTAL_TPJNL_REC_SIZE calculation time;
+			 * ensure it has not changed until now when the actual jnl record write occurs.
+			 * same case with csa->jnl_before_images & jbp->before_images.
+			 */
+			assert(si->cw_set_depth == si->tmp_cw_set_depth);
+			assert(jbp->before_images == csa->jnl_before_image);
+			if (0 == jpc->pini_addr)
+				jnl_put_jrt_pini(csa);
+			if (jbp->before_images)
 			{
-				/* The JNL_SHORT_TIME done below should be done before any journal writing activity on the
-				 * journal file. This is because all the jnl record writing routines assume jgbl.gbl_jrec_time
-				 * initialized approporiately. Note that jnl_ensure_open() can call cre_jnl_file() which
-				 * in turn assumes jgbl.gbl_jrec_time is set. Also jnl_file_extend() can call
-				 * jnl_write_epoch_rec() which in turn assumes jgbl.gbl_jrec_time is set.
-				 * In case of forw-phase-recovery, mur_output_record() would have already set this.
-				 */
-				if (!jgbl.forw_phase_recovery)
-					JNL_SHORT_TIME(jgbl.gbl_jrec_time);
-				assert(jgbl.gbl_jrec_time);
-				first_time = FALSE;
-			}
-			jnl_status = jnl_ensure_open();
-			if (jnl_status == 0)
-			{
-				jbp = csa->jnl->jnl_buff;
-				/* si->tmp_cw_set_depth is a copy of si->cw_set_depth at TOTAL_TPJNL_REC_SIZE calculation time;
-				 * ensure it has not changed until now when the actual jnl record write occurs.
-				 * same case with csa->jnl_before_images & jbp->before_images.
-				 */
-				assert(si->cw_set_depth == si->tmp_cw_set_depth);
-				assert(jbp->before_images == csa->jnl_before_image);
-				if (DISK_BLOCKS_SUM(jbp->freeaddr, si->total_jnl_rec_size) > jbp->filesize)
-				{	/* Moved here to prevent jnlrecs split across multiple generation journal files. */
-					jnl_flush(csa->jnl->region);
-					if (-1 == jnl_file_extend(csa->jnl, si->total_jnl_rec_size))
+				for (cse = si->first_cw_set;  NULL != cse;  cse = cse->next_cw_set)
+				{	/* Write out before-update journal image records */
+					TRAVERSE_TO_LATEST_CSE(cse);
+					ASSERT_IS_WITHIN_SHM_BOUNDS(cse->old_block, csa);
+					DEBUG_ONLY(is_mm = (dba_mm == csa->hdr->acc_meth);)
+					DEBUG_ONLY(csd = cs_data;)
+					DBG_ENSURE_OLD_BLOCK_IS_VALID(cse, is_mm, csa, csd);
+					if ((kill_t_create == cse->mode) || (kill_t_write == cse->mode) ||
+						(kill_t_write_root == cse->mode) || (kill_t_writemap == cse->mode))
+						continue;
+					if ((NULL != cse->old_block) &&
+						(((blk_hdr_ptr_t)(cse->old_block))->tn < jbp->epoch_tn))
 					{
-						assert((!JNL_ENABLED(csd)) && JNL_ENABLED(csa));
-						status = t_fail_hist[t_tries] = cdb_sc_jnlclose;
-						TP_TRACE_HIST(CR_BLKEMPTY, NULL);
-						t_commit_cleanup(status, 0);
-						if ((CDB_STAGNATE - 1) == t_tries)
-							release_crit = TRUE;
-						goto failed;
-					}
+						jnl_write_pblk(csa, cse->blk, (blk_hdr_ptr_t)cse->old_block);
+						cse->jnl_freeaddr = jbp->freeaddr;
+					} else
+						cse->jnl_freeaddr = 0;
 				}
-				if (0 == csa->jnl->pini_addr)
-					jnl_put_jrt_pini(csa);
-				if (jbp->before_images)
-				{
-					if (jbp->next_epoch_time <= jgbl.gbl_jrec_time)
-					{	/* Flush the cache. Since we are in crit, defer syncing the epoch */
-						if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH))
-						{
-							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_jnl_wcsflu);
-							status = t_fail_hist[t_tries] = cdb_sc_cacheprob;
-							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-							TP_RETRY_ACCOUNTING(csa, csd, status);
-							TP_TRACE_HIST(CR_BLKEMPTY, NULL);
-							t_commit_cleanup(status, 0);
-							goto failed;
-						}
-					}
-					for (cse = si->first_cw_set;  NULL != cse;  cse = cse->next_cw_set)
-					{	/* Write out before-update journal image records */
-						TRAVERSE_TO_LATEST_CSE(cse);
-						ASSERT_IS_WITHIN_SHM_BOUNDS(cse->old_block, csa);
-						DBG_ENSURE_OLD_BLOCK_IS_VALID(cse, is_mm, csa, csd);
-						if ((kill_t_create == cse->mode) || (kill_t_write == cse->mode) ||
-							(kill_t_write_root == cse->mode) || (kill_t_writemap == cse->mode))
-							continue;
-						if ((NULL != cse->old_block) &&
-							(((blk_hdr_ptr_t)(cse->old_block))->tn < jbp->epoch_tn))
-						{
-							jnl_write_pblk(csa, cse->blk, (blk_hdr_ptr_t)cse->old_block);
-							cse->jnl_freeaddr = jbp->freeaddr;
-						} else
-							cse->jnl_freeaddr = 0;
-					}
-				}
-				if (!jgbl.forw_phase_recovery)
-				{
-					if (0 == participants)
-					{
-						if (replication)
-							QWASSIGN(jnl_fence_ctl.token, tjpl->jnl_seqno);
-						else
-							QWASSIGN2DW(jnl_fence_ctl.token, csa->jnl->regnum, csa->ti->curr_tn);
-					}
-					++participants;
-				}
-				for (jfb = si->jnl_head;  NULL != jfb; jfb = jfb->next)
-					jnl_write_logical(csa, jfb);
-			} else
-			{
-				csa->ti->early_tn = ctn;
-				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
 			}
-		}	/* if (journaling) */
-		csa->prev_free_blks = csa->ti->free_blocks;
-		csa->t_commit_crit = TRUE;
-		if (csd->dsid && tp_kill_bitmaps)
-			rc_cpt_inval();
-		for (cse = si->first_cw_set;  NULL != cse;  cse = cse->next_cw_set)
-		{
-			TRAVERSE_TO_LATEST_CSE(cse);
-			if ((kill_t_create == cse->mode) || (kill_t_write == cse->mode) ||
-				(kill_t_write_root == cse->mode) || (kill_t_writemap == cse->mode))
-				continue;
-			if (csd->dsid && !tp_kill_bitmaps && (0 == cse->level))
+			if (!jgbl.forw_phase_recovery)
 			{
-				assert(!is_mm);
-				rc_cpt_entry(cse->blk);
-			}
-			status = is_mm ? mm_update(cse, NULL, ctn, ctn, si) : bg_update(cse, NULL, ctn, ctn, si);
-			if (cdb_sc_normal != status)
-			{
-				assert(FALSE);		/* the database is probably in trouble */
-				if (replication)
+				if (0 == participants)
 				{
-					QWINCRBYDW(jpl->write_addr, jpl->jnlpool_size); /* refresh hist */
-					rel_lock(jnlpool.jnlpool_dummy_reg);
+					if (replication)
+						QWASSIGN(jnl_fence_ctl.token, tjpl->jnl_seqno);
+					else
+						QWASSIGN2DW(jnl_fence_ctl.token, jpc->regnum, csa->ti->curr_tn);
 				}
-				TP_TRACE_HIST(cse->blk, cse->blk_target);
-				if (cdb_sc_cacheprob != status)
-					t_commit_cleanup(status, 0);
-				goto failed;
+				++participants;
 			}
-			cse->mode = gds_t_committed;
+			for (jfb = si->jnl_head;  NULL != jfb; jfb = jfb->next)
+				jnl_write_logical(csa, jfb);
 		}
-		csa->t_commit_crit = FALSE;
-		++csa->ti->curr_tn;
-		assert(csa->ti->curr_tn == csa->ti->early_tn);
-		/* write out the db header every HEADER_UPDATE_COUNT -1 transactions */
-		if (!(csa->ti->curr_tn & (HEADER_UPDATE_COUNT - 1)))
-			fileheader_sync(si->gv_cur_region);
-		if (NULL != si->kill_set_head)
-			INCR_KIP(csd, csa, si->kip_incremented);
-	} /* for (si ... ) */
-	assert(cdb_sc_normal == status);
-	/* the next section marks the transaction complete in the journal */
+	}
+	/* the next section marks the transaction complete in the journal by writing TCOM record in all regions */
 	tcom_record.prefix.time = jgbl.gbl_jrec_time;
 	if (!jgbl.forw_phase_recovery)
 	{
@@ -918,21 +913,83 @@ boolean_t	tp_tend(boolean_t crit_only)
 			QWINCRBY(jgbl.max_resync_seqno, seq_num_one);
 	}
 	/* Note that only those regions that are actively journaling will appear in the following list: */
-	for (csa = jnl_fence_ctl.fence_list;  (sgmnt_addrs *) - 1 != csa;  csa = csa->next_fenced)
+	for (csa = jnl_fence_ctl.fence_list;  (sgmnt_addrs *) -1 != csa;  csa = csa->next_fenced)
 	{
-		assert(((sgm_info *)(csa->sgm_info_ptr))->first_cw_set);
-		tcom_record.prefix.pini_addr = csa->jnl->pini_addr;
-		tcom_record.prefix.tn = csa->ti->curr_tn - 1;
+		jpc = csa->jnl;
+		assert(((sgm_info *)(csa->sgm_info_ptr))->update_trans);
+		tcom_record.prefix.pini_addr = jpc->pini_addr;
+		tcom_record.prefix.tn = csa->ti->curr_tn;
 		if (REPL_ENABLED(csa))
 		{
 			QWASSIGN(csa->hdr->reg_seqno, tjpl->jnl_seqno);
 			if (is_updproc)
 				QWASSIGN(csa->hdr->resync_seqno, jgbl.max_resync_seqno);
 		}
-		TP_CHANGE_REG_IF_NEEDED(csa->jnl->region);
+		TP_CHANGE_REG_IF_NEEDED(jpc->region);
 		/* Note tcom_record.jnl_tid was set in op_tstart() or updproc() */
-		jnl_write(csa->jnl, JRT_TCOM, (jnl_record *)&tcom_record, NULL, NULL);
+		jnl_write(jpc, JRT_TCOM, (jnl_record *)&tcom_record, NULL, NULL);
 	}
+	/* the following section is the actual commitment of the changes in the database */
+	for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
+	{
+		if (!si->update_trans)
+			continue;
+		assert((NULL == si->first_cw_set) || (0 != si->cw_set_depth));
+		sgm_info_ptr = si;
+		TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
+		csa = cs_addrs;
+		csd = cs_data;
+		is_mm = (dba_mm == csa->hdr->acc_meth);
+		ctn = csa->ti->curr_tn;
+		assert((ctn + 1) == csa->ti->early_tn);
+		csa->prev_free_blks = csa->ti->free_blocks;
+		csa->t_commit_crit = TRUE;
+		if (csd->dsid && tp_kill_bitmaps)
+			rc_cpt_inval();
+		cse = si->first_cw_set;
+		if (NULL != cse)
+		{
+			do
+			{
+				TRAVERSE_TO_LATEST_CSE(cse);
+				assert((n_gds_t_op != cse->mode) && (gds_t_committed != cse->mode));
+				assert(n_gds_t_op < kill_t_create);
+				assert(n_gds_t_op < kill_t_write);
+				assert(n_gds_t_op < kill_t_write_root);
+				assert(n_gds_t_op < kill_t_writemap);
+				if (n_gds_t_op > cse->mode)
+				{
+					if (csd->dsid && !tp_kill_bitmaps && (0 == cse->level))
+					{
+						assert(!is_mm);
+						rc_cpt_entry(cse->blk);
+					}
+					status = is_mm ? mm_update(cse, NULL, ctn, ctn, si) : bg_update(cse, NULL, ctn, ctn, si);
+					if (cdb_sc_normal != status)
+					{
+						assert(FALSE);		/* the database is probably in trouble */
+						TP_TRACE_HIST(cse->blk, cse->blk_target);
+						retvalue = t_commit_cleanup(status, 0);	/* return value of TRUE implies	       */
+						assert(retvalue); /* secshr_db_clnup() should have completed the commit for us */
+						status = cdb_sc_normal;	/* reset status to normal as transaction is complete */
+						goto skip_failed;	/* do not do "failed:" processing as we do not hold crit */
+					}
+				}
+				cse->mode = gds_t_committed;
+				cse = cse->next_cw_set;
+			} while (NULL != cse);
+		} else
+			si->update_trans = T_COMMIT_STARTED; /* tell secshr_db_clnup(), roll-back is no longer possible */
+		csa->t_commit_crit = FALSE;
+		++csa->ti->curr_tn;
+		assert(csa->ti->curr_tn == csa->ti->early_tn);
+		/* write out the db header every HEADER_UPDATE_COUNT -1 transactions */
+		if (!(csa->ti->curr_tn & (HEADER_UPDATE_COUNT - 1)))
+			fileheader_sync(si->gv_cur_region);
+		if (NULL != si->kill_set_head)
+			INCR_KIP(csd, csa, si->kip_incremented);
+	} /* for (si ... ) */
+	assert(cdb_sc_normal == status);
 	if (replication)
 	{
 		assert(jgbl.cumul_index == jgbl.cu_jnl_index);
@@ -942,19 +999,17 @@ boolean_t	tp_tend(boolean_t crit_only)
 		jnl_header->jnldata_len = jgbl.cumul_jnl_rec_len;
 		jnl_header->prev_jnldata_len = jpl->lastwrite_len;
 		jpl->lastwrite_len = jnl_header->jnldata_len;
-		/* For systems with UNORDERED memory access (example, ALPHA), on a multi processor system,
-		 * it is possible that the source server notices the change in write_addr
+		/* For systems with UNORDERED memory access (example, ALPHA, POWER4, PA-RISC 2.0), on a multi
+		 * processor system, it is possible that the source server notices the change in write_addr
 		 * before seeing the change to jnlheader->jnldata_len, leading it to read an invalid
 		 * transaction length. To avoid such conditions, we should commit the order of shared
 		 * memory updates before we update write_addr. This ensures that the source server sees all
 		 * shared memory updates related to a transaction before the change in write_addr
-		 *
-		 * Read Alpha Architecture Reference Manual, edited by Richard L Sites, Chapter "System
-		 * Architecture and Programming Implications" for memory coherency issues.
 		 */
-		COMMIT_SHM_UPDATES;
-		QWINCRBYDW(jpl->write_addr, jnl_header->jnldata_len);
+		SHM_WRITE_MEMORY_BARRIER;
 		jpl->write = tjpl->write;
+		/* jpl->write_addr should be updated before updating jpl->jnl_seqno as secshr_db_clnup() relies on this */
+		QWINCRBYDW(jpl->write_addr, jnl_header->jnldata_len);
 		QWASSIGN(jpl->jnl_seqno, tjpl->jnl_seqno);			/* End atomic stmnts */
 		assert(QWEQ(jpl->early_write_addr, jpl->write_addr));
 		rel_lock(jnlpool.jnlpool_dummy_reg);
@@ -985,14 +1040,14 @@ failed:
 	/* If either finished successfully or we are not doing final retry, release all the
 	   critical locks we have obtained. Take this moment of non-critness to check if we
 	   had an unhandled IO timer pop. */
-	do_deferred_writes = FALSE;
 	if ((cdb_sc_normal == status) || release_crit)
-	{
-		/* Release regions  */
+	{	/* Release regions  */
 		for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 			rel_crit(tr->reg);
 		do_deferred_writes = TRUE;
 	}
+
+skip_failed:
 	REVERT;
 	UNIX_ONLY(
 		/* Must be done after REVERT since we are no longer in crit */
@@ -1005,9 +1060,12 @@ failed:
 		/* keep this out of the loop above so crits of all regions are released without delay */
 		for (si = first_sgm_info;  NULL != si; si = si->next_sgm_info)
 		{
-			if (NULL != si->first_cw_set)
+			if (si->update_trans)
 			{
 				TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
+				++cs_data->n_tp_updates;
+				if (NULL == si->first_cw_set)
+					++cs_data->n_tp_updates_duplicate;
 				wcs_timer_start(si->gv_cur_region, TRUE);
 			}
 			if (si->backup_block_saved)
@@ -1037,7 +1095,8 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
 	enum cdb_sc	status;
 	gv_key		*pKey;
 	int4		blk_size, blk_fill_size, cur_blk_size, blk_seg_cnt, delta, n, new_rec_size, next_rec_shrink;
-	int4		rec_cmpc, segment_update_array_size, target_key_size;
+	int4		rec_cmpc, target_key_size;
+	uint4		segment_update_array_size;
 	key_cum_value	*kv, *kvhead;
 	mstr		value;
 	off_chain	chain1;

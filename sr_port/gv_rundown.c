@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,6 @@
 #include "rc_cpt_ops.h"
 #include "gv_rundown.h"
 
-GBLREF	bool			update_trans;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	boolean_t		pool_init;
@@ -73,7 +72,6 @@ void gv_rundown(void)
 
 	r_save = gv_cur_region;		/* Save for possible core dump */
 	gvcmy_rundown();
-	update_trans = TRUE;
 	ENABLE_AST
 
 	if (TRUE == pool_init)

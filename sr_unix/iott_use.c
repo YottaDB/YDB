@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,7 @@ void iott_use(io_desc *iod, mval *pp)
 	char		dc1;
 	int		fil_type;
 	unsigned char	ch, len;
-	unsigned short	length, width;
+	int4		length, width;
 	uint4		mask_in;
 	d_tt_struct	*temp_ptr, *tt_ptr;
 	io_desc		*d_in, *d_out;
@@ -228,8 +228,8 @@ void iott_use(io_desc *iod, mval *pp)
 					t.c_iflag &= ~IXOFF;
 					break;
 				case iop_length:
-					GET_USHORT(length, pp->str.addr + p_offset);
-					if (length < 0)
+					GET_LONG(length, pp->str.addr + p_offset);
+					if (0 > length)
 						rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
 					d_out->length = length;
 					break;
@@ -284,10 +284,10 @@ void iott_use(io_desc *iod, mval *pp)
 					gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
 					break;
 				case iop_width:
-					GET_USHORT(width, pp->str.addr + p_offset);
-					if (width < 0)
+					GET_LONG(width, pp->str.addr + p_offset);
+					if (0 > width)
 						rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
-					if (width == 0)
+					if (0 == width)
 					{
 						d_out->wrap = FALSE;
 						d_out->width = TTDEF_PG_WIDTH;
@@ -304,8 +304,8 @@ void iott_use(io_desc *iod, mval *pp)
 					d_out->wrap = FALSE;
 					break;
 				case iop_x:
-					GET_SHORT(d_out->dollar.x, pp->str.addr + p_offset);
-					if ((short)(d_out->dollar.x) < 0)
+					GET_LONG(d_out->dollar.x, pp->str.addr + p_offset);
+					if (0 > d_out->dollar.x)
 						d_out->dollar.x = 0;
 					if (d_out->dollar.x > d_out->width && d_out->wrap)
 					{
@@ -317,8 +317,8 @@ void iott_use(io_desc *iod, mval *pp)
 					gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
 					break;
 				case iop_y:
-					GET_SHORT(d_out->dollar.y, pp->str.addr + p_offset);
-					if ((short)(d_out->dollar.y) < 0)
+					GET_LONG(d_out->dollar.y, pp->str.addr + p_offset);
+					if (0 > d_out->dollar.y)
 						d_out->dollar.y = 0;
 					if (d_out->length)
 						d_out->dollar.y %= d_out->length;

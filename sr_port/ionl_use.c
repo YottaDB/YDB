@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@ void ionl_use(io_desc *iod, mval *pp)
 {
 	unsigned char	ch, len;
 	int		fil_type;
-	unsigned short	width, length;
+	int4		width, length;
 	io_desc		*d_in, *d_out;
 	mident		tab;
 	int		p_offset;
@@ -82,13 +82,13 @@ void ionl_use(io_desc *iod, mval *pp)
 			iod->write_filter = 0;
 			break;
 		case iop_length:
-			GET_USHORT(length, pp->str.addr + p_offset);
+			GET_LONG(length, pp->str.addr + p_offset);
 			if (length < 0)
 				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
 			d_out->length = length;
 			break;
 		case iop_width:
-			GET_USHORT(width, pp->str.addr + p_offset);
+			GET_LONG(width, pp->str.addr + p_offset);
 			if (width < 0)
 				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
 			if (width == 0)
@@ -112,9 +112,9 @@ void ionl_use(io_desc *iod, mval *pp)
 		{
 			int4 col;
 
-			GET_SHORT(col, pp->str.addr + p_offset);
+			GET_LONG(col, pp->str.addr + p_offset);
 			d_out->dollar.x = col;
-			if ((short)(d_out->dollar.x) < 0)
+			if ((d_out->dollar.x) < 0)
 				d_out->dollar.x = 0;
 			if (d_out->dollar.x > d_out->width && d_out->wrap)
 				d_out->dollar.x %= d_out->width;
@@ -124,9 +124,9 @@ void ionl_use(io_desc *iod, mval *pp)
 		{
 			int4 row;
 
-			GET_SHORT(row, (pp->str.addr + p_offset));
+			GET_LONG(row, (pp->str.addr + p_offset));
 			d_out->dollar.y = row;
-			if ((short)(d_out->dollar.y) < 0)
+			if ((d_out->dollar.y) < 0)
 				d_out->dollar.y = 0;
 			if (d_out->length)
 				d_out->dollar.y %= d_out->length;

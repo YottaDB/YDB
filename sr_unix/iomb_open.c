@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@ short iomb_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	io_desc		*iod;
  	d_mb_struct	*d_mb;
 	int		p_offset;
+	error_def(ERR_DEVPARMNEG);
 
 	p_offset = 0;
 	iod = dev_name->iod;
@@ -52,7 +53,9 @@ short iomb_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			switch(ch)
 			{
 			case iop_blocksize:
-				GET_SHORT(d_mb->maxmsg, (pp->str.addr + p_offset++));
+				GET_LONG(d_mb->maxmsg, (pp->str.addr + p_offset));
+				if (d_mb->maxmsg < 0)
+					rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
 				break;
 			case iop_readonly:
 				d_mb->promsk = IO_RD_ONLY;

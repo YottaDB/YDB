@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
 #include "iormdefsp.h"
 #include "gtmio.h"
 
-void iorm_wteol(short x,io_desc *iod)
+void iorm_wteol(int4 x,io_desc *iod)
 {
 	int	i, fixed_pad, pad_size, res_size;
 	int	status;

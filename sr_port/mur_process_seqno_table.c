@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,30 +55,28 @@ void mur_process_seqno_table(seq_num *min_broken_seqno, seq_num *losttn_seqno)
 			assert(NULL == (multi_struct *)multi->next);
 		}
 	}
-	if (0 == max_resolve_seqno && MAXUINT8 == min_resolve_seqno)
-	{ 	/* No token was there */
-		*losttn_seqno = murgbl.stop_rlbk_seqno;
-		*min_broken_seqno = min_brkn_seqno;
-		return;
+	if (*losttn_seqno >= min_resolve_seqno)
+	{	/* Update losttn_seqno to the first seqno gap from min_resolve_seqno to max_resolve_seqno */
+		assert(max_resolve_seqno >= min_resolve_seqno);
+		seq_arr_size = max_resolve_seqno - min_resolve_seqno + 1;
+		/* To conserve space instead of int array char array is used. We can use bit map to save more space. */
+		seq_arr = (char *) malloc(seq_arr_size);
+		memset(seq_arr, 0, seq_arr_size);
+		for (index = 0; index < murgbl.token_table.size; index++)
+		{
+			multi = (multi_struct *)table_base[index].ptr;
+			if (NULL != multi)
+				seq_arr[multi->token - min_resolve_seqno] = 1;
+		}
+		for (index = 0; index < seq_arr_size && seq_arr[index]; index++)
+			;
+		free (seq_arr);
+		*losttn_seqno = min_resolve_seqno + index;
 	}
-	assert(max_resolve_seqno >= min_resolve_seqno);
-	seq_arr_size = max_resolve_seqno - min_resolve_seqno + 1;
-	/* To conserve space instead of int array char array is used. We can use bit map to save more space. */
-	seq_arr = (char *) malloc(seq_arr_size);
-	memset(seq_arr, 0, seq_arr_size);
-	for (index = 0; index < murgbl.token_table.size; index++)
-	{
-		multi = (multi_struct *)table_base[index].ptr;
-		if (NULL != multi)
-			seq_arr[multi->token - min_resolve_seqno] = 1;
-	}
-	for (index = 0; index < seq_arr_size && seq_arr[index]; index++)
-		;
-	free (seq_arr);
-	if (index == seq_arr_size)	/* No gap in sequence numbers */
+	if (*losttn_seqno > murgbl.stop_rlbk_seqno)
 		*losttn_seqno = murgbl.stop_rlbk_seqno;
-	else
-		*losttn_seqno = MIN(min_resolve_seqno + index, murgbl.stop_rlbk_seqno);
+	if (*losttn_seqno > min_brkn_seqno)
+		*losttn_seqno = min_brkn_seqno;
 	*min_broken_seqno = min_brkn_seqno;
 	mur_multi_rehash();	/* To release memory and shorten the table */
 	return;

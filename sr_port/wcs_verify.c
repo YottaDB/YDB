@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 
 	uint4			cnt, lcnt, offset, max_tn;
 	int4			bp_lo, bp_top, bp, cr_base, cr_top, bt_top_off, bt_base_off, i;
+	sm_uc_ptr_t		bptmp;
 	bool			ret;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -132,6 +133,14 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		send_msg(VARLSTCNT(8) ERR_DBFHEADERR, 6, DB_LEN_STR(reg),
 			RTS_ERROR_TEXT("bt_base"), csa->bt_base, (sm_uc_ptr_t)csd + csa->nl->bt_base_off);
 		csa->bt_base = (bt_rec_ptr_t)((sm_uc_ptr_t)csd + csa->nl->bt_base_off);
+	}
+	if (csa->ti != &csd->trans_hist)
+	{
+		assert(expect_damage);
+		ret = FALSE;
+		send_msg(VARLSTCNT(8) ERR_DBFHEADERR, 6, DB_LEN_STR(reg),
+			RTS_ERROR_TEXT("csa->ti"), (sm_uc_ptr_t)csa->ti, (sm_uc_ptr_t)&csd->trans_hist);
+		csa->ti = &csd->trans_hist;
 	}
 	n_bts = csd->n_bts;
 	offset += n_bts * sizeof(bt_rec);
@@ -260,12 +269,12 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 			 */
 			max_tn = th->tn;
 		}
-		if (((int)(th->blk) != BT_NOTVALID) && (((int)(th->blk) < 0) || ((int)(th->blk) > csa->ti->total_blks)))
+		if (((int)(th->blk) != BT_NOTVALID) && (((int)(th->blk) < 0) || ((int)(th->blk) > csd->trans_hist.total_blks)))
 		{
 			assert(expect_damage);
 			ret = FALSE;
 			send_msg(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
-				th, th->blk, th->blk, RTS_ERROR_TEXT("th->blk"), 0, csa->ti->total_blks);
+				th, th->blk, th->blk, RTS_ERROR_TEXT("th->blk"), 0, csd->trans_hist.total_blks);
 		}
 		if (((int)(th->cache_index) != CR_NOTVALID) &&
 			(((int)(th->cache_index) < cr_base) || ((int)(th->cache_index) >= cr_top)))
@@ -424,12 +433,12 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 	memset(blkque_array, 0, n_bts * sizeof(boolean_t));	/* initially, we did not find any cr in the cr blkques */
 	for (bp = bp_lo, cr = cr_lo, cnt = n_bts; cnt > 0; cr++, bp += csd->blk_size, cnt--)
 	{
-		if (((int)(cr->blk) != CR_BLKEMPTY) && (((int)(cr->blk) < 0) || ((int)(cr->blk) >= csa->ti->total_blks)))
+		if (((int)(cr->blk) != CR_BLKEMPTY) && (((int)(cr->blk) < 0) || ((int)(cr->blk) >= csd->trans_hist.total_blks)))
 		{
 			assert(expect_damage);
 			ret = FALSE;
 			send_msg(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
-				cr, cr->blk, cr->blk, RTS_ERROR_TEXT("cr->blk"), 0, csa->ti->total_blks);
+				cr, cr->blk, cr->blk, RTS_ERROR_TEXT("cr->blk"), 0, csd->trans_hist.total_blks);
 		}
 		if (cr->tn > csd->trans_hist.curr_tn)
 		{
@@ -517,12 +526,15 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 			 * a global buffer will fail cert_blk() but the cache structures as such are not damaged. wcs_recover()
 			 * should not return failure in that case.
 			 */
-			if (!cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, bp), 0))
+			bptmp = (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, bp);
+			if (!cert_blk(reg, cr->blk, (blk_hdr_ptr_t)bptmp, 0))
 			{
 				assert(expect_damage);
 				ret = FALSE;
 				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
 					cr, cr->blk, RTS_ERROR_TEXT("Block certification result"), FALSE, TRUE);
+				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg), cr, cr->blk,
+						RTS_ERROR_TEXT("Block certification result buffer"), bptmp, csa->lock_addrs[0]);
 			}
 		}
 		if ((cr->in_cw_set != TRUE) && (cr->in_cw_set != FALSE))
@@ -566,8 +578,8 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
 				cr, cr->blk, RTS_ERROR_TEXT("cr->rip_latch"), cr->rip_latch.latch_pid, 0);
 		}
-		if (cr->iosb[0] != 0)
-		{	/* do not set "ret" to FALSE in both cases below. this is because it seems like VMS can set iosb[0] to
+		if (cr->iosb.cond != 0)
+		{	/* do not set "ret" to FALSE in both cases below. this is because it seems like VMS can set iosb.cond to
 			 * the qio status much after a process that issued the qio died. our current suspicion is that this occurs
 			 * because the iosb is in shared memory which is available even after the process dies. although
 			 * the two cases below are unexpected, wcs_wtstart()/wcs_wtfini() handle this well enough that we do
@@ -579,7 +591,7 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
 					cr, cr->blk, RTS_ERROR_TEXT("cr->cr->dirty"), cr->dirty, TRUE);
 				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->cr->iosb"), cr->iosb[0], 0);
+					cr, cr->blk, RTS_ERROR_TEXT("cr->cr->iosb"), cr->iosb.cond, 0);
 			}
 			if (0 == cr->epid)
 			{
@@ -587,10 +599,10 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
 					cr, cr->blk, RTS_ERROR_TEXT("cr->epid"), cr->epid, -1);
 				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->iosb"), cr->iosb[0], 0);
+					cr, cr->blk, RTS_ERROR_TEXT("cr->iosb"), cr->iosb.cond, 0);
 			}
 		}
-		if ((WRT_STRT_PNDNG == cr->iosb[0]) && (0 == cr->dirty))
+		if ((WRT_STRT_PNDNG == cr->iosb.cond) && (0 == cr->dirty))
 		{
 			assert(expect_damage);
 			ret = FALSE;
@@ -622,16 +634,6 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 		}
 #else
 		/* iosb, twin, image_count, wip_stopped are currently used in VMS only */
-		for (i = 0; i < 4; i++)
-		{
-			if (0 != cr->iosb[i])
-			{
-				assert(expect_damage);
-				ret = FALSE;
-				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
-					cr, cr->blk, RTS_ERROR_TEXT("cr->iosb"), cr->iosb[i], 0);
-			}
-		}
 		if (0 != cr->twin)
 		{
 			assert(expect_damage);
@@ -713,6 +715,24 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 				ret = FALSE;
 				send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
 					cr, cr->blk, RTS_ERROR_TEXT("cr hash"), cr0 - cr_qbase, cr->blk % csd->bt_buckets);
+				if (caller_is_wcs_recover && !cr->stopped)
+				{	/* if cr->stopped is TRUE, then the buffer was created by secshr_db_clnup(),
+					 * and hence it is ok to have different hash value, but otherwise we believe
+					 * the hash value and consider cr->blk to be invalid and hence make this buffer empty
+					 *
+					 * Ideally we would like to dump the contents of this broken buffer to a file for later
+					 * analysis. Since we hold crit now, we do not want to do that. It might be better
+					 * to copy this buffer into another area in shared-memory dedicated to holding
+					 * such information so a later DSE session can then dump the information.
+					 *
+					 * Ideally, it should be wcs_recover() that fixes the cache-record, but then the
+					 * blk_que traversing logic has to be redone there in order to determine this
+					 * disparity in the hash value. To avoid that we reset cr->blk here itself but
+					 * do it only if called from wcs_recover().
+					 */
+					assert(FALSE);
+					cr->blk = CR_BLKEMPTY;
+				}
 			}
 			blkque_array[cr - cr_lo] = TRUE; /* note the fact that this cr's blkque validity is already checked */
 		}
@@ -739,6 +759,11 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 			ret = FALSE;
 			send_msg(VARLSTCNT(10) ERR_DBCRERR, 8, DB_LEN_STR(reg),
 				cr, cr->blk, RTS_ERROR_TEXT("cr blkque hash"), -1, cr->blk % csd->bt_buckets);
+			if (caller_is_wcs_recover && !cr->stopped)	/* see comment above ("cr hash") for similar handling */
+			{
+				assert(FALSE);
+				cr->blk = CR_BLKEMPTY;
+			}
 		}
 	}
 

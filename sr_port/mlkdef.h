@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,8 @@ typedef struct				/* lock node.  The member descriptions below are correct if th
 					 * and image_count can be used together to determine whether the process has
 					 * abnormally terminated. */
 	int4	pending;		/* relative pointer to a mlk_prcblk, or zero if no entries are are blocked on this node */
+	int4	auxpid;			/* If non-zero auxowner, this is the pid of the client that is holding the lock */
+	unsigned char	auxnode[16];	/* If non-zero auxowner, this is the nodename of the client that is holding the lock */
 } mlk_shrblk;
 
 typedef struct				/* the subscript value of a single node in a tree.  Stored separately so that

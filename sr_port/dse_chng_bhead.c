@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,9 +48,10 @@
 #include "process_deferred_stale.h"
 #endif
 #include "util.h"
+#include "t_abort.h"
 
 GBLREF char		*update_array, *update_array_ptr;
-GBLREF int		update_array_size;
+GBLREF uint4		update_array_size;
 GBLREF srch_hist	dummy_hist;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
@@ -117,19 +118,19 @@ void dse_chng_bhead(void)
 	{
 		if (!cli_get_num("LEVEL",&x))
 		{
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		if (ismap && (unsigned char)x != LCL_MAP_LEVL)
 		{
 			util_out_print("Error: invalid level for a bit map block.",TRUE);
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		if (!ismap && (x < 0 || x > MAX_BT_DEPTH + 1))
 		{
 			util_out_print("Error: invalid level.",TRUE);
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 	 	new_hdr.levl = (unsigned char)x;
@@ -144,35 +145,34 @@ void dse_chng_bhead(void)
 	{
 		if (!cli_get_hex("BSIZ",&x))
 		{
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		if (ismap && x != mapsize)
 		{
 			util_out_print("Error: invalid bsiz.",TRUE);
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		else if (x < sizeof(blk_hdr) || x > blk_size)
 		{
 			util_out_print("Error: invalid bsiz.",TRUE);
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		chng_blk = TRUE;
 		new_hdr.bsiz = x;
 	}
 	if (!chng_blk)
-	{
-		T_ABORT(gv_cur_region, cs_addrs);	/* note : T_ABORT() is a multi-line macro, hence surrounded by parens */
-	} else
+		t_abort(gv_cur_region, cs_addrs);
+	else
 	{
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, bp + sizeof(new_hdr), new_hdr.bsiz - sizeof(new_hdr));
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
 			util_out_print("Error: bad block build.",TRUE);
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		t_write (patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, new_hdr.levl, TRUE, FALSE);
@@ -191,7 +191,7 @@ void dse_chng_bhead(void)
 		{
 			rel_crit(gv_cur_region);
 			util_out_print("Error: Unable to read buffer.", TRUE);
-			T_ABORT(gv_cur_region, cs_addrs);
+			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
 		/* Create a null update array for a block */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +60,7 @@ GBLREF short		dollar_tlevel;
 GBLREF collseq		*local_collseq;
 GBLREF int4		zdate_form;
 GBLREF int4		zdir_form;
+GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 
 LITREF mval literal_zero;
 LITREF mval literal_one;
@@ -163,6 +164,12 @@ va_dcl
 		}
 		s2pool(&tmpstr);
 		dst->str = tmpstr;
+		break;
+	case VTK_GVDUPSETNOOP:
+		if (gvdupsetnoop)
+			*dst = literal_one;
+		else
+			*dst = literal_zero;
 		break;
 	case VTK_GVFILE:
 		assert(gd_header);

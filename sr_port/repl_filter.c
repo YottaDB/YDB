@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -284,7 +284,7 @@ static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len)
 		first_rectype = ((jnl_record *)tr)->prefix.jrec_type;
 		is_nontp = !IS_FENCED(first_rectype);
 		is_null = (JRT_NULL == first_rectype);
-		save_jnl_seqno = GET_REPL_JNL_SEQNO(tr);
+		save_jnl_seqno = GET_JNL_SEQNO(tr);
 		if (NULL == (extr_end = jnl2extcvt((jnl_record *)tr, tr_len, extract_buff)))
 			GTMASSERT;
 		extr_len = extr_end - extract_buff;

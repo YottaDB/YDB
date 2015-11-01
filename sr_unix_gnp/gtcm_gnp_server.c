@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,6 +94,7 @@
 #include "gtcm_gnp_pktdmp.h"
 #include "util.h"
 #include "getzdir.h"
+#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
 #ifdef __osf__
 #pragma pointer_size (save)
@@ -383,6 +384,7 @@ int main(int argc, char **argv, char **envp)
 
 	image_type = GTCM_GNP_SERVER_IMAGE;
 	is_replicator = TRUE;	/* as GT.CM GNP goes through t_end() and can write jnl records to the jnlpool for replicated db */
+	gtm_env_init();	/* read in all environment variables */
 	gtmenvp = envp;
 	run_time = TRUE;
 	getjobnum();

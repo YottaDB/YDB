@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,8 @@
 
 #define MAX_COLLTYPE	255
 #define MIN_COLLTYPE	0
+#define XFORM	0
+#define XBACK	1
 
 #ifdef UNIX					/* environment variable syntax is OS dependent */
 #	define	CT_PREFIX	"$gtm_collate_"
@@ -52,6 +54,7 @@ typedef struct collseq_struct {
 	int4			(*xback)();
 	int4			(*version)();
 	int4			(*verify)();
+	int			argtype;
 } collseq;
 
 GBLREF char	*lcl_coll_xform_buff;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,8 @@
 #define CRIT_NOT_TRANS_REG	0x00000002
 #define CRIT_RELEASE		0x00000004
 #define CRIT_ALL_REGIONS	0x00000008
+
+#define	HAVE_CRIT_IN_WTSTART	0x00000010	/* check if csa->in_wtstart is true */
 
 /* Note absence of any flags is default value which finds if any region
    or the replication pool have crit or are getting crit. It returns

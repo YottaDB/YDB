@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,9 +69,9 @@ bool	mubfilcpy (backup_reg_list *list)
 	unsigned char		command[MAX_FN_LEN * 2 + 5]; /* 5 == max(sizeof("cp"),sizeof("mv")) + 2 (space) + 1 (NULL) */
 	sgmnt_data_ptr_t	header_cpy;
 	int4			backup_fd = -1, size, vbn, status, counter, rsize, ntries;
-	int4			handled, save_errno, adjust, blk_num, temp, rv, tempfilelen;
+	int4			save_errno, adjust, blk_num, temp, rv, tempfilelen;
 	struct stat		stat_buf;
-	off_t			filesize;
+	off_t			filesize, handled;
 	char 			*inbuf, *zero_blk, *ptr, *errptr;
 	boolean_t		done;
 	char			tempfilename[MAX_FN_LEN + 1], tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN], *tempnam();
@@ -256,7 +256,14 @@ bool	mubfilcpy (backup_reg_list *list)
 		if (0 < (filesize = stat_buf.st_size))
 		{
 			inbuf = (char *)malloc(sizeof(int4) + sizeof(block_id) + header_cpy->blk_size);
-			LSEEKREAD(list->backup_fd, 0, &rsize, sizeof(rsize), status);
+			/* Do not use LSEEKREAD macro here because of dependence on setting filepointer for
+			   subsequent reads.
+			*/
+			if (-1 != (status = (ssize_t)lseek(list->backup_fd, 0, SEEK_SET)))
+			{
+				DOREADRC(list->backup_fd, &rsize, sizeof(rsize), status);
+			} else
+				status = errno;
 			if (0 != status)
 			{
 				if (0 < status)

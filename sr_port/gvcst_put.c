@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,8 +56,6 @@
 #include "gvcst_search_blk.h"
 #include "gvcst_put.h"
 
-error_def(ERR_GVPUTFAIL);
-
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	gv_key			*gv_altkey, *gv_currkey;
 GBLREF	int4			gv_keysize;
@@ -68,7 +66,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	short			dollar_tlevel;
-GBLREF	uint4			t_err, process_id;
+GBLREF	uint4			process_id;
 GBLREF	cw_set_element		cw_set[];
 GBLREF	unsigned char		cw_set_depth;
 GBLREF 	unsigned int		t_tries;
@@ -77,34 +75,30 @@ GBLREF	boolean_t		horiz_growth;
 GBLREF	int4			prev_first_off, prev_next_off;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	boolean_t		is_updproc;
-GBLREF	ua_list			*first_ua, *curr_ua;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	int			gv_fillfactor,
-                                update_array_size,
-				cumul_update_array_size,	/* the current total size of the update array */
                                 rc_set_fragment;	/* Contains offset within data at which data fragment starts */
-GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	uint4			update_array_size, cumul_update_array_size;	/* the current total size of the update array */
 GBLREF	jnl_fence_control	jnl_fence_ctl;
-GBLREF  jnl_format_buffer       *non_tp_jfb_ptr;
-GBLREF  inctn_opcode_t          inctn_opcode;
+GBLREF	jnl_format_buffer       *non_tp_jfb_ptr;
+GBLREF	inctn_opcode_t          inctn_opcode;
 GBLREF	boolean_t		is_replicator;
-GBLREF jnl_gbls_t		jgbl;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 
 static	block_id	lcl_root;
 static	int4		blk_size, blk_fill_size;
 static	int4 const	zeroes = 0;
+static	boolean_t	jnl_format_done;
 
-static	bool	        gvcst_put_blk(mval *v, bool *extra_block_split_req);
+static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req);
 
 void	gvcst_put(mval *v)
 {
 	bool			extra_block_split_req;
 	char			*ptr;
 	short			temp_short;
-	int			save_t_tries;
-	jnl_format_buffer	*jfb;
-	jnl_action		*ja;
-	boolean_t       	new_tn;
+
 	error_def(ERR_SCNDDBNOUPD);
 
 	if ((FALSE == pool_init) && REPL_ENABLED(cs_data) && is_replicator)
@@ -113,77 +107,45 @@ void	gvcst_put(mval *v)
 		rts_error(VARLSTCNT(1) ERR_SCNDDBNOUPD);
 	blk_size = cs_data->blk_size;
 	blk_fill_size = (blk_size * gv_fillfactor) / 100 - cs_data->reserved_bytes;
-	for (new_tn = TRUE; ; )
+	jnl_format_done = FALSE;	/* do jnl_format() only once per logical transaction irrespective of number of retries */
+	do
 	{
-		if (new_tn)
-		{
-			if ((0 == dollar_tlevel) || (NULL == sgm_info_ptr->first_cw_set))
-				t_begin(ERR_GVPUTFAIL, TRUE);
-			else
-				t_err = ERR_GVPUTFAIL;
-			lcl_root = gv_target->root;
-		}
-		if (JNL_ENABLED(cs_addrs) && (new_tn || (cdb_sc_jnlstatemod == t_fail_hist[save_t_tries])))
-		{
-			if (0 == dollar_tlevel)
-			{
-				jfb = non_tp_jfb_ptr; /* already malloced in gvcst_init() */
-				jgbl.cumul_jnl_rec_len = 0;
-			} else
-			{
-				jfb = (jnl_format_buffer *)get_new_element(sgm_info_ptr->jnl_list, 1);
-				jfb->next = NULL;
-				assert(NULL == *sgm_info_ptr->jnl_tail);
-				*sgm_info_ptr->jnl_tail = jfb;
-				sgm_info_ptr->jnl_tail = &jfb->next;
-			}
-			ja = &(jfb->ja);
-			ja->key = gv_currkey;
-			ja->val = v;
-			ja->operation = JNL_SET;
-			jnl_format(jfb);
-			jgbl.cumul_jnl_rec_len += jfb->record_size;
-			assert(0 == jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY);
-			DEBUG_ONLY(jgbl.cumul_index++;)
-		}
-		save_t_tries = t_tries;
-		if (gvcst_put_blk(v, &extra_block_split_req))
-		{
-			if (!extra_block_split_req)
-				break;
-			else
-				new_tn = TRUE;
-		} else
-			new_tn = FALSE;		/* new_tn is FALSE only if we need to do a retry */
-	}
+		T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVPUTFAIL);
+		lcl_root = gv_target->root;
+		while(!gvcst_put_blk(v, &extra_block_split_req))
+			;
+	} while (extra_block_split_req);
 }
 
 static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
 {
-	blk_segment	*bs1, *bs_ptr, *new_blk_bs;
-	block_id	allocation_clue, tp_root, gvt_for_root;
-	block_index	left_hand_index, ins_chain_index, next_blk_index;
-	block_offset	next_offset, first_offset, ins_off1, ins_off2, old_curr_chain_next_off;
-	cw_set_element	*cse, *cse_new, *old_cse;
-	gv_namehead	*save_targ;
-	enum cdb_sc	status;
-	gv_key		*temp_key;
-	mstr		value;
-	off_chain	chain1, curr_chain, prev_chain;
-	rec_hdr_ptr_t	curr_rec_hdr, extra_rec_hdr, next_rec_hdr, new_star_hdr, rp;
-	srch_blk_status	*bh, *bq, *tp_srch_status;
-	srch_hist	*dir_hist;
-	int		cur_blk_size, blk_seg_cnt, delta, i, left_hand_offset, n, ins_chain_offset,
-			new_blk_size_l, new_blk_size_r, last_possible_left_offset, new_rec_size, next_rec_shrink, next_rec_shrink1,
-			offset_sum, rec_cmpc, segment_update_array_size, target_key_size, tp_lev, undo_index;
-	char		*va;
-	sm_uc_ptr_t	cp1, cp2, curr;
-	unsigned short	extra_record_orig_size, rec_size, temp_short;
-	bool		chain_in_orig_block, copy_extra_record, level_0, new_rec, no_pointers,
-			succeeded = FALSE;
-	boolean_t	make_it_null, gbl_target_was_set;
-	uint4		dummy;
-	key_cum_value	*tempkv;
+	blk_segment		*bs1, *bs_ptr, *new_blk_bs;
+	block_id		allocation_clue, tp_root, gvt_for_root;
+	block_index		left_hand_index, ins_chain_index, next_blk_index;
+	block_offset		next_offset, first_offset, ins_off1, ins_off2, old_curr_chain_next_off;
+	cw_set_element		*cse, *cse_new, *old_cse;
+	gv_namehead		*save_targ;
+	enum cdb_sc		status;
+	gv_key			*temp_key;
+	mstr			value;
+	off_chain		chain1, curr_chain, prev_chain;
+	rec_hdr_ptr_t		curr_rec_hdr, extra_rec_hdr, next_rec_hdr, new_star_hdr, rp;
+	srch_blk_status		*bh, *bq, *tp_srch_status;
+	srch_hist		*dir_hist;
+	int			cur_blk_size, blk_seg_cnt, delta, i, left_hand_offset, n, ins_chain_offset,
+				new_blk_size_l, new_blk_size_r, last_possible_left_offset, new_rec_size,
+				next_rec_shrink, next_rec_shrink1, offset_sum, rec_cmpc, target_key_size, tp_lev, undo_index;
+	uint4			segment_update_array_size;
+	char			*va;
+	sm_uc_ptr_t		cp1, cp2, curr;
+	unsigned short		extra_record_orig_size, rec_size, temp_short;
+	bool			chain_in_orig_block, copy_extra_record, level_0, new_rec, no_pointers,
+				succeeded = FALSE;
+	boolean_t		make_it_null, gbl_target_was_set, duplicate_set = FALSE;
+	uint4			dummy;
+	key_cum_value		*tempkv;
+	jnl_format_buffer	*jfb;
+	jnl_action		*ja;
 
 	assert(NULL != update_array);
 	assert(NULL != update_array_ptr);
@@ -380,6 +342,13 @@ static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
 			}
 			new_rec_size = sizeof(rec_hdr) + (target_key_size - rec_cmpc) + value.len;
 			delta = new_rec_size - rec_size;
+			if (!delta && gvdupsetnoop && value.len
+				&& !memcmp(value.addr, (sm_uc_ptr_t)rp + new_rec_size - value.len, value.len))
+			{
+				duplicate_set = TRUE;
+				succeeded = TRUE;
+				break;	/* duplicate SET */
+			}
 			next_rec_shrink = 0;
 		}
 		if (0 < dollar_tlevel)
@@ -527,7 +496,7 @@ static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
 					}
 				}
 				assert((ins_chain_offset + (int)cse->next_off) <=
-				       (delta + (sm_long_t)((blk_hdr_ptr_t)bh->buffaddr)->bsiz - sizeof(off_chain)));
+				       (delta + (sm_long_t)cur_blk_size - sizeof(off_chain)));
 			}
 			succeeded = TRUE;
 			if (level_0 && new_rec)
@@ -619,8 +588,10 @@ static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
 			} else
 			{	/* Insert in left hand (new) block */
 				/* If there is only one record on the left hand side, try for two */
-				copy_extra_record = (0 == bh->prev_rec.offset  &&  level_0  &&  new_rec  &&
-							sizeof(blk_hdr) < ((blk_hdr_ptr_t)bh->buffaddr)->bsiz);
+				copy_extra_record = ((0 == bh->prev_rec.offset)
+							&& level_0
+							&& new_rec
+							&& (sizeof(blk_hdr) < cur_blk_size));
 				BLK_INIT(bs_ptr, bs1);
 				if (no_pointers)
 					left_hand_offset = 0;
@@ -662,11 +633,10 @@ static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
 						}
 						if (copy_extra_record)
 						{
-							GET_USHORT(temp_short, &((rec_hdr_ptr_t)(bh->buffaddr
-								+ sizeof(blk_hdr)))->rsiz);
-							n = temp_short - bh->curr_rec.match;
-							if (n + (int)bh->curr_rec.offset + new_rec_size
-							    > blk_size - cs_data->reserved_bytes)
+							assert(rec_size);
+							n = rec_size - bh->curr_rec.match;
+							if ((n + (int)bh->curr_rec.offset + new_rec_size)
+									> (blk_size - cs_data->reserved_bytes))
 								copy_extra_record = FALSE;
 							else
 							{
@@ -674,6 +644,12 @@ static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
 								extra_rec_hdr->rsiz = n;
 								extra_rec_hdr->cmpc = bh->curr_rec.match;
 								BLK_SEG(bs_ptr, (sm_uc_ptr_t)extra_rec_hdr, sizeof(rec_hdr));
+								if (n < sizeof(rec_hdr))
+								{
+									assert(CDB_STAGNATE > t_tries);
+									status = cdb_sc_mkblk;
+									goto retry;
+								}
 								BLK_SEG(bs_ptr,
 									bh->buffaddr + sizeof(blk_hdr) + sizeof(rec_hdr)
 										+ bh->curr_rec.match,
@@ -697,12 +673,13 @@ static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
 					status = cdb_sc_mkblk;
 					goto retry;
 				}
-				if (!new_rec  ||  copy_extra_record)
-				{
-					/* Should guard for empty block??? */
-					GET_USHORT(temp_short, &rp->rsiz);
-					rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + temp_short);
+				/* assert that both !new_rec and copy_extra_record can never be TRUE at the same time */
+				assert(new_rec || !copy_extra_record);
+				if (!new_rec || copy_extra_record)
+				{	/* Should guard for empty block??? */
+					rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + rec_size);
 					rec_cmpc = rp->cmpc;
+					temp_short = rec_size;
 					GET_USHORT(rec_size, &rp->rsiz);
 				}
 				if (copy_extra_record)
@@ -1167,6 +1144,39 @@ static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
 			tempkv->value.addr = (char *)bs1[4].addr;	/* 	but not used in that case, so ok */
 		}
 	}
+	assert(succeeded);
+	/* format the journal records only once for non-TP (irrespective of number of restarts).
+	 * for TP, restart code causes a change in flow and calls gvcst_put() again which will force us to redo the jnl_format()
+	 */
+	assert(dollar_tlevel || !jnl_format_done || (JNL_SET == non_tp_jfb_ptr->ja.operation));
+	assert(!dollar_tlevel || !jnl_format_done
+		|| (JNL_SET == ((jnl_format_buffer *)((uchar_ptr_t)sgm_info_ptr->jnl_tail
+								- offsetof(jnl_format_buffer, next)))->ja.operation));
+	if (JNL_ENABLED(cs_addrs) && !jnl_format_done)
+	{
+		if (0 == dollar_tlevel)
+		{
+			jfb = non_tp_jfb_ptr; /* already malloced in gvcst_init() */
+			jgbl.cumul_jnl_rec_len = 0;
+			DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
+		} else
+		{
+			jfb = (jnl_format_buffer *)get_new_element(sgm_info_ptr->jnl_list, 1);
+			jfb->next = NULL;
+			assert(NULL == *sgm_info_ptr->jnl_tail);
+			*sgm_info_ptr->jnl_tail = jfb;
+			sgm_info_ptr->jnl_tail = &jfb->next;
+		}
+		ja = &(jfb->ja);
+		ja->key = gv_currkey;
+		ja->val = v;
+		ja->operation = JNL_SET;
+		jnl_format(jfb);
+		jgbl.cumul_jnl_rec_len += jfb->record_size;
+		assert(0 == jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY);
+		DEBUG_ONLY(jgbl.cumul_index++;)
+		jnl_format_done = TRUE;
+	}
 	horiz_growth = FALSE;
 	assert(cs_addrs->dir_tree == gv_target || tp_root);
 	RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
@@ -1174,12 +1184,13 @@ static	bool	gvcst_put_blk(mval *v, bool *extra_block_split_req)
 	{
 		if (*extra_block_split_req)
                         inctn_opcode = inctn_gvcstput_extra_blk_split;
-                if (succeeded)
-                        succeeded = (0 != t_end(&gv_target->hist, dir_hist));
+                succeeded = (0 != t_end(&gv_target->hist, dir_hist));
                 inctn_opcode = inctn_invalid_op;
 		if (succeeded)
 		{
 			++cs_data->n_puts;
+			if (duplicate_set)
+				++cs_data->n_puts_duplicate;
 			if (NULL != dir_hist)
 				gv_target->clue.end = 0;	/* Invalidate clue */
 		}

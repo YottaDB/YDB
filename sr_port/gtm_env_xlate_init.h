@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,8 +72,8 @@ error_def(ERR_TEXT);
 		}												\
 		val_xlated.str.addr = NULL;									\
 		ret_gtm_env_xlate = (*gtm_env_xlate_entry)(&(VAL1)->str, &(VAL2)->str, &(dollar_zdir.str), &(val_xlated.str));	\
-		if (MAX_STRLEN < val_xlated.str.len)							\
-			rts_error(VARLSTCNT(4) ERR_XTRNRETVAL, 2, val_xlated.str.len, MAX_STRLEN);				\
+		if (MAX_DBSTRLEN < val_xlated.str.len)							\
+			rts_error(VARLSTCNT(4) ERR_XTRNRETVAL, 2, val_xlated.str.len, MAX_DBSTRLEN);				\
 		if (0 != ret_gtm_env_xlate)									\
 		{												\
 			if ((val_xlated.str.len) && (val_xlated.str.addr))					\

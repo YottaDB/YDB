@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -161,7 +161,7 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int sh
 	{
 		save_errno = errno;
 		gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id, RTS_ERROR_STRING(insname));
-		gtm_putmsg(VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmdt()"), CALLFROM, save_errno);
+		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmdt()"), CALLFROM, save_errno);
 		CLNUP_REPLPOOL_ACC_SEM(sem_id, insname);
 		return FALSE;
 	}

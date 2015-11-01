@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ LITREF unsigned char	io_params_size[];
 void	iotcp_use(io_desc *iod, mval *pp)
 {
 	unsigned char	c;
-	int		length, width;
+	int4		length, width;
 	d_tcp_struct	*tcpptr, newtcp;
 	int		p_offset;
 
@@ -56,7 +56,7 @@ void	iotcp_use(io_desc *iod, mval *pp)
 		switch (c = *(pp->str.addr + p_offset++))
 		{
 		case iop_width:
-			GET_SHORT(width, pp->str.addr + p_offset);
+			GET_LONG(width, pp->str.addr + p_offset);
 			if (width == 0)
 				newtcp.width = TCPDEF_WIDTH;
 			else  if (width > 0)
@@ -65,10 +65,10 @@ void	iotcp_use(io_desc *iod, mval *pp)
 				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
 			break;
 		case iop_length:
-			GET_SHORT(length, pp->str.addr + p_offset);
+			GET_LONG(length, pp->str.addr + p_offset);
 			if (length == 0)
 				newtcp.length = TCPDEF_LENGTH;
-			else  if (length >= 0)
+			else  if (length > 0)
 				newtcp.length = length;
 			else
 				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);

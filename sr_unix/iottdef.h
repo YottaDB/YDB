@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,7 @@ typedef struct
 typedef struct
 {
 	uint4		in_buf_sz;		/* size of read buffer		*/
-	unsigned short  pg_width;		/* width of output page		*/
+	/* unsigned short  pg_width;		   width of output page		*/
 	uint4		ext_cap;
 	io_terminator	enbld_outofbands; 	/* enabled out-of-band chars	*/
 	uint4   	term_ctrl;

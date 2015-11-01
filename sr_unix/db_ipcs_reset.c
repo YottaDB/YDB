@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,10 +64,12 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	assert(reg);
 	temp_region = gv_cur_region; 	/* save gv_cur_region wherever there is scope for it to be changed */
 	gv_cur_region = reg; /* dbfilop needs gv_cur_region */
-	udi = FILE_INFO(reg);
-	if (!udi || INVALID_SEMID == udi->ftok_semid || INVALID_SEMID == udi->semid)
+	udi = NULL;
+	if (NULL != reg->dyn.addr->file_cntl)
+		udi = FILE_INFO(reg);
+	if ((NULL == udi) || (INVALID_SEMID == udi->ftok_semid) || (INVALID_SEMID == udi->semid))
 	{
-		assert(FALSE);
+		assert(!reg->open);
 		gv_cur_region = temp_region;
 		return FALSE;
 	}
@@ -83,8 +85,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	}
 	if (!ftok_sem_lock(reg, FALSE, immediate))
 		return FALSE;
-	/*
-	 * Now we have locked the database using ftok_sem. Any other ftok conflicted database will
+	/* Now we have locked the database using ftok_sem. Any other ftok conflicted database will
 	 * suspend at this point, because of the lock.
 	 * At the end of this routine, we release ftok semaphore.
 	 * Now read file header and continue with main operation of this routine.

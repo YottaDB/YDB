@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@
 
 /* The size by which the hashtable is incremented after its size exceeds the table of primes */
 #define HASHTABINCRSIZE 22932
-#define hash(v, nelem)          (((unsigned long)v) % nelem)
+#define hash(v, nelem)          (((unsigned int)v) % nelem)
 
 /* the following variable hash_entry is modified as a side-affect of a call to add_hashtab_ent.
  * this holds the pointer to the hash element that was created or found (depending on whether a

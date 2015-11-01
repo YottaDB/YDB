@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,15 +91,15 @@ typedef struct io_desc_struct
 	struct io_log_name_struct	*trans_name;
 	struct io_log_name_struct	*name;
 	mstr				error_handler;
-	unsigned short			length;
-	unsigned short			width;
+	unsigned int			length;
+	unsigned int			width;
 	bool				perm;		/* permanent	*/
 	bool				wrap;		/* if FALSE trunc */
 	enum io_dev_type		type;
 	enum io_dev_state		state;
 	struct
-	{	unsigned short	x;
-		unsigned short	y;
+	{	unsigned int	x;
+		unsigned int	y;
 		unsigned short	zeof;
 		unsigned short	za;
 		unsigned char	zb[ESC_LEN];
@@ -136,9 +136,9 @@ typedef struct dev_dispatch_struct
 	short	(*rdone)(mint *, int4);
 	void	(*write)(mstr *);
 	void	(*wtone)(unsigned char);
-	void	(*wteol)(short, io_desc *);
+	void	(*wteol)(int4, io_desc *);
 	void	(*wtff)(void);
-	void	(*wttab)(short);
+	void	(*wttab)(int4);
 	void	(*flush)(io_desc *);
 	short	(*readfl)(mval *, int4, int4);
 	void	(*iocontrol)(mstr *);
@@ -166,9 +166,9 @@ void io_init_name(void);
 #define ioxx_rdone(X)		short io##X##_rdone (mint *v, int4 timeout)
 #define ioxx_write(X)		void io##X##_write(mstr *v)
 #define ioxx_wtone(X)		void io##X##_wtone(unsigned char c)
-#define ioxx_wteol(X)		void io##X##_wteol(short cnt, io_desc *iod)
+#define ioxx_wteol(X)		void io##X##_wteol(int4 cnt, io_desc *iod)
 #define ioxx_wtff(X)		void io##X##_wtff(void)
-#define ioxx_wttab(X)		void io##X##_wttab(short x)
+#define ioxx_wttab(X)		void io##X##_wttab(int4 x)
 #define ioxx_flush(X)		void io##X##_flush(io_desc *iod)
 #define ioxx_readfl(X)		short io##X##_readfl(mval *v, int4 width, int4 timeout)
 #define xx_iocontrol(X)		void X##_iocontrol(mstr *d)

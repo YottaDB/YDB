@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +45,7 @@ GBLREF	uint4		process_id;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	volatile int4	db_fsync_in_prog;	/* for DB_FSYNC macro usage */
 GBLREF 	jnl_gbls_t	jgbl;
+GBLREF 	bool		in_backup;
 
 #define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart)							\
 if (cnl->in_wtstart)												\
@@ -308,7 +309,7 @@ bool wcs_flu(bool options)
 		jb->need_db_fsync = TRUE;	/* for comments on need_db_fsync, see jnl_output_sp.c */
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
 		assert(!(JNL_FILE_SWITCHED(jpc)));
-		if (!jgbl.forw_phase_recovery && (csa->ti->curr_tn == csa->ti->early_tn))
+		if (!jgbl.dont_reset_gbl_jrec_time && (csa->ti->curr_tn == csa->ti->early_tn))
 			JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() and jnl_write_epoch_rec() */
 		assert(jgbl.gbl_jrec_time);
 		if (0 == csa->jnl->pini_addr)

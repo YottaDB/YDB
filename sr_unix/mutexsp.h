@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,14 @@
 
 #ifndef MUTEXSP_H
 #define MUTEXSP_H
+
+#ifdef MUTEX_MSEM_WAKE
+#ifdef POSIX_MSEM
+#include <semaphore.h>
+#else
+#include <sys/mman.h>
+#endif
+#endif
 
 #define MUTEX_INIT_SEMVAL		LOCK_AVAILABLE
 #define MUTEX_IMPOSSIBLE_SEMVAL		-1024 /* Any value other than
@@ -74,7 +82,11 @@ void 		mutex_seed_init(void);
 void mutex_cleanup(gd_region *reg);
 
 #ifdef MUTEX_MSEM_WAKE
+#  ifdef POSIX_MSEM
+void mutex_wake_proc(sem_t *mutex_wake_msem_ptr);
+#  else
 void mutex_wake_proc(msemaphore *mutex_wake_msem_ptr);
+#  endif
 #else
 void mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance);
 #endif
@@ -82,6 +94,19 @@ void mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance);
 void mutex_sock_init(void);
 void mutex_sock_cleanup(void);
 unsigned char *pid2ascx(unsigned char *pid_str, pid_t pid);
+
+#ifdef MUTEX_MSEM_WAKE
+#ifdef POSIX_MSEM
+#  define MSEM_LOCKW(X)	 sem_wait(X)
+#  define MSEM_LOCKNW(X) sem_trywait(X)
+#  define MSEM_UNLOCK(X) sem_post(X)
+#else
+#  define MSEM_LOCKW(X)	 msem_lock(X, 0)
+#  define MSEM_LOCKNW(X) msem_lock(X, MSEM_IF_NOWAIT)
+#  define MSEM_UNLOCK(X) msem_unlock(X, 0)
+#endif
+#endif
+
 
 #if defined(MUTEX_DEBUG) || defined(MUTEX_TRACE) || defined(MUTEX_TEST_RECOVERY)
 #include "gtm_stdio.h"

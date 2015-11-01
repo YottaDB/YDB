@@ -288,7 +288,7 @@ void	mur_close_files(void)
 		}
 		rctl->jctl_head = NULL;	/* So that we do not come to above loop again */
 		UNIX_ONLY(
-			if (rctl->standalone && !db_ipcs_reset(rctl->gd, TRUE))
+			if (rctl->standalone && !db_ipcs_reset(rctl->gd, !murgbl.clean_exit))
 				wrn_count++;
 			rctl->standalone = FALSE;
 		)
@@ -298,7 +298,7 @@ void	mur_close_files(void)
 #if defined(UNIX)
 	if (mur_options.rollback && murgbl.repl_standalone)
 	{
-		mu_replpool_remove_sem();
+		mu_replpool_remove_sem(FALSE);
 		murgbl.repl_standalone = FALSE;
 	}
 #endif

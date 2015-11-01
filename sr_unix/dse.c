@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,6 +63,7 @@
 #include "getjobnum.h"
 #include "sig_init.h"
 #include "gtmmsg.h"
+#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
 GBLDEF block_id			patch_curr_blk;
 GBLREF gd_region		*gv_cur_region;
@@ -87,6 +88,7 @@ GBLREF unsigned char    	cw_set_depth;
 GBLREF uint4			process_id;
 GBLREF jnlpool_addrs		jnlpool;
 GBLREF char			cli_err_str[];
+GBLREF boolean_t        	write_after_image;
 
 static bool	dse_process(int argc);
 static void display_prompt(void);
@@ -96,7 +98,9 @@ int main(int argc, char *argv[])
 	static char	prompt[]="DSE> ";
 
 	image_type = DSE_IMAGE;
+	gtm_env_init();	/* read in all environment variables */
 	dse_running = TRUE;
+	write_after_image = TRUE;	/* In case it calls it changes a block, we write after image */
 	licensed = TRUE;
 	transform = TRUE;
 	op_open_ptr = op_open;

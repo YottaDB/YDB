@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,7 @@
 #include "gtmio.h"
 #include "file_head_read.h"
 #include "file_head_write.h"
+#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
 #define TIME_FORMAT	"_%Y%j%H%M%S"	/* .yearjuliendayhoursminutesseconds */
 
@@ -158,6 +159,7 @@ int main(void)
 	error_def(ERR_TEXT);
 
 	image_type = GTMSECSHR_IMAGE;
+	gtm_env_init();	/* read in all environment variables */
 	err_init(gtmsecshr_cond_hndlr);
 	gtmsecshr_init();
 	input_timeval.tv_sec  = MAX_TIMEOUT_VALUE;

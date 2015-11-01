@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,7 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
-#include "hashtab.h"		/* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h, cws_insert.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "tp_timeout.h"
@@ -40,6 +40,8 @@
 #include "gvcst_tp_init.h"
 #include "dpgbldir.h"
 #include <varargs.h>
+#include "longset.h"		/* needed for cws_insert.h */
+#include "cws_insert.h"		/* for cw_stagnate_reinitialized */
 
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
@@ -153,6 +155,12 @@ va_dcl
 		rts_error(VARLSTCNT(4) ERR_TPMIXUP, 2, "An M", "a fenced logical");
 	if (dollar_tlevel + 1 >= TP_MAX_NEST)
 		rts_error(VARLSTCNT(1) ERR_TPTOODEEP);
+	va_start(varlst);
+	dollar_t = va_arg(varlst, int);
+	serial = va_arg(varlst, int);
+	tid = va_arg(varlst, mval *);
+	prescnt = va_arg(varlst, int);
+	MV_FORCE_STR(tid);
 	if (0 == dollar_tlevel)
 	{
 		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1;
@@ -170,26 +178,22 @@ va_dcl
 		}
 		++local_tn;					/* Begin new local transaction */
 		jgbl.wait_for_jnl_hard = TRUE;
-	}
-	va_start(varlst);
-	dollar_t = va_arg(varlst, int);
-	serial = va_arg(varlst, int);
-	tid = va_arg(varlst, mval *);
-	memset(tcom_record.jnl_tid, 0, TID_STR_SIZE);
-	if ((0 == dollar_tlevel) && (0 != tid->str.len))
-	{
-		if (tid->str.len > TID_STR_SIZE)
-			tid->str.len = TID_STR_SIZE;
-		memcpy(tcom_record.jnl_tid, (char *)tid->str.addr, tid->str.len);
-		if ((TP_BATCH_SHRT == tid->str.len) || (TP_BATCH_LEN == tid->str.len))
+		memset(tcom_record.jnl_tid, 0, TID_STR_SIZE);
+		if (0 != tid->str.len)
 		{
-			lower_to_upper(tp_bat, (uchar_ptr_t)tid->str.addr, tid->str.len);
-			if (0 == memcmp(TP_BATCH_ID, tp_bat, tid->str.len))
-				jgbl.wait_for_jnl_hard = FALSE;
+			if (tid->str.len > TID_STR_SIZE)
+				tid->str.len = TID_STR_SIZE;
+			memcpy(tcom_record.jnl_tid, (char *)tid->str.addr, tid->str.len);
+			if ((TP_BATCH_SHRT == tid->str.len) || (TP_BATCH_LEN == tid->str.len))
+			{
+				lower_to_upper(tp_bat, (uchar_ptr_t)tid->str.addr, tid->str.len);
+				if (0 == memcmp(TP_BATCH_ID, tp_bat, tid->str.len))
+					jgbl.wait_for_jnl_hard = FALSE;
+			}
 		}
 	}
-	prescnt = va_arg(varlst, int);
-	MV_FORCE_STR(tid);
+	assert((NULL == cw_stagnate) || cw_stagnate_reinitialized);
+		/* either cw_stagnate has not been initialized at all or previous-non-TP or tp_hist should have done CWS_RESET */
 	if (prescnt > 0)
 	{
 		VAR_COPY(lvname, varlst);
@@ -390,7 +394,7 @@ va_dcl
 	/* Store the dollar_tlevel specific information */
 	for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
 	{
-		for (prev_tli = NULL, tli = si->tlvl_info_head; tli; tli = tli->next_tlevel_info)
+		for (prev_tli = NULL, tli = si->tlvl_info_head; (NULL != tli); tli = tli->next_tlevel_info)
 			prev_tli = tli;
 		new_tli = (tlevel_info *)get_new_element(si->tlvl_info_list, 1);
 		new_tli->t_level = dollar_tlevel;
@@ -411,6 +415,7 @@ va_dcl
 			DEBUG_ONLY(new_tli->tlvl_cumul_index = jgbl.cumul_index;)
 		}
 		new_tli->next_tlevel_info = NULL;
+		new_tli->update_trans = si->update_trans;
 		if (prev_tli)
 			prev_tli->next_tlevel_info = new_tli;
 		else

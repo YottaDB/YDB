@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,7 +75,8 @@ GBLREF	boolean_t		is_updproc;
 GBLREF	void			(*tp_timeout_clear_ptr)(void);
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	tp_region		*tp_reg_list;	/* Chained list of regions used in this transaction not cleared on tp_restart */
-GBLREF jnl_gbls_t		jgbl;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 
 void	op_tcommit(void)
 {
@@ -131,21 +132,31 @@ void	op_tcommit(void)
 					si->cr_array = (cache_rec_ptr_ptr_t)malloc(sizeof(cache_rec_ptr_t) * si->cr_array_size);
 				}
 				assert(!is_mm || (0 == si->cr_array_size && NULL == si->cr_array));
+				/* whenever si->first_cw_set is non-NULL, ensure that si->update_trans is TRUE */
+				assert((NULL == si->first_cw_set) || si->update_trans);
+				/* whenever si->first_cw_set is NULL, ensure that si->update_trans is FALSE
+				 * except when the set noop optimization is enabled */
+				assert((NULL != si->first_cw_set) || !si->update_trans || gvdupsetnoop);
 				if (NULL != si->first_cw_set)
 				{
 					assert(0 != si->cw_set_depth);
 					cw_depth = si->cw_set_depth;
-					/* Caution : since csa->backup_in_prog and read_before_image are initialized below only if
-					 * cw_depth is non-zero, these variable should be used below only within an if (cw_depth).
+					/* Caution : since csa->backup_in_prog is initialized below only if si->first_cw_set is
+					 * non-NULL, it should be used in tp_tend() only within an if (NULL != si->first_cw_set)
 					 */
 					csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb);
 					read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog);
-					/* The following section allocates new blocks required by the transaction
-					 * it is done before going crit in order to reduce the change of having to
-					 * wait on a read while crit. The trade-off is that if a newly allocated
-					 * block is "stolen," it will cause a restart.
+					/* The following section allocates new blocks required by the transaction it is done
+					 * before going crit in order to reduce the change of having to wait on a read while crit.
+					 * The trade-off is that if a newly allocated block is "stolen," it will cause a restart.
 					 */
-					last_cw_set_before_maps = si->last_cw_set;
+					if (NULL == si->first_cw_bitmap)
+					{	/* si->first_cw_bitmap can be non-NULL only if there was an rts_error()
+						 * in tp_tend() and ZTRAP handler was invoked which in turn did a TCOMMIT.
+						 * in that case do not reset si->first_cw_bitmap.
+						 */
+						last_cw_set_before_maps = si->last_cw_set;
+					}
 					for (cse = si->first_cw_set;  NULL != cse;  cse = cse->next_cw_set)
 					{	/* assert to ensure we haven't missed out on resetting jnl_freeaddr for any cse
 						 * in t_write/t_create/t_write_map/t_write_root/mu_write_map [D9B11-001991] */
@@ -228,7 +239,8 @@ void	op_tcommit(void)
 										: (cse->blk < csa->ti->total_blks)));
 						}	/* if (gds_t_create == cse->mode) */
 					}	/* for (all cw_set_elements) */
-					si->first_cw_bitmap = last_cw_set_before_maps->next_cw_set;
+					if (NULL == si->first_cw_bitmap)
+						si->first_cw_bitmap = last_cw_set_before_maps->next_cw_set;
 					if (cdb_sc_normal == status && 0 != csd->dsid)
 					{
 						for (ks = si->kill_set_head; NULL != ks; ks = ks->next_kill_set)
@@ -293,6 +305,7 @@ void	op_tcommit(void)
 		assert(0 == have_crit(CRIT_HAVE_ANY_REG));
 		/* Commit was successful */
 		dollar_trestart = 0;
+		t_tries = 0;
 		/* the following section is essentially deferred garbage collection, freeing release block a bitmap at a time */
 		if (NULL != first_sgm_info)
 		{

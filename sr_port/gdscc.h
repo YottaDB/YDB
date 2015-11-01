@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +16,9 @@
 
 #include <sys/types.h>
 
-/* BIG_UA is the maximum size of a single update array. It is 16MB. */
-#define BIG_UA  16777216
+/* BIG_UA is the maximum size of a single update array specified as an unsigned quantity (usages rely on this). It is 16MB. */
+#define BIG_UA  (uint4)16777216
+
 #define CDB_R_SET_SIZE		32
 #define CDB_CW_SET_SIZE 	(MAX_BT_DEPTH * 3 + 1 + 2)
 #define CDB_W_SET_SIZE		16
@@ -37,6 +38,16 @@
 #define	GDS_WRITE_KILL		1
 #define	GDS_WRITE_BLOCK_SPLIT	2
 
+/* macro to traverse to the end of an horizontal cw_set_element list */
+
+#define TRAVERSE_TO_LATEST_CSE(x)					\
+{									\
+	assert(dollar_tlevel);						\
+	if (x)								\
+                for ( ; (x)->high_tlevel; x = (x)->high_tlevel)		\
+                        ;						\
+}
+
 typedef unsigned short	block_offset;
 typedef short   	block_index;
 
@@ -48,7 +59,7 @@ enum gds_t_mode
 	gds_t_acquired,
 	gds_t_committed,
 	gds_t_writemap,
-	n_gds_t_op,
+	n_gds_t_op,		/* tp_tend() depends on this order of placement of n_gds_t_op */
 	kill_t_create,
 	kill_t_write,
 	kill_t_write_root,
@@ -127,24 +138,6 @@ typedef struct cw_set_element_struct
 	block_offset	undo_offset[2];
 } cw_set_element;
 
-block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work,
-        cw_set_element *cs, int *cw_depth_ptr);
-
-/* macro to traverse to the end of an horizontal cw_set_element list */
-
-#define TRAVERSE_TO_LATEST_CSE(x)					\
-{									\
-	assert(dollar_tlevel);						\
-	if (x)								\
-                for ( ; (x)->high_tlevel; x = (x)->high_tlevel)		\
-                        ;						\
-}
-
-#define T_ABORT(reg, csa) 				\
-{							\
-	assert(&FILE_INFO(reg)->s_addrs == csa);	\
-	if (csa->now_crit) 				\
-		rel_crit(reg);				\
-}
+block_id	bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw_set_element *cs, int *cw_depth_ptr);
 
 #endif

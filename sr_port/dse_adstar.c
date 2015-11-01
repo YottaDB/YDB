@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,10 +36,11 @@
 #include "t_begin_crit.h"
 #include "gvcst_blk_build.h"
 #include "util.h"
+#include "t_abort.h"
 
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF gd_region        *gv_cur_region;
-GBLREF int		update_array_size;
+GBLREF uint4		update_array_size;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
 GBLREF srch_hist	dummy_hist;
@@ -96,7 +97,7 @@ void dse_adstar(void)
 	{
 		util_out_print("Error: cannot add a star record to a data block.", TRUE);
 		free(lbp);
-		T_ABORT(gv_cur_region, cs_addrs);
+		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
 	if (((blk_hdr_ptr_t) lbp)->bsiz > blk_size)
@@ -109,7 +110,7 @@ void dse_adstar(void)
 	{
 		util_out_print("Error:  not enough free space in block for a star record.", TRUE);
 		free(lbp);
-		T_ABORT(gv_cur_region, cs_addrs);
+		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
 	rsize = sizeof(rec_hdr) + sizeof(block_id);
@@ -124,7 +125,7 @@ void dse_adstar(void)
 	{
 		util_out_print("Error: bad blk build.", TRUE);
 		free(lbp);
-		T_ABORT(gv_cur_region, cs_addrs);
+		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
 	t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);

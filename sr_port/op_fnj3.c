@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ void op_fnj3(mval *src,int width,int fract,mval *dst)
 	w = width + MAX_NUM_SIZE + 2 + fract;
 	/* the literal two above accounts for the possibility
 	of inserting a zero and/or a minus with a width of zero */
-	if  (w > 32767)
+	if  (w > MAX_STRLEN)
 		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 	MV_FORCE_NUM(src);
 	/* need to guarantee that the n2s call will not cause string pool overflow */

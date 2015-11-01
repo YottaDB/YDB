@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,7 +106,7 @@ unsigned char *mval2subsc( mval *v , gv_key *g )
 			mstr_ch.addr = (char*) in_ptr;
 			mstr_buf1.len = 256;
 			mstr_buf1.addr = buf1;
-			do_xform(gv_target->collseq->xform, &mstr_ch, &mstr_buf1, &n);
+			do_xform(gv_target->collseq, XFORM, &mstr_ch, &mstr_buf1, &n);
 			in_ptr = (unsigned char *) buf1;
                 }
 		if (g->end + n + 3 > g->top - MAX_NUM_SUBSC_LEN )

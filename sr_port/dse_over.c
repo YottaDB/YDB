@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,10 +38,11 @@
 #include "t_begin_crit.h"
 #include "gvcst_blk_build.h"
 #include "ebc_xlat.h"
+#include "t_abort.h"
 
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF gd_region        *gv_cur_region;
-GBLREF int		update_array_size;
+GBLREF uint4		update_array_size;
 GBLREF gd_addr		*gd_header;
 GBLREF srch_hist	dummy_hist;
 GBLREF sgmnt_addrs	*cs_addrs;
@@ -141,12 +142,12 @@ void dse_over(void)
 	if (offset >= size)
 	{
 		util_out_print("Error:  offset too large.", TRUE);
-		T_ABORT(gv_cur_region, cs_addrs);
+		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
 	if (FALSE == dse_data(&data[0], &data_len))
 	{
-		T_ABORT(gv_cur_region, cs_addrs);
+		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
 	cvt_src_ptr = cvt_dst_ptr = (unsigned char *)data;
@@ -156,7 +157,7 @@ void dse_over(void)
 	if (offset + data_len > size)
 	{
 		util_out_print("Error:  data will not fit in block at given offset.", TRUE);
-		T_ABORT(gv_cur_region, cs_addrs);
+		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
 	lbp = (uchar_ptr_t)malloc(blk_size);
@@ -169,7 +170,7 @@ void dse_over(void)
 	{
 		util_out_print("Error: bad blk build.", TRUE);
 		free(lbp);
-		T_ABORT(gv_cur_region, cs_addrs);
+		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
 	t_write(blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);

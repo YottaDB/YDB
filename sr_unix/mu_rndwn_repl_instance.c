@@ -68,7 +68,7 @@ GBLREF	gd_region		*ftok_sem_reg;
  *	TRUE,  if successful.
  *	FALSE, otherwise.
  */
-boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id)
+boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t immediate)
 {
 	boolean_t		jnlpool_stat = TRUE, recvpool_stat = TRUE;
 	char			*instname, shmid_buff[TMP_BUF_LEN];
@@ -105,7 +105,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id)
 	udi = FILE_INFO(reg);
 	udi->fn = (char *)reg->dyn.addr->fname;
 	/* Lock replication instance using ftok semaphore */
-	if (!ftok_sem_get(reg, TRUE, REPLPOOL_ID, TRUE))
+	if (!ftok_sem_get(reg, TRUE, REPLPOOL_ID, immediate))
 		return FALSE;
 	repl_inst_get((char *)instname, &repl_instance);
 	semarg.buf = &semstat;
@@ -194,7 +194,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id)
 		repl_inst_recvpool_reset();
 
 	/* Release replication instance ftok semaphore lock */
-	if (!ftok_sem_release(reg, TRUE, TRUE))
+	if (!ftok_sem_release(reg, TRUE, immediate))
 		return FALSE;
 	return (jnlpool_stat && recvpool_stat);
 }

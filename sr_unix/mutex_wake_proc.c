@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,6 @@
 #include "gtm_socket.h"
 #include <sys/un.h>
 #include <string.h>
-#include <sys/mman.h>
 #include <errno.h>
 
 #include "gdsroot.h"
@@ -62,7 +61,11 @@ mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance)
 #else
 
 void
+#ifdef POSIX_MSEM
+mutex_wake_proc(sem_t *mutex_wake_msem_ptr)
+#else
 mutex_wake_proc(msemaphore *mutex_wake_msem_ptr)
+#endif
 {
 	/* Unlock the memsem to wake the proc waiting on it */
 	int	rc;
@@ -82,9 +85,13 @@ mutex_wake_proc(msemaphore *mutex_wake_msem_ptr)
 	 * Additonal note: this was converted to an EINTR wrapper macro.
 	 */
 
-	MSEM_UNLOCK(mutex_wake_msem_ptr, 0, rc);
+	do
+	{
+		rc = MSEM_UNLOCK(mutex_wake_msem_ptr);
+	} while (-1 == rc && EINTR == errno);
 	if (0 > rc)
-		rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Mutual Exclusion subsytem : Error with msem_unlock"), errno);
+		rts_error(VARLSTCNT(5) ERR_TEXT, 2,
+			  RTS_ERROR_TEXT("Mutual Exclusion subsytem : Error with msem_unlock/sem_post"), errno);
 	return;
 }
 

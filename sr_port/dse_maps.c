@@ -55,7 +55,7 @@
 #define MAX_UTIL_LEN 80
 
 GBLREF char             *update_array, *update_array_ptr;
-GBLREF int		update_array_size;
+GBLREF uint4		update_array_size;
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
 GBLREF block_id         patch_curr_blk;

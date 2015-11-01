@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,7 +97,7 @@ boolean_t repl_tr_good(uchar_ptr_t tr, int tr_len, seq_num seqno)
 				return FALSE;
 			}
 		}
-		if (seqno != GET_REPL_JNL_SEQNO(jrec))
+		if (seqno != GET_JNL_SEQNO(jrec))
 		{
 			assert(FALSE);
 			return FALSE;

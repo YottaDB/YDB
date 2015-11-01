@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@ CONDITION_HANDLER(mupip_set_jnl_ch)
 	error_def(ERR_MUNOFINISH);
 
 	START_CH
-	mupip_set_jnl_cleanup();
+	mupip_set_jnl_cleanup(FALSE);
 	PRN_ERROR
 	if (SEVERITY == ERROR  ||  SEVERITY == SEVERE)
 		mupip_exit(ERR_MUNOFINISH);

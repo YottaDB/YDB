@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,13 +57,19 @@
 #include "sec_shr_blk_build.h"
 #include "sec_shr_map_build.h"
 #include "add_inter.h"
+#include "send_msg.h"	/* for send_msg() prototype */
+#include "secshr_db_clnup.h"
+#include "gdsbgtr.h"
 
 #define FLUSH 1
+
+#define	WCBLOCKED_WBUF_DQD_LIT	"wcb_secshr_db_clnup_wbuf_dqd"
+#define	WCBLOCKED_NOW_CRIT_LIT	"wcb_secshr_db_clnup_now_crit"
 
 /* SECSHR_ACCOUNTING macro assumes csd is dereferencible and uses "csa", "csd" and "is_bg" */
 #define		SECSHR_ACCOUNTING(value)						\
 {											\
-	if (csa->read_write || is_bg)							\
+	if (do_accounting)								\
 	{										\
 		if (csd->secshr_ops_index < sizeof(csd->secshr_ops_array))		\
 			csd->secshr_ops_array[csd->secshr_ops_index] = (uint4)(value);	\
@@ -92,32 +98,41 @@
 
 #ifdef UNIX
 #  ifdef DEBUG_CHECK_LATCH
-#   define CHECK_LATCH(X) {								\
-	                          uint4 pid;						\
-				  if ((pid = (X)->latch_pid) == process_id)		\
-				  {							\
-					  SET_LATCH_GLOBAL(X, LOCK_AVAILABLE);		\
-					  util_out_print("Latch cleaned up", FLUSH);	\
-				  } else if (0 != pid && FALSE == is_proc_alive(pid, 0))\
-                                  {							\
-                                          util_out_print("Orphaned latch cleaned up", TRUE); \
-					  compswap((X), pid, LOCK_AVAILABLE);		\
-                                  }							\
-                          }
+#   define CHECK_LATCH(X, is_exiting)					\
+{									\
+	uint4 pid;							\
+									\
+	if ((pid = (X)->latch_pid) == process_id)			\
+	{								\
+		if (is_exiting)						\
+		{							\
+			SET_LATCH_GLOBAL(X, LOCK_AVAILABLE);		\
+			util_out_print("Latch cleaned up", FLUSH);	\
+		}							\
+	} else if (0 != pid && FALSE == is_proc_alive(pid, 0))		\
+	{								\
+		  util_out_print("Orphaned latch cleaned up", TRUE);	\
+		  compswap((X), pid, LOCK_AVAILABLE);			\
+	}								\
+}
 #else
-#   define CHECK_LATCH(X) {								\
-	                          uint4 pid;						\
-				  if ((pid = (X)->latch_pid) == process_id)		\
-				  {							\
-					  SET_LATCH_GLOBAL(X, LOCK_AVAILABLE);		\
-				  }							\
-				  else if (0 != pid && FALSE == is_proc_alive(pid, 0))	\
-					  compswap((X), pid, LOCK_AVAILABLE);		\
-                          }
+#   define CHECK_LATCH(X, is_exiting) 				\
+{								\
+	uint4 pid;						\
+								\
+	if ((pid = (X)->latch_pid) == process_id)		\
+	{							\
+		if (is_exiting)					\
+		{						\
+			SET_LATCH_GLOBAL(X, LOCK_AVAILABLE);	\
+		}						\
+	} else if (0 != pid && FALSE == is_proc_alive(pid, 0))	\
+		compswap((X), pid, LOCK_AVAILABLE);		\
+}
 #endif
 GBLREF uint4		process_id;
 #else
-#   define CHECK_LATCH(X)
+#   define CHECK_LATCH(X, is_exiting)
 #endif
 
 GBLDEF gd_addr		*(*get_next_gdr_addrs)();
@@ -135,10 +150,14 @@ GBLREF node_local_ptr_t	locknl;
 
 bool secshr_tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
 
-void secshr_db_clnup(boolean_t termination_mode)
+void secshr_db_clnup(enum secshr_db_state secshr_state)
 {
 	unsigned char		*chain_ptr;
-	boolean_t		is_bg, jnlpool_reg, tp_update_underway;
+	char			*wcblocked_ptr;
+	boolean_t		is_bg, jnlpool_reg, do_accounting, first_time = TRUE, is_exiting;
+	boolean_t		tp_update_underway = FALSE;	/* set to TRUE if TP commit was in progress or complete */
+	boolean_t		non_tp_update_underway = FALSE;	/* set to TRUE if non-TP commit was in progress or complete */
+	boolean_t		update_underway = FALSE;	/* set to TRUE if either TP or non-TP commit was underway */
 	int			max_bts;
 	unsigned int		lcnt;
 	cache_rec_ptr_t		clru, cr, cr_top, start_cr;
@@ -151,12 +170,94 @@ void secshr_db_clnup(boolean_t termination_mode)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		blk_ptr;
+	jnlpool_ctl_ptr_t	jpl;
+
+	error_def(ERR_WCBLOCKED);
 
 	if (NULL == get_next_gdr_addrs)
 		return;
-	tp_update_underway = FALSE;
+	/*
+	 * secshr_db_clnup() can be called with one of the following three values for "secshr_state"
+	 *
+	 * 	a) NORMAL_TERMINATION   --> We are called from the exit-handler for precautionary cleanup.
+	 * 				    We should NEVER be in the midst of a database update in this case.
+	 * 	b) COMMIT_INCOMPLETE    --> We are called from t_commit_cleanup().
+	 * 				    We should ALWAYS be in the midst of a database update in this case.
+	 * 	c) ABNORMAL_TERMINATION --> This is currently VMS ONLY. This process received a STOP/ID.
+	 * 				    We can POSSIBLY be in the midst of a database update in this case.
+	 * 				    When UNIX boxes allow kernel extensions, this can be made to handle "kill -9" too.
+	 *
+	 * If we are in the midst of a database update, then depending on the stage of the commit we are in,
+	 * 	we need to ROLL-BACK (undo the partial commit) or ROLL-FORWARD (complete the partial commit) the database update.
+	 *
+	 * t_commit_cleanup() handles the ROLL-BACK and secshr_db_clnup() handles the ROLL-FORWARD
+	 *
+	 * For all error conditions in the database commit logic, t_commit_cleanup() gets control first.
+	 * If then determines whether to do a ROLL-BACK or a ROLL-FORWARD.
+	 * If a ROLL-BACK needs to be done, then t_commit_cleanup() handles it all by itself and we will not come here.
+	 * If a ROLL-FORWARD needs to be done, then t_commit_cleanup() invokes secshr_db_clnup().
+	 * 	In this case, secshr_db_clnup() will be called with a "secshr_state" value of "COMMIT_INCOMPLETE".
+	 *
+	 * In case of a STOP/ID in VMS, secshr_db_clnup() is directly invoked with a "secshr_state" value of "ABNORMAL_TERMINATION".
+	 * Irrespective of whether we are in the midst of a database commit or not, t_commit_cleanup() does not get control.
+	 * Since the process can POSSIBLY be in the midst of a database update while it was STOP/IDed,
+	 * 	the logic for determining whether it is a ROLL-BACK or a ROLL-FORWARD needs to also be in secshr_db_clnup().
+	 * If it is determined that a ROLL-FORWARD needs to be done, secshr_db_clnup() takes care of it by itself.
+	 * But if a ROLL-BACK needs to be done, then secshr_db_clnup() DOES NOT invoke t_commit_cleanup().
+	 * Instead it sets csd->wc_blocked to TRUE thereby ensuring the next process that gets CRIT does a cache recovery
+	 * 	which will take care of doing more than the ROLL-BACK that t_commit_cleanup() would have otherwise done.
+	 *
+	 * The logic for determining if it is a ROLL-BACK or ROLL-FORWARD is explained below.
+	 * The commit logic flow in tp_tend and t_end can be captured as follows. Note that in t_end there is only one region.
+	 *
+	 *  1) Get crit on all regions
+	 *  2) Get crit on jnlpool
+	 *  3) jnlpool_ctl->early_write_addr += delta;
+	 *       For each region participating
+	 *       {
+	 *  4)     csa->ti->early_tn++;
+	 *         Write journal records
+	 *  5)     csa->hdr->reg_seqno = jnlpool_ctl->jnl_seqno + 1;
+	 *       }
+	 *       For each region participating
+	 *       {
+	 *  6)	    csa->t_commit_crit = TRUE;
+	 *             For every cw-set-element of this region
+	 *             {
+	 *               Commit this particular block.
+	 *               cs->mode = gds_t_committed;
+	 *             }
+	 *  7)       csa->t_commit_crit = FALSE;
+	 *  8)     csa->ti->curr_tn++;
+	 *       }
+	 *  9) jnlpool_ctl->write_addr = jnlpool_ctl->early_write_addr;
+	 * 10) jnlpool_ctl->jnl_seqno++;
+	 * 11) Release crit on jnlpool
+	 * 12) Release crit on and all regions
+	 *
+	 * If a TP transaction has proceeded to step (6) for at least one region, then "tp_update_underway" is set to TRUE
+	 * and the transaction cannot be rolled back but has to be committed. Otherwise the transaction is rolled back.
+	 *
+	 * If a non-TP transaction has proceeded to step (6), then "non_tp_update_underway" is set to TRUE
+	 * and the transaction cannot be rolled back but has to be committed. Otherwise the transaction is rolled back.
+	 *
+	 * There is "one exception" though. A non-TP transaction that does a duplicate set (i.e. has cw_set_depth = 0 although
+	 * update_trans is TRUE), WILL not set "non_tp_update_underway" to TRUE even though it has proceeded to step (7). This
+	 * is because there will be no cw_set_element that is updated to see that cs->mode is gds_t_committed. One can do
+	 * something similar to what is done for TP for duplicate sets which is to set si->update_trans to a special value
+	 * T_COMMIT_STARTED that will indicate this fact to secshr_db_clnup/t_commit_cleanup. But that unfortunately can
+	 * only be done through the global variable "update_trans" for non-TP and that is not accessible by secshr_db_clnup
+	 * unless it is passed as another parameter in init_secshr_addrs. Since that involves changing a whole lot of things
+	 * than is worth it, we temporarily roll-back a duplicate set non-TP update even though it has proceeded to step (7).
+	 *
+	 * There is an "exception to this exception" though and that is if secshr_db_clnup() is called from t_commit_cleanup(),
+	 * it will be called with secshr_state == COMMIT_INCOMPLETE and in that case we do not need access to "update_trans"
+	 * to determine the fact that we are past step (6). This is because t_commit_cleanup() (which had access to "update_trans")
+	 * has already determined we are past step (6) before calling secshr_db_clnup() and so we can rely on that.
+	 */
+	is_exiting = (ABNORMAL_TERMINATION == secshr_state) || (NORMAL_TERMINATION == secshr_state);
 	if (GTM_PROBE(sizeof(first_sgm_info_addrs), first_sgm_info_addrs, READ))
-	{
+	{	/* determine update_underway for TP transaction */
 		for (si = *first_sgm_info_addrs;  NULL != si;  si = si->next_sgm_info)
 		{
 			if (GTM_PROBE(sizeof(sgm_info), si, READ))
@@ -165,12 +266,49 @@ void secshr_db_clnup(boolean_t termination_mode)
 				{	/* Note that SECSHR_PROBE_REGION does a "continue" if any probes fail. */
 					SECSHR_PROBE_REGION(si->gv_cur_region);	/* sets csa */
 					if (csa->t_commit_crit || gds_t_committed == si->first_cw_set->mode)
+					{
 						tp_update_underway = TRUE;
+						update_underway = TRUE;
+					}
+					break;
+				} else if (si->update_trans)
+				{	/* case of duplicate set not creating any cw-sets but updating db curr_tn++ */
+					if (T_COMMIT_STARTED == si->update_trans)
+					{
+						tp_update_underway = TRUE;
+						update_underway = TRUE;
+					}
 					break;
 				}
 			} else
 				break;
 		}
+	}
+	if (GTM_PROBE(sizeof(unsigned char), cw_depth_addrs, READ))
+	{	/* determine update_underway for non-TP transaction */
+		/* we assume here that cw_set_depth is reset to 0 in t_end once an active non-TP transaction is complete */
+		if (0 != *cw_depth_addrs)
+		{
+			assert(!tp_update_underway);
+			assert(!update_underway);
+			cs = cw_set_addrs;
+			if (GTM_PROBE(sizeof(cw_set_element), cs, READ))
+			{
+				if (gds_t_committed == cs->mode)
+				{
+					non_tp_update_underway = TRUE;	/* non-tp update was underway */
+					update_underway = TRUE;
+				}
+			}
+		}
+	}
+	if (COMMIT_INCOMPLETE == secshr_state && !tp_update_underway)
+	{	/* if we are called from t_commit_cleanup and we have determined above that tp_update_underway is not TRUE,
+		 * then there should have been a non-TP update underway (otherwise t_commit_cleanup() would not have called us)
+		 * this takes care of the comment above which talks about "exception to this exception".
+		 */
+		non_tp_update_underway = TRUE;	/* non-tp update was underway */
+		update_underway = TRUE;
 	}
 	for (gd_header = (*get_next_gdr_addrs)(NULL);  NULL != gd_header;  gd_header = (*get_next_gdr_addrs)(gd_header))
 	{
@@ -183,8 +321,17 @@ void secshr_db_clnup(boolean_t termination_mode)
 				if (!GTM_PROBE(sizeof(sgmnt_data), csd, WRITE))
 					continue; /* would be nice to notify the world of a problem but where and how? */
 				is_bg = (csd->acc_meth == dba_bg);
-				if (csa->read_write || is_bg)		/* cannot update csd if MM and read-only */
-					csd->secshr_ops_index = 0;	/* start accounting otherwise */
+				do_accounting = FALSE;
+				/* do SECSHR_ACCOUNTING only if holding crit (to avoid another process' normal termination call
+				 * to secshr_db_clnup() from overwriting whatever important information we wrote. if we are in
+				 * crit, for the next process to overwrite us it needs to get crit which in turn will invoke
+				 * wcs_recover() which in turn will send whatever we wrote to the operator log).
+				 * also cannot update csd if MM and read-only. take care of that too. */
+				if (csa->now_crit && (csa->read_write || is_bg))
+				{	/* start accounting */
+					csd->secshr_ops_index = 0;
+					do_accounting = TRUE;
+				}
 				SECSHR_ACCOUNTING(3);	/* 3 is the number of arguments following including self */
 				SECSHR_ACCOUNTING(__LINE__);
 				SECSHR_ACCOUNTING(rundown_process_id);
@@ -199,12 +346,12 @@ void secshr_db_clnup(boolean_t termination_mode)
 				SECSHR_ACCOUNTING(3);	/* 3 is the number of arguments following including self */
 				SECSHR_ACCOUNTING(__LINE__);
 				SECSHR_ACCOUNTING(csa->ti->curr_tn);
-				CHECK_LATCH(&csa->backup_buffer->backup_ioinprog_latch);
+				CHECK_LATCH(&csa->backup_buffer->backup_ioinprog_latch, is_exiting);
                                 VMS_ONLY(
                                         if (csa->backup_buffer->backup_ioinprog_latch.latch_pid == rundown_process_id)
                                                 bci(&csa->backup_buffer->backup_ioinprog_latch.latch_word);
                                 )
-				if (GTM_PROBE(NODE_LOCAL_SIZE_DBS, csa->nl, WRITE))
+				if (GTM_PROBE(NODE_LOCAL_SIZE_DBS, csa->nl, WRITE) && is_exiting)
 				{
 #ifdef UNIX
 					/* If we hold any latches in the node_local area, release them. Note we do not check
@@ -212,9 +359,9 @@ void secshr_db_clnup(boolean_t termination_mode)
 					   the aswp logic. Since it is only used for the 3 state cache record lock and
 					   separate recovery exists for it, we do not do anything with it here.
 					*/
-					CHECK_LATCH(&csa->nl->wc_var_lock);
+					CHECK_LATCH(&csa->nl->wc_var_lock, is_exiting);
 #endif
-					if (ABNORMAL_TERMINATION == termination_mode)
+					if (ABNORMAL_TERMINATION == secshr_state)
 					{
 						if (csa->timer)
 						{
@@ -245,7 +392,7 @@ void secshr_db_clnup(boolean_t termination_mode)
 						SECSHR_ACCOUNTING(reg->sec_size);
 						continue;
 					}
-					CHECK_LATCH(&csa->acc_meth.bg.cache_state->cacheq_active.latch);
+					CHECK_LATCH(&csa->acc_meth.bg.cache_state->cacheq_active.latch, is_exiting);
 					start_cr = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
 					max_bts = csd->n_bts;
 					if (!GTM_PROBE(max_bts * sizeof(cache_rec), start_cr, WRITE))
@@ -256,22 +403,27 @@ void secshr_db_clnup(boolean_t termination_mode)
 						continue;
 					}
 					cr_top = start_cr + max_bts;
-					for (cr = start_cr;  cr < cr_top;  cr++)
-					{	/* walk write cache looking for incomplete writes and reads issued by self */
-						VMS_ONLY(
-							if ((0 == cr->iosb[0]) && (cr->epid == rundown_process_id))
-								cr->wip_stopped = TRUE;
-						)
-						CHECK_LATCH(&cr->rip_latch);
-						assert(rundown_process_id);
-						if ((cr->r_epid == rundown_process_id) && (0 == cr->dirty)
-								&& (FALSE == cr->in_cw_set))
-						{
-							cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
-							cr->blk = CR_BLKEMPTY;
-							assert(0 == cr->bt_index);/* ensure no bt points to this cr for empty blk */
-							/* don't mess with ownership the I/O may not yet be cancelled; ownership
-							 * will be cleared by whoever gets stuck waiting for the buffer */
+					if (is_exiting)
+					{
+						for (cr = start_cr;  cr < cr_top;  cr++)
+						{	/* walk the cache looking for incomplete writes and reads issued by self */
+							VMS_ONLY(
+								if ((0 == cr->iosb.cond) && (cr->epid == rundown_process_id))
+									cr->wip_stopped = TRUE;
+							)
+							CHECK_LATCH(&cr->rip_latch, is_exiting);
+							assert(rundown_process_id);
+							if ((cr->r_epid == rundown_process_id) && (0 == cr->dirty)
+									&& (FALSE == cr->in_cw_set))
+							{	/* increment cycle for blk number changes (for tp_hist) */
+								cr->cycle++;
+								cr->blk = CR_BLKEMPTY;
+								/* ensure no bt points to this cr for empty blk */
+								assert(0 == cr->bt_index);
+								/* don't mess with ownership the I/O may not yet be cancelled;
+								 * ownership will be cleared by whoever gets stuck waiting
+								 * for the buffer */
+							}
 						}
 					}
 				}
@@ -328,7 +480,7 @@ void secshr_db_clnup(boolean_t termination_mode)
 					}
 					if (NULL == si)
 					{
-						SECSHR_ACCOUNTING(3);
+						SECSHR_ACCOUNTING(2);
 						SECSHR_ACCOUNTING(__LINE__);
 					}
 				} else if (csa->t_commit_crit)
@@ -339,11 +491,23 @@ void secshr_db_clnup(boolean_t termination_mode)
 						SECSHR_ACCOUNTING(__LINE__);
 						SECSHR_ACCOUNTING(cw_depth_addrs);
 					} else
-					{
-						first_cw_set = cs = cw_set_addrs;
-						cs_top = cs + *cw_depth_addrs;
+					{	/* csa->t_commit_crit being TRUE is a clear cut indication that we have
+						 * reached stage (6). ROLL-FORWARD the commit unconditionally.
+						 */
+						if (0 != *cw_depth_addrs)
+						{
+							first_cw_set = cs = cw_set_addrs;
+							cs_top = cs + *cw_depth_addrs;
+						}
+						/* else is the case where we had a duplicate set that did not update any cw-set */
+						non_tp_update_underway = TRUE;
+						update_underway = TRUE;
 					}
 				}
+				/* It is possible that we were in the midst of a non-TP commit for this region at or past stage (7),
+				 * with csa->t_commit_crit set to FALSE. It is a case of duplicate SET with zero cw_set_depth.
+				 * See comment at beginning of module about commit logic flow and the non-TP "one exception"
+				 */
 				if (NULL != first_cw_set)
 				{
 					if (is_bg)
@@ -352,7 +516,11 @@ void secshr_db_clnup(boolean_t termination_mode)
 						lcnt = 0;
 					}
 					if (csa->t_commit_crit)
+					{
+						assert(NORMAL_TERMINATION != secshr_state); /* for normal termination we should not
+											     * have been in the midst of commit */
 						csd->trans_hist.free_blocks = csa->prev_free_blks;
+					}
 					SECSHR_ACCOUNTING(tp_update_underway ? 5 : 6);
 					SECSHR_ACCOUNTING(__LINE__);
 					SECSHR_ACCOUNTING(first_cw_set);
@@ -398,6 +566,8 @@ void secshr_db_clnup(boolean_t termination_mode)
 							csd->trans_hist.free_blocks -= cs->reference_cnt;
 						if ((gds_t_committed == cs->mode) || (gds_t_write_root == cs->mode))
 							continue;	/* already processed */
+						assert(NORMAL_TERMINATION != secshr_state); /* for normal termination we should not
+											     * have been in the midst of commit */
 						if (is_bg)
 						{
 							for (; lcnt++ < max_bts;)
@@ -637,9 +807,9 @@ void secshr_db_clnup(boolean_t termination_mode)
 					if (GTM_PROBE(sizeof(jnl_private_control), csa->jnl, WRITE))
 					{
 						jbp = csa->jnl->jnl_buff;
-						if (GTM_PROBE(sizeof(jnl_buffer), jbp, WRITE))
+						if (GTM_PROBE(sizeof(jnl_buffer), jbp, WRITE) && is_exiting)
 						{
-							CHECK_LATCH(&jbp->fsync_in_prog_latch);
+							CHECK_LATCH(&jbp->fsync_in_prog_latch, is_exiting);
 							if (VMS_ONLY(csa->jnl->qio_active)
 								UNIX_ONLY(jbp->io_in_prog_latch.latch_pid == process_id))
 							{
@@ -671,22 +841,47 @@ void secshr_db_clnup(boolean_t termination_mode)
 						SECSHR_ACCOUNTING(sizeof(jnl_private_control));
 					}
 				}
-				if (csa->freeze && csd->freeze == rundown_process_id && !csa->persistent_freeze)
+				if (is_exiting && csa->freeze && csd->freeze == rundown_process_id && !csa->persistent_freeze)
 				{
 					csd->image_count = 0;
 					csd->freeze = 0;
 				}
+				if (is_bg && (csa->wbuf_dqd || csa->now_crit))
+				{	/* if csa->wbuf_dqd == TRUE, most likely failed during REMQHI in wcs_wtstart
+					 * or db_csh_get.  cache corruption is suspected so set wc_blocked.
+					 * if csa->now_crit is TRUE, someone else should clean the cache, so set wc_blocked.
+					 */
+					SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+					if (csa->now_crit)
+					{
+						wcblocked_ptr = WCBLOCKED_NOW_CRIT_LIT;
+						BG_TRACE_PRO_ANY(csa, wcb_secshr_db_clnup_now_crit);
+					} else
+					{
+						wcblocked_ptr = WCBLOCKED_WBUF_DQD_LIT;
+						BG_TRACE_PRO_ANY(csa, wcb_secshr_db_clnup_wbuf_dqd);
+					}
+					UNIX_ONLY(
+						/* cannot send oplog message in VMS as privileged routines cannot do I/O */
+						send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_STR(wcblocked_ptr),
+							process_id, csa->ti->curr_tn, DB_LEN_STR(reg));
+					)
+				}
+				csa->wbuf_dqd = 0;	/* We can clear the flag now */
 				if (csa->now_crit)
 				{
-					if (is_bg)
-						csd->wc_blocked = TRUE;
 					if (csa->ti->curr_tn == csa->ti->early_tn - 1)
-					{
-						if (csa->t_commit_crit)
+					{	/* there can be at most one region in non-TP with different curr_tn and early_tn */
+						assert(!non_tp_update_underway || first_time);
+						assert(NORMAL_TERMINATION != secshr_state); /* for normal termination we should not
+											     * have been in the midst of commit */
+						DEBUG_ONLY(first_time = FALSE;)
+						if (update_underway)
 							csa->ti->curr_tn++;
 						else
 							csa->ti->early_tn = csa->ti->curr_tn;
 					}
+					assert(csa->ti->early_tn == csa->ti->curr_tn);
 					csa->t_commit_crit = FALSE;	/* ensure we don't process this region again */
 					if ((GTM_PROBE(NODE_LOCAL_SIZE_DBS, csa->nl, WRITE)) &&
                                                 (GTM_PROBE(CRIT_SPACE, csa->critical, WRITE)))
@@ -726,19 +921,15 @@ void secshr_db_clnup(boolean_t termination_mode)
 						SECSHR_ACCOUNTING(CRIT_SPACE);
 					}
 				}
-				VMS_ONLY(
-					if (is_bg && csa->wbuf_dqd)	/* most likely failed during REMQHI in wcs_wtstart */
-						csd->wc_blocked = TRUE;	/* cache corruption is suspected so set wc_blocked */
-				)
 #ifdef UNIX
 				/* All releases done now. Double check latch is really cleared */
 				if ((GTM_PROBE(NODE_LOCAL_SIZE_DBS, csa->nl, WRITE)) &&
 				    (GTM_PROBE(CRIT_SPACE, csa->critical, WRITE)))
 				{
-					CHECK_LATCH(&csa->critical->semaphore);
-					CHECK_LATCH(&csa->critical->crashcnt_latch);
-					CHECK_LATCH(&csa->critical->prochead.latch);
-					CHECK_LATCH(&csa->critical->freehead.latch);
+					CHECK_LATCH(&csa->critical->semaphore, is_exiting);
+					CHECK_LATCH(&csa->critical->crashcnt_latch, is_exiting);
+					CHECK_LATCH(&csa->critical->prochead.latch, is_exiting);
+					CHECK_LATCH(&csa->critical->freehead.latch, is_exiting);
 				}
 #endif
 			}	/* For all regions */
@@ -746,12 +937,24 @@ void secshr_db_clnup(boolean_t termination_mode)
 			break;
 	}	/* For all glds */
 	if (jnlpool_reg_addrs && (GTM_PROBE(sizeof(jnlpool_reg_addrs), jnlpool_reg_addrs, READ)))
-	{
+	{	/* although there is only one jnlpool reg, SECSHR_PROBE_REGION macro might do a "continue" and hence the for loop */
 		for (reg = *jnlpool_reg_addrs, jnlpool_reg = TRUE; jnlpool_reg && reg; jnlpool_reg = FALSE) /* only jnlpool reg */
 		{
 			SECSHR_PROBE_REGION(reg);	/* SECSHR_PROBE_REGION sets csa */
 			if (csa->now_crit)
-			{
+			{	/* there are asserts in jnlpool_init.c to ensure the below assignment of jpl is ok */
+				assert(NORMAL_TERMINATION != secshr_state); /* for normal termination we should not
+									     * have been holding the journal pool crit lock */
+				jpl = (jnlpool_ctl_ptr_t)((sm_uc_ptr_t)csa->critical - sizeof(jnlpool_ctl_struct));
+				if (GTM_PROBE(sizeof(jnlpool_ctl_struct), jpl, WRITE))
+				{
+					if ((jpl->early_write_addr != jpl->write_addr) && (update_underway))
+					{	/* we need to update journal pool to reflect the increase in jnl-seqno */
+						jpl->write_addr += jpl->jnlpool_size;	/* refresh hist */
+						jpl->jnl_seqno++;			/* increment jnl_seqno */
+						/* the above takes care of rolling forward steps (9) and (10) of the commit flow */
+					}
+				}
 				if ((GTM_PROBE(NODE_LOCAL_SIZE_DBS, csa->nl, WRITE)) &&
 					(GTM_PROBE(CRIT_SPACE, csa->critical, WRITE)))
 				{
@@ -766,6 +969,7 @@ void secshr_db_clnup(boolean_t termination_mode)
 						mutex_stoprelw(csa->critical);
 						csa->now_crit = FALSE;
 					)
+					/* the above takes care of rolling forward step (11) of the commit flow */
 				}
 			}
 		}

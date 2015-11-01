@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"		/* for memcpy */
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -26,6 +28,10 @@
 #include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
+#include "gtmimagename.h"
+#include "cmidef.h"		/* for cmmdef.h */
+#include "hashdef.h"		/* for cmmdef.h */
+#include "cmmdef.h"		/* for curr_entry structure definition */
 
 /* Include prototypes */
 #include "mlk_garbage_collect.h"
@@ -47,6 +53,7 @@ GBLREF	short		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
 GBLREF	tp_region	*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
 GBLREF  tp_region	*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
+GBLREF enum gtmImageTypes	image_type;
 
 /*
  * ------------------------------------------------------
@@ -67,6 +74,7 @@ uint4 mlk_lock(mlk_pvtblk *p,
 	int			siz, retval, status;
 	bool			blocked, was_crit;
 	sgmnt_addrs		*csa;
+	connection_struct	*curr_entry;	/* for GT.CM GNP server */
 
 	if (p->region->dyn.addr->acc_meth != dba_usr)
 	{
@@ -129,6 +137,14 @@ uint4 mlk_lock(mlk_pvtblk *p,
 					mlk_prcblk_delete(ctl, d, process_id);
 				d->owner = process_id;
 				d->auxowner = auxown;
+				if (auxown && (GTCM_GNP_SERVER_IMAGE == image_type))
+				{	/* called from gtcml_lock_internal() */
+					curr_entry = (connection_struct *)auxown;
+					d->auxpid = curr_entry->pvec->jpv_pid;
+					assert(sizeof(curr_entry->pvec->jpv_node) <= sizeof(d->auxnode));
+					memcpy(d->auxnode, &curr_entry->pvec->jpv_node[0], sizeof(curr_entry->pvec->jpv_node));
+					/* cases of calls from omi_prc_lock() and rc_prc_lock() are not currently handled */
+				}
 				d->sequence = p->sequence = csa->hdr->trans_hist.lock_sequence++;
 				MLK_LOGIN(d);
 				p->nodptr = d;

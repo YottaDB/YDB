@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,27 +38,20 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-#include "lockconst.h"
 #include "copy.h"
 #include "interlock.h"
 #include "relqueopi.h"
 #include "performcaslatchcheck.h"
 #include "relqop.h"
-#include "wcs_backoff.h"
+#include "wcs_sleep.h"
 #include "caller_id.h"
+#include "rel_quant.h"
+#include "sleep_cnt.h"
 
 GBLREF	volatile	int4	fast_lock_count;
 GBLREF	int4		process_id;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	int		num_additional_processors;
-
-#define QI_RETRY	128
-
-#ifdef QI_STARVATION
-#  undef QI_STARVATION
-#endif
-
-#define QI_STARVATION	1000
 
 #ifdef DEBUG_QUEUE
 #define VERIFY_QUEUE(base) verify_queue(base)
@@ -66,16 +59,15 @@ GBLREF	int		num_additional_processors;
 #define VERIFY_QUEUE(base)
 #endif
 
-
 int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 {
-	int	retries, spins, maxspin;
+	int	retries, spins, maxspins;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
-	maxspin = num_additional_processors ? QI_RETRY : 1;
-	for (retries = 0 ;  retries < QI_STARVATION ;  retries++)
+	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
+	for (retries = LOCK_TRIES - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
 	{
-		for (spins = maxspin; 0 < spins; spins--)
+		for (spins = maxspins; 0 < spins; spins--)
 		{
                         if (GET_SWAPLOCK(&base->latch))
 			{
@@ -90,9 +82,18 @@ int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 				return QUEUE_INSERT_SUCCESS;
 			}
 		}
-		if (0 != retries)
-			wcs_backoff(retries);
-		performCASLatchCheck(&base->latch, retries);
+		if (retries & 0x3)
+			/* On all but every 4th pass, do a simple rel_quant */
+			rel_quant();	/* Release processor to holder of lock (hopefully) */
+		else
+		{
+			/* On every 4th pass, we bide for awhile */
+			wcs_sleep(LOCK_SLEEP);
+			assert(0 == (LOCK_TRIES % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
+			/* If near end of loop, see if target is dead and/or wake it up */
+			if (RETRY_CASLATCH_CUTOFF == retries)
+				performCASLatchCheck(&base->latch, LOOP_CNT_SEND_WAKEUP);
+		}
 	}
 	DUMP_LOCKHIST();
 	--fast_lock_count;
@@ -104,13 +105,13 @@ int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 
 int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 {
-	int	retries, spins, maxspin;
+	int	retries, spins, maxspins;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
-	maxspin = num_additional_processors ? QI_RETRY : 1;
-	for (retries = 0 ;  retries < QI_STARVATION ;  retries++)
+	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
+	for (retries = LOCK_TRIES - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
 	{
-		for (spins = maxspin; 0 < spins; spins--)
+		for (spins = maxspins; 0 < spins; spins--)
 		{
                         if (GET_SWAPLOCK(&base->latch))
 			{
@@ -125,9 +126,18 @@ int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 				return QUEUE_INSERT_SUCCESS;
 			}
 		}
-		if (0 != retries)
-			wcs_backoff(retries);
-		performCASLatchCheck(&base->latch, retries);
+		if (retries & 0x3)
+			/* On all but every 4th pass, do a simple rel_quant */
+			rel_quant();	/* Release processor to holder of lock (hopefully) */
+		else
+		{
+			/* On every 4th pass, we bide for awhile */
+			wcs_sleep(LOCK_SLEEP);
+			/* If near end of loop, see if target is dead and/or wake it up */
+			assert(0 == (LOCK_TRIES % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
+			if (RETRY_CASLATCH_CUTOFF == retries)
+				performCASLatchCheck(&base->latch, LOOP_CNT_SEND_WAKEUP);
+		}
 	}
 	DUMP_LOCKHIST();
 	--fast_lock_count;
@@ -139,14 +149,14 @@ int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 
 que_ent_ptr_t remqhi1(que_head_ptr_t base)
 {
-	int		retries, spins, maxspin;
+	int		retries, spins, maxspins;
 	que_ent_ptr_t	ret;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
-	maxspin = num_additional_processors ? QI_RETRY : 1;
-	for (retries = 0 ;  retries < QI_STARVATION ;  retries++)
+	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
+	for (retries = LOCK_TRIES - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
 	{
-		for (spins = maxspin; 0 < spins; spins--)
+		for (spins = maxspins; 0 < spins; spins--)
 		{
                         if (GET_SWAPLOCK(&base->latch))
 			{
@@ -163,9 +173,18 @@ que_ent_ptr_t remqhi1(que_head_ptr_t base)
 				return ret;
 			}
 		}
-		if (0 != retries)
-			wcs_backoff(retries);
-		performCASLatchCheck(&base->latch, retries);
+		if (retries & 0x3)
+			/* On all but every 4th pass, do a simple rel_quant */
+			rel_quant();	/* Release processor to holder of lock (hopefully) */
+		else
+		{
+			/* On every 4th pass, we bide for awhile */
+			wcs_sleep(LOCK_SLEEP);
+			/* If near end of loop, see if target is dead and/or wake it up */
+			assert(0 == (LOCK_TRIES % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
+			if (RETRY_CASLATCH_CUTOFF == retries)
+				performCASLatchCheck(&base->latch, LOOP_CNT_SEND_WAKEUP);
+		}
 	}
 	DUMP_LOCKHIST();
 	--fast_lock_count;
@@ -177,14 +196,14 @@ que_ent_ptr_t remqhi1(que_head_ptr_t base)
 
 que_ent_ptr_t remqti1(que_head_ptr_t base)
 {
-	int		retries, spins, maxspin;
+	int		retries, spins, maxspins;
 	que_ent_ptr_t	ret;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
-	maxspin = num_additional_processors ? QI_RETRY : 1;
-	for (retries = 0 ;  retries < QI_STARVATION ;  retries++)
+	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
+	for (retries = LOCK_TRIES - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
 	{
-		for (spins = maxspin; 0 < spins; spins--)
+		for (spins = maxspins; 0 < spins; spins--)
 		{
                         if (GET_SWAPLOCK(&base->latch))
 			{
@@ -201,9 +220,18 @@ que_ent_ptr_t remqti1(que_head_ptr_t base)
 				return ret;
 			}
 		}
-		if (0 != retries)
-			wcs_backoff(retries);
-		performCASLatchCheck(&base->latch, retries);
+		if (retries & 0x3)
+			/* On all but every 4th pass, do a simple rel_quant */
+			rel_quant();	/* Release processor to holder of lock (hopefully) */
+		else
+		{
+			/* On every 4th pass, we bide for awhile */
+			wcs_sleep(LOCK_SLEEP);
+			assert(0 == (LOCK_TRIES % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
+			/* If near end of loop, see if target is dead and/or wake it up */
+			if (RETRY_CASLATCH_CUTOFF == retries)
+				performCASLatchCheck(&base->latch, LOOP_CNT_SEND_WAKEUP);
+		}
 	}
 	DUMP_LOCKHIST();
 	--fast_lock_count;

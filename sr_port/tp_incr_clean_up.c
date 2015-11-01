@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,10 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "copy.h"
-#include "change_reg.h"
+#include "longset.h"		/* also needed for cws_insert.h */
+#include "cws_insert.h"		/* for cw_stagnate_reinitialized */
+
+#include "change_reg.h"		/* prototypes */
 
 GBLREF  sgm_info        	*first_sgm_info;
 GBLREF  sgm_info        	*sgm_info_ptr;
@@ -167,6 +170,10 @@ void tp_incr_clean_up(short newlevel)
 		freed = free_last_n_elements(si->cw_set_list, num_free);
 		assert(freed);
 	}
+	assert((NULL != first_sgm_info) || (NULL == cw_stagnate) || cw_stagnate_reinitialized);
+		/* if no database activity, cw_stagnate should be uninitialized or reinitialized */
+	if (NULL != first_sgm_info)
+		CWS_RESET;
 	gv_cur_region = tmp_gv_cur_region;	/* restore gv_cur_region and associated pointers */
 	change_reg();
 	if (NULL == gv_cur_region)		/* change_reg() does not set sgm_info_ptr() in case of NULL gv_cur_region */
@@ -343,6 +350,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 		}
 		assert(!invalidate || (0 == cs_addrs->dir_tree->clue.end));
 		si->last_tp_hist = tli->tlvl_tp_hist_info;
+		si->update_trans = tli->update_trans;
 	} else
 	{	/* there was nothing at the beginning of transaction level (newlevel + 1) */
 		assert(tli == si->tlvl_info_head);
@@ -360,6 +368,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 		}
 		reinit_hashtab(&si->blks_in_use);
 		si->num_of_blks = 0;
+		si->update_trans = FALSE;
 		cs_addrs->dir_tree->clue.end = 0;
 		si->last_tp_hist = si->first_tp_hist;
 	}

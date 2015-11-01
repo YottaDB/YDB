@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -132,7 +132,7 @@ void mupip_rundown(void)
 		if (region && mu_star_specified)		/* rundown repl pools belonging to this global directory */
 		{
 			if (repl_inst_get_name((char *)replpool_id.instname, &full_len, sizeof(replpool_id.instname)))
-				if (!mu_rndwn_repl_instance(&replpool_id))
+				if (!mu_rndwn_repl_instance(&replpool_id, TRUE))
 					exit_status = ERR_MUNOTALLSEC;
 		}
 	} else

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,15 +24,16 @@
 #include "hashtab.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
-#include "longset.h"
+#include "longset.h"		/* also needed for cws_insert.h */
 #include "tp_change_reg.h"
+#include "cws_insert.h"		/* for cw_stagnate_reinitialized */
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	sgm_info		*sgm_info_ptr, *first_sgm_info;
 GBLREF	ua_list			*curr_ua, *first_ua;
 GBLREF	char			*update_array, *update_array_ptr;
-GBLREF	int			update_array_size, tp_allocation_clue;
-GBLREF	int			cumul_update_array_size;
+GBLREF	int			tp_allocation_clue;
+GBLREF	uint4			update_array_size, cumul_update_array_size;
 GBLREF  gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	gv_namehead		*gv_target_list;
@@ -51,46 +52,77 @@ void	tp_clean_up(boolean_t rollback_flag)
 	cw_set_element	*cse, *cse1;
 	int		cw_in_page = 0, hist_in_page = 0, level = 0;
 	int4		depth;
+	uint4		tmp_update_array_size;
 	off_chain	chain1;
-	ua_list		*next_ua;
+	ua_list		*next_ua, *tmp_ua;
 	srch_blk_status	*srch_hist;
 	boolean_t       is_mm;
+	sgmnt_addrs	*csa;
 
+	assert((NULL != first_sgm_info) || (NULL == cw_stagnate) || cw_stagnate_reinitialized);
+		/* if no database activity, cw_stagnate should be uninitialized or reinitialized */
 	if (first_sgm_info != NULL)
-	{
-		assert(first_ua != NULL);
-		if (first_ua->next_ua != NULL)
+	{	/* It is possible that first_ua is NULL at this point due to a prior call to tp_clean_up() that failed in
+		 * malloc() of tmp_ua->update_array. This is possible because we might have originally had two chunks of
+		 * update_arrays each x-bytes in size and we freed them up and requested 2x-bytes of contiguous storage
+		 * and we might error out on that malloc attempt (though this is very improbable).
+		 */
+		if ((NULL != first_ua) && (NULL != first_ua->next_ua))
 		{	/* if the original update array was too small, make a new larger one */
-			for (curr_ua = first_ua, update_array_size = 0; curr_ua != NULL; curr_ua = next_ua)
+			/* tmp_update_array_size is used below instead of the global variables (update_array_size,
+			 * first_ua->update_array_size or cumul_update_array_size) to handle error returns from	malloc()
+			 * The global variables are reset to represent a NULL update_array before the malloc. If the malloc
+			 * succeeds, they will be assigned the value of tmp_update_array_size and otherwise (if malloc fails
+			 * due to memory exhausted situation) they stay NULL which is the right thing to do.
+			 */
+			update_array_size = 0;
+			for (curr_ua = first_ua, tmp_update_array_size = 0; curr_ua != NULL; curr_ua = next_ua)
 			{
-				update_array_size += curr_ua->update_array_size;
 				next_ua = curr_ua->next_ua;
-				free(curr_ua->update_array);
+				/* curr_ua->update_array can be NULL in case we got an error in the ENSURE_UPDATE_ARRAY_SPACE
+				 * macro while trying to do the malloc of the update array. Since tp_clean_up() is called in
+				 * most exit handling code, it has to be very careful, hence the checks for non-NULLness below.
+				 */
+				if (NULL != &curr_ua->update_array[0])
+				{
+					free(curr_ua->update_array);
+					tmp_update_array_size += curr_ua->update_array_size;
+						/* add up only those update arrays that have been successfully malloced */
+				}
 				if (curr_ua != first_ua)
 					free(curr_ua);
 			}
-			assert(update_array_size == cumul_update_array_size);
-			curr_ua = first_ua;
-			first_ua->next_ua = NULL;
-			if (BIG_UA < update_array_size)
-				cumul_update_array_size = update_array_size = BIG_UA;
-			first_ua->update_array_size = update_array_size;
-			first_ua->update_array = update_array
-						= (char *)malloc(update_array_size);
+			assert(tmp_update_array_size == cumul_update_array_size);
+			tmp_ua = first_ua;
+			curr_ua = first_ua = NULL;	/* reset to indicate no update-array temporarily */
+			if (NULL != tmp_ua)
+			{
+				tmp_ua->next_ua = NULL;
+				tmp_ua->update_array = update_array = update_array_ptr = NULL;
+				tmp_ua->update_array_size = cumul_update_array_size = 0;
+				if (BIG_UA < tmp_update_array_size)
+					tmp_update_array_size = BIG_UA;
+				tmp_ua->update_array = (char *)malloc(tmp_update_array_size);
+				/* assign global variables only after malloc() succeeds */
+				update_array = tmp_ua->update_array;
+				cumul_update_array_size = update_array_size = tmp_ua->update_array_size = tmp_update_array_size;
+				curr_ua = first_ua = tmp_ua; /* set first_ua to non-NULL value once all mallocs are successful */
+			}
 		}
 		update_array_ptr = update_array;
 		if (rollback_flag) 		/* Rollback invalidates clues in all targets used by this transaction */
 		{
+			DEBUG_ONLY(csa = &FILE_INFO(first_sgm_info->gv_cur_region)->s_addrs;)
+			assert(NULL != first_sgm_info->next_sgm_info || csa->dir_tree->root == 1);
 			for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
 			{
 				if (gvnh->read_local_tn != local_tn)
 					continue;		/* Bypass gv_targets not used in this transaction */
-				assert(NULL != first_sgm_info->next_sgm_info || cs_addrs->dir_tree->root == 1);
 				gvnh->clue.end = 0;
 				chain1 = *(off_chain *)&gvnh->root;
 				if (chain1.flag)
 				{
-					assert(NULL != first_sgm_info->next_sgm_info || cs_addrs->dir_tree != gvnh);
+					assert(NULL != first_sgm_info->next_sgm_info || csa->dir_tree != gvnh);
 					gvnh->root = 0;
 				}
 			}
@@ -207,6 +239,7 @@ void	tp_clean_up(boolean_t rollback_flag)
       			reinitialize_list(si->tlvl_info_list);		/* reinitialize the tlvl_info buddy_list */
 			si->first_cw_set = si->last_cw_set = si->first_cw_bitmap = NULL;
 			si->cw_set_depth = 0;
+			si->update_trans = FALSE;
 			si->total_jnl_rec_size = cs_addrs->min_total_tpjnl_rec_size;	/* Reinitialize total_jnl_rec_size */
 			si->last_tp_hist = si->first_tp_hist;		/* reinitialize the tp history */
 			si->fresh_start = TRUE;
@@ -219,6 +252,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
 		global_tlvl_info_head = NULL;
 		reinitialize_list(global_tlvl_info_list);		/* reinitialize the global_tlvl_info buddy_list */
+		CWS_RESET; /* reinitialize the hashtable before restarting/committing the TP transaction */
 	}	/* if (any database work in the transaction) */
 
 	tp_allocation_clue = MASTER_MAP_SIZE * BLKS_PER_LMAP + 1;

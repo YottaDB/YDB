@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,15 @@
 #include "copy.h"
 #include "spec_type.h"
 #include "stringpool.h"
-#include "t_end.h"
+#include "filestruct.h"		/* needed for jnl.h */
+#include "gdscc.h"		/* needed for tp.h */
+#include "jnl.h"		/* needed for tp.h */
+#include "gdskill.h"		/* needed for tp.h */
+#include "hashtab.h"		/* needed for tp.h */
+#include "buddy_list.h"		/* needed for tp.h */
+#include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
+
+#include "t_end.h"		/* prototypes */
 #include "t_retry.h"
 #include "t_begin.h"
 #include "gvcst_search.h"
@@ -38,7 +46,6 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 GBLREF short            dollar_tlevel;
 GBLREF short            dollar_trestart;
-GBLREF uint4		t_err;
 GBLREF unsigned int	t_tries;
 GBLREF bool		is_standalone;
 GBLREF gv_namehead	*reset_gv_target;
@@ -56,7 +63,6 @@ void gvcst_root_search(void)
 	bool		is_valid_hist();
 	boolean_t	gbl_target_was_set;
 	gv_namehead	*save_targ;
-	error_def(ERR_GVGETFAIL);
 
 	assert((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth));
 	assert(gv_altkey->top == gv_currkey->top);
@@ -80,10 +86,7 @@ void gvcst_root_search(void)
 	gv_target = cs_addrs->dir_tree;
 	if (is_standalone)  /* *&&  (0 != gv_target->clue.end)  &&  (FALSE == is_valid_hist(&gv_target->hist))) */
 		gv_target->clue.end = 0;
-        if (0 == dollar_tlevel)
-		t_begin(ERR_GVGETFAIL, FALSE);
-	else
-		t_err = ERR_GVGETFAIL;
+	T_BEGIN_READ_NONTP_OR_TP(ERR_GVGETFAIL);
 	assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 	for (;;)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,8 @@
 #include "objlabel.h"
 
 GBLDEF int4		curr_addr, code_size;
-GBLDEF char		cg_phase;	/* code generation phase */
+GBLREF char		cg_phase;	/* code generation phase */
+GBLREF char		cg_phase_last;	/* previous code generation phase */
 GBLDEF uint4 		lits_text_size, lits_mval_size;
 
 GBLREF bool		run_time;
@@ -119,6 +120,7 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	*/
 	curr_addr = PTEXT_OFFSET;
 	cg_phase = CGP_APPROX_ADDR;
+	cg_phase_last = CGP_NOSTATE;
 	code_gen();
 	code_size = curr_addr;
 	cg_phase = CGP_ADDR_OPT;

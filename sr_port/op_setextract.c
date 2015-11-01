@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,7 +78,7 @@ void op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 
 	/* Calculate total string len. delim_cnt has needed padding delimiters for null fields */
 	strlen = pfxlen + padlen + expr->str.len + sfxlen;
-	if (strlen >= MAX_STRLEN)
+	if (strlen > MAX_STRLEN)
 		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 	if (strlen > (stringpool.top - stringpool.free))
 		stp_gcol(strlen);

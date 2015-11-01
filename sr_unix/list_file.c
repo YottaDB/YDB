@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,14 +37,15 @@ static readonly struct
 	unsigned char	newversion;
 	unsigned char	wrap;
 	unsigned char	width;
-	unsigned char	v_width[2];
+	unsigned char	v_width[sizeof(int4)];
 	unsigned char	eol;
 } open_params_list = {
 	(unsigned char)iop_newversion,	(unsigned char)iop_wrap,
+	(unsigned char)iop_recordsize,
 #ifdef BIGENDIAN
-	(unsigned char)iop_recordsize,	(unsigned char)0, (unsigned char)132,
+	(unsigned char)0, (unsigned char)0, (unsigned char)0, (unsigned char)132,
 #else
-	(unsigned char)iop_recordsize,	(unsigned char)132, (unsigned char)0,
+	(unsigned char)132, (unsigned char)0, (unsigned char)0, (unsigned char)0,
 #endif
 	(unsigned char)iop_eol
 	};
@@ -130,7 +131,7 @@ void list_cmd(void)
 
 
 LITDEF char gtm_copy_right[] = "\
-  Copyright 1985, 2003 Sanchez Computer Associates, Inc.";
+  Copyright 1985, 2004 Sanchez Computer Associates, Inc.";
 
 LITREF char gtm_release_name[];
 LITREF int4 gtm_release_name_len;

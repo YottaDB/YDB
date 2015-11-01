@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,13 +87,12 @@ static readonly char mtlab_type[] = {MTLAB_ANSI, MTLAB_ANSI, MTLAB_DOS11, MTLAB_
 
 #define VREC_HDR_LEN	4
 
-short
-iomt_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
+short iomt_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
 {
 	bool		do_rewind, do_erase;
 	int		lab_type;
 	unsigned char	ch, *buff, len;
-	unsigned short	length;
+	int4		blocksize, recordsize, length;
 	uint4		status;
 	d_mt_struct	*mt, newmt;
 	iosb		io_status_blk;
@@ -158,10 +157,20 @@ iomt_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
 		switch (ch = *(pp->str.addr + p_offset++))
 		{
 		case iop_blocksize:
-			GET_USHORT(newmt.block_sz, (pp->str.addr + p_offset));
+			GET_LONG(blocksize, (pp->str.addr + p_offset));
+			if (blocksize < 0)
+				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+			if (blocksize > MAX_BLK_SZ)
+				rts_error(VARLSTCNT(1) ERR_MTBLKTOOBIG);
+			newmt.block_sz = blocksize;
 			break;
 		case iop_recordsize:
-			GET_USHORT(newmt.record_sz, (pp->str.addr + p_offset));
+			GET_LONG(recordsize, (pp->str.addr + p_offset));
+			if (recordsize < 0)
+				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+			if (recordsize > MAX_REC_SZ)
+				rts_error(VARLSTCNT(1) ERR_MTRECTOOBIG);
+			newmt.record_sz = recordsize;
 			break;
 		case iop_rewind:
 			do_rewind = TRUE;
@@ -244,7 +253,7 @@ iomt_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
 			newmt.wrap = FALSE;
 			break;
 		case iop_length:
-			GET_USHORT(length, (pp->str.addr + p_offset));
+			GET_LONG(length, (pp->str.addr + p_offset));
 			if (length < 0)
 			{
 				iomt_closesp(fd);

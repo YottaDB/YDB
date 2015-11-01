@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,41 +55,39 @@
 #include "rc_cpt_ops.h"
 #include "add_inter.h"
 
-error_def(ERR_GVKILLFAIL);
-
 GBLREF	boolean_t		is_updproc;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF  boolean_t               pool_init;
+GBLREF	boolean_t		pool_init;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey, *gv_altkey;
 GBLREF	int4			gv_keysize;
 GBLREF	gv_namehead		*gv_target;
-GBLREF	int			update_array_size;
-GBLREF  int                     cumul_update_array_size;	/* needed for the ENSURE_UPDATE_ARRAY_SPACE macro */
+GBLREF	uint4			update_array_size, cumul_update_array_size; /* needed for the ENSURE_UPDATE_ARRAY_SPACE macro */
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
-GBLREF  kill_set                *kill_set_tail;
+GBLREF	kill_set		*kill_set_tail;
 GBLREF	short			dollar_tlevel;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*sgm_info_ptr;
-GBLREF	ua_list			*first_ua, *curr_ua;		/* needed for the ENSURE_UPDATE_ARRAY_SPACE macro */
-GBLREF	uint4			t_err;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		t_tries;
 GBLREF	boolean_t 		kip_incremented;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	boolean_t		is_replicator;
-GBLREF jnl_gbls_t		jgbl;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	int4			update_trans;
 
 void	gvcst_kill(bool do_subtree)
 {
 	bool			clue, flush_cache, left_extra, right_extra;
 	boolean_t		actual_update, next_fenced_was_null, jnl_enabled;
+	int4			prev_update_trans;
 	cw_set_element		*tp_cse;
 	enum cdb_sc		cdb_status;
-	int			lev, segment_update_array_size;
+	int			lev;
+	uint4			segment_update_array_size;
 	jnl_action		*ja;
 	jnl_format_buffer	*jfb;
 	kill_set		kill_set_head, *ks, *temp_ks;
@@ -103,17 +101,15 @@ void	gvcst_kill(bool do_subtree)
 		jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
 	if (REPL_ENABLED(cs_data) && pool_init && jnlpool_ctl->upd_disabled && !is_updproc)
 		rts_error(VARLSTCNT(1) ERR_SCNDDBNOUPD);
-	clue = 0 != gv_target->clue.end;
+	clue = (0 != gv_target->clue.end);
 	if (0 == dollar_tlevel)
 	{
 		kill_set_head.next_kill_set = NULL;
-		t_begin(ERR_GVKILLFAIL, TRUE);
 		if (jnl_fence_ctl.level)	/* next_fenced_was_null is reliable only if we are in ZTransaction */
 			next_fenced_was_null = (NULL == cs_addrs->next_fenced) ? TRUE : FALSE;
-	} else if (NULL == sgm_info_ptr->first_cw_set)
-			t_begin(ERR_GVKILLFAIL, TRUE);
-	else
-		t_err = ERR_GVKILLFAIL;
+	} else
+		prev_update_trans = sgm_info_ptr->update_trans;
+	T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVKILLFAIL);
 	assert(NULL != update_array);
 	assert(NULL != update_array_ptr);
 	assert(0 != update_array_size);
@@ -230,14 +226,28 @@ void	gvcst_kill(bool do_subtree)
 		if (!dollar_tlevel)
 		{
 			assert(FALSE == actual_update);
-			actual_update = cw_set_depth;	/* for non-TP, tp_cse is NULL even if cw_set_depth is non-zero */
+			actual_update = (0 != cw_set_depth); /* for non-TP, tp_cse is NULL even if cw_set_depth is non-zero */
+			/* reset update_trans to TRUE in case it got set to FALSE in previous retry */
+			/* do not treat redundant KILL as an update-transaction */
+			update_trans = actual_update;
 		} else
+		{
 			assert(!actual_update || sgm_info_ptr->cw_set_depth);
+			/* no need to reset sgm_info_ptr->update_trans in case actual_update is TRUE (like is done above for
+			 * non-TP) as retry in TP will have caused flow of control to restart from the beginning of transaction
+			 * and tp_clean_up would have reset sgm_info_ptr->update_trans anyways.
+			 */
+			if (!actual_update)
+				sgm_info_ptr->update_trans = prev_update_trans;	/* restore status prior to redundant KILL */
+		}
 		if ((jnl_enabled = JNL_ENABLED(cs_addrs)) && actual_update)
 		{	/* Maintain journal records only if the kill actually resulted in an update. */
 			if (0 == dollar_tlevel)
+			{
 				jfb = non_tp_jfb_ptr; /* Already malloced in gvcst_init() */
-			else
+				jgbl.cumul_jnl_rec_len = 0;
+				DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
+			} else
 			{
 				jfb = (jnl_format_buffer *)get_new_element(sgm_info_ptr->jnl_list, 1);
 				jfb->next = NULL;
@@ -253,10 +263,7 @@ void	gvcst_kill(bool do_subtree)
 			else
 				ja->operation = JNL_ZKILL;
 			jnl_format(jfb);
-			if (0 == dollar_tlevel)
-				jgbl.cumul_jnl_rec_len = jfb->record_size;
-			else
-				jgbl.cumul_jnl_rec_len += jfb->record_size;
+			jgbl.cumul_jnl_rec_len += jfb->record_size;
 			assert(0 == jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY);
 			DEBUG_ONLY(jgbl.cumul_index++;)
 		}

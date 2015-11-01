@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,17 +14,25 @@
  *          so that attaching shared memory does not interfere with malloc.
  */
 
-#include "gtm_stdio.h"
-#include <sys/ipc.h>
+#include "mdef.h"
+
 #include <sys/shm.h>
 #ifndef __MVS__
 #include <sys/sysmacros.h>
 #endif
-#include "mdef.h"
+#include "gtm_stdio.h"
+#include "gtm_ipc.h"
+
 #include "do_shmat.h"
+
+GBLREF	int4		gtm_shmflags;	/* Flags to OR into supplied flags */
 
 void *do_shmat(int4 shmid, const void *shmaddr, int4 shmflg)
 {
-	return(shmat((int)shmid, shmaddr, SHMAT_ARG((int)shmflg)));
+#ifdef __sparc
+	return(shmat((int)shmid, shmaddr, shmflg | gtm_shmflags | SHM_SHARE_MMU));
+#else
+	return(shmat((int)shmid, shmaddr, shmflg | gtm_shmflags));
+#endif
 }
 

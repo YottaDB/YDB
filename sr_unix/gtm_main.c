@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,7 @@
 #include "jobchild_init.h"
 #include "cli_parse.h"
 #include "invocation_mode.h"
+#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
 GBLREF enum gtmImageTypes	image_type;
 GBLREF IN_PARMS			*cli_lex_in_ptr;
@@ -65,6 +66,7 @@ int gtm_main (int argc, char **argv, char **envp)
 
 	gtmenvp = envp;
 	image_type = GTM_IMAGE;
+	gtm_env_init();	/* read in all environment variables */
 	err_init(stop_image_conditional_core);
 	cli_lex_setup(argc, argv);
 	/*	put the arguments into buffer, then clean up the token buffer

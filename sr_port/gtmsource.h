@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,38 +80,29 @@ typedef enum
 #define GTMSOURCE_MIN_TCP_RECV_BUFSIZE	(512)		/* anything less than this, issue a warning */
 #define GTMSOURCE_TCP_RECV_BUFSIZE	(1024)		/* not much inbound traffic, we can live with a low limit */
 
-typedef struct
-{
-	replpool_identifier	jnlpool_id;
-	seq_num	start_jnl_seqno;/* The sequence number with which operations
-				 * started */
-	volatile seq_num jnl_seqno; 	/* Sequence number for transactions.
-			    	         * Updated by GTM process. Volatile to
-					 * force load on every access */
-	uint4	jnldata_base_off; /* Journal pool offset from where journal
-				   * data starts */
-	uint4	jnlpool_size; 	/* available space for journal data in bytes */
-	uint4	write; 		/* Relative offset from jnldata_base_off
-				 * for the next journal record to be written.
-				 * Updated by GTM process. */
-	uint4	lastwrite_len;  /* The length of the last transaction written
-				 * into the journal pool. Copied to
-				 * jnldata_hdr.prev_jnldata_len before writing
-				 * into the pool. Updated by GTM process */
-	volatile qw_off_t early_write_addr; /* Virtual address assuming the
-				    	     * to-be-written jnl records are
-				    	     * already written into the journal
-				    	     * pool. Is equal to write_addr except
-				    	     * in the window when the actual write
-				    	     * takes place. volatile to force load
-					     * on every access */
-	qw_off_t write_addr;    /* Virtual address of the next journal record
-			     	 * to be written in the merged journal file.
-			     	 * Note that the merged journal may not exist.
-			     	 * Updated by GTM process */
+#define GTMSOURCE_FH_FLUSH_INTERVAL	60 /* seconds, if required, flush file header(s) every these many seconds */
 
-	boolean_t	upd_disabled;	/* Identify whether updates are disabled or not
-					 *  on the secondary */
+typedef struct
+{ /* IMPORTANT : all fields that are used by the source server reading from pool logic must be defined VOLATILE to avoid compiler
+   * optimization, forcing fresh load on every access */
+	replpool_identifier	jnlpool_id;
+	seq_num			start_jnl_seqno;	/* The sequence number with which operations started */
+	volatile seq_num 	jnl_seqno; 		/* Sequence number for transactions. Updated by GTM process */
+	uint4			jnldata_base_off;	/* Journal pool offset from where journal data starts */
+	uint4			jnlpool_size; 		/* Available space for journal data in bytes */
+	uint4			write; 			/* Relative offset from jnldata_base_off for the next journal record to
+							 * be written. Updated by GTM process. */
+	volatile uint4		lastwrite_len;  	/* The length of the last transaction written into the journal pool.
+							 * Copied to jnldata_hdr.prev_jnldata_len before writing into the pool.
+							 * Updated by GTM process. */
+	volatile qw_off_t	early_write_addr;	/* Virtual address assuming the to-be-written jnl records are already
+							 * written into the journal pool. Is equal to write_addr except in the
+							 * window when the actual write takes place. */
+	volatile qw_off_t	write_addr;		/* Virtual address of the next journal record to be written in the merged
+							 * journal file.  Note that the merged journal may not exist.
+			     	 			 * Updated by GTM process */
+	boolean_t		upd_disabled;		/* Identify whether updates are disabled or not  on the secondary */
+	int4			int16_filler;		/* To make size of the structure 16-byte multiple */
 } jnlpool_ctl_struct;
 
 #if defined(__osf__) && defined(__alpha)
@@ -343,6 +334,35 @@ typedef struct
 		}									\
 	}
 
+#define UPDATE_RESYNC_SEQNO(REGION, pre_update, post_update)							\
+{ /* modifies csa, was_crit; uses pre_update, post_update */							\
+	csa = &FILE_INFO(REGION)->s_addrs;									\
+	if (REPL_ENABLED(csa->hdr))										\
+	{ /* Although csa->hdr->resync_seqno is only modified by the source					\
+	   * server and never concurrently, it is accessed by fileheader_sync() which				\
+	   * does it while in crit. To avoid the latter from reading an inconsistent				\
+	   * value (i.e. neither the pre-update nor the post-update value), which is				\
+	   * possible if the 8-byte operation is not atomic but a sequence of two				\
+	   * 4-byte operations AND if the pre-update and post-update value differ in				\
+	   * their most significant 4-bytes, we grab crit.							\
+	   *													\
+	   * For native INT8 platforms, we expect the compiler to optimize the "if" away.			\
+	   *													\
+	   * Note: the ordering of operands in the below if check is the way it is because			\
+	   * a. the more frequent case is QWCHANGE_IS_READER_CONSISTENT returning TRUE.				\
+	   * b. source server does not hold crit coming here (but we are covering the case			\
+	   *    when it may)											\
+	   */													\
+		if (!QWCHANGE_IS_READER_CONSISTENT(pre_update, post_update)					\
+				&& FALSE == (was_crit = csa->now_crit))						\
+			grab_crit(REGION);									\
+		FILE_INFO(REGION)->s_addrs.hdr->resync_seqno = post_update;					\
+		if (!QWCHANGE_IS_READER_CONSISTENT(pre_update, post_update)					\
+				&& FALSE == was_crit)								\
+			rel_crit(REGION);									\
+	}													\
+}
+
 /********** Source server function prototypes **********/
 int		gtmsource(void);
 boolean_t	gtmsource_is_heartbeat_overdue(time_t *now, repl_heartbeat_msg_t *overdue_heartbeat);
@@ -389,5 +409,6 @@ int		gtmsource_init_heartbeat(void);
 int		gtmsource_process_heartbeat(repl_heartbeat_msg_t *heartbeat_msg);
 int		gtmsource_send_heartbeat(time_t *now);
 int		gtmsource_stop_heartbeat(void);
+void		gtmsource_flush_fh(seq_num resync_seqno);
 
 #endif /* GTMSOURCE_H */

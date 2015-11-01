@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -291,6 +291,9 @@ void jnlpool_init(jnlpool_user pool_user,
 			RTS_ERROR_LITERAL("Error with journal pool shmat"), save_errno);
 	}
 	csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + sizeof(jnlpool_ctl_struct));
+	/* secshr_db_clnup() relies on this relationship between jnlpool_ctl and csa->critical, hence the following assert */
+	assert(sizeof(jnlpool_ctl_struct) == ROUND_UP(sizeof(jnlpool_ctl_struct), (2*BITS_PER_UCHAR)));
+	assert((sm_uc_ptr_t)csa->critical == ((sm_uc_ptr_t)jnlpool.jnlpool_ctl + sizeof(jnlpool_ctl_struct)));
 	jnlpool_mutex_spin_parms = (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)csa->critical + CRIT_SPACE);
 	csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)csa->critical + CRIT_SPACE + sizeof(mutex_spin_parms_struct));
 	if (shm_created)

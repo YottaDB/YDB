@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -347,6 +347,7 @@ struct extcall_package_list	*exttab_parse (mval *package)
 	error_def(ERR_ZCMLTSTATUS);
 	error_def(ERR_ZCRPARMNAME);
 	error_def(ERR_ZCPREALLVALPAR);
+	error_def(ERR_ZCPREALLVALINV);
 	/* First, construct package name environment variable */
 	memcpy(str_buffer, PACKAGE_ENV_PREFIX, sizeof(PACKAGE_ENV_PREFIX));
 	tbp = &str_buffer[sizeof(PACKAGE_ENV_PREFIX) - 1];
@@ -450,6 +451,10 @@ struct extcall_package_list	*exttab_parse (mval *package)
 				ret_pre_alloc_val = scan_array_bound(&tbp,ret_tok);
 			else
 				ext_stx_error(ERR_ZCPREALLVALPAR, ext_table_file_name);
+			/* We should allow the pre-allocated value upto to the maximum string size (MAX_STRLEN) plus 1 for the
+			 * extra terminating NULL. Negative values would have been caught by scan_array_bound() above */
+			if (ret_pre_alloc_val > MAX_STRLEN + 1)
+				ext_stx_error(ERR_ZCPREALLVALINV, ext_table_file_name);
 		} else
 			ret_pre_alloc_val = -1;
 		end = scan_ident(tbp);
@@ -505,6 +510,10 @@ struct extcall_package_list	*exttab_parse (mval *package)
 					parameter_alloc_values[parameter_count] = scan_array_bound(&tbp, pr);
 				else
 					ext_stx_error(ERR_ZCPREALLVALPAR, ext_table_file_name);
+				/* We should allow the pre-allocated value upto to the maximum string size (MAX_STRLEN) plus 1 for
+				 * the extra terminating NULL. Negative values would have been caught by scan_array_bound() above */
+				if (parameter_alloc_values[parameter_count] > MAX_STRLEN + 1)
+					ext_stx_error(ERR_ZCPREALLVALINV, ext_table_file_name);
 			} else
 				parameter_alloc_values[parameter_count] = -1;
 			tbp = scan_space(tbp);

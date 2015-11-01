@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,7 @@
 
 #include "gtcm.h"
 #include "error.h"
+#include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 
 #ifndef lint
 static char rcsid[] = "$Header:$";
@@ -89,18 +90,19 @@ int main(int argc, char_ptr_t argv[])
     int		  i;
     char	  buff[OMI_BUFSIZ];
 
+    gtm_env_init(); /* read in all environment variables before calling any function particularly malloc (from err_init below)*/
 /*  Open the packet log file for playback */
     if (argc == 1)
 	conn.fd = fileno(stdin);
     else if (argc == 2) {
 	if (INV_FD_P((conn.fd = open(argv[argc - 1], O_RDONLY)))) {
-	    printf("%s: open(\"%s\"): %s\n", argv[0], argv[argc - 1],
+	    PRINTF("%s: open(\"%s\"): %s\n", argv[0], argv[argc - 1],
 		   sys_errlist[errno]);
 	    exit(-1);
 	}
     }
     else {
-	printf("%s: bad command line arguments\n\t%s [ filename ]\n",
+	PRINTF("%s: bad command line arguments\n\t%s [ filename ]\n",
 	       argv[0], argv[0]);
 	exit(-1);
     }
@@ -140,15 +142,15 @@ int main(int argc, char_ptr_t argv[])
 	if (omi_srvc_xact(&conn) < 0)
 	    break;
 
-    printf("%d seconds connect time\n", time((time_t)0) - conn.stats.start);
-    printf("%d OMI transactions\n", omi_nxact);
-    printf("%d OMI errors\n", omi_nerrs);
+    PRINTF("%d seconds connect time\n", time((time_t)0) - conn.stats.start);
+    PRINTF("%d OMI transactions\n", omi_nxact);
+    PRINTF("%d OMI errors\n", omi_nerrs);
 #ifdef GTCM_RC
-    printf("%d RC transactions\n", rc_nxact);
-    printf("%d RC errors\n", rc_nerrs);
+    PRINTF("%d RC transactions\n", rc_nxact);
+    PRINTF("%d RC errors\n", rc_nerrs);
 #endif /* defined(GTCM_RC) */
-    printf("%d bytes recv'd\n", conn.stats.bytes_recv);
-    printf("%d bytes sent\n", conn.stats.bytes_send);
+    PRINTF("%d bytes recv'd\n", conn.stats.bytes_recv);
+    PRINTF("%d bytes sent\n", conn.stats.bytes_send);
 
     gtcm_exit();
 

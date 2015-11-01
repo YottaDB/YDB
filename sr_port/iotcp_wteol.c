@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@
 #include "iotcpdefsp.h"
 #include "iotcproutine.h"
 
-void	iotcp_wteol(short x, io_desc *iod)
+void	iotcp_wteol(int4 x, io_desc *iod)
 {
 	/* pending a change request C9A06-001531 */
 	return;

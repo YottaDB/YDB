@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,6 +67,8 @@
 
 GBLREF  seq_num         seq_num_one, seq_num_zero;
 
+static	int		upgrade_standalone_sems = -1;
+
 static void init_replication(sgmnt_data *new_head)
 {
         /* initialize replication related fields */
@@ -75,6 +77,18 @@ static void init_replication(sgmnt_data *new_head)
         QWASSIGN(new_head->old_resync_seqno, seq_num_one);
         new_head->resync_tn = 1;
         new_head->repl_state = repl_closed;              /* default */
+}
+
+CONDITION_HANDLER(mupip_upgrade_ch)
+{
+	START_CH;
+	PRN_ERROR;
+	if (-1 != upgrade_standalone_sems)
+	{
+		if (0 != sem_rmid(upgrade_standalone_sems))
+			util_out_print("Error with sem_rmid : %d [0x%x]", TRUE, upgrade_standalone_sems, upgrade_standalone_sems);
+	}
+	NEXTCH;
 }
 
 void mupip_upgrade(void)
@@ -86,7 +100,7 @@ void mupip_upgrade(void)
 	unsigned short	fn_len;
 	int4		fd, save_errno, old_hdr_size, new_hdr_size, status, bufsize, dsize, datasize[2];
 	int4            old_hdr_size_vbn, new_hdr_size_vbn;
-	int		fstat_res, sems;
+	int		fstat_res;
 	off_t 		last_full_grp_startoff, old_file_len, old_file_len2, read_off, write_off, old_start_vbn_off;
 	block_id	last_full_grp_startblk;
 	v3_sgmnt_data	old_head_data, *old_head;
@@ -100,10 +114,11 @@ void mupip_upgrade(void)
 	error_def(ERR_DBFILOPERR);
 	error_def(ERR_DBPREMATEOF);
 
+	ESTABLISH(mupip_upgrade_ch);
 	fn_len = sizeof(fn);
 	if (!cli_get_str("FILE", fn, &fn_len))
 		rts_error(VARLSTCNT(1) ERR_MUNODBNAME);
-	if (!(mupip_upgrade_standalone(fn, &sems)))
+	if (!(mupip_upgrade_standalone(fn, &upgrade_standalone_sems)))
 		rts_error(VARLSTCNT(1) ERR_MUNOUPGRD);
 	if (-1 == (fd = OPEN(fn, O_RDWR)))
 	{
@@ -132,11 +147,9 @@ void mupip_upgrade(void)
 
 	/* Prepare v3.x file header buffer */
 	old_hdr_size  = sizeof(*old_head);
-	util_out_print("Old header size: !SL", FLUSH, old_hdr_size);
 	old_head = &old_head_data;
 	/* Prepare v4.x file header buffer */
 	new_hdr_size = sizeof(*new_head);
-	util_out_print("New header size: !SL", FLUSH, new_hdr_size);
 	new_head = &new_head_data;
 	memset(new_head, 0, new_hdr_size);
 	old_hdr_size_vbn = DIVIDE_ROUND_UP(old_hdr_size, DISK_BLOCK_SIZE);
@@ -169,8 +182,7 @@ void mupip_upgrade(void)
 		}
 	}
 	else
-	{
-		/* Note: We assume that if the V4.x header and current GT.M file header
+	{	/* Note: We assume that if the V4.x header and current GT.M file header
 		 *       has same field names, they are at same offset */
 		/* READ the header from file again as V4.x header */
                 LSEEKREAD(fd, 0, new_head, new_hdr_size, status);
@@ -231,8 +243,15 @@ void mupip_upgrade(void)
                         rts_error(VARLSTCNT(5) ERR_DBFILOPERR, 2, fn_len, fn, status);
                 close(fd);
                 util_out_print("File !AD successfully upgraded.!/", FLUSH, fn_len, fn);
+		if (0 != sem_rmid(upgrade_standalone_sems))
+		{
+			util_out_print("Error with sem_rmid : %d [0x%x]", TRUE, upgrade_standalone_sems, upgrade_standalone_sems);
+			rts_error(VARLSTCNT(1) ERR_MUNOUPGRD);
+		}
                 mupip_exit(SS_NORMAL);
 	}
+	util_out_print("Old header size: !SL", FLUSH, old_hdr_size);
+	util_out_print("New header size: !SL", FLUSH, new_hdr_size);
 	if (old_head->createinprogress)
 	{
 		close(fd);
@@ -426,9 +445,10 @@ void mupip_upgrade(void)
 	free(upgrd_buff[1]);
 	close(fd);
 	util_out_print("File !AD successfully upgraded.!/", FLUSH, fn_len, fn);
-	if (0 != sem_rmid(sems))
+	REVERT;
+	if (0 != sem_rmid(upgrade_standalone_sems))
 	{
-		util_out_print("Error with sem_rmid", TRUE);
+		util_out_print("Error with sem_rmid : %d [0x%x]", TRUE, upgrade_standalone_sems, upgrade_standalone_sems);
 		rts_error(VARLSTCNT(1) ERR_MUNOUPGRD);
 	}
 	mupip_exit(SS_NORMAL);

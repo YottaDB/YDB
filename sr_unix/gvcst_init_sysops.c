@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_sem.h"
+#include "gtm_statvfs.h"
 
 #include "gt_timer.h"
 #include "gdsroot.h"
@@ -86,6 +87,8 @@ GBLREF  boolean_t               sem_incremented;
 GBLREF  boolean_t               mupip_jnl_recover;
 GBLREF	ipcs_mesg		db_ipcs;
 GBLREF	node_local_ptr_t	locknl;
+GBLREF	boolean_t		new_dbinit_ipc;
+GBLREF	boolean_t		gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
 
 #ifndef MUTEX_MSEM_WAKE
 GBLREF	int 	mutex_sock_fd;
@@ -98,6 +101,8 @@ LITREF  int4                    gtm_release_name_len;
 /* if debugging large address stuff, make all memory segments allocate above 1G line */
 GBLDEF  sm_uc_ptr_t     next_smseg = (sm_uc_ptr_t)(1L * 1024 * 1024 * 1024);
 #endif
+
+OS_PAGE_SIZE_DECLARE
 
 static  int             errno_save;
 error_def(ERR_DBFILERR);
@@ -232,11 +237,11 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd)
 void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 {
 	static boolean_t	mutex_init_done = FALSE;
-	boolean_t       	is_bg, read_only, new_ipc = FALSE;
+	boolean_t       	is_bg, read_only;
 	char            	machine_name[MAX_MCNAMELEN];
 	file_control    	*fc;
 	int			gethostname_res, stat_res, mm_prot;
-	int4            	status, semval;
+	int4            	status, semval, dblksize, fbwsize;
 	sm_long_t       	status_l;
 	sgmnt_addrs     	*csa;
 	sgmnt_data_ptr_t        csd;
@@ -245,6 +250,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	union semun		semarg;
 	struct semid_ds		semstat;
 	struct shmid_ds         shmstat;
+	struct statvfs		dbvfs;
 	uint4           	sopcnt;
 	unix_db_info    	*udi;
 #ifdef periodic_timer_removed
@@ -262,6 +268,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	assert(tsd->acc_meth == dba_bg  ||  tsd->acc_meth == dba_mm);
 	is_bg = (dba_bg == tsd->acc_meth);
 	read_only = reg->read_only;
+	new_dbinit_ipc = FALSE;	/* we did not create a new ipc resource */
 	udi = FILE_INFO(reg);
 	memset(machine_name, 0, sizeof(machine_name));
 	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, gethostname_res))
@@ -310,7 +317,8 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 					ERR_TEXT, 2, LEN_AND_LIT("Error with database control semget"), errno);
 			}
-			new_ipc = TRUE;
+			udi->shmid = INVALID_SHMID;	/* reset shmid so dbinit_ch does not get confused in case we go there */
+			new_dbinit_ipc = TRUE;
 			tsd->semid = udi->semid;
 			semarg.val = GTM_ID;
 			/*
@@ -379,10 +387,11 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		if (INVALID_SHMID != udi->shmid || 0 != udi->shm_ctime)
 			/* make sure mu_rndwn_file() has reset shared memory */
 			GTMASSERT;
-		new_ipc = TRUE;
+		udi->shmid = INVALID_SHMID;	/* reset shmid so dbinit_ch does not get confused in case we go there */
+		new_dbinit_ipc = TRUE;
 	}
 	sem_incremented = TRUE;
-	if (new_ipc)
+	if (new_dbinit_ipc)
 	{
 		/* Create new shared memory using IPC_PRIVATE. System guarantees a unique id */
 #ifdef __MVS__
@@ -426,7 +435,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	csa->lock_addrs[0] = (sm_uc_ptr_t)csa->backup_buffer + BACKUP_BUFFER_SIZE + 1;
 	csa->lock_addrs[1] = csa->lock_addrs[0] + LOCK_SPACE_SIZE(tsd) - 1;
 	csa->total_blks = tsd->trans_hist.total_blks;   		/* For test to see if file has extended */
-	if (new_ipc)
+	if (new_dbinit_ipc)
 	{
 		memset(csa->nl, 0, sizeof(*csa->nl));			/* We allocated shared storage -- we have to init it */
 		if (JNL_ALLOWED(csa))
@@ -465,7 +474,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	}
 	if (!csa->nl->glob_sec_init)
 	{
-		assert(new_ipc);
+		assert(new_dbinit_ipc);
 		if (is_bg)
 			*csd = *tsd;
 		if (csd->machine_name[0])                  /* crash occured */
@@ -538,6 +547,34 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		if (-1 == stat_res)
 			rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
 		set_gdid_from_stat(&csa->nl->unique_id.uid, &stat_buf);
+		if (gtm_fullblockwrites)
+		{	/* We have been asked to do FULL BLOCK WRITES for this database. On *NIX, attempt to get the filesystem
+			   blocksize from statvfs. This allows a full write of a blockwithout the OS having to fetch the old
+			   block for a read/update operation. We will round the IOs to the next filesystem blocksize if the
+			   following criteria are met:
+
+			   1) Database blocksize must be a whole multiple of the filesystem blocksize for the above
+			      mentioned reason.
+
+			   2) Filesystem blocksize must be a factor of the size of the database file header. This is due
+			      to the fact that the fileheader is of an odd size (currently 24K) so only certain pagesize
+			      and database block size combinations give the aligned writes necessary for this support to
+			      make sense.
+
+			   The saved length (if the feature is enabled) will be the filesystem blocksize and will be the
+			   length that a database IO is rounded up to prior to initiation of the IO.
+			*/
+			FSTATVFS(udi->fd, &dbvfs, status);
+			if (0 == status)
+			{
+				dblksize = csd->blk_size;
+				fbwsize = dbvfs.f_bsize;
+				if (0 != fbwsize && (0 == dblksize % fbwsize) && (0 == sizeof(sgmnt_data) % fbwsize))
+					csa->do_fullblockwrites = TRUE;		/* This region is fullblockwrite enabled */
+				/* Report this length in DSE even if not enabled */
+				csa->fullblockwrite_len = fbwsize;		/* Length for rounding fullblockwrite */
+			}
+		}
 	} else
 	{
 		if (strcmp(csa->nl->machine_name, machine_name))       /* machine names do not match */
@@ -622,7 +659,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 				  ERR_TEXT, 2, LEN_AND_LIT("Error with database header flush"), errno_save);
 		}
-	} else if (read_only && new_ipc)
+	} else if (read_only && new_dbinit_ipc)
 	{	/* For read-only process if shared memory and semaphore created for first time,
 		 * semaphore and shared memory id, and semaphore creation time are written to disk.
 		 */

@@ -129,16 +129,6 @@ void t_retry(enum cdb_sc failure)
 		assert(NULL != gv_target);
 		if (NULL != gv_target)
 			gv_target->clue.end = 0;
-		DEBUG_ONLY(
-			/* gvcst_put currently writes a SET journal-record for every update and extra_block_split phase. This
-			 * means that it may write more than one journal-record although only one update went in. This is
-			 * because of the way the jnl code is structured in gvcst_put rather than in gvcst_put_blk
-			 * Until that structuring is moved into gvcst_put_blk, we should take care not to reset jgbl.cumul_index
-			 * for gvcst_put which is identified by (ERR_GVPUTFAIL == t_err) or by (ERR_GVKILLFAIL != t_err).
-			 */
-			if (ERR_GVPUTFAIL != t_err)
-				jgbl.cumul_index = jgbl.cu_jnl_index = 0;
-		)
 	} else
 	{	/* for TP, do the minimum; most of the logic is in tp_retry, because it is also invoked directly from t_commit */
 		t_fail_hist[t_tries] = failure;

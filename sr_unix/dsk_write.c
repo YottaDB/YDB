@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,30 +26,32 @@
 #include "iosp.h"
 #include "gtmio.h"
 
-GBLDEF	bool	non_buffer_write;
+GBLDEF	bool		non_buffer_write;
 
-int	dsk_write (gd_region *r, block_id blk, sm_uc_ptr_t buff)
+int	dsk_write (gd_region *reg, block_id blk, sm_uc_ptr_t buff)
 {
 	unix_db_info	*udi;
 	int4		size, save_errno;
 	sgmnt_addrs	*csa;
 
-	udi = (unix_db_info *)(r->dyn.addr->file_cntl->file_info);
+	udi = (unix_db_info *)(reg->dyn.addr->file_cntl->file_info);
 	csa = &udi->s_addrs;
-#ifdef FULLBLOCKWRITES
-	size = csa->hdr->blk_size;
-#else
-	size = ((((blk_hdr_ptr_t)buff)->bsiz + 1) & ~1);
-#endif
-	assert(r->read_only == FALSE);
-	assert(r->dyn.addr->acc_meth == dba_bg || non_buffer_write);
+	assert(csa->hdr);
+	size = (((blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
+	if (csa->do_fullblockwrites)
+	{	/* round size up to next full logical filesys block. */
+		size = ROUND_UP(size, csa->fullblockwrite_len);
+		assert(size <= csa->hdr->blk_size);
+	}
+	assert(FALSE == reg->read_only);
+	assert(dba_bg == reg->dyn.addr->acc_meth || non_buffer_write);
 	assert(!csa->acc_meth.bg.cache_state->cache_array || buff != (sm_uc_ptr_t)csa->hdr);
 	assert(non_buffer_write || !csa->acc_meth.bg.cache_state->cache_array
 			|| (buff >= (sm_uc_ptr_t)csa->acc_meth.bg.cache_state->cache_array
 					+ (sizeof(cache_rec) * (csa->hdr->bt_buckets + csa->hdr->n_bts))));
 	assert(non_buffer_write || !csa->critical || buff < (sm_uc_ptr_t)csa->critical);
 		/* assumes critical follows immediately after the buffer pool */
-	assert(size >= sizeof(blk_hdr));
+	assert(sizeof(blk_hdr) <= size);
 	assert(size <= csa->hdr->blk_size);
 
 	if (udi->raw)
@@ -62,9 +64,7 @@ int	dsk_write (gd_region *r, block_id blk, sm_uc_ptr_t buff)
 		   save_errno);
 
 	if (0 != save_errno)		/* If it didn't work for whatever reason.. */
-	{
 		return -1;
-	}
 
 	return SS_NORMAL;
 }

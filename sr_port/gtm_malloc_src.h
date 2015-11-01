@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -196,14 +196,12 @@ typedef struct storExtHdrStruct
 #define MAXDEFERQUEUES 10
 #ifdef DEBUG
 #  define STOR_EXTENTS_KEEP 1 /* Keep only one extent in debug for maximum testing */
-#  define INITIAL_DEBUG_LEVEL GDL_Simple
 #  define MINTWO 64
 #  define MAXINDEX 5
 #  define STE_FP(p) p->fPtr
 #  define STE_BP(p) p->bPtr
 #else
 #  define STOR_EXTENTS_KEEP 5
-#  define INITIAL_DEBUG_LEVEL GDL_None
 #  define MINTWO 16
 #  define MAXINDEX 7
 #  define STE_FP(p) p->userStorage.links.fPtr
@@ -257,7 +255,7 @@ typedef struct
 #  define TRACE_FREE(addr, len)
 #endif
 #ifdef DEBUG_SM
-#  define DEBUGSM(x) (printf x, fflush(stdout))
+#  define DEBUGSM(x) (PRINTF x, fflush(stdout))
 # else
 #  define DEBUGSM(x)
 #endif
@@ -326,6 +324,9 @@ GBLDEF volatile int smLastFreeIndex;			/* Index to entry of last free-er */
 GBLDEF smTraceItem smMallocs[MAXSMTRACE];		/* Array of recent allocators */
 GBLDEF smTraceItem smFrees[MAXSMTRACE];			/* Array of recent releasers */
 GBLDEF volatile unsigned int smTn;			/* Storage management (wrappable) transaction number */
+#ifndef PRO_BUILD
+GBLREF boolean_t gtmdbglvl_inited;			/* gtmDebugLevel has been initialized but only in debug build*/
+#endif
 #endif
 
 GBLREF	uint4		gtmDebugLevel;			/* Debug level (0 = using default sm module so with
@@ -356,10 +357,12 @@ STATICD readonly unsigned char markerChar[4] = {0xde, 0xad, 0xbe, 0xef};
 #else
 STATICD readonly uint4 TwoTable[MAXINDEX + 2] = {16, 32, 64, 128, 256, 512, 1024, 2048, 0xFFFFFFFF};
 #endif
+
 STATICD storElem	freeStorElemQs[MAXINDEX + 1];	/* Need full element as queue anchor for dbl-linked
 							   list since ptrs not at top of element */
 STATICD storExtHdr	storExtHdrQ;			/* List of storage blocks we allocate here */
 STATICD int		curExtents;			/* Number of current extents */
+
 #ifdef GTM_MALLOC_REENT
 STATICD storElem *deferFreeQueues[MAXDEFERQUEUES];	/* Where deferred (nested) frees are queued for later processing */
 STATICD boolean_t deferFreeExists;			/* A deferred free is pending on a queue */
@@ -431,14 +434,20 @@ STATICR void gtmSmInit(void)
 	char		*ascNum;
 	storElem	*uStor;
 	int		i, sizeIndex, testSize, blockSize;
-	unsigned int	status;
-	mstr		envLog, dbgVal;
-	char		tranBuffer[MAX_TRANS_NAME_LEN];
 
 	error_def(ERR_TRNLOGFAIL);
 	error_def(ERR_INVDBGLVL);
 
+	/* WARNING!! Since this is early initialization, the following asserts are not well behaved if they do
+	   indeed trip. The best that can be hoped for is they give a condition handler exhausted error on
+	   GTM startup. Unfortunately, more intelligent responses are somewhat elusive since no output devices
+	   are setup nor (potentially) most of the GTM runtime.
+	*/
 	assert(MINTWO == TwoTable[0]);
+#ifndef PRO_BUILD
+	/* For a pro build, this var wasn't set so the assert makes no sense so bypass it */
+	assert(gtmdbglvl_inited);
+#endif
 	/* Check that the storage queue offset in a storage element has sufficient reach
 	   to cover an extent.
 	*/
@@ -469,39 +478,6 @@ STATICR void gtmSmInit(void)
 #endif
 	dqinit(&storExtHdrQ, links);
 	gtmSmInitialized = TRUE;
-
-	/* See if a debug level has been specified */
-	gtmDebugLevel = INITIAL_DEBUG_LEVEL;
-	envLog.addr = GTM_DEBUG_LEVEL_ENVLOG;
-	envLog.len = sizeof(GTM_DEBUG_LEVEL_ENVLOG) - 1;
-	status = trans_log_name(&envLog, &dbgVal, tranBuffer);
-	if (SS_NORMAL != status && SS_NOLOGNAM != status)
-	{
-		gtm_putmsg(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, envLog.len, envLog.addr, status);
-		return;
-	}
-	if (SS_NOLOGNAM != status)
-	{	/* We have a value, convert to numeric */
-		ascNum = dbgVal.addr;
-		if (1 < dbgVal.len && '0' == *ascNum++ && 'x' == *ascNum++)
-			/* We have a hex value */
-			i = (int)asc_hex2i(ascNum, dbgVal.len - 2);
-		else
-			/* Hope we have a decimal value */
-			i = asc2i((uchar_ptr_t)dbgVal.addr, dbgVal.len);
-		if (-1 == i)
-		{
-			gtm_putmsg(VARLSTCNT(6) ERR_INVDBGLVL, 4, dbgVal.len, dbgVal.addr, envLog.len, envLog.addr);
-			i = 0;
-		}
-		if (0 != gtmDebugLevel)
-			i |= GDL_Simple;		/* Make sure simple debugging turned on if any is */
-		if ((GDL_SmChkFreeBackfill | GDL_SmChkAllocBackfill) & i)
-			i |= GDL_SmBackfill;		/* Can't check it unless it's filled in */
-		if (GDL_SmStorHog & i)
-			i |= GDL_SmBackfill | GDL_SmChkAllocBackfill;
-		gtmDebugLevel |= i;
-	}
 }
 
 /* Recursive routine used to obtain an element on a given size queue. If no

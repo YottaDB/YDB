@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,8 +23,8 @@
  * CLOSE_OBJECT_FILE - close the object file after releasing the lock on it.
  * POLL_OBJECT_FILE - polls to open a non-empty object file for reading.
  * CLOSEFILE	Loop until close succeeds for fails with other than EINTR.
- * LSEEKREAD	Performs an lseek followed by read and sets global variable to warn off
- *		async IO routines.
+ * LSEEKREAD	Performs either pread() or an lseek()/ read() combination. In
+ *		the latter case, sets global variable to warn off async IO routines.
  * LSEEKWRITE	Same as LSEEKREAD but for WRITE.
  * DOREADRC	Performs read, returns code 0 if okay, otherwise returns errno.
  * DOREADRL     Performs read but returns length read or -1 if errno is set.
@@ -38,9 +38,7 @@
 #define GTMIO_Included
 
 #include <sys/types.h>
-#ifdef	__sparc
-#include <unistd.h>
-#endif
+#include "gtm_unistd.h"
 #include "gtm_fcntl.h"
 
 #ifdef __linux__
@@ -261,9 +259,89 @@ for (cntr=0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
 		RC = errno;					\
 }
 
-#define GET_LSEEK_FLAGS_ARRAY											\
-{														\
-	GBLREF	boolean_t	*lseekIoInProgress_flags;							\
+#if defined(__osf__) || defined(_AIX) || defined(__sparc) || defined(__linux__)
+/* These platforms are known to support pread/pwrite. Currently there is a problem
+   on HP/UX 11i and HP/UX 11.0 doesn't support it and MVS is unknown so those
+   platforms get the oldform. 02/2004 se.
+
+   Note !! pread and pwrite do NOT set the file pointer like lseek/read/write would
+   so they are NOT a drop in replacement !!
+*/
+
+#define NOPIO_ONLY(X)
+
+#define GET_LSEEK_FLAG(FDESC, VAL)
+
+#define LSEEKREAD(FDESC, FPTR, FBUFF, FBUFF_LEN, RC) \
+{ \
+	ssize_t			gtmioStatus; \
+	size_t			gtmioBuffLen; \
+	off_t			gtmioPtr; \
+	sm_uc_ptr_t 		gtmioBuff; \
+	gtmioBuffLen = FBUFF_LEN; \
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
+	gtmioPtr = (off_t)(FPTR); \
+	for (;;) \
+        { \
+		if (-1 != (gtmioStatus = pread(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr))) \
+		{ \
+			gtmioBuffLen -= gtmioStatus; \
+			if (0 == gtmioBuffLen || 0 == gtmioStatus) \
+			        break; \
+			gtmioBuff += gtmioStatus; \
+			gtmioPtr += gtmioStatus; \
+			continue; \
+		} \
+		if (EINTR != errno) \
+			break; \
+        } \
+	if (0 == gtmioBuffLen) \
+		RC = 0; \
+	else if (-1 == gtmioStatus)    	/* Had legitimate error - return it */ \
+		RC = errno; \
+	else \
+		RC = -1;		/* Something kept us from reading what we wanted */ \
+}
+
+#define LSEEKWRITE(FDESC, FPTR, FBUFF, FBUFF_LEN, RC) \
+{ \
+	ssize_t			gtmioStatus; \
+	size_t			gtmioBuffLen; \
+	off_t			gtmioPtr; \
+	sm_uc_ptr_t 		gtmioBuff; \
+	gtmioBuffLen = FBUFF_LEN; \
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
+	gtmioPtr = (off_t)(FPTR); \
+	for (;;) \
+        { \
+		if (-1 != (gtmioStatus = pwrite(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr))) \
+		{ \
+			gtmioBuffLen -= gtmioStatus; \
+			if (0 == gtmioBuffLen) \
+			        break; \
+			gtmioBuff += gtmioStatus; \
+			gtmioPtr += gtmioStatus; \
+			continue; \
+		} \
+		if (EINTR != errno) \
+			break; \
+        } \
+	if (0 == gtmioBuffLen) \
+		RC = 0; \
+	else if (-1 == gtmioStatus)    	/* Had legitimate error - return it */ \
+		RC = errno; \
+	else \
+		RC = -1;		/* Something kept us from writing what we wanted */ \
+}
+
+#else /* real lseek and read/write - still need to protect against interrupts inbetween calls */
+
+#define NOPIO_ONLY(X) X
+
+/* Note array is not initialized but first IO to a given file descriptor will initialize that element */
+#define GET_LSEEK_FLAGS_ARRAY						\
+{									\
+	GBLREF	boolean_t	*lseekIoInProgress_flags;		\
 	if ((boolean_t *)0 == lseekIoInProgress_flags)								\
 		lseekIoInProgress_flags = (boolean_t *)malloc(sysconf(_SC_OPEN_MAX) * sizeof(boolean_t));	\
 }
@@ -355,6 +433,7 @@ for (cntr=0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
 		RC = -1;		/* Something kept us from writing what we wanted */ \
 	SET_LSEEK_FLAG(FDESC, FALSE);	/* Reason this is last is so max optimization occurs */ \
 }
+#endif /* if old lseekread/writes */
 
 #define DOREADRC(FDESC, FBUFF, FBUFF_LEN, RC) \
 { \

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,17 +103,13 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 #define SP		 0x20
 #define DEL		 0x7f
 
-/* #define MAX_STRLEN	 		(1 * 1024 * 1024)  maximum GT.M string size (1 MB) */
-
-/* Reverting back to 32K. We have identified a few areas (I/O device parameters, xcalls, DALs, Collation) that will
- * get affected as a result of supporting >32K strings.  These functionalities define various parameters based on the
- * 32K string limit. Unless these cases are dealt with long strings, it is not safe to support >32K strings */
-#define MAX_STRLEN			32767
-
+#define MAX_STRLEN_32K			32767
+/* MAX_STRLEN for local variable is changed from 32767 to 1048576 (1 MB) */
+#define MAX_STRLEN	 		(1 * 1024 * 1024)  /*maximum GT.M string size (1 MB)*/
+#define MAX_DBSTRLEN			(32 * 1024 - 1) /* Maximum database string size */
 /* Initial buffer size allocated for a GT.M string which can geometrically be increased upto the size enough to fit in MAX_STRLEN */
 #define MAX_STRBUFF_INIT	 	(32 * 1024)
 
-#define MAX_DBSTRLEN			(32 * 1024) /* Maximum database string size */
 #define MAX_NUM_SIZE			64
 #define MAX_FORM_NUM_SUBLEN		128	/* this is enough to hold the largest numeric subscript */
 #define PERIODIC_FLUSH_CHECK_INTERVAL (30 * 1000)
@@ -222,6 +218,7 @@ int4 timeout2msec(int4 timeout);
 #define	MEMCMP_LIT(SOURCE, LITERAL)	memcmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
 #define MEMCPY_LIT(TARGET, LITERAL)	memcpy(TARGET, LITERAL, sizeof(LITERAL) - 1)
 #define	STRNCMP_LIT(TARGET, LITERAL)	strncmp(TARGET, LITERAL, sizeof(LITERAL) - 1)
+#define	STRNCMP_STR(TARGET, STRING)	strncmp(TARGET, STRING, strlen(STRING))
 
 /* *********************************************************************************************************** */
 /*		   Frequently used len + str combinations in macro form.				       */
@@ -285,7 +282,13 @@ int m_usleep(int useconds);
 #	define NON_USHBIN_ONLY(X)	X
 #endif
 
-#define LONG_SLEEP(x)				sleep((x))
+/* Note: LONG_SLEEP *MUST*NOT* be the sleep() function because use of the sleep() function in
+   GT.M causes problems with GT.M's timers on some platforms. Specifically, the sleep() function
+   causes the SIGARLM handler to be silently deleted on Solaris systems (through Solaris 9 at least).
+   This leads to lost timer pops and has the potential for system hangs.
+ */
+#define LONG_SLEEP(x)		hiber_start((x) * 1000)
+
 #define OS_PAGE_SIZE		gtm_os_page_size
 #define OS_PAGE_SIZE_DECLARE	GBLREF int4 gtm_os_page_size;
 #define IO_BLOCK_SIZE	      OS_PAGE_SIZE
@@ -761,12 +764,6 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define ZDIR_FORM_FULLPATH		0x00000000
 #define ZDIR_FORM_DIRECTORY		0x00000001
 #define IS_VALID_ZDIR_FORM(zdirform)	(ZDIR_FORM_FULLPATH == (zdirform) || ZDIR_FORM_DIRECTORY == (zdirform))
-
-#ifdef __sparc
-#define SHMAT_ARG(X)		(X) | SHM_SHARE_MMU
-#else
-#define SHMAT_ARG(X)		(X)
-#endif
 
 #define MAXNUMLEN 		128	/* from PV_N2S */
 #define CENTISECONDS		100	/* VMS lib$day returns 1/100s, we want seconds, use this factor to convert b/n the two */

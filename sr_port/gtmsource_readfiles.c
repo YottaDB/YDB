@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -562,7 +562,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 				rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
 				if (IS_REPLICATED(rectype))
 				{
-					QWASSIGN(max_seqno, GET_REPL_JNL_SEQNO(b->recbuff));
+					QWASSIGN(max_seqno, GET_JNL_SEQNO(b->recbuff));
 					max_seqno_addr = b->recaddr;
 				} else if (rectype == JRT_EOF)
 					break;
@@ -653,7 +653,7 @@ static	int first_read(repl_ctl_element *ctl)
 			rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
 			if (IS_REPLICATED(rectype))
 			{
-				QWASSIGN(ctl->min_seqno, GET_REPL_JNL_SEQNO(b->recbuff));
+				QWASSIGN(ctl->min_seqno, GET_JNL_SEQNO(b->recbuff));
 				QWASSIGN(ctl->seqno, ctl->min_seqno);
 				ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 				QWASSIGN(ctl->max_seqno, ctl->min_seqno);
@@ -752,7 +752,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 	*bufsiz -= b->reclen;
 	rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
 	assert(IS_REPLICATED(rectype));
-	QWASSIGN(rec_jnl_seqno, GET_JNL_SEQNO(b->recbuff));
+	rec_jnl_seqno = GET_REPL_JNL_SEQNO(b->recbuff);
 	assert(QWEQ(rec_jnl_seqno, ctl->seqno));
 	if (QWGT(rec_jnl_seqno, ctl->max_seqno))
 	{
@@ -801,7 +801,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 						trans_read = TRUE;
 				}
 				*bufsiz -= b->reclen;
-				QWASSIGN(rec_jnl_seqno, GET_REPL_JNL_SEQNO(b->recbuff));
+				QWASSIGN(rec_jnl_seqno, GET_JNL_SEQNO(b->recbuff));
 				assert(QWEQ(rec_jnl_seqno, ctl->seqno));
 				if (QWGT(rec_jnl_seqno, ctl->max_seqno))
 				{
@@ -887,7 +887,7 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 			rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
 			if (IS_REPLICATED(rectype))
 			{
-				rec_jnl_seqno = GET_REPL_JNL_SEQNO(b->recbuff);
+				rec_jnl_seqno = GET_JNL_SEQNO(b->recbuff);
 				if (srch_status->seqno == 0 || srch_status->seqno != rec_jnl_seqno)
 				{ /* change srch_status only when records of different transactions are encountered */
 					srch_status->prev_seqno = srch_status->seqno;
@@ -1133,15 +1133,19 @@ static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno
 			srch_func = do_linear_search;
 			lo_addr = b->recaddr;
 			hi_addr = MAXUINT4;
-		} else if (read_seqno <= ctl->max_seqno)
-		{ /* For read_seqno == ctl->max_seqno, do not use linear search. Remember, max_seqno_dskaddr may be the
-		   * the address of the TCOM record of a transaction, and this TCOM record may be in a different block
-		   * than the block containing the first record of the transcation. To get it right, we may have to
-		   * back off to previous blocks. Well, do_binary_search() handles this condition. So, better we use binary
-		   * search.
-		   */
+		} else if (read_seqno < ctl->max_seqno)
+		{
 			lo_addr = b->recaddr;
 			hi_addr = ctl->max_seqno_dskaddr;
+		} else if (read_seqno == ctl->max_seqno)
+		{	/* For read_seqno == ctl->max_seqno, do not use linear search. Remember, max_seqno_dskaddr may be the
+			 * the address of the TCOM record of a transaction, and this TCOM record may be in a different block
+			 * than the block containing the first record of the transcation. To get it right, we may have to
+			 * back off to previous blocks. Well, do_binary_search() handles this condition. So, better we use binary
+			 * search. */
+			lo_addr = b->recaddr;
+			assert(ctl->max_seqno_dskaddr < rb->fc->eof_addr);
+			hi_addr = rb->fc->eof_addr;
 		} else /* read_seqno > ctl->max_seqno */
 		{
 			lo_addr = ctl->max_seqno_dskaddr;

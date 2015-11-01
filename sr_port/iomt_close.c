@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #include "iomtdef.h"
 #include "io_params.h"
 #include "stringpool.h"
+#include "copy.h"
 
 LITREF unsigned char io_params_size[];
 
@@ -25,6 +26,7 @@ void iomt_close(io_desc *dv, mval *pp)
 	unsigned char   ch;
 	d_mt_struct    *mt_ptr;
 	int		p_offset;
+	int4		skips;
 
 	error_def(ERR_UNIMPLOP);
 
@@ -46,7 +48,8 @@ void iomt_close(io_desc *dv, mval *pp)
 				s2pool(&dv->error_handler);
 				break;
 			case iop_skipfile:
-				iomt_skipfile(dv, *((short *)(pp->str.addr + p_offset)));
+				GET_LONG(skips, (pp->str.addr + p_offset));
+				iomt_skipfile(dv, skips);
 				break;
 			case iop_unload:
 #ifdef UNIX
@@ -62,7 +65,8 @@ void iomt_close(io_desc *dv, mval *pp)
 				iomt_erase(dv);
 				break;
 			case iop_space:
-				iomt_skiprecord(dv, *((short *)(pp->str.addr + p_offset)));
+				GET_LONG(skips, (pp->str.addr + p_offset));
+				iomt_skiprecord(dv, skips);
 				break;
 			case iop_writeof:
 				iomt_eof(dv);

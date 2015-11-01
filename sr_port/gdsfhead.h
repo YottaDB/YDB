@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,9 @@
 /* this requires gdsroot.h gtm_facility.h fileinfo.h gdsbt.h */
 
 #include <sys/types.h>
+#ifdef VMS
+#include "iosb_disk.h"
+#endif
 
 #define CACHE_STATE_OFF sizeof(que_ent)
 
@@ -113,7 +116,9 @@ typedef struct cache_rec_struct
   					 * used to check for process leaving without releasing the buffer
 					 * must be word aligned on the VAX */
 	CNTR4DCL(read_in_progress,10);	/* -1 for normal and 0 for rip used by t_qread and checked by others */
-	short		iosb[4];	/* used on VMS write */
+#ifdef VMS
+	io_status_block_disk	iosb;	/* used on VMS write */
+#endif
 	bool		in_tend;	/* TRUE from bg_update indicates secshr_db_clnup should finish update */
 	bool		data_invalid;	/* TRUE from bg_update indicates t_commit_cleanup and wcs_recover should invalidate */
 	bool		stopped;	/* TRUE indicates to wcs_recover that secshr_db_clnup built the block */
@@ -166,7 +171,9 @@ typedef struct
   					 * used to check for process leaving without releasing the buffer
 					 * must be word aligned on the VAX */
 	CNTR4DCL(read_in_progress,10);	/* -1 for normal and 0 for rip used by t_qread and checked by others */
-	short		iosb[4];	/* used on VMS write */
+#ifdef VMS
+	io_status_block_disk	iosb;	/* used on VMS write */
+#endif
 	bool		in_tend;	/* TRUE from bg_update indicates secshr_db_clnup should finish update */
 	bool		data_invalid;	/* TRUE from bg_update indicates t_commit_cleanup and wcs_recover should invalidate */
 	bool		stopped;	/* TRUE indicates to wcs_recover that secshr_db_clnup built the block */
@@ -531,7 +538,7 @@ typedef struct sgmnt_data_struct
 	/************* ACCOUNTING INFOMATION ********************************/
 	int4		n_retries[CDB_MAX_TRIES];
 					/* Counts of the number of retries it took to commit a transaction */
-	int4		n_puts;		/* number of puts */
+	int4		n_puts;		/* number of puts (non-tp only) */
 	int4		n_kills;	/* number of kills */
 	int4		n_queries;	/* number of $Query's */
 	int4		n_gets;		/* number of MUMPS GETS */
@@ -673,7 +680,10 @@ typedef struct sgmnt_data_struct
 	int4		intrpt_recov_repl_state;	/* replication state at start of interrupted recover/rollback */
 	jnl_tm_t	intrpt_recov_tp_resolve_time;	/* since-time for the interrupted recover */
 	seq_num 	intrpt_recov_resync_seqno;	/* resync/fetchresync jnl_seqno of interrupted rollback */
-	char		filler3[944];
+	uint4		n_puts_duplicate;		/* number of duplicate sets in non-TP */
+	uint4		n_tp_updates;		/* number of TP transactions that incremented the db curr_tn for this region */
+	uint4		n_tp_updates_duplicate;	/* number of TP transactions that did purely duplicate sets in this region */
+	char		filler3[932];
 	int4		filler_highest_lbm_blk_changed;	/* Records highest local bit map block that
 							   changed so we know how much of master bit
 							   map to write out. Modified only under crit */
@@ -726,7 +736,7 @@ typedef struct  backup_buff_struct
 	int4            size,
 			free,
 			disk;                   /* disk == free means the buffer is empty */
-	uint4           dskaddr;
+	off_t           dskaddr;
 	global_latch_t  backup_ioinprog_latch;
 	char            tempfilename[256];
 	int4            backup_errno;
@@ -970,6 +980,8 @@ typedef struct	sgmnt_addrs_struct
 	int4		backup_in_prog;		/* true if online backup in progress for this region (used in op_tcommit/tp_tend) */
 	int4		ref_cnt;		/* count of number of times csa->nl->ref_cnt was incremented by this process */
 	int4		fid_index;		/* index for region ordering based on unique_id */
+	boolean_t	do_fullblockwrites;	/* This region enabled for full block writes */
+	size_t		fullblockwrite_len;	/* Length of a full block write */
 } sgmnt_addrs;
 
 

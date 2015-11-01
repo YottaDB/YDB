@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,8 @@
 #include "util.h"
 #include "dse.h"
 #include "stringpool.h"		/* for GET_CURR_TIME_IN_DOLLARH_AND_ZDATE macro */
+#include "op.h"			/* for op_fnzdate and op_horolog prototype */
+#include "wcs_recover.h"	/* for wcs_recover prototype */
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*original_header;
@@ -179,7 +181,8 @@ void dse_cache(void)
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo + csa->hdr->bt_buckets),
 					sizeof(cache_rec), csa->hdr->n_bts);
 			util_out_print("Region !AD :  global_buffer      = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo + csa->hdr->bt_buckets + csa->hdr->n_bts),
+					TRUE, REG_LEN_STR(reg),
+					ROUND_UP2(DB_ABS2REL(cr_que_lo + csa->hdr->bt_buckets + csa->hdr->n_bts), DISK_BLOCK_SIZE),
 					csa->hdr->blk_size, csa->hdr->n_bts);
 			util_out_print("Region !AD :  db_file_header     = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->hdr));
@@ -190,7 +193,7 @@ void dse_cache(void)
 			util_out_print("Region !AD :  bt_record          = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_base), sizeof(bt_rec), csa->hdr->n_bts);
 			util_out_print("Region !AD :  shared_memory_size = 0x!XL",
-					TRUE, REG_LEN_STR(reg), reg->sec_size);
+					TRUE, REG_LEN_STR(reg), reg->sec_size VMS_ONLY(* DISK_BLOCK_SIZE));
 		}
 		if (!was_crit && !nocrit_present)
 			rel_crit(reg);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,21 +15,18 @@
 
 GBLREF io_pair		io_curr_device;
 
-void ious_iocontrol(d)
-mstr *d;
+void ious_iocontrol(mstr *d)
 {
 	return;
 }
 
-void ious_dlr_device(d)
-mstr *d;
+void ious_dlr_device(mstr *d)
 {
 	d->len = 0;
 	return;
 }
 
-void ious_dlr_key(d)
-mstr *d;
+void ious_dlr_key(mstr *d)
 {
 	d->len = 0;
 	return;

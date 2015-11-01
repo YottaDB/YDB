@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,7 @@
 #include <descrip.h>
 #include <jpidef.h>
 #endif
+#include "real_len.h"		/* for real_len() prototype */
 
 GBLREF	mur_opt_struct	mur_options;
 GBLREF	reg_ctl_list	*mur_ctl;
@@ -66,6 +67,8 @@ static  const   char proc_header[] =
 static	const	char proc_fao[] =
         "!8XL !8AD !12AD !8AD !20AD !15AD !8XL !5AD !20AD";
 
+#define	TIME_DISPLAY_FAO	"!20AD"
+
 /* Convert a time value to a string in the TIME_FORMAT_STRING's format.  this routine currently does not handle $h printing */
 static int	format_time(jnl_proc_time proc_time, char *string, int string_len, int time_format)
 {
@@ -87,10 +90,10 @@ static	void	mur_show_jpv(jnl_process_vector *pv, boolean_t print_header)
 
 	jpv_time_len = format_time(pv->jpv_time, jpv_time_str, sizeof(jpv_time_str), LONG_TIME_FORMAT);
 	login_time_len = format_time(pv->jpv_login_time, login_time_str, sizeof(login_time_str), LONG_TIME_FORMAT);
-	node_len = real_len(JPV_LEN_NODE,	pv->jpv_node);
-	user_len = real_len(JPV_LEN_USER,	pv->jpv_user);
-	proc_len = real_len(JPV_LEN_PRCNAM,	pv->jpv_prcnam);
-	term_len = real_len(JPV_LEN_TERMINAL,	pv->jpv_terminal);
+	node_len = real_len(JPV_LEN_NODE,	(unsigned char *)pv->jpv_node);
+	user_len = real_len(JPV_LEN_USER,	(unsigned char *)pv->jpv_user);
+	proc_len = real_len(JPV_LEN_PRCNAM,	(unsigned char *)pv->jpv_prcnam);
+	term_len = real_len(JPV_LEN_TERMINAL,	(unsigned char *)pv->jpv_terminal);
 	switch (pv->jpv_mode)
 	{
 		case JPI$K_DETACHED:	mode_str = "Detch";	break;
@@ -118,6 +121,8 @@ static	const	char proc_header[] =
 static	const	char proc_fao[] =
 	"!10ZL !12AD !8AD !4AD !38AD";
 
+#define	TIME_DISPLAY_FAO	" !19AD"
+
 /* Convert a time value to a string in the TIME_FORMAT_STRING's format */
 static int	format_time(jnl_proc_time proc_time, char *string, int string_len, int time_format)
 {
@@ -143,9 +148,9 @@ static	void	mur_show_jpv(jnl_process_vector	*pv, boolean_t print_header)
 	char	jpv_time_str[LENGTH_OF_TIME + 1];
 
 	jpv_time_len = format_time(pv->jpv_time, jpv_time_str, sizeof(jpv_time_str), LONG_TIME_FORMAT);
-	node_len = real_len(JPV_LEN_NODE,	pv->jpv_node);
-	user_len = real_len(JPV_LEN_USER,	pv->jpv_user);
-	term_len = real_len(JPV_LEN_TERMINAL,	pv->jpv_terminal);
+	node_len = real_len(JPV_LEN_NODE,	(unsigned char *)pv->jpv_node);
+	user_len = real_len(JPV_LEN_USER,	(unsigned char *)pv->jpv_user);
+	term_len = real_len(JPV_LEN_TERMINAL,	(unsigned char *)pv->jpv_terminal);
 	if (print_header)
 	{
 		util_out_print(proc_header, TRUE);
@@ -178,14 +183,14 @@ void	mur_show_header(jnl_ctl_list * jctl)
 	util_out_print(" Virtual file size!_!_!_!8UL [0x!XL] blocks", TRUE, DOUBLE_ARG(header->virtual_size));
 	util_out_print(" Crash    !_!_!_!_   !AD", TRUE, 5, (header->crash ? " TRUE" : "FALSE"));
 	util_out_print(" Recover interrupted!_!_!_   !AD", TRUE, 5, (header->recover_interrupted ? " TRUE" : "FALSE"));
-	util_out_print(" End of Data!_!_!_!_!8UL [0x!XL]", TRUE, DOUBLE_ARG(header->end_of_data));
-	util_out_print(" Prev Recovery End of Data!_!_!8UL [0x!XL]", TRUE, DOUBLE_ARG(header->prev_recov_end_of_data));
+	util_out_print(" End of Data!_!_!_      !10UL [0x!XL]", TRUE, DOUBLE_ARG(header->end_of_data));
+	util_out_print(" Prev Recovery End of Data!_      !10UL [0x!XL]", TRUE, DOUBLE_ARG(header->prev_recov_end_of_data));
 	time_len = format_time(header->bov_timestamp, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
-	util_out_print(" Journal Creation Time      !20AD", TRUE, time_len, time_str);
+	util_out_print(" Journal Creation Time      "TIME_DISPLAY_FAO, TRUE, time_len, time_str);
 	time_len = format_time(header->eov_timestamp, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
-	util_out_print(" Time of last update        !20AD", TRUE, time_len, time_str);
-	util_out_print(" Begin Transaction!_!_!_!8UL [0x!XL]", TRUE, DOUBLE_ARG(header->bov_tn));
-	util_out_print(" End Transaction!_!_!_!8UL [0x!XL]", TRUE, DOUBLE_ARG(header->eov_tn));
+	util_out_print(" Time of last update        "TIME_DISPLAY_FAO, TRUE, time_len, time_str);
+	util_out_print(" Begin Transaction!_!_      !10UL [0x!XL]", TRUE, DOUBLE_ARG(header->bov_tn));
+	util_out_print(" End Transaction!_!_      !10UL [0x!XL]", TRUE, DOUBLE_ARG(header->eov_tn));
 	util_out_print(" Align size!_!_!_!16UL [0x!XL] bytes", TRUE, DOUBLE_ARG(header->alignsize));
 	util_out_print(" Epoch Interval!_!_!_!_!8UL", TRUE, EPOCH_SECOND2SECOND(header->epoch_interval));
 	util_out_print(" Replication State!_!_!_  !AD", TRUE, 6, (header->repl_state == repl_closed ? "CLOSED" : "  OPEN"));
@@ -195,7 +200,7 @@ void	mur_show_header(jnl_ctl_list * jctl)
 	util_out_print(" Jnlfile Extension!_!_!16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(header->jnl_deq));
 	util_out_print(" Maximum Physical Record Length!_!16UL [0x!XL]", TRUE, DOUBLE_ARG(header->max_phys_reclen));
 	util_out_print(" Maximum Logical Record Length!_!16UL [0x!XL]", TRUE, DOUBLE_ARG(header->max_logi_reclen));
-	util_out_print(" Turn Around Point Offset!_!_!8UL [0x!XL]", TRUE, DOUBLE_ARG(header->turn_around_offset));
+	util_out_print(" Turn Around Point Offset!_      !10UL [0x!XL]", TRUE, DOUBLE_ARG(header->turn_around_offset));
 	if (header->turn_around_time)
 		time_len = format_time(header->turn_around_time, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
 	else

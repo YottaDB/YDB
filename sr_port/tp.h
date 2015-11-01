@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,11 @@
 #define MAX_VISIBLE_TRESTART	4	/* Per Bhaskar on 10/20/98: dollar_trestart is not allowed to visibly exceed 4
 					 * because of errors this causes in legacy Profile versions (any < 6.1)        */
 
+#define	T_COMMIT_STARTED	MAXPOSINT4	/* a non-zero positive value to temporarily assign to si->update_trans.
+						 * this will indicate to secshr_db_clnup() that this transaction is
+						 * beyond the point of rolling back by t_commit_cleanup() and can
+						 * ONLY be rolled forward by secshr_db_clnup() */
+
 /* structure to hold transaction level specific info per segment.
  * Aids in incremental rollback, to identify the state of various elements at the BEGINNING of a new transaction level. */
 
@@ -53,7 +58,8 @@ typedef struct tlevel_info_struct
 	uint4		tlvl_cumul_jrec_len,
 			tlvl_cumul_index;	/* tlvl_cumul_index is maintained only #ifdef DEBUG (similar to cumul_index) */
 	srch_blk_status	*tlvl_tp_hist_info;	/* state of the tp_hist array (tail) before this t_level started */
-	short		t_level;
+	int4		t_level;
+	int4		update_trans;		/* a copy of sgm_info_ptr->update_trans before this t_level started */
 } tlevel_info;
 
 /* structure to hold the global (across all segments) dollar_tlevel specific information.
@@ -97,8 +103,9 @@ typedef struct sgm_info_struct
 			*last_tp_hist;
 	hashtab		*blks_in_use;
 	gd_region	*gv_cur_region;
-	trans_num	start_tn,
-			start_csh_tn;		/* not maintained but preserved in case needed in future */
+	trans_num	start_tn;
+	int4		update_trans;	/* was this region updated; usually TRUE if cw_set_depth is non-zero, but additionally
+					 * TRUE in case of a duplicate set in gvcst_put.c (cw_set_depth is zero in that case) */
 	cw_set_element	*first_cw_set,
 			*last_cw_set,
 			*first_cw_bitmap;
@@ -171,7 +178,7 @@ typedef struct ua_list_struct
 	struct ua_list_struct
 			*next_ua;
 	char		*update_array;
-	int		update_array_size;
+	uint4		update_array_size;
 } ua_list;
 
 typedef struct new_buff_buddy_list_struct
@@ -259,6 +266,7 @@ GBLREF	short	dollar_trestart;
 /* JNL_FILE_TAIL_PRESERVE macro indicates maximum number of bytes to ensure allocated at the end of the journal file
  * 	 to store the journal records that will be written whenever the journal file gets closed.
  * (i)	 Any process closing the journal file needs to write at most one PINI, one EPOCH, one PFIN and one EOF record
+ *	 In case of wcs_recover extra INCTN will be written
  * (ii)	 We may need to give room for twice the above space to accommodate the EOF writing by a process that closes the journal
  *	 and the EOF writing by the first process that reopens it and finds no space left and switches to a new journal.
  * (iii) We may need to write one ALIGN record at the most since the total calculated from (i) and (ii) above is
@@ -266,50 +274,46 @@ GBLREF	short	dollar_trestart;
  * 	   The variable portion of this ALIGN record can get at the most equal to the maximum of the sizes of the
  * 	   PINI/EPOCH/PFIN/EOF record. (We know PINI_RECLEN is maximum of EPOCH_RECLEN, PFIN_RECLEN, EOF_RECLEN)
  */
-#define	JNL_FILE_TAIL_PRESERVE	(MIN_ALIGN_RECLEN + (PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN) * 2 + PINI_RECLEN)
+#define	JNL_FILE_TAIL_PRESERVE	(MIN_ALIGN_RECLEN + (PINI_RECLEN + EPOCH_RECLEN + INCTN_RECLEN + 		\
+								PFIN_RECLEN + EOF_RECLEN) * 2 + PINI_RECLEN)
 
 #define TOTAL_TPJNL_REC_SIZE(total_jnl_rec_size, si, csa)							\
 {														\
-	total_jnl_rec_size = si->total_jnl_rec_size;								\
 	DEBUG_ONLY(si->tmp_cw_set_depth = si->cw_set_depth;)	/* save a copy to check later in tp_tend() */	\
+	total_jnl_rec_size = si->total_jnl_rec_size;								\
 	if (csa->jnl_before_image)										\
 		total_jnl_rec_size += (si->cw_set_depth * csa->pblk_align_jrecsize);				\
 	/* Since we have already taken into account an align record per journal record and since the size of	\
 	 * an align record will be < (size of the journal record written + fixed-size of align record)		\
 	 * we can be sure we won't need more than twice the computed space.					\
+	 * JNL_FILE_TAIL_PRESERVE is to give allowance for space needed at end of journal file 			\
+	 * in case journal file close is needed 								\
 	 */													\
-	total_jnl_rec_size *= 2;										\
 	assert(JNL_FILE_TAIL_PRESERVE < (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));					\
-	/* give allowance for space needed at end of journal file in case journal file close is needed */	\
-	total_jnl_rec_size += JNL_FILE_TAIL_PRESERVE;								\
-	si->total_jnl_rec_size = total_jnl_rec_size;								\
+	si->total_jnl_rec_size = total_jnl_rec_size = (total_jnl_rec_size * 2) + JNL_FILE_TAIL_PRESERVE;	\
 }
+
+#define MIN_TOTAL_NONTPJNL_REC_SIZE 	(PINI_RECLEN + MIN_ALIGN_RECLEN + INCTN_RECLEN + MIN_ALIGN_RECLEN)
 
 /* This macro gives a pessimistic estimate on the total journal record size needed.
  * The side effect is that we might end up with a journal file extension when it was actually not needed.
  */
 #define TOTAL_NONTPJNL_REC_SIZE(total_jnl_rec_size, non_tp_jfb_ptr, csa, tmp_cw_set_depth)			\
 {														\
-	total_jnl_rec_size = non_tp_jfb_ptr->record_size;							\
-	if (total_jnl_rec_size)											\
-		total_jnl_rec_size += csa->min_total_nontpjnl_rec_size;						\
+	total_jnl_rec_size = (non_tp_jfb_ptr->record_size + MIN_TOTAL_NONTPJNL_REC_SIZE); 			\
 	if (csa->jnl_before_image)										\
+		/* One PBLK record for each gds block changed by the transaction */				\
 		total_jnl_rec_size += (tmp_cw_set_depth * csa->pblk_align_jrecsize);				\
-	/* The following two computations are either rare or are needed in dse where performance		\
-	 * 	is not a concern. Hence these are recomputed everytime instead of storing in a variable.	\
-	 */													\
-	if (dse_running || write_after_image)									\
+	if (write_after_image)											\
 		total_jnl_rec_size += MIN_AIMG_RECLEN + csa->hdr->blk_size + MIN_ALIGN_RECLEN;			\
-	if (mu_reorg_process || 0 == cw_depth || inctn_gvcstput_extra_blk_split == inctn_opcode)		\
-		total_jnl_rec_size += INCTN_RECLEN + MIN_ALIGN_RECLEN;						\
 	/* Since we have already taken into account an align record per journal record and since the size of	\
 	 * an align record will be < (size of the journal record written + fixed-size of align record)		\
 	 * we can be sure we won't need more than twice the computed space.					\
+	 * JNL_FILE_TAIL_PRESERVE is to give allowance for space needed at end of journal file 			\
+	 * in case journal file close is needed 								\
 	 */													\
-	total_jnl_rec_size *= 2;										\
 	assert(JNL_FILE_TAIL_PRESERVE < (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));					\
-	/* give allowance for space needed at end of journal file in case journal file close is needed */	\
-	total_jnl_rec_size += JNL_FILE_TAIL_PRESERVE;								\
+	total_jnl_rec_size = total_jnl_rec_size * 2 + JNL_FILE_TAIL_PRESERVE;					\
 }
 
 #define INVALIDATE_CLUE(cse) 					\
@@ -377,6 +381,39 @@ GBLREF	short	dollar_trestart;
 #define INVOKE_RESTART	rts_error(VARLSTCNT(1) ERR_TPRETRY);
 #endif
 
+/* the following macros T_BEGIN_READ_NONTP_OR_TP and T_BEGIN_SETORKILL_NONTP_OR_TP are similar except for one difference
+ * which is that for the SETORKILL case, sgm_info_ptr->update_trans needs to be set to TRUE. They need to be maintained
+ * in parallel always. The reason for choosing this duplication is because it saves us an if check which would have
+ * otherwise been had the two macros been merged and this is used in database code where performance is a concern.
+ */
+/* the macro below uses "dollar_tlevel", "t_err" and "sgm_info_ptr" */
+#define T_BEGIN_SETORKILL_NONTP_OR_TP(err_code)										\
+{															\
+	GBLREF	sgm_info	*sgm_info_ptr;										\
+	GBLREF	uint4		t_err;											\
+	error_def(err_code);												\
+															\
+	if (0 == dollar_tlevel)												\
+		t_begin(err_code, TRUE);										\
+	else														\
+	{														\
+		t_err = err_code;											\
+		assert(NULL != sgm_info_ptr);										\
+		sgm_info_ptr->update_trans = TRUE;									\
+	}														\
+}
+
+/* the macro below uses "dollar_tlevel", "t_err" */
+#define T_BEGIN_READ_NONTP_OR_TP(err_code)										\
+{															\
+	GBLREF	uint4		t_err;											\
+	error_def(err_code);												\
+															\
+	if (0 == dollar_tlevel)												\
+		t_begin(err_code, FALSE);										\
+	else														\
+		t_err = err_code;											\
+}
 
 void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
 void tp_clean_up(boolean_t rollback_flag);

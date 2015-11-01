@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,8 +99,8 @@ CONDITION_HANDLER(mu_extract_handler1)
 void mu_extract(void)
 {
 	int 				stat_res, truncate_res;
-	int				reg_max_rec, reg_max_key, reg_max_blk, iter, format, local_errno, perm, int_nlen;
-	boolean_t			freeze = FALSE, logqualifier, out_raw, success;
+	int				reg_max_rec, reg_max_key, reg_max_blk, iter, format, local_errno, int_nlen;
+	boolean_t			freeze = FALSE, logqualifier, success;
 	char				format_buffer[FORMAT_STR_MAX_SIZE],  ch_set_name[MAX_CHSET_NAME], cli_buff[MAX_LINE],
 					label_buff[LABEL_STR_MAX_SIZE], gbl_name_buff[sizeof(mident) + 2]; /* 2 for null and '^' */
 	glist				gl_head, *gl_ptr;
@@ -111,20 +111,12 @@ void mu_extract(void)
 	struct stat                     statbuf;
 	mval				val, curr_gbl_name, op_val, op_pars;
 	enum code_set_type		saved_out_set;
-	static unsigned char		ochset_set = FALSE, *open_params_list;
-	static readonly unsigned char	raw_params_list[7] =
+	static unsigned char		ochset_set = FALSE;
+	static readonly unsigned char	open_params_list[] =
 	{
 		(unsigned char)iop_noreadonly,
 		(unsigned char)iop_nowrap,
 		(unsigned char)iop_stream,
-		(unsigned char)iop_recordsize, (unsigned char)0x07F,(unsigned char)0x07F,
-		(unsigned char)iop_eol
-	};
-	static readonly unsigned char noraw_params_list[6] =
-	{
-		(unsigned char)iop_nowrap,
-		(unsigned char)iop_stream,
-		(unsigned char)iop_recordsize, (unsigned char)0x07F,(unsigned char)0x07F,
 		(unsigned char)iop_eol
 	};
 	static readonly unsigned char no_param = (unsigned char)iop_eol;
@@ -209,16 +201,6 @@ void mu_extract(void)
 	{
 		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
 		mupip_exit(ERR_MUPCLIERR);
-	}
-	out_raw = is_raw_dev(outfilename);
-	if (!out_raw)
-	{
-		open_params_list = noraw_params_list;
-	}
-	else
-	{
-		open_params_list = raw_params_list;
-		perm = 0;
 	}
 	if (-1 == Stat((char *)outfilename, &statbuf))
         {

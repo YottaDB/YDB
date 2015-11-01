@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,7 @@ void op_fnfgncal();
 int op_fnfgncal_rpc();	/* typ to keep the compiler happy as set into xfer_table, which is int */
 #endif
 void op_fngvget(mval *v, mval *def);
-void op_fngetjpi(mint *jpid,mval *kwd,mval *ret);
+void op_fngetjpi(mint jpid, mval *kwd, mval *ret);
 void op_fnlvprvname(mval *src, mval *dst);
 void op_fnname();
 void op_fnqlength(mval *name, mval *subscripts);
@@ -123,7 +123,7 @@ void op_unlock(void);
 void op_use(mval *v, mval *p);
 void op_view();
 void op_write(mval *v);
-void op_wteol(short n);
+void op_wteol(int4 n);
 void op_wtff(void);
 void op_wtone(unsigned char c);
 void op_wttab(mint x);

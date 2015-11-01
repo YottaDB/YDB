@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,7 +98,7 @@ typedef struct  stack_frame_prof_struct
 	unsigned long   sys_time;
 } stack_frame_prof;
 
-#ifdef VMS
+#if defined(VMS) && !defined(__TIME_LOADED)
 struct tms {
 	int4	tms_utime;		/* user time */
 	int4	tms_stime;		/* system time */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,18 +16,16 @@
 #include "gtm_time.h"	/* for time() */
 #include "gtm_socket.h"
 #include "gtm_stdlib.h"
+#include "gtm_unistd.h"
+#include "gtm_stdio.h"
 
 #include <errno.h>
-#include <unistd.h>
 #include <sys/un.h>
 #include <iotcp_select.h>
 #if defined(__sparc) || defined(__hpux) || defined(__MVS__) || defined(__linux__)
 #include <limits.h>
 #else
 #include <sys/limits.h>
-#endif
-#ifdef MUTEX_MSEM_WAKE
-#include <sys/mman.h>
 #endif
 
 #include "aswp.h"
@@ -63,10 +61,13 @@
 GBLREF boolean_t		mutex_salvaged, disable_sigcont;
 GBLREF uint4			process_id;
 GBLREF int			num_additional_processors;
-
 #ifdef MUTEX_MSEM_WAKE
 GBLREF volatile uint4           heartbeat_counter;
+#  ifdef POSIX_MSEM
+static sem_t			*mutex_wake_msem_ptr = NULL;
+#  else
 static msemaphore		*mutex_wake_msem_ptr = NULL;
+#  endif
 static mutex_que_entry_ptr_t	msem_slot;
 #else
 GBLREF int			mutex_sock_fd;
@@ -161,7 +162,7 @@ void			mutex_salvage(gd_region *reg);
 static	void	clean_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 {
 	mutex_que_entry_ptr_t	q_free_entry;
-#ifdef MUTEX_MSEM_WAKE
+#if defined(MUTEX_MSEM_WAKE) && !defined(POSIX_MSEM)
 	msemaphore		*status;
 #endif
 
@@ -185,7 +186,11 @@ static	void	clean_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 	while (n--)
 	{
 #ifdef MUTEX_MSEM_WAKE
+#ifdef POSIX_MSEM
+		if (-1 == sem_init(&q_free_entry->mutex_wake_msem, TRUE, 0))  /* Shared lock with no initial resources (locked) */
+#else
 		if ((NULL == (status = msem_init(&q_free_entry->mutex_wake_msem, MSEM_LOCKED))) || ((msemaphore *)-1 == status))
+#endif
 			rts_error(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 				RTS_ERROR_TEXT("Error with mutex wait memory semaphore initialization"), errno);
 #endif
@@ -295,7 +300,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr)
 			 * the check for EINTR below is valid and should not be converted to an EINTR
 			 * wrapper macro, because another condition is checked for the while loop.
 			 */
-			while (!(wakeup_status = (0 == msem_lock(mutex_wake_msem_ptr, 0))))
+			while (!(wakeup_status = (0 == MSEM_LOCKW(mutex_wake_msem_ptr))))
 			{
 				if (EINTR == errno)
 				{
@@ -478,10 +483,13 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa)
 				free_slot->mutex_wake_instance = mutex_expected_wake_instance;
 #ifdef MUTEX_MSEM_WAKE
 				mutex_wake_msem_ptr = &free_slot->mutex_wake_msem;
-				/* this line makes sure that the msemaphore is locked initially
+				/* this loop makes sure that the msemaphore is locked initially
 				 * before the process goes to long sleep
 				 */
-				MSEM_LOCK(mutex_wake_msem_ptr, MSEM_IF_NOWAIT, rc);
+				do
+				{
+					rc = MSEM_LOCKNW(mutex_wake_msem_ptr);
+				} while (-1 == rc && EINTR == errno);
 #endif
 				/*
 				 * Significance of mutex_wake_instance field :

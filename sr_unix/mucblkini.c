@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,11 +46,9 @@ void mucblkini (void)
 	udi = (unix_db_info *)gv_cur_region->dyn.addr->file_cntl->file_info;
 	bp1 = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);
 	bp2 = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);
-#ifdef FULLBLOCKWRITES
-	bmpsize = cs_addrs->hdr->blk_size;
-#else
-	bmpsize = BM_SIZE(cs_addrs->hdr->bplmap);			/* Size of first local bit map */
-#endif
+	bmpsize = BM_SIZE(cs_addrs->hdr->bplmap);
+	if (cs_addrs->do_fullblockwrites)
+		bmpsize = ROUND_UP(bmpsize, cs_addrs->fullblockwrite_len);
 	bmp = (uchar_ptr_t)malloc(bmpsize);
 	LSEEKREAD(udi->fd, (off_t)(cs_addrs->hdr->start_vbn - 1) * DISK_BLOCK_SIZE, bmp, bmpsize, status);
 	if (0 != status)

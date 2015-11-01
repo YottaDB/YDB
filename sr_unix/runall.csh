@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -408,8 +408,13 @@ foreach lib_ (`cat ${TMP_DIR}_Lib_list`)
 	set library = $lib_:r
 	set library = $library:e
 	set library = $library.$libext
-	echo "-->  into $gtm_obj/$library <--"
-	gt_ar $gt_ar_option_update $gtm_obj/$library `cat $lib_`
+	if ("libgtmrpc.a" != $library) then
+		echo "-->  into $gtm_obj/$library <--"
+		gt_ar $gt_ar_option_update $gtm_obj/$library `cat $lib_`
+	else
+		echo "-->  into $gtm_exe/$library <--"
+		gt_ar $gt_ar_option_update $gtm_exe/$library `cat $lib_`
+	endif
 	if ($status) then
 		if ($?RUNALL_DEBUG != 0) env
 		goto cleanup

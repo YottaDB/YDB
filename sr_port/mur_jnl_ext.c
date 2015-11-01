@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,8 +34,7 @@
 #include "zshow.h"
 #include "mur_jnl_ext.h"
 #include "op.h"
-
-
+#include "real_len.h"		/* for real_len() prototype */
 
 GBLREF	gv_key		*gv_currkey;
 GBLREF 	mur_gbls_t	murgbl;
@@ -360,14 +359,3 @@ int extract_process_vector(jnl_process_vector *pv, int extract_len)
 	EXTTXTVMS(pv->jpv_prcnam, JPV_LEN_PRCNAM);
 	return extract_len;
 }
-
-/* A utility routine to compute the length of a string, exclusive of trailing blanks or nuls
-   (NOTE:  this routine is also called from mur_output_show() and the mur_extract_*() routines) */
-int real_len(int length, char *str)
-{
-	int	clen;	/* current length */
-	for (clen = length - 1;  clen >= 0  &&  (str[clen] == ' '  ||  str[clen] == '\0');  --clen)
-		;
-	return clen + 1;
-}
-

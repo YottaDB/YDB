@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -122,7 +122,11 @@ unsigned char mu_cre_file(void)
 			SPRINTF_AND_PERROR("Error opening file %s\n");
 			return EXIT_ERR;
 		}
-		LSEEKREAD(fd, 0,  buff, sizeof(buff), status);
+		if (-1 != (status = (ssize_t)lseek(fd, 0, SEEK_SET)))
+		{
+			DOREADRC(fd, buff, sizeof(buff), status);
+		} else
+			status = errno;
 		if (0 != status)
 		{
 			SPRINTF_AND_PERROR("Error reading header for file %s\n");

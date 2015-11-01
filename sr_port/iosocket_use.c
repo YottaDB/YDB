@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,8 @@ LITREF 	unsigned char		io_params_size[];
 void	iosocket_use(io_desc *iod, mval *pp)
 {
 	unsigned char	ch, len;
-	short		handled_len, handlea_len, handles_len, length, width;
+	short		handled_len, handlea_len, handles_len;
+	int4		length, width;
 	d_socket_struct *dsocketptr, newdsocket;
 	socket_struct	*socketptr, newsocket;
 	char		handlea[MAX_HANDLE_LEN], handles[MAX_HANDLE_LEN], handled[MAX_HANDLE_LEN];
@@ -230,14 +231,14 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			zff_len = 0;
 			break;
 		case iop_length:
-			GET_SHORT(length, pp->str.addr + p_offset);
+			GET_LONG(length, pp->str.addr + p_offset);
 			if (length < 0)
 				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
 			iod->length = length;
 			break;
 		case iop_width:
 			/* SOCKET WIDTH is handled the same way as TERMINAL WIDTH */
-			GET_SHORT(width, pp->str.addr + p_offset);
+			GET_LONG(width, pp->str.addr + p_offset);
 			if (width < 0)
 				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
 			if (0 == width)

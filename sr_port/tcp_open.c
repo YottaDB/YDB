@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,15 +10,21 @@
  ****************************************************************/
 
 /*
- * tcp_open
- *		*** iotcp_open.c can be recoded to use this module ***
+ * tcp_open.
  *
- *      parameter -- a string like beowulf.sanchez.com:6100:10
- *                   which means to open a tcp connection to
- *                   beowulf.sanchez.com at port 6100 with a
- *                   10 seconds timeout.
- *      return    -- socket descriptor for the connection or
- *                   -1  and output the error.
+ *      parameters:
+ *		     host - name like beowulf.sanchez.com or NULL
+ *		     port - numeric port number
+ *		     timeout - numeric seconds
+ *		     passive - boolean 0 is sender and must have a host, 1 may
+ *		               have a host and if so, it is checked to see that
+ *		               incomming connections are from that host.
+ *      return:
+ *                  socket descriptor for the connection or
+ *                  -1 and output the error.
+ *
+ * Note that on error return errno may not be at the same value as the error condition.
+ *
  */
 
 #include "mdef.h"
@@ -46,18 +52,19 @@
 #include "gtmmsg.h"
 
 #define	MAX_CONN_PENDING	5
-#define	NAP_LENGTH		100
+#define	NAP_LENGTH		300
 
 GBLREF tcp_library_struct       tcp_routines;
 
 int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /* host needs to be NULL terminated */
 {
-	boolean_t		no_time_left = FALSE;
+	boolean_t		no_time_left = FALSE, error_given = FALSE;
 	char			temp_addr[SA_MAXLEN + 1], addr[SA_MAXLEN + 1];
 	char 			*from, *to, *errptr, *temp_ch;
 	int			match, sock, sendbufsize, size, ii, on = 1, temp_1 = -2;
 	int4                    errlen, rv, msec_timeout;
 	struct	sockaddr_in	sin;
+	in_addr_t		temp_sin_addr;
 	char                    msg_buffer[1024];
 	mstr                    msg_string;
 	ABS_TIME                cur_time, end_time;
@@ -66,20 +73,13 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 
 	error_def(ERR_INVADDRSPEC);
 
+	temp_sin_addr = 0;
 	msg_string.len = sizeof(msg_buffer);
 	msg_string.addr = msg_buffer;
 	memset((char *)&sin, 0, sizeof(struct sockaddr_in));
 
-	if (NULL == host)
-	{
-		if (!passive)
-		{
-			util_out_print("An address has to be specified for an active connection.", TRUE);
-			return -1;
-		}
-		sin.sin_addr.s_addr = INADDR_ANY;
-	}
-	else
+	/* ============================= initialize structures ============================== */
+	if (NULL != host)
 	{
 		temp_ch = host;
 		while(ISDIGIT(*temp_ch) || ('.' == *temp_ch))
@@ -89,15 +89,29 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		else
 			SPRINTF(addr, "%s", host);
 
-		if (-1 == (sin.sin_addr.s_addr = tcp_routines.aa_inet_addr(addr)))
+		if (-1 == (temp_sin_addr = tcp_routines.aa_inet_addr(addr)))
 		{
 			gtm_getmsg(ERR_INVADDRSPEC, &msg_string);
 			util_out_print(msg_string.addr, TRUE, ERR_INVADDRSPEC);
 			return  -1;
 		}
-		sin.sin_port = GTM_HTONS(port);
-		sin.sin_family = AF_INET;
 	}
+
+	if (passive)
+		/* We can only listen on our own system */
+		sin.sin_addr.s_addr = INADDR_ANY;
+	else
+	{
+		if (0 == temp_sin_addr)
+		{ 	/* If no address was specified */
+			util_out_print("An address has to be specified for an active connection.", TRUE);
+			return -1;
+		}
+		/* Set where to send the connection attempt */
+		sin.sin_addr.s_addr = temp_sin_addr;
+	}
+	sin.sin_port = GTM_HTONS(port);
+	sin.sin_family = AF_INET;
 
 
 	/* ============================== do the connection ============================== */
@@ -150,9 +164,9 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			utimeout.tv_sec = timeout;
 			utimeout.tv_usec = 0;
 		}
-		do
+		while(1)
 		{
-			do
+			while(1)
 			{
 				/*
 				 * the check for EINTR below is valid and should not be converted to an EINTR
@@ -164,7 +178,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 				rv = tcp_routines.aa_select(lsock + 1, (void *)&tcp_fd, (void *)0, (void *)0,
 					(NO_M_TIMEOUT == timeout) ? (struct timeval *)0 : &utimeout);
                                 utimeout = save_utimeout;
-				if ((rv >= 0) || (EINTR != errno))
+				if ((0 <= rv) || (EINTR != errno))
 					break;
 				if (NO_M_TIMEOUT != timeout)
 				{
@@ -176,14 +190,13 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 						break;
 					}
 				}
-			} while (1);
+			}
 			if (0 == rv)
 			{
 				util_out_print("Listening timed out.\n", TRUE);
 				(void)tcp_routines.aa_close(lsock);
 				return -1;
-			}
-			else  if (rv < 0)
+			} else  if (0 > rv)
 			{
 				errptr = (char *)STRERROR(errno);
 				errlen = strlen(errptr);
@@ -205,10 +218,15 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 #ifdef	DEBUG_ONLINE
 			PRINTF("Connection is from : %s\n", &temp_addr[0]);
 #endif
-			if ((INADDR_ANY == sin.sin_addr.s_addr) || (0 == memcmp(&addr[0], &temp_addr[0], strlen(addr))))
+			/* Check if connection is from whom we want it to be from. Note that this is not a robust check
+			   (potential for multiple IP addrs for a resolved name but workarounds for this exist so not a lot
+			   of effort has been expended here at this time. Especially since the check is easily spoofed with
+			   raw sockets anyway. It is more for the accidental "oops" type check than serious security..
+			*/
+			if ((0 == temp_sin_addr) || (0 == memcmp(&addr[0], &temp_addr[0], strlen(addr))))
 				break;
 			else
-			{
+			{	/* Connection not from expected host */
 				(void)tcp_routines.aa_close(sock);
 				if (NO_M_TIMEOUT != timeout)
 				{
@@ -216,11 +234,16 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 					cur_time = sub_abs_time(&end_time, &cur_time);
 					utimeout.tv_sec = ((cur_time.at_sec > 0) ? cur_time.at_sec : 0);
 				}
+				if (!error_given)
+				{
+					util_out_print("Connection from !AD rejected and ignored", TRUE,
+						       LEN_AND_STR(&temp_addr[0]));
+					error_given = TRUE;
+				}
 			}
-		} while  (1);
+		}
 		(void)tcp_routines.aa_close(lsock);
-	}
-	else
+	} else
 	{
 		if (NO_M_TIMEOUT != timeout)
 		{
@@ -232,7 +255,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		temp_1 = 1;
 		do
 		{
-			if(1 != temp_1)
+			if (1 != temp_1)
 				tcp_routines.aa_close(sock);
 			sock = tcp_routines.aa_socket(AF_INET, SOCK_STREAM, 0);
 			if (-1 == sock)
@@ -257,7 +280,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			 * wrapper macro, because other error conditions are checked, and a retry is not
 			 * immediately performed.
 			 */
-			if ((temp_1 < 0) && (ECONNREFUSED != errno) && (EINTR != errno))
+			if ((0 > temp_1) && (ECONNREFUSED != errno) && (EINTR != errno))
 			{
 				(void)tcp_routines.aa_close(sock);
 				errptr = (char *)STRERROR(errno);
@@ -265,7 +288,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			        util_out_print(errptr, TRUE, errno);
 				return -1;
 			}
-			if ((temp_1 < 0) && (EINTR == errno))
+			if ((0 > temp_1) && (EINTR == errno))
 			{
 				(void)tcp_routines.aa_close(sock);
 				util_out_print("Interrupted.", TRUE);
@@ -279,9 +302,9 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 					no_time_left = TRUE;
 			}
 			SHORT_SLEEP(NAP_LENGTH);               /* Sleep for NAP_LENGTH ms */
-		} while ((TRUE != no_time_left) && (temp_1 < 0));
+		} while ((FALSE == no_time_left) && (0 > temp_1));
 
-		if (temp_1 < 0) /* out of time */
+		if (0 > temp_1) /* out of time */
 		{
 			tcp_routines.aa_close(sock);
 			util_out_print("Connection timed out.", TRUE);

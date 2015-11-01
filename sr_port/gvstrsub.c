@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@ unsigned char *gvstrsub(unsigned char *src, unsigned char *target)
 		mstr_x.addr = buf;
 		mstr_tmp.len = 256;
 		mstr_tmp.addr = buf1;
-		do_xform(gv_target->collseq->xback, &mstr_x, &mstr_tmp, &length);
+		do_xform(gv_target->collseq, XBACK, &mstr_x, &mstr_tmp, &length);
 		n = length;
 		ch1 = (unsigned char *)buf1;
 	}
@@ -124,15 +124,3 @@ unsigned char *gvstrsub(unsigned char *src, unsigned char *target)
 
 	return target;
 }
-
-
-
-
-
-
-
-
-
-
-
-

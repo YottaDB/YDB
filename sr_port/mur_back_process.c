@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,9 +71,9 @@ static uint4 save_turn_around_point(reg_ctl_list *rctl)
  *	This creates list of tokens for broken fenced transactions.
  *	For noverify qualifier in backward recovry, it may apply PBLK calling mur_apply_pblk()
  */
-boolean_t mur_back_process(boolean_t apply_pblk)
+boolean_t mur_back_process(boolean_t apply_pblk, seq_num *pre_resolve_seqno)
 {
-	boolean_t		apply_pblk_this_region, resolve_seq;
+	boolean_t		apply_pblk_this_region, resolve_seq, inactive_check, this_reg_resolved;
 	enum jnl_record_type 	rectype;
 	enum rec_fence_type	rec_fence;
 	int4			rec_image_count = 0;	/* This is a dummy variable for UNIX */
@@ -205,6 +205,7 @@ boolean_t mur_back_process(boolean_t apply_pblk)
 			}
 		}
 	} /* end else !mur_options.forward */
+	*pre_resolve_seqno = 0;
 	murgbl.db_updated = mur_options.update && !mur_options.verify;
 	/* At this point we have computed murgbl.tp_resolve_time. It is the time upto which (at least)
 	 * we need to do token resolution. This is for all kinds of recovery and rollback.
@@ -222,29 +223,64 @@ boolean_t mur_back_process(boolean_t apply_pblk)
 		mur_jctl->rec_offset = mur_jctl->lvrec_off;
 		rec_token_seq = MAXUINT8;
 		rec_time = 0;
+		inactive_check = (rctl->lvrec_time < murgbl.tp_resolve_time) && !resolve_seq && (FENCE_NONE != mur_options.fences);
+		this_reg_resolved = FALSE;
 		for (status = mur_prev(mur_jctl->rec_offset); SS_NORMAL == status; status = mur_prev_rec())
 		{
 			assert(0 == mur_jctl->turn_around_offset);
 			rectype = mur_rab.jnlrec->prefix.jrec_type;
-			if ((rctl->lvrec_time < murgbl.tp_resolve_time) && !resolve_seq
-					&& IS_SET_KILL_ZKILL(rectype) && (FENCE_NONE != mur_options.fences))
-				GTMASSERT;	/* Out of design situation */
+			if (inactive_check && !(JRT_EPOCH == rectype || JRT_EOF == rectype ||
+							JRT_PFIN == rectype || JRT_ALIGN == rectype))
+				/* When region is inactive, that is, no logical updates are done, only EPOCH/PFIN/ALIGN/EOF
+				 * can be seen. Otherwise, it is an out of design situation */
+				GTMASSERT;
+			/* Resolve point is defined as the offset of the earliest journal record whose
+			 *      a) timestamp is >= murgbl.tp_resolve_time (if resolve_seq == FALSE)
+	 		 *      b) jnl_seqno is >= murgbl.resync_seqno is reached (if resolve_seq == TRUE)
+			 * Turn around point is defined as the offset of the earliest EPOCH whose
+			 *      a) timestamp is less than murgbl.tp_resolve_time
+			 *              (if recover OR rollback with murgbl.resync_seqno == 0)
+			 *      b) jnl_seqno is < murgbl.resync_seqno (if rollback with murgbl.resync_seqno != 0)
+			 * We resolve tokens or find holes for rollback till Resolve Point,
+			 *      though Turn Around Point can be much before this.
+			 * We apply PBLK till Turn Around Point.
+			 */
 			if (JRT_PBLK == rectype && apply_pblk_this_region)
 			{
 				mur_output_pblk();
 				continue;
 			}
-			rec_time = mur_rab.jnlrec->prefix.time;
-			if (IS_REPLICATED(rectype) || JRT_EPOCH == rectype)
-				rec_token_seq = GET_REPL_JNL_SEQNO(mur_rab.jnlrec);
-			/* We always resolve tokens till murgbl.tp_resolve_time.
-			 * In addition we also resolve tokens till murgbl.resync_seqno if resolve_seq == TRUE.
-			 * We call this as resolve point, which is different than turn around point.
-			 * Turn around point is defined as EPOCH where:
-			 *	a) For recover murgbl.tp_resolve_time is reached
-			 *	b) For rollback murgbl.tp_resolve_time is reached
-			 *		and  murgbl.resync_seqno is reached if non-zero
+			/* In journal records token_seq field is a union of jnl_seqno and token for TP or unfenced records.
+			 * It is in the same offset for all records when they are present.
+			 * For ZTP jnl_seqno and token are two different fields.
+			 * offset of jnl_seqno in ZTP is same as that of token_seq in TP or unfenced records.
+			 * token field is only present in ZTP.
+			 * For non-replication (that is, doing recover) and unfenced records token_seq field has no use.
+			 * For replication (that is, doing rollback) unfenced and TP records contain jnl_seqno in token_seq field.
+			 * This is used as token in the hash table.
+			 * Note : ZTP is not currently supported in replication. When supported here for rollback
+			 *	  we may need to use both token and sequence number fields to do token resolution and
+			 *	  find holes in sequence number.
 			 */
+			rec_time = mur_rab.jnlrec->prefix.time;
+			if (REC_HAS_TOKEN_SEQ(rectype))
+			{
+				rec_token_seq = GET_JNL_SEQNO(mur_rab.jnlrec);
+				if (mur_options.rollback && !this_reg_resolved && rec_time < murgbl.tp_resolve_time)
+				{
+					if (JRT_EPOCH == rectype || JRT_EOF == rectype)
+					{
+						if (rec_token_seq > *pre_resolve_seqno)
+							*pre_resolve_seqno = rec_token_seq;
+					} else
+					{
+						if ((rec_token_seq + 1) > *pre_resolve_seqno)
+							*pre_resolve_seqno = rec_token_seq + 1;
+					}
+					this_reg_resolved = TRUE;
+				}
+			} else
+				continue;
 			if (JRT_EPOCH == rectype)
 			{
 				assert(mur_options.forward || murgbl.intrpt_recovery ||
@@ -260,15 +296,10 @@ boolean_t mur_back_process(boolean_t apply_pblk)
 			}
 			if (rec_time < murgbl.tp_resolve_time && (!resolve_seq || rec_token_seq < murgbl.resync_seqno))
 				continue;
-			/* Note: token_seq is a union of jnl_seqno and token for TP or unfenced records.
-			 * 	 It is in the same offset for all records when they are present.
-			 *       For ZTP jnl_seqno and token are two different fields.
-			 *	 offset of jnl_seqno in ZTP is same as that of token_seq in TP or unfenced records.
-			 *	 token field is only present in ZTP.
-			 *	 For unfenced and TP records token_seq is used as token when necessary.
-			 *	 For non-replication (that is, doing recover) and unfenced records token_seq field has no use.
-			 */
-			if (IS_FENCED(rectype) && FENCE_NONE != mur_options.fences && rec_time <= mur_options.before_time)
+			if ((FENCE_NONE == mur_options.fences || rec_time > mur_options.before_time)
+				|| (rec_time < murgbl.tp_resolve_time && (!resolve_seq || rec_token_seq < murgbl.resync_seqno)))
+				continue;
+			if (IS_FENCED(rectype))
 			{	/* Note for a ZTP if FSET/GSET is present before mur_options.before_time and
 				 * GUPD/ZTCOM are present after mur_options.before_time, it is considered broken. */
 				rec_fence = GET_REC_FENCE_TYPE(rectype);
@@ -319,11 +350,10 @@ boolean_t mur_back_process(boolean_t apply_pblk)
 						{
 							multi->partner--;
 							assert(0 <= multi->partner);
+							assert((TPFENCE != rec_fence) || rec_time == multi->time);
+							assert((ZTPFENCE != rec_fence) || rec_time >= multi->time);
 							if (0 == multi->partner)
-							{
-								assert((TPFENCE != rec_fence) || multi->time == rec_time);
 								murgbl.broken_cnt--;	/* It is resolved */
-							}
 							multi->regnum = mur_regno;
 						}
 					} else
@@ -337,14 +367,15 @@ boolean_t mur_back_process(boolean_t apply_pblk)
 					}
 				}
 			} else if (mur_options.rollback && IS_REPLICATED(rectype) && rec_token_seq <= murgbl.stop_rlbk_seqno)
-			{	/* We come here for rollback and and replicated records.
-				 * We come here even record is fenced. User must have specified fence=NONE in that case.
-				 * We are here because these are not considered broken. They are either lost or good.
-				 * For resync and fetch_resync all non-tp transactions (and TP with mur_options.fence_none)
-				 * after murgbl.stop_rlbk_seqno are considered lost or broken.
+			{	/* Process unfenced transactions. They are either lost or good.
+				 * For RESYNC and FETCH_RESYNC qualifiers, all non-tp transactions
+				 * 	after murgbl.stop_rlbk_seqno are considered lost or broken.
 				 * So, we do not need to add them in token(seqnum) table to find gap in sequence number.
-				 * For consitent rollback murgbl.stop_rlbk_seqno == MAXUINT8,
-				 * so all records till tp_resolve_time are considered for broken/lost/good */
+				 * For consistent rollback murgbl.stop_rlbk_seqno == MAXUINT8,
+				 * 	so all records till tp_resolve_time are considered for broken/lost/good determination.
+				 * For rollback, pid or image_type or time are not necessary to establish uniqueness of token.
+				 * Because token (jnl_seqno) is already guaranteed to be unique for an instance
+				 */
 				rec_fence = GET_REC_FENCE_TYPE(rectype);
 				token = (ZTPFENCE != rec_fence) ? rec_token_seq :
 					((struct_jrec_ztp_upd *)mur_rab.jnlrec)->token;
@@ -356,13 +387,13 @@ boolean_t mur_back_process(boolean_t apply_pblk)
 					MUR_TOKEN_ADD(multi, token, 0, 0, 0, 0, rec_fence, 0);
 				} else
 				{
-					assert(FENCE_NONE == mur_options.fences && NOFENCE != rec_fence);
-					assert(0 == multi->partner);
-					assert(0 == multi->pid);
-					VMS_ONLY(assert(0 == multi->image_count);)
+					assert(FALSE);
+					if (!(mur_report_error(MUR_DUPTOKEN)))
+						return FALSE;
 				}
 			}
 		} /* end for mur_prev */
+		assert(!mur_options.rollback || this_reg_resolved);
 		if (mur_options.verbose)
 			gtm_putmsg(VARLSTCNT(15) ERR_MUJNINFO, 13, LEN_AND_LIT("Mur_back_process:trnarnd "),
 			mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, mur_jctl->rec_offset,

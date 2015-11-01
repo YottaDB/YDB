@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -27,6 +27,7 @@
 
 	.text
 .extern	n2s
+.extern i2mval
 
 # PUBLIC	op_fnlength
 ENTRY op_fnlength
@@ -36,11 +37,18 @@ ENTRY op_fnlength
 	call	n2s
 	popl	%edx
 	popl	%eax
-l10:	pushl	%ebx
+l10:	cmpl	$INT_HI,mval_l_strlen(%edx)
+	jge	l11			# len too large for mv_i2mval
+	pushl	%ebx
 	movl	%eax,%ebx
 	movl	mval_l_strlen(%edx),%eax
 	mv_i2mval %eax, %ebx
 	popl	%ebx
+	ret
+l11:	pushl	mval_l_strlen(%edx)
+	pushl	%eax
+	call	i2mval
+	addl	$8,%esp
 	ret
 # op_fnlength ENDP
 

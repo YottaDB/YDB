@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,9 +32,11 @@ int m_merge(void)
 
 	opctype 	put_oc;
 	oprtype 	mopr;
-	triple		*sub, *ref,  *obp, *s1, tmpchain;
+	triple		*sub, *ref,  *obp, *s1, *restart, tmpchain;
 	mval		mv;
 	int		type;
+
+	restart = newtriple(OC_RESTARTPC);	/* Here is where a restart should pick up */
 
 	dqinit(&tmpchain, exorder);
 	/* Left Hand Side of EQUAL sign */

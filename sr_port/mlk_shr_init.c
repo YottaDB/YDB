@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,8 +32,14 @@ void mlk_shr_init(sm_uc_ptr_t base,
 	mlk_prcblk_ptr_t	pb;
 	mlk_ctldata_ptr_t	ctl;
 
-	nr_blocks = size / 64;
-	nr_procs = size / 160;
+	/* there are four sections with the following approximate sizes
+	 *  mlk_ctldata	--> sizeof(mlk_ctldata)
+	 *  mlk_shrblk	--> size * 5/8 (consisting of nr_blocks number of mlk_shrblk structures)
+	 *  mlk_prcblk	--> size * 1/8 (consisting of nr_procs  number of mlk_prcblk structures)
+	 *  mlk_shrsubs	--> size * 3/8 - sizeof(mlk_ctldata) (consisting of variable number of variable length subscript strings)
+	 */
+	nr_blocks = ((size >> 1) + (size >> 3)) / sizeof(mlk_shrblk);	/* size/2 + size/8 = size*5/8 */
+	nr_procs = (size >> 3) / sizeof(mlk_prcblk);
 
 	memset(base, 0, size);
 	ctl = (mlk_ctldata_ptr_t)base;
@@ -53,8 +59,8 @@ void mlk_shr_init(sm_uc_ptr_t base,
 		A2R(pb->next, pb + 1);
 	}
 	cp = (sm_uc_ptr_t)(pb + 1);
-	A2R(ctl->subbase ,cp);
-	A2R(ctl->subfree ,cp);
+	A2R(ctl->subbase, cp);
+	A2R(ctl->subfree, cp);
 	cp = (sm_uc_ptr_t)base + size;
 	A2R(ctl->subtop ,cp);
 	assert(ctl->subtop > ctl->subbase);

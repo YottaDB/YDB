@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,7 +95,8 @@ void op_fnnext(lv_val *src,mval *key,mval *dst)
 						tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 						assert(NULL != lcl_coll_xform_buff);
 						tmp_sbs.str.addr = lcl_coll_xform_buff;
-						do_xform(local_collseq->xform, &key->str, &tmp_sbs.str, &length);
+						do_xform(local_collseq, XFORM, &key->str,
+								&tmp_sbs.str, &length);
 						tmp_sbs.str.len = length;
 						s2pool(&(tmp_sbs.str));
 						key = &tmp_sbs;
@@ -108,7 +109,7 @@ void op_fnnext(lv_val *src,mval *key,mval *dst)
 							tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
 							assert(NULL != lcl_coll_xform_buff);
 							tmp_sbs.str.addr = lcl_coll_xform_buff;
-							do_xform(local_collseq->xback,
+							do_xform(local_collseq, XBACK,
 								&((sbs_str_struct *) status.ptr)->str,
 								&tmp_sbs.str,
 								&length);

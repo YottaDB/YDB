@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,6 +69,7 @@ GBLREF	reg_ctl_list	*mur_ctl;
 GBLREF	int		mur_regno;
 GBLREF	mur_opt_struct	mur_options;
 GBLREF	mur_gbls_t	murgbl;
+LITREF	boolean_t		jrt_is_replicated[JRT_RECTYPES];
 
 
 /*******************************************************************************************
@@ -280,7 +281,7 @@ uint4 mur_prev(off_jnl_t dskaddr)
 					gtm_putmsg(VARLSTCNT(9) ERR_JNLBADRECFMT, 3, mur_jctl->jnl_fn_len,
 						mur_jctl->jnl_fn, dskaddr, ERR_TEXT, 2,
 						LEN_AND_LIT("Requested offset beyond end of file [prev] (dskaddr > 0)"));
-					return ERR_JNLREADEOF;
+					return ERR_JNLBADRECFMT;
 				}
 			}
 		} /* end good_prefix */
@@ -366,7 +367,7 @@ uint4 mur_prev(off_jnl_t dskaddr)
 				gtm_putmsg(VARLSTCNT(9) ERR_JNLBADRECFMT, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn,
 					   mur_jctl->rec_offset, ERR_TEXT, 2,
 					   LEN_AND_LIT("Requested offset beyond beginning of file [prev]"));
-				return ERR_JNLREADEOF;
+				return ERR_JNLBADRECFMT;
 			}
 		}
 	} /* end of dskaddr == 0 */
@@ -468,7 +469,7 @@ uint4 mur_next(off_jnl_t dskaddr)
 			{
 				gtm_putmsg(VARLSTCNT(9) ERR_JNLBADRECFMT, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, dskaddr,
 					   ERR_TEXT, 2, LEN_AND_LIT("Requested offset beyond end of file [next] (dskaddr > 0)"));
-				return ERR_JNLREADEOF;
+				return ERR_JNLBADRECFMT;
 			}
 		} /* end good_prefix */
 	} else
@@ -523,7 +524,7 @@ uint4 mur_next(off_jnl_t dskaddr)
 			}
 			/* If possible, overlap I/O with processing, read into available buffer */
 			if ((1 == mur_desc.index || /* we just copied partial record (if any), OR */
-			    (unsigned char *)prefix == mur_desc.cur_buff->top) && /* we completely processed cur_buff */
+			    (unsigned char *)prefix >= mur_desc.cur_buff->top) && /* we completely processed cur_buff */
 			    MUR_BUFF_SIZE < mur_jctl->eof_addr - MAX(mur_desc.sec_buff->dskaddr, mur_desc.cur_buff->dskaddr))
 			/* there is data to be read; MAX magic is for when no read was posted to sec_buff (last chunk in file) */
 			{
@@ -555,9 +556,12 @@ uint4 mur_next(off_jnl_t dskaddr)
 		} else
 		{
 			if (!mur_jctl->tail_analysis)
+			{
 				gtm_putmsg(VARLSTCNT(9) ERR_JNLBADRECFMT, 3, mur_jctl->jnl_fn_len,
 					mur_jctl->jnl_fn, mur_jctl->rec_offset,
 					ERR_TEXT, 2, LEN_AND_LIT("Requested offset beyond end of file [next] (dskaddr == 0)"));
+				return ERR_JNLBADRECFMT;
+			}
 			return ERR_JNLREADEOF;
 		}
 	} /* end of dskaddr == 0 */
@@ -615,6 +619,8 @@ uint4	mur_fread_eof(jnl_ctl_list *jctl)
 	jnl_file_header	*jfh;
 	uint4		status, lvrec_off;
 
+	if (mur_options.show_head_only) /* only SHOW HEADER, no need for time consuming search for valid eof */
+		return SS_NORMAL;
 	jfh = jctl->jfh;
 	if (0 != jfh->prev_recov_end_of_data)
 	{ 	/* regardless of jfh->crash, prev_recov_end_of_data and end_of_data must point to valid records since previous
@@ -642,8 +648,6 @@ uint4	mur_fread_eof(jnl_ctl_list *jctl)
 			return SS_NORMAL;
 		}
 	}
-	if (mur_options.show_head_only) /* only SHOW HEADER, no need for time consuming search for valid eof */
-		return SS_NORMAL;
 	/* crash or invalid end */
 	jctl->properly_closed = FALSE;
 	jctl->tail_analysis = TRUE;
@@ -679,6 +683,7 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 	uint4		status, rec_len, blen;
 	jnl_record	*rec;
 	trans_num	rec_tn;
+	seq_num		rec_seqno;
 
 	jfh = jctl->jfh;
 	assert(lo_off <= jctl->eof_addr);
@@ -731,9 +736,20 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 			break;
 		mid_off = new_mid_off + mid_further;
 	}
-	if (0 == rec_offset) 	/* Unexpected condition, there must have been at least one good record (PINI or EPOCH) */
-		GTMASSERT;	/* at the beginning of the file */
-	/* We found a valid record at mid_off, go forward to find the last valid record */
+	if (0 == rec_offset)
+	{	/* Unexpected condition:
+		 * a) If lo_off was 0 while entering this routine, this means there was no good record at or after the beginning
+		 * 	of the journal file (i.e. offset of JNL_HDR_LEN). This is impossible since a PINI record was written at
+		 * 	journal file creation time and at least that should have been seen as a good record.
+		 * b) If lo_off was non-zero while entering this routine, this implies there was no good record anywhere at or
+		 * 	after an offset of lo_off in the journal file. But this is impossible since a non-zero value of lo_off
+		 * 	implies it is equal to jfh->end_of_data which means that an EPOCH/EOF record written at that offset
+		 * 	and the journal file was synced so we should at least see that good record.
+		 */
+		GTMASSERT;
+	}
+	/* We found a valid record at mid_off, go forward to find the last valid record.  Before the for loop
+	 * of mur_next(0) following call is necessary to initialize buffers and for the assumptions in mur_next() */
 	jctl->rec_offset = rec_offset;
 	if (SS_NORMAL != (status = mur_next(rec_offset)))
 	{
@@ -741,18 +757,28 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 			GTMASSERT; /* we just checked the validity, didn't we? */
 		return status;
 	}
-	for (rec_len = mur_rab.jnlrec->prefix.forwptr,	/* CAUTION: don't deference rec after mur_next() as the area it points */
-	     rec_tn = mur_rab.jnlrec->prefix.tn;	/* to may have been overwritten */
-	     SS_NORMAL == mur_next(0) && /* could read successfully */
-	     ((mur_rab.jnlrec->prefix.tn >= rec_tn) || /* increasing order of transaction number */
-	      (!jctl->tail_analysis && /* if looking for valid end (call from fread_eof), stop if discontinuity in tn */
-	       mur_options.extract_full && ++murgbl.err_cnt <= mur_options.error_limit)); /* extract_full is special case, continue
-											   * until error_limit exhausted */
-	     jctl->rec_offset += rec_len, rec_len = mur_rab.jnlrec->prefix.forwptr, rec_tn = mur_rab.jnlrec->prefix.tn)
-		;
+	/* Note that though currently it is required not to change system time when journaling is on,
+	 * we do not check time continuity here. We hope that in future we will remove the restriction */
+	for (rec_len = mur_rab.jnlrec->prefix.forwptr, rec_tn = mur_rab.jnlrec->prefix.tn, rec_seqno = 0 ; ;
+		jctl->rec_offset += rec_len, rec_len = mur_rab.jnlrec->prefix.forwptr, rec_tn = mur_rab.jnlrec->prefix.tn)
+	{
+		/* if next record could not be read, break;
+		 * if non-decreasing order of transaction number and it is not extract_full, break;
+		 * for extract_full if it is called from mur_fread_eof() or error limit exhausted break */
+		if ((SS_NORMAL != mur_next(0)) ||
+			((mur_rab.jnlrec->prefix.tn < rec_tn) &&
+			(jctl->tail_analysis || !mur_options.extract_full || ++murgbl.err_cnt > mur_options.error_limit)))
+	     		break;
+		if (mur_options.rollback && REC_HAS_TOKEN_SEQ(mur_rab.jnlrec->prefix.jrec_type))
+		{
+			if (GET_JNL_SEQNO(mur_rab.jnlrec) < rec_seqno) /* if jnl seqno is not in sequence */
+				break;
+			rec_seqno = GET_JNL_SEQNO(mur_rab.jnlrec);
+		}
+	}
 	/* now set mur_rab fields to point to valid record */
 	assert(jctl->rec_offset);
-	status = mur_prev(jctl->rec_offset); /* A conservative and safe approach since valid record may have been overwritten. */
+	status = mur_prev(jctl->rec_offset); /* Since valid record may have been overwritten we must do this */
 					     /* We call mur_prev, not mur_next, although both position mur_rab to the same
 					      * record (when called with non zero arg) to make sure no assumptions in a following
 					      * call to mur_prev(0) are violated. We leave the buffers in a state suitable
@@ -789,11 +815,12 @@ uint4 mur_valrec_next(jnl_ctl_list *jctl, off_jnl_t lo_off)
 			return status; /* I/O error or unexpected failure */
 		assert(jctl->rec_offset < jctl->lvrec_off); /* lvrec_off must have a valid record */
 	}
+	assert(SS_NORMAL == status);
 	/* now work backwards to find the earliest valid record in the immediately preceding alignsize chunk */
-	for (status = mur_prev(0); SS_NORMAL == status; jctl->rec_offset -= mur_rab.jreclen)
+	for ( ; SS_NORMAL == mur_prev(0); jctl->rec_offset -= mur_rab.jreclen)
 		;
+	assert(JNL_FILE_FIRST_RECORD <= jctl->rec_offset);
 	/* now set mur_rab fields to point to valid record */
-	assert(jctl->rec_offset);
 	status = mur_next(jctl->rec_offset); /* A conservative and safe approach since valid record may have been overwritten. */
 					     /* We call mur_next, not mur_prev, although both position mur_rab to the same
 					      * record (when called with non zero arg) to make sure no assumptions in a following

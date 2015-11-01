@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@ GBLREF	gd_region		*gv_cur_region;
  * Return Value: TRUE, if succsessful
  *	         FALSE, if fails.
  */
-boolean_t mu_replpool_grab_sem()
+boolean_t mu_replpool_grab_sem(boolean_t immediate)
 {
 	char			instname[MAX_FN_LEN + 1];
 	gd_region		*r_save;
@@ -92,7 +92,7 @@ boolean_t mu_replpool_grab_sem()
 	replreg->dyn.addr->fname_len = full_len;
 	udi = FILE_INFO(replreg);
 	udi->fn = (char *)replreg->dyn.addr->fname;
-	if (!ftok_sem_get(replreg, TRUE, REPLPOOL_ID, TRUE))
+	if (!ftok_sem_get(replreg, TRUE, REPLPOOL_ID, immediate))
 		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instname);
 	repl_inst_get(instname, &repl_instance);
 	/*
@@ -185,7 +185,7 @@ boolean_t mu_replpool_grab_sem()
 	/*
 	 * Now release jnlpool/recvpool ftok semaphore
 	 */
-	if (!ftok_sem_release(replreg, TRUE, TRUE))
+	if (!ftok_sem_release(replreg, TRUE, immediate))
 	{
 		remove_sem_set(SOURCE);
 		remove_sem_set(RECV);

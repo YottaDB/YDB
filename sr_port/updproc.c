@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -121,6 +121,8 @@ GBLREF	boolean_t		tp_restart_fail_sig_used;
 #endif
 GBLREF	boolean_t		is_replicator;
 GBLREF	jnl_gbls_t		jgbl;
+GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
+
 LITREF	int			jrt_update[JRT_RECTYPES];
 LITREF	boolean_t		jrt_fixed_size[JRT_RECTYPES];
 LITREF	boolean_t		jrt_is_replicated[JRT_RECTYPES];
@@ -230,6 +232,13 @@ int updproc(void)
 	/* is_standalone = TRUE; */
 	is_updproc = TRUE;
 	is_replicator = TRUE;	/* as update process goes through t_end() and can write jnl recs to the jnlpool for replicated db */
+	gvdupsetnoop = FALSE;	/* disable optimization to avoid multiple updates to the database and journal for duplicate sets */
+	/* if duplicate SETs cause multiple updates to the database and journal in the primary, we want to do the same
+	 * here in order to maintain the jnl_seqno in sync. note that the primary can run the VIEW "GVDUPSETNOOP" command
+	 * to enable/disable this feature on a per-process basis so it is not under our control. if the primary does run with
+	 * this feature enabled, then we will not be receiving journal records for the duplicate set anyways so running with
+	 * this flag always set to FALSE does not hurt.
+	 */
 	memset((uchar_ptr_t)&recvpool, 0, sizeof(recvpool)); /* For util_base_ch and mupip_exit */
 	if (updproc_init() == UPDPROC_EXISTS) /* we got the global directory header already */
 		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Update Process already exists"));
@@ -501,7 +510,7 @@ void updproc_actions(void)
 				 * server may read data that is overwritten (or stale). This is true only on
 				 * architectures and OSes that allow unordered memory access
 				 */
-				COMMIT_SHM_UPDATES;
+				SHM_WRITE_MEMORY_BARRIER;
 				cs_addrs->ti->early_tn = cs_addrs->ti->curr_tn + 1;
 				JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() */
 				jnl_status = jnl_ensure_open();
@@ -530,17 +539,14 @@ void updproc_actions(void)
 					(temp_jnlpool_ctl->write > jnlpool_ctl->write ? 0 : jnlpool_ctl->jnlpool_size);
 				jnl_header->prev_jnldata_len = jnlpool_ctl->lastwrite_len;
 				jnlpool_ctl->lastwrite_len = jnl_header->jnldata_len;
-				/* For systems with UNORDERED memory access (example, ALPHA), on a multi processor system,
-				 * it is possible that the source server notices the change in write_addr
+				/* For systems with UNORDERED memory access (example, ALPHA, POWER4, PA-RISC 2.0), on a multi
+				 * processor system, it is possible that the source server notices the change in write_addr
 				 * before seeing the change to jnlheader->jnldata_len, leading it to read an invalid
 				 * transaction length. To avoid such conditions, we should commit the order of shared
 				 * memory updates before we update write_addr. This ensures that the source server sees all
 				 * shared memory updates related to a transaction before the change in write_addr
-				 *
-				 * Read Alpha Architecture Reference Manual, edited by Richard L Sites, Chapter "System
-				 * Architecture and Programming Implications" for memory coherency issues.
 				 */
-				COMMIT_SHM_UPDATES;
+				SHM_WRITE_MEMORY_BARRIER;
 				QWINCRBYDW(jnlpool_ctl->write_addr, jnl_header->jnldata_len);
 				jnlpool_ctl->write = temp_jnlpool_ctl->write;
 				jnlpool_ctl->jnl_seqno = temp_jnlpool_ctl->jnl_seqno;

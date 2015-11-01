@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@
 #include "iottdef.h"
 
 /* essentially the same as ionl_wteol */
-void iott_wteol(short val, io_desc *io_ptr)
+void iott_wteol(int4 val, io_desc *io_ptr)
 {
 	mstr	eol;
 	int	eol_cnt;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -187,15 +187,17 @@ static readonly CLI_ENTRY dse_rdmp_qual[] = {
 };
 
 static readonly CLI_ENTRY dse_fdmp_qual[] = {
-{ "ALL", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0, 0, 0 },
-{ "BACKUP", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "BASIC", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "BG_TRC", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "DB_CSH", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "JOURNAL", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "RETRIES", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "TPBLKMOD", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
-{ "TPRETRIES", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "ALL",         0, 0, 0, 0, 0, 0, VAL_N_A, 0, 0,   0, 0 },
+{ "BACKUP",      0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "BASIC",       0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "BG_TRC",      0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "DB_CSH",      0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "ENVIRONMENT", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "GVSTATS",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "JOURNAL",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "RETRIES",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "TPBLKMOD",    0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "TPRETRIES",   0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
 { 0 }
 };
 

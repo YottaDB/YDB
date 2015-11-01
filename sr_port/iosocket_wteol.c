@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@
 
 GBLREF tcp_library_struct	tcp_routines;
 
-void	iosocket_wteol(short val, io_desc *io_ptr)
+void	iosocket_wteol(int4 val, io_desc *io_ptr)
 {
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;

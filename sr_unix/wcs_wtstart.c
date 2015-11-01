@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <signal.h>	/* for VSIG_ATOMIC_T type */
 
 #include "gtm_stdio.h"
 
@@ -47,10 +48,14 @@
 #include "add_inter.h"
 #include "wcs_recover.h"
 #include "gtm_string.h"
+#include "have_crit.h"
+#include "deferred_signal_handler.h"
 
 GBLREF	boolean_t		*lseekIoInProgress_flags;	/* needed for the LSEEK* macros in gtmio.h */
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			process_id;
+GBLREF	VSIG_ATOMIC_T		forced_exit;
+GBLREF	int			process_exiting;
 
 /* In case of a disk-full situation, we want to print a message every 1 minute. We maintain two global variables to that effect.
  * dskspace_msg_counter and save_dskspace_msg_counter. If we encounter a disk-full situation and both those variables are different
@@ -79,7 +84,9 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	sm_uc_ptr_t		blk_ptr;
 	uint4			saved_dsk_addr;
 	unix_db_info		*udi;
+#ifdef DEBUG
 	cache_rec_ptr_t		cr, cr_lo, cr_hi;
+#endif
 	static	int4		error_message_loop_count = 0;
 
 	error_def(ERR_DBFILERR);
@@ -135,37 +142,31 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			}
 		}
 		ahead = &csa->acc_meth.bg.cache_state->cacheq_active;
-		cr_lo = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
-		cr_hi = cr_lo + csd->n_bts;
+		DEBUG_ONLY(cr_lo = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;)
+		DEBUG_ONLY(cr_hi = cr_lo + csd->n_bts;)
 	} else
 	{
 		ahead = &csa->acc_meth.mm.mmblk_state->mmblkq_active;
 		if (cnl->mm_extender_pid == process_id)
 			max_writes = max_ent;		/* allow file extender or rundown to write everything out */
-		cr_lo = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets);
-		cr_hi = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets + csd->n_bts);
+		DEBUG_ONLY(cr_lo = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets);)
+		DEBUG_ONLY(cr_hi = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets + csd->n_bts);)
 	}
 	assert(((sm_long_t)ahead & 7) == 0);
 	queue_empty = FALSE;
-
+	csa->wbuf_dqd++;			/* Tell rundown we have an orphaned block in case of interrupt */
 	for (n1 = n2 = 0, csrfirst = NULL;  n1 < max_ent  &&  n2 < max_writes  &&  !csd->wc_blocked ;  ++n1)
 	{
-		assert(FALSE == csa->wbuf_dqd);
-		csa->wbuf_dqd = TRUE;			/* Tell rundown we have an orphaned block in case of interrupt */
 		csr = (cache_state_rec_ptr_t)REMQHI((que_head_ptr_t)ahead);
 		if (INTERLOCK_FAIL == (int4)csr)
 		{
 			assert(FALSE);
 			SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 			BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail1);
-			csa->wbuf_dqd = FALSE;
 			break;
 		}
 		if (NULL == csr)
-		{
-			csa->wbuf_dqd = FALSE;
 			break;				/* the queue is empty */
-		}
 		if (csr == csrfirst)
 		{					/* completed a tour of the queue */
 			queue_empty = FALSE;
@@ -176,24 +177,15 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 				BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail2);
 			}
-			csa->wbuf_dqd = FALSE;
 			break;
 		}
-		cr = (cache_rec_ptr_t)((sm_uc_ptr_t)csr - sizeof(cr->blkque));
-		if (CR_NOT_ALIGNED(cr, cr_lo) || CR_NOT_IN_RANGE(cr, cr_lo, cr_hi))
-		{
-			assert(FALSE);
-			SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-			BG_TRACE_PRO_ANY(csa, wc_blocked_wcs_wtstart_bad_cr);
-			csa->wbuf_dqd = FALSE;
-			break;
-		}
+		DEBUG_ONLY(cr = (cache_rec_ptr_t)((sm_uc_ptr_t)csr - sizeof(cr->blkque));
+		assert(!CR_NOT_ALIGNED(cr, cr_lo) && !CR_NOT_IN_RANGE(cr, cr_lo, cr_hi));)
 		if (dba_bg == csd->acc_meth)
 		{
 			if (CR_BLKEMPTY == csr->blk)
 			{	/* must be left by t_commit_cleanup - removing it from the queue and the following
 				   completes the cleanup */
-				csa->wbuf_dqd = FALSE;
 				assert(0 != csr->dirty);
 				assert(csr->data_invalid);
 
@@ -222,10 +214,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 						assert(FALSE);
 						SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 						BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail3);
-						csa->wbuf_dqd = FALSE;
 						break;
 					}
-                                        csa->wbuf_dqd = FALSE;
                                         if (csrfirst == NULL)
                                                 csrfirst = csr;
                                         continue;
@@ -246,7 +236,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 							send_msg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(region),
 								ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), errno);
 							RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);
-							csa->wbuf_dqd = FALSE;
 							if (NULL == csrfirst)
 								csrfirst = csr;
 							continue;
@@ -274,12 +263,10 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				csr->epid = process_id;
 				bp = (blk_hdr_ptr_t)(GDS_ANY_REL2ABS(csa, csr->buffaddr));
 				VALIDATE_BM_BLK(csr->blk, bp, csa, region, bmp_status);	/* bmp_status holds bmp buffer's validity */
-#ifdef FULLBLOCKWRITES
-				size = csd->blk_size;
-#else
 				size = bp->bsiz;
+				if (csa->do_fullblockwrites)
+					size = ROUND_UP(size, csa->fullblockwrite_len);
 				assert(size <= csd->blk_size);
-#endif
 				offset = (csd->start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)csr->blk * csd->blk_size;
 				INCR_DB_CSH_COUNTER(csa, n_dsk_writes, 1);
 				/* Do db write without timer protect (not needed since wtstart not reenterable in one task) */
@@ -310,12 +297,10 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 						(sm_off_t)csr->blk * csd->blk_size);
 					assert((sm_uc_ptr_t)bp < csa->db_addrs[1]);
 				}
-#ifdef FULLBLOCKWRITES
-				size = csd->blk_size;
-#else
 				size = bp->bsiz;
+				if (csa->do_fullblockwrites)
+					size = ROUND_UP(size, csa->fullblockwrite_len);
 				assert(size <= csd->blk_size);
-#endif
 				offset = (off_t)((sm_uc_ptr_t)bp - (sm_uc_ptr_t)csd);
 				INCR_DB_CSH_COUNTER(csa, n_dsk_writes, 1);
 				/* Do db write without timer protect (not needed since wtstart not reenterable in one task) */
@@ -331,10 +316,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					assert(FALSE);
 					SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 					BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail4);
-					csa->wbuf_dqd = FALSE;
 					break;
 				}
-				csa->wbuf_dqd = FALSE;
 				/* note: this will be automatically retried after csd->flush_time[0] msec, if this was called
 				 * through a timer-pop, otherwise, error should be handled (including ignored) by the caller.
 				 */
@@ -371,8 +354,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			   sync with the actual count on the queue which caused an assert failure in wcs_flu. SE 11/2000
 			*/
 		}
-		csa->wbuf_dqd = FALSE;
 	}
+	csa->wbuf_dqd--;
 	DEBUG_ONLY(
 		if (0 == n2)
 			BG_TRACE_ANY(csa, wrt_noblks_wrtn);
@@ -380,6 +363,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	assert(cnl->in_wtstart > 0 && csa->in_wtstart);
 	DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
 	csa->in_wtstart = FALSE;			/* This process can write again */
+	if (forced_exit && !process_exiting && !have_crit(HAVE_CRIT_IN_WTSTART)) /* do deferred MUPIP STOP handling if needed */
+		deferred_signal_handler();					 /* do it only if not already exiting */
 	if (queue_empty)			/* Active queue has become empty. */
 		wcs_clean_dbsync_timer(csa);	/* Start a timer to flush-filehdr (and write epoch if before-imaging) */
 	return err_status;

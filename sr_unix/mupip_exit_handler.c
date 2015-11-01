@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,8 +39,6 @@
 #include "gtmimagename.h"
 #include "eintr_wrappers.h"
 #include "repl_log.h"
-#include "io.h"			/* for gtmsecshr.h */
-#include "gtmsecshr.h"
 #include "gt_timer.h"
 #include "util.h"
 #include "mutex.h"
@@ -55,6 +53,7 @@
 #include "buddy_list.h"
 #include "muprec.h"
 #include "gtmmsg.h"
+#include "secshr_db_clnup.h"
 
 GBLREF int			process_exiting;
 GBLREF boolean_t	        mupip_jnl_recover;
@@ -100,7 +99,7 @@ void mupip_exit_handler(void)
 	if (jgbl.mupip_journal)
 		mur_close_files();
 	mupip_jnl_recover = FALSE;
-	jgbl.forw_phase_recovery = FALSE;
+	jgbl.dont_reset_gbl_jrec_time = jgbl.forw_phase_recovery = FALSE;
 	cancel_timer(0);		/* Cancel all timers - No unpleasant surprises */
 	secshr_db_clnup(NORMAL_TERMINATION);
         if (jnlpool.jnlpool_ctl)

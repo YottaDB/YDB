@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,6 @@
 
 #define RELOCATE(field, type, base) field = (type)((unsigned char *)(field) + (unsigned int)(base))
 #define RELREAD 50			/* number of relocation entries to buffer */
-#define COFFHDRLEN (sizeof(int4) * 10)	/* Size of old masscomp-coff header before routine hdr */
 
 /* This macro will check if the file is an old non-shared-binary variant of GT.M code and if
    so just return false to signal a recompile. The assumption is that if we fall out of this
@@ -43,7 +42,11 @@
 #ifndef NO_NONUSB_RECOMPILE
 #  define CHECK_NONUSB_RECOMPILE								\
 {												\
-	LSEEKREAD(file_desc, COFFHDRLEN, marker, sizeof(JSB_MARKER) -1, status);		\
+	if (-1 != (status = (ssize_t)lseek(file_desc, COFFHDRLEN, SEEK_SET)))			\
+        {											\
+		DOREADRC(file_desc, marker, sizeof(JSB_MARKER) - 1, status);			\
+	} else											\
+		status = errno;									\
 	if (0 == status && 0 == MEMCMP_LIT(marker, JSB_MARKER))					\
         {											\
                 free(hdr);									\
@@ -132,7 +135,11 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		hdr->shlib_handle = zro_entry->shrlib;
 	} else
 	{	/* Seek past native object headers to get GT.M object's routine header */
-		LSEEKREAD(file_desc, NATIVE_HDR_LEN, hdr, sizeof(rhdtyp), status);
+		if (-1 != (status = (ssize_t)lseek(file_desc, NATIVE_HDR_LEN, SEEK_SET)))
+		{
+			DOREADRC(file_desc, hdr, sizeof(rhdtyp), status);
+		} else
+			status = errno;
 		if (0 != status)
 		{
 			CHECK_NONUSB_RECOMPILE;
