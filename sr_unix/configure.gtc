@@ -79,7 +79,6 @@ fi
 
 # Other files
 hlpfiles="gdehelp.dat gtmhelp.dat"
-awkfiles="repl_sort_add_seq.awk repl_sort_rem_tran.awk"
 if [ $arch = "sco" ]; then
 	ofiles="$hlpfiles esnecil"
 elif [ $arch = "sun"  -o  $arch = "solaris" ]; then
@@ -90,8 +89,6 @@ elif [ $arch = "dux"  -o  $arch = "hp"  -o  $arch = "ibm" -o $arch = "linux" ]; 
 else
 	ofiles="$hlpfiles"
 fi
-
-ofiles="$ofiles $awkfiles"
 
 # Directories
 if [ $arch = "sun"  -o  $arch = "solaris" ]; then
@@ -344,5 +341,5 @@ read resp
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
 		*.gtc gtm* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid \
-		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.* $awkfiles
+		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.*
 fi

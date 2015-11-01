@@ -226,7 +226,8 @@ boolean_t mur_back_process(boolean_t apply_pblk)
 		{
 			assert(0 == mur_jctl->turn_around_offset);
 			rectype = mur_rab.jnlrec->prefix.jrec_type;
-			if (rctl->lvrec_time < murgbl.tp_resolve_time && !resolve_seq && IS_SET_KILL_ZKILL(rectype))
+			if ((rctl->lvrec_time < murgbl.tp_resolve_time) && !resolve_seq
+					&& IS_SET_KILL_ZKILL(rectype) && (FENCE_NONE != mur_options.fences))
 				GTMASSERT;	/* Out of design situation */
 			if (JRT_PBLK == rectype && apply_pblk_this_region)
 			{

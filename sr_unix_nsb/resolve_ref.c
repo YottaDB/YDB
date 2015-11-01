@@ -50,10 +50,10 @@ int resolve_ref(int errknt)
 		walktree((mvar *)mlabtab, resolve_lab, (char *)&errknt);
 	} else
 	{
-		COMPDBG(printf(" ************************************* Begin resolve_ref scan ******************************\n"););
+		COMPDBG(PRINTF(" ************************************* Begin resolve_ref scan ******************************\n"););
 		dqloop(&t_orig, exorder, x)
 		{
-			COMPDBG(printf(" ************************ Triple Start **********************\n"););
+			COMPDBG(PRINTF(" ************************ Triple Start **********************\n"););
 			COMPDBG(cdbg_dump_triple(x, 0););
 			for (n = x->operand ; n < &(x->operand[2]) ; n++)
 			{
@@ -178,34 +178,41 @@ int resolve_ref(int errknt)
 					}
 					continue;
 				case TRIP_REF:
-					if ((y = n->oprval.tref)->opcode == OC_PASSTHRU)
-					{
-						assert(y->operand[0].oprclass == TRIP_REF);
-						*n = y->operand[0];
-						COMPDBG(printf(" ** p1: operand at 0x%08lx replaced by operand at 0x%08lx\n",
-							       n, &y->operand[0]););
-					}
-					p = (tbp *) mcalloc(sizeof(tbp));
-					p->bpt = x;
-					dqins(&n->oprval.tref->backptr, que, p);
+					resolve_tref(x, n);
 					continue;
 				}
 			}
 			n = &x->destination;
 			if (n->oprclass == TRIP_REF)
-			{
-				if ((y = n->oprval.tref)->opcode == OC_PASSTHRU)
-				{
-					assert(y->operand[0].oprclass == TRIP_REF);
-					*n = y->operand[0];
-					COMPDBG(printf(" ** p2: operand at 0x%08lx replaced by operand at 0x%08lx\n",
-						       n, &y->operand[0]););
-				}
-				p = (tbp *) mcalloc(sizeof(tbp));
-				p->bpt = x;
-				dqins(&n->oprval.tref->backptr, que, p);
-			}
+				resolve_tref(x, n);
 		}
 	}
 	return errknt;
+}
+
+
+/* If for example there are nested $SELECT routines feeding a value to a SET $PIECE/$EXTRACT, this nested checking is
+   necessary to make sure no OC_PASSTHRUs remain in the parameter chain to get turned into OC_NOOPs that will
+   cause GTMASSERTs in emit_code.
+*/
+void resolve_tref(triple *curtrip, oprtype *opnd)
+{
+	triple	*tripref;
+	tbp	*tripbp;
+
+	if (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode)
+	{
+		assert(tripref->operand[0].oprclass == TRIP_REF);
+		do
+		{	/* As many OC_PASSTHRUs as are stacked, we will devour */
+			*opnd = tripref->operand[0];
+		} while (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode);
+	}
+
+	COMPDBG(PRINTF(" ** Passthru replacement: Operand at 0x%08lx replaced by operand at 0x%08lx\n",
+		       opnd, &tripref->operand[0]););
+
+	tripbp = (tbp *) mcalloc(sizeof(tbp));
+	tripbp->bpt = curtrip;
+	dqins(&opnd->oprval.tref->backptr, que, tripbp);
 }

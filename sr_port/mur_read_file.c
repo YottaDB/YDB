@@ -106,8 +106,8 @@ uint4 mur_prev_rec(void)
 		}
 		if (ERR_JNLBADRECFMT != status)
 			return status;
-		if (mur_options.extr[GOOD_TN])
-		{
+		if (!mur_options.update)
+		{	/* only allow EXTRACT/SHOW/VERIFY to proceed after printing the error if error_limit permits */
 			if (!mur_report_error(MUR_JNLBADRECFMT))
 				return status;
 			/* continue in distress, look for other valid records */
@@ -171,10 +171,10 @@ uint4 mur_next_rec(void)
 		}
 		if (ERR_JNLBADRECFMT != status)
 			return status;
-		if (mur_options.extr[GOOD_TN])
-		{
+		if (!mur_options.update)
+		{	/* only allow EXTRACT/SHOW/VERIFY to proceed after printing the error if error_limit permits */
 			if (!mur_report_error(MUR_JNLBADRECFMT))
-				return ERR_JNLBADRECFMT;
+				return status;
 			/* continue in distress, look for other valid records */
 			return mur_valrec_next(mur_jctl, mur_jctl->rec_offset + rec_size);
 		}
@@ -672,7 +672,7 @@ uint4	mur_fread_eof(jnl_ctl_list *jctl)
  ************************************************************************************************/
 uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 {
-	off_jnl_t	mid_off, new_mid_off, rec_offset;
+	off_jnl_t	mid_off, new_mid_off, rec_offset, mid_further;
 	boolean_t	this_rec_valid;
 	jnl_file_header	*jfh;
 	jrec_prefix	*prefix;
@@ -726,9 +726,10 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 		else
 			hi_off = mid_off;
 	     	new_mid_off = ROUND_DOWN2(((lo_off >> 1) + (hi_off >> 1)), jfh->alignsize);
-		mid_off = (new_mid_off != mid_off) ? new_mid_off : new_mid_off + jfh->alignsize;
-		if (mid_off >= hi_off)
+		mid_further = (new_mid_off != mid_off) ? 0 : jfh->alignsize; /* if necessary, move further to avoid repeat search */
+		if (hi_off - new_mid_off <= mid_further)
 			break;
+		mid_off = new_mid_off + mid_further;
 	}
 	if (0 == rec_offset) 	/* Unexpected condition, there must have been at least one good record (PINI or EPOCH) */
 		GTMASSERT;	/* at the beginning of the file */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,19 +24,19 @@
 
 /* JOB Parameter tables */
 #define JPSDEF(a,b,c) {a, b}
-static readonly nametabent	job_param_names[] =
+const static readonly nametabent job_param_names[] =
 {
 #include "jobparamstrs.h"
 };
 
 #undef JPSDEF
 #define JPSDEF(a,b,c) c
-static readonly jp_type	job_param_data[] =
+const static readonly jp_type job_param_data[] =
 {
 #include "jobparamstrs.h"
 };
 
-static readonly unsigned char	job_param_index[27] =
+const static readonly unsigned char job_param_index[27] =
 {
 	 0,  2,  2,  2,  6,  8,  8, 10, 10, 14, 14, 14, 16,
 	16, 22, 24, 28, 28, 28, 34, 34, 34, 34, 34, 34, 34,
@@ -56,8 +56,8 @@ GBLREF mident	window_ident;
 
 int one_job_param (char **parptr)
 {
-	bool		neg;
-	int		x,len,num;
+	boolean_t	neg;
+	int		x, len, num;
 	error_def	(ERR_JOBPARUNK);
 	error_def	(ERR_JOBPARNOVAL);
 	error_def	(ERR_JOBPARVALREQ);
@@ -113,8 +113,7 @@ int one_job_param (char **parptr)
 			GTMASSERT;
 		}
 		advancewindow ();
-	}
-	else if (window_token == TK_EQUAL)
+	} else if (window_token == TK_EQUAL)
 	{
 		stx_error (ERR_JOBPARNOVAL);
 		return FALSE;

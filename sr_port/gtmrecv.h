@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,13 +9,12 @@
  *								*
  ****************************************************************/
 
-#ifndef _GTMRECV_H
-#define _GTMRECV_H
+#ifndef GTMRECV_H
+#define GTMRECV_H
 
 /* Needs mdef.h, gdsfhead.h and its dependencies, and iosp.h */
 
 #define	MAX_FILTER_CMD_LEN	512
-#define MAX_TR_BUFFSIZE			1 * 1024 * 1024
 
 #ifdef VMS
 #define MAX_GSEC_KEY_LEN		32 /* 31 is allowed + 1 for NULL terminator */
@@ -66,12 +65,26 @@ enum
 #define RECVPOOL_SEGMENT		'R'
 #define MIN_RECVPOOL_SIZE		(1024 * 1024)
 
+#define GTMRECV_MIN_TCP_SEND_BUFSIZE	(512)		/* anything less than this, issue a warning */
+#define GTMRECV_TCP_SEND_BUFSIZE	(1024)		/* not much outbound traffic, we can live with a low limit */
+#define GTMRECV_MIN_TCP_RECV_BUFSIZE	(16   * 1024)	/* anything less than this, issue a warning */
+#define GTMRECV_TCP_RECV_BUFSIZE_INCR	(32   * 1024)	/* attempt to get a larger buffer with this increment */
+#define GTMRECV_TCP_RECV_BUFSIZE	(1024 * 1024)	/* desirable to set the buffer size to be able to receive large chunks */
+
+/* Note:  fields shared between the receiver and update processes
+	  really need to have memory barriers or other appropriate
+	  synchronization constructs to ensure changes by one
+	  process are actually seen by the other process.  Cache
+	  line spacing should also be taken into account.
+	  Adding volatile is only a start at this.
+*/
+
 typedef struct
 {
 	replpool_identifier recvpool_id;
-	seq_num	start_jnl_seqno;/* The sequence number with which operations
-				 * started. Initialized by Update Process */
-	seq_num	jnl_seqno; 	/* Sequence number of the next transaction
+	volatile seq_num	start_jnl_seqno;	/* The sequence number with which operations
+				 * started.  Initialized by receiver server */
+	volatile seq_num	jnl_seqno; 	/* Sequence number of the next transaction
 				 * expected to be received from Source Server.
 			    	 * Updated by Receiver Server */
 	seq_num	old_jnl_seqno;	/* Stores the value of jnl_seqno before it
@@ -80,13 +93,13 @@ typedef struct
 	uint4	recvdata_base_off; /* Receive pool offset from where journal
 				    * data starts */
 	uint4	recvpool_size; 	/* Available space for journal data in bytes */
-	uint4 	write; 		/* Relative offset from recvdata_base_off for
+	volatile uint4 	write; 	/* Relative offset from recvdata_base_off for
 				 * for the next journal record to be written.
 				 * Updated by Receiver Server */
-	uint4	write_wrap;	/* Relative offset from recvdata_base_off
+	volatile uint4	write_wrap;	/* Relative offset from recvdata_base_off
 				 * where write was wrapped by Receiver Server */
 
-	uint4	wrapped;	/* Boolean, set by Receiver Server when it wraps
+	volatile uint4	wrapped;	/* Boolean, set by Receiver Server when it wraps
 				 * Reset by Update Process when it wraps. Used
 				 * for detecting space used in the receive
 				 * pool */
@@ -115,21 +128,21 @@ typedef struct
 {
 	uint4		upd_proc_pid;
 	uint4		upd_proc_pid_prev;      /* save for reporting old pid if we fail */
-	uint4	 	read; 			/* Relative offset from
+	volatile uint4	read; 			/* Relative offset from
 						 * recvdata_base_off of the
 						 * next journal record to be
 						 * read from the receive pool */
-	seq_num		read_jnl_seqno;		/* Next jnl_seqno to be read */
-	uint4		upd_proc_shutdown;      /* Used to communicate shutdown
+	volatile seq_num	read_jnl_seqno;	/* Next jnl_seqno to be read */
+	volatile uint4	upd_proc_shutdown;      /* Used to communicate shutdown
 						 * related values between
 						 * Receiver Server and Update
 						 * Process */
-	int4		upd_proc_shutdown_time; /* Time allowed for update
+	volatile int4	upd_proc_shutdown_time; /* Time allowed for update
 						 * process to shut down */
-	uint4		bad_trans;		/* Boolean, set by Update
+	volatile uint4	bad_trans;		/* Boolean, set by Update
 						 * Process that it received
 						 * a bad transaction record */
-	uint4		changelog;		/* Boolean - change the log
+	volatile uint4	changelog;		/* Boolean - change the log
 						   file */
 	int4		start_upd;		/* Used to communicate upd only
 						 * startup values */
@@ -165,8 +178,8 @@ typedef struct
  	 * Data items used in communicating action qualifiers (show statistics,
 	 * shutdown) and qualifier values (log file, shutdown time, etc).
  	 */
-	uint4			statslog; /* Boolean - detailed log on/off? */
-	uint4			shutdown; /* Used to communicate shutdown
+	volatile uint4		statslog; /* Boolean - detailed log on/off? */
+	volatile uint4		shutdown; /* Used to communicate shutdown
 					   * related values between process
 					   * initiating shutdown and Receiver
 					   * Server */
@@ -174,10 +187,10 @@ typedef struct
 						* in seconds */
 	int4			listen_port;	/* Port at which the Receiver
 						 * Server is listening */
-	uint4			restart;	/* Used by receiver server to
+	volatile uint4		restart;	/* Used by receiver server to
 						 * coordinate crash restart
 						 * with update process */
-	uint4			changelog;	/* Boolean - change the log
+	volatile uint4		changelog;	/* Boolean - change the log
 						 * file */
 	char			filter_cmd[MAX_FILTER_CMD_LEN];
 	char			log_file[MAX_FN_LEN + 1];
@@ -270,7 +283,8 @@ typedef struct
 	char            filter_cmd[MAX_FILTER_CMD_LEN];
 } gtmrecv_options_t;
 
-#include <netinet/in.h>
+#include "gtm_inet.h"
+
 /********** Receiver server function prototypes **********/
 int	gtmrecv(void);
 int	gtmrecv_changelog(void);
@@ -293,6 +307,10 @@ int	gtmrecv_start_updonly(void);
 int	gtmrecv_upd_proc_init(boolean_t fresh_start);
 int	gtmrecv_wait_for_detach(void);
 void	gtmrecv_exit(int exit_status);
+int	gtmrecv_alloc_msgbuff(void);
+void	gtmrecv_free_msgbuff(void);
+int	gtmrecv_alloc_filter_buff(int bufsiz);
+void	gtmrecv_free_filter_buff(void);
 int	is_updproc_alive(void);
 int	is_srv_alive(int srv_type);
 int	is_recv_srv_alive(void);

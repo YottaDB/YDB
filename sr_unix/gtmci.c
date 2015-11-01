@@ -20,6 +20,8 @@
 #include <errno.h>
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
+
+#include "cli.h"
 #include "stringpool.h"
 #include "rtnhdr.h"
 #include "stack_frame.h"
@@ -47,7 +49,7 @@ GBLREF 	void			(*restart)();
 GBLREF 	boolean_t		gtm_startup_active;
 GBLREF	int * volatile		var_on_cstack_ptr;	/* volatile so that nothing gets optimized out */
 GBLREF	rhdtyp			*ci_base_addr;
-GBLDEF 	unsigned int		nested_level = 1;	/* current nested depth of callin environments */
+GBLDEF 	unsigned int		nested_level;		/* current nested depth of callin environments */
 
 GBLREF  mval			dollar_zstatus;
 GBLREF  unsigned char		*fgncal_stack;
@@ -91,7 +93,7 @@ va_dcl
 	void 			op_extcall(), op_extexfun(), flush_pio(void);
 	int			*save_var_on_cstack_ptr;
 	int			status;
-
+	error_def(ERR_MAXSTRLEN);
 	error_def(ERR_CIRCALLNAME);
 	error_def(ERR_CINOENTRY);
 
@@ -197,14 +199,19 @@ va_dcl
 					arg_mval.mvtype = MV_STR;
 					arg_mval.str.addr = va_arg(var, gtm_char_t*);
 					arg_mval.str.len = strlen(arg_mval.str.addr);
+					if (MAX_STRLEN < arg_mval.str.len)
+						rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 					s2pool(&arg_mval.str);
 					break;
 				case xc_string_star:
 					mstr_parm = va_arg(var, gtm_string_t*);
 					arg_mval.mvtype = MV_STR;
-					arg_mval.str.addr = mstr_parm->address;
+					if (MAX_STRLEN < (uint4)mstr_parm->length)
+						rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 					arg_mval.str.len = mstr_parm->length;
+					arg_mval.str.addr = mstr_parm->address;
 					s2pool(&arg_mval.str);
+
 					break;
 				default:
 					GTMASSERT; /* should have been caught by citab_parse */
@@ -331,6 +338,7 @@ int gtm_init()
 	{ /* call-in invoked from C as base. GT.M hasn't been started up yet. */
 		image_type = GTM_IMAGE;
 		err_init(stop_image_conditional_core);
+		cli_lex_setup(0, NULL);
 		/* Initialize msp to the maximum so if errors occur during GT.M startup below,
 		 * the unwind logic in gtmci_ch() will get rid of the whole stack. */
 		msp = (unsigned char*)-1;
@@ -343,6 +351,7 @@ int gtm_init()
 		gtm_savetraps(); /* nullify default $ZTRAP handling */
 		assert(gtm_startup_active);
 		assert(frame_pointer->flags & SFF_CI);
+		nested_level = 1;
 	}
 	else if (!(frame_pointer->flags & SFF_CI))
 	{ /* Nested call-in: setup a new CI environment (SFF_CI frame on top of base-frame) */

@@ -130,7 +130,8 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		if (1 != temp_short)
 			rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
 		ptr += sizeof(short);
-		MV_FORCE_MVAL(v, *ptr);
+		status = *ptr;	/* Temp assignment to status gets rid of compiler warning in MV_FORCE_MVAL macro */
+		MV_FORCE_MVAL(v, status);
 		return;
 	}
 	if (reply_code == CMMS_R_PREV || reply_code == CMMS_R_QUERY || reply_code == CMMS_R_ORDER)

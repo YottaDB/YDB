@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ GBLREF boolean_t		master_dir;
 GBLREF boolean_t		muint_fast;
 GBLREF boolean_t		muint_key;
 GBLREF boolean_t		muint_subsc;
-GBLREF boolean_t		tn_reset;
+GBLREF boolean_t		tn_reset_this_reg;
 GBLREF int			disp_maxkey_errors;
 GBLREF int			disp_trans_errors;
 GBLREF int			maxkey_errors;
@@ -191,7 +191,7 @@ boolean_t mu_int_blk(
 		return FALSE;
 	}
 	blk_size = (int)((blk_hdr_ptr_t)blk_base)->bsiz;
-	if (tn_reset && !muint_fast)
+	if (tn_reset_this_reg && !muint_fast)
 	{
 		((blk_hdr_ptr_t)blk_base)->tn = 0;
 		mu_int_write(blk, blk_base);

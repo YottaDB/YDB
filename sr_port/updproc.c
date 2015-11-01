@@ -84,6 +84,7 @@
 #include "gtmmsg.h"	/* for gtm_putmsg() prototype */
 #include "mu_gv_stack_init.h"
 #include "jnl_typedef.h"
+#include "memcoherency.h"
 
 #define MINIMUM_BUFFER_SIZE	(DISK_BLOCK_SIZE * 32)
 
@@ -126,9 +127,9 @@ LITREF	boolean_t		jrt_is_replicated[JRT_RECTYPES];
 
 error_def(ERR_NORECOVERERR);
 
-static sgmnt_data_ptr_t csd;
-static seq_num		seqnum_diff;
-static 	boolean_t	updproc_continue = TRUE;
+static	sgmnt_data_ptr_t csd;
+static	seq_num		seqnum_diff;
+static	boolean_t	updproc_continue = TRUE;
 static	seq_num		start_jnl_seqno;
 
 void			mupip_update();
@@ -154,8 +155,6 @@ CONDITION_HANDLER(updproc_ch)
 		repl_log(updproc_log_fp, TRUE, TRUE, " ----> TPRETRY for sequence number "INT8_FMT" "INT8_FMTX" \n",
 			INT8_PRINT(recvpool.upd_proc_local->read_jnl_seqno),
 			INT8_PRINTX(recvpool.upd_proc_local->read_jnl_seqno));
-		recvpool.upd_proc_local->bad_trans = TRUE;
-		recvpool.upd_proc_local->read = 0;
 		/* This is a kludge. We can come here from 2 places.
 		 *	( i) From a call to t_retry which does a rts_error(ERR_TPRETRY).
 		 *	(ii) From updproc_actions() where immediately after op_tcommit we detect that dollar_tlevel is non-zero.
@@ -199,11 +198,6 @@ CONDITION_HANDLER(updproc_ch)
  * Unless there is a TPRESTART, the processing remains in the updproc_actions loop,
  *   but when a resource conflict triggers a TPRESTART, the condition handler drops
  *   back to the outer loop in updproc, which reissues the call.
- * The reason for this structure is that VMS condition handling continues from where
- *   something left off, and, in this case, it returns control to the loop around
- *   the function call in the routine (updproc) that established the handler.
- * The longjmp mechanism used for UNIX condition handling could have been bent to work
- *   without the extra call, but that approach was abandoned to keep the code portable.
  */
 int updproc(void)
 {
@@ -243,7 +237,7 @@ int updproc(void)
 	mu_gv_stack_init(&mstack_ptr);
 	recvpool.upd_proc_local->read = 0;
 	QWASSIGN(seqnum_diff, seq_num_zero);
-	QWASSIGN(jnl_seqno, start_jnl_seqno);
+	QWASSIGN(jnl_seqno, start_jnl_seqno);	/* set in upd_open_files */
 	QWASSIGN(recvpool.recvpool_ctl->jnl_seqno, jnl_seqno);
 	QWASSIGN(recvpool.upd_proc_local->read_jnl_seqno, jnl_seqno);
 	if (repl_enabled)
@@ -282,7 +276,7 @@ void updproc_actions(void)
 	int			fd, n;
 	int			rec_len, backptr;
 	char			fn[MAX_FN_LEN];
-	sm_uc_ptr_t		readaddrs;
+	sm_uc_ptr_t		readaddrs;	/* start of current rec in pool */
 	struct_jrec_null	null_record;
 	jnldata_hdr_ptr_t	jnl_header;
 	boolean_t		incr_seqno;
@@ -297,9 +291,9 @@ void updproc_actions(void)
 	error_def(ERR_TPRETRY);
 
 	ESTABLISH(updproc_ch);
-	temp_read = 0;
-	temp_write = 0;
-	readaddrs = recvpool.recvdata_base;
+	temp_read = recvpool.upd_proc_local->read;
+	temp_write = recvpool.recvpool_ctl->write;
+	readaddrs = recvpool.recvdata_base + temp_read;
 	upd_rec_seqno = tupd_num = tcom_num = 0;
 	QWASSIGN(jnl_seqno, recvpool.upd_proc_local->read_jnl_seqno);
 	while (TRUE)
@@ -318,7 +312,7 @@ void updproc_actions(void)
 				repl_log(updproc_log_fp, TRUE, TRUE,
 					"JNLSEQNO of last transaction written to journal pool = "INT8_FMT" "INT8_FMTX" \n",
 					INT8_PRINT(jnlpool_ctl->jnl_seqno), INT8_PRINTX(jnlpool_ctl->jnl_seqno));
-				repl_log(updproc_log_fp, TRUE, TRUE, "Secondary Ahead of Primary by "INT8_FMT" "INT8_FMT" \n",
+				repl_log(updproc_log_fp, TRUE, TRUE, "Secondary Ahead of Primary by "INT8_FMT" "INT8_FMTX" \n",
 					INT8_PRINT(temp_df_seqnum), INT8_PRINTX(temp_df_seqnum));
 
 			}
@@ -328,12 +322,21 @@ void updproc_actions(void)
 		if (GTMRECV_NO_RESTART != recvpool.gtmrecv_local->restart)
 		{
 			/* wait for restart to become GTMRECV_NO_RESTART (set by the Receiver Server) */
-			QWASSIGN(recvpool.recvpool_ctl->jnl_seqno, jnl_seqno);
-			readaddrs = recvpool.recvdata_base;
-			recvpool.upd_proc_local->read = 0;
-			recvpool.gtmrecv_local->restart = GTMRECV_UPD_RESTARTED;
-			temp_read = 0;
-			temp_write = 0;
+			if (GTMRECV_RCVR_RESTARTED == recvpool.gtmrecv_local->restart)
+			{
+				QWASSIGN(recvpool.recvpool_ctl->jnl_seqno, jnl_seqno);
+				readaddrs = recvpool.recvdata_base;
+				recvpool.upd_proc_local->read = 0;
+				recvpool.gtmrecv_local->restart = GTMRECV_UPD_RESTARTED;
+				temp_read = 0;
+				temp_write = 0;
+				if (0 < tupd_num)
+				{
+					assert(dollar_tlevel);
+					op_trollback(0);
+					tupd_num = 0;
+				}
+			}
 			SHORT_SLEEP(10);
 			continue;
 		}
@@ -343,7 +346,7 @@ void updproc_actions(void)
 			recvpool.upd_proc_local->changelog = FALSE;
 		}
 		if (recvpool.upd_proc_local->bad_trans
-			|| (FALSE == recvpool.recvpool_ctl->wrapped
+			|| (0 == tupd_num && FALSE == recvpool.recvpool_ctl->wrapped
 				&& (temp_write = recvpool.recvpool_ctl->write) == recvpool.upd_proc_local->read))
 		{
 			/* to take care of the startup case where jnl_seqno is 0 in the recvpool_ctl */
@@ -356,6 +359,8 @@ void updproc_actions(void)
 		/*     assume receiver will update wrapped even for exact overflows */
 		if (temp_read >= recvpool.recvpool_ctl->write_wrap)
 		{
+			if (0 < tupd_num)	/* receive pool cannot wrap in the middle of TP */
+				GTMASSERT;	/* see process_tr_buff in gtmrecv_process for why */
 			if (FALSE == recvpool.recvpool_ctl->wrapped)
 			{
 				/* Update process in keeping up with receiver
@@ -480,7 +485,8 @@ void updproc_actions(void)
 				QWASSIGN(temp_jnlpool_ctl->write_addr, jnlpool_ctl->write_addr);
 				QWASSIGN(temp_jnlpool_ctl->write, jnlpool_ctl->write);
 				QWASSIGN(temp_jnlpool_ctl->jnl_seqno, jnlpool_ctl->jnl_seqno);
-				assert(QWMODDW(temp_jnlpool_ctl->write_addr, temp_jnlpool_ctl->jnlpool_size) == temp_jnlpool_ctl->write);
+				assert(QWMODDW(temp_jnlpool_ctl->write_addr,
+					temp_jnlpool_ctl->jnlpool_size) == temp_jnlpool_ctl->write);
 				jgbl.cumul_jnl_rec_len = sizeof(jnldata_hdr_struct) + NULL_RECLEN;
 				temp_jnlpool_ctl->write += sizeof(jnldata_hdr_struct);
 				if (temp_jnlpool_ctl->write >= temp_jnlpool_ctl->jnlpool_size)
@@ -489,6 +495,13 @@ void updproc_actions(void)
 					temp_jnlpool_ctl->write = 0;
 				}
 				QWADDDW(jnlpool_ctl->early_write_addr, jnlpool_ctl->write_addr, jgbl.cumul_jnl_rec_len);
+				/* Source server does not read in crit. It relies on early_write_addr, the transaction
+				 * data, lastwrite_len, write_addr being updated in that order. To ensure this order,
+				 * we have to force out early_write_addr to its coherency point now. If not, the source
+				 * server may read data that is overwritten (or stale). This is true only on
+				 * architectures and OSes that allow unordered memory access
+				 */
+				COMMIT_SHM_UPDATES;
 				cs_addrs->ti->early_tn = cs_addrs->ti->curr_tn + 1;
 				JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() */
 				jnl_status = jnl_ensure_open();
@@ -517,6 +530,17 @@ void updproc_actions(void)
 					(temp_jnlpool_ctl->write > jnlpool_ctl->write ? 0 : jnlpool_ctl->jnlpool_size);
 				jnl_header->prev_jnldata_len = jnlpool_ctl->lastwrite_len;
 				jnlpool_ctl->lastwrite_len = jnl_header->jnldata_len;
+				/* For systems with UNORDERED memory access (example, ALPHA), on a multi processor system,
+				 * it is possible that the source server notices the change in write_addr
+				 * before seeing the change to jnlheader->jnldata_len, leading it to read an invalid
+				 * transaction length. To avoid such conditions, we should commit the order of shared
+				 * memory updates before we update write_addr. This ensures that the source server sees all
+				 * shared memory updates related to a transaction before the change in write_addr
+				 *
+				 * Read Alpha Architecture Reference Manual, edited by Richard L Sites, Chapter "System
+				 * Architecture and Programming Implications" for memory coherency issues.
+				 */
+				COMMIT_SHM_UPDATES;
 				QWINCRBYDW(jnlpool_ctl->write_addr, jnl_header->jnldata_len);
 				jnlpool_ctl->write = temp_jnlpool_ctl->write;
 				jnlpool_ctl->jnl_seqno = temp_jnlpool_ctl->jnl_seqno;
@@ -533,18 +557,17 @@ void updproc_actions(void)
 					memcpy(tcom_record.jnl_tid, rec->jrec_tcom.jnl_tid, TID_STR_SIZE);
 					op_tcommit();
 					if (0 != dollar_tlevel)
-					{	/* op_tcommit restarted the transaction - do update process special handling for tpretry */
-#ifdef VMS
-			/* The error below has special handling in a few condition handlers because it not so much signals an error
-			   as it does drive the necessary mechanisms to invoke a restart. Consequently this error can be
-			   overridden by a "real" error. For VMS, the extra parameters are specified to provide "placeholders" on
-			   the stack in the signal array if a real error needs to be overlayed in place of this one (see
-			   code in updproc_ch).
-			*/
-						rts_error(VARLSTCNT(6) ERR_TPRETRY, 4, 0, 0, 0, 0);
-#else
-						rts_error(VARLSTCNT(1) ERR_TPRETRY);
-#endif
+					{	/* op_tcommit restarted the transaction - do update process special
+						 * handling for tpretry.  The error below has special handling in a
+						 * few condition handlers because it not so much signals an error
+			   			 * as it does drive the necessary mechanisms to invoke a restart.
+						 * Consequently this error can be overridden by a "real" error.
+						 * For VMS, the extra parameters are specified to provide "placeholders"
+						 * on the stack in the signal array if a real error needs to be
+						 * overlayed in place of this one (see code in updproc_ch).
+						 * Defined in tp.h, the below issues ERR_TPRETRY.
+						*/
+						INVOKE_RESTART;
 					}
 					tcom_num = tupd_num = upd_rec_seqno = 0;
 					incr_seqno = TRUE;
@@ -616,7 +639,8 @@ void updproc_actions(void)
 		}
 		readaddrs = readaddrs + rec_len;
 		temp_read += rec_len;
-		recvpool.upd_proc_local->read = temp_read;
+		if (0 == tupd_num)
+			recvpool.upd_proc_local->read = temp_read;
 	}
 	updproc_continue = FALSE;
 }

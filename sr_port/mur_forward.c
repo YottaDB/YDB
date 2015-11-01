@@ -369,13 +369,10 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 					{
 						assert(FALSE); /* We want to debug this */
 						murgbl.wrn_count++;
-						gtm_putmsg(VARLSTCNT(5) ERR_DUPTN, 3, curr_tn,
+						gtm_putmsg(VARLSTCNT(6) ERR_DUPTN, 4, curr_tn, mur_jctl->rec_offset,
 							mur_jctl->jnl_fn_len, mur_jctl->jnl_fn);
 						if (mur_options.update && dollar_tlevel)
-						{
 							op_trollback(0);
-							process_losttn = TRUE;
-						}
 					}
 				}
 				if (mur_options.update)

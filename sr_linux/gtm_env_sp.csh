@@ -112,6 +112,6 @@ endif
 
 # Assembler definitions:
 # Note: we need to specify the assembler output file name or it will write it to the source directory.
-alias	gt_as_bta	'gt_as $gt_as_option_DDEBUG $gt_as_option_optimize -o `basename \!:1 .s`.o \!:1'
+alias	gt_as_bta	'gt_as $gt_as_option_debug $gt_as_option_nooptimize -o `basename \!:1 .s`.o \!:1'
 alias	gt_as_dbg	'gt_as $gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize -o `basename \!:1 .s`.o \!:1'
 alias	gt_as_pro	'gt_as $gt_as_option_optimize -o `basename \!:1 .s`.o \!:1'

@@ -26,13 +26,21 @@
    Warning: the lists above may not be complete.
 */
 
+/* The M stack frame on all platforms that follow pv-based linkage model (alpha model)
+ * contains a pointer to the base of routine's literal section. All such platforms
+ * must define HAS_LITERAL_SECT so that the routines that create a new stack frame
+ * initialize literal_ptr field apppropriately. */
+#if defined(__alpha) || defined(_AIX) || defined(__hpux)
+#define HAS_LITERAL_SECT
+#endif
+
 typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 {
 	struct rhead_struct *rvector;	/* routine header */
 	mval		**l_symtab;	/* local symbol table */
 	unsigned char	*mpc;		/* mumps program counter */
 	unsigned char	*ctxt;		/* context pointer (base register for use when there's no PC-relative address mode) */
-#if defined(__alpha) || defined(_AIX)
+#ifdef HAS_LITERAL_SECT
 	int4		*literal_ptr;	/* pointer to base of literals */
 #endif
 	unsigned char	*temps_ptr;	/* pointer to base of temps */

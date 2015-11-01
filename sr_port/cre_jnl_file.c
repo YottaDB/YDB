@@ -158,7 +158,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	struct FAB      	fab;
 	struct NAM      	nam;
 	char            	es_buffer[MAX_FN_LEN], name_buffer[MAX_FN_LEN];
-	int			blk, block, zero_size;
+	uint4			blk, block, zero_size;
 	io_status_block_disk	iosb;
 #endif
 	error_def(ERR_FILERENAME);

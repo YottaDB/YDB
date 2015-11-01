@@ -32,7 +32,7 @@ void op_lvpatwrite(va_alist)
 va_dcl
 {
 	va_list		var;
-	bool		flag, local_buff;
+	boolean_t	flag, local_buff;
 	int4		count, arg1, arg2;
 	mval		*mv;
 	zshow_out	output, *out;
@@ -52,15 +52,15 @@ va_dcl
 		output.buff = &buff[0];
 		output.ptr = output.buff;
 		out = &output;
-	}else
-	{	out = (zshow_out *) arg1;
-	}
+	} else
+		out = (zshow_out *) arg1;
 	count--;
 	arg1 = va_arg(var, int4);
 	lvzwr_init(TRUE, (mval *)arg1);
 	count--;
 	for (; count > 0; )
-	{	mv = va_arg(var, mval *); count--;
+	{
+		mv = va_arg(var, mval *); count--;
 		switch ((flag = MV_FORCE_INT(mv)))
 		{
 		case ZWRITE_ASTERISK:	/* caution fall through */

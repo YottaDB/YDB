@@ -40,19 +40,16 @@
 #include "dse.h"
 #include "dse_puttime.h"
 #include "gtmmsg.h"
-#include "stringpool.h"
+#include "stringpool.h"		/* for GET_CURR_TIME_IN_DOLLARH_AND_ZDATE macro */
 #include "op.h"
 
 #define MAX_UTIL_LEN    	64
-#define DSE_DMP_TIME_FMT	"DD MON YEAR 24:60:SS"
 #define NEXT_EPOCH_TIME_SPACES	"                   " /* 19 spaces, we have 19 character field width to output Next Epoch Time */
 
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF gd_region        *gv_cur_region;
-GBLREF spdesc		stringpool;
-LITREF mval		literal_null;
 
-static mval dse_dmp_time_fmt = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, STR_LIT_LEN(DSE_DMP_TIME_FMT), DSE_DMP_TIME_FMT, 0, 0);
+GBLDEF mval dse_dmp_time_fmt = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, STR_LIT_LEN(DSE_DMP_TIME_FMT), DSE_DMP_TIME_FMT, 0, 0);
 
 LITREF	char		*jrt_label[JRT_RECTYPES];
 
@@ -75,13 +72,14 @@ LITREF	char		*jrt_label[JRT_RECTYPES];
 
 void dse_dmp_fhead (void)
 {
-	boolean_t	jnl_buff_open;
-        unsigned char   util_buff[MAX_UTIL_LEN], buffer[MAXNUMLEN], *ptr;
-        int             util_len, rectype, time_len;
-	uint4		jnl_status;
-	enum jnl_state_codes		jnl_state;
-	gds_file_id	zero_fid;
-	mval		time_val, zdate_time;
+	boolean_t		jnl_buff_open;
+	unsigned char		util_buff[MAX_UTIL_LEN], buffer[MAXNUMLEN], *ptr;
+	int			util_len, rectype, time_len;
+	uint4			jnl_status;
+	enum jnl_state_codes	jnl_state;
+	gds_file_id		zero_fid;
+	mval			dollarh_mval, zdate_mval;
+	char			dollarh_buffer[MAXNUMLEN], zdate_buffer[sizeof(DSE_DMP_TIME_FMT)];
 
         jnl_state = (uint4)cs_addrs->hdr->jnl_state;
 	VMS_ONLY(
@@ -96,19 +94,9 @@ void dse_dmp_fhead (void)
 		util_out_print("!/File            !AD", TRUE, gv_cur_region->dyn.addr->fname_len,
 			&gv_cur_region->dyn.addr->fname[0]);
 		util_out_print("Region          !AD", TRUE, gv_cur_region->rname_len, &gv_cur_region->rname[0]);
-		op_horolog(&time_val); /* returns $H value in stringpool */
-		assert(MAXNUMLEN >= time_val.str.len);
-		memcpy(buffer, time_val.str.addr, time_val.str.len); /* if op_fnzdate calls stp_gcol, time_val might get corrupt
-									because it is not known to stp_gcol. To prevent problems,
-									copy from stringpool to local buffer */
-		time_val.str.addr = (char*)buffer;
-		stringpool.free -= time_val.str.len; /* now that we've made a copy, we don't need time_val in stringpool */
-		op_fnzdate(&time_val, &dse_dmp_time_fmt, (mval *)&literal_null, (mval *)&literal_null,
-			   &zdate_time); /* returns zdate formatted
-												        string in stringpool */
-		util_out_print("Date/Time       !AD [$H = !AD]", TRUE, zdate_time.str.len, zdate_time.str.addr,
-				time_val.str.len, time_val.str.addr);
-		stringpool.free -= zdate_time.str.len; /* we don't need zdate_time in stringpool anymore, also to prevent stpgcol */
+		GET_CURR_TIME_IN_DOLLARH_AND_ZDATE(dollarh_mval, dollarh_buffer, zdate_mval, zdate_buffer);
+		util_out_print("Date/Time       !AD [$H = !AD]", TRUE, zdate_mval.str.len, zdate_mval.str.addr,
+				dollarh_mval.str.len, dollarh_mval.str.addr);
 		util_out_print("  Access method                   !AD", FALSE, 2,
 			(cs_addrs->hdr->acc_meth == dba_mm) ? "MM" : "BG");
 		util_out_print("      ", FALSE);
@@ -350,7 +338,7 @@ void dse_dmp_fhead (void)
 			(cs_addrs->hdr->recov_interrupted ? " TRUE" : "FALSE"));
 		util_out_print("      ", FALSE);
 		util_out_print("  INTRPT resolve time   !12UL", TRUE, cs_addrs->hdr->intrpt_recov_tp_resolve_time);
-		util_out_print("  INTRPT seqno          !12UL", FALSE, cs_addrs->hdr->intrpt_recov_resync_seqno);
+		util_out_print("  INTRPT seqno    0x!16@XJ", FALSE, &cs_addrs->hdr->intrpt_recov_resync_seqno);
 		util_out_print("      ", FALSE);
 		util_out_print("  INTRPT jnl_state      !12UL", TRUE, cs_addrs->hdr->intrpt_recov_jnl_state);
 		util_out_print("  INTRPT repl_state     !12UL", FALSE, cs_addrs->hdr->intrpt_recov_repl_state);

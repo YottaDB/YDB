@@ -41,7 +41,7 @@ typedef struct dyn_modes_struct
 	int		rtn_name_len;
 	void		(*func_ptr1)(void);
 	void		(*func_ptr2)(void);
-	int		(*func_ptr3)(void);
+	void		(*func_ptr3)(void);
 } dyn_modes;
 
 static dyn_modes our_modes[2] =
@@ -72,8 +72,8 @@ rhdtyp *make_mode (int mode_index)
 	dyn_modes	*dmode;
 
 	assert(DM_MODE == mode_index || CI_MODE == mode_index);
-	base_address = (rhdtyp *)malloc(sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(int));
-	memset(base_address, 0, 	sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(int));
+	base_address = (rhdtyp *)malloc(sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(lnr_tabent));
+	memset(base_address, 0, 	sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(lnr_tabent));
 	dmode = &our_modes[mode_index];
 	memcpy(&base_address->routine_name, dmode->rtn_name, dmode->rtn_name_len);
 
@@ -83,14 +83,14 @@ rhdtyp *make_mode (int mode_index)
 	base_address->lnrtab_adr = (lnr_tabent *)base_address->ptext_end_adr;
 
 	base_address->labtab_adr = (lab_tabent *)((unsigned char *)base_address + sizeof(rhdtyp) +
-						  CODE_SIZE + CODE_LINES * sizeof(int));
+						  CODE_SIZE + CODE_LINES * sizeof(lnr_tabent));
 
 	base_address->lnrtab_len = CODE_LINES;
 	base_address->labtab_len = 1;
 
 	code = (unsigned int *)base_address->ptext_adr;	/* start of executable code */
 	GEN_CALL(dmode->func_ptr1);			/* line 0,1 */
-#if _AIX
+#ifdef _AIX
 	if (CI_MODE == mode_index)
 	{
 		/* Following 2 instructions are generated to call the routine stored in GTM_REG_ACCUM.
@@ -104,12 +104,19 @@ rhdtyp *make_mode (int mode_index)
 	}
 #endif
 	GEN_CALL(dmode->func_ptr2);
-	GEN_CALL(dmode->func_ptr3);			/* line 2 */
+#ifdef __hpux
+	if (DM_MODE == mode_index)
+	{
+		*code++ = HPPA_INS_BEQ | (MAKE_COND_BRANCH_TARGET(-8) << HPPA_SHIFT_OFFSET); /* BEQ r0,r0, -8 */
+		*code++ = HPPA_INS_NOP;
+	}
+#endif
+	GEN_CALL(dmode->func_ptr3);				/* line 2 */
 
 	lnr = LNRTAB_ADR(base_address);
-	*lnr++ = 0;					/* line 0 */
-	*lnr++ = 0;					/* line 1 */
-	*lnr++ = 2 * CALL_SIZE + EXTRA_INST * 4;	/* line 2 */
+	*lnr++ = 0;						/* line 0 */
+	*lnr++ = 0;						/* line 1 */
+	*lnr++ = 2 * CALL_SIZE + EXTRA_INST * sizeof(int);	/* line 2 */
 
 	lbl = base_address->labtab_adr;
 	lbl->lnr_adr = base_address->lnrtab_adr;
@@ -117,7 +124,7 @@ rhdtyp *make_mode (int mode_index)
 	base_address->current_rhead_adr = base_address;
 	zlput_rname(base_address);
 
-	inst_flush(base_address, sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(int4));
+	inst_flush(base_address, sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(lnr_tabent));
 
 	return base_address;
 }

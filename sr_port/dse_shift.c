@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,11 +69,6 @@ void dse_shift(void)
 	if (patch_curr_blk < 0 || patch_curr_blk >= cs_addrs->ti->total_blks || !(patch_curr_blk % cs_addrs->hdr->bplmap))
 	{
 		util_out_print("Error: invalid block number.", TRUE);
-		return;
-	}
-	if (cli_present("FORWARD") == CLI_PRESENT && cli_present("BACKWARD") == CLI_PRESENT)
-	{
-		util_out_print("Error:  incompatible qualifiers FORWARD and BACKWARD", TRUE);
 		return;
 	}
 	if (cli_present("OFFSET") != CLI_PRESENT)

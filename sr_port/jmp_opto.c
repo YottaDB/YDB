@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ typedef struct
 LITREF octabstruct	oc_tab[];	/* op-code table */
 GBLREF triple		t_orig;		/* head of triples */
 
-static readonly jump_opto_struct jump_opto_table[NUM_JO_TBL_ELE] =
+const static readonly jump_opto_struct jump_opto_table[NUM_JO_TBL_ELE] =
 {
 	{	OC_JMP,		/* opcode */
 		0,		/* index */
@@ -162,22 +162,22 @@ static	unsigned int jo_ind_ray[OPCODE_COUNT];
 
 static void jo_get_ptrs(unsigned int op)
 {
-	jump_opto_struct	*j, *j_top;
+	const jump_opto_struct	*j, *j_top;
 
 	for (j = &jump_opto_table[0], j_top = j + NUM_JO_TBL_ELE; j < j_top; j++)
 	{
 		if (j->opcode == op)
 		{
 			jo_ind_ray[op] = j->index;
-			jo_ptr_ray[op] = &j->opto_flag[0];
+			jo_ptr_ray[op] = (unsigned int *)&j->opto_flag[0];
 			return;
 		}
 	}
 	jo_ind_ray[op] = NO_ENTRY;
-	jo_ptr_ray[op] = (unsigned int *) NO_ENTRY;
+	jo_ptr_ray[op] = (unsigned int *)NO_ENTRY;
 }
 
-static readonly oprtype null_operand;
+const static readonly oprtype null_operand;
 
 /************************************************************************************************************
  NOTE:	We may which to modify the lookup method at some point in the future.  B. Shear suggests nested switch

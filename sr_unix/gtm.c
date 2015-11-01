@@ -27,7 +27,11 @@
 #pragma pointer_size (save)
 #pragma pointer_size (long)
 #endif
+
+#ifndef NOLIBGTMSHR
+/* for bta builds we link gtm_main() statically so we do not need to open the shared library */
 typedef int (*gtm_main_t)(int argc, char **argv, char **envp);
+#endif
 
 int main (int argc, char **argv, char **envp)
 #ifdef __osf__
@@ -35,6 +39,7 @@ int main (int argc, char **argv, char **envp)
 #endif
 {
 	int		status;
+#ifndef NOLIBGTMSHR
 	char		gtmshr_file[PATH_MAX];
 	char_ptr_t	fptr;
 	int		dir_len;
@@ -82,6 +87,7 @@ int main (int argc, char **argv, char **envp)
 			FPRINTF(stderr, "%%GTM-E-TEXT, %s\n", fptr);
 		return ERR_DLLNORTN;
 	}
+#endif
 	status = gtm_main(argc, argv, envp);
 	return status;
 }

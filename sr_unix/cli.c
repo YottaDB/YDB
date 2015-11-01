@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,38 +25,6 @@
 
 /*
  * --------------------------------------------------
- * Convert string to hex.
- *
- * Return:
- *	TRUE	- OK
- *	FALSE	- Could not convert to hex
- * --------------------------------------------------
- */
-static boolean_t str_to_hex(char *str, int4 *dst)
-{
-	long int 	result;
-	int		save_errno;
-	boolean_t	retval;
-
-	save_errno = errno;
-	errno = 0;
-        result = STRTOL(str, NULL, 16);
-	if (ERANGE != errno && INT_MIN <= result && INT_MAX >= result)
-	{
-		*dst = result;
-		retval = TRUE;
-	} else
-	{
-		*dst = 0;
-		retval = FALSE;
-	}
-	errno = save_errno;
-	return (retval);
-}
-
-
-/*
- * --------------------------------------------------
  * Find the qualifier and convert it to hex.
  *
  * Return:
@@ -72,10 +40,9 @@ boolean_t cli_get_hex(char *entry, int4 *dst)
 	assert(strlen(entry) > 0);
 	strncpy(local_str, entry, sizeof(local_str) - 1);
 
-	if (cli_present(local_str) == CLI_PRESENT
-	  && cli_get_value(local_str, buf))
+	if ((cli_present(local_str) == CLI_PRESENT) && cli_get_value(local_str, buf))
 	{
-		if (!str_to_hex(buf, dst))
+		if (!cli_str_to_hex(buf, dst))
 		{
 			FPRINTF(stderr, "Error: cannot convert %s value to hex number.\n", buf);
 			return FALSE;
@@ -84,7 +51,6 @@ boolean_t cli_get_hex(char *entry, int4 *dst)
 	}
 	return FALSE;
 }
-
 
 /*
  * --------------------------------------------------
@@ -132,26 +98,35 @@ boolean_t cli_get_num(char *entry, int4 *dst)
 {
 	char		buf[25];
 	char		local_str[MAX_LINE];
+	unsigned long 	local_ulong;
+	int		save_errno;
+
 	strncpy(local_str, entry, sizeof(local_str) - 1);
-
-	if (cli_present(local_str) == CLI_PRESENT
-	  && cli_get_value(local_str, buf))
+	if ((cli_present(local_str) == CLI_PRESENT) && cli_get_value(local_str, buf))
 	{
-	        if(ATOL(buf) > 2147483647){
-			util_out_print("Error: maximum size exceeded.", TRUE);
-			return FALSE;
-		}
-
 		if (cli_is_dcm(buf))
 		{
-			*dst = ATOI(buf);
-			return(TRUE);
+			save_errno = errno;
+			errno = 0;
+			local_ulong = STRTOUL(buf, NULL, 10);
+			if ((0 != errno) || UINT_MAX < local_ulong)
+			{	/* errno is non-zero implies "str" is outside the range of representable values in an unsigned long.
+				 * else if local_ulong > UINT_MAX, it means that on platforms where long is 8-bytes, "str" is >= 4G
+				 */
+				*dst = 0;
+				FPRINTF(stderr, "Error: Cannot convert %s string. Overflow\n",buf);
+				errno = save_errno;
+				return FALSE;
+			} else
+			{
+				*dst = local_ulong;
+				errno = save_errno;
+				return TRUE;
+			}
 		}
-
-		if (str_to_hex(buf, dst))
-			return(TRUE);
-		FPRINTF(stderr, "Error: cannot convert %s string to number.\n", buf);
-		return FALSE;
+		if (cli_str_to_hex(buf, dst))
+			return TRUE;
+		FPRINTF(stderr, "Error: Cannot convert %s string to number.\n", buf);
 	}
 	return FALSE;
 }

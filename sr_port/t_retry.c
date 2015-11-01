@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -36,6 +37,7 @@
 #include "wcs_recover.h"
 #include "wcs_sleep.h"
 #include "have_crit.h"
+#include "gdsbgtr.h"		/* for the BG_TRACE_PRO macros */
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
@@ -67,6 +69,7 @@ void t_retry(enum cdb_sc failure)
 		CWS_RESET;
 	if (0 == dollar_tlevel)
 	{
+		SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(cs_addrs, failure);	/* set wc_blocked if cache related status */
 		cs_addrs->hdr->n_retries[t_tries]++;
 		if (cs_addrs->critical)
 			crash_count = cs_addrs->critical->crashcnt;
@@ -142,7 +145,10 @@ void t_retry(enum cdb_sc failure)
 		assert(NULL == cs_addrs || NULL != cs_addrs->hdr);	/* both cs_addrs and cs_data should be NULL or non-NULL. */
 		assert(NULL != cs_addrs || cdb_sc_needcrit == failure); /* cs_addrs can be NULL in case of retry in op_lock2 */
 		if (NULL != cs_addrs)					/*  in which case failure code should be cdb_sc_needcrit. */
-			TP_RETRY_ACCOUNTING(cs_addrs->hdr, failure);
+		{
+			SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(cs_addrs, failure);
+			TP_RETRY_ACCOUNTING(cs_addrs, cs_addrs->hdr, failure);
+		}
 		assert((NULL != gv_target)
 				|| (cdb_sc_needcrit == failure) && (CDB_STAGNATE <= t_tries) && have_crit(CRIT_HAVE_ANY_REG));
 		/* only known case of gv_target being NULL is if a t_retry is done from gvcst_init. the above assert checks this */

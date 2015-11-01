@@ -83,6 +83,8 @@ if ( $?gtm_version_change == "1" ) then
 
 	setenv	gt_cc_compiler		"cc"		# name of C compiler
 
+	setenv	gt_cc_option_DBTABLD	"-DNOLIBGTMSHR"	# define NOLIBGTMSHR macro to statically link mumps for bta image
+
 	setenv	gt_cc_option_DDEBUG	"-DDEBUG"	# define DEBUG compilation-time macro
 	setenv	gt_cc_option_I		""		# specify header (include) file directory/ies
 							#   (set by gtmsrc.csh during version command)
@@ -114,6 +116,9 @@ if ( $?gtm_version_change == "1" ) then
 	setenv	gt_ld_sysrtns		""		# system routines needed for link (in addition to defaults)
 	setenv	gt_ld_aio_syslib	""		# system libraries needed for async I/O routines
 
+	# Linker options to create shared libraries from GT.M generated objects
+	setenv	gt_ld_m_shl_linker	"ld"
+	setenv	gt_ld_m_shl_options	""
 
 	# Generic shared library information:
 
@@ -165,7 +170,7 @@ alias	gt_ar			'$gt_ar_archiver'
 # Generic assembler invocations:
 
 alias	gt_as			'$gt_as_assembler $gt_as_options_common $gt_as_option_I'
-alias	gt_as_bta		'gt_as $gt_as_option_DDEBUG $gt_as_option_optimize'
+alias	gt_as_bta		'gt_as $gt_as_option_debug $gt_as_option_nooptimize'
 alias	gt_as_dbg		'gt_as $gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize'
 alias	gt_as_pro		'gt_as $gt_as_option_optimize'
 
@@ -173,7 +178,7 @@ alias	gt_as_pro		'gt_as $gt_as_option_optimize'
 # Generic C compiler invocations:
 
 alias	gt_cc			'$gt_cc_compiler $gt_cc_options_common $gt_cc_option_I'
-alias	gt_cc_bta		'gt_cc $gt_cc_option_DDEBUG $gt_cc_option_optimize'
+alias	gt_cc_bta		'gt_cc $gt_cc_option_DBTABLD $gt_cc_option_debug $gt_cc_option_nooptimize'
 alias	gt_cc_dbg		'gt_cc $gt_cc_option_DDEBUG $gt_cc_option_debug $gt_cc_option_nooptimize'
 alias	gt_cc_pro		'gt_cc $gt_cc_option_optimize'
 

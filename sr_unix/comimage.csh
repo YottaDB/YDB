@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -75,21 +75,6 @@ case "[Bb]*":
 			"$gt_as_options_common $gt_as_option_I $gt_as_option_DDEBUG $gt_as_option_optimize"
 		set comimage_cc_options_default = \
 			"$gt_cc_options_common $gt_cc_option_I $gt_cc_option_DDEBUG $gt_cc_option_optimize"
-		if ( $HOSTOS == "HP-UX" ) then
-			# Apparently, there are numerous bugs in the C optimizer that interact
-			# with our bta versions in such a way as to cause erroneous execution.
-			# This should be cleared up as soon as we upgrade to HP-UX version 10.x.
-			# At that time, remove this message from comimage.csh (and its associated
-			# comment [i.e., this]) and remove the overriding definition of the HP-UX
-			# alias for gt_cc_bta in $gtm_com/gtm_cshrc.csh (the default alias includes
-			# optimization).
-			mailx -s "non-standard C compiler options" $LOGNAME <<comimage1
-WARNING: For HP-UX bta compilations, we have turned off the C compiler optimization.
-This message generated while you were building HP-UX GT.M version $comimage_ver $comimage_image.
-comimage1
-			set comimage_cc_options_default = \
-				"$gt_cc_options_common $gt_cc_option_I $gt_cc_option_DDEBUG $gt_cc_option_nooptimize"
-		endif
 		breaksw
 
 case "[Dd*]":

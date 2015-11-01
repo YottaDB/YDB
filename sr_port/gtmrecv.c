@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -231,9 +231,14 @@ int gtmrecv(void)
 	gvinit();
 	region_init(FALSE);
 #endif
-	if (!recvpool_ctl->fresh_start) /* Coming up after a crash, reset Update process read */
+	if (recvpool_ctl->fresh_start)
+		QWASSIGNDW(recvpool_ctl->jnl_seqno, 0); /* Update process will initialize this to a non-zero value */
+	else
+	{	/* Coming up after a crash, reset Update process read.  This is done by setting gtmrecv_local->restart.
+		 * This will trigger update process to reset recvpool_ctl->jnl_seqno too.
+		*/
 		gtmrecv_local->restart = GTMRECV_RCVR_RESTARTED;
-	QWASSIGNDW(recvpool_ctl->jnl_seqno, 0); /* Update process will write this */
+	}
 	save_upd_status = upd_proc_local->upd_proc_shutdown;
 	for (upd_start_attempts = 0;
 	     UPDPROC_START_ERR == (upd_start_status = gtmrecv_upd_proc_init(recvpool_ctl->fresh_start)) &&

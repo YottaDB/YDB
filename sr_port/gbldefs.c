@@ -134,7 +134,11 @@ GBLDEF	bool		error_mupip = FALSE,
 			is_standalone = FALSE,
 			std_dev_outbnd = FALSE,
 			in_mupip_freeze = FALSE,
-			in_backup = FALSE;
+	                in_backup = FALSE,
+	                view_debug1 = FALSE,
+	                view_debug2 = FALSE,
+	                view_debug3 = FALSE,
+	                view_debug4 = FALSE;
 
 GBLDEF	boolean_t	is_updproc = FALSE,
 			mupip_jnl_recover = FALSE,
@@ -143,6 +147,7 @@ GBLDEF	boolean_t	is_updproc = FALSE,
 			unhandled_stale_timer_pop = FALSE,
 			gtcm_connection = FALSE,
 			is_replicator = FALSE,	/* TRUE => this process can write jnl records to the jnlpool for replicated db */
+	                tp_in_use = FALSE,	/* TRUE => TP has been used by this process and is thus initialized */
 			dollar_truth = TRUE;
 
 GBLDEF	VSIG_ATOMIC_T	forced_exit = FALSE;	/* Asynchronous signal/interrupt handler sets this variable to TRUE,
@@ -466,6 +471,11 @@ GBLDEF	gd_region	*ftok_sem_reg = NULL;	/* Last region for which ftok semaphore i
 GBLDEF	gd_region	*standalone_reg = NULL;	/* We have standalone access for this region */
 #endif
 
+#ifdef VMS
+GBLDEF	uint4	check_channel_status = 0; /* stores the qio return status just before GTMASSERT in CHECK_CHANNEL_STATUS macro */
+GBLDEF	uint4	check_channel_id = 0; 	/* stores the channel id just before a qio in a global variable for debugging purposes */
+#endif
+
 GBLDEF	boolean_t		write_after_image = FALSE;	/* true for after-image jnlrecord writing by recover/rollback */
 GBLDEF	int			iott_write_error;
 GBLDEF	boolean_t		recovery_success = FALSE; /* To Indicate successful recovery */
@@ -656,3 +666,26 @@ GBLDEF bool		update_trans;
 
 GBLDEF	boolean_t	mu_rndwn_file_dbjnl_flush;	/* to indicate standalone access is available to shared memory so
 							 * wcs_recover() need not increment db curr_tn or write inctn record */
+
+GBLDEF	boolean_t	is_uchar_wcs_code[] = 	/* uppercase failure codes that imply database cache related problem */
+{	/* if any of the following failure codes are seen in the final retry, wc_blocked will be set to trigger cache recovery */
+#define	CDB_SC_NUM_ENTRY(code, value)
+#define CDB_SC_UCHAR_ENTRY(code, is_wcs_code, value)	is_wcs_code,
+#define	CDB_SC_LCHAR_ENTRY(code, is_wcs_code, value)
+#include "cdb_sc_table.h"
+#undef CDB_SC_NUM_ENTRY
+#undef CDB_SC_UCHAR_ENTRY
+#undef CDB_SC_LCHAR_ENTRY
+};
+
+GBLDEF	boolean_t	is_lchar_wcs_code[] = 	/* lowercase failure codes that imply database cache related problem */
+{	/* if any of the following failure codes are seen in the final retry, wc_blocked will be set to trigger cache recovery */
+#define	CDB_SC_NUM_ENTRY(code, value)
+#define CDB_SC_UCHAR_ENTRY(code, is_wcs_code, value)
+#define	CDB_SC_LCHAR_ENTRY(code, is_wcs_code, value)	is_wcs_code,
+#include "cdb_sc_table.h"
+#undef CDB_SC_NUM_ENTRY
+#undef CDB_SC_UCHAR_ENTRY
+#undef CDB_SC_LCHAR_ENTRY
+};
+

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -105,6 +105,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	static int		next_report_at = 1;
 	static boolean_t	send_xoff = FALSE;
 	static boolean_t	xoff_sent = FALSE;
+	static boolean_t	log_draining_msg = FALSE;
 	static boolean_t	send_badtrans = FALSE;
 	static boolean_t	upd_shut_too_early_logged = FALSE;
 	static repl_msg_t	xoff_msg, bad_trans_msg;
@@ -112,10 +113,12 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	boolean_t	alert = FALSE, info = FALSE;
 	int		return_status;
 	gd_region       *region_top;
-	unsigned char	*msg_ptr;
-	int		send_len, sent_len, recvd_len, recv_len, temp_len;
-	int		pending_msg_size;
-	int		upd_start_status, upd_start_attempts, status;
+	unsigned char	*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
+	int		tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
+	int		torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
+	int		status;					/* needed for REPL_{SEND,RECV}_LOOP */
+	int		temp_len, pending_msg_size;
+	int		upd_start_status, upd_start_attempts;
 	int		buffered_data_len;
 	int		upd_exit_status;
 	boolean_t	bad_trans_detected = FALSE;
@@ -189,7 +192,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		xoff_msg.type = REPL_XOFF_ACK_ME;
 		memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&recvpool.upd_proc_local->read_jnl_seqno, sizeof(seq_num));
 		xoff_msg.len = MIN_REPL_MSGLEN;
-		REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, xoff_msg.len, &gtmrecv_poll_immediate)
+		REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, xoff_msg.len, FALSE, &gtmrecv_poll_immediate)
 			; /* Empty Body */
 		if (SS_NORMAL != status)
 		{
@@ -208,7 +211,10 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 					RTS_ERROR_LITERAL("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
 							"Error in select"), status);
 		} else
+		{
 			xoff_sent = TRUE;
+			log_draining_msg = TRUE;
+		}
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_XOFF_ACK_ME sent due to upd shutdown/crash or bad trans\n");
 		send_xoff = FALSE;
 	} else if (send_xoff && !xoff_sent && repl_connection_reset)
@@ -220,10 +226,12 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	/* Drain pipe */
 	if (xoff_sent)
 	{
-		repl_log(gtmrecv_log_fp, TRUE, TRUE,
-				"REPL INFO - Draining replication pipe due to %s\n",
-				send_badtrans ? "BAD_TRANS" : "UPD shutdown/crash");
-
+		if (log_draining_msg)
+		{ /* avoid multiple logs per instance */
+			repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Draining replication pipe due to %s\n",
+					send_badtrans ? "BAD_TRANS" : "UPD shutdown/crash");
+			log_draining_msg = FALSE;
+		}
 		if (0 != *buff_unprocessed)
 		{
 			/* Throw away the current contents of the buffer */
@@ -258,7 +266,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		{
 			/* Receive the header of a message */
 			REPL_RECV_LOOP(gtmrecv_sock_fd, ((unsigned char *)gtmrecv_msgp) + *buff_unprocessed,
-				       (REPL_MSG_HDRLEN - *buff_unprocessed), &gtmrecv_poll_interval)
+				       (REPL_MSG_HDRLEN - *buff_unprocessed), FALSE, &gtmrecv_poll_interval)
 				; /* Empty Body */
 
 			REPL_DPRINT3("gtmrecv_poll_actions : Received %d type of message of length %d while draining\n",
@@ -269,7 +277,8 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				(0 != *buff_unprocessed || 0 == *pending_data_len) && REPL_XOFF_ACK == gtmrecv_msgp->type)
 		{
 			/* The rest of the XOFF_ACK msg */
-			REPL_RECV_LOOP(gtmrecv_sock_fd, gtmrecv_msgp, (MIN_REPL_MSGLEN - REPL_MSG_HDRLEN), &gtmrecv_poll_interval)
+			REPL_RECV_LOOP(gtmrecv_sock_fd, gtmrecv_msgp, (MIN_REPL_MSGLEN - REPL_MSG_HDRLEN), FALSE,
+					&gtmrecv_poll_interval)
 				; /* Empty Body */
 			if (SS_NORMAL == status)
 			{
@@ -291,7 +300,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 			     pending_msg_size -= gtmrecv_max_repl_msglen)
 			{
 				temp_len = (pending_msg_size < gtmrecv_max_repl_msglen)? pending_msg_size : gtmrecv_max_repl_msglen;
-				REPL_RECV_LOOP(gtmrecv_sock_fd, gtmrecv_msgp, temp_len, &gtmrecv_poll_interval)
+				REPL_RECV_LOOP(gtmrecv_sock_fd, gtmrecv_msgp, temp_len, FALSE, &gtmrecv_poll_interval)
 					; /* Empty Body */
 			}
 
@@ -334,12 +343,12 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		bad_trans_msg.type = REPL_BADTRANS;
 		memcpy((uchar_ptr_t)&bad_trans_msg.msg[0], (uchar_ptr_t)&recvpool.upd_proc_local->read_jnl_seqno, sizeof(seq_num));
 		bad_trans_msg.len = MIN_REPL_MSGLEN;
-		REPL_SEND_LOOP(gtmrecv_sock_fd, &bad_trans_msg, bad_trans_msg.len, &gtmrecv_poll_immediate)
+		REPL_SEND_LOOP(gtmrecv_sock_fd, &bad_trans_msg, bad_trans_msg.len, FALSE, &gtmrecv_poll_immediate)
 			; /* Empty Body */
 		if (SS_NORMAL == status)
 		{
 			repl_log(gtmrecv_log_fp, TRUE, TRUE,
-					"Sent bad trans msg with seqno %ld\n", recvpool.upd_proc_local->read_jnl_seqno);
+					"REPL_BADTRANS sent with seqno %llu\n", recvpool.upd_proc_local->read_jnl_seqno);
 		} else
 		{
 			if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)

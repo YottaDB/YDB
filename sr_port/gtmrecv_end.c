@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,8 +65,8 @@ GBLREF int			gtmrecv_log_fd;
 GBLREF int			gtmrecv_statslog_fd;
 GBLREF FILE			*gtmrecv_log_fp;
 GBLREF FILE			*gtmrecv_statslog_fp;
-GBLREF int                     	repl_recv_data_recvd;
-GBLREF int                     	repl_recv_data_processed;
+GBLREF qw_num                  	repl_recv_data_recvd;
+GBLREF qw_num                  	repl_recv_data_processed;
 GBLREF repl_msg_ptr_t		gtmrecv_msgp;
 GBLREF uchar_ptr_t		repl_filter_buff;
 
@@ -143,10 +143,8 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 														REPL_STR_ERROR);
 		}
 	)
-	if (gtmrecv_msgp)
-		free(gtmrecv_msgp);
-	if (repl_filter_buff)
-		free(repl_filter_buff);
+	gtmrecv_free_msgbuff();
+	gtmrecv_free_filter_buff();
 	recvpool.recvpool_ctl = NULL;
 	/* Close the connection with the Receiver */
 	if (-1 != gtmrecv_listen_sock_fd)
@@ -155,10 +153,9 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 		close(gtmrecv_sock_fd);
 	QWDECRBYDW(log_seqno, 1);
 	QWDECRBYDW(log_seqno1, 1);
-	repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Last recvd tr num : "INT8_FMT"  Tr Total : %ld  Msg Total : %ld\n",
-			INT8_PRINT(log_seqno), repl_recv_data_processed, repl_recv_data_recvd);
-	repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Last tr num processed by update process : "INT8_FMT"\n",
-			INT8_PRINT(log_seqno1));
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Last recvd tr num : %llu  Tr Total : %llu  Msg Total : %llu\n",
+			log_seqno, repl_recv_data_processed, repl_recv_data_recvd);
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Last tr num processed by update process : %llu\n", log_seqno1);
 	gtm_event_log_close();
 	if (gtmrecv_filter & EXTERNAL_FILTER)
 		repl_stop_filter();

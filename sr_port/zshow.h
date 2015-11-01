@@ -12,10 +12,11 @@
 #ifndef __ZSHOW_H__
 #define __ZSHOW_H__
 
-#define ZSHOW_DEVICE 1
-#define ZSHOW_GLOBAL 2
-#define ZSHOW_LOCAL 3
-#define ZSHOW_NOPARM -1
+#define ZSHOW_DEVICE 	1
+#define ZSHOW_GLOBAL 	2
+#define ZSHOW_LOCAL 	3
+#define ZSHOW_NOPARM	-1
+#define ZSHOW_ALL	"IVBDLSC"
 
 #define CLEANUP_ZSHOW_BUFF				\
 {							\
@@ -43,8 +44,7 @@ typedef struct {
     char		curr_code;	/* code from previous write			*/
     char		*buff;		/* output buffer				*/
     char		*ptr;		/* end of current output line in output buffer	*/
-    int			len;		/* max line length 				*/
-    int			size;		/* max output buffer size that dynamically changes during buffer expansion */
+    int			len;		/* max line length, also size of output buffer  */
     int			line_num;	/* index for output variable starts at one	*/
     union
     {		zs_lv_struct	lv;

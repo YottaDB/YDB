@@ -43,9 +43,8 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 	pini_record.prefix.jrec_type = JRT_PINI;
 	pini_record.prefix.forwptr = pini_record.suffix.backptr = PINI_RECLEN;
 	pini_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-	/* Caution: in case an ALIGN record is written before the PINI record in jnl_write(),
-	 * pini_addr is updated appropriately */
-	pini_record.prefix.pini_addr = csa->jnl->pini_addr = csa->jnl->jnl_buff->freeaddr;
+	pini_record.prefix.pini_addr = csa->jnl->jnl_buff->freeaddr;
+	/* in case an ALIGN record is written before the PINI record in jnl_write(), pini_addr above is updated appropriately. */
 	pini_record.prefix.tn = csa->ti->curr_tn;
 	assert(jgbl.gbl_jrec_time);	/* the caller should have set it */
 	if (!jgbl.gbl_jrec_time)
@@ -74,7 +73,8 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 	}
 	memcpy((unsigned char*)&pini_record.process_vector[CURR_JPV], (unsigned char*)prc_vec, sizeof(jnl_process_vector));
 	jnl_write(csa->jnl, JRT_PINI, (jnl_record *)&pini_record, NULL, NULL);
-	assert(csa->jnl->pini_addr == csa->jnl->jnl_buff->freeaddr - PINI_RECLEN);
+	/* Note : csa->jnl->pini_addr should not be updated until PINI record is written [C9D08-002376] */
+	csa->jnl->pini_addr = csa->jnl->jnl_buff->freeaddr - PINI_RECLEN;
 	if (jgbl.forw_phase_recovery && (NULL != jgbl.mur_plst))
 		jgbl.mur_plst->new_pini_addr = csa->jnl->pini_addr;/* note down for future forward play logical record processing */
 }

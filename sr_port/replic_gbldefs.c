@@ -38,9 +38,7 @@
 #include "read_db_files_from_gld.h"
 
 GBLDEF	unsigned char	*gtmsource_tcombuff_start = NULL;
-GBLDEF	unsigned char	*gtmsource_tcombuff_end = NULL;
-GBLDEF	unsigned char	*gtmsource_tcombuffp = NULL;
-GBLDEF	uchar_ptr_t	repl_filter_buff = NULL;
+GBLDEF	unsigned char	*repl_filter_buff = NULL;
 GBLDEF	int		repl_filter_bufsiz = 0;
 GBLDEF	unsigned char	jnl_ver, remote_jnl_ver;
 GBLDEF	unsigned int	jnl_source_datalen, jnl_dest_maxdatalen;

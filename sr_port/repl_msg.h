@@ -55,7 +55,8 @@ typedef struct
 	 * small message buffer */
 } repl_msg_t;
 
-#define	MAX_REPL_MSGLEN		(MAX_TR_BUFFSIZE + REPL_MSG_HDRLEN)
+#define	MAX_REPL_MSGLEN	(1 * 1024 * 1024) /* should ideally match the TCP send (recv) bufsiz of source (receiver) server */
+#define MAX_TR_BUFFSIZE	(MAX_REPL_MSGLEN - REPL_MSG_HDRLEN) /* allow for replication message header */
 
 typedef struct
 {

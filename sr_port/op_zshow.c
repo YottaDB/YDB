@@ -31,10 +31,15 @@ GBLREF gv_key *gv_currkey;
 
 void op_zshow(mval *func,int type,lv_val *lvn)
 {
-	static readonly char all[]="IVBDLSC";
-	char		*ptr;
-	bool		do_all=FALSE,done_s=FALSE,done_b=FALSE,done_d=FALSE,done_v=FALSE,done_l=FALSE,
-			done_c=FALSE, done_i=FALSE;
+	const char	*ptr;
+	boolean_t	do_all = FALSE,
+			done_s = FALSE,
+			done_b = FALSE,
+			done_d = FALSE,
+			done_v = FALSE,
+			done_l = FALSE,
+			done_c = FALSE,
+			done_i = FALSE;
 	int		i;
   	zshow_out	output;
 	error_def(ERR_ZSHOWBADFUNC);
@@ -66,17 +71,20 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 		}
 	}
 	if (do_all)
-	{	ptr = &all[0];
-		i = sizeof(all) - 1;
-	}else
-	{	ptr = func->str.addr;
+	{
+		ptr = ZSHOW_ALL;
+		i = STR_LIT_LEN(ZSHOW_ALL);
+	} else
+	{
+		ptr = func->str.addr;
 		i = func->str.len;
 	}
 	memset(&output, 0, sizeof(output));
 	if (type == ZSHOW_LOCAL)
-	{	output.out_var.lv.lvar = lvn;
-	}else if (type == ZSHOW_GLOBAL)
-	{	output.out_var.gv.end = gv_currkey->end;
+		output.out_var.lv.lvar = lvn;
+	else if (type == ZSHOW_GLOBAL)
+	{
+		output.out_var.gv.end = gv_currkey->end;
 		output.out_var.gv.prev = gv_currkey->prev;
 	}
 	MAXSTR_BUFF_INIT;

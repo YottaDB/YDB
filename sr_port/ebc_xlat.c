@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@
 
 /* EBCDIC to ASCII */
 
-GBLDEF unsigned char e2a[256] =
+LITDEF unsigned char e2a[256] =
 {
   /* 00 - 07: */ 0x0, 0x1, 0x2, 0x3, 0x9c, 0x9, 0x86, 0x7f,
   /* 08 - 0f: */ 0x97, 0x8d, 0x8e, 0xb, 0xc, 0xd, 0xe, 0xf,
@@ -68,7 +68,7 @@ GBLDEF unsigned char e2a[256] =
 
 /* ASCII to EBCDIC */
 
-GBLDEF unsigned char a2e[256] =
+LITDEF unsigned char a2e[256] =
 {
   /* 00 - 07: */ 0x0, 0x1, 0x2, 0x3, 0x37, 0x2d, 0x2e, 0x2f,
   /* 08 - 0f: */ 0x16, 0x5, 0x15, 0xb, 0xc, 0xd, 0xe, 0xf,

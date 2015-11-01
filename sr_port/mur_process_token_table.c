@@ -26,7 +26,6 @@
 GBLREF mur_gbls_t	murgbl;
 DEBUG_ONLY(GBLREF mur_opt_struct	mur_options;)
 
-#define MUR_ENOUGH_COMPLETE_TRANS(MURGBL) ((MURGBL).broken_cnt <= ((MURGBL).token_table.count >> 2)) /* 75% resolved completely */
 
 jnl_tm_t mur_process_token_table(boolean_t *ztp_broken)
 {

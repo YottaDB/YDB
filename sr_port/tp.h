@@ -159,7 +159,11 @@ typedef struct tp_region_struct
 {
 	struct	tp_region_struct *fPtr;			/* Next in list */
 	gd_region	*reg;				/* Region pointer */
-	gd_id		file_id; 			/* both for VMS and UNIX */
+	union						/* we will either use file_id or index */
+	{
+		gd_id		file_id; 		/* both for VMS and UNIX */
+		int4		fid_index;		/* copy of csa->fid_index for this region */
+	} file;
 } tp_region;
 
 typedef struct ua_list_struct
@@ -219,12 +223,35 @@ GBLREF	short	dollar_trestart;
 			&& (first_tp_srch_status) < (sgm_info_ptr)->last_tp_hist));	\
 }
 
-#define	TP_RETRY_ACCOUNTING(csd, status)						\
-{											\
-	if (dollar_trestart < ARRAYSIZE((csd)->n_tp_retries) - 1)			\
-		(csd)->n_tp_retries_conflicts[dollar_trestart]++;			\
-	else										\
-		(csd)->n_tp_retries_conflicts[ARRAYSIZE(csd->n_tp_retries) - 1]++;	\
+#define	SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status)				\
+{	/* set wc_blocked if final retry and cache related failure status */		\
+	if (CDB_STAGNATE <= t_tries)							\
+	{										\
+		GBLREF	boolean_t	is_uchar_wcs_code[];				\
+		GBLREF	boolean_t	is_lchar_wcs_code[];				\
+			boolean_t	is_wcs_code = FALSE;				\
+											\
+		if (ISALPHA(status))							\
+		{									\
+			if (status > 'Z')						\
+				is_wcs_code = is_lchar_wcs_code[status - 'a'];		\
+			else								\
+				is_wcs_code = is_uchar_wcs_code[status - 'A'];		\
+		}									\
+		if (is_wcs_code)							\
+		{									\
+			SET_TRACEABLE_VAR(csa->hdr->wc_blocked, TRUE);			\
+			BG_TRACE_PRO_ANY(csa, wc_blocked_wcs_cdb_sc_final_retry);	\
+		}									\
+	}										\
+}
+
+#define	TP_RETRY_ACCOUNTING(csa, csd, status)							\
+{												\
+	if (dollar_trestart < ARRAYSIZE((csd)->n_tp_retries) - 1)				\
+		(csd)->n_tp_retries_conflicts[dollar_trestart]++;				\
+	else											\
+		(csd)->n_tp_retries_conflicts[ARRAYSIZE(csd->n_tp_retries) - 1]++;		\
 }
 
 #define PREV_OFF_INVALID -1

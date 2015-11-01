@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,12 +82,13 @@ int mu_rndwn_all(void)
 	error_def(ERR_MUJPOOLRNDWNFL);
 	error_def(ERR_MURPOOLRNDWNFL);
 	error_def(ERR_REPLACCSEM);
+	error_def(ERR_SYSCALL);
 	error_def(ERR_TEXT);
 
 	if (NULL == (pf = POPEN(IPCS_CMD_STR ,"r")))
         {
 		save_errno = errno;
-		util_out_print("Error with popen(), !AD", TRUE, LEN_AND_STR(STRERROR(save_errno)));
+		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("POPEN()"), CALLFROM, save_errno);
                 return ERR_MUNOTALLSEC;
         }
 	fname = (char *)malloc(MAX_FN_LEN + 1);
@@ -406,11 +407,13 @@ int mu_rndwn_sem_all(void)
 
 	error_def(ERR_MUNOTALLSEC);
 	error_def(ERR_SEMREMOVED);
+	error_def(ERR_TEXT);
+	error_def(ERR_SYSCALL);
 
 	if (NULL == (pf = POPEN(IPCS_SEM_CMD_STR ,"r")))
         {
 		save_errno = errno;
-		util_out_print("Error with popen(), !AD", TRUE, LEN_AND_STR(STRERROR(save_errno)));
+		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("POPEN()"), CALLFROM, save_errno);
                 return ERR_MUNOTALLSEC;
         }
 	while (NULL != (FGETS(entry, sizeof(entry), pf, fgets_res)) && entry[0] != '\n')

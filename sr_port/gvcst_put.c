@@ -99,7 +99,7 @@ static	bool	        gvcst_put_blk(mval *v, bool *extra_block_split_req);
 void	gvcst_put(mval *v)
 {
 	bool			extra_block_split_req;
-	char			temp[4096], temp1[4096], *ptr;
+	char			*ptr;
 	short			temp_short;
 	int			save_t_tries;
 	jnl_format_buffer	*jfb;

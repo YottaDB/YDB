@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -131,7 +131,7 @@ void dse_all(void)
 		stat = cli_present("FREEZE");
 		if (stat == CLI_NEGATED)
 			nofreeze = TRUE;
-		else  if (stat == CLI_PRESENT)
+		else if (stat == CLI_PRESENT)
 		{
 			freeze = TRUE;
 			nofreeze = FALSE;
@@ -139,11 +139,6 @@ void dse_all(void)
                 if (cli_present("OVERRIDE") == CLI_PRESENT)
                         override = TRUE;
 	}
-
-
-	if(wc && flush)
-                util_out_print("Error: Incompatible qualifiers, WCINIT and BUFFER_FLUSH", TRUE);
-
 	old_addrs = cs_addrs;
 	old_region = gv_cur_region;
 	old_block = patch_curr_blk;
@@ -163,13 +158,11 @@ void dse_all(void)
 				ptr->rname_len, &ptr->rname[0]);
 			continue;
 		}
-
 		/* put on region list in order of ftok value so processed in same order that
 		   crits are obtained */
 		csa = &FILE_INFO(ptr)->s_addrs;
 		insert_region(ptr, &(region_list), NULL, sizeof(tp_region));
 	}
-
 	/* Now run the list of regions in the sorted ftok order to execute the desired commands */
 	for (rg = region_list; NULL != rg; rg = rg->fPtr)
 	{
@@ -187,11 +180,8 @@ void dse_all(void)
 
 		if (crit)
 		{
-#if defined(UNIX)
-			gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY, TRUE);
-#elif defined(VMS)
-			mutex_init(cs_addrs->critical, NUM_CRIT_ENTRY, TRUE);
-#endif
+			UNIX_ONLY(gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY, TRUE);)
+			VMS_ONLY(mutex_init(cs_addrs->critical, NUM_CRIT_ENTRY, TRUE);)
 			cs_addrs->nl->in_crit = 0;
 			cs_addrs->now_crit = cs_addrs->read_lock = FALSE;
 		}
@@ -203,15 +193,12 @@ void dse_all(void)
 		        while (FALSE == region_freeze(gv_cur_region, TRUE, override))
                 		hiber_start(1000);
 		}
-
 		if (seize)
                         grab_crit(gv_cur_region);
-
 		if (wc)
 		{
-			if(FALSE == seize)
+			if (FALSE == seize)
 				grab_crit(gv_cur_region);
-
 			bt_init(cs_addrs);
 			if (cs_addrs->hdr->acc_meth == dba_bg)
 			{
@@ -219,32 +206,25 @@ void dse_all(void)
 				db_csh_ini(cs_addrs);
 				db_csh_ref(cs_addrs);
 			}
-
 			if((FALSE == seize) || (TRUE == release))
 				rel_crit(gv_cur_region);
 		}
-
 		if (flush)
 			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-
 		if (release && cs_addrs->now_crit)
 			rel_crit(gv_cur_region);
-
                 else if (release && !cs_addrs->now_crit)
 		{
                         util_out_print("Current process does not own the Region: !AD.",TRUE, REG_LEN_STR(gv_cur_region));
 		}
-
 		if (nofreeze)
 		{
 			if (!region_freeze(gv_cur_region,FALSE, override))
 				util_out_print("Region: !AD is frozen by another user, not releasing freeze",TRUE,
 					REG_LEN_STR(gv_cur_region));
 		}
-
 		if (ref)
 			cs_addrs->nl->ref_cnt = 1;
-
 	}
 	cs_addrs = old_addrs;
 	gv_cur_region = old_region;
@@ -252,8 +232,3 @@ void dse_all(void)
 	GET_SAVED_GDADDR(gd_header, temp_gdaddr, map, gv_cur_region);
 	return;
 }
-
-
-
-
-

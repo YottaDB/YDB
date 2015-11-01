@@ -65,8 +65,8 @@ void shrink_trips(void)
 		PRINTF(" \n\n\n\n************************************ Begin pre-shrink_trips dump *****************************\n");
 		dqloop(&t_orig, exorder, ct)
 		{
-			COMPDBG(PRINTF(" ************************ Triple Start **********************\n"););
-			COMPDBG(cdbg_dump_triple(ct, 0););
+			PRINTF(" ************************ Triple Start **********************\n");
+			cdbg_dump_triple(ct, 0);
 		}
 		PRINTF(" \n\n\n\n************************************ Begin shrink_trips scan *****************************\n");
 	}
@@ -141,8 +141,8 @@ void shrink_trips(void)
 	{
 		dqloop(&t_orig, exorder, ct)
 		{
-			COMPDBG(PRINTF(" ************************ Triple Start **********************\n"););
-			COMPDBG(cdbg_dump_triple(ct, 0););
+			PRINTF(" ************************ Triple Start **********************\n");
+			cdbg_dump_triple(ct, 0);
 		}
 	}
 #endif
@@ -154,18 +154,16 @@ boolean_t litref_triple_oprcheck(oprtype *operand)
 {
 	if (TRIP_REF == operand->oprclass)
 	{	/* We are referring to another triple */
-		switch(operand->oprval.tref->opcode)
-		{
-			case OC_LIT:
-				/* It is a literal section reference.. done */
+		if (OC_LIT == operand->oprval.tref->opcode)
+			/* It is a literal section reference.. done */
+			return TRUE;
+		if (OC_PARAMETER == operand->oprval.tref->opcode)
+		{	/* There are two more parameters to check. Call recursively */
+			if (litref_triple_oprcheck(&operand->oprval.tref->operand[0]))
 				return TRUE;
-			case OC_PARAMETER:
-				/* There are two more parameters to check. Call recursively */
-				if (litref_triple_oprcheck(&operand->oprval.tref->operand[0]))
-					return TRUE;
-				return litref_triple_oprcheck(&operand->oprval.tref->operand[1]);
+			return litref_triple_oprcheck(&operand->oprval.tref->operand[1]);
 		}
 	}
-	return FALSE;
+	return FALSE;	/* Uninteresting triple .. not our type */
 }
 #endif /* USHBIN_SUPPORTED or VMS */

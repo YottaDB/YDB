@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -136,6 +136,8 @@ void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr)
 			++crit_deadlock_check_cycle;
 			for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 			{
+				if (!tr->reg->open)
+					continue;
 				csa = &FILE_INFO(tr->reg)->s_addrs;
 				if (csa->now_crit)
 					csa->crit_check_cycle = crit_deadlock_check_cycle;

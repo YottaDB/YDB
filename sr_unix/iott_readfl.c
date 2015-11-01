@@ -42,8 +42,7 @@ GBLREF	int4		ctrap_action_is;
 
 #ifdef __MVS__
 LITREF	unsigned char	ebcdic_lower_to_upper_table[];
-GBLREF	unsigned char	e2a[];
-GBLREF	unsigned char	a2e[];
+LITREF	unsigned char	e2a[];
 #	define	INPUT_CHAR	asc_inchar
 #	define	GETASCII(OUTPARM, INPARM)	{OUTPARM = e2a[INPARM];}
 #	define	NATIVE_CVT2UPPER(OUTPARM, INPARM)	{OUTPARM = ebcdic_lower_to_upper_table[INPARM];}

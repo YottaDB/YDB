@@ -141,7 +141,7 @@
  . Quit:ansi="none"
  . Do:'ansiopen
  . . Open outansi:newversion Use outansi
- . . Do hdr Set ansiopen=1 Write !,"static readonly int error_ansi[] = {",!
+ . . Do hdr Set ansiopen=1 Write !,"const static readonly int error_ansi[] = {",!
  . . Quit
  . Use outansi Write $Char(9),$Justify(ansi,4),",",$Char(9),"/* ",outmsg(cnt)," */",!
  . Quit

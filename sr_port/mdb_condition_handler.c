@@ -450,7 +450,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			{
 				proc_act_type = SFT_DEV_ACT;
 				err_act = &io_std_device.in->error_handler;
-			} else  if (!std_dev_outbnd && (err_dev->type == tt) && err_dev->error_handler.len)
+			} else  if (!std_dev_outbnd && err_dev && (err_dev->type == tt) && err_dev->error_handler.len)
 			{
 				proc_act_type = SFT_DEV_ACT;
 				err_act = &err_dev->error_handler;

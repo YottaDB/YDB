@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsroot.h"
@@ -43,7 +44,7 @@ long gtcm_action_pending(connection_struct *c)
 		UNIX_ONLY(DEBUG_ONLY(locknl = FILE_INFO(action_que_dummy_reg)->s_addrs.nl;))	/* for DEBUG_ONLY LOCK_HIST macro */
 		status = INSQTI(c, &action_que);
 		UNIX_ONLY(DEBUG_ONLY(locknl = NULL;))	/* restore "locknl" to default value */
-		if (-1 == status)
+		if (INTERLOCK_FAIL == status)
 			return status;
 		c->waiting_in_queue = TRUE;
 	}

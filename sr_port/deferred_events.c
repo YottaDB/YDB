@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,9 @@
 
 /* The transfer table */
 GBLREF int 		(*xfer_table[])();
+
+/* M Profiling active */
+GBLREF	boolean_t	is_tracing_on;
 
 /* Marks sensitive database operations */
 GBLREF volatile int4	fast_lock_count;
@@ -275,6 +278,8 @@ boolean_t xfer_reset_if_setter(int4 event_type)
  *    => It's possible to have handler-in-handler execution.
  *    => If no handler executed, would lose other deferred events due
  *       to reset of all pending.
+ * - If M profiling is active, some entries should be set to the
+ *       op_mprof* routines.
  * - Return value indicates whether reset type matches set type.
  *   If it does not, this indicates an "abnormal" path.
  *    - Should still reset the table in this case.
@@ -317,11 +322,20 @@ boolean_t xfer_reset_handlers(int4 event_type)
 	assert(0 < num_deferred);
 	assert(0 < xfer_table_events[event_type]);
 
-	xfer_table[xf_linefetch] = op_linefetch;
-	xfer_table[xf_linestart] = op_linestart;
+	if (is_tracing_on)
+	{
+		xfer_table[xf_linefetch] = op_mproflinefetch;
+		xfer_table[xf_linestart] = op_mproflinestart;
+		xfer_table[xf_forloop] = op_mprofforloop;
+	}
+	else
+	{
+		xfer_table[xf_linefetch] = op_linefetch;
+		xfer_table[xf_linestart] = op_linestart;
+		xfer_table[xf_forloop] = op_forloop;
+	}
 	xfer_table[xf_zbfetch] = op_zbfetch;
 	xfer_table[xf_zbstart] = op_zbstart;
-	xfer_table[xf_forloop] = op_forloop;
 	xfer_table[xf_forchk1] = op_forchk1;
 	xfer_table[xf_ret] = opp_ret;
 	xfer_table[xf_retarg] = op_retarg;

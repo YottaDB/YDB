@@ -37,6 +37,8 @@
 #include "op.h"
 #include "have_crit.h"
 #include "gtm_caseconv.h"
+#include "gvcst_tp_init.h"
+#include "dpgbldir.h"
 #include <varargs.h>
 
 error_def(ERR_STACKCRIT);
@@ -46,10 +48,10 @@ error_def(ERR_TPSTACKCRIT);
 error_def(ERR_TPSTACKOFLOW);
 error_def(ERR_TPTOODEEP);
 
-
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	short			dollar_tlevel;
 GBLREF	mval			dollar_zgbldir;
+GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	gd_addr			*gd_header;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
@@ -73,7 +75,8 @@ GBLREF  sgmnt_data_ptr_t	cs_data;
 GBLREF  sgmnt_addrs		*cs_addrs;
 GBLREF  gd_region		*gv_cur_region;
 GBLREF	struct_jrec_tcom	tcom_record;
-GBLREF jnl_gbls_t		jgbl;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	boolean_t		tp_in_use;
 
 #define NORESTART -1
 #define ALLLOCAL  -2
@@ -82,7 +85,11 @@ GBLREF jnl_gbls_t		jgbl;
  * 	fields like it were a gv_currkey pointer. Since these members are 2-byte fields, we need atleast 2 byte alignment.
  * We want to be safer and hence give 4-byte alignment by declaring the array as an array of integers.
  */
-static	int4	gv_orig_key[TP_MAX_NEST + 1][DIVIDE_ROUND_UP((sizeof(gv_key) + MAX_KEY_SZ + 1), sizeof(int4))];
+struct gv_orig_key_struct
+{
+	int4	gv_orig_key[TP_MAX_NEST + 1][DIVIDE_ROUND_UP((sizeof(gv_key) + MAX_KEY_SZ + 1), sizeof(int4))];
+};
+static  struct gv_orig_key_struct *gv_orig_key_ptr;
 
 /*** temporary ***/
 GBLREF int4	    		dollar_zmaxtptime;
@@ -116,7 +123,31 @@ va_dcl
 	global_tlvl_info	*gtli, *new_gtli, *prev_gtli;
 	kill_set		*ks, *prev_ks;
 	jnl_format_buffer 	*jfb, *prev_jfb;
+	gd_region		*r_top, *r_local;
+	gd_addr			*addr_ptr;
 	unsigned char		tp_bat[TP_BATCH_LEN];
+
+	/* If we haven't done any TP until now, turn the flag on to tell gvcst_init to
+	   initialize it in any regions it opens from now on and initialize it in any
+	   regions that are already open.
+	*/
+	if (!tp_in_use)
+	{
+		tp_in_use = TRUE;
+		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+		{
+			for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)
+			{
+				if (r_local->open && !r_local->was_open &&
+				    (dba_bg == r_local->dyn.addr->acc_meth || dba_mm == r_local->dyn.addr->acc_meth))
+				{	/* Let's initialize those regions but only if it came through gvcst_init_sysops
+					   (being a bg or mm region)
+					*/
+					gvcst_tp_init(r_local);
+				}
+			}
+		}
+	}
 
 	if (0 != jnl_fence_ctl.level)
 		rts_error(VARLSTCNT(4) ERR_TPMIXUP, 2, "An M", "a fenced logical");
@@ -255,7 +286,14 @@ va_dcl
 	tf->restartable = (NORESTART != prescnt);
 	tf->old_locks = (NULL != mlk_pvt_root);
 	tf->orig_gv_target = gv_target;
-	tf->orig_key = (gv_key *)&gv_orig_key[dollar_tlevel][0];
+	/* If the TP structures have not yet been initialized, do that now.
+	 */
+	if (NULL == gv_orig_key_ptr)
+	{	/* This need only be set once */
+		gv_orig_key_ptr = (struct gv_orig_key_struct *)malloc(sizeof(struct gv_orig_key_struct));
+		memset(gv_orig_key_ptr, 0, sizeof(struct gv_orig_key_struct));
+	}
+	tf->orig_key = (gv_key *)&(gv_orig_key_ptr->gv_orig_key[dollar_tlevel][0]);
 	memcpy(tf->orig_key, gv_currkey, sizeof(gv_key) + gv_currkey->end);
 	tf->gd_header = gd_header;
 	tf->zgbldir = dollar_zgbldir;

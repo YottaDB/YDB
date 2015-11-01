@@ -250,9 +250,6 @@ chmod +x {lowerc,upperc}*
 cp $gtm_tools/*.gtc .
 mv configure{.gtc,}
 
-cp $gtm_tools/repl_sort_add_seq.awk repl_sort_add_seq.awk
-cp $gtm_tools/repl_sort_rem_tran.awk repl_sort_rem_tran.awk
-
 cp $gtm_inc/gtmxc_types.h .
 cp $gtm_inc/gtm_descript.h .
 #
@@ -536,12 +533,13 @@ cd ./obj
 
 # Verify that $gtm_src/ttt.c has been generated from $gtm_tools/ttt.txt, $gtm_inc/opcode_def.h, and $gtm_inc/vxi.h
 cp $gtm_inc/opcode_def.h $gtm_inc/vxi.h $gtm_tools/ttt.txt .
-gtm <<GTM.in_tttgen
+gtm <<GTM_in_tttgen
 Set \$ZROUTINES=". $gtm_dist"
 Do ^TTTGEN
 ZContinue
 Halt
-GTM.in_tttgen
+GTM_in_tttgen
+
 diff {$gtm_src/,}ttt.c >& ttt.dif
 if ( $status != 0 ) then
 	echo "comlist-W-tttoutofdate, ${dollar_sign}gtm_src/ttt.c was not generated from ${dollar_sign}gtm_tools/ttt.txt, " \
@@ -566,39 +564,39 @@ cd $p3
 
 # Create a default global directory.
 setenv gtmgbldir ./mumps.gld
-gde <<GDE.in1
+gde <<GDE_in1
 exit
-GDE.in1
+GDE_in1
 
 # Create the GT.M help database file.
 setenv gtmgbldir $gtm_dist/gtmhelp.gld
-gde <<GDE.in_gtmhelp
+gde <<GDE_in_gtmhelp
 Change -segment DEFAULT	-block=2048	-file=$gtm_dist/gtmhelp.dat
 Change -region DEFAULT	-record=1020	-key=255
-GDE.in_gtmhelp
+GDE_in_gtmhelp
 
 mupip create
 
-gtm <<GTM.in_gtmhelp
+gtm <<GTM_in_gtmhelp
 Do ^GTMHLPLD
 $gtm_dist/mumps.hlp
 Halt
-GTM.in_gtmhelp
+GTM_in_gtmhelp
 
 
 # Create the GDE help database file.
 setenv gtmgbldir $gtm_dist/gdehelp.gld
-gde <<GDE.in_gdehelp
+gde <<GDE_in_gdehelp
 Change -segment DEFAULT	-block=2048	-file=$gtm_dist/gdehelp.dat
 Change -region DEFAULT	-record=1020	-key=255
-GDE.in_gdehelp
+GDE_in_gdehelp
 
 mupip create
 
-gtm <<GTM.in_gdehelp
+gtm <<GTM_in_gdehelp
 Do ^GTMHLPLD
 $gtm_dist/gde.hlp
-GTM.in_gdehelp
+GTM_in_gdehelp
 
 chmod 775 *
 

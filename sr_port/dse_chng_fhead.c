@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,6 +72,8 @@ void dse_chng_fhead(void)
 	trans_num	tn;
 	char		temp_str[256], temp_str1[256], buf[MAX_LINE];
 	int		gethostname_res;
+	sm_uc_ptr_t	chng_ptr;
+
 	error_def(ERR_FREEZE);
 	error_def(ERR_BLKSIZ512);
 	error_def(ERR_DBRDONLY);
@@ -189,37 +191,37 @@ void dse_chng_fhead(void)
 		if (SGMNT_HDR_LEN < location + size)
 			util_out_print("Error: Cannot modify any location outside the file-header", TRUE);
 		else  if (0 != location % size)
-			util_out_print("Error: Location !1UL [0x!1XL] should be a multiple of Size !1UL [0x!1XL] ",
+			util_out_print("Error: Location !UL [0x!XL] should be a multiple of Size !UL",
 							TRUE, location, location, size, size);
 		else
 		{
+			chng_ptr = (sm_uc_ptr_t)cs_addrs->hdr + location;
 			if (sizeof(char) == size)
 			{
 				SPRINTF(temp_str, "!UB [0x!XB]");
-				old_value = *(unsigned char *)((char *)cs_addrs->hdr + location);
+				old_value = *(sm_uc_ptr_t)chng_ptr;
 			}
 			else if (sizeof(short) == size)
 			{
 				SPRINTF(temp_str, "!UW [0x!XW]");
-				old_value = *(unsigned short *)((char *)cs_addrs->hdr + location);
+				old_value = *(sm_ushort_ptr_t)chng_ptr;
 			}
 			else if (sizeof(int4) == size)
 			{
 				SPRINTF(temp_str, "!UL [0x!XL]");
-				old_value = *(uint4 *)((char *)cs_addrs->hdr + location);
+				old_value = *(sm_uint_ptr_t)chng_ptr;
 			}
 			if (value_present)
 			{
 				if (sizeof(char) == size)
-					*(unsigned char *)((char *)cs_addrs->hdr + location) = value;
+					*(sm_uc_ptr_t)chng_ptr = value;
 				else if (sizeof(short) == size)
-					*(unsigned short *)((char *)cs_addrs->hdr + location) = value;
+					*(sm_ushort_ptr_t)chng_ptr = value;
 				else if (sizeof(int4) == size)
-					*(uint4 *)((char *)cs_addrs->hdr + location) = value;
-			}
-			else
+					*(sm_uint_ptr_t)chng_ptr = value;
+			} else
 				value = old_value;
-			SPRINTF(temp_str1, "Location !UL [0x!XL] :: Old Value = %s :: New Value = %s :: Size = !UB [0x!XB]",
+			SPRINTF(temp_str1, "Location !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
 											temp_str, temp_str);
 			util_out_print(temp_str1, TRUE, location, location, old_value, old_value, value, value, size, size);
 		}

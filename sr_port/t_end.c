@@ -69,6 +69,7 @@
 #include "add_inter.h"
 #include "jnl_write_pblk.h"
 #include "jnl_write_aimg_rec.h"
+#include "memcoherency.h"
 
 #define BLOCK_FLUSHING(x) (csa->hdr->clustered && x->flushing && !CCP_SEGMENT_STATE(cs_addrs->nl,CCST_MASK_HAVE_DIRTY_BUFFERS))
 
@@ -158,7 +159,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 	uint4			tot_jrec_size;
 	jnlpool_ctl_ptr_t	jpl, tjpl;
 	boolean_t		replication = FALSE;
-	boolean_t		is_mm, release_crit;
+	boolean_t		is_mm, release_crit = FALSE;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
 	boolean_t		write_inctn = FALSE;	/* set to TRUE in case writing an inctn record is necessary */
@@ -264,14 +265,8 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 				 * any necessary IO has a chance of occurring outside crit.
 				 * The available space must be double-checked inside crit. */
 				if (!is_mm && (csa->nl->wc_in_free < (int4)(cw_set_depth + 1))
-					   && !wcs_get_space(gv_cur_region, cw_set_depth + 1, 0))
-				{
-					SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-					BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_hist);
-					status = cdb_sc_cacheprob;
-					REVERT;
-					goto failed;
-				}
+					   && !wcs_get_space(gv_cur_region, cw_set_depth + 1, NULL))
+					assert(FALSE);	/* wcs_get_space() should have returned TRUE unconditionally in this case */
 				for (;;)
 				{
 					grab_crit(gv_cur_region);
@@ -338,6 +333,19 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 			}
 			csa->backup_in_prog = !csa->backup_in_prog;	/* reset csa->backup_in_prog to current state */
 			read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog); /* recalculate */
+		}
+		/* in crit, ensure cache-space is available. the out-of-crit check done above might not have been enough */
+		if (!is_mm && update_trans && (csa->nl->wc_in_free < (int4)(cw_set_depth + 1))
+			   && !wcs_get_space(gv_cur_region, cw_set_depth + 1, NULL))
+		{
+			assert(FALSE);
+			SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+			BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_hist);
+			status = cdb_sc_cacheprob;
+			if ((CDB_STAGNATE - 1) == t_tries)
+				release_crit = TRUE;
+			REVERT;
+			goto failed;
 		}
 		assert(csd == csa->hdr);
 		if (inctn_invalid_op != inctn_opcode)
@@ -415,8 +423,11 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 							cr = (cache_rec_ptr_t)GDS_REL2ABS(bt->cache_index);
 							if (cr->blk != bt->blk)
 							{
+								assert(FALSE);
 								SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-								GTMASSERT;
+								BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_crbtmismatch1);
+								status = cdb_sc_crbtmismatch;
+								break;
 							}
 						}
 					}
@@ -430,10 +441,13 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					if ((NULL == cr) || (cr->cycle != t1->cycle) ||
 					    ((sm_long_t)GDS_REL2ABS(cr->buffaddr) != (sm_long_t)t1->buffaddr))
 					{
-						if (cr && bt &&(cr->blk != bt->blk))
+						if ((NULL != cr) && (NULL != bt) && (cr->blk != bt->blk))
 						{
+							assert(FALSE);
 							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-							GTMASSERT;
+							BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_crbtmismatch2);
+							status = cdb_sc_crbtmismatch;
+							break;
 						}
 						assert(CDB_STAGNATE > t_tries);
 						status = cdb_sc_lostcr;
@@ -499,8 +513,11 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 							cr = (cache_rec_ptr_t)GDS_REL2ABS(bt->cache_index);
 							if (cr->blk != bt->blk)
 							{
+								assert(FALSE);
 								SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-								GTMASSERT;
+								BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_crbtmismatch3);
+								status = cdb_sc_crbtmismatch;
+								break;
 							}
 						}
 					}
@@ -587,6 +604,13 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					}
 					assert(QWEQ(jpl->early_write_addr, jpl->write_addr));
 					QWADDDW(jpl->early_write_addr, jpl->write_addr, tmp_cumul_jnl_rec_len);
+					/* Source server does not read in crit. It relies on early_write_addr, the transaction
+					 * data, lastwrite_len, write_addr being updated in that order. To ensure this order,
+					 * we have to force out early_write_addr to its coherency point now. If not, the source
+					 * server may read data that is overwritten (or stale). This is true only on
+					 * architectures and OSes that allow unordered memory access
+					 */
+					COMMIT_SHM_UPDATES;
 				}
 				assert(cw_set_depth < CDB_CW_SET_SIZE);
 				assert(csa->ti->early_tn == csa->ti->curr_tn);
@@ -772,6 +796,17 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 					 */
 					INT8_ONLY(assert(jgbl.cumul_index == jgbl.cu_jnl_index);)
 					jpl->lastwrite_len = jnl_header->jnldata_len;
+					/* For systems with UNORDERED memory access (example, ALPHA), on a multi processor system,
+					 * it is possible that the source server notices the change in write_addr
+					 * before seeing the change to jnlheader->jnldata_len, leading it to read an invalid
+					 * transaction length. To avoid such conditions, we should commit the order of shared
+					 * memory updates before we update write_addr. This ensures that the source server sees all
+					 * shared memory updates related to a transaction before the change in write_addr
+		 			 *
+		 			 * Read Alpha Architecture Reference Manual, edited by Richard L Sites, Chapter "System
+		 			 * Architecture and Programming Implications" for memory coherency issues.
+					 */
+					COMMIT_SHM_UPDATES;
 					QWINCRBYDW(jpl->write_addr, jnl_header->jnldata_len);
 					jpl->write = tjpl->write;
 					jpl->jnl_seqno = tjpl->jnl_seqno;

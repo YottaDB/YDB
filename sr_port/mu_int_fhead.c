@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ GBLDEF int4			mu_int_ovrhd;
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_data		mu_int_data;
 GBLREF uint4			mu_int_errknt;
-GBLREF boolean_t		tn_reset;
+GBLREF boolean_t		tn_reset_specified;
 
 boolean_t mu_int_fhead(void)
 {
@@ -147,9 +147,13 @@ boolean_t mu_int_fhead(void)
 		mu_int_err(ERR_DBMXRSEXCMIN, 0, 0, 0, 0, 0, 0, 0);
 	if (mu_data->blk_size - sizeof(blk_hdr) < mu_data->max_rec_size)
 		mu_int_err(ERR_DBMAXRSEXBL, 0, 0, 0, 0, 0, 0, 0);
-	if (!tn_reset && mu_data->trans_hist.curr_tn > WARNING_TN)
+	/* !tn_reset_this_reg should ideally be used here instead of (!tn_reset_specified || gv_cur_region->read_only).
+	 * But at this point, tn_reset_this_reg has not yet been set for this region and to avoid taking a risk in
+	 *   changing the code flow, we redo the computation ot tn_reset_this_reg here. This is not as much a performance concern.
+	 */
+	if ((!tn_reset_specified || gv_cur_region->read_only) && (mu_data->trans_hist.curr_tn > WARNING_TN))
 	{
-		rts_error(VARLSTCNT(4) ERR_MUTNWARN, 2, DB_LEN_STR(gv_cur_region));
+		gtm_putmsg(VARLSTCNT(4) ERR_MUTNWARN, 2, DB_LEN_STR(gv_cur_region));
 		mu_int_errknt++;
 	}
 	/* Note - ovrhd is incremented once in order to achieve a zero-based

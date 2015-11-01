@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,8 +19,8 @@
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
-#include "gdsfhead.h"
 #include "gdsblk.h"
+#include "gdsfhead.h"
 #include "gdscc.h"
 #include "copy.h"
 #include "filestruct.h"
@@ -37,8 +37,10 @@
 #include "t_qread.h"
 #include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
+#include "cert_blk.h"
 
 GBLREF bool             certify_all_blocks;
+GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gv_namehead	*gv_target;
 GBLREF short		dollar_tlevel;
@@ -165,8 +167,8 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 						return cdb_sc_lostcr;
 					}
         				if (certify_all_blocks &&
-						  (FALSE == cert_blk(leaf_blk_hist->blk_num, (blk_hdr_ptr_t)cse->new_buff,
-						 	 cse->blk_target->root)))
+						  (FALSE == cert_blk(gv_cur_region, leaf_blk_hist->blk_num,
+								     (blk_hdr_ptr_t)cse->new_buff, cse->blk_target->root)))
 						GTMASSERT;
 				}
 				cse->done = TRUE;

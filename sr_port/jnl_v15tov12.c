@@ -35,9 +35,9 @@ LITREF int      	v12_jnl_fixed_size[];
 LITREF	boolean_t	jrt_is_replicated[JRT_RECTYPES];
 LITREF	int		jrt_update[JRT_RECTYPES];
 
+/* Convert a transaction from jnl version  15 (V.4.4-002) to 12  (GT.M versions V4.3-000 through V4.3-001E) */
 int jnl_v15tov12(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz)
 {
-	/* Convert a transaction from jnl version  15 (V.4.4-002) to 12 (V4.3-000/1/1A/1B/1C/1D) */
 	unsigned char		*jb, *cb, *cstart, *jstart, *ptr;
 	enum	jnl_record_type	rectype;
 	int			status, reclen;

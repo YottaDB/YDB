@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,41 +51,45 @@ GBLREF	int * volatile		var_on_cstack_ptr;	/* volatile so that nothing gets optim
 
 #define	MAX_MPROF_STACK_LEVEL	1024
 #ifdef 	MPROF_DEBUGGING
-#define PRINT_PROF_TREE		mprof_tree_print(head_tblnd,0,1)
-#define PRINT_PROF_TREE_ELEM	mprof_tree_print(curr_tblnd,0,-1)
+#define PRINT_PROF_TREE		mprof_tree_print(mprof_ptr->head_tblnd, 0, 1)
+#define PRINT_PROF_TREE_ELEM	mprof_tree_print(mprof_ptr->curr_tblnd, 0, -1)
 #else
 #define PRINT_PROF_TREE
 #define PRINT_PROF_TREE_ELEM
 #endif
 
-static struct tms		tprev, tcurr;
-static struct tms		time_stack[MAX_MPROF_STACK_LEVEL];
-static struct mprof_tree	*head_tblnd, *curr_tblnd;
-static struct mprof_tree	*currnd_stk[MAX_MPROF_STACK_LEVEL];
-static unsigned int		loop_info_stk[MAX_MPROF_STACK_LEVEL]; /*for DO's*/
-static unsigned int		for_level;
-static int			inside_for_loop_state;
-static int			line_prof_stack = 0;
-static int			curr_num_subscripts;
-static char			**pcavailptr, **pcavailbase;
-static int			pcavail;
-static boolean_t		is_tracing_ini;
-static mval			subsc[MAX_GVSUBSCRIPTS];
-static gvargs_t			gvargs;
-static mval			gbl_to_fill;
-static int			overflowed_levels;
+struct mprof_struct
+{
+	 struct tms		tprev, tcurr;
+	 struct tms		time_stack[MAX_MPROF_STACK_LEVEL];
+	 struct mprof_tree	*head_tblnd, *curr_tblnd;
+	 struct mprof_tree	*currnd_stk[MAX_MPROF_STACK_LEVEL];
+	 unsigned int		loop_info_stk[MAX_MPROF_STACK_LEVEL]; /*for DO's*/
+	 unsigned int		for_level;
+	 int			inside_for_loop_state;
+	 int			line_prof_stack;
+	 int			curr_num_subscripts;
+	 char			**pcavailptr, **pcavailbase;
+	 int			pcavail;
+	 boolean_t		is_tracing_ini;
+	 mval			subsc[MAX_GVSUBSCRIPTS];
+	 gvargs_t		gvargs;
+	 mval			gbl_to_fill;
+	 int			overflowed_levels;
+};
+static struct mprof_struct *mprof_ptr;
 
 #define OVERFLOW_STRING	":INCOMPLETE DATA: MAXTRACELEVEL"
 #define MPROF_NULL_LABEL "^"
 #define MPROF_FOR_LOOP	"FOR_LOOP"
-#define UPDATE_TIME(x)	x->e.usr_time += (tcurr.tms_utime - tprev.tms_utime);\
-			x->e.sys_time += (tcurr.tms_stime - tprev.tms_stime);
-#define MPROF_INCR_COUNT		curr_tblnd->e.count += 1
+#define UPDATE_TIME(x)	x->e.usr_time += (mprof_ptr->tcurr.tms_utime - mprof_ptr->tprev.tms_utime);\
+			x->e.sys_time += (mprof_ptr->tcurr.tms_stime - mprof_ptr->tprev.tms_stime);
+#define MPROF_INCR_COUNT		mprof_ptr->curr_tblnd->e.count += 1
 #define LINK_NEW(x) 	if (NULL == x->loop_link) \
 				x->loop_link = (struct mprof_tree *)new_node(x->e)
-#define SAME_LINE	(0 == (	strcmp((char *)tmp_trc_tbl_entry.rout_name, (char *)curr_tblnd->e.rout_name) ||  \
-				strcmp((char *)tmp_trc_tbl_entry.label_name, (char *)curr_tblnd->e.label_name) ||  \
-				strcmp((char *)tmp_trc_tbl_entry.line_num, (char *)curr_tblnd->e.line_num)))
+#define SAME_LINE	(0 == (	strcmp((char *)tmp_trc_tbl_entry.rout_name, (char *)mprof_ptr->curr_tblnd->e.rout_name) ||  \
+				strcmp((char *)tmp_trc_tbl_entry.label_name, (char *)mprof_ptr->curr_tblnd->e.label_name) ||  \
+				strcmp((char *)tmp_trc_tbl_entry.line_num, (char *)mprof_ptr->curr_tblnd->e.line_num)))
 #define RTS_ERROR_VIEWNOTFOUND(x)	rts_error(VARLSTCNT(8) ERR_VIEWNOTFOUND, 2, gvn->str.len, gvn->str.addr, \
 						ERR_TEXT, 2, RTS_ERROR_STRING(x));
 
@@ -108,18 +112,23 @@ void	turn_tracing_on(mval *gvn)
 	}
 	if (0 == gvn->str.len || '^' != gvn->str.addr[0])
 		rts_error(VARLSTCNT(4) ERR_NOTGBL, 2, gvn->str.len, gvn->str.addr);
-	parse_gvn(gvn);
-	memcpy(&gbl_to_fill, gvn, sizeof(gbl_to_fill));
-	gbl_to_fill.str.addr = (char *)malloc(gvn->str.len); /*len was already setup*/
-	memcpy(gbl_to_fill.str.addr, gvn->str.addr, gvn->str.len);
-	if (!pcavailbase)
+	if (!mprof_ptr)
 	{
-		pcavailbase = (char **) malloc(PROFCALLOC_DSBLKSIZE);
-		*pcavailbase = 0;
+		mprof_ptr = (struct mprof_struct *)malloc(sizeof(struct mprof_struct));
+		memset(mprof_ptr, 0, sizeof(struct mprof_struct));
 	}
-	pcavailptr = pcavailbase;
-	pcavail = PROFCALLOC_DSBLKSIZE - sizeof(char *);
-	memset(pcavailptr + 1, 0, pcavail);
+	parse_gvn(gvn);
+	memcpy(&mprof_ptr->gbl_to_fill, gvn, sizeof(mprof_ptr->gbl_to_fill));
+	mprof_ptr->gbl_to_fill.str.addr = (char *)malloc(gvn->str.len); /*len was already setup*/
+	memcpy(mprof_ptr->gbl_to_fill.str.addr, gvn->str.addr, gvn->str.len);
+	if (!mprof_ptr->pcavailbase)
+	{
+		mprof_ptr->pcavailbase = (char **) malloc(PROFCALLOC_DSBLKSIZE);
+		*mprof_ptr->pcavailbase = 0;
+	}
+	mprof_ptr->pcavailptr = mprof_ptr->pcavailbase;
+	mprof_ptr->pcavail = PROFCALLOC_DSBLKSIZE - sizeof(char *);
+	memset(mprof_ptr->pcavailptr + 1, 0, mprof_ptr->pcavail);
 	TIMES(&curr);
 	prof_stackptr = (unsigned char *)malloc(TOTAL_SIZE_OF_PROFILING_STACKS);
 	prof_msp = profstack_base = prof_stackptr + (TOTAL_SIZE_OF_PROFILING_STACKS - GUARD_RING_FOR_PROFILING_STACK);
@@ -127,15 +136,15 @@ void	turn_tracing_on(mval *gvn)
 	profstack_warn = profstack_top + GUARD_RING_FOR_PROFILING_STACK;
 	prof_fp = (stack_frame_prof *) (prof_msp -= sizeof(stack_frame_prof));
 	get_entryref_information(FALSE, NULL);
-	curr_tblnd = head_tblnd = (struct mprof_tree *)new_node(tmp_trc_tbl_entry);
+	mprof_ptr->curr_tblnd = mprof_ptr->head_tblnd = (struct mprof_tree *)new_node(tmp_trc_tbl_entry);
 	prof_fp->prev = (stack_frame_prof *)NULL;
 	prof_fp->sys_time = curr.tms_stime;
 	prof_fp->usr_time = curr.tms_utime;
 	prof_fp->dummy_stack_count = 0;
 	POPULATE_PROFILING_TABLE();
 	is_tracing_on = TRUE;
-	inside_for_loop_state = 0;
-	for_level = 0;
+	mprof_ptr->inside_for_loop_state = 0;
+	mprof_ptr->for_level = 0;
 }
 
 void turn_tracing_off (mval *gvn)
@@ -143,14 +152,15 @@ void turn_tracing_off (mval *gvn)
 	if (FALSE == is_tracing_on)
 		return;
 	PRINT_PROF_TREE;
-	TIMES(&tcurr);
+	assert(mprof_ptr);
+	TIMES(&mprof_ptr->tcurr);
 	if (NULL != gvn)
 		parse_gvn(gvn);
-	is_tracing_on = is_tracing_ini = FALSE;
-	assert(0 != gbl_to_fill.str.addr);
-	free(gbl_to_fill.str.addr);
-	gbl_to_fill.str.addr = 0;
-	mprof_tree_walk(head_tblnd);
+	is_tracing_on = mprof_ptr->is_tracing_ini = FALSE;
+	assert(0 != mprof_ptr->gbl_to_fill.str.addr);
+	free(mprof_ptr->gbl_to_fill.str.addr);
+	mprof_ptr->gbl_to_fill.str.addr = 0;
+	mprof_tree_walk(mprof_ptr->head_tblnd);
 	free(prof_stackptr);
 	pcfree();
 	CLEAR_PROFILING_TABLE();
@@ -189,65 +199,68 @@ void    pcurrpos(int inside_for_loop)
 	struct mprof_tree	*tmp_tblnd;
 	int			tmp_int, tmp_int_a;
 
-	TIMES(&tcurr);
+	assert(mprof_ptr);
+	if (!mprof_ptr)
+		return;	/* protect in pro build */
+	TIMES(&mprof_ptr->tcurr);
 	get_entryref_information(TRUE, &tmp_trc_tbl_entry);
-	if (FALSE == is_tracing_ini)
+	if (FALSE == mprof_ptr->is_tracing_ini)
 	{
-		is_tracing_ini = TRUE;
-		curr_tblnd = head_tblnd = (struct mprof_tree *)new_node(tmp_trc_tbl_entry);
+		mprof_ptr->is_tracing_ini = TRUE;
+		mprof_ptr->curr_tblnd = mprof_ptr->head_tblnd = (struct mprof_tree *)new_node(tmp_trc_tbl_entry);
 	}
-	if (NULL != curr_tblnd)
+	if (NULL != mprof_ptr->curr_tblnd)
 	{
-		if ((MPROF_OUTOFFOR | MPROF_INTOFOR) & inside_for_loop_state)
+		if ((MPROF_OUTOFFOR | MPROF_INTOFOR) & mprof_ptr->inside_for_loop_state)
 		{
 			/*either on the way out of FOR, or into FOR (or another iteration)*/
-			LINK_NEW(curr_tblnd);
-			if (MPROF_OUTOFFOR == inside_for_loop_state)
+			LINK_NEW(mprof_ptr->curr_tblnd);
+			if (MPROF_OUTOFFOR == mprof_ptr->inside_for_loop_state)
 			{
 				/*going OUT of a loop*/
-				curr_tblnd->e.cur_loop_level--;
-				if (curr_tblnd->e.cur_loop_level < 0)
+				mprof_ptr->curr_tblnd->e.cur_loop_level--;
+				if (mprof_ptr->curr_tblnd->e.cur_loop_level < 0)
 				{
 					/* there was another level*/
-					curr_tblnd->e.cur_loop_level = 0;
-					curr_tblnd->e.loop_level++;
+					mprof_ptr->curr_tblnd->e.cur_loop_level = 0;
+					mprof_ptr->curr_tblnd->e.loop_level++;
 				}
 				/*update the loop counts*/
-				tmp_int = curr_tblnd->e.loop_level;
-				tmp_tblnd=curr_tblnd->loop_link;
-				tmp_tblnd->e.loop_level=curr_tblnd->e.loop_level;
+				tmp_int = mprof_ptr->curr_tblnd->e.loop_level;
+				tmp_tblnd = mprof_ptr->curr_tblnd->loop_link;
+				tmp_tblnd->e.loop_level = mprof_ptr->curr_tblnd->e.loop_level;
 				while (0 < tmp_int)
 				{
 					LINK_NEW(tmp_tblnd);
 					(tmp_tblnd->loop_link)->e.loop_level = tmp_tblnd->e.loop_level - 1;
-					if (tmp_int == curr_tblnd->e.cur_loop_level+1)
+					if (tmp_int == mprof_ptr->curr_tblnd->e.cur_loop_level + 1)
 						(tmp_tblnd->loop_link)->e.count++;
-					tmp_tblnd=tmp_tblnd->loop_link;
+					tmp_tblnd = tmp_tblnd->loop_link;
 					tmp_int--;
 				}
 			}
 
-			if (MPROF_INTOFOR == inside_for_loop_state)
+			if (MPROF_INTOFOR == mprof_ptr->inside_for_loop_state)
 			{
 				/*going INTO a loop*/
 				/* when going into, we go all the way in*/
-				if (0 == curr_tblnd->e.loop_level)
-					curr_tblnd->e.loop_level = 1;
-				curr_tblnd->e.cur_loop_level = curr_tblnd->e.loop_level;
+				if (0 == mprof_ptr->curr_tblnd->e.loop_level)
+					mprof_ptr->curr_tblnd->e.loop_level = 1;
+				mprof_ptr->curr_tblnd->e.cur_loop_level = mprof_ptr->curr_tblnd->e.loop_level;
 			}
-			UPDATE_TIME(curr_tblnd->loop_link);
-			UPDATE_TIME(curr_tblnd);
-			if ((MPROF_OUTOFFOR == inside_for_loop_state) && (!SAME_LINE))
-				for_level = 1;
-			if (MPROF_INTOFOR == inside_for_loop_state)
-				for_level = 1;
+			UPDATE_TIME(mprof_ptr->curr_tblnd->loop_link);
+			UPDATE_TIME(mprof_ptr->curr_tblnd);
+			if ((MPROF_OUTOFFOR == mprof_ptr->inside_for_loop_state) && (!SAME_LINE))
+				mprof_ptr->for_level = 1;
+			if (MPROF_INTOFOR == mprof_ptr->inside_for_loop_state)
+				mprof_ptr->for_level = 1;
 
-			if (for_level)
+			if (mprof_ptr->for_level)
 			{
 				/* increment the level count for all levels*/
-				tmp_int = curr_tblnd->e.loop_level;
+				tmp_int = mprof_ptr->curr_tblnd->e.loop_level;
 				tmp_int_a = 1; /* do the time update only for the first time*/
-				tmp_tblnd=curr_tblnd;
+				tmp_tblnd = mprof_ptr->curr_tblnd;
 				while (0 <= tmp_int)
 				{
 					LINK_NEW(tmp_tblnd);
@@ -260,16 +273,16 @@ void    pcurrpos(int inside_for_loop)
 					tmp_int--;
 				}
 			}
-			if (MPROF_OUTOFFOR == inside_for_loop_state)
+			if (MPROF_OUTOFFOR == mprof_ptr->inside_for_loop_state)
 			{
-				curr_tblnd->e.for_count = 0;
-				for_level = 0;
+				mprof_ptr->curr_tblnd->e.for_count = 0;
+				mprof_ptr->for_level = 0;
 			}
 
 		}
-		if ((MPROF_LINEFETCH + MPROF_LINESTART) & inside_for_loop_state)
+		if ((MPROF_LINEFETCH + MPROF_LINESTART) & mprof_ptr->inside_for_loop_state)
 		{
-			UPDATE_TIME(curr_tblnd);
+			UPDATE_TIME(mprof_ptr->curr_tblnd);
 			MPROF_INCR_COUNT;
 
 		}
@@ -277,15 +290,15 @@ void    pcurrpos(int inside_for_loop)
 		{
 			/*prepare next guy*/
 			tmp_trc_tbl_entry.for_count = 1;
-			for_level = 0;
+			mprof_ptr->for_level = 0;
 			/*no counting here, no timing either */
 		} else
-			for_level = 1;
+			mprof_ptr->for_level = 1;
 	}
 	PRINT_PROF_TREE_ELEM;
-	curr_tblnd = (struct mprof_tree *)mprof_tree_insert(head_tblnd, tmp_trc_tbl_entry);
-	tprev = tcurr;
-	inside_for_loop_state = inside_for_loop;
+	mprof_ptr->curr_tblnd = (struct mprof_tree *)mprof_tree_insert(mprof_ptr->head_tblnd, tmp_trc_tbl_entry);
+	mprof_ptr->tprev = mprof_ptr->tcurr;
+	mprof_ptr->inside_for_loop_state = inside_for_loop;
 }
 
 char *pcalloc(unsigned int n)
@@ -293,29 +306,29 @@ char *pcalloc(unsigned int n)
 	char **x;
 
 	n = ((n + 3) & ~3); /* make sure that it is quad-word aligned */
-	if (n > pcavail)
+	if (n > mprof_ptr->pcavail)
 	{
-		if (*pcavailptr)
-			pcavailptr = (char ** ) *pcavailptr;
+		if (*mprof_ptr->pcavailptr)
+			mprof_ptr->pcavailptr = (char ** ) *mprof_ptr->pcavailptr;
 		else
 		{
 			x = (char **) malloc(PROFCALLOC_DSBLKSIZE);
-			*pcavailptr = (char *) x;
-			pcavailptr = x;
-			*pcavailptr = 0;
+			*mprof_ptr->pcavailptr = (char *) x;
+			mprof_ptr->pcavailptr = x;
+			*mprof_ptr->pcavailptr = 0;
 		}
-		pcavail = PROFCALLOC_DSBLKSIZE - sizeof(char *);
-		memset(pcavailptr + 1, 0, pcavail);
+		mprof_ptr->pcavail = PROFCALLOC_DSBLKSIZE - sizeof(char *);
+		memset(mprof_ptr->pcavailptr + 1, 0, mprof_ptr->pcavail);
 	}
-	pcavail -= n;
-	assert(pcavail >= 0);
-	return (char *) pcavailptr + pcavail + sizeof(char *);
+	mprof_ptr->pcavail -= n;
+	assert(mprof_ptr->pcavail >= 0);
+	return (char *) mprof_ptr->pcavailptr + mprof_ptr->pcavail + sizeof(char *);
 }
 
 void pcfree(void)
 {
-	pcavailptr = pcavailbase;
-	pcavail = PROFCALLOC_DSBLKSIZE - sizeof(char *);
+	mprof_ptr->pcavailptr = mprof_ptr->pcavailbase;
+	mprof_ptr->pcavail = PROFCALLOC_DSBLKSIZE - sizeof(char *);
 	return;
 }
 
@@ -365,21 +378,21 @@ void	new_prof_frame(int dummy)
 
 	if (dummy)
 	{
-		if (++line_prof_stack < MAX_MPROF_STACK_LEVEL)
+		if (++mprof_ptr->line_prof_stack < MAX_MPROF_STACK_LEVEL)
 		{
-			currnd_stk[line_prof_stack] = curr_tblnd;
-			time_stack[line_prof_stack] = tprev;
-			loop_info_stk[line_prof_stack] = inside_for_loop_state;
+			mprof_ptr->currnd_stk[mprof_ptr->line_prof_stack] = mprof_ptr->curr_tblnd;
+			mprof_ptr->time_stack[mprof_ptr->line_prof_stack] = mprof_ptr->tprev;
+			mprof_ptr->loop_info_stk[mprof_ptr->line_prof_stack] = mprof_ptr->inside_for_loop_state;
 		} else
 		{
-			if (!overflowed_levels)
+			if (!mprof_ptr->overflowed_levels)
 			{
 				gtm_putmsg(VARLSTCNT(3) ERR_MAXTRACELEVEL, 1, MAX_MPROF_STACK_LEVEL);
-				overflowed_levels++;
+				mprof_ptr->overflowed_levels++;
 			}
 			return;
 		}
-		curr_tblnd = NULL;
+		mprof_ptr->curr_tblnd = NULL;
 		TIMES(&curr);
 		prof_fp->sys_time = curr.tms_stime - prof_fp->sys_time;
 		prof_fp->usr_time = curr.tms_utime - prof_fp->usr_time;
@@ -391,13 +404,12 @@ void	new_prof_frame(int dummy)
 		psf->label_name[0] = '\0';
 		prof_fp = psf;
 		prof_fp->dummy_stack_count = 0;
-	}
-	else
+	} else
 		prof_fp->dummy_stack_count += 1;
 	return;
 }
 
-void unw_prof_frame (void)
+void unw_prof_frame(void)
 {
 	struct trace_entry	e;
 	struct trace_entry	tmp_trc_tbl_entry;
@@ -405,10 +417,13 @@ void unw_prof_frame (void)
 	struct tms		curr;
 	stack_frame		*save_fp;
 
-	if (line_prof_stack >= MAX_MPROF_STACK_LEVEL)
+	assert(mprof_ptr);
+	if (!mprof_ptr)
+		return;	/* protect in pro build */
+	if (mprof_ptr->line_prof_stack >= MAX_MPROF_STACK_LEVEL)
 	{
-		line_prof_stack--;
-		assert(overflowed_levels);
+		mprof_ptr->line_prof_stack--;
+		assert(mprof_ptr->overflowed_levels);
 		return;
 	}
 	TIMES(&curr);
@@ -435,24 +450,24 @@ void unw_prof_frame (void)
 		memcpy((char *)e.line_num, "*dlin*",6);
 		e.line_num[6]='\0';
 		e.for_count = 0;
-		t = mprof_tree_insert(head_tblnd, tmp_trc_tbl_entry);
+		t = mprof_tree_insert(mprof_ptr->head_tblnd, tmp_trc_tbl_entry);
 		/*update count and timing of quit statements (implicit or explicit)*/
 		t->e.count++;
-		t->e.usr_time += (curr.tms_utime - tprev.tms_utime);
-		t->e.sys_time += (curr.tms_stime - tprev.tms_stime);
-		t = mprof_tree_insert(head_tblnd, e);
+		t->e.usr_time += (curr.tms_utime - mprof_ptr->tprev.tms_utime);
+		t->e.sys_time += (curr.tms_stime - mprof_ptr->tprev.tms_stime);
+		t = mprof_tree_insert(mprof_ptr->head_tblnd, e);
 		/*update count and timing (from prof_fp) of frame I'm leaving*/
 		t->e.count++;
 		t->e.sys_time += prof_fp->sys_time;
 		t->e.usr_time += prof_fp->usr_time;
 		if (prof_fp->prev)
 		{
-			if (line_prof_stack > 0)
+			if (mprof_ptr->line_prof_stack > 0)
 			{
-				tprev = time_stack[line_prof_stack];
-				curr_tblnd = currnd_stk[line_prof_stack];
-				inside_for_loop_state = loop_info_stk[line_prof_stack];
-				line_prof_stack--;
+				mprof_ptr->tprev = mprof_ptr->time_stack[mprof_ptr->line_prof_stack];
+				mprof_ptr->curr_tblnd = mprof_ptr->currnd_stk[mprof_ptr->line_prof_stack];
+				mprof_ptr->inside_for_loop_state = mprof_ptr->loop_info_stk[mprof_ptr->line_prof_stack];
+				mprof_ptr->line_prof_stack--;
 			} else
 				GTMASSERT;
 			/* move back up to parent frame */
@@ -460,14 +475,13 @@ void unw_prof_frame (void)
 			prof_fp = prof_fp->prev;
 			prof_fp->sys_time = curr.tms_stime - prof_fp->sys_time;
 			prof_fp->usr_time = curr.tms_utime - prof_fp->usr_time;
-		}
-		else
+		} else
 		{
 			/* This should only be true only if the View command is not at
 			 * the top-most stack level. In which case add profiling information
 			 * for the quit statement. */
-			tprev = tcurr;
-			curr_tblnd = NULL;
+			mprof_ptr->tprev = mprof_ptr->tcurr;
+			mprof_ptr->curr_tblnd = NULL;
 			prof_fp = (stack_frame_prof *)prof_msp;
 			save_fp = frame_pointer;
 			frame_pointer = frame_pointer->old_frame_pointer;
@@ -485,8 +499,7 @@ void unw_prof_frame (void)
 			prof_fp->label_name[0] = '\0';
 			prof_fp->dummy_stack_count = 0;
 		}
-	}
-	else
+	} else
 	{
 		assert(prof_fp->dummy_stack_count > 0);
 		prof_fp->dummy_stack_count--;
@@ -508,44 +521,42 @@ void	crt_gbl(struct mprof_tree *p, int info_level)
 
 	if (0 == p->e.count)
 		return;
-	count = gvargs.count;
-	spt = &subsc[count];
+	count = mprof_ptr->gvargs.count;
+	spt = &mprof_ptr->subsc[count];
 	/* Global name --> ^PREFIX(<OPTIONAL ARGUMENTS>, "rout-name", "label-name", "line-num", "forloop") */
 	spt->mvtype = MV_STR;
 	spt->str.len = strlen((char *)p->e.rout_name);
 	spt->str.addr = (char *)pcalloc(spt->str.len+1);
 	memcpy(spt->str.addr, p->e.rout_name, strlen((char *)p->e.rout_name));
-	gvargs.args[count++] = spt++;
+	mprof_ptr->gvargs.args[count++] = spt++;
 	spt->mvtype = MV_STR;
 	if (p->e.label_name[0] != '\0')
 	{
 		spt->str.len = strlen((char *)p->e.label_name);
 		spt->str.addr = (char *)pcalloc(spt->str.len+1);
 		memcpy(spt->str.addr, p->e.label_name, spt->str.len);
-	}
-	else
+	} else
 	{	/* place holder before first label */
 		spt->str.len = sizeof(MPROF_NULL_LABEL) - 1;
 		spt->str.addr = (char *)pcalloc(sizeof(MPROF_NULL_LABEL));
 		memcpy(spt->str.addr, MPROF_NULL_LABEL, spt->str.len);
 	}
-	gvargs.args[count++] = spt++;
+	mprof_ptr->gvargs.args[count++] = spt++;
 	spt->mvtype = MV_STR;
 	spt->str.len = strlen((char *)p->e.line_num);
 	if (strcmp((char *)p->e.line_num, "*dlin*"))
 	{
 		spt->str.addr = (char *)pcalloc(spt->str.len+1);
 		memcpy(spt->str.addr, p->e.line_num, strlen((char *)p->e.line_num));
-		gvargs.args[count] = spt;
+		mprof_ptr->gvargs.args[count] = spt;
 		count++;
 		spt++;
-	}
-	else if ('\0' == p->e.line_num)
+	} else if ('\0' == p->e.line_num)
 	{
 		spt->str.len = strlen("*unk*");
 		spt->str.addr = (char *)pcalloc(spt->str.len+1);
 		memcpy(spt->str.addr, "*unk*", spt->str.len);
-		gvargs.args[count] = spt;
+		mprof_ptr->gvargs.args[count] = spt;
 		count++;
 	}
 	if (info_level)
@@ -554,7 +565,7 @@ void	crt_gbl(struct mprof_tree *p, int info_level)
 		spt->str.len = strlen(MPROF_FOR_LOOP);
 		spt->str.addr = (char *)pcalloc(sizeof(MPROF_FOR_LOOP));
 		memcpy(spt->str.addr, MPROF_FOR_LOOP, spt->str.len);
-		gvargs.args[count++] = spt++;
+		mprof_ptr->gvargs.args[count++] = spt++;
 		/*write for level into the subscript as well*/
 		spt->mvtype = MV_STR;
 		tmpnum = i2asc(subsval, p->e.loop_level);
@@ -562,11 +573,11 @@ void	crt_gbl(struct mprof_tree *p, int info_level)
 		spt->str.len = strlen((char *)subsval);
 		spt->str.addr = (char *)pcalloc(spt->str.len+1);
 		memcpy(spt->str.addr, subsval, spt->str.len);
-		gvargs.args[count++] = spt++;
+		mprof_ptr->gvargs.args[count++] = spt++;
 	}
-	gvargs.count = count;
-	callg((int(*)())op_gvname, &gvargs);
-	gvargs.count = curr_num_subscripts;
+	mprof_ptr->gvargs.count = count;
+	callg((int(*)())op_gvname, &mprof_ptr->gvargs);
+	mprof_ptr->gvargs.count = mprof_ptr->curr_num_subscripts;
 	/* Data --> "count:cpu-time in user mode:cpu-time in sys mode" */
 	start_point = (int)&dataval[0];
 	tmpnum = (unsigned char *)&dataval[0];
@@ -592,7 +603,7 @@ void	crt_gbl(struct mprof_tree *p, int info_level)
 	data.mvtype = MV_STR;
 	data.str.len = (((int )tmpnum - start_point) > 0) ? ((int )tmpnum - start_point) : (start_point - (int )tmpnum);
 
-	if ((overflowed_levels) && !(strcmp((char *)p->e.line_num, "*dlin*")))
+	if ((mprof_ptr->overflowed_levels) && !(strcmp((char *)p->e.line_num, "*dlin*")))
 	{
 		tmp_str_len = data.str.len;
 		data.str.len += sizeof(OVERFLOW_STRING) - 1;
@@ -750,7 +761,7 @@ void parse_gvn(mval *gvn)
 	}
 	mpsp = mprof_mstr.addr;
 	/* Parse the global variable passed to insert the information */
-	spt = &subsc[0];
+	spt = &mprof_ptr->subsc[0];
 	spt->mvtype = MV_STR;
 	spt->str.addr = mpsp;
 	ch = *mpsp++ = *c_ref++;
@@ -763,7 +774,7 @@ void parse_gvn(mval *gvn)
 			RTS_ERROR_VIEWNOTFOUND("Invalid global name");
 	}
 	spt->str.len = (long)mpsp - (long)spt->str.addr;
-	gvargs.args[count++] = spt++;
+	mprof_ptr->gvargs.args[count++] = spt++;
 	spt->str.addr = (char *)mpsp;
 	/* Process subscripts if any */
 	if (c_ref++ < c_top)
@@ -842,7 +853,7 @@ void parse_gvn(mval *gvn)
 				continue;
 			}
 			spt->str.len = (long)mpsp - (long)spt->str.addr;
-			gvargs.args[count++] = spt++;
+			mprof_ptr->gvargs.args[count++] = spt++;
 			if (*c_ref != ',')
 				break;
 			spt->str.addr = mpsp;
@@ -857,7 +868,7 @@ void parse_gvn(mval *gvn)
 			RTS_ERROR_VIEWNOTFOUND("There are trailing characters after the global name");
 	}
 	assert((char *)mpsp <= mprof_mstr.addr + mprof_mstr.len);	/* Ensure we haven't overrun the malloced buffer */
-	curr_num_subscripts = gvargs.count = count;
+	mprof_ptr->curr_num_subscripts = mprof_ptr->gvargs.count = count;
 }
 
 #if defined(VMS)

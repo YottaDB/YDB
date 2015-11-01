@@ -33,6 +33,7 @@
 #include "tp_frame.h"
 #include "copy.h"
 #include "interlock.h"
+#include "gdsbgtr.h"		/* for the BG_TRACE_PRO macros */
 
 /* Include proto-types.. */
 #include "t_qread.h"
@@ -202,7 +203,8 @@ void	op_tcommit(void)
 							{
 								GET_CDB_SC_CODE(new_blk, status); /* code is set in status */
 								t_fail_hist[t_tries] = status;
-								TP_RETRY_ACCOUNTING(csd, status);
+								SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+								TP_RETRY_ACCOUNTING(csa, csd, status);
 								break;	/* transaction must attempt restart */
 							}
 							if (blk_used && read_before_image)
@@ -213,7 +215,8 @@ void	op_tcommit(void)
 								{
 									status = rdfail_detail;
 									t_fail_hist[t_tries] = status;
-									TP_RETRY_ACCOUNTING(csd, status);
+									SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+									TP_RETRY_ACCOUNTING(csa, csd, status);
 									break;
 								}
 							} else

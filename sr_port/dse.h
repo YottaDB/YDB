@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,33 @@
 #ifndef __DSE_H__
 #define __DSE_H__
 
-#define PATCH_SAVE_SIZE 128
+#define PATCH_SAVE_SIZE		128
+#define DSE_DMP_TIME_FMT	"DD-MON-YEAR 24:60:SS"
+
+#define	GET_CURR_TIME_IN_DOLLARH_AND_ZDATE(dollarh_mval, dollarh_buffer, zdate_mval, zdate_buffer)				\
+{	/* gets current time in the mval "dollarh_mval" in dollarh format and in the mval "zdate_mval" in ZDATE format		\
+	 * the ZDATE format string used is DSE_DMP_TIME_FMT									\
+	 * the dollarh_buffer and zdate_buffer are buffers which the corresponding mvals use to store the actual time string	\
+	 */															\
+	GBLREF mval		dse_dmp_time_fmt;										\
+	GBLREF spdesc		stringpool;											\
+	LITREF mval		literal_null;											\
+																\
+	op_horolog(&dollarh_mval); /* returns $H value in stringpool */								\
+	assert(sizeof(dollarh_buffer) >= dollarh_mval.str.len);									\
+	/* if op_fnzdate (called below) calls stp_gcol, dollarh_mval might get corrupt because it is not known to stp_gcol.	\
+	 * To prevent problems, copy from stringpool to local buffer */								\
+	memcpy(dollarh_buffer, dollarh_mval.str.addr, dollarh_mval.str.len);							\
+	dollarh_mval.str.addr = (char *)dollarh_buffer;										\
+	stringpool.free -= dollarh_mval.str.len; /* now that we've made a copy, we don't need dollarh_mval in stringpool */	\
+	op_fnzdate(&dollarh_mval, &dse_dmp_time_fmt, (mval *)&literal_null, (mval *)&literal_null, &zdate_mval);		\
+		/* op_fnzdate() returns zdate formatted string in stringpool */							\
+	assert(sizeof(zdate_buffer) >= zdate_mval.str.len);									\
+	/* copy over stringpool string into local buffer to ensure zdate_mval will not get corrupt */				\
+	memcpy(zdate_buffer, zdate_mval.str.addr, zdate_mval.str.len);								\
+	zdate_mval.str.addr = (char *)zdate_buffer;										\
+	stringpool.free -= zdate_mval.str.len; /* now that we've made a copy, we don't need zdate_mval in stringpool anymore */	\
+}
 
 typedef struct
 {
@@ -51,11 +77,12 @@ void dse_adrec(void);
 void dse_adstar(void);
 void dse_all(void);
 boolean_t dse_b_dmp(void);
+void dse_cache(void);
 void dse_chng_bhead(void);
 void dse_chng_fhead(void);
 void dse_chng_rhead(void);
 void dse_crit(void);
-int dse_dmp(void);
+void dse_dmp(void);
 void dse_eval(void);
 void dse_f_blk(void);
 void dse_f_free(void);

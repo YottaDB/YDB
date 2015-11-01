@@ -95,10 +95,10 @@ void mupip_exit_handler(void)
 
 	if (exit_handler_active)	/* Don't recurse if exit handler exited */
 		return;
-	if (jgbl.mupip_journal)
-		mur_close_files();
 	exit_handler_active = TRUE;
 	process_exiting = TRUE;
+	if (jgbl.mupip_journal)
+		mur_close_files();
 	mupip_jnl_recover = FALSE;
 	jgbl.forw_phase_recovery = FALSE;
 	cancel_timer(0);		/* Cancel all timers - No unpleasant surprises */
@@ -157,14 +157,15 @@ void mupip_exit_handler(void)
 				ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
 		}
 	}
-	mu_reset_term_characterstics();
 	/* log the exit of replication servers */
 	if (is_src_server)
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server exiting...\n");
-	if (is_rcvr_server)
+	else if (is_rcvr_server)
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Receiver server exiting...\n");
-	if (is_updproc)
+	else if (is_updproc)
 		repl_log(updproc_log_fp, TRUE, TRUE, "Update process exiting...\n");
+	else
+		mu_reset_term_characterstics(); /* the replication servers use files for output/error, not terminal */
 	util_out_close();
 	close_repl_logfiles();
 	print_exit_stats();

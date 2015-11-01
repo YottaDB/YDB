@@ -242,7 +242,8 @@ uint4	mur_output_record()
 			assert(plst->new_pini_addr == cs_addrs->jnl->pini_addr);
 			if (0 != cs_addrs->jnl->pini_addr)
 				jnl_put_jrt_pfin(mur_ctl[mur_regno].csa);
-			rel_crit(mur_ctl[mur_regno].gd);
+			if (!was_crit)
+				rel_crit(mur_ctl[mur_regno].gd);
 		}
 		return SS_NORMAL;
 	case JRT_NULL:

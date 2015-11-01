@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,7 @@ void op_hang(mval* num)
 #ifdef VMS
 	uint4 	time[2];
 	int4	efn_mask, status;
+	error_def(ERR_SYSCALL);
 #endif
 	ms = 0;
 	MV_FORCE_NUM(num);
@@ -67,9 +68,9 @@ void op_hang(mval* num)
 			time[1] = -time_high_ms(ms) - 1;
 			efn_mask = (1 << efn_outofband | 1 << efn_timer);
 			if (SS$_NORMAL != (status = sys$setimr(efn_timer, &time, NULL, &time, 0)))
-				rts_error(VARLSTCNT(1) status);
+				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("$setimr"), CALLFROM, status);
 			if (SS$_NORMAL != (status = sys$wflor(efn_outofband, efn_mask)))
-				rts_error(VARLSTCNT(1) status);
+				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("$wflor"), CALLFROM, status);
 		)
 		if (outofband)
 		{
@@ -77,7 +78,8 @@ void op_hang(mval* num)
 				if (SS$_WASCLR == (status = sys$readef(efn_timer, &efn_mask)))
 				{
 					if (SS$_NORMAL != (status = sys$cantim(&time, 0)))
-						rts_error(VARLSTCNT(1) status);
+						rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("$cantim"), CALLFROM,
+							status);
 				}
 				else if (SS$_WASSET != status)
 					GTMASSERT;
@@ -85,6 +87,10 @@ void op_hang(mval* num)
 			outofband_action(FALSE);
 		}
 	} else
+	{
 		rel_quant();
+		if (outofband)
+			outofband_action(FALSE);
+	}
 	return;
 }

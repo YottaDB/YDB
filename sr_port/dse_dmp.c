@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ CONDITION_HANDLER(dse_dmp_handler)
 
 static char	*format_label[] = {"; BAD", "; GLO", "; ZWR"}; /* CLOSE_FMT == 0, GLO_FMT == 1 and ZWR_FMT == 2 */
 
-int dse_dmp(void)
+void	dse_dmp(void)
 {
 	boolean_t	dmp_res, glo_present, zwr_present;
 
@@ -53,12 +53,7 @@ int dse_dmp(void)
 		if (CLOSED_FMT == dse_dmp_format)
 		{
 			util_out_print("Error:  must open an output file before dump.", TRUE);
-			return FALSE;
-		}
-		if (glo_present && zwr_present)
-		{
-			util_out_print("Error: Qualifiers GLO and ZWR not compatible.", TRUE);
-			return FALSE;
+			return;
 		}
 		if (OPEN_FMT == dse_dmp_format)
 		{
@@ -69,10 +64,10 @@ int dse_dmp(void)
 		{
 			util_out_print("Error:  current output file already contains !AD records.", TRUE,
 					LEN_AND_STR(&format_label[dse_dmp_format][MESS_OFF]));
-			return FALSE;
+			return;
 		}
 		patch_is_fdmp = TRUE;
-		ESTABLISH_RET(dse_dmp_handler, 0);
+		ESTABLISH(dse_dmp_handler);
 	} else
 		patch_is_fdmp = FALSE;
 	if (CLI_PRESENT == cli_present("RECORD") || CLI_PRESENT == cli_present("OFFSET"))
@@ -86,5 +81,5 @@ int dse_dmp(void)
 			util_out_print("!UL !AD records written.!/", TRUE, patch_fdmp_recs,
 					LEN_AND_STR(&format_label[dse_dmp_format][MESS_OFF]));
 	}
-	return TRUE;
+	return;
 }

@@ -213,7 +213,7 @@ int initialize_pattern_table(void)
 
 	/* Initialize pattern/typemask structures and pat_allmaskbits for default typemask */
 	curr_pattern = pattern_list = &mumps_pattern;
-	pattern_typemask = mumps_pattern.typemask = (unsigned long *)&(typemask[0]);
+	pattern_typemask = mumps_pattern.typemask = (uint4 *)&(typemask[0]);
 	for (pat_allmaskbits = 0, letter = 0; letter < PATENTS; letter++)
 		pat_allmaskbits |= pattern_typemask[letter];	/* used in do_patfixed/do_pattern */
 

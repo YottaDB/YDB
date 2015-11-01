@@ -57,7 +57,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	{
 		for (lcnt = 1; fsync_addr > jb->fsync_dskaddr && !JNL_FILE_SWITCHED(jpc); lcnt++)
 		{
-			if (MAX_FSYNC_WAIT_CNT == lcnt / 2)	/* half way into max.patience*/
+			if (MAX_FSYNC_WAIT_CNT / 2 == lcnt)	/* half way into max.patience*/
 			{
 				saved_status = jpc->status;
 				jpc->status = SS_NORMAL;

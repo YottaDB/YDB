@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,7 @@
 #include "repl_log.h"
 #include "iosp.h"
 #include "repl_shutdcode.h"
+#include "gt_timer.h"
 #include "gtmsource_heartbeat.h"
 #include "jnl.h"
 #include "repl_filter.h"
@@ -44,6 +45,7 @@
 #ifdef UNIX
 #include "gtmio.h"
 #endif
+#include "sgtm_putmsg.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	int			gtmsource_sock_fd;
@@ -54,6 +56,7 @@ GBLREF 	FILE			*gtmsource_log_fp;
 GBLREF	int			gtmsource_statslog_fd;
 GBLREF 	FILE			*gtmsource_statslog_fp;
 GBLREF	int			gtmsource_filter;
+GBLREF	volatile time_t		gtmsource_now;
 
 int gtmsource_poll_actions(boolean_t poll_secondary)
 {
@@ -65,7 +68,9 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	char			seq_num_str[32], *seq_num_ptr;
 	char			*time_ptr;
 	char			time_str[CTIME_BEFORE_NL + 1];
+	char			print_msg[1024], msg_str[1024];
 	int			status;
+	error_def(ERR_REPLWARN);
 
 	gtmsource_local = jnlpool.gtmsource_local;
 	if (SHUTDOWN == gtmsource_local->shutdown)
@@ -73,27 +78,26 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Shutdown signalled\n");
 		gtmsource_end(); /* Won't return */
 	}
-	if (GTMSOURCE_CHANGING_MODE !=  gtmsource_state &&
-	    GTMSOURCE_MODE_PASSIVE == gtmsource_local->mode)
+	if (GTMSOURCE_CHANGING_MODE !=  gtmsource_state && GTMSOURCE_MODE_PASSIVE == gtmsource_local->mode)
 	{
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Changing mode from ACTIVE to PASSIVE\n");
 		gtmsource_state = GTMSOURCE_CHANGING_MODE;
 		return (SS_NORMAL);
 	}
 
-	if (poll_secondary && GTMSOURCE_CHANGING_MODE != gtmsource_state &&
-	    GTMSOURCE_WAITING_FOR_CONNECTION != gtmsource_state)
+	if (poll_secondary && GTMSOURCE_CHANGING_MODE != gtmsource_state && GTMSOURCE_WAITING_FOR_CONNECTION != gtmsource_state)
 	{
-		now = time(NULL);
+		now = gtmsource_now;
 		if (gtmsource_is_heartbeat_overdue(&now, &overdue_heartbeat))
 		{
 			time_ptr = GTM_CTIME((time_t *)&overdue_heartbeat.ack_time[0]);
 			memcpy(time_str, time_ptr, CTIME_BEFORE_NL);
 			time_str[CTIME_BEFORE_NL] = '\0';
-			repl_log(gtmsource_log_fp, TRUE, TRUE, "No response received for heartbeat sent at %s with SEQNO "
-				 INT8_FMT" in %d seconds. Closing connection\n", time_str,
-				 INT8_PRINT(*(seq_num *)&overdue_heartbeat.ack_seqno[0]),
-				 gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT]);
+			SPRINTF(msg_str, "No response received for heartbeat sent at %s with SEQNO %llu in %00.f seconds. "
+					"Closing connection\n", time_str, *(seq_num *)&overdue_heartbeat.ack_seqno[0],
+				 	difftime(now, *(time_t *)&overdue_heartbeat.ack_time[0]));
+			sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLWARN, 2, LEN_AND_STR(msg_str));
+			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 			repl_close(&gtmsource_sock_fd);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 			gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;

@@ -30,7 +30,6 @@ static CLI_ENTRY 	*gpqual_root;			/* pointer to root of
 							   subordinate qualifier table */
 static CLI_ENTRY 	*gpcmd_qual;			/* pointer command qualifier table */
 static CLI_ENTRY 	*gpcmd_verb;			/* pointer to verb table */
-static CLI_ENTRY 	*gpcmd_qual_val;		/* pointer to qualifier table */
 static CLI_PARM 	*gpcmd_parm_vals;		/* pointer to parameters for command */
 
 GBLREF char 		cli_token_buf[];
@@ -59,7 +58,6 @@ void	clear_parm_vals(CLI_ENTRY *cmd_parms, boolean_t follow) 		/* pointer to opt
 	int		need_copy;
 
 	need_copy = (gpcmd_qual != cmd_parms);
-
 	while (strlen(cmd_parms->name) > 0)
 	{
 		if (cmd_parms->pval_str)
@@ -202,7 +200,7 @@ CLI_ENTRY *find_cmd_param(char *str, CLI_ENTRY *pparm, int follow)
 
 	if (FALSE == follow)
 		return NULL;
-	/*if to follow, go through the qual_vals, and check those tables */
+	/* if to follow, go through the qual_vals, and check those tables */
 	for(ind =0; 0 < strlen((pparm + ind)->name); ind++)
 	{
 		pparm_tmp = (pparm + ind)->qual_vals;
@@ -255,13 +253,10 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	 * -------------------------------------------------------------------
 	 */
 	if (!cli_is_qualif(cli_token_buf) && !cli_is_assign(cli_token_buf))
-	{
-		/* ----------------------------------------------------
+	{	/* ----------------------------------------------------
 		 * If token is not a qualifier, it must be a parameter
-		 * ----------------------------------------------------
-		 */
-		/* ------------------------------------------------------------
-		 * no need to check for eof on cli_get_string_token(eof) since
+		 *
+		 * No need to check for eof on cli_get_string_token(eof) since
 		 * already checked that on the previous cli_look_next_token.
 		 * now you have to skip initial white spaces before reading
 		 * the string since cli_get_string_token considers a space
@@ -324,17 +319,6 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	 */
 	if (-1 == (neg_flg = cli_check_negated(&opt_str, pcmd_parms, &pparm)))
 		return(-1);
-	/* --------------------------------------------------
-	 * If there is another level, update global pointers
-	 * --------------------------------------------------
-	 */
-	if (pparm->parms)
-	{
-		func = pparm->func;
-		gpqual_root = pparm;
-		clear_parm_vals(pparm->parms, TRUE);
-		gpcmd_qual = pparm->parms;
-	}
 	/* -------------------------------------------------------------
 	 * If value is disallowed for this qualifier, and an assignment
 	 * token is encounter, report error, values not allowed for
@@ -351,8 +335,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 			return(-1);
 		}
 	} else
-	{
-		/* --------------------------------------------------
+	{	/* --------------------------------------------------
 		 * Get Value either optional, or required.
 		 * In either case, there must be an assignment token
 		 * --------------------------------------------------
@@ -372,13 +355,10 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 					 */
 					if (pparm->pval_str)
 						free(pparm->pval_str);
-					pparm->negated = 0;
 					if (pparm->qual_vals)
 						clear_parm_vals(pparm->qual_vals, FALSE);
 
 				}
-				pparm->negated = neg_flg;
-				pparm->present = 1;
 				/* -------------------------------
 				 * Allocate memory and save value
 				 * -------------------------------
@@ -390,69 +370,85 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 					if (!cli_get_sub_quals(pparm))
 						return(-1);
 				}
-				return(1);
 			}
-		}
- 		cli_gettoken(eof);
-		/* ---------------------------------
-		 * Get the assignment token + value
-		 * ---------------------------------
-		 */
-		if (!cli_is_assign(cli_token_buf))
+		} else
 		{
-			SNPRINTF(cli_err_str, MAX_STRLEN,
-			  "Assignment missing after option : %s",
-			  pparm->name);
-			return(-1);
-		}
-		/* --------------------------------------------------------
-		 * get the value token, "=" is NOT a token terminator here
-		 * --------------------------------------------------------
-		 */
-		if (!cli_look_next_string_token(eof) || 0 == cli_get_string_token(eof))
-		{
-			SNPRINTF(cli_err_str, MAX_STRLEN,
-			  "Unrecognized option : %s, value expected but not found",
-			  pparm->name);
-			cli_lex_in_ptr->tp = 0;
-			return(-1);
-		}
-		val_str = cli_token_buf;
-		if (!cli_numeric_check(pparm, val_str))
-		{
-			cli_lex_in_ptr->tp = 0;
-			return(-1);
-		}
-		if (pparm->present)
-		{
-			/* The option was specified before, so clean up that one,
-			 * the last one overrides
+			cli_gettoken(eof);
+			/* ---------------------------------
+			 * Get the assignment token + value
+			 * ---------------------------------
 			 */
-			if (pparm->pval_str)
-				free(pparm->pval_str);
-			if (pparm->qual_vals)
-				clear_parm_vals(pparm->qual_vals, FALSE);
-		}
-		/* -------------------------------
-		 * Allocate memory and save value
-		 * -------------------------------
-		 */
-		pparm->pval_str = malloc(strlen(cli_token_buf) + 1);
-		strcpy(pparm->pval_str, cli_token_buf);
+			if (!cli_is_assign(cli_token_buf))
+			{
+				SNPRINTF(cli_err_str, MAX_STRLEN, "Assignment missing after option : %s", pparm->name);
+				return(-1);
+			}
+			/* --------------------------------------------------------
+			 * get the value token, "=" is NOT a token terminator here
+			 * --------------------------------------------------------
+			 */
+			if (!cli_look_next_string_token(eof) || 0 == cli_get_string_token(eof))
+			{
+				SNPRINTF(cli_err_str, MAX_STRLEN, "Unrecognized option : %s, value expected but not found",
+						pparm->name);
+				cli_lex_in_ptr->tp = 0;
+				return(-1);
+			}
+			val_str = cli_token_buf;
+			if (!cli_numeric_check(pparm, val_str))
+			{
+				cli_lex_in_ptr->tp = 0;
+				return(-1);
+			}
+			if (pparm->present)
+			{	/* The option was specified before, so clean up that one,
+				 * the last one overrides
+				 */
+				if (pparm->pval_str)
+					free(pparm->pval_str);
+				if (pparm->qual_vals)
+					clear_parm_vals(pparm->qual_vals, FALSE);
+			}
+			/* -------------------------------
+			 * Allocate memory and save value
+			 * -------------------------------
+			 */
+			pparm->pval_str = malloc(strlen(cli_token_buf) + 1);
+			strcpy(pparm->pval_str, cli_token_buf);
 
-		if (!cli_get_sub_quals(pparm))
-			return(-1);
+			if (!cli_get_sub_quals(pparm))
+				return(-1);
+		}
 	}
 	if (pparm->present)
 		pparm->negated = 0;
 	pparm->negated = neg_flg;
 	pparm->present = 1;
-
+	if (NULL != pparm->func)
+		func = pparm->func;
+	/* ----------------------------------------------------------------------------------------------------------------------
+	 * If there is another level, update global pointers
+	 * Notice that this global pointer updation should be done only at the end of this routine in order to ensure that the
+	 * 	check_disallow() function invoked below sees the currently parsed argument as present (i.e. pparm->present = 1)
+	 * ----------------------------------------------------------------------------------------------------------------------
+	 */
+	if (pparm->parms)
+	{	/*-------------------------------------------------------------------------------------------
+		 * Check that the disallow conditions for this level are met before switching to next level
+		 *-------------------------------------------------------------------------------------------
+		 */
+		if (FALSE == check_disallow(gpcmd_verb))
+			return (-1);
+		gpqual_root = pparm;
+		clear_parm_vals(pparm->parms, TRUE);
+		gpcmd_qual = pparm->parms;
+		gpcmd_verb = pparm;	/* this needs to be done in order for check_disallow() to do the proper disallow check.
+					 * an example that will not work otherwise is cli_disallow_mupip_replic_receive() */
+	}
 	return(1);
 }
 
-/*
- * -----------------------------------------------------
+/* -----------------------------------------------------
  * Check if the value is numeric if it is supposed to be
  *
  * Return:
@@ -557,7 +553,6 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 	pparm_qual = pparm->qual_vals;
 	if (!pparm_qual)
 		return TRUE;
-	gpcmd_qual_val = pparm; /*for future reference */
 	if ((VAL_STR == pparm->val_type) || (VAL_LIST == pparm->val_type))
 	{
 		strncpy(local_str, pparm->pval_str, sizeof(local_str) - 1);
@@ -757,8 +752,7 @@ int parse_cmd(void)
 		cli_lex_in_ptr->tp = 0;
 		res = -1;
 	}
-	if (1 > opt_cnt && -1 != res
-	    && VAL_REQ == cmd_ary[cmd_ind].required)
+	if ((1 > opt_cnt) && (-1 != res) && (VAL_REQ == cmd_ary[cmd_ind].required))
 	{
 		SNPRINTF(cli_err_str, MAX_STRLEN, "Command argument expected, but not found");
 		res = -1;
@@ -767,7 +761,7 @@ int parse_cmd(void)
 	 * Check that the disallow conditions are met (to allow)
 	 *------------------------------------------------------
 	 */
-	if ((-1 != res) && ((FALSE == check_disallow(gpcmd_verb)) || (FALSE == check_disallow(gpcmd_qual_val))))
+	if ((-1 != res) && (FALSE == check_disallow(gpcmd_verb)))
 		res = -1;
 	/* -------------------------------------
 	 * If parse error, display error string
@@ -787,8 +781,7 @@ int parse_cmd(void)
 		return(ERR_CLIERR);
 }
 
-/*
- * ------------------------------------------------------------
+/* ------------------------------------------------------------
  * See if command parameter is present on the command line,
  * and if it is, return the pointer to its table entry.
  *
@@ -814,7 +807,6 @@ CLI_ENTRY *get_parm_entry(char *parm_str)
 	 * search qualifier table for this option
 	 * ---------------------------------------
 	 */
-
 	if (!gpcmd_qual)
 		return(NULL);
 	if (NULL == strchr(local_str,'.'))
@@ -975,10 +967,21 @@ bool cli_get_parm(char *entry, char val_buf[])
 				}
 				parm_ary[match_ind] = malloc(parm_len + 1);
 				if (parm_len)
+				{
 					memcpy(parm_ary[match_ind], &local_str[0], parm_len);
-				*(parm_ary[match_ind] + parm_len + 1) = '\0';
+					*(parm_ary[match_ind] + parm_len + 1) = '\0';
+				} else
+					*parm_ary[match_ind] = '\0';
 			} else
-				return FALSE;
+			{	/* No string was returned so create a real ghost to point to.
+				   Note that this should be revisited since this is NOT what should
+				   be happening. We should be returning FALSE here but need to instead
+				   return a null parm since current behaviors have a dependency on it
+				   SE 10/2003
+				 */
+				parm_ary[match_ind] = malloc(1);
+				*parm_ary[match_ind] = '\0';
+			}
 		} else if ((char *)-1 == parm_ary[match_ind])
 			return(FALSE);
 		memcpy(val_buf, parm_ary[match_ind], strlen(parm_ary[match_ind]) + 1);

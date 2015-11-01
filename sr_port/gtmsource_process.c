@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_stdio.h"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -45,28 +46,30 @@
 #include "repl_errno.h"
 #include "repl_dbg.h"
 #include "iosp.h"
-#include "gtm_stdio.h"
+#include "gt_timer.h"
 #include "gtmsource_heartbeat.h"
 #include "repl_filter.h"
 #include "repl_log.h"
+#include "min_max.h"
+#include "rel_quant.h"
 
-#define OVERFLOWN(qw)		(0 == (DWASSIGNQW(temp_dw, qw)))
+#define MAX_HEXDUMP_CHARS_PER_LINE	26 /* 2 characters per byte + space, 80 column assumed */
 
 GBLDEF	seq_num			gtmsource_save_read_jnl_seqno;
 GBLDEF	struct timeval		gtmsource_poll_wait, gtmsource_poll_immediate;
-GBLDEF	qw_off_t		jnlpool_size;
 GBLDEF	gtmsource_state_t	gtmsource_state = GTMSOURCE_DUMMY_STATE;
 GBLDEF	repl_msg_ptr_t		gtmsource_msgp = NULL;
 GBLDEF	int			gtmsource_msgbufsiz = 0;
 GBLREF	uchar_ptr_t		repl_filter_buff;
 GBLREF	int			repl_filter_bufsiz;
 
-GBLDEF	long			repl_source_data_sent;
-GBLDEF	long			repl_source_msg_sent;
-GBLDEF	long			repl_source_lastlog_data_sent = 0;
-GBLDEF	long			repl_source_lastlog_msg_sent = 0;
+GBLDEF	qw_num			repl_source_data_sent = 0;
+GBLDEF	qw_num			repl_source_msg_sent = 0;
+GBLDEF	qw_num			repl_source_lastlog_data_sent = 0;
+GBLDEF	qw_num			repl_source_lastlog_msg_sent = 0;
 GBLDEF	time_t			repl_source_prev_log_time;
 GBLDEF  time_t			repl_source_this_log_time;
+GBLREF	volatile time_t		gtmsource_now;
 
 GBLREF	int			gtmsource_sock_fd;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -88,15 +91,7 @@ GBLREF	seq_num			seq_num_zero, seq_num_minus_one, seq_num_one;
 GBLREF	unsigned char		jnl_ver, remote_jnl_ver;
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
 GBLREF	unsigned char		jnl_source_rectype, jnl_dest_maxrectype;
-
-void	conn_reset_handler(int signal);
-
-void	conn_reset_handler(int signal)
-{
-	repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset...waiting for port to shutdown on recv end\n");
- 	LONG_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_TO_QUIT);
-	return;
-}
+GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
 
 int gtmsource_process(void)
 {
@@ -106,30 +101,36 @@ int gtmsource_process(void)
 	jnlpool_ctl_ptr_t	jctl;
 	seq_num			recvd_seqno, sav_read_jnl_seqno;
 	struct sockaddr_in	secondary_addr;
-	unsigned char		*msg_ptr;
 	seq_num			recvd_jnl_seqno, tmp_read_jnl_seqno;
-	int			data_len;
-	int			send_len, sent_len, recv_len, recvd_len;
-	int			status, srch_status;
+	int			data_len, srch_status;
+	unsigned char		*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
+	int			tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
+	int			torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
+	int			status;					/* needed for REPL_{SEND,RECV}_LOOP */
+	int			tot_tr_len;
 	struct timeval		poll_time;
 	int			recvd_msg_type, recvd_start_flags;
-	struct sigaction	act;
 	repl_msg_t		xoff_ack;
 	repl_msg_ptr_t		send_msgp;
 	uchar_ptr_t		in_buff, out_buff, save_filter_buff;
 	uint4			in_size, out_size, out_bufsiz, tot_out_size, pre_intlfilter_datalen;
-
-	seq_num			lastlog_seqno, log_seqno, diff_seqno;
+	seq_num			lastlog_seqno, log_seqno, diff_seqno, pre_read_jnl_seqno, post_read_jnl_seqno, jnl_seqno;
 	unsigned char		seq_num_str[32], *seq_num_ptr;
-	boolean_t		xon_wait_logged = FALSE;
+	char			err_string[1024];
+	boolean_t		xon_wait_logged, prev_catchup, catchup, force_recv_check;
 	double			time_elapsed;
-	long			trans_sent_cnt = 0;
-	long			last_log_tr_sent_cnt = 0;
+	qw_num			trans_sent_cnt = 0;
+	qw_num			last_log_tr_sent_cnt = 0;
 	seq_num			resync_seqno, old_resync_seqno, curr_seqno, filter_seqno;
 	gd_region		*reg, *region_top;
 	sgmnt_addrs		*csa;
 	boolean_t		was_crit;
 	uint4			temp_dw;
+	qw_num			backlog_bytes, backlog_count;
+	long			prev_msg_sent = 0;
+	time_t			prev_now = 0, save_now;
+	int			index;
+	struct timeval		poll_wait, poll_immediate;
 
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
@@ -137,51 +138,49 @@ int gtmsource_process(void)
 	error_def(ERR_JNLSETDATA2LONG);
 	error_def(ERR_JNLNEWREC);
 
+	assert(REPL_MSG_HDRLEN == sizeof(jnldata_hdr_struct)); /* necessary for reading multiple transactions from jnlpool in
+								* a single attempt */
 	jctl = jnlpool.jnlpool_ctl;
 	gtmsource_local = jnlpool.gtmsource_local;
 	gtmsource_msgp = NULL;
 	gtmsource_msgbufsiz = MAX_REPL_MSGLEN;
-	QWASSIGNDW(jnlpool_size, jctl->jnlpool_size);
 
 	assert(GTMSOURCE_POLL_WAIT < MAX_GTMSOURCE_POLL_WAIT);
 	gtmsource_poll_wait.tv_sec = 0;
 	gtmsource_poll_wait.tv_usec = GTMSOURCE_POLL_WAIT;
+	poll_wait = gtmsource_poll_wait;
 
 	gtmsource_poll_immediate.tv_sec = 0;
-	gtmsource_poll_immediate.tv_sec = 0;
-
-	repl_source_data_sent = repl_source_msg_sent = 0;
-	repl_source_lastlog_data_sent = 0;
-	repl_source_lastlog_msg_sent = 0;
+	gtmsource_poll_immediate.tv_usec = 0;
+	poll_immediate = gtmsource_poll_immediate;
 
 	gtmsource_init_sec_addr(&secondary_addr);
 
 	gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 
-	/* Setup the loss of connection handler */
-	sigemptyset(&act.sa_mask);
-	act.sa_flags = 0;
-	act.sa_handler = conn_reset_handler;
-	sigaction(SIGPIPE, &act, 0);
-
 	while (TRUE)
 	{
 		gtmsource_stop_heartbeat();
 
-		QWASSIGN(lastlog_seqno, seq_num_minus_one);
+		lastlog_seqno = gtmsource_local->read_jnl_seqno - 1;
 		QWDECRBYDW(lastlog_seqno, (LOGTRNUM_INTERVAL - 1));
 		trans_sent_cnt = -LOGTRNUM_INTERVAL + 1;
-
-		repl_source_prev_log_time = time(NULL);
+		last_log_tr_sent_cnt = 0;
 
 		if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 		{
 			gtmsource_est_conn(&secondary_addr);
 			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 				return (SS_NORMAL);
-			repl_log(gtmsource_log_fp, TRUE, TRUE, "Connected to secondary\n");
-			gtmsource_alloc_msgbuff(gtmsource_msgbufsiz);
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "Connected to secondary, using TCP send buffer size %d "
+					"receive buffer size %d\n", repl_max_send_buffsize, repl_max_recv_buffsize);
+			repl_source_data_sent = repl_source_msg_sent = 0;
+			repl_source_lastlog_data_sent = 0;
+			repl_source_lastlog_msg_sent = 0;
+
+			gtmsource_alloc_msgbuff(MAX_REPL_MSGLEN);
 			gtmsource_state = GTMSOURCE_WAITING_FOR_RESTART;
+			repl_source_prev_log_time = time(NULL);
 		}
 		if (GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state &&
 		    SS_NORMAL != (status = gtmsource_recv_restart(&recvd_seqno, &recvd_msg_type, &recvd_start_flags)))
@@ -191,29 +190,37 @@ int gtmsource_process(void)
 				if (REPL_CONN_RESET(status) || ETIMEDOUT == status)
 				{
 					/* Connection reset */
+					repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while receiving restart SEQNO\n");
 					repl_close(&gtmsource_sock_fd);
 					SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 					gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 					continue;
 				} else
-					rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-						  RTS_ERROR_LITERAL("Error receiving RESTART SEQNO. Error in recv"), status);
+				{
+					SNPRINTF(err_string, sizeof(err_string),
+							"Error receiving RESTART SEQNO. Error in recv : %s", STRERROR(status));
+					rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
+				}
 			} else if (EREPL_SEND == repl_errno)
 			{
 				if (REPL_CONN_RESET(status))
 				{
-					repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset\n");
+					repl_log(gtmsource_log_fp, TRUE, TRUE,
+					       "Connection reset while sending XOFF_ACK due to possible update process shutdown\n");
 					repl_close(&gtmsource_sock_fd);
 					SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 					gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 					continue;
 				}
-				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					  RTS_ERROR_LITERAL("Error sending XOFF_ACK_ME message. Error in send"), status);
+				SNPRINTF(err_string, sizeof(err_string), "Error sending XOFF_ACK_ME message. Error in send : %s",
+						STRERROR(status));
+				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
 			} else if (EREPL_SELECT == repl_errno)
-				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					  RTS_ERROR_LITERAL("Error receiving RESTART SEQNO/sending XOFF_ACK_ME. Error in select"),
-					  status);
+			{
+				SNPRINTF(err_string, sizeof(err_string), "Error receiving RESTART SEQNO/sending XOFF_ACK_ME.  "
+						"Error in select : %s", STRERROR(status));
+				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
+			}
 		}
 		if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 			return (SS_NORMAL);
@@ -247,7 +254,7 @@ int gtmsource_process(void)
 		QWASSIGN(*(seq_num *)&((repl_start_reply_msg_ptr_t)gtmsource_msgp)->start_seqno[0],
 			 gtmsource_local->read_jnl_seqno);
 		gtmsource_msgp->len = MIN_REPL_MSGLEN;
-		REPL_SEND_LOOP(gtmsource_sock_fd, gtmsource_msgp, gtmsource_msgp->len, &gtmsource_poll_immediate)
+		REPL_SEND_LOOP(gtmsource_sock_fd, gtmsource_msgp, gtmsource_msgp->len, FALSE, &poll_immediate)
 		{
 			gtmsource_poll_actions(FALSE);
 			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
@@ -257,26 +264,33 @@ int gtmsource_process(void)
 		{
 			if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
 			{
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset\n");
+				repl_log(gtmsource_log_fp, TRUE, TRUE,
+						"Connection reset while sending REPL_WILL_RESTART/RESYNC_SEQNO\n");
 				repl_close(&gtmsource_sock_fd);
 				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 				gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 				continue;
 			}
 			if (EREPL_SEND == repl_errno)
-				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					  RTS_ERROR_LITERAL("Error sending ROLLBACK FIRST message. Error in send"), status);
+			{
+				SNPRINTF(err_string, sizeof(err_string), "Error sending ROLLBACK FIRST message. Error in send : %s",
+						STRERROR(status));
+				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
+			}
 			if (EREPL_SELECT == repl_errno)
-				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					  RTS_ERROR_LITERAL("Error sending ROLLBACK FIRST message. Error in select"), status);
+			{
+				SNPRINTF(err_string, sizeof(err_string), "Error sending ROLLBACK FIRST message. "
+						"Error in select : %s", STRERROR(status));
+				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
+			}
 		}
 		if (REPL_WILL_RESTART_WITH_INFO != gtmsource_msgp->type)
 		{
 			assert(gtmsource_msgp->type == REPL_RESYNC_SEQNO || gtmsource_msgp->type == REPL_ROLLBACK_FIRST);
 			if (REPL_RESYNC_SEQNO == gtmsource_msgp->type)
 			{
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "RESYNC_SEQNO msg sent with SEQNO "INT8_FMT"\n",
-					 INT8_PRINT(*(seq_num *)&gtmsource_msgp->msg[0]));
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "RESYNC_SEQNO msg sent with SEQNO %llu\n",
+					 (*(seq_num *)&gtmsource_msgp->msg[0]));
 				QWASSIGN(resync_seqno, recvd_seqno);
 				if (QWLE(gtmsource_local->read_jnl_seqno, resync_seqno))
 					QWASSIGN(resync_seqno, gtmsource_local->read_jnl_seqno);
@@ -295,8 +309,8 @@ int gtmsource_process(void)
 					}
 				}
 			 	assert(QWNE(old_resync_seqno, seq_num_zero));
-				REPL_DPRINT2("BEFORE FINDING RESYNC - old_resync_seqno is "INT8_FMT, INT8_PRINT(old_resync_seqno));
-				REPL_DPRINT2(", curr_seqno is "INT8_FMT"\n", INT8_PRINT(curr_seqno));
+				REPL_DPRINT2("BEFORE FINDING RESYNC - old_resync_seqno is %llu", old_resync_seqno);
+				REPL_DPRINT2(", curr_seqno is %llu\n", curr_seqno);
 				if (QWNE(old_resync_seqno, resync_seqno))
 				{
 					assert(QWGE(curr_seqno, gtmsource_local->read_jnl_seqno));
@@ -308,10 +322,25 @@ int gtmsource_process(void)
 						csa = &FILE_INFO(reg)->s_addrs;
 						if (REPL_ENABLED(csa->hdr))
 						{
-							REPL_DPRINT2("Assigning "INT8_FMT, INT8_PRINT(resync_seqno));
-							REPL_DPRINT3(" to old_resync_seqno of %s. Prev value "INT8_FMT"\n",
-									reg->rname, INT8_PRINT(csa->hdr->old_resync_seqno));
+							REPL_DPRINT4("Assigning %llu to old_resyc_seqno of %s. Prev value %llu\n",
+									resync_seqno, reg->rname, csa->hdr->old_resync_seqno);
+							/* Although csa->hdr->old_resync_seqno is only modified by the source
+							 * server and never concurremntly, it is read by fileheader_sync() which
+							 * does it while in crit. To avoid the latter from reading an inconsistent
+							 * value (i.e. neither the pre-update nor the post-update value, which is
+							 * possible if the 8-byte operation is not atomic but a sequence of two
+							 * 4-byte operations AND if the pre-update and post-update value differ in
+							 * their most significant 4-bytes) we grab crit. We could have used the
+							 * QWCHANGE_IS_READER_CONSISTENT macro (which checks for most significant
+							 * 4-byte differences) instead to determine if it is really necessary to
+							 * grab crit. But since the update to old_resync_seqno is a rare operation,
+							 * we decide to play it safe.
+							 */
+							if (FALSE == (was_crit = csa->now_crit))
+								grab_crit(reg);
 							QWASSIGN(csa->hdr->old_resync_seqno, resync_seqno);
+							if (FALSE == was_crit)
+								rel_crit(reg);
 						}
 					}
 				}
@@ -340,9 +369,10 @@ int gtmsource_process(void)
 			gtmsource_set_lookback();
 		}
 
-		poll_time = gtmsource_poll_immediate;
+		poll_time = poll_immediate;
 		gtmsource_state = GTMSOURCE_SENDING_JNLRECS;
 		gtmsource_init_heartbeat();
+
 		if (jnl_ver > remote_jnl_ver && IF_NONE != repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
 									       [remote_jnl_ver - JNL_VER_EARLIEST_REPL])
 		{
@@ -358,14 +388,12 @@ int gtmsource_process(void)
 		} else
 		{
 			gtmsource_filter &= ~INTERNAL_FILTER;
-			if (NO_FILTER == gtmsource_filter && repl_filter_buff)
-			{
-				free(repl_filter_buff);
-				repl_filter_buff = NULL;
-				repl_filter_bufsiz = 0;
-			}
+			if (NO_FILTER == gtmsource_filter)
+				gtmsource_free_filter_buff();
 		}
-
+		catchup = FALSE;
+		force_recv_check = TRUE;
+		xon_wait_logged = FALSE;
 		while (TRUE)
 		{
 			gtmsource_poll_actions(TRUE);
@@ -374,20 +402,99 @@ int gtmsource_process(void)
 			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 				break;
 
-			/* Check if receiver sent me anything */
-			REPL_RECV_LOOP(gtmsource_sock_fd, gtmsource_msgp, MIN_REPL_MSGLEN, &poll_time)
+			/* If the backlog is high, we want to avoid communication overhead as much as possible. We switch
+			 * our communication mode to *catchup* mode, wherein we don't wait for the pipe to become ready to
+			 * send. Rather, we assume the pipe is ready for sending. The risk is that the send may block if
+			 * the pipe is not ready for sending. In the user's perspective, the risk is that the source server
+			 * may not respond to administrative actions such as "change log", "shutdown" (although mupip stop
+			 * would work).
+			 */
+			pre_read_jnl_seqno = gtmsource_local->read_jnl_seqno;
+			prev_catchup = catchup;
+			assert(jctl->write_addr >= gtmsource_local->read_addr);
+			backlog_bytes = jctl->write_addr - gtmsource_local->read_addr;
+			jnl_seqno = jctl->jnl_seqno;
+			assert(jnl_seqno >= pre_read_jnl_seqno - 1); /* jnl_seqno >= pre_read_jnl_seqno is the most common case;
+								      * see gtmsource_readpool() for when the rare case can occur */
+			backlog_count = (jnl_seqno >= pre_read_jnl_seqno) ? (jnl_seqno - pre_read_jnl_seqno) : 0;
+			catchup = (BACKLOG_BYTES_THRESHOLD <= backlog_bytes || BACKLOG_COUNT_THRESHOLD <= backlog_count);
+			if (!prev_catchup && catchup) /* transition from non catchup to catchup */
 			{
-				if (0 == recvd_len && MIN_REPL_MSGLEN == recv_len)
-					break;
-				gtmsource_poll_actions(TRUE);
-				if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
-					return (SS_NORMAL);
-				if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
-					break;
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server entering catchup mode at Seqno : %llu "
+					 "Current backlog : %llu Backlog size in journal pool : %llu bytes\n", pre_read_jnl_seqno,
+					 backlog_count, backlog_bytes);
+				prev_now = gtmsource_now;
+				prev_msg_sent = repl_source_msg_sent;
+				force_recv_check = TRUE;
+			} else if (prev_catchup && !catchup) /* transition from catchup to non catchup */
+			{
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server returning to regular mode from catchup mode "
+					 "at Seqno : %llu Current backlog : %llu Backlog size in journal pool : %llu bytes\n",
+					 pre_read_jnl_seqno, backlog_count, backlog_bytes);
+				if (gtmsource_msgbufsiz - MAX_REPL_MSGLEN > 2 * OS_PAGE_SIZE)
+				{/* We have expanded the buffer by too much (could have been avoided had we sent one transaction
+				  * at a time while reading from journal files); let's revert back to our initial buffer size.
+				  * If we don't reduce our buffer, it is possible that the buffer keeps growing (while reading
+				  * from journal file) thus making the size of sends while reading from journal pool very
+				  * large (> 1 MB). Better to do some house keeping. We will force an expansion if the transaction
+				  * size dictates it. Ideally, this must be done while switching reading back from files to
+				  * pool, but we can't afford to free the buffer until we sent the transaction out. That apart,
+				  * let's wait for some breathing time to do house keeping. In catchup mode, we intend to keep
+				  * the send size large. */
+					gtmsource_free_filter_buff();
+					gtmsource_free_msgbuff();
+					gtmsource_alloc_msgbuff(MAX_REPL_MSGLEN); /* will also allocate filter buffer */
+				}
 			}
-			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
-				break;
 
+			/* Check if receiver sent us any control message.
+			 * Typically, the traffic from receiver to source is very low compared to traffic in the other direction.
+			 * More often than not, there will be nothing on the pipe to receive. Ideally, we should let TCP
+			 * notify us when there is data on the pipe (async I/O on Unix and VMS). We are not there yet. Until then,
+			 * we use heuristics - attempt receive every GTMSOURCE_SENT_THRESHOLD_FOR_RECV bytes of sent data, and
+			 * every heartbeat period, OR whenever we want to force a check
+			 */
+			if (GTMSOURCE_SENDING_JNLRECS != gtmsource_state || !catchup || prev_now != (save_now = gtmsource_now) ||
+				GTMSOURCE_SENT_THRESHOLD_FOR_RECV <= repl_source_msg_sent - prev_msg_sent || force_recv_check)
+			{
+				REPL_EXTRA_DPRINT2("gtmsource_process: receiving because : %s\n",
+						   (GTMSOURCE_SENDING_JNLRECS != gtmsource_state) ? "state is not SENDING_JNLRECS" :
+						   !catchup ? "not in catchup mode" :
+						   (prev_now != save_now) ? "heartbeat interval passed" :
+						   (GTMSOURCE_SENT_THRESHOLD_FOR_RECV <= repl_source_msg_sent - prev_msg_sent) ?
+						   	"sent bytes threshold for recv crossed" :
+							"force recv check");
+				REPL_EXTRA_DPRINT6("gtmsource_state : %d  prev_now : %ld gtmsource_now : %ld repl_source_msg_sent "
+						   ": %ld prev_msg_sent : %ld\n", gtmsource_state, prev_now, save_now,
+						   repl_source_msg_sent, prev_msg_sent);
+				REPL_RECV_LOOP(gtmsource_sock_fd, gtmsource_msgp, MIN_REPL_MSGLEN, FALSE, &poll_time)
+				{
+					if (0 == recvd_len) /* nothing received in the first attempt, let's try again later */
+						break;
+					gtmsource_poll_actions(TRUE);
+					if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+						return (SS_NORMAL);
+					if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+						break;
+				}
+				REPL_EXTRA_DPRINT3("gtmsource_process: %d received, type is %d\n", recvd_len,
+							(0 != recvd_len) ? gtmsource_msgp->type : -1);
+				if (GTMSOURCE_SENDING_JNLRECS == gtmsource_state && catchup)
+				{
+					if (prev_now != save_now)
+						prev_now = save_now;
+					else if (GTMSOURCE_SENT_THRESHOLD_FOR_RECV <= repl_source_msg_sent - prev_msg_sent)
+					{ /* do not set to repl_source_msg_sent; increment by GTMSOURCE_SENT_THRESHOLD_FOR_RECV
+					   * instead so that we force recv every GTMSOURCE_SENT_THRESHOLD_FOR_RECV bytes */
+						prev_msg_sent += GTMSOURCE_SENT_THRESHOLD_FOR_RECV;
+					}
+				}
+			} else
+			{ /* behave as if there was nothing to be read */
+				status = SS_NORMAL;
+				recvd_len = 0;
+			}
+			force_recv_check = FALSE;
 			if (SS_NORMAL == status && 0 != recvd_len)
 			{
 				/* Process the received control message */
@@ -396,7 +503,7 @@ int gtmsource_process(void)
 					case REPL_XOFF:
 					case REPL_XOFF_ACK_ME:
 						gtmsource_state = GTMSOURCE_WAITING_FOR_XON;
-						poll_time = gtmsource_poll_wait;
+						poll_time = poll_wait;
 						repl_log(gtmsource_log_fp, TRUE, TRUE,
 							 "REPL_XOFF/REPL_XOFF_ACK_ME received. Send stalled...\n");
 						xon_wait_logged = FALSE;
@@ -406,7 +513,7 @@ int gtmsource_process(void)
 							QWASSIGN(*(seq_num *)&xoff_ack.msg[0], *(seq_num *)&gtmsource_msgp->msg[0]);
 							xoff_ack.len = MIN_REPL_MSGLEN;
 							REPL_SEND_LOOP(gtmsource_sock_fd, &xoff_ack, xoff_ack.len,
-								       &gtmsource_poll_immediate)
+								       FALSE, &poll_immediate)
 							{
 								gtmsource_poll_actions(FALSE);
 								if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
@@ -420,32 +527,54 @@ int gtmsource_process(void)
 								if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
 								{
 									repl_log(gtmsource_log_fp, TRUE, TRUE,
-										"Connection reset\n");
+										"Connection reset while sending REPL_XOFF_ACK\n");
 									repl_close(&gtmsource_sock_fd);
 									gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 									break;
 								}
 								if (EREPL_SEND == repl_errno)
-									rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-									 RTS_ERROR_LITERAL("Error sending REPL_XOFF_ACK_ME"
-									 "message. Error in send"),
-									  status);
+								{
+									SNPRINTF(err_string, sizeof(err_string),
+											"Error sending REPL_XOFF_ACK_ME.  "
+											"Error in send : %s",
+											STRERROR(status));
+									rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+									 		RTS_ERROR_STRING(err_string));
+								}
 								if (EREPL_SELECT == repl_errno)
-									rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-									 RTS_ERROR_LITERAL("Error sending REPL_XOFF_ACK_ME"
-									 "message. Error in select"),
-									  status);
+								{
+									SNPRINTF(err_string, sizeof(err_string),
+											"Error sending REPL_XOFF_ACK_ME.  "
+											"Error in select : %s",
+											STRERROR(status));
+									rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+									 		RTS_ERROR_STRING(err_string));
+								}
 							}
 						}
 						break;
 
 					case REPL_XON:
 						gtmsource_state = GTMSOURCE_SENDING_JNLRECS;
-						poll_time = gtmsource_poll_immediate;
+						poll_time = poll_immediate;
 						repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_XON received\n");
 						gtmsource_restart_heartbeat; /*Macro*/
 						REPL_DPRINT1("Restarting HEARTBEAT\n");
 						xon_wait_logged = FALSE;
+						/* In catchup mode, we do not receive as often as we would have in non catchup mode.
+						 * The consequence of this may be that we do not react to XOFF quickly enough,
+						 * making it worse for the replication pipe. We may end up with multiple XOFFs (with
+						 * intervening XONs) sitting on the replication pipe that are yet to be received
+						 * and processed by the source server. To avoid such a situation, on receipt of
+						 * an XON, we immediately force a check on the incoming pipe thereby draining
+						 * all pending XOFF/XONs, keeping the pipe smooth. Also, there is less likelihood
+						 * of missing a HEARTBEAT response (that is perhaps on the pipe) which may lead to
+						 * connection breakage although the pipe is alive and well.
+						 *
+						 * We will force a check regardless of mode (catchup or non catchup) as we may
+						 * be pounding the secondary even in non catchup mode
+						 */
+						force_recv_check = TRUE;
 						break;
 
 					case REPL_BADTRANS:
@@ -455,14 +584,13 @@ int gtmsource_process(void)
 						if (REPL_BADTRANS == gtmsource_msgp->type)
 						{
 							repl_log(gtmsource_log_fp, TRUE, TRUE,
-								 "REPL_BADTRANS received with SEQNO "INT8_FMT"\n",
-								 INT8_PRINT(recvd_seqno));
+							"REPL_BADTRANS received with SEQNO %llu\n", recvd_seqno);
 						} else
 						{
 							recvd_start_flags = ((repl_start_msg_ptr_t)gtmsource_msgp)->start_flags;
 							repl_log(gtmsource_log_fp, TRUE, TRUE,
-								 "REPL_START_JNL_SEQNO received with SEQNO "INT8_FMT". Possible "
-								 "crash of recvr/update process\n", INT8_PRINT(recvd_seqno));
+								 "REPL_START_JNL_SEQNO received with SEQNO %llu. Possible "
+								 "crash of recvr/update process\n", recvd_seqno);
 						}
 						break;
 
@@ -470,8 +598,15 @@ int gtmsource_process(void)
 						gtmsource_process_heartbeat((repl_heartbeat_msg_t *)gtmsource_msgp);
 						break;
 					default:
-						repl_log(gtmsource_log_fp, TRUE, TRUE, "Message of unknown type (%d) received\n",
-								gtmsource_msgp->type);
+						repl_log(gtmsource_log_fp, TRUE, TRUE, "Message of unknown type %d length %d"
+								"received, hex dump follows\n", gtmsource_msgp->type, recvd_len);
+						for (index = 0; index < MIN(recvd_len, gtmsource_msgbufsiz - REPL_MSG_HDRLEN); )
+						{
+							repl_log(gtmsource_log_fp, FALSE, FALSE, "%.2x ",
+									gtmsource_msgp->msg[index]);
+							if ((++index) % MAX_HEXDUMP_CHARS_PER_LINE == 0)
+								repl_log(gtmsource_log_fp, FALSE, FALSE, "\n");
+						}
 						break;
 				}
 			} else if (SS_NORMAL != status)
@@ -481,21 +616,27 @@ int gtmsource_process(void)
 					if (REPL_CONN_RESET(status) || ETIMEDOUT == status)
 					{
 						/* Connection reset */
+						repl_log(gtmsource_log_fp, TRUE, TRUE,
+								"Connection reset while attempting to receive from secondary\n");
 						repl_close(&gtmsource_sock_fd);
 						SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 						gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
-						REPL_DPRINT1("CONN RESET while attempting to receive from secondary\n");
 						break;
 					} else
-						rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-							  RTS_ERROR_LITERAL("Error receiving Control message from Receiver. "
-								  	    "Error in recv"), status);
+					{
+						SNPRINTF(err_string, sizeof(err_string),
+								"Error receiving Control message from Receiver. Error in recv : %s",
+								STRERROR(status));
+						rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, RTS_ERROR_STRING(err_string));
+					}
 				} else if (EREPL_SELECT == repl_errno)
-					rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-						  RTS_ERROR_LITERAL("Error receiving Control message from Receiver. "
-							  	    "Error in select"), status);
+				{
+					SNPRINTF(err_string, sizeof(err_string),
+							"Error receiving Control message from Receiver. Error in select : %s",
+							STRERROR(status));
+					rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, RTS_ERROR_STRING(err_string));
+				}
 			}
-
 			if (GTMSOURCE_WAITING_FOR_XON == gtmsource_state)
 			{
 				if (!xon_wait_logged)
@@ -507,39 +648,41 @@ int gtmsource_process(void)
 				}
 				continue;
 			}
-			if (GTMSOURCE_SEARCHING_FOR_RESTART == gtmsource_state ||
-			    gtmsource_state == GTMSOURCE_WAITING_FOR_CONNECTION)
+			if (GTMSOURCE_SEARCHING_FOR_RESTART  == gtmsource_state ||
+			    GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 			{
 				xon_wait_logged = FALSE;
 				break;
 			}
-
 			assert(gtmsource_state == GTMSOURCE_SENDING_JNLRECS);
+			if (force_recv_check) /* we want to poll the incoming pipe for possible XOFF */
+				continue;
 
-			status = gtmsource_get_jnlrecs(&gtmsource_msgp->msg[0],
-						       &data_len,
-			             	     	       gtmsource_msgbufsiz -
-						       REPL_MSG_HDRLEN);
-
+			tot_tr_len = gtmsource_get_jnlrecs(&gtmsource_msgp->msg[0], &data_len,
+							   gtmsource_msgbufsiz - REPL_MSG_HDRLEN, NO_FILTER == gtmsource_filter);
+			post_read_jnl_seqno = gtmsource_local->read_jnl_seqno;
 			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 				return (SS_NORMAL);
 			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 				break;
 
-			if (0 == status)
+			if (0 <= tot_tr_len)
 			{
 				if (0 < data_len)
 				{
 					send_msgp = gtmsource_msgp;
 					if (gtmsource_filter & EXTERNAL_FILTER)
 					{
-						QWSUBDW(filter_seqno, gtmsource_local->read_jnl_seqno, 1);
+						assert(tot_tr_len == data_len + REPL_MSG_HDRLEN); /* only ONE transaction read */
+						QWSUBDW(filter_seqno, post_read_jnl_seqno, 1);
 						if (SS_NORMAL != (status = repl_filter(filter_seqno, gtmsource_msgp->msg, &data_len,
 									     	       gtmsource_msgbufsiz)))
 							repl_filter_error(filter_seqno, status);
+						tot_tr_len = data_len + REPL_MSG_HDRLEN;
 					}
 					if (gtmsource_filter & INTERNAL_FILTER)
 					{
+						assert(tot_tr_len == data_len + REPL_MSG_HDRLEN); /* only ONE transaction read */
 						pre_intlfilter_datalen = data_len;
 						in_buff = gtmsource_msgp->msg;
 						in_size = pre_intlfilter_datalen;
@@ -563,6 +706,7 @@ int gtmsource_process(void)
 						if (SS_NORMAL == status)
 						{
 							data_len = tot_out_size + out_size;
+							tot_tr_len = data_len + REPL_MSG_HDRLEN;
 							send_msgp = (repl_msg_ptr_t)repl_filter_buff;
 						} else
 						{
@@ -581,7 +725,8 @@ int gtmsource_process(void)
 					}
 					send_msgp->type = REPL_TR_JNL_RECS;
 					send_msgp->len = data_len + REPL_MSG_HDRLEN;
-					REPL_SEND_LOOP(gtmsource_sock_fd, send_msgp, send_msgp->len, &gtmsource_poll_immediate)
+					REPL_SEND_LOOP(gtmsource_sock_fd, send_msgp, tot_tr_len, UNIX_ONLY(catchup) VMS_ONLY(TRUE),
+							&poll_immediate)
 					{
 						gtmsource_poll_actions(FALSE);
 						if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
@@ -591,65 +736,99 @@ int gtmsource_process(void)
 					{
 						if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
 						{
-							repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset\n");
+							repl_log(gtmsource_log_fp, TRUE, TRUE,
+									"Connection reset while sending transaction data\n");
 							repl_close(&gtmsource_sock_fd);
 							SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 							gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 							break;
 						}
 						if (EREPL_SEND == repl_errno)
-							rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-								  RTS_ERROR_LITERAL("Error sending DATA. Error in send"), status);
+						{
+							SNPRINTF(err_string, sizeof(err_string),
+								"Error sending DATA. Error in send : %s", STRERROR(status));
+							rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+								  RTS_ERROR_STRING(err_string));
+						}
 						if (EREPL_SELECT == repl_errno)
-							rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-								  RTS_ERROR_LITERAL("Error sending DATA. Error in select"), status);
+						{
+							SNPRINTF(err_string, sizeof(err_string),
+								"Error sending DATA. Error in select : %s", STRERROR(status));
+							rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+								  RTS_ERROR_STRING(err_string));
+						}
 					}
 					region_top = gd_header->regions + gd_header->n_regions;
 					for (reg = gd_header->regions; reg < region_top; reg++)
 					{
 						csa = &FILE_INFO(reg)->s_addrs;
 						if (REPL_ENABLED(csa->hdr))
-						{
-#ifndef INT8_SUPPORTED
-							/* To deposit correct value of resync_seqno in the file-header,
-							 * we grab_crit each time when its lower 4-bytes overflow as the
-							 * file-header sync is done in crit,*/
-							if (OVERFLOWN(gtmsource_local->read_jnl_seqno) &&
-									FALSE == (was_crit = csa->now_crit))
+						{ /* Although csa->hdr->resync_seqno is only modified by the source
+						   * server and never concurrently, it is read by fileheader_sync() which
+						   * does it while in crit. To avoid the latter from reading an inconsistent
+						   * value (i.e. neither the pre-update nor the post-update value), which is
+						   * possible if the 8-byte operation is not atomic but a sequence of two
+						   * 4-byte operations AND if the pre-update and post-update value differ in
+						   * their most significant 4-bytes, we grab crit.
+						   *
+						   * For native INT8 platforms, we expect the compiler to optimize the "if" away.
+						   *
+						   * Note: the ordering of operands in the below if check is the way it is because
+						   * a. the more frequent case is QWCHANGE_IS_READER_CONSISTENT returning TRUE.
+						   * b. source server does not hold crit coming here (but we are covering the case
+						   *    when it may)
+						   */
+							if (!QWCHANGE_IS_READER_CONSISTENT(pre_read_jnl_seqno, post_read_jnl_seqno)
+									&& FALSE == (was_crit = csa->now_crit))
 								grab_crit(reg);
-#endif
-							QWASSIGN(FILE_INFO(reg)->s_addrs.hdr->resync_seqno,
-								 gtmsource_local->read_jnl_seqno);
-#ifndef INT8_SUPPORTED
-							if (OVERFLOWN(gtmsource_local->read_jnl_seqno) && FALSE == was_crit)
+							FILE_INFO(reg)->s_addrs.hdr->resync_seqno = post_read_jnl_seqno;
+							if (!QWCHANGE_IS_READER_CONSISTENT(pre_read_jnl_seqno, post_read_jnl_seqno)
+									&& FALSE == was_crit)
 								rel_crit(reg);
-#endif
 						}
 					}
 
-					repl_source_data_sent += data_len;
-					repl_source_msg_sent += gtmsource_msgp->len;
+					repl_source_msg_sent += (qw_num)tot_tr_len;
+					repl_source_data_sent += (qw_num)(tot_tr_len) -
+								(post_read_jnl_seqno - pre_read_jnl_seqno) * REPL_MSG_HDRLEN;
 					QWASSIGN(log_seqno, lastlog_seqno);
 					QWINCRBYDW(log_seqno, LOGTRNUM_INTERVAL + 1);
-					if (QWLE(log_seqno, gtmsource_local->read_jnl_seqno))
-					{
-						QWASSIGN(log_seqno, gtmsource_local->read_jnl_seqno);
+					if (QWLE(log_seqno, post_read_jnl_seqno) || gtmsource_logstats)
+					{ /* print always when STATSLOG is ON, or when the log interval has passed */
+						QWASSIGN(log_seqno, post_read_jnl_seqno);
 						QWDECRBYDW(log_seqno, 1);
-						trans_sent_cnt += LOGTRNUM_INTERVAL;
-						QWSUB(diff_seqno, jctl->jnl_seqno, gtmsource_local->read_jnl_seqno);
-						repl_log(gtmsource_log_fp, FALSE, FALSE, "REPL INFO - Tr num : "INT8_FMT,
-							 INT8_PRINT(log_seqno));
-						repl_log(gtmsource_log_fp, FALSE, FALSE, "  Tr Total : %ld  Msg Total : %ld  ",
+						trans_sent_cnt += log_seqno - lastlog_seqno;
+						/* jctl->jnl_seqno >= post_read_jnl_seqno is the most common case;
+						 * see gtmsource_readpool() for when the rare case can occur */
+						assert(jctl->jnl_seqno >= post_read_jnl_seqno - 1);
+						diff_seqno = (jctl->jnl_seqno >= post_read_jnl_seqno) ?
+								(jctl->jnl_seqno - post_read_jnl_seqno) : 0;
+						repl_log(gtmsource_log_fp, FALSE, FALSE, "REPL INFO - Tr num : %llu", log_seqno);
+						repl_log(gtmsource_log_fp, FALSE, FALSE, "  Tr Total : %llu  Msg Total : %llu  ",
 							 repl_source_data_sent, repl_source_msg_sent);
-						repl_log(gtmsource_log_fp, FALSE, TRUE, "Current backlog : "INT8_FMT"\n",
-							 INT8_PRINT(diff_seqno));
-						repl_source_this_log_time = time(NULL);
+						repl_log(gtmsource_log_fp, FALSE, TRUE, "Current backlog : %llu\n", diff_seqno);
+						/* gtmsource_now is updated by the heartbeat protocol every heartbeat
+						 * interval. To cut down on calls to time(), we use gtmsource_now as the
+						 * time to figure out if we have to log statistics. This works well as the
+						 * logging interval generally is larger than the heartbeat interval, and that
+						 * the heartbeat protocol is running when we are sending data. The consequence
+						 * although is that we may defer logging when we would have logged. We can live
+						 * with that given the benefit of not calling time related system calls.
+						 * Currently, the logging interval is not changeable by users. When/if we provide
+						 * means of choosing log interval, this code may have to be re-examined.
+						 * Vinaya 2003, Sep 08
+						 */
+						assert(0 != gtmsource_now); /* must hold if we are sending data */
+						repl_source_this_log_time = gtmsource_now; /* approximate time, in the worst case,
+											    * behind by heartbeat interval */
+						assert(repl_source_this_log_time >= repl_source_prev_log_time);
 						time_elapsed = difftime(repl_source_this_log_time, repl_source_prev_log_time);
 						if ((double)GTMSOURCE_LOGSTATS_INTERVAL <= time_elapsed)
 						{
 							repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO since last log : "
-								 "Time elapsed : %00.f  Tr sent : %ld  Tr bytes : %ld  Msg bytes : "
-								 "%ld\n", time_elapsed, trans_sent_cnt - last_log_tr_sent_cnt,
+								 "Time elapsed : %00.f  Tr sent : %llu  Tr bytes : %llu  "
+								 "Msg bytes : %llu\n",
+								  time_elapsed, trans_sent_cnt - last_log_tr_sent_cnt,
 								 repl_source_data_sent - repl_source_lastlog_data_sent,
 								 repl_source_msg_sent - repl_source_lastlog_msg_sent);
 							repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO since last log : "
@@ -667,18 +846,13 @@ int gtmsource_process(void)
 						}
 						QWASSIGN(lastlog_seqno, log_seqno);
 					}
-					if (gtmsource_logstats)
-					{
-						QWASSIGN(diff_seqno, gtmsource_local->read_jnl_seqno);
-						QWDECRBYDW(diff_seqno, 1);
-						repl_log(gtmsource_statslog_fp, FALSE, FALSE, "Tr : "INT8_FMT"  Tr Size : %d  "
-							 "Tr Total : %d  Msg Size : %d  Msg Total : %d\n", INT8_PRINT(diff_seqno),
-							 data_len, repl_source_data_sent, gtmsource_msgp->len,
-							 repl_source_msg_sent);
-					}
+					poll_time = poll_immediate;
 				} else /* data_len == 0 */
-					SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNL_RECS);
-			} else /* else status < 0, error */
+				{
+					poll_time = poll_wait;
+					rel_quant(); /* nothing to send, give up processor and let other processes run */
+				}
+			} else /* else tot_tr_len < 0, error */
 			{
 				if (0 < data_len) /* Insufficient buffer space, increase the buffer space */
 					gtmsource_alloc_msgbuff(data_len + REPL_MSG_HDRLEN);

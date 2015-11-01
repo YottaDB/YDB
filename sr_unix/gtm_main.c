@@ -84,7 +84,7 @@ int gtm_main (int argc, char **argv, char **envp)
 		we didnot change argv[0]
 	*/
 	ptr = cli_lex_in_ptr->in_str;
-	memmove(strlen("MUMPS ") + ptr, ptr, strlen(ptr));
+	memmove(strlen("MUMPS ") + ptr, ptr, strlen(ptr) + 1);
 	memcpy(ptr, "MUMPS ", strlen("MUMPS "));
 
 	/*	reset the argument buffer pointer, it's changed in cli_gettoken() call above    */

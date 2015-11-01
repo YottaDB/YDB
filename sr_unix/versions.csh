@@ -10,16 +10,16 @@
 #################################################################
 
 #
-#######################################################################
+############################################
 #
 #
-#	versions - set default GT.M versions for Linux platforms
+#	versions - set default GT.M versions
 #
 #
-#######################################################################
+############################################
 
 #	gtm_curpro is the current production version
-setenv	gtm_curpro	"V43001D"
+setenv	gtm_curpro	"V44002"
 
 #	gtm_verno is the current production version
 setenv	gtm_verno	$gtm_curpro

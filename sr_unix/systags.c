@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,8 @@
 
 #include "mdef.h"
 
-GBLDEF int sys_nerrno = 151;
-GBLDEF char *sys_errnolist[] = { "0",
+LITDEF int sys_nerrno = 151;
+LITDEF char *sys_errnolist[] = { "0",
 "ENO1"  , "ENO2"  , "ENO3"  , "ENO4"  , "ENO5"  , "ENO6"  , "ENO7"  , "ENO8"  , "ENO9"  , "ENO10",
 "ENO11" , "ENO12" , "ENO13" , "ENO14" , "ENO15" , "ENO16" , "ENO17" , "ENO18" , "ENO19" , "ENO20",
 "ENO21" , "ENO22" , "ENO23" , "ENO24" , "ENO25" , "ENO26" , "ENO27" , "ENO28" , "ENO29" , "ENO30",

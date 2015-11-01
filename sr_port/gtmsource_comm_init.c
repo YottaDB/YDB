@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_stdio.h"
+#include "gtm_string.h"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -36,7 +39,6 @@
 
 GBLDEF	int			gtmsource_sock_fd = -1;
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	uint4			repl_max_send_buffsize, repl_max_recv_buffsize;
 
 int gtmsource_comm_init(void)
 {
@@ -44,6 +46,8 @@ int gtmsource_comm_init(void)
 
 	const	int	disable_keepalive = 0;
 	struct	linger	disable_linger = {0, 0};
+	char	error_string[1024];
+	int	err_status;
 
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
@@ -54,33 +58,31 @@ int gtmsource_comm_init(void)
 	/* Create the socket used for communicating with secondary */
 	if (-1 == (gtmsource_sock_fd = socket(AF_INET, SOCK_STREAM, 0)))
 	{
-		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error with source server socket create"), ERRNO);
+		err_status = ERRNO;
+		SNPRINTF(error_string, sizeof(error_string), "Error with source server socket create : %s", STRERROR(err_status));
+		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
 		return(-1);
 	}
 
 	/* A connection breakage should get rid of the socket */
 
-	if ( 0 > setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, sizeof(disable_linger)))
-		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error with source server socket disable linger"), ERRNO);
+	if (-1 == setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, sizeof(disable_linger)))
+	{
+		err_status = ERRNO;
+		SNPRINTF(error_string, sizeof(error_string), "Error with source server socket disable linger : %s",
+				STRERROR(err_status));
+		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
+	}
 
 #ifdef REPL_DISABLE_KEEPALIVE
-	if (0 > setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_KEEPALIVE, (const void *)&disable_keepalive,
+	if (-1 == setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_KEEPALIVE, (const void *)&disable_keepalive,
 		sizeof(disable_keepalive)))
-	{
-		/* Till SIGPIPE is handled properly */
-		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error with source server socket disable keepalive"), ERRNO);
+	{ /* Till SIGPIPE is handled properly */
+		err_status = ERRNO;
+		SNPRINTF(error_string, sizeof(error_string), "Error with source server socket disable keepalive : %s",
+				STRERROR(err_status));
+		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
 	}
 #endif
-
-	if (0 > get_sock_buff_size(gtmsource_sock_fd, &repl_max_send_buffsize, &repl_max_recv_buffsize))
-	{
-		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error getting socket send/recv buffsizes"), ERRNO);
-		return -1;
-	}
-
 	return(0);
 }

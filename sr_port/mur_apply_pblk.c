@@ -127,7 +127,7 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 			0, murgbl.token_table.count, murgbl.broken_cnt);
 		for (status = mur_prev(mur_jctl->rec_offset); SS_NORMAL == status; status = mur_prev_rec())
 		{
-			if (apply_intrpt_pblk && !mur_jctl->jfh->recover_interrupted && NULL == rctl->jctl_alt_head)
+			if (apply_intrpt_pblk && NULL == rctl->jctl_alt_head && !mur_jctl->jfh->recover_interrupted)
 			{
 				assert(NULL != mur_jctl->next_gen);
 				assert(mur_jctl->next_gen->jfh->recover_interrupted);

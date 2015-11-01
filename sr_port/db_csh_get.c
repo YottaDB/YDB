@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,31 +36,26 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 	cache_rec_ptr_t			cr, cr_hash_base;
 	int				blk_hash, lcnt, ocnt, hmax;
 	bool				is_mm;
-	DEBUG_ONLY(cache_rec_ptr_t	cr_low;
-		   cache_rec_ptr_t	cr_high;
-		  )
+	cache_rec_ptr_t			cr_low, cr_high;
 
 	csa = cs_addrs;
 	csd = csa->hdr;
 	is_mm = (dba_mm == csd->acc_meth);
 	assert((FALSE == is_mm) || (csa->now_crit));	/* if MM you should be in crit */
+	VMS_ONLY(assert(FALSE == is_mm);)	/* in VMS, MM should never call db_csh_get */
 	hmax = csd->bt_buckets;
 	blk_hash = (block % hmax);
 	if (!is_mm)
 	{
-		DEBUG_ONLY(cr_low = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
-			   cr_high = cr_low + csd->n_bts;
-		)
+		cr_low = &csa->acc_meth.bg.cache_state->cache_array[0];
+		cr_high = cr_low + csd->bt_buckets + csd->n_bts;
 		cr_hash_base = csa->acc_meth.bg.cache_state->cache_array + blk_hash;
-	}
-	else
+	} else
 	{
-		DEBUG_ONLY(cr_low = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets);
-			   cr_high = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets + csd->n_bts);
-			  )
+		cr_low = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array);
+		cr_high = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets + csd->n_bts);
 		cr_hash_base = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + blk_hash);
 	}
-
 	ocnt = 0;
 	do
 	{
@@ -70,9 +65,14 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 		do
 		{
 			cr = (cache_rec_ptr_t)((sm_uc_ptr_t)cr + cr->blkque.fl);
+			assert(!CR_NOT_ALIGNED(cr, cr_low) && !CR_NOT_IN_RANGE(cr, cr_low, cr_high));
+			if (CR_NOT_ALIGNED(cr, cr_low) || CR_NOT_IN_RANGE(cr, cr_low, cr_high))
+			{	/* safeguard against corruption to the cache causing out-of-design values of cr->blkque.fl above */
+				BG_TRACE_PRO_ANY(csa, wc_blocked_db_csh_get_bad_cr);
+				return (cache_rec_ptr_t)CR_NOTVALID;	/* wc_blocked will be set by caller */
+			}
 			if (BT_QUEHEAD == cr->blk)
-			{
-				/* We have reached the end of the queue, validate we have run the queue
+			{	/* We have reached the end of the queue, validate we have run the queue
 				 * back around to the same queue header or we'll need to retry because the
 				 * queue changed on us.
 				 */
@@ -80,7 +80,6 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 					return (cache_rec_ptr_t)NULL;
 				break;			/* Retry - something changed */
 			}
-			assert((cr < cr_high) && (cr >= cr_low));
 			if ((CR_BLKEMPTY != cr->blk) && ((cr->blk % hmax) != blk_hash))
 				break;			/* Retry - something changed */
 			assert((0 != cr->blkque.fl) && (0 != cr->blkque.bl));

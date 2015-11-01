@@ -33,6 +33,7 @@ GDEINIT
 	s glo("AIX325")=glo("AIX")
 	s HEX(0)=1
 	f x=1:1:8 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
+	s TWO(26)=TWO(24)*4
 	s TWO(31)=TWO(32)*.5
 	s lower="abcdefghijklmnopqrstuvwxyz",upper="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	s endian=endian($p($zver," ",4))
@@ -94,12 +95,12 @@ GDEINIT
 ; bg
 	s minseg("BG","ALLOCATION")=10,minseg("BG","BLOCK_SIZE")=SIZEOF("dsk_blk"),minseg("BG","EXTENSION_COUNT")=0
 	s minseg("BG","GLOBAL_BUFFER_COUNT")=64,minseg("BG","LOCK_SPACE")=10,minseg("BG","RESERVED_BYTES")=0
-	s maxseg("BG","ALLOCATION")=TWO(24),(maxseg("BG","BLOCK_SIZE"),maxseg("BG","RESERVED_BYTES"))=HEX(4)-SIZEOF("dsk_blk")
+	s maxseg("BG","ALLOCATION")=TWO(26),(maxseg("BG","BLOCK_SIZE"),maxseg("BG","RESERVED_BYTES"))=HEX(4)-SIZEOF("dsk_blk")
 	s maxseg("BG","EXTENSION_COUNT")=HEX(4)-1,maxseg("BG","GLOBAL_BUFFER_COUNT")=65536,maxseg("BG","LOCK_SPACE")=1000
 ; mm
 	s minseg("MM","ALLOCATION")=10,minseg("MM","BLOCK_SIZE")=SIZEOF("dsk_blk"),minseg("MM","DEFER")=0
 	s minseg("MM","LOCK_SPACE")=10,minseg("MM","EXTENSION_COUNT")=0,minseg("MM","RESERVED_BYTES")=0
-	s maxseg("MM","ALLOCATION")=TWO(24),(maxseg("MM","BLOCK_SIZE"),maxseg("BG","RESERVED_BYTES"))=HEX(4)-SIZEOF("dsk_blk")
+	s maxseg("MM","ALLOCATION")=TWO(26),(maxseg("MM","BLOCK_SIZE"),maxseg("BG","RESERVED_BYTES"))=HEX(4)-SIZEOF("dsk_blk")
 	s maxseg("MM","DEFER")=86400,maxseg("MM","LOCK_SPACE")=1000,maxseg("MM","EXTENSION_COUNT")=HEX(4)-1
 	q
 

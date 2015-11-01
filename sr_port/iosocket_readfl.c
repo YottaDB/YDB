@@ -161,7 +161,7 @@ short	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	dsocketptr->dollar_key[0] = '\0';
 	iod->dollar.zb[0] = '\0';
 
-	bufflen_init = MAX_STRLEN_INIT;
+	bufflen_init = MAX_STRBUFF_INIT;
 	max_bufflen = (vari) ? bufflen_init : width;
 	if (stringpool.free + max_bufflen > stringpool.top)
 		stp_gcol(max_bufflen);

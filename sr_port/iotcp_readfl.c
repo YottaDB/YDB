@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,9 @@ static int fcntl_res;
 #include "stringpool.h"
 #include "wake_alarm.h"
 
+/* Maximum we will read in one read for this device */
+#define MAX_READLEN 32767
+
 GBLREF	io_pair			io_curr_device;
 GBLREF	bool			out_of_time;
 GBLREF	spdesc			stringpool;
@@ -41,13 +44,13 @@ GBLREF	tcp_library_struct	tcp_routines;
 GBLREF	int4			outofband;
 
 short	iotcp_readfl(mval *v, int4 width, int4 timeout)
-					/* 0 == width is a flag that the caller is read and the length is not actually fixed */
-					/* timeout in seconds */
+/* 0 == width is a flag that the caller is read and the length is not actually fixed */
+/* timeout in seconds */
 {
 	/* VMS uses the UCX interface; should support others that emulate it */
-	bool		ret, timed, vari;
+	boolean_t	ret, timed, vari;
 	int		flags, len, real_errno, save_errno;
-	short int	i;
+	int		i;
 	io_desc		*io_ptr;
 	d_tcp_struct	*tcpptr;
 	int4		status;
@@ -71,11 +74,11 @@ short	iotcp_readfl(mval *v, int4 width, int4 timeout)
 	if (0 == width)
 	{	/* op_readfl won't do this; must be a call from iotcp_read */
 		vari = TRUE;
-		width = MAX_STRLEN;
+		width = MAX_READLEN;
 	} else
 	{
 		vari = FALSE;
-		width = (width < MAX_STRLEN) ? width : MAX_STRLEN;
+		width = (width < MAX_READLEN) ? width : MAX_READLEN;
 	}
 	if (stringpool.free + width > stringpool.top)
 		stp_gcol(width);
@@ -162,12 +165,11 @@ short	iotcp_readfl(mval *v, int4 width, int4 timeout)
 		if (status < 0)
 		{
 			if (EINTR == errno && FALSE == out_of_time)
-			{				/* interrupted by a signal which is not OUR timer, continue looping */
+			{	/* interrupted by a signal which is not OUR timer, continue looping */
 				status = 0;
-			}else
+			} else
 				real_errno = errno;
-		}
-		else
+		} else
 			real_errno = 0;
 		if (outofband)
 			break;

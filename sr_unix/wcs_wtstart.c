@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,10 +79,9 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	sm_uc_ptr_t		blk_ptr;
 	uint4			saved_dsk_addr;
 	unix_db_info		*udi;
+	cache_rec_ptr_t		cr, cr_lo, cr_hi;
 	static	int4		error_message_loop_count = 0;
 
-	error_def(ERR_ERRCALL);
-	error_def(ERR_DBCCERR);
 	error_def(ERR_DBFILERR);
 	error_def(ERR_JNLFSYNCERR);
 	error_def(ERR_TEXT);
@@ -136,11 +135,15 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			}
 		}
 		ahead = &csa->acc_meth.bg.cache_state->cacheq_active;
+		cr_lo = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
+		cr_hi = cr_lo + csd->n_bts;
 	} else
 	{
 		ahead = &csa->acc_meth.mm.mmblk_state->mmblkq_active;
 		if (cnl->mm_extender_pid == process_id)
 			max_writes = max_ent;		/* allow file extender or rundown to write everything out */
+		cr_lo = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets);
+		cr_hi = (cache_rec_ptr_t)(csa->acc_meth.mm.mmblk_state->mmblk_array + csd->bt_buckets + csd->n_bts);
 	}
 	assert(((sm_long_t)ahead & 7) == 0);
 	queue_empty = FALSE;
@@ -150,11 +153,13 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		assert(FALSE == csa->wbuf_dqd);
 		csa->wbuf_dqd = TRUE;			/* Tell rundown we have an orphaned block in case of interrupt */
 		csr = (cache_state_rec_ptr_t)REMQHI((que_head_ptr_t)ahead);
-		if (CR_NOTVALID == (sm_long_t)csr)
-		{					/* shouldn't be on the queue unless it's valid */
-			csa->wbuf_dqd = FALSE;
+		if (INTERLOCK_FAIL == (int4)csr)
+		{
 			assert(FALSE);
-			continue;			/* in production, it's off the queue, so just go on */
+			SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+			BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail1);
+			csa->wbuf_dqd = FALSE;
+			break;
 		}
 		if (NULL == csr)
 		{
@@ -165,8 +170,21 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		{					/* completed a tour of the queue */
 			queue_empty = FALSE;
 			n = INSQTI((que_ent_ptr_t)csr, (que_head_ptr_t)ahead);
-			if (n == INTERLOCK_FAIL)
-				rts_error(VARLSTCNT(9) ERR_DBCCERR, 2, DB_LEN_STR(region), ERR_ERRCALL, 3, CALLFROM);
+			if (INTERLOCK_FAIL == n)
+			{
+				assert(FALSE);
+				SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+				BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail2);
+			}
+			csa->wbuf_dqd = FALSE;
+			break;
+		}
+		cr = (cache_rec_ptr_t)((sm_uc_ptr_t)csr - sizeof(cr->blkque));
+		if (CR_NOT_ALIGNED(cr, cr_lo) || CR_NOT_IN_RANGE(cr, cr_lo, cr_hi))
+		{
+			assert(FALSE);
+			SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+			BG_TRACE_PRO_ANY(csa, wc_blocked_wcs_wtstart_bad_cr);
 			csa->wbuf_dqd = FALSE;
 			break;
 		}
@@ -192,19 +210,21 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
                                 need_jnl_sync = (csr->jnl_addr > jb->fsync_dskaddr);
                                 assert(!need_jnl_sync || jpc->channel != NOJNL || cnl->wcsflu_pid != process_id);
 				got_lock = FALSE;
-                                if ((csr->jnl_addr > jb->dskaddr) ||
-				    (need_jnl_sync && (NOJNL == jpc->channel ||
-						       (FALSE == (got_lock = GET_SWAPLOCK(&jb->fsync_in_prog_latch)))
-						       )
-				     )
-				    )
+                                if ((csr->jnl_addr > jb->dskaddr)
+					|| (need_jnl_sync && (NOJNL == jpc->channel
+								|| (FALSE == (got_lock = GET_SWAPLOCK(&jb->fsync_in_prog_latch))))))
                                 {
                                         if (need_jnl_sync)
                                                 BG_TRACE_PRO_ANY(csa, n_jnl_fsync_tries);
 					n = INSQTI((que_ent_ptr_t)csr, (que_head_ptr_t)ahead);
                                         if (n == INTERLOCK_FAIL)
-                                                rts_error(VARLSTCNT(9) ERR_DBCCERR, 2, DB_LEN_STR(region),
-											ERR_ERRCALL, 3, CALLFROM);
+					{
+						assert(FALSE);
+						SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+						BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail3);
+						csa->wbuf_dqd = FALSE;
+						break;
+					}
                                         csa->wbuf_dqd = FALSE;
                                         if (csrfirst == NULL)
                                                 csrfirst = csr;
@@ -307,7 +327,13 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
                                 n = INSQTI((que_ent_ptr_t)csr, (que_head_ptr_t)ahead);
 				if (n == INTERLOCK_FAIL)
-					rts_error(VARLSTCNT(9) ERR_DBCCERR, 2, DB_LEN_STR(region), ERR_ERRCALL, 3, CALLFROM);
+				{
+					assert(FALSE);
+					SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+					BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail4);
+					csa->wbuf_dqd = FALSE;
+					break;
+				}
 				csa->wbuf_dqd = FALSE;
 				/* note: this will be automatically retried after csd->flush_time[0] msec, if this was called
 				 * through a timer-pop, otherwise, error should be handled (including ignored) by the caller.

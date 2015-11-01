@@ -67,6 +67,7 @@
 #include "send_msg.h"
 #include "add_inter.h"
 #include "t_qread.h"
+#include "memcoherency.h"
 
 GBLREF	short			dollar_tlevel;
 GBLREF	bool			update_trans;
@@ -182,35 +183,17 @@ boolean_t	tp_tend(boolean_t crit_only)
 		/* We are still out of crit if this is not our last attempt. If so, run the region list and check
 		 * that we have sufficient free blocks for our update. If not, get them now while we can.
 		 * We will repeat this check later in crit but it will hopefully have little or nothing to do.
-		 * Only unix for now -- VMS can't deal yet.
 		 */
-		UNIX_ONLY(
-			for (si = first_sgm_info;  (NULL != si);  si = si->next_sgm_info)
-			{
-				TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
-				csa = cs_addrs;
-				if (csa->now_crit)  /* bypass 1st check if already in crit -- check later */
-					continue;
-				csd = cs_data;
-				is_mm = (dba_mm == csd->acc_meth);
-				if (!is_mm && (NULL != si->first_cw_set))
-				{
-					if (csa->nl->wc_in_free < si->cw_set_depth + 1)
-					{
-						if (!wcs_get_space(si->gv_cur_region, si->cw_set_depth + 1, NULL))
-						{
-							SET_TRACEABLE_VAR(csd->wc_blocked,TRUE);
-							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_wcsgetspace);
-							status = cdb_sc_cacheprob;
-							TP_TRACE_HIST(CR_BLKEMPTY, NULL);
-							t_fail_hist[t_tries] = status;
-							TP_RETRY_ACCOUNTING(csd, status);
-							return FALSE;
-						}
-					}
-				}
-			}
-		)
+		for (si = first_sgm_info;  (NULL != si);  si = si->next_sgm_info)
+		{
+			TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
+			if (cs_addrs->now_crit)  /* bypass 1st check if already in crit -- check later */
+				continue;
+			is_mm = (dba_mm == cs_data->acc_meth);
+			if (!is_mm && (NULL != si->first_cw_set) && (cs_addrs->nl->wc_in_free < si->cw_set_depth + 1)
+					&& !wcs_get_space(si->gv_cur_region, si->cw_set_depth + 1, NULL))
+				assert(FALSE);	/* wcs_get_space() should have returned TRUE unconditionally in this case */
+		}
 	}
 	ESTABLISH_RET(t_ch, FALSE);
 	/* the following section grabs crit in all regions touched by the transaction. We use a different
@@ -252,7 +235,8 @@ boolean_t	tp_tend(boolean_t crit_only)
 					assert(FALSE);
 					status = cdb_sc_needcrit;	/* break the possible deadlock by signalling a restart */
 					t_fail_hist[t_tries] = status;
-					TP_RETRY_ACCOUNTING(csd, status);
+					SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(tcsa, status);
+					TP_RETRY_ACCOUNTING(tcsa, tcsa->hdr, status);
 					TP_TRACE_HIST(CR_BLKEMPTY, NULL);
 					return FALSE;
 				}
@@ -356,7 +340,7 @@ boolean_t	tp_tend(boolean_t crit_only)
 				csa->backup_in_prog = !csa->backup_in_prog;	/* reset csa->backup_in_prog to current state */
 			}
 			if (!is_mm)
-			{
+			{	/* in crit, ensure cache-space is available. the out-of-crit check done above might not be enough */
 				if (csa->nl->wc_in_free < si->cw_set_depth + 1)
 				{
 					if (!wcs_get_space(si->gv_cur_region, si->cw_set_depth + 1, NULL))
@@ -365,7 +349,8 @@ boolean_t	tp_tend(boolean_t crit_only)
 						SET_TRACEABLE_VAR(csd->wc_blocked,TRUE);
 						BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_wcsgetspace);
 						status = cdb_sc_cacheprob;
-						TP_RETRY_ACCOUNTING(csd, status);
+						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+						TP_RETRY_ACCOUNTING(csa, csd, status);
 						TP_TRACE_HIST(CR_BLKEMPTY, NULL);
 						goto failed;
 					}
@@ -401,7 +386,8 @@ boolean_t	tp_tend(boolean_t crit_only)
 						|| (cdb_sc_normal != recompute_upd_array(t1, cse)) || !++leafmods)
 					{
 						status = cdb_sc_blkmod;
-						TP_RETRY_ACCOUNTING(csd, status);
+						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+						TP_RETRY_ACCOUNTING(csa, csd, status);
 						TP_TRACE_HIST(t1->blk_num, tp_get_target(t1->buffaddr));
 						DEBUG_ONLY(continue;)
 						goto failed;
@@ -464,7 +450,8 @@ boolean_t	tp_tend(boolean_t crit_only)
 									continue;
 							}
 							status = cdb_sc_blkmod;
-							TP_RETRY_ACCOUNTING(csd, status);
+							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+							TP_RETRY_ACCOUNTING(csa, csd, status);
 							TP_TRACE_HIST_MOD(t1->blk_num, tp_get_target(t1->buffaddr),
 									tp_blkmod_tp_tend, csd, t1->tn, bt->tn, t1->level);
 							DEBUG_ONLY(continue;)
@@ -475,7 +462,8 @@ boolean_t	tp_tend(boolean_t crit_only)
 				{
 					assert(CDB_STAGNATE > t_tries);
 					status = cdb_sc_losthist;
-					TP_RETRY_ACCOUNTING(csd, status);
+					SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+					TP_RETRY_ACCOUNTING(csa, csd, status);
 					TP_TRACE_HIST(t1->blk_num, tp_get_target(t1->buffaddr));
 					DEBUG_ONLY(continue;)
 					goto failed;
@@ -490,10 +478,16 @@ boolean_t	tp_tend(boolean_t crit_only)
 					else
 					{
 						cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
-						if (cr && (cr->blk != bt->blk))
+						if ((NULL != cr) && (cr->blk != bt->blk))
 						{
+							assert(FALSE);
 							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-							GTMASSERT;
+							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_crbtmismatch1);
+							status = cdb_sc_crbtmismatch;
+							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+							TP_RETRY_ACCOUNTING(csa, csd, status);
+							TP_TRACE_HIST(t1->blk_num, tp_get_target(t1->buffaddr));
+							goto failed;
 						}
 					}
 					if ((cache_rec_ptr_t)CR_NOTVALID == cr)
@@ -501,7 +495,8 @@ boolean_t	tp_tend(boolean_t crit_only)
 						SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 						BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_t1);
 						status = cdb_sc_cacheprob;
-						TP_RETRY_ACCOUNTING(csd, status);
+						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+						TP_RETRY_ACCOUNTING(csa, csd, status);
 						TP_TRACE_HIST(t1->blk_num, tp_get_target(t1->buffaddr));
 						goto failed;
 					}
@@ -510,14 +505,21 @@ boolean_t	tp_tend(boolean_t crit_only)
 						if ((NULL == cr) || (cr->cycle != t1->cycle) ||
 							((sm_long_t)GDS_ANY_REL2ABS(csa, cr->buffaddr) != (sm_long_t)t1->buffaddr))
 						{
-							if (cr && bt &&(cr->blk != bt->blk))
+							if ((NULL != cr) && (NULL != bt) && (cr->blk != bt->blk))
 							{
+								assert(FALSE);
 								SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-								GTMASSERT;
+								BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_crbtmismatch2);
+								status = cdb_sc_crbtmismatch;
+								SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+								TP_RETRY_ACCOUNTING(csa, csd, status);
+								TP_TRACE_HIST(t1->blk_num, tp_get_target(t1->buffaddr));
+								goto failed;
 							}
 							assert(CDB_STAGNATE > t_tries);
 							status = cdb_sc_lostcr;
-							TP_RETRY_ACCOUNTING(csd, status);
+							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+							TP_RETRY_ACCOUNTING(csa, csd, status);
 							TP_TRACE_HIST(t1->blk_num, NULL == cr ? NULL : tp_get_target(t1->buffaddr));
 							DEBUG_ONLY(continue;)
 							goto failed;
@@ -568,7 +570,8 @@ boolean_t	tp_tend(boolean_t crit_only)
 				{
 					assert(CDB_STAGNATE > t_tries);
 					status = cdb_sc_bmlmod;
-					TP_RETRY_ACCOUNTING(csd, status);
+					SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+					TP_RETRY_ACCOUNTING(csa, csd, status);
 					TP_TRACE_HIST(cse->blk, NULL);
 					goto failed;
 				}
@@ -583,16 +586,18 @@ boolean_t	tp_tend(boolean_t crit_only)
 					{
 						assert(CDB_STAGNATE > t_tries);
 						status = cdb_sc_bmlmod;
-						TP_RETRY_ACCOUNTING(csd, status);
-						TP_TRACE_HIST(cse->blk, NULL);
+						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+						TP_RETRY_ACCOUNTING(csa, csd, status);
+						TP_TRACE_HIST(tp_blk, NULL);
 						goto failed;
 					}
 				} else if (cse->tn <= tnque_earliest_tn)
 				{
 					assert(CDB_STAGNATE > t_tries);
 					status = cdb_sc_lostbmlhist;
-					TP_RETRY_ACCOUNTING(csd, status);
-					TP_TRACE_HIST(cse->blk, NULL);
+					SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+					TP_RETRY_ACCOUNTING(csa, csd, status);
+					TP_TRACE_HIST(tp_blk, NULL);
 					goto failed;
 				}
 				TRAVERSE_TO_LATEST_CSE(cse);
@@ -603,8 +608,9 @@ boolean_t	tp_tend(boolean_t crit_only)
 					if ((cache_rec_ptr_t)CR_NOTVALID == cr)
 					{
 						status = cdb_sc_cacheprob;
-						TP_RETRY_ACCOUNTING(csd, status);
-						TP_TRACE_HIST(cse->blk, cse->blk_target);
+						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+						TP_RETRY_ACCOUNTING(csa, csd, status);
+						TP_TRACE_HIST(tp_blk, NULL);
 						SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 						BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_bitmap);
 						goto failed;
@@ -614,8 +620,14 @@ boolean_t	tp_tend(boolean_t crit_only)
 					cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
 					if (cr->blk != bt->blk)
 					{
+						assert(FALSE);
 						SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-						GTMASSERT;
+						BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_crbtmismatch3);
+						status = cdb_sc_crbtmismatch;
+						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+						TP_RETRY_ACCOUNTING(csa, csd, status);
+						TP_TRACE_HIST(tp_blk, NULL);
+						goto failed;
 					}
 				}
 				if ((NULL == cr) || (cr->cycle != cse->cycle) ||
@@ -623,8 +635,9 @@ boolean_t	tp_tend(boolean_t crit_only)
 				{
 					assert(CDB_STAGNATE > t_tries);
 					status = cdb_sc_lostbmlcr;
-					TP_RETRY_ACCOUNTING(csd, status);
-					TP_TRACE_HIST(cse->blk, NULL);
+					SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+					TP_RETRY_ACCOUNTING(csa, csd, status);
+					TP_TRACE_HIST(tp_blk, NULL);
 					goto failed;
 				}
 				assert(si->cr_array_index < si->cr_array_size);
@@ -679,7 +692,8 @@ boolean_t	tp_tend(boolean_t crit_only)
 						status = cdb_sc_cacheprob;
 						SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 						BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_jnl_cwset);
-						TP_RETRY_ACCOUNTING(csd, status);
+						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+						TP_RETRY_ACCOUNTING(csa, csd, status);
 						goto failed;
 					}
 					if ((NULL == cr) || (0 <= cr->read_in_progress))
@@ -687,7 +701,8 @@ boolean_t	tp_tend(boolean_t crit_only)
 						TP_TRACE_HIST(cse->blk, cse->blk_target);
 						assert(CDB_STAGNATE > t_tries);
 						status = cdb_sc_lostbefor;
-						TP_RETRY_ACCOUNTING(csd, status);
+						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+						TP_RETRY_ACCOUNTING(csa, csd, status);
 						goto failed;
 					}
 					assert(si->cr_array_index < si->cr_array_size);
@@ -727,6 +742,13 @@ boolean_t	tp_tend(boolean_t crit_only)
 		assert(jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY == 0);
 		assert(QWEQ(jpl->early_write_addr, jpl->write_addr));
 		QWADDDW(jpl->early_write_addr, jpl->write_addr, jgbl.cumul_jnl_rec_len);
+		/* Source server does not read in crit. It relies on early_write_addr, the transaction
+		 * data, lastwrite_len, write_addr being updated in that order. To ensure this order,
+		 * we have to force out early_write_addr to its coherency point now. If not, the source
+		 * server may read data that is overwritten (or stale). This is true only on
+		 * architectures and OSes that allow unordered memory access
+		 */
+		COMMIT_SHM_UPDATES;
 	}
 	first_time = TRUE;
 	for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
@@ -793,7 +815,8 @@ boolean_t	tp_tend(boolean_t crit_only)
 							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_jnl_wcsflu);
 							status = t_fail_hist[t_tries] = cdb_sc_cacheprob;
-							TP_RETRY_ACCOUNTING(csd, status);
+							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+							TP_RETRY_ACCOUNTING(csa, csd, status);
 							TP_TRACE_HIST(CR_BLKEMPTY, NULL);
 							t_commit_cleanup(status, 0);
 							goto failed;
@@ -919,6 +942,17 @@ boolean_t	tp_tend(boolean_t crit_only)
 		jnl_header->jnldata_len = jgbl.cumul_jnl_rec_len;
 		jnl_header->prev_jnldata_len = jpl->lastwrite_len;
 		jpl->lastwrite_len = jnl_header->jnldata_len;
+		/* For systems with UNORDERED memory access (example, ALPHA), on a multi processor system,
+		 * it is possible that the source server notices the change in write_addr
+		 * before seeing the change to jnlheader->jnldata_len, leading it to read an invalid
+		 * transaction length. To avoid such conditions, we should commit the order of shared
+		 * memory updates before we update write_addr. This ensures that the source server sees all
+		 * shared memory updates related to a transaction before the change in write_addr
+		 *
+		 * Read Alpha Architecture Reference Manual, edited by Richard L Sites, Chapter "System
+		 * Architecture and Programming Implications" for memory coherency issues.
+		 */
+		COMMIT_SHM_UPDATES;
 		QWINCRBYDW(jpl->write_addr, jnl_header->jnldata_len);
 		jpl->write = tjpl->write;
 		QWASSIGN(jpl->jnl_seqno, tjpl->jnl_seqno);			/* End atomic stmnts */

@@ -22,8 +22,8 @@ GBLREF bool	dec_nofac;
 #if !defined(__MVS__) && !defined(__linux__)
 GBLREF int	sys_nerr;
 #endif
-GBLREF char	*sys_errnolist[];
-GBLREF int	sys_nerrno;
+LITREF char	*sys_errnolist[];
+LITREF int	sys_nerrno;
 
 
 #ifdef	__osf__
@@ -43,7 +43,8 @@ extern char	*sys_errlist[];
 void	gtm_getmsg (int4 msgnum, mstr *msgbuf)
 {
 	short int	m_len, faclen, taglen, j, sever;
-	char 		*cp, *top, *msgp, *fac, *tag;
+	char 		*cp;
+	const char 	*top, *msgp, *fac, *tag;
 	const err_msg	*msg;
 	const err_ctl	*ctl;
 

@@ -441,13 +441,15 @@ typedef struct
 	hentry = ht_put(&murgbl.token_table, (mname *)&(multi->token), &new);			\
 	assert(new || NULL != hentry->ptr);							\
 	if (!new && hentry->ptr)								\
-		multi->next = (struct multi_struct *)hentry->ptr;				\
+		multi->next = (multi_struct *)hentry->ptr;					\
 	else											\
 		multi->next = NULL;								\
 	hentry->ptr = (char *)multi;								\
 	if (rec_partner)									\
 		murgbl.broken_cnt = murgbl.broken_cnt + 1;					\
 }
+
+#define	MUR_WITHIN_ERROR_LIMIT(err_cnt, error_limit) ((++err_cnt <= error_limit) || (mur_options.interactive && mur_interactive()))
 
 #if defined(UNIX)
 #define MUR_TOKEN_LOOKUP(token, pid, image_count, rec_time, fence) mur_token_lookup(token, pid, rec_time, fence)

@@ -24,6 +24,9 @@
 #define MAX_CLI_ERR_STR	256	/* Max error string length */
 #define MAX_LINE	32767+256	/* Max line len , maximum record size plus some overhead */
 
+#define PARM_OVHD 	32	/* Parameter overhead value */
+
+
 #define VAL_N_A		0	/* value type not applicable */
 #define VAL_STR		1	/* String value type */
 #define VAL_NUM		2	/* Number */
@@ -112,8 +115,9 @@ typedef struct
 #pragma pointer_size (restore)
 #endif
 
-	char    in_str[MAX_LINE];       /* input string buffer */
-	char    *tp;                    /* token pointer */
+	char    *tp;            /* token pointer */
+	int	buflen;		/* length of in_str */
+	char    in_str[1];	/* input string buffer. The real length is computed and added to this block */
 } IN_PARMS;
 
 /* include platform independent prototypes */

@@ -70,7 +70,7 @@ char 	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char *ext_buff)
 
 char	*jnl2ext(char *jnl_buff, char *ext_buff)
 {
-	char		*curr, *val_ptr, *ptr, rectype, key_buff[sizeof(gv_key) + MAX_KEY_SZ + 8];
+	char		*curr, *val_ptr, *ptr, rectype, key_buff[sizeof(gv_key) + MAX_KEY_SZ + 7];
 	jnl_record	*rec;
 	gv_key		*key;
 	jnl_string	*keystr;

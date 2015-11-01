@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -124,6 +124,9 @@ void	op_dmode(void)
 		save_reg = gv_cur_region;
 		for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 		{
+			assert(tr->reg->open);
+			if (!tr->reg->open)
+				continue;
 			gv_cur_region = tr->reg;
 			tp_change_reg();
 			if (TRUE == cs_addrs->now_crit)

@@ -35,8 +35,31 @@ GBLREF 	mur_rab_t	mur_rab;
 GBLREF	jnl_ctl_list	*mur_jctl;
 GBLREF	reg_ctl_list	*mur_ctl;
 GBLREF	mur_read_desc_t	mur_desc;
-/*
- * This routine reads a PINI record from a Journal file.
+GBLREF	mur_opt_struct  mur_options;
+
+#define	PROCEED_IF_EXTRACT_SHOW_VERIFY(pini_addr, plst, pplst)								\
+{	/* allow EXTRACT/SHOW/VERIFY to proceed after printing BAD PINI error if error_limit permits.			\
+	 * the way we proceed is by returning as if pini_addr was the first journal record in the file.			\
+	 * this is guaranteed to be a PINI record because of the way GT.M create journal files.				\
+	 */														\
+	boolean_t		proceed;										\
+	GBLREF 	mur_gbls_t	murgbl;											\
+	GBLREF	mur_opt_struct  mur_options;										\
+															\
+	proceed = MUR_WITHIN_ERROR_LIMIT(murgbl.err_cnt, mur_options.error_limit);	/* increments murgbl.err_cnt */	\
+	if (!proceed || mur_options.update)	/* RECOVER/ROLLBACK should not proceed even if error_limit permits */	\
+		return ERR_JNLBADRECFMT;										\
+	pini_addr = JNL_FILE_FIRST_RECORD;										\
+	if (NULL != (plst = (pini_list_struct *)lookup_hashtab_ent(mur_jctl->pini_list, (void *)pini_addr, &dummy)))	\
+	{														\
+		*pplst = plst;												\
+		return SS_NORMAL;											\
+	}														\
+	/* at this point we have a bad PINI record in the beginning of the journal file, we probably should GTMASSERT */\
+	return ERR_JNLBADRECFMT;											\
+}
+
+/* This routine reads a PINI record from a Journal file.
  * If it is not already in the hash table, it saves it in the hash table,
  * For success pplst = (pointer to the pini_list_struct structure) is updated.
  * For success it returns SS_NORMAL. Else error code is returned.
@@ -64,7 +87,9 @@ uint4	mur_get_pini(off_jnl_t pini_addr, pini_list_struct **pplst)
 	{
 		gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, mur_jctl->rec_offset);
 		gtm_putmsg(VARLSTCNT(5) ERR_JNLREAD, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, pini_addr);
-		return ERR_JNLBADRECFMT;
+		assert(FALSE);
+		murgbl.wrn_count++;
+		PROCEED_IF_EXTRACT_SHOW_VERIFY(pini_addr, plst, pplst);
 	}
 	mur_rab.pinirec = (struct_jrec_pini *)(mur_desc.random_buff.base + (pini_addr - mur_desc.random_buff.dskaddr));
 	/* Verify that it's actually a PINI record */
@@ -74,7 +99,9 @@ uint4	mur_get_pini(off_jnl_t pini_addr, pini_list_struct **pplst)
 		gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, mur_jctl->rec_offset);
 		if (JRT_PINI != mur_rab.pinirec->prefix.jrec_type)
 			gtm_putmsg(VARLSTCNT(5) ERR_NOPINI, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, pini_addr);
-		return ERR_JNLBADRECFMT;
+		assert(FALSE);
+		murgbl.wrn_count++;
+		PROCEED_IF_EXTRACT_SHOW_VERIFY(pini_addr, plst, pplst);
 	}
 	/* Insert it into the list */
 	plst = (pini_list_struct *)get_new_element(murgbl.pini_buddy_list, 1);

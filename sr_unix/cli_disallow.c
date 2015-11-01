@@ -183,6 +183,7 @@ boolean_t check_disallow(CLI_ENTRY *pparm)
 	qual_disallow_func = pparm->disallow_func;
 	if (NULL == qual_disallow_func)
 		return TRUE;
+	assert(NULL != pparm->parms);	/* should never add a line in *_cmd.c with a disallow function and no sub-qualifiers */
 	/* Copy the error string ahead of time */
 	SPRINTF(cli_err_str, "Missing or illegal combination of command elements - check documentation:");
 	/* point to the end so that individual disallow functions can fill it */

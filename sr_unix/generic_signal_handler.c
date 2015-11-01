@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -125,8 +125,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				forced_exit_err = ERR_GTMSECSHRSHUTDOWN;
 			else
 				forced_exit_err = ERR_FORCEDHALT;
-			/* If nothing pending AND we have crit, wait to invoke shutdown */
-			if (EXIT_PENDING_TOLERANT >= exit_state && 0 != have_crit(CRIT_HAVE_ANY_REG))
+			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
+			if (EXIT_PENDING_TOLERANT >= exit_state && (0 != have_crit(CRIT_HAVE_ANY_REG) || exit_handler_active))
 			{
 				forced_exit = TRUE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -159,8 +159,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					exit_state = EXIT_IMMED;
 					GTMASSERT;
 			}
-			/* If nothing pending AND we have crit, wait to invoke shutdown */
-			if (EXIT_PENDING_TOLERANT >= exit_state && 0 != have_crit(CRIT_HAVE_ANY_REG))
+			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
+			if (EXIT_PENDING_TOLERANT >= exit_state && (0 != have_crit(CRIT_HAVE_ANY_REG) || exit_handler_active))
 			{
 				forced_exit = TRUE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -197,8 +197,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 #ifdef _AIX
 		case SIGDANGER:
 			forced_exit_err = ERR_KRNLKILL;
-			/* If nothing pending AND we have crit, wait to invoke shutdown */
-			if (EXIT_PENDING_TOLERANT >= exit_state && 0 != have_crit(CRIT_HAVE_ANY_REG))
+			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
+			if (EXIT_PENDING_TOLERANT >= exit_state && (0 != have_crit(CRIT_HAVE_ANY_REG) || exit_handler_active))
 			{
 				forced_exit = TRUE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -223,8 +223,9 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				case GTMSIGINFO_USER:
 					/* This signal was SENT to us so it can wait until we are out of crit to cause an exit */
 					forced_exit_err = ERR_KILLBYSIGUINFO;
-					/* If nothing pending AND we have crit, wait to invoke shutdown */
-					if (EXIT_PENDING_TOLERANT >= exit_state && 0 != have_crit(CRIT_HAVE_ANY_REG))
+					/* If nothing pending AND we have crit or already exiting, wait to invoke shutdown */
+					if (EXIT_PENDING_TOLERANT >= exit_state
+							&& (0 != have_crit(CRIT_HAVE_ANY_REG) || exit_handler_active))
 					{
 						assert(GTMSECSHR_IMAGE != image_type);
 						forced_exit = TRUE;
@@ -282,7 +283,9 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		(*signal_routine)();
 	}
 	if (GTMSECSHR_IMAGE != image_type)
+	{
+		assert((EXIT_IMMED <= exit_state) || !exit_handler_active);
 		exit(-exi_condition);
-	else
+	} else
 		return;
 }

@@ -11,7 +11,7 @@
 
 # Commands to build GT.M downloaded from SourceForge
 # 1. 'cd' to the GT.M directory where sr_* directories are copied to.
-# 2. Define an environment variable gtm_dist to point to a prior GT.M installation.
+# 2. Define an environment variable gtm_curpro to point to the full path of the prior GT.M installation.
 #    (download and install GT.M binary distribution from SourceForge if you do not have
 #    GT.M installed already).
 # 3. To build debug version with no compiler optimzations -
@@ -437,14 +437,12 @@ endif
 	@$(gt_echoe) "\t"cp -f $$\< $$\@ >> $@
 
 # By setting gtm_curpro to point to a prior installed GT.M directory (if available), the following
-# rule automatically generates *_ctl.c from *.msg. If gtm_curpro does not exist (e.g. SourceForge),
-# the repository copies (*_ctl.c) will be used instead. 
-# NOTE: all *_ctl.c and merrors_ansi.h are added to CVS tree (sr_port) at SourceForge.
+# rule automatically generates *_ctl.c from *.msg.
 ifdef gtm_curpro
 %_ctl.c:%.msg msg.m
-	gtm_dist=$(gtm_root)/$(gtm_curpro)/pro;export gtm_dist;\
-		$(gtm_root)/$(gtm_curpro)/pro/mumps $(filter-out $<, $^);\
-		$(gtm_root)/$(gtm_curpro)/pro/mumps -run msg $< unix
+	gtm_dist=$(gtm_curpro);export gtm_dist;\
+		$(gtm_curpro)/mumps $(filter-out $<, $^);\
+		$(gtm_curpro)/mumps -run msg $< unix
 	@rm -f msg.o
 endif
 

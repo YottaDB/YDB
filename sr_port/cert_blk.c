@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,10 +32,8 @@
 #include "error.h"
 #include "mmemory.h"
 #include "gtm_ffs.h"
+#include "cert_blk.h"
 
-
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF short		dollar_tlevel;
 
 #define BITS_PER_UCHAR	8
@@ -53,25 +51,27 @@ GBLREF short		dollar_tlevel;
 
 void rts_error_func(int err, uchar_ptr_t buff);
 
-int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
+int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root)
 {
-	block_id	child;
-	rec_hdr_ptr_t	rp, r_top;
-	bool 		dummy_bool, first_key, full, not_gvt;
-	int		num_subscripts, key_max_subs = 0;
-	uint4		bplmap, mask1, offset;
-	sm_uint_ptr_t	chunk_p;			/* Value is unaligned so will be assigned to chunk */
-	uint4		chunk;
-	sm_uc_ptr_t	blk_top, blk_id_ptr, key_base, mp, b_ptr;
-	unsigned char	rec_cmpc;
-	unsigned char	ch, prior_expkey[MAX_KEY_SZ + 1];
-	unsigned int	prior_expkeylen;
-	unsigned short	temp_ushort;
-	int		blk_levl;
-	int		blk_size, rec_size, comp_length, rec_offset, key_size;
-	unsigned char	util_buff[MAX_UTIL_LEN];
-	int		util_len;
-	off_chain	chain;
+	block_id		child;
+	rec_hdr_ptr_t		rp, r_top;
+	bool			dummy_bool, first_key, full, not_gvt;
+	int			num_subscripts, key_max_subs = 0;
+	uint4			bplmap, mask1, offset;
+	sm_uint_ptr_t		chunk_p;			/* Value is unaligned so will be assigned to chunk */
+	uint4			chunk;
+	sm_uc_ptr_t		blk_top, blk_id_ptr, key_base, mp, b_ptr;
+	unsigned char		rec_cmpc;
+	unsigned char		ch, prior_expkey[MAX_KEY_SZ + 1];
+	unsigned int		prior_expkeylen;
+	unsigned short		temp_ushort;
+	int			blk_levl;
+	int			blk_size, rec_size, comp_length, rec_offset, key_size;
+	unsigned char		util_buff[MAX_UTIL_LEN];
+	int			util_len;
+	off_chain		chain;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
 
 	error_def(ERR_DBBLEVMX);
 	error_def(ERR_DBBLEVMN);
@@ -100,10 +100,9 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 	error_def(ERR_DBROOTSUBSC);
 	error_def(ERR_DBMAXNRSUBS); /* same error as ERR_MAXNRSUBSCRIPTS, but has a string output as well */
 
-
-
-	assert(cs_data == cs_addrs->hdr);	/* one might argue that this assert and that 2 line down should be errors */
-	bplmap = cs_data->bplmap;
+	csa = &FILE_INFO(reg)->s_addrs;
+	csd = csa->hdr;
+	bplmap = csd->bplmap;
 	assert(bplmap == BLKS_PER_LMAP);
 	blk_levl = bp->levl;
 	blk_size = bp->bsiz;
@@ -122,7 +121,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 	util_buff[util_len] = 0;
 
 	chain = *(off_chain *)&blk;
-	assert(!chain.flag || dollar_tlevel && !cs_addrs->t_commit_crit);
+	assert(!chain.flag || dollar_tlevel && !csa->t_commit_crit);
 	if (!chain.flag && (offset * bplmap) == (uint4)blk)					/* it's a bitmap */
 	{
 		if ((unsigned char)blk_levl != LCL_MAP_LEVL)
@@ -142,7 +141,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 			return FALSE;
 		}
 		full = TRUE;
-		offset = ((cs_addrs->ti->total_blks - blk) >= bplmap) ? bplmap : (cs_addrs->ti->total_blks - blk);
+		offset = ((csa->ti->total_blks - blk) >= bplmap) ? bplmap : (csa->ti->total_blks - blk);
 		blk_top = (sm_uc_ptr_t)bp + BM_SIZE(offset + (BITS_PER_UCHAR / BML_BITS_PER_BLK) - 1);
 		for (chunk_p = (sm_uint_ptr_t)mp ;  (sm_uc_ptr_t)chunk_p - blk_top < 0 ;  chunk_p++)
 		{
@@ -168,7 +167,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 			}
 
 		}
-		if (full == (NO_FREE_SPACE != gtm_ffs(blk / bplmap, cs_data->master_map, MASTER_MAP_BITS_PER_LMAP)))
+		if (full == (NO_FREE_SPACE != gtm_ffs(blk / bplmap, csd->master_map, MASTER_MAP_BITS_PER_LMAP)))
 		{
 			rts_error_func(ERR_DBBMMSTR, util_buff);
 			return FALSE;
@@ -206,7 +205,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 			return FALSE;
 		}
 	}
-	if (blk_size > cs_addrs->hdr->blk_size)
+	if (blk_size > csd->blk_size)
 	{
 		rts_error_func(ERR_DBBSIZMX, util_buff);
 		return FALSE;
@@ -365,7 +364,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 		{	/* index block */
 			GET_LONG(child, blk_id_ptr);
 			chain = *(off_chain *)&child;
-			assert(!chain.flag || dollar_tlevel && !cs_addrs->t_commit_crit);
+			assert(!chain.flag || dollar_tlevel && !csa->t_commit_crit);
 			if (!chain.flag)
 			{
 				if (child <= 0)
@@ -373,7 +372,7 @@ int cert_blk (block_id blk, blk_hdr_ptr_t bp, block_id root)
 					rts_error_func(ERR_DBPTRNOTPOS, util_buff);
 					return FALSE;
 				}
-				if (child > cs_addrs->ti->total_blks)
+				if (child > csa->ti->total_blks)
 				{
 					rts_error_func(ERR_DBPTRMX, util_buff);
 					return FALSE;

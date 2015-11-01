@@ -71,6 +71,7 @@ boolean_t mur_insert_prev(void)
 		gtm_putmsg(VARLSTCNT(6) ERR_JNLBADRECFMT, 3, new_jctl->jnl_fn_len, new_jctl->jnl_fn,
 				new_jctl->rec_offset, new_jctl->status);
 		mur_jctl = jctl;
+		free(new_jctl);
 		return FALSE;
 	}
 	assert(!mur_options.forward || (!(jctl->jfh->recover_interrupted && !new_jctl->jfh->recover_interrupted)));
@@ -86,6 +87,7 @@ boolean_t mur_insert_prev(void)
 			if (mur_options.update || !proceed)
 			{
 				mur_jctl = jctl;
+				free(new_jctl);
 				return FALSE;
 			}
 		}
@@ -95,6 +97,7 @@ boolean_t mur_insert_prev(void)
 				new_jctl->jfh->eov_tn, new_jctl->jnl_fn_len, new_jctl->jnl_fn,
 				jctl->jfh->bov_tn, jctl->jnl_fn_len, jctl->jnl_fn);
 			mur_jctl = jctl;
+			free(new_jctl);
 			return FALSE;
 		}
 	}
@@ -114,6 +117,7 @@ boolean_t mur_insert_prev(void)
 					new_jctl->jnl_fn, new_jctl->jfh->data_file_name_length,
 					new_jctl->jfh->data_file_name);
 			mur_jctl = jctl;
+			free(new_jctl);
 			return FALSE;
 		}
 	}
@@ -124,6 +128,7 @@ boolean_t mur_insert_prev(void)
 		{
 			gtm_putmsg(VARLSTCNT(6) ERR_JNLCYCLE, 4, cur_jctl->jnl_fn_len, cur_jctl->jnl_fn, DB_LEN_STR(rctl->gd));
 			mur_jctl = jctl;
+			free(new_jctl);
 			return FALSE;
 		}
 		if (new_jctl->jfh->turn_around_offset && cur_jctl->jfh->turn_around_offset)

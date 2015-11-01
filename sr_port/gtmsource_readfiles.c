@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include <stddef.h>	/* for offsetof macro */
 #ifdef UNIX
 #include <sys/ipc.h>
@@ -66,7 +68,9 @@
 #include "repl_sp.h"
 #include "is_file_identical.h"
 #include "repl_log.h"
-#include "longcpy.h"
+#include "min_max.h"
+#include "error.h"
+#include "repl_tr_good.h"
 
 #define LOG_WAIT_FOR_JNL_RECS_PERIOD	(10 * 1000) /* ms */
 #define LOG_WAIT_FOR_JNLOPEN_PERIOD	(10 * 1000) /* ms */
@@ -76,9 +80,6 @@
 #define UNKNOWN_ERR_STR		"Error unknown"
 
 GBLREF	unsigned char		*gtmsource_tcombuff_start;
-GBLREF	unsigned char		*gtmsource_tcombuff_end;
-GBLREF	unsigned char		*gtmsource_tcombuffp;
-
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	repl_ctl_element	*repl_ctl_list;
 GBLREF	seq_num			gtmsource_save_read_jnl_seqno;
@@ -88,6 +89,7 @@ GBLREF	seq_num			seq_num_zero, seq_num_one;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	FILE			*gtmsource_log_fp;
 GBLREF	FILE			*gtmsource_statslog_fp;
+LITREF	int			jrt_update[JRT_RECTYPES];
 LITREF	boolean_t		jrt_is_replicated[JRT_RECTYPES];
 
 static	int4			num_tcom = -1;
@@ -95,11 +97,12 @@ static	boolean_t		trans_read = FALSE;
 static	int			tot_tcom_len = 0;
 static	int			total_wait_for_jnl_recs = 0;
 static	int			total_wait_for_jnlopen = 0;
+static	unsigned char		*tcombuffp = NULL;
 
 static	int			adjust_buff_leaving_hdr(repl_buff_t *rb);
-static	int			position_read(repl_ctl_element*, seq_num, tr_search_method_t);
+static	tr_search_state_t	position_read(repl_ctl_element*, seq_num);
 static	int			read_regions(
-					uchar_ptr_t *buff, int *buff_avail,
+					unsigned char **buff, int *buff_avail,
 					boolean_t attempt_open_oldnew,
 					boolean_t *brkn_trans,
 					seq_num read_jnl_seqno);
@@ -245,11 +248,11 @@ static	int repl_next(repl_buff_t *rb)
 		} else
 		{
 			if (repl_errno == EREPL_JNLFILESEEK)
-				strcpy(err_string, LSEEK_ERR_STR);
+				MEMCPY_LIT(err_string, LSEEK_ERR_STR);
 			else if (repl_errno == EREPL_JNLFILEREAD)
-				strcpy(err_string, READ_ERR_STR);
+				MEMCPY_LIT(err_string, READ_ERR_STR);
 			else
-				strcpy(err_string, UNKNOWN_ERR_STR);
+				MEMCPY_LIT(err_string, UNKNOWN_ERR_STR);
 			rts_error(VARLSTCNT(9) ERR_REPLFILIOERR, 2, rb->backctl->jnl_fn_len, rb->backctl->jnl_fn,
 			  	  ERR_TEXT, 2, LEN_AND_STR(err_string), status);
 		}
@@ -433,9 +436,13 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 	 * in the above case, source server's read of REPL_BLKSIZE bytes while trying to read at offset end_of_data would
 	 * 	have succeeded since the whole REPL_BLKSIZE block has been allocated in the journal file both in Unix and VMS.
 	 * but only the first EOF_RECLEN bytes of that block is valid data.
+	 * For the case new_eof_addr < prev_eof_addr, the assert could have been
+	 * DIVIDE_ROUND_UP(prev_eof_addr, REPL_BLKSIZE(rb)) == DIVIDE_ROUND_UP(new_eof_addr, REPL_BLKSIZE(rb)), but we use
+	 * DIVIDE_ROUND_DOWN and account for prev_eof_addr being an exact multiple of REPL_BLKSIZE(rb) to avoid 4G overflow
 	 */
 	assert((new_eof_addr >= prev_eof_addr)
-		|| (DIVIDE_ROUND_UP(prev_eof_addr, REPL_BLKSIZE(rb)) == DIVIDE_ROUND_UP(new_eof_addr, REPL_BLKSIZE(rb))));
+		|| (DIVIDE_ROUND_DOWN(prev_eof_addr, REPL_BLKSIZE(rb)) - ((0 == prev_eof_addr % REPL_BLKSIZE(rb)) ? 1 : 0)
+		    == DIVIDE_ROUND_DOWN(new_eof_addr, REPL_BLKSIZE(rb))));
 	fc->eof_addr = new_eof_addr;
 	/* eof_change calculated below is not used anywhere. In case it needs to be used, the below calculation
 	 * 	has to be reexamined in light of the above assert involving new_eof_addr and prev_eof_addr
@@ -453,7 +460,7 @@ static	int force_file_read(repl_ctl_element *ctl)
 	repl_buff_t		*rb;
 	repl_buff_desc		*b;
 	repl_file_control_t	*fc;
-	char			rectype;
+	enum jnl_record_type	rectype;
 
 	rb = ctl->repl_buff;
 	b = &rb->buff[REPL_MAINBUFF];
@@ -482,12 +489,12 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	repl_buff_t		*rb;
 	repl_buff_desc		*b;
 	repl_file_control_t	*fc;
-	uint4			dskread;
+	uint4			dskread, stop_at;
 	boolean_t		max_seqno_found, fh_read_done;
 	uint4			max_seqno_addr;
 	seq_num			max_seqno, reg_seqno;
 	int			status;
-	char			rectype;
+	enum jnl_record_type	rectype;
 	gd_region		*reg;
 	sgmnt_addrs		*csa;
 
@@ -531,21 +538,24 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	QWASSIGN(max_seqno, seq_num_zero);
 	max_seqno_addr = 0;
 	max_seqno_found = FALSE;
-	dskread += REPL_BLKSIZE(rb);
-	while (!max_seqno_found && dskread >= REPL_BLKSIZE(rb))
+	do
 	{
 		/* Ignore the existing contents of scratch buffer */
 		b->buffremaining = REPL_BLKSIZE(rb);
 		b->recbuff = b->base;
 		b->reclen = 0;
-		dskread -= REPL_BLKSIZE(rb);
 		b->readaddr = b->recaddr = JNL_BLK_DSKADDR(dskread, REPL_BLKSIZE(rb));
 		if (b->readaddr == JNL_FILE_FIRST_RECORD && adjust_buff_leaving_hdr(rb) != SS_NORMAL)
 		{
 			assert(repl_errno == EREPL_BUFFNOTFRESH);
 			GTMASSERT; /* Program bug */
 		}
-		while (!max_seqno_found)
+		stop_at = dskread + MIN(REPL_BLKSIZE(rb), fc->eof_addr - dskread); /* Limit search to this block */
+		/* If we don't limit the search, we may end up re-reading blocks that follow this block. The consequence of
+		 * limiting the search is that we may not find the maximum close to the current state, but some time in the past
+		 * for a file that is growing. We can live with that as we will redo the max search if necessary */
+		assert(stop_at > dskread);
+		while (b->reclen < stop_at - b->recaddr)
 		{
 			if ((status = repl_next(rb)) == SS_NORMAL)
 			{
@@ -555,15 +565,9 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 					QWASSIGN(max_seqno, GET_REPL_JNL_SEQNO(b->recbuff));
 					max_seqno_addr = b->recaddr;
 				} else if (rectype == JRT_EOF)
-				{
-					if (QWNE(max_seqno, seq_num_zero))
-						max_seqno_found = TRUE;
 					break;
-				}
 			} else if (status == EREPL_JNLRECINCMPL)
-			{
-				if (QWNE(max_seqno, seq_num_zero))
-					max_seqno_found = TRUE;
+			{ /* it is possible to get this return value if jb->dskaddr is in the middle of a journal record */
 				break;
 			} else
 			{
@@ -573,7 +577,10 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 					GTMASSERT;
 			}
 		}
-	}
+		if ((max_seqno_found = (0 != max_seqno)) || (0 == dskread))
+			break;
+		dskread -= REPL_BLKSIZE(rb);
+	} while (TRUE);
 	rb->buffindex = REPL_MAINBUFF;	/* reset back to the main buffer */
 	if (max_seqno_found)
 	{
@@ -581,7 +588,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 		ctl->max_seqno_dskaddr = max_seqno_addr;
 		return (SS_NORMAL);
 	}
-	/* dskread < REPL_BLKSIZE(rb), actually dskread == 0 */
+	/* dskread == 0 */
 	repl_errno = EREPL_JNLEARLYEOF;
 	return (repl_errno);
 }
@@ -614,7 +621,7 @@ static	int first_read(repl_ctl_element *ctl)
 	 */
 
 	int 			status, eof_change;
-	char			rectype;
+	enum jnl_record_type	rectype;
 	repl_buff_t		*rb;
 	repl_buff_desc		*b;
 	repl_file_control_t	*fc;
@@ -671,45 +678,45 @@ static	int first_read(repl_ctl_element *ctl)
 				rts_error(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
 		}
 	}
-	REPL_DPRINT4("FIRST READ of %s - Min seqno "INT8_FMT" EOF addr %d\n",
-			ctl->jnl_fn, INT8_PRINT(ctl->min_seqno), ctl->repl_buff->fc->eof_addr);
+	REPL_DPRINT5("FIRST READ of %s - Min seqno "INT8_FMT" min_seqno_dskaddr %u EOF addr %u\n",
+			ctl->jnl_fn, INT8_PRINT(ctl->min_seqno), ctl->min_seqno_dskaddr, ctl->repl_buff->fc->eof_addr);
 	if (update_max_seqno_info(ctl) != SS_NORMAL)
 	{
 		assert(repl_errno == EREPL_JNLEARLYEOF);
 		GTMASSERT; /* Program bug */
 	}
-	REPL_DPRINT4("FIRST READ of %s - Max seqno "INT8_FMT" EOF addr %d\n",
-			ctl->jnl_fn, INT8_PRINT(ctl->max_seqno), ctl->repl_buff->fc->eof_addr);
+	REPL_DPRINT5("FIRST READ of %s - Max seqno "INT8_FMT" max_seqno_dskaddr %u EOF addr %d\n",
+			ctl->jnl_fn, INT8_PRINT(ctl->max_seqno), ctl->max_seqno_dskaddr, ctl->repl_buff->fc->eof_addr);
 	ctl->first_read_done = TRUE;
 	return (SS_NORMAL);
 }
 
-static void increase_buffer(uchar_ptr_t *buff, int *buflen, int buffer_needed)
+static void increase_buffer(unsigned char **buff, int *buflen, int buffer_needed)
 {
 	int 		newbuffsize, alloc_status;
-	uchar_ptr_t	old_msgp;
+	unsigned char	*old_msgp;
 
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
 
 	/* The tr size is not known apriori. Hence, a good guess of 1.5 times the current buffer space is used */
-	newbuffsize = gtmsource_msgbufsiz + (gtmsource_msgbufsiz << 1);
+	newbuffsize = gtmsource_msgbufsiz + (gtmsource_msgbufsiz >> 1);
 	if (buffer_needed > newbuffsize)
 		newbuffsize = buffer_needed;
 	REPL_DPRINT3("Buff space shortage. Attempting to increase buff space. Curr buff space %d. Attempt increase to atleast %d\n",
 		     gtmsource_msgbufsiz, newbuffsize);
-	old_msgp = (uchar_ptr_t)gtmsource_msgp;
+	old_msgp = (unsigned char *)gtmsource_msgp;
 	if ((alloc_status = gtmsource_alloc_msgbuff(newbuffsize)) != SS_NORMAL)
 	{
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			  LEN_AND_LIT("Error extending buffer space while reading files. Malloc error"), alloc_status);
 	}
-	*buff = (uchar_ptr_t)gtmsource_msgp + (*buff - old_msgp);
-	*buflen = gtmsource_msgbufsiz - (*buff - (uchar_ptr_t)gtmsource_msgp);
+	*buff = (unsigned char *)gtmsource_msgp + (*buff - old_msgp);
+	*buflen = gtmsource_msgbufsiz - (*buff - (unsigned char *)gtmsource_msgp);
 	return;
 }
 
-static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsiz, seq_num read_jnl_seqno)
+static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bufsiz, seq_num read_jnl_seqno)
 {	/* Read the transaction ctl->seqno into buff. Position the next read at the next seqno in the journal file.
 	 * Update max_seqno if necessary.  If read of the next seqno blocks, leave the read buffers as is.
 	 * The next time when this journal file is accessed the read will move forward.
@@ -719,7 +726,7 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 	repl_file_control_t	*fc;
 	int			readlen;
 	seq_num			rec_jnl_seqno;
-	char			rectype;
+	enum jnl_record_type	rectype;
 	int			status;
 	seq_num			read_seqno;
 	unsigned char		*seq_num_ptr, seq_num_str[32];
@@ -735,10 +742,11 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 	fc = rb->fc;
 	ctl->read_complete = FALSE;
 	readlen = 0;
+	assert(0 != b->reclen);
 	if (b->reclen > *bufsiz)
 		increase_buffer(buff, bufsiz, b->reclen);
 	assert(b->reclen <= *bufsiz);
-	longcpy(*buff, b->recbuff, b->reclen);
+	memcpy(*buff, b->recbuff, b->reclen);
 	*buff += b->reclen;
 	readlen += b->reclen;
 	*bufsiz -= b->reclen;
@@ -752,12 +760,14 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 		ctl->max_seqno_dskaddr = b->recaddr;
 	}
 	ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
-	if (JRT_SET == rectype || JRT_KILL == rectype || JRT_ZKILL == rectype || JRT_NULL == rectype)
+	if (!IS_FENCED(rectype) || JRT_NULL == rectype)
 	{	/* Entire transaction done */
 		ctl->read_complete = TRUE;
 		trans_read = TRUE;
+	} else
+	{
+		assert(IS_TUPD(rectype) || IS_FUPD(rectype)); /* The first record should be the beginning of a transaction */
 	}
-	assert(rectype != JRT_TCOM && rectype != JRT_ZTCOM); /* The first record shouldn't be a TCOM */
 	/* Suggested optimisation : Instead of waiting for all records pertaining to this transaction to
 	 * be written to the journal file, read those available, mark this file BLOCKED, read other journal
 	 * files, and come back to this journal file later.
@@ -774,13 +784,13 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 				assert(b->reclen <= *bufsiz);
 				if (rectype != JRT_TCOM && rectype != JRT_ZTCOM)
 				{
-					longcpy(*buff, b->recbuff, b->reclen);
+					memcpy(*buff, b->recbuff, b->reclen);
 					*buff += b->reclen;
 					readlen += b->reclen;
 				} else
 				{
-					longcpy(gtmsource_tcombuffp, b->recbuff, b->reclen);
-					gtmsource_tcombuffp += b->reclen;
+					memcpy(tcombuffp, b->recbuff, b->reclen);
+					tcombuffp += b->reclen;
 					tot_tcom_len += b->reclen;
 					/* End of transaction in this file */
 					ctl->read_complete = TRUE;
@@ -829,41 +839,48 @@ static	int read_transaction(repl_ctl_element *ctl, uchar_ptr_t *buff, int *bufsi
 	}
 	/* Try positioning next read to the next seqno. Leave it as is if operation blocks (has to wait for records) */
 	QWADD(read_seqno, ctl->seqno, seq_num_one);
-	/* Better to do a linear search */
-	position_read(ctl, read_seqno, TR_LINEAR_SEARCH);
+	position_read(ctl, read_seqno);
 	return (readlen);
 }
 
-static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, seq_num read_seqno)
+static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, uint4 max_readaddr, seq_num read_seqno,
+						tr_search_status_t *srch_status)
 {
 	repl_buff_t		*rb;
 	repl_buff_desc		*b;
-	repl_file_control_t	*fc;
 	seq_num			rec_jnl_seqno;
-	char			rectype;
+	enum jnl_record_type	rectype;
 	tr_search_state_t	found;
 	int			status;
 
 	error_def(ERR_JNLBADRECFMT);
 
+	REPL_DPRINT5("do_linear_search: file : %s lo_addr : %u max_readaddr : %u read_seqno : %llu\n",
+			ctl->jnl_fn, lo_addr, max_readaddr, read_seqno);
+	assert(lo_addr < max_readaddr);
 	rb = ctl->repl_buff;
 	assert(rb->buffindex == REPL_MAINBUFF);
 	b = &rb->buff[rb->buffindex];
-	assert(lo_addr >= JNL_FILE_FIRST_RECORD);
-	if (lo_addr != b->readaddr)
-	{	/* Initiate a fresh read */
-		b->recaddr = b->readaddr = lo_addr;
+	if (lo_addr != b->recaddr)
+	{ /* Initiate a fresh read */
+		lo_addr = ROUND_DOWN(lo_addr, REPL_BLKSIZE(rb));
+		b->recaddr = b->readaddr = JNL_BLK_DSKADDR(lo_addr, REPL_BLKSIZE(rb));
 		b->recbuff = b->base;
 		b->reclen = 0;
 		b->buffremaining = REPL_BLKSIZE(rb);
-	}	/* else use what has been read already */
-	if (b->readaddr == JNL_FILE_FIRST_RECORD && adjust_buff_leaving_hdr(rb) != SS_NORMAL)
-	{
-		assert(repl_errno == EREPL_BUFFNOTFRESH);
-		GTMASSERT;	/* Program bug */
+		if (b->readaddr == JNL_FILE_FIRST_RECORD && adjust_buff_leaving_hdr(rb) != SS_NORMAL)
+		{
+			assert(repl_errno == EREPL_BUFFNOTFRESH);
+			GTMASSERT;	/* Program bug */
+		}
+		REPL_DPRINT1("do_linear_search: initiating fresh read\n");
+	} else
+	{ /* use what has been read already */
+		assert(read_seqno != ctl->seqno); /* if not, we'll skip to the next transaction and declare read_seqno not found */
 	}
 	found = TR_NOT_FOUND;
-	while (found == TR_NOT_FOUND)
+	srch_status->prev_seqno = srch_status->seqno = 0;
+	while (found == TR_NOT_FOUND && b->reclen < max_readaddr - b->recaddr)
 	{
 		if ((status = repl_next(rb)) == SS_NORMAL)
 		{
@@ -871,6 +888,11 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 			if (IS_REPLICATED(rectype))
 			{
 				rec_jnl_seqno = GET_REPL_JNL_SEQNO(b->recbuff);
+				if (srch_status->seqno == 0 || srch_status->seqno != rec_jnl_seqno)
+				{ /* change srch_status only when records of different transactions are encountered */
+					srch_status->prev_seqno = srch_status->seqno;
+					srch_status->seqno = rec_jnl_seqno;
+				}
 				if (QWLT(ctl->max_seqno, rec_jnl_seqno))
 				{
 					QWASSIGN(ctl->max_seqno, rec_jnl_seqno);
@@ -889,48 +911,284 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 		else if (status == EREPL_JNLRECFMT)
 			rts_error(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, ctl->jnl_fn_len, ctl->jnl_fn, b->recaddr);
 	}
+	REPL_DPRINT2("do_linear_search: returning %s\n", (found == TR_NOT_FOUND) ? "TR_NOT_FOUND" :
+							 (found == TR_FOUND) ? "TR_FOUND" :
+							 (found == TR_WILL_NOT_BE_FOUND) ? "TR_WILL_NOT_BE_FOUND" :
+							 (found == TR_FIND_WOULD_BLOCK) ? "TR_FIND_WOULD_BLOCK" :
+							 "*UNKNOWN RETURN CODE*");
 	return (found);
 }
 
-static	tr_search_state_t do_binary_search(repl_ctl_element *ctl, uint4 lo_addr, uint4 hi_addr, seq_num read_seqno)
+static	tr_search_state_t do_binary_search(repl_ctl_element *ctl, uint4 lo_addr, uint4 hi_addr, seq_num read_seqno,
+						tr_search_status_t *srch_status)
 {
-	GTMASSERT; /* Don't call it till 'tis coded */
-	return 0;
+	repl_buff_t		*rb;
+	repl_buff_desc		*b;
+	repl_file_control_t	*fc;
+	tr_search_state_t	found;
+	uint4			low, high, mid, new_mid, mid_further, stop_at;
+	uint4			srch_half_lo_addr, srch_half_hi_addr, othr_half_lo_addr, othr_half_hi_addr;
+	uint4			hi_addr_mod, hi_addr_diff, mid_mod, mid_diff;
+	uint4			willnotbefound_addr = 0, willnotbefound_stop_at = 0;
+	int			iter, max_iter;
+	enum jnl_record_type	rectype;
+	boolean_t		search_complete = FALSE;
+
+	REPL_DPRINT5("do_binary_search: file : %s lo_addr : %u hi_addr : %u read_seqno : %llu\n",
+			ctl->jnl_fn, lo_addr, hi_addr, read_seqno);
+	if (lo_addr > hi_addr)
+	{
+		REPL_DPRINT1("do_binary_search: lower limit is larger than upper limit, search not initiated\n");
+		return TR_NOT_FOUND;
+	}
+	rb = ctl->repl_buff;
+	assert(rb->buffindex == REPL_MAINBUFF);
+	b = &rb->buff[rb->buffindex];
+	fc = rb->fc;
+	assert(lo_addr <  fc->eof_addr);
+	assert(hi_addr <= fc->eof_addr);
+	assert(lo_addr <= hi_addr);
+	low = ROUND_DOWN(lo_addr, REPL_BLKSIZE(rb));
+	if (0 == (hi_addr_mod = hi_addr % REPL_BLKSIZE(rb)))
+		hi_addr_mod = REPL_BLKSIZE(rb); /* avoid including additional block if already aligned */
+	hi_addr_diff = fc->eof_addr - hi_addr;
+	high = hi_addr + MIN(REPL_BLKSIZE(rb) - hi_addr_mod, hi_addr_diff);
+	for (found = TR_NOT_FOUND, mid = ROUND_DOWN((low >> 1) + (high >> 1), REPL_BLKSIZE(rb)); ; )
+	{
+		mid_mod = mid % REPL_BLKSIZE(rb);
+		mid_diff = fc->eof_addr - mid;
+		assert(0 != mid_diff);
+		stop_at = mid + MIN(REPL_BLKSIZE(rb) - mid_mod, mid_diff);
+		assert(stop_at <= high);
+		found = do_linear_search(ctl, mid, stop_at, read_seqno, srch_status);
+		assert(srch_status->seqno == 0 || srch_status->seqno == ctl->seqno);
+		switch (found)
+		{
+			case TR_FOUND:
+				rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
+				if (!IS_FENCED(rectype) || IS_TUPD(rectype) || IS_FUPD(rectype) || JRT_NULL == rectype)
+				{
+					REPL_DPRINT4("do_binary_search: found %llu at %u in %s\n", read_seqno, b->recaddr,
+							ctl->jnl_fn);
+					return found;
+				}
+				assert(b->recaddr >= REPL_BLKSIZE(rb)); /* cannot have trailing records of a tr in first block */
+				low = ((b->recaddr > REPL_BLKSIZE(rb)) ?
+					ROUND_DOWN(b->recaddr - REPL_BLKSIZE(rb), REPL_BLKSIZE(rb)) : 0);
+				high = ROUND_DOWN(b->recaddr, REPL_BLKSIZE(rb));
+				REPL_DPRINT5("do_binary_search: found record of type %d with seqno %llu at %u in %s\n",
+						rectype, read_seqno, b->recaddr, ctl->jnl_fn);
+				REPL_DPRINT3("do_binary_search: will back off and search for beginning of transaction, changing "
+						"low to %u high to %u\n", low, high);
+				break;
+			case TR_NOT_FOUND:
+				assert(b->readaddr == stop_at);
+				if (srch_status->seqno != 0)
+				{ /* at least one replicated record found in block */
+					assert(read_seqno > srch_status->seqno);
+					low = stop_at; /* search in the upper half */
+					REPL_DPRINT5("do_binary_search: could not find %llu in block %u, last seen replicated "
+							"record has seqno %llu changing low to %u\n", read_seqno, mid,
+							srch_status->seqno, low);
+				} else
+				{ /* no replicated record found in block */
+					assert(srch_status->prev_seqno == 0); /* must hold if no replicated record found */
+					REPL_DPRINT3("do_binary_search: could not find %llu, no replicated record in block %u, "
+							"searching lower half", read_seqno, mid);
+					if (low < mid) /* seach lower half recursively */
+						found = do_binary_search(ctl, low, mid, read_seqno, srch_status);
+					else
+					{
+						REPL_DPRINT4("do_binary_search: all blocks searched in lower half search, "
+								"seqno %llu not found, low %u high %u\n", read_seqno, low, mid);
+					}
+					if (found == TR_NOT_FOUND && stop_at < high) /* search upper half recursively */
+						found = do_binary_search(ctl, stop_at, high, read_seqno, srch_status);
+					else
+					{
+						REPL_DEBUG_ONLY(
+							if (found == TR_NOT_FOUND)
+							{
+								REPL_DPRINT4("do_binary_search: all blocks searched in upper half"
+									" search, seqno %llu not found, low %u high %u\n",
+									read_seqno, stop_at, high);
+							}
+						)
+					}
+					if (found != TR_NOT_FOUND)
+						return found;
+					search_complete = TRUE;
+				}
+				break;
+
+			case TR_WILL_NOT_BE_FOUND:
+				if (srch_status->seqno != 0 && read_seqno < srch_status->seqno)
+				{
+					if (srch_status->prev_seqno == 0)
+					{ /* first replicated record in block has larger seqno than read_seqno */
+						REPL_DPRINT5("do_binary_search: will not find %llu, first replicated record in "
+								"block %u has seqno %llu, changing high to %u\n", read_seqno, mid,
+								srch_status->seqno, mid);
+						willnotbefound_addr = mid;
+						willnotbefound_stop_at = stop_at;
+						high = mid; /* search in the lower half */
+					} else
+					{ /* at least two replicated records found, and the read_seqno is between the seqno
+					   * numbers of two records */
+						REPL_DPRINT5("do_binary_search: will not find %llu in block %u, last two seqnos are"
+								" %llu and %llu, return WILL_NOT_BE_FOUND\n", read_seqno, mid,
+								srch_status->prev_seqno, srch_status->seqno);
+						assert(srch_status->prev_seqno < read_seqno);
+						return found; /* read_seqno is not in this journal file */
+					}
+				} else
+				{ /* found EOF record, read_seqno is not in this journal file */
+					REPL_DPRINT3("do_binary_search: will not find %llu in block %u, EOF found\n", read_seqno,
+							mid);
+					return found;
+				}
+				break;
+
+			case TR_FIND_WOULD_BLOCK:
+				assert(mid == ROUND_DOWN(high, REPL_BLKSIZE(rb))); /* must be the last block for this retval */
+				assert(ctl->file_state == JNL_FILE_OPEN || /* file that is yet to grow, or truncated file */
+					ctl->file_state == JNL_FILE_CLOSED && 0 != fc->jfh->prev_recov_end_of_data);
+				if (srch_status->seqno != 0)
+				{ /* journal flush yet to be done, or truncated file's end_of_data reached, can't locate seqno */
+					assert(read_seqno > srch_status->seqno);
+					REPL_DPRINT4("do_binary_search: find of %llu would block, last seqno %llu found in block "
+							"%u\n", read_seqno, srch_status->seqno, mid);
+					return (ctl->file_state == JNL_FILE_OPEN ? found : TR_WILL_NOT_BE_FOUND);
+				}
+				/* no replicated record found in the block, search in previous block(s) */
+				high = (high > REPL_BLKSIZE(rb)) ? high - REPL_BLKSIZE(rb) : 0;
+				REPL_DPRINT4("do_binary_search: find of %llu would block, no seqno found in block %u, "
+						"change high to %u\n", read_seqno, mid, high);
+				break;
+
+			default: /* Why didn't we cover all cases? */
+				GTMASSERT;
+		} /* end switch */
+		if (!search_complete && low < high)
+		{
+			new_mid = ROUND_DOWN((low >> 1) + (high >> 1), REPL_BLKSIZE(rb));
+			mid_further = (new_mid != mid) ? 0 : REPL_BLKSIZE(rb); /* if necessary, move further to avoid repeat */
+			if (high - new_mid > mid_further)
+			{
+				mid = new_mid + mid_further;
+				continue;
+			}
+		}
+		REPL_DPRINT6("do_binary_search: all blocks searched, seqno %llu not found, low %u high %u mid %u mid_further %u\n",
+				read_seqno, low, high, mid, mid_further);
+		assert(found != TR_FOUND);
+		/* done searching all blocks between lo_addr and hi_addr */
+		if (found == TR_NOT_FOUND && 0 != willnotbefound_addr)
+		{ /* There is a block that contains a seqno larger than read_seqno; leave ctl positioned at that seqno.
+		   * If we don't do this, we may repeat binary search (wastefully) for all seqnos between read_seqno and
+		   * the least seqno larger than read_seqno in this file.
+		   */
+			found = do_linear_search(ctl, willnotbefound_addr, willnotbefound_stop_at, read_seqno, srch_status);
+			REPL_DPRINT4("do_binary_search: position at seqno %llu in block [%u, %u)\n", srch_status->seqno,
+					willnotbefound_addr, willnotbefound_stop_at);
+			assert(found == TR_WILL_NOT_BE_FOUND);
+			assert(read_seqno < ctl->seqno);
+		}
+		return found;
+	} /* end for */
+	GTMASSERT; /* shouldn't reach here, must return from within for */
+	return TR_FIND_ERR;
 }
 
-static	int position_read(repl_ctl_element *ctl, seq_num read_seqno, tr_search_method_t srch_meth)
+static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno)
 {
-	int		status;
-	repl_buff_t	*rb;
-	uint4		lo_addr, hi_addr;
+	repl_buff_t		*rb;
+	repl_buff_desc		*b;
+	uint4			lo_addr, hi_addr;
+	tr_search_state_t	found, (*srch_func)();
+	tr_search_status_t	srch_status;
+	DEBUG_ONLY(jnl_record	*jrec;)
+	DEBUG_ONLY(enum jnl_record_type	rectype;)
 
 	/* Position read pointers so that the next read should get the first journal record with JNL_SEQNO atleast read_seqno.
 	 * Do a search between min_seqno and seqno if read_seqno < ctl->seqno; else search from ctl->seqno onwards.
 	 * If ctl->seqno > ctl->max_seqno update max_seqno as you move, else search between ctl->seqno and ctl->max_seqno.
-	 * We want to do a binary search here. For now do a linear search.
+	 * We want to do a binary search here.
 	 */
+
+	/* Validate the range; if called from read_transaction(), it is possible that we are looking out of range, but
+	 * we clearly can identify such a case */
+	assert(ctl->min_seqno <= read_seqno);
+	assert(read_seqno <= ctl->max_seqno || read_seqno == ctl->seqno + 1);
 	rb = ctl->repl_buff;
-	if (QWLE(read_seqno, ctl->seqno))
+	assert(REPL_MAINBUFF == rb->buffindex);
+	b = &rb->buff[rb->buffindex];
+	/* looking up something we read already? */
+	assert(read_seqno != ctl->seqno || read_seqno == ctl->min_seqno || read_seqno == ctl->max_seqno || ctl->lookback);
+	srch_func = do_binary_search;
+	if (read_seqno > ctl->seqno)
 	{
-		lo_addr = JNL_BLK_DSKADDR(ctl->min_seqno_dskaddr, REPL_BLKSIZE(rb));
-		assert(lo_addr != rb->buff[REPL_MAINBUFF].readaddr);
-		hi_addr = JNL_BLK_DSKADDR(rb->buff[REPL_MAINBUFF].recaddr, REPL_BLKSIZE(rb));
-		srch_meth = TR_BINARY_SEARCH;	/* Preferred over linear */
-	} else		/* QWGT(read_seqno, ctl->seqno) */
+		if (read_seqno == ctl->seqno + 1)
+		{ /* trying to position to next seqno or the max, better to do linear search */
+			srch_func = do_linear_search;
+			lo_addr = b->recaddr;
+			hi_addr = MAXUINT4;
+		} else if (read_seqno <= ctl->max_seqno)
+		{ /* For read_seqno == ctl->max_seqno, do not use linear search. Remember, max_seqno_dskaddr may be the
+		   * the address of the TCOM record of a transaction, and this TCOM record may be in a different block
+		   * than the block containing the first record of the transcation. To get it right, we may have to
+		   * back off to previous blocks. Well, do_binary_search() handles this condition. So, better we use binary
+		   * search.
+		   */
+			lo_addr = b->recaddr;
+			hi_addr = ctl->max_seqno_dskaddr;
+		} else /* read_seqno > ctl->max_seqno */
+		{
+			lo_addr = ctl->max_seqno_dskaddr;
+			hi_addr = rb->fc->eof_addr;
+		}
+	} else /* (read_seqno <= ctl->seqno) */
 	{
-		lo_addr = rb->buff[REPL_MAINBUFF].readaddr;
-		if (srch_meth == TR_BINARY_SEARCH && QWLE(read_seqno, ctl->max_seqno))
-			hi_addr = JNL_BLK_DSKADDR(ctl->max_seqno_dskaddr, REPL_BLKSIZE(rb));
-		else
-			srch_meth = TR_LINEAR_SEARCH;
+		if (read_seqno != ctl->min_seqno)
+		{
+			lo_addr = ctl->min_seqno_dskaddr;
+			hi_addr = b->recaddr + b->reclen;
+		} else
+		{ /* trying to locate min, better to do linear search */
+			srch_func = do_linear_search;
+			lo_addr = ctl->min_seqno_dskaddr;
+			hi_addr = MAXUINT4;
+			if (read_seqno == ctl->seqno) /* we are positioned where we want to be, no need for read */
+			{
+				assert(lo_addr == b->recaddr);
+				assert(MIN_JNLREC_SIZE <= b->reclen);
+				DEBUG_ONLY(jrec = (jnl_record *)b->recbuff;)
+				DEBUG_ONLY(rectype = jrec->prefix.jrec_type;)
+				assert(b->reclen == jrec->prefix.forwptr);
+				assert(IS_VALID_JNLREC(jrec, rb->fc->jfh));
+				assert(IS_REPLICATED(rectype));
+				assert(!IS_FENCED(rectype) || IS_TUPD(rectype) || IS_FUPD(rectype) || JRT_NULL == rectype);
+				REPL_DPRINT3("position_read: special case, read %llu is same as min in %s, returning TR_FOUND\n",
+						read_seqno, ctl->jnl_fn);
+				return TR_FOUND;
+			}
+		}
 	}
-	srch_meth = TR_LINEAR_SEARCH; /* force linear for now, binary_search is not yet ready */
-	status = ((srch_meth == TR_BINARY_SEARCH) ?
-		  	do_binary_search(ctl, lo_addr, hi_addr, read_seqno) : do_linear_search(ctl, lo_addr, read_seqno));
-	return (SS_NORMAL);
+#if defined(GTMSOURCE_READFILES_LINEAR_SEARCH_TEST)
+	srch_func = do_linear_search;
+	hi_addr = MAXUINT4;
+#elif defined(GTMSOURCE_READFILES_BINARY_SEARCH_TEST)
+	srch_func = do_binary_search;
+	hi_addr = rb->fc->eof_addr;
+#endif
+	REPL_DPRINT6("position_read: Using %s search to locate %llu in %s between %u and %u\n",
+			(srch_func == do_linear_search) ? "linear" : "binary", read_seqno, ctl->jnl_fn, lo_addr, hi_addr);
+	found = srch_func(ctl, lo_addr, hi_addr, read_seqno, &srch_status);
+	assert(found != TR_NOT_FOUND);
+	return (found);
 }
 
-static	int read_and_merge(uchar_ptr_t buff, int maxbufflen, seq_num read_jnl_seqno)
+static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_seqno)
 {
 	int 			buff_avail, total_read, read_len, pass;
 	boolean_t		brkn_trans;
@@ -945,7 +1203,7 @@ static	int read_and_merge(uchar_ptr_t buff, int maxbufflen, seq_num read_jnl_seq
 	total_read = 0;
 	total_wait_for_jnl_recs = 0;
 	total_wait_for_jnlopen = 0;
-	gtmsource_tcombuffp = gtmsource_tcombuff_start;
+	tcombuffp = gtmsource_tcombuff_start;
 	buff_avail = maxbufflen;
 	for (ctl = repl_ctl_list->next; ctl != NULL; ctl = ctl->next)
 		ctl->read_complete = FALSE;
@@ -964,20 +1222,20 @@ static	int read_and_merge(uchar_ptr_t buff, int maxbufflen, seq_num read_jnl_seq
 		if (brkn_trans)
 		{
 			seq_num_ptr = i2ascl(seq_num_str, read_jnl_seqno);
-			rts_error(VARLSTCNT(4) ERR_REPLBRKNTRANS, 2, seq_num_ptr - seq_num_str, seq_num_str);
+			rts_error(VARLSTCNT(4) MAKE_MSG_SEVERE(ERR_REPLBRKNTRANS), 2, seq_num_ptr - seq_num_str, seq_num_str);
 		}
 		total_read += read_len;
 	}
 	if (tot_tcom_len > 0)
 	{	/* Copy all the TCOM records to the end of the buffer */
-		assert(tot_tcom_len <= ((uchar_ptr_t)gtmsource_msgp + gtmsource_msgbufsiz - buff));
-		longcpy(buff, gtmsource_tcombuff_start, tot_tcom_len);
+		assert(tot_tcom_len <= ((unsigned char *)gtmsource_msgp + gtmsource_msgbufsiz - buff));
+		memcpy(buff, gtmsource_tcombuff_start, tot_tcom_len);
 		total_read += tot_tcom_len;
 	}
 	return (total_read);
 }
 
-static	int read_regions(uchar_ptr_t *buff, int *buff_avail,
+static	int read_regions(unsigned char **buff, int *buff_avail,
 		         boolean_t attempt_open_oldnew, boolean_t *brkn_trans, seq_num read_jnl_seqno)
 {
 	repl_ctl_element	*ctl, *prev_ctl, *old_ctl;
@@ -1096,8 +1354,7 @@ static	int read_regions(uchar_ptr_t *buff, int *buff_avail,
 						continue;
 					}
 				}
-			} else if (ctl->file_state == JNL_FILE_EMPTY ||
-				   QWGT(ctl->min_seqno, read_jnl_seqno))
+			} else if (ctl->file_state == JNL_FILE_EMPTY || QWGT(ctl->min_seqno, read_jnl_seqno))
 			{	/* May be in prev gener */
 				if (ctl->prev->reg == ctl->reg && ctl->file_state != JNL_FILE_EMPTY)
 				{	/* If prev gener is already open, and we come here, we are looking for
@@ -1152,8 +1409,10 @@ static	int read_regions(uchar_ptr_t *buff, int *buff_avail,
 				ctl = old_ctl;
 				prev_ctl = old_ctl->prev;
 				REPL_DPRINT2("Attempt searching in %s and backwards\n", ctl->jnl_fn);
-			} else		/* ctl->file_state == JNL_FILE_OPEN || * QWLE(read_jnl_seqno, ctl->max_seqno) */
+			} else
 			{
+				assert((ctl->file_state == JNL_FILE_OPEN || read_jnl_seqno <= ctl->max_seqno)
+				       && ctl->min_seqno <= read_jnl_seqno);
 				if (ctl->lookback)
 				{
 					assert(QWLE(read_jnl_seqno, ctl->seqno));
@@ -1161,7 +1420,7 @@ static	int read_regions(uchar_ptr_t *buff, int *buff_avail,
 					REPL_DPRINT4("Looking back and attempting to position read for %s at "
 							INT8_FMT". File state is %s\n", ctl->jnl_fn, INT8_PRINT(read_jnl_seqno),
 							(ctl->file_state == JNL_FILE_OPEN) ? "OPEN" : "CLOSED");
-					position_read(ctl, read_jnl_seqno, TR_BINARY_SEARCH);
+					position_read(ctl, read_jnl_seqno);
 					ctl->lookback = FALSE;
 				}
 				if (QWEQ(read_jnl_seqno, ctl->seqno))
@@ -1176,7 +1435,7 @@ static	int read_regions(uchar_ptr_t *buff, int *buff_avail,
 				} else if (QWLT(read_jnl_seqno, ctl->seqno))
 				{	/* This region is not involved in transaction read_jnl_seqno */
 					found = TR_WILL_NOT_BE_FOUND;
-				} else	/* QWGT(read_jl_seqno, ctl->seqno) */
+				} else	/* QWGT(read_jnl_seqno, ctl->seqno) */
 				{
 					if (ctl->file_state == JNL_FILE_OPEN)
 					{	/* State change from READ_FILE->READ_POOL-> READ_FILE might cause this.
@@ -1193,7 +1452,7 @@ static	int read_regions(uchar_ptr_t *buff, int *buff_avail,
 							 * attempt to position next read to read_jnl_seqno
 							 */
 							force_file_read(ctl); /* Buffer might be stale with an EOF record */
-							position_read(ctl, read_jnl_seqno, TR_BINARY_SEARCH);
+							position_read(ctl, read_jnl_seqno);
 						} else
 						{	/* Will possibly be found in next gener */
 							prev_ctl = ctl;
@@ -1201,10 +1460,10 @@ static	int read_regions(uchar_ptr_t *buff, int *buff_avail,
 						}
 					} else if (ctl->file_state == JNL_FILE_CLOSED)
 					{	/* May be found in this jnl file, attempt to position next read to read_jnl_seqno */
-						position_read(ctl, read_jnl_seqno, TR_BINARY_SEARCH);
+						position_read(ctl, read_jnl_seqno);
 					} else
-					{
-						GTMASSERT; /* Program bug - ctl_seqno should never be greater than ctl->max_seqno */
+					{ /* Program bug - ctl->seqno should never be greater than ctl->max_seqno */
+						GTMASSERT;
 					}
 				}
 			}
@@ -1217,48 +1476,94 @@ static	int read_regions(uchar_ptr_t *buff, int *buff_avail,
 	return (cumul_read);
 }
 
-int gtmsource_readfiles(uchar_ptr_t buff, int *data_len, int maxbufflen)
+int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, boolean_t read_multiple)
 {
 
-	int		read_size;
-	unsigned char	seq_num_str[32], *seq_num_ptr;
-	unsigned char	seq_num_str1[32], *seq_num_ptr1;
+	int4			read_size, read_state, first_tr_len, tot_tr_len;
+	unsigned char		seq_num_str[32], *seq_num_ptr;
+	unsigned char		seq_num_str1[32], *seq_num_ptr1;
+	jnlpool_ctl_ptr_t	jctl;
+	gtmsource_local_ptr_t	gtmsource_local;
+	seq_num			read_jnl_seqno, jnl_seqno;
+	qw_num			read_addr;
+	uint4			jnlpool_size;
+	static int4		max_tr_size = MAX_TR_BUFFSIZE; /* Will generally be less than initial gtmsource_msgbufsiz;
+								* allows for space to accommodate the last transaction */
 
-#ifdef REPL_DEBUG
-	seq_num         repl_dbg_save_read_jnl_seqno;
-#endif
-	REPL_DPRINT2("Reading "INT8_FMT" from Journal Files\n", INT8_PRINT(jnlpool.gtmsource_local->read_jnl_seqno));
-	assert(buff == &gtmsource_msgp->msg[0]); /* else increasing buffer space will not work */
-	read_size = read_and_merge(buff, maxbufflen, jnlpool.gtmsource_local->read_jnl_seqno);
-	if (QWLE(gtmsource_save_read_jnl_seqno, jnlpool.gtmsource_local->read_jnl_seqno))
+	jctl = jnlpool.jnlpool_ctl;
+	gtmsource_local = jnlpool.gtmsource_local;
+	jnlpool_size = jctl->jnlpool_size;
+	jnl_seqno = jctl->jnl_seqno;
+	read_jnl_seqno = gtmsource_local->read_jnl_seqno;
+	read_state = gtmsource_local->read_state;
+	assert(buff == (unsigned char *)gtmsource_msgp + REPL_MSG_HDRLEN); /* else increasing buffer space will not work */
+	assert(maxbufflen == gtmsource_msgbufsiz - REPL_MSG_HDRLEN);
+	tot_tr_len = 0;
+	assert(REPL_MSG_HDRLEN == sizeof(jnldata_hdr_struct));
+	read_addr = gtmsource_local->read_addr;
+	first_tr_len = read_size = read_and_merge(buff, maxbufflen, read_jnl_seqno++) + REPL_MSG_HDRLEN;
+	max_tr_size = MAX(max_tr_size, read_size);
+	do
 	{
-		QWINCRBYDW(jnlpool.gtmsource_local->read_addr, (read_size + sizeof(jnldata_hdr_struct)));
-#ifdef REPL_DEBUG
-		QWASSIGN(repl_dbg_save_read_jnl_seqno, jnlpool.gtmsource_local->read_jnl_seqno);
-		QWINCRBY(repl_dbg_save_read_jnl_seqno, seq_num_one);
-		REPL_DPRINT2("Readfiles : after sync with pool read_seqno : "INT8_FMT, INT8_PRINT(repl_dbg_save_read_jnl_seqno));
-		REPL_DPRINT3(" read_addr : "INT8_FMT" read : %d\n", INT8_PRINT(jnlpool.gtmsource_local->read_addr),
-				jnlpool.gtmsource_local->read);
-#endif
-		if (jnlpool_hasnt_overflowed(jnlpool.gtmsource_local->read_addr)) /* No more overflow, switch to READ_POOL */
+		tot_tr_len += read_size;
+		REPL_DPRINT5("File read seqno : %llu Tr len : %d Total tr len : %d Maxbufflen : %d\n", read_jnl_seqno - 1,
+				read_size - REPL_MSG_HDRLEN, tot_tr_len, maxbufflen);
+		if (gtmsource_save_read_jnl_seqno < read_jnl_seqno)
 		{
-			jnlpool.gtmsource_local->read = QWMODDW(jnlpool.gtmsource_local->read_addr,
-					jnlpool.jnlpool_ctl->jnlpool_size);
-			jnlpool.gtmsource_local->read_state = READ_POOL;
+			read_addr += read_size;
+			if (jnlpool_size >= (jctl->early_write_addr - read_addr)) /* No more overflow, switch to READ_POOL */
+			{ /* To avoid the expense of memory barrier in jnlpool_hasnt_overflowed(), we use a possibly stale
+			   * value of early_write_addr to check if we can switch back to pool. The consequence
+			   * is that we may switch back and forth between file and pool read if we are in a situation wherein a
+			   * GTM process races with source server, writing transactions into the pool right when the source server
+			   * concludes that it can read from pool. We think this condition is rare enough that the expense
+			   * of re-opening the files (due to the transition) and re-positioning read pointers is considered
+			   * living with when compared with the cost of a memory barrier. We can reduce the expense by
+			   * not clearing the file information for every transition back to pool. We can wait for a certain
+			   * period of time (say 15 minutes) before we close all files. */
+				gtmsource_local->read = read_addr % jnlpool_size;
+				gtmsource_local->read_state = read_state = READ_POOL;
+				break;
+			}
+			REPL_DPRINT3("Readfiles : after sync with pool read_seqno: %llu read_addr: %llu\n", read_jnl_seqno,
+					read_addr);
 		}
-	}
-	QWINCRBY(jnlpool.gtmsource_local->read_jnl_seqno, seq_num_one);
+		if (read_multiple)
+		{
+			if (tot_tr_len < max_tr_size && read_jnl_seqno < jnl_seqno)
+			{ /* Limit the read by the buffer length, or until there is no more to be read. If not limited by the
+			   * buffer length, the buffer will keep growing due to logic that expands the buffer when needed */
+				/* recompute buff and maxbufflen as buffer may have expanded during read_and_merge */
+				buff = (unsigned char *)gtmsource_msgp + tot_tr_len + REPL_MSG_HDRLEN;
+				maxbufflen = gtmsource_msgbufsiz - tot_tr_len - REPL_MSG_HDRLEN;
+				read_size = read_and_merge(buff, maxbufflen, read_jnl_seqno++) + REPL_MSG_HDRLEN;
+				max_tr_size = MAX(max_tr_size, read_size);
+				/* don't use buff to assign type and len as buffer may have expanded, use gtmsource_msgp instead */
+				((repl_msg_ptr_t)((unsigned char *)gtmsource_msgp + tot_tr_len))->type = REPL_TR_JNL_RECS;
+				((repl_msg_ptr_t)((unsigned char *)gtmsource_msgp + tot_tr_len))->len  = read_size;
+				continue;
+			}
+			REPL_DPRINT6("Readfiles : tot_tr_len %d max_tr_size %d read_jnl_seqno %llu jnl_seqno %llu "
+				     "gtmsource_msgbufsize : %d; stop multiple reads\n", tot_tr_len, max_tr_size, read_jnl_seqno,
+				     jnl_seqno, gtmsource_msgbufsiz);
+		}
+		break;
+	} while (TRUE);
+	gtmsource_local->read_addr = read_addr;
+	gtmsource_local->read_jnl_seqno = read_jnl_seqno;
 #ifdef GTMSOURCE_ALWAYS_READ_FILES
-	jnlpool.gtmsource_local->read_state = READ_FILE;
+	gtmsource_local->read_state = read_state = READ_FILE;
 #endif
-	if (jnlpool.gtmsource_local->read_state == READ_POOL)
+	if (read_state == READ_POOL)
 	{
 		gtmsource_ctl_close(); /* no need to keep files open now that we are going to read from pool */
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server now reading from journal pool. Tr num = "INT8_FMT"\n",
-				INT8_PRINT(jnlpool.gtmsource_local->read_jnl_seqno));
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server now reading from journal pool at transaction %llu\n",
+				read_jnl_seqno);
+		REPL_DPRINT3("Readfiles : after switch to pool, read_addr : "INT8_FMT" read : %u\n",
+				INT8_PRINT(read_addr), gtmsource_local->read);
 	}
-	*data_len = read_size;
-	return (0);
+	*data_len = (first_tr_len - REPL_MSG_HDRLEN);
+	return (tot_tr_len);
 }
 
 static	int scavenge_closed_jnl_files(seq_num ack_seqno)	/* currently  not used */
@@ -1332,7 +1637,7 @@ int gtmsource_update_resync_tn(seq_num resync_seqno)
 	REPL_DPRINT2("UPDATING RESYNC TN with seqno "INT8_FMT"\n", INT8_PRINT(resync_seqno));
 	gtmsource_ctl_close();
 	gtmsource_ctl_init();
-	read_size = read_and_merge((uchar_ptr_t)&gtmsource_msgp->msg[0], gtmsource_msgbufsiz - REPL_MSG_HDRLEN, resync_seqno);
+	read_size = read_and_merge((unsigned char *)&gtmsource_msgp->msg[0], gtmsource_msgbufsiz - REPL_MSG_HDRLEN, resync_seqno);
 	for (ctl = repl_ctl_list->next, prev_ctl = repl_ctl_list; ctl != NULL; )
 	{
 		for (region = ctl->reg;
@@ -1352,5 +1657,7 @@ int gtmsource_update_resync_tn(seq_num resync_seqno)
 		for (; ctl != NULL && ctl->reg == region;
 		       prev_ctl = ctl, ctl = ctl->next);
 	}
+	gtmsource_ctl_close(); /* close all structures now that we are done; if we have to read from journal files; we'll open
+				* the structures again */
 	return (SS_NORMAL);
 }

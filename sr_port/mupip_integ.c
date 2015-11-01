@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -111,7 +111,8 @@ GBLDEF boolean_t		master_dir;
 GBLDEF boolean_t		muint_key = FALSE;
 GBLDEF boolean_t		muint_subsc = FALSE;
 GBLDEF boolean_t		mu_int_err_ranges;
-GBLDEF boolean_t		tn_reset;
+GBLDEF boolean_t		tn_reset_specified;	/* use this to avoid recomputing cli_present("TN_RESET") in the loop */
+GBLDEF boolean_t		tn_reset_this_reg;
 GBLDEF block_id			mu_int_adj_prev[MAX_BT_DEPTH + 1];
 GBLDEF block_id			mu_int_path[MAX_BT_DEPTH + 1];
 GBLDEF global_list		*trees_tail;
@@ -241,6 +242,7 @@ void mupip_integ(void)
 		if (muint_key)
 			disp_map_errors = 0;
 	}
+	tn_reset_specified = (CLI_PRESENT == cli_present("TN_RESET"));
 	mu_outofband_setup();
 #ifdef UNIX
 	ESTABLISH(mu_int_ch);
@@ -301,8 +303,8 @@ void mupip_integ(void)
 		trees_tail->nct = 0;
 		trees_tail->act = 0;
 		trees_tail->ver = 0;
-		tn_reset = update_header_tn = FALSE;
-		if (CLI_PRESENT == cli_present("TN_RESET"))
+		tn_reset_this_reg = update_header_tn = FALSE;
+		if (tn_reset_specified)
 		{
 			if (gv_cur_region->read_only)
 			{
@@ -314,7 +316,7 @@ void mupip_integ(void)
 				/* is this error supposed to update error count, or leave it ( then mu_int_errknt-- instead)*/
 				mu_int_plen++;  /* continuing, so compensate for mu_int_err decrement */
 			} else
-				tn_reset = update_header_tn = TRUE;
+				tn_reset_this_reg = update_header_tn = TRUE;
 		}
 		if (CLI_PRESENT == cli_present("BLOCK"))
 		{

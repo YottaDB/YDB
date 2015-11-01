@@ -269,6 +269,7 @@ void secshr_db_clnup(boolean_t termination_mode)
 						{
 							cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 							cr->blk = CR_BLKEMPTY;
+							assert(0 == cr->bt_index);/* ensure no bt points to this cr for empty blk */
 							/* don't mess with ownership the I/O may not yet be cancelled; ownership
 							 * will be cleared by whoever gets stuck waiting for the buffer */
 						}
@@ -480,7 +481,8 @@ void secshr_db_clnup(boolean_t termination_mode)
 						{
 							if (!tp_update_underway)
 							{
-								if (FALSE == sec_shr_blk_build(cs, blk_ptr, csa->ti->curr_tn))
+								if (FALSE == sec_shr_blk_build(csa, csd, is_bg,
+											cs, blk_ptr, csa->ti->curr_tn))
 								{
 									SECSHR_ACCOUNTING(10);
 									SECSHR_ACCOUNTING(__LINE__);
@@ -542,7 +544,7 @@ void secshr_db_clnup(boolean_t termination_mode)
 							{	/* TP */
 								if (cs->done == 0)
 								{
-									if (FALSE == sec_shr_blk_build(cs, blk_ptr,
+									if (FALSE == sec_shr_blk_build(csa, csd, is_bg, cs, blk_ptr,
 													csa->ti->curr_tn))
 									{
 										SECSHR_ACCOUNTING(10);
@@ -724,6 +726,10 @@ void secshr_db_clnup(boolean_t termination_mode)
 						SECSHR_ACCOUNTING(CRIT_SPACE);
 					}
 				}
+				VMS_ONLY(
+					if (is_bg && csa->wbuf_dqd)	/* most likely failed during REMQHI in wcs_wtstart */
+						csd->wc_blocked = TRUE;	/* cache corruption is suspected so set wc_blocked */
+				)
 #ifdef UNIX
 				/* All releases done now. Double check latch is really cleared */
 				if ((GTM_PROBE(NODE_LOCAL_SIZE_DBS, csa->nl, WRITE)) &&

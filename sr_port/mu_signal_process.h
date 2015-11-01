@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,8 @@
 
 #ifndef MU_SIGNAL_PROCESS_H
 #define MU_SIGNAL_PROCESS_H
+
+#define STOP_STR	"STOP"
 
 void mu_signal_process(char *command, int signal);
 

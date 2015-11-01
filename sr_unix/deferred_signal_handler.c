@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,7 @@ GBLREF	uint4			process_id;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	gtmImageName		gtmImageNames[];
 GBLREF	enum gtmImageTypes	image_type;
+GBLREF	boolean_t		exit_handler_active;
 
 void deferred_signal_handler(void)
 {
@@ -45,6 +46,11 @@ void deferred_signal_handler(void)
 	/* To avoid nested calls to this routine, we set forced_exit to FALSE at the very beginning */
 	forced_exit = FALSE;
 
+	if (exit_handler_active)
+	{
+		assert(FALSE);	/* at this point in time (June 2003) there is no way we know of to get here, hence the assert */
+		return;	/* since anyway we are exiting currently, resume exit handling instead of reissuing another one */
+	}
 	/* For signals that get a delayed response so we can get out of crit, we also delay the messages.
 	 * This routine will output those delayed messages from the appropriate structures to both the
 	 * user and the system console.

@@ -46,6 +46,8 @@
 #include "set_num_additional_processors.h"
 #include "have_crit.h"
 #include "t_retry.h"
+#include "gvcst_tp_init.h"
+#include "dpgbldir.h"
 
 #define CWS_INITIAL_SIZE        32
 
@@ -72,6 +74,7 @@ GBLREF	tp_region		*tp_reg_list;		/* Ptr to list of tp_regions for this transacti
 GBLREF	unsigned int		t_tries;
 GBLREF	hashtab			*cw_stagnate;
 GBLREF	struct_jrec_tcom	tcom_record;
+GBLREF	boolean_t		tp_in_use;
 
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
@@ -132,13 +135,12 @@ void	assert_jrec_member_offsets(void)
 
 void gvcst_init (gd_region *greg)
 {
-	sgmnt_addrs		*csa;
+	sgmnt_addrs		*csa, *prevcsa, *regcsa;
 	sgmnt_data_ptr_t	csd, temp_cs_data;
 	char			cs_data_buff[ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE)];
 	unsigned int		segment_update_array_size;
 	file_control		*fc;
-	gd_region		*prev_reg;
-	sgm_info		*si;
+	gd_region		*prev_reg, *reg_top;
 #ifdef DEBUG
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
@@ -148,6 +150,10 @@ void gvcst_init (gd_region *greg)
 	char			trans_buff[MAX_FN_LEN+1];
 	static int4		first_time = TRUE;
 	char			now_running[MAX_REL_NAME];
+	unique_file_id		*greg_fid, *reg_fid;
+	gd_addr			*addr_ptr;
+	tp_region		*tr;
+	int4			prev_index;
 
 	error_def (ERR_DBFLCORRP);
 	error_def (ERR_DBCREINCOMP);
@@ -439,80 +445,8 @@ void gvcst_init (gd_region *greg)
 		 */
 		csa->min_total_nontpjnl_rec_size = PINI_RECLEN + MIN_ALIGN_RECLEN;
 	}
-	/* For the first open of this region we are guaranteed that csa->sgm_info_ptr is NULL.
-	 * Only in this case, the one-time TP structure-initialization needs to be done.
-	 * Note GT.CM and DAL-calls-to-gds_rundown can require opening/closing of the same region multiple times.
-	 */
-	if (GTCM_SERVER_IMAGE != image_type && GTCM_GNP_SERVER_IMAGE != image_type)
-				/* currently TP is not supported for GT.CM */
-	{
-		if (NULL == csa->sgm_info_ptr)
-		{
-			si = csa->sgm_info_ptr = (sgm_info *)malloc(sizeof(sgm_info));
-			assert(32768 > sizeof(sgm_info));
-			memset(si, 0, sizeof(sgm_info));
-			si->tp_hist_size = TP_MAX_MM_TRANSIZE;
-			si->cur_tp_hist_size = INIT_CUR_TP_HIST_SIZE;	/* should be very much less than si->tp_hist_size */
-			assert(si->cur_tp_hist_size <= si->tp_hist_size);
-			init_hashtab(&si->blks_in_use, BLKS_IN_USE_INIT_ELEMS);
-			/* See comment in tp.h about cur_tp_hist_size for details */
-			si->first_tp_hist = si->last_tp_hist =
-							(srch_blk_status *)malloc(sizeof(srch_blk_status) * si->cur_tp_hist_size);
-			si->cw_set_list = (buddy_list *)malloc(sizeof(buddy_list));
-			initialize_list(si->cw_set_list, sizeof(cw_set_element), CW_SET_LIST_INIT_ALLOC);
-			si->tlvl_cw_set_list = (buddy_list *)malloc(sizeof(buddy_list));
-			initialize_list(si->tlvl_cw_set_list, sizeof(cw_set_element), TLVL_CW_SET_LIST_INIT_ALLOC);
-			si->tlvl_info_list = (buddy_list *)malloc(sizeof(buddy_list));
-			initialize_list(si->tlvl_info_list, sizeof(tlevel_info), TLVL_INFO_LIST_INIT_ALLOC);
-			si->new_buff_list = (buddy_list *)malloc(sizeof(buddy_list));
-			initialize_list(si->new_buff_list, sizeof(que_ent) + csa->hdr->blk_size, NEW_BUFF_LIST_INIT_ALLOC);
-			si->recompute_list = (buddy_list *)malloc(sizeof(buddy_list));
-			initialize_list(si->recompute_list, sizeof(key_cum_value), RECOMPUTE_LIST_INIT_ALLOC);
-			/* The size of the si->cr_array can go up to TP_MAX_MM_TRANSIZE, but usually is quite less.
-			 * Therefore, initially allocate a small array and expand as needed later.
-			 */
-			if (dba_bg == greg->dyn.addr->acc_meth)
-			{
-				si->cr_array_size = si->cur_tp_hist_size;
-				si->cr_array = (cache_rec_ptr_ptr_t)malloc(sizeof(cache_rec_ptr_t) * si->cr_array_size);
-			} else
-			{
-				si->cr_array_size = 0;
-				si->cr_array = NULL;
-			}
-			si->fresh_start = TRUE;
-		} else
-			si = csa->sgm_info_ptr;
-		si->gv_cur_region = greg;
-		si->start_tn = csa->ti->curr_tn;
-		if (JNL_ALLOWED(csa))
-		{
-			si->total_jnl_rec_size = csa->min_total_tpjnl_rec_size;	/* Reinitialize total_jnl_rec_size */
-			/* Since the following jnl-mallocs are independent of any dynamically-changeable parameter of the
-			 * database, we can as well use the existing malloced jnl structures if at all they exist.
-			 */
-			if (NULL == si->jnl_tail)
-			{
-				si->jnl_tail = &si->jnl_head;
-				si->jnl_list = (buddy_list *)malloc(sizeof(buddy_list));
-				initialize_list(si->jnl_list, sizeof(jnl_format_buffer), JNL_LIST_INIT_ALLOC);
-				si->format_buff_list = (buddy_list *)malloc(sizeof(buddy_list));
-				/* Minimum value of elemSize is 8 due to alignment requirements of the returned memory location.
-				 * Therefore, we request an elemSize of 8 bytes for the format-buffer and will convert as much
-				 * bytes as we need into as many 8-byte multiple segments (see code in jnl_format).
-				 */
-				initialize_list(si->format_buff_list, JFB_ELE_SIZE,
-					DIVIDE_ROUND_UP(JNL_FORMAT_BUFF_INIT_ALLOC, JFB_ELE_SIZE));
-			}
-		} else if (NULL != si->jnl_tail)
-		{	/* journaling is currently disallowed although it was allowed (non-zero si->jnl_tail)
-			 * during the prior use of this region. Free up unnecessary region-specific structures now.
-			 */
-			FREEUP_BUDDY_LIST(si->jnl_list);
-			FREEUP_BUDDY_LIST(si->format_buff_list);
-			si->jnl_tail = NULL;
-		}
-	}
+	if (tp_in_use || GTM_IMAGE != image_type)
+		gvcst_tp_init(greg);	/* Initialize TP structures, else postpone till TP is used (only if GTM) */
 	if (!global_tlvl_info_list)
 	{
 		global_tlvl_info_list = (buddy_list *)malloc(sizeof(buddy_list));
@@ -520,6 +454,55 @@ void gvcst_init (gd_region *greg)
 	}
 	greg->open = TRUE;
 	greg->opening = FALSE;
+	if ((dba_bg == greg->dyn.addr->acc_meth) || (dba_mm == greg->dyn.addr->acc_meth))
+	{
+		/* Determine fid_index of current region's file_id across sorted file_ids of all regions open until now.
+		 * All regions which have a file_id lesser than that of current region will have no change to their fid_index
+		 * All regions which have a file_id greater than that of current region will have their fid_index incremented by 1
+		 * The fid_index determination algorithm below has an optimization in that if the current region's file_id is
+		 * determined to be greater than a that of a particular region, then all regions whose fid_index is lesser
+		 * than that particular region's fid_index are guaranteed to have a lesser file_id than the current region
+		 * so we do not compare those against the current region's file_id.
+		 * Note that the sorting is done only on DB/MM regions. GT.CM/DDP regions should not be part of TP transactions,
+		 * hence they will not be sorted.
+		 */
+		prevcsa = NULL;
+		greg_fid = &(csa->nl->unique_id);
+		for (addr_ptr = get_next_gdr(NULL); NULL != addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+		{
+			for (prev_reg = addr_ptr->regions, reg_top = prev_reg + addr_ptr->n_regions; prev_reg < reg_top; prev_reg++)
+			{
+				if ((!prev_reg->open) || (greg == prev_reg))
+					continue;
+				/* Only BG/MM regions can be involved in TP transactions, do not sort GT.CM or DDP regions */
+				if (!((dba_bg == prev_reg->dyn.addr->acc_meth) || (dba_mm == prev_reg->dyn.addr->acc_meth)))
+					continue;
+				regcsa = (sgmnt_addrs *)&FILE_INFO(prev_reg)->s_addrs;
+				if ((NULL != prevcsa) && (regcsa->fid_index < prevcsa->fid_index))
+					continue;
+				reg_fid = &((regcsa)->nl->unique_id);
+				VMS_ONLY(if (0 < memcmp(&(greg_fid->file_id), (char *)&(reg_fid->file_id), sizeof(gd_id))))
+				UNIX_ONLY(if (0 < gdid_cmp(&(greg_fid->uid), &(reg_fid->uid))))
+				{
+					if (NULL == prevcsa || regcsa->fid_index > prevcsa->fid_index)
+						prevcsa = regcsa;
+				} else
+					regcsa->fid_index++;
+			}
+		}
+		if (NULL == prevcsa)
+			csa->fid_index = 1;
+		else
+			csa->fid_index = prevcsa->fid_index + 1;
+		/* Also update tp_reg_list fid_index's as insert_region relies on it */
+		DEBUG_ONLY(prev_index = 0;)
+		for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
+		{
+			tr->file.fid_index = (&FILE_INFO(tr->reg)->s_addrs)->fid_index;
+			assert(prev_index < tr->file.fid_index);
+			DEBUG_ONLY(prev_index = tr->file.fid_index);
+		}
+	}
 	REVERT;
 	return;
 }

@@ -48,6 +48,7 @@
 #include "io.h"			/* needed by gtmsecshr.h */
 #include "gtmsecshr.h"		/* for continue_proc */
 #endif
+#include "cert_blk.h"
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
 GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a failure (no buffer filled) and the real
@@ -86,7 +87,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	register sgmnt_addrs	*csa;
 	register sgmnt_data_ptr_t	csd;
 	int4			dummy_errno;
-	boolean_t		already_built, is_mm, reset_first_tp_srch_status;
+	boolean_t		already_built, is_mm, reset_first_tp_srch_status, set_wc_blocked;
 
 	error_def(ERR_DBFILERR);
 	error_def(ERR_BUFOWNERSTUCK);
@@ -154,8 +155,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							return (sm_uc_ptr_t)NULL;
 						}
         					if (certify_all_blocks &&
-								FALSE == cert_blk(blk, (blk_hdr_ptr_t)cse->new_buff,
-									cse->blk_target->root))
+								FALSE == cert_blk(gv_cur_region, blk, (blk_hdr_ptr_t)cse->new_buff,
+											cse->blk_target->root))
 							GTMASSERT;
 					}
 					cse->done = TRUE;
@@ -211,6 +212,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		bt = NULL;
 	was_crit = csa->now_crit;
 	ocnt = 0;
+	set_wc_blocked = FALSE;	/* to indicate whether csd->wc_blocked was set to TRUE by us */
 	do
 	{
 		if (NULL == (cr = db_csh_get(blk)))
@@ -240,7 +242,12 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				assert(csa->now_crit);
 				cr = db_csh_getn(blk);
 				if (CR_NOTVALID == (sm_long_t)cr)
+				{
+					SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
+					BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_db_csh_getn_invalid_blk);
+					set_wc_blocked = TRUE;
 					break;
+				}
 				assert(0 <= cr->read_in_progress);
 				*cycle = cr->cycle;
 				cr->tn = csa->ti->curr_tn;
@@ -283,7 +290,12 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			}
 		}
 		if (CR_NOTVALID == (sm_long_t)cr)
+		{
+			SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
+			BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_db_csh_get_invalid_blk);
+			set_wc_blocked = TRUE;
 			break;
+		}
 		for (lcnt = 1;  ; lcnt++)
 		{
 			if (0 > cr->read_in_progress)
@@ -348,6 +360,14 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					{
 						if (FALSE == is_proc_alive(blocking_pid, cr->image_count))
 						{	/* process gone: release that process's lock */
+							assert(0 == cr->bt_index);
+							if (cr->bt_index)
+							{
+								SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+								BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_bad_bt_index1);
+								set_wc_blocked = TRUE;
+								break;
+							}
 							cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 							cr->blk = CR_BLKEMPTY;
 							RELEASE_BUFF_READ_LOCK(cr);
@@ -365,6 +385,14 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						}
 					} else
 					{	/* process stopped before could set r_epid */
+						assert(0 == cr->bt_index);
+						if (cr->bt_index)
+						{
+							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+							BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_bad_bt_index2);
+							set_wc_blocked = TRUE;
+							break;
+						}
 						cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 						cr->blk = CR_BLKEMPTY;
 						RELEASE_BUFF_READ_LOCK(cr);
@@ -377,6 +405,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			} else
 				wcs_sleep(lcnt);
 		}
+		if (set_wc_blocked)	/* cannot use csd->wc_blocked here as we might not necessarily have crit */
+			break;
 		ocnt++;
 		if (BAD_LUCK_ABOUNDS <= ocnt)
 		{
@@ -389,8 +419,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				grab_crit(gv_cur_region);
 		}
 	} while (TRUE);
-	BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_db_csh_get_invalid_blk);
-	SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
+	assert(set_wc_blocked && (csd->wc_blocked || !csa->now_crit));
 	rdfail_detail = cdb_sc_cacheprob;
 	if (was_crit != csa->now_crit)
 		rel_crit(gv_cur_region);

@@ -173,9 +173,9 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		align_rec.prefix.tn = jnl_rec->prefix.tn;
 		/* we have to write an ALIGN record here before writing the PINI record but we do not have a non-zero
 		 * pini_addr for the ALIGN since we have not yet written the PINI. we use the pini_addr field of the
-		 * first PINI journal record in the journal file which is nothing but JNL_HDR_LEN.
+		 * first PINI journal record in the journal file which is nothing but JNL_FILE_FIRST_RECORD.
 		 */
-		align_rec.prefix.pini_addr = (JRT_PINI == rectype) ? JNL_HDR_LEN : jnl_rec->prefix.pini_addr;
+		align_rec.prefix.pini_addr = (JRT_PINI == rectype) ? JNL_FILE_FIRST_RECORD : jnl_rec->prefix.pini_addr;
 		suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 		assert(jpc->temp_free >= 0 && jpc->temp_free < jpc->jnl_buff->size);
 		if (jpc->jnl_buff->size >= (jpc->temp_free + align_rec_len))
@@ -214,7 +214,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		jb->free = jpc->temp_free;
 		jpc->free_update_inprog = FALSE;
 		if (JRT_PINI == rectype)
-			jnl_rec->prefix.pini_addr = csa->jnl->pini_addr = csa->jnl->jnl_buff->freeaddr;
+			jnl_rec->prefix.pini_addr = csa->jnl->jnl_buff->freeaddr;
 	}
 	UNIX_ONLY(assert(!jb->blocked));
 	VMS_ONLY(assert(!jb->blocked || jb->blocked == process_id && lib$ast_in_prog())); /* wcs_wipchk_ast can set jb->blocked */

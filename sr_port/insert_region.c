@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,13 @@
  *	return
  *		pointer to the item in the list that is corresponding to the region.
  *		*reg_list and *reg_free_list are also updated if needed.
+ *
+ *	fid_index field in csa and tp_reg_list is maintained by gvcst_init. Maintaining tp_reg_list is
+ *	important, since the regions might be re-sorted in between insert_region() calls (i.e. new
+ *	regions opening). All callers of insert_region except for dse_all() either use tp_reg_list or do not
+ *	have the regions open.  dse_all() opens the regions before it calls insert_region(), so maintaining
+ *	fid_index in tp_reg_list is sufficient.
+ *
  */
 
 #include "mdef.h"
@@ -53,7 +60,6 @@
 #include "tp_grab_crit.h"
 #include "t_retry.h"
 
-GBLREF	tp_region	*rlist;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	bool		run_time;
 GBLREF	short		dollar_tlevel;
@@ -72,15 +78,20 @@ tp_region	*insert_region(	gd_region	*reg,
 	uint4		status;
 	gd_region	*temp_reg;
 #endif
+	int4		local_fid_index;
+	sgmnt_addrs	*csa;
+	int4		prev_index;
 
 	assert(size >= sizeof(tp_region));
 	assert(!run_time || dollar_tlevel);
+	if (reg->open)
+		csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
 #if defined(VMS)
-	local_id_fiptr = &local_id.file_id[0];
-	temp_reg = gv_cur_region;
-	gv_cur_region = reg;
-	if (TRUE != reg->open)
+	if (!reg->open)
 	{
+		temp_reg = gv_cur_region;
+		gv_cur_region = reg;
+		local_id_fiptr = &local_id.file_id[0];
 		if (!mupfndfil(reg, NULL))
 		{
 			gv_cur_region = temp_reg;
@@ -104,17 +115,15 @@ tp_region	*insert_region(	gd_region	*reg,
 	    	{
 			local_id_fiptr = &(FILE_INFO(reg)->file_id);
 	      		sys$dassgn(FILE_INFO(reg)->fab->fab$l_stv);
-	    	}
-	  	else
+	    	} else
 	    	{
 	      		gtm_putmsg(VARLSTCNT(1) status);
 			gv_cur_region = temp_reg;
 	      		return NULL;
 	    	}
-	}
-	else
-		local_id_fiptr = &((&FILE_INFO(reg)->s_addrs)->nl->unique_id.file_id);
-	gv_cur_region = temp_reg;
+		gv_cur_region = temp_reg;
+	} else
+		local_fid_index = csa->fid_index;
 #elif defined(UNIX)
 	if (!reg->open)
 	{
@@ -123,7 +132,7 @@ tp_region	*insert_region(	gd_region	*reg,
 		if (!filename_to_id(&local_id.uid, (char *)reg->dyn.addr->fname))
 			return NULL;
 	} else
-		local_id.uid = (&FILE_INFO(reg)->s_addrs)->nl->unique_id.uid;
+		local_fid_index = csa->fid_index;
 #endif
 	/* See if the region is already on the list or if we have to add it */
 	for (tr = *reg_list, tr_last = NULL; NULL != tr; tr = tr->fPtr)
@@ -131,12 +140,32 @@ tp_region	*insert_region(	gd_region	*reg,
 		if (reg == tr->reg)			/* Region is found */
 		{	/* assert we are not in final retry or we are in TP and have crit on the region already */
 			assert((CDB_STAGNATE > t_tries)
-				|| ((0 < dollar_tlevel) && reg->open && (&FILE_INFO(reg)->s_addrs)->now_crit));
+				|| ((0 < dollar_tlevel) && reg->open && csa->now_crit));
 			return tr;
 		}
-		VMS_ONLY(if (0 < memcmp(&(tr->file_id), local_id_fiptr, sizeof(gd_id))))
-		UNIX_ONLY(if (0 < gdid_cmp(&(tr->file_id), &(local_id.uid))))
-			break;				/* .. we have found our insertion point */
+		if (reg->open)
+		{	/* gvcst_init must have sorted them and filled in the fid_index field of node_local */
+			assert(tr->reg->open);
+			if ((tr->file.fid_index > local_fid_index))
+				break;				/* .. we have found our insertion point */
+		} else
+		{	/* let's sort here */
+			if (!tr->reg->open)
+			{	/* all regions closed */
+				VMS_ONLY(if (0 < memcmp(&(tr->file.file_id), local_id_fiptr, sizeof(gd_id))))
+				UNIX_ONLY(if (0 < gdid_cmp(&(tr->file.file_id), &(local_id.uid))))
+					break;				/* .. we have found our insertion point */
+			} else
+			{	/* the other regions are open, i.e. file is pointing to fid_index, use file_id
+				 * from node_local */
+				VMS_ONLY(if (0 < memcmp(
+					&(((sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs)->nl->unique_id.file_id),
+					local_id_fiptr, sizeof(gd_id))))
+				UNIX_ONLY(if (0 < gdid_cmp(
+					&(((sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs)->nl->unique_id.uid), &(local_id.uid))))
+					break;				/* .. we have found our insertion point */
+			}
+		}
 		tr_last = tr;
 	}
 	if ((NULL != reg_free_list) && (NULL != *reg_free_list))	/* Get a used block off our unused queue */
@@ -150,8 +179,12 @@ tp_region	*insert_region(	gd_region	*reg,
 			memset(tr_new, 0, size);
 	}
 	tr_new->reg = reg;				/* Add this region to end of list */
-	VMS_ONLY(memcpy(&(tr_new->file_id), local_id_fiptr, sizeof(gd_id));)
-	UNIX_ONLY(tr_new->file_id = local_id.uid;)
+	if (!reg->open)
+	{
+		VMS_ONLY(memcpy(&(tr_new->file.file_id), local_id_fiptr, sizeof(gd_id));)
+		UNIX_ONLY(tr_new->file.file_id = local_id.uid;)
+	} else
+		tr_new->file.fid_index = local_fid_index;
 	if (NULL == tr_last)
 	{	/* First element on the list */
 		tr_new->fPtr = *reg_list;
@@ -161,7 +194,7 @@ tp_region	*insert_region(	gd_region	*reg,
 		tr_new->fPtr = tr_last->fPtr;
 		tr_last->fPtr = tr_new;
 	}
-	if ((CDB_STAGNATE <= t_tries) && (0 < dollar_tlevel) && reg->open && !(&FILE_INFO(reg)->s_addrs)->now_crit)
+	if ((CDB_STAGNATE <= t_tries) && (0 < dollar_tlevel) && reg->open && !csa->now_crit)
 	{	/* Final retry in TP and this region not locked down. Get crit on it if it is open.
 		 * reg->open needs to be checked above to take care of the case where we do an insert_region() from gvcst_init()
 		 * 	in the 3rd retry in TP when we have not yet opened the region. In case region is not open,
@@ -172,7 +205,18 @@ tp_region	*insert_region(	gd_region	*reg,
 			t_retry(cdb_sc_needcrit);	/* avoid deadlock -- restart transaction */
 			assert(FALSE);			/* should not come here as t_retry() does not return */
 		}
-		assert((&FILE_INFO(reg)->s_addrs)->now_crit);	/* ensure we have crit now */
+		assert(csa->now_crit);	/* ensure we have crit now */
 	}
+	DEBUG_ONLY(
+		prev_index = 0;
+		for (tr = *reg_list; NULL != tr; tr = tr->fPtr)
+		{
+			if (tr->reg->open)
+			{
+				assert(prev_index < tr->file.fid_index);
+				DEBUG_ONLY(prev_index = tr->file.fid_index);
+			}
+		}
+	)
 	return tr_new;
 }

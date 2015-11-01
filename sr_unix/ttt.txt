@@ -17,7 +17,7 @@ OC_BINDPARM:	irepl	val.2
 OC_BOOLFINI:	incl	val.1
 OC_BOOLINIT:	clrl	val.0
 OC_BREAK:	jsb	xfer.xf_break
-OC_CALL-BYTE:	pushab	val.2
+OC_CALL-BYTE:	pushl	val.2
 		jsb	xfer.xf_callb
 		brb	jmp.1
 OC_CALL-LONG:	pushl	val.2

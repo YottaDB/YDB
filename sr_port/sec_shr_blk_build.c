@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,14 +28,39 @@
 #endif
 #include "sec_shr_blk_build.h"
 
-int sec_shr_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
+#define		SECSHR_ACCOUNTING(value)						\
+{											\
+	if (csa->read_write || is_bg)							\
+	{										\
+		if (csd->secshr_ops_index < sizeof(csd->secshr_ops_array))		\
+			csd->secshr_ops_array[csd->secshr_ops_index] = (uint4)(value);	\
+		csd->secshr_ops_index++;						\
+	}										\
+}
+
+int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
+			cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 {
 	blk_segment	*seg, *stop_ptr, *array;
 	unsigned char	*ptr;
 
 	array = (blk_segment *)cse->upd_addr;
-	if (!(GTM_PROBE(sizeof(blk_segment), array, READ)) || !(GTM_PROBE(sizeof(blk_hdr), base_addr, WRITE)))
+	if (!(GTM_PROBE(sizeof(blk_segment), array, READ)))
+	{
+		SECSHR_ACCOUNTING(4);
+		SECSHR_ACCOUNTING(__LINE__);
+		SECSHR_ACCOUNTING(cse->upd_addr);
+		SECSHR_ACCOUNTING(sizeof(blk_segment));
 		return FALSE;
+	}
+	if (!(GTM_PROBE(sizeof(blk_hdr), base_addr, WRITE)))
+	{
+		SECSHR_ACCOUNTING(4);
+		SECSHR_ACCOUNTING(__LINE__);
+		SECSHR_ACCOUNTING(base_addr);
+		SECSHR_ACCOUNTING(sizeof(blk_hdr));
+		return FALSE;
+	}
 
 	/* block transaction number needs to be modified first. see comment in gvcst_blk_build as to why */
 	((blk_hdr*)base_addr)->tn = ctn;
@@ -48,11 +73,34 @@ int sec_shr_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		for (seg = array + 1, stop_ptr = (blk_segment *)array->addr;  seg <= stop_ptr;  seg++)
 		{
 			if (!(GTM_PROBE(sizeof(blk_segment), seg, READ)))
+			{
+				SECSHR_ACCOUNTING(4);
+				SECSHR_ACCOUNTING(__LINE__);
+				SECSHR_ACCOUNTING(seg);
+				SECSHR_ACCOUNTING(sizeof(blk_segment));
 				return FALSE;
+			}
+			if (!seg->len)
+				continue;	/* GTM_PROBE on a zero length returns FALSE so check for it explicitly here */
 			if (!(GTM_PROBE(seg->len, seg->addr, READ)))
+			{
+				SECSHR_ACCOUNTING(5);
+				SECSHR_ACCOUNTING(__LINE__);
+				SECSHR_ACCOUNTING(seg);
+				SECSHR_ACCOUNTING(seg->addr);
+				SECSHR_ACCOUNTING(seg->len);
 				return FALSE;
+			}
 			if (!(GTM_PROBE(seg->len, ptr, WRITE)))
+			{
+				SECSHR_ACCOUNTING(6);
+				SECSHR_ACCOUNTING(__LINE__);
+				SECSHR_ACCOUNTING(seg);
+				SECSHR_ACCOUNTING(ptr);
+				SECSHR_ACCOUNTING(seg->addr);
+				SECSHR_ACCOUNTING(seg->len);
 				return FALSE;
+			}
 			memmove(ptr, seg->addr, seg->len);
 			ptr += seg->len;
 		}
@@ -62,12 +110,35 @@ int sec_shr_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		for  (seg = (blk_segment*)array->addr, stop_ptr = array;  seg > stop_ptr;  seg--)
 		{
 			if (!(GTM_PROBE(sizeof(blk_segment), seg, READ)))
+			{
+				SECSHR_ACCOUNTING(4);
+				SECSHR_ACCOUNTING(__LINE__);
+				SECSHR_ACCOUNTING(seg);
+				SECSHR_ACCOUNTING(sizeof(blk_segment));
 				return FALSE;
-			ptr -= seg->len;
+			}
+			if (!seg->len)
+				continue;	/* GTM_PROBE on a zero length returns FALSE so check for it explicitly here */
 			if (!(GTM_PROBE(seg->len, seg->addr, READ)))
+			{
+				SECSHR_ACCOUNTING(5);
+				SECSHR_ACCOUNTING(__LINE__);
+				SECSHR_ACCOUNTING(seg);
+				SECSHR_ACCOUNTING(seg->addr);
+				SECSHR_ACCOUNTING(seg->len);
 				return FALSE;
+			}
+			ptr -= seg->len;
 			if (!(GTM_PROBE(seg->len, ptr, WRITE)))
+			{
+				SECSHR_ACCOUNTING(6);
+				SECSHR_ACCOUNTING(__LINE__);
+				SECSHR_ACCOUNTING(seg);
+				SECSHR_ACCOUNTING(ptr);
+				SECSHR_ACCOUNTING(seg->addr);
+				SECSHR_ACCOUNTING(seg->len);
 				return FALSE;
+			}
 			memmove(ptr, seg->addr, seg->len);
 		}
 	}

@@ -53,7 +53,7 @@ static  bool	star_found;
 
 static  void 	ext_stx_error();
 static 	int 	scan_array_bound(char **b,int curr_type);
-static int	parm_space_needed[] =
+const static int parm_space_needed[] =
 {
 	0,
 	0,
@@ -133,7 +133,7 @@ static char	*scan_labelref(char *c)
 
 static enum xc_types	scan_keyword (char **c)
 {
-	static struct
+	const static struct
 	{
 		char		nam[MAX_NAM_LEN];
 		enum xc_types	typ[MAXIMUM_STARS + 1]; /* one entry for each level of indirection eg [1] is type* */
@@ -213,25 +213,25 @@ static 	int scan_array_bound(char **b,int curr_type)
 	error_def	(ERR_ZCCSQRBR);
 	error_def	(ERR_ZCPREALLNUMEX);
 
-	static int	default_pre_alloc_value[] =
-			{
-				0, /* Unknown Type */
-				0, /* void */
-				0, /* status */
-				0, /* long */
-				0, /* unsigned long */
-				0, /* float */
-				0, /* double */
-				1, /* Pointer to long */
-				1, /* Pointer to unsigned long */
-				1, /* Pointer to string */
-				1, /* Pointer to float */
-				100, /* Pointer to char */
-				1, /* Pointer to pointer of char */
-				1, /* Pointer to double */
-				1, /* Pointer to function */
-				1  /* Pointer to pointer to function */
-			};
+	const static int default_pre_alloc_value[] =
+	{
+		0, /* Unknown Type */
+		0, /* void */
+		0, /* status */
+		0, /* long */
+		0, /* unsigned long */
+		0, /* float */
+		0, /* double */
+		1, /* Pointer to long */
+		1, /* Pointer to unsigned long */
+		1, /* Pointer to string */
+		1, /* Pointer to float */
+		100, /* Pointer to char */
+		1, /* Pointer to pointer of char */
+		1, /* Pointer to double */
+		1, /* Pointer to function */
+		1  /* Pointer to pointer to function */
+	};
 
 	c = *b;
 	/* already found '[' */

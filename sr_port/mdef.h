@@ -102,9 +102,18 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 #define NUL		 0x00
 #define SP		 0x20
 #define DEL		 0x7f
-#define MAX_STRLEN	 		(1 * 1024 * 1024) /* maximum GT.M string size (1 MB) */
-#define MAX_STRLEN_INIT	 		(32 * 1024) /* Initial buffer size allocated for a GT.M string
-						       which can adaptively be increased upto MAX_STRLEN */
+
+/* #define MAX_STRLEN	 		(1 * 1024 * 1024)  maximum GT.M string size (1 MB) */
+
+/* Reverting back to 32K. We have identified a few areas (I/O device parameters, xcalls, DALs, Collation) that will
+ * get affected as a result of supporting >32K strings.  These functionalities define various parameters based on the
+ * 32K string limit. Unless these cases are dealt with long strings, it is not safe to support >32K strings */
+#define MAX_STRLEN			32767
+
+/* Initial buffer size allocated for a GT.M string which can geometrically be increased upto the size enough to fit in MAX_STRLEN */
+#define MAX_STRBUFF_INIT	 	(32 * 1024)
+
+#define MAX_DBSTRLEN			(32 * 1024) /* Maximum database string size */
 #define MAX_NUM_SIZE			64
 #define MAX_FORM_NUM_SUBLEN		128	/* this is enough to hold the largest numeric subscript */
 #define PERIODIC_FLUSH_CHECK_INTERVAL (30 * 1000)
@@ -308,6 +317,11 @@ typedef struct
 				 * unused on platforms with such instructions. */
 } que_head, cache_que_head, mmblk_que_head;
 
+#define	IS_PTR_ALIGNED(ptr, ptr_base, elemSize)					\
+	(0 == ((((sm_uc_ptr_t)(ptr)) - ((sm_uc_ptr_t)(ptr_base))) % elemSize))
+#define	IS_PTR_IN_RANGE(ptr, ptr_lo, ptr_hi)								\
+	(((sm_uc_ptr_t)(ptr) >= (sm_uc_ptr_t)(ptr_lo)) && ((sm_uc_ptr_t)(ptr) < (sm_uc_ptr_t)(ptr_hi)))
+
 #ifdef DB64
 # ifdef __osf__
 #  pragma pointer_size(save)
@@ -330,6 +344,22 @@ typedef que_head *	que_head_ptr_t;
 #define GTM_INT64T_DEFINED
    typedef	uint64_t		gtm_uint64_t;
    typedef	int64_t			gtm_int64_t;
+#endif
+
+ /* Define 8-bytes as a structure containing 2-byte array of uint4s.  Overlay this structure upon an 8 byte quantity for easy
+  * access to the lower or upper 4 bytes using lsb_index and msb_index respectively.
+  */
+ typedef struct
+ {
+	uint4	value[2];
+ } non_native_uint8;
+
+#ifdef BIGENDIAN
+#  define	msb_index		0
+#  define	lsb_index		1
+#  else
+#  define	msb_index		1
+#  define	lsb_index		0
 #endif
 
 #ifdef INT8_SUPPORTED
@@ -362,18 +392,10 @@ typedef que_head *	que_head_ptr_t;
 #  define	INT8_PRINTX(x)		x
 #  define	INT8_ONLY(x)		x
 #else
- typedef struct
- {
-	uint4	value[2];
- } qw_num, seq_num, qw_off_t, token_num;		/* Define 8-bytes as a structure containing 2-byte array of uint4s */
-
-#ifdef BIGENDIAN
-#  define	msb_index		0
-#  define	lsb_index		1
-#  else
-#  define	msb_index		1
-#  define	lsb_index		0
-#endif
+ typedef struct non_native_uint8	qw_num;
+ typedef struct non_native_uint8	seq_num;
+ typedef struct non_native_uint8	token_num;
+ typedef struct non_native_uint8	qw_off_t;
 
 #  define	DWASSIGNQW(A,B)		(A)=(B).value[lsb_index]
 #  define	QWASSIGN(A,B)		(A)=(B)
@@ -746,11 +768,15 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define SHMAT_ARG(X)		(X)
 #endif
 
-#define MAXNUMLEN 	128	/* from PV_N2S */
-#define CENTISECONDS	100	/* VMS lib$day returns 1/100s, we want seconds, use this factor to convert b/n the two */
-#define MINUTE		60		/* seconds in a minute */
-#define HOUR		MINUTE*60	/* one hour in seconds 60 * 60 */
-#define ONEDAY		86400		/* seconds in a day */
+#define MAXNUMLEN 		128	/* from PV_N2S */
+#define CENTISECONDS		100	/* VMS lib$day returns 1/100s, we want seconds, use this factor to convert b/n the two */
+#define MINUTE			60	/* seconds in a minute */
+#define HOUR			3600	/* one hour in seconds 60 * 60 */
+#define ONEDAY			86400	/* seconds in a day */
+#define MILLISECS_IN_SEC	1000	/* millseconds in a second */
+#define MICROSEC_IN_SEC		1000000 /* microseconds in a second */
+
+#define ASSERT_IN_RANGE(low, x, high)	assert((low <= x) && (x <= high))
 
 #if defined(VMS)
 #define DAYS		6530  /* adjust VMS returned days by this amount; GTM zero time Dec 31, 1840, VMS zero time 7-NOV-1858 */
@@ -783,5 +809,19 @@ typedef uint4 		jnl_tm_t;
 typedef uint4 		off_jnl_t;
 #define MAXUINT8	((gtm_uint64_t)-1)
 #define MAXUINT4	((uint4)-1)
+
+/* On platforms that support native 8 byte operations (such as Alpha), an assignment to an 8 byte field is atomic. On other
+ * platforms, an 8 byte assignment is a sequence of 4 byte operations. On such platforms, use this macro to determine if the
+ * change from the current value to the new value provides a consistent view (entirely the pre read, or entirely the post read,
+ * and not in between). Any change that causes the most significant 4 bytes to differ can cause inconsistency. In such cases, it
+ * may be necessary to grab crit if modifying a shared field.
+ */
+#ifdef  INT8_NATIVE
+#define QWCHANGE_IS_READER_CONSISTENT(FROM8, TO8)	(TRUE)
+#else
+/* Note: cannot use this macro when FROM8 or TO8 do not have an lvalue (eg.  literal) */
+#define QWCHANGE_IS_READER_CONSISTENT(FROM8, TO8)	(((non_native_uint8 *)&(FROM8))->value[msb_index]	\
+							 == ((non_native_uint8 *)&(TO8))->value[msb_index])
+#endif
 
 #endif /* MDEF_included */

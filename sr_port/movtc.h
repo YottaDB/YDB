@@ -12,7 +12,6 @@
 #ifndef MOVTC_INCLUDED
 #define MOVTC_INCLUDED
 
-void movtc(register int length, register unsigned char *inbuf, const unsigned char table[],
-	register unsigned char *outbuf);
+void movtc(int length, unsigned char *inbuf, const unsigned char table[], unsigned char *outbuf);
 
 #endif /* MOVTC_INCLUDED */

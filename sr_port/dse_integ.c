@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,14 +17,15 @@
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
+#include "gdsblk.h"
 #include "gdsfhead.h"
 #include "cli.h"
-#include "gdsblk.h"
 #include "util.h"
 #include "dse.h"
 
 /* Include prototypes */
 #include "t_qread.h"
+#include "cert_blk.h"
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
@@ -75,7 +76,7 @@ void dse_integ(void)
 
 	if (!(bp = t_qread(patch_curr_blk, &dummy_int, &dummy_cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-	if (TRUE == cert_blk(patch_curr_blk, (blk_hdr_ptr_t)bp, 0))
+	if (TRUE == cert_blk(gv_cur_region, patch_curr_blk, (blk_hdr_ptr_t)bp, 0))
 		util_out_print("!/  No errors detected.!/", TRUE);
 	else
 		util_out_print(NULL, TRUE);

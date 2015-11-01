@@ -609,7 +609,7 @@ DLRCTOOBIG	<!_!AD!/!_!_!_$CHAR() value cannot be greater than 255>/error/fao=2!/
 WCERRNOTCHG	<Not all specified database files were changed>/error/fao=0!/ansi=0
 WCWRNNOTCHG	<Not all specified database files were changed>/warning/fao=0!/ansi=0
 UNUSEDMSG604	<WCINFNOTCHG last used in V4.3-000 (release-date 2001/11/30)>/success/fao=0!/ansi=0
-MUTNWARN	<WARNING: Transaction number is approaching limit for file !AD, renew database with MUPIP>/warning/fao=2!/ansi=0
+MUTNWARN	<Database file !AD is approaching 4G transaction number limit.  Renew database with MUPIP INTEG TN_RESET>/warning/fao=2!/ansi=0
 JNLNAMLEN	<Journal file name !AD: for database file !AD exceeds maximum length of !UL>/error/fao=5!/ansi=0
 LCKSTIMOUT	<DAL timed lock request expired>/warning/fao=0!/ansi=0
 CTLMNEMAXLEN	<The maximum length of a control mnemonic has been exceeded>/error/fao=0!/ansi=0
@@ -694,7 +694,7 @@ DBROOTSUBSC	<!AD Root block contains non name-level entries> /info /fao=2!/ansi=
 TIMEROVFL	<Timer overflow; interval probably too large> /error /fao=0!/ansi=0
 GTMASSERT	<!AD - Assert failed !AD line !UL>/fatal/fao=5!/ansi=0
 DBFHEADERR	<Database file !AD: control problem: !AD was 0x!XL expecting 0x!XL> /info /fao=6!/ansi=0
-DBADDRANGE	<Database file !AD, element location 0x!XL: control 0x!XL was outside !AD range 0x!XL to 0x!XL> /info /fao=8!/ansi=0
+DBADDRANGE	<Database file !AD, element location 0x!XL: blk = 0x!XL: control 0x!XL was outside !AD range 0x!XL to 0x!XL> /info /fao=9!/ansi=0
 DBQUELINK	<Database file !AD, element location 0x!XL: blk = 0x!XL: control !AD queue problem: was 0x!XL, expecting 0x!XL> /info /fao=8!/ansi=0
 DBCRERR		<Database file !AD, cr location 0x!XL blk = 0x!XL error: !AD was 0x!XL, expecting 0x!XL> /info /fao=8!/ansi=0
 MUSTANDALONE	<Could not get exclusive access to !AD> /info /fao=2!/ansi=0
@@ -756,7 +756,7 @@ ADDRTOOLONG	<Socket address !AD of length !UL is longer than the maximum permiss
 LSNCONNOTCMP	<Listen and connect are not compatible>/error/fao=0!/ansi=76
 CPBEYALLOC	<Attempt to copy beyond the allocated buffer>/error/fao=0!/ansi=0
 DBRDONLY	<Database file !AD read only>/error/fao=2!/ansi=0
-DUPTN		<Duplicate transaction found [TN = 0x!XL] in journal file !AD>/warning/fao=3!/ansi=0
+DUPTN		<Duplicate transaction found [TN = 0x!XL] at offset 0x!XL in journal file !AD>/warning/fao=4!/ansi=0
 TRESTLOC	<Transaction start: !AD, Transaction failure: !AD>/error/fao=4!/ansi=0
 REPLPOOLINST	<Error with replication pool (id = !UL) for instance file !AD>/error/fao=3!/ansi=0
 ZCVECTORINDX	<Invalid Vector Index !UL>/warning/fao=1!/ansi=0
@@ -796,7 +796,7 @@ DEFEREVENT	<Transfer table reset for event type !UL when set for type !UL>/info/
 JNLFILNOTCHG	<Journal file not changed>/error/fao=0!/ansi=0
 EVENTLOGERR	<Error in event logging subsystem>/error/fao=0!/ansi=0
 UPDATEFILEOPEN	<Update file open error>/error/fao=0!/ansi=0
-JNLBADRECFMT	<Journal File Record Format Error encountered for file !AD at disk address !UL>/error/fao=3!/ansi=0
+JNLBADRECFMT	<Journal File Record Format Error encountered for file !AD at disk address 0x!XL>/error/fao=3!/ansi=0
 UNUSEDMSG803	<JNLBADALIGN last used in V4.3-001E (release-date 2003/02/15)>/error/fao=0!/ansi=0
 MUKILLIP	<Kill in progress indicator is set for file !AD, incorrectly marked busy errors should follow>/warning/fao=2!/ansi=0
 JNLRDONLY	<Journal file !AD read only>/error/fao=2!/ansi=0
@@ -998,7 +998,7 @@ DBRNDWN		<Error during global database rundown for region !AD.!/Notify those res
 MUDESTROYFAIL	<Global section (!AD) corresponding to file !AD failed to be destroyed>/info/fao=4!/ansi=0
 NOTALLDBOPN	<Not all required database files were opened>/fatal/fao=0!/ansi=0
 MUSELFBKUP	<Database file !AD can not be backed upon itself>/error/fao=2!/ansi=0
-DBDANGER	<Process killed while committing update for database file !AD.  Possibility of database damage.>/info/fao=2!/ansi=0
+DBDANGER	<Process killed while committing update for database file !AD.  Possibility of damage to block 0x!XL.>/info/fao=3!/ansi=0
 TRUNCATEFAIL	<Truncating !AD from 0x!XL VMS blocks to 0x!XL blocks failed>/error/fao=4!/ansi=0
 TCGETATTR	<Error while getting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 TCSETATTR	<Error while setting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
@@ -1161,8 +1161,8 @@ CIMAXPARAM	<Exceeded maximum number of parameters in the call-in table entry. An
 CITPNESTED	<Call-ins can not be used inside a TP transaction>/error/fao=0!/ansi=0
 CIMAXLEVELS	<Too many nested Call-ins. Nested resources exhaused at level !UL.>/error/fao=1!/ansi=0
 JOBINTRRETHROW	<Job interrupt redelivered>/error/fao=0!/ansi=0
-STARFILE	<Star(*) argument cannot be specified with !AD>/info/fao=2!/ansi=0
-NOSTARFILE	<Only star(*) argument can be specified with !AD>/info/fao=2!/ansi=0
+STARFILE	<Star(*) argument cannot be specified with !AD>/error/fao=2!/ansi=0
+NOSTARFILE	<Only star(*) argument can be specified with !AD>/error/fao=2!/ansi=0
 MUJNLSTAT	<!AD at !AD>/info/fao=4!/ansi=0
 JNLTPNEST	<Mupip journal command found nested TP transactions for journal file !AD at offset 0x!XL at transaction number 0x!XL>/error/fao=4!/ansi=0
 REPLOFFJNLON	<Replication state for region !AD is OFF but journaling state is enabled>/error/fao=2!/ansi=0
@@ -1188,10 +1188,14 @@ MUJNINFO	<Processing !AD journal file !AD, rec_offset 0x!XL, resolve_time 0x!XL,
 DBFRZRESETFL	<Freeze release failed on database file !AD>/error/fao=2!/ansi=0
 JNLCYCLE	<Journal file !AD causes cycle in the journal file generations of database file !AD>/error/fao=4!/ansi=0
 JNLPREVRECOV	<Journal file has nonzero value in prev_recov_end_of_data field>/error/fao=0!/ansi=0
-RESOLVESEQNO	<Resloving till sequence number 0x!16@XJ>/info/fao=1!/ansi=0
+RESOLVESEQNO	<Resolving until sequence number 0x!16@XJ>/info/fao=1!/ansi=0
 BOVTNGTEOVTN	<Journal file !AD has beginning transaction [0x!XL] which is greater than end transaction [0x!XL]>/error/fao=4!/ansi=0
-BOVTMGTEOVTM	<Journal file !AD has beginning timestamp [0x!XL] which is greater than end timestamp [0x!XL]>/error/fao=4!/ansi=0
-BEGSEQGTENDSEQ	<Journal file !AD has beginning sequence number 0x!16@XJ which is greater than end sequence number 0x!16@XJ>/error/fao=4!/ansi=0
+BOVTMGTEOVTM	<Journal file !AD has beginning timestamp [0x!XL] greater than end timestamp [0x!XL]>/error/fao=4!/ansi=0
+BEGSEQGTENDSEQ	<Journal file !AD has beginning sequence number [0x!16@XJ] greater than end sequence number [0x!16@XJ]>/error/fao=4!/ansi=0
+DBADDRALIGN	<Database file !AD, element location 0x!XL: blk = 0x!XL: [!AD] control 0x!XL was unaligned relative to base 0x!XL and element size 0x!XL>/info/fao=9!/ansi=0
+DBWCVERIFYSTART <Database file !AD, write cache verification started by pid !UL [0x!XL] at transaction number 0x!XL>/info/fao=5!/ansi=0
+DBWCVERIFYEND   <Database file !AD, write cache verification finished by pid !UL [0x!XL] at transaction number 0x!XL>/info/fao=5!/ansi=0
+MUPIPSIG	<!AD (signal !UL) issued from process !UL [0x!XL] to process !UL [0x!XL]>/info/fao=7!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

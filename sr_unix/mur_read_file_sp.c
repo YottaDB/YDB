@@ -147,12 +147,15 @@ boolean_t mur_fopen_sp(jnl_ctl_list *jctl)
 			jctl->os_filesize = stat_buf.st_size;
 			return TRUE;
 		}
+		jctl->status = errno;
 		CLOSEFILE(jctl->channel, status);
-	}
-	jctl->status = errno;
-	gtm_putmsg(VARLSTCNT(12) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len, jctl->jnl_fn, ERR_SYSCALL, 5,
+	} else
+		jctl->status = errno;
+	if (ENOENT == jctl->status)	/* File Not Found is a common error, so no need for SYSCALL */
+		gtm_putmsg(VARLSTCNT(5) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len, jctl->jnl_fn, jctl->status);
+	else
+		gtm_putmsg(VARLSTCNT(12) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len, jctl->jnl_fn, ERR_SYSCALL, 5,
 			LEN_AND_STR((-1 == jctl->channel) ? "open" : "fstat"), CALLFROM, jctl->status);
-	murgbl.wrn_count++;
 	jctl->channel = NOJNL;
 	return FALSE;
 }

@@ -53,15 +53,15 @@
 
 #define MAX_ATTEMPTS_FOR_FETCH_RESYNC	30
 #define MAX_WAIT_FOR_FETCHRESYNC_CONN	30 /* s */
-#define FETCHRESYNC_PRIMARY_POLL	1 /* s */
+#define FETCHRESYNC_PRIMARY_POLL	(MICROSEC_IN_SEC - 1) /* micro seconds, almost 1 second */
 
 GBLREF uint4			process_id;
 GBLREF int			recvpool_shmid;
 GBLREF int			gtmrecv_listen_sock_fd, gtmrecv_sock_fd;
 GBLREF struct sockaddr_in	primary_addr;
 GBLREF seq_num			seq_num_zero;
-GBLREF uint4			repl_max_send_buffsize, repl_max_recv_buffsize;
-GBLREF 	jnl_gbls_t		jgbl;
+GBLREF jnl_gbls_t		jgbl;
+GBLREF int			repl_max_send_buffsize, repl_max_recv_buffsize;
 
 CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 {
@@ -79,12 +79,12 @@ CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 
 int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 {
-	int		status;
 	size_t		primary_addr_len;
 	repl_msg_t	msg;
-	unsigned char	*msg_ptr;
-	int		sent_len, send_len;
-	int		recv_len, recvd_len;
+	unsigned char	*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
+	int		tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
+	int		torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
+	int		status;					/* needed for REPL_{SEND,RECV}_LOOP */
 	fd_set		input_fds;
 	int		wait_count;
 	char		seq_num_str[32], *seq_num_ptr;
@@ -112,8 +112,8 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 	gtmrecv_fetchresync_immediate.tv_sec = 0;
 	gtmrecv_fetchresync_immediate.tv_usec = 0;
 
-	gtmrecv_fetchresync_poll.tv_sec = FETCHRESYNC_PRIMARY_POLL;
-	gtmrecv_fetchresync_poll.tv_usec = 0;
+	gtmrecv_fetchresync_poll.tv_sec = 0;
+	gtmrecv_fetchresync_poll.tv_usec = FETCHRESYNC_PRIMARY_POLL;
 
 	gtmrecv_comm_init(port);
 
@@ -157,21 +157,19 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 			RTS_ERROR_LITERAL("Error accepting connection from Source Server"), errno);
 
 	repl_log(stdout, TRUE, TRUE, "Connection established\n");
-
-	close(gtmrecv_listen_sock_fd);
-
-	if (0 > get_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize, &repl_max_recv_buffsize))
+	repl_close(&gtmrecv_listen_sock_fd);
+	if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize))
+		|| 0 != (status = get_recv_sock_buff_size(gtmrecv_sock_fd, &repl_max_recv_buffsize)))
 	{
-		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			RTS_ERROR_LITERAL("Error getting socket send/recv buffsizes"), ERRNO);
+		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_LIT("Error getting socket send/recv buffsizes"),
+				status);
 		return ERR_REPLCOMM;
 	}
-
 	msg.type = REPL_FETCH_RESYNC;
 	memset(&msg.msg[0], 0, MIN_REPL_MSGLEN - REPL_MSG_HDRLEN);
 	QWASSIGN(*(seq_num *)&msg.msg[0], jgbl.max_resync_seqno);
 	msg.len = MIN_REPL_MSGLEN;
-	REPL_SEND_LOOP(gtmrecv_sock_fd, &msg, msg.len, &gtmrecv_fetchresync_immediate)
+	REPL_SEND_LOOP(gtmrecv_sock_fd, &msg, msg.len, FALSE, &gtmrecv_fetchresync_immediate)
 		; /* Empty Body */
 
 	if (status != SS_NORMAL)
@@ -185,7 +183,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 	}
 
 	wait_count = MAX_ATTEMPTS_FOR_FETCH_RESYNC;
-	REPL_RECV_LOOP(gtmrecv_sock_fd, &msg, MIN_REPL_MSGLEN, &gtmrecv_fetchresync_poll)
+	REPL_RECV_LOOP(gtmrecv_sock_fd, &msg, MIN_REPL_MSGLEN, FALSE, &gtmrecv_fetchresync_poll)
 	{
 		if (0 >= wait_count)
 			break;
@@ -214,11 +212,11 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno)
 	repl_log(stdout, TRUE, TRUE, "Received RESYNC SEQNO is "INT8_FMT"\n", INT8_PRINT(*resync_seqno));
 	/* Wait till connection is broken or REPL_CONN_CLOSE
 	 * is received */
-	REPL_RECV_LOOP(gtmrecv_sock_fd, &msg, MIN_REPL_MSGLEN, &gtmrecv_fetchresync_poll)
+	REPL_RECV_LOOP(gtmrecv_sock_fd, &msg, MIN_REPL_MSGLEN, FALSE, &gtmrecv_fetchresync_poll)
 	{
 		REPL_DPRINT1("FETCH_RESYNC : Waiting for source to send CLOSE_CONN or connection breakage\n");
 	}
-	close(gtmrecv_sock_fd);
+	repl_close(&gtmrecv_sock_fd);
 	REPL_DPRINT2("FETCH RESYNC : Waiting for pid %d rollback process to complete\n", rollback_pid);
 	return SS_NORMAL;
 }

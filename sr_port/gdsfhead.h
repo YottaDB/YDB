@@ -969,6 +969,7 @@ typedef struct	sgmnt_addrs_struct
 	uint4		crit_check_cycle;	/* Used to mark which regions in a transaction legiticamtely have crit */
 	int4		backup_in_prog;		/* true if online backup in progress for this region (used in op_tcommit/tp_tend) */
 	int4		ref_cnt;		/* count of number of times csa->nl->ref_cnt was incremented by this process */
+	int4		fid_index;		/* index for region ordering based on unique_id */
 } sgmnt_addrs;
 
 
@@ -1093,6 +1094,61 @@ typedef struct	gv_namehead_struct
 	}											\
 }
 
+#define COPY_SUBS_TO_GVCURRKEY(var, gv_currkey, was_null, is_null)								\
+{																\
+	GBLREF mv_stent		*mv_chain;											\
+	GBLREF unsigned char	*msp, *stackwarn, *stacktop;									\
+	mval			*temp;												\
+																\
+	error_def(ERR_STACKOFLOW);												\
+	error_def(ERR_STACKCRIT);												\
+																\
+	was_null |= is_null;													\
+	val = va_arg(var, mval *);												\
+	if (val->mvtype & MV_SUBLIT)												\
+	{															\
+		is_null = ((STR_SUB_PREFIX == *(unsigned char *)val->str.addr) && (KEY_DELIMITER == *(val->str.addr + 1))); 	\
+		if (gv_target->collseq || gv_target->nct)									\
+		{														\
+			assert(dba_cm != gv_cur_region->dyn.addr->acc_meth); /* collation transformation should be done at the	\
+										server's end for CM regions */			\
+			transform = FALSE;											\
+			end = gvsub2str((uchar_ptr_t)val->str.addr, buff, FALSE);						\
+			transform = TRUE;											\
+			/* it does not seem like we need the PUSH_MV_STENT and POP_MV_STENT here --- nars - 2003/09/17 */	\
+			PUSH_MV_STENT(MVST_MVAL);										\
+			temp = &mv_chain->mv_st_cont.mvs_mval;									\
+			temp->mvtype = MV_STR;											\
+			temp->str.addr = (char *)buff;										\
+			temp->str.len = end - buff;										\
+			mval2subsc(temp, gv_currkey);										\
+			POP_MV_STENT(); /* temp */										\
+		} else														\
+		{														\
+			len = val->str.len;											\
+			if (gv_currkey->end + len - 1 >= max_key)								\
+			{													\
+				if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))			\
+					end = &buff[MAX_ZWR_KEY_SZ - 1];							\
+				rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);			\
+			}													\
+			memcpy((gv_currkey->base + gv_currkey->end), val->str.addr, len);					\
+			gv_currkey->prev = gv_currkey->end;									\
+			gv_currkey->end += len - 1;										\
+		}														\
+	} else															\
+	{															\
+		mval2subsc(val, gv_currkey);											\
+		if (gv_currkey->end >= max_key)											\
+		{														\
+			if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))				\
+				end = &buff[MAX_ZWR_KEY_SZ - 1 ];								\
+			rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);				\
+		}														\
+	 	is_null = (MV_IS_STRING(val) && (0 == val->str.len));								\
+	}															\
+}
+
 /* The enum codes below correspond to code-paths that can increment the database curr_tn
  * without having a logical update. Journaling currently needs to know all such code-paths */
 typedef enum
@@ -1196,6 +1252,9 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 #error unsupported platform
 #endif
 
+#define CR_NOT_ALIGNED(cr, cr_base)		(!IS_PTR_ALIGNED((cr), (cr_base), sizeof(cache_rec)))
+#define CR_NOT_IN_RANGE(cr, cr_lo, cr_hi)	(!IS_PTR_IN_RANGE((cr), (cr_lo), (cr_hi)))
+
 bt_rec_ptr_t bt_put(gd_region *r, int4 block);
 void bt_que_refresh(gd_region *greg);
 void bt_init(sgmnt_addrs *cs);
@@ -1215,7 +1274,7 @@ void assert_jrec_member_offsets(void);
 boolean_t mupfndfil(gd_region *reg, mstr *mstr_addr);
 enum cdb_sc rel_read_crit(gd_region *reg, short crash_ct);
 
-bool wcs_verify(gd_region *reg, boolean_t expect_damage);
+bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs_recover);
 bool wcs_wtfini(gd_region *reg);
 #ifdef VMS
 int4 wcs_wtstart(gd_region *region);

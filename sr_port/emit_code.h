@@ -32,12 +32,13 @@ void    reset_push_list_ptr(void);
 void	emit_call_xfer(int xfer);
 
 int	get_arg_reg(void);
-int     get_bytes(void);
 int	gtm_reg(int vax_reg);
 
 #define NUM_BUFFERRED_INSTRUCTIONS 25
+#define ASM_OUT_BUFF 	256
+#define PUSH_LIST_SIZE	500
 
-#if defined(__vms) || defined(_AIX)
+#if defined(__vms) || defined(_AIX) || defined(__hpux)
 #  define TRUTH_IN_REG
 #elif defined(__osf__)
 #  undef TRUTH_IN_REG

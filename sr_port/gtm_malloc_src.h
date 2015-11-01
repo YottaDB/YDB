@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -408,9 +408,8 @@ GMR_ONLY(STATICD	int	deferFreePending;)	/* Total number of frees that were defer
 STATICR void gtmSmInit(void);
 storElem *findStorElem(int sizeIndex);
 #ifdef DEBUG
+#include "gtm_malloc.h"
 void backfill(unsigned char *ptr, int len);
-void verifyFreeStorage(void);
-void verifyAllocatedStorage(void);
 boolean_t backfillChk(unsigned char *ptr, int len);
 #else
 void *gtm_malloc_dbg(size_t);
@@ -694,10 +693,7 @@ void *gtm_malloc(size_t size)
 #ifdef DEBUG
 			GMR_ONLY(if (!reentered))
 			{	/* Verify the storage chains before we play */
-				if (GDL_SmFreeVerf & gtmDebugLevel)
-					verifyFreeStorage();
-				if (GDL_SmAllocVerf & gtmDebugLevel)
-					verifyAllocatedStorage();
+				VERIFY_STORAGE_CHAINS;
 			}
 #endif
 
@@ -878,10 +874,7 @@ void gtm_free(void *addr)
 		assert(0 == memcmp(&NullStruct.nullTMark[0], markerChar, sizeof(markerChar)));
 #ifdef DEBUG
 		/* verify chains before we attempt dequeue */
-		if (GDL_SmFreeVerf & gtmDebugLevel)
-			verifyFreeStorage();
-		if (GDL_SmAllocVerf & gtmDebugLevel)
-			verifyAllocatedStorage();
+		VERIFY_STORAGE_CHAINS;
 #endif
 		INCR_CNTR(totalFrees);
 		if ((unsigned char *)addr != &NullStruct.nullStr[0])

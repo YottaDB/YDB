@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,6 +49,9 @@
 #include "ftok_sems.h"
 #include "mu_rndwn_all.h"
 #include "util.h"
+#ifdef UNIX
+#include "ipcrmid.h"	/* for sem_rmid() prototype */
+#endif
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	recvpool_addrs		recvpool;
@@ -77,11 +80,15 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id)
 	union semun		semarg;
 	uchar_ptr_t		ret_ptr;
 	unix_db_info		*udi;
+	int			save_errno;
 
 	error_def(ERR_MUJPOOLRNDWNSUC);
 	error_def(ERR_MURPOOLRNDWNSUC);
 	error_def(ERR_MUJPOOLRNDWNFL);
 	error_def(ERR_MURPOOLRNDWNFL);
+	error_def(ERR_SEMREMOVED);
+	error_def(ERR_REPLACCSEM);
+	error_def(ERR_SYSCALL);
 
 	if (NULL == reg)
 	{
@@ -109,11 +116,11 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id)
 	 */
 	if (INVALID_SEMID != repl_instance.jnlpool_semid)
 		if ((-1 == semctl(repl_instance.jnlpool_semid, 0, IPC_STAT, semarg)) ||
-	 		(semarg.buf->sem_ctime != repl_instance.jnlpool_semid_ctime))
+	 			(semarg.buf->sem_ctime != repl_instance.jnlpool_semid_ctime))
 			repl_instance.jnlpool_semid = INVALID_SEMID;
 	if (INVALID_SHMID != repl_instance.jnlpool_shmid)
 		if ((-1 == shmctl(repl_instance.jnlpool_shmid, IPC_STAT, &shmstat)) ||
-	 		(shmstat.shm_ctime != repl_instance.jnlpool_shmid_ctime))
+	 			(shmstat.shm_ctime != repl_instance.jnlpool_shmid_ctime))
 			repl_instance.jnlpool_shmid = INVALID_SHMID;
 	if (INVALID_SHMID != repl_instance.jnlpool_shmid)
 	{
@@ -122,9 +129,26 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id)
 		*ret_ptr = '\0';
 		gtm_putmsg(VARLSTCNT(6) (jnlpool_stat ? ERR_MUJPOOLRNDWNSUC : ERR_MUJPOOLRNDWNFL),
 			4, LEN_AND_STR(shmid_buff), LEN_AND_STR(replpool_id->instname));
+	} else if (INVALID_SEMID != repl_instance.jnlpool_semid)
+	{
+		if (0 == sem_rmid(repl_instance.jnlpool_semid))
+		{	/* note that shmid_buff used here is actually a buffer to hold semid (not shmid) */
+			ret_ptr = i2asc((uchar_ptr_t)shmid_buff, repl_instance.jnlpool_semid);
+			*ret_ptr = '\0';
+			gtm_putmsg(VARLSTCNT(9) ERR_MUJPOOLRNDWNSUC, 4, LEN_AND_STR(shmid_buff), LEN_AND_STR(replpool_id->instname),
+						ERR_SEMREMOVED, 1, repl_instance.jnlpool_semid);
+		} else
+		{
+			save_errno = errno;
+			gtm_putmsg(VARLSTCNT(13) ERR_REPLACCSEM, 3, repl_instance.jnlpool_semid, RTS_ERROR_STRING(instname),
+						ERR_SYSCALL, 5, RTS_ERROR_LITERAL("jnlpool sem_rmid()"), CALLFROM, save_errno);
+		}
+		/* Note that jnlpool_stat is not set to FALSE in case sem_rmid() fails above. This is because the journal pool is
+		 * anyway not present and it is safer to reset the sem/shmids in the instance file. The only thing this might cause
+		 * is a stranded semaphore but that is considered better than getting errors due to not resetting instance file.
+		 */
 	}
-	if (jnlpool_stat)
-		/* Reset instance file for jnlpool info */
+	if (jnlpool_stat)	/* Reset instance file for jnlpool info */
 		repl_inst_jnlpool_reset();
 	/*
 	 * --------------------------
@@ -134,11 +158,11 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id)
 	recvpool.recvpool_dummy_reg = reg;
 	if (INVALID_SEMID != repl_instance.recvpool_semid)
 		if ((-1 == semctl(repl_instance.recvpool_semid, 0, IPC_STAT, semarg)) ||
-	 		(semarg.buf->sem_ctime != repl_instance.recvpool_semid_ctime))
+	 			(semarg.buf->sem_ctime != repl_instance.recvpool_semid_ctime))
 			repl_instance.recvpool_semid = INVALID_SEMID;
 	if (INVALID_SHMID != repl_instance.recvpool_shmid)
 		if ((-1 == shmctl(repl_instance.recvpool_shmid, IPC_STAT, &shmstat)) ||
-	 		(shmstat.shm_ctime != repl_instance.recvpool_shmid_ctime))
+	 			(shmstat.shm_ctime != repl_instance.recvpool_shmid_ctime))
 			repl_instance.recvpool_shmid = INVALID_SHMID;
 	if (INVALID_SHMID != repl_instance.recvpool_shmid)
 	{
@@ -147,11 +171,29 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id)
 		*ret_ptr = '\0';
 		gtm_putmsg(VARLSTCNT(6) (recvpool_stat ? ERR_MURPOOLRNDWNSUC : ERR_MURPOOLRNDWNFL),
 			4, LEN_AND_STR(shmid_buff), LEN_AND_STR(replpool_id->instname));
+	} else if (INVALID_SEMID != repl_instance.recvpool_semid)
+	{
+		if (0 == sem_rmid(repl_instance.recvpool_semid))
+		{	/* note that shmid_buff used here is actually a buffer to hold semid (not shmid) */
+			ret_ptr = i2asc((uchar_ptr_t)shmid_buff, repl_instance.recvpool_semid);
+			*ret_ptr = '\0';
+			gtm_putmsg(VARLSTCNT(9) ERR_MURPOOLRNDWNSUC, 4, LEN_AND_STR(shmid_buff), LEN_AND_STR(replpool_id->instname),
+						ERR_SEMREMOVED, 1, repl_instance.recvpool_semid);
+		} else
+		{
+			save_errno = errno;
+			gtm_putmsg(VARLSTCNT(13) ERR_REPLACCSEM, 3, repl_instance.recvpool_semid, RTS_ERROR_STRING(instname),
+						ERR_SYSCALL, 5, RTS_ERROR_LITERAL("recvpool sem_rmid()"), CALLFROM, save_errno);
+		}
+		/* Note that recvpool_stat is not set to FALSE in case sem_rmid() fails above. This is because the journal pool is
+		 * anyway not present and it is safer to reset the sem/shmids in the instance file. The only thing this might cause
+		 * is a stranded semaphore but that is considered better than getting errors due to not resetting instance file.
+		 */
 	}
-	if (recvpool_stat)
-		/* Reset instance file for recvpool info */
+	if (recvpool_stat)	/* Reset instance file for recvpool info */
 		repl_inst_recvpool_reset();
-	/* Release recvpool ftok semaphore lock */
+
+	/* Release replication instance ftok semaphore lock */
 	if (!ftok_sem_release(reg, TRUE, TRUE))
 		return FALSE;
 	return (jnlpool_stat && recvpool_stat);

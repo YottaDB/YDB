@@ -2,9 +2,11 @@ dse_adrec
 dse_adstar
 dse_all
 dse_b_dmp
+dse_cache
 dse_chng_bhead
 dse_chng_fhead
 dse_chng_rhead
+dse_cmd_disallow
 dse_crit
 dse_ctrlc_handler
 dse_data

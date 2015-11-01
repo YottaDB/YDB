@@ -44,14 +44,13 @@ int m_set(void)
 	int		first_val_lit, last_val_lit;
 	boolean_t	first_is_lit, last_is_lit, got_lparen, delim1char, is_extract;
 	opctype		put_oc;
-	oprtype		v, firstval, lastval, *sb1, *result, resptr;
-	triple		*delimiter, *first, *put, *get, *last, *obp, *s, *sub, *s0, *s1, *oldchain;
-	triple		getchain, setchain;
+	oprtype		v, delimval, firstval, lastval, *sb1, *result, resptr;
+	triple		*delimiter, *first, *put, *get, *last, *obp, *s, *sub, *s0, *s1, targchain;
 	triple		*jmptrp1, *jmptrp2;
 	mint		delimlit;
 
 	temp_subs = delim1char = is_extract = FALSE;
-	dqinit(&setchain, exorder);
+	dqinit(&targchain, exorder);
 	result = (oprtype *)mcalloc(sizeof(oprtype));
 	resptr = put_indr(result);
 	jmptrp1 = jmptrp2 = NULL;
@@ -63,10 +62,11 @@ int m_set(void)
 		temp_subs = TRUE;
 	}
 
-	/* Some explanation: The triples generated that are related to the lefthand side of the
-	   SET are put on the setchain triple list rather than curtchain. This is because although
-	   they are generated first, they need to be evaluated and executed last so they
-	   will be added to curtchain after the righthand side has been completed.
+	/* Some explanation: The triples from the left hand side of the SET expression that are
+	   expressly associated with fetching (in case of set $piece/$extract) and/or storing of
+	   the target value are removed from curtchain and placed on the targchain. Later, these
+	   triples will be added to the end of curtchain to do the finishing store of the target
+	   after the righthand side has been evaluated. This is per the M standard.
 	*/
 
 	for (;;)
@@ -79,14 +79,14 @@ int m_set(void)
 				if (v.oprval.tref->opcode == OC_PUTINDX)
 				{
 					dqdel(v.oprval.tref, exorder);
-					dqins(setchain.exorder.bl, exorder, v.oprval.tref);
+					dqins(targchain.exorder.bl, exorder, v.oprval.tref);
 					sub = v.oprval.tref;
 					put_oc = OC_PUTINDX;
 				}
 				put = maketriple(OC_STO);
 				put->operand[0] = v;
 				put->operand[1] = resptr;
-				dqins(setchain.exorder.bl, exorder, put);
+				dqins(targchain.exorder.bl, exorder, put);
 				break;
 			case TK_CIRCUMFLEX:
 				s1 = curtchain->exorder.bl;
@@ -100,10 +100,10 @@ int m_set(void)
 				}
 				assert(put_oc == OC_GVNAME || put_oc == OC_GVNAKED || put_oc == OC_GVEXTNAM);
 				dqdel(sub, exorder);
-				dqins(setchain.exorder.bl, exorder, sub);
+				dqins(targchain.exorder.bl, exorder, sub);
 				put = maketriple(OC_GVPUT);
 				put->operand[0] = resptr;
-				dqins(setchain.exorder.bl, exorder, put);
+				dqins(targchain.exorder.bl, exorder, put);
 				break;
 			case TK_ATSIGN:
 				if (!indirection(&v))
@@ -118,7 +118,7 @@ int m_set(void)
 				put = maketriple(OC_INDSET);
 				put->operand[0] = v;
 				put->operand[1] = resptr;
-				dqins(setchain.exorder.bl, exorder,put);
+				dqins(targchain.exorder.bl, exorder, put);
 				break;
 			case TK_DOLLAR:
 				advancewindow();
@@ -149,7 +149,7 @@ int m_set(void)
 						put = maketriple(OC_PSVPUT);
 					put->operand[0] = put_ilit(svn_data[index].opcode);
 					put->operand[1] = resptr;
-					dqins(setchain.exorder.bl, exorder, put);
+					dqins(targchain.exorder.bl, exorder, put);
 					break;
 				}
 				/* Only 2 function names allowed on left side: $Piece and $Extract */
@@ -173,13 +173,12 @@ int m_set(void)
 				advancewindow();
 				advancewindow();
 				/* Although we see the get (target) variable first, we need to save it's processing
-				   on another chain -- the getchain -- because the retrieval of the target is bypassed
+				   on another chain -- the targchain -- because the retrieval of the target is bypassed
 				   and the naked indicator is not reset if the first/last parameters are not set in a logical
 				   manner (must be > 0 and first <= last). So the evaluation order is delimiter (if $piece),
 				   first, last and then target.
-				*/
-				dqinit(&getchain, exorder);
-				/* Set up primary action triple now since it is ref'd by the put triples
+
+				   Set up primary action triple now since it is ref'd by the put triples
 				   generated below.
 				*/
 				s = maketriple(setop);
@@ -199,7 +198,7 @@ int m_set(void)
 						if (v.oprval.tref->opcode == OC_PUTINDX)
 						{
 							dqdel(v.oprval.tref, exorder);
-							dqins(getchain.exorder.bl, exorder, v.oprval.tref);
+							dqins(targchain.exorder.bl, exorder, v.oprval.tref);
 							sub = v.oprval.tref;
 							put_oc = OC_PUTINDX;
 						}
@@ -234,7 +233,7 @@ int m_set(void)
 						}
 						assert(put_oc == OC_GVNAME || put_oc == OC_GVNAKED || put_oc == OC_GVEXTNAM);
 						dqdel(sub, exorder);
-						dqins(getchain.exorder.bl, exorder, sub);
+						dqins(targchain.exorder.bl, exorder, sub);
 						get = maketriple(OC_FNGVGET);
 						get->operand[0] = put_str(0, 0);
 						put = maketriple(OC_GVPUT);
@@ -245,18 +244,15 @@ int m_set(void)
 						return FALSE;
 				}
 				s->operand[0] = put_tref(get);
-				/* Code to fetch args for "get" triple are on getchain. Put get there now too. */
-				dqins(getchain.exorder.bl, exorder, get);
-				chktchain(&getchain);
-				/* From now on, put things on setchain which will be evaluated after right hand side
-				   of "=" expression as described earlier
-				*/
-				oldchain = setcurtchain(&setchain);
-				first = maketriple(OC_PARAMETER);
+				/* Code to fetch args for target triple are on targchain. Put get there now too. */
+				dqins(targchain.exorder.bl, exorder, get);
+				chktchain(&targchain);
+
 				if (!is_extract)
 				{	/* Set $piece */
 					delimiter = newtriple(OC_PARAMETER);
 					s->operand[1] = put_tref(delimiter);
+					first = newtriple(OC_PARAMETER);
 					delimiter->operand[1] = put_tref(first);
 					/* Process delimiter string ($piece only) */
 					if (window_token != TK_COMMA)
@@ -265,15 +261,14 @@ int m_set(void)
 						return FALSE;
 					}
 					advancewindow();
-					if (!strexpr(&(delimiter->operand[0])))
+					if (!strexpr(&delimval))
 						return FALSE;
-					assert(delimiter->operand[0].oprclass == TRIP_REF);
+					assert(delimval.oprclass == TRIP_REF);
 				} else
 				{	/* Set $Extract */
+					first = newtriple(OC_PARAMETER);
 					s->operand[1] = put_tref(first);
 				}
-				dqins(setchain.exorder.bl, exorder, first);
-				chktchain(&setchain);
 				/* Process first integer value */
 				if (window_token != TK_COMMA)
 					firstval = put_ilit(1);
@@ -290,29 +285,28 @@ int m_set(void)
 					assert(firstval.oprval.tref->operand[0].oprclass  == ILIT_REF);
 					first_val_lit = firstval.oprval.tref->operand[0].oprval.ilit;
 				}
-				chktchain(&setchain);
 				if (window_token != TK_COMMA)
 				{	/* There is no "last" value. Only if 1 char literal delimiter and
 					   no "last" value can we generate shortcut code to op_setp1 entry
 					   instead of op_setpiece.
 					*/
-					if (!is_extract && delimiter->operand[0].oprval.tref->opcode == OC_LIT &&
-					    delimiter->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len == 1)
+					if (!is_extract && delimval.oprval.tref->opcode == OC_LIT &&
+					    delimval.oprval.tref->operand[0].oprval.mlit->v.str.len == 1)
 					{	/* This reference to a one character literal needs to be turned into
 						   an explict literal instead */
 						delimlit =
-						       (mint)*delimiter->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.addr;
-						dqdel(delimiter->operand[0].oprval.tref, exorder);
+							(mint)*delimval.oprval.tref->operand[0].oprval.mlit->v.str.addr;
 						delimiter->operand[0] = put_ilit(delimlit);
 						s->opcode = OC_SETP1;
 						delim1char = TRUE;
 					} else
 					{
+						if (!is_extract)
+							delimiter->operand[0] = delimval;
 						last = newtriple(OC_PARAMETER);
 						first->operand[1] = put_tref(last);
-						last->operand[0] = first->operand[0];
+						last->operand[0] = first->operand[0];	/* start = end range */
 					}
-					chktchain(&setchain);
 					/* Generate test sequences for first/last to bypass the set operation if
 					   first/last are not in a usable form */
 					if (first_is_lit)
@@ -328,6 +322,8 @@ int m_set(void)
 					}
 				} else
 				{	/* There IS a last value */
+					if (!is_extract)
+						delimiter->operand[0] = delimval;
 					last = newtriple(OC_PARAMETER);
 					first->operand[1] = put_tref(last);
 					advancewindow();
@@ -335,12 +331,9 @@ int m_set(void)
 						return FALSE;
 					assert(lastval.oprclass == TRIP_REF);
 					last->operand[0] = lastval;
-					chktchain(&setchain);
 					/* Generate inline code to test first/last for usability and if found
 					   lacking, branch around the getchain and the actual store so we avoid
-					   setting the naked indicator so far as the target gvn is concerned. If
-					   the case was something like: Set $Piece(^x(1),^(2),^(3),^(4))=42, the
-					   standard is unclear as to what would happen and all bets are off.
+					   setting the naked indicator so far as the target gvn is concerned.
 					*/
 					if (last_is_lit = (lastval.oprval.tref->opcode == OC_ILIT))
 					{	/* Case 1: last is a literal */
@@ -367,36 +360,21 @@ int m_set(void)
 						jmptrp2 = newtriple(OC_JMPGTR);
 					}
 				}
-				chktchain(&setchain);
-
-				/* First we need to add the getchain to the end of the setchain.We must do
-				   this manually as there are no macros to deal with adding a chain with a
-				   header being part of the chain (i.e. curtchain is a pointer, not a real
-				   element like setchain is).
-				*/
-				obp = setchain.exorder.bl;	/* Maintain ptr to end of setchain list */
-				setchain.exorder.bl = getchain.exorder.bl;
-				getchain.exorder.bl->exorder.fl = &setchain;
-				obp->exorder.fl = getchain.exorder.fl;
-				getchain.exorder.fl->exorder.bl = obp;
-				chktchain(&setchain);
 				if (window_token != TK_RPAREN)
 				{
 					stx_error(ERR_RPARENMISSING);
 					return FALSE;
 				}
 				advancewindow();
-				dqins(setchain.exorder.bl, exorder, s);
-				dqins(setchain.exorder.bl, exorder, put);
-				chktchain(&setchain);
+				dqins(targchain.exorder.bl, exorder, s);
+				dqins(targchain.exorder.bl, exorder, put);
+				chktchain(&targchain);
 				/* Put result operand on the chain. End of chain depends on whether or not
 				   we are calling the shortcut or the full set-piece code */
 				if (delim1char)
 					first->operand[1] = resptr;
 				else
 					last->operand[1] = resptr;
-				/* One last duy to perform to set chain back to its former happy self */
-				setcurtchain(oldchain);
 				break;
 			default:
 				stx_error(ERR_VAREXPECTED);
@@ -432,7 +410,7 @@ int m_set(void)
 
 	/* Now add in the left-hand side triples */
 	obp = curtchain->exorder.bl;
-	dqadd(obp, &setchain, exorder);		/* this is a violation of info hiding */
+	dqadd(obp, &targchain, exorder);		/* this is a violation of info hiding */
 	chktchain(curtchain);
 
 	if (sub)

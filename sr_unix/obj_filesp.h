@@ -29,8 +29,13 @@ void buff_flush(void);
 /* Currently JSB contains two instructions:
  * 	load %ret, -1
  * 	ret
+ #	nop	# (hppa)
  */
-#define JSB_ACTION_N_INS	2
+#ifdef __hpux
+#  define JSB_ACTION_N_INS	3
+#else
+#  define JSB_ACTION_N_INS	2
+#endif
 
 #define JSB_MARKER		"GTM_CODE"
 #define MIN_LINK_PSECT_SIZE	0

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,18 +53,10 @@ int gtmsource_secnd_update(boolean_t print_message)
 		return(ABNORMAL_SHUTDOWN);
 	}
 	grab_lock(jnlpool.jnlpool_dummy_reg);
-	if (update_disable)
-		jnlpool.jnlpool_ctl->upd_disabled = TRUE;
-	else
-		jnlpool.jnlpool_ctl->upd_disabled = FALSE;
+	jnlpool.jnlpool_ctl->upd_disabled = update_disable;
 	rel_lock(jnlpool.jnlpool_dummy_reg);
 	rel_sem(SOURCE, SRC_SERV_OPTIONS_SEM);
 	if (print_message)
-	{
-		if (update_disable)
-			util_out_print("Updates are disabled now on secondary", TRUE);
-		else
-			util_out_print("Updates are enabled now on secondary", TRUE);
-	}
+		util_out_print("Updates are now !AZ", TRUE, update_disable ? "disabled" : "enabled");
 	return(NORMAL_SHUTDOWN);
 }

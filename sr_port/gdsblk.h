@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,7 +93,6 @@ typedef rec_hdr *rec_hdr_ptr_t;
 
 int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used);
 void bm_setmap(block_id bml, block_id blk, int4 busy);
-int cert_blk(block_id blk, blk_hdr_ptr_t bp, block_id root);
 void bml_newmap(blk_hdr_ptr_t ptr, uint4 size, trans_num curr_tn);
 
 /* End of gdsblk.h */

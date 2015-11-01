@@ -71,8 +71,11 @@ error_def(ERR_ASSERT);
 #ifdef __hpux
 #define CACHELINE_SIZE        64
 #define MSYNC_ADDR_INCS        OS_PAGE_SIZE
-
+#define USHBIN_SUPPORTED
 #define OFF_T_LONG
+/* Make sure linkage Psect is aligned on appropriate boundary. */
+#define LINKAGE_PSECT_BOUNDARY	4
+typedef uint4 mach_inst;	/* machine instruction */
 #endif
 
 #ifdef __linux__
@@ -120,8 +123,11 @@ typedef unsigned short	in_port_t;
 #define INTERLOCK_ADD(X,Y,Z)    (add_inter(Z, (sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
 
 
-/* Reserve enough space in routine header for the dummy string "GTM_CODE".  */
-#define RHEAD_JSB_SIZE	8
+/* On NON_USHBIN_ONLY platforms, reserve enough space in routine header for the dummy
+ * string "GTM_CODE". On USHBIN_ONLY platforms, reserve space of 16 bytes that holds
+ * instructions for simple 'return -1' plus as many characters of "GTM_CODE" as can be fit
+ * in the rest of the available bytes */
+#define RHEAD_JSB_SIZE	NON_USHBIN_ONLY(8) USHBIN_ONLY(16)
 
 typedef struct
 {

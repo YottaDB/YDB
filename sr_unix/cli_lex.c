@@ -25,39 +25,43 @@
 #include "cli.h"
 #include "eintr_wrappers.h"
 
-GBLDEF char cli_token_buf[MAX_LINE+1];	/* Token buffer */
+GBLDEF char	cli_token_buf[MAX_LINE + 1];	/* Token buffer */
 GBLREF int	cmd_cnt;
 GBLREF char	**cmd_arg;
-
-static IN_PARMS cli_lex_in;
 
 GBLDEF IN_PARMS *cli_lex_in_ptr;
 
 static int tok_string_extract(void)
 {
-	int token_len;
-	bool	have_quote, first_quote;
-	char *in_sp, *out_sp;
+	int		token_len;
+	boolean_t	have_quote, first_quote;
+	char		*in_sp, *out_sp;
 
-	in_sp = cli_lex_in.tp;
+	assert(cli_lex_in_ptr);
+	in_sp = cli_lex_in_ptr->tp;
 	out_sp = cli_token_buf;
 	token_len = 0;
 	have_quote = FALSE;
-	for( ; ;)
-	{	while(*in_sp && !ISSPACE((int) *in_sp) && *in_sp != '-')
-		{	if (*in_sp == '"')
-			{	if (!have_quote)
-				{	have_quote = TRUE;
+	for ( ; ;)
+	{
+		while (*in_sp && !ISSPACE((int)*in_sp) && *in_sp != '-')
+		{
+			if (*in_sp == '"')
+			{
+				if (!have_quote)
+				{
+					have_quote = TRUE;
 					in_sp++;
-				}else
-				{	if (*++in_sp == '"')
-					{	*out_sp++ = *in_sp++;	/* double quote, one goes in string, still have quote */
+				} else
+				{
+					if (*++in_sp == '"')
+					{
+						*out_sp++ = *in_sp++;	/* double quote, one goes in string, still have quote */
 						token_len++;
-					}else
-					{	have_quote = FALSE;
-					}
+					} else
+						have_quote = FALSE;
 				}
-			}else
+			} else
 			{
 				*out_sp++ = *in_sp++;
 				token_len++;
@@ -77,11 +81,10 @@ static int tok_string_extract(void)
 		break;
 	}
 	*out_sp = '\0';
-	cli_lex_in.tp = in_sp;
+	cli_lex_in_ptr->tp = in_sp;
 
-	return(token_len);
+	return (token_len);
 }
-
 
 
 /*
@@ -90,32 +93,59 @@ static int tok_string_extract(void)
  * -------------------------
  */
 #ifdef __osf__
-	/* N.B. argv is passed in from main (in gtm.c) almost straight from the operating system.  */
+/* N.B. If the process is started by mumps, argv passed in from main (in gtm.c) is almost straight from the operating system.
+ * if the process is started externally (call-ins), argc and argv are 0 and NULL respectively */
 #pragma pointer_size (save)
 #pragma pointer_size (long)
 #endif
-void	cli_lex_setup ( int	argc, char	*argv[])
+void	cli_lex_setup (int argc, char **argv)
+{
+	int	parmlen, parmindx;
+	char	**parmptr;
 #ifdef __osf__
 #pragma pointer_size (restore)
 #endif
-{
 #ifdef __MVS__
-	__argvtoascii_a(argc,argv);
+	__argvtoascii_a(argc, argv);
 #endif
 	cmd_cnt = argc;
-	cmd_arg = (char **)&argv[0];
-	cli_lex_in.argc = argc;
-	cli_lex_in.argv = &argv[0];
-	*cli_lex_in.in_str = '\0';
-	cli_lex_in.tp = 0;
-	cli_lex_in_ptr = &cli_lex_in;
+	cmd_arg = (char **)argv;
+	/* Quickly run through the parameters to get a ballpark on the
+	   size of the string needed to store them.
+	*/
+	for (parmindx = 1, parmptr = argv, parmlen = 0; parmindx <= argc; parmptr++, parmindx++)
+		parmlen += strlen(*parmptr) + 1;
+	parmlen = parmlen + PARM_OVHD;	/* Extraneous extras, etc. */
+	parmlen = (parmlen > MAX_LINE ? MAX_LINE : parmlen) + 1;
+	/* call-ins may repeatedly initialize cli_lex_setup for every invocation of gtm_init() */
+	if (!cli_lex_in_ptr || parmlen > cli_lex_in_ptr->buflen)
+	{	/* We have the cure for a missing or unusable buffer */
+		if (cli_lex_in_ptr)
+			free(cli_lex_in_ptr);
+		cli_lex_in_ptr = (IN_PARMS *)malloc(sizeof(IN_PARMS) + parmlen);
+		cli_lex_in_ptr->buflen = parmlen;
+	}
+	cli_lex_in_ptr->argc = argc;
+	cli_lex_in_ptr->argv = argv;
+	cli_lex_in_ptr->in_str[0] = '\0';
+	cli_lex_in_ptr->tp = NULL;
 }
 
 void cli_str_setup(int length, char *addr)
 {
-	cli_lex_in.argc = 0;
-	cli_lex_in.tp = cli_lex_in.in_str;
-	memcpy(cli_lex_in.in_str, addr, length > MAX_LINE ? MAX_LINE : length);
+	assert(cli_lex_in_ptr);
+	length = (length > MAX_LINE ? MAX_LINE : length) + 1;
+	if (!cli_lex_in_ptr || length > cli_lex_in_ptr->buflen)
+	{	/* We have the cure for a missing or unusable buffer */
+		if (cli_lex_in_ptr)
+			free(cli_lex_in_ptr);
+		cli_lex_in_ptr = (IN_PARMS *)malloc(sizeof(IN_PARMS) + length);
+		cli_lex_in_ptr->buflen = length;
+	}
+	cli_lex_in_ptr->argv = NULL;
+	cli_lex_in_ptr->argc = 0;
+	cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
+	memcpy(cli_lex_in_ptr->in_str, addr, length);
 }
 
 /*
@@ -256,12 +286,13 @@ void	skip_white_space(void)
 {
 	char	*in_sp;
 
-	in_sp = cli_lex_in.tp;
+	assert(cli_lex_in_ptr);
+	in_sp = cli_lex_in_ptr->tp;
 
 	while(ISSPACE((int)*in_sp))
 		in_sp++;
 
-	cli_lex_in.tp = in_sp;
+	cli_lex_in_ptr->tp = in_sp;
 }
 
 
@@ -280,7 +311,8 @@ static int	tok_extract (void)
 	int	token_len;
 	char	*in_sp, *out_sp;
 
-	in_sp = cli_lex_in.tp;
+	assert(cli_lex_in_ptr);
+	in_sp = cli_lex_in_ptr->tp;
 
 	out_sp = cli_token_buf;
 	token_len = 0;
@@ -293,8 +325,7 @@ static int	tok_extract (void)
 	{
 		*out_sp++ = *in_sp++;
 		token_len = 1;
-	}
-	else
+	} else
 	{
 		while(*in_sp && !ISSPACE((int) *in_sp)
 		  && *in_sp != '-'
@@ -305,7 +336,7 @@ static int	tok_extract (void)
 		}
 	}
 	*out_sp = '\0';
-	cli_lex_in.tp = in_sp;
+	cli_lex_in_ptr->tp = in_sp;
 
 	return(token_len);
 }
@@ -325,27 +356,28 @@ static int	tok_extract (void)
 
 int	cli_gettoken (int *eof)
 {
-	int	arg_no, token_len;
-	char	*from, *to;
+	int		arg_no, token_len, in_len;
+	char		*from, *to;
+	IN_PARMS	*new_cli_lex_in_ptr;
 
-
+	assert(cli_lex_in_ptr);
 	/* Reading from program argument list */
-	if (cli_lex_in.argc > 1 && cli_lex_in.tp == 0)
+	if (cli_lex_in_ptr->argc > 1 && cli_lex_in_ptr->tp == 0)
 	{
-		cli_lex_in.tp = cli_lex_in.in_str;
+		cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
 		arg_no = 1;
 			/* convert arguments into array */
-		while(arg_no < cli_lex_in.argc)
+		while(arg_no < cli_lex_in_ptr->argc)
 		{
 			if (arg_no > 1)
-				strcat(cli_lex_in.in_str, " ");
-			if (strlen(cli_lex_in.in_str)
-			  + strlen(cli_lex_in.argv[arg_no]) > MAX_LINE)
+				strcat(cli_lex_in_ptr->in_str, " ");
+			if (strlen(cli_lex_in_ptr->in_str)
+			    + strlen(cli_lex_in_ptr->argv[arg_no]) > MAX_LINE)
 				break;
-			if (cli_has_space(cli_lex_in.argv[arg_no]))
+			if (cli_has_space(cli_lex_in_ptr->argv[arg_no]))
 			{
-				from = cli_lex_in.argv[arg_no++];
-				to = cli_lex_in.in_str + strlen(cli_lex_in.in_str);
+				from = cli_lex_in_ptr->argv[arg_no++];
+				to = cli_lex_in_ptr->in_str + strlen(cli_lex_in_ptr->in_str);
 				*to++ = '\"';
 				while(*from != '\0')
 				{
@@ -355,27 +387,33 @@ int	cli_gettoken (int *eof)
 				}
 				*to++ = '\"';
 				*to = '\0';
-			}
-			else
-			{
-				strcat(cli_lex_in.in_str, cli_lex_in.argv[arg_no++]);
-			}
+			} else
+				strcat(cli_lex_in_ptr->in_str, cli_lex_in_ptr->argv[arg_no++]);
 		}
-	        cli_lex_in_ptr = &cli_lex_in;
 	}
 
 
-	if (cli_lex_in.tp == 0 || strlen(cli_lex_in.tp) < 1)
+	if (NULL == cli_lex_in_ptr->tp || strlen(cli_lex_in_ptr->tp) < 1)
 	{
-
-		FGETS_FILE(cli_lex_in.in_str, MAX_LINE, stdin, cli_lex_in.tp);
-    		if (NULL != cli_lex_in.tp)
+		cli_token_buf[0] = '\0';
+		FGETS_FILE(cli_token_buf, MAX_LINE, stdin, cli_lex_in_ptr->tp);
+    		if (NULL != cli_lex_in_ptr->tp)
     		{
-    			cli_lex_in.in_str[strlen(cli_lex_in.in_str)-1] = '\0';
-    			cli_lex_in_ptr = &cli_lex_in;
+			in_len = strlen(cli_token_buf);
+			if (cli_lex_in_ptr->buflen < in_len)
+			{
+				new_cli_lex_in_ptr = (IN_PARMS *)malloc(sizeof(IN_PARMS) + in_len);
+				new_cli_lex_in_ptr->argc = cli_lex_in_ptr->argc;
+				new_cli_lex_in_ptr->argv = cli_lex_in_ptr->argv;
+				new_cli_lex_in_ptr->buflen = in_len;
+				free(cli_lex_in_ptr);
+				cli_lex_in_ptr = new_cli_lex_in_ptr;
+			}
+			memcpy(cli_lex_in_ptr->in_str, cli_token_buf, in_len);
+			cli_lex_in_ptr->in_str[in_len - 1] = '\0';
+			cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;	/* Repoint to new home from cli_token_buf */
       			*eof = 0;
-           	}
-	    	else
+           	} else
 	    	{
 	      		*eof = EOF;
 	      		return (0);
@@ -384,7 +422,7 @@ int	cli_gettoken (int *eof)
 	}
 
 	token_len = tok_extract();
-	*eof = (cli_lex_in.argc > 1 && token_len == 0);
+	*eof = (cli_lex_in_ptr->argc > 1 && token_len == 0);
 	return token_len;
 }
 
@@ -406,12 +444,13 @@ int cli_look_next_token(int *eof)
 	int tok_len;
 	char *old_tp;
 
-	if (((char *) NULL == cli_lex_in.tp) || (!strlen(cli_lex_in.tp)))
+	assert(cli_lex_in_ptr);
+	if (((char *) NULL == cli_lex_in_ptr->tp) || (!strlen(cli_lex_in_ptr->tp)))
 		return(0);
 
-	old_tp = cli_lex_in.tp;
+	old_tp = cli_lex_in_ptr->tp;
 	tok_len = cli_gettoken(eof);
-	cli_lex_in.tp = old_tp;
+	cli_lex_in_ptr->tp = old_tp;
 
 	return(tok_len);
 }
@@ -421,37 +460,40 @@ int cli_look_next_string_token(int *eof)
 	int tok_len;
 	char *old_tp;
 
-	if (!strlen(cli_lex_in.tp))
+	assert(cli_lex_in_ptr);
+	if (!strlen(cli_lex_in_ptr->tp))
 		return(0);
 
-	old_tp = cli_lex_in.tp;
+	old_tp = cli_lex_in_ptr->tp;
 	tok_len = cli_get_string_token(eof);
-	cli_lex_in.tp = old_tp;
+	cli_lex_in_ptr->tp = old_tp;
 
 	return(tok_len);
 }
 
 int cli_get_string_token(int *eof)
 {
-	int arg_no, token_len;
-	char *from, *to;
+	int		arg_no, token_len, in_len;
+	char		*from, *to;
+	IN_PARMS 	*new_cli_lex_in_ptr;
 
-		/* Reading from program argument list */
-	if (cli_lex_in.argc > 1 && cli_lex_in.tp == 0)
+	assert(cli_lex_in_ptr);
+	/* Reading from program argument list */
+	if (cli_lex_in_ptr->argc > 1 && cli_lex_in_ptr->tp == 0)
 	{
-		cli_lex_in.tp = cli_lex_in.in_str;
+		cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
 		arg_no = 1;
-			/* convert arguments into array */
-		while(arg_no < cli_lex_in.argc)
+		/* convert arguments into array */
+		while(arg_no < cli_lex_in_ptr->argc)
 		{
 			if (arg_no > 1)
-				strcat(cli_lex_in.in_str, " ");
-			if (strlen(cli_lex_in.in_str) + strlen(cli_lex_in.argv[arg_no]) > MAX_LINE)
+				strcat(cli_lex_in_ptr->in_str, " ");
+			if (strlen(cli_lex_in_ptr->in_str) + strlen(cli_lex_in_ptr->argv[arg_no]) > MAX_LINE)
 				break;
-			if (cli_has_space(cli_lex_in.argv[arg_no]))
+			if (cli_has_space(cli_lex_in_ptr->argv[arg_no]))
 			{
-				from = cli_lex_in.argv[arg_no++];
-				to = cli_lex_in.in_str + strlen(cli_lex_in.in_str) - 1;
+				from = cli_lex_in_ptr->argv[arg_no++];
+				to = cli_lex_in_ptr->in_str + strlen(cli_lex_in_ptr->in_str) - 1;
 				*to++ = '\"';
 				while(*from != '\0')
 				{
@@ -461,35 +503,40 @@ int cli_get_string_token(int *eof)
 				}
 				*to++ = '\"';
 				*to = '\0';
-			}
-			else
-			{
-				strcat(cli_lex_in.in_str, cli_lex_in.argv[arg_no++]);
-			}
+			} else
+				strcat(cli_lex_in_ptr->in_str, cli_lex_in_ptr->argv[arg_no++]);
 		}
-	        cli_lex_in_ptr = &cli_lex_in;
 	}
 
-	if (cli_lex_in.tp == 0 || strlen(cli_lex_in.tp) < 1)
+	if (NULL == cli_lex_in_ptr->tp || strlen(cli_lex_in_ptr->tp) < 1)
 	{
-
-	    FGETS_FILE(cli_lex_in.in_str, MAX_LINE, stdin, cli_lex_in.tp);
-	    if (NULL != cli_lex_in.tp)
-	    {
-	      cli_lex_in.in_str[strlen(cli_lex_in.in_str)-1] = '\0';
-	      cli_lex_in_ptr = &cli_lex_in;
-	      *eof = 0;
-            }
-	    else
-	    {
-	      *eof = EOF;
-	      return (0);
-            }
-
+		cli_token_buf[0] = '\0';
+		FGETS_FILE(cli_token_buf, MAX_LINE, stdin, cli_lex_in_ptr->tp);
+    		if (NULL != cli_lex_in_ptr->tp)
+    		{
+			in_len = strlen(cli_token_buf);
+			if (cli_lex_in_ptr->buflen < in_len)
+			{
+				new_cli_lex_in_ptr = (IN_PARMS *)malloc(sizeof(IN_PARMS) + in_len);
+				new_cli_lex_in_ptr->argc = cli_lex_in_ptr->argc;
+				new_cli_lex_in_ptr->argv = cli_lex_in_ptr->argv;
+				new_cli_lex_in_ptr->buflen = in_len;
+				free(cli_lex_in_ptr);
+				cli_lex_in_ptr = new_cli_lex_in_ptr;
+			}
+			memcpy(cli_lex_in_ptr->in_str, cli_token_buf, in_len);
+			cli_lex_in_ptr->in_str[in_len - 1] = '\0';
+			cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;	/* Repoint to new home from cli_token_buf */
+      			*eof = 0;
+           	} else
+		{
+			*eof = EOF;
+			return (0);
+		}
         }
 
 	token_len = tok_string_extract();
-	*eof = (cli_lex_in.argc > 1 && token_len == 0);
+	*eof = (cli_lex_in_ptr->argc > 1 && token_len == 0);
 	return token_len;
 }
 

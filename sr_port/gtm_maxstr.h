@@ -61,7 +61,7 @@
  */
 
 /* The maximum nested depth of MAXSTR_BUFF_INIT/MAXSTR_BUFF_FINI allowed. We do not expect
- * many nesting levels. When the buffer stack overflows, GT.M ASSERTS.  */
+ * many nesting levels. When the buffer stack overflows, GT.M asserts. */
 #define	MAXSTR_STACK_SIZE	10
 
 GBLREF mstr	maxstr_buff[];		/* Buffer stack for nested MAXSTR_BUFF_INIT/MAXSTR_BUFF_FINI */
@@ -69,28 +69,28 @@ GBLREF mstr	maxstr_buff[];		/* Buffer stack for nested MAXSTR_BUFF_INIT/MAXSTR_B
  * although mstr is chosen as the entry type, it does not represent a GT.M string in the
  * traditional sense. The addr field point to the malloc'd buffer and is NULL if no
  * reallocation occured, i.e. buffer lies on the stack. The len field stores the current
- * buffer size which can grow geometrically *
+ * buffer size which can grow geometrically.
  */
 GBLREF int	maxstr_stack_level;	/* Current (0-index based) depth of nested MAXSTR_BUFF_INIT/MAXSTR_BUFF_FINI */
 
-#define MAXSTR_BUFF_DECL(var)	char var[MAX_STRLEN_INIT];
+#define MAXSTR_BUFF_DECL(var)	char var[MAX_STRBUFF_INIT];
 
 #define MAXSTR_BUFF_INIT 					\
 {								\
 	ESTABLISH(gtm_maxstr_ch);				\
 	maxstr_stack_level++;					\
-	maxstr_buff[maxstr_stack_level].len = MAX_STRLEN_INIT;	\
-	maxstr_buff[maxstr_stack_level].addr = NULL;		\
 	assert(maxstr_stack_level < MAXSTR_STACK_SIZE);		\
+	maxstr_buff[maxstr_stack_level].len = MAX_STRBUFF_INIT;	\
+	maxstr_buff[maxstr_stack_level].addr = NULL;		\
 }
 
 #define MAXSTR_BUFF_INIT_RET 					\
 {								\
 	ESTABLISH_RET(gtm_maxstr_ch, -1);			\
 	maxstr_stack_level++;					\
-	maxstr_buff[maxstr_stack_level].len = MAX_STRLEN_INIT;	\
-	maxstr_buff[maxstr_stack_level].addr = NULL;		\
 	assert(maxstr_stack_level < MAXSTR_STACK_SIZE);		\
+	maxstr_buff[maxstr_stack_level].len = MAX_STRBUFF_INIT;	\
+	maxstr_buff[maxstr_stack_level].addr = NULL;		\
 }
 
 /* The following macro checks whether the existing available buffer is sufficient
@@ -107,8 +107,10 @@ GBLREF int	maxstr_stack_level;	/* Current (0-index based) depth of nested MAXSTR
 #define MAXSTR_BUFF_FINI 					\
 {								\
 	if (maxstr_buff[maxstr_stack_level].addr)		\
+	{							\
 		free(maxstr_buff[maxstr_stack_level].addr);	\
-	maxstr_buff[maxstr_stack_level].addr = NULL;		\
+		maxstr_buff[maxstr_stack_level].addr = NULL;	\
+	}							\
 	maxstr_buff[maxstr_stack_level].len = 0;		\
 	maxstr_stack_level--;					\
 	REVERT; /* gtm_maxstr_ch() */				\

@@ -37,6 +37,7 @@
 #include "gtm_caseconv.h"
 #include "outofband.h"
 #include "wake_alarm.h"
+#include "stringpool.h"
 
 #define  LOGNAME_LEN 255
 
@@ -78,12 +79,16 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	int		fstat_res;
 
 	int		p_offset;
+	boolean_t	mknod_err , stat_err;
+	int 		save_mknod_err, save_stat_err;
 
 	mt_ptr = NULL;
 	char_or_block_special = FALSE;
 	out_of_time = FALSE;
 	file_des = -2;
 	oflag = 0;
+	mknod_err = FALSE;
+	stat_err = FALSE;
 	tn.len = tl->len;
 	if (tn.len > LOGNAME_LEN)
 		tn.len = LOGNAME_LEN;
@@ -118,33 +123,38 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 			{
 				ch = *(pp->str.addr + p_offset++);
 				if (iop_fifo == ch)
-				{
-					/* fifo with RW permissions for owner, group, other */
-					if ((-1 != MKNOD(buf, FIFO_PERMISSION, 0))
-#ifdef __MVS__
-						|| (EEXIST == errno)
-#endif
-						)
-					{
-						tl->iod->type = ff;
-						tl->iod->dollar.zeof = TRUE;
-#ifdef __MVS__
-						/*	create another one for fifo write	*/
-						tl->iod->pair.out = (io_desc *)malloc(sizeof(io_desc));
-						(tl->iod->pair.out)->pair.in = tl->iod;
-						(tl->iod->pair.out)->pair.out = (tl->iod->pair.out);
-						(tl->iod->pair.out)->trans_name = tl;
-						(tl->iod->pair.out)->type = ff;
-						sys_fifo = FALSE;
-#endif
-						break;
-					} else  if (EEXIST != errno)
-						rts_error(VARLSTCNT(1) errno);
-				} else  if (iop_sequential == ch)
+					tl->iod->type = ff;
+				else  if (iop_sequential == ch)
 					tl->iod->type = rm;
-
 				p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
 					(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+			}
+			if (ff == tl->iod->type)
+			{
+				/* fifo with RW permissions for owner, group, other */
+				if ((-1 != MKNOD(buf, FIFO_PERMISSION, 0))
+#ifdef __MVS__
+					|| (EEXIST == errno)
+#endif
+					)
+				{
+					tl->iod->dollar.zeof = TRUE;
+#ifdef __MVS__
+					/*	create another one for fifo write	*/
+					tl->iod->pair.out = (io_desc *)malloc(sizeof(io_desc));
+					(tl->iod->pair.out)->pair.in = tl->iod;
+					(tl->iod->pair.out)->pair.out = (tl->iod->pair.out);
+					(tl->iod->pair.out)->trans_name = tl;
+					(tl->iod->pair.out)->type = ff;
+					sys_fifo = FALSE;
+#endif
+				} else  if (EEXIST != errno)
+				{
+					mknod_err = TRUE;
+					save_mknod_err = errno;
+					/* This save_err will be checked immediately after error_handler is set;
+					   In that way error handler will get the chance to handle any error */
+				}
 			}
 		}
 		if ((n_io_dev_types == tl->iod->type) && mspace && mspace->str.len)
@@ -162,62 +172,66 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		if (n_io_dev_types == tl->iod->type)
 		{
 			if (0 == memvcmp(tn.addr, tn.len, sys_input.addr, sys_input.len))
-			{
 				file_des = 0;
+			else if (0 == memvcmp(tn.addr, tn.len, sys_output.addr, sys_output.len))
+				file_des = 1;
+			if (0 == file_des || 1 == file_des)
+			{
 				FSTAT_FILE(file_des, &outbuf, fstat_res);
 				if (-1 == fstat_res)
-					rts_error(VARLSTCNT(1) errno);
-			} else
+				{	/* save errno to be handled by exception handler if set */
+					save_stat_err = errno;
+					stat_err = TRUE;
+				}
+			}
+			else if (0 == memvcmp(tn.addr, tn.len, LIT_AND_LEN("/dev/null")))
+				tl->iod->type = nl;
+			else
 			{
-				if (0 == memvcmp(tn.addr, tn.len, sys_output.addr, sys_output.len))
+				STAT_FILE(buf, &outbuf, stat_res);
+				if ((-1 == stat_res) && (n_io_dev_types == tl->iod->type))
 				{
-					file_des = 1;
-					FSTAT_FILE(file_des, &outbuf, fstat_res);
-					if (-1 == fstat_res)
-						rts_error(VARLSTCNT(1) errno);
-				} else  if (0 == memvcmp(tn.addr, tn.len, "/dev/null", 9))
-					tl->iod->type = nl;
-				else
-				{
-					STAT_FILE(buf, &outbuf, stat_res);
-					if ((-1 == stat_res) && (n_io_dev_types == tl->iod->type))
-					{
-
-						if (ENOENT == errno)
-							tl->iod->type = rm;
-						else
-							rts_error(VARLSTCNT(1) errno);
+					if (ENOENT == errno)
+						tl->iod->type = rm;
+					else
+					{	/* save errno to be checked later */
+						save_stat_err = errno;
+						stat_err = TRUE;
 					}
 				}
 			}
 		}
+
 		if (n_io_dev_types == tl->iod->type)
 		{
-			switch(outbuf.st_mode & S_IFMT)
+			if (!stat_err)
 			{
-				case S_IFCHR:
-				case S_IFBLK:
-					char_or_block_special = TRUE;
-					break;
-				case S_IFIFO:
-					tl->iod->type = ff;
+				switch(outbuf.st_mode & S_IFMT)
+				{
+					case S_IFCHR:
+					case S_IFBLK:
+						char_or_block_special = TRUE;
+						break;
+					case S_IFIFO:
+						tl->iod->type = ff;
 #ifdef __MVS__
-					sys_fifo = TRUE;
+						sys_fifo = TRUE;
 #endif
-					break;
-				case S_IFREG:
-				case S_IFDIR:
-					tl->iod->type = rm;
-					break;
-				case S_IFSOCK:
-				case 0:
-					tl->iod->type = ff;
+						break;
+					case S_IFREG:
+					case S_IFDIR:
+						tl->iod->type = rm;
+						break;
+					case S_IFSOCK:
+					case 0:
+						tl->iod->type = ff;
 #ifdef __MVS__
-					sys_fifo = TRUE;
+						sys_fifo = TRUE;
 #endif
-					break;
-				default:
-					break;
+						break;
+					default:
+						break;
+				}
 			}
 		}
 		naml->iod = tl->iod;
@@ -239,6 +253,13 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 			assert((params) *(pp->str.addr + p_offset) < (params)n_iops);
 			switch ((ch = *(pp->str.addr + p_offset++)))
 			{
+				case iop_exception:
+					{
+					naml->iod->error_handler.len = *(pp->str.addr + p_offset);
+					naml->iod->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
+					s2pool(&naml->iod->error_handler);
+					break;
+					}
 				case iop_allocation:
 					if (rm == naml->iod->type)
 					{
@@ -294,12 +315,22 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
 				(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 		}
+
+		/* Check the saved error from mknod() for fifo, also saved error from fstat() or stat()
+		  so error handler (if set)  can handle it */
+		if (ff == tl->iod->type  && mknod_err)
+			rts_error(VARLSTCNT(1) save_mknod_err);
+		/* Error from either stat() or fstat() function */
+		if (stat_err)
+			rts_error(VARLSTCNT(1) save_stat_err);
+
 		if (timed)
 			start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
 		/* RW permissions for owner and others as determined by umask. */
 		umask_orig = umask(000);	/* determine umask (destructive) */
 		(void)umask(umask_orig);	/* reset umask */
 		umask_creat = 0666 & ~umask_orig;
+
 		/*
 		 * no OPEN EINTR macros in the following while loop  due to complex error checks and processing between
 		 * top of while and calls to OPEN4
@@ -404,7 +435,6 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	}
 	assert(naml->iod->type < n_io_dev_types);
 	naml->iod->disp_ptr = &io_dev_dispatch[naml->iod->type];
-	active_device = naml->iod;
 	if (dev_never_opened == naml->iod->state)
 	{
 		naml->iod->wrap = DEFAULT_IOD_WRAP;

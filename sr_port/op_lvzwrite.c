@@ -32,7 +32,7 @@ void op_lvzwrite(va_alist)
 va_dcl
 {
 	va_list		var;
-	bool		flag;
+	boolean_t	flag;
 	int4		count, arg1, arg2;
 	mval		*mv;
 	zshow_out	output, *out;
@@ -57,7 +57,7 @@ va_dcl
 		case ZWRITE_ASTERISK:
 			lvzwr_arg(flag, (mval *)0, (mval *)0); /* caution fall through */
 		case ZWRITE_END:
-			lvzwr_fini(out,flag);
+			lvzwr_fini(out, flag);
 			MAXSTR_BUFF_FINI;
 			return;
 			break;

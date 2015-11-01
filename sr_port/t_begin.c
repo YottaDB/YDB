@@ -30,7 +30,7 @@
 
 GBLREF short 		crash_count;
 GBLREF trans_num	start_tn;
-GBLREF cw_set_element	cw_set[CDB_CW_SET_SIZE];
+GBLREF cw_set_element	cw_set[];
 GBLREF unsigned char	cw_set_depth, cw_map_depth;
 GBLREF unsigned int	t_tries;
 GBLREF uint4		t_err;

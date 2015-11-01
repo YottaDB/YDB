@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,6 +71,9 @@ void op_zsystem(mval *v)
 		for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 		{	/* the mdb_condition_handler does all regions in all global directories
 			 * this should produce the same result more quickly but the difference should be noted */
+			assert(tr->reg->open);
+			if (!tr->reg->open)
+				continue;
 			csa = (sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs;
 			if (csa->now_crit)
 				rel_crit(tr->reg);

@@ -38,6 +38,7 @@
 #include "dpgbldir.h"
 #include "sgnl.h"
 #include "mvalconv.h"
+#include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro */
 
 #ifndef EARLY_VARARGS
 #include <varargs.h>	/* needs to be after the above include files otherwise linux/x86 gcc complains */
@@ -116,46 +117,7 @@ va_dcl
 	max_key = gv_cur_region->max_key_size;
 	for (count -= 3;  count > 0;  count--)
 	{
-		was_null |= is_null;
-		val = va_arg(var, mval *);
-		if (val->mvtype & MV_SUBLIT)
-		{
-			is_null = ((STR_SUB_PREFIX == *(unsigned char *)val->str.addr) && (KEY_DELIMITER == *(val->str.addr + 1)));
-			if (gv_target->collseq)
-			{
-				mval temp;
-
-				transform = FALSE;
-				end = gvsub2str((uchar_ptr_t)val->str.addr, buff, FALSE);
-				transform = TRUE;
-				temp.mvtype = MV_STR;
-				temp.str.addr = (char *)buff;
-				temp.str.len = end - buff;
-				mval2subsc(&temp, gv_currkey);
-			} else
-			{
-				len = val->str.len;
-				if (gv_currkey->end + len - 1 >= max_key)
-				{
-					if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
-						end = &buff[MAX_ZWR_KEY_SZ - 1];
-					rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff , buff);
-				}
-				memcpy((gv_currkey->base + gv_currkey->end), val->str.addr, len);
-				gv_currkey->prev = gv_currkey->end;
-				gv_currkey->end += len - 1;
-			}
-		} else
-		{
-			mval2subsc(val, gv_currkey);
-			if (gv_currkey->end >= max_key)
-			{
-				if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
-					end = &buff[MAX_ZWR_KEY_SZ - 1];
-				rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff , buff);
-			}
-			is_null = (MV_IS_STRING(val) && (0 == val->str.len));
-		}
+		COPY_SUBS_TO_GVCURRKEY(var, gv_currkey, was_null, is_null);	/* updates gv_currkey, was_null, is_null */
 	}
 	gv_curr_subsc_null = is_null;
 	if (was_null && (FALSE == gv_cur_region->null_subs))

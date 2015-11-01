@@ -31,13 +31,13 @@ GBLREF uint4	gtmDebugLevel;
 
 int resolve_ref(int errknt)
 {
-	triple	*x,*y,*z;
-	tbp	*p;
+	triple	*curtrip, *tripref, *chktrip;
+	tbp	*tripbp;
 	mline	*mxl;
 	mlabel	*mlbx;
-	oprtype *n;
-	int4	in_error;
+	oprtype *opnd;
 	int	actcnt;
+
 	error_def(ERR_LABELMISSING);
 	error_def(ERR_LABELUNKNOWN);
 	error_def(ERR_FMLLSTPRESENT);
@@ -51,166 +51,177 @@ int resolve_ref(int errknt)
 	} else
 	{
 		COMPDBG(printf(" ************************************* Begin resolve_ref scan ******************************\n"););
-		dqloop(&t_orig, exorder, x)
+		dqloop(&t_orig, exorder, curtrip)
 		{
 			COMPDBG(printf(" ************************ Triple Start **********************\n"););
-			COMPDBG(cdbg_dump_triple(x, 0););
-			for (n = x->operand ; n < &(x->operand[2]) ; n++)
+			COMPDBG(cdbg_dump_triple(curtrip, 0););
+			for (opnd = curtrip->operand ; opnd < &(curtrip->operand[2]) ; opnd++)
 			{
-				if (n->oprclass == INDR_REF)
-					*n = *(n->oprval.indr);
-				switch (n->oprclass)
+				if (opnd->oprclass == INDR_REF)
+					*opnd = *(opnd->oprval.indr);
+				switch (opnd->oprclass)
 				{
 				case TNXT_REF:
-					n->oprclass = TJMP_REF;
-					n->oprval.tref = n->oprval.tref->exorder.fl;
+					opnd->oprclass = TJMP_REF;
+					opnd->oprval.tref = opnd->oprval.tref->exorder.fl;
 					/* caution:  fall through */
 				case TJMP_REF:
-					p = (tbp *) mcalloc(sizeof(tbp));
-					p->bpt = x;
-					dqins(&n->oprval.tref->jmplist, que, p);
+					tripbp = (tbp *) mcalloc(sizeof(tbp));
+					tripbp->bpt = curtrip;
+					dqins(&opnd->oprval.tref->jmplist, que, tripbp);
 					continue;
 				case MNXL_REF:
-					mxl = n->oprval.mlin->child;
+					mxl = opnd->oprval.mlin->child;
 					if (mxl)
-						y = mxl->externalentry;
+						tripref = mxl->externalentry;
 					else
-						y = 0;
-					if (!y)
-					{
-						/* ignore vacuuous DO sp sp */
-						x->opcode = OC_NOOP;
+						tripref = 0;
+					if (!tripref)
+					{	/* ignore vacuuous DO sp sp */
+						curtrip->opcode = OC_NOOP;
 						break;
 					}
-					n->oprclass = TJMP_REF;
-					n->oprval.tref = y;
+					opnd->oprclass = TJMP_REF;
+					opnd->oprval.tref = tripref;
 					break;
 				case MLAB_REF:
 					assert(!run_time);
-					mlbx = n->oprval.lab;
-					y = mlbx->ml ? mlbx->ml->externalentry : 0;
-					if (y)
+					mlbx = opnd->oprval.lab;
+					tripref = mlbx->ml ? mlbx->ml->externalentry : 0;
+					if (tripref)
 					{
 						if (mlbx->formalcnt == NO_FORMALLIST)
 						{
-							n->oprclass = TJMP_REF;
-							n->oprval.tref = y;
+							opnd->oprclass = TJMP_REF;
+							opnd->oprval.tref = tripref;
 						} else
 						{
 							errknt++;
 							stx_error(ERR_FMLLSTPRESENT, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
 							source_error_found = 0;
-							y = newtriple(OC_RTERROR);
-							y->operand[0] = put_ilit(ERR_FMLLSTPRESENT);
-							y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
-							n->oprval.tref = y;
-							n->oprclass = TJMP_REF;
+							tripref = newtriple(OC_RTERROR);
+							tripref->operand[0] = put_ilit(ERR_FMLLSTPRESENT);
+							/* This is a subroutine/func reference */
+							tripref->operand[1] = put_ilit(TRUE);
+							opnd->oprval.tref = tripref;
+							opnd->oprclass = TJMP_REF;
 						}
 					} else
 					{
 						errknt++;
 						stx_error(ERR_LABELMISSING, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
 						source_error_found = 0;
-						y = newtriple(OC_RTERROR);
-						y->operand[0] = put_ilit(ERR_LABELUNKNOWN);
-						y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
-						n->oprval.tref = y;
-						n->oprclass = TJMP_REF;
+						tripref = newtriple(OC_RTERROR);
+						tripref->operand[0] = put_ilit(ERR_LABELUNKNOWN);
+						/* This is a subroutine/func reference */
+						tripref->operand[1] = put_ilit(TRUE);
+						opnd->oprval.tref = tripref;
+						opnd->oprclass = TJMP_REF;
 					}
 					continue;
 				case MFUN_REF:
 					assert (!run_time);
-					assert (x->opcode == OC_JMP);
-					z = x->exorder.bl;
-					assert (z->opcode == OC_EXCAL || z->opcode == OC_EXFUN);
-					assert (z->operand[1].oprclass == TRIP_REF);
-					z = z->operand[1].oprval.tref;
-					assert (z->opcode == OC_PARAMETER);
-					assert (z->operand[0].oprclass == TRIP_REF);
-					assert (z->operand[0].oprval.tref->opcode == OC_TRIPSIZE);
-					assert (z->operand[0].oprval.tref->operand[0].oprclass == TSIZ_REF);
-					z = z->operand[1].oprval.tref;
-					assert (z->opcode == OC_PARAMETER);
-					assert (z->operand[0].oprclass == TRIP_REF);
-					assert (z->operand[0].oprval.tref->opcode == OC_ILIT);
-					assert (z->operand[0].oprval.tref->operand[0].oprclass == ILIT_REF);
-					z = z->operand[1].oprval.tref;
-					assert (z->opcode == OC_PARAMETER);
-					assert (z->operand[0].oprclass == TRIP_REF);
-					assert (z->operand[0].oprval.tref->opcode == OC_ILIT);
-					assert (z->operand[0].oprval.tref->operand[0].oprclass == ILIT_REF);
-					actcnt = z->operand[0].oprval.tref->operand[0].oprval.ilit;
+					assert (curtrip->opcode == OC_JMP);
+					chktrip = curtrip->exorder.bl;
+					assert (chktrip->opcode == OC_EXCAL || chktrip->opcode == OC_EXFUN);
+					assert (chktrip->operand[1].oprclass == TRIP_REF);
+					chktrip = chktrip->operand[1].oprval.tref;
+					assert (chktrip->opcode == OC_PARAMETER);
+					assert (chktrip->operand[0].oprclass == TRIP_REF);
+					assert (chktrip->operand[0].oprval.tref->opcode == OC_TRIPSIZE);
+					assert (chktrip->operand[0].oprval.tref->operand[0].oprclass == TSIZ_REF);
+					chktrip = chktrip->operand[1].oprval.tref;
+					assert (chktrip->opcode == OC_PARAMETER);
+					assert (chktrip->operand[0].oprclass == TRIP_REF);
+					assert (chktrip->operand[0].oprval.tref->opcode == OC_ILIT);
+					assert (chktrip->operand[0].oprval.tref->operand[0].oprclass == ILIT_REF);
+					chktrip = chktrip->operand[1].oprval.tref;
+					assert (chktrip->opcode == OC_PARAMETER);
+					assert (chktrip->operand[0].oprclass == TRIP_REF);
+					assert (chktrip->operand[0].oprval.tref->opcode == OC_ILIT);
+					assert (chktrip->operand[0].oprval.tref->operand[0].oprclass == ILIT_REF);
+					actcnt = chktrip->operand[0].oprval.tref->operand[0].oprval.ilit;
 					assert (0 <= actcnt);
-					mlbx = n->oprval.lab;
-					y = mlbx->ml ? mlbx->ml->externalentry : 0;
-					if (y)
+					mlbx = opnd->oprval.lab;
+					tripref = mlbx->ml ? mlbx->ml->externalentry : 0;
+					if (tripref)
 					{
 						if (mlbx->formalcnt == NO_FORMALLIST)
 						{
 							errknt++;
 							stx_error(ERR_FMLLSTMISSING, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
 							source_error_found = 0;
-							y = newtriple(OC_RTERROR);
-							y->operand[0] = put_ilit(ERR_FMLLSTMISSING);
-							y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
-							n->oprval.tref = y;
-							n->oprclass = TJMP_REF;
+							tripref = newtriple(OC_RTERROR);
+							tripref->operand[0] = put_ilit(ERR_FMLLSTMISSING);
+							/* This is a subroutine/func reference */
+							tripref->operand[1] = put_ilit(TRUE);
+							opnd->oprval.tref = tripref;
+							opnd->oprclass = TJMP_REF;
 						} else if (mlbx->formalcnt < actcnt)
 						{
 							errknt++;
 							stx_error(ERR_ACTLSTTOOLONG, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
 							source_error_found = 0;
-							y = newtriple(OC_RTERROR);
-							y->operand[0] = put_ilit(ERR_ACTLSTTOOLONG);
-							y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
-							n->oprval.tref = y;
-							n->oprclass = TJMP_REF;
+							tripref = newtriple(OC_RTERROR);
+							tripref->operand[0] = put_ilit(ERR_ACTLSTTOOLONG);
+							/* This is a subroutine/func reference */
+							tripref->operand[1] = put_ilit(TRUE);
+							opnd->oprval.tref = tripref;
+							opnd->oprclass = TJMP_REF;
 						} else
 						{
-							n->oprclass = TJMP_REF;
-							n->oprval.tref = y;
+							opnd->oprclass = TJMP_REF;
+							opnd->oprval.tref = tripref;
 						}
 					} else
 					{
 						errknt++;
 						stx_error(ERR_LABELMISSING, 2, mid_len(&mlbx->mvname), &mlbx->mvname);
 						source_error_found = 0;
-						y = newtriple(OC_RTERROR);
-						y->operand[0] = put_ilit(ERR_LABELUNKNOWN);
-						y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
-						n->oprval.tref = y;
-						n->oprclass = TJMP_REF;
+						tripref = newtriple(OC_RTERROR);
+						tripref->operand[0] = put_ilit(ERR_LABELUNKNOWN);
+						/* This is a subroutine/func reference */
+						tripref->operand[1] = put_ilit(TRUE);
+						opnd->oprval.tref = tripref;
+						opnd->oprclass = TJMP_REF;
 					}
 					continue;
 				case TRIP_REF:
-					if ((y = n->oprval.tref)->opcode == OC_PASSTHRU)
-					{
-						assert(y->operand[0].oprclass == TRIP_REF);
-						*n = y->operand[0];
-						COMPDBG(printf(" ** p1: operand at 0x%08lx replaced by operand at 0x%08lx\n",
-							       n, &y->operand[0]););
-					}
-					p = (tbp *) mcalloc(sizeof(tbp));
-					p->bpt = x;
-					dqins(&n->oprval.tref->backptr, que, p);
+					resolve_tref(curtrip, opnd);
 					continue;
 				}
 			}
-			n = &x->destination;
-			if (n->oprclass == TRIP_REF)
-			{
-				if ((y = n->oprval.tref)->opcode == OC_PASSTHRU)
-				{
-					assert(y->operand[0].oprclass == TRIP_REF);
-					*n = y->operand[0];
-					COMPDBG(printf(" ** p2: operand at 0x%08lx replaced by operand at 0x%08lx\n",
-						       n, &y->operand[0]););
-				}
-				p = (tbp *) mcalloc(sizeof(tbp));
-				p->bpt = x;
-				dqins(&n->oprval.tref->backptr, que, p);
-			}
+			opnd = &curtrip->destination;
+			if (opnd->oprclass == TRIP_REF)
+				resolve_tref(curtrip, opnd);
 		}
 	}
 	return errknt;
+}
+
+
+/* If for example there are nested $SELECT routines feeding a value to a SET $PIECE/$EXTRACT, this nested checking is
+   necessary to make sure no OC_PASSTHRUs remain in the parameter chain to get turned into OC_NOOPs that will
+   cause GTMASSERTs in emit_code.
+*/
+void resolve_tref(triple *curtrip, oprtype *opnd)
+{
+	triple	*tripref;
+	tbp	*tripbp;
+
+	if (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode)
+	{
+		assert(tripref->operand[0].oprclass == TRIP_REF);
+		do
+		{	/* As many OC_PASSTHRUs as are stacked, we will devour */
+			*opnd = tripref->operand[0];
+		} while (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode);
+	}
+
+	COMPDBG(printf(" ** Passthru replacement: Operand at 0x%08lx replaced by operand at 0x%08lx\n",
+		       opnd, &tripref->operand[0]););
+
+	tripbp = (tbp *) mcalloc(sizeof(tbp));
+	tripbp->bpt = curtrip;
+	dqins(&opnd->oprval.tref->backptr, que, tripbp);
 }

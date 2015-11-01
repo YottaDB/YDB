@@ -205,7 +205,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 		if (NULL != tmp_jfh)
 			free(tmp_jfh);
 		tmp_jfh = NULL;
-		rts_error(VARLSTCNT(7) ERR_JNLFILOPN, 4, jnl_fn_len, jnl_fn, REG_LEN_STR(reg));
+		rts_error(VARLSTCNT(7) ERR_JNLFILOPN, 4, jnl_fn_len, jnl_fn, DB_LEN_STR(reg), status);
 	}
 
 	tmp_ctl->repl_buff = repl_buff_create(tmp_jfh->alignsize);

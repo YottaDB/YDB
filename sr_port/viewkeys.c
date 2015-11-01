@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,30 +16,31 @@
 #include "view.h"
 #include "gtm_caseconv.h"
 
-GBLDEF bool view_debug1=0, view_debug2=0, view_debug3=0, view_debug4=0;
+#define TOP_VIEWTAB_ENTRY (&viewtab[sizeof(viewtab) / sizeof(viewtab[0])])
+#define VT_KWSIZE (sizeof(viewtab[0].keyword))
+
+#define VIEWTAB(A,B,C,D) {A, B, C, D}
+const static readonly viewtab_entry viewtab[] =
+{
+#include "viewtab.h"
+};
+#undef VIEWTAB
 
 viewtab_entry *viewkeys(mstr *v)
 {
 /* given view keyword, return pointer to viewtab_entry for that keyword
    or: return 0 means not found, return -1 means keyword is ambiguous */
-#define VIEWTAB(A,B,C,D) {A, B, C, D}
-	static readonly viewtab_entry viewtab[] =
-	{
-#include "viewtab.h"
-	};
-#undef VIEWTAB
-#define TOP_VIEWTAB_ENTRY (&viewtab[sizeof(viewtab) / sizeof(viewtab[0])])
-#define VT_KWSIZE (sizeof(viewtab[0].keyword))
 
-	unsigned char cmpbuf[VT_KWSIZE];
-	viewtab_entry *vt_ptr, *vt_top;
-	short len;
-	int n;
+	unsigned char		cmpbuf[VT_KWSIZE];
+	const viewtab_entry	*vt_ptr, *vt_top;
+	short 			len;
+	int 			n;
+
 	error_def(ERR_VIEWNOTFOUND);
 	error_def(ERR_VIEWAMBIG);
 
 	if (v->len == 0)
-		vt_ptr = (viewtab_entry *) 0;
+		vt_ptr = (viewtab_entry *)NULL;
 	else
 	{
 		len = (v->len < sizeof(cmpbuf) ? v->len : sizeof(cmpbuf));
@@ -55,16 +56,15 @@ viewtab_entry *viewkeys(mstr *v)
 			else if (n == 0)
 			{
 				if (vt_ptr < vt_top - 1 && memcmp(cmpbuf, (vt_ptr + 1)->keyword, len) == 0)
-				{	vt_ptr = (viewtab_entry *) -1;
-				}
+					vt_ptr = (viewtab_entry *)-1;
 				break;
 			}
 		}
 	}
-	if (vt_ptr == (viewtab_entry *) -1)
+	if (vt_ptr == (viewtab_entry *)-1)
 		rts_error(VARLSTCNT(4) ERR_VIEWAMBIG, 2, v->len, v->addr);
 	else if (!vt_ptr || vt_ptr >= vt_top)
 		rts_error(VARLSTCNT(4) ERR_VIEWNOTFOUND, 2, v->len, v->addr);
 
-	return vt_ptr;
+	return (viewtab_entry *)vt_ptr;
 }

@@ -29,10 +29,21 @@ GBLREF mur_gbls_t	murgbl;
 
 CONDITION_HANDLER(mur_multi_rehash_ch)
 {
+	/* If we cannot alloc memory during rehasing, just continue in normal program flow */
+	error_def(ERR_MEMORY);
+	error_def(ERR_VMSMEMORY);
+	error_def(ERR_MEMORYRECURSIVE);
+	START_CH;
 	/* If we cannot allocate memory or any error while doing rehash, just abort any more rehashing.
 	 *  We will continue with old table */
-	START_CH;
-	UNWIND(NULL, NULL);
+	if (ERR_MEMORY == SIGNAL || ERR_VMSMEMORY == SIGNAL || ERR_MEMORYRECURSIVE == SIGNAL)
+	{
+		UNWIND(NULL, NULL);
+	}
+	else
+	{
+		NEXTCH; /* non memory related error */
+	}
 }
 
 void mur_multi_rehash(void)

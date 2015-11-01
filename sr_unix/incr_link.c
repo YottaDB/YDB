@@ -13,6 +13,7 @@
 
 #include <errno.h>
 #include "gtm_unistd.h"
+#include "gtm_stdio.h"
 
 #include "rtnhdr.h"
 #include "compiler.h"
@@ -23,7 +24,9 @@
 #include "incr_link.h"
 #include "cachectl.h"
 #include "obj_file.h"
+#include "gtm_limits.h"
 #include "min_max.h"
+#include "gtmdbglvl.h"
 
 #define RELOCATE(field, type, base) field = (type)((unsigned char *)(field) + (unsigned int)(base))
 #define RELREAD 50			/* number of relocation entries to buffer */
@@ -62,8 +65,8 @@ static rhdtyp		*hdr;
 
 GBLDEF mident		zlink_mname;
 
-GBLREF unsigned char	*zl_lab_err;
 GBLREF mach_inst	jsb_action[JSB_ACTION_N_INS];
+GBLREF uint4		gtmDebugLevel;
 
 typedef struct	res_list_struct
 {
@@ -90,6 +93,8 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	unsigned char	*shdr, *rel_base;
 	mval		*curlit;
 	lab_tabent	*curlbe;
+	char		name_buf[PATH_MAX+1];
+	int		name_buf_len;
 	char		marker[sizeof(JSB_MARKER) - 1];
 
 	error_def(ERR_INVOBJ);
@@ -119,13 +124,10 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	hdr = (rhdtyp *)malloc(sizeof(rhdtyp));
 	if (shlib)
 	{	/* Make writable copy of header as header of record */
-#ifdef _AIX
-		/* Incomming symbol is a TOC entry which needs dereferencing */
-		shdr = *(unsigned char **)zro_entry->shrsym;
-#else
-		/* Incomming symbol is the start of the shared object */
-		shdr = (unsigned char *)zro_entry->shrsym;
-#endif
+		/* On some platforms, the address returned by dlsym() is not the actual shared code address, but normally
+		 * an address to the linkage table, eg. TOC (AIX), PLT (HP-UX). Computing the actual shared code address
+		 * is platform dependent and is handled by the macro (see incr_link_sp.h) */
+		shdr = GET_RTNHDR_ADDR(zro_entry->shrsym);
 		memcpy(hdr, shdr, sizeof(rhdtyp));
 		hdr->shlib_handle = zro_entry->shrlib;
 	} else
@@ -202,6 +204,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	RELOCATE(hdr->vartab_adr, var_tabent *, rel_base);
 	RELOCATE(hdr->lnrtab_adr, lnr_tabent *, rel_base);
 	RELOCATE(hdr->literal_text_adr, unsigned char *, rel_base);
+
 	/* Read-write releasable section */
 	sect_rw_rel_size = (int)hdr->labtab_adr - (int)hdr->literal_adr;
 	sect_rw_rel = malloc(sect_rw_rel_size);
@@ -231,6 +234,14 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 			curlit->str.addr += (int)hdr->literal_text_adr;
 	}
 	hdr->src_full_name.addr += (int)hdr->literal_text_adr;
+
+	if (GDL_PrintEntryPoints & gtmDebugLevel)
+	{	/* Prepare name and address for announcement.. */
+		name_buf_len = (PATH_MAX > hdr->src_full_name.len) ? hdr->src_full_name.len : PATH_MAX;
+		memcpy(name_buf, hdr->src_full_name.addr, name_buf_len);
+		name_buf[name_buf_len] = '\0';
+		PRINTF("incr_link: %s loaded at 0x%08lx\n", name_buf, hdr->ptext_adr);
+	}
 
 	/* Read-write non-releasable section */
 	sect_rw_nonrel_size = hdr->labtab_len * sizeof(lab_tabent);
@@ -310,7 +321,8 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		old_rhead = (rhdtyp *)old_rhead->old_rhead_adr;
 	}
 	urx_resolve(hdr, (lab_tabent *)lbt_bot, (lab_tabent *)lbt_top);
-	cacheflush(hdr->ptext_adr, (hdr->ptext_end_adr - hdr->ptext_adr), BCACHE);
+	if (!shlib)
+		cacheflush(hdr->ptext_adr, (hdr->ptext_end_adr - hdr->ptext_adr), BCACHE);
 	return TRUE;
 }
 

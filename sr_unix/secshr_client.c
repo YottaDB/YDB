@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,30 +65,30 @@ static volatile int		client_timer_popped;
 static unsigned long		cur_seqno = 0;
 
 
-char    secshr_fail_mesg_code[][MAX_GTMSECSHR_FAIL_MESG_LEN] = {
-                                        "",
-                                        "Wake Message Failed",
-                                        "Check process alive failed",
-                                        "Remove Semaphore failed",
-                                        "Remove Shared Memory segment failed",
-                                        "Ping Message failed",
-					"Remove File failed",
-					"Continue Process failed",
-                                    };
+const static char readonly secshr_fail_mesg_code[][MAX_GTMSECSHR_FAIL_MESG_LEN] = {
+	"",
+	"Wake Message Failed",
+	"Check process alive failed",
+	"Remove Semaphore failed",
+	"Remove Shared Memory segment failed",
+	"Ping Message failed",
+	"Remove File failed",
+	"Continue Process failed",
+};
 
-char	secshr_unbl_start_mesg_code[][MAX_GTMSECSHR_FAIL_MESG_LEN] = {
-				"",
-				"gtmsecshr unable to set-uid to root",
-				"gtmsecshr unable to set-gid to root",
-				"gtmsecshr unable to open log file",
-				"gtmsecshr unable to dup stdout and stderr",
-				"The environmental variable gtm_dist is pointing to an invalid path",
-				"Unable to exec gtmsecshr",
-				"gtmsecshr unable to create a  child process",
-				"The environmental variable gtm_log is pointing to an invalid path",
-				"Error with gtmsecshr semaphore",
-				"Invalid gtm exit message",
-			};
+const static char readonly secshr_unbl_start_mesg_code[][MAX_GTMSECSHR_FAIL_MESG_LEN] = {
+	"",
+	"gtmsecshr unable to set-uid to root",
+	"gtmsecshr unable to set-gid to root",
+	"gtmsecshr unable to open log file",
+	"gtmsecshr unable to dup stdout and stderr",
+	"The environmental variable gtm_dist is pointing to an invalid path",
+	"Unable to exec gtmsecshr",
+	"gtmsecshr unable to create a  child process",
+	"The environmental variable gtm_log is pointing to an invalid path",
+	"Error with gtmsecshr semaphore",
+	"Invalid gtm exit message",
+};
 
 #define MAX_RETRIES			7
 #define CLIENT_ACK_TIMER		5

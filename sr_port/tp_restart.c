@@ -127,11 +127,14 @@ void	tp_restart(int newlevel)
 	tp_frame		*tf;
 	mv_stent		*mvc;
 	tp_region		*tr;
-	static gv_namehead	*noplace;
 	mval			bangHere, beganHere;
 	sgmnt_addrs		*csa;
 	int4			num_closed = 0;
 	boolean_t		tp_tend_status;
+	static gv_namehead	*noplace;
+	DEBUG_ONLY(
+	static int4		uncounted_restarts;	/* do not count some failure codes towards MAX_TRESTARTS */
+	)
 
 	ESTABLISH(tp_restart_ch);
 	assert(1 == newlevel);
@@ -141,6 +144,10 @@ void	tp_restart(int newlevel)
 		return; /* for the compiler only -- never executed */
 	}
 
+	DEBUG_ONLY(
+		if (uncounted_restarts >= dollar_trestart)
+			uncounted_restarts = dollar_trestart;
+	)
 	/* Increment restart counts for each region in this transaction */
 	for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 	{
@@ -245,6 +252,7 @@ void	tp_restart(int newlevel)
 		case cdb_sc_jnlstatemod:
 		case cdb_sc_backupstatemod:
 			t_tries--;
+			DEBUG_ONLY(uncounted_restarts++;)
 			/* fall through */
 		default:
 			if (CDB_STAGNATE < ++t_tries)
@@ -349,7 +357,8 @@ void	tp_restart(int newlevel)
 		return; /* for the compiler only -- never executed */
 	}
 	++dollar_trestart;
-	assert(MAX_TRESTARTS > dollar_trestart);	/* a magic number just to ensure we dont do too many restarts */
+	assert(dollar_trestart >= uncounted_restarts);
+	assert(MAX_TRESTARTS > (dollar_trestart - uncounted_restarts)); /* a magic number to ensure we dont do too many restarts */
 	if (!dollar_trestart)		/* in case of a wrap */
 		dollar_trestart--;
 	dollar_truth = tp_pointer->dlr_t;

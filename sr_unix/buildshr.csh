@@ -41,14 +41,17 @@ endif
 switch ($2)
 case "[bB]*":
 	set gt_ld_options = "$gt_ld_options_bta"
+	set gt_image = "bta"
 	breaksw
 
 case "[dD]*":
 	set gt_ld_options = "$gt_ld_options_dbg"
+	set gt_image = "dbg"
 	breaksw
 
 case "[pP]*":
 	set gt_ld_options = "$gt_ld_options_pro"
+	set gt_image = "pro"
 	breaksw
 
 default:
@@ -67,24 +70,34 @@ set buildshr_verbose = $?verbose
 set verbose
 set echo
 
-# Building libgtmshr.so shared library
-set aix_loadmap_option = ''
-if ( $HOSTOS == "AIX") then
-	set aix_loadmap_option = "-bcalls:$gtm_map/libgtmshr.loadmap -bmap:$gtm_map/libgtmshr.loadmap -bxref:$gtm_map/libgtmshr.loadmap"
-	# Delete old gtmshr since AIX linker fails to overwrite an already loaded shared library.
-	rm -f $3/libgtmshr$gt_ld_shl_suffix
+set gt_ld_linklib_options = "-L$gtm_obj $gtm_obj/gtm_main.o $gtm_obj/mumps_clitab.o -lmumps -lgnpclient -lcmisockettcp"
+set nolibgtmshr = "no"	# by default build libgtmshr
+
+if ($gt_image == "bta") then
+	set nolibgtmshr = "yes"	# if bta build, build a static mumps executable
 endif
 
-$shell $gtm_tools/genexport.csh $gtm_tools/gtmshr_symbols.exp gtmshr_symbols.export
+if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
+	# Building libgtmshr.so shared library
+	set aix_loadmap_option = ''
+	if ( $HOSTOS == "AIX") then
+		set aix_loadmap_option = "-bcalls:$gtm_map/libgtmshr.loadmap -bmap:$gtm_map/libgtmshr.loadmap -bxref:$gtm_map/libgtmshr.loadmap"
+		# Delete old gtmshr since AIX linker fails to overwrite an already loaded shared library.
+		rm -f $3/libgtmshr$gt_ld_shl_suffix
+	endif
 
-gt_ld $gt_ld_options $gt_ld_shl_options $gt_ld_ci_options $aix_loadmap_option ${gt_ld_option_output}$3/libgtmshr$gt_ld_shl_suffix -L$gtm_obj $gtm_obj/{gtm_main,mumps_clitab}.o \
-		-lmumps -lgnpclient -lcmisockettcp $gt_ld_syslibs >& $gtm_map/libgtmshr.map
-if ( $status != 0 ) then
-	set buildshr_status = `expr $buildshr_status + 1`
-	echo "buildshr-E-linkgtmshr, Failed to link gtmshr (see ${dollar_sign}gtm_map/libgtmshr.map)" \
-		>> $gtm_log/error.`basename $gtm_exe`.log
+	$shell $gtm_tools/genexport.csh $gtm_tools/gtmshr_symbols.exp gtmshr_symbols.export
+
+	gt_ld $gt_ld_options $gt_ld_shl_options $gt_ld_ci_options $aix_loadmap_option \
+		${gt_ld_option_output}$3/libgtmshr$gt_ld_shl_suffix \
+		${gt_ld_linklib_options} $gt_ld_syslibs >& $gtm_map/libgtmshr.map
+	if ( $status != 0 ) then
+		set buildshr_status = `expr $buildshr_status + 1`
+		echo "buildshr-E-linkgtmshr, Failed to link gtmshr (see ${dollar_sign}gtm_map/libgtmshr.map)" \
+			>> $gtm_log/error.`basename $gtm_exe`.log
+	endif
+	set gt_ld_linklib_options = ""	# do not link in mumps whatever is already linked in libgtmshr.so
 endif
-
 
 # Building mumps executable
 set aix_loadmap_option = ''
@@ -92,7 +105,9 @@ if ( $HOSTOS == "AIX") then
 	set aix_loadmap_option = "-bcalls:$gtm_map/mumps.loadmap -bmap:$gtm_map/mumps.loadmap -bxref:$gtm_map/mumps.loadmap"
 endif
 
-gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/mumps $gtm_obj/gtm.o $gt_ld_sysrtns $gt_ld_syslibs >& $gtm_map/mumps.map
+gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/mumps $gtm_obj/gtm.o ${gt_ld_linklib_options} \
+	$gt_ld_sysrtns $gt_ld_syslibs >& $gtm_map/mumps.map
+
 if ( $status != 0  ||  ! -x $3/mumps ) then
 	set buildshr_status = `expr $buildshr_status + 1`
 	echo "buildshr-E-linkmumps, Failed to link mumps (see ${dollar_sign}gtm_map/mumps.map)" \

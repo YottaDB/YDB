@@ -9,6 +9,11 @@
  *								*
  ****************************************************************/
 
+#ifndef COLLSEQ_H_INCLUDED
+#define COLLSEQ_H_INCLUDED
+
+#include "min_max.h"
+
 #define MAX_COLLTYPE	255
 #define MIN_COLLTYPE	0
 
@@ -28,15 +33,15 @@ if ((str)->len > max_lcl_coll_xform_bufsiz)					\
 	if (0 == max_lcl_coll_xform_bufsiz)					\
 	{									\
 		assert(NULL == lcl_coll_xform_buff);				\
-		max_lcl_coll_xform_bufsiz = MAX_STRLEN_INIT;			\
-	}									\
-	else {									\
+		max_lcl_coll_xform_bufsiz = MAX_STRBUFF_INIT;			\
+	} else									\
+	{									\
 		assert(NULL != lcl_coll_xform_buff);				\
 		free(lcl_coll_xform_buff);					\
 	}									\
 	while ((str)->len > max_lcl_coll_xform_bufsiz)				\
 		max_lcl_coll_xform_bufsiz += max_lcl_coll_xform_bufsiz;		\
-	assert(max_lcl_coll_xform_bufsiz <= MAX_STRLEN);			\
+	max_lcl_coll_xform_bufsiz = MIN(MAX_STRLEN, max_lcl_coll_xform_bufsiz);	\
 	lcl_coll_xform_buff = (char *)malloc(max_lcl_coll_xform_bufsiz);	\
 }
 
@@ -58,3 +63,4 @@ int4 do_verify(collseq *csp, unsigned char type, unsigned char ver);
 int find_local_colltype(void);
 void act_in_gvt(void);
 
+#endif /* COLLSEQ_H_INCLUDED */

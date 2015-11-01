@@ -56,7 +56,7 @@ LITDEF short ttt[3492] = {
 /*  293 */	VXI_INCL,VXT_VAL,1,VXT_END,
 /*  297 */	VXI_CLRL,VXT_VAL,0,VXT_END,
 /*  301 */	VXI_JSB,VXT_XFER,4 * (short int) xf_break,VXT_END,
-/*  305 */	VXI_PUSHAB,VXT_VAL,2,VXI_JSB,VXT_XFER,4 * (short int) xf_callb,VXI_BRB,VXT_JMP,
+/*  305 */	VXI_PUSHL,VXT_VAL,2,VXI_JSB,VXT_XFER,4 * (short int) xf_callb,VXI_BRB,VXT_JMP,
 /*  313 */	1,VXT_END,
 /*  315 */	VXI_PUSHL,VXT_VAL,2,VXI_JSB,VXT_XFER,4 * (short int) xf_calll,VXI_JMP,VXT_JMP,
 /*  323 */	1,VXT_END,

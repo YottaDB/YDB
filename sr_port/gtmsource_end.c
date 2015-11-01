@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,7 @@
 #include "mutex.h"
 #endif
 #include "repl_log.h"
+#include "repl_comm.h"
 
 GBLREF jnlpool_addrs 	jnlpool;
 GBLREF jnlpool_ctl_ptr_t jnlpool_ctl;
@@ -65,8 +66,8 @@ GBLREF boolean_t	gtmsource_logstats;
 GBLREF int		gtmsource_statslog_fd;
 GBLREF FILE		*gtmsource_statslog_fp;
 GBLREF unsigned char	*gtmsource_tcombuff_start;
-GBLREF long		repl_source_data_sent;
-GBLREF long		repl_source_msg_sent;
+GBLREF qw_num		repl_source_data_sent;
+GBLREF qw_num		repl_source_msg_sent;
 GBLREF seq_num		seq_num_zero;
 GBLREF repl_msg_ptr_t	gtmsource_msgp;
 GBLREF uchar_ptr_t	repl_filter_buff;
@@ -109,24 +110,20 @@ int gtmsource_end1(boolean_t auto_shutdown)
 	)
 	jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
 	pool_init = FALSE;
-	if (gtmsource_msgp)
-		free(gtmsource_msgp);
-	if (gtmsource_tcombuff_start)
-		free(gtmsource_tcombuff_start);
-	if (repl_filter_buff)
-		free(repl_filter_buff);
+	gtmsource_free_msgbuff();
+	gtmsource_free_tcombuff();
+	gtmsource_free_filter_buff();
 	gtmsource_stop_heartbeat();
-	if (-1 != gtmsource_sock_fd)
-		close(gtmsource_sock_fd); /* Close the conn with Receiver */
+	repl_close(&gtmsource_sock_fd);
 	if (QWNE(log_seqno, seq_num_zero))
 		QWDECRBYDW(log_seqno, 1);
 	if (QWNE(log_seqno1, seq_num_zero))
 		QWDECRBYDW(log_seqno1, 1);
 	QWSUB(diff_seqno, log_seqno1, log_seqno);
-	repl_log(gtmsource_log_fp, TRUE, FALSE, "REPL INFO - Last written tr num into jnlpool : "INT8_FMT, INT8_PRINT(log_seqno1));
-	repl_log(gtmsource_log_fp, FALSE, FALSE, "  Last sent tr num : "INT8_FMT, INT8_PRINT(log_seqno));
-	repl_log(gtmsource_log_fp, FALSE, TRUE, "  Number of unsent tr : "INT8_FMT"\n", INT8_PRINT(diff_seqno));
-	repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Tr Total : %ld  Msg Total : %ld\n",
+	repl_log(gtmsource_log_fp, TRUE, FALSE, "REPL INFO - Last written tr num into jnlpool : %llu", log_seqno1);
+	repl_log(gtmsource_log_fp, FALSE, FALSE, "  Last sent tr num : %llu", log_seqno);
+	repl_log(gtmsource_log_fp, FALSE, TRUE, "  Number of unsent tr : %llu\n", diff_seqno);
+	repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Tr Total : %llu  Msg Total : %llu\n",
 		 repl_source_data_sent, repl_source_msg_sent);
 	if (gtmsource_filter & EXTERNAL_FILTER)
 		repl_stop_filter();

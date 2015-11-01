@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -345,9 +345,7 @@ int gtmsource_get_opt(void)
 			util_out_print("Error parsing STATSLOG qualifier", TRUE);
 			return(-1);
 		}
-#ifdef UNIX
-		cli_strupper(statslog_val);
-#endif
+		UNIX_ONLY(cli_strupper(statslog_val);)
 		if (0 == strcmp(statslog_val, "ON"))
 			gtmsource_options.statslog = TRUE;
 		else if (0 == strcmp(statslog_val, "OFF"))
@@ -372,20 +370,16 @@ int gtmsource_get_opt(void)
 			util_out_print("Error parsing UPDATE qualifier", TRUE);
 			return(-1);
 		}
-#ifdef UNIX
-		cli_strupper(update_val);
-#endif
+		UNIX_ONLY(cli_strupper(update_val);)
 		if (strcmp(update_val, "ENABLE") == 0)
 		{
-			util_out_print("Update are enabled now on Secondary", TRUE);
+			util_out_print("Update are now enabled", TRUE);
 			update_disable = FALSE;
-		}
-		else if (strcmp(update_val, "DISABLE") == 0)
+		} else if (strcmp(update_val, "DISABLE") == 0)
 		{
-			util_out_print("Update are disabled now on Secondary", TRUE);
+			util_out_print("Update are now disabled", TRUE);
 			update_disable = TRUE;
-		}
-		else
+		} else
 		{
 			util_out_print("Invalid value for UPDATE qualifier, should be either ENABLE or DISABLE", TRUE);
 			return(-1);

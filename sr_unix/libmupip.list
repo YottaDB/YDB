@@ -50,6 +50,7 @@ jnl_v12tov15
 jnl_v15tov11
 jnl_v15tov12
 jnlext_write
+jnlpool_hasnt_overflowed
 mu_clsce
 mu_cre_file
 mu_cre_structs
@@ -183,6 +184,7 @@ repl_filter
 repl_ipc_cleanup
 repl_log
 repl_log_init
+repl_tr_good
 replic_gbldefs
 updproc
 updproc_end

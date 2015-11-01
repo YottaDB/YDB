@@ -329,13 +329,15 @@ typedef struct
 }
 
 void dump_lockhist(void);
-
 #define DUMP_LOCKHIST() dump_lockhist()
 #else
 #define CRIT_TRACE(X)
 #define LOCK_HIST(OP, LOC, ID, CNT)
 #define DUMP_LOCKHIST()
 #endif
+
+#define BT_NOT_ALIGNED(bt, bt_base)		(!IS_PTR_ALIGNED((bt), (bt_base), sizeof(bt_rec)))
+#define BT_NOT_IN_RANGE(bt, bt_lo, bt_hi)	(!IS_PTR_IN_RANGE((bt), (bt_lo), (bt_hi)))
 
 #define NUM_CRIT_ENTRY		1024
 #define CRIT_SPACE		(NUM_CRIT_ENTRY * sizeof(mutex_que_entry) + sizeof(mutex_struct))

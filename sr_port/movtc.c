@@ -11,11 +11,11 @@
 
 #include "movtc.h"
 
-void	movtc (int length, unsigned char *inbuf, const unsigned char table[256], unsigned char *outbuf)
+void	movtc(int length, unsigned char *inbuf, const unsigned char table[], unsigned char *outbuf)
 {
 	while (length > 0)
 	{
-		*outbuf++ = table[(int) *inbuf++];
+		*outbuf++ = table[(int)*inbuf++];
 		--length;
 	}
 }

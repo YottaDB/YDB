@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ GBLREF	sgmnt_data		mu_int_data;
 GBLREF	block_id		mu_int_path[];
 GBLREF	boolean_t		block;
 GBLREF	boolean_t		muint_key;
-GBLREF	boolean_t		tn_reset;
+GBLREF	boolean_t		tn_reset_this_reg;
 GBLREF	int			mu_int_plen;
 GBLREF	int			disp_map_errors;
 GBLREF	int			mu_map_errs;
@@ -107,12 +107,12 @@ void mu_int_maps(void)
 			mu_int_err(ERR_DBMBSIZMX, 0, 0, 0, 0, 0, 0, level);
 			continue;
 		}
-		if (tn_reset)
+		if (tn_reset_this_reg)
 		{
 			((blk_hdr_ptr_t)disk)->tn = 0;
 			mu_int_write(blkno, disk);
 		}
-		if (((blk_hdr_ptr_t)disk)->tn > mu_int_data.trans_hist.curr_tn)
+		if (((blk_hdr_ptr_t)disk)->tn >= mu_int_data.trans_hist.curr_tn)
 		{
 			if (trans_errors < disp_trans_errors)
 			{

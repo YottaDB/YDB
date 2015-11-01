@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -39,88 +41,159 @@
 #include "repl_ctl.h"
 #include "repl_errno.h"
 #include "repl_dbg.h"
-#include "longcpy.h"
+#include "memcoherency.h"
+#include "repl_tr_good.h"
+#include "min_max.h"
 
 GBLREF	jnlpool_addrs	jnlpool;
-GBLREF	qw_off_t	jnlpool_size;
 
-boolean_t jnlpool_hasnt_overflowed(seq_num read_addr)
-{
-	qw_off_t	unread_data;
-
-	QWSUB(unread_data, jnlpool.jnlpool_ctl->early_write_addr, read_addr);
-	return (QWLE(unread_data, jnlpool_size));
-}
-
-int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen)
+int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multiple, qw_num stop_read_at)
 {
 
-	uint4 		bufflen, read_size;
-	int4		wrap_size;
-	unsigned char   seq_num_str[32], *seq_num_ptr;
+	uint4 			jnldata_len, read_size, read, jnlpool_size, avail_data;
+	uint4			first_tr_len, num_tr_read, tr_len;
+	int4			wrap_size;
+	unsigned char   	seq_num_str[32], *seq_num_ptr;
+	uchar_ptr_t		buf_top, tr_p;
+	jnlpool_ctl_ptr_t	jctl;
+	gtmsource_local_ptr_t	gtmsource_local;
+	sm_uc_ptr_t		jnldata_base;
+	jnldata_hdr_ptr_t	jnl_header;
+	qw_num			read_addr, avail_data_qw;
+	repl_msg_ptr_t		msgp;
+	seq_num			read_jnl_seqno, jnl_seqno;
 
-#ifdef REPL_DEBUG
-	int	repl_dbg_source_save_read;
-	seq_num	repl_dbg_save_read_jnl_seqno;
-#endif
-
-	if (jnlpool_hasnt_overflowed(jnlpool.gtmsource_local->read_addr))
-	{
-		/* No overflow yet */
-		assert(jnlpool.gtmsource_local->read + sizeof(jnldata_hdr_struct) <= jnlpool.jnlpool_ctl->jnlpool_size);
-		bufflen = ((jnldata_hdr_ptr_t)(jnlpool.jnldata_base + jnlpool.gtmsource_local->read))->jnldata_len;
-		if (0 < bufflen && jnlpool.jnlpool_ctl->jnlpool_size >= bufflen)
+	jctl = jnlpool.jnlpool_ctl;
+	jnlpool_size = jctl->jnlpool_size;
+	DEBUG_ONLY(jnl_seqno = jctl->jnl_seqno;) /* jnl_seqno is used in an assert below. jnl_seqno is a local variable for
+						  * debugging purposes since shared memory can change from the time the assert
+						  * fails to the time the core gets created
+						  */
+	jnldata_base = jnlpool.jnldata_base;
+	gtmsource_local = jnlpool.gtmsource_local;
+	read = gtmsource_local->read;
+	read_addr = gtmsource_local->read_addr;
+	read_jnl_seqno = gtmsource_local->read_jnl_seqno;
+	assert(stop_read_at > read_addr); /* there should be data to be read, if not how did we end up here? */
+	if (jnlpool_hasnt_overflowed(jctl, jnlpool_size, read_addr))
+	{ /* No overflow yet. Before we read the content (including the jnldata_len read below), we have to ensure we read
+	   * up-to-date content. We rely on the memory barrier done in jnlpool_hasnt_overflowed for this. */
+		assert(read + sizeof(jnldata_hdr_struct) <= jnlpool_size);
+		jnl_header = (jnldata_hdr_ptr_t)(jnldata_base + read);
+		first_tr_len = jnldata_len = jnl_header->jnldata_len;
+		if (read_multiple)
 		{
-			read_size = bufflen - sizeof(jnldata_hdr_struct);
-			if (0 < read_size && maxbufflen >= read_size)
+			assert(stop_read_at >= read_addr);
+			avail_data_qw = stop_read_at - read_addr;
+			assert(maxbufflen <= MAXPOSINT4); /* to catch the case of change in type of maxbufflen */
+			avail_data = (uint4)MIN(avail_data_qw, (qw_num)maxbufflen);
+			read_multiple = (first_tr_len < avail_data);
+			if (read_multiple)
+				jnldata_len = avail_data;
+		}
+		if (sizeof(jnldata_hdr_struct) < jnldata_len && jnldata_len <= jnlpool_size)
+		{
+			read_size = jnldata_len - sizeof(jnldata_hdr_struct);
+			if (0 < read_size && read_size <= maxbufflen)
 			{
-				if (0 < (wrap_size = (int4)(jnlpool.gtmsource_local->read +
-							    bufflen - jnlpool.jnlpool_ctl->jnlpool_size)))
+				if (0 < (wrap_size = (int4)(read - (jnlpool_size - jnldata_len))))
 					read_size -= wrap_size;
-				longcpy(buff,
-    		               	       jnlpool.jnldata_base +
-		                       jnlpool.gtmsource_local->read +
-	       	                       sizeof(jnldata_hdr_struct),
-		       	               read_size);
+				memcpy(buff, (sm_uc_ptr_t)jnl_header + sizeof(jnldata_hdr_struct), read_size);
 				if (0 < wrap_size)
-					longcpy(buff + read_size, jnlpool.jnldata_base, wrap_size);
-
-				if (jnlpool_hasnt_overflowed(jnlpool.gtmsource_local->read_addr))
-				{
-					/* No overflow */
-					assert(QWEQ(jnlpool.gtmsource_local->read_jnl_seqno, GET_REPL_JNL_SEQNO(buff)));
-
-#ifdef REPL_DEBUG
-					repl_dbg_source_save_read = jnlpool.gtmsource_local->read;
-					QWASSIGN(repl_dbg_save_read_jnl_seqno, jnlpool.gtmsource_local->read_jnl_seqno);
-#endif
-					jnlpool.gtmsource_local->read = ((0 > wrap_size) ?
-							jnlpool.gtmsource_local->read + bufflen : wrap_size);
-					QWINCRBYDW(jnlpool.gtmsource_local->read_addr, bufflen);
-					QWINCRBYDW(jnlpool.gtmsource_local->read_jnl_seqno, 1);
-					*data_len = bufflen - sizeof(jnldata_hdr_struct);
-					REPL_DPRINT6("Pool read seqno : "INT8_FMT" size : %d  Read %d  : Next Read : %d%s\n",
-						INT8_PRINT(repl_dbg_save_read_jnl_seqno), *data_len, repl_dbg_source_save_read,
-						jnlpool.gtmsource_local->read, (0 < wrap_size) ? "  READ WRAPPED" : "");
-					return (0);
-				} /* else overflow happened, or about
-				   * to happen */
-			} else if (0 < read_size && jnlpool_hasnt_overflowed(jnlpool.gtmsource_local->read_addr))
-			{
-				/* Buffer cannot accommodate data */
+					memcpy(buff + read_size, jnldata_base, wrap_size);
+				/* Now that we have read the content, we have to ensure that we haven't read content that may been
+				 * overwritten. We rely on the memory barrier done in jnlpool_hasnt_overflowed for this */
+				if (jnlpool_hasnt_overflowed(jctl, jnlpool_size, read_addr))
+				{ /* No overflow */
+					REPL_DEBUG_ONLY(
+						assert(repl_tr_good(buff, first_tr_len - sizeof(jnldata_hdr_struct),
+								read_jnl_seqno));
+					)
+					num_tr_read = 1;
+					if (read_multiple)
+					{ /* although stop_read_at - read_addr contains no partial transaction, it is possible that
+					   * stop_read_at - read_addr is more than maxbufflen, and hence we read fewer bytes
+					   * than stop_read_at - read_addr; scan what we read to figure out if the tail is an
+					   * incomplete transaction */
+						assert(first_tr_len < jnldata_len); /* must hold if multiple transactions read */
+						tr_p = buff + first_tr_len - sizeof(jnldata_hdr_struct);
+						buf_top = buff + jnldata_len - sizeof(jnldata_hdr_struct);
+						while (sizeof(jnldata_hdr_struct) < (buf_top - tr_p)) /* more than hdr available */
+						{
+							tr_len = ((jnldata_hdr_ptr_t)tr_p)->jnldata_len;
+							assert(0 < tr_len);
+							assert(tr_len <= jnlpool_size);
+							if (tr_len <= (buf_top - tr_p)) /* transaction completely read */
+							{ /* the message type and len assignments are a violation of layering;
+							   * ideally, this should be done in gtmsource_process(), but we choose
+							   * to do it here for performance reasons. If we have to do it in
+							   * gtmsource_process(), we have to scan the buffer again. */
+								((repl_msg_ptr_t)tr_p)->type = REPL_TR_JNL_RECS;
+								((repl_msg_ptr_t)tr_p)->len = tr_len;
+								REPL_DEBUG_ONLY(
+									assert(repl_tr_good(tr_p + REPL_MSG_HDRLEN,
+										tr_len - REPL_MSG_HDRLEN,
+										read_jnl_seqno + num_tr_read));
+								)
+								num_tr_read++;
+								tr_p += tr_len;
+							} else
+							{
+								REPL_DPRINT5("Partial transaction read since jnldata_len %llu "
+										"larger than maxbufflen %d, tr_len %d, remaining "
+										"buffer %d\n", avail_data_qw, maxbufflen,
+										tr_len, buf_top - tr_p);
+								break;
+							}
+						}
+						REPL_DEBUG_ONLY(
+							if (0 != (buf_top - tr_p))
+							{
+								REPL_DPRINT4("Partial tr header read since jnldata_len %llu "
+									"larger than maxbufflen %d, incomplete header length %d\n",
+									avail_data_qw, maxbufflen, buf_top - tr_p);
+							} else ;
+						)
+						jnldata_len = (tr_p - buff) + sizeof(jnldata_hdr_struct);
+						wrap_size = (int4)(read - (jnlpool_size - jnldata_len));
+					}
+					REPL_DPRINT4("Pool read seqno : "INT8_FMT" Num Tr read : %d Total Tr len : %d\n",
+					       INT8_PRINT(read_jnl_seqno), num_tr_read, jnldata_len);
+					REPL_DPRINT4("Read %u : Next read : %u : %s\n", read,
+						     (0 > wrap_size) ? read + jnldata_len : wrap_size,
+						     (0 > wrap_size) ? "" : " READ WRAPPED");
+					read = ((0 > wrap_size) ? read + jnldata_len : wrap_size);
+					read_addr += jnldata_len;
+					read_jnl_seqno += num_tr_read;
+					assert(stop_read_at >= read_addr);
+					assert(jnl_seqno >= read_jnl_seqno - 1);
+					/* In the rare case when we read the transaction read_jnl_seqno just as it becomes
+					 * available and before the GTM process that wrote it updates jctl->jnl_seqno
+					 * in t_end/tp_tend, we may return from this function with read_jnl_seqno one more than
+					 * jctl->jnl_seqno. This is such a rare case that we don't want to add a wait loop for
+					 * jctl->jnl_seqno to become equal to read_jnl_seqno. We expect that by the time we send
+					 * the just read transaction(s) using socket I/O, jctl->jnl_seqno would have been updated.
+					 * In any case, we prevent ourselves from misinterpreting this condition when
+					 * read_jnl_seqno is compared against jctl->jnl_seqno in gtmsource_process(),
+					 * gtmsource_get_jnlrecs() and gtmsource_showbacklog()
+					 */
+					assert(read == read_addr % jnlpool_size);
+					gtmsource_local->read = read;
+					gtmsource_local->read_addr = read_addr;
+					gtmsource_local->read_jnl_seqno = read_jnl_seqno;
+					*data_len = first_tr_len - sizeof(jnldata_hdr_struct);
+					return (jnldata_len);
+				} /* else overflow happened, or about to happen */
+			} else if (0 < read_size && jnlpool_hasnt_overflowed(jctl, jnlpool_size, read_addr))
+			{ /* Buffer cannot accommodate data */
 				*data_len = read_size;
 				return (-1);
 			} /* else
-			   * I read a corrupt (overwritten) large value, or
-			   * read_size == 0, both of which imply overflow.
-			   * read_size == 0 => overflow because every
-			   * transaction generates non-zero bytes of jnl data
-			   */
+			   * We read a corrupt (overwritten) large value, or read_size == 0, both of which imply overflow.
+			   * read_size == 0 => overflow because every transaction generates non-zero bytes of jnl data */
 		} /* else
-		   * I read a corrupt (overwritten) large value, or read 0,
-		   * both of which imply overflow. bufflen == 0 => overflow
-		   * because every transaction generates non-zero bytes of jnl
-		   * data */
+		   * We read a corrupt (overwritten) large value, or read 0, both of which imply overflow.
+		   * jnldata_len == 0 => overflow because every transaction generates non-zero bytes of jnl data */
 	} /* else overflow happened, or about to happen */
 	*data_len = -1;
 	return (-1); /* Error indication */

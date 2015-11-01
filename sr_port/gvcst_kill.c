@@ -87,7 +87,6 @@ void	gvcst_kill(bool do_subtree)
 {
 	bool			clue, flush_cache, left_extra, right_extra;
 	boolean_t		actual_update, next_fenced_was_null, jnl_enabled;
-	char			temp[4096], temp1[4096], *temp_ptr;
 	cw_set_element		*tp_cse;
 	enum cdb_sc		cdb_status;
 	int			lev, segment_update_array_size;

@@ -34,17 +34,13 @@
 #include "xfer_enum.h"
 #endif
 
-/* Make sure LONG_JUMP_OFFSET is large enough to force the long jump instruction sequence. */
 #define MVAL_INT4_SIZE DIVIDE_ROUND_UP(sizeof(mval), sizeof(int4))
 
 #ifdef DEBUG
 #include "vdatsize.h"
 /* VAX DISASSEMBLER TEXT */
-static const char       vdat_lit[VDAT_LIT_SIZE + 1] =   "S^#";
 static const char       vdat_bdisp[VDAT_BDISP_SIZE + 1] =       "B^";
 static const char       vdat_wdisp[VDAT_WDISP_SIZE + 1] =       "W^";
-static const char       vdat_ldisp[VDAT_LDISP_SIZE + 1] =       "L^";
-static const char       vdat_ap[VDAT_AP_SIZE + 1]=      "(AP)";
 static const char       vdat_r9[VDAT_R9_SIZE + 1]=      "(r9)";
 static const char       vdat_r8[VDAT_R8_SIZE + 1]=      "(r8)";
 static const char       vdat_gr[VDAT_GR_SIZE + 1] =     "G^";
@@ -54,12 +50,13 @@ static const char       vdat_gtmliteral[VDAT_GTMLITERAL_SIZE + 1] =     "GTM$LIT
 static const char       vdat_def[VDAT_DEF_SIZE + 1] =   "@";
 
 GBLDEF unsigned char    *obpt;          /* output buffer index */
-GBLDEF unsigned char    outbuf[256];    /* assembly language output buffer */
+GBLDEF unsigned char    outbuf[ASM_OUT_BUFF];    /* assembly language output buffer */
 static int              vaxi_cnt = 1;   /* Vax instruction count */
 
 /* Disassembler text: */
 LITREF char             *xfer_name[];
 LITREF char             vxi_opcode[][6];
+GBLREF char 		*oc_tab_graphic[];
 #endif
 
 LITREF octabstruct	oc_tab[];	/* op-code table */
@@ -79,11 +76,8 @@ DEBUG_ONLY(static boolean_t	opcode_emitted;)
 
 static int		stack_depth = 0;
 
-GBLREF char 		source_file_name[];
-GBLREF short int	source_name_len;
 GBLREF int		curr_addr;
 GBLREF char		cg_phase;	/* code generation phase */
-GBLREF char 		*oc_tab_graphic[];
 
 
 /*variables for counting the arguments*/
@@ -92,7 +86,7 @@ static int	vax_pushes_seen, vax_number_of_arguments;
 static struct	push_list
 {
 	struct push_list	*next;
-	unsigned char		value[500];
+	unsigned char		value[PUSH_LIST_SIZE];
 } *current_push_list_ptr, *push_list_start_ptr;
 
 static int	push_list_index;
@@ -249,7 +243,10 @@ void trip_gen (triple *ct)
 				{
 					tsp = repl;
 					tsp = emit_vax_inst((short *)tsp, &saved_opr[0], --sopr);
-					DEBUG_ONLY(emit_asmlist(ct));
+#ifdef DEBUG
+					if (cg_phase == CGP_ASSEMBLY)
+						emit_asmlist(ct);
+#endif
 				} while (sopr > &saved_opr[repcnt]);
 			} else
 			{
@@ -260,7 +257,10 @@ void trip_gen (triple *ct)
 		{
 			assert(*tsp > 0 && *tsp <= 511);
 			tsp = emit_vax_inst((short *)tsp, &saved_opr[0], sopr);
-			DEBUG_ONLY(emit_asmlist(ct));
+#ifdef DEBUG
+			if (cg_phase == CGP_ASSEMBLY)
+				emit_asmlist(ct);
+#endif
 		}/* else */
 	}/* for */
 
@@ -275,30 +275,27 @@ void emit_asmlist(triple *ct)
 	int		offset;
 	unsigned char	*c;
 
-	if (cg_phase == CGP_ASSEMBLY)
+	obpt -= 2;
+	*obpt = ' ';	/* erase trailing comma */
+	if (!opcode_emitted)
 	{
-		obpt -= 2;
-		*obpt = ' ';	/* erase trailing comma */
-		if (!opcode_emitted)
-		{
-			opcode_emitted = TRUE;
-			offset = &outbuf[0] + 60 - obpt;
-			if (offset >= 1)
-			{	/* tab to position 60 */
-				memset(obpt, ' ', offset);
-				obpt += offset;
-			} else
-			{	/* leave at least 2 spaces */
-				memset(obpt, ' ', 2);
-				obpt += 2;
-			}
-			*obpt++ = ';';
-			for (c = (unsigned char*)oc_tab_graphic[ct->opcode]; *c;)
-				*obpt++ = *c++;
+		opcode_emitted = TRUE;
+		offset = &outbuf[0] + 60 - obpt;
+		if (offset >= 1)
+		{	/* tab to position 60 */
+			memset(obpt, ' ', offset);
+			obpt += offset;
+		} else
+		{	/* leave at least 2 spaces */
+			memset(obpt, ' ', 2);
+			obpt += 2;
 		}
-		emit_eoi();
-		format_machine_inst();
+		*obpt++ = ';';
+		for (c = (unsigned char*)oc_tab_graphic[ct->opcode]; *c;)
+			*obpt++ = *c++;
 	}
+	emit_eoi();
+	format_machine_inst();
 }
 
 void	emit_eoi (void)
@@ -373,12 +370,12 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 #ifdef TRUTH_IN_REG
 					reg = gtm_reg(*inst++);
 #else
-				/* For Tru64, the $TRUTH value is not carried in a register and
+				/* For platforms, where the $TRUTH value is not carried in a register and
 				   must be fetched from a global variable by subroutine call. */
 					assert(*inst == 0x5a);		/* VAX r10 or $TEST register */
 					inst++;
 					emit_call_xfer(4 * xf_dt_get);
-					reg = ALPHA_REG_V0;
+					reg = GTM_REG_R0;	/* function return value */
 
 #endif
 					if (sav_in == VXI_BLBC)
@@ -396,47 +393,30 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					emit_jmp(GENERIC_OPCODE_BR, &inst, 0);
 					break;
 
+				case VXI_BICB2:
 #ifdef TRUTH_IN_REG
-				case VXI_BICB2:
 					GEN_CLEAR_TRUTH;
-					assert(*inst == VXT_LIT);
-					inst++;
-					assert(*inst == 1);
-					inst++;
-					assert(*inst == VXT_REG);
-					inst++;
-					inst++;
-					break;
-				case VXI_BISB2:
-					GEN_SET_TRUTH;
-					assert(*inst == VXT_LIT);
-					inst++;
-					assert(*inst == 1);
-					inst++;
-					assert(*inst == VXT_REG);
-					inst++;
-					inst++;
-					break;
-
-#else
-				case VXI_BICB2:
-				case VXI_BISB2:
-					assert(*inst == VXT_LIT);
-					inst++;
-					assert(*inst == 1);
-					inst++;
-					assert(*inst == VXT_REG);
-					inst++;
-					inst++;
-					if (sav_in == VXI_BICB2)
-						emit_call_xfer(sizeof(int4) * xf_dt_false);
-					else
-					{
-						assert(sav_in == VXI_BISB2);
-						emit_call_xfer(sizeof(int4) * xf_dt_true);
-					}
-					break;
 #endif
+					assert(*inst == VXT_LIT);
+					inst++;
+					assert(*inst == 1);
+					inst++;
+					assert(*inst == VXT_REG);
+					inst++;
+					inst++;
+					break;
+				case VXI_BISB2:
+#ifdef TRUTH_IN_REG
+					GEN_SET_TRUTH;
+#endif
+					assert(*inst == VXT_LIT);
+					inst++;
+					assert(*inst == 1);
+					inst++;
+					assert(*inst == VXT_REG);
+					inst++;
+					inst++;
+					break;
 				case VXI_CALLS:
 					oc_int = TRUE;
 					if (*inst == VXT_LIT)
@@ -668,7 +648,6 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					} else
 						GTMASSERT;
 					break;
-					break;
 				case VXT_IREPAB:
 					assert(*inst == VXT_VAL);
 					inst += 2;
@@ -704,7 +683,8 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					if (*inst == VXT_LIT)
 					{
 						inst++;
-						GEN_LOAD_IMMED(reg, *inst++);
+						GEN_LOAD_IMMED(reg, *inst);
+						inst++;
 					} else if (*inst == VXT_ADDR)
 					{
 						inst++;
@@ -757,7 +737,10 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 	int	skip_idx;
 	int	branch_offset;
 
-	assert(jmp_offset != 0);
+	/* assert(jmp_offset != 0); */
+	/* assert commented since jmp_offset could be zero in CGP_ADDR_OPT phase after a jump to the immediately following
+	 * instruction is nullified (as described below) */
+
 	/* size of this particular instruction */
 	jmp_offset -= (char *)&code_buf[code_idx] - (char *)&code_buf[0];
 	assert((jmp_offset & 3) == 0);
@@ -774,7 +757,7 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 			*obpt++ = '^';
 			*obpt++ = '0';
 			*obpt++ = 'x';
-			obpt += i2hex_nofill(branch_offset, (uchar_ptr_t)obpt, 8);
+			obpt += i2hex_nofill(INST_SIZE * branch_offset, (uchar_ptr_t)obpt, 8);
 			*obpt++ = ',';
 			*obpt++ = ' ';
 		/*****  WARNING - FALL THRU *****/
@@ -786,12 +769,11 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 			*instp += 1;
 			assert(1 == **instp);
 			(*instp)++;
-			if (0 == jmp_offset)
-			{	/* There is no jump */
-				code_buf[code_idx++] = GENERIC_OPCODE_NOP;
-				jmp_offset -= sizeof(INST_SIZE);
-			}
-			else if (EMIT_JMP_SHORT_CODE_CHECK)
+			if (0 == branch_offset)
+			{	/* This is a jump to the immediately following instruction. Nullify the jump
+				   and don't generate any instruction (not even a NOP) */
+				/* code_buf[code_idx++] = GENERIC_OPCODE_NOP; */
+			} else if (EMIT_JMP_SHORT_CODE_CHECK)
 			{	/* Short jump immediate operand - some platforms also do a compare */
 				EMIT_JMP_SHORT_CODE_GEN;
 			} else
@@ -837,35 +819,34 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 					}
 					skip_idx = code_idx++; /* Save index of branch inst. Set target offset later */
 					code_buf[skip_idx] = IGEN_COND_BRANCH_REG_OFFSET(branchop_opposite, reg, 0);
-					jmp_offset -= sizeof(code_buf[skip_idx]);
-				}
-#if defined(_AIX)
-				if (EMIT_JMP_LONG_BRANCH_CHECK)
-				{	/* This is AIX's more common unconditional branch generation. Most other platforms
-					   will have the "short" branch generation up top be more common but that form does
-					   not cover unconditional jumps for AIX.
-					*/
-					code_buf[code_idx++] = IGEN_UCOND_BRANCH_REG_OFFSET(branchop, 0, jmp_offset);
-				} else
+					branch_offset--;
+#ifdef DELAYED_BRANCH
+					code_buf[code_idx++] = GENERIC_OPCODE_NOP;
+					branch_offset--;
 #endif
+				}
+				if (EMIT_JMP_LONG_CODE_CHECK)
+				{ /* This is more common unconditional branch generation and should be mutually
+				     exclusive to EMIT_JMP_OPPOSITE_BR_CHECK. Some platforms will have the "short"
+				     branch generation up top be more common but that form does not cover unconditional
+				     jumps (Examples: AIX and HP-UX) */
+					assert(!(EMIT_JMP_OPPOSITE_BR_CHECK));
+					code_buf[code_idx++] = IGEN_UCOND_BRANCH_REG_OFFSET(branchop, 0, branch_offset);
+#ifdef DELAYED_BRANCH
+					code_buf[code_idx++] = GENERIC_OPCODE_NOP;
+#endif
+				} else
 				{
-					GEN_PCREL;
-					jmp_offset -= sizeof(code_buf[code_idx]);
-					emit_base_offset(GTM_REG_CODEGEN_TEMP, jmp_offset);
-					/* If the last instruction created by emit_base_offset had a zero offset in it, then
-					   it wasn't of any useful benefit so we will extract the source register to use as the
-					   basis for the jump and cause the emitter to overwrite the partially formed instruction
-					   with the actual jump instruction. Otherwise we do the load address thing to the
-					   GTM_REG_CODEGEN_TEMP register and proceed normally.
-					*/
-					if (EMIT_JMP_ZERO_DISP_COND)
-						src_reg = GENXCT_LOAD_SRCREG(code_buf[code_idx]);
-					else
-					{
-						code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(GTM_REG_CODEGEN_TEMP);
-						src_reg = GTM_REG_CODEGEN_TEMP;
+					if (EMIT_JMP_OPPOSITE_BR_CHECK)
+					{  /* VAX conditional long jump generates two native branch instructions -
+					      one conditional branch (above) and one PC relative branch (below).
+					      The second branch instruction also needs adjustment of the origin. */
+						EMIT_JMP_ADJUST_BRANCH_OFFSET;
 					}
-					GEN_JUMP_REG(src_reg);
+					GEN_PCREL;
+					emit_base_offset(GTM_REG_CODEGEN_TEMP, (INST_SIZE * branch_offset));
+					code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(GTM_REG_CODEGEN_TEMP);
+					GEN_JUMP_REG(GTM_REG_CODEGEN_TEMP);
 				}
 				if (skip_idx != -1)
 				{	/* Fill in the offset from our opposite jump instruction to here .. the
@@ -888,6 +869,7 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 */
 void	emit_pcrel(void)
 {
+	int branch_offset;
 	jmp_offset -= (char *)&code_buf[code_idx] - (char *)&code_buf[0];
 
 	switch (cg_phase)
@@ -906,9 +888,10 @@ void	emit_pcrel(void)
 		case CGP_ADDR_OPT:
 		case CGP_APPROX_ADDR:
 		case CGP_MACHINE:
+			branch_offset = jmp_offset / INST_SIZE;
 			GEN_PCREL;
-			jmp_offset -= sizeof(code_buf[code_idx]);	/* Account for 1st linking instruction */
-			emit_base_offset(GTM_REG_CODEGEN_TEMP, jmp_offset);
+			EMIT_JMP_ADJUST_BRANCH_OFFSET;  /* Account for different branch origins on different platforms */
+			emit_base_offset(GTM_REG_CODEGEN_TEMP, INST_SIZE * branch_offset);
 			break;
 		default:
 			GTMASSERT;
@@ -1342,16 +1325,17 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
  *	during the CGP_APPROX_ADDR and CGP_ADDR_OPT phases relative to the other phases.  For example:
  *
  *	CGP_APPROX_ADDR and CGP_ADDR_OPT phases:
- *		a0 [r16] <- first argument, . . ., a5 [r21] <- sixth argument
- *		if more than six, series of:
- *				ldx	GTM_REG_ACCUM, next argument
- *				stq	GTM_REG_ACCUM, 8*(i-6)(sp)
+ *		arg1 <- first argument, . . ., argN <- N th argument
+ *		if more than N, series of:
+ *				LOAD	GTM_REG_ACCUM, next argument
+ *				STORE	GTM_REG_ACCUM, STACK_WORD_SIZE*(i-N)(sp)
  *
  *	other phases:
- *		if more than six, series of:
- *				ldx	GTM_REG_ACCUM, next argument
- *				stq	GTM_REG_ACCUM, 8*(i-6)(sp)
- *		a5 [r21] <- sixth argument, . . ., a0 [r16] <- first argument
+ *		if more than N, series of:
+ *				LOAD	GTM_REG_ACCUM, next argument
+ *				STORE	GTM_REG_ACCUM, STACK_WORD_SIZE*(i-N)(sp)
+ *		argN <- N th argument, . . ., arg1 <- first argument
+ *	where STACK_WORD_SIZE is 8(Alpha) or 4(other platforms).
  *
  *	While this technique correctly predicts the number of arguments, it does not guarantee to start any of the
  *	individual argument instruction sequences, except the first, during the CGP_APPROX_ADDR phase at the same
@@ -1371,7 +1355,7 @@ int	get_arg_reg(void)
 		case	CGP_APPROX_ADDR:
 		case	CGP_ADDR_OPT:
 			if (vax_pushes_seen < MACHINE_REG_ARGS)
-				arg_reg_i = BASE_ARG_REG + vax_pushes_seen;
+				arg_reg_i = GET_ARG_REG(vax_pushes_seen);
 			else
 				arg_reg_i = GTM_REG_ACCUM;
 			break;
@@ -1382,7 +1366,7 @@ int	get_arg_reg(void)
 				vax_number_of_arguments = next_vax_push_list();
 
 			if (vax_number_of_arguments <= MACHINE_REG_ARGS)
-				arg_reg_i = BASE_ARG_REG + (vax_number_of_arguments - 1);
+				arg_reg_i = GET_ARG_REG(vax_number_of_arguments - 1);
 			else
 				arg_reg_i = GTM_REG_ACCUM;
 			break;
@@ -1391,7 +1375,6 @@ int	get_arg_reg(void)
 			GTMASSERT;
 			break;
 	}
-
 	return arg_reg_i;
 }
 
@@ -1453,18 +1436,17 @@ void	emit_push(int reg)
 		case CGP_APPROX_ADDR:
 		case CGP_ADDR_OPT:
 			if (vax_pushes_seen >= MACHINE_REG_ARGS)
-				code_idx++;	/* for stq instruction */
+				code_idx++;	/* for STORE instruction */
 			break;
 
 		case CGP_ASSEMBLY:
 		case CGP_MACHINE:
 			if (vax_number_of_arguments <= MACHINE_REG_ARGS)
-				assert(reg == BASE_ARG_REG + (vax_number_of_arguments - 1));
+				assert(reg == GET_ARG_REG(vax_number_of_arguments - 1));
 			else
 			{
 				assert(reg == GTM_REG_ACCUM);
-				stack_offset = STACK_ARG_BASE_OFFSET + 	/* Base offset where args are stored */
-					ARGUMENT_WIDTH * (vax_number_of_arguments - MACHINE_REG_ARGS - 1);
+				stack_offset = STACK_ARG_OFFSET(vax_number_of_arguments - MACHINE_REG_ARGS - 1);
 				GEN_STORE_ARG(reg, stack_offset);	/* Store arg on stack */
 			}
 			break;
@@ -1507,7 +1489,7 @@ void	add_to_vax_push_list(int pushes_seen)
 		rts_error(VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS);
 
 	push_list_index++;
-	if (push_list_index >= 500)
+	if (push_list_index >= PUSH_LIST_SIZE)
 	{
 		push_list_index = 0;
 		if (current_push_list_ptr->next == 0 )
@@ -1524,7 +1506,7 @@ void	add_to_vax_push_list(int pushes_seen)
 int	next_vax_push_list(void)
 {
 	push_list_index++;
-	if (push_list_index >= 500)
+	if (push_list_index >= PUSH_LIST_SIZE)
 	{
 		push_list_index=0;
 		if (current_push_list_ptr->next == 0 )

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,23 +62,21 @@ bt_rec_ptr_t bt_put(gd_region *r, int4 block)
 			p = (bt_rec_ptr_t)((sm_uc_ptr_t)(csa->th_base) + csa->th_base->tnque.fl - sizeof(th->tnque));
 			if (CR_NOTVALID != p->cache_index)
 			{	/* the oldest bt is still valid */
+				if (csd->wc_blocked)
+					GTMASSERT;	/* we are in wcs_recover() already */
 				w = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, p->cache_index);
 				if (w->dirty)
 				{	/* get it written so it can be reused */
 					BG_TRACE_PRO_ANY(csa, bt_put_flush_dirty);
 					if (FALSE == wcs_get_space(r, 0, w))
 					{
-						if (FALSE == csd->wc_blocked)
-						{
-							assert(FALSE);
-							secshr_db_clnup(NORMAL_TERMINATION);
-							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-							BG_TRACE_PRO_ANY(csa, wcb_bt_put);
-							send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bt_put"),
-								process_id, lcl_tn, DB_LEN_STR(r));
-							return NULL;
-						} else
-							GTMASSERT;	/* we are in wcs_recover() already */
+						assert(FALSE);
+						secshr_db_clnup(NORMAL_TERMINATION);
+						SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+						BG_TRACE_PRO_ANY(csa, wcb_bt_put);
+						send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bt_put"),
+							process_id, lcl_tn, DB_LEN_STR(r));
+						return NULL;
 					}
 				}
 				p->cache_index = CR_NOTVALID;

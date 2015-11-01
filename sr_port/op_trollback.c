@@ -61,8 +61,12 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 	 	 */
 		tp_clean_up(TRUE);
 		for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
-			if (TRUE == FILE_INFO(tr->reg)->s_addrs.now_crit)
+		{
+			if (!tr->reg->open)
+				continue;
+			if (FILE_INFO(tr->reg)->s_addrs.now_crit)
 				rel_crit(tr->reg);			/* release any crit regions */
+		}
 		tp_unwind(newlevel, ROLLBACK_INVOCATION);
 		dollar_trestart = 0;
 		if (gv_currkey != NULL)

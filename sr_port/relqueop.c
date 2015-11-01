@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ que_ent_ptr_t remqh (que_ent_ptr_t base)
 	que_ent_ptr_t	ret;
 
 	ret = (que_ent_ptr_t)base->fl;			/* Will be 0 or offset to element */
-	if (NULL != ret)
+	if ((que_ent_ptr_t)0 != ret)
 	{
 		ret = (que_ent_ptr_t)((uchar_ptr_t)base + (int)ret);
 		base->fl += ret->fl;
@@ -74,7 +74,7 @@ que_ent_ptr_t remqt (que_ent_ptr_t base)
 	que_ent_ptr_t	ret;
 
 	ret = (que_ent_ptr_t)base->bl;			/* Will be 0 or offset to element */
-	if (NULL != ret)
+	if ((que_ent_ptr_t)0 != ret)
 	{
 		ret = (que_ent_ptr_t)((uchar_ptr_t)base + (int)ret);
 		base->bl += ret->bl;

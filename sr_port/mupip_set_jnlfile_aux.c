@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,7 +92,7 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 		jnlfile.len = full_buf_len;
 		jnldef.addr = JNL_EXT_DEF;
 		jnldef.len = sizeof(JNL_EXT_DEF) - 1;
-		if (FILE_NOT_FOUND == gtm_file_stat(&jnlfile, &jnldef, NULL, FALSE, &ustatus))
+		if (FILE_PRESENT != gtm_file_stat(&jnlfile, &jnldef, NULL, FALSE, &ustatus))
 			gtm_putmsg(VARLSTCNT(5) ERR_JNLFNF, 2, buf_len, buf, ustatus);
 		if (jnl_fn_len == full_buf_len && (0 == memcmp(jnl_fn, full_buf, jnl_fn_len)))
 		{

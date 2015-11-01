@@ -85,7 +85,7 @@ boolean_t mupfndfil(gd_region *reg, mstr *filestr)
 		retptr = &ret;
 	} else
 		retptr = filestr;
-	if (FILE_NOT_FOUND == gtm_file_stat(&file, &def, retptr, FALSE, &ustatus))
+	if (FILE_PRESENT != gtm_file_stat(&file, &def, retptr, FALSE, &ustatus))
 	{
 		if (!jgbl.mupip_journal)
 		{	/* Do not print error messages in case of call from mur_open_files().

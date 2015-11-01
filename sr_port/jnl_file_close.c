@@ -107,13 +107,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 			header.crash = FALSE;
 			DO_FILE_WRITE(jpc->channel, 0, &header, JNL_HDR_LEN, jpc->status, jpc->status2);
 			if (SYSCALL_ERROR(jpc->status))
-			{
-				if (SYSCALL_ERROR(jpc->status2))
-					rts_error(VARLSTCNT(7) ERR_JNLWRERR, 2, JNL_LEN_STR(csa->hdr),
-						jpc->status, 0, jpc->status2);
-				else
-					rts_error(VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csa->hdr), jpc->status);
-			}
+				rts_error(VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csa->hdr), jpc->status);
 
 		}
 		/* jnl_file_id should be nullified only after the jnl file header has been written to disk.

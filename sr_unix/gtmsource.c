@@ -147,15 +147,12 @@ int gtmsource()
 		jnlpool.gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT] =
 			gtmsource_options.connect_parms[GTMSOURCE_CONN_HEARTBEAT_MAX_WAIT];
 	}
-	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, NULL, gtmsource_options.log_file, NULL);
-	assert(SS_NORMAL == log_init_status);
-	repl_log_fd2fp(&gtmsource_log_fp, gtmsource_log_fd);
 	/* If previous shutdown did not complete successfully and
 	 * jnlpool was left lying around, do not proceed
 	 */
 	if (!jnlpool_inited && NO_SHUTDOWN != jnlpool.gtmsource_local->shutdown)
 	{
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO : Previous source server did not complete shutdown."
+		repl_log(stderr, TRUE, TRUE, "REPL INFO : Previous source server did not complete shutdown."
 				"Resetting shutdown related fields\n");
 		jnlpool.gtmsource_local->shutdown = NO_SHUTDOWN;
 	}
@@ -198,6 +195,9 @@ int gtmsource()
 	process_id = getpid();
 	ppid = getppid();
 	jnlpool.gtmsource_local->gtmsource_pid = process_id;
+	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, NULL, gtmsource_options.log_file, NULL);
+	assert(SS_NORMAL == log_init_status);
+	repl_log_fd2fp(&gtmsource_log_fp, gtmsource_log_fd);
 	if (-1 == (procgp = setsid()))
 		send_msg(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Source server error in setsid"), errno);
 
@@ -354,23 +354,9 @@ int gtmsource()
 		/* gtmsource_process returns only when mode needs to be changed to PASSIVE */
 		assert(gtmsource_state == GTMSOURCE_CHANGING_MODE);
 		gtmsource_ctl_close();
-		if (gtmsource_msgp)
-		{
-			free(gtmsource_msgp);
-			gtmsource_msgp = NULL;
-			gtmsource_msgbufsiz = 0;
-		}
-		if (gtmsource_tcombuff_start)
-		{
-			free(gtmsource_tcombuff_start);
-			gtmsource_tcombuff_start = NULL;
-		}
-		if (repl_filter_buff)
-		{
-			free(repl_filter_buff);
-			repl_filter_buff = NULL;
-			repl_filter_bufsiz = 0;
-		}
+		gtmsource_free_msgbuff();
+		gtmsource_free_tcombuff();
+		gtmsource_free_filter_buff();
 		gtmsource_stop_heartbeat();
 		if (gtmsource_sock_fd != -1)
 			repl_close(&gtmsource_sock_fd);

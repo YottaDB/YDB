@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@ int repl_log_init(repl_log_file_t log_type,
 {
 	/* Open the log file */
 
-	char	log_file_name[MAX_FN_LEN + 1];
+	char	log_file_name[MAX_FN_LEN + 1], *err_code;
 	int	tmp_fd;
 	int	save_errno;
 	int	stdout_status, stderr_status;
@@ -81,9 +81,11 @@ int repl_log_init(repl_log_file_t log_type,
 	{
 		if (log_type == REPL_GENERAL_LOG && *log_fd == -1 || *stats_fd == -1)
 		{
+			save_errno = ERRNO;
+			err_code = STRERROR(save_errno);
 			send_msg(VARLSTCNT(8) ERR_REPLLOGOPN, 6,
 			 	 LEN_AND_STR(log_file_name),
-				 LEN_AND_STR(STRERROR(ERRNO)),
+				 LEN_AND_STR(err_code),
 				 LEN_AND_STR(NULL_DEVICE));
 			strcpy(log_file_name, NULL_DEVICE);
 			if (log_type == REPL_GENERAL_LOG)
@@ -93,9 +95,11 @@ int repl_log_init(repl_log_file_t log_type,
 			OPENFILE(log_file_name, O_RDWR, tmp_fd); /* Should not fail */
 		} else
 		{
+			save_errno = ERRNO;
+			err_code = STRERROR(save_errno);
 			gtm_putmsg(VARLSTCNT(8) ERR_REPLLOGOPN, 6,
 			 	   LEN_AND_STR(log_file_name),
-				   LEN_AND_STR(STRERROR(ERRNO)),
+				   LEN_AND_STR(err_code),
 				   (log_type == REPL_GENERAL_LOG) ?
 				   strlen(log) : strlen(stats_log),
 				   (log_type == REPL_GENERAL_LOG) ?
@@ -136,9 +140,10 @@ int repl_log_init(repl_log_file_t log_type,
 			*log_fd = tmp_fd;
 		} else
 		{
+			err_code = STRERROR(save_errno);
 			gtm_putmsg(VARLSTCNT(10) ERR_REPLLOGOPN, 6,
 			 	   LEN_AND_STR(log_file_name),
-				   LEN_AND_STR(STRERROR(save_errno)),
+				   LEN_AND_STR(err_code),
 				   (log_type == REPL_GENERAL_LOG) ?
 				   strlen(log) : strlen(stats_log),
 				   (log_type == REPL_GENERAL_LOG) ?

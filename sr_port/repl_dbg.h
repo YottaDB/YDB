@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,11 +9,14 @@
  *								*
  ****************************************************************/
 
-#ifndef _REPL_DBG_H
-#define _REPL_DBG_H
+#ifndef REPL_DBG_H
+#define REPL_DBG_H
 
 #ifdef REPL_DEBUG
 #include "gtm_stdio.h"
+
+#define REPL_DEBUG_ONLY(stmt)		stmt
+
 #define REPL_DPRINT1(p)			{ \
 						FPRINTF(stderr, p); \
 				         	fflush(stderr); \
@@ -38,8 +41,21 @@
 						FPRINTF(stderr, p, q, r, s, t, u);\
 						fflush(stderr); \
 					}
-#else
+#ifdef REPL_EXTRA_DEBUG
 
+#define REPL_EXTRA_DEBUG_ONLY(stmt)		stmt
+#define REPL_EXTRA_DPRINT1(p)			REPL_DPRINT1(p)
+#define REPL_EXTRA_DPRINT2(p, q)		REPL_DPRINT2(p, q)
+#define REPL_EXTRA_DPRINT3(p, q, r)		REPL_DPRINT3(p, q, r)
+#define REPL_EXTRA_DPRINT4(p, q, r, s)		REPL_DPRINT4(p, q, r, s)
+#define REPL_EXTRA_DPRINT5(p, q, r, s, t)	REPL_DPRINT5(p, q, r, s, t)
+#define REPL_EXTRA_DPRINT6(p, q, r, s, t, u)	REPL_DPRINT6(p, q, r, s, t, u)
+
+#endif /* REPL_EXTRA_DEBUG */
+
+#else /* ! REPL_DEBUG */
+
+#define REPL_DEBUG_ONLY(stmt)
 #define REPL_DPRINT1(p)
 #define REPL_DPRINT2(p, q)
 #define REPL_DPRINT3(p, q, r)
@@ -47,6 +63,18 @@
 #define REPL_DPRINT5(p, q, r, s, t)
 #define REPL_DPRINT6(p, q, r, s, t, u)
 
-#endif
+#endif /* REPL_DEBUG */
 
-#endif
+#if !defined(REPL_DEBUG) || !defined(REPL_EXTRA_DEBUG)
+
+#define REPL_EXTRA_DEBUG_ONLY(stmt)
+#define REPL_EXTRA_DPRINT1(p)
+#define REPL_EXTRA_DPRINT2(p, q)
+#define REPL_EXTRA_DPRINT3(p, q, r)
+#define REPL_EXTRA_DPRINT4(p, q, r, s)
+#define REPL_EXTRA_DPRINT5(p, q, r, s, t)
+#define REPL_EXTRA_DPRINT6(p, q, r, s, t, u)
+
+#endif /* !REPL_DEBUG || !REPL_EXTRA_DEBUG */
+
+#endif /* REPL_DBG_H */

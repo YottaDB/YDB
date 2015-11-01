@@ -251,7 +251,7 @@ int gvn(void);
 
 void ind_code(mstr *obj);
 int resolve_ref(int errknt);
-
+void resolve_tref(triple *, oprtype *);
 void start_fetches(opctype op);
 
 int actuallist(oprtype *opr);

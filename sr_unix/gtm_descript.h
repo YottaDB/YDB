@@ -17,9 +17,9 @@ int mumps_call();
 
 
 typedef struct  {
-	int	len;
-	void	*val;
+	short	len;
 	short 	type;
+	void	*val;
 } gtm_descriptor;
 
 

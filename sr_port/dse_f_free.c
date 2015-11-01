@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,10 +52,6 @@ void dse_f_free(void)
 	}
 	bplmap = cs_addrs->hdr->bplmap;
 
-	if (cli_present("HINT") != CLI_PRESENT)
-	{	util_out_print("Error: must give hint block number.",TRUE);
-		return;
-	}
 	if(!cli_get_hex("HINT",&blk))
 		return;
 	if (blk < 0 || blk >= cs_addrs->ti->total_blks || (blk / bplmap * bplmap == blk))

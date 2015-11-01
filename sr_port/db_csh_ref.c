@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,7 +82,7 @@ void	db_csh_ref(sgmnt_addrs *cs_addrs)
 
 		cr->cycle++;	/* increment cycle whenever buffer's blk number changes (for tp_hist) */
 		cr->blk = CR_BLKEMPTY;
-
+		assert(0 == cr->bt_index);	/* when cr->blk is empty, ensure no bt points to this cache-record */
 		if  (!is_mm)
 		{
 			assert(bp <= bp_top);

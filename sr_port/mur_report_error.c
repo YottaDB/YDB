@@ -42,7 +42,6 @@ boolean_t mur_report_error(enum mur_error code)
 	error_def(ERR_PREVJNLNOEOF);
 	error_def(ERR_JNLBADRECFMT);
 
-	++murgbl.err_cnt;
 	switch (code)
 	{
 	default:
@@ -64,5 +63,5 @@ boolean_t mur_report_error(enum mur_error code)
 		break;
 
 	}
-	return murgbl.err_cnt <= mur_options.error_limit  ||  mur_options.interactive  &&  mur_interactive();
+	return MUR_WITHIN_ERROR_LIMIT(murgbl.err_cnt, mur_options.error_limit); /* side-effect : increments murgbl.err_cnt */
 }

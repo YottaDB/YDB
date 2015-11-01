@@ -225,10 +225,6 @@ else
 		ls -1Lat | sed -n '1,/__temp_runall_'${latest_exe}'/p' | grep -E '(\.h$|\.si$)' >>&! ${TMP_DIR}_inc_files
 		rm -f __temp_runall_${latest_exe} >& /dev/null
 		popd >& /dev/null
-		if (! -z ${TMP_DIR}_inc_files) then
-			sort -u ${TMP_DIR}_inc_files >&! ${TMP_DIR}_inc_files_sorted
-			mv ${TMP_DIR}_inc_files_sorted ${TMP_DIR}_inc_files
-		endif
 		echo "...... Searching for --------> out-of-date SOURCEs ...... "
 		pushd $gtm_src >& /dev/null
 		ln -s $gtm_exe/${latest_exe} __temp_runall_${latest_exe}
@@ -241,6 +237,22 @@ else
 		echo ""
 		goto cleanup
 	endif
+endif
+
+###### if *.msg files got included, then also include *_ansi.h files for recompiling #######
+if (!(-z ${TMP_DIR}_src_files)) then
+	foreach file (`cat ${TMP_DIR}_src_files`)
+		set ext = $file:e
+		if ("$ext" == "msg") then
+			set file=$file:t:r
+			echo ${file}_ansi.h >>&! ${TMP_DIR}_inc_files
+		endif
+	end
+endif
+
+if (! -z ${TMP_DIR}_inc_files) then
+	sort -u ${TMP_DIR}_inc_files >&! ${TMP_DIR}_inc_files_sorted
+	mv ${TMP_DIR}_inc_files_sorted ${TMP_DIR}_inc_files
 endif
 
 set backslash_quote

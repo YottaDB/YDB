@@ -183,15 +183,6 @@ void dse_chng_bhead(void)
 	{
 		if (!cli_get_hex("TN",&x))
 			return;
-		if (x < 0)
-		{
-			if (x != -1)
-			{
-				util_out_print("Error: invalid transaction number.",TRUE);
-				T_ABORT(gv_cur_region, cs_addrs);
-				return;
-			}
-		}
 		t_begin_crit(ERR_DSEFAIL);
 		assert(cs_addrs->ti->early_tn == cs_addrs->ti->curr_tn);
 		cs_addrs->ti->early_tn++;

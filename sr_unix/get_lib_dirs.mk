@@ -10,10 +10,7 @@
 #################################################################
 ############### Define platform-specific directory ring-down ##################################
 
-ifeq ($(shell basename $(shell domainname) .com), sanchez)
-gt_src_list:=src inc tools pct
-else
-
+ifndef usertype
 ifeq ($(gt_os_type), OSF1)
 common_dirs_sp=unix_gnp unix_cm unix port_cm port
 else
@@ -45,5 +42,6 @@ ifeq ($(gt_os_type), OS/390)
 lib_dirs_sp=os390 s390 $(common_dirs_sp)
 endif
 gt_src_list:=$(addprefix sr_, $(lib_dirs_sp))
-
+else ### inhouse
+gt_src_list:=src inc tools pct
 endif

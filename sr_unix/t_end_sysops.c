@@ -75,6 +75,7 @@
 #include "add_inter.h"
 #include "gtmimagename.h"
 #include "gtcm_jnl_switched.h"
+#include "cert_blk.h"
 
 GBLDEF	cache_rec_ptr_t		get_space_fail_cr;	/* gbldefed to be accessible in a pro core */
 
@@ -481,7 +482,7 @@ enum cdb_sc     mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
         }       /* not a map */
         if (certify_all_blocks)
         {
-                if (FALSE == cert_blk(cs->blk,(blk_hdr_ptr_t)db_addr[0],
+                if (FALSE == cert_blk(gv_cur_region, cs->blk,(blk_hdr_ptr_t)db_addr[0],
 				(0 < dollar_tlevel) ? (cs->blk_target ? cs->blk_target->root : 0) : gv_target->root))
                         GTMASSERT;
         }
@@ -697,7 +698,7 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                                 DUMP_LOCKHIST();        /* Find history of the locks and relative activity */
                                                 assert(FALSE);
                                                 cr->in_tend = FALSE;
-                                                return cdb_sc_comfail;
+                                                return cdb_sc_comfail;	/* should do a secshr_db_clnup()... */
                                         }
                                 }
                                 if (WRITER_STILL_OWNS_BUFF(cr, n))
@@ -788,7 +789,7 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
                                                 DUMP_LOCKHIST();        /* Find history of the locks and relative activity */
                                                 assert(FALSE);
                                                 cr->in_tend = FALSE;
-                                                return cdb_sc_comfail;
+                                                return cdb_sc_comfail;	/* should do a secshr_db_clnup()... */
                                         }
                                 }
                                 if (WRITER_STILL_OWNS_BUFF(cr, n))
@@ -951,7 +952,7 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
         }
         if (certify_all_blocks)
         {
-                if (FALSE == cert_blk(cs->blk, (blk_hdr_ptr_t)blk_ptr,
+                if (FALSE == cert_blk(gv_cur_region, cs->blk, (blk_hdr_ptr_t)blk_ptr,
                                 (0 < dollar_tlevel) ? (cs->blk_target ? cs->blk_target->root : 0)
                                                         : gv_target->root))
                         GTMASSERT;
@@ -964,7 +965,15 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
         {       /* stuff it on the active queue */
                 n = INSQTI((que_ent_ptr_t)&cr->state_que, (que_head_ptr_t)&cs_addrs->acc_meth.bg.cache_state->cacheq_active);
                 if (INTERLOCK_FAIL == n)
-                        return cdb_sc_comfail;
+		{
+			assert(FALSE);
+			secshr_db_clnup(NORMAL_TERMINATION);
+			SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
+			BG_TRACE_PRO(wcb_bg_update_lckfail1);
+			send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bg_update_lckfail1"),
+				process_id, ctn, DB_LEN_STR(gv_cur_region));
+			return cdb_sc_cacheprob;
+		}
                 ADD_ENT_TO_ACTIVE_QUE_CNT(&cs_addrs->nl->wcs_active_lvl, &cs_addrs->nl->wc_var_lock);
                 DECR_CNT(&cs_addrs->nl->wc_in_free, &cs_addrs->nl->wc_var_lock);
         }
@@ -974,10 +983,15 @@ enum cdb_sc     bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num 
         {       /* it's off the active que, so put it back at the head to minimize the chances of blocks being "pinned" in memory */
                 n = INSQHI((que_ent_ptr_t)&cr->state_que, (que_head_ptr_t)&cs_addrs->acc_meth.bg.cache_state->cacheq_active);
                 if (INTERLOCK_FAIL == n)
-                {
-                        assert(FALSE);
-                        return cdb_sc_comfail;
-                }
+		{
+			assert(FALSE);
+			secshr_db_clnup(NORMAL_TERMINATION);
+			SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
+			BG_TRACE_PRO(wcb_bg_update_lckfail2);
+			send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bg_update_lckfail2"),
+				process_id, ctn, DB_LEN_STR(gv_cur_region));
+			return cdb_sc_cacheprob;
+		}
         } else
                 assert(FALSE == OWN_BUFF(n));
         VERIFY_QUEUE_LOCK(&cs_addrs->acc_meth.bg.cache_state->cacheq_active, &cs_addrs->nl->db_latch);
@@ -1097,10 +1111,16 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
         error_def(ERR_WAITDSKSPACE);
 
         assert((0 != needed) || (NULL != cr));
-
         csa = &FILE_INFO(reg)->s_addrs;
         csd = csa->hdr;
-
+	if (FALSE == csa->now_crit)
+	{
+		assert(0 != needed);	/* if needed == 0, then we should be in crit */
+		for (lcnt = DIVIDE_ROUND_UP(needed, csd->n_wrt_per_flu);  0 < lcnt;  lcnt--)
+			JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0, dummy_errno);
+					/* a macro that ensure jnl is open, invokes wcs_wtstart() and checks for errors etc. */
+		return TRUE;
+	}
 #if defined(UNTARGETED_MSYNC)
         if (dba_mm == csd->acc_meth)
                 assert(FALSE);
@@ -1165,7 +1185,7 @@ bool    wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
                 for (lcnt = 1; (0 != cr->dirty) && (BUF_OWNER_STUCK > lcnt); ++lcnt)
                 {
                         for (; 0 != cr->dirty && 0 != csa->acc_meth.bg.cache_state->cacheq_active.fl;)
-				JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0);
+				JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0, save_errno);
                         if (0 != cr->dirty)
                                 wcs_sleep(lcnt);
                         else

@@ -9,8 +9,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _GTMSOURCE_H
-#define _GTMSOURCE_H
+#ifndef GTMSOURCE_H
+#define GTMSOURCE_H
 
 /* for in_addr_t typedef on Linux */
 #ifdef __linux__
@@ -21,12 +21,8 @@
 
 /* Needs mdef.h, gdsfhead.h and its dependencies */
 #define JNLPOOL_DUMMY_REG_NAME		"JNLPOOL_REG"
-#define ASSERT_IN_RANGE(low, x, high)	assert((low <= x) && (x <= high))
 #define MAX_FILTER_CMD_LEN		512
-
-#define MAX_TR_BUFFSIZE			1 * 1024 * 1024
-#define MILLISECS_IN_SEC			1000
-#define MIN_JNLPOOL_SIZE		(1024 * 1024)
+#define MIN_JNLPOOL_SIZE		(1 * 1024 * 1024)
 
 #ifdef VMS
 #define MAX_GSEC_KEY_LEN		32 /* 31 is allowed + 1 for NULL terminator */
@@ -74,13 +70,24 @@ typedef enum
 
 #define GTMSOURCE_SHUTDOWN_PAD_TIME		5 /* seconds */
 
+#define GTMSOURCE_SENT_THRESHOLD_FOR_RECV	(1 * 1024 * 1024)
+#define BACKLOG_BYTES_THRESHOLD			(1 * 1024 * 1024)
+#define BACKLOG_COUNT_THRESHOLD			(10 * 1024)
+
+#define GTMSOURCE_MIN_TCP_SEND_BUFSIZE	(16   * 1024)	/* anything less than this, issue a warning */
+#define GTMSOURCE_TCP_SEND_BUFSIZE_INCR	(32   * 1024)	/* attempt to get a larger buffer with this increment */
+#define GTMSOURCE_TCP_SEND_BUFSIZE	(1024 * 1024)	/* desirable to set the buffer size to be able to send large chunks */
+#define GTMSOURCE_MIN_TCP_RECV_BUFSIZE	(512)		/* anything less than this, issue a warning */
+#define GTMSOURCE_TCP_RECV_BUFSIZE	(1024)		/* not much inbound traffic, we can live with a low limit */
+
 typedef struct
 {
 	replpool_identifier	jnlpool_id;
 	seq_num	start_jnl_seqno;/* The sequence number with which operations
 				 * started */
-	seq_num	jnl_seqno; 	/* Sequence number for transactions.
-			    	 * Updated by GTM process */
+	volatile seq_num jnl_seqno; 	/* Sequence number for transactions.
+			    	         * Updated by GTM process. Volatile to
+					 * force load on every access */
 	uint4	jnldata_base_off; /* Journal pool offset from where journal
 				   * data starts */
 	uint4	jnlpool_size; 	/* available space for journal data in bytes */
@@ -91,12 +98,13 @@ typedef struct
 				 * into the journal pool. Copied to
 				 * jnldata_hdr.prev_jnldata_len before writing
 				 * into the pool. Updated by GTM process */
-	qw_off_t early_write_addr; /* Virtual address assuming the
-				    * to-be-written jnl records are
-				    * already written into the journal
-				    * pool. Is equal to write_addr except
-				    * in the window when the actual write
-				    * takes place */
+	volatile qw_off_t early_write_addr; /* Virtual address assuming the
+				    	     * to-be-written jnl records are
+				    	     * already written into the journal
+				    	     * pool. Is equal to write_addr except
+				    	     * in the window when the actual write
+				    	     * takes place. volatile to force load
+					     * on every access */
 	qw_off_t write_addr;    /* Virtual address of the next journal record
 			     	 * to be written in the merged journal file.
 			     	 * Note that the merged journal may not exist.
@@ -341,6 +349,9 @@ boolean_t	gtmsource_is_heartbeat_overdue(time_t *now, repl_heartbeat_msg_t *over
 int		gtmsource_alloc_filter_buff(int bufsiz);
 int		gtmsource_alloc_msgbuff(int maxbuffsize);
 int		gtmsource_alloc_tcombuff(void);
+void		gtmsource_free_filter_buff(void);
+void		gtmsource_free_msgbuff(void);
+void		gtmsource_free_tcombuff(void);
 int		gtmsource_changelog(void);
 int		gtmsource_checkhealth(void);
 int		gtmsource_comm_init(void);
@@ -348,26 +359,22 @@ int		gtmsource_ctl_close(void);
 int		gtmsource_ctl_init(void);
 int		gtmsource_end1(boolean_t auto_shutdown);
 int		gtmsource_est_conn(struct sockaddr_in *secondary_addr);
-int		gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen);
+int		gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multiple);
 int		gtmsource_get_opt(void);
-int		gtmsource_init_heartbeat(void);
 int		gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status);
 int		gtmsource_mode_change(int to_mode);
 int		gtmsource_poll_actions(boolean_t poll_secondary);
 int		gtmsource_process(void);
-int		gtmsource_process_heartbeat(repl_heartbeat_msg_t *heartbeat_msg);
-int		gtmsource_readfiles(uchar_ptr_t buff, int *data_len, int maxbufflen);
-int		gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen);
+int		gtmsource_readfiles(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multiple);
+int		gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multiple, qw_num stop_read_at);
 int		gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_flags);
 int		gtmsource_secnd_update(boolean_t print_message);
-int		gtmsource_send_heartbeat(time_t *now);
 int		gtmsource_set_lookback(void);
 int		gtmsource_showbacklog(void);
 int		gtmsource_shutdown(boolean_t auto_shutdown, int exit_status);
 int		gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags);
 int		gtmsource_statslog(void);
 int		gtmsource_stopfilter(void);
-int		gtmsource_stop_heartbeat(void);
 int		gtmsource_update_resync_tn(seq_num resync_seqno);
 void		gtmsource_autoshutdown(void);
 void		gtmsource_end(void);
@@ -375,11 +382,12 @@ void		gtmsource_exit(int exit_status);
 void		gtmsource_init_sec_addr(struct sockaddr_in *secondary_addr);
 void		gtmsource_seqno_init(void);
 void		gtmsource_sigstop(void);
-void		sgtm_putmsg();
+boolean_t	jnlpool_hasnt_overflowed(jnlpool_ctl_ptr_t jctl, uint4 jnlpool_size, qw_num read_addr);
+void		jnlpool_detach(void);
+void		jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t *jnlpool_initialized);
+int		gtmsource_init_heartbeat(void);
+int		gtmsource_process_heartbeat(repl_heartbeat_msg_t *heartbeat_msg);
+int		gtmsource_send_heartbeat(time_t *now);
+int		gtmsource_stop_heartbeat(void);
 
-boolean_t jnlpool_hasnt_overflowed(seq_num read_addr);
-void jnlpool_detach(void);
-void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup,
-	boolean_t *jnlpool_initialized);
-
-#endif
+#endif /* GTMSOURCE_H */

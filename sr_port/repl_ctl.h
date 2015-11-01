@@ -97,6 +97,11 @@ typedef struct repl_ctl_struct
 	struct repl_ctl_struct	*next;
 } repl_ctl_element;
 
+typedef struct {
+	seq_num		seqno;		/* the last sequence number seen in a block before linear search returns */
+	seq_num		prev_seqno;	/* the one previous to the last one */
+} tr_search_status_t;
+
 #define JNL_BLK_DSKADDR(addr, blksize) \
 	((ROUND_DOWN((addr), (blksize)) > JNL_FILE_FIRST_RECORD) ? \
 	 	ROUND_DOWN((addr), (blksize)) : JNL_FILE_FIRST_RECORD)
