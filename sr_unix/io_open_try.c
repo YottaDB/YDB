@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,6 +69,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	TID		timer_id;
 	struct stat	outbuf;
 	char		*buf, namebuf[LOGNAME_LEN + 1];
+	unsigned char	dev_type[MAX_DEV_TYPE_LEN];
 	d_mt_struct	*mt_ptr;
 	iosb		io_status_blk;
 	int		umask_orig, umask_creat;
@@ -148,12 +149,12 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		}
 		if ((n_io_dev_types == tl->iod->type) && mspace && mspace->str.len)
 		{
-			lower_to_upper((uchar_ptr_t)mspace->str.addr, (uchar_ptr_t)mspace->str.addr, mspace->str.len);
+			lower_to_upper(dev_type, (uchar_ptr_t)mspace->str.addr, mspace->str.len);
 			if (((sizeof("TCP") - 1) == mspace->str.len)
-				&& (0 == memcmp(mspace->str.addr, "TCP", sizeof("TCP") - 1)))
+				&& (0 == MEMCMP_LIT(dev_type, "TCP")))
 				tl->iod->type = tcp;
 			else if (((sizeof("SOCKET") - 1) == mspace->str.len)
-				&& (0 == memcmp(mspace->str.addr, "SOCKET", sizeof("SOCKET") - 1)))
+				 && (0 == MEMCMP_LIT(dev_type, "SOCKET")))
 				tl->iod->type = gtmsocket;
 			else
 				tl->iod->type = us;

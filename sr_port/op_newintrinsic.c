@@ -21,15 +21,17 @@
 #include "gdsfhead.h"
 #include "dpgbldir.h"
 #include "dpgbldir_sysops.h"
+#include "error_trap.h"		/* for STACK_ZTRAP_EXPLICIT_NULL macro */
 
-GBLREF gv_key   *gv_currkey;
-GBLREF gv_namehead *gv_target;
-GBLREF gd_addr  *gd_header;
-GBLREF mval	dollar_ztrap;
-GBLREF mval	dollar_etrap;
-GBLREF mval	dollar_estack_delta;
-GBLREF mval	dollar_zyerror;
-GBLREF mval	dollar_zgbldir;
+GBLREF gv_key		*gv_currkey;
+GBLREF gv_namehead	*gv_target;
+GBLREF gd_addr		*gd_header;
+GBLREF mval		dollar_ztrap;
+GBLREF mval		dollar_etrap;
+GBLREF mval		dollar_estack_delta;
+GBLREF mval		dollar_zyerror;
+GBLREF mval		dollar_zgbldir;
+GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 
 /* Routine to NEW a special intrinsic variable. Note that gtm_newinstrinsic(),
    which actually does the dirty work, may shift the stack to insert the mv_stent
@@ -39,7 +41,8 @@ GBLREF mval	dollar_zgbldir;
 */
 void op_newintrinsic(int intrtype)
 {
-	mval	*intrinsic;
+	mval		*intrinsic;
+	boolean_t	stored_explicit_null;
 
 	switch(intrtype)
 	{
@@ -54,13 +57,26 @@ void op_newintrinsic(int intrtype)
 			   but calls directly to gtm_newintrinsic instead.
 			*/
 			if (dollar_etrap.str.len)
+			{
+				assert(FALSE == ztrap_explicit_null);
 				return;
+			}
+			assert(!ztrap_explicit_null || (0 == dollar_ztrap.str.len));
+			DEBUG_ONLY(stored_explicit_null = FALSE;)
+			if (ztrap_explicit_null && (0 == dollar_ztrap.str.len))
+			{
+				DEBUG_ONLY(stored_explicit_null = TRUE;)
+				dollar_ztrap.str.len = STACK_ZTRAP_EXPLICIT_NULL;	/* to be later used by unw_mv_ent() */
+			}
 			intrinsic = &dollar_ztrap;
 			break;
 		case SV_ETRAP:
 			/* See comment above for SV_ZTRAP */
 			if (dollar_ztrap.str.len)
+			{
+				assert(FALSE == ztrap_explicit_null);
 				return;
+			}
 			intrinsic = &dollar_etrap;
 			break;
 		case SV_ESTACK:
@@ -98,5 +114,6 @@ void op_newintrinsic(int intrtype)
 		if (gv_target)
 			gv_target->clue.end = 0;
 	}
+	assert((SV_ZTRAP != intrtype) || !stored_explicit_null || (0 == intrinsic->str.len));
         return;
 }

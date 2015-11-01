@@ -261,9 +261,11 @@ int updproc(void)
 	frame_pointer = (stack_frame *)msp;
 	memset(frame_pointer, 0, sizeof(stack_frame));
 	frame_pointer->type = SFT_COUNT;
+	frame_pointer->temps_ptr = (unsigned char *)frame_pointer; /* no temporaries in this frame */
 	--frame_pointer;
 	memset(frame_pointer, 0, sizeof(stack_frame));
 	frame_pointer->type = SFT_COUNT;
+	frame_pointer->temps_ptr = (unsigned char *)frame_pointer; /* no temporaries in this frame either */
 	frame_pointer->old_frame_pointer = (stack_frame *)msp;
 	msp = (unsigned char *)frame_pointer;
 	recvpool.upd_proc_local->read = 0;

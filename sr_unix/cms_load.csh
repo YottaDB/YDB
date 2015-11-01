@@ -118,13 +118,13 @@ cp $cms_dir/*/gtmsrc.csh .
 
 ############### Define platform-specific libraries ##################################
 
-set gtm_s_aix   = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_rs6000 sr_aix"
-set gtm_s_osf1  = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_alpha sr_dux"
-set gtm_s_hp_ux = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_hppa sr_hpux"
-set gtm_s_linux = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_i386 sr_linux"
-set gtm_s_sunos = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_sparc sr_sun"
-set gtm_s_os390 = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_s390 sr_os390"
-set gtm_s_l390 = "sr_port sr_port_cm sr_unix sr_unix_cm sr_unix_gnp sr_l390 sr_linux"
+set gtm_s_aix   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_rs6000 sr_aix"
+set gtm_s_osf1  = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_alpha  sr_dux"
+set gtm_s_hp_ux = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_hppa   sr_hpux"
+set gtm_s_linux = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_i386   sr_linux"
+set gtm_s_sunos = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_sparc  sr_sun"
+set gtm_s_os390 = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_s390   sr_os390"
+set gtm_s_l390  = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_l390   sr_linux"
 
 set platform_library = "$platform_name"
 if ( "s390" == $MACHTYPE && "linux" == $platform_library ) then

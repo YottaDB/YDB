@@ -66,8 +66,11 @@ static  char    * const jtype[] =
 		(cs_addrs->hdr->VARIABLE.evnt_tn));
 
 #define SHOW_DB_CSH_STAT(COUNTER, TEXT1, TEXT2)									\
-	util_out_print(TEXT1"  0x!8XL      "TEXT2"  0x!8XL", TRUE, (cs_addrs->hdr->COUNTER.curr_count), 	\
-		(cs_addrs->hdr->COUNTER.cumul_count + cs_addrs->hdr->COUNTER.curr_count));
+	if (cs_addrs->hdr->COUNTER.curr_count || cs_addrs->hdr->COUNTER.cumul_count)				\
+	{													\
+		util_out_print(TEXT1"  0x!8XL      "TEXT2"  0x!8XL", TRUE, (cs_addrs->hdr->COUNTER.curr_count), \
+				(cs_addrs->hdr->COUNTER.cumul_count + cs_addrs->hdr->COUNTER.curr_count));	\
+	}
 
 /* NEED_TO_DUMP is only for the qualifiers other than "BASIC" and "ALL".
 	file_header is not dumped only if "NOBASIC" is explicitly specified */

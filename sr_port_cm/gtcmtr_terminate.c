@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,7 @@ bool gtcmtr_terminate(bool cm_err)
 			curr_entry->pvec = NULL;
 		}
 		curr_entry->region_root = NULL;	/* make sure you can't access any regions through this entry... just in case */
+		curr_entry->maxregnum = 0;
 		if (curr_entry->clb_ptr)
 		{
 			clb = curr_entry->clb_ptr;

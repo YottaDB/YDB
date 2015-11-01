@@ -719,7 +719,7 @@ int	t_end(srch_hist *hist1, srch_hist *hist2)
 /*** Warning: Possible fall-thru... ***/
   failed:
 	gv_target->clue.end = 0;
-	if ((CDB_STAGNATE - 1) > t_tries)
+	if (((CDB_STAGNATE - 1) > t_tries) && (cs_addrs->now_crit))
 		rel_crit(gv_cur_region);
 	t_retry(status);
 	cw_map_depth = 0;

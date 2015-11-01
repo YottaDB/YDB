@@ -197,20 +197,13 @@ GBLDEF	mval		dollar_zgbldir,
 GBLDEF  uint4		dollar_zjob;
 GBLDEF	mval		dollar_zinterrupt;
 GBLDEF	boolean_t	dollar_zininterrupt;
-GBLDEF	ecode_list	dollar_ecode_base = {0, 0, NULL, NULL},
-			*dollar_ecode_list = &dollar_ecode_base;
-GBLDEF	int		error_level = 0;		/* execution level where last error occurred */
-GBLDEF	int4		error_last_ecode;		/* last error code number */
-GBLDEF	unsigned char	*error_last_mpc_err;		/* ptr to original mpc when error occurred */
-GBLDEF	unsigned char	*error_last_ctxt_err;		/* ptr to original ctxt when error occurred */
-GBLDEF	stack_frame	*error_last_frame_err;		/* ptr to frame where error occurred */
-GBLDEF	unsigned char	*error_last_b_line;		/* ptr to beginning of line where error occurred */
+
 GBLDEF	mv_stent	*mv_chain;
 GBLDEF	sgm_info	*first_sgm_info;
 GBLDEF	spdesc		indr_stringpool,
 			rts_stringpool,
 			stringpool;
-GBLDEF	stack_frame	*frame_pointer, *error_frame;
+GBLDEF	stack_frame	*frame_pointer;
 GBLDEF	stack_frame	*zyerr_frame = NULL;
 GBLDEF	symval		*curr_symval;
 GBLDEF	tp_frame	*tp_pointer;
@@ -228,7 +221,7 @@ GBLDEF	int4		dollar_zeditor;
 GBLDEF	boolean_t	sem_incremented = FALSE;
 GBLDEF	mval		**ind_result_array, **ind_result_sp, **ind_result_top;
 GBLDEF	mval		**ind_source_array, **ind_source_sp, **ind_source_top;
-GBLDEF	rtn_tables	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
+GBLDEF	RTN_TABENT	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
 GBLDEF	int4		break_message_mask;
 GBLDEF	bool		rc_locked = FALSE,
 			certify_all_blocks = FALSE;	/* If flag is set all blocks are checked after they are
@@ -470,7 +463,7 @@ GBLDEF	int	cs_parscan;			/* number of partial scans (partial cache hits) */
 GBLDEF	int	c_clear;			/* cleared due to (possible) value change */
 GBLDEF	boolean_t	setp_work;
 #endif
-GBLDEF z_records	zbrk_recs = {0, 0, 0, 0};
+GBLDEF z_records	zbrk_recs = {NULL, NULL, NULL};
 
 #ifdef UNIX
 GBLDEF	ipcs_mesg	db_ipcs;		/* For requesting gtmsecshr to update ipc fields */
@@ -624,3 +617,17 @@ GBLDEF	uint4		crit_deadlock_check_cycle;	/* compared to csa->crit_check_cycle to
 							   in a transaction legitimately has crit or not */
 GBLDEF	node_local_ptr_t	locknl;		/* if non-NULL, indicates node-local of interest to the LOCK_HIST macro */
 GBLDEF	boolean_t	in_mutex_deadlock_check;	/* if TRUE, mutex_deadlock_check() is part of our current C-stack trace */
+/* $ECODE and $STACK related variables.
+ * error_frame and skip_error_ret should ideally be part of dollar_ecode structure. since sr_avms/opp_ret.m64 uses these
+ * global variables and it was felt risky changing it to access a member of a structure, they are kept as separate globals */
+GBLDEF	stack_frame		*error_frame;		/* ptr to frame where last error occurred or was rethrown */
+GBLDEF	boolean_t		skip_error_ret;		/* set to TRUE by golevel(), used and reset by op_unwind() */
+GBLDEF	dollar_ecode_type	dollar_ecode;		/* structure containing $ECODE related information */
+GBLDEF	dollar_stack_type	dollar_stack;		/* structure containing $STACK related information */
+GBLDEF	unsigned char		*error_frame_save_mpc[DOLLAR_STACK_MAXINDEX];	/* save the mpc before resetting to error_ret()
+										 * do this for 256 levels */
+GBLDEF	boolean_t		ztrap_explicit_null;	/* whether $ZTRAP was explicitly set to NULL in the current frame */
+GBLDEF	int4			gtm_object_size;	/* Size of entire gtm object for compiler use */
+GBLDEF	int4			linkage_size;		/* Size of linkage section during compile */
+GBLDEF	uint4			lnkrel_cnt;		/* number of entries in linkage Psect to relocate */
+GBLDEF	boolean_t		disallow_forced_expansion, forced_expansion; /* Used in stringpool managment */

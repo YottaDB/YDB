@@ -136,85 +136,85 @@ boolean_t	tp_tend(boolean_t crit_only)
 	status = cdb_sc_normal;
 	no_sets = TRUE;
 	jnl_status = 0;
-	for (si = first_sgm_info;  NULL != si; si = si->next_sgm_info)
+	if (FALSE == crit_only)
 	{
-		sgm_info_ptr = si;
-		TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
-		csa = cs_addrs;
-		csd = cs_data;
-		if ((csd->wc_blocked) ||			/* If blocked, or.. */
-			((dba_mm == csa->hdr->acc_meth) &&	/* we have MM and.. */
-			(csa->total_blks != csa->ti->total_blks)))	/* and file has been extended */
-		{	/* Force repair */
-			t_fail_hist[t_tries] = cdb_sc_helpedout; /* special status to prevent punishing altruism */
-			TP_TRACE_HIST(CR_BLKEMPTY, NULL);
-			return FALSE;
-		}
-		if (crit_only)
-			continue;
-		if (NULL == si->first_cw_set  &&  si->start_tn == csa->ti->early_tn)
-		{	/* read with no change to the transaction history */
-			/* assure that we haven't overrun our history buffer and we have reasonable values for first and last */
-			assert(si->last_tp_hist - si->first_tp_hist <= si->tp_hist_size);
-			continue;
-		} else
-			no_sets = FALSE;
-		if (JNL_ENABLED(csa))
-		{	/* compute the total journal record size requirements before grab_crit().
-			 * there is code later that will check for state changes from now to then
-			 */
-			TOTAL_TPJNL_REC_SIZE(total_jnl_rec_size, si, csa);
-			/* compute current transaction's maximum journal space needs in number of disk blocks */
-			si->tot_jrec_size = MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size);
-		}
-	}	/* for (si ... ) */
-	if (no_sets && (FALSE == crit_only))
-	{
-		if (CDB_STAGNATE <= t_tries)
+		for (si = first_sgm_info;  NULL != si; si = si->next_sgm_info)
 		{
-			for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
-				rel_crit(tr->reg);
-		}
-		UNIX_ONLY(
-			/* Must be done after REVERT since we are no longer in crit */
-			if (unhandled_stale_timer_pop)
-				process_deferred_stale();
-		)
-		return TRUE;
-	}
-	/* We are still out of crit if this is not our last attempt. If so, run the region
-	   list and check that we have sufficient free blocks for our update. If not, get
-	   them now while we can. We will repeat this check later in crit but it will
-	   hopefully have little or nothing to do. */
-
-	/* Only unix for now -- VMS can't deal yet */
-	UNIX_ONLY(
-		for (si = first_sgm_info;  (cdb_sc_normal == status) && (NULL != si);  si = si->next_sgm_info)
-		{
+			sgm_info_ptr = si;
 			TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
 			csa = cs_addrs;
-			if (csa->now_crit)  /* bypass 1st check if already in crit -- check later */
-				continue;
 			csd = cs_data;
-			is_mm = (dba_mm == csd->acc_meth);
-			if (!is_mm && (NULL != si->first_cw_set))
+			if ((csd->wc_blocked) ||			/* If blocked, or.. */
+				((dba_mm == csa->hdr->acc_meth) &&	/* we have MM and.. */
+				(csa->total_blks != csa->ti->total_blks)))	/* and file has been extended */
+			{	/* Force repair */
+				t_fail_hist[t_tries] = cdb_sc_helpedout; /* special status to prevent punishing altruism */
+				TP_TRACE_HIST(CR_BLKEMPTY, NULL);
+				return FALSE;
+			}
+			if (NULL == si->first_cw_set  &&  si->start_tn == csa->ti->early_tn)
+			{	/* read with no change to the transaction history */
+				/* assure we haven't overrun our history buffer and we have reasonable values for first and last */
+				assert(si->last_tp_hist - si->first_tp_hist <= si->tp_hist_size);
+				continue;
+			} else
+				no_sets = FALSE;
+			if (JNL_ENABLED(csa))
+			{	/* compute the total journal record size requirements before grab_crit().
+				 * there is code later that will check for state changes from now to then
+				 */
+				TOTAL_TPJNL_REC_SIZE(total_jnl_rec_size, si, csa);
+				/* compute current transaction's maximum journal space needs in number of disk blocks */
+				si->tot_jrec_size = MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size);
+			}
+		}	/* for (si ... ) */
+		if (no_sets)
+		{
+			if (CDB_STAGNATE <= t_tries)
 			{
-				if (csa->nl->wc_in_free < si->cw_set_depth + 1)
+				for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
+					rel_crit(tr->reg);
+			}
+			UNIX_ONLY(
+				/* Must be done after REVERT since we are no longer in crit */
+				if (unhandled_stale_timer_pop)
+					process_deferred_stale();
+			)
+			return TRUE;
+		}
+		/* We are still out of crit if this is not our last attempt. If so, run the region list and check
+		 * that we have sufficient free blocks for our update. If not, get them now while we can.
+		 * We will repeat this check later in crit but it will hopefully have little or nothing to do.
+		 * Only unix for now -- VMS can't deal yet.
+		 */
+		UNIX_ONLY(
+			for (si = first_sgm_info;  (cdb_sc_normal == status) && (NULL != si);  si = si->next_sgm_info)
+			{
+				TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
+				csa = cs_addrs;
+				if (csa->now_crit)  /* bypass 1st check if already in crit -- check later */
+					continue;
+				csd = cs_data;
+				is_mm = (dba_mm == csd->acc_meth);
+				if (!is_mm && (NULL != si->first_cw_set))
 				{
-					if (!wcs_get_space(si->gv_cur_region, si->cw_set_depth + 1, NULL))
+					if (csa->nl->wc_in_free < si->cw_set_depth + 1)
 					{
-						SET_TRACEABLE_VAR(csd->wc_blocked,TRUE);
-						BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_wcsgetspace);
-						status = cdb_sc_cacheprob;
-						TP_TRACE_HIST(CR_BLKEMPTY, NULL);
-						t_fail_hist[t_tries] = status;
-						TP_RETRY_ACCOUNTING(csd, status);
-						return FALSE;
+						if (!wcs_get_space(si->gv_cur_region, si->cw_set_depth + 1, NULL))
+						{
+							SET_TRACEABLE_VAR(csd->wc_blocked,TRUE);
+							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_wcsgetspace);
+							status = cdb_sc_cacheprob;
+							TP_TRACE_HIST(CR_BLKEMPTY, NULL);
+							t_fail_hist[t_tries] = status;
+							TP_RETRY_ACCOUNTING(csd, status);
+							return FALSE;
+						}
 					}
 				}
 			}
-		}
-	)
+		)
+	}
 	ESTABLISH_RET(t_ch, FALSE);
 	/* the following section grabs crit in all regions touched by the transaction. We use a different
 	 * structure here for grabbing crit. The tp_reg_list region list contains all the regions that

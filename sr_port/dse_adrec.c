@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,12 +112,12 @@ void dse_adrec(void)
 		{
 			util_out_print("Error: block pointer must be specified for this index block record.", TRUE);
 			free(lbp);
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
-		if(!cli_get_hex("POINTER", &blk))
+		if (!cli_get_hex("POINTER", &blk))
 		{
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			free(lbp);
 			return;
 		}
@@ -125,7 +125,7 @@ void dse_adrec(void)
 		{
 			util_out_print("Error: pointer is an invalid block number.", TRUE);
 			free(lbp);
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
 		MEMCP(&data[0], (char *)&blk, 0, sizeof(block_id), sizeof(block_id));
@@ -136,13 +136,13 @@ void dse_adrec(void)
 		{
 			util_out_print("Error:  data must be specified for this data block record.", TRUE);
 			free(lbp);
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
 		if (FALSE == dse_data(&data[0], &data_len))
 		{
 			free(lbp);
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
 		if (key_len + data_len >  cs_addrs->hdr->max_rec_size)
@@ -157,7 +157,7 @@ void dse_adrec(void)
 		if (!(rp = skan_rnum(lbp, TRUE)))
 		{
 			free(lbp);
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
 	} else if (cli_present("OFFSET") == CLI_PRESENT)
@@ -165,14 +165,14 @@ void dse_adrec(void)
 		if (!(rp = skan_offset(lbp, TRUE)))
 		{
 			free(lbp);
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
 	} else
 	{
 		util_out_print("Error:  must specify a record number or offset for the record to be added.", TRUE);
 		free(lbp);
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		return;
 	}
 
@@ -228,7 +228,7 @@ void dse_adrec(void)
 		util_out_print("Error: record too large for remaining space in block.", TRUE);
 		free(lbp);
 		free(new_bp);
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		return;
 	}
 	memcpy(rp, new_bp, new_len);
@@ -241,7 +241,7 @@ void dse_adrec(void)
 	{
 		util_out_print("Error: bad blk build.", TRUE);
 		free(lbp);
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		return;
 	}
 	t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);

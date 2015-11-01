@@ -800,4 +800,43 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff);
 /* the following macro uses 8-byte quantities (gtm_uint64_t) to perform additions that might cause a 4G overflow */
 #define	DISK_BLOCKS_SUM(freeaddr, jrec_size)	DIVIDE_ROUND_UP((((gtm_uint64_t)(freeaddr)) + (jrec_size)), DISK_BLOCK_SIZE)
 
+/* For future portability JNLBUFF_ALLOC is defined in jnl.h instead of jnlsp.h */
+#ifdef UNIX
+#define JPC_ALLOC(csa)								\
+{										\
+	csa->jnl = (jnl_private_control *)malloc(sizeof(*csa->jnl));		\
+	memset(csa->jnl, 0, sizeof(*csa->jnl));					\
+}
+#else
+#define JPC_ALLOC(csa)								\
+{										\
+	vms_lock_sb	*tmp_jnllsb;						\
+	if (NULL == csa->jnl)							\
+	{									\
+		csa->jnl = (jnl_private_control *)malloc(sizeof(*csa->jnl));	\
+		memset(csa->jnl, 0, sizeof(*csa->jnl));				\
+		csa->jnl->jnllsb = malloc(sizeof(vms_lock_sb));			\
+	} else									\
+	{									\
+		tmp_jnllsb = csa->jnl->jnllsb;					\
+		memset(csa->jnl, 0, sizeof(*csa->jnl));				\
+		csa->jnl->jnllsb = tmp_jnllsb;					\
+	}									\
+	memset(csa->jnl->jnllsb, 0, sizeof(vms_lock_sb));			\
+}
+#endif
+#define JNL_INIT(csa, reg, csd)								\
+{											\
+	csa->jnl_state = csd->jnl_state;						\
+	csa->jnl_before_image = csd->jnl_before_image;					\
+	csa->repl_state = csd->repl_state;						\
+	if JNL_ALLOWED(csa)								\
+	{										\
+		JPC_ALLOC(csa);								\
+		csa->jnl->region = reg;							\
+		csa->jnl->jnl_buff = (jnl_buffer_ptr_t)((sm_uc_ptr_t)(csa->nl) + NODE_LOCAL_SPACE + JNL_NAME_EXP_SIZE);\
+		csa->jnl->channel = NOJNL;						\
+	} else										\
+		csa->jnl = NULL;							\
+}
 #endif /* JNL_H_INCLUDED */

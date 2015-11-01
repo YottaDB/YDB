@@ -13,7 +13,7 @@
 
 #include "gtm_ipc.h"
 #include <errno.h>
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include <arpa/inet.h>
 #include "gtm_stdlib.h"
@@ -62,8 +62,6 @@ GBLREF	node_local_ptr_t	locknl;
 
 LITREF	char			gtm_release_name[];
 LITREF	int4			gtm_release_name_len;
-
-#define MEGA_BOUND		1024*1024
 
 void jnlpool_init(jnlpool_user pool_user,
 		  boolean_t gtmsource_startup,

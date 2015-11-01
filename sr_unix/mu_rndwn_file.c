@@ -390,7 +390,12 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
        	}
 	reg->dyn.addr->acc_meth = acc_meth = tsd->acc_meth;
 	dbsecspc(reg, tsd);
+#ifdef __MVS__
+	/* match gvcst_init_sysops.c shmget with __IPC_MEGA */
+	if (ROUND_UP(reg->sec_size, MEGA_BOUND) != shm_buf.shm_segsz)
+#else
 	if (reg->sec_size != shm_buf.shm_segsz)
+#endif
 	{
 		util_out_print("Expected shared memory size is !SL, but found !SL",
 			TRUE, reg->sec_size, shm_buf.shm_segsz);
@@ -466,14 +471,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 #ifdef CACHELINE_SIZE
 	assert(0 == ((int)cs_addrs->critical & (CACHELINE_SIZE - 1)));
 #endif
-	if (JNL_ALLOWED(tsd))
-	{
-		cs_addrs->jnl = (jnl_private_control *)malloc(sizeof(*cs_addrs->jnl));
-		memset(cs_addrs->jnl, 0, sizeof(*cs_addrs->jnl));
-		cs_addrs->jnl->channel = NOJNL;
-		cs_addrs->jnl->region = reg;
-		cs_addrs->jnl->jnl_buff = (jnl_buffer_ptr_t)(cs_addrs->db_addrs[0] + NODE_LOCAL_SPACE + JNL_NAME_EXP_SIZE);
-	}
+	JNL_INIT(cs_addrs, reg, tsd);
 	cs_addrs->backup_buffer = (backup_buff_ptr_t)(cs_addrs->db_addrs[0] + NODE_LOCAL_SPACE + JNL_SHARE_SIZE(tsd));
 	cs_addrs->lock_addrs[0] = (sm_uc_ptr_t)cs_addrs->backup_buffer + BACKUP_BUFFER_SIZE + 1;
 	cs_addrs->lock_addrs[1] = cs_addrs->lock_addrs[0] + LOCK_SPACE_SIZE(tsd) - 1;
@@ -538,7 +536,11 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	if (rc_cpt_removed)
 		csd->rc_srv_cnt = csd->dsid = csd->rc_node = 0;   /* reset RC values if we've rundown the RC CPT */
 	/* WCSFLU_NONE only is done here , as we aren't sure of the state, so no EPOCH's are written.
- 	 * If we write EPOCH, recover may get confused */
+ 	 * If we write EPOCH, recover may get confused
+	 * Note that for journaling we do not call jnl_file_close().
+	 * As a result journal file might not have an EOF record.
+	 * So, a new process will switch the journal file and cut the journal file link,
+	 * though it might be a good journal without an EOF */
 	if (cs_addrs->nl->glob_sec_init)
 		wcs_flu(WCSFLU_NONE);
 	if (JNL_ALLOWED(csd))

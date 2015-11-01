@@ -131,6 +131,7 @@ void	tp_restart(int newlevel)
 	mval			bangHere, beganHere;
 	sgmnt_addrs		*csa;
 	int4			num_closed = 0;
+	boolean_t		tp_tend_status;
 
 	ESTABLISH(tp_restart_ch);
 	assert(1 == newlevel);
@@ -257,7 +258,7 @@ void	tp_restart(int newlevel)
 				return; /* for the compiler only -- never executed */
 			} else
 			{	/* as of this writing, this operates only between the 2nd and 3rd tries;
-				 * the 2nd is fast with the assumption of coincidental confict in an attempt
+				 * the 2nd is fast with the assumption of coincidental conflict in an attempt
 				 * to take advantage of the buffer state created by the 1st try
 				 * the next to last try is not followed by a backoff as it may leave the buffers locked,
 				 * to reduce live lock and deadlock issues
@@ -285,7 +286,8 @@ void	tp_restart(int newlevel)
 					}
 				}
 			}
-			(void)tp_tend(TRUE);	/* call tp_tend just to grab crits */
+			tp_tend_status = tp_tend(TRUE);	/* call tp_tend just to grab crits */
+			assert(FALSE != tp_tend_status);
 			/* pick up all MM extension information */
 			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
 				if (dba_mm == si->gv_cur_region->dyn.addr->acc_meth)

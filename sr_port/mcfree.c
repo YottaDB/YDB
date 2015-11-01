@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#define MC_DSBLKSIZE 8180
+#include "mmemory.h"
 
 GBLREF int mcavail;
 GBLREF char **mcavailptr, **mcavailbase;
@@ -19,6 +19,6 @@ GBLREF char **mcavailptr, **mcavailbase;
 void mcfree(void)
 {
 	mcavailptr = mcavailbase;
-	mcavail = MC_DSBLKSIZE - sizeof(char *);
+	mcavail = MC_DSBLKSIZE - sizeof(char_ptr_t);
 	return;
 }

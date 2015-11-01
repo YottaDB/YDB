@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@
 #include "iosp.h"
 #include "gtmmsg.h"
 #include "trans_log_name.h"
+#include "error.h"
 
 #define MAXARGSIZE	1024
 
@@ -53,7 +54,7 @@ int gtm_event_log_init(void)
 
 	memcpy(shared_lib, trans_name.addr, trans_name.len);
 	shared_lib[trans_name.len] = '\0';
-	if ((gtm_event_log_handle = fgn_getpak(shared_lib)) == NULL)
+	if (NULL == (gtm_event_log_handle = fgn_getpak(shared_lib, INFO)))
 	{
 		SPRINTF(print_msg, "Could not open shared library specified in %s - %s. No event logging done",
 			GTM_EVENT_LOG_LIB_ENV, shared_lib);
@@ -77,7 +78,7 @@ int gtm_event_log_init(void)
 	memcpy(log_func, trans_name.addr, trans_name.len);
 	log_func[trans_name.len] = '\0';
 
-	if ((gtm_event_log_func = fgn_getrtn(gtm_event_log_handle, &trans_name)) == NULL)
+	if (NULL == (gtm_event_log_func = fgn_getrtn(gtm_event_log_handle, &trans_name, INFO)))
 	{
 #ifdef GTM_EVENT_LOG_HARDCODE_RTN_NAME
 		SPRINTF(print_msg, "Could not find function %s in shared library %s. No event logging done",
@@ -98,7 +99,7 @@ int gtm_event_log_init(void)
 int gtm_event_log_close(void)
 {
 	if (gtm_do_event_log)
-		fgn_closepak(gtm_event_log_handle);
+		fgn_closepak(gtm_event_log_handle, INFO);
 	gtm_do_event_log = FALSE;
 	return(SS_NORMAL);
 }

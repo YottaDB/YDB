@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -45,7 +45,7 @@ include gtm_env_sp.mk
 
 
 VPATH=$(addprefix $(gtm_ver)/, $(gt_src_list))
-gt_cc_option_I:=$(addprefix -I$(gtm_ver)/, $(gt_src_list)) -I$(CURDIR)
+gt_cc_option_I:=$(gt_cc_option_I) $(addprefix -I$(gtm_ver)/, $(gt_src_list)) -I$(CURDIR)
 gt_as_option_I:=$(gt_cc_option_I)
 
 aux_list=dse geteuid gtm_dmna gtmsecshr lke mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean semstat2 ftok

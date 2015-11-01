@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@
 GBLREF char	window_token;
 GBLREF bool	run_time;
 GBLREF oprtype	*for_stack[],**for_stack_ptr;
+GBLREF mval	dollar_ztrap;
 
 int m_quit(void)
 {
@@ -32,7 +33,7 @@ int m_quit(void)
 	if (for_stack_ptr == for_stack)
 	{
 		if (window_token == TK_EOL || window_token == TK_SPACE)
-			newtriple((run_time) ? OC_HARDRET : OC_RET);
+			newtriple((dollar_ztrap.str.len) ? OC_HARDRET : OC_RET);
 		else
 		{
 			if (!(rval = expr(&x)))

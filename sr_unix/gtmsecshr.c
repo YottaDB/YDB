@@ -24,7 +24,6 @@
 #endif
 #include <stdlib.h>
 #endif
-#include <libgen.h>
 #include "gtm_sem.h"
 #include "gtm_string.h"
 #include "gtm_fcntl.h"
@@ -333,7 +332,8 @@ void gtmsecshr_init(void)
 	if (-1 == (secshr_sem = semget(gtmsecshr_key, FTOK_SEM_PER_ID, RWDALL | IPC_NOWAIT)))
 	{
 		secshr_sem = INVALID_SEMID;
-		if (-1 == (secshr_sem = semget(gtmsecshr_key, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT | IPC_NOWAIT | IPC_EXCL)))
+		if (ENOENT != errno ||		/* below will fail otherwise */
+		    -1 == (secshr_sem = semget(gtmsecshr_key, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT | IPC_NOWAIT | IPC_EXCL)))
 		{
 			secshr_sem = INVALID_SEMID;
 			util_out_print("semget error errno = !UL", TRUE, errno);
@@ -569,7 +569,7 @@ void gtmsecshr_sig_init(void)
 int service_request(gtmsecshr_mesg *buf)
 {
 	int			ret_status = 0;
-	int			fn_len, index, save_errno, save_code;
+	int			fn_len, index, basind, save_errno, save_code;
 	int			stat_res;
 	time_t			now;
 	char			*time_ptr;
@@ -675,9 +675,20 @@ int service_request(gtmsecshr_mesg *buf)
 			buf->code = EINVAL;
 		} else
 		{
-			basnam = basename(buf->mesg.path);
-			if ('/' == *basnam)	/* Linux (at least) returns a leading slash in the basename, so increment past it */
-				basnam++;
+			if ('/' == buf->mesg.path[index - 1] && 1 < index)
+			{	/* remove trailing slash unless only slash */
+				buf->mesg.path[index - 1] = '\0';
+				index--;
+			}
+			for (basind = index - 1; 0 <= basind; basind--)
+			{
+				if ('/' == buf->mesg.path[basind])
+					break;
+			}
+			if (0 < basind || (0 == basind && '/' == buf->mesg.path[basind]))
+				basnam = &buf->mesg.path[basind + 1];
+			else
+				basnam = &buf->mesg.path[0];
 			STAT_FILE(buf->mesg.path, &statbuf, stat_res);
 			if (-1 == stat_res)
 			{
@@ -686,7 +697,11 @@ int service_request(gtmsecshr_mesg *buf)
 					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,
 					index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index, buf->mesg.path,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to get file status"), errno);
+#ifndef __MVS__
 			} else if (!S_ISSOCK(statbuf.st_mode))
+#else
+			} else if (!(S_ISSOCK(statbuf.st_mode) || S_ISCHR(statbuf.st_mode)))
+#endif
 			{
 				gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFFILE, 7,
 					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,

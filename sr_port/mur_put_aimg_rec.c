@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,7 +75,7 @@ void mur_put_aimg_rec(jnl_record *rec)
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
 		util_out_print("Error: bad blk build.", TRUE);
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		return;
 	}
 	t_write(blk_num, (unsigned char *)bs1, 0, 0, (sm_uc_ptr_t)bp, ((blk_hdr_ptr_t)aimg_blk_ptr)->levl, TRUE, FALSE);

@@ -10,7 +10,11 @@
 #################################################################
 ############### Define platform-specific directory ring-down ##################################
 
+ifeq ($(gt_os_type), OSF1)
 common_dirs_sp=unix_gnp unix_cm unix port_cm port
+else
+common_dirs_sp=unix_gnp unix_cm unix_nsb unix port_cm port
+endif
 gt_os_type=$(shell uname -s)
 gt_machine_type=$(shell uname -m)
 

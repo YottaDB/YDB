@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,20 +14,14 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
-#include "op.h"
-#include "get_ret_targ.h"
 #include "golevel.h"
 
-GBLREF stack_frame      *frame_pointer;
-GBLREF tp_frame         *tp_pointer;
+GBLREF	stack_frame	*frame_pointer;
 
-LITREF mval             literal_null;
-
-void golevel(int4 level)
+void	golevel(int4 level)
 {
         stack_frame     *fp;
         int4            unwind, zlevel;
-        mval            *ret_targ;
 
         error_def(ERR_ZGOTOTOOBIG);
         error_def(ERR_ZGOTOLTZERO);
@@ -47,20 +41,6 @@ void golevel(int4 level)
 			break;
 		unwind++;
         }
-        for (ret_targ = NULL; unwind--; )
-        {
-		while (tp_pointer && tp_pointer->fp <= frame_pointer)
-               	        op_trollback(-1);
-		if (0 == unwind)
-		{
-			ret_targ = get_ret_targ();
-	       		if (NULL != ret_targ)
-	       		{
-	       		        *ret_targ = literal_null;
-	       		        ret_targ->mvtype |= MV_RETARG;
-	       		}
-		}
-		op_unwind();
-	}
+	goframes(unwind);
         return;
 }

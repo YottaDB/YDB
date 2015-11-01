@@ -38,6 +38,8 @@ void gtcm_add_region(connection_struct *cnx,cm_region_head *rh)
 		ptr = (cm_region_list *)malloc(sizeof(*ptr));
 		memset(ptr,0,sizeof(*ptr));
 		ptr->regnum = cnx->maxregnum++;
+		assert(!cnx->region_array[ptr->regnum]);
+		cnx->region_array[ptr->regnum] = ptr;
 		ptr->reghead = rh;
 		ptr->cs = cnx;
 		DEBUG_ONLY(locknl = FILE_INFO(rh->reg)->s_addrs.nl;)	/* for DEBUG_ONLY LOCK_HIST macro */

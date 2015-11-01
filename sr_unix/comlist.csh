@@ -261,7 +261,10 @@ cp $gtm_inc/gtm_stdio.h .
 cp $gtm_inc/gtm_stdlib.h .
 cp $gtm_inc/gtm_string.h .
 if ( "$HOSTOS" == "OS/390" ) then
-cp $gtm_inc/global_a.h .
+	cp $gtm_inc/global_a.h .
+	cp $gtm_inc/gtm_unistd.h .
+	cp $gtm_inc/gtm_netdb.h .
+	cp $gtm_inc/gtm_stat.h .
 endif
 
 

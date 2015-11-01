@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,12 +19,13 @@
 #include "gtcmlkdef.h"
 #include "gtcml.h"
 
+GBLREF	ABS_TIME	chkreg_time;
+
 bool gtcml_lcktime(cm_lckblklck *lck)
 {
-	ABS_TIME	time_now, new_blktime;
+	ABS_TIME	new_blktime;
 	uint4		status;
 
 	add_int_to_abs_time(&lck->blktime, CM_LKBLK_TIME, &new_blktime);
-	sys_get_curr_time(&time_now);
-	return (0 > abs_time_comp(&time_now, &new_blktime) ? FALSE : TRUE);
+	return (0 > abs_time_comp(&chkreg_time, &new_blktime) ? FALSE : TRUE);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,9 +25,6 @@
 #include "stringpool.h"
 #include "setterm.h"
 #include "op.h"
-
-#define	DOTM		".m"
-#define	DOTOBJ		".o"
 
 GBLREF	io_pair		io_std_device;
 GBLREF	mstr 		dollar_zsource;
@@ -96,18 +93,18 @@ void op_zedit(mval *v, mval *p)
 	{
 		if ('.' != *ptr)
 		{
-			typ = sizeof(DOTM) - 1;
+			typ = STR_LIT_LEN(DOTM);
 			if (path_len + typ > MAX_FBUFF)
 				rts_error(VARLSTCNT(4) ERR_ZEDFILSPEC, 2, path_len, es);
-			memcpy(&es[path_len], DOTM, sizeof(DOTM) - 1);
+			memcpy(&es[path_len], DOTM, STR_LIT_LEN(DOTM));
 			path_len += typ;
 		}
 	} else
 	{
-		if ((sizeof(DOTOBJ) - 1 == pblk.b_ext) && !memcmp (ptr + pblk.b_name, DOTOBJ, sizeof(DOTOBJ) - 1))
+		if ((STR_LIT_LEN(DOTOBJ) == pblk.b_ext) && !MEMCMP_LIT(ptr + pblk.b_name, DOTOBJ))
 			rts_error(VARLSTCNT(4) ERR_ZEDFILSPEC, 2, path_len, es);
-		else if ((sizeof(DOTM) - 1 == pblk.b_ext) && !memcmp (ptr + pblk.b_name, DOTM, sizeof(DOTM) - 1))
-			typ = sizeof(DOTM) - 1;
+		else if ((STR_LIT_LEN(DOTM) == pblk.b_ext) && !MEMCMP_LIT(ptr + pblk.b_name, DOTM))
+			typ = STR_LIT_LEN(DOTM);
 	}
 	dollar_zsource.addr = es;
 	dollar_zsource.len = path_len - typ;
@@ -118,19 +115,19 @@ void op_zedit(mval *v, mval *p)
 		src.addr = es;
 		src.len = path_len;
 		srcdir = (zro_ent *)0;
-		zro_search(0, 0, &src, &srcdir);
+		zro_search(0, 0, &src, &srcdir, TRUE);
 		if (NULL == srcdir)
 		{	/* find the first source directory */
 			objcnt = zro_root->count;
-			for (sp = zro_root + 1;  (NULL == srcdir) && (0 < objcnt--);)
+			for (sp = zro_root + 1;  (NULL == srcdir) && (0 < objcnt--); ++sp)
 			{
-				sp++;
-				if (0 != sp++->count)
+				if (ZRO_TYPE_OBJECT == sp->type && 0 != (++sp)->count)
 					srcdir  = sp;
 			}
 		}
 		if (srcdir && srcdir->str.len)
 		{
+			assert(ZRO_TYPE_SOURCE == srcdir->type);
 			tslash = ('/' == srcdir->str.addr[srcdir->str.len - 1]) ? 0 : 1;
 			if (path_len + srcdir->str.len + tslash >= sizeof(es))
 				rts_error(VARLSTCNT(4) ERR_ZEDFILSPEC, 2, src.len, src.addr);

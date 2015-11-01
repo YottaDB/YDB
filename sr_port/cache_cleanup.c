@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@ void cache_cleanup(stack_frame *sf)
 	assert(sf->ctxt);
 	vp = (int4 *)sf->ctxt;
 	vp--;
-	if ((OMAGIC << 16) + OBJ_LABEL == *vp)	/* Validate backward linkage */
+	if ((GTM_OMAGIC << 16) + OBJ_LABEL == *vp)	/* Validate backward linkage */
 	{	/* Frame is one of ours */
 		vp--;
 		irtnhdr = (ihdtyp *)((char *)vp + *vp);

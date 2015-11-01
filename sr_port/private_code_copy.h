@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,15 +9,10 @@
  *								*
  ****************************************************************/
 
-#include "mdef.h"
-#include "zbreak.h"
+#ifndef PRIVATE_CODE_COPY_H_INCLUDED
+#define PRIVATE_CODE_COPY_H_INCLUDED
 
-char *zr_get_last(z_records *z)
-{
-char *c;
+uint4 cre_private_code_copy(rhdtyp *rtn);
+void release_private_code_copy(rhdtyp *rtn);
 
-if ((c = z->free - z->rec_size) >= z->beg)
-	return(c);
-else
-	return((char*)0);
-}
+#endif /* PRIVATE_CODE_COPY_H_INCLUDED */

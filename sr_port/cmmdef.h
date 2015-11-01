@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -134,6 +134,7 @@ typedef struct cs_struct
 		boolean_t			query_is_queryget; /* based on client/server protocol levels, query == queryget */
 		boolean_t			err_compat; /* based on client/server protocol levels (and platform type),
 							     * rts_error mechanism b/n client and server might be different */
+		cm_region_list			*region_array[256];	/* [UCHAR_MAX + 1] speed up gtcm_find_region */
 	} connection_struct;
 
 typedef struct cm_region_head_struct

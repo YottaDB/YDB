@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,15 +10,13 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "rtnhdr.h"
 #include "zbreak.h"
 
-void zr_init(z_records *z, int4 count, int4 rec_size)
+void zr_init(z_records *zrecs, int4 count)
 {
-	short size;
-
-	size =  count * rec_size;
-	z->beg = malloc(size);
-	z->free = z->beg;
-	z->end = z->beg + size;
-	z->rec_size = rec_size;
+	zrecs->beg = (zbrk_struct *)malloc(count * sizeof(zbrk_struct));
+	zrecs->free = zrecs->beg;
+	zrecs->end = zrecs->beg + count;
+	return;
 }

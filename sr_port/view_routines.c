@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,14 +20,14 @@
 #include "view.h"
 
 #define S_CUTOFF 7
-GBLREF rtn_tables *rtn_names,*rtn_names_end;
+GBLREF RTN_TABENT *rtn_names, *rtn_names_end;
 GBLREF stack_frame *frame_pointer;
 
 void view_routines(mval *dst,mident *name)
 {
 	unsigned short  len;
 	mident		temp;
-	rtn_tables	*bot, *top, *mid;
+	RTN_TABENT	*bot, *top, *mid;
 	int4		comp;
 
 	len = mid_len(name);
@@ -52,7 +52,7 @@ void view_routines(mval *dst,mident *name)
 	}
 
 	for (;;)
-	{	if ((char *) top - (char *) bot < S_CUTOFF * sizeof(rtn_tables))
+	{	if ((char *) top - (char *) bot < S_CUTOFF * sizeof(RTN_TABENT))
 		{
 			comp = -1;
 			for (mid = bot; comp < 0 && mid <= top ;mid++)

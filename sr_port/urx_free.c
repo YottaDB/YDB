@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,38 +10,39 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "rtnhdr.h" /* for urx.h */
 #include "urx.h"
 
-void urx_free (anchor)
-urx_rtnref	*anchor;
+void urx_free (urx_rtnref *anchor)
 {
 	urx_rtnref	*rp;
 	urx_labref	*lp;
 	urx_addr	*ap;
 
-	assert (anchor->len == 0);
+	/* Release entire given (local) unresolved chain (done on error) */
+	assert(anchor->len == 0);
 	while (anchor->next != 0)
 	{
 		rp = anchor->next;
 		anchor->next = rp->next;
 		while (rp->addr != 0)
-		{
+		{	/* release address chain for this routine */
 			ap = rp->addr;
 			rp->addr = ap->next;
-			free (ap);
+			free(ap);
 		}
 		while (rp->lab != 0)
 		{
 			lp = rp->lab;
 			while (lp->addr != 0)
-			{
+			{	/* release address chain for this label */
 				ap = lp->addr;
 				lp->addr = ap->next;
-				free (ap);
+				free(ap);
 			}
 			rp->lab = lp->next;
-			free (lp);
+			free(lp);	/* release label node */
 		}
-		free (rp);
+		free(rp);	/* release routine node */
 	}
 }

@@ -17,9 +17,9 @@
 #include <sys/shm.h>
 #include <arpa/inet.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <string.h>
-#include <unistd.h>
+#include "gtm_fcntl.h"
+#include "gtm_string.h"
+#include "gtm_unistd.h"
 #include <signal.h>	/* for VSIG_ATOMIC_T type */
 #include "gtm_time.h"
 
@@ -98,7 +98,7 @@ void gds_rundown(void)
 
 	bool			is_mm, we_are_last_user, we_are_last_writer;
 	boolean_t		ipc_deleted, remove_shm;
-	char			*time_ptr;
+	char			*time_ptr, local_time_ptr[CTIME_BEFORE_NL + 1];
 	gd_region		*reg;
 	int			save_errno, status;
 	int4			semval, ftok_semval, sopcnt, ftok_sopcnt;
@@ -514,6 +514,8 @@ void gds_rundown(void)
 	if (!ftok_sem_release(reg, !mupip_jnl_recover, FALSE))
 			rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 	GET_CUR_TIME;
+	strncpy(local_time_ptr, time_ptr, CTIME_BEFORE_NL);     /* make safe */
+	time_ptr = &local_time_ptr[0];
 	if (is_src_server)
 		util_out_print("!AD : Source server !AZ IPC resources for region !AD", TRUE,
 				CTIME_BEFORE_NL, time_ptr, ipc_deleted ? "deleted" : "did not delete", REG_LEN_STR(reg));

@@ -68,20 +68,21 @@ void mlk_unlock(mlk_pvtblk *p)
 		{
 			d->owner = 0;
 			d->sequence = csa->hdr->trans_hist.lock_sequence++;
-			stop_waking = (d->children ? mlk_tree_wake_children(ctl,
-				(mlk_shrblk_ptr_t)R2A(d->children), p->region) : FALSE);
-			for (  ; d ; d = pnt)
+			assert(!d->owner || d->owner == process_id);
+			/* do not call mlk_tree_wake_children/mlk_wake_pending on "d" if d->owner is non-zero.
+			 * for comments on why, see comments about d->owner in mlk_wake_pending.c
+			 */
+			stop_waking = (d->children && !d->owner)
+						? mlk_tree_wake_children(ctl, (mlk_shrblk_ptr_t)R2A(d->children), p->region)
+						: FALSE;
+			for ( ; d ; d = pnt)
 			{
-				if (d->parent)
-					pnt = (mlk_shrblk_ptr_t)R2A(d->parent);
-				else
-					pnt = 0;
-				if (!stop_waking && d->pending)
+				pnt = ((d->parent) ? (mlk_shrblk_ptr_t)R2A(d->parent) : 0);
+				if (!stop_waking && d->pending && !d->owner)
 				{
 					mlk_wake_pending(ctl, d, p->region);
 					stop_waking = TRUE;
-				}
-				else
+				} else
 					mlk_shrblk_delete_if_empty(ctl, d);
 			}
 		}

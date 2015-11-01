@@ -73,6 +73,7 @@
 #include "gtmmsg.h"
 #include "getjobname.h"
 #include "jobchild_init.h"
+#include "error_trap.h"			/* for ecode_init() prototype */
 #include "zyerror_init.h"
 #include "ztrap_form_init.h"
 #include "ztrap_new_init.h"
@@ -83,6 +84,7 @@
 #include "svnames.h"
 #include "gtmci_signals.h"
 #include "jobinterrupt_init.h"
+#include "zco_init.h"
 
 #ifdef __sun
 #define PACKAGE_ENV_TYPE  "GTMXC_RPC"  /* env var to use rpc instead of xcall */
@@ -94,7 +96,7 @@
 GBLDEF void		(*restart)() = &mum_tstart;
 GBLREF mval 		**ind_result_array, **ind_result_sp, **ind_result_top;
 GBLREF mval 		**ind_source_array, **ind_source_sp, **ind_source_top;
-GBLREF rtn_tables 	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
+GBLREF RTN_TABENT 	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
 GBLREF int4		break_message_mask;
 GBLREF stack_frame 	*frame_pointer;
 GBLREF unsigned char 	*stackbase, *stacktop, *stackwarn, *msp;
@@ -141,8 +143,8 @@ void gtm_startup(struct startup_vector *svec)
 
 	assert(svec->argcnt == sizeof(*svec));
 	get_page_size();
-	rtn_fst_table = rtn_names = (rtn_tables *) svec->rtn_start;
-	rtn_names_end = rtn_names_top = (rtn_tables *) svec->rtn_end;
+	rtn_fst_table = rtn_names = (RTN_TABENT *) svec->rtn_start;
+	rtn_names_end = rtn_names_top = (RTN_TABENT *) svec->rtn_end;
 	if (svec->user_stack_size < 4096)
 		svec->user_stack_size = 4096;
 	if (svec->user_stack_size > 8388608)
@@ -154,10 +156,10 @@ void gtm_startup(struct startup_vector *svec)
 	stackwarn = stacktop + 1024;
 	break_message_mask = svec->break_message_mask;
 	lv_null_subs = svec->lvnullsubs;
-	if (svec->user_strpl_size < STP_INCREMENT)
-		svec->user_strpl_size = STP_INCREMENT;
-	else if (svec->user_strpl_size > STP_MAXSIZE)
-		svec->user_strpl_size = STP_MAXSIZE;
+	if (svec->user_strpl_size < STP_INITSIZE)
+		svec->user_strpl_size = STP_INITSIZE;
+	else if (svec->user_strpl_size > STP_MAXINITSIZE)
+		svec->user_strpl_size = STP_MAXINITSIZE;
 	stp_init(svec->user_strpl_size);
 	if (svec->user_indrcache_size > MAX_INDIRECTION_NESTING || svec->user_indrcache_size < MIN_INDIRECTION_NESTING)
 		svec->user_indrcache_size = MIN_INDIRECTION_NESTING;
@@ -213,6 +215,7 @@ void gtm_startup(struct startup_vector *svec)
 	jobinterrupt_init();
 	getzdir();
 	dpzgbini();
+	zco_init();
 	/* a base addr of 0 indicates a gtm_init call from an rpc server */
 	if (svec->base_addr)
 		jobchild_init();
@@ -223,6 +226,7 @@ void gtm_startup(struct startup_vector *svec)
 	dollar_zstatus.mvtype = MV_STR;
 	dollar_zstatus.str.len = 0;
 	dollar_zstatus.str.addr = (char *)0;
+	ecode_init();
 	zyerror_init();
 	ztrap_form_init();
 	ztrap_new_init();

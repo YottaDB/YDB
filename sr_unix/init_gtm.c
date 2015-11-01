@@ -80,8 +80,8 @@ void init_gtm(void)
 	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	memset(&svec, 0, sizeof(svec));
 	svec.argcnt = sizeof(svec);
-	svec.rtn_start = svec.rtn_end = malloc(sizeof(rtn_tables));
-	memset(svec.rtn_start, 0, sizeof(rtn_tables));
+	svec.rtn_start = svec.rtn_end = malloc(sizeof(RTN_TABENT));
+	memset(svec.rtn_start, 0, sizeof(RTN_TABENT));
 	svec.user_stack_size = 120 * 1024;
 	svec.user_indrcache_size = 32;
 	svec.user_strpl_size = 20480;

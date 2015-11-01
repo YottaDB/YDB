@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,33 +17,27 @@
 #include "io.h"
 #include "compiler.h"
 
-#ifdef __MVS__
-#define SIZEOF_LA	4
-#else
-#define SIZEOF_LA	0
-#endif
-
-GBLREF z_records zbrk_recs;
-GBLREF stack_frame *frame_pointer;
+GBLREF z_records	zbrk_recs;
+GBLREF stack_frame	*frame_pointer;
 
 int op_zbreak(stack_frame *fp)
 {
 	unsigned char	*line_addr;
-	zbrk_struct	*z;
+	zbrk_struct	*z_ptr;
 
 	line_addr = find_line_start(fp->mpc, fp->rvector);
-	assert(line_addr);
+	assert(NULL != line_addr);
 	line_addr = (unsigned char *)find_line_call(line_addr) - SIZEOF_LA;
-	z = (zbrk_struct *)zr_find(&zbrk_recs, (char *)line_addr);
-	assert(z);
+	z_ptr = zr_find(&zbrk_recs, (zb_code *)line_addr);
+	assert(NULL != z_ptr);
 
-	if ((z->count > 0 && --z->count > 0))
-		return(TRUE);
+	if (0 < z_ptr->count && 0 < --z_ptr->count)
+		return (TRUE);
 	else
 	{
 		flush_pio();
-		comp_indr(&z->action->obj);
+		comp_indr(&z_ptr->action->obj);
 		frame_pointer->type = SFT_ZBRK_ACT;
-		return(FALSE);
+		return (FALSE);
 	}
 }

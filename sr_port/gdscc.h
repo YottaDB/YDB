@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -140,6 +140,11 @@ block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work,
                         ;						\
 }
 
-#define t_abort() rel_crit(gv_cur_region)
+#define T_ABORT(reg, csa) 				\
+{							\
+	assert(&FILE_INFO(reg)->s_addrs == csa);	\
+	if (csa->now_crit) 				\
+		rel_crit(reg);				\
+}
 
 #endif

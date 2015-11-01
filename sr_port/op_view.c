@@ -216,6 +216,8 @@ va_dcl
 			r_top = gv_cur_region = parmblk.gv_ptr;
 		for (;  gv_cur_region <= r_top;  gv_cur_region++)
 		{
+			if (!gv_cur_region->open)
+				gv_init_reg(gv_cur_region);
 			change_reg();
 			if (JNL_ENABLED(cs_addrs->hdr))
 			{

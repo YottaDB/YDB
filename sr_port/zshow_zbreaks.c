@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,48 +11,36 @@
 
 #include "mdef.h"
 
-#include "gtm_string.h"
-
-#include "mlkdef.h"
-#include "zshow.h"
+#include "rtnhdr.h"
 #include "zbreak.h"
-#include "stringpool.h"
-#include "mvalconv.h"
+#include "zshow.h"
 
-GBLREF z_records zbrk_recs;
+GBLREF z_records	zbrk_recs;
+
 void zshow_zbreaks(zshow_out *output)
 {
-	zbrk_struct		*z;
-	mval			v, temp;
-	char			buff[50], *b, *c, *c_top;
+	zbrk_struct	*z_ptr;
+	mval		entryref;
+	mstr		rtn, lab;
+	char		entryrefbuff[sizeof(mident) + 1 + 10 + 1 + sizeof(mident)];
 
-	v.mvtype = MV_STR;
-	if ((z = (zbrk_struct*)zbrk_recs.beg) == (zbrk_struct*)zbrk_recs.free)
-	{	return;
-	}
-	else
+	if (zbrk_recs.beg == zbrk_recs.free)
+		return;
+	assert(NULL != zbrk_recs.beg);
+	assert(NULL != zbrk_recs.free);
+	assert(NULL != zbrk_recs.end);
+
+	entryref.mvtype = MV_STR;
+	rtn.len = sizeof(mident);
+	lab.len = sizeof(mident);
+	for (z_ptr = zbrk_recs.beg; z_ptr < zbrk_recs.free; z_ptr++)
 	{
-		for (z = (zbrk_struct*)zbrk_recs.beg ;z && z < (zbrk_struct*)zbrk_recs.free ; z++)
-		{	v.str.addr = b = &buff[0];
-			for (c = &z->lab.c[0], c_top = c + sizeof(mident); c < c_top && *c ; c++)
-			{	*b++ = *c;
-			}
-			if (z->offset)
-			{
-				*b++ = '+';
-				MV_FORCE_MVAL(&temp,z->offset) ;
-				n2s(&temp);
-				memcpy(b, temp.str.addr, temp.str.len);
-				b += temp.str.len;
-			}
-			*b++ = '^';
-			for (c = &z->rtn.c[0], c_top = c + sizeof(mident); c < c_top && *c ; c++)
-			{	*b++ = *c;
-			}
-			v.str.len = b - v.str.addr;
-
-			output->flush = TRUE;
-			zshow_output(output,&v.str);
-		}
+		rtn.addr = z_ptr->rtn.c;
+		lab.addr = z_ptr->lab.c;
+		entryref.str.len = rtnlaboff2entryref(entryrefbuff, &rtn, &lab, z_ptr->offset) - entryrefbuff;
+		entryref.str.addr = entryrefbuff;
+		output->flush = TRUE;
+		zshow_output(output, &entryref.str);
 	}
+	return;
 }

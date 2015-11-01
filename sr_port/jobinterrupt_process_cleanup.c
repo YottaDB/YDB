@@ -25,15 +25,15 @@
 #include "gtmmsg.h"
 #include "jobinterrupt_process_cleanup.h"
 
-GBLREF stack_frame	*frame_pointer;
-GBLREF spdesc		stringpool;
-GBLREF spdesc		rts_stringpool;
-GBLREF bool		compile_time;
-GBLREF bool		transform;
-GBLREF unsigned short	proc_act_type;
-GBLREF volatile boolean_t dollar_zininterrupt;
-GBLREF mval		dollar_zstatus;
-GBLREF unsigned char	*error_last_b_line;
+GBLREF stack_frame		*frame_pointer;
+GBLREF spdesc			stringpool;
+GBLREF spdesc			rts_stringpool;
+GBLREF bool			compile_time;
+GBLREF bool			transform;
+GBLREF unsigned short		proc_act_type;
+GBLREF volatile boolean_t	dollar_zininterrupt;
+GBLREF mval			dollar_zstatus;
+GBLREF dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 
 /* Counterpart to trans_code_cleanup for job interrupt errors */
 void jobinterrupt_process_cleanup(void)
@@ -68,7 +68,7 @@ void jobinterrupt_process_cleanup(void)
 	msgbuff.addr = (char *)msgbuf;
 	msgbuff.len = sizeof(msgbuf);
 	gtm_getmsg(ERR_ERRWZINTR, &msgbuff);
-	mbptr = msgbuf + strlen(msgbuf);
+	mbptr = msgbuf + strlen((char *)msgbuf);
 	/* Find the beginning of the compiler error (look for "%") */
 	zstptr = (unsigned char *)dollar_zstatus.str.addr;
 	for (zstlen = dollar_zstatus.str.len; zstlen; zstptr++, zstlen--)
@@ -85,7 +85,7 @@ void jobinterrupt_process_cleanup(void)
 	}
 	*mbptr++ = 0;
 	util_out_print(msgbuf, OPER);
-	if (0 == error_last_b_line)
+	if (NULL == dollar_ecode.error_last_b_line)
 	{	/* Was a direct mode frame this message needs to go out to the console */
 		dec_err(VARLSTCNT(1) ERR_ERRWZINTR);
 	}

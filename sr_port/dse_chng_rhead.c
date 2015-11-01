@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,13 +94,13 @@ void dse_chng_rhead(void)
 	{
 		if (!(rp = skan_rnum(bp, FALSE)))
 		{
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
 	} else if (!(rp = skan_offset (bp, FALSE)))
 	{
-			t_abort();
-			return;
+		T_ABORT(gv_cur_region, cs_addrs);
+		return;
 	}
 	GET_SHORT(new_rec.rsiz, &((rec_hdr_ptr_t)rp)->rsiz);
 	new_rec.cmpc = ((rec_hdr_ptr_t)rp)->cmpc;
@@ -108,13 +108,13 @@ void dse_chng_rhead(void)
 	{
 		if (!cli_get_hex("CMPC", &x))
 		{
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
 		if (x < 0 || x > 0x7f)
 		{
 			util_out_print("Error: invalid cmpc.",TRUE);
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
 		if (x > patch_comp_count)
@@ -126,13 +126,13 @@ void dse_chng_rhead(void)
 	{
 		if (!cli_get_hex("RSIZ", &x))
 		{
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
 		if (x < sizeof(rec_hdr) || x > blk_size)
 		{
 			util_out_print("Error: invalid rsiz.", TRUE);
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
 		new_rec.rsiz = x;
@@ -154,7 +154,7 @@ void dse_chng_rhead(void)
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
 			util_out_print("Error: bad blk build.", TRUE);
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
 		t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)bp)->levl, TRUE, FALSE);

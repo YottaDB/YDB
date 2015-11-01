@@ -238,7 +238,8 @@ void mupip_integ(void)
 			mupip_exit(ERR_MUPCLIERR);
 		if (FALSE == mu_int_getkey(key_buff, keylen))
 			mupip_exit(ERR_MUPCLIERR);
-		disp_map_errors = 0;
+		if (muint_key)
+			disp_map_errors = 0;
 	}
 	mu_outofband_setup();
 #ifdef UNIX
@@ -390,7 +391,7 @@ void mupip_integ(void)
  			gv_altkey->base[gv_altkey->end] = '\0';
  			if (gv_target->act)
  				act_in_gvt();
-			if (mu_int_blk(trees->root, MAX_BT_DEPTH, TRUE, &dummy, 0, &dummy, 0, 0))
+			if (mu_int_blk(trees->root, MAX_BT_DEPTH, TRUE, gv_altkey->base, gv_altkey->end, &dummy, 0, 0))
 			{
 				if (full)
 				{
@@ -467,9 +468,8 @@ void mupip_integ(void)
 			}
 		}
 		if ((FALSE == block) && (FALSE == muint_key))
-			mu_int_maps();
-		if ((FALSE == block) && (FALSE == muint_key))
 		{
+			mu_int_maps();
 			if (! mu_int_errknt)
 			{
 				blocks_free = mu_int_data.trans_hist.total_blks -

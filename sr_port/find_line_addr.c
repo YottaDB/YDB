@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,26 +21,21 @@ GBLREF command_qualifier	cmd_qlf;
 
 int4 *find_line_addr (rhdtyp *routine, mstr *label, short int offset)
 {
- 	lbl_tables	*base, *top, *ptr;
+ 	LAB_TABENT	*base, *top, *ptr;
 	rhdtyp		*real_routine;
 	mident		target_label;
-	int4		*line_table, *first_line;
+	LNR_TABENT	*line_table, *first_line;
 	int		stat, n;
 	error_def(ERR_LABELONLY);
 
 	if (!routine)
 		return 0;
 
-	if (routine->label_only  &&  offset != 0)
-		rts_error(VARLSTCNT(4) ERR_LABELONLY, 2, mid_len((mident *)&routine->routine_name), routine->routine_name);
-
-	real_routine = (rhdtyp *)((char *)routine + routine->current_rhead_ptr);
-	first_line = (int4 *)((char *)real_routine + real_routine->lnrtab_ptr);
+	real_routine = CURRENT_RHEAD_ADR(routine);
+	first_line = LNRTAB_ADR(real_routine);
 
 	if (!label->len  ||  !*label->addr)
-	{
 		line_table = first_line;
-	}
 	else
 	{
 		memset(&target_label.c[0], 0, sizeof(mident));
@@ -51,7 +46,7 @@ int4 *find_line_addr (rhdtyp *routine, mstr *label, short int offset)
 			lower_to_upper((uchar_ptr_t)&target_label.c[0], (uchar_ptr_t)label->addr,
 				(label->len <= sizeof(mident)) ? label->len : sizeof(mident));
 
-		ptr = base = (lbl_tables *)((char *) real_routine + real_routine->labtab_ptr);
+		ptr = base = LABTAB_ADR(real_routine);
 		top = base + real_routine->labtab_len;
 		for (  ;  ;  )
 		{
@@ -60,7 +55,7 @@ int4 *find_line_addr (rhdtyp *routine, mstr *label, short int offset)
 			stat = memcmp(&target_label.c[0], &ptr->lab_name.c[0], sizeof(mident));
 			if (!stat)
 			{
-				line_table = (int4 *)((char *)real_routine + ptr->lab_ln_ptr);
+				line_table = LABENT_LNR_ENTRY(real_routine, ptr);
 				break;
 			}
 			else if (stat > 0)

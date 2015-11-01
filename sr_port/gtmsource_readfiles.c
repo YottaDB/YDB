@@ -81,8 +81,8 @@ GBLDEF	unsigned char		*gtmsource_tcombuff_end = NULL;
 GBLDEF	unsigned char		*gtmsource_tcombuffp = NULL;
 
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF  repl_ctl_element        *repl_ctl_list;
-GBLREF  seq_num                 gtmsource_save_read_jnl_seqno;
+GBLREF	repl_ctl_element	*repl_ctl_list;
+GBLREF	seq_num			gtmsource_save_read_jnl_seqno;
 GBLREF	repl_msg_ptr_t		gtmsource_msgp;
 GBLREF	int			gtmsource_msgbufsiz;
 GBLREF	seq_num			seq_num_zero, seq_num_one;
@@ -96,18 +96,18 @@ static	int			tot_tcom_len = 0;
 static	int			total_wait_for_jnl_recs = 0;
 static	int			total_wait_for_jnlopen = 0;
 
-static 	int			adjust_buff_leaving_hdr(repl_buff_t *rb);
+static	int			adjust_buff_leaving_hdr(repl_buff_t *rb);
 static	int			position_read(repl_ctl_element*, seq_num, tr_search_method_t);
-static	int			 read_regions(
+static	int			read_regions(
 					uchar_ptr_t *buff, int *buff_avail,
-		         		boolean_t attempt_open_oldnew,
+					boolean_t attempt_open_oldnew,
 					boolean_t *brkn_trans,
 					seq_num read_jnl_seqno);
 
 static	int			first_read(repl_ctl_element*);
-static	int 			update_max_seqno_info(repl_ctl_element *ctl);
+static	int			update_max_seqno_info(repl_ctl_element *ctl);
 static	int			adjust_for_eof_or_extension(repl_ctl_element *ctl);
-static	int 			scavenge_closed_jnl_files(seq_num ack_seqno);
+static	int			scavenge_closed_jnl_files(seq_num ack_seqno);
 
 static	int repl_read_file(repl_buff_t *rb)
 {
@@ -116,13 +116,13 @@ static	int repl_read_file(repl_buff_t *rb)
 	int			nb;
 	sgmnt_addrs		*csa;
 	uint4			dskaddr;
-	int4			read_less, status;
+	uint4			read_less, status;
 	VMS_ONLY(
-		short           iosb[4];
-		int4		read_off;
-		int4		extra_bytes;
+		short		iosb[4];
+		uint4		read_off;
+		uint4		extra_bytes;
 		sm_uc_ptr_t 	read_buff;
-		DEBUG_ONLY(unsigned char verify_buff[DISK_BLOCK_SIZE];)
+		DEBUG_ONLY(unsigned char	verify_buff[DISK_BLOCK_SIZE];)
 	)
 
 	error_def(ERR_TEXT);
@@ -132,6 +132,7 @@ static	int repl_read_file(repl_buff_t *rb)
 	csa = &FILE_INFO(rb->backctl->reg)->s_addrs;
 	read_less = 0;
 	assert(b->readaddr >= b->recaddr);
+	assert(0 < b->buffremaining);
 	dskaddr = csa->jnl->jnl_buff->dskaddr;
 	if (is_gdid_gdid_identical(&fc->id, JNL_GDID_PTR(csa)))
 	{	/* Make sure we do not read beyond end of data in the journal file */
@@ -140,7 +141,8 @@ static	int repl_read_file(repl_buff_t *rb)
 		 * update_max_seqno_info -> repl_next. Specifically, this logic is needed till the existing
 		 * JRT_EOF record is completely overwritten and the file grows beyond its existing size.
 		 */
-		if (b->readaddr + b->buffremaining > dskaddr)
+		assert(b->readaddr <= dskaddr);
+		if (b->buffremaining > (dskaddr - b->readaddr))	/* note the ordering of the operands to take care of 4G overflow */
 		{
 			if (b->readaddr == dskaddr)
 			{
@@ -148,7 +150,7 @@ static	int repl_read_file(repl_buff_t *rb)
 						rb->backctl->jnl_fn, b->readaddr);
 				return (SS_NORMAL);
 			}
-			read_less = b->readaddr + b->buffremaining - dskaddr;
+			read_less = b->buffremaining - (dskaddr - b->readaddr);	/* explicit ordering to take care of 4G overflow */
 			REPL_DPRINT5("READ FILE : Racing with jnl file %s avoided. Read size reduced from %u to %u at offset %u\n",
 					rb->backctl->jnl_fn, b->buffremaining, b->buffremaining - read_less, b->readaddr);
 		}

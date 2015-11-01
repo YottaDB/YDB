@@ -125,6 +125,7 @@ GBLREF int4		dollar_zeditor;
 GBLREF short		dollar_tlevel;
 GBLREF short		dollar_trestart;
 GBLREF mval		dollar_etrap;
+GBLREF mval		dollar_estack_delta;
 GBLREF mval		dollar_zerror;
 GBLREF mval		dollar_zyerror;
 GBLREF mval		dollar_system;
@@ -153,10 +154,15 @@ void zshow_svn(zshow_out *output)
 		ZS_VAR_EQU(&x, device_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ECODE */
-		dollar_ecode_build(-1, &var);
+		ecode_get(-1, &var);
 		ZS_VAR_EQU(&x, ecode_text);
 		mval_write(output, &var, TRUE);
-	/* SV_ESTACK should go here */
+	/* SV_ESTACK */
+		save_dollar_zlevel = dollar_zlevel();
+		count = (save_dollar_zlevel - 1) - dollar_estack_delta.m[0];
+		MV_FORCE_MVAL(&var, count);
+		ZS_VAR_EQU(&x, estack_text);
+		mval_write(output, &var, TRUE);
 	/* SV_ETRAP */
 		var.mvtype = MV_STR;
 		var.str = dollar_etrap.str;
@@ -221,7 +227,7 @@ void zshow_svn(zshow_out *output)
 		ZS_VAR_EQU(&x, reference_text);
 		mval_write(output, &var, TRUE);
 	/* SV_STACK */
-		count = (save_dollar_zlevel = dollar_zlevel()) - 1;
+		count = (save_dollar_zlevel - 1);
 		MV_FORCE_MVAL(&var, count);
 		ZS_VAR_EQU(&x, stack_text);
 		mval_write(output, &var, TRUE);
@@ -273,7 +279,7 @@ void zshow_svn(zshow_out *output)
 		ZS_VAR_EQU(&x, zb_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZCMDLINE */
-		get_command_line(&var);
+		get_command_line(&var, TRUE);	/* TRUE to indicate we want $ZCMDLINE (i.e. processed not actual command line) */
 		ZS_VAR_EQU(&x, zcmdline_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZCOMPILE */

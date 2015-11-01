@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,7 +109,7 @@ void		wcs_recover(gd_region *reg)
 	error_def(ERR_STOPTIMEOUT);
 	error_def(ERR_TEXT);
 
-	save_reg = reg;		/* protect against [at least] M LOCK code which doesn't maintain cs_addrs and cs_data */
+	save_reg = gv_cur_region;	/* protect against [at least] M LOCK code which doesn't maintain cs_addrs and cs_data */
 	TP_CHANGE_REG(reg);	/* which are needed by called routines such as wcs_wtstart and wcs_mm_recover */
 	if (dba_mm == reg->dyn.addr->acc_meth)	 /* MM uses wcs_recover to remap the database in case of a file extension */
 	{
@@ -507,19 +507,21 @@ void		wcs_recover(gd_region *reg)
 	}
 	if (FALSE == wcs_verify(reg, FALSE))
 		GTMASSERT;
-        if (JNL_ENABLED(cs_data))
+        if (JNL_ENABLED(csd))
         {
-		assert(csa->jnl->region == gv_cur_region);
-		csa->jnl->region = gv_cur_region;	/* Make sure that in pro we make jnl_ensure happy if it's not initialized */
+		assert(csa->jnl->region == reg);
+		csa->jnl->region = reg;	/* Make sure that in pro we make jnl_ensure happy if it's not initialized */
                 jnl_status = jnl_ensure_open();
 		if (0 == jnl_status)
 		{
+			if (0 == csa->jnl->pini_addr)
+				jnl_put_jrt_pini(csa);
 			save_inctn_opcode = inctn_opcode; /* in case caller does not expect inctn_opcode to be changed here */
 			inctn_opcode = inctn_wcs_recover;
-			jnl_write_inctn_rec(cs_addrs);
+			jnl_write_inctn_rec(csa);
 			inctn_opcode = save_inctn_opcode;
 		} else
-			jnl_file_lost(csa->jnl,jnl_status);
+			jnl_file_lost(csa->jnl, jnl_status);
         }
         assert(csa->ti->curr_tn = csa->ti->early_tn);
 	csa->ti->early_tn = ++csa->ti->curr_tn;

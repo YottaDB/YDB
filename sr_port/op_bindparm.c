@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,7 +78,7 @@ va_dcl
 			new_var = *actp;
 		}
 		lspp = (lv_val **)&frame_pointer->l_symtab[frmp];	/* address of l_symtab entry */
-		labname = &(((vent *)frame_pointer->vartab_ptr)[frmp]);
+		labname = &(((VAR_TABENT *)frame_pointer->vartab_ptr)[frmp]);
 		assert(0 <= frmp && frmp < frame_pointer->vartab_len);
 		hte = ht_put(&curr_symval->h_symtab, (mname *)labname, &new);
 		if (new)

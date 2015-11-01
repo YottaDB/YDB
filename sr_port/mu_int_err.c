@@ -130,9 +130,15 @@ void	mu_int_err(
 		if (has_bot)
 		{
 			util_out_print("^", FALSE);
+			/* in the case bot is the leftmost key of the gvtree, it needs a second null to be a properly terminated
+			 * real key for print_target. since it is a simple set, we unconditionally do it for every key */
+			bot[has_bot] = 0;
 			print_target(bot);
 		} else
-			util_out_print("^A", FALSE);
+		{
+			assert(master_dir);	/* for a global variable tree, we better have a non-zero begin key */
+			util_out_print("^%", FALSE);
+		}
 		util_out_print(" to ", FALSE);
 		if (has_top)
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,14 +17,16 @@
 #include "unw_retarg.h"
 #include "underr.h"
 #include "unwind_nocounts.h"
+#include "error_trap.h"
 
-GBLREF void		(*unw_prof_frame_ptr)(void);
-GBLREF stack_frame	*frame_pointer, *zyerr_frame;
-GBLREF unsigned char	*msp,*stackbase,*stacktop;
-GBLREF mv_stent		*mv_chain;
-GBLREF tp_frame		*tp_pointer;
-GBLREF boolean_t	is_tracing_on;
+GBLREF	void		(*unw_prof_frame_ptr)(void);
+GBLREF	stack_frame	*frame_pointer, *zyerr_frame;
+GBLREF	unsigned char	*msp,*stackbase,*stacktop;
+GBLREF	mv_stent	*mv_chain;
+GBLREF	tp_frame	*tp_pointer;
+GBLREF	boolean_t	is_tracing_on;
 
+/* this has to be maintained in parallel with op_unwind(), the unwind without a return argument (intrinsic quit) routine */
 int unw_retarg(mval *src)
 {
 	mval		ret_value, *trg;
@@ -61,6 +63,10 @@ int unw_retarg(mval *src)
 	}
 	if (!got_ret_target)
 		rts_error(VARLSTCNT(1) ERR_NOTEXTRINSIC);	/* This routine was not invoked as an extrinsic function */
+	/* Note that error_ret() should be invoked only after the rts_error() of TPQUIT and NOTEXTRINSIC.
+	 * This is so the TPQUIT/NOTEXTRINSIC error gets noted down in $ECODE (which wont happen if error_ret() is called before).
+	 */
+	INVOKE_ERROR_RET_IF_NEEDED;
 	if (is_tracing_on)
 		(*unw_prof_frame_ptr)();
 	msp = (unsigned char *)frame_pointer + sizeof(stack_frame);

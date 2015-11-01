@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,7 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	assert((unsigned char *) msp < stackbase);
 	sf->old_frame_pointer = frame_pointer;
 	sf->rvector = rtn_base;
-	sf->vartab_ptr = (char *) rtn_base + sf->rvector->vartab_ptr;
+	sf->vartab_ptr = (char *)VARTAB_ADR(rtn_base);
 	sf->vartab_len = sf->rvector->vartab_len;
 	sf->ctxt = context;
 	sf->mpc = transfer_addr;
@@ -54,7 +54,7 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	msp -= x1 = rtn_base->temp_size;
 	sf->temps_ptr = msp;
 	sf->type = SFT_COUNT;
-	msp -= x2 = rtn_base->vartab_len * sizeof(mval*);
+	msp -= x2 = rtn_base->vartab_len * sizeof(mval *);
 	sf->l_symtab = (mval **) msp;
    	if (msp <= stackwarn)
    	{

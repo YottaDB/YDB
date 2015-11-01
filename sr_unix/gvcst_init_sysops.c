@@ -17,8 +17,6 @@
 #include <sys/param.h>
 #endif
 #include <errno.h>
-#include <string.h>
-#include <sys/ipc.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/sem.h>
@@ -78,7 +76,6 @@
 #define ATTACH_TRIES   		10
 #define DEFEXT          	"*.dat"
 #define MAX_RES_TRIES  	 	620
-#define MEGA_BOUND      	(1024 * 1024)
 #define EIDRM_SLEEP_INT		500
 #define EIDRM_MAX_SLEEPS	20
 
@@ -391,7 +388,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		 */
 #ifdef __MVS__
 		if (-1 == (status_l = udi->shmid = shmget(IPC_PRIVATE, ROUND_UP(reg->sec_size, MEGA_BOUND),
-			__IPC_MEGA | IPC_CREAT | IPC_EXCL | RWDALL)))
+			__IPC_MEGA | IPC_CREAT | RWDALL)))
 #else
 		if (-1 == (status_l = udi->shmid = shmget(IPC_PRIVATE, reg->sec_size, RWDALL | IPC_CREAT)))
 #endif
@@ -423,23 +420,9 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 #ifdef CACHELINE_SIZE
 	assert(0 == ((int)csa->critical & (CACHELINE_SIZE - 1)));
 #endif
-	/* Note: Here we check jnl_sate from database file and
-	 * its value cannot change without standalone access.
-	 * In other words it is not necessary to read shared memory for the test (jnl_state != jnl_notallowed) */
-	csa->jnl_state = tsd->jnl_state;
-	csa->jnl_before_image = tsd->jnl_before_image;
-	csa->repl_state = tsd->repl_state;
-	/* The jnl_buff buffer should be initialized irrespective of read/write process */
-	if (JNL_ALLOWED(csa))
-	{
-		csa->jnl = (jnl_private_control *)malloc(sizeof(*csa->jnl));
-		memset(csa->jnl, 0, sizeof(*csa->jnl));
-		csa->jnl->channel = NOJNL;
-		csa->jnl->region = reg;
-		csa->jnl->jnl_buff = (jnl_buffer_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SPACE + JNL_NAME_EXP_SIZE);
-	}
-	else
-		csa->jnl = NULL;
+	/* Note: Here we check jnl_sate from database file and its value cannot change without standalone access.
+	 * The jnl_buff buffer should be initialized irrespective of read/write process */
+	JNL_INIT(csa, reg, tsd);
 	csa->backup_buffer = (backup_buff_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SPACE + JNL_SHARE_SIZE(tsd));
 	csa->lock_addrs[0] = (sm_uc_ptr_t)csa->backup_buffer + BACKUP_BUFFER_SIZE + 1;
 	csa->lock_addrs[1] = csa->lock_addrs[0] + LOCK_SPACE_SIZE(tsd) - 1;

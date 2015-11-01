@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@ void job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labaddr)
 	int4		*lp;
 	error_def	(ERR_JOBLABOFF);
 
-	if ((rt_hdr = find_rtn_hdr (rtn)) == 0)
+	if ((rt_hdr = find_rtn_hdr(rtn)) == 0)
 	{
 		mval rt;
 
@@ -31,12 +31,11 @@ void job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labaddr)
 		if ((rt_hdr = find_rtn_hdr (rtn)) == 0)
 			GTMASSERT;
 	}
-
-	lp = find_line_addr (rt_hdr, label, offset);
+	lp = NULL;
+	if (!rt_hdr->label_only || 0 == offset)  /* If label_only and offset != 0 should cause error */
+		lp = find_line_addr (rt_hdr, label, offset);
 	if (!lp)
-	{
 		rts_error(VARLSTCNT(1) ERR_JOBLABOFF);
-	}
-	*labaddr = (char *) (*lp + (char *) rt_hdr);
+	*labaddr = (char *) LINE_NUMBER_ADDR(rt_hdr, lp);
 	*hdr = (char *)rt_hdr;
 }

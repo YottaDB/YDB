@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,18 +22,6 @@
 #define MAX_ERRSTR_LEN		1024	/* maximum length of the error string returned
 					   by dlerror(). Couldn't find any system
 					   defined length, 1024 is just arbitrary */
-#define PRN_DLERROR			\
-{					\
-	dummy_err_str = dlerror();	\
-	if (dummy_err_str)		\
-	{ /* this is done since util_out_print does not handle 64 bit pointers as of now */ \
-		err_str = (char *)malloc(MAX_ERRSTR_LEN);	\
-		strcpy(err_str, dummy_err_str);			\
-		gtm_putmsg(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_STRING(err_str)); \
-		free(err_str);		\
-	}				\
-}
-
 typedef int4	(*fgnfnc)();
 
 struct extcall_string
@@ -126,9 +114,9 @@ typedef struct parmblk_struct
 #include "rtnhdr.h"
 
 /* function prototypes */
-void_ptr_t	fgn_getpak(char *pak_name);
-fgnfnc 		fgn_getrtn(void_ptr_t pak_handle, mstr *sym_name);
-void		fgn_closepak(void_ptr_t pak_handle);
+void_ptr_t	fgn_getpak(char *pak_name, int msgtype);
+fgnfnc 		fgn_getrtn(void_ptr_t pak_handle, mstr *sym_name, int msgtype);
+void		fgn_closepak(void_ptr_t pak_handle, int msgtype);
 int 		fgncal_getint(mstr *inp);
 int 		fgncal_read_args(mstr *inp);
 void 		fgncal_getstr(mstr *inp, mstr *str);

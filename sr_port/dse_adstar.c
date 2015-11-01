@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,7 +96,7 @@ void dse_adstar(void)
 	{
 		util_out_print("Error: cannot add a star record to a data block.", TRUE);
 		free(lbp);
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		return;
 	}
 	if (((blk_hdr_ptr_t) lbp)->bsiz > blk_size)
@@ -109,7 +109,7 @@ void dse_adstar(void)
 	{
 		util_out_print("Error:  not enough free space in block for a star record.", TRUE);
 		free(lbp);
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		return;
 	}
 	rsize = sizeof(rec_hdr) + sizeof(block_id);
@@ -124,7 +124,7 @@ void dse_adstar(void)
 	{
 		util_out_print("Error: bad blk build.", TRUE);
 		free(lbp);
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		return;
 	}
 	t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);

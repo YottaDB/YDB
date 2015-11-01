@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@ GBLREF char **cmd_arg;
 #pragma pointer_size (restore)
 #endif
 
-void get_command_line(mval *result)
+void get_command_line(mval *result, boolean_t zcmd_line)
 {
 	int		first_item, len, word_cnt;
 	unsigned char	*cp;
@@ -42,12 +42,15 @@ void get_command_line(mval *result)
 	if (cmd_cnt > 1)
 	{
 		first_item = 1;
-		cp = (unsigned char *)cmd_arg[1];
-		if ('-' == *cp++)
-		{
-			first_item++;
-			if ('r' == TOLOWER(*cp))
+		if (zcmd_line)
+		{	/* $ZCMDLINE returns the processed command line. Remove "-direct" and/or "-run <runarg>" from cmd line */
+			cp = (unsigned char *)cmd_arg[1];
+			if ('-' == *cp++)
+			{
 				first_item++;
+				if ('r' == TOLOWER(*cp))
+					first_item++;
+			}
 		}
 		for (word_cnt = first_item; word_cnt < cmd_cnt; word_cnt++)
 			len += strlen(cmd_arg[word_cnt]) + 1;		/* include space between arguments */

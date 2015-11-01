@@ -22,19 +22,21 @@
 #include "gdsfhead.h"
 #include "dpgbldir.h"
 #include "dpgbldir_sysops.h"
+#include "error_trap.h"		/* for STACK_ZTRAP_EXPLICIT_NULL macro */
 #include "op.h"
 
-GBLREF symval		*curr_symval;
-GBLREF sbs_blk		*sbs_blk_hdr;
-GBLREF boolean_t	dollar_truth;
-GBLREF lv_val		*active_lv;
-GBLREF gv_key           *gv_currkey;
-GBLREF gv_namehead      *gv_target;
-GBLREF gd_addr          *gd_header;
-GBLREF mval		dollar_etrap;
-GBLREF mval		dollar_ztrap;
-GBLREF mval             dollar_zgbldir;
+GBLREF symval			*curr_symval;
+GBLREF sbs_blk			*sbs_blk_hdr;
+GBLREF boolean_t		dollar_truth;
+GBLREF lv_val			*active_lv;
+GBLREF gv_key			*gv_currkey;
+GBLREF gv_namehead		*gv_target;
+GBLREF gd_addr			*gd_header;
+GBLREF mval			dollar_etrap;
+GBLREF mval			dollar_ztrap;
+GBLREF mval			dollar_zgbldir;
 GBLREF volatile boolean_t	dollar_zininterrupt;
+GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 
 mval	*unw_mv_ent(mv_stent *mv_st_ent)
 {
@@ -43,18 +45,26 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 	mval		*ret_value;
 	ht_entry	*hte;
 
-	active_lv = (lv_val *)0; /* if we get here, subscript set was successful,
-				  * clear active_lv to avoid later cleanup problems */
-
+	active_lv = (lv_val *)0; /* if we get here, subscript set was successful, clear active_lv to avoid later cleanup problems */
 	switch (mv_st_ent->mv_st_type)
 	{
 	case MVST_MSAV:
 		*mv_st_ent->mv_st_cont.mvs_msav.addr = mv_st_ent->mv_st_cont.mvs_msav.v;
 		if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_etrap)
 		{
+			if (dollar_etrap.str.len)
+				ztrap_explicit_null = FALSE;
 			dollar_ztrap.str.len = 0;
 		} else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_ztrap)
+		{
+			if (STACK_ZTRAP_EXPLICIT_NULL == dollar_ztrap.str.len)
+			{
+				dollar_ztrap.str.len = 0;
+				ztrap_explicit_null = TRUE;
+			} else
+				ztrap_explicit_null = FALSE;
 			dollar_etrap.str.len = 0;
+		}
 		else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_zgbldir)
 		{
 	        	if (dollar_zgbldir.str.len != 0)

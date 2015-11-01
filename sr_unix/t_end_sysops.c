@@ -1341,15 +1341,17 @@ void    wcs_stale(TID tid, int4 hd_len, gd_region **region)
         bool            need_new_timer;
 	boolean_t	lseekIoInProgress_flag;
         gd_region       *reg, *save_region;
-        sgmnt_addrs     *csa, *save_csaddrs;
-        sgmnt_data_ptr_t        csd;
+        sgmnt_addrs     *csa, *save_csaddrs, *check_csaddrs;
+        sgmnt_data_ptr_t        csd, save_csdata;
 
 	/* Note the non-usage of TP_CHANGE_REG_IF_NEEDED macros since this routine can be timer driven. */
         save_region = gv_cur_region;            /* Certain debugging calls expect gv_cur_region to be correct */
+	save_csaddrs = cs_addrs;
+	save_csdata = cs_data;
 	if (NULL == save_region || FALSE == save_region->open)
-        	save_csaddrs = NULL;		/* Save to see if we are in crit anywhere */
+        	check_csaddrs = NULL;		/* Save to see if we are in crit anywhere */
 	else
-        	save_csaddrs = &FILE_INFO(save_region)->s_addrs;	/* Save to see if we are in crit anywhere */
+        	check_csaddrs = &FILE_INFO(save_region)->s_addrs;	/* Save to see if we are in crit anywhere */
         reg = *region;				/* Region addr needing some synching */
 	assert(reg->open);
 	TP_CHANGE_REG(reg);
@@ -1381,7 +1383,7 @@ void    wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);
 	if ((FALSE == lseekIoInProgress_flag)
 		&& (0 == crit_count)
-		&& (NULL == save_csaddrs || FALSE == save_csaddrs->now_crit)
+		&& (NULL == check_csaddrs || FALSE == check_csaddrs->now_crit)
 		&& (0 == fast_lock_count))
         {
                 switch (reg->dyn.addr->acc_meth)
@@ -1445,6 +1447,11 @@ void    wcs_stale(TID tid, int4 hd_len, gd_region **region)
         /* We aren't creating a new timer so decrement the count for this one that is now done */
         DECR_CNT(&csa->nl->wcs_timers, &csa->nl->wc_var_lock);
         csa->timer = FALSE;                     /* No timer set for this region this process anymore */
-	TP_CHANGE_REG(save_region);	/* Restore to former glory */
+	/* To restore to former glory, don't use TP_CHANGE_REG, 'coz we might mistakenly set cs_addrs and cs_data to NULL
+	 * if the region we are restoring has been closed. Don't use tp_change_reg 'coz we might be ripping out the structures
+	 * needed in tp_change_reg in gv_rundown. */
+	gv_cur_region = save_region;
+	cs_addrs = save_csaddrs;
+	cs_data = save_csdata;
         return;
 }

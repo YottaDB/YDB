@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,10 +19,12 @@
 #include "rtnhdr.h"
 #include "zbreak.h"
 
-int4 *op_labaddr(rhdtyp *routine, mval *label, int4 offset)
+USHBIN_ONLY(static LNR_TABENT *ind_lnr;)
+
+USHBIN_ONLY(LNR_TABENT  **) NON_USHBIN_ONLY(LNR_TABENT *)op_labaddr(rhdtyp *routine, mval *label, int4 offset)
 {
 	rhdtyp		*real_routine, *routine_hdr;
-	int4		*answer, *first_line;
+	LNR_TABENT	*answer, *first_line;
 
 	error_def(ERR_LABELMISSING);
 	error_def(ERR_OFFSETINV);
@@ -39,14 +41,18 @@ int4 *op_labaddr(rhdtyp *routine, mval *label, int4 offset)
 #endif
 		routine_hdr = routine;
 	if (routine_hdr->label_only && offset)
-		rts_error(VARLSTCNT(4) ERR_LABELONLY, 2, mid_len(&routine_hdr->routine_name), routine_hdr->routine_name);
+		rts_error(VARLSTCNT(4) ERR_LABELONLY, 2, mid_len(&routine_hdr->routine_name), routine_hdr->routine_name.c);
 	answer = find_line_addr(routine_hdr, &label->str, 0);
-	if (0 == answer)
+	if (NULL == answer)
 		rts_error(VARLSTCNT(4) ERR_LABELMISSING, 2, mid_len((mident *)label->str.addr), label->str.addr);
-	real_routine = (rhdtyp *)((char *)routine_hdr + routine_hdr->current_rhead_ptr);
-	first_line = (int4 *)((char *)real_routine + real_routine->lnrtab_ptr);
+	real_routine = CURRENT_RHEAD_ADR(routine_hdr);
+	first_line = LNRTAB_ADR(real_routine);
 	answer += offset;
 	if (answer < first_line || answer >= first_line + real_routine->lnrtab_len)
 		rts_error(VARLSTCNT(5) ERR_OFFSETINV, 3, mid_len((mident *)label->str.addr), label->str.addr, offset);
-	return answer;
+	USHBIN_ONLY(
+		ind_lnr = answer;
+		return &ind_lnr;
+		)
+	NON_USHBIN_ONLY(return answer;)
 }

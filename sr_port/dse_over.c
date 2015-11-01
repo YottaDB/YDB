@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -141,12 +141,12 @@ void dse_over(void)
 	if (offset >= size)
 	{
 		util_out_print("Error:  offset too large.", TRUE);
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		return;
 	}
 	if (FALSE == dse_data(&data[0], &data_len))
 	{
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		return;
 	}
 	cvt_src_ptr = cvt_dst_ptr = (unsigned char *)data;
@@ -156,7 +156,7 @@ void dse_over(void)
 	if (offset + data_len > size)
 	{
 		util_out_print("Error:  data will not fit in block at given offset.", TRUE);
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		return;
 	}
 	lbp = (uchar_ptr_t)malloc(blk_size);
@@ -169,7 +169,7 @@ void dse_over(void)
 	{
 		util_out_print("Error: bad blk build.", TRUE);
 		free(lbp);
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		return;
 	}
 	t_write(blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,9 +26,9 @@ mval *lookup_variable(unsigned int x)
 	ht_entry *q;
 
 	assert(x < frame_pointer->vartab_len);
-	q = ht_put(&curr_symval->h_symtab , (mname *)&(((vent *) frame_pointer->vartab_ptr)[x]) , &new);
+	q = ht_put(&curr_symval->h_symtab, (mname *)&(((VAR_TABENT *)frame_pointer->vartab_ptr)[x]), &new);
 	if (new)
-	{	lv_newname(q, curr_symval);
-	}
+		lv_newname(q, curr_symval);
+
 	return (mval *) q->ptr;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,11 +18,10 @@
 cm_region_list *gtcm_find_region(connection_struct *cnx, unsigned char rnum)
 {
 	error_def(CMERR_REGNTFND);
-	cm_region_list *ptr;
 
-	for (ptr = cnx->region_root ; ptr && ptr->regnum != rnum ; ptr = ptr->next)
-		;
-	if (!ptr)
+	if (rnum > cnx->maxregnum || !cnx->region_array[rnum])
 		rts_error(VARLSTCNT(1) CMERR_REGNTFND);
-	return ptr;
+	else
+		return cnx->region_array[rnum];
 }
+                    

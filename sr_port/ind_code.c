@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,12 +33,11 @@ GBLDEF unsigned char	*runtime_base;
 
 void	ind_code(mstr *obj)
 {
-	vent		*vptr;
+	VAR_TABENT	*vptr;
 	ihdtyp		*itext;
 	int		indir_code_size, validation, hdr_offset;
-	short int	short_temp;
-	unsigned short	ushort_temp;
 	int4		long_temp;
+	uint4		ulong_temp;
 	unsigned char	*indr_base_addr;
 
 	assert(run_time);
@@ -50,40 +49,40 @@ void	ind_code(mstr *obj)
 	shrink_jmps();
 	indir_code_size = indr_stringpool.free - indr_stringpool.base +	/* literal strings */
 		mlitmax * sizeof(mval) +			/* literal mvals */
-		mvmax * sizeof(vent) +				/* variable table ents */
+		mvmax * sizeof(VAR_TABENT) +				/* variable table ents */
 		code_size +
 		(sizeof(int4) * 2) +				/* validation word and (neg) offset to ihdtyp */
 		3;						/* Max amount for code alignment */
 	if (stringpool.top - stringpool.free < indir_code_size)
 		stp_gcol(indir_code_size);
-	itext = (ihdtyp *) stringpool.free;
+	itext = (ihdtyp *)stringpool.free;
 	indr_base_addr = stringpool.free;
 	stringpool.free += sizeof(ihdtyp);
 	indir_lits(itext);
 	hdr_offset = indr_base_addr - stringpool.free;		/* offset to ihdtyp */
 	emit_immed((char *)&hdr_offset, sizeof(hdr_offset));
-	validation = (OMAGIC << 16) + OBJ_LABEL;			/* Word to validate we are in right place */
+	validation = (GTM_OMAGIC << 16) + OBJ_LABEL;			/* Word to validate we are in right place */
 	emit_immed((char *)&validation, sizeof(validation));
 	runtime_base = stringpool.free;
 	cg_phase = CGP_MACHINE;
 	code_gen();
 
-	/* itext->vartab_ptr = stringpool.free - indr_base_addr; */
+	/* itext->vartab_off = stringpool.free - indr_base_addr; */
 	long_temp = stringpool.free - indr_base_addr;
-	PUT_LONG(&(itext->vartab_ptr),long_temp);
+	PUT_LONG(&(itext->vartab_off), long_temp);
 	/* itext->vartab_len = mvmax; */
-	short_temp = mvmax;
-	PUT_SHORT(&(itext->vartab_len),short_temp);
-	vptr = (vent *) mcalloc(mvmax * sizeof(vent));
+	long_temp = mvmax;
+	PUT_LONG(&(itext->vartab_len), long_temp);
+	vptr = (VAR_TABENT *) mcalloc(mvmax * sizeof(VAR_TABENT));
 	if (mvartab)
 		walktree(mvartab, cg_var, (char *)&vptr);
-	emit_immed((char *) vptr, mvmax * sizeof(vent));
+	emit_immed((char *) vptr, mvmax * sizeof(VAR_TABENT));
 	/* itext->temp_mvals = sa_temps[TVAL_REF]; */
-	short_temp = sa_temps[TVAL_REF];
-	PUT_SHORT(&(itext->temp_mvals),short_temp);
+	long_temp = sa_temps[TVAL_REF];
+	PUT_LONG(&(itext->temp_mvals), long_temp);
 	/* itext->temp_size = sa_temps_offset[TCAD_REF]; */
-	ushort_temp = sa_temps_offset[TCAD_REF];
-	PUT_SHORT(&(itext->temp_size), ushort_temp);
+	ulong_temp = sa_temps_offset[TCAD_REF];
+	PUT_ULONG(&(itext->temp_size), ulong_temp);
 	/* indir_code_size may be greater than the actual resultant code size
 	   because expression coersion may cause some literals to be optimized
 	   away, leaving mlitmax greater than actual.

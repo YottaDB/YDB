@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,10 +27,13 @@
 GBLDEF cm_lckblkreg *blkdlist;
 GBLREF gd_region *gv_cur_region;
 
+GBLDEF ABS_TIME chkreg_time;
+
 void gtcml_chkreg(void)
 {
 	cm_lckblkreg *reg, *reg1;
 
+	sys_get_curr_time(&chkreg_time);	/* just once per pass */
 	reg1 = reg = blkdlist;
 
 	while (reg)

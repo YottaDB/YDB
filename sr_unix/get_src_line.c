@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,54 +70,49 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 	src_tbl = (uint4 *)ht->ptr;
 	if (not_present || ht->ptr == 0)
 	{
-		if (rtn_vector->label_only)
+		c = malloc(rtn_vector->src_full_name.len + 1);
+		memcpy(c,rtn_vector->src_full_name.addr, rtn_vector->src_full_name.len);
+		*(c + rtn_vector->src_full_name.len) = 0;	/* ensure string is null terminated */
+		fd = OPEN(c, O_RDONLY);
+		free(c);
+		if (fd == -1)
 		{
-			srcstat |= SRCNOTAVAIL;
-			found = FALSE;
-		}
-		else
-		{
-			c = malloc(rtn_vector->src_full_name.len + 1);
-			memcpy(c,rtn_vector->src_full_name.addr,rtn_vector->src_full_name.len);
-			*(c + rtn_vector->src_full_name.len) = 0;	/* ensure string is null terminated */
-			fd = OPEN(c, O_RDONLY);
-			free(c);
-			if (fd == -1)
+			n = mid_len(&rtn_vector->routine_name);
+			memcpy (srcnamebuf, &rtn_vector->routine_name.c[0], n);
+			if (srcnamebuf[0] == '%')	/* percents are translated to _ on filenames */
+				srcnamebuf[0] = '_';
+			srcnamebuf[n] = '.';
+			srcnamebuf[n + 1] = 'm';
+			src.addr = srcnamebuf;
+			src.len = n + 2;
+			zro_search (0, 0, &src, &srcdir, TRUE);
+			if (srcdir)
 			{
-				n = mid_len(&rtn_vector->routine_name);
-				memcpy (srcnamebuf, &rtn_vector->routine_name.c[0], n);
-				if (srcnamebuf[0] == '%')	/* percents are translated to _ on filenames */
-					srcnamebuf[0] = '_';
-				srcnamebuf[n] = '.';
-				srcnamebuf[n + 1] = 'm';
-				src.addr = srcnamebuf;
-				src.len = n + 2;
-				zro_search (0, 0, &src, &srcdir);
-				if (srcdir)
-				{
-					c1 = malloc(src.len + srcdir->str.len + 2);
-					memcpy(c1,srcdir->str.addr,srcdir->str.len);
-					c2 = c1 + srcdir->str.len;
-					*c2++ = '/';
-					memcpy(c2,src.addr,src.len);
-					c2 += src.len;
-					*c2++ = 0;
-					fd = OPEN(c1, O_RDONLY);
-					free(c1);
-					if (fd == -1)
-						rts_error(VARLSTCNT(1) errno);
-					found = TRUE;
-				} else
-					found = FALSE;
-			} else
+				c1 = malloc(src.len + srcdir->str.len + 2);
+				memcpy(c1,srcdir->str.addr,srcdir->str.len);
+				c2 = c1 + srcdir->str.len;
+				*c2++ = '/';
+				memcpy(c2,src.addr,src.len);
+				c2 += src.len;
+				*c2++ = 0;
+				fd = OPEN(c1, O_RDONLY);
+				free(c1);
+				if (fd == -1)
+					rts_error(VARLSTCNT(1) errno);
 				found = TRUE;
-			if (!found)
-				srcstat |= SRCNOTFND;
-		}
+			} else
+				found = FALSE;
+		} else
+			found = TRUE;
+
+		if (!found)
+			srcstat |= SRCNOTFND;
 		n = found ? rtn_vector->lnrtab_len : 0;
 		assert((found && n >= 1) || (n == 0));
-		src_tbl = (uint4 *)malloc(n * sizeof(mstr) + sizeof(uint4));
-		base = (mstr *)((char *)src_tbl + sizeof (uint4));
+		/* first two words are the status code and the number of entries */
+		src_tbl = (uint4 *)malloc(n * sizeof(mstr) + sizeof(uint4) * 2);
+		base = (mstr *)(src_tbl + 2);
+		*(src_tbl + 1) = n;
 		badfmt = FALSE;
 		checksum = 0;
 		for (current = base + 1, top = base + n ; current < top ; current++)
@@ -188,12 +183,12 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 		ht->ptr = (char *) src_tbl;
 	}
 	srcstat |= *src_tbl;
-	lt_ptr = (int *)find_line_addr(rtn_vector,&label->str,0);
+	lt_ptr = (int *)find_line_addr(rtn_vector, &label->str, 0);
 	if (!lt_ptr)
 		srcstat |= LABELNOTFOUND;
 	else if (!(srcstat & (SRCNOTFND | SRCNOTAVAIL)))
 	{
-		n = (int) (lt_ptr - (int *) ((char *) rtn_vector + rtn_vector->lnrtab_ptr));
+		n = (int) (lt_ptr - (int *)LNRTAB_ADR(rtn_vector));
 		n += offset;
 		if (n == 0)
 			srcstat |= ZEROLINE;
@@ -202,7 +197,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 		else if (n >= rtn_vector->lnrtab_len)
 			srcstat |= AFTERLASTLINE;
 		else	/* successfully located line */
-			*srcret = ((mstr *) (src_tbl + 1)) + n;
+			*srcret = ((mstr *) (src_tbl + 2)) + n;
 	}
 	return srcstat;
 }

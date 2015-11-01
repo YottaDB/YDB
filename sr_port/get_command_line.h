@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef GET_COMMAND_LINE_INCLUDED
 #define GET_COMMAND_LINE_INCLUDED
 
-void get_command_line(mval *result);
+void get_command_line(mval *result, boolean_t zcmd_line);
 
 #endif /* GET_COMMAND_LINE_INCLUDED */

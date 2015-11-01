@@ -288,14 +288,17 @@ void	mupip_recover(void)
 					ctl = ctl->prev)
 			{
 				ctl->consist_stop_addr = 0;
-				for (status = mur_get_last(ctl->rab); SS_NORMAL == status; status = mur_previous(ctl->rab, 0))
+				if (mur_options.rollback || mur_options.verify)
 				{
-					rec = (jnl_record *)ctl->rab->recbuff;
-					rectype = REF_CHAR(&rec->jrec_type);
-					if (JRT_EPOCH == rectype  ||  JRT_TCOM == rectype  ||  JRT_KILL == rectype
-						||  JRT_ZKILL == rectype ||  JRT_SET == rectype  ||  JRT_NULL == rectype)
+					for (status = mur_get_last(ctl->rab); SS_NORMAL == status;
+									status = mur_previous(ctl->rab, 0))
 					{
-						if (mur_options.rollback)
+						if (!mur_options.rollback)
+							continue;
+						rec = (jnl_record *)ctl->rab->recbuff;
+						rectype = REF_CHAR(&rec->jrec_type);
+						if (JRT_EPOCH == rectype  ||  JRT_TCOM == rectype  ||  JRT_KILL == rectype
+							||  JRT_ZKILL == rectype ||  JRT_SET == rectype  ||  JRT_NULL == rectype)
 						{
 							assert(QWEQ(rec->val.jrec_epoch.jnl_seqno, rec->val.jrec_tcom.jnl_seqno));
 							assert(QWEQ(rec->val.jrec_epoch.jnl_seqno, rec->val.jrec_kill.jnl_seqno));
@@ -626,9 +629,11 @@ check_pblk:
 			frame_pointer = (stack_frame *)msp;
 			memset(frame_pointer, 0, sizeof(stack_frame));
 			frame_pointer->type = SFT_COUNT;
+			frame_pointer->temps_ptr = (unsigned char *)frame_pointer; /* no temporaries in this frame */
 			--frame_pointer;
 			memset(frame_pointer, 0, sizeof(stack_frame));
 			frame_pointer->type = SFT_COUNT;
+			frame_pointer->temps_ptr = (unsigned char *)frame_pointer; /* no temporaries in this frame either */
 			frame_pointer->old_frame_pointer = (stack_frame *)msp;
 			msp = (unsigned char *)frame_pointer;
 		}

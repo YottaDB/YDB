@@ -56,6 +56,7 @@ typedef unsigned short mstr_len_t;
 #define BITS_PER_UCHAR  8 /* note, C does not require this to be 8, see <limits.h> for definitions of CHAR_BIT and UCHAR_MAX */
 
 #define MAXPOSINT4		((int4)0x7fffffff)
+#define	MAX_DIGITS_IN_INT	10	/* maximum number of decimal digits in an integer */
 #define MAX_HOST_NAME_LEN	256
 
 #ifndef _AIX
@@ -154,6 +155,9 @@ char *s2n(mval *u);
 #define ROUND_UP2(VALUE, MODULUS)		(CHECKPOT(MODULUS) ((VALUE) + ((MODULUS) - 1)) & ~((MODULUS) - 1))
 #define ROUND_DOWN2(VALUE, MODULUS)		(CHECKPOT(MODULUS) (VALUE) & ~((MODULUS) - 1))
 
+/* Length needed to pad out to a given power of 2 boundary */
+#define PADLEN(value, bndry) (ROUND_UP2((sm_long_t)(value), bndry) - (sm_long_t)(value))
+
 /* LOG2_OF_INTEGER returns the ceiling of log (base 2) of number */
 #define LOG2_OF_INTEGER(number, log2_of_number)			\
 {								\
@@ -198,6 +202,7 @@ int4 timeout2msec(int4 timeout);
 #define	LEN_AND_STR(STRING)		LENGTH_AND_STRING(STRING)
 
 #define	MEMCMP_LIT(SOURCE, LITERAL)	memcmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
+#define MEMCPY_LIT(TARGET, LITERAL)	memcpy(TARGET, LITERAL, sizeof(LITERAL) - 1)
 
 /* *********************************************************************************************************** */
 /*		   Frequently used len + str combinations in macro form.				       */
@@ -246,6 +251,19 @@ int m_usleep(int useconds);
 #	define UNSUPPORTED_PLATFORM_CHECK
 #else
 #	define UNSUPPORTED_PLATFORM_CHECK	#error UNSUPPORTED PLATFORM
+#endif
+
+/* Note the macros below refer to the UNIX Shared Binary Support. Because the
+   support is *specifically* for the Unix platform, "NON_USHBIN_ONLY()" will
+   also be true for VMS even though that platform does have shared binary support
+   (but it does not have Unix Shared Binary support).
+ */
+#ifdef USHBIN_SUPPORTED
+#	define USHBIN_ONLY(X)		X
+#	define NON_USHBIN_ONLY(X)
+#else
+#	define USHBIN_ONLY(X)
+#	define NON_USHBIN_ONLY(X)	X
 #endif
 
 #define LONG_SLEEP(x)				sleep((x))
@@ -631,12 +649,13 @@ typedef enum
 #define NOLICENSE	/* cheap way to obsolete it */
 /* To use GET_CUR_TIME macro 'now' of type time_t and 'time_ptr' of type char *
  * should be defined at the calling place */
-#define GET_CUR_TIME 	{		 					\
-				if ((time_t)-1 == (now = time(NULL)))		\
-					time_ptr = "time failed";		\
-				else if (NULL == (time_ptr = GTM_CTIME(&now)))	\
-					time_ptr = "ctime failed";		\
-			}
+#define GET_CUR_TIME 						\
+{		 						\
+	if ((time_t)-1 == (now = time(NULL)))			\
+		time_ptr = "****** time failed *****\n"; /* keep string len same as CTIME_BEFORE_NL */ \
+	else if (NULL == (time_ptr = GTM_CTIME(&now)))		\
+		time_ptr = "***** ctime failed *****\n"; /* keep string len same as CTIME_BEFORE_NL */ \
+}
 
 /* i2 conversation functions */
 void i2hex(unsigned int val, uchar_ptr_t dest, int len);

@@ -306,9 +306,9 @@ va_dcl
 		sa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 		if (NULL != sa->hdr)
 		{
-#define GVSTAT_MAX_DIGITS 10
-#define GVSTAT_KEYWORD_SIZE 5		/* THREE PLUS TWO DELIMITERS */
-#define GVSTAT_KEYWORD_COUNT 9
+#define GVSTAT_MAX_DIGITS	MAX_DIGITS_IN_INT
+#define GVSTAT_KEYWORD_SIZE	5		/* THREE PLUS TWO DELIMITERS */
+#define GVSTAT_KEYWORD_COUNT	9
 #define GVSTAT_MAX_SIZE ((GVSTAT_KEYWORD_COUNT + CDB_STAGNATE + ARRAYSIZE(sa->hdr->n_tp_retries) \
 				+ ARRAYSIZE(sa->hdr->n_tp_retries_conflicts)) * (GVSTAT_MAX_DIGITS + GVSTAT_KEYWORD_SIZE))
 			if (stringpool.top - stringpool.free < GVSTAT_MAX_SIZE)

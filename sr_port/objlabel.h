@@ -10,12 +10,21 @@
  ****************************************************************/
 
 /* objlabel.h -- define OMAGIC and OBJ_LABEL here.  */
+#ifndef OBJLABEL_DEFINED
+#define OBJLABEL_DEFINED
 
-#define	OMAGIC	0407		/* old impure format */
+/* There is a system define for OMAGIC on some platforms that conficts with ours. Old
+   use is deprecated in favor of GTM_OMAGIC flavor.
+*/
+#define	GTM_OMAGIC	0407		/* old impure format */
+#ifndef USHBIN_SUPPORTED
+#define OMAGIC	GTM_OMAGIC		/* non-native doesn't have to worry here */
+#endif
 
 /* The Object file label is composed of a platform-generic part and platform-specific part.
  *
- * 	OBJ_LABEL = (OBJ_UNIX_LABEL << 8) + OBJ_PLATFORM_LABEL
+ * 	OBJ_LABEL = (OBJ_UNIX_LABEL << n) + OBJ_PLATFORM_LABEL
+ *      (n = 8 previously now n = 4 to allow more binary versions)
  *
  * For every object format change that spans across all platforms, we increment the platform-generic part OBJ_UNIX_LABEL.
  * For every platform-specific object format change, we increment the platform-specific part OBJ_PLATFORM_LABEL
@@ -46,4 +55,12 @@
 #error UNSUPPORTED PLATFORM
 #endif
 
-#define OBJ_LABEL	((OBJ_UNIX_LABEL << 8) + (OBJ_PLATFORM_LABEL))
+#ifdef USHBIN_SUPPORTED
+#  define OBJ_LABEL	((OBJ_UNIX_LABEL << 4) + (OBJ_PLATFORM_LABEL))
+#else
+#  define OBJ_LABEL	((OBJ_UNIX_LABEL << 8) + (OBJ_PLATFORM_LABEL))
+#endif
+
+#define MAGIC_COOKIE ((GTM_OMAGIC << 16) + OBJ_LABEL)
+
+#endif

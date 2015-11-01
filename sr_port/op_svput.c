@@ -57,7 +57,6 @@ GBLREF mstr		dollar_zroutines;
 GBLREF mstr		dollar_zsource;
 GBLREF int		dollar_zmaxtptime;
 GBLREF int		ztrap_form;
-GBLREF ecode_list	*dollar_ecode_list;
 GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_zerror;
 GBLREF mval		dollar_zyerror;
@@ -65,14 +64,11 @@ GBLREF mval		dollar_system;
 GBLREF mval		dollar_zinterrupt;
 GBLREF boolean_t	ztrap_new;
 GBLREF stack_frame	*error_frame;
-GBLREF unsigned char	*error_last_mpc_err;
-GBLREF unsigned char	*error_last_ctxt_err;
-GBLREF stack_frame	*error_last_frame_err;
+GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 
 void op_svput(int varnum, mval *v)
 {
 	int		i, ok, state;
-	ecode_list	*ecode_next;
 	error_def(ERR_UNIMPLOP);
 	error_def(ERR_TEXT);
 	error_def(ERR_INVECODEVAL);
@@ -136,12 +132,14 @@ void op_svput(int varnum, mval *v)
 		break;
 	case SV_ZROUTINES:
 		MV_FORCE_STR(v);
+		/* The string(v) should be parsed and loaded before setting $zroutines
+		 * to retain the old value in case errors occur while loading */
+		zro_load(&v->str);
 		if (dollar_zroutines.addr)
 			free (dollar_zroutines.addr);
 		dollar_zroutines.addr = (char *)malloc(v->str.len);
 		memcpy (dollar_zroutines.addr, v->str.addr, v->str.len);
 		dollar_zroutines.len = v->str.len;
-		zro_load (&dollar_zroutines);
 		break;
 	case SV_ZSOURCE:
 		MV_FORCE_STR(v);
@@ -153,16 +151,18 @@ void op_svput(int varnum, mval *v)
 			op_newintrinsic(SV_ZTRAP);
 		dollar_ztrap.mvtype = MV_STR;
 		dollar_ztrap.str = v->str;
-		/* Setting either $ZTRAP or $ETRAP to empty
-		 * causes all error trapping to be canceled
-		 */
+		/* Setting either $ZTRAP or $ETRAP to empty causes any current error trapping to be canceled */
 		if (!v->str.len)
 		{
 			dollar_etrap.mvtype = MV_STR;
 			dollar_etrap.str = v->str;
+			ztrap_explicit_null = TRUE;
 		} else /* Ensure that $ETRAP and $ZTRAP are not both active at the same time */
+		{
+			ztrap_explicit_null = FALSE;
 			if (dollar_etrap.str.len > 0)
 				gtm_newintrinsic(&dollar_etrap);
+		}
 		if (ztrap_form & ZTRAP_POP)
 			ztrap_save_ctxt();
 		break;
@@ -212,43 +212,29 @@ void op_svput(int varnum, mval *v)
 		}
 		if (v->str.len > 0)
 		{
-			ecode_next = (ecode_list *) malloc(sizeof(ecode_list));
-			ecode_next->previous = dollar_ecode_list;
-			dollar_ecode_list = ecode_next;
-			ecode_next->level = dollar_zlevel();
-			ecode_next->str.len = v->str.len;
-			ecode_next->str.addr = malloc(v->str.len);
-			memcpy(ecode_next->str.addr, v->str.addr, v->str.len);
+			ecode_add(&v->str);
 			rts_error(VARLSTCNT(2) ERR_SETECODE, 0);
 		} else
 		{
-			for (ecode_next = dollar_ecode_list;
-				ecode_next->previous;
-				ecode_next = dollar_ecode_list)
-			{
-				free(ecode_next->str.addr);
-				dollar_ecode_list = ecode_next->previous;
-				free(ecode_next);
-			}
-			error_frame = NULL;
-			error_last_frame_err = NULL;
-			error_last_mpc_err = error_last_ctxt_err = NULL;
+			NULLIFY_DOLLAR_ECODE;	/* reset $ECODE related variables to correspond to $ECODE = NULL state */
+			NULLIFY_ERROR_FRAME;	/* we are no more in error-handling mode */
 		}
 		break;
 	case SV_ETRAP:
 		MV_FORCE_STR(v);
 		dollar_etrap.mvtype = MV_STR;
 		dollar_etrap.str = v->str;
-		/* Setting either $ZTRAP or $ETRAP to empty
-		 * causes all error trapping to be canceled
-		 */
+		/* Setting either $ZTRAP or $ETRAP to empty causes any current error trapping to be canceled */
 		if (!v->str.len)
 		{
 			dollar_ztrap.mvtype = MV_STR;
 			dollar_ztrap.str = v->str;
-		} else /* Ensure that $ETRAP and $ZTRAP are not both active at the same time */
-			if (dollar_ztrap.str.len > 0)
-				gtm_newintrinsic(&dollar_ztrap);
+		} else if (dollar_ztrap.str.len > 0)
+		{	/* Ensure that $ETRAP and $ZTRAP are not both active at the same time */
+			assert(FALSE == ztrap_explicit_null);
+			gtm_newintrinsic(&dollar_ztrap);
+		}
+		ztrap_explicit_null = FALSE;
 		break;
 	case SV_ZERROR:
 		MV_FORCE_STR(v);

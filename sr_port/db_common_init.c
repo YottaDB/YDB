@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,11 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "filestruct.h"
+#include "iosp.h"
+#include "jnl.h"
+
+GBLREF	jnl_process_vector	*prc_vec;
 
 void	db_common_init(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t csd)
 {
@@ -37,4 +42,10 @@ void	db_common_init(gd_region *reg, sgmnt_addrs *csa, sgmnt_data_ptr_t csd)
 	reg->jnl_buffer_size = csd->jnl_buffer_size;
 	reg->jnl_before_image = csd->jnl_before_image;
 	bt_init(csa);
+	/* Initialization of prc_vec is done even for no journaling. gtcm uses this always. Others might need it too. */
+	if (NULL == prc_vec)
+	{
+		prc_vec = (jnl_process_vector *)malloc(sizeof(jnl_process_vector));
+		jnl_prc_vector(prc_vec);
+	}
 }

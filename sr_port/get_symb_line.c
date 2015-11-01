@@ -15,11 +15,11 @@
 
 #include "rtnhdr.h"
 #include "stack_frame.h"
+#include "error_trap.h"		/* for error_ret()/error_ret_vms() declaration */
 
-GBLREF stack_frame	*frame_pointer;
-GBLREF unsigned char	*error_last_mpc_err;
-GBLREF unsigned char	*error_last_ctxt_err;
-GBLREF stack_frame	*error_last_frame_err;
+GBLREF stack_frame		*frame_pointer;
+GBLREF stack_frame		*error_frame;
+GBLREF dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 
 unsigned char *get_symb_line (unsigned char *out, unsigned char **b_line, unsigned char **ctxt)
 {
@@ -31,20 +31,16 @@ unsigned char *get_symb_line (unsigned char *out, unsigned char **b_line, unsign
 	line_reset = FALSE;
 	for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
 	{
-		fpmpc = (fp == error_last_frame_err) ? error_last_mpc_err : fp->mpc;
-		fpctxt = (fp == error_last_frame_err) ? error_last_ctxt_err : fp->ctxt;
-		/*The equality check in the second half of the following expression is to
-		  account for the delay-slot in HP-UX for implicit quits. Not an issue here,
-		  but added for uniformity. */
-		if ((unsigned char *) fp->rvector + fp->rvector->ptext_ptr <= fpmpc &&
-			fpmpc <= (unsigned char *) fp->rvector + fp->rvector->vartab_ptr)
+		fpmpc = ((fp != error_frame) || (fp->mpc != dollar_ecode.error_rtn_addr))
+				? fp->mpc : dollar_ecode.error_frame_mpc;
+		fpctxt = ((fp != error_frame) || (fp->ctxt != dollar_ecode.error_rtn_ctxt))
+				? fp->ctxt : dollar_ecode.error_frame_ctxt;
+		if (ADDR_IN_CODE(fpmpc, fp->rvector))
 		{
 			if (ctxt != 0)
 				*ctxt = fpctxt;
 			if (line_reset)
 				addr = fpmpc + 1;
-			else if ((unsigned char*) fp->rvector + fp->rvector->current_rhead_ptr == fpmpc)
-				addr = fpmpc + 1;	/* this may be dead code: examine relation with if above */
 			else
 				addr = fpmpc;
 			out_addr = symb_line (addr, out, b_line, fp->rvector);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,8 @@ va_dcl
 	int			has_return, i;
 	rhdtyp          	*base_addr;
 	unsigned char   	*transfer_addr;
-	uint4			inp_mask, out_mask, mask, label_offset;
+	uint4			inp_mask, out_mask, mask;
+	uint4			label_offset, *lnr_entry;
 	mval			arg_mval, *arg_ptr;
 	enum xc_types		arg_type;
 	gtm_string_t		*mstr_parm;
@@ -106,8 +107,14 @@ va_dcl
 	invocation_mode |= MUMPS_GTMCI;
 	memset(&param_blk, sizeof(param_blk), 0);
 	param_blk.rtnaddr = (void*)base_addr;
-	label_offset = (int4)((char*)transfer_addr - (char*)base_addr);
-	param_blk.labaddr = &label_offset;
+	/* lnr_entry below is a pointer to the code offset for this label from the
+	 * beginning of text base(on USHBIN platforms) or from the beginning of routine
+	 * header (on NON_USHBIN platforms).
+	 * On NON_USHBIN platforms -- 2nd argument to EXTCALL is this pointer
+	 * On USHBIN -- 2nd argument to EXTCALL is the pointer to this pointer (&lnr_entry) */
+	lnr_entry = &label_offset;
+	*lnr_entry = CODE_OFFSET(base_addr, transfer_addr);
+	param_blk.labaddr = USHBIN_ONLY(&)lnr_entry;
 	param_blk.argcnt = entry->argcnt;
 
 	VAR_START(var);
@@ -150,11 +157,7 @@ va_dcl
 				if (!(mask & 1))
 					i2usmval(&arg_mval, *arg_val);
 				break;		}
-			case xc_float:	{
-				gtm_float_t arg_val = va_arg(var, gtm_float_t);
-				if (!(mask & 1))
-					double2mval(arg_val, &arg_mval);
-				break;	}
+			case xc_float: /* fall through */
 			case xc_double:	{
 				gtm_double_t arg_val = va_arg(var, gtm_double_t);
 				if (!(mask & 1))
@@ -279,8 +282,6 @@ va_dcl
 				va_arg(var, gtm_ulong_t);
 				break;
 			case xc_float:
-				va_arg(var, gtm_float_t);
-				break;
 			case xc_double:
 				va_arg(var, gtm_double_t);
 				break;

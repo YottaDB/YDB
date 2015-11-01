@@ -61,8 +61,8 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
         gd_region               *reg, *save_region;
 	jnl_private_control	*jpc;
 	node_local_ptr_t	cnl;
-	sgmnt_addrs		*csa, *save_csaddrs;
-	sgmnt_data_ptr_t	csd;
+	sgmnt_addrs		*csa, *check_csaddrs, *save_csaddrs;
+	sgmnt_data_ptr_t	csd, save_csdata;
 	boolean_t		lseekIoInProgress_flag;
 
 	csa = *csaptr;
@@ -76,9 +76,11 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		csa->dbsync_timer = FALSE;
 		return;
 	}
-	save_region = gv_cur_region;
+	save_region = gv_cur_region; /* Save for later restore. See notes about restore */
+	save_csaddrs = cs_addrs;
+	save_csdata = cs_data;
 	/* Save to see if we are in crit anywhere */
-        save_csaddrs = ((NULL == save_region || FALSE == save_region->open) ?  NULL : (&FILE_INFO(save_region)->s_addrs));
+        check_csaddrs = ((NULL == save_region || FALSE == save_region->open) ?  NULL : (&FILE_INFO(save_region)->s_addrs));
 	/* Note the non-usage of TP_CHANGE_REG_IF_NEEDED macros since this routine can be timer driven. */
 	TP_CHANGE_REG(reg);
 	csd = csa->hdr;
@@ -116,7 +118,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			&& (0 == crit_count)       && (0 == fast_lock_count)
 			&& (!jnl_qio_in_prog)      && (!db_fsync_in_prog)
 		        && (!jpc || !jpc->jnl_buff || (LOCK_AVAILABLE == jpc->jnl_buff->fsync_in_prog_latch.latch_pid))
-			&& (NULL == save_csaddrs || FALSE == save_csaddrs->now_crit) && (FALSE == csa->now_crit)
+			&& (NULL == check_csaddrs || FALSE == check_csaddrs->now_crit) && (FALSE == csa->now_crit)
 			&& (FALSE != tp_grab_crit(reg)))
 		{
 			/* Note that if we are here, we have obtained crit using tp_grab_crit. */
@@ -136,6 +138,11 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		start_timer((TID)csa, TIM_DEFER_DBSYNC, &wcs_clean_dbsync, sizeof(csa), (char *)&csa);
 	} else
 		csa->dbsync_timer = FALSE;
-	TP_CHANGE_REG(save_region);
+	/* To restore to former glory, don't use TP_CHANGE_REG, 'coz we might mistakenly set cs_addrs and cs_data to NULL
+	 * if the region we are restoring to has been closed. Don't use tp_change_reg 'coz we might be ripping out the structures
+	 * needed in tp_change_reg in gv_rundown. */
+	gv_cur_region = save_region;
+	cs_addrs = save_csaddrs;
+	cs_data = save_csdata;
 	return;
 }

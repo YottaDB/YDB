@@ -22,6 +22,5 @@
 
 void zro_init(void);
 void zro_load(mstr *str);
-void zro_search (mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir);
 
 #endif

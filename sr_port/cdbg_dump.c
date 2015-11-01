@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,13 +77,13 @@ void cdbg_dump_triple(triple *dtrip, int indent)
 {
 	int		len;
 
-	printf("%s Triple %s [0x%08lx]   Forward ptr: 0x%08lx   Backward ptr: 0x%08lx  Source line: %d  Column: %d\n",
+	PRINTF("%s Triple %s [0x%08lx]   Forward ptr: 0x%08lx   Backward ptr: 0x%08lx  Source line: %d  Column: %d\n",
 	       cdbg_indent(indent), oc_tab_graphic[dtrip->opcode], dtrip,
 	       dtrip->exorder.fl, dtrip->exorder.bl, dtrip->src.line, dtrip->src.column);
 	/*switch(dtrip->opcode)
 	{
 		case OC_CDLIT:
-			printf("%s  OC_CDLT ptr: 0x%08lx  len: 0x%08lx\n",
+			PRINTF("%s  OC_CDLT ptr: 0x%08lx  len: 0x%08lx\n",
 			       cdbg_indent(indent), opr->oprval.cdlt->addr, opr->oprval.cdlt->len);
 			if (opr->oprval.cdlt->len)
 				cdbg_dump_mstr(cdbg_indent(indent), opr->oprval.cdlt);
@@ -102,7 +102,11 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 	int4	offset;
 	char	buff[MAX_STRLEN + 1];
 
-	printf("%s %s  [0x%08lx]  Type: %s\n", cdbg_indent(indent), oprtype_names[opnum], opr, oprtype_type_names[opr->oprclass]);
+	if (opr)
+		PRINTF("%s %s  [0x%08lx]  Type: %s\n", cdbg_indent(indent), oprtype_names[opnum], opr,
+		       oprtype_type_names[opr->oprclass]);
+	else
+		PRINTF("%s ** Warning ** Null opr passed as operand\n", cdbg_indent(indent));
 	if (!opr->oprclass)
 		return;
 
@@ -110,42 +114,53 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 	switch(opr->oprclass)
 	{
 		case TVAR_REF:
+			PRINTF("%s  Temporary variable index %d\n", cdbg_indent(indent), opr->oprval.temp);
+			break;
 		case TCAD_REF:
 		case TVAD_REF:
 		case MVAR_REF:
-			printf("%s   LS vref: 0x%08lx  RS vref: 0x%08lx  index: %d  varname: %s  last triple: 0x%08lx\n",
-			       cdbg_indent(indent), opr->oprval.vref->lson, opr->oprval.vref->rson, opr->oprval.vref->mvidx,
-			       cdbg_makstr(opr->oprval.vref->mvname.c, buff, sizeof(opr->oprval.vref->mvname)),
-			       opr->oprval.vref->last_fetch);
+			if (opr->oprval.vref)
+				PRINTF("%s   LS vref: 0x%08lx  RS vref: 0x%08lx  index: %d  varname: %s  last triple: 0x%08lx\n",
+				       cdbg_indent(indent), opr->oprval.vref->lson, opr->oprval.vref->rson, opr->oprval.vref->mvidx,
+				       cdbg_makstr(opr->oprval.vref->mvname.c, buff, sizeof(opr->oprval.vref->mvname)),
+				       opr->oprval.vref->last_fetch);
+			else
+				PRINTF("%s   ** Warning ** oprval.vref is NULL\n", cdbg_indent(indent));
 			break;
 		case TINT_REF:
 		case TVAL_REF:
 			offset = sa_temps_offset[opr->oprclass];
 			offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
-			printf("%s   temp index: %d  offset: 0x%08lx\n", cdbg_indent(indent), opr->oprval.temp, offset);
+			PRINTF("%s   temp index: %d  offset: 0x%08lx\n", cdbg_indent(indent), opr->oprval.temp, offset);
 			break;
 		case ILIT_REF:
-			printf("%s   ilit value: %d [0x%08lx]\n", cdbg_indent(indent), opr->oprval.ilit, opr->oprval.ilit);
+			PRINTF("%s   ilit value: %d [0x%08lx]\n", cdbg_indent(indent), opr->oprval.ilit, opr->oprval.ilit);
 			break;
 		case MLIT_REF:
-			printf("%s   lit-ref Fwd ptr: 0x%08lx  Bkwd ptr: 0x%08lx  rtaddr: 0x%08lx\n",
-			       cdbg_indent(indent), opr->oprval.mlit->que.fl, opr->oprval.mlit->que.bl,
-			       opr->oprval.mlit->rt_addr);
+			if (opr->oprval.mlit)
+				PRINTF("%s   lit-ref Fwd ptr: 0x%08lx  Bkwd ptr: 0x%08lx  rtaddr: 0x%08lx\n",
+				       cdbg_indent(indent), opr->oprval.mlit->que.fl, opr->oprval.mlit->que.bl,
+				       opr->oprval.mlit->rt_addr);
+			else
+				PRINTF("%s   ** Warning ** oprval.mlit is NULL\n", cdbg_indent(indent));
 			cdbg_dump_mval(indent, &opr->oprval.mlit->v);
 			break;
 		case TJMP_REF:
-			printf("%s   tjmp-ref jump list ptr: 0x%08lx\n", cdbg_indent(indent), &opr->oprval.tref->jmplist);
+			if (opr->oprval.tref)
+				PRINTF("%s   tjmp-ref jump list ptr: 0x%08lx\n", cdbg_indent(indent), &opr->oprval.tref->jmplist);
+			else
+				PRINTF("%s   ** Warning ** oprval.tref is NULL\n", cdbg_indent(indent));
 			break;
 		case TRIP_REF:
 			rtrip = opr->oprval.tref;
-			printf("%s   Trip reference:\n", cdbg_indent(indent));
+			PRINTF("%s   Trip reference:\n", cdbg_indent(indent));
 			cdbg_dump_triple(rtrip, indent + 1);
 			break;
 		case INDR_REF:
 			cdbg_dump_operand(indent, opr->oprval.indr, opnum);
 			break;
 		default:
-			printf("%s   %s bogus reference\n", cdbg_indent(indent), oprtype_type_names[opr->oprclass]);
+			PRINTF("%s   %s bogus reference\n", cdbg_indent(indent), oprtype_type_names[opr->oprclass]);
 	}
 }
 
@@ -155,49 +170,49 @@ void cdbg_dump_mval(int indent, mval *mv)
 	double		mvf;
 	int4		mvd;
 
-	printf("%s   Type: 0x%1x  (", cdbg_indent(indent), mv->mvtype);
+	PRINTF("%s   Type: 0x%1x  (", cdbg_indent(indent), mv->mvtype);
 	first = TRUE;
 	if (mv->mvtype & MV_NM)
 	{
-		printf("Number");
+		PRINTF("Number");
 		first = FALSE;
 	}
 	if (mv->mvtype & MV_INT)
 	{
 		if (!first)
-			printf(", ");
-		printf("Integer");
+			PRINTF(", ");
+		PRINTF("Integer");
 		first = FALSE;
 	}
 	if (mv->mvtype & MV_STR)
 	{
 		if (!first)
-			printf(", ");
-		printf("String");
+			PRINTF(", ");
+		PRINTF("String");
 		first = FALSE;
 	}
 	if (first)
 	{
-		printf("Undefined MVAL)\n");
+		PRINTF("Undefined MVAL)\n");
 		return;
 	}
-	printf(")  Sign: %d  Exp: %d\n", mv->sgn, mv->e);
+	PRINTF(")  Sign: %d  Exp: %d\n", mv->sgn, mv->e);
 	if (mv->mvtype & MV_NUM_MASK)
 	{
 		if (mv->mvtype & MV_INT)
 		{
 			mvd = mval2i(mv);
-			printf("%s   Integer value: %d\n", cdbg_indent(indent), mvd);
+			PRINTF("%s   Integer value: %d\n", cdbg_indent(indent), mvd);
 		} else
 		{
 			mvf = mval2double(mv);
-			printf("%s   Double value: %f\n", cdbg_indent(indent), mvf);
+			PRINTF("%s   Double value: %f\n", cdbg_indent(indent), mvf);
 		}
 	}
 	if (mv->mvtype & MV_STR)
 	{
 		if (!mv->str.len)
-			printf("%s   String value: <null value>\n", cdbg_indent(indent));
+			PRINTF("%s   String value: <null value>\n", cdbg_indent(indent));
 		else
 			cdbg_dump_mstr(indent, &mv->str);
 	}
@@ -214,7 +229,7 @@ void cdbg_dump_mstr(int indent, mstr *ms)
 		len = sizeof(buffer) - 1;
 	memcpy(buffer, ms->addr, len);
 	buffer[len] = 0;
-	printf("%s   String value: %s\n", cdbg_indent(indent), buffer);
+	PRINTF("%s   String value: %s\n", cdbg_indent(indent), buffer);
 }
 
 /* Provide string to do indenting of formatted output */

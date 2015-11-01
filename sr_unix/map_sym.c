@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,10 +19,11 @@
 #include "iosp.h"
 #include "io.h"
 #include "trans_log_name.h"
+#include "error.h"
 
 #define ERR_FGNSYM				\
 {						\
-	fgn_closepak(handle);			\
+	fgn_closepak(handle, INFO);		\
 	return FALSE;				\
 }
 
@@ -45,16 +46,16 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 	if (SS_NORMAL != (status = trans_log_name(fspec, &fspec_trans, buffer)))
     	    return FALSE;
 
-	if (NULL == (handle = fgn_getpak(buffer)))
+	if (NULL == (handle = fgn_getpak(buffer, INFO)))
     	    return FALSE;
 
-	if (!(ret_collseq->xform = fgn_getrtn(handle, &xform_sym)))
+	if (!(ret_collseq->xform = fgn_getrtn(handle, &xform_sym, INFO)))
 		ERR_FGNSYM;
-	if (!(ret_collseq->xback = fgn_getrtn(handle, &xback_sym)))
+	if (!(ret_collseq->xback = fgn_getrtn(handle, &xback_sym, INFO)))
 		ERR_FGNSYM;
-	if (!(ret_collseq->verify = fgn_getrtn(handle, &verify_sym)))
+	if (!(ret_collseq->verify = fgn_getrtn(handle, &verify_sym, INFO)))
 		ERR_FGNSYM;
-	if (!(ret_collseq->version = fgn_getrtn(handle, &version_sym)))
+	if (!(ret_collseq->version = fgn_getrtn(handle, &version_sym, INFO)))
 		ERR_FGNSYM;
 
 	return TRUE;

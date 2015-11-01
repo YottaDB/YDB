@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,8 +27,6 @@
 #include "incr_link.h"
 #include "compiler.h"
 
-#define	DOTM			".m"
-#define	DOTOBJ			".o"
 #define SRC			1
 #define OBJ			2
 #define NOTYPE			3
@@ -67,7 +65,7 @@ void op_zlink (mval *v, mval *quals)
 	srcdir = objdir = (zro_ent *) 0;
 	expdir = FALSE;
 	if (quals)
-	{
+	{ /* explicit ZLINK */
 		memset(&pblk, 0, sizeof(pblk));
 		pblk.buff_size = MAX_FBUFF;
 		pblk.buffer = inputf;
@@ -147,26 +145,26 @@ void op_zlink (mval *v, mval *quals)
 			objstr.len = objnamelen;
 			if (type == OBJ)
 			{
-				zro_search(&objstr, &objdir, 0, 0);
+				zro_search(&objstr, &objdir, 0, 0, TRUE);
 				if (!objdir)
 					rts_error(VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr,
 						ERR_FILENOTFND, 2, dollar_zsource.len, dollar_zsource.addr);
 			} else  if (type == SRC)
 			{
-				zro_search (&objstr, &objdir, &srcstr, &srcdir);
+				zro_search(&objstr, &objdir, &srcstr, &srcdir, TRUE);
 				if (!srcdir)
 					rts_error(VARLSTCNT(8) ERR_ZLINKFILE, 2, srcnamelen, &srcnamebuf[0],
 						ERR_FILENOTFND, 2, srcnamelen, &srcnamebuf[0]);
 			} else
 			{
-				zro_search (&objstr, &objdir, &srcstr, &srcdir);
+				zro_search(&objstr, &objdir, &srcstr, &srcdir, TRUE);
 				if (!objdir && !srcdir)
 					rts_error(VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr,
 						ERR_FILENOTFND, 2, dollar_zsource.len, dollar_zsource.addr);
 			}
 		}
 	} else
-	{
+	{ /* auto-ZLINK */
 		type = NOTYPE;
 		memcpy(&srcnamebuf[0],v->str.addr,v->str.len);
 		memcpy(&srcnamebuf[v->str.len], DOTM, sizeof(DOTM));
@@ -182,7 +180,10 @@ void op_zlink (mval *v, mval *quals)
 		srcstr.len = srcnamelen;
 		objstr.addr = &objnamebuf[0];
 		objstr.len = objnamelen;
-		zro_search (&objstr, &objdir, &srcstr, &srcdir);
+		/* On shared platforms, skip parameter should be FALSE to indicate an auto-ZLINK so that
+		 * zro_search looks into shared libraries. On non-shared platforms, it should be
+		 * TRUE to instruct zro_search to always skip shared libraries */
+		zro_search(&objstr, &objdir, &srcstr, &srcdir, NON_USHBIN_ONLY(TRUE) USHBIN_ONLY(FALSE));
 		if (!objdir && !srcdir)
 			rts_error(VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 				ERR_FILENOTFND, 2, v->str.len, v->str.addr);
@@ -195,6 +196,7 @@ void op_zlink (mval *v, mval *quals)
 	{
 		if (objdir)
 		{
+			assert(ZRO_TYPE_OBJLIB != objdir->type);
 			if (objdir->str.len + objnamelen + 2 > sizeof(objnamebuf))
 				rts_error(VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 			if (objdir->str.len)
@@ -211,7 +213,7 @@ void op_zlink (mval *v, mval *quals)
 		POLL_OBJECT_FILE(objnamebuf, obj_desc);
 		if (obj_desc == -1)
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr, errno);
-		if (!incr_link (obj_desc))
+		if (USHBIN_ONLY(!incr_link(obj_desc, NULL)) NON_USHBIN_ONLY(!incr_link(obj_desc)))
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr, ERR_VERSION);
 		status = close (obj_desc);
 		if (status == -1)
@@ -230,6 +232,7 @@ void op_zlink (mval *v, mval *quals)
 
 		if (srcdir)
 		{
+			assert(ZRO_TYPE_OBJLIB != objdir->type);
 			if (srcdir->str.len + srcnamelen > sizeof(srcnamebuf) - 1)
 				rts_error(VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 			if (srcdir->str.len)
@@ -245,6 +248,17 @@ void op_zlink (mval *v, mval *quals)
 		}
 		if (objdir)
 		{
+			if (ZRO_TYPE_OBJLIB == objdir->type)
+			{
+				NON_USHBIN_ONLY(GTMASSERT;)
+				assert(objdir->shrlib);
+				assert(objdir->shrsym);
+				USHBIN_ONLY(
+					if (!incr_link(0, objdir))
+						GTMASSERT;
+				)
+				return;
+			}
 			if (objdir->str.len + objnamelen > sizeof(objnamebuf) - 1)
 				rts_error(VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 			if (objdir->str.len)
@@ -321,7 +335,7 @@ void op_zlink (mval *v, mval *quals)
 		POLL_OBJECT_FILE(objnamebuf, obj_desc);
 		if (obj_desc == -1)
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
-		status = incr_link(obj_desc);
+		status = USHBIN_ONLY(incr_link(obj_desc, NULL)) NON_USHBIN_ONLY(incr_link(obj_desc));
 		if (!status)	/* due only to version mismatch, so recompile */
 		{
 			status = close (obj_desc);
@@ -348,7 +362,7 @@ void op_zlink (mval *v, mval *quals)
 			POLL_OBJECT_FILE(object_file_name, obj_desc);
 			if (obj_desc == -1)
 				rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
-			if (!incr_link (obj_desc))
+			if (USHBIN_ONLY(!incr_link(obj_desc, NULL)) NON_USHBIN_ONLY(!incr_link(obj_desc)))
 				GTMASSERT;
 		}
 		status = close (obj_desc);

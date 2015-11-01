@@ -88,9 +88,10 @@ void ch_trace_point() {return;}
 
 #define PRN_ERROR		util_cond_flush();
 
-/* With the introduction of call-ins, there could be multiple mdb_condition_handlers
- * stacked up in chnd stack. The active context should be reset to the youngest
- * mdb_condition_handler created by the current gtm/call-in invocation */
+/* MUM_TSTART unwinds the current C-stack and restarts executing generated code from the top of the current M-stack.
+ * With the introduction of call-ins, there could be multiple mdb_condition_handlers stacked up in chnd stack.
+ * The active context should be reset to the youngest mdb_condition_handler created by the current gtm/call-in invocation
+ */
 #define MUM_TSTART		{					\
                                         CHTRACEPOINT;			\
 					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--)	; \

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@
 #include "fgncal.h"
 #include "gtmci.h"
 #include "eintr_wrappers.h"
+#include "error.h"
 
 #define	CR			0x0A		/* Carriage return */
 #define	NUM_TABS_FOR_GTMERRSTR	2
@@ -42,7 +43,6 @@
 #define	SPACE_BLOCK_SIZE	1024
 #define	TABLEN			8
 #define	POINTER_SIZE		6
-#define	MAX_DIGITS		10
 
 static 	int	ext_source_line_num;
 static  int	ext_source_line_len;
@@ -206,10 +206,10 @@ static enum xc_types	scan_keyword (char **c)
 
 static 	int scan_array_bound(char **b,int curr_type)
 {
-	char 	number[MAX_DIGITS];
-	char	*c;
-	char 	*line;
-	int 	index;
+	char 		number[MAX_DIGITS_IN_INT];
+	char		*c;
+	char 		*line;
+	int 		index;
 	error_def	(ERR_ZCCSQRBR);
 	error_def	(ERR_ZCPREALLNUMEX);
 
@@ -380,7 +380,7 @@ struct extcall_package_list	*exttab_parse (mval *package)
 		/* External call table is a null file */
 		rts_error(VARLSTCNT(4) ERR_ZCCTNULLF, 2, package->str.len, package->str.addr);
 	}
-	pakhandle = fgn_getpak(str_buffer);
+	pakhandle = fgn_getpak(str_buffer, INFO);
 	if (NULL == pakhandle)
 	{
 		/* Unable to obtain handle to the shared library */
@@ -528,7 +528,15 @@ struct extcall_package_list	*exttab_parse (mval *package)
 		}
 		put_mstr(&rtnnam, &entry_ptr->entry_name);
 		put_mstr(&callnam, &entry_ptr->call_name);
-		entry_ptr->fcn = fgn_getrtn(pak->package_handle, &entry_ptr->call_name);
+
+		/* the reason for passing INFO severity is that PROFILE has several routines listed in
+		 * the external call table that are not in the shared library. PROFILE folks would
+		 * rather see info/warning messages for such routines at shared library open time,
+		 * than error out. These unimplemented routines, they say were not being called from
+		 * the application and wouldn't cause any application failures. If we fail to open
+		 * the shared libary, or we fail to locate a routine that is called from the
+		 * application, we issue rts_error message (in extab_parse.c) */
+		entry_ptr->fcn = fgn_getrtn(pak->package_handle, &entry_ptr->call_name, INFO);
 #ifdef DEBUG_EXTCALL
 		FPRINTF(stderr, "   package entry point: %s, address: %x\n", entry_ptr->entry_name.addr, entry_ptr->fcn);
 #endif

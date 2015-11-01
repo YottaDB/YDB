@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <errno.h>
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include <arpa/inet.h>
 #include "gtm_string.h"
@@ -53,7 +53,6 @@ LITREF	char			gtm_release_name[];
 LITREF	int4			gtm_release_name_len;
 
 #define MAX_RES_TRIES		620 		/* Also defined in gvcst_init_sysops.c */
-#define MEGA_BOUND		(1024*1024)
 
 void recvpool_init(recvpool_user pool_user,
 		   boolean_t gtmrecv_startup,

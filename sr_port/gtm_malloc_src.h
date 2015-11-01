@@ -209,12 +209,15 @@ typedef struct storExtHdrStruct
 #  define STE_FP(p) p->userStorage.links.fPtr
 #  define STE_BP(p) p->userStorage.links.bPtr
 #endif
-/* We define two constants here: EXTENT_USED is the amount of storage that we will actually
-   be using. But since this storage must be aligned on a MAXTWO boundary, we allocate one extra
-   extent in EXTENT_SIZE so we are guarranteed that our alignment can be done.
+/* Our extent must be aligned on a MAXTWO byte boundary hence we allocate one more extent than
+   we actually want so we can be guarranteed usable storage. However if that allocation actually
+   starts on a MAXTWO boundary (on guarranteed 8 byte boundary), then we get an extra element.
+   Here we define our extent size and provide an initial sanity value for "extent_used". If the
+   allocator ever gets this extra block, this field will be increased by the size of one element
+   to compensate.
 */
 #define EXTENT_SIZE ((MAXTWO * (ELEMS_PER_EXTENT + 1)) + sizeof(storExtHdr))
-#define EXTENT_USED (MAXTWO * ELEMS_PER_EXTENT + sizeof(storExtHdr))
+static unsigned int extent_used = (MAXTWO * ELEMS_PER_EXTENT + sizeof(storExtHdr));
 /* Following are values used in queueIndex in a storage element. Note that both
    values must be less than zero for the current code to function correctly. */
 #define QUEUE_ANCHOR		-1
@@ -348,10 +351,10 @@ STATICD readonly struct
 /* Arrays allocated with size of MAXINDEX + 2 are sized to hold an extra
    entry for "real malloc" type allocations. */
 
-STATICD readonly uint4 TwoTable[MAXINDEX + 2] = {64, 128, 256, 512, 1024, 2048, 0xFFFFFFFF};		/* Powers of two element sizes */
+STATICD readonly uint4 TwoTable[MAXINDEX + 2] = {64, 128, 256, 512, 1024, 2048, 0xFFFFFFFF};	/* Powers of two element sizes */
 STATICD readonly unsigned char markerChar[4] = {0xde, 0xad, 0xbe, 0xef};
 #else
-STATICD readonly uint4 TwoTable[MAXINDEX + 2] = {16, 32, 64, 128, 256, 512, 1024, 2048, 0xFFFFFFFF};	/* Powers of two element sizes */
+STATICD readonly uint4 TwoTable[MAXINDEX + 2] = {16, 32, 64, 128, 256, 512, 1024, 2048, 0xFFFFFFFF};
 #endif
 STATICD storElem	freeStorElemQs[MAXINDEX + 1];	/* Need full element as queue anchor for dbl-linked
 							   list since ptrs not at top of element */
@@ -440,7 +443,7 @@ STATICR void gtmSmInit(void)
 	/* Check that the storage queue offset in a storage element has sufficient reach
 	   to cover an extent.
 	*/
-	assert(((EXTENT_USED - sizeof(storExtHdr)) <= ((1 << (sizeof(uStor->extHdrOffset) * 8)) - 1)));
+	assert(((extent_used - sizeof(storExtHdr)) <= ((1 << (sizeof(uStor->extHdrOffset) * 8)) - 1)));
 
 	/* Initialize size table used to get a storage queue index */
 	sizeIndex = 0;
@@ -566,6 +569,7 @@ storElem *findStorElem(int sizeIndex)
 		{
 			i = 0;		/* The storage was suitably aligned, we get an extra block free */
 			sEHdr = (storExtHdr *)((char *)sEHdr + MAXTWO);
+			extent_used = EXTENT_SIZE; /* New max for sanity checks */
 		} else
 			i = 1;		/* The storage was not aligned. Have planned number of blocks with some waste */
 		assert(((char *)sEHdr + sizeof(*sEHdr)) <= ((char *)uStorAlloc + EXTENT_SIZE));
@@ -576,7 +580,7 @@ storElem *findStorElem(int sizeIndex)
 			uStor2->state = Free;
 			uStor2->queueIndex = MAXINDEX;
 			uStor2->extHdrOffset = (char *)sEHdr - (char *)uStor2;
-			assert(EXTENT_USED > uStor2->extHdrOffset);
+			assert(extent_used > uStor2->extHdrOffset);
 #ifdef DEBUG
 			memcpy(uStor2->headMarker, markerChar, sizeof(markerChar));
 			/* Backfill entire block on free queue so we can detect trouble
@@ -1155,7 +1159,7 @@ void verifyFreeStorage(void)
 			assert(0 == ((unsigned long)uStor & (TwoTable[i] - 1)));			/* Verify alignment */
 			assert(Free == uStor->state);							/* Verify state */
 			assert(0 == memcmp(uStor->headMarker, markerChar, sizeof(markerChar)));		/* Verify metadata marker */
-			assert(MAXINDEX != i || EXTENT_USED > uStor->extHdrOffset);
+			assert(MAXINDEX != i || extent_used > uStor->extHdrOffset);
 			if (GDL_SmChkFreeBackfill & gtmDebugLevel)
 			{	/* Use backfill check method for verifying freed storage is untouched */
 				assert(backfillChk((unsigned char *)uStor + hdrSize, TwoTable[i] - hdrSize));
@@ -1186,7 +1190,7 @@ void verifyAllocatedStorage(void)
 			assert(0 == memcmp(uStor->headMarker, markerChar, sizeof(markerChar)));	/* Verify metadata markers */
 			trailerMarker = (unsigned char *)&uStor->userStorage.userStart+uStor->allocLen;/* Where  trailer was put */
 			assert(0 == memcmp(trailerMarker, markerChar, sizeof(markerChar)));
-			assert(MAXINDEX != i || EXTENT_USED > uStor->extHdrOffset);
+			assert(MAXINDEX != i || extent_used > uStor->extHdrOffset);
 			if (GDL_SmChkAllocBackfill & gtmDebugLevel)
 			{	/* Use backfill check method for after-allocation metadata */
 				assert(backfillChk(trailerMarker + sizeof(markerChar),

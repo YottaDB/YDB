@@ -59,14 +59,7 @@ void zshow_stack(zshow_out *output)
 				*nfp++ = (fp->flags & SFF_ZTRAP_ERR) ? SFT_ZTRAP : SFT_DEV_ACT;
 				line_reset = TRUE;
 			}
-			if ((unsigned char*)fp->rvector + fp->rvector->current_rhead_ptr == fp->mpc)
-				addr = fp->mpc + 1;
-			/*The equality check in the second half of the expression below is to
-			  account for the delay-slot in HP-UX for implicit quits. Not an issue here,
-			  but added for uniformity. */
-			else if (line_reset &&
-				((unsigned char *) fp->rvector + fp->rvector->ptext_ptr <= fp->mpc &&
-				fp->mpc <= (unsigned char *) fp->rvector + fp->rvector->vartab_ptr))
+			if (line_reset && ADDR_IN_CODE(fp->mpc, fp->rvector))
 			{
 				addr = fp->mpc + 1;
 				line_reset = FALSE;

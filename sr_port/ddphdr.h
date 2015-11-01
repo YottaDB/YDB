@@ -17,6 +17,10 @@ typedef int4 condition_code;
 #define MAX_ETHER_DATA_SIZE 		1500
 #define ETHERNET_HEADER_SIZE 		14	/* Is size of Destination address + source address + protocol # */
 #define ETHERADDR_LENGTH		6
+#define MIN_ETH_RECV_BUFCNT		1	/* from OpenVMS I/O User's Reference Manual, system default */
+#define MAX_ETH_RECV_BUFCNT		255	/* from OpenVMS I/O User's Reference Manual */
+#define ETH_RCV_BUFCNT			64	/* GT.CM DDP default */
+#define DDP_ETH_PROTO_TYPE		((unsigned short)0x3980)	/* will be seen as 8039 on the wire */
 
 #define DDP_MIN_MSG_LEN			64
 #define DDP_PROTO_VERSION		0x02 /* MSM, DSM-11 use version 2; DSM 6.0 & 6.1, DDP-DOS V1.00.8+ use version 4 */
@@ -70,20 +74,24 @@ typedef int4 condition_code;
 #define DDP_GROUP_LOGICAL_PREFIX	"GTMDDP_GROUPS_"
 #define DDP_ETHER_DEV_PREFIX		"GTMDDP_CONTROLLER_"
 #define DDP_MAXRECSIZE_PREFIX		"GTMDDP_MAXRECSIZE_"
+#define DDP_ETH_RCV_BUFCNT_PREFIX	"GTMDDP_ETHRCVBUFCNT_"
+#define DDP_MAXREQCREDITS_PREFIX	"GTMDDP_MAXREQCREDITS_"
 #define DDP_CLIENT_CKTNAM_LOGI		"GTMDDP_CIRCUIT_NAME"
 
-#define DDP_MAX_VOLSETS		16
-#define DDP_TEXT_ID_LENGTH	3
-#define DDP_ANNOUNCE_CODE_LEN	2		/* "WI" or "II" */
-#define MAXIMUM_PROCESSES	256
-#define DDP_MAX_GROUP		16
-#define DDP_DEFAULT_GROUP_MASK	0x0001		/* member of group 0 */
-#define DDP_MIN_RECSIZE		1024
+#define DDP_MAX_VOLSETS			16
+#define DDP_TEXT_ID_LENGTH		3
+#define DDP_ANNOUNCE_CODE_LEN		2		/* "WI" or "II" */
+#define MAXIMUM_PROCESSES		256
+#define DDP_MAX_GROUP			16
+#define DDP_DEFAULT_GROUP_MASK		0x0001		/* member of group 0 */
+#define DDP_MIN_RECSIZE			1024
+#define DDP_LEAST_MAXREQCREDITS		1
+#define DDP_LARGEST_MAXREQCREDITS	0xFF
 
 /* some constants that were derived from DSM packets */
 #define DDP_GROUP_MASK			0x0101
 #define DDP_ADVERTISE_INTERVAL		0x00
-#define DDP_MAX_REQUEST_CREDITS		0x14
+#define DDP_MAX_REQUEST_CREDITS		0x04
 #define DDP_CPU_TYPE			0x01
 #define DDP_SOFTWARE_VERSION		0x00
 #define DDP_CPU_LOAD_RATING		0x00
@@ -99,6 +107,19 @@ typedef int4 condition_code;
 #define DDP_NODE_STATUS_DISABLED	0x20 /* bit is 1 if disabled, 0 if enabled */
 
 #define DDP_NODE_STATUS_ALL_CLEAR	0x00 /* read enabled + write enabled + reachable + no state change + circuit enabled */
+
+#define DDP_LOG_ERROR(err_len, err_string)											\
+{																\
+	time_t			now;												\
+	char			*time_ptr;											\
+	bool			save_dec_nofac;											\
+																\
+	GET_CUR_TIME;														\
+	save_dec_nofac = dec_nofac; /* save for later restore */								\
+	dec_nofac = TRUE; /* don't need error mnemonic prefix, just print the message contents */				\
+	dec_err(VARLSTCNT(6) ERR_DDPLOGERR, 4, CTIME_BEFORE_NL, time_ptr, (err_len), (err_string));				\
+	dec_nofac = save_dec_nofac; /* back to what it was */									\
+}
 
 /* All structures that are DDP messages should be packed; do not let the compiler pad for structure member alignment */
 #pragma member_alignment save

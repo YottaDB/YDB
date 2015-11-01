@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,13 +50,11 @@ void gtcml_lkstarve(TID timer_id, int4 data_len, connection_struct **connection)
 	 * block only SIGALRM. Here, we need to block the CMI signals as well. */
 	CMI_MUTEX_BLOCK;
 #endif
-/* what is this really testing? smw 97/7/2
-	if (((connection_struct *)RELQUE2PTR(cnx->qent.fl))->qent.bl + cnx->qent.fl != 0)
-*/
 	if (curr_entry != cnx && !cnx->waiting_in_queue)
 	{
 		gtcm_action_pending(cnx);
 		cnx->new_msg = FALSE;
+		VMS_ONLY(if (action_que.bl == action_que.fl) GT_WAKE;)	/* if only message on queue kick it */
 	} else
 		on_queue_p++;
 #ifdef UNIX

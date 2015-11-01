@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -125,7 +125,7 @@ void dse_shift(void)
 	if (offset < sizeof(blk_hdr) || offset > size)
 	{
 		util_out_print("Error:  offset not in range of block.", TRUE);
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		if (lbp)
 			free(lbp);
 		return;
@@ -136,7 +136,7 @@ void dse_shift(void)
 		if (shift + size >= cs_addrs->hdr->blk_size)
 		{
 			util_out_print("Error:  block not large enough to accomodate shift.", TRUE);
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			if (lbp)
 				free(lbp);
 			return;
@@ -158,7 +158,7 @@ void dse_shift(void)
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
 		util_out_print("Error: bad blk build.", TRUE);
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		if (lbp)
 			free(lbp);
 		return;

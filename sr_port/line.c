@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,12 +61,13 @@ int line(uint4 *lnc)
 		int_label();
 
 	if (window_token == TK_IDENT || (cmd_qlf.qlf & CQ_LINE_ENTRY))
-	{
 		start_fetches(OC_LINEFETCH);
-		curlin->line_number = *lnc;
-		*lnc = *lnc + 1;
-		curlin->table = TRUE;
-	}
+	else
+		newtriple(OC_LINESTART);
+
+	curlin->line_number = *lnc;
+	*lnc = *lnc + 1;
+	curlin->table = TRUE;
 	pos_in_chain = *curtchain;
 
 	if (window_token == TK_IDENT)

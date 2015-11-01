@@ -180,7 +180,7 @@ CMD		<Command expected but not found>/error/fao=0!/ansi=0
 COLON		<Colon (:) expected in this context>/error/fao=0!/ansi=0
 COMMA		<Comma expected in this context>/error/fao=0!/ansi=0
 COMMAORRPARENEXP	<Comma or right parenthesis expected but not found>/error/fao=0!/ansi=0
-COMMENT		<Comment line.  Placed zbreak at next line.>/info/fao=0!/ansi=0
+COMMENT		<Comment line.  Placed zbreak at next executable line.>/info/fao=0!/ansi=0
 CTRAP		<Character trap $C(!UL) encountered>/error/fao=1!/ansi=0
 CTRLC		<CTRL_C encountered>/info/fao=0!/ansi=0
 CTRLY		<User interrupt encountered>/info/fao=0!/ansi=0
@@ -1081,7 +1081,7 @@ CINOENTRY	<No entry specified for !AD in the call-in table>/error/fao=2!/ansi=0
 JNLINVSWITCHLMT	<Journal AUTOSWITCHLIMIT [!UL] falls outside of allowed limits [!UL] and [!UL]>/error/fao=3!/ansi=0
 SETZDIR		<Cannot change working directory to !AD>/error/fao=2!/ansi=0
 JOBACTREF	<Actual parameter in job command passed by reference>/error/fao=0!/ansi=40
-ECLOSTMID	<ECODE exceeded maximum string length, all codes except the first and last suppressed>/warning/fao=0!/ansi=0
+ECLOSTMID	<$ECODE overflow, the first and last ecodes are retained, but some intervening ecodes have been lost>/warning/fao=0!/ansi=0
 ZFF2MANY	<Number of characters specified for ZFF deviceparameter (!UL) is more than the maximum allowed (!UL)>/error/fao=2!/ansi=0
 JNLFSYNCLSTCK	<Journaling fsync lock is stuck>/info/fao=0!/ansi=0
 DELIMWIDTH	<Delimiter length !UL exceeds device width !UL>/error/fao=2!/ansi=0
@@ -1143,6 +1143,11 @@ DDPRECSIZNOTNUM	<Maximum record size is not numeric>/error/fao=0!/ansi=0
 DDPOUTMSG2BIG	<DDP message too big to be accommodated in outbound buffer>/error/fao=0!/ansi=0
 DDPNOSERVER	<DDP Server not running on local node>/error/fao=0!/ansi=0
 MUTEXRELEASED	<Process !UL [0x!XL] has released the critical section for database !AD to avoid deadlock. $TLEVEL: !UL  t_tries: !UL>/error/fao=6!/ansi=0
+JNLCRESTATUS	<!AD at line !UL for journal file !AD, database file !AD encountered status: 0x!XL IOSB: 0x!XW>/warning/fao=9!/ansi=0
+ZBREAKFAIL	<Could not set breakpoint at !AD due to insufficient memory>/info/fao=2!/ansi=0
+DLLVERSION	<Routine !AD in library !AD was compiled with an incompatible version of GT.M.  Recompile with the current version and re-link.>/error/fao=4!/ansi=0
+INVZROENT	<!AD is neither a directory nor an object library(DLL)>/error/fao=2!/ansi=0
+DDPLOGERR	<!AD: !AD>/error/fao=4!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

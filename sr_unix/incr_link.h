@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #ifndef INCR_LINK_INCLUDED
 #define INCR_LINK_INCLUDED
 
-bool incr_link(int file_desc);
+NON_USHBIN_ONLY(bool incr_link(int file_desc);)
+USHBIN_ONLY(bool incr_link(int file_desc, zro_ent *zro_entry);)
 
 #endif /* INCR_LINK_INCLUDED */

@@ -431,128 +431,135 @@ boolean_t mu_int_blk(
 			memcpy(old_buff, buff, comp_length);
 			memcpy(buff + rec_cmpc, key_base, key_size);
 			buff_length = rec_cmpc + key_size;
-			if (!master_dir && !level)
+			if (!master_dir)
 			{	/* master_directory has no subscripts; block splits don't preserve numeric integrity in index */
 				if (muint_subsc)
 				{
 					if (muint_end_key)
 					{
-						if (memcmp(buff, muint_end_key->base, muint_start_key->end) > 0)
+						if (memcmp(buff, muint_end_key->base, muint_end_key->end + 1) > 0)
 						{
 							if (level)
 								muint_range_done = TRUE;
 							else
 							{
 								mu_int_recs[level]--;
+								mu_int_plen--;
+								free(blk_base);
 								return TRUE;
 							}
 						}
-						if (memcmp(buff, muint_start_key->base, muint_start_key->end) < 0)
+						if (memcmp(buff, muint_start_key->base, muint_start_key->end + 1) < 0)
 						{
 							mu_int_recs[level]--;
 							continue;
 						}
 					} else
 					{
-						if (memcmp(buff, muint_start_key->base, muint_start_key->end) > 0)
+						if (memcmp(buff, muint_start_key->base, muint_start_key->end + 1) > 0)
 						{
 							if (level)
 								muint_range_done = TRUE;
 							else
 							{
 								mu_int_recs[level]--;
+								mu_int_plen--;
+								free(blk_base);
 								return TRUE;
 							}
 						}
-						if (memcmp(buff, muint_start_key->base, muint_start_key->end) < 0)
+						if (memcmp(buff, muint_start_key->base, muint_start_key->end + 1) < 0)
 						{
 							mu_int_recs[level]--;
 							continue;
 						}
 					}
 				}
-				s_index = 0;
-				if (NO_SUBSCRIPTS != mu_sub_list[0].index)
+				if (!level)
 				{
-					for (;  (mu_sub_list[s_index].index < (short int)rec_cmpc - 1) &&
-							mu_sub_list[s_index].index > 0;)
+					s_index = 0;
+					if (NO_SUBSCRIPTS != mu_sub_list[0].index)
+					{
+						for (;  (mu_sub_list[s_index].index < (short int)rec_cmpc - 1) &&
+								mu_sub_list[s_index].index > 0;)
+							if (MAX_GVSUBSCRIPTS <= s_index++)
+								break;
+						if (s_index)
+							s_index--;
+					} else		/* scan off key */
+					{
+						for (b_index = 0;  buff[b_index];  b_index++)
+							;
+						b_index++;
+						mu_sub_list[0].index = b_index;
+					}
+					b_index = mu_sub_list[s_index].index;
+					start_index = s_index;
+					while (buff[b_index])
+					{
+						if (mu_int_exponent[buff[b_index]])
+							mu_sub_list[s_index].numeric = TRUE;
+						else
+							mu_sub_list[s_index].numeric = FALSE;
+						mu_sub_list[s_index].index = b_index;
+						for (;  buff[b_index];  b_index++)
+							;
+						b_index++;
 						if (MAX_GVSUBSCRIPTS <= s_index++)
 							break;
-					if (s_index)
-						s_index--;
-				} else		/* scan off key */
-				{
-					for (b_index = 0;  buff[b_index];  b_index++)
-						;
-					b_index++;
-					mu_sub_list[0].index = b_index;
-				}
-				b_index = mu_sub_list[s_index].index;
-				start_index = s_index;
-				while (buff[b_index])
-			  	{
-					if (mu_int_exponent[buff[b_index]])
-						mu_sub_list[s_index].numeric = TRUE;
-					else
-						mu_sub_list[s_index].numeric = FALSE;
-					mu_sub_list[s_index].index = b_index;
-					for (;  buff[b_index];  b_index++)
-						;
-					b_index++;
-					if (MAX_GVSUBSCRIPTS <= s_index++)
-						break;
-				}
-				if (MAX_GVSUBSCRIPTS < s_index)
-				{
-					mu_int_err(ERR_DBMAXNRSUBS, TRUE, TRUE, buff,
-						comp_length, top_key, top_len, (unsigned int)blk_levl);
-					mu_int_plen++;	/* continuing, so compensate for mu_int_err decrement */
-					break;
-				}
-				mu_sub_list[s_index].index = 0;
-				for (;  (start_index != s_index) && (0 != mu_sub_list[start_index].index);  start_index++)
-				{
-					if (mu_sub_list[start_index].numeric)
+					}
+					if (MAX_GVSUBSCRIPTS < s_index)
 					{
-						b_index = mu_sub_list[start_index].index;
-						if (buff[b_index] > NEG_SUB)
+						mu_int_err(ERR_DBMAXNRSUBS, TRUE, TRUE, buff,
+							comp_length, top_key, top_len, (unsigned int)blk_levl);
+						mu_int_plen++;	/* continuing, so compensate for mu_int_err decrement */
+						break;
+					}
+					mu_sub_list[s_index].index = 0;
+					for (;  (start_index != s_index) && (0 != mu_sub_list[start_index].index);  start_index++)
+					{
+						if (mu_sub_list[start_index].numeric)
 						{
-							b_index++;
-							while (buff[b_index])
+							b_index = mu_sub_list[start_index].index;
+							if (buff[b_index] > NEG_SUB)
 							{
-								memcpy(&check_vals, &buff[b_index], 1);
-								if (!mu_int_possub[check_vals.one][check_vals.two])
+								b_index++;
+								while (buff[b_index])
 								{
-									mu_int_err(ERR_DBBADNSUB, TRUE, TRUE,
-										buff, comp_length, top_key, top_len,
-										(unsigned int)blk_levl);
+									memcpy(&check_vals, &buff[b_index], 1);
+									if (!mu_int_possub[check_vals.one][check_vals.two])
+									{
+										mu_int_err(ERR_DBBADNSUB, TRUE, TRUE,
+											buff, comp_length, top_key, top_len,
+											(unsigned int)blk_levl);
+										free(blk_base);
+										return FALSE;
+									}
+									b_index++;
+								}
+							} else
+							{
+								b_index++;
+								while ((STR_SUB_PREFIX != buff[b_index]) && (0 != buff[b_index]))
+								{
+									memcpy(&check_vals, &buff[b_index], 1);
+									if (!mu_int_negsub[check_vals.one][check_vals.two])
+									{
+										mu_int_err(ERR_DBBADNSUB, TRUE, TRUE,
+											buff, comp_length, top_key, top_len,
+											(unsigned int)blk_levl);
+										free(blk_base);
+										return FALSE;
+									}
+									b_index++;
+								}
+								if (STR_SUB_PREFIX != buff[b_index++] || (buff[b_index]))
+								{
+									mu_int_err(ERR_DBBADNSUB, TRUE, TRUE, buff, comp_length,
+											top_key, top_len, (unsigned int)blk_levl);
 									free(blk_base);
 									return FALSE;
 								}
-								b_index++;
-							}
-						} else
-						{
-							b_index++;
-							while ((STR_SUB_PREFIX != buff[b_index]) && (0 != buff[b_index]))
-							{
-								memcpy(&check_vals, &buff[b_index], 1);
-								if (!mu_int_negsub[check_vals.one][check_vals.two])
-								{
-									mu_int_err(ERR_DBBADNSUB, TRUE, TRUE,
-										buff, comp_length, top_key, top_len,
-										(unsigned int)blk_levl);
-									free(blk_base);
-									return FALSE;
-								}
-								b_index++;
-							}
-							if (STR_SUB_PREFIX != buff[b_index++] || (buff[b_index]))
-							{
-								mu_int_err(ERR_DBBADNSUB, TRUE, TRUE, buff, comp_length,
-										top_key, top_len, (unsigned int)blk_levl);
-								free(blk_base);
-								return FALSE;
 							}
 						}
 					}
@@ -598,6 +605,7 @@ boolean_t mu_int_blk(
 					mu_int_err(ERR_DBBDBALLOC, TRUE, TRUE, old_buff, comp_length, buff, buff_length,
 							(unsigned int) ((blk_hdr_ptr_t)ptr)->levl);
 					mu_int_plen--;
+					free(blk_base);
 					return FALSE;
 				}
 				mu_int_blks[0]++;
@@ -627,15 +635,15 @@ boolean_t mu_int_blk(
 					if (muint_end_key)	/* range */
 					{
 						len = c1 - temp_buff + 1;
-						if ((0 >= memcmp(muint_start_key->base, temp_buff, len < muint_start_keyend ?
+						if ((0 < memcmp(muint_start_key->base, temp_buff, len < muint_start_keyend ?
 									len : muint_start_keyend))
-							&& (0 >  memcmp(muint_end_key->base, temp_buff, len < muint_end_keyend ?
+							|| (0 >  memcmp(muint_end_key->base, temp_buff, len < muint_end_keyend ?
 									len : muint_end_keyend)))
 								continue;
 					} else
 					{
-						if (((muint_start_keyend - 1) == (c1 - temp_buff))
-							&& (memcmp(muint_start_key->base, temp_buff, muint_start_keyend)))
+						if (((muint_start_keyend - 1) != (c1 - temp_buff))
+							|| (memcmp(muint_start_key->base, temp_buff, muint_start_keyend)))
 								continue;
 					}
 				}

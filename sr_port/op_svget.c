@@ -84,6 +84,7 @@ GBLREF mval		dollar_system;
 GBLREF mval		dollar_zinterrupt;
 GBLREF boolean_t	dollar_zininterrupt;
 GBLREF int4		zdir_form;
+GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 
 LITREF mval		literal_zero,literal_one;
 LITREF char		gtm_release_name[];
@@ -190,7 +191,7 @@ void op_svget(int varnum, mval *v)
 		MV_FORCE_MVAL(v, 0);
 		break;
 	case SV_ZCMDLINE:
-		get_command_line(v);
+		get_command_line(v, TRUE);	/* TRUE to indicate we want $ZCMDLINE (i.e. processed not actual command line) */
 		break;
 	case SV_ZEOF:
 		*v = io_curr_device.in->dollar.zeof ? literal_one : literal_zero;
@@ -268,6 +269,7 @@ void op_svget(int varnum, mval *v)
 	case SV_ZTRAP:
 		v->mvtype = MV_STR;
 		v->str = dollar_ztrap.str;
+		assert(!v->str.len || !ztrap_explicit_null);
 		s2pool(&(v->str));
 		break;
 	case SV_DEVICE:
@@ -294,7 +296,7 @@ void op_svget(int varnum, mval *v)
 		MV_FORCE_MVAL(v, (NULL == get_ret_targ()) ? 0 : 1);
 		break;
 	case SV_ECODE:
-		dollar_ecode_build(-1, v);
+		ecode_get(-1, v);
 		break;
 	case SV_ESTACK:
 		count = (dollar_zlevel() - 1) - dollar_estack_delta.m[0];
@@ -303,10 +305,11 @@ void op_svget(int varnum, mval *v)
 	case SV_ETRAP:
 		v->mvtype = MV_STR;
 		v->str = dollar_etrap.str;
+		assert(!v->str.len || !ztrap_explicit_null);
 		s2pool(&(v->str));
 		break;
 	case SV_STACK:
-		count = dollar_zlevel() - 1;
+		count = (dollar_zlevel() - 1);
 		MV_FORCE_MVAL(v, count);
 		break;
 	case SV_ZERROR:

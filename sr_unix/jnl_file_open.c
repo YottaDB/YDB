@@ -217,9 +217,9 @@ uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for
 				sts = ERR_JNLOPNERR;
 				continue;
 			}
-			if (eof_record->val.jrec_eof.tn != csa->ti->header_open_tn)
+			if (eof_record->val.jrec_eof.tn != csd->trans_hist.curr_tn)
 			{
-				if (eof_record->val.jrec_eof.tn < csa->ti->header_open_tn)
+				if (eof_record->val.jrec_eof.tn < csd->trans_hist.curr_tn)
 				  jpc->status = ERR_JNLTRANSLSS;
 				else
 				  jpc->status = ERR_JNLTRANSGTR;

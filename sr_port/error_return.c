@@ -26,35 +26,31 @@
 #define BASE_FRAME(fp) ((fp->type & SFT_DM))
 #endif
 
-GBLREF	int4		error_last_ecode;
-GBLREF	stack_frame	*frame_pointer, *error_frame;
-GBLREF	unsigned short	proc_act_type;
-GBLREF	unsigned char	*error_last_mpc_err;
-GBLREF	unsigned char	*error_last_ctxt_err;
-GBLREF	stack_frame	*error_last_frame_err;
+GBLREF	stack_frame		*frame_pointer;
+GBLREF	unsigned short		proc_act_type;
+GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 
 void error_return(void)
 {
 	int		parent_level;
 	stack_frame	*parent_frame;
 	boolean_t	rethrow_needed = FALSE;
+
 	error_def(ERR_REPEATERROR);
 
-	error_frame = NULL;
-	error_last_frame_err = NULL;
-	error_last_mpc_err = error_last_ctxt_err = NULL;
+	NULLIFY_ERROR_FRAME;	/* reset error_frame, error_frame_mpc and error_frame_ctxt */
 	parent_level = dollar_zlevel() - 1;
 	for (parent_frame = frame_pointer->old_frame_pointer;
-		parent_frame && !(parent_frame->type & SFT_COUNT) && !BASE_FRAME(parent_frame);
+		(NULL != parent_frame) && !(parent_frame->type & SFT_COUNT) && !BASE_FRAME(parent_frame);
 		parent_frame = parent_frame->old_frame_pointer)
 		;
-	if ((!parent_frame) || (parent_level < 1))
-	                EXIT(error_last_ecode);
+	if ((NULL == parent_frame) || (parent_level < 1))
+		EXIT(dollar_ecode.error_last_ecode);
 	assert(parent_level > 0);
-	if (!BASE_FRAME(parent_frame) && ecode_check())
+	if (!BASE_FRAME(parent_frame) && (dollar_ecode.index))
 		rethrow_needed = TRUE;
 	if (parent_frame->type & SFT_DM)
-	{ /* hack to retain SFT_DM frame from being unwound by golevel */
+	{	/* hack to retain SFT_DM frame from being unwound by golevel */
 		parent_frame->type |= SFT_COUNT;
 		golevel(parent_level+1);
 		parent_frame->type &= ~SFT_COUNT;
@@ -63,6 +59,9 @@ void error_return(void)
 		golevel(parent_level);
 	assert(!proc_act_type);
 	if (rethrow_needed)
+	{
 		rts_error(VARLSTCNT(1) ERR_REPEATERROR);
+		assert(FALSE);	/* the previous rts_error() should not return */
+	}
 	UNIX_ONLY(MUM_TSTART;)
 }

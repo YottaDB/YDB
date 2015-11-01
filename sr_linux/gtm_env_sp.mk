@@ -36,6 +36,9 @@ gt_as_src_suffix=.s
 # C compiler options
 gt_cc_compiler=gcc
 
+# Do not lookup the source directory before include directories specified by -I.
+gt_cc_option_I=-I-
+
 #	gt_cc_options_common=-c -D_LARGEFILE64_SOURCE=1 -D_FILE_OFFSET_BITS=64
 #	gt_cc_options_common=-c -ansi -DFULLBLOCKWRITES -D_XOPEN_SOURCE=500 -D_BSD_SOURCE -D_POSIX_C_SOURCE=199506L -D_FILE_OFFSET_BITS=64
 # 		FULLBLOCKWRITES to make all block IO read/write the entire block to stave off prereads (assumes blind writes supported)

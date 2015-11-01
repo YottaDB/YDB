@@ -61,7 +61,6 @@ GBLREF	int			cumul_update_array_size;
 GBLREF	ua_list			*first_ua, *curr_ua;
 GBLREF	short			crash_count, dollar_tlevel;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
-GBLREF	jnl_process_vector	*prc_vec;
 GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	buddy_list		*global_tlvl_info_list;
@@ -505,16 +504,6 @@ void gvcst_init (gd_region *greg)
 		GTMASSERT;
 	}
 	db_common_init(greg, csa, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
-	/* initialization of prc_vec is done unconditionally irrespective of whether journaling
-	 * is allowed or not because mupip recover calls mur_recover_write_epoch_rec() which in turn
-	 * calls jnl_put_jrt_pini() which needs an initialized prc_vec even though journaling
-	 * had been disabled when recover did the call to gvcst_init() for that region
-	 */
-	if (NULL == prc_vec)
-	{
-		prc_vec = (jnl_process_vector *)malloc(sizeof(jnl_process_vector));
-		jnl_prc_vector(prc_vec);
-	}
 	/* Compute the maximum journal space requirements for a PBLK (including possible ALIGN record).
 	 * Use this constant in the TOTAL_TPJNL_REC_SIZE and TOTAL_NONTP_JNL_REC_SIZE macros instead of recomputing.
 	 */

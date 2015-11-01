@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,10 +49,8 @@ error_def(ERR_TEXT);
 		UNIX_ONLY(										\
 			memcpy(pakname, env_gtm_env_xlate.addr, env_gtm_env_xlate.len);			\
 			pakname[env_gtm_env_xlate.len]='\0';						\
-			if (NULL == (pakhandle = fgn_getpak(pakname)))					\
-				rts_error(VARLSTCNT(1) ERR_XTRNTRANSDLL);				\
-			if (NULL == (gtm_env_xlate_entry = (int (*)())fgn_getrtn(pakhandle, &routine_name)))	\
-				rts_error(VARLSTCNT(1) ERR_XTRNTRANSDLL);				\
+			pakhandle = fgn_getpak(pakname, ERROR);						\
+			gtm_env_xlate_entry = (int (*)())fgn_getrtn(pakhandle, &routine_name, ERROR);	\
 		)											\
 		VMS_ONLY(										\
 			entry_point.dsc$b_dtype = DSC$K_DTYPE_T;					\

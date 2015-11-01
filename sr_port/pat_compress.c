@@ -33,7 +33,7 @@ int pat_compress(uint4	pattern_mask,
  	assert(pattern_mask);
 	if ((infinite == last_infinite) && !(pattern_mask & PATM_ALT))
 	{
-		lastpat_mask = *lastpatptr & PATM_LONGFLAGS;
+		lastpat_mask = *lastpatptr & (PATM_STRLIT | PATM_LONGFLAGS);
 		if (lastpat_mask == pattern_mask)
 		{
 			if (pattern_mask & PATM_STRLIT)
@@ -42,7 +42,7 @@ int pat_compress(uint4	pattern_mask,
 					return TRUE;
 			} else
 				return TRUE;
-		} else if (infinite && lastpat_mask && !(pattern_mask & PATM_STRLIT))
+		} else if (infinite && lastpat_mask && !(lastpat_mask & PATM_STRLIT) && !(pattern_mask & PATM_STRLIT))
 		{	/* lastpat_mask can be 0 if the previous pattern mask was PATM_ALT which is outside of PATM_LONGFLAGS range.
 			 * Do not compress in that case. Hence the && lastpat_mask in the else if above.
 			 */

@@ -241,6 +241,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					}
 				} else
 				{
+					infinite = FALSE;
 					instr->addr = (char *)inchar;
 					upper_bound = curchar - '0';
 					while (ctypetab[curchar = *inchar++] == TK_DIGIT)
@@ -308,7 +309,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				}
 				pattern_mask = PATM_ALT;
 				cur_alt = &init_alt;
-				alttail.addr = inchar;
+				alttail.addr = (char *)inchar;
 				alttail.len = instr->len - (int4)((char *)inchar - saveinstr);
 				status = patstr(&alttail, &cur_alt->altpat, &inchar);
 				if (status)
@@ -339,7 +340,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				cur_alt = (alternation *)cur_alt->next;
 				cur_alt->next = NULL;
 				done_free = FALSE;
-				alttail.addr = inchar;
+				alttail.addr = (char *)inchar;
 				alttail.len = instr->len - (int4)((char *)inchar - saveinstr);
 				status = patstr(&alttail, &cur_alt->altpat, &inchar);
 				if (status)

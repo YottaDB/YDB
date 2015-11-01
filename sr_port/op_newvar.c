@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@ void op_newvar(uint4 arg1)
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
 
-	varname = &(((vent *)frame_pointer->vartab_ptr)[arg1]);
+	varname = &(((VAR_TABENT *)frame_pointer->vartab_ptr)[arg1]);
 	hte = ht_get(&curr_symval->h_symtab, (mname *)varname);
 	assert(hte);	/* variable must be defined and fetched by this point */
 	if (frame_pointer->type & SFT_COUNT)
@@ -158,7 +158,7 @@ void op_newvar(uint4 arg1)
 		new = mv_st_ent->mv_st_cont.mvs_nval.mvs_val = lv_getslot(curr_symval);
 		ptab = &mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab;
 		varname = &mv_st_ent->mv_st_cont.mvs_nval.name;
-		memcpy(varname, &(((vent *)frame_pointer->vartab_ptr)[arg1]), sizeof(*varname));
+		memcpy(varname, &(((VAR_TABENT *)frame_pointer->vartab_ptr)[arg1]), sizeof(*varname));
 
 		/* For each (indirect) stack frame we have visited, find and set the new value of varname into the
 		   stack frame. Note that varname might not exist in all frames.

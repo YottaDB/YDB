@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,17 +10,18 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "rtnhdr.h"
 #include "zbreak.h"
 
-char *zr_find(z_records *z, char *addr)
+zbrk_struct *zr_find(z_records *zrecs, zb_code *addr)
 {
-	char *c;
+	zbrk_struct *z_ptr;
 
 	/* NOTE: records are stored by decreasing addresses */
-	for (c = z->beg ;c <= z->free ;c += z->rec_size)
+	for (z_ptr = zrecs->beg; z_ptr < zrecs->free; z_ptr++)
 	{
-		if (*(int4*)c == (int) addr)
-			return(c);
+		if (z_ptr->mpc == addr)
+			return(z_ptr);
 	}
-	return((char*)0);
+	return NULL;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,8 +31,11 @@ GBLREF	boolean_t	muint_subsc;
 
 int mu_int_getkey(unsigned char *key_buff, int keylen)
 {
-	mval				v;
-	unsigned char			*ptr, *top, *src, *dest, slit[MAX_KEY_SZ + 1], *tmp;
+	int4		keysize;
+	mval		tmpmval;
+	unsigned char	*top, *startsrc, *src, *dest, slit[MAX_KEY_SZ + 1], *tmp;
+	int		iter;
+	gv_key		*muint_tmpkey;
 
 	src = key_buff;
 	if ('"' == key_buff[keylen - 1])
@@ -42,184 +45,140 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 		keylen--;
 		src++;
 	}
-	muint_start_key = (gv_key*)malloc(sizeof(gv_key) + MAX_KEY_SZ + 1);
-	muint_start_key->top = MAX_KEY_SZ + 1;
-	muint_start_key->prev = 0;
-	for (ptr = src, top = ptr + keylen; ptr < top; ptr++)
-	{
-		if ((':' == *ptr) && ('^' == *(ptr + 1)))
-			break;
-	}
-	if ('^' != *src++)
-	{
-		util_out_print("Error: invalid key.", TRUE);
+	if (0 == keylen)
+	{	/* null subscript specified. signal an error */
+		UNIX_ONLY(assert(FALSE));	/* Unix should not reach here at all. cli_parse() would have errored out */
+		util_out_print("%GTM-E-CLIERR, Unrecognized option : SUBSCRIPT, value expected but not found", TRUE);
 		return FALSE;
 	}
-	if ((MAX_KEY_SZ < (ptr - src)) || (MAX_KEY_SZ < (top - ptr)))
+	keysize = (MAX_KEY_SZ + MAX_NUM_SUBSC_LEN + 4) & (-4);			/* same calculation as done in targ_alloc() */
+	top = src + keylen;
+	startsrc = src;
+	for (iter = 0, top = src + keylen; (iter < 2) && (src < top); iter++)
 	{
-		util_out_print("Error: key too long.", TRUE);
-		return FALSE;
-	}
-	dest = muint_start_key->base;
-	if (ISALPHA(*src) || ('%' == *src))
-		*dest++ = *src++;
-	else
-	{
-		util_out_print("Error: invalid key.", TRUE);
-		return FALSE;
-	}
-	for ( ; (':' != *src) && ('(' != *src) && src < ptr ;src++)
-	{
-		if (ISALNUM(*src))
-			*dest = *src;
+		muint_tmpkey = (gv_key *)malloc(sizeof(gv_key) -1 + keysize); /* same calculation as done in gv_init_reg() */
+		muint_tmpkey->top = keysize;
+		muint_tmpkey->prev = 0;
+		dest = muint_tmpkey->base;
+		if ('^' != *src++)
+		{
+			util_out_print("Error in SUBSCRIPT qualifier : Key does not begin with '^' at offset !UL in !AD",
+					TRUE, src - 1 - startsrc, top - startsrc, startsrc);
+			return FALSE;
+		}
+		if (ISALPHA(*src) || ('%' == *src))
+			*dest++ = *src++;
 		else
 		{
-			util_out_print("Error: invalid key.", TRUE);
+			util_out_print("Error in SUBSCRIPT qualifier : Global variable name does not begin with an alphabet"
+					" or % at offset !UL in !AD", TRUE, src - startsrc, top - startsrc, startsrc);
 			return FALSE;
 		}
-		dest++;
-	}
-	*dest++ = 0;
-	*dest = 0;
-	muint_start_key->end = dest - muint_start_key->base;
-	muint_start_keyend = muint_start_key->end;
-	if ('(' == *src)
-	{
-		muint_subsc = TRUE;
-		src++;
-		for (;;)
+		for ( ; ('(' != *src) && (src < top); )
 		{
-			v.mvtype = MV_STR;
-			if ('\"' != *src)
-			{
-				for (v.str.addr = (char*)src ; (')' != *src) && (',' != *src) ; src++)
-				{
-					if (src == ptr || (*src < '0' || *src > '9') && ('-' != *src) && ('.' != *src))
-					{
-						util_out_print("Error: invalid key.", TRUE);
-						return FALSE;
-					}
-				}
-				v.str.len = src - (unsigned char*)v.str.addr;
-				s2n(&v);
-				v.mvtype &= MV_NUM_MASK;
-			} else
-			{
-				src++;
-				tmp = slit;
-				for (;;)
-				{
-					if (src == ptr)
-					{
-						util_out_print("Error: invalid key.", TRUE);
-						return FALSE;
-					}
-					if ('\"' == *src)
-						if ('\"' != *++src)
-							break;
-					*tmp++ = *src++;
-				}
-				v.str.addr = (char*)slit;
-				v.str.len = tmp - slit;
-			}
-			mval2subsc(&v, muint_start_key);
-			if (',' != *src)
+			if (':' == *src)
 				break;
-			src++;
-		}
-		if (')' != *src++)
-		{
-			util_out_print("Error: invalid key.", TRUE);
-			return FALSE;
-		}
-		dest = muint_start_key->base + muint_start_key->end;
-	}
-	muint_key = TRUE;
-	if (ptr == top)
-		return TRUE;
-	muint_end_key = (gv_key*)malloc(MAX_KEY_SZ + 1);
-	muint_end_key->top = MAX_KEY_SZ + 1;
-	muint_end_key->prev = 0;
-	ptr++;
-	src = ptr;
-	dest = muint_end_key->base;
-	if ('^' != *src++)
-	{
-		util_out_print("Error: invalid key.", TRUE);
-		return FALSE;
-	}
-	if (ISALPHA(*src) || ('%' == *src))
-		*dest++ = *src++;
-	else
-	{
-		util_out_print("Error: invalid key.", TRUE);
-		return FALSE;
-	}
-	for ( ; ('(' != *src) && src < top ;src++)
-	{
-		if (ISALNUM(*src))
-			*dest = *src;
-		else
-		{
-			util_out_print("Error: invalid key.", TRUE);
-			return FALSE;
-		}
-		dest++;
-	}
-	*dest++ = 0;
-	*dest = 0;
-	muint_end_key->end = dest - muint_end_key->base;
-	muint_end_keyend = muint_end_key->end;
-	if ('(' == *src)
-	{
-		muint_subsc = TRUE;
-		src++;
-		for (;;)
-		{
-			v.mvtype = MV_STR;
-			if ('\"' != *src)
+			if (ISALNUM(*src))
+				*dest++ = *src++;
+			else
 			{
-				for (v.str.addr = (char*)src ; (')' != *src) && (',' != *src) ; src++)
-				{
-					if (src == top || (*src < '0' || *src > '9') && ('-' != *src) && ('.' != *src))
-					{
-						util_out_print("Error: invalid key.", TRUE);
-						return FALSE;
-					}
-				}
-				v.str.len = src - (unsigned char *)v.str.addr;
-				s2n(&v);
-				v.mvtype &= MV_NUM_MASK;
-			} else
-			{
-				src++;
-				tmp = slit;
-				for (;;)
-				{
-					if (src == top)
-					{
-						util_out_print("Error: invalid key.", TRUE);
-						return FALSE;
-					}
-					if ('\"' == *src)
-						if ('\"' != *++src)
-							break;
-					*tmp++ = *src++;
-				}
-				v.str.addr = (char *)slit;
-				v.str.len = tmp - slit;
+				util_out_print("Error in SUBSCRIPT qualifier : Global variable name contains non-alphanumeric "
+					"characters at offset !UL in !AD", TRUE, src - startsrc, top - startsrc, startsrc);
+				return FALSE;
 			}
-			mval2subsc(&v, muint_end_key);
-			if (',' != *src)
-				break;
-			src++;
 		}
-		if (')' != *src++)
+		*dest++ = 0;
+		*dest = 0;
+		muint_tmpkey->end = dest - muint_tmpkey->base;
+		if (!iter)
 		{
-			util_out_print("Error: invalid key.", TRUE);
-			return FALSE;
+			muint_start_key = muint_tmpkey;
+			muint_start_keyend = muint_start_key->end;
+		} else
+		{
+			muint_end_key = muint_tmpkey;
+			muint_end_keyend = muint_end_key->end;
 		}
-		dest = muint_end_key->base + muint_end_key->end;
+		if ('(' == *src)
+		{
+			muint_subsc = TRUE;
+			src++;
+			for ( ; src < top; )
+			{
+				tmpmval.mvtype = MV_STR;
+				if ('\"' != *src)
+				{
+					for (tmpmval.str.addr = (char *)src; (src < top) && (')' != *src) && (',' != *src); src++)
+					{
+						if ((*src < '0' || *src > '9') && ('-' != *src) && ('.' != *src))
+						{
+							util_out_print("Error in SUBSCRIPT qualifier : Non-string subscript "
+									"contains non-numerical characters at offset !UL in !AD",
+									TRUE, src - startsrc, top - startsrc, startsrc);
+							return FALSE;
+						}
+					}
+					tmpmval.str.len = src - (unsigned char*)tmpmval.str.addr;
+					if (!tmpmval.str.len)
+					{
+						util_out_print("Error in SUBSCRIPT qualifier : Empty subscript specified at "
+								"offset !UL in !AD",
+								TRUE, src - startsrc, top - startsrc, startsrc);
+						return FALSE;
+					}
+					s2n(&tmpmval);
+					tmpmval.mvtype &= MV_NUM_MASK;
+				} else
+				{
+					src++;
+					tmp = slit;
+					for (;;)
+					{
+						if (src >= top)
+						{
+							util_out_print("Error in SUBSCRIPT qualifier : String subscript does not "
+									"terminate with double-quote (\") character at offset !UL "
+									"in !AD", TRUE, src - startsrc, top - startsrc, startsrc);
+							return FALSE;
+						}
+						if ('\"' == *src)
+							if ('\"' != *++src)
+								break;
+						*tmp++ = *src++;
+					}
+					tmpmval.str.addr = (char*)slit;
+					tmpmval.str.len = tmp - slit;
+				}
+				mval2subsc(&tmpmval, muint_tmpkey);
+				if ((src >= top) || (',' != *src))
+					break;
+				src++;
+			}
+			if (src >= top)
+			{
+				assert(src == top);
+				util_out_print("Error in SUBSCRIPT qualifier : Empty/Incomplete subscript specified at "
+						"offset !UL in !AD",
+						TRUE, src - startsrc, top - startsrc, startsrc);
+				return FALSE;
+			}
+			if (')' != *src++)
+			{
+				util_out_print("Error in SUBSCRIPT qualifier : Subscript terminating right parentheses not found "
+						"at offset !UL in !AD", TRUE, src - 1 - startsrc, top - startsrc, startsrc);
+				return FALSE;
+			}
+		}
+		if (':' == *src)
+			src++;
+		muint_key = TRUE;
+	}
+	if (src < top)
+	{
+		assert(iter == 2);
+		util_out_print("Error: Subscript qualifier keyrange not clear. More than two keys specified at offset !UL in !AD",
+				TRUE, src - startsrc, top - startsrc, startsrc);
+		return FALSE;
 	}
 	return TRUE;
 }

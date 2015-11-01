@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -133,7 +133,7 @@ void jobchild_init(void)
 		} else /* direct mode */
 		{
 			base_addr = make_dmode();
-			transfer_addr = (unsigned char *)base_addr + base_addr->ptext_ptr;
+			transfer_addr = PTEXT_ADR(base_addr);
 		}
 		job_arglist.callargs = 0;
 		/* Set up $ZMODE to "INTERACTIVE" */

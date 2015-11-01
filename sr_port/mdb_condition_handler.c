@@ -76,15 +76,6 @@
 #include "jobexam_process.h"
 #include "jobinterrupt_process_cleanup.h"
 
-#define ERROR_RTN_FRM_CTXT 	(repeat_error || NULL == error_last_frame_err || 		\
-					error_last_frame_err->mpc != CODE_ADDRESS(ERROR_RTN))
-#define SAVE_CURR_FRM_CTXT \
-{							\
-	error_last_mpc_err = frame_pointer->mpc; 	\
-	error_last_ctxt_err = frame_pointer->ctxt; 	\
-	error_last_frame_err = frame_pointer; 		\
-}
-
 GBLREF spdesc           stringpool, rts_stringpool, indr_stringpool;
 GBLREF volatile int4	outofband;
 GBLREF volatile bool	std_dev_outbnd;
@@ -121,22 +112,18 @@ GBLREF boolean_t	created_core;
 GBLREF boolean_t	dont_want_core;
 GBLREF mval		dollar_zstatus, dollar_zerror;
 GBLREF mval		dollar_etrap;
-GBLREF int		error_level;
-GBLREF int4		error_last_ecode;
-GBLREF unsigned char	*error_last_mpc_err;
-GBLREF unsigned char	*error_last_ctxt_err;
-GBLREF stack_frame	*error_last_frame_err;
-GBLREF unsigned char	*error_last_b_line;
 GBLREF volatile int4	gtmMallocDepth;
 GBLREF int4		exi_condition;
 #ifdef VMS
 GBLREF struct chf$signal_array	*tp_restart_fail_sig;
-GBLREF boolean_t	tp_restart_fail_sig_used;
+GBLREF boolean_t		tp_restart_fail_sig_used;
 #endif
-GBLREF int		merge_args;
-GBLREF lvzwrite_struct	lvzwrite_block;
-GBLREF int		process_exiting;
+GBLREF int			merge_args;
+GBLREF lvzwrite_struct		lvzwrite_block;
+GBLREF int			process_exiting;
 GBLREF volatile boolean_t	dollar_zininterrupt;
+GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
+GBLREF dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 
 #define GTMFATAL_ERROR_DUMP_FILENAME "GTM_FATAL_ERROR"
 static readonly mval gtmfatal_error_filename = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(GTMFATAL_ERROR_DUMP_FILENAME) - 1,
@@ -186,7 +173,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 	mval			zpos, dummy_mval;
 	stack_frame		*fp;
 	boolean_t		error_in_zyerror;
-	boolean_t		repeat_error;
+	boolean_t		repeat_error, etrap_handling;
+	int			level;
 
 	static unsigned char dumpable_error_dump_file_parms[2] = {iop_newversion, iop_eol};
 	static unsigned char dumpable_error_dump_file_noparms[1] = {iop_eol};
@@ -217,7 +205,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 
 	START_CH;
 	if (repeat_error = (ERR_REPEATERROR == SIGNAL)) /* assignment and comparison */
-		SIGNAL = error_last_ecode;
+		SIGNAL = dollar_ecode.error_last_ecode;
 	preemptive_ch(SEVERITY);
 	assert((NULL == cs_addrs) || (FALSE == cs_addrs->read_lock));
 	if ((int)ERR_UNSOLCNTERR == SIGNAL)
@@ -306,8 +294,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 			{
 				SET_ZSTATUS(NULL);
 			}
-			if ((0 != dollar_etrap.str.len) && ERROR_RTN_FRM_CTXT)
-				SAVE_CURR_FRM_CTXT;
 			/* On Unix, we need to push out our error now before we potentially overlay it in jobexam_process() */
 			UNIX_ONLY(PRN_ERROR);
 			/* Create dump file */
@@ -445,22 +431,19 @@ CONDITION_HANDLER(mdb_condition_handler)
 			}
 			if (!repeat_error)
 			{
-				error_last_b_line = SET_ZSTATUS(0);
+				dollar_ecode.error_last_b_line = SET_ZSTATUS(0);
 			}
-			if (0 != dollar_etrap.str.len && ERROR_RTN_FRM_CTXT)
-				SAVE_CURR_FRM_CTXT;
 			if (sp_base != rts_stringpool.base)
 			{
 				rts_stringpool = stringpool;	/* update rts_stringpool */
 				stringpool = indr_stringpool;	/* change back */
 			}
-			assert(NULL != error_last_b_line);
+			assert(NULL != dollar_ecode.error_last_b_line);
 			assert(NULL != (unsigned char *)restart_pc);
 			frame_pointer->mpc = (unsigned char *)restart_pc;
 			frame_pointer->ctxt = restart_ctxt;
 			err_act = NULL;
-			error_level = dollar_zlevel() - 1;
-			error_last_ecode = SIGNAL;
+			dollar_ecode.error_last_ecode = SIGNAL;
 			if (std_dev_outbnd && io_std_device.in && io_std_device.in->type == tt &&
 				io_std_device.in->error_handler.len)
 			{
@@ -470,32 +453,55 @@ CONDITION_HANDLER(mdb_condition_handler)
 			{
 				proc_act_type = SFT_DEV_ACT;
 				err_act = &err_dev->error_handler;
-			} else  if (0 != dollar_ztrap.str.len)
+			} else if (NULL != error_frame)
+			{	/* a primary error occurred already. irrespective of whether ZTRAP or ETRAP is active now,
+				 * we need to consider this as a nested error and trigger nested error processing.
+				 */
+				goerrorframe(error_frame);
+				assert(error_frame == frame_pointer);
+				SET_ERROR_FRAME(frame_pointer);	/* reset dollar_ecode.error_frame to frame_pointer as well as reset
+								 * error_frame_mpc, error_frame_ctxt and error_frame->{mpc,ctxt} */
+				proc_act_type = 0;
+			} else if (0 != dollar_ztrap.str.len)
 			{
 				proc_act_type = SFT_ZTRAP;
 				err_act = &dollar_ztrap.str;
-			} else	if (0 != dollar_etrap.str.len)
-			{
-				if (NULL != error_frame)
-				{
-					for (fp = frame_pointer;  fp && fp < error_frame;  fp = fp->old_frame_pointer)
-					{
-						IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(fp);
-						fp->ctxt = CONTEXT(pseudo_ret);
-						fp->mpc = CODE_ADDRESS(pseudo_ret);
-					}
-					assert(fp == error_frame);
-					IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(error_frame);
-					error_frame->mpc = CODE_ADDRESS(ERROR_RTN);
-					error_frame->ctxt = CONTEXT(ERROR_RTN);
-					proc_act_type = 0;
-				} else
-					proc_act_type = SFT_ZTRAP;
-				err_act = &dollar_etrap.str;
 			} else
-			{
-				PRN_ERROR;
-				rts_error(VARLSTCNT(1) ERR_NOEXCNOZTRAP);
+			{	/* either $ETRAP is empty-string or non-empty.
+				 * if non-empty, use $ETRAP for error-handling.
+				 * if     empty,
+				 * 	if ztrap_explicit_null is FALSE use empty-string $ETRAP for error-handling
+				 * 	if ztrap_explicit_null is TRUE  unwind as many frames as possible until we see a frame
+				 * 					where ztrap_explicit_null is FALSE and $ZTRAP is NULL.
+				 * 					in that frame, use $ETRAP for error-handling.
+				 * 					if no such frame is found, exit after printing the error.
+				 */
+				etrap_handling = TRUE;
+				if (ztrap_explicit_null)
+				{
+					assert(0 == dollar_etrap.str.len);
+					for (level = dollar_zlevel() - 1; level > 0; level--)
+					{
+						golevel(level);
+						assert(level == dollar_zlevel());
+						if (!ztrap_explicit_null && !dollar_ztrap.str.len)
+							break;
+					}
+					if (0 >= level)
+					{
+						assert(0 == level);
+						etrap_handling = FALSE;
+					}
+				}
+				if (etrap_handling)
+				{
+					proc_act_type = SFT_ZTRAP;
+					err_act = &dollar_etrap.str;
+				} else
+				{
+					PRN_ERROR;
+					rts_error(VARLSTCNT(1) ERR_NOEXCNOZTRAP);
+				}
 			}
 			if (clean_mum_tstart())
 				MUM_TSTART;
@@ -541,10 +547,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 		mv_chain->mv_st_cont.mvs_stck.mvs_stck_addr = &stacktop;
 	}
 	if (!repeat_error)
-		error_last_b_line = 0;
+		dollar_ecode.error_last_b_line = NULL;
 	/* ----------------------------------------------------------------
 	 * error from direct mode actions does not set $zstatus and is not
-	 * restarted (error_last_b_line = 0); error from transcendental
+	 * restarted (dollar_ecode.error_last_b_line = NULL); error from transcendental
 	 * code does set $zstatus but does not restart the line
 	 * ----------------------------------------------------------------
 	 */
@@ -558,11 +564,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 		}
 		if (!repeat_error)
 		{
-			error_last_b_line = SET_ZSTATUS(&context);
+			dollar_ecode.error_last_b_line = SET_ZSTATUS(&context);
 		}
-		if ((0 != dollar_etrap.str.len) && ERROR_RTN_FRM_CTXT)
-			SAVE_CURR_FRM_CTXT;
-		assert(NULL != error_last_b_line);
+		assert(NULL != dollar_ecode.error_last_b_line);
 		if (sp_base != rts_stringpool.base)
 		{
 			rts_stringpool = stringpool;	/* update rts_stringpool */
@@ -610,15 +614,14 @@ CONDITION_HANDLER(mdb_condition_handler)
 			/*The equality check in the second half of the expression below is to
 			  account for the delay-slot in HP-UX for implicit quits. Not an issue here,
 			  but added for uniformity. */
-			if ((unsigned char *)fp->rvector + fp->rvector->ptext_ptr <= fp->mpc &&
-				fp->mpc <= (unsigned char *)fp->rvector + fp->rvector->vartab_ptr)
+			if (ADDR_IN_CODE(fp->mpc, fp->rvector))
 			{
 				if (dollar_ztrap.str.len > 0)
 				{
 					/* GT.M specific error trapping
 					 * retries the line with the error
 					 */
-					fp->mpc = error_last_b_line;
+					fp->mpc = dollar_ecode.error_last_b_line;
 					fp->ctxt = context;
 				}
 				break;
@@ -643,43 +646,68 @@ CONDITION_HANDLER(mdb_condition_handler)
 			   and unmark the frame.
 			*/
 			IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(frame_pointer);
-			frame_pointer->mpc = error_last_b_line;
+			frame_pointer->mpc = dollar_ecode.error_last_b_line;
 			frame_pointer->ctxt = context;
 		}
 		err_act = NULL;
-		error_level = dollar_zlevel() - 1;
-		error_last_ecode = SIGNAL;
+		dollar_ecode.error_last_ecode = SIGNAL;
 		if (err_dev && err_dev->error_handler.len && ((int)ERR_TPTIMEOUT != SIGNAL))
 		{
 			proc_act_type = SFT_DEV_ACT;
 			err_act = &err_dev->error_handler;
-		} else  if (0 != dollar_ztrap.str.len)
+		} else if (NULL != error_frame)
+		{	/* a primary error occurred already. irrespective of whether ZTRAP or ETRAP is active now, we need to
+			 * consider this as a nested error and trigger nested error processing.
+			 */
+			goerrorframe(error_frame);
+			assert(error_frame == frame_pointer);
+			SET_ERROR_FRAME(frame_pointer);	/* reset dollar_ecode.error_frame to frame_pointer as well as reset
+							 * error_frame_mpc, error_frame_ctxt and error_frame->{mpc,ctxt} */
+			proc_act_type = 0;
+			MUM_TSTART;	/* unwind the current C-stack and restart executing from the top of the current M-stack */
+			assert(FALSE);
+		} else if (0 != dollar_ztrap.str.len)
 		{
+			assert(!ztrap_explicit_null);
 			proc_act_type = SFT_ZTRAP;
 			err_act = &dollar_ztrap.str;
-		} else	if (0 != dollar_etrap.str.len)
-		{
-			if (NULL != error_frame)
+		} else
+		{	/* either $ETRAP is empty-string or non-empty.
+			 * if non-empty, use $ETRAP for error-handling.
+			 * if     empty,
+			 * 	if ztrap_explicit_null is FALSE use empty-string $ETRAP for error-handling
+			 * 	if ztrap_explicit_null is TRUE  unwind as many frames as possible until we see a frame
+			 * 					where ztrap_explicit_null is FALSE and $ZTRAP is NULL.
+			 * 					in that frame, use $ETRAP for error-handling.
+			 * 					if no such frame is found, exit after printing the error.
+			 */
+			etrap_handling = TRUE;
+			if (ztrap_explicit_null)
 			{
-				for (fp = frame_pointer;  fp && fp < error_frame;  fp = fp->old_frame_pointer)
+				assert(0 == dollar_etrap.str.len);
+				for (level = dollar_zlevel() - 1; level > 0; level--)
 				{
-					IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(fp);
-					fp->ctxt = CONTEXT(pseudo_ret);
-					fp->mpc = CODE_ADDRESS(pseudo_ret);
+					golevel(level);
+					assert(level == dollar_zlevel());
+					if (!ztrap_explicit_null && !dollar_ztrap.str.len)
+						break;
 				}
-				proc_act_type = 0;
-				assert(fp == error_frame);
-				IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(error_frame);
-				error_frame->mpc = CODE_ADDRESS(ERROR_RTN);
-				error_frame->ctxt = CONTEXT(ERROR_RTN);
-			} else
+				if (0 >= level)
+				{
+					assert(0 == level);
+					etrap_handling = FALSE;
+				}
+			}
+			if (etrap_handling)
+			{
 				proc_act_type = SFT_ZTRAP;
-			err_act = &dollar_etrap.str;
+				err_act = &dollar_etrap.str;
+			}
 		}
 		if (clean_mum_tstart())
 			MUM_TSTART;
 	}
-	if ((SFT_ZINTR | SFT_COUNT) != proc_act_type || 0 == error_last_b_line)
+	if ((SFT_ZINTR | SFT_COUNT) != proc_act_type || 0 == dollar_ecode.error_last_b_line)
 	{	/* No user console error for $zinterrupt compile problems and if not direct mode. Accomplish
 		   this by bypassing the code inside this if which *will* be executed for most cases
 		*/

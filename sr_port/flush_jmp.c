@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@ GBLREF unsigned char	*stackbase,*stacktop,*msp,*stackwarn;
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
 LITDEF bool 		mvs_save[] = { TRUE, FALSE, TRUE, FALSE,
-					TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE };
+					TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE };
 
 void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr)
 {
@@ -42,15 +42,13 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	error_def(ERR_STACKCRIT);
 
 	unwind_nocounts();
-	/* We are going to mutate the current frame from the program it
-	   was running to the program we want it to run. If the current
-	   frame is marked for indr cache cleanup, do that cleanup now
-	   and unmark the frame.
-	*/
+	/* We are going to mutate the current frame from the program it was running to the program we want it to run.
+	 * If the current frame is marked for indr cache cleanup, do that cleanup now and unmark the frame.
+	 */
 	IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(frame_pointer);
 
 	frame_pointer->rvector = rtn_base;
-	frame_pointer->vartab_ptr = (char *) rtn_base + rtn_base->vartab_ptr;
+	frame_pointer->vartab_ptr = (char *)VARTAB_ADR(rtn_base);
 	frame_pointer->vartab_len = frame_pointer->rvector->vartab_len;
 	frame_pointer->mpc = transfer_addr;
 	frame_pointer->ctxt = context;

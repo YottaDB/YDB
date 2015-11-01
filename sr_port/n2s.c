@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,8 +17,7 @@
 #include "stringpool.h"
 #include "underr.h"
 
-#define INT_DIGITS	10
-#define PACKED_DIGITS	9
+#define PACKED_DIGITS	(MAX_DIGITS_IN_INT - 1)	/* maximum packed decimal representation is 999999999 (nine nines) */
 
 GBLREF spdesc	stringpool;
 
@@ -26,7 +25,7 @@ unsigned char *n2s(mval *mv_ptr)
 {
 	unsigned char	*start, *cp, *cp1;
 	int4		exp, n0, m1, m0, tmp;
-	unsigned char	lcl_buf[INT_DIGITS];
+	unsigned char	lcl_buf[MAX_DIGITS_IN_INT];
 
 	if (!MV_DEFINED(mv_ptr))
 	{

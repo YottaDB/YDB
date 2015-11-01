@@ -23,11 +23,12 @@
 #include "svnames.h"
 #include "error_trap.h"
 #include "jobinterrupt_process.h"
+#include "dollar_zlevel.h"		/* for SET_ERROR_FRAME macro to use dollar_zlevel() function */
 
 #define POP_SPECIFIED 	((ztrap_form & ZTRAP_POP) && (level2go = MV_FORCE_INT(&ztrap_pop2level))) /* note: assignment */
 #define IS_ETRAP	(err_act == &dollar_etrap.str)
 
-GBLREF stack_frame	*frame_pointer, *zyerr_frame, *error_frame, *error_last_frame_err;
+GBLREF stack_frame	*frame_pointer, *zyerr_frame, *error_frame;
 GBLREF unsigned short	proc_act_type;
 GBLREF spdesc		rts_stringpool, stringpool, indr_stringpool;
 GBLREF mstr		*err_act;
@@ -159,17 +160,8 @@ void trans_code(void)
 	 * at one level below */
 	if (IS_ETRAP)
 	{
-		assert(error_last_frame_err == frame_pointer);
-		frame_pointer->mpc = CODE_ADDRESS(ERROR_RTN);
-		frame_pointer->ctxt = CONTEXT(ERROR_RTN);
-		error_frame = frame_pointer;
-
-		PUSH_MV_STENT(MVST_STCK);
-		mv_chain->mv_st_cont.mvs_stck.mvs_stck_val = NULL;
-		mv_chain->mv_st_cont.mvs_stck.mvs_stck_addr = (unsigned char **)&error_last_frame_err;
-		PUSH_MV_STENT(MVST_STCK);
-		mv_chain->mv_st_cont.mvs_stck.mvs_stck_val = NULL;
-		mv_chain->mv_st_cont.mvs_stck.mvs_stck_addr = (unsigned char **)&error_frame;
+		SET_ERROR_FRAME(frame_pointer);	/* reset dollar_ecode.error_frame to point to frame_pointer as well as resetting
+						 * error_frame_mpc, error_frame_ctxt fields and error_frame->{mpc,ctxt} */
 	}
 	if (!(ztrap_form & ZTRAP_CODE) && !IS_ETRAP && POP_SPECIFIED)
 		golevel(level2go);

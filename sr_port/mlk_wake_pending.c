@@ -60,6 +60,10 @@ void mlk_wake_pending(mlk_ctldata_ptr_t ctl,
 	if (!d->pending)
 		return;
 	ctl->wakeups++;
+	/* Before updating d->sequence ensure there is no process owning this lock, since otherwise when the owner process attempts
+	 * to release the lock it will fail as its private copy of "p->sequence" will not match the shared memory "d->sequence".
+	*/
+	assert(!d->owner);
 	d->sequence = csa->hdr->trans_hist.lock_sequence++;	/* This node is being awakened (GTCM) */
 	BG_TRACE_PRO_ANY(csa, mlock_wakeups);			/* Record halted slumbers */
 	if (reg->dyn.addr->acc_meth == dba_bg &&

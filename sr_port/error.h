@@ -29,6 +29,8 @@ typedef struct err_ctl_struct
 
 #include "errorsp.h"
 
+#define ERROR_RETURN		error_return
+
 #define FCNTL		1
 #define MSGCNTL		27
 #define MSGFAC		16
@@ -39,6 +41,9 @@ typedef struct err_ctl_struct
 #define FACMASK(fac)		(FCNTL << MSGCNTL | 1 << MSGNBIT | (fac) << MSGFAC)
 #define MSGMASK(msg,fac)	(((msg) & ~FACMASK(fac)) >> MSGSEVERITY)
 #define SEVMASK(msg)		((msg) & 7)
+
+/* to change default severity of msg to type */
+#define MAKE_MSG_TYPE(msg, type)  ((msg) & ~SEV_MSK | (type))
 
 err_ctl *err_check(int err);
 

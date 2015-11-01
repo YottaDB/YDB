@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,13 +106,13 @@ void dse_rmrec(void)
 		if (!(rp = rp_base = skan_rnum(lbp, FALSE)))
 		{
 			free(lbp);
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
 	} else if (!(rp = rp_base = skan_offset(lbp, FALSE)))
 	{
 		free(lbp);
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);
 		return;
 	}
 	memcpy(&comp_key[0], &patch_comp_key[0], sizeof(patch_comp_key));
@@ -137,7 +137,7 @@ void dse_rmrec(void)
 				{
 					util_out_print("Error: bad blk build.",TRUE);
 					free(lbp);
-					t_abort();
+					T_ABORT(gv_cur_region, cs_addrs);
 					return;
 				}
 				t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
@@ -187,7 +187,7 @@ void dse_rmrec(void)
 		{
 			util_out_print("Error: bad blk build.", TRUE);
 			free(lbp);
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);
 			return;
 		}
 		t_write(patch_curr_blk, (unsigned char *)bs1, 0, 0, bp, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);

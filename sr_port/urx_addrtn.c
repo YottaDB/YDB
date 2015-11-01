@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,43 +10,46 @@
  ****************************************************************/
 
 #include "mdef.h"
-
 #include "gtm_string.h"
-
+#include "rtnhdr.h"
 #include "urx.h"
 
-urx_rtnref *urx_addrtn (urx_rtnref *rp_start, urx_rtnref *rp)
+urx_rtnref *urx_addrtn(urx_rtnref *rp_start, urx_rtnref *rp)
 {
 	urx_rtnref	*rp0, *rp1;
 	char		*rtn;
-	short		rtnlen;
-	bool		found;
-	int		c;
+	int		rtnlen, c;
 
 	rtnlen = rp->len;
 	rtn = rp->name.c;
-	assert (0 < rtnlen);
-	found = FALSE;
+	assert(0 < rtnlen);
 	rp0 = rp_start;
 	rp1 = rp0->next;
+	/* Locate if rp exists in rtn chain anchored by rp_start. If it exists, return
+	   that address after putting the addr reference chain on the end of the
+	   existing chain. Note that routines are ordered on this chain alphabetically
+	   within routine name size ... i.e. all sorted 1 character routines followed
+	   by all sorted 2 character routines, etc.
+	*/
 	while (rp1 != 0)
 	{
 		c = rtnlen - rp1->len;
-		if (!c) c = memcmp (rtn, rp1->name.c, rtnlen);
+		if (!c)
+			c = memcmp(rtn, rp1->name.c, rtnlen);
 		if (c > 0)
 		{
 			rp0 = rp1;
 			rp1 = rp0->next;
-		}
-		else
+		} else
 		{
-			if (c == 0) return rp1;
+			if (c == 0)
+				return rp1;
 			break;
 		}
 	}
-	assert (rp0->next == rp1);
+	assert(rp0->next == rp1);
 	rp->next = rp1;
 	rp0->next = rp;
-	assert (rp0->next != 0);
+	assert(rp0->next != 0);
 	return rp0->next;
 }

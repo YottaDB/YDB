@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,9 +45,10 @@ GBLREF	uint4		process_id;
 GBLREF	int4		outofband;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
 
-/*
- * -----------------------------------------------
+/* -----------------------------------------------
+ *
  * Maintain in parallel with op_lock2
+ *
  * Arguments:
  *	timeout	- max. time to wait for locks before giving up
  *      auxown - auxillary owner field for use by servers
@@ -131,7 +132,10 @@ int	op_zalloc2(int4 timeout, uint4 auxown)	/* timeout in seconds */
 			mlk_bckout(pvt_ptr2, ZALLOCATED);
 		}
 		if ((0 < dollar_tlevel) && (CDB_STAGNATE <= t_tries))
+		{
+			mlk_unpend(pvt_ptr1);		/* Eliminated the dangling request block */
 			t_retry(cdb_sc_needcrit);		/* release crit to prevent a deadlock */
+		}
 		/* Start with 0.5 second timer interval, double that interval each
 		 * iteration until a maximum timer limit is achieved.
 		 */

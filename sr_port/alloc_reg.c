@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#include "cmd_qlf.h"
 #include "gtmdbglvl.h"
 #include "compiler.h"
 #include "mdq.h"
@@ -23,10 +24,11 @@
 
 #define MAX_TEMP_COUNT 128
 
-GBLREF int	mvmax;
-LITREF octabstruct oc_tab[];
-GBLREF triple	t_orig;
-GBLREF uint4	gtmDebugLevel;
+GBLREF int			mvmax;
+LITREF octabstruct 		oc_tab[];
+GBLREF triple			t_orig;
+GBLREF uint4			gtmDebugLevel;
+GBLREF command_qualifier  	cmd_qlf;
 
 GBLDEF int4 sa_temps[VALUED_REF_TYPES];
 GBLDEF int4 sa_temps_offset[VALUED_REF_TYPES];
@@ -46,7 +48,7 @@ void alloc_reg(void)
 	tbp	*b;
 	oprtype *j;
 	opctype opc, opx;
-	char	tempcont[VALUED_REF_TYPES][MAX_TEMP_COUNT],dest_type;
+	char	tempcont[VALUED_REF_TYPES][MAX_TEMP_COUNT], dest_type;
 	int	r, c, temphigh[VALUED_REF_TYPES];
 	unsigned int oct;
 	int4	size;
@@ -73,7 +75,19 @@ void alloc_reg(void)
 			if (opx == OC_LINESTART || opx == OC_LINEFETCH || opx == OC_ISFORMAL)
 			{
 				opc = x->opcode = OC_NOOP;
-				COMPDBG(printf("   ** Converting triple to NOOP **\n"););
+				COMPDBG(printf("   ** Converting triple to NOOP (rsn 1) **\n"););
+				continue;	/* continue, because 'normal' NOOP continues from this switch */
+			}
+			/* There is a special case in the case of NOLINE_ENTRY being specified. If a blank line is followed
+			   by a line with a label and that label generates fetch information, the generated triple sequence
+			   will be LINESTART (from blank line), ILIT (count from PREVIOUS fetch), LINEFETCH. We will detect
+			   that sequence here and change the LINESTART to a NOOP.
+			*/
+			if (!(cmd_qlf.qlf & CQ_LINE_ENTRY) && OC_ILIT == opx && x->exorder.fl->exorder.fl \
+			    && OC_LINEFETCH == x->exorder.fl->exorder.fl->opcode)
+			{
+				opc = x->opcode = OC_NOOP;
+				COMPDBG(printf("   ** Converting triple to NOOP (rsn 2) **\n"););
 				continue;	/* continue, because 'normal' NOOP continues from this switch */
 			}
 			break;
@@ -82,7 +96,8 @@ void alloc_reg(void)
 			assert(x->operand[0].oprclass == TRIP_REF &&
 				x->operand[0].oprval.tref->opcode == OC_ILIT);
 			if (x->operand[0].oprval.tref->operand[0].oprval.ilit == mvmax)
-			{	x->operand[0].oprval.tref->operand[0].oprval.ilit = 0;
+			{
+				x->operand[0].oprval.tref->operand[0].oprval.ilit = 0;
 				x->operand[1].oprclass = 0;
 			}
 			break;
@@ -103,10 +118,10 @@ void alloc_reg(void)
 				opc = x->opcode = OC_EQUNUL;
 			} else if (x->operand[1].oprclass == TRIP_REF && x->operand[1].oprval.tref->opcode == OC_LIT &&
 					x->operand[1].oprval.tref->operand[0].oprval.mlit->v.str.len == 0)
-				{
-					x->operand[1].oprclass = 0;
-					opc = x->opcode = OC_EQUNUL;
-				}
+			{
+				x->operand[1].oprclass = 0;
+				opc = x->opcode = OC_EQUNUL;
+			}
 			break;
 		}
 		for (j = x->operand, y = x; j < &(y->operand[2]) ;)
@@ -123,11 +138,13 @@ void alloc_reg(void)
 				if (r = ref->destination.oprclass)
 				{
 					dqloop(&ref->backptr, que, b)
+					{
 						if (b->bpt == y)
 						{
 							dqdel(b, que);
 							break;
 						}
+					}
 					if (ref->backptr.que.fl == &ref->backptr && r != TVAR_REF)
 						tempcont[r][j->oprval.tref->destination.oprval.temp] = 0;
 				}
@@ -152,8 +169,7 @@ void alloc_reg(void)
 					x->destination = y->operand[0];
 					y->opcode = OC_NOOP;
 					y->operand[0].oprclass = y->operand[1].oprclass = 0;
-				}
-				else
+				} else
 				{
 					oct &= OCT_VALUE | OCT_MVADDR;
 					assert (oct == OCT_MVAL || oct == OCT_MINT || oct == (OCT_MVADDR | OCT_MVAL)
@@ -173,8 +189,7 @@ void alloc_reg(void)
 						x->opcode = OC_NOOP;
 				}
 			}
-		}
-		else if (dest_type == TRIP_REF)
+		} else if (dest_type == TRIP_REF)
 		{
 			assert(x->destination.oprval.tref->destination.oprclass);
 			x->destination = x->destination.oprval.tref->destination;

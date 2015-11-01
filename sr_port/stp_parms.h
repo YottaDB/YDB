@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,14 +16,15 @@
 #define STP_PAGE_SIZE	8192 /* if necessary, change this under appropriate ifdefs for different platforms, or, use macros from
 			      * mdefsp.h */
 #define STP_INITSIZE	(12 * STP_PAGE_SIZE) /* initial size of string pool */
-#define STP_MAXSIZE	(400 * STP_PAGE_SIZE) /* maximum size of string pool */
-#define STP_INCREMENT	(4 * STP_PAGE_SIZE) /* amount to grow string pool, also used as minimum stringpool size */
+#define STP_MAXINITSIZE	(400 * STP_PAGE_SIZE) /* maximum initial size of string pool */
+#define STP_GEOM_INCREMENT	(4 * STP_PAGE_SIZE) /* grow string pool as a multiple of this during geometric growth */
+#define STP_LINEAR_INCREMENT	(12 * STP_PAGE_SIZE) /* grow string pool as a multiple of this during linear growth */
 #define STP_MINFREE	(4 * STP_PAGE_SIZE) /* minimum amount which will cause a 'grow' next time */
 #define STP_MAXITEMS	8192	/* maximum number of mval's for garbage collection */
-#define STP_MAXGEOMGROWTH (16 * 1024 * 1024) /* let the stringpool grow geometrically till the size reaches STP_MAXGEOMGROWTH, after
+#define STP_MAXGEOMGROWTH (4 * 1024 * 1024) /* let the stringpool grow geometrically till the size reaches STP_MAXGEOMGROWTH, after
 					      * which, grow linearly */
-#define STP_RECLAIMLIMIT (2 * 1024 * 1024) /* if the space reclaimed is more than this amount, don't do forced expansion */
-#define STP_LIMITFRCDEXPN  STP_MAXGEOMGROWTH /* no forced expansions of any kind after the stringpool size grows to this limit */
+#define STP_RECLAIMLIMIT (1 * 1024 * 1024) /* if the space reclaimed is more than this amount, don't do forced expansion */
+#define STP_LIMITFRCDEXPN  (8 * 1024 * 1024) /* no forced expansions of any kind after the stringpool size grows to this limit */
 #define STP_GEOMGROWTH_FACTOR	2
 #define STP_MINRECLAIM	((stringpool.top - stringpool.base) >> 2) /* atleast 25% of the current size */
 #define STP_ENOUGHRECLAIMED ((stringpool.top - stringpool.base) - ((stringpool.top - stringpool.base) >> 3))/* 87.5% of size */

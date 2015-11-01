@@ -87,5 +87,6 @@ void call_dm(void);
 int dm_start(void);
 stack_frame *op_get_msf (void);
 int op_zbreak(stack_frame *fp);
+void adjust_frames(unsigned char *old_ptext_beg, unsigned char *old_ptext_end, unsigned char *new_ptext_beg);
 
 #endif

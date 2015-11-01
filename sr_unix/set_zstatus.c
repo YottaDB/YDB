@@ -96,9 +96,9 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp)
 	}
 	status_loc = (NULL == zyerr_frame) ? &dollar_zstatus : &dollar_zerror;
 	status_loc->str.len = zstatus_bptr - zstatus_buff;
-	status_loc->str.addr = zstatus_buff;
+	status_loc->str.addr = (char *)zstatus_buff;
 	s2pool(&status_loc->str);
 	status_loc->mvtype = MV_STR;
-	set_ecode(arg);
+	ecode_set(arg);
 	return (b_line);
 }

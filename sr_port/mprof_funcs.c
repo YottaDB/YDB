@@ -113,7 +113,8 @@ void	turn_tracing_on(mval *gvn)
 	gbl_to_fill.str.addr = (char *)malloc(gvn->str.len); /*len was already setup*/
 	memcpy(gbl_to_fill.str.addr, gvn->str.addr, gvn->str.len);
 	if (!pcavailbase)
-	{	pcavailbase = (char **) malloc(PROFCALLOC_DSBLKSIZE);
+	{
+		pcavailbase = (char **) malloc(PROFCALLOC_DSBLKSIZE);
 		*pcavailbase = 0;
 	}
 	pcavailptr = pcavailbase;
@@ -230,13 +231,16 @@ void    pcurrpos(int inside_for_loop)
 			{
 				/*going INTO a loop*/
 				/* when going into, we go all the way in*/
-				if (0 == curr_tblnd->e.loop_level) curr_tblnd->e.loop_level = 1;
+				if (0 == curr_tblnd->e.loop_level)
+					curr_tblnd->e.loop_level = 1;
 				curr_tblnd->e.cur_loop_level = curr_tblnd->e.loop_level;
 			}
 			UPDATE_TIME(curr_tblnd->loop_link);
 			UPDATE_TIME(curr_tblnd);
-			if ((MPROF_OUTOFFOR == inside_for_loop_state) && (!SAME_LINE)) for_level = 1;
-			if (MPROF_INTOFOR == inside_for_loop_state) for_level = 1;
+			if ((MPROF_OUTOFFOR == inside_for_loop_state) && (!SAME_LINE))
+				for_level = 1;
+			if (MPROF_INTOFOR == inside_for_loop_state)
+				for_level = 1;
 
 			if (for_level)
 			{
@@ -257,7 +261,10 @@ void    pcurrpos(int inside_for_loop)
 				}
 			}
 			if (MPROF_OUTOFFOR == inside_for_loop_state)
-				{curr_tblnd->e.for_count = 0; for_level=0;}
+			{
+				curr_tblnd->e.for_count = 0;
+				for_level = 0;
+			}
 
 		}
 		if ((MPROF_LINEFETCH + MPROF_LINESTART) & inside_for_loop_state)
@@ -266,15 +273,14 @@ void    pcurrpos(int inside_for_loop)
 			MPROF_INCR_COUNT;
 
 		}
-			if ((MPROF_OUTOFFOR == inside_for_loop) && (SAME_LINE))
-			{
-				/*prepare next guy*/
-				tmp_trc_tbl_entry.for_count = 1;
-				for_level = 0;
-				/*no counting here, no timing either */
-			}
-			else
-				for_level = 1;
+		if ((MPROF_OUTOFFOR == inside_for_loop) && (SAME_LINE))
+		{
+			/*prepare next guy*/
+			tmp_trc_tbl_entry.for_count = 1;
+			for_level = 0;
+			/*no counting here, no timing either */
+		} else
+			for_level = 1;
 	}
 	PRINT_PROF_TREE_ELEM;
 	curr_tblnd = (struct mprof_tree *)mprof_tree_insert(head_tblnd, tmp_trc_tbl_entry);
@@ -421,8 +427,7 @@ void unw_prof_frame (void)
 			/* it should have been filled in get_entryref_information */
 			strcpy((char *)e.label_name,(char *) tmp_trc_tbl_entry.label_name);
 			strcpy((char *)e.rout_name,(char *) tmp_trc_tbl_entry.rout_name);
-		}
-		else
+		} else
 		{
 			strcpy((char *)e.label_name, prof_fp->label_name);
 			strcpy((char *)e.rout_name, prof_fp->rout_name);
@@ -604,14 +609,14 @@ void	crt_gbl(struct mprof_tree *p, int info_level)
 void	get_entryref_information(boolean_t line, struct trace_entry *tmp_trc_tbl_entry)
 {
 	boolean_t	line_reset;
-	lbl_tables	*max_label, *label_table, *last_label;
+	LAB_TABENT	*max_label, *label_table, *last_label;
 	rhdtyp		*routine;
 	stack_frame	*fp;
 	int		status;
 	unsigned char	*addr, *out_addr;
 	unsigned char	temp[OFFSET_LEN];
-	uint4		*line_table, *last_line, len, ct;
-	uint4		offset, in_addr_offset;
+	int4		*line_table, *last_line, len, ct;
+	int4		offset, in_addr_offset;
 	unsigned long	user_time, system_time;
 
 	line_reset = FALSE;
@@ -620,10 +625,9 @@ void	get_entryref_information(boolean_t line, struct trace_entry *tmp_trc_tbl_en
 		/*The equality check in the second half of the expression below is to
 		  account for the delay-slot in HP-UX for implicit quits.
 		  */
-		if ((unsigned char *) fp->rvector + fp->rvector->ptext_ptr <= fp->mpc &&
-			fp->mpc <= (unsigned char *) fp->rvector + fp->rvector->vartab_ptr)
+		if (ADDR_IN_CODE(fp->mpc, fp->rvector))
 		{
-			if (line_reset || ((unsigned char*) fp->rvector + fp->rvector->current_rhead_ptr == fp->mpc))
+			if (line_reset)
 				addr = fp->mpc + 1;
 			else
 				addr = fp->mpc;
@@ -640,20 +644,20 @@ void	get_entryref_information(boolean_t line, struct trace_entry *tmp_trc_tbl_en
 		return;
 	}
 	routine = fp->rvector;
-	routine = (rhdtyp *)((unsigned char *) routine + routine->current_rhead_ptr);
-	label_table = (lbl_tables *)((char *) routine + routine->labtab_ptr);
+	routine = CURRENT_RHEAD_ADR(routine);
+	label_table = LABTAB_ADR(routine);
 	last_label = label_table + routine->labtab_len;
 	max_label = label_table++;
 	while (label_table < last_label)
 	{
-		if (addr > (unsigned char *) routine + *((int4 *) ((char *) routine + label_table->lab_ln_ptr)))
+		if (addr > LABEL_ADDR(routine, label_table))
 		{
-			if (max_label->lab_ln_ptr <= label_table->lab_ln_ptr)
+			if (max_label->LABENT_LNR_OFFSET <= label_table->LABENT_LNR_OFFSET)
 				max_label = label_table;
 		}
 		label_table++;
 	}
-	line_table = (uint4 *)((char *) routine + max_label->lab_ln_ptr);
+	line_table = LABENT_LNR_ENTRY(routine, max_label);
 	len = mid_len(&max_label->lab_name);
 	if (len)
 	{
@@ -684,8 +688,8 @@ void	get_entryref_information(boolean_t line, struct trace_entry *tmp_trc_tbl_en
 	if (!line)
 		return;
 	offset = 0;
-	in_addr_offset = addr - (unsigned char *) routine;
-	last_line = (uint4 *)((char *) routine + routine->lnrtab_ptr);
+	in_addr_offset = CODE_OFFSET(routine, addr);
+	last_line = LNRTAB_ADR(routine);
 	last_line += routine->lnrtab_len;
 	for( ; ++line_table < last_line ; offset++)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,7 +95,7 @@ void cache_put(unsigned char code, mstr *source, mstr *object)
 		   counterparts, we save having to (re)copy them to the stringpool where they will be handled
 		   safely and correctly.
 		*/
-		fix_base = (mval *)((unsigned char *)csp->obj.addr + ((ihdtyp *)(csp->obj.addr))->fixup_vals_ptr);
+		fix_base = (mval *)((unsigned char *)csp->obj.addr + ((ihdtyp *)(csp->obj.addr))->fixup_vals_off);
 		for (fix = fix_base, i = 0 ;  i < fixup_cnt ;  i++, fix++)
 		{
 			if (MV_IS_STRING(fix))		/* if string, place in string pool */

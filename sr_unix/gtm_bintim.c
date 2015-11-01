@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,13 +9,13 @@
  *								*
  ****************************************************************/
 
-/* int gtm_bintim(char *s, jnl_proc_time *timep)
+/* int gtm_bintim(char *toscan, jnl_proc_time *timep)
  *
  * Converts an absolute or relative time to the UNIX internal format (seconds
  * past 1970)
  *
  * Input:
- *    s   	ASCII string containing an absolute or relative time
+ *    toscan   	ASCII string containing an absolute or relative time
  *	  	specification (see below).
  *
  *    timep	pointer to a variable which will hold the absolute or
@@ -38,7 +38,7 @@
 
 #include "mdef.h"
 
-#include <time.h>
+#include "gtm_time.h"
 
 #include "gtm_ctype.h"
 #include "gtm_string.h"
@@ -48,38 +48,39 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "gtm_string.h"
 #include "filestruct.h"
 #include "jnl.h"	/* jnl_proc_time needs this. jnl.h needs some of the above */
 #include "gtm_bintim.h"
 
-static int getmon (char *month);
+#define monthalphas "abcdefgjlmnoprstuvyABCDEFGJLMNOPRSTUVY"
 
-int gtm_bintim (char *s, jnl_proc_time *timep)
+static int getmon(char *month);
+
+int gtm_bintim(char *toscan, jnl_proc_time *timep)
 {
-    time_t	now;
+    time_t	now, mktime_ret;
     struct tm	time_tm, *now_tm;
-    int		n, sec, min, hour, day, year;
+    int		num, sec, min, hour, day, year;
     char	month[256];
-    int		len = strlen(s),
+    int		len = strlen(toscan),
 		matched = 0;
 
     *month = '\0';
     now = time((time_t *) 0);
     now_tm = localtime(&now);
 
-    n = SSCANF(s,"%d %d", &day, &hour);
-    if (n == 2)  /* delta time format */
+    num = SSCANF(toscan, "%d %d", &day, &hour);
+    if (2 == num)  /* delta time format */
     {
-	n = SSCANF(s, "%d %d:%d:%d%n", &day, &hour, &min, &sec, &matched);
+	num = SSCANF(toscan, "%d %d:%d:%d%n", &day, &hour, &min, &sec, &matched);
 	if (matched < len)
 	{
-	    n = SSCANF(s, "%d %d:%d:%d:%*d%n", &day, &hour, &min, &sec,
+	    num = SSCANF(toscan, "%d %d:%d:%d:%*d%n", &day, &hour, &min, &sec,
 		       &matched);
 	    if (matched < len)
 	    {
 		sec = 0;
-		n = SSCANF(s, "%d %d:%d%n", &day, &hour, &min, &matched);
+		num = SSCANF(toscan, "%d %d:%d%n", &day, &hour, &min, &matched);
 		if (matched < len)
 		    return -1;
 	    }
@@ -89,39 +90,39 @@ int gtm_bintim (char *s, jnl_proc_time *timep)
     }
     else	 /* absolute time format */
     {
-	n = SSCANF(s, "%d-%[a-zA-Z]-%d %d:%d:%d%n", &day, month, &year,
+	num = SSCANF(toscan, "%d-%[" monthalphas "]-%d %d:%d:%d%n", &day, month, &year,
 		   &hour, &min, &sec, &matched);
 
 	if (matched < len)
 	{
-	    n = SSCANF(s, "%d-%[a-zA-Z]-%d %d:%d:%d:%*d%n", &day, month,
+	    num = SSCANF(toscan, "%d-%[" monthalphas "]-%d %d:%d:%d:%*d%n", &day, month,
 		       &year, &hour, &min, &sec, &matched);
 
 	    if (matched < len)
 	    {
 		sec = 0;
-		n = SSCANF(s, "%d-%[a-zA-Z]-%d %d:%d%n", &day, month, &year,
+		num = SSCANF(toscan, "%d-%[" monthalphas "]-%d %d:%d%n", &day, month, &year,
 			   &hour, &min, &matched);
 
 		if (matched < len)
 		{
 		    hour = min = sec = 0;
-		    n = SSCANF(s, "%d-%[a-zA-Z]-%d%n", &day, month, &year,
+		    num = SSCANF(toscan, "%d-%[" monthalphas "]-%d%n", &day, month, &year,
 			       &matched);
 		    if (matched < len)
 		    {
 			day = now_tm->tm_mday;
 			year = now_tm->tm_year + 1900;
-			n = SSCANF(s, "-- %d:%d:%d%n", &hour, &min, &sec,
+			num = SSCANF(toscan, "-- %d:%d:%d%n", &hour, &min, &sec,
 				   &matched);
 			if (matched < len)
 			{
-			    n = SSCANF(s, "-- %d:%d:%d:%*d%n", &hour, &min,
+			    num = SSCANF(toscan, "-- %d:%d:%d:%*d%n", &hour, &min,
 				       &sec, &matched);
 			    if (matched < len)
 			    {
 				sec = 0;
-				n = SSCANF(s, "-- %d:%d%n", &hour, &min,
+				num = SSCANF(toscan, "-- %d:%d%n", &hour, &min,
 					   &matched);
 				if (matched < len)
 				    return -1;
@@ -144,17 +145,14 @@ int gtm_bintim (char *s, jnl_proc_time *timep)
     time_tm.tm_year = year-1900;
     time_tm.tm_isdst = -1;
 
-    *timep = mktime(&time_tm);
-
-    if (*timep < 0)
+    mktime_ret = mktime(&time_tm);
+    if ((time_t)-1 == mktime_ret)
 	return -1;
-
+    *timep = (jnl_proc_time)mktime_ret;
     return 0;
 }
 
-
-
-static int getmon (char *month)
+static int getmon(char *month)
 {
     char	*p;
     int		i;

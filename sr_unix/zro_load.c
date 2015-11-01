@@ -15,17 +15,19 @@
 #include "gtm_stat.h"
 #include "gtm_stdlib.h"
 
+#include <errno.h>
 #include "io.h"
 #include "iosp.h"
 #include "zroutines.h"
 #include "parse_file.h"
 #include "eintr_wrappers.h"
 #include "longcpy.h"
+#include "error.h"
+#include "fgncal.h"
 
-#define GETTOK		toktyp = zro_gettok (&lp, top, &tok)
+#define GETTOK		toktyp = zro_gettok(&lp, top, &tok)
 
 GBLDEF	zro_ent		*zro_root;
-GBLREF  int		errno;
 
 void zro_load (mstr *str)
 {
@@ -44,6 +46,8 @@ void zro_load (mstr *str)
 	error_def		(ERR_MAXARGCNT);
 	error_def		(ERR_QUALEXP);
 	error_def		(ERR_ZROSYNTAX);
+	error_def		(ERR_NOLBRSRC);
+	error_def		(ERR_INVZROENT);
 
 	lp = str->addr;
 	top = lp + str->len;
@@ -87,16 +91,27 @@ void zro_load (mstr *str)
 		STAT_FILE(tranbuf, &outbuf, stat_res);
 		if (-1 == stat_res)
 			rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FILEPARSE, 2, tok.len, tok.addr, errno);
-		if (!(outbuf.st_mode & S_IFDIR))
-			rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_DIRONLY, 2, tok.len, tok.addr);
+		if (S_ISREG(outbuf.st_mode))
+		{ /* regular file - a shared library file */
+			array[oi].shrlib = fgn_getpak(tranbuf, ERROR);
+			array[oi].type = ZRO_TYPE_OBJLIB;
+			si = oi + 1;
+		}
+		else {
+			if (!S_ISDIR(outbuf.st_mode))
+				rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_INVZROENT, 2, tok.len, tok.addr);
+			array[oi].type = ZRO_TYPE_OBJECT;
+			array[oi + 1].type = ZRO_TYPE_COUNT;
+			si = oi + 2;
+		}
 		array[0].count++;
-		array[oi].type = ZRO_TYPE_OBJECT;
 		array[oi].str = tok;
-		array[oi + 1].type = ZRO_TYPE_COUNT;
-		si = oi + 2;
 		GETTOK;
 		if (toktyp == ZRO_LBR)
 		{
+			if (array[oi].type == ZRO_TYPE_OBJLIB)
+				rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_NOLBRSRC);
+
 			GETTOK;
 			if (toktyp == ZRO_DEL)
 				GETTOK;
@@ -127,7 +142,7 @@ void zro_load (mstr *str)
 				if (-1 == stat_res)
 					rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
 						ERR_FILEPARSE, 2, tok.len, tok.addr, errno);
-				if (!(outbuf.st_mode & S_IFDIR))
+				if (!S_ISDIR(outbuf.st_mode))
 					rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
 						ERR_DIRONLY, 2, tok.len, tok.addr);
 				array[oi + 1].count++;
@@ -140,15 +155,17 @@ void zro_load (mstr *str)
 			}
 			GETTOK;
 		}
-		else
-		if (toktyp == ZRO_DEL || toktyp == ZRO_EOL)
-		{
-			if (si >= ZRO_MAX_ENTS)
-				rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
-			array[oi + 1].count = 1;
-			array[si] = array[oi];
-			array[si].type = ZRO_TYPE_SOURCE;
-			si++;
+		else {
+			if ((array[oi].type != ZRO_TYPE_OBJLIB) && (toktyp == ZRO_DEL || toktyp == ZRO_EOL))
+			{
+				if (si >= ZRO_MAX_ENTS)
+					rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr,
+						  ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
+				array[oi + 1].count = 1;
+				array[si] = array[oi];
+				array[si].type = ZRO_TYPE_SOURCE;
+				si++;
+			}
 		}
 		if (toktyp == ZRO_EOL)
 			break;
@@ -167,12 +184,13 @@ void zro_load (mstr *str)
 		assert (oi);
 		for (op = zro_root + 1; oi-- > 0; )
 		{	/* release space held by translated entries */
-			assert (op->type == ZRO_TYPE_OBJECT);
+			assert (op->type == ZRO_TYPE_OBJECT || op->type == ZRO_TYPE_OBJLIB);
 			if (op->str.len)
 				free(op->str.addr);
-			op++;
+			if ((op++)->type == ZRO_TYPE_OBJLIB)
+				continue;	/* i.e. no sources for shared library */
 			assert (op->type == ZRO_TYPE_COUNT);
-			si = op++->count;
+			si = (op++)->count;
 			for ( ; si-- > 0; op++)
 			{
 				assert (op->type == ZRO_TYPE_SOURCE);
@@ -189,7 +207,7 @@ void zro_load (mstr *str)
 	assert (oi);
 	for (op = zro_root + 1; oi-- > 0; )
 	{
-		assert (op->type == ZRO_TYPE_OBJECT);
+		assert (op->type == ZRO_TYPE_OBJECT || op->type == ZRO_TYPE_OBJLIB);
 		if (op->str.len)
 		{
 			pblk.buff_size = MAX_FBUFF;
@@ -203,9 +221,10 @@ void zro_load (mstr *str)
 			op->str.len = pblk.b_esl;
 			memcpy(op->str.addr, pblk.buffer, pblk.b_esl);
 		}
-		op++;
+		if ((op++)->type == ZRO_TYPE_OBJLIB)
+			continue;
 		assert (op->type == ZRO_TYPE_COUNT);
-		si = op++->count;
+		si = (op++)->count;
 		for ( ; si-- > 0; op++)
 		{
 			assert (op->type == ZRO_TYPE_SOURCE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,13 +17,12 @@
 #include "ident.h"
 
 #define S_CUTOFF 7
-GBLREF rtn_tables	*rtn_names, *rtn_names_end;
+GBLREF RTN_TABENT	*rtn_names, *rtn_names_end;
 
-rhdtyp	*find_rtn_hdr(name)
-mstr	*name;
+rhdtyp	*find_rtn_hdr(mstr *name)
 {
 	mident		temp;
-	rtn_tables	*bot, *top, *mid;
+	RTN_TABENT	*bot, *top, *mid;
 	int4		comp;
 
 	assert (name->len <= sizeof(mident));
@@ -36,31 +35,27 @@ mstr	*name;
 	{
 		if (top < bot)
 			return 0;
-		else if ((char *)top - (char *)bot < S_CUTOFF * sizeof(rtn_tables))
+		else if ((char *)top - (char *)bot < S_CUTOFF * sizeof(RTN_TABENT))
 		{
 			comp = -1;
 			for (mid = bot;  comp < 0  &&  mid <= top;  mid++)
 			{
 				comp = memcmp(mid->rt_name.c, &temp, sizeof(mident));
 				if (comp == 0)
-				{
-					return (rhdtyp *)mid->rt_ptr;
-				}
+					return mid->RTNENT_RT_ADR;
 			}
 			return 0;
-		}
-		else
+		} else
 		{
-			mid = bot + (top - bot)/2;
+			mid = bot + (top - bot) / 2;
 			comp = memcmp(mid->rt_name.c, &temp, sizeof(mident));
 			if (comp == 0)
-				return (rhdtyp *) mid->rt_ptr;
+				return mid->RTNENT_RT_ADR;
 			else if (comp < 0)
 			{
 				bot = mid + 1;
 				continue;
-			}
-			else
+			} else
 			{
 				top = mid - 1;
 				continue;

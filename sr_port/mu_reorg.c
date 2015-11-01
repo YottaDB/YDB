@@ -282,7 +282,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					{
 						if (cs_addrs->now_crit)
 						{
-							t_abort(); /* Release crit earliest possible */
+							T_ABORT(gv_cur_region, cs_addrs); /* Release crit earliest possible */
 							gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
 							reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
 								file_extended, lvls_reduced,
@@ -458,8 +458,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				} /* end if (0 == level) */
 				break;
 			}/* === SPLIT-COALESCE LOOP END === */
-			/* t_abort is called in case we have crit. */
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);	/* T_ABORT is called in case we have crit. */
 		}/* === START WHILE COMPLETE_MERGE === */
 
 		if (mu_ctrlc_occurred || mu_ctrly_occurred)
@@ -490,7 +489,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					{
 						if (cs_addrs->now_crit)
 						{
-							t_abort(); /* Release crit earliest possible */
+							T_ABORT(gv_cur_region, cs_addrs); /* Release crit earliest possible */
 							gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
 							reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
 								file_extended, lvls_reduced,
@@ -570,8 +569,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				break;
 
 			}	/* === END OF SWAP LOOP === */
-			/* t_abort is called in case we have crit. */
-			t_abort();
+			T_ABORT(gv_cur_region, cs_addrs);	/* T_ABORT is called in case we have crit. */
 		}
 		if (mu_ctrlc_occurred || mu_ctrly_occurred)
 		{
@@ -618,7 +616,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				{
 					if (cs_addrs->now_crit)
 					{
-						t_abort(); /* Release crit earliest possible */
+						T_ABORT(gv_cur_region, cs_addrs); /* Release crit earliest possible */
 						gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
 						reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
 							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
@@ -665,8 +663,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 			}
 			break;
 		} 		/* main reduce level loop ends */
-		/* t_abort is called in case we have crit. */
-		t_abort();
+		T_ABORT(gv_cur_region, cs_addrs);	/* T_ABORT is called in case we have crit. */
 		if (0 == cnt1)
 			break;
 	}
@@ -686,7 +683,7 @@ void reorg_finish(block_id dest_blk_id, int blks_processed, int blks_killed,
 	int blks_reused, int file_extended, int lvls_reduced,
 	int blks_coalesced, int blks_split, int blks_swapped)
 {
-	t_abort();
+	T_ABORT(gv_cur_region, cs_addrs);
 	file_extended = cs_data->trans_hist.total_blks - file_extended;
 	util_out_print("Blocks processed    : !SL ", FLUSH, blks_processed);
 	util_out_print("Blocks coalsced     : !SL ", FLUSH, blks_coalesced);
