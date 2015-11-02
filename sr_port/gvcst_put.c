@@ -1637,12 +1637,17 @@ tn_restart:
 	 */
 	if (0 == dollar_tlevel)
 	{
+		nodeflags = 0;
+		GTMTRIG_ONLY(
+			if (skip_dbtriggers)
+				nodeflags |= JS_SKIP_TRIGGERS_MASK;
+		)
 		assert(!jnl_format_done || !is_dollar_incr && (JNL_SET == non_tp_jfb_ptr->ja.operation));
 		if (need_extra_block_split)
                         inctn_opcode = inctn_gvcstput_extra_blk_split;
 		else if (JNL_WRITE_LOGICAL_RECS(csa) && !jnl_format_done)
 		{
-			jfb = jnl_format(JNL_SET, gv_currkey, (!is_dollar_incr ? val : post_incr_mval), 0);
+			jfb = jnl_format(JNL_SET, gv_currkey, (!is_dollar_incr ? val : post_incr_mval), nodeflags);
 			assert(NULL != jfb);
 			jnl_format_done = TRUE;
 		}

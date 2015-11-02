@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_stat.h"
 #include "gtm_string.h"
 #include "gdsroot.h"			/* for gdsfhead.h */
 #include "gdsbt.h"			/* for gdsfhead.h */
@@ -84,6 +85,7 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 	short			len;
 	uint4			record_num;
 	boolean_t		trigger_error;
+	struct stat		statbuf;
 	enum cdb_sc		status;
 	uint4			trig_stats[NUM_STATS];
 	char			*trigger_rec;
@@ -91,15 +93,21 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 	unsigned short		value_len[NUM_SUBS];
 
 	trigger_error = all_triggers_error = FALSE;
+	if ((0 == trigger_filename_len) || (-1 == Stat(trigger_filename, &statbuf)) || !S_ISREG(statbuf.st_mode))
+	{
+		op_trollback(0);
+		return TRIG_FAILURE;
+	}
 	ESTABLISH_RET(trigger_trgfile_tpwrap_ch, all_triggers_error);
 	io_save_device = io_curr_device;
 	mu_load_init(trigger_filename, trigger_filename_len);
-	io_trigfile_device = io_curr_device;
 	if (mupip_error_occurred)
 	{
+		op_trollback(0);
 		REVERT;
-		exit(-1);
+		return TRIG_FAILURE;
 	}
+	io_trigfile_device = io_curr_device;
 	record_num = 0;
 	for (i = 0; NUM_STATS > i; i++)
 		trig_stats[i] = 0;

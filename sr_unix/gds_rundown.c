@@ -311,7 +311,8 @@ void gds_rundown(void)
 		/* Try getting crit using tp_grab_crit. If we don't get crit, we would not hang for eternity and will skip
 		 * doing the orphaned snapshot cleanup. It will be cleaned up eventually.
 		 */
-		if (tp_grab_crit(reg) && (ss_pid == ss_shm_ptr->ss_info.ss_pid) && !is_proc_alive(ss_pid, 0))
+		if (tp_grab_crit(reg) && (ss_pid == ss_shm_ptr->ss_info.ss_pid)
+			&& (is_cur_process_ss_initiator || !is_proc_alive(ss_pid, 0)))
 		{
 			ss_release(NULL);
 			rel_crit(reg);

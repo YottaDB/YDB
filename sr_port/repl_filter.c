@@ -688,6 +688,10 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len)
 		QWASSIGN(null_jnlrec.jnl_seqno, save_jnl_seqno);
 		memcpy(tr, (char *)&null_jnlrec, NULL_RECLEN);
 		*tr_len = NULL_RECLEN;
+		/* Reset read pointers to avoid the subsequent records from being wrongly interpreted */
+		assert(srv_line_end <= srv_read_end);
+		assert(srv_line_start <= srv_read_end);
+		srv_line_end = srv_line_start = srv_read_end;
 	}
 	return(SS_NORMAL);
 }

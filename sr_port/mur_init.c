@@ -130,6 +130,7 @@ void	mur_rctl_desc_alloc(reg_ctl_list *rctl)
 	mur_desc->random_buff.read_in_progress = FALSE;
 	mur_desc->seq_buff[0].read_in_progress = FALSE;
 	mur_desc->seq_buff[1].read_in_progress = FALSE;
+	mur_desc->aux_buff2.read_in_progress = FALSE;
 #	if defined(UNIX) && defined(MUR_USE_AIO)
 	mur_desc->seq_buff[0].aiocbp = (struct aiocb *)malloc(SIZEOF(struct aiocb));
 	mur_desc->seq_buff[1].aiocbp = (struct aiocb *)malloc(SIZEOF(struct aiocb));

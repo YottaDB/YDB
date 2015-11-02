@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@
 
 GBLREF collseq		*local_collseq;
 GBLREF bool		undef_inhibit;
+GBLREF int		lv_null_subs;
 LITREF mval		literal_null ;
 
 lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
@@ -45,6 +46,7 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	unsigned char		buff[512], *end;
 
 	error_def(ERR_UNDEF);
+	error_def(ERR_LVNULLSUBS);
 
 	VAR_START(var, start);
 	VMS_ONLY(va_count(argcnt));
@@ -64,6 +66,12 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 		else
 		{
 			assert(tbl->ident == MV_SBS);
+			MV_FORCE_DEFINED(key);
+			if (MV_IS_STRING(key) && (0 == key->str.len) && (LVNULLSUBS_NEVER == lv_null_subs))
+			{
+				va_end(var);
+				rts_error(VARLSTCNT(1) ERR_LVNULLSUBS);
+			}
 			if (!(key->mvtype & MV_NM ? !(key->mvtype & MV_NUM_APPROX) : (bool)val_iscan(key)))
 			{
 				if (local_collseq)

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2009 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2010 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -32,7 +32,8 @@ comline: s cp=1,ntoken="",ntoktype="TKEOL" s:runtime comline="/"_comline d GETTO
 	d GDEPARSE^GDEPARSE
 	q
 CTRL
-	i $p($zs,",",3,999)["%GTM-E-CTRAP, Character trap $C(3) encountered" s:comlevel comlevel=comlevel-1 zg @resume(comlevel)
+	i $p($zs,",",3,999)["%GTM-E-CTRAP, Character trap $C(3) encountered" do  zg @resume(comlevel)
+	. i comlevel>0 d comeof; if we take a ctrl-c in a command file then get out of that command file
 	i $p($zs,",",3,999)["%GTM-E-CTRAP, Character trap $C(25) encountered" h
 	i $p($zs,",",3,999)["%GTM-E-CTRAP, Character trap $C(26) encountered" d EXIT^GDEEXIT
 	i $p($zs,",",3,999)="%GTM-E-IOEOF, Attempt to read past an end-of-file" d comexit
@@ -48,18 +49,18 @@ comfile:
 	s (comfile,comfile(comlevel+1))=$zparse(value,"","",".COM")
 	i '$l($zsearch(comfile)),'$l($zsearch(comfile)) zm gdeerr("FNF"):comfile
 	e  o comfile:(read:exc="zg "_$zl_":comeof") zm gdeerr("EXECOM"):comfile d SCRIPT
-comeof	c comfile s comlevel=comlevel-1
+comeof	c comfile s comlevel=$select(comlevel>1:comlevel-1,1:0)
 	i comlevel>0 s comfile=comfile(comlevel) zm gdeerr("EXECOM"):comfile
 	e  u @useio
 	i $p($zs,",",3)'["%GTM-E-IOEOF",$p($zs,",",3)'["FNF" w !,$p($zs,",",3,9999),!
 	q
 SCRIPT:
 	s comlevel=comlevel+1
-	f  u comfile r comline i $e(comline,1)'="!" u @useio d comline
+	f  u comfile r comline i $e(comline,1)'="!" u @useio d comline:$l(comline)
 	;this loop is terminated by the comfile exception at eof
 SHOERR
 	w !,$p($zs,",",3,999),!
-	i comlevel s comlevel=comlevel-1
+	s comlevel=$s(comlevel>1:comlevel-1,1:0)
 	s $ecode=""
 	zg @resume(comlevel)
 	q

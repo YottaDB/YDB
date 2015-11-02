@@ -22,6 +22,15 @@
 #include "get_ret_targ.h"
 #include "xfer_enum.h"
 #include "dollar_quit.h"
+#if defined(__sparc)
+#  include "sparc.h"
+#elif defined(__MVS__)
+#  include "s390.h"
+#elif defined(__hppa)
+#  include "hppa.h"
+#elif defined(__ia64)
+#  include "ia64.h"
+#endif
 
 /* Determine value to return for $QUIT:
  *
@@ -40,6 +49,8 @@
  *
  * Because this routine looks at the generated code stream at the return point, it is highly platform
  * dependent.
+ *
+ * Note: If generated code changes for a platform, this module needs to be revisited.
  */
 int dollar_quit(void)
 {
@@ -50,9 +61,10 @@ int dollar_quit(void)
 
 	union
 	{
-		char		*instr;
+		unsigned char	*instr;
 		unsigned short	*instr_type;
-		char		*xfer_offset_8;
+		unsigned char	*instr_type_8;
+		unsigned char	*xfer_offset_8;
 		short		*xfer_offset_16;
 		int		*xfer_offset_32;
 	} ptrs;
@@ -64,14 +76,43 @@ int dollar_quit(void)
 	else
 	{	/* There is a parm block - see if they want a "regular" or alias type return argument */
 		sf = sf->old_frame_pointer;		/* Caller's frame */
-		ptrs.instr = (char *)sf->mpc + EXFUNRET_INST_OFFSET;
-#		if defined(__x86_64__) || defined(__i386)
+#		ifdef __i386
 		{
-			if (0x53FF == *ptrs.instr_type)
-			{	/* Short format CALL */
+			ptrs.instr = sf->mpc;
+			/* First figure out the potential length of the lea* instruction loading compiler temp offset */
+			if (0x078d == *ptrs.instr_type)
+				ptrs.instr += 3;	/* Past the 2 byte lea plus 1 byte push */
+			else if (0x478d == *ptrs.instr_type)
+				ptrs.instr += 4;	/* Past the 3 byte lea plus 1 byte push */
+			else if (0x878d == *ptrs.instr_type)
+				ptrs.instr += 7;	/* Past the 6 byte lea plus 1 byte push */
+			else
+				ptrs.instr = NULL;
+			/* Note the "long format call opcode" check below assumes that both of the EXFUNRET[ALS] calls remain at a
+			 * greater-than-128 byte offset in the transfer table (which they currently are).
+			 */
+			if ((NULL != ptrs.instr) && (0x93FF == *ptrs.instr_type))
+			{
 				ptrs.instr += SIZEOF(*ptrs.instr_type);
-				xfer_index = *ptrs.xfer_offset_8 / SIZEOF(void *);
-			} else if (0x93FF == *ptrs.instr_type)
+				xfer_index = *ptrs.xfer_offset_32 / SIZEOF(void *);
+			} else
+				xfer_index = -1;
+		}
+#		elif defined(__x86_64__)
+		{
+			ptrs.instr = sf->mpc;
+			if (0x8d49 == *ptrs.instr_type)
+			{
+				ptrs.instr += 2;	/* Past first part of instruction type */
+				if (0x7e == *ptrs.instr_type_8)
+					ptrs.instr += 2;	/* past last byte of instruction type plus 1 byte offset */
+				else if (0xbe == *ptrs.instr_type_8)
+					ptrs.instr += 5;	/* past last byte of instruction type plus 4 byte offset */
+				else
+					ptrs.instr = NULL;
+			} else
+				ptrs.instr_type = NULL;
+			if ((NULL != ptrs.instr) && (0x93FF == *ptrs.instr_type))
 			{	/* Long format CALL */
 				ptrs.instr += SIZEOF(*ptrs.instr_type);
 				xfer_index = *ptrs.xfer_offset_32 / SIZEOF(void *);
@@ -80,6 +121,7 @@ int dollar_quit(void)
 		}
 #		elif defined(_AIX)
 		{
+			ptrs.instr = sf->mpc + 4;	/* Past address load of compiler temp arg */
 			if (0xE97C == *ptrs.instr_type)
 			{	/* ld of descriptor address from xfer table */
 				ptrs.instr += SIZEOF(*ptrs.instr_type);
@@ -89,14 +131,16 @@ int dollar_quit(void)
 		}
 #		elif defined(__alpha)	/* Applies to both VMS and Tru64 as have same codegen */
 		{
-			if (UNIX_ONLY(0xA36C) VMS_ONLY(0xA36B) == *(ptrs.instr_type + 1))
-				/* ldl of descriptor address from xfer table - little endian - offset prior to opcode*/
+			ptrs.instr = sf->mpc + 4;	/* Past address load of compiler temp arg */
+			if (UNIX_ONLY(0xA36C) VMS_ONLY(0xA36B) == *(ptrs.instr_type + 1))	/* Different code for reg diff */
+				/* ldl of descriptor address from xfer table - little endian - offset prior to opcode */
 				xfer_index = *ptrs.xfer_offset_16 / SIZEOF(void *);
 			else
 				xfer_index = -1;
 		}
 #		elif defined(__sparc)
 		{
+			ptrs.instr = sf->mpc + 4;	/* Past address load of compiler temp arg */
 			if (0xC85C == *ptrs.instr_type)
 			{	/* ldx of rtn address from xfer table */
 				ptrs.instr += SIZEOF(*ptrs.instr_type);
@@ -104,7 +148,7 @@ int dollar_quit(void)
 			} else
 				xfer_index = -1;
 		}
-#		elif defined(__MVS__)
+#		elif defined(__MVS__) || defined(Linux390)
 		{
 			format_RXY	instr_LG;
 			union
@@ -112,21 +156,16 @@ int dollar_quit(void)
 				int	offset;
 				struct
 				{	/* Used to reassemble the offset in the LG instruction */
-#					ifdef BIGENDIAN
 					int	offset_unused:12;
 					int	offset_hi:8;
 					int	offset_low:12;
-#					else
-					int	offset_low:12;
-					int	offset_hi:8;
-					int	offset_unused:12;
-#					endif
 				} instr_LG_bits;
 			} RXY;
 
+			ptrs.instr = sf->mpc + 6;	/* Past address load of compiler temp arg */
 			memcpy(&instr_LG, ptrs.instr, SIZEOF(instr_LG));
 			if ((S390_OPCODE_RXY_LG == instr_LG.opcode) && (S390_SUBCOD_RXY_LG == instr_LG.opcode2)
-			    && (REG_R6 == instr_LG.r1) && (GTM_REG_XFER_TABLE == instr_LG.b2))
+			    && (GTM_REG_SAVE_RTN_ADDR == instr_LG.r1) && (GTM_REG_XFER_TABLE == instr_LG.b2))
 			{	/* LG of rtn address from xfer table */
 				RXY.offset = 0;
 				RXY.instr_LG_bits.offset_hi = instr_LG.dh2;
@@ -148,6 +187,8 @@ int dollar_quit(void)
 				} instr_offset;
 			} fmt_1;
 
+			ptrs.instr = sf->mpc + 8;	/* Past address load of compiler temp arg plus rtn call to load of xfer
+							 * table call with offset in delay slot */
 			memcpy(&instr_LDX, ptrs.instr, SIZEOF(instr_LDX));
 			if (((HPPA_INS_LDW >> HPPA_SHIFT_OP) == instr_LDX.pop) && (GTM_REG_XFER_TABLE == instr_LDX.b)
 			    && (R22 == instr_LDX.t))
@@ -179,6 +220,7 @@ int dollar_quit(void)
 				} instr_offset;
 			} imm14;
 
+			ptrs.instr = sf->mpc + 16;	/* Past address load of compiler temp arg */
 #			ifdef BIGENDIAN
 			xfer_ref_inst.hexValue.aValue = GTM_BYTESWAP_64(((ia64_bundle *)ptrs.instr)->hexValue.aValue);
 			xfer_ref_inst.hexValue.bValue = GTM_BYTESWAP_64(((ia64_bundle *)ptrs.instr)->hexValue.bValue);
@@ -207,7 +249,7 @@ int dollar_quit(void)
 			/* Need a QUIT with an alias return value */
 			retval = 11;
 		else
-		{	/* Something weird afoot but plunge forwards.. */
+		{	/* Something weird afoot - had parm block can can't locate EXFUNRET[ALS] opcode */
 			assert(FALSE);
 			retval = 0;
 		}

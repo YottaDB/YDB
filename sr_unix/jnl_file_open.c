@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,8 @@
 #include "gtm_dbjnl_dupfd_check.h"
 #endif
 
+GBLREF	boolean_t		is_src_server;
+
 error_def(ERR_JNLFILOPN);
 error_def(ERR_JNLMOVED);
 error_def(ERR_JNLOPNERR);
@@ -59,7 +61,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 	uint4			sts;
 	sm_uc_ptr_t		nameptr;
 	int			fstat_res;
-	int			stat_res, close_res;
+	int			close_res;
 	boolean_t		retry;
 	ZOS_ONLY(int		realfiletag;)
 
@@ -120,6 +122,9 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 			}
 			if (0 != sts && (retry))
 			{
+				assert(!is_src_server);	/* source server should only read journal files so must never reach
+							 * a situation where it has to switch journal files.
+							 */
 				sts = jnl_file_open_switch(reg, sts);
 				retry = FALSE;	/* Do not switch more than once, even if error occurs */
 				if (0 == sts)
@@ -148,13 +153,15 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 		{
 			jpc->status = errno;
 			sts = ERR_JNLFILOPN;
+		} else
+		{
+			FSTAT_FILE(jpc->channel, &stat_buf, fstat_res);
+			ZOS_ONLY(gtm_zos_tag_to_policy(jpc->channel, TAG_BINARY, &realfiletag);)
 		}
-		ZOS_ONLY(gtm_zos_tag_to_policy(jpc->channel, TAG_BINARY, &realfiletag);)
 	}   /* if init */
 	if (0 == sts)
 	{
-		STAT_FILE((sm_c_ptr_t)nameptr, &stat_buf, stat_res);
-		if (0 == stat_res)
+		if (0 == fstat_res)
 		{
 			if (init || is_gdid_stat_identical(&csa->nl->jnl_file.u, &stat_buf))
 			{
@@ -198,5 +205,6 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 		assert(NOJNL == jpc->channel);
 		jnl_send_oper(jpc, sts);
 	}
+	assert((0 != sts) || (NOJNL != jpc->channel));
 	return sts;
 }

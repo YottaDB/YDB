@@ -1286,7 +1286,9 @@ boolean_t	tp_tend()
 	 * In case of forward processing phase of journal recovery, multi-region TP transactions are
 	 * played as multi-region transactions only after resolve-time is reached and that too in
 	 * region-by-region order (not necessarily upd_num order across all regions). Until then they
-	 * are played as multiple single-region transactions. Check accordingly.
+	 * are played as multiple single-region transactions. Also if -fences=none is specified, then
+	 * ALL multi-region TP transactions (even those after resolve time) are played as multiple
+	 * single-region TP transactions. Assert accordingly.
 	 */
 	max_upd_num = jgbl.tp_ztp_jnl_upd_num;
 	if (jgbl.forw_phase_recovery)
@@ -1322,7 +1324,8 @@ boolean_t	tp_tend()
 				if (upd_num <= (max_upd_num - upd_num_start))
 				{
 					assert((TRUE == upd_num_seen[upd_num])
-						|| (jgbl.forw_phase_recovery && (jgbl.gbl_jrec_time < jgbl.mur_tp_resolve_time)));
+						|| (jgbl.forw_phase_recovery && ((jgbl.gbl_jrec_time < jgbl.mur_tp_resolve_time)
+											|| jgbl.mur_fences_none)));
 					upd_num_seen[upd_num] = FALSE;
 				} else
 					assert(FALSE == upd_num_seen[upd_num]);

@@ -51,6 +51,13 @@ else
 	deliver_gtcm_gnp="no"
 fi
 
+# create symbolic links if utf8 directory exists.  Ignore the "file exists" errors for the .o files
+# which exist in both directories.
+
+if [ -d utf8 ]; then
+	(cd utf8; ln -s ../* . 2> /dev/null)
+fi
+
 # Native shared library extension.
 if [ $arch = "hp" -a `uname -m` != "ia64" ]; then
 	ext=".sl"
@@ -795,6 +802,11 @@ if [ $arch = "zos" ]; then
 	other_object_files="$other_object_files GENEXPORT.o"
 fi
 
+if [ "$doutf8" -ne 0 ]; then
+	# make symbolic links to gtmhelp.gld and gdehelp.gld
+	(cd $gtmdist/utf8; ln -s ../gtmhelp.gld gtmhelp.gld; ln -s ../gdehelp.gld gdehelp.gld)
+fi
+
 # make database files read only
 chmod 0444 $gtmdist/*.dat
 chmod 0444 $gtmdist/*.gld
@@ -825,22 +837,22 @@ chgrp $binuser $tgtmsecshrdir
 
 # Install gtmsecshr and the wrapper with special permissions
 if [ $arch = "sun" -o $arch = "linux" ]; then
-	install -m 4755 -o root -g $binuser gtmsecshr $gtmdist
+	install -m 4555 -o root -g $binuser gtmsecshr $gtmdist
 	install -m 4500 -o root -g $binuser gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
 elif [ $arch = "ibm" ]; then
-	/usr/bin/install -f $gtmdist -M 4755 -O root -G $binuser gtmsecshr
+	/usr/bin/install -f $gtmdist -M 4555 -O root -G $binuser gtmsecshr
 	/usr/bin/install -f $tgtmsecshrdir -M 4500 -O root -G $binuser gtmsecshrdir/gtmsecshr
 elif [ -x /usr/sbin/install ]; then
-	/usr/sbin/install -f $gtmdist -m 4755 -u root -g $binuser gtmsecshr $gtmdist
+	/usr/sbin/install -f $gtmdist -m 4555 -u root -g $binuser gtmsecshr $gtmdist
 	/usr/sbin/install -f $tgtmsecshrdir -m 4500 -u root -g $binuser gtmsecshrdir/gtmsecshr $tgtmsecshrdir
 elif [ $arch = "zos" ]; then
 	cp gtmsecshr $gtmdist/gtmsecshr
 	cp gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
 	chown $rootuser:$binuser $gtmdist/gtmsecshr $tgtmsecshrdir/gtmsecshr
-	chmod 4755 $gtmdist/gtmsecshr
+	chmod 4555 $gtmdist/gtmsecshr
 	chmod 4500 $tgtmsecshrdir/gtmsecshr
 else
-	install -f $gtmdist -m 4755 -u root -g $binuser gtmsecshr $gtmdist
+	install -f $gtmdist -m 4555 -u root -g $binuser gtmsecshr $gtmdist
 	install -f $tgtmsecshrdir -m 4500 -u root -g $binuser gtmsecshrdir/gtmsecshr $tgtmsecshrdir
 fi
 
@@ -853,12 +865,11 @@ strip $tgtmsecshrdir/gtmsecshr > /dev/null 2>&1
 
 # change group ownership of wrapper if group restricted
 # also remove user privileges for wrapper if group changed
-# otherwise change group to the default as some files were created with root group
 if [ "$group" != "" ] ; then
 	chgrp $group $gtmdist/gtmsecshr
+	$echo ""
+	$echo "Removing world permissions from gtmsecshr wrapper since group restricted to \"$group\""
 	chmod 4550 $gtmdist/gtmsecshr
-else
-	chgrp $binuser $gtmdist/gtmsecshr
 fi
 
 # leave nothing writeable

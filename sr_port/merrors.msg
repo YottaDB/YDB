@@ -1354,6 +1354,8 @@ ZTRIGINVACT	<Missing or invalid subcode (first) parameter given to $ZTRIGGER()>/
 ZTRIGNOTP	<$ZTRIGGER() cannot use update subcodes FILE or ITEM when a TP transaction is in progress ($TLEVEL greater than zero)>/error/fao=0!/ansi=0
 QUITALSINV	<QUIT * return when the extrinsic was not invoked with SET *>/error/fao=0!/ansi=0
 PROCTERM	<!AD process termination due to !AD from !AD>/warning/fao=6!/ansi=0
+SRCLNNTDSP	<Source lines exceeding !UL character width are not displayed>/info/fao=1!/ansi=0
+ARROWNTDSP	<Unable to display ^----- due to length of source line>/info/fao=0!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

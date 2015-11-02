@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,7 @@ GBLREF mval		last_fnquery_return_varname;
 GBLREF mval		last_fnquery_return_sub[MAX_LVSUBSCRIPTS];
 GBLREF int		last_fnquery_return_subcnt;
 GBLREF boolean_t 	local_collseq_stdnull;
+GBLREF int		lv_null_subs;
 
 void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 {
@@ -57,8 +58,9 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 	VMS_ONLY(int		sbscnt;)
 	boolean_t		found, is_num, last_sub_null, nullify_term;
 
-	error_def		(ERR_STACKOFLOW);
-	error_def		(ERR_STACKCRIT);
+	error_def(ERR_STACKOFLOW);
+	error_def(ERR_STACKCRIT);
+	error_def(ERR_LVNULLSUBS);
 
 	VAR_START(var, dst);
 	VMS_ONLY(va_count(sbscnt);)
@@ -90,6 +92,11 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 			MV_FORCE_DEFINED(*argpp);
 			if (MV_IS_STRING(*argpp))
 			{
+				if ((0 == (*argpp)->str.len) && (i + 1 != sbscnt) && (LVNULLSUBS_NEVER == lv_null_subs))
+				{	/* This is not the last subscript, we don't allow nulls subs and it was null */
+					va_end(var);
+					rts_error(VARLSTCNT(1) ERR_LVNULLSUBS);
+				}
 				if (is_num = MV_IS_CANONICAL(*argpp))
 				{
 					MV_FORCE_NUM(*argpp);

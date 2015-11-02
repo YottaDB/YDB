@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -366,6 +366,7 @@ void	mur_get_options(void)
 		else if (CLI_PRESENT == cli_present("FENCES.PROCESS"))
 			mur_options.fences = FENCE_PROCESS;	/* DEFAULT */
 	}
+	DEBUG_ONLY(jgbl.mur_fences_none = (FENCE_NONE == mur_options.fences);)
 	/*-----		-[NO]INTERACTIVE	-----*/
 #ifdef VMS
 	item_code = JPI$_MODE;

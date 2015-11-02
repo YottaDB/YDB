@@ -54,6 +54,7 @@
 #include "error.h"
 #include "repl_tr_good.h"
 #include "repl_instance.h"
+#include "wbox_test_init.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
@@ -313,6 +314,7 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 	gd_region		*r_save;
 	uint4			jnl_status;
 	boolean_t		do_jnl_ensure_open;
+	gd_id_ptr_t		reg_ctl_end_id;
 
 	error_def(ERR_REPLFILIOERR);
 	error_def(ERR_TEXT);
@@ -324,12 +326,25 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 	jnl_status = 0;
 	nopen = 0;
 	csa = &FILE_INFO(reg)->s_addrs;
-	if (is_gdid_gdid_identical(&reg_ctl_end->repl_buff->fc->id, JNL_GDID_PTR(csa))) /* Journal file remains same */
-		return (nopen);
+	reg_ctl_end_id = &reg_ctl_end->repl_buff->fc->id;
+	/* Note that at this point, journaling might have been turned OFF (e.g. REPL_WAS_ON state) in which case
+	 * JNL_GDID_PTR(csa) would have been nullified by jnl_file_lost. Therefore comparing with that is not a good idea
+	 * to use the "id" to check if the journal file remains same (this was done previously). Instead use the ID of
+	 * the current reg_ctl_end and the NAME of the newly opened journal file. Because we dont have crit, we cannot
+	 * safely read the journal file name from the file header therefore we invoke repl_ctl_create unconditionally
+	 * (that has safety protections for crit) and use the new_ctl that it returns to access the journal file name
+	 * returned and use that for the ID to NAME comparison.
+	 */
 	jnl_fn_len = 0; jnl_fn[0] = '\0';
 	for (do_jnl_ensure_open = TRUE; ; do_jnl_ensure_open = FALSE)
 	{
 		repl_ctl_create(&new_ctl, reg, jnl_fn_len, jnl_fn, do_jnl_ensure_open);
+		if (do_jnl_ensure_open && is_gdid_file_identical(reg_ctl_end_id, new_ctl->jnl_fn, new_ctl->jnl_fn_len))
+		{	/* Current journal file in db file header has been opened ALREADY by source server. Return right away */
+			assert(0 == nopen);
+			repl_ctl_close(new_ctl);
+			return (nopen);
+		}
 		nopen++;
 		REPL_DPRINT2("Newer generation file %s opened\n", new_ctl->jnl_fn);
 		new_ctl->prev = reg_ctl_end;
@@ -344,7 +359,7 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 		{ /* prev link has been cut, can't follow path back from latest generation jnlfile to the latest we had opened */
 			rts_error(VARLSTCNT(4) ERR_NOPREVLINK, 2, new_ctl->jnl_fn_len, new_ctl->jnl_fn);
 		}
-		if (is_gdid_file_identical(&reg_ctl_end->repl_buff->fc->id, jnl_fn, jnl_fn_len))
+		if (is_gdid_file_identical(reg_ctl_end_id, jnl_fn, jnl_fn_len))
 			break;
 	}
 	/* Name of the journal file corresponding to reg_ctl_end might have changed. Update the name.
@@ -1505,7 +1520,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 		for ( ; ctl->next != NULL && ctl->next->reg == region; prev_ctl = ctl, ctl = ctl->next)
 			;
 	}
-	assert(!*brkn_trans);
+	assert(!*brkn_trans || (gtm_white_box_test_case_enabled && (WBTEST_REPLBRKNTRANS == gtm_white_box_test_case_number)));
 	return (cumul_read);
 }
 

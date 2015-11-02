@@ -913,6 +913,7 @@ void mupip_backup(void)
 					break;
 				}
 				assert(!kip_count);
+				GET_C_STACK_FOR_KIP(kip_pids_arr_ptr, crit_counter, MAX_CRIT_TRY, 2, MAX_KIP_PID_SLOTS);
 				gtm_putmsg(VARLSTCNT(4) ERR_BACKUPKILLIP, 2, DB_LEN_STR(gv_cur_region));
 			}
 			/* Now that we have crit, check if this region is actively journaled and if gbl_jrec_time needs to be

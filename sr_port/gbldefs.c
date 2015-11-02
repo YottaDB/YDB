@@ -210,6 +210,8 @@ GBLDEF	int4		backup_close_errno,
 			forced_exit_err,
 			exit_state,
 			restore_read_errno;
+GBLDEF	int		lv_null_subs = LVNULLSUBS_OK;	/* UNIX: set in gtm_env_init_sp(), VMS: set in gtm$startup() - init'd here
+							 * in case alternative invocation methods bypass gtm_startup() */
 GBLDEF	volatile int4	outofband, crit_count = 0;
 GBLDEF	int		mumps_status = SS_NORMAL,
 			stp_array_size = 0;

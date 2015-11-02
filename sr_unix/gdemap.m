@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006 Fidelity Information Services, Inc	;
+;	Copyright 2006, 2010 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -51,10 +51,11 @@ MAP2NAM(list)
 	. i $d(list(x_")")) q
 	. s xl=$l(x)
 	. i $e(x,xl)=")" s xn=$e(x,1,xl-1),(nams(xn))="" q
-	. s xp=x,(ip,in)=0,star=$s(xl<SIZEOF("mident"):"*",1:"")
+	. s xp=x,(ip,in)=0,star=$s(xl<(SIZEOF("mident")-1):"*",1:"")
 	. f  s xp=$$lexprev(xp),l=$l(xp) q:'l  s ip=ip+1 q:l=xl&$d(list(xp))
 	. i ip'=1 s xn=x f  s xn=$$lexnext(xn),l=$l(xn) q:'l  s in=in+1 q:l'>xl&($d(list(xn))!$d(list(xn_")")))
-	. i ip,ip'>in!('in&$l($tr(x,"z"))) s xp=x f ip=1:1:ip s xp=$$lexprev(xp),xn=xp_star,(nams(xn),ar(xl,xn))=""
+	. i ip,ip'>in!($zl($tr(x,"z"))&(xl+1=SIZEOF("mident")!'in)) do
+	. . s xp=x f ip=1:1:ip s xp=$$lexprev(xp),xn=xp_star,(nams(xn),ar(xl,xn))=""
 	. e  s:'in&'$l($tr(x,"z")) in=1 s xn=x f in=1:1:in d  q:$d(nams(xn))!$d(list(xn_")"))
 	. . s xp=xn_star,(nams(xp),ar($l(xn),xp))="",xn=$$lexnext(xn)
 	s x="",ok=1

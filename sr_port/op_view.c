@@ -64,7 +64,8 @@
 }
 
 GBLREF boolean_t	certify_all_blocks;
-GBLREF bool		lv_null_subs, undef_inhibit, jobpid;
+GBLREF bool		undef_inhibit, jobpid;
+GBLREF int		lv_null_subs;
 GBLREF bool		view_debug1, view_debug2, view_debug3, view_debug4;
 GBLREF bool		zdefactive;
 GBLREF unsigned short	zdefbufsiz;
@@ -254,10 +255,13 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			/* This feature is not needed any more. This is a noop now */
 			break;
 		case VTK_LVNULLSUBS:
-			lv_null_subs = TRUE;
+			lv_null_subs = LVNULLSUBS_OK;
 			break;
 		case VTK_NOLVNULLSUBS:
-			lv_null_subs = FALSE;
+			lv_null_subs = LVNULLSUBS_NO;
+			break;
+		case VTK_NEVERLVNULLSUBS:
+			lv_null_subs = LVNULLSUBS_NEVER;
 			break;
 		case VTK_JNLFLUSH:
 			if (NULL == gd_header)		/* open gbldir */

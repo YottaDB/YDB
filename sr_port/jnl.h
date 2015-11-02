@@ -975,6 +975,7 @@ typedef struct
 								 */
 #	endif
 #	ifdef DEBUG
+	boolean_t			mur_fences_none;	/* a copy of mur_options.fences to be accessible to runtime code */
 	uint4				cumul_index;
 	uint4				cu_jnl_index;
 	uint4				max_tp_ztp_jnl_upd_num;	/* Max of all <jgbl.tp_ztp_jnl_upd_num> values processed in this

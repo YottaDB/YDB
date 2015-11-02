@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,14 +36,17 @@ GBLDEF	lv_val		*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 
 GBLREF	spdesc		stringpool;
 GBLREF	boolean_t	gtm_utf8_mode;
+GBLREF	int		lv_null_subs;
 
 LITREF mval	literal_null;
 
-static	mval	ind_val;	/* Subscript for variable tree search */
-static	lv_val	*ind_var;	/* Variable tree holding existing search context */
+STATICDEF	mval	ind_val;		/* Subscript for variable tree search */
+STATICDEF	lv_val	*ind_var;		/* Variable tree holding existing search context */
+STATICDEF	int	save_lv_null_subs;	/* Needs to be static so condition handler can access it */
 
-static		CONDITION_HANDLER(dir_ch);
-static int	pop_top (lv_val *src, mval *res);
+STATICFNDEF	CONDITION_HANDLER(fnzsrch_ch);
+STATICFNDEF	CONDITION_HANDLER(dir_ch);
+STATICFNDEF int	pop_top (lv_val *src, mval *res);
 void		dir_srch (parse_blk *pfil);
 
 int op_fnzsearch (mval *file, mint indx, mval *ret)
@@ -57,6 +60,10 @@ int op_fnzsearch (mval *file, mint indx, mval *ret)
 	mstr		tn;
 	lv_val		*ind_tmp;
 	error_def(ERR_INVSTRLEN);
+
+	ESTABLISH_RET(fnzsrch_ch, -1);
+	save_lv_null_subs = lv_null_subs;
+	lv_null_subs = LVNULLSUBS_OK;	/* $ZSearch processing depends on this */
 
 	MV_FORCE_STR(file);
 	if (file->str.len > MAX_FBUFF)
@@ -144,6 +151,8 @@ int op_fnzsearch (mval *file, mint indx, mval *ret)
 		}
 	}
 	assert((0 == ret->str.len) || (pret.p.pblk.b_esl == ret->str.len));
+	lv_null_subs = save_lv_null_subs;
+	REVERT;
 	return pret.p.pint;
 }
 
@@ -408,7 +417,23 @@ void dir_srch (parse_blk *pfil)
 }
 
 
-static CONDITION_HANDLER(dir_ch)
+STATICFNDEF CONDITION_HANDLER(fnzsrch_ch)
+{
+	int	dummy1, dummy2;
+	error_def(ERR_ASSERT);
+	error_def(ERR_GTMASSERT);
+	error_def(ERR_GTMCHECK);
+        error_def(ERR_MEMORY);
+	error_def(ERR_STACKOFLOW);
+
+	START_CH;
+
+	lv_null_subs = save_lv_null_subs;
+	NEXTCH;
+}
+
+
+STATICFNDEF CONDITION_HANDLER(dir_ch)
 {
 	int	dummy1, dummy2;
 	error_def(ERR_ASSERT);
@@ -454,7 +479,7 @@ void	zsrch_clr (int indx)
 	than the parse_file() maximum are ignored.
 */
 
-static	int pop_top (lv_val *src, mval *res)
+STATICFNDEF int pop_top (lv_val *src, mval *res)
 {
 	lv_val	*tmp;
 	plength	pret;

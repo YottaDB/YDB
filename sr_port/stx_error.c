@@ -153,7 +153,7 @@ void stx_error(int in_error, ...)
 	if (in_error == ERR_BADCHAR)
 	{
 		memset(buf, ' ', LISTTAB);
-		show_source_line(&buf[LISTTAB], warn);
+		show_source_line(&buf[LISTTAB], SIZEOF(buf), warn);
 		cnt = va_arg(args, VA_ARG_TYPE);
 		assert(cnt == 4);
 		arg1 = va_arg(args, VA_ARG_TYPE);
@@ -187,7 +187,7 @@ void stx_error(int in_error, ...)
 	} else
 	{
 		memset(buf, ' ', LISTTAB);
-		show_source_line(&buf[LISTTAB], warn);
+		show_source_line(&buf[LISTTAB], SIZEOF(buf), warn);
 		if (warn)
 		{
 			if ((in_error != ERR_CEUSRERROR) && (in_error != ERR_INVDLRCVAL))

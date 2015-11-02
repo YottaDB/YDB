@@ -434,8 +434,10 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 		{
 			if (0 != sem_rmid(udi->ftok_semid))
 			{
+				save_errno = errno;
 				gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
 				gtm_putmsg(VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("sem_rmid()"), CALLFROM);
+				GTM_SEM_CHECK_EINVAL(gtm_environment_init, save_errno, udi);
 				return FALSE;
 			}
 			udi->ftok_semid = INVALID_SEMID;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,7 +106,7 @@ void advancewindow(void)
 					}
 					if (!run_time)
 					{
-						show_source_line(source_line_buff, TRUE);
+						show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
 						dec_err(VARLSTCNT(1) ERR_LITNONGRAPH);
 					}
 				}

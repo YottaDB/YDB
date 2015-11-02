@@ -185,10 +185,14 @@ if ( $buildaux_gde == 1 ) then
 			unsetenv LC_ALL
 			setenv gtm_chset UTF-8	# switch to "UTF-8" mode
 			\rm -f utf8/*.m	# use \rm to avoid rm from asking for confirmation (in case it has been aliased so)
-			#Avoid copying getpass.m to the utf8 directory. The compilation and the subsequent copy of the GETPASS.o
+			#Avoid linking getpass.m to the utf8 directory. The compilation and the subsequent copy of the GETPASS.o
 			#will be done in build.sh
-			cp `ls *.m | grep -v -E "getpass\.m"` utf8
+			# get a list of all m files to link
+			setenv mfiles `ls *.m | grep -v -E "getpass\.m"`
 			cd utf8
+			foreach mfile ($mfiles)
+				ln -s ../$mfile $mfile
+			end
 			../mumps *.m
 			if ($status != 0) then
 				set buildaux_status = `expr $buildaux_status + 1`

@@ -48,7 +48,8 @@ typedef enum {
 	WBTEST_FILE_EXTEND_ERROR,		/* 24 : Prevent assert form mupip extend if # blocks is > 224M */
 	WBTEST_BUFOWNERSTUCK_STACK,		/* 25 : Get stack trace of the blocking pid for stuck messages*/
 	WBTEST_OINTEG_WAIT_ON_START,		/* 26 : Have online integ wait 60 after initiating the snapshot */
-	WBTEST_MUR_ABNORMAL_EXIT_EXPECTED	/* 27 : We expect MUPIP JOURNAL RECOVER/ROLLBACK to exit with non-zero status */
+	WBTEST_MUR_ABNORMAL_EXIT_EXPECTED,	/* 27 : We expect MUPIP JOURNAL RECOVER/ROLLBACK to exit with non-zero status */
+	WBTEST_REPLBRKNTRANS			/* 28 : We expect a REPLBRKNTRANS error from the source server */
 } wbtest_code_t;
 
 #ifdef DEBUG

@@ -74,6 +74,7 @@ GBLREF	uint4			t_err;
 GBLREF	int			tprestart_state;
 GBLREF	unsigned int		t_tries;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
+GBLREF	short			dollar_trestart;
 #ifdef DEBUG
 GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
@@ -1293,8 +1294,10 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit)
 			 * "op_tstart" (in GVTR_INIT_AND_TPWRAP_IF_NEEDED macro) when calling gvtr_init.
 			 * Therefore, this should have been the second (or more) invocation of the GVTR_INIT_AND_TPWRAP_IF_NEEDED
 			 * macro for the same gvcst_put or gvcst_kill action which means there was at least one retry.
+			 * Note that some retries could be uncounted (e.g. cdb_sc_helpedout) so we cannot check t_tries
+			 * but can check dollar_trestart which is incremented unconditionally on a retry.
 			 */
-			assert(t_tries);
+			assert(dollar_trestart);
 			assert(donot_INVOKE_MUMTSTART);
 			gvtr_db_tpwrap(csa, tp_is_implicit);
 			assert(sgm_info_ptr == csa->sgm_info_ptr);

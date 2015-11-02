@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@ LITREF	mval	SBS_MVAL_INT_ELE;
 
 GBLREF	collseq		*local_collseq;
 GBLREF	boolean_t 	local_collseq_stdnull;
-GBLREF	bool         	lv_null_subs;
+GBLREF	int         	lv_null_subs;
 GBLREF	boolean_t	in_op_fnnext;
 
 #define MINUS_ONE -MV_BIAS
@@ -153,7 +153,7 @@ void op_fnorder(lv_val *src, mval *key, mval *dst)
 				found = TRUE;
 				if (local_collseq_stdnull && 0 == dst->str.len)
 				{
-					assert(lv_null_subs);
+					assert(LVNULLSUBS_OK == lv_null_subs);
 					if (lv_nxt_str_inx(str, &dst->str, &status))
 					{
 						dst->str = ((sbs_str_struct*)status.ptr)->str;

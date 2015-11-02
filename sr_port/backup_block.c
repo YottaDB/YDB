@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,6 +80,11 @@ boolean_t backup_block(sgmnt_addrs *csa, block_id blk, cache_rec_ptr_t backup_cr
 		DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, bkp_src_blk);
 	}
 #	endif
+	/* Adjust bsiz to be within database block size range. Asserts above will ensure this IS the case for DBG. */
+	if (bsiz < SIZEOF(blk_hdr))
+		bsiz = SIZEOF(blk_hdr);
+	else if (bsiz > sbufh_p->blk_size)
+		bsiz = sbufh_p->blk_size;
 	/* Copy block information to data portion of shmpool block just following header */
 	memcpy((sblkh_p + 1), bkp_src_blk, bsiz);
 	/* Need a write coherency fence here as we want to make sure the above info is stored and

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 #include "gtm_string.h"
 #include "compiler.h"
 #include "show_source_line.h"
+#include "gtmmsg.h"
 #ifdef UNICODE_SUPPORTED
 #include "gtm_utf8.h"
 #endif
@@ -23,20 +24,39 @@ GBLREF unsigned char	*source_buffer;
 GBLREF bool		dec_nofac;
 GBLREF boolean_t	run_time;
 
-void show_source_line(char* buf, boolean_t warn)
+#define MAXLINESIZEFORDISPLAY 1023
+
+void show_source_line(char* buf, ssize_t buflen, boolean_t warn)
 {
-	char 	*b, *c, *c_top;
+	char 	*b, *b_top, *c, *c_top;
 	int	chlen, chwidth;
-	unsigned int ch;
+	unsigned int ch, line_chwidth = 0;
+	boolean_t unable_to_complete_arrow = FALSE;
+	mstr	msgstr;
 	error_def(ERR_SRCLIN);
 	error_def(ERR_SRCLOC);
+	error_def(ERR_SRCLNNTDSP);
+	error_def(ERR_ARROWNTDSP);
 
+	b_top = buf + buflen - STR_LIT_LEN(ARROW) - 1; /* allow room for arrow and string terminator */
 	for (c = (char *)source_buffer, b = buf, c_top = c + last_source_column - 1; c < c_top; )
 	{
 		if (*c == '\t')
+		{
+			if ((b + 1) > b_top)
+			{
+				unable_to_complete_arrow = TRUE;
+				break;
+			}
 			*b++ = *c++;
+		}
 		else if (!gtm_utf8_mode || *(uchar_ptr_t)c <= ASCII_MAX)
 		{
+			if ((b + 1) > b_top)
+			{
+				unable_to_complete_arrow = TRUE;
+				break;
+			}
 			*b++ = ' ';
 			c++;
 		}
@@ -46,6 +66,11 @@ void show_source_line(char* buf, boolean_t warn)
 			chlen = (int)(UTF8_MBTOWC(c, c_top, ch) - (uchar_ptr_t)c);
 			if (WEOF != ch && 0 < (chwidth = UTF8_WCWIDTH(ch)))
 			{
+				if ((b + chwidth) > b_top)
+				{
+					unable_to_complete_arrow = TRUE;
+					break;
+				}
 				memset(b, ' ', chwidth);
 				b += chwidth;
 			}
@@ -53,13 +78,52 @@ void show_source_line(char* buf, boolean_t warn)
 		}
 #endif
 	}
-	memcpy(b, ARROW, STR_LIT_LEN(ARROW));
-	b += STR_LIT_LEN(ARROW);
-	*b = '\0';
+	if (unable_to_complete_arrow)
+	{
+		msgstr.addr = buf;
+		msgstr.len = buflen;
+		dec_nofac = TRUE;
+		gtm_getmsg(ERR_ARROWNTDSP, &msgstr);
+		dec_nofac = FALSE;
+	} else
+	{
+		memcpy(b, ARROW, STR_LIT_LEN(ARROW));
+		b += STR_LIT_LEN(ARROW);
+		*b = '\0';
+	}
 	if (warn)
 	{
+		for (c = (char *)source_buffer; c < (char *)source_buffer + STRLEN((char *)source_buffer) - 1; )
+		{
+			if (*c == '\t')
+			{
+				line_chwidth++;
+				c++;
+			}
+			else if (!gtm_utf8_mode || *(uchar_ptr_t)c <= ASCII_MAX)
+			{
+				line_chwidth++;
+				c++;
+			}
+#ifdef UNICODE_SUPPORTED
+			else
+			{
+				chlen = (int)(UTF8_MBTOWC(c, (char *)source_buffer + STRLEN((char *)source_buffer) - 1, ch)
+						- (uchar_ptr_t)c);
+				if (WEOF != ch && 0 < (chwidth = UTF8_WCWIDTH(ch)))
+					line_chwidth += chwidth;
+				c += chlen;
+			}
+#endif
+		}
 		dec_nofac = TRUE;
-		dec_err(VARLSTCNT (6) ERR_SRCLIN, 4, LEN_AND_STR((char *)source_buffer), b - buf, buf);
+		if (line_chwidth < MAXLINESIZEFORDISPLAY)
+			if (unable_to_complete_arrow)
+				dec_err(VARLSTCNT(6) ERR_SRCLIN, 4, LEN_AND_STR((char *)source_buffer), msgstr.len, msgstr.addr);
+			else
+				dec_err(VARLSTCNT(6) ERR_SRCLIN, 4, LEN_AND_STR((char *)source_buffer), b - buf, buf);
+		else
+			dec_err(VARLSTCNT(2) ERR_SRCLNNTDSP, 1, MAXLINESIZEFORDISPLAY);
 		if (!run_time)
 			dec_err(VARLSTCNT(6) ERR_SRCLOC, 4, last_source_column, source_line, source_name_len, source_file_name);
 		dec_nofac = FALSE;

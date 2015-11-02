@@ -1469,4 +1469,14 @@ typedef struct gtm_num_range_struct
 # define DBGFPF(x) {flush_pio(); fprintf x; fflush(stderr);}
 #endif
 
+/* Settings for lv_null_subs */
+enum
+{
+	LVNULLSUBS_FIRST = -1,	/* So _NO is 0 to match existing values */
+	LVNULLSUBS_NO,		/* No null LV subscripts in SET type cases */
+	LVNULLSUBS_OK,		/* Null LV subscripts are allowed */
+	LVNULLSUBS_NEVER,	/* LVNULLSUBS_NO plus LV subscripts prohibited in $DATA, $GET, $ORDER, $QUERY, KILL, etc */
+	LVNULLSUBS_LAST
+};
+
 #endif /* MDEF_included */

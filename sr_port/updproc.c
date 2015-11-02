@@ -707,6 +707,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		{
 			if (JRT_NULL == rectype)
 			{
+				save_reg = gv_cur_region;
 				gv_cur_region = gld_db_files->gd;
 				tp_change_reg();
 				csa = cs_addrs;
@@ -799,6 +800,12 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				rel_crit(gv_cur_region);
 				jgbl.cumul_jnl_rec_len = 0;
 				incr_seqno = TRUE;
+				/* Restore gv_cur_region to what it was before the NULL record processing started. op_tstart
+				 * relies on the fact that gv_target->gd_csa and cs_addrs be in sync. If prior to NULL record
+				 * processing, gv_target->gd_csa pointed to AREG and after NULL record processing, gv_cur_region
+				 * points to DEFAULT then the op_tstart assert DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC will fail.
+				 */
+				TP_CHANGE_REG(save_reg);
 			} else if (JRT_TCOM == rectype)
 			{
 				if (tcom_num == tupd_num)

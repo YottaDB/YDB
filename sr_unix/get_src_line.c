@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_stat.h"
+#include "gtm_stdio.h"
 
 #include "rtnhdr.h"
 #include "zroutines.h"
@@ -27,9 +28,6 @@
 #include "zbreak.h"
 #include "hashtab_mname.h"
 #include "hashtab.h"
-#ifdef	__MVS__
-#include "gtm_zos_io.h"
-#endif
 
 #define RT_TBL_SZ 20
 
@@ -37,10 +35,9 @@ GBLREF hash_table_mname rt_name_tbl;
 
 int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 {
-	int		fd, n,*lt_ptr, size;
-        ssize_t         status;
+	int		n, *lt_ptr, size;
 	uint4		checksum, srcint;
-	bool		badfmt, found, added;
+	boolean_t	found, added, eof_seen;
 	mstr		src;
 	rhdtyp		*rtn_vector;
 	zro_ent		*srcdir;
@@ -50,12 +47,11 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 	char		srcnamebuf[SIZEOF(mident_fixed) + STR_LIT_LEN(DOTM)];
 	ht_ent_mname	*tabent;
 	var_tabent	rtnent;
-	int		rc;
-	ZOS_ONLY(int	realfiletag;)
+	int		rc, fclose_res;
+	char		*fgets_rc;
+	FILE		*fp;
 
 	error_def(ERR_TXTSRCFMT);
-	error_def(ERR_TEXT);
-	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	srcstat = 0;
 	*srcret = (mstr *)0;
@@ -82,13 +78,13 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 		c = malloc(rtn_vector->src_full_name.len + 1);
 		memcpy(c,rtn_vector->src_full_name.addr, rtn_vector->src_full_name.len);
 		*(c + rtn_vector->src_full_name.len) = 0;	/* ensure string is null terminated */
-		fd = OPEN(c, O_RDONLY);
-#ifdef __MVS__
-		if (FD_INVALID != fd && -1 == gtm_zos_tag_to_policy(fd, TAG_UNTAGGED, &realfiletag))
-			TAG_POLICY_SEND_MSG(c, errno, realfiletag, TAG_UNTAGGED);
-#endif
+		/* At this point, it is not clear if Fopen will handle zos tagging correctly in all cases.
+		 * especially when tagged with other than ISO8859-1 or IBM-1047. When we resurrect the zOS
+		 * platform, we need to test this out.
+		 */
+		fp = Fopen(c, "r");
 		free(c);
-		if (FD_INVALID == fd)
+		if (NULL == fp)
 		{
 			n = (int)rtn_vector->routine_name.len;
 			memcpy(srcnamebuf, rtn_vector->routine_name.addr, n);
@@ -107,14 +103,13 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 				memcpy(c2,src.addr,src.len);
 				c2 += src.len;
 				*c2++ = 0;
-				fd = OPEN(c1, O_RDONLY);
-#ifdef __MVS__
-				if (FD_INVALID != fd && -1 == gtm_zos_tag_to_policy(fd, TAG_UNTAGGED, &realfiletag))
-					TAG_POLICY_SEND_MSG(c1, errno, realfiletag, TAG_UNTAGGED);
-#endif
+				fp = Fopen(c1, "r");
 				free(c1);
-				if (FD_INVALID == fd)
+				if (NULL == fp)
+				{
 					rts_error(VARLSTCNT(1) errno);
+					assert(FALSE);
+				}
 				found = TRUE;
 			} else
 				found = FALSE;
@@ -122,40 +117,50 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 			found = TRUE;
 
 		if (!found)
+		{
 			srcstat |= SRCNOTFND;
-		n = found ? (int)rtn_vector->lnrtab_len : 0;
+			n = 0;
+		} else
+			n = (int)rtn_vector->lnrtab_len;
 		assert((found && n >= 1) || (n == 0));
 		/* first two words are the status code and the number of entries */
 		src_tbl = (uint4 *)malloc(n * SIZEOF(mstr) + SIZEOF(uint4) * 2);
 		base = RECAST(mstr *)(src_tbl + 2);
 		*(src_tbl + 1) = n;
-		badfmt = FALSE;
 		checksum = 0;
+		eof_seen = FALSE;
 		for (current = base + 1, top = base + n ; current < top ; current++)
 		{
-			for (c = buff, c1 = buff + MAX_SRCLINE; c < c1; )
+			assert(found && (NULL != fp));
+			if (!eof_seen)
 			{
-				DOREAD_A_NOINT(fd, c, 1, status);
-				if (-1 == status)
+				FGETS(buff, MAX_SRCLINE, fp, fgets_rc);
+				if (NULL == fgets_rc)
 				{
-					CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
-					rts_error(VARLSTCNT(3) ERR_TXTSRCFMT, 0, errno);
-				} else if (!status)
-					break;
-				if (*c == '\n')
-					break;
-				++c;
-			}
-			if (c == c1)
-				rts_error(VARLSTCNT(1) ERR_TXTSRCFMT);
-			size = (int)(c - buff);
+					if (ferror(fp))
+					{
+						FCLOSE(fp, fclose_res);
+						assert(!fclose_res);
+						rts_error(VARLSTCNT(3) ERR_TXTSRCFMT, 0, errno);
+						assert(FALSE);
+					} else
+					{
+						eof_seen = TRUE;
+						assert(feof(fp));
+						size = 0;
+					}
+				} else
+				{
+					size = (int)STRLEN(buff);
+					/* Strip trailing '\n' if any (if at least one byte was read in) */
+					if (size && ('\n' == buff[size - 1]))
+						size--;
+				}
+			} else	/* eof seen; nothing more to read in file */
+				size = 0;
 			if (size)
-			{
-				for (c2 = buff + size, c1 = buff;
-					c1 < c2 && *c1 != ' ' && *c1 != '\t'; c1++)
-						;
-				/* calculate checksum */
-				for (chkcalc = buff; chkcalc < c2; )
+			{	/* Calculate checksum */
+				for (chkcalc = buff, c2 = buff + size; chkcalc < c2; )
 				{
 					srcint = 0;
 					if (c2 - chkcalc < SIZEOF(int4))
@@ -183,15 +188,23 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 		if (found)
 		{
 	 		*base = *(base + 1);
-			if (!badfmt)
+			/* Ensure we have reached the end of the source file. If not, we need to issue a CHECKSUMFAIL error. Most
+			 * often the !eof_seen part of the check is not needed since the checksums will not match. But if it so
+			 * happens that the checksums do match, then this extra check helps us correctly identify a TXTSRCMAT error.
+			 */
+			if (!eof_seen)
 			{
-				status = read(fd,buff,1);
-				if (status || checksum != rtn_vector->checksum)
-					badfmt = TRUE;
+				FGETS(buff, MAX_SRCLINE, fp, fgets_rc);
+				if ((NULL == fgets_rc) && !ferror(fp))
+				{
+					eof_seen = TRUE;
+					assert(feof(fp));
+				}
 			}
-			CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
-			if (badfmt)
+			if (!eof_seen || (checksum != rtn_vector->checksum))
 				srcstat |= CHECKSUMFAIL;
+			FCLOSE(fp, fclose_res);
+			assert(!fclose_res);
 		}
 		*src_tbl = srcstat;
 		tabent->value = (char *) src_tbl;

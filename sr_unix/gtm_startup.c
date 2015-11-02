@@ -127,7 +127,6 @@ GBLREF bool			compile_time;
 GBLREF spdesc			stringpool;
 GBLREF spdesc			rts_stringpool;
 GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
-GBLREF bool			lv_null_subs;
 GBLREF lv_val			*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 GBLREF symval			*curr_symval;
 GBLREF collseq       	  	*local_collseq;
@@ -188,7 +187,6 @@ void gtm_startup(struct startup_vector *svec)
 	stacktop = mstack_ptr + 2 * mvs_size[MVST_NTAB];
 	stackwarn = stacktop + (16 * 1024);
 	break_message_mask = svec->break_message_mask;
-	lv_null_subs = svec->lvnullsubs;
 	if (svec->user_strpl_size < STP_INITSIZE)
 		svec->user_strpl_size = STP_INITSIZE;
 	else if (svec->user_strpl_size > STP_MAXINITSIZE)

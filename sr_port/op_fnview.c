@@ -53,7 +53,7 @@ GBLREF jnl_fence_control jnl_fence_ctl;
 GBLREF bool		undef_inhibit;
 GBLREF int4		break_message_mask;
 GBLREF command_qualifier cmd_qlf;
-GBLREF bool		lv_null_subs;
+GBLREF int		lv_null_subs;
 GBLREF tp_frame		*tp_pointer;
 GBLREF short		dollar_tlevel;
 GBLREF collseq		*local_collseq;

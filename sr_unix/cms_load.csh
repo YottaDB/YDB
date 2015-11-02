@@ -1,7 +1,7 @@
 #! /usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,6 +9,9 @@
 #	the license, please stop and do not read further.	#
 #								#
 #################################################################
+
+# This file is used by package.csh and must be modified prior
+# to deploying to a new platform
 
 if ("$1" == "-m") then
         set mods_only=1
@@ -147,27 +150,29 @@ cd $gtm_ver
 cp $preserve_time $cms_dir/*/gtmsrc.csh .
 
 ############### Define platform-specific libraries ##################################
-# if you add a directory below you must modify cms_chsrc.csh in at least two places
-# assume you have added sr_x86_64 to gtm_s_linux64 below
-# in cms_chsrc.cms add:
-# setenv sr_x86_64	$cms_ver/sr_x86_64
-# and modify s_linux64:
-# setenv s_linux64	"{$sr_linux,$sr_x86_64,$sr_x86_regs,$sr_unix,$sr_port,$sr_unix_cm,$sr_unix_gnp,$sr_port_cm}"
-# if this directory is added to more than one gtm_s... then modify the additional s_... in cms_cshrc.csh
+# if you add a platform or a platform specific directory below you must modify
+# tools/cms_tools/cms_cshrc.csh
+# tools/work_tools/get_lib_dirs.csh
+# sr_unix/get_lib_dirs.mk
+#
+# platform ordering goes:
+# platform+OS arch arch_common OS {portable,nsb_portable}
+
 
 set gtm_s_aix     = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_rs6000   sr_aix  "
 set gtm_s_osf1    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_alpha    sr_dux  "
 set gtm_s_hpux    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_hppa     sr_hpux "
 set gtm_s_linux   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_x86_regs sr_i386   sr_linux"
-set gtm_s_linux64 = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_x86_regs sr_x86_64  sr_linux"
-set gtm_s_sunos   = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_sparc  sr_sun  "
-set gtm_s_os390   = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_s390   sr_os390"
-set gtm_s_l390    = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_l390   sr_linux"
-set gtm_s_hpia    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_hpux   sr_ia64 "
-set gtm_s_linuxia = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_linux  sr_ia64 "
+set gtm_s_linux64 = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_x86_regs sr_x86_64 sr_linux"
+set gtm_s_sunos   = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_sparc    sr_sun"
+set gtm_s_os390   = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_s390     sr_os390"
+set gtm_s_l390    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_linux    sr_s390   sr_l390"
+set gtm_s_hpia    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_hpux     sr_ia64 "
+set gtm_s_linuxia = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_linux    sr_ia64 "
+set gtm_s_cygwin  = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_x86_regs sr_i386   sr_linux"
 
 set platform_library = "$platform_name"
-if ( "s390" == $MACHTYPE && "linux" == $platform_library ) then
+if ( "s390x" == $MACHTYPE && "linux" == $platform_library ) then
 	set platform_library = "l390"
 endif
 if ( "z/OS" == $MACHTYPE ) then

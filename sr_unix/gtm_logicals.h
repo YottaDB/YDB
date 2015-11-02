@@ -52,6 +52,7 @@
 /* GTM processing versus M standard */
 /* (see gtm_local_collate above) */
 #define GTM_STDXKILL			"$gtm_stdxkill"
+#define GTM_LVNULLSUBS			"$gtm_lvnullsubs"
 
 /* Miscellaneous */
 #define	GTM_DEBUG_LEVEL_ENVLOG		"$gtmdbglvl"

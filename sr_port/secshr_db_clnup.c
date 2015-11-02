@@ -251,6 +251,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 #	endif
 	GTM_SNAPSHOT_ONLY(
 		snapshot_context_ptr_t	lcl_ss_ctx;
+		cache_rec_ptr_t		snapshot_cr;
 	)
 
 	error_def(ERR_WCBLOCKED);
@@ -1023,11 +1024,13 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						 * rely on precomputed value csa->backup_in_prog since it is not initialized
 						 * if (cw_depth == 0) (see t_end.c). Hence using cnl->nbb explicitly in check.
 						 * However, for snapshots we can rely on csa as it is computed under
-						 * if (update_trans).
+						 * if (update_trans). Use cs->was_free to ensure that FREE blocks are not
+						 * back'ed up either by secshr_db_clnup or wcs_recover.
 						 */
-						if ((SNAPSHOTS_IN_PROG(csa) ||
-							(BACKUP_NOT_IN_PROGRESS != cnl->nbb)) && (NULL != cs->old_block))
+						if ((SNAPSHOTS_IN_PROG(csa) || (BACKUP_NOT_IN_PROGRESS != cnl->nbb))
+							&& (NULL != cs->old_block))
 						{
+							DEBUG_ONLY(GTM_SNAPSHOT_ONLY(snapshot_cr = NULL;)) /* Will be set below */
 							if (T_COMMIT_CRIT_PHASE2 != csa->t_commit_crit)
 							{	/* Set "cr->twin" to point to "cs->old_block". This is not normal
 								 * usage since "twin" usually points to a cache-record. But this
@@ -1055,8 +1058,12 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								assert(cr_alt != cr);
 								assert(cs->blk == cr_alt->blk);
 								assert(rundown_process_id == cr_alt->in_cw_set);
+								snapshot_cr = cr_alt;
 #								endif
-								cr->twin = GDS_ANY_ABS2REL(csa, cs->old_block);
+								/* wcs_recover need not copy before images of FREE blocks
+								 * to the backup buffer */
+								if (!cs->was_free)
+									cr->twin = GDS_ANY_ABS2REL(csa, cs->old_block);
 							} else
 							{	/* We have to finish phase2 update.
 								 * If Unix, we backup the block right here instead of waiting for
@@ -1081,19 +1088,19 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 									 * MUPIP BACKUP will anyways flush it at the end.
 									 */
 								}
+								snapshot_cr = cr;
 #								endif
-								GTM_SNAPSHOT_ONLY(
-									if (csa->snapshot_in_prog)
-									{
-										lcl_ss_ctx = SS_CTX_CAST(csa->ss_ctx);
-										WRITE_SNAPSHOT_BLOCK(csa,
-													cr,
-													NULL,
-													cr->blk,
-													lcl_ss_ctx);
-									}
-								)
 							}
+#							ifdef GTM_SNAPSHOT
+							if (SNAPSHOTS_IN_PROG(csa))
+							{
+								lcl_ss_ctx = SS_CTX_CAST(csa->ss_ctx);
+								assert(NULL != snapshot_cr);
+								assert((snapshot_cr == cr) || (snapshot_cr == cr_alt));
+								WRITE_SNAPSHOT_BLOCK(csa, snapshot_cr, NULL, snapshot_cr->blk,
+											lcl_ss_ctx);
+							}
+#							endif
 						}
 						if (T_COMMIT_CRIT_PHASE2 != csa->t_commit_crit)
 						{	/* Adjust blks_to_upgrd counter if not already done in phase1. The value of

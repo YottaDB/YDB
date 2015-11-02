@@ -263,12 +263,19 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, unsigned short gbl_name_len
 {
 	char			save_name[MAX_MIDENT_LEN + 1], curr_name[MAX_MIDENT_LEN + 1];
 	boolean_t		wildcard;
+	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
+	gd_region		*save_gv_cur_region;
+	gv_key			*save_gv_currkey;
+	gv_namehead		*hasht_tree, *save_gv_target;
+	sgm_info		*save_sgm_info_ptr;
+	sgmnt_addrs		*csa;
+	mname_entry		gvent;
+	mstr			ms_gbl_nam;
 	mval			mv_curr_nam;
         mval                    mi, trigger_count, trig_gbl;
         mval                    *mv_trig_cnt_ptr, mv_trigger_val;
 	int			indx, count;
 	char			*ptr;
-	boolean_t		name_found;
 	uint4			curr_name_len;
 	int			trigvn_len;
 
@@ -288,7 +295,6 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, unsigned short gbl_name_len
 		BUILD_HASHT_SUB_CURRKEY(gbl_name, gbl_name_len);
 	}
 	mv_trig_cnt_ptr = &trigger_count;
-	name_found = FALSE;
 	memcpy(curr_name, gbl_name, gbl_name_len);
 	curr_name_len = gbl_name_len;
 	STR2MVAL(mv_curr_nam, gbl_name, gbl_name_len);
@@ -314,18 +320,30 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, unsigned short gbl_name_len
 			}
 			ptr = mv_trigger_val.str.addr;
 			trigvn_len = STRLEN(mv_trigger_val.str.addr);
-			assert(MAX_MIDENT_LEN >= trigvn_len);
 			ptr += trigvn_len + 1;
 			A2I(ptr, mv_trigger_val.str.addr + mv_trigger_val.str.len, indx);
 			STR2MVAL(trig_gbl, mv_trigger_val.str.addr, trigvn_len);
+			SAVE_TRIGGER_REGION_INFO;
+			ms_gbl_nam.addr = mv_trigger_val.str.addr;
+			ms_gbl_nam.len = trigvn_len;
+			gv_bind_name(gd_header, &ms_gbl_nam);
+			csa = gv_target->gd_csa;
+			SETUP_TRIGGER_GLOBAL;
+			INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 		} else
 		{
 			STR2MVAL(trig_gbl, curr_name, curr_name_len);
-			name_found = TRUE;
 			indx = 0;
 		}
-		if (name_found)
-			write_out_trigger(trig_gbl.str.addr, trig_gbl.str.len, file_name_len, op_val, indx);
+		write_out_trigger(trig_gbl.str.addr, trig_gbl.str.len, file_name_len, op_val, indx);
+		if (trig_name)
+		{
+			if (NULL != save_gv_cur_region)
+			{
+				TP_CHANGE_REG_IF_NEEDED(save_gv_cur_region);
+			}
+			RESTORE_TRIGGER_REGION_INFO;
+		}
 		if (wildcard)
 		{
 			if (trig_name)
@@ -398,7 +416,6 @@ STATICFNDEF void dump_all_triggers(unsigned short file_name_len, mval *op_val)
 
 boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_name, uint4 file_name_len)
 {
-	boolean_t		found_blank;
 	char			*sel_ptr, *prev_ptr, *ptr1, *ptr2;
 	int			gbl_len, prev_len;
 	mstr			gbl_name;
@@ -409,6 +426,7 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 	gv_key			*save_gv_currkey;
 	gv_key			*save_gv_altkey;
 	gd_region		*save_gv_cur_region;
+	char			save_select_list[MAX_BUFF_SIZE];
 	mname_entry		gvent;
 	mval			trigger_value;
 	int			len, len1;
@@ -432,14 +450,18 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 	error_def(ERR_MUPCLIERR);
 	error_def(ERR_MUNOACTION);
 
+	/* make a local copy of the select list and use it to avoid string-pool problems */
+	assert(MAX_BUFF_SIZE > select_list_len);
+	memcpy(save_select_list, select_list, select_list_len);
+	save_select_list[select_list_len] = '\0';
 	gvinit();
-	dump_all = found_blank = FALSE;
+	dump_all = FALSE;
 	prev_len = 0;
 	if (0 == select_list_len)
 		dump_all = TRUE;
 	else
 	{
-		for (ptr1 = select_list, len = select_list_len;
+		for (ptr1 = save_select_list, len = select_list_len;
 				(NULL != (ptr2 = strchr(ptr1, '*'))) && (len > (len1 = INTCAST(ptr2 - ptr1)));
 				ptr1 = ptr2 + 1)
 		{	/* look for either a real "dump-it-all" *, an error *, or a wildcard * */
@@ -470,14 +492,9 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 	else
 	{
 		len = select_list_len;
-		sel_ptr = strtok(select_list, ",");
+		sel_ptr = strtok(save_select_list, ",");
 		do
 		{
-			if (NULL != (ptr1 = strchr(sel_ptr, ' ')))
-			{
-				*ptr1 = '\0';
-				found_blank = TRUE;
-			}
 			trig_name = ('^' != *sel_ptr);
 			ptr1 = sel_ptr;
 			if (!trig_name)
@@ -545,10 +562,13 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 			INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 			if (0 != gv_target->root)
 				write_gbls_or_names(gbl_name.addr, gbl_name.len, file_name_len, &op_val, trig_name);
-			TP_CHANGE_REG_IF_NEEDED(save_gv_cur_region);
+			if (NULL != save_gv_cur_region)
+			{
+				TP_CHANGE_REG_IF_NEEDED(save_gv_cur_region);
+			}
 			RESTORE_TRIGGER_REGION_INFO;
 			len--;
-		} while ((NULL != (sel_ptr = strtok(NULL, ","))) && !found_blank);
+		} while (NULL != (sel_ptr = strtok(NULL, ",")));	/* Embedded assignment is intended */
 	}
 	if (0 != file_name_len)
 	{

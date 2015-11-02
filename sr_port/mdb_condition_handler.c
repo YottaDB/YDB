@@ -1033,7 +1033,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		DBGEHND((stderr, "mdb_condition_handler: Printing error status\n"));
 		PRN_ERROR;
 		if (compile_time && ((int)ERR_LABELMISSING) != SIGNAL)
-			show_source_line(source_line_buff, TRUE);
+			show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
 	}
 	if (!dm_action && !trans_action && (0 != src_line_d.len))
 	{

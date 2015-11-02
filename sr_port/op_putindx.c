@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,7 @@
 #include "alias.h"
 
 GBLDEF lv_val		*active_lv;
-GBLDEF bool		lv_null_subs = TRUE;
+GBLREF int		lv_null_subs;
 GBLREF collseq		*local_collseq;
 
 lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
@@ -47,6 +47,7 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
        	sbs_search_status status;
 	mval	*key;
 	boolean_t is_canonical;
+
 	error_def(ERR_LVNULLSUBS);
 
 	VAR_START(var, start);
@@ -58,10 +59,11 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 				--argcnt > 0;  start = lv, subs_level++)
 	{
 		key = va_arg(var, mval *);
-		lv = 0;
+		MV_FORCE_DEFINED(key);	/* Subscripts for set shouldn't be undefined - check here enables lvnullsubs to work */
+		lv = NULL;
 		if (!(is_canonical = MV_IS_CANONICAL(key)))
 		{
-			if (!key->str.len && !lv_null_subs)
+			if (!key->str.len && (LVNULLSUBS_OK != lv_null_subs))	/* Error for both LVNULLSUBS_{NO,NEVER} */
 			{
 				active_lv = start;
 				va_end(var);

@@ -425,8 +425,13 @@ research:
 		{	/* Maintain journal records only if the kill actually resulted in a database update. */
 			if (0 == dollar_tlevel)
 			{
+				nodeflags = 0;
+				GTMTRIG_ONLY(
+					if (skip_dbtriggers)
+						nodeflags = JS_SKIP_TRIGGERS_MASK;
+				)
 				assert(!jnl_format_done);
-				jfb = jnl_format(operation, gv_currkey, NULL, 0);
+				jfb = jnl_format(operation, gv_currkey, NULL, nodeflags);
 				assert(NULL != jfb);
 			} else if (!jnl_format_done)
 			{

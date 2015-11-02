@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,9 +71,6 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "memcoherency.h"
-#ifdef GTM_SNAPSHOT
-#include "db_snapshot.h"
-#endif
 
 GBLREF	boolean_t		certify_all_blocks;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -127,7 +124,6 @@ void wcs_recover(gd_region *reg)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	sgm_info		*si;
-	boolean_t		lcl_ss_in_prog;
 
 	error_def(ERR_BUFRDTIMEOUT);
 	error_def(ERR_DBADDRALIGN);
@@ -224,25 +220,8 @@ void wcs_recover(gd_region *reg)
 	blk_size = csd->blk_size;
 	buffptr = (sm_uc_ptr_t)ROUND_UP((sm_ulong_t)cr_top, OS_PAGE_SIZE);
 	backup_block_saved = FALSE;
-#	ifdef GTM_SNAPSHOT
-	if (SNAPSHOTS_IN_PROG(cnl))
-	{
-		/* If snapshots are already in progress, then try to release the existing context if a new one has started
-		 * after we last updated csa->snapshot_in_prog
-		 */
-		if (SNAPSHOTS_IN_PROG(csa))
-			SS_RELEASE_IF_NEEDED(csa, cnl);
-		/* Try to create a new context if a new one has started after we last updated csa->snapshot_in_prog. After this,
-		 * with respect to snapshots all the remaining transaction logic in t_end, bg_update_phase2 and secshr_db_clnup
-		 * should use csa and should not rely on cnl
-		 */
-		SS_INIT_IF_NEEDED(csa, cnl);
-	} else
-		csa->snapshot_in_prog = FALSE;
-#	endif
-	lcl_ss_in_prog = SNAPSHOTS_IN_PROG(csa);
-	if ((BACKUP_NOT_IN_PROGRESS != cnl->nbb) || lcl_ss_in_prog)
-	{	/* Online backup or snapshots are in progress. Check if secshr_db_clnup has created any cache-records with pointers
+	if (BACKUP_NOT_IN_PROGRESS != cnl->nbb)
+	{	/* Online backup is in progress. Check if secshr_db_clnup has created any cache-records with pointers
 		 * to before-images that need to be backed up. If so take care of that first before doing any cache recovery.
 		 */
 		bp_lo = (INTPTR_T)buffptr;
@@ -322,13 +301,6 @@ void wcs_recover(gd_region *reg)
 					backup_block(csa, cr_alt->blk, cr_alt, NULL);
 					backup_block_saved = TRUE;
 				}
-#				ifdef GTM_SNAPSHOT
-				if (lcl_ss_in_prog)
-				{
-					assert(NULL != (SS_CTX_CAST(csa->ss_ctx)));
-					WRITE_SNAPSHOT_BLOCK(csa, cr_alt, NULL, cr_alt->blk, (SS_CTX_CAST(csa->ss_ctx)));
-				}
-#				endif
 			}
 		}
 	}

@@ -52,7 +52,8 @@ GBLREF	boolean_t		is_gtm_chset_utf8;
 GBLREF	boolean_t		utf8_patnumeric;
 GBLREF	boolean_t		badchar_inhibit;
 GBLREF	boolean_t		gtm_quiet_halt;
-GBLREF	int			gtm_non_blocked_write_retries; /* number for retries for non_blocked write to pipe */
+GBLREF	int			lv_null_subs;			/* Local variable null subscripts allowed */
+GBLREF	int			gtm_non_blocked_write_retries;	/* number for retries for non_blocked write to pipe */
 GBLREF	char			*gtm_core_file;
 GBLREF	char			*gtm_core_putenv;
 ZOS_ONLY(GBLREF	char		*gtm_utf8_locale_object;)
@@ -120,6 +121,12 @@ void	gtm_env_init_sp(void)
 	ret = logical_truth_value(&val, FALSE, &is_defined);
 	if (is_defined)
 		gtm_quiet_halt = ret;
+
+	/* Initialize local variable null subscripts allowed flag */
+	val.addr = GTM_LVNULLSUBS;
+	val.len = SIZEOF(GTM_LVNULLSUBS) - 1;
+	ret = trans_numeric(&val, &is_defined, TRUE); /* Not initialized enuf for errors yet so silent rejection of invalid vals */
+	lv_null_subs = ((is_defined && (LVNULLSUBS_FIRST < ret) && (LVNULLSUBS_LAST > ret)) ? ret : LVNULLSUBS_OK);
 
 #	ifdef GTM_TRIGGER
 	token = GTM_TRIGGER_ETRAP;

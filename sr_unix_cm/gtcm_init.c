@@ -77,6 +77,7 @@ GBLREF uint4			*pattern_typemask;
 GBLREF enum gtmImageTypes	image_type;
 GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF boolean_t		is_replicator;
+GBLDEF boolean_t		skip_dbtriggers;
 
 void	gtcm_fail(int sig);
 
@@ -99,6 +100,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	get_page_size();
 	is_replicator = TRUE;	/* as GT.CM OMI goes through t_end() and can write jnl records to the jnlpool for replicated db */
 	image_type = GTCM_SERVER_IMAGE;
+	GTMTRIG_ONLY(skip_dbtriggers = TRUE;) /* GTCM OMI SERVER does not support triggers. */
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 
 #ifndef GTCM_DEBUG_NOBACKGROUND

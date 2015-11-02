@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,7 +114,7 @@ typedef struct {
 	 	ROUND_DOWN((addr), (blksize)) : JNL_FILE_FIRST_RECORD)
 
 int repl_ctl_close(repl_ctl_element *ctl);
-int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len,
-	char *jnl_fn, boolean_t init);
+int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char *jnl_fn, boolean_t init);
+int repl_open_jnl_file_by_name(repl_ctl_element *tmp_ctl, int jnl_fn_len, char *jnl_fn, int *fd_ptr, void *stat_buf_ptr);
 
 #endif

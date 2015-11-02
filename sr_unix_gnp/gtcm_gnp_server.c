@@ -129,6 +129,7 @@ GBLDEF gd_region		*action_que_dummy_reg;
 GBLDEF char			gtcm_gnp_server_log[MAX_FN_LEN + 1];
 /* the length is the orignal length */
 GBLDEF int			gtcm_gnp_log_path_len;
+GBLDEF boolean_t		skip_dbtriggers;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -372,6 +373,7 @@ int main(int argc, char **argv, char **envp)
 	error_def(ERR_TEXT);
 
 	image_type = GTCM_GNP_SERVER_IMAGE;
+	GTMTRIG_ONLY(skip_dbtriggers = TRUE;) /* GTCM GNP does not support triggers. */
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	is_replicator = TRUE;	/* as GT.CM GNP goes through t_end() and can write jnl records to the jnlpool for replicated db */
 	gtm_env_init();	/* read in all environment variables */

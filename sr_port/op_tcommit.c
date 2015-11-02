@@ -170,7 +170,7 @@ enum cdb_sc	op_tcommit(void)
 				 * trigger invocation to be done before completing the explicit (outside-trigger) update.
 				 * Cannot commit such a transaction. Issue error.
 				 */
-				rts_error(VARLSTCNT(1) ERR_TRIGTCOMMIT, gtm_trigger_depth, tstart_trigger_depth);
+				rts_error(VARLSTCNT(4) ERR_TRIGTCOMMIT, 2, gtm_trigger_depth, tstart_trigger_depth);
 			}
 		)
 		save_cur_region = gv_cur_region;
