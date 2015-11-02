@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "mmemory.h"
 #include "compiler.h"
 #include "mdq.h"
+#include "hashtab_str.h"
 
 GBLREF bool			shift_gvrefs;
 GBLREF mcalloc_hdr		*mcavailptr, *mcavailbase;
@@ -34,6 +35,7 @@ GBLREF unsigned short int	expr_depth;
 
 void tripinit(void)
 {
+	COMPILE_HASHTAB_CLEANUP;
 	if (!mcavailbase)
 	{
 		mcavailbase = (mcalloc_hdr *)malloc(MC_DSBLKSIZE);

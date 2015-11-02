@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,7 +84,8 @@ int main(int argc, char_ptr_t argv[])
     if (argc == 1)
 	conn.fd = fileno(stdin);
     else if (argc == 2) {
-	if (INV_FD_P((conn.fd = open(argv[argc - 1], O_RDONLY)))) {
+	if (INV_FD_P((conn.fd = open(argv[argc - 1], O_RDONLY))))
+	{
 	    PRINTF("%s: open(\"%s\"): %s\n", argv[0], argv[argc - 1],
 		   STRERROR(errno));
 	    exit(-1);
@@ -117,7 +118,7 @@ int main(int argc, char_ptr_t argv[])
     conn.state  = OMI_ST_DISC;
     conn.ga     = (ga_struct *)0;	/* struct gd_addr_struct */
     conn.of     = (oof_struct *)0;	/* struct rc_oflow */
-    conn.pklog  = INV_FD;
+    conn.pklog  = FD_INVALID;
 /*  Initialize the statistics */
     conn.stats.bytes_recv = 0;
     conn.stats.bytes_send = 0;

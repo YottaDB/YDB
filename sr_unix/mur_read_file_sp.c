@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,9 @@
 #include "eintr_wrappers.h"
 #include "gtm_aio.h"
 #include "gtmio.h"
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gtm_facility.h"
@@ -34,6 +37,7 @@
 #include "iosp.h"
 #include "copy.h"
 #include "gtmmsg.h"
+#include "repl_sp.h"		/* for F_CLOSE used by the JNL_FD_CLOSE macro */
 
 GBLREF	mur_read_desc_t	mur_desc;
 GBLREF	jnl_ctl_list	*mur_jctl;
@@ -129,9 +133,12 @@ boolean_t mur_fopen_sp(jnl_ctl_list *jctl)
 {
 	struct stat		stat_buf;
 	int			status, perms;
+	ZOS_ONLY(int		realfiletag;)
 
 	error_def(ERR_JNLFILEOPNERR);
 	error_def(ERR_SYSCALL);
+	error_def(ERR_TEXT);
+	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	perms = O_RDONLY;
 	jctl->read_only = TRUE;
@@ -144,23 +151,27 @@ boolean_t mur_fopen_sp(jnl_ctl_list *jctl)
 		jctl->read_only = FALSE;
 	}
 	jctl->channel = OPEN((char *)jctl->jnl_fn, perms);
-	if (-1 != jctl->channel)
+	if (FD_INVALID != jctl->channel)
 	{
 		FSTAT_FILE(jctl->channel, &stat_buf, status);
 		if (-1 != status)
 		{
+#ifdef __MVS__
+			if (-1 == gtm_zos_tag_to_policy(jctl->channel, TAG_BINARY, &realfiletag))
+				TAG_POLICY_GTM_PUTMSG((char *)jctl->jnl_fn, errno, realfiletag, TAG_BINARY);
+#endif
 			jctl->os_filesize = (off_jnl_t)stat_buf.st_size;
 			return TRUE;
 		}
 		jctl->status = errno;
-		CLOSEFILE(jctl->channel, status);
+		JNL_FD_CLOSE(jctl->channel, status);	/* sets jctl->channel to NOJNL */
 	} else
 		jctl->status = errno;
+	assert(NOJNL == jctl->channel);
 	if (ENOENT == jctl->status)	/* File Not Found is a common error, so no need for SYSCALL */
 		gtm_putmsg(VARLSTCNT(5) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len, jctl->jnl_fn, jctl->status);
 	else
 		gtm_putmsg(VARLSTCNT(12) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len, jctl->jnl_fn, ERR_SYSCALL, 5,
 			LEN_AND_STR((-1 == jctl->channel) ? "open" : "fstat"), CALLFROM, jctl->status);
-	jctl->channel = NOJNL;
 	return FALSE;
 }

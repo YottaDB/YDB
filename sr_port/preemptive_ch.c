@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@
 
 GBLREF	gv_namehead		*reset_gv_target;
 GBLREF	gv_namehead		*gv_target;
-GBLREF	boolean_t		kip_incremented;
+GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	short			dollar_tlevel;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -55,12 +55,13 @@ void preemptive_ch(int preemptive_severe)
 	{
 		for (si = first_sgm_info;  si != NULL; si = si->next_sgm_info)
 		{
-			if (si->kip_incremented)
+			if (NULL != si->kip_csa)
 			{
 				csa = si->tp_csa;
-				DECR_KIP(csa->hdr, csa, si->kip_incremented);
+				assert(si->tp_csa == si->kip_csa);
+				DECR_KIP(csa->hdr, csa, si->kip_csa);
 			}
 		}
-	} else if (kip_incremented)
-		DECR_KIP(cs_data, cs_addrs, kip_incremented);
+	} else if (NULL != kip_csa && (NULL != kip_csa->hdr) && (NULL != kip_csa->nl))
+		DECR_KIP(kip_csa->hdr, kip_csa, kip_csa);
 }

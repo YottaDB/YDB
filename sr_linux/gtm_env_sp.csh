@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -29,6 +29,7 @@ set platform_only = `echo $platform_name | sed 's/_.*//'`
 #### To determine whether the build type is 64 or 32. On x86_64 linux box, use the header file "x86_64.h" in the inc directory.
 if ( "ia64" == $mach_type || ( "x86_64" == $mach_type && -e $gtm_inc/x86_64.h) ) then
 	setenv linux_build_type 64
+	setenv gt_ld_m_shl_options "-shared"
 else
 	setenv linux_build_type 32
 endif
@@ -53,6 +54,7 @@ if ( $?gtm_version_change == "1" ) then
 
 	setenv	gt_ar_option_create	"qSv"		# quick, verbose
 	setenv	gt_ar_option_update	"rv"		# replace, verbose
+	setenv	gt_ar_option_delete	"dv"		# delete, verbose
 	setenv	gt_ar_use_ranlib	"yes"
 
 	# Assembler definitions:
@@ -167,7 +169,9 @@ if ( $?gtm_version_change == "1" ) then
 
 	# -M		generate link map onto standard output
 	setenv	gt_ld_options_common	"-Wl,-M"
-	setenv 	gt_ld_options_gtmshr	"-Wl,--version-script,gtmshr_symbols.export"
+	setenv 	gt_ld_options_gtmshr	"-Wl,-u,gtm_filename_to_id -Wl,--version-script,gtmshr_symbols.export"
+	setenv 	gt_ld_options_all_exe	"-rdynamic -Wl,-u,gtm_filename_to_id"
+	setenv	gt_ld_options_all_exe	"$gt_ld_options_all_exe -Wl,--version-script,gtmexe_symbols.export"
 
         if ( "ia64" == $mach_type ) then
 		# Added -lelf
@@ -269,6 +273,7 @@ if ( "ia64" != $mach_type ) then
 		# Do not split alias definitions across multiple lines as tcsh will then use the last partial line
 		# as the definition. So it is ok even if the definition goes more than 132 columns (coding standard).
 	alias	gt_as_dbg	\
-		'gt_as $gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize $assembler_op_arch_size -o `basename \!:1 .s`.o \!:1'
+		'gt_as $gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize $assembler_op_arch_size \
+				-o `basename \!:1 .s`.o \!:1'
 	alias   gt_as_pro	'gt_as $gt_as_option_optimize $assembler_op_arch_size -o `basename \!:1 .s`.o \!:1'
 endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,27 +11,29 @@
 
 /* Uniform Hash Implementation
 
-We have redisigned the hash table implementation completely. We will have one
-header file for all the code for hash implementation. We have hash implementation for
-following data types as key:
-a) int4
-b) int8
-c) object code
-d) variable name.
-Using pre-processor following four C files will expand four sets of routines.
-a) hashtab_int4.c
-b) hashtab_int8.c
-b) hashtab_mname.c
-c) hashtab_objcode.c
-*
-* Restrictions :
-*		We assumed that no user of hash needs to add "key, value" pair where both are null.
-*		We examined that GT.M does not need to have such cases.
-*		(If we want to remove above restriction, an extra field is needed for HT_ENT)
-*		We can add 0 as valid data for int4 and int8, however, it must always have non-zero value.
-*		We can add 0 length string as "key" in objcode, however, it must always have non-zero length value.
-*		We know object code cannot be 0 length, so even object source (key) is of 0 length, we are fine.
-*		GT.M cannot have 0 length mname. So "key" for mname cannot be 0 length.
+Hash table code supports the following data types as key:
+  a) int4
+  b) int8
+  c) UINTPTR_T
+  d) object code
+  e) variable name.
+  f) local process address (supported via define using either int4 or int8 as type
+
+Using pre-processor following four C files will expand five sets of routines.
+  a) hashtab_int4.c
+  b) hashtab_int8.c
+  c) hashtab_addr.c
+  d) hashtab_mname.c
+  e) hashtab_objcode.c
+
+Restrictions :
+  We assumed that no user of hash needs to add "key, value" pair where both are null.
+  We examined that GT.M does not need to have such cases.
+  We can add 0 as valid data for int4 and int8, however, it must always have non-zero value.
+  We can add 0 length string as "key" in objcode, however, it must always have non-zero length value.
+  We know object code cannot be 0 length, so even object source (key) is of 0 length, we are fine.
+  GT.M cannot have 0 length mname. So "key" for mname cannot be 0 length.
+  (If we want to remove above restriction, an extra field is needed for HT_ENT)
 */
 
 #include "gtm_malloc.h"		/* For raise_gtmmemory_error() definition */
@@ -75,16 +77,34 @@ LITREF	int		ht_sizes[];
 #	define REINITIALIZE_HASHTAB		reinitialize_hashtab_int8
 #	define COMPACT_HASHTAB			compact_hashtab_int8
 
+#elif defined(ADDR_HASH)
+
+#	define HT_KEY_T				char *
+#	define HT_ENT				ht_ent_addr
+#	define HASH_TABLE			hash_table_addr
+#	define HTENT_KEY_MATCH(tabent, hkey)	((tabent)->key == (*hkey))
+#	define FIND_HASH(hkey, hash)		COMPUTE_HASH_ADDR(hkey, hash)
+#	define HTENT_EMPTY			HTENT_EMPTY_ADDR
+#	define HTENT_VALID			HTENT_VALID_ADDR
+#	define INIT_HASHTAB			init_hashtab_addr
+#	define EXPAND_HASHTAB			expand_hashtab_addr
+#	define ADD_HASHTAB			add_hashtab_addr
+#	define LOOKUP_HASHTAB			lookup_hashtab_addr
+#	define DELETE_HASHTAB			delete_hashtab_addr
+#	define FREE_HASHTAB			free_hashtab_addr
+#	define REINITIALIZE_HASHTAB		reinitialize_hashtab_addr
+#	define COMPACT_HASHTAB			compact_hashtab_addr
+
 #elif defined(MNAME_HASH)
 
 #	define HT_KEY_T				mname_entry
 #	define HT_ENT				ht_ent_mname
 #	define HASH_TABLE			hash_table_mname
 #	define HTENT_KEY_MATCH(tabent, hkey)									\
-		(    ((tabent)->key.hash_code == (hkey)->hash_code)						\
-		  && ((tabent)->key.var_name.len == (hkey)->var_name.len)					\
-		  && (0 == memcmp((tabent)->key.var_name.addr, (hkey)->var_name.addr, (hkey)->var_name.len))	\
-		)
+	(    ((tabent)->key.hash_code == (hkey)->hash_code)							\
+	     && ((tabent)->key.var_name.len == (hkey)->var_name.len)						\
+	     && (0 == memcmp((tabent)->key.var_name.addr, (hkey)->var_name.addr, (hkey)->var_name.len))		\
+	)
 #	define FIND_HASH(hkey, hash)		{assert((hkey)->hash_code); hash = (hkey)->hash_code;}
 	/* Note: FIND_HASH for mname does not compute hash_code. Callers must make sure it is already computed.
 	 *	 FIND_HASH for objcode or int4 or int8 computes hash code
@@ -95,21 +115,44 @@ LITREF	int		ht_sizes[];
 #	define EXPAND_HASHTAB			expand_hashtab_mname
 #	define ADD_HASHTAB			add_hashtab_mname
 #	define LOOKUP_HASHTAB			lookup_hashtab_mname
-#	define DELETE_HASHTAB			delete_hashtab_mname
+#	define DELETE_HASHTAB			delete_hashtab_mnamen
 #	define FREE_HASHTAB			free_hashtab_mname
 #	define REINITIALIZE_HASHTAB		reinitialize_hashtab_mname
 #	define COMPACT_HASHTAB			compact_hashtab_mname
+
+#elif defined(STRING_HASH)
+
+#	define HT_KEY_T				stringkey
+#	define HT_ENT				ht_ent_str
+#	define HASH_TABLE			hash_table_str
+#	define HTENT_KEY_MATCH(tabent, hkey)						\
+	(((tabent)->key.hash_code == (hkey)->hash_code)					\
+	 && ((tabent)->key.str.len == (hkey)->str.len)					\
+	 && (0 == memcmp((tabent)->key.str.addr, (hkey)->str.addr, (hkey)->str.len))	\
+	)
+#	define FIND_HASH(hkey, hash)		hash = (hkey)->hash_code
+/* Note: FIND_HASH for str does not compute hash_code. Callers must make sure it is already computed */
+#	define HTENT_EMPTY			HTENT_EMPTY_STR
+#	define HTENT_VALID			HTENT_VALID_STR
+#	define INIT_HASHTAB			init_hashtab_str
+#	define EXPAND_HASHTAB			expand_hashtab_str
+#	define ADD_HASHTAB			add_hashtab_str
+#	define LOOKUP_HASHTAB			lookup_hashtab_str
+#	define DELETE_HASHTAB			delete_hashtab_str
+#	define FREE_HASHTAB			free_hashtab_str
+#	define REINITIALIZE_HASHTAB		reinitialize_hashtab_str
+#	define COMPACT_HASHTAB			compact_hashtab_str
 
 #elif defined (OBJCODE_HASH)
 
 #	define HT_KEY_T				icode_str
 #	define HT_ENT				ht_ent_objcode
 #	define HASH_TABLE			hash_table_objcode
-#	define HTENT_KEY_MATCH(tabent, hkey)							\
-		(    ((tabent)->key.code == (hkey)->code)					\
-		  && ((tabent)->key.str.len == (hkey)->str.len)					\
-		  && (0 == memcmp((tabent)->key.str.addr, (hkey)->str.addr, (hkey)->str.len))	\
-		)
+#	define HTENT_KEY_MATCH(tabent, hkey)						\
+	(((tabent)->key.code == (hkey)->code)						\
+	 && ((tabent)->key.str.len == (hkey)->str.len)					\
+	 && (0 == memcmp((tabent)->key.str.addr, (hkey)->str.addr, (hkey)->str.len))	\
+	)
 #	define FIND_HASH(hkey, hash)		COMPUTE_HASH_OBJCODE(hkey, hash)
 #	define HTENT_EMPTY			HTENT_EMPTY_OBJCODE
 #	define HTENT_VALID			HTENT_VALID_OBJCODE
@@ -167,6 +210,7 @@ LITREF	int		ht_sizes[];
 		return tabent; /* valid and matched */				\
 }
 
+#ifndef MNAME_HASH
 #define RETURN_IF_DELETED(table, tabent, hkey)					\
 {										\
 	void	*dummy;								\
@@ -180,6 +224,20 @@ LITREF	int		ht_sizes[];
 		return TRUE;							\
 	}									\
 }
+#else
+/* No COMPACTING if HASH_MNAME for reasons explained below in ADD_HASHTAB */
+#define RETURN_IF_DELETED(table, tabent, hkey)					\
+{										\
+	void	*dummy;								\
+	if (HTENT_EMPTY(tabent, void, dummy))					\
+		return FALSE;							\
+	if (!HTENT_MARK_DELETED(tabent) && HTENT_KEY_MATCH(tabent, hkey))	\
+	{									\
+		DELETE_HTENT(table, tabent);					\
+		return TRUE;							\
+	}									\
+}
+#endif
 
 
 #define HT_FIELDS_COMMON_INIT(table) 							\
@@ -235,7 +293,6 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize)
 	boolean_t	added;
 	void		*htval;
 	CONDITION_HANDLER(hashtab_rehash_ch);
-
 	ESTABLISH(hashtab_rehash_ch);
 	INIT_HASHTAB(&newtable, minsize);
 	REVERT;
@@ -243,11 +300,24 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize)
 	{
 		if (HTENT_VALID(tabent, void, htval))
 		{
+#ifdef MNAME_HASH
+			/* Place location of new ht_ent entry into value location of existing ht entry */
+			added = ADD_HASHTAB(&newtable, &tabent->key, htval, (ht_ent_mname **)&tabent->value);
+#else
 			added = ADD_HASHTAB(&newtable, &tabent->key, htval, &dummy);
+#endif
 			assert(added);
 		}
 	}
-	free(table->base); 	/* Deallocate old table entries */
+#ifdef MNAME_HASH
+	/* At this point there are only two possible values for "table" if we were called through
+	   add_hashtab_mname_symval(). See hashtab_mname.c for description. If we came from there,
+	   we dont want to free the table as that routine needs it for further processing.
+	*/
+	if (!curr_symval ||
+	    (table != &curr_symval->h_symtab && (!curr_symval->last_tab || table != &curr_symval->last_tab->h_symtab)))
+#endif
+		free(table->base); 	/* Deallocate old table entries */
 	*table = newtable;
 }
 
@@ -266,21 +336,30 @@ boolean_t ADD_HASHTAB(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **t
 #endif /* INT8_HASH */
 	HT_ENT		*oldbase, *first_del_ent, *tabbase;
 
-	if (table->count >= table->exp_trigger_size)
+#ifdef MNAME_HASH
+	if (COMPACT_NEEDED(table))
 	{
-		oldbase = table->base;
-		EXPAND_HASHTAB(table, table->size + 1);
-		if (oldbase == table->base) /* expansion failed */
+		COMPACT_HASHTAB(table);
+	} else
+#endif /* MNAME_HASH -- For mname table, very important that expansion/contraction only occur here when can be
+	  protected by add_hashtab_symval() routine since expansion/contraction needs requisite change in
+	  the l_symtab entries.
+       */
+		if (table->count >= table->exp_trigger_size)
 		{
-			if (table->exp_trigger_size >= table->size)
-				/* Note this error routine will use the memory error parameters recorded when the
-				   memory error was first raised by EXPAND_HASHTAB() above so the error will appear
-				   as if it had occurred during that expansion attempt.
-				*/
+			oldbase = table->base;
+			EXPAND_HASHTAB(table, table->size + 1);
+			if (oldbase == table->base) /* expansion failed */
+			{
+				if (table->exp_trigger_size >= table->size)
+					/* Note this error routine will use the memory error parameters recorded when the
+					   memory error was first raised by EXPAND_HASHTAB() above so the error will appear
+					   as if it had occurred during that expansion attempt.
+					*/
 				raise_gtmmemory_error();
-			table->exp_trigger_size = table->size;
+				table->exp_trigger_size = table->size;
+			}
 		}
-	}
 	first_del_ent = NULL;
 	tabbase = &table->base[0];
 	prime = table->size;

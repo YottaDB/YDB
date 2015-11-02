@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,9 +13,7 @@
 
 /* Start jnlsp.h - platform-specific journaling definitions.  */
 
-#ifndef sys_nerr
 #include <errno.h>
-#endif
 
 typedef gtm_int64_t		jnl_proc_time;
 typedef	int			fd_type;
@@ -28,7 +26,7 @@ typedef unix_file_info		fi_type;
 #define JNL_ALLOC_MAX		8388607  /* 4GB - 512 Bytes */
 #endif
 #define JNL_BUFFER_DEF		ROUND_UP2(128, IO_BLOCK_SIZE / DISK_BLOCK_SIZE)
-#define NOJNL			-1
+#define NOJNL			FD_INVALID_NONPOSIX
 #define MID_TIME(W)		W
 #define EXTTIMEVMS(T)
 #define EXTINTVMS(I)

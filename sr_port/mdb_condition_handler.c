@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,6 +78,7 @@
 #include "jobinterrupt_process_cleanup.h"
 #include "fix_xfer_entry.h"
 #include "change_reg.h"
+#include "tp_change_reg.h"
 
 #ifdef UNIX
 #include "iormdef.h"
@@ -126,16 +127,20 @@ GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
 GBLREF	boolean_t		tp_restart_fail_sig_used;
 #endif
 GBLREF	int			merge_args;
-GBLREF	lvzwrite_struct		lvzwrite_block;
+GBLREF	lvzwrite_datablk	*lvzwrite_block;
 GBLREF	int			process_exiting;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
 GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 GBLREF	boolean_t		in_gvcst_incr;
 GBLREF	gv_namehead		*gv_target;
-GBLREF  gd_region		*gv_cur_region;
-GBLREF  sgmnt_addrs		*cs_addrs;
-GBLREF  sgmnt_data_ptr_t	cs_data;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	sgm_info		*first_sgm_info;
+#ifdef UNIX
+GBLREF	io_desc		*gtm_err_dev;
+#endif
 
 #define	RUNTIME_ERROR_STR		"Following runtime error"
 #define GTMFATAL_ERROR_DUMP_FILENAME	"GTM_FATAL_ERROR"
@@ -227,6 +232,20 @@ CONDITION_HANDLER(mdb_condition_handler)
 	error_def(ERR_GTMERREXIT);
 
 	START_CH;
+#ifdef UNIX
+	/* It is possible that we entered here from a bad compile of the open exception handler
+	   for an rm device.  If gtm_err_dev is still set and SFT_DEV_ACT is equal to
+	   proc_act_type then its structures should be released now. */
+	if (NULL != gtm_err_dev)
+	{
+		if (SFT_DEV_ACT == proc_act_type)
+		{
+			remove_rms(gtm_err_dev);
+		} else
+			assert(FALSE);
+		gtm_err_dev = NULL;
+	}
+#endif
 	if (repeat_error = (ERR_REPEATERROR == SIGNAL)) /* assignment and comparison */
 		SIGNAL = dollar_ecode.error_last_ecode;
 	preemptive_ch(SEVERITY);
@@ -257,7 +276,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 */
 	merge_args = 0;
 	if ((SUCCESS != SEVERITY) && (INFO != SEVERITY))
-		lvzwrite_block.curr_subsc = lvzwrite_block.subsc_count = 0;
+	{
+		if (lvzwrite_block)
+			/* If lvzwrite_block does not (yet) exist, no harm, no foul */
+			lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
+	}
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
 		/* ----------------------------------------------------
@@ -314,9 +337,18 @@ CONDITION_HANDLER(mdb_condition_handler)
 			gv_cur_region = csa->region;
 			assert(gv_cur_region->open);
 			assert((dba_mm == gv_cur_region->dyn.addr->acc_meth) || (dba_bg == gv_cur_region->dyn.addr->acc_meth));
-			/* The above assert is needed to ensure that change_reg (invoked below) will set cs_addrs, cs_data etc.
-			 * to non-zero values */
-			change_reg();	/* updates global variables "cs_addrs", "cs_data" and "sgm_info_ptr" */
+			/* The above assert is needed to ensure that change_reg/tp_change_reg (invoked below)
+			 * will set cs_addrs, cs_data etc. to non-zero values.
+			 */
+			if (NULL != first_sgm_info)
+				change_reg(); /* updates "cs_addrs", "cs_data", "sgm_info_ptr" and maybe "first_sgm_info" */
+			else
+			{	/* We are either inside a non-TP transaction or in a TP transaction that has done NO database
+				 * references. In either case, we do NOT want to setting sgm_info_ptr or first_sgm_info.
+				 * Hence use tp_change_reg instead of change_reg below.
+				 */
+				tp_change_reg(); /* updates "cs_addrs", "cs_data" */
+			}
 			assert(cs_addrs == csa);
 			assert(cs_data == csa->hdr);
 			assert(NULL != cs_data);
@@ -811,9 +843,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 #ifdef UNIX
 			if (err_dev && dev_open != err_dev->state && (rm == err_dev->type))
 			{
-				remove_rms(err_dev);
-				/* err_dev was freed so make sure it's not used again */
-				err_dev = (io_desc *)0;
+				gtm_err_dev = err_dev;
+				/* structures pointed to by err_dev were freed so make sure it's not used again */
+				err_dev = NULL;
 			}
 #endif
 			MUM_TSTART;
@@ -826,8 +858,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 		if (err_dev && dev_open != err_dev->state && (rm == err_dev->type))
 		{
 			remove_rms(err_dev);
-			/* err_dev was freed so make sure it's not used again */
-			err_dev = (io_desc *)0;
+			/* structures pointed to by err_dev were freed so make sure it's not used again */
+			err_dev = NULL;
 		}
 	}
 #endif

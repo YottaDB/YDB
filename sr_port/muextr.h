@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,19 @@ typedef struct coll_hdr_struct
 	unsigned char	pad;
 } coll_hdr;
 
+#ifdef GTM_CRYPT
+/* The following structure is used by mupip extract/load to store the hash of all the extracted dat files. These hashes will be
+ * stored right after the extract header is written. Each hash  will be referred by it's index number at the beginning of each
+ * record. This information will be used during mupip load to decrypt a particular record. Although the structure contains only
+ * one field, we need to access the hashes by index. */
+typedef struct muextr_hash_hdr_struct
+{
+	char	gtmcrypt_hash[GTMCRYPT_HASH_LEN];
+} muext_hash_hdr;
+
+typedef muext_hash_hdr	*muext_hash_hdr_ptr_t;
+#endif
+
 #define MU_FMT_GO		0
 #define MU_FMT_BINARY		1
 #define MU_FMT_GOQ		2
@@ -40,9 +53,18 @@ typedef struct coll_hdr_struct
 #define FORMAT_STR_MAX_SIZE 50
 #define LABEL_STR_MAX_SIZE 128
 #define EXTR_DEFAULT_LABEL	"GT.M MUPIP EXTRACT"
-
-#define BIN_HEADER_VERSION	"4"
-#define BIN_HEADER_LABEL	"GDS BINARY EXTRACT LEVEL "BIN_HEADER_VERSION
+/* In unix, the binary extract label was bumped to 5 as part of the db encryption changes. Since db encryption is not supported in
+ * VMS, we keep the label at 4 for VMS. Whenever the extract label needs to be bumped up next, if possible, try to get both Unix
+ * and VMS back to common label (might need to add a field in the extract header to indicate whether encryption is supported
+ * or not as part of this change). */
+#ifdef UNIX
+#define V4_BIN_HEADER_VERSION	"4"
+#define V4_BIN_HEADER_LABEL	"GDS BINARY EXTRACT LEVEL "V4_BIN_HEADER_VERSION
+#define BIN_HEADER_VERSION  	"5"
+#else
+#define BIN_HEADER_VERSION  	"4"
+#endif
+#define BIN_HEADER_LABEL        "GDS BINARY EXTRACT LEVEL "BIN_HEADER_VERSION
 #define BIN_HEADER_DATEFMT	"YEARMMDD2460SS"
 #define BIN_HEADER_NUMSZ	5
 #define BIN_HEADER_LABELSZ	32
@@ -58,6 +80,12 @@ typedef struct coll_hdr_struct
 char *mu_extr_ident(mstr *a);
 void  mu_extract(void);
 int mu_extr_getblk(unsigned char *ptr);		/***type int added***/
+#if defined(UNIX) && defined(GTM_CRYPT)
+boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format, muext_hash_hdr_ptr_t hash_array,
+									boolean_t is_any_file_encrypted);
+#elif defined(UNIX)
+boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format);
+#endif
 #ifdef UNIX
 #define WRITE_BIN_EXTR_BLK(BUFF, BSIZE)		\
 {						\
@@ -80,7 +108,6 @@ int mu_extr_getblk(unsigned char *ptr);		/***type int added***/
 	op_write(&val);				\
 	op_wteol(1);				\
 }
-boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format);
 #elif defined(VMS)
 #define WRITE_BIN_EXTR_BLK(PTR, SIZE) 			\
 {							\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,9 +16,7 @@
 #include "gtm_socket.h"
 #include "gtm_inet.h"
 #include <errno.h>
-#ifndef __MVS__
 #include <netinet/tcp.h>
-#endif
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
@@ -62,7 +60,7 @@ void iosocket_flush(io_desc *iod)
 		errptr = (char *)STRERROR(errno);
                 errlen = strlen(errptr);
                 iod->dollar.za = 9;
-                memcpy(dsocketptr->dollar_device, "1,", sizeof("1,") - 1);
+		MEMCPY_LIT(dsocketptr->dollar_device, "1,");
                 memcpy(&dsocketptr->dollar_device[sizeof("1,") - 1], errptr, errlen + 1);	/* we want the null */
 		if (socketptr->ioerror)
 			rts_error(VARLSTCNT(6) ERR_SOCKWRITE, 0, ERR_TEXT, 2, errlen, errptr);

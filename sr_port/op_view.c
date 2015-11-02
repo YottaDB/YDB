@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,6 @@
 #include "mdef.h"
 
 #include <stdarg.h>
-
 #include "gtm_string.h"
 
 #include "gdsroot.h"
@@ -42,6 +41,10 @@
 #include "dpgbldir.h"	/* for get_next_gdr() prototype */
 #include "ast.h"
 #include "wcs_flu.h"
+#include "stringpool.h"
+#include "gtmdbglvl.h"
+#include "gtm_malloc.h"
+#include "alias.h"
 
 #define WRITE_LITERAL(x) (outval.str.len = sizeof(x) - 1, outval.str.addr = (x), op_write(&outval))
 
@@ -78,6 +81,10 @@ GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not
 GBLREF boolean_t 	local_collseq_stdnull;
 GBLREF boolean_t	badchar_inhibit;
 GBLREF int		gv_fillfactor;
+GBLREF symval		*curr_symval;
+GBLREF uint4		gtmDebugLevel;
+GBLREF boolean_t	lvmon_enabled;
+GBLREF spdesc		stringpool;
 
 #define MAX_YDIRTSTR 32
 #define ZDEFMIN 1024
@@ -91,8 +98,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	int			status;
 	gd_region		*reg, *r_top, *save_reg;
 	gv_namehead		*gvnh;
-	VMS_ONLY(int		numarg;)
-		mval			*arg, *nextarg, outval;
+	mval			*arg, *nextarg, outval;
 	mstr			tmpstr;
 	va_list			var;
 	viewparm		parmblk;
@@ -106,6 +112,14 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	symval			*cstab;
 	sgmnt_addrs		*csa;
 	jnl_buffer_ptr_t	jb;
+        int			table_size_orig;
+        ht_ent_mname		*table_base_orig;
+	hash_table_mname	*table;
+	boolean_t		dbgdmpenabled;
+	symval			*lvlsymtab;
+	lv_blk			*lvbp;
+	lv_val			*lvp, *lvp_top;
+	VMS_ONLY(int		numarg;)
 
 	static int ydirt_str_len = 0;
 	static char ydirt_str[MAX_YDIRTSTR + 1];
@@ -144,7 +158,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 		arg = va_arg(var, mval *);
 		MV_FORCE_STR(arg);
 	} else
-		arg = (mval *)0;
+		arg = (mval *)NULL;
 	vtp = viewkeys(&keyword->str);
 	view_arg_convert(vtp, arg, &parmblk);
 	switch(vtp->keycode)
@@ -560,6 +574,55 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				testvalue = MIN_FILLFACTOR;
 			gv_fillfactor = testvalue;
 			break;
+		case VTK_STPGCOL:
+			stp_gcol(INTCAST(stringpool.top - stringpool.free) + 1);  /* computation to avoid assert in stp_gcol */
+			break;
+		case VTK_LVGCOL:
+			als_lvval_gc();
+			break;
+		case VTK_LVREHASH:
+			/* This doesn't actually expand or contract the local variable hash table but does cause it to be
+			   rebuilt. Then we need to do the same sort of cleanup that add_hashtab_mname_symval does. */
+
+			/* Step 1: remember table we started with */
+			table = &curr_symval->h_symtab;
+			table_base_orig = table->base;
+			table_size_orig = table->size;
+			/* Step 2 - rebuild the local variable hash table */
+			expand_hashtab_mname(&curr_symval->h_symtab, curr_symval->h_symtab.size);
+			/* Step 3 - repair the l_symtab entries on the stack from the rebuilt hash table */
+			if (table_base_orig != curr_symval->h_symtab.base)
+				/* Only needed if expansion was successful */
+				als_lsymtab_repair(table, table_base_orig, table_size_orig);
+			break;
+		case VTK_STORDUMP:
+			if (gtmDebugLevel)
+			{	/* gtmdbglvl must be non-zero to have hope of printing a storage dump */
+				dbgdmpenabled = (GDL_SmDump & gtmDebugLevel);
+				gtmDebugLevel |= GDL_SmDump;		/* Turn on indicator to force print */
+				printMallocDump();
+				if (!dbgdmpenabled)
+					gtmDebugLevel &= (~GDL_SmDump);	/* Shut indicator back off */
+			}
+			break;
+#if DEBUG_ALIAS
+		case VTK_LVMONOUT:
+			als_lvmon_output();
+			break;
+		case VTK_LVMONSTART:
+			lvmon_enabled = TRUE;	/* Enable lv_val monitoring */
+			/* Clear any existing marks on all lv_vals */
+			for (lvlsymtab = curr_symval; lvlsymtab; lvlsymtab = lvlsymtab->last_tab)
+				for (lvbp = &curr_symval->first_block; lvbp; lvbp = lvbp->next)
+					for (lvp = lvbp->lv_base, lvp_top = lvbp->lv_free; lvp < lvp_top; lvp++)
+						if (MV_SBS != lvp->v.mvtype)
+							lvp->stats.lvmon_mark = FALSE;
+			break;
+		case VTK_LVMONSTOP:
+			als_lvmon_output();
+			lvmon_enabled = FALSE;
+			break;
+#endif
 		default:
 			va_end(var);
 			rts_error(VARLSTCNT(1) ERR_VIEWCMD);

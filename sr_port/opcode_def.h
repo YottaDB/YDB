@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -298,3 +298,12 @@ OPCODE_DEF(OC_FNZCONVERT3, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZWIDTH, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZSUBSTR, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZECHAR, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_SETALS2ALS, (OCT_NULL))
+OPCODE_DEF(OC_SETALSIN2ALSCT, (OCT_NULL))
+OPCODE_DEF(OC_SETALSCTIN2ALS, (OCT_NULL))
+OPCODE_DEF(OC_SETALSCT2ALSCT, (OCT_NULL))
+OPCODE_DEF(OC_KILLALIAS, (OCT_NULL))
+OPCODE_DEF(OC_KILLALIASALL, (OCT_NULL))
+OPCODE_DEF(OC_FNZDATA, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_CLRALSVARS, (OCT_NULL))
+OPCODE_DEF(OC_FNZAHANDLE, (OCT_MVAL | OCT_EXPRLEAF))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +60,7 @@ void    initialize_list(buddy_list *list, int4 elemSize, int4 initAlloc)
 	list->free_que->fl = list->free_que->bl = 0;
 }
 
+/* Any changes to this routine need corresponding changes to the VERIFY_LIST_IS_REINITIALIZED macro (defined in buddy_list.h) */
 void	reinitialize_list(buddy_list *list)
 {
 	assert(list);

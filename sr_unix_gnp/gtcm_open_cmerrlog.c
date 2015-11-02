@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,9 @@
 #include "iosp.h"
 #include "gtm_rename.h"
 #include "gtm_logicals.h"
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 
 #define GTCM_GNP_CMERR_FN		GTM_LOG_ENV "/gtcm_gnp_server.log"
 
@@ -41,7 +44,9 @@ void gtcm_open_cmerrlog(void)
 	uint4 		ustatus;
 	int4 		rval;
 	FILE 		*new_file;
+
 	error_def(ERR_TEXT);
+	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	if (0 != (len = STRLEN(gtcm_gnp_server_log)))
 	{
@@ -57,6 +62,10 @@ void gtcm_open_cmerrlog(void)
 	{
 		lfn_path[lfn2.len] = 0;
 		rename_file_if_exists(lfn_path, lfn2.len, new_lfn_path, &new_len, &ustatus);
+#ifdef __MVS__
+		if (-1 == gtm_zos_create_tagged_file(lfn_path, TAG_EBCDIC))
+			TAG_POLICY_GTM_PUTMSG(lfn_path, errno, -1, TAG_EBCDIC);
+#endif
 		new_file = Fopen(lfn_path, "a");
 		if (NULL != new_file)
 		{

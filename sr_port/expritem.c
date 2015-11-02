@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -211,6 +211,7 @@ LITDEF nametabent fun_names[] =
 	,{2, "TR"}, {8, "TRANSLAT*"}
 	,{1, "V*"}
 	,{2, "ZA"}, {6, "ZASCII"}
+	,{3, "ZAH"}, {8, "ZAHANDLE"}
 	,{7, "ZBITAND"}
 	,{8, "ZBITCOUN*"}
 	,{8, "ZBITFIND"}
@@ -224,7 +225,9 @@ LITDEF nametabent fun_names[] =
 	,{2, "ZC"}, {5, "ZCALL"}
 	,{3, "ZCH"}, {5, "ZCHAR"}
 	,{3, "ZCO"}, {8, "ZCONVERT"}
-	,{2, "ZD"}, {5, "ZDATE"}
+	,{2, "ZD"}
+	,{5, "ZDATA"}
+	,{5, "ZDATE"}
 	,{2, "ZE"}, {8, "ZEXTRACT"}
 	,{6, "ZECHAR"}
 	,{2, "ZF"}, {5, "ZFIND"}
@@ -259,7 +262,7 @@ LITDEF unsigned char fun_index[27] =
 {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
-	39, 43, 47, 47, 48, 48, 48, 48, 109	/* s t u v w x y z ~ */
+	39, 43, 47, 47, 48, 48, 48, 48, 112	/* s t u v w x y z ~ */
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -291,6 +294,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNTRANSLATE, ALL_SYS }, { OC_FNTRANSLATE, ALL_SYS }
 	,{ OC_FNVIEW, ALL_SYS }
 	,{ OC_FNZASCII, UNIX_OS }, { OC_FNZASCII, UNIX_OS }
+	,{ OC_FNZAHANDLE, ALL_SYS }, { OC_FNZAHANDLE, ALL_SYS }
 	,{ OC_FNZBITAND, ALL_SYS }
 	,{ OC_FNZBITCOUN, ALL_SYS }
 	,{ OC_FNZBITFIND, ALL_SYS }
@@ -308,7 +312,9 @@ LITDEF fun_data_type fun_data[] =
 #endif
 	,{ OC_FNZCHAR, UNIX_OS }, { OC_FNZCHAR, UNIX_OS }
 	,{ OC_FNZCONVERT2, UNIX_OS }, { OC_FNZCONVERT2, UNIX_OS }
-	,{ OC_FNZDATE, ALL_SYS }, { OC_FNZDATE, ALL_SYS }
+	,{ OC_FNZDATE, ALL_SYS }
+	,{ OC_FNZDATA, ALL_SYS }
+	,{ OC_FNZDATE, ALL_SYS }
 	,{ OC_FNZEXTRACT, UNIX_OS }, { OC_FNZEXTRACT, UNIX_OS }
         ,{ OC_FNCHAR, ALL_SYS }
 	,{ OC_FNZFIND, UNIX_OS }, { OC_FNZFIND, UNIX_OS }
@@ -367,6 +373,7 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =
 	f_translate, f_translate,
 	f_view,
 	f_ascii, f_ascii,
+	f_zahandle, f_zahandle,
 	f_two_mval,
 	f_one_mval,
 	f_fnzbitfind,
@@ -380,7 +387,9 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =
 	f_zcall, f_zcall,
 	f_zchar, f_zchar,
 	f_zconvert, f_zconvert,
-	f_zdate, f_zdate,
+	f_zdate,
+	f_data,				/* $ZDATA reuses parser for $DATA since only runtime execution differs */
+	f_zdate,
 	f_extract, f_extract,
 	f_zchar,
 	f_find, f_find,
@@ -412,9 +421,8 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =
 
 int expritem(oprtype *a)
 {
-	int 		index, sv_opcode;
+	int 		index, sv_opcode, i;
 	unsigned char 	type;
-	short int 	i;
 	triple 		*ref;
 	oprtype 	x1;
 	boolean_t	parse_warn;
@@ -431,7 +439,7 @@ int expritem(oprtype *a)
 	assert(sizeof(svn_names)/sizeof(nametabent) == sizeof(svn_data)/sizeof(svn_data_type)); /* are all SVNs covered? */
 	assert(fun_index[26] == (sizeof(fun_names)/sizeof(nametabent)));
 	assert(sizeof(fun_names)/sizeof(nametabent) == sizeof(fun_data)/sizeof(fun_data_type)); /* are all functions covered? */
-	if (i = tokentable[window_token].uo_type)
+	if (i = tokentable[window_token].uo_type)	/* Note assignment */
 	{
 		type = tokentable[window_token].opr_type;
 		advancewindow();
@@ -444,8 +452,7 @@ int expritem(oprtype *a)
 				window_mval.sgn = 1;
 			if (window_token == TK_NUMLIT)
 				n2s(&window_mval);
-		}
-		else
+		} else
 		{
 			if (!expratom(&x1))
 				return FALSE;
@@ -456,118 +463,125 @@ int expritem(oprtype *a)
 			return TRUE;
 		}
 	}
-	switch(i = window_token)
+	switch(i = window_token)	/* Note assignment */
 	{
-	case TK_INTLIT:
-		n2s(&window_mval);
-	case TK_NUMLIT:
-	case TK_STRLIT:
-		*a = put_lit(&window_mval);
-		advancewindow();
-		return TRUE;
-	case TK_LPAREN:
-		advancewindow();
-		if (eval_expr(a))
-			if (window_token == TK_RPAREN)
+		case TK_INTLIT:
+			n2s(&window_mval);
+		case TK_NUMLIT:
+		case TK_STRLIT:
+			*a = put_lit(&window_mval);
+			advancewindow();
+			return TRUE;
+		case TK_LPAREN:
+			advancewindow();
+			if (eval_expr(a) && TK_RPAREN == window_token)
 			{
 				advancewindow();
 				return TRUE;
 			}
-		stx_error(ERR_RPARENMISSING);
-		return FALSE;
-	case TK_DOLLAR:
-		if (director_token == TK_DOLLAR)
-		{
-			temp_subs = TRUE;
-			if (!exfunc (a))
-				return FALSE;
-		}
-		else if (director_token == TK_AMPERSAND)
-		{	advancewindow();
-			temp_subs = TRUE;
-			if (!extern_func(a))
-				return FALSE;
-		}
-		else
-		{
-			advancewindow();
-			if (window_token != TK_IDENT)
+			stx_error(ERR_RPARENMISSING);
+			return FALSE;
+		case TK_DOLLAR:
+			if (director_token == TK_DOLLAR)
 			{
-				stx_error(ERR_FCNSVNEXPECTED);
-				return FALSE;
-			}
-			parse_warn = FALSE;
-			if (director_token == TK_LPAREN)
-			{
-				index = namelook(fun_index, fun_names, window_ident.addr, window_ident.len);
-				if (index < 0)
-				{
-					STX_ERROR_WARN(ERR_INVFCN);	/* sets "parse_warn" to TRUE */
-				} else
-				{
-					assert(sizeof(fun_names)/sizeof(fun_data_type) > index);
-					if (! VALID_FUN(index) )
-					{
-						STX_ERROR_WARN(ERR_FNOTONSYS);	/* sets "parse_warn" to TRUE */
-					}
-				}
-				advancewindow();
-				advancewindow();
-				if (!parse_warn)
-				{
-					assert(OPCODE_COUNT > fun_data[index].opcode);
-					if (!(bool)((*fun_parse[index])(a, fun_data[index].opcode)))
-						return FALSE;
-				} else
-				{
-					*a = put_lit((mval *)&literal_null);
-					/* Parse the remaining arguments until the corresponding RIGHT-PAREN/SPACE/EOL is reached */
-					if (!parse_until_rparen_or_space())
-						return FALSE;
-				}
-				if (window_token != TK_RPAREN)
-				{
-					stx_error(ERR_RPARENMISSING);
+				temp_subs = TRUE;
+				if (!exfunc(a))
 					return FALSE;
-				}
+			} else if (TK_AMPERSAND == director_token)
+			{
 				advancewindow();
+				temp_subs = TRUE;
+				if (!extern_func(a))
+					return FALSE;
 			} else
 			{
-				index = namelook(svn_index, svn_names, window_ident.addr, window_ident.len);
-				if (0 > index)
-				{
-					STX_ERROR_WARN(ERR_INVSVN);	/* sets "parse_warn" to TRUE */
-				} else
-				{
-					assert(sizeof(svn_names)/sizeof(svn_data_type) > index);
-					if (!VALID_SVN(index))
-					{
-						STX_ERROR_WARN(ERR_FNOTONSYS);	/* sets "parse_warn" to TRUE */
-					}
-				}
 				advancewindow();
-				if (!parse_warn)
+				if (TK_IDENT != window_token)
 				{
-					sv_opcode = svn_data[index].opcode;
-					assert(SV_NUM_SV > sv_opcode);
-					if (sv_opcode == SV_TEST)
-						*a = put_tref(newtriple(OC_GETTRUTH));
-					else
+					stx_error(ERR_FCNSVNEXPECTED);
+					return FALSE;
+				}
+				parse_warn = FALSE;
+				if (TK_LPAREN == director_token)
+				{
+					index = namelook(fun_index, fun_names, window_ident.addr, window_ident.len);
+					if (index < 0)
 					{
-						if (sv_opcode == SV_X || sv_opcode == SV_Y)
-							devctlexp = TRUE;
-						ref = newtriple(OC_SVGET);
-						ref->operand[0] = put_ilit(sv_opcode);
-						*a = put_tref(ref);
+						STX_ERROR_WARN(ERR_INVFCN);	/* sets "parse_warn" to TRUE */
+					} else
+					{
+						assert(sizeof(fun_names) / sizeof(fun_data_type) > index);
+						if (!VALID_FUN(index))
+						{
+							STX_ERROR_WARN(ERR_FNOTONSYS);	/* sets "parse_warn" to TRUE */
+						} else if (OC_FNINCR == fun_data[index].opcode)
+						{	/* $INCR is used. This can operate on undefined local variables
+							 * and make them defined. If used in a SET where the left and right
+							 * side of the = operator use this variable (as a subscript on the left
+							 * and as input to the $INCR function on the right), we want an UNDEF
+							 * error to show up which means we need to set "temp_subs" to TRUE.
+							 */
+							temp_subs = TRUE;
+						}
 					}
+					advancewindow();
+					advancewindow();
+					if (!parse_warn)
+					{
+						assert(OPCODE_COUNT > fun_data[index].opcode);
+						if (!(boolean_t)((*fun_parse[index])(a, fun_data[index].opcode)))
+							return FALSE;
+					} else
+					{
+						*a = put_lit((mval *)&literal_null);
+						/* Parse the remaining arguments until the corresponding RIGHT-PAREN/SPACE/EOL
+						   is reached */
+						if (!parse_until_rparen_or_space())
+							return FALSE;
+					}
+					if (window_token != TK_RPAREN)
+					{
+						stx_error(ERR_RPARENMISSING);
+						return FALSE;
+					}
+					advancewindow();
 				} else
-					*a = put_lit((mval *)&literal_null);
+				{
+					index = namelook(svn_index, svn_names, window_ident.addr, window_ident.len);
+					if (0 > index)
+					{
+						STX_ERROR_WARN(ERR_INVSVN);	/* sets "parse_warn" to TRUE */
+					} else
+					{
+						assert(sizeof(svn_names)/sizeof(svn_data_type) > index);
+						if (!VALID_SVN(index))
+						{
+							STX_ERROR_WARN(ERR_FNOTONSYS);	/* sets "parse_warn" to TRUE */
+						}
+					}
+					advancewindow();
+					if (!parse_warn)
+					{
+						sv_opcode = svn_data[index].opcode;
+						assert(SV_NUM_SV > sv_opcode);
+						if (sv_opcode == SV_TEST)
+							*a = put_tref(newtriple(OC_GETTRUTH));
+						else
+						{
+							if (sv_opcode == SV_X || sv_opcode == SV_Y)
+								devctlexp = TRUE;
+							ref = newtriple(OC_SVGET);
+							ref->operand[0] = put_ilit(sv_opcode);
+							*a = put_tref(ref);
+						}
+					} else
+						*a = put_lit((mval *)&literal_null);
+				}
 			}
-		}
-		return TRUE;
-	case TK_COLON:
-		stx_error (ERR_EXPR);
-		return FALSE;
+			return TRUE;
+		case TK_COLON:
+			stx_error (ERR_EXPR);
+			return FALSE;
 	}
 	return FALSE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,7 @@ GBLREF zshow_out        *zwr_output;
 GBLREF int              merge_args;
 GBLREF merge_glvn_ptr	mglvnp;
 GBLREF gv_namehead      *gv_target;
-GBLREF lvzwrite_struct  lvzwrite_block;
+GBLREF lvzwrite_datablk *lvzwrite_block;
 GBLREF lv_val		*active_lv;
 
 void op_merge(void)
@@ -116,7 +116,7 @@ void op_merge(void)
 		(merge_args == (MARG1_LCL | MARG2_GBL)) ||
 		(merge_args == (MARG1_GBL | MARG2_LCL)) ||
 		(merge_args == (MARG1_GBL | MARG2_GBL)));
-	assert(0 == lvzwrite_block.curr_subsc);
+	assert(!lvzwrite_block || 0 == lvzwrite_block->curr_subsc);
 	/* Need to protect value from stpgcol */
 	PUSH_MV_STENT(MVST_MVAL);
 	value = &mv_chain->mv_st_cont.mvs_mval;
@@ -352,7 +352,7 @@ void op_merge(void)
 			output.ptr = output.buff;
 			output.out_var.lv.lvar = mglvnp->lclp[IND1];
 			zwr_output = &output;
-			lvzwr_init(FALSE, &mglvnp->lclp[IND2]->v);
+			lvzwr_init(zwr_patrn_mident, &mglvnp->lclp[IND2]->v);
 			lvzwr_arg(ZWRITE_ASTERISK, 0, 0);
 			lvzwr_var(mglvnp->lclp[IND2], 0);
 			/* assert that destination got all data of the source and its descendants */
@@ -368,7 +368,7 @@ void op_merge(void)
 			output.out_var.gv.end = gv_currkey->end;
 			output.out_var.gv.prev = gv_currkey->prev;
 			zwr_output = &output;
-			lvzwr_init(FALSE, &mglvnp->lclp[IND2]->v);
+			lvzwr_init(zwr_patrn_mident, &mglvnp->lclp[IND2]->v);
 			lvzwr_arg(ZWRITE_ASTERISK, 0, 0);
 			lvzwr_var(mglvnp->lclp[IND2], 0);
 			gvname_env_restore(mglvnp->gblp[IND1]);	 /* naked indicator is restored into gv_currkey */

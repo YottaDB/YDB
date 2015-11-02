@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -408,7 +408,7 @@ static int open_patfile(int name_len, char *file_name)
 	int		status;
 	unsigned char	*name_copy;
 
-#ifdef VMS
+#	ifdef VMS
 	fab = cc$rms_fab;
 	fab.fab$l_fna = file_name;
 	fab.fab$b_fns = name_len;
@@ -422,7 +422,7 @@ static int open_patfile(int name_len, char *file_name)
 	status = sys$connect(&rab);
 	if (RMS$_NORMAL != status)
 		return 0;
-#else
+#	else
 	name_copy = malloc(name_len + 1);
 	memcpy(name_copy, file_name, name_len);
 	name_copy[name_len] = '\0';
@@ -430,7 +430,7 @@ static int open_patfile(int name_len, char *file_name)
 	free(name_copy);
 	if (NULL == patfile)
 		return 0;
-#endif
+#	endif
 	if (getaline())
 		ch = patline;
 	return 1;

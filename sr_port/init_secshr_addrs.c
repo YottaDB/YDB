@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@ GBLREF inctn_detail_t	*inctn_detail_addrs;
 GBLREF short		*dollar_tlevel_addrs;
 GBLREF int4		*update_trans_addrs;
 GBLREF sgmnt_addrs	**cs_addrs_addrs;
-GBLREF boolean_t 	*kip_incremented_addrs;
+GBLREF sgmnt_addrs 	**kip_csa_addrs;
 GBLREF boolean_t	*need_kip_incr_addrs;
 GBLREF trans_num	*start_tn_addrs;
 
@@ -58,7 +58,7 @@ void init_secshr_addrs(gd_addr_fn_ptr getnxtgdr, cw_set_element *cwsetaddrs,
 	inctn_opcode_t *inctn_opcode_address,
 	inctn_detail_t *inctn_detail_address, short *dollar_tlevel_address,
 	int4 *update_trans_address, sgmnt_addrs **cs_addrs_address,
-	boolean_t *kip_incremented_address, boolean_t *need_kip_incr_address,
+	sgmnt_addrs **kip_csa_address, boolean_t *need_kip_incr_address,
 	trans_num *start_tn_address)
 {
 	get_next_gdr_addrs = getnxtgdr;
@@ -77,7 +77,7 @@ void init_secshr_addrs(gd_addr_fn_ptr getnxtgdr, cw_set_element *cwsetaddrs,
 	dollar_tlevel_addrs = dollar_tlevel_address;
 	update_trans_addrs = update_trans_address;
 	cs_addrs_addrs = cs_addrs_address;
-	kip_incremented_addrs = kip_incremented_address;
+	kip_csa_addrs = kip_csa_address;
 	need_kip_incr_addrs = need_kip_incr_address;
 	start_tn_addrs = start_tn_address;
 }

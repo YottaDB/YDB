@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,15 +12,15 @@
 #include "mdef.h"
 #include "io.h"
 #include "iottdef.h"
-#ifdef __MVS__
-#include <unistd.h>
+#ifdef KEEP_zOS_EBCDIC
+#include "gtm_unistd.h"
 #endif
 
 uchar_ptr_t iott_escape(uchar_ptr_t strin, uchar_ptr_t strtop, io_desc *io_ptr)
 {
 	unsigned char *str;
 	unsigned char esc_type;
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 	error_def(ERR_ASC2EBCDICCONV);
 	if ((DEFAULT_CODE_SET != io_ptr->in_code_set) && ( -1 == __etoa_l((char *)strin, strtop - strin) ))
 		rts_error(VARLSTCNT(4) ERR_ASC2EBCDICCONV, 2, LEN_AND_LIT("__etoa_l"));
@@ -92,7 +92,7 @@ uchar_ptr_t iott_escape(uchar_ptr_t strin, uchar_ptr_t strtop, io_desc *io_ptr)
 			break;
 	}
 	io_ptr->esc_state = esc_type;
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 	if ((DEFAULT_CODE_SET != io_ptr->in_code_set) && ( -1 == __atoe_l((char *)strin, strtop - strin) ))
 		rts_error(VARLSTCNT(4) ERR_ASC2EBCDICCONV, 2, LEN_AND_LIT("__atoe_l"));
 #endif

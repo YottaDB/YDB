@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,15 +18,19 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "hashtab_mname.h"
+#include "hashtab_addr.h"
+#include "lv_val.h"
 #include "zwrite.h"
 
-GBLREF lvzwrite_struct lvzwrite_block;
+GBLREF lvzwrite_datablk *lvzwrite_block;
 
 void lvzwr_arg(int t, mval *a1, mval *a2)
 {
 	int sub_idx;
 
-	sub_idx = lvzwrite_block.subsc_count++;
+	assert(lvzwrite_block);
+	sub_idx = lvzwrite_block->subsc_count++;
 	/* it would be good to guard the array sub_idx < sizeof... */
 	if (a1)
 	{
@@ -44,12 +48,12 @@ void lvzwr_arg(int t, mval *a1, mval *a2)
 		if (0 == a2->str.len)				/* can never be value */
 			a2 = NULL;
 	}
-	((zwr_sub_lst *)lvzwrite_block.sub)->subsc_list[sub_idx].subsc_type = t;
-	((zwr_sub_lst *)lvzwrite_block.sub)->subsc_list[sub_idx].first = a1;
-	((zwr_sub_lst *)lvzwrite_block.sub)->subsc_list[sub_idx].second = a2;
+	((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[sub_idx].subsc_type = t;
+	((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[sub_idx].first = a1;
+	((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[sub_idx].second = a2;
 	if ((ZWRITE_ASTERISK != t) && (ZWRITE_ALL != t))
-		lvzwrite_block.mask |= 1 << sub_idx;
+		lvzwrite_block->mask |= 1 << sub_idx;
 	if (ZWRITE_VAL != t)
-		lvzwrite_block.fixed = FALSE;
+		lvzwrite_block->fixed = FALSE;
 	return;
 }

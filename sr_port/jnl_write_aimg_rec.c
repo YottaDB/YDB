@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,9 @@
 #include "jnl_write_aimg_rec.h"
 #include "jnl_get_checksum.h"
 #include "min_max.h"
-
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 GBLREF 	jnl_gbls_t		jgbl;
 
 void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse)
@@ -39,9 +41,12 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse)
 	jnl_format_buffer 	blk_trailer;	/* partial record after the aimg block */
 	char			local_buff[JNL_REC_START_BNDRY + JREC_SUFFIX_SIZE];
 	jrec_suffix		*suffix;
-	blk_hdr_ptr_t		buffer;
+	blk_hdr_ptr_t		buffer, save_buffer;
 	jnl_private_control	*jpc;
-
+#ifdef GTM_CRYPT
+	char			*buff;
+	int			req_enc_blk_size, init_status, crypt_status;
+#endif
 	assert(csa->now_crit);
 	jpc = csa->jnl;
 	assert(0 != jpc->pini_addr);
@@ -59,7 +64,7 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse)
 	assert(buffer->bsiz >= sizeof(blk_hdr));
 	aimg_record.bsiz = MIN(csa->hdr->blk_size, buffer->bsiz);
 	aimg_record.ondsk_blkver = cse->ondsk_blkver;
-	tmp_jrec_size = FIXED_AIMG_RECLEN + aimg_record.bsiz + JREC_SUFFIX_SIZE;
+	tmp_jrec_size = (int)FIXED_AIMG_RECLEN + aimg_record.bsiz + JREC_SUFFIX_SIZE;
 	jrec_size = ROUND_UP2(tmp_jrec_size, JNL_REC_START_BNDRY);
 	zero_len = jrec_size - tmp_jrec_size;
 	blk_trailer.buff = local_buff + (JNL_REC_START_BNDRY - zero_len);
@@ -69,5 +74,23 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse)
 	aimg_record.prefix.forwptr = suffix->backptr = jrec_size;
 	suffix->suffix_code = JNL_REC_SUFFIX_CODE;
 	assert(sizeof(uint4) == sizeof(jrec_suffix));
+	save_buffer = buffer;
+#	ifdef GTM_CRYPT
+	req_enc_blk_size = buffer->bsiz - SIZEOF(*buffer);
+	if (BLOCK_REQUIRE_ENCRYPTION(csa->hdr->is_encrypted, buffer->levl, req_enc_blk_size))
+	{
+		ASSERT_ENCRYPTION_INITIALIZED;
+		memcpy(csa->encrypted_blk_contents, buffer, sizeof(*buffer));
+		GTMCRYPT_ENCODE_FAST(csa->encr_key_handle,
+				     (char *)(buffer + 1),
+				     req_enc_blk_size,
+				     (csa->encrypted_blk_contents + sizeof(*buffer)),
+				     crypt_status);
+		if (0 != crypt_status)
+			GC_RTS_ERROR(crypt_status, NULL);
+		buffer = (blk_hdr_ptr_t)csa->encrypted_blk_contents;
+	}
+#	endif
 	jnl_write(jpc, JRT_AIMG, (jnl_record *)&aimg_record, buffer, &blk_trailer);
+	buffer = save_buffer;
 }

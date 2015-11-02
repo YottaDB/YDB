@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,6 +86,9 @@
 #include "jnl_get_checksum.h"
 #include "updproc_get_gblname.h"
 #include "wcs_recover.h"
+#include "have_crit.h"
+#include "wbox_test_init.h"
+#include "format_targ_key.h"
 
 #define	MAX_IDLE_HARD_SPINS	1000	/* Fail-safe count to avoid hanging CPU in tight loop while it's idle */
 
@@ -276,6 +279,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	int4			tupd_num; /* the number of tset/tkill/tzkill records encountered */
 	int4			tcom_num; /* the number of tcom records encountered */
 	seq_num			jnl_seqno, tmpseqno; /* the current jnl_seq no of the Update process */
+	seq_num			last_errored_seqno = 0;
 	int			key_len, rec_len, backptr;
 	char			fn[MAX_FN_LEN];
 	sm_uc_ptr_t		readaddrs;	/* start of current rec in pool */
@@ -295,6 +299,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	char	           	gv_mname[MAX_KEY_SZ];
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;
 	boolean_t		log_switched = FALSE;
 	static	seq_num		seqnum_diff = 0;
 	jnl_private_control	*jpc;
@@ -314,6 +319,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	error_def(ERR_UPDREPLSTATEOFF);
 	error_def(ERR_TPRETRY);
 	error_def(ERR_GBLOFLOW);
+	error_def(ERR_GVSUBOFLOW);
+	error_def(ERR_GVIS);
+	error_def(ERR_REC2BIG);
 
 	ESTABLISH(updproc_ch);
 	recvpool_ctl = recvpool.recvpool_ctl;
@@ -670,7 +678,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				temp_jnlpool_ctl->jnl_seqno = jnlpool_ctl->jnl_seqno;
 				assert((temp_jnlpool_ctl->write_addr % temp_jnlpool_ctl->jnlpool_size) == temp_jnlpool_ctl->write);
 				jgbl.cumul_jnl_rec_len = sizeof(jnldata_hdr_struct) + NULL_RECLEN;
-				temp_jnlpool_ctl->write += sizeof(jnldata_hdr_struct);
+				temp_jnlpool_ctl->write += SIZEOF(jnldata_hdr_struct);
 				if (temp_jnlpool_ctl->write >= temp_jnlpool_ctl->jnlpool_size)
 				{
 					assert(temp_jnlpool_ctl->write == temp_jnlpool_ctl->jnlpool_size);
@@ -799,33 +807,44 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				memcpy(gv_currkey->base, keystr->text, keystr->length);
 				gv_currkey->base[keystr->length] = 0; 	/* second null of a key terminator */
 				gv_currkey->end = keystr->length;
-				if (IS_KILL(rectype))
-					op_gvkill();
-				else if (IS_ZKILL(rectype))
-					op_gvzwithdraw();
+				if (gv_currkey->end + 1 > gv_cur_region->max_key_size)
+				{
+					bad_trans_type = upd_bad_key_size;
+					assert(gtm_white_box_test_case_enabled
+						&& (WBTEST_UPD_GVSUBOFLOW_ERROR == gtm_white_box_test_case_number));
+				}
 				else
 				{
-					assert(IS_SET(rectype));
-					if (keystr->length + 1 + val_mv.str.len + sizeof(rec_hdr) > gv_cur_region->max_rec_size)
+					if (IS_KILL(rectype))
+						op_gvkill();
+					else if (IS_ZKILL(rectype))
+						op_gvzwithdraw();
+					else
 					{
-						bad_trans_type = upd_bad_val_size;
-						assert(FALSE);
-					} else
+						assert(IS_SET(rectype));
+						if (keystr->length + 1 + val_mv.str.len + sizeof(rec_hdr) >
+										gv_cur_region->max_rec_size)
+						{
+							bad_trans_type = upd_bad_val_size;
+							assert(gtm_white_box_test_case_enabled
+								&& (WBTEST_UPD_REC2BIG_ERROR == gtm_white_box_test_case_number));
+						} else
 						op_gvput(&val_mv);
-				}
-				if ((upd_good_record == bad_trans_type) && !IS_TP(rectype))
-					incr_seqno = TRUE;
-				if (disk_blk_read || 0 >= csa->n_pre_read_trigger)
-				{
-					csd = csa->hdr;
-					upd_helper_ctl->first_done = FALSE;
-					upd_helper_ctl->pre_read_offset = temp_read + rec_len;
-					REPL_DPRINT2("pre_read_offset = %x\n", upd_helper_ctl->pre_read_offset);
-					csa->n_pre_read_trigger = (int)((csd->n_bts * (float)csd->reserved_for_upd /
+					}
+					if ((upd_good_record == bad_trans_type) && !IS_TP(rectype))
+						incr_seqno = TRUE;
+					if (disk_blk_read || 0 >= csa->n_pre_read_trigger)
+					{
+						csd = csa->hdr;
+						upd_helper_ctl->first_done = FALSE;
+						upd_helper_ctl->pre_read_offset = temp_read + rec_len;
+						REPL_DPRINT2("pre_read_offset = %x\n", upd_helper_ctl->pre_read_offset);
+						csa->n_pre_read_trigger = (int)((csd->n_bts * (float)csd->reserved_for_upd /
 						csd->avg_blks_per_100gbl) * csd->pre_read_trigger_factor / 100.0);
-				} else
-					csa->n_pre_read_trigger--;
-				disk_blk_read = FALSE;
+					} else
+						csa->n_pre_read_trigger--;
+					disk_blk_read = FALSE;
+				}
 			}
 		}
 		if (upd_good_record != bad_trans_type)
@@ -835,17 +854,55 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				"-> Bad trans :: bad_trans_type = %ld type = %ld len = %ld backptr = %ld jnl_seqno = %llu "
 				"[0x%llx]\n", bad_trans_type, rectype, rec_len, backptr, tmpseqno, tmpseqno);
 			upd_proc_local->bad_trans = TRUE;
+			/* We dont expect to be holding crit on any region in case of a bad_trans.
+			 * Nevertheless release crit in PRO just in case we hold it.
+			 */
+			assert(0 == have_crit(CRIT_HAVE_ANY_REG));
 			if (0 < dollar_tlevel)
 			{
 				repl_log(updproc_log_fp, TRUE, TRUE,
 					"OP_TROLLBACK IS CALLED -->Bad trans :: dollar_tlevel = %ld\n", dollar_tlevel);
-				op_trollback(0);
+				op_trollback(0);	/* this should also release crit (if any) on all regions in TP */
+				assert(!dollar_tlevel);
+			} else
+			{	/* Non-TP : Release crit if any */
+				save_reg = gv_cur_region;
+				if ((NULL != save_reg) && save_reg->open)
+				{
+					csa = (sgmnt_addrs *)&FILE_INFO(save_reg)->s_addrs;
+					assert(NULL != csa);	/* since save_reg->open is TRUE */
+					if (csa->now_crit)
+						rel_crit(save_reg);
+				}
 			}
+			assert(0 == have_crit(CRIT_HAVE_ANY_REG));
 			readaddrs = recvpool.recvdata_base;
 			upd_proc_local->read = 0;
 			temp_read = 0;
 			temp_write = 0;
 			upd_rec_seqno = tupd_num = tcom_num = 0;
+			/*Throw an error if bad_trans comes for the same sequence number*/
+			if (last_errored_seqno == jnl_seqno)
+			{
+				last_errored_seqno = 0;
+				switch(bad_trans_type)
+				{
+					case upd_bad_key_size:
+						if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+							end = &buff[MAX_ZWR_KEY_SZ - 1];
+						rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS,2, end - buff, buff);
+						break;
+					case upd_bad_val_size:
+						if (0 == (end = format_targ_key(buff,MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+							end = &buff[MAX_ZWR_KEY_SZ - 1];
+						rts_error(VARLSTCNT(10) ERR_REC2BIG, 4,
+							gv_currkey->end + 1 + val_mv.str.len + sizeof(rec_hdr),
+							(int4)gv_cur_region->max_rec_size, REG_LEN_STR(gv_cur_region), ERR_GVIS, 2,
+							end - buff, buff);
+						break;
+				}
+			}else
+				last_errored_seqno = jnl_seqno;
 			continue;
 		}
 		if (incr_seqno)

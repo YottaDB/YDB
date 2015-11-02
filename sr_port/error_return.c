@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,10 @@ GBLREF	unsigned short		proc_act_type;
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 GBLREF	int			mumps_status;
 GBLREF	stack_frame		*error_frame;
+#ifdef UNIX
+#include "io.h"
+GBLREF	io_desc		*gtm_err_dev;
+#endif
 
 void error_return(void)
 {
@@ -98,6 +102,9 @@ void error_return(void)
 		assert(FALSE);	/* the previous rts_error() should not return */
 	}
 	UNIX_ONLY(
+		/* zero the error device just to be safe */
+		assert(NULL == gtm_err_dev);
+		gtm_err_dev = NULL;
 		if (parent_counted_frame->flags & SFF_CI) /* Unhandled error in call-in: return to gtm_ci */
 			mumps_status = dollar_ecode.error_last_ecode;
 		MUM_TSTART;

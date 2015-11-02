@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,9 +68,12 @@ typedef struct storElemStruct
 #endif
 } storElem;
 
+size_t gtm_bestfitsize(size_t);
 void verifyFreeStorage(void);
 void verifyAllocatedStorage(void);
 void raise_gtmmemory_error(void);
+void printMallocInfo(void);
+void printMallocDump(void);
 
 #define VERIFY_STORAGE_CHAINS			\
 {						\

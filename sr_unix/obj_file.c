@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,8 @@
 #include "obj_gen.h"
 #include "cgp.h"
 #include "mdq.h"
+#include "hashtab.h"
+#include "hashtab_str.h"
 #include "objlabel.h"
 #include "stringpool.h"
 #include "parse_file.h"
@@ -44,21 +46,25 @@ GBLREF spdesc		stringpool;
 GBLREF int4		linkage_size;
 GBLREF uint4		lnkrel_cnt;	/* number of entries in linkage Psect to relocate */
 GBLREF int4		sym_table_size;
+GBLREF hash_table_str	*compsyms_hashtab;
 
 static char			emit_buff[OBJ_EMIT_BUF_SIZE];	/* buffer for emit output */
-static int			emit_buff_used;		/* number of chars in emit_buff */
-static struct rel_table		*link_rel, *link_rel_end; /* Linkage relocation entries.  */
+static int			emit_buff_used;			/* number of chars in emit_buff */
+static int			symcnt;
+static struct rel_table		*link_rel, *link_rel_end;	/* Linkage relocation entries.  */
 static struct linkage_entry	*linkage_first, *linkage_last;
 static struct sym_table		*symbols;
+
 void	emit_link_reference(int4 refoffset, mstr *name);
-int	output_symbol_size(void);
 
 void	drop_object_file(void)
 {
+	int	rc;
+
         if (0 < object_file_des)
         {
 		UNLINK(object_file_name);
-		close(object_file_des);
+		CLOSEFILE_RESET(object_file_des, rc);	/* resets "object_file_des" to FD_INVALID */
         }
 }
 
@@ -166,43 +172,95 @@ void	buff_flush(void)
  */
 struct sym_table *define_symbol(unsigned char psect, mstr *name)
 {
+	boolean_t		usehtab, added;
 	int4			cmp;
 	struct sym_table	*sym, *sym1, *newsym;
+	stringkey		symkey;
+	ht_ent_str		*syment;
 
-	sym = symbols;
-	sym1 = 0;
-	while (sym)
-	{
-		if ((cmp = memvcmp(name->addr, (int)name->len, &sym->name[0], sym->name_len - 1)) <= 0)
-			break;
-		sym1 = sym;
-		sym = sym->next;
+	usehtab = (SYM_HASH_CUTOVER < symcnt);
+	DEBUG_ONLY(syment = NULL);
+	if (!usehtab)
+	{	/* "Brute force" version of lookup for now */
+		assert(NULL == compsyms_hashtab || NULL == compsyms_hashtab->base);
+		sym = symbols;
+		sym1 = NULL;
+		while (sym)
+		{
+			if ((cmp = memvcmp(name->addr, (int)name->len, &sym->name[0], sym->name_len - 1)) <= 0)
+				break;
+			sym1 = sym;
+			sym = sym->next;
+		}
+		if (!cmp && sym)
+			return sym;
+	} else
+	{	/* Hashtable lookup -- Note use of hashtab_mname for this is somewhat overloading the usage since there
+		   are compound symbols of the form "routine"."label" which can exceed the typical size of an mname but
+		   since mnames are just addr/length pairs at the definition level, this works for us and is easier than
+		   defining a new hashtable type identical to the mname hash in all but name.
+		*/
+		if (!compsyms_hashtab)
+		{	/* Allocate if not allocated yet */
+			compsyms_hashtab = (hash_table_str *)malloc(sizeof(hash_table_str));
+			compsyms_hashtab->base = NULL;
+		}
+		if (!compsyms_hashtab->base)
+		{	/* Need to initialize hash table and load it with the elements so far */
+			init_hashtab_str(compsyms_hashtab, SYM_HASH_CUTOVER * 2);
+			assert(compsyms_hashtab->base);
+			for (sym = symbols; sym; sym = sym->next)
+			{
+				symkey.str.addr = (char *)&sym->name[0];
+				symkey.str.len = sym->name_len - 1;
+				COMPUTE_HASH_STR(&symkey);
+				added = add_hashtab_str(compsyms_hashtab, &symkey, sym, &syment);
+				assert(added);
+				assert(syment->value);
+				assert(syment->key.str.addr == (char *)&((struct sym_table *)syment->value)->name[0]);
+			}
+		}
+		symkey.str = *name;	/* Copy of the key */
+		COMPUTE_HASH_STR(&symkey);
+		added = add_hashtab_str(compsyms_hashtab, &symkey, NULL, &syment);
+		if (!added)
+		{	/* Hash entry exists for this symbol */
+			sym = (struct sym_table *)syment->value;
+			assert(sym);
+			assert(0 == memvcmp(name->addr, (int)name->len, &sym->name[0], sym->name_len - 1));
+			return sym;
+		}
 	}
 
-	if (cmp || !sym)
-	{
-		/* Didn't find it in existing symbols; create new symbol.  */
-		newsym = (struct sym_table *)mcalloc(USIZEOF(struct sym_table) + name->len);
-		newsym->name_len = name->len + 1;
-		memcpy(&newsym->name[0], name->addr, name->len);
-		newsym->name[name->len] = 0;
-		newsym->n.n_type = N_EXT;
-		if (GTM_CODE == psect)
-			newsym->n.n_type |= N_TEXT;	/* if symbol is in GTM_CODE, it is defined */
-		else
-			lnkrel_cnt++;	/* otherwise it's external (only one reference in linkage Psect) */
-		newsym->resolve = 0;
-		newsym->linkage_offset = -1;	/* don't assign linkage Psect offset unless it's used */
+	/* Didn't find it in existing symbols; create new symbol.  */
+	newsym = (struct sym_table *)mcalloc(USIZEOF(struct sym_table) + name->len);
+	newsym->name_len = name->len + 1;
+	memcpy(&newsym->name[0], name->addr, name->len);
+	newsym->name[name->len] = 0;
+	newsym->n.n_type = N_EXT;
+	if (GTM_CODE == psect)
+		newsym->n.n_type |= N_TEXT;	/* if symbol is in GTM_CODE, it is defined */
+	else
+		lnkrel_cnt++;	/* otherwise it's external (only one reference in linkage Psect) */
+	newsym->resolve = 0;
+	newsym->linkage_offset = -1;	/* don't assign linkage Psect offset unless it's used */
+	if (!usehtab)
+	{	/* Brute force -- add into the queue where the test failed (keeping sorted) */
 		newsym->next = sym;
 		if (sym1)
 			sym1->next = newsym;
 		else
 			symbols = newsym;
-		sym_table_size += newsym->name_len;
-		sym = newsym;
+	} else
+	{	/* Hashtab usage -- add at beginning .. easiest since sorting doesn't matter for future lookups */
+		newsym->next = symbols;
+		symbols = newsym;
+		assert(syment);
+		syment->value = newsym;
 	}
-
-	return sym;
+	++symcnt;
+	sym_table_size += newsym->name_len;
+	return newsym;
 }
 
 
@@ -214,15 +272,8 @@ void	resolve_sym (void)
 
 	for (sym = symbols, symnum = 0; sym; sym = sym->next, symnum++)
 	{
-		if (sym->resolve)
-		{
-			rel = sym->resolve;
-			while (rel)
-			{
-				rel->r.r_symbolnum = symnum;
-				rel = rel->resolve;
-			}
-		}
+		for (rel = sym->resolve; rel; rel = rel->resolve)
+			rel->r.r_symbolnum = symnum;
 	}
 }
 
@@ -237,7 +288,8 @@ void	output_relocation (void)
 }
 
 
-/* Size that output_symbol() below will eventually generate */
+#ifdef DEBUG
+/* Size that output_symbol() below will eventually generate -- used to verify validity of OUTPUT_SYMBOL_SIZE macro */
 int	output_symbol_size(void)
 {
 	uint4			string_length;
@@ -252,6 +304,7 @@ int	output_symbol_size(void)
 	}
 	return string_length;
 }
+#endif
 
 
 /* Symbol string table output. Consists of a series of null terminated
@@ -281,9 +334,9 @@ void	output_symbol(void)
  */
 void	obj_init(void)
 {
-	lnkrel_cnt = 0;
+	lnkrel_cnt = symcnt = 0;
 	link_rel = link_rel_end = NULL;
-	symbols = 0;
+	symbols = NULL;
 	sym_table_size = 0;
 
 	linkage_first = linkage_last = NULL;
@@ -359,7 +412,7 @@ void	emit_literals(void)
 			p->v.str.addr = NULL;
 		p->v.fnpc_indx = (unsigned char)-1;
 		emit_immed((char *)&p->v, sizeof(p->v));
-		offset += sizeof(p->v);
+		offset += SIZEOF(p->v);
 	}
 	assert (offset == lits_mval_size);
 }
@@ -393,7 +446,7 @@ int4	find_linkage(mstr* name)
 			linkage_last->next = newlnk;
 		linkage_last = newlnk;
 
-		linkage_size += sizeof(lnk_tabent);
+		linkage_size += SIZEOF(lnk_tabent);
 	}
 	return sym->linkage_offset;
 }

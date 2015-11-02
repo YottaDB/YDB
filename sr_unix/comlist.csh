@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Infromation Services, Inc #
+#	Copyright 2001, 2009 Fidelity Infromation Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -13,6 +13,7 @@
 #####################################################################################
 #
 #	comlist.csh - compile all sources, create object libraries, link executables.
+#			Should be kept in sync with similar code in mkutf8dir.csh
 #
 #	arguments:
 #		$1 -	assembler options
@@ -292,10 +293,12 @@ cp $gtm_inc/gtm_descript.h .
 #
 # headers to support ASCII/EBCDIC independence
 #
+cp $gtm_inc/main_pragma.h .
 cp $gtm_inc/gtm_stdio.h .
 cp $gtm_inc/gtm_stdlib.h .
 cp $gtm_inc/gtm_string.h .
-if ( "$HOSTOS" == "OS/390" ) then
+cp $gtm_inc/gtm_strings.h .
+if ( "$HOSTOS" == "OS/390disable" ) then
 	cp $gtm_inc/global_a.h .
 	cp $gtm_inc/gtm_unistd.h .
 	cp $gtm_inc/gtm_netdb.h .
@@ -420,7 +423,10 @@ echo ""
 echo "Start of C Compilation"	# Do not change this string. $gtm_tools/buildwarn.csh relies on this to detect warnings.
 echo ""
 
-/bin/ls $gs[1] | egrep '\.c$'   | xargs -n25 $shell $gtm_tools/gt_cc.csh
+#Do not compile gtmcrypt_ref.c, maskpass.c, ascii2hex.c.
+#$gtm_tools/buildplugin.csh will take care of compilation and building of the reference plugin and the supporting files.
+/bin/ls $gs[1] | egrep '\.c$' | \
+	egrep -v '^gtmcrypt_ref|^gtmcrypt_dbk_ref|^gtmcrypt_pk_ref|^maskpass|^ascii2hex'  | xargs -n25 $shell $gtm_tools/gt_cc.csh
 
 # Special compilation for omi_sx_play.c
 set comlist_gt_cc_bak = "$comlist_gt_cc"
@@ -496,7 +502,7 @@ foreach i ( $comlist_liblist )
 		gt_ar $gt_ar_option_create $gtm_exe/lib$i.a `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list` >>& ar$i.log
 		if ( $status != 0 ) then
 			@ comlist_status = $status
-			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_tools/ar$i.log)" \
+			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
 		# retain_list.txt contains modules listed in *.list that also need to be
@@ -521,12 +527,13 @@ foreach i ( $comlist_liblist )
 		set exclude = "$exclude|^mupip\.o|^mupip_cmd\.o|^gtmsecshr\.o|^gtmsecshr_wrapper\.o|^geteuid\.o|^dtgbldir\.o"
 		set exclude = "$exclude|^semstat2\.o|^ftok\.o|^msg\.o|^gtcm_main\.o|^gtcm_play\.o|^gtcm_pkdisp\.o|^gtcm_shmclean\.o"
 		set exclude = "$exclude|^omi_srvc_xct\.o|^omi_sx_play\.o"
-		set exclude = "$exclude|^gtcm_gnp_server\.o|^gtcm_gnp_clitab\.o|^dbcertify_cmd.o"
+		set exclude = "$exclude|^gtcm_gnp_server\.o|^gtcm_gnp_clitab\.o|^dbcertify_cmd\.o"
+		set exclude = "$exclude|^dummy_gtmci\.o"
 		/bin/ls | egrep '\.o$' | egrep -v "$exclude" | \
 			xargs -n50 $shell $gtm_tools/gt_ar.csh $gt_ar_option_create lib$i.a >>& ar$i.log
 		if ( $status != 0 ) then
 			@ comlist_status = $status
-			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_tools/ar$i.log)" \
+			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
 		breaksw
@@ -560,13 +567,6 @@ foreach i ( $comlist_liblist )
 	echo "End of $i archive creation: `date`"
 end
 
-
-#
-# OS/390 clients need the ASCII/EBCDIC conversion library for xcall
-#
-if ( "$HOSTOS" == "OS/390" ) then
-	cp $gtm_obj/libascii.a ${gtm_dist}
-endif
 
 /bin/ls | egrep '\.o$' | egrep -v "$exclude" | xargs -n25 rm -f
 
@@ -605,6 +605,11 @@ if ( "$HOSTOS" != "SunOS" ) then
 endif
 
 cd $p3
+
+# Generate Special Debug Files (z/OS specific at the moment)
+if ( -e $gtm_tools/gtm_dbgld.csh ) then
+	$gtm_tools/gtm_dbgld.csh
+endif
 
 # Create a default global directory.
 setenv gtmgbldir ./mumps.gld
@@ -660,8 +665,8 @@ if ($status != 0) @ comlist_status = $status
 if (-e $gtm_exe/utf8) then	# would have been created by buildaux.csh while building GDE
 	pushd $gtm_exe
 	foreach file (*)
-		# Skip directories
-		if (-d $file) then
+		# Skip utf8 directory
+		if (-d $file && "utf8" == $file) then
 			continue
 		endif
 		# Skip soft linking .o files
@@ -671,7 +676,7 @@ if (-e $gtm_exe/utf8) then	# would have been created by buildaux.csh while build
 		endif
 		# Soft link everything else
 		if (-e utf8/$file) then
-			rm -f utf8/$file
+			rm -rf utf8/$file
 			if ($status != 0) @ comlist_status = $status
 		endif
 		ln -s ../$file utf8/$file

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,8 +74,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 	struct stat	statbuf;
 	int		p_offset;
 	mstr		chset_mstr;
-	boolean_t	ichset_specified, ochset_specified;
-	gtm_chset_t	width_chset;
+	boolean_t	ichset_specified, ochset_specified, chset_allowed;
+	gtm_chset_t	width_chset, temp_chset;
 
 	error_def(ERR_DEVPARMNEG);
 	error_def(ERR_RMWIDTHPOS);
@@ -88,7 +88,9 @@ void	iorm_use(io_desc *iod, mval *pp)
 	p_offset = 0;
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
 	seen_wrap = fstat_done = FALSE;
-	ichset_specified = ochset_specified = FALSE;
+	ichset_specified = ochset_specified = chset_allowed = FALSE;
+	if (ZOS_ONLY(TRUE ||) gtm_utf8_mode)
+		chset_allowed = TRUE;
 	while (*(pp->str.addr + p_offset) != iop_eol)
 	{
 		assert((params) *(pp->str.addr + p_offset) < (params)n_iops);
@@ -105,7 +107,19 @@ void	iorm_use(io_desc *iod, mval *pp)
 			break;
 		case iop_nofixed:
 			if (iod->state != dev_open)
+			{
 				rm_ptr->fixed = FALSE;
+				if (CHSET_BINARY == iod->ichset)
+				{
+					ichset_specified = FALSE;
+					iod->ichset = CHSET_M;
+				}
+				if (CHSET_BINARY == iod->ochset)
+				{
+					ochset_specified = FALSE;
+					iod->ochset = CHSET_M;
+				}
+			}
 			break;
 		case iop_length:
 			GET_LONG(length, (pp->str.addr + p_offset));
@@ -145,9 +159,9 @@ void	iorm_use(io_desc *iod, mval *pp)
 			rm_ptr->noread = FALSE;
 			break;
 		case iop_recordsize:
-			if (dev_open != iod->state || (CHSET_M == iod->ichset && CHSET_M == iod->ochset) ||
+			if (dev_open != iod->state || (!IS_UTF_CHSET(iod->ichset) && !IS_UTF_CHSET(iod->ochset)) ||
 				(!rm_ptr->done_1st_read && !rm_ptr->done_1st_write))
-			{	/* only if not open, M, or no reads or writes yet */
+			{	/* only if not open, not UTF, or no reads or writes yet */
 				GET_LONG(recordsize, (pp->str.addr + p_offset));
 				if (recordsize <= 0)
 					rts_error(VARLSTCNT(1) ERR_RMWIDTHPOS);
@@ -175,7 +189,20 @@ void	iorm_use(io_desc *iod, mval *pp)
 			}
 			break;
 		case iop_stream:
-			rm_ptr->stream = TRUE;
+			if (iod->state != dev_open)
+			{
+				rm_ptr->stream = TRUE;
+				if (CHSET_BINARY == iod->ichset)
+				{
+					ichset_specified = FALSE;
+					iod->ichset = CHSET_M;
+				}
+				if (CHSET_BINARY == iod->ochset)
+				{
+					ochset_specified = FALSE;
+					iod->ochset = CHSET_M;
+				}
+			}
 			break;
 		case iop_truncate:
 			if (!rm_ptr->fifo && !rm_ptr->pipe)
@@ -222,14 +249,14 @@ void	iorm_use(io_desc *iod, mval *pp)
 		case iop_width:
 			assert(iod->state == dev_open);
 			GET_LONG(width, (pp->str.addr + p_offset));
-			if (0 > width || (0 == width && CHSET_M == iod->ochset))
+			if (0 > width || (0 == width && !IS_UTF_CHSET(iod->ochset)))
 				rts_error(VARLSTCNT(1) ERR_RMWIDTHPOS);
 			else if (MAX_STRLEN < width)
 				rts_error(VARLSTCNT(1) ERR_RMWIDTHTOOBIG);
-			/* Do not allow a WIDTH of 1 if UTF mode (ICHSET or OCHSET is not M) */
-			if ((1 == width) && ((CHSET_M != iod->ochset) || (CHSET_M != iod->ichset)))
+			/* Do not allow a WIDTH of 1 if either ICHSET or OCHSET is UTF-* */
+			if ((1 == width) && gtm_utf8_mode && ((IS_UTF_CHSET(iod->ochset)) || (IS_UTF_CHSET(iod->ichset))))
 				rts_error(VARLSTCNT(1) ERR_WIDTHTOOSMALL);
-			if (CHSET_M != iod->ochset && rm_ptr->fixed)
+			if (IS_UTF_CHSET(iod->ochset) && rm_ptr->fixed)
 				iorm_flush(iod);	/* need to flush current record first */
 			rm_ptr->def_width = FALSE;
 			if (0 == width)
@@ -244,6 +271,17 @@ void	iorm_use(io_desc *iod, mval *pp)
 			}
 			break;
 		case iop_wrap:
+			if (dev_open != iod->state)
+			{
+				if (CHSET_BINARY == iod->ichset || CHSET_BINARY == iod->ochset)
+					break;		/* ignore wrap if BINARY specified */
+			} else
+			{	/* already open so check what conversion is in use  */
+#ifdef __MVS__
+				if (CHSET_BINARY == iod->process_chset)
+					break;
+#endif
+			}
 			iod->wrap = TRUE;
 			seen_wrap = TRUE;	/* Don't allow WIDTH=0 to override WRAP */
 			break;
@@ -262,15 +300,18 @@ void	iorm_use(io_desc *iod, mval *pp)
 					ICONV_OPEN_CD(iod->input_conv_cd, (char *)(pp->str.addr + p_offset + 1),
 												INSIDE_CH_SET);
 #endif
-				if (gtm_utf8_mode && dev_open != iod->state)
+				if (chset_allowed && (dev_open != iod->state))
 				{
 					chset_mstr.addr = (char *)(pp->str.addr + p_offset + 1);
 					chset_mstr.len = *(pp->str.addr + p_offset);
-					SET_ENCODING(iod->ichset, &chset_mstr);
+					SET_ENCODING(temp_chset, &chset_mstr);
+					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
+						break;	/* ignore UTF chsets if not utf8_mode */
+					iod->ichset = temp_chset;
 					ichset_specified = TRUE;
 				}
-                        break;
 			}
+                        break;
                 case iop_opchset:
 			{
 #ifdef KEEP_zOS_EBCDIC
@@ -283,32 +324,44 @@ void	iorm_use(io_desc *iod, mval *pp)
 					ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET,
 							(char *)(pp->str.addr + p_offset + 1));
 #endif
-				if (gtm_utf8_mode && dev_open != iod->state)
+				if (chset_allowed && (dev_open != iod->state))
 				{
 					chset_mstr.addr = (char *)(pp->str.addr + p_offset + 1);
 					chset_mstr.len = *(pp->str.addr + p_offset);
-					SET_ENCODING(iod->ochset, &chset_mstr);
+					SET_ENCODING(temp_chset, &chset_mstr);
+					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
+						break;	/* ignore UTF chsets if not utf8_mode */
+					iod->ochset = temp_chset;
 					ochset_specified = TRUE;
-					if (!IS_PADCHAR_VALID(iod->ochset, rm_ptr->padchar))
+					if (gtm_utf8_mode && !IS_PADCHAR_VALID(iod->ochset, rm_ptr->padchar))
 						rts_error(VARLSTCNT(2) ERR_PADCHARINVALID, 0);
 				}
-                        	break;
 			}
+                        break;
                 case iop_chset:
 			{
-				if (gtm_utf8_mode && dev_open != iod->state)
+				if (chset_allowed && (dev_open != iod->state))
 				{
 					chset_mstr.addr = (char *)(pp->str.addr + p_offset + 1);
 					chset_mstr.len = *(pp->str.addr + p_offset);
-					SET_ENCODING(iod->ochset, &chset_mstr);
-					if (!IS_PADCHAR_VALID(iod->ochset, rm_ptr->padchar))
+					SET_ENCODING(temp_chset, &chset_mstr);
+					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
+						break;	/* ignore UTF chsets if not utf8_mode */
+					iod->ochset = temp_chset;
+					if (gtm_utf8_mode && !IS_PADCHAR_VALID(iod->ochset, rm_ptr->padchar))
 						rts_error(VARLSTCNT(2) ERR_PADCHARINVALID, 0);
 					iod->ichset = iod->ochset;
 					ochset_specified = ichset_specified = TRUE;
 				}
-                        	break;
 			}
+                        break;
 		case iop_m:
+			if (chset_allowed && (dev_open != iod->state))
+			{
+				iod->ichset = iod->ochset = CHSET_M;
+				ichset_specified = ochset_specified = TRUE;
+			}
+			break;
 		case iop_utf8:
 		case iop_utf16:
 		case iop_utf16be:
@@ -316,7 +369,6 @@ void	iorm_use(io_desc *iod, mval *pp)
 			if (gtm_utf8_mode && dev_open != iod->state)
 			{
 				iod->ichset = iod->ochset =
-					(iop_m       == c) ? CHSET_M :
 					(iop_utf8    == c) ? CHSET_UTF8 :
 					(iop_utf16   == c) ? CHSET_UTF16 :
 					(iop_utf16be == c) ? CHSET_UTF16BE : CHSET_UTF16LE;
@@ -332,12 +384,22 @@ void	iorm_use(io_desc *iod, mval *pp)
 	if (dev_open != iod->state)
 	{
 		if (!ichset_specified)
+		{
+#ifdef __MVS__
+			iod->is_ichset_default = TRUE;
+#endif
 			iod->ichset = (gtm_utf8_mode) ? CHSET_UTF8 : CHSET_M;
+		}
 		if (!ochset_specified)
+		{
+#ifdef __MVS__
+			iod->is_ochset_default = TRUE;
+#endif
 			iod->ochset = (gtm_utf8_mode) ? CHSET_UTF8 : CHSET_M;
-		if (CHSET_M != iod->ichset && CHSET_UTF16 != iod->ichset)
+		}
+		if ((CHSET_M != iod->ichset) && (CHSET_UTF16 != iod->ichset) && (CHSET_MAX_IDX > iod->ichset))
 			get_chset_desc(&chset_names[iod->ichset]);
-		if (CHSET_M != iod->ochset && CHSET_UTF16 != iod->ochset)
+		if ((CHSET_M != iod->ochset) && (CHSET_UTF16 != iod->ochset) && (CHSET_MAX_IDX > iod->ochset))
 			get_chset_desc(&chset_names[iod->ochset]);
 		/* If ICHSET or OCHSET is of type UTF-16, check that RECORDSIZE is even */
 		if (gtm_utf8_mode && (IS_UTF16_CHSET(iod->ichset) || IS_UTF16_CHSET(iod->ochset)))

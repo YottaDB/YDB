@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@
 #include <signal.h>
 #include <stddef.h>
 #include <errno.h>
-#ifndef VMS
+#if !defined(VMS) && !defined(__MVS__)
 #include <malloc.h>
 #endif
 #include "gtm_stdio.h"
@@ -91,6 +91,16 @@
 #  define STATICD static
 #  define STATICR static
 #  define GBLRDEF GBLREF
+#endif
+
+#ifdef GTM64
+#  define gmaAdr "%016lx"
+#  define gmaFill "         "
+#  define gmaLine "--------"
+#else
+#  define gmaAdr "%08lx"
+#  define gmaFill " "
+#  define gmaLine " "
 #endif
 
 #ifdef VMS
@@ -431,6 +441,7 @@ boolean_t backfillChk(unsigned char *ptr, gtm_msize_t len);
 void *gtm_malloc_dbg(size_t);
 void gtm_free_dbg(void *);
 void raise_gtmmemory_error_dbg(void);
+size_t gtm_bestfitsize_dbg(size_t);
 #endif
 
 /* Initialize the storage manangement system. Things to initialize:
@@ -662,6 +673,7 @@ void processDeferredFrees()	/* Note renamed to processDeferredFrees_dbg when inc
 #endif
 
 
+/* Note, if the below declaration changes, corresponding changes in gtmxc_types.h needs to be done. */
 /* Obtain free storage of the given size */
 void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in gtm_malloc_dbg.c */
 {
@@ -723,9 +735,9 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 			if (0 != size)
 			{
 				GMR_ONLY(size = MAX(sizeof(char *), size);)	/* Need room for deferred free next pointer */
-				tSize = size + hdrSize;				/* Add in header size */
+				tSize = (gtm_msize_t)size + hdrSize;		/* Add in header size */
 #ifdef DEBUG
-				tSize += sizeof(markerChar);			/* Add in room for trailer label */
+				tSize += SIZEOF(markerChar);			/* Add in room for trailer label */
 				/* If being a storage hog, we want to make sure we have plenty of room for
 				   filler. For strings up to MAXTWO in length, we pad with an additional 50%
 				   of storage with a minimum of 32 bytes and a maximum of 256 bytes. For larger
@@ -735,7 +747,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 				if (GDL_SmStorHog & gtmDebugLevel)
 				{
 					if (MAXTWO >= size)
-						tSize += MIN(MAX(size / 2, 32), 256);
+						tSize += (gtm_msize_t)(MIN(MAX(size / 2, 32), 256));
 					else
 						tSize += 256;
 				}
@@ -793,11 +805,11 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 				memcpy(trailerMarker, markerChar, sizeof(markerChar));	/* Small trailer */
 				if (GDL_SmInitAlloc & gtmDebugLevel)
 					/* Initialize the space we are allocating */
-					backfill((unsigned char *)&uStor->userStorage.userStart, size);
+					backfill((unsigned char *)&uStor->userStorage.userStart, (gtm_msize_t)size);
 				if (GDL_SmBackfill & gtmDebugLevel)
 				{	/* Use backfill method of after-allocation metadata */
 					backfill(trailerMarker + sizeof(markerChar),
-					(uStor->realLen - size - hdrSize - sizeof(markerChar)));
+					(uStor->realLen - (gtm_msize_t)size - hdrSize - SIZEOF(markerChar)));
 				}
 
 				uStor->smTn = smTn;					/* transaction number */
@@ -826,7 +838,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 			if (MAXSMTRACE <= smLastMallocIndex)
 				smLastMallocIndex = 0;
 			smMallocs[smLastMallocIndex].smAddr = retVal;
-			smMallocs[smLastMallocIndex].smSize = size;
+			smMallocs[smLastMallocIndex].smSize = (gtm_msize_t)size;
 			smMallocs[smLastMallocIndex].smCaller = CALLERID;
 			smMallocs[smLastMallocIndex].smTn = smTn;
 #endif
@@ -861,6 +873,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 #endif
 }
 
+/* Note, if the below declaration changes, corresponding changes in gtmxc_types.h needs to be done. */
 /* Release the free storage at the given address */
 void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_malloc_dbg.c */
 {
@@ -940,6 +953,9 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 			uStor = (storElem *)((unsigned long)addr - hdrSize);		/* Backup ptr to element header */
 			sizeIndex = uStor->queueIndex;
 #ifdef DEBUG
+			if (GDL_SmInitAlloc & gtmDebugLevel)
+				/* Initialize the space we are de-allocating */
+				backfill((unsigned char *)&uStor->userStorage.userStart, uStor->allocLen);
 			TRACE_FREE(addr, uStor->allocLen);
 			saveSize = uStor->allocLen;
 			/* Extra checking for debugging. Note that these sanity checks are only done in debug
@@ -1049,10 +1065,9 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 
 			} else
 			{
-				DEBUG_ONLY(saveSize = 0);
 				assert(REAL_MALLOC == sizeIndex);		/* Better be a real malloc type block */
 				INCR_CNTR(freeCnt[MAXINDEX + 1]);		/* Count free of malloc */
-				allocSize = uStor->realLen;
+				allocSize = saveSize = uStor->realLen;
 #ifdef DEBUG
                                 /* Backfill entire block being freed so usage of it will cause problems */
                                 if (GDL_SmBackfill & gtmDebugLevel)
@@ -1173,6 +1188,53 @@ void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg wh
 }
 
 
+/* Return the maximum size that would fully utilize a storage block given the input size. If the size will not
+   fit in one of the buddy list queue elems, it is returned unchanged. Otherwise, the size of the buddy list queue
+   element minus the overhead will be returned as the best fit size.
+*/
+size_t gtm_bestfitsize(size_t size)
+{
+	size_t	tSize;
+	int	hdrSize, sizeIndex;
+
+#ifndef DEBUG
+	/* If we are not expanding for DEBUG, check now if DEBUG has been turned on.
+	   If it has, we are in the wrong module Jack. This IF is structured so that
+	   if this is the normal (optimized) case we will fall into the code and
+	   handle the rerouting at the end.
+
+	   Note: The DEBUG expansion of this code in a pro build actually has a different
+	   entry point name (gtm_bestfitsize_dbg) and if malloc debugging options are
+	   on in pro, we need to call that version, but since efficiency in pro trumps
+	   clarity, we put the redirecting call at the bottom of the if-else block to
+	   avoid disrupting the instruction pipeline.
+	*/
+        if (GDL_None == gtmDebugLevel)
+        {
+#endif
+		hdrSize = OFFSETOF(storElem, userStorage);		/* Size of storElem header */
+		tSize = size + hdrSize DEBUG_ONLY(+ SIZEOF(markerChar));
+		if (MAXTWO >= tSize)
+		{	/* Allocation would fit in a buddy list queue */
+			sizeIndex = GetSizeIndex(tSize);
+			tSize = TwoTable[sizeIndex];
+			return (tSize - hdrSize DEBUG_ONLY(- SIZEOF(markerChar)));
+		}
+		return size;
+#ifndef DEBUG
+	}
+	/* If not a debug module and debugging is enabled, reroute call to
+	   the debugging version.
+	*/
+	return gtm_bestfitsize_dbg(size);
+#endif
+}
+
+
+/* Note that the DEBUG define takes on an additional meaning in this module. Not only are routines defined within
+   intended for DEBUG builds but they are also only generated ONCE rather than twice like most of the routines are
+   in this module.
+*/
 #ifdef DEBUG
 /* Backfill the requested area with marker text. We do this by doing single byte
    stores up to the point where we can do aligned stores of the native register
@@ -1194,7 +1256,7 @@ void backfill(unsigned char *ptr, gtm_msize_t len)
 			unalgnLen = ChunkSize - unalgnLen;	/* How far to go to get to alignment point */
 			unalgnLen = MIN(unalgnLen, len);	/* Make sure not going too far */
 			c = backfillMarkC;
-			len -= unalgnLen;
+			len -= (gtm_msize_t)unalgnLen;
 			do
 			{
 				*ptr++ = *c++;
@@ -1209,7 +1271,7 @@ void backfill(unsigned char *ptr, gtm_msize_t len)
 		while (chunkCnt--)
 		{
 			*chunkPtr++ = ChunkValue;
-			len -= sizeof(ChunkType);
+			len -= SIZEOF(ChunkType);
 		}
 
 		/* Do remaining unaligned portion if any */
@@ -1246,7 +1308,7 @@ boolean_t backfillChk(unsigned char *ptr, gtm_msize_t len)
 			unalgnLen = ChunkSize - unalgnLen;	/* How far to go to get to alignment point */
 			unalgnLen = MIN(unalgnLen, len);	/* Make sure not going too far */
 			c = backfillMarkC;
-			len -= unalgnLen;
+			len -= (gtm_msize_t)unalgnLen;
 			do
 			{
 				if (*ptr++ == *c++)
@@ -1263,7 +1325,7 @@ boolean_t backfillChk(unsigned char *ptr, gtm_msize_t len)
 		while (chunkCnt--)
 		{
 			if (*chunkPtr++ == ChunkValue)
-				len -= sizeof(ChunkType);
+				len -= SIZEOF(ChunkType);
 			else
 				return FALSE;
 		}
@@ -1338,7 +1400,7 @@ void verifyAllocatedStorage(void)
 			if (GDL_SmChkAllocBackfill & gtmDebugLevel)
 			{	/* Use backfill check method for after-allocation metadata */
 				assert(backfillChk(trailerMarker + sizeof(markerChar),
-					(uStor->realLen - uStor->allocLen - hdrSize - sizeof(markerChar))));
+					(uStor->realLen - uStor->allocLen - hdrSize - SIZEOF(markerChar))));
 			}
 		}
 	}
@@ -1353,7 +1415,6 @@ void verifyAllocatedStorage(void)
 */
 void printMallocInfo(void)
 {
-	storElem	*eHdr, *uStor;
 	int 		i, j;
 
 	if (GDL_SmStats & gtmDebugLevel)
@@ -1383,19 +1444,9 @@ void printMallocInfo(void)
 			}
 		}
 	}
-#ifdef GTM64
-#  define gmaAdr "%016lx"
-#  define gmaFill "         "
-#  define gmaLine "--------"
-#else
-#  define gmaAdr "%08lx"
-#  define gmaFill " "
-#  define gmaLine " "
-#endif
-
 	if (GDL_SmDumpTrace & gtmDebugLevel)
 	{
-		FPRINTF(stderr,"\nMalloc Storage Traceback:\n");
+		FPRINTF(stderr,"\nMalloc Storage Traceback:   gtm_malloc() addr: 0x"gmaAdr"\n", &gtm_malloc);
 		FPRINTF(stderr,"TransNumber "gmaFill" AllocAddr        Size "gmaFill" CallerAddr\n");
 		FPRINTF(stderr,"------------------------------------------------"gmaLine gmaLine"\n");
 		for (i = 0,j = smLastMallocIndex; i < MAXSMTRACE; ++i,--j)/* Loop through entire table, start with last elem used */
@@ -1418,22 +1469,35 @@ void printMallocInfo(void)
 					smFrees[j].smTn, smFrees[j].smAddr, smFrees[j].smSize, smFrees[j].smCaller);
 		}
 		FPRINTF(stderr,"\n");
+		fflush(stderr);
 	}
+	printMallocDump();
+}
+
+
+/* Routine to print storage dump. This is called as part of print_malloc_info but is also potentially separately called from
+   op_view so is a separate routine.
+*/
+void printMallocDump(void)
+{
+	storElem	*eHdr, *uStor;
+	int		i;
+
 	if (GDL_SmDump & gtmDebugLevel)
 	{
-		FPRINTF(stderr,"\nMalloc Storage Dump:\n");
-		FPRINTF(stderr,gmaFill"Malloc Addr  "gmaFill"   Alloc From     Malloc Size\n");
-		FPRINTF(stderr,"-------------------------------------------"gmaLine gmaLine"\n");
+		FPRINTF(stderr,"\nMalloc Storage Dump:   gtm_malloc() addr: 0x"gmaAdr"\n", &gtm_malloc);
+		FPRINTF(stderr,gmaFill"Malloc Addr  "gmaFill"   Alloc From     Malloc Size   Trans Number\n");
+		FPRINTF(stderr," ----------------------------------------------------------"gmaLine gmaLine"\n");
 		/* Looping for each allocated queue */
 		for (eHdr = &allocStorElemQs[0], i = 0; i <= (MAXINDEX + 1); ++i, ++eHdr)
 		{
 			for (uStor = STE_FP(eHdr); uStor->queueIndex != QUEUE_ANCHOR; uStor = STE_FP(uStor))
 			{
-				FPRINTF(stderr, " 0x"gmaAdr"       0x"gmaAdr"      %10d\n",
-					&uStor->userStorage.userStart, uStor->allocatedBy, uStor->allocLen);
+				FPRINTF(stderr, "  0x"gmaAdr"      0x"gmaAdr"      %10d     %10d\n",
+					&uStor->userStorage.userStart, uStor->allocatedBy, uStor->allocLen, uStor->smTn);
 			}
 		}
+		fflush(stderr);
 	}
-
 }
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@
  *	Usage:  semstat2 <semid1> <semid2> ... <semidn>
  */
 
+#include "main_pragma.h"
 #include <errno.h>
 #include <sys/types.h>
 #include "gtm_ipc.h"
@@ -53,10 +54,6 @@ int main (int argc, char *argv[])
 	struct	 	sembuf sop;
 	struct semid_ds		semstat;
 	union semun	semarg;
-
-#ifdef __MVS__
-	__argvtoascii_a(argc, argv);
-#endif
 
 	if (argc == 1)
 	{

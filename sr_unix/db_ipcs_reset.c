@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,7 +97,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	if (0 != status)
 	{
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
-		CLOSEFILE(udi->fd, status);
+		CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
 		if (0 != status)
 			gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 		return FALSE;
@@ -112,7 +112,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 		if (0 != status)
 		{
 			gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
-			CLOSEFILE(udi->fd, status);
+			CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
 			if (0 != status)
 				gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 			return FALSE;
@@ -133,13 +133,13 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 		if (0 != (status = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0)))
 		{
 			gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
-			CLOSEFILE(udi->fd, status);
+			CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
 			if (0 != status)
 				gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 			return FALSE;
 		}
 	}
-	CLOSEFILE(udi->fd, status);
+	CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
 	if (0 != status)
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 	if (0 != sem_rmid(udi->semid))
@@ -154,7 +154,6 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	udi->shmid = INVALID_SHMID;
 	udi->gt_sem_ctime = 0;
 	udi->gt_shm_ctime = 0;
-	assert((reg != standalone_reg) || (NULL == standalone_reg));	/* ftok_sem_release() should have NULLified it */
 	standalone_reg = NULL;		/* just in case */
 	return TRUE;
 }

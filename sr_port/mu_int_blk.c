@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -677,7 +677,7 @@ boolean_t mu_int_blk(
 				memcpy(trees_tail->offset, mu_int_offset, sizeof(uint4) * (MAX_BT_DEPTH + 1));
 				assert(sizeof(trees_tail->key) == sizeof(muint_temp_buff));
 				memcpy(trees_tail->key, muint_temp_buff, sizeof(muint_temp_buff));
-				trees_tail->keysize = strlen((char *)muint_temp_buff);
+				trees_tail->keysize = STRLEN((char *)muint_temp_buff);
 				hdr_len = SIZEOF(rec_hdr) + STRLEN(trees_tail->key) + 2 - rec_cmpc; /* We cannot use
 									mid_len() which expects mident_fixed structure */
 				/* +2 in the above hdr_len calculation is to take into account

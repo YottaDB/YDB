@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,25 +27,33 @@ static char rcsid[] = "$Header:$";
 #include "gtm_time.h"
 #include "gtcm.h"
 #include "eintr_wrappers.h"
+#ifdef __MVS__
+#include "gtm_stat.h"
+#include "gtm_zos_io.h"
+#endif
 
 int gtcm_dmpstat(int sig)
 {
     extern omi_conn_ll	*omi_conns;
-    extern int		 omi_pid;
-    extern int4	 omi_nxact;
-    extern int4	 omi_nxact2;
-    extern int4	 omi_nerrs;
-    extern int4	 omi_brecv;
-    extern int4	 omi_bsent;
-    extern int4		 gtcm_stime;  /* start time for GT.CM */
-    extern int4		 gtcm_ltime;  /* last time stats were gathered */
+    extern int		omi_pid;
+    extern int4		omi_nxact;
+    extern int4		omi_nxact2;
+    extern int4		omi_nerrs;
+    extern int4		omi_brecv;
+    extern int4		omi_bsent;
+    extern int4		gtcm_stime;  /* start time for GT.CM */
+    extern int4		gtcm_ltime;  /* last time stats were gathered */
 
     FILE		*fp;
-    time_t		 t;
-    time_t		 uptime, uphours, upmins, upsecs;
-    time_t		 itime, ihours, imins, isecs;
+    time_t		t;
+    time_t		uptime, uphours, upmins, upsecs;
+    time_t		itime, ihours, imins, isecs;
     int			status;
 
+#ifdef __MVS__
+    int tag_status;
+    tag_status = gtm_zos_create_tagged_file(GTCM_STAT, TAG_EBCDIC);
+#endif
     if (!(fp = Fopen(GTCM_STAT, "a")))
 	return -1;
 
@@ -73,6 +81,7 @@ int gtcm_dmpstat(int sig)
 	OMI_DBG((omi_debug, "Time since last stat dump:  %ld:%.2ld:%.2ld\n",
 		 ihours,imins,isecs));
     }
+    ZOS_ONLY(FPRINTF(fp, "Log file tag status : %s\n", (-1 == tag_status)?"failed":"success");)
     FPRINTF(fp, "Good connections: %d\n", omi_conns->stats.conn);
     OMI_DBG((omi_debug, "Good connections: %d\n", omi_conns->stats.conn));
     FPRINTF(fp, "Bad connections: 0\n");

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -178,7 +178,7 @@ int gtmsource_send_heartbeat(time_t *now)
 		return (SS_NORMAL);
 
 	QWASSIGN(*(seq_num *)&heartbeat_element->heartbeat.ack_seqno[0], jnlpool.jnlpool_ctl->jnl_seqno);
-	*(gtm_time4_t *)&heartbeat_element->heartbeat.ack_time[0] = *now;
+	*(gtm_time4_t *)&heartbeat_element->heartbeat.ack_time[0] = (gtm_time4_t)(*now);
 
 	heartbeat_element->heartbeat.type = REPL_HEARTBEAT;
 	heartbeat_element->heartbeat.len = MIN_REPL_MSGLEN;

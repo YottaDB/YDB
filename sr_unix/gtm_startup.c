@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,6 +87,9 @@
 #include "gtm_icu_api.h"	/* for u_strToUpper and u_strToLower */
 #include "gtm_conv.h"
 #include "fix_xfer_entry.h"
+#include "zwrite.h"
+#include "alias.h"
+#include "cenable.h"
 
 #ifdef __sun
 #define PACKAGE_ENV_TYPE  "GTMXC_RPC"  /* env var to use rpc instead of xcall */
@@ -186,8 +189,8 @@ void gtm_startup(struct startup_vector *svec)
 	stp_init(svec->user_strpl_size);
 	if (svec->user_indrcache_size > MAX_INDIRECTION_NESTING || svec->user_indrcache_size < MIN_INDIRECTION_NESTING)
 		svec->user_indrcache_size = MIN_INDIRECTION_NESTING;
-	ind_result_array = (mval **)malloc(sizeof(int4) * svec->user_indrcache_size);
-	ind_source_array = (mval **)malloc(sizeof(int4) * svec->user_indrcache_size);
+	ind_result_array = (mval **)malloc(sizeof(mval *) * svec->user_indrcache_size);
+	ind_source_array = (mval **)malloc(sizeof(mval *) * svec->user_indrcache_size);
 	ind_result_sp = ind_result_array;
 	ind_result_top = ind_result_sp + svec->user_indrcache_size;
 	ind_source_sp = ind_source_array;
@@ -231,17 +234,16 @@ void gtm_startup(struct startup_vector *svec)
 	zsrch_var = lv_getslot(curr_symval);
 	zsrch_dir1 = lv_getslot(curr_symval);
 	zsrch_dir2 = lv_getslot(curr_symval);
-	zsrch_var->v.mvtype = zsrch_dir1->v.mvtype = zsrch_dir2->v.mvtype = 0;
-	zsrch_var->tp_var = zsrch_dir1->tp_var = zsrch_dir2->tp_var = 0;
-	zsrch_var->ptrs.val_ent.children = zsrch_dir1->ptrs.val_ent.children =
-		zsrch_dir2->ptrs.val_ent.children = 0;
-	zsrch_var->ptrs.val_ent.parent.sym = zsrch_dir1->ptrs.val_ent.parent.sym =
-		zsrch_dir2->ptrs.val_ent.parent.sym = curr_symval;
+	LVVAL_INIT(zsrch_var, curr_symval);
+	LVVAL_INIT(zsrch_dir1, curr_symval);
+	LVVAL_INIT(zsrch_dir2, curr_symval);
+
 	/* Initialize global pointer to control-C handler. Also used in iott_use */
 	ctrlc_handler_ptr = &ctrlc_handler;
 	sig_init(generic_signal_handler, ctrlc_handler_ptr, suspsigs_handler);
 	atexit(gtm_exit_handler);
-	io_init(TRUE);
+	io_init(FALSE);		/* starts with nocenable */
+	cenable();		/* cenable unless the environment indicates otherwise - 2 steps because this can report errors */
 	jobinterrupt_init();
 	getzdir();
 	dpzgbini();
@@ -295,6 +297,14 @@ void gtm_startup(struct startup_vector *svec)
 		fnpca.fnpcs[i].pcoffmax = &fnpca.fnpcs[i].pstart[FNPC_ELEM_MAX];
 		fnpca.fnpcs[i].indx = i;
 	}
+	/* Initialize zwrite subsystem. Better to do it now when we have storage to allocate than
+	   if we fail and storage allocation may not be possible. To that end, pretend we have
+	   seen alias acitivity so those structures are initialized as well.
+	*/
+	assert(FALSE == curr_symval->alias_activity);
+	curr_symval->alias_activity = TRUE;
+	lvzwr_init(0, (mval *)NULL);
+	curr_symval->alias_activity = FALSE;
 	fnpca.fnpcsteal = &fnpca.fnpcs[0];		/* Starting place to look for cache reuse */
 	fnpca.fnpcmax = &fnpca.fnpcs[FNPC_MAX - 1];	/* The last element */
 	return;

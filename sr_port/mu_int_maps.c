@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -138,7 +138,7 @@ void mu_int_maps(void)
 		agree = TRUE;
 		for (lcnt = 0, dskmap_p = (uint_ptr_t)(disk + sizeof(blk_hdr)), lmap = (uint4 *)local;
 			lcnt < mapsize;
-			lcnt += sizeof(int4) * BITS_PER_UCHAR / BML_BITS_PER_BLK,
+			lcnt += SIZEOF(int4) * BITS_PER_UCHAR / BML_BITS_PER_BLK,
 			dskmap_p++, lmap++)  /* # of bits/ bits per blk */
 		{
 			GET_LONG(dskmap, dskmap_p);

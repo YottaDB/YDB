@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,11 @@
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
+#include "gtm_permissions.h"
 
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -40,19 +44,18 @@
 #include "shmpool.h"
 #include "wcs_phase2_commit_wait.h"
 
-#ifdef __MVS__
 #define TMPDIR_ACCESS_MODE	R_OK | W_OK | X_OK
-#else
-#define TMPDIR_ACCESS_MODE	R_OK | W_OK | X_OK | F_OK
-#endif
 
-#define	CLEANUP_AND_RETURN_FALSE	{					\
-						if (-1 != backup_fd)		\
-							close(backup_fd);	\
-						if (!debug_mupip)		\
-							UNLINK(tempfilename);	\
-						return FALSE;			\
-					}
+#define	CLEANUP_AND_RETURN_FALSE								\
+{												\
+	int	rc;										\
+												\
+	if (FD_INVALID != backup_fd)								\
+		CLOSEFILE_RESET(backup_fd, rc);	/* resets "backup_fd" to FD_INVALID */	\
+	if (!debug_mupip)									\
+		UNLINK(tempfilename);								\
+	return FALSE;										\
+}
 
 GBLREF	bool			file_backed_up;
 GBLREF	gd_region		*gv_cur_region;
@@ -68,7 +71,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	mstr			*file, tempfile;
 	unsigned char		command[MAX_FN_LEN * 2 + 5]; /* 5 == max(sizeof("cp"),sizeof("mv")) + 2 (space) + 1 (NULL) */
 	sgmnt_data_ptr_t	header_cpy;
-	int4			backup_fd = -1, size, vbn, counter, hdrsize, rsize, ntries;
+	int4			backup_fd = FD_INVALID, size, vbn, counter, hdrsize, rsize, ntries;
 	ssize_t                 status;
 	int4			save_errno, adjust, blk_num, temp, rv, tempfilelen;
 	struct stat		stat_buf;
@@ -79,6 +82,9 @@ bool	mubfilcpy (backup_reg_list *list)
 	int                     fstat_res;
 	uint4			ustatus;
 	shmpool_blk_hdr_ptr_t	sblkh_p;
+	ZOS_ONLY(int		realfiletag;)
+	int			group_id;
+	int			perm;
 
 	error_def(ERR_BCKUPBUFLUSH);
 	error_def(ERR_COMMITWAITSTUCK);
@@ -86,6 +92,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	error_def(ERR_ERRCALL);
 	error_def(ERR_TEXT);
 	error_def(ERR_TMPFILENOCRE);
+	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	file = &(list->backup_file);
 	file->addr[file->len] = '\0';
@@ -169,8 +176,9 @@ bool	mubfilcpy (backup_reg_list *list)
 		CLEANUP_AND_RETURN_FALSE;
 	}
 
+	/* give temporary files the group and permissions as other shared resources - like journal files */
 	OPENFILE(tempfilename, O_RDWR, backup_fd);
-	if (-1 == backup_fd)
+	if (FD_INVALID == backup_fd)
 	{
 		save_errno = errno;
 		errptr = (char *)STRERROR(save_errno);
@@ -181,6 +189,25 @@ bool	mubfilcpy (backup_reg_list *list)
 		util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
 		CLEANUP_AND_RETURN_FALSE;
 	}
+	FSTAT_FILE(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
+	if (-1 != fstat_res)
+		gtm_set_group_and_perm(&stat_buf, &group_id, &perm, (0770 & stat_buf.st_mode));
+	/* setup new group and permissions if indicated by the security rules.
+	 * Use 0770 anded with current mode for the new mode if  if masked permission selected.
+	 */
+	if ((-1 == fstat_res) || (-1 == FCHMOD(backup_fd, perm)) || ((-1 != group_id) && (-1 == fchown(backup_fd, -1, group_id))))
+	{
+		save_errno = errno;
+		errptr = (char *)STRERROR(save_errno);
+		util_out_print("system : !AZ", TRUE, errptr);
+		if (online)
+			cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
+		CLEANUP_AND_RETURN_FALSE;
+	}
+#if defined(__MVS__)
+	if (-1 == gtm_zos_tag_to_policy(backup_fd, TAG_BINARY, &realfiletag))
+		TAG_POLICY_GTM_PUTMSG( tempfilename, realfiletag, TAG_BINARY, errno);
+#endif
 
 	if (online)
 	{
@@ -398,8 +425,7 @@ bool	mubfilcpy (backup_reg_list *list)
 		util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
 		CLEANUP_AND_RETURN_FALSE;
 	}
-	CLOSEFILE(backup_fd, status);
-	backup_fd = -1;
+	CLOSEFILE_RESET(backup_fd, status);	/* resets "backup_fd" to FD_INVALID */
 
 	/* mv it to destination */
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,7 +86,7 @@ void op_merge_arg(int m_opr_type, lv_val *lvp)
 	if ((MARG1_GBL == m_opr_type || MARG2_GBL == m_opr_type) && !mglvnp->gblp[IND1])
 	{
 		assert(!mglvnp->gblp[IND1] && !mglvnp->gblp[IND2]);
-		maxkeysz = (MAX_KEY_SZ + MAX_NUM_SUBSC_LEN + 4) & (-4);
+		maxkeysz = DBKEYSIZE(MAX_KEY_SZ);
 		mglvnp->gblp[IND1] = (gvname_info *)malloc(sizeof(struct gvname_info_struct));
 		mglvnp->gblp[IND1]->s_gv_currkey =  (gv_key *)malloc(sizeof(gv_key) + maxkeysz - 1);
 		mglvnp->gblp[IND1]->s_gv_currkey->top = maxkeysz;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include "gdsroot.h"
+#include "gtm_string.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
@@ -49,6 +50,15 @@ GBLREF tp_region	*halt_ptr;
 GBLREF tp_region	*grlist;
 GBLREF bool		in_mupip_freeze;
 GBLREF bool		error_mupip;
+GBLREF boolean_t	debug_mupip;
+
+#define INTERRUPTED	(mu_ctrly_occurred || mu_ctrlc_occurred)
+#define PRINT_FREEZEERR 											\
+{														\
+	gtm_putmsg(VARLSTCNT(6) ERR_FREEZEERR, 4, LEN_AND_STR(msg1[freeze]), REG_LEN_STR(gv_cur_region));	\
+	status = ERR_MUNOFINISH;										\
+}
+#define PRINT_UNFROZEN_MSG	util_out_print("All regions will be unfrozen", TRUE)
 
 void	mupip_freeze(void)
 {
@@ -57,6 +67,9 @@ void	mupip_freeze(void)
 	tp_region	*rptr, *rptr1;
 	boolean_t	freeze, override;
 	freeze_status	freeze_ret;
+	const char 	*msg1[] = { "unfreeze", "freeze" } ;
+	const char 	*msg2[] = { "UNFROZEN", "FROZEN" } ;
+	const char 	*msg3[] = { "unfrozen", "frozen" } ;
 
 	error_def(ERR_BUFFLUFAILED);
 	error_def(ERR_DBRDONLY);
@@ -66,6 +79,7 @@ void	mupip_freeze(void)
 	error_def(ERR_MUNOFINISH);
 	error_def(ERR_MUKILLIP);
 	error_def(ERR_KILLABANDONED);
+	error_def(ERR_FREEZEERR);
 
 	status = SS_NORMAL;
 	in_mupip_freeze = TRUE;
@@ -101,6 +115,8 @@ void	mupip_freeze(void)
 	} else
 		override = FALSE;
 	error_mupip = FALSE;
+	/* DBG qualifier prints extra debug messages while waiting for KIP in region freeze */
+	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
 	mu_getlst("REG_NAME", sizeof(tp_region));
 	if (error_mupip)
 	{
@@ -111,16 +127,18 @@ void	mupip_freeze(void)
 	ESTABLISH(mu_freeze_ch);
 	for (rptr = grlist;  NULL != rptr;  rptr = rptr->fPtr)
 	{
-		if (mu_ctrly_occurred || mu_ctrlc_occurred)
+		if (INTERRUPTED)
 			break;
 		if ((dba_bg != rptr->reg->dyn.addr->acc_meth) && (dba_mm != rptr->reg->dyn.addr->acc_meth))
 		{
 			util_out_print("Can only FREEZE BG and MM databases", TRUE);
+			PRINT_FREEZEERR;
 			continue;
 		}
 		if (reg_cmcheck(rptr->reg))
 		{
 			util_out_print("!/Can't FREEZE region !AD across network", TRUE, REG_LEN_STR(rptr->reg));
+			PRINT_FREEZEERR;
 			continue;
 		}
 		gv_cur_region = rptr->reg;
@@ -128,6 +146,7 @@ void	mupip_freeze(void)
 		if (gv_cur_region->was_open)	/* Already open under another name.  Region will not be marked open*/
 		{
 			gv_cur_region->open = FALSE;
+			util_out_print("FREEZE region !AD is already open under another name", TRUE, REG_LEN_STR(rptr->reg));
 			continue;
 		}
 		change_reg();
@@ -137,12 +156,14 @@ void	mupip_freeze(void)
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, gv_cur_region->dyn.addr->fname_len,
 				gv_cur_region->dyn.addr->fname);
+			PRINT_FREEZEERR;
 			continue;
 		}
 		if (freeze && (0 != cs_addrs->hdr->abandoned_kills))
 		{
 			gtm_putmsg(VARLSTCNT(6) ERR_KILLABANDONED, 4, DB_LEN_STR(rptr->reg),
 				LEN_AND_LIT("database could have incorrectly marked busy integrity errors"));
+			PRINT_FREEZEERR;
 			continue;
 		}
 		while (REG_FREEZE_SUCCESS != (freeze_ret = region_freeze(gv_cur_region, freeze, override, TRUE)))
@@ -150,24 +171,35 @@ void	mupip_freeze(void)
 			if (REG_ALREADY_FROZEN == freeze_ret)
 			{
 				hiber_start(1000);
-				if ((TRUE == mu_ctrly_occurred) || (TRUE == mu_ctrlc_occurred))
+				if (INTERRUPTED)
 					break;
-			}
-			else if (REG_HAS_KIP == freeze_ret)
+			} else if (REG_HAS_KIP == freeze_ret)
 			{
 				assert(!override);
-				rts_error(VARLSTCNT(4) ERR_MUKILLIP, 2, DB_LEN_STR(gv_cur_region));
-			}
-			else
+				util_out_print("Kill in progress indicator is set for database file !AD", TRUE,
+					DB_LEN_STR(gv_cur_region));
+				PRINT_UNFROZEN_MSG;
+				rts_error(VARLSTCNT(1) ERR_MUNOFINISH);
+			} else
 				assert(FALSE);
 		}
 		cs_addrs->persistent_freeze = freeze;	/* secshr_db_clnup() shouldn't clear the freeze up */
 		if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH))
-			rts_error(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("FREEZE"), DB_LEN_STR(gv_cur_region));
+		{
+			gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("MUPIP FREEZE"), DB_LEN_STR(gv_cur_region));
+			PRINT_UNFROZEN_MSG;
+			rts_error(VARLSTCNT(1) ERR_MUNOFINISH);
+		}
 		halt_ptr = rptr->fPtr;
+		if (record && gv_cur_region->open)
+			cs_addrs->hdr->last_rec_backup = cs_addrs->ti->curr_tn;
+		if (REG_FREEZE_SUCCESS == freeze_ret)
+			util_out_print("Region !AD is now !AD", TRUE, REG_LEN_STR(gv_cur_region), LEN_AND_STR(msg2[freeze]));
+		else
+			PRINT_FREEZEERR;
 	}
 	REVERT;
-	if (mu_ctrly_occurred || mu_ctrlc_occurred)
+	if (INTERRUPTED)
 	{
 		for (rptr1 = grlist;  rptr1 != rptr;  rptr1 = rptr1->fPtr)
 		{
@@ -178,16 +210,8 @@ void	mupip_freeze(void)
 		}
 		gtm_putmsg(VARLSTCNT(1) ERR_FREEZECTRL);
 		status = ERR_MUNOFINISH;
-	} else  if (record)
-	{
-		for (rptr = grlist;  NULL != rptr;  rptr = rptr->fPtr)
-		{
-			gv_cur_region = rptr->reg;
-			if (FALSE == gv_cur_region->open)
-				continue;
-			cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
-			cs_addrs->hdr->last_rec_backup = cs_addrs->ti->curr_tn;
-		}
 	}
+	if (SS_NORMAL == status)
+		util_out_print("All requested regions !AD", TRUE, LEN_AND_STR(msg3[freeze]));
 	mupip_exit(status);
 }

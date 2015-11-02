@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,7 @@ void iott_close(io_desc *v, mval *pp)
 	if (v == io_std_device.in || (v == io_std_device.out))
 		return;
 
-	CLOSEFILE(ttptr->fildes, status);
+	CLOSEFILE_RESET(ttptr->fildes, status);	/* resets "ttptr->fildes" to FD_INVALID */
 	if (0 != status)
 	{
 		assert(status == errno);

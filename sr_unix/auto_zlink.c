@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,8 +27,10 @@ IA64_ONLY(GBLREF char 		asm_mode;)
 
 /* Due to the complex instruction set of x86_64, we require a function to implement the macro VALID_CALLING_SEQUENCE
    and this function will calculate both the offsets (rtnhdr & labaddr) and store them into these global variables */
-X86_64_ONLY(GBLDEF int4		rtnhdr_off;)
-X86_64_ONLY(GBLDEF int4		labaddr_off;)
+#if defined(__x86_64__) || defined(__MVS__)
+GBLDEF int4		rtnhdr_off;
+GBLDEF int4		labaddr_off;
+#endif
 
 rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent **line)
 {

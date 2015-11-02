@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -569,7 +569,7 @@ void rc_send_cpt(rc_xblk_hdr *head, rc_rsp_page *last_aq)	/* Zero if no read op 
 	cpt_size = rc_cpt->cpsync - head->sync.value;
 	if (cpt_size < 0)			/* handle wraps */
 		cpt_size += RC_MAX_CPT_SYNC;
-	cpt_size *= RC_CPT_ENTRY_SIZE;
+	cpt_size *= (int)(RC_CPT_ENTRY_SIZE);
 	if ((cpt_size > (int)head->cpt_siz.value) || (cpt_size > (RC_CPT_ENTRY_SIZE * RC_CPT_TABSIZE)))
 	{
 		head->cpt_siz.value = RC_CPT_OVERFLOW;

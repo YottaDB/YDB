@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -130,7 +130,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 		}
 		gmap_beg.len = len;
 		c = mu_extr_ident(&gmap_beg);
-		len -= (c - gmap_beg.addr);
+		len -= (int)(c - gmap_beg.addr);
 		assert(len >= 0);
 		if (0 == len)
 			gmap_end = gmap_beg;

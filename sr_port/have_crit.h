@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,11 @@ typedef enum
 	INTRPT_OK_TO_INTERRUPT = 0,
 	INTRPT_IN_GTCMTR_TERMINATE,
 	INTRPT_IN_TP_UNWIND,
+	INTRPT_IN_TP_CLEAN_UP,
+	INTRPT_IN_CRYPT_SECTION,
+	INTRPT_IN_DB_CSH_GETN,
+	INTRPT_IN_DB_INIT,
+	INTRPT_IN_GDS_RUNDOWN,
 	INTRPT_NUM_STATES
 } intrpt_state_t;
 
@@ -59,6 +64,18 @@ GBLREF	intrpt_state_t	intrpt_ok_state;
 	if (forced_exit && !process_exiting && OK_TO_INTERRUPT)						\
 		UNIX_ONLY(deferred_signal_handler();)							\
 		VMS_ONLY(sys$exit(exi_condition);)							\
+}
+
+#define SAVE_INTRPT_OK_STATE(NEWSTATE)									\
+{													\
+	save_intrpt_ok_state = intrpt_ok_state;								\
+	intrpt_ok_state = NEWSTATE;									\
+}
+
+#define RESTORE_INTRPT_OK_STATE										\
+{													\
+	intrpt_ok_state = save_intrpt_ok_state;								\
+	DEFERRED_EXIT_HANDLING_CHECK;	/* check if any signals were deferred while we held lock */	\
 }
 
 uint4 have_crit(uint4 crit_state);

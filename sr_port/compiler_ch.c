@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@
 #include "reinit_externs.h"
 #include "compiler.h"
 #include "util.h"
+#include "hashtab_str.h"
 
 GBLREF command_qualifier	cmd_qlf;
 GBLREF char			cg_phase;
@@ -46,6 +47,7 @@ CONDITION_HANDLER(compiler_ch)
 	if (cmd_qlf.qlf & CQ_WARNINGS)
 		PRN_ERROR;
 
+	COMPILE_HASHTAB_CLEANUP;
 	reinit_externs();
 	mstr_native_align = save_mstr_native_align;
 

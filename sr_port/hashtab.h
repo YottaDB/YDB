@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,9 +33,9 @@
 #define DELETE_HTENT(table, tabent)					\
 {									\
 	(tabent)->value = HT_DELETED_ENTRY;				\
-	table->count--;							\
-	table->del_count++;						\
-	assert((table->count + table->del_count) <= table->size);	\
+	(table)->count--;						\
+	(table)->del_count++;						\
+	assert(((table)->count + (table)->del_count) <= (table)->size);	\
 }
 #define COMPACT_NEEDED(table) ((table)->del_count > (table)->cmp_trigger_size)
 

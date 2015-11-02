@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,7 +76,7 @@ int omi_prc_unlk(omi_conn *cptr, char *xend, char *buff, char *bend)
 	mlk_pvt_root->trans = 0;
 	if (mlk_pvt_root->nodptr && mlk_pvt_root->nodptr->owner == omi_pid)
 	{
-		assert(mlk_pvt_root->nodptr->auxowner = (UINTPTR_T)cptr);
+		assert(mlk_pvt_root->nodptr->auxowner == (UINTPTR_T)cptr);
 		if (--mlk_pvt_root->level == 0)
 			mlk_unlock(mlk_pvt_root);
 	} else

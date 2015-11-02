@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,6 +70,9 @@ error_def(ERR_JNLWRERR);
 error_def(ERR_JNLVSIZE);
 error_def(ERR_PREMATEOF);
 error_def(ERR_JNLPREVRECOV);
+#ifdef GTM_CRYPT
+error_def(ERR_CRYPTJNLWRONGHASH);
+#endif
 
 /* note: returns 0 on success */
 uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
@@ -151,6 +154,14 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 		jpc->status = ERR_JNLBADRECFMT;
 		return ERR_JNLOPNERR;
 	}
+	GTMCRYPT_ONLY(
+		if (memcmp(header->encryption_hash, csd->encryption_hash, GTMCRYPT_HASH_LEN))
+		{
+			send_msg(VARLSTCNT(6) ERR_CRYPTJNLWRONGHASH, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+			jpc->status = ERR_CRYPTJNLWRONGHASH;
+			return ERR_JNLOPNERR;
+		}
+	)
 	assert(header->eov_tn == eof_record.prefix.tn);
 	header->eov_tn = eof_record.prefix.tn;
 	assert(header->eov_timestamp == eof_record.prefix.time);

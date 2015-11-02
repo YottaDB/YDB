@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	GTM_SOCKLEN_TYPE	size;
 	boolean_t		zint_restart;
 	mv_stent		*mv_zintdev;
-	short			retry_num;
+	int			retry_num;
         error_def(ERR_SOCKACPT);
         error_def(ERR_SOCKWAIT);
         error_def(ERR_TEXT);
@@ -147,9 +147,9 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 			utimeout.tv_usec = 0;
 		} else
 		{
-			msec_timeout = cur_time.at_sec * 1000 + cur_time.at_usec / 1000;
+			msec_timeout = (int4)(cur_time.at_sec * 1000 + cur_time.at_usec / 1000);
 			utimeout.tv_sec = cur_time.at_sec;
-			utimeout.tv_usec = cur_time.at_usec;
+			utimeout.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
 		}
 	}
 	sockintr->end_time_valid = FALSE;
@@ -187,7 +187,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 				break;
 			}
 			utimeout.tv_sec = cur_time.at_sec;
-			utimeout.tv_usec = cur_time.at_usec;
+			utimeout.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
 		} else
 			break;	/* either other error or done */
 	}
@@ -315,9 +315,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		memcpy(&dsocketptr->dollar_key[len], newsocketptr->handle, newsocketptr->handle_len);
 		len += newsocketptr->handle_len;
 		dsocketptr->dollar_key[len++] = '|';
-		MEMCPY_STR(&dsocketptr->dollar_key[len], newsocketptr->remote.saddr_ip);
-		len += strlen(newsocketptr->remote.saddr_ip);
-		dsocketptr->dollar_key[len] = '\0';
+		strcpy(&dsocketptr->dollar_key[len], newsocketptr->remote.saddr_ip);
 	} else
 	{
 		assert(socket_connected == socketptr->state);
@@ -328,9 +326,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		memcpy(&dsocketptr->dollar_key[len], socketptr->handle, socketptr->handle_len);
                 len += socketptr->handle_len;
                 dsocketptr->dollar_key[len++] = '|';
-                MEMCPY_STR(&dsocketptr->dollar_key[len], socketptr->remote.saddr_ip);
-                len += strlen(socketptr->remote.saddr_ip);
-                dsocketptr->dollar_key[len] = '\0';
+                strcpy(&dsocketptr->dollar_key[len], socketptr->remote.saddr_ip);
 	}
 	return TRUE;
 }

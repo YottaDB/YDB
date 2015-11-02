@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,6 +77,7 @@ GBLDEF	int4		n_pvtmods, n_blkmods;
 GBLDEF	gv_namehead	*tp_fail_hist[CDB_MAX_TRIES];
 GBLDEF	block_id	t_fail_hist_blk[CDB_MAX_TRIES];
 GBLDEF	gd_region	*tp_fail_hist_reg[CDB_MAX_TRIES];
+GBLREF	symval		*curr_symval;
 
 GBLREF	short		dollar_tlevel, dollar_trestart;
 GBLREF	int		dollar_truth;
@@ -392,7 +393,11 @@ void	tp_restart(int newlevel)
          * updated blocks). This is typically needed for a restart.
          */
         tp_clean_up(TRUE);
+	/* Note that this form of tp_unwind() will not only unwind the TP stack but also most if not all of
+	   the M stackframe and mv_stent chain as well.
+	*/
 	tp_unwind(newlevel, RESTART_INVOCATION);
+	assert(tf == tp_pointer);	/* Needs to be true for now. Revisit when can restart to other than newlevel == 1 */
 	gd_header = tp_pointer->gd_header;
 	gv_target = tp_pointer->orig_gv_target;
 	gv_cur_region = tp_pointer->gd_reg;
@@ -407,9 +412,49 @@ void	tp_restart(int newlevel)
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
 	tp_pointer->fp->mpc = tp_pointer->restart_pc;
 	tp_pointer->fp->ctxt = tp_pointer->restart_ctxt;
+	/* Make sure everything else added to the stack since the transaction started is unwound */
 	while (frame_pointer != tf->fp)
 		op_unwind();
 	assert((msp <= stackbase) && (msp > stacktop));
+	assert((mv_chain <= (mv_stent *)stackbase) && (mv_chain > (mv_stent *)stacktop));
+	assert(MVST_TPHOLD == tf->mvc->mv_st_type);
+	for (mvc = mv_chain;  mvc < tf->mvc;)
+	{
+		unw_mv_ent(mvc);
+		mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);
+	}
+	assert((void *)mvc < (void *)frame_pointer);
+	assert(mvc == tf->mvc);
+	mv_chain = mvc;
+	msp = (unsigned char *)mvc;
+	assert(curr_symval == tf->sym);
+	if (frame_pointer->flags & SFF_UNW_SYMVAL)
+	{	/* A symval was popped in THIS stackframe by one of our last mv_stent unwinds which means
+		   l_symtab is fairly borked.
+		*/
+		assert(frame_pointer->l_symtab);	/* Would be NULL in replication processor */
+		if ((unsigned char *)frame_pointer->l_symtab < msp)
+		{	/* This condition is set up when a local routine is called which, since it is using the
+			   same code, uses the same l_symtab as the caller. But when an exclusive new is done in
+			   this frame, op_xnew creates a NEW symtab just for this frame. But when this code
+			   unwound back to the TSTART, we also unwound the l_symtab this frame was using. So here
+			   we verify this frame is a simple call frame from the previous and restore the use of its
+			   l_symtab if so. If not, GTMASSERT. Note the outer SFF_UWN_SYMVAL check keeps us from having
+			   non-existant l_symtab issues which is possible when we are MUPIP.
+			*/
+			if ((frame_pointer->rvector == frame_pointer->old_frame_pointer->rvector)
+			    && (frame_pointer->vartab_ptr == frame_pointer->old_frame_pointer->vartab_ptr))
+			{
+				frame_pointer->l_symtab = frame_pointer->old_frame_pointer->l_symtab;
+				frame_pointer->flags &= SFF_UNW_SYMVAL_OFF;	/* No need to clear symtab now */
+			} else
+				GTMASSERT;
+		} else
+		{	/* Otherwise the l_symtab needs to be cleared so its references get re-resolved to *this* symtab */
+			memset(frame_pointer->l_symtab, 0, frame_pointer->vartab_len * SIZEOF(ht_ent_mname *));
+			frame_pointer->flags &= SFF_UNW_SYMVAL_OFF;
+		}
+	}
 	if (FALSE == tf->restartable)
 	{
 		if (run_time)
@@ -431,14 +476,5 @@ void	tp_restart(int newlevel)
 		dollar_trestart--;
 	dollar_truth = tp_pointer->dlr_t;
 	dollar_zgbldir = tp_pointer->zgbldir;
-	assert((mv_chain <= (mv_stent *)stackbase) && (mv_chain > (mv_stent *)stacktop));
-	for (mvc = mv_chain;  MVST_TPHOLD != mvc->mv_st_type;)
-	{
-		unw_mv_ent(mvc);
-		mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);
-	}
-	assert((INTPTR_T)mvc < (INTPTR_T)frame_pointer);
-	mv_chain = mvc;
-	msp = (unsigned char *)mvc;
 	REVERT;
 }

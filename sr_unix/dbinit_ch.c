@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,8 @@
 
 #include "mdef.h"
 
-#include <sys/ipc.h>
+#include "gtm_ipc.h"
+
 #include <sys/mman.h>
 #include <sys/shm.h>
 #include <sys/sem.h>
@@ -31,6 +32,7 @@
 #include "util.h"
 #include "ftok_sems.h"
 #include "gtmimagename.h"
+#include "gtmio.h"
 
 GBLREF gd_region		*db_init_region;
 GBLREF boolean_t		sem_incremented;
@@ -43,6 +45,7 @@ CONDITION_HANDLER(dbinit_ch)
 	gd_segment	*seg;
 	struct shmid_ds	shm_buf;
 	sgmnt_addrs	*csa;
+	int		rc;
 
 	START_CH;
 	if (SUCCESS == SEVERITY || INFO == SEVERITY)
@@ -56,7 +59,7 @@ CONDITION_HANDLER(dbinit_ch)
 		udi = FILE_INFO(db_init_region);
 	if (NULL != udi)
 	{
-		close(udi->fd);
+		CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 		csa = &udi->s_addrs;
 		if (NULL != csa->hdr)
 		{

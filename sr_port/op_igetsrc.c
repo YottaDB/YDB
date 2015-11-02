@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,5 +19,6 @@ void op_igetsrc(mval *v)
 	ind_source_sp--;
 	assert(ind_source_sp >= ind_source_array);
 	*v = **ind_source_sp;
+	v->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 	return;
 }

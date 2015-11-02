@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,8 @@ int op_readfl(mval *v, int4 length, int4 timeout)
 	if (timeout < 0)
 		timeout = 0;
 	/* length is in units of characters, MAX_STRLEN and allocation unit in stp is bytes. Compute the worst case need in bytes */
-	b_length = (CHSET_M == io_curr_device.in->ichset) ? length : (length * 4); /* worst case, every Unicode char is 4 bytes */
+	/* worst case, every Unicode char is 4 bytes */
+	b_length = (!IS_UTF_CHSET(io_curr_device.in->ichset)) ? length : (length * 4);
 	if (length <= 0)
 		rts_error(VARLSTCNT(1) ERR_RDFLTOOSHORT);
 	if (length > MAX_STRLEN) /* this check is more useful in "M" mode. For UTF-8 mode, checks have to be done while reading */

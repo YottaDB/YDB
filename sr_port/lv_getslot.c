@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,15 +10,27 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_stdio.h"
+
 #include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "sbs_blk.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "caller_id.h"
+#include "alias.h"
+
+GBLREF boolean_t	lvmon_enabled;
 
 lv_val *lv_getslot(symval *sym)
 {
-	lv_blk *p,*q;
-	int n;
-	lv_val *x;
+	lv_blk	*p,*q;
+	int	n;
+	lv_val	*x;
 
 	n = 0;
 	if (sym->lv_flist)
@@ -44,5 +56,8 @@ lv_val *lv_getslot(symval *sym)
 			}
 		}
 	}
+	assert(x);
+	DBGRFCT((stderr, ">> lv_getslot(): Allocating new lv_val/lv_sbs_tbl at 0x"lvaddr" by routine 0x"lvaddr"\n",
+		 x, caller_id()));
 	return x;
 }

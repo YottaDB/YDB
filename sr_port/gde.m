@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2008 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2009 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -47,10 +47,11 @@ comfile:
 	d GETTOK^GDESCAN,TFSPEC^GDEPARSE
 	s (comfile,comfile(comlevel+1))=$zparse(value,"","",".COM")
 	i '$l($zsearch(comfile)),'$l($zsearch(comfile)) zm gdeerr("FNF"):comfile
-	e  zm gdeerr("EXECOM"):comfile o comfile:(read:exc="zg "_$zl_":comeof") d SCRIPT
+	e  o comfile:(read:exc="zg "_$zl_":comeof") zm gdeerr("EXECOM"):comfile d SCRIPT
 comeof	c comfile s comlevel=comlevel-1
 	i comlevel>0 s comfile=comfile(comlevel) zm gdeerr("EXECOM"):comfile
 	e  u @useio
+	i $p($zs,",",3)'["%GTM-E-IOEOF",$p($zs,",",3)'["FNF" w !,$p($zs,",",3,9999),!
 	q
 SCRIPT:
 	s comlevel=comlevel+1
@@ -66,7 +67,8 @@ ABORT
 	s abortzs=$zs,abort="GDEDUMP.DMP",$et=""
         o abort:(newversion:noreadonly) u abort zsh "*" c abort
         u @useio
-        i $d(gdeerr) zm gdeerr("GDECHECK") Write $ZMessage($Select($ZVersion'["VMS"&(256>abortzs):+abortzs,1:+abortzs\8*8+4)),! ; make fatal except native UNIX
+	; make GDECHECK error fatal except native UNIX
+        i $d(gdeerr) zm gdeerr("GDECHECK") Write $ZMessage($Select($ZVersion'["VMS"&(256>abortzs):+abortzs,1:+abortzs\8*8+4)),!
         e  w $zs
         h
 DEBUG	;entry point to debug gde

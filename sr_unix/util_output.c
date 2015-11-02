@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,15 +109,15 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 	desc_struct	*d;
 	signed char	schar;
 	unsigned char	type, type2;
-	caddr_t		c, ctop, outptr, outtop, message_next, message_top;
+	caddr_t		c, ctop, outptr, outtop, outtop1, message_next, message_top;
 	uchar_ptr_t 	ret_ptr;
 	unsigned char	uchar;
 	short		sshort, *s;
 	unsigned short	ushort;
-	int		i, length, field_width, repeat_count, int_val, chwidth, cwidth;
+	int		i, nexti, length, field_width, repeat_count, int_val, chwidth, orig_chwidth, cwidth;
 	unsigned int	ch;
 	UINTPTR_T	addr_val;
-	ssize_t		chlen ;
+	ssize_t		chlen;
 	boolean_t	indirect;
 	qw_num_ptr_t	val_ptr;
 	unsigned char	numa[22];
@@ -269,52 +269,80 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					cwidth = field_width;
 				assert(0 <= cwidth); /* since all unprintable and illegal characters are ignored */
 				assert(0 <= field_width);
+				outtop1 = outtop - 1;
 				if (right_justify)
 				{
-					for (i = field_width - cwidth;  i > 0 && outptr < outtop - 1;  --i)
+					for (i = field_width - cwidth;  i > 0 && outptr < outtop1; --i)
 						*outptr++ = ' ';
 				}
-				for (i = 0, ctop = c + length;  (i < cwidth && outptr < outtop  - 1);  c += chlen)
+				if (!gtm_utf8_mode)
 				{
-#ifdef UNICODE_SUPPORTED
+					chwidth = 1;	/* for both printable and unprintable characters */
+					chlen = 1;
+				}
+				for (i = 0, ctop = c + length; c < ctop; c += chlen)
+				{
 					if (!gtm_utf8_mode)
 					{
-#endif
 						ch = *c;
-						chlen = 1;
-						chwidth = (ch < ' '  ||  ch > '~') ? -1 : 1;
-						isprintable = (-1 != chwidth); /* Ignored in M mode for FAO !AD */
-#ifdef UNICODE_SUPPORTED
+						isprintable = ((' ' <= ch) || ('~' >= ch)); /* Ignored in M mode for FAO !AD */
 					} else
 					{
 						chlen = (caddr_t)UTF8_MBTOWC(c, ctop, ch) - c;
-						chwidth = (int)((GTMSECSHR_IMAGE != image_type) ? UTF8_WCWIDTH(ch): chlen);
-						/* Assume printability for GTMSECSHR */
-						isprintable = (-1 != chwidth) ||
-							((GTMSECSHR_IMAGE != image_type) ? U_ISSPACE(ch): TRUE);
+						if (GTMSECSHR_IMAGE != image_type)
+						{
+							chwidth = (int)UTF8_WCWIDTH(ch);
+							/* Note down chwidth (for debugging) from ICU before tampering with it */
+							DEBUG_ONLY(orig_chwidth = chwidth;)
+							if (-1 != chwidth)
+								isprintable = TRUE;
+							else
+							{
+								isprintable = U_ISSPACE(ch);
+								chwidth = 1; /* treat unprintable characters as having width=1 */
+							}
+						} else
+						{	/* Assume printability for GTMSECSHR */
+							chwidth = (int)chlen;
+							isprintable = TRUE;
+						}
 					}
-#endif
-					if (!isprintable && ('F' == type2 UNICODE_ONLY(|| ('D' == type2 && gtm_utf8_mode))))
+					assert('\0' != ch);	/* we dont expect <null> bytes in the middle of the string */
+					assert((c + chlen) <= ctop);
+					assert(0 < chlen);
+					assert((0 < chwidth) || (0 == chwidth) && gtm_utf8_mode);
+					nexti = i + chwidth;
+					if (nexti > cwidth)	/* adding next input char will cross requested width */
+						break;
+					if ((outptr + chlen) > outtop1)	/* adding next input char will cross output buffer limit */
+						break;
+					if (!isprintable && (('F' == type2) UNICODE_ONLY(|| (('D' == type2) && gtm_utf8_mode))))
 					{	/* Since HPUX stops printing lines (via fprintf) when it
 						   encounters a bad character, all platforms in utf8 mode
 						   will behave as if !AF were specified and put a "." in place
 						   of non-printable characters. SE 01/2007
 						*/
 						*outptr++ = '.';
-						++i;
-					} else if ('\0' != ch && chlen <= outtop - outptr - 1)
+						i = nexti;
+					} else if ('\0' != ch)	/* skip NULL bytes in the middle of the string */
 					{
-						memcpy(outptr, c, chlen);
-						outptr += chlen;
-						if (0 <= chwidth)
-							i += chwidth;
-						else /* treat unprintable characters as having a width of 1 */
-							++i;
+						if (1 == chlen)
+							*outptr++ = *c;
+						else
+						{
+							memcpy(outptr, c, chlen);
+							outptr += chlen;
+						}
+						i = nexti;
 					}
 				}
+				/* Ensure we are still within limits */
+				assert(outptr <= outtop1);
+				assert(i <= cwidth);
+				assert(c <= ctop);
 				if (!right_justify)
 				{
-					for (i = field_width - cwidth;  i > 0 && outptr < outtop - 1;  --i)
+					for (i = field_width - i;  i > 0 && outptr < outtop1;  --i)
 						*outptr++ = ' ';
 				}
 				continue;
@@ -541,63 +569,74 @@ void	util_out_send_oper(char *addr, unsigned int len)
 
 void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 {
-	char	fmt_buff[OUT_BUFF_SIZE];
+	char	fmt_buff[OUT_BUFF_SIZE];	/* needs to be same size as that of util_outbuff */
 	caddr_t	fmtc;
 	int	rc, count;
+	char	*fmt_top1, *fmt_top2; /* the top of the buffer after leaving 1 (and 2 bytes respectively) at the end */
+	int	util_avail_len;
 
-	/*
-	 * Note: this function checks for EINTR on FPRINTF. This check should not be
-	 * converted to an EINTR wrapper macro because of the variable number of args used
-	 * by fprintf.
-	 */
-
+	assert(sizeof(fmt_buff) == sizeof(util_outbuff));
 	if (util_outptr == NULL)
 		util_outptr = util_outbuff;
-
 	if (message != NULL)
-		util_outptr = util_format(message, var, util_outptr, OUT_BUFF_SIZE - (util_outptr - util_outbuff) - 2, faocnt);
-
+	{
+		util_avail_len = INTCAST(util_outbuff + sizeof(util_outbuff) - util_outptr - 2);
+		assert(0 <= util_avail_len);
+		if (0 < util_avail_len)
+			util_outptr = util_format(message, var, util_outptr, util_avail_len, faocnt);
+	}
 	switch (flush)
 	{
 		case NOFLUSH:
 			break;
-
 		case RESET:
 			break;
-
 		case FLUSH:
 			*util_outptr++ = '\n';
 		case OPER:
 		case SPRINT:
-			/******************************************************************************************************
-			   For all three of these actions we need to do some output buffer translation. In all cases a '%'
-			   is translated to the escape version '%%'. For OPER and SPRINT, we also translate '\n' to a ', '
-			   since some syslog() implementations (like Tru64) stop processing the passed message on a newline.
-			*******************************************************************************************************/
+			/* For all three of these actions we need to do some output buffer translation. In all cases a '%'
+			 * is translated to the escape version '%%'. For OPER and SPRINT, we also translate '\n' to a ', '
+			 * since some syslog() implementations (like Tru64) stop processing the passed message on a newline.
+			 * Note that since the '%' -> '%%' or '\n' to ', ' translations imply an expansion in the buffer size
+			 * requirements, we could potentially overflow the buffer after the translation. In that case we will
+			 * stop copying just before the point of overflow is reached even though it means loss of the tail data.
+			 */
 			*util_outptr = '\0';
-			for (util_outptr = util_outbuff, fmtc = fmt_buff;  0 != *util_outptr; )
+			fmt_top1 = fmt_buff + sizeof(fmt_buff) - 1;
+			fmt_top2 = fmt_top1 - 1;
+			for (util_outptr = util_outbuff, fmtc = fmt_buff; (0 != *util_outptr) && (fmtc < fmt_top1); )
 			{
 				if ('%' == *util_outptr)
 				{
+					if (fmtc >= fmt_top2) /* Check if there is room for 2 bytes. If not stop copying */
+						break;
 					*fmtc++ = '%';	/* escape for '%' */
 					*fmtc++ = '%';
 					util_outptr++;
 				} else if ('\n' == *util_outptr && (OPER == flush || SPRINT == flush))
 				{
+					if (fmtc >= fmt_top2) /* Check if there is room for 2 bytes. If not stop copying */
+						break;
 					*fmtc++ = ',';
 					*fmtc++ = ' ';
 					util_outptr++;
 				} else
 					*fmtc++ = *util_outptr++;
 			}
+			assert(fmtc <= fmt_top1);
 			*fmtc++ = '\0';
 			switch (flush)
 			{
 				case FLUSH:
-					/* Keep retrying FPRINTF if errno is EINTR. But we have seen a nested FPRINTF call to
-					 * return EINTR incorrectly even though it was a different FPRINTF (that is in the
-					 * C call stack) was interrupted. So no point in retrying indefinitely in this case.
-					 * Hence limit the loop iterations to an arbitrary finite value.
+					/* Note that although upper-case FPRINTF is used below, it is NOT EINTR safe (reason
+					 * being fprintf accepts variable # of arguments and it is not possible to write a
+					 * wrapper macro accepting the same # of arguments and implementing EINTR protection).
+					 * Therefore we have our own EINTR handling code here. Keep retrying FPRINTF if errno
+					 * is EINTR. We have seen a NESTED FPRINTF call return EINTR incorrectly even though
+					 * it was a different FPRINTF in the current C stack that was interrupted. So no point
+					 * in retrying indefinitely in this case. Hence limit the loop iterations to an
+					 * arbitrary finite value.
 					 */
 					count = 0;
 					do
@@ -609,7 +648,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 					assert((-1 != rc) || (EINTR != errno));
 					break;
 				case OPER:
-					util_out_send_oper(STR_AND_LEN(fmt_buff));
+					util_out_send_oper(fmt_buff, UINTCAST(fmtc - fmt_buff));
 					break;
 				case SPRINT:
 					memcpy(util_outbuff, fmt_buff, fmtc - fmt_buff);
@@ -623,7 +662,6 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 	{
 		case NOFLUSH:
 			break;
-
 		case FLUSH:
 		case RESET:
 		case OPER:
@@ -632,7 +670,6 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 			util_outptr = util_outbuff;
 			break;
 	}
-
 }
 
 void	util_out_print(caddr_t message, int flush, ...)

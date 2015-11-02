@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -25,7 +25,7 @@
 .extern	zstep_level
 
 	.text
-.extern	fetch
+.extern	gtm_fetch
 .extern	op_retarg
 .extern	op_zbreak
 .extern	op_zst_break
@@ -65,7 +65,7 @@ l2:	popl	%eax
 ENTRY op_zbfetch
 	movl	frame_pointer,%edx
 	popl	msf_mpc_off(%edx)
-	call	fetch
+	call	gtm_fetch
 	popl	%eax
 #	lea	esp, [esp][eax*4]
 	leal	(%esp,%eax,4),%esp
@@ -91,7 +91,7 @@ ENTRY op_zbstart
 ENTRY op_zstepfetch
 	movl	frame_pointer,%edx
 	popl	msf_mpc_off(%edx)
-	call	fetch
+	call	gtm_fetch
 	popl	%eax
 #	lea	esp, [esp][eax*4]
 	leal	(%esp,%eax,4),%esp
@@ -113,7 +113,7 @@ ENTRY op_zstepstart
 ENTRY op_zstzbfetch
 	movl	frame_pointer,%edx
 	popl	msf_mpc_off(%edx)
-	call	fetch
+	call	gtm_fetch
 	popl	%eax
 #	lea	esp, [esp][eax*4]
 	leal	(%esp,%eax,4),%esp
@@ -141,7 +141,7 @@ ENTRY op_zstzbstart
 ENTRY op_zstzb_fet_over
 	movl	frame_pointer,%edx
 	popl	msf_mpc_off(%edx)
-	call	fetch
+	call	gtm_fetch
 	popl	%eax
 #	lea	esp, [esp][eax*4]
 	leal	(%esp,%eax,4),%esp
@@ -193,7 +193,7 @@ l8:	call	op_zst_over
 ENTRY op_zst_fet_over
 	movl	frame_pointer,%edx
 	popl	msf_mpc_off(%edx)
-	call	fetch
+	call	gtm_fetch
 	popl	%eax
 #	lea	esp, [esp][eax*4]
 	leal	(%esp,%eax,4),%esp

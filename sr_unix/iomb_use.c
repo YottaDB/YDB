@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,7 @@
 #include "io_params.h"
 #include "compiler.h"
 #include "stringpool.h"
+#include "gtmio.h"
 
 LITREF unsigned char io_params_size[];
 
@@ -33,6 +34,7 @@ void iomb_use(io_desc *iod, mval *pp)
 	d_mb_struct	*mb_ptr;
 	params		ch;
 	int		p_offset;
+	int		rc;
 
 	p_offset = 0;
 	iomb_flush(iod);
@@ -44,7 +46,7 @@ void iomb_use(io_desc *iod, mval *pp)
 		case iop_delete:
 			if (mb_ptr->prmflg && mb_ptr->del_on_close)
 			{
-				close(mb_ptr->channel);
+				CLOSEFILE_RESET(mb_ptr->channel, rc);	/* resets "mb_ptr->channel" to FD_INVALID */
 				path = iod->trans_name->dollar_io;
 				if ((status = UNLINK(path)) == (unsigned int)-1)
 				rts_error(VARLSTCNT(1) errno);

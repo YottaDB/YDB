@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,7 @@ GBLREF mline 		mline_root;
 GBLREF mvar 		*mvartab;
 GBLREF mident		module_name;
 GBLREF int4		gtm_object_size;
+GBLREF int4		sym_table_size;
 GBLREF int4		linkage_size;
 GBLREF uint4		lnkrel_cnt;	/* number of entries in linkage Psect to relocate */
 GBLREF spdesc		stringpool;
@@ -96,7 +97,6 @@ GBLREF spdesc		stringpool;
  */
 
 void	cg_lab (mlabel *mlbl, char *do_emit);
-int	output_symbol_size(void);
 
 
 void	obj_code (uint4 src_lines, uint4 checksum)
@@ -167,7 +167,7 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	/* Line number table offset setup */
 	rhead.lnrtab_adr = (lnr_tabent *)rhead.ptext_end_adr;
 	rhead.lnrtab_len = src_lines;
-	code_size += src_lines * sizeof(lnr_tabent);
+	code_size += src_lines * SIZEOF(lnr_tabent);
 	lnr_pad_size = PADLEN(code_size, SECTION_ALIGN_BOUNDARY);
 	code_size += lnr_pad_size;
 	/* Literal text section offset setup */
@@ -185,14 +185,14 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	/* Variable table offset setup */
 	rhead.vartab_adr = (var_tabent *)(size_t)code_size;
 	rhead.vartab_len = mvmax;
-	code_size += mvmax * sizeof(var_tabent);
+	code_size += mvmax * SIZEOF(var_tabent);
 	/* Linkage section setup. No table in object but need its length. */
 	rhead.linkage_adr = NULL;
 	rhead.linkage_len = linkage_size / SIZEOF(lnk_tabent);
 	/* Label table offset setup */
 	rhead.labtab_adr = (lab_tabent *)(size_t)code_size;
 	rhead.labtab_len = mlmax;
-	code_size += mlmax * sizeof(lab_tabent);
+	code_size += mlmax * SIZEOF(lab_tabent);
 	if (mlabtab)
 		walktree((mvar *)mlabtab, cg_lab, NULL);
 	/* Prior to calculating reloc and symbol size, run the linkage chains to fill out
@@ -200,10 +200,11 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	comp_linkages();
 	/* Relocation table offset setup */
 	rhead.rel_table_off = code_size;
-	code_size += lnkrel_cnt * sizeof(struct relocation_info);
+	code_size += lnkrel_cnt * SIZEOF(struct relocation_info);
 	/* Symbol text list offset setup */
 	rhead.sym_table_off = code_size;
-	code_size += output_symbol_size();
+	assert(OUTPUT_SYMBOL_SIZE == output_symbol_size());
+	code_size += OUTPUT_SYMBOL_SIZE;
 	/* Pad to OBJECT_SIZE_ALIGNMENT byte boundary.(Perhaps need for building into shared library -MR) */
 	object_pad_size = PADLEN(code_size, OBJECT_SIZE_ALIGNMENT);
 	code_size += object_pad_size;

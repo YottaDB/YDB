@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,10 @@
 #endif
 #include "hashtab.h"
 #include "wcs_phase2_commit_wait.h"
+
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
 GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a failure (no buffer filled) and the real
@@ -270,6 +274,14 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		*cr_out = 0;
 		return (sm_uc_ptr_t)(mm_read(blk));
 	}
+#	ifdef GTM_CRYPT
+	/* If database is encrypted, check if encryption initialization went fine for this database. If not,
+	 * do not let process proceed as it could now potentially get a peek at the desired data from the
+	 * decrypted shared memory global buffers (read in from disk by other processes) without having to go to disk.
+	 */
+	if (csa->encrypt_init_status)
+		GC_RTS_ERROR(csa->encrypt_init_status, gv_cur_region->dyn.addr->fname);
+#	endif
 	assert(dba_bg == csd->acc_meth);
 	assert(!first_tp_srch_status || !first_tp_srch_status->cr
 					|| first_tp_srch_status->cycle != first_tp_srch_status->cr->cycle);

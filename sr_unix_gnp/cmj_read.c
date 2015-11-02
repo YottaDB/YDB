@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,6 @@
 #include "gtm_string.h"
 #include "cmidef.h"
 #include <errno.h>
-#include <netinet/in.h>
 #include <sys/uio.h>
 #include "gtm_inet.h"
 
@@ -188,7 +187,7 @@ void cmj_read_interrupt(struct CLB *lnk, int signo)
 			{
 				/* we just read part of the length */
 				assert(CMI_TCP_PREFIX_LEN > rval);
-				lnk->ios.len_len +=  rval;
+				lnk->ios.len_len +=  (int)rval;
 				status = cmj_clb_set_async(lnk);
 				if (CMI_ERROR(status))
 					cmj_err(lnk, CMI_REASON_STATUS, status);

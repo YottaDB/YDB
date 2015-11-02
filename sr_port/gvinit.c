@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@ void gvinit(void)
 	/* May get in here after an extended ref call, so you don't want to
 		lose any preexisting keys */
 
-	keysize = (gd_header->regions->max_key_size + MAX_NUM_SUBSC_LEN + 4) & (-4);
+	keysize = DBKEYSIZE(gd_header->regions->max_key_size);
 	assert(keysize);
 	if (keysize > gv_keysize)
 	{

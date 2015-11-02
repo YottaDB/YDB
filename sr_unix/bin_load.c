@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,9 @@
 #include "mu_gvis.h"
 #include "gtmmsg.h"
 #include "gtm_utf8.h"
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 
 GBLREF bool		mupip_DB_full;
 GBLREF bool		mu_ctrly_occurred;
@@ -55,7 +58,20 @@ GBLREF bool             transform;
 #define	BIN_PUT		0
 #define BIN_BIND	1
 #define ERR_COR		2
-
+#ifdef GTM_CRYPT
+#define EMPTY_GTMCRYPT_HASH16	"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+#define EMPTY_GTMCRYPT_HASH32	EMPTY_GTMCRYPT_HASH16 EMPTY_GTMCRYPT_HASH16
+#define EMPTY_GTMCRYPT_HASH	EMPTY_GTMCRYPT_HASH32 EMPTY_GTMCRYPT_HASH32
+#define GC_BIN_LOAD_ERR(crypt_status)			\
+{							\
+	if (0 != crypt_status)				\
+	{						\
+		GC_GTM_PUTMSG(crypt_status, NULL);	\
+		mupip_error_occurred = TRUE;		\
+		return;					\
+	}						\
+}
+#endif
 static readonly unsigned char gt_lit[] = "LOAD TOTAL";
 
 /* starting extract file format 3, we have an extra record for each gvn, that contains the
@@ -69,7 +85,7 @@ void		bin_call_db(int, INTPTR_T, INTPTR_T);
 
 void bin_load(uint4 begin, uint4 end)
 {
-	unsigned char	*ptr, *cp1, *cp2, *btop, *gvkey_char_ptr, *tmp_ptr, *tmp_key_ptr;
+	unsigned char	*ptr, *cp1, *cp2, *btop, *gvkey_char_ptr, *tmp_ptr, *tmp_key_ptr, *c, *ctop;
 	unsigned char	hdr_lvl, src_buff[MAX_KEY_SZ + 1], dest_buff[MAX_ZWR_KEY_SZ],
 			cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1];
 	unsigned char	*end_buff;
@@ -85,6 +101,13 @@ void bin_load(uint4 begin, uint4 end)
 	coll_hdr	extr_collhdr, db_collhdr;
 	gv_key 		*tmp_gvkey;
 	char		std_null_coll[BIN_HEADER_NUMSZ + 1];
+#	ifdef GTM_CRYPT
+	gtmcrypt_key_t			*encr_key_handles;
+	char				*inbuf;
+	int4				index;
+	int				req_dec_blk_size, init_status, crypt_status;
+	muext_hash_hdr_ptr_t		hash_array = NULL;
+#	endif
 
 	error_def(ERR_GVIS);
 	error_def(ERR_TEXT);
@@ -103,7 +126,7 @@ void bin_load(uint4 begin, uint4 end)
 	v.mvtype = MV_STR;
 	len = mu_bin_get((char **)&ptr);
 	hdr_lvl = EXTR_HEADER_LEVEL(ptr);
-	if (!((hdr_lvl == '4' && len == BIN_HEADER_SZ) || (hdr_lvl < '4' && len == V3_BIN_HEADER_SZ)))
+	if (!(((hdr_lvl == '4'|| hdr_lvl == '5') && len == BIN_HEADER_SZ) || (hdr_lvl < '4' && len == V3_BIN_HEADER_SZ)))
 	{
 		rts_error(VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
@@ -116,7 +139,6 @@ void bin_load(uint4 begin, uint4 end)
 		rts_error(VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
-
 	/* check if extract was generated in UTF-8 mode */
 	utf8_extract = (0 == MEMCMP_LIT(&ptr[len - BIN_HEADER_LABELSZ], UTF8_NAME)) ? TRUE : FALSE;
 	if ((utf8_extract && !gtm_utf8_mode) || (!utf8_extract && gtm_utf8_mode))
@@ -128,6 +150,16 @@ void bin_load(uint4 begin, uint4 end)
 		mupip_exit(ERR_LDBINFMT);
 	}
 
+	if ('4' >= hdr_lvl)
+	{	/* Binary extracts in V50000-to-V52000 (label=4) and pre-V50000 (label=3) could have a '\0' byte (NULL byte)
+		 * in the middle of the string. Replace it with ' ' (space) like it would be in V52000 binary extracts and above.
+		 */
+		for (c = ptr, ctop = c + len; c < ctop; c++)
+		{
+			if ('\0' == *c)
+				*c = ' ';
+		}
+	}
 	util_out_print("Label = !AD\n", TRUE, len, ptr);
 	new_gvn = FALSE;
 	if (hdr_lvl > '3')
@@ -144,6 +176,28 @@ void bin_load(uint4 begin, uint4 end)
 		}
 	} else
 		extr_std_null_coll = 0;
+#	ifdef GTM_CRYPT
+	if ('5' <= hdr_lvl)
+	{
+		int	i, num_indexes;
+
+		len = mu_bin_get((char **)&ptr);
+		hash_array = (muext_hash_hdr *) malloc(len);
+		/* store hashes of all the files used during extract into muext_hash_hdr structure */
+		memcpy((char *)hash_array, ptr, len);
+		num_indexes = len / GTMCRYPT_HASH_LEN;
+		encr_key_handles = (gtmcrypt_key_t *) malloc (sizeof(gtmcrypt_key_t) * num_indexes);
+		INIT_PROC_ENCRYPTION(crypt_status);
+		GC_BIN_LOAD_ERR(crypt_status);
+		for (index = 0; index < num_indexes; index++)
+		{
+			if (0 == memcmp(hash_array[index].gtmcrypt_hash, EMPTY_GTMCRYPT_HASH, GTMCRYPT_HASH_LEN))
+				continue;
+			GTMCRYPT_GETKEY(hash_array[index].gtmcrypt_hash, encr_key_handles[index], crypt_status);
+			GC_BIN_LOAD_ERR(crypt_status);
+		}
+	}
+#	endif
 	if (hdr_lvl  > '2')
 	{
 		len = mu_bin_get((char **)&ptr);
@@ -212,7 +266,27 @@ void bin_load(uint4 begin, uint4 end)
 			continue;
 		}
 		global_key_count = 1;
-		rp = (rec_hdr*)ptr;
+		rp = (rec_hdr*)(ptr);
+#		ifdef GTM_CRYPT
+		if ('5' <= hdr_lvl)
+		{
+			/* Getting index value from the extracted file. It indicates which database file this record belongs */
+			GET_LONG(index, ptr);
+
+			if (-1 != index) /* Indicates that the record is encrypted. */
+			{
+				req_dec_blk_size = len - SIZEOF(int4);
+				inbuf = (char *)(ptr + sizeof(int4));
+				GTMCRYPT_DECODE_FAST(encr_key_handles[index],
+						     inbuf,
+						     req_dec_blk_size,
+					       	     NULL,
+						     crypt_status);
+				GC_BIN_LOAD_ERR(crypt_status);
+			}
+			rp = (rec_hdr*)(ptr + sizeof(int4));
+		}
+#		endif
 		btop = ptr + len;
 		cp1 = (unsigned char*)(rp + 1);
 		v.str.addr = (char*)cp1;
@@ -229,7 +303,7 @@ void bin_load(uint4 begin, uint4 end)
 		GET_SHORT(rec_len, &rp->rsiz);
 		if (rp->cmpc != 0 || v.str.len > rec_len || mupip_error_occurred)
 		{
-			bin_call_db(ERR_COR, rec_count, global_key_count);
+			bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
 			mu_gvis();
 			util_out_print(0, TRUE);
 			continue;
@@ -285,7 +359,7 @@ void bin_load(uint4 begin, uint4 end)
 			GET_SHORT(rec_len, &rp->rsiz);
 			if (rec_len + (unsigned char *)rp > btop)
 			{
-				bin_call_db(ERR_COR, rec_count, global_key_count);
+				bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
 				mu_gvis();
 				util_out_print(0, TRUE);
 				break;
@@ -302,7 +376,7 @@ void bin_load(uint4 begin, uint4 end)
 				if (cp1 > (unsigned char *) rp + rec_len ||
 				    cp2 > (unsigned char *) gv_currkey + gv_currkey->top)
 				{
-					bin_call_db(ERR_COR, rec_count, global_key_count);
+					bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
 					mu_gvis();
 					util_out_print(0, TRUE);
 					break;
@@ -383,7 +457,7 @@ void bin_load(uint4 begin, uint4 end)
 			}
 			if (gv_currkey->end >= max_key)
 			{
-				bin_call_db(ERR_COR, rec_count, global_key_count);
+				bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
 				mu_gvis();
 				util_out_print(0, TRUE);
 				continue;
@@ -399,7 +473,7 @@ void bin_load(uint4 begin, uint4 end)
 			{
 				if (!mupip_DB_full)
 				{
-					bin_call_db(ERR_COR, rec_count, global_key_count);
+					bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
 					util_out_print(0, TRUE);
 				}
 				break;
@@ -408,6 +482,10 @@ void bin_load(uint4 begin, uint4 end)
 			global_key_count++;
 		}
 	}
+	GTMCRYPT_ONLY(
+		if (NULL != hash_array)
+			free(hash_array);
+	)
 	free(tmp_gvkey);
 	mu_load_close();
 	util_out_print("LOAD TOTAL!_!_Key Cnt: !UL  Max Subsc Len: !UL  Max Data Len: !UL", TRUE, key_count, max_subsc_len,

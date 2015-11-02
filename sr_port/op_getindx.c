@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@
 #include "do_xform.h"
 #include "undx.h"
 #include "mvalconv.h"
-#include "val_iscan.h" 
+#include "val_iscan.h"
 
 #define IS_INTEGER 0
 
@@ -34,23 +34,23 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	mval			tmp_sbs;
 	int			cur_subscr;
 	int                     length;
-	error_def(ERR_UNDEF);
 	va_list			var;
 	VMS_ONLY(int		argcnt;)
-	int4			temp;
+		int4			temp;
 	lv_sbs_tbl     		*tbl;
 	lv_val			*lv;
   	sbs_search_status      	status;
 	mval			*key;
 	int			arg1;
+	unsigned char		buff[512], *end;
+
+	error_def(ERR_UNDEF);
 
 	VAR_START(var, start);
-	VMS_ONLY(va_count(argcnt);)
+	VMS_ONLY(va_count(argcnt));
 
 	if (local_collseq)
-	{
 		tmp_sbs.mvtype = MV_STR;
-	}
 
 	lv = start;
 	arg1 = --argcnt;
@@ -59,12 +59,12 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	{
 		cur_subscr++;
 		key = va_arg(var, mval *);
-       	if ((tbl = lv->ptrs.val_ent.children) == 0)
-		lv = 0;
+		if (NULL == (tbl = lv->ptrs.val_ent.children))
+			lv = NULL;
 		else
 		{
 			assert(tbl->ident == MV_SBS);
-			if ( !(key->mvtype & MV_NM ? !(key->mvtype & MV_NUM_APPROX)  : (bool)val_iscan(key)) )
+			if (!(key->mvtype & MV_NM ? !(key->mvtype & MV_NUM_APPROX) : (bool)val_iscan(key)))
 			{
 				if (local_collseq)
 				{
@@ -78,9 +78,8 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 					s2pool(&(tmp_sbs.str));
 					key = &tmp_sbs;
 				}
-				lv = (tbl->str) ? lv_get_str_inx(tbl->str, &key->str, &status) : 0;
-			}
-			else
+				lv = (tbl->str) ? lv_get_str_inx(tbl->str, &key->str, &status) : NULL;
+			} else
 			{
 				MV_FORCE_NUM(key);
 				if (tbl->int_flag)
@@ -89,17 +88,11 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 					if (MV_IS_INT(key))
 					{
 						temp = MV_FORCE_INT(key) ;
-						lv = ( temp >= 0 && temp < SBS_NUM_INT_ELE ? tbl->num->ptr.lv[temp] : 0 ) ;
-					}
-					else
-					{
-						lv = 0;
-					}
-			 	}
-			 	else
-			       	{
-					lv = (tbl->num) ? lv_get_num_inx(tbl->num, key, &status) : 0 ;
-			 	}
+						lv = (temp >= 0 && temp < SBS_NUM_INT_ELE ? tbl->num->ptr.lv[temp] : NULL) ;
+					} else
+						lv = NULL;
+			 	} else
+					lv = (tbl->num) ? lv_get_num_inx(tbl->num, key, &status) : NULL;
 			}
 		}
 	}
@@ -110,8 +103,6 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			lv = (lv_val *)&literal_null;
 		else
 		{
-			unsigned char	buff[512], *end;
-
 			VAR_START(var, start);
 			end = undx(start, var, arg1, buff, sizeof(buff));
 			va_end(var);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,8 @@
 #include "iosp.h"
 #include "gtm_logicals.h"
 #include "min_max.h"
-#include "gtm_string.h" 	/* for STRNCASECMP */
+#include "gtm_string.h"
+#include "gtm_strings.h" 	/* for STRNCASECMP */
 #include "trans_log_name.h"
 #include "ztrap_form_init.h"
 

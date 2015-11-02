@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,10 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#ifdef UNIX
+#include "io.h"
+#endif
 
 #include "error.h"
 #include "indir_enum.h"
@@ -39,6 +43,9 @@ GBLREF mval		dollar_etrap;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 GBLREF mv_stent		*mv_chain;
 GBLREF bool		transform;
+#ifdef UNIX
+GBLREF	io_desc		*gtm_err_dev;
+#endif
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMCHECK);
@@ -142,6 +149,13 @@ CONDITION_HANDLER(trans_code_ch)
 		dummy_ptr = push_mval(&dummy);
 	}
 	op_commarg(dummy_ptr, indir_goto);
+#ifdef UNIX
+	if (NULL != gtm_err_dev)
+	{
+		remove_rms(gtm_err_dev);
+		gtm_err_dev = NULL;
+	}
+#endif
 	trans_code_finish();
 	UNWIND(NULL, NULL);
 }
@@ -175,6 +189,13 @@ void trans_code(void)
 	ESTABLISH(trans_code_ch);
 	op_commarg(dummy_ptr, ((ztrap_form & ZTRAP_CODE) || IS_ETRAP) ? indir_linetail : indir_goto);
 	REVERT;
+#ifdef UNIX
+	if (NULL != gtm_err_dev)
+	{
+		remove_rms(gtm_err_dev);
+		gtm_err_dev = NULL;
+	}
+#endif
 	trans_code_finish();
 	return;
 }

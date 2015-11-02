@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,8 @@ GBLREF boolean_t	created_core;		/* core file was created */
 GBLREF boolean_t	core_in_progress;
 GBLREF int4		exi_condition;
 GBLREF sigset_t		blockalrm;
+
+#define MM_MALLOC_ALREADY_TRIED	(sgmnt_data_ptr_t)-1
 
 #ifdef AIX_SYSTRACE_ENABLE
 #	ifndef _AIX
@@ -180,8 +182,12 @@ DEBUG_ONLY( struct rlimit rlim;)
 					 */
 					csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
 					tmp_csd = csa->hdr;
-					if (NULL != tmp_csd)
+					/* If the malloc below has an error we could end up calling gtm_fork_n_core again
+					 * recursively.  We limit the recursion by not trying more than once per csa.
+					 */
+					if ((NULL != tmp_csd) && (MM_MALLOC_ALREADY_TRIED != csa->mm_core_hdr))
 					{
+						csa->mm_core_hdr = MM_MALLOC_ALREADY_TRIED;
 						csd = (sgmnt_data_ptr_t)malloc(sizeof(*csd));
 						memcpy((sm_uc_ptr_t)csd, (uchar_ptr_t)tmp_csd, sizeof(*csd));
 						csa->mm_core_hdr = csd;

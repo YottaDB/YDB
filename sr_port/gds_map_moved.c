@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -121,6 +121,11 @@ void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_t
 						{
 							hist->h[hist_index].buffaddr += adj;
 							assert(new_base <= hist->h[hist_index].buffaddr);
+						} else if ((hist == hist2) && (0 < gvt->clue.end))
+						{	/* alt_hist is not updated when clue is set so the buffaddr can
+							 * point to a prior instance of the file's mapping.  So, reset alt_hist.
+							 */
+							hist->h[hist_index].blk_num = HIST_TERMINATOR;
 						} else
 						{	/* It's already been adjusted or it has to be a private copy */
 							assert(((new_base <= hist->h[hist_index].buffaddr)

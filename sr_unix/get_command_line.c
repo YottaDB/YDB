@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,7 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 			}
 		}
 		for (word_cnt = first_item; word_cnt < cmd_cnt; word_cnt++)
-			len += strlen(cmd_arg[word_cnt]) + 1;		/* include space between arguments */
+			len += STRLEN(cmd_arg[word_cnt]) + 1;		/* include space between arguments */
 	}
 	if (0 >= len)
 	{

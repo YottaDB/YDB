@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@
 /* A utility routine to compute the length of a string, exclusive of trailing blanks or nuls
  * (NOTE:  this routine is also called from mur_output_show() and the mur_extract_*() routines)
  */
-int real_len(int length, unsigned char *str)
+int real_len(int length, uchar_ptr_t str)
 {
 	int		clen;	/* current length */
 

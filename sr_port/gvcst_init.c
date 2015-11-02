@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,10 @@
 #include "hashtab_mname.h"
 #include "process_gvt_pending_list.h"
 #include "gtmmsg.h"
+
+#ifdef	GTM_FD_TRACE
+#include "gtm_dbjnl_dupfd_check.h"
+#endif
 
 GBLREF	gd_region		*gv_cur_region, *db_init_region;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -306,6 +310,7 @@ void gvcst_init (gd_region *greg)
 		csa->regcnt++;	/* Increment # of regions that point to this csa */
 		return;
 	}
+	GTM_FD_TRACE_ONLY(gtm_dbjnl_dupfd_check();)	/* check if any of db or jnl fds collide (D9I11-002714) */
 	greg->was_open = FALSE;
 	/* we shouldn't have crit on any region unless we are in TP and in the final retry or we are in
 	 * mupip_set_journal trying to switch journals across all regions. Currently, there is no fine-granular
@@ -492,7 +497,7 @@ void gvcst_init (gd_region *greg)
 	/* Compute the maximum journal space requirements for a PBLK (including possible ALIGN record).
 	 * Use this variable in the TOTAL_TPJNL_REC_SIZE and TOTAL_NONTP_JNL_REC_SIZE macros instead of recomputing.
 	 */
-	csa->pblk_align_jrecsize = MIN_PBLK_RECLEN + csd->blk_size + MIN_ALIGN_RECLEN;
+	csa->pblk_align_jrecsize = (int4)MIN_PBLK_RECLEN + csd->blk_size + (int4)MIN_ALIGN_RECLEN;
 	segment_update_array_size = UA_SIZE(csd);
 
 	if (first_ua == NULL)
@@ -538,6 +543,15 @@ void gvcst_init (gd_region *greg)
 			non_tp_jfb_ptr = (jnl_format_buffer *)malloc(sizeof(jnl_format_buffer));
 			non_tp_jfb_buff_ptr =  (unsigned char *)malloc(MAX_JNL_REC_SIZE);
 			non_tp_jfb_ptr->buff = (char *) non_tp_jfb_buff_ptr;
+			/* If the journal records need to be encrypted in the journal file and if replication is in use,
+			 * we will need access to both the encrypted (for the journal file) and unencrypted (for the
+			 * journal pool) journal record contents. Since this code is executed only once (for the first
+			 * journaled database opened) by this process, we will have to allocate an alternate buffer
+			 * for this purpose (to hold the unencrypted data) as long as this GT.M version supports encryption.
+			 */
+			GTMCRYPT_ONLY(
+				non_tp_jfb_ptr->alt_buff = (char *)malloc(MAX_JNL_REC_SIZE);
+			)
 			non_tp_jfb_ptr->record_size = 0;	/* initialize it to 0 since TOTAL_NONTPJNL_REC_SIZE macro uses it */
 		}
 		/* csa->min_total_tpjnl_rec_size represents the minimum journal buffer space needed for a TP transaction.

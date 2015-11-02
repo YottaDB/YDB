@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -140,7 +140,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 					t_retry((enum cdb_sc)rdfail_detail);
 					continue;
 				}
-				t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -(nextblk - blk));
+				t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -(int4)(nextblk - blk));
 				if ((trans_num)0 == (ret_tn = t_end(&alt_hist, NULL)))
 					continue;
 				break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,7 +96,7 @@ void create_object_file(rhdtyp *rhead)
 	object_file_name[object_name_len] = 0;
 
 	OPEN_OBJECT_FILE(object_file_name, O_CREAT | O_RDWR, object_file_des);
-	if (object_file_des == -1)
+	if (FD_INVALID == object_file_des)
 		rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 	memcpy(&rhead->jsb[0], "GTM_CODE", sizeof(rhead->jsb));
 	emit_addr((char *)&rhead->src_full_name.addr - (char *)rhead,
@@ -137,10 +137,12 @@ void close_object_file(void)
 
 void drop_object_file(void)
 {
-        if (object_file_des > 0)
+	int	rc;
+
+        if (FD_INVALID != object_file_des)
         {
 		UNLINK(object_file_name);
-		close(object_file_des);
+		CLOSEFILE_RESET(object_file_des, rc);	/* resets "object_file_des" to FD_INVALID */
         }
 }
 
@@ -281,10 +283,8 @@ void buff_emit(void)
 {
 	uint4 stat;
 
-	if (write(object_file_des, emit_buff, emit_buff_used) == -1)
-	{
+	if (-1 == write(object_file_des, emit_buff, emit_buff_used))
 		rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
-	}
 	emit_buff_used = 0;
 }
 

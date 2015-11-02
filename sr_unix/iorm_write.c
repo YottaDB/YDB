@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,7 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 	d_rm_struct	*rm_ptr;
 
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
+	assert(NULL != rm_ptr);
 	if (CHSET_UTF8 != iod->ochset)
 	{
 		outstart = outptr = &rm_ptr->outbuf[rm_ptr->out_bytes];
@@ -103,6 +104,7 @@ void iorm_write_utf(mstr *v)
 
 	iod = io_curr_device.out;
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
+	assert(NULL != rm_ptr);
 	inptr = (unsigned char *)v->addr;
 	inlen = v->len;
 	top = inptr + inlen;
@@ -189,7 +191,13 @@ void iorm_write_utf(mstr *v)
 		{	/* filled to WIDTH or end of input or full record */
 			if (0 < outbytes)
 			{
-				DOWRITERC(rm_ptr->fildes, outstart, outbytes, status);
+				if (rm_ptr->fifo || rm_ptr->pipe)
+				{
+					WRITEPIPE(rm_ptr->fildes, rm_ptr->pipe_buff_size, outstart, outbytes, status);
+				} else
+				{
+					DOWRITERC(rm_ptr->fildes, outstart, outbytes, status);
+				}
 				if (0 != status)
 				{
 					DOLLAR_DEVICE_WRITE(rm_ptr,status);
@@ -294,16 +302,21 @@ void iorm_write(mstr *v)
 	char		*out;
 	int		inlen, outlen, status, len;
 	d_rm_struct	*rm_ptr;
+	int		flags;
+	int		fcntl_res;
 	error_def(ERR_NOTTOEOFONPUT);
 	error_def(ERR_RMSRDONLY);
+	error_def(ERR_SYSCALL);
 
 	iod = io_curr_device.out;
 #ifdef __MVS__
-	if (((d_rm_struct *)iod->dev_sp)->fifo)
-		rm_ptr = (d_rm_struct *)(iod->pair.out)->dev_sp;
+	if (NULL == iod->dev_sp)
+		rm_ptr = (d_rm_struct *)(iod->pair.in)->dev_sp;
 	else
-#endif
+		rm_ptr = (d_rm_struct *)(iod->pair.out)->dev_sp;
+#else
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
+#endif
 	memcpy(rm_ptr->dollar_device, "0", sizeof("0"));
 
 	if (rm_ptr->noread)
@@ -314,8 +327,24 @@ void iorm_write(mstr *v)
 		rts_error(VARLSTCNT(1) ERR_NOTTOEOFONPUT);
 	}
 
+	/* if it's a fifo and not system output/error, last operation was not a write and O_NONBLOCK is not set
+	   then set it.  A read will turn it off */
+	if (rm_ptr->fifo && (2 < rm_ptr->fildes) && (RM_WRITE != rm_ptr->lastop))
+	{
+		flags = 0;
+		FCNTL2(rm_ptr->fildes, F_GETFL, flags);
+		if (0 > flags)
+			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+		if (!(flags & O_NONBLOCK))
+		{
+			FCNTL3(rm_ptr->fildes, F_SETFL, (flags | O_NONBLOCK), fcntl_res);
+			if (0 > fcntl_res)
+				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+		}
+	}
+
 	rm_ptr->lastop = RM_WRITE;
-	if (CHSET_M != iod->ochset)
+	if (IS_UTF_CHSET(iod->ochset))
 	{
 		iorm_write_utf(v);
 		return;
@@ -335,7 +364,13 @@ void iorm_write(mstr *v)
 	for (out = v->addr; ; out += len)
 	{
 		len = MIN(inlen, outlen);
-		DOWRITERC(rm_ptr->fildes, out, len, status);
+		if (rm_ptr->fifo || rm_ptr->pipe)
+		{
+			WRITEPIPE(rm_ptr->fildes, rm_ptr->pipe_buff_size, out, len, status);
+		} else
+		{
+			DOWRITERC(rm_ptr->fildes, out, len, status);
+		}
 		if (0 != status)
 		{
 			DOLLAR_DEVICE_WRITE(rm_ptr,status);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,9 @@
 #include "op.h"
 #include "incr_link.h"
 #include "compiler.h"
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 
 #define SRC			1
 #define OBJ			2
@@ -49,18 +52,21 @@ void op_zlink (mval *v, mval *quals)
 	bool			expdir;
 	parse_blk		pblk;
 	mval			qualifier;
-	error_def		(ERR_WILDCARD);
-	error_def		(ERR_VERSION);
-	error_def		(ERR_FILENOTFND);
-	error_def		(ERR_ZLINKFILE);
-	error_def		(ERR_ZLNOOBJECT);
-	error_def		(ERR_FILEPARSE);
+
+	error_def(ERR_WILDCARD);
+	error_def(ERR_VERSION);
+	error_def(ERR_FILENOTFND);
+	error_def(ERR_ZLINKFILE);
+	error_def(ERR_ZLNOOBJECT);
+	error_def(ERR_FILEPARSE);
+	error_def(ERR_TEXT);
+	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	MV_FORCE_STR(v);
 	if (!v->str.len || v->str.len > MAX_FBUFF)
 		rts_error(VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 
-	object_file_des = -1;
+	object_file_des = FD_INVALID;
 	srcdir = objdir = (zro_ent *) 0;
 	expdir = FALSE;
 	if (quals)
@@ -210,13 +216,12 @@ void op_zlink (mval *v, mval *quals)
 			}
 		}
 		OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, object_file_des);
-		if (object_file_des == -1)
+		if (FD_INVALID == object_file_des)
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr, errno);
 		if (USHBIN_ONLY(!incr_link(object_file_des, NULL)) NON_USHBIN_ONLY(!incr_link(object_file_des)))
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr, ERR_VERSION);
-		status = close(object_file_des);
-		object_file_des = -1;
-		if (status == -1)
+		CLOSEFILE_RESET(object_file_des, status);	/* resets "object_file_des" to FD_INVALID */
+		if (-1 == status)
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr, errno);
 	} else	/* either NO type or SOURCE type */
 	{
@@ -277,7 +282,7 @@ void op_zlink (mval *v, mval *quals)
 		if (type != SRC)
 		{
 			OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, object_file_des);
-			if (object_file_des == -1)
+			if (FD_INVALID == object_file_des)
 			{
 				if (errno == ENOENT)
 					obj_found = FALSE;
@@ -309,9 +314,9 @@ void op_zlink (mval *v, mval *quals)
 						rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 					if (src_stat.st_mtime > obj_stat.st_mtime)
 					{
-						status = close(object_file_des);
-						object_file_des = -1;
-						if (status == -1)
+						CLOSEFILE_RESET(object_file_des, status);	/* resets "object_file_des"
+												 * to FD_INVALID */
+						if (-1 == status)
 							rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 						compile = TRUE;
 					}
@@ -348,9 +353,8 @@ void op_zlink (mval *v, mval *quals)
 		status = USHBIN_ONLY(incr_link(object_file_des, NULL)) NON_USHBIN_ONLY(incr_link(object_file_des));
 		if (!status)	/* due only to version mismatch, so recompile */
 		{
-			status = close(object_file_des);
-			object_file_des = -1;
-			if (status == -1)
+			CLOSEFILE_RESET(object_file_des, status);	/* resets "object_file_des" to FD_INVALID */
+			if (-1 == status)
 				rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 			if (compile)
 				GTMASSERT;
@@ -376,9 +380,8 @@ void op_zlink (mval *v, mval *quals)
 			if (USHBIN_ONLY(!incr_link(object_file_des, NULL)) NON_USHBIN_ONLY(!incr_link(object_file_des)))
 				GTMASSERT;
 		}
-		status = close(object_file_des);
-		object_file_des = -1;
-		if (status == -1)
+		CLOSEFILE_RESET(object_file_des, status);	/* resets "object_file_des" to FD_INVALID */
+		if (-1 == status)
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 	}
 }

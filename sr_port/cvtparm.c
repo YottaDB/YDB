@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -119,7 +119,7 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 	if (strlen >= 0)
 	{
 		*stringpool.free++ = strlen;
-		siz -= sizeof(char);
+		siz -= SIZEOF(char);
 	}
 	memcpy(stringpool.free, cp, siz);
 	stringpool.free += siz;

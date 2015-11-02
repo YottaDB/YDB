@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -215,6 +215,8 @@ void dse_all(void)
                         	                break;
 					}
 				}
+				if (freeze != !(cs_addrs->hdr->freeze))
+					util_out_print("Region !AD is now FROZEN", TRUE, REG_LEN_STR(gv_cur_region));
 			}
 			if (seize)
 				grab_crit(gv_cur_region);
@@ -245,6 +247,8 @@ void dse_all(void)
 				if (REG_ALREADY_FROZEN == region_freeze(gv_cur_region,FALSE, override, FALSE))
 					util_out_print("Region: !AD is frozen by another user, not releasing freeze",TRUE,
 						REG_LEN_STR(gv_cur_region));
+				else
+					util_out_print("Region !AD is now UNFROZEN", TRUE, REG_LEN_STR(gv_cur_region));
 			}
 			if (ref)
 				cs_addrs->nl->ref_cnt = 1;

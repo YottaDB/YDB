@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,7 @@ void	op_indlvarg(mval *v, mval *dst)
 	if (valid_mname(&v->str))
 	{
 		*dst = *v;
+		dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 		return;
 	}
 	if (*v->str.addr == '@')
@@ -50,7 +51,8 @@ void	op_indlvarg(mval *v, mval *dst)
 			object.len  = v->str.len;
 			comp_init(&object);
 			if (rval = indirection(&x))
-			{	ref = newtriple(OC_INDLVARG);
+			{
+				ref = newtriple(OC_INDLVARG);
 				ref->operand[0] = x;
 				x = put_tref(ref);
 			}
@@ -64,8 +66,7 @@ void	op_indlvarg(mval *v, mval *dst)
 				comp_indr(&object);
 				return;
 			}
-		}
-		else
+		} else
 		{
 			*ind_result_sp++ = dst;
 			if (ind_result_sp >= ind_result_top)

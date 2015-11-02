@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,9 @@ void iob_flush(BFILE *bf);
 
 void iob_read(BFILE *bf, char *buf, int nbytes)
 {
-	int4 nread, nreread;
+	int4	nread, nreread;
+	int	rc;
+
 	error_def(ERR_IOEOF);
 
 	if (bf->write_mode)
@@ -71,14 +73,14 @@ void iob_read(BFILE *bf, char *buf, int nbytes)
 		}
 		else if (nread == 0 || nread % bf->blksiz)
 		{
-			close(bf->fd);
+			CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
 			rts_error(VARLSTCNT(1) ERR_IOEOF);
 
 			/* if we continued from here, assume that this is a magnetic
 			   tape and we have loaded the next volume. Re-open and
 			   finish the read operation.
 			   */
-			while ((bf->fd = OPEN3(bf->path,bf->oflag,bf->mode)) == -1)
+			while (FD_INVALID == (bf->fd = OPEN3(bf->path,bf->oflag,bf->mode)))
 				rts_error(VARLSTCNT(1) errno);
 
 			DOREADRL(bf->fd, bf->buf + nread, bf->bufsiz - nread, nreread);

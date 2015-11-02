@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,8 +50,15 @@ int	iorm_rdone(mint *v, int4 timeout)
 				case CHSET_UTF16LE:
 					UTF16LE_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
 					break;
-				default:
+				case CHSET_UTF16:
 					GTMASSERT;
+				default:
+#ifdef __MVS
+					codepoint = (unsigned char)tmp.str.addr[0];
+					break;
+#else
+					GTMASSERT;
+#endif
 			}
 			UNICODE_ONLY(assert(WEOF != codepoint);)
 		} else

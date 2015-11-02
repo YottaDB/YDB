@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef __REAL_LEN_H__
 #define __REAL_LEN_H__
 
-int real_len(int length, unsigned char *str);
+int real_len(int length, uchar_ptr_t str);
 
 #endif

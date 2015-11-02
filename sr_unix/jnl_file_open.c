@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,11 +31,18 @@
 #include "gtmmsg.h"
 #include "iosp.h"	/* for SS_NORMAL */
 #include "gtmio.h"
-#include "repl_sp.h"	/* F_CLOSE */
+#include "repl_sp.h"	/* for F_CLOSE used by the JNL_FD_CLOSE macro */
 #include "interlock.h"
 #include "lockconst.h"
 #include "aswp.h"
 #include "is_file_identical.h"
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
+
+#ifdef	GTM_FD_TRACE
+#include "gtm_dbjnl_dupfd_check.h"
+#endif
 
 error_def(ERR_JNLFILOPN);
 error_def(ERR_JNLMOVED);
@@ -54,6 +61,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 	int			fstat_res;
 	int			stat_res, close_res;
 	boolean_t		retry;
+	ZOS_ONLY(int		realfiletag;)
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
@@ -86,23 +94,26 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 				OPENFILE((sm_c_ptr_t)csd->jnl_file_name, O_RDWR, jpc->channel);
 				jpc->sync_io = FALSE;
 			}
-			if (-1 == jpc->channel)
+			/* Check that if ever open errors out (i.e. return status is FD_INVALID=-1),
+			 * jpc->channel will be already set to NOJNL (which is also defined to be -1).
+			 */
+			assert(FD_INVALID == NOJNL);
+			if (FD_INVALID == jpc->channel)
 			{
 				jpc->status = errno;
 				sts = ERR_JNLFILOPN;
-				jpc->channel = NOJNL;
 				if (EACCES == jpc->status || EROFS == jpc->status)
 					break;
 			} else
 			{
+				ZOS_ONLY(gtm_zos_tag_to_policy(jpc->channel, TAG_BINARY, &realfiletag);)
 				FSTAT_FILE(jpc->channel, &stat_buf, fstat_res);
 				if (-1 == fstat_res)
 				{
 					jpc->status = errno;
 					assert(FALSE);
 					sts = ERR_JNLRDERR;
-					F_CLOSE(jpc->channel, close_res);
-					jpc->channel = NOJNL;
+					JNL_FD_CLOSE(jpc->channel, close_res);	/* sets jpc->channel to NOJNL */
 					break;
 				} else
 					sts = jnl_file_open_common(reg, (off_jnl_t) stat_buf.st_size);
@@ -129,12 +140,16 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 			OPENFILE((sm_c_ptr_t)nameptr, O_RDWR, jpc->channel);
 			jpc->sync_io = FALSE;
 		}
-		if (-1 == jpc->channel)
+		/* Check that if ever open errors out (i.e. return status is FD_INVALID=-1,
+		 * jpc->channel will be already set to NOJNL (which is also defined to be -1).
+		 */
+		assert(FD_INVALID == NOJNL);
+		if (FD_INVALID == jpc->channel)
 		{
 			jpc->status = errno;
 			sts = ERR_JNLFILOPN;
-			jpc->channel = NOJNL;
 		}
+		ZOS_ONLY(gtm_zos_tag_to_policy(jpc->channel, TAG_BINARY, &realfiletag);)
 	}   /* if init */
 	if (0 == sts)
 	{
@@ -145,8 +160,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 			{
 				if (jnl_closed == csd->jnl_state)
 				{	/* Operator close came in while opening */
-					F_CLOSE(jpc->channel, close_res);
-					jpc->channel = NOJNL;
+					JNL_FD_CLOSE(jpc->channel, close_res);	/* sets jpc->channel to NOJNL */
 					jpc->fileid.inode = 0;
 					jpc->fileid.device = 0;
 					jpc->pini_addr = 0;
@@ -157,6 +171,13 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 						set_gdid_from_stat(&csa->nl->jnl_file.u, &stat_buf);
 					}
 					jpc->cycle = jb->cycle;	/* make private cycle and shared cycle in sync */
+					GTM_FD_TRACE_ONLY(
+						gtm_dbjnl_dupfd_check(); /* Check if db or jnl fds collide (D9I11-002714) */
+						if (NOJNL == jpc->channel)
+						{	/* The dupfd check above has reset our channel. No idea why. */
+							GTMASSERT;
+						}
+					)
 				}  /* if jnl_state */
 			} else
 			{	/* not init and file moved */
@@ -173,8 +194,8 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 	if (0 != sts)
 	{
 		if (NOJNL != jpc->channel)
-			F_CLOSE(jpc->channel, close_res);
-		jpc->channel = NOJNL;
+			JNL_FD_CLOSE(jpc->channel, close_res);	/* sets jpc->channel to NOJNL */
+		assert(NOJNL == jpc->channel);
 		jnl_send_oper(jpc, sts);
 	}
 	return sts;

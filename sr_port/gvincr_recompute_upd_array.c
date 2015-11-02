@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -196,7 +196,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 		{
 			old_block = (blk_hdr_ptr_t)cse->old_block;
 			if (old_block->tn < csa->jnl->jnl_buff->epoch_tn)
-				cse->blk_checksum = jnl_get_checksum((uint4 *)old_block, old_block->bsiz);
+				cse->blk_checksum = jnl_get_checksum((uint4 *)old_block, csa, old_block->bsiz);
 			else
 				cse->blk_checksum = 0;
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,16 +17,17 @@
  */
 #ifndef OP_MERGE_DEFINED
 
-typedef struct merge_glvn_struct_type {
+typedef struct merge_glvn_struct_type
+{
 	gvname_info 		*gblp[2];
 	struct lv_val_struct    *lclp[2];
 } merge_glvn_struct;
 typedef merge_glvn_struct *merge_glvn_ptr;
 
 /* Function Prototypes */
-void 		op_merge(void);
-void 		op_merge_arg(int m_opr_type, lv_val *lvp);
-void 		merge_desc_check(void);
+void 	op_merge(void);
+void 	op_merge_arg(int m_opr_type, lv_val *lvp);
+void 	merge_desc_check(void);
 
 #define OP_MERGE_DEFINED
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -131,13 +131,13 @@ void zshow_output(zshow_out *out, const mstr *str)
 						disp_len -= inchar_width;
 						strptr = strnext;
 					}
-					outlen = strptr - strbase;
+					outlen = (ssize_t)(strptr - strbase);
 				}
 #endif
 				memcpy(out->ptr, strbase, outlen);
 				out->ptr += outlen;
-				str_processed += outlen;
-				len = strtop - strptr;
+				str_processed += (int)outlen;
+				len = (ssize_t)(strtop - strptr);
 				char_len -= chcnt;
 				assert((UNICODE_ONLY((gtm_utf8_mode) ?
 						     (ssize_t)UTF8_LEN_STRICT(strptr, (int)len) :) len) == char_len);
@@ -157,8 +157,8 @@ void zshow_output(zshow_out *out, const mstr *str)
 		{
 			memcpy(out->ptr, str->addr + str_processed, len);
 			out->ptr += len;
-			out->len += char_len;
-			out->displen += disp_len;
+			out->len += (int)char_len;
+			out->displen += (int)disp_len;
 		}
 		if (out->flush && out->ptr != out->buff)
 		{
@@ -226,22 +226,22 @@ void zshow_output(zshow_out *out, const mstr *str)
 			strtop = str->addr + str->len;
 			for (; strptr != strtop; )
 			{
-				len = strtop - strptr;
+				len = (ssize_t)(strtop - strptr);
 				if (len <= MAX_SRCLINE - (out->ptr - out->buff))
 					break;
-				len = MAX_SRCLINE - (out->ptr - out->buff);
+				len = MAX_SRCLINE - (ssize_t)(out->ptr - out->buff);
 				strbase = str->addr + str_processed;
 #ifdef UNICODE_SUPPORTED
 				if (gtm_utf8_mode)
 				{ /* terminate at the proper character boundary within MAX_SRCLINE bytes */
 					UTF8_LEADING_BYTE(strbase + len, strbase, leadptr);
-					len = leadptr - strbase;
+					len = (ssize_t)(leadptr - strbase);
 				}
 #endif
 				memcpy(out->ptr, strbase, len);
 				strptr += len;
 				out->ptr += len;
-				str_processed += len;
+				str_processed += (int)len;
 				mv->str.addr = 0;
 				mv->str.len = 0;
 				MV_FORCE_MVAL(mv, out->line_num);
@@ -337,22 +337,22 @@ void zshow_output(zshow_out *out, const mstr *str)
 			strtop = str->addr + str->len;
 			for (; strptr != strtop; )
 			{
-				len = strtop - strptr;
+				len = (ssize_t)(strtop - strptr);
 				if (len <= out->len - (out->ptr - out->buff))
 					break;
-				len = out->len - (out->ptr - out->buff);
+				len = out->len - (ssize_t)(out->ptr - out->buff);
 				strbase = str->addr + str_processed;
 #ifdef UNICODE_SUPPORTED
 				if (gtm_utf8_mode)
 				{ /* terminate at the proper character boundary within out->len bytes */
 					UTF8_LEADING_BYTE(strbase + len, strbase, leadptr);
-					len = leadptr - strbase;
+					len = (ssize_t)(leadptr - strbase);
 				}
 #endif
 				memcpy(out->ptr, strbase, len);
 				strptr += len;
 				out->ptr += len;
-				str_processed += len;
+				str_processed += (int)len;
 				MV_FORCE_MVAL(mv, out->line_num);
 				if (FIRST_LINE_OF_ZSHOW_OUTPUT(out))
 					op_gvnaked(VARLSTCNT(1) mv);

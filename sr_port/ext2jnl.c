@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -202,7 +202,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	str2gvkey_nogvfunc(ptr, keylength, gv_currkey);
 	rec->jrec_kill.mumps_node.length = gv_currkey->end;
 	memcpy(rec->jrec_kill.mumps_node.text, gv_currkey->base, gv_currkey->end);
-	temp_reclen = FIXED_UPD_RECLEN + rec->jrec_kill.mumps_node.length + SIZEOF(jnl_str_len_t);
+	temp_reclen = (int)(FIXED_UPD_RECLEN + rec->jrec_kill.mumps_node.length + SIZEOF(jnl_str_len_t));
 	if (IS_KILL_ZKILL(rectype))
 	{
 		temp_reclen += JREC_SUFFIX_SIZE;
@@ -228,7 +228,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	REPL_DPRINT3("ext2jnl JNL Format : src : Len %d :: DATA:%s\n", src.len, src.addr);
 	REPL_DPRINT3("ext2jnl JNL Format : des : Len %d :: DATA:%s\n", des.len, des.addr);
 	PUT_MSTR_LEN((char_ptr_t)rec + temp_reclen, des.len);
-	temp_reclen += sizeof(jnl_str_len_t) + des.len + JREC_SUFFIX_SIZE;
+	temp_reclen += SIZEOF(jnl_str_len_t) + des.len + JREC_SUFFIX_SIZE;
 	reclen = ROUND_UP2(temp_reclen, JNL_REC_START_BNDRY);
 	memset((char_ptr_t)rec + temp_reclen - JREC_SUFFIX_SIZE, 0, reclen - temp_reclen);
 	suffix = (jrec_suffix *)((char_ptr_t)rec + reclen - JREC_SUFFIX_SIZE);

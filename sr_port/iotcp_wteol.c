@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,16 +13,12 @@
 
 #include <sys/types.h>
 #include <errno.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#ifdef __MVS__
-#include <xti.h>
-#else
 #include <netinet/tcp.h>
-#endif
 
 #include "gtm_stdio.h"
 #include "gtm_string.h"
+#include "gtm_socket.h"
+#include "gtm_inet.h"
 
 #include "io.h"
 #include "iotcpdef.h"

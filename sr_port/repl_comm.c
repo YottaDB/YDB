@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@
 #include "repl_log.h"
 #include "iotcpdef.h"
 #include "gtmmsg.h"
-
+#include "gt_timer.h"
 /* These statistics are useful and should perhaps be collected - Vinaya 2003/08/18
  *
  * Common:
@@ -131,7 +131,7 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, boolean_t skip_pi
 					break;
 				}
 				timeout.tv_sec  = 0;
-				timeout.tv_usec = wait_val;
+				timeout.tv_usec = (gtm_tv_usec_t)wait_val;
 #ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 				poll_timeout = wait_val / 1000;		/* convert to millisecs */
 #endif
@@ -215,7 +215,7 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, boolean_t skip_da
 	struct pollfd	poll_fdlist[1];
 #endif
 
-	assert(-1 != sock_fd);
+	assert(FD_INVALID != sock_fd);
 	max_recv_len = *recv_len;
 	/* VMS returns SYSTEM-F-INVBUFLEN if max_recv_len is larger than the hard limit VMS_MAX_TCP_SEND_SIZE (64K - 1 on some
 	 * impelementations, 64K - 512 on some others). Although VMS_MAX_TCP_RECV_SIZE may be larger than repl_max_recv_buffsize,
@@ -258,7 +258,7 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, boolean_t skip_da
 					break;
 				}
 				timeout.tv_sec  = 0;
-				timeout.tv_usec = wait_val;
+				timeout.tv_usec = (gtm_tv_usec_t)wait_val;
 #ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 				poll_timeout = wait_val / 1000;		/* convert to millisecs */
 #endif
@@ -311,11 +311,8 @@ int repl_close(int *sock_fd)
 {
 	int	status = 0;
 
-	if (*sock_fd != -1)
-	{
-		CLOSEFILE(*sock_fd, status);
-		*sock_fd = -1; /* set to -1 even if CLOSEFILE fails */
-	}
+	if (FD_INVALID != *sock_fd)
+		CLOSEFILE_RESET(*sock_fd, status);	/* resets "*sock_fd" to FD_INVALID */
 	return (0 == status ? 0 : ERRNO);
 }
 
@@ -348,7 +345,7 @@ static int set_sock_buff_size(int sockfd, int buflen, int which_buf)
 	int	optlen;
 #endif
 	optlen = sizeof(buflen);
-        status = setsockopt(sockfd, SOL_SOCKET, which_buf, (void *)&buflen, optlen);
+        status = setsockopt(sockfd, SOL_SOCKET, which_buf, (void *)&buflen, (GTM_SOCKLEN_TYPE)optlen);
 	return (0 == status) ? 0 : ERRNO;
 }
 

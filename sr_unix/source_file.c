@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,8 @@
 #include "op.h"
 #include "source_file.h"
 #include "zroutines.h"
+#include "gtmio.h"
+#include "iotimer.h"
 
 GBLREF unsigned short	source_name_len;
 GBLREF unsigned char	source_file_name[];
@@ -53,6 +55,8 @@ void	compile_source_file(unsigned short flen, char *faddr)
 	mval		fstr, ret;
 	int		i;
 	unsigned char	*p;
+	int		rc;
+
 	error_def	(ERR_FILEPARSE);
 	error_def	(ERR_FILENOTFND);
 	error_def	(ERR_ERRORSUMMARY);
@@ -64,7 +68,7 @@ void	compile_source_file(unsigned short flen, char *faddr)
 		dollar_zcstatus = ERR_ERRORSUMMARY;
 	} else
 	{
-		object_file_des = -1;
+		object_file_des = FD_INVALID;
 		fstr.mvtype = MV_STR;
 		fstr.str.addr = faddr;
 		fstr.str.len = flen;
@@ -97,16 +101,13 @@ void	compile_source_file(unsigned short flen, char *faddr)
 				dollar_zcstatus = ERR_ERRORSUMMARY;
 				continue;
 			}
-
 			if (compiler_startup())
 				dollar_zcstatus = ERR_ERRORSUMMARY;
-			else
+			else if (FD_INVALID != object_file_des)
 			{
-				if (close(object_file_des) == -1)
-				{
+				CLOSEFILE_RESET(object_file_des, rc);	/* resets "object_file_des" to FD_INVALID */
+				if (-1 == rc)
 					rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
-				}
-				object_file_des = -1;
 			}
 			if (tt_so_do_once)
 				break;
@@ -220,7 +221,7 @@ int4	read_source_file (void)
 	tmp_list_dev = io_curr_device;
 	io_curr_device = compile_src_dev;
 	ESTABLISH_RET(read_source_ch, -1);
-	op_readfl(&val, MAX_SRCLINE, 0);
+	op_readfl(&val, MAX_SRCLINE, NO_M_TIMEOUT);
 	REVERT;
 	memcpy((char *)source_buffer, val.str.addr, val.str.len);
 	cp = source_buffer + val.str.len;

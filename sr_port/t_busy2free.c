@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@ void	t_busy2free(srch_blk_status *blkhist)
 		 * access the buffer more than the db blk_size.
 		 */
 		bsiz = MIN(old_block->bsiz, csa->hdr->blk_size);
-		cse->blk_checksum = jnl_get_checksum((uint4*)old_block, bsiz);
+		cse->blk_checksum = jnl_get_checksum((uint4*)old_block, csa, bsiz);
 	}
 	cse->upd_addr = NULL;
 	cse->jnl_freeaddr = 0;		/* reset jnl_freeaddr that previous transaction might have filled in */

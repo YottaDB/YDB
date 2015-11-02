@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,7 +82,7 @@ GBLREF	unsigned int		t_tries;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	kill_set		*kill_set_tail;
-GBLREF	boolean_t		kip_incremented;
+GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	int4			update_trans;
 GBLREF	boolean_t		mu_reorg_in_swap_blk;
@@ -392,7 +392,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), rtsib_hist)))
 						{
 							need_kip_incr = FALSE;
-							assert(!kip_incremented);
+							assert(NULL == kip_csa);
 							if (level)
 							{	/* reinitialize level member in rtsib_hist srch_blk_status' */
 								for (count = 0; count < MAX_BT_DEPTH; count++)
@@ -408,13 +408,13 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						if (detailed_log)
 							log_detailed_log("CLS", &(gv_target->hist), rtsib_hist, level,
 								NULL, ret_tn);
-						assert(0 < kill_set_list.used || !kip_incremented);
+						assert(0 < kill_set_list.used || (NULL == kip_csa));
 						if (0 < kill_set_list.used)     /* decrease kill_in_prog */
 						{
 							gvcst_kill_sort(&kill_set_list);
 							GVCST_BMP_MARK_FREE(&kill_set_list, ret_tn, inctn_mu_reorg,
 									inctn_bmp_mark_free_mu_reorg, inctn_opcode, cs_addrs)
-							DECR_KIP(cs_data, cs_addrs, kip_incremented);
+							DECR_KIP(cs_data, cs_addrs, kip_csa);
 							if (detailed_log)
 								log_detailed_log("KIL", &(gv_target->hist), NULL, level,
 									&kill_set_list, ret_tn);
@@ -461,7 +461,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 							need_kip_incr = FALSE;
 							inctn_opcode = inctn_mu_reorg;	/* reset inctn_opcode to its default */
 							update_trans = TRUE;	/* reset update_trans to its old value */
-							assert(!kip_incremented);
+							assert(NULL == kip_csa);
 							continue;
 						}
 						/* there is no need to reset update_trans to TRUE in case of a successful t_end()
@@ -553,7 +553,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL)))
 						{
 							need_kip_incr = FALSE;
-							assert(!kip_incremented);
+							assert(NULL == kip_csa);
 							DECR_BLK_NUM(dest_blk_id);
 							continue;
 						}
@@ -562,7 +562,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						gvcst_kill_sort(&kill_set_list);
 						GVCST_BMP_MARK_FREE(&kill_set_list, ret_tn, inctn_mu_reorg,
 								inctn_bmp_mark_free_mu_reorg, inctn_opcode, cs_addrs)
-						DECR_KIP(cs_data, cs_addrs, kip_incremented);
+						DECR_KIP(cs_data, cs_addrs, kip_csa);
 						if (detailed_log)
 							log_detailed_log("KIL", &(gv_target->hist), NULL, level,
 								&kill_set_list, ret_tn);
@@ -575,7 +575,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					else if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), &(reorg_gv_target->hist))))
 					{
 						need_kip_incr = FALSE;
-						assert(!kip_incremented);
+						assert(NULL == kip_csa);
 						DECR_BLK_NUM(dest_blk_id);
 						continue;
 					}
@@ -672,7 +672,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL)))
 				{
 					need_kip_incr = FALSE;
-					assert(!kip_incremented);
+					assert(NULL == kip_csa);
 					continue;
 				}
 				if (detailed_log)
@@ -680,7 +680,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				gvcst_kill_sort(&kill_set_list);
 				GVCST_BMP_MARK_FREE(&kill_set_list, ret_tn, inctn_mu_reorg,
 						inctn_bmp_mark_free_mu_reorg, inctn_opcode, cs_addrs)
-				DECR_KIP(cs_data, cs_addrs, kip_incremented);
+				DECR_KIP(cs_data, cs_addrs, kip_csa);
 				if (detailed_log)
 					log_detailed_log("KIL", &(gv_target->hist), NULL, level, &kill_set_list, ret_tn);
 				blks_reused += kill_set_list.used;

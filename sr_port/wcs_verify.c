@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -508,7 +508,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				send_msg(VARLSTCNT(6) ERR_DBCLNUPINFO, 4, DB_LEN_STR(reg), RTS_ERROR_TEXT(secshr_string));
 				cnl->secshr_ops_index = SECSHR_OPS_ARRAY_SIZE;
 			}
-			for (i = 0; (i + 1) < cnl->secshr_ops_index; i += cnl->secshr_ops_array[i])
+			for (i = 0; (i + 1) < cnl->secshr_ops_index; i += (int4)cnl->secshr_ops_array[i])
 			{
 				SPRINTF(secshr_string, "Line %3ld ", cnl->secshr_ops_array[i + 1]);
 				for (lcnt = i + 2; lcnt < MIN(cnl->secshr_ops_index, i + cnl->secshr_ops_array[i]); lcnt++)
@@ -610,13 +610,16 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					send_msg(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
 						 cr, cr->blk, RTS_ERROR_TEXT("cr->r_epid"), cr->r_epid, 0, CALLFROM);
 				}
-			} else if ((-1 == cr->read_in_progress) && !caller_is_wcs_recover && (CR_BLKEMPTY != cr->blk) &&
-				   !cr->data_invalid)
-			{	/* if the buffer is not being read into currently (checked both by cr->r_epid being 0 and
+			} else if ((-1 == cr->read_in_progress) && !caller_is_wcs_recover && (CR_BLKEMPTY != cr->blk)
+				&& !cr->data_invalid
+				VMS_ONLY(&& (!IS_BITMAP_BLK(cr->blk) || (0 == cr->twin) || (0 != cr->bt_index))))
+			{	/* If the buffer is not being read into currently (checked both by cr->r_epid being 0 and
 				 * cr->read_in_progress being -1) and we are being called from DSE CACHE -VERIFY and cr points
 				 * to a valid non-empty block, check the content of cr->buffaddr through a cert_blk().
-				 * use "bp" as the buffer as cr->buffaddr might be detected as corrupt by the buffaddr checks above
-				 * The reason why the cert_blk() is done only from a DSE CACHE -VERIFY call and not from a
+				 * In VMS, if it is a bitmap block, we could have twins so do check only on newtest twin as
+				 * older twin could have an incorrect masterbitmap full/free status (DBBMMSTR error).
+				 * Use "bp" as the buffer as cr->buffaddr might be detected as corrupt by the buffaddr checks
+				 * above. The reason why the cert_blk() is done only from a DSE CACHE -VERIFY call and not from a
 				 * wcs_recover() call is that wcs_recover() is supposed to check the integrity of the data
 				 * structures in the cache and not the integrity of the data (global buffers) in the cache. If the
 				 * database has an integrity error, a global buffer will fail cert_blk() but the cache structures

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -92,7 +92,17 @@ if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
 		set aix_binitfini_option = "-binitfini::gtmci_cleanup"
 	endif
 
-	$shell $gtm_tools/genexport.csh $gtm_tools/gtmshr_symbols.exp gtmshr_symbols.export
+	if ("OS/390" == $HOSTOS) then
+		set exp = "x"
+	else
+		set exp = "export"
+	endif
+	$shell $gtm_tools/genexport.csh $gtm_tools/gtmshr_symbols.exp gtmshr_symbols.$exp
+
+	# The below is used to generate an export file that is specific to executables. Typically used to export
+	# some symbols from utility progs like mupip, dse, lke etc
+
+	$shell $gtm_tools/genexport.csh $gtm_tools/gtmexe_symbols.exp gtmexe_symbols.$exp
 
 	gt_ld $gt_ld_options $gt_ld_shl_options $aix_binitfini_option $gt_ld_ci_options $aix_loadmap_option \
 		${gt_ld_option_output}$3/libgtmshr$gt_ld_shl_suffix \
@@ -107,7 +117,10 @@ if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
 		# (and if it does, it is irrelevent) we merrily ignore the output. It either works or it doesn't.
 		chcon -t texrel_shlib_t $3/libgtmshr$gt_ld_shl_suffix >& /dev/null
 	endif
-	set gt_ld_linklib_options = ""	# do not link in mumps whatever is already linked in libgtmshr.so
+	if ($HOSTOS == "OS/390") then
+		cp $gtm_obj/gtmshr_symbols.$exp $3/
+	endif
+	set gt_ld_linklib_options = "-L$gtm_obj"	# do not link in mumps whatever is already linked in libgtmshr.so
 endif
 
 # Building mumps executable
@@ -116,7 +129,7 @@ if ( $HOSTOS == "AIX") then
 	set aix_loadmap_option = "-bcalls:$gtm_map/mumps.loadmap -bmap:$gtm_map/mumps.loadmap -bxref:$gtm_map/mumps.loadmap"
 endif
 
-gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/mumps $gtm_obj/gtm.o ${gt_ld_linklib_options} \
+gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/mumps ${gt_ld_linklib_options} $gtm_obj/gtm.o \
 	$gt_ld_sysrtns $gt_ld_syslibs >& $gtm_map/mumps.map
 
 if ( $status != 0  ||  ! -x $3/mumps ) then
@@ -138,7 +151,8 @@ if ( $gt_ar_gtmrpc_name != "" ) then
 	if ( $HOSTOS == "AIX") then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtmsvc.loadmap"
 	endif
-	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtm_svc \
+	# export gtm_filename_to_id and dependent modules from gtm_svc.
+	gt_ld $gt_ld_options $gt_ld_options_all_exe $aix_loadmap_option ${gt_ld_option_output}$3/gtm_svc \
 		-L$gtm_obj $gtm_obj/{gtm_svc,mumps_clitab,gtm_rpc_init,gtm_dal_svc}.o $gt_ld_sysrtns \
 		-lmumps -lgnpclient -lcmisockettcp -L$gtm_exe -l$gt_ar_gtmrpc_name $gt_ld_syslibs >& $gtm_map/gtm_svc.map
 	if ( $status != 0  ||  ! -x $3/gtm_svc ) then

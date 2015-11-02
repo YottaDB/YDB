@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -166,7 +166,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 	uint4		*patptr;
 	int		match, alt_size, charlen, bytelen, pat_found;
 	mval		alt_pat, alt_str;
-	pte_csh		*tmp_pte, *src_pte, *dst_pte, *free_pte;
+	pte_csh		*tmp_pte;
 	unsigned char	*strtmp, *strnext;
 
 	if (PTE_MAX_CURALT_DEPTH > curalt_depth)
@@ -190,7 +190,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 			{
 				new_pte_csh_size = (cur_pte_csh_size << 1);
 				tmp_pte = malloc(sizeof(pte_csh) * new_pte_csh_size);
-				free_pte = cur_pte_csh_array;
+				free(cur_pte_csh_array);
 				pte_csh_alloc_size[curalt_depth] = new_pte_csh_size;
 				pte_csh_array[curalt_depth] = tmp_pte;
 				cur_pte_csh_array = pte_csh_array[curalt_depth];
@@ -321,7 +321,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 						{
 							strnext = UTF8_MBNEXT(strtmp, strtop);
 							assert(strnext > strtmp);
-							bytelen += strnext - strtmp;
+							bytelen += (int)(strnext - strtmp);
 							strtmp = strnext;
 						}
 					}

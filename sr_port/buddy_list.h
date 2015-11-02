@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,9 +52,7 @@ typedef struct	buddy_list_struct
  * to maintain a linked list of free elements.
  *
  * Also don't mix usage of free_last_n_elements() and get_new_free_element() unless you know what you are doing.
- *
  */
-
 void		initialize_list(buddy_list *list, int4 elemSize, int4 initAlloc);
 char		*get_new_element(buddy_list *list, int4 nElements);
 char		*find_element(buddy_list *list, int4 index);
@@ -80,6 +78,39 @@ char		*get_new_free_element(buddy_list *list);	/* gets a freed-up element if ava
 		cleanup_list(list);		\
 		free(list);			\
 	}					\
+}
+
+#define	VERIFY_LIST_IS_REINITIALIZED(list)					\
+{	/* The following code verifies the same fields initialized by the	\
+	 * function "reinitialize_list". Any changes to one should be reflected	\
+	 * in the other.							\
+	 */									\
+	assert(0 == list->nElems);						\
+	assert(list->cumulMaxElems == list->initAlloc);				\
+	assert(list->ptrArrayCurr == list->ptrArray);				\
+	assert(list->nextFreePtr == list->ptrArray[0]);				\
+	assert(0 == list->itrptrArrayCurr);					\
+	assert(0 == list->itrnElems);						\
+	assert(0 == list->itrcumulMaxElems);					\
+	assert(0 == list->itrnextFreePtr);					\
+	assert(0 == list->free_que->fl);					\
+	assert(0 == list->free_que->bl);					\
+}
+
+#define	REINITIALIZE_LIST(LST)						\
+{									\
+	buddy_list	*lcllist;					\
+									\
+	lcllist = LST;							\
+	assert((0 == lcllist->free_que->fl) || lcllist->nElems);	\
+	assert((0 == lcllist->free_que->bl) || lcllist->nElems);	\
+	if (lcllist->nElems)						\
+		reinitialize_list(lcllist);				\
+	else								\
+	{	/* No need to reinitialize. Verify			\
+		 * that list is already initialized */			\
+		VERIFY_LIST_IS_REINITIALIZED(lcllist);			\
+	}								\
 }
 
 #endif

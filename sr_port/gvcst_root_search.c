@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,6 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF short            dollar_tlevel;
 GBLREF short            dollar_trestart;
 GBLREF unsigned int	t_tries;
-GBLREF bool		is_standalone;
 GBLREF gv_namehead	*reset_gv_target;
 
 static	mstr	global_collation_mstr;
@@ -92,8 +91,6 @@ void gvcst_root_search(void)
 		reset_gv_target = save_targ;
 	}
 	gv_target = cs_addrs->dir_tree;
-	if (is_standalone)  /* *&&  (0 != gv_target->clue.end)  &&  (FALSE == is_valid_hist(&gv_target->hist))) */
-		gv_target->clue.end = 0;
 	T_BEGIN_READ_NONTP_OR_TP(ERR_GVGETFAIL);
 	assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 	for (;;)

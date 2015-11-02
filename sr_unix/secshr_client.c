@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -208,12 +208,12 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 		{
 			memcpy(&mesg.mesg.db_ipcs, &db_ipcs, sizeof(struct ipcs_mesg_struct));
 			/* most of the time file length is much smaller than MAX_TRANS_NAME_LEN */
-			mesg.len += (sizeof(struct ipcs_mesg_struct) - MAX_TRANS_NAME_LEN);
+			mesg.len += (SIZEOF(struct ipcs_mesg_struct) - MAX_TRANS_NAME_LEN);
 			mesg.len += mesg.mesg.db_ipcs.fn_len;
 		} else
 		{
 			mesg.mesg.id = id;
-			mesg.len += sizeof(mesg.mesg.id);
+			mesg.len += SIZEOF(mesg.mesg.id);
 		}
 		mesg.pid = process_id;
 		mesg.seqno = ++cur_seqno;
@@ -223,7 +223,7 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 		for (send_complete = FALSE; !send_complete;)
 		{
   			SENDTO_SOCK(gtmsecshr_sockfd, send_ptr, send_len, 0, (struct sockaddr *)&gtmsecshr_sock_name,
-				(sssize_t)gtmsecshr_sockpath_len, num_chars_sent);
+				(GTM_SOCKLEN_TYPE)gtmsecshr_sockpath_len, num_chars_sent);
 			if (0 <= num_chars_sent)
 			{
 				sent += num_chars_sent;
@@ -233,7 +233,7 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 					break;
 				}
 				send_ptr += num_chars_sent;
-				send_len -= num_chars_sent;
+				send_len -= (int)num_chars_sent;
 			} else
 			{
 				/* sendto failed - start server and attempt to resend */
@@ -293,7 +293,7 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 
 				}
 				recv_ptr += num_chars_recvd;
-				recv_len -= num_chars_recvd;
+				recv_len -= (int)num_chars_recvd;
 				continue;
 			}
 			if (client_timer_popped)

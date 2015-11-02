@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -235,7 +235,7 @@ void dse_adrec(void)
 	}
 	memcpy(rp, new_bp, new_len);
 	free(new_bp);
-	((blk_hdr_ptr_t)lbp)->bsiz += new_len + rp - b_top;
+	((blk_hdr_ptr_t)lbp)->bsiz += new_len + (unsigned int)(rp - b_top);
 
 	BLK_INIT(bs_ptr, bs1);
 	BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + sizeof(blk_hdr), (int)((blk_hdr_ptr_t)lbp)->bsiz - sizeof(blk_hdr));

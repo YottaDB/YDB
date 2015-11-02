@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ void op_gvquery (mval *v)
 {
 	int4			size;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, *glob_begin;
- 	bool			found;
+ 	boolean_t		found, ok_to_change_currkey;
 	enum db_acc_method 	acc_meth;
 	unsigned char		*extnamsrc, *extnamdst, *extnamtop;
 	int			maxlen;
@@ -46,21 +46,25 @@ void op_gvquery (mval *v)
 	/* We want to turn QUERY into QUERYGET for all types of access methods so that we can cache the value of the key returned
 	 * by $QUERY. The value is very likely to be used shortly after $QUERY - Vinaya, Aug 13, 2001 */
 	acc_meth = gv_cur_region->dyn.addr->acc_meth;
-	if (gv_curr_subsc_null)
+	/* Modify gv_currkey such that a gvcst_search of the resulting key will find the next available record in collation order.
+	 * But in case of dba_usr (the custom implementation of $ORDER which is overloaded for DDP now but could be more in the
+	 * future) it is better to hand over gv_currkey as it is so the custom implementation can decide what to do with it.
+	 */
+	ok_to_change_currkey = (dba_usr != acc_meth);
+	if (ok_to_change_currkey)
 	{
-		if (0 == gv_cur_region->std_null_coll)
-			gv_currkey->base[gv_currkey->prev] = 01;
-		else
+		if (gv_curr_subsc_null && (0 == gv_cur_region->std_null_coll))
 		{
+			assert(STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]);
+			gv_currkey->base[gv_currkey->prev] = 01;
+		} else
+		{	/* Note, gv_currkey->prev isn't changed here. We rely on this
+			 * in gtcmtr_query to distinguish different forms of the key.
+			 */
 			gv_currkey->base[gv_currkey->end++]= 1;
-			gv_currkey->base[gv_currkey->end++] = 0;
-			gv_currkey->base[gv_currkey->end] = 0;
+			gv_currkey->base[gv_currkey->end++] = KEY_DELIMITER;
+			gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 		}
-	} else
-	{ /* Note, gv_currkey->prev isn't changed here. We rely on this in gtcmtr_query to distinguish different forms of the key */
-		gv_currkey->base[gv_currkey->end++]= 1;
-		gv_currkey->base[gv_currkey->end++] = 0;
-		gv_currkey->base[gv_currkey->end] = 0;
 	}
 	switch (acc_meth)
 	{
@@ -78,6 +82,22 @@ void op_gvquery (mval *v)
 			assert(FALSE); /* why didn't we cover all access methods? */
 			found = FALSE;
 			break;
+	}
+	if (ok_to_change_currkey)
+	{	/* Restore gv_currkey to what it was at function entry time */
+		if (gv_curr_subsc_null && (0 == gv_cur_region->std_null_coll))
+		{
+			assert(01 == gv_currkey->base[gv_currkey->prev]);
+			gv_currkey->base[gv_currkey->prev] = STR_SUB_PREFIX;
+		} else
+		{
+			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
+			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end - 1]);
+			assert(1 == gv_currkey->base[gv_currkey->end - 2]);
+			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end - 3]);
+			gv_currkey->end -= 2;
+			gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
+		}
 	}
 	v->mvtype = MV_STR;
 	if (found)

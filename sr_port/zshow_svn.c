@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -284,7 +284,7 @@ void zshow_svn(zshow_out *output)
 		ZS_VAR_EQU(&x, za_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZALLOCSTOR */
-		count = totalAlloc;
+		count = (int)totalAlloc;	/* WARNING: downcasting possible 64bit value to 32bits */
 		MV_FORCE_UMVAL(&var, (unsigned int)count);
 		ZS_VAR_EQU(&x, zallocstor_text);
 		mval_write(output, &var, TRUE);
@@ -415,7 +415,7 @@ void zshow_svn(zshow_out *output)
 		ZS_VAR_EQU(&x, zquit_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZREALSTOR */
-		count = totalRmalloc;
+		count = (int)totalRmalloc;	/* WARNING: downcasting possible 64bit value to 32bits */
 		MV_FORCE_UMVAL(&var, (unsigned int)count);
 		ZS_VAR_EQU(&x, zrealstor_text);
 		mval_write(output, &var, TRUE);
@@ -452,7 +452,7 @@ void zshow_svn(zshow_out *output)
 		ZS_VAR_EQU(&x, ztrap_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZUSEDSTOR */
-		count = totalUsed;
+		count = (int)totalUsed;		/* WARNING: downcasting possible 64bit value to 32bits */
 		MV_FORCE_UMVAL(&var, (unsigned int)count);
 		ZS_VAR_EQU(&x, zusedstor_text);
 		mval_write(output, &var, TRUE);

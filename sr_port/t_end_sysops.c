@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,6 +54,7 @@
 #include "wbox_test_init.h"
 #include "cache.h"
 #include "memcoherency.h"
+#include "repl_sp.h"		/* for F_CLOSE (used by JNL_FD_CLOSE) */
 
 #if defined(VMS)
 #include "efn.h"
@@ -66,7 +67,6 @@
 #include "aswp.h"
 #include "gt_timer.h"
 #include "gtmio.h"
-#include "repl_sp.h"		/* F_CLOSE */
 #include "io.h"			/* for gtmsecshr.h */
 #include "performcaslatchcheck.h"
 #include "gtmmsg.h"
@@ -1624,11 +1624,10 @@ uint4	jnl_ensure_open(void)
 	jnl_private_control	*jpc;
 	sgmnt_addrs		*csa;
 	boolean_t		first_open_of_jnl, need_to_open_jnl;
+	int			close_res;
 #	if defined(VMS)
 	static const gds_file_id	file;
 	uint4				status;
-#	elif defined(UNIX)
-	int			close_res;
 #	endif
 
 	csa = cs_addrs;
@@ -1663,9 +1662,7 @@ uint4	jnl_ensure_open(void)
 	} else if (JNL_FILE_SWITCHED(jpc))
 	{	/* The journal file has been changed "on the fly"; close the old one and open the new one */
 		VMS_ONLY(assert(FALSE);)	/* everyone having older jnl open should have closed it at time of switch in VMS */
-		VMS_ONLY(sys$dassgn(jpc->channel);)	/* close old generation journal file */
-		UNIX_ONLY(F_CLOSE(jpc->channel, close_res);)
-		jpc->channel = NOJNL;
+		JNL_FD_CLOSE(jpc->channel, close_res);	/* sets jpc->channel to NOJNL */
 		need_to_open_jnl = TRUE;
 	}
 	if (need_to_open_jnl)

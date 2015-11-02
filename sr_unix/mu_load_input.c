@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,7 @@
 
 #include "gtm_fcntl.h"
 #include "gtm_string.h"
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include <errno.h>
 
 #include "gtm_stdio.h"
@@ -27,6 +27,7 @@
 #include "gtm_stat.h"
 #include "op.h"
 #include "mu_load_input.h"
+#include "iotimer.h"
 
 #define BUFF_SIZE	65536
 
@@ -43,10 +44,11 @@ void mu_load_init(char *fn, short fn_len)
 {
 	mval            val;
 	mval            pars;
-	static readonly unsigned char open_params_list[3] =
+	static readonly unsigned char open_params_list[] =
 	{
 		(unsigned char)iop_readonly,
 		(unsigned char)iop_rewind,
+		(unsigned char)iop_m,
 		(unsigned char)iop_eol
 	};
 
@@ -59,6 +61,7 @@ void mu_load_init(char *fn, short fn_len)
 	val.mvtype = MV_STR;
 	val.str.len = fn_len;
 	val.str.addr = (char *)fn;
+	/* The mode will be set to M for reads */
 	(*op_open_ptr)(&val, &pars, 0, 0);
 	op_use(&val, &pars);
 	load_fn_ptr = fn;
@@ -163,7 +166,8 @@ short	mu_load_get(char **in_ptr)
 	buff1_ptr = buff1_end = buff1;
 	for (;;)
 	{
-		op_read(&val, 0);
+		/* do untimed reads */
+		op_read(&val, NO_M_TIMEOUT);
 		if (!val.str.len && io_curr_device.in->dollar.zeof)
 		{
 			REVERT;

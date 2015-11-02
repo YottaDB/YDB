@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2006 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2009 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -65,4 +65,5 @@ GDEMSGIN
 	s gdeerr("INVGBLDIR")=150503851
 	s gdeerr("WRITEERROR")=150503859
 	s gdeerr("NONASCII")=150503866
+	s gdeerr("ENCNOMM")=150503874
 	q

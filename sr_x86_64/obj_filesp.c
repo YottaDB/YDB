@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,29 +81,17 @@ static char static_string_tbl[] = {
 #define SEC_STRTAB_INDX 2
 #define SEC_SYMTAB_INDX 3
 
-GBLDEF uint4 txtrel_cnt;
-
 LITREF char gtm_release_name[];
 LITREF int4 gtm_release_name_len;
 
 GBLREF mliteral 	literal_chain;
 GBLREF char 		source_file_name[];
 GBLREF unsigned short 	source_name_len;
-GBLREF mident	routine_name;
-GBLREF mident	module_name;
-GBLREF int4	mlmax, mvmax;
-GBLREF int4	code_size, lit_addrs, lits_size;
-GBLREF int4	psect_use_tab[];	/* bytes of each psect in this module */
-
-static short int current_psect;
-static char emit_buff[OBJ_EMIT_BUF_SIZE];	/* buffer for emit output */
-static short int emit_buff_used;		/* number of chars in emit_buff */
-
-static uint4 cdlits;
-static struct rel_table *data_rel, *data_rel_end;
-static struct rel_table *text_rel, *text_rel_end;
-static int file_des;
-DEBUG_ONLY(static uint4 		txtrel_cnt_in_hdr;)
+GBLREF mident		routine_name;
+GBLREF mident		module_name;
+GBLREF int4		mlmax, mvmax;
+GBLREF int4		code_size, lit_addrs, lits_size;
+GBLREF int4		psect_use_tab[];	/* bytes of each psect in this module */
 
 error_def(ERR_OBJFILERR);
 
@@ -140,7 +128,7 @@ void create_object_file(rhdtyp *rhead)
         object_file_name[object_name_len] = 0;
 
         OPEN_OBJECT_FILE(object_file_name, O_CREAT | O_RDWR, object_file_des);
-        if (-1 == object_file_des)
+        if (FD_INVALID == object_file_des)
                 rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 
 /* Action instructions and marker are not kept in the same array since the type of the elements of
@@ -198,7 +186,7 @@ void close_object_file(void)
         symIndex += strEntrySize;
 
         gtm_obj_code = (char *)malloc(bufSize);
-        /* At this point, we have only the GTM object written onto the file. We need to read it back and wrap inside 
+        /* At this point, we have only the GTM object written onto the file. We need to read it back and wrap inside
 	   the ELF object and write a native ELF object file.
 	*/
         lseek(object_file_des, 0, SEEK_SET);
@@ -212,13 +200,11 @@ void close_object_file(void)
 		FPRINTF(stderr, "Elf library out of date!n");
 		GTMASSERT;
         }
-
         if ((elf = elf_begin(object_file_des, ELF_C_WRITE, NULL)) == 0)
         {
 		FPRINTF(stderr, "elf_begin failed!\n");
 		GTMASSERT;
         }
-
         if ( (ehdr = elf64_newehdr(elf)) == NULL )
         {
 		FPRINTF(stderr, "elf64_newehdr() failed!\n");

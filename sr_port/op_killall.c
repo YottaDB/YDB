@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,14 +17,16 @@
 
 GBLREF symval *curr_symval;
 
+/* Note similar code exists in op_xkill which excepts some records */
 void op_killall(void)
 {
 	ht_ent_mname	*sym, *top;
 	lv_val		*lv;
+
 	for (sym = curr_symval->h_symtab.base, top = sym + curr_symval->h_symtab.size; sym < top; sym++)
 	{
-		if(HTENT_VALID_MNAME(sym, lv_val, lv))
-			op_kill(lv);
+		if (HTENT_VALID_MNAME(sym, lv_val, lv))
+			lv_kill(lv, TRUE);
 	}
 	return;
 }

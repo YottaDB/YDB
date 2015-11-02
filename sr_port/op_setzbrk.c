@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,10 +29,6 @@
 #include "iosp.h"
 #include "gtm_text_alloc.h"
 
-#ifdef __ia64
-#include "ia64.h"
-#endif /*__ia64__*/
-
 GBLREF z_records		zbrk_recs;
 GBLREF mident_fixed		zlink_mname;
 GBLREF stack_frame		frame_pointer;
@@ -56,6 +52,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 	uint4		status;
 	icode_str	indir_src;
 	boolean_t	deleted;
+
 	error_def(ERR_ZLINKFILE);
 	error_def(ERR_ZLMODULE);
 	error_def(ERR_NOZBRK);
@@ -148,45 +145,31 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 #endif
 				z_ptr = zr_get_free(&zbrk_recs, addr);
 				NON_USHBIN_ONLY(fix_pages((unsigned char *)addr, (unsigned char *)addr));
-#ifndef __ia64
-				z_ptr->m_opcode = *addr; /* save for later restore while cancelling breakpoint */
-				tmp_xf_code = (z_ptr->m_opcode & ZB_CODE_MASK) >> ZB_CODE_SHIFT;
+
+				/* save for later restore while cancelling breakpoint */
+#ifdef	COMPLEX_INSTRUCTION_UPDATE
+				EXTRACT_OFFSET_TO_M_OPCODE(z_ptr->m_opcode, addr);
 #else
-				ia64_fmt_A4 inst;
-				/* Revist when instruction bundling implemented. */
-				EXTRACT_INST(addr, inst, 3);
-				z_ptr->m_opcode = ASSEMBLE_14(inst);
+				z_ptr->m_opcode = *addr; /* save for later restore while cancelling breakpoint */
+#endif
 				tmp_xf_code = (z_ptr->m_opcode & ZB_CODE_MASK) >> ZB_CODE_SHIFT;
-#endif /* __ia64*/
 				if (xf_linefetch * sizeof(UINTPTR_T) == tmp_xf_code)
-#ifndef __ia64
+				{
+#ifdef	COMPLEX_INSTRUCTION_UPDATE
+					FIX_OFFSET_WITH_ZBREAK_OFFSET(addr, xf_zbfetch);
+#else
 					*addr = (*addr & (zb_code)(~ZB_CODE_MASK)) |
 						((xf_zbfetch * sizeof(UINTPTR_T)) << ZB_CODE_SHIFT);
-#else
-				{
-					zb_code imm14 = xf_zbfetch * sizeof(UINTPTR_T);
-					inst.format.imm7b=imm14;
-					inst.format.imm6d=imm14 >> 7;
-					inst.format.sb=imm14 >> 13;
-					/* Revist when instruction bundling implemented. */
-					UPDATE_INST(addr, inst, 3);
-				}
 #endif
-				else if (xf_linestart * sizeof(UINTPTR_T) == tmp_xf_code)
-#ifndef __ia64
+				} else if (xf_linestart * sizeof(UINTPTR_T) == tmp_xf_code)
+				{
+#ifdef	COMPLEX_INSTRUCTION_UPDATE
+					FIX_OFFSET_WITH_ZBREAK_OFFSET(addr, xf_zbstart);
+#else
 					*addr = (*addr & (zb_code)(~ZB_CODE_MASK)) |
 						((xf_zbstart * sizeof(UINTPTR_T)) << ZB_CODE_SHIFT);
-#else
-				{
-					zb_code imm14 = xf_zbstart * sizeof(UINTPTR_T);
-					inst.format.imm7b=imm14;
-					inst.format.imm6d=imm14 >> 7;
-					inst.format.sb=imm14 >> 13;
-					/* Revist when instruction bundling implemented. */
-					UPDATE_INST(addr, inst, 3);
-				}
 #endif
-				else if (((xf_zbstart * sizeof(UINTPTR_T)) != tmp_xf_code)
+				} else if (((xf_zbstart * sizeof(UINTPTR_T)) != tmp_xf_code)
 					&& ((xf_zbfetch * sizeof(UINTPTR_T)) != tmp_xf_code))
 					GTMASSERT;
 				z_ptr->rtn = &(CURRENT_RHEAD_ADR(routine))->routine_name;
@@ -194,11 +177,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 				z_ptr->lab = lab_name;
 				z_ptr->offset = offset;
 				z_ptr->mpc = (zb_code *)((unsigned char *)addr - SIZEOF_LA);
-#ifndef __ia64
-				inst_flush(addr, sizeof(*addr));
-#else
-				inst_flush(addr, sizeof(ia64_bundle));
-#endif
+				inst_flush(addr, sizeof(INST_TYPE));
 			}
 			if (z_ptr->action)
 			{	/* A zbreak command was already set for this line */

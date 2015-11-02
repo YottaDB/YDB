@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,8 +49,20 @@
 		REPOSITION_PTR(ptr, type, delta, begin, end);		\
 }
 
+#define	REPOSITION_GVNH_HIST(GVNH, CSA, DELTA, SI)								\
+{														\
+	srch_blk_status 	*t1;										\
+														\
+	if (GVNH->gd_csa == CSA)										\
+	{	/* reposition pointers only if global corresponds to current database file */			\
+		for (t1 = &GVNH->hist.h[0]; t1->blk_num; t1++)							\
+			REPOSITION_PTR_IF_NOT_NULL(t1->first_tp_srch_status, struct srch_blk_status_struct,	\
+							DELTA, SI->first_tp_hist, SI->last_tp_hist);		\
+	} else													\
+		assert((GVNH != gv_target) && (GVNH != cs_addrs->dir_tree));					\
+}
 
-GBLREF	gv_namehead	*gv_target, *gv_target_list;
+GBLREF	gv_namehead	*gv_target, *gvt_tp_list;
 GBLREF	sgm_info	*sgm_info_ptr;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	sgmnt_addrs	*cs_addrs;
@@ -90,6 +102,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	boolean_t	wc_blocked;
 	boolean_t	ready2signal_gvundef_lcl;
 #	endif
+	gv_namehead	*gvt;	/* store local copy of global "gv_target" for faster access */
 
 	error_def(ERR_TRANS2BIG);
 	error_def(ERR_GVKILLFAIL);
@@ -104,8 +117,9 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	)
 	is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
 	si = sgm_info_ptr;
-	store_history = (!gv_target->noisolation || ERR_GVKILLFAIL == t_err || ERR_GVPUTFAIL == t_err);
-	assert(hist1 != &gv_target->hist);
+	gvt = gv_target;
+	store_history = (!gvt->noisolation || ERR_GVKILLFAIL == t_err || ERR_GVPUTFAIL == t_err);
+	assert(hist1 != &gvt->hist);
 	/* Ideally, store_history should be computed separately for blk_targets of gv_target->hist and hist1,
 	 * i.e. within the outer for loop below. But this is not needed since if t_err is ERR_GVPUTFAIL,
 	 * store_history is TRUE both for gv_target->hist and hist1 (which is cs_addrs->dir_tree if non-NULL)
@@ -114,7 +128,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	 * !blk_target->noisolation and hence the same value for store_history. We assert this is the case below.
 	 */
 	assert(ERR_GVPUTFAIL == t_err && (NULL == hist1 || hist1 == &cs_addrs->dir_tree->hist && !cs_addrs->dir_tree->noisolation)
-			|| !hist1 || hist1->h[0].blk_target == gv_target);
+			|| !hist1 || hist1->h[0].blk_target == gvt);
 	/* We are going to reference fields from shared memory including cr->in_tend and t1->buffaddr->tn in that order (as part
 	 * of the TP_IS_CDB_SC_BLKMOD macro below). To ensure we read an uptodate value of cr->in_tend, we do a read memory
 	 * barrier here. Note that to avoid out-of-order reads, the read memory barrier needs to be done AFTER the reference
@@ -127,7 +141,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	 * tree and accessing the buffers, they were guaranteed to have seen a consistent state of the database.
 	 */
 	SHM_READ_MEMORY_BARRIER;
-	for (hist = &gv_target->hist; hist != NULL && cdb_sc_normal == status; hist = (hist == &gv_target->hist) ? hist1 : NULL)
+	for (hist = &gvt->hist; hist != NULL && cdb_sc_normal == status; hist = (hist == &gvt->hist) ? hist1 : NULL)
 	{	/* this loop execute once or twice: 1st for gv_target and then for hist1, if any */
 		if (tprestart_syslog_delta)
 			n_blkmods = n_pvtmods = 0;
@@ -363,16 +377,16 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						|| !local_hash_entry && (hist == hist1));
 					/* Ensure we don't miss updating "cse" */
 					assert((NULL != local_hash_entry) || ((srch_blk_status *)(tabent->value))->cse|| !t1->cse);
-					assert(!local_hash_entry || !local_hash_entry->cse || !t1->cse ||
-						t1->cse == local_hash_entry->cse  ||
-						t1->cse->low_tlevel == local_hash_entry->cse);
+					assert(!local_hash_entry || !local_hash_entry->cse || !t1->cse
+						|| (t1->cse == local_hash_entry->cse)
+						|| (t1->cse->low_tlevel == local_hash_entry->cse));
 					if (local_hash_entry && t1->cse)
 					{
 						assert(is_mm || local_hash_entry->cse
-								|| t1->first_tp_srch_status == local_hash_entry
-									&& t1->cycle == local_hash_entry->cycle
-									&& t1->cr == local_hash_entry->cr
-									&& t1->buffaddr == local_hash_entry->buffaddr);
+								|| ((t1->first_tp_srch_status == local_hash_entry)
+									&& (t1->cycle == local_hash_entry->cycle)
+									&& (t1->cr == local_hash_entry->cr)
+									&& (t1->buffaddr == local_hash_entry->buffaddr)));
 						local_hash_entry->cse = t1->cse;
 					}
 				}
@@ -401,7 +415,15 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	}
 	/* If validation has succeeded, assert that if gtm_gvundef_fatal is non-zero, then we better not signal a GVUNDEF */
 	assert((cdb_sc_normal != status) || !gtm_gvundef_fatal || !ready2signal_gvundef_lcl);
-	gv_target->read_local_tn = local_tn;
+	if (gvt->read_local_tn != local_tn)
+	{	/* Set read_local_tn to local_tn; Also add gvt to list of gvtargets referenced in this TP transaction. */
+		gvt->read_local_tn = local_tn;
+		gvt->next_tp_gvnh = gvt_tp_list;
+		gvt_tp_list = gvt;
+	} else
+	{	/* Check that gvt is already part of the list of gvtargets referenced in this TP transaction */
+		DBG_CHECK_IN_GVT_TP_LIST(gvt, TRUE);	/* TRUE => we check that gvt IS present in the gvt_tp_list */
+	}
 	CWS_RESET;
 	return status;
 }
@@ -433,24 +455,29 @@ void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 	for (tli = si->tlvl_info_head; tli; tli = tli->next_tlevel_info)
 		REPOSITION_PTR_IF_NOT_NULL(tli->tlvl_tp_hist_info, srch_blk_status, delta, si->first_tp_hist, si->last_tp_hist);
 	csa = si->tp_csa;
-	for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
+	/* Adjust histories of gvtargets used in this TP transaction. Note that it is possible "gv_target" or "cs_addrs->dir_tree"
+	 * might not yet be part of this list even though they will be at the end of the current invocation of tp_hist.
+	 * In this case too gv_target's pointers need to be repositioned.
+	 */
+	for (gvnh = gvt_tp_list; NULL != gvnh; gvnh = gvnh->next_tp_gvnh)
 	{
-		/* Bypass gv_targets not used in this transaction. Note that the gvnh == gv_target check done below is
-		 * to take care of the case where gv_target's read_local_tn is not yet local_tn although it will be, at the end
-		 * of the current invocation of tp_hist. In this case too gv_target's pointers need to be repositioned.
-		 */
-		if (gvnh->read_local_tn != local_tn && gvnh != gv_target && gvnh != cs_addrs->dir_tree)
-			continue;		/* Bypass gv_targets not used in this transaction */
-		if (gvnh->gd_csa == csa)
-		{	/* reposition pointers only if global corresponds to current database file */
-			for (t1 = &gvnh->hist.h[0]; t1->blk_num; t1++)
-				REPOSITION_PTR_IF_NOT_NULL(t1->first_tp_srch_status, struct srch_blk_status_struct,
-								delta, si->first_tp_hist, si->last_tp_hist);
-		} else
-			assert((gvnh != gv_target) && (gvnh != cs_addrs->dir_tree));
+		assert(gvnh->read_local_tn == local_tn);
+		REPOSITION_GVNH_HIST(gvnh, csa, delta, si);
 	}
+	if (local_tn != gv_target->read_local_tn) /* Note: gv_target could be "cs_addrs->dir_tree" at this point in some cases */
+		REPOSITION_GVNH_HIST(gv_target, csa, delta, si);
+	/* cs_addrs->dir_tree (directory tree) history does not need any special repositioning. That is because either
+	 * 	(a) It is the same as gv_target in which case we would have done the repositioning in the previous statement OR
+	 * 	(b) It is different from gv_target in which case there are two subcases.
+	 * 		(1) It was accessed in this TP transaction. If so it would have been in gvt_tp_list and repositioning
+	 * 			would have already happened above.
+	 * 		(2) It was NOT accessed in this TP transaction. If so it will not have any "first_tp_srch_status" fields
+	 * 			that need repositioning either. Any non-zero "first_tp_srch_status" values are left over from
+	 * 			previous transactions and could coincidentally match our current tp_hist range so we can not
+	 * 			even add any asserts to validate this reasoning.
+	 */
 	assert(NULL == hist1 || hist1 != &gv_target->hist);		/* ensure that gv_target isn't doubly repositioned */
-	if (NULL != hist1 && hist1 != &cs_addrs->dir_tree->hist)		/* ensure don't reposition directory tree again */
+	if ((NULL != hist1) && (hist1 != &cs_addrs->dir_tree->hist))	/* ensure we don't reposition directory tree again */
 	{
 		for (t1 = &hist1->h[0]; t1->blk_num; t1++)
 			REPOSITION_PTR_IF_NOT_NULL(t1->first_tp_srch_status, struct srch_blk_status_struct,

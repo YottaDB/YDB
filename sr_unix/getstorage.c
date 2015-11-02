@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,11 @@ ssize_t	getstorage(void)
                           CALLFROM,
                           save_errno);
         }
+#if !defined(__MVS__)
 	cur_sbrk = (UINTPTR_T)sbrk(0); /* Two step conversion to eliminate warnings */
+#else
+	cur_sbrk = 0;			/* smw until something better */
+#endif
 	size = rl.rlim_cur - cur_sbrk;
 #if !defined(GTM64) && defined(INT8_SUPPORTED)
         if(MAXPOSINT4 < size)

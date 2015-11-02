@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,9 @@
 
 #ifndef JNLSP_H_INCLUDED
 #include "jnlsp.h"
+#endif
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
 #endif
 
 #define TID_STR_SIZE		8
@@ -484,7 +487,13 @@ typedef struct
 	uint4 			checksum;	/* Calculate from journal file id */
 	uint4			prev_recov_blks_to_upgrd_adjust;	/* amount to adjust filehdr "blks_to_upgrd" if ever
 									 * backward recovery goes back past this journal file */
-	char			filler[960];
+	/* encryption related fields */
+	uint4			is_encrypted;
+	char			encryption_hash[GTMCRYPT_RESERVED_HASH_LEN];
+
+	/* filler remaining */
+	char			filler[700];
+
 } jnl_file_header;
 
 typedef struct
@@ -519,6 +528,8 @@ typedef struct
 	uint4 			checksum;
 	uint4			free_blocks;		/* free  blocks counter at time of epoch */
 	uint4			total_blks;		/* total blocks counter at time of epoch */
+	uint4			is_encrypted;
+	char			encryption_hash[GTMCRYPT_HASH_LEN];
 } jnl_create_info;
 
 /* Journal record definitions */
@@ -550,6 +561,11 @@ typedef struct jnl_format_buff_struct
 	char 				*buff;
 	uint4				checksum;
 	jnl_action			ja;
+#ifdef GTM_CRYPT
+	char				*alt_buff; /* for storing the unencrypted jnl *SET and *KILL records to be pushed
+						    * into the jnl pool. */
+	NON_GTM64_ONLY(int4		dummy_filler;) /* for alignment in 32 bit machines. */
+#endif
 } jnl_format_buffer;
 
 /* All fixed size recrods are 8-byte-multiple size.
@@ -849,6 +865,8 @@ DEBUG_ONLY(
  */
 #define	BUILD_AIMG_IF_JNL_ENABLED(csa, csd, jfb, cse)					\
 {											\
+	GBLREF	cw_set_element   	cw_set[];					\
+											\
 	if (JNL_ENABLED(csd))								\
 	{										\
 		cse = (cw_set_element *)(&cw_set[0]);					\
@@ -933,6 +951,22 @@ DEBUG_ONLY(
 	} else														\
 		csa->jnl = NULL;											\
 }
+#define	JNL_FD_CLOSE(CHANNEL, RC)										\
+{														\
+	fd_type	lcl_channel;											\
+														\
+	/* Reset incoming channel BEFORE closing it. This way, if we get interrupted BEFORE the close but	\
+	 * after we have reset channel, we could at most end up with a file descriptor leak. Doing it the	\
+	 * other way around could cause us to close the channel but yet have a dangling pointer to it that	\
+	 * could result in more than one close of the same file descriptor where the second close could		\
+	 * be on some other valid open file descriptor.								\
+	 */													\
+	lcl_channel = CHANNEL;											\
+	CHANNEL = NOJNL;											\
+	F_CLOSE(lcl_channel, RC);	/* resets "lcl_channel" to FD_INVALID */				\
+	assert(SS_NORMAL == RC);										\
+}
+
 #define MAX_EPOCH_DELAY		30
 #define EXT_NEW 		"_new"
 #define PREFIX_ROLLED_BAK	"rolled_bak_"
@@ -945,13 +979,14 @@ DEBUG_ONLY(
 	/* Add MIN_ALIGN_RECLEN since the condition to write an align record is "(this rec size + MIN_ALIGN_RECLEN) crosses	\
 	 * align boundary". The largest record will be of type JRT_ALIGN that is at most "the largest possible non ALIGN	\
 	 * type record + MIN_ALIGN_RECLEN" */											\
-	(JINFO)->max_phys_reclen = ROUND_UP2(MIN_PBLK_RECLEN + (CSD)->blk_size, JNL_REC_START_BNDRY) + MIN_ALIGN_RECLEN;	\
+	(JINFO)->max_phys_reclen = (uint4)ROUND_UP2(MIN_PBLK_RECLEN + (CSD)->blk_size, JNL_REC_START_BNDRY) +			\
+		(uint4)MIN_ALIGN_RECLEN;											\
 	/* max_logi_reclen must ideally be based on (CSD)->max_rec_size, but since max_rec_size can be changed independent of	\
 	 * journal file creation, we consider the max possible logical record size. */						\
 	assert(FIXED_UPD_RECLEN <= FIXED_ZTP_UPD_RECLEN);									\
 	/* fixed size part of ztp update record + MAX possible (key + data) len + keylen + datalen */				\
-	(JINFO)->max_logi_reclen = ROUND_UP2(FIXED_ZTP_UPD_RECLEN + ((CSD)->blk_size - USIZEOF(blk_hdr) - USIZEOF(rec_hdr)) +	\
-			                     USIZEOF(jnl_str_len_t) + USIZEOF(mstr_len_t) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY);\
+	(JINFO)->max_logi_reclen = (uint4)ROUND_UP2(FIXED_ZTP_UPD_RECLEN + ((CSD)->blk_size - USIZEOF(blk_hdr) -		\
+		USIZEOF(rec_hdr)) + USIZEOF(jnl_str_len_t) + USIZEOF(mstr_len_t) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY);	\
 	assert((JINFO)->max_phys_reclen >= (JINFO)->max_logi_reclen);								\
 }
 
@@ -962,7 +997,19 @@ DEBUG_ONLY(
 	 */												\
 	assert((NULL == jnlpool_ctl) || (csd->reg_seqno <= (jnlpool_ctl->jnl_seqno + 1)));		\
 }
+#ifdef GTM_CRYPT
+#define DECODE_SET_KILL_ZKILL(mumps_node_ptr, is_ztp, rec_size, key_handle, RC)				\
+{													\
+	int span_length, fixed_prefix;									\
+													\
+	RC = 0;												\
+	fixed_prefix = (is_ztp) ? FIXED_ZTP_UPD_RECLEN : FIXED_UPD_RECLEN;				\
+	ASSERT_ENCRYPTION_INITIALIZED;									\
+	span_length = rec_size - fixed_prefix - JREC_SUFFIX_SIZE;					\
+	GTMCRYPT_DECODE_FAST(key_handle, (char *)mumps_node_ptr, span_length, NULL, RC);		\
+}
 
+#endif /* GTM_CRYPT */
 /* jnl_ prototypes */
 int	jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size); /***type int added***/
 void	jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat);

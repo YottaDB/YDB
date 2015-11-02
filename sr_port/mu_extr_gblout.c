@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,9 @@
 #include "zshow.h"
 #include "gtmmsg.h"
 #include "min_max.h"
-
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 #define INTEG_ERROR_RETURN 							\
 {										\
 	gtm_putmsg(VARLSTCNT(4) ERR_EXTRFAIL, 2, gn->str.len, gn->str.addr); 	\
@@ -52,10 +54,15 @@ GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gd_addr			*gd_header;
 
 static readonly unsigned char gt_lit[] = "TOTAL";
 
-#ifdef UNIX
+#if defined(UNIX) && defined(GTM_CRYPT)
+boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format, muext_hash_hdr_ptr_t hash_array,
+							boolean_t is_any_file_encrypted)
+#elif defined(UNIX)
 boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format)
 #elif defined(VMS)
 boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int format)
@@ -69,13 +76,22 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 	unsigned short	rec_size;
 	sm_uc_ptr_t 	cp1, blktop, rectop;
 	blk_hdr_ptr_t 	bp;
-	rec_hdr_ptr_t 	rp;
+	rec_hdr_ptr_t 	rp, save_rp;
 	unsigned char  	*keytop, *cp2, last, current;
 	static gv_key	*beg_gv_currkey; 	/* this is used to check key out of order condition */
 	static unsigned char	*private_blk = NULL, *zwr_buffer = NULL, *key_buffer = NULL;
 	static uint4	private_blksz = 0;
 	static int	max_zwr_len = 0;
 
+#	ifdef GTM_CRYPT
+	static sgmnt_data_ptr_t		prev_csd;
+	static gtmcrypt_key_t		encr_key_handle;
+	static int4			index, prev_allocated_size;
+	int				init_status, crypt_status;
+	char				*inbuf;
+	gd_region			*reg, *reg_top;
+	static unsigned char		*unencrypted_blk_buff;
+#	endif
 	error_def(ERR_EXTRFAIL);
 	error_def(ERR_RECORDSTAT);
 
@@ -103,6 +119,32 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 	gname_size = gv_currkey->end;
 	keytop = &gv_currkey->base[gv_currkey->top];
 	st->recknt = st->reclen = st->keylen = st->datalen = 0;
+#	ifdef GTM_CRYPT
+	if (is_any_file_encrypted && (cs_data->is_encrypted) && (format == MU_FMT_BINARY))
+	{
+		INIT_PROC_ENCRYPTION(init_status);
+		if (0 != init_status)
+		{
+			GC_GTM_PUTMSG(init_status, gv_cur_region->dyn.addr->fname);
+			return FALSE;
+		}
+		if (prev_csd != cs_data)
+		{
+			prev_csd = cs_data;
+			for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions, index = 0;
+					reg < reg_top; reg++, index++)
+				if (gv_cur_region == reg)
+					break;
+			assert(gv_cur_region < reg_top);
+			GTMCRYPT_GETKEY(hash_array[index].gtmcrypt_hash, encr_key_handle, crypt_status);
+			if (0 != crypt_status)
+			{
+				GC_GTM_PUTMSG(init_status, gv_cur_region->dyn.addr->fname);
+				return FALSE;
+			}
+		}
+	}
+#	endif
 	for ( ; ; )
 	{
 		if (mu_ctrly_occurred)
@@ -127,7 +169,48 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 		if (format == MU_FMT_BINARY)
 		{
 			out_size = blktop - (sm_uc_ptr_t)rp;
+			save_rp = rp;
+#			ifdef GTM_CRYPT
+			if (is_any_file_encrypted)
+			{
+				/* Note that we are only encrypting data blocks */
+				if (cs_data->is_encrypted)
+				{
+					inbuf = (char *)(rp);
+
+					*(int4 *)(cs_addrs->encrypted_blk_contents) = index;
+					GTMCRYPT_ENCODE_FAST(encr_key_handle,
+								inbuf,
+								out_size,
+								cs_addrs->encrypted_blk_contents + sizeof(int4),
+								crypt_status);
+					if (0 != crypt_status)
+					{
+						GC_GTM_PUTMSG(crypt_status, gv_cur_region->dyn.addr->fname);
+						return FALSE;
+					}
+				} else
+				{
+					/* If we extract from a mix of encrypted and unencrypted databases, for the unencrypted
+					 * databases, cs_addrs->encrypted_blk_contents will not be initialized in db_init. Hence
+					 * we use a static buffer for this purpose. */
+					if (NULL == unencrypted_blk_buff || (prev_allocated_size < out_size))
+					{
+						if (NULL != unencrypted_blk_buff)
+							free(unencrypted_blk_buff);
+						unencrypted_blk_buff = (unsigned char *) malloc(out_size + sizeof(int4));
+						prev_allocated_size = out_size;
+					}
+					*(int4 *)(unencrypted_blk_buff) = -1;
+					memcpy(unencrypted_blk_buff + (sizeof(int4)), rp, out_size);
+				}
+				rp = (cs_data->is_encrypted) ? (rec_hdr_ptr_t)cs_addrs->encrypted_blk_contents
+							     : (rec_hdr_ptr_t)unencrypted_blk_buff;
+				out_size += sizeof(int4);
+			}
+#			endif
 			WRITE_BIN_EXTR_BLK(rp, out_size); /* output records of current block */
+			rp = save_rp;
 		}
 		for (beg_key = TRUE; (sm_uc_ptr_t)rp < blktop; rp = (rec_hdr_ptr_t)rectop)
 		{ 	/* Start scanning a block */

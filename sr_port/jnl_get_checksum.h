@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,9 +21,10 @@ GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-onl
 #endif
 
 /* This macro is to be used whenever we are computing the checksum of a block that has been acquired. */
-#define	JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, old_blk, bsize)						\
+#define	JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, csa, old_blk, bsize)					\
 {													\
 	cache_rec_ptr_t	cr;										\
+	boolean_t	cr_is_null;									\
 	/* Record current database tn before computing checksum of acquired block. This is used		\
 	 * later by the commit logic to determine if the block contents have changed (and hence		\
 	 * if recomputation of checksum is necessary). For BG, we have two-phase commit where		\
@@ -49,13 +50,20 @@ GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-onl
 	 * (using donot_commit variable) to ensure we do restart this transaction.			\
 	 */												\
 	cr = cse->cr;											\
-	assert((NULL != cr) || dollar_tlevel);								\
-	DEBUG_ONLY(if (NULL == cr) donot_commit |= DONOTCOMMIT_JNLGETCHECKSUM_NULL_CR;)			\
-	cse->tn = (((NULL == cr) || cr->in_tend) ? 0 : csd->trans_hist.curr_tn);			\
-	cse->blk_checksum = jnl_get_checksum((uint4 *)(old_blk), (bsize));				\
+	cr_is_null = (NULL == cr);									\
+	assert(!cr_is_null || dollar_tlevel);								\
+	DEBUG_ONLY(if (cr_is_null) donot_commit |= DONOTCOMMIT_JNLGETCHECKSUM_NULL_CR;)			\
+	cse->tn = ((cr_is_null || cr->in_tend) ? 0 : csd->trans_hist.curr_tn);				\
+	/* If cr is NULL, it is a restartable situation. So dont waste time computing checksums. Also	\
+	 * if the db is encrypted, we cannot get at the encryption global buffer (jnl_get_checksum	\
+	 * requires this) since we dont even have a regular global buffer corresponding to this block	\
+	 * so there is no way jnl_get_checksum can proceed in that case. So it is actually necessary	\
+	 * to avoid computing checksums if cr is NULL.							\
+	 */												\
+	cse->blk_checksum = !cr_is_null ? jnl_get_checksum((uint4 *)(old_blk), csa, (bsize)) : 0;	\
 }
 
-uint4 jnl_get_checksum(uint4 *buff, int bufflen);
+uint4 jnl_get_checksum(uint4 *buff, sgmnt_addrs *csa, int bufflen);
 uint4 jnl_get_checksum_entire(uint4 *buff, int bufflen);
 
 #endif

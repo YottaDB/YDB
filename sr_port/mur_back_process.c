@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,9 @@
 #include "mupip_exit.h"
 #include "mur_validate_checksum.h"
 #include "gdsblk.h"
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 
 GBLREF  int		mur_regno;
 GBLREF 	mur_gbls_t	murgbl;
@@ -148,7 +151,7 @@ boolean_t mur_back_process(boolean_t apply_pblk, seq_num *pre_resolve_seqno)
 			alt_tp_resolve_time = mur_rab.jnlrec->prefix.time;
 		} else	/* An error message must have been printed */
 			break;
-		reinitialize_list(murgbl.multi_list);
+		REINITIALIZE_LIST(murgbl.multi_list);
 		reinitialize_hashtab_int8(&murgbl.token_table);
 		murgbl.broken_cnt = 0;
 		/* We must restart from latest generation. */
@@ -195,7 +198,9 @@ uint4 mur_back_processing(boolean_t apply_pblk, seq_num *pre_resolve_seqno, jnl_
 	pini_list_struct		*plst;
 	reg_ctl_list			*rctl, *rctl_top;
 	jnl_string			*keystr;
-
+	GTMCRYPT_ONLY(
+		int			crypt_status;
+	)
 	error_def		(ERR_JNLREADBOF);
 	error_def		(ERR_NOPREVLINK);
 	error_def		(ERR_DUPTOKEN);
@@ -292,7 +297,7 @@ uint4 mur_back_processing(boolean_t apply_pblk, seq_num *pre_resolve_seqno, jnl_
 				 * in case this recovery is interrupted/crashes.
 				 */
 				assert(0 == iterationcnt || rctl->csd->intrpt_recov_tp_resolve_time >= murgbl.tp_resolve_time);
-				rctl->csd->intrpt_recov_tp_resolve_time = murgbl.tp_resolve_time;
+				rctl->csd->intrpt_recov_tp_resolve_time = (jnl_tm_t)murgbl.tp_resolve_time;
 				assert(0 == iterationcnt ||
 				       rctl->csd->intrpt_recov_resync_seqno == (resolve_seq ? murgbl.resync_seqno : 0));
 				rctl->csd->intrpt_recov_resync_seqno = (resolve_seq ? murgbl.resync_seqno : 0);
@@ -374,40 +379,84 @@ uint4 mur_back_processing(boolean_t apply_pblk, seq_num *pre_resolve_seqno, jnl_
 					(mur_jctl->rec_offset >= mur_jctl->jfh->end_of_data);
 			assert(0 == mur_jctl->turn_around_offset);
 			rectype = (enum jnl_record_type)mur_rab.jnlrec->prefix.jrec_type;
-			if (!mur_validate_checksum())
-				MUR_BACK_PROCESS_ERROR("Checksum validation failed");
-			if (mur_rab.jnlrec->prefix.tn != rec_tn && mur_rab.jnlrec->prefix.tn != rec_tn - 1)
+			/* Even if -verify is NOT specified, if the journal file had a crash, do verification until
+			 * the first epoch is reached as the journal file could be corrupt anywhere until then
+			 * (mur_fread_eof on the journal file at the start might not have caught it).
+			 */
+			if (mur_options.verify || (mur_jctl->jfh->crash && mur_jctl->after_end_of_data))
 			{
-				rec_tn = mur_rab.jnlrec->prefix.tn;
-				MUR_BACK_PROCESS_ERROR("Transaction number continuty check failed");
-			}
-			if (mur_options.rollback && REC_HAS_TOKEN_SEQ(rectype) && GET_JNL_SEQNO(mur_rab.jnlrec) > rec_token_seq)
-			{
-				rec_token_seq = GET_JNL_SEQNO(mur_rab.jnlrec);
-				MUR_BACK_PROCESS_ERROR("Sequence number continuty check failed");
-			}
-			if (IS_SET_KILL_ZKILL(rectype))
-			{
-				if (IS_ZTP(rectype))
-					keystr = (jnl_string *)&mur_rab.jnlrec->jrec_fkill.mumps_node;
-				else
-					keystr = (jnl_string *)&mur_rab.jnlrec->jrec_kill.mumps_node;
-				if (keystr->length > max_key_size)
-					MUR_BACK_PROCESS_ERROR("Key size check failed");
-				if (0 != keystr->text[keystr->length - 1])
-					MUR_BACK_PROCESS_ERROR("Key null termination check failed");
-				if (IS_SET(rectype))
+				if (!mur_validate_checksum())
+					MUR_BACK_PROCESS_ERROR("Checksum validation failed");
+				if (mur_rab.jnlrec->prefix.tn != rec_tn && mur_rab.jnlrec->prefix.tn != rec_tn - 1)
 				{
-					GET_MSTR_LEN(val_len, &keystr->text[keystr->length]);
-					if (keystr->length + 1 + sizeof(rec_hdr) + val_len > max_rec_size)
-						MUR_BACK_PROCESS_ERROR("Record size check failed");
+					rec_tn = mur_rab.jnlrec->prefix.tn;
+					MUR_BACK_PROCESS_ERROR("Transaction number continuty check failed");
 				}
-			} else if (JRT_PBLK == rectype)
+				if (mur_options.rollback && REC_HAS_TOKEN_SEQ(rectype)
+						&& GET_JNL_SEQNO(mur_rab.jnlrec) > rec_token_seq)
+				{
+					rec_token_seq = GET_JNL_SEQNO(mur_rab.jnlrec);
+					MUR_BACK_PROCESS_ERROR("Sequence number continuty check failed");
+				}
+				if (IS_SET_KILL_ZKILL(rectype))
+				{
+					if (IS_ZTP(rectype))
+						keystr = (jnl_string *)&mur_rab.jnlrec->jrec_fkill.mumps_node;
+					else
+						keystr = (jnl_string *)&mur_rab.jnlrec->jrec_kill.mumps_node;
+#					ifdef GTM_CRYPT
+					if (mur_jctl->jfh->is_encrypted)
+					{
+						DECODE_SET_KILL_ZKILL(keystr, IS_ZTP(rectype), mur_rab.jnlrec->prefix.forwptr,
+								      mur_jctl->encr_key_handle, crypt_status);
+						if (0 != crypt_status)
+						{
+							GC_GTM_PUTMSG(crypt_status, NULL);
+							return crypt_status;
+						}
+					}
+#					endif
+					if (keystr->length > max_key_size)
+						MUR_BACK_PROCESS_ERROR("Key size check failed");
+					if (0 != keystr->text[keystr->length - 1])
+						MUR_BACK_PROCESS_ERROR("Key null termination check failed");
+					if (IS_SET(rectype))
+					{
+						GET_MSTR_LEN(val_len, &keystr->text[keystr->length]);
+						if (keystr->length + 1 + sizeof(rec_hdr) + val_len > max_rec_size)
+							MUR_BACK_PROCESS_ERROR("Record size check failed");
+					}
+				} else if (JRT_PBLK == rectype)
+				{
+					if (mur_rab.jnlrec->jrec_pblk.bsiz > max_blk_size)
+						MUR_BACK_PROCESS_ERROR("PBLK size check failed");
+					assert((FALSE == apply_pblk_this_region) || !mur_options.verify);
+					/* In case this journal file was crashed it is possible that we see a good PBLK at
+					 * this point in time but could find bad journal data in the journal file at an
+					 * EARLIER offset (further in backward processing). If the current recovery has been
+					 * invoked with -noverify, we dont have a separate pblk application phase. One might
+					 * wonder if in such a case, it is safe to apply good pblks at this point without
+					 * knowing if bad pblks could be encountered later in backward processing. Turns out
+					 * it is safe. If there were bad pblks BEFORE this good pblk, this means the good pblk
+					 * landed in the journal file on disk because of pure chance (the IO system scheduled
+					 * this write before the crash whereas the write of the previous bad pblks did not get
+					 * a chance). As long as the bad pblks were not synced to the file, this means the db
+					 * blocks corresponding to the good blks did NOT get modified at all (because the
+					 * function wcs_wtstart ensures a db blk is written ONLY if all journal records until
+					 * its corresponding pblk have been fsynced to the journal file). So basically the good
+					 * pblk would be identical to the copy of the block in the unrecovered database at
+					 * this point so it does not hurt to play it on top. For cases where there are no such
+					 * bad data gaps in the journal file, playing the pblk when -noverify is specified is
+					 * necessary as the pblk would be different from the copy of the blk in the database.
+					 * So it is safe to do the play in both cases.
+					 */
+					if (apply_pblk_this_region)
+						mur_output_pblk();
+					continue;
+				}
+			} else if (JRT_PBLK == rectype && apply_pblk_this_region)
 			{
-				if (mur_rab.jnlrec->jrec_pblk.bsiz > max_blk_size)
-					MUR_BACK_PROCESS_ERROR("PBLK size check failed");
-				if (apply_pblk_this_region)
-					mur_output_pblk();
+				mur_output_pblk();
 				continue;
 			}
 			rec_tn = mur_rab.jnlrec->prefix.tn;

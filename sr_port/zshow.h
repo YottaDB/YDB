@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,32 +31,36 @@
 #define	FIRST_LINE_OF_ZSHOW_OUTPUT(out)	(('G' != out->code) && ('g' != out->code)&& ('L' != out->code)&& ('l' != out->code) \
 						? (1 != out->line_num) : (0 != out->line_num))
 
-typedef struct {
-	struct lv_val_struct		*lvar;		/* local variable to output to			*/
-	struct lv_val_struct		*child;		/* output variable with function subscript added*/
-}zs_lv_struct;
+typedef struct
+{
+	struct lv_val_struct	*lvar;	/* local variable to output to			*/
+	struct lv_val_struct	*child;	/* output variable with function subscript added */
+} zs_lv_struct;
 
-typedef struct {
+typedef struct
+{
 	int		end;		/* gv_currkey->end for global output variable	*/
 	int		prev;		/* gv_currkey->prev 				*/
-}zs_gv_struct;
+} zs_gv_struct;
 
-typedef struct {
-    char		type;		/* device, local variable or global variable				*/
-    char		code;		/* function = "BDSW"							*/
-    char		curr_code;	/* code from previous write						*/
-    int			size;		/* total size of the output buffer					*/
-    char		*buff;		/* output buffer							*/
-    char		*ptr;		/* end of current output line in output buffer				*/
-    int			len;		/* UTF-8 character length in the current buffer(ZSHOW_DEVICE)
+typedef struct
+{
+	char		type;		/* device, local variable or global variable				*/
+	char		code;		/* function = "BDSW"							*/
+	char		curr_code;	/* code from previous write						*/
+	int		size;		/* total size of the output buffer					*/
+	char		*buff;		/* output buffer							*/
+	char		*ptr;		/* end of current output line in output buffer				*/
+	int		len;		/* UTF-8 character length in the current buffer(ZSHOW_DEVICE)
 					   or maximum length of global output record (ZSHOW_GLOBAL) 		*/
-    int			displen;	/* Display length of the current buffer(ZSHOW_DEVICE) unused otherwise	*/
-    int			line_num;	/* index for output variable starts at one				*/
-    union
-    {		zs_lv_struct	lv;
+	int		displen;	/* Display length of the current buffer(ZSHOW_DEVICE) unused otherwise	*/
+	int		line_num;	/* index for output variable starts at one				*/
+	boolean_t	flush;		/* flush the buffer							*/
+	union
+	{
+		zs_lv_struct	lv;
 		zs_gv_struct	gv;
-    } out_var;
-    bool		flush;		/* flush the buffer					*/
+	} out_var;
 } zshow_out;
 
 #include "mlkdef.h"
@@ -88,7 +92,7 @@ void		zshow_zwrite(zshow_out *output);
 boolean_t	zwr2format(mstr *src, mstr *des);
 int		zwrkeylength(char* ptr, int len);
 int		format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len);
-void		mval_write(zshow_out *output, mval *v, bool flush);
+void		mval_write(zshow_out *output, mval *v, boolean_t flush);
 void		mval_nongraphic(zshow_out *output, char *cp, int len, int num);
 void		gvzwr_fini(zshow_out *out, int pat);
 void		lvzwr_fini(zshow_out *out, int t);

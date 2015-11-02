@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,16 +45,7 @@ gld_dbname_list *read_db_files_from_gld(gd_addr *addr)
 	{
 		assert (map_region < map_region_top);
 		seg = (gd_segment *)map_region->dyn.addr;
-		if (NULL == seg->file_cntl)
-		{
-			seg->file_cntl = (file_control *)malloc(sizeof(*seg->file_cntl));
-			memset(seg->file_cntl, 0, sizeof(*seg->file_cntl));
-		}
-		if (NULL == seg->file_cntl->file_info)
-		{
-			seg->file_cntl->file_info = (void *)malloc(sizeof(GDS_INFO));
-			memset(seg->file_cntl->file_info, 0, sizeof(GDS_INFO));
-		}
+		FILE_CNTL_INIT_IF_NULL(seg);
 		ret.len = sizeof(filename);
 		ret.addr = filename;
 		retptr = &ret;

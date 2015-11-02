@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,45 +58,48 @@
 #include "secshr_db_clnup.h"
 #include "gtmio.h"
 #include "repl_shutdcode.h"
+#include "op.h"
 
-GBLREF int			process_exiting;
-GBLREF boolean_t	        mupip_jnl_recover;
-GBLREF boolean_t                need_core;
-GBLREF boolean_t                created_core;
-GBLREF boolean_t	        core_in_progress;
-GBLREF boolean_t	        exit_handler_active;
-GBLREF recvpool_addrs 	        recvpool;
-GBLREF jnlpool_addrs 	        jnlpool;
-GBLREF boolean_t	        pool_init;
-GBLREF jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF boolean_t        	is_src_server;
-GBLREF boolean_t        	is_rcvr_server;
-GBLREF boolean_t		is_updproc;
-GBLREF boolean_t		is_updhelper;
-GBLREF FILE			*gtmsource_log_fp;
-GBLREF FILE			*gtmrecv_log_fp;
-GBLREF FILE			*updproc_log_fp;
-GBLREF FILE			*updhelper_log_fp;
-GBLREF int			gtmsource_log_fd;
-GBLREF int			gtmsource_statslog_fd;
-GBLREF FILE			*gtmsource_statslog_fp;
-GBLREF int			gtmrecv_log_fd;
-GBLREF int			gtmrecv_statslog_fd;
-GBLREF FILE			*gtmrecv_statslog_fp;
-GBLREF int			updproc_log_fd;
-GBLREF int			updhelper_log_fd;
-GBLREF gd_region		*standalone_reg;
-GBLREF gd_region		*gv_cur_region;
-GBLREF gd_region		*ftok_sem_reg;
-GBLREF jnl_gbls_t		jgbl;
-GBLREF upd_helper_entry_ptr_t	helper_entry;
+GBLREF	int			process_exiting;
+GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF	boolean_t		have_standalone_access;
+GBLREF	boolean_t		need_core;
+GBLREF	boolean_t		created_core;
+GBLREF	boolean_t		core_in_progress;
+GBLREF	boolean_t		exit_handler_active;
+GBLREF	recvpool_addrs		recvpool;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	boolean_t		pool_init;
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	boolean_t		is_src_server;
+GBLREF	boolean_t		is_rcvr_server;
+GBLREF	boolean_t		is_updproc;
+GBLREF	boolean_t		is_updhelper;
+GBLREF	FILE			*gtmsource_log_fp;
+GBLREF	FILE			*gtmrecv_log_fp;
+GBLREF	FILE			*updproc_log_fp;
+GBLREF	FILE			*updhelper_log_fp;
+GBLREF	int			gtmsource_log_fd;
+GBLREF	int			gtmsource_statslog_fd;
+GBLREF	FILE			*gtmsource_statslog_fp;
+GBLREF	int			gtmrecv_log_fd;
+GBLREF	int			gtmrecv_statslog_fd;
+GBLREF	FILE			*gtmrecv_statslog_fp;
+GBLREF	int			updproc_log_fd;
+GBLREF	int			updhelper_log_fd;
+GBLREF	gd_region		*standalone_reg;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gd_region		*ftok_sem_reg;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	upd_helper_entry_ptr_t	helper_entry;
+GBLREF	short			dollar_tlevel;
 
 void close_repl_logfiles(void);
 
 void mupip_exit_handler(void)
 {
 	char		err_log[1024];
-        unix_db_info   	*udi;
+	unix_db_info		*udi;
 	FILE		*fp;
 
 	if (exit_handler_active)	/* Don't recurse if exit handler exited */
@@ -104,37 +107,49 @@ void mupip_exit_handler(void)
 	exit_handler_active = TRUE;
 	process_exiting = TRUE;
 	if (jgbl.mupip_journal)
+	{
 		mur_close_files();
-	mupip_jnl_recover = FALSE;
+		mupip_jnl_recover = FALSE;
+		have_standalone_access = FALSE;
+	}
 	jgbl.dont_reset_gbl_jrec_time = jgbl.forw_phase_recovery = FALSE;
 	cancel_timer(0);		/* Cancel all timers - No unpleasant surprises */
 	secshr_db_clnup(NORMAL_TERMINATION);
-        if (jnlpool.jnlpool_ctl)
+	if (jnlpool.jnlpool_ctl)
 	{
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 		mutex_cleanup(jnlpool.jnlpool_dummy_reg);
-                SHMDT(jnlpool.jnlpool_ctl);
+		SHMDT(jnlpool.jnlpool_ctl);
 		jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
 		pool_init = FALSE;
 	}
+	if (dollar_tlevel)
+		op_trollback(0);
 	gv_rundown();
 	if (standalone_reg)
 		db_ipcs_reset(standalone_reg, TRUE);
+	/* have_standalone_access needs to be reset to FALSE in case we came through mupip extend and
+	 * this is one of the platforms that requires standalone access to do a file extension.  In that case
+	 * gv_rundown above requires have_standalone_access to be TRUE for proper operation.  Additionally,
+	 * standalone access was acquired in mupip_extend and now it is no longer needed.
+	 *
+	 */
+	have_standalone_access = FALSE;
 	if (is_updhelper && NULL != helper_entry) /* haven't had a chance to cleanup, must be an abnormal exit */
 	{
 		helper_entry->helper_shutdown = ABNORMAL_SHUTDOWN;
 		helper_entry->helper_pid = 0; /* vacate my slot */
 		helper_entry = NULL;
 	}
-        if (recvpool.recvpool_ctl)
+	if (recvpool.recvpool_ctl)
 	{
-                SHMDT(recvpool.recvpool_ctl);
+		SHMDT(recvpool.recvpool_ctl);
 		recvpool.recvpool_ctl = NULL;
 	}
 	/*
 	 * Note:
-	 * 	In older versions we used to release replication semaphores here.
-	 * 	But it does not really help. We do not want to release them until this process exits.
+	 *	In older versions we used to release replication semaphores here.
+	 *	But it does not really help. We do not want to release them until this process exits.
 	 *	We use SEM_UNDO flag for semaphore creation. So when this process will exit,
 	 *	OS will automatically release the semaphore value by 1. That is do nothing about them.
 	 */
@@ -204,28 +219,39 @@ void close_repl_logfiles()
 {
 	int	rc;
 
-	if (gtmsource_statslog_fd != -1)
-		CLOSEFILE(gtmsource_statslog_fd, rc);
-	if (gtmsource_statslog_fp != NULL)
+	if (FD_INVALID != gtmsource_statslog_fd)
+	{
+		if (gtmsource_log_fd == gtmsource_statslog_fd)
+			gtmsource_log_fd = FD_INVALID;
+		CLOSEFILE_RESET(gtmsource_statslog_fd, rc);	/* resets "gtmsource_statslog_fd" to FD_INVALID */
+	}
+	if (NULL != gtmsource_statslog_fp)
 		FCLOSE(gtmsource_statslog_fp, rc);
-	if (gtmsource_log_fd != -1)
-		CLOSEFILE(gtmsource_log_fd, rc);
-	if (gtmsource_log_fp != NULL)
+	if (FD_INVALID != gtmsource_log_fd)
+		CLOSEFILE_RESET(gtmsource_log_fd, rc);	/* resets "gtmsource_log_fd" to FD_INVALID */
+	if (NULL != gtmsource_log_fp)
 		FCLOSE(gtmsource_log_fp, rc);
-	if (gtmrecv_statslog_fd != -1)
-		CLOSEFILE(gtmrecv_statslog_fd, rc);
-	if (gtmrecv_statslog_fp != NULL)
+	if (FD_INVALID != gtmrecv_statslog_fd)
+	{
+		if (gtmrecv_log_fd == gtmrecv_statslog_fd)
+			gtmrecv_log_fd = FD_INVALID;
+		CLOSEFILE_RESET(gtmrecv_statslog_fd, rc);	/* resets "gtmrecv_statslog_fd" to FD_INVALID */
+	}
+	if (NULL != gtmrecv_statslog_fp)
 		FCLOSE(gtmrecv_statslog_fp, rc);
-	if (gtmrecv_log_fd != -1)
-		CLOSEFILE(gtmrecv_log_fd, rc);
-	if (gtmrecv_log_fp != NULL)
+	if (FD_INVALID != gtmrecv_log_fd)
+		CLOSEFILE_RESET(gtmrecv_log_fd, rc);	/* resets "gtmrecv_log_fd" to FD_INVALID */
+	if (NULL != gtmrecv_log_fp)
 		FCLOSE(gtmrecv_log_fp, rc);
-	if (updproc_log_fd != -1)
-		CLOSEFILE(updproc_log_fd, rc);
-	if (updproc_log_fp != NULL)
+	if (FD_INVALID != updproc_log_fd)
+	{
+		assert(updproc_log_fd != updhelper_log_fd);
+		CLOSEFILE_RESET(updproc_log_fd, rc);	/* resets "updproc_log_fd" to FD_INVALID */
+	}
+	if (NULL != updproc_log_fp)
 		FCLOSE(updproc_log_fp, rc);
-	if (updhelper_log_fd != -1)
-		CLOSEFILE(updhelper_log_fd, rc);
-	if (updhelper_log_fp != NULL)
+	if (FD_INVALID != updhelper_log_fd)
+		CLOSEFILE_RESET(updhelper_log_fd, rc);	/* resets "updhelper_log_fd" to FD_INVALID */
+	if (NULL != updhelper_log_fp)
 		FCLOSE(updhelper_log_fp, rc);
 }

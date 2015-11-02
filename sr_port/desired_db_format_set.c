@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,10 +62,19 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	error_def(ERR_MUDWNGRDTN);
 	error_def(ERR_MUNOACTION);
 	error_def(ERR_WCBLOCKED);
+	error_def(ERR_CRYPTNOV4);
 
 	assert(reg->open);
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
+	GTMCRYPT_ONLY(
+		/* We don't allow databases to be encrypted if the version is V4 */
+		if (csd->is_encrypted && (GDSV4 == new_db_format))
+		{
+			gtm_putmsg(VARLSTCNT(4) ERR_CRYPTNOV4, 2, DB_LEN_STR(reg));
+			return ERR_CRYPTNOV4;
+		}
+	)
 	was_crit = csa->now_crit;
 	if (FALSE == was_crit)
 		grab_crit(reg);

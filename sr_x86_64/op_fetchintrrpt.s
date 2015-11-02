@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -25,7 +25,7 @@
 .extern	neterr_pending
 
 	.text
-.extern	fetch
+.extern	gtm_fetch
 .extern	gvcmz_neterr
 .extern	outofband_clear
 .extern	async_action
@@ -36,7 +36,7 @@ ENTRY op_fetchintrrpt
 	popq	msf_mpc_off(REG64_SCRATCH1)
 	movq    REG_PV, msf_ctxt_off(REG64_SCRATCH1)
 	movb    $0,REG8_ACCUM             # variable length argument
-	call	fetch
+	call	gtm_fetch
 	cmpb	$0,neterr_pending(REG_IP)
 	je	l1
 	call	outofband_clear

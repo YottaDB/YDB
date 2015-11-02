@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,6 +79,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	ht_ent_int4		*tabent;
 	sm_uc_ptr_t		buffaddr;
 	trans_num		blkhdrtn;
+	int			hist_size;
 
 	pTarg = gv_target;
 	assert(NULL != pTarg);
@@ -89,30 +90,65 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	SET_GVCST_SEARCH_CLUE(0);
 	INCR_DB_CSH_COUNTER(cs_addrs, n_gvcst_srches, 1);
 	pTargHist = (NULL == pHist ? &pTarg->hist : pHist);
-
-	if (0 != pTarg->clue.end)
-	{	/* have valid clue */
+	/* If final retry and TP then we can safely use clues of gv_targets that have already been used in this
+	 * TP transaction (read_local_tn == local_tn). As for the other gv_targets, we have no easy way of
+	 * determining if their clues are still uptodate (i.e. using the clue will guarantee us no restart) and
+	 * since we are in the final retry, we dont want to take a risk. So dont use the clue in that case.
+	 * If Non-TP, we will be dealing with only ONE gv_target so its clue would have been reset to 0 as part
+	 * of the penultimate restart so we dont have any of the above issue in the non-tp case. The only exception
+	 * is if we are in gvcst_kill in which case, gvcst_search will be called twice and the clue could be non-zero
+	 * for the second invocation. In this case, the clue is guaranteed to be uptodate since it was set just now
+	 * as part of the first invocation. So no need to do anything about clue in final retry for Non-TP.
+	 */
+	if ((0 != pTarg->clue.end)
+		&& !((CDB_STAGNATE <= t_tries) && dollar_tlevel && (pTarg->read_local_tn != local_tn)))
+	{	/* have valid clue that is also safe to use */
 		INCR_DB_CSH_COUNTER(cs_addrs, n_gvcst_srch_clues, 1);
 		assert(!dollar_tlevel || sgm_info_ptr);
-		status = cdb_sc_normal;
+		status = cdb_sc_normal;	/* clue is usable unless proved otherwise */
 		if (NULL != pHist)
-		{	/* Copy the full srch_hist and set loop terminator flag in unused srch_blk_status entry */
-			memcpy(pHist, &pTarg->hist, HIST_SIZE(pTarg->hist));
-			((srch_blk_status *)((char *)pHist + HIST_SIZE(pTarg->hist)))->blk_num = 0;
-		}
-		if (0 < dollar_tlevel)
-		{
+		{	/* Copy the full srch_hist and set loop terminator flag in unused srch_blk_status entry.
+			 * If in TP and if leaf block in history has cse, we are guaranteed that it is built by the
+			 * immediately previous call to "gvcst_search" (called by gvcst_kill which does two calls to
+			 * gvcst_search of which this invocation is the second) so no need to build the block like
+			 * is done for the (NULL == pHist) case below. Assert that and some more.
+			 */
+			hist_size = HIST_SIZE(pTarg->hist);
+			memcpy(pHist, &pTarg->hist, hist_size);
+			((srch_blk_status *)((char *)pHist + hist_size))->blk_num = 0;
+#			ifdef DEBUG
+			if (dollar_tlevel)
+			{
+				leaf_blk_hist = &pHist->h[0];
+				assert(0 == leaf_blk_hist->level);
+				chain1 = *(off_chain *)&leaf_blk_hist->blk_num;
+				if (chain1.flag == 1)
+				{
+					assert((int)chain1.cw_index < sgm_info_ptr->cw_set_depth);
+					tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain1.cw_index, &cse);
+				} else
+				{
+					tp_srch_status = leaf_blk_hist->first_tp_srch_status;
+					ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(tp_srch_status, sgm_info_ptr);
+					cse = (NULL != tp_srch_status) ? tp_srch_status->cse : NULL;
+				}
+				assert((NULL == cse) || cse->done);
+			}
+#			endif
+		} else if (0 < dollar_tlevel)
+		{	/* First nullify first_tp_srch_status member in gv_target history if out-of-date. This is logically done
+			 * at tp_clean_up time but delayed until the time this gv_target is used next in a transaction. This way
+			 * it saves some CPU cycles. pTarg->read_local_tn tells us whether this is the first usage of this
+			 * gv_target in this TP transaction and if so we need to reset the out-of-date field.
+			 */
 			if (pTarg->read_local_tn != local_tn)
-			{	/* Nullify out-of-date first_tp_srch_status members of histories.
-				 * Note that tp_restarts() cause no change in local_tn but yet nullify the
-				 * 	hashtable (sgm_info_ptr->blks_in_use). Therefore even in that case, we
-				 *	should be nullifying first_tp_srch_status members. But in that case, the
-				 *	clue would have been nullified (in tp_clean_up) and we wouldn't be in this
-				 *	part of the code at all. Hence the check just for read_local_tn != local_tn.
-				 */
-				for (srch_status = pTargHist->h; HIST_TERMINATOR != srch_status->blk_num; srch_status++)
+			{
+				for (srch_status = &pTarg->hist.h[0]; HIST_TERMINATOR != srch_status->blk_num; srch_status++)
 					srch_status->first_tp_srch_status = NULL;
 			}
+			/* TP & going to use clue. check if clue path contains a leaf block with a corresponding unbuilt
+			 * cse from the previous traversal. If so build it first before gvcst_search_blk/gvcst_search_tail.
+			 */
 			tp_srch_status = NULL;
 			leaf_blk_hist = &pTarg->hist.h[0];
 			assert(0 == leaf_blk_hist->level);
@@ -142,24 +178,25 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			}
 			assert(!cse || !cse->high_tlevel);
 			leaf_blk_hist->first_tp_srch_status = tp_srch_status;
-			if ((cse != NULL) && !cse->done)
+			if ((NULL != cse) && !cse->done)
 			{	/* there's a private copy and it's not up to date */
 				already_built = (NULL != cse->new_buff);
 				gvcst_blk_build(cse, cse->new_buff, 0);
-				/* Validate the block's search history right after building a private copy.
-				 * This is not needed in case gvcst_search is going to reuse the clue's search history and return
-				 * (because tp_hist will do the validation of this block). But if gvcst_search decides to do a
-				 * fresh traversal (because the clue does not cover the path of the current input key etc.) the
-				 * block build that happened now will not get validated in tp_hist since it will instead be given
-				 * the current key's search history path (a totally new path) for validation. Since a private copy
-				 * of the block has been built, tp_tend would also skip validating this block so it is necessary
-				 * that we validate the block right here. Since it is tricky to accurately differentiate between
-				 * the two cases, we do the validation unconditionally here (besides it is only a few if checks
-				 * done per block build so it is considered okay performance-wise).
+				/* Validate the block's search history right after building a private copy.  This is
+				 * not needed in case gvcst_search is going to reuse the clue's search history and
+				 * return (because tp_hist will do the validation of this block). But if gvcst_search
+				 * decides to do a fresh traversal (because the clue does not cover the path of the
+				 * current input key etc.) the block build that happened now will not get validated
+				 * in tp_hist since it will instead be given the current key's search history path (a
+				 * totally new path) for validation. Since a private copy of the block has been built,
+				 * tp_tend would also skip validating this block so it is necessary that we validate
+				 * the block right here. Since it is tricky to accurately differentiate between
+				 * the two cases, we do the validation unconditionally here (besides it is only a
+				 * few if checks done per block build so it is considered okay performance-wise).
 				 */
 				if (!already_built && !chain1.flag)
-				{	/* is_mm is calculated twice, but this is done so as to speed up the most-frequent path,
-					 * i.e. when there is a clue and either no cse or cse->done is TRUE
+				{	/* is_mm is calculated twice, but this is done so as to speed up the most-frequent
+					 * path, i.e. when there is a clue and either no cse or cse->done is TRUE
 					 */
 					is_mm = (dba_mm == cs_data->acc_meth);
 					buffaddr = tp_srch_status->buffaddr;
@@ -185,60 +222,33 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				leaf_blk_hist->cr = 0;
 				leaf_blk_hist->cycle = CYCLE_PVT_COPY;
 			}
-			/* For now we are testing whether the 0th (always) and 1st level (TP only) blocks have been modified
-			 * instead of doing it for the whole tree. That too the 1st only in TP. This is to strike a balance between
-			 * the overhead of doing a restart if an out-of-date clue is taken and the overhead of validating the clue.
-			 * Also note that only the cdb_sc_blkmod check is done. The cdb_lostcr check is not done in anticipation
-			 * that it is quite infrequent assuming a lot of global buffers in a production environment.
-			 */
+			/* For TP, check level 1 of the clue -- see comment following the end of this block for an explanation */
 	    		srch_status = &pTargHist->h[1];
 			cr = srch_status->cr;
 			if (TP_IS_CDB_SC_BLKMOD(cr, srch_status))
-				status = cdb_sc_blkmod;
-			srch_status--;
-		} else
-			srch_status = &pTargHist->h[0];
-		if (CDB_STAGNATE <= t_tries)
-		{	/* Validate every level in the clue before using since this is the final retry. */
-			assert(CDB_STAGNATE == t_tries);
-			is_mm = (dba_mm == cs_data->acc_meth);
-			for (srch_status = &pTargHist->h[0]; HIST_TERMINATOR != srch_status->blk_num; srch_status++)
-			{
-				assert(srch_status->level == srch_status - &pTargHist->h[0]);
-				assert(is_mm || (NULL == srch_status->cr) || (NULL != srch_status->buffaddr));
-				cr = srch_status->cr;
-				assert(!is_mm || (NULL == cr));
-				if (TP_IS_CDB_SC_BLKMOD(cr, srch_status))
-				{
-					status = cdb_sc_blkmod;
-					break;
-				}
-				if (srch_status->cr)
-				{
-					if (srch_status->cycle != srch_status->cr->cycle)
-					{
-						status = cdb_sc_lostcr;
-						break;
-					}
-					if (CDB_STAGNATE <= t_tries || mu_reorg_process)
-						CWS_INSERT(srch_status->cr->blk);
-					srch_status->cr->refer = TRUE;
-				}
-			}
-		} else if (srch_status->cr)
+				status = cdb_sc_blkmod;	/* clue is no longer usable */
+		}
+		/* As a cheap way to avoid expensive restarts, test whether the level 0 (TP and non-TP) and level 1 (TP only)
+		 * blocks have been modified. This strikes a balance between the overhead of validating the clue and the cost
+		 * of doing a restart because of using an out-of-date clue. Check only for cdb_sc_blkmod. In a production
+		 * environment because of sufficient global buffers we expect cdb_lostcr to be infrequent and skip that test
+		 * for level 1. For level 0 we do that test as well just in case. This technique has been empirically validated
+		 * to dramatically reduce the # of restarts in a highly contentious TP environment.
+		 */
+		srch_status = &pTargHist->h[0];
+		cr = srch_status->cr;
+		if (NULL != cr)
 		{	/* Re-read leaf block if cr doesn't match history. Do this only for leaf-block for performance reasons. */
 			assert(NULL != srch_status->buffaddr);
-			cr = srch_status->cr;
 			if (TP_IS_CDB_SC_BLKMOD(cr, srch_status))
-				status = cdb_sc_blkmod;
+				status = cdb_sc_blkmod;	/* clue is no longer usable */
 			else if ((srch_status->cycle != cr->cycle)
 					&& (NULL == (srch_status->buffaddr =
 						t_qread(srch_status->blk_num, &srch_status->cycle, &srch_status->cr))))
-				status = cdb_sc_lostcr;
+				status = cdb_sc_lostcr;	/* clue is no longer usable */
 		}
-		if (cdb_sc_normal == status)	/* avoid using clue if you know it is out of date */
-		{
-			/* Put more-likely case earlier in the if then else sequence.
+		if (cdb_sc_normal == status)
+		{	/* Now that we are ready to use the clue, put more-likely case earlier in the if then else sequence.
 			 * For sequential reads of globals, we expect the tail of the clue to be much more used than the head.
 			 * For random reads, both are equally probable and hence it doesn't matter.
 			 * The case (0 == n1) is not expected a lot (relatively) since the application may be able to optimize
@@ -248,10 +258,10 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			{
 				if (memcmp(pKey->base, pTarg->last_rec->base, nKeyLen) <= 0)
 				{
-					if ((cdb_sc_normal == (status = gvcst_search_tail(pKey, pTargHist->h, &pTarg->clue))) &&
-						(NULL == pHist))
+					if ((cdb_sc_normal == (status = gvcst_search_tail(pKey, pTargHist->h, &pTarg->clue)))
+						&& (NULL == pHist))
 					{	/* need to retain old clue for future use by gvcst_search_tail */
-						memcpy(&pTarg->clue, pKey, KEY_COPY_SIZE(pKey));
+						COPY_CURRKEY_TO_GVTARGET_CLUE(pTarg, pKey);
 					}
 					SET_GVCST_SEARCH_CLUE(1);
 					INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_tail, 1);
@@ -263,7 +273,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				{
 					SET_GVCST_SEARCH_CLUE(3);
 					if (NULL == pHist)
-						memcpy(&pTarg->clue, pKey, KEY_COPY_SIZE(pKey));
+						COPY_CURRKEY_TO_GVTARGET_CLUE(pTarg, pKey);
 					INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_head, 1);
 					return gvcst_search_blk(pKey, pTargHist->h);
 				}
@@ -285,13 +295,11 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_maxlvl;
 	}
-
 	if (0 == (int)nLevl)
 	{
 		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_badlvl;
 	}
-
 	is_mm = (dba_mm == cs_data->acc_meth);
 	pTargHist->depth = (int)nLevl;
 	pCurr = &pTargHist->h[nLevl];
@@ -437,7 +445,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			assert(c2 < &pTarg->last_rec->base[pTarg->last_rec->top]); /* make sure we don't exceed allocated bounds */
 			*c2 = *c1;
 		}
-		memcpy(&pTarg->clue, pKey, KEY_COPY_SIZE(pKey));
+		COPY_CURRKEY_TO_GVTARGET_CLUE(pTarg, pKey);
 	}
 	return cdb_sc_normal;
 }

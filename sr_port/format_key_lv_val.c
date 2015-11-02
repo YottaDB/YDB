@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,7 +66,7 @@ unsigned char	*format_key_lv_val(lv_val *lvpin, unsigned char *buff, int size)
 	assert(MV_SYM == tbl->ident);
 
 	endbuff = format_lvname(startlvp, buff, size);
-	size -= (endbuff - buff);
+	size -= (int)(endbuff - buff);
 	buff = endbuff;
 
 	if (cntfmt)

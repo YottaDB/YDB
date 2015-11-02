@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,7 @@
 #include "util.h"
 #include "gtmmsg.h"
 #include "mur_validate_checksum.h"
+#include "repl_sp.h"		/* for F_CLOSE (used by JNL_FD_CLOSE) */
 
 error_def(ERR_BEGSEQGTENDSEQ);
 error_def(ERR_BOVTMGTEOVTM);
@@ -76,7 +77,9 @@ GBLREF	mur_gbls_t	murgbl;
 GBLREF	gd_region	*gv_cur_region;
 LITREF	int		jrt_update[JRT_RECTYPES];
 LITREF	boolean_t	jrt_is_replicated[JRT_RECTYPES];
-
+GTMCRYPT_ONLY(
+	GBLREF	int	process_exiting;
+)
 
 /*
  * Function name: mur_prev_rec
@@ -884,6 +887,9 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 	char		jrecbuf[PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN];
 	jnl_record	*jrec;
 	int		cre_jnl_rec_size;
+	GTMCRYPT_ONLY(
+		int	crypt_status;
+	)
 
 	if (!mur_fopen_sp(jctl))
 		return FALSE;
@@ -984,6 +990,22 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 	/* Please investigate if murgbl.max_extr_record_length is more than what a VMS record (in a line) can handle ??? */
 	if (murgbl.max_extr_record_length < ZWR_EXP_RATIO(jctl->jfh->max_logi_reclen))
 		murgbl.max_extr_record_length = ZWR_EXP_RATIO(jctl->jfh->max_logi_reclen);
+#	ifdef GTM_CRYPT
+	jctl->is_same_hash_as_db = TRUE;
+	if (FALSE == process_exiting && jfh->is_encrypted)
+	{
+		/* Encryption initialization will not happen in db_init for all cases.
+		 * Eg: MUPIP JOURNAL -BACKWARD -SHOW -NOVERIFY */
+		INIT_PROC_ENCRYPTION(crypt_status);
+		/* If the encryption init failed in db_init, the below MACRO should return an error.
+		 * But, since this will be called for those operations that might not actually require encryption/decryption,
+		 * we don't report the error immediately. Instead wait for the first encryption/decryption task and report
+		 * accordingly. */
+		GTMCRYPT_GETKEY(jfh->encryption_hash, jctl->encr_key_handle, crypt_status);
+		if (NULL != mur_ctl->csd && (0 != memcmp(mur_ctl->csd->encryption_hash, jfh->encryption_hash, GTMCRYPT_HASH_LEN)))
+			jctl->is_same_hash_as_db = FALSE;
+	}
+#	endif
 	return TRUE;
 }
 
@@ -999,11 +1021,9 @@ boolean_t mur_fclose(jnl_ctl_list *jctl)
 		jctl->jfh = NULL;
 	}
 	free_hashtab_int4(&jctl->pini_list);
-	if (SS_NORMAL == (jctl->status = UNIX_ONLY(close)VMS_ONLY(sys$dassgn)(jctl->channel)))
-	{
-		jctl->channel = NOJNL;
+	JNL_FD_CLOSE(jctl->channel, jctl->status);	/* sets jctl->channel to NOJNL */
+	if (SS_NORMAL == jctl->status)
 		return TRUE;
-	}
 	UNIX_ONLY(jctl->status = errno;)
 	assert(FALSE);
 	gtm_putmsg(VARLSTCNT(5) ERR_JNLFILECLOSERR, 2, jctl->jnl_fn_len, jctl->jnl_fn, jctl->status);

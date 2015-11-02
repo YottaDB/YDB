@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,9 +56,9 @@
 #include "gtm_string.h"
 #include <stddef.h>
 
-#if defined(__ia64) && defined(__linux__)
+#if (defined(__ia64) && defined(__linux__)) || defined(__MVS__)
 #include "gtm_unistd.h"
-#endif /* __ia64 && __linux__  */
+#endif /* __ia64 && __linux__ or __MVS__ */
 
 #include "gt_timer.h"
 #include "wake_alarm.h"
@@ -75,15 +75,18 @@
 #include "send_msg.h"
 
 
-#if defined(__osf__) || defined(__MVS__)
+#if defined(__osf__)
 #define HZ	CLK_TCK
+#elif defined(__MVS__)
+#define HZ	gtm_zos_HZ
+STATICDEF int	gtm_zos_HZ = 100;	/* see prealloc_gt_timers below */
 #endif
 
 #ifdef ITIMER_REAL
 #define BSD_TIMER
 #else
 
-/* smw check def of time() including arg - see below   should be time_t
+/* check def of time() including arg - see below   should be time_t
        (from sys/types.h) and traditionally unsigned long */
 #ifndef __osf__
 int4	time();
@@ -203,6 +206,9 @@ void	prealloc_gt_timers(void)
 	   hope to need (dbg versions will assert fail if this number is exceeded).
 	   Allocate them with 16 bytes of possible data each. */
 
+#ifdef __MVS__
+	gtm_zos_HZ == sysconf(_SC_CLK_TCK);	/* get the real value */
+#endif
 	timeblk_hdrlen = OFFSETOF(GT_TIMER, hd_data[0]);
 	timeblk = timeblks = (GT_TIMER *)malloc((timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN) * INIT_GT_TIMERS);
 	for (gt_timer_cnt = INIT_GT_TIMERS; 0 < gt_timer_cnt; --gt_timer_cnt)
@@ -264,7 +270,7 @@ void	sys_get_curr_time (ABS_TIME *atp)
 
 void	hiber_start (uint4 hiber)
 {
-/* smw timer_start has char * as hdata type */
+/* timer_start has char * as hdata type */
 	int4		waitover;
 	int4		*waitover_addr;
 	TID		tid;
@@ -470,7 +476,7 @@ static void	sys_settimer (TID tid, ABS_TIME *time_to_expir, void (*handler)())
 	else
 	{
 		sys_timer.it_value.tv_sec = time_to_expir->at_sec;
-		sys_timer.it_value.tv_usec = time_to_expir->at_usec;
+		sys_timer.it_value.tv_usec = (gtm_tv_usec_t)time_to_expir->at_usec;
 	}
 	sys_timer.it_interval.tv_sec = sys_timer.it_interval.tv_usec = 0;
 	setitimer(ITIMER_REAL, &sys_timer, &old_sys_timer);

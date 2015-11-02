@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@
 #include "reinit_externs.h"
 #include "comp_esc.h"
 #include "resolve_blocks.h"
+#include "hashtab_str.h"
 
 #define HOPELESS_COMPILE 128
 
@@ -48,6 +49,7 @@ GBLREF int			mlmax;
 GBLREF mline			mline_root;
 GBLREF char			cg_phase;	/* code generation phase */
 GBLREF boolean_t		mstr_native_align, save_mstr_native_align;
+GBLREF hash_table_str		*complits_hashtab;
 
 bool compiler_startup(void)
 {
@@ -66,6 +68,7 @@ bool compiler_startup(void)
 
 	static readonly char compile_terminated[] = "COMPILATION TERMINATED DUE TO EXCESS ERRORS";
 
+	assert(NULL == complits_hashtab || NULL == complits_hashtab->base);
 	memset(&null_mident, 0, sizeof(null_mident));
 	ESTABLISH_RET(compiler_ch, FALSE);
 
@@ -194,6 +197,7 @@ bool compiler_startup(void)
 		list_cmd();
 		close_list_file();
 	}
+	COMPILE_HASHTAB_CLEANUP;
 	reinit_externs();
 	mstr_native_align = save_mstr_native_align;
 	REVERT;

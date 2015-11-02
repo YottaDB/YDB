@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,9 +41,7 @@
 #include "util.h"
 #include "repl_comm.h"
 #include "eintr_wrappers.h"
-#ifdef UNIX
 #include "gtmio.h"
-#endif
 #include "sgtm_putmsg.h"
 #include "copy.h"
 
@@ -165,8 +163,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Stopping stats log\n");
 		/* Force all data out to the file before closing the file */
 		repl_log(gtmsource_statslog_fp, TRUE, TRUE, "End statistics logging\n");
-		UNIX_ONLY(CLOSEFILE(gtmsource_statslog_fd, status);) VMS_ONLY(close(gtmsource_statslog_fd);)
-		gtmsource_statslog_fd = -1;
+		CLOSEFILE_RESET(gtmsource_statslog_fd, status);	/* resets "gtmsource_statslog_fd" to FD_INVALID */
 		/* We need to FCLOSE because a later open() in repl_log_init() might return the same file descriptor as the one
 		 * that we just closed. In that case, FCLOSE done in repl_log_fd2fp() affects the newly opened file and
 		 * FDOPEN will fail returning NULL for the file pointer. So, we close both the file descriptor and file pointer.

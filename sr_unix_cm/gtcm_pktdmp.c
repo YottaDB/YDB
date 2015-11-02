@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,10 @@
 #include "gtcm_sysenv.h"
 #include "gtcm.h"
 #include "omi.h"
+#ifdef __MVS__
+#include "eintr_wrappers.h"
+#include "gtm_zos_io.h"
+#endif
 
 GBLREF omi_conn		*curr_conn;
 GBLREF char		*omi_service;
@@ -127,11 +131,17 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 		sprintf(fileName,"/usr/tmp/%s_%s.%d", omi_service,
 			tbuf, fileID++);
 
-
+#ifdef __MVS__
+	if (-1 == gtm_zos_create_tagged_file(fileName, TAG_EBCDIC))
+	{
+		fprintf(stderr,"Could not create and tag new packet dump file (%s).\n", fileName);
+		perror(fileName);
+	}
+#endif
 	fp = fopen(fileName, "w");
 	if (fp == NULL)
 	{
-		fprintf(stderr,"Could not open packet dump file (%s).\n",fileName);
+		fprintf(stderr,"Could not open packet dump file (%s).\n", fileName);
 		perror(fileName);
 		return;
 	}

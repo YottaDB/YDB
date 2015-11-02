@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,22 +24,24 @@
 */
 #include "mdef.h"
 
-#include <fcntl.h>
-#include <sys/stat.h>
 #include <sys/types.h>
+
+#include "gtm_fcntl.h"
+#include "gtm_stat.h"
 #include "gtm_stdio.h"
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include "gtm_stdlib.h"
 
 #include "gtm_pipe.h"
 #include "eintr_wrappers.h"
+#include "gtmio.h"
 
 GBLDEF	uint4	pipe_child;
 
 int gtm_pipe(char *command, pipe_type pt)
 {
 	int 	pfd[2], child, parent;
-	int	dup2_res;
+	int	dup2_res, rc;
 	pid_t	child_pid;
 
 	parent = (int)pt;
@@ -50,33 +52,25 @@ int gtm_pipe(char *command, pipe_type pt)
 		PERROR("pipe : ");
 		return -2;
 	}
-
-	if(-1 == (child_pid = fork()))
+	if (-1 == (child_pid = fork()))
 	{
 		PERROR("fork : ");
 		return -1;
-	}
-	else if (0 == child_pid)
-	{
-		/* child process */
-		close(pfd[parent]);
+	} else if (0 == child_pid)
+	{	/* child process */
+		CLOSEFILE_RESET(pfd[parent], rc);	/* resets "pfd[parent]" to FD_INVALID */
 		DUP2(pfd[child], child, dup2_res);
-		close(pfd[child]);
-		/*
-		 * we should have used exec instead of SYSTEM.
-		 * Earlier it was followed by exit(0), which calls exit_handler.
-		 * So both child and parent will do exit handling. This can make ref_cnt < 0, or,
-		 * it can release semaphores, which we should not rlease until parent exists.
-		 * So we just call _exit(0)
+		CLOSEFILE_RESET(pfd[child], rc);	/* resets "pfd[child]" to FD_INVALID */
+		/* We should have used exec instead of SYSTEM. Earlier it was followed by exit(0), which calls exit_handler.
+		 * So both child and parent will do exit handling. This can make ref_cnt < 0, or, it can release semaphores,
+		 * which we should not release until parent exists. So we just call _exit(0).
 		 */
 		SYSTEM(command);
 		_exit(0); /* just exit from here */
-	}
-	else
-	{
-		/* parent process */
+	} else
+	{	/* parent process */
 		pipe_child = child_pid;
-		close(pfd[child]);
+		CLOSEFILE_RESET(pfd[child], rc);	/* resets "pfd[child]" to FD_INVALID */
    		return pfd[parent];
 	}
 

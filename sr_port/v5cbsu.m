@@ -1,6 +1,6 @@
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;								;
-	;	Copyright 2005, 2008 Fidelity Information Services, Inc	;
+	;	Copyright 2005, 2009 Fidelity Information Services, Inc	;
 	;								;
 	;	This source code contains the intellectual property	;
 	;	of its copyright holder(s), and is made available	;
@@ -166,8 +166,10 @@ readp1rc(outfile)
 	;
 doopen(file,readflag)
 	Set file(1)=readflag
-	If readflag Open file:@("(Readonly:Fixed:RecordSize="_filBufSz_":Blocksize="_filBufSz_")")
-	Else        Open file:@("(New:Fixed:RecordSize="_filBufSz_":Blocksize="_filBufSz_")")
+	new chsetstr
+	set chsetstr=$SELECT($ZV["OS390":":chset=""BINARY""",1:"")
+	If readflag Open file:@("(Readonly:Fixed"_chsetstr_":RecordSize="_filBufSz_":Blocksize="_filBufSz_")")
+	Else        Open file:@("(New:Fixed"_chsetstr_":RecordSize="_filBufSz_":Blocksize="_filBufSz_")")
 	Set file(2)=""	; Buffer for this file
 	Quit
 

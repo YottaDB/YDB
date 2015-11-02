@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,11 +73,9 @@ typedef struct
 #define VAR_START(a)	va_start(a)
 #define VARLSTCNT(a)	a,		/* push count of arguments*/
 
-#ifndef GTSQL    /* these cannot be used within SQL */
 #ifdef __sparc
 #define malloc gtm_malloc
 #define free gtm_free
-#endif
 #endif
 
 #define CODE_ADDRESS(func)	(unsigned char *)func

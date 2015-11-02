@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -138,7 +138,7 @@ void	cli_lex_setup (int argc, char **argv)
 #ifdef __osf__
 #pragma pointer_size (restore)
 #endif
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 	__argvtoascii_a(argc, argv);
 #endif
 	cmd_cnt = argc;
@@ -147,7 +147,7 @@ void	cli_lex_setup (int argc, char **argv)
 	   size of the string needed to store them.
 	*/
 	for (parmindx = 1, parmptr = argv, parmlen = 0; parmindx <= argc; parmptr++, parmindx++)
-		parmlen += strlen(*parmptr) + 1;
+		parmlen += STRLEN(*parmptr) + 1;
 	parmlen = parmlen + PARM_OVHD;	/* Extraneous extras, etc. */
 	parmlen = (parmlen > MAX_LINE ? MAX_LINE : parmlen) + 1;
 	/* call-ins may repeatedly initialize cli_lex_setup for every invocation of gtm_init() */
@@ -391,7 +391,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 				return NULL;
 			}
 			in_len = u_strlen(cli_fgets_Ubuffer);
-			in_len = trim_U16_line_term(cli_fgets_Ubuffer, in_len);
+			in_len = trim_U16_line_term(cli_fgets_Ubuffer, (int)in_len);
 			for (u16_off = 0, mbc_len = 0; u16_off < in_len; )
 			{
 				U16_NEXT(cli_fgets_Ubuffer, u16_off, in_len, uc32_cp);
@@ -420,7 +420,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 				destbuffer = buffer;
 			}
 			errorcode = U_ZERO_ERROR;
-			u_strToUTF8(destbuffer, destsize, &mbc_dest_len, cli_fgets_Ubuffer, in_len + 1, &errorcode);
+			u_strToUTF8(destbuffer, destsize, &mbc_dest_len, cli_fgets_Ubuffer, (int4)in_len + 1, &errorcode);
 			if (U_FAILURE(errorcode))
 				if (U_BUFFER_OVERFLOW_ERROR == errorcode)
 				{	/* truncate so null terminated */
@@ -446,7 +446,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 			if (cli_lex_str)
 			{
 				if (cli_lex_in_ptr->buflen < in_len)
-					cli_lex_in_expand(in_len);
+					cli_lex_in_expand((int)in_len);
 				destbuffer = cli_lex_in_ptr->in_str;
 			} else
 			{

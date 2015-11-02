@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <stdarg.h>
 #include "gtm_string.h"
 
 #include "error.h"
@@ -25,8 +26,15 @@
 #include "zwrite.h"
 #include "op.h"
 #include "mvalconv.h"
-#include <stdarg.h>
 #include "gtm_maxstr.h"
+#include "alias.h"
+
+GBLREF  uint4   	zwrtacindx;
+GBLREF  int     	merge_args;
+GBLREF  symval  	*curr_symval;
+GBLREF  zwr_hash_table  *zwrhtab;
+
+LITREF  mstr    	dzwrtac_clean;
 
 void op_lvzwrite(UNIX_ONLY_COMMA(int4 count) long arg1, ...)
 {
@@ -39,8 +47,9 @@ void op_lvzwrite(UNIX_ONLY_COMMA(int4 count) long arg1, ...)
 	MAXSTR_BUFF_DECL(buff);
 
 	VAR_START(var, arg1);
-	VMS_ONLY(va_count(count);)
+	VMS_ONLY(va_count(count));
 	MAXSTR_BUFF_INIT;
+
 	memset(&output, 0, sizeof(output));
 	output.code = 'V';
 	output.type = ZSHOW_DEVICE;
@@ -49,42 +58,51 @@ void op_lvzwrite(UNIX_ONLY_COMMA(int4 count) long arg1, ...)
 	output.ptr = output.buff;
 	out = &output;
 	count--;
-	lvzwr_init(FALSE, (mval *)arg1);
+	lvzwr_init(zwr_patrn_mident, (mval *)arg1);
 	for (; count > 0; )
-	{	mv = va_arg(var, mval *); count--;
+	{
+		mv = va_arg(var, mval *); count--;
 		switch ((flag = MV_FORCE_INT(mv)))
 		{
-		case ZWRITE_ASTERISK:
-			lvzwr_arg(flag, (mval *)0, (mval *)0); /* caution fall through */
-		case ZWRITE_END:
-			lvzwr_fini(out, flag);
-			MAXSTR_BUFF_FINI;
-			return;
-			break;
-		case ZWRITE_ALL:
-			lvzwr_arg(flag, (mval *)0, (mval *)0);
-			break;
-		case ZWRITE_BOTH:
-			arg1 = va_arg(var, long);
-			arg2 = va_arg(var, long);
-			count -= 2;
-			lvzwr_arg(flag, (mval *)arg1, (mval *)arg2);
-			break;
-		case ZWRITE_UPPER:
-			arg1 = va_arg(var, long);
-			count--;
-			lvzwr_arg(flag, (mval *)0, (mval *)arg1);
-			break;
-		case ZWRITE_VAL:
-		case ZWRITE_LOWER:
-		case ZWRITE_PATTERN:
-			arg1 = va_arg(var, long);
-			count--;
-			lvzwr_arg(flag, (mval *)arg1, (mval *)0);
-			break;
-		default:
-			GTMASSERT;
-			break;
+			case ZWRITE_ASTERISK:
+				lvzwr_arg(flag, (mval *)0, (mval *)0); /* caution fall through */
+			case ZWRITE_END:
+				lvzwr_fini(out, flag);
+				if (zwrtacindx)
+				{       /* If we output some $ZWRTAC stuff, send one last line to close it up */
+					assert (!merge_args && curr_symval->alias_activity);
+					out->flush = TRUE;
+					zshow_output(out, &dzwrtac_clean);
+					zwrtacindx = 0;
+				}
+				if (zwrhtab && !zwrhtab->cleaned)
+					als_zwrhtab_init();
+				MAXSTR_BUFF_FINI;
+				return;
+			case ZWRITE_ALL:
+				lvzwr_arg(flag, (mval *)0, (mval *)0);
+				break;
+			case ZWRITE_BOTH:
+				arg1 = va_arg(var, long);
+				arg2 = va_arg(var, long);
+				count -= 2;
+				lvzwr_arg(flag, (mval *)arg1, (mval *)arg2);
+				break;
+			case ZWRITE_UPPER:
+				arg1 = va_arg(var, long);
+				count--;
+				lvzwr_arg(flag, (mval *)0, (mval *)arg1);
+				break;
+			case ZWRITE_VAL:
+			case ZWRITE_LOWER:
+			case ZWRITE_PATTERN:
+				arg1 = va_arg(var, long);
+				count--;
+				lvzwr_arg(flag, (mval *)arg1, (mval *)0);
+				break;
+			default:
+				GTMASSERT;
+				break;
 		}
 	}
 	va_end(var);

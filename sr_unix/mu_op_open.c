@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@
 #include "iottdef.h"
 #include "iomtdef.h"
 #include "mupip_io_dev_dispatch.h"
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #include "iormdef.h"
 #endif
 #include "eintr_wrappers.h"
@@ -127,7 +127,7 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 	int		fstat_res;
 	int		save_errno;
 	int		p_offset;
-	boolean_t	ichset_specified, ochset_specified;
+	boolean_t	ichset_specified, ochset_specified, filecreated = FALSE;
 
 	error_def(ERR_SYSCALL);
 
@@ -199,7 +199,10 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 				{
 
 					if (ENOENT == errno)
+					{
 						tl->iod->type = rm;
+						filecreated = TRUE;
+					}
 					else
 					{
 						save_errno = errno;
@@ -343,9 +346,9 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 			naml->iod->ichset = (gtm_utf8_mode) ? CHSET_UTF8 : CHSET_M;
 		if (!ochset_specified)
 			naml->iod->ochset = (gtm_utf8_mode) ? CHSET_UTF8 : CHSET_M;
-		if (CHSET_M != naml->iod->ichset && CHSET_UTF16 != naml->iod->ichset)
+		if (IS_UTF_CHSET(naml->iod->ichset) && CHSET_UTF16 != naml->iod->ichset)
 			get_chset_desc(&chset_names[naml->iod->ichset]);
-		if (CHSET_M != naml->iod->ochset && CHSET_UTF16 != naml->iod->ochset)
+		if (IS_UTF_CHSET(naml->iod->ochset) && CHSET_UTF16 != naml->iod->ochset)
 			get_chset_desc(&chset_names[naml->iod->ochset]);
 		/* RW permissions for owner and others as determined by umask. */
 		umask_orig = umask(000);	/* determine umask (destructive) */
@@ -416,6 +419,7 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 		naml->iod->dollar.za = 0;
 		naml->iod->dollar.zb[0] = 0;
 	}
+	naml->iod->newly_created = filecreated;
 	status = (naml->iod->disp_ptr->open)(naml, pp, file_des, mspace, NO_M_TIMEOUT);
 	if (TRUE == status)
 		naml->iod->state = dev_open;
@@ -424,6 +428,7 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 	if (1 == file_des)
 		naml->iod->dollar.zeof = TRUE;
 	active_device = 0;
+	naml->iod->newly_created = FALSE;
 
 	if (run_time)
 		return (status);

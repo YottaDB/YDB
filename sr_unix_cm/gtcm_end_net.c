@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,10 +23,11 @@ static char rcsid[] = "$Header:$";
 #include "mdef.h"
 
 #include "gtm_stdio.h"
-#include "gtm_unistd.h"		/* for close() */
+#include "gtm_unistd.h"		/* for close() used by CLOSEFILE_RESET */
 #include "gtm_time.h"		/* for ctime() and time() */
 
 #include "gtcm.h"
+#include "gtmio.h"
 
 GBLREF char	*omi_oprlist[];
 GBLREF char	*omi_errlist[];
@@ -39,7 +40,8 @@ gtcm_end_net(cll)
     extern int4	 omi_nxact, omi_nerrs, omi_brecv, omi_bsent;
 
     omi_conn	*cptr, *tptr;
-    int		 i, nxact, nerrs;
+    int		i, nxact, nerrs;
+    int		rc;
 
 /*  Close all existing connections */
     cptr = cll->head;
@@ -50,8 +52,8 @@ gtcm_end_net(cll)
     }
 
 #ifdef BSD_TCP
-    if (!INV_FD_P(cll->nve))
-	(void) close(cll->nve);
+	if (!INV_FD_P(cll->nve))
+		CLOSEFILE_RESET(cll->nve, rc);	/* resets "cll->nve" to FD_INVALID */
 #endif /* defined(BSD_TCP) */
 
     OMI_DBG_STMP;

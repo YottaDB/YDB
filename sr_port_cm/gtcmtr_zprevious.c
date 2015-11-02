@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,8 @@
 #include "gtcm_find_region.h"
 #include "gtcm_bind_name.h"
 #include "gtcmtr_protos.h"
+#include "gdscc.h"
+#include "jnl.h"
 
 GBLREF connection_struct *curr_entry;
 GBLREF gv_namehead	*gv_target;
@@ -42,7 +44,7 @@ GBLREF gd_region        *gv_cur_region;
 bool gtcmtr_zprevious(void)
 {
 	boolean_t		found, is_null;
-	unsigned char		*ptr, regnum;
+	unsigned char		*ptr, regnum, *kprev, *kcur, *ktop;
 	unsigned short		top, old_top;
 	unsigned short		len, tmp_len;
 	gv_key			*save_key;
@@ -62,38 +64,46 @@ bool gtcmtr_zprevious(void)
 	len--;	/* subtract size of regnum */
 	assert(0 == offsetof(gv_key, top));
 	GET_USHORT(old_top, ptr); /* old_top = ((gv_key *)ptr)->top; */
+	/* old_top is the size of the gv_currkey structure allocated on the client side.
+	 * gv_currkey->top is the size of the corresponding gv_currkey structure allocated on the server side.
+	 * Both could be different depending on the reg->max_key_size values across ALL databases that each of
+	 * them have accessed till now. Use the client or server version of the "top" field as appropriate.
+	 */
 	CM_GET_GVCURRKEY(ptr, len);
 	cm_reg_head = reg_ref->reghead;
 	if (gv_currkey->prev)
 	{
 		gtcm_bind_name(cm_reg_head, FALSE); /* sets gv_target; do not use gv_target before gtcm_bind_name */
 		if (gv_target->collseq || gv_target->nct)
-		{
-			is_null = ((gv_currkey->prev == (gv_currkey->end - 3))
-					&& (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->end - 2])
-					&& (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->end - 3]));
+		{	/* Need to convert subscript representation from client side to string representation
+			 * so any collation transformations can happen on server side.
+			 * First determine if last subscript is a NULL subscript. Code in op_zprevious uses same logic
+			 */
+			is_null = TRUE;
+			kprev = &gv_currkey->base[gv_currkey->prev];
+			for (kcur = kprev, ktop = &gv_currkey->base[old_top] - 1; kcur < ktop; kcur++)
+			{
+				if (STR_SUB_MAXVAL != *kcur)
+				{
+					is_null = FALSE;
+					break;
+				}
+			}
 			if (is_null)
-			{	/* last subscript of incoming key is a NULL subscript */
-				gv_currkey->base[gv_currkey->end - 2] = KEY_DELIMITER;
-				gv_currkey->end--;
-				if (0 != gv_cur_region->std_null_coll)
-					gv_currkey->base[gv_currkey->prev] = SUBSCRIPT_STDCOL_NULL;
+			{	/* Last subscript of incoming key is a NULL subscript.
+				 * Client would have represented it using a sequence of FF, FF, FF, ...
+				 * Remove the representation temporarily before doing the gv_xform_key.
+				 * Introduce the NULL subscript after the transformation.
+				 * This is because we do NOT allow a null subsc to be transformed to a non null subsc
+				 * 	so no need for that be part of the transformation.
+				 */
+				*kprev = KEY_DELIMITER;
+				gv_currkey->end = gv_currkey->prev;
 			}
 			gv_xform_key(gv_currkey, FALSE);
 			if (is_null)
-			{
-				assert((gv_currkey->end - 2) == gv_currkey->prev);
-				/* null subsc -> non null subsc transformation not allowed. the following asserts ensure that */
-				assert(gv_cur_region->std_null_coll || (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]));
-				assert(!gv_cur_region->std_null_coll
-					|| (SUBSCRIPT_STDCOL_NULL == gv_currkey->base[gv_currkey->prev]));
-				/* With standard null collation, we want the same behavior as without it. So replace 0x01 in
-				 * gv_currkey->base[gv_currkey->prev] with 0xFF. The following assignment is redundant if
-				 * not standard null collation. But it is done to avoid pipeline break should we introduce an if.
-				 */
-				gv_currkey->base[gv_currkey->prev] = STR_SUB_PREFIX;
-				gv_currkey->base[gv_currkey->prev + 1] = STR_SUB_PREFIX;
-				gv_currkey->base[++(gv_currkey->end)] = 0;
+			{	/* Insert the NULL subscript at the end just in time for the gvcst_zprevious call. */
+				GVZPREVIOUS_APPEND_MAX_SUBS_KEY(gv_currkey, gv_target);
 			}
 		}
 		found = (0 == gv_target->root) ? FALSE : gvcst_zprevious();
@@ -142,8 +152,7 @@ bool gtcmtr_zprevious(void)
 		if (gv_target->nct || gv_target->collseq)
 			gv_xform_key(gv_altkey, TRUE);
 		/* len = sizeof(gv_key) + gv_altkey->end; */
-		len = gv_altkey->end + sizeof(unsigned short) + sizeof(unsigned short) + sizeof(unsigned short) +
-		      sizeof(char);
+		len = gv_altkey->end + sizeof(unsigned short) + sizeof(unsigned short) + sizeof(unsigned short) + sizeof(char);
 	}
 	ptr = curr_entry->clb_ptr->mbf;
 	*ptr++ = CMMS_R_PREV;
@@ -152,8 +161,7 @@ bool gtcmtr_zprevious(void)
 	ptr += sizeof(short);
 	*ptr++ = regnum;
 	if (len)
-	{
-		/* memcpy(ptr, gv_altkey, len); */ /* this memcpy modified to the following PUTs and memcpy; vinu, 07/18/01 */
+	{	/* memcpy(ptr, gv_altkey, len); */ /* this memcpy modified to the following PUTs and memcpy; vinu, 07/18/01 */
 		/* we are goint to restore top from old_top, why even bother setting it now? vinu, 07/18/01 */
 		/* PUT_USHORT(ptr, gv_altkey->top); */
 		PUT_USHORT(ptr + sizeof(unsigned short), gv_altkey->end);

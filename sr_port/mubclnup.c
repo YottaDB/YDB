@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 
 #ifdef VMS
@@ -42,6 +44,7 @@
 #include "ftok_sems.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#include "gtmio.h"
 #endif
 
 GBLREF 	spdesc 		stringpool;
@@ -66,6 +69,7 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 	struct FAB	temp_fab;
 #else
 	unix_db_info	*udi;
+	int		rc;
 #endif
 
 	error_def(ERR_FORCEDHALT);
@@ -132,7 +136,7 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 #if defined(UNIX)
 					if (ptr->backup_fd > 2)
 					{
-						close(ptr->backup_fd);
+						CLOSEFILE_RESET(ptr->backup_fd, rc);	/* resets "ptr" to FD_INVALID */
 						UNLINK(ptr->backup_tempfile);
 					}
 #elif defined(VMS)

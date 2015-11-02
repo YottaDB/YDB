@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,6 +69,9 @@ VMS_ONLY(static  const   unsigned short  zero_fid[3];)
 uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 {
 	jnl_create_info		jnl_info;
+	GTMCRYPT_ONLY(
+		jnl_create_info	*jnl_info_ptr;
+	)
 	GDS_INFO		*gds_info;
 	file_control		*fc;
 	int			new_stat_res;	/* gtm_file_stat() return value for new journal file name */
@@ -571,6 +574,10 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				jnl_info.blks_to_upgrd = csd->blks_to_upgrd;
 				jnl_info.free_blocks   = csd->trans_hist.free_blocks;
 				jnl_info.total_blks    = csd->trans_hist.total_blks;
+				GTMCRYPT_ONLY(
+					jnl_info_ptr = &jnl_info;
+					GTMCRYPT_COPY_HASH(csd, jnl_info_ptr);
+				)
                                 if (EXIT_NRM != (status = cre_jnl_file(&jnl_info)))
 				{	/* There was an error attempting to create the journal file */
 					exit_status |= status;

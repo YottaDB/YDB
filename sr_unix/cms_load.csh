@@ -1,7 +1,7 @@
 #! /usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -37,7 +37,7 @@ alias cp 'cp -f \!:* >& /dev/null'		# some copies may be null copies. we dont wa
 alias mv 'mv -f \!:* >& /dev/null'		# some moves may be null moves. we dont want error messages coming out.
 alias chmod 'chmod \!:* >& /dev/null'		# some chmods may be null chmods. we dont want error messages coming out.
 
-set platform_name = `uname | sed 's/-//g' | tr '[A-Z]' '[a-z]'`
+set platform_name = `uname | sed 's/-//g' | sed 's=/==g' | tr '[A-Z]' '[a-z]'`
 if ($platform_name == "sunos") then
 	alias grep /usr/xpg4/bin/grep		# for -E option to work on sparky
 endif
@@ -51,7 +51,7 @@ set dir_structure      = "inc pct src tools log $build_types"
 set gtm_src_types = "c m64 s msg"
 set gtm_inc_types = "h max mac si"
 set gtm_pct_types = "mpt m hlp"
-set gtm_tools_types = "gtc sed awk sh csh list txt exp mk"
+set gtm_tools_types = "gtc sed awk sh csh list txt exp mk ksh"
 
 #####################################################################################
 
@@ -74,6 +74,8 @@ if ($platform_name == "hpux") then
 	if ($srcuid != $dstuid) then
 		set preserve_time = ""
 	endif
+else if ("os390" == "$platform_name") then
+	set preserve_time = "-m"	# only preserve times
 endif
 
 cd $dst_top_dir
@@ -159,7 +161,7 @@ set gtm_s_hpux    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_g
 set gtm_s_linux   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_x86_regs sr_i386   sr_linux"
 set gtm_s_linux64 = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_x86_regs sr_x86_64  sr_linux"
 set gtm_s_sunos   = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_sparc  sr_sun  "
-set gtm_s_os390   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_s390   sr_os390"
+set gtm_s_os390   = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_s390   sr_os390"
 set gtm_s_l390    = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_l390   sr_linux"
 set gtm_s_hpia    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_hpux   sr_ia64 "
 set gtm_s_linuxia = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_linux  sr_ia64 "
@@ -265,6 +267,21 @@ if ($mods_only == 0) then
 	cd $gtm_ver/pct
 	ls -1 *.mpt | awk '{printf "mv %s _%s\n", $1, $1}' | sed 's/mpt$/m/g' | sh
 
+######################## Convert EBCDIC files to ASCII #######################
+	if ("OS/390" == $HOSTOS) then
+		cd ..
+		mv pct pctebc
+		mkdir pct
+		cd pctebc
+		foreach file (*)
+			iconv -T -f IBM-1047 -t ISO8859-1 $file > $gtm_ver/pct/$file
+			if (0 != $status) then
+				echo "Error converting $file (with iconv) -- return status: $status"
+			endif
+			touch -r $file $gtm_ver/pct/$file
+		end
+		cd $gtm_ver/pct
+	endif
 ######################## Edit release_name.h ####################################
 
 	if ($cms_ver != $dst_ver) then

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,10 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#if defined(__MVS__) && !defined(_ISOC99_SOURCE)
+#define _ISOC99_SOURCE
+#endif
 
 #include "mdef.h"
 
@@ -19,6 +23,7 @@
 #include "gtm_unistd.h"
 #include "gtm_time.h"
 #include "gtm_stat.h"
+#include <sys/time.h>
 
 #include <errno.h>
 #include <signal.h>
@@ -1131,7 +1136,7 @@ int gtmsource_process(void)
 							{	/* Send REPL_TR_CMP_JNL_RECS message with 8-byte header */
 								send_msgp->type = (tot_tr_len << REPL_TR_CMP_MSG_TYPE_BITS)
 											| REPL_TR_CMP_JNL_RECS;
-								send_msgp->len = cmpbuflen + msghdrlen;
+								send_msgp->len = (int4)cmpbuflen + msghdrlen;
 								/* Note that a compressed message need not be 8-byte aligned even
 								 * though the input message was. So round it up to the nearest
 								 * align boundary. The actual message will contain the unaligned
@@ -1149,9 +1154,10 @@ int gtmsource_process(void)
 								 * though the input message was. So round it up to the nearest
 								 * align boundary.
 								 */
-								send_cmpmsgp->len = ROUND_UP(cmpbuflen + msghdrlen, REPL_MSG_ALIGN);
+								send_cmpmsgp->len = (int4)(ROUND_UP(cmpbuflen + msghdrlen,
+									REPL_MSG_ALIGN));
 								send_cmpmsgp->uncmplen = tot_tr_len;
-								send_cmpmsgp->cmplen = cmpbuflen;
+								send_cmpmsgp->cmplen = (int4)cmpbuflen;
 								send_tr_len = send_msgp->len;
 							}
 						} else

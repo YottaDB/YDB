@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,12 @@
 #include <curses.h>		/* must be before term.h */
 #include "gtm_term.h"
 #include "getcaps.h"
+#ifdef DEBUG
+#include <assert.h>
+#endif
+#if defined(__MVS__) && __CHARSET_LIB==1	/* -qascii */
+#include "ebc_xlat.h"
+#endif
 
 #ifndef assert
 #define assert(x)
@@ -58,7 +64,7 @@ GBLDEF	char	*KEYPAD_LOCAL;		/* turn keypad off */
 GBLDEF	char	*KEYPAD_XMIT;		/* turn keypad on */
 GBLDEF  int	GTM_LINES;		/* number of rows */
 
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
 #endif
 static	int	gtm_auto_right_margin = 0;
@@ -82,7 +88,21 @@ static	char	gtm_keypad_local[] = "[?1l";
 static	char	gtm_keypad_xmit[] = "[?1h";
 static	int	gtm_lines = 24;
 
-#ifdef __MVS__
+#if defined(__MVS__) && __CHARSET_LIB==1	/* -qascii */
+static	char	gtm_cap_ascii[16 * 16];	/* ESC_LEN from io.h times number of tigetstr values */
+#define CAP2ASCII(CAP)							\
+{									\
+	ebc_len = sizeof(CAP);						\
+	assert(sizeof(gtm_cap_ascii) > (gtm_cap_index + ebc_len));	\
+	ebc_to_asc((unsigned char *)&gtm_cap_ascii[gtm_cap_index], (unsigned char *)CAP, ebc_len);	\
+	CAP = &gtm_cap_ascii[gtm_cap_index];				\
+	gtm_cap_index += ebc_len;					\
+}
+#else
+#define CAP2ASCII(CAP)
+#endif
+
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
 /* extern	unsigned char	leftkey[], rightkey[], upkey[], downkey[]; */
@@ -98,19 +118,36 @@ static	int	gtm_lines = 24;
 int	getcaps(int fildes)
 {
 	char	*cap;
+#if defined(__MVS__) && __CHARSET_LIB==1	/* -qascii */
+	char	cap_ebcdic[128];	/* more than enough for terminal name */
+	int	ebc_len, gtm_cap_index = 0;
+#endif
 	int	status;
 
 	cap = GETENV("TERM");
 	if (!cap)
 		cap = "unknown";
 
+#if defined(__MVS__) && __CHARSET_LIB==1	/* -qascii */
+	ebc_len = strlen(cap);
+	if (sizeof(cap_ebcdic) < ebc_len)
+		ebc_len = sizeof(cap_ebcdic) - 1;
+	asc_to_ebc((unsigned char *)cap_ebcdic, (unsigned char *)cap, ebc_len);
+	cap_ebcdic[ebc_len] = '\0';
+	cap = cap_ebcdic;
+#endif
+
 	SETUPTERM(cap, fildes, &status);
 
 	if (1 == status)
 	{
 
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
+#endif
+#if defined(__MVS__) && __CHARSET_LIB==1	/* -qascii */
+/* assumes source is EBCDIC and curses/terminfo entries expect EBCDIC */
+#pragma convert(source)
 #endif
 		AUTO_RIGHT_MARGIN = tigetflag("am");
 		CLR_EOS = tigetstr("ed");
@@ -133,64 +170,99 @@ int	getcaps(int fildes)
 		KEYPAD_XMIT = tigetstr("smkx");
 		GTM_LINES = tigetnum("lines");
 
-#ifdef __MVS__
+#if defined(__MVS__) && __CHARSET_LIB==1	/* -qascii */
+#pragma convert(pop)
+#endif
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
 
 		assert(-1 != AUTO_RIGHT_MARGIN);
 		if (0 == AUTO_RIGHT_MARGIN)
 			AUTO_RIGHT_MARGIN = gtm_auto_right_margin;
-		assert((char *)-1L != CLR_EOS);
-		if (NULL == CLR_EOS)
+		assert((char *)-1 != CLR_EOS);
+		if (NULL == CLR_EOS || (char *)-1 == CLR_EOS)
 			CLR_EOS = gtm_clr_eos;
-		assert((char *)-1L != CLR_EOL);
-		if (NULL == CLR_EOL)
+		else
+			CAP2ASCII(CLR_EOS);
+		assert((char *)-1 != CLR_EOL);
+		if (NULL == CLR_EOL || (char *)-1 == CLR_EOL)
 			CLR_EOL = gtm_clr_eol;
+		else
+			CAP2ASCII(CLR_EOL);
 		assert(-2 != COLUMNS);
 		if (-1 == COLUMNS)
 			COLUMNS = gtm_columns;
-		assert((char *)-1L != CURSOR_ADDRESS);
-		if (NULL == CURSOR_ADDRESS)
+		assert((char *)-1 != CURSOR_ADDRESS);
+		if (NULL == CURSOR_ADDRESS || (char *)-1 == CURSOR_ADDRESS)
 			CURSOR_ADDRESS = gtm_cursor_address;
-		assert((char *)-1L != CURSOR_DOWN);
-		if (NULL == CURSOR_DOWN)
+		else
+			CAP2ASCII(CURSOR_ADDRESS);
+		assert((char *)-1 != CURSOR_DOWN);
+		if (NULL == CURSOR_DOWN || (char *)-1 == CURSOR_DOWN)
 			CURSOR_DOWN = gtm_cursor_down;
-		assert((char *)-1L != CURSOR_LEFT);
-		if (NULL == CURSOR_LEFT)
+		else
+			CAP2ASCII(CURSOR_DOWN);
+		assert((char *)-1 != CURSOR_LEFT);
+		if (NULL == CURSOR_LEFT || (char *)-1 == CURSOR_LEFT)
 			CURSOR_LEFT = gtm_cursor_left;
-		assert((char *)-1L != CURSOR_RIGHT);
-		if (NULL == CURSOR_RIGHT)
+		else
+			CAP2ASCII(CURSOR_LEFT);
+		assert((char *)-1 != CURSOR_RIGHT);
+		if (NULL == CURSOR_RIGHT || (char *)-1 == CURSOR_RIGHT)
 			CURSOR_RIGHT = gtm_cursor_right;
-		assert((char *)-1L != CURSOR_UP);
-		if (NULL == CURSOR_UP)
+		else
+			CAP2ASCII(CURSOR_RIGHT);
+		assert((char *)-1 != CURSOR_UP);
+		if (NULL == CURSOR_UP || (char *)-1 == CURSOR_UP)
 			CURSOR_UP = gtm_cursor_up;
-		assert((char *)-1L != KEY_BACKSPACE);
-		if (NULL == KEY_BACKSPACE)
+		else
+			CAP2ASCII(CURSOR_UP);
+		assert((char *)-1 != KEY_BACKSPACE);
+		if (NULL == KEY_BACKSPACE || (char *)-1 == KEY_BACKSPACE)
 			KEY_BACKSPACE = gtm_key_backspace;
-		assert((char *)-1L != KEY_DC);
-		if (NULL == KEY_DC)
+		else
+			CAP2ASCII(KEY_BACKSPACE);
+		assert((char *)-1 != KEY_DC);
+		if (NULL == KEY_DC || (char *)-1 == KEY_DC)
 			KEY_DC = gtm_key_dc;
-		assert((char *)-1L != KEY_DOWN);
-		if (NULL == KEY_DOWN)
+		else
+			CAP2ASCII(KEY_DC);
+		assert((char *)-1 != KEY_DOWN);
+		if (NULL == KEY_DOWN || (char *)-1 == KEY_DOWN)
 			KEY_DOWN = gtm_key_down;
-		assert((char *)-1L != KEY_LEFT);
-		if (NULL == KEY_LEFT)
+		else
+			CAP2ASCII(KEY_DOWN);
+		assert((char *)-1 != KEY_LEFT);
+		if (NULL == KEY_LEFT || (char *)-1 == KEY_LEFT)
 			KEY_LEFT = gtm_key_left;
-		assert((char *)-1L != KEY_RIGHT);
-		if (NULL == KEY_RIGHT)
+		else
+			CAP2ASCII(KEY_LEFT);
+		assert((char *)-1 != KEY_RIGHT);
+		if (NULL == KEY_RIGHT || (char *)-1 == KEY_RIGHT)
 			KEY_RIGHT = gtm_key_right;
-		assert((char *)-1L != KEY_UP);
-		if (NULL == KEY_UP)
+		else
+			CAP2ASCII(KEY_RIGHT);
+		assert((char *)-1 != KEY_UP);
+		if (NULL == KEY_UP || (char *)-1 == KEY_UP)
 			KEY_UP = gtm_key_up;
-		assert((char *)-1L != KEY_INSERT);
-		if (NULL == KEY_INSERT)
+		else
+			CAP2ASCII(KEY_UP);
+		assert((char *)-1 != KEY_INSERT);
+		if (NULL == KEY_INSERT || (char *)-1 == KEY_INSERT)
 			KEY_INSERT = gtm_key_insert;
-		assert((char *)-1L != KEYPAD_LOCAL);
-		if (NULL == KEYPAD_LOCAL)
+		else
+			CAP2ASCII(KEY_INSERT);
+		assert((char *)-1 != KEYPAD_LOCAL);
+		if (NULL == KEYPAD_LOCAL || (char *)-1 == KEYPAD_LOCAL)
 			KEYPAD_LOCAL = gtm_keypad_local;
-		assert((char *)-1L != KEYPAD_XMIT);
-		if (NULL == KEYPAD_XMIT)
+		else
+			CAP2ASCII(KEYPAD_LOCAL);
+		assert((char *)-1 != KEYPAD_XMIT);
+		if (NULL == KEYPAD_XMIT || (char *)-1 == KEYPAD_XMIT)
 			KEYPAD_XMIT = gtm_keypad_xmit;
+		else
+			CAP2ASCII(KEYPAD_XMIT);
 		assert(-2 != GTM_LINES);
 		if (-1 == GTM_LINES)
 			GTM_LINES = gtm_lines;

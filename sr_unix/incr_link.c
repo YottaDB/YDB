@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,15 +47,15 @@
 #  define CHECK_NONUSB_RECOMPILE								\
 {												\
 	if (-1 != (status = (ssize_t)lseek(file_desc, COFFHDRLEN, SEEK_SET)))			\
-        {											\
-		DOREADRC(file_desc, marker, sizeof(JSB_MARKER) - 1, status);			\
+	{											\
+		DOREADRC_OBJFILE(file_desc, marker, SIZEOF(JSB_MARKER) - 1, status);		\
 	} else											\
 		status = errno;									\
 	if (0 == status && 0 == MEMCMP_LIT(marker, JSB_MARKER))					\
-        {											\
-                free(hdr);									\
+	{											\
+		free(hdr);									\
 		return FALSE;	/* Signal recompile */						\
-        }											\
+	}											\
 }
 #else
 #  define CHECK_NONUSB_RECOMPILE 	/* No old recompile check is being generated */
@@ -73,7 +73,13 @@ static rhdtyp		*hdr;
 GBLREF mident_fixed	zlink_mname;
 GBLREF mach_inst	jsb_action[JSB_ACTION_N_INS];
 GBLREF uint4		gtmDebugLevel;
-GBLREF  boolean_t	gtm_utf8_mode;
+GBLREF boolean_t	gtm_utf8_mode;
+
+ZOS_ONLY(
+GBLDEF unsigned char	*text_section;
+GBLDEF int		total_length;
+GBLDEF int		text_counter = 0;
+)
 
 typedef struct	res_list_struct
 {
@@ -93,7 +99,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 {
 	rhdtyp		*old_rhead;
 	int		sect_ro_rel_size, sect_rw_rel_size;
-        ssize_t         status, sect_rw_nonrel_size;
+	ssize_t	 status, sect_rw_nonrel_size;
 	lab_tabent	*lbt_ent, *lbt_bot, *lbt_top, *olbt_ent, *olbt_bot, *olbt_top;
 	lnr_tabent	*olnt_ent, olnt_top;
 	mident_fixed	module_name;
@@ -109,17 +115,27 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	int		name_buf_len;
 	char		marker[sizeof(JSB_MARKER) - 1];
 
-	AIX_ONLY(
-	FILHDR          *hddr = NULL;
-        unsigned short  magic;
-	)
-
 	error_def(ERR_DLLCHSETM);
 	error_def(ERR_DLLCHSETUTF8);
 	error_def(ERR_DLLVERSION);
 	error_def(ERR_INVOBJ);
 	error_def(ERR_LOADRUNNING);
 	error_def(ERR_TEXT);
+
+	AIX_ONLY(
+		FILHDR	  *hddr = NULL;
+		unsigned short  magic;
+	)
+
+	ZOS_ONLY(
+		ESD symbol;
+		boolean_t extended_symbols_present = FALSE;
+		total_length = 0;
+		text_counter = 0;
+		memset(&symbol, 0 , sizeof(ESD));
+		assert(NULL == text_section);
+		ZOS_FREE_TEXT_SECTION;
+	)
 
 	urx_lcl_anchor.len = 0;
 	urx_lcl_anchor.addr = 0;
@@ -147,7 +163,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		/* On some platforms, the address returned by dlsym() is not the actual shared code address, but normally
 		 * an address to the linkage table, eg. TOC (AIX), PLT (HP-UX). Computing the actual shared code address
 		 * is platform dependent and is handled by the macro (see incr_link_sp.h) */
-		shdr = GET_RTNHDR_ADDR(zro_entry->shrsym);
+		shdr = (unsigned char *)GET_RTNHDR_ADDR(zro_entry->shrsym);
 		memcpy(hdr, shdr, sizeof(rhdtyp));
 		hdr->shlib_handle = zro_entry->shrlib;
 	} else
@@ -156,7 +172,8 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		/* To check if it is not an xcoff64 bit .o */
 		AIX_ONLY(
 			hddr = (FILHDR *)(malloc(sizeof(FILHDR)));
-			if (-1 != (status = read(file_desc, hddr, sizeof(FILHDR))))
+			DOREADRC(file_desc, hddr, sizeof(FILHDR), status);
+			if (-1 != status)
 			{
 				magic = hddr->f_magic;
 				if (-1 == (status = (ssize_t)lseek(file_desc, -(sizeof(FILHDR)), SEEK_SET)))
@@ -168,10 +185,31 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 			if (magic != U64_TOCMAGIC)
 				return FALSE;
 		)
-
+		/* In the GOFF .o on zOS, if the symbol name(name of the module) exceeds ESD_NAME_MAX_LENGTH (8), *
+		 * then 2 extra extended records are emitted, which causes the start of text section to vary */
+#ifdef __MVS__
+			DOREADRC(file_desc, &symbol, sizeof(symbol), status);	/* This is HDR record */
+			if (-1 != status)
+			{
+				DOREADRC(file_desc, &symbol, sizeof(symbol), status)	/* First symbol (ESD record) */
+				if (-1 != status)
+				{
+					if (0x01 == symbol.ptv[1])	/* which means the extended records are there */
+						extended_symbols_present = TRUE;
+					else
+					{
+						assert(0x0 == symbol.ptv[1]);
+						extended_symbols_present = FALSE;
+					}
+				} else
+					status = errno;
+			} else
+				status = errno;
+#endif
 		if (-1 != (status = (ssize_t)lseek(file_desc, NATIVE_HDR_LEN, SEEK_SET)))
 		{
-			DOREADRC(file_desc, hdr, sizeof(rhdtyp), status);
+			ZOS_ONLY(extract_text(file_desc, &total_length);)
+			DOREADRC_OBJFILE(file_desc, hdr, SIZEOF(rhdtyp), status);
 		} else
 			status = errno;
 		if (0 != status)
@@ -181,8 +219,8 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		}
 	}
 	if (0 != memcmp(hdr->jsb, (char *)jsb_action, sizeof(jsb_action)) ||
-	    0 != memcmp(&hdr->jsb[sizeof(jsb_action)], JSB_MARKER,
-                       	MIN(STR_LIT_LEN(JSB_MARKER), sizeof(hdr->jsb) - sizeof(jsb_action))))
+		0 != memcmp(&hdr->jsb[sizeof(jsb_action)], JSB_MARKER,
+				MIN(STR_LIT_LEN(JSB_MARKER), sizeof(hdr->jsb) - sizeof(jsb_action))))
 	{
 		if (!shlib)	/* Shared library cannot recompile so this is always an error */
 		{
@@ -196,9 +234,9 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		if (shlib)
 		{
 			if (MAGIC_COOKIE_V5 > hdr->objlabel)
-			{ /* The library was built using a version prior to V50FT01. The routine_name field of the
-			     pre-V5 routine header was an 8-byte char array, so read the routine name in the old
-			     format */
+			{ 	/* The library was built using a version prior to V50FT01. The routine_name field of the
+				   pre-V5 routine header was an 8-byte char array, so read the routine name in the old
+				   format */
 				int len;
 				pre_v5_routine_name = (pre_v5_mident *)((char*)hdr + PRE_V5_RTNHDR_RTNOFF);
 				for (len = 0; len < sizeof(pre_v5_mident) && pre_v5_routine_name->c[len]; len++)
@@ -206,22 +244,36 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 				zl_error(0, zro_entry, ERR_DLLVERSION, len, &(pre_v5_routine_name->c[0]),
 				 	zro_entry->str.len, zro_entry->str.addr);
 			}
-			else
-			{ /* Note: routine_name field has not been relocated yet, so compute its absolute
-			     address in the shared library and use it */
+#if defined(__osf__) || defined(__hppa)
+			else if (MAGIC_COOKIE_V52 > hdr->objlabel)
+			{	/* Note: routine_name field has not been relocated yet, so compute its absolute
+				   address in the shared library and use it */
+				v50v51_mstr	*mstr5051;	/* declare here so don't have to conditionally add above */
+
+				mstr5051 = (v50v51_mstr *)((char *)hdr + V50V51_RTNHDR_RTNMSTR_OFFSET);
+				zl_error(0, zro_entry, ERR_DLLVERSION, mstr5051->len,
+					 ((char *)shdr + *(int4 *)((char *)hdr + V50V51_FTNHDR_LITBASE_OFFSET)
+					  + (int4)mstr5051->addr),
+					 zro_entry->str.len, zro_entry->str.addr);
+			}
+#endif
+			else	/* V52 or later but not current version */
+			{	/* Note: routine_name field has not been relocated yet, so compute its absolute
+				   address in the shared library and use it */
 				zl_error(0, zro_entry, ERR_DLLVERSION, hdr->routine_name.len, (char *)shdr +
 					(UINTPTR_T)hdr->literal_text_adr + (UINTPTR_T)hdr->routine_name.addr,
 				 	zro_entry->str.len, zro_entry->str.addr);
 			}
 		}
+		ZOS_FREE_TEXT_SECTION;
 		return FALSE;
 	}
 
 	if (((hdr->compiler_qlf & CQ_UTF8) && !gtm_utf8_mode) || (!(hdr->compiler_qlf & CQ_UTF8) && gtm_utf8_mode))
-	{ /* object file compiled with a different $ZCHSET is being used */
+	{ 	/* object file compiled with a different $ZCHSET is being used */
 		if (shlib)	/* Shared library cannot recompile so this is always an error */
-		{ /* Note: routine_name field has not been relocated yet, so compute its absolute address
-		     in the shared library and use it */
+		{	/* Note: routine_name field has not been relocated yet, so compute its absolute address
+			   in the shared library and use it */
 			if ((hdr->compiler_qlf & CQ_UTF8) && !gtm_utf8_mode)
 			{
 				zl_error(0, zro_entry, ERR_DLLCHSETUTF8, (int)hdr->routine_name.len, (char *)shdr +
@@ -256,7 +308,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		sect_ro_rel = GTM_TEXT_ALLOC(sect_ro_rel_size);
 		/* It should be aligned well at this point but make a debug level check to verify */
 		assert((INTPTR_T)sect_ro_rel == ((INTPTR_T)sect_ro_rel & ~(LINKAGE_PSECT_BOUNDARY - 1)));
-		DOREADRC(file_desc, sect_ro_rel, sect_ro_rel_size, status);
+		DOREADRC_OBJFILE(file_desc, sect_ro_rel, sect_ro_rel_size, status);
 		if (0 != status)
 			zl_error(file_desc, zro_entry, ERR_INVOBJ, 0, 0, 0, 0);
 		/* The offset correction is the amount that needs to be applied to a given storage area that
@@ -296,7 +348,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		memcpy(sect_rw_rel, shdr + (INTPTR_T)hdr->literal_adr, sect_rw_rel_size);
 	else
 	{
-		DOREADRC(file_desc, sect_rw_rel, sect_rw_rel_size, status);
+		DOREADRC_OBJFILE(file_desc, sect_rw_rel, sect_rw_rel_size, status);
 		if (0 != status)
 			zl_error(file_desc, zro_entry, ERR_INVOBJ, 0, 0, 0, 0);
 	}
@@ -329,8 +381,8 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 
 	/* Fixup header's source path and routine names as they both point to the offsets from the
 	 * beginning of the literal text pool */
-        hdr->src_full_name.addr += (INTPTR_T)hdr->literal_text_adr;
-        hdr->routine_name.addr += (INTPTR_T)hdr->literal_text_adr;
+	hdr->src_full_name.addr += (INTPTR_T)hdr->literal_text_adr;
+	hdr->routine_name.addr += (INTPTR_T)hdr->literal_text_adr;
 
 	if (GDL_PrintEntryPoints & gtmDebugLevel)
 	{	/* Prepare name and address for announcement.. */
@@ -347,7 +399,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		memcpy(sect_rw_nonrel, shdr + (INTPTR_T)hdr->labtab_adr, sect_rw_nonrel_size);
 	else
 	{
-		DOREADRC(file_desc, sect_rw_nonrel, sect_rw_nonrel_size, status);
+		DOREADRC_OBJFILE(file_desc, sect_rw_nonrel, sect_rw_nonrel_size, status);
 		if (0 != status)
 			zl_error(file_desc, zro_entry, ERR_INVOBJ, 0, 0, 0, 0);
 	}
@@ -400,12 +452,11 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 					break;
 			}
 			if ((lbt_ent < lbt_top) && !order)
-			{	/* Have a label name match. Update line pointer for this entry */
+				/* Have a label name match. Update line pointer for this entry */
 				olbt_ent->lnr_adr = lbt_ent->lnr_adr;
-			} else
-			{	/* This old label entry has no match. Mark as undefined */
+			else
+				/* This old label entry has no match. Mark as undefined */
 				olbt_ent->lnr_adr = NULL;
-			}
 		}
 		old_rhead->src_full_name = hdr->src_full_name;
 		old_rhead->routine_name = hdr->routine_name;
@@ -429,6 +480,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	urx_resolve(hdr, (lab_tabent *)lbt_bot, (lab_tabent *)lbt_top);
 	if (!shlib)
 		cacheflush(hdr->ptext_adr, (hdr->ptext_end_adr - hdr->ptext_adr), BCACHE);
+	ZOS_FREE_TEXT_SECTION;
 	return TRUE;
 }
 
@@ -438,8 +490,8 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 	res_list		*res_root, *new_res, *res_temp, *res_temp1;
 	unsigned char		*symbols, *sym_temp, *sym_temp1, *symtop, *res_addr;
 	struct relocation_info	rel[RELREAD], *rel_ptr;
-	int	       	numrel, rel_read, string_size, sym_size, i;
-        ssize_t                 status;
+	int			numrel, rel_read, string_size, sym_size, i;
+	ssize_t			status;
 	mident_fixed		rtnid, labid;
 	mstr			rtn_str;
 	rhdtyp			*rtn;
@@ -448,6 +500,8 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 	urx_rtnref		*urx_rp;
 	urx_addr		*urx_tmpaddr;
 
+	error_def(ERR_INVOBJ);
+	error_def(ERR_TEXT);
 	res_root = NULL;
 	numrel = (int)((hdr->sym_table_off - hdr->rel_table_off) / sizeof(struct relocation_info));
 	if ((numrel * sizeof(struct relocation_info)) != (hdr->sym_table_off - hdr->rel_table_off))
@@ -462,7 +516,7 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 		} else
 		{	/* Buffer the relocation entries */
 			rel_read = (numrel < RELREAD ? numrel : RELREAD);
-			DOREADRC(file, &rel[0], rel_read * sizeof(struct relocation_info), status);
+			DOREADRC_OBJFILE(file, &rel[0], rel_read * SIZEOF(struct relocation_info), status);
 			if (0 != status)
 			{
 				res_free(res_root);
@@ -520,18 +574,18 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 	{
 		memcpy(&string_size, shdr + hdr->sym_table_off, sizeof(string_size));
 		symbols = shdr + hdr->sym_table_off + sizeof(string_size);
-		string_size -= sizeof(string_size);
+		string_size -= SIZEOF(string_size);
 	} else
 	{
-		DOREADRC(file, &string_size, sizeof(string_size), status);
+		DOREADRC_OBJFILE(file, &string_size, SIZEOF(string_size), status);
 		if (0 != status)
 		{
 			res_free(res_root);
 			return FALSE;
 		}
-		string_size -= sizeof(string_size);
+		string_size -= SIZEOF(string_size);
 		symbols = malloc(string_size);
-		DOREADRC(file, symbols, string_size, status);
+		DOREADRC_OBJFILE(file, symbols, string_size, status);
 		if (0 != status)
 		{
 			free(symbols);
@@ -698,6 +752,7 @@ void	res_free (res_list *root)
 
 void	zl_error (int4 file, zro_ent *zroe, int4 err, int4 len, char *addr, int4 len2, char *addr2)
 {
+	ZOS_FREE_TEXT_SECTION;
 	zl_error_hskpng(file);
 	/* 0, 2, or 4 arguments */
 	if (0 == len)
@@ -712,6 +767,8 @@ void	zl_error (int4 file, zro_ent *zroe, int4 err, int4 len, char *addr, int4 le
 /* ZL_ERROR-housekeeping */
 void	zl_error_hskpng(int4 file)
 {
+	int	rc;
+
 	if (!shlib)
 	{	/* Only non shared library links have these areas to free */
 		if (hdr)
@@ -722,6 +779,6 @@ void	zl_error_hskpng(int4 file)
 			free(sect_rw_rel);
 		if (sect_rw_nonrel)
 			free(sect_rw_nonrel);
-		close(file);
+		CLOSEFILE_RESET(file, rc);	/* resets "file" to FD_INVALID */
 	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,7 @@
 #define repl_fork_rcvr_server(pid, d1) (((*(pid) = fork()) >= 0) ? SS_NORMAL : *(pid))
 
 /*----- File I/O related -----*/
-#define F_CLOSE(FD, RC)				CLOSEFILE(FD, RC) /* interrupt safe close() */
+#define F_CLOSE(FD, RC)				CLOSEFILE_RESET(FD, RC) /* interrupt safe close(); also resets "FD" to FD_INVALID */
 #define F_COPY_GDID(to, from)			memcpy(&(to), &(from), sizeof(to))
 #define F_COPY_GDID_FROM_STAT(to, stat_buf) 	set_gdid_from_stat(&(to), &stat_buf);
 #define F_READ_BLK_ALIGNED			LSEEKREAD

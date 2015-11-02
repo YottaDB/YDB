@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007, 2008 Fidelity Information Services, Inc 	#
+#	Copyright 2007, 2009 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -20,10 +20,15 @@
 
 set found_icu = ""
 set utflocale = `locale -a | grep -i en_us | grep -i utf | grep '8$'`
-if (`uname` == "AIX" || `uname` == "SunOS") then
+set host_platform_name = `uname`
+if ($host_platform_name == "AIX" || $host_platform_name == "SunOS" || $host_platform_name == "OS/390") then
 	setenv LIBPATH /usr/local/lib64:/usr/local/lib
 	setenv LD_LIBRARY_PATH /usr/local/lib64:/usr/local/lib
 	set library_path = `echo $LIBPATH | sed 's/:/ /g'`
+	if ("OS/390" == $HOSTOS) then
+#		z/OS has both en_US.UTF-8 and En_US.UTF-8 with both .xplink and .lp64 suffixes - we need .lp64
+		set utflocale = `locale -a | grep En_US.UTF-8.lp64 | sed 's/.lp64$//'`
+	endif
 else
 # Optional parameter added. This script can be executed from remote system using ssh
 # The environment $gtm_* variable's will not defined.
@@ -48,9 +53,38 @@ else
 	set library_path = `echo $LD_LIBRARY_PATH | sed 's/:/ /g'`
 endif
 
+set icu_ext = ".so"
+if ($host_platform_name == "AIX") then
+	set icu_ext = ".a"
+else if ($host_platform_name == "HP-UX") then
+	set icu_ext = ".sl"
+endif
 foreach libpath ($library_path)
-	# 36 is the version GT.M supports for ICU
-	if (-e $libpath) set found_icu = `ls -1 $libpath | grep "libicu.*36.*" | wc -l`
+	# 36 is the least version GT.M supports for ICU.
+	# We have to get the numeric value from the ICU library. On non-AIX platforms, this can be done by
+	# first getting the library to which libicuio.so is pointing to (this is always TRUE, in the sense
+	# ICU always ships libicuio.so linked to the appropriate version'ed library).
+	# The ICU libraries are formatted like "libicu<ALPHANUM>.<EXT>.<MAJOR_VER><MINOR_VER>". So, we can
+	# use awk to get the last part of the 'ls -l' on libicuio.so and use awk and cut to get the version
+	# numbers. However on AIX and z/OS, ICU libraries are formatted like "libicu<ALPHANUM><MAJOR_VER><MINOR_VER>.<EXT>"
+	# and hence it is not as straightforward to extract the MAJOR_VER. So, we first eliminate the prefix
+	# part of the library name that contains libicu<ALPHANUM> using sed and use cut now to extract the
+	# version number.
+	if (-e $libpath) then
+		if (-f $libpath/libicuio$icu_ext) then
+			set icu_versioned_lib = `ls -l $libpath/libicuio$icu_ext | awk '{print $NF}'`
+			if ($host_platform_name == "AIX" || $host_platform_name == "OS/390") then
+				set icu_ver = `echo $icu_versioned_lib | sed 's/libicuio//g' | cut -f 1 -d '.'`
+			else
+				set icu_ver = `echo $icu_versioned_lib | cut -f 3 -d '.'`
+			endif
+			if ($icu_ver >= "36") then
+				set found_icu = 1
+			else
+				set found_icu = 0
+			endif
+		endif
+	endif
 	if ($found_icu) then
 		break
 	endif

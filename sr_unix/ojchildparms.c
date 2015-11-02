@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,55 +33,124 @@ GBLREF	spdesc stringpool;
  */
 void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 {
-	char			*sp;
+	char			*sp, *parmbuf;
 	char			parm_string[8];
 	int4			argcnt, i;
 
 	error_def(ERR_STRINGOFLOW);
 
+	/* getenv() may use static buffer so for any parms we fetch a value for, rebuffer them so they
+	   don't go away. We use malloc'd space because the stringpool garbage collector does not know
+	   about these private (to this routine) structures and we can't use "temp stringpool space" as
+	   is used in other modules since we will be putting the parms in the stringpool below. The
+	   storage allocated here will be released in jobchild_init() when it is done with it.
+	*/
 	if (jparms->directory.addr = GETENV(CWD_ENV))
+	{
 		jparms->directory.len = STRLEN(jparms->directory.addr);
-	else
+		if (0 != jparms->directory.len)
+		{
+			parmbuf = malloc(jparms->directory.len);
+			memcpy(parmbuf, jparms->directory.addr, jparms->directory.len);
+		 	jparms->directory.addr = parmbuf;
+	 	}
+	} else
 		jparms->directory.len = 0;
 
 	if (jparms->gbldir.addr = GETENV(GBLDIR_ENV))
+	{
 		jparms->gbldir.len = STRLEN(jparms->gbldir.addr);
-	else
+		if (0 != jparms->gbldir.len)
+		{
+			parmbuf = malloc(jparms->gbldir.len);
+			memcpy(parmbuf, jparms->gbldir.addr, jparms->gbldir.len);
+			jparms->gbldir.addr = parmbuf;
+		}
+	} else
 		jparms->gbldir.len = 0;
 
 	if (jparms->startup.addr = GETENV(STARTUP_ENV))
+	{
 		jparms->startup.len = STRLEN(jparms->startup.addr);
-	else
+		if (0 != jparms->startup.len)
+		{
+			parmbuf = malloc(jparms->startup.len);
+			memcpy(parmbuf, jparms->startup.addr, jparms->startup.len);
+			jparms->startup.addr = parmbuf;
+		}
+	} else
 		jparms->startup.len = 0;
 
 	if (jparms->input.addr = GETENV(IN_FILE_ENV))
+	{
 		jparms->input.len = STRLEN(jparms->input.addr);
-	else
+		if (0 != jparms->input.len)
+		{
+			parmbuf = malloc(jparms->input.len);
+			memcpy(parmbuf, jparms->input.addr, jparms->input.len);
+			jparms->input.addr = parmbuf;
+		}
+	} else
 		jparms->input.len = 0;
 
 	if (jparms->output.addr = GETENV(OUT_FILE_ENV))
+	{
 		jparms->output.len = STRLEN(jparms->output.addr);
-	else
+		if (0 != jparms->output.len)
+		{
+			parmbuf = malloc(jparms->output.len);
+			memcpy(parmbuf, jparms->output.addr, jparms->output.len);
+			jparms->output.addr = parmbuf;
+		}
+	} else
 		jparms->output.len = 0;
 
 	if (jparms->error.addr = GETENV(ERR_FILE_ENV))
+	{
 		jparms->error.len = STRLEN(jparms->error.addr);
-	else
+		if (0 != jparms->error.len)
+		{
+			parmbuf = malloc(jparms->error.len);
+			memcpy(parmbuf, jparms->error.addr, jparms->error.len);
+			jparms->error.addr = parmbuf;
+		}
+	} else
 		jparms->error.len = 0;
 
 	if (jparms->routine.addr = GETENV(ROUTINE_ENV))
+	{
 		jparms->routine.len = STRLEN(jparms->routine.addr);
-	else
+		if (0 != jparms->routine.len)
+		{
+			parmbuf = malloc(jparms->routine.len);
+			memcpy(parmbuf, jparms->routine.addr, jparms->routine.len);
+			jparms->routine.addr = parmbuf;
+		}
+	} else
 		jparms->routine.len = 0;
 
 	if (jparms->label.addr = GETENV(LABEL_ENV))
+	{
 		jparms->label.len = STRLEN(jparms->label.addr);
-	else
+		if (0 != jparms->label.len)
+		{
+			parmbuf = malloc(jparms->label.len);
+			memcpy(parmbuf, jparms->label.addr, jparms->label.len);
+			jparms->label.addr = parmbuf;
+		}
+	} else
 		jparms->label.len = 0;
 
 	if (jparms->logfile.addr = GETENV(LOG_FILE_ENV))
+	{
 		jparms->logfile.len = STRLEN(jparms->logfile.addr);
-	else
+		if (0 != jparms->logfile.len)
+		{
+			parmbuf = malloc(jparms->logfile.len);
+			memcpy(parmbuf, jparms->logfile.addr, jparms->logfile.len);
+			jparms->logfile.addr = parmbuf;
+		}
+	} else
 		jparms->logfile.len = 0;
 
 	if (sp = GETENV(OFFSET_ENV))

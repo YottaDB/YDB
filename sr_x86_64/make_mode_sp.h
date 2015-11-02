@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007 Fidelity Information Services, Inc *
+ *      Copyright 2007, 2009 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -9,9 +9,10 @@
  *                                                              *
  ****************************************************************/
 
-#define CALL_SIZE 12
-#define EXTRA_INST 0
-#define EXTRA_INST_SIZE 0
+#define CODEBUF_TYPE	char
+#define CALL_SIZE	12
+#define EXTRA_INST	0
+#define EXTRA_INST_SIZE	0
 
 #define GEN_CALL(func)  { \
     *((char *)code)++ = 0x48;				       \

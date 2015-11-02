@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,6 +52,9 @@
 #include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "have_crit.h"
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	recvpool_addrs		recvpool;
@@ -165,7 +168,7 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 		assert(udi->grabbed_ftok_sem);
 	}
 	OPENFILE(fn, O_RDONLY, fd);
-	if (-1 == fd)
+	if (FD_INVALID == fd)
 		rts_error(VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
 	assert(0 < buflen);
 	if (0 != offset)
@@ -229,7 +232,7 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 		else
 			rts_error(VARLSTCNT(7) ERR_REPLINSTREAD, 4, buflen, (qw_off_t *)&offset, LEN_AND_STR(fn), status);
 	}
-	CLOSEFILE(fd, status);
+	CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
 	assert(0 == status);
 	if (0 != status)
 		rts_error(VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
@@ -250,6 +253,7 @@ void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	int		status, fd, oflag;
 	unix_db_info	*udi;
 	gd_region	*reg;
+	ZOS_ONLY(int	realfiletag;)
 
 	error_def(ERR_TEXT);
 	error_def(ERR_REPLINSTOPEN);
@@ -257,6 +261,7 @@ void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	error_def(ERR_REPLINSTWRITE);
 	error_def(ERR_REPLINSTCLOSE);
 	error_def(ERR_SYSCALL);
+	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	/* Assert that except for MUPIP REPLIC -INSTANCE_CREATE or -EDITINSTANCE, all callers hold the FTOK semaphore
 	 * on the replication instance file. Note that the instance file might be pointed to by one of the two region
@@ -284,19 +289,24 @@ void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	if (in_repl_inst_create)
 		oflag |= (O_CREAT | O_EXCL);
 	OPENFILE3(fn, oflag, 0666, fd);
-	if (-1 == fd)
+	if (FD_INVALID == fd)
 	{
 		if (!in_repl_inst_create)
 			rts_error(VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
 		else
 			rts_error(VARLSTCNT(5) ERR_REPLINSTCREATE, 2, LEN_AND_STR(fn), errno);
 	}
+#ifdef __MVS__
+	if (-1 == (in_repl_inst_create ? gtm_zos_set_tag(fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag) :
+					 gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag)))
+		TAG_POLICY_GTM_PUTMSG(fn, errno, realfiletag, TAG_BINARY);
+#endif
 	assert(0 < buflen);
 	LSEEKWRITE(fd, offset, buff, buflen, status);
 	assert(0 == status);
 	if (0 != status)
 		rts_error(VARLSTCNT(7) ERR_REPLINSTWRITE, 4, buflen, (qw_off_t *)&offset, LEN_AND_STR(fn), status);
-	CLOSEFILE(fd, status);
+	CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
 	assert(0 == status);
 	if (0 != status)
 		rts_error(VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
@@ -342,13 +352,13 @@ void	repl_inst_sync(char *fn)
 	)
 	oflag = O_RDWR;
 	OPENFILE3(fn, oflag, 0666, fd);
-	if (-1 == fd)
+	if (FD_INVALID == fd)
 		rts_error(VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
 	GTM_FSYNC(fd, status);
 	assert(0 == status);
 	if (0 != status)
 		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fsync()"), CALLFROM, errno);
-	CLOSEFILE(fd, status);
+	CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
 	assert(0 == status);
 	if (0 != status)
 		rts_error(VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);

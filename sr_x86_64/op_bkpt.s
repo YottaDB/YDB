@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -25,7 +25,7 @@
 .extern	zstep_level
 
 	.text
-.extern	fetch
+.extern	gtm_fetch
 .extern	op_retarg
 .extern	op_zbreak
 .extern	op_zst_break
@@ -65,7 +65,7 @@ ENTRY op_zbfetch
 	movq	frame_pointer(REG_IP),REG64_ACCUM
 	popq	msf_mpc_off(REG64_ACCUM)
 	movb    $0,REG8_ACCUM             # variable length argumentt
-	call	fetch
+	call	gtm_fetch
 	#popq	REG64_ACCUM
 	#leaq	(REG_SP,REG64_ACCUM,8),REG_SP
 	movq	frame_pointer(REG_IP),REG64_ARG0
@@ -88,7 +88,7 @@ ENTRY op_zstepfetch
 	movq	frame_pointer(REG_IP),REG64_ACCUM
 	popq	msf_mpc_off(REG64_ACCUM)
 	movb    $0,REG8_ACCUM             # variable length argument
-	call	fetch
+	call	gtm_fetch
 	#popq	REG64_ACCUM
 	#leaq	(REG_SP,REG64_ACCUM,8),REG_SP
 	call	op_zst_break
@@ -110,7 +110,7 @@ ENTRY op_zstzbfetch
 	movq	frame_pointer(REG_IP),REG64_ACCUM
 	popq	msf_mpc_off(REG64_ACCUM)
 	movb    $0,REG8_ACCUM             # variable length argument
-	call	fetch
+	call	gtm_fetch
 	#popq	REG64_ACCUM
 	#leaq	(REG_SP,REG64_ACCUM,8),REG_SP
 	movq	frame_pointer(REG_IP),REG64_ARG0
@@ -135,7 +135,7 @@ ENTRY op_zstzb_fet_over
 	movq	frame_pointer(REG_IP),REG64_ACCUM
 	popq	msf_mpc_off(REG64_ACCUM)
 	movb    $0,REG8_ACCUM             # variable length argument
-	call	fetch
+	call	gtm_fetch
 	#popq	REG64_ACCUM
 	#leaq	(REG_SP,REG64_ACCUM,8),REG_SP
 	movq	frame_pointer(REG_IP),REG64_ARG0
@@ -186,7 +186,7 @@ ENTRY op_zst_fet_over
 	movq	frame_pointer(REG_IP),REG64_ACCUM
 	popq	msf_mpc_off(REG64_ACCUM)
 	movb    $0,REG8_ACCUM             # variable length argument
-	call	fetch
+	call	gtm_fetch
 	#popq	REG64_ACCUM
 	#leaq	(REG_SP,REG64_ACCUM,8),REG_SP
 	movq	zstep_level(REG_IP),REG64_ACCUM

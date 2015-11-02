@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,14 +54,14 @@ int4 disk_block_available(int fd, GTM_BAVAIL_TYPE *ret, boolean_t fill_unix_hole
 	FSTATVFS_FILE(fd, &fstatvfs_buf, status);
 	if (-1 == status)
 		return errno;
-	*ret = (fstatvfs_buf.f_frsize / DISK_BLOCK_SIZE) * fstatvfs_buf.f_bavail;
+	*ret = (GTM_BAVAIL_TYPE)((fstatvfs_buf.f_frsize / DISK_BLOCK_SIZE) * fstatvfs_buf.f_bavail);
 	if (fill_unix_holes)
 	{
 		FSTAT_FILE(fd, &fstat_buf, status);
 		if (-1 == status)
 			return errno;
-		*ret -= DEV_BSIZE / DISK_BLOCK_SIZE
-			* (DIVIDE_ROUND_UP(fstat_buf.st_size, DEV_BSIZE) - fstat_buf.st_blocks);
+		*ret -= (GTM_BAVAIL_TYPE)(DEV_BSIZE / DISK_BLOCK_SIZE
+			* (DIVIDE_ROUND_UP(fstat_buf.st_size, DEV_BSIZE) - fstat_buf.st_blocks));
 	}
 	return 0;
 }

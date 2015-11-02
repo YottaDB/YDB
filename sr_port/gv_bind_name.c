@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,6 @@
 #include "hashtab.h"
 
 GBLREF gv_namehead	*gv_target;
-GBLREF short            dollar_trestart;
 GBLREF gv_key		*gv_currkey;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_binding	*gd_map, *gd_map_top;
@@ -67,8 +66,6 @@ void gv_bind_name(gd_addr *addr, mstr *targ)
 		gv_target = gvnh_reg->gvt;
 		gv_cur_region = reg;
 		acc_meth = gv_cur_region->dyn.addr->acc_meth;
-		if (dollar_trestart)
-			gv_target->clue.end = 0;
 	} else
 	{
 		map = gd_map + 1;	/* get past local locks */

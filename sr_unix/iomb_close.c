@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 #include "iombdef.h"
 #include "io_params.h"
 #include "stringpool.h"
+#include "gtmio.h"
 
 LITREF unsigned char io_params_size[];
 
@@ -28,6 +29,7 @@ void  iomb_close(io_desc *device, mval *pp)
 	int		status;
 	d_mb_struct	*mb_ptr;
 	int		p_offset;
+	int		rc;
 
 	p_offset = 0;
 	mb_ptr = (d_mb_struct *)device->dev_sp;
@@ -49,7 +51,7 @@ void  iomb_close(io_desc *device, mval *pp)
 			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
 				(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 		}
-		close(mb_ptr->channel);
+		CLOSEFILE_RESET(mb_ptr->channel, rc);	/* resets "mb_ptr->channel" to FD_INVALID */
 		if (mb_ptr->del_on_close || (!mb_ptr->prmflg))
 		{
 			path = device->trans_name->dollar_io;

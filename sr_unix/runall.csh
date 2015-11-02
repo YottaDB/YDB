@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -23,47 +23,66 @@ set compileonly = 0
 set linkonly = 0
 set helponly = 0
 set mumps_changed = ""
-set ascii_changed = ""
+set gtmplatformlib_changed = ""
 
-
-set temp=(`getopt nchl $argv:q`)
-if ($? == 0) then
-	eval set argv=\($temp:q\)
-	while (1)
-		switch ($1:q)
-			case -n :
-				set listonly = 1
-				shift
-				breaksw
-
-			case -c :
-				set compileonly = 1
-				shift
-				breaksw
-
-			case -l :
-				set linkonly = 1
-				shift
-				breaksw
-
-			case -h :
-				set helponly = 1
-				shift
-				breaksw
-
-			case -- :
-				shift
-				break
-		endsw
-	end
-else
-	set helponly = 1
-endif
+while (0 < $#)
+	switch ($1:q)
+		case -n :
+			set listonly = 1
+			breaksw
+		case -c :
+			set compileonly = 1
+			breaksw
+		case -l :
+			set linkonly = 1
+			breaksw
+		case -h :
+			set helponly = 1
+			breaksw
+		default :
+			break
+	endsw
+	shift
+end
+#set temp=(`getopt nchl $argv:q`)
+#if ($? == 0) then
+#	eval set argv=\($temp:q\)
+#	while (1)
+#		switch ($1:q)
+#			case -n :
+#				set listonly = 1
+#				shift
+#				breaksw
+#
+#			case -c :
+#				set compileonly = 1
+#				shift
+#				breaksw
+#
+#			case -l :
+#				set linkonly = 1
+#				shift
+#				breaksw
+#
+#			case -h :
+#				set helponly = 1
+#				shift
+#				breaksw
+#
+#			case -- :
+#				shift
+#				break
+#		endsw
+#	end
+#else
+#	set helponly = 1
+#endif
 
 if ($helponly) then
 	echo "Usage : `basename $0` [-n|-c|-h] [file...]"
 	echo " -n	List the out-of-date sources; don't compile, or build"
 	echo " -c	Compile the out-of-date sources; don't build"
+	echo " -l	Link the out-of-date sources; don't compile"
 	echo " -h	Print this message"
 	echo ""
 	exit 1
@@ -189,8 +208,14 @@ gtcm_gnp_server gtcm_gnp_server
 gtcm_gnp_clitab gtcm_gnp_server
 dbcertify dbcertify
 dbcertify_cmd dbcertify
+gtmcrypt_dbk_ref gtmcrypt
+gtmcrypt_pk_ref gtmcrypt
+gtmcrypt_ref gtmcrypt
+ascii2hex gtmcrypt
+maskpass gtmcrypt
 LABEL
 
+set exclude_compile_list = "gtmcrypt_dbk_ref gtmcrypt_pk_ref gtmcrypt_ref ascii2hex maskpass"
 # find all libnames other than mumps
 pushd $gtm_tools >& /dev/null
 set comlist_liblist = `ls *.list | sed 's/.list//' | sed 's/^lib//'`
@@ -377,6 +402,19 @@ if (! -z ${TMP_DIR}_src_files) then
 		set file = $file:r		# take the non-extension part for the obj file
 		set objfile = ${file}.o
 
+		# Do not compile plugin files if they are modified. Compilation and subsequent build will happen in
+		# buildaux.csh
+		set exclude_compile_list_modified = "FALSE"
+		foreach exclude_file ($exclude_compile_list)
+			if ($exclude_file == $file) then
+				set exclude_compile_list_modified = "TRUE"
+				break
+			endif
+		end
+		if ("TRUE" == $exclude_compile_list_modified) then
+			continue
+		endif
+
 		alias runall_cc gt_cc_${RUNALL_IMAGE}
 		alias gt_as $gt_as_assembler $gt_as_options_common $gt_as_option_I $RUNALL_EXTRA_AS_FLAGS
 		alias runall_as gt_as_${RUNALL_IMAGE}
@@ -462,29 +500,37 @@ if (! -z ${TMP_DIR}_src_files) then
 
 	(ls -1 ${TMP_DIR}_lib_.* > ${TMP_DIR}_Lib_list) >& /dev/null
 
+	set retainlist = ""
 	foreach lib_ (`cat ${TMP_DIR}_Lib_list`)
 		set libext = $lib_:e
 		set library = $lib_:r
 		set library = $library:e
 		set library = $library.$libext
+		# Note down if any files in retain_list.txt are being compiled. If so we need to make sure we dont remove
+		# those .o files after including them in libgtmrpc.a as they also needed to be included in libmumps.a
 		if ("libgtmrpc.a" != $library) then
-			echo "-->  into $gtm_obj/$library <--"
-			gt_ar $gt_ar_option_update $gtm_obj/$library `cat $lib_`
-			if (("ia64" == $mach_type) && ("hpux" == $platform_name)) then
-				ranlib $gtm_obj/$library
-			endif
+			set dstlib = "$gtm_obj/$library"
 		else
-			echo "-->  into $gtm_exe/$library <--"
-			gt_ar $gt_ar_option_update $gtm_exe/$library `cat $lib_`
-			if (("ia64" == $mach_type) && ("hpux" == $platform_name)) then
-				ranlib $gtm_exe/$library
-			endif
+			set dstlib = "$gtm_exe/$library"
+			set retainlist = `cat $lib_ | egrep -f $gtm_tools/retain_list.txt`
+		endif
+		# remove pre-existing object files from object library to ensure an older working version of the module does
+		# not get used in case the current version of the module did not compile and failed to produce an object file.
+		gt_ar $gt_ar_option_delete $dstlib `cat $lib_` >& /dev/null
+		echo "-->  into $dstlib <--"
+		gt_ar $gt_ar_option_update $dstlib `cat $lib_`
+		if (("ia64" == $mach_type) && ("hpux" == $platform_name)) then
+			ranlib $dstlib
 		endif
 		if ($status) then
 			if ($?RUNALL_DEBUG != 0) env
 			goto cleanup
 		endif
-		rm -f `cat $lib_`
+		if (("" != "$retainlist") && ("libgtmrpc.a" == $library)) then
+			rm -f `cat $lib_ | egrep -v -f $gtm_tools/retain_list.txt`
+		else
+			rm -f `cat $lib_`
+		endif
 		echo ""
 	end
 	echo ""
@@ -494,23 +540,17 @@ if (! -z ${TMP_DIR}_src_files) then
 	echo "----------------------------------------------------------"
 	echo
 
-	cat ${TMP_DIR}_Lib_list ${TMP_DIR}_main_.misc | sed 's/.*lib//g' | sed 's/\.a$//g' | sort -u >! ${TMP_DIR}_main_.final
+	# did libmumps.a change
 	set mumps_changed = `grep libmumps.a ${TMP_DIR}_Lib_list`
 
-	# On OS390, check if libascii has been rebuilt. If $gt_ar_ascii_name
-	# has the value "ascii", then the null definition in gtm_env.csh was
-	# overridden in gtm_env_sp.csh (OS390 only), so set ascii_changed
-	# accordingly. OS390 adds "-lascii" to $gt_ld_syslibs so it gets included
-	# when linking in buildaux.csh and buildshr.csh
+	# on z/OS only, did libgtmzos.a change
+	set gtmplatformlib_changed = `grep libgtmzos.a ${TMP_DIR}_Lib_list`
 
-	if ("$gt_ar_ascii_name" == "ascii") then
-		set ascii_changed = `grep libascii.a ${TMP_DIR}_Lib_list`
-	else
-		set ascii_changed = ""
-	endif
+	cat ${TMP_DIR}_Lib_list ${TMP_DIR}_main_.misc | sed 's/.*lib//g' | sed 's/\.a$//g' | sort -u >! ${TMP_DIR}_main_.final
 endif # if (! -z ${TMP_DIR}_src_files) then
 
-if ("$mumps_changed" != "" || "$ascii_changed" != "") then
+# if either libmumps.a or a platform specific support library changes rebuild everything
+if ("$mumps_changed" != "" || "$gtmplatformlib_changed" != "") then
 	$shell $gtm_tools/build${RUNALL_IMAGE}.csh $RUNALL_VERSION
 else
 	if (-e ${TMP_DIR}_main_.final) then
@@ -531,6 +571,11 @@ if ( -f $gtm_log/error.${RUNALL_IMAGE}.log ) then
 	echo " ---->  Leaving runall logfiles ${TMP_DIR}_* intact. Please remove after troubleshooting."
 	echo ""
 	goto done
+endif
+
+# Generate Special Debug Files (z/OS specific at the moment)
+if ( -e $gtm_tools/gtm_dbgld.csh ) then
+	$gtm_tools/gtm_dbgld.csh
 endif
 
 cleanup:

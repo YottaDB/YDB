@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -317,7 +317,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 					msec_timeout = -1;
                                         out_of_time = TRUE;
                                 } else
-					msec_timeout = cur_time.at_sec * 1000 + cur_time.at_usec / 1000;
+					msec_timeout = (int4)(cur_time.at_sec * 1000 + cur_time.at_usec / 1000);
 				SOCKET_DEBUG(PRINTF("socrfl: Taking timeout end time from read restart data - "
 						    "computed msec_timeout: %d\n", msec_timeout); DEBUGSOCKFLUSH);
 			}
@@ -399,7 +399,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				   character is and verify that many characters are available in the buffer and return the
 				   character length to us to use for bufflen.
 				*/
-				charlen = iosocket_snr_utf_prebuffer(iod, socketptr, 0, &time_for_read,
+				charlen = (int)iosocket_snr_utf_prebuffer(iod, socketptr, 0, &time_for_read,
 								     (!vari || has_delimiter || 0 == chars_read));
 				SOCKET_DEBUG2(PRINTF("socrfl: charlen from iosocket_snr_utf_prebuffer = %d\n", charlen);
 					     DEBUGSOCKFLUSH);
@@ -468,7 +468,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		} else if (0 < status)
 		{
 			SOCKET_DEBUG2(PRINTF("socrfl: Bytes read: %d\n", status); DEBUGSOCKFLUSH);
-			bytes_read += status;
+			bytes_read += (int)status;
 			UNIX_ONLY(if (iod == io_std_device.out)
 				prin_in_dev_failure = FALSE;)
 			if (socketptr->first_read && CHSET_M != ichset) /* May have a BOM to defuse */
@@ -657,7 +657,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			if (c_ptr < c_top) /* width size READ completed OR partial last char, push back bytes into input buffer */
 			{
 				iosocket_unsnr(socketptr, c_ptr, c_top - c_ptr);
-				bytes_read -= c_top - c_ptr;	/* We will be re-reading these bytes */
+				bytes_read -= (int)(c_top - c_ptr);	/* We will be re-reading these bytes */
 				requeue_done = TRUE;		/* Force single (full) char read next time through */
 				SOCKET_DEBUG2(PRINTF("socrfl: Requeue of %d bytes done - adjusted bytes_read: %d\n",
 						    (c_top - c_ptr), bytes_read); DEBUGSOCKFLUSH);

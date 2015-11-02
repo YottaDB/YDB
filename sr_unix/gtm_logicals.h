@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,11 +34,11 @@
 #define	GTM_WHITE_BOX_TEST_CASE_COUNT	"$gtm_white_box_test_case_count"
 
 /* Indirection-cache */
-#define GTM_MAX_INDRCACHE_MEMORY	"$gtm_max_indrcache_memory"
-#define GTM_MAX_INDRCACHE_COUNT		"$gtm_max_indrcache_count"
+#define	GTM_MAX_INDRCACHE_MEMORY	"$gtm_max_indrcache_memory"
+#define	GTM_MAX_INDRCACHE_COUNT		"$gtm_max_indrcache_count"
 
 /* MUPIP BACKUP */
-# define GTM_BAK_TEMPDIR_LOG_NAME	"$GTM_BAKTMPDIR"
+#define	GTM_BAK_TEMPDIR_LOG_NAME	"$GTM_BAKTMPDIR"
 
 /* Pattern match operator */
 #define	PAT_FILE			"$gtm_pattern_file"
@@ -46,8 +46,8 @@
 
 /* Alternative Collation */
 #define	CT_PREFIX			"$gtm_collate_"
-#define LCT_PREFIX			"$gtm_local_collate"
-#define LCT_STDNULL			"$gtm_lct_stdnull"
+#define	LCT_PREFIX			"$gtm_local_collate"
+#define	LCT_STDNULL			"$gtm_lct_stdnull"
 
 /* Miscellaneous */
 #define	GTM_DEBUG_LEVEL_ENVLOG		"$gtmdbglvl"
@@ -61,10 +61,11 @@
 #define	ZTRAP_NEW			"$gtm_ztrap_new"
 #define	ZDATE_FORM			"$gtm_zdate_form"
 #define	DISABLE_ALIGN_STRINGS		"$gtm_disable_alignstr"
-#define GTM_MAX_SOCKETS			"$gtm_max_sockets"
-#define GTM_MEMORY_RESERVE		"$gtm_memory_reserve"
-#define GTM_ZQUIT_ANYWAY		"$gtm_zquit_anyway"
+#define	GTM_MAX_SOCKETS			"$gtm_max_sockets"
+#define	GTM_MEMORY_RESERVE		"$gtm_memory_reserve"
+#define	GTM_ZQUIT_ANYWAY		"$gtm_zquit_anyway"
 #define	GTM_NOUNDEF			"$gtm_noundef"
+#define	GTM_PROMPT			"$gtm_prompt"
 
 /* -------------------------- Unix only --------------------------  */
 
@@ -77,17 +78,22 @@
 #define	GTM_REPL_INSTNAME		"$gtm_repl_instname"
 #define	GTM_REPL_INSTSECONDARY		"$gtm_repl_instsecondary"
 #define	GTM_ZLIB_CMP_LEVEL		"$gtm_zlib_cmp_level"
-#define GTM_EVENT_LOG_LIB_ENV		"$gtm_event_log_libpath"
-#define GTM_EVENT_LOG_RTN_ENV		"$gtm_event_log_rtn"
+#define	GTM_EVENT_LOG_LIB_ENV		"$gtm_event_log_libpath"
+#define	GTM_EVENT_LOG_RTN_ENV		"$gtm_event_log_rtn"
 
 /* Unicode */
-#define GTM_CHSET_ENV			"$gtm_chset"
-#define GTM_PATNUMERIC_ENV		"$gtm_patnumeric"
-#define GTM_BADCHAR_ENV			"$gtm_badchar"
-#define GTM_ICU_MINOR_ENV		"$gtm_icu_minorver"
+#define	GTM_CHSET_ENV			"$gtm_chset"
+#ifdef __MVS__
+#define	GTM_CHSET_LOCALE_ENV		"$gtm_chset_locale"
+#define	GTM_TAG_UTF8_AS_ASCII		"$gtm_dont_tag_UTF8_ASCII"
+#endif
+#define	GTM_PATNUMERIC_ENV		"$gtm_patnumeric"
+#define	GTM_BADCHAR_ENV			"$gtm_badchar"
+#define	GTM_ICU_VERSION			"$gtm_icu_version"
 
 /* Miscellaneous */
 #define	GTM_LOG_ENV			"$gtm_log"
 #define	GTM_PRINCIPAL_EDITING		"$gtm_principal_editing"
-#define GTM_QUIET_HALT			"$gtm_quiet_halt"
+#define	GTM_QUIET_HALT			"$gtm_quiet_halt"
 #define	GTM_NON_BLOCKED_WRITE_RETRIES	"$gtm_non_blocked_write_retries"
+#define	GTM_NOCENABLE			"$gtm_nocenable"

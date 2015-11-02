@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,9 @@ typedef struct shm_parms_struct
 
 #define CLNUP_RNDWN(udi, reg)									\
 {												\
-	close(udi->fd);										\
+	int	rc;										\
+												\
+	CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */		\
 	if (sem_created)									\
 	{											\
 		if (-1 == semctl(udi->semid, 0, IPC_RMID))					\

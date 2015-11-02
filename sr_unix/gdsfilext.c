@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@
 #include "mmseg.h"
 #include "gdsblk.h"		/* needed for gds_blk_downgrade.h */
 #include "gds_blk_downgrade.h"	/* for IS_GDS_BLK_DOWNGRADE_NEEDED macro */
-
+#include "wbox_test_init.h"
 /* Include prototypes */
 #include "bit_set.h"
 #include "disk_block_available.h"
@@ -71,6 +71,7 @@ GBLREF	unsigned int	t_tries;
 GBLREF	jnl_gbls_t	jgbl;
 GBLREF	inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
+GBLREF  boolean_t	have_standalone_access;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -106,15 +107,16 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	error_def(ERR_TOTALBLKMAX);
 	error_def(ERR_WAITDSKSPACE);
 
-#ifdef __hppa
-	if (dba_mm == cs_addrs->hdr->acc_meth)
+#if !defined(MM_FILE_EXT_OK)
+	if (!have_standalone_access && (dba_mm == cs_addrs->hdr->acc_meth))
 		return (uint4)(NO_FREE_SPACE); /* should this be changed to show extension not allowed ? */
 #endif
 
 	/* Both blocks and total blocks are unsigned ints so make sure we aren't asking for huge numbers that will
 	   overflow and end up doing silly things.
 	*/
-	assert(blocks <= (MAXTOTALBLKS(cs_data) - cs_data->trans_hist.total_blks));
+	assert((blocks <= (MAXTOTALBLKS(cs_data) - cs_data->trans_hist.total_blks)) ||
+				(gtm_white_box_test_case_enabled && (WBTEST_FILE_EXTEND_ERROR == gtm_white_box_test_case_number)));
 
 	if (!blocks)
 		return (uint4)(NO_FREE_SPACE); /* should this be changed to show extension not enabled ? */
@@ -143,10 +145,8 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		{
 			send_msg(VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, DB_LEN_STR(gv_cur_region),
 					(uint4)(avail_blocks - ((new_blocks <= avail_blocks) ? new_blocks : 0)));
-#ifndef __MVS__
 			if (blocks > (uint4)avail_blocks)
 				return (uint4)(NO_FREE_SPACE);
-#endif
 		}
 	}
 	cs_addrs->extending = TRUE;

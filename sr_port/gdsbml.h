@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@
 #define	THREE_BLKS_BITMASK	0x3F
 #define	TWO_BLKS_BITMASK	0x0F
 #define	ONE_BLK_BITMASK		0x03
+#define BMP_EIGHT_BLKS_FREE	255
 
 /* returns the bitmap status (BLK_BUSY|BLK_FREE|etc.) of the "blknum"th block within the local bitmap block "bp" in bml_status */
 #define	GET_BM_STATUS(bp, blknum, bml_status)								\
@@ -78,28 +79,6 @@
 		status = cdb_sc_gbloflow;		\
 	else if (EXTEND_UNFREEZECRIT == gdsfilext_code)	\
 		status = (enum cdb_sc)cdb_sc_unfreeze_getcrit;	\
-}
-
-#define MAXHARDCRITS		31
-
-/* The following unfreeze-wait logic is lifted from similar stuff in tp_tend() */
-
-#define	GRAB_UNFROZEN_CRIT(reg, csa, csd)				\
-{									\
-	int	lcnt;							\
-	void	wcs_backoff();						\
-									\
-	assert(&FILE_INFO(reg)->s_addrs == csa && csa->hdr == csd);	\
-	for (lcnt = 0; ; lcnt++)					\
-	{								\
-		grab_crit(reg);						\
-		if (!csd->freeze)					\
-			break;						\
-		rel_crit(reg);						\
-		if (MAXHARDCRITS < lcnt)				\
-			wcs_backoff(lcnt);				\
-	}								\
-	assert(!csd->freeze && csa->now_crit);				\
 }
 
 #define MASTER_MAP_BITS_PER_LMAP	1

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,16 +10,18 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "main_pragma.h"
 
 #undef malloc
 #undef free
+#undef GTM_FD_TRACE	/* do not use gtm_open4 with FD tracing */
 
 #include "gtm_string.h"
 #include "gtm_fcntl.h"
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include <errno.h>
 
 #include "gdsroot.h"
@@ -31,31 +33,46 @@
 #include "mlkdef.h"
 #include "filestruct.h"
 #include "gbldirnam.h"
+#include "hashtab_mname.h"
+
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
+
+#define asc2i(str,len) atoi((const char*)str)
+#ifdef BIGENDIAN
+#	define	FIRST_ONE	0x2329FFFF
+#	define  SECOND_ONE	0x25FFFFFF
+#else
+#	define	FIRST_ONE	0xFFFF2923
+#	define  SECOND_ONE	0xFFFFFF25
+#endif
 
 #ifdef GTM64
 #define SAVE_ADDR_REGION                   \
 { \
-	int4 *tmp = (int4 *) &(addr->regions); \
-	*long_ptr++ = *tmp; \
-	long_ptr++;       \
+	int4 *tmp = (int *)&(addr->regions); \
+	*int4_ptr++ = *(tmp + lsb_index); \
+	int4_ptr++;       \
 }
 #else /* GTM64 */
 #define SAVE_ADDR_REGION                   \
-	*long_ptr++ = (int4)addr->regions;
+	*int4_ptr++ = (int4)addr->regions;
 #endif /* GTM64 */
 
 
 int main(int argc, char **argv)
 {
 	int		fd;
-	FILE		*fp;
 	header_struct	*header;
 	gd_addr		*addr;
 	gd_region	*region;
+	gd_region	*region_top;
 	gd_segment	*segment;
-	int4		*long_ptr;
-	uint4		size;
+	int4		*int4_ptr;
+	uint4		t_offset, size;
 	int		i, alloc, extend, block, global, key, lock, record;
+	ZOS_ONLY(int	realfiletag;)
 
 	argv++;
 	alloc = 100;
@@ -166,11 +183,15 @@ int main(int argc, char **argv)
 		PRINTF("Global value %d is invalid, must be between 64 and 4096\n", global);
 		return 0;
 	}
-	if (-1 == (fd = OPEN4("./mumps.gld", O_CREAT | O_EXCL | O_RDWR, 0600, 0 )))
+	if (FD_INVALID == (fd = OPEN4("./mumps.gld", O_CREAT | O_EXCL | O_RDWR, 0600, 0 )))
 	{
 		PERROR("Error opening file");
 		return 0;
 	}
+#if defined(__MVS__)
+	if (-1 == gtm_zos_set_tag(fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
+		PERROR("Error tagging file with TAG_BINARY");
+#endif
 	size = sizeof(header_struct) + sizeof(gd_addr) + 3 * sizeof(gd_binding) + 1 * sizeof(gd_region) + 1 * sizeof(gd_segment);
 	header = (header_struct *)malloc(ROUND_UP(size, DISK_BLOCK_SIZE));
 	memset(header, 0, ROUND_UP(size, DISK_BLOCK_SIZE));
@@ -190,57 +211,56 @@ int main(int argc, char **argv)
 	addr->id = 0;
 	addr->local_locks = 0;
 	addr->end = (INTPTR_T)((char *)addr->segments + 1 * sizeof(gd_segment));
-	long_ptr = (int4*)((char *)addr + (INTPTR_T)(addr->maps));
-
-#ifdef BIGENDIAN
-	*long_ptr++ = 0x232FFFFF;
-#else
-        *long_ptr++ = 0xFFFF2F23;
-#endif
-	*long_ptr++ = 0xFFFFFFF;
-	*long_ptr++ = 0xFFFFFFF;
-	*long_ptr++ = 0xFFFFFFF;
-	*long_ptr++ = 0xFFFFFFF;
-	*long_ptr++ = 0xFFFFFFF;
-	*long_ptr++ = 0xFFFFFFF;
-	*long_ptr++ = 0xFFFFFFF;
-	SAVE_ADDR_REGION
-
-#ifdef BIGENDIAN
-	*long_ptr++ = 0x24FFFFFF;
-#else
-        *long_ptr++ = 0xFFFFFF24;
-#endif
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	SAVE_ADDR_REGION
-
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	*long_ptr++ = 0xFFFFFFFF;
-	SAVE_ADDR_REGION
-
+	int4_ptr = (int4*)((char *)addr + (INTPTR_T)(addr->maps));
+	*int4_ptr++ = FIRST_ONE;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+        SAVE_ADDR_REGION
+	*int4_ptr++ = SECOND_ONE;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+        SAVE_ADDR_REGION
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+	*int4_ptr++ = 0xFFFFFFFF;
+        SAVE_ADDR_REGION
 	region = (gd_region*)((char *)addr + (INTPTR_T)(addr->regions));
 	segment = (gd_segment*)((char *)addr + (INTPTR_T)(addr->segments));
 	region->rname_len = 7;
 	memcpy(region->rname,"DEFAULT",7);
-	region->dyn.offset = (INTPTR_T)addr->segments;
+
+	for (region_top = region + addr->n_regions; region < region_top ; region++)
+	{	t_offset = region->dyn.offset;
+		region->dyn.addr = (gd_segment *)(INTPTR_T)t_offset;
+	}
+
+	region = (gd_region*)((char *)addr + (INTPTR_T)(addr->regions));
+	region->dyn.offset = (int4)(INTPTR_T)addr->segments;
 	region->max_rec_size = record;
 	region->max_key_size = key;
 	region->open = region->lock_write = region->null_subs = region->jnl_state = 0;
-	region->jnl_alq = region->jnl_deq = region->jnl_buffer_size = region->jnl_before_image = 0;
+	region->jnl_alq = 0x64;
+	region->jnl_deq = 0x64;
+	region->jnl_buffer_size = 0x80;
+	region->jnl_before_image = 1;
 	region->jnl_file_len = region->node = region->cmx_regnum = 0;
 	region->sec_size = 0;
+
 	segment->sname_len = 7;
 	memcpy(segment->sname,"DEFAULT",7);
 	memcpy(segment->fname,"mumps.dat",9);
@@ -255,23 +275,19 @@ int main(int argc, char **argv)
 	segment->buckets = 0;
 	segment->windows = 0;
 	segment->acc_meth = dba_bg;
-	segment->defer_time = 1;
+	segment->defer_time = 0;
 	segment->file_cntl = 0;
 
-	if (NULL == (fp = FDOPEN(fd,"r+")))
-	{
-		PERROR("Error doing fdopen on file");
-		return 0;
-	}
-	if (fseek(fp, (long)0, SEEK_SET))
+	if (lseek(fd, (off_t)0, SEEK_SET))
 	{
 		PERROR("Error seeking on file");
 		return 0;
 	}
-	if (fwrite(header,1,size,fp) != size)
+	if (write(fd, header, size) != size)
 	{
 		PERROR("Error writing to file");
 		return 0;
 	}
 	return 1;
 }
+

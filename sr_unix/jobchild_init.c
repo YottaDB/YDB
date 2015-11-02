@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@
 #include "job.h"
 #include "gcall.h"
 #include "jobchild_init.h"
+#include "lv_val.h"
 #include "callg.h"
 #include "invocation_mode.h"
 #include "gtmci.h"
@@ -118,6 +119,25 @@ void jobchild_init(void)
 		dollar_zmode.mvtype = MV_STR;
 		dollar_zmode.str.addr = &other_mode_buf[0];
 		dollar_zmode.str.len = sizeof(other_mode_buf) -1;
+		/* Release storage allocated by ojchildparms() */
+		if (jparms.directory.len)
+			free(jparms.directory.addr);
+		if (jparms.gbldir.len)
+			free(jparms.gbldir.addr);
+		if (jparms.startup.len)
+			free(jparms.startup.addr);
+		if (jparms.input.len)
+			free(jparms.input.addr);
+		if (jparms.output.len)
+			free(jparms.output.addr);
+		if (jparms.error.len)
+			free(jparms.error.addr);
+		if (jparms.routine.len)
+			free(jparms.routine.addr);
+		if (jparms.label.len)
+			free(jparms.label.addr);
+		if (jparms.logfile.len)
+			free(jparms.logfile.addr);
 	} else
 	{
 		/* If we are not a child, setup a dummy mumps routine */

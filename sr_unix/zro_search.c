@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@
 #include "zroutines.h"
 #include "eintr_wrappers.h"
 #include "error.h"
+#include "lv_val.h"
 #include "fgncal.h"
 
 GBLREF	zro_ent		*zro_root;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,13 +40,6 @@
 #include "getzdir.h"
 #include "gtm_newintrinsic.h"
 
-#define DEFAULT_PROMPT	"GTM>"
-/* The prompt buffer size (31) below would allow at least 8 Unicode characters, but since most
- * commonly used Unicode characters only occupy upto 3 bytes, the buffer would at least accommodate
- * 10 Unicode characters in a prompt */
-GBLDEF char		prombuf[MAX_MIDENT_LEN] = DEFAULT_PROMPT;
-GBLDEF MSTR_DEF(gtmprompt, STR_LIT_LEN(DEFAULT_PROMPT), &prombuf[0]);
-
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_addr		*gd_header;
@@ -75,6 +68,8 @@ GBLREF int4		zdate_form;
 GBLREF mval		dollar_ztexit;
 GBLREF boolean_t	dollar_ztexit_bool;
 GBLREF boolean_t	dollar_zquit_anyway;
+GBLREF char		prombuf[MAX_MIDENT_LEN];
+GBLREF mstr		gtmprompt;
 
 void op_svput(int varnum, mval *v)
 {

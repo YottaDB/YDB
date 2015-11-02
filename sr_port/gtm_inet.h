@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 #ifdef VMS
 #include <inet/in.h>
 #endif
-#ifdef _AIX
+#if defined(_AIX) || defined (__MVS__)
 #include <netinet/in.h>
 #endif
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,10 +9,13 @@
  *								*
  ****************************************************************/
 #include "mdef.h"
+
 #include "gtm_string.h"
+
 #include "gtm_limits.h"		/* needed for PATH_MAX */
 #include "error.h"
 #include "gtmxc_types.h"	/* needed for xc_string_t */
+#include "lv_val.h"
 #include "fgncal.h"
 #include "gtm_env_xlate_init.h"
 
@@ -54,7 +57,7 @@ mval* gtm_env_translate(mval* val1, mval* val2, mval* val_xlated)
 		in3.address = dollar_zdir.str.addr;
 		out.address = NULL;
 		ret_gtm_env_xlate = (*gtm_env_xlate_entry)(&in1, &in2, &in3, &out);
-		val_xlated->str.len = out.length;
+		val_xlated->str.len = (mstr_len_t)out.length;
 		val_xlated->str.addr = out.address;
 		if (MAX_DBSTRLEN < val_xlated->str.len)
 			rts_error(VARLSTCNT(4) ERR_XTRNRETVAL, 2, val_xlated->str.len, MAX_DBSTRLEN);

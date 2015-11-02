@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include <stddef.h> /* for offsetof() macro */
 
 #include "gtm_string.h"
 #include "min_max.h"
@@ -42,7 +44,9 @@
 #include "tp_change_reg.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search prototype */
 #include "tp_set_sgm.h"
-
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 GBLREF	gv_key		*gv_currkey;
 GBLREF	gv_namehead	*gv_target;
 GBLREF  gd_region       *gv_cur_region;
@@ -57,7 +61,6 @@ GBLREF	reg_ctl_list	*mur_ctl;
 GBLREF	jnl_ctl_list	*mur_jctl;
 GBLREF 	int		mur_regno;
 GBLREF	mur_opt_struct	mur_options;
-GBLREF	short          	dollar_trestart;
 GBLREF	short		dollar_tlevel;
 GBLREF 	jnl_gbls_t	jgbl;
 GBLREF	seq_num		seq_num_zero;
@@ -75,7 +78,7 @@ static	void	(* const extraction_routine[])() =
 uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num losttn_seqno)
 {
 	char			new;
-	boolean_t		process_losttn, extr_file_create[TOT_EXTR_TYPES], added;
+	boolean_t		process_losttn, extr_file_create[TOT_EXTR_TYPES], added, is_set_kill_zkill;
 	trans_num		curr_tn, last_tn;
 	enum jnl_record_type	rectype;
 	enum rec_fence_type	rec_fence;
@@ -94,7 +97,9 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	ht_ent_mname		*tabent;
 	mname_entry	 	gvent;
 	gvnh_reg_t		*gvnh_reg;
-
+	GTMCRYPT_ONLY(
+	int			crypt_status;
+	)
 	error_def(ERR_JNLREADEOF);
 	error_def(ERR_DUPTN);
 	error_def(ERR_BLKCNTEDITFAIL);
@@ -105,7 +110,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 		extr_file_create[recstat] = TRUE;
 	jgbl.dont_reset_gbl_jrec_time = jgbl.forw_phase_recovery = TRUE;
 	jgbl.mur_pini_addr_reset_fnptr = (pini_addr_reset_fnptr)mur_pini_addr_reset;
-	gv_keysize = ROUND_UP2(MAX_KEY_SZ + MAX_NUM_SUBSC_LEN, 4);
+	gv_keysize = DBKEYSIZE(MAX_KEY_SZ);
 	mu_gv_stack_init(&mstack_ptr);
 	assert(!mur_options.rollback_losttnonly || !murgbl.db_updated);
 	if (!mur_options.rollback_losttnonly)
@@ -141,7 +146,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 		{
 			gv_cur_region = rctl->gd;
 			tp_change_reg();
-			SET_CSA_DIR_TREE(cs_addrs, gv_keysize, gv_cur_region);
+			SET_CSA_DIR_TREE(cs_addrs, MAX_KEY_SZ, gv_cur_region);
 			/* Keep gv_target and gv_cur_region in sync always. Now that region is changed, set gv_target to
 			 * csa->dir_tree. We dont want to set it to NULL as there is code in t_begin that assumes it is non-NULL.
 			 */
@@ -155,9 +160,28 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			rec = mur_rab.jnlrec;
 			rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 			rec_time = rec->prefix.time;
+			is_set_kill_zkill = (boolean_t)(IS_SET_KILL_ZKILL(rectype));
 			if (rec_time > mur_options.before_time)
 				/* Even they do not go to losttrans or brkntrans files */
 				break;
+			if (is_set_kill_zkill)
+			{
+				boolean_t is_ztp = (boolean_t)(IS_ZTP(rectype));
+				keystr = is_ztp ? (jnl_string *)&rec->jrec_fkill.mumps_node
+							   : (jnl_string *)&rec->jrec_kill.mumps_node;
+#				ifdef GTM_CRYPT
+				if (mur_jctl->jfh->is_encrypted)
+				{
+					DECODE_SET_KILL_ZKILL(keystr, is_ztp, rec->prefix.forwptr,
+							      mur_jctl->encr_key_handle, crypt_status);
+					if (0 != crypt_status)
+					{
+						GC_GTM_PUTMSG(crypt_status, NULL);
+						return crypt_status;
+					}
+				}
+#				endif
+			}
 			if (mur_options.selection && !mur_select_rec())
 				continue;
 			assert((0 == mur_options.after_time) || mur_options.forward && !murgbl.db_updated);
@@ -213,7 +237,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 							recstat = BROKEN_TN;
 						}
 					}
-				} else if ((FENCE_ALWAYS == mur_options.fences) && (IS_SET_KILL_ZKILL(rectype)))
+				} else if ((FENCE_ALWAYS == mur_options.fences) && is_set_kill_zkill)
 				{
 					process_losttn = TRUE;
 					recstat = BROKEN_TN;
@@ -279,10 +303,9 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			 * Only then can we call gvcst_root_search() to find out collation set up for this global.
 			 */
 			assert(!mur_options.update || (NULL != rctl->csa));
-			if (IS_SET_KILL_ZKILL(rectype))
+			if (is_set_kill_zkill)
 			{	/* ZTP has different record format than TP or non-TP. TP and non-TP has same format */
-				keystr = (IS_ZTP(rectype)) ? (jnl_string *)&rec->jrec_fkill.mumps_node
-							   : (jnl_string *)&rec->jrec_kill.mumps_node;
+				assert(NULL != keystr);
 				memcpy(gv_currkey->base, &keystr->text[0], keystr->length);
 				gv_currkey->base[keystr->length] = '\0';
 				gv_currkey->end = keystr->length;
@@ -297,8 +320,6 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 						gv_target = gvnh_reg->gvt;
 						gv_cur_region = gvnh_reg->gd_reg;
 						assert(gv_cur_region->open);
-						if (dollar_trestart)
-							gv_target->clue.end = 0;
 					} else
 					{
 						assert(gv_cur_region->max_key_size <= MAX_KEY_SZ);
@@ -329,7 +350,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			}
 			if (GOOD_TN == recstat)
 			{
-				if ((IS_SET_KILL_ZKILL(rectype) && !IS_TP(rectype)) || JRT_TCOM == rectype)
+				if ((is_set_kill_zkill && !IS_TP(rectype)) || JRT_TCOM == rectype)
 				{
 					/*
 					 * Do forward journaling, eliminating operations with duplicate transaction

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -306,7 +306,7 @@ enum cdb_sc	gvcst_search_tail (gv_key *pKey, srch_blk_status *pStat, gv_key *pOl
 			}
 			if (nFlg < 0)
 			{
-				nTargLen += pTargKeyBase - pCurrTarg;
+				nTargLen += (int)(pTargKeyBase - pCurrTarg);
 				goto match_term;
 			}
 		}

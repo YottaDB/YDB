@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,13 +29,20 @@
 #  define DUMPRSLTFILE	"TYPE "
 #  define RMS_OPEN_BIN        ,"rfm=fix","mrs=512","ctx=bin"
 #else
-#  define OPTDELIM	"-"
-#  define DEFAULT_OUTFILE_SUFFIX ".dbcertscan"
-#  define TMPCMDFILSFX	".sh"
+#ifdef __MVS__
+#  define SHELL_START	"#!/usr/local/bin/tcsh"
+#  define SETDISTLOGENV	"setenv "GTM_DIST" "
+#  define DSE_START_PIPE_RSLT1	"$"GTM_DIST"/dse << EOF >& "
+#  define DSE_START_PIPE_RSLT2	""
+#else
 #  define SHELL_START	"#!/bin/sh"
 #  define SETDISTLOGENV	GTM_DIST"="
 #  define DSE_START_PIPE_RSLT1	"$"GTM_DIST"/dse << EOF > "
 #  define DSE_START_PIPE_RSLT2	" 2>&1"
+#endif
+#  define OPTDELIM	"-"
+#  define DEFAULT_OUTFILE_SUFFIX ".dbcertscan"
+#  define TMPCMDFILSFX	".sh"
 #  define DSE_FIND_REG_ALL	"find -reg"
 #  define MUPIP_START	"$"GTM_DIST"/mupip << EOF"
 #  define RUN_CMD	"./"

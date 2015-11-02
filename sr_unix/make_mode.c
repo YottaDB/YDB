@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,12 +114,7 @@ rhdtyp *make_mode (int mode_index)
 	rhdtyp		*base_address;
 	lab_tabent	*lbl;
 	lnr_tabent	*lnr;
-#ifdef __ia64
-	uint8		*code;
-#else
-	NON_X86_64_ONLY(unsigned int	*code;)
-	X86_64_ONLY(char 	*code;)
-#endif /* __ia64 */
+	CODEBUF_TYPE	*code;
 	dyn_modes	*dmode;
 	int algnd_rtnhdr_size = (int)ROUND_UP2(sizeof(rhdtyp), SECTION_ALIGN_BOUNDARY);
 	int algnd_code_size   = (int)ROUND_UP2(CODE_SIZE, NATIVE_WSIZE);
@@ -144,12 +139,7 @@ rhdtyp *make_mode (int mode_index)
 	base_address->lnrtab_len = CODE_LINES;
 	base_address->labtab_len = 1;
 
-#ifdef __ia64
-	code = (uint8 *)base_address->ptext_adr;	/* start of executable code */
-#else
-	NON_X86_64_ONLY(code = (unsigned int *)base_address->ptext_adr;)	/* start of executable code */
-	X86_64_ONLY(code = (char *)base_address->ptext_adr;)	/* start of executable code */
-#endif /* __ia64 */
+	code = (CODEBUF_TYPE *)base_address->ptext_adr;	/* start of executable code */
 #ifdef __ia64
 	if (dyn_modes_type[mode_index][0] == 'C')
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ typedef struct
 
 #include <sys/types.h>
 
-#define sssize_t      size_t
+#define sssize_t	size_t
 #define SHMDT(X)	shmdt((void *)(X))
 
 /* constant needed for FIFO - OS390 redefines in mdefsp.h */
@@ -56,22 +56,43 @@ typedef struct
 #include "mdefsa.h"
 #include "mdefsp.h"
 
+/* Define GT.M interlude functions for open, close, pipe, creat and dup system calls. This lets GT.M trace through all file
+ * descriptor activity (needed for D9I11-002714). Do this on all Unix platforms. Note that only the macro GTM_FD_TRACE is
+ * defined here. gtm_unistd.h and gtm_fcntl.h define the actual GT.M interlude functions based on this macro.
+ */
+#if defined(UNIX)
+#	define	GTM_FD_TRACE
+#	define	GTM_FD_TRACE_ONLY(X)	X
+#else
+#	define	GTM_FD_TRACE_ONLY(X)
+#endif
+
+/* Define what is an invalid file descriptor in Unix and VMS. */
+#if defined(UNIX)
+#	define	FD_INVALID		-1	/* fd of -1 is invalid in Unix posix calls */
+#	define	FD_INVALID_NONPOSIX	FD_INVALID
+#else
+#	define	FD_INVALID		-1	/* fd of -1 is invalid in VMS if using POSIX interface (open/close etc.) */
+#	define	FD_INVALID_NONPOSIX	 0	/* fd of 0 is invalid in VMS if using RMS sys$open calls (non-posix interface) */
+#endif
+
 /* Now that mdefsp.h is included, GBLDEF should have been #defined. Use it to define STATICDEF for variables
  * and STATICFNDEF, STATICFNREF for functions. Define STATICDEF to "GBLDEF". This way we know such usages are intended
  * to be "static" but yet can effectively debug these variables since they are externally visible.
  * For functions, do not use the "static" keyword to make them externally visible.
  * Note that a STATICREF for variables does not make sense since statics are supposed to be used only within one module.
  */
-#define STATICDEF 	GBLDEF
+#define	STATICDEF	GBLDEF
 #define	STATICFNREF	extern
 #define	STATICFNDEF
 
-/* For all platforms except Tru64/VMS (alpha platforms), the [U]INTPTR_T types will be equivalenced to [u]intptr_t.
-   But since this type is used for alignment and other checking, and since Tru64/VMS (implemented as a
-   32 bit platform) unconditionally sets this type to its 8 char variant, on Tru64/VMS we will explicitly make
-   [U]INTPTR_T a 4 byte creature.
+/* INTPTR_T is an integer that has the same length as a pointer on each platform.  Its basic use is for arithmetic
+   or generic parameters.  For all platforms except Tru64/VMS (alpha platforms), the [U]INTPTR_T types will be
+   equivalenced to [u]intptr_t.  But since this type is used for alignment and other checking, and since Tru64/VMS
+   (implemented as a 32 bit platform) unconditionally sets this type to its 8 char variant, on Tru64/VMS we will
+   explicitly make [U]INTPTR_T a 4 byte creature.
 */
-#ifndef __alpha
+#if !defined(__alpha)
 typedef intptr_t INTPTR_T;
 typedef uintptr_t UINTPTR_T;
 #else
@@ -121,6 +142,12 @@ typedef UINTPTR_T uintszofptr_t;
 #	define NON_LINUX_ONLY(X) X
 #endif
 
+#ifdef __MVS__
+#	define ZOS_ONLY(X) X
+#else
+#	define ZOS_ONLY(X)
+#endif
+
 #if !defined(__alpha) && !defined(__sparc) && !defined(__hpux) && !defined(mips) && !defined(__ia64)
 #	define UNALIGNED_ACCESS_SUPPORTED
 #endif
@@ -128,13 +155,6 @@ typedef UINTPTR_T uintszofptr_t;
 #if defined(__ia64)
 #	define IA64_ONLY(X)	X
 #	define NON_IA64_ONLY(X)
-#	define OFFSETOF(X,Y) ((int)(offsetof(X,Y)))
-#	define USIZEOF(X) ((unsigned int)(sizeof(X)))
-#	define STRLEN(X) ((int)(strlen(X)))
-#	define USTRLEN(X) ((unsigned int)(strlen(X)))
-#	define SIZEOF(X) ((int)(sizeof(X)))
-#	define INTCAST(X) ((int)(X))
-#	define UINTCAST(X) ((uint4)(X))
 #  ifdef DEBUG
 #	define	IA64_DEBUG_ONLY(X)	X
 #  else
@@ -143,15 +163,26 @@ typedef UINTPTR_T uintszofptr_t;
 #else
 #	define	IA64_ONLY(X)
 #	define	NON_IA64_ONLY(X)	X
-#	define	OFFSETOF(X,Y) offsetof(X,Y)
-#	define 	USIZEOF(X) ((uint4)sizeof(X))
-#	define 	STRLEN(X) strlen(X)
-#	define 	USTRLEN(X) strlen(X)
-#	define 	SIZEOF(X) sizeof(X)
-#	define  INTCAST(X) X
-#	define  UINTCAST(X) X
 #	define	IA64_DEBUG_ONLY(X)
 #endif/* __ia64 */
+
+#if defined(__ia64) || defined(__MVS__)
+#	define INTCAST(X) ((int)(X))
+#	define UINTCAST(X) ((uint4)(X))
+#	define USIZEOF(X) ((unsigned int)(sizeof(X)))
+#	define SIZEOF(X) ((int)(sizeof(X)))
+#	define STRLEN(X) ((int)(strlen(X)))
+#	define USTRLEN(X) ((unsigned int)(strlen(X)))
+#	define OFFSETOF(X,Y) ((int)(offsetof(X,Y)))
+#else
+#	define  INTCAST(X) X
+#	define  UINTCAST(X) X
+#	define 	USIZEOF(X) ((uint4)sizeof(X))
+#	define 	SIZEOF(X) sizeof(X)
+#	define 	STRLEN(X) strlen(X)
+#	define 	USTRLEN(X) strlen(X)
+#	define	OFFSETOF(X,Y) offsetof(X,Y)
+#endif
 
 #ifdef __x86_64__
 #define X86_64_ONLY(x)		x
@@ -161,7 +192,7 @@ typedef UINTPTR_T uintszofptr_t;
 #define NON_X86_64_ONLY(x)    x
 #endif /* __x86_64__ */
 
-#if defined(__i386) || defined(__x86_64__) || defined(__ia64)
+#if defined(__i386) || defined(__x86_64__) || defined(__ia64) || defined(__MVS__) || defined(Linux390)
 #define NON_RISC_ONLY(x)	x
 #define RISC_ONLY(x)
 #elif defined(__sparc) || defined(_AIX) || defined(__hppa) || defined(__alpha)
@@ -234,6 +265,7 @@ typedef struct
 {
 	mident 		var_name;	/* var_name.addr points to the actual variable name */
 	uint4		hash_code;	/* hash (scrambled) value of the variable name text */
+	boolean_t	marked;		/* Used when in hashtable entry for xkill (at least) */
 } mname_entry;
 
 /* The M stack frame on all platforms that follow pv-based linkage model (alpha model)
@@ -241,11 +273,9 @@ typedef struct
  * must define HAS_LITERAL_SECT so that the routines that create a new stack frame
  * initialize literal_ptr field apppropriately.
  *
- * Note removed "defined(__MVS__) || defined(__s390__) ||" from this ifdef to shorten the line. These can
- * be reinserted in the even these platforms are reactivated.
  */
-#if defined(__alpha) || defined(_AIX) || defined(__hpux) || defined(__sparc) || (defined(__linux__) &&  \
-	(defined(__ia64) || defined(__x86_64__)))
+#if defined(__alpha) || defined(_AIX) || defined(__hpux) || defined(__sparc) || defined(__MVS__) || (defined(__linux__) &&  \
+	(defined(__ia64) || defined(__x86_64__) || defined(__s390__)))
 #	define HAS_LITERAL_SECT
 #endif
 
@@ -262,6 +292,13 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 #define MV_SUBLIT	64
 #define MV_RETARG      128
 #define MV_UTF_LEN     256
+#define MV_ALIASCONT   512
+
+/* Special definition used when an xnew'd lv_val is moved from a popped symtab to an earlier
+   one so it can be preserved. This flag marks the lv_val as a pointer to the new symtab so
+   multiple references to it can be resolved.
+*/
+#define MV_LVCOPIED	0x7fff
 
 #define MV_XBIAS	62
 #define MV_XZERO	 0
@@ -326,6 +363,7 @@ GBLREF	boolean_t		gtm_utf8_mode;
 #	define MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 6 + 7)
 #endif
 
+#define MAX_SYSERR		1000000
 
 unsigned char *n2s(mval *mv_ptr);
 char *s2n(mval *u);
@@ -345,10 +383,10 @@ mval *underr (mval *start, ...);
 #define MV_FORCE_BOOL(X)	(MV_FORCE_NUM(X), (X)->m[1] ? TRUE : FALSE)
 #define MV_FORCE_INT(M)		(MV_FORCE_DEFINED(M), MV_FORCE_INTD(M))
 #define MV_FORCE_INTD(M)	(DBG_ASSERT(MV_DEFINED(M)) (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2i(M))
-#define MV_FORCE_UMVAL(M,I)     (((I) >= 1000000) ? i2usmval((M),(I)) : \
-				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (I)*MV_BIAS ))
-#define MV_FORCE_MVAL(M,I)	(((I) >= 1000000 || (I) <= -1000000) ? i2mval((M),(I)) : \
-				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (I)*MV_BIAS ))
+#define MV_FORCE_UMVAL(M,I)     (((I) >= 1000000) ? i2usmval((M),(int)(I)) : \
+				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS ))
+#define MV_FORCE_MVAL(M,I)	(((I) >= 1000000 || (I) <= -1000000) ? i2mval((M),(int)(I)) : \
+				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS ))
 #define MV_FORCE_FLT(F,I)	( (F)->e = 0 , (F)->m[1] = (I)*MV_BIAS )
 #define MV_ASGN_FLT2MVAL(M,F)	( (F).e == 0 ? ( (M).mvtype = MV_NM | MV_INT , (M).m[1] = (F).m[1] )\
 					     : ( (M).mvtype = MV_NM , (M).m[0] = (F).m[0] , (M).m[1] = (F).m[1]\
@@ -360,7 +398,7 @@ mval *underr (mval *start, ...);
 /* Note MV_FORCE_CANONICAL currently only used in op_add() when vars are known to be defined so no MV_FORCE_DEFINED()
    macro has been added. If uses are added, this needs to be revisited. 01/2008 se
 */
-#define MV_FORCE_CANONICAL(X)	((((X)->mvtype & MV_NM) == 0   ? s2n(X) : 0 )\
+#define MV_FORCE_CANONICAL(X)	((((X)->mvtype & MV_NM) == 0 ? s2n(X) : 0 ) \
 				 ,((X)->mvtype & MV_NUM_APPROX ? (X)->mvtype &= MV_NUM_MASK : 0 ))
 #define MV_IS_NUMERIC(X)	(((X)->mvtype & MV_NM) != 0)
 #define MV_IS_INT(X)		(bool)isint(X)
@@ -404,11 +442,13 @@ mval *underr (mval *start, ...);
 #  define CHECKPOT(MODULUS)			((MODULUS) & ((MODULUS) - 1)) ? GTMASSERT, 0 :
 #  define BREAK_IN_PRO__CONTINUE_IN_DBG		continue
 #  define DEBUG_ONLY(statement)			statement
+#  define DEBUG_ONLY_COMMA(statement)		statement,
 #  define PRO_ONLY(statement)
 #else
 #  define CHECKPOT(MODULUS)
 #  define BREAK_IN_PRO__CONTINUE_IN_DBG		break
 #  define DEBUG_ONLY(statement)
+#  define DEBUG_ONLY_COMMA(statement)
 #  define PRO_ONLY(statement)			statement
 #endif
 
@@ -455,7 +495,7 @@ int4 timeout2msec(int4 timeout);
 #define	RTS_ERROR_STRING(STRING)	LENGTH_AND_STRING(STRING)
 
 /* the LITERAL version of the macro should be used over STRING whenever possible for efficiency reasons */
-#define	STR_LIT_LEN(LITERAL)		(sizeof(LITERAL) - 1)
+#define	STR_LIT_LEN(LITERAL)		(SIZEOF(LITERAL) - 1)
 #define	LITERAL_AND_LENGTH(LITERAL)	(LITERAL), (sizeof(LITERAL) - 1)
 #define	LENGTH_AND_LITERAL(LITERAL)	(sizeof(LITERAL) - 1), (LITERAL)
 #define	STRING_AND_LENGTH(STRING)	(STRING), (STRLEN((char *)(STRING)))
@@ -468,12 +508,48 @@ int4 timeout2msec(int4 timeout);
 
 #define	MEMCMP_LIT(SOURCE, LITERAL)	memcmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
 #define MEMCPY_LIT(TARGET, LITERAL)	memcpy(TARGET, LITERAL, sizeof(LITERAL) - 1)
-#define MEMCPY_STR(TARGET, STRING)	memcpy(TARGET, STRING, strlen(STRING))
 #define	STRNCMP_LIT(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
 #define	STRNCMP_STR(SOURCE, STRING)	strncmp(SOURCE, STRING, strlen((char *)(STRING)))
 
 #define	STRCPY(SOURCE, DEST)		strcpy((char *)(SOURCE), (char *)(DEST))
 #define	STRCMP(SOURCE, DEST)		strcmp((char *)(SOURCE), (char *)(DEST))
+
+/* Macro to copy a source string to a malloced area that is set to the destination pointer.
+ * Since it is possible that DST might have multiple pointer dereferences in its usage, we
+ * use a local pointer variable and finally assign it to DST thereby avoiding duplication of
+ * those pointer dereferences (one for the malloc and one for the strcpy).
+ * There are two macros depending on whether a string or literal is passed.
+ */
+#define	MALLOC_CPY_STR(DST, SRC)		\
+{						\
+	char	*mcs_ptr;			\
+	int	mcs_len;			\
+						\
+	mcs_len = STRLEN(SRC) + 1;		\
+	mcs_ptr = malloc(mcs_len);		\
+	memcpy(mcs_ptr, SRC, mcs_len);		\
+	DST = mcs_ptr;				\
+}
+
+#define	MALLOC_CPY_LIT(DST, SRC)		\
+{						\
+	char	*mcs_ptr;			\
+	int	mcs_len;			\
+						\
+	mcs_len = SIZEOF(SRC);			\
+	mcs_ptr = malloc(mcs_len);		\
+	memcpy(mcs_ptr, SRC, mcs_len);		\
+	DST = mcs_ptr;				\
+}
+
+#define MALLOC_INIT(DST, SIZ)			\
+{						\
+	void	*lcl_ptr;			\
+						\
+	lcl_ptr = malloc(SIZ);			\
+	memset(lcl_ptr, 0, SIZ);		\
+	DST = lcl_ptr;				\
+}
 
 /* *********************************************************************************************************** */
 /*		   Frequently used len + str combinations in macro form.				       */
@@ -567,6 +643,27 @@ int m_usleep(int useconds);
 #	define NON_REGULAR_MSYNC_ONLY(X)
 #	define NO_MSYNC_ONLY(X)
 #	define NON_NO_MSYNC_ONLY(X)
+#endif
+
+/* HP-UX on PA-RISC and z/OS are not able to have dynamic file extensions while running in MM access mode
+ * HP-UX:
+ * All HP-UX before v3 (PA-RISC and 11i v1 and v2) have distinct memory map buffers and file system buffers with no simple
+ * way to map between them.  To get around this problem the "Unified File Cache" was implemented in v3 for both Itanium
+ * and PA-RISC which solves things.  The only way around the limitation in v1 and v2 would be to strategically place calls
+ * to "msync" throughout the code to keep the memory maps and file cache buffers in sync.  This is too onerous a price
+ * to pay.
+ * z/OS:
+ * If multiple processes are accessing the same mapped file, and one process needs to extend/remap the file,
+ * all the other processes must also unmap the file.
+ *
+ * This same comment is in the test framework in set_gtm_machtype.csh.  If this comment is updated, also update the other.
+ */
+#ifdef UNIX
+#	if !defined(__hppa) && !defined(__MVS__)
+#	define MM_FILE_EXT_OK
+#	else
+#	undef MM_FILE_EXT_OK
+#	endif
 #endif
 
 #ifdef VMS
@@ -751,7 +848,7 @@ typedef que_head *	que_head_ptr_t;
 #  define	QWINCRBYDW(A,B)		(A)+=(gtm_uint64_t)(B)
 #  define	QWDECRBYDW(A,B)		(A)-=(gtm_uint64_t)(B)
 #  define	QWMULBYDW(A,B,C)	(A)=(B)*(C)
-#  define	QWDIVIDEBYDW(A,B,Q,R)	{(R)=(A)%(B); (Q)=(A)/(B);}
+#  define	QWDIVIDEBYDW(A,B,Q,R)	{(R)=(int)((A)%(B)); (Q)=(A)/(B);}
 #  define	QWMODDW(A,B)		((A)%(B))
 #  define	QWLE(A,B)		((A)<=(B))
 #  define	QWLT(A,B)		((A)<(B))
@@ -1100,7 +1197,7 @@ unsigned int asc_hex2i(char *p, int len);
 			(des)[(des_len)++] = n1 + '0';							\
 		(des)[(des_len)++] = ((num) % 10) + '0';						\
 	} else 												\
-		des_len += i2asc((uchar_ptr_t)((des) + des_len), num) - (uchar_ptr_t)((des) + des_len);	\
+		des_len += (int)(i2asc((uchar_ptr_t)((des) + des_len), num) - (uchar_ptr_t)((des) + des_len));	\
 }
 
 /* This macro converts a decimal string to a number (a more efficient alternative to asc2i).
@@ -1118,7 +1215,10 @@ unsigned int asc_hex2i(char *p, int len);
 
 void double2s(double *dp, mval *v); /* double conversion */
 int skpc(char c, int length, char *string);
+
+/* If the below declaration changes, corresponding changes in gtmxc_types.h needs to be done. */
 void *gtm_malloc(size_t size);
+/* If the below declaration changes, corresponding changes in gtmxc_types.h needs to be done. */
 void gtm_free(void *addr);
 int gtm_memcmp (const void *, const void *, size_t);
 DEBUG_ONLY(void printMallocInfo(void);)
@@ -1279,11 +1379,35 @@ typedef enum
 	CHSET_UTF16,
 	CHSET_UTF16LE,
 	CHSET_UTF16BE,
-	CHSET_MAX_IDX		/* maximum number of CHSETs supported */
+	CHSET_ASCII,
+	CHSET_EBCDIC,
+	CHSET_BINARY,
+	CHSET_MAX_IDX_ALL	/* maximum number of CHSETs supported */
 } gtm_chset_t;
 
+#define CHSET_UTF_MIN	CHSET_UTF8
+#define CHSET_UTF_MAX	CHSET_UTF16BE
+#define CHSET_MAX_IDX	CHSET_ASCII	/* max true CHSETs */
+
 #define	IS_UTF16_CHSET(chset)	((CHSET_UTF16 == (chset)) || (CHSET_UTF16LE == (chset)) || (CHSET_UTF16BE == (chset)))
+#define IS_UTF_CHSET(chset) ((CHSET_UTF_MIN <= (chset)) && (CHSET_UTF_MAX >= (chset)))
 
 #define CHK_BOUNDARY_ALIGNMENT(pointer) (((UINTPTR_T)pointer) & (sizeof(UINTPTR_T) - 1))
-
+#if defined(__ia64) || defined(__i386) || defined(__x86_64__) || defined(__sparc) || defined(_AIX) || defined(__MVS__)
+#define GTM_CRYPT
+#define GTMCRYPT_ONLY(X)		X
+#else
+#define GTMCRYPT_ONLY(X)
+#endif
+#define GTMCRYPT_HASH_LEN		64
+#define GTMCRYPT_HASH_HEX_LEN		GTMCRYPT_HASH_LEN * 2
+#define GTMCRYPT_RESERVED_HASH_LEN	256
+#define GET_HASH_IN_HEX(in, out, len)						\
+{										\
+	int i;									\
+										\
+	assert(0 == len % 2);							\
+	for (i = 0; i < len; i+=2)						\
+		sprintf((char *)out + i, "%02X", (unsigned char)in[i/2]);	\
+}
 #endif /* MDEF_included */

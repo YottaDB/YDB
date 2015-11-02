@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,25 +35,29 @@ int	get_arg_reg(void);
 int	gtm_reg(int vax_reg);
 
 #ifdef __x86_64__
-#define NUM_BUFFERRED_INSTRUCTIONS 100
-#define CODE_TYPE char
-#else /* ! __x86_64__ */
-#define NUM_BUFFERRED_INSTRUCTIONS 25
-#ifdef __ia64
-#define CODE_TYPE ia64_bundle
+#  define NUM_BUFFERRED_INSTRUCTIONS 100
+#  define CODE_TYPE char
+#elif defined(__ia64)
+#  define CODE_TYPE ia64_bundle
+#  define NUM_BUFFERRED_INSTRUCTIONS 25
+#elif defined(__MVS__)
+#  define CODE_TYPE uint2
+#  define NUM_BUFFERRED_INSTRUCTIONS 100
 #else
-#define CODE_TYPE uint4
-#endif /* __ia64 */
-#endif /* __x86_64__ */
+#  define CODE_TYPE uint4
+#  define NUM_BUFFERRED_INSTRUCTIONS 25
+#endif
+
 #define ASM_OUT_BUFF 	256
 #define PUSH_LIST_SIZE	500
 
-#if defined(__vms) || defined(_AIX) || defined(__sparc) || defined(__hpux) || (defined(__linux__) && defined(__ia64))
+#if defined(__vms) || defined(_AIX) || defined(__sparc) || defined(__hpux) || (defined(__linux__) && defined(__ia64)) \
+	|| defined(__MVS__)
 #  define TRUTH_IN_REG
 #elif defined(__osf__) || (defined(__linux__) && defined(__x86_64__))
 #  undef TRUTH_IN_REG
 #else
-# error UNSUPPORTED PLATFORM
+#  error UNSUPPORTED PLATFORM
 #endif
 
 #endif

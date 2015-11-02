@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,11 +19,19 @@ UNIX_ONLY(GBLDEF) VMS_ONLY(LITDEF) dev_dispatch_struct io_dev_dispatch[]=
 {
 	iotype(iott, iott, nil),
 	iotype(iomt, iomt, nil),
+#ifdef UNIX
+	iotype(iorm, iorm, iopi),
+#else
 	iotype(iorm, iorm, nil),
+#endif
 	iotype(ious, ious, ious),
 	iotype(iomb, iomb, nil),
 	iotype(ionl, ionl, nil),
+#ifdef UNIX
+	iotype(ioff, iorm, iopi),
+#else
 	iotype(ioff, iorm, nil),
+#endif
 	iotype(iotcp, iotcp, iotcp),
 	iotype(iosocket, iosocket, iosocket)
 #ifdef UNIX

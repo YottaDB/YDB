@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,8 @@ mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance)
 
 	unsigned char   	mutex_wake_this_proc_str[2 * sizeof(pid_t) + 1];
 	mutex_wake_msg_t	msg;
-	int			sendto_res, status;
+	int			status;
+	ssize_t			sendto_res;
 	static int		sendto_fail_pid;
 	char			sendtomsg[256];
 
@@ -74,7 +75,7 @@ mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance)
 	 * sendto() issue is therefore not considered critical at this moment. This might need to be revisited in case this
 	 * code starts to get used again. -- nars - 2008/01/15.
 	 */
-	SENDTO_SOCK(mutex_sock_fd, (char *)&msg, sizeof(msg), 0, (struct sockaddr *)&mutex_wake_this_proc,
+	SENDTO_SOCK(mutex_sock_fd, (char *)&msg, SIZEOF(msg), 0, (struct sockaddr *)&mutex_wake_this_proc,
 		mutex_wake_this_proc_len, sendto_res);
 	if (0 > sendto_res)
 	{	/* Sending wakeup to the mutex socket file of the waiting pid can fail if the process terminated (and hence deleted

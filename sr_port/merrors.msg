@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2008 Fidelity Information Services, Inc	!
+!	Copyright 2001, 2009 Fidelity Information Services, Inc	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -242,7 +242,7 @@ JNLSUCCESS	<!AD successful>/success/fao=2!/ansi=0
 GBLNAME		<Either an identifier or a left parenthesis is expected after a ^ in this context>/error/fao=0!/ansi=29
 GBLOFLOW	<Database segment is full>/error/fao=0!/ansi=0
 CORRUPT		<Corrupt input in Blk # !UL, Key #!UL; resuming with next global block>/error/fao=2!/ansi=0
-GTMCHECK	<Internal GT.M error--Report to GT.M Support>/fatal/fao=0!/ansi=0
+GTMCHECK	<Internal GT.M error--Report to your GT.M Support Channel>/fatal/fao=0!/ansi=0
 GVDATAFAIL	<Global variable $DATA function failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 EORNOTFND	<!_!AD!/!_!_!_End of record not found>/error/fao=2!/ansi=0
 GVGETFAIL	<Global variable retrieval failed.  Failure code: !AD.>/error/fao=2!/ansi=0
@@ -670,7 +670,7 @@ RBWRNNOTCHG	<Not all specified database files were changed>/warning/fao=0!/ansi=
 GTMSECSHRSRVF	<!AD - !UL : Attempt to service request failed>/error/fao=3!/ansi=0
 FREEZECTRL	<Control Y or control C encountered during attempt to freeze the database. Aborting freeze.>/info/fao=0!/ansi=0
 JNLFLUSH	<Error flushing journal buffers to journal file !AD>/info/fao=2!/ansi=0
-CCPSIGDMP	<CCP non fatal dump, continuing operation.  Notify GT.M Support.>/info/fao=0!/ansi=0
+CCPSIGDMP	<CCP non fatal dump, continuing operation. Report to your GT.M Support Channel.>/info/fao=0!/ansi=0
 NOPRINCIO	<Unable to write to principal device>/fatal/fao=0!/ansi=0
 INVPORTSPEC	<Invalid port specification>/error/fao=0!/ansi=0
 INVADDRSPEC	<Invalid IP address specification>/error/fao=0!/ansi=0
@@ -838,7 +838,7 @@ FILEIDGBLSEC	<File ID in global section does not match with the database file !A
 GBLSECNOTGDS	<Global Section !AD is not a GT.M global section>/error/fao=2!/ansi=0
 BADGBLSECVER	<Global Section !AD does not match the current database version>/error/fao=2!/ansi=0
 RECSIZENOTEVEN	<RECORDSIZE [!UL] needs to be a multiple of 2 if ICHSET or OCHSET is UTF-16, UTF-16LE or UTF-16BE>/error/fao=1!/ansi=0
-BUFFLUFAILED	<Error flushing buffers from MUPIP !AD for database file !AD>/error/fao=4!/ansi=0
+BUFFLUFAILED	<Error flushing buffers from !AD for database file !AD>/error/fao=4!/ansi=0
 MUQUALINCOMP	<Incompatible qualifiers - FILE and REGION>/error/fao=0!/ansi=0
 DISTPATHMAX	<$gtm_dist path is greater than maximum (!UL)>/error/fao=1!/ansi=0
 MAXTRACEHEIGHT	<The maximum trace tree height (!UL) has been exceeded.  The trace information will be incomplete.>/info/fao=1!/ansi=0
@@ -1265,9 +1265,9 @@ BADCHSET	<!AD is not a valid character mapping in this context>/error/fao=2!/ans
 BADCASECODE	<!AD is not a valid case conversion code>/error/fao=2!/ansi=0
 BADCHAR		<$ZCHAR(!AD) is not a valid character in the !AD encoding form>/error/fao=4!/ansi=0
 DLRCILLEGAL	<!_!AD!/!_!_!_Illegal $CHAR() value !UL>/error/fao=3!/ansi=0
-NONUTF8CHSET	<Incorrect character set (!AD).  Locale must be set to use UTF-8 character set>/error/fao=2!/ansi=0
+NONUTF8LOCALE	<Locale has character encoding (!AD) which is not compatible with UTF-8 character set>/error/fao=2!/ansi=0
 INVDLRCVAL	<Invalid $CHAR() value !UL>/error/fao=1!/ansi=0
-INVICUVER	<Symbol !AD not found in the ICU libraries. ICU version !AD must be used>/error/fao=4!/ansi=0
+INVICUVER	<Symbol !AD not found in the ICU libraries. ICU version greater than or equal to 3.6 should be used>/error/fao=2!/ansi=0
 LOADINVCHSET	<Extract file CHSET (!AD) is incompatible with gtm_chset>/error/fao=2!/ansi=0
 DLLCHSETM	<Routine !AD in library !AD was compiled with CHSET=M which is different from $ZCHSET. Recompile with CHSET=UTF-8 and re-link.>/error/fao=4!/ansi=0
 DLLCHSETUTF8	<Routine !AD in library !AD was compiled with CHSET=UTF-8 which is different from $ZCHSET. Recompile with CHSET=M and re-link.>/error/fao=4!/ansi=0
@@ -1300,6 +1300,24 @@ MMNOBFORRPL	<Replication cannot be used in database file !AD which uses MM acces
 KILLABANDONED	<Abandoned kills counter is greater than zero for file !AD, !AD>/warning/fao=4!/ansi=0
 BACKUPKILLIP	<Kill in progress indicator is set for file !AD, backup database could have incorrectly marked busy integrity errors>/warning/fao=2!/ansi=0
 LOGTOOLONG	<Environment variable !AD is too long. Maximum length allowed is !UL bytes.>/error/fao=3!/ansi=0
+NOALIASLIST	<Parenthetical lists of multiple arguments cannot have a preceding alias introducer or include alias (*) forms>/error/fao=0!/ansi=0
+ALIASEXPECTED	<Alias or alias container variable expected in this context>/error/fao=0!/ansi=0
+VIEWLVN		<Invalid local variable name used with VIEW/$VIEW(): !AD>/error/fao=2!/ansi=0
+DZWRNOPAREN	<$ZWRTACxxx is not allowed inside a parenthesized SET target>/error/fao=0!/ansi=0
+DZWRNOALIAS	<$ZWRTAC cannot be aliased>/error/fao=0!/ansi=0
+FREEZEERR	<Error while trying to !AD region !AD>/error/fao=4!/ansi=0
+CLOSEFAIL	<Error while closing file descriptor !SL>/error/fao=1!/ansi=0
+CRYPTINIT		<Error initializing encryption library. !AD>/error/fao=2!/ansi=0
+CRYPTOPFAILED		<Encrypt/Decrypt operation failed. !AD>/error/fao=2!/ansi=0
+CRYPTDLNOOPEN		<Error loading encryption library. !AD>/error/fao=2!/ansi=0
+CRYPTNOV4		<!AD is an encrypted database. Cannot downgrade(to V4) with Encryption option enabled.>/error/fao=2!/ansi=0
+CRYPTNOMM		<!AD is an encrypted database. Cannot support MM access method.>/error/fao=2!/ansi=0
+CRYPTJNLWRONGHASH	<Encryption key hash mismatch between journal file !AD and corresponding database file !AD>/error/fao=4!/ansi=0
+CRYPTKEYFETCHFAILED	<Cannot obtain encryption key for !AD. !AD>/error/fao=4!/ansi=0
+CRYPTKEYFETCHFAILEDNF 	<Cannot obtain encryption key. !AD>/error/fao=2!/ansi=0
+CRYPTHASHGENFAILED	<Error generating encryption hash. !AD>/error/fao=2!/ansi=0
+CRYPTNOPSWDINTP	<Cannot prompt for password inside a TP transaction.>/error/fao=0!/ansi=0
+BADTAG		<Unable to use file !AD (CCSID !UL) with CCSID !UL>/error/fao=4!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

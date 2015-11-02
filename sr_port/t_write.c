@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -122,7 +122,6 @@ cw_set_element *t_write (
 			sgm_info_ptr->cw_set_depth++;
 			assert(gv_target);
 			cse->blk_target = gv_target;
-			gv_target->write_local_tn = local_tn;
 			new_cse = TRUE;
 		} else
 		{
@@ -190,7 +189,7 @@ cw_set_element *t_write (
 			 * access the buffer more than the db blk_size.
 			 */
 			bsiz = MIN(old_block->bsiz, csa->hdr->blk_size);
-			cse->blk_checksum = jnl_get_checksum((uint4*)old_block, bsiz);
+			cse->blk_checksum = jnl_get_checksum((uint4*)old_block, csa, bsiz);
 		}
 		/* the buffer in shared memory holding the GDS block contents currently does not have in its block header the
 		 * on-disk format of that block. if it had, we could have easily copied that over to the cw-set-element.

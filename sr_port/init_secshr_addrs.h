@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@ void init_secshr_addrs(gd_addr_fn_ptr getnxtgdr, cw_set_element *cwsetaddrs,
 		       inctn_opcode_t *inctn_opcode_address,
 		       inctn_detail_t *inctn_detail_address, short *dollar_tlevel_address,
 		       int4 *update_trans_address, sgmnt_addrs **cs_addrs_address,
-		       boolean_t *kip_incremented_address, boolean_t *need_kip_incr_address,
+		       sgmnt_addrs **kip_csa_addrs, boolean_t *need_kip_incr_address,
 		       trans_num *start_tn_address);
 
 #include "dpgbldir.h"		/* for "get_next_gdr" used by INVOKE_INIT_SECSHR_ADDRS macro */
@@ -36,7 +36,7 @@ GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl r
 GBLREF	short			dollar_tlevel;
 GBLREF	int4			update_trans;
 GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	boolean_t 		kip_incremented;
+GBLREF	sgmnt_addrs 		*kip_csa;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	trans_num		start_tn;
 
@@ -45,6 +45,6 @@ GBLREF	trans_num		start_tn;
 				&cw_set_depth, process_id, image_count, OS_PAGE_SIZE,		\
 				&jnlpool.jnlpool_dummy_reg, &inctn_opcode, &inctn_detail,	\
 				&dollar_tlevel, &update_trans, &cs_addrs,			\
-				&kip_incremented, &need_kip_incr, &start_tn);
+				&kip_csa, &need_kip_incr, &start_tn);
 
 #endif /* INIT_SECSHR_ADDRS_INCLUDED */

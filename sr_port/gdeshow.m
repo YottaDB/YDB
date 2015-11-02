@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2005 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2009 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -84,10 +84,13 @@ oneseg:
 BG	w ?x(8),"GLOB=",$j(segs(s,"GLOBAL_BUFFER_COUNT"),4)
 	w !,BOL,?x(8),"LOCK=",$j(segs(s,"LOCK_SPACE"),4)
 	w !,BOL,?x(8),"RES =",$j(segs(s,"RESERVED_BYTES"),4)
+	; For non-encryption platforms, always show FLAG as OFF. For VMS dont even display this line
+	i $ZVersion'["VMS" w !,BOL,?x(8),"ENCR=",$S((encsupportedplat=TRUE&segs(s,"ENCRYPTION_FLAG")):"ON",1:"OFF")
 	q
 MM	w ?x(8),$s(segs(s,"DEFER"):"DEFER",1:"NODEFER")
 	w !,BOL,?x(8),"LOCK=",$j(segs(s,"LOCK_SPACE"),4)
 	w !,BOL,?x(8),"RES =",$j(segs(s,"RESERVED_BYTES"),4)
+	i $ZVersion'["VMS" w !,BOL,?x(8),"ENCR=OFF"
 	q
 MAP
 	n map
@@ -189,7 +192,8 @@ tmpreghd:
 	s x(0)=31,x(1)=1,x(2)=19,x(3)=44,x(4)=49,x(5)=55,x(6)=61,x(7)=72,x(8)=82
 	w !,BOL,!,BOL,?x(0),"*** TEMPLATES ***"
 	w !,BOL,?x(3),$j("Def",4),?x(4),$j("Rec",5),?x(5),$j("Key",5),?x(6),"Null",?x(7),"Standard"
-	w !,BOL,?x(1),"Region",?x(3),$j("Coll",4),?x(4),$j("Size",5),?x(5),$j("Size",5),?x(6),"Subs",?x(7),"NullColl",?x(8),"Journaling"
+	w !,BOL,?x(1),"Region",?x(3),$j("Coll",4),?x(4),$j("Size",5),?x(5),$j("Size",5)
+	w ?x(6),"Subs",?x(7),"NullColl",?x(8),"Journaling"
 	w !,BOL,?x(1),$tr($j("",92)," ","-")
 	q
 tmpjnlhd:

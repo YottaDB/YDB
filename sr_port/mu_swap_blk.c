@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -432,7 +432,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 						assert(CDB_STAGNATE > t_tries);
 						return cdb_sc_lostbmlcr;
 					}
-					JNL_GET_CHECKSUM_ACQUIRED_BLK(tmpcse, cs_data, tmpcse->old_block, bsiz);
+					JNL_GET_CHECKSUM_ACQUIRED_BLK(tmpcse, cs_data, cs_addrs, tmpcse->old_block, bsiz);
 				}
 			}
 			assert(GDSVCURR == tmpcse->ondsk_blkver);	/* should have been set by t_create above */

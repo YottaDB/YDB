@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,6 +9,7 @@
  *								*
  ****************************************************************/
 
+ICU_DEF(u_getVersion)
 ICU_DEF(u_isalpha)
 ICU_DEF(u_islower)
 ICU_DEF(u_isupper)

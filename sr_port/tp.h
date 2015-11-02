@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -139,7 +139,7 @@ typedef struct sgm_info_struct
 	boolean_t		fresh_start;
 	int4			crash_count;
 	boolean_t		backup_block_saved;
-	boolean_t		kip_incremented;
+	sgmnt_addrs		*kip_csa;
 	int			tmp_cw_set_depth;	/* used only #ifdef DEBUG. see comments for tmp_cw_set_depth in "tp_tend" */
 	uint4			tot_jrec_size;		/* maximum journal space needs for this transaction */
 } sgm_info;
@@ -331,7 +331,7 @@ GBLREF	short	dollar_trestart;
 	 * in case journal file close is needed 								\
 	 */													\
 	assert(JNL_FILE_TAIL_PRESERVE < (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));					\
-	si->total_jnl_rec_size = total_jnl_rec_size = (total_jnl_rec_size * 2) + JNL_FILE_TAIL_PRESERVE;	\
+	si->total_jnl_rec_size = total_jnl_rec_size = (total_jnl_rec_size * 2) + (uint4)JNL_FILE_TAIL_PRESERVE;	\
 }
 
 #define MIN_TOTAL_NONTPJNL_REC_SIZE 	(PINI_RECLEN + MIN_ALIGN_RECLEN + INCTN_RECLEN + MIN_ALIGN_RECLEN)
@@ -341,12 +341,12 @@ GBLREF	short	dollar_trestart;
  */
 #define TOTAL_NONTPJNL_REC_SIZE(total_jnl_rec_size, non_tp_jfb_ptr, csa, tmp_cw_set_depth)			\
 {														\
-	total_jnl_rec_size = (non_tp_jfb_ptr->record_size + MIN_TOTAL_NONTPJNL_REC_SIZE); 			\
+	total_jnl_rec_size = (non_tp_jfb_ptr->record_size + (uint4)MIN_TOTAL_NONTPJNL_REC_SIZE);		\
 	if (csa->jnl_before_image)										\
 		/* One PBLK record for each gds block changed by the transaction */				\
-		total_jnl_rec_size += (tmp_cw_set_depth * csa->pblk_align_jrecsize);				\
+		total_jnl_rec_size += (tmp_cw_set_depth * csa->pblk_align_jrecsize);			\
 	if (write_after_image)											\
-		total_jnl_rec_size += MIN_AIMG_RECLEN + csa->hdr->blk_size + MIN_ALIGN_RECLEN;			\
+		total_jnl_rec_size += (uint4)MIN_AIMG_RECLEN + csa->hdr->blk_size + (uint4)MIN_ALIGN_RECLEN;	\
 	/* Since we have already taken into account an align record per journal record and since the size of	\
 	 * an align record will be < (size of the journal record written + fixed-size of align record)		\
 	 * we can be sure we won't need more than twice the computed space.					\
@@ -354,7 +354,7 @@ GBLREF	short	dollar_trestart;
 	 * in case journal file close is needed 								\
 	 */													\
 	assert(JNL_FILE_TAIL_PRESERVE < (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));					\
-	total_jnl_rec_size = total_jnl_rec_size * 2 + JNL_FILE_TAIL_PRESERVE;					\
+	total_jnl_rec_size = total_jnl_rec_size * 2 + (uint4)JNL_FILE_TAIL_PRESERVE;				\
 }
 
 #define INVALIDATE_CLUE(cse) 					\

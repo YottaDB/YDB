@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,10 +28,10 @@ void bt_malloc(sgmnt_addrs *csa)
 	if ((-(sizeof(uint4) * 2) & SIZEOF_FILE_HDR(csd)) != SIZEOF_FILE_HDR(csd))
 		GTMASSERT;
 	csa->nl->bt_header_off = (n = (uint4)(SIZEOF_FILE_HDR(csd)));
-	csa->nl->th_base_off = (n += csd->bt_buckets * sizeof(bt_rec));	/* hash table */
-	csa->nl->th_base_off += sizeof(que_ent);				/* tnque comes after fl and bl of blkque */
-	csa->nl->bt_base_off = (n += sizeof(bt_rec));			/* th_queue anchor referenced above */
-	assert((n += (csd->n_bts * sizeof(bt_rec))) == (SIZEOF_FILE_HDR(csd)) + (BT_SIZE(csd)));	/* DON'T use n after this */
+	csa->nl->th_base_off = (n += csd->bt_buckets * SIZEOF(bt_rec));	/* hash table */
+	csa->nl->th_base_off += SIZEOF(que_ent);				/* tnque comes after fl and bl of blkque */
+	csa->nl->bt_base_off = (n += SIZEOF(bt_rec));			/* th_queue anchor referenced above */
+	assert((n += (csd->n_bts * SIZEOF(bt_rec))) == (SIZEOF_FILE_HDR(csd)) + (BT_SIZE(csd)));	/* DON'T use n after this */
 	bt_init(csa);
 	bt_refresh(csa);
 	return;

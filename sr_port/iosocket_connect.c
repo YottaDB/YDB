@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,9 +15,7 @@
 #include "gtm_time.h"
 #include "gtm_socket.h"
 #include "gtm_inet.h"
-#ifndef __MVS__
 #include <netinet/tcp.h>
-#endif
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gt_timer.h"
@@ -200,7 +198,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 					break;
 				default:
 					errptr = (char *)STRERROR(real_errno);
-					errlen = strlen(errptr);
+					errlen = STRLEN(errptr);
 					rts_error(VARLSTCNT(6) ERR_OPENCONN, 0, ERR_TEXT, 2, errlen, errptr);
 					break;
 			}
@@ -245,9 +243,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
         memcpy(&dsocketptr->dollar_key[len], socketptr->handle, socketptr->handle_len);
         len += socketptr->handle_len;
         dsocketptr->dollar_key[len++] = '|';
-	MEMCPY_STR(&dsocketptr->dollar_key[len], socketptr->remote.saddr_ip);
-	len += strlen(socketptr->remote.saddr_ip);
-	dsocketptr->dollar_key[len] = '\0';
+	strcpy(&dsocketptr->dollar_key[len], socketptr->remote.saddr_ip); /* Also copies in trailing null */
 
 	return TRUE;
 }

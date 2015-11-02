@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,41 +26,36 @@ lv_val *lv_nxt_str_inx(sbs_blk *root, mstr *key, sbs_search_status *status)
        	for (blk = root; ; prev = blk, blk = nxt)
        	{
 		if (!(nxt = blk->nxt))
-		{
 			break;
-		}
        	       	x = mstrcmp(key, &nxt->ptr.sbs_str[0].str);
-       	       	if (x < 0)
-		{
+       	       	if (0 > x)
 			break;
-		}
 	}
 
 	status->blk = blk;
 	status->prev = prev;
-       	for (p = (sbs_str_struct*)&blk->ptr.sbs_str[0], top =  (sbs_str_struct*)&blk->ptr.sbs_str[blk->cnt]; p < top; p++)
+       	for (p = (sbs_str_struct *)&blk->ptr.sbs_str[0], top =  (sbs_str_struct *)&blk->ptr.sbs_str[blk->cnt]; p < top; p++)
        	{
 		x = mstrcmp(key, &p->str);
-	 	if (x == 0)
+	 	if (0 == x)
        	       	{
 			if (++p < top)
 	 	 	{
-				status->ptr = (char*)p;
+				status->ptr = (char *)p;
 	 			return(p->lv);
-	 		}
-	 		else if (blk->nxt)
+	 		} else if (blk->nxt)
 	 		{
 				status->prev = blk;
 	 			status->blk  = blk->nxt;
 	 			assert(status->blk->cnt);
-	 			p = (sbs_str_struct*)&status->blk->ptr.sbs_str[0];
-				status->ptr = (char*)p;
+	 			p = (sbs_str_struct *)&status->blk->ptr.sbs_str[0];
+				status->ptr = (char *)p;
 				return(p->lv);
 			}
 	 	}
-	 	if (x < 0)
+	 	if (0 > x)
 	 	{
-			status->ptr = (char*)p;
+			status->ptr = (char *)p;
 			return(p->lv);
 	 	}
 	}
@@ -69,13 +64,10 @@ lv_val *lv_nxt_str_inx(sbs_blk *root, mstr *key, sbs_search_status *status)
 		status->prev = blk;
 		status->blk  = blk->nxt;
 		assert(status->blk->cnt);
-		p = (sbs_str_struct*)&status->blk->ptr.sbs_str[0];
-		status->ptr = (char*)p;
+		p = (sbs_str_struct *)&status->blk->ptr.sbs_str[0];
+		status->ptr = (char *)p;
 		return(p->lv);
 	}
-	else
-	{
-		status->ptr = (char*)p;
-	 	return(0);
-	}
+	status->ptr = (char *)p;
+	return NULL;
 }

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -65,6 +65,17 @@ endif
 ifndef gtm_ver
 gtm_ver=$(CURDIR)
 endif
+
+ifndef crypttype
+crypttype=gcrypt
+endif
+
+ifeq ($(buildtypes),dbg)
+cryptbuildtype=d
+else
+cryptbuildtype=p
+endif
+
 gt_ar_archiver=ar
 gt_ar_options=rv
 
@@ -93,7 +104,8 @@ endif
 endif
 
 dirs: 	$(addprefix $(gtm_ver)/, $(addsuffix /obj, $(buildtypes))) \
-	$(addprefix $(gtm_ver)/, $(addsuffix /map, $(buildtypes))) ;
+ 	$(addprefix $(gtm_ver)/, $(addsuffix /map, $(buildtypes))) \
+	$(addprefix $(gtm_ver)/, $(addsuffix /plugin, $(buildtypes))) ;
 
 # Compile and archive all modules and stop.
 compile: dirs $(addsuffix _compile, $(buildtypes)) ;
@@ -155,6 +167,8 @@ endif
 	mkdir -p $@
 %/map:
 	mkdir -p $@
+%/plugin:
+	mkdir -p $@/gtmcrypt
 
 dbg_%:comlist.mk
 	$(MAKE) -C $(gtm_ver)/dbg/obj -I$(gtm_ver)/dbg/obj $(make_i_flags) -f $< CURRENT_BUILDTYPE=dbg $*
@@ -185,12 +199,15 @@ exe_list:=libgtmshr$(gt_ld_shl_suffix) $(exe_list) $(gt_svc_exe)
 
 # m file stuff.  These list builds go to great pain to insure that either
 # post cms_load forms and pre-cms load forms work.
+plugin_cfiles:= gtmcrypt_ref.c gtmcrypt_pk_ref.c gtmcrypt_dbk_ref.c maskpass.c ascii2hex.c
+plugin_hfiles:= gtmcrypt_ref.h gtmcrypt_pk_ref.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_interface.h gtmxc_types.h main_pragma.h
+plugin_sh_file:= build.sh install.sh
+plugin_mfile:=getpass.m
 mfile_list:=$(filter-out _%.m, $(filter %.m, $(allfiles_list)))
 mptfile_list:=$(sort $(basename $(filter %.mpt, $(allfiles_list))) $(basename $(patsubst _%.m, %, $(filter _%.m, $(allfiles_list)))))
 mfile_targets:=$(addsuffix .m,$(foreach f,$(basename $(mfile_list)), $(shell echo $(f) | tr '[:lower:]' '[:upper:]')))
 mptfile_targets:=$(addprefix _,$(addsuffix .m, $(foreach f,$(mptfile_list), $(shell echo $(f) | tr '[:lower:]' '[:upper:]'))))
-cfile_list:=$(filter %.c, $(allfiles_list))
-
+cfile_list:=$(filter-out $(plugin_cfiles), $(filter %.c, $(allfiles_list)))
 ifdef gt_as_src_from_suffix
 #
 # DUX requires .m64 to be gawk'ed and assembled as well
@@ -206,8 +223,9 @@ gtc_list:=$(filter %.gtc, $(allfiles_list))
 csh_files:=$(filter lower%.csh upper%.csh, $(allfiles_list))
 list_files:=$(filter %.list, $(allfiles_list))
 msgfile_list:=$(filter %.msg, $(allfiles_list))
+plugin_ksh_file:=$(filter %.ksh, $(allfiles_list))
 
-hfile_list := gtm_stdio.h gtm_stdlib.h gtm_string.h gtmxc_types.h $(hfile_list_sp)
+hfile_list := gtm_stdio.h gtm_stdlib.h gtm_string.h gtm_strings.h gtmxc_types.h main_pragma.h $(hfile_list_sp)
 sh_targets:=$(basename $(sh_list))
 
 msgcfile_list=$(addsuffix _ctl.c,$(basename $(msgfile_list)))
@@ -244,6 +262,7 @@ gtcm_play_obj=gtcm_play.o omi_sx_play.o
 gtcm_pkdisp_obj=gtcm_pkdisp.o
 gtcm_shmclean_obj=gtcm_shmclean.o
 dtgbldir_obj=dtgbldir.o
+dummy_gtmci_obj=dummy_gtmci.o
 
 # exclude .o's in .list files, .o's used in ld's below, plus dtgbldir.o
 # (which doesn't appear to be used anywhere!
@@ -267,7 +286,8 @@ exclude_list:= \
 	$(gtcm_play_obj) \
 	$(gtcm_pkdisp_obj) \
 	$(gtcm_shmclean_obj) \
-	$(dtgbldir_obj)
+	$(dtgbldir_obj) \
+	$(dummy_gtmci_obj)
 
 # retain_list contains the modules listed in a .list file that also need to be
 # included in libmumps.a (eg. getmaxfds, sleep in sr_sun:libgtmrpc.list)
@@ -309,8 +329,8 @@ ifdef gt_ar_gtmrpc_name
 gt_ar_gtmrpc_name_target=../lib$(gt_ar_gtmrpc_name).a
 endif
 
-postbuild=$(gt_ar_gtmrpc_name_target) dotcsh dotsh helpfiles hfiles gtcmconfig \
-	../mumps.gld ../gtmhelp.dat ../gdehelp.dat
+postbuild=$(gt_ar_gtmrpc_name_target) dotcsh dotsh helpfiles hfiles gtcmconfig cpplugin_scripts cpplugin_file cpplugin_mfile\
+	../mumps.gld ../gtmhelp.dat ../gdehelp.dat build_plugin_lib
 
 all:	links mfiles mcompiles testit $(postbuild)
 
@@ -351,8 +371,10 @@ endef
 	$(compile-help)
 
 mcompiles:
-	cd ..;gtm_dist=$(dir $(CURDIR));export gtm_dist;gtmgbldir=$(notdir $@);export gtmgbldir; ./mumps *.m ; tcsh -f ../sr_unix/mkutf8dir.csh
+	cd ..;gtm_dist=$(dir $(CURDIR));export gtm_dist;gtmgbldir=$(notdir $@);export gtmgbldir; LC_CTYPE=C; export LC_CTYPE; gtm_chset=M; export gtm_chset; ./mumps *.m ; tcsh -f ../sr_unix/mkutf8dir.csh
 
+pluginbuild:
+	mkdir -p plugin/gtmcrypt; cp ../sr_unix/gtmcrypt_ref.h plugin/gtmcrypt/; cp ../sr_unix/gtmcrypt_ref.c plugin/gtmcrypt/;
 dotcsh: $(csh_files)
 	cp -f $^ ..
 	cd ..;chmod +x $(notdir $^)
@@ -365,6 +387,24 @@ helpfiles: $(helpfile_list)
 
 hfiles: $(hfile_list)
 	cp -f $^ ..
+ifeq ($(gt_os_type), OSF1)
+cpplugin_scripts: $(plugin_ksh_file) $(plugin_sh_file)
+
+cpplugin_file: $(plugin_cfiles) $(plugin_hfiles)
+
+cpplugin_mfile: $(plugin_mfile)
+
+build_plugin_lib:
+else
+cpplugin_scripts: $(plugin_ksh_file) $(plugin_sh_file)
+	cp -f $^ ../plugin/gtmcrypt
+cpplugin_file: $(plugin_cfiles) $(plugin_hfiles)
+	cp -f $^ ../plugin/gtmcrypt
+cpplugin_mfile: $(plugin_mfile)
+	cp -f $^ ../plugin/gtmcrypt/GETPASS.m
+build_plugin_lib:
+	gtm_dist=$(dir $(CURDIR));export gtm_dist;cd $(gtm_dist)/plugin/gtmcrypt;sh -f build.sh $(crypttype) $(cryptbuildtype); sh -f install.sh
+endif
 
 mfiles: $(addprefix ../, $(mfile_targets) $(mptfile_targets))
 
@@ -382,6 +422,12 @@ rm -f $@
 @echo $(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $+ $(gt_ld_syslibs) > ../map/$(notdir $@).map 2>&1
 @$(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $+ $(gt_ld_syslibs) >> ../map/$(notdir $@).map 2>&1
 endef
+define gt-ld_with_export
+rm -f $@
+@echo "linking $(notdir $@)..."
+@echo $(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $(gt_ld_options_all_exe) $+ $(gt_ld_syslibs) > ../map/$(notdir $@).map 2>&1
+@$(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $(gt_ld_options_all_exe) $+ $(gt_ld_syslibs) >> ../map/$(notdir $@).map 2>&1
+endef
 
 ifdef gt_svc_exe
 # Note: gtm_svc should link with gtm_dal_svc.o before
@@ -395,7 +441,7 @@ endif
 	$(gt-ld)
 
 ../dse: $(dse_obj) libdse.a libmumps.a libstub.a
-	$(gt-ld)
+	$(gt-ld_with_export)
 
 ../geteuid: $(geteuid_obj) libmumps.a
 	$(gt-ld)
@@ -415,24 +461,24 @@ endif
 	$(gt-ld)
 
 ../mupip: $(mupip_obj) libmupip.a libmumps.a libstub.a $(gt_ld_aio_syslib)
-	$(gt-ld)
+	$(gt-ld_with_export)
 
 ../dbcertify: $(dbcertify_obj) libdbcertify.a libmupip.a libmumps.a libstub.a $(gt_ld_aio_syslib)
 	$(gt-ld)
 
-../gtcm_server: $(gtcm_server_obj) libgtcm.a libmumps.a libstub.a
+../gtcm_server: $(gtcm_server_obj) $(dummy_gtmci_obj) libgtcm.a libmumps.a libstub.a
 	$(gt-ld)
 
-../gtcm_gnp_server: $(gtcm_gnp_server_obj) libgnpserver.a liblke.a libmumps.a libcmisockettcp.a libstub.a
+../gtcm_gnp_server: $(gtcm_gnp_server_obj) $(dummy_gtmci_obj) libgnpserver.a liblke.a libmumps.a libcmisockettcp.a libstub.a
 	$(gt-ld)
 
-../gtcm_play: $(gtcm_play_obj) libgtcm.a libmumps.a libstub.a
+../gtcm_play: $(gtcm_play_obj) $(dummy_gtmci_obj) libgtcm.a libmumps.a libstub.a
 	$(gt-ld)
 
-../gtcm_pkdisp: $(gtcm_pkdisp_obj) libgtcm.a libmumps.a libstub.a
+../gtcm_pkdisp: $(gtcm_pkdisp_obj) $(dummy_gtmci_obj) libgtcm.a libmumps.a libstub.a
 	$(gt-ld)
 
-../gtcm_shmclean: $(gtcm_shmclean_obj) libgtcm.a libmumps.a libstub.a
+../gtcm_shmclean: $(gtcm_shmclean_obj) $(dummy_gtmci_obj) libgtcm.a libmumps.a libstub.a
 	$(gt-ld)
 
 ../semstat2: $(semstat2_obj)
@@ -443,7 +489,7 @@ endif
 
 # build GT.M shared library(libgtmshr) from PIC-compiled .o files
 # chcon is for SELinux - see comment in buildshr.csh
-../libgtmshr$(gt_ld_shl_suffix): gtmshr_symbols.export $(gtmshr_obj) libmumps.a libgnpclient.a libcmisockettcp.a
+../libgtmshr$(gt_ld_shl_suffix): gtmshr_symbols.export gtmexe_symbols.export $(gtmshr_obj) libmumps.a libgnpclient.a libcmisockettcp.a
 	rm -f $@
 	@echo "linking $(notdir $@)..."
 	@echo $(gt_ld_linker) $(gt_ld_options) $(gt_ld_shl_options) $(gt_ld_options_gtmshr) -o $@ $(gtmshr_obj) -lmumps -lgnpclient -lcmisockettcp $(gt_ld_syslibs) > ../map/$(notdir $@).map 2>&1

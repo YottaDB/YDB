@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,9 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 GBLREF  jnl_process_vector	*prc_vec;
 GBLREF 	jnl_gbls_t		jgbl;
 
@@ -66,4 +68,7 @@ void jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header)
 	header->virtual_size = info->alloc;
 	header->jnl_deq = info->extend;
 	header->checksum = info->checksum;
+	GTMCRYPT_ONLY(
+		GTMCRYPT_COPY_HASH(info, header);
+	)
 }

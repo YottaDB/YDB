@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@ lv_val *lv_ins_num_sbs(sbs_search_status *stat, mval *key, lv_sbs_tbl *tbl)
 {
        	sbs_blk	       	*blk, *new, *nxt, *prev;
        	sbs_flt_struct 	*src, *dst, *slot;
- 	short  	       	max_count;
+ 	int  	       	max_count;
 	lv_val		*lv;
        	char		*top;
 
@@ -41,58 +41,46 @@ lv_val *lv_ins_num_sbs(sbs_search_status *stat, mval *key, lv_sbs_tbl *tbl)
        	       	dst = &blk->ptr.sbs_flt[blk->cnt];
        	       	src = dst - 1;
 	       	for ( ; src >= (sbs_flt_struct *) stat->ptr; src--, dst--)
-       	       	{
 			*dst = *src;
-	       	}
 	 	slot = (sbs_flt_struct *)stat->ptr;
 	       	blk->cnt++;
-       	}
-       	else if (stat->prev != stat->blk && stat->prev->cnt < max_count)
+       	} else if (stat->prev != stat->blk && stat->prev->cnt < max_count)
  	{	/* flow into previous block */
  	       	prev = stat->prev;
        	       	dst = &prev->ptr.sbs_flt[prev->cnt];
        	       	if (stat->ptr == (char *)&blk->ptr.sbs_flt[0])
-	 	{
 			slot = dst;
-	 	}
 	 	else
 	 	{
 			src = &blk->ptr.sbs_flt[0];
        	       	       	*dst = *src;
        	       	       	dst = src;
        	       	       	src += 1;
-       	       	       	memcpy(dst, src, (char*)stat->ptr - (char*)src);
-       	       	       	slot = (sbs_flt_struct *)((char*)stat->ptr - sizeof(sbs_flt_struct));
+       	       	       	memcpy(dst, src, (char *)stat->ptr - (char *)src);
+       	       	       	slot = (sbs_flt_struct *)((char *)stat->ptr - sizeof(sbs_flt_struct));
 	 	}
  	       	prev->cnt++;
-	}
-	else if (blk->nxt && blk->nxt->cnt < max_count)
+	} else if (blk->nxt && blk->nxt->cnt < max_count)
 	{      	/* flow into next block */
 	 	nxt = blk->nxt;
        	       	dst = &nxt->ptr.sbs_flt[nxt->cnt];
        	       	src = dst - 1;
        	       	for ( ; src >= &nxt->ptr.sbs_flt[0]; src--, dst--)
-	       	{
 			*dst = *src;
-	       	}
 
 	 	if (stat->ptr == (char *)&blk->ptr.sbs_flt[blk->cnt])
-	       	{
 			slot = dst;
-	 	}
 	     	else
 	     	{
 			*dst = blk->ptr.sbs_flt[blk->cnt - 1];
 	       	       	dst = &blk->ptr.sbs_flt[blk->cnt - 1];
        	     	       	src = dst - 1;
 	       	 	for ( ; src >= (sbs_flt_struct *)stat->ptr; src--, dst--)
-	       	       	{
 				*dst = *src;
-	 	       	}
 	 	 	slot = (sbs_flt_struct *)stat->ptr;
 	 	}
 	 	nxt->cnt++;
-       	}else
+       	} else
 	{    	/* split block */
 	     	new = lv_get_sbs_blk (tbl->sym);
 		assert (new->cnt == 0);
@@ -100,35 +88,26 @@ lv_val *lv_ins_num_sbs(sbs_search_status *stat, mval *key, lv_sbs_tbl *tbl)
 		assert (new->sbs_que.fl && new->sbs_que.bl);
 		new->nxt = blk;
 		if (stat->prev == stat->blk)
-		{
 			tbl->num = new;
-		}
 		else
-       	       	{
 			stat->prev->nxt = new;
-		}
 
        	       	dst = &new->ptr.sbs_flt[0];
-       	       	if (stat->ptr == (char*)&blk->ptr.sbs_flt[0])
+       	       	if (stat->ptr == (char *)&blk->ptr.sbs_flt[0])
 	     	{
 			slot = dst;
 			new->cnt = 1;
-	     	}
-	     	else
+	     	} else
 	     	{
        	       	       	src = &blk->ptr.sbs_flt[0];
        	       	       	for ( ; src < (sbs_flt_struct *)stat->ptr; src++, dst++)
-	       	       	{
 				*dst = *src;
-	     	       	}
-			new->cnt = dst - &new->ptr.sbs_flt[0];
+			new->cnt = INTCAST(dst - &new->ptr.sbs_flt[0]);
 	     		slot = &blk->ptr.sbs_flt[0];
 	     		dst = slot + 1;
 	     		top = (char *)&blk->ptr.sbs_flt[blk->cnt];
        	       	       	for ( ; src < (sbs_flt_struct *)top; src++, dst++)
-	       	       	{
 				*dst = *src;
-	     	       	}
 			blk->cnt = blk->cnt - new->cnt + 1;
 	 	}
 	}

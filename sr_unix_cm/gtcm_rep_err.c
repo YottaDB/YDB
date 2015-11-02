@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,10 @@ static char rcsid[] = "$Header:$";
 #include "fao_parm.h"
 #include "eintr_wrappers.h"
 #include "sgtm_putmsg.h"
+#ifdef __MVS__
+#include "gtm_stat.h"
+#include "gtm_zos_io.h"
+#endif
 
 GBLREF char		*omi_service;
 static boolean_t 	first_syslog = TRUE;
@@ -43,7 +47,9 @@ void gtcm_rep_err(char *msg, int errcode)
     time_t	now;
     int		status;
     char *gtm_dist, fileName[256];
+
     error_def(ERR_TEXT);
+    ZOS_ONLY(error_def(ERR_BADTAG);)
     /*error_def(ERR_OMISERVHANG);*/
 
     if ('\0' == msg[0])
@@ -57,6 +63,14 @@ void gtcm_rep_err(char *msg, int errcode)
     else
 	    SPRINTF(fileName, "%s/log/gtcm_server.erlg", P_tmpdir);
 
+#ifdef __MVS__
+    if (-1 != gtm_zos_create_tagged_file(fileName, TAG_EBCDIC))
+    {
+	char *tag_emsg = STRERROR(errno);
+	sgtm_putmsg(outbuf, VARLSTCNT(10) ERR_BADTAG, 4, LEN_AND_STR(fileName),
+		-1, TAG_EBCDIC, ERR_TEXT, 2, RTS_ERROR_STRING(tag_emsg));
+    }
+#endif
     if ((fp = Fopen(fileName, "a")))
     {
 		now=time(0);

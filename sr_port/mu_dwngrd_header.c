@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,7 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 	v15_csd->file_corrupt = csd->file_corrupt;
 	v15_csd->createinprogress = csd->createinprogress;
 	time(&temp_time);	/* No need to propagate previous value */
-	v15_csd->creation.date_time = temp_time;
+	v15_csd->creation.date_time = (v15_time_t)temp_time;
 	v15_csd->last_inc_backup = (v15_trans_num)csd->last_inc_backup;
 	v15_csd->last_com_backup = (v15_trans_num)csd->last_com_backup;
 	v15_csd->last_rec_backup = (v15_trans_num)csd->last_rec_backup;
@@ -134,7 +134,7 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 		} else
 		{
 			v15_csd->old_resync_seqno = csd->zqgblmod_seqno;
-			v15_csd->resync_tn = csd->zqgblmod_tn;
+			v15_csd->resync_tn = (v15_trans_num)csd->zqgblmod_tn;
 		}
 	)
 	if (REPL_WAS_ENABLED(csd))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@ void iorm_wtone(int ch)
 	unsigned char	uni_buf[GTM_MB_LEN_MAX], *endptr;
 #endif
 
-	if (!gtm_utf8_mode || CHSET_M == io_curr_device.out->ochset)
+	if (!gtm_utf8_mode || !IS_UTF_CHSET(io_curr_device.out->ochset))
 	{
 		c = (char)ch;
 		temp.len = 1;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,12 +19,13 @@
 #include <inttypes.h>
 #endif
 
-#define GTM_PATH_MAX	1024	/* includes terminating NULL */
-
+#if defined (__MVS__)
 #ifndef PATH_MAX
-/*  For zOS */
-#define PATH_MAX 	255
-#define	GTM_PATH_MAX	255
+#define PATH_MAX 	256
+#endif
+#define	GTM_PATH_MAX	PATH_MAX
+#else
+#define GTM_PATH_MAX	1024	/* includes terminating NULL */
 #endif
 
 #if defined(LLONG_MAX)		/* C99 and others */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,14 @@ void mu_int_write(block_id blk, uchar_ptr_t ptr)
 	fc = gv_cur_region->dyn.addr->file_cntl;
 	fc->op = FC_WRITE;
 	fc->op_buff = ptr;
-	fc->op_len = mu_int_data.blk_size;
+	/* Previously, fc->op_len was set to mu_int_data.blk_size. Although only the transaction number in the block header is
+	 * going to be reset, we were writing the entire buffer (mu_int_data.blk_size). This demanded a encryption
+	 * of the buffer before being written to the disk. To avoid an encryption, we are only going to write the block header
+	 * in the desired offset(op_pos). Note that since mu_int_write is called just after an mu_int_read, the block previously
+	 * read will be in the OS cache and hence won't cause performance issues due to unaligned writes. When the  database is
+	 * not fully upgraded from V4 to V5, we will be writing the entrie block size. This is due to the block upgrades between
+	 * V4 and V5 that can happen in the unencrypted versions of the database. */
+	fc->op_len = UNIX_ONLY(mu_int_data.fully_upgraded ? SIZEOF(blk_hdr) : ) mu_int_data.blk_size;
 	fc->op_pos = mu_int_ovrhd + (mu_int_data.blk_size / DISK_BLOCK_SIZE * blk);
 	dbfilop(fc);
 	DEBUG_ONLY(reformat_buffer_in_use--;)

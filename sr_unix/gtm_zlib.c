@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,9 +12,10 @@
 #include "mdef.h"
 
 #include <dlfcn.h>
-
 #include "gtm_string.h"
 
+#include "lv_val.h"
+#include "real_len.h"		/* for COPY_DLERR_MSG */
 #include "fgncal.h"		/* needed for COPY_DLLERR_MSG() */
 #include "gtm_zlib.h"
 #include "gtmmsg.h"

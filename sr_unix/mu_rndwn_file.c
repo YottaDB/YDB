@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,9 @@
 #include "ftok_sems.h"
 #include "mu_rndwn_all.h"
 #include "error.h"
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	gd_region		*gv_cur_region;
@@ -117,7 +120,11 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	int			semop_res, stat_res;
 	uint4			status_msg;
 	gd_id			tmp_dbfid;
-
+	int			rc;
+	GTMCRYPT_ONLY(
+		int		init_status;
+		sgmnt_addrs	*csa;
+	)
 	error_def (ERR_BADDBVER);
 	error_def (ERR_DBFILERR);
 	error_def (ERR_DBNOTGDS);
@@ -143,7 +150,8 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	if (SS_NORMAL != status)
 	{
 		gtm_putmsg(VARLSTCNT(5) status, 2, DB_LEN_STR(reg), errno);
-		close(udi->fd);
+		if (FD_INVALID != udi->fd)	/* Since dbfilop failed, close udi->fd only if it was opened */
+			CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
                 return FALSE;
 	}
 	/*
@@ -155,13 +163,13 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	if (reg->read_only && !standalone)
 	{
 		gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(reg));
-		close(udi->fd);
+		CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 		return FALSE;
 	}
 	ESTABLISH_RET(mu_rndwn_file_ch, FALSE);
 	if (!ftok_sem_get(reg, TRUE, GTM_ID, !standalone))
 	{
-		close(udi->fd);
+		CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 		REVERT;
 		return FALSE;
 	}
@@ -177,12 +185,35 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	if (0 != status)
 	{
 		RNDWN_ERR("!AD -> Error reading from file.", reg);
-		close(udi->fd);
+		CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 		free(tsd);
 		REVERT;
 		ftok_sem_release(reg, TRUE, TRUE);
 		return FALSE;
 	}
+#	ifdef GTM_CRYPT
+	/* During rundown gvcst_init is not called and hence we need to do the encryption setup here. */
+	/* We do some basic encryption initializations here.
+	 * 1. Call hash check to figure out if the database file's hash matches with that of the db_key_file.
+	 * 2. if the dat file is encrypted, then make a call to the encryption plugin with GTMCRYPT_GETKEY to obtain the
+	 *    symmetric key which can be used at later stages for encryption and decryption.
+	 * 3. malloc csa->encrypted_blk_contents to be used in jnl_write_aimg_rec and dsk_write_nocache
+	 */
+	if (tsd->is_encrypted)
+	{
+		csa = &(udi->s_addrs);
+		INIT_PROC_ENCRYPTION(init_status);
+		if (0 == init_status)
+			INIT_DB_ENCRYPTION(reg->dyn.addr->fname, csa, tsd, init_status);
+		if (0 != init_status)
+		{
+			GC_GTM_PUTMSG(init_status, (reg->dyn.addr->fname));
+			close(udi->fd);
+			free(tsd);
+			return FALSE;
+		}
+	}
+#	endif
 	udi->shmid = tsd->shmid;
 	udi->semid = tsd->semid;
 	udi->gt_sem_ctime = tsd->gt_sem_ctime.ctime;
@@ -201,7 +232,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			{
 				udi->semid = INVALID_SEMID;
 				RNDWN_ERR("!AD -> Error with semget with IPC_CREAT.", reg);
-				close(udi->fd);
+				CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 				free(tsd);
 				REVERT;
 				ftok_sem_release(reg, TRUE, TRUE);
@@ -218,7 +249,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, SETVAL, semarg))
 			{
 				RNDWN_ERR("!AD -> Error with semctl with SETVAL.", reg);
-				close(udi->fd);
+				CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 				if (sem_created && -1 == semctl(udi->semid, 0, IPC_RMID))
 						RNDWN_ERR("!AD -> Error removing semaphore.", reg);
 				free(tsd);
@@ -235,7 +266,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, IPC_STAT, semarg))
 			{
 				RNDWN_ERR("!AD -> Error with semctl with IPC_STAT.", reg);
-				close(udi->fd);
+				CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 				if (sem_created && -1 == semctl(udi->semid, 0, IPC_RMID))
 						RNDWN_ERR("!AD -> Error removing semaphore.", reg);
 				free(tsd);
@@ -263,7 +294,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			}
 			else
 				RNDWN_ERR("!AD -> File already open by another process.", reg);
-			close(udi->fd);
+			CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 			free(tsd);
 			REVERT;
 			ftok_sem_release(reg, TRUE, TRUE);
@@ -339,7 +370,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 						return FALSE;
 					}
 				}
-				close(udi->fd);
+				CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 				REVERT;
 				if (!ftok_sem_release(reg, FALSE, FALSE))
 				{
@@ -376,7 +407,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			free(tsd);
 			return FALSE;
 		}
-		close(udi->fd);
+		CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 		free(tsd);
 		REVERT;
 		/* For mupip rundown (standalone = FALSE), we release/remove ftok semaphore here. */
@@ -421,7 +452,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	reg->dyn.addr->acc_meth = acc_meth = tsd->acc_meth;
 	dbsecspc(reg, tsd);
 #ifdef __MVS__
-	/* match gvcst_init_sysops.c shmget with __IPC_MEGA */
+	/* match gvcst_init_sysops.c shmget with __IPC_MEGA or _LP64 */
 	if (ROUND_UP(reg->sec_size, MEGA_BOUND) != shm_buf.shm_segsz)
 #else
 	if (reg->sec_size != shm_buf.shm_segsz)
@@ -507,6 +538,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			set_gdid_from_stat(&tmp_dbfid, &stat_buf);
 			if (FALSE == is_gdid_gdid_identical(&tmp_dbfid, &cs_addrs->nl->unique_id.uid))
 			{
+				assert(FALSE);
 				send_msg(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid,
 					 ERR_TEXT, 2,
 					 LEN_AND_LIT("[MUPIP] Database filename and fileid in shared memory are not in sync"));
@@ -752,7 +784,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		return FALSE;
 	if (standalone)
 		standalone_reg = reg;
-	close(udi->fd);
+	CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 	return TRUE;
 }
 

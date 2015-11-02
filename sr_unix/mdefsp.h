@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *    Copyright 2001, 2008 Fidelity Information Services, Inc   *
+ *    Copyright 2001, 2009 Fidelity Information Services, Inc   *
  *                                                              *
  *    This source code contains the intellectual property       *
  *    of its copyright holder(s), and is made available         *
@@ -248,10 +248,8 @@ typedef struct
 #define VAR_START(a, b)	va_start(a, b)
 #define VARLSTCNT(a)	a,		/* push count of arguments*/
 
-#ifndef GTSQL	/* these cannot be used within SQL */
 #define malloc gtm_malloc
 #define free gtm_free
-#endif
 
 #ifndef __ia64
 #define CODE_ADDRESS(func)	(unsigned char *)func

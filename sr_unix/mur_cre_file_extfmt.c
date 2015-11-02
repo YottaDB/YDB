@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,6 +68,7 @@ int4 mur_cre_file_extfmt(int recstat)
 	static readonly	char 	*ext_file_type[] = {STR_JNLEXTR, STR_BRKNEXTR, STR_LOSTEXTR};
 	static readonly unsigned char		open_params_list[]=
 	{
+		(unsigned char)iop_m,
 		(unsigned char)iop_newversion,
 		(unsigned char)iop_noreadonly,
 		(unsigned char)iop_nowrap,

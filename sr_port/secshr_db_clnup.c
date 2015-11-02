@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -177,7 +177,7 @@ GBLDEF inctn_detail_t	*inctn_detail_addrs;
 GBLDEF short		*dollar_tlevel_addrs;
 GBLDEF int4		*update_trans_addrs;
 GBLDEF sgmnt_addrs	**cs_addrs_addrs;
-GBLDEF boolean_t 	*kip_incremented_addrs;
+GBLDEF sgmnt_addrs 	**kip_csa_addrs;
 GBLDEF boolean_t	*need_kip_incr_addrs;
 GBLDEF trans_num	*start_tn_addrs;
 
@@ -210,7 +210,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	unsigned char		*chain_ptr;
 	char			*wcblocked_ptr;
 	boolean_t		is_bg, jnlpool_reg, do_accounting, first_time = TRUE, is_exiting;
-	boolean_t		dlr_tlevel, kipincremented_usable, needkipincr;
+	boolean_t		dlr_tlevel, kip_csa_usable, needkipincr;
 	int4			upd_trans; /* a copy of the global variable "update_trans" which is needed for VMS STOP/ID case */
 	boolean_t		tp_update_underway = FALSE;	/* set to TRUE if TP commit was in progress or complete */
 	boolean_t		non_tp_update_underway = FALSE;	/* set to TRUE if non-TP commit was in progress or complete */
@@ -239,7 +239,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	sm_uc_ptr_t		bufstart;
 	int4			bufindx;	/* should be the same type as "csd->bt_buckets" */
 	commit_type		this_reg_commit_type;	/* indicate the type of commit of a given region in a TP transaction */
-	gv_namehead		*gvt = NULL;
+	gv_namehead		*gvt = NULL, *gvtarget;
+	srch_blk_status		*t1;
 	trans_num		currtn;
 	int4			n;
 #	ifdef VMS
@@ -465,7 +466,12 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					}
 				}
 				if ((csa->in_wtstart) && (0 < cnl->in_wtstart))
+				{
 					CAREFUL_DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
+					assert(0 < cnl->intent_wtstart);
+					if (0 < cnl->intent_wtstart)
+						CAREFUL_DECR_CNT(&cnl->intent_wtstart, &cnl->wc_var_lock);
+				}
 				csa->in_wtstart = FALSE;	/* Let wcs_wtstart run for exit processing */
 				if (cnl->wcsflu_pid == rundown_process_id)
 					cnl->wcsflu_pid = 0;
@@ -935,6 +941,30 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							assert(CR_BLKEMPTY != cr->blk);
 							cr->jnl_addr = cs->jnl_freeaddr;
 							cr->stopped = TRUE;
+							/* Keep cs->cr and t1->cr uptodate to ensure clue will be accurate */
+							cs->cr = cr;
+							cs->cycle = cr->cycle;
+							if (!IS_BITMAP_BLK(cs->blk))
+							{	/* Not a bitmap block, update clue history to reflect new cr */
+								assert((0 <= cs->level) && (MAX_BT_DEPTH > cs->level));
+								gvtarget = cs->blk_target;
+								assert((MAX_BT_DEPTH + 1)
+									== (sizeof(gvtarget->hist.h)
+										/ sizeof(gvtarget->hist.h[0])));
+								if ((0 <= cs->level) && (MAX_BT_DEPTH > cs->level)
+									&& GTM_PROBE(sizeof(gv_namehead), gvtarget, WRITE)
+									&& (0 != gvtarget->clue.end))
+								{
+									t1 = &gvtarget->hist.h[cs->level];
+									if (t1->blk_num == cs->blk)
+									{
+										t1->cr = cr;
+										t1->cycle = cs->cycle;
+										t1->buffaddr = (sm_uc_ptr_t)
+												GDS_ANY_REL2ABS(csa, cr->buffaddr);
+									}
+								}
+							}
 						} else
 						{	/* We are in PHASE2 of the commit (i.e. have completed PHASE1 for ALL cses)
 							 * We have already picked out a cr for the commit. Use that.
@@ -1009,7 +1039,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								 */
 #								ifdef UNIX
 								bufstart = (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, start_cr->buffaddr);
-								bufindx = (cs->old_block - bufstart) / csd->blk_size;
+								bufindx = (int4)(cs->old_block - bufstart) / csd->blk_size;
 								assert(0 <= bufindx);
 								assert(bufindx < csd->n_bts);
 								cr_alt = &start_cr[bufindx];
@@ -1475,36 +1505,36 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						|| (REG_COMMIT_PARTIAL == this_reg_commit_type)
 						|| (REG_COMMIT_UNSTARTED == this_reg_commit_type));
 					/* We have already checked that "si" is READABLE. Check that it is WRITABLE since
-					 * we might need to set "si->kip_incremented" in the CAREFUL_INCR_KIP macro.
+					 * we might need to set "si->kip_csa" in the CAREFUL_INCR_KIP macro.
 					 */
 					if (GTM_PROBE(sizeof(sgm_info), si, WRITE))
 					{
-						kipincremented_usable = TRUE;
+						kip_csa_usable = TRUE;
 						/* Take this opportunity to reset si->cr_array_index */
 						si->cr_array_index = 0;
 					} else
 					{
-						kipincremented_usable = FALSE;
+						kip_csa_usable = FALSE;
 						assert(FALSE);
 					}
 					if (REG_COMMIT_COMPLETE != this_reg_commit_type)
 					{
-						if (kipincremented_usable && (NULL != si->kill_set_head) && !si->kip_incremented)
-							CAREFUL_INCR_KIP(csd, csa, si->kip_incremented);
+						if (kip_csa_usable && (NULL != si->kill_set_head) && (NULL == si->kip_csa))
+							CAREFUL_INCR_KIP(csd, csa, si->kip_csa);
 					} else
-						assert((NULL == si->kill_set_head) || si->kip_incremented);
-					assert((NULL == si->kill_set_head) || si->kip_incremented);
+						assert((NULL == si->kill_set_head) || (NULL != si->kip_csa));
+					assert((NULL == si->kill_set_head) || (NULL != si->kip_csa));
 				} else
-				{	/* Non-TP. Check need_kip_incr and kip_incremented flags. */
+				{	/* Non-TP. Check need_kip_incr and value pointed to by kip_csa. */
 					assert(non_tp_update_underway);
-					/* Note that *kip_incremented_addrs could be FALSE if we are in the
-					 * 1st phase of the M-kill and TRUE if we are in the 2nd phase of the kill.
-					 * Only if it is FALSE, should we increment the kill_in_prog flag.
+					/* Note that *kip_csa_addrs could be NULL if we are in the
+					 * 1st phase of the M-kill and NON NULL if we are in the 2nd phase of the kill.
+					 * Only if it is NULL, should we increment the kill_in_prog flag.
 					 */
-					kipincremented_usable =
-						(GTM_PROBE(sizeof(*kip_incremented_addrs), kip_incremented_addrs, WRITE))
+					kip_csa_usable =
+						(GTM_PROBE(sizeof(*kip_csa_addrs), kip_csa_addrs, WRITE))
 							? TRUE : FALSE;
-					assert(kipincremented_usable);
+					assert(kip_csa_usable);
 					if (GTM_PROBE(sizeof(*need_kip_incr_addrs), need_kip_incr_addrs, WRITE))
 						needkipincr = *need_kip_incr_addrs;
 					else
@@ -1512,9 +1542,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						needkipincr = FALSE;
 						assert(FALSE);
 					}
-					if (needkipincr && kipincremented_usable && !*kip_incremented_addrs)
+					if (needkipincr && kip_csa_usable && (NULL == *kip_csa_addrs))
 					{
-						CAREFUL_INCR_KIP(csd, csa, *kip_incremented_addrs);
+						CAREFUL_INCR_KIP(csd, csa, *kip_csa_addrs);
 						*need_kip_incr_addrs = FALSE;
 					}
 				}
@@ -1545,26 +1575,26 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				if (dlr_tlevel || (NULL != firstsgminfo))
 				{
 					si = csa->sgm_info_ptr;
-					kipincremented_usable = (GTM_PROBE(sizeof(sgm_info), si, WRITE)) ? TRUE : FALSE;
-					assert(kipincremented_usable);
+					kip_csa_usable = (GTM_PROBE(sizeof(sgm_info), si, WRITE)) ? TRUE : FALSE;
+					assert(kip_csa_usable);
 					/* Since the kill process cannot be completed, we need to decerement KIP count
 					 * and increment the abandoned_kills count.
 					 */
-					if (kipincremented_usable && (NULL != si->kill_set_head) && si->kip_incremented)
+					if (kip_csa_usable && (NULL != si->kill_set_head) && (NULL != si->kip_csa))
 					{
-						CAREFUL_DECR_KIP(csd, csa, si->kip_incremented);
+						CAREFUL_DECR_KIP(csd, csa, si->kip_csa);
 						CAREFUL_INCR_ABANDONED_KILLS(csd, csa);
 					} else
-						assert((NULL == si->kill_set_head) || !si->kip_incremented);
+						assert((NULL == si->kill_set_head) || (NULL == si->kip_csa));
 				} else if (!dlr_tlevel)
 				{
-					kipincremented_usable =
-						(GTM_PROBE(sizeof(*kip_incremented_addrs), kip_incremented_addrs, WRITE))
+					kip_csa_usable =
+						(GTM_PROBE(sizeof(*kip_csa_addrs), kip_csa_addrs, WRITE))
 						? TRUE : FALSE;
-					assert(kipincremented_usable);
-					if (kipincremented_usable && *kip_incremented_addrs)
+					assert(kip_csa_usable);
+					if (kip_csa_usable && (NULL != *kip_csa_addrs))
 					{
-						CAREFUL_DECR_KIP(csd, csa, *kip_incremented_addrs);
+						CAREFUL_DECR_KIP(csd, csa, *kip_csa_addrs);
 						CAREFUL_INCR_ABANDONED_KILLS(csd, csa);
 					}
 				}

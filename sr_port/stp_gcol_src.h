@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 
 #include <stddef.h>
 #include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gtm_facility.h"
@@ -49,7 +50,10 @@
 #include "longcpy.h"
 #include "stpg_sort.h"
 #include "hashtab_objcode.h"
+#include "hashtab_str.h"
 #include "hashtab.h"
+#include "min_max.h"
+#include "alias.h"
 
 #ifndef STP_MOVE
 GBLDEF symval		*first_symval;
@@ -64,9 +68,9 @@ GBLREF hash_table_objcode cache_table;
 GBLREF bool		compile_time;
 GBLREF unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF int		stp_array_size;
-GBLREF gvzwrite_struct	gvzwrite_block;
+GBLREF gvzwrite_datablk	gvzwrite_block;
 GBLREF io_log_name	*io_root_log_name;
-GBLREF lvzwrite_struct	lvzwrite_block;
+GBLREF lvzwrite_datablk	*lvzwrite_block;
 GBLREF mliteral		literal_chain;
 GBLREF mstr		*comline_base, dollar_zsource, **stp_array;
 GBLREF mval		dollar_etrap, dollar_system, dollar_zerror, dollar_zgbldir, dollar_zstatus, dollar_zstep, dollar_ztrap;
@@ -83,6 +87,13 @@ GBLREF mval		last_fnquery_return_sub[MAX_LVSUBSCRIPTS];	/* .. (subscripts) */
 GBLREF int		last_fnquery_return_subcnt;			/* .. (count of subscripts) */
 GBLREF boolean_t	mstr_native_align;
 GBLREF fnpc_area	fnpca;
+GBLREF zwr_hash_table	*zwrhtab;					/* How we track aliases during zwrites */
+GBLREF int4		SPGC_since_LVGC;				/* stringpool GCs since the last dead-data GC */
+GBLREF int4		LVGC_interval;					/* dead data GC done every LVGC_interval stringpool GCs */
+GBLREF boolean_t	suspend_lvgcol;
+GBLREF hash_table_str	*complits_hashtab;
+
+
 OS_PAGE_SIZE_DECLARE
 
 static mstr		**topstr, **array, **arraytop;
@@ -146,7 +157,7 @@ static mstr		**topstr, **array, **arraytop;
 			if (fixup_cnt)							\
 			{								\
 				vent = (var_tabent *)((char *)ihdr + ihdr->vartab_off);	\
-				for (vartop = vent + fixup_cnt;  vent < vartop; vent++)\
+				for (vartop = vent + fixup_cnt;  vent < vartop; vent++)	\
 				{							\
 					x = STR_STPG_GET(&vent->var_name);		\
 					if (x)						\
@@ -160,7 +171,7 @@ static mstr		**topstr, **array, **arraytop;
 { \
 	padlen = 0; \
 	for (; cstr < topstr; cstr++) \
-	{ \
+	{ 	/* Note having same mstr in array more than once can cause following assert to fail */ \
 		assert((*cstr)->addr >= (char *)begaddr); \
 		if ((*cstr)->addr > (char *)endaddr && (*cstr)->addr != (char *)endaddr + padlen) \
 			break; \
@@ -205,9 +216,9 @@ mstr **stp_gcol_mv_stpg_put(mstr *X)
 {
 	int	stp_put_int;
 
-	assert(0 < (X)->len); /* It would be nice to test for maxlen here but that causes some usages of stringpool
-				 to fail as other types of stuff are built into the stringppool besides strings. */
-	*topstr++ = (X);
+	assert(0 < X->len); /* It would be nice to test for maxlen here but that causes some usages of stringpool
+			       to fail as other types of stuff are built into the stringppool besides strings. */
+	*topstr++ = X;
 	return (topstr >= arraytop ? (stp_put_int = (int)(topstr - array), stp_expand_array(), array = stp_array,
 				      topstr = array + stp_put_int, arraytop = array + stp_array_size) : 0);
 }
@@ -219,9 +230,9 @@ mstr **stp_gcol_mv_stpg_put(mstr *X)
 */
 void stp_vfy_mval(void)
 {
-	lv_blk			*lv_blk_ptr;
-	lv_val			*lvp, *lvlimit;
-	mstr			*x;
+	lv_blk		*lv_blk_ptr;
+	lv_val		*lvp, *lvlimit;
+	mstr		*x;
 
 	if (!first_symval)
 	{	/* Must be setting up first symbol table now */
@@ -235,7 +246,7 @@ void stp_vfy_mval(void)
 		for (lvp = lv_blk_ptr->lv_base, lvlimit = lv_blk_ptr->lv_free;
 		     lvp < lvlimit;  lvp++)
 		{
-			if (lvp->v.mvtype != MV_SBS)
+			if (MV_SBS != lvp->v.mvtype)
 			{
 				x = MV_STPG_GET(&(lvp->v));
 				if (x)
@@ -269,7 +280,7 @@ void mv_parse_tree_collect(mvar *node)
 void stp_move(char *from, char *to) /* garbage collect and move range (from,to] to stringpool adjusting all mvals/mstrs pointing
 				     * in this range */
 #else
-void stp_gcol(int space_asked) /* garbage collect and create enough space for space_asked bytes */
+	void stp_gcol(int space_asked) /* garbage collect and create enough space for space_asked bytes */
 #endif
 {
 #ifdef STP_MOVE
@@ -307,15 +318,57 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 	static int		indr_stp_maxnoexp_passes = STP_INITMAXNOEXP_PASSES;
 	static int		rts_stp_maxnoexp_passes = STP_INITMAXNOEXP_PASSES;
 	int			*maxnoexp_passes;
-	int			stp_incr;
+	int			stp_incr, killcnt;
 	boolean_t		maxnoexp_growth;
 	ht_ent_objcode 		*tabent_objcode, *topent;
 	ht_ent_mname		*tabent_mname, *topent_mname;
+	ht_ent_addr		*tabent_addr, *topent_addr;
+	ht_ent_str		*tabent_lit, *topent_lit;
+	mliteral		*mlit;
+	zwr_alias_var		*zav;
 	cache_entry		*cp;
 	var_tabent		*vent, *vartop;
 	symval			*symtab;
+	lv_xnew_var		*xnewvar;
+	tp_var			*restore_ent;
 	error_def		(ERR_STPEXPFAIL);
 
+#ifndef STP_MOVE
+	/* Before we get cooking with our stringpool GC, check if it is appropriate to call lv_val garbage collection.
+	   This is data that can get orphaned with no way to access it when aliases are used. This form of GC is only done
+	   if aliases are actively being used. It is not called with every stringpool garbage collection but every "N"
+	   calls to this routine (when GCing the runtime stringpool only). The value of N is self-tuning to some extent.
+	   There are mins and maximums to be observed.
+	*/
+	if ((stringpool.base == rts_stringpool.base) && (NULL != curr_symval) && curr_symval->alias_activity)
+	{	/* We have alias stuff going on so see if we need a GC */
+		++SPGC_since_LVGC;
+		DBGRFCT((stderr, "stp_gcol: Current interval: %d  Intervals till LVGC: %d\n",
+			 SPGC_since_LVGC, MAX(0, LVGC_interval - SPGC_since_LVGC)));
+		if (suspend_lvgcol)
+		{
+			DBGRFCT((stderr, "stp_gcol: Bypassing LVGC check due to suspend_lvgcol\n"));
+		} else if (SPGC_since_LVGC >= LVGC_interval)
+		{	/* Time for a GC */
+			killcnt = als_lvval_gc();
+			DBGRFCT((stderr, "stp_gcol: Previous interval: %d ", LVGC_interval));
+			if (0 == killcnt)
+				/* Nothing recovered .. be less aggresive */
+				LVGC_interval = MIN((LVGC_interval + 1), MAX_SPGC_PER_LVGC);
+			else
+				/* Some data was recovered, be more aggresive */
+				LVGC_interval = MAX((LVGC_interval - 5), MIN_SPGC_PER_LVGC);
+			DBGRFCT((stderr, " New interval: %d\n", LVGC_interval));
+			/* SPGC_since_LVGC is cleared by als_lv_gc() */
+		}
+	}
+#ifdef DEBUG_REFCNT
+	else if ((stringpool.base == rts_stringpool.base) && (NULL != curr_symval))
+	{
+		DBGRFCT((stderr, "stp_gcol: lvgcol check bypassed for lack of aliasness\n"));
+	}
+#endif	/* DEBUG_REFCNT */
+#endif	/* !STP_MOVE */
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 	assert(stringpool.top - stringpool.free < space_asked || space_asked == 0);
@@ -347,7 +400,7 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 		GTMASSERT; /* neither rts_stringpool, nor indr_stringpool */
 	}
 
-	if (stp_array == 0)
+	if (NULL == stp_array)
 		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * sizeof(mstr *));
 
 	topstr = array = stp_array;
@@ -362,14 +415,32 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 	if (((stringpool.base != rts_stringpool.base) || (0 == cache_table.size)))
 	{
 #ifndef STP_MOVE
-		mliteral *p;
 		if (literal_chain.que.fl != 0)
-		{
-			dqloop(&literal_chain, que, p)
+		{	/* If hashtable exists, pull it all from there rather that searching for it twice */
+			if (complits_hashtab && complits_hashtab->base)
 			{
-				x = MV_STPG_GET(&(p->v));
-				if (x)
-					MV_STPG_PUT(x);
+				for (tabent_lit = complits_hashtab->base, topent_lit = complits_hashtab->top;
+				     tabent_lit < topent_lit; tabent_lit++)
+				{
+					if (HTENT_VALID_STR(tabent_lit, mliteral, mlit))
+					{	/* Key first, then value */
+						x = STR_STPG_GET(&(tabent_lit->key.str));
+						if (x)
+							MV_STPG_PUT(x);
+						x = MV_STPG_GET(&(mlit->v));
+						if (x)
+							MV_STPG_PUT(x);
+
+					}
+				}
+			} else
+			{	/* No hash table, just the values */
+				dqloop(&literal_chain, que, mlit)
+				{
+					x = MV_STPG_GET(&(mlit->v));
+					if (x)
+						MV_STPG_PUT(x);
+				}
 			}
 		}
 		assert(offsetof(mvar, mvname) == offsetof(mlabel, mvname));
@@ -380,9 +451,9 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 #endif
 	} else
 	{
+#ifndef STP_MOVE
 		/* Some house keeping since we are garbage collecting. Clear out all the lookaside
-		   arrays for the simple $piece function if this isn't a vax (no lookaside on vax). */
-#ifndef __vax
+		   arrays for the simple $piece function. */
 #  ifdef DEBUG
 		GBLREF int c_clear;
 		++c_clear;		/* Count clearing operations */
@@ -410,14 +481,24 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 		for (symtab = curr_symval; NULL != symtab; symtab = symtab->last_tab)
 		{
 			for (tabent_mname = symtab->h_symtab.base, topent_mname = symtab->h_symtab.top;
-					tabent_mname < topent_mname; tabent_mname++)
+			     tabent_mname < topent_mname; tabent_mname++)
 			{
-				if (HTENT_VALID_MNAME(tabent_mname, lv_val, lvp))
-				{
+				if (!HTENT_EMPTY_MNAME(tabent_mname, lv_val, lvp))
+				{	/* Note this code checks for "not empty" rathan than VALID hash table entry
+					   because a deleted entry still has a key that needs to be preserved. With
+					   the introduction of aliases, the $ZWRTAC* pseudo local vars are created and
+					   deleted where before aliases no deletion of MNAME entries ever occurred.
+					*/
 					x = (mstr *)STR_STPG_GET(&(tabent_mname->key.var_name));
 					if (x)
 						MV_STPG_PUT(x);
 				}
+			}
+			for (xnewvar = symtab->xnew_var_list; xnewvar; xnewvar = xnewvar->next)
+			{
+				x = (mstr *)STR_STPG_GET(&xnewvar->key.var_name);
+				if (x)
+					MV_STPG_PUT(x);
 			}
 		}
 
@@ -427,24 +508,42 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 				MV_STPG_PUT(x);
 		}
 
-		if (lvzwrite_block.curr_subsc)
+		if (lvzwrite_block && lvzwrite_block->curr_subsc)
 		{
-			assert(lvzwrite_block.sub);
-			zwr_sub = (zwr_sub_lst *)lvzwrite_block.sub;
-			for (index = 0;  index < (int)lvzwrite_block.curr_subsc;  index++)
+			assert(lvzwrite_block->sub);
+			zwr_sub = (zwr_sub_lst *)lvzwrite_block->sub;
+			for (index = 0;  index < (int)lvzwrite_block->curr_subsc;  index++)
 			{
 				assert(zwr_sub->subsc_list[index].actual != zwr_sub->subsc_list[index].first
-					|| !zwr_sub->subsc_list[index].second);
+				       || !zwr_sub->subsc_list[index].second);
 				/*
 				 * we cannot garbage collect duplicate mval pointers.
 				 * So make sure zwr_sub->subsc_list[index].actual is not pointing to an
 				 * existing (mval *) which  is already protected
 				 */
 				if (zwr_sub->subsc_list[index].actual &&
-					zwr_sub->subsc_list[index].actual != zwr_sub->subsc_list[index].first)
+				    zwr_sub->subsc_list[index].actual != zwr_sub->subsc_list[index].first)
 				{
 					x = MV_STPG_GET(zwr_sub->subsc_list[index].actual);
 					if (x)
+						MV_STPG_PUT(x);
+				}
+			}
+		}
+		if (zwrhtab)
+		{
+			for (tabent_addr = zwrhtab->h_zwrtab.base, topent_addr = zwrhtab->h_zwrtab.top;
+			     tabent_addr < topent_addr; tabent_addr++)
+			{
+				if (HTENT_VALID_ADDR(tabent_addr, zwr_alias_var, zav))
+				{
+					x = (mstr *)STR_STPG_GET(&zav->ptrs.val_ent.zwr_var);
+					/* Regular varnames are already accounted for in other ways so
+					   we need to avoid putting this mstr into the process array twice.
+					   The only var names we need worry about are $ZWRTACxxx so make
+					   simple check for var names starting with '$'.
+					*/
+					if (x && x->len && '$' == *x->addr)
 						MV_STPG_PUT(x);
 				}
 			}
@@ -507,83 +606,88 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 		{
 			switch (mvs->mv_st_type)
 			{
-			case MVST_MVAL:
-				m = &mvs->mv_st_cont.mvs_mval;
-				break;
-			case MVST_MSAV:
-				m = &mvs->mv_st_cont.mvs_msav.v;
-				break;
-			case MVST_STAB:
-				if (mvs->mv_st_cont.mvs_stab)
-				{	/* if initalization of the table was successful */
-					for (lv_blk_ptr = &mvs->mv_st_cont.mvs_stab->first_block;
-						lv_blk_ptr;
-						lv_blk_ptr = lv_blk_ptr->next)
-					{
-						for (lvp = lv_blk_ptr->lv_base, lvlimit = lv_blk_ptr->lv_free;
-							lvp < lvlimit;  lvp++)
+				case MVST_MVAL:
+					m = &mvs->mv_st_cont.mvs_mval;
+					break;
+				case MVST_MSAV:
+					m = &mvs->mv_st_cont.mvs_msav.v;
+					break;
+				case MVST_STAB:
+					if (mvs->mv_st_cont.mvs_stab)
+					{	/* if initalization of the table was successful */
+						for (lv_blk_ptr = &mvs->mv_st_cont.mvs_stab->first_block;
+						     lv_blk_ptr;
+						     lv_blk_ptr = lv_blk_ptr->next)
 						{
-							if ((lvp->v.mvtype == MV_SBS)
-								&& (tbl = (lv_sbs_tbl *)lvp)
-								&& (blk = tbl->str))
+							for (lvp = lv_blk_ptr->lv_base, lvlimit = lv_blk_ptr->lv_free;
+							     lvp < lvlimit;  lvp++)
 							{
-								assert(tbl->ident == MV_SBS);
-								for (;  blk;  blk = blk->nxt)
+								if ((lvp->v.mvtype == MV_SBS)
+								    && (tbl = (lv_sbs_tbl *)lvp)
+								    && (blk = tbl->str))
 								{
-									for (s_sbs = &blk->ptr.sbs_str[0],
-									    straddr = (unsigned char *)&blk->ptr.sbs_str[blk->cnt];
-									    s_sbs < (sbs_str_struct *)straddr; s_sbs++)
+									assert(tbl->ident == MV_SBS);
+									for (;  blk;  blk = blk->nxt)
 									{
-										x = STR_STPG_GET(&s_sbs->str);
-										if (x)
-											MV_STPG_PUT(x);
+										for (s_sbs = &blk->ptr.sbs_str[0],
+										     straddr = (uchar_ptr_t)
+											     &blk->ptr.sbs_str[blk->cnt];
+										     s_sbs < (sbs_str_struct *)straddr; s_sbs++)
+										{
+											x = STR_STPG_GET(&s_sbs->str);
+											if (x)
+												MV_STPG_PUT(x);
+										}
 									}
+								} else
+								{
+									x = MV_STPG_GET(&(lvp->v));
+									if (x)
+										MV_STPG_PUT(x);
 								}
-							} else
-							{
-								x = MV_STPG_GET(&(lvp->v));
-								if (x)
-									MV_STPG_PUT(x);
 							}
 						}
 					}
-				}
-				continue;
-			case MVST_IARR:
-				m = (mval *)mvs->mv_st_cont.mvs_iarr.iarr_base;
-				for (mtop = m + mvs->mv_st_cont.mvs_iarr.iarr_mvals;  m < mtop;  m++)
-				{
-					x = MV_STPG_GET(m);
+					continue;
+				case MVST_IARR:
+					m = (mval *)mvs->mv_st_cont.mvs_iarr.iarr_base;
+					for (mtop = m + mvs->mv_st_cont.mvs_iarr.iarr_mvals;  m < mtop;  m++)
+					{
+						x = MV_STPG_GET(m);
+						if (x)
+							MV_STPG_PUT(x);
+					}
+					continue;
+				case MVST_LVAL:
+				case MVST_NTAB:
+				case MVST_PARM:
+				case MVST_TVAL:
+				case MVST_STCK:
+				case MVST_STCK_SP:
+				case MVST_PVAL:
+				case MVST_TPHOLD:
+					continue;
+				case MVST_NVAL:
+#ifdef DEBUG
+					/* The var_name field is only present in a debug build */
+					x = (mstr *)STR_STPG_GET(&mvs->mv_st_cont.mvs_nval.name.var_name);
 					if (x)
 						MV_STPG_PUT(x);
-				}
-				continue;
-			case MVST_NTAB:
-			case MVST_PARM:
-			case MVST_TVAL:
-			case MVST_STCK:
-			case MVST_STCK_SP:
-			case MVST_PVAL:
-			case MVST_TPHOLD:
-				continue;
-			case MVST_NVAL:
-				x = (mstr *)STR_STPG_GET(&mvs->mv_st_cont.mvs_nval.name.var_name);
-				if (x)
-					MV_STPG_PUT(x);
-				continue;
-			case MVST_ZINTR:
-				m = &mvs->mv_st_cont.mvs_zintr.savtarg;
-				break;
-			case MVST_ZINTDEV:
-				if (mvs->mv_st_cont.mvs_zintdev.buffer_valid)
-				{
-					x = (mstr *)STR_STPG_GET(&mvs->mv_st_cont.mvs_zintdev.curr_sp_buffer);
-					if (x)
-						MV_STPG_PUT(x);
-				}
-				continue;
-			default:
-				GTMASSERT;
+#endif
+					continue;
+				case MVST_ZINTR:
+					m = &mvs->mv_st_cont.mvs_zintr.savtarg;
+					break;
+				case MVST_ZINTDEV:
+					if (mvs->mv_st_cont.mvs_zintdev.buffer_valid)
+					{
+						x = (mstr *)STR_STPG_GET(&mvs->mv_st_cont.mvs_zintdev.curr_sp_buffer);
+						if (x)
+							MV_STPG_PUT(x);
+					}
+					continue;
+				default:
+					GTMASSERT;
 			}
 			x = MV_STPG_GET(m);
 			if (x)
@@ -618,6 +722,12 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 				x = MV_STPG_GET(&tf->zgbldir);
 				if (x)
 					MV_STPG_PUT(x);
+				for (restore_ent = tf->vars; restore_ent; restore_ent = restore_ent->next)
+				{
+					x = (mstr *)STR_STPG_GET(&(restore_ent->key.var_name));
+					if (x)
+						MV_STPG_PUT(x);
+				}
 				tf = tf->old_tp_frame;
 			}
 		}
@@ -635,7 +745,7 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 			if (tmpaddr + tmplen > straddr) /* if it is not a proper substring of previous one */
 			{
 				int tmplen2;
-				tmplen2 = ((tmpaddr >= straddr) ? tmplen : (tmpaddr + tmplen - straddr));
+				tmplen2 = ((tmpaddr >= straddr) ? tmplen : (int)(tmpaddr + tmplen - straddr));
 				assert(0 < tmplen2);
 				totspace += tmplen2;
 				if (mstr_native_align)
@@ -653,7 +763,7 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 	assert(mstr_native_align || space_after_compact >= space_before_compact);
 #endif
 	space_reclaim = space_after_compact - space_before_compact; /* this can be -ve, if alignment causes expansion */
-	space_needed -= space_after_compact;
+	space_needed -= (int)space_after_compact;
 	if (0 < space_needed && STP_RECLAIMLIMIT > space_reclaim)
 	{
 		(*spc_needed_passes)++;
@@ -674,9 +784,9 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 	        (!disallow_forced_expansion && /* iii */
 	         STP_LIMITFRCDEXPN >= stringpool.top - stringpool.base && /* iv */
 	         (STP_MAXLOWRECLAIM_PASSES <= *low_reclaim_passes || /* v */
-	         (maxnoexp_growth = (*maxnoexp_passes < STP_MAXNOEXP_PASSES && *spc_needed_passes >= *maxnoexp_passes))))) /* vi */
+		  (maxnoexp_growth = (*maxnoexp_passes < STP_MAXNOEXP_PASSES && *spc_needed_passes >= *maxnoexp_passes))))) /* vi */
 #endif
-	     )
+	    )
 	{
 		/* i   - more space needed than available
 		 * ii  - very less space available

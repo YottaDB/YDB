@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@ void op_wtone(int c)
 		c = start_ptr[0];
 	}
 #endif
-	if (CHSET_M != active_device->ochset && !U_VALID_CODE(c)) /* validate code point before dev specific output */
+	if (IS_UTF_CHSET(active_device->ochset) && !U_VALID_CODE(c)) /* validate code point before dev specific output */
 		rts_error(VARLSTCNT(3) ERR_INVDLRCVAL, 1, c);
 	(io_curr_device.out->disp_ptr->wtone)(c);
 	active_device = 0;

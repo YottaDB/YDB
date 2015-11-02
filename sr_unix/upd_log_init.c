@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,7 @@ int upd_log_init(recvpool_user who)
 		}
 		strcat(log_file, file_suffix);
 	}
-	if (-1 == *fd_addrs || (UPDPROC == who && 0 != strcmp(log_file, recvpool.upd_proc_local->log_file)))
+	if (FD_INVALID == *fd_addrs || (UPDPROC == who && 0 != strcmp(log_file, recvpool.upd_proc_local->log_file)))
 	{
 		status = repl_log_init(REPL_GENERAL_LOG, fd_addrs, NULL, log_file, NULL);
 		repl_log_fd2fp(fp_addrs, *fd_addrs);

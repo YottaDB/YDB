@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,9 @@
 #include "i386.h"
 #include "obj_file.h"
 #include "emit_code.h"
+#include "hashtab_mname.h"
+#include "stddef.h"
+
 
 #define BUFFERED_CODE_SIZE 50
 #define LONG_JUMP_OFFSET (0x7ffffffc)
@@ -876,6 +879,11 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 			case LOAD_ADDRESS:
 				code_idx++;
 				emit_base_offset(use_reg, base_reg, offset);
+				if (opr->oprclass == TVAR_REF)
+				{
+					code_idx++;
+					emit_base_offset(use_reg, use_reg, offsetof(ht_ent_mname, value));
+				}
 				break;
 			case PUSH:
 				if (!val_output)
@@ -895,8 +903,18 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 			case PUSH_ADDRESS:
 				if (val_output)
 				{
-					code_idx++;
-					emit_base_offset(I386_INS_PUSH_Ev, base_reg, offset);
+					if (opr->oprclass == TVAR_REF)
+					{
+						code_idx++;
+						emit_base_offset(use_reg, base_reg, offset);
+						code_idx++;
+						emit_base_offset(I386_INS_PUSH_Ev, use_reg, offsetof(ht_ent_mname, value));
+					}
+					else
+					{
+						code_idx++;
+						emit_base_offset(I386_INS_PUSH_Ev, base_reg, offset);
+					}
 				}
 				else
 				{
@@ -1065,6 +1083,11 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 				else
 					code_buf[code_idx++] = I386_INS_LEA_Gv_M;
 				emit_base_offset(use_reg, base_reg, offset);
+				if (opr->oprclass == TVAR_REF)
+				{
+					code_buf[code_idx++] = I386_INS_MOV_Gv_Ev;
+					emit_base_offset(use_reg, use_reg, offsetof(ht_ent_mname, value));
+				}
 				break;
 			case PUSH:
 				if (val_output)
@@ -1084,8 +1107,18 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 			case PUSH_ADDRESS:
 				if (val_output)
 				{
-					code_buf[code_idx++] = I386_INS_Grp5_Prefix;
-					emit_base_offset(I386_INS_PUSH_Ev, base_reg, offset);
+					if (opr->oprclass == TVAR_REF)
+					{
+						code_buf[code_idx++] = I386_INS_MOV_Gv_Ev;
+						emit_base_offset(use_reg, base_reg, offset);
+						code_buf[code_idx++] = I386_INS_Grp5_Prefix;
+						emit_base_offset(I386_INS_PUSH_Ev, use_reg, offsetof(ht_ent_mname, value));
+					}
+					else
+					{
+						code_buf[code_idx++] = I386_INS_Grp5_Prefix;
+						emit_base_offset(I386_INS_PUSH_Ev, base_reg, offset);
+					}
 				}
 				else
 				{

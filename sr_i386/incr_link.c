@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,7 @@ bool incr_link(int file_desc)
 	{
 		if (-1 == read_size)
 		{
-			save_errno = errno < sys_nerr ? (0 <= errno ? errno : 0) : 0;
+			save_errno = errno;
 			zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, strlen(STRERROR(save_errno)),
 					STRERROR(save_errno));
 		}
@@ -97,7 +97,7 @@ bool incr_link(int file_desc)
 	{
 		if (-1 == read_size)
 		{
-			save_errno = errno < sys_nerr ? (0 <= errno ? errno : 0) : 0;
+			save_errno = errno;
 			zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, strlen(STRERROR(save_errno)),
 					STRERROR(save_errno));
 		}
@@ -421,13 +421,14 @@ void res_free(res_list *root)
  * err2 - an error code that accepts two arguments (!AD) */
 void zl_error(int4 file, int4 err, int4 err2, int4 len, char *addr)
 {
+	int	rc;
+
 	if (code)
 	{
 		GTM_TEXT_FREE(code);
 		code = NULL;
 	}
-	close(file);
-
+	CLOSEFILE_RESET(file, rc);	/* resets "file" to FD_INVALID */
 	if (0 != err && 0 != err2)
 		rts_error(VARLSTCNT(6) err, 0, err2, 2, len, addr);
 	else if (0 != err)

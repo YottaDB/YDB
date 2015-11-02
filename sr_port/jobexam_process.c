@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -119,7 +119,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	saved_util_outbuff_len = 0;
 	if (NULL == util_outptr)
 		util_outptr = util_outbuff;
-	if (0 != (saved_util_outbuff_len = (util_outptr - util_outbuff)))	/* Caution -- assignment */
+	if (0 != (saved_util_outbuff_len = (int)(util_outptr - util_outbuff)))	/* Caution -- assignment */
 	{
 		assert(0 <= saved_util_outbuff_len);
 		assert(saved_util_outbuff_len <= sizeof(saved_util_outbuff));

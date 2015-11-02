@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,11 @@
 
 #include "gtm_stdlib.h"		/* for exit() */
 #include "gtm_stdio.h"
-
+#ifdef __MVS__
+#include "eintr_wrappers.h"
+#include "gtm_stat.h"
+#include "gtm_zos_io.h"
+#endif
 #include "gtcm.h"
 
 #ifndef lint
@@ -106,10 +110,17 @@ int gtcm_prsopt(int argc, char_ptr_t argv[])
 			    omi_debug = stdout;
 		    else if ((*(argv + 1))[0] == '=' && (*(argv + 1))[1] == '\0')
 			    omi_debug = stderr;
-		    else if (!(omi_debug = fopen(*(argv + 1), "w+")))
+		    else
 		    {
-			    perror("error opening log file");
-			    exit(1);
+#ifdef __MVS__
+			    if (-1 == gtm_zos_create_tagged_file(*(argv + 1), TAG_EBCDIC))
+					perror("error tagging log file");
+#endif
+		    	    if (!(omi_debug = fopen(*(argv + 1), "w+")))
+		    	    {
+			    	    perror("error opening log file");
+			    	    exit(1);
+		    	    }
 		    }
 		    break;
 		  case opt_pktlog:	omi_pklog = *(argv + 1);  break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,15 +48,22 @@
 #include "dpgbldir.h"
 #include "gtmio.h"
 #include "jnl.h"
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 
-#define MAX_CMD_LINE	 8192	/* Maximum command line length */
-#define MAX_PATH	     128	/* Maximum file path length */
-#define MAX_LAB_LEN	     32		/* Maximum Label string length */
-#define MAX_RTN_LEN	     32		/* Maximum Routine string length */
-#define TEMP_BUFF_SIZE   1024
-#define PARM_STRING_SIZE 9
-#define MAX_NUM_LEN	     10	/* Maximum length number will be when converted to string */
-#define MAX_JOB_QUALS	 12	/* Maximum environ variables set for job qualifiers */
+#define MAX_CMD_LINE		8192	/* Maximum command line length */
+#define MAX_PATH		 128	/* Maximum file path length */
+#define MAX_LAB_LEN		  32		/* Maximum Label string length */
+#define MAX_RTN_LEN		  32		/* Maximum Routine string length */
+#define TEMP_BUFF_SIZE		1024
+#define PARM_STRING_SIZE	   9
+#define MAX_NUM_LEN		  10	/* Maximum length number will be when converted to string */
+#define MAX_JOB_QUALS		  12	/* Maximum environ variables set for job qualifiers */
+#define	MUMPS_EXE_STR		"/mumps"
+#define	MUMPS_DIRECT_STR	"-direct"
+#define GTMJ_FMT		"gtmj%03d="
+#define PARM_STR		"gtmj000="
 
 static 	int		joberr = joberr_gen;
 static 	boolean_t	job_launched = FALSE;
@@ -69,7 +76,7 @@ GBLREF	int			mutex_sock_fd;
 #ifndef SYS_ERRLIST_INCLUDE
 /* currently either stdio.h or errno.h both of which are included above */
 /*	needed by TIMEOUT_ERROR in jobsp.h */
-#ifndef __sun
+#if !defined(__sun) && !defined(___MVS__)
 GBLREF	int			sys_nerr;
 #endif
 #endif
@@ -147,7 +154,7 @@ void job_term_handler(int sig){
 int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_return, int pipe_fds[])
 {
 	char			cbuff[TEMP_BUFF_SIZE], pbuff[TEMP_BUFF_SIZE];
-	char			tbuff[MAX_CMD_LINE], tbuff2[MAX_CMD_LINE], parm_string[PARM_STRING_SIZE];
+	char			tbuff[MAX_CMD_LINE], tbuff2[MAX_CMD_LINE];
 	char			*pgbldir_str;
 	char			*transfer_addr;
 	int4			index, environ_count, string_len, temp;
@@ -179,8 +186,9 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef	__osf__
 #pragma pointer_size (restore)
 #endif
-	error_def(ERR_JOBPARTOOLONG);
 	error_def(ERR_JOBFAIL);
+	error_def(ERR_JOBPARTOOLONG);
+	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_TEXT);
 
 	job_launched = FALSE;
@@ -287,8 +295,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		io_rundown(RUNDOWN_EXCEPT_STD);
 
 		/* release the pipe opened by grand parent (P) */
-		CLOSEFILE(pipe_fds[0], pipe_status);
-		CLOSEFILE(pipe_fds[1], pipe_status);
+		CLOSEFILE_RESET(pipe_fds[0], pipe_status);	/* resets "pipe_fds[0]" to FD_INVALID */
+		CLOSEFILE_RESET(pipe_fds[1], pipe_status);	/* resets "pipe_fds[1]" to FD_INVALID */
+
+		/* Close any encryption related fds that the plug-in might have opened */
+		GTMCRYPT_ONLY(GTMCRYPT_CLOSE;)
 
 		/* Run through the list of databases to simply close them out (still open by parent) */
 		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
@@ -306,27 +317,20 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 					 * we do not miss out on closing open journal file descriptors in the case where the
 					 * current jnl_state is "jnl_closed" but we had opened the file when it was "jnl_open".
 					 */
-					if (JNL_ALLOWED(csd) && NULL != csa->jnl && NOJNL != csa->jnl->channel)
-					{
-						CLOSEFILE(csa->jnl->channel, rc);
-					}
-					CLOSEFILE(udi->fd, rc);
+					if (JNL_ALLOWED(csd) && (NULL != csa->jnl) && (NOJNL != csa->jnl->channel))
+						CLOSEFILE_RESET(csa->jnl->channel, rc);	/* resets "channel" to FD_INVALID */
+					CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 				}
 			}
 		}
 #ifndef MUTEX_MSEM_WAKE
 		/* We don't need the parent's mutex socket anymore either (if we are using the socket) */
-		if (-1 != mutex_sock_fd)
-		{
-			CLOSEFILE(mutex_sock_fd, rc);
-			mutex_sock_fd = -1;
-		}
+		if (FD_INVALID != mutex_sock_fd)
+			CLOSEFILE_RESET(mutex_sock_fd, rc);	/* resets "mutex_sock_fd" to FD_INVALID */
 #endif
-
 		/* Count the number of environment variables.  */
 		for (environ_count = 0, c3 = environ, c2 = *c3;  c2;  c3++, c2 = *c3)
 			environ_count++;
-
 #ifdef	__osf__
 /* Since we're creating an array of pointers for the O/S, make sure sizeof(char *) is correct for 64-bit pointers for OSF/1.  */
 #pragma	pointer_size (save)
@@ -371,11 +375,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		if (string_len > MAX_CMD_LINE)
 			rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 		c1 = (char *)malloc(string_len + 1);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
 #endif
 		SPRINTF_ENV_NUM(c1, CHILD_FLAG_ENV, par_pid, env_ind);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
 		/* Pass all information about the job via shell's environment.
@@ -393,11 +397,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
 #endif
 			SPRINTF_ENV_STR(c1, GBLDIR_ENV, pbuff, env_ind);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
 		}
@@ -412,11 +416,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
 #endif
 			SPRINTF_ENV_STR(c1, STARTUP_ENV, pbuff, env_ind);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
 		}
@@ -431,11 +435,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
 #endif
 			SPRINTF_ENV_STR(c1, IN_FILE_ENV, pbuff, env_ind);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
 		}
@@ -453,11 +457,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
 #endif
 			SPRINTF_ENV_STR(c1, OUT_FILE_ENV, pbuff, env_ind);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
 		}
@@ -475,11 +479,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
 #endif
 			SPRINTF_ENV_STR(c1, ERR_FILE_ENV, pbuff, env_ind);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
 		}
@@ -495,11 +499,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
 #endif
 			SPRINTF_ENV_STR(c1, ROUTINE_ENV, pbuff, env_ind);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
 		}
@@ -513,11 +517,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		if (string_len > TEMP_BUFF_SIZE)
 			rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 		c1 = (char *)malloc(string_len + 1);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
 #endif
 		SPRINTF_ENV_STR(c1, LABEL_ENV, pbuff, env_ind);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
 
@@ -526,11 +530,11 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		if (string_len > TEMP_BUFF_SIZE)
 			rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 		c1 = (char *)malloc(string_len + 1);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
 #endif
 		SPRINTF_ENV_NUM(c1, OFFSET_ENV, jparms->offset, env_ind);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
 
@@ -541,56 +545,42 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			if (string_len > TEMP_BUFF_SIZE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len + 1);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
 #endif
 			SPRINTF_ENV_NUM(c1, PRIORITY_ENV, jparms->baspri, env_ind);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
 		}
 
-		memcpy(parm_string, "gtmj000=", PARM_STRING_SIZE);
 		for (index = 0, jp = jparms->parms;  jp ;  index++, jp = jp->next)
 		{
 			if (jp->parm->str.len > MAX_CMD_LINE - 2)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			string_len = STRLEN(parm_string) + jp->parm->str.len + 1;
+			string_len = STRLEN(PARM_STR) + jp->parm->str.len + 1;
 			if (string_len > MAX_CMD_LINE)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 			c1 = (char *)malloc(string_len);
-#ifdef __MVS__
-			__getEstring1_a_copy(c1, parm_string, strlen(parm_string));
-			__getEstring1_a_copy(c1 + strlen(parm_string), jp->parm->str.addr, jp->parm->str.len);
+#ifdef KEEP_zOS_EBCDIC
+			__getEstring1_a_copy(c1, STR_AND_LEN(PARM_STRING));
+			__getEstring1_a_copy(c1 + strlen(PARM_STRING), jp->parm->str.addr, jp->parm->str.len);
 #else
-			memcpy(c1, parm_string, strlen(parm_string));
-			memcpy(c1 + strlen(parm_string), jp->parm->str.addr, jp->parm->str.len);
+			SPRINTF(c1, GTMJ_FMT, index);
+			memcpy(c1 + strlen(PARM_STR), jp->parm->str.addr, jp->parm->str.len);
 #endif
 			*(c1 + string_len - 1) = 0;
 			*env_ind++ = c1;
-			if (parm_string[6] == '9')
-			{
-				if (parm_string[5] == '9')
-				{
-					parm_string[4] = parm_string[4] + 1;
-					parm_string[5] = '0';
-				} else
-				{
-					parm_string[5] = parm_string[5] + 1;
-				}
-				parm_string[6] = '0';
-			} else
-				parm_string[6] = parm_string[6] + 1;
 		}
 		string_len = STRLEN("%s=%ld") + STRLEN(GTMJCNT_ENV) + MAX_NUM_LEN - 5;
 		if (string_len > TEMP_BUFF_SIZE)
 			rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 		c1 = (char *)malloc(string_len + 1);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(suspend)
 #endif
 		SPRINTF_ENV_NUM(c1, GTMJCNT_ENV, index, env_ind);
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #pragma convlit(resume)
 #endif
 
@@ -637,20 +627,25 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #endif
 
 		c1 = GETENV("gtm_dist");
-		memcpy(tbuff, c1, strlen(c1));
-		c2 = &tbuff[strlen(c1)];
-		memcpy(c2, "/mumps", 7);
+		string_len = STRLEN(c1);
+		if ((string_len + sizeof(MUMPS_EXE_STR)) < sizeof(tbuff))
+		{
+			memcpy(tbuff, c1, string_len);
+			c2 = &tbuff[string_len];
+			strcpy(c2, MUMPS_EXE_STR);
+		} else
+			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, string_len, c1, sizeof(tbuff) - sizeof(MUMPS_EXE_STR));
 
-#ifdef __MVS__	/* use real memcpy to preserve env in native code set */
-#pragma convlit(suspend)
-		memcpy(cbuff, "-direct", 8);
-#pragma convlit(resume)
-#else
-		memcpy(cbuff, "-direct", 8);
-#endif
+#		ifdef KEEP_zOS_EBCDIC_	/* use real strcpy to preserve env in native code set */
+#		pragma convlit(suspend)
+#		endif
+		strcpy(cbuff, MUMPS_DIRECT_STR);
+#		ifdef KEEP_zOS_EBCDIC_
+#		pragma convlit(resume)
+#		endif
 
-#ifdef __MVS__
-		__getEstring1_a_copy(tbuff2, tbuff, strlen(tbuff));
+#ifdef KEEP_zOS_EBCDIC
+		__getEstring1_a_copy(tbuff2, STR_AND_LEN(tbuff));
 		argv[0] = tbuff2;
 #else
 		argv[0] = tbuff;

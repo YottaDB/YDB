@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,34 @@
  ****************************************************************/
 #ifndef COMPILER_H_INCLUDED
 #define COMPILER_H_INCLUDED
+
+/* Cutover from simple lists to hash table access - tuned by testing compilation
+   of 24K+ Vista M source routines.
+*/
+#define LIT_HASH_CUTOVER DEBUG_ONLY(4) PRO_ONLY(32)
+#define SYM_HASH_CUTOVER DEBUG_ONLY(4) PRO_ONLY(16)
+
+#define COMPLITS_HASHTAB_CLEANUP									\
+	{												\
+		GBLREF hash_table_str		*complits_hashtab;					\
+		if (complits_hashtab && complits_hashtab->base)						\
+		{	/* Release hash table itself but leave hash table descriptor if exists */ 	\
+			free(complits_hashtab->base);							\
+			complits_hashtab->base = NULL;							\
+		}											\
+	}
+#define COMPSYMS_HASHTAB_CLEANUP									\
+	{												\
+		GBLREF hash_table_str		*compsyms_hashtab;					\
+		if (compsyms_hashtab && compsyms_hashtab->base)						\
+		{	/* Release hash table itself but leave hash table descriptor if exists */ 	\
+			free(compsyms_hashtab->base);							\
+			compsyms_hashtab->base = NULL;							\
+		}											\
+	}
+#define COMPILE_HASHTAB_CLEANUP		\
+	COMPLITS_HASHTAB_CLEANUP;	\
+	COMPSYMS_HASHTAB_CLEANUP;
 
 typedef unsigned int	opctype;
 
@@ -36,8 +64,8 @@ typedef struct	mlinestruct
 				*sibling,
 				*child;
 	struct	tripletype	*externalentry;
-	short int		line_number;	/* ...operation on this line */
-	short int		table;		/* put in table or not */
+	uint4			line_number;	/* ...operation on this line */
+	boolean_t		table;		/* put in table or not */
 } mline;
 
 typedef struct	mlabstruct
@@ -46,8 +74,8 @@ typedef struct	mlabstruct
 				*rson;
 	mline			*ml;
 	mident			mvname;
-	short			formalcnt;
-	bool			gbl;
+	int			formalcnt;
+	boolean_t		gbl;
 } mlabel;
 
 typedef struct	mliteralstruct
@@ -123,8 +151,8 @@ typedef struct	tbptype
 
 typedef struct
 {
-	unsigned short		line;
-	unsigned short		column;
+	uint4			line;
+	uint4			column;
 } source_address;
 
 typedef struct	tripletype
@@ -364,9 +392,11 @@ int f_translate(oprtype *a, opctype op);
 int f_two_mstrs(oprtype *a, opctype op);
 int f_two_mval(oprtype *a, opctype op);
 int f_view(oprtype *a, opctype op);
+int f_zahandle(oprtype *a, opctype op);
 int f_zcall(oprtype *a, opctype op);
 int f_zchar(oprtype *a, opctype op);
 int f_zdate(oprtype *a, opctype op);
+int f_zdebug(oprtype *a, opctype op);
 int f_zechar(oprtype *a, opctype op);
 int f_zgetsyi(oprtype *a, opctype op);
 int f_zjobexam(oprtype *a, opctype op);

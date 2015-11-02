@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -215,7 +215,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		if (level)
 		{
 			GET_USHORT(temp_ushort, &left_ptr->rsiz);
-			next_rec_shrink += sizeof(rec_hdr) + sizeof(block_id) - temp_ushort;
+			next_rec_shrink += SIZEOF(rec_hdr) + SIZEOF(block_id) - temp_ushort;
 		}
 	} else
 	{
@@ -241,7 +241,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	}
 	BLK_INIT(bs_ptr, bs1);
 	first_copy = TRUE;
-	blkseglen = (bytptr)del_ptr - (bytptr)first_in_blk;
+	blkseglen = (int)((bytptr)del_ptr - (bytptr)first_in_blk);
 	if (0 < blkseglen)
 	{
 		if (((bytptr)right_ptr != (bytptr)top_of_block)  ||  (0 == level))
@@ -250,7 +250,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			first_copy = FALSE;
 		} else
 		{
-			blkseglen = (bytptr)left_ptr - (bytptr)first_in_blk;
+			blkseglen = (int)((bytptr)left_ptr - (bytptr)first_in_blk);
 			if (0 < blkseglen)
 			{
 				BLK_SEG(bs_ptr, (bytptr)first_in_blk, blkseglen);
@@ -264,7 +264,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			BLK_SEG(bs_ptr, ((bytptr)left_ptr + temp_ushort - sizeof(block_id)), sizeof(block_id));
 		}
 	}
-	blkseglen = (bytptr)top_of_block - (bytptr)right_ptr;
+	blkseglen = (int)((bytptr)top_of_block - (bytptr)right_ptr);
 	assert(0 <= blkseglen);
 	if (0 != blkseglen)
 	{
@@ -288,7 +288,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			if (prev_len)
 				BLK_SEG(bs_ptr, (bytptr)(right_prev_ptr + 1) , prev_len);
 			right_bytptr = (bytptr)(right_ptr + 1);
-			blkseglen = (bytptr)top_of_block - right_bytptr;
+			blkseglen = (int)((bytptr)top_of_block - right_bytptr);
 			if (0 < blkseglen)
 			{
 				BLK_SEG(bs_ptr, right_bytptr, blkseglen);

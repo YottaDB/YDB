@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,9 @@
 #include "gtm_stdio.h"
 #include "gtm_statvfs.h"
 
+#if defined(__MVS__)
+#include "gtm_zos_io.h"
+#endif
 #include "parse_file.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -36,19 +39,25 @@
 #include "mu_cre_file.h"
 #include "gtmmsg.h"
 #include "util.h"
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 
 #define BLK_SIZE (((gd_segment*)gv_cur_region->dyn.addr)->blk_size)
 
-#define CLEANUP(XX)	{				\
-				if (cc)			\
-					free(cc);	\
-				if (cs_data)		\
-					free(cs_data); 	\
-				if (0 < fd)		\
-					close(fd);	\
-				if (EXIT_ERR == XX)	\
-					UNLINK(path);	\
-			}
+#define CLEANUP(XX)								\
+{										\
+	int	rc;								\
+										\
+	if (cc)									\
+		free(cc);							\
+	if (cs_data)								\
+		free(cs_data);							\
+	if (FD_INVALID != fd)							\
+		CLOSEFILE_RESET(fd, rc); /* resets "fd" to FD_INVALID */	\
+	if (EXIT_ERR == XX)							\
+		UNLINK(path);							\
+}
 
 #define SPRINTF_AND_PERROR(MESSAGE)			\
 {							\
@@ -58,6 +67,13 @@
 	PERROR(errbuff);				\
 }
 
+#define SPRINTF_AND_PERROR_MVS(MESSAGE)				\
+{								\
+	save_errno = errno;					\
+	SPRINTF(errbuff, MESSAGE, path, realfiletag, TAG_BINARY);	\
+	errno = save_errno;					\
+	PERROR(errbuff);					\
+}
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -67,7 +83,7 @@ unsigned char mu_cre_file(void)
 {
 	char		*cc = NULL, path[MAX_FBUFF + 1], errbuff[512];
 	unsigned char	buff[DISK_BLOCK_SIZE];
-	int		fd = -1, i, lower, upper, norm_vbn;
+	int		fd = FD_INVALID, i, lower, upper, norm_vbn;
         ssize_t         status;
 	uint4		raw_dev_size;		/* size of a raw device, in bytes */
 	int4		blocks_for_create, blocks_for_extension, save_errno;
@@ -78,6 +94,12 @@ unsigned char mu_cre_file(void)
 	unix_db_info	udi_struct, *udi;
 	char		*fgets_res;
 	gd_segment	*seg;
+	GTMCRYPT_ONLY(
+	char		datfile_hash[GTMCRYPT_HASH_LEN];
+	int		init_status;
+	int		crypt_status;
+)
+	ZOS_ONLY(int	realfiletag;)
 
 	error_def(ERR_NOSPACECRE);
 	error_def(ERR_LOWSPACECRE);
@@ -118,10 +140,22 @@ unsigned char mu_cre_file(void)
 	udi = &udi_struct;
 	memset(udi, 0, sizeof(unix_db_info));
 	udi->raw = is_raw_dev(pblk.l_dir);
+#	ifdef GTM_CRYPT
+	/* Check if this file is an encrypted database. If yes, do init */
+	if (gv_cur_region->dyn.addr->is_encrypted)
+	{
+		INIT_PROC_ENCRYPTION(init_status);
+		if (0 != init_status)
+		{
+			GC_GTM_PUTMSG(init_status, NULL);
+			return EXIT_ERR;
+		}
+	}
+#	endif
 	if (udi->raw)
 	{
 		fd = OPEN(pblk.l_dir,O_EXCL | O_RDWR);
-		if (-1 == fd)
+		if (FD_INVALID == fd)
 		{
 			SPRINTF_AND_PERROR("Error opening file %s\n");
 			return EXIT_ERR;
@@ -136,6 +170,10 @@ unsigned char mu_cre_file(void)
 			SPRINTF_AND_PERROR("Error reading header for file %s\n");
 			return EXIT_ERR;
 		}
+#ifdef __MVS__
+		if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
+			SPRINTF_AND_PERROR_MVS("Error setting tag policy for file %s (%d) to %d\n");
+#endif
 		if (!memcmp(buff, GDS_LABEL, STR_LIT_LEN(GDS_LABEL)))
 		{
 			char rsp[80];
@@ -167,11 +205,15 @@ unsigned char mu_cre_file(void)
 	} else
 	{
 		fd = OPEN3(pblk.l_dir, O_CREAT | O_EXCL | O_RDWR, 0600);
-		if (-1 == fd)
+		if (FD_INVALID == fd)
 		{
 			SPRINTF_AND_PERROR("Error opening file %s\n");
 			return EXIT_ERR;
 		}
+#ifdef __MVS__
+		if (-1 == gtm_zos_set_tag(fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
+			SPRINTF_AND_PERROR_MVS("Error setting tag policy for file %s (%d) to %d\n");
+#endif
 		if (0 != (save_errno = disk_block_available(fd, &avail_blocks, FALSE)))
 		{
 			errno = save_errno;
@@ -252,6 +294,29 @@ unsigned char mu_cre_file(void)
 		cs_data->trans_hist.total_blks += DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, BLKS_PER_LMAP - 1);
 		cs_data->extension_size = gv_cur_region->dyn.addr->ext_blk_count;
 	}
+#	ifdef GTM_CRYPT
+	/* Check if this file is an encrypted database. If yes, do init */
+	if (gv_cur_region->dyn.addr->is_encrypted)
+	{
+		GTMCRYPT_HASH_GEN(path, STRLEN(path), datfile_hash, crypt_status);
+		if (0 != crypt_status)
+		{
+			GC_GTM_PUTMSG(crypt_status, gv_cur_region->dyn.addr->fname);
+			CLEANUP(EXIT_ERR);
+			return EXIT_ERR;
+		}
+		memcpy(cs_data->encryption_hash, datfile_hash, GTMCRYPT_HASH_LEN);
+		cs_data->is_encrypted = TRUE; /* Mark this file as encrypted */
+		ALLOC_BUFF_GET_ENCR_KEY(cs_addrs, cs_data->encryption_hash, BLK_SIZE, crypt_status);
+		if (0 != crypt_status)
+		{
+			GC_GTM_PUTMSG(crypt_status, (gv_cur_region->dyn.addr->fname));
+			CLEANUP(EXIT_ERR);
+			return EXIT_ERR;
+		}
+	} else
+		cs_data->is_encrypted = FALSE;
+#	endif
 	mucregini(cs_data->trans_hist.total_blks);
 	cs_data->createinprogress = FALSE;
 	LSEEKWRITE(udi->fd, 0, cs_data, SIZEOF_FILE_HDR_DFLT, status);

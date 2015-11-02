@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,7 @@
 #include "gtmsource.h"
 #include "repl_instance.h"
 #include "iotcpdef.h"
+#include "gtmio.h"
 
 #define MAX_ATTEMPTS_FOR_FETCH_RESYNC	60 /* max-wait in seconds for source server response after connection is established */
 #define MAX_WAIT_FOR_FETCHRESYNC_CONN	60 /* max-wait in seconds to establish connection with the source server */
@@ -76,14 +77,13 @@ GBLREF	boolean_t		src_node_endianness_known;
 
 CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 {
+	int	rc;
+
 	START_CH;
-
-	if (gtmrecv_listen_sock_fd != -1)
-		close(gtmrecv_listen_sock_fd);
-
-	if (gtmrecv_sock_fd != -1)
-		close(gtmrecv_sock_fd);
-
+	if (FD_INVALID != gtmrecv_listen_sock_fd)
+		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
+	if (FD_INVALID != gtmrecv_sock_fd)
+		CLOSEFILE_RESET(gtmrecv_sock_fd, rc);	/* resets "gtmrecv_sock_fd" to FD_INVALID */
 	PRN_ERROR;
 	NEXTCH;
 }

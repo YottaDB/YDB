@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,7 @@
 #include "copy.h"
 #include "gtmxc_types.h"
 #include "rtnhdr.h"
+#include "lv_val.h"
 #include "fgncal.h"
 #include "gtmci.h"
 #include "eintr_wrappers.h"
@@ -95,7 +96,7 @@ static void	*get_memory(size_t n)
 	assert(space_remaining >= n);
 	x = heap_base;
 	heap_base = (char *)heap_base + n;
-	space_remaining -= n;
+	space_remaining -= (int)n;
 	return x;
 }
 
@@ -360,6 +361,7 @@ struct extcall_package_list	*exttab_parse(mval *package)
 	error_def(ERR_ZCRPARMNAME);
 	error_def(ERR_ZCPREALLVALPAR);
 	error_def(ERR_ZCPREALLVALINV);
+	error_def(ERR_TEXT);
 
 	/* First, construct package name environment variable */
 	memcpy(str_buffer, PACKAGE_ENV_PREFIX, sizeof(PACKAGE_ENV_PREFIX));

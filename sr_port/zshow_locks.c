@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ void zshow_locks(zshow_out *output)
 	v.str.len = sizeof(mlg) - 1;
 	zshow_output(output, &v.str);
 	ptr = i2ascl((uchar_ptr_t)valstr, mlk_stats.n_user_locks_success);
-	v.str.len = ptr - &valstr[0];
+	v.str.len = (mstr_len_t)(ptr - &valstr[0]);
 	v.str.addr = (char *)&valstr[0];
 	zshow_output(output, &v.str);
 
@@ -47,7 +47,7 @@ void zshow_locks(zshow_out *output)
 	v.str.len = sizeof(mlt) - 1;
 	zshow_output(output, &v.str);
 	ptr = i2ascl((uchar_ptr_t)valstr, mlk_stats.n_user_locks_fail);
-	v.str.len = ptr - &valstr[0];
+	v.str.len = (mstr_len_t)(ptr - &valstr[0]);
 	v.str.addr = (char *)&valstr[0];
 	zshow_output(output, &v.str);
 	output->flush = TRUE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@
 #include "mdef.h"
 
 #include "gtm_stdlib.h"
-#include "gtm_unistd.h"		/* for close() */
+#include "gtm_unistd.h"		/* for close() used by CLOSEFILE_RESET */
 #include "gtm_time.h"		/* for ctime() and time() */
 
 #ifndef lint
@@ -29,6 +29,7 @@ static char rcsid[] = "$Header:$";
 #include "gtm_stdio.h"
 
 #include "gtcm.h"
+#include "gtmio.h"
 
 GBLREF char	*omi_service;
 GBLREF int	rc_server_id;
@@ -44,6 +45,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	omi_fd		fd;
 	int		i;
 	int 		save_errno;
+	int		rc;
 #ifdef NET_TCP
 	struct servent		*se;
 	unsigned short		port;
@@ -105,7 +107,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	if (port && setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *)&on, sizeof(on)) < 0)
 	{
 		save_errno = errno;
-		(void) close(fd);
+		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		return save_errno;
 	}
 	/* the system should periodically check to see if the connections are live */
@@ -113,7 +115,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	{
 		save_errno = errno;
 		perror("setsockopt:");
-		(void) close(fd);
+		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		return save_errno;
 	}
 	/*  Bind an address to the socket */
@@ -123,14 +125,14 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	if (bind(fd, (struct sockaddr *)&sin, sizeof(sin)) < 0)
 	{
 		save_errno = errno;
-		(void) close(fd);
+		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		return save_errno;
 	}
 	/*  Initialize the listen queue */
 	if (listen(fd, 5) < 0)
 	{
 		save_errno = errno;
-		(void) close(fd);
+		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		return save_errno;
 	}
 	/* set up raw socket for use with pinging option */
@@ -182,7 +184,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 #endif
 	return 0;
 #else /* defined(SYSV_TCP) */
-	cll->nve = INV_FD;
+	cll->nve = FD_INVALID;
 	return -1;
 #endif /* !defined(SYSV_TCP) */
 #endif /* !defined(BSD_TCP) */

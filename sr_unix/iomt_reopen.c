@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include <errno.h>
+
 #include "gtm_fcntl.h"
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
@@ -21,14 +22,17 @@
 #include "iomtdef.h"
 #include "iosp.h"
 #include "error.h"
+#include "gtmio.h"
 
 uint4 iomt_reopen (io_desc *dv, unsigned short mode, int rewind)
 {
-	uint4   status;
-	d_mt_struct    *mt_ptr;
+	uint4   	status;
+	d_mt_struct	*mt_ptr;
+	int		res, fpos, rpos;
+	int4		mt_fileno, mt_blkno;
+	int		rc;
+
 	error_def (ERR_MTIOERR);
-	int             res, fpos, rpos;
-	int4            mt_fileno, mt_blkno;
 
 	mt_ptr = (d_mt_struct *) dv->dev_sp;
 
@@ -45,8 +49,8 @@ uint4 iomt_reopen (io_desc *dv, unsigned short mode, int rewind)
 		fpos = mt_ptr->filepos;
 		rpos = mt_ptr->recpos;
 	}
-	status = close (mt_ptr->access_id);
-	if ((int4)status < 0)
+	CLOSEFILE_RESET(mt_ptr->access_id, rc);	/* resets "mt_ptr->access_id" to FD_INVALID */
+	if (0 > rc)
 	{
 		PERROR("iomt_reopen");
 		rts_error (VARLSTCNT (5) ERR_MTIOERR, 2, dv->name->len, dv->name->dollar_io, errno);

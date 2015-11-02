@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -44,6 +44,7 @@ ENTRY op_fnget
 	movl	%eax,%edi
 	REP
 	movsb
+	andw	$~mval_m_aliascont, mval_w_mvtype(%eax)	# Don't propagate alias container flag
 	popl	%esi
 	popl	%edi
 	ret

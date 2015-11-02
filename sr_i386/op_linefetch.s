@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -24,13 +24,13 @@
 .extern	frame_pointer
 
 	.text
-.extern	fetch
+.extern	gtm_fetch
 
 # PUBLIC	op_linefetch
 ENTRY op_linefetch
 	movl	frame_pointer,%eax
 	popl	msf_mpc_off(%eax)
-	call	fetch
+	call	gtm_fetch
 	popl	%eax
 	leal	(%esp,%eax,4),%esp
 	movl	frame_pointer,%eax

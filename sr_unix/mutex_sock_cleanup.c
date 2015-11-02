@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,7 @@
 #include "filestruct.h"
 #include "mutex.h"
 #include "send_msg.h"
+#include "gtmio.h"
 
 GBLREF int			mutex_sock_fd;
 GBLREF struct sockaddr_un	mutex_sock_address;
@@ -37,14 +38,12 @@ error_def(ERR_TEXT);
 
 void mutex_sock_cleanup(void)
 {
-	int save_errno;
+	int 	save_errno;
+	int	rc;
 
 	/* Close the mutex wake socket */
-	if (-1 != mutex_sock_fd)
-	{
-		close(mutex_sock_fd);
-		mutex_sock_fd = -1;
-	}
+	if (FD_INVALID != mutex_sock_fd)
+		CLOSEFILE_RESET(mutex_sock_fd, rc);	/* resets "mutex_sock_fd" to FD_INVALID */
 	if ((NULL != mutex_sock_address.sun_path) && (-1 == UNLINK(mutex_sock_address.sun_path))
 		&& (ENOENT != errno))
 	{

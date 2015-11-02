@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,17 +11,20 @@
 
 /* Define macros to do our IO and restart as appropriate
  *
- * IOCTL        Loop until ioctl call succeeds or fails with other than EINTR.
+ * IOCTL	Loop until ioctl call succeeds or fails with other than EINTR.
  * OPENFILE	Loop until open succeeds or fails with other than EINTR.
  * OPENFILE_SYNC
  *		Loop until open succeeds or fails with other than EINTR.
  *		Opens with O_DSYNC/O_SYNC in direct mode where possible.
  *		Else opens only with O_DSYNC or O_SYNC.
  * OPEN_OBJECT_FILE
- *              Opens the object file and waits till it gets a lock(shr/excl).
- *              Sets default perms if it creates a new file.
+ *		Opens the object file and waits till it gets a lock(shr/excl).
+ *		Sets default perms if it creates a new file.
  * CLOSE_OBJECT_FILE - close the object file after releasing the lock on it.
  * CLOSEFILE	Loop until close succeeds for fails with other than EINTR.
+ * CLOSEFILE_RESET
+ * 		Loop until close succeeds for fails with other than EINTR.
+ * 		At end reset channel to FD_INVALID unconditionally (even if close was not successful).
  * CONVERT_OBJECT_LOCK - convert type of lock held on object file
  * LSEEKREAD	Performs either pread() or an lseek()/ read() combination. In
  *		the latter case, sets global variable to warn off async IO routines.
@@ -29,11 +32,12 @@
  *			ACTUALLY READ are stored irrespective of whether all REQUESTED BYTES were read or not.
  * LSEEKWRITE	Same as LSEEKREAD but for WRITE.
  * DOREADRC	Performs read, returns code 0 if okay, otherwise returns errno.
- * DOREADRL     Performs read but returns length read or -1 if errno is set.
+ * DOREADRL	Performs read but returns length read or -1 if errno is set.
  * DOREADRLTO2	Same as DOREADRL but has a timeout flag to poll on interrupts.
  * DOWRITE	Performs write with no error checking/return.
  * DOWRITERC	Performs write, returns code 0 if okay, otherwise returns errno.
  * DOWRITERL	Performs write but returns length written or -1 if errno is set.
+ * WRITEPIPE	Performs write to FIFO/pipe but individual writes (within loop) limited to system pipe buffer size
  */
 
 #ifndef GTMIO_Included
@@ -50,7 +54,7 @@
 #include <sys/vfs.h>
 #endif
 
-#ifdef __KEEP_zOS_EBCDIC__
+#ifdef KEEP_zOS_EBCDIC
 #define DOWRITE_A	__write_a
 #define DOREAD_A	__read_a
 #define	DOWRITERL_A	#error need to create as part of z/OS port and make __write_a return status and good errno
@@ -71,7 +75,7 @@
 		RC = ioctl(FDESC, REQUEST, ARG); \
 	} while(-1 == RC && EINTR == errno); \
 	if (-1 != RC) \
-	        RC = 0; \
+		RC = 0; \
 	else \
 		RC = errno; \
 }
@@ -100,7 +104,7 @@
 #if defined(_AIX)
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT | O_DSYNC, FDESC);
 #elif defined(__osf__)
-#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC) 										\
+#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)										\
 {															\
 	struct statvfs	statvfs_buf;											\
 	int		macro_errno;											\
@@ -108,7 +112,7 @@
 	if (-1 == statvfs(FNAME, &statvfs_buf))										\
 	{														\
 		macro_errno = errno;											\
-		util_out_print("Error finding FS type for file, !AD :!AD", OPER, 					\
+		util_out_print("Error finding FS type for file, !AD :!AD", OPER,					\
 				LEN_AND_STR(FNAME), LEN_AND_STR(STRERROR(macro_errno)));				\
 		dio_success = FALSE;											\
 	} else if (strcmp(FSTYPE_ADVFS, statvfs_buf.f_basetype))							\
@@ -122,7 +126,7 @@
 	}														\
 }
 #elif defined(__sparc)
-#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)		 								\
+#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)										\
 {															\
 	struct statvfs	statvfs_buf;											\
 	int		macro_errno;											\
@@ -136,7 +140,7 @@
 	} else if (strcmp(FSTYPE_UFS, statvfs_buf.f_basetype))								\
 			dio_success = FALSE;										\
 	OPENFILE(FNAME, FFLAGS | O_DSYNC, FDESC);									\
-	if (dio_success && -1 != FDESC) 										\
+	if (dio_success && -1 != FDESC)											\
 	{														\
 		if (-1 == directio(FDESC, DIRECTIO_ON))									\
 		{													\
@@ -156,11 +160,11 @@
 
 #if defined (Linux390)
 /* fcntl on Linux390 2.2.16 sometimes returns EINVAL */
-#define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC) \
-{ \
-	int status; \
-	struct flock lock;    /* arg to lock the file thru fnctl */   \
-	while (-1 == (FDESC = OPEN3(FNAME, FFLAG, 0666)) && EINTR == errno)    \
+#define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC)					\
+{										\
+	int status;								\
+	struct flock lock;    /* arg to lock the file thru fnctl */		\
+	while (-1 == (FDESC = OPEN3(FNAME, FFLAG, 0666)) && EINTR == errno)	\
 	;  \
 }
 #define CONVERT_OBJECT_LOCK(FDESC, FFLAG, RC)
@@ -185,24 +189,25 @@
 #define LOCK_IS_ALLOWED(FDESC, STATUS)	STATUS = 0
 #endif
 /* The for loop is the workaround for a glitch in read locking in zlink.  The primary steps to acquire a
- * read-lock are 1. open the file, and 2. read lock it.  If a process creates the initial, empty version
+ * read-lock are 1. open the file, and 2. read lock it.	 If a process creates the initial, empty version
  * of the file (with the OPEN3), but has not yet write-locked it, and meanwhile, another process does its
  * open and gets a read-lock, then a later read within incr_link() will end up reading an empty file. To
- * avoid that problem, readers have to poll for a non-empty object file before reading.  If the read lock
+ * avoid that problem, readers have to poll for a non-empty object file before reading.	 If the read lock
  * is obtained, but the file is empty, then release the read lock, sleep for a while, and retry the file open.
  */
 #define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC)									\
 {														\
 	int		status;											\
-	struct flock	lock;    /* arg to lock the file thru fnctl */						\
+	struct flock	lock;	 /* arg to lock the file thru fnctl */						\
 	int		cntr;											\
 	struct stat	stat_buf;										\
 	pid_t		l_pid;											\
+	ZOS_ONLY(int	realfiletag;)										\
 														\
 	l_pid = getpid();											\
 	for (cntr = 0; cntr < MAX_FILE_OPEN_TRIES; cntr++)							\
 	{													\
-		while (-1 == (FDESC = OPEN3(FNAME, FFLAG, 0666)) && EINTR == errno)				\
+		while (FD_INVALID == (FDESC = OPEN3(FNAME, FFLAG, 0666)) && EINTR == errno)			\
 			;											\
 		if (-1 != FDESC)										\
 		{												\
@@ -210,71 +215,70 @@
 			if (-2 != status)									\
 			{											\
 				do {										\
-					lock.l_type = (((FFLAG) & O_WRONLY) || ((FFLAG) & O_RDWR))		\
-						? F_WRLCK : F_RDLCK;						\
+					lock.l_type = ((O_WRONLY == ((FFLAG) & O_ACCMODE)) ||			\
+						( O_RDWR == ((FFLAG) & O_ACCMODE))) ? F_WRLCK : F_RDLCK;	\
 					lock.l_whence = SEEK_SET;	/*locking offsets from file beginning*/	\
-					lock.l_start = lock.l_len = 0;	/* lock the whole file */ 		\
+					lock.l_start = lock.l_len = 0;	/* lock the whole file */		\
 					lock.l_pid = l_pid;							\
-				} while (-1 == (status = fcntl(FDESC, F_SETLKW, &lock)) && EINTR == errno); 	\
+				} while (-1 == (status = fcntl(FDESC, F_SETLKW, &lock)) && EINTR == errno);	\
 			}											\
 			if (-1 != status)									\
 			{											\
 				if ((FFLAG) & O_CREAT)								\
 				{										\
 					FTRUNCATE(FDESC, 0, status);						\
+					ZOS_ONLY(								\
+						status = gtm_zos_set_tag(FDESC, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag); \
+					)									\
 				} else										\
 				{										\
-					FSTAT_FILE(FDESC, &stat_buf, status); 					\
+					FSTAT_FILE(FDESC, &stat_buf, status);					\
 					if (status || (0 == stat_buf.st_size))					\
 					{									\
 						CLOSE_OBJECT_FILE(FDESC, status);				\
-						FDESC = -1;							\
 						SHORT_SLEEP(WAIT_FOR_FILE_TIME);				\
 						continue;							\
 					}									\
+					ZOS_ONLY(								\
+						status = gtm_zos_tag_to_policy(FDESC, TAG_BINARY, &realfiletag);	\
+					)									\
 				}										\
 			}											\
 			if (-1 == status)									\
-			{											\
-				CLOSEFILE(FDESC, status);/* can't fail - no writes, no writes-behind */ 	\
-				FDESC = -1;									\
-			}											\
+				CLOSEFILE_RESET(FDESC, status);/* can't fail - no writes, no writes-behind */ 	\
 		}												\
 		break;												\
 	}													\
 }
 #define CONVERT_OBJECT_LOCK(FDESC, FFLAG, RC)						\
 {											\
-	struct flock	lock;    /* arg to lock the file thru fnctl */			\
+	struct flock	lock;	 /* arg to lock the file thru fnctl */			\
 	pid_t		l_pid;								\
 											\
 	l_pid = getpid();								\
 	do {										\
 		lock.l_type = FFLAG;							\
 		lock.l_whence = SEEK_SET;	/*locking offsets from file beginning*/	\
-		lock.l_start = lock.l_len = 0;	/* lock the whole file */ 		\
+		lock.l_start = lock.l_len = 0;	/* lock the whole file */		\
 		lock.l_pid = l_pid;							\
-	} while (-1 == (RC = fcntl(FDESC, F_SETLKW, &lock)) && EINTR == errno); 	\
+	} while (-1 == (RC = fcntl(FDESC, F_SETLKW, &lock)) && EINTR == errno);		\
 }
 #endif
 
 #ifndef Linux390
-#define CLOSE_OBJECT_FILE(FDESC, RC) \
-{ \
-	struct flock lock;    /* arg to unlock the file thru fnctl */   \
-	do { \
-		lock.l_type = F_UNLCK; \
-		lock.l_whence = SEEK_SET; \
-		lock.l_start = lock.l_len = 0; /* unlock the whole file */\
-		lock.l_pid = getpid(); \
-	} while (-1 == (RC = fcntl(FDESC, F_SETLK, &lock)) && EINTR == errno); \
-	CLOSEFILE(FDESC, RC); \
+#define CLOSE_OBJECT_FILE(FDESC, RC)						\
+{										\
+	struct flock lock;    /* arg to unlock the file thru fnctl */		\
+	do {									\
+		lock.l_type = F_UNLCK;						\
+		lock.l_whence = SEEK_SET;					\
+		lock.l_start = lock.l_len = 0; /* unlock the whole file */	\
+		lock.l_pid = getpid();						\
+	} while (-1 == (RC = fcntl(FDESC, F_SETLK, &lock)) && EINTR == errno);	\
+	CLOSEFILE_RESET(FDESC, RC);						\
 }
 #else
-#define CLOSE_OBJECT_FILE(FDESC, RC) \
-{ \
-	CLOSEFILE(FDESC, RC); \
-	}
+#define CLOSE_OBJECT_FILE(FDESC, RC)	CLOSEFILE_RESET(FDESC, RC)
 #endif
 
 #define CLOSEFILE(FDESC, RC)					\
@@ -287,7 +291,24 @@
 		RC = errno;					\
 }
 
-#if defined(__osf__) || defined(_AIX) || defined(__sparc) || defined(__linux__) || defined(__hpux) || defined(__CYGWIN__)
+#define	CLOSEFILE_RESET(FDESC, RC)	\
+{					\
+	CLOSEFILE(FDESC, RC)		\
+	FDESC = FD_INVALID;		\
+}
+
+/* Close file only if we have it open. Use FCNTL to check if we have it open */
+#define CLOSEFILE_IF_OPEN(FDESC, RC)							\
+{											\
+	int	flags;									\
+											\
+	FCNTL2(FDESC, F_GETFL, flags);							\
+	if ((-1 != flags) || (EBADF != errno))						\
+		CLOSEFILE(FDESC, RC);	/* file is a valid descriptor. Close it */	\
+}
+
+#if defined(__osf__) || defined(_AIX) || defined(__sparc) || defined(__linux__) || defined(__hpux) || \
+	defined(__CYGWIN__) || defined(__MVS__)
 /* These platforms are known to support pread/pwrite. MVS is unknown and so gets the old support.
 
    Note !! pread and pwrite do NOT (on most platforms) set the file pointer like lseek/read/write would
@@ -316,27 +337,27 @@
 	ssize_t			gtmioStatus; \
 	size_t			gtmioBuffLen; \
 	off_t			gtmioPtr; \
-	sm_uc_ptr_t 		gtmioBuff; \
+	sm_uc_ptr_t		gtmioBuff; \
 	gtmioBuffLen = FBUFF_LEN; \
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
 	gtmioPtr = (off_t)(FPTR); \
 	for (;;) \
-        { \
+	{ \
 		if (-1 != (gtmioStatus = pread(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr))) \
 		{ \
 			gtmioBuffLen -= gtmioStatus; \
 			if (0 == gtmioBuffLen || 0 == gtmioStatus) \
-			        break; \
+				break; \
 			gtmioBuff += gtmioStatus; \
 			gtmioPtr += gtmioStatus; \
 			continue; \
 		} \
 		if (EINTR != errno) \
 			break; \
-        } \
+	} \
 	if (0 == gtmioBuffLen) \
 		RC = 0; \
-	else if (-1 == gtmioStatus)    	/* Had legitimate error - return it */ \
+	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */ \
 		RC = errno; \
 	else \
 		RC = -1;		/* Something kept us from reading what we wanted */ \
@@ -350,29 +371,29 @@
 	ssize_t			gtmioStatus;							\
 	size_t			gtmioBuffLen;							\
 	off_t			gtmioPtr;							\
-	sm_uc_ptr_t 		gtmioBuff;							\
+	sm_uc_ptr_t		gtmioBuff;							\
 												\
-	gtmioBuffLen = (FBUFF_LEN); 								\
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF); 							\
+	gtmioBuffLen = (FBUFF_LEN);								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
 	gtmioPtr = (off_t)(FPTR);								\
 	for (;;)										\
-        {											\
+	{											\
 		if (-1 != (gtmioStatus = pread(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr)))	\
 		{										\
 			gtmioBuffLen -= gtmioStatus;						\
 			if (0 == gtmioBuffLen || 0 == gtmioStatus)				\
-			        break;								\
+				break;								\
 			gtmioBuff += gtmioStatus;						\
 			gtmioPtr += gtmioStatus;						\
 			continue;								\
 		}										\
 		if (EINTR != errno)								\
 			break;									\
-        }											\
+	}											\
 	(ACTUAL_READLEN) = (FBUFF_LEN) - gtmioBuffLen;						\
 	if (0 == gtmioBuffLen)									\
 		RC = 0;										\
-	else if (-1 == gtmioStatus)    	/* Had legitimate error - return it */			\
+	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */			\
 		RC = errno;									\
 	else											\
 		RC = -1;		/* Something kept us from reading what we wanted */	\
@@ -383,27 +404,27 @@
 	ssize_t			gtmioStatus; \
 	size_t			gtmioBuffLen; \
 	off_t			gtmioPtr; \
-	sm_uc_ptr_t 		gtmioBuff; \
+	sm_uc_ptr_t		gtmioBuff; \
 	gtmioBuffLen = FBUFF_LEN; \
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
 	gtmioPtr = (off_t)(FPTR); \
 	for (;;) \
-        { \
+	{ \
 		if (-1 != (gtmioStatus = pwrite(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr))) \
 		{ \
 			gtmioBuffLen -= gtmioStatus; \
 			if (0 == gtmioBuffLen) \
-			        break; \
+				break; \
 			gtmioBuff += gtmioStatus; \
 			gtmioPtr += gtmioStatus; \
 			continue; \
 		} \
 		if (EINTR != errno) \
 			break; \
-        } \
+	} \
 	if (0 == gtmioBuffLen) \
 		RC = 0; \
-	else if (-1 == gtmioStatus)    	/* Had legitimate error - return it */ \
+	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */ \
 		RC = errno; \
 	else \
 		RC = -1;		/* Something kept us from writing what we wanted */ \
@@ -441,20 +462,20 @@
 	ssize_t			gtmioStatus; \
 	size_t			gtmioBuffLen; \
 	off_t			gtmioPtr; \
-	sm_uc_ptr_t 		gtmioBuff; \
+	sm_uc_ptr_t		gtmioBuff; \
 	SET_LSEEK_FLAG(FDESC, TRUE); \
 	gtmioBuffLen = FBUFF_LEN; \
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
 	gtmioPtr = (off_t)(FPTR); \
 	for (;;) \
-        { \
+	{ \
 		if (-1 != (gtmioStatus = (ssize_t)lseek(FDESC, gtmioPtr, SEEK_SET))) \
 		{ \
 			if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen))) \
 			{ \
 				gtmioBuffLen -= gtmioStatus; \
 				if (0 == gtmioBuffLen || 0 == gtmioStatus) \
-				        break; \
+					break; \
 				gtmioBuff += gtmioStatus; \
 				gtmioPtr += gtmioStatus; \
 				continue; \
@@ -462,10 +483,10 @@
 		} \
 		if (EINTR != errno) \
 			break; \
-        } \
+	} \
 	if (0 == gtmioBuffLen) \
 		RC = 0; \
-	else if (-1 == gtmioStatus)    	/* Had legitimate error - return it */ \
+	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */ \
 		RC = errno; \
 	else \
 		RC = -1;		/* Something kept us from reading what we wanted */ \
@@ -481,21 +502,21 @@
 	ssize_t			gtmioStatus;							\
 	size_t			gtmioBuffLen;							\
 	off_t			gtmioPtr;							\
-	sm_uc_ptr_t 		gtmioBuff;							\
+	sm_uc_ptr_t		gtmioBuff;							\
 												\
 	SET_LSEEK_FLAG(FDESC, TRUE);								\
 	gtmioBuffLen = FBUFF_LEN;								\
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
 	gtmioPtr = (off_t)(FPTR);								\
 	for (;;)										\
-        {											\
+	{											\
 		if (-1 != (gtmioStatus = (ssize_t)lseek(FDESC, gtmioPtr, SEEK_SET)))		\
 		{										\
 			if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))		\
 			{									\
 				gtmioBuffLen -= gtmioStatus;					\
 				if (0 == gtmioBuffLen || 0 == gtmioStatus)			\
-				        break;							\
+					break;							\
 				gtmioBuff += gtmioStatus;					\
 				gtmioPtr += gtmioStatus;					\
 				continue;							\
@@ -503,11 +524,11 @@
 		}										\
 		if (EINTR != errno)								\
 			break;									\
-        }											\
+	}											\
 	(ACTUAL_READLEN) = (FBUFF_LEN) - gtmioBuffLen;						\
 	if (0 == gtmioBuffLen)									\
 		RC = 0;										\
-	else if (-1 == gtmioStatus)    	/* Had legitimate error - return it */			\
+	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */			\
 		RC = errno;									\
 	else											\
 		RC = -1;		/* Something kept us from reading what we wanted */	\
@@ -520,20 +541,20 @@
 	ssize_t			gtmioStatus; \
 	size_t			gtmioBuffLen; \
 	off_t			gtmioPtr; \
-	sm_uc_ptr_t 		gtmioBuff; \
+	sm_uc_ptr_t		gtmioBuff; \
 	SET_LSEEK_FLAG(FDESC, TRUE); \
 	gtmioBuffLen = FBUFF_LEN; \
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
 	gtmioPtr = (off_t)(FPTR); \
 	for (;;) \
-        { \
+	{ \
 		if (-1 != (gtmioStatus = (ssize_t)lseek(FDESC, gtmioPtr, SEEK_SET))) \
 		{ \
 			if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen))) \
 			{ \
 				gtmioBuffLen -= gtmioStatus; \
 				if (0 == gtmioBuffLen) \
-				        break; \
+					break; \
 				gtmioBuff += gtmioStatus; \
 				gtmioPtr += gtmioStatus; \
 				continue; \
@@ -541,10 +562,10 @@
 		} \
 		if (EINTR != errno) \
 			break; \
-        } \
+	} \
 	if (0 == gtmioBuffLen) \
 		RC = 0; \
-	else if (-1 == gtmioStatus)    	/* Had legitimate error - return it */ \
+	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */ \
 		RC = errno; \
 	else \
 		RC = -1;		/* Something kept us from writing what we wanted */ \
@@ -556,25 +577,25 @@
 { \
 	ssize_t		gtmioStatus; \
 	size_t		gtmioBuffLen; \
-	sm_uc_ptr_t 	gtmioBuff; \
+	sm_uc_ptr_t	gtmioBuff; \
 	gtmioBuffLen = FBUFF_LEN; \
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
 	for (;;) \
-        { \
+	{ \
 		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen))) \
-	        { \
+		{ \
 			gtmioBuffLen -= gtmioStatus; \
 			if (0 == gtmioBuffLen || 0 == gtmioStatus) \
 				break; \
 			gtmioBuff += gtmioStatus; \
-	        } \
+		} \
 		else if (EINTR != errno) \
 			break; \
-        } \
-	if (-1 == gtmioStatus)	    	/* Had legitimate error - return it */ \
+	} \
+	if (-1 == gtmioStatus)		/* Had legitimate error - return it */ \
 		RC = errno; \
 	else if (0 == gtmioBuffLen) \
-	        RC = 0; \
+		RC = 0; \
 	else \
 		RC = -1;		/* Something kept us from reading what we wanted */ \
 }
@@ -583,24 +604,24 @@
 { \
 	ssize_t		gtmioStatus; \
 	size_t		gtmioBuffLen; \
-	sm_uc_ptr_t 	gtmioBuff; \
+	sm_uc_ptr_t	gtmioBuff; \
 	gtmioBuffLen = FBUFF_LEN; \
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
 	for (;;) \
-        { \
+	{ \
 		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen))) \
-	        { \
+		{ \
 			gtmioBuffLen -= gtmioStatus; \
 			if (0 == gtmioBuffLen || 0 == gtmioStatus) \
 				break; \
 			gtmioBuff += gtmioStatus; \
-	        } \
+		} \
 		else if (EINTR != errno) \
 		  break; \
-        } \
+	} \
 	if (-1 != gtmioStatus) \
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually read */ \
-	else 	    					/* Had legitimate error - return it */ \
+	else						/* Had legitimate error - return it */ \
 		RLEN = -1; \
 }
 
@@ -612,12 +633,12 @@ TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT) \
 	int		tfcntl_res;\
 	size_t		gtmioBuffLen; \
 	sm_uc_ptr_t	gtmioBuff; \
-	gtmioBuffLen =  (size_t)FBUFF_LEN; \
+	gtmioBuffLen =	(size_t)FBUFF_LEN; \
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
 	for (;;) \
-        { \
+	{ \
 		/* if it is a read x:0 on a pipe and it is not blocked (always the case when starting a read)\
-		   then try and read one char.  If it succeeds then turn on blocked io and read the rest\
+		   then try and read one char.	If it succeeds then turn on blocked io and read the rest\
 		   of the line.*/\
 		if (ISPIPE && (FALSE == *BLOCKED_IN))			\
 		{\
@@ -660,18 +681,18 @@ TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT) \
 		/* if we didn't read 1 character or it's an error don't read anymore now */\
 		if (TRUE == skip_read) break;\
 		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen))) \
-	        { \
+		{ \
 			gtmioBuffLen -= gtmioStatus; \
 			if (0 == gtmioBuffLen || 0 == gtmioStatus) \
 				break; \
 			gtmioBuff += gtmioStatus; \
-	        } \
+		} \
 		else if (EINTR != errno || TOFLAG) \
 		  break; \
-        } \
+	} \
 	if (-1 != gtmioStatus) \
-		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); 	/* Return length actually read */ \
-	else 	    					/* Had legitimate error - return it */ \
+		RLEN = (int)(FBUFF_LEN - gtmioBuffLen);		/* Return length actually read */ \
+	else						/* Had legitimate error - return it */ \
 	{\
 		if (ISPIPE)\
 			*TOT_BYTES_READ = (int)(FBUFF_LEN - gtmioBuffLen); \
@@ -683,22 +704,22 @@ TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT) \
 { \
 	ssize_t		gtmioStatus; \
 	size_t		gtmioBuffLen; \
-	sm_uc_ptr_t 	gtmioBuff; \
+	sm_uc_ptr_t	gtmioBuff; \
 	gtmioBuffLen = FBUFF_LEN; \
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
 	assert(0 != gtmioBuffLen);	\
 	for (;;) \
-        { \
+	{ \
 		if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen))) \
-	        { \
+		{ \
 			gtmioBuffLen -= gtmioStatus; \
 			if (0 == gtmioBuffLen) \
 				break; \
 			gtmioBuff += gtmioStatus; \
-	        } \
+		} \
 		else if (EINTR != errno) \
 		  break; \
-        } \
+	} \
 	/* GTMASSERT? */ \
 }
 
@@ -712,16 +733,16 @@ TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT) \
 	gtmioBuffLen = FBUFF_LEN;								\
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
 	for (;;)										\
-        {											\
+	{											\
 		if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen)))		\
-	        {										\
+		{										\
 			gtmioBuffLen -= gtmioStatus;						\
 			if (0 == gtmioBuffLen)							\
 				break;								\
 			gtmioBuff += gtmioStatus;						\
-	        }										\
+		}										\
 		else if (EINTR != errno && EAGAIN != errno)					\
-		        break;									\
+			break;									\
 		else if (EAGAIN == errno)							\
 		{										\
 			if (gtm_non_blocked_write_retries <= block_cnt)				\
@@ -729,11 +750,11 @@ TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT) \
 			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
 			block_cnt++;								\
 		}										\
-        }											\
-	if (-1 == gtmioStatus)	    	/* Had legitimate error - return it */			\
+	}											\
+	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
 		RC = errno;									\
 	else if (0 == gtmioBuffLen)								\
-	        RC = 0;										\
+		RC = 0;										\
 	else											\
 		RC = -1;		/* Something kept us from writing what we wanted */	\
 }
@@ -767,7 +788,7 @@ TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT) \
 {												\
 	ssize_t		gtmioStatus;								\
 	size_t		gtmioBuffLen;								\
-	sm_uc_ptr_t 	gtmioBuff;								\
+	sm_uc_ptr_t	gtmioBuff;								\
 	int		block_cnt = 0;								\
 												\
 	GBLREF	int	gtm_non_blocked_write_retries;						\
@@ -775,16 +796,16 @@ TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT) \
 	gtmioBuffLen = FBUFF_LEN;								\
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
 	for (;;)										\
-        {											\
+	{											\
 		if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen)))		\
-	        {										\
+		{										\
 			gtmioBuffLen -= gtmioStatus;						\
 			if (0 == gtmioBuffLen)							\
-			        break;								\
+				break;								\
 			gtmioBuff += gtmioStatus;						\
-	        }										\
+		}										\
 		else if (EINTR != errno && EAGAIN != errno)					\
-		        break;									\
+			break;									\
 		else if (EAGAIN == errno)							\
 		{										\
 			if (gtm_non_blocked_write_retries <= block_cnt)				\
@@ -792,7 +813,7 @@ TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT) \
 			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
 			block_cnt++;								\
 		}										\
-        }											\
+	}											\
 	if (-1 != gtmioStatus)									\
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually written */	\
 	else						/* Had legitimate error - return it */	\
@@ -819,5 +840,47 @@ typedef struct {
 int	fd;
 mstr	v;
 }file_pointer;
+
+/* WRITEPIPE is a work-around for a problem found in z/OS where the kernel doesn't seem to
+ * break up writes into small enough pieces, requiring that we do it ourselves.  The fix is
+ * applied to all Unix platforms, even though all except z/OS seem to work with monster writes.
+ */
+#define WRITEPIPE(FDESC, PIPESZ, FBUFF, FBUFF_LEN, RC)						\
+{												\
+	GBLREF	int	gtm_non_blocked_write_retries;						\
+	ssize_t		gtmioStatus;								\
+	size_t		gtmioBuffLen;								\
+	size_t		shortBuffLen;								\
+	sm_uc_ptr_t	gtmioBuff;								\
+	int		block_cnt = 0;								\
+	gtmioBuffLen = FBUFF_LEN;								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
+	for (;;)										\
+	{											\
+		shortBuffLen = MIN(PIPESZ, gtmioBuffLen);					\
+		if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, shortBuffLen)))		\
+		{										\
+			gtmioBuffLen -= gtmioStatus;						\
+			if (0 == gtmioBuffLen)							\
+				break;								\
+			gtmioBuff += gtmioStatus;						\
+		}										\
+		else if (EINTR != errno && EAGAIN != errno)					\
+			break;									\
+		else if (EAGAIN == errno)							\
+		{										\
+			if (gtm_non_blocked_write_retries <= block_cnt)				\
+				break;								\
+			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
+			block_cnt++;								\
+		}										\
+	}											\
+	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
+		RC = errno;									\
+	else if (0 == gtmioBuffLen)								\
+		RC = 0;										\
+	else											\
+		RC = -1;		/* Something kept us from writing what we wanted */	\
+}
 
 #endif

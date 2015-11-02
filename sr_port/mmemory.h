@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,8 @@
 #define MC_DSBLKSIZE ((8 * 1024) - offsetof(storElem, userStorage))	/* Total (real) alloc will be for 8K */
 
 /* The header of the memory block allocated by mcalloc */
-typedef struct mcalloc_hdr_struct {
+typedef struct mcalloc_hdr_struct
+{
 	struct mcalloc_hdr_struct *link;	/* pointer to the next block */
 	int4		size;			/* size of the usable area in this block */
 	GTM64_ONLY(int filler;)			/* The data(data[0]) on 64-bit platforms should begin on 8-byte boundary */

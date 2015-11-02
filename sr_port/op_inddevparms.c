@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,13 +45,13 @@ void	op_inddevparms(mval *devpsrc, int4 ok_iop_parms,  mval *devpiopl)
 		comp_init(&devpsrc->str);
 		if (TK_ATSIGN == window_token)
 		{	/* For the indirection-obsessive */
-			if (!indirection(&devpopr))
-				rts_error(VARLSTCNT(1) ERR_INDEXTRACHARS);
-			indref = newtriple(OC_INDDEVPARMS);
-			indref->operand[0] = devpopr;
-			indref->operand[1] = put_ilit(ok_iop_parms);
-			plist = put_tref(indref);
-			rval = TRUE;
+			if (rval = indirection(&devpopr))	/* Note assignment */
+			{
+				indref = newtriple(OC_INDDEVPARMS);
+				indref->operand[0] = devpopr;
+				indref->operand[1] = put_ilit(ok_iop_parms);
+				plist = put_tref(indref);
+			}
 		} else	/* We have the parm string to process now */
 			rval = (bool)deviceparameters(&plist, ok_iop_parms);
 		if (!comp_fini(rval, &object, OC_IRETMVAL, &plist, devpsrc->str.len))

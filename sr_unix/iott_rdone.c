@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -223,7 +223,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 						break;
 					}
 					input_timeval.tv_sec = cur_time.at_sec;
-					input_timeval.tv_usec = cur_time.at_usec;
+					input_timeval.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
 				}
 			} else
 			{	/* This is an untimed read. We had set the select timeout to be 100 seconds by default. But since

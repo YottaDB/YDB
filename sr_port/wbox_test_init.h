@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,11 @@ typedef enum {
 	WBTEST_REPL_TEST_UNCMP_ERROR,		/* 18 : Unix only */
 	WBTEST_REPL_TR_UNCMP_ERROR,		/* 19 : Unix only */
 	WBTEST_TP_HIST_CDB_SC_BLKMOD,		/* 20 */
-	WBTEST_ABANDONEDKILL			/* 21 MUPIP STOP a kill in progress in 2nd stage*/
+	WBTEST_ABANDONEDKILL,			/* 21 MUPIP STOP a kill in progress in 2nd stage*/
+	WBTEST_ENCRYPT_INIT_ERROR,		/* 22 : Prevent encryption initialized assert from happening */
+	WBTEST_UPD_GVSUBOFLOW_ERROR,		/* 23 : Update process should issue GVSUBOFLOW error */
+	WBTEST_UPD_REC2BIG_ERROR,		/* 24 : Update process should issue REC2BIG error*/
+	WBTEST_FILE_EXTEND_ERROR		/* 25 : Prevent assert form mupip extend if # blocks is > 224M */
 } wbtest_code_t;
 
 #ifdef DEBUG
@@ -63,6 +67,21 @@ typedef enum {
 }
 #else
 #define GTM_WHITE_BOX_TEST(input_test_case_num, lhs, rhs)
+#endif
+
+#ifdef DEBUG
+#define ENABLE_WBTEST_ABANDONEDKILL									\
+	sleep_counter = 0;										\
+	GTM_WHITE_BOX_TEST(WBTEST_ABANDONEDKILL, sleep_counter, SLEEP_ONE_MIN);				\
+	if (SLEEP_ONE_MIN == sleep_counter)								\
+	{												\
+		assert(gtm_white_box_test_case_enabled);						\
+		util_out_print("!/INFO : WBTEST_ABANDONEDKILL waiting in Phase II of Kill",TRUE);	\
+		while (1 <= sleep_counter)								\
+			wcs_sleep(sleep_counter--);							\
+	}
+#else
+#define ENABLE_WBTEST_ABANDONEDKILL
 #endif
 
 #endif

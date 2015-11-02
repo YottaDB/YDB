@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,11 +18,8 @@ typedef struct gparam_list_struct
 	void    	*arg[MAXIMUM_PARAMETERS];
 } gparam_list;
 
-/* defined as macro on MVS */
-#ifndef callg
 typedef	INTPTR_T (*callgfnptr)(intszofptr_t cnt, ...);
 INTPTR_T callg(callgfnptr, gparam_list *);
-#endif
 void callg_signal(void *);
 
 #endif

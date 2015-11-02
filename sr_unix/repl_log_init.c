@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,13 +32,16 @@
 #include "repl_sp.h"
 #include "send_msg.h"
 #include "gtmmsg.h"
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 
-GBLDEF int		gtmsource_log_fd = -1;
-GBLDEF int		gtmsource_statslog_fd = -1;
-GBLDEF int		gtmrecv_log_fd = -1;
-GBLDEF int		gtmrecv_statslog_fd = -1;
-GBLDEF int		updproc_log_fd = -1;
-GBLDEF int		updhelper_log_fd = -1;
+GBLDEF int		gtmsource_log_fd = FD_INVALID;
+GBLDEF int		gtmsource_statslog_fd = FD_INVALID;
+GBLDEF int		gtmrecv_log_fd = FD_INVALID;
+GBLDEF int		gtmrecv_statslog_fd = FD_INVALID;
+GBLDEF int		updproc_log_fd = FD_INVALID;
+GBLDEF int		updhelper_log_fd = FD_INVALID;
 
 GBLDEF FILE		*gtmsource_log_fp = NULL;
 GBLDEF FILE		*gtmsource_statslog_fp = NULL;
@@ -59,9 +62,15 @@ int repl_log_init(repl_log_file_t log_type,
 	int	tmp_fd;
 	int	save_errno;
 	int	stdout_status, stderr_status;
-
+	int	rc;
+#ifdef __MVS__
+	int		status;
+	int		realfiletag;
+	struct stat     info;
+#endif
 	error_def(ERR_REPLLOGOPN);
 	error_def(ERR_TEXT);
+	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	if (*log == '\0')
 		return(EREPL_LOGFILEOPEN);
@@ -78,10 +87,11 @@ int repl_log_init(repl_log_file_t log_type,
 		}
 	}
 
+	ZOS_ONLY(STAT_FILE(log_file_name, &info, status);)
 	OPENFILE3(log_file_name, O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH, tmp_fd);
 	if (tmp_fd < 0)
 	{
-		if (log_type == REPL_GENERAL_LOG && *log_fd == -1 || *stats_fd == -1)
+		if ((REPL_GENERAL_LOG == log_type) && (FD_INVALID == *log_fd) || (FD_INVALID == *stats_fd))
 		{
 			save_errno = ERRNO;
 			err_code = STRERROR(save_errno);
@@ -110,7 +120,17 @@ int repl_log_init(repl_log_file_t log_type,
 			return(EREPL_LOGFILEOPEN);
 		}
 	}
-
+#ifdef __MVS__
+	if (0 == status)
+	{
+		if (-1 == gtm_zos_tag_to_policy(tmp_fd, TAG_UNTAGGED, &realfiletag))
+			TAG_POLICY_GTM_PUTMSG(log_file_name, errno, realfiletag, TAG_UNTAGGED);
+	} else
+	{
+		if (-1 == gtm_zos_set_tag(tmp_fd, TAG_EBCDIC, TAG_TEXT, TAG_FORCE, &realfiletag))
+			TAG_POLICY_GTM_PUTMSG(log_file_name, errno, realfiletag, TAG_EBCDIC);
+	}
+#endif
 	if (log_type == REPL_GENERAL_LOG)
 	{
 		int dup2_res;
@@ -122,7 +142,7 @@ int repl_log_init(repl_log_file_t log_type,
 			if (stderr_status < 0)
 			{
 				save_errno = ERRNO;
-				if (*log_fd != -1)
+				if (FD_INVALID != *log_fd)
 				{
 					DUP2(*log_fd, 1, dup2_res); /* Restore old log file */
 					DUP2(*log_fd, 2, dup2_res);
@@ -131,14 +151,14 @@ int repl_log_init(repl_log_file_t log_type,
 		} else
 		{
 			save_errno = ERRNO;
-			if (*log_fd != -1)
+			if (FD_INVALID != *log_fd)
 				DUP2(*log_fd, 1, dup2_res); /* Restore old log file */
 		}
 
 		if (stdout_status >= 0 && stderr_status >= 0)
 		{
-			if (*log_fd != -1)
-				close(*log_fd);
+			if (FD_INVALID != *log_fd)
+				CLOSEFILE_RESET(*log_fd, rc);	/* resets "*log_fd" to FD_INVALID */
 			*log_fd = tmp_fd;
 		} else
 		{
@@ -154,8 +174,8 @@ int repl_log_init(repl_log_file_t log_type,
 		}
 	} else
 	{
-		if (*stats_fd != -1)
-			close(*stats_fd);
+		if (FD_INVALID != *stats_fd)
+			CLOSEFILE_RESET(*stats_fd, rc);	/* resets "*stats_fd" to FD_INVALID */
 		*stats_fd = tmp_fd;
 	}
 

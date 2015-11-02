@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -147,9 +147,28 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 				gtmsi->bad_vadr = info->si_addr;
 				gtmsi->infotype |= GTMSIGINFO_BADR;
 				break;
-#  elif defined(__MVS__)	/* not much info available */
-				gtmsi->int_iadr = info->si_addr;
-				gtmsi->infotype |= GTMSIGINFO_ILOC;
+#  elif defined(__MVS__)
+				if (0 > info->si_code)
+				{	/* sent from another process */
+					gtmsi->send_pid = info->si_pid;
+					gtmsi->send_uid = info->si_uid;
+					gtmsi->infotype |= GTMSIGINFO_USER;
+				} else
+				{
+                                	gtmsi->subcode = info->si_code;
+					if ((SIGBUS == sig) || (SIGFPE == sig) || (SIGILL == sig) || (SIGSEGV == sig))
+					{	/* address of faulting instruction */
+                                		gtmsi->int_iadr = info->si_addr;
+                                		gtmsi->infotype |= GTMSIGINFO_ILOC;
+					}
+/* we don't know the format of the mcontext structure yet
+					if (context != NULL)
+                                	{
+                                	        gtmsi->bad_vadr = (caddr_t)context->uc_mcontext[0];
+                                	        gtmsi->infotype |= GTMSIGINFO_BADR;
+                                	}
+*/
+				}
 				break;
 #  elif defined(_AIX)
 				gtmsi->subcode = info->si_code;
@@ -167,7 +186,6 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 		}
 
 		/* See if additional information can be gleaned from the subcode */
-#  if !defined(__MVS__)
 		if (0 != gtmsi->subcode)
 		{
 			switch (sig)
@@ -234,7 +252,6 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 					break;
 			}
 		}
-#  endif /* Attempt to glean more info from subcode */
 	}
 #elif defined(Linux390)
 	/* Linux as of when the Linux390 port was done did not yet support returning signal information properly

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,10 +29,15 @@
 #define	UNKNOWN_SYSERR 		"unknown system error"
 #define COPY_DLLERR_MSG(err_ptr, err_buf)					\
 {										\
+	int len = 0;								\
+										\
 	if ((err_ptr = dlerror()) != NULL)					\
-		strncpy(err_buf, err_ptr, sizeof(err_buf));			\
-	else									\
-		memcpy(err_buf, UNKNOWN_SYSERR, sizeof(UNKNOWN_SYSERR));	\
+	{									\
+		len = real_len(sizeof(err_buf)-1, (uchar_ptr_t)err_ptr);	\
+		strncpy(err_buf, err_ptr, len);					\
+		err_buf[len] = '\0';						\
+	} else									\
+		STRCPY(err_buf, UNKNOWN_SYSERR);				\
 }
 
 typedef int4	(*fgnfnc)();
@@ -129,7 +134,7 @@ typedef struct parmblk_struct
 	int4    argcnt;
 	void    *rtnaddr, *labaddr, *retaddr;
 	int4    mask;
-	mval    *args[MAXIMUM_PARAMETERS];
+	lv_val	*args[MAXIMUM_PARAMETERS];
 } parmblk_struct;
 
 #include "rtnhdr.h"

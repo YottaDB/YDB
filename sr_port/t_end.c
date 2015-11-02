@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,14 +114,13 @@ GBLREF	unsigned char		cw_set_depth, cw_map_depth;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
-GBLREF	bool			is_standalone;
 GBLREF	boolean_t		is_updproc;
 GBLREF	seq_num			seq_num_one;
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	boolean_t		dse_running;
 GBLREF	boolean_t		unhandled_stale_timer_pop;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
-GBLREF	boolean_t 		kip_incremented;
+GBLREF	sgmnt_addrs 		*kip_csa;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	boolean_t		write_after_image;
 GBLREF	boolean_t		is_replicator;
@@ -200,6 +199,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	uint4			prev_cr_array_index;
 #	ifdef DEBUG
 	boolean_t		ready2signal_gvundef_lcl;
+	GTMCRYPT_ONLY(
+		blk_hdr_ptr_t	save_old_block;
+	)
 #	endif
 	int			n_blks_validated;
 
@@ -332,7 +334,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 							status = cdb_sc_lostbmlcr;
 							goto failed_skip_revert;
 						}
-						JNL_GET_CHECKSUM_ACQUIRED_BLK(cs, csd, old_block, bsiz);
+						JNL_GET_CHECKSUM_ACQUIRED_BLK(cs, csd, csa, old_block, bsiz);
 					}
 				}
 				/* assert that the block that we got from bm_getfree is less than the total blocks.
@@ -391,12 +393,17 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				if (FALSE == csd->freeze)
 					break;
 				rel_crit(gv_cur_region);
+				/* We are about to wait for freeze. Assert that we are not in phase2 of a bitmap free operation
+				 * (part of an M-kill or REORG operation). The freeze must have waited for the phase2 to complete.
+				 */
+				assert((inctn_bmp_mark_free_gtm != inctn_opcode) && (inctn_bmp_mark_free_mu_reorg != inctn_opcode));
 				while (csd->freeze)
 					hiber_start(1000);
 			}
 		} else
 			grab_crit(gv_cur_region);
 	}
+	assert(!update_trans || !csd->freeze);	/* We should never proceed to update a frozen database */
         if (is_mm && ((csa->hdr != csd) || (csa->total_blks != csa->ti->total_blks)))
         {       /* If MM, check if wcs_mm_recover was invoked as part of the grab_crit done above OR if
                  * the file has been extended. If so, restart.
@@ -654,6 +661,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			t1->tn = valid_thru;
 			n_blks_validated++;
 		}
+		assert((hist != hist2) || (t1 != hist->h));
 	}
 	/* Assert that if gtm_gvundef_fatal is non-zero, then we better not be about to signal a GVUNDEF */
 	assert(!gtm_gvundef_fatal || !ready2signal_gvundef_lcl);
@@ -841,11 +849,12 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 						assert(sizeof(bsiz) == sizeof(old_block->bsiz));
 						bsiz = old_block->bsiz;
 						assert(bsiz <= csd->blk_size);
-						cs->blk_checksum = jnl_get_checksum((uint4*)old_block, bsiz);
+						cs->blk_checksum = jnl_get_checksum((uint4*)old_block, csa, bsiz);
 					}
 					DEBUG_ONLY(
 					else
-						assert(cs->blk_checksum == jnl_get_checksum((uint4 *)old_block, old_block->bsiz));
+						assert(cs->blk_checksum == jnl_get_checksum((uint4 *)old_block,
+												csa, old_block->bsiz));
 					)
 					assert(cs->cr->blk == cs->blk);
 				}
@@ -874,7 +883,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			INT8_ONLY(assert(tjpl->write == tjpl->write_addr % tjpl->jnlpool_size);)
 			assert(jgbl.cumul_jnl_rec_len);
 			tmp_cumul_jnl_rec_len = (uint4)(jgbl.cumul_jnl_rec_len + sizeof(jnldata_hdr_struct));
-			tjpl->write += sizeof(jnldata_hdr_struct);
+			tjpl->write += SIZEOF(jnldata_hdr_struct);
 			if (tjpl->write >= tjpl->jnlpool_size)
 			{
 				assert(tjpl->write == tjpl->jnlpool_size);
@@ -961,7 +970,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 					jnl_put_jrt_pini(csa);
 				if (JNL_HAS_EPOCH(jbp))
 				{
-					if (jbp->next_epoch_time <= jgbl.gbl_jrec_time)
+					if ((jbp->next_epoch_time <= jgbl.gbl_jrec_time) UNCONDITIONAL_EPOCH_ONLY(|| TRUE))
 					{	/* Flush the cache. Since we are in crit, defer syncing epoch */
 						if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_IN_COMMIT))
 						{
@@ -1040,10 +1049,29 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 								bsiz = MIN(bsiz, csd->blk_size);
 							assert(!cs->blk_checksum ||
 								(cs->blk_checksum == jnl_get_checksum((uint4 *)old_block,
+													csa,
 													bsiz)));
 							if (!cs->blk_checksum)
 								cs->blk_checksum = jnl_get_checksum((uint4 *)old_block,
+													csa,
 													bsiz);
+#							ifdef GTM_CRYPT
+							if (csd->is_encrypted)
+							{
+								DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, (sm_uc_ptr_t)old_block);
+								DEBUG_ONLY(save_old_block = old_block;)
+								old_block = (blk_hdr_ptr_t)GDS_ANY_ENCRYPTGLOBUF(old_block,
+														      csa);
+								/* Ensure that the unencrypted block and it's twin counterpart are
+								 *in sync. */
+								assert(save_old_block->tn == old_block->tn);
+								assert(save_old_block->bsiz == old_block->bsiz);
+								assert(save_old_block->levl == old_block->levl);
+								DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa,
+												       csd,
+												       (sm_uc_ptr_t)old_block);
+							}
+#							endif
 							jnl_write_pblk(csa, cs, old_block);
 							cs->jnl_freeaddr = jbp->freeaddr;
 						}
@@ -1219,6 +1247,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		/* signal secshr_db_clnup/t_commit_cleanup, roll-back is no longer possible */
 		update_trans = T_COMMIT_STARTED;
 		assert(cdb_sc_normal == status);
+		assert(!csd->freeze);	/* should never increment curr_tn on a frozen database */
 		INCREMENT_CURR_TN(csd);
 		csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;	/* set this BEFORE releasing crit but AFTER incrementing curr_tn */
 		/* If db is journaled, then db header is flushed periodically when writing the EPOCH record,
@@ -1229,7 +1258,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			fileheader_sync(gv_cur_region);
 		if (need_kip_incr)		/* increment kill_in_prog */
 		{
-			INCR_KIP(csd, csa, kip_incremented);
+			INCR_KIP(csd, csa, kip_csa);
 			need_kip_incr = FALSE;
 		}
 		start_tn = dbtn; /* start_tn temporarily used to store currtn (for bg_update_phase2) before releasing crit */

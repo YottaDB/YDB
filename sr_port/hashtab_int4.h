@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,12 +11,18 @@
 #ifndef HASHTAB_INT4_H
 #define HASHTAB_INT4_H
 
-typedef struct {
+/* Note that hashtab_addr has #define references to all items in this header file. Changes/additions
+   should be reflected there as well.
+*/
+
+typedef struct
+{
 	uint4		key;
 	void		*value;
 } ht_ent_int4;
 
-typedef struct hash_table_int4_struct {
+typedef struct hash_table_int4_struct
+{
 	ht_ent_int4 	*base;		/* base of array of hent_* entries */
 	ht_ent_int4 	*top; 		/* top of array of hent_* entries */
 	unsigned int 	size;		/* Hash table size */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,12 +31,17 @@
 #include "gtmimagename.h"
 #include "mupipbckup.h"
 #include "send_msg.h"
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 
 GBLREF	uint4			process_id;
 GBLREF	enum gtmImageTypes	image_type;
 
 error_def(ERR_BKUPTMPFILOPEN);
 error_def(ERR_BKUPTMPFILWRITE);
+error_def(ERR_TEXT);
+ZOS_ONLY(error_def(ERR_BADTAG);)
 
 boolean_t backup_buffer_flush(gd_region *reg)
 {
@@ -45,7 +50,8 @@ boolean_t backup_buffer_flush(gd_region *reg)
 	sgmnt_addrs		*csa;
 	shmpool_buff_hdr_ptr_t	sbufh_p;
 	shmpool_blk_hdr_ptr_t	sblkh_p, next_sblkh_p;
-	DEBUG_ONLY(int		flush_cnt);
+	DEBUG_ONLY(int		flush_cnt;)
+	ZOS_ONLY(int		realfiletag;)
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	sbufh_p = csa->shmpool_buffer;
@@ -80,7 +86,7 @@ boolean_t backup_buffer_flush(gd_region *reg)
 	if (0 < sbufh_p->backup_cnt)
 	{	/* open the file, write to it at the address and close the file */
 		OPENFILE(sbufh_p->tempfilename, O_RDWR, fd);
-		if (-1 == fd)
+		if (FD_INVALID == fd)
 		{
 			sbufh_p->failed = process_id;
 			sbufh_p->backup_errno = errno;
@@ -90,6 +96,10 @@ boolean_t backup_buffer_flush(gd_region *reg)
 			shmpool_unlock_hdr(reg);
 			return FALSE;
 		}
+#ifdef __MVS__
+		if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
+			TAG_POLICY_SEND_MSG(sbufh_p->tempfilename, errno, realfiletag, TAG_BINARY);
+#endif
 		write_size = SIZEOF(*sblkh_p) + sbufh_p->blk_size;
 		DEBUG_ONLY(flush_cnt = 0);
 		for (sblkh_p = SBLKP_REL2ABS(&sbufh_p->que_backup, fl);
@@ -128,7 +138,7 @@ boolean_t backup_buffer_flush(gd_region *reg)
 			/* Now we can deque this entry from the backup queue safely and release it */
 			shmpool_blk_free(reg, sblkh_p);
 		}
-		CLOSEFILE(fd, status);
+		CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
 	}
 	shmpool_unlock_hdr(reg);
 	return TRUE;

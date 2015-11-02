@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -321,6 +321,13 @@ typedef struct node_local_struct
    	int4		secshr_ops_index;
    	INTPTR_T	secshr_ops_array[SECSHR_OPS_ARRAY_SIZE]; /* taking up 4K(on 32-bit platform) and 8K(on 64-bit platforms) */
 	gvstats_rec_t	gvstats_rec;
+	trans_num	last_wcsflu_tn;			/* curr_tn when last wcs_flu was done on this database */
+#	ifdef GTM_CRYPT
+	sm_off_t	encrypt_glo_buff_off;	/* offset from unencrypted global buffer to its encrypted counterpart */
+	NON_GTM64_ONLY(
+		int	tmp_filler;		/* Added so that the structure is aligned properly in 32 bit machines */
+	)
+#	endif
 } node_local;
 
 #ifdef DEBUG

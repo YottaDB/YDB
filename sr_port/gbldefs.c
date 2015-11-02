@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,9 +22,6 @@
 #include "gtm_limits.h"
 
 #include <signal.h>
-#ifdef __MVS__
-#include "gtm_time.h"      /* required for fd_set */
-#endif
 #include <sys/time.h>
 #ifdef UNIX
 # include <sys/un.h>
@@ -36,9 +33,11 @@
 # include "desblk.h"
 #endif
 #include "cache.h"
+#include "hashtab_addr.h"
 #include "hashtab_int4.h"
 #include "hashtab_int8.h"
 #include "hashtab_mname.h"
+#include "hashtab_str.h"
 #include "hashtab_objcode.h"
 #include "rtnhdr.h"
 #include "gdsroot.h"
@@ -91,6 +90,7 @@
 #include "dpgbldir.h"
 #include "mmemory.h"
 #include "have_crit.h"
+#include "alias.h"
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
@@ -130,6 +130,12 @@
 #include "gtm_utf8.h"
 #endif
 
+# ifdef GTM_CRYPT
+# include "gtmcrypt.h"
+# include "gdsblk.h"
+# include "muextr.h"
+# endif
+
 #define DEFAULT_ZERROR_STR	"Unprocessed $ZERROR, see $ZSTATUS"
 #define DEFAULT_ZERROR_LEN	(sizeof(DEFAULT_ZERROR_STR) - 1)
 
@@ -157,7 +163,6 @@ GBLDEF	bool		error_mupip = FALSE,
 			jobpid = FALSE,
 			online = FALSE,
 			record = FALSE,
-			is_standalone = FALSE,
 			std_dev_outbnd = FALSE,
 			in_mupip_freeze = FALSE,
 	                in_backup = FALSE,
@@ -170,13 +175,16 @@ GBLDEF	bool		error_mupip = FALSE,
 GBLDEF	boolean_t	is_updproc = FALSE,
 			is_updhelper = FALSE,
 			mupip_jnl_recover = FALSE,
+			is_standalone = FALSE,
 			repl_allowed = FALSE,
+			suspend_lvgcol = FALSE,
 			run_time = FALSE,
 			unhandled_stale_timer_pop = FALSE,
 			gtcm_connection = FALSE,
 			is_replicator = FALSE,	/* TRUE => this process can write jnl records to the jnlpool for replicated db */
 	                tp_in_use = FALSE,	/* TRUE => TP has been used by this process and is thus initialized */
-			dollar_truth = TRUE;
+			dollar_truth = TRUE,
+			have_standalone_access = FALSE;
 
 GBLDEF	VSIG_ATOMIC_T	forced_exit = FALSE;	/* Asynchronous signal/interrupt handler sets this variable to TRUE,
 						 * hence the VSIG_ATOMIC_T type in the definition.
@@ -199,9 +207,9 @@ GBLDEF	int4		backup_close_errno,
 GBLDEF	volatile int4	outofband, crit_count = 0;
 GBLDEF	int		mumps_status = SS_NORMAL,
 			stp_array_size = 0;
-GBLDEF	gvzwrite_struct	gvzwrite_block;
+GBLDEF	gvzwrite_datablk	gvzwrite_block;
+GBLDEF	lvzwrite_datablk	*lvzwrite_block;
 GBLDEF	io_log_name	*io_root_log_name;
-GBLDEF	lvzwrite_struct	lvzwrite_block;
 GBLDEF	mliteral	literal_chain;
 GBLDEF	mstr		*comline_base,
 			dollar_zsource,
@@ -230,6 +238,13 @@ GBLDEF	boolean_t	dollar_zininterrupt;
 GBLDEF	boolean_t	dollar_ztexit_bool; /* Truth value of dollar_ztexit when coerced to boolean */
 GBLDEF	boolean_t	dollar_zquit_anyway;
 
+#define	DEFAULT_PROMPT	"GTM>"
+/* The prompt buffer size (31) below would allow at least 8 Unicode characters, but since most
+ * commonly used Unicode characters only occupy upto 3 bytes, the buffer would at least accommodate
+ * 10 Unicode characters in a prompt */
+GBLDEF	char		prombuf[MAX_MIDENT_LEN] = DEFAULT_PROMPT;
+GBLDEF	MSTR_DEF(gtmprompt, STR_LIT_LEN(DEFAULT_PROMPT), &prombuf[0]);
+
 GBLDEF	mv_stent	*mv_chain;
 GBLDEF	sgm_info	*first_sgm_info;	/* List of participating regions in the TP transaction with NO ftok ordering */
 GBLDEF	sgm_info	*first_tp_si_by_ftok;	/* List of participating regions in the TP transaction sorted on ftok order */
@@ -244,7 +259,8 @@ GBLDEF	tp_region	*halt_ptr,
 			*grlist;
 GBLDEF	trans_num	local_tn;	/* transaction number for THIS PROCESS (starts at 0 each time) */
 GBLDEF	gv_namehead	*gv_target;
-GBLDEF	gv_namehead	*gv_target_list;
+GBLDEF	gv_namehead	*gv_target_list;	/* List of ALL gvts that were allocated (in targ_alloc) by this process */
+GBLDEF	gv_namehead	*gvt_tp_list;		/* List of gvts that were referenced in the current TP transaction */
 GBLDEF	gvt_container	*gvt_pending_list;	/* list of gvts that need to be re-examined/re-allocated when region is opened */
 GBLDEF	buddy_list	*gvt_pending_buddy_list;/* buddy_list for maintaining memory for gv_targets to be re-examined/allocated */
 
@@ -268,6 +284,8 @@ GBLDEF	boolean_t	certify_all_blocks = FALSE;	/* If flag is set all blocks are ch
 GBLDEF	mval		curr_gbl_root;
 GBLDEF	gd_addr		*original_header;
 GBLDEF	hash_table_mname *gd_tab_ptr = NULL;
+GBLDEF	hash_table_str	*complits_hashtab = NULL;
+GBLDEF	hash_table_str	*compsyms_hashtab = NULL;
 GBLDEF	mem_list	*mem_list_head;
 GBLDEF	boolean_t	debug_mupip;
 GBLDEF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
@@ -375,7 +393,7 @@ GBLDEF	int			gtmsecshr_cli_sockpath_len;
 GBLDEF	mstr			gtmsecshr_pathname;
 GBLDEF	int			server_start_tries;
 GBLDEF	int			gtmsecshr_log_file;
-GBLDEF	int			gtmsecshr_sockfd = -1;
+GBLDEF	int			gtmsecshr_sockfd = FD_INVALID;
 GBLDEF	boolean_t		gtmsecshr_sock_init_done = FALSE;
 GBLDEF	char			muext_code[MUEXT_MAX_TYPES][2] =
 				{	{'0', '0'},
@@ -430,7 +448,7 @@ GBLDEF	volatile int4		jnl_qio_in_prog;
 #ifdef UNIX
 GBLDEF	gtmsiginfo_t		signal_info;
 #ifndef MUTEX_MSEM_WAKE
-GBLDEF	int			mutex_sock_fd = -1;
+GBLDEF	int			mutex_sock_fd = FD_INVALID;
 GBLDEF	struct sockaddr_un	mutex_sock_address;
 GBLDEF	struct sockaddr_un	mutex_wake_this_proc;
 GBLDEF	int			mutex_wake_this_proc_len;
@@ -453,6 +471,7 @@ GBLDEF	parmblk_struct 		*param_list; /* call-in parameters block (defined in uni
 GBLDEF	unsigned int		invocation_mode = MUMPS_COMPILE; /* how mumps has been invoked */
 GBLDEF	char			cli_err_str[MAX_CLI_ERR_STR] = "";   /* Parse Error message buffer */
 GBLDEF	char			*cli_err_str_ptr = NULL;
+GBLDEF	io_desc			*gtm_err_dev = NULL;
 #endif
 
 /* this array is indexed by file descriptor */
@@ -481,7 +500,7 @@ GBLDEF	volatile int		suspend_status = NO_SUSPEND;
 
 GBLDEF	gv_namehead		*reset_gv_target = INVALID_GV_TARGET;
 GBLDEF	VSIG_ATOMIC_T		util_interrupt = 0;
-GBLDEF	boolean_t		kip_incremented;
+GBLDEF	sgmnt_addrs		*kip_csa;
 GBLDEF	boolean_t		need_kip_incr;
 GBLDEF	int			merge_args = 0;
 GBLDEF	merge_glvn_ptr		mglvnp = NULL;
@@ -975,6 +994,19 @@ GBLDEF	int4		pin_fail_ref_cnt;		/* Reference count when we failed to pin */
 GBLDEF	int4		pin_fail_in_wtstart;		/* Count of processes in wcs_wtstart when we failed to pin */
 GBLDEF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 commit when we failed to pin */
 
+GBLDEF	zwr_hash_table	*zwrhtab;			/* How we track aliases during zwrites */
+GBLDEF	uint4		zwrtacindx;			/* When creating $ZWRTACxxx vars for ZWRite, this holds xxx */
+GBLDEF	uint4		tstartcycle;			/* lv_val cycle for tstart operations */
+GBLDEF	uint4		lvtaskcycle;			/* lv_val cycle for misc lv_val related tasks */
+GBLDEF	int4		SPGC_since_LVGC;			/* stringpool GCs since the last lv_val GC */
+GBLDEF	int4		LVGC_interval = MIN_SPGC_PER_LVGC;	/* dead data GC is done every LVGC_interval stringpool GCs */
+GBLDEF	lv_xnew_var	*xnewvar_anchor;		/* Anchor for unused lv_xnew_var blocks */
+GBLDEF	lv_xnew_ref	*xnewref_anchor;		/* Anchor for unused lv_xnew_ref blocks */
+
+#ifdef DEBUG_ALIAS
+GBLDEF	boolean_t	lvmon_enabled;			/* Enable lv_val monitoring */
+#endif
+
 #ifdef DEBUG
 GBLDEF	boolean_t	gtm_gvundef_fatal;
 GBLDEF	boolean_t	in_op_gvget;			/* TRUE if op_gvget() is a call ancestor in the C-stack */
@@ -1001,5 +1033,26 @@ GBLDEF	boolean_t	blocksig_initialized = FALSE;	/* set to TRUE when blockalrm and
 GBLDEF	sigset_t	blockalrm;
 GBLDEF	sigset_t	block_sigsent;	/* block all signals that can be sent externally
 					  (SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT) */
+GBLDEF  char            *gtm_core_file;
+GBLDEF  char            *gtm_core_putenv;
 #endif
 
+#ifdef __MVS__
+GBLDEF	char		*gtm_utf8_locale_object;
+GBLDEF	boolean_t	gtm_tag_utf8_as_ascii = TRUE;
+#endif
+#ifdef GTM_CRYPT
+GBLDEF	int4				gtmcrypt_init_state;            /* Represents the various states of encryption library */
+GBLDEF	int4				gbl_encryption_ecode;
+GBLDEF	char				dl_err[MAX_ERRSTR_LEN];
+
+GBLDEF	gtmcrypt_init_t			gtmcrypt_init_fnptr;
+GBLDEF  gtmcrypt_close_t        	gtmcrypt_close_fnptr;
+GBLDEF  gtmcrypt_hash_gen_t		gtmcrypt_hash_gen_fnptr;
+GBLDEF  gtmcrypt_encode_t		gtmcrypt_encode_fnptr;
+GBLDEF  gtmcrypt_decode_t		gtmcrypt_decode_fnptr;
+GBLDEF	gtmcrypt_getkey_by_hash_t	gtmcrypt_getkey_by_hash_fnptr;
+GBLDEF	gtmcrypt_getkey_by_name_t	gtmcrypt_getkey_by_name_fnptr;
+GBLDEF	gtmcrypt_strerror_t		gtmcrypt_strerror_fnptr;
+
+#endif /* GTM_CRYPT */

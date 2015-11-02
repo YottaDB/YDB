@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,6 +61,7 @@ void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned cha
 	assert(0 <= datalen);
 	iod = io_curr_device.in;
 	rm_ptr = (d_rm_struct *)(iod->dev_sp);
+	assert(NULL != rm_ptr);
 	vmvalptr->str.len = datalen;
 	vmvalptr->str.addr = (char *)stringpool.free;
         if (0 < datalen)
@@ -85,13 +86,10 @@ void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned cha
 			rm_ptr->dollar_key[MIN(delimlen, RM_BUFLEN - 1)] = '\0';
                 }
         }
-	/* if this is a pipe then we have to set dollar_device in the output device */
-	if (rm_ptr->pipe)
-	{
-		len = SIZEOF(ONE_COMMA) - 1;
-		memcpy(rm_ptr->dollar_device, ONE_COMMA, len);
-		memcpy(&rm_ptr->dollar_device[len], BADCHAR_DEVICE_MSG, SIZEOF(BADCHAR_DEVICE_MSG));
-	}
+	/* set dollar_device in the output device */
+	len = SIZEOF(ONE_COMMA) - 1;
+	memcpy(rm_ptr->dollar_device, ONE_COMMA, len);
+	memcpy(&rm_ptr->dollar_device[len], BADCHAR_DEVICE_MSG, SIZEOF(BADCHAR_DEVICE_MSG));
 }
 #endif
 
@@ -118,8 +116,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	FILE		*filstr;
 	boolean_t	pipe_zero_timeout = FALSE;
 	int		blocked_in = TRUE;
-	unsigned char	tchar;
-	int		tfcntl_res;
+	int		do_clearerr = FALSE;
+	int		saved_lastop;
 
 	error_def(ERR_IOEOF);
 	error_def(ERR_SYSCALL);
@@ -131,10 +129,11 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 
 	assert (io_ptr->state == dev_open);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
+	assert(NULL != rm_ptr);
 
 	/* if it is a pipe and it's the stdout returned then we need to get the read file descriptor
 	   from rm_ptr->read_fildes and the stream pointer from rm_ptr->read_filstr */
-	if (rm_ptr->pipe && rm_ptr->read_fildes)
+	if ((rm_ptr->pipe ZOS_ONLY(|| rm_ptr->fifo)) && (0 < rm_ptr->read_fildes))
 	{
 		assert(rm_ptr->read_filstr);
 		fildes = rm_ptr->read_fildes;
@@ -145,7 +144,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 		filstr = rm_ptr->filstr;
 	}
 
-	utf_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
+	utf_active = gtm_utf8_mode ? (IS_UTF_CHSET(io_ptr->ichset)) : FALSE;
 	if (io_ptr->dollar.x && rm_ptr->lastop == RM_WRITE)
 	{
 		if (!io_ptr->dollar.za)
@@ -153,6 +152,24 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 		io_ptr->dollar.x = 0;
 	}
 
+	/* if it's a fifo and not system input and the last operation was a write and O_NONBLOCK is set then
+	   turn if off.  A write will turn it on.  The default is RM_NOOP. */
+	if (rm_ptr->fifo && (0 != rm_ptr->fildes) && (RM_WRITE == rm_ptr->lastop))
+	{
+		flags = 0;
+		FCNTL2(rm_ptr->fildes, F_GETFL, flags);
+		if (0 > flags)
+			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+		if (flags & O_NONBLOCK)
+		{
+			FCNTL3(rm_ptr->fildes, F_SETFL, (flags & ~O_NONBLOCK), fcntl_res);
+			if (0 > fcntl_res)
+				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+		}
+	}
+
+	/* save the lastop for zeof test later */
+	saved_lastop = rm_ptr->lastop;
 	rm_ptr->lastop = RM_READ;
 	timer_id = (TID)iorm_readfl;
 	max_width = io_ptr->width - io_ptr->dollar.x;
@@ -220,8 +237,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					status = -2;
 			} else
 				tot_bytes_read = bytes_count = status;
-		} else if (!rm_ptr->pipe)
-		{	/* fifo or rms-file device */
+		} else if (!rm_ptr->pipe && !rm_ptr->fifo)
+		{	/* rms-file device */
 			do
 			{
 				if (EOF != (status = getc(filstr)))
@@ -239,26 +256,39 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 				} else
 				{
 					inchar = 0;
-					if (errno == 0)
-						status = 0;
-					else if (errno == EINTR)
+					if (feof(filstr))
 					{
-						if (out_of_time)
-							status = -2;
-						else
-							continue;		/* Ignore interrupt if not our wakeup */
+						status = 0;
+						clearerr(filstr);
 					}
+					else
+						do_clearerr = TRUE;
 					break;
 				}
 			} while (bytes_count < width);
 		} else
-		{	/* pipe device */
+		{	/* fifo or pipe device */
 			do
 			{
-				status = read(fildes, (sm_uc_ptr_t)&tchar, 1);
+				unsigned char tchar;
+				int tfcntl_res;
+				if (EOF != (status = getc(filstr)))
+				{
+					tchar = (unsigned char)status;
+					/* force it to process below in case character read is a 0 */
+					if (!status)
+						status = 1;
+				}
+				else if (feof(filstr))
+				{
+					status = 0;
+					clearerr(filstr);
+				}
+
 				if (0 > status)
 				{
-					if (!timed || 0 != msec_timeout)
+					do_clearerr = TRUE;
+					if (!rm_ptr->pipe || !timed || 0 != msec_timeout)
 					{
 						/* process for a non-pipe or r x or r x:1 or r x:0 after timer started*/
 						inchar = 0;
@@ -399,7 +429,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			}
                 } else
 		{	/* VARIABLE or STREAM */
-			assert(CHSET_M != chset);
+			assert(IS_UTF_CHSET(chset));
 			if (rm_ptr->inbuf_pos <= rm_ptr->inbuf_off)
 			{	/* reset buffer pointers */
 				rm_ptr->inbuf_pos = rm_ptr->inbuf_off = rm_ptr->inbuf;
@@ -620,10 +650,10 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 							break;		/* out of do loop */
 						temp_start = temp;
 						temp = (char *)UTF8_WCTOMB(utf_code, temp_start);
-						bytes_count += (temp - temp_start);
+						bytes_count += (int4)(temp - temp_start);
 						if (bytes_count > MAX_STRLEN)
 						{	/* need to leave bytes for this character in buffer */
-							bytes_count -= (temp - temp_start);
+							bytes_count -= (int4)(temp - temp_start);
 							rm_ptr->inbuf_off = char_start;
 							break;
 						}
@@ -653,25 +683,27 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 		}
  	}
 	real_errno = errno;
+	if (TRUE == do_clearerr)
+		clearerr(filstr);
+	memcpy(rm_ptr->dollar_device, "0", SIZEOF("0"));
+	io_ptr->dollar.za = 0;
 	/* On error, getc() returns EOF while read() returns -1. Both code paths converge here. Thankfully EOF is -1 on all
 	 * platforms that we know of so it is enough to check for -1 status here. Assert that below.
 	 */
 	assert(EOF == -1);
 	if ((-1 == status) && (EINTR != real_errno))
 	{
-		io_ptr->dollar.za = 9;
 		v->str.len = 0;
 		v->str.addr = (char *)stringpool.free;		/* ensure valid address */
 		if (timed && !out_of_time)
 			cancel_timer(timer_id);
 		if (EAGAIN != real_errno)
 		{
+			io_ptr->dollar.za = 9;
 			/* save error in $device */
 			DOLLAR_DEVICE_SET(rm_ptr, real_errno);
 			rts_error(VARLSTCNT(1) real_errno);
 		}
-		len = SIZEOF(ONE_COMMA_UNAVAILABLE);
-		memcpy(rm_ptr->dollar_device, ONE_COMMA_UNAVAILABLE, len);
 		ret = FALSE;
 	}
 
@@ -698,29 +730,30 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 		}
 	}
 
-	if (status == 0 && tot_bytes_read == 0 && !rm_ptr->fifo)
+	if (status == 0 && tot_bytes_read == 0)
 	{
 		v->str.len = 0;
 		v->str.addr = (char *)stringpool.free;		/* ensure valid address */
 		UNICODE_ONLY(v->str.char_len = 0;)
-		io_ptr->dollar.za = 0;
-		if (io_ptr->dollar.zeof == TRUE)
-		{
-			io_ptr->dollar.za = 9;
+
+		/* on end of file set $za to 9 */
+		len = SIZEOF(ONE_COMMA_DEV_DET_EOF);
+		memcpy(rm_ptr->dollar_device, ONE_COMMA_DEV_DET_EOF, len);
+		io_ptr->dollar.za = 9;
+
+		if ((TRUE == io_ptr->dollar.zeof) && (RM_READ == saved_lastop))
 			rts_error(VARLSTCNT(1) ERR_IOEOF);
-		}
+
 		io_ptr->dollar.zeof = TRUE;
-		if (pipe_zero_timeout)
-		{
-			/* it is a pipe r x:0 so set $device */
-			len = SIZEOF(ONE_COMMA_UNAVAILABLE);
-			memcpy(rm_ptr->dollar_device, ONE_COMMA_UNAVAILABLE, len);
-			io_ptr->dollar.za = 9;
-		}
 		io_ptr->dollar.x = 0;
 		io_ptr->dollar.y++;
 		if (io_ptr->error_handler.len > 0)
 			rts_error(VARLSTCNT(1) ERR_IOEOF);
+		if ((pipe_zero_timeout || rm_ptr->fifo) && out_of_time)
+		{
+			ret = TRUE;
+			out_of_time = FALSE;
+		}
 	} else
 	{
 		if (rm_ptr->pipe)
@@ -730,10 +763,6 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			else
 				ret = FALSE;
 		}
-
-		if (pipe_zero_timeout && EINTR == real_errno)
-			io_ptr->dollar.za = 9;
-
 		if (!utf_active || !rm_ptr->fixed)
 		{	/* if Unicode and fixed, already setup the mstr */
 			v->str.len = bytes_count;
@@ -757,8 +786,5 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			}
 		}
 	}
-	/* set device to 0 if ok */
-	if (ret == TRUE)
-		memcpy(rm_ptr->dollar_device, "0", SIZEOF("0"));
 	return (rm_ptr->pipe && out_of_time) ? FALSE : ret;
 }

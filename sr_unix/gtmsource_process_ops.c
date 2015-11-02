@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,10 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#if defined(__MVS__) && !defined(_ISOC99_SOURCE)
+#define _ISOC99_SOURCE
+#endif
 
 #include "mdef.h"
 
@@ -104,7 +108,7 @@ void gtmsource_init_sec_addr(struct sockaddr_in *secondary_addr)
 int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 {
 	int			connection_attempts, alert_attempts, save_errno, status;
-	char			print_msg[1024], msg_str[1024];
+	char			print_msg[1024], msg_str[1024], *errmsg;
 	gtmsource_local_ptr_t	gtmsource_local;
 	int			send_buffsize, recv_buffsize, tcp_s_bufsize;
 
@@ -125,7 +129,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 		CONNECT_SOCKET(gtmsource_sock_fd, (struct sockaddr *)secondary_addr, sizeof(*secondary_addr), status);
 		if (0 == status)
 			break;
-		repl_log(gtmsource_log_fp, FALSE, FALSE, "%d hard connection atempt failed : %s\n", connection_attempts + 1,
+		repl_log(gtmsource_log_fp, FALSE, FALSE, "%d hard connection attempt failed : %s\n", connection_attempts + 1,
 			 STRERROR(ERRNO));
 		repl_close(&gtmsource_sock_fd);
 		if (REPL_MAX_CONN_HARD_TRIES_PERIOD > jnlpool.gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD])
@@ -202,8 +206,11 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
 	}
 	if (0 != (status = get_recv_sock_buff_size(gtmsource_sock_fd, &recv_buffsize)))
+	{
+		errmsg = STRERROR(status);
 		rts_error(VARLSTCNT(10) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_LIT("Error getting socket recv buffsize"),
-			ERR_TEXT, 2, RTS_ERROR_STRING(STRERROR(status)));
+			ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
+	}
 	if (recv_buffsize < GTMSOURCE_TCP_RECV_BUFSIZE)
 	{
 		if (0 != (status = set_recv_sock_buff_size(gtmsource_sock_fd, GTMSOURCE_TCP_RECV_BUFSIZE)))
@@ -1027,7 +1034,7 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 		*repl_zlib_cmp_level_ptr = ZLIB_CMPLVL_NONE;	/* no compression */
 		return TRUE;
 	}
-	test_msg.datalen = cmplen;
+	test_msg.datalen = (int4)cmplen;
 	memcpy(test_msg.data, cmpbuf, test_msg.datalen);
 	gtmsource_repl_send((repl_msg_ptr_t)&test_msg, "REPL_CMP_TEST", MAX_SEQNO);
 	if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))

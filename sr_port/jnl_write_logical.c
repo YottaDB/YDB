@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,8 +45,10 @@ GBLREF	seq_num			seq_num_zero;
 void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 {
 	struct_jrec_upd		*jrec;
+	GTMCRYPT_ONLY(
+		struct_jrec_upd	*jrec_alt;
+	)
 	jnl_private_control	*jpc;
-
 	/* If REPL_WAS_ENABLED(csa) is TRUE, then we would not have gone through the code that initializes
 	 * jgbl.gbl_jrec_time or jpc->pini_addr. But in this case, we are not writing the journal record
 	 * to the journal buffer or journal file but write it only to the journal pool from where it gets
@@ -70,5 +72,13 @@ void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 	{	/* t_end and tp_tend already has set token or jnl_seqno into jnl_fence_ctl.token */
 		QWASSIGN(jrec->token_seq.token, jnl_fence_ctl.token);
 	}
+#	ifdef GTM_CRYPT
+	if (REPL_ALLOWED(csa))
+	{
+		jrec_alt = (struct_jrec_upd *)jfb->alt_buff;
+		jrec_alt->prefix = jrec->prefix;
+		QWASSIGN(jrec_alt->token_seq, jrec->token_seq);
+	}
+#	endif
 	JNL_WRITE_APPROPRIATE(csa, jpc, jfb->rectype, (jnl_record *)jrec, NULL, jfb);
 }

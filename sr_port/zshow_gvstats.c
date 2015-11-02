@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ STATICFNDEF void zshow_gvstats_output(zshow_out *output, mstr *gldname, mstr *re
 	zshow_output(output, &strcounter);			\
 	zshow_output(output, &keywordseparator);		\
 	ptr = i2ascl((uchar_ptr_t)valstr, gvstats->COUNTER);	\
-	valmstr.len = ptr - &valstr[0];				\
+	valmstr.len = (mstr_len_t)(ptr - &valstr[0]);		\
 	valmstr.addr = (char *)&valstr[0];			\
 	zshow_output(output, &valmstr);				\
 }

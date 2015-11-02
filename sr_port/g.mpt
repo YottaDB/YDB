@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987, 2003 Sanchez Computer Associates, Inc.	;
+;	Copyright 1987, 2009 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -60,5 +60,5 @@ ERR	u $p w !,$p($zs,",",2,99),!
 EXIT	i $d(%ZD),%ZD'=$p c %ZD
 	u $p:(ctrap="":exc="")
 	q
-LOOP	d base
+LOOP	if 1'=$zeof d base
 	q

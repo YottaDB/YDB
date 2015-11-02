@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -237,7 +237,7 @@ void	repl_inst_dump_gtmsrclcl(gtmsrc_lcl_ptr_t gtmsrclcl_ptr)
 		PRINT_OFFSET_PREFIX(offsetof(gtmsrc_lcl, connect_jnl_seqno), sizeof(gtmsrclcl_ptr->connect_jnl_seqno));
 		util_out_print( PREFIX_SRCLCL "Connect Sequence Number     !20@UQ [0x!16@XQ]", TRUE, idx,
 			&gtmsrclcl_ptr->connect_jnl_seqno, &gtmsrclcl_ptr->connect_jnl_seqno);
-		section_offset += sizeof(gtmsrc_lcl);
+		section_offset += SIZEOF(gtmsrc_lcl);
 	}
 }
 
@@ -287,7 +287,7 @@ void	repl_inst_dump_triplehist(char *inst_fn, int4 num_triples)
 		PRINT_OFFSET_PREFIX(offsetof(repl_triple, rcvd_from_instname[0]), sizeof(curtriple.rcvd_from_instname));
 		util_out_print(PREFIX_TRIPLEHIST "Received from Instance      !R15AD", TRUE, idx,
 			LEN_AND_STR((char *)curtriple.rcvd_from_instname));
-		section_offset += sizeof(repl_triple);
+		section_offset += SIZEOF(repl_triple);
 	}
 }
 

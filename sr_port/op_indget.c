@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,12 +34,9 @@ GBLREF	triple			*expr_start;
 
 void	op_indget(mval *dst, mval *target, mval *value)
 {
-	error_def(ERR_INDMAXNEST);
-	error_def(ERR_VAREXPECTED);
 	bool		rval;
 	mstr		object, *obj;
 	oprtype		v;
-	char		*i, *i_top, *c, *c_top;
 	lv_val 		*a;
 	int4		y;
 	triple		*s, *src, *oldchain, tmpchain, *r, *triptr;
@@ -47,6 +44,9 @@ void	op_indget(mval *dst, mval *target, mval *value)
 	lv_val		*lv;
 	var_tabent	targ_key;
 	ht_ent_mname	*tabent;
+
+	error_def(ERR_INDMAXNEST);
+	error_def(ERR_VAREXPECTED);
 
 	MV_FORCE_DEFINED(value);
 	MV_FORCE_STR(target);
@@ -66,60 +66,61 @@ void	op_indget(mval *dst, mval *target, mval *value)
 				a = (lv_val *)tabent->value;
 				*dst = a->v;
 			}
+			dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 			return;
 		}
 		comp_init(&target->str);
 		src = newtriple(OC_IGETSRC);
 		switch (window_token)
 		{
-		case TK_IDENT:
-			if (rval = lvn(&v, OC_SRCHINDX, 0))
-			{
-				s = newtriple(OC_FNGET2);
-				s->operand[0] = v;
-				s->operand[1] = put_tref(src);
-			}
-			break;
-		case TK_CIRCUMFLEX:
-			if (rval = gvn())
-			{
-				r = newtriple(OC_FNGVGET1);
-				s = newtriple(OC_FNGVGET2);
-				s->operand[0] = put_tref(r);
-				s->operand[1] = put_tref(src);
-			}
-			break;
-		case TK_ATSIGN:
-			if (shift_gvrefs)
-			{
-				dqinit(&tmpchain, exorder);
-				oldchain = setcurtchain(&tmpchain);
-				if (rval = indirection(&v))
+			case TK_IDENT:
+				if (rval = lvn(&v, OC_SRCHINDX, 0))
 				{
-					s = newtriple(OC_INDGET);
-					s->operand[0] = v;
-					s->operand[1] = put_tref(src);
-					newtriple(OC_GVSAVTARG);
-					setcurtchain(oldchain);
-					dqadd(expr_start, &tmpchain, exorder);
-					expr_start = tmpchain.exorder.bl;
-					triptr = newtriple(OC_GVRECTARG);
-					triptr->operand[0] = put_tref(expr_start);
-				} else
-					setcurtchain(oldchain);
-			} else
-			{
-				if (rval = indirection(&v))
-				{
-					s = newtriple(OC_INDGET);
+					s = newtriple(OC_FNGET2);
 					s->operand[0] = v;
 					s->operand[1] = put_tref(src);
 				}
-			}
-			break;
-		default:
-			stx_error(ERR_VAREXPECTED);
-			break;
+				break;
+			case TK_CIRCUMFLEX:
+				if (rval = gvn())
+				{
+					r = newtriple(OC_FNGVGET1);
+					s = newtriple(OC_FNGVGET2);
+					s->operand[0] = put_tref(r);
+					s->operand[1] = put_tref(src);
+				}
+				break;
+			case TK_ATSIGN:
+				if (shift_gvrefs)
+				{
+					dqinit(&tmpchain, exorder);
+					oldchain = setcurtchain(&tmpchain);
+					if (rval = indirection(&v))
+					{
+						s = newtriple(OC_INDGET);
+						s->operand[0] = v;
+						s->operand[1] = put_tref(src);
+						newtriple(OC_GVSAVTARG);
+						setcurtchain(oldchain);
+						dqadd(expr_start, &tmpchain, exorder);
+						expr_start = tmpchain.exorder.bl;
+						triptr = newtriple(OC_GVRECTARG);
+						triptr->operand[0] = put_tref(expr_start);
+					} else
+						setcurtchain(oldchain);
+				} else
+				{
+					if (rval = indirection(&v))
+					{
+						s = newtriple(OC_INDGET);
+						s->operand[0] = v;
+						s->operand[1] = put_tref(src);
+					}
+				}
+				break;
+			default:
+				stx_error(ERR_VAREXPECTED);
+				break;
 		}
 		v = put_tref(s);
 		if (comp_fini(rval, &object, OC_IRETMVAL, &v, target->str.len))

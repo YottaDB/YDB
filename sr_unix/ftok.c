@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,12 +14,19 @@
  *	Usage:  ftok <dbfile1> <dbfile2> ... <dbfilen>
  */
 
+#include "mdef.h"
+#include "main_pragma.h"
+/* Use system fprintf instead of gtm_fprintf.  Since ftok is a standalone process which has no timers there is no need for
+ * gtm_fprintf. This change also eliminates unnecessary code bloat.
+ */
+#define NO_GTM_FPRINTF
 #include "gtm_stdio.h"
+#undef NO_GTM_FPRINTF
 #include "gtm_stdlib.h"
 #include <sys/types.h>
 #include "gtm_ipc.h"
 #include <errno.h>
-#include <string.h>
+#include "gtm_string.h"
 
 #define DEFAULT_ID	43
 #define ID_PREFIX	"-id="
@@ -37,21 +44,19 @@ int main (int argc, char *argv[])
 	int	i;
 	int	id = DEFAULT_ID;
 
-#ifdef __MVS__
-	__argvtoascii_a(argc, argv);
-#endif
 	if (argc == 1)
 		PrintUsage;
 
 	if (*argv[1] == '-')
 	{
-		if (strncmp(argv[1], ID_PREFIX, sizeof(ID_PREFIX) - 1) != 0 || argv[1][sizeof(ID_PREFIX) - 1] == '\0')
+		if ((0 != STRNCMP_LIT(argv[1], ID_PREFIX)) || ('\0' == argv[1][sizeof(ID_PREFIX) - 1]))
 			PrintUsage;
 
 		errno = 0;
 		if (((id = ATOI(argv[1] + sizeof(ID_PREFIX) - 1)) == 0 && errno != 0) || id <= 0)
 		{
-			FPRINTF(stderr, "Invalid id %s specified, using default id %d\n", argv[1] + sizeof(ID_PREFIX) - 1, DEFAULT_ID);
+			FPRINTF(stderr, "Invalid id %s specified, using default id %d\n", \
+					argv[1] + sizeof(ID_PREFIX) - 1, DEFAULT_ID);
 			id = DEFAULT_ID;
 		}
 		i = 2;

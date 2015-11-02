@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	int4		status, max_reply_len;
 	struct CLB	*lnk;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
+	unsigned short	srv_buff_size;
 
 	error_def(ERR_BADSRVRNETMSG);
 	error_def(ERR_UNIMPLOP);
@@ -183,11 +184,18 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		{
 			if (*ptr++ != gv_cur_region->cmx_regnum)
 				rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
-			/* memcpy(gv_altkey, ptr, len - 1); */
-			CM_GET_USHORT(gv_altkey->top, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
+#ifdef DEBUG
+			CM_GET_USHORT(srv_buff_size, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
+			assert(srv_buff_size == gv_altkey->top);
+			/* Check gv_altkey has enough size allocated for the data to be copied*/
+			/*gv_init_reg would have got the correct key length from server*/
+			assert(srv_buff_size >= (len - 1 - sizeof(unsigned short) - sizeof(unsigned short) -
+							sizeof(unsigned short)));
+#endif
 			ptr += sizeof(unsigned short);
 			CM_GET_USHORT(gv_altkey->end, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
-			ptr += sizeof(unsigned short);
+			DEBUG_ONLY(assert(gv_altkey->end <= gv_altkey->top));
+  			ptr += sizeof(unsigned short);
 			CM_GET_USHORT(gv_altkey->prev, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 			ptr += sizeof(unsigned short);
 			memcpy(gv_altkey->base, ptr, len - 1 - sizeof(unsigned short) - sizeof(unsigned short) -

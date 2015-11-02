@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ void	comp_indr (mstr *obj)
 {
 	stack_frame	*sf;
 	unsigned char	*fix, *fix_base, *tmps, *syms, *save_msp;
-	int		tempsz, vartabsz, fixup_cnt;
+	int		tempsz, vartabsz, fixup_cnt, zapsz;
 	INTPTR_T	*vp;
 	ihdtyp		*rtnhdr;
 	error_def(ERR_STACKOFLOW);
@@ -49,7 +49,7 @@ void	comp_indr (mstr *obj)
 	tempsz = ROUND_UP2(rtnhdr->temp_size, SIZEOF(char *));
 	tmps = msp -= tempsz;
 	vartabsz = rtnhdr->vartab_len;
-	vartabsz *= sizeof(mval *);
+	vartabsz *= SIZEOF(ht_ent_mname *);
 	/* Check that our vars and friends can fit on this stack */
 	if ((msp -= vartabsz) <= stackwarn)
 	{
@@ -57,8 +57,7 @@ void	comp_indr (mstr *obj)
 		{
 			msp  = save_msp;
 			rts_error(VARLSTCNT(1) ERR_STACKOFLOW);
-		}
-		else
+		} else
 			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
 	}
 	syms = msp;
@@ -67,19 +66,19 @@ void	comp_indr (mstr *obj)
 	sf->old_frame_pointer = frame_pointer;
 	sf->type = 0;
 	sf->temps_ptr = tmps;
-	if (tempsz)
-		memset(tmps, 0, tempsz);
-	sf->l_symtab = (mval **)syms;
+	sf->l_symtab = (ht_ent_mname **)syms;
 	sf->vartab_len = rtnhdr->vartab_len;
-	if (vartabsz)
-		memset(syms, 0, vartabsz);
+	if (zapsz = (vartabsz + tempsz))
+		memset(syms, 0, zapsz);	/* Zap temps and symtab together */
 
 	sf->vartab_ptr = (char *)rtnhdr + rtnhdr->vartab_off;
 	sf->temp_mvals = rtnhdr->temp_mvals;
 	/* Code starts just past the literals that were fixed up and past the validation and hdr offset fields */
 	sf->mpc = (unsigned char *)rtnhdr + rtnhdr->fixup_vals_off + (rtnhdr->fixup_vals_num * sizeof(mval));
+	/* IA64 required SECTION_ALIGN_BOUNDARY alignment (16 bytes). ABS 2008/12
+	   This has been carried forward to other 64bit platfoms without problems */
         GTM64_ONLY(sf->mpc  = (unsigned char *)ROUND_UP2((UINTPTR_T)sf->mpc, SECTION_ALIGN_BOUNDARY));
-	sf->mpc = sf->mpc + (2 * sizeof(INTPTR_T)); /*Account for hdroffset and MAGIC_VALUE*/
+	sf->mpc = sf->mpc + (2 * sizeof(INTPTR_T)); /* Account for hdroffset and MAGIC_VALUE */
 	sf->flags = SFF_INDCE;		/* We will be needing cleanup for this frame */
 	DEBUG_ONLY(
 		vp = (INTPTR_T *)sf->mpc;

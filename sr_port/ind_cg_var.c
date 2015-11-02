@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,4 +28,5 @@ void ind_cg_var(mvar *v, var_tabent **p)
 	COMPUTE_HASH_MNAME(&((*p)[v->mvidx]));
 	(*p)[v->mvidx].var_name.addr = (char *)((v->mvname.addr - (char *)indr_stringpool.base) +
 						ROUND_UP2(sizeof(ihdtyp), NATIVE_WSIZE));
+	(*p)[v->mvidx].marked = FALSE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 /*	gtmxc_types.h - GT.M, Unix Edition External Call type definitions.  */
+
+#ifndef GTMXC_TYPES_H
+#define GTMXC_TYPES_H
 
 #ifdef __osf__
 /* Ensure 32-bit pointers for compatibility with GT.M internal representations.  */
@@ -64,3 +67,15 @@ xc_status_t 	gtm_ci(const char *c_rtn_name, ...);
 xc_status_t 	gtm_init(void);
 xc_status_t 	gtm_exit(void);
 void 		gtm_zstatus(char* msg, int len);
+
+typedef	int	gtmcrypt_key_t;
+
+typedef void	*xc_fileid_ptr_t;
+xc_status_t	gtm_filename_to_id(xc_string_t *filename, xc_fileid_ptr_t *fileid);
+xc_status_t	gtm_is_file_identical(xc_fileid_ptr_t fileid1, xc_fileid_ptr_t fileid2);
+void		gtm_xcfileid_free(xc_fileid_ptr_t fileid);
+
+void 		*gtm_malloc(size_t);
+void 		gtm_free(void *);
+
+#endif /* GTMXC_TYPES_H */

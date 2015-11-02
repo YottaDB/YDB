@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,8 @@
 #include "outofband.h"
 /* #include "xfer_enum.h" */
 #include "op.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
+#include "lv_val.h"
 #include "callg.h"
 #include "gtmmsg.h"
 #include "str2gvargs.h"
@@ -49,7 +51,7 @@ GBLREF 	mval			dollar_job;
 GBLREF	uint4			process_id;
 GBLREF	int * volatile		var_on_cstack_ptr;	/* volatile so that nothing gets optimized out */
 
-static const MIDENT_DEF(above_routine, sizeof("*above*") - 1, "*above*");
+static const MIDENT_CONST(above_routine, "*above*");
 
 #define	MAX_MPROF_STACK_LEVEL	1024
 #ifdef 	MPROF_DEBUGGING
@@ -501,8 +503,8 @@ void unw_prof_frame(void)
 		t = mprof_tree_insert(mprof_ptr->head_tblnd, &e);
 		/*update count and timing (from prof_fp) of frame I'm leaving*/
 		t->e.count++;
-		t->e.sys_time += prof_fp->sys_time;
-		t->e.usr_time += prof_fp->usr_time;
+		t->e.sys_time += (unsigned int)prof_fp->sys_time;
+		t->e.usr_time += (unsigned int)prof_fp->usr_time;
 		if (prof_fp->prev)
 		{
 			if (mprof_ptr->line_prof_stack > 0)
@@ -650,7 +652,7 @@ void crt_gbl(mprof_tree *p, int info_level)
 	if ((mprof_ptr->overflowed_levels) && (-1 == p->e.line_num))
 	{
 		tmp_str_len = data.str.len;
-		data.str.len += sizeof(OVERFLOW_STRING) - 1;
+		data.str.len += SIZEOF(OVERFLOW_STRING) - 1;
 		data.str.addr = (char *)pcalloc((unsigned int)data.str.len);
 		MEMCPY_LIT(dataval + tmp_str_len, OVERFLOW_STRING);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -208,12 +208,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	if (new_ipc)
 	{
 		/* Create the shared memory */
-#ifdef __MVS__
-		if (-1 == (udi->shmid = recvpool_shmid =
-			     shmget(IPC_PRIVATE, ROUND_UP(gtmrecv_options.buffsize, MEGA_BOUND), __IPC_MEGA | IPC_CREAT | RWDALL)))
-#else
 		if (-1 == (udi->shmid = recvpool_shmid = shmget(IPC_PRIVATE, gtmrecv_options.buffsize, IPC_CREAT | RWDALL)))
-#endif
 		{
 			udi->shmid = recvpool_shmid = INVALID_SHMID;
 			save_errno = errno;

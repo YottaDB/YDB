@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,9 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 
 #define INSERT			TRUE
 #define NO_INSERT		FALSE
@@ -129,6 +132,15 @@ typedef struct io_desc_struct
 	iconv_t				output_conv_cd;
 	enum code_set_type		in_code_set;
 	enum code_set_type		out_code_set;
+#endif
+	boolean_t			newly_created;
+#ifdef __MVS__
+	gtm_chset_t			file_chset;	/* from file tag */
+	gtm_chset_t			process_chset;	/* how to do conversion */
+	unsigned int			file_tag;
+	boolean_t			text_flag;
+	boolean_t			is_ichset_default;
+	boolean_t			is_ochset_default;
 #endif
 	gtm_chset_t			ichset;
 	gtm_chset_t			ochset;
@@ -348,6 +360,13 @@ LITREF unsigned char ebcdic_spaces_block[];
 
 #endif /* __MVS__ */
 
+#else /* !KEEP_zOS_EBCDIC && !VMS*/
+
+#define SPACES_BLOCK spaces_block
+#define RM_SPACES_BLOCK spaces_block
+
+#endif /* KEEP_zOS_EBCDIC || VMS */
+
 #define ICONV_OPEN_CD(DESC_CD, CODE_SRC, CODE_TARGET)		\
 {								\
 	if (!strcmp(CODE_TARGET, CODE_SRC))			\
@@ -367,13 +386,6 @@ LITREF unsigned char ebcdic_spaces_block[];
 	else if (ASCII_TO_EBCDIC == CD)				\
 		asc_to_ebc(*(DEST), *(SRC), *(IN_LEN_PTR));	\
 }
-
-#else /* !KEEP_zOS_EBCDIC && !VMS*/
-
-#define SPACES_BLOCK spaces_block
-#define RM_SPACES_BLOCK spaces_block
-
-#endif /* KEEP_zOS_EBCDIC || VMS */
 
 #define SET_ENCODING(CHSET, CHSET_MSTR)												\
 {																\

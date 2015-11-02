@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,7 +104,7 @@ GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
 	}														\
 }
 
-bool wcs_flu(bool options)
+boolean_t wcs_flu(uint4 options)
 {
 	bool			success, was_crit;
 	boolean_t		fix_in_wtstart, flush_hdr, jnl_enabled, sync_epoch, write_epoch, need_db_fsync, in_commit;
@@ -427,6 +427,7 @@ bool wcs_flu(bool options)
 			jnl_put_jrt_pini(csa);
 		jnl_write_epoch_rec(csa);
 	}
+	cnl->last_wcsflu_tn = csa->ti->curr_tn;	/* record when last successful wcs_flu occurred */
 	cnl->wcsflu_pid = 0;
 	if (!was_crit)
 		rel_crit(gv_cur_region);

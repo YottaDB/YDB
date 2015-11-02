@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,10 +55,14 @@ void iorm_wteol(int4 x,io_desc *iod)
 		rts_error(VARLSTCNT(1) ERR_NOTTOEOFONPUT);
 	}
 	rm_ptr->lastop = RM_WRITE;
+#ifdef __MVS__
+	if (CHSET_BINARY != iod->process_chset)
+	{
+#endif
 	for (i = 0; i < x ; i++)
 	{
 #ifdef UNICODE_SUPPORTED
-		if (CHSET_M != iod->ochset)
+		if (IS_UTF_CHSET(iod->ochset))
 		{
 			if (!rm_ptr->done_1st_write)
 			{
@@ -156,6 +160,10 @@ void iorm_wteol(int4 x,io_desc *iod)
 		}
 		iod->dollar.x = 0;
 	}
+#ifdef __MVS__
+	} else
+		iod->dollar.x = 0;	/* just reset $X for BINARY */
+#endif
 	iod->dollar.za = 0;
 	iod->dollar.y += x;
 	if (iod->length)

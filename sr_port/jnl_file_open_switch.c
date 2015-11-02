@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,11 +44,8 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts)
 	jpc = csa->jnl;
 
 	assert((ERR_JNLFILOPN != sts) && (NOJNL != jpc->channel) || (ERR_JNLFILOPN == sts) && (NOJNL == jpc->channel));
-	if ((ERR_JNLFILOPN != sts) && (NOJNL != jpc->channel))
-	{
-		F_CLOSE(jpc->channel, status);
-	}
-	jpc->channel = NOJNL;
+	if (NOJNL != jpc->channel)
+		JNL_FD_CLOSE(jpc->channel, status);	/* sets jpc->channel to NOJNL */
 	jnl_send_oper(jpc, sts);
 	/* attempt to create a new journal file */
 	memset(&create, 0, sizeof(create));

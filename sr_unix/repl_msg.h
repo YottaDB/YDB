@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,8 +110,8 @@ typedef struct	/* Used also to send a message of type REPL_INST_NOHIST */
 #define	REPL_TR_CMP_MSG_TYPE_MASK	((1 << REPL_TR_CMP_MSG_TYPE_BITS) - 1)
 
 /* Defines for sending REPL_TR_CMP_JNL_RECS2 message */
-#define	REPL_MSG_UNCMPLEN	sizeof(int4)
-#define	REPL_MSG_CMPLEN		sizeof(int4)
+#define	REPL_MSG_UNCMPLEN	SIZEOF(int4)
+#define	REPL_MSG_CMPLEN		SIZEOF(int4)
 #define	REPL_MSG_HDRLEN2	(REPL_MSG_HDRLEN + REPL_MSG_UNCMPLEN + REPL_MSG_CMPLEN)	/* 16-byte header */
 typedef struct	/* Used also to send a message of type REPL_TR_CMP_JNL_RECS2 */
 {

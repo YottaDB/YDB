@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@ void op_break(void)
 		while (c < c_top) if (*c++ == ',') break;
 		if (c < c_top)
 		{
-			line_length = c - 1 - line_start;	/* Go back one ',' */
+			line_length = (int)(c - 1 - line_start);	/* Go back one ',' */
 			assert(sizeof(line) >= line_length);
 			memcpy(line, line_start, MIN(line_length, sizeof(line)));
 		}

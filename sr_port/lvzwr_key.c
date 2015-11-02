@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@
 #include "zwrite.h"
 #include "gtm_string.h"
 
-GBLREF lvzwrite_struct lvzwrite_block;
+GBLREF lvzwrite_datablk *lvzwrite_block;
 
 unsigned char *lvzwr_key(unsigned char *buff, int size)
 {
@@ -28,13 +28,14 @@ unsigned char *lvzwr_key(unsigned char *buff, int size)
 	mstr	sub;
 	unsigned char *cp, *cq;
 
-	len = MIN(size, lvzwrite_block.curr_name->len);
+	assert(lvzwrite_block);
+	len = MIN(size, lvzwrite_block->curr_name->len);
 	assert(MAX_MIDENT_LEN >= len);
-	memcpy(buff, lvzwrite_block.curr_name->addr, len);
+	memcpy(buff, lvzwrite_block->curr_name->addr, len);
 	size -= len;
 	buff += len;
 
-	if (lvzwrite_block.subsc_count)
+	if (lvzwrite_block->subsc_count)
 	{
 		if (size)
 		{
@@ -43,14 +44,14 @@ unsigned char *lvzwr_key(unsigned char *buff, int size)
 		}
 		for (sub_idx = 0; ; )
 		{
-			mval_lex(((zwr_sub_lst *)lvzwrite_block.sub)->subsc_list[sub_idx].actual, &sub);
+			mval_lex(((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[sub_idx].actual, &sub);
 			if (0 <= (size -= sub.len))
 			{
 				memcpy(buff, sub.addr, sub.len);
 				buff += sub.len;
 			} else
 				break;
-			if (++sub_idx < lvzwrite_block.curr_subsc && size)
+			if (++sub_idx < lvzwrite_block->curr_subsc && size)
 			{
 				*buff++ = ',';
 				size--;

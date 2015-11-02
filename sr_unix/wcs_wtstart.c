@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,6 +52,9 @@
 #include "gds_blk_downgrade.h"
 #include "deferred_signal_handler.h"
 #include "memcoherency.h"
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 
 #define	REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, trace_cntr)	\
 {									\
@@ -70,7 +73,8 @@ GBLREF	uint4		process_id;
 GBLREF	sm_uc_ptr_t	reformat_buffer;
 GBLREF	int		reformat_buffer_len;
 GBLREF	volatile int	reformat_buffer_in_use;	/* used only in DEBUG mode */
-GBLREF	int		fast_lock_count;
+GBLREF	volatile int4	fast_lock_count;
+GBLREF	boolean_t	run_time;
 
 /* In case of a disk-full situation, we want to print a message every 1 minute. We maintain two global variables to that effect.
  * dskspace_msg_counter and save_dskspace_msg_counter. If we encounter a disk-full situation and both those variables are different
@@ -84,7 +88,7 @@ void	wcs_sync_epoch(TID tid, int4 hd_len, jnl_private_control **jpcptr);
 
 int4	wcs_wtstart(gd_region *region, int4 writes)
 {
-	blk_hdr_ptr_t		bp;
+	blk_hdr_ptr_t		bp, save_bp;
 	boolean_t               need_jnl_sync, queue_empty, got_lock, bmp_status;
 	cache_que_head_ptr_t	ahead;		/* serves dual purpose since cache_que_head = mmblk_que_head */
 	cache_state_rec_ptr_t	csr, csrfirst;	/* serves dual purpose for MM and BG */
@@ -103,7 +107,14 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	cache_rec_ptr_t		cr, cr_lo, cr_hi;
 	static	int4		error_message_loop_count = 0;
 	uint4			index;
-
+	boolean_t		is_mm;
+	GTMCRYPT_ONLY(
+		int		req_enc_blk_size;
+		int4		crypt_status = 0;
+		char		*inbuf;
+		boolean_t	is_encrypted;
+		blk_hdr_ptr_t	enc_bp;
+	)
 	error_def(ERR_DBFILERR);
 	error_def(ERR_JNLFSYNCERR);
 	error_def(ERR_TEXT);
@@ -114,11 +125,13 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	udi = FILE_INFO(region);
 	csa = &udi->s_addrs;
 	csd = csa->hdr;
+	is_mm = (dba_mm == csd->acc_meth);
+	assert(is_mm || (dba_bg == csd->acc_meth));
 
 	/* you don't enter this routine if this has been compiled with #define UNTARGETED_MSYNC and it is MM mode */
-#if defined(UNTARGETED_MSYNC)
-	assert(dba_mm != csd->acc_meth);
-#endif
+#	if defined(UNTARGETED_MSYNC)
+	assert(!is_mm);
+#	endif
 
 	BG_TRACE_ANY(csa, wrt_calls);	/* Calls to wcs_wtstart */
 	if (csd->wc_blocked)
@@ -153,18 +166,15 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	jpc = csa->jnl;
 	assert(!JNL_ALLOWED(csd) || NULL != jpc);	/* if journaling is allowed, we better have non-null csa->jnl */
 
-	if (dba_bg == csd->acc_meth)
+	if (!is_mm)
 	{
 		if (JNL_ENABLED(csd) && (NULL != jpc) && (NOJNL != jpc->channel))
-		{
-			if (SS_NORMAL != (err_status = jnl_qio_start(jpc)))
-			{
-				if (csa->now_crit && (ERR_JNLWRTNOWWRTR != err_status) && (ERR_JNLWRTDEFER != err_status))
-				{
-					jpc->jnl_buff->blocked = 0;
-					jnl_file_lost(jpc, err_status);
-				}
-			}
+		{	/* Before flushing the database buffers, give journal flushing a nudge. Any failures in writing to the
+			 * journal are not handled here since the main purpose of wcs_wtstart is to flush the database buffers
+			 * (not journal buffers). The journal issue will be caught later (in jnl_flush or some other jnl routine)
+			 * and appropriate errors, including triggering jnl_file_lost (if JNLCNTRL error) will be issued there.
+			 */
+			jnl_qio_start(jpc);
 		}
 		ahead = &csa->acc_meth.bg.cache_state->cacheq_active;
 		cr_lo = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
@@ -192,8 +202,12 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		}
 		if (NULL == csr)
 		{
-			NO_MSYNC_ONLY(queue_empty = TRUE;)	/* NO_MSYNC doesn't sync db, make sure it syncs the journal file */
-			break;					/* the queue is empty */
+			NO_MSYNC_ONLY(
+				/* NO_MSYNC doesn't sync db, make sure it syncs the journal file */
+				if (is_mm)
+					queue_empty = TRUE;
+			)
+			break;				/* the queue is empty */
 		}
 		if (csr == csrfirst)
 		{					/* completed a tour of the queue */
@@ -202,7 +216,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			break;
 		}
 		cr = (cache_rec_ptr_t)((sm_uc_ptr_t)csr - sizeof(cr->blkque));
-		if (dba_bg == csd->acc_meth)
+		if (!is_mm)
 		{
 			assert(!CR_NOT_ALIGNED(cr, cr_lo) && !CR_NOT_IN_RANGE(cr, cr_lo, cr_hi));
 			if (CR_BLKEMPTY == csr->blk)
@@ -274,7 +288,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			assert(0 == n);
 			assert(0 != csr->dirty);
 			/* We're going to write this block out now */
-			if (dba_bg == csd->acc_meth)
+			save_errno = 0;
+			if (!is_mm)
 			{
 				assert(FALSE == csr->data_invalid);	/* check that buffer has valid data */
 				csr->epid = process_id;
@@ -317,18 +332,44 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				assert(size <= csd->blk_size);
 				offset = (csd->start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)csr->blk * csd->blk_size;
 				INCR_GVSTATS_COUNTER(csa, cnl, n_dsk_write, 1);
-				/* Do db write without timer protect (not needed since wtstart not reenterable in one task) */
-				LSEEKWRITE(udi->fd, offset, bp, size, save_errno);
-				if ((blk_hdr_ptr_t)reformat_buffer == bp)
+				save_bp = bp;
+#				ifdef GTM_CRYPT
+				if (csd->is_encrypted)
 				{
-					DEBUG_ONLY(reformat_buffer_in_use--;)
-					assert(0 == reformat_buffer_in_use);
-					--fast_lock_count; /* allow interrupts now that we are done using the reformat buffer */
-					assert(0 <= fast_lock_count);
+					assert((unsigned char *)bp != reformat_buffer);
+					DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, (sm_uc_ptr_t)bp);
+					save_bp = (blk_hdr_ptr_t) GDS_ANY_ENCRYPTGLOBUF(bp, csa);
+					DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, (sm_uc_ptr_t)save_bp);
+					req_enc_blk_size = bp->bsiz - (SIZEOF(*bp));
+					if (BLK_NEEDS_ENCRYPTION(bp->levl, req_enc_blk_size))
+					{
+						ASSERT_ENCRYPTION_INITIALIZED;
+						memcpy(save_bp, bp, sizeof(blk_hdr));
+						GTMCRYPT_ENCODE_FAST(csa->encr_key_handle,
+								     (char *)(bp + 1),
+								     req_enc_blk_size,
+								     (char *)(save_bp + 1),
+								     crypt_status);
+						if (0 != crypt_status)
+							save_errno = crypt_status;
+					} else
+						memcpy(save_bp, bp, bp->bsiz);
+				}
+#				endif
+				if (0 == save_errno)
+				{	/* Do db write without timer protect (no need since wtstart not reenterable in one task) */
+					LSEEKWRITE(udi->fd, offset, save_bp, size, save_errno);
+					if ((blk_hdr_ptr_t)reformat_buffer == bp)
+					{
+						DEBUG_ONLY(reformat_buffer_in_use--;)
+						assert(0 == reformat_buffer_in_use);
+						/* allow interrupts now that we are done using the reformat buffer */
+						--fast_lock_count;
+						assert(0 <= fast_lock_count);
+					}
 				}
 			} else
 			{
-				save_errno = 0;
 #if defined(TARGETED_MSYNC)
 			        bp = (blk_hdr_ptr_t)(csa->db_addrs[0] + (sm_off_t)csr->blk * MSYNC_ADDR_INCS);
 				if ((sm_uc_ptr_t)bp > csa->db_addrs[1])
@@ -368,8 +409,9 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				{	/* first time and every minute */
 					send_msg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
 						 ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
-					gtm_putmsg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
-						   ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
+					if (!run_time)
+						gtm_putmsg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
+							   ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
 					save_dskspace_msg_counter = dskspace_msg_counter;
 					start_timer((TID)&dskspace_msg_timer, DSKSPACE_MSG_INTERVAL, dskspace_msg_timer, 0, NULL);
 				}
@@ -382,7 +424,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			 * to end of routine, since we still hold the lock on the cache-record */
 			queue_empty = !SUB_ENT_FROM_ACTIVE_QUE_CNT(&cnl->wcs_active_lvl, &cnl->wc_var_lock);
 			INCR_CNT(&cnl->wc_in_free, &cnl->wc_var_lock);
-			if (dba_bg == csd->acc_meth)
+			if (!is_mm)
 			{
 				csr->flushed_dirty_tn = csr->dirty;
 				csr->epid = 0;
@@ -403,10 +445,32 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			BG_TRACE_ANY(csa, wrt_noblks_wrtn);
 		assert(cnl->in_wtstart > 0 && csa->in_wtstart);
 	)
+	if (csa->dbsync_timer && n1)
+	{	/* If we already have a dbsync timer active AND we found at least one dirty cache record in the active queue
+		 * now, this means there has not been enough time period of idleness since the last update and so there is
+		 * no purpose to the existing timer. A new one would anyways be started whenever the last dirty cache
+		 * record in the current active queue is flushed. Cancel the previous one.
+		 */
+		cancel_timer((TID)csa);
+		csa->dbsync_timer = FALSE;
+	}
 	DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
 	CLEAR_WTSTART_PID(cnl, index);
+	/* do not allow interrupts (particularly dbsync timer) in this two-line window (C9J06-003139) */
+	assert(0 <= fast_lock_count);
+	++fast_lock_count;
 	csa->in_wtstart = FALSE;			/* This process can write again */
 	DECR_INTENT_WTSTART(cnl);
+	--fast_lock_count;
+	assert(0 <= fast_lock_count);
+	GTMCRYPT_ONLY(
+		if (0 != crypt_status)
+		{	/* Now that we have done all cleanup (reinserted the cache-record that failed the write and cleared
+			 * cnl->in_wtstart and cnl->intent_wtstart, go ahead and issue the error.
+			 */
+			GC_RTS_ERROR(crypt_status, region->dyn.addr->fname);
+		}
+	)
 	DEFERRED_EXIT_HANDLING_CHECK; /* now that in_wtstart is FALSE, check if deferred signal/exit handling needs to be done */
 	if (queue_empty)			/* Active queue has become empty. */
 		wcs_clean_dbsync_timer(csa);	/* Start a timer to flush-filehdr (and write epoch if before-imaging) */

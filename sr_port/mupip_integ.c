@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -118,6 +118,11 @@ GBLDEF global_list		*trees;
 GBLDEF sgmnt_data		mu_int_data;
 GBLDEF trans_num		largest_tn;
 GBLDEF int4			mu_int_blks_to_upgrd;
+/* The following global variable is used to store the encryption information for the current database. The
+ * variable is initialized in mu_int_init(mupip integ -file <file.dat>) and mu_int_reg(mupip integ -reg <reg_name>). */
+GTMCRYPT_ONLY(
+	GBLDEF	gtmcrypt_key_t	mu_int_encrypt_key_handle;
+)
 
 GBLREF bool			mu_ctrly_occurred;
 GBLREF bool			mu_ctrlc_occurred;
@@ -129,6 +134,7 @@ GBLREF gv_key			*gv_altkey;
 GBLREF sgmnt_addrs		*cs_addrs;
 GBLREF tp_region		*grlist;
 GBLREF bool			region;
+GBLREF boolean_t		debug_mupip;
 
 void mupip_integ(void)
 {
@@ -246,6 +252,8 @@ void mupip_integ(void)
 			disp_map_errors = 0;
 	}
 	tn_reset_specified = (CLI_PRESENT == cli_present("TN_RESET"));
+	/* DBG qualifier prints extra debug messages while waiting for KIP in region freeze */
+	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
 	mu_outofband_setup();
 #ifdef UNIX
 	ESTABLISH(mu_int_ch);
@@ -492,7 +500,7 @@ void mupip_integ(void)
 					util_len += i2hex_nofill(region ? cs_addrs->hdr->trans_hist.free_blocks :
 							mu_int_data.trans_hist.free_blocks, (uchar_ptr_t)&util_buff[util_len], 8);
 					MEMCPY_LIT(&util_buff[util_len], TEXT1);
-					util_len += sizeof(TEXT1) - 1;
+					util_len += SIZEOF(TEXT1) - 1;
 					util_len += i2hex_nofill(blocks_free, (uchar_ptr_t)&util_buff[util_len], 8);
 					util_buff[util_len] = 0;
 					util_out_print(util_buff, TRUE);

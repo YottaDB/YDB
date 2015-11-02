@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +9,9 @@
  *								*
  ****************************************************************/
 
-#ifndef __LOOKUP_VARIABLE_H__
-#define __LOOKUP_VARIABLE_H__
+#ifndef __CENABLE_H__
+#define __CENABLE_H__
 
-mval *lookup_variable(unsigned int x);
+void cenable(void);
 
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,10 +21,6 @@
 #include "private_code_copy.h"
 #include "gtm_text_alloc.h"
 
-#ifdef __ia64
-#include "ia64.h"
-#endif /*__ia64__*/
-
 GBLREF hash_table_objcode	cache_table;
 
 void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
@@ -32,8 +28,6 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 	mstr		rtn_str;
 	rhdtyp		*routine;
 	boolean_t	deleted;
-	IA64_ONLY(ia64_fmt_A4	inst;)
-	IA64_ONLY(zb_code	imm14;)
 
 	assert(zrecs->beg  <= zrecs->free);
 	assert(zrecs->free < zrecs->end);
@@ -54,19 +48,14 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 			z_ptr->action = NULL;
 		}
 	}
-#ifndef __ia64
-	*z_ptr->mpc = z_ptr->m_opcode;
-	inst_flush(z_ptr->mpc, sizeof(*z_ptr->mpc));
+
+	/* In the generated code, change the offset in TRANSFER TABLE */
+#ifdef COMPLEX_INSTRUCTION_UPDATE
+	EXTRACT_AND_UPDATE_INST(z_ptr->mpc, z_ptr->m_opcode);
 #else
-	EXTRACT_INST(z_ptr->mpc, inst, 3);
-	imm14 = z_ptr->m_opcode;
-	inst.format.imm7b = imm14;
-	inst.format.imm6d = imm14 >> 7;
-	inst.format.sb = imm14 >> 13;
-	/* Revist when instruction bundling implemented */
-	UPDATE_INST(z_ptr->mpc, inst, 3);
-	inst_flush(z_ptr->mpc, sizeof(ia64_bundle));
+	*z_ptr->mpc = z_ptr->m_opcode;
 #endif
+	inst_flush(z_ptr->mpc, sizeof(INST_TYPE));
 
 #ifdef USHBIN_SUPPORTED
 	if (((z_ptr == zrecs->beg) || !MIDENT_EQ((z_ptr - 1)->rtn, z_ptr->rtn)) &&

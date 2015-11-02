@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,6 +68,7 @@ GBLREF	mur_opt_struct	mur_options;
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	jnlpool_addrs	jnlpool;
+GBLREF	boolean_t	have_standalone_access;
 
 #define            		STAR_QUOTE "\"*\""
 boolean_t mur_open_files()
@@ -279,6 +280,7 @@ boolean_t mur_open_files()
 					gtm_putmsg(VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(rctl->gd));
 					return FALSE;
 				}
+				have_standalone_access = TRUE;
 				rctl->standalone = TRUE;
 			}
 			if (mur_options.update || mur_options.extr[GOOD_TN])

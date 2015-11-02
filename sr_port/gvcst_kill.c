@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,7 @@
 #include "wcs_sleep.h"
 #include "wbox_test_init.h"
 #include "memcoherency.h"
+#include "util.h"
 
 GBLREF	boolean_t		is_updproc;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
@@ -75,12 +76,12 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		t_tries;
-GBLREF	boolean_t 		kip_incremented;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	boolean_t		is_replicator;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	int4			update_trans;
 GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	sgmnt_addrs		*kip_csa;
 
 void	gvcst_kill(bool do_subtree)
 {
@@ -343,7 +344,7 @@ void	gvcst_kill(bool do_subtree)
 					csa->next_fenced = NULL;
 				}
 				need_kip_incr = FALSE;
-				assert(!kip_incremented);
+				assert(NULL == kip_csa);
 				continue;
 			}
 			/* In case this is MM and t_end caused a database extension, reset csd */
@@ -364,39 +365,31 @@ void	gvcst_kill(bool do_subtree)
 			 * the history's curr.match.  However, this record will have been shuffled to the position of
 			 * the "left hand" key, and therefore, the original curr.offset should be left untouched. */
 			gv_target->hist.h[0].curr_rec.match = alt_hist->h[0].curr_rec.match;
-			memcpy(&gv_target->clue, gv_altkey, sizeof(gv_key) + gv_altkey->end);
+			COPY_CURRKEY_TO_GVTARGET_CLUE(gv_target, gv_altkey);
 		}
 		if (0 == dollar_tlevel)
 		{
-			assert(0 < kill_set_head.used || !kip_incremented);
+			assert(0 < kill_set_head.used || (NULL == kip_csa));
 			if (0 < kill_set_head.used)     /* free subtree, decrease kill_in_prog */
 			{	/* If csd->dsid is non-zero then some rc code was exercised before the changes
 				 * to prevent pre-commit expansion of the kill subtree. Not clear on what to do now.
 				 */
 				assert(!csd->dsid);
-                        	GTM_WHITE_BOX_TEST(WBTEST_ABANDONEDKILL, sleep_counter, SLEEP_ONE_MIN);
-#				ifdef DEBUG
-	                        if (SLEEP_ONE_MIN == sleep_counter)
-				{
-					assert(gtm_white_box_test_case_enabled);
-					while (1 <= sleep_counter)
-						wcs_sleep(sleep_counter--);
-				}
-#				endif
+				ENABLE_WBTEST_ABANDONEDKILL;
 				gvcst_expand_free_subtree(&kill_set_head);
 				/* In case this is MM and gvcst_expand_free_subtree() called gvcst_bmp_mark_free() called t_retry()
 				 * which remapped an extended database, reset csd */
 				assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
 				csd = cs_data;
-				DECR_KIP(csd, csa, kip_incremented);
+				DECR_KIP(csd, csa, kip_csa);
 			}
-			assert(0 < kill_set_head.used || !kip_incremented);
+			assert(0 < kill_set_head.used || (NULL == kip_csa));
 			for (ks = kill_set_head.next_kill_set;  NULL != ks;  ks = temp_ks)
 			{
 				temp_ks = ks->next_kill_set;
 				free(ks);
 			}
-			assert(0 < kill_set_head.used || !kip_incremented);
+			assert(0 < kill_set_head.used || (NULL == kip_csa));
 		}
 		return;
 retry:		t_retry(cdb_status);

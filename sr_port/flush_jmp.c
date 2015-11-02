@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,8 @@ GBLREF	symval		*curr_symval;
  * In that case, we do not want to restore "stackwarn" to its previous value since we are still handling
  * the STACKCRIT error. So we set MVST_STCK_SP type as needing to be preserved.
  */
-LITDEF	boolean_t	mvs_save[] = {
+LITDEF	boolean_t	mvs_save[] =
+{
 	TRUE,	/* MVST_MSAV */
 	FALSE,	/* MVST_MVAL */
 	TRUE,	/* MVST_STAB */
@@ -54,7 +55,8 @@ LITDEF	boolean_t	mvs_save[] = {
 	TRUE,	/* MVST_TPHOLD */
 	TRUE,	/* MVST_ZINTR */
 	FALSE,	/* MVST_ZINTDEV */
-	TRUE	/* MVST_STCK_SP */
+	TRUE,	/* MVST_STCK_SP */
+	TRUE	/* MVST_LVAL */
 };
 
 void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr)
@@ -89,22 +91,22 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	frame_pointer->mpc = transfer_addr;
 	frame_pointer->ctxt = context;
 #ifdef HAS_LITERAL_SECT
-	frame_pointer->literal_ptr = (int4 *)0;
+	frame_pointer->literal_ptr = (int4 *)NULL;
 #endif
 	frame_pointer->temp_mvals = frame_pointer->rvector->temp_mvals;
 	size = rtn_base->temp_size;
-	frame_pointer->temps_ptr = (unsigned char *) frame_pointer - size;
-	size += rtn_base->vartab_len * sizeof(mval *);
-	frame_pointer->l_symtab = (mval **)((char *) frame_pointer - size);
+	frame_pointer->temps_ptr = (unsigned char *)frame_pointer - size;
+	size += rtn_base->vartab_len * SIZEOF(ht_ent_mname *);
+	frame_pointer->l_symtab = (ht_ent_mname **)((char *)frame_pointer - size);
 	assert(frame_pointer->type & SFT_COUNT);
-	assert((unsigned char *) mv_chain > stacktop && (unsigned char *) mv_chain <= stackbase);
+	assert((unsigned char *)mv_chain > stacktop && (unsigned char *)mv_chain <= stackbase);
 
-	while ((char *) mv_chain < (char *) frame_pointer && !mvs_save[mv_chain->mv_st_type])
+	while ((char *)mv_chain < (char *)frame_pointer && !mvs_save[mv_chain->mv_st_type])
 	{
 		msp = (unsigned char *)mv_chain;
 		op_oldvar();
 	}
-	if ((char *) mv_chain > (char *) frame_pointer)
+	if ((char *)mv_chain > (char *)frame_pointer)
 	{
 		msp_save = msp;
 		msp = (unsigned char *)frame_pointer->l_symtab;
@@ -121,27 +123,27 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 		return;
 	}
 	mv_st_ent = mv_chain;
-	mv_st_prev = (mv_stent *)((char *) mv_st_ent + mv_st_ent->mv_st_next);
-	top = (char *) mv_st_ent + mvs_size[mv_st_ent->mv_st_type];
-	while ((char *) mv_st_prev < (char *) frame_pointer)
+	mv_st_prev = (mv_stent *)((char *)mv_st_ent + mv_st_ent->mv_st_next);
+	top = (char *)mv_st_ent + mvs_size[mv_st_ent->mv_st_type];
+	while ((char *)mv_st_prev < (char *)frame_pointer)
 	{
 		mv_st_type = mv_st_prev->mv_st_type;
 		if (!mvs_save[mv_st_type])
 		{
 			unw_mv_ent(mv_st_prev);
 			mv_st_ent->mv_st_next += mv_st_prev->mv_st_next;
-			mv_st_prev = (mv_stent *)((char *) mv_st_prev + mv_st_prev->mv_st_next);
+			mv_st_prev = (mv_stent *)((char *)mv_st_prev + mv_st_prev->mv_st_next);
 			continue;
 		}
 		if (mv_st_prev != (mv_stent *)top)
 			memmove(top, mv_st_prev, mvs_size[mv_st_prev->mv_st_type]);
 		mv_st_ent->mv_st_next = mvs_size[mv_st_ent->mv_st_type];
 		mv_st_ent = (mv_stent *)top;
-		mv_st_ent->mv_st_next += (char *) mv_st_prev - top;
+		mv_st_ent->mv_st_next += (unsigned int)((char *)mv_st_prev - top);
 		top += mvs_size[mv_st_ent->mv_st_type];
-		mv_st_prev = (mv_stent *)((char *) mv_st_ent + mv_st_ent->mv_st_next);
+		mv_st_prev = (mv_stent *)((char *)mv_st_ent + mv_st_ent->mv_st_next);
 	}
-	shift = (int4)((char *) frame_pointer - top - size);
+	shift = (int4)((char *)frame_pointer - top - size);
 	if (shift)
 	{
    		if ((unsigned char *)mv_chain + shift <= stackwarn)
@@ -151,11 +153,11 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
    			else
    				rts_error(VARLSTCNT(1) ERR_STACKCRIT);
       		}
-		memmove((char *) mv_chain + shift, mv_chain, top - (char *) mv_chain);
-		mv_chain = (mv_stent *)((char *) mv_chain + shift);
-		mv_st_ent = (mv_stent *)((char *) mv_st_ent + shift);
+		memmove((char *)mv_chain + shift, mv_chain, top - (char *)mv_chain);
+		mv_chain = (mv_stent *)((char *)mv_chain + shift);
+		mv_st_ent = (mv_stent *)((char *)mv_st_ent + shift);
 		mv_st_ent->mv_st_next -= shift;
-		msp = (unsigned char *) mv_chain;
+		msp = (unsigned char *)mv_chain;
 	}
 	memset(frame_pointer->l_symtab, 0, size);
 	return;

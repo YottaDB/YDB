@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,26 @@ enum tp_unwind_invocation
 	RESTART_INVOCATION
 };
 
-void	tp_unwind(short newlevel, enum tp_unwind_invocation);
+/* Array size to hold post unwind restored lv_vals to scan for containers differs between
+   pro and dbg builds. For dbg, we want to exercise the code where more than one of the
+   blocks is being processed but for production, we size the array where more than the
+   one allocated in automatic storage would be "unusual".
+*/
+#ifdef DEBUG
+#  define ARY_SCNCNTNR_DIM 1
+#else
+#  define ARY_SCNCNTNR_DIM 28
+#endif
+#define ARY_SCNCNTNR_MAX (ARY_SCNCNTNR_DIM - 1)
+
+typedef struct post_restore_lvscan_struct
+{
+	struct post_restore_lvscan_struct *next;
+	lv_val	*ary_scncntnr[ARY_SCNCNTNR_DIM];
+	int	elemcnt;
+} lvscan_blk;
+
+void tp_unwind(short newlevel, enum tp_unwind_invocation);
+void tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvscan_blk **lvscan_anchor);
 
 #endif

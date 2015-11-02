@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -290,15 +290,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						}
 					}
 					if (!gtm_utf8_mode)
-					{
-						if (!IS_ASCII(curchar))
-						{
-							++inchar;
-							instr->addr = (char *)inchar;
-							return ERR_PATLIT;
-						}
 						bytelen = 1;
-					}
 					UNICODE_ONLY(
 					else
 					{
@@ -308,11 +300,11 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 							instr->addr = (char *)inchar;
 							return ERR_PATLIT;
 						}
-						if (!IS_ASCII(curchar))
-							strlit.flags |= PATM_STRLIT_NONASCII;
 						assert(1 <= bytelen);
 					}
 					)
+					if (!IS_ASCII(curchar))
+						strlit.flags |= PATM_STRLIT_NONASCII;
 					strlit.bytelen += bytelen;
 					if (strlit.bytelen >= alloclen)
 					{

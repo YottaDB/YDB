@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,12 @@
 
 #include "mdef.h"
 
-#include <errno.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include "gtm_socket.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
+#include "gtm_inet.h"
+
+#include <errno.h>
 
 #include "io.h"
 #include "iotcpdef.h"

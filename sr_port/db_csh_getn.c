@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <signal.h>	/* needed for VSIG_ATOMIC_T */
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -40,6 +41,7 @@
 #include "wcs_timer_start.h"
 #include "add_inter.h"
 #include "wbox_test_init.h"
+#include "have_crit.h"
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
@@ -62,6 +64,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	sgmnt_data_ptr_t	csd;
 	srch_blk_status		*tp_srch_status;
 	ht_ent_int4		*tabent;
+	int			save_intrpt_ok_state;
 
 	error_def(ERR_BUFRDTIMEOUT);
 	error_def(ERR_INVALIDRIP);
@@ -78,6 +81,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	pass2 = 2 * max_ent;	/* skip referred cache records */
 	pass3 = 3 * max_ent;	/* skip nothing */
 	INCR_DB_CSH_COUNTER(csa, n_db_csh_getns, 1);
+	SAVE_INTRPT_OK_STATE(INTRPT_IN_DB_CSH_GETN);
 	for (lcnt = 0;  ; lcnt++)
 	{
 		if (lcnt > pass3)
@@ -127,16 +131,26 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			 *	them even if they don't have a cse. This is to ensure that the current action doesn't
 			 *	encounter a restart due to cdb_sc_lostcr in "tp_hist" even in the fourth-retry.
 			 */
+			tp_srch_status = NULL;
 			if (dollar_tlevel && (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&cr->blk)))
-				&& (tp_srch_status = (srch_blk_status *) tabent->value) && tp_srch_status->cse)
+					&& (tp_srch_status = (srch_blk_status *)tabent->value) && (tp_srch_status->cse))
 			{	/* this process is already using the block - skip it */
 				cr->refer = TRUE;
 				continue;
 			}
 			if (NULL != lookup_hashtab_int4(&cw_stagnate, (uint4 *)&cr->blk))
-			{
+			{	/* this process is already using the block for the current gvcst_search - skip it */
 				cr->refer = TRUE;
 				continue;
+			}
+			if (NULL != tp_srch_status)
+			{	/* About to reuse a buffer that is part of the read-set of the current TP transaction.
+				 * Reset clue as otherwise the next global reference of that global will use an outofdate clue.
+				 * Even though tp_srch_status is available after the sgm_info_ptr->blks_in_use hashtable check,
+				 * we dont want to reset the clue in case the cw_stagnate hashtable check causes the same cr
+				 * to be skipped from reuse. Hence the placement of this reset logic AFTER the cw_stagnate check.
+				 */
+				tp_srch_status->blk_target->clue.end = 0;
 			}
 		}
 		if (cr->dirty)
@@ -298,10 +312,12 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			csa->nl->cache_hits = 0;
 		}
 		INCR_DB_CSH_COUNTER(csa, n_db_csh_getn_lcnt, lcnt);
+		RESTORE_INTRPT_OK_STATE;
 		return cr;
 	}
 	/* force a recover */
 	INCR_DB_CSH_COUNTER(csa, n_db_csh_getn_lcnt, lcnt);
 	csa->nl->cur_lru_cache_rec_off = GDS_ABS2REL(cr);
+	RESTORE_INTRPT_OK_STATE;
 	return (cache_rec_ptr_t)CR_NOTVALID;
 }

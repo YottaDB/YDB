@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,11 +64,11 @@ void mutex_sock_init(void)
 	error_def(ERR_TEXT);
 	error_def(ERR_MUTEXRSRCCLNUP);
 
-	if (mutex_sock_fd != -1) /* Initialization done already */
+	if (FD_INVALID != mutex_sock_fd) /* Initialization done already */
 		return;
 
 	/* Create the socket used for sending and receiving mutex wake mesgs */
-	if ((mutex_sock_fd = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
+	if (FD_INVALID == (mutex_sock_fd = socket(AF_UNIX, SOCK_DGRAM, 0)))
 		rts_error(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("Error with mutex socket create"), errno);
 
 	memset((char *)&mutex_sock_address, 0, sizeof(mutex_sock_address));
@@ -93,18 +93,18 @@ void mutex_sock_init(void)
 	}
 
 	strcpy(mutex_sock_path + mutex_sock_path_len, MUTEX_SOCK_FILE_PREFIX);
-	mutex_sock_path_len += (sizeof(MUTEX_SOCK_FILE_PREFIX) - 1);
+	mutex_sock_path_len += (SIZEOF(MUTEX_SOCK_FILE_PREFIX) - 1);
 	mutex_wake_this_proc_prefix_len = mutex_sock_path_len;
 	/* Extend mutex_sock_path with pid */
 	strcpy(mutex_sock_path + mutex_sock_path_len, (char *)pid2ascx(pid_str, process_id));
-	mutex_sock_path_len += strlen((char *)pid_str);
+	mutex_sock_path_len += STRLEN((char *)pid_str);
 
 	if (mutex_sock_path_len > sizeof(mutex_sock_address.sun_path))
 		rts_error(VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("Mutex socket path too long"));
 
 	mutex_sock_address.sun_family = AF_UNIX;
 	strcpy(mutex_sock_address.sun_path, mutex_sock_path);
-	mutex_sock_len = sizeof(mutex_sock_address.sun_family) + mutex_sock_path_len + 1; /* Include NULL byte in length */
+	mutex_sock_len = SIZEOF(mutex_sock_address.sun_family) + mutex_sock_path_len + 1; /* Include NULL byte in length */
 
 	if (UNLINK(mutex_sock_address.sun_path) == -1) /* in case it was left from last time */
 	{

@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,8 +34,9 @@
 #include "is_file_identical.h"
 #include "dpgbldir.h"
 #include "rel_quant.h"
-#include "repl_sp.h"	/* F_CLOSE */
+#include "repl_sp.h"	/* for F_CLOSE used by the JNL_FD_CLOSE macro */
 #include "memcoherency.h"
+#include "gtm_dbjnl_dupfd_check.h"
 
 GBLREF	volatile int4	db_fsync_in_prog;
 GBLREF	volatile int4	jnl_qio_in_prog;
@@ -247,6 +248,21 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 			else
 				jb->enospc_errcnt = 0;
 			jnl_send_oper(jpc, ERR_JNLACCESS);
+#			ifdef GTM_FD_TRACE
+			if ((EBADF == status) || (ESPIPE == status))
+			{	/* likely case of D9I11-002714. check if fd is valid */
+				gtm_dbjnl_dupfd_check();
+				/* If fd of this journal points to some other database or journal file opened by this process
+				 * the above call would have reset jpc->channel. If it did not get reset, then check
+				 * if the fd in itself is valid and points back to the journal file. If not reset it to NOJNL.
+				 */
+				if (NOJNL != jpc->channel)
+					gtm_check_fd_is_valid(jpc->region, FALSE, jpc->channel);
+				/* If jpc->channel still did not get reset to NOJNL, it means the file descriptor is valid but
+				 * not sure why we are getting EBADF/ESPIPE errors. No further recovery attempted at this point.
+				 */
+			}
+#			endif
 			status = ERR_JNLACCESS;
 		}
 	}
@@ -260,8 +276,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	)
 	if ((jnl_closed == csa->hdr->jnl_state) && (NOJNL != jpc->channel))
 	{
-		F_CLOSE(jpc->channel, close_res);
-		jpc->channel = NOJNL;
+		JNL_FD_CLOSE(jpc->channel, close_res);	/* sets jpc->channel to NOJNL */
 		jpc->pini_addr = 0;
 	}
 	jnl_qio_in_prog--;

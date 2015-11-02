@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,7 @@ unsigned char	*format_key_mvals(unsigned char *buff, int size, lvname_info *lvnp
 
 	cnt = (int)lvnp->total_lv_subs - 1;
 	endbuff = format_lvname(lvnp->start_lvp, buff, size);
-	size -= (endbuff - buff);
+	size -= (int)(endbuff - buff);
 	buff = endbuff;
 
 	if (cnt > 0 && size > 0)

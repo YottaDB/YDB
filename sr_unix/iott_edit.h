@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,7 @@
 #ifndef IOTT_EDIT_H
 #define IOTT_EDIT_H
 
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 LITREF	unsigned char	ebcdic_lower_to_upper_table[];
 LITREF	unsigned char	e2a[];
 #	define	INPUT_CHAR	asc_inchar

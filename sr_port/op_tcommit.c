@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,8 @@
 #include "tp_timeout.h"
 #include "gtm_caseconv.h"
 #include "op.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
+#include "lv_val.h"
 #include "gvcst_expand_free_subtree.h"
 #include "format_targ_key.h"
 #include "bm_getfree.h"
@@ -54,6 +56,7 @@
 #include "wcs_sleep.h"
 #include "wbox_test_init.h"
 #include "memcoherency.h"
+#include "util.h"
 
 error_def(ERR_GBLOFLOW);
 error_def(ERR_GVIS);
@@ -269,7 +272,8 @@ void	op_tcommit(void)
 										status = cdb_sc_lostbmlcr;
 										break;
 									}
-									JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, old_block, bsiz);
+									JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, csa,
+													old_block, bsiz);
 								}
 							} else
 								cse->old_block = NULL;
@@ -323,7 +327,7 @@ void	op_tcommit(void)
 				assert(cdb_sc_normal != t_fail_hist[t_tries]);	/* else will go into an infinite try loop */
 				DEBUG_ONLY(
 					for (si = first_sgm_info;  si != temp_si; si = si->next_sgm_info)
-						assert(!si->kip_incremented);
+						assert(NULL == si->kip_csa);
 				)
 				if (cdb_sc_gbloflow == status)
 				{
@@ -367,23 +371,15 @@ void	op_tcommit(void)
 			{
 				if (NULL == si->kill_set_head)
 				{
-					assert(!si->kip_incremented);
+					assert(NULL == si->kip_csa);
 					continue;	/* no kills in this segment */
 				}
-				GTM_WHITE_BOX_TEST(WBTEST_ABANDONEDKILL, sleep_counter, SLEEP_ONE_MIN);
-#				ifdef DEBUG
-				if (SLEEP_ONE_MIN == sleep_counter)
-				{
-					assert(gtm_white_box_test_case_enabled);
-					while (1 <= sleep_counter)
-						wcs_sleep(sleep_counter--);
-				}
-#				endif
+				ENABLE_WBTEST_ABANDONEDKILL;
 				TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
 				sgm_info_ptr = si;	/* needed in gvcst_expand_free_subtree */
 				gvcst_expand_free_subtree(si->kill_set_head);
 				assert(NULL != si->kill_set_head);
-				DECR_KIP(cs_data, cs_addrs, si->kip_incremented);
+				DECR_KIP(cs_data, cs_addrs, si->kip_csa);
 			}		/* for (all segments in the transaction) */
 			assert(NULL == temp_si || NULL == si->kill_set_head);
 		}	/* if (kills in the transaction) */

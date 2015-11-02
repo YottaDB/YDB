@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -41,6 +41,7 @@ ENTRY op_fnget
 	movq	REG64_RET0,REG64_ARG0		#Set destination
 	REP					#Repeat until count is zero
 	movsb
+	andw	$~mval_m_aliascont, mval_w_mvtype(REG64_RET0)	# Don't propagate alias container flag
 	ret
 l5:	movw	$mval_m_str,mval_w_mvtype(REG64_RET0)
 	movl	$0,mval_l_strlen(REG64_RET0)

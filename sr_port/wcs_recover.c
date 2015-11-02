@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -153,9 +153,9 @@ void wcs_recover(gd_region *reg)
 	 * non-TP or TP transaction that has already PINNED a few buffers as otherwise we will create an out-of-design state.
 	 * The only exception is if we are in the 2nd phase of KILL in a TP transaction. In this case si->cr_aray_index
 	 * could be non-zero as it is reset only in tp_clean_up which is invoked AFTER freeing up ALL the blocks in
-	 * the function gvcst_expand_free_subtree. Work around this by checking for si->kip_incremented to be TRUE in this case.
+	 * the function gvcst_expand_free_subtree. Work around this by checking for si->kip_csa to be NON NULL in this case.
 	 */
-	assert((!dollar_tlevel && !cr_array_index) || (dollar_tlevel && (!si->cr_array_index || si->kip_incremented)));
+	assert((!dollar_tlevel && !cr_array_index) || (dollar_tlevel && (!si->cr_array_index || (NULL != si->kip_csa))));
 	/* We should never invoke wcs_recover in the final retry as that could cause the transaction in progress to restart
 	 * (which is an out-of-design situation). There are a few exceptions e.g. tp_restart/t_retry where we have not started
 	 * the transaction so allow those. Such places set the variable ok_to_call_wcs_recover to TRUE. Also if we are in
@@ -244,7 +244,7 @@ void wcs_recover(gd_region *reg)
 					assert(FALSE);
 					continue;
 				}
-				bufindx = (old_block - bp_lo) / csd->blk_size;
+				bufindx = (int4)((old_block - bp_lo) / csd->blk_size);
 				assert(0 <= bufindx);
 				assert(bufindx < csd->n_bts);
 				cr_alt = &cr_lo[bufindx];
@@ -794,7 +794,7 @@ void wcs_recover(gd_region *reg)
 
 #ifdef UNIX
 
-#ifndef __hppa
+#ifdef MM_FILE_EXT_OK
 void	wcs_mm_recover(gd_region *reg)
 {
 	int			mm_prot;
@@ -861,7 +861,7 @@ void	wcs_mm_recover(gd_region *reg)
 	sigprocmask(SIG_SETMASK, &savemask, NULL);
 	return;
 }
-#else	/* hppa */
+#else	/* !MM_FILE_EXT_OK */
 void	wcs_mm_recover(gd_region *reg)
 {
 	unsigned char		*end, buff[MAX_ZWR_KEY_SZ];

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,7 +112,7 @@ void op_setzpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval 
 	{
 		match_ptr = matchb(del->str.len, (uchar_ptr_t)del->str.addr,
 				   src_len, src_str, &match_res);
-		src_len -= (match_ptr - src_str);
+		src_len -= (int)(match_ptr - src_str);
 		src_str = match_ptr;
 		if (0 == match_res) /* if match not found */
 			goto l80;
@@ -127,7 +127,7 @@ void op_setzpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval 
 	do {
 		match_ptr = matchb(del->str.len, (uchar_ptr_t)del->str.addr,
 				   src_len, src_str, &match_res);
-		src_len -= (match_ptr - src_str);
+		src_len -= (int)(match_ptr - src_str);
 		src_str = match_ptr;
 		if (0 == match_res) /* if match not found */
 			goto l90;

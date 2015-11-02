@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,9 +91,6 @@ static	unsigned char	recall_error_msg[][MAX_ERR_MSG_LEN] =
 };
 
 error_def(ERR_IOEOF);
-#ifdef __MVS__
-error_def(ERR_ASC2EBCDICCONV);
-#endif
 
 #define	WRITE_GTM_PROMPT													\
 if (0 < gtmprompt.len)														\

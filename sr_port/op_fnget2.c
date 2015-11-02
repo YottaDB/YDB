@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,9 +15,8 @@
 void op_fnget2(mval *dst, mval *src, mval *defval)
 {
 	if (src && MV_DEFINED(src))
-	{	*dst = *src;
-	}
+		*dst = *src;
 	else
-	{	*dst = *defval;
-	}
+		*dst = *defval;
+	dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 }

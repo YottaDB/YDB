@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,11 @@ typedef struct
 
 typedef struct
 {
+#ifdef VMS
 	unsigned short channel;
+#else
+	signed short channel;	/* need to store -1 for invalid file descriptor hence SIGNED */
+#endif
 	uint4 maxmsg;
 	uint4 promsk;
 	unsigned char del_on_close;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,10 @@
 
 #include "mdef.h"
 
-#include "gtm_unistd.h"
 #include <errno.h>
+#include <sys/wait.h>
 
+#include "gtm_unistd.h"
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 
@@ -21,7 +22,7 @@
 #include "iormdef.h"
 #include "io_params.h"
 #include "eintr_wrappers.h"
-#include <sys/wait.h>
+#include "gtmio.h"
 
 LITREF unsigned char	io_params_size[];
 
@@ -38,7 +39,7 @@ void iorm_close(io_desc *iod, mval *pp)
 	struct stat	statbuf, fstatbuf;
 	int		p_offset;
 	pid_t  		done_pid;
-	int  		wait_status;
+	int  		wait_status, rc;
 
 	assert (iod->type == rm);
 	if (iod->state != dev_open)
@@ -90,9 +91,9 @@ void iorm_close(io_desc *iod, mval *pp)
 	}
 
 	if (iod->pair.in != iod)
-		assert (iod->pair.out == iod);
+		assert(iod->pair.out == iod);
 	if (iod->pair.out != iod)
-		assert (iod->pair.in == iod);
+		assert(iod->pair.in == iod);
 
 	iod->state = dev_closed;
 	iod->dollar.zeof = FALSE;
@@ -114,19 +115,29 @@ void iorm_close(io_desc *iod, mval *pp)
 	   in a newly JOBbed off process, the fclose() does an implied fflush() which is known to do an lseek() which resets
 	   the file pointers of any open (flat) files in the parent due to an archane interaction between child and parent
 	   processes prior to an execv() call. The fclose (for stream files) will fail but it will clean up structures orphaned
-	   by the close().
+	   by the CLOSEFILE_RESET.
 	*/
 	/* Close the fildes unless this is a direct close of the stderr device */
 	if (!rm_ptr->stderr_parent)
 	{
-		close(rm_ptr->fildes);
+		/* Before closing a pipe device file descriptor, check if the fd was already closed as part of a "write /eof".
+		 * If so, do not attempt the close now. Only need to free up the device structures.
+		 */
+		if (FD_INVALID != rm_ptr->fildes)
+			CLOSEFILE_RESET(rm_ptr->fildes, rc);	/* resets "rm_ptr->fildes" to FD_INVALID */
 		if (rm_ptr->filstr != NULL)
+		{
 			FCLOSE(rm_ptr->filstr, fclose_res);
+			rm_ptr->filstr = NULL;
+		}
 		/* if this is a pipe and read_fildes and read_filstr are set then close them also */
-		if (rm_ptr->read_fildes)
-			close(rm_ptr->read_fildes);
+		if (0 < rm_ptr->read_fildes)
+			CLOSEFILE_RESET(rm_ptr->read_fildes, rc);	/* resets "rm_ptr->read_fildes" to FD_INVALID */
 		if (rm_ptr->read_filstr != NULL)
+		{
 			FCLOSE(rm_ptr->read_filstr, fclose_res);
+			rm_ptr->read_filstr = NULL;
+		}
 	}
 
 	/* reap the forked shell process if a pipe - it will be a zombie, otherwise*/
@@ -149,36 +160,5 @@ void iorm_close(io_desc *iod, mval *pp)
 			remove_rms(rm_ptr->stderr_child);
 		}
 	}
-#ifdef __MVS__
-	if (rm_ptr->fifo)
-	{
-		if (rm_ptr != (iod->pair.out)->dev_sp || rm_ptr != (iod->pair.in)->dev_sp)
-		{
-			if (rm_ptr != (iod->pair.out)->dev_sp)
-			{
-				rm_ptr = (iod->pair.out)->dev_sp;
-				iod = iod->pair.out;
-			}
-			else
-			{
-				rm_ptr = (iod->pair.in)->dev_sp;
-				iod = iod->pair.in;
-			}
-			assert(NULL != rm_ptr);
-			if(dev_closed != iod->state)
-			{
-				iod->state = dev_closed;
-				iod->dollar.zeof = FALSE;
-				iod->dollar.x = 0;
-				iod->dollar.y = 0;
-				rm_ptr->lastop = RM_NOOP;
-				assert(rm_ptr->fildes>=0);
-				close(rm_ptr->fildes);
-				if (rm_ptr->filstr != NULL)
-					fclose(rm_ptr->filstr);
-			}
-		}
-	}
-#endif
 	return;
 }

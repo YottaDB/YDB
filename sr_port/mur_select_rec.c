@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,7 +92,7 @@ boolean_t	mur_select_rec()
 				wildcard_match = mur_do_wildcard(pv->jpv_user, sl_ptr->buff, JPV_LEN_USER, sl_ptr->len);
 			if (!wildcard_match)
 			{
-				pv_len = real_len(JPV_LEN_USER, (unsigned char *)pv->jpv_user);
+				pv_len = real_len(JPV_LEN_USER, (uchar_ptr_t)pv->jpv_user);
 				sl_len = MIN(sl_ptr->len, JPV_LEN_USER);
 			}
 			if (wildcard_match || (pv_len == sl_len) && (0 == memcmp(pv->jpv_user, sl_ptr->buff, sl_len)))
@@ -145,7 +145,7 @@ boolean_t	mur_select_rec()
 				wildcard_match = mur_do_wildcard(pv->jpv_prcnam, sl_ptr->buff, JPV_LEN_PRCNAM, sl_ptr->len);
 			if (!wildcard_match)
 			{
-				pv_len = real_len(JPV_LEN_PRCNAM, (unsigned char *)pv->jpv_prcnam);
+				pv_len = real_len(JPV_LEN_PRCNAM, (uchar_ptr_t)pv->jpv_prcnam);
 				sl_len = MIN(sl_ptr->len, JPV_LEN_PRCNAM);
 			}
 			if (wildcard_match || (pv_len == sl_len) && (0 == memcmp(pv->jpv_prcnam, sl_ptr->buff, sl_len)))

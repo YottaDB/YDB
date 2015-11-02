@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,7 @@
 #  define processDeferredFrees processDeferredFrees_dbg
 #  define release_unused_storage release_unused_storage_dbg
 #  define raise_gtmmemory_error raise_gtmmemory_error_dbg
+#  define gtm_bestfitsize gtm_bestfitsize_dbg
 #  define DEBUG
 #  define PRO_BUILD
 #  define GTM_MALLOC_DEBUG

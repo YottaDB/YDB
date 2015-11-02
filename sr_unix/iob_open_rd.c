@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,14 +26,18 @@
 
 #include "mdef.h"
 
-#include "gtm_string.h"
-
-#include <unistd.h>
 #include <errno.h>
-#include "gtm_fcntl.h"
 #include <sys/types.h>
+
+#include "gtm_string.h"
+#include "gtm_unistd.h"
+#include "gtm_fcntl.h"
 #include "gtm_stat.h"
+
 #include "iob.h"
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 
 BFILE *iob_open_rd(path, blksiz, blkfactor)
     char *path;
@@ -42,14 +46,25 @@ BFILE *iob_open_rd(path, blksiz, blkfactor)
 {
     int fd;
     BFILE *file;
+#ifdef __MVS__
+    int realfiletag;
+    /* Need the ERR_BADTAG and ERR_TEXT  error_defs for the TAG_POLICY macro warning */
+    error_def(ERR_TEXT);
+    error_def(ERR_BADTAG);
+#endif
 
-    if ((fd = OPEN3(path,O_RDONLY,0)) == -1)
+    if (FD_INVALID == (fd = OPEN3(path,O_RDONLY,0)))
 	return NULL;
+#ifdef __MVS__
+	if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
+		TAG_POLICY_GTM_PUTMSG(path, realfiletag, TAG_BINARY, errno);
+#endif
+
 
     file = malloc(sizeof(BFILE));
     file->fd = fd;
     file->path = malloc(strlen(path) + 1);
-    memcpy(file->path, path, strlen(path) + 1);
+    strcpy(file->path, path);
     file->oflag = O_RDONLY;
     file->mode = 0;
     file->blksiz = blksiz;

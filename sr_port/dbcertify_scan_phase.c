@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,9 @@
 #include "gtm_stdlib.h"
 #include "gtm_fcntl.h"
 
+#if defined(__MVS__)
+#include "gtm_zos_io.h"
+#endif
 #include "cli.h"
 #include "copy.h"
 #include "iosp.h"
@@ -97,6 +100,7 @@ error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_COLLTYPVERSION);
 error_def(ERR_GVIS);
 error_def(ERR_MUPCLIERR);
+ZOS_ONLY(error_def(ERR_BADTAG);)
 
 void dbc_write_p1out(phase_static_area *psa, void *obuf, int olen);
 void dbc_requeue_block(phase_static_area *psa, block_id blk_num);
@@ -123,6 +127,7 @@ void dbcertify_scan_phase(void)
 	block_id	bitmap_blk_num, last_bitmap_blk_num, blk_num;
 	integ_error_blk_list	*iebl;
 	phase_static_area *psa;
+	ZOS_ONLY(int	realfiletag;)
 
 	psa = psa_gbl;
 	DBC_DEBUG(("DBC_DEBUG: Beginning scan phase\n"));
@@ -209,22 +214,15 @@ void dbcertify_scan_phase(void)
 	}
 
 	/* Build data structures and open database */
-	psa->dbc_gv_cur_region = malloc(sizeof(gd_region));
-	memset(psa->dbc_gv_cur_region, 0, sizeof(gd_region));
-
-	psa->dbc_gv_cur_region->dyn.addr = malloc(sizeof(gd_segment));
-	memset(psa->dbc_gv_cur_region->dyn.addr, 0, sizeof(gd_segment));
+	MALLOC_INIT(psa->dbc_gv_cur_region, sizeof(gd_region));
+	MALLOC_INIT(psa->dbc_gv_cur_region->dyn.addr, sizeof(gd_segment));
 	psa->dbc_gv_cur_region->dyn.addr->acc_meth = dba_bg;
 	len = strlen((char_ptr_t)dbfn);
 	strcpy((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname, (char_ptr_t)dbfn);
 	psa->dbc_gv_cur_region->dyn.addr->fname_len = (unsigned short)len;
 
-	psa->dbc_gv_cur_region->dyn.addr->file_cntl = malloc(sizeof(*psa->dbc_gv_cur_region->dyn.addr->file_cntl));
-	memset(psa->dbc_gv_cur_region->dyn.addr->file_cntl, 0, sizeof(*psa->dbc_gv_cur_region->dyn.addr->file_cntl));
+	FILE_CNTL_INIT(psa->dbc_gv_cur_region->dyn.addr);
 	psa->dbc_gv_cur_region->dyn.addr->file_cntl->file_type = dba_bg;
-
-	psa->dbc_gv_cur_region->dyn.addr->file_cntl->file_info = malloc(sizeof(GDS_INFO));
-	memset(psa->dbc_gv_cur_region->dyn.addr->file_cntl->file_info, 0, sizeof(GDS_INFO));
 
 	psa->dbc_cs_data = malloc(sizeof(*psa->dbc_cs_data));
 
@@ -258,13 +256,17 @@ void dbcertify_scan_phase(void)
 	if (!psa->report_only)
 	{	/* Recreate the file entirely if it exists */
 		psa->outfd = OPEN3((char_ptr_t)psa->outfn, O_WRONLY + O_CREAT + O_TRUNC, S_IRUSR + S_IWUSR RMS_OPEN_BIN);
-		if (-1 == psa->outfd)
+		if (FD_INVALID == psa->outfd)
 		{	/* The following STRERROR() extraction necessary for VMS portability */
 			save_errno = errno;
 			errmsg = STRERROR(save_errno);
 			rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn),
 				  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 		}
+#ifdef __MVS__
+		if (-1 == gtm_zos_set_tag(psa->outfd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
+			TAG_POLICY_GTM_PUTMSG((char_ptr_t)psa->outfn, errno, realfiletag, TAG_BINARY);
+#endif
 		memset((void *)&psa->ofhdr, 0, sizeof(p1hdr));
 		memcpy(psa->ofhdr.p1hdr_tag, P1HDR_TAG, sizeof(psa->ofhdr.p1hdr_tag));
 		dbc_write_p1out(psa, &psa->ofhdr, sizeof(p1hdr));	/* Initial hdr is all zeroes */
@@ -380,7 +382,7 @@ void dbcertify_scan_phase(void)
 		assert(sizeof(psa->ofhdr.dbfn) > strlen((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname));
 		strcpy((char_ptr_t)psa->ofhdr.dbfn, (char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname);
 		dbc_write_p1out(psa, &psa->ofhdr, sizeof(p1hdr));	/* Rewrite populated output file header */
-		CLOSEFILE(psa->outfd, rc);				/* Close output file */
+		CLOSEFILE_RESET(psa->outfd, rc);		/* Close output file; Resets "psa->outfd" to FD_INVALID */
 		if (-1 == rc)
 		{
 			save_errno = errno;
@@ -538,7 +540,7 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 					   psa->dbc_gv_cur_region->dyn.addr->fname);
 				if (!psa->report_only)
 				{
-					CLOSEFILE(psa->outfd, rc);		/* Close output file */
+					CLOSEFILE_RESET(psa->outfd, rc); /* Close output file; Resets "psa->outfd" to FD_INVALID */
 					if (-1 == rc)
 					{
 						save_errno = errno;
@@ -725,7 +727,7 @@ void dbc_integ_error(phase_static_area *psa, block_id blk_num, char_ptr_t emsg)
 	{	/* Give integrity error message */
 		if (!psa->report_only)
 		{
-			CLOSEFILE(psa->outfd, rc);		/* Close output file */
+			CLOSEFILE_RESET(psa->outfd, rc);	/* Close output file; Resets "psa->outfd" to FD_INVALID */
 			if (-1 == rc)
 			{
 				save_errno = errno;

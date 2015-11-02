@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@
 GBLREF 	jnl_gbls_t	jgbl;
 GBLREF	mur_read_desc_t	mur_desc;
 GBLREF	mur_gbls_t	murgbl;
-GBLREF	bool		is_standalone;
+GBLREF	boolean_t	is_standalone;
 GBLREF	boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF	void		(*call_on_signal)();
 GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];

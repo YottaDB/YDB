@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,7 @@ void gv_init_reg (gd_region *reg)
 	}
 	assert(reg->open);
 
-	keysize = (reg->max_key_size + MAX_NUM_SUBSC_LEN + 4) & (-4);
+	keysize = DBKEYSIZE(reg->max_key_size);
 
 	if (keysize > gv_keysize)
 	{

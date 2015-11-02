@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,13 +11,16 @@
 
 #include "mdef.h"
 
-#include <stdlib.h>
+#include "gtm_stdlib.h"
 #include <signal.h>
 
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
 #include "error.h"
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 
 void gtm_dump_core(void)
 {
@@ -25,6 +28,9 @@ void gtm_dump_core(void)
         char                    newname[20];
         int                     suffix, status;
         struct stat             fs1;
+
+	/* Scrub any encryption related information before taking a core dump */
+	GTMCRYPT_ONLY(GTMCRYPT_CLOSE;)
 
         sigemptyset(&act.sa_mask);
 #ifdef _AIX

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,6 @@ GBLREF	short			dollar_tlevel;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	boolean_t		write_after_image;
 GBLREF	unsigned int		t_tries;
 GBLREF	boolean_t		run_time;
@@ -85,10 +84,8 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	 * Note that a similar change is not needed in gvcst_map_build() because that will never be in the
 	 *     search history for any key.
 	 */
-	if (!ctn && !mu_reorg_upgrd_dwngrd_in_prog)
-	{
-		assert(dollar_tlevel);
-		/* Subtract one so will pass concurrency control for mm databases.
+	if (!ctn && dollar_tlevel)
+	{	/* Subtract one so will pass concurrency control for mm databases.
 		 * This block is guaranteed to be in an earlier history from when it was first read,
 		 * so this history is superfluous for concurrency control.
 		 * The correct tn is put in the block in mm_update or bg_update when the block is copied to the database.

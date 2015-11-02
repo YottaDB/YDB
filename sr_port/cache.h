@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ typedef struct ihead_struct
 } ihdtyp;
 
 #define ICACHE_TABLE_INIT_SIZE 	64	/* Use 1K memory initially */
-#define ICACHE_SIZE 		ROUND_UP2(sizeof(cache_entry), NATIVE_WSIZE)
+#define ICACHE_SIZE 		ROUND_UP2(SIZEOF(cache_entry), NATIVE_WSIZE)
 
 /* We allow cache_table to grow till we hit memory or entry maximums. If more memory is needed, we do compaction.
  * Current default limits (overrideable by environment variable): 128 entries, 128KB of object code on all platforms

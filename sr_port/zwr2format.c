@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@ LITREF	unsigned char	lower_to_upper_table[];
 #define FORMAT_PRINTABLE(cp)					\
 {								\
 	memcpy(&dstptr[des->len], cpstart, (cp) - cpstart);	\
-	des->len += (cp) - cpstart;				\
+	des->len += (int)((cp) - cpstart);			\
 }
 
 #define FORMAT_CHAR(c)						\
@@ -119,7 +119,7 @@ boolean_t zwr2format(mstr *src, mstr *des)
 					strnext = UTF8_WCTOMB(num, &dstptr[des->len]);
 					if (strnext == &dstptr[des->len])
 						return FALSE;	/* illegal code points in $C() */
-					des->len += strnext - &dstptr[des->len];
+					des->len += (int)(strnext - &dstptr[des->len]);
 				}
 #endif
 				switch(ch = *cp++)

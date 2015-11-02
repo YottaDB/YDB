@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,18 +9,21 @@
  *								*
  ****************************************************************/
 
+#if defined(__MVS__) && !defined(_ISOC99_SOURCE)
+#define _ISOC99_SOURCE
+#endif
+
 #include "mdef.h"
+
+#include <sys/time.h>
+#include <errno.h>
 
 #include "gtm_stdio.h"
 #include "gtm_string.h"
-
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/time.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
+#include "gtm_socket.h"
+#include "gtm_inet.h"
+#include "gtm_fcntl.h"
+#include "gtm_unistd.h"
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
 #endif
@@ -37,7 +40,7 @@
 #include "repl_sp.h"
 #include "repl_comm.h"
 
-GBLDEF	int			gtmsource_sock_fd = -1;
+GBLDEF	int			gtmsource_sock_fd = FD_INVALID;
 GBLREF	jnlpool_addrs		jnlpool;
 
 int gtmsource_comm_init(void)
@@ -52,11 +55,11 @@ int gtmsource_comm_init(void)
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
 
-	if (-1 != gtmsource_sock_fd) /* Initialization done already */
+	if (FD_INVALID != gtmsource_sock_fd) /* Initialization done already */
 		return(0);
 
 	/* Create the socket used for communicating with secondary */
-	if (-1 == (gtmsource_sock_fd = socket(AF_INET, SOCK_STREAM, 0)))
+	if (FD_INVALID == (gtmsource_sock_fd = socket(AF_INET, SOCK_STREAM, 0)))
 	{
 		err_status = ERRNO;
 		SNPRINTF(error_string, sizeof(error_string), "Error with source server socket create : %s", STRERROR(err_status));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,9 @@
 #ifndef _REPL_CTL_H
 #define _REPL_CTL_H
 
+#ifdef	GTM_CRYPT
+#include "gtmcrypt.h" /* for gtmcrypt_key_t type used in repl_ctl_element */
+#endif
 enum
 {
 	JNL_FILE_UNREAD,
@@ -96,6 +99,9 @@ typedef struct repl_ctl_struct
 	char			jnl_fn[JNL_NAME_SIZE];
 	struct repl_ctl_struct	*prev;
 	struct repl_ctl_struct	*next;
+#	ifdef GTM_CRYPT
+	gtmcrypt_key_t		encr_key_handle;
+#	endif
 } repl_ctl_element;
 
 typedef struct {

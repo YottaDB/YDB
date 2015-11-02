@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,10 +89,10 @@ static	void	mur_show_jpv(jnl_process_vector *pv, boolean_t print_header)
 
 	jpv_time_len = format_time(pv->jpv_time, jpv_time_str, sizeof(jpv_time_str), LONG_TIME_FORMAT);
 	login_time_len = format_time(pv->jpv_login_time, login_time_str, sizeof(login_time_str), LONG_TIME_FORMAT);
-	node_len = real_len(JPV_LEN_NODE,	(unsigned char *)pv->jpv_node);
-	user_len = real_len(JPV_LEN_USER,	(unsigned char *)pv->jpv_user);
-	proc_len = real_len(JPV_LEN_PRCNAM,	(unsigned char *)pv->jpv_prcnam);
-	term_len = real_len(JPV_LEN_TERMINAL,	(unsigned char *)pv->jpv_terminal);
+	node_len = real_len(JPV_LEN_NODE,	(uchar_ptr_t)pv->jpv_node);
+	user_len = real_len(JPV_LEN_USER,	(uchar_ptr_t)pv->jpv_user);
+	proc_len = real_len(JPV_LEN_PRCNAM,	(uchar_ptr_t)pv->jpv_prcnam);
+	term_len = real_len(JPV_LEN_TERMINAL,	(uchar_ptr_t)pv->jpv_terminal);
 	switch (pv->jpv_mode)
 	{
 		case JPI$K_DETACHED:	mode_str = "Detch";	break;
@@ -147,9 +147,9 @@ static	void	mur_show_jpv(jnl_process_vector	*pv, boolean_t print_header)
 	char	jpv_time_str[LENGTH_OF_TIME + 1];
 
 	jpv_time_len = format_time(pv->jpv_time, jpv_time_str, sizeof(jpv_time_str), LONG_TIME_FORMAT);
-	node_len = real_len(JPV_LEN_NODE,	(unsigned char *)pv->jpv_node);
-	user_len = real_len(JPV_LEN_USER,	(unsigned char *)pv->jpv_user);
-	term_len = real_len(JPV_LEN_TERMINAL,	(unsigned char *)pv->jpv_terminal);
+	node_len = real_len(JPV_LEN_NODE,	(uchar_ptr_t)pv->jpv_node);
+	user_len = real_len(JPV_LEN_USER,	(uchar_ptr_t)pv->jpv_user);
+	term_len = real_len(JPV_LEN_TERMINAL,	(uchar_ptr_t)pv->jpv_terminal);
 	if (print_header)
 	{
 		util_out_print((caddr_t)proc_header, TRUE);
@@ -164,8 +164,9 @@ static	void	mur_show_jpv(jnl_process_vector	*pv, boolean_t print_header)
 void	mur_show_header(jnl_ctl_list * jctl)
 {
 	jnl_file_header	*hdr;
-	int		time_len;
+	int		time_len, idx;
 	char		time_str[LENGTH_OF_TIME + 1];
+	char 		outbuf[GTMCRYPT_HASH_HEX_LEN + 1];
 
 	hdr = jctl->jfh;
 	util_out_print("!/Journal file name       !AD", TRUE, jctl->jnl_fn_len, jctl->jnl_fn);
@@ -182,6 +183,11 @@ void	mur_show_header(jnl_ctl_list * jctl)
 	util_out_print(" Journal file checksum seed             !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->checksum));
 	util_out_print(" Crash                                       !AD", TRUE, 5, (hdr->crash ? " TRUE" : "FALSE"));
 	util_out_print(" Recover interrupted                         !AD", TRUE, 5, (hdr->recover_interrupted ? " TRUE" : "FALSE"));
+	/* Since we are defining GTM_CRYPT only for IA64, x86_64, i386, AIX and Solaris, the below dump might not happen
+	 * for VMS, Tru64, Solaris 32 and other encryption-unsupported platforms. So, do the display unconditionally. */
+	util_out_print(" Journal file encrypted                      !AD", TRUE, 5, (hdr->is_encrypted ? " TRUE" : "FALSE"));
+	GET_HASH_IN_HEX(hdr->encryption_hash, outbuf, GTMCRYPT_HASH_HEX_LEN);
+	util_out_print(" Journal file hash                           !AD", TRUE, GTMCRYPT_HASH_HEX_LEN, outbuf);
 	util_out_print(" Blocks to Upgrade Adjustment           !10UL [0x!XL]", TRUE,
 		DOUBLE_ARG(hdr->prev_recov_blks_to_upgrd_adjust));
 	util_out_print(" End of Data                            !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->end_of_data));

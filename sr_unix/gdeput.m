@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006, 2007 Fidelity Information Services, Inc	;
+;	Copyright 2006, 2009 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -26,23 +26,23 @@ GDEPUT()
 	s x=x+(csegcnt*SIZEOF("gd_segment"))
 	s rec=""
 ; contents
-	i (gtm64="true") s rec=rec_$c(0,0,0,0,0,0,0,0)				       		; not used
+	i (gtm64=TRUE) s rec=rec_$c(0,0,0,0,0,0,0,0)				       		; not used
 	e  s rec=rec_$c(0,0,0,0)								; not used
 	s rec=rec_$$num2bin(4,maxrecsize)							; max rec size
 	s filesize=SIZEOF("gd_contents")
 	s rec=rec_$$num2bin(2,mapcnt)_$$num2bin(2,cregcnt)_$$num2bin(2,csegcnt)_$$num2bin(2,0)	; maps,regs,segs,filler
-	i (gtm64="true") d
+	i (gtm64=TRUE) d
 	. s rec=rec_$$num2bin(4,0) 								; padding
 	. s rec=rec_$$num2bin(8,filesize)							; mapptr
 	e  s rec=rec_$$num2bin(4,filesize)							; mapptr
 	s filesize=filesize+(mapcnt*SIZEOF("gd_map"))
-	i (gtm64="true") s rec=rec_$$num2bin(8,filesize)					; regionptr
+	i (gtm64=TRUE) s rec=rec_$$num2bin(8,filesize)						; regionptr
 	e  s rec=rec_$$num2bin(4,filesize)							; regionptr
 	s filesize=filesize+(cregcnt*SIZEOF("gd_region"))
-	i (gtm64="true") s rec=rec_$$num2bin(8,filesize)					; segmentptr
+	i (gtm64=TRUE) s rec=rec_$$num2bin(8,filesize)					; segmentptr
 	e  s rec=rec_$$num2bin(4,filesize)							; segmentptr
 	s filesize=filesize+(csegcnt*SIZEOF("gd_segment")),base=filesize
-	i (gtm64="true") d
+	i (gtm64=TRUE) d
 	. s rec=rec_$tr($j("",24)," ",ZERO)							; reserved
 	. s rec=rec_$$num2bin(8,filesize)							; end
 	e  d
@@ -54,9 +54,9 @@ GDEPUT()
 	s gdexcept="s gdeputzs=$zs  zgoto "_$zl_":writeerr^GDEPUT"
 	i $ZVersion["VMS"  s tempfile=$p(file,";",1)_"inprogress"
 	e  s tempfile=file_"inprogress"
-	; "The below check for OS390 needs to be changed when z/OS port is resurrected"
 	;if zchset is UTF-8 open in raw mode to avoid BADCHAR errors
-	s chset=$SELECT($ZV["OS390":"ISO8859-1",$ZV["VMS":"",$ZCHSET="UTF-8":"M",1:"")
+	; For OS390 aka z/OS, use BINARY mode
+	s chset=$SELECT($ZV["OS390":"BINARY",$ZV["VMS":"",$ZCHSET="UTF-8":"M",1:"")
 	o tempfile:(rewind:noreadonly:newversion:recordsize=512:fixed:blocksize=512:exception=gdexcept:ochset=chset)
 ; maps
 	s s=""
@@ -76,7 +76,7 @@ GDEPUT()
 	u tempfile
 	f  s record=$ze(rec,1,512),rec=$ze(rec,513,9999) q:'$zl(record)  w record,!
 	u @useio
-	i $ZV'["VMS" o file c file:delete
+	i $ZV'["VMS" o file:chset="M" c file:delete
 	c tempfile:rename=file
 	q 1
 
@@ -90,7 +90,7 @@ fdatum:
 map:
 	d writerec
 	i $zl(s)'=SIZEOF("mident") d error1
-	i (gtm64="true") s rec=rec_s_$$num2bin(4,cregs(map(s),"offset"))_$$num2bin(4,0) ; add padding
+	i (gtm64=TRUE) s rec=rec_s_$$num2bin(4,cregs(map(s),"offset"))_$$num2bin(4,0) ; add padding
 	e  s rec=rec_s_$$num2bin(4,cregs(map(s),"offset"))
 	q
 cregion:
@@ -99,7 +99,7 @@ cregion:
 	s rec=rec_s_$tr($j("",MAXREGLN-$l(s))," ",ZERO)
 	s rec=rec_$$num2bin(2,regs(s,"KEY_SIZE"))
 	s rec=rec_$$num2bin(4,regs(s,"RECORD_SIZE"))
-	i (gtm64="true") d
+	i (gtm64=TRUE) d
 	. s rec=rec_$$num2bin(4,csegs(regs(s,"DYNAMIC_SEGMENT"),"offset"))_$$num2bin(4,0) ; padding
 	. s rec=rec_$$num2bin(8,0)
 	e  d
@@ -118,7 +118,7 @@ cregion:
 	s rec=rec_$$num2bin(1,regs(s,"STDNULLCOLL"))
 	s rec=rec_$$num2bin(1,$zl(regs(s,"FILE_NAME")))
 	s rec=rec_regs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$zl(regs(s,"FILE_NAME")))," ",ZERO)
-	i (gtm64="true") s rec=rec_$tr($j("",12)," ",ZERO)					; reserved + padding
+	i (gtm64=TRUE) s rec=rec_$tr($j("",12)," ",ZERO)					; reserved + padding
 	e  s rec=rec_$tr($j("",8)," ",ZERO)							; reserved
 	q
 csegment:
@@ -132,7 +132,7 @@ csegment:
 	s rec=rec_$$num2bin(2,segs(s,"BLOCK_SIZE"))
 	s rec=rec_$$num2bin(2,segs(s,"EXTENSION_COUNT"))
 	s rec=rec_$$num2bin(4,segs(s,"ALLOCATION"))
-	i (gtm64="true") s rec=rec_$tr($j("",12)," ",ZERO)						;reserved for clb + padding
+	i (gtm64=TRUE) s rec=rec_$tr($j("",12)," ",ZERO)						;reserved for clb + padding
 	e  s rec=rec_$tr($j("",4)," ",ZERO)								;reserved for clb
 	s rec=rec_".DAT"
 	s rec=rec_$c(+segs(s,"DEFER"))
@@ -145,18 +145,23 @@ csegment:
 	s x=$s(am="BG":1,am="MM":2,am="USER":4,1:-1)
 	i x=-1 d error1
 	s rec=rec_$$num2bin(4,x)
-	i (gtm64="true") d
+	i (gtm64=TRUE) d
 	. s rec=rec_$$num2bin(8,0)		; file_cntl ptr
 	. s rec=rec_$$num2bin(8,0)		; repl_list ptr
 	e  d
 	. s rec=rec_$$num2bin(4,0)		; file_cntl ptr
 	. s rec=rec_$$num2bin(4,0)		; repl_list ptr
+	; Only for platforms that support encryption, we write this value. Others it will
+	; always be 0 (ie encryption is off)
+	i (encsupportedplat=TRUE) s rec=rec_$$num2bin(4,segs(s,"ENCRYPTION_FLAG"))
+	e  s rec=rec_$$num2bin(4,0)
+	i (gtm64=TRUE) s rec=rec_$$num2bin(4,0)
 	q
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
 
 num2bin:(l,n)
-	i (gtm64="true") q $s(l=1:$$num2tiny(+n),l=2:$$num2shrt(+n),l=4:$$num2int(+n),l=8:$$num2long(+n),1:$$num2error)
+	i (gtm64=TRUE) q $s(l=1:$$num2tiny(+n),l=2:$$num2shrt(+n),l=4:$$num2int(+n),l=8:$$num2long(+n),1:$$num2error)
 	e  q $s(l=1:$$num2tiny(+n),l=2:$$num2shrt(+n),l=4:$$num2int(+n),1:$$num2error)
 	;
 num2tiny:(num)

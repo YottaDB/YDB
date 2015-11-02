@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,9 +22,7 @@
 #include "mu_cre_structs.h"
 
 void mu_cre_structs(gd_region *greg)
-{	greg->dyn.addr->file_cntl = (file_control *)malloc(sizeof(*greg->dyn.addr->file_cntl));
-	memset(greg->dyn.addr->file_cntl, 0, sizeof(*greg->dyn.addr->file_cntl));
-	greg->dyn.addr->file_cntl->file_info = (void *)malloc(sizeof(unix_db_info));
-	memset(greg->dyn.addr->file_cntl->file_info, 0, sizeof(unix_db_info));
+{
+	FILE_CNTL_INIT(greg->dyn.addr);
 	return;
 }

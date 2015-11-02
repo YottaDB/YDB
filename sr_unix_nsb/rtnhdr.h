@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,18 +45,18 @@ typedef struct	rhead_struct
 	mstr		src_full_name;		/* (updated) full source name of current module version */
 	mident		routine_name;
 	int4		vartab_off;		/* (updated) offset to variable table of current module version */
-	short int	vartab_len;		/* (updated) length of variable table of current module version */
+	int4		vartab_len;		/* (updated) length of variable table of current module version */
 	int4		labtab_off;
-	short int	labtab_len;
+	int4		labtab_len;
 	int4		lnrtab_off;
-	short int	lnrtab_len;
+	int4		lnrtab_len;
 	int4		ptext_off;		/* (updated) offset to start of instructions for current module version */
 	int4		checksum;
 	uint4		compiler_qlf;		/* bit flags of compiler qualifiers used (see cmd_qlf.h) */
 	int4		old_rhead_off;
 	int4		current_rhead_off;	/* (updated) offset to routine header of current module version */
-	short int	temp_mvals;		/* (updated) temp_mvals value of current module version */
-	unsigned short	temp_size;		/* (updated) temp_size value of current module version */
+	int4		temp_mvals;		/* (updated) temp_mvals value of current module version */
+	int4		temp_size;		/* (updated) temp_size value of current module version */
 #ifdef HAS_LITERAL_SECT
 	int4		*linkage_ptr;		/* (updated) address of linkage Psect of current module version */
 	unsigned char	*literal_ptr;		/* (updated) address of literal Psect of current module version */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,8 @@ LITREF boolean_t	jrt_is_replicated[JRT_RECTYPES];
 LITREF int		jrt_update[JRT_RECTYPES];
 
 static	pid_t	repl_filter_pid = -1;
-static int 	repl_srv_filter_fd[2] = {-1, -1}, repl_filter_srv_fd[2] = {-1, -1};
+static int 	repl_srv_filter_fd[2] = {FD_INVALID, FD_INVALID};
+static int	repl_filter_srv_fd[2] = {FD_INVALID, FD_INVALID};
 static char 	*extract_buff;
 static char	*extr_rec;
 static char	*srv_buff_start, *srv_buff_end, *srv_line_start, *srv_line_end, *srv_read_end;
@@ -102,7 +103,7 @@ void jnl_extr_init(void)
 {
 	/* Should be a non-filter related function. But for now,... Needs GBLREFs gv_currkey and transform */
 	transform = FALSE;      /* to avoid the assert in mval2subsc() */
-	gv_keysize = (MAX_KEY_SZ + MAX_NUM_SUBSC_LEN + 4) & (-4);
+	gv_keysize = DBKEYSIZE(MAX_KEY_SZ);
 	gv_currkey = (gv_key *)malloc(sizeof(gv_key) + gv_keysize);
 	gv_currkey->top = gv_keysize;
 	gv_currkey->prev = gv_currkey->end = 0;
@@ -113,26 +114,14 @@ static void repl_filter_close_all_pipes(void)
 {
 	int	close_res;
 
-	if (-1 != repl_srv_filter_fd[READ_END])
-	{
-		F_CLOSE(repl_srv_filter_fd[READ_END], close_res);
-		repl_srv_filter_fd[READ_END] = -1;
-	}
-	if (-1 != repl_srv_filter_fd[WRITE_END])
-	{
-		F_CLOSE(repl_srv_filter_fd[WRITE_END], close_res);
-		repl_srv_filter_fd[WRITE_END] = -1;
-	}
-	if (-1 != repl_filter_srv_fd[READ_END])
-	{
-		F_CLOSE(repl_filter_srv_fd[READ_END], close_res);
-		repl_filter_srv_fd[READ_END] = -1;
-	}
-	if (-1 != repl_filter_srv_fd[WRITE_END])
-	{
-		F_CLOSE(repl_filter_srv_fd[WRITE_END], close_res);
-		repl_filter_srv_fd[WRITE_END] = -1;
-	}
+	if (FD_INVALID != repl_srv_filter_fd[READ_END])
+		F_CLOSE(repl_srv_filter_fd[READ_END], close_res);	/* resets "repl_srv_filter_fd[READ_END]" to FD_INVALID */
+	if (FD_INVALID != repl_srv_filter_fd[WRITE_END])
+		F_CLOSE(repl_srv_filter_fd[WRITE_END], close_res); /* resets "_CLOSE(repl_srv_filter_fd[WRITE_END]" to FD_INVALID */
+	if (FD_INVALID != repl_filter_srv_fd[READ_END])
+		F_CLOSE(repl_filter_srv_fd[READ_END], close_res);	/* resets "repl_filter_srv_fd[READ_END]" to FD_INVALID */
+	if (FD_INVALID != repl_filter_srv_fd[WRITE_END])
+		F_CLOSE(repl_filter_srv_fd[WRITE_END], close_res);	/* resets "repl_filter_srv_fd[WRITE_END]" to FD_INVALID */
 
 }
 
@@ -195,10 +184,10 @@ int repl_filter_init(char *filter_cmd)
 	if (0 < (repl_filter_pid = UNIX_ONLY(fork)VMS_ONLY(vfork)()))
 	{ /* Server */
 		UNIX_ONLY(
-			F_CLOSE(repl_srv_filter_fd[READ_END], close_res); /* SERVER: WRITE only on server -> filter pipe */
-			repl_srv_filter_fd[READ_END] = -1;
-			F_CLOSE(repl_filter_srv_fd[WRITE_END], close_res); /* SERVER: READ only on filter -> server pipe */
-			repl_filter_srv_fd[WRITE_END] = -1;
+			F_CLOSE(repl_srv_filter_fd[READ_END], close_res); /* SERVER: WRITE only on server -> filter pipe;
+								* also resets "repl_srv_filter_fd[READ_END]" to FD_INVALID */
+			F_CLOSE(repl_filter_srv_fd[WRITE_END], close_res); /* SERVER: READ only on filter -> server pipe;
+								* also resets "repl_srv_filter_fd[WRITE_END]" to FD_INVALID */
 		)
 		memset((char *)&null_jnlrec, 0, NULL_RECLEN);
 		null_jnlrec.prefix.jrec_type = JRT_NULL;
@@ -216,10 +205,10 @@ int repl_filter_init(char *filter_cmd)
 	if (0 == repl_filter_pid)
 	{ /* Filter */
 		UNIX_ONLY(
-			F_CLOSE(repl_srv_filter_fd[WRITE_END], close_res); /* FILTER: READ only on server -> filter pipe */
-			repl_srv_filter_fd[WRITE_END] = -1;
-			F_CLOSE(repl_filter_srv_fd[READ_END], close_res); /* FILTER: WRITE only on filter -> server pipe */
-			repl_filter_srv_fd[READ_END] = -1;
+			F_CLOSE(repl_srv_filter_fd[WRITE_END], close_res); /* FILTER: READ only on server -> filter pipe;
+								* also resets "repl_srv_filter_fd[WRITE_END]" to FD_INVALID */
+			F_CLOSE(repl_filter_srv_fd[READ_END], close_res); /* FILTER: WRITE only on filter -> server pipe;
+								* also resets "repl_srv_filter_fd[READ_END]" to FD_INVALID */
 			/* Make the server->filter pipe stdin for filter */
 			DUP2(repl_srv_filter_fd[READ_END], 0, status);
 			if (0 > status)
@@ -237,7 +226,9 @@ int repl_filter_init(char *filter_cmd)
 			VMS_ONLY(
 				/* For vfork(), there is no real child process. So, both ends of both the pipes have to be closed */
 				F_CLOSE(repl_srv_filter_fd[WRITE_END], close_res);
+					/* resets "repl_srv_filter_fd[WRITE_END]" to FD_INVALID */
 				F_CLOSE(repl_filter_srv_fd[READ_END], close_res);
+					/* resets "repl_filter_srv_fd[READ_END]" to FD_INVALID */
 			)
 			gtm_putmsg(VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Could not exec filter"), ERRNO);
 			repl_errno = EREPL_FILTERSTART_EXEC;

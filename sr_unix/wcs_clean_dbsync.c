@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -162,21 +162,31 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			 */
 			/* Note that if we are here, we have obtained crit using tp_grab_crit. */
 			assert(csa->ti->early_tn == csa->ti->curr_tn);
-			/* Do not invoke wcs_flu if the database has a newer journal file than what this process had open when the
-			 * dbsync timer was started in wcs_wtstart. This is because mainline (non-interrupt) code in
-			 * jnl_write_attempt/jnl_output_sp assumes that interrupt code will not update jpc structures to
-			 * point to latest journal file (i.e. will not do a jnl_ensure_open) but wcs_flu might invoke just that.
-			 * It is ok not to do a wcs_flu since whichever process did the journal switch would have written the
-			 * EPOCH record in the older generation journal file. Therefore there is no need to start a new dbsync
-			 * timer in this case.
-			 * For the MM case, we need to make sure the journal file is flushed to disk, but only do it if
-			 * there has been at least one transaction since the last time we flushed so there isn't an excessive
-			 * number of epochs written. No need to do this if jpc is NULL since that means journaling is not
-			 * enabled anyways so we dont need the WCSFLU_WRITE_EPOCH and WCSFLU_SYNC_EPOCH parts and since this is
-			 * MM, we dont anyways need the WCSFLU_FLUSH_HDR part so no need to do the wcs_flu itself.
+			/* Do not invoke wcs_flu if the database has a newer journal file than what this process had open
+			 * when the dbsync timer was started in wcs_wtstart. This is because mainline (non-interrupt) code
+			 * in jnl_write_attempt/jnl_output_sp assumes that interrupt code will not update jpc structures to
+			 * point to latest journal file (i.e. will not do a jnl_ensure_open) but wcs_flu might invoke just
+			 * that. It is ok not to do a wcs_flu since whichever process did the journal switch would have
+			 * written the EPOCH record in the older generation journal file. Therefore there is no need to
+			 * start a new dbsync timer in this case.
+			 *
+			 * If journaling and writing EPOCHs, do a wcs_flu only if there has been at least one transaction
+			 * since the last time someone wrote an EPOCH.
+			 *
+			 * If NOT journaling or if NOT writing EPOCHs, do a wcs_flu only if there has been at least one
+			 * transaction since the last time someone did a wcs_flu.
+			 *
+			 * This way wcs_flu is not redundantly invoked and it ensures that the least number of epochs
+			 * (only the necessary ones) are written OR the least number of db file header flushes are done.
+			 *
+			 * If MM and not writing EPOCHs, we dont need to even flush the file header since MM by default
+			 * does NO msyncs of the database file during normal operation but instead only at database rundown.
+			 * So no need to do wcs_flu in this case.
 			 */
-			if ((!jpc || (NOJNL == jpc->channel) || !JNL_FILE_SWITCHED(jpc))
-				&& (!is_mm || (NULL != jpc) && (jpc->jnl_buff->epoch_tn < csa->ti->curr_tn)))
+			if ((NULL != jpc) && JNL_HAS_EPOCH(jpc->jnl_buff)
+					? (((NOJNL == jpc->channel) || !JNL_FILE_SWITCHED(jpc))
+							&& (jpc->jnl_buff->epoch_tn < csa->ti->curr_tn))
+					: !is_mm && (cnl->last_wcsflu_tn < csa->ti->curr_tn))
 			{
 				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 				BG_TRACE_PRO_ANY(csa, n_dbsync_writes);

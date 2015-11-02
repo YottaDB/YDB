@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,10 @@
 #include <setjmp.h>
 
 #include "gtm_stdio.h"
+
+#ifdef __MVS__
+#  define GTMCORENAME "gtmcore"
+#endif
 
 #define CONDITION_HANDLER(name)	ch_ret_type name(int arg)
 #define MAX_HANDLERS 15		/* should be enough for dse/lke/mupip etc. */

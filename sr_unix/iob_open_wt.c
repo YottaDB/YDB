@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,14 +26,15 @@
 
 #include "mdef.h"
 
-#include "gtm_string.h"
-
-#include <unistd.h>
 #include <errno.h>
-#include "gtm_fcntl.h"
 #include <sys/types.h>
-#include "iob.h"
+
+#include "gtm_string.h"
+#include "gtm_unistd.h"
+#include "gtm_fcntl.h"
 #include "gtm_stat.h"
+
+#include "iob.h"
 
 BFILE *iob_open_wt(path, blksiz, blkfactor)
     char *path;
@@ -43,13 +44,13 @@ BFILE *iob_open_wt(path, blksiz, blkfactor)
     int fd;
     BFILE *file;
 
-    if ((fd = OPEN3(path,O_WRONLY | O_CREAT,0)) == -1)
+    if (FD_INVALID == (fd = OPEN3(path,O_WRONLY | O_CREAT,0)))
 	return NULL;
 
     file = malloc(sizeof(BFILE));
     file->fd = fd;
     file->path = malloc(strlen(path) + 1);
-    memcpy(file->path, path, strlen(path) + 1);
+    strcpy(file->path, path);
     file->oflag = O_WRONLY | O_CREAT;
     file->mode = 0;
     file->blksiz = blksiz;

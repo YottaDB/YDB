@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,13 +38,6 @@ GBLREF  uint4		dollar_zjob;
 GBLREF	int4		outofband;
 GBLREF	int		dollar_truth;
 GBLREF	boolean_t	job_try_again;
-
-#ifndef SYS_ERRLIST_INCLUDE
-/* needed by TIMEOUT_ERROR in jobsp.h */
-#ifndef __sun
-GBLREF	int		sys_nerr;
-#endif
-#endif
 
 static	int4	tid;	/* Job Timer ID */
 void	job_timer_handler(void);
@@ -203,15 +196,13 @@ int	op_job(int4 argcnt, ...)
 		cancel_timer((TID)&tid);
 
 	/* the child process (M), that wrote to pipe, would have been exited by now */
-	CLOSEFILE(pipe_fds[1], pipe_status); /* close the write-end to make the following read non-blocking */
+	CLOSEFILE_RESET(pipe_fds[1], pipe_status);	/* close the write-end to make the following read non-blocking;
+							 * also resets "pipe_fds[1]" to FD_INVALID */
 	assert(sizeof(pid_t) == sizeof(zjob_pid));
 	DOREADRC(pipe_fds[0], &zjob_pid, sizeof(zjob_pid), pipe_status); /* read jobbed off PID from pipe */
 	if (0 < pipe_status) /* empty pipe (pipe_status == -1) is ignored and not reported as error */
-	{
 		rts_error(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Error reading from pipe"), errno);
-	}
-	CLOSEFILE(pipe_fds[0], pipe_status); /* release the pipe */
-
+	CLOSEFILE_RESET(pipe_fds[0], pipe_status); /* release the pipe; also resets "pipe_fds[0]" to FD_INVALID */
 	if (status)
 	{
 		if (timed)					/* $test should be modified only for timed job commands */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,9 @@
 
 #include <sys/sem.h>
 
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -54,6 +57,7 @@
 #include "change_reg.h"
 #include "desired_db_format_set.h"
 #include "gtmmsg.h"		/* for gtm_putmsg prototype */
+#include "gtmcrypt.h"
 
 GBLREF tp_region		*grlist;
 GBLREF gd_region		*gv_cur_region;
@@ -85,6 +89,13 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	gd_region		*temp_cur_region;
 	char			*errptr, *command = "MUPIP SET VERSION";
 	int			save_errno;
+	int			rc;
+#ifdef __MVS__
+	int realfiletag;
+	/* Need the ERR_BADTAG and ERR_TEXT  error_defs for the TAG_POLICY macro warning */
+	error_def(ERR_TEXT);
+	error_def(ERR_BADTAG);
+#endif
 
 	error_def(ERR_DBPREMATEOF);
 	error_def(ERR_DBRDERR);
@@ -95,6 +106,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	error_def(ERR_WCERRNOTCHG);
 	error_def(ERR_WCWRNNOTCHG);
 	error_def(ERR_MMNODYNDWNGRD);
+	error_def(ERR_CRYPTNOMM);
 
 	exit_stat = EXIT_NRM;
 	defer_status = cli_present("DEFER_TIME");
@@ -314,7 +326,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (FALSE == got_standalone)
 				return (int4)ERR_WCERRNOTCHG;
 			/* we should open it (for changing) after mu_rndwn_file, since mu_rndwn_file changes the file header too */
-			if (-1 == (fd = OPEN(fn, O_RDWR)))
+			if (FD_INVALID == (fd = OPEN(fn, O_RDWR)))
 			{
 				save_errno = errno;
 				errptr = (char *)STRERROR(save_errno);
@@ -324,6 +336,10 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				mu_gv_cur_reg_free();
 				continue;
 			}
+#ifdef __MVS__
+			if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
+				TAG_POLICY_GTM_PUTMSG(fn, realfiletag, TAG_BINARY, errno);
+#endif
 			LSEEKREAD(fd, 0, csd, sizeof(sgmnt_data), status);
 			if (0 != status)
 			{
@@ -344,7 +360,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				{
 					util_out_print("!UL too large, maximum reserved bytes allowed is !UL for database file !AD",
 							TRUE, reserved_bytes, MAX_RESERVE_B(csd), fn_len, fn);
-					close(fd);
+					CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 					db_ipcs_reset(gv_cur_region, FALSE);
 					return (int4)ERR_RBWRNNOTCHG;
 				}
@@ -357,6 +373,13 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					   FALSE);
 			if ((n_dba != access) && (csd->acc_meth != access))	/* n_dba is a proxy for no change */
 			{
+#				ifdef GTM_CRYPT
+				if (dba_mm == access && (csd->is_encrypted))
+				{
+					gtm_putmsg(VARLSTCNT(4) ERR_CRYPTNOMM, 2, DB_LEN_STR(gv_cur_region));
+					mupip_exit(ERR_RBWRNNOTCHG);
+				}
+#				endif
 				if (dba_mm == access)
 					csd->defer_time = 1;			/* defer defaults to 1 */
 				csd->acc_meth = access;
@@ -459,7 +482,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				util_out_print("Database file !AD not changed: ", TRUE, fn_len, fn);
 				rts_error(VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
 			}
-			close(fd);
+			CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 			/* --------------------- report results ------------------------- */
 			if (glbl_buff_status)
 				util_out_print("Database file !AD now has !UL global buffers",

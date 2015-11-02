@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -126,7 +126,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	    gv_cur_region=0;
 	    return RC_FILEACCESS;
 	}
-	gv_keysize = (gv_cur_region->max_key_size + MAX_NUM_SUBSC_LEN + 4) & (-4);
+	gv_keysize = DBKEYSIZE(gv_cur_region->max_key_size);
 	cs_addrs->dir_tree = (gv_namehead*)malloc(sizeof(gv_namehead) + 2*sizeof(gv_key) + 3*(gv_keysize - 1));
 	gv_altkey = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
 	gv_currkey = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
@@ -268,7 +268,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	    return RC_FILEACCESS;
 	}
 	rel_crit(gv_cur_region);
-	keysize = (gv_cur_region->max_key_size + MAX_NUM_SUBSC_LEN + 4) & (-4);
+	keysize = DBKEYSIZE(gv_cur_region->max_key_size);
 	cs_addrs->dir_tree = (gv_namehead*)malloc(sizeof(gv_namehead) + 2*sizeof(gv_key) + 3*(keysize - 1));
 	if (keysize > gv_keysize) {
 	    gv_keysize = keysize;;

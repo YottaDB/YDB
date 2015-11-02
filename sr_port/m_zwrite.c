@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,14 +45,15 @@ GBLREF mstr_len_t	sizeof_pat_everything;
 int m_zwrite(void)
 {
 	int4		pcount;			/* parameter count */
-	triple *ref,*ref1,*head,*last,*count;
-	opctype op;
-	oprtype name,limit;
-	mval	mv;
-	mint code;
-	mint subscount;
-	char c;
-	bool pat;
+	triple		*ref, *ref1, *head, *last, *count;
+	opctype 	op;
+	oprtype 	name, limit;
+	mval		mv;
+	mint		code;
+	mint		subscount;
+	char		c;
+	boolean_t	pat;
+
 	error_def(ERR_VAREXPECTED);
 	error_def(ERR_RPARENMISSING);
 	error_def(ERR_ZWRSPONE);
@@ -65,73 +66,70 @@ int m_zwrite(void)
 	{
 		advancewindow();
 		op = OC_GVZWRITE;
-	}
-	else
-	{	op = OC_LVZWRITE;
-	}
+	} else
+		op = OC_LVZWRITE;
+
 	switch(window_token)
 	{
-	case TK_SPACE:
-	case TK_EOL:
-		if (op == OC_GVZWRITE)
-		{
-			stx_error(ERR_VAREXPECTED);
-			return FALSE;
-		}
-		else
-		{	 op = OC_LVPATWRITE;
-		}
-		head = maketriple(op);
-		head->operand[0] = put_ilit((mint)3);
-		ref1 = newtriple(OC_PARAMETER);
-		head->operand[1] = put_tref(ref1);
-		ref1->operand[0] = put_ilit(0);			/* shows not from zshow */
-		ref = newtriple(OC_PARAMETER);
-		ref1->operand[1] = put_tref(ref);
-		ref->operand[0] = put_str((char *)pat_everything,sizeof_pat_everything);
-		MV_FORCE_MVAL(&mv,ZWRITE_ASTERISK) ;
-		ref->operand[1] = put_lit(&mv);
-		ins_triple(head);
-		return TRUE;
-	case TK_IDENT:
-		name = put_str(window_ident.addr, window_ident.len);
-		advancewindow();
-		break;
-	case TK_LPAREN:
-		if (op != OC_GVZWRITE) /* naked reference */
-		{
-			stx_error(ERR_VAREXPECTED);
-			return FALSE;
-		}
-		name = put_str(window_ident.addr, 0);
-		break;
-	case TK_ATSIGN:
-		if (!indirection(&name))
-			return FALSE;
-		if (op == OC_LVZWRITE && window_token != TK_LPAREN)
-		{
-			ref = maketriple(OC_COMMARG);
-			ref->operand[0] = name;
-			ref->operand[1] = put_ilit(indir_zwrite);
-			ins_triple(ref);
-			return TRUE;
-		}
-		ref = newtriple(OC_INDPAT);
-		ref->operand[0] = name;
-		name = put_tref(ref);
-		break;
-	case TK_QUESTION:
-		advancewindow();
-		source_column = last_source_column;
-		if (!compile_pattern(&name,FALSE))
-			return FALSE;
-		if (op == OC_LVZWRITE)
+		case TK_SPACE:
+		case TK_EOL:
+			if (op == OC_GVZWRITE)
+			{
+				stx_error(ERR_VAREXPECTED);
+				return FALSE;
+			}
 			op = OC_LVPATWRITE;
-		pat = TRUE;
-		break;
-	default:
-		stx_error(ERR_VAREXPECTED);
-		return FALSE;
+			head = maketriple(op);
+			head->operand[0] = put_ilit((mint)3);		/* count */
+			ref1 = newtriple(OC_PARAMETER);
+			head->operand[1] = put_tref(ref1);
+			ref1->operand[0] = put_ilit(0);			/* shows not from zshow */
+			ref = newtriple(OC_PARAMETER);
+			ref1->operand[1] = put_tref(ref);
+			ref->operand[0] = put_str((char *)pat_everything, sizeof_pat_everything);
+			MV_FORCE_MVAL(&mv, ZWRITE_ASTERISK) ;
+			ref->operand[1] = put_lit(&mv);
+			ins_triple(head);
+			return TRUE;
+		case TK_IDENT:
+			name = put_str(window_ident.addr, window_ident.len);
+			advancewindow();
+			break;
+		case TK_LPAREN:
+			if (op != OC_GVZWRITE) /* naked reference */
+			{
+				stx_error(ERR_VAREXPECTED);
+				return FALSE;
+			}
+			name = put_str(window_ident.addr, 0);
+			break;
+		case TK_ATSIGN:
+			if (!indirection(&name))
+				return FALSE;
+			if (op == OC_LVZWRITE && window_token != TK_LPAREN)
+			{
+				ref = maketriple(OC_COMMARG);
+				ref->operand[0] = name;
+				ref->operand[1] = put_ilit(indir_zwrite);
+				ins_triple(ref);
+				return TRUE;
+			}
+			ref = newtriple(OC_INDPAT);
+			ref->operand[0] = name;
+			name = put_tref(ref);
+			break;
+		case TK_QUESTION:
+			advancewindow();
+			source_column = last_source_column;
+			if (!compile_pattern(&name, FALSE))
+				return FALSE;
+			if (op == OC_LVZWRITE)
+				op = OC_LVPATWRITE;
+			pat = TRUE;
+			break;
+		default:
+			stx_error(ERR_VAREXPECTED);
+			return FALSE;
 	}
 	head = maketriple(op);
 	last = newtriple(OC_PARAMETER);
@@ -159,11 +157,11 @@ int m_zwrite(void)
 		pcount++;
 		if (pat)
 		{
-			MV_FORCE_MVAL(&mv,ZWRITE_END) ;
-		}
-		else
-		{	subscount++ ;
-			MV_FORCE_MVAL(&mv,ZWRITE_ASTERISK) ;
+			MV_FORCE_MVAL(&mv, ZWRITE_END);
+		} else
+		{
+			subscount++ ;
+			MV_FORCE_MVAL(&mv, ZWRITE_ASTERISK);
 		}
 		last->operand[1] = put_lit(&mv);
 		head->operand[0] = put_ilit(pcount);
@@ -182,7 +180,7 @@ int m_zwrite(void)
 			case TK_RPAREN:
 				dqdel(ref,exorder);
 				advancewindow();
-				MV_FORCE_MVAL(&mv,ZWRITE_END) ;
+				MV_FORCE_MVAL(&mv, ZWRITE_END);
 				last->operand[1] = put_lit(&mv);
 				pcount++;
 				head->operand[0] = put_ilit((mint)pcount);
@@ -199,7 +197,7 @@ int m_zwrite(void)
 					return FALSE;
 				}
 				advancewindow();
-				MV_FORCE_MVAL(&mv,ZWRITE_ASTERISK) ;
+				MV_FORCE_MVAL(&mv, ZWRITE_ASTERISK);
 				last->operand[1] = put_lit(&mv);
 				pcount++;
 				subscount++;
@@ -211,7 +209,7 @@ int m_zwrite(void)
 			case TK_QUESTION:
 				advancewindow();
 				source_column = last_source_column;
-				if (!compile_pattern(&limit,FALSE))
+				if (!compile_pattern(&limit, FALSE))
 					return FALSE;
 				if (window_token != TK_COMMA && window_token != TK_RPAREN)
 				{	stx_error(ERR_ZWRSPONE);
@@ -220,7 +218,7 @@ int m_zwrite(void)
 				if (window_token == TK_COMMA)
 					advancewindow();
 				subscount++;
-				MV_FORCE_MVAL(&mv,ZWRITE_PATTERN) ;
+				MV_FORCE_MVAL(&mv, ZWRITE_PATTERN);
 				ref->operand[0] = put_lit(&mv);
 				pcount++;
 				ref1 = newtriple(OC_PARAMETER);
@@ -235,7 +233,7 @@ int m_zwrite(void)
 					if (c != TK_COMMA)
 					{
 						advancewindow();
-						MV_FORCE_MVAL(&mv,ZWRITE_UPPER) ;
+						MV_FORCE_MVAL(&mv, ZWRITE_UPPER);
 						ref->operand[0] = put_lit(&mv);
 						pcount++;
 						subscount++;
@@ -246,7 +244,7 @@ int m_zwrite(void)
 				/* caution: fall through */
 			case TK_COMMA:
 				advancewindow();
-				MV_FORCE_MVAL(&mv,ZWRITE_ALL) ;
+				MV_FORCE_MVAL(&mv, ZWRITE_ALL);
 				ref->operand[0] = put_lit(&mv);
 				pcount++;
 				subscount++;
@@ -265,30 +263,29 @@ int m_zwrite(void)
 					code = ZWRITE_LOWER;
 					advancewindow();
 					c = window_token;
-				}
-				else
+				} else
 					code = ZWRITE_VAL;
 				switch (c)
 				{
-				case TK_COMMA:
-					advancewindow();
-					/* caution: fall through */
-				case TK_RPAREN:
-					MV_FORCE_MVAL(&mv,code) ;
-					ref->operand[0] = put_lit(&mv);
-					pcount++;
-					continue;
-				default:
-					if (code == ZWRITE_VAL)
-					{
-						stx_error(ERR_COMMA);
-						return FALSE;
-					}
-					MV_FORCE_MVAL(&mv,ZWRITE_BOTH) ;
-					ref->operand[0] = put_lit(&mv);
-					pcount++;
-					ref = last;
-					break;
+					case TK_COMMA:
+						advancewindow();
+						/* caution: fall through */
+					case TK_RPAREN:
+						MV_FORCE_MVAL(&mv, code) ;
+						ref->operand[0] = put_lit(&mv);
+						pcount++;
+						continue;
+					default:
+						if (code == ZWRITE_VAL)
+						{
+							stx_error(ERR_COMMA);
+							return FALSE;
+						}
+						MV_FORCE_MVAL(&mv, ZWRITE_BOTH) ;
+						ref->operand[0] = put_lit(&mv);
+						pcount++;
+						ref = last;
+						break;
 				}
 				break;
 		}
@@ -299,8 +296,6 @@ int m_zwrite(void)
 		last->operand[0] = limit;
 		pcount++;
 		if (window_token == TK_COMMA)
-		{
 			advancewindow();
-		}
 	}
 }

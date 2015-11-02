@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,9 @@ UNIX_ONLY(void close_object_file(void);)
 VMS_ONLY(void close_object_file(rhdtyp *rhead);)
 void create_object_file(rhdtyp *rhead);
 void obj_init(void);
+DEBUG_ONLY(int output_symbol_size(void);)
+
+#define OUTPUT_SYMBOL_SIZE (USIZEOF(int4) + sym_table_size)
 
 #define PADCHARS	"PADDING PADDING"
 #ifndef SECTION_ALIGN_BOUNDARY

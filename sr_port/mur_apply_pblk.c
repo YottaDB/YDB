@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,9 @@
 #include "gdsbml.h"
 #include "bit_clear.h"
 #include "bit_set.h"
+#ifdef GTM_CRYPT
+#include "gtm_string.h"
+#endif
 
 #if defined(UNIX)
 #include "gtm_unistd.h"
@@ -122,7 +125,7 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 				 * in case of normal recovery with -noverify, we would have written this information
 				 * out in mur_back_process() itself so we do not need to write it again here.
 				 */
-				rctl->csd->intrpt_recov_tp_resolve_time = murgbl.tp_resolve_time;
+				rctl->csd->intrpt_recov_tp_resolve_time = (jnl_tm_t)murgbl.tp_resolve_time;
 				rctl->csd->intrpt_recov_resync_seqno = (murgbl.resync_seqno ? murgbl.resync_seqno : 0);
 				/* flush the changed csd to disk */
 				fc = rctl->gd->dyn.addr->file_cntl;
@@ -316,7 +319,11 @@ uint4 mur_output_pblk(void)
 	int4			size, fbw_size, fullblockwrite_len, blks_in_lmap;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-
+	GTMCRYPT_ONLY(
+		int		req_enc_blk_size;
+		int		crypt_status;
+		blk_hdr_ptr_t	bp;
+	)
 	if (mur_options.rollback_losttnonly)	/* In case of a LOSTTNONLY rollback, it is still possible to reach here */
 		return SS_NORMAL;/* if one region has NOBEFORE_IMAGE while another has BEFORE_IMAGE. Any case do NOT apply PBLKs */
 	rctl = &mur_ctl[mur_regno];
@@ -401,5 +408,27 @@ uint4 mur_output_pblk(void)
 		fbw_size = size;
 	db_ctl->op_buff = pblkcontents;
 	db_ctl->op_len = fbw_size;
+	/* During recovery process, the dat file is recreated by reading the PBLK records from the jnl file and applying them
+	 * to the dat file. In case the database is encrypted, the journal file would also have encrypted PBLK records so
+	 * as long as both the journal file and database file have the same encryption keys (usual case) we dont need to do
+	 * any encryption in this function. But if the keys are different, we need to decrypt the journal record using the
+	 * key from the journal file and re-encrypt it using the key from the database file before applying the PBLK record.
+	 */
+#	ifdef GTM_CRYPT
+	bp = (blk_hdr_ptr_t) pblkcontents;
+	req_enc_blk_size = bp->bsiz - SIZEOF(*bp);
+	if (!mur_jctl->is_same_hash_as_db && BLOCK_REQUIRE_ENCRYPTION(csd->is_encrypted, bp->levl, req_enc_blk_size))
+	{
+		ASSERT_ENCRYPTION_INITIALIZED;
+		GTMCRYPT_DECODE_FAST(mur_jctl->encr_key_handle, (char *)(bp + 1), req_enc_blk_size, NULL, crypt_status);
+		if (0 == crypt_status)
+			GTMCRYPT_ENCODE_FAST(csa->encr_key_handle, (char *)(bp + 1), req_enc_blk_size, NULL, crypt_status);
+		if (0 != crypt_status)
+		{
+			GC_GTM_PUTMSG(crypt_status, NULL);
+			return crypt_status;
+		}
+	}
+#	endif
 	return (dbfilop(db_ctl));
 }

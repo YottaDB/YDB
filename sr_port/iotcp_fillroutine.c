@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@ int	gtm_connect(int socket, struct sockaddr *address, size_t address_len)
 
 	do
 	{
-		res = connect(socket, address, address_len);
+		res = connect(socket, address, (GTM_SOCKLEN_TYPE)address_len);
 	} while (-1 == res && EINTR == errno);
 
 	return(res);

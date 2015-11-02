@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,8 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
+#include "lv_val.h"
 #include "fgncal.h"
 #include "gtmci.h"
 #include "gtmxc_types.h"
@@ -173,7 +175,7 @@ static void	extarg2mval(void *src, enum xc_types typ, mval *dst)
 			dst->mvtype = MV_STR;
 			if (sp->len > MAX_STRLEN)
 				rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
-			dst->str.len = sp->len;
+			dst->str.len = (mstr_len_t)sp->len;
 			if ((0 < sp->len) && (NULL != sp->addr))
 			{
 				dst->str.addr = sp->addr;
@@ -190,7 +192,7 @@ static void	extarg2mval(void *src, enum xc_types typ, mval *dst)
 			str_len = STRLEN(cp);
 			if (str_len > MAX_STRLEN)
 				rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
-			dst->str.len = str_len;
+			dst->str.len = (mstr_len_t)str_len;
 			dst->str.addr = cp;
 			s2pool(&dst->str);
 			break;
@@ -257,7 +259,7 @@ static int	extarg_getsize(void *src, enum xc_types typ, mval *dst)
 				return 0;
 			} else  if (NULL == sp->addr)
 				sp->len = 0;
-			return sp->len;
+			return (int)(sp->len);
 			break;
 		default:
 			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
@@ -360,7 +362,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 					n += (-1 != entry_ptr->param_pre_alloc_size[i]) ? entry_ptr->param_pre_alloc_size[i] : 0;
 				break;
 			case xc_double_star:
-				n += sizeof(double);
+				n += SIZEOF(double);
 				if (m1 & 1)
 					MV_FORCE_DEFINED(v);
 				break;
@@ -452,7 +454,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				break;
 			case xc_uint_star:
 				param_list->arg[i] = free_space_pointer;
-				*((xc_uint_t *)free_space_pointer) = (m1 & 1) ? (xc_ulong_t)mval2ui(v) : 0;
+				*((xc_uint_t *)free_space_pointer) = (m1 & 1) ? (xc_uint_t)mval2ui(v) : 0;
 				free_space_pointer++;
 				break;
 			case xc_long_star:

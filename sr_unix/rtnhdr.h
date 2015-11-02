@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,8 +99,25 @@ typedef struct
 } rtn_tabent;
 
 /* byte offset of the routine_name field in the routine headers of pre-V5 releases */
-#define PRE_V5_RTNHDR_RTNOFF	24
+#define PRE_V5_RTNHDR_RTNOFF		24
 
+/* byte offset of the routine_name mstr (len,addr) in V50 and V51 - only used in Tru64/HPUX-HPPA */
+#if defined(__osf__) || defined(__hppa)
+#  define V50V51_RTNHDR_RTNMSTR_OFFSET	24
+#  ifdef __osf__
+#    define V50V51_FTNHDR_LITBASE_OFFSET	68
+#  elif defined(__hppa)
+#    define V50V51_FTNHDR_LITBASE_OFFSET	64
+#  else
+#    error "Unsupported platform"
+#  endif
+typedef struct
+{
+	unsigned int	len;		/* Byte length */
+	int4		*addr;		/* Offset at this stage */
+} v50v51_mstr;
+#endif
+#
 /* Macros for accessing routine header fields in a portable way */
 #define VARTAB_ADR(rtnhdr) ((rtnhdr)->vartab_adr)
 #define LABTAB_ADR(rtnhdr) ((rtnhdr)->labtab_adr)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +45,7 @@ GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF jnl_gbls_t		jgbl;
 LITREF	int			jrt_fixed_size[];
 LITREF	int			jrt_is_replicated[];
+LITREF  int			jrt_update[JRT_RECTYPES];
 
 /* This function does a subset of what "jnl_write" does. While "jnl_write" writes the journal record to the journal buffer,
  * journal file and journal pool, this function writes the journal records ONLY TO the journal pool. This function should
@@ -68,6 +69,7 @@ void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, 
 	uint4			jnlpool_size;
 	uchar_ptr_t		jnlrecptr;
 	DEBUG_ONLY(uint4	lcl_dskaddr;)
+	uchar_ptr_t		tmp_buff;
 
 	error_def(ERR_JNLWRTNOWWRTR);
 	error_def(ERR_JNLWRTDEFER);
@@ -88,7 +90,15 @@ void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, 
 	DEBUG_ONLY(jgbl.cu_jnl_index++;)
 	jnlpool_size = temp_jnlpool_ctl->jnlpool_size;
 	dstlen = jnlpool_size - temp_jnlpool_ctl->write;
-	jnlrecptr = (jrt_fixed_size[rectype] ? (uchar_ptr_t)jnl_rec : (uchar_ptr_t)jfb->buff);
+	if (jrt_fixed_size[rectype])
+		jnlrecptr = (uchar_ptr_t)jnl_rec;
+#	ifdef GTM_CRYPT
+	else if(csa->hdr->is_encrypted && IS_SET_KILL_ZKILL(rectype))
+		jnlrecptr = (uchar_ptr_t)jfb->alt_buff;
+#	endif
+	else
+		jnlrecptr = (uchar_ptr_t)jfb->buff;
+
 	if (rlen <= dstlen)	/* dstlen & srclen >= rlen  (most frequent case) */
 		memcpy(jnldata_base + temp_jnlpool_ctl->write, jnlrecptr, rlen);
 	else			/* dstlen < rlen <= srclen */

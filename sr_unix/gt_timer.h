@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,19 @@ typedef struct tag_abs_time {
 	long	at_sec;		/* seconds */
 	long	at_usec;	/* and microseconds */
 } ABS_TIME;
+
+#include <sys/time.h>
+
+/* Type that corresponds to the tv_usec field in a timeval struct.  Valid across all platforms */
+#if defined(__linux__) || defined(__ia64) || defined(__sparc) || defined(_AIX) || defined(__MVS__)
+    typedef     suseconds_t     gtm_tv_usec_t;
+#elif defined(__hppa)
+    typedef     long            gtm_tv_usec_t;
+#elif defined(__osf__)
+    typedef     int             gtm_tv_usec_t;
+#elif !defined(VMS)
+#   error unsupported platform
+#endif
 
 /*
  * -----------------------------------------------------

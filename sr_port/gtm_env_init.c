@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,13 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+#include "gtm_stdlib.h"
+
 #include "gtm_logicals.h"
 #include "logical_truth_value.h"
 #include "trans_numeric.h"
+#include "trans_log_name.h"
 #include "gtmdbglvl.h"
 #include "iosp.h"
 #include "wbox_test_init.h"
@@ -58,6 +62,8 @@ GBLREF	uint4		outOfMemoryMitigateSize;	/* Reserve that we will freed to help cle
 GBLREF	uint4		max_cache_memsize;	/* Maximum bytes used for indirect cache object code */
 GBLREF	uint4		max_cache_entries;	/* Maximum number of cached indirect compilations */
 GBLREF	boolean_t	gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
+GBLREF	char		prombuf[MAX_MIDENT_LEN];
+GBLREF	mstr		gtmprompt;
 
 #ifdef DEBUG
 GBLREF	boolean_t	gtm_gvundef_fatal;
@@ -66,9 +72,11 @@ GBLREF	boolean_t	gtm_gvundef_fatal;
 void	gtm_env_init(void)
 {
 	static boolean_t	gtm_env_init_done = FALSE;
-	mstr			val;
+	mstr			val, trans;
 	boolean_t		ret, is_defined;
 	uint4			tdbglvl, tmsock, reservesize, memsize, cachent;
+	int4			status;
+	char			buf[MAX_TRANS_NAME_LEN];
 
 	if (!gtm_env_init_done)
 	{
@@ -193,6 +201,19 @@ void	gtm_env_init(void)
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
 			dollar_zquit_anyway = ret;
+
+		/* Initialize ZPROMPT to desired GTM prompt or default */
+		val.addr = GTM_PROMPT;
+		val.len = sizeof(GTM_PROMPT) - 1;
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, sizeof(buf), do_sendmsg_on_log2long)))
+		{	/* Non-standard prompt requested */
+			assert(sizeof(buf) > trans.len);
+			if (sizeof(prombuf) >= trans.len)
+			{
+				gtmprompt.len = trans.len;
+				memcpy(gtmprompt.addr, trans.addr, trans.len);
+			}
+		}
 
 		/* Platform specific initializations */
 		gtm_env_init_sp();

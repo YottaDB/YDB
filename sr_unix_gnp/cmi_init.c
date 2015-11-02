@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,13 +9,16 @@
  *								*
  ****************************************************************/
 #include "mdef.h"
-#include "cmidef.h"
-#include "eintr_wrappers.h"
+
+#include <errno.h>
+
 #include "gtmio.h"
 #include "gtm_netdb.h"
 #include "gtm_socket.h"
-#include <netinet/in.h>
-#include <errno.h>
+#include "gtm_inet.h"
+
+#include "cmidef.h"
+#include "eintr_wrappers.h"
 
 GBLREF struct NTD *ntd_root;
 
@@ -59,7 +62,7 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 
 	/* create the listening socket */
 	ntd_root->listen_fd = socket(AF_INET, SOCK_STREAM, p->p_proto);
-	if (-1 == ntd_root->listen_fd)
+	if (FD_INVALID == ntd_root->listen_fd)
 		return errno;
 
 	/* make sure we can re-run quickly w/o reuse problems */
@@ -68,8 +71,7 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 	if (-1 == status)
 	{
 		save_errno = errno;
-		CLOSEFILE(ntd_root->listen_fd, rc);
-		ntd_root->listen_fd = -1;
+		CLOSEFILE_RESET(ntd_root->listen_fd, rc);	/* resets "ntd_root->listen_fd" to FD_INVALID */
 		return save_errno;
 	}
 
@@ -77,16 +79,14 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 	if (-1 == status)
 	{
 		save_errno = errno;
-		CLOSEFILE(ntd_root->listen_fd, rc);
-		ntd_root->listen_fd = -1;
+		CLOSEFILE_RESET(ntd_root->listen_fd, rc);	/* resets "ntd_root->listen_fd" to FD_INVALID */
 		return save_errno;
 	}
 
 	status = cmj_setupfd(ntd_root->listen_fd);
 	if (CMI_ERROR(status))
 	{
-		CLOSEFILE(ntd_root->listen_fd, rc);
-		ntd_root->listen_fd = -1;
+		CLOSEFILE_RESET(ntd_root->listen_fd, rc);	/* resets "ntd_root->listen_fd" to FD_INVALID */
 		return status;
 	}
 
@@ -95,16 +95,14 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 	if (-1 == rval)
 	{
 		save_errno = errno;
-		CLOSEFILE(ntd_root->listen_fd, rc);
-		ntd_root->listen_fd = -1;
+		CLOSEFILE_RESET(ntd_root->listen_fd, rc);	/* resets "ntd_root->listen_fd" to FD_INVALID */
 		SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 		return save_errno;
 	}
 	status = cmj_set_async(ntd_root->listen_fd);
 	if (CMI_ERROR(status))
 	{
-		CLOSEFILE(ntd_root->listen_fd, rc);
-		ntd_root->listen_fd = -1;
+		CLOSEFILE_RESET(ntd_root->listen_fd, rc);	/* resets "ntd_root->listen_fd" to FD_INVALID */
 		SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 		return status;
 	}

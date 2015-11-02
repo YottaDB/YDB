@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,8 +52,8 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 {
 	char			addr[SA_MAXLITLEN], *errptr, sockaddr[SA_MAXLITLEN],
 		                temp_addr[SA_MAXLITLEN], dev_type[MAX_DEV_TYPE_LEN];
-	unsigned char		ch, len, *c, *next, *top;
-	int			handle_len, moreread_timeout;
+	unsigned char		ch, *c, *next, *top;
+	int			handle_len, moreread_timeout, len;
 	unsigned short		port;
 	int4			errlen, msec_timeout, real_errno, p_offset = 0, zff_len, delimiter_len;
 	int			d_socket_struct_len;
@@ -243,7 +243,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 				break;
 			case iop_zlisten:
 				listen_specified = TRUE;
-				len = *(pp->str.addr + p_offset);
+				len = (int)(*(pp->str.addr + p_offset));
 				if (len < SA_MAXLITLEN)
 				{
 					memset(sockaddr, 0, sizeof(sockaddr));
@@ -254,7 +254,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 				break;
 			case iop_connect:
 				connect_specified = TRUE;
-				len = *(pp->str.addr + p_offset);
+				len = (int)(*(pp->str.addr + p_offset));
 				if (len < SA_MAXLITLEN)
 				{
 					memset(sockaddr, 0, sizeof(sockaddr));
@@ -274,7 +274,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 				break;
 			case iop_attach:
 				attach_specified = TRUE;
-				handle_len = (short)(*(pp->str.addr + p_offset));
+				handle_len = (int)(*(pp->str.addr + p_offset));
 				if (handle_len > MAX_HANDLE_LEN)
 					handle_len = MAX_HANDLE_LEN;
 				memcpy(sock_handle, pp->str.addr + p_offset + 1, handle_len);
@@ -400,9 +400,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		memcpy(&newdsocket->dollar_key[len], socketptr->handle, socketptr->handle_len);
 		len += socketptr->handle_len;
 		newdsocket->dollar_key[len++] = '|';
-		MEMCPY_STR(&newdsocket->dollar_key[len], socketptr->remote.saddr_ip);
-		len += strlen(socketptr->remote.saddr_ip);
-		newdsocket->dollar_key[len++] = '\0';
+		strcpy(&newdsocket->dollar_key[len], socketptr->remote.saddr_ip);	/* Copies in terminating NULL */
 	}
 	if (0 <= zff_len && /* ZFF or ZNOFF specified */
 	    0 < (socketptr->zff.len = zff_len)) /* assign the new ZFF len, might be 0 from ZNOFF, or ZFF="" */

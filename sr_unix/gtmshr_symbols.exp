@@ -10,3 +10,6 @@ gtm_cancel_timer
 gtm_jnlpool_detach
 gtm_malloc
 gtm_free
+gtm_filename_to_id
+gtm_is_file_identical
+gtm_xcfileid_free

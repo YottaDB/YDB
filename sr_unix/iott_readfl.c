@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -1095,7 +1095,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				break;
 			}
 			input_timeval.tv_sec = cur_time.at_sec;
-			input_timeval.tv_usec = cur_time.at_usec;
+			input_timeval.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
 		}
 	} while (outlen < length);
 	*zb_ptr++ = 0;

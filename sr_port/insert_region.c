@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -101,16 +101,7 @@ tp_region	*insert_region(	gd_region	*reg,
 			gv_cur_region = temp_reg;
 			return NULL;
 		}
-	  	if (NULL == reg->dyn.addr->file_cntl)
-	    	{
-	      		reg->dyn.addr->file_cntl = malloc(sizeof(file_control));
-              		memset(reg->dyn.addr->file_cntl, 0, sizeof(file_control));
-	    	}
-	  	if (NULL == reg->dyn.addr->file_cntl->file_info)
-	    	{
-	      		reg->dyn.addr->file_cntl->file_info = malloc(sizeof(vms_gds_info));
-	      		memset(reg->dyn.addr->file_cntl->file_info, 0, sizeof(vms_gds_info));
-	    	}
+		FILE_CNTL_INIT_IF_NULL(reg->dyn.addr);
 	  	fc = reg->dyn.addr->file_cntl;
 		fc->file_type = reg->dyn.addr->acc_meth;
 	  	fc->op = FC_OPEN;

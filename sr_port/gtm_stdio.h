@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@
 
 #define FPRINTF         		fprintf
 
-#ifdef UNIX
+#if defined(UNIX) && !defined(__MVS__) && !defined(NO_GTM_FPRINTF)
 /* #define to be gtm_fprintf to serve as a wrapper for blocking signals since fprintf is not signal-safe. */
 #define	fprintf		gtm_fprintf
 int	gtm_fprintf(FILE *stream, const char *format, ...);	/* Define prototype of "gtm_fprintf" here */

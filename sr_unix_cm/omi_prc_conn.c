@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,9 @@ static char rcsid[] = "$Header:$";
 
 #include "gtm_string.h"
 #include "gtm_stdio.h"
-#include <crypt.h> /* for crypt() */
+#ifndef __MVS__
+#include <crypt.h> /* for crypt(), actually it is in unistd.h */
+#endif
 #include "gtm_unistd.h" /* for crypt() */
 
 #include "gtcm.h"
@@ -73,7 +75,8 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 /*  Data */
     OMI_LI_READ(&li_min, cptr->xptr);
-    if (OMI_MAX_DATA < li_min.value) {
+    if (OMI_MAX_DATA < li_min.value)
+    {
 	cptr->state = OMI_ST_CLOS;
 	return -OMI_ER_SE_LENMIN;
     }
@@ -83,7 +86,8 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 /*  Subscript */
     OMI_LI_READ(&li_min, cptr->xptr);
-    if (OMI_MAX_SUBSCR < li_min.value) {
+    if (OMI_MAX_SUBSCR < li_min.value)
+    {
 	cptr->state = OMI_ST_CLOS;
 	return -OMI_ER_SE_LENMIN;
     }
@@ -93,7 +97,8 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 /*  Reference */
     OMI_LI_READ(&li_min, cptr->xptr);
-    if (OMI_MAX_REF < li_min.value) {
+    if (OMI_MAX_REF < li_min.value)
+    {
 	cptr->state = OMI_ST_CLOS;
 	return -OMI_ER_SE_LENMIN;
     }
@@ -103,7 +108,8 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 /*  Message */
     OMI_LI_READ(&li_min, cptr->xptr);
-    if (cptr->bsiz < li_min.value) {
+    if (cptr->bsiz < li_min.value)
+    {
 	cptr->state = OMI_ST_CLOS;
 	return -OMI_ER_SE_LENMIN;
     }
@@ -113,7 +119,8 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 /*  Oustanding */
     OMI_LI_READ(&li_min, cptr->xptr);
-    if (1 < li_min.value) {
+    if (1 < li_min.value)
+    {
 	cptr->state = OMI_ST_CLOS;
 	return -OMI_ER_SE_LENMIN;
     }
@@ -137,7 +144,8 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 /*  Agent name (in) */
     OMI_SI_READ(&ss_len, cptr->xptr);
-    if ((ag_name = (char *) malloc(ss_len.value + 1)) == NULL) {
+    if ((ag_name = (char *) malloc(ss_len.value + 1)) == NULL)
+    {
 	    OMI_DBG((omi_debug, "%s:  memory allocation error (insufficient resources) while\n", SRVR_NAME));
 	    OMI_DBG((omi_debug, "processing connect request from connection %d, %s.\n",
 	    		cptr->stats.id, gtcm_hname(&cptr->stats.sin)));
@@ -151,7 +159,8 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 /*  Agent password (in) */
     OMI_SI_READ(&ss_len, cptr->xptr);
-    if ((ag_pass = (char *) malloc(ss_len.value + 1)) == NULL) {
+    if ((ag_pass = (char *) malloc(ss_len.value + 1)) == NULL)
+    {
 	    OMI_DBG((omi_debug, "%s:  memory allocation error (insufficient resources) while\n", SRVR_NAME));
 	    OMI_DBG((omi_debug, "processing connect request from connection %d, %s.\n",
 	    		cptr->stats.id, gtcm_hname(&cptr->stats.sin)));
@@ -162,8 +171,8 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
     ag_pass[ss_len.value] = '\0';
     cptr->xptr += ss_len.value;
 
-/* No support for authentication on SCO, Linux, or Cygwin at the moment...*/
-#if !(defined(SCO) || defined(__linux__) || defined(__CYGWIN__))
+/* No support for authentication on SCO, Linux, Cygwin, or z/OS at the moment...*/
+#if !(defined(SCO) || defined(__linux__) || defined(__CYGWIN__) || defined(__MVS__))
     if (authenticate)  /* verify password and user name */
     {
 #ifdef SHADOWPW
@@ -174,20 +183,20 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 	    char *pw, *syspw;
 
 	    /* lowercase agent name */
-	    for(s=ag_name; *s; s++)
-		    if (isupper(*s))
-			    *s = tolower(*s);
+	    for(s = ag_name; *s; s++)
+		    if (ISUPPER(*s))
+			    *s = TOLOWER(*s);
 
 #ifdef SHADOWPW
-	    if (!stat("/etc/shadow", &buf))
+	    if (!Stat("/etc/shadow", &buf))
 	    {
-		if ((spass= getspnam(ag_name)) == NULL)
+		if ((spass = getspnam(ag_name)) == NULL)
 		{
 		    if (errno)
 		    {
 			OMI_DBG((omi_debug, "%s:  error opening /etc/shadow for input\n",
 				 SRVR_NAME, ag_name));
-			perror("/etc/shadow");
+			PERROR("/etc/shadow");
 			return -OMI_ER_DB_USERNOAUTH;
 		    }
 		    OMI_DBG((omi_debug, "%s:  user %s not found in /etc/shadow\n",
@@ -195,38 +204,37 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 		    return -OMI_ER_DB_USERNOAUTH;
 		}
 		syspw = spass->sp_pwdp;
-	    }
-	    else if ((pass = getpwnam(ag_name)) == NULL)
+	    } else if ((pass = getpwnam(ag_name)) == NULL)
 	    {
 		    OMI_DBG((omi_debug, "%s:  user %s not found in /etc/passwd\n",
 			     SRVR_NAME, ag_name));
 		    return -OMI_ER_DB_USERNOAUTH;
-	    }
-	    else
+	    } else
 		syspw = pass->pw_passwd;
 
 
 
 #else    /* ndef SHADOWPW */
-	    if ((pass = getpwnam(ag_name)) == NULL) {
+	    if ((pass = getpwnam(ag_name)) == NULL)
+	    {
 		    OMI_DBG((omi_debug, "%s:  user %s not found in /etc/passwd\n",
 			     SRVR_NAME, ag_name));
 		    return -OMI_ER_DB_USERNOAUTH;
-	    }
-	    else
+	    } else
 		syspw = pass->pw_passwd;
 
 #endif   /* SHADOWPW */
 
 	    pw = (char *) crypt(ag_pass, syspw);
 
-	    if (strcmp(pw, syspw) != 0) {
+	    if (strcmp(pw, syspw) != 0)
+	    {
 		    OMI_DBG((omi_debug, "%s:  login attempt for user %s failed.\n",
 			     SRVR_NAME, ag_name));
 		    return -OMI_ER_DB_USERNOAUTH;
 	    }
     }
-#endif  /* SCO or linux or cygwin */
+#endif  /* SCO or linux or cygwin or z/OS */
 
 
 /*  Server name (in) */
@@ -249,7 +257,8 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 /*  Extensions (in) -- count through them */
     OMI_SI_READ(&ext_cnt, cptr->xptr);
-    for (i = 0; i < ext_cnt.value; i++) {
+    for (i = 0; i < ext_cnt.value; i++)
+    {
 	OMI_LI_READ(&ext, cptr->xptr);
 	cptr->exts |= (1 << (ext.value - 1));
     }
@@ -269,19 +278,23 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
     eptr  = bptr;
     bptr += OMI_SI_SIZ;
     i     = 0;
-    if (cptr->exts & OMI_XTF_BUNCH) {
+    if (cptr->exts & OMI_XTF_BUNCH)
+    {
 	OMI_LI_WRIT(OMI_XTN_BUNCH, bptr);
 	i++;
     }
-    if (cptr->exts & OMI_XTF_GGR) {
+    if (cptr->exts & OMI_XTF_GGR)
+    {
 	OMI_LI_WRIT(OMI_XTN_GGR, bptr);
 	i++;
     }
-    if (cptr->exts & OMI_XTF_NEWOP) {
+    if (cptr->exts & OMI_XTF_NEWOP)
+    {
 	OMI_LI_WRIT(OMI_XTN_NEWOP, bptr);
 	i++;
     }
-    if (cptr->exts & OMI_XTF_RC) {
+    if (cptr->exts & OMI_XTF_RC)
+    {
 	OMI_LI_WRIT(OMI_XTN_RC, bptr);
 	i++;
     }

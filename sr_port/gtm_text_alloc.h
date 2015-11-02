@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@
    the algorithms in gtm_text_alloc.c with ones not based on the buddy system could
    potentially alleviate these efficiency differences.
 */
-#if defined(__linux__) || defined(__osf__)
+#if defined(__linux__) || defined(__osf__) || defined(__MVS__)
 #  define GTM_TEXT_ALLOC(x) gtm_text_alloc(x)
 #  define GTM_TEXT_FREE(x) gtm_text_free(x)
 void *gtm_text_alloc(size_t size);

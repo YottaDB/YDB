@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,9 @@
 #include "mupint.h"
 #include "mu_file_size.h"
 #include "gtmmsg.h"
-
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 GBLDEF unsigned char		*mu_int_locals;
 GBLDEF unsigned char		*mu_int_master;
 GBLDEF int4			mu_int_ovrhd;
@@ -40,7 +42,7 @@ boolean_t mu_int_fhead(void)
 	unsigned int	maps, native_size, size, block_factor;
 	trans_num	temp_tn, max_tn_warn;
 	sgmnt_data_ptr_t mu_data;
-
+	GTMCRYPT_ONLY(int	crypt_status;)
 	error_def(ERR_KILLABANDONED);
 	error_def(ERR_MUKILLIP);
 	error_def(ERR_MUTNWARN);
@@ -147,6 +149,19 @@ boolean_t mu_int_fhead(void)
 		mu_int_err(ERR_DBMXRSEXCMIN, 0, 0, 0, 0, 0, 0, 0);
 	if (mu_data->blk_size - sizeof(blk_hdr) < mu_data->max_rec_size)
 		mu_int_err(ERR_DBMAXRSEXBL, 0, 0, 0, 0, 0, 0, 0);
+#	ifdef GTM_CRYPT
+	if (mu_data->is_encrypted)
+	{
+		/* Encryption init should have happened in db_init. */
+		ASSERT_ENCRYPTION_INITIALIZED;
+		GTMCRYPT_HASH_CHK(mu_data->encryption_hash, crypt_status);
+		if (0 != crypt_status)
+		{
+			GC_GTM_PUTMSG(crypt_status, (gv_cur_region->dyn.addr->fname));
+			return FALSE;
+		}
+	}
+#	endif
 	/* !tn_reset_this_reg should ideally be used here instead of (!tn_reset_specified || gv_cur_region->read_only).
 	 * But at this point, tn_reset_this_reg has not yet been set for this region and to avoid taking a risk in
 	 *   changing the code flow, we redo the computation ot tn_reset_this_reg here. This is not as much a performance concern.

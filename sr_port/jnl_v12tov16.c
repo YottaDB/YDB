@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,7 +78,7 @@ int jnl_v12tov16(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 								   v12_jnl_fixed_size[rectype] + total_key);
 						total_data = long_data_len + SIZEOF(mstr_len_t);
 					}
-					conv_reclen = JREC_PREFIX_SIZE + FIXED_UPD_RECLEN +
+					conv_reclen = JREC_PREFIX_SIZE + (unsigned int)FIXED_UPD_RECLEN +
 						total_key + total_data + JREC_SUFFIX_SIZE;
 					conv_reclen = ROUND_UP2(conv_reclen, JNL_REC_START_BNDRY);
 				}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +12,15 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_stat.h"
 #if defined(UNIX)
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "eintr_wrappers.h"
+#include "gtm_permissions.h"
+#if defined(__MVS__)
+#include "gtm_zos_io.h"
+#endif
 #elif defined(VMS)
 #include <rms.h>
 #include <iodef.h>
@@ -23,7 +28,6 @@
 #include "iosb_disk.h"
 #endif
 
-#include "gtm_stat.h"
 #include "gtm_file_stat.h"
 #include "gtm_rename.h"
 #include "error.h"
@@ -68,7 +72,7 @@
 if (SYSCALL_ERROR(info->status) || SYSCALL_ERROR(info->status2))	\
 {									\
 	int	status;							\
-	F_CLOSE(channel, status);					\
+	F_CLOSE(channel, status);/* resets "channel" to FD_INVALID */	\
 	if (NULL != jrecbuf_base)					\
 		free(jrecbuf_base);					\
 	return EXIT_ERR;						\
@@ -169,6 +173,11 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 #elif defined(UNIX)
 	struct stat		stat_buf;
 	int			fstat_res;
+	ZOS_ONLY(int		realfiletag;)
+	int			stat_res;
+	int			group_id;
+	struct stat		sb;
+	int			perm;
 #endif
 	uint4			temp_offset, temp_checksum;
 
@@ -176,6 +185,8 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	error_def(ERR_RENAMEFAIL);
 	error_def(ERR_JNLCRESTATUS);
 	error_def(ERR_PREMATEOF);
+ 	error_def(ERR_TEXT);
+ 	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	jrecbuf = NULL;
 	if (info->no_rename)
@@ -194,7 +205,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	{
 		create_fn = &fn_buff[0];
 		if (SS_NORMAL != (info->status = prepare_unique_name((char *)info->jnl, (int)info->jnl_len, "", EXT_NEW,
-				(char *)create_fn, &create_fn_len, &info->status2)))
+								     (char *)create_fn, &create_fn_len, &info->status2)))
 		{
 			STATUS_MSG(info);
 			return EXIT_ERR;
@@ -208,15 +219,10 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		STATUS_MSG(info);
 		return EXIT_ERR;
 	}
-	if (-1 == fchmod(channel, 0666))
-	{
-		info->status = errno;
-		STATUS_MSG(info);
-		return EXIT_ERR;
-	}
-	jrecbuf_base = malloc(DISK_BLOCK_SIZE + ALIGNMENT_SIZE);
-	jrecbuf = (char *)ROUND_UP2((uintszofptr_t)jrecbuf_base, DISK_BLOCK_SIZE);
-	memset(jrecbuf, 0, DISK_BLOCK_SIZE);
+#if defined(__MVS__)
+ 	if (-1 == gtm_zos_set_tag(channel, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
+ 		TAG_POLICY_SEND_MSG((char *)create_fn, errno, realfiletag, TAG_BINARY);
+#endif
 	FSTAT_FILE(channel, &stat_buf, fstat_res);
 	if (-1 == fstat_res)
 	{
@@ -225,6 +231,37 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		F_CLOSE(channel, status);
 		return EXIT_ERR;
 	}
+	/* check database file again. It was checked earlier so should still be ok. */
+	STAT_FILE((sm_c_ptr_t)info->fn, &sb, stat_res);
+	if (-1 == stat_res)
+	{
+		info->status = errno;
+		STATUS_MSG(info);
+		F_CLOSE(channel, status);
+		return EXIT_ERR;
+	}
+	/* setup new group and permissions if indicated by the security rules.
+	 * Use 0770 anded with current mode for the new mode if it is world writeable.
+	 */
+	gtm_set_group_and_perm(&sb, &group_id, &perm, (0770 & sb.st_mode));
+	/* if group not the same then change group of temporary file */
+	if ((-1 != group_id) && (group_id != stat_buf.st_gid) && (-1 == fchown(channel, -1, group_id)))
+	{
+		info->status = errno;
+		STATUS_MSG(info);
+		F_CLOSE(channel, status);
+		return EXIT_ERR;
+	}
+	if (-1 == FCHMOD(channel, perm))
+	{
+		info->status = errno;
+		STATUS_MSG(info);
+		F_CLOSE(channel, status);	/* resets "channel" to FD_INVALID */
+		return EXIT_ERR;
+	}
+	jrecbuf_base = malloc(DISK_BLOCK_SIZE + ALIGNMENT_SIZE);
+	jrecbuf = (char *)ROUND_UP2((uintszofptr_t)jrecbuf_base, DISK_BLOCK_SIZE);
+	memset(jrecbuf, 0, DISK_BLOCK_SIZE);
 	set_gdid_from_stat(&jnlfile_id, &stat_buf);
 #elif defined(VMS)
 	nam = cc$rms_nam;
@@ -270,6 +307,8 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	memcpy(jnlfile_id.fid, &nam.nam$w_fid, sizeof(jnlfile_id.fid));
 #endif
 	info->checksum = jnl_get_checksum_entire((uint4 *)&jnlfile_id, sizeof(gd_id));
+	/* Journal file header size relies on this assert */
+	assert(256 == GTMCRYPT_RESERVED_HASH_LEN);
 	/* We have already saved previous journal file name in info */
 	header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_base, DISK_BLOCK_SIZE));
 	jfh_from_jnl_info(info, header);
@@ -346,7 +385,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	DO_FILE_WRITE(channel, JNL_HDR_LEN, jrecbuf, ROUND_UP2(cre_jnl_rec_size, DISK_BLOCK_SIZE), info->status, info->status2);
 	STATUS_MSG(info);
 	RETURN_ON_ERROR(info);
-	F_CLOSE(channel, status);
+	F_CLOSE(channel, status);	/* resets "channel" to FD_INVALID */
 	free(jrecbuf_base);
 	jrecbuf_base = NULL;
 	if (info->no_rename)
@@ -357,7 +396,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	 * So system will have a.mjl_timestamp and a.mjl_new for a crash after this call
 	 */
 	if (SS_NORMAL != (info->status = gtm_rename((char *)info->jnl, (int)info->jnl_len,
-			(char *)rename_fn, rename_fn_len, &info->status2)))
+						    (char *)rename_fn, rename_fn_len, &info->status2)))
 	{
 		if (run_time)
 			send_msg(VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
@@ -370,7 +409,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	 * So system will have a.mjl_timestamp as previous generation and a.mjl as new/current journal file
 	 */
 	if (SS_NORMAL !=  (info->status = gtm_rename((char *)create_fn, create_fn_len,
-			(char *)info->jnl, (int)info->jnl_len, &info->status2)))
+						     (char *)info->jnl, (int)info->jnl_len, &info->status2)))
 	{
 		if (run_time)
 			send_msg(VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);

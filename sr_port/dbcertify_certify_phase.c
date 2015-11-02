@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,9 @@
 #include "gtm_stdlib.h"
 #include "gtm_fcntl.h"
 
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 #include "gtmio.h"
 #include "cli.h"
 #include "copy.h"
@@ -99,6 +102,7 @@ error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_BITMAPSBAD);
 error_def(ERR_MUPCLIERR);
+ZOS_ONLY(error_def(ERR_BADTAG);)
 
 /* The final certify phase of certification process */
 void dbcertify_certify_phase(void)
@@ -112,6 +116,7 @@ void dbcertify_certify_phase(void)
 	unsigned char	dbfn[MAX_FN_LEN + 1];
 	file_control	*fc;
 	phase_static_area *psa;
+	ZOS_ONLY(int	realfiletag;)
 
 	psa = psa_gbl;
 	DBC_DEBUG(("DBC_DEBUG: Beginning certification phase\n"));
@@ -139,7 +144,7 @@ void dbcertify_certify_phase(void)
 
 	/* Open phase-1 output file (our input file) */
 	psa->outfd = OPEN((char_ptr_t)psa->outfn, O_RDONLY RMS_OPEN_BIN);
-	if (-1 == psa->outfd)
+	if (FD_INVALID == psa->outfd)
 	{
 		save_errno = errno;
 		if (save_errno == ENOENT)
@@ -151,6 +156,10 @@ void dbcertify_certify_phase(void)
 				  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 		}
 	}
+#ifdef __MVS__
+	if (-1 == gtm_zos_tag_to_policy(psa->outfd, TAG_BINARY, &realfiletag))
+		TAG_POLICY_GTM_PUTMSG((char_ptr_t)psa->outfn, errno, realfiletag, TAG_BINARY);
+#endif
 	dbc_read_p1out(psa, &psa->ofhdr, sizeof(p1hdr));		/* Read phase 1 output file header */
 	if (0 != memcmp(psa->ofhdr.p1hdr_tag, P1HDR_TAG, sizeof(psa->ofhdr.p1hdr_tag)))
 		rts_error(VARLSTCNT(4) ERR_DBCBADFILE, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn));
@@ -179,22 +188,15 @@ void dbcertify_certify_phase(void)
 	util_out_print("Certification phase for database !AD beginning", FLUSH, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn));
 
 	/* Build database structures */
-	psa->dbc_gv_cur_region = malloc(sizeof(gd_region));
-	memset(psa->dbc_gv_cur_region, 0, sizeof(gd_region));
-
-	psa->dbc_gv_cur_region->dyn.addr = malloc(sizeof(gd_segment));
-	memset(psa->dbc_gv_cur_region->dyn.addr, 0, sizeof(gd_segment));
+	MALLOC_INIT(psa->dbc_gv_cur_region, sizeof(gd_region));
+	MALLOC_INIT(psa->dbc_gv_cur_region->dyn.addr, sizeof(gd_segment));
 	psa->dbc_gv_cur_region->dyn.addr->acc_meth = dba_bg;
 	len = STRLEN((char_ptr_t)psa->ofhdr.dbfn);
 	strcpy((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname, (char_ptr_t)dbfn);
 	psa->dbc_gv_cur_region->dyn.addr->fname_len = len;
 
-	psa->dbc_gv_cur_region->dyn.addr->file_cntl = malloc(sizeof(*psa->dbc_gv_cur_region->dyn.addr->file_cntl));
-	memset(psa->dbc_gv_cur_region->dyn.addr->file_cntl, 0, sizeof(*psa->dbc_gv_cur_region->dyn.addr->file_cntl));
+	FILE_CNTL_INIT(psa->dbc_gv_cur_region->dyn.addr);
 	psa->dbc_gv_cur_region->dyn.addr->file_cntl->file_type = dba_bg;
-
-	psa->dbc_gv_cur_region->dyn.addr->file_cntl->file_info = malloc(sizeof(GDS_INFO));
-	memset(psa->dbc_gv_cur_region->dyn.addr->file_cntl->file_info, 0, sizeof(GDS_INFO));
 
 	psa->dbc_cs_data = malloc(sizeof(*psa->dbc_cs_data));
 	fc = psa->fc = psa->dbc_gv_cur_region->dyn.addr->file_cntl;
@@ -211,8 +213,7 @@ void dbcertify_certify_phase(void)
 
 	/* Initialize maximum key we may need later if we encounter gvtroot blocks */
 	maxkeystructsize = sizeof(dbc_gv_key) + MAX_DBC_KEY_SZ - 1;
-	psa->max_key = malloc(maxkeystructsize);
-	memset(psa->max_key, 0, maxkeystructsize);
+	MALLOC_INIT(psa->max_key, maxkeystructsize);
 	psa->max_key->top = maxkeystructsize;
 	psa->max_key->gvn_len = 1;
 	*psa->max_key->base = (unsigned char)0xFF;
@@ -222,7 +223,7 @@ void dbcertify_certify_phase(void)
 	/* Allocate update array based on fileheader values */
 	psa->dbc_cs_data->max_update_array_size = psa->dbc_cs_data->max_non_bm_update_array_size =
 		(uint4)ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(psa->dbc_cs_data), UPDATE_ARRAY_ALIGN_SIZE);
-	psa->dbc_cs_data->max_update_array_size += ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE);
+	psa->dbc_cs_data->max_update_array_size += (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE));
 	update_array = malloc(psa->dbc_cs_data->max_update_array_size);
 	update_array_size = psa->dbc_cs_data->max_update_array_size;
 
@@ -311,7 +312,7 @@ void dbcertify_certify_phase(void)
 
 	dbc_flush_fhead(psa);
 	dbc_close_db(psa);
-	CLOSEFILE(psa->outfd, rc);
+	CLOSEFILE_RESET(psa->outfd, rc);	/* resets "psa->outfd" to FD_INVALID */
 
 	PRINTF("\n");
 	PRINTF("Total blocks in scan phase file --   %12d [0x%08x]\n", psa->ofhdr.blk_count, psa->ofhdr.blk_count);

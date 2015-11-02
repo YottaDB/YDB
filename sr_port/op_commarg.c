@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,13 @@ void	op_commarg(mval *v, unsigned char argcode)
 			if (TK_COMMA == window_token)
 				advancewindow();
 			else
+			{	/* Allow trailing spaces/comments that we will ignore */
+				while (TK_SPACE == window_token)
+					advancewindow();
+				if (TK_EOL == window_token)
+					break;
 				rts_error(VARLSTCNT(1) ERR_INDEXTRACHARS);
+			}
 		}
 		if (comp_fini(rval, &object, OC_RET, 0, v->str.len))
 		{

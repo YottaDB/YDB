@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -189,8 +189,6 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 		 * jb->dsk != jb->freeaddr % jb->size => out of design condition
 		 * jb->dskaddr > jb->freeaddr => out of design condition, or jnl was switched
 		 */
-		assert(!csa->now_crit
-			|| (gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
 		status = ERR_JNLCNTRL;
 	}
 	return status;

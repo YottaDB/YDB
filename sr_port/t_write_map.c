@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,7 +84,7 @@ void t_write_map (
 		 * access the buffer more than the db blk_size.
 		 */
 		bsiz = MIN(old_block->bsiz, csa->hdr->blk_size);
-		cs->blk_checksum = jnl_get_checksum((uint4*)old_block, bsiz);
+		cs->blk_checksum = jnl_get_checksum((uint4*)old_block, csa, bsiz);
 	}
 	cs->cycle = blkhist->cycle;
 	cr = blkhist->cr;

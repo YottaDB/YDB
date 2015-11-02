@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@ cmi_status_t cmj_netinit(void)
 	ntd_root = (struct NTD *)malloc(sizeof(*ntd_root));
 	tsk = ntd_root;
 	memset(tsk, 0, sizeof(*tsk));
-	tsk->listen_fd = -1;
+	tsk->listen_fd = FD_INVALID;
 	FD_ZERO(&tsk->rs);
 	FD_ZERO(&tsk->ws);
 	FD_ZERO(&tsk->es);

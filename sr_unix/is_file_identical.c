@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,7 @@
 
 #include "mdef.h"
 
-#include <stdlib.h>
+#include "gtm_stdlib.h"
 
 #include "gtm_stat.h"
 
@@ -30,8 +30,8 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "eintr_wrappers.h"
-#include "is_file_identical.h"
 #include "copy.h"
+#include "is_file_identical.h"
 
 bool is_gdid_file_identical(gd_id_ptr_t fid, char *filename, int4 filelen)
 {
@@ -66,6 +66,20 @@ bool is_file_identical(char *filename1, char *filename2)
 	}
 	return rv;
 }
+
+bool  is_gdid_identical(gd_id_ptr_t fid1, gd_id_ptr_t fid2)
+{
+	bool rv = FALSE;
+#if defined(__osf__) || defined(_AIX)
+	if ((fid1->inode == fid2->inode) && (fid1->device == fid2->device) && (fid1->st_gen == fid2->st_gen))
+		rv = TRUE;
+#else
+	if ((fid1->inode == fid2->inode) && (fid1->device == fid2->device))
+		rv = TRUE;
+#endif
+	return rv;
+}
+
 
 bool is_gdid_stat_identical(gd_id_ptr_t fid, struct stat *stat_buf)
 {

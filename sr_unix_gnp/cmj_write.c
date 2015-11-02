@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,6 @@
 #include "gtm_string.h"
 #include "cmidef.h"
 #include <errno.h>
-#include <netinet/in.h>
 #include <sys/uio.h>
 #include "gtm_inet.h"
 
@@ -175,7 +174,7 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 		}
 		if (rval > 0)
 		{
-			lnk->ios.len_len += rval;
+			lnk->ios.len_len += (int)rval;
 			assert(CMI_TCP_PREFIX_LEN >= lnk->ios.len_len);
 			if (lnk->ios.len_len == CMI_TCP_PREFIX_LEN) /* prefix length successfully sent */
 			{
@@ -216,7 +215,7 @@ void cmj_write_interrupt(struct CLB *lnk, int signo)
 		/* partial or no write of length */
 		if (rval > 0)
 		{
-			lnk->ios.len_len += rval;
+			lnk->ios.len_len += (int)rval;
 			assert(CMI_TCP_PREFIX_LEN > lnk->ios.len_len);
 		}
 		status = cmj_clb_set_async(lnk);

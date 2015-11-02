@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #include "fnpc.h"
 #include "cache.h"
 #include "sockint_stats.h"
+#include "gtm_malloc.h"
 #include "gtm_text_alloc.h"
 
 GBLREF	uint4		gtmDebugLevel;		/* Debug level (0 = using default sm module so with

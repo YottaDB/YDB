@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,8 +99,11 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMV52000:		/* Unicode */
 			case GDSMV53000:		/* M-Itanium release */
 				gvstats_rec_upgrade(csa); /* Move GVSTATS information to new place in file header */
-				break;
 			case GDSMV53003:		/* ZSHOW "G" release */
+				csd->is_encrypted = FALSE;
+				memset(csd->encryption_hash, 0, GTMCRYPT_HASH_LEN);
+				break;
+			case GDSMV53004:		/* New encryption fields */
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */

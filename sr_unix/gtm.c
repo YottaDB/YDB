@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,9 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "main_pragma.h"
 
 #include "gtm_stdio.h"
 #include "gtm_string.h"
+#include "gtm_strings.h"
 #include "gtm_stdlib.h"
 #include "gtm_limits.h"
 #include <dlfcn.h>
@@ -100,7 +102,7 @@ int main (int argc, char **argv, char **envp)
 	if (GTM_PATH_MAX <= dir_len + STR_LIT_LEN(GTMSHR_IMAGE_NAME) + 1)
 	{
 		FPRINTF(stderr, "%%GTM-E-DISTPATHMAX, $gtm_dist path is greater than maximum (%lu)\n",
-				(GTM_PATH_MAX - STR_LIT_LEN(GTMSHR_IMAGE_NAME) - 2));
+			(unsigned long)(GTM_PATH_MAX - STR_LIT_LEN(GTMSHR_IMAGE_NAME) - 2));
 		return ERR_DISTPATHMAX;
 	}
 	memcpy(&gtmshr_file[0], fptr, dir_len);

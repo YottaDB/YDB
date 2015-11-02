@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,9 @@
 #endif
 #include "gtm_string.h"
 
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 #include "gtmio.h"
 #include "iosp.h"
 #include "gdsroot.h"
@@ -81,6 +84,7 @@ void mupip_downgrade(void)
 	struct FAB	mupfab;
 	struct XABFHC	xabfhc;
 #endif
+	ZOS_ONLY(int	realfiletag;)
 	unsigned char	new_master_map[MASTER_MAP_SIZE_V4];
 
 	error_def(ERR_BADDBVER);
@@ -101,6 +105,7 @@ void mupip_downgrade(void)
 	error_def(ERR_MUSTANDALONE);
 	error_def(ERR_SYSCALL);
 	error_def(ERR_TEXT);
+	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	/* Structure checks .. */
 	assert((24 * 1024) == sizeof(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
@@ -142,10 +147,10 @@ void mupip_downgrade(void)
 	channel = mupfab.fab$l_stv;
 	file_size =  xabfhc.xab$l_ebk * DISK_BLOCK_SIZE;
 #else
-	if (-1 == (channel = OPEN(db_fn, O_RDWR)))
+	if (FD_INVALID == (channel = OPEN(db_fn, O_RDWR)))
 	{
 		save_errno = errno;
-		if (-1 != (channel = OPEN(db_fn, O_RDONLY)))
+		if (FD_INVALID != (channel = OPEN(db_fn, O_RDONLY)))
 			gtm_putmsg(VARLSTCNT(10) ERR_DBRDONLY, 2, db_fn_len, db_fn, errno, 0,
 				   MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2, LEN_AND_LIT("Cannot downgrade read-only database"));
 		else
@@ -161,6 +166,10 @@ void mupip_downgrade(void)
 		mupip_exit(ERR_MUNODWNGRD);
 	}
 	file_size = stat_buf.st_size;
+#if defined(__MVS__)
+	if (-1 == gtm_zos_tag_to_policy(channel, TAG_BINARY, &realfiletag))
+		TAG_POLICY_GTM_PUTMSG(db_fn, errno, realfiletag, TAG_BINARY);
+#endif
 #endif
 	csd_size = sizeof(sgmnt_data);
 	DO_FILE_READ(channel, 0, &csd, csd_size, status, status2);
@@ -171,7 +180,7 @@ void mupip_downgrade(void)
 	}
 	if (memcmp(csd.label, GDS_LABEL, STR_LIT_LEN(GDS_LABEL)))
 	{ 	/* It is not V5.0-000 */
-		F_CLOSE(channel, rc);
+		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 		if (memcmp(csd.label, GDS_LABEL, GDS_LABEL_SZ - 3))
 			gtm_putmsg(VARLSTCNT(4) ERR_DBNOTGDS, 2, db_fn_len, db_fn);
 		else
@@ -182,33 +191,33 @@ void mupip_downgrade(void)
 	/* It is V5.x version: So proceed with downgrade */
 	if (csd.createinprogress)
 	{
-		F_CLOSE(channel, rc);
+		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 		gtm_putmsg(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2, LEN_AND_LIT("Database creation in progress"));
 		mupip_exit(ERR_MUNODWNGRD);
 	}
 	if (csd.freeze)
 	{
-		F_CLOSE(channel, rc);
+		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 		gtm_putmsg(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2, LEN_AND_LIT("Database is frozen"));
 		mupip_exit(ERR_MUNODWNGRD);
 	}
 	if (csd.wc_blocked)
 	{
-		F_CLOSE(channel, rc);
+		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 		gtm_putmsg(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR),
 			   2, LEN_AND_LIT("Database modifications are disallowed because wc_blocked is set"));
 		mupip_exit(ERR_MUNODWNGRD);
 	}
 	if (csd.file_corrupt)
 	{
-		F_CLOSE(channel, rc);
+		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 		gtm_putmsg(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2, LEN_AND_LIT("Database corrupt"));
 		mupip_exit(ERR_MUNODWNGRD);
 	}
 	if (csd.intrpt_recov_tp_resolve_time || csd.intrpt_recov_resync_seqno || csd.recov_interrupted
 						|| csd.intrpt_recov_jnl_state || csd.intrpt_recov_repl_state)
 	{
-		F_CLOSE(channel, rc);
+		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 		gtm_putmsg(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2, LEN_AND_LIT("Recovery was interrupted"));
 		mupip_exit(ERR_MUNODWNGRD);
 	}
@@ -225,26 +234,26 @@ void mupip_downgrade(void)
 		(off_t)csd.trans_hist.total_blks * csd.blk_size + (off_t)csd.blk_size == file_size));
 	if (START_VBN_V4 != csd.start_vbn)
 	{	/* start_vbn is not something that GT.M V4 can handle. signal downgrade not possible */
-		F_CLOSE(channel, rc);
+		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 		gtm_putmsg(VARLSTCNT(4) ERR_MUDWNGRDNOTPOS, 2, csd.start_vbn, START_VBN_V4);
 		mupip_exit(ERR_MUNODWNGRD);
 	}
 	if ((trans_num)MAX_TN_V4 < csd.trans_hist.curr_tn)
 	{
-		F_CLOSE(channel, rc);
+		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 		gtm_putmsg(VARLSTCNT(5) ERR_MUDWNGRDTN, 3, &csd.trans_hist.curr_tn, db_fn_len, db_fn);
 		mupip_exit(ERR_MUNODWNGRD);
 	}
 	if (csd.blks_to_upgrd != (csd.trans_hist.total_blks - csd.trans_hist.free_blocks))
 	{
-		F_CLOSE(channel, rc);
+		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 		gtm_putmsg(VARLSTCNT(5) ERR_MUDWNGRDNRDY, 3, db_fn_len, db_fn,
 			   (csd.trans_hist.total_blks - csd.trans_hist.free_blocks - csd.blks_to_upgrd));
 		mupip_exit(ERR_MUNODWNGRD);
 	}
 	if (MASTER_MAP_SIZE_V4 < csd.master_map_len || MAXTOTALBLKS_V4 < csd.trans_hist.total_blks)
 	{
-		F_CLOSE(channel, rc);
+		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("master_map_len"),
 			   csd.master_map_len,  csd.master_map_len);
 		gtm_putmsg(VARLSTCNT(4) MAKE_MSG_TYPE(ERR_TEXT, ERROR), 2, LEN_AND_LIT("Master map is too large"));
@@ -267,7 +276,7 @@ void mupip_downgrade(void)
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILOPERR, 2, db_fn_len, db_fn, status);
 		mupip_exit(ERR_MUNODWNGRD);
 	}
-	F_CLOSE(channel, rc);
+	F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 	UNIX_ONLY(mu_all_version_release_standalone(sem_inf));
 	gtm_putmsg(VARLSTCNT(8) ERR_MUPGRDSUCC, 6, db_fn_len, db_fn, RTS_ERROR_LITERAL("downgraded"),
 		   RTS_ERROR_LITERAL("GT.M V4"));

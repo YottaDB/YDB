@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -39,15 +39,15 @@ endif
 #
 switch ($gtm_exe:t)
 	case "[bB]*":
-		set gt_cc = "`alias gt_cc_bta`"
+		alias gtcc "`alias gt_cc_bta`"
 		set gt_ld_options = "$gt_ld_options_bta"
 		breaksw
 	case "[dD]*":
-		set gt_cc = "`alias gt_cc_dbg`"
+		alias gtcc "`alias gt_cc_dbg`"
 		set gt_ld_options = "$gt_ld_options_dbg"
 		breaksw
 	case "[pP]*":
-		set gt_cc = "`alias gt_cc_pro`"
+		alias gtcc "`alias gt_cc_pro`"
 		set gt_ld_options = "$gt_ld_options_pro"
 		breaksw
 	default:
@@ -56,7 +56,7 @@ switch ($gtm_exe:t)
 		breaksw
 endsw
 
-alias gt_ld $gt_ld_linker $gt_ld_options $gt_ld_sysrtns $gt_ld_syslibs
+alias gt_ld $gt_ld_linker $gt_ld_options -L$gtm_obj $gt_ld_sysrtns $gt_ld_syslibs
 
 ###############################################################################################################
 
@@ -80,9 +80,9 @@ if ($srcfile:e != "c") then
 	exit -1
 endif
 
-(gt_cc -E $gtm_src/$srcfile > ${TMPFILE}_$srcfile:r.lis) >& /dev/null
+(gtcc -E $gtm_src/$srcfile > ${TMPFILE}_$srcfile:r.lis) >& /dev/null
 awk -v c_struct=${c_struct} -f $gtm_tools/offset.awk ${TMPFILE}_$srcfile:r.lis > ${TMPFILE}_$srcfile
-gt_cc ${TMPFILE}_$srcfile -o ${TMPFILE}_$srcfile.o >& /dev/null
+gtcc ${TMPFILE}_$srcfile -o ${TMPFILE}_$srcfile.o >& /dev/null
 
 if ($status != 0) then
 	echo "OFFSET-E-SRCSTRUCTMISMATCH : Very likely that the c-structure isn't used in the c-source-file-name. Please give a valid input."
@@ -91,7 +91,7 @@ if ($status != 0) then
 	echo "-----------------------------------------------------------------------------------------"
 	echo "###### Below is the output from the compiler ########"
 	echo "-----------------------------------------------------------------------------------------"
-	gt_cc ${TMPFILE}_$srcfile -o ${TMPFILE}_$srcfile.o
+	gtcc ${TMPFILE}_$srcfile -o ${TMPFILE}_$srcfile.o
 	exit -1
 endif
 

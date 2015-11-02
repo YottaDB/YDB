@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,15 +38,21 @@ static readonly struct
 	unsigned char	wrap;
 	unsigned char	width;
 	unsigned char	v_width[sizeof(int4)];
+#ifdef __MVS__
+	unsigned char	chsetebcdic[8];
+#endif
 	unsigned char	eol;
 } open_params_list = {
 	(unsigned char)iop_newversion,	(unsigned char)iop_wrap,
 	(unsigned char)iop_recordsize,
-#ifdef BIGENDIAN
+#	ifdef BIGENDIAN
 	(unsigned char)0, (unsigned char)0, (unsigned char)0, (unsigned char)132,
-#else
+#	else
 	(unsigned char)132, (unsigned char)0, (unsigned char)0, (unsigned char)0,
-#endif
+#	endif
+#	ifdef __MVS__
+	(unsigned char)iop_chset, 6, 'E', 'B', 'C', 'D', 'I', 'C',
+#	endif
 	(unsigned char)iop_eol
 	};
 
@@ -131,9 +137,6 @@ void list_cmd(void)
 }
 
 
-LITDEF char gtm_copy_right[] = "\
-  Copyright 1985, 2007 Fidelity Information Services, Inc";
-
 LITREF char gtm_release_name[];
 LITREF int4 gtm_release_name_len;
 
@@ -154,10 +157,6 @@ void list_head(bool newpage)
 	head.mvtype = MV_STR;
 	head.str.addr = (char *)&gtm_release_name[0];
 	head.str.len = gtm_release_name_len;
-	op_write (&head);
-
-	head.str.addr = (char *)&gtm_copy_right[0];
-	head.str.len = sizeof(gtm_copy_right) - 1;
 	op_write (&head);
 
 	op_wttab(col_2);

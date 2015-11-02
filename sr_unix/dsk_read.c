@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,10 @@
 #include "gtmio.h"
 #include "gds_blk_upgrade.h"
 #include "gdsbml.h"
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
+#include "gdsdbver.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -45,10 +49,10 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 	unix_db_info		*udi;
 	int4			size, save_errno;
 	enum db_ver		tmp_ondskblkver;
-	sm_uc_ptr_t		save_buff = NULL;
+	sm_uc_ptr_t		save_buff = NULL, enc_save_buff;
 	boolean_t		fully_upgraded;
 	DEBUG_ONLY(
-		blk_hdr_ptr_t	blk_hdr;
+		blk_hdr_ptr_t	blk_hdr_val;
 		static int	in_dsk_read;
 	)
 	/* It is possible that the block that we read in from disk is a V4 format block.  The database block scanning routines
@@ -63,7 +67,11 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 	 */
 	static sm_uc_ptr_t	read_reformat_buffer;
 	static int		read_reformat_buffer_len;
-
+	GTMCRYPT_ONLY(
+		int 		req_dec_blk_size;
+		int 		crypt_status;
+		boolean_t	is_encrypted;
+	)
 	error_def(ERR_DYNUPGRDFAIL);
 
 	assert(0 == in_dsk_read);	/* dsk_read should never be nested. the read_reformat_buffer logic below relies on this */
@@ -99,12 +107,44 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 	}
 	assert(NULL != cs_addrs->nl);
 	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_dsk_read, 1);
+	enc_save_buff = buff;
+#	ifdef GTM_CRYPT
+	is_encrypted = cs_data->is_encrypted;
+	if (is_encrypted)
+	{
+		DBG_ENSURE_PTR_IS_VALID_GLOBUFF(cs_addrs, cs_data, buff);
+		enc_save_buff = GDS_ANY_ENCRYPTGLOBUF(buff, cs_addrs);
+		DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(cs_addrs, cs_data, enc_save_buff);
+	}
+#	endif
 	LSEEKREAD(udi->fd,
 		  (DISK_BLOCK_SIZE * (cs_data->start_vbn - 1) + (off_t)blk * size),
-		  buff,
+		  enc_save_buff,
 		  size,
 		  save_errno);
 	assert(0 == save_errno);
+#	ifdef GTM_CRYPT
+	if (is_encrypted)
+	{
+		req_dec_blk_size = (((blk_hdr_ptr_t)enc_save_buff)->bsiz) - SIZEOF(blk_hdr);
+		if (IS_BLK_ENCRYPTED(((blk_hdr_ptr_t)enc_save_buff)->levl, req_dec_blk_size))
+		{
+			ASSERT_ENCRYPTION_INITIALIZED;
+			memcpy(buff, enc_save_buff, sizeof(blk_hdr));
+			GTMCRYPT_DECODE_FAST(cs_addrs->encr_key_handle,
+					     (char *)enc_save_buff + sizeof(blk_hdr),
+					     req_dec_blk_size,
+					     (char *)buff + sizeof(blk_hdr),
+					     crypt_status);
+			if (0 != crypt_status)
+			{
+				GC_RTS_ERROR(crypt_status, gv_cur_region->dyn.addr->fname);
+				return crypt_status;
+			}
+		} else
+			memcpy(buff, enc_save_buff, size);
+	}
+#	endif
 	if (0 == save_errno)
 	{	/* See if block needs to be converted to current version. Assuming buffer is at least short aligned */
 		assert(0 == (long)buff % 2);
@@ -140,8 +180,8 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 		{	/* Do basic checks on GDS block that was just read. Do it only if holding crit as we could read
 			 * uninitialized blocks otherwise. Also DSE might read bad blocks even inside crit so skip checks.
 			 */
-			blk_hdr = (NULL != save_buff) ? (blk_hdr_ptr_t)save_buff : (blk_hdr_ptr_t)buff;
-			GDS_BLK_HDR_CHECK(cs_data, blk_hdr, fully_upgraded);
+			blk_hdr_val = (NULL != save_buff) ? (blk_hdr_ptr_t)save_buff : (blk_hdr_ptr_t)buff;
+			GDS_BLK_HDR_CHECK(cs_data, blk_hdr_val, fully_upgraded);
 		}
 	)
 	return save_errno;

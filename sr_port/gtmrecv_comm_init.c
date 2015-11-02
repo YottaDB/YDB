@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,12 +13,11 @@
 
 #include "gtm_string.h"
 #include "gtm_socket.h"
+#include "gtm_inet.h"
+#include "gtm_fcntl.h"
 
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <sys/time.h>
 #include <errno.h>
-#include <fcntl.h>
 #include "gtm_unistd.h"
 #ifdef VMS
 #include <descrip.h> /* Required for gtmrecv.h */
@@ -33,27 +32,27 @@
 #include "filestruct.h"
 #include "gtmrecv.h"
 #include "repl_sp.h"
+#include "gtmio.h"
 
-GBLDEF	int			gtmrecv_listen_sock_fd = -1;
+GBLDEF	int		gtmrecv_listen_sock_fd = FD_INVALID;
 
+/* Initialize communication stuff */
 int gtmrecv_comm_init(in_port_t port)
 {
-	/* Initialize communication stuff */
-
 	struct sockaddr_in	secondary_addr;
-
 	const	int	enable_reuseaddr = 1;
 	const   int    	disable_keepalive = 1;
 	struct  linger  disable_linger = {0, 0};
+	int		rc;
 
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
 
-	if (-1 != gtmrecv_listen_sock_fd) /* Initialization done already */
+	if (FD_INVALID != gtmrecv_listen_sock_fd) /* Initialization done already */
 		return (0);
 
 	/* Create the socket used for communicating with primary */
-	if (-1 == (gtmrecv_listen_sock_fd = socket(AF_INET, SOCK_STREAM, 0)))
+	if (FD_INVALID == (gtmrecv_listen_sock_fd = socket(AF_INET, SOCK_STREAM, 0)))
 	{
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with receiver server socket create"), ERRNO);
@@ -90,14 +89,14 @@ int gtmrecv_comm_init(in_port_t port)
 	if (0 > BIND(gtmrecv_listen_sock_fd, (struct sockaddr *)&secondary_addr, sizeof(secondary_addr)))
 	{
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Could not bind local address"), ERRNO);
-		close(gtmrecv_listen_sock_fd);
+		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 		return (-1);
 	}
 
 	if (0 > listen(gtmrecv_listen_sock_fd, 5))
 	{
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Could not listen"), ERRNO);
-		close(gtmrecv_listen_sock_fd);
+		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 		return (-1);
 	}
 

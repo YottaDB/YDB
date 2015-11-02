@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,9 @@
 #include "gtm_stdio.h"
 #include "gtm_stat.h"
 
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 #include "stp_parms.h"
 #include "stringpool.h"
 #include "gdsroot.h"
@@ -47,15 +50,13 @@
 #include "mvalconv.h"
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
-
+#include "filestruct.h"
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF bool		mu_ctrlc_occurred;
 GBLREF bool		mu_ctrly_occurred;
 GBLREF spdesc		rts_stringpool, stringpool;
 GBLREF gd_region	*gv_cur_region;
-GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF gd_addr		*gd_header;
-GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF io_pair          io_curr_device;
 GBLREF io_desc          *active_device;
 GBLREF gv_namehead	*gv_target;
@@ -70,6 +71,10 @@ static readonly mval		datefmt = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(datefmt
 static readonly mval		null_str = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, 0, 0, 0);
 static char			outfilename[256];
 static unsigned short		filename_len;
+
+#define BINARY_FORMAT_STRING	"BINARY"
+#define ZWR_FORMAT_STRING	"ZWR"
+#define GO_FORMAT_STRING	"GO"
 
 #define	WRITE_NUMERIC(nmfield)						\
 {									\
@@ -86,6 +91,7 @@ static unsigned short		filename_len;
 	outptr += val.str.len;						\
 }
 
+#define GET_BIN_HEADER_SIZE(LABEL) (sizeof(LABEL) + sizeof(BIN_HEADER_DATEFMT) - 1 + 4 * BIN_HEADER_NUMSZ + BIN_HEADER_LABELSZ)
 CONDITION_HANDLER(mu_extract_handler)
 {
 	mval				op_val, op_pars;
@@ -134,6 +140,7 @@ void mu_extract(void)
 	static unsigned char		ochset_set = FALSE;
 	static readonly unsigned char	open_params_list[] =
 	{
+		(unsigned char)iop_m,
 		(unsigned char)iop_noreadonly,
 		(unsigned char)iop_nowrap,
 		(unsigned char)iop_stream,
@@ -141,6 +148,15 @@ void mu_extract(void)
 	};
 	static readonly unsigned char no_param = (unsigned char)iop_eol;
 	coll_hdr	extr_collhdr;
+	int				bin_header_size;
+	int	 			reg_no;
+	boolean_t			is_any_file_encrypted = FALSE;
+	GTMCRYPT_ONLY(
+		unsigned short		hash_buff_len;
+		sgmnt_data_ptr_t	csd;
+		sgmnt_addrs		*csa;
+		muext_hash_hdr_ptr_t	hash_array;
+	)
 
 	error_def(ERR_NOSELECT);
 	error_def(ERR_GTMASSERT);
@@ -171,10 +187,10 @@ void mu_extract(void)
 				mupip_exit(ERR_MUNOACTION);	/* need to change to OPCHSET error when added */
 			ch_set_name[ch_set_len] = '\0';
 #ifdef KEEP_zOS_EBCDIC
-			if ( (iconv_t)0 != active_device->output_conv_cd)
-				ICONV_CLOSE_CD(active_device->output_conv_cd);
-			if (DEFAULT_CODE_SET != active_device->out_code_set)
-				ICONV_OPEN_CD(active_device->output_conv_cd, INSIDE_CH_SET, ch_set_name);
+   			if ( (iconv_t)0 != active_device->output_conv_cd)
+   			        ICONV_CLOSE_CD(active_device->output_conv_cd);
+   			if (DEFAULT_CODE_SET != active_device->out_code_set)
+   				ICONV_OPEN_CD(active_device->output_conv_cd, INSIDE_CH_SET, ch_set_name);
 #else
 			chset_mstr.addr = ch_set_name;
 			chset_mstr.len = ch_set_len;
@@ -191,14 +207,14 @@ void mu_extract(void)
 	n_len = sizeof(format_buffer);
 	if (FALSE == cli_get_str("FORMAT", format_buffer, &n_len))
 	{
-		n_len = sizeof("ZWR") - 1;
-		memcpy(format_buffer, "ZWR", n_len);
+		n_len = sizeof(ZWR_FORMAT_STRING) - 1;
+		memcpy(format_buffer, ZWR_FORMAT_STRING, n_len);
 	}
 	int_nlen = n_len;
 	lower_to_upper((uchar_ptr_t)format_buffer, (uchar_ptr_t)format_buffer, int_nlen);
-	if (0 == memcmp(format_buffer, "ZWR", n_len))
+	if (0 == memcmp(format_buffer, ZWR_FORMAT_STRING, n_len))
 	        format = MU_FMT_ZWR;
-	else if (0 == memcmp(format_buffer, "GO", n_len))
+	else if (0 == memcmp(format_buffer, GO_FORMAT_STRING, n_len))
 	{
 		if (gtm_utf8_mode)
 		{
@@ -206,7 +222,7 @@ void mu_extract(void)
 			mupip_exit(ERR_MUPCLIERR);
 		}
 	        format = MU_FMT_GO;
-	} else if (0 == memcmp(format_buffer, "BINARY", n_len))
+	} else if (0 == memcmp(format_buffer, BINARY_FORMAT_STRING, n_len))
 		format = MU_FMT_BINARY;
 	else
 	{
@@ -229,8 +245,14 @@ void mu_extract(void)
 	/* For binary format, check whether all regions have same null collation order */
 	if (MU_FMT_BINARY == format)
 	{
-		for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions, reg_std_null_coll = -1;
-			reg < region_top ; reg++)
+		GTMCRYPT_ONLY(
+			hash_buff_len = (sizeof(muext_hash_hdr) * gd_header->n_regions);
+			hash_array = (muext_hash_hdr *)malloc(hash_buff_len);
+			memset(hash_array, 0, hash_buff_len);
+		)
+		for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions,
+				reg_std_null_coll = -1, reg_no = 0;
+					reg < region_top ; reg++, reg_no++)
 		{
 			if (reg->open)
 			{
@@ -244,6 +266,13 @@ void mu_extract(void)
 						mupip_exit(ERR_NULLCOLLDIFF);
 					}
 				}
+#				ifdef GTM_CRYPT
+				csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
+				csd = csa->hdr;
+				memcpy(hash_array[reg_no].gtmcrypt_hash, csd->encryption_hash, GTMCRYPT_HASH_LEN);
+				if (csd->is_encrypted)
+					is_any_file_encrypted = TRUE;
+#				endif
 			}
 		}
 		assert(-1 != reg_std_null_coll);
@@ -291,8 +320,15 @@ void mu_extract(void)
 				4 * BIN_HEADER_NUMSZ + BIN_HEADER_LABELSZ);
 		outptr = outbuf;
 
-		MEMCPY_LIT(outptr, BIN_HEADER_LABEL);
-		outptr += STR_LIT_LEN(BIN_HEADER_LABEL);
+		if (is_any_file_encrypted)
+		{
+			MEMCPY_LIT(outptr, BIN_HEADER_LABEL);
+			outptr += STR_LIT_LEN(BIN_HEADER_LABEL);
+		} else
+		{
+			MEMCPY_LIT(outptr, V4_BIN_HEADER_LABEL);
+			outptr += STR_LIT_LEN(V4_BIN_HEADER_LABEL);
+		}
 
 		stringpool.free = stringpool.base;
 		op_horolog(&val);
@@ -355,6 +391,17 @@ void mu_extract(void)
 		op_val.str.addr = (char *)outbuf;
 		op_val.str.len = label_len;
 		op_write(&op_val);
+#		ifdef GTM_CRYPT
+		if (is_any_file_encrypted)
+		{
+			op_val.str.addr = (char *)(&hash_buff_len);
+			op_val.str.len = sizeof(hash_buff_len);
+			op_write(&op_val);
+			op_val.str.addr = (char *)hash_array;
+			op_val.str.len = hash_buff_len;
+			op_write(&op_val);
+		}
+#		endif
 	} else
 	{
 		assert((MU_FMT_GO == format) || (MU_FMT_ZWR == format));
@@ -421,10 +468,18 @@ void mu_extract(void)
 			op_val.str.len = sizeof(extr_collhdr);
 			op_write(&op_val);
 		}
+#		ifdef GTM_CRYPT
+		success = mu_extr_gblout(&gl_ptr->name,
+					 &global_total,
+					 format,
+					 hash_array,
+					 is_any_file_encrypted) && success;
+#		else
 		/* Note: Do not change the order of the expression below.
 		 * Otherwise if success is FALSE, mu_extr_gblout() will not be called at all.
 		 * We want mu_extr_gblout() to be called irrespective of the value of success */
 		success = mu_extr_gblout(&gl_ptr->name, &global_total, format) && success;
+#		endif
 		if (logqualifier)
 		{
 			gbl_name_buff[0]='^';
@@ -465,6 +520,10 @@ void mu_extract(void)
 		TRUNCATE_FILE((const char *)outfilename, statbuf.st_size - 1, truncate_res);
 		if (-1 == truncate_res)
 			rts_error(VARLSTCNT(1) errno);
+		GTMCRYPT_ONLY(
+			if (hash_array)
+				free(hash_array);
+		)
 	}
 	mupip_exit(success ? SS_NORMAL : ERR_MUNOFINISH);
 }

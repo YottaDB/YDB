@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +21,9 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "gtmio.h"	/* for CLOSEFILE macro used by F_CLOSE macro */
-#include "repl_sp.h"	/* for F_CLOSE macro */
+#include "gtmio.h"	/* for CLOSEFILE used by the F_CLOSE macro in JNL_FD_CLOSE */
+#include "repl_sp.h"	/* for F_CLOSE used by the JNL_FD_CLOSE macro */
+#include "iosp.h"	/* for SS_NORMAL used by the JNL_FD_CLOSE macro */
 
 #include "heartbeat_timer.h"
 #include "gt_timer.h"
@@ -32,6 +33,7 @@
 GBLREF	volatile uint4		heartbeat_counter;
 GBLREF	boolean_t		is_src_server;
 GBLREF	enum gtmImageTypes	image_type;
+GBLREF	uint4			process_id;
 
 void heartbeat_timer(void)
 {
@@ -68,8 +70,9 @@ void heartbeat_timer(void)
 				jpc = csa->jnl;
 				if ((NULL != jpc) && (NOJNL != jpc->channel) && JNL_FILE_SWITCHED(jpc))
 				{	/* The journal file we have as open is not the latest generation journal file. Close it */
-					F_CLOSE(jpc->channel, rc);
-					jpc->channel = NOJNL;
+					/* Assert that we never have an active write on a previous generation journal file. */
+					assert(process_id != jpc->jnl_buff->io_in_prog_latch.u.parts.latch_pid);
+					JNL_FD_CLOSE(jpc->channel, rc);	/* sets jpc->channel to NOJNL */
 					jpc->pini_addr = 0;
 				}
 			}

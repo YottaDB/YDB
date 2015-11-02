@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -36,6 +36,7 @@
 
 
 set setactive_save_verbose = $?verbose
+set exit_status = 0
 unset verbose
 
 set setactive_p1 = ""
@@ -61,6 +62,7 @@ endif
 
 $shell -f $gtm_tools/setactive1.csh "$setactive_p1" "$setactive_p2" $setactive_interact $setactive_setenv
 set setactive_status = $status
+if ($setactive_status) @ exit_status++
 
 # This is needed to ensure the current values of these environment variables don't persist past the
 # invocation of 'setactive_setenv' and 'gtmsrc.csh' in case the version to which we are changing
@@ -76,7 +78,9 @@ unsetenv	gtm_obj
 
 if ( $setactive_status == 0 ) then
 	source $setactive_setenv
+	if ($status) @ exit_status++
 	source $gtm_ver/gtmsrc.csh
+	if ($status) @ exit_status++
 endif
 
 
@@ -100,3 +104,5 @@ else
 	unset setactive_save_verbose
 	unset verbose
 endif
+
+exit $exit_status

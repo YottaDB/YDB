@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,11 +45,11 @@ typedef struct
 #define	MAX_BITMAP_UPDATE_ARRAY_SIZE	((MAX_BT_DEPTH + 1) * ROUND_UP2(sizeof(block_id) * (BLKS_PER_LMAP + 1), 		\
 												UPDATE_ELEMENT_ALIGN_SIZE))
 #define MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd)											\
-		(CDB_CW_SET_SIZE * ROUND_UP2(BLK_SEG_ARRAY_SIZE * sizeof(blk_segment), UPDATE_ELEMENT_ALIGN_SIZE)		\
+		(CDB_CW_SET_SIZE * ROUND_UP2(BLK_SEG_ARRAY_SIZE * SIZEOF(blk_segment), UPDATE_ELEMENT_ALIGN_SIZE)		\
 		 + 2 * ROUND_UP2(csd->blk_size, UPDATE_ELEMENT_ALIGN_SIZE)							\
 		 + (MAX_BT_DEPTH - 1) * 											\
-			(3 * ROUND_UP2(sizeof(rec_hdr), UPDATE_ELEMENT_ALIGN_SIZE) 						\
-				+ 2 * ROUND_UP2(sizeof(block_id), UPDATE_ELEMENT_ALIGN_SIZE) + 2 * ROUND_UP2(MAX_KEY_SZ, 8))	\
+			(3 * ROUND_UP2(SIZEOF(rec_hdr), UPDATE_ELEMENT_ALIGN_SIZE) 						\
+				+ 2 * ROUND_UP2(SIZEOF(block_id), UPDATE_ELEMENT_ALIGN_SIZE) + 2 * ROUND_UP2(MAX_KEY_SZ, 8))	\
 		 + ROUND_UP2(csd->blk_size, UPDATE_ELEMENT_ALIGN_SIZE) + ROUND_UP2(BSTAR_REC_SIZE, UPDATE_ELEMENT_ALIGN_SIZE))
 
 #define UA_SIZE(X)		(uint4)(X->max_update_array_size)
@@ -162,7 +162,7 @@ GBLREF	unsigned char		cw_set_depth;
 	assert(!dollar_tlevel || (0 <= (sm_long_t)lcl_len1));							\
 	(BNUM)->addr = (ADDR);											\
 	(BNUM)->len  = lcl_len1;										\
-	blk_seg_cnt += lcl_len1;										\
+	blk_seg_cnt += (int)lcl_len1;										\
 	assert((char *)BNUM - update_array_ptr < 0);								\
 	(BNUM)++;												\
 }

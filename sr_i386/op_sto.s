@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -37,6 +37,7 @@ a:	pushl	%edi
 	movl	%eax,%edi
 	REP
 	movsb
+	andw	$~mval_m_aliascont, mval_w_mvtype(%eax)	# Don't propagate alias container flag
 	popl	%esi
 	popl	%edi
 	ret

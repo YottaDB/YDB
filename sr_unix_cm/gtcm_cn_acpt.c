@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,16 +15,19 @@
 
 #include "mdef.h"
 
+#include <errno.h>
+
 #include "gtm_fcntl.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
-#include "gtm_unistd.h"		/* for close() */
+#include "gtm_unistd.h"		/* for close() used by CLOSEFILE_RESET */
 #include "gtm_time.h"		/* for ctime() and time() */
+
 #include "gtcm.h"
 #include "rc_oflow.h"
-#include <errno.h>
 #include "eintr_wrappers.h"
 #include "gtm_socket.h"
+#include "gtmio.h"
 
 #ifdef BSD_TCP
 #include "gtm_inet.h"
@@ -43,6 +46,7 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	int		i;
 	omi_conn	*cptr;
 	omi_fd		fd;
+	int		rc;
 
 #ifdef BSD_TCP
 	GTM_SOCKLEN_TYPE			sln;
@@ -60,7 +64,7 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	{
 		if (cptr)
 			free(cptr);
-		(void) close(fd);
+		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		return -1;
 	}
 	/*  Initialize the connection structure */
@@ -77,7 +81,7 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	cptr->ga    = (ga_struct *)0; /* struct gd_addr_struct */
 	cptr->of = (oof_struct *) malloc(sizeof(struct rc_oflow));
 	memset(cptr->of, 0, sizeof(struct rc_oflow));
-	cptr->pklog = INV_FD;
+	cptr->pklog = FD_INVALID;
 	/*  Initialize the statistics */
 	memcpy(&cptr->stats.sin,&sin,sizeof(sin));
 	cptr->stats.bytes_recv = 0;
@@ -140,7 +144,7 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 			char		pklog[1024];
 
 			(void) sprintf(pklog, "%s.%04d", omi_pklog, cptr->stats.id);
-			if (INV_FD_P((cptr->pklog = open(pklog, O_WRONLY|O_CREAT|O_APPEND|O_TRUNC, 0644))))
+			if (INV_FD_P((cptr->pklog = OPEN3(pklog, O_WRONLY|O_CREAT|O_APPEND|O_TRUNC, 0644))))
 			{
 				errno_save = errno;
 				OMI_DBG_STMP;

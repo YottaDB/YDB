@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 # include "gtm_stat.h"
 # include "gtm_unistd.h"
 # include <sys/shm.h>
+# include "gtm_permissions.h"
 #elif defined(VMS)
 # include <rms.h>
 # include <iodef.h>
@@ -28,6 +29,9 @@
 #include "gtm_tempnam.h"
 #include "gtm_time.h"
 
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -96,11 +100,7 @@ static  const   unsigned short  zero_fid[3];
 # error Unsupported Platform
 #endif
 
-#ifdef __MVS__
 #define TMPDIR_ACCESS_MODE	(R_OK | W_OK | X_OK)
-#else
-#define TMPDIR_ACCESS_MODE	(R_OK | W_OK | X_OK | F_OK)
-#endif
 
 GBLDEF  boolean_t	backup_started;
 GBLDEF  boolean_t	backup_interrupted;
@@ -244,11 +244,14 @@ void mupip_backup(void)
 	replpool_identifier	replpool_id;
 	sm_uc_ptr_t		start_addr;
 	seq_num			jnl_seqno;
+	int			group_id;
+	int			perm;
 #else
 # error UNSUPPORTED PLATFORM
 #endif
 	now_t			now;						/* for GET_CUR_TIME macro */
 	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
+	ZOS_ONLY(int		realfiletag;)
 
 	error_def(ERR_BACKUPCTRL);
 	error_def(ERR_DBCCERR);
@@ -279,6 +282,7 @@ void mupip_backup(void)
 	error_def(ERR_MUSELFBKUP);
 	error_def(ERR_KILLABANDONED);
 	error_def(ERR_BACKUPKILLIP);
+	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	/* ==================================== STEP 1. Initialization ======================================= */
 
@@ -609,7 +613,7 @@ void mupip_backup(void)
 			}
 			SPRINTF(tempfilename + tempdir_full.len,"/%s_XXXXXX",tempnam_prefix);
 			MKSTEMP(tempfilename, rptr->backup_fd);
-			if (-1 == rptr->backup_fd)
+			if (FD_INVALID == rptr->backup_fd)
 			{
 				status = errno;
 				if ((NULL != tempdir_full.addr) &&
@@ -626,6 +630,10 @@ void mupip_backup(void)
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(status);
 			}
+#ifdef __MVS__
+			if (-1 == gtm_zos_set_tag(rptr->backup_fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
+				TAG_POLICY_GTM_PUTMSG(tempfilename, realfiletag, TAG_BINARY, errno);
+#endif
 			/* Temporary file for backup was created above using "mkstemp" which on AIX opens the file without
 			 * large file support enabled. Work around that by closing the file descriptor returned and reopening
 			 * the file with the "open" system call (which gets correctly translated to "open64"). We need to do
@@ -634,7 +642,7 @@ void mupip_backup(void)
 			 */
 			tmpfd = rptr->backup_fd;
 			OPENFILE(tempfilename, O_RDWR, rptr->backup_fd);
-			if (-1 == rptr->backup_fd)
+			if (FD_INVALID == rptr->backup_fd)
 			{
 				status = errno;
 				util_out_print("!/Error re-opening temporary file created by mkstemp()!/", TRUE);
@@ -644,17 +652,25 @@ void mupip_backup(void)
 				mupip_exit(status);
 			}
 			/* Now that the temporary file has been opened successfully, close the fd returned by mkstemp */
-			F_CLOSE(tmpfd, fclose_res);
+			F_CLOSE(tmpfd, fclose_res);	/* resets "tmpfd" to FD_INVALID */
 			tempdir_full.len = STRLEN(tempdir_full.addr); /* update the length */
+#ifdef __MVS__
+			if (-1 == gtm_zos_tag_to_policy(rptr->backup_fd, TAG_BINARY, &realfiletag))
+				TAG_POLICY_GTM_PUTMSG(tempfilename, realfiletag, TAG_BINARY, errno);
+#endif
 			if (debug_mupip)
 				util_out_print("!/MUPIP INFO:   Temp file name: !AD", TRUE,tempdir_full.len, tempdir_full.addr);
 			memcpy(&rptr->backup_tempfile[0], tempdir_full.addr, tempdir_full.len);
 			rptr->backup_tempfile[tempdir_full.len] = 0;
-
-			/* give temporary files the same set of permission as the database files */
+			/* give temporary files the group and permissions as other shared resources - like journal files */
 			FSTAT_FILE(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
-			if ((-1 == fstat_res)
-				|| (-1 == fchmod(rptr->backup_fd, stat_buf.st_mode)))
+			if (-1 != fstat_res)
+				gtm_set_group_and_perm(&stat_buf, &group_id, &perm, (0770 & stat_buf.st_mode));
+			/* setup new group and permissions if indicated by the security rules.  Use
+			 * 0770 anded with current mode for the new mode if masked permission selected.
+			 */
+			if ((-1 == fstat_res) || (-1 == FCHMOD(rptr->backup_fd, perm))
+				|| ((-1 != group_id) && (-1 == fchown(rptr->backup_fd, -1, group_id))))
 			{
 				status = errno;
 				gtm_putmsg(VARLSTCNT(1) status);

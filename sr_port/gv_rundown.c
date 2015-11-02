@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,9 @@
 #include "rc_cpt_ops.h"
 #include "gv_rundown.h"
 #include "targ_alloc.h"
-
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	boolean_t		pool_init;
@@ -142,6 +144,10 @@ void gv_rundown(void)
 						}
 						free(cs_addrs->jnl);
 					}
+					GTMCRYPT_ONLY(
+						if (cs_addrs->encrypted_blk_contents)
+							free(cs_addrs->encrypted_blk_contents);
+					)
 				}
 				assert(gv_cur_region->dyn.addr->file_cntl->file_info);
 				VMS_ONLY(
@@ -167,6 +173,7 @@ void gv_rundown(void)
 	rc_close_section();
 	gv_cur_region = r_save;		/* Restore value for dumps but this region is now closed and is otherwise defunct */
 	cs_addrs = NULL;
+	GTMCRYPT_ONLY(GTMCRYPT_CLOSE;)
 #ifdef UNIX
 	gtmsecshr_sock_cleanup(CLIENT);
 #ifndef MUTEX_MSEM_WAKE

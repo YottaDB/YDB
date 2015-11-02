@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,12 +59,12 @@ void	op_indglvn(mval *v,mval *dst)
 				{
 					*dst = literal_null;
 					return;
-				}
-				else
+				} else
 					rts_error(VARLSTCNT(4) ERR_UNDEF, 2, v->str.len, v->str.addr);
 			}
 			a = (lv_val *)tabent->value;
 			*dst = a->v;
+			dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 			return;
 		}
 		comp_init(&v->str);
@@ -78,8 +78,7 @@ void	op_indglvn(mval *v,mval *dst)
 				rts_error(VARLSTCNT(1) ERR_INDMAXNEST);
 			comp_indr(&object);
 		}
-	}
-	else
+	} else
 	{
 		*ind_result_sp++ = dst;
 		if (ind_result_sp >= ind_result_top)

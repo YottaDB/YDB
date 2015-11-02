@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,7 @@ void op_indtext(mval *lab, mint offset, mval *rtn, mval *dst)
 
 	MV_FORCE_STR(lab);
 	indir_src.str.len = lab->str.len;
-	indir_src.str.len += sizeof("+^") - 1;
+	indir_src.str.len += SIZEOF("+^") - 1;
 	indir_src.str.len += MAX_NUM_SIZE;
 	indir_src.str.len += rtn->str.len;
 	if (stringpool.top - stringpool.free < indir_src.str.len)

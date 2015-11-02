@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,11 +14,11 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
-#include <fcntl.h>
+#include "gtm_fcntl.h"
 #include "job.h"
 #include "eintr_wrappers.h"
 
-#ifdef __MVS__
+#ifdef KEEP_ZOS_EBCDIC
 extern unsigned char a2e[];
 #define SLSH a2e['/']
 #else

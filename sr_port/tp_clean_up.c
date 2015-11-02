@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include <signal.h>             /* for VSIG_ATOMIC_T type */
 
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -28,6 +30,7 @@
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
 #include "gdsblkops.h"		/* for RESET_UPDATE_ARRAY macro */
 #include "error.h"
+#include "have_crit.h"
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	sgm_info		*sgm_info_ptr, *first_sgm_info;
@@ -38,7 +41,7 @@ GBLREF	int			tp_allocation_clue;
 GBLREF	uint4			update_array_size, cumul_update_array_size;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	gv_namehead		*gv_target_list;
+GBLREF	gv_namehead		*gv_target_list, *gvt_tp_list;
 GBLREF	trans_num		local_tn;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	short			dollar_tlevel;
@@ -67,12 +70,19 @@ void	tp_clean_up(boolean_t rollback_flag)
 	uint4		tmp_update_array_size;
 	off_chain	chain1;
 	ua_list		*next_ua, *tmp_ua;
-	srch_blk_status	*srch_hist;
+	srch_blk_status	*t1;
 	boolean_t       is_mm;
 	sgmnt_addrs	*csa;
+	block_id	cseblk, histblk;
+	cache_rec_ptr_t	cr;
+	int4		upd_trans;
+	int		save_intrpt_ok_state;
 
 	error_def(ERR_MEMORY);
 	error_def(ERR_VMSMEMORY);
+
+	/* We are about to clean up structures. Defer MUPIP STOP/signal handling until function end. */
+	SAVE_INTRPT_OK_STATE(INTRPT_IN_TP_CLEAN_UP);
 
 	assert((NULL != first_sgm_info) || (0 == cw_stagnate.size) || cw_stagnate_reinitialized);
 		/* if no database activity, cw_stagnate should be uninitialized or reinitialized */
@@ -81,7 +91,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 			donot_commit = FALSE;
 		assert(!donot_commit);
 	)
-	if (first_sgm_info != NULL)
+	if (NULL != first_sgm_info)
 	{	/* It is possible that first_ua is NULL at this point due to a prior call to tp_clean_up() that failed in
 		 * malloc() of tmp_ua->update_array. This is possible because we might have originally had two chunks of
 		 * update_arrays each x-bytes in size and we freed them up and requested 2x-bytes of contiguous storage
@@ -133,10 +143,9 @@ void	tp_clean_up(boolean_t rollback_flag)
 		RESET_UPDATE_ARRAY; /* do not use CHECK_AND_RESET_UPDATE_ARRAY since we are in TP and will fail the check there */
 		if (rollback_flag) 		/* Rollback invalidates clues in all targets used by this transaction */
 		{
-			for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
+			for (gvnh = gvt_tp_list; NULL != gvnh; gvnh = gvnh->next_tp_gvnh)
 			{
-				if (gvnh->read_local_tn != local_tn)
-					continue;		/* Bypass gv_targets not used in this transaction */
+				assert(gvnh->read_local_tn == local_tn);
 				gvnh->clue.end = 0;
 				chain1 = *(off_chain *)&gvnh->root;
 				if (chain1.flag)
@@ -146,12 +155,168 @@ void	tp_clean_up(boolean_t rollback_flag)
 					gvnh->root = 0;
 				}
 			}
+#			ifdef DEBUG
+			/* Ensure that we did not miss out on resetting clue for any gvtarget */
+			for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
+			{
+				assert((gvnh->read_local_tn != local_tn) || (0 == gvnh->clue.end));
+				chain1 = *(off_chain *)&gvnh->root;
+				assert(!chain1.flag);	/* Also assert that all gvts in this process have valid root blk */
+			}
+#			endif
 			local_tn++;	/* to effectively invalidate first_tp_srch_status of all gv_targets */
 		}
 		for (si = first_sgm_info;  si != NULL;  si = next_si)
 		{
-			gv_cur_region = si->gv_cur_region;
-			tp_change_reg();
+			TP_TEND_CHANGE_REG(si);
+			upd_trans = si->update_trans;	/* copy in local for debugging purposes in case later asserts fail */
+			if (upd_trans)
+			{
+				if (NULL != (ks = si->kill_set_head))
+				{
+					FREE_KILL_SET(si, ks);
+					si->kill_set_tail = NULL;
+					si->kill_set_head = NULL;
+				}
+				if (NULL != si->jnl_head)
+				{
+					REINITIALIZE_LIST(si->format_buff_list);
+					REINITIALIZE_LIST(si->jnl_list);		/* reinitialize the jnl buddy_list */
+					si->jnl_tail = &si->jnl_head;
+					cs_addrs->next_fenced = NULL;
+					si->jnl_head = NULL;
+				}
+				if (FALSE == rollback_flag)
+				{	/* Non-rollback case (op_tcommit) validates clues in the targets we are updating */
+					sgm_info_ptr = si;	/* for tp_get_cw to work */
+					is_mm = (dba_mm == gv_cur_region->dyn.addr->acc_meth);
+					for (cse = si->first_cw_set; cse != si->first_cw_bitmap; cse = cse->next_cw_set)
+					{
+						assert(0 < cse->old_mode); /* assert that phase2 is complete on this block */
+						if (n_gds_t_op < cse->old_mode)
+						{	/* cse's block no longer exists in db so no clue can/should point to it */
+							assert((kill_t_create == cse->old_mode) || (kill_t_write == cse->old_mode));
+							continue;
+						}
+						TRAVERSE_TO_LATEST_CSE(cse);
+						assert(NULL == cse->new_buff || NULL != cse->blk_target);
+						if (NULL == (blk_target = cse->blk_target))
+							continue;
+						if (0 == blk_target->clue.end)
+						{
+							chain1 = *(off_chain *)&blk_target->root;
+							if (chain1.flag)
+							{
+								assert(blk_target != cs_addrs->dir_tree);
+								blk_target->root = 0;
+							}
+							continue;
+						}
+						depth = blk_target->hist.depth;
+						if ((level = (int)cse->level) > depth)
+							continue;
+						t1 = &blk_target->hist.h[level];
+						cseblk = cse->blk;
+						histblk = t1->blk_num;
+						if (cseblk == histblk)
+						{
+							assert(!((off_chain *)&histblk)->flag);
+							if (!is_mm)
+							{
+								cr = cse->cr;
+								assert(NULL != cr);
+								UNIX_ONLY(assert((NULL == t1->cr) || (t1->cr == cr));)
+								if (cr != t1->cr)
+								{
+									t1->cr = cr;
+									t1->cycle = cse->cycle;
+									t1->buffaddr = GDS_REL2ABS(cr->buffaddr);
+								} else
+								{
+									assert(t1->cr == cr);
+									assert(t1->cycle == cse->cycle);
+									assert(t1->buffaddr == GDS_REL2ABS(cr->buffaddr));
+								}
+							} else
+							{
+								t1->buffaddr = cs_addrs->acc_meth.mm.base_addr
+											+ (sm_off_t)cs_data->blk_size * cseblk;
+								assert(NULL == t1->cr);
+							}
+							t1->cse = NULL;
+						} else
+						{
+							chain1 = *(off_chain *)&histblk;
+							if (chain1.flag)
+							{
+								tp_get_cw(si->first_cw_set, (int)chain1.cw_index, &cse1);
+								if (cse == cse1)
+								{
+									if (blk_target->root == histblk)
+										blk_target->root = cseblk;
+									t1->blk_num = cseblk;
+									if (is_mm)
+										t1->buffaddr =
+											cs_addrs->acc_meth.mm.base_addr
+											+ (sm_off_t)cs_data->blk_size * cseblk;
+									else
+									{
+										cr = cse->cr;
+										assert(NULL != cr);
+										t1->cr = cr;
+										t1->cycle = cse->cycle;
+										t1->buffaddr = GDS_REL2ABS(cr->buffaddr);
+									}
+									t1->cse = NULL;
+								}
+							}
+						}
+					}
+				}
+				si->total_jnl_rec_size = cs_addrs->min_total_tpjnl_rec_size; /* Reinitialize total_jnl_rec_size */
+				REINITIALIZE_LIST(si->recompute_list);
+				REINITIALIZE_LIST(si->cw_set_list);	/* reinitialize the cw_set buddy_list */
+				REINITIALIZE_LIST(si->new_buff_list);	/* reinitialize the new_buff buddy_list */
+				REINITIALIZE_LIST(si->tlvl_cw_set_list);	/* reinitialize the tlvl_cw_set buddy_list */
+				REINITIALIZE_LIST(si->tlvl_info_list);		/* reinitialize the tlvl_info buddy_list */
+				si->first_cw_set = si->last_cw_set = si->first_cw_bitmap = NULL;
+				si->cw_set_depth = 0;
+				si->update_trans = FALSE;
+			} else if (rollback_flag)
+				REINITIALIZE_LIST(si->tlvl_info_list);		/* reinitialize the tlvl_info buddy_list */
+#			ifdef DEBUG
+			/* Verify that all fields that were reset in the if code above are already at the reset value.
+			 * There are NO exceptions to this rule. If this transaction had si->update_trans TRUE at some
+			 * point but later did rollbacks which caused it to become FALSE, the incremental rollback would
+			 * have taken care to reset these fields explicitly.
+			 */
+			assert(NULL == si->kill_set_head);
+			assert(NULL == si->kill_set_tail);
+			assert(NULL == si->jnl_head);
+			assert(NULL == cs_addrs->next_fenced);
+			if (JNL_ALLOWED(cs_addrs))
+			{
+				assert(si->total_jnl_rec_size == cs_addrs->min_total_tpjnl_rec_size);
+				VERIFY_LIST_IS_REINITIALIZED(si->jnl_list);
+				VERIFY_LIST_IS_REINITIALIZED(si->format_buff_list);
+				assert(si->jnl_tail == &si->jnl_head);
+			} else
+			{
+				assert(NULL == si->jnl_list);
+				assert(NULL == si->format_buff_list);
+				assert(NULL == si->jnl_tail);
+			}
+			VERIFY_LIST_IS_REINITIALIZED(si->recompute_list);
+			VERIFY_LIST_IS_REINITIALIZED(si->cw_set_list);
+			VERIFY_LIST_IS_REINITIALIZED(si->new_buff_list);
+			VERIFY_LIST_IS_REINITIALIZED(si->tlvl_cw_set_list);
+			VERIFY_LIST_IS_REINITIALIZED(si->tlvl_info_list);
+			assert(NULL == si->first_cw_set);
+			assert(NULL == si->last_cw_set);
+			assert(NULL == si->first_cw_bitmap);
+			assert(0 == si->cw_set_depth);
+			assert(FALSE == si->update_trans);
+#			endif
 			if (si->num_of_blks)
 			{	/* Check that it is the same as the # of used entries in the hashtable.
 				 * The only exception is if we got interrupted by a signal right after updating one
@@ -163,134 +328,46 @@ void	tp_clean_up(boolean_t rollback_flag)
 				si->num_of_blks = 0;
 			}
 			si->cr_array_index = 0;			/* reinitialize si->cr_array */
-			si->backup_block_saved = FALSE;
-			for (ks = si->kill_set_head;  ks != NULL;  ks = next_ks)
-			{
-				next_ks = ks->next_kill_set;
-				free(ks);
-			}
-			si->kill_set_head = si->kill_set_tail = NULL;
-			if (si->jnl_head)
-			{
-				reinitialize_list(si->format_buff_list);
-				reinitialize_list(si->jnl_list);		/* reinitialize the jnl buddy_list */
-				si->jnl_head = NULL;
-				si->jnl_tail = &si->jnl_head;
-				cs_addrs->next_fenced = NULL;
-			}
-			reinitialize_list(si->recompute_list);
-			sgm_info_ptr = si;	/* for tp_get_cw to work */
-			if (FALSE == rollback_flag)
-			{
-				is_mm = (dba_mm == gv_cur_region->dyn.addr->acc_meth);
-				for (cse = si->first_cw_set; cse != si->first_cw_bitmap; cse = cse->next_cw_set)
-				{
-					TRAVERSE_TO_LATEST_CSE(cse);
-					assert(NULL == cse->new_buff || NULL != cse->blk_target);
-					if (NULL == (blk_target = cse->blk_target))
-						continue;
-					blk_target->clue.end = 0;
-					if (0 == blk_target->clue.end)
-					{
-						chain1 = *(off_chain *)&blk_target->root;
-						if (chain1.flag)
-						{
-							assert(blk_target != cs_addrs->dir_tree);
-							blk_target->root = 0;
-						}
-						continue;
-					}
-					/* Non-rollback case (op_tcommit) validates clues in the targets we are updating. */
-					srch_hist = &blk_target->hist.h[0];
-					depth = blk_target->hist.depth;
-					if ((level = (int)cse->level) > depth)
-						continue;
-					if (NULL == srch_hist[level].cr)
-					{
-						if (cse->blk == srch_hist[level].blk_num)
-						{
-							assert(!((off_chain *)&srch_hist[level].blk_num)->flag);
-							if (is_mm)
-								srch_hist[level].buffaddr = cs_addrs->acc_meth.mm.base_addr +
-									(sm_off_t)cs_data->blk_size * cse->blk;
-							else
-							{
-								assert(CYCLE_PVT_COPY == srch_hist[level].cycle);
-								srch_hist[level].cr = cse->cr;
-								srch_hist[level].cycle = cse->cycle;
-								srch_hist[level].buffaddr = GDS_REL2ABS(cse->cr->buffaddr);
-							}
-							srch_hist[level].cse = NULL;
-						} else
-						{
-							chain1 = *(off_chain *)&srch_hist[level].blk_num;
-							if (chain1.flag)
-							{
-								tp_get_cw(si->first_cw_set, (int)chain1.cw_index, &cse1);
-								if (cse == cse1)
-								{
-									if (blk_target->root == srch_hist[level].blk_num)
-										blk_target->root = cse->blk;
-									srch_hist[level].blk_num = cse->blk;
-									if (is_mm)
-										srch_hist[level].buffaddr =
-											cs_addrs->acc_meth.mm.base_addr +
-											  (sm_off_t)cs_data->blk_size * cse->blk;
-									else
-									{
-										srch_hist[level].cr = cse->cr;
-										srch_hist[level].cycle = cse->cycle;
-										srch_hist[level].buffaddr =
-											GDS_REL2ABS(cse->cr->buffaddr);
-									}
-									srch_hist[level].cse = NULL;
-								}
-							}
-						}
-					} else if (cse->blk == srch_hist[level].blk_num)
-					{
-						assert(cse->cr == srch_hist[level].cr);
-						assert(cse->cycle == srch_hist[level].cycle);
-					}
-				}
-			}
-			reinitialize_list(si->cw_set_list);	/* reinitialize the cw_set buddy_list */
-			reinitialize_list(si->new_buff_list);	/* reinitialize the new_buff buddy_list */
-      			reinitialize_list(si->tlvl_cw_set_list);	/* reinitialize the tlvl_cw_set buddy_list */
-      			reinitialize_list(si->tlvl_info_list);		/* reinitialize the tlvl_info buddy_list */
-			si->first_cw_set = si->last_cw_set = si->first_cw_bitmap = NULL;
-			si->cw_set_depth = 0;
-			si->update_trans = FALSE;
-			si->total_jnl_rec_size = cs_addrs->min_total_tpjnl_rec_size;	/* Reinitialize total_jnl_rec_size */
 			si->last_tp_hist = si->first_tp_hist;		/* reinitialize the tp history */
 			si->fresh_start = TRUE;
 			si->tlvl_info_head = NULL;
 			next_si = si->next_sgm_info;
 			si->next_sgm_info = NULL;
-			jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
 		}	/* for (all segments in the transaction) */
-		DEBUG_ONLY(
-			if (!process_exiting)
-			{	/* Ensure that we did not miss out on clearing any gv_target->root which had chain.flag set.
-				 * Dont do this if the process is cleaning up the TP transaction as part of exit handling
-				 */
-				for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
+		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
+#		ifdef DEBUG
+		if (!process_exiting)
+		{	/* Ensure that we did not miss out on clearing any gv_target->root which had chain.flag set.
+			 * Dont do this if the process is cleaning up the TP transaction as part of exit handling
+			 * Also use this opportunity to check that non-zero clues for BG contain non-null cr in histories.
+			 */
+			for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
+			{
+				chain1 = *(off_chain *)&gvnh->root;
+				assert(!chain1.flag);
+				if (gvnh->root)
+				{	/* check that gv_target->root falls within total blocks range */
+					csa = gvnh->gd_csa;
+					assert(NULL != csa);
+					assert(gvnh->root < csa->ti->total_blks);
+				}
+				if (gvnh->clue.end)
 				{
-					chain1 = *(off_chain *)&gvnh->root;
-					assert(!chain1.flag);
-					if (gvnh->root)
-					{	/* check that gv_target->root falls within total blocks range */
-						csa = gvnh->gd_csa;
-						assert(NULL != csa);
-						assert(gvnh->root < csa->ti->total_blks);
+					is_mm = (dba_mm == gvnh->gd_csa->hdr->acc_meth);
+					for (t1 = &gvnh->hist.h[0]; t1->blk_num; t1++)
+					{
+						assert(is_mm || (NULL != t1->cr));
+						assert(NULL == t1->cse);
 					}
 				}
 			}
-		)
+		}
+#		endif
 		jgbl.cumul_jnl_rec_len = 0;
 		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
 		global_tlvl_info_head = NULL;
-		reinitialize_list(global_tlvl_info_list);		/* reinitialize the global_tlvl_info buddy_list */
+		REINITIALIZE_LIST(global_tlvl_info_list);		/* reinitialize the global_tlvl_info buddy_list */
+		gvt_tp_list = NULL;
 		CWS_RESET; /* reinitialize the hashtable before restarting/committing the TP transaction */
 	}	/* if (any database work in the transaction) */
 	VMS_ONLY(tp_has_kill_t_cse = FALSE;)
@@ -298,4 +375,5 @@ void	tp_clean_up(boolean_t rollback_flag)
 	sgm_info_ptr = NULL;
 	first_sgm_info = NULL;
 	assert((NULL == first_tp_si_by_ftok) || process_exiting);
+	RESTORE_INTRPT_OK_STATE;	/* check if any MUPIP STOP/signals were deferred while in this function */
 }

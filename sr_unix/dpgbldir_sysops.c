@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,9 @@
 
 #include <errno.h>
 
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 #include "parse_file.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -43,6 +46,11 @@ GBLREF mval dollar_zgbldir;
 
 error_def(ERR_ZGBLDIRACC);
 error_def(ERR_IOEOF);
+#ifdef __MVS__
+/* Need the ERR_BADTAG and ERR_TEXT  error_defs for the TAG_POLICY macro warning */
+error_def(ERR_TEXT);
+error_def(ERR_BADTAG);
+#endif
 
 mstr *get_name(mstr *ms)
 {
@@ -71,14 +79,15 @@ mstr *get_name(mstr *ms)
 void *open_gd_file(mstr *v)
 
 {
-	file_pointer *fp;
+	file_pointer	*fp;
+	ZOS_ONLY(int	realfiletag;)
 
 	fp = (file_pointer*)malloc(sizeof(*fp));
 	fp->v.len = v->len;
 	fp->v.addr = (char *)malloc(v->len + 1);
 	memcpy(fp->v.addr, v->addr, v->len);
 	*((char*)((char*)fp->v.addr + v->len)) = 0;	/* Null terminate string */
-	if ((fp->fd = OPEN(fp->v.addr, O_RDONLY)) == -1)
+	if (FD_INVALID == (fp->fd = OPEN(fp->v.addr, O_RDONLY)))
 	{
 		if (dollar_zgbldir.str.len &&
 			dollar_zgbldir.str.len == fp->v.len &&
@@ -93,6 +102,10 @@ void *open_gd_file(mstr *v)
 			dollar_zgbldir.str.len,
 			dollar_zgbldir.str.addr, errno);
 	}
+#ifdef __MVS__
+	if (-1 == gtm_zos_tag_to_policy(fp->fd, TAG_BINARY, &realfiletag))
+		TAG_POLICY_SEND_MSG(fp->v.addr, errno, realfiletag, TAG_BINARY);
+#endif
 	return (void *)fp;
 }
 
@@ -123,7 +136,9 @@ void fill_gd_addr_id(gd_addr *gd_ptr, file_pointer *file_ptr)
 }
 void close_gd_file(file_pointer *file_ptr)
 {
-	close(file_ptr->fd);
+	int	rc;
+
+	CLOSEFILE_RESET(file_ptr->fd, rc);	/* resets "file_ptr->fd" to FD_INVALID */
 	free(file_ptr->v.addr);
 	free(file_ptr);
 	return;

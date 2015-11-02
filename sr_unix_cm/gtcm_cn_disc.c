@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,10 +23,11 @@ static char rcsid[] = "$Header:$";
 #include "mdef.h"
 
 #include "gtm_stdio.h"
-#include "gtm_unistd.h"		/* for close() */
+#include "gtm_unistd.h"		/* for close() used by CLOSEFILE_RESET */
 #include "gtm_time.h"		/* for ctime() and time() */
 
 #include "gtcm.h"
+#include "gtmio.h"
 
 #ifdef GTCM_RC
 #include "rc.h"
@@ -36,6 +37,7 @@ void gtcm_cn_disc(omi_conn *cptr, omi_conn_ll *cll)
 {
 	time_t	end;
 	int	i, nxact, nerrs;
+	int	rc;
 
 	/*  Cumulative statistics */
 	end = time((time_t *)0);
@@ -65,10 +67,10 @@ void gtcm_cn_disc(omi_conn *cptr, omi_conn_ll *cll)
 	OMI_DBG((omi_debug, "%s:\t%d bytes sent\n", SRVR_NAME, cptr->stats.bytes_send));
 #ifdef BSD_TCP
 	/*  Close out the network connection */
-	(void) close(cptr->fd);
+	CLOSEFILE_RESET(cptr->fd, rc);	/* resets "cptr->fd" to FD_INVALID */
 #endif /* defined(BSD_TCP) */
-	if (cptr->pklog)
-		close(cptr->pklog);
+	if (FD_INVALID != cptr->pklog)
+		CLOSEFILE_RESET(cptr->pklog, rc);	/* resets "cptr->pklog" to FD_INVALID */
 #ifdef GTCM_RC
 	if (cptr->of)
 		rc_oflow_fin(cptr->of);

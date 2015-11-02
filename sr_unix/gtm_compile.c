@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,12 @@
 #include "gtm_compile.h"
 #include "patcode.h"
 #include "print_exit_stats.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "alias.h"
 
 GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
 GBLREF stack_frame	 	*frame_pointer;
@@ -84,12 +90,9 @@ int	gtm_compile (void)
 	zsrch_var = lv_getslot(curr_symval);
 	zsrch_dir1 = lv_getslot(curr_symval);
 	zsrch_dir2 = lv_getslot(curr_symval);
-	zsrch_var->v.mvtype = zsrch_dir1->v.mvtype = zsrch_dir2->v.mvtype = 0;
-	zsrch_var->tp_var = zsrch_dir1->tp_var = zsrch_dir2->tp_var = 0;
-	zsrch_var->ptrs.val_ent.children = zsrch_dir1->ptrs.val_ent.children =
-		zsrch_dir2->ptrs.val_ent.children = 0;
-	zsrch_var->ptrs.val_ent.parent.sym = zsrch_dir1->ptrs.val_ent.parent.sym =
-		zsrch_dir2->ptrs.val_ent.parent.sym = curr_symval;
+	LVVAL_INIT(zsrch_var, curr_symval);
+	LVVAL_INIT(zsrch_dir1, curr_symval);
+	LVVAL_INIT(zsrch_dir2, curr_symval);
 
 	cmd_qlf.object_file.str.addr = obj_file;
 	cmd_qlf.object_file.str.len = MAX_FBUFF;

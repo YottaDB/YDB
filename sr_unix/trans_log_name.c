@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,7 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 			/* For non-initial pass copy any non-env var text that we have passed over into output buffer
 			 * and update output buffer pointer. Before that check if output buffer can hold that data.
 			 */
-			s_len = s_ptr - s_start;
+			s_len = (int)(s_ptr - s_start);
 			if ((b_ptr + s_len) >= b_top)
 			{
 				ret = SS_LOG2LONG;
@@ -66,7 +66,7 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 			/* Get the env var name. Take care not to exceed input string length */
 			for ( ; (s_ptr < s_top) && (ch = *s_ptr, ('_' == ch) || ISALNUM(ch)); s_ptr++)
 				;
-			s_len = s_ptr - s_start - 1;
+			s_len = (int)(s_ptr - s_start) - 1;
 			/* Copy it into "temporary-buffer" so we can null-terminate it and pass to GETENV */
 			if (trans_log_name_buflen <= s_len)
 			{	/* Currently allocated buffer is not enough. Expand it. */
@@ -82,11 +82,11 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 			if (NULL != (tran_buff = GETENV(trans_log_name_buff)))
 			{
 				s_start = tran_buff;
-				s_len = strlen(tran_buff);
+				s_len = STRLEN(tran_buff);
 				ret = SS_NORMAL;
 			} else
 			{	/* if there is no env var then just copy the name of the env var name including $ */
-				s_len = s_ptr - s_start;
+				s_len = (int)(s_ptr - s_start);
 			}
 			if ((b_ptr + s_len) >= b_top)
 			{
@@ -103,7 +103,7 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 	}
 	if (SS_LOG2LONG != ret)
 	{	/* if there is anything left after the last env var name, copy it */
-		s_len = s_ptr - s_start;
+		s_len = (int)(s_ptr - s_start);
 		if ((b_ptr + s_len) >= b_top)
 			ret = SS_LOG2LONG;
 		else

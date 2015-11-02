@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -173,7 +173,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		util_out_print("!/MUPIP REORG !AD cannot proceed with above errors!/", TRUE, LEN_AND_STR(command));
 		mupip_exit(ERR_MUNOACTION);
 	}
-	gv_keysize = ROUND_UP2(MAX_KEY_SZ + MAX_NUM_SUBSC_LEN, 4);
+	gv_keysize = DBKEYSIZE(MAX_KEY_SZ);
 	gv_target = targ_alloc(gv_keysize, NULL, NULL);	/* t_begin needs this initialized */
 	memset(&alt_hist, 0, sizeof(alt_hist));	/* null-initialize history */
 	blkhist = &alt_hist.h[0];
@@ -287,7 +287,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		if (!wcs_flu(WCSFLU_FLUSH_HDR))	/* wcs_flu assumes gv_cur_region is set (which it is in this routine) */
 		{
 			rel_crit(reg);
-			gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("REORG UPGRADE/DOWNGRADE"), DB_LEN_STR(reg));
+			gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("MUPIP REORG UPGRADE/DOWNGRADE"), DB_LEN_STR(reg));
 			status = ERR_MUNOFINISH;
 			continue;
 		}
@@ -658,7 +658,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			if (!wcs_flu(WCSFLU_FLUSH_HDR))	/* wcs_flu assumes gv_cur_region is set (which it is in this routine) */
 			{
 				gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4,
-					LEN_AND_LIT("REORG UPGRADE/DOWNGRADE"), DB_LEN_STR(reg));
+					LEN_AND_LIT("MUPIP REORG UPGRADE/DOWNGRADE"), DB_LEN_STR(reg));
 				status = ERR_MUNOFINISH;
 				rel_crit(reg);
 				continue;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -146,7 +146,8 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 		if (-1 == semctl(udi->ftok_semid, FTOK_SEM_PER_ID - 1, SETVAL, semarg))
 		{
 			save_errno = errno;
-			if (EINVAL == save_errno && MAX_RES_TRIES >= lcnt)
+			/*EIDRM seen only on Linux*/
+			if (((EINVAL == save_errno) || (EIDRM == errno)) && MAX_RES_TRIES >= lcnt)
 					continue;
 			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
 			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl()"), CALLFROM, save_errno);
@@ -442,8 +443,6 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 				return FALSE;
 			}
 			udi->ftok_semid = INVALID_SEMID;
-			if (ftok_sem_reg == standalone_reg)
-				standalone_reg = NULL;
 			ftok_sem_reg = NULL;
 			udi->grabbed_ftok_sem = FALSE;
 			return TRUE;
@@ -464,8 +463,6 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 		return FALSE;
 	}
 	udi->grabbed_ftok_sem = FALSE;
-	if (ftok_sem_reg == standalone_reg)
-		standalone_reg = NULL;
 	ftok_sem_reg = NULL;
 	return TRUE;
 }

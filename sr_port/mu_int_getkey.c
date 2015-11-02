@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,7 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 		util_out_print("%GTM-E-CLIERR, Unrecognized option : SUBSCRIPT, value expected but not found", TRUE);
 		return FALSE;
 	}
-	keysize = (MAX_KEY_SZ + MAX_NUM_SUBSC_LEN + 4) & (-4);			/* same calculation as done in "targ_alloc" */
+	keysize = DBKEYSIZE(MAX_KEY_SZ);
 	top = src + keylen;
 	startsrc = src;
 	for (iter = 0, top = src + keylen; (iter < 2) && (src < top); iter++)

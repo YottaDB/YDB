@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -275,7 +275,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 	GTM_SOCKLEN_TYPE	mutex_woke_me_proc_len;
 	mutex_wake_msg_t	mutex_wake_msg[2];
 	int			sel_stat;
-	int			nbrecvd;
+	ssize_t			nbrecvd;
 	int			timeout_intr_slpcnt;
 	long			timeout_val;
 #endif
@@ -340,7 +340,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 		do
 		{
 			timeout.tv_sec = MUTEX_CONST_TIMEOUT_VAL;
-			timeout.tv_usec = (nrand48(next_rand) & ((1U << MUTEX_NUM_WAIT_BITS) - 1)) + 1;
+			timeout.tv_usec = (gtm_tv_usec_t)(nrand48(next_rand) & ((1U << MUTEX_NUM_WAIT_BITS) - 1)) + 1;
 			timeout_val = timeout.tv_sec * ONE_MILLION + timeout.tv_usec;
 			/*
 			 * Can add backoff logic here to increase the timeout
@@ -371,7 +371,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 						RTS_ERROR_TEXT("Error with mutex select. Running in degraded mode"), errno);
 				timeout_val >>= 1;
 				timeout.tv_sec = timeout_val / ONE_MILLION;
-				timeout.tv_usec = timeout_val % ONE_MILLION;
+				timeout.tv_usec = (gtm_tv_usec_t)(timeout_val % ONE_MILLION);
 				MUTEX_DPRINT4("%d: Interrupted select, new timeout %d s %d us\n", process_id, timeout.tv_sec,
 					timeout.tv_usec);
 				/* the next line deals with the case that an interrupted select has changed mutex_wait_on_descs */
@@ -381,7 +381,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 			if (1 == sel_stat) /* Somebody woke me up */
 			{
 				mutex_woke_me_proc_len = sizeof(struct sockaddr_un);
-				RECVFROM_SOCK(mutex_sock_fd, (void *)&mutex_wake_msg[0], sizeof(mutex_wake_msg), 0,
+				RECVFROM_SOCK(mutex_sock_fd, (void *)&mutex_wake_msg[0], SIZEOF(mutex_wake_msg), 0,
 					(struct sockaddr *)&mutex_woke_me_proc,
 					(GTM_SOCKLEN_TYPE *)&mutex_woke_me_proc_len, nbrecvd);
 				if (sizeof(mutex_wake_msg) == nbrecvd) /* Drained out both old and new wake messages */
@@ -947,16 +947,13 @@ void	mutex_per_process_init(void)
 #ifndef MUTEX_MSEM_WAKE
 	else
 	{	/* Close socket opened by the first call. But dont delete the socket file as the parent process will do that. */
-		assert(-1 != mutex_sock_fd);
-		if (-1 != mutex_sock_fd)
-		{
-			CLOSEFILE(mutex_sock_fd, status);
-			mutex_sock_fd = -1;
-		}
+		assert(FD_INVALID != mutex_sock_fd);
+		if (FD_INVALID != mutex_sock_fd)
+			CLOSEFILE_RESET(mutex_sock_fd, status);	/* resets "mutex_sock_fd" to FD_INVALID */
 	}
-	assert(-1 == mutex_sock_fd);
+	assert(FD_INVALID == mutex_sock_fd);
 	mutex_sock_init();
-	assert(-1 != mutex_sock_fd);
+	assert(FD_INVALID != mutex_sock_fd);
 #endif
 	mutex_per_process_init_pid = process_id;
 }

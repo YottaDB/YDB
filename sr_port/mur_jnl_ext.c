@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,7 @@ LITREF	char		*jrt_label[JRT_RECTYPES];
 
 #define LAB_LEN 	7
 #define LAB_TERM	"\\"
-#define LAB_TERM_SZ	(sizeof(LAB_TERM) - 1)
+#define LAB_TERM_SZ	(SIZEOF(LAB_TERM) - 1)
 
 /* This routine formats and outputs journal extract records
    corresponding to M SET, KILL, ZKILL, TSTART, and ZTSTART commands */

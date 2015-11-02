@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,6 +73,89 @@
 #include "send_msg.h"
 #include "gtmmsg.h"
 #include "shmpool.h"
+#include "gtm_permissions.h"
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
+#include "have_crit.h"
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
+
+#define GTM_ATTACH_CHECK_ERROR													\
+{																\
+	if (-1 == status_l)													\
+	{															\
+		rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),							\
+			  ERR_TEXT, 2, LEN_AND_LIT("Error attaching to database shared memory"), errno);			\
+	}															\
+}
+
+#ifdef DEBUG_DB64
+#define GTM_ATTACH_SHM														\
+{																\
+	status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, next_smseg, SHM_RND));			\
+	next_smseg = (sm_uc_ptr_t)ROUND_UP((sm_long_t)(next_smseg + reg->sec_size), SHMAT_ADDR_INCS);				\
+	GTM_ATTACH_CHECK_ERROR;													\
+	csa->nl = (node_local_ptr_t)csa->db_addrs[0];										\
+}
+#else
+#define GTM_ATTACH_SHM														\
+{																\
+	status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, 0, SHM_RND));				\
+	GTM_ATTACH_CHECK_ERROR;													\
+	csa->nl = (node_local_ptr_t)csa->db_addrs[0];										\
+}
+#endif
+
+#define GTM_ATTACH_SHM_AND_CHECK_VERS(VERMISMATCH, SHM_SETUP_OK)								\
+{																\
+	GTM_ATTACH_SHM;														\
+	/* The following checks for GDS_LABEL_GENERIC and  gtm_release_name ensure that the shared memory under consideration	\
+	 * is valid.  If shared memory is already initialized, do VERMISMATCH check BEFORE referencing any other fields in	\
+	 * shared memory.													\
+	 */															\
+	VERMISMATCH = FALSE;													\
+	SHM_SETUP_OK = FALSE;													\
+	if (!MEMCMP_LIT(csa->nl->label, GDS_LABEL_GENERIC))									\
+	{															\
+		if (memcmp(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1))					\
+		{	/* Copy csa->nl->now_running into a local variable before passing to rts_error() due to the following	\
+			 * issue:												\
+			 * In VMS, a call to rts_error() copies only the error message and its arguments (as pointers) and	\
+			 *  transfers control to the topmost condition handler which is dbinit_ch() in this case. dbinit_ch()	\
+			 *  does a PRN_ERROR only for SUCCESS/INFO (VERMISMATCH is neither of them) and in addition		\
+			 *  nullifies csa->nl as part of its condition handling. It then transfers control to the next level	\
+			 *  condition handler which does a PRN_ERROR but at that point in time, the parameter			\
+			 *  csa->nl->now_running is no longer accessible and hence no \parameter substitution occurs (i.e. the	\
+			 *  error message gets displayed with plain !ADs).							\
+			 * In UNIX, this is not an issue since the first call to rts_error() does the error message		\
+			 *  construction before handing control to the topmost condition handler. But it does not hurt to do	\
+			 *  the copy.												\
+			 */													\
+			assert(strlen(csa->nl->now_running) < sizeof(now_running));						\
+			memcpy(now_running, csa->nl->now_running, sizeof(now_running));						\
+			now_running[sizeof(now_running) - 1] = '\0'; /* protection against bad csa->nl->now_running values */	\
+			VERMISMATCH = TRUE;											\
+		} else														\
+			SHM_SETUP_OK = TRUE;											\
+	}															\
+}
+
+#define GTM_VERMISMATCH_ERROR													\
+{																\
+	if (!vermismatch_already_printed)											\
+	{															\
+		vermismatch_already_printed = TRUE;										\
+		/* for DSE, change VERMISMATCH to be INFO (instead of the more appropriate WARNING)				\
+		 * as we want the condition handler (dbinit_ch) to do a CONTINUE (which it does					\
+		 * only for severity levels SUCCESS or INFO) and resume processing in gvcst_init.c				\
+		 * instead of detaching from shared memory.									\
+		 */														\
+		rts_error(VARLSTCNT(8) MAKE_MSG_TYPE(ERR_VERMISMATCH, ((DSE_IMAGE != image_type) ? ERROR : INFO)), 6,		\
+			DB_LEN_STR(reg), gtm_release_name_len, gtm_release_name, LEN_AND_STR(now_running));			\
+	}															\
+}
 
 #define ATTACH_TRIES   		10
 #define DEFEXT          	"*.dat"
@@ -85,12 +168,17 @@ GBLREF  uint4                   process_id;
 GBLREF  gd_region               *gv_cur_region;
 GBLREF  boolean_t               sem_incremented;
 GBLREF  boolean_t               mupip_jnl_recover;
+GBLREF  boolean_t               have_standalone_access;
 GBLREF	ipcs_mesg		db_ipcs;
 GBLREF	node_local_ptr_t	locknl;
 GBLREF	boolean_t		new_dbinit_ipc;
 GBLREF	boolean_t		gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
 GBLREF	uint4			mutex_per_process_init_pid;
+GBLREF	boolean_t		dse_running;
 
+GTMCRYPT_ONLY(
+GBLREF	gtmcrypt_key_t		mu_int_encrypt_key_handle;
+)
 #ifndef MUTEX_MSEM_WAKE
 GBLREF	int 	mutex_sock_fd;
 #endif
@@ -108,6 +196,7 @@ OS_PAGE_SIZE_DECLARE
 static  int             errno_save;
 error_def(ERR_DBFILERR);
 error_def(ERR_TEXT);
+ZOS_ONLY(error_def(ERR_BADTAG);)
 
 gd_region *dbfilopn (gd_region *reg)
 {
@@ -120,20 +209,12 @@ gd_region *dbfilopn (gd_region *reg)
 	gd_segment      *seg;
 	int             status;
 	bool            raw;
-	int		stat_res;
+	int		stat_res, rc;
+	ZOS_ONLY(int	realfiletag;)
 
 	seg = reg->dyn.addr;
 	assert(seg->acc_meth == dba_bg  ||  seg->acc_meth == dba_mm);
-	if (NULL == seg->file_cntl)
-	{
-		seg->file_cntl = (file_control *)malloc(sizeof(*seg->file_cntl));
-		memset(seg->file_cntl, 0, sizeof(*seg->file_cntl));
-	}
-	if (NULL == seg->file_cntl->file_info)
-	{
-		seg->file_cntl->file_info = (void *)malloc(sizeof(unix_db_info));
-		memset(seg->file_cntl->file_info, 0, sizeof(unix_db_info));
-	}
+	FILE_CNTL_INIT_IF_NULL(seg);
 	file.addr = (char *)seg->fname;
 	file.len = seg->fname_len;
 	memset(&pblk, 0, sizeof(pblk));
@@ -187,10 +268,10 @@ gd_region *dbfilopn (gd_region *reg)
 	udi->gt_shm_ctime = 0;
 	reg->read_only = FALSE;		/* maintain csa->read_write simultaneously */
 	udi->s_addrs.read_write = TRUE;	/* maintain reg->read_only simultaneously */
-	if (udi->fd == -1)
+	if (FD_INVALID == udi->fd)
 	{
 		OPENFILE(fnptr, O_RDONLY, udi->fd);
-		if (udi->fd == -1)
+		if (FD_INVALID == udi->fd)
 		{
 			errno_save = errno;
 			if (GTCM_GNP_SERVER_IMAGE != image_type)
@@ -204,11 +285,15 @@ gd_region *dbfilopn (gd_region *reg)
 		reg->read_only = TRUE;			/* maintain csa->read_write simultaneously */
 		udi->s_addrs.read_write = FALSE;	/* maintain reg->read_only simultaneously */
 	}
+#ifdef __MVS__
+	if (-1 == gtm_zos_tag_to_policy(udi->fd, TAG_BINARY, &realfiletag))
+		TAG_POLICY_SEND_MSG(fnptr, errno, realfiletag, TAG_BINARY);
+#endif
 	STAT_FILE(fnptr, &buf, stat_res);
 	set_gdid_from_stat(&udi->fileid, &buf);
 	if (prev_reg = gv_match(reg))
 	{
-		close(udi->fd);
+		CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 		free(seg->file_cntl->file_info);
 		free(seg->file_cntl);
 		seg->file_cntl = 0;
@@ -255,6 +340,18 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	unix_db_info    	*udi;
 	char			now_running[MAX_REL_NAME];
 	unsigned int		full_len;
+	GTMCRYPT_ONLY(
+		int		init_status;
+		boolean_t	do_crypt_init = FALSE;
+	)
+	int			save_intrpt_ok_state;
+	boolean_t		shm_setup_ok = FALSE;
+	boolean_t		vermismatch = FALSE;
+	boolean_t		vermismatch_already_printed = FALSE;
+	int			lib_gid = -1;
+	int			group_id;
+	struct stat		sb;
+	int			perm;
 
 	error_def(ERR_CLSTCONFLICT);
 	error_def(ERR_CRITSEMFAIL);
@@ -277,6 +374,24 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	csa = &udi->s_addrs;
 	csa->db_addrs[0] = csa->db_addrs[1] = csa->lock_addrs[0] = NULL;   /* to help in dbinit_ch  and gds_rundown */
 	reg->opening = TRUE;
+	SAVE_INTRPT_OK_STATE(INTRPT_IN_DB_INIT);
+	/* We do some basic encryption initializations here.
+	 * 1. Call hash check to figure out if the dat file's hash matches with that of the db_key_file
+	 * 2. if the dat file is encrypted, then make a call to the encryption plugin with GTMCRYPT_GETKEY to obtain the
+	 *    symmetric key which can be used at later stages for encryption and decryption.
+	 * 3. malloc csa->encrypted_blk_contents to be used in jnl_write_aimg_rec and dsk_write_nocache
+	 */
+#	ifdef GTM_CRYPT
+	/* Since LKE will never look at the encrypted contents of the database file, it won't need the initialize
+	 * encryption. */
+	do_crypt_init = (tsd->is_encrypted && (LKE_IMAGE != image_type));
+	if (do_crypt_init)
+	{
+		/* Encryption initialization is a heavy operation due to the initalization of gpgme. Hence, we do
+		 * it before acquiring the lock. We do rest of the operations like hash check after the lock. */
+		INIT_PROC_ENCRYPTION(init_status);
+	}
+#	endif
 	/*
 	 * Create ftok semaphore for this region.
 	 * We do not want to make ftok counter semaphore to be 2 for on mupip journal recover process.
@@ -296,12 +411,35 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	fc->op_len = sizeof(*tsd);
 	fc->op_pos = 1;
 	dbfilop(fc);		/* Read file header */
+#	ifdef GTM_CRYPT
+	if (do_crypt_init)
+	{	/* The below macro if encounters an error will note the error code and will defer the error
+		 * handling if the image_type is not MUMPS. This is done so that a user who will be using
+		 * any of the GT.M  utility(MUPIP, DSE) on a non encrypted task, might not be forced to setup
+		 * an encrypted environment. For instance, MUPIP JOURNAL -EXTRACT -SHOW=HEADER -FORWARD should
+		 * not error out during the above encryption initialization. Moreover, we shouldn't even be doing
+		 * the below INIT_DB_ENCRYPTION if the above encryption initialization failed. */
+		if (0 == init_status)
+			INIT_DB_ENCRYPTION(reg->dyn.addr->fname, csa, tsd, init_status);
+		if (0 != init_status && (GTM_IMAGE == image_type))
+			GC_RTS_ERROR(init_status, reg->dyn.addr->fname);
+		csa->encrypt_init_status = init_status;
+	}
+#	endif
 	udi->shmid = tsd->shmid;
 	udi->semid = tsd->semid;
 	udi->gt_sem_ctime = tsd->gt_sem_ctime.ctime;
 	udi->gt_shm_ctime = tsd->gt_shm_ctime.ctime;
 	dbsecspc(reg, tsd); 	/* Find db segment size */
-	if (!mupip_jnl_recover)
+	/* get the stats for the database file */
+	FSTAT_FILE(udi->fd, &sb, stat_res);
+	if (-1 == stat_res)
+		rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
+	/* setup new group and permissions if indicated by the security rules.  Use 660 for
+	 * the new mode if it is world writeable.
+	 */
+	gtm_set_group_and_perm(&sb, &group_id, &perm, 0660);
+	if (!have_standalone_access)
 	{
 		if (INVALID_SEMID == udi->semid)
 		{
@@ -320,6 +458,17 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			udi->shmid = INVALID_SHMID;	/* reset shmid so dbinit_ch does not get confused in case we go there */
 			new_dbinit_ipc = TRUE;
 			tsd->semid = udi->semid;
+			/* change group and permissions */
+			semarg.buf = &semstat;
+			if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, IPC_STAT, semarg))
+				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+					  ERR_TEXT, 2, LEN_AND_LIT("Error with database control semctl IPC_STAT1"), errno);
+			if ((-1 != group_id) && (group_id != semstat.sem_perm.gid))
+				semstat.sem_perm.gid = group_id;
+			semstat.sem_perm.mode = perm;
+			if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, IPC_SET, semarg))
+				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+					  ERR_TEXT, 2, LEN_AND_LIT("Error with database control semctl IPC_SET"), errno);
 			semarg.val = GTM_ID;
 			/*
 			 * Following will set semaphore number 2 (=FTOK_SEM_PER_ID - 1)  value as GTM_ID.
@@ -329,15 +478,14 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, SETVAL, semarg))
 				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 					ERR_TEXT, 2, LEN_AND_LIT("Error with database control semctl SETVAL"), errno);
-			/*
-			 * Warning: We must read the sem_ctime using IPC_STAT after SETVAL, which changes it.
+			/* Warning: We must read the sem_ctime using IPC_STAT after SETVAL, which changes it.
 			 *	    We must NOT do any more SETVAL after this. Our design is to use
 			 *	    sem_ctime as creation time of semaphore.
 			 */
 			semarg.buf = &semstat;
 			if (-1 == semctl(udi->semid, FTOK_SEM_PER_ID - 1, IPC_STAT, semarg))
 				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-					ERR_TEXT, 2, LEN_AND_LIT("Error with database control semctl IPC_STAT"), errno);
+					ERR_TEXT, 2, LEN_AND_LIT("Error with database control semctl IPC_STAT2"), errno);
 			tsd->gt_sem_ctime.ctime = udi->gt_sem_ctime = semarg.buf->sem_ctime;
 		} else
 		{
@@ -347,19 +495,33 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 				 */
 				rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
 						ERR_TEXT, 2, LEN_AND_LIT("semid is valid but shmid is invalid"));
+			if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
+				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+					ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl"), errno);
+			else if (shmstat.shm_ctime != tsd->gt_shm_ctime.ctime)
+			{
+				GTM_ATTACH_SHM_AND_CHECK_VERS(vermismatch, shm_setup_ok);
+				if (vermismatch)
+				{
+					GTM_VERMISMATCH_ERROR;
+				} else
+					rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
+						ERR_TEXT, 2, LEN_AND_LIT("shm_ctime does not match"));
+			}
 			semarg.buf = &semstat;
 			if (-1 == semctl(udi->semid, 0, IPC_STAT, semarg))
 				/* file header has valid semid but semaphore does not exist */
 				rts_error(VARLSTCNT(6) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name));
 			else if (semarg.buf->sem_ctime != tsd->gt_sem_ctime.ctime)
-				rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
+			{
+				GTM_ATTACH_SHM_AND_CHECK_VERS(vermismatch, shm_setup_ok);
+				if (vermismatch)
+				{
+					GTM_VERMISMATCH_ERROR;
+				} else
+					rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
 						ERR_TEXT, 2, LEN_AND_LIT("sem_ctime does not match"));
-			if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
-				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-					ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl"), errno);
-			else if (shmstat.shm_ctime != tsd->gt_shm_ctime.ctime)
-				rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
-					ERR_TEXT, 2, LEN_AND_LIT("shm_ctime does not match"));
+			}
 		}
 		/* We already have ftok semaphore of this region, so just plainly do semaphore operation */
 		/* This is the database access control semaphore for any region */
@@ -379,8 +541,8 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
 			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, errno_save);
 		}
-	} else /* for mupip_jnl_recover we were already in mu_rndwn_file and got "semid" semaphore  */
-	{	/* Make sure mu_rndwn_file() has created semaphore for standalone access */
+	} else /* for have_standalone_access we were already in mupip_exit_handler and got "semid" semaphore  */
+	{	/* Make sure mupip_exit_handler() has created semaphore for standalone access */
 		if (INVALID_SEMID == udi->semid || 0 == udi->gt_sem_ctime)
 			GTMASSERT;
 		/* Make sure mu_rndwn_file() has reset shared memory. In pro, just clear it and proceed. */
@@ -390,58 +552,44 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	}
 	sem_incremented = TRUE;
 	if (new_dbinit_ipc)
-	{
-		/* Create new shared memory using IPC_PRIVATE. System guarantees a unique id */
-#ifdef __MVS__
-		if (-1 == (status_l = udi->shmid = shmget(IPC_PRIVATE, ROUND_UP(reg->sec_size, MEGA_BOUND),
-			__IPC_MEGA | IPC_CREAT | RWDALL)))
-#else
+	{	/* Create new shared memory using IPC_PRIVATE. System guarantees a unique id */
 		if (-1 == (status_l = udi->shmid = shmget(IPC_PRIVATE, reg->sec_size, RWDALL | IPC_CREAT)))
-#endif
 		{
-			udi->shmid = status_l = INVALID_SHMID;
+			udi->shmid = (int)INVALID_SHMID;
+			status_l = INVALID_SHMID;
 			rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 				  ERR_TEXT, 2, LEN_AND_LIT("Error with database shmget"), errno);
 		}
 		tsd->shmid = udi->shmid;
 		if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
 			rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl"), errno);
+				ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl IPC_STAT1"), errno);
+		/* change group and permissions */
+		if ((-1 != group_id) && (group_id != shmstat.shm_perm.gid))
+			shmstat.shm_perm.gid = group_id;
+		shmstat.shm_perm.mode = perm;
+		if (-1 == shmctl(udi->shmid, IPC_SET, &shmstat))
+			rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+				  ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl IPC_SET"), errno);
+		/* Warning: We must read the shm_ctime using IPC_STAT after IPC_SET, which changes it.
+		 *	    We must NOT do any more IPC_SET or SETVAL after this. Our design is to use
+		 *	    shm_ctime as creation time of shared memory and store it in file header.
+		 */
+		if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
+			rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+				ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl IPC_STAT2"), errno);
 		tsd->gt_shm_ctime.ctime = udi->gt_shm_ctime = shmstat.shm_ctime;
-	}
-#ifdef DEBUG_DB64
-	status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, next_smseg, SHM_RND));
-	next_smseg = (sm_uc_ptr_t)ROUND_UP((sm_long_t)(next_smseg + reg->sec_size), SHMAT_ADDR_INCS);
-#else
-	status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, 0, SHM_RND));
-#endif
-	if (-1 == status_l)
+		GTM_ATTACH_SHM;
+		shm_setup_ok = TRUE;
+	} else
 	{
-		rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-			  ERR_TEXT, 2, LEN_AND_LIT("Error attaching to database shared memory"), errno);
-	}
-	csa->nl = (node_local_ptr_t)csa->db_addrs[0];
-	/* If shared memory is already initialized, do VERMISMATCH check BEFORE referencing any other fields in shared memory. */
-	if (!new_dbinit_ipc && csa->nl->glob_sec_init && memcmp(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1))
-	{	/* Copy csa->nl->now_running into a local variable before passing to rts_error() due to the following issue.
-		 * In VMS, a call to rts_error() copies only the error message and its arguments (as pointers) and
-		 *  transfers control to the topmost condition handler which is dbinit_ch() in this case. dbinit_ch()
-		 *  does a PRN_ERROR only for SUCCESS/INFO (VERMISMATCH is neither of them) and in addition
-		 *  nullifies csa->nl as part of its condition handling. It then transfers control to the next level condition
-		 *  handler which does a PRN_ERROR but at that point in time, the parameter csa->nl->now_running is no longer
-		 *  accessible and hence no parameter substitution occurs (i.e. the error message gets displayed with plain !ADs).
-		 * In UNIX, this is not an issue since the first call to rts_error() does the error message
-		 *  construction before handing control to the topmost condition handler. But it does not hurt to do the copy.
-		 */
-		assert(strlen(csa->nl->now_running) < sizeof(now_running));
-		memcpy(now_running, csa->nl->now_running, sizeof(now_running));
-		now_running[sizeof(now_running) - 1] = '\0';	/* protection against bad values of csa->nl->now_running */
-		/* for DSE, change VERMISMATCH to be INFO (instead of the more appropriate WARNING) as we want the
-		 * condition handler (dbinit_ch) to do a CONTINUE (which it does only for severity levels SUCCESS or INFO)
-		 * and resume processing in gvcst_init.c instead of detaching from shared memory.
-		 */
-		rts_error(VARLSTCNT(8) MAKE_MSG_TYPE(ERR_VERMISMATCH, ((DSE_IMAGE != image_type) ? ERROR : INFO)), 6,
-			DB_LEN_STR(reg), gtm_release_name_len, gtm_release_name, LEN_AND_STR(now_running));
+		GTM_ATTACH_SHM_AND_CHECK_VERS(vermismatch, shm_setup_ok);
+		if (vermismatch)
+		{
+			GTM_VERMISMATCH_ERROR;
+		} else if (!shm_setup_ok)
+			rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
+				  ERR_TEXT, 2, LEN_AND_LIT("shared memory is invalid"));
 	}
 	csa->critical = (mutex_struct_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
 	assert(((INTPTR_T)csa->critical & 0xf) == 0); 			/* critical should be 16-byte aligned */
@@ -492,9 +640,14 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		csa->db_addrs[1] = csa->db_addrs[0] + stat_buf.st_size - 1;
 		csd = csa->hdr = (sgmnt_data_ptr_t)csa->db_addrs[0];
 	}
-	if (!csa->nl->glob_sec_init)
+	/* If shm_setup_ok is TRUE, we are guaranteed that vermismatch is FALSE.  Therefore, we can safely
+	 * dereference csa->nl->glob_sec_init without worrying about whether or not it could be at a different
+	 * offset than the current version.
+	 */
+	if (shm_setup_ok && !csa->nl->glob_sec_init)
 	{
 		assert(new_dbinit_ipc);
+		assert(!vermismatch);
 		if (is_bg)
 		{
 			memcpy(csd, tsd, sizeof(sgmnt_data));
@@ -550,8 +703,8 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		{
 			csd->trans_hist.early_tn = csd->trans_hist.curr_tn;
 			csd->max_update_array_size = csd->max_non_bm_update_array_size
-				= (int4)ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE);
-			csd->max_update_array_size += ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE);
+				= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
+			csd->max_update_array_size += (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE));
 			/* add current db_csh counters into the cumulative counters and reset the current counters */
 #			define TAB_DB_CSH_ACCT_REC(COUNTER, DUMMY1, DUMMY2)		\
 				csd->COUNTER.cumul_count += csd->COUNTER.curr_count;	\
@@ -623,6 +776,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		if (FALSE == is_gdid_gdid_identical(&FILE_INFO(reg)->fileid, &csa->nl->unique_id.uid) ||
 						csa->nl->creation_date_time4 != csd->creation_time4)
 		{
+			assert(dse_running);
 			send_msg(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
 				ERR_TEXT, 2, LEN_AND_LIT("Fileid of database file doesn't match fileid in shared memory"));
 			rts_error(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
@@ -639,6 +793,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		 * If not its a serious condition. Error out. */
 		if (FALSE == is_gdid_stat_identical(&csa->nl->unique_id.uid, &stat_buf))
 		{
+			assert(dse_running);
 			send_msg(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
 				ERR_TEXT, 2, LEN_AND_LIT("Database filename and fileid in shared memory are not in sync"));
 			rts_error(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
@@ -748,7 +903,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	++csa->nl->ref_cnt;	/* This value is changed under control of the init/rundown semaphore only */
 	assert(!csa->ref_cnt);	/* Increment shared ref_cnt before private ref_cnt increment. */
 	csa->ref_cnt++;		/* Currently journaling logic in gds_rundown() in VMS relies on this order to detect last writer */
-	if (!mupip_jnl_recover)
+	if (!have_standalone_access)
 	{
 		/* Release control lockout now that it is init'd */
 		if (0 != (errno_save = do_semop(udi->semid, 0, -1, SEM_UNDO)))
@@ -762,6 +917,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	/* Release ftok semaphore lock so that any other ftok conflicted database can continue now */
 	if (!ftok_sem_release(reg, FALSE, FALSE))
 		rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
+	RESTORE_INTRPT_OK_STATE;
 	/* Do the per process initialization of mutex stuff */
 	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
 	if (!mutex_per_process_init_pid)

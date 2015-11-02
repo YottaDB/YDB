@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,6 @@ block_index t_create (
 		tp_cw_list(&cse);
 		assert(gv_target);
 		cse->blk_target = gv_target;
-		gv_target->write_local_tn = local_tn;
 	}
 
 	cse->mode = gds_t_create;

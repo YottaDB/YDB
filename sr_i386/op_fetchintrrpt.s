@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -25,7 +25,7 @@
 .extern	neterr_pending
 
 	.text
-.extern	fetch
+.extern	gtm_fetch
 .extern	gvcmz_neterr
 .extern	outofband_clear
 .extern	async_action
@@ -34,7 +34,7 @@
 ENTRY op_fetchintrrpt
 	movl	frame_pointer,%edx
 	popl	msf_mpc_off(%edx)
-	call	fetch
+	call	gtm_fetch
 	popl	%eax
 	leal	(%esp,%eax,4),%esp
 	cmpb	$0,neterr_pending

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006, 2007 Fidelity Information Services, Inc	;
+;	Copyright 2006, 2009 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -13,34 +13,43 @@ LOAD
 	n abs,contents,rel,xregs,xsegs,reglist,map,$et
 	i debug s $et="b"
 	e  s $et="g ABORT^GDE:($p($p($zs,"","",3),""-"")'=""%GDE"") u io w !,$p($zs,"","",3,999),! h"
-	; "The below check for OS390 needs to be changed when z/OS port is resurrected"
 	; if zchset is UTF-8 open in raw mode to avoid BADCHAR errors
-	s abs=1,update=0,chset=$SELECT($ZV["OS390":"ISO8859-1",$ZV["VMS":"",$ZCHSET="UTF-8":"M",1:"")
+	; For OS390 aka z/OS, use BINARY mode
+	s abs=1,update=0,chset=$SELECT($ZV["OS390":"BINARY",$ZV["VMS":"",$ZCHSET="UTF-8":"M",1:"")
 	o file:(exc="g badfile":rewind:recordsize=SIZEOF("dsk_blk"):readonly:fixed:blocksize=SIZEOF("dsk_blk"):ichset=chset)
 	u file r rec
 	i debug u @useio
 ; header
 	s label=$ze(rec,1,12)
+	s mach=$p($zver," ",4)
+	s seghasencrflag=FALSE
+	if ($e(label,0,9)="GTCGBDUNX"),$e(label,$l(label)-1,99)>5 s seghasencrflag=TRUE
+	set v534=0
+	i (label="GTCGBDUNX105")!((label="GTCGBDUNX005")&(mach="IA64")) s label=hdrlab,v534=1,update=1   ;autoconvert
+	i (v534=1) n SIZEOF d v534init
+	set v533=0
+	i (gtm64=TRUE),(label="GTCGBDUNX006") s label=hdrlab,v533=1,update=1   ;autoconvert
+	i (v533=1) n SIZEOF d v533init
 	set v532=0
-	i (gtm64="true"),(label="GTCGBLDIR008")!(label="GTCGBDUNX005") s label=hdrlab,v532=1,update=1	;autoconvert
-	i (v532=1),($p($zver," ",4)'="IA64") n gtm64 s gtm64="false"
-	i (v532=1),($p($zver," ",4)'="IA64") n SIZEOF d v532init
+	i (label="GTCGBLDIR008")!(label="GTCGBDUNX005") s label=hdrlab,v532=1,update=1	;autoconvert
+	i (v532=1),(mach'="IA64") n gtm64 s gtm64=FALSE
+	i (v532=1),(mach'="IA64") n SIZEOF d v532init
 	set v5ft1=0
-	i (label="GTCGBLDIR008")!(label="GTCGBDUNX004") s label=hdrlab,v5ft1=1,update=1			;autoconvert
-	i v5ft1=1 n gtm64 s gtm64="false"
+	i (label="GTCGBLDIR008")!(label="GTCGBDUNX004") s label=hdrlab,v5ft1=1,update=1 ;autoconvert
+	i v5ft1=1 n gtm64 s gtm64=FALSE
 	i v5ft1=1 n SIZEOF d v5ft1init
 	set v44=0
-	i (label="GTCGBLDIR007")!(label="GTCGBDUNX003") s label=hdrlab,v44=1,update=1			;autoconvert
-	i v44=1 n gtm64 s gtm64="false"
+	i (label="GTCGBLDIR007")!(label="GTCGBDUNX003") s label=hdrlab,v44=1,update=1	;autoconvert
+	i v44=1 n gtm64 s gtm64=FALSE
 	i v44=1 n MAXNAMLN,MAXSEGLN,MAXREGLN,SIZEOF d v44init
 	s v30=0
-	i (label="GTCGBLDIR006")!(label="GTCGBDUNX002") s label=hdrlab,v30=4,update=1			;autoconvert
-	i v30=4 n gtm64 s gtm64="false"
-	i label'=hdrlab d cretmps,CONVERT^GDEOGET,verify s update=1 q					;autoconvert
+	i (label="GTCGBLDIR006")!(label="GTCGBDUNX002") s label=hdrlab,v30=4,update=1 ;autoconvert
+	i v30=4 n gtm64 s gtm64=FALSE
+	i label'=hdrlab d cretmps,CONVERT^GDEOGET,verify s encryptsupported=FALSE,update=1 q ;autoconvert
 	s filesize=$$bin2num($ze(rec,13,16))
 	s abs=abs+SIZEOF("gd_header")
 ; contents
-	i (gtm64="true") d
+	i (gtm64=TRUE) d
 	. i $ze(rec,abs,abs+7)'=$c(0,0,0,0,0,0,0,0) zm gdeerr("INPINTEG")						; filler
 	. s abs=abs+8
 	e  d
@@ -51,7 +60,7 @@ LOAD
 	s contents("regioncnt")=$$bin2num($ze(rec,abs,abs+1)),abs=abs+2
 	s contents("segmentcnt")=$$bin2num($ze(rec,abs,abs+1)),abs=abs+2
 	i $ze(rec,abs,abs+1)'=$tr($j("",2)," ",ZERO) zm gdeerr("INPINTEG")				; filler
-	i (gtm64="true") d
+	i (gtm64=TRUE) d
 	. s abs=abs+6											; including padding
 	. s contents("maps")=$$bin2num($ze(rec,abs,abs+7)),abs=abs+8
 	. s contents("regions")=$$bin2num($ze(rec,abs,abs+7)),abs=abs+8
@@ -107,10 +116,12 @@ LOAD
 	i 'v44&'v30 d tmpreg("STDNULLCOLL")
 	f i=2:1:$l(accmeth,"\") s am=$p(accmeth,"\",i) d
 	. i am="MM" d:$zl(rec)-(rel-1)<3 nextrec i +$ze(rec,rel,rel+2)'=2 d tmpmm q
-	. f s="ACCESS_METHOD","ALLOCATION","BLOCK_SIZE","BUCKET_SIZE","DEFER","EXTENSION_COUNT","FILE_TYPE" d tmpseg(am,s)
-	. f s="GLOBAL_BUFFER_COUNT","LOCK_SPACE" d tmpseg(am,s)
+	. f s="ACCESS_METHOD","ALLOCATION","BLOCK_SIZE","BUCKET_SIZE","DEFER" d tmpseg(am,s)
+	. i (seghasencrflag=TRUE) d tmpseg(am,"ENCRYPTION_FLAG")
+	. f s="EXTENSION_COUNT","FILE_TYPE","GLOBAL_BUFFER_COUNT","LOCK_SPACE" d tmpseg(am,s)
 	. i 'v30 d tmpseg(am,"RESERVED_BYTES")					;autoconvert, can be condensed someday
 	. d tmpseg(am,"WINDOW_SIZE")
+	.
 	c file
 ; resolve
 	s s=""
@@ -118,7 +129,9 @@ LOAD
 	f  s s=$o(regs(s)) q:'$l(s)  zm:'$d(xsegs(regs(s,"DYNAMIC_SEGMENT"))) gdeerr("INPINTEG") d
 	. s regs(s,"DYNAMIC_SEGMENT")=xsegs(regs(s,"DYNAMIC_SEGMENT"))
 	f  s s=$o(segs(s)) q:'$l(s)  s am=segs(s,"ACCESS_METHOD") d
-	. s x="" f  s x=$o(segs(s,x)) q:x=""  i x'="FILE_NAME",'$l(tmpseg(am,x)) zm:segs(s,x) gdeerr("INPINTEG") s segs(s,x)=""
+	. s x=""
+	. f  s x=$o(segs(s,x)) q:x=""  d
+	. . i x'="FILE_NAME",'$l(tmpseg(am,x)) zm:segs(s,x) gdeerr("INPINTEG") s segs(s,x)=""
 	; fall through !
 verify:	s x=$$ALL^GDEVERIF
 	i 'x zm gdeerr("INPINTEG")
@@ -144,7 +157,7 @@ map:
 	s s=$ze(rec,rel,rel+SIZEOF("mident")-1),rel=rel+SIZEOF("mident")
 	s x=$zf(s,$c(0))-2 i x=-2 s x=SIZEOF("mident")
 	s s=$ze(s,1,x)
-	i (gtm64="true") s x=$$bin2num($ze(rec,rel,rel+3)),rel=rel+8 ; read 4 bytes, but skip 8 bytes
+	i (gtm64=TRUE) s x=$$bin2num($ze(rec,rel,rel+3)),rel=rel+8 ; read 4 bytes, but skip 8 bytes
 	e  s x=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	s map(s)=x
 	s reglist(x)="",x=x-contents("regions")
@@ -159,12 +172,12 @@ region:
 	s s=$ze(rec,rel,rel+l-1),rel=rel+MAXREGLN,xregs(abs-1-SIZEOF("gd_header"))=s
 	s regs(s,"KEY_SIZE")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s regs(s,"RECORD_SIZE")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
-	i (gtm64="true") s regs(s,"DYNAMIC_SEGMENT")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+8  ; read 4 bytes, but skip 8
+	i (gtm64=TRUE) s regs(s,"DYNAMIC_SEGMENT")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+8  ; read 4 bytes, but skip 8
 	e  s regs(s,"DYNAMIC_SEGMENT")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	s x=regs(s,"DYNAMIC_SEGMENT")-contents("segments")
 	i x#(SIZEOF("gd_segment")-v30) zm gdeerr("INPINTEG")						; autoconvert
 	i x\(SIZEOF("gd_segment")-v30)'<contents("segmentcnt") zm gdeerr("INPINTEG")			; autoconvert
-	i (gtm64="true") d
+	i (gtm64=TRUE) d
 	. i $ze(rec,rel,rel+7)'=$c(0,0,0,0,0,0,0,0) zm gdeerr("INPINTEG")				; static segment
 	. s rel=rel+8
 	e  d
@@ -192,7 +205,7 @@ region:
 	s l=$$bin2num($ze(rec,rel)),rel=rel+1 ;jnl_file_len
 	s regs(s,"FILE_NAME")=$ze(rec,rel,rel+l-1),rel=rel+SIZEOF("file_spec")
 	i $ze(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) zm gdeerr("INPINTEG")				; reserved
-	i (gtm64="true") s rel=rel+12
+	i (gtm64=TRUE) s rel=rel+12
 	e  s rel=rel+8
 	s abs=abs+SIZEOF("gd_region")
 	q
@@ -210,7 +223,7 @@ segment:
 	s segs(s,"BLOCK_SIZE")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s segs(s,"EXTENSION_COUNT")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s segs(s,"ALLOCATION")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
-	i (gtm64="true") d
+	i (gtm64=TRUE) d
 	. i $ze(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) zm gdeerr("INPINTEG")			; reserved for clb
 	. s rel=rel+12						; padding
 	e  d
@@ -232,7 +245,7 @@ segment:
 	i 'v30 s segs(s,"RESERVED_BYTES")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4		;autoconvert
 	e  s segs(s,"RESERVED_BYTES")=0
 	s rel=rel+4										; access method already processed
-	i (gtm64="true") d
+	i (gtm64=TRUE) d
 	. i $ze(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) zm gdeerr("INPINTEG")			; file_cntl pointer
 	. s rel=rel+8
 	. i $ze(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) zm gdeerr("INPINTEG")			; repl_list pointer
@@ -242,6 +255,12 @@ segment:
 	. s rel=rel+4
 	. i $ze(rec,rel,rel+3)'=$tr($j("",4)," ",ZERO) zm gdeerr("INPINTEG")			; repl_list pointer
 	. s rel=rel+4
+	; If the gld file has the encrytion flag, read it. Also read only if
+	; the current platform is encrpytion enabled. Otherwise default to 0
+	s segs(s,"ENCRYPTION_FLAG")=$S(((encsupportedplat=TRUE)&(seghasencrflag=TRUE)):$$bin2num($ze(rec,rel,rel+3)),1:0)
+	i (seghasencrflag=TRUE) d
+	. s rel=rel+4
+        . if (gtm64=TRUE) s rel=rel+4 ; Padding bytes for 64 bit platforms
 	s abs=abs+SIZEOF("gd_segment")-v30
 	q
 gderead:(max)
@@ -309,6 +328,7 @@ cretmps:
 	s tmpseg("BG","RESERVED_BYTES")=0
 	s tmpseg("BG","LOCK_SPACE")=40
 	s tmpseg("BG","WINDOW_SIZE")=""
+	s tmpseg("BG","ENCRYPTION_FLAG")=0
 	d tmpmm
 	s tmpseg("USER","ACCESS_METHOD")="USER"
 	s tmpseg("USER","ALLOCATION")=""
@@ -321,6 +341,7 @@ cretmps:
 	s tmpseg("USER","RESERVED_BYTES")=0
 	s tmpseg("USER","LOCK_SPACE")=""
 	s tmpseg("USER","WINDOW_SIZE")=""
+	s tmpseg("USER","ENCRYPTION_FLAG")=0
 	s tmpacc="BG"
 	q
 tmpmm:	s tmpseg("MM","ACCESS_METHOD")="MM"
@@ -334,6 +355,7 @@ tmpmm:	s tmpseg("MM","ACCESS_METHOD")="MM"
 	s tmpseg("MM","RESERVED_BYTES")=0
 	s tmpseg("MM","LOCK_SPACE")=40
 	s tmpseg("MM","WINDOW_SIZE")=""
+	s tmpseg("MM","ENCRYPTION_FLAG")=0
 	q
 maktseg:	s segs(defseg,"FILE_NAME")=defdb
 	s seg="segs(defseg)",x=""
@@ -387,3 +409,37 @@ v532init:
 	i ver'="VMS" s SIZEOF("blk_hdr")=16
 	e  s SIZEOF("blk_hdr")=7
 	q
+v533init:
+	s SIZEOF("am_offset")=324
+	s SIZEOF("file_spec")=256
+	s SIZEOF("gd_header")=16
+	s SIZEOF("gd_contents")=44
+	s SIZEOF("gd_map")=36
+	s SIZEOF("gd_region")=332
+	s SIZEOF("gd_segment")=340
+	s SIZEOF("mident")=32
+	s SIZEOF("rec_hdr")=3
+	s SIZEOF("dsk_blk")=512
+	s SIZEOF("max_str")=32767
+	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32
+	s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
+	i ver'="VMS" s SIZEOF("blk_hdr")=16
+	e  s SIZEOF("blk_hdr")=7
+	q
+v534init:
+        s SIZEOF("am_offset")=332
+        s SIZEOF("file_spec")=256
+        s SIZEOF("gd_header")=16
+        s SIZEOF("gd_contents")=80
+        s SIZEOF("gd_map")=40
+        s SIZEOF("gd_region")=344
+        s SIZEOF("gd_segment")=352
+        s SIZEOF("mident")=32
+        s SIZEOF("blk_hdr")=16
+        s SIZEOF("rec_hdr")=3
+        s SIZEOF("dsk_blk")=512
+        s SIZEOF("max_str")=32767
+        s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32   ; maximum name length allowed is 31 characters
+        s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
+        q
+

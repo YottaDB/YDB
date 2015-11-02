@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,7 @@
 
 #define	EXTTXT(T,L)							\
 {									\
-	actual = real_len(L, T);					\
+	actual = real_len(L, (uchar_ptr_t)T);				\
 	memcpy (&murgbl.extr_buff[extract_len], T, actual);		\
 	extract_len += actual;						\
 	murgbl.extr_buff[extract_len++] = '\\';				\
@@ -347,6 +347,11 @@ typedef struct jnl_ctl_list_struct
 	struct reg_ctl_list_struct	*reg_ctl;		/* Back pointer to this region's reg_ctl_list */
 	struct jnl_ctl_list_struct 	*next_gen;		/* next generation journal file */
 	struct jnl_ctl_list_struct 	*prev_gen;		/* previous generation journal file */
+#	ifdef GTM_CRYPT
+	gtmcrypt_key_t			encr_key_handle;
+	boolean_t			is_same_hash_as_db;	/* to indicate whether the db and the jnl file share
+								 * the same encryption key. */
+#	endif
 } jnl_ctl_list;
 
 

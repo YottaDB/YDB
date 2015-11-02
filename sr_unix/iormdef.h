@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@
 
 #define	ONE_COMMA			"1,"
 #define	ONE_COMMA_UNAVAILABLE		"1,Resource temporarily unavailable"
+#define	ONE_COMMA_DEV_DET_EOF		"1,Device detected EOF"
 
 #define	DEF_RM_PADCHAR		' '	/* SPACE */
 
@@ -110,9 +111,10 @@ typedef struct
 	unsigned char	*inbuf_top;	/* Last char (+1) in inbuf */
 	unsigned char	*outbuf;	/* Output buffer area */
 	FILE		*filstr;
+	long		pipe_buff_size;
 }d_rm_struct;	/*  rms		*/
 
-#ifdef __MVS__
+#ifdef KEEP_zOS_EBCDIC
 #define NATIVE_NL	0x15		/* EBCDIC */
 #else
 #define NATIVE_NL	'\n'		/* ASCII */

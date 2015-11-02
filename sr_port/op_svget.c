@@ -1,5 +1,5 @@
 /****************************************************************
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,9 @@
 #include "error_trap.h"
 #include "setzdir.h"
 #include "get_reference.h"
+#ifdef UNIX
+#include "iormdef.h"
+#endif
 
 #define ESC_OFFSET		4
 #define MAX_COMMAND_LINE_LENGTH	255
@@ -107,6 +110,9 @@ void op_svget(int varnum, mval *v)
 	int 		count;
 	unsigned int	ucount;
 	char		*c1, *c2;
+#ifdef UNIX
+ 	d_rm_struct	*d_rm;
+#endif
 
 	error_def(ERR_UNIMPLOP);
 	error_def(ERR_TEXT);
@@ -207,6 +213,17 @@ void op_svget(int varnum, mval *v)
 							   (i.e. processed not actual command line) */
 			break;
 		case SV_ZEOF:
+#ifdef UNIX
+			if (rm == io_curr_device.in->type)
+			{
+				d_rm = (d_rm_struct *)io_curr_device.in->dev_sp;
+				if (RM_READ != d_rm->lastop)
+				{
+					*v = literal_zero;
+					break;
+				}
+			}
+#endif
 			*v = io_curr_device.in->dollar.zeof ? literal_one : literal_zero;
 			break;
 		case SV_ZQUIT:
@@ -357,15 +374,15 @@ void op_svget(int varnum, mval *v)
 			*v = dollar_ztexit;
 			break;
 		case SV_ZALLOCSTOR:
-			ucount = totalAlloc + totalAllocGta;
+			ucount = (unsigned int)(totalAlloc + totalAllocGta);
 			MV_FORCE_UMVAL(v, ucount);
 			break;
 		case SV_ZREALSTOR:
-			ucount = totalRmalloc + totalRallocGta;
+			ucount = (unsigned int)(totalRmalloc + totalRallocGta);
 			MV_FORCE_UMVAL(v, ucount);
 			break;
 		case SV_ZUSEDSTOR:
-			ucount = totalUsed + totalUsedGta;
+			ucount = (unsigned int)(totalUsed + totalUsedGta);
 			MV_FORCE_UMVAL(v, ucount);
 			break;
 		case SV_ZCHSET:

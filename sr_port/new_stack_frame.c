@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	error_def(ERR_STACKCRIT);
 
 	msp_save = msp;
-	sf = (stack_frame *) (msp -= sizeof(stack_frame));
+	sf = (stack_frame *)(msp -= sizeof(stack_frame));
    	if (msp <= stackwarn)
    	{
 		if (msp <= stacktop)
@@ -39,7 +39,7 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
    		} else
 			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
    	}
-	assert((unsigned char *) msp < stackbase);
+	assert((unsigned char *)msp < stackbase);
 	sf->old_frame_pointer = frame_pointer;
 	sf->rvector = rtn_base;
 	sf->vartab_ptr = (char *)VARTAB_ADR(rtn_base);
@@ -48,14 +48,14 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	sf->mpc = transfer_addr;
 	sf->flags = 0;
 #ifdef HAS_LITERAL_SECT
-	sf->literal_ptr = (int4 *)0;
+	sf->literal_ptr = (int4 *)NULL;
 #endif
 	sf->temp_mvals = sf->rvector->temp_mvals;
 	msp -= x1 = rtn_base->temp_size;
 	sf->temps_ptr = msp;
 	sf->type = SFT_COUNT;
-	msp -= x2 = rtn_base->vartab_len * USIZEOF(mval *);
-	sf->l_symtab = (mval **) msp;
+	msp -= x2 = rtn_base->vartab_len * USIZEOF(ht_ent_mname *);
+	sf->l_symtab = (ht_ent_mname **)msp;
    	if (msp <= stackwarn)
    	{
 		if (msp <= stacktop)

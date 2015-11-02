@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,6 @@
 /* gtcm_ping.c - routines providing the capability of pinging remote
  * 		 machines.
  */
-
 #include "mdef.h"
 
 #include "gtm_stdio.h"
@@ -33,12 +32,14 @@
 #endif
 
 #include "gtm_inet.h"
+#ifndef __MVS__
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#endif
 #include "omi.h"
 
-#if defined(__CYGWIN__) && !defined(ICMP_ECHO)
+#if (defined(__CYGWIN__) || defined(__MVS__)) && !defined(ICMP_ECHO)
 /* Note that we may actually need to use Windows sockets for icmp for now */
 
 struct icmp
@@ -63,7 +64,26 @@ struct icmp
 #define ICMP_MINLEN 8
 #endif
 
-#endif /* __CYGWIN__ */
+#ifndef IP_MAXPACKET
+#define IP_MAXPACKET 65535
+#endif
+#endif /* __CYGWIN__ || __MVS */
+
+#ifdef __MVS__
+struct ip
+  {
+    unsigned int ip_v:4;		/* version */
+    unsigned int ip_hl:4;		/* header length */
+    unsigned char ip_tos;		/* type of service */
+    u_short ip_len;			/* total length */
+    u_short ip_id;			/* identification */
+    u_short ip_off;			/* fragment offset field */
+    unsigned char ip_ttl;		/* time to live */
+    unsigned char ip_p;			/* protocol */
+    u_short ip_sum;			/* checksum */
+    struct in_addr ip_src, ip_dst;	/* source and dest address */
+  };
+#endif
 
 static int pingsock = -1, ident;
 static char pingrcv[IP_MAXPACKET], pingsend[256];
@@ -191,7 +211,8 @@ int get_ping_rsp(void)
 		continue;
 	}
 	ip = (struct ip *) pingrcv;
-	icp = (struct icmp *)(pingrcv + (ip->ip_hl << 2));
+	icp = (struct icmp *)(pingrcv + ((ip->ip_hl) << 2));
+	/* xxxxxxx icp = (struct icmp *)(pingrcv + (ip->ip_hl << 2)); */
 #ifdef DEBUG_PING
 	{
 		char *host;

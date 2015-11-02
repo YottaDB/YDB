@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,9 +106,10 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 	error_def(ERR_SYSCALL);
 
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
-	/* if it is a pipe and it's the stdout returned then we need to get the read file descriptor
-	   from rm_ptr->read_fildes */
-	if (rm_ptr->pipe && rm_ptr->read_fildes)
+	/* If it is a pipe and it's the stdout returned then we need to get the read file descriptor from rm_ptr->read_fildes.
+	 * Additionally, z/OS saves its FIFO read file descriptors in read_fildes, so retrieve it.
+	 */
+	if ((rm_ptr->pipe ZOS_ONLY(|| rm_ptr->fifo)) && (FD_INVALID != rm_ptr->read_fildes))
 		fildes = rm_ptr->read_fildes;
 	else
 		fildes = rm_ptr->fildes;
@@ -166,15 +167,15 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 
 	assert (io_ptr->state == dev_open);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
-
-	/* if it is a pipe and it's the stdout returned then we need to get the read file descriptor
-	   from rm_ptr->read_fildes */
-	if (rm_ptr->pipe && rm_ptr->read_fildes)
+	/* If it is a pipe and it's the stdout returned then we need to get the read file descriptor from rm_ptr->read_fildes.
+	 * Additionally, z/OS saves its FIFO read file descriptors in read_fildes, so retrieve it.
+	 */
+	if ((rm_ptr->pipe ZOS_ONLY(|| rm_ptr->fifo)) && (FD_INVALID != rm_ptr->read_fildes))
 		fildes = rm_ptr->read_fildes;
 	else
 		fildes = rm_ptr->fildes;
 
-	assert(gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE);
+	assert(gtm_utf8_mode ? (IS_UTF_CHSET(io_ptr->ichset)) : FALSE);
 	assert(rm_ptr->fixed);
 	bytes2read = rm_ptr->recordsize;
 	bytes_read = chars_read = 0;
@@ -182,7 +183,7 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 	errno = status = 0;
 	rm_ptr->inbuf_pos = rm_ptr->inbuf_off = rm_ptr->inbuf;
 	chset = io_ptr->ichset;
-	assert(CHSET_M != chset);
+	assert(IS_UTF_CHSET(chset));
 	if (!rm_ptr->done_1st_read)
 	{
 		/* need to check for BOM *//* smw do this later perhaps or first */

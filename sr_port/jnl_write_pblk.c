@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,10 +58,11 @@ void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer)
 	 */
 	assert(buffer->bsiz <= csa->hdr->blk_size || dse_running);
 	pblk_record.bsiz = MIN(csa->hdr->blk_size, buffer->bsiz);
-	assert((pblk_record.bsiz == buffer->bsiz) || (cse->blk_checksum == jnl_get_checksum((uint4 *)buffer, pblk_record.bsiz)));
+	assert((pblk_record.bsiz == buffer->bsiz) ||
+	       (cse->blk_checksum == jnl_get_checksum((uint4 *)buffer, NULL, pblk_record.bsiz)));
 	assert(pblk_record.bsiz >= sizeof(blk_hdr) || dse_running);
 	pblk_record.ondsk_blkver = cse->ondsk_blkver;
-	tmp_jrec_size = FIXED_PBLK_RECLEN + pblk_record.bsiz + JREC_SUFFIX_SIZE;
+	tmp_jrec_size = (int)FIXED_PBLK_RECLEN + pblk_record.bsiz + JREC_SUFFIX_SIZE;
 	jrec_size = ROUND_UP2(tmp_jrec_size, JNL_REC_START_BNDRY);
 	zero_len = jrec_size - tmp_jrec_size;
 	blk_trailer.buff = local_buff + (JNL_REC_START_BNDRY - zero_len);

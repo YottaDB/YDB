@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,15 +11,16 @@
 
 #include "mdef.h"
 
-#include "gtm_ipc.h"
 #include <sys/shm.h>
 #include <errno.h>
+#include <sys/sem.h>
+
+#include "gtm_ipc.h"
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_inet.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
-#include <sys/sem.h>
 #include "gtm_sem.h"
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
@@ -222,6 +223,7 @@ boolean_t validate_replpool_shm_entry(char *entry, replpool_id_ptr_t replpool_id
 	shm_parms		*parm_buff;
 	int			fd;
 	struct stat		st_buff;
+	int			rc;
 
 	error_def(ERR_MUNOTALLSEC);
 	error_def(ERR_REPLACCSEM);
@@ -281,13 +283,13 @@ boolean_t validate_replpool_shm_entry(char *entry, replpool_id_ptr_t replpool_id
 		 * for future enhancement. - Layek - 5/1/1.
 		 */
 		OPENFILE(replpool_id->instfilename, O_RDONLY, fd);	/* check if we can open it */
-		if (-1 == fd)
+		if (FD_INVALID == fd)
 		{
 			shmdt((void *)start_addr);
 			free(parm_buff);
 			return FALSE;
 		}
-		close(fd);
+		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		shmdt((void *)start_addr);
 		free(parm_buff);
 		return TRUE;

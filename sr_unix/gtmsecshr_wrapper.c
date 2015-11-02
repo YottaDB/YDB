@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,18 +9,29 @@
  *								*
  ****************************************************************/
 
+#include "mdef.h"
+/* We want system malloc, not gtm_malloc (which comes from mdef.h --> mdefsp.h).  Since gtmsecshr_wrapper runs as root,
+ * using the system malloc will increase security over using gtm_malloc.  Additionally, by not using gtm_malloc, we
+ * are reducing code bloat.
+ */
+#undef malloc
+#include <sys/un.h>
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_syslog.h"
+#include "main_pragma.h"
+#ifndef __MVS__
 #include <malloc.h>
+#endif
 
 #define ROOTUID 0
 #define ROOTGID 0
 
 #define MAX_ENV_VAR_VAL_LEN 1024
 #define MAX_ALLOWABLE_LEN 256
+#define MAX_SOCKFILE_NAME_LEN 25
 
 #define OVERWRITE 1
 
@@ -28,6 +39,10 @@
 #define GTM_TMP "gtm_tmp"
 #define GTM_DIST "gtm_dist"
 #define GTM_DBGLVL "gtmdbglvl"
+#ifdef __MVS__
+#define GTM_ZOS_AUTOCVT "_BPXK_AUTOCVT"
+#define GTM_ZOS_AUTOCVT_ON "ON"
+#endif
 
 #define SUB_PATH_TO_GTMSECSHR "/gtmsecshrdir/gtmsecshr"
 #define	GTMSECSHR_BASENAME "/gtmsecshr"
@@ -60,9 +75,9 @@ int gtm_setenv(char * env_var_name, char * env_var_val, int overwrite)
 	char *env_var_ptr;
 	int len;
 
-	len = strlen(env_var_name) + strlen("=") + strlen(env_var_val) + 1;
+	len = STRLEN(env_var_name) + STRLEN("=") + STRLEN(env_var_val) + 1;
 
-	env_var_ptr = (char *) malloc(len);
+	env_var_ptr = (char *)malloc(len);
 	if (NULL == env_var_ptr)
 		return -1;
 
@@ -101,7 +116,7 @@ int gtm_clearenv()
                 eq = strchr(*p, '=');
                 if (NULL != eq)
                 {
-			len = eq - *p;
+			len = (int)(eq - *p);
 			if (MAX_ENV_NAME_LEN > len)
 			{
                         	memcpy(env_var_name, *p, len);
@@ -131,6 +146,9 @@ int main()
 	int gtm_log_exists = 0;
 	int gtm_tmp_exists = 0;
 	int gtm_dbglvl_exists = 0;
+
+	/* used to get size of sockaddr_un struct used to limit gtm_tmp size */
+	struct sockaddr_un	token_socket;
 
 	openlog("GTMSECSHRINIT", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
 
@@ -172,7 +190,7 @@ int main()
 
 	if (env_var_ptr = getenv(GTM_TMP))
 	{
-		if (MAX_ALLOWABLE_LEN < strlen(env_var_ptr))
+		if (sizeof(token_socket.sun_path) < (strlen(env_var_ptr) + MAX_SOCKFILE_NAME_LEN))
 		{
 			syslog(LOG_USER | LOG_INFO, "gtm_tmp env var too long. gtmsecshr will not be started.\n");
 			ret = -1;
@@ -195,6 +213,13 @@ int main()
 			strcpy(gtm_dbglvl_val, env_var_ptr);
 		}
 	}
+
+#ifdef __MVS__
+	if (!(env_var_ptr = getenv(GTM_ZOS_AUTOCVT)))
+	{
+		syslog(LOG_USER | LOG_INFO, "_BPXK_AUTOCVT is not set, forcing autoconversion\n");
+	}
+#endif
 
 	if (!ret)
 	{	/* clear all */
@@ -239,6 +264,14 @@ int main()
 				ret = -1;
 			}
 		}
+#ifdef __MVS__
+		status = gtm_setenv(GTM_ZOS_AUTOCVT, GTM_ZOS_AUTOCVT_ON, OVERWRITE);
+		if (status)
+		{
+			syslog(LOG_USER | LOG_INFO,
+				"setenv for _BPXK_AUTOCVT failed. gtmsecshr logs may contain mixed ASCII and EBCDIC.\n");
+		}
+#endif
 	}
 
 	if (!ret)

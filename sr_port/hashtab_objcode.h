@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,12 +11,14 @@
 #ifndef HASHTAB_OBJCODE_H
 #define HASHTAB_OBJCODE_H
 
-typedef struct {
+typedef struct
+{
 	icode_str	key;
 	void		*value;
 } ht_ent_objcode;
 
-typedef struct hash_table_objcode_struct {
+typedef struct hash_table_objcode_struct
+{
 	ht_ent_objcode 	*base;		/* base of array of hent_* entries */
 	ht_ent_objcode 	*top; 		/* top of array of hent_* entries */
 	unsigned int 	size;		/* Hash table size */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "main_pragma.h"
 
 #include <sys/time.h>
 #include <sys/shm.h>
@@ -18,12 +19,10 @@
 #include "gtm_socket.h"
 #include <sys/un.h>
 #include <signal.h>
-#if !defined(__MVS__)
-#if !defined(_AIX) && !defined(__linux__) && !defined(__hpux) && !defined(__CYGWIN__)
+#if !defined(_AIX) && !defined(__linux__) && !defined(__hpux) && !defined(__CYGWIN__) && !defined(__MVS__)
 #include <siginfo.h>
 #endif
 #include "gtm_stdlib.h"
-#endif
 #include "gtm_sem.h"
 #include "gtm_string.h"
 #include "gtm_fcntl.h"
@@ -31,6 +30,11 @@
 #include "gtm_time.h"
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
+#include "gtm_permissions.h"
+
+#if defined(__MVS__)
+#include "gtm_zos_io.h"
+#endif
 
 #include "cli.h"
 #include "error.h"
@@ -88,6 +92,7 @@ static	char			gtmsecshr_logpath[MAX_TRANS_NAME_LEN];
 void clean_client_sockets(char *path);
 void gtmsecshr_timer_handler(void);
 void gtmsecshr_signal_handler(int sig, siginfo_t *info, void *context);
+ZOS_ONLY(boolean_t gtm_tag_error(char *filename, int realtag, int desiredtag);)
 
 /* Note that this condition handler is not really properly setup as a condition handler
    in that it has none of the required condition handler macros in it. It's job is just
@@ -205,7 +210,7 @@ int main(void)
 		while (!recv_complete)
 		{
 			num_chars_recd = (int)(RECVFROM(gtmsecshr_sockfd, (void *)recv_ptr, recv_len, 0,
-							(struct sockaddr *)&client_addr, (GTM_SOCKLEN_TYPE *)&client_addr_len));
+							(struct sockaddr *)&client_addr, &client_addr_len));
 			if ((-1 == num_chars_recd) && (gtmsecshr_timer_popped || EINTR != errno))
 			{
 				rts_error(VARLSTCNT(6) ERR_GTMSECSHR, 1, process_id, ERR_GTMSECSHRRECVF, 0, errno);
@@ -237,7 +242,7 @@ int main(void)
 		while (!send_complete)
 		{
 			num_chars_sent = (int)(SENDTO(gtmsecshr_sockfd, send_ptr, send_len, 0,
-							(struct sockaddr *)&client_addr, (sssize_t)client_addr_len));
+						(struct sockaddr *)&client_addr, (GTM_SOCKLEN_TYPE)client_addr_len));
 			if ((-1 == num_chars_sent) && (gtmsecshr_timer_popped || errno != EINTR))
 			{
 				 rts_error(VARLSTCNT(6) ERR_GTMSECSHR, 1, process_id, ERR_GTMSECSHRSENDF, 0, errno);
@@ -283,6 +288,9 @@ void gtmsecshr_init(void)
 	gtmsecshr_mesg	mesg;
 	struct stat	stat_buf;
 	char		*gtm_tmp_ptr;
+	int		rc;
+	int		lib_gid;
+	struct stat	dist_stat_buff;
 
 	error_def(ERR_GTMSECSHRSTART);
 	error_def(ERR_GTMSECSHRSRVF);
@@ -302,9 +310,13 @@ void gtmsecshr_init(void)
 				ERR_GTMSECSHRSUIDF, 0, ERR_GTMSECSHROPCMP, 0, errno);
 		gtmsecshr_exit(SETUIDROOT, FALSE);
 	}
-	if ((getsid(process_id) != process_id) && ((pid_t)-1 == setsid()))
+	pid = getsid(process_id);
+	if ((pid != process_id) && ((pid_t)-1 == setsid()))
+	{
+		save_errno = errno;
 		send_msg(VARLSTCNT(8) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
-				ERR_GTMSECSHRSSIDF, 0, errno);
+				ERR_GTMSECSHRSSIDF, 0, save_errno);
+	}
 	gtmsecshr_open_log_file();
 	if (0 > (pid = fork()))
 	{
@@ -320,9 +332,13 @@ void gtmsecshr_init(void)
 	GET_CUR_TIME;
 	util_out_print("gtmsecshr started at !AD", TRUE, RTS_ERROR_STRING(time_ptr));
 	gtmsecshr_sig_init();
-	close(0);
+	CLOSEFILE(0, rc);
 	for (file_des = (int)sysconf(_SC_OPEN_MAX)-1; file_des >= 3; file_des--)
-		close(file_des);
+	{	/* Close the file only if we have it open. This is to avoid a CLOSEFAIL error in case of
+		 * trying to close an invalid file descriptor.
+		 */
+		CLOSEFILE_IF_OPEN(file_des, rc);
+	}
 	CHDIR("/");
 	umask(0);
 	if (gtmsecshr_pathname_init(SERVER) != 0)
@@ -369,7 +385,25 @@ void gtmsecshr_init(void)
 	if (-1 == Stat(gtmsecshr_sock_name.sun_path, &stat_buf))
 		gtm_putmsg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to get status of socket file"), errno);
-	stat_buf.st_mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+	/* Get the distribution group */
+	lib_gid = gtm_get_group_id(&dist_stat_buff);
+	/* if it is world accessible then make mode 666 */
+	if ((-1 != lib_gid) && (dist_stat_buff.st_mode & 04))
+		lib_gid = -1;
+	if (-1 == lib_gid)
+		stat_buf.st_mode = 0666;
+	else
+	{
+		/* change group if different from current user group */
+		if (lib_gid != GETGID() && (-1 == CHOWN(gtmsecshr_sock_name.sun_path, -1, lib_gid)))
+		{
+			gtm_putmsg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
+				   RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
+				   RTS_ERROR_LITERAL("Unable to change socket file group"), errno);
+		}
+		/* change mode to 660 */
+		stat_buf.st_mode = 0660;
+	}
 	if (-1 == CHMOD(gtmsecshr_sock_name.sun_path, stat_buf.st_mode))
 		gtm_putmsg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to change socket file permisions"), errno);
@@ -394,7 +428,7 @@ void gtmsecshr_exit (int exit_code, boolean_t dump)
 		DUMP_CORE;
 	}
 	gtmsecshr_sock_cleanup(SERVER);
-	gtmsecshr_sockfd = -1;
+	gtmsecshr_sockfd = FD_INVALID;
 	if (SEMAPHORETAKEN != exit_code)
 	{	/* remove semaphore */
 		if (-1 == (gtmsecshr_sem = semget(gtmsecshr_key, FTOK_SEM_PER_ID, RWDALL | IPC_NOWAIT)))
@@ -418,6 +452,9 @@ int gtmsecshr_open_log_file (void)
 	int     	save_errno = 0, status;
 	char    	gtmsecshr_path[MAX_TRANS_NAME_LEN], *error_mesg;
 	mstr    	gtmsecshr_lognam, gtmsecshr_transnam;
+#ifdef __MVS__
+	int		create_logfile = 0, realfiletag;
+#endif
 
 	error_def(ERR_GTMSECSHRDEFLOG);
 	error_def(ERR_GTMSECSHRLOGF);
@@ -457,6 +494,10 @@ int gtmsecshr_open_log_file (void)
 	if (gtmsecshr_logpath[gtmsecshr_logpath_len - 1] != '/')
 		gtmsecshr_logpath[gtmsecshr_logpath_len++] = '/';
 	strcpy(gtmsecshr_logpath + gtmsecshr_logpath_len , GTMSECSHR_LOG_PREFIX);
+#if defined(__MVS__)
+	if (-1 == Stat(gtmsecshr_logpath, &buf))
+		create_logfile = 1;
+#endif
 	if (0 > (gtmsecshr_log_file = OPEN3(gtmsecshr_logpath, O_RDWR|O_CREAT|O_APPEND, GTMSECSHR_PERMS)))
 	{
 		send_msg(VARLSTCNT(14) ERR_GTMSECSHRLOGF, 3, RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
@@ -464,6 +505,18 @@ int gtmsecshr_open_log_file (void)
 				ERR_TEXT, 2, RTS_ERROR_STRING(gtmsecshr_logpath), errno);
 		exit(UNABLETOOPNLOGFILEFTL);
 	}
+#if defined(__MVS__)
+	if ((1 == create_logfile) && (-1 == gtm_zos_set_tag(gtmsecshr_log_file, TAG_EBCDIC, TAG_TEXT, TAG_FORCE, &realfiletag)))
+			gtm_tag_error(gtmsecshr_logpath, realfiletag, TAG_EBCDIC);
+	else if (!gtm_zos_autocvt_enabled())
+	{
+		send_msg(VARLSTCNT(14) ERR_GTMSECSHRLOGF, 3, RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
+				RTS_ERROR_LITERAL("_BPXK_AUTOCVT='ON' not set, policy tagging the log file"),
+				ERR_TEXT, 2, RTS_ERROR_STRING(gtmsecshr_logpath), errno);
+		if (-1 == gtm_zos_tag_to_policy(gtmsecshr_log_file, TAG_UNTAGGED, &realfiletag))
+			gtm_tag_error(gtmsecshr_logpath, realfiletag, TAG_UNTAGGED);
+	}
+#endif
 	assert(0 <= gtmsecshr_log_file);
 	if (-1 == dup2(gtmsecshr_log_file, 1))
 	{
@@ -488,7 +541,8 @@ void gtmsecshr_switch_log_file(int sig)
 	struct tm       *tm_struct;
 	size_t		dummy;
 	struct stat	fs;
-	int		newname_len, suffix, save_errno, temp_fd;
+	int		newname_len, suffix, save_errno, temp_fd, rc;
+	ZOS_ONLY(int	realfiletag;)
 
 	error_def(ERR_TEXT);
 	error_def(ERR_GTMSECSHRLOGSWH);
@@ -526,8 +580,14 @@ void gtmsecshr_switch_log_file(int sig)
 	}
 	/* --- switch to use the new log file --- */
 	if ((-1 == RENAME(gtmsecshr_logpath, &newname[0]))
-		|| (0 > (temp_fd = OPEN3(gtmsecshr_logpath, O_RDWR | O_CREAT | O_APPEND, GTMSECSHR_PERMS)))
+		|| (FD_INVALID == (temp_fd = OPEN3(gtmsecshr_logpath, O_RDWR | O_CREAT | O_APPEND, GTMSECSHR_PERMS)))
 		|| (-1 == dup2(temp_fd, gtmsecshr_log_file))
+#if defined(__MVS__)
+		|| (-1 == gtm_zos_set_tag(temp_fd, TAG_EBCDIC, TAG_TEXT, TAG_FORCE, &realfiletag)
+		    && gtm_tag_error(gtmsecshr_logpath, realfiletag, TAG_EBCDIC))
+		|| ((!gtm_zos_autocvt_enabled()) && ((-1 == gtm_zos_tag_to_policy(gtmsecshr_log_file, TAG_UNTAGGED, &realfiletag))
+ 						 && gtm_tag_error(gtmsecshr_logpath, realfiletag, TAG_UNTAGGED)))
+#endif
 		|| (-1 == dup2(temp_fd, 1))
 		|| (-1 == dup2(temp_fd, 2)))
 	{
@@ -540,7 +600,7 @@ void gtmsecshr_switch_log_file(int sig)
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Recycling gtmsecshr is suggested."), save_errno);
 		return;
 	}
-	close(gtmsecshr_log_file);
+	CLOSEFILE_RESET(gtmsecshr_log_file, rc);	/* resets "gtmsecshr_log_file" to FD_INVALID */
 	gtmsecshr_log_file = temp_fd;
 	/* --- log this switching action in the new log file --- */
 	GET_CUR_TIME;
@@ -799,3 +859,15 @@ int service_request(gtmsecshr_mesg *buf)
 	}
 	return ret_status;
 }
+
+#ifdef __MVS__
+boolean_t gtm_tag_error(char *filename, int realtag, int desiredtag)
+{
+	error_def(ERR_TEXT);
+	error_def(ERR_BADTAG);
+	char *errmsg = STRERROR(errno);
+	send_msg(VARLSTCNT(10) ERR_BADTAG, 4, LEN_AND_STR(filename), realtag,
+			desiredtag, ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
+	return 0;
+}
+#endif

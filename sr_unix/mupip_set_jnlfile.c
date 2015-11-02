@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,13 +11,16 @@
 
 #include "mdef.h"
 
-#include <sys/ipc.h>
+#include "gtm_ipc.h"
 #include "gtm_fcntl.h"
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "gtmio.h"
@@ -46,12 +49,18 @@ int4 mupip_set_jnlfile(char *jnl_fname, int jnl_fn_len)
 	jnl_file_header	*header;
 	char		*errptr;
 	int		save_no;
+	int		rc;
+#ifdef __MVS__
+	int realfiletag;
+	/* Need the ERR_BADTAG and ERR_TEXT  error_defs for the TAG_POLICY macro warning */
+	error_def(ERR_TEXT);
+	error_def(ERR_BADTAG);
+#endif
 
 	error_def(ERR_JNLFILNOTCHG);
 
-
 	OPENFILE(jnl_fname, O_RDWR, jnl_fd);
-	if (-1 == jnl_fd)
+	if (FD_INVALID == jnl_fd)
 	{
 		save_no = errno;
 		util_out_print("Error opening journal file !AD", TRUE, LEN_AND_STR(jnl_fname));
@@ -59,6 +68,10 @@ int4 mupip_set_jnlfile(char *jnl_fname, int jnl_fn_len)
 		util_out_print("open : !AZ", TRUE, errptr);
 		return((int4)ERR_JNLFILNOTCHG);
 	}
+#ifdef __MVS__
+	if (-1 == gtm_zos_tag_to_policy(jnl_fd, TAG_BINARY, &realfiletag))
+		TAG_POLICY_GTM_PUTMSG(jnl_fname, realfiletag, TAG_BINARY, errno);
+#endif
 	LSEEKREAD(jnl_fd, 0, (sm_uc_ptr_t)hdr_buffer, sizeof(hdr_buffer), status);
 	if (0 != status)
 	{
@@ -86,7 +99,8 @@ int4 mupip_set_jnlfile(char *jnl_fname, int jnl_fn_len)
 		util_out_print("write : !AZ", TRUE, errptr);
 		return((int4)ERR_JNLFILNOTCHG);
 	}
-	if (-1 == close(jnl_fd))
+	CLOSEFILE_RESET(jnl_fd, rc);	/* resets "jnl_fd" to FD_INVALID */
+	if (-1 == rc)
 	{
 		save_no = errno;
 		util_out_print("Error closing journal file !AD", TRUE, LEN_AND_STR(jnl_fname));

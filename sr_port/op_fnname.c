@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,28 +39,39 @@ GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 #define TEST_FAKE_STRINGPOOL_FULL
 #endif
 
-#define COPY_ARG_TO_STP									\
-	{										\
-		has_str_repsn = MV_IS_STRING(arg);					\
-		TEST_FAKE_STRINGPOOL_FULL;						\
-		mval_lex(arg, &format_out);						\
-		if (format_out.addr != (char *)stringpool.free && has_str_repsn)	\
-		{ /*  mval_lex doesn't create string representation for canonical arg that already has a string representation. */ \
-			assert(arg->str.len  == format_out.len );			\
-			assert(arg->str.addr == format_out.addr);			\
-			TEST_FAKE_STRINGPOOL_FULL;					\
-			if (stringpool.top - stringpool.free < arg->str.len)		\
-				stp_gcol(arg->str.len);					\
-			memcpy(stringpool.free, arg->str.addr, arg->str.len); /* use arg 'coz gcol doesn't preserve format_out */ \
-		}									\
-		if (has_str_repsn)							\
-		{ /* mval_lex copies arg at stringpool.free and leaves stringpool.free unchanged. Caller has to change  */ \
-		  /* stringpool.free to keep dst protected. MV_FORCE_STR in mval_lex creates string representation at   */ \
-		  /* format.out for canonical numbers that did not have string representation updating stringpool.free. */ \
-		  /* No need to update stringpool.free for such cases.							*/ \
-			stringpool.free += format_out.len;				\
-		}									\
-	}										\
+#define COPY_ARG_TO_STP								\
+{										\
+	boolean_t	has_str_repsn;						\
+										\
+	has_str_repsn = MV_IS_STRING(arg) || !MV_DEFINED(arg);			\
+	TEST_FAKE_STRINGPOOL_FULL;						\
+	mval_lex(arg, &format_out);						\
+	if (MV_IS_CANONICAL(arg))						\
+	{ /*  mval_lex doesn't create string representation for canonical arg	\
+	   * that already has a string representation. */			\
+		assert(arg->str.len  == format_out.len );			\
+		assert(arg->str.addr == format_out.addr);			\
+		TEST_FAKE_STRINGPOOL_FULL;					\
+		if (stringpool.top - stringpool.free < arg->str.len)		\
+			stp_gcol(arg->str.len);					\
+		memcpy(stringpool.free, arg->str.addr, arg->str.len);		\
+			/* use arg 'coz gcol doesn't preserve format_out  */	\
+	}									\
+	if (has_str_repsn)							\
+	{	/* mval_lex copies arg at stringpool.free and USUALLY leaves	\
+		 * stringpool.free unchanged. Caller (us) has to update		\
+		 * stringpool.free to keep dst protected. EXCEPT: MV_FORCE_STR	\
+		 * in mval_lex creates string representation for canonical	\
+		 * numbers that did not have string representation and updates	\
+		 * stringpool.free as that representation "belongs" to the mval	\
+		 * in question - no need to update stringpool.free for such	\
+		 * cases. Lucky for us, it sits in the perfect place in the	\
+		 * middle of our work has_str_repsn includes not defined check	\
+		 * in case of noundef - if undef it comes back as empty string.	\
+		 */								\
+		stringpool.free += format_out.len;				\
+	}									\
+}										\
 
 #define COPY_SUBSCRIPTS 								\
 	for ( ; ; ) 									\
@@ -84,7 +95,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 	mstr		format_out;
 	va_list		var;
 	unsigned char	*sptr, *key_ptr, *key_top;
-	boolean_t	has_str_repsn;
+
 	error_def(ERR_MAXSTRLEN);
 	error_def(ERR_GVNAKED);
 	error_def(ERR_FNNAMENEG);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,5 +20,6 @@
 #define COFFHDRLEN         (sizeof(int4) * 8)      /* Size of old masscomp-coff header before routine hdr */
 
 #define GET_RTNHDR_ADDR(sym)	(unsigned char *)(sym)
+#define DOREADRC_OBJFILE(FDESC, FBUFF, FBUFF_LEN, RC) DOREADRC(FDESC, FBUFF, FBUFF_LEN, RC)
 
 #endif

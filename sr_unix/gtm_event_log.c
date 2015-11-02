@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,12 +11,13 @@
 
 #include "mdef.h"
 
-#include "gtm_string.h"
 #include <errno.h>
+#include "gtm_string.h"
 #include "gtm_stdio.h"
 
 #include "gtm_event_log.h"
 #include "rtnhdr.h"
+#include "lv_val.h"
 #include "fgncal.h"
 #include "io.h"
 #include "iosp.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,9 @@
 
 #include "mdef.h"
 
-#include "gtm_string.h"
-
 #include <stdarg.h>
+#include "gtm_string.h"
+#include "gtm_stdio.h"
 
 #include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
@@ -22,6 +22,12 @@
 #include "stringpool.h"
 #include "do_xform.h"
 #include "mvalconv.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "alias.h"
 
 GBLDEF lv_val		*active_lv;
 GBLDEF bool		lv_null_subs = TRUE;
@@ -45,8 +51,9 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 
 	VAR_START(var, start);
 	VMS_ONLY(va_count(argcnt);)
-	if (NULL != start->tp_var)		/* if this variable is marked as a Transaction Processing protected variable, */
-		tp_var_clone(start);	/*	 clone the tree. */
+	/* if this variable is marked as a Transaction Processing protected variable, clone the tree. */
+	if (NULL != start->tp_var && !start->tp_var->var_cloned)
+		TP_VAR_CLONE(start);
 	for (subs_level = 1 + ((MV_SBS != start->ptrs.val_ent.parent.sbs->ident) ? 0 : start->ptrs.val_ent.parent.sbs->level);
 				--argcnt > 0;  start = lv, subs_level++)
 	{
@@ -159,6 +166,14 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 		tbl->level = subs_level;
 	}
 	va_end(var);
+	/* This var is about to be set/modified. If it exists and is an alias container var, that reference is going
+	   to go away. Take care of that possibility now.
+	*/
+	if (MV_DEFINED(&lv->v))
+	{
+		DECR_AC_REF(lv, TRUE);
+		lv->v.mvtype &= ~MV_ALIASCONT;	/* Value being replaced is now no longer a container var */
+	}
 	active_lv = lv;
 	return lv;
 }

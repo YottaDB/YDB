@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -180,7 +180,7 @@ bool	lke_showlock(
 					memcpy(&gtcmbuf[gtcmbufidx], CLNTNODE_LIT, STR_LIT_LEN(CLNTNODE_LIT));
 					gtcmbufidx += STR_LIT_LEN(CLNTNODE_LIT);
 					memcpy(&gtcmbuf[gtcmbufidx], tree->auxnode, sizeof(tree->auxnode));
-					gtcmbufidx += real_len(sizeof(tree->auxnode), tree->auxnode);
+					gtcmbufidx += real_len(sizeof(tree->auxnode), (uchar_ptr_t)tree->auxnode);
 					memcpy(&gtcmbuf[gtcmbufidx], CLNTPID_LIT, STR_LIT_LEN(CLNTPID_LIT));
 					gtcmbufidx += STR_LIT_LEN(CLNTPID_LIT);
 					SPRINTF(&gtcmbuf[gtcmbufidx], PIDPRINT_LIT, tree->auxpid);

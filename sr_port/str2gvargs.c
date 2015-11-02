@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -127,7 +127,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 					subsc_ptr = p1;
 				} else
 				{
-					spt->str.len += p1 - p2;
+					spt->str.len += (mstr_len_t)(p1 - p2);
 					subsc_ptr += p1 - p2;
 				}
 				if ('_' == *cp)
@@ -248,7 +248,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 					subsc_ptr = p1;
 				} else
 				{
-					spt->str.len += p1 - p2;
+					spt->str.len += (mstr_len_t)(p1 - p2);
 					subsc_ptr += p1 - p2;
 				}
 				if ('_' == *cp)

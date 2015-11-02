@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,10 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_ctype.h"
 #include "gtm_string.h"
+
 #include "cmd_qlf.h"
 #include "mmemory.h"
 #include "mlabel2xtern.h"
@@ -37,8 +39,8 @@ void mlabel2xtern(mstr *dst, mident *rtn, mident *lab)
 			if ('%' == *pt)
 				*pt = '_';
 			pt += lab->len;
-		}
-		else {
+		} else
+		{
 			cnt = 0;
 			if ('%' == lab->addr[cnt])
 			{

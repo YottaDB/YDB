@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
+
 #include "startup.h"
 #include "rtnhdr.h"
 #include "stack_frame.h"
@@ -29,17 +30,22 @@
 #include "ctrlc_handler.h"
 #include "mprof.h"
 #include "gtm_startup_chk.h"
-#include "gtm_compile.h"
 #include "gtm_startup.h"
 #include "jobchild_init.h"
 #include "cli_parse.h"
 #include "invocation_mode.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "gtm_main.h"		/* for "gtm_main" prototype */
+#include "io.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
+#endif
+#ifdef GTM_CRYPT
+#include "gtmci.h"
+#include "gtmcrypt.h"
+#define GTM_PASSWD "gtm_passwd"
 #endif
 
 GBLREF enum gtmImageTypes	image_type;
@@ -60,7 +66,6 @@ GBLREF char			cli_err_str[];
 
 GBLDEF char 		**gtmenvp;
 
-
 int gtm_main (int argc, char **argv, char **envp)
 
 #ifdef __osf__
@@ -68,8 +73,12 @@ int gtm_main (int argc, char **argv, char **envp)
 #endif
 
 {
-	char		*ptr;
-	int             eof, parse_ret;
+	char			*ptr;
+	int             	eof, parse_ret;
+	GTMCRYPT_ONLY(
+		char		*gtm_passwd;
+		int		init_status;
+	)
 
 	gtmenvp = envp;
 	image_type = GTM_IMAGE;
@@ -115,6 +124,16 @@ int gtm_main (int argc, char **argv, char **envp)
 	gtm_chk_dist(argv[0]);
 	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	init_gtm();
+#	ifdef GTM_CRYPT
+	if (MUMPS_COMPILE != invocation_mode
+	    && (NULL != (gtm_passwd = (char *)getenv(GTM_PASSWD)))
+	    && (0 == strlen(gtm_passwd)))
+	{
+		INIT_PROC_ENCRYPTION(init_status);
+		if (0 != init_status)
+			GC_RTS_ERROR(init_status, NULL);
+	}
+#	endif
 	dm_start();
 	return 0;
 }

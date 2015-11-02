@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,7 @@
 #include <errno.h>
 #ifdef __MVS__
 #include <sys/time.h>
+#include "gtm_zos_io.h"
 #endif
 
 #include "gdsroot.h"
@@ -64,6 +65,8 @@
 #include "gds_blk_downgrade.h"
 #include "shmpool.h"
 #include "min_max.h"
+#include "gtmxc_types.h"
+#include "gtmcrypt.h"
 
 #define COMMON_READ(S, BUFF, LEN)				\
 	{							\
@@ -136,6 +139,21 @@ void mupip_restore(void)
 	char			*errptr;
 	pid_t			waitpid_res;
 	shmpool_blk_hdr_ptr_t	sblkh_p;
+	int			rc;
+#	ifdef GTM_CRYPT
+	char			bkup_hash[GTMCRYPT_HASH_LEN], target_hash[GTMCRYPT_HASH_LEN];
+	char			*enc_inbuf;
+	int			blk_size, req_enc_blk_size, req_dec_blk_size, init_status, crypt_status;
+	gtmcrypt_key_t		bkup_key_handle, target_key_handle;
+	boolean_t		is_bkup_file_encrypted, is_target_file_encrypted;
+	boolean_t		is_same_hash = FALSE;
+#	endif
+#ifdef __MVS__
+	int realfiletag;
+	/* Need the ERR_BADTAG and ERR_TEXT  error_defs for the TAG_POLICY macro warning */
+	error_def(ERR_TEXT);
+	error_def(ERR_BADTAG);
+#endif
 
 	error_def(ERR_MUPRESTERR);
 	error_def(ERR_MUPCLIERR);
@@ -157,7 +175,7 @@ void mupip_restore(void)
 		mupip_exit(ERR_MUPRESTERR);
 	}
 	OPENFILE(db_name, O_RDWR, db_fd);
-	if (-1 == db_fd)
+	if (FD_INVALID == db_fd)
 	{
 		save_errno = errno;
 		util_out_print("Error accessing output file !AD. Aborting restore.", TRUE, n_len, db_name);
@@ -165,6 +183,10 @@ void mupip_restore(void)
 		util_out_print("open : !AZ", TRUE, errptr);
 		mupip_exit(save_errno);
 	}
+#ifdef __MVS__
+	if (-1 == gtm_zos_tag_to_policy(db_fd, TAG_BINARY, &realfiletag))
+		TAG_POLICY_GTM_PUTMSG(db_name, realfiletag, TAG_BINARY, errno);
+#endif
 	murgetlst();
 	old_data = (sgmnt_data *)malloc(sizeof(sgmnt_data));
 	LSEEKREAD(db_fd, 0, old_data, sizeof(sgmnt_data), save_errno);
@@ -200,6 +222,11 @@ void mupip_restore(void)
 	old_tot_blks = old_data->trans_hist.total_blks;
 	old_start_vbn = old_data->start_vbn;
 	bplmap = old_data->bplmap;
+	GTMCRYPT_ONLY(
+		/* Before the old_data is free'ed, we copy the hash from the header for future encryption */
+		memcpy(target_hash,  old_data->encryption_hash, GTMCRYPT_HASH_LEN);
+		is_target_file_encrypted = old_data->is_encrypted;
+	)
 	old_bit_maps = DIVIDE_ROUND_DOWN(old_tot_blks, bplmap);
 	inbuf = (char *)malloc(BACKUP_TEMPFILE_BUFF_SIZE);
 	sblkh_p = (shmpool_blk_hdr_ptr_t)inbuf;
@@ -319,7 +346,8 @@ void mupip_restore(void)
 				mupip_exit(ERR_MUPRESTERR);
 		}
 		COMMON_READ(in, inhead, sizeof(inc_header));
-		if (memcmp(&inhead->label[0], INC_HEADER_LABEL, INC_HDR_LABEL_SZ))
+		if (memcmp(&inhead->label[0], V5_INC_HEADER_LABEL, INC_HDR_LABEL_SZ) &&
+		    (memcmp(&inhead->label[0], INC_HEADER_LABEL, INC_HDR_LABEL_SZ)))
 		{
 			util_out_print("Input file !AD has an unrecognizable format", TRUE, ptr->input_file.len,
 				ptr->input_file.addr);
@@ -328,6 +356,15 @@ void mupip_restore(void)
 			mu_gv_cur_reg_free();
 			mupip_exit(ERR_MUPRESTERR);
 		}
+#		ifdef GTM_CRYPT
+		is_bkup_file_encrypted = FALSE;
+		if (inhead->is_encrypted)
+		{
+			COMMON_READ(in, bkup_hash, GTMCRYPT_HASH_LEN);
+			is_bkup_file_encrypted = inhead->is_encrypted;
+		}
+#		endif
+
 		if (curr_tn != inhead->start_tn)
 		{
 			util_out_print("Transaction in input file !AD does not align with database TN.!/DB: !16@XQ!_"
@@ -426,6 +463,39 @@ void mupip_restore(void)
 			}
 		}
 		rsize = SIZEOF(shmpool_blk_hdr) + inhead->blk_size;
+#		ifdef GTM_CRYPT
+		if (is_bkup_file_encrypted || is_target_file_encrypted)
+		{
+			/* See if the backup file and the target file are going to have
+			 * the same hash thereby speeding up the most common case. */
+			if (!memcmp(bkup_hash, target_hash, GTMCRYPT_HASH_LEN))
+				is_same_hash = TRUE;
+			if (!is_same_hash)
+			{
+				INIT_PROC_ENCRYPTION(init_status);
+				if (0 != init_status)
+					mupip_exit(init_status);
+				if (is_bkup_file_encrypted)
+				{
+					GTMCRYPT_GETKEY(bkup_hash, bkup_key_handle, crypt_status);
+					if (0 != crypt_status)
+					{
+						GC_GTM_PUTMSG(crypt_status, ptr->input_file.addr);
+						mupip_exit(init_status);
+					}
+				}
+				if (is_target_file_encrypted)
+				{
+					GTMCRYPT_GETKEY(target_hash, target_key_handle, crypt_status);
+					if (0 != crypt_status)
+					{
+						GC_GTM_PUTMSG(crypt_status, db_name);
+						mupip_exit(init_status);
+					}
+				}
+			}
+		}
+#		endif
 		for ( ; ;)
 		{        /* All reords are of fixed size so process until we get to a zeroed record marking the end */
 			COMMON_READ(in, inbuf, rsize);	/* Note rsize == sblkh_p */
@@ -472,12 +542,43 @@ void mupip_restore(void)
 				} else
 					size = (((blk_hdr_ptr_t)blk_ptr)->bsiz + 1) & ~1;
 			}
+#			ifdef GTM_CRYPT
+			req_dec_blk_size = ((blk_hdr_ptr_t)blk_ptr)->bsiz - SIZEOF(blk_hdr);
+			if (!is_same_hash && (BLOCK_REQUIRE_ENCRYPTION(is_bkup_file_encrypted, (((blk_hdr_ptr_t)blk_ptr)->levl),
+							req_dec_blk_size)))
+			{
+				GTMCRYPT_DECODE_FAST(bkup_key_handle,
+							blk_ptr + SIZEOF(blk_hdr),
+							req_dec_blk_size,
+							NULL,
+							crypt_status);
+				if (0 != crypt_status)
+				{
+					GC_GTM_PUTMSG(crypt_status, ptr->input_file.addr);
+					mupip_exit(crypt_status);
+				}
+			}
+#			endif
 			offset = (old_start_vbn - 1) * DISK_BLOCK_SIZE + ((off_t)old_blk_size * blk_num);
-			LSEEKWRITE(db_fd,
-				   offset,
-				   blk_ptr,
-				   size,
-				   save_errno);
+#			ifdef GTM_CRYPT
+			blk_size = ((blk_hdr_ptr_t)blk_ptr)->bsiz;
+			req_enc_blk_size = blk_size - SIZEOF(blk_hdr);
+			if (!is_same_hash && (BLOCK_REQUIRE_ENCRYPTION(is_target_file_encrypted,
+							(((blk_hdr_ptr_t)blk_ptr)->levl), req_enc_blk_size)))
+			{
+				GTMCRYPT_ENCODE_FAST(target_key_handle,
+							blk_ptr + SIZEOF(blk_hdr),
+							req_enc_blk_size,
+							NULL,
+							crypt_status);
+				if (0 != crypt_status)
+				{
+					GC_GTM_PUTMSG(crypt_status, db_name);
+					mupip_exit(crypt_status);
+				}
+			}
+#			endif
+			LSEEKWRITE(db_fd, offset, blk_ptr, size, save_errno);
 			if (0 != save_errno)
 			{
 				util_out_print("Error accessing output file !AD. Aborting restore.",
@@ -496,6 +597,10 @@ void mupip_restore(void)
 		COMMON_READ(in, inbuf, rsize);
 		((sgmnt_data_ptr_t)inbuf)->start_vbn = old_start_vbn;
 		((sgmnt_data_ptr_t)inbuf)->free_space = (uint4)(((old_start_vbn - 1) * DISK_BLOCK_SIZE) - SIZEOF_FILE_HDR(inbuf));
+		GTMCRYPT_ONLY(
+			memcpy(((sgmnt_data_ptr_t)inbuf)->encryption_hash, target_hash, GTMCRYPT_HASH_LEN);
+			((sgmnt_data_ptr_t)inbuf)->is_encrypted = is_target_file_encrypted;
+		)
 		LSEEKWRITE(db_fd, 0, inbuf, rsize - sizeof(int4), save_errno);
 		if (0 != save_errno)
 		{
@@ -557,7 +662,7 @@ void mupip_restore(void)
 				iob_close(in);
 				break;
 			case backup_to_exec:
-				close(in->fd);
+				CLOSEFILE_RESET(in->fd, rc);	/* resets "in->fd" to FD_INVALID */
 				if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, 0)))
 					WAITPID(pipe_child, (int *)&status, 0, waitpid_res);
 				break;
@@ -579,6 +684,7 @@ static void exec_read(BFILE *bf, char *buf, int nbytes)
 	int4	status;
 	char	*curr;
 	pid_t	waitpid_res;
+	int	rc;
 
 	assert(nbytes > 0);
 	needed = nbytes;
@@ -604,7 +710,7 @@ static void exec_read(BFILE *bf, char *buf, int nbytes)
 			gtm_putmsg(VARLSTCNT(1) errno);
 			if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, 0)))
 				WAITPID(pipe_child, (int *)&status, 0, waitpid_res);
-			close(bf->fd);
+			CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
 			restore_read_errno = errno;
 			break;
 		}
@@ -620,6 +726,7 @@ static void tcp_read(BFILE *bf, char *buf, int nbytes)
 	char		*curr;
 	fd_set          fs;
 	ABS_TIME	save_nap, nap;
+	int		rc;
 
 	needed = nbytes;
 	curr = buf;
@@ -654,7 +761,7 @@ static void tcp_read(BFILE *bf, char *buf, int nbytes)
 		if ((status < 0) && (errno != EINTR))
 		{
 			gtm_putmsg(VARLSTCNT(1) errno);
-			close(bf->fd);
+			CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
 			restore_read_errno = errno;
 			break;
 		}

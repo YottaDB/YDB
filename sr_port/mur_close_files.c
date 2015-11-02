@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -129,6 +129,8 @@ void	mur_close_files(void)
 	process_exiting = TRUE;	/* Signal function "free" (in gtm_malloc_src.h) not to bother with frees as we are any exiting.
 				 * This avoids assert failures that would otherwise occur due to nested storage mgmt calls
 				 * just in case we came here because of an interrupt (e.g. SIGTERM) while a malloc was in progress.
+				 * In case the database is encrypted, this value is used to avoid using mur_ctl->csd in mur_fopen
+				 * as it would be invalid due to the gds_rundown() done below.
 				 */
 	csd = &csd_temp;
 	/* If journaling, gds_rundown will need to write PINI/PFIN records. The timestamp of that journal record will

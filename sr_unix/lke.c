@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "main_pragma.h"
 
 #include "gtm_inet.h"
 #include "gtm_fcntl.h"
@@ -114,15 +115,16 @@ static bool lke_process(int argc)
 {
 	bool		flag = FALSE;
 	int		res;
-	static int	save_stderr = 2;
+	static int	save_stderr = SYS_STDERR;
 
 	error_def(ERR_CTRLC);
 
 	ESTABLISH_RET(util_ch, TRUE);
 	if (util_interrupt)
 		rts_error(VARLSTCNT(1) ERR_CTRLC);
-	if (save_stderr != 2)  /* necesary in case of rts_error */
-		close_fileio(save_stderr);
+	if (SYS_STDERR != save_stderr)  /* necesary in case of rts_error */
+		close_fileio(&save_stderr);
+	assert(SYS_STDERR == save_stderr);
 
 	func = 0;
 	util_interrupt = 0;
@@ -152,10 +154,11 @@ static bool lke_process(int argc)
 	}
 	if (func)
 	{
-		flag = open_fileio(&save_stderr); /* save_stderr = 2 if -output option not present */
+		flag = open_fileio(&save_stderr); /* save_stderr = SYS_STDERR if -output option not present */
 		func();
 		if (flag)
-			close_fileio(save_stderr);
+			close_fileio(&save_stderr);
+		assert(SYS_STDERR == save_stderr);
 	}
 	REVERT;
 	return(1 >= argc);

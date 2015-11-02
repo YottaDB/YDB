@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
 GBLREF spdesc stringpool;
 GBLREF symval *curr_symval;
 
-void op_fnlvname(mval *src,mval *dst)
+void op_fnlvname(mval *src, mval *dst)
 {
 	ht_ent_mname	*p, *min, *top;
 	int 		n;
@@ -41,7 +41,7 @@ void op_fnlvname(mval *src,mval *dst)
 	min = 0;
 	for ( ; p < top ; p++)
 	{
-		if (HTENT_VALID_MNAME(p, lv_val, lv))
+		if (HTENT_VALID_MNAME(p, lv_val, lv) && '$' != *p->key.var_name.addr)	/* Avoid $ZWRTAC* variables in tree */
 		{
 			if (lv && (MV_DEFINED(&(lv->v)) || ((tbl = lv->ptrs.val_ent.children) && (tbl->num || tbl->str))))
 			{
@@ -76,5 +76,4 @@ void op_fnlvname(mval *src,mval *dst)
 		dst->str.addr = (char *)stringpool.free;
 		stringpool.free += n;
 	}
-	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,10 @@
 #include "min_max.h"
 #include "gvcst_lbm_check.h"
 #include "wcs_phase2_commit_wait.h"
+#include "gtm_permissions.h"
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 
 GBLREF	bool			record;
 GBLREF	bool			online;
@@ -143,6 +147,11 @@ bool	mubinccpy (backup_reg_list *list)
 	block_id		blk_num_base, blk_num;
 	boolean_t		is_bitmap_blk, backup_this_blk;
 	enum db_ver		dummy_odbv;
+	int			rc;
+	int                     fstat_res;
+	struct stat		stat_buf;
+	int			group_id;
+	int			perm;
 	DEBUG_INCBKUP_ONLY(int	blks_this_lmap;)
 
 	error_def(ERR_BCKUPBUFLUSH);
@@ -190,11 +199,18 @@ bool	mubinccpy (backup_reg_list *list)
 				ESTABLISH_RET(iob_io_error1, FALSE);
 			} else
 			{
-				if (-1 == (status = CHMOD(file->addr, 0600)))
+				FSTAT_FILE(db_fd, &stat_buf, fstat_res);
+				if (-1 != fstat_res)
+					gtm_set_group_and_perm(&stat_buf, &group_id, &perm, (0770 & stat_buf.st_mode));
+				/* setup new group and permissions if indicated by the security rules.  Use 0770 anded with
+				 * current mode for the new mode if masked permission selected.
+				 */
+				if ((-1 == fstat_res) || (-1 == FCHMOD(backup->fd, perm))
+					|| ((-1 != group_id) && (-1 == fchown(backup->fd, -1, group_id))))
 				{
-					PERROR("chmod error: ");
+					PERROR("fchmod/fchown error: ");
 					util_out_print("ERROR: Cannot access incremental backup file !AD.",
-							TRUE, file->len, file->addr);
+						       TRUE, file->len, file->addr);
 					util_out_print("WARNING: Backup file !AD is not valid.", TRUE, file->len, file->addr);
 					CLEANUP_AND_RETURN_FALSE;
 				}
@@ -252,7 +268,10 @@ bool	mubinccpy (backup_reg_list *list)
 
 	/* ============================= write inc_header =========================================== */
 	outbuf = (inc_header*)malloc(sizeof(inc_header));
-	MEMCPY_LIT(&outbuf->label[0], INC_HEADER_LABEL);
+	if (header->is_encrypted)
+		MEMCPY_LIT(&outbuf->label[0], INC_HEADER_LABEL);
+	else
+		MEMCPY_LIT(&outbuf->label[0], V5_INC_HEADER_LABEL);
 	stringpool.free = stringpool.base;
 	op_horolog(&val);
 	stringpool.free = stringpool.base;
@@ -264,8 +283,15 @@ bool	mubinccpy (backup_reg_list *list)
 	outbuf->db_total_blks = header->trans_hist.total_blks;
 	outbuf->blk_size = header->blk_size;
 	outbuf->blks_to_upgrd = header->blks_to_upgrd;
+	GTMCRYPT_ONLY(
+		outbuf->is_encrypted = header->is_encrypted;
+	)
 	util_out_print("MUPIP backup of database file !AD to !AD", TRUE, DB_LEN_STR(gv_cur_region), file->len, file->addr);
 	COMMON_WRITE(backup, (char *)outbuf, SIZEOF(inc_header));
+#	ifdef GTM_CRYPT
+		if (header->is_encrypted)
+			COMMON_WRITE(backup, (char *)header->encryption_hash, GTMCRYPT_HASH_LEN);
+#	endif
 	free(outbuf);
 
 	if (mu_ctrly_occurred  ||  mu_ctrlc_occurred)
@@ -535,9 +561,9 @@ bool	mubinccpy (backup_reg_list *list)
 		{
 			if ((size1 = (int4)(ptr1_top - ptr1)) > mubmaxblk)
 				size1 = (mubmaxblk / DISK_BLOCK_SIZE) * DISK_BLOCK_SIZE;
-			size1 += sizeof(int4);
+			size1 += SIZEOF(int4);
 			COMMON_WRITE(backup, (char *)&size1, sizeof(int4));
-			size1 -= sizeof(int4);
+			size1 -= SIZEOF(int4);
 			COMMON_WRITE(backup, (char *)ptr1, size1);
 		}
 		rsize = sizeof(HDR_MSG) + sizeof(int4);
@@ -549,9 +575,9 @@ bool	mubinccpy (backup_reg_list *list)
 		{
 			if ((size1 = (int4)(ptr1_top - ptr1)) > mubmaxblk)
 				size1 = (mubmaxblk / DISK_BLOCK_SIZE) * DISK_BLOCK_SIZE;
-			size1 += sizeof(int4);
+			size1 += SIZEOF(int4);
 			COMMON_WRITE(backup, (char *)&size1, sizeof(int4));
-			size1 -= sizeof(int4);
+			size1 -= SIZEOF(int4);
 			COMMON_WRITE(backup, (char *)ptr1, size1);
 		}
 		rsize = sizeof(MAP_MSG) + sizeof(int4);
@@ -576,7 +602,7 @@ bool	mubinccpy (backup_reg_list *list)
 				memset(outptr, 0, backup->blksiz - backup->remaining);
 				COMMON_WRITE(backup, outptr, backup->blksiz - backup->remaining);
 			}
-			close(backup->fd);
+			CLOSEFILE_RESET(backup->fd, rc);	/* resets "backup->fd" to FD_INVALID */
 			/* needs to wait till the child dies, because of the rundown issues */
 			if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, 0)))
 			{
@@ -592,7 +618,7 @@ bool	mubinccpy (backup_reg_list *list)
 				memset(outptr, 0, backup->blksiz - backup->remaining);
 				COMMON_WRITE(backup, outptr, backup->blksiz - backup->remaining);
 			}
-			close(backup->fd);
+			CLOSEFILE_RESET(backup->fd, rc);	/* resets "backup->fd" to FD_INVALID */
 			break;
 	}
 
@@ -632,6 +658,7 @@ void exec_write(BFILE *bf, char *buf, int nbytes)
 	int	nwritten;
 	uint4	status;
 	pid_t	waitpid_res;
+	int	rc;
 
 	DOWRITERL(bf->fd, buf, nbytes, nwritten);
 
@@ -641,7 +668,7 @@ void exec_write(BFILE *bf, char *buf, int nbytes)
 	if ((nwritten < nbytes) && (-1 == nwritten))
 	{
 		gtm_putmsg(VARLSTCNT(1) errno);
-		close(bf->fd);
+		CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
 		if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, 0)))
 			WAITPID(pipe_child, (int *)&status, 0, waitpid_res);
 		backup_write_errno = errno;
@@ -653,10 +680,10 @@ void tcp_write(BFILE *bf, char *buf, int nbytes)
 {
 	int	nwritten, iostatus;
 	int	send_retry;
+	int	rc;
 
 	nwritten = 0;
 	send_retry = 5;
-
 	do
 	{
 		if (-1 != (iostatus = tcp_routines.aa_send(bf->fd, buf + nwritten, nbytes - nwritten, 0)))
@@ -674,7 +701,7 @@ void tcp_write(BFILE *bf, char *buf, int nbytes)
 	if ((nwritten != nbytes) && (-1 == iostatus))
 	{
 		gtm_putmsg(VARLSTCNT(1) errno);
-		close(bf->fd);
+		CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
 		backup_write_errno = errno;
 	}
 	return;

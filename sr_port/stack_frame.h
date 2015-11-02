@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,10 +26,13 @@
    Warning: the lists above may not be complete.
 */
 
+#include "hashtab_mname.h"
+
+
 typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 {
 	struct rhead_struct *rvector;	/* routine header */
-	mval		**l_symtab;	/* local symbol table */
+	ht_ent_mname	**l_symtab;	/* local symbol table */
 	unsigned char	*mpc;		/* mumps program counter */
 	unsigned char	*ctxt;		/* context pointer (base register for use when there's no PC-relative address mode) */
 #ifdef HAS_LITERAL_SECT
@@ -74,11 +77,14 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFF_ETRAP_ERR	(1 << 4)	/* A $ETRAP style error occurred while in this frame. Next level stack frame should
 					 * reset mpc and ctxt to that of CODE_ADDRESS(ERROR_RETURN) just before unwinding.
 					 */
+#define SFF_UNW_SYMVAL	(1 << 5)	/* Unwound a symval in this stackframe (relevant to tp_restart) */
+
 #define SFF_INDCE_OFF   	~(SFF_INDCE)		/* Mask to turn off SFF_INDCE */
 #define SFF_ZTRAP_ERR_OFF	~(SFF_ZTRAP_ERR)	/* Mask to turn off SFF_ZTRAP_ERR */
 #define SFF_DEV_ACT_ERR_OFF	~(SFF_DEV_ACT_ERR)	/* Mask to turn off SFF_DEV_ACT_ERR */
 #define SFF_CI_OFF		~(SFF_CI)		/* Mask to turn off SFF_CI */
 #define SFF_ETRAP_ERR_OFF	~(SFF_ETRAP_ERR)	/* Mask to turn off SFF_ETRAP_ERR */
+#define SFF_UNW_SYMVAL_OFF	~(SFF_UNW_SYMVAL)	/* Mask to turn off SFF_UNW_SYMVAL */
 
 #define	ADJUST_FRAME_POINTER(fptr, shift)			\
 {								\

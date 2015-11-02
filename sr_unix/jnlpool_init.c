@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -285,12 +285,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		}
 		udi->gt_sem_ctime = semarg.buf->sem_ctime;
 		/* Create the shared memory */
-#ifdef __MVS__
-		if (-1 == (udi->shmid = shmget(IPC_PRIVATE,
-						ROUND_UP(gtmsource_options.buffsize, MEGA_BOUND), __IPC_MEGA | IPC_CREAT | RWDALL)))
-#else
 		if (-1 == (udi->shmid = shmget(IPC_PRIVATE, gtmsource_options.buffsize, IPC_CREAT | RWDALL)))
-#endif
 		{
 			udi->shmid = INVALID_SHMID;
 			save_errno = errno;

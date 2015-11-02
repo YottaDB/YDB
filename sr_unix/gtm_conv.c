@@ -1,12 +1,12 @@
 /****************************************************************
- *                                                              *
- *      Copyright 2006, 2007 Fidelity Information Services, Inc       *
- *                                                              *
- *      This source code contains the intellectual property     *
- *      of its copyright holder(s), and is made available       *
- *      under a license.  If you do not know the terms of       *
- *      the license, please stop and do not read further.       *
- *                                                              *
+ *								*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
  ****************************************************************/
 
 #include "mdef.h"
@@ -17,7 +17,7 @@
 #include "gtm_utf8.h"
 #include "gtm_conv.h"
 
-LITDEF mstr chset_names[CHSET_MAX_IDX] =
+LITDEF mstr chset_names[CHSET_MAX_IDX_ALL] =
 { /* Supported character set (CHSET) codes for the 3-argument form of $ZCONVERT.
    *  NOTE: Update the *_CHSET_LEN macros below if new CHSETs are added.
    */
@@ -26,7 +26,10 @@ LITDEF mstr chset_names[CHSET_MAX_IDX] =
 	{5, 5, "UTF-8"},
 	{6, 6, "UTF-16"},
 	{8, 8, "UTF-16LE"},
-	{8, 8, "UTF-16BE"}
+	{8, 8, "UTF-16BE"},
+	{5, 5, "ASCII"},
+	{6, 6, "EBCDIC"},
+	{6, 6, "BINARY"}
 };
 #define MIN_CHSET_LEN	1	/* minimum length of CHSET names */
 #define MAX_CHSET_LEN	8	/* maximum length of CHSET names */
@@ -68,7 +71,7 @@ int verify_chset(const mstr *parm)
 	lower_to_upper((unsigned char *)mode, (unsigned char *)parm->addr, parm->len);
 
 	/* See if any of our possibilities match */
-	for (vptr = chset_names, vptr_top = vptr + CHSET_MAX_IDX; vptr < vptr_top; ++vptr)
+	for (vptr = chset_names, vptr_top = vptr + CHSET_MAX_IDX_ALL; vptr < vptr_top; ++vptr)
 	{
 		if (parm->len == vptr->len &&
 		    0 == memcmp(mode, vptr->addr, vptr->len))
@@ -122,7 +125,7 @@ UConverter* get_chset_desc(const mstr* chset)
 	int 			chset_indx;
 	UErrorCode		status;
 
-	if (0 >= (chset_indx = verify_chset(chset)))
+	if ((0 >= (chset_indx = verify_chset(chset))) || (CHSET_MAX_IDX <= chset_indx))
 		return NULL;
 	if (NULL == chset_desc[chset_indx])
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +45,9 @@
 #include "send_msg.h"
 #include "dse.h"
 #include "gtmmsg.h"
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 
 GBLREF	VSIG_ATOMIC_T	util_interrupt;
 GBLREF	sgmnt_addrs	*cs_addrs;
@@ -80,6 +83,11 @@ void dse_chng_fhead(void)
 	char		temp_str[256], temp_str1[256], buf[MAX_LINE];
 	int		gethostname_res;
 	sm_uc_ptr_t	chng_ptr;
+	const char 	*freeze_msg[] = { "UNFROZEN", "FROZEN" } ;
+	GTMCRYPT_ONLY(
+		char	hash_buff[GTMCRYPT_HASH_LEN];
+		int	crypt_status;
+	)
 
 	error_def(ERR_FREEZE);
 	error_def(ERR_BLKSIZ512);
@@ -557,6 +565,8 @@ void dse_chng_fhead(void)
 			}
 
 		}
+		if (x != !(cs_addrs->hdr->freeze))
+			util_out_print("Region !AD is now !AD", TRUE, REG_LEN_STR(gv_cur_region), LEN_AND_STR(freeze_msg[x]));
 		cs_addrs->persistent_freeze = x;	/* secshr_db_clnup() shouldn't clear the freeze up */
 	}
 	if (CLI_PRESENT == cli_present("FULLY_UPGRADED") && cli_get_int("FULLY_UPGRADED", &x))
@@ -668,6 +678,44 @@ void dse_chng_fhead(void)
 			util_out_print("Error: cannot get value for !AD.", TRUE, LEN_AND_LIT("MACHINE_NAME"));
 
 	}
+#	ifdef GTM_CRYPT
+	if (CLI_PRESENT == cli_present("ENCRYPTION_HASH"))
+	{
+		/* It could be possible that when the user is trying to change the encryption hash in the file header,
+		 * more than one process is accessing the database. In such a case, changing the hash might affect the
+		 * running processes. So warn the user about the potential consequence and return. */
+		if (1 < cs_addrs->nl->ref_cnt)
+		{
+			util_out_print("Cannot reset encryption hash in file header while !XL other processes are \
+					accessing the database.",
+					TRUE,
+					cs_addrs->nl->ref_cnt - 1);
+			return;
+		}
+		ASSERT_ENCRYPTION_INITIALIZED;  /* assert that encryption is already initialized in db_init */
+
+		/* It is possible that the encryption hash in the database file header is corrupted and we are trying to
+		 * reset it here. But for that to happen, GTMCRYPT_HASH_GEN should not worry about the error happened in
+		 * db_init (unless the encryption library failed due to dlopen error as this would mean that the function
+		 * pointers for the encryption APIs would not be initialized to a proper value and we would end up not
+		 * reporting error). So, the below macro resets the error only if it was not caused due to a dlopen error. */
+		GTMCRYPT_RESET_HASH_MISMATCH_ERR;
+
+		/* Now generate the new hash to be placed in the database file header. */
+		GTMCRYPT_HASH_GEN((char *)gv_cur_region->dyn.addr->fname,
+				  gv_cur_region->dyn.addr->fname_len,
+				  hash_buff,
+				  crypt_status);
+		if (0 != crypt_status)
+			GC_GTM_PUTMSG(crypt_status, gv_cur_region->dyn.addr->fname);
+		memcpy(cs_addrs->hdr->encryption_hash, hash_buff, GTMCRYPT_HASH_LEN);
+		DEBUG_ONLY(
+			GTMCRYPT_HASH_CHK(cs_addrs->hdr->encryption_hash, crypt_status);
+			assert(0 == crypt_status);
+		)
+	}
+#	endif
+
 #ifdef UNIX
 	if (CLI_PRESENT == cli_present("JNL_YIELD_LIMIT") && cli_get_int("JNL_YIELD_LIMIT", &x))
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,7 @@ struct aiocb {
 }
 
 #else
-/* Non-AIX , Note that OS390 does not support asynchronous I/O */
+/* Non-AIX */
 #define AIO_READ(FD, AIOCBP, STATUS1, STATUS2) 		\
 {							\
 	STATUS2 = SS_NORMAL;				\

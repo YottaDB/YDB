@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -118,8 +118,8 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 			else
 				rts_error(VARLSTCNT(1) ERR_NULLCOLLDIFF);
 		}
-		if (((csa->hdr->max_key_size + MAX_NUM_SUBSC_LEN + 4) & (-4)) > gv_keysize)
-			gv_keysize = (csa->hdr->max_key_size + MAX_NUM_SUBSC_LEN + 4) & (-4);
+		if (DBKEYSIZE(csa->hdr->max_key_size) > gv_keysize)
+			gv_keysize = DBKEYSIZE(csa->hdr->max_key_size);
 		SET_CSA_DIR_TREE(csa, reg->max_key_size, reg);
 		csa->now_crit = FALSE;
 		if (reg->was_open)	 /* Should never happen as only open one at a time, but handle for safety */

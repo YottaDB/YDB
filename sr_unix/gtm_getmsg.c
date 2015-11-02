@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,35 +18,17 @@
 #include "gtmmsg.h"
 
 GBLREF bool	dec_nofac;
-#ifndef SYS_ERRLIST_INCLUDE
-/* sys_nerr and sys_errlist defined in stdio for linux */
-GBLREF int	sys_nerr;
-#endif
-LITREF char	*sys_errnolist[];
-LITREF int	sys_nerrno;
 
+#define ERR_TAG		"ENO"
 
-#ifndef SYS_ERRLIST_INCLUDE
-
-#ifdef	__osf__
-#pragma pointer_size (save)
-#pragma pointer_size (long)
-#endif
-
-#ifndef __sun
-extern char	*sys_errlist[];
-#endif
-#ifdef	__osf__
-#pragma pointer_size (restore)
-#endif
-
-#endif
 
 void	gtm_getmsg (int4 msgnum, mstr *msgbuf)
 {
 	short int	m_len, faclen, taglen, j, sever;
-	char 		*cp;
-	const char 	*top, *msgp, *fac, *tag;
+	char		*cp;
+	const char 	*top, *msgp, *fac;
+	char		outbuf[32];
+	char_ptr_t	tag;
 	const err_msg	*msg;
 	const err_ctl	*ctl;
 
@@ -57,41 +39,27 @@ void	gtm_getmsg (int4 msgnum, mstr *msgbuf)
 		j = MSGMASK(msgnum, ctl->facnum);
 		msg = ctl->fst_msg + j - 1;
 		msgp = msg->msg;
-		tag = msg->tag;
+		tag = (char_ptr_t)msg->tag;
 		fac = ctl->facname;
 		sever = SEVMASK(msgnum);
 	} else
 	{
 		sever = ERROR;
-
-		if ((msgnum < sys_nerrno) && (msgnum > 0))
-			tag = sys_errnolist[msgnum];
-		else
+		tag = (char_ptr_t)outbuf;
+		if ((MAX_SYSERR > msgnum) && (msgnum > 0))
 		{
-#ifdef DEBUG
-			/* Below code commented out for now since it was triggered by ZMessage with invalid msg number given */
-			/*PRN_ERROR;*/			/* Flush what we have so far prior to the assert failure */
-			/*assert(FALSE);*/		/* Will cause an error within the error but we will catch where this
-								happens so we can fix them */
-#endif
-			tag = "UNKNOWN";
-		}
-
-#ifndef __MVS__
-#ifdef __sun
-		assert (strerror(1) != 0);		/* OSF/1 check; can happen with 64-bit pointers and bad declaration */
-		if ((msgnum > 0))
-#else
-		assert (sys_errlist[1] != 0);		/* OSF/1 check; can happen with 64-bit pointers and bad declaration */
-		if ((msgnum < sys_nerr) && (msgnum > 0))
-#endif
-#else
-		if ((msgnum < MAX_SYSERR) && (msgnum > 0))
-#endif
+			assert(NULL != STRERROR(1));	/* OSF/1 check; can happen with 64-bit pointers and bad declaration */
+			cp = (char *)tag;
+			MEMCPY_LIT(cp, ERR_TAG);
+			cp += strlen(ERR_TAG);
+			cp = (char *)i2asc((uchar_ptr_t)cp, msgnum);
+			*cp = '\0';
 			msgp = STRERROR(msgnum);
-		else
+		} else
+		{
+			tag = "UNKNOWN";
 			msgp = "Unknown system error !SL";
-
+		}
 		fac = "SYSTEM";
 	}
 	m_len = strlen(msgp);
@@ -99,7 +67,7 @@ void	gtm_getmsg (int4 msgnum, mstr *msgbuf)
 	{
 		m_len += (faclen = strlen(fac));
 		m_len += 4;	/* %-<sev>- */
-		m_len += (taglen = strlen(tag));
+		m_len += (taglen = strlen((const char *)tag));
 		m_len += 2;	/* ,  */
 	}
 	m_len = m_len > msgbuf->len - 1 ? msgbuf->len - 1 : m_len;

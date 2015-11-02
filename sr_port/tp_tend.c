@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -126,28 +126,6 @@ GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-onl
 boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse);
 enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse);
 
-/* Wait for a region freeze to be turned off. Note that we dont hold CRIT at this point. Ideally we would have
- * READ memory barriers between each iterations of sleep to try and get the latest value of the "freeze" field from
- * the concurrently updated database shared memory. But since region-freeze is a perceivably rare event, we choose
- * not to do the memory barriers. The consequence of this decision is that it might take more iterations for us to
- * see updates to the "freeze" field than it would have if we did the memory barrier each iteration. But since we
- * dont hold crit at this point AND since freeze is a rare event, we dont mind the extra wait.
- */
-#define	WAIT_FOR_REGION_TO_UNFREEZE(CSA, CSD)		\
-{							\
-	int	lcnt1;					\
-							\
-	assert(CSA->hdr == CSD);			\
-	assert(!CSA->now_crit);				\
-	for (lcnt1 = 1; ; lcnt1++)			\
-	{						\
-		if (!CSD->freeze)			\
-			break;				\
-		if (MAXHARDCRITS < lcnt1)       	\
-			wcs_backoff(lcnt1);     	\
-	}						\
-}
-
 boolean_t	tp_crit_all_regions()
 {
 	int			lcnt;
@@ -207,7 +185,7 @@ boolean_t	tp_tend()
 	boolean_t		replication = FALSE, update_trans, region_is_frozen;
 	bt_rec_ptr_t		bt;
 	cache_rec_ptr_t		cr;
-	cw_set_element		*cse, *first_cw_set, *cs1;
+	cw_set_element		*cse, *first_cw_set, *bmp_begin_cse;
 	file_control		*fc;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
@@ -227,7 +205,7 @@ boolean_t	tp_tend()
 	int			repl_tp_region_count = 0, tmp_repl_tp_region_count;
 	boolean_t		release_crit, yes_jnl_no_repl, recompute_cksum, cksum_needed;
 	uint4			jnl_status, leafmods, indexmods;
-	uint4			total_jnl_rec_size;
+	uint4			total_jnl_rec_size, in_tend;
 	jnlpool_ctl_ptr_t	jpl, tjpl;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress */
 	blk_hdr_ptr_t		old_block;
@@ -238,6 +216,11 @@ boolean_t	tp_tend()
 	gv_namehead		*prev_target, *curr_target;
 	jnl_tm_t		save_gbl_jrec_time;
 	enum gds_t_mode		mode;
+#	ifdef GTM_CRYPT
+	DEBUG_ONLY(
+		blk_hdr_ptr_t	save_old_block;
+	)
+#	endif
 
 	error_def(ERR_DLCKAVOIDANCE);
 	error_def(ERR_JNLFILOPN);
@@ -641,7 +624,8 @@ boolean_t	tp_tend()
 						}
 						assert(csd == csa->hdr);	/* If MM, csd shouldn't have been reset */
 					}
-					if (JNL_HAS_EPOCH(jbp) && (jbp->next_epoch_time <= jgbl.gbl_jrec_time))
+					if (JNL_HAS_EPOCH(jbp)
+						&& ((jbp->next_epoch_time <= jgbl.gbl_jrec_time) UNCONDITIONAL_EPOCH_ONLY(|| TRUE)))
 					{	/* Flush the cache. Since we are in crit, defer syncing the epoch */
 						if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_IN_COMMIT))
 						{
@@ -704,6 +688,7 @@ boolean_t	tp_tend()
 								else
 								{
 									indexmods++;
+									t1->blk_target->clue.end = 0;
 									if (leafmods)
 										status = cdb_sc_blkmod;
 								}
@@ -1014,12 +999,12 @@ boolean_t	tp_tend()
 							assert(sizeof(bsiz) == sizeof(old_block->bsiz));
 							bsiz = old_block->bsiz;
 							assert(bsiz <= csd->blk_size);
-							cse->blk_checksum = jnl_get_checksum((uint4*)old_block, bsiz);
+							cse->blk_checksum = jnl_get_checksum((uint4*)old_block, csa, bsiz);
 						}
 						DEBUG_ONLY(
 						else
 							assert(cse->blk_checksum ==
-									jnl_get_checksum((uint4 *)old_block, old_block->bsiz));
+									jnl_get_checksum((uint4 *)old_block, csa, old_block->bsiz));
 						)
 						assert(cse->cr->blk == cse->blk);
 					}	/* end if acquired block */
@@ -1087,14 +1072,14 @@ boolean_t	tp_tend()
 		tjpl->write = jpl->write;
 		QWASSIGN(tjpl->jnl_seqno, jpl->jnl_seqno);
 		INT8_ONLY(assert(tjpl->write == tjpl->write_addr % tjpl->jnlpool_size);)
-		tjpl->write += sizeof(jnldata_hdr_struct);
+		tjpl->write += SIZEOF(jnldata_hdr_struct);
 		if (tjpl->write >= tjpl->jnlpool_size)
 		{
 			assert(tjpl->write == tjpl->jnlpool_size);
 			tjpl->write = 0;
 		}
 		assert(jgbl.cumul_jnl_rec_len);
-		jgbl.cumul_jnl_rec_len += TCOM_RECLEN * repl_tp_region_count + sizeof(jnldata_hdr_struct);
+		jgbl.cumul_jnl_rec_len += TCOM_RECLEN * repl_tp_region_count + SIZEOF(jnldata_hdr_struct);
 		DEBUG_ONLY(jgbl.cumul_index += repl_tp_region_count;)
 		assert(jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY == 0);
 		assert(QWEQ(jpl->early_write_addr, jpl->write_addr));
@@ -1181,10 +1166,27 @@ boolean_t	tp_tend()
 							|| (epoch_tn >= si->start_tn));
 						assert(old_block->bsiz <= csd->blk_size);
 						if (!cse->blk_checksum)
-							cse->blk_checksum = jnl_get_checksum((uint4 *)old_block, old_block->bsiz);
+							cse->blk_checksum = jnl_get_checksum((uint4 *)old_block,
+											     csa,
+											     old_block->bsiz);
 						else
 							assert(cse->blk_checksum == jnl_get_checksum((uint4 *)old_block,
-													old_block->bsiz));
+												     csa,
+												     old_block->bsiz));
+#						ifdef GTM_CRYPT
+						if (csd->is_encrypted)
+						{
+							DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, (sm_uc_ptr_t)old_block);
+							DEBUG_ONLY(save_old_block = old_block;)
+							old_block = (blk_hdr_ptr_t)GDS_ANY_ENCRYPTGLOBUF(old_block, csa);
+							/* Ensure that the unencrypted block and it's twin counterpart are in
+							 * sync. */
+							assert(save_old_block->tn == old_block->tn);
+							assert(save_old_block->bsiz == old_block->bsiz);
+							assert(save_old_block->levl == old_block->levl);
+							DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, (sm_uc_ptr_t)old_block);
+						}
+#						endif
 						jnl_write_pblk(csa, cse, old_block);
 						cse->jnl_freeaddr = jbp->freeaddr;
 					} else
@@ -1398,6 +1400,7 @@ boolean_t	tp_tend()
 			/* signal secshr_db_clnup/t_commit_cleanup, roll-back is no longer possible */
 			si->update_trans = T_COMMIT_STARTED;
 			csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;	/* set this BEFORE releasing crit */
+			assert(!csd->freeze);	/* should never increment curr_tn on a frozen database */
 			INCREMENT_CURR_TN(csd);
 			/* If db is journaled, then db header is flushed periodically when writing the EPOCH record,
 			 * otherwise do it here every HEADER_UPDATE_COUNT transactions.
@@ -1406,7 +1409,7 @@ boolean_t	tp_tend()
 					&& !(csd->trans_hist.curr_tn & (HEADER_UPDATE_COUNT - 1)))
 				fileheader_sync(gv_cur_region);
 			if (NULL != si->kill_set_head)
-				INCR_KIP(csd, csa, si->kip_incremented);
+				INCR_KIP(csd, csa, si->kip_csa);
 		} else
 			ctn = si->tp_csd->trans_hist.curr_tn;
 		si->start_tn = ctn; /* start_tn used temporarily to store currtn (for bg_update_phase2) before releasing crit */
@@ -1534,13 +1537,7 @@ failed:
 	 * histories so they will be valid for a future access utilizing the clue field. This occurs
 	 * to improve performance (of next tn in case of commit of current tn) or the chances of commit
 	 * (of current tn in case of a restart/retry).
-	 *
-	 * But since the clue of all gv_targets which gets updated in this TP transaction is reset to NULL
-	 * in tp_clean_up (tracked as part of C9905-001119), there is no point having this logic until
-	 * the mentioned change-request gets fixed. So for now, the below code is disabled. Needs to
-	 * be re-enabled as part of fixing C9905-001119.
 	 */
-#	ifdef WAIT_FOR_TPCLEANUP_TO_BE_FIXED
 	for (si = first_tp_si_by_ftok;  (si_not_validated != si);  si = si->next_tp_si_by_ftok)
 	{
 		if ((cdb_sc_normal == status) && (si->update_trans))
@@ -1549,48 +1546,43 @@ failed:
 			valid_thru = si->start_tn;
 		assert(valid_thru <= si->tp_csd->trans_hist.curr_tn);
 		is_mm = (dba_mm == si->tp_csd->acc_meth);
+		bmp_begin_cse = si->first_cw_bitmap;
 		prev_target = NULL;
-		for (cse = si->first_cw_set; NULL != cse; cse = cse->next_cw_set)
+		for (cse = si->first_cw_set; bmp_begin_cse != cse; cse = cse->next_cw_set)
 		{
-			cache_rec_ptr_t	cr;
-			uint4		in_tend;
-
 			TRAVERSE_TO_LATEST_CSE(cse);
 			curr_target = cse->blk_target;
 			/* Avoid redundant updates to gv_target's history using a simplistic scheme (check previous iteration) */
-			if ((NULL != curr_target) && (prev_target != curr_target))
+			if ((prev_target != curr_target) && (0 != curr_target->clue.end))
 			{
 				prev_target = curr_target;
 				for (t1 = &curr_target->hist.h[0]; t1->blk_num; t1++)
 				{	/* If MM, the history can be safely updated. In BG, phase2 of commit happens outside of
 					 * crit. So we need to check if the global buffer corresponding to this block is
-					 * in the process of being updated concurrently by another process. If so, this concurrent
-					 * update could still be in progress the next time we scan the buffer (in gvcst_search_blk)
-					 * as part of the next transaction and therefore updating t1->tn to valid_thru
-					 * (which is HIGHER than the transaction number corresponding to the ongoing phase2 update)
-					 * would incorrectly indicate all updates below valid_thru are complete on this block
-					 * and would lead to false validations (missed out cdb_sc_blkmod restarts). If no update
-					 * is in progress, we can safely update our history to reflect the fact that all updates
-					 * to this block before the current transaction number are complete as of this point.
-					 * Note that it is possible we have pinned the buffer ourselves for updating it. In this
-					 * case, we can update t1->tn since we will not scan the buffer for the next transaction
-					 * until the phase2 part of the current update is done. Note that it is ok to do the
-					 * cr->in_tend check outside of crit. If this update started after we released crit,
-					 * t1->tn will still be lesser than the transaction at which this update occurred so a
-					 * cdb_sc_blkmod check is guaranteed to be signalled. If this update started and ended
-					 * after we released crit but before we reached here, it is ok to set t1->tn to
-					 * valid_thru as the concurrent update corresponds to a higher transaction number
-					 * and will still fail the cdb_sc_blkmod check in the next validation.
+					 * in the process of being updated concurrently by another process. If so, we have no
+					 * guarantee that the concurrent update started AFTER valid_thru db-tn so we cannot safely
+					 * reset t1->tn in this case. If no update is in progress, we can safely update our history
+					 * to reflect the fact that all updates to this block before the current transaction number
+					 * are complete as of this point. Note that it is ok to do the cr->in_tend check outside
+					 * of crit. If this update started after we released crit, t1->tn will still be lesser than
+					 * the transaction at which this update occurred so a cdb_sc_blkmod check is guaranteed to
+					 * be signalled. If this update started and ended after we released crit but before we
+					 * reached here, it is ok to set t1->tn to valid_thru as the concurrent update corresponds
+					 * to a higher transaction number and will still fail the cdb_sc_blkmod check in the next
+					 * validation. Also note that because of this selective updation of t1->tn, it is possible
+					 * that for a given gv_target->hist, hist[0].tn is not guaranteed to be GREATER than
+					 * hist[1].tn. Therefore t_begin has to now determine the minimum and use that as the
+					 * start_tn instead of looking at hist[MAXDEPTH].tn and using that.
 					 */
 					cr = !is_mm ? t1->cr : NULL;
 					in_tend = (NULL != cr) ? cr->in_tend : 0;
-					if (!in_tend || (process_id == in_tend))
+					assert(process_id != in_tend);
+					if (!in_tend)
 						t1->tn = valid_thru;
 				}
 			}
 		}
 	}
-#	endif
 skip_failed:
 	REVERT;
 	DEFERRED_EXIT_HANDLING_CHECK; /* now that all crits are released, check if deferred signal/exit handling needs to be done */
@@ -1633,30 +1625,16 @@ failed_skip_revert:
 /* --------------------------------------------------------------------------------------------
  * This code is very similar to the code in gvcst_put for the non-block-split case. Any changes
  * in either place should be reflected in the other.
- *
- * This function does not touch the input history "hist1". Instead it takes a copy and updates
- * the copy. Specifically "hist1->tn" does not get updated to the current db tn in order
- * that the combination of [history + cw-set-element-update-array] reflects the latest
- * contents of the block. This means if the history tn gets checked against the bt's tn (the
- * cdb_sc_blkmod check done in tp_tend) more than once (possible if we are in a multi-region TP
- * transaction where one region got validated first but later another region was found frozen
- * so we had to release crit on all the regions and wait for the unfreeze and then re-grabbed
- * crit on all regions and re-validated this region) the check will fail the same way the second
- * iteration as well thereby causing us to reinvoke this recomputation routine. Although this is
- * duplicate work, it is considered okay since
- * a) it is not clear if updating "hist1->tn" in this routine (which would avoid the reinvoking
- *	this recomputation routine) is safe AND
- * b) a frozen region is a relatively rare situation that it is ok to take this recomputation hit.
  * --------------------------------------------------------------------------------------------
  */
-enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
+enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 {
 	blk_segment		*bs1, *bs_ptr;
 	boolean_t		new_rec;
 	cache_rec_ptr_t		cr;
 	char			*va;
 	enum cdb_sc		status;
-	gv_key			*pKey;
+	gv_key			*pKey = NULL;
 	int4			blk_size, blk_fill_size, cur_blk_size, blk_seg_cnt, delta ;
         int4                    n, new_rec_size, next_rec_shrink;
 	int4			rec_cmpc, target_key_size;
@@ -1666,10 +1644,11 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
 	off_chain		chain1;
 	rec_hdr_ptr_t		curr_rec_hdr, next_rec_hdr, rp;
 	sm_uc_ptr_t		cp1, buffaddr;
-	srch_blk_status		temp_srch_blk_status, *bh;
 	unsigned short		rec_size;
 	sgmnt_addrs		*csa;
 	blk_hdr_ptr_t		old_block;
+	gv_namehead		*gvt;
+	srch_blk_status		*t1;
 
 	csa = cs_addrs;
 	BG_TRACE_PRO_ANY(csa, recompute_upd_array_calls);
@@ -1677,10 +1656,7 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
 	assert(!cse->level && cse->blk_target && !cse->first_off && !cse->write_type);
 	blk_size = cs_data->blk_size;
 	blk_fill_size = (blk_size * gv_fillfactor) / 100 - cs_data->reserved_bytes;
-	cse->blk_target->clue.end = 0;		/* nullify clues for gv_targets involved in recomputation */
 	cse->first_copy = TRUE;
-	bh = &temp_srch_blk_status;
-	*bh = *hist1;
 	if (dba_bg == csa->hdr->acc_meth)
 	{	/* For BG method, modify history with uptodate cache-record, buffer and cycle information.
 		 * Also modify cse->old_block and cse->ondsk_blkver to reflect the updated buffer.
@@ -1709,7 +1685,8 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
 		bh->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
 	}
 	buffaddr = bh->buffaddr;
-	for (kvhead = kv = cse->recompute_list_head; kv; kv = kv->next)
+	assert(NULL != cse->recompute_list_head);
+	for (kvhead = kv = cse->recompute_list_head; (NULL != kv); kv = kv->next)
 	{
 		pKey = &kv->key;
 		value = kv->value;
@@ -1826,6 +1803,27 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
 			return cdb_sc_blksplit;
 		}
 	}
+	/* Update bh->tn to reflect the fact that it is uptodate as of the current database transaction.
+	 * Not doing so could actually cause unnecessary restarts.
+	 */
+	bh->tn = csa->hdr->trans_hist.curr_tn;
+	/* If block in this history element is the same as gv_target's leaf block and it has a non-zero clue, update it */
+	gvt = bh->blk_target;
+	assert(!bh->level);	/* this is why it is safe to access 0th array index in the next line */
+	t1 = &gvt->hist.h[0];
+	if (gvt->clue.end && (t1->blk_num == bh->blk_num))
+	{
+		*t1 = *bh;
+		/* Update clue to reflect last key in recompute list. No need to update gvt->first_rec and gvt->last_rec
+		 * as they are guaranteed to be the same as what it was when the clue was filled in by gvcst_search (if
+		 * they are different, an index block would have changed which means we would restart this transaction
+		 * anyways and the clue would be reset to 0).
+		 */
+		assert(NULL != pKey);
+		COPY_CURRKEY_TO_GVTARGET_CLUE(gvt, pKey);
+		if (new_rec)
+			t1->curr_rec.match = gvt->clue.end + 1;	/* Keep srch_hist and clue in sync for NEXT gvcst_search */
+	}
 	/* At this point, cse->new_buff could be non-NULL either because the same variable was being updated multiple times
 	 * inside of the TP transaction or because cse->recompute_list_head contained more than one variable (in which case
 	 * cse->new_buff will be set by the invocation of gvcst_blk_build (above) for the second element in the list. In
@@ -1838,7 +1836,7 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
 		old_block = (blk_hdr_ptr_t)cse->old_block;
 		assert(old_block->bsiz <= csa->hdr->blk_size);
 		if (old_block->tn < csa->jnl->jnl_buff->epoch_tn)
-			cse->blk_checksum = jnl_get_checksum((uint4 *)old_block, old_block->bsiz);
+			cse->blk_checksum = jnl_get_checksum((uint4 *)old_block, csa, old_block->bsiz);
 		else
 			cse->blk_checksum = 0;
 	}
@@ -1934,7 +1932,7 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 					if (old_block->tn < jbp->epoch_tn)
 					{
 						bsiz = old_block->bsiz;
-						JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, old_block, bsiz);
+						JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, csa, old_block, bsiz);
 					} else
 						cse->blk_checksum = 0;
 				}
@@ -1972,7 +1970,7 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 		if (NULL != jbp)
 		{	/* recompute CHECKSUM for the modified bitmap block before-image */
 			if (old_block->tn < jbp->epoch_tn)
-				bml_cse->blk_checksum = jnl_get_checksum((uint4 *)old_block, old_block->bsiz);
+				bml_cse->blk_checksum = jnl_get_checksum((uint4 *)old_block, csa, old_block->bsiz);
 			else
 				bml_cse->blk_checksum = 0;
 		}

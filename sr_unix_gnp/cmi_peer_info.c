@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,10 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#if defined(__MVS__) && !defined(_ISOC99_SOURCE)
+#define _ISOC99_SOURCE
+#endif
 
 #include "mdef.h"
 #include "cmidef.h"

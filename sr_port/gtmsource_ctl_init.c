@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,12 @@
 #include "repl_sp.h"
 #include "tp_change_reg.h"
 #include "is_file_identical.h"
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 
 GBLDEF repl_ctl_element	*repl_ctl_list = NULL;
 
@@ -102,7 +108,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 	repl_ctl_element	*tmp_ctl = NULL;
 	jnl_file_header		*tmp_jfh = NULL;
 	jnl_file_header		*tmp_jfh_base = NULL;
-	int			tmp_fd = -1;
+	int			tmp_fd = NOJNL;
 	int			status;
 #ifdef UNIX
 	struct stat		stat_buf;
@@ -113,6 +119,9 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 #else
 #error Unsupported platform
 #endif
+	GTMCRYPT_ONLY(
+		int 		crypt_status;
+	)
 	uint4			jnl_status;
 
 	error_def(ERR_JNLBADLABEL);
@@ -160,7 +169,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 		tmp_ctl->jnl_fn[jnl_fn_len] = '\0';
 
 		/* Open Journal File */
-#ifdef UNIX
+#		ifdef UNIX
 		OPENFILE(tmp_ctl->jnl_fn, O_RDONLY, tmp_fd);
 		if (0 > tmp_fd)
 			status = errno;
@@ -170,7 +179,11 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 			if (0 > status)
 				status = errno;
 		}
-#elif defined(VMS)
+#		ifdef __MVS
+		if (-1 == gtm_zos_tag_to_policy(tmp_fd, TAG_BINARY))
+			status = errno;
+#		endif
+#		elif defined(VMS)
 		fab = cc$rms_fab;
 		fab.fab$l_fna = tmp_ctl->jnl_fn;
 		fab.fab$b_fns = tmp_ctl->jnl_fn_len;
@@ -187,9 +200,9 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 			status = SS_NORMAL;
 			tmp_fd = fab.fab$l_stv;
 		}
-#else
-#error Unsupported platform
-#endif
+#		else
+#		error Unsupported platform
+#		endif
 		REPL_DPRINT2("CTL INIT :  Direct open of file %s\n", tmp_ctl->jnl_fn);
 	}
 
@@ -220,7 +233,17 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 	tmp_ctl->repl_buff->fc->jfh_base = tmp_jfh_base;
 	tmp_ctl->repl_buff->fc->jfh = tmp_jfh;
 	tmp_ctl->repl_buff->fc->fd = tmp_fd;
-
+#	ifdef GTM_CRYPT
+	if (tmp_jfh->is_encrypted)
+	{
+		INIT_PROC_ENCRYPTION(crypt_status);
+		/* If the encryption init failed in db_init, the below MACRO should return an error.
+		 * Depending on the error returned, report the error.*/
+		GTMCRYPT_GETKEY(tmp_jfh->encryption_hash, tmp_ctl->encr_key_handle, crypt_status);
+		if (0 != crypt_status)
+			GC_RTS_ERROR(crypt_status, jnl_fn);
+	}
+#	endif
 	if (init)
 	{
 		F_COPY_GDID(tmp_ctl->repl_buff->fc->id, JNL_GDID_PVT(csa));
@@ -311,7 +334,7 @@ int repl_ctl_close(repl_ctl_element *ctl)
 					free(ctl->repl_buff->fc->jfh_base);
 				if (NOJNL != ctl->repl_buff->fc->fd)
 				{
-					F_CLOSE(ctl->repl_buff->fc->fd, status);
+					F_CLOSE(ctl->repl_buff->fc->fd, status); /* resets "ctl->repl_buff->fc->fd" to FD_INVALID */
 				}
 				free(ctl->repl_buff->fc);
 			}
@@ -344,10 +367,10 @@ int gtmsource_ctl_close(void)
 					 * jnl_ensure_open(). In which case, we would have copied jnl->channel to fc->fd.
 					 * Validate. */
 					assert(csa->jnl->channel == ctl->repl_buff->fc->fd);
-					F_CLOSE(csa->jnl->channel, status);
-					csa->jnl->channel = NOJNL;
+					JNL_FD_CLOSE(csa->jnl->channel, status);	/* sets csa->jnl->channel to NOJNL */
 					ctl->repl_buff->fc->fd = NOJNL; /* closed jnl->channel which is the same as fc->fd.
 									 * no need to close again */
+					assert(csa->jnl->channel == ctl->repl_buff->fc->fd);
 					csa->jnl->cycle--; /* decrement cycle so jnl_ensure_open() knows to reopen the journal */
 				}
 			}

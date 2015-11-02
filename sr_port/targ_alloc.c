@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +48,7 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	gvt_hashtab_present = FALSE;
 	if ((NULL != gvent) && (NULL != csa))
 	{
-		assert(keysize = csa->hdr->max_key_size);
+		assert(keysize == csa->hdr->max_key_size);
 		if (NULL != csa->gvt_hashtab)
 		{	/* Check if incoming gvname is already part of the database file specific hashtable. If so,
 			 * return gv_target that already exists here instead of mallocing something new.
@@ -66,8 +66,7 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 			gvt_hashtab_present = TRUE;
 		}
 	}
-	keysize = ROUND_UP2((keysize + MAX_NUM_SUBSC_LEN), 4);	/* Alignment is done so that first_rec
-							    	   and last_rec starts at aligned boundary */
+	keysize = DBKEYSIZE(keysize);
 	partial_size = SIZEOF(gv_namehead) + 2 * SIZEOF(gv_key) + 3 * keysize;
 	gvn_size = (NULL == gvent) ? MAX_MIDENT_LEN : gvent->var_name.len;
 	gvt = (gv_namehead *)malloc(partial_size + gvn_size);
@@ -110,7 +109,6 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	gvt->regcnt = 1;
 	gvt->collseq = NULL;
 	gvt->read_local_tn = (trans_num)0;
-	gvt->write_local_tn = (trans_num)0;
 	gvt->noisolation = FALSE;
 	gvt->alt_hist = (srch_hist *)malloc(sizeof(srch_hist));
 	gvt->hist.h[0].blk_num = HIST_TERMINATOR;
@@ -124,6 +122,7 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 		gvt->alt_hist->h[index].blk_target = gvt;
 	}
 	gvt->prev_gvnh = NULL;
+	gvt->next_tp_gvnh = NULL;
 	assert(gv_target_list != gvt);
 	gvt->next_gvnh = gv_target_list;		/* Insert into gv_target list */
 	if (NULL != gv_target_list)
@@ -153,6 +152,8 @@ void	targ_free(gv_namehead *gvt)
 		UNIX_ONLY(assert((GTCM_GNP_SERVER_IMAGE == image_type) || (process_exiting && (gvt == cs_addrs->dir_tree)));)
 		gv_target = NULL;	/* In that case, set gv_target to NULL to ensure freed up memory is never used */
 	}
+	/* assert we never delete a gvt that is actively used in a TP transaction */
+	DBG_CHECK_IN_GVT_TP_LIST(gvt, FALSE);	/* FALSE => we check that gvt is NOT present in the gvt_tp_list */
 	prev_gvnh = gvt->prev_gvnh;
 	next_gvnh = gvt->next_gvnh;
 	/* Input "gvt" can NOT be part of the gv_target_list (i.e. not allocated through targ_alloc) in case of a GT.CM GNP or

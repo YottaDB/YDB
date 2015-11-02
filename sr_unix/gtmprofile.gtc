@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -10,7 +10,7 @@
 #################################################################
 gtm_dist="GTMDIST"; export gtm_dist
 gtmgbldir="mumps.gld"; export gtmgbldir
-if [ "$gtm_chset" = "UTF-8" ] ; then
+if [ "$gtm_chset" = "UTF-8" -o "$gtm_chset" = "utf-8" ] ; then
         if [ -e $gtm_dist/utf8 ] ; then
                 gtm_dist="$gtm_dist/utf8"; export gtm_dist
         fi

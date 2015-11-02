@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,20 +29,20 @@ void cmj_incoming_call(struct NTD *tsk)
 	GTM_SOCKLEN_TYPE sz = SIZEOF(in);
 	cmi_status_t status;
 
-	while ((-1 == (rval = accept(tsk->listen_fd, (struct sockaddr *)&in, (GTM_SOCKLEN_TYPE *)&sz))) && EINTR == errno)
+	while ((-1 == (rval = ACCEPT(tsk->listen_fd, (struct sockaddr *)&in, (GTM_SOCKLEN_TYPE *)&sz))) && EINTR == errno)
 		;
 	while (rval >= 0)
 	{
 		status = cmj_setupfd(rval);
 		if (CMI_ERROR(status))
 		{
-			CLOSEFILE(rval, rc);
+			CLOSEFILE_RESET(rval, rc);	/* resets "rval" to FD_INVALID */
 			return;
 		}
 		status = cmj_set_async(rval);
 		if (CMI_ERROR(status))
 		{
-			CLOSEFILE(rval, rc);
+			CLOSEFILE_RESET(rval, rc);	/* resets "rval" to FD_INVALID */
 			return;
 		}
 
@@ -52,7 +52,7 @@ void cmj_incoming_call(struct NTD *tsk)
 		{
 			/* no point if the callbacks are not in place */
 			cmi_free_clb(lnk);
-			CLOSEFILE(rval, rc);
+			CLOSEFILE_RESET(rval, rc);	/* resets "rval" to FD_INVALID */
 			return;
 		}
 		if (rval > tsk->max_fd)
@@ -66,7 +66,7 @@ void cmj_incoming_call(struct NTD *tsk)
 		/* setup for callback processing */
 		lnk->deferred_event = TRUE;
 		lnk->deferred_reason = CMI_REASON_CONNECT;
-		while ((-1 == (rval = accept(tsk->listen_fd, (struct sockaddr *)&in, (GTM_SOCKLEN_TYPE *)&sz))) && EINTR == errno)
+		while ((-1 == (rval = ACCEPT(tsk->listen_fd, (struct sockaddr *)&in, (GTM_SOCKLEN_TYPE *)&sz))) && EINTR == errno)
 			;
 	}
 }

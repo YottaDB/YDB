@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,14 +63,11 @@
 #include "gtmsecshr.h"
 #include "ftok_sems.h"
 #include "gtmimagename.h"
+#include "gtmio.h"
+#include "have_crit.h"
 
-#define CANCEL_DB_TIMERS(region, cancelled_timer, cancelled_dbsync_timer)	\
+#define CANCEL_DB_TIMERS(region, csa, cancelled_timer, cancelled_dbsync_timer)	\
 {										\
-	sgmnt_addrs	*csa;							\
-										\
-	cancelled_timer = FALSE;						\
-	cancelled_dbsync_timer = FALSE;						\
-	csa = &FILE_INFO(region)->s_addrs;					\
 	if (csa->timer)								\
 	{									\
 		cancel_timer((TID)region);					\
@@ -89,6 +86,7 @@
 
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	boolean_t		mupip_jnl_recover;
+GBLREF	boolean_t		have_standalone_access;
 GBLREF	boolean_t		created_core, need_core, dont_want_core, is_src_server, is_updproc;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -113,7 +111,7 @@ void gds_rundown(void)
 	now_t			now;	/* for GET_CUR_TIME macro */
 	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	gd_region		*reg;
-	int			save_errno, status;
+	int			save_errno, status, rc;
 	int4			semval, ftok_semval, sopcnt, ftok_sopcnt;
 	short			crash_count;
 	sm_long_t		munmap_len;
@@ -125,6 +123,7 @@ void gds_rundown(void)
 	unix_db_info		*udi;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
+	int			save_intrpt_ok_state;
 
 	error_def(ERR_CRITSEMFAIL);
 	error_def(ERR_DBCCERR);
@@ -206,7 +205,9 @@ void gds_rundown(void)
 		return;
 	}
 	/* Cancel any pending flush timer for this region by this task */
-	CANCEL_DB_TIMERS(reg, cancelled_timer, cancelled_dbsync_timer);
+	cancelled_timer = FALSE;
+	cancelled_dbsync_timer = FALSE;
+	CANCEL_DB_TIMERS(reg, csa, cancelled_timer, cancelled_dbsync_timer);
 	we_are_last_user = FALSE;
 	if (!csa->persistent_freeze)
 		region_freeze(reg, FALSE, FALSE, FALSE);
@@ -218,13 +219,14 @@ void gds_rundown(void)
 	 * We already have created ftok semaphore in db_init or, mu_rndwn_file and did not remove it.
 	 * So just lock it. We do it in blocking mode.
 	 */
+	SAVE_INTRPT_OK_STATE(INTRPT_IN_GDS_RUNDOWN);
 	if (!ftok_sem_lock(reg, FALSE, FALSE))
 		rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 	/*
-	 * For mupip_jnl_recover we already have database access control semaphore.
-	 * We do not release it. We release it from  mur_close_files.
+	 * If we already have database access control semaphore, we do not release it now.  We will release it
+	 * in mupip_exit_handler.c
 	 */
-	if (!mupip_jnl_recover)
+	if (!have_standalone_access)
 	{
 		sop[0].sem_num = 0; sop[0].sem_op = 0;	/* Wait for 0 */
 		sop[1].sem_num = 0; sop[1].sem_op = 1;	/* Lock */
@@ -241,6 +243,7 @@ void gds_rundown(void)
 					DB_LEN_STR(reg),
 					ERR_RNDWNSEMFAIL);
 				REVERT;
+				RESTORE_INTRPT_OK_STATE;
 				return;			/* Already in rundown for this region */
 			}
 			if (EAGAIN != save_errno)
@@ -278,11 +281,11 @@ void gds_rundown(void)
 			ERR_TEXT, 2, RTS_ERROR_TEXT("gds_rundown shmctl"), save_errno);
 	} else
 		we_are_last_user =  (1 == shm_buf.shm_nattch) && !vermismatch;
-	assert(!mupip_jnl_recover || we_are_last_user); /* recover => one user */
+	assert(!have_standalone_access || we_are_last_user); /* recover => one user */
 	if (-1 == (semval = semctl(udi->semid, 1, GETVAL)))
 		rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
 	we_are_last_writer = (1 == semval) && (FALSE == reg->read_only) && !vermismatch;/* There's one writer left and I am it */
-	assert(!(mupip_jnl_recover && !reg->read_only) || we_are_last_writer); /* recover + R/W region => one writer */
+	assert(!(have_standalone_access && !reg->read_only) || we_are_last_writer); /* recover + R/W region => one writer */
 	if (-1 == (ftok_semval = semctl(udi->ftok_semid, 1, GETVAL)))
 		rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
 	/* If csa->nl->donotflush_dbjnl is set, it means mupip recover/rollback was interrupted and therefore we should
@@ -434,8 +437,8 @@ void gds_rundown(void)
 		{
 			grab_crit(reg);			/* To satisfy crit requirement in fileheader_sync() */
 			memset(csd->machine_name, 0, MAX_MCNAMELEN); /* clear the machine_name field */
-			if (!mupip_jnl_recover && we_are_last_user)
-			{	/* mupip_jnl_recover will do this after mur_close_file */
+			if (!have_standalone_access && we_are_last_user)
+			{	/* mupip_exit_handler will do this after mur_close_file */
 				csd->semid = INVALID_SEMID;
 				csd->shmid = INVALID_SHMID;
 				csd->gt_sem_ctime.ctime = 0;
@@ -468,8 +471,12 @@ void gds_rundown(void)
 			}
                 }
 	} /* end if (!reg->read_only && !csa->nl->donotflush_dbjnl) */
-	if (reg->read_only && we_are_last_user && !mupip_jnl_recover)
-	{	/* mupip_jnl_recover will do this after mur_close_file */
+	/* We had cancelled all db timers at start of rundown. In case as part of rundown (wcs_flu above), we had started
+	 * any timers, cancel them BEFORE setting reg->open to FALSE (assert in wcs_clean_dbsync relies on this).
+	 */
+	CANCEL_DB_TIMERS(reg, csa, cancelled_timer, cancelled_dbsync_timer);
+	if (reg->read_only && we_are_last_user && !have_standalone_access)
+	{	/* mupip_exit_handler will do this after mur_close_file */
 		db_ipcs.semid = INVALID_SEMID;
 		db_ipcs.shmid = INVALID_SHMID;
 		db_ipcs.gt_sem_ctime = 0;
@@ -483,7 +490,8 @@ void gds_rundown(void)
 				  ERR_TEXT, 2, RTS_ERROR_TEXT("gtmsecshr failed to update database file header"));
 	}
 	/* Done with file now, close it */
-	if (-1 == close(udi->fd))
+	CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
+	if (-1 == rc)
 	{
 		rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 			  ERR_TEXT, 2, LEN_AND_LIT("Error during file close"), errno);
@@ -537,9 +545,9 @@ void gds_rundown(void)
 			send_msg(VARLSTCNT(6) ERR_DBRNDWNWRN, 4, DB_LEN_STR(reg), process_id, process_id);
 		/*
 		 * Don't release semaphore in case of mupip recover/rollback; since it has standalone access.
-		 * It will release the semaphore in mur_close_files.
+		 * It will release the semaphore in mupip_exit_handler.
 		 */
-		if (!mupip_jnl_recover)
+		if (!have_standalone_access)
 		{
 			if (0 != sem_rmid(udi->semid))
 				rts_error(VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
@@ -548,7 +556,7 @@ void gds_rundown(void)
 		}
 	} else
 	{
-		assert(!mupip_jnl_recover);
+		assert(!have_standalone_access);
 		/* If we were writing, get rid of our writer access count semaphore */
 		if (!reg->read_only)
 			if (0 != (save_errno = do_semop(udi->semid, 1, -1, SEM_UNDO)))
@@ -560,8 +568,9 @@ void gds_rundown(void)
 				ERR_TEXT, 2, RTS_ERROR_TEXT("gds_rundown rundown semaphore release"), save_errno);
 		grabbed_access_sem = FALSE;
 	}
-	if (!ftok_sem_release(reg, !mupip_jnl_recover, FALSE))
+	if (!ftok_sem_release(reg, !have_standalone_access, FALSE))
 			rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
+	RESTORE_INTRPT_OK_STATE;
 	if (!ipc_deleted)
 	{
 		GET_CUR_TIME;
@@ -612,7 +621,7 @@ CONDITION_HANDLER(gds_rundown_ch)
 	udi = FILE_INFO(gv_cur_region);
 	csa = &udi->s_addrs;
 	/* We got here on an error and are going to close the region. Cancel any pending flush timer for this region by this task*/
-	CANCEL_DB_TIMERS(gv_cur_region, cancelled_timer, cancelled_dbsync_timer);
+	CANCEL_DB_TIMERS(gv_cur_region, csa, cancelled_timer, cancelled_dbsync_timer);
 	/* release the access control semaphore, if you hold it */
 	if (grabbed_access_sem)
 	{
@@ -639,7 +648,7 @@ CONDITION_HANDLER(gds_rundown_ch)
 
 	}
 	if (udi->grabbed_ftok_sem)
-		ftok_sem_release(gv_cur_region, !mupip_jnl_recover, TRUE);
+		ftok_sem_release(gv_cur_region, !have_standalone_access, TRUE);
 	gv_cur_region->open = FALSE;
 	PRN_ERROR;
 	gtm_putmsg(VARLSTCNT(4) ERR_DBRNDWN, 2, REG_LEN_STR(gv_cur_region));

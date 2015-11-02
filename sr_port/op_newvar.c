@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,9 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
+#include "gtm_string.h"
+
 #include "hashtab_mname.h"
 #include "lv_val.h"
 #include "rtnhdr.h"
@@ -18,7 +21,12 @@
 #include "stack_frame.h"
 #include "tp_frame.h"
 #include "op.h"
-#include "gtm_string.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "alias.h"
 
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
@@ -41,6 +49,7 @@ void op_newvar(uint4 arg1)
 	tp_frame	*tpp;
 	int		indx;
 	int4		shift_size;
+	DBGRFCT_ONLY(mident_fixed vname;)
 
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
@@ -49,7 +58,7 @@ void op_newvar(uint4 arg1)
 	tabent = lookup_hashtab_mname(&curr_symval->h_symtab, varname);
 	assert(tabent);	/* variable must be defined and fetched by this point */
 	if (frame_pointer->type & SFT_COUNT)
-	{	/* Current (youngest) frame is NOT an indirect frame.
+	{	/* Current (youngest) frame IS a counted frame.
 		   If the var being new'd exists in an earlier frame, we need to save
 		   that value so it can be restored when we exit this frame. Since this
 		   is a counted frame, just create a stack entry to save the old value.
@@ -72,19 +81,12 @@ void op_newvar(uint4 arg1)
 			mv_st_ent = mv_chain;
 			new = mv_st_ent->mv_st_cont.mvs_nval.mvs_val = lv_getslot(curr_symval);
 			ptab = &mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab;
-			mv_st_ent->mv_st_cont.mvs_nval.name = ((var_tabent *)frame_pointer->vartab_ptr)[arg1];
-			varname = &mv_st_ent->mv_st_cont.mvs_nval.name;
+			DEBUG_ONLY(mv_st_ent->mv_st_cont.mvs_nval.name = ((var_tabent *)frame_pointer->vartab_ptr)[arg1]);
+			DEBUG_ONLY(varname = &mv_st_ent->mv_st_cont.mvs_nval.name);
 		}
-
-		/* save symtab that's older than the current frame */
-		if (frame_pointer->l_symtab > (mval **)frame_pointer)
-			ptab->lst_addr = (lv_val **)&frame_pointer->l_symtab[arg1];
-		else
-			ptab->lst_addr = NULL;
-		frame_pointer->l_symtab[arg1] = (mval *)new;
 		assert((int)arg1 >= 0);
 	} else
-	{	/* Current (youngest) frame IS an indirect frame.
+	{	/* Current (youngest) frame IS NOT a counted frame.
 		   The situation is more complex because this is not a true stackframe.
 		   It has full access to the base "counted" frame's vars and any new
 		   done here must behave as if it were done in the base/counted frame.
@@ -130,7 +132,7 @@ void op_newvar(uint4 arg1)
 		for (fp_fix = frame_pointer;  fp_fix != fp_prev;  fp_fix = fp_fix->old_frame_pointer)
 		{
 			if ((unsigned char *)fp_fix->l_symtab < top && (unsigned char *)fp_fix->l_symtab > stacktop)
-				fp_fix->l_symtab = (mval **)((char *)fp_fix->l_symtab - shift_size);
+				fp_fix->l_symtab = (ht_ent_mname **)((char *)fp_fix->l_symtab - shift_size);
 			if (fp_fix->temps_ptr < top && fp_fix->temps_ptr > stacktop)
 				fp_fix->temps_ptr -= shift_size;
 			if (fp_fix->vartab_ptr < (char *)top && fp_fix->vartab_ptr > (char *)stacktop)
@@ -175,45 +177,22 @@ void op_newvar(uint4 arg1)
 		}
 		new = mv_st_ent->mv_st_cont.mvs_nval.mvs_val = lv_getslot(curr_symval);
 		ptab = &mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab;
-		mv_st_ent->mv_st_cont.mvs_nval.name = ((var_tabent *)frame_pointer->vartab_ptr)[arg1];
-		varname = &mv_st_ent->mv_st_cont.mvs_nval.name;
-
-		/* For each (indirect) stack frame we have visited, find and set the new value of varname into the
-		   stack frame. Note that varname might not exist in all frames.
-		*/
-		for (fp_fix = frame_pointer; ; fp_fix = fp_fix->old_frame_pointer)
-		{
-			for (indx = 0; indx < fp_fix->vartab_len; indx++)
-			{
-				if (MSTR_EQ(&(((var_tabent *)fp_fix->vartab_ptr)[indx].var_name), &varname->var_name))
-					break;
-			}
-			if (fp_fix == fp_prev)		/* Have last substantive frame.. Set its value later */
-				break;
-			if (indx < fp_fix->vartab_len)
-				fp_fix->l_symtab[indx] = (mval *)new;
-		}
-		/* Do frame type specific initialization of restoration structure. Save old value if the value
-		   exists in this frame.
-		*/
-		if (indx < fp_fix->vartab_len)
-		{
-			ptab->lst_addr = (lv_val **)&fp_fix->l_symtab[indx];			/* save restore symtab entry */
-			fp_fix->l_symtab[indx] = (mval *)new;
-		} else
-			ptab->lst_addr = NULL;
+		DEBUG_ONLY(mv_st_ent->mv_st_cont.mvs_nval.name = ((var_tabent *)frame_pointer->vartab_ptr)[arg1]);
+		DEBUG_ONLY(varname = &mv_st_ent->mv_st_cont.mvs_nval.name);
 	}
 
 	/* initialize new data cell */
-	new->v.mvtype = 0;
-	new->tp_var = NULL;
-	new->ptrs.val_ent.children = 0;
-	new->ptrs.val_ent.parent.sym = curr_symval;
-	new->ptrs.free_ent.next_free = 0;
+	LVVAL_INIT(new, curr_symval);
 
 	/* finish initializing restoration structures */
 	ptab->save_value = (lv_val *)tabent->value;
-	ptab->nam_addr = varname;
+	ptab->hte_addr = tabent;
+	DEBUG_ONLY(ptab->nam_addr = varname);
+	DBGRFCT_ONLY(
+		memcpy(vname.c, tabent->key.var_name.addr, tabent->key.var_name.len);
+		vname.c[tabent->key.var_name.len] = '\0';
+	);
+	DBGRFCT((stderr, "op_newvar: Var '%s' hte 0x"lvaddr" being reset from 0x"lvaddr" to 0x"lvaddr"\n",
+		 &vname.c, tabent, tabent->value, new));
 	tabent->value = (char *)new;
-	return;
 }

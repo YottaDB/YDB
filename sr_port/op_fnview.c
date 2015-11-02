@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,8 @@
 #include "op.h"
 #include "patcode.h"
 #include "mvalconv.h"
+#include "lv_val.h"
+#include "alias.h"
 
 GBLREF spdesc		stringpool;
 GBLREF int4		cache_hits, cache_fails;
@@ -426,6 +428,15 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			break;
 		case VTK_MAXSOCKETS:
 			n = gtm_max_sockets;
+			break;
+		case VTK_LVCREF:
+			n = ((lv_val *)parmblk.value)->stats.crefcnt;
+			break;
+		case VTK_LVREF:
+			n = ((lv_val *)parmblk.value)->stats.trefcnt;
+			break;
+		case VTK_LVGCOL:
+			n = als_lvval_gc();
 			break;
 		default:
 			rts_error(VARLSTCNT(1) ERR_VIEWFN);

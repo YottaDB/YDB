@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,8 @@ boolean_t backup_block(sgmnt_addrs *csa, block_id blk, cache_rec_ptr_t backup_cr
 	shmpool_blk_hdr_ptr_t	sblkh_p;
 	boolean_t		ret = TRUE, is_bg;
 	sgmnt_data_ptr_t	csd;
+	sm_uc_ptr_t		bkp_src_blk;
+
 
 	csd = csa->hdr;
 	is_bg = (dba_bg == csd->acc_meth);
@@ -66,8 +68,18 @@ boolean_t backup_block(sgmnt_addrs *csa, block_id blk, cache_rec_ptr_t backup_cr
 		assert(((blk_hdr_ptr_t)backup_blk_p)->bsiz >= sizeof(blk_hdr));
 	} else /* For MM version, no dynamic conversions take place so just record block as we know it is */
 		sblkh_p->use.bkup.ondsk_blkver = csd->desired_db_format;
+	bkp_src_blk = backup_blk_p;
+#	ifdef GTM_CRYPT
+	/* If the database is encrypted, we need to copy the block to the twin buffer */
+	if (csd->is_encrypted)
+	{
+		DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, backup_blk_p);
+		bkp_src_blk = GDS_ANY_ENCRYPTGLOBUF(backup_blk_p, csa);
+		DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, bkp_src_blk);
+	}
+#	endif
 	/* Copy block information to data portion of shmpool block just following header */
-	memcpy((sblkh_p + 1), backup_blk_p, bsiz);
+	memcpy((sblkh_p + 1), bkp_src_blk, bsiz);
 	/* Need a write coherency fence here as we want to make sure the above info is stored and
 	 * reflected to other processors before we mark the block valid.
 	 */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 #include "gtm_string.h"
 #include "gtm_ipc.h"
 #include "gtm_stat.h"
+#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_socket.h"
 
@@ -30,6 +31,8 @@
 #include "getjobnum.h"
 #include "gtmmsg.h"
 #include "trans_log_name.h"
+#include "eintr_wrappers.h"
+#include "gtm_permissions.h"
 
 GBLREF struct sockaddr_un 	gtmsecshr_sock_name;
 GBLREF struct sockaddr_un 	gtmsecshr_cli_sock_name;
@@ -49,7 +52,7 @@ static char hex_table[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','
 unsigned char		*mypid2ascx(unsigned char *, pid_t);
 
 #ifndef SUN_LEN
-#  define SUN_LEN(x)	sizeof(*x)
+#  define SUN_LEN(x)	SIZEOF(*x)
 #else
 #  define EXACT_SIZE_SOCKNAME
 #endif
@@ -108,7 +111,7 @@ int4 gtmsecshr_pathname_init(int caller)
 	gtmsecshr_sockpath[gtmsecshr_sockpath_len] = '\0';
 
 	strcpy(gtmsecshr_sockpath + gtmsecshr_sockpath_len , GTMSECSHR_SOCK_PREFIX);
-	gtmsecshr_sockpath_len += (sizeof(GTMSECSHR_SOCK_PREFIX) - 1);
+	gtmsecshr_sockpath_len += (SIZEOF(GTMSECSHR_SOCK_PREFIX) - 1);
 
 	gtmsecshr_logname.addr = GTMSECSHR_PATH;
 	gtmsecshr_logname.len = sizeof(GTMSECSHR_PATH) - 1;
@@ -149,6 +152,10 @@ int4 gtmsecshr_sock_init(int caller)
 	unsigned char		id_str[MAX_ID_LEN+1], suffix;
 	unsigned char		pid_str[2 * sizeof(pid_t) + 1];
 	int			i2hex_nofill(int , uchar_ptr_t, int);
+	int			stat_res;
+	struct stat     	stat_buf;
+	struct stat     	dist_stat_buff;
+	int			lib_gid;
 
 	error_def(ERR_GTMSECSHRSOCKET);
 	error_def(ERR_TEXT);
@@ -166,7 +173,7 @@ int4 gtmsecshr_sock_init(int caller)
 		gtmsecshr_cli_sock_name.sun_family = AF_UNIX;
 		memcpy(gtmsecshr_cli_sock_name.sun_path, gtmsecshr_sockpath, gtmsecshr_sockpath_len);
 		strcpy(gtmsecshr_cli_sock_name.sun_path + gtmsecshr_sockpath_len, (char *)mypid2ascx(pid_str, process_id));
-		gtmsecshr_cli_sockpath_len = SUN_LEN(&gtmsecshr_cli_sock_name);
+		gtmsecshr_cli_sockpath_len = (int)(SUN_LEN(&gtmsecshr_cli_sock_name));
 	}
 
 	id_str[i2hex_nofill((unsigned int)gtmsecshr_key, (uchar_ptr_t )id_str, MAX_ID_LEN)] = 0;
@@ -175,9 +182,9 @@ int4 gtmsecshr_sock_init(int caller)
 	gtmsecshr_sockpath_len += id_str_len;
 	gtmsecshr_sock_name.sun_family = AF_UNIX;
 	memcpy(gtmsecshr_sock_name.sun_path, gtmsecshr_sockpath, gtmsecshr_sockpath_len);
-	gtmsecshr_sockpath_len = SUN_LEN(&gtmsecshr_sock_name);
+	gtmsecshr_sockpath_len = (int)(SUN_LEN(&gtmsecshr_sock_name));
 
-	if (-1 == (gtmsecshr_sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)))
+	if (FD_INVALID == (gtmsecshr_sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)))
 	{
 		rts_error(VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3, RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"),
 			  process_id, ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr socket create"), errno);
@@ -265,11 +272,28 @@ int4 gtmsecshr_sock_init(int caller)
 				ret_status = BINDERR;
 			} else if ('\0' != suffix)
 				ret_status = ONETIMESOCKET;
+			/* if ret_status is zero do the following checks
+			 * if $gtm_dist/libgtmshr.so is not world accessible then set mode to 0660
+			 * and change the gid to the gid of $gtm_dist/libgtmshr.so
+			 * if different from current user */
+			if (!ret_status)
+			{
+				lib_gid = gtm_get_group_id(&dist_stat_buff);
+				if ((-1 != lib_gid) && (dist_stat_buff.st_mode & 04))
+					lib_gid = -1; /* don't change it */
+
+				if ((-1 != lib_gid) &&
+				    (-1 == CHMOD(gtmsecshr_cli_sock_name.sun_path, 0660) || ((lib_gid != GETGID()) &&
+							 (-1 == CHOWN(gtmsecshr_cli_sock_name.sun_path, -1, lib_gid)))))
+				{
+					rts_error(VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
+						  RTS_ERROR_STRING("Caller"), process_id, ERR_TEXT, 2,
+						  RTS_ERROR_LITERAL("Error changing socket permissions/group"), errno);
+				}
+			}
 		}
 	}
-
 	gtmsecshr_sock_init_done = TRUE;
-
 	return ret_status;
 }
 

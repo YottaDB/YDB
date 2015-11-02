@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,10 +71,11 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	bool		timed = FALSE;
 	int		file_des;
 #ifdef __MVS__
-	int		file_des_w;	/*	fifo write	*/
+	int		file_des_w = -2;	/*	fifo write	*/
 	uint4		status_w;
-	bool		sys_fifo = TRUE;
+	d_rm_struct	*d_rm_out, *d_rm_in;
 #endif
+	boolean_t	filecreated = FALSE;
 	TID		timer_id;
 	struct stat	outbuf;
 	char		*buf, namebuf[LOGNAME_LEN + 1];
@@ -154,15 +155,17 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 #endif
 				    )
 				{
-					tl->iod->dollar.zeof = TRUE;
 #ifdef __MVS__
+					if (EEXIST != errno)
+						filecreated = TRUE;
 					/*	create another one for fifo write	*/
 					tl->iod->pair.out = (io_desc *)malloc(sizeof(io_desc));
 					(tl->iod->pair.out)->pair.in = tl->iod;
 					(tl->iod->pair.out)->pair.out = (tl->iod->pair.out);
 					(tl->iod->pair.out)->trans_name = tl;
 					(tl->iod->pair.out)->type = ff;
-					sys_fifo = FALSE;
+#else
+					filecreated = TRUE;
 #endif
 				} else  if (EEXIST != errno)
 				{
@@ -212,8 +215,10 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 				if ((-1 == stat_res) && (n_io_dev_types == tl->iod->type))
 				{
 					if (ENOENT == errno)
+					{
 						tl->iod->type = rm;
-					else
+						filecreated = TRUE;
+					} else
 					{	/* save errno to be checked later */
 						save_stat_err = errno;
 						stat_err = TRUE;
@@ -234,9 +239,6 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 						break;
 					case S_IFIFO:
 						tl->iod->type = ff;
-#ifdef __MVS__
-						sys_fifo = TRUE;
-#endif
 						break;
 					case S_IFREG:
 					case S_IFDIR:
@@ -276,9 +278,6 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 						/* fall through */
 					case 0:
 						tl->iod->type = ff;
-#ifdef __MVS__
-						sys_fifo = TRUE;
-#endif
 						break;
 					default:
 						break;
@@ -287,16 +286,13 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		}
 		naml->iod = tl->iod;
 	}
+	assert((0 <= naml->iod->state) && (n_io_dev_states > naml->iod->state));
 	active_device = naml->iod;
 
 	if ((-2 == file_des) && (dev_open != naml->iod->state) && (us != naml->iod->type)
 	    && (tcp != naml->iod->type) && (gtmsocket != naml->iod->type) && (pi != naml->iod->type))
 	{
 		oflag |= (O_RDWR | O_CREAT | O_NOCTTY);
-#ifdef __MVS__
-		if (ff == naml->iod->type && !sys_fifo)
-			oflag |= O_NONBLOCK;
-#endif
 		size = 0;
 		p_offset = 0;
 		ichset_specified = ochset_specified = FALSE;
@@ -396,7 +392,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		 */
 		while ((-1 == (file_des = OPEN4(buf, oflag, umask_creat, size))) && !out_of_time)
 		{
-			if (0 == msec_timeout)
+			if (timed && (0 == msec_timeout))
 				out_of_time = TRUE;
 			if (outofband)
 				outofband_action(FALSE);
@@ -413,8 +409,9 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 				{
 					int	oflag_clone;
 					int	fcntl_res;
-					/*	oflag must be O_RDWR, set it to be O_WRONLY 	*/
+					/* oflag must be O_RDWR, set it to be O_RDONLY 	*/
 					oflag &= ~O_WRONLY;
+					oflag |= O_NONBLOCK;
 					while ((-1 == (file_des = OPEN4(buf, oflag, umask_creat, size))) && !out_of_time)
 					{
 						if (0 == msec_timeout)
@@ -433,6 +430,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 					FCNTL2(file_des, F_GETFL, oflag_clone);
 					FCNTL3(file_des, F_SETFL, (oflag_clone & ~O_NONBLOCK), fcntl_res);
 
+					/* oflag was just made O_RDONLY, now set it to be O_WRONLY */
 					oflag |= O_WRONLY;
 					oflag &= ~O_RDONLY;
 					while ((-1 == (file_des_w = OPEN4(buf, oflag, umask_creat, size))) && !out_of_time)
@@ -455,9 +453,16 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 				break;
 			}
 		}
-
 		if (out_of_time && (-1 == file_des))
+		{
+			if ((ff == tl->iod->type) && filecreated)
+			{	/* The FIFO didn't really exist so remove all traces of it */
+				UNLINK(tl->iod->trans_name->dollar_io);
+				tl->iod->type = rm;
+				remove_rms(tl->iod);
+			}
 			return FALSE;
+		}
 	}
 	if (timed && !out_of_time)
 		cancel_timer(timer_id);
@@ -481,7 +486,6 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 			ICONV_OPEN_CD(naml->iod->input_conv_cd, INSIDE_CH_SET, OUTSIDE_CH_SET);
 	}
 #endif
-
 	if (-1 == file_des)
 		rts_error(VARLSTCNT(1) errno);
 
@@ -513,54 +517,71 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	}
 #ifdef __MVS__
 	/*	copy over the content of tl->iod(naml->iod) to (tl->iod->pair.out)	*/
-	if ( ff == tl->iod->type && !sys_fifo)
+	if (ff == tl->iod->type)
 	{
 		*(tl->iod->pair.out) = *(tl->iod);
 		(tl->iod->pair.out)->pair.in = tl->iod;
 		(tl->iod->pair.out)->pair.out = (tl->iod->pair.out);
-		if (file_des_w > -1)
+		assert((0 <= tl->iod->pair.out->state) && (n_io_dev_states > tl->iod->pair.out->state));
+		if (-1 < file_des_w)
 		{
 			io_desc		*io_ptr;
- 			d_rm_struct	*d_rm;
 			io_log_name	dev_name;	/*	dummy	*/
 
 			io_ptr = (tl->iod->pair.out);
 			assert(io_ptr != tl->iod->pair.in);
-			assert(io_ptr != 0);
+			assert(NULL != io_ptr);
 			assert(io_ptr->state >= 0 && io_ptr->state < n_io_dev_states);
-			assert(io_ptr->type == ff);
-			if (!(d_rm = (d_rm_struct *) io_ptr->dev_sp))
-			{
-				io_ptr->dev_sp = (void*)malloc(sizeof(d_rm_struct));
-				d_rm = (d_rm_struct *) io_ptr->dev_sp;
-				io_ptr->state = dev_closed;
-				d_rm->stream = FALSE;
-				io_ptr->width = DEF_RM_WIDTH;
-				io_ptr->length = DEF_RM_LENGTH;
-				d_rm->fixed = FALSE;
-				d_rm->noread = FALSE;
-			}
-			d_rm->fifo = TRUE;
-			io_ptr->type = rm;
+			assert(ff == io_ptr->type);
 			dev_name.iod = tl->iod->pair.out;
-			status_w = iorm_open(&dev_name, pp, file_des_w, mspace, timeout);
-			if (TRUE == status_w)
+			if (TRUE == ioff_open(&dev_name, pp, file_des_w, mspace, timeout))
 				(tl->iod->pair.out)->state = dev_open;
-			else	if (dev_open == (tl->iod->pair.out)->state)
+			else if (dev_open == (tl->iod->pair.out)->state)
 				(tl->iod->pair.out)->state = dev_closed;
 		}
+		else if ((-2 == file_des_w) && (O_WRONLY == (oflag & O_ACCMODE)))
+			active_device = naml->iod = tl->iod->pair.out;
 		if (0 == file_des_w)
 			(tl->iod->pair.out)->dollar.zeof = TRUE;
 	}
 #endif
+	naml->iod->newly_created = filecreated;
 	status = (naml->iod->disp_ptr->open)(naml, pp, file_des, mspace, timeout);
 	if (TRUE == status)
 		naml->iod->state = dev_open;
 	else if ((dev_open == naml->iod->state) && (gtmsocket != naml->iod->type))
 		naml->iod->state = dev_closed;
+#ifdef __MVS__
+	d_rm_out = tl->iod->pair.out->dev_sp;
+	d_rm_in = tl->iod->pair.in->dev_sp;
+	if ((ff == tl->iod->pair.in->type) || (ff == tl->iod->pair.out->type))
+	{
+		if (NULL == d_rm_in)
+		{
+			tl->iod->pair.in->type = rm;
+			tl->iod->pair.in->state = tl->iod->pair.out->state;
+			tl->iod->pair.in->dev_sp = d_rm_out;
+		}
+		else if (NULL == d_rm_out)
+		{
+			tl->iod->pair.out->type = rm;
+			tl->iod->pair.out->state = tl->iod->pair.in->state;
+			tl->iod->pair.out->dev_sp = d_rm_in;
+		}
+	}
+	if (-1 < file_des_w)
+	{
+		d_rm_out->read_fildes = d_rm_in->fildes;
+		d_rm_out->read_filstr = d_rm_in->filstr;
+		free(d_rm_in);
+		tl->iod->pair.in->dev_sp = d_rm_out;
+	}
+
+#endif
 	if (1 == file_des)
 		naml->iod->dollar.zeof = TRUE;
 	active_device = 0;
+	naml->iod->newly_created = FALSE;
 
 	if ((NO_M_TIMEOUT != timeout)&& run_time)
 		return (status);

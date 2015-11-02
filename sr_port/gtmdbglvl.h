@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,5 +38,5 @@
 #define GDL_SmDump		0x00008000	/* (32768) Do full blown storage dump -- only useful in debug mode */
 #define GDL_PrintEntryPoints	0x00010000	/* (65536) Print address of entry points when they are loaded/resolved */
 #define GDL_PrintSockIntStats	0x00020000	/* (131072) Print Socket interrupt stats on exit */
-#define GDL_SmInitAlloc		0x00040000	/* (262144) Initialize all storage allocated with 0xdeadbeef */
+#define GDL_SmInitAlloc		0x00040000	/* (262144) Initialize all storage allocated or deallocated with 0xdeadbeef */
 #endif

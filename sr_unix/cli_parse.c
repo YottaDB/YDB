@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,10 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#if defined(__MVS__) && !defined(_ISOC99_SOURCE)
+#define _ISOC99_SOURCE
+#endif
 
 #include "mdef.h"
 
@@ -237,7 +241,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 {
 	CLI_ENTRY 	*pparm;
 	char 		*opt_str, *val_str;
-	int 		neg_flg, parm_len;
+	int 		neg_flg;
 
 	/* -----------------------------------------
 	 * get qualifier marker, or parameter token
@@ -273,9 +277,8 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 		}
 		if (parm_ary[parms_cnt] && (((char *)-1L) != parm_ary[parms_cnt]))
 			free(parm_ary[parms_cnt]);
-		parm_len = STRLEN(cli_token_buf) + 1;
-		parm_ary[parms_cnt] = malloc(parm_len);
-		memcpy(parm_ary[parms_cnt++], cli_token_buf, parm_len);
+		MALLOC_CPY_STR(parm_ary[parms_cnt], cli_token_buf);
+		parms_cnt++;
 		return(1);
 	}
 	/* ---------------------------------------------------------------------
@@ -365,8 +368,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 				 */
 				if (pparm->parm_values)
 				{
-					pparm->pval_str = malloc(strlen(pparm->parm_values->prompt) + 1);
-					strcpy(pparm->pval_str, pparm->parm_values->prompt);
+					MALLOC_CPY_STR(pparm->pval_str, pparm->parm_values->prompt);
 					if (!cli_get_sub_quals(pparm))
 						return(-1);
 				}
@@ -413,9 +415,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 			 * Allocate memory and save value
 			 * -------------------------------
 			 */
-			pparm->pval_str = malloc(strlen(cli_token_buf) + 1);
-			strcpy(pparm->pval_str, cli_token_buf);
-
+			MALLOC_CPY_STR(pparm->pval_str, cli_token_buf);
 			if (!cli_get_sub_quals(pparm))
 				return(-1);
 		}
@@ -586,7 +586,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 			if (-1 == (neg_flg = cli_check_negated( &tmp_str_ptr, pparm_qual, &pparm1)))
 				return FALSE;
 			if ( 1 == neg_flg)
-				len_str -=  strlen(NO_STRING);
+				len_str -=  STRLEN(NO_STRING);
 
 			if ((ptr_equal) && (ptr_equal + 1 < ptr_next_comma))
 				val_flg = TRUE;
@@ -635,10 +635,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 						free(pparm1->pval_str);
 				}
 				if ((!val_flg) && (VAL_NOT_REQ == pparm1->required) && pparm1->parm_values)
-				{
-					pparm1->pval_str = malloc(strlen(pparm1->parm_values->prompt) + 1);
-					strcpy(pparm1->pval_str, pparm1->parm_values->prompt);
-				}
+					MALLOC_CPY_STR(pparm1->pval_str, pparm1->parm_values->prompt);
 				if (val_flg)
 				{
 					ptr_equal_len = STRLEN(ptr_equal + 1);

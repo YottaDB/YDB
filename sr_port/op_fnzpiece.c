@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,7 +66,7 @@ void op_fnzpiece(mval *src, mval *del, int first, int last, mval *dst)
 	while (first--)
 	{
 		tmp_str = (char *)matchb(del_len, (uchar_ptr_t)del_str, src_len, (uchar_ptr_t)src_str, &match_res);
-		src_len -= (tmp_str - src_str);
+		src_len -= (int)(tmp_str - src_str);
 		src_str = tmp_str;
 		if (0 == match_res)
 		{
@@ -79,7 +79,7 @@ void op_fnzpiece(mval *src, mval *del, int first, int last, mval *dst)
 	while (piece_cnt--)
 	{
 		tmp_str = (char *)matchb(del_len, (uchar_ptr_t)del_str, src_len, (uchar_ptr_t)src_str, &match_res);
-		src_len -= (tmp_str - src_str);
+		src_len -= (int)(tmp_str - src_str);
 		src_str = tmp_str;
 		if (0 == match_res)
 			break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, LLC.	*
+ *	Copyright 2005, 2009 Fidelity Information Services, LLC.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,9 +92,9 @@ void dbcertify_dbfilop(phase_static_area *psa)
 			DBC_DEBUG(("DBC_DEBUG: -- Opening database %s\n", (char *)psa->dbc_gv_cur_region->dyn.addr->fname));
 			psa->dbc_gv_cur_region->read_only = FALSE;	/* maintain csa->read_write simultaneously */
 			udi->s_addrs.read_write = TRUE;			/* maintain reg->read_only simultaneously */
-			if (-1 == (udi->fd = OPEN((char *)psa->dbc_gv_cur_region->dyn.addr->fname, O_RDWR)))
+			if (FD_INVALID == (udi->fd = OPEN((char *)psa->dbc_gv_cur_region->dyn.addr->fname, O_RDWR)))
 			{
-				if (-1 == (udi->fd = OPEN((char *)psa->dbc_gv_cur_region->dyn.addr->fname, O_RDONLY)))
+				if (FD_INVALID == (udi->fd = OPEN((char *)psa->dbc_gv_cur_region->dyn.addr->fname, O_RDONLY)))
 				{
 					save_errno = errno;
 					rts_error(VARLSTCNT(5) ERR_DBOPNERR, 2, DB_LEN_STR(psa->dbc_gv_cur_region), save_errno);
@@ -114,7 +114,7 @@ void dbcertify_dbfilop(phase_static_area *psa)
 			break;
 		case FC_CLOSE:
 			DBC_DEBUG(("DBC_DEBUG: -- Closing database %s\n", (char *)psa->dbc_gv_cur_region->dyn.addr->fname));
-			CLOSEFILE(udi->fd, save_errno);
+			CLOSEFILE_RESET(udi->fd, save_errno);	/* resets "udi->fd" to FD_INVALID */
 			if (0 != save_errno)
 				rts_error(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(udi->fn), save_errno);
 			break;

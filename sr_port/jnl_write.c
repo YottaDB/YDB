@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,7 @@ GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF jnl_gbls_t		jgbl;
 LITREF	int			jrt_fixed_size[];
 LITREF	int			jrt_is_replicated[];
+LITREF 	int			jrt_update[JRT_RECTYPES];
 
 #ifdef DEBUG
 /* The fancy ordering of operators/operands in the JNL_SPACE_AVAILABLE calculation is to avoid overflows. */
@@ -98,7 +99,7 @@ LITREF	int			jrt_is_replicated[];
 void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_record *jnl_rec, blk_hdr_ptr_t blk_ptr,
 	jnl_format_buffer *jfb)
 {
-	int4			align_rec_len, rlen, rlen_with_align, srclen, dstlen, lcl_size, lcl_free, lcl_orig_free;
+	int4			align_rec_len, rlen, rlen_with_align, dstlen, lcl_size, lcl_free, lcl_orig_free;
 	jnl_buffer_ptr_t	jb;
 	sgmnt_addrs		*csa;
 	struct_jrec_align	align_rec;
@@ -110,6 +111,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	DEBUG_ONLY(uint4	lcl_dskaddr;)
 	sm_uc_ptr_t		lcl_buff;
 	gd_region		*reg;
+	char			*ptr;
+	GTMCRYPT_ONLY(int	save_pos;)
 
 	error_def(ERR_JNLWRTNOWWRTR);
 	error_def(ERR_JNLWRTDEFER);
@@ -136,7 +139,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	rlen = jnl_rec->prefix.forwptr;
 	jb->bytcnt += rlen;
 	assert (0 == rlen % JNL_REC_START_BNDRY);
-	rlen_with_align = rlen + MIN_ALIGN_RECLEN;
+	rlen_with_align = rlen + (int4)MIN_ALIGN_RECLEN;
 	assert(0 == rlen_with_align % JNL_REC_START_BNDRY);
 	assert((uint4)rlen_with_align < ((uint4)1 << jb->log2_of_alignsize));
 	if ((lcl_freeaddr >> jb->log2_of_alignsize) == ((lcl_freeaddr + rlen_with_align - 1) >> jb->log2_of_alignsize))
@@ -144,8 +147,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	else
 	{
 		align_rec.align_str.length = ROUND_UP2(lcl_freeaddr, ((uint4)1 << jb->log2_of_alignsize))
-						- lcl_freeaddr - MIN_ALIGN_RECLEN;
-		align_rec_len = MIN_ALIGN_RECLEN + align_rec.align_str.length;
+			- lcl_freeaddr - (uint4)MIN_ALIGN_RECLEN;
+		align_rec_len = (int4)(MIN_ALIGN_RECLEN + align_rec.align_str.length);
 		assert (0 == align_rec_len % JNL_REC_START_BNDRY);
 		rlen_with_align = rlen + align_rec_len;
 	}
@@ -210,10 +213,10 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		if (lcl_size >= (lcl_free + align_rec_len))
 		{	/* before the string for zeroes */
 			memcpy(lcl_buff + lcl_free, (uchar_ptr_t)&align_rec, FIXED_ALIGN_RECLEN);
-			lcl_free += (FIXED_ALIGN_RECLEN + align_rec.align_str.length); /* zeroing is not necessary */
+			lcl_free += (int4)(FIXED_ALIGN_RECLEN + align_rec.align_str.length); /* zeroing is not necessary */
 		} else
 		{
-			JNL_PUTSTR(lcl_free, lcl_buff, (uchar_ptr_t)&align_rec, FIXED_ALIGN_RECLEN, lcl_size);
+			JNL_PUTSTR(lcl_free, lcl_buff, (uchar_ptr_t)&align_rec, (int4)FIXED_ALIGN_RECLEN, lcl_size);
 			if (lcl_size >= (lcl_free + align_rec.align_str.length + sizeof(jrec_suffix)))
 				lcl_free += align_rec.align_str.length;	/* zeroing is not necessary */
 			else
@@ -230,7 +233,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		/* Now copy suffix */
 		assert(0 == (UINTPTR_T)(&lcl_buff[0] + lcl_free) % sizeof(jrec_suffix));
 		*(jrec_suffix *)(lcl_buff + lcl_free) = *(jrec_suffix *)&suffix;
-		lcl_free += sizeof(jrec_suffix);
+		lcl_free += SIZEOF(jrec_suffix);
 		if (lcl_size == lcl_free)
 			lcl_free = 0;
 		jpc->new_freeaddr = lcl_freeaddr + align_rec_len;
@@ -325,7 +328,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			if (nowrap)
 			{	/* write fixed part of record before the actual gds block image */
 				memcpy(lcl_buff + lcl_free, (uchar_ptr_t)jnl_rec, FIXED_BLK_RECLEN);
-				lcl_free += FIXED_BLK_RECLEN;
+				lcl_free += (int4)FIXED_BLK_RECLEN;
 				/* write actual block */
 				memcpy(lcl_buff + lcl_free, (uchar_ptr_t)blk_ptr, jrec_blk->bsiz);
 				lcl_free += jrec_blk->bsiz;
@@ -337,7 +340,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 					lcl_free = 0;
 			} else
 			{	/* write fixed part of record before the actual gds block image */
-				JNL_PUTSTR(lcl_free, lcl_buff, (uchar_ptr_t)jnl_rec, FIXED_BLK_RECLEN, lcl_size);
+				JNL_PUTSTR(lcl_free, lcl_buff, (uchar_ptr_t)jnl_rec, (int4)FIXED_BLK_RECLEN, lcl_size);
 				/* write actual block */
 				JNL_PUTSTR(lcl_free, lcl_buff, (uchar_ptr_t)blk_ptr, jrec_blk->bsiz, lcl_size);
 				/* Now write trailing characters for 8-bye alignment and then suffix */
@@ -365,42 +368,32 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	assert(lcl_free == jpc->new_freeaddr % lcl_size);
 	if (REPL_ENABLED(csa) && jrt_is_replicated[rectype])
 	{
+		/* If the database is encrypted, then at this point jfb->buff will contain encrypted
+		 * data which we don't want to to push into the jnlpool. Instead, we make use of the
+		 * alternate alt_buff which is guaranteed to contain the original unencrypted data.
+		 * */
+		if (jrt_fixed_size[rectype])
+			ptr = (char *)jnl_rec;
+		else
+		{
+#			ifdef GTM_CRYPT
+			if (csa->hdr->is_encrypted && IS_SET_KILL_ZKILL(rectype))
+			 	ptr = jfb->alt_buff;
+			else
+#			endif
+				ptr = jfb->buff;
+		}
 		assert(NULL != jnlpool.jnlpool_ctl && NULL != jnlpool_ctl); /* ensure we haven't yet detached from the jnlpool */
 		assert((&FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs)->now_crit);	/* ensure we have the jnl pool lock */
 		DEBUG_ONLY(jgbl.cu_jnl_index++;)
-		srclen = lcl_size - lcl_orig_free;
 		jnlpool_size = temp_jnlpool_ctl->jnlpool_size;
 		dstlen = jnlpool_size - temp_jnlpool_ctl->write;
-		if (rlen <= srclen)
+		if (rlen <= dstlen)	/* dstlen >= rlen  (most frequent case) */
+			memcpy(jnldata_base + temp_jnlpool_ctl->write, ptr, rlen);
+		else			/* dstlen < rlen */
 		{
-			if (rlen <= dstlen)	/* dstlen & srclen >= rlen  (most frequent case) */
-				memcpy(jnldata_base + temp_jnlpool_ctl->write, lcl_buff + lcl_orig_free, rlen);
-			else			/* dstlen < rlen <= srclen */
-			{
-				memcpy(jnldata_base + temp_jnlpool_ctl->write, lcl_buff + lcl_orig_free, dstlen);
-				memcpy(jnldata_base, lcl_buff + lcl_orig_free + dstlen, rlen - dstlen);
-			}
-		} else
-		{
-			if (rlen <= dstlen)		/* srclen < rlen <= dstlen */
-			{
-				memcpy(jnldata_base + temp_jnlpool_ctl->write, lcl_buff + lcl_orig_free, srclen);
-				memcpy(jnldata_base + temp_jnlpool_ctl->write + srclen, lcl_buff, rlen - srclen);
-			} else if (dstlen == srclen)	/* dstlen = srclen < rlen */
-			{
-				memcpy(jnldata_base + temp_jnlpool_ctl->write, lcl_buff + lcl_orig_free, dstlen);
-				memcpy(jnldata_base, lcl_buff, rlen - dstlen);
-			} else if (dstlen < srclen)	/* dstlen < srclen < rlen */
-			{
-				memcpy(jnldata_base + temp_jnlpool_ctl->write, lcl_buff + lcl_orig_free, dstlen);
-				memcpy(jnldata_base, lcl_buff + lcl_orig_free + dstlen, srclen - dstlen);
-				memcpy(jnldata_base + srclen - dstlen, lcl_buff, rlen - srclen);
-			} else				/* srclen < dstlen < rlen */
-			{
-				memcpy(jnldata_base + temp_jnlpool_ctl->write, lcl_buff + lcl_orig_free, srclen);
-				memcpy(jnldata_base + temp_jnlpool_ctl->write + srclen, lcl_buff, dstlen - srclen);
-				memcpy(jnldata_base, lcl_buff + dstlen - srclen, rlen - dstlen);
-			}
+			memcpy(jnldata_base + temp_jnlpool_ctl->write, ptr, dstlen);
+			memcpy(jnldata_base, ptr + dstlen, rlen - dstlen);
 		}
 		temp_jnlpool_ctl->write += rlen;
 		if (temp_jnlpool_ctl->write >= jnlpool_size)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,11 +91,11 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 				adptr = iotcp_name2ip(temp_addr);
 				if (NULL == adptr)
 				{
-#ifndef __hpux
+#if !defined(__hpux) && !defined(__MVS__)
 					errptr = HSTRERROR(h_errno);
 					rts_error(VARLSTCNT(6) ERR_INVADDRSPEC, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
 #else
-					/* Grumble grumble HPUX doesn't have hstrerror() */
+					/* Grumble grumble HPUX and z/OS don't have hstrerror() */
 					rts_error(VARLSTCNT(1) ERR_INVADDRSPEC);
 #endif
 					free(socketptr);
@@ -125,7 +125,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 			rts_error(VARLSTCNT(4) ERR_PROTNOTSUP, 2, MIN(strlen(tcp), sizeof("TCP") - 1), tcp);
 			return NULL;
 		}
-		socketptr->sd = -1; /* don't mess with 0 */
+		socketptr->sd = FD_INVALID; /* don't mess with 0 */
 		socketptr->state = socket_created; /* Is this really useful? */
 	} else
 	{	/* socket already setup by inetd */

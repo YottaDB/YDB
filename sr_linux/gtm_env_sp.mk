@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-#       Copyright 2001, 2008 Fidelity Information Services, Inc #
+#       Copyright 2001, 2009 Fidelity Information Services, Inc #
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -124,7 +124,8 @@ endif
 endif
 gt_ld_aio_syslib=
 gt_ld_sysrtns=
-gt_ld_options_gtmshr=-Wl,--version-script,gtmshr_symbols.export
+gt_ld_options_gtmshr=-Wl,-u,gtm_filename_to_id -Wl,--version-script,gtmshr_symbols.export
+gt_ld_options_all_exe=-rdynamic -Wl,-u,gtm_filename_to_id -Wl,--version-script,gtmexe_symbols.export
 gt_ld_shl_linker=$(gt_ld_linker)
 gt_ld_shl_options=-shared
 gt_ld_shl_suffix=.so

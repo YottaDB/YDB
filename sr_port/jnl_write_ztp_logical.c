@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,10 @@ GBLREF	seq_num			seq_num_zero;
 void	jnl_write_ztp_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 {
 	struct_jrec_ztp_upd	*jrec;
+	volatile seq_num	temp_seqno;
+	GTMCRYPT_ONLY(
+		struct_jrec_ztp_upd	*jrec_alt;
+	)
 	jnl_private_control	*jpc;
 
 	/* If REPL_WAS_ENABLED(csa) is TRUE, then we would not have gone through the code that initializes
@@ -60,6 +64,7 @@ void	jnl_write_ztp_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 	jrec->prefix.tn = csa->ti->curr_tn;
 	jrec->prefix.time = jgbl.gbl_jrec_time;
 	jrec->prefix.checksum = jfb->checksum;
+	temp_seqno = temp_jnlpool_ctl->jnl_seqno;
 	if (jgbl.forw_phase_recovery)
 	{
 		QWASSIGN(jrec->jnl_seqno, jgbl.mur_jrec_seqno);
@@ -67,14 +72,18 @@ void	jnl_write_ztp_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 	} else
 	{
 		if (REPL_ALLOWED(csa))
-			QWASSIGN(jrec->jnl_seqno, temp_jnlpool_ctl->jnl_seqno);
+		{
+			QWASSIGN(jrec->jnl_seqno, temp_seqno);
+		}
 		else
+		{
 			QWASSIGN(jrec->jnl_seqno, seq_num_zero);
+		}
 		if (QWEQ(jnl_fence_ctl.token, seq_num_zero))
 		{	/* generate token once after op_ztstart and use for all its mini-transactions
 			 * jnl_fence_ctl.token is set to seq_num_zero in op_ztstart */
 			if (REPL_ALLOWED(csa))
-				QWASSIGN(jnl_fence_ctl.token, temp_jnlpool_ctl->jnl_seqno);
+				QWASSIGN(jnl_fence_ctl.token, temp_seqno);
 			else
 			{
 				TOKEN_SET(&jnl_fence_ctl.token, csa->ti->curr_tn, csa->regnum);
@@ -82,5 +91,14 @@ void	jnl_write_ztp_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 		}
 		QWASSIGN(jrec->token, jnl_fence_ctl.token);
 	}
+#	ifdef GTM_CRYPT
+	if (REPL_ALLOWED(csa))
+	{
+		jrec_alt = (struct_jrec_ztp_upd *)jfb->alt_buff;
+		jrec_alt->prefix = jrec->prefix;
+		QWASSIGN(jrec_alt->token, jrec->token);
+		QWASSIGN(jrec_alt->jnl_seqno, jrec->jnl_seqno);
+	}
+#	endif
 	JNL_WRITE_APPROPRIATE(csa, jpc, jfb->rectype, (jnl_record *)jrec, NULL, jfb);
 }

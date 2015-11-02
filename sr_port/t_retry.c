@@ -38,6 +38,7 @@
 #include "wcs_sleep.h"
 #include "have_crit.h"
 #include "gdsbgtr.h"		/* for the BG_TRACE_PRO macros */
+#include "wcs_backoff.h"
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -53,6 +54,7 @@ GBLREF	unsigned int		t_tries;
 GBLREF	uint4			t_err;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		is_dollar_incr;
+GBLREF	int4			update_trans;
 #ifdef DEBUG
 GBLREF	boolean_t		ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose */
 GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
@@ -64,6 +66,7 @@ void t_retry(enum cdb_sc failure)
 	unsigned char		*end, buff[MAX_ZWR_KEY_SZ];
 	short			tl;
 	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
 
 	error_def(ERR_GBLOFLOW);
 	error_def(ERR_GVIS);
@@ -117,16 +120,25 @@ void t_retry(enum cdb_sc failure)
 			grab_crit(gv_cur_region);
 			CHECK_MM_DBFILEXT_REMAP_IF_NEEDED(csa, gv_cur_region);
 			DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
+			csd = cs_data;
 			if (CDB_STAGNATE > t_tries)
 				rel_crit(gv_cur_region);
-			else if (CDB_STAGNATE < t_tries)
+			else if (CDB_STAGNATE == t_tries)
+			{
+				if (csd->freeze && update_trans)
+				{	/* Final retry on an update transaction and region is frozen.
+					 * Wait for it to be unfrozen and only then grab crit.
+					 */
+					GRAB_UNFROZEN_CRIT(gv_cur_region, csa, csd);
+				}
+			} else
 			{
 				assert((failure != cdb_sc_helpedout) && (failure != cdb_sc_future_read)
 					&& (failure != cdb_sc_jnlclose) && (failure != cdb_sc_jnlstatemod)
 					&& (failure != cdb_sc_backupstatemod) && (failure != cdb_sc_inhibitkills));
 				if (cdb_sc_unfreeze_getcrit == failure)
 				{
-					GRAB_UNFROZEN_CRIT(gv_cur_region, csa, cs_data);
+					GRAB_UNFROZEN_CRIT(gv_cur_region, csa, csd);
 					t_tries = CDB_STAGNATE;
 				} else
 				{

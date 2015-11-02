@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,6 +52,7 @@ typedef union
 #define VTP_DBKEY 8
 #define VTP_RTNAME 16
 #define	VTP_DBKEYLIST 32
+#define VTP_LVN 64
 
 #define VIEWTAB(A,B,C,D) C
 

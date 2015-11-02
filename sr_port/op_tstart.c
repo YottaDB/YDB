@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,7 @@
 #include "longset.h"		/* needed for cws_insert.h */
 #include "hashtab.h"
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
+#include "alias.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"	/* needed by *TYPEMASK* macros defined in gtm_utf8.h */
@@ -73,7 +74,7 @@ GBLREF	unsigned char		*msp, *stacktop, *stackwarn, *tpstackbase, *tpstacktop, *t
 GBLREF  unsigned int		t_tries;
 GBLREF	tp_region		*tp_reg_list, *tp_reg_free_list;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
-GBLREF	bool			is_standalone;
+GBLREF	boolean_t		is_standalone;
 GBLREF 	void			(*tp_timeout_start_timer_ptr)(int4 tmout_sec);
 GBLREF  sgm_info                *first_sgm_info;
 GBLREF  global_tlvl_info	*global_tlvl_info_head;
@@ -85,6 +86,7 @@ GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		tp_in_use;
 GBLREF	boolean_t		gtm_utf8_mode;
+GBLREF	uint4			tstartcycle;
 #ifdef VMS
 GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
 #endif
@@ -95,6 +97,7 @@ GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only
 
 #define NORESTART -1
 #define ALLLOCAL  -2
+#define TP_STACK_SIZE (32768 GTM64_ONLY(* 2))	/* 64 bit has pointers twice size so needs more room */
 
 /* Note gv_orig_key[i] is assigned to tp_pointer->orig_key which then tries to dereference the "begin", "end", "prev", "top"
  * 	fields like it were a gv_currkey pointer. Since these members are 2-byte fields, we need atleast 2 byte alignment.
@@ -114,7 +117,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	bool			serial;			/* whether SERIAL keyword was present */
 	int			prescnt,		/* number of names to save, -1 = no restart, -2 = preserve all */
 				pres;
-	lv_val			*lv, *var;
+	lv_val			*lv;
 	mlk_pvtblk		*pre_lock;
 	mlk_tp			*lck_tp;
 	mval			*preserve,		/* list of names to save */
@@ -123,7 +126,6 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	mv_stent		*mv_st_ent, *mvst_tmp, *mvst_prev;
 	stack_frame		*fp, *fp_fix;
 	tp_frame		*tf;
-	tp_var			*restore_ent;
 	unsigned char		*old_sp, *top, *tstack_ptr, *ptrstart, *ptrend, *ptrinvalidbegin;
 	va_list			varlst, lvname;
 	tp_region		*tr, *tr_next;
@@ -188,6 +190,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 			tp_reg_free_list = tr; 			/* Place on free queue */
 		}
 		++local_tn;					/* Begin new local transaction */
+		INCR_TSTARTCYCLE;
 		jgbl.wait_for_jnl_hard = TRUE;
 		memset(tcom_record.jnl_tid, 0, TID_STR_SIZE);
 		if (0 != tid->str.len)
@@ -225,14 +228,16 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		VMS_ONLY(tp_has_kill_t_cse = FALSE;)
 		assert(!donot_commit);
 	}
+	/* either cw_stagnate has not been initialized at all or previous-non-TP or tp_hist should have done CWS_RESET */
 	assert((0 == cw_stagnate.size) || cw_stagnate_reinitialized);
-		/* either cw_stagnate has not been initialized at all or previous-non-TP or tp_hist should have done CWS_RESET */
+
 	if (prescnt > 0)
 	{
 		VAR_COPY(lvname, varlst);
 		for (pres = 0;  pres < prescnt;  ++pres)
 		{
 			preserve = va_arg(lvname, mval *);
+			assert(MV_IS_STRING(preserve));		/* Check if this loop can be eliminated */
 			MV_FORCE_STR(preserve);
 		}
 		va_end(lvname);
@@ -265,7 +270,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		for (fp_fix = frame_pointer;  fp_fix != fp;  fp_fix = fp_fix->old_frame_pointer)
 		{
 			if ((unsigned char *)fp_fix->l_symtab < top  &&  (unsigned char *)fp_fix->l_symtab > stacktop)
-				fp_fix->l_symtab = (mval **)((char *)fp_fix->l_symtab - shift_size);
+				fp_fix->l_symtab = (ht_ent_mname **)((char *)fp_fix->l_symtab - shift_size);
 			if (fp_fix->temps_ptr < top  &&  fp_fix->temps_ptr > stacktop)
 				fp_fix->temps_ptr -= shift_size;
 			if (fp_fix->vartab_ptr < (char *)top  &&  fp_fix->vartab_ptr > (char *)stacktop)
@@ -304,20 +309,15 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	mv_st_ent->mv_st_cont.mvs_tp_holder = dollar_tlevel;
 	if (NULL == tpstackbase)
 	{
-		tstack_ptr = (unsigned char *)malloc(32768);
-		tp_sp = tpstackbase = tstack_ptr + 32768;
+		tstack_ptr = (unsigned char *)malloc(TP_STACK_SIZE);
+		tp_sp = tpstackbase = tstack_ptr + TP_STACK_SIZE;
 		tpstacktop = tstack_ptr;
 		tpstackwarn = tpstacktop + 1024;
 		tp_pointer = NULL;
 	}
 
 	/* Add a new tp_frame in the TP stack */
-	/* Pre V5, tf allocation was
-	 * tf = (tp_frame *)(tp_sp -= sizeof(tp_frame) + sizeof(mident) * pres);
-	 * The (sizeof(mident) * pres) area *may* have been for saving the names of preserved variables. We say *may*
-	 * because we could not locate such logic in the history of op_tstart(). We don't need the name of a local
-	 * variable to save and restore it (refer to the logic maintaining tf->vars). To avoid wasting space,
-	 * we no longer allocate the extra "sizeof(mident) * pres" effective V5. */
+	DBGRFCT((stderr, "\n*** op_tstart: *** Entering $TLEVEL = %d\n", dollar_tlevel + 1));
 	tf = (tp_frame *)(tp_sp -= sizeof(tp_frame));
 	if (tp_sp < tpstackwarn)
 	{
@@ -354,7 +354,9 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	tf->gd_header = gd_header;
 	tf->gd_reg = gv_cur_region;
 	tf->zgbldir = dollar_zgbldir;
-	tf->sym = (symval *)NULL;
+	tf->mvc = mv_st_ent;
+	tf->sym = curr_symval;
+	tf->tp_save_all_flg = FALSE;
 	tf->vars = (tp_var *)NULL;
 	tf->old_tp_frame = tp_pointer;
 	tp_pointer = tf;
@@ -379,50 +381,54 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 				tpvent.var_name.len = mvname->str.len;
 				tpvent.var_name.addr = mvname->str.addr;
 				COMPUTE_HASH_MNAME(&tpvent);
-				if (add_hashtab_mname(&curr_symval->h_symtab, &tpvent, NULL, &tabent))
+				tpvent.marked = FALSE;
+				if (add_hashtab_mname_symval(&curr_symval->h_symtab, &tpvent, NULL, &tabent))
 					lv_newname(tabent, curr_symval);
 				lv = (lv_val *)tabent->value;
+				assert(lv);
+				assert(0 < lv->stats.trefcnt);
+				assert(lv->stats.crefcnt <= lv->stats.trefcnt);
 				/* In order to allow restart of a sub-transaction, this should chain rather than back stop,
-				   with appropriate changes to tp_var_clone and tp_unwind */
+				   with appropriate changes to lv_var_clone and tp_unwind */
 				if (NULL == lv->tp_var)
 				{
-					/* Suggested enhancement: create space for restore_ent in the TP frame instead of
-					 * malloc'ing for each preserved variable. This will improve memory efficiency by
-					 * eliminating need for linked list. This may also assist in implementing restarting
-					 * of sub-transactions where we can limit the store/restore logic to locals for the
-					 * sub-transaction. With linked list, there is no straight-forward way to tell if
-					 * an lv was specified in a sub-transaction, and if so, which sub-transaction. */
-					var = lv_getslot(lv->ptrs.val_ent.parent.sym);
-					restore_ent = (tp_var *)malloc(sizeof(tp_var));
-					restore_ent->current_value = lv;
-					restore_ent->save_value = var;
-					restore_ent->next = tf->vars;
-					lv->tp_var = var;
-					*var = *lv;
-					tf->vars = restore_ent;
+					TP_SAVE_RESTART_VAR(lv, tf, &tabent->key);
+					if (lv->ptrs.val_ent.children)
+						TPSAV_CNTNRS_IN_TREE(lv);
+				} else
+				{	/* We have saved this var previously. But check if it got saved via a container var
+					   and therefore has no name associated with it. If so, update the key in the tp_var
+					   structure so it gets its name restored properly if necessary.
+					*/
+					if (0 == lv->tp_var->key.var_name.len)
+						lv->tp_var->key = tabent->key;
 				}
 			}
 		}
 		va_end(lvname);
-	}
-	else if (ALLLOCAL == prescnt)
+	} else if (ALLLOCAL == prescnt)
 	{	/* Preserve all variables */
-		tf->sym = curr_symval;
+		tf->tp_save_all_flg = TRUE;
 		++curr_symval->tp_save_all;
 		for (curent = curr_symval->h_symtab.base, topent = curr_symval->h_symtab.top;  curent < topent;  curent++)
 		{
-			if (HTENT_VALID_MNAME(curent, lv_val, lv))
+			if (HTENT_VALID_MNAME(curent, lv_val, lv) && ('$' != *curent->key.var_name.addr))
 			{
+				assert(lv);
+				assert(0 < lv->stats.trefcnt);
+				assert(lv->stats.crefcnt <= lv->stats.trefcnt);
 				if (NULL == lv->tp_var)
 				{
-					var = lv_getslot(lv->ptrs.val_ent.parent.sym);
-					restore_ent = (tp_var *)malloc(sizeof(tp_var));
-					restore_ent->current_value = lv;
-					restore_ent->save_value = var;
-					restore_ent->next = tf->vars;
-					lv->tp_var = var;
-					*var = *lv;
-					tf->vars = restore_ent;
+					TP_SAVE_RESTART_VAR(lv, tf, &curent->key);
+					if (lv->ptrs.val_ent.children)
+						TPSAV_CNTNRS_IN_TREE(lv);
+				} else
+				{	/* We have saved this var previously. But check if it got saved via a container var
+					   and therefore has no name associated with it. If so, update the key in the tp_var
+					   structure so it gets its name restored properly if necessary.
+					*/
+					if (0 == lv->tp_var->key.var_name.len)
+						lv->tp_var->key = curent->key;
 				}
 			}
 		}
@@ -507,11 +513,11 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		 * ------------------------------------------------------------------
 		 */
 		if (1 == dollar_tlevel)
-		{
 			(*tp_timeout_start_timer_ptr)(tmout_sec);
-		} else
+		else
 		{
 			/* Confirm that timeout already pending, else warning */
 		}
 	}
+	DBGRFCT((stderr, "\nop_tstart: complete\n"));
 }

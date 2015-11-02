@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,53 +11,77 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
+#include "gtm_string.h"
+
+#include "rtnhdr.h"
+#include "stack_frame.h"
+#include "mv_stent.h"
 #include "hashtab_mname.h"	/* needed for lv_val.h */
+#include "hashtab.h"
 #include "lv_val.h"
 #include "tp_frame.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "caller_id.h"
+#include "alias.h"
 
-GBLREF tp_frame *tp_pointer;
+GBLREF tp_frame		*tp_pointer;
+GBLREF stack_frame	*frame_pointer;
+GBLREF symval		*curr_symval;
+GBLREF mv_stent		*mv_chain;
+GBLREF short		dollar_tlevel;
 
 void lv_newname(ht_ent_mname *hte, symval *sym)
 {
-	lv_val	*var, *lv;
-	tp_frame *tf;
-	tp_var	*restore_ent;
-	unsigned char all_cnt, sav_cnt;
+	lv_val		*lv, *var;
+	tp_frame	*tf, *first_tf_saveall;
+	tp_var		*restore_ent;
+	DBGRFCT_ONLY(mident_fixed vname;)
 
+	assert(hte);
+	assert(sym);
 	lv = lv_getslot(sym);
-	lv->v.mvtype = 0;
-	lv->tp_var = NULL;
-	lv->ptrs.val_ent.children = 0;
-	lv->ptrs.val_ent.parent.sym = sym;
+	LVVAL_INIT(lv, sym);
+	DBGRFCT_ONLY(
+		memcpy(vname.c, hte->key.var_name.addr, hte->key.var_name.len);
+		vname.c[hte->key.var_name.len] = '\0';
+	);
+	DBGRFCT((stderr, "lv_newname: Varname '%s' in sym 0x"lvaddr" resetting hte 0x"lvaddr" from 0x"lvaddr" to 0x"lvaddr
+		 " -- called from 0x"lvaddr"\n\n",
+		 &vname.c, sym, hte, hte->value, lv, caller_id()));
 	hte->value = lv;
-	if (sym->tp_save_all)
+	assert(0 < lv->stats.trefcnt);
+	if (!sym->tp_save_all)
+		return;
+	/* Newly encountered variables need to be saved if there is restore all TP frame in effect as they
+	   need to be restored to an undefined state but we only know about them when we encounter them
+	   hence this code where new vars are created. We locate the earliest TP frame that has the same symval
+	   in its tp_frame and save the entry there. This is so var set in later TP frame levels still get restored
+	   even if the TSTART frame they were created in gets committed.
+	*/
+	DEBUG_ONLY(first_tf_saveall = NULL);
+	for (tf = tp_pointer; (NULL != tf) && (tf->sym == sym); tf = tf->old_tp_frame)
 	{
-		all_cnt = 0;
-		for (tf = tp_pointer; tf; tf = tf->old_tp_frame)
-		{
-			if (tf->sym)
-			{
-				if (tf->sym != sym)
-					break;
-				all_cnt++;
-			}
-		}
-		assert(all_cnt);
-		sav_cnt = all_cnt;
-		for (tf = tp_pointer; all_cnt > 0; tf = tf->old_tp_frame)
-		{
-			assert(tf);
-			if (tf->sym)
-			{
-				var = lv_getslot(lv->ptrs.val_ent.parent.sym);
-				restore_ent = (tp_var *)malloc(sizeof(*restore_ent));
-				restore_ent->current_value = lv;
-				restore_ent->save_value = var;
-				restore_ent->next = tf->vars;
-				tf->vars = restore_ent;
-				*var = *lv;
-				all_cnt--;
-			}
-		}
+		if (tf->tp_save_all_flg)
+			first_tf_saveall = tf;
 	}
+	assert(first_tf_saveall);
+	var = lv_getslot(lv->ptrs.val_ent.parent.sym);
+	restore_ent = (tp_var *)malloc(sizeof(*restore_ent));
+	restore_ent->current_value = lv;
+	restore_ent->save_value = var;
+	restore_ent->key = hte->key;
+	restore_ent->var_cloned = TRUE;
+	restore_ent->next = first_tf_saveall->vars;
+	first_tf_saveall->vars = restore_ent;
+	assert(NULL == lv->tp_var);
+	lv->tp_var = restore_ent;
+	*var = *lv;
+	INCR_CREFCNT(lv);		/* With a copy made, bump the refcnt to keep lvval from being deleted */
+	INCR_TREFCNT(lv);
+	assert(1 < lv->stats.trefcnt);
 }

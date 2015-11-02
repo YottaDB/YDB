@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,9 +45,8 @@ bool gtcmtr_terminate(bool cm_err)
 
 	if (curr_entry)
 	{
-		save_intrpt_ok_state = intrpt_ok_state;
 		/* We are about to rundown databases, clean up structures. Defer MUPIP STOP/signal handling until function end. */
-		intrpt_ok_state = INTRPT_IN_GTCMTR_TERMINATE;
+		SAVE_INTRPT_OK_STATE(INTRPT_IN_GTCMTR_TERMINATE);
 		cancel_timer((TID)curr_entry);
 		gtcml_lkrundown();
 		gtcmd_rundown(curr_entry, cm_err);
@@ -84,8 +83,7 @@ bool gtcmtr_terminate(bool cm_err)
 		 */
 		VMS_ONLY(free(curr_entry));
 		curr_entry = NULL;
-		intrpt_ok_state = save_intrpt_ok_state;
-		DEFERRED_EXIT_HANDLING_CHECK;	/* check if any MUPIP STOP/signals were deferred while in this function */
+		RESTORE_INTRPT_OK_STATE;	/* check if any MUPIP STOP/signals were deferred while in this function */
 	}
 	gtcm_users--;
 	VMS_ONLY(gtcm_ast_avail++);

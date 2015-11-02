@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@ GBLREF	short			dollar_tlevel;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	volatile int4		fast_lock_count;
+GBLREF	sgm_info		*first_sgm_info;
 
 #ifdef DEBUG
 GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
@@ -47,6 +48,7 @@ GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only
 void t_begin (uint4 err, boolean_t update_transaction) 	/* err --> error code for current gvcst_routine */
 {
 	srch_blk_status	*s;
+	trans_num	histtn;
 
 	assert(0 == dollar_tlevel); /* if in TP, the T_BEGIN_xxx_NONTP_OR_TP macro should have been used and we will not be here */
 	/* any changes to the initialization in the two lines below might need a similar change in T_BEGIN_xxx_NONTP_OR_TP macros */
@@ -57,17 +59,19 @@ void t_begin (uint4 err, boolean_t update_transaction) 	/* err --> error code fo
         /* start_tn manipulation for TP taken care of in tp_hist */
 	if (cs_addrs->critical)
 		crash_count = cs_addrs->critical->crashcnt;
+	start_tn = cs_addrs->ti->curr_tn;
 	if (gv_target->clue.end)
-	{
-		start_tn = cs_addrs->ti->curr_tn;
-		s = &gv_target->hist.h[0];
-		if (start_tn > s[gv_target->hist.depth].tn)
-			start_tn = s[gv_target->hist.depth].tn;
-		DEBUG_ONLY(for (s = &gv_target->hist.h[0]; s->blk_num; s++)
-				assert(start_tn <= s->tn);
-		)
-	} else
-		start_tn = cs_addrs->ti->curr_tn;
+	{	/* Since we have a clue, determine if the clue history has lesser transaction numbers and if so use that
+		 * as the start tn. Note that we need to take the MIN of all history level tns (see comment in tp_tend.c
+		 * in valid_thru processing logic for why).
+		 */
+		for (s = &gv_target->hist.h[0]; s->blk_num; s++)
+		{
+			histtn = s->tn;
+			if (start_tn > histtn)
+				start_tn = histtn;
+		}
+	}
 	cw_set_depth = 0;
 	cw_map_depth = 0;
 	/* since this is mainline code and we know fast_lock_count should be 0 at this point reset it just in case it is not.

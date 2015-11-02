@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008 Fidelity Information Services, Inc.*
+ *	Copyright 2008, 2009 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -179,7 +179,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	}
 	if (send_xoff && !xoff_sent)
 	{
-		if (-1 != gtmrecv_sock_fd)
+		if (FD_INVALID != gtmrecv_sock_fd)
 		{	/* Send XOFF_ACK_ME */
 			xoff_msg.type = REPL_XOFF_ACK_ME;
 			memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&send_seqno, sizeof(seq_num));
@@ -342,7 +342,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	} else
 		return_status = STOP_POLL;
 
-	if ((STOP_POLL == return_status) && (send_badtrans || send_cmp2uncmp) && (-1 != gtmrecv_sock_fd))
+	if ((STOP_POLL == return_status) && (send_badtrans || send_cmp2uncmp) && (FD_INVALID != gtmrecv_sock_fd))
 	{	/* Send REPL_BADTRANS or REPL_CMP2UNCMP message */
 		bad_trans_msg.type = send_cmp2uncmp ? REPL_CMP2UNCMP : REPL_BADTRANS;
 		bad_trans_msg.len  = MIN_REPL_MSGLEN;
@@ -424,7 +424,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 					     "upd restart\n");
 				gtmrecv_wait_for_jnl_seqno = TRUE;
 				report_cnt = next_report_at = 1;
-				if (send_xoff && -1 == gtmrecv_sock_fd)
+				if (send_xoff && (FD_INVALID == gtmrecv_sock_fd))
 				{
 					/* Update start command was issued before connection was established,
 					 * no point in sending XOFF.  */
@@ -479,8 +479,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Stopping stats log\n");
 		/* Force all data out to the file before closing the file */
 		repl_log(gtmrecv_statslog_fp, TRUE, TRUE, "End statistics logging\n");
-		CLOSEFILE(gtmrecv_statslog_fd, status);
-		gtmrecv_statslog_fd = -1;
+		CLOSEFILE_RESET(gtmrecv_statslog_fd, status);	/* resets "gtmrecv_statslog_fd" to FD_INVALID */
 		/* We need to FCLOSE because a later open() in repl_log_init() might return the same file descriptor as the one
 		 * that we just closed. In that case, FCLOSE done in repl_log_fd2fp() affects the newly opened file and
 		 * FDOPEN will fail returning NULL for the file pointer. So, we close both the file descriptor and file pointer.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,24 +58,24 @@ int4	v12_jnl_record_length(jnl_record *rec, int4 top)  /* top is maximum length 
 	case JRT_EOF:
 	case JRT_NULL:
 	case JRT_INCTN:
-		n += JREC_SUFFIX_SIZE;
+		n += (int4)JREC_SUFFIX_SIZE;
 		break;
 
 	case JRT_ALIGN:
 		if (n > top)
 			break;
 		GET_USHORT(m, &rec->val.jrec_align.align_str.align_string.length);
-		n += m + JREC_SUFFIX_SIZE;
+		n += m + (int4)JREC_SUFFIX_SIZE;
 		break;
 
 	case JRT_KILL:
 	case JRT_ZKILL:
-		n += sizeof(unsigned short);
+		n += SIZEOF(unsigned short);
 		if (n > top)
 			break;
 
 		GET_USHORT(m, &rec->val.jrec_kill.mumps_node.length);
-		n += m + JREC_SUFFIX_SIZE;
+		n += m + (int4)JREC_SUFFIX_SIZE;
 		break;
 
 	case JRT_FKILL:
@@ -86,16 +86,16 @@ int4	v12_jnl_record_length(jnl_record *rec, int4 top)  /* top is maximum length 
 	case JRT_GZKILL:
 	case JRT_TZKILL:
 	case JRT_UZKILL:
-		n += sizeof(unsigned short);
+		n += SIZEOF(unsigned short);
 		if (n > top)
 			break;
 
 		GET_USHORT(m, &rec->val.jrec_fkill.mumps_node.length);
-		n += m + JREC_SUFFIX_SIZE;
+		n += m + (int4)JREC_SUFFIX_SIZE;
 		break;
 
 	case JRT_SET:
-		n += sizeof(unsigned short);
+		n += SIZEOF(unsigned short);
 		if (n > top)
 			break;
 
@@ -103,18 +103,18 @@ int4	v12_jnl_record_length(jnl_record *rec, int4 top)  /* top is maximum length 
 		n += m;
 		if (n + sizeof(mstr_len_t) > top)
 		{
-			n += sizeof(mstr_len_t);
+			n += SIZEOF(mstr_len_t);
 			break;
 		}
 		GET_MSTR_LEN(mstr_len, (char *)rec + n);
-		n += mstr_len + sizeof(mstr_len_t) + JREC_SUFFIX_SIZE;
+		n += mstr_len + SIZEOF(mstr_len_t) + (int4)JREC_SUFFIX_SIZE;
 		break;
 
 	case JRT_FSET:
 	case JRT_GSET:
 	case JRT_TSET:
 	case JRT_USET:
-		n += sizeof(unsigned short);
+		n += SIZEOF(unsigned short);
 		if (n > top)
 			break;
 
@@ -122,11 +122,11 @@ int4	v12_jnl_record_length(jnl_record *rec, int4 top)  /* top is maximum length 
 		n += m;
 		if (n + sizeof(mstr_len_t) > top)
 		{
-			n += sizeof(mstr_len_t);
+			n += SIZEOF(mstr_len_t);
 			break;
 		}
 		GET_MSTR_LEN(mstr_len, (char *)rec + n);
-		n += mstr_len + sizeof(mstr_len_t) + JREC_SUFFIX_SIZE;
+		n += mstr_len + SIZEOF(mstr_len_t) + (int4)JREC_SUFFIX_SIZE;
 		break;
 
 	case JRT_PBLK:
@@ -134,7 +134,7 @@ int4	v12_jnl_record_length(jnl_record *rec, int4 top)  /* top is maximum length 
 			break;
 
 		GET_USHORT(m, &rec->val.jrec_pblk.bsiz);
-		n += m + JREC_SUFFIX_SIZE;
+		n += m + (int4)JREC_SUFFIX_SIZE;
 		break;
 
 	case JRT_AIMG:
@@ -142,7 +142,7 @@ int4	v12_jnl_record_length(jnl_record *rec, int4 top)  /* top is maximum length 
 			break;
 
 		GET_USHORT(m, &rec->val.jrec_aimg.bsiz);
-		n += m + JREC_SUFFIX_SIZE;
+		n += m + (int4)JREC_SUFFIX_SIZE;
 		break;
 
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,8 @@ mval *fgncal_lookup(mval *x)
 	{
 		targ_key.var_name = ident;
 		COMPUTE_HASH_MNAME(&targ_key);
-		if (add_hashtab_mname(&curr_symval->h_symtab, &targ_key, NULL, &tabent))
+		targ_key.marked = FALSE;
+		if (add_hashtab_mname_symval(&curr_symval->h_symtab, &targ_key, NULL, &tabent))
 			lv_newname(tabent, curr_symval);
 		ret_val = (mval *) tabent->value;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,10 +28,16 @@
 #include "iormdef.h"
 #include "io_params.h"
 #include "eintr_wrappers.h"
+#include "gtmio.h"
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#include "gtm_zos_chset.h"
+#endif
 
 LITREF	unsigned char		io_params_size[];
 GBLREF io_pair			io_curr_device;
 GBLREF io_log_name 		*io_root_log_name;
+ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
 
 #define FREE_ALL { if (NULL != copy_cmd_string) free(copy_cmd_string); if (NULL != temp) free(temp);\
 		if (NULL != buf)  free(buf); if (NULL != dir_in_path) free(dir_in_path);if (NULL != command2) free(command2); }
@@ -91,7 +97,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	char *env_var;
 	int env_inc;
 	struct stat sb;
-	char *path;
+	char *path, path_buff[GTM_PATH_MAX];
 	char *temp;
 	char *buf;
 	char *dir_in_path;
@@ -102,16 +108,21 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	char *token3;
 	int notfound = FALSE;
 	int ret_stat;
-	int pathsize;
+	int pathsize, path_len;
 	int cmd_string_size;
 
 	path = GETENV("PATH");
+	path_len = STRLEN(path);
+	if (GTM_PATH_MAX <= path_len)
+		path_len = GTM_PATH_MAX - 1;
+	memcpy(path_buff, path, path_len + 1);	/* + 1 for null */
+	path = path_buff;
 
 	cmd_string_size = STRLEN(cmd_string) + 1;
-	pathsize = PATH_MAX + cmd_string_size;
+	pathsize = GTM_PATH_MAX + cmd_string_size;
 	buf = (char *)malloc(pathsize);
 	copy_cmd_string = (char *)malloc(cmd_string_size);
-	dir_in_path = (char *)malloc(PATH_MAX);
+	dir_in_path = (char *)malloc(GTM_PATH_MAX);
 	command2 = (char *)malloc(cmd_string_size);
 	temp = (char *)malloc(pathsize);
 	memcpy(copy_cmd_string, cmd_string, cmd_string_size);
@@ -195,7 +206,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 			}
 
 			/* search all the directories in the $PATH */
-			memcpy(dir_in_path, path, STRLEN(path) + 1);
+			memcpy(dir_in_path, path, path_len + 1);
 			for (str3= dir_in_path; TRUE == notfound; str3 = NULL)
 			{
 				token3 = strtok_r(str3, ":", &saveptr3);
@@ -214,7 +225,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 		}
 		if (TRUE == notfound)
 		{
-			assert(PATH_MAX > (STRLEN(token2) + 1));
+			assert(GTM_PATH_MAX > (STRLEN(token2) + 1));
 			memcpy(ret_token, token2, STRLEN(token2) + 1);
 			FREE_ALL;
 			return(FALSE);
@@ -240,8 +251,6 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	io_desc		*stderr_iod;
  	d_rm_struct	*d_rm;
 	io_log_name	*stderr_naml;				/* logical record for stderr device */
-	error_def(ERR_SYSCALL);
-
 	unsigned char	ch;
 	int		param_cnt = 0;
 	int		p_offset = 0;
@@ -271,10 +280,20 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	char		ret_token[GTM_MAX_DIR_LEN];
 	int		save_errno;
 	int		flags;
-	int		fcntl_res;
+	int		fcntl_res, rc;
+#ifdef __MVS__
+	gtm_chset_t	read_chset, write_chset, stderr_chset = CHSET_EBCDIC;
+	int		read_cvt[2], write_cvt[2], dummy_cvt[2];
+	mstr		chset_mstr;
+	char		*errmsg;
+	boolean_t	textflag;
+	int		ccsid, status, realfiletag;
+#endif
 
 	error_def(ERR_DEVOPENFAIL);
+	error_def(ERR_SYSCALL);
 	error_def(ERR_TEXT);
+	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	iod = dev_name->iod;
 
@@ -318,6 +337,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
 			     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 	}
+	/* for z/OS, grab the chset from the device params to tag the pipe */
+	ZOS_ONLY(gtm_zos_iop_chset(dev_name, pp, &read_chset, &write_chset);)
 
 	/* If command device parameter not entered then exit with error */
 	if (0 == slen[PCOMMAND])
@@ -376,7 +397,15 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		PIPE_ERROR_INIT();
 		rts_error(VARLSTCNT(5) ERR_DEVOPENFAIL, 2, LEN_AND_LIT("PIPE - pipe(pfd_write) failed"), save_errno);
 	} else
+	{
+#ifdef __MVS__
+		PIPE_CVT_FROM_CHSET(write_chset, ccsid, textflag, write_cvt);
+		/* only default and binary get tagged */
+		if (-1 == gtm_zos_set_tag(pfd_write[0], ccsid, textflag, TAG_FORCE, &realfiletag))
+			TAG_POLICY_SEND_MSG("PIPE - ccsid tag(pfd_write) failed", errno, realfiletag, ccsid);
+#endif
 		iod->dollar.zeof = FALSE;
+	}
 
 	/* child to write stdout (and possibly stderr) to pfd_read[1] and parent to read from pfd_read[0] */
 	if (return_stdout)
@@ -386,7 +415,14 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			PIPE_ERROR_INIT();
 			rts_error(VARLSTCNT(5) ERR_DEVOPENFAIL, 2, LEN_AND_LIT("PIPE - pipe(pfd_read) failed"), save_errno);
 		} else
+		{
+#ifdef __MVS__
+			PIPE_CVT_FROM_CHSET(read_chset, ccsid, textflag, read_cvt);
+			if (-1 == gtm_zos_set_tag(pfd_read[0], ccsid, textflag, TAG_FORCE, &realfiletag))
+				TAG_POLICY_SEND_MSG("PIPE - ccsid tag(pfd_read) failed", errno, realfiletag, ccsid);
+#endif
 			file_des_read = pfd_read[0];
+		}
 
 	/* child to write to pfd_read_stderr[1] and parent to read from pfd_read_stderr[0] */
 	if (return_stderr)
@@ -396,7 +432,15 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			PIPE_ERROR_INIT();
 			rts_error(VARLSTCNT(5) ERR_DEVOPENFAIL, 2, LEN_AND_LIT("PIPE - pipe(pfd_read_stderr) failed"), save_errno);
 		} else
+		{
+#ifdef __MVS__
+			/* stderr is always tagged EBCDIC. there are no Unicode or untagged ASCII error messages */
+			PIPE_CVT_FROM_CHSET(stderr_chset, ccsid, textflag, dummy_cvt);
+			if (-1 == gtm_zos_set_tag(pfd_read_stderr[0], ccsid, textflag, TAG_FORCE, &realfiletag))
+				TAG_POLICY_SEND_MSG("PIPE - ccsid tag(pfd_read_stderr) failed", errno, realfiletag, ccsid);
+#endif
 			file_des_read_stderr = pfd_read_stderr[0];
+		}
 
 	file_des_write = pfd_write[1];
 	/*do the fork and exec */
@@ -415,11 +459,17 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		io_log_name	*l, *prev;
 		d_rm_struct	*d_rm;
 
-		close(pfd_write[1]);          /* Close unused write end */
+		CLOSEFILE_RESET(pfd_write[1], rc);          /* Close unused write end; Resets "pfd_write[1]" to FD_INVALID */
+		ZOS_ONLY(if (-1 == gtm_zos_setcvtmode(pfd_write[0], write_cvt[CHILDCVT]))
+			TAG_POLICY_SEND_MSG("PIPE - conversion mode(pfd_write) failed in child", errno, realfiletag, ccsid));
 		if (return_stdout)
-			close(pfd_read[0]);          /* Close unused read end for stdout return*/
+		{
+			CLOSEFILE_RESET(pfd_read[0], rc); /* Close unused read end for stdout return; Reset fd to FD_INVALID */
+			ZOS_ONLY(if (-1 == gtm_zos_setcvtmode(pfd_read[1], read_cvt[CHILDCVT]))
+				TAG_POLICY_SEND_MSG("PIPE - conversion mode(pfd_read) failed in child", errno, realfiletag, ccsid));
+		}
 		if (return_stderr)
-			close(pfd_read_stderr[0]);          /* Close unused read end for stderr return */
+			CLOSEFILE_RESET(pfd_read_stderr[0], rc); /* Close unused read end for stderr return; Set fd to FD_INVALID */
 		/* close any other pipe output file_des_write */
 		assert (0 != io_root_log_name);
 		assert(0 == io_root_log_name->len);
@@ -427,11 +477,14 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			iod = l->iod;
 			d_rm = (d_rm_struct *) iod->dev_sp;
-			if (d_rm && TRUE == d_rm->pipe)
-				close(d_rm->fildes);
+			/* If a pipe device, it is possible that the file descriptor could be closed even though the device
+			 * structure is not (due to a "write /eof"). Therefore check if the file descriptor is not already
+			 * closed before attempting to close it.
+			 */
+			if (d_rm && d_rm->pipe && (FD_INVALID != d_rm->fildes))
+				CLOSEFILE_RESET(d_rm->fildes, rc);	/* resets "d_rm->fildes" to FD_INVALID */
 		}
-
-		close(0);
+		CLOSEFILE(0, rc);
 		/* stdin becomes pfd_write[0] */
 		if (-1 == dup2(pfd_write[0], 0))
 		{
@@ -440,11 +493,10 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			rts_error(VARLSTCNT(5) ERR_DEVOPENFAIL, 2,
 				  LEN_AND_LIT("PIPE - dup2(pfd_write[0]) failed in child"), save_errno);
 		}
-
 		if (return_stdout)
 		{
 			/* stdout becomes pfd_read[1] */
-			close(1);
+			CLOSEFILE(1, rc);
 			if (-1 == dup2(pfd_read[1], 1))
 			{
 				save_errno = errno;
@@ -452,11 +504,10 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				rts_error(VARLSTCNT(5) ERR_DEVOPENFAIL, 2,
 					  LEN_AND_LIT("PIPE - dup2(pfd_read[1],1) failed in child"), save_errno);
 			}
-
 			/* stderr also becomes pfd_read[1] if return_stderr is false*/
 			if (FALSE == return_stderr)
 			{
-				close(2);
+				CLOSEFILE(2, rc);
 				if (-1 == dup2(pfd_read[1], 2))
 				{
 					save_errno = errno;
@@ -466,10 +517,9 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				}
 			}
 		}
-
 		if (return_stderr)
 		{
-			close(2);
+			CLOSEFILE(2, rc);
 			if (-1 == dup2(pfd_read_stderr[1], 2))
 			{
 				save_errno = errno;
@@ -478,7 +528,6 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 					  LEN_AND_LIT("PIPE - dup2(pfd_read_stderr[1],2) failed in child"), save_errno);
 			}
 		}
-
 		if (0 == slen[PSHELL])
 		{
 			/* get SHELL environment */
@@ -491,7 +540,6 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				ret = EXECL(sh, basename(sh), "-c", pcommand, (char *)NULL);
 		} else
 			ret = EXECL(pshell, pshell_name, "-c", pcommand, (char *)NULL);
-
 		if (-1 == ret)
 		{
 			save_errno = errno;
@@ -499,14 +547,19 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			rts_error(VARLSTCNT(5) ERR_DEVOPENFAIL, 2, LEN_AND_LIT("PIPE - execl failed in child"), save_errno);
 		}
 	} else
-	{
-		/* in parent */
-		close(pfd_write[0]);          /* Close unused read end */
+	{	/* in parent */
+		CLOSEFILE_RESET(pfd_write[0], rc);          /* Close unused read end; Resets "pfd_write[0]" to FD_INVALID */
+		ZOS_ONLY(if (-1 == gtm_zos_setcvtmode(pfd_write[1], write_cvt[PARENTCVT]))
+			TAG_POLICY_SEND_MSG("PIPE - conversion mode(pfd_write) failed", errno, realfiletag, ccsid));
 		/* if returning stdout then close unused write end */
 		if (return_stdout)
-			close(pfd_read[1]);
+		{
+			CLOSEFILE_RESET(pfd_read[1], rc);	/* resets "pfd_read[1]" to FD_INVALID */
+			ZOS_ONLY(if(-1 == gtm_zos_setcvtmode(pfd_read[0], read_cvt[PARENTCVT]))
+				TAG_POLICY_SEND_MSG("PIPE - conversion mode(pfd_read) failed", errno, realfiletag, ccsid));
+		}
 		if (return_stderr)
-			close(pfd_read_stderr[1]);
+			CLOSEFILE_RESET(pfd_read_stderr[1], rc);	/* resets "pfd_read_stderr[1]" to FD_INVALID */
 	}
 	assert((params) *(pp->str.addr) < (unsigned char) n_iops);
 	assert(0 != iod);
@@ -548,28 +601,23 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		d_rm->dev_param_pairs.num_pairs = param_cnt;
 		if (slen[PSHELL])
 		{
-			d_rm->dev_param_pairs.pairs[param_offset].name = malloc(SIZEOF("SHELL="));
-			strcpy(d_rm->dev_param_pairs.pairs[param_offset].name, "SHELL=");
+			MALLOC_CPY_LIT(d_rm->dev_param_pairs.pairs[param_offset].name, "SHELL=");
 			/* add quotes around the command field */
 			d_rm->dev_param_pairs.pairs[param_offset].definition = malloc(STRLEN(pshell) + 5);
 			SPRINTF(d_rm->dev_param_pairs.pairs[param_offset++].definition, "\"%s\"", pshell);
 			if (NULL != pshell)
 				free(pshell);
 		}
-
 		/* We checked for command existence earlier so no need to check again */
-		d_rm->dev_param_pairs.pairs[param_offset].name = malloc(SIZEOF("COMMAND="));
-		strcpy(d_rm->dev_param_pairs.pairs[param_offset].name, "COMMAND=");
+		MALLOC_CPY_LIT(d_rm->dev_param_pairs.pairs[param_offset].name, "COMMAND=");
 		/* add quotes around the command field */
 		d_rm->dev_param_pairs.pairs[param_offset].definition = malloc(STRLEN(pcommand) + 5);
 		SPRINTF(d_rm->dev_param_pairs.pairs[param_offset++].definition, "\"%s\"", pcommand);
 		if (NULL != pcommand)
 			free(pcommand);
-
 		if (slen[PSTDERR])
 		{
-			d_rm->dev_param_pairs.pairs[param_offset].name = malloc(SIZEOF("STDERR="));
-			strcpy(d_rm->dev_param_pairs.pairs[param_offset].name, "STDERR=");
+			MALLOC_CPY_LIT(d_rm->dev_param_pairs.pairs[param_offset].name, "STDERR=");
 			/* add quotes around the stderr field */
 			d_rm->dev_param_pairs.pairs[param_offset].definition = malloc(STRLEN(pstderr) + 5);
 			SPRINTF(d_rm->dev_param_pairs.pairs[param_offset].definition, "\"%s\"", pstderr);

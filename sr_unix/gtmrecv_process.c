@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,10 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#if defined(__MVS__) && !defined(_ISOC99_SOURCE)
+#define _ISOC99_SOURCE
+#endif
 
 #include "mdef.h"
 
@@ -101,7 +105,7 @@
 GBLDEF	repl_msg_ptr_t		gtmrecv_msgp;
 GBLDEF	int			gtmrecv_max_repl_msglen;
 GBLDEF	struct timeval		gtmrecv_poll_interval, gtmrecv_poll_immediate;
-GBLDEF	int			gtmrecv_sock_fd = -1;
+GBLDEF	int			gtmrecv_sock_fd = FD_INVALID;
 GBLDEF	boolean_t		repl_connection_reset = FALSE;
 GBLDEF	boolean_t		gtmrecv_wait_for_jnl_seqno = FALSE;
 GBLDEF	boolean_t		gtmrecv_bad_trans_sent = FALSE;
@@ -557,7 +561,7 @@ static int gtmrecv_est_conn(void)
 	}
 	ACCEPT_SOCKET(gtmrecv_listen_sock_fd, (struct sockaddr *)&primary_addr,
 		      (GTM_SOCKLEN_TYPE *)&primary_addr_len, gtmrecv_sock_fd);
-	if (-1 == gtmrecv_sock_fd)
+	if (FD_INVALID == gtmrecv_sock_fd)
 	{
 		status = ERRNO;
 #ifdef __hpux
@@ -601,13 +605,13 @@ static int gtmrecv_est_conn(void)
 				ACCEPT_SOCKET(gtmrecv_listen_sock_fd, (struct sockaddr *)&primary_addr,
 				(GTM_SOCKLEN_TYPE *)&primary_addr_len, gtmrecv_sock_fd);
 				status = ERRNO;
-				if ((-1 == gtmrecv_sock_fd) && (ENOBUFS == status))
+				if ((FD_INVALID == gtmrecv_sock_fd) && (ENOBUFS == status))
 					retry_num++;
 				else
 					break;
 			}
 		}
-		if (-1 == gtmrecv_sock_fd)
+		if (FD_INVALID == gtmrecv_sock_fd)
 #endif
 		{
 			status = ERRNO;
@@ -1231,7 +1235,11 @@ static void process_tr_buff(int msg_type)
 			assert(triplecontent.forwptr == sizeof(triplecontent));
 			assert(triplecontent.start_seqno == recvpool_ctl->jnl_seqno);
 			assert(triplecontent.start_seqno >= recvpool.upd_proc_local->read_jnl_seqno);
-			assert(triplecontent.start_seqno > recvpool_ctl->last_valid_triple.start_seqno);
+			assert((triplecontent.start_seqno > recvpool_ctl->last_valid_triple.start_seqno)
+				 || ((triplecontent.start_seqno == recvpool_ctl->last_valid_triple.start_seqno)
+					&& gtm_white_box_test_case_enabled
+					&& ((WBTEST_UPD_GVSUBOFLOW_ERROR == gtm_white_box_test_case_number)
+						|| (WBTEST_UPD_REC2BIG_ERROR == gtm_white_box_test_case_number))));
 			assert(triplecontent.start_seqno >= recvpool_ctl->last_rcvd_triple.start_seqno);
 			/* Copy relevant fields from received triple message to "last_rcvd_triple" structure */
 			memcpy(recvpool_ctl->last_rcvd_triple.root_primary_instname, triplecontent.instname,
@@ -1741,7 +1749,7 @@ static void do_main_loop(boolean_t crash_restart)
 						}
 						if (!uncmpfail)
 						{
-							cmpsolve_msg.datalen = destlen;
+							cmpsolve_msg.datalen = (int4)destlen;
 							GTM_WHITE_BOX_TEST(WBTEST_REPL_TEST_UNCMP_ERROR, cmpsolve_msg.datalen,
 								REPL_MSG_CMPDATALEN - 1);
 							if (REPL_MSG_CMPDATALEN != cmpsolve_msg.datalen)
@@ -2102,7 +2110,7 @@ static void gtmrecv_heartbeat_timer(TID tid, int4 interval_len, int *interval_pt
 
 static void gtmrecv_main_loop(boolean_t crash_restart)
 {
-	assert(gtmrecv_sock_fd == -1);
+	assert(FD_INVALID == gtmrecv_sock_fd);
 	gtmrecv_poll_actions(0, 0, NULL); /* Clear any pending bad trans */
 	gtmrecv_est_conn();
 	gtmrecv_bad_trans_sent = FALSE; /* this assignment should be after gtmrecv_est_conn since gtmrecv_est_conn can

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,7 @@
 #include "iosp.h"
 #include "jnl_typedef.h"
 #include "gtmmsg.h"	/* for gtm_putmsg() prototype */
+#include "mur_validate_checksum.h" /* for mur_validate_checksum() */
 
 GBLREF	int			mur_regno;
 GBLREF reg_ctl_list		*mur_ctl;
@@ -52,6 +53,7 @@ boolean_t mur_ztp_lookback(void)
 	error_def(ERR_MUINFOUINT4);
 	error_def(ERR_MUINFOUINT8);
 	error_def(ERR_MUINFOSTR);
+	error_def(ERR_TEXT);
 
 	assert(FENCE_NONE != mur_options.fences);
 	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
@@ -69,6 +71,11 @@ boolean_t mur_ztp_lookback(void)
 				break;
 			jrec = mur_rab.jnlrec;
 			rectype = (enum jnl_record_type)mur_rab.jnlrec->prefix.jrec_type;
+			if (mur_options.verify && !mur_validate_checksum())
+			{
+				gtm_putmsg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Checksum validation failed"));
+				return FALSE;
+			}
 			if (mur_options.lookback_time_specified && jrec->prefix.time <= mur_options.lookback_time)
 				break;
 			if (mur_options.lookback_opers_specified)

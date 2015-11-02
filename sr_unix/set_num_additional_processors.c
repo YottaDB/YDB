@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
 #ifdef __hpux
 #include <sys/pstat.h>
 #else
-#include <unistd.h>
+#include "gtm_unistd.h"
 #endif
 #else  /* __MVS__ */
 #define CVT_ADDR                       0x10  	/* -> to CVT */
@@ -35,7 +35,6 @@ void set_num_additional_processors(void)
 	long numcpus;
 	error_def(ERR_NUMPROCESSORS);
 
-
 #ifdef __hpux
 	struct pst_dynamic psd;
 	if (pstat_getdynamic(&psd, sizeof(psd), (size_t)1, 0) == -1)
@@ -47,7 +46,7 @@ void set_num_additional_processors(void)
 		numcpus = psd.psd_proc_cnt;
 #else
 #ifdef __MVS__
-	numcpus=*(TYPE_OF_NUM_CPUS *)(OFFSET_IN_CSD_OF_NUM_CPUS_ADDR+*(char **)(OFFSET_IN_CVT_OF_CSD_ADDR+*(char **)CVT_ADDR));
+	numcpus=*(TYPE_OF_NUM_CPUS *)((*(int *)((*(int *)CVT_ADDR)+OFFSET_IN_CVT_OF_CSD_ADDR))+OFFSET_IN_CSD_OF_NUM_CPUS_ADDR);
 #else
 	if ((numcpus = sysconf(_SC_NPROCESSORS_ONLN)) == -1)
 	{

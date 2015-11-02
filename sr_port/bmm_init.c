@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,14 +18,14 @@
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsfhead.h"
+#include "gdsbml.h"
 
-#define EIGHT_BLKS_FREE 255
 
 GBLREF sgmnt_data *cs_data;
 
 void bmm_init(void)
 {
 	assert(cs_data && cs_data->master_map_len);
-	memset(MM_ADDR(cs_data), EIGHT_BLKS_FREE, MASTER_MAP_SIZE(cs_data));
+	memset(MM_ADDR(cs_data), BMP_EIGHT_BLKS_FREE, MASTER_MAP_SIZE(cs_data));
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,15 +14,22 @@
 #include "opcode.h"
 #include "mdq.h"
 #include "mvalconv.h"
+#include "hashtab.h"
+#include "hashtab_str.h"
 
-LITREF octabstruct oc_tab[];
+GBLREF hash_table_str	*complits_hashtab;
+
+LITREF octabstruct	oc_tab[];
 
 void coerce(oprtype *a,unsigned short new_type)
 {
 
-	mliteral *lit;
-	opctype conv, old_op;
-	triple *ref, *coerc;
+	mliteral 	*lit;
+	opctype		conv, old_op;
+	triple		*ref, *coerc;
+	stringkey	litkey;
+	ht_ent_str	*litent;
+	boolean_t	litdltd;
 
 	assert (new_type == OCT_MVAL || new_type == OCT_MINT || new_type == OCT_BOOL);
 	assert (a->oprclass == TRIP_REF);
@@ -37,12 +44,23 @@ void coerce(oprtype *a,unsigned short new_type)
 		old_op = ref->opcode;
 		if (new_type & oc_tab[old_op].octype)
 			return;
-	}
-	else if (old_op == OC_LIT && new_type == OCT_MINT)
+	} else if (OC_LIT == old_op && OCT_MINT == new_type)
 	{
 		lit = ref->operand[0].oprval.mlit;
 		if (!(++lit->rt_addr))
+		{	/* completely removing this otherwise unused literal as needs to be an ILIT instead */
+			if (NULL != complits_hashtab && NULL != complits_hashtab->base)
+			{	/* Deleted entry is in the hash table .. remove it */
+				litkey.str = lit->v.str;
+				COMPUTE_HASH_STR(&litkey);
+				DEBUG_ONLY(litent = lookup_hashtab_str(complits_hashtab, &litkey));
+				assert(litent);	/* Literal is there .. better be found */
+				assert(litent->value == (void *)lit);
+				litdltd = delete_hashtab_str(complits_hashtab, &litkey);
+				assert(litdltd);
+			}
 			dqdel(lit, que);
+		}
 		ref->opcode = OC_ILIT;
 		ref->operand[0].oprclass = ILIT_REF;
 		ref->operand[0].oprval.ilit = MV_FORCE_INTD(&(lit->v));
@@ -58,5 +76,4 @@ void coerce(oprtype *a,unsigned short new_type)
 	coerc->operand[0] = put_tref(ref);
 	*a = put_tref(coerc);
 	return;
-
 }

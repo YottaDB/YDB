@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -27,6 +27,8 @@ mval_v_sbs		=	4
 mval_v_sym		=	5
 mval_v_sublit		=	6
 mval_v_retarg		=	7
+mval_v_utflen		=	8
+mval_v_aliascont	=	9
 
 mval_m_nm		=	0x001
 mval_m_int_without_nm	=	0x002
@@ -37,6 +39,8 @@ mval_m_sbs		=	0x010
 mval_m_sym		=	0x020
 mval_m_sublit		=	0x040
 mval_m_retarg		=	0x080
+mval_m_utflen		=	0x100
+mval_m_aliascont	=	0x200
 
 #smw 99/7/12 Now using MS VC 5.0 so the following paragraph should
 #		be replaced.

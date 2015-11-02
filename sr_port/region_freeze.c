@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,11 +13,15 @@
 
 #include "gtm_stdio.h"
 
+#ifdef VMS
+#include <descrip.h>
+#include <ssdef.h>
+#endif
+
 #ifdef VVMS_GTCX
 #include <iodef.h>
 #include <fab.h>
 #include <efndef.h>
-
 #endif
 
 #include "gdsroot.h"
@@ -38,10 +42,15 @@
 #include "interlock.h"
 #include "add_inter.h"
 #include "wcs_sleep.h"
+#include "gtm_time.h"
+#include "gtm_string.h"
+#include "cli.h"
+#include "util.h"
 
 GBLREF	bool		caller_id_flag;
 GBLREF	bool		in_mupip_freeze;
 GBLREF	uint4		process_id;
+GBLREF	boolean_t	debug_mupip;
 #ifdef UNIX
 GBLREF	uint4		user_id;
 #define FREEZE_ID	(0 == user_id ? FROZEN_BY_ROOT : user_id)
@@ -70,6 +79,8 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 	uint4			freeze_id, sleep_counter;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
+	now_t			now;                                            /* for GET_CUR_TIME macro */
+	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2];       /* for GET_CUR_TIME macro */
 
 	error_def(ERR_FREEZEID);
 
@@ -97,6 +108,13 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 		if (!override && wait_for_kip && (0 < csd->kill_in_prog))
 		{
 			rel_crit(region);
+			/* MUPIP FREEZE/INTEG and BACKUP's DBG qualifier prints extra debug messages while waiting for KIP */
+			if (debug_mupip)
+			{
+				GET_CUR_TIME;
+				util_out_print("!/MUPIP INFO: !AD : Start kill-in-prog wait for database !AD", TRUE,
+					CTIME_BEFORE_NL, time_ptr, DB_LEN_STR(region));
+			}
 			do
 			{
 				grab_crit(region);
@@ -105,6 +123,12 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 				rel_crit(region);
 				wcs_sleep(sleep_counter);
 			} while (MAX_CRIT_TRY > sleep_counter++);
+			if (debug_mupip)
+			{
+				GET_CUR_TIME;
+				util_out_print("!/MUPIP INFO: !AD : Done with kill-in-prog wait on region", TRUE,
+					CTIME_BEFORE_NL, time_ptr);
+			}
 		}
 		/* if can't ever be true when override is true. */
 		if (MAX_CRIT_TRY <= sleep_counter)

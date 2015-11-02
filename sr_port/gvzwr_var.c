@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@
 #define eb_less(u, v)	(numcmp(u, v) < 0)
 
 GBLREF gv_key		*gv_currkey;
-GBLREF gvzwrite_struct  gvzwrite_block;
+GBLREF gvzwrite_datablk  gvzwrite_block;
 GBLREF int4		outofband;
 GBLREF bool		gv_curr_subsc_null;
 GBLREF gd_region	*gv_cur_region;

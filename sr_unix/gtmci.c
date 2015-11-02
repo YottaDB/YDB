@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,7 @@
 #include "stack_frame.h"
 #include "mvalconv.h"
 #include "gtmxc_types.h"
+#include "lv_val.h"
 #include "fgncal.h"
 #include "gtmci.h"
 #include "error.h"
@@ -37,6 +38,7 @@
 #include "gtm_savetraps.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "code_address_type.h"
+#include "push_lvval.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -131,7 +133,7 @@ int gtm_ci (const char *c_rtn_name, ...)
 	has_return = (xc_void == entry->return_type) ? 0 : 1;
 	if (has_return)
 	{	/* create mval slot for return value */
-		param_blk.retaddr = (void *)push_mval(&arg_mval);
+		param_blk.retaddr = (void *)push_lvval(&arg_mval);
 		va_arg(var, void *);	/* advance va_arg */
 	} else
 		param_blk.retaddr = 0;
@@ -189,10 +191,10 @@ int gtm_ci (const char *c_rtn_name, ...)
                                         i2usmval(&arg_mval, va_arg(var, gtm_uint_t));
                                         break;
 				case xc_long:
-					i2mval(&arg_mval, va_arg(var, gtm_long_t));
+					i2mval(&arg_mval, (int)va_arg(var, gtm_long_t));
 					break;
 				case xc_ulong:
-					i2usmval(&arg_mval, va_arg(var, gtm_ulong_t));
+					i2usmval(&arg_mval, (int)va_arg(var, gtm_ulong_t));
 					break;
                                 case xc_int_star:
                                         i2mval(&arg_mval, *va_arg(var, gtm_int_t *));
@@ -201,10 +203,10 @@ int gtm_ci (const char *c_rtn_name, ...)
                                         i2usmval(&arg_mval, *va_arg(var, gtm_uint_t *));
                                         break;
 				case xc_long_star:
-					i2mval(&arg_mval, *va_arg(var, gtm_long_t *));
+					i2mval(&arg_mval, (int)*va_arg(var, gtm_long_t *));
 					break;
 				case xc_ulong_star:
-					i2usmval(&arg_mval, *va_arg(var, gtm_ulong_t *));
+					i2usmval(&arg_mval, (int)*va_arg(var, gtm_ulong_t *));
 					break;
 				case xc_float: /* fall through */
 				case xc_double:
@@ -235,7 +237,7 @@ int gtm_ci (const char *c_rtn_name, ...)
 						va_end(var);
 						rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 					}
-					arg_mval.str.len = mstr_parm->length;
+					arg_mval.str.len = (mstr_len_t)mstr_parm->length;
 					arg_mval.str.addr = mstr_parm->address;
 					s2pool(&arg_mval.str);
 
@@ -245,7 +247,7 @@ int gtm_ci (const char *c_rtn_name, ...)
 					GTMASSERT; /* should have been caught by citab_parse */
 			}
 		}
-		param_blk.args[i] = push_mval(&arg_mval);
+		param_blk.args[i] = push_lvval(&arg_mval);
 	}
 	va_end(var);
 	param_blk.mask = out_mask;
@@ -284,12 +286,12 @@ int gtm_ci (const char *c_rtn_name, ...)
 		{
 			if (!has_return)
 				continue;
-			arg_ptr = (mval *)(param_blk.retaddr);
+			arg_ptr = &((lv_val *)(param_blk.retaddr))->v;
 			mask = 1;
 			arg_type = entry->return_type;
 		} else
 		{
-			arg_ptr = param_blk.args[i-1];
+			arg_ptr = &param_blk.args[i-1]->v;
 			mask = out_mask;
 			arg_type = entry->parms[i-1];
 			out_mask >>= 1;

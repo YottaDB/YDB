@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,9 @@
 #include "zbreak.h"
 #include "hashtab_mname.h"
 #include "hashtab.h"
+#ifdef	__MVS__
+#include "gtm_zos_io.h"
+#endif
 
 #define RT_TBL_SZ 20
 
@@ -47,7 +50,12 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 	char		srcnamebuf[sizeof(mident_fixed) + STR_LIT_LEN(DOTM)];
 	ht_ent_mname	*tabent;
 	var_tabent	rtnent;
+	int		rc;
+	ZOS_ONLY(int	realfiletag;)
+
 	error_def(ERR_TXTSRCFMT);
+	error_def(ERR_TEXT);
+	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	srcstat = 0;
 	*srcret = (mstr *)0;
@@ -75,8 +83,12 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 		memcpy(c,rtn_vector->src_full_name.addr, rtn_vector->src_full_name.len);
 		*(c + rtn_vector->src_full_name.len) = 0;	/* ensure string is null terminated */
 		fd = OPEN(c, O_RDONLY);
+#ifdef __MVS__
+		if (FD_INVALID != fd && -1 == gtm_zos_tag_to_policy(fd, TAG_UNTAGGED, &realfiletag))
+			TAG_POLICY_SEND_MSG(c, errno, realfiletag, TAG_UNTAGGED);
+#endif
 		free(c);
-		if (fd == -1)
+		if (FD_INVALID == fd)
 		{
 			n = (int)rtn_vector->routine_name.len;
 			memcpy(srcnamebuf, rtn_vector->routine_name.addr, n);
@@ -96,8 +108,12 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 				c2 += src.len;
 				*c2++ = 0;
 				fd = OPEN(c1, O_RDONLY);
+#ifdef __MVS__
+				if (FD_INVALID != fd && -1 == gtm_zos_tag_to_policy(fd, TAG_UNTAGGED, &realfiletag))
+					TAG_POLICY_SEND_MSG(c1, errno, realfiletag, TAG_UNTAGGED);
+#endif
 				free(c1);
-				if (fd == -1)
+				if (FD_INVALID == fd)
 					rts_error(VARLSTCNT(1) errno);
 				found = TRUE;
 			} else
@@ -122,12 +138,10 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 				DOREAD_A_NOINT(fd, c, 1, status);
 				if (-1 == status)
 				{
-					close(fd);
+					CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 					rts_error(VARLSTCNT(3) ERR_TXTSRCFMT, 0, errno);
 				} else if (!status)
-				{
 					break;
-				}
 				if (*c == '\n')
 					break;
 				++c;
@@ -175,7 +189,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 				if (status || checksum != rtn_vector->checksum)
 					badfmt = TRUE;
 			}
-			close(fd);
+			CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 			if (badfmt)
 				srcstat |= CHECKSUMFAIL;
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,7 @@
 #include "mupip_upgrade.h"
 #include "mupip_ftok.h"
 #include "mupip_endiancvt.h"
-
+#include "mupip_crypt.h"
 #include "gtmsource.h"
 #include "gtmrecv.h"
 #include "read_db_files_from_gld.h"	/* Needed for updproc.h */
@@ -240,6 +240,7 @@ static	CLI_PARM	mup_freeze_parm[] = {
 };
 
 static	CLI_ENTRY	mup_freeze_qual[] = {
+	{ "DBG",      mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0 },
 	{ "OFF",      mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 	{ "ON",       mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 	{ "OVERRIDE", mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
@@ -271,6 +272,7 @@ static	CLI_ENTRY	mup_integ_qual[] = {
 	{ "ADJACENCY",   mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
 	{ "BLOCK",       mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, VAL_HEX },
 	{ "BRIEF",       mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
+	{ "DBG",         mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0       },
 	{ "FAST",        mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 	{ "FILE",        mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 	{ "FULL",        mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
@@ -570,6 +572,13 @@ static	CLI_ENTRY	mup_set_qual[] = {
 { 0 }
 };
 
+static 	CLI_ENTRY	mup_crypt_qual[] = {
+{ "DECRYPT",		  mupip_crypt, 0, 0,		      0, 		    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
+{ "FILE",                 mupip_crypt, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0 },
+{ "LENGTH",               mupip_crypt, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
+{ "OFFSET",               mupip_crypt, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
+{ 0 }
+};
 static	CLI_PARM	mup_stop_parm[] = {
 	{ "ID", "ID: " },
 	{ "", "" }
@@ -589,6 +598,7 @@ GBLDEF	CLI_ENTRY	cmd_ary[] = {
 { "BACKUP",    mupip_backup,  mup_backup_qual,    mup_backup_parm,    0, cli_disallow_mupip_backup,    0, VAL_DISALLOWED, 2, 0, 0, 0 },
 { "CONVERT",   mupip_cvtpgm,  mup_convert_qual,   mup_convert_parm,   0, 0,                            0, VAL_DISALLOWED, 2, 0, 0, 0 },
 { "CREATE",    mupip_create,  mup_create_qual,    0,                  0, 0,                            0, VAL_DISALLOWED, 0, 0, 0, 0 },
+{ "CRYPT",     mupip_crypt,   mup_crypt_qual,     0,		      0, 0,                            0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "DOWNGRADE", mupip_downgrade, 0,                mup_downgrade_parm, 0, 0,                            0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "ENDIANCVT", mupip_endiancvt, mup_endian_qual,  mup_endian_parm,    0, 0,                            0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "EXIT",      mupip_quit,    0,                  0,                  0, 0,                            0, VAL_DISALLOWED, 0, 0, 0, 0 },

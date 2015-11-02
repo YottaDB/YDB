@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007, 2008 Fidelity Information Services, Inc *
+ *      Copyright 2007, 2009 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -766,6 +766,7 @@ void format_machine_inst()
 				/*	Ins :: OPCODE ModRM (Reg, Mem)/(No_IMM)	*/
 					case I386_INS_LEA_Gv_M :
 					case I386_INS_MOV_Gv_Ev :
+					case I386_INS_CMP_Gv_Ev :
 					case I386_INS_XOR_Gv_Ev :
 					case I386_INS_MOVSXD_Gv_Ev :
 						instruction.num_operands = 2;

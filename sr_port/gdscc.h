@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,7 @@ enum gds_t_mode
 typedef struct key_value_struct
 {
 	gv_key			key;			/* note that the following array holds the actual key contents */
-	char			key_contents[ROUND_UP(MAX_KEY_SZ + MAX_NUM_SUBSC_LEN, 4)];
+	char			key_contents[DBKEYSIZE(MAX_KEY_SZ)];
 	mstr			value;
 	struct key_value_struct	*next;
 } key_cum_value;

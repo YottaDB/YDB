@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,13 +11,19 @@
 #ifndef HASHTAB_INT8_H
 #define HASHTAB_INT8_H
 
-typedef struct {
+/* Note that hashtab_addr has #define references to all items in this header file. Changes/additions
+   should be reflected there as well.
+*/
+
+typedef struct
+{
 	gtm_uint64_t	key;
 	void		*value;
-	uint4		filler; /* To make it 16 byte for all platforms and aligned */
+	NON_GTM64_ONLY(uint4 filler;) 	/* To make it 16 byte for all platforms and aligned */
 } ht_ent_int8;
 
-typedef struct hash_table_int8_struct {
+typedef struct hash_table_int8_struct
+{
 	ht_ent_int8 	*base;		/* base of array of hent_* entries */
 	ht_ent_int8 	*top; 		/* top of array of hent_* entries */
 	unsigned int 	size;		/* Hash table size */

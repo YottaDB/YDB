@@ -1,7 +1,7 @@
 #! tcsh -f
 #################################################################
 #								#
-#	Copyright 2007, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -28,13 +28,16 @@ if ( -e $checkunicode ) then
     source $checkunicode $x8664inc
     if ("TRUE" == "$is_unicode_support") then
 	if (! -e utf8) mkdir utf8
+	if ( "OS/390" == $HOSTOS ) then
+		setenv gtm_chset_locale $utflocale	# LC_CTYPE not picked up right
+	endif
 	setenv LC_CTYPE $utflocale
 	unsetenv LC_ALL
 	setenv gtm_chset UTF-8	# switch to "UTF-8" mode
 
 	foreach file (*)
-		# Skip directories
-		if (-d $file) then
+		# Skip utf8 directory
+		if (-d $file && "utf8" == $file) then
 			continue
 		endif
 		# Skip soft linking .o files
@@ -44,7 +47,7 @@ if ( -e $checkunicode ) then
 		endif
 		# Soft link everything else
 		if (-e utf8/$file) then
-			rm -f utf8/$file
+			rm -rf utf8/$file
 		endif
 		ln -s ../$file utf8/$file
 	end

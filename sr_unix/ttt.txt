@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2007 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2009 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -43,6 +43,8 @@ OC_CLOSE:	pushab	val.2
 		calls	#2,xfer.xf_close
 OC_CLRTEST:	bicb2	#1,r10
 		jsb	xfer.xf_dt_false
+OC_CLRALSVARS:	pushab	val.1
+		calls	#1,xfer.xf_clralsvars
 OC_COBOOL-MINT:	tstl	val.1
 OC_COBOOL-MVAL:	movab	val.1,r1
 		jsb	xfer.xf_mval2bool
@@ -270,6 +272,9 @@ OC_FNZASCII:	pushab	val.0
 		pushab	val.1
 		pushl	val.2
 		calls	#3,xfer.xf_fnzascii
+OC_FNZAHANDLE:	pushab	val.0
+		pushab	val.1
+		calls	#2,xfer.xf_fnzahandle
 OC_FNZBITAND:	pushab	val.2
 		pushab	val.1
 		pushab	val.0
@@ -324,6 +329,9 @@ OC_FNZCONVERT3: pushab  val.0                   ; Destination mval
                 pushab  val.2                   ; src chset
                 pushab  val.1                   ; string
                 calls   #4,xfer.xf_fnzconvert3
+OC_FNZDATA:	pushab	val.0
+		pushab	val.1
+		calls	#2,xfer.xf_fnzdata
 OC_FNZDATE:	pushab	val.0
 		pushab	val.4
 		pushab	val.3
@@ -652,7 +660,10 @@ OC_JOB:		jsb 	xfer.xf_restartpc
 		calls	val.1,xfer.xf_job
 OC_KILL:	pushab	val.1
 		calls	#1,xfer.xf_kill
+OC_KILLALIAS:   pushl	val.1
+		calls	#1,xfer.xf_killalias
 OC_KILLALL:	calls	#0,xfer.xf_killall
+OC_KILLALIASALL:	calls	#0,xfer.xf_killaliasall
 OC_LABADDR:	pushl	val.2
 		pushab	val.1
 		pushab	val.3
@@ -761,6 +772,18 @@ OC_RHDADDR1:	pushl	#0
 OC_RTERROR:	pushl	val.2
 		pushl	val.1
 		jsb	xfer.xf_rterror
+OC_SETALS2ALS:	pushl	val.1
+		pushab	val.2
+		calls	#2,xfer.xf_setals2als
+OC_SETALSIN2ALSCT:	pushab	val.1
+			pushab	val.2
+			calls	#2,xfer.xf_setalsin2alsct
+OC_SETALSCTIN2ALS:	pushl	val.1
+			pushab	val.2
+			calls	#2,xfer.xf_setalsctin2als
+OC_SETALSCT2ALSCT:	pushab	val.1
+			pushab	val.2
+			calls	#2,xfer.xf_setalsct2alsct
 OC_SETEXTRACT:	pushab	val.0
 		pushl	val.3
 		pushl	val.2

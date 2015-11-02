@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,15 @@
 #define GLO_NAME_MAXLEN 33	/* 1 for length, 4 for prefix, 15 for dvi, 1 for $, 12 for fid */
 #define MAX_NUM_SUBSC_LEN 10	/* one for exponent, nine for the 18 significant digits */
 #define EXTEND_WARNING_FACTOR 3
+/* Define macro to compute the maximum key size required in the gv_key structure based on the database's maximum key size.
+ * Align it to 4-byte boundary as this macro is mostly used by targ_alloc which allocates 3 keys one for gv_target->clue,
+ * one for gv_target->first_rec and one for gv_target->last_rec. The alignment ensures all 3 fields start at aligned boundary.
+ * In the following macro, we can ideally use the ROUND_UP2 macro but since this is used in a typedef (of "key_cum_value")
+ * in gdscc.h, we cannot use that macro as it contains GTMASSERT expressions to do the 2-power check. To avoid this,
+ * we use the ROUND_UP macro (which has no checks). It is ok to do that instead of the more-efficient ROUND_UP2 macro
+ * as the second parameter is a constant so all this should get evaluated at compile-time itself.
+ */
+#define DBKEYSIZE(KSIZE)	(ROUND_UP((KSIZE + MAX_NUM_SUBSC_LEN), 4))
 
 typedef	gtm_uint64_t	trans_num;
 typedef	uint4		trans_num_4byte;
@@ -63,7 +72,7 @@ typedef struct
 				       but must be less than or equal to gds_file_id */
 	{	ino_t	inode;
 		dev_t	device;
-#if defined(__hpux) || defined(__linux__) || defined (__CYGWIN__) ||defined(_UWIN)
+#if defined(__hpux) || defined(__linux__) || defined (__CYGWIN__) ||defined(_UWIN) || defined(__MVS__)
 		unsigned int st_gen;
 #elif defined(_AIX)
 		ulong_t st_gen;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,23 +81,23 @@ void zshow_stack(zshow_out *output)
 					{
 					case SFT_ZBRK_ACT:
 						MEMCPY_LIT(&buff[v.len], ZBRK_FRAME);
-						v.len += sizeof(ZBRK_FRAME) - 1;
+						v.len += SIZEOF(ZBRK_FRAME) - 1;
 						break;
 					case SFT_DEV_ACT:
 						MEMCPY_LIT(&buff[v.len], DEVERR_FRAME);
-						v.len += sizeof(DEVERR_FRAME) - 1;
+						v.len += SIZEOF(DEVERR_FRAME) - 1;
 						break;
 					case SFT_ZTRAP:
 						MEMCPY_LIT(&buff[v.len], ZTRAP_FRAME);
-						v.len += sizeof(ZTRAP_FRAME) - 1;
+						v.len += SIZEOF(ZTRAP_FRAME) - 1;
 						break;
 					case SFT_DM:
 						MEMCPY_LIT(&buff[v.len], DIR_MODE_MESS);
-						v.len += sizeof(DIR_MODE_MESS) - 1;
+						v.len += SIZEOF(DIR_MODE_MESS) - 1;
 						break;
 					case (SFT_COUNT | SFT_ZINTR):
 						MEMCPY_LIT(&buff[v.len], ZINTR_FRAME);
-						v.len += sizeof(DIR_MODE_MESS) - 1;
+						v.len += SIZEOF(DIR_MODE_MESS) - 1;
 						break;
 					default:
 						break;

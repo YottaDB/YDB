@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,6 +55,7 @@ GBLDEF mval dse_dmp_time_fmt = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, STR_LIT_LEN(DSE
 LITREF	char		*jrt_label[JRT_RECTYPES];
 LITREF	char		*gtm_dbversion_table[];
 
+
 #define SHOW_STAT(TEXT, VARIABLE)       if (0 != csd->VARIABLE##_cntr) 					\
 	util_out_print(TEXT"  0x!XL        Transaction =   0x!16@XQ", TRUE, (csd->VARIABLE##_cntr),	\
 		(&csd->VARIABLE##_tn));
@@ -83,7 +84,7 @@ void dse_dmp_fhead (void)
 {
 	boolean_t		jnl_buff_open;
 	unsigned char		util_buff[MAX_UTIL_LEN], buffer[MAXNUMLEN];
-	int			util_len, rectype, time_len, index;
+	int			util_len, rectype, time_len, index, idx;
 	uint4			jnl_status;
 	enum jnl_state_codes	jnl_state;
 	gds_file_id		zero_fid;
@@ -98,6 +99,7 @@ void dse_dmp_fhead (void)
 	boolean_t		is_dse_all;
 	uint4			pid;
 	boolean_t		new_line;
+	unsigned char		outbuf[GTMCRYPT_HASH_HEX_LEN + 1];
 
 	is_dse_all = dse_all_dump;
 	dse_all_dump = FALSE;
@@ -242,6 +244,7 @@ void dse_dmp_fhead (void)
 		UNIX_ONLY(
 		util_out_print("  Commit Wait Spin Count!12UL", TRUE, csd->wcs_phase2_commit_wait_spincnt);
 		)
+		util_out_print("  Database file encrypted             !AD", TRUE, 5, csd->is_encrypted ? " TRUE" : "FALSE");
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump if -/ALL as if part of above display */
@@ -284,6 +287,9 @@ void dse_dmp_fhead (void)
 
 		util_out_print(0, TRUE);
 		util_out_print("  MM defer_time                       !5SL", TRUE, csd->defer_time);
+		/* Print the database encryption hash information */
+		GET_HASH_IN_HEX(csd->encryption_hash, outbuf, GTMCRYPT_HASH_HEX_LEN);
+		util_out_print("  Database file encryption hash  !AD", TRUE, GTMCRYPT_HASH_HEX_LEN, outbuf);
 	}
 	if (NEED_TO_DUMP("ENVIRONMENT"))
 	{

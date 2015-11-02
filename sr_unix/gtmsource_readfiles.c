@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,9 @@
 #include "error.h"
 #include "repl_tr_good.h"
 #include "repl_instance.h"
-
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 #define LOG_WAIT_FOR_JNL_RECS_PERIOD	(10 * 1000) /* ms */
 #define LOG_WAIT_FOR_JNLOPEN_PERIOD	(10 * 1000) /* ms */
 
@@ -191,7 +193,12 @@ static	int repl_next(repl_buff_t *rb)
 	uint4			maxreclen;
 	int			status, sav_buffremaining;
 	char			err_string[BUFSIZ];
-
+	GTMCRYPT_ONLY(
+		int				crypt_status;
+		enum jnl_record_type		rectype;
+		jnl_record			*rec;
+		jnl_string			*keystr;
+	)
 	error_def(ERR_REPLFILIOERR);
 	error_def(ERR_TEXT);
 
@@ -234,10 +241,34 @@ static	int repl_next(repl_buff_t *rb)
 		(reclen = ((jrec_prefix *)b->recbuff)->forwptr) <= maxreclen &&
 		IS_VALID_JNLREC((jnl_record *)b->recbuff, rb->fc->jfh))
 	{
+#		ifdef GTM_CRYPT
+		if (rb->fc->jfh->is_encrypted)
+		{
+			rec = ((jnl_record *)(b->recbuff));
+			rectype = rec->prefix.jrec_type;
+			if (IS_SET_KILL_ZKILL(rectype))
+			{
+				keystr = (IS_ZTP(rectype)) ? (jnl_string *)&rec->jrec_fkill.mumps_node
+							   : (jnl_string *)&rec->jrec_kill.mumps_node;
+				DECODE_SET_KILL_ZKILL(keystr,
+						      (IS_ZTP(rectype)),
+						      rec->prefix.forwptr,
+						      rb->backctl->encr_key_handle,
+						      crypt_status);
+				if (0 != crypt_status)
+					GC_RTS_ERROR(crypt_status, rb->backctl->jnl_fn);
+			}
+		}
+#		endif
 		b->reclen = reclen;
 		return SS_NORMAL;
 	}
 	repl_errno = (maxreclen > JREC_PREFIX_SIZE && reclen <= maxreclen) ? EREPL_JNLRECFMT : EREPL_JNLRECINCMPL;
+	if (EREPL_JNLRECFMT == repl_errno)
+	{	/* not sure how this can happen. take a dump (fork_n_core) to gather more information */
+		assert(FALSE);
+		gtm_fork_n_core();
+	}
 	b->reclen = 0;
 	return repl_errno;
 }
@@ -783,8 +814,11 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 				}
 				ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 			} else if (rectype == JRT_EOF)
+			{
+				assert(FALSE);
 				rts_error(VARLSTCNT(7) ERR_REPLBRKNTRANS, 1, &read_jnl_seqno,
 						ERR_TEXT, 2, RTS_ERROR_LITERAL("Early EOF found"));
+			}
 		} else if (status == EREPL_JNLRECINCMPL)
 		{	/* Log warning message for every certain number of attempts. There might have been a crash
 			 * and the file might have been corrupted. The file possibly might never grow.
@@ -1475,6 +1509,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 		for ( ; ctl->next != NULL && ctl->next->reg == region; prev_ctl = ctl, ctl = ctl->next)
 			;
 	}
+	assert(!*brkn_trans);
 	return (cumul_read);
 }
 

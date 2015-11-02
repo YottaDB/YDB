@@ -1,6 +1,6 @@
 /****************************************************************
- *
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *								*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,6 +9,9 @@
  *								*
  ****************************************************************/
 #include "mdef.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
 #include "jnl_get_checksum.h"
 
 /*
@@ -30,10 +33,22 @@
  *	And so on until the input buffer length is exceeded.
  * 	If bufflen is not divisible by 4, it is ROUNDED DOWN to the nearest 4-byte (uint4) multiple.
  */
-uint4 jnl_get_checksum(uint4 *buff, int bufflen)
+uint4 jnl_get_checksum(uint4 *buff, sgmnt_addrs *csa, int bufflen)
 {
-	uint4 	*top, *blk_base, *blk_top, blen, checksum;
+	uint4			*top, *blk_base, *blk_top, blen, checksum;
+#	ifdef GTM_CRYPT
+	DEBUG_ONLY(
+		sm_uc_ptr_t	orig_buff = NULL;
+	)
 
+	if (NULL != csa && (csa->hdr->is_encrypted))
+	{
+		DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csa->hdr, (sm_uc_ptr_t)buff);
+		DEBUG_ONLY(orig_buff = (unsigned char *)buff;)
+		buff = (uint4 *)GDS_ANY_ENCRYPTGLOBUF(buff, csa);
+		DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csa->hdr, (sm_uc_ptr_t)buff);
+	}
+#	endif
 	checksum = INIT_CHECKSUM_SEED;
 	for (blen = bufflen / USIZEOF(*buff), top = buff + blen, blk_top = buff + CHKSUM_SEGLEN4 / 2; buff < top ;)
 	{

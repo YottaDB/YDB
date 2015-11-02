@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc       #
+#	Copyright 2007, 2009 Fidelity Information Services, Inc       #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -24,7 +24,7 @@
 .extern	frame_pointer
 
 	.text
-.extern	fetch
+.extern	gtm_fetch
 
 # PUBLIC	op_linefetch
 ENTRY op_linefetch
@@ -32,7 +32,7 @@ ENTRY op_linefetch
 	popq	msf_mpc_off(REG64_ACCUM)            # save incoming return PC in frame_pointer->mpc
 	movq	REG_PV, msf_ctxt_off(REG64_ACCUM)   # Save linkage pointer
 	movb    $0,REG8_ACCUM                       # variable length argument
-	call	fetch
+	call	gtm_fetch
 	movq	frame_pointer(REG_IP),REG64_ACCUM
 	pushq	msf_mpc_off(REG64_ACCUM)
 	ret

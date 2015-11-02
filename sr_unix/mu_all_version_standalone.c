@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,12 +35,17 @@
 #include "gdsblk.h"
 #include "eintr_wrappers.h"
 #include "mu_all_version_standalone.h"
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#endif
 
 static	int	ftok_ids[FTOK_ID_CNT] = {1, 43};
 
 error_def(ERR_MUSTANDALONE);
 error_def(ERR_DBOPNERR);
 error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
+ZOS_ONLY(error_def(ERR_BADTAG);)
 
 /* Aquire semaphores that on on all V4.x releases are the access control semaphores. In pre V4.2 releases
    they were based on an FTOK of the database name with an ID of '1'. In V4.2 and later, they are based on
@@ -57,6 +62,7 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 	int		i, rc, save_errno, fd;
 	struct sembuf	sop[4];
 	int		shmid;
+	ZOS_ONLY(int	realfiletag;)
 
 	v15_sgmnt_data	v15_csd;
 
@@ -124,23 +130,25 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 	if (-1 == shmid)
 	{	/* That failed, second check is if shmid stored in file-header (if any) exists */
 		fd = OPEN(db_fn, O_RDONLY);
-		if (-1 == fd)
+		if (FD_INVALID == fd)
 		{
 			save_errno = errno;
 			mu_all_version_release_standalone(sem_inf);
 			rts_error(VARLSTCNT(5) ERR_DBOPNERR, 2, RTS_ERROR_TEXT(db_fn), save_errno);
 		}
+#ifdef __MVS__
+		if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
+			TAG_POLICY_GTM_PUTMSG(db_fn, errno, realfiletag, TAG_BINARY);
+#endif
 		LSEEKREAD(fd, 0, &v15_csd, sizeof(v15_csd), rc);
 		if (0 != rc)
 		{
 			mu_all_version_release_standalone(sem_inf);
 			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("LSEEKREAD()"), CALLFROM, rc);
 		}
-		CLOSEFILE(fd, rc);
+		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		if (0 != v15_csd.shmid && INVALID_SHMID != v15_csd.shmid)
-		{
 			shmid = shmget(v15_csd.shmid, 0, RWDALL);
-		}
 	}
 	if (-1 != shmid)
 	{

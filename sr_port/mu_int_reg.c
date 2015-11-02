@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,19 +32,26 @@
 #include "wcs_sleep.h"
 #include "wcs_flu.h"
 #include "interlock.h"
-
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_data		mu_int_data;
 GBLREF unsigned char		*mu_int_master;
 GBLREF uint4			mu_int_errknt;
 GBLREF sgmnt_data_ptr_t		cs_data;
-
+GTMCRYPT_ONLY(
+	GBLREF gtmcrypt_key_t	mu_int_encrypt_key_handle;
+)
 void mu_int_reg(gd_region *reg, boolean_t *return_value)
 {
 	int			lcnt;
 	sgmnt_addrs     	*csa;
 	cache_que_head_ptr_t    crq, crqwip;
 	freeze_status		status;
+	GTMCRYPT_ONLY(
+		int		crypt_status;
+	)
 
 	error_def(ERR_BUFFLUFAILED);
 	error_def(ERR_DBRDONLY);
@@ -72,7 +79,22 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		return;
 	}
 	change_reg();
-
+#	ifdef GTM_CRYPT
+	/* Initialize mu_int_encrypt_key_handle to be used in mu_int_read */
+	if (cs_data->is_encrypted)
+	{
+		/* Encryption init should have happened in db_init. */
+		ASSERT_ENCRYPTION_INITIALIZED;
+		/* If the encryption init failed in db_init, the below MACRO should return an error.
+		 * Depending on the error returned, report the error.*/
+		GTMCRYPT_GETKEY(cs_data->encryption_hash, mu_int_encrypt_key_handle, crypt_status);
+		if (0 != crypt_status)
+		{
+			GC_GTM_PUTMSG(crypt_status, (gv_cur_region->dyn.addr->fname));
+			return;
+		}
+	}
+#	endif
 	if ((gv_cur_region->read_only) && (dba_mm == cs_data->acc_meth))
 	{
 		util_out_print("!/MM database is read only. MM database cannot be frozen without write access.", TRUE);
@@ -121,7 +143,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 				rel_crit(gv_cur_region);
 				if (!ok)
 				{
-					gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("INTEG"),
+					gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("MUPIP INTEG"),
 						DB_LEN_STR(gv_cur_region));
 					mu_int_errknt++;
 					return;
@@ -141,7 +163,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		}
 	} else  if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH))
 	{
-		gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("INTEG"), DB_LEN_STR(gv_cur_region));
+		gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("MUPIP INTEG"), DB_LEN_STR(gv_cur_region));
 		mu_int_errknt++;
 		return;
 	}

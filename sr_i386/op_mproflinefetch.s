@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -24,7 +24,7 @@
 .extern	frame_pointer
 
 	.text
-.extern	fetch
+.extern	gtm_fetch
 .extern	stack_leak_check
 .extern pcurrpos
 
@@ -34,7 +34,7 @@ MPR_LINEFETCH	=	0x4
 ENTRY op_mproflinefetch
 	movl	frame_pointer,%eax
 	popl	msf_mpc_off(%eax)
-	call	fetch
+	call	gtm_fetch
 	pushl	$MPR_LINEFETCH
 	call	pcurrpos
 	addl 	$4,%esp

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF	int			mur_regno;
 
-#define BPL	sizeof(int4)*8/BML_BITS_PER_BLK					/* blocks masked by a int4 */
+#define BPL	SIZEOF(int4)*8/BML_BITS_PER_BLK					/* blocks masked by a int4 */
 
 int4 mur_blocks_free()
 {

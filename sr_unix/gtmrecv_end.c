@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,21 +11,13 @@
 
 #include "mdef.h"
 
-#include "gtm_unistd.h"		/* for close() */
+#include "gtm_unistd.h"		/* for close */
 #include "gtm_string.h"
 
-#ifdef UNIX
 #include "gtm_ipc.h"
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <sys/wait.h>
-#elif defined(VMS)
-#include <ssdef.h>
-#include <psldef.h>
-#include <descrip.h> /* Required for gtmrecv.h */
-#else
-#error Unsupported platform
-#endif
 #include <errno.h>
 #include "gtm_inet.h"
 
@@ -47,12 +39,10 @@
 #include "repl_filter.h"
 #include "repl_msg.h"
 #include "repl_sem.h"
-#ifdef VMS
-#include "repl_shm.h"
-#endif
 #include "repl_log.h"
 #include "is_proc_alive.h"
 #include "gtmsource.h"
+#include "gtmio.h"
 
 GBLREF	uint4			process_id;
 GBLREF	recvpool_addrs		recvpool;
@@ -118,7 +108,7 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 	uint4		savepid;
 	int		exit_status;
 	seq_num		log_seqno, log_seqno1;
-	int		fclose_res;
+	int		fclose_res, rc;
 #ifdef VMS
 	int4		status;
 #endif
@@ -176,10 +166,10 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 	gtmrecv_free_filter_buff();
 	recvpool.recvpool_ctl = NULL;
 	/* Close the connection with the Receiver */
-	if (-1 != gtmrecv_listen_sock_fd)
-		close(gtmrecv_listen_sock_fd);
-	if (-1 != gtmrecv_sock_fd)
-		close(gtmrecv_sock_fd);
+	if (FD_INVALID != gtmrecv_listen_sock_fd)
+		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
+	if (FD_INVALID != gtmrecv_sock_fd)
+		CLOSEFILE_RESET(gtmrecv_sock_fd, rc);	/* resets "gtmrecv_sock_fd" to FD_INVALID */
 	QWDECRBYDW(log_seqno, 1);
 	QWDECRBYDW(log_seqno1, 1);
 	repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Last recvd tr num : %llu  Tr Total : %llu  Msg Total : %llu\n",

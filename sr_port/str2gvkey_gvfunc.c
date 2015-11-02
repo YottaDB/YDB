@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,8 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "op.h"
+#include "hashtab_mname.h"	/* needed for lv_val.h */
+#include "lv_val.h"
 #include "subscript.h"
 #include "str2gvargs.h"
 #include "str2gvkey.h"

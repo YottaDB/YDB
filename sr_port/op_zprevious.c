@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,9 @@
 #include "gvsub2str.h"
 #include "gvcmx.h"
 #include "gvusr.h"
+#include "filestruct.h"
+#include "gdscc.h"
+#include "jnl.h"
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey;
@@ -45,24 +48,36 @@ void op_zprevious(mval *v)
 	gd_binding		*map;
 	mstr			name;
 	enum db_acc_method	acc_meth;
-	bool			found;
+	boolean_t		found, ok_to_change_currkey;
 
-	if (gv_curr_subsc_null)
-	{	/* With standard null collation, we still want the same behavior,
-		 * so replace 0x01 in gv_currkey->base[gv_currkey->prev] with 0xFF
-		 */
-		assert(gv_cur_region->std_null_coll || (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]));
-		assert(!gv_cur_region->std_null_coll || (SUBSCRIPT_STDCOL_NULL == gv_currkey->base[gv_currkey->prev]));
-		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->prev + 1]);
-		assert(gv_currkey->end == gv_currkey->prev + 2);
-		gv_currkey->base[gv_currkey->prev] = 0xFF;	/* redundant assignment for when !gv_cur_region->std_null_coll;
-								 * done to avoid pipeline break should we introduce an if */
-		gv_currkey->base[gv_currkey->prev + 1] = 0xFF;
-		gv_currkey->base[++(gv_currkey->end)] = 0;
-	}
+	assert(gv_currkey->prev || !gv_curr_subsc_null);
 	if (gv_currkey->prev)
-	{
+	{	/* If last subscript is a NULL subscript, modify gv_currkey such that a gvcst_search of the resulting gv_currkey
+		 * will find the last available subscript. But in case of dba_usr, (the custom implementation of $ZPREVIOUS which
+		 * is overloaded for DDP now but could be more in the future) it is better to hand over gv_currkey as it is so
+		 * the custom implementation can decide what to do with it.
+		 */
 		acc_meth = gv_cur_region->dyn.addr->acc_meth;
+		ok_to_change_currkey = (dba_usr != acc_meth);
+		if (gv_curr_subsc_null && ok_to_change_currkey)
+		{	/* Replace the last subscript with the highest possible subscript value i.e. the byte sequence
+			 * 	0xFF (STR_SUB_MAXVAL), 0xFF, 0xFF ...  as much as possible i.e. until gv_currkey->top permits.
+			 * This subscript is guaranteed to be NOT present in the database since a user who tried to set this
+			 * exact subscripted global would have gotten a GVSUBOFLOW error (because GT.M sets aside a few bytes
+			 * of padding space). And yet this is guaranteed to collate AFTER any existing subscript. Therefore we
+			 * can safely do a gvcst_zprevious on this key to get at the last existing key in the database.
+			 *
+			 * With    standard null collation, the last subscript will be 0x01
+			 * Without standard null collation, the last subscript will be 0xFF
+			 * Assert that is indeed the case as this will be used to restore the replaced subscript at the end.
+			 */
+			assert(gv_cur_region->std_null_coll || (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]));
+			assert(!gv_cur_region->std_null_coll || (SUBSCRIPT_STDCOL_NULL == gv_currkey->base[gv_currkey->prev]));
+			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->prev + 1]);
+			assert(gv_currkey->end == gv_currkey->prev + 2);
+			assert(gv_currkey->end < gv_currkey->top); /* need "<" (not "<=") to account for terminating 0x00 */
+			GVZPREVIOUS_APPEND_MAX_SUBS_KEY(gv_currkey, gv_target);
+		}
 		if ((dba_bg == acc_meth) || (dba_mm == acc_meth))
 		{
 			if (!gv_target->root)	/* global does not exist */
@@ -101,14 +116,13 @@ void op_zprevious(mval *v)
 				v->str.addr + v->str.len >= (char *)stringpool.base);
 		} else
 			v->str.len = 0;
-		/* Reset gv_currkey from next possible key value to what is was at function entry time */
-		if (gv_curr_subsc_null)
-		{
+		if (gv_curr_subsc_null && ok_to_change_currkey)
+		{	/* Restore gv_currkey to what it was at function entry time */
 			gv_currkey->base[gv_currkey->prev + 1] = KEY_DELIMITER;
 			if (gv_cur_region->std_null_coll)
 				gv_currkey->base[gv_currkey->prev] = SUBSCRIPT_STDCOL_NULL;
 			assert(gv_cur_region->std_null_coll || (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]));
-			gv_currkey->end--;
+			gv_currkey->end = gv_currkey->prev + 2;
 		}
 	} else
 	{	/* the following section is for $ZPREVIOUS(^gname) */
@@ -165,12 +179,12 @@ void op_zprevious(mval *v)
 				assert(0 == (map - 1)->name[sizeof((map - 1)->name) - 1]);
 				gv_currkey->end = mid_len((mident_fixed *)((map - 1)->name));
 				memcpy(gv_currkey->base, (map - 1)->name, gv_currkey->end);
-				gv_currkey->base[gv_currkey->end++] = 0;
-				gv_currkey->base[gv_currkey->end++] = 0;
+				gv_currkey->base[gv_currkey->end++] = KEY_DELIMITER;
+				gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 			}
 		}
 		gv_currkey->end = 0;
-		gv_currkey->base[0] = 0;
+		gv_currkey->base[0] = KEY_DELIMITER;
 		v->mvtype = MV_STR;
 		if (found)
 		{
@@ -189,7 +203,7 @@ void op_zprevious(mval *v)
 				v->str.addr + v->str.len >= (char *)stringpool.base);
 		} else
 			v->str.len = 0;
-		/* No need to reset gv_currkey (to what it was at function entry) as it is already set to NULL */
+		/* No need to restore gv_currkey (to what it was at function entry) as it is already set to NULL */
 	}
 	return;
 }

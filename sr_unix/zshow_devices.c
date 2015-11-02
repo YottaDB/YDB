@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,10 @@
 #include "zshow_params.h"
 #include "nametabtyp.h"
 #include "mvalconv.h"
+#ifdef __MVS__
+#include "gtm_zos_io.h"
+#include <_Ccsid.h>
+#endif
 
 LITREF mstr	     	chset_names[];
 LITREF nametabent	dev_param_names[];
@@ -117,6 +121,15 @@ void zshow_devices(zshow_out *output)
 	static readonly char port_text[] = "PORT=";
 	static readonly char ichset_text[] = "ICHSET=";
 	static readonly char ochset_text[] = "OCHSET=";
+#ifdef __MVS__
+	static readonly char filetag_text[] = "FILETAG=";
+	static readonly char untagged_text[] = "UNTAGGED";
+	static readonly char ebcdic_text[] = "EBCDIC";
+	static readonly char binary_text[] = "BINARY";
+	static readonly char processchset_text[] = "CHSET=";
+	static readonly char text_text[] = " TEXT";
+	char   csname[_CSNAME_LEN_MAX + 1], *csptr;
+#endif
 	static readonly char zsh_socket_state[][10] =
 		{       "CONNECTED"
 			,"LISTENING"
@@ -348,7 +361,7 @@ void zshow_devices(zshow_out *output)
 						{
 							ZS_PARM_SP(&v,zshow_read);
 						}
-						if (CHSET_M != l->iod->ichset || CHSET_M != l->iod->ochset)
+						if (gtm_utf8_mode && (IS_UTF_CHSET(l->iod->ichset) || IS_UTF_CHSET(l->iod->ochset)))
 						{
 							if (!rm_ptr->def_recsize)
 							{
@@ -424,6 +437,43 @@ void zshow_devices(zshow_out *output)
 							default:
 								GTMASSERT;
 						}
+#ifdef __MVS__
+						if (TAG_ASCII != l->iod->file_tag)
+						{
+							ZS_STR_OUT(&v, filetag_text);
+							switch ((unsigned int)l->iod->file_tag)
+							{
+							case TAG_UNTAGGED:
+								ZS_STR_OUT(&v,  untagged_text);
+								break;
+							case TAG_EBCDIC:
+								ZS_STR_OUT(&v,  ebcdic_text);
+								break;
+							case TAG_BINARY:
+								ZS_STR_OUT(&v,  binary_text);
+								break;
+							default:
+								if (-1 == __toCSName((__ccsid_t)l->iod->file_tag, csname))
+								{ /* no name so output number */
+									csptr = (char *)i2asc((uchar_ptr_t)csname,
+										(unsigned int)l->iod->file_tag);
+									*csptr = '\0';	/* terminate */
+								}
+								ZS_VAR_STR_OUT(&v, csname);
+							}
+							if (l->iod->text_flag)
+								ZS_STR_OUT(&v, text_text);
+							ZS_ONE_OUT(&v, space_text);
+						}
+						if (l->iod->file_chset != l->iod->process_chset &&
+							(!(0 == l->iod->file_chset && CHSET_ASCII == l->iod->process_chset) &&
+							 !(CHSET_ASCII == l->iod->file_chset && CHSET_M == l->iod->process_chset)))
+						{	/* suppress default cases */
+							ZS_STR_OUT(&v, processchset_text);
+							zshow_output(output, &chset_names[l->iod->process_chset]);
+							ZS_ONE_OUT(&v, space_text);
+						}
+#endif
 						break;
 					case mb:
 						ZS_STR_OUT(&v,mailbox_text);

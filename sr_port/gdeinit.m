@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2008 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2009 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -36,14 +36,12 @@ GDEINIT
 	; release_name.h.  C9801-000344
 	s glo("AIX325")=glo("AIX")
 	s HEX(0)=1
-	s gtm64="false"
-	i ($p($zver," ",4)="IA64") s gtm64="true"
-	i ($p($zver," ",4)="RS6000") s gtm64="true"
-	i ($p($zver," ",4)="x86_64") s gtm64="true"
-	i ($p($zver," ",4)="SPARC") s gtm64="true"
-	i (gtm64="true") f x=1:1:16 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
+	s gtm64=$p($zver," ",4)
+	i "/IA64/RS6000/SPARC/x86_64/x86/S390"[("/"_gtm64) s encsupportedplat=TRUE,gtm64=$s("x86"=gtm64:FALSE,1:TRUE)
+	e  s (encsupportedplat,gtm64)=FALSE
+	i (gtm64=TRUE) f x=1:1:16 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
 	e  f x=1:1:8 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
-	s TWO(26)=TWO(24)*4
+	f i=25:1:28 s TWO(i)=TWO(i-1)*2
 	s TWO(31)=TWO(32)*.5
 	s lower="abcdefghijklmnopqrstuvwxyz",upper="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	s endian=endian($p($zver," ",4),$p($zver," ",3))
@@ -51,21 +49,20 @@ GDEINIT
 	s defglo=glo(ver)
 	s comline=$zcmdline
 	s nullsubs="\NEVER\FALSE\ALWAYS\TRUE\EXISTING"
-	s nommbi=1		; this is used in gdeverif and should be removed along with the code when support is added
+	s nommbi=1              ; this is used in gdeverif and should be removed along with the code when support is added
 	d UNIX:ver'="VMS"
 	d VMS:ver="VMS"
 	d syntabi
 ;
-	i (gtm64="false") d
+	i (gtm64=FALSE) d
 	. s SIZEOF("am_offset")=324
 	. s SIZEOF("file_spec")=256
 	. s SIZEOF("gd_header")=16
 	. s SIZEOF("gd_contents")=44
 	. s SIZEOF("gd_map")=36
 	. s SIZEOF("gd_region")=332
-	. s SIZEOF("gd_segment")=336
-	. s SIZEOF("mident")=32
-	. s SIZEOF("blk_hdr")=16
+	. if ver'="VMS" s SIZEOF("gd_segment")=340
+	. e  s SIZEOF("gd_segment")=336
 	e  d
 	. s SIZEOF("am_offset")=332
 	. s SIZEOF("file_spec")=256
@@ -73,9 +70,9 @@ GDEINIT
 	. s SIZEOF("gd_contents")=80
 	. s SIZEOF("gd_map")=40
 	. s SIZEOF("gd_region")=344
-	. s SIZEOF("gd_segment")=352
-	. s SIZEOF("mident")=32
-	. s SIZEOF("blk_hdr")=16
+	. s SIZEOF("gd_segment")=360
+	s SIZEOF("mident")=32
+	s SIZEOF("blk_hdr")=16
 	s SIZEOF("rec_hdr")=3
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=32767
@@ -121,12 +118,14 @@ GDEINIT
 ; bg
 	s minseg("BG","ALLOCATION")=10,minseg("BG","BLOCK_SIZE")=SIZEOF("dsk_blk"),minseg("BG","EXTENSION_COUNT")=0
 	s minseg("BG","GLOBAL_BUFFER_COUNT")=64,minseg("BG","LOCK_SPACE")=10,minseg("BG","RESERVED_BYTES")=0
-	s maxseg("BG","ALLOCATION")=TWO(26),(maxseg("BG","BLOCK_SIZE"),maxseg("BG","RESERVED_BYTES"))=HEX(4)-SIZEOF("dsk_blk")
+	s maxseg("BG","ALLOCATION")=TWO(27),(maxseg("BG","BLOCK_SIZE"),maxseg("BG","RESERVED_BYTES"))=HEX(4)-SIZEOF("dsk_blk")
+	i ver'="VMS" s maxseg("BG","ALLOCATION")=TWO(28)-TWO(25) ; supports 224M blocks for UNIX only
 	s maxseg("BG","EXTENSION_COUNT")=HEX(4)-1,maxseg("BG","GLOBAL_BUFFER_COUNT")=65536,maxseg("BG","LOCK_SPACE")=65536
 ; mm
 	s minseg("MM","ALLOCATION")=10,minseg("MM","BLOCK_SIZE")=SIZEOF("dsk_blk"),minseg("MM","DEFER")=0
 	s minseg("MM","LOCK_SPACE")=10,minseg("MM","EXTENSION_COUNT")=0,minseg("MM","RESERVED_BYTES")=0
-	s maxseg("MM","ALLOCATION")=TWO(26),(maxseg("MM","BLOCK_SIZE"),maxseg("BG","RESERVED_BYTES"))=HEX(4)-SIZEOF("dsk_blk")
+	s maxseg("MM","ALLOCATION")=TWO(27),(maxseg("MM","BLOCK_SIZE"),maxseg("BG","RESERVED_BYTES"))=HEX(4)-SIZEOF("dsk_blk")
+	i ver'="VMS" s maxseg("MM","ALLOCATION")=TWO(28)-TWO(25) ; supports 224M blocks for UNIX only
 	s maxseg("MM","DEFER")=86400,maxseg("MM","LOCK_SPACE")=1000,maxseg("MM","EXTENSION_COUNT")=HEX(4)-1
 	q
 
@@ -172,6 +171,7 @@ syntabi:
 	s syntab("ADD","SEGMENT","BUCKET_SIZE")="REQUIRED"
 	s syntab("ADD","SEGMENT","BUCKET_SIZE","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","DEFER")="NEGATABLE"
+ 	i ver'="VMS" s syntab("ADD","SEGMENT","ENCRYPTION_FLAG")="NEGATABLE"
 	s syntab("ADD","SEGMENT","EXTENSION_COUNT")="REQUIRED"
 	s syntab("ADD","SEGMENT","EXTENSION_COUNT","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","FILE_NAME")="REQUIRED"
@@ -222,6 +222,7 @@ syntabi:
 	s syntab("CHANGE","SEGMENT","BUCKET_SIZE")="REQUIRED"
 	s syntab("CHANGE","SEGMENT","BUCKET_SIZE","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT","DEFER")="NEGATABLE"
+	i ver'="VMS" s syntab("CHANGE","SEGMENT","ENCRYPTION_FLAG")="NEGATABLE"
 	s syntab("CHANGE","SEGMENT","EXTENSION_COUNT")="REQUIRED"
 	s syntab("CHANGE","SEGMENT","EXTENSION_COUNT","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT","FILE_NAME")="REQUIRED"
@@ -269,6 +270,7 @@ syntabi:
 	s syntab("TEMPLATE","SEGMENT","BUCKET_SIZE")="REQUIRED"
 	s syntab("TEMPLATE","SEGMENT","BUCKET_SIZE","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","DEFER")="NEGATABLE"
+	i ver'="VMS" s syntab("TEMPLATE","SEGMENT","ENCRYPTION_FLAG")="NEGATABLE"
 	s syntab("TEMPLATE","SEGMENT","EXTENSION_COUNT")="REQUIRED"
 	s syntab("TEMPLATE","SEGMENT","EXTENSION_COUNT","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","FILE_NAME")="REQUIRED"
@@ -331,8 +333,8 @@ VMS
 	q
 
 UNIX:
-	s hdrlab="GTCGBDUNX005"         ; must be concurrently maintained in gbldirnam.h!!!
-        i (gtm64="true") s hdrlab="GTCGBDUNX105"
+	s hdrlab="GTCGBDUNX006"         ; must be concurrently maintained in gbldirnam.h!!!
+        i (gtm64=TRUE) s hdrlab="GTCGBDUNX106" ; the high order digit is a 64-bit flag
 	s tfile="$gtmgbldir"
 	s accmeth="\BG\MM"
 	s helpfile="$gtm_dist/gdehelp.gld"

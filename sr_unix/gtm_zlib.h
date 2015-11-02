@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,7 +9,10 @@
  *								*
  ****************************************************************/
 
-#if defined(__osf__) && defined(__alpha)
+#ifndef GTM_ZLIB_H_INCLUDED
+#define	GTM_ZLIB_H_INCLUDED
+
+#if (defined(__osf__) && defined(__alpha)) || (defined(__MVS__))
 	/* For some reason, zconf.h (included by zlib.h) on Tru64 seems to undefine const if STDC is not defined.
 	 * The GT.M build time options currently dont define __STDC__ on Tru64 (which is what leads zconf.h to define STDC)
 	 * so define STDC temporarily. In any case check if it is defined and only if not defined, do the overriding define.
@@ -22,7 +25,7 @@
 
 #include <zlib.h>
 
-#if defined(__osf__) && defined(__alpha)
+#if (defined(__osf__) && defined(__alpha)) || (defined(__MVS__))
 	/* Undefine STDC in case it was defined just above */
 #	if (defined(GTM_ZLIB_STDC_DEFINE))
 #		undef STDC
@@ -66,3 +69,4 @@ GBLREF	int4			repl_zlib_cmp_level;	/* zlib compression level currently in use in
 
 void gtm_zlib_init(void);
 
+#endif

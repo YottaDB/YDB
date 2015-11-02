@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,11 +89,7 @@ XFER(xf_calll, op_calll),
 XFER(xf_close, op_close),
 XFER(xf_currtn, op_currtn),
 XFER(xf_lock, op_lock),
-#ifndef __MVS__
-XFER(xf_fetch, fetch),
-#else
 XFER(xf_fetch, gtm_fetch),
-#endif
 XFER(xf_fnfnumber, op_fnfnumber),
 XFER(xf_fnget, op_fnget),
 XFER(xf_fngetdvi, op_fngetdvi),
@@ -269,4 +265,13 @@ XFER(xf_fnzconvert3, op_fnzconvert3),
 XFER(xf_fnzwidth, op_fnzwidth),
 XFER(xf_fnzsubstr, op_fnzsubstr),
 #endif
-XFER(xf_fnzechar, op_fnzechar)
+XFER(xf_fnzechar, op_fnzechar),
+XFER(xf_setals2als, op_setals2als),
+XFER(xf_setalsin2alsct, op_setalsin2alsct),
+XFER(xf_setalsctin2als, op_setalsctin2als),
+XFER(xf_setalsct2alsct, op_setalsct2alsct),
+XFER(xf_killalias, op_killalias),
+XFER(xf_killaliasall, op_killaliasall),
+XFER(xf_fnzdata, op_fnzdata),
+XFER(xf_clralsvars, op_clralsvars),
+XFER(xf_fnzahandle, op_fnzahandle)

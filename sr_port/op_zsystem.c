@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,12 @@
 
 #include "mdef.h"
 
+#include <errno.h>
 #ifdef VMS
 #include <descrip.h>
 #include <ssdef.h>
+#else
+#include <sys/wait.h>
 #endif
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
@@ -56,6 +59,11 @@ void op_zsystem(mval *v)
 	tp_region	*tr;
 #ifdef UNIX
 	char		*sh, cmd_buf[MAXZSYSSTRLEN], *cmd;
+#ifdef _BSD
+        union wait      wait_stat;
+#else
+        int4            wait_stat;
+#endif
 #elif defined VMS
 	uint4		status;
 	$DESCRIPTOR(d_cmd,"");
@@ -64,6 +72,7 @@ void op_zsystem(mval *v)
 #endif
 	error_def(ERR_INVSTRLEN);
 	error_def(ERR_TPNOTACID);
+	error_def(ERR_SYSCALL);
 
 	if (0 < dollar_tlevel)
 	{	/* Note the existence of similar code in op_dmode.c and mdb_condition_handler.c.
@@ -118,6 +127,16 @@ void op_zsystem(mval *v)
 		resetterm(io_std_device.in);
 #ifdef UNIX
 	dollar_zsystem = SYSTEM(cmd);
+	if (-1 == dollar_zsystem)
+		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("system"), CALLFROM, errno);
+#ifdef _BSD
+	assert(sizeof(wait_stat) == sizeof(int4));
+	wait_stat.w_status = dollar_zsystem;
+#else
+	wait_stat = dollar_zsystem;
+#endif
+	if (WIFEXITED(wait_stat))
+		dollar_zsystem = WEXITSTATUS(wait_stat);
 #elif defined VMS
 	status = spawn_and_bgwait(&d_cmd, 0, 0, &trust, 0, 0, &dollar_zsystem);
 #endif

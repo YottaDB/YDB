@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,11 +91,11 @@ void dbc_open_command_file(phase_static_area *psa)
 	gtm_dist_m.len = sizeof(UNIX_ONLY("$")GTM_DIST) - 1;
 	status = TRANS_LOG_NAME(&gtm_dist_m, &gtm_dist_path, gtm_dist_path_buff, sizeof(gtm_dist_path_buff),
 					dont_sendmsg_on_log2long);
-#	ifdef UNIX
+#ifdef UNIX
 	if (SS_LOG2LONG == status)
 		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, gtm_dist_m.len, gtm_dist_m.addr, sizeof(gtm_dist_path_buff) - 1);
 	else
-#	endif
+#endif
 	if (SS_NORMAL != status)
 		rts_error(VARLSTCNT(1) ERR_GTMDISTUNDEF);
 	assert(0 < gtm_dist_path.len);

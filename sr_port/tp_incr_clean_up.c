@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,13 +28,9 @@
 #include "longset.h"		/* also needed for cws_insert.h */
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
 
-#include "change_reg.h"		/* prototypes */
-
 GBLREF  sgm_info        	*first_sgm_info;
 GBLREF  sgm_info        	*sgm_info_ptr;
 GBLREF  short        		dollar_tlevel;
-GBLREF 	sgmnt_addrs		*cs_addrs;
-GBLREF 	sgmnt_data_ptr_t	cs_data;
 GBLREF  gd_region		*gv_cur_region;
 GBLREF  global_tlvl_info	*global_tlvl_info_head;
 GBLREF  buddy_list		*global_tlvl_info_list;
@@ -71,19 +67,18 @@ void tp_incr_clean_up(short newlevel)
 	cw_set_element		*cse_newlvl;	/* pointer to that cse in a given horizontal list closest to "newlevel" */
 	srch_blk_status		*tp_srch_status;
 	int			min_t_level;	/* t_level of the head of the horizontal-list of a given cw-set-element */
-	gd_region		*tmp_gv_cur_region;
 	ht_ent_int4		*tabent;
+	int4			upd_trans;
+	sgmnt_addrs		*csa;
 
 	assert(newlevel > 0);
 	if (JNL_FENCE_LIST_END != jnl_fence_ctl.fence_list)	/* currently global_tlvl_info struct holds only jnl related info */
 		rollbk_gbl_tlvl_info(newlevel);
-	tmp_gv_cur_region = gv_cur_region;	/* save region and associated pointers to restore them later */
 	for (si = first_sgm_info;  si != NULL;  si = si->next_sgm_info)
 	{
 		num_free = 0;
-		sgm_info_ptr = si;	/* maintain sgm_info_ptr & gv_cur_region binding whenever doing TP_CHANGE_REG */
-		TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
-		rollbk_sgm_tlvl_info(newlevel, si);			/* rollback all the tlvl specific info */
+		upd_trans = si->update_trans;	/* Note down before rollback if there were any updates in this region */
+		rollbk_sgm_tlvl_info(newlevel, si);	/* rollback all the tlvl specific info; may reset si->update_trans */
 		cse = si->first_cw_set;
 		DEBUG_ONLY(min_t_level = 1);
 		/* A property that will help a lot in understanding this algorithm is the following.
@@ -181,15 +176,25 @@ void tp_incr_clean_up(short newlevel)
 		si->cw_set_depth -= num_free;
 		freed = free_last_n_elements(si->cw_set_list, num_free);
 		assert(freed);
+		if (upd_trans && !si->update_trans)
+		{	/* si had updates before the rollback but none after. Do buddylist cleanup so tp_clean_up dont need to */
+			csa = si->tp_csa;
+			if (JNL_ALLOWED(csa))
+			{
+				REINITIALIZE_LIST(si->jnl_list);
+				REINITIALIZE_LIST(si->format_buff_list);
+				si->total_jnl_rec_size = csa->min_total_tpjnl_rec_size;
+			}
+			REINITIALIZE_LIST(si->recompute_list);
+			REINITIALIZE_LIST(si->cw_set_list);	/* reinitialize the cw_set buddy_list */
+			REINITIALIZE_LIST(si->new_buff_list);	/* reinitialize the new_buff buddy_list */
+			REINITIALIZE_LIST(si->tlvl_cw_set_list);	/* reinitialize the tlvl_cw_set buddy_list */
+		}
 	}
 	assert((NULL != first_sgm_info) || 0 == cw_stagnate.size || cw_stagnate_reinitialized);
 		/* if no database activity, cw_stagnate should be uninitialized or reinitialized */
 	if (NULL != first_sgm_info)
 		CWS_RESET;
-	gv_cur_region = tmp_gv_cur_region;	/* restore gv_cur_region and associated pointers */
-	change_reg();
-	if (NULL == gv_cur_region)		/* change_reg() does not set sgm_info_ptr() in case of NULL gv_cur_region */
-		sgm_info_ptr = NULL;
 }
 
 /* correct the next_off field in cse which was overwritten due to next level
@@ -277,6 +282,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 	jnl_format_buffer	*jfb, *temp_jfb;
 	tlevel_info		*tli, *next_tli, *prev_tli;
 	srch_blk_status		*th, *tp_srch_status;
+	sgmnt_addrs		*csa;
 
 	for (prev_tli = NULL, tli = si->tlvl_info_head; tli; tli = tli->next_tlevel_info)
 	{
@@ -296,6 +302,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 		assert(NULL != th->blk_target);
 		th->blk_target->clue.end = 0;
 	}
+	csa = si->tp_csa;
 	if (tli && tli->t_level == newlevel + 1)
 	{	/* freeup the kill set used in tlevels > newlevel */
 		if (tli->tlvl_kill_set)
@@ -314,7 +321,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 			FREE_KILL_SET(si, temp_kill_set);
 			si->kill_set_head = si->kill_set_tail = NULL;
 		}
-		if (JNL_WRITE_LOGICAL_RECS(cs_addrs))
+		if (JNL_WRITE_LOGICAL_RECS(csa))
 		{
 			if (tli->tlvl_jfb_info)
 			{
@@ -346,9 +353,9 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 				 * blk_targets is now done above and the directory tree should also be covered by that.
 				 * hence the DEBUG_ONLY surrounding for the statements below. --- nars -- 2002/07/26
 				 */
-				if ((cs_addrs->dir_tree->read_local_tn == local_tn) && !invalidate)
+				if ((csa->dir_tree->read_local_tn == local_tn) && !invalidate)
 				{
-					for (tp_srch_status = cs_addrs->dir_tree->hist.h;
+					for (tp_srch_status = csa->dir_tree->hist.h;
 						HIST_TERMINATOR != (blk = tp_srch_status->blk_num); tp_srch_status++)
 					{
 						if (tp_srch_status->first_tp_srch_status == th)
@@ -360,7 +367,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 				}
 			)
 		}
-		assert(!invalidate || (0 == cs_addrs->dir_tree->clue.end));
+		assert(!invalidate || (0 == csa->dir_tree->clue.end));
 		si->last_tp_hist = tli->tlvl_tp_hist_info;
 		si->update_trans = tli->update_trans;
 	} else
@@ -369,7 +376,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 		temp_kill_set = si->kill_set_head;
 		FREE_KILL_SET(si, temp_kill_set);
 		si->kill_set_head = si->kill_set_tail = NULL;
-		if (JNL_WRITE_LOGICAL_RECS(cs_addrs))
+		if (JNL_WRITE_LOGICAL_RECS(csa))
 		{
 			temp_jfb = si->jnl_head;
 			FREE_JFB_INFO(si, temp_jfb);
@@ -381,7 +388,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 		reinitialize_hashtab_int4(si->blks_in_use);
 		si->num_of_blks = 0;
 		si->update_trans = FALSE;
-		cs_addrs->dir_tree->clue.end = 0;
+		csa->dir_tree->clue.end = 0;
 		si->last_tp_hist = si->first_tp_hist;
 	}
 	/* delete all the tli's starting from this tli */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,8 @@
 #ifdef UNIX
 #include "xfer_enum.h"
 #endif
+#include "hashtab_mname.h"
+#include "stddef.h"
 
 /* Required to find out variable length argument runtime function calls*/
 #if defined(__x86_64__) || defined(__ia64)
@@ -643,12 +645,22 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					inst++;
 					emit_trip(*(fst_opr + *inst++), TRUE, GENERIC_OPCODE_LDA, MOVC3_TRG_REG);
 
+#ifdef					__MVS__
+					/* The MVC instruction on zOS facilitates memory copy(mval in this case) in a single
+					 * instruction instead of multiple 8/4 byte copies.
+					 *
+					 * TODO: Revisit other platforms using generic emit_code and verify if the below
+					 * logic of multiple copies can be replaced with more efficient instruction(s)
+					 * available on that particular platform.
+					 */
+					GEN_MVAL_COPY(MOVC3_SRC_REG, MOVC3_TRG_REG, sizeof(mval));
+#else
 					for (words_to_move = MVAL_INT_SIZE, reg_offset = 0; words_to_move;)
 					{
 						reg = MACHINE_FIRST_ARG_REG;
 						save_reg_offset = reg_offset;
 						for (cnt = 0, cnttop = MIN(words_to_move, MACHINE_REG_ARGS) ;  cnt < cnttop;
-							cnt++, reg_offset += sizeof(UINTPTR_T))
+							cnt++, reg_offset += SIZEOF(UINTPTR_T))
 						{
 							X86_64_ONLY(targ_reg = GET_ARG_REG(cnt);)
 							NON_X86_64_ONLY(targ_reg = reg + cnt;)
@@ -658,7 +670,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						reg = MACHINE_FIRST_ARG_REG;
 						for (cnt = 0;
 							cnt < cnttop;
-							cnt++, save_reg_offset += sizeof(UINTPTR_T), words_to_move--)
+							cnt++, save_reg_offset += SIZEOF(UINTPTR_T), words_to_move--)
 						{
 							X86_64_ONLY(targ_reg = GET_ARG_REG(cnt);)
 							NON_X86_64_ONLY(targ_reg = reg + cnt;)
@@ -666,6 +678,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 							GTM64_ONLY(GEN_STORE_WORD_8(targ_reg, MOVC3_TRG_REG, save_reg_offset);)
 						}
 					}
+#endif
 					break;
 				case VXI_MOVL:
 					if (*inst == VXT_REG)
@@ -851,7 +864,7 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 	uint4 	branchop_opposite;
 	int	src_reg;
 	int	skip_idx;
-	IA64_ONLY(int tmp_code_idx;)
+	NON_RISC_ONLY(int tmp_code_idx;)
 	int	branch_offset;
 
 	/* assert(jmp_offset != 0); */
@@ -859,8 +872,11 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 	 * instruction is nullified (as described below) */
 
 	/* size of this particular instruction */
-	jmp_offset -= (char *)&code_buf[code_idx] - (char *)&code_buf[0];
+	jmp_offset -= (int)((char *)&code_buf[code_idx] - (char *)&code_buf[0]);
+#ifndef __MVS__
+	/* The code_buff on zOS is filled with 2 byte chunks */
 	assert((jmp_offset & 3) == 0);
+#endif
 	branch_offset = jmp_offset / INST_SIZE;
 
 	/* Some platforms have a different origin for the offset */
@@ -1007,7 +1023,8 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 void	emit_pcrel(void)
 {
 	int branch_offset;
-	jmp_offset -= (char *)&code_buf[code_idx] - (char *)&code_buf[0];
+
+	jmp_offset -= INTCAST((char *)&code_buf[code_idx] - (char *)&code_buf[0]);
 
 	switch (cg_phase)
 	{
@@ -1100,7 +1117,11 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							}
 
 							X86_64_ONLY(IGEN_LOAD_ADDR_REG(trg_reg))
+#ifndef __MVS__
 							NON_X86_64_ONLY(code_idx++;)
+#else
+							IGEN_LOAD_ADDR_REG(trg_reg);
+#endif
 							inst_emitted = TRUE;
 							break;
 						case OC_CDLIT:
@@ -1188,6 +1209,12 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						{
 							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg))
 							RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg);)
+							if (opr->oprclass == TVAR_REF)
+							{
+								emit_base_offset(trg_reg, offsetof(ht_ent_mname, value));
+								NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg))
+								RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg);)
+							}
 							inst_emitted = TRUE;
 						} else
 						{
@@ -1397,6 +1424,12 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						{
 							RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg);)
 							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg))
+							if (opr->oprclass == TVAR_REF)
+							{
+								emit_base_offset(trg_reg, offsetof(ht_ent_mname, value));
+								NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg))
+								RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg);)
+							}
 							inst_emitted = TRUE;
 						} else
 						{
@@ -1534,6 +1567,12 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						{
 							RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg);)
 							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg))
+							if (opr->oprclass == TVAR_REF)
+							{
+								emit_base_offset(trg_reg, offsetof(ht_ent_mname, value));
+								NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg))
+								RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg);)
+							}
 							inst_emitted = TRUE;
 						} else
 						{

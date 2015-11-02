@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,8 @@
 
 #define S_CUTOFF 		7
 #define FREE_RTNTBL_SPACE 	17
+#define RTNTBL_EXP_MIN sizeof(rtn_tabent) * FREE_RTNTBL_SPACE /* never expand the routine name table by less than 17 entries */
+#define RTNTBL_EXP_MAX 16*1024+1 /* never expand the routine name table by more than 16KB (at one time) */
 
 GBLREF rtn_tabent	*rtn_fst_table, *rtn_names, *rtn_names_end, *rtn_names_top;
 GBLREF stack_frame	*frame_pointer;
@@ -83,8 +85,11 @@ bool zlput_rname (rhdtyp *hdr)
 		src = (char *) mid;
 		src_len = (char *)rtn_names_end - (char *)mid + sizeof(rtn_tabent);
 		if (rtn_names_end >= rtn_names_top)
-		{ /* Not enough room, recreate table in larger area */
-			size = (char *)rtn_names_end - (char *)rtn_names + (sizeof(rtn_tabent) * FREE_RTNTBL_SPACE);
+		{ /* Not enough room, recreate table in larger area, try to expand exponentially */
+			size = (char *)rtn_names_end - (char *)rtn_names;
+			size = ROUND_UP(size +
+				((RTNTBL_EXP_MIN > size) ? RTNTBL_EXP_MIN : ((RTNTBL_EXP_MAX < size) ? RTNTBL_EXP_MAX : size)),
+				sizeof(rtn_tabent));
 			new = malloc(size);
 			memcpy(new, rtn_names, (char *)mid - (char *)rtn_names);
 			mid = (rtn_tabent *)((char *)mid + (new - (char *)rtn_names));
@@ -139,8 +144,7 @@ bool zlput_rname (rhdtyp *hdr)
 				}
 				free(tabent->value);
 				tabent->value = 0;
-			} else
-				tabent = NULL;
+			}
 		}
 		NON_USHBIN_ONLY(
 			hdr->old_rhead_ptr = (int4)old_rhead;
@@ -158,9 +162,10 @@ bool zlput_rname (rhdtyp *hdr)
 				stp_move((char *)old_rhead->literal_text_adr,
 					 (char *)(old_rhead->literal_text_adr + old_rhead->literal_text_len));
 				if (tabent)
-				{	/* There was $TEXT info released thus an hash entry with a program name probably
-					   pointing into the readonly storage we are about to release. Replace the mident
-					   key in the hashtable with the routine name mident from the new header.
+				{	/* There was (at one time) a $TEXT source section for this routine. We may have just
+					   released it but whether the source was for the routine just replaced or for an earlier
+					   replacement, the key for that segment is pointing into the readonly storage we
+					   are just about to release. Replace the key with the current one for this routine.
 					*/
 					assert(MSTR_EQ(&tabent->key.var_name, rtn_name));
 					tabent->key.var_name = *rtn_name;	/* Update key with newly saved mident */

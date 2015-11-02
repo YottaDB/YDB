@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,19 +32,26 @@
 #include "mu_gv_cur_reg_init.h"
 #include "gtmmsg.h"
 
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 #define MSGBUF_SIZE 256
 
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_data		mu_int_data;
 GBLREF unsigned char		*mu_int_master;
-
+GTMCRYPT_ONLY(
+GBLREF gtmcrypt_key_t		mu_int_encrypt_key_handle;
+)
 boolean_t mu_int_init(void)
 {
 	unsigned int	native_size, size, status;
 	file_control	*fc;
 	boolean_t	standalone;
 	char		msgbuff[MSGBUF_SIZE], *msgptr;
-
+	GTMCRYPT_ONLY(
+		int	crypt_status;
+	)
 	error_def(ERR_MUNODBNAME);
 	error_def(ERR_MUSTANDALONE);
 	error_def(ERR_DBFSTHEAD);
@@ -86,6 +93,23 @@ boolean_t mu_int_init(void)
 		mu_int_err(ERR_DBFSTHEAD, 0, 0, 0, 0, 0, 0, 0);
 		return FALSE;
 	}
+#	ifdef GTM_CRYPT
+	/* Initialize encryption and the key information for the current segment to be used in mu_int_read.
+	 * Note that this is done here and will be called only if mupip integ is called with -file option.
+	 * In other case where mupip integ is called with -reg option, the following initialization will be done
+	 * in db_init. */
+	if (mu_int_data.is_encrypted)
+	{
+		INIT_PROC_ENCRYPTION(crypt_status);
+		if (0 == crypt_status)
+			GTMCRYPT_GETKEY(mu_int_data.encryption_hash, mu_int_encrypt_key_handle, crypt_status);
+		if (0 != crypt_status)
+		{
+			GC_GTM_PUTMSG(crypt_status, (gv_cur_region->dyn.addr->fname));
+			return FALSE;
+		}
+	}
+#	endif
 	mu_int_master = malloc(mu_int_data.master_map_len);
 	fc->op = FC_READ;
 	fc->op_buff = mu_int_master;

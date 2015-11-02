@@ -1,0 +1,7 @@
+gtm_ci
+gtm_zstatus
+gtm_malloc
+gtm_free
+gtm_filename_to_id
+gtm_is_file_identical
+gtm_xcfileid_free

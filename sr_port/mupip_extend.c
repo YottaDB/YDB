@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,11 +38,18 @@
 #include "mupip_extend.h"
 #include "gtmmsg.h"
 #include "gdsfilext.h"
+#include "wcs_backoff.h"
+#if !defined(MM_FILE_EXT_OK)
+#include "mu_rndwn_file.h"	/* for STANDALONE macro */
+#endif
 
 GBLREF gd_addr		*gd_header;
 GBLREF gd_region 	*gv_cur_region;
 GBLREF sgmnt_addrs 	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
+#if !defined(MM_FILE_EXT_OK)
+GBLREF boolean_t	have_standalone_access;
+#endif
 
 void mupip_extend(void)
 {
@@ -97,6 +104,19 @@ void mupip_extend(void)
 		util_out_print("!/Can't EXTEND region !AD across network",TRUE, REG_LEN_STR(gv_cur_region));
 		mupip_exit(ERR_MUNOACTION);
 	}
+#if !defined(MM_FILE_EXT_OK)
+	if (dba_mm == gv_cur_region->dyn.addr->acc_meth)
+	{
+		FILE_CNTL_INIT(gv_cur_region->dyn.addr);
+		if (!STANDALONE(gv_cur_region))
+		{
+			util_out_print("Can't get standalone access to database file !AD with MM access method, no extension done.",
+				TRUE, DB_LEN_STR(gv_cur_region));
+			mupip_exit(ERR_MUNOACTION);
+		}
+		have_standalone_access = TRUE;
+	}
+#endif
 	gvcst_init(gv_cur_region);				/* This should not happen as extend works on only */
 	if (gv_cur_region->was_open)				/* one region at a time, but handle for safety */
 	{
@@ -125,6 +145,7 @@ void mupip_extend(void)
 	{
 		case dba_bg:
 		case dba_mm:
+			grab_crit(gv_cur_region);
 			GRAB_UNFROZEN_CRIT(gv_cur_region, cs_addrs, cs_data);
 			old_total = cs_addrs->ti->total_blks;
 			if ((uint4)NO_FREE_SPACE == (status = gdsfilext(blocks, old_total)))

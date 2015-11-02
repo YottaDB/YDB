@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -120,12 +120,12 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	i2hex_blkfill(blk,&util_buff[util_len], BLOCK_WINDOW);
 	util_len += BLOCK_WINDOW;
 	MEMCPY_LIT(&util_buff[util_len], TEXT1); /* OFFSET_WINDOW + 1 spaces */
-	util_len += sizeof(TEXT3) - 1;
+	util_len += SIZEOF(TEXT3) - 1;
 	util_len += OFFSET_WINDOW +1;
 	i2hex_blkfill(blk_levl, &util_buff[util_len], LEVEL_WINDOW);
 	util_len += LEVEL_WINDOW;
 	MEMCPY_LIT(&util_buff[util_len], TEXT2);
-	util_len += sizeof(TEXT2) - 1;
+	util_len += SIZEOF(TEXT2) - 1;
 	util_buff[util_len] = 0;
 
 	chain = *(off_chain *)&blk;
@@ -183,8 +183,9 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 		if (full == (NO_FREE_SPACE != gtm_ffs(blk / bplmap, MM_ADDR(csd), MASTER_MAP_BITS_PER_LMAP)))
 		{
 			RTS_ERROR_FUNC(ERR_DBBMMSTR, util_buff);
-			/* We have seen DSE CACHE -VERIFY fail occasionally with the DBBMMSTR error for no reason.
-			 * Hence adding an assert that will give us a dump file to analyze if ever this happens again.
+			/* DSE CACHE -VERIFY used to fail occasionally with the DBBMMSTR error because of passing
+			 * an older twin global buffer that contained stale bitmap information. That is now fixed.
+			 * So we dont expect any more such failures. Assert accordingly.
 			 */
 			assert(!dse_running);
 			return FALSE;
@@ -259,13 +260,13 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 		i2hex_blkfill(blk,&util_buff[util_len], BLOCK_WINDOW);
 		util_len += BLOCK_WINDOW;
 		MEMCPY_LIT(&util_buff[util_len], TEXT1); /* OFFSET_WINDOW + 1 spaces */
-		util_len += sizeof(TEXT3) - 1;
+		util_len += SIZEOF(TEXT3) - 1;
 		i2hex_nofill(rec_offset, &util_buff[util_len], OFFSET_WINDOW);
 		util_len += OFFSET_WINDOW + 1;
 		i2hex_blkfill(blk_levl, &util_buff[util_len], LEVEL_WINDOW);
 		util_len += LEVEL_WINDOW;
 		MEMCPY_LIT(&util_buff[util_len], TEXT2);
-		util_len += sizeof(TEXT2) - 1;
+		util_len += SIZEOF(TEXT2) - 1;
 		util_buff[util_len] = 0;
 
 		if (rec_size <= sizeof(rec_hdr))

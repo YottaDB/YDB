@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,173 @@
 #include "gtmmsg.h"
 #include "caller_id.h"
 #include "gtm_text_alloc.h"
+
+GBLREF  int		process_exiting;		/* Process is on it's way out */
+GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
+
+OS_PAGE_SIZE_DECLARE
+
+#ifdef COMP_GTA		/* Only build this routine if it is going to be called */
+/* This module is built in two different ways: (1) For z/OS the allocation and free routines will just call
+   __malloc31() and free() respectively since mmap() on z/OS does not support the necessary features as of this
+   writing (12/2008). (2) For all other platforms that use this module (Linux and Tru64 builds currently), the
+   module will expand with the mmap code. [SE 12/2008]
+*/
+
+/* The MAXTWO is set to pagesize and MINTWO to 5 sizes below that. Our systems have page
+   sizes of 16K, 8K, and 4K.
+*/
+#define MAXTWO gtm_os_page_size
+#define MINTWO TwoTable[0]		/* Computed by gtaSmInit() */
+#define MAXINDEX 5
+
+/* Fields to help instrument our algorithm */
+GBLREF  size_t    	totalRallocGta;                 /* Total storage currently (real) mmap alloc'd */
+GBLREF  size_t     	totalAllocGta;                  /* Total mmap allocated (includes allocation overhead but not free space */
+GBLREF  size_t     	totalUsedGta;                   /* Sum of "in-use" portions (totalAllocGta - overhead) */
+static	int		totalAllocs;                    /* Total alloc requests */
+static	int		totalFrees;                     /* Total free requests */
+static	size_t		rAllocMax;                      /* Maximum value of totalRalloc */
+static	int		allocCnt[MAXINDEX + 2];         /* Alloc count satisfied by each queue size */
+static	int		freeCnt[MAXINDEX + 2];          /* Free count for element in each queue size */
+static	int		elemSplits[MAXINDEX + 2];       /* Times a given queue size block was split */
+static	int		elemCombines[MAXINDEX + 2];     /* Times a given queue block was formed by buddies being recombined */
+static	int		freeElemCnt[MAXINDEX + 2];      /* Current count of elements on the free queue */
+static	int		freeElemMax[MAXINDEX + 2];      /* Maximum number of blocks on the free queue */
+
+error_def(ERR_TRNLOGFAIL);
+error_def(ERR_INVDBGLVL);
+error_def(ERR_MEMORY);
+error_def(ERR_SYSCALL);
+error_def(ERR_MEMORYRECURSIVE);
+error_def(ERR_TEXT);
+
+#define INCR_CNTR(x) ++x
+#define DECR_CNTR(x) --x
+#define INCR_SUM(x, y) x += y
+#define DECR_SUM(x, y) x -= y
+#define SET_MAX(max, tst) max = MAX(max, tst)
+#define SET_ELEM_MAX(idx) SET_MAX(freeElemMax[idx], freeElemCnt[idx])
+#define CALLERID ((unsigned char *)caller_id())
+
+/* States a storage element may be in (which need to be different from malloc states). */
+enum ElemState {Allocated = 0x43, Free = 0x34};
+
+/* Each allocated block (in the mmap build) has the following structure. The actual address
+   returned to the user for allocation and supplied by the user for release
+   is actually the storage beginning at the 'userStorage.userStart' area.
+   This holds true even for storage that is truely mmap'd.
+*/
+typedef struct storElemStruct
+{	/* This flavor of header is 16 bytes. This is required on IA64 and we have just adopted it for
+	   the other platforms as well as it is a minor expense given the sizes of chunks we are using
+	*/
+	int		queueIndex;			/* Index into TwoTable for this size of element */
+	enum ElemState	state;				/* State of this block */
+	unsigned int	realLen;			/* Real (total) length of allocation */
+	int		filler;
+	union						/* The links are used only when element is free */
+	{
+		struct					/* Free block information */
+		{
+			struct	storElemStruct	*fPtr;	/* Next storage element on free queue */
+			struct	storElemStruct	*bPtr;	/* Previous storage element on free queue */
+		} links;
+		unsigned char	userStart;		/* First byte of user useable storage */
+	} userStorage;
+} storElem;
+
+#ifdef __MVS__
+
+static  uint4  		TwoTable[MAXINDEX + 2];
+/* ******* z/OS expansion ******* */
+#undef malloc
+#undef free
+#include "rtnhdr.h"
+#include "obj_file.h"
+
+/* This function is meant as a temporary replacement for the gtm_text_alloc code that uses mmap.
+   ABS 2008/12 - It is deficient in two regards:
+   1) It abuses storElem - the abuse stems from account needs.  It was hoped that we could simply
+   abuse storElem to hold the actual length of memory allocated and then use the size of storElem
+   as the offset to the original start of memory address that was malloc'ed.  However, the
+   userStart of memory needs to be SECTION_ALIGN_BOUNDARY byte aligned.
+	action: don't use storElem
+   2) SECTION_ALIGN_BOUNDARY is 16 bytes in 64bit world.  Since __malloc31 is returning 8 byte
+   aligned memory, we really only needed a pad of 8 bytes.  But that left no real mechanism to
+   return to the original start of memory. So we have a pad of 24 bytes.  The first 8 bytes point
+   back to the start of memory.  If the next 8 bytes are 16 byte aligned that is returned to the
+   caller.  If not, then we store the start of memory there and return the next 8 bytes.  This allows
+   us to free() the correct address.
+	action: remove SECTION_ALIGN_BOUNDARY as a restriction for all 64bit platforms except IA64
+ */
+void *gtm_text_alloc(size_t size)
+{
+	storElem	*uStor;
+	unsigned long	*aligned, *memStart;
+	int		hdrSize, tSize, save_errno;
+
+	hdrSize = SIZEOF(storElem);
+	/* Pad the memory area for SECTION_ALIGN_BOUNDARY alignment required by comp_indr() */
+	tSize = (int)size + hdrSize + (SECTION_ALIGN_BOUNDARY * 2);
+	uStor = __malloc31(tSize);
+	if (NULL != uStor)
+	{
+		assert(((long)uStor & (long)-8) == (long)uStor);
+
+		aligned = (unsigned long *)&uStor->userStorage.userStart;
+		aligned++;
+		/* Matching the alignment as required in comp_indr() */
+		aligned = (unsigned long *)ROUND_UP2((unsigned long)aligned, (unsigned long)SECTION_ALIGN_BOUNDARY);
+
+		memStart = aligned - 1;
+		*memStart = (unsigned long) uStor;
+		assert((unsigned long)uStor == *memStart);
+
+		uStor->realLen = tSize;
+		INCR_SUM(totalRallocGta, tSize);
+		INCR_SUM(totalAllocGta, tSize);
+		INCR_SUM(totalUsedGta, tSize);
+		INCR_CNTR(totalAllocs);
+		SET_MAX(rAllocMax, totalUsedGta);
+
+		return (void *)aligned;
+	}
+
+	save_errno = errno;
+        if (ENOMEM == save_errno)
+	{
+		assert(FALSE);
+		rts_error(VARLSTCNT(5) ERR_MEMORY, 2, tSize, CALLERID, save_errno);
+	}
+	/* On non-allocate related error, give more general error and GTMASSERT */
+	gtm_putmsg(VARLSTCNT(14) ERR_SYSCALL, 5, LEN_AND_LIT("gtm_text_alloc()"), CALLFROM,
+		   save_errno, 0,
+		   ERR_TEXT, 3, LEN_AND_LIT("Storage call made from"), CALLERID);
+	GTMASSERT;
+}
+
+void gtm_text_free(void *addr)
+{
+	int		size;
+	long		*storage;
+	storElem	*uStor;
+
+	storage = (long *)addr;
+	storage--;
+	uStor = (storElem *)*storage;
+	size = uStor->realLen;
+
+	free(uStor);
+	DECR_SUM(totalRallocGta, size);
+	DECR_SUM(totalAllocGta, size);
+	DECR_SUM(totalUsedGta, size);
+	INCR_CNTR(totalFrees);
+}
+
+#else /* if not __MVS__ */
+
+/* ******* Normal mmap() expansion ******* */
 
 /* These routines for Unix are NOT thread or interrupt safe */
 #  define TEXT_ALLOC(rsize, addr)										\
@@ -77,16 +244,6 @@
 	}													\
 }
 
-/* States a storage element may be in (which need to be different from malloc states). */
-enum ElemState {Allocated = 0x43, Free = 0x34};
-
-/* The MAXTWO is set to pagesize and MINTWO to 5 sizes below that. Our systems have page
-   sizes of 16K, 8K, and 4K.
-*/
-#define MAXTWO gtm_os_page_size
-#define MINTWO TwoTable[0]		/* Computed by gtaSmInit() */
-#define MAXINDEX 5
-
 #define STE_FP(p) p->userStorage.links.fPtr
 #define STE_BP(p) p->userStorage.links.bPtr
 
@@ -100,14 +257,6 @@ enum ElemState {Allocated = 0x43, Free = 0x34};
 # else
 #  define DEBUGSM(x)
 #endif
-
-#define INCR_CNTR(x) ++x
-#define INCR_SUM(x, y) x += y
-#define DECR_CNTR(x) --x
-#define DECR_SUM(x, y) x -= y
-#define SET_MAX(max, tst) max = MAX(max, tst)
-#define SET_ELEM_MAX(idx) SET_MAX(freeElemMax[idx], freeElemCnt[idx])
-#define CALLERID ((unsigned char *)caller_id())
 
 /* Define "routines" to enqueue and dequeue storage elements. Use define so we don't
    have to depend on each implementation's compiler inlining to get efficient code here */
@@ -141,33 +290,6 @@ enum ElemState {Allocated = 0x43, Free = 0x34};
 	assert(0 == ((unsigned long)uStor & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */ \
 }
 
-GBLREF  int		process_exiting;		/* Process is on it's way out */
-GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
-
-/* Each allocated block has the following structure. The actual address
-   returned to the user for allocation and supplied by the user for release
-   is actually the storage beginning at the 'userStorage.userStart' area.
-   This holds true even for storage that is truely mmap'd.
-*/
-typedef struct storElemStruct
-{	/* This flavor of header is 16 bytes. This is required on IA64 and we have just adopted it for
-	   the other platforms as well as it is a minor expense given the sizes of chunks we are using
-	*/
-	int		queueIndex;			/* Index into TwoTable for this size of element */
-	enum ElemState	state;				/* State of this block */
-	unsigned int	realLen;			/* Real (total) length of allocation */
-	int		filler;
-	union						/* The links are used only when element is free */
-	{
-		struct					/* Free block information */
-		{
-			struct	storElemStruct	*fPtr;	/* Next storage element on free queue */
-			struct	storElemStruct	*bPtr;	/* Previous storage element on free queue */
-		} links;
-		unsigned char	userStart;		/* First byte of user useable storage */
-	} userStorage;
-} storElem;
-
 GBLREF readonly struct
 {
 	unsigned char nullHMark[4];
@@ -181,23 +303,6 @@ static  storElem	freeStorElemQs[MAXINDEX + 1];	/* Need full element as queue anc
 static	volatile int4	gtaSmDepth;			/* If we get nested... */
 static	boolean_t	gtaSmInitialized;		/* Initialized indicator */
 
-/* Fields to help instrument our algorithm */
-GBLREF  size_t    	totalRallocGta;                 /* Total storage currently (real) mmap alloc'd */
-GBLREF  size_t     	totalAllocGta;                  /* Total mmap allocated (includes allocation overhead but not free space */
-GBLREF  size_t     	totalUsedGta;                   /* Sum of "in-use" portions (totalAllocGta - overhead) */
-static	int		totalAllocs;                    /* Total alloc requests */
-static	int		totalFrees;                     /* Total free requests */
-static	size_t		rAllocMax;                      /* Maximum value of totalRalloc */
-static	int		allocCnt[MAXINDEX + 2];         /* Alloc count satisfied by each queue size */
-static	int		freeCnt[MAXINDEX + 2];          /* Free count for element in each queue size */
-static	int		elemSplits[MAXINDEX + 2];       /* Times a given queue size block was split */
-static	int		elemCombines[MAXINDEX + 2];     /* Times a given queue block was formed by buddies being recombined */
-static	int		freeElemCnt[MAXINDEX + 2];      /* Current count of elements on the free queue */
-static	int		freeElemMax[MAXINDEX + 2];      /* Maximum number of blocks on the free queue */
-
-OS_PAGE_SIZE_DECLARE
-
-#ifdef COMP_GTA		/* Only build this routine if it is going to be called */
 /* Internal prototypes */
 void gtaSmInit(void);
 storElem *gtaFindStorElem(int sizeIndex);
@@ -209,6 +314,7 @@ error_def(ERR_MEMORY);
 error_def(ERR_SYSCALL);
 error_def(ERR_MEMORYRECURSIVE);
 error_def(ERR_CALLERID);
+error_def(ERR_TEXT);
 
 /* Initialize the storage manangement system. Things to initialize:
 
@@ -463,6 +569,7 @@ void gtm_text_free(void *addr)
 	--gtaSmDepth;
 	--fast_lock_count;
 }
+#endif /* not __MVS__ */
 
 /* Routine to print the end-of-process info -- either allocation statistics or malloc trace dump.
    Note that the use of FPRINTF here instead of util_out_print is historical. The output was at one

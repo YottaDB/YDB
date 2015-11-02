@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -218,7 +218,8 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 	{	/* Buffer is empty, read at least one char into it so we can check how many we need */
 		do
 		{
-			bytesread = iosocket_snr_io(socketptr, socketptr->buffer, socketptr->buffer_size, flags, time_for_read);
+			bytesread = (int)iosocket_snr_io(socketptr, socketptr->buffer, socketptr->buffer_size, flags,
+				time_for_read);
 			SOCKET_DEBUG2(real_errno = errno);
 			SOCKET_DEBUG2(PRINTF("socsnrupb: Buffer empty - bytes read: %d  errno: %d\n", bytesread, real_errno);
 				      DEBUGSOCKFLUSH);

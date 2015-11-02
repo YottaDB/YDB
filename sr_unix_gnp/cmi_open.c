@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,15 +10,18 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "cmidef.h"
-#include "eintr_wrappers.h"
-#include <netinet/in.h>
+
+#include <errno.h>
+
 #include "gtm_socket.h"
 #include "gtm_netdb.h"
 #include "gtm_inet.h"
-#include "gtmio.h"
 #include "gtm_string.h"
-#include <errno.h>
+
+#include "cmidef.h"
+#include "gtmio.h"
+#include "eintr_wrappers.h"
+
 #include "relqop.h"
 
 GBLREF struct NTD *ntd_root;
@@ -67,7 +70,7 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	lnk->err = NULL;
 	lnk->ast = NULL;
 	new_fd = socket(AF_INET, SOCK_STREAM, p->p_proto);
-	if (-1 == new_fd)
+	if (FD_INVALID == new_fd)
 		return errno;
 
 	while ((-1 == (rval = connect(new_fd, (struct sockaddr *)&in, sizeof(in)))) && EINTR ==errno && 0 == outofband)
@@ -75,13 +78,13 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	if (-1 == rval)
 	{
 		save_errno = errno;
-		CLOSEFILE(new_fd, rc);
+		CLOSEFILE_RESET(new_fd, rc);	/* resets "new_fd" to FD_INVALID */
 		return save_errno;
 	}
 	SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &oset, rc);
 	status = cmj_setupfd(new_fd);
 	if (CMI_ERROR(status))
-		CLOSEFILE(new_fd, rc)
+		CLOSEFILE_RESET(new_fd, rc)	/* resets "new_fd" to FD_INVALID */
 	else
 	{
 		status = cmj_set_async(new_fd);
@@ -94,9 +97,8 @@ cmi_status_t cmi_open(struct CLB *lnk)
 			lnk->peer = in;
 			FD_SET(new_fd, &ntd_root->es);
 			lnk->sta = CM_CLB_IDLE;
-		}
-		else
-			CLOSEFILE(new_fd, rc);
+		} else
+			CLOSEFILE_RESET(new_fd, rc);	/* resets "new_fd" to FD_INVALID */
 	}
 	SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 	return status;

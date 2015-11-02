@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,9 @@
 #include "dbfilop.h"
 #include "gvcst_blk_build.h"
 #include "jnl_write.h"
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 
 GBLREF  mur_opt_struct  	mur_options;
 GBLREF 	jnl_gbls_t		jgbl;
@@ -84,6 +87,11 @@ uint4	mur_output_record()
 	pini_list_struct	*plst;
 	boolean_t		jnl_enabled, was_crit;
 	struct_jrec_null	null_record;
+	GTMCRYPT_ONLY(
+		blk_hdr_ptr_t	aimg_blk_ptr;
+		int		req_dec_blk_size;
+		int		crypt_status;
+	)
 
 	error_def(ERR_JNLBADRECFMT);
 
@@ -231,6 +239,25 @@ uint4	mur_output_record()
 		if (!mur_options.apply_after_image)
 			return SS_NORMAL;
 		write_after_image = TRUE;
+#		ifdef GTM_CRYPT
+		/* Decrypt AIMG records if applicable. */
+		if (cs_data->is_encrypted)
+		{
+			aimg_blk_ptr = (blk_hdr_ptr_t)&rec->jrec_aimg.blk_contents[0];
+			req_dec_blk_size = aimg_blk_ptr->bsiz - SIZEOF(blk_hdr);
+			ASSERT_ENCRYPTION_INITIALIZED;
+			if (IS_BLK_ENCRYPTED(aimg_blk_ptr->levl, req_dec_blk_size))
+			{
+				GTMCRYPT_DECODE_FAST(mur_jctl->encr_key_handle,
+						     (char *)(aimg_blk_ptr + 1),
+						     req_dec_blk_size,
+						     NULL,
+						     crypt_status);
+				if (0 != crypt_status)
+					GC_RTS_ERROR(crypt_status, NULL);
+			}
+		}
+#		endif
 		mur_put_aimg_rec(rec);
 		write_after_image = FALSE;
 		break;

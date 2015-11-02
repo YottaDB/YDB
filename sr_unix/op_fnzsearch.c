@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -143,7 +143,7 @@ int op_fnzsearch (mval *file, mint indx, mval *ret)
 			}
 		}
 	}
-	assert(pret.p.pblk.b_esl == ret->str.len);
+	assert((0 == ret->str.len) || (pret.p.pblk.b_esl == ret->str.len));
 	return pret.p.pint;
 }
 

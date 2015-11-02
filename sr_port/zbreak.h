@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,11 +41,7 @@ typedef struct
 #define CANCEL_ONE -1
 #define CANCEL_ALL -2
 
-#ifdef __MVS__		/* need to adjust for load address inst. (temporary) */
-#define SIZEOF_LA	4
-#else
 #define SIZEOF_LA	0
-#endif
 
 zbrk_struct *zr_find(z_records *zrecs, zb_code *addr);
 zbrk_struct *zr_get_free(z_records *zrecs, zb_code *addr);

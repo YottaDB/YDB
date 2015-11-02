@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Information Services, Inc #
+#	Copyright 2001, 2009 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,7 +9,6 @@
 #								#
 #################################################################
 # This script must be run with shell, not Cshell, and it must be a standard compliant sh.
-# On Solaris this is in /usr/xpg4/bin/sh.
 
 # In order to test future configure.csh changes, copy a modified version into /usr/library/Vxxx/pro/configure
 # and /usr/library/Vxxx/dbg/configure.  Then execute $cms_tools/kitstart.csh -ti Vxxx and check output log
@@ -50,8 +49,19 @@ fi
 # Native shared library extension.
 if [ $arch = "hp" -a `uname -m` != "ia64" ]; then
 	ext=".sl"
+elif [ $arch = "zos" ]; then
+	ext=".dll"
 else
 	ext=".so"
+fi
+
+# Native super user and group
+if [ $arch = "zos" ]; then
+	rootuser=OMVSKERN
+	binuser=OMVSGRP
+else
+	rootuser=root
+	binuser=bin
 fi
 
 # Binaries
@@ -72,14 +82,12 @@ if [ $deliver_gtcm_gnp = "yes" ]; then
 fi
 
 # Other files
-hlpfiles="gdehelp.dat gtmhelp.dat"
+hlpfiles="gdehelp.dat gtmhelp.dat *.h"
 if [ $arch = "sco" ]; then
 	ofiles="$hlpfiles esnecil"
 elif [ $arch = "sun"  -o  $arch = "solaris" ]; then
-	ofiles="$hlpfiles libgtmrpc.a gtm_descript.h gtmidef.h"
+	ofiles="$hlpfiles libgtmrpc.a"
 	binaries="$binaries gtm_svc"
-elif [ $arch = "dux"  -o  $arch = "hp"  -o  $arch = "ibm" -o $arch = "linux" ]; then
-	ofiles="$hlpfiles gtmxc_types.h"
 else
 	ofiles="$hlpfiles"
 fi
@@ -139,6 +147,12 @@ rm tmp_owngrp
 $echo "In what directory should GT.M be installed? \c"
 read gtmdist
 
+# if gtmdist is relative then need to make it absolute
+
+if [ `echo $gtmdist | grep -c '^/'` -eq 0 ] ; then
+    gtmdist=`pwd`/$gtmdist
+fi
+
 $echo ""
 
 if [ -d $gtmdist ]; then
@@ -148,7 +162,7 @@ if [ -d $gtmdist ]; then
 	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 		chmod 0755 $gtmdist
 		chown $owner $gtmdist
-		chgrp bin $gtmdist
+		chgrp $binuser $gtmdist
 	else
 		exit
 	fi
@@ -159,15 +173,19 @@ else
 
 	read resp
 	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-		mkdir $gtmdist
+		mkdir -p $gtmdist
 		chmod 0755 $gtmdist
 		chown $owner $gtmdist
-		chgrp bin $gtmdist
+		chgrp $binuser $gtmdist
 	else
 		exit
 	fi
 fi
 
+if [ ! -w $gtmdist ]; then
+	$echo "Directory $gtmdist is not writeable, so exiting"
+	exit
+fi
 
 server_id=42
 
@@ -175,50 +193,133 @@ $echo ""
 $echo "Installing GT.M...."
 $echo ""
 
+
 # Create $gtmdist/utf8 if this platform can support "UTF-8" mode.
 
+# keep the utf8 libicu search code in gtm_test_install.csh in sync with the following!
+
 if [ -d "utf8" ]; then
+	unset gtm_icu_version
 	# If package has utf8 directory, see if system has libicu and locale
-	# Setup library path (in prep for looking for libicu)
-	is64bit_gtm=`file mumps | grep 64-bit | wc -l`
+	# Setup library path (in prep for looking for libicu and crypto libs)
+	if [ "$arch" = "hp" ] ; then
+		is64bit_gtm=`file mumps | grep "IA64" | wc -l`
+	else
+		is64bit_gtm=`file mumps | grep "64-bit" | wc -l`
+	fi
 	if [ $is64bit_gtm -eq 1 ] ; then
 		library_path="/usr/local/lib64 /usr/local/lib /usr/lib /usr/lib32"
 	else
 		library_path="/usr/local/lib /usr/lib /usr/lib32"
 	fi
-	# Look for libicu
-	for libpath in $library_path
-	do
-		if [ -d $libpath ]; then
-			found_icu=`\ls -1 $libpath/libicu*36* 2>/dev/null | wc -l`
-			if [ "$found_icu" -ne 0 ] ; then
-				# Determine if they are the right 64/32 bit libraries
-				if [ $arch = "ibm" ] ; then
-					is64bit_icu=`nm -X64 $libpath/libicu*36* 2>/dev/null | head -1 | wc -l`
-				elif [ $arch = "linux" ] ; then
-					is64bit_icu=`file $libpath/libicu*36* | grep 64-bit | wc -l`
+	$echo "Should unicode support be installed? (y or n) \c"
+	read resp
+	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+		would_like_utf8=1
+		$echo "Should an ICU version other than the default be used? (y or n) \c"
+		read resp
+		if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+			$echo "Enter ICU version (at least ICU version 3.6 is required. Enter as <minor-ver>.<major-ver>): \c"
+			read gtm_icu_version
+			icu_ver=`$echo $gtm_icu_version | sed 's/\.//'`
+			majmin=`$echo $icu_ver | cut -f 1 -d "."`
+			if [ "$majmin" -lt "36" ] ; then
+				$echo "WARNING: ICU version $majmin is less than 3.6. Unicode support will not be installed"
+				would_like_utf8=0
+			fi
+		fi
+	else
+		would_like_utf8=0
+		doutf8=0
+	fi
+	# Look for libicu libraries
+	found_icu=0
+	icu_ext=".so"
+	if [ $arch = "ibm" ] ; then
+		icu_ext=".a"
+	elif [ $arch = "hp" ] ; then
+		icu_ext=".sl"
+	fi
+	if [ "$would_like_utf8" -eq 1 ] ; then
+		for libpath in $library_path
+		do
+			icu_lib_found=0
+			if [ "$gtm_icu_version" = "" -a -f "$libpath/libicuio$icu_ext" ] ; then
+				icu_lib_found=1
+				# Find the actual version'ed library to which libicuio.{so,sl,a} points to
+				icu_versioned_lib=`ls -l $libpath/libicuio$icu_ext | awk '{print $NF}'`
+				# Find out vital parameters
+				if [ "$arch" = "ibm" ]; then
+					# From the version'ed library(eg. libicuio36.0.a) extract out
+					# 36.0.a
+					full_icu_ver_string=`echo $icu_versioned_lib | sed 's/libicuio//g'`
+					# Extract 36 from 36.0.a
+					majmin=`echo $full_icu_ver_string | cut -f 1 -d '.'`
+				else
+					full_icu_ver_string=`echo $icu_versioned_lib | sed 's/libicuio\.//g'`
+					majmin=`echo $full_icu_ver_string | cut -f 2 -d '.'`
 				fi
-
-				if [ \( "$is64bit_gtm" -eq 1 \) -a \( "$is64bit_icu" -ne 0 \) ] ; then
-					save_icu_libpath=$libpath
-					break
-				elif [ \( "$is64bit_gtm" -ne 1 \) -a \( "$is64bit_icu" -eq 0 \) ] ; then
-					save_icu_libpath=$libpath
-					break
+			elif [ "$gtm_icu_version" != "" ] ; then
+				# If the user specified a desired version number, then check if the ICU
+				# library with that version number exists.
+				if [ "$arch" = "ibm" -a -f "$libpath/libicuio$majmin$icu_ext" ] ; then
+					icu_lib_found=1
+				elif [ -f "$libpath/libicuio$icu_ext.$majmin" ] ; then
+					icu_lib_found=1
+				else
+					icu_lib_found=0
+				fi
+			fi
+			if [ $icu_lib_found -eq 1 ] ; then
+				# Figure out the object mode(64 bit or 32 bit)  of ICU libraries on the target machine
+				if [ $arch = "linux" -o $arch = "sun"  -o  $arch = "solaris" ] ; then
+					icu_full_ver_lib=`ls -l $libpath/libicuio$icu_ext.$majmin 2>/dev/null | awk '{print $NF}'`
+					is64bit_icu=`file $libpath/$icu_full_ver_lib 2>/dev/null | grep "64-bit" | wc -l`
+				elif [ $arch = "hp" ] ; then
+					icu_full_ver_lib=`ls -l $libpath/libicuio$icu_ext.$majmin 2>/dev/null | awk '{print $NF}'`
+					is64bit_icu=`file $libpath/$icu_full_ver_lib 2>/dev/null | grep "IA64" | wc -l`
+				elif [ $arch = "ibm" ] ; then
+					icu_full_ver_lib=`ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
+					is64bit_icu=`nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -1 | wc -l`
+				fi
+				# Make sure both GTM and ICU are in sync with object mode compatibility (eg both are 32 bit/64 bit )
+				if [ "$is64bit_gtm" -eq 1 -a "$is64bit_icu" -ne 0 ] ; then
+					found_icu=1
+				elif [ "$is64bit_gtm" -ne 1 -a "$is64bit_icu" -eq 0 ] ; then
+					found_icu=1
 				else
 					found_icu=0
 				fi
-
+				# If we have everything we want, then save the libpath that contains the proper ICU library and
+				# set the gtm_icu_version
+				if [ "$found_icu" -eq 1 -a "$majmin" -ge 36 ] ; then
+					save_icu_libpath="$libpath"
+					minorver=`expr $majmin % 10`
+					majorver=`expr $majmin / 10`
+					gtm_icu_version="$majorver.$minorver"
+					export gtm_icu_version
+					break
+				fi
+			fi
+		done
+		if [ "$found_icu" -eq 0 ] ; then
+			if [ $majmin != "" ] ; then
+				echo "WARNING: ICU version $gtm_icu_version not found. Not installing Unicode support."
+			else
+				echo "WARNING: Default ICU version not found. Not installing Unicode support."
 			fi
 		fi
-	done
-	# Look for locale
-	utflocale=`locale -a | grep -i en_us | grep -i utf | grep '8$'`
-	# If both libicu and locale are on system then install UTF-8 support
-	if [ \( "$found_icu" -ne 0 \)  -a \( "$utflocale" != "" \) ] ; then
-		doutf8=1
-	else
-		doutf8=0
+		# Look for locale
+		utflocale=`locale -a | grep -i en_us | grep -i utf | grep '8$'`
+		if [ "$utflocale" = "" ] ; then
+			echo "WARNING: UTF8 locale not found. Not installing Unicode support."
+		fi
+		# If both libicu and locale are on system then install UTF-8 support
+		if [ "$found_icu" -ne 0  -a "$utflocale" != "" ] ; then
+			doutf8=1
+		else
+			doutf8=0
+		fi
 	fi
 else
 	# If utf8 dir does not exist in package, can't install UTF-8 support
@@ -279,7 +380,7 @@ for i in $rscripts
 do
 	cp $i $gtmdist
 	chmod 0744 $gtmdist/$i
-	chown root $gtmdist/$i
+	chown $rootuser $gtmdist/$i
 done
 
 # Install the normal binaries
@@ -291,6 +392,10 @@ do
 		/usr/bin/install -f $gtmdist -M 755 -O $owner -G bin $i
 	elif [ -x /usr/sbin/install ]; then
 		/usr/sbin/install -f $gtmdist -m 755 -u $owner -g bin $i $gtmdist
+	elif [ $arch = "zos" ]; then
+		cp $i $gtmdist/
+		chmod 755 $gtmdist/$i
+		chown $user:$binuser $gtmdist/$i
 	else
 		install -f $gtmdist -m 755 -u $owner -g bin $i $gtmdist
 	fi
@@ -312,6 +417,115 @@ fi
 # support). For that reason, we attempt the command and if it works, great. If it doesn't, oh well we tried.
 if [ -f /usr/bin/chcon ]; then
 	chcon -t texrel_shlib_t $gtmdist/libgtmshr$ext > /dev/null 2>&1
+fi
+
+# Create $gtmdist/plugin/gtmcrypt directory if this platform supports encryption
+
+# Define variables to denote plugin and gtmcrypt directory names
+plugin="plugin"
+plugin_gtmcrypt="$plugin/gtmcrypt"
+
+# Gtmcrypt files used to build (and install)
+gtmcryptbldfiles="install.sh build.sh"
+
+# Gtmcrypt Binaries
+gtmcryptbinaries="ascii2hex maskpass"
+
+# Gtmcrypt shared library
+gtmcryptsharedlib="libgtmcrypt$ext"
+
+# Gtmcrypt scripts
+gtmcryptscripts="add_db_key.ksh gen_sym_key.ksh encrypt_db_key.ksh decrypt_db_key.ksh gen_keypair.ksh"
+gtmcryptscripts="$gtmcryptscripts import_and_sign_key.ksh gen_entropy.ksh kill_entropy.ksh gen_sym_hash.ksh"
+
+# Gtmcrypt related M file
+gtmcryptmfile="GETPASS.m"
+
+# Gtmcrypt source files
+gtmcryptsrcfiles="gtmcrypt_ref.c gtmcrypt_ref.h gtmcrypt_interface.h gtmxc_types.h ascii2hex.c maskpass.c"
+gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_dbk_ref.c gtmcrypt_dbk_ref.h gtmcrypt_pk_ref.c gtmcrypt_pk_ref.h"
+gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_sym_ref.h $gtmcryptbldfiles $gtmcryptmfile"
+
+# Other Gtmcrypt related files
+gtmcryptofiles="gtmcrypt.tab"
+
+dogtmcrypt=0
+if [ -d "$plugin_gtmcrypt" ]; then
+	dogtmcrypt=1
+	# Create plugin directory and gtmcrypt directory
+	mkdir -p $gtmdist/plugin/gtmcrypt
+	chmod 0755 $gtmdist/plugin
+	chown $owner $gtmdist/plugin
+	chgrp $binuser $gtmdist/plugin
+	chmod 0755 $gtmdist/plugin/gtmcrypt
+	chown $owner $gtmdist/plugin/gtmcrypt/
+	chgrp $binuser $gtmdist/plugin/gtmcrypt
+
+
+	#Install the plugin related scripts
+	for i in $gtmcryptscripts
+	do
+		cp $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt/$i
+		chmod 0755 $gtmdist/$plugin_gtmcrypt/$i
+		chown $owner $gtmdist/$plugin_gtmcrypt/$i
+		chgrp $binuser $gtmdist/$plugin_gtmcrypt/$i
+	done
+
+	# Install the plugin binaries
+	for i in $gtmcryptbinaries
+	do
+		if [ $arch = "sun" -o $arch = "linux" ]; then
+			install -g bin -o $owner -m 755 $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
+		elif [ $arch = "ibm" ]; then
+			/usr/bin/install -f $gtmdist/$plugin_gtmcrypt -M 755 -O $owner -G bin $plugin_gtmcrypt/$i
+		elif [ -x /usr/sbin/install ]; then
+			/usr/sbin/install -f $gtmdist/$plugin_gtmcrypt -m 755 -u $owner -g bin \
+				$plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
+		else
+			install -f $gtmdist/$plugin_gtmcrypt -m 755 -u $owner -g bin \
+				$plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
+		fi
+	done
+
+	# Install the plugin shared library
+	if [ $arch = "sun" -o $arch = "linux" ]; then
+		install -g bin -o $owner -m 755 $plugin/$gtmcryptsharedlib $gtmdist/$plugin
+	elif [ $arch = "ibm" ]; then
+		/usr/bin/install -f $gtmdist/$plugin -M 755 -O $owner -G bin $plugin/$gtmcryptsharedlib
+	elif [ -x /usr/sbin/install ]; then
+		/usr/sbin/install -f $gtmdist/$plugin -m 755 -u $owner -g bin $plugin/$gtmcryptsharedlib $gtmdist/$plugin
+	else
+		install -f $gtmdist/$plugin -m 755 -u $owner -g bin $plugin/$gtmcryptsharedlib $gtmdist/$plugin
+	fi
+
+	# Install the plugin related M file
+	cp $plugin_gtmcrypt/$gtmcryptmfile $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
+	chmod 0644 $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
+	chown $owner $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
+	chgrp $binuser $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
+	# If utf8 is supported, soft link the GETPASS.m into $gtmdist/plugin/gtmcrypt/utf8 directory.
+	if [ $doutf8 -ne 0 ]; then
+		mkdir -p $gtmdist/$plugin_gtmcrypt/utf8
+		chmod 0755 $gtmdist/$plugin_gtmcrypt/utf8
+		chown $owner $gtmdist/$plugin_gtmcrypt/utf8
+		chgrp $binuser $gtmdist/$plugin_gtmcrypt/utf8
+		(cd $gtmdist/$plugin_gtmcrypt/utf8; ln -s ../$gtmcryptmfile $gtmcryptmfile)
+	fi
+
+	# Install other plugin files
+	for i in $gtmcryptofiles
+	do
+		cp $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
+		chmod 0644 $gtmdist/$plugin_gtmcrypt/$i
+		chown $owner $gtmdist/$plugin_gtmcrypt/$i
+		chgrp $binuser $gtmdist/$plugin_gtmcrypt/$i
+	done
+
+	# Tar the source files
+	(cd $plugin_gtmcrypt; chmod 0644 $gtmcryptsrcfiles; chown $owner $gtmcryptsrcfiles; chgrp $binuser $gtmcryptsrcfiles)
+	(cd $plugin_gtmcrypt; chmod 0555 $gtmcryptbldfiles; chown $owner $gtmcryptbldfiles; chgrp $binuser $gtmcryptbldfiles)
+	(cd $plugin_gtmcrypt; tar -cvf source.tar $gtmcryptsrcfiles >/dev/null 2>&1; mv source.tar $gtmdist/$plugin_gtmcrypt)
+	(cd $gtmdist/$plugin_gtmcrypt; chmod 0644 source.tar; chown $owner source.tar; chgrp $binuser source.tar)
 fi
 
 # Install GDE, GTMHELP, and all the percent routines
@@ -340,6 +554,9 @@ if [ "$doutf8" -ne 0 ]; then
 			fi
 		fi
 	done
+	if [ "$dogtmcrypt" -ne 0 ]; then
+		ln -s ../plugin $gtmdist/utf8/plugin
+	fi
 	cd ..
 fi
 
@@ -355,8 +572,14 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	$echo ""
 	$echo "Creating lowercase versions of the MUMPS routines."
 	(cd $gtmdist; ./lowerc_cp *.m)
+	if [ "$dogtmcrypt" -ne 0 ]; then
+		(cd $gtmdist/$plugin_gtmcrypt; ln -s $gtmcryptmfile `echo $gtmcryptmfile | tr '[A-Z]' '[a-z]'`)
+	fi
 	if [ "$doutf8" -ne 0 ]; then
 		(cd $gtmdist/utf8; ./lowerc_cp *.m)
+		if [ "$dogtmcrypt" -ne 0 ]; then
+			(cd $gtmdist/$plugin_gtmcrypt/utf8; ln -s $gtmcryptmfile `echo $gtmcryptmfile | tr '[A-Z]' '[a-z]'`)
+		fi
 	fi
 fi
 
@@ -375,6 +598,9 @@ $echo ""
 gtm_chset="M"
 export gtm_chset
 (cd $gtmdist; ./mumps -nowarning *.m)
+if [ "$dogtmcrypt" -ne 0 ]; then
+	(cd $gtmdist/plugin/gtmcrypt; $gtmdist/mumps -nowarning *.m; mv *.o $gtmdist)
+fi
 if [ "$doutf8" -ne 0 ]; then
 	# Ensure we ARE in UTF-8 mode
 	utflocale=`locale -a | grep -i en_us | grep -i utf | grep '8$'`
@@ -389,9 +615,13 @@ if [ "$doutf8" -ne 0 ]; then
 	if [ $arch = "ibm" ]; then
 		export LIBPATH=$save_icu_libpath
 	else
-		export LD_LIBRARY_PATH=$save_icu_libpath
+		LD_LIBRARY_PATH=$save_icu_libpath
+		export LD_LIBRARY_PATH
 	fi
-	(export gtm_dist=$gtmdist/utf8; cd $gtm_dist; ./mumps -nowarning *.m)
+	(gtm_dist=$gtmdist/utf8; export gtm_dist; cd $gtm_dist; ./mumps -nowarning *.m)
+	if [ "$dogtmcrypt" -ne 0 ]; then
+		(cd $gtmdist/plugin/gtmcrypt/utf8; $gtmdist/utf8/mumps -nowarning *.m; mv *.o $gtmdist/utf8)
+	fi
 	gtm_chset="M"
 	export gtm_chset
 fi
@@ -400,16 +630,27 @@ chmod 0644 $gtmdist/*.m
 chmod 0644 $gtmdist/*.o
 chown $owner $gtmdist/*.m
 chown $owner $gtmdist/*.o
-chgrp bin $gtmdist/*.m
-chgrp bin $gtmdist/*.o
+chgrp $binuser $gtmdist/*.m
+chgrp $binuser $gtmdist/*.o
 
 if [ "$doutf8" -ne 0 ]; then
 	chmod 0644 $gtmdist/utf8/*.m
 	chmod 0644 $gtmdist/utf8/*.o
 	chown $owner $gtmdist/utf8/*.m
 	chown $owner $gtmdist/utf8/*.o
-	chgrp bin $gtmdist/utf8/*.m
-	chgrp bin $gtmdist/utf8/*.o
+	chgrp $binuser $gtmdist/utf8/*.m
+	chgrp $binuser $gtmdist/utf8/*.o
+fi
+
+if [ "$dogtmcrypt" -ne 0 ]; then
+	chmod 0644 $gtmdist/plugin/gtmcrypt/*.m
+	chown $owner $gtmdist/plugin/gtmcrypt/*.m
+	chgrp $binuser $gtmdist/plugin/gtmcrypt/*.m
+	if [ "$doutf8" -ne 0 ]; then
+		chmod 0644 $gtmdist/plugin/gtmcrypt/utf8/*.m
+		chown $owner $gtmdist/plugin/gtmcrypt/utf8/*.m
+		chgrp $binuser $gtmdist/plugin/gtmcrypt/utf8/*.m
+	fi
 fi
 
 gtm_dist=$gtmdist
@@ -423,7 +664,7 @@ export gtmroutines
 gtmgbldir=$gtmdist/gtmhelp.gld
 export gtmgbldir
 
-$gtmdist/mumps -direct <<GDE.in1
+cat <<GDE.in1 | $gtmdist/mumps -direct
 Do ^GDE
 Change -segment DEFAULT	-block=2048	-file=$gtmdist/gtmhelp.dat
 Change -region DEFAULT	-record=1020	-key=255
@@ -433,7 +674,7 @@ GDE.in1
 gtmgbldir=$gtmdist/gdehelp.gld
 export gtmgbldir
 
-$gtmdist/mumps -direct <<GDE.in2
+cat <<GDE.in2 | $gtmdist/mumps -direct
 Do ^GDE
 Change -segment DEFAULT	-block=2048	-file=$gtmdist/gdehelp.dat
 Change -region DEFAULT	-record=1020	-key=255
@@ -467,7 +708,7 @@ fi
 tgtmsecshrdir=$gtmdist/gtmsecshrdir
 mkdir $tgtmsecshrdir
 chmod 700 $tgtmsecshrdir
-chgrp bin $tgtmsecshrdir
+chgrp $binuser $tgtmsecshrdir
 
 # Install gtmsecshr and the wrapper with special permissions
 if [ $arch = "sun" -o $arch = "linux" ]; then
@@ -479,9 +720,19 @@ elif [ $arch = "ibm" ]; then
 elif [ -x /usr/sbin/install ]; then
 	/usr/sbin/install -f $gtmdist -m 4755 -u root -g bin gtmsecshr $gtmdist
 	/usr/sbin/install -f $tgtmsecshrdir -m 4500 -u root -g bin gtmsecshrdir/gtmsecshr $tgtmsecshrdir
+elif [ $arch = "zos" ]; then
+	cp gtmsecshr $gtmdist/gtmsecshr
+	cp gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
+	chmod 4755 $gtmdist/gtmsecshr
+	chmod 4500 $tgtmsecshrdir/gtmsecshr
+	chown $rootuser:$binuser $gtmdist/gtmsecshr $tgtmsecshrdir/gtmsecshr
 else
 	install -f $gtmdist -m 4755 -u root -g bin gtmsecshr $gtmdist
 	install -f $tgtmsecshrdir -m 4500 -u root -g bin gtmsecshrdir/gtmsecshr $tgtmsecshrdir
+fi
+
+if [ -d $gtmdist/utf8 ]; then
+	(cd $gtmdist/utf8; ln -s ../gtmsecshrdir gtmsecshrdir; ln -s ../gtmsecshr gtmsecshr)
 fi
 
 strip $gtmdist/gtmsecshr > /dev/null 2>&1
@@ -502,6 +753,18 @@ if [ -d $gtmdist/utf8 ]; then
 	chmod a-w $gtmdist/utf8/*
 fi
 
+if [ -d $gtmdist/plugin ]; then
+	chmod a-w $gtmdist/plugin/*
+fi
+
+if [ -d $gtmdist/plugin/gtmcrypt ]; then
+	chmod a-w $gtmdist/plugin/gtmcrypt/*
+fi
+
+if [ -d $gtmdist/plugin/gtmcrypt/utf8 ]; then
+	chmod a-w $gtmdist/plugin/gtmcrypt/utf8/*
+fi
+
 $echo ""
 $echo "Installation completed. Would you like all the temporary files"
 $echo "removed from this directory? (y or n) \c"
@@ -511,12 +774,8 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
 		*.gtc gtm* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid \
 		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.* COPYING
+	\rm -rf GETPASS.o plugin
 	if [ -d utf8 ]; then
-		cd utf8
-		\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
-			*.gtc gtm* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid \
-			esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.* COPYING
-		cd ..
-		rm -rf utf8
+		\rm -rf utf8
 	fi
 fi
