@@ -44,8 +44,7 @@
 
 
 #ifdef VMS
-	GBLREF uint4	image_count;
-	GBLREF int4	login_time[2];
+GBLREF uint4	image_count;
 #endif
 
 GBLREF	int4		process_id;
@@ -80,7 +79,9 @@ uint4 mlk_lock(mlk_pvtblk *p,
 	boolean_t		blocked, was_crit, have_space;
 	sgmnt_addrs		*csa;
 	connection_struct	*curr_entry;	/* for GT.CM GNP server */
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (p->region->dyn.addr->acc_meth != dba_usr)
 	{
 		csa = &FILE_INFO(p->region)->s_addrs;

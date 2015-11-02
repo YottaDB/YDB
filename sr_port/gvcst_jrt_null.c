@@ -55,8 +55,10 @@ void	gvcst_jrt_null()
 	rec = (struct_jrec_null *)non_tp_jfb_ptr->buff;
 	rec->prefix.jrec_type = JRT_NULL;
 	rec->prefix.forwptr = NULL_RECLEN;
+	rec->prefix.checksum = INIT_CHECKSUM_SEED;
 	rec->suffix.backptr = NULL_RECLEN;
 	rec->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+	rec->filler = 0;
 	jgbl.cumul_jnl_rec_len = NULL_RECLEN;
 	/* The rest of the initialization is taken care of by jnl_write_logical (invoked in t_end below) */
 	DEBUG_ONLY(jgbl.cumul_index = 1;)

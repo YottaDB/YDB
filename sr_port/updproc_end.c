@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,6 +67,7 @@
 #include "mupip_exit.h"
 #include "read_db_files_from_gld.h"
 #include "updproc.h"
+#include "have_crit.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	recvpool_addrs		recvpool;
@@ -80,7 +81,7 @@ GBLREF	FILE			*updproc_log_fp;
 void  updproc_stop(boolean_t exit)
 {
 	int4		status;
-	int		fclose_res, idx;
+	int		fclose_res, idx, save_errno;
 	seq_num		log_seqno, log_seqno1, jnlpool_seqno, jnlpool_strm_seqno[MAX_SUPPL_STRMS];
 	sgmnt_addrs	*repl_csa;
 	UNIX_ONLY(
@@ -114,23 +115,20 @@ void  updproc_stop(boolean_t exit)
 #		endif
 		repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Update process Read Seqno : %llu\n", log_seqno1);
 		repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n", log_seqno);
-		/* nullify jnlpool_ctl before detaching from jnlpool since if it is the other way, we might be interrupted
-		 * by the periodic timer routines and end up in jnl_write_epoch_rec() routine that dereferences jnlpool_ctl
-		 * since it is non-NULL although it has been detached from and is no longer valid memory.
-		 */
-		jnlpool_ctl = NULL;
-#ifdef UNIX
+#		ifdef UNIX
 		mutex_cleanup(jnlpool.jnlpool_dummy_reg);
-		SHMDT(jnlpool.jnlpool_ctl);
-#elif defined(VMS)
+		JNLPOOL_SHMDT(status, save_errno);
+		if (0 > status)
+			repl_log(stderr, TRUE, TRUE, "Error detaching from jnlpool : %s\n", STRERROR(save_errno));
+#		elif defined(VMS)
+		jnlpool_ctl = jnlpool.jnlpool_ctl = NULL;
 		if (SS$_NORMAL != (status = detach_shm(jnlpool.shm_range)))
 			repl_log(stderr, TRUE, TRUE, "Error detaching from jnlpool : %s\n", REPL_STR_ERROR);
 		if (SS$_NORMAL != (status = signoff_from_gsec(jnlpool.shm_lockid)))
 			repl_log(stderr, TRUE, TRUE, "Error dequeueing lock on jnlpool global section : %s\n", REPL_STR_ERROR);
-#else
-#error Unsupported Platform
-#endif
-		jnlpool.jnlpool_ctl = NULL;
+#		else
+#		error Unsupported Platform
+#		endif
 		pool_init = FALSE;
 	}
 	recvpool.upd_proc_local->upd_proc_shutdown = NORMAL_SHUTDOWN;

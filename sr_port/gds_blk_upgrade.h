@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,7 +74,7 @@ GBLREF	boolean_t	dse_running;
 		{														\
 			upgrdstatus = SS_NORMAL;										\
 			if (NULL != (ondskblkver))										\
-				*(ondskblkver) = GDSV5;										\
+				*(ondskblkver) = GDSV6;										\
 		} else														\
 		{														\
 			upgrdstatus = gds_blk_upgrade((sm_uc_ptr_t)(srcbuffptr), (sm_uc_ptr_t)(trgbuffptr),			\
@@ -86,7 +86,7 @@ GBLREF	boolean_t	dse_running;
 	{															\
 		upgrdstatus = SS_NORMAL;											\
 		if (NULL != (ondskblkver))											\
-			*(ondskblkver) = GDSV5;											\
+			*(ondskblkver) = GDSV6;											\
 	} else if (UPGRADE_ALWAYS == gtm_blkupgrade_flag)									\
 	{															\
 		upgrdstatus = gds_blk_upgrade((sm_uc_ptr_t)(srcbuffptr), (sm_uc_ptr_t)(trgbuffptr),				\

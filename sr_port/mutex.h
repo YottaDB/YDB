@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@
 #error Unsupported Platform
 #endif
 
+#define MUTEXLCKALERT_INTERVAL		32	/* seconds [UNIX only] */
 #define MUTEX_SLEEP_SPIN_COUNT		128
 #define MUTEX_SHORT_WAIT_MS		2 /* ms.  Keep this a power of 2 */
 #define MUTEX_SHORT_WAIT_US		(MUTEX_SHORT_WAIT_MS << 10) /* micro sec */
@@ -34,7 +35,5 @@
 #define MUTEX_MAX_OPTIMISTIC_ATTEMPTS 		1024
 
 #define MUTEX_MAX_WAIT_FOR_PROGRESS_CNTR	3
-
-#define MUTEX_MAX_WRITE_LOCK_ATTEMPTS		8
 
 #endif /* MUTEX_H */

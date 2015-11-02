@@ -13,7 +13,7 @@
 
 #include "gtm_string.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "error_trap.h"		/* for error_ret()/error_ret_vms() declaration */
 

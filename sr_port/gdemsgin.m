@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2011 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2012 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -22,6 +22,7 @@ GDEMSGIN
 	s gdeerr("INPINTEG")=150503506
 	s gdeerr("KEYSIZIS")=150503523
 	s gdeerr("KEYTOOBIG")=150503515
+	s gdeerr("KEYFORBLK")=150503891
 	s gdeerr("KEYWRDAMB")=150503530
 	s gdeerr("KEYWRDBAD")=150503538
 	s gdeerr("LOADGD")=150503547

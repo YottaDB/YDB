@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,8 @@
 #include "arit.h"
 #include "stringpool.h"
 
-#define DIGIT(x)	( x >='0' && x <= '9' )
-#define NUM_MASK	( MV_NM | MV_INT | MV_NUM_APPROX )
+#define DIGIT(x)	((x >='0') && (x <= '9'))
+#define NUM_MASK	(MV_NM | MV_INT | MV_NUM_APPROX)
 
 error_def(ERR_NUMOFLOW);
 
@@ -24,9 +24,9 @@ LITREF int4 ten_pwr[];
 
 char *s2n (mval *u)
 {
-	char		*c, *d, *w, *eos;
-	int		i, j, k, x, y, z, sign, zero, expdigits;
-	boolean_t	digit, dot, exp, exneg, tail, dotseen, isdot;
+	boolean_t	digit, dot, dotseen, exp, exneg, isdot, tail;
+	char		*c, *d, *eos, *w;
+	int		expdigits, i, j, k, sign, x, y, z, zero;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -35,21 +35,21 @@ char *s2n (mval *u)
 		GTMASSERT;
 	c = u->str.addr;
 	if (0 == u->str.len)
-	{
+	{	/* Substitute pre-converted NULL/0 value */
 		TREF(s2n_intlit) = 1;
 		*u = literal_null;
 		return c;
 	}
-	eos = u->str.addr + u->str.len;
+	eos = u->str.addr + u->str.len;				/* End of string marker */
 	sign = 0;
 	while (c < eos && (('-'== *c) || ('+' == *c)))
-		sign += (('-' == *c++) ? 1 : 2);
-	for (zero = 0; (c < eos) && ('0'== *c ); zero++, c++)
+		sign += (('-' == *c++) ? 1 : 2);		/* Sign is odd: negative, even: positive */
+	for (zero = 0; (c < eos) && ('0'== *c ); zero++, c++)	/* Eliminate leading zeroes */
 		 ;
 	dot = ((c < eos) && ('.' == *c));
 	if (dot)
 		c++;
-	for (y = 0; (c < eos) && ('0' == *c ); c++, y--)
+	for (y = 0; (c < eos) && ('0' == *c ); c++, y--)	/* Eliminate leading zeroes of possible fractional part */
 		;
 	z = u->m[0] = u->m[1] = 0;				/* R0 */
 	d = c + 9;
@@ -81,7 +81,8 @@ char *s2n (mval *u)
 			u->m[1] *= 10;
 			i++;
 		} else
-		{	i = 0;
+		{
+			i = 0;
 			u->m[1] = (u->m[1] * 10) + (*c - '0');
 		}
 	}							/* R2 */
@@ -107,8 +108,7 @@ char *s2n (mval *u)
 			;
 	}
 	tail = (c != eos) || (dot && (('0' == *(c - 1)) || ('.' == *(c - 1))));
-	dotseen = FALSE;
-	for ( ; (c < eos) && ((isdot = ('.' == *c)) || DIGIT(*c)); c++)
+	for (dotseen = dot; (c < eos) && (((isdot = ('.' == *c)) && !dot) || DIGIT(*c)); c++)
 	{
 		dotseen = (dotseen || isdot);
 		if (!dotseen)
@@ -117,7 +117,7 @@ char *s2n (mval *u)
 	digit = (0 != z) || (0 != y) || (0 != zero);
 	x = 0;
 	exp = ('E' == *c) && digit;
-	if (exp && (c+1 < eos))
+	if (exp && ((c + 1) < eos))
 	{
 		c++;
 		exneg = ('-' == *c);
@@ -171,7 +171,7 @@ char *s2n (mval *u)
 					? (MV_NM | MV_NUM_APPROX) : MV_NM;
 			}
 		}
-		assert(u->m[1] < MANT_HI);
+		assert(MANT_HI > u->m[1]);
 	} else
 	{
 		u->mvtype |= (MV_NM | MV_INT | MV_NUM_APPROX);

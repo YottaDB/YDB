@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,7 @@ GBLREF unsigned int	t_tries;
 enum cdb_sc	gvcst_expand_key(blk_hdr_ptr_t bp, int4 rec_top, gv_key *key)
 {
 	unsigned short	temp_ushort;
+	int		tmp_cmpc;
 	int4		r_offset;
 	rec_hdr_ptr_t	rp, rtop;
 	sm_uc_ptr_t	p;
@@ -50,7 +51,7 @@ enum cdb_sc	gvcst_expand_key(blk_hdr_ptr_t bp, int4 rec_top, gv_key *key)
 			return cdb_sc_rmisalign;
 		}
 		current = 1;
-		kend = kbase + rp->cmpc;
+		kend = kbase + EVAL_CMPC(rp);
 		p = (sm_uc_ptr_t)(rp + 1);
 		for (;;)
 		{
@@ -73,6 +74,11 @@ enum cdb_sc	gvcst_expand_key(blk_hdr_ptr_t bp, int4 rec_top, gv_key *key)
 		{
 			key->end = kend - kbase - 1;
 			key->prev = kprv - kbase;
+			if (KEY_DELIMITER == *kbase)
+				/* A valid key wouldn't start with a '\0' character. So the block must have been
+				 * concurrently modified.
+				 */
+				return cdb_sc_mkblk;
 			return cdb_sc_normal;
 		}
 		kprv = kend - 1;	/* start of last key */

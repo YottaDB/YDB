@@ -66,7 +66,7 @@ void dse_chng_fhead(void)
 {
 	int4		x, index_x, save_x;
 	unsigned short	buf_len;
-	boolean_t	was_crit, was_hold_onto_crit;
+	boolean_t	was_crit, was_hold_onto_crit, corrupt_file_present;
 	boolean_t	override = FALSE;
 	int4		nocrit_present;
 	int4		location_present, value_present, size_present, size;
@@ -83,26 +83,32 @@ void dse_chng_fhead(void)
 		char	hash_buff[GTMCRYPT_HASH_LEN];
 		int	crypt_status;
 	)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (gv_cur_region->read_only)
 		rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
-
 	memset(temp_str, 0, 256);
 	memset(temp_str1, 0, 256);
 	memset(buf, 0, MAX_LINE);
 	was_crit = cs_addrs->now_crit;
+	/* If the user requested DSE CHANGE -FILE -CORRUPT, then skip the check in grab_crit, which triggers an rts_error, as this
+	 * is one of the ways of turning off the file_corrupt flag in the file header
+	 */
+	TREF(skip_file_corrupt_check) = corrupt_file_present = (CLI_PRESENT == cli_present("CORRUPT_FILE"));
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
+	TREF(skip_file_corrupt_check) = FALSE;	/* Now that grab_crit is done, reset the global variable */
 	if (CLI_PRESENT == cli_present("OVERRIDE"))
 		override = TRUE;
-#ifdef VMS
+#	ifdef VMS
 	if (cs_addrs->hdr->freeze && (cs_addrs->hdr->freeze != process_id ||
 		cs_addrs->hdr->image_count != image_count) && !override)
-#endif
-#ifdef UNIX
+#	endif
+#	ifdef UNIX
 	if (cs_addrs->hdr->freeze && (cs_addrs->hdr->image_count != process_id)
 		&& !override)
-#endif
+#	endif
 	{
 		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
                 util_out_print("Region: !AD  is frozen by another user, not releasing freeze.",
@@ -260,6 +266,8 @@ void dse_chng_fhead(void)
 	}
 	if ((CLI_PRESENT == cli_present("KEY_MAX_SIZE")) && (cli_get_int("KEY_MAX_SIZE", &x)))
 	{
+		if (cs_addrs->hdr->max_key_size > x)
+			cs_addrs->hdr->maxkeysz_assured = FALSE;
 		cs_addrs->hdr->max_key_size = x;
 		gv_cur_region->max_key_size = x;
 	}
@@ -431,7 +439,7 @@ void dse_chng_fhead(void)
 		if ( -1 != (x = cli_t_f_n("STDNULLCOLL")))
 			gv_cur_region->std_null_coll = cs_addrs->hdr->std_null_coll = x;
 	}
-	if (CLI_PRESENT == cli_present("CORRUPT_FILE"))
+	if (corrupt_file_present)
 	{
 		x = cli_t_f_n("CORRUPT_FILE");
 		if (1 == x)
@@ -716,6 +724,18 @@ void dse_chng_fhead(void)
 			util_out_print("YIELD_LIMIT cannot be greater than !UL", TRUE, MAX_YIELD_LIMIT);
 		else
 			cs_addrs->hdr->yield_lmt = x;
+	}
+	if (CLI_PRESENT == cli_present("QDBRUNDOWN"))
+	{
+		cs_addrs->hdr->mumps_can_bypass = TRUE;
+		util_out_print("Database file !AD now has quick database rundown flag set to TRUE", TRUE,
+			       gv_cur_region->dyn.addr->fname_len, (char *)gv_cur_region->dyn.addr->fname);
+	}
+	else if (CLI_NEGATED == cli_present("QDBRUNDOWN"))
+	{
+		cs_addrs->hdr->mumps_can_bypass = FALSE;
+		util_out_print("Database file !AD now has quick database rundown flag set to FALSE", TRUE,
+			       gv_cur_region->dyn.addr->fname_len, (char *)gv_cur_region->dyn.addr->fname);
 	}
 #endif
 	if (CLI_PRESENT == cli_present(UNIX_ONLY("JNL_SYNCIO") VMS_ONLY("JNL_CACHE")))

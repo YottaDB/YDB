@@ -33,6 +33,7 @@
 #include <errno.h>
 
 #include "gtm_string.h"
+#include "gtm_time.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gdsbml.h"
@@ -60,6 +61,7 @@
 #include "mu_truncate.h"
 #include "gtmio.h"
 #include "util.h"
+#include "anticipatory_freeze.h"
 
 #include "sleep_cnt.h"
 #include "wcs_sleep.h"
@@ -69,6 +71,8 @@
 #include "shmpool.h"
 #include "clear_cache_array.h"
 #include "wcs_flu.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
 
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBFILERR);
@@ -105,6 +109,7 @@ GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	volatile int4		db_fsync_in_prog;	/* for DB_FSYNC macro usage */
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	int			num_additional_processors;
+GBLREF	jnlpool_addrs		jnlpool;
 
 boolean_t mu_truncate(int4 truncate_percent)
 {
@@ -120,6 +125,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 	uint4			old_free, new_free;
 	uint4			end_blocks;
 	int4			blks_in_lmap, blk;
+	gtm_uint64_t		before_trunc_file_size;
 	off_t			trunc_file_size;
 	uchar_ptr_t		lmap_addr;
 	boolean_t		was_crit;
@@ -155,6 +161,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 		return TRUE;
 	}
 	/* already checked for parallel truncates on this region --- see mupip_reorg.c */
+	gv_target = NULL;
 	assert(csa->nl->trunc_pid == process_id);
 	assert(dba_mm != csd->acc_meth);
 	old_total = csa->ti->total_blks;
@@ -253,8 +260,12 @@ boolean_t mu_truncate(int4 truncate_percent)
 					/* block processed, scan from the next one */
 					blk++;
 					break;
+				} else
+				{
+					assert(t_tries < CDB_STAGNATE);
+					t_retry(cdb_sc_badbitmap);
+					continue;
 				}
-				assertpro(FALSE);
 			} /* END recycled2free retry loop */
 		} /* END scanning blocks of this particular lmap */
 		/* Write PBLK for the bitmap block, in case it hasn't been written i.e. t_end() was never called above */
@@ -264,7 +275,6 @@ boolean_t mu_truncate(int4 truncate_percent)
 		for (;;)
 		{
 			RESET_UPDATE_ARRAY;
-			gv_target->clue.end = 0;
 			BLK_ADDR(blkid_ptr, SIZEOF(block_id), block_id);
 			*blkid_ptr = 0;
 			update_trans = UPDTRNS_DB_UPDATED_MASK;
@@ -294,10 +304,10 @@ boolean_t mu_truncate(int4 truncate_percent)
 	for (;;)
 	{ /* wait for FREEZE, we don't want to truncate a frozen database */
 		grab_crit(gv_cur_region);
-		if (!cs_data->freeze)
+		if (!cs_data->freeze && !IS_REPL_INST_FROZEN)
 			break;
 		rel_crit(gv_cur_region);
-		while (cs_data->freeze)
+		while (cs_data->freeze || IS_REPL_INST_FROZEN)
 			hiber_start(1000);
 	}
 	assert(csa->nl->trunc_pid == process_id);
@@ -375,12 +385,10 @@ boolean_t mu_truncate(int4 truncate_percent)
 	CHECK_TN(csa, csd, curr_tn);
 	udi = FILE_INFO(gv_cur_region);
 	/* Information used by recover_truncate to check if the file size and csa->ti->total_blks are INCONSISTENT */
-	csd->before_trunc_file_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl); /* in DISK_BLOCKs */
-	assert((off_t)csd->before_trunc_file_size * DISK_BLOCK_SIZE > (off_t)(old_total - new_total) * csd->blk_size);
-	trunc_file_size = (off_t)csd->before_trunc_file_size * DISK_BLOCK_SIZE
+	before_trunc_file_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl); /* in DISK_BLOCKs */
+	assert((off_t)before_trunc_file_size * DISK_BLOCK_SIZE > (off_t)(old_total - new_total) * csd->blk_size);
+	trunc_file_size = (off_t)before_trunc_file_size * DISK_BLOCK_SIZE
 		- (off_t)(old_total - new_total) * csd->blk_size; /* in bytes */
-	DBGEHND((stdout, "DBG:: csd->before_trunc_file_size * DISK_BLOCK_SIZE = [%lld], trunc_file_size = [%lld]\n",
-		(off_t)csd->before_trunc_file_size * DISK_BLOCK_SIZE, trunc_file_size));
 	csd->after_trunc_total_blks = new_total;
 	csd->before_trunc_free_blocks = csa->ti->free_blocks;
 	csd->before_trunc_total_blks = old_total; /* Flags interrupted truncate for recover_truncate */
@@ -420,6 +428,11 @@ boolean_t mu_truncate(int4 truncate_percent)
 	}
 	/* file size and total blocks: CONSISTENT (shrunk) */
 	KILL_TRUNC_TEST(WBTEST_CRASH_TRUNCATE_4); /* 58 : Issue a kill -9 after FTRUNCATE, before 2nd fsync */
+	csa->nl->root_search_cycle++;	/* Force concurrent processes to restart in t_end/tp_tend to make sure no one
+					 * tries to commit updates past the end of the file. Bitmap validations together
+					 * with highest_lbm_with_busy_blk should actually be sufficient, so this is
+					 * just to be safe.
+					 */
 	csd->before_trunc_total_blks = 0; /* indicate CONSISTENT */
 	/* Increment TN */
 	assert(csa->ti->early_tn == csa->ti->curr_tn);
@@ -459,7 +472,7 @@ STATICFNDEF int4 bml_find_busy_recycled(int4 hint, uchar_ptr_t base_addr, int4 b
 			GET_STATUS(*ptr, i, status);
 			if (status != BLK_FREE)
 			{
-				assert(status == BLK_BUSY || status == BLK_RECYCLED);
+				assert((t_tries < CDB_STAGNATE) || (status == BLK_BUSY) || (status == BLK_RECYCLED));
 				*bml_status_ptr = status;
 				return blknum;
 			}

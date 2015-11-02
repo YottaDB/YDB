@@ -13,7 +13,7 @@
 
 #include "gtm_string.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 
 GBLREF unsigned char 	*stacktop, *stackwarn, *msp;

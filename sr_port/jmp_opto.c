@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,6 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
-
 #include "compiler.h"
 #include "opcode.h"
 #include "mdq.h"
@@ -20,25 +19,26 @@
 #include "gtmdbglvl.h"
 #include "cdbg_dump.h"
 
-#define JOPT_NO_OPT 1
-#define JOPT_REP_JMP 2
-#define JOPT_REF_NXT_TRP 3
-
-#define PTR_NOT_DEFINED 0
-#define IND_NOT_DEFINED ((unsigned char)-2)
-#define NO_ENTRY ((unsigned char)-1)
-
-#define NUM_JO_TBL_ELE 11
-typedef struct
-{	unsigned int	opcode;
-	unsigned int	index;
-	unsigned int	opto_flag[NUM_JO_TBL_ELE];
-}jump_opto_struct;
-
 LITREF octabstruct	oc_tab[];	/* op-code table */
 GBLREF triple		t_orig;		/* head of triples */
 GBLREF uint4		gtmDebugLevel;
-const static readonly jump_opto_struct jump_opto_table[NUM_JO_TBL_ELE] =
+
+#define IND_NOT_DEFINED ((unsigned char)-2)
+#define JOPT_NO_OPT 1
+#define JOPT_REP_JMP 2
+#define JOPT_REF_NXT_TRP 3
+#define NO_ENTRY ((unsigned char)-1)
+#define NUM_JO_TBL_ELE 11
+#define PTR_NOT_DEFINED 0
+
+typedef struct
+{
+	unsigned int	opcode;
+	unsigned int	index;
+	unsigned int	opto_flag[NUM_JO_TBL_ELE];
+} jump_opto_struct;
+
+LITDEF readonly jump_opto_struct jump_opto_table[NUM_JO_TBL_ELE] =
 {
 	{	OC_JMP,		/* opcode */
 		0,		/* index */
@@ -162,10 +162,12 @@ const static readonly jump_opto_struct jump_opto_table[NUM_JO_TBL_ELE] =
 		}
 	}
 };
-static	unsigned int *jo_ptr_ray[OPCODE_COUNT];
-static	unsigned int jo_ind_ray[OPCODE_COUNT];
+STATICDEF	unsigned int *jo_ptr_ray[OPCODE_COUNT];
+STATICDEF	unsigned int jo_ind_ray[OPCODE_COUNT];
 
-static void jo_get_ptrs(unsigned int op)
+STATICFNDCL	void jo_get_ptrs(unsigned int op);
+
+STATICFNDEF void jo_get_ptrs(unsigned int op)
 {
 	const jump_opto_struct	*j, *j_top;
 
@@ -182,7 +184,7 @@ static void jo_get_ptrs(unsigned int op)
 	jo_ptr_ray[op] = (unsigned int *)NO_ENTRY;
 }
 
-const static readonly oprtype null_operand;
+STATICDEF const readonly oprtype null_operand;
 
 /************************************************************************************************************
  NOTE:	We may which to modify the lookup method at some point in the future.  B. Shear suggests nested switch
@@ -191,9 +193,9 @@ const static readonly oprtype null_operand;
 
 void jmp_opto(void)
 {
-	unsigned int	i, *p, **clrp1, **clrtop1, *clrp2, *clrtop2;
+	unsigned int	**clrp1, *clrp2, **clrtop1, *clrtop2, i, *p;
 	tbp 		*b;
-	triple		*cur_trip, *terminal_trip, *ref_trip, *jump_trip, *next_trip, *ct;
+	triple		*ct, *cur_trip, *jump_trip, *next_trip, *ref_trip, *terminal_trip;
 	void		get_jo_ptrs();
 
 #	ifdef DEBUG
@@ -205,33 +207,48 @@ void jmp_opto(void)
 		PRINTF(" \n\n\n\n************************************ Begin jmp_opto scan *****************************\n");
 	}
 #	endif
-
 	for (clrp1 = &jo_ptr_ray[0], clrtop1 = clrp1 + OPCODE_COUNT; clrp1 < clrtop1; clrp1++)
 		*clrp1 = (unsigned int *)NO_ENTRY;
 	for (clrp2 = &jo_ind_ray[0], clrtop2 = clrp2 + OPCODE_COUNT; clrp2 < clrtop2; clrp2++)
 		*clrp2 = NO_ENTRY;
-
 	dqloop(&t_orig, exorder, cur_trip)
 	{
 		if (OC_GVSAVTARG == cur_trip->opcode)
-		{
+		{	/* Look for an adjacent and therefore superfluous GVRECTARG */
 			for (next_trip = cur_trip->exorder.fl;
 			     oc_tab[next_trip->opcode].octype & OCT_CGSKIP;
 			     next_trip = next_trip->exorder.fl)
 				;
-
-			if (OC_GVRECTARG == next_trip->opcode
-			    && next_trip->operand[0].oprval.tref == cur_trip
-			    && next_trip->jmplist.que.fl == &(next_trip->jmplist))
+			if ((OC_GVRECTARG == next_trip->opcode)
+			    && (next_trip->operand[0].oprval.tref == cur_trip)
+			    && (next_trip->jmplist.que.fl == &(next_trip->jmplist)))
 			{
 				COMPDBG(PRINTF("jmp_opto: NOOPing OC_GVRECTARG opcode at triple addres 0x"lvaddr"\n", next_trip););
 				next_trip->opcode = OC_NOOP;
 				next_trip->operand[0].oprclass = next_trip->operand[1].oprclass = 0;
+				cur_trip = cur_trip->exorder.bl;	/* in case there are more than one in a row */
 			}
 			continue;
 		}
-		if ((oc_tab[cur_trip->opcode].octype & OCT_JUMP) &&
-		    (OC_CALL != cur_trip->opcode) && (OC_CALLSP != cur_trip->opcode))
+		if (OC_GVRECTARG == cur_trip->opcode)
+		{	/* Look for a second effectively adjacent GVRECTARG that duplicates this one */
+			for (next_trip = cur_trip->exorder.fl;
+			     oc_tab[next_trip->opcode].octype & OCT_CGSKIP;
+			     next_trip = next_trip->exorder.fl)
+				;
+			if ((OC_GVRECTARG == next_trip->opcode)
+			    && (next_trip->operand[0].oprval.tref == cur_trip->operand[0].oprval.tref)
+			    && (next_trip->jmplist.que.fl == &(next_trip->jmplist)))
+			{
+				COMPDBG(PRINTF("jmp_opto: NOOPing OC_GVRECTARG opcode at triple addres 0x"lvaddr"\n", next_trip););
+				next_trip->opcode = OC_NOOP;
+				next_trip->operand[0].oprclass = next_trip->operand[1].oprclass = 0;
+				cur_trip = cur_trip->exorder.bl;	/* in case there are more than one in a row */
+			}
+			continue;
+		}
+		if ((oc_tab[cur_trip->opcode].octype & OCT_JUMP)
+			&& (OC_CALL != cur_trip->opcode) && (OC_CALLSP != cur_trip->opcode))
 		{
 			assert(OPCODE_COUNT > cur_trip->opcode);
 			if (PTR_NOT_DEFINED == (p = jo_ptr_ray[cur_trip->opcode]))	/* note assignment */
@@ -246,7 +263,6 @@ void jmp_opto(void)
 				jo_get_ptrs(jump_trip->opcode);
 				i = jo_ind_ray[jump_trip->opcode];
 			}
-
 			while ((IND_NOT_DEFINED != i) && (NO_ENTRY != i))
 			{
 				switch(p[i])
@@ -266,7 +282,6 @@ void jmp_opto(void)
 								}
 							}
 							dqins(&jump_trip->exorder.fl->jmplist, que, b);
-
 							cur_trip->operand[0].oprval.tref = jump_trip->exorder.fl;
 							jump_trip = cur_trip->operand[0].oprval.tref;
 							if (IND_NOT_DEFINED == (i = jo_ind_ray[jump_trip->opcode])) /* assignmnt */
@@ -292,7 +307,6 @@ void jmp_opto(void)
 								}
 							}
 							dqins(&jump_trip->operand[0].oprval.tref->jmplist, que, b);
-
 							cur_trip->operand[0] = jump_trip->operand[0];
 							jump_trip = cur_trip->operand[0].oprval.tref;
 							if (IND_NOT_DEFINED == (i = jo_ind_ray[jump_trip->opcode])) /* assgnmnt */
@@ -310,7 +324,6 @@ void jmp_opto(void)
 						break;
 				} /* switch */
 			} /* while  */
-
 			terminal_trip = cur_trip->exorder.fl;
 			while ((oc_tab[cur_trip->opcode].octype & OCT_JUMP)
 			       && (OC_CALL != cur_trip->opcode) && (OC_CALLSP != cur_trip->opcode)
@@ -320,7 +333,6 @@ void jmp_opto(void)
 				     (oc_tab[ref_trip->opcode].octype & OCT_CGSKIP);
 				     (ref_trip = ref_trip->exorder.fl))
 					;
-
 				if (ref_trip == terminal_trip)
 				{
 					cur_trip->opcode = OC_NOOP;
@@ -333,7 +345,6 @@ void jmp_opto(void)
 			cur_trip = terminal_trip->exorder.bl;
 		} /* if  */
 	} /* dqloop */
-
 #	ifdef DEBUG
 	/* If debug and compiler debugging is enabled, run through the triples again to show what we
 	 * have done to them..

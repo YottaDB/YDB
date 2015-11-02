@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,7 @@
 
 #include "gtm_string.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "error_trap.h"
@@ -160,8 +160,8 @@ void	get_frame_place_mcode(int level, stack_mode_t mode, int cur_zlevel, mval *r
 				indce = irtnhdr->indce;
 				assert(NULL != indce);
 				assert(0 < indce->refcnt);	/* currently used in the M stack better have a non-zero refcnt */
+				s2pool(&indce->src.str);
 				result->str = indce->src.str;
-				s2pool(&result->str);
 				assert(((unsigned char *)result->str.addr + result->str.len) == stringpool.free);
 			} else
 			{	/* Not a real indirect. The mpc may have been reset by error handling to various assembler

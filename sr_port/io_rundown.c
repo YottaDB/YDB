@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ void io_rundown (int rundown_type)
 
 void io_dev_close (io_log_name *d)
 {
-	static readonly unsigned char	p[] = { iop_eol};
+	static readonly unsigned char	p[] = {iop_rundown, iop_eol};
 	mval				pp;
 
 	if (d->iod->pair.in == io_std_device.in  &&  d->iod->pair.out == io_std_device.out)

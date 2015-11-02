@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "objlabel.h"
 #include "cache.h"
@@ -65,9 +65,9 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	 */
 	assert(!(frame_pointer->flags & SFF_ETRAP_ERR) || (NULL == error_frame) || (error_frame == frame_pointer));
 	assert(!(SFT_TRIGR & frame_pointer->type));
-	frame_pointer->flags &= SFF_ETRAP_ERR_OFF;	/* clear the SFF_ETRAP_ERR bit */
-	frame_pointer->flags &= SFF_TRIGR_CALLD_OFF;	/* clear the SFF_TRIGR_CALLD bit since this frame is being rewritten */
-	GTMTRIG_ONLY(DBGTRIGR((stderr, "flush_jmp: Turrning off SFF_TRIGR_CALLD in frame 0x"lvaddr"\n", frame_pointer)));
+	frame_pointer->flags &= SFF_ETRAP_ERR_OFF;	  /* clear SFF_ETRAP_ERR bit */
+	frame_pointer->flags &= SFF_IMPLTSTART_CALLD_OFF; /* clear SFF_IMPLTSTART_CALLD bit since this frame is being rewritten */
+	GTMTRIG_ONLY(DBGTRIGR((stderr, "flush_jmp: Turrning off SFF_IMPLTSTART_CALLD_OFF in frame 0x"lvaddr"\n", frame_pointer)));
 	frame_pointer->rvector = rtn_base;
 	frame_pointer->vartab_ptr = (char *)VARTAB_ADR(rtn_base);
 	frame_pointer->vartab_len = frame_pointer->rvector->vartab_len;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@
 
 #ifdef GTM_TRIGGER
 #include "hashtab_mname.h"
-#include "rtnhdr.h"		/* needed for gv_trigger.h */
+#include <rtnhdr.h>		/* needed for gv_trigger.h */
 #include "gv_trigger.h"		/* needed for INIT_ROOT_GVT */
 #include "targ_alloc.h"
 #endif
@@ -45,7 +45,7 @@
 
 GBLDEF bool             wide_out;
 GBLDEF char             patch_comp_key[MAX_KEY_SZ + 1];
-GBLDEF unsigned char    patch_comp_count;
+GBLDEF unsigned short   patch_comp_count;
 GBLDEF int              patch_rec_counter;
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF VSIG_ATOMIC_T	util_interrupt;
@@ -65,8 +65,9 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 	sm_uc_ptr_t	r_top, key_top, cptr0, cptr1, cptr_top, cptr_base = NULL, cptr_next = NULL;
 	char		key_buf[MAX_KEY_SZ + 1], *temp_ptr, *temp_key, util_buff[MAX_UTIL_LEN];
 	char		*prefix_str, *space_str, *dot_str, *format_str;
-	unsigned char	cc;
-	short int	size;
+	unsigned short	cc;
+	int		tmp_cmpc;
+	unsigned short 	size;
 	int4		util_len, head;
 	uint4 		ch;
 	int		buf_len, field_width,fastate, chwidth = 0;
@@ -79,7 +80,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 		return NULL;
 	head = cli_present("HEADER");
 	GET_SHORT(size, &((rec_hdr_ptr_t)rp)->rsiz);
-	cc = ((rec_hdr_ptr_t)rp)->cmpc;
+	cc = EVAL_CMPC((rec_hdr_ptr_t)rp);
 	if ((CLI_NEGATED != head) && !patch_is_fdmp)
 	{
 		MEMCPY_LIT(util_buff, "Rec:");
@@ -96,7 +97,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 		util_len += i2hex_nofill(size, (uchar_ptr_t)&util_buff[util_len], 4);
 		MEMCPY_LIT(&util_buff[util_len], "  Cmpc ");
 		util_len += SIZEOF("  Cmpc ") - 1;
-		util_len += i2hex_nofill(cc, (uchar_ptr_t)&util_buff[util_len], 2);
+		util_len += i2hex_nofill(cc, (uchar_ptr_t)&util_buff[util_len], 3);
 		MEMCPY_LIT(&util_buff[util_len], "  ");
 		util_len += SIZEOF("  ") - 1;
 		util_buff[util_len] = 0;
@@ -120,8 +121,6 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 	size = key_top - rp - SIZEOF(rec_hdr);
 	if (size > SIZEOF(patch_comp_key) - 2 - cc)
 		size = SIZEOF(patch_comp_key) - 2 - cc;
-	if (size < 0)
-		size = 0;
 	memcpy(&patch_comp_key[cc], rp + SIZEOF(rec_hdr), size);
 	patch_comp_count = cc + size;
 	patch_comp_key[patch_comp_count] = patch_comp_key[patch_comp_count + 1] = 0;
@@ -147,7 +146,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 		}
 		util_out_print("Key ", FALSE);
 		if (r_top == b_top
-			&& ((blk_hdr_ptr_t)bp)->levl && !((rec_hdr_ptr_t)rp)->cmpc
+			&& ((blk_hdr_ptr_t)bp)->levl && !EVAL_CMPC((rec_hdr_ptr_t)rp)
 			&& r_top - rp == SIZEOF(rec_hdr) + SIZEOF(block_id))
 				util_out_print("*", FALSE);
 		else  if (patch_comp_key[0])

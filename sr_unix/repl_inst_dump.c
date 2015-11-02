@@ -684,6 +684,17 @@ void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl)
 	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, onln_rlbk_cycle), SIZEOF(jnlpool_ctl->onln_rlbk_cycle));
 	util_out_print( PREFIX_JNLPOOLCTL "Online Rollback Cycle             !20UL [0x!XL]", TRUE,
 		jnlpool_ctl->onln_rlbk_cycle, jnlpool_ctl->onln_rlbk_cycle);
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, freeze), SIZEOF(jnlpool_ctl->freeze));
+	PRINT_BOOLEAN( PREFIX_JNLPOOLCTL  "Freeze                                      !R10AZ", jnlpool_ctl->freeze, -1);
+	if (jnlpool_ctl->freeze)
+	{
+		PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, freeze_comment[0]), SIZEOF(jnlpool_ctl->freeze_comment));
+		if (STRLEN(jnlpool_ctl->freeze_comment) <= 38)
+			util_out_print( PREFIX_JNLPOOLCTL "Freeze Comment  !R38AZ", TRUE, jnlpool_ctl->freeze_comment);
+		else
+			util_out_print( PREFIX_JNLPOOLCTL "Freeze Comment: !AZ", TRUE, jnlpool_ctl->freeze_comment);
+	}
+
 }
 
 void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
@@ -888,12 +899,12 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 			gtmsourcelocal_ptr->statslog, gtmsourcelocal_ptr->statslog);
 
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, statslog_file[0]), SIZEOF(gtmsourcelocal_ptr->statslog_file));
-		if (20 >= strlen(gtmsourcelocal_ptr->log_file))
+		if (20 >= strlen(gtmsourcelocal_ptr->statslog_file))
 		{
 			util_out_print( PREFIX_SOURCELOCAL "Statslog File               !R20AZ",
 				TRUE, idx, gtmsourcelocal_ptr->statslog_file);
 		} else
-		{
+		{	/*After gtm-7296, the statslog_file length should always be 0, so the following in fact won't be executed*/
 			util_out_print( PREFIX_SOURCELOCAL "Statslog File               !AZ",
 				TRUE, idx, gtmsourcelocal_ptr->statslog_file);
 		}

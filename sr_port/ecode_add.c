@@ -14,7 +14,7 @@
 #include "gtm_string.h"		/* for memcpy() */
 
 #include "min_max.h"		/* for MIN macro */
-#include "rtnhdr.h"		/* for stack_frame.h */
+#include <rtnhdr.h>		/* for stack_frame.h */
 #include "stack_frame.h"	/* for stack_frame type */
 #include "error_trap.h"
 

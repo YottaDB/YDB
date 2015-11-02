@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,8 @@
 #include "gtmio.h"
 #include "gds_blk_downgrade.h"
 #include "gdsbml.h"
+#include "jnl.h"
+#include "anticipatory_freeze.h"
 
 GBLREF	sm_uc_ptr_t	reformat_buffer;
 GBLREF	int		reformat_buffer_len;
@@ -91,7 +93,7 @@ int	dsk_write(gd_region *reg, block_id blk, cache_rec_ptr_t cr)
 		assert(size <= csd->blk_size - SIZEOF(blk_hdr) + SIZEOF(v15_blk_hdr));
 		size = (size + 1) & ~1;
 		assert(SIZEOF(v15_blk_hdr) <= size);
-	} else DEBUG_ONLY(if (GDSV5 == cr->ondsk_blkver))
+	} else DEBUG_ONLY(if (GDSV6 == cr->ondsk_blkver))
 	{
 		size = (((blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
 		assert(SIZEOF(blk_hdr) <= size);
@@ -112,11 +114,9 @@ int	dsk_write(gd_region *reg, block_id blk, cache_rec_ptr_t cr)
 	assert(size <= csd->blk_size);
 	if (udi->raw)
 		size = ROUND_UP(size, DISK_BLOCK_SIZE);	/* raw I/O must be a multiple of DISK_BLOCK_SIZE */
-	LSEEKWRITE(udi->fd,
+	DB_LSEEKWRITE(csa, udi->fn, udi->fd,
 		   (DISK_BLOCK_SIZE * (csd->start_vbn - 1) + (off_t)blk * csd->blk_size),
-		   buff,
-		   size,
-		   save_errno);
+		   buff, size, save_errno);
 	DEBUG_ONLY(reformat_buffer_in_use--;)
 	assert(0 == reformat_buffer_in_use);
 	--fast_lock_count;

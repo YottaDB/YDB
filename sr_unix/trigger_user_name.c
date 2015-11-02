@@ -13,7 +13,7 @@
 
 #include "gtm_ctype.h"
 #include "gtm_string.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"

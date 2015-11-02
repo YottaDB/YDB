@@ -1,7 +1,7 @@
 #! /usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -54,7 +54,7 @@ set dir_structure      = "inc pct src tools log $build_types"
 set gtm_src_types = "c m64 s msg"
 set gtm_inc_types = "h max mac si"
 set gtm_pct_types = "mpt m hlp"
-set gtm_tools_types = "gtc sed awk sh csh list txt exp mk ksh"
+set gtm_tools_types = "gtc sed awk sh csh list txt exp mk ksh cmake tab in"
 
 #####################################################################################
 
@@ -102,7 +102,7 @@ if (-e $dst_ver) then
 		/bin/ps $psopt | grep "$dst_top_dir/$dst_ver/" | grep -vE "grep|$0"
 		exit 1
 	endif
-	if ($dst_ver =~ V3* || $dst_ver =~ V4* || $dst_ver =~ V5* || $dst_ver == "V990") then
+	if ($dst_ver =~ V3* || $dst_ver =~ V4* || $dst_ver =~ V5*  || $dst_ver =~ V6* || $dst_ver == "V990") then
 		set move_args = "compulsory"
 	endif
 	# to use this script to update released versions, you must

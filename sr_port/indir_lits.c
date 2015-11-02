@@ -14,7 +14,7 @@
 #include "compiler.h"
 #include "mdq.h"
 #include "stringpool.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "copy.h"
 #include "obj_file.h"
 #include "cache.h"

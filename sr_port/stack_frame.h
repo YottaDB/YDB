@@ -108,17 +108,18 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 					 *      cause the getframe macro to invoke error_return() for further error processing.
 					 */
 #define SFF_UNW_SYMVAL	(1 << 5)	/* 0x20 Unwound a symval in this stackframe (relevant to tp_restart) */
-#define SFF_TRIGR_CALLD	(1 << 6)	/* 0x40 This frame initiated a trigger call - checked by MUM_TSTART to prevent error
-					 *	returns to the frame which would cause a restart of error handling.
-					 */
+#define SFF_IMPLTSTART_CALLD	(1 << 6)	/* 0x40 This frame initiated a trigger call or spanning node transaction
+						 * 	- checked by MUM_TSTART to prevent error returns to the frame
+						 * 	which would cause a restart of error handling.
+						 */
 
-#define SFF_INDCE_OFF   	~(SFF_INDCE)		/* Mask to turn off SFF_INDCE */
-#define SFF_ZTRAP_ERR_OFF	~(SFF_ZTRAP_ERR)	/* Mask to turn off SFF_ZTRAP_ERR */
-#define SFF_DEV_ACT_ERR_OFF	~(SFF_DEV_ACT_ERR)	/* Mask to turn off SFF_DEV_ACT_ERR */
-#define SFF_CI_OFF		~(SFF_CI)		/* Mask to turn off SFF_CI */
-#define SFF_ETRAP_ERR_OFF	~(SFF_ETRAP_ERR)	/* Mask to turn off SFF_ETRAP_ERR */
-#define SFF_UNW_SYMVAL_OFF	~(SFF_UNW_SYMVAL)	/* Mask to turn off SFF_UNW_SYMVAL */
-#define SFF_TRIGR_CALLD_OFF	~(SFF_TRIGR_CALLD)	/* Mask to turn off SFF_TRIGR_CALLD */
+#define SFF_INDCE_OFF   		~(SFF_INDCE)		/* Mask to turn off SFF_INDCE */
+#define SFF_ZTRAP_ERR_OFF		~(SFF_ZTRAP_ERR)	/* Mask to turn off SFF_ZTRAP_ERR */
+#define SFF_DEV_ACT_ERR_OFF		~(SFF_DEV_ACT_ERR)	/* Mask to turn off SFF_DEV_ACT_ERR */
+#define SFF_CI_OFF			~(SFF_CI)		/* Mask to turn off SFF_CI */
+#define SFF_ETRAP_ERR_OFF		~(SFF_ETRAP_ERR)	/* Mask to turn off SFF_ETRAP_ERR */
+#define SFF_UNW_SYMVAL_OFF		~(SFF_UNW_SYMVAL)	/* Mask to turn off SFF_UNW_SYMVAL */
+#define SFF_IMPLTSTART_CALLD_OFF	~(SFF_IMPLTSTART_CALLD)	/* Mask to turn off SFF_IMPLTSTART_CALLD */
 
 #define	ADJUST_FRAME_POINTER(fptr, shift)			\
 {								\

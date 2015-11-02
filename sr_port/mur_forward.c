@@ -94,8 +94,22 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	seq_num 		rec_token_seq;
 	forw_multi_struct	*forw_multi;
 	multi_struct 		*multi;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	skip_dbtriggers = TRUE;	/* do not want to invoke any triggers for updates done by journal recovery */
+#	ifdef UNIX
+	/* In case of mupip journal -recover -backward or -rollback -backward, the forward phase replays the journal records
+	 * and creates new journal records. If there is no space to write these journal records, "jnl_file_lost" will eventually
+	 * get called. In this case, we want it to issue a runtime error (thereby terminating the journal recovery with an
+	 * abnormal exit status, forcing the user to free up more space and reissue the journal recovery) and not turn
+	 * journaling off (which would silently let recovery proceed and exit with normal status even though the db might
+	 * have integ errors at that point). Use the error_on_jnl_file_lost feature to implement this error triggering.
+	 * This error_on_jnl_file_lost feature is not currently implemented in VMS hence the #ifdef UNIX for now.
+	 */
+	if (mur_options.update)
+		TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_ERRORS;
+#	endif
 	murgbl.extr_buff = (char *)malloc(murgbl.max_extr_record_length);
 	for (recstat = (enum broken_type)0; recstat < TOT_EXTR_TYPES; recstat++)
 		murgbl.extr_file_create[recstat] = TRUE;
@@ -155,7 +169,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			cs_addrs->rctl = rctl;
 			rctl->csd = cs_data;
 			rctl->sgm_info_ptr = cs_addrs->sgm_info_ptr;
-			SET_CSA_DIR_TREE(cs_addrs, MAX_KEY_SZ, reg);
+			assert(!reg->open || (NULL != cs_addrs->dir_tree));
 			gv_target = cs_addrs->dir_tree;
 		}
 		jctl->after_end_of_data = FALSE;
@@ -164,6 +178,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 		if (SS_NORMAL != status)
 			return status;
 		PRINT_VERBOSE_STAT(jctl, "mur_forward:at the start");
+		rctl->process_losttn = FALSE;
 		/* Any multi-region TP transaction will be processed as multiple single-region TP transactions up
 		 * until the tp-resolve-time is reached. From then on, they will be treated as one multi-region TP
 		 * transaction. This is needed for proper lost-tn determination (any multi-region transaction that
@@ -199,7 +214,6 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 					 * Do not even consider region for next processing loop */
 		}
 		rctl->last_tn = 0;
-		rctl->process_losttn = FALSE;
 		murgbl.regcnt_remaining++;	/* # of regions participating in recovery at this point */
 		if (NULL == rctl_start)
 			rctl_start = rctl;

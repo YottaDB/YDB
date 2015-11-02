@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,9 +95,9 @@ bool gtcmtr_put(void)
 	{
 		if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
 			end = &buff[MAX_ZWR_KEY_SZ - 1];
-		rts_error(VARLSTCNT(11) ERR_REC2BIG, 4, n + v.str.len + SIZEOF(rec_hdr),
+		rts_error(VARLSTCNT(10) ERR_REC2BIG, 4, n + v.str.len + SIZEOF(rec_hdr),
 			(int4)gv_cur_region->max_rec_size, REG_LEN_STR(gv_cur_region),
-			0, ERR_GVIS, 2, end - buff, buff);
+			ERR_GVIS, 2, end - buff, buff);
 	}
 	gvcst_put(&v);
 	if (JNL_ALLOWED(cs_addrs))

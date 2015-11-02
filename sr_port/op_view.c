@@ -12,9 +12,14 @@
 #include "mdef.h"
 
 #include <stdarg.h>
+#if defined(UNIX) && defined(DEBUG)
+# include "gtm_syslog.h"	/* Needed for white box case in VTK_STORDUMP */
+#endif
 #include "gtm_string.h"
+#include "gtm_stdio.h"
 
 #include "gtmio.h"
+#include "util.h"
 #include "have_crit.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -47,9 +52,16 @@
 #include "alias.h"
 #include "fullbool.h"
 #ifdef GTM_TRIGGER
-#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
-#include "gv_trigger.h"
-#include "gtm_trigger.h"
+# include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
+# include "gv_trigger.h"
+# include "gtm_trigger.h"
+#endif
+#ifdef UNIX
+# include "wbox_test_init.h"
+# include "mutex.h"
+# ifdef DEBUG
+#  include "gtmsecshr.h"
+# endif
 #endif
 
 GBLREF	boolean_t		certify_all_blocks;
@@ -76,6 +88,7 @@ GBLREF	uint4			gtmDebugLevel;
 GBLREF	boolean_t		lvmon_enabled;
 GBLREF	spdesc			stringpool;
 GBLREF	boolean_t		is_updproc;
+GBLREF	pid_t			process_id;
 
 error_def(ERR_ACTRANGE);
 error_def(ERR_COLLATIONUNDEF);
@@ -115,7 +128,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 {
 	int4			testvalue, tmpzdefbufsiz;
 	uint4			jnl_status, dummy_errno;
-	int			status;
+	int			status, lcnt, icnt;
 	gd_region		*reg, *r_top, *save_reg;
 	gv_namehead		*gvnh;
 	mval			*arg, *nextarg, outval;
@@ -125,7 +138,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	viewtab_entry		*vtp;
 	gd_addr			*addr_ptr;
 	noisolation_element	*gvnh_entry;
-	int			lct, ncol;
+	int			lct, ncol, nct;
 	collseq			*new_lcl_collseq;
 	ht_ent_mname		*tabent, *topent;
 	lv_val			*lv;
@@ -215,7 +228,14 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 					gv_cur_region = reg;
 					change_reg(); /* for jnl_ensure_open */
 					ENSURE_JNL_OPEN(cs_addrs, gv_cur_region);
-					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
+					/* We should NOT invoke wcs_recover here because it's possible we are in the final retry
+					 * of a TP transaction. In this case, we likely have pointers to non-dirty global buffers
+					 * in our transaction histories. Doing cache recovery could dry clean most of these buffers.
+					 * And that might cause us to get confused, attempt to restart, and incorrectly issue a
+					 * TPFAIL error because we are already in the final retry. By passing the WCSFLU_IN_COMMIT
+					 * bit, we instruct wcs_flu to avoid wcs_recover.
+					 */
+					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH | WCSFLU_IN_COMMIT);
 				}
 			}
 			gv_cur_region = save_reg;
@@ -503,7 +523,14 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				nextarg = va_arg(var, mval *);
 				ncol = MV_FORCE_INT(nextarg);
 			}
-			if ((-1 == lct) && (-1 == ncol))
+			nextarg = NULL;
+			nct = -1;
+			if (numarg > 2)
+			{
+				nextarg = va_arg(var, mval *);
+				nct = MV_FORCE_INT(nextarg);
+			}
+			if ((-1 == lct) && (-1 == ncol) && (-1 == nct))
 				break;
 			/* lct = -1 indicates user wants to change only ncol, not lct */
 			if (-1 != lct)
@@ -556,6 +583,8 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			}
 			if (-1 != ncol)
 				TREF(local_collseq_stdnull) = (ncol ? TRUE: FALSE);
+			if (-1 != nct)
+				TREF(local_coll_nums_as_strings) = (nct ? TRUE: FALSE);
 			break;
 		case VTK_PATLOAD:
 			if (!load_pattern_table(parmblk.value->str.len, parmblk.value->str.addr))
@@ -665,6 +694,26 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			DEFER_BASE_REL_HASHTAB(table, FALSE);
 			break;
 		case VTK_STORDUMP:
+#			if defined(DEBUG) && defined(UNIX)
+			if (gtm_white_box_test_case_enabled
+			    && (WBTEST_HOLD_CRIT_TILL_LCKALERT == gtm_white_box_test_case_number))
+			{	/* Hold crit for a long enough interval to generate lock alert which then does a continue_proc */
+				grab_crit(gv_cur_region);
+				icnt = TREF(continue_proc_cnt);
+				DBGGSSHR((LOGFLAGS, "op_view: Pid %d, initial icnt: %d\n", process_id, icnt));
+				for (lcnt = 0; (MUTEXLCKALERT_INTERVAL * 12) > lcnt; lcnt++)
+				{	/* Poll for icnt to be increased - check every quarter second */
+					SHORT_SLEEP(250);	/* Quarter second nap */
+					if (TREF(continue_proc_cnt) > icnt)
+						break;
+					DBGGSSHR((LOGFLAGS, "op_view: loop: %d - continue_proc_cnt: %d\n", lcnt,
+						  TREF(continue_proc_cnt)));
+				}
+				DBGGSSHR((LOGFLAGS, "op_view: pid %d, lcnt: %d, icnt: %d, continue_proc_cnt: %d\n",
+					  process_id, lcnt, icnt, TREF(continue_proc_cnt)));
+				rel_crit(gv_cur_region);
+			} else		/* If we do the white box test, avoid the rest */
+#			endif
 			if (gtmDebugLevel)
 			{	/* gtmdbglvl must be non-zero to have hope of printing a storage dump */
 				dbgdmpenabled = (GDL_SmDump & gtmDebugLevel);
@@ -697,6 +746,21 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 		case VTK_LVMONSTOP:
 			als_lvmon_output();
 			lvmon_enabled = FALSE;
+			break;
+#		endif
+#		ifdef DEBUG
+		case VTK_LVDMP:		/* Write partial lv_val into to output device */
+			outval.mvtype = MV_STR;
+			lv = (lv_val *)parmblk.value;
+			util_out_print("", RESET);	/* Reset the buffer */
+			util_out_print("LV: !AD  addr: 0x!XJ  mvtype: 0x!4XW  sign: !UB  exp: !UL  m[0]: !UL [0x!XL]  "
+				       "m[1]: !UL [0x!XL]  str.len: !UL  str.addr: 0x!XJ", SPRINT, arg->str.len, arg->str.addr,
+				       lv, lv->v.mvtype, lv->v.sgn, lv->v.e, lv->v.m[0], lv->v.m[0], lv->v.m[1], lv->v.m[1],
+				       lv->v.str.len, lv->v.str.addr);
+			outval.str.addr = TREF(util_outptr);
+			outval.str.len = STRLEN(TREF(util_outptr));
+			op_write(&outval);
+			op_wteol(1);
 			break;
 #		endif
 		default:

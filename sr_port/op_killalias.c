@@ -14,7 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "op.h"
 #include "lv_val.h"

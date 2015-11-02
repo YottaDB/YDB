@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,8 +46,12 @@ static char rcsid[] = "$Header:$";
 #define GTM_DIST_PATH "$gtm_dist"
 
 GBLREF char		*omi_service;
-STATICDEF boolean_t 	first_syslog = TRUE;
+STATICDEF boolean_t 	first_error = TRUE;
 STATICDEF char 		fileName[GTM_PATH_MAX];
+
+error_def(ERR_TEXT);
+error_def(ERR_DISTPATHMAX);
+ZOS_ONLY(error_def(ERR_BADTAG);)
 
 void gtcm_rep_err(char *msg, int errcode)
 {
@@ -57,31 +61,22 @@ void gtcm_rep_err(char *msg, int errcode)
 	int	status, retval;
 	char 	*gtm_dist, *filebuf;
 	mstr	tn;
-	MSTR_DEF(val, strlen(GTM_DIST_PATH), GTM_DIST_PATH);
-
-	error_def(ERR_TEXT);
-	error_def(ERR_DISTPATHMAX);
-	ZOS_ONLY(error_def(ERR_BADTAG);)
-	/*error_def(ERR_OMISERVHANG);*/
+	MSTR_DEF(val, strlen(GTM_DIST_PATH), GTM_DIST_PATH);		/* BYPASSOK */
 
 	if ('\0' == msg[0])
-   	sgtm_putmsg(outbuf, VARLSTCNT(2) errcode, 0);
+		sgtm_putmsg(outbuf, VARLSTCNT(2) errcode, 0);
 	else
-   	sgtm_putmsg(outbuf, VARLSTCNT(6) errcode, 0, ERR_TEXT, 2, LEN_AND_STR(msg));
-	if (first_syslog)
+		sgtm_putmsg(outbuf, VARLSTCNT(6) errcode, 0, ERR_TEXT, 2, LEN_AND_STR(msg));
+	if (first_error)
 	{
-#	ifdef BSD_LOG
-		(void)OPENLOG("GTCM", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
-#	endif
-		first_syslog = FALSE;
+		first_error = FALSE;
 		filebuf = fileName;
 		status = TRANS_LOG_NAME(&val, &tn, fileName, GTM_PATH_MAX, dont_sendmsg_on_log2long);
 		if ((SS_LOG2LONG == status) || (tn.len + strlen(GTCM_SERV_LOG) >= GTM_PATH_MAX))
 		{
 			send_msg(VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_PATH_MAX - strlen(GTCM_SERV_LOG));
 			exit(ERR_DISTPATHMAX);
-		}
-		else if (SS_NORMAL == status)
+		} else if (SS_NORMAL == status)
 			filebuf = strcat(fileName, GTCM_SERV_LOG);
 		else
 		{
@@ -94,18 +89,16 @@ void gtcm_rep_err(char *msg, int errcode)
 	{
 		char *tag_emsg = STRERROR(errno);
 		sgtm_putmsg(outbuf, VARLSTCNT(10) ERR_BADTAG, 4, LEN_AND_STR(fileName),
-			-1, TAG_EBCDIC, ERR_TEXT, 2, RTS_ERROR_STRING(tag_emsg));
+			    -1, TAG_EBCDIC, ERR_TEXT, 2, RTS_ERROR_STRING(tag_emsg));
 	}
 #	endif
 	if ((fp = Fopen(fileName, "a")))
 	{
 		now = time(0);
 		FPRINTF(fp, "%s", GTM_CTIME(&now));
-		FPRINTF(fp,"server(%s)  %s", omi_service, outbuf);
+		FPRINTF(fp, "server(%s)  %s", omi_service, outbuf);
 		FCLOSE(fp, status);
 	}
-#	ifdef BSD_LOG
-	SYSLOG(LOG_USER | LOG_INFO, "%s", outbuf);
-#	endif /* defined(BSD_LOG) */
+	util_out_print(outbuf, OPER);	/* Same message goes out to operator log */
 	return;
 }

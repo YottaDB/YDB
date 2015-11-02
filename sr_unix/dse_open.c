@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,14 +66,27 @@ void	dse_open (void)
 	int4 	save_errno;
 
 	mval		val;
-	mval		pars;
+	mval		open_pars, use_pars;
 	mstr		chset_mstr;
 	int		cnt;
+
 	static readonly unsigned char open_params_list[] =
 	{
 		(unsigned char)iop_newversion,
 		(unsigned char)iop_m,
+		(unsigned char)iop_nowrap,
 		(unsigned char)iop_eol
+	};
+
+	/*set iop_width=1MB(1*1024*1024)*/
+	static readonly unsigned char use_params_list[] =
+	{
+		(unsigned char)iop_width,
+#       ifdef BIGENDIAN
+		(unsigned char)0x0, (unsigned char)0x10, (unsigned char)0x0, (unsigned char)0x0
+#       else
+		(unsigned char)0x0, (unsigned char)0x0, (unsigned char)0x10, (unsigned char)0x0
+#       endif
 	};
 
 	if (cli_present("FILE") == CLI_PRESENT)
@@ -95,14 +108,17 @@ void	dse_open (void)
 		patch_ofile[cli_len] = 0;
 		patch_len = cli_len;
 
-		pars.mvtype = MV_STR;
-		pars.str.len = SIZEOF(open_params_list);
-		pars.str.addr = (char *)open_params_list;
 		val.mvtype = MV_STR;
 		val.str.len = patch_len;
 		val.str.addr = (char *)patch_ofile;
-		(*op_open_ptr)(&val, &pars, 0, NULL);
-		op_use(&val, &pars);
+		open_pars.mvtype = MV_STR;
+		open_pars.str.len = SIZEOF(open_params_list);
+		open_pars.str.addr = (char *)open_params_list;
+		(*op_open_ptr)(&val, &open_pars, 0, NULL);
+		use_pars.mvtype = MV_STR;
+		use_pars.str.len = SIZEOF(use_params_list);
+		use_pars.str.addr = (char *)use_params_list;
+		op_use(&val, &use_pars);
 
 		if (CLI_PRESENT == cli_present("OCHSET"))
 		{

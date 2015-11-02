@@ -102,7 +102,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	int			key_len, key_len_dir;
 	block_id		dest_blk_id, work_blk_id, child1, child2;
 	enum cdb_sc		status;
-	srch_hist 		*dest_hist_ptr;
+	srch_hist 		*dest_hist_ptr, *dir_hist_ptr;
 	cache_rec_ptr_t		dest_child_cr;
 	blk_segment		*bs1, *bs_ptr;
 	sm_uc_ptr_t		saved_blk, work_blk_ptr, work_parent_ptr, dest_parent_ptr, dest_blk_ptr,
@@ -122,6 +122,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	if (NULL == TREF(gv_reorgkey))
 		GVKEY_INIT(TREF(gv_reorgkey), DBKEYSIZE(MAX_KEY_SZ));
 	dest_hist_ptr = &(reorg_gv_target->hist);
+	dir_hist_ptr = reorg_gv_target->alt_hist;
 	blk_size = cs_data->blk_size;
 	work_parent_ptr = gv_target->hist.h[level+1].buffaddr;
 	work_parent_size = ((blk_hdr_ptr_t)work_parent_ptr)->bsiz;
@@ -273,24 +274,24 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		gv_target = reorg_gv_target;
 		gv_target->root = cs_addrs->dir_tree->root;
 		gv_target->clue.end = 0;
-		/* assign Directory tree path to find dest_blk_id in dest_hist_ptr */
-		status = gvcst_search(TREF(gv_reorgkey), dest_hist_ptr);
+		/* assign Directory tree path to find dest_blk_id in dir_hist_ptr */
+		status = gvcst_search(TREF(gv_reorgkey), dir_hist_ptr);
 		if (cdb_sc_normal != status)
 		{
 			assert(t_tries < CDB_STAGNATE);
-			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
+			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
 			return status;
 		}
-		if (dest_hist_ptr->h[0].curr_rec.match != (TREF(gv_reorgkey))->end + 1)
+		if (dir_hist_ptr->h[0].curr_rec.match != (TREF(gv_reorgkey))->end + 1)
 		{	/* may be in a kill_set of another process */
-			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
+			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
 			continue;
 		}
-		for (wlevel = 0; wlevel <= dest_hist_ptr->depth &&
-			dest_hist_ptr->h[wlevel].blk_num != dest_blk_id; wlevel++);
-		if (dest_hist_ptr->h[wlevel].blk_num == dest_blk_id)
+		for (wlevel = 0; wlevel <= dir_hist_ptr->depth &&
+			dir_hist_ptr->h[wlevel].blk_num != dest_blk_id; wlevel++);
+		if (dir_hist_ptr->h[wlevel].blk_num == dest_blk_id)
 		{	/* do not swap a dir_tree block */
-			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
+			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
 			continue;
 		}
 		/* gv_reorgkey will now have the first key from dest_blk_id,
@@ -298,20 +299,20 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		 */
 		memcpy(&((TREF(gv_reorgkey))->base[0]), rec_base + SIZEOF(rec_hdr), key_len);
 		(TREF(gv_reorgkey))->end = key_len - 1;
-		GET_KEY_LEN(key_len_dir, dest_hist_ptr->h[0].buffaddr + dest_hist_ptr->h[0].curr_rec.offset + SIZEOF(rec_hdr));
+		GET_KEY_LEN(key_len_dir, dir_hist_ptr->h[0].buffaddr + dir_hist_ptr->h[0].curr_rec.offset + SIZEOF(rec_hdr));
 		/* Get root of GVT for dest_blk_id */
 		GET_LONG(gv_target->root,
-			dest_hist_ptr->h[0].buffaddr + dest_hist_ptr->h[0].curr_rec.offset + SIZEOF(rec_hdr) + key_len_dir);
+			dir_hist_ptr->h[0].buffaddr + dir_hist_ptr->h[0].curr_rec.offset + SIZEOF(rec_hdr) + key_len_dir);
 		if ((0 == gv_target->root) || (gv_target->root > (cs_data->trans_hist.total_blks - 1)))
 		{
 			assert(t_tries < CDB_STAGNATE);
-			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
+			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
 			return cdb_sc_blkmod;
 		}
 		/* Assign Global Variable Tree path to find dest_blk_id in dest_hist_ptr */
 		gv_target->clue.end = 0;
 		status = gvcst_search(TREF(gv_reorgkey), dest_hist_ptr);
-		RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
+		RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
 		if (dest_blk_level >= dest_hist_ptr->depth || /* do not swap in root level */
 			dest_hist_ptr->h[dest_blk_level].blk_num != dest_blk_id) /* must be in a kill set of another process. */
 			continue;
@@ -406,7 +407,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			 * cse->was_free to TRUE so that in t_end, this condition can be used to read the before images of
 			 * the FREE blocks if needed.
 			 */
-			tmpcse->was_free = (BLK_FREE == x_blk_lmap);
+			(BLK_FREE == x_blk_lmap) ? SET_FREE(tmpcse) : SET_NFREE(tmpcse);
 			/* No need to write before-image in case the block is FREE. In case the database had never been fully
 			 * upgraded from V4 to V5 format (after the MUPIP UPGRADE), all RECYCLED blocks can basically be considered
 			 * FREE (i.e. no need to write before-images since backward journal recovery will never be expected

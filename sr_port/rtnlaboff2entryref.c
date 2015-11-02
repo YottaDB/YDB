@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 #include "gtm_string.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 
 /* Format the given routine, label and offset into user presentable label+offset^routine string,
  * return end of formatted output + 1. Does not check for buffer overflow, it's caller's

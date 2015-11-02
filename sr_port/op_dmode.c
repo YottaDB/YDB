@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,7 @@
 #include "iottdef.h"
 #endif
 #include "iotimer.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
@@ -46,8 +46,9 @@
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
 
-#define	DIRECTMODESTR	"Entering DIRECT MODE"
+#define	DIRECTMODESTR	"Entering DIRECT MODE - TP RESTART will fail"
 
+GBLREF	uint4		dollar_trestart;
 GBLREF	io_pair		io_curr_device;
 GBLREF	io_pair		io_std_device;
 GBLREF	stack_frame	*frame_pointer;
@@ -89,15 +90,9 @@ void	op_dmode(void)
 	io_curr_device = io_std_device;
 	if ((TRUE == io_curr_device.in->dollar.zeof) || kill)
 		op_halt();
-
-	/*****************************************************
-	The following code  is meant to avoid an infinite
-	loop on UNIX systems which occurs when there is an
-	error in writing the the principal output device here
-	that results in a call to the condition handler
-	and an eventual return to this location.
-	*****************************************************/
-
+	/* The following code avoids an infinite loop on UNIX systems when there is an error in writing to the principal device
+	 * resulting in a call to the condition handler and an eventual return to this location
+	 */
 #	ifdef UNIX
 	if ((loop_cnt > 0) && (errno == old_errno))
 	{	/* Tried and failed 2x to write to principal device */
@@ -108,10 +103,8 @@ void	op_dmode(void)
 	++loop_cnt;
 	old_errno = errno;
 #	endif
-
 	*((INTPTR_T **)&restart_pc) = (INTPTR_T *)CODE_ADDRESS(call_dm);
 	*((INTPTR_T **)&restart_ctxt) = (INTPTR_T *)GTM_CONTEXT(call_dm);
-
 #	ifdef UNIX
 	loop_cnt = 0;
 	old_errno = 0;
@@ -122,7 +115,6 @@ void	op_dmode(void)
 	if (!tt_ptr || !tt_ptr->mupintr)
 #	endif
 		op_wteol(1);
-
 	TPNOTACID_CHECK(DIRECTMODESTR);
 	if (io_curr_device.in->type == tt)
 		dm_read(input_line);

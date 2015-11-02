@@ -41,7 +41,7 @@
 #include "send_msg.h"
 #include "svnames.h"		/* for SV_ZTWORMHOLE */
 #ifdef GTM_TRIGGER
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"
 #endif
 /* Include prototypes */
@@ -161,7 +161,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
 		if (jnl_enabled)
 		{
-			jnl_fence_ctl.token = rec->jrec_set_kill.token_seq.token;
+			MUR_SET_JNL_FENCE_CTL_TOKEN(rec->jrec_set_kill.token_seq.token, rctl);
 			jnl_fence_ctl.strm_seqno = rec->jrec_set_kill.strm_seqno;
 			jgbl.tp_ztp_jnl_upd_num = rec->jrec_set_kill.update_num;
 			DEBUG_ONLY(jgbl.max_tp_ztp_jnl_upd_num = MAX(jgbl.max_tp_ztp_jnl_upd_num, jgbl.tp_ztp_jnl_upd_num);)
@@ -251,7 +251,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		if (jnl_enabled)
 		{	/* Format the ZTWORM journal record */
 			assert(dollar_tlevel);	/* op_tstart should already have been done by mur_forward */
-			jnl_fence_ctl.token = rec->jrec_ztworm.token_seq.token;
+			MUR_SET_JNL_FENCE_CTL_TOKEN(rec->jrec_ztworm.token_seq.token, rctl);
 			jnl_fence_ctl.strm_seqno = rec->jrec_ztworm.strm_seqno;
 			jgbl.tp_ztp_jnl_upd_num = rec->jrec_ztworm.update_num;
 			DEBUG_ONLY(jgbl.max_tp_ztp_jnl_upd_num = MAX(jgbl.max_tp_ztp_jnl_upd_num, jgbl.tp_ztp_jnl_upd_num);)
@@ -271,23 +271,24 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		 * are done playing the journal records of ALL regions involved in the TP.
 		 */
 		if (NULL == rctl->forw_multi)
-		{	/* Even for FENCE_NONE we apply fences. Otherwise an TUPD/UUPD becomes UPD etc. */
+		{	/* Even for FENCE_NONE we apply fences. Otherwise a TUPD/UUPD becomes UPD etc. */
 			if (jnl_enabled)
 			{
-				jnl_fence_ctl.token = rec->jrec_tcom.token_seq.token;
+				MUR_SET_JNL_FENCE_CTL_TOKEN(rec->jrec_tcom.token_seq.token, rctl);
 				jnl_fence_ctl.strm_seqno = rec->jrec_tcom.strm_seqno;
 				jgbl.mur_jrec_participants = rec->jrec_tcom.num_participants;
 				memcpy(tcom_record.jnl_tid, rec->jrec_tcom.jnl_tid, TID_STR_SIZE);
 			}
 			assert(dollar_tlevel);
 			op_tcommit();
-		}
+		} else
+			MUR_DBG_SET_LAST_PROCESSED_JNL_SEQNO(rec->jrec_tcom.token_seq.token, rctl);
 		break;
 	case JRT_ZTCOM:
 		/* Even for FENCE_NONE we apply fences. Otherwise an FUPD/GUPD becomes UPD etc. */
 		if (jnl_enabled)
 		{
-			jnl_fence_ctl.token = rec->jrec_ztcom.token;
+			MUR_SET_JNL_FENCE_CTL_TOKEN(rec->jrec_ztcom.token, rctl);
 			jnl_fence_ctl.strm_seqno = 0;	/* strm_seqno is only for replication & ZTCOM does not work with replic */
 			jgbl.mur_jrec_participants = rec->jrec_ztcom.participants;
 		}
@@ -374,6 +375,11 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		break;
 	case JRT_NULL:
 		assert(cs_addrs == rctl->csa);
+		if (jnl_enabled)
+		{
+			MUR_SET_JNL_FENCE_CTL_TOKEN(rec->jrec_null.jnl_seqno, rctl);
+			jnl_fence_ctl.strm_seqno = rec->jrec_null.strm_seqno;
+		}
 		gvcst_jrt_null();
 		break;
 	default:

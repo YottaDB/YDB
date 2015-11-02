@@ -1,6 +1,6 @@
-/****************************************************************
+ /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,39 +28,75 @@
 #include "util_out_print_vaparm.h"
 #include "gtmimagename.h"
 
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "repl_msg.h"
+#include "repl_shutdcode.h"
+#include "gtmsource.h"
+#include "gtmrecv.h"
+#include "repl_instance.h"
+#include "trans_log_name.h"
+#include "gtmio.h"
+#include "gtm_logicals.h"
+
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
 
+GBLDEF	boolean_t		first_syslog = TRUE;	/* Global for a process - not thread specific */
+GBLDEF	char			facility[MAX_INSTNAME_LEN + 100];
+
+GBLREF	io_pair			io_std_device;
+GBLREF	boolean_t		blocksig_initialized;
+GBLREF  sigset_t		block_sigsent;
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	boolean_t		is_src_server;
+GBLREF	boolean_t		is_rcvr_server;
+GBLREF	boolean_t		is_updproc;
+GBLREF	boolean_t		is_updhelper;
+GBLREF  recvpool_addrs          recvpool;
+GBLREF  uint4                   process_id;
+GBLREF	void			(*op_write_ptr)(mval *v);
+GBLREF	void			(*op_wteol_ptr)(int4 n);
+
+error_def(ERR_REPLINSTACC);
+error_def(ERR_TEXT);
 
 #define GETFAOVALDEF(faocnt, var, type, result, defval) \
 	if (faocnt > 0) {result = (type)va_arg(var, type); faocnt--;} else result = defval;
 
-GBLREF	io_pair			io_std_device;
-GBLDEF	char		*util_outptr, util_outbuff[OUT_BUFF_SIZE];
-GBLDEF	va_list		last_va_list_ptr;
-GBLREF	boolean_t	blocksig_initialized;
-GBLREF  sigset_t	block_sigsent;
-GBLREF	void		(*op_write_ptr)(mval *v);
-GBLREF	void		(*op_wteol_ptr)(int4 n);
+#define INSERT_MARKER					\
+{							\
+	STRNCPY_STR(offset, "-", STRLEN("-"));		\
+	offset += STRLEN("-");				\
+}
 
-static	boolean_t	first_syslog = TRUE;
-static	char		save_util_outbuff[OUT_BUFF_SIZE];
-static	int4		save_buff_used;
+#define BUILD_FACILITY(strptr)				\
+{							\
+	STRNCPY_STR(offset, strptr, STRLEN(strptr));	\
+	offset += STRLEN(strptr);			\
+	INSERT_MARKER; 					\
+}
 
 /*
  *	This routine implements a SUBSET of FAO directives, namely:
  *
  *		!/	!_	!^	!!
  *
+
  *		!mAC	!mAD	!mAF	!mAS	!mAZ
  *
  *		!mSB	!mSW	!mSL
  *
  *		!mUB	!mUW	!mUL    !m@UJ   !m@UQ
  *
- *		!mXB	!mXW	!mXL    !m@XJ   !m@XQ
+ *		!mXB	!mXW	!mXL    !mXJ    !m@XJ   !m@XQ
  *
  *		!mZB	!mZW	!mZL
  *
@@ -74,16 +110,25 @@ static	int4		save_buff_used;
  *	FAO stands for "formatted ASCII output".  The FAO directives may be considered equivalent to format
  *	specifications and are documented with the VMS Lexical Fuction F$FAO in the OpenVMS DCL Dictionary.
  *
- *	The @XH and @XJ types need special mention. XH and XJ are ascii formatting of addresses and integers respectively.
- *	BOTH are ASCII formatted hexdecimal output of a 64 bit sign-extended value.
- *	The present implementation of util_output does not support 'H'.
- *	This support was new in VMS 7.2 (and is one reason why GTM 4.2 requires VMS 7.2).
- *	The "@" designates an "indirect" request meaning that the address of
- *	the 8 byte item is passed rather than the item itself. This is what allows us to print 8 byte values in the
- *	non-Alpha 32 bit parameter worlds. These types are documented in the VMS System services manual under SYS$FAO.
- *	There are several other types that are supported on VMS but only these two were added on Unix.
+ *	The @XH and @XJ types need special mention. XH and XJ are ascii formatting of addresses and integers respectively. BOTH are
+ *	ASCII formatted hexdecimal output of a 64 bit sign-extended value. The present implementation of util_output does not
+ *	support 'H'. This support was new in VMS 7.2 (and is one reason why GTM 4.2 requires VMS 7.2). The "@" designates an
+ *	"indirect" request meaning that the address of the 8 byte item is passed rather than the item itself. This is what allows
+ *	us to print 8 byte values in the non-Alpha 32 bit parameter worlds. These types are documented in the VMS System services
+ *	manual under SYS$FAO. There are several other types that are supported on VMS but only these two were added on Unix.
  *
- *	In addition this implements another directive
+ *	Another variant of the 'J' type is !mXJ which the routine implements. This variant is used to print 'addresses' in platform
+ *	independent way. For examples of this type, see the definition and usages of the following messages:
+ *
+ *	CALLERID
+ *	KILLBYSIGSINFO1
+ *	KILLBYSIGSINFO2
+ *
+ *	One important caveat in using !mXJ variant is that the input value is expected to be 4-byte on 32-bit platforms and 8-byte
+ *	on 64-bit platforms. Passing an 8-byte quantity on a 32-bit platform can cause SIGSEGV. If a field is always 8-bytes on both
+ * 	the 32 and 64 bit platforms (like transaction numbers), use 0x!16@XQ variant instead.
+ *
+ *	In addition, this routine also implements another set of directives
  *
  *		!RmAC	!RmAD	!RmAF	!RmAS	!RmAZ
  *
@@ -128,12 +173,12 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 	unsigned char	numa[22];
 	unsigned char	*numptr;
 	boolean_t	right_justify, isprintable;
+	DCL_THREADGBL_ACCESS;
 
-	VAR_COPY(last_va_list_ptr, fao);
+	SETUP_THREADGBL_ACCESS;
+	VAR_COPY(TREF(last_va_list_ptr), fao);
 	outptr = buff;
-	outtop = outptr + size - 5;	/* 5 bytes to prevent writing across border 	*/
-	/* 5 comes from line 268 -- 278			*/
-
+	outtop = outptr + size - 5;	/* 5 bytes to prevent writing across border */
 	while (outptr < outtop)
 	{
 		/* Look for the '!' that starts an FAO directive */
@@ -141,19 +186,18 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 		{
 			if (schar == '\0')
 			{
-				va_end(last_va_list_ptr);	/* reset before using as dest in copy */
-				VAR_COPY(last_va_list_ptr, fao);
+				va_end(TREF(last_va_list_ptr));	/* reset before using as dest in copy */
+				VAR_COPY(TREF(last_va_list_ptr), fao);
 				return outptr;
 			}
 			*outptr++ = schar;
 			if (outptr >= outtop)
 			{
-				va_end(last_va_list_ptr);	/* reset before using as dest in copy */
-				VAR_COPY(last_va_list_ptr, fao);
+				va_end(TREF(last_va_list_ptr));	/* reset before using as dest in copy */
+				VAR_COPY(TREF(last_va_list_ptr), fao);
 				return outptr;
 			}
 		}
-
 		field_width = 0;	/* Default values */
 		repeat_count = 1;
 		right_justify = FALSE;
@@ -172,7 +216,6 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 		{
 			for (c = message;  *c >= '0'  &&  *c <= '9';  ++c)
 				;
-
 			if ((length = (int)(c - message)) > 0)
 			{
 				field_width = repeat_count
@@ -180,36 +223,30 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 				message = c;
 			}
 		}
-
 		if ('@' == *message)			/* Indirectly addressed operand */
 		{
 			indirect = TRUE;
 			message++;
 		} else
 			indirect = FALSE;
-
 		switch (type = *message++)
 		{
 			case '/':
 				assert(!indirect);
 				*outptr++ = '\n';
 				continue;
-
 			case '_':
 				assert(!indirect);
 				*outptr++ = '\t';
 				continue;
-
 			case '^':
 				assert(!indirect);
 				*outptr++ = '\f';
 				continue;
-
 			case '!':
 				assert(!indirect);
 				*outptr++ = '!';
 				continue;
-
 			case '*':
 				assert(!indirect);
 				if (repeat_count > 0)
@@ -227,7 +264,6 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 				}
 				message += chlen;
 				continue;
-
 			case 'A':
 				assert(!indirect);
 				switch(type2 = *message++)
@@ -236,13 +272,11 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 						GETFAOVALDEF(faocnt, fao, caddr_t, c, NULL);
 						length = c ? *c++ : 0;
 						break;
-
 					case 'D':
 					case 'F': /* string with length and addr parameters */
 						GETFAOVALDEF(faocnt, fao, int4, length, 0);
 						GETFAOVALDEF(faocnt, fao, caddr_t, c, NULL);
 						break;
-
 					case 'S':
 						if (faocnt)
 						{
@@ -256,7 +290,6 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 							length = 0;
 						}
 						break;
-
 					case 'Z': /* null teminated string */
 						GETFAOVALDEF(faocnt, fao, caddr_t, c, NULL);
 						length = c ? STRLEN(c) : 0;
@@ -323,10 +356,10 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 						break;
 					if (!isprintable && (('F' == type2) UNICODE_ONLY(|| (('D' == type2) && gtm_utf8_mode))))
 					{	/* Since HPUX stops printing lines (via FPRINTF) when it
-						   encounters a bad character, all platforms in utf8 mode
-						   will behave as if !AF were specified and put a "." in place
-						   of non-printable characters. SE 01/2007
-						*/
+						 * encounters a bad character, all platforms in utf8 mode
+						 * will behave as if !AF were specified and put a "." in place
+						 * of non-printable characters. SE 01/2007
+						 */
 						*outptr++ = '.';
 						i = nexti;
 					} else if ('\0' != ch)	/* skip NULL bytes in the middle of the string */
@@ -351,7 +384,6 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 						*outptr++ = ' ';
 				}
 				continue;
-
 			default:	/* Rest of numeric types come here */
 				assert('S' == type || 'U' == type || 'X' == type || 'Z' == type);
 				numptr = numa;
@@ -412,7 +444,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					}
 					switch (type)
 					{
-						case 'S':		/* Signed value. Give sign if need to */
+						case 'S':	/* Signed value. Give sign if need to */
 							if ('J' == type2)
 							{
 								GTM64_ONLY(
@@ -433,7 +465,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 							{
 								*numptr++ = '-';
 								int_val = -(int_val);
-							} /* note fall into unsigned */
+							}	/* note fall into unsigned */
 						case 'U':
 						case 'Z':		/* zero filled */
 							NON_GTM64_ONLY(numptr = i2asc(numptr, int_val);)
@@ -446,7 +478,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 							break;
 						case 'X':		/* Hex */
 							switch (type2)
-							{ /* length is number of ascii hex chars */
+							{	/* length is number of ascii hex chars */
 								case 'B':
 							        	length = SIZEOF(short);
 							         	break;
@@ -490,8 +522,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 						}
 					} else 	/* support ZJ, ZQ, UQ and UJ */
 					{
-						if ('Z' != type && 'U' != type )
-							GTMASSERT;
+						assertpro(('Z' == type) || ('U' == type));
 						assert('J' == type2 || 'Q' == type2);
 						GETFAOVALDEF(faocnt, fao, qw_num_ptr_t, val_ptr, NULL);	/* Addr of long type */
 						if (val_ptr)
@@ -530,15 +561,17 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 				}
 		}
 	}
-	va_end(last_va_list_ptr);	/* reset before using as dest in copy */
-	VAR_COPY(last_va_list_ptr, fao);
+	va_end(TREF(last_va_list_ptr));	/* reset before using as dest in copy */
+	VAR_COPY(TREF(last_va_list_ptr), fao);
 	return outptr;
 }
 
 void	util_out_close(void)
 {
+	DCL_THREADGBL_ACCESS;
 
-	if ((NULL != util_outptr) && (util_outptr != util_outbuff))
+	SETUP_THREADGBL_ACCESS;
+	if ((NULL != TREF(util_outptr)) && (TREF(util_outptr) != TREF(util_outbuff_ptr)))
 		util_out_print("", FLUSH);
 }
 
@@ -547,11 +580,135 @@ void	util_out_send_oper(char *addr, unsigned int len)
 /* 2nd arg: length of system long message (not used in Unix implementation) */
 {
 	sigset_t		savemask;
+	char			*img_type, *offset, *proc_type=NULL, *helper_type=NULL;
+	char 			temp_inst_fn[MAX_FN_LEN + 1], fn[MAX_FN_LEN + 1];
+	mstr			log_nam, trans_name;
+	uint4			ustatus;
+	int4			status;
+	unsigned int		bufsize, file_name_len, *fn_len;
+	boolean_t		ret;
+	repl_inst_hdr		replhdr;
+	int			fd;
+	upd_helper_ctl_ptr_t	upd_helper_ctl;
+	upd_helper_entry_ptr_t	helper, helper_top;
 
 	if (first_syslog)
 	{
 		first_syslog = FALSE;
-		(void)OPENLOG("GTM", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
+
+		offset = facility;
+		BUILD_FACILITY("GTM");
+		switch (image_type)
+		{
+			case GTM_IMAGE:
+				img_type = "MUMPS";
+				break;
+			case MUPIP_IMAGE:
+				img_type = "MUPIP";
+				break;
+			case DSE_IMAGE:
+				img_type = "DSE";
+				break;
+			case LKE_IMAGE:
+				img_type = "LKE";
+				break;
+			case DBCERTIFY_IMAGE:
+				img_type = "DBCERTIFY";
+				break;
+			case GTM_SVC_DAL_IMAGE:
+				img_type = "GTM_SVC_DAL";
+				break;
+			case GTCM_SERVER_IMAGE:
+				img_type = "GTCM";
+				break;
+			case GTCM_GNP_SERVER_IMAGE:
+				img_type = "GTCM_GNP";
+				break;
+			case GTMSECSHR_IMAGE:
+				img_type = "SECSHR";
+				break;
+			default:
+				assertpro(FALSE);
+		}
+		STRNCPY_STR(offset, img_type, STRLEN(img_type));
+		offset += STRLEN(img_type);
+		if (jnlpool_ctl)
+		{	/* Read instace file name from jnlpool */
+			if (image_type == MUPIP_IMAGE)
+			{
+				if (is_src_server)
+					proc_type = "SRCSRVR";
+				else if (is_rcvr_server)
+					proc_type = "RCVSRVR";
+				else if (is_updproc)
+					proc_type = "UPDPROC";
+			}
+			if (proc_type)
+			{
+				offset -= STRLEN(img_type);
+				BUILD_FACILITY(proc_type);
+			}
+			else
+				INSERT_MARKER;
+			STRNCPY_STR(offset, (char *)jnlpool.repl_inst_filehdr->inst_info.this_instname,
+					STRLEN((char *)jnlpool.repl_inst_filehdr->inst_info.this_instname));
+		} else
+		{	/* Read instance name from instance file */
+			if (is_updhelper)
+			{	/* Determine helper type from recvpool */
+				upd_helper_ctl = recvpool.upd_helper_ctl;
+				for (helper = upd_helper_ctl->helper_list, helper_top = helper + MAX_UPD_HELPERS;
+					helper < helper_top; helper++)
+				{
+					if (helper->helper_pid_prev == process_id) /* found my entry */
+					{
+						if ( UPD_HELPER_READER == helper->helper_type )
+							helper_type = "UPDREAD";
+						else if (UPD_HELPER_WRITER == helper->helper_type)
+							helper_type = "UPDWRITE";
+						break;
+					}
+				}
+				offset -= STRLEN(img_type);
+				if (helper_type) /*Otherwise entry for helper is not present in the receiver pool*/
+				{
+					BUILD_FACILITY(helper_type);
+				}
+				else {
+					proc_type = "UPDHELP";
+					BUILD_FACILITY(proc_type);
+				}
+			}
+			fn_len = &file_name_len;
+			bufsize = MAX_FN_LEN + 1;
+			log_nam.addr = GTM_REPL_INSTANCE;
+			log_nam.len = SIZEOF(GTM_REPL_INSTANCE) - 1;
+			trans_name.addr = temp_inst_fn;
+			ret = FALSE;
+			GET_INSTFILE_NAME(dont_sendmsg_on_log2long, return_on_error);
+			/* We want the instance name as part of operator log messages, but if we can’t get it,
+			 * we will get by without it, so ignore any errors we might encounter trying to find the name
+			 */
+			if (ret)
+			{
+				OPENFILE(fn, O_RDONLY, fd);
+				if (FD_INVALID != fd)
+				{
+					LSEEKREAD(fd, 0, &replhdr, SIZEOF(repl_inst_hdr), status);
+					if (0 == status)
+					{
+						if (!is_updhelper)
+						{
+							INSERT_MARKER;
+						}
+						STRNCPY_STR(offset, (char *)replhdr.inst_info.this_instname,
+								STRLEN((char *)replhdr.inst_info.this_instname));
+					}
+				CLOSEFILE_RESET(fd, status);
+				}
+			}
+		}
+		(void)OPENLOG(facility, LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
 	}
 	/*
 	 * When syslog is processing and a signal occurs, the signal processing might eventually lead to another syslog
@@ -559,36 +716,38 @@ void	util_out_send_oper(char *addr, unsigned int len)
 	 * block waiting for that lock which can't be released since the first syslog was interrupted by the signal.
 	 * A work around is to temporarily block signals (SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT, SIGALRM) and then
 	 * restore them after the syslog call returns.
-	 */
-	/* It is possible for early process startup code to invoke this function so blocksig_initialized might not yet be set.
+	 *
+	 * It is possible for early process startup code to invoke this function so blocksig_initialized might not yet be set.
 	 * An example C-stack is main/get_page_size/system-function interrupted by MUPIP STOP/generic_signal_handler/send_msg.
 	 * Therefore this does not have an assert(blocksig_initialized) that similar code in other places (e.g. dollarh.c) has.
 	 */
 	if (blocksig_initialized)	/* In pro, dont take chances and handle case where it is not initialized */
 		sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);
-	(void)SYSLOG(LOG_USER | LOG_INFO, "%s", addr);
+	SYSLOG(LOG_USER | LOG_INFO, "%s", addr);
 	if (blocksig_initialized)
 		sigprocmask(SIG_SETMASK, &savemask, NULL);
 }
 
-
 void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 {
-	char	fmt_buff[OUT_BUFF_SIZE];	/* needs to be same size as that of util_outbuff */
+	char	fmt_buff[OUT_BUFF_SIZE];	/* needs to be same size as that of the util out buffer */
 	caddr_t	fmtc;
 	int	rc, count;
 	char	*fmt_top1, *fmt_top2; /* the top of the buffer after leaving 1 (and 2 bytes respectively) at the end */
 	int	util_avail_len;
+	DCL_THREADGBL_ACCESS;
 
-	assert(SIZEOF(fmt_buff) == SIZEOF(util_outbuff));
-	if (util_outptr == NULL)
-		util_outptr = util_outbuff;
-	if (message != NULL)
+	SETUP_THREADGBL_ACCESS;
+	if (IS_GTMSECSHR_IMAGE && (FLUSH == flush))
+		flush = OPER;			/* All gtmsecshr origin msgs go to operator log */
+	if (NULL == TREF(util_outptr))
+		TREF(util_outptr) = TREF(util_outbuff_ptr);
+	if (NULL != message)
 	{
-		util_avail_len = INTCAST(util_outbuff + SIZEOF(util_outbuff) - util_outptr - 2);
+		util_avail_len = INTCAST(TREF(util_outbuff_ptr) + OUT_BUFF_SIZE - TREF(util_outptr) - 2);
 		assert(0 <= util_avail_len);
 		if (0 < util_avail_len)
-			util_outptr = util_format(message, var, util_outptr, util_avail_len, faocnt);
+			TREF(util_outptr) = util_format(message, var, TREF(util_outptr), util_avail_len, faocnt);
 	}
 	switch (flush)
 	{
@@ -597,7 +756,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 		case RESET:
 			break;
 		case FLUSH:
-			*util_outptr++ = '\n';
+			*(TREF(util_outptr))++ = '\n';
 		case OPER:
 		case SPRINT:
 			/* For all three of these actions we need to do some output buffer translation. In all cases a '%'
@@ -607,27 +766,28 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 			 * requirements, we could potentially overflow the buffer after the translation. In that case we will
 			 * stop copying just before the point of overflow is reached even though it means loss of the tail data.
 			 */
-			*util_outptr = '\0';
+			*(TREF(util_outptr)) = '\0';
 			fmt_top1 = fmt_buff + SIZEOF(fmt_buff) - 1;
 			fmt_top2 = fmt_top1 - 1;
-			for (util_outptr = util_outbuff, fmtc = fmt_buff; (0 != *util_outptr) && (fmtc < fmt_top1); )
+			for (TREF(util_outptr) = TREF(util_outbuff_ptr), fmtc = fmt_buff;
+			    (0 != *(TREF(util_outptr))) && (fmtc < fmt_top1); )
 			{
-				if ('%' == *util_outptr)
+				if ('%' == *(TREF(util_outptr)))
 				{
 					if (fmtc >= fmt_top2) /* Check if there is room for 2 bytes. If not stop copying */
 						break;
 					*fmtc++ = '%';	/* escape for '%' */
 					*fmtc++ = '%';
-					util_outptr++;
-				} else if ('\n' == *util_outptr && (OPER == flush || SPRINT == flush))
+					(TREF(util_outptr))++;
+				} else if ('\n' == *(TREF(util_outptr)) && (OPER == flush || SPRINT == flush))
 				{
 					if (fmtc >= fmt_top2) /* Check if there is room for 2 bytes. If not stop copying */
 						break;
 					*fmtc++ = ',';
 					*fmtc++ = ' ';
-					util_outptr++;
+					(TREF(util_outptr))++;
 				} else
-					*fmtc++ = *util_outptr++;
+					*fmtc++ = *(TREF(util_outptr))++;
 			}
 			assert(fmtc <= fmt_top1);
 			*fmtc++ = '\0';
@@ -640,7 +800,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 					util_out_send_oper(fmt_buff, UINTCAST(fmtc - fmt_buff));
 					break;
 				case SPRINT:
-					memcpy(util_outbuff, fmt_buff, fmtc - fmt_buff);
+					memcpy(TREF(util_outbuff_ptr), fmt_buff, fmtc - fmt_buff);
 					break;
 			}
 			break;
@@ -656,7 +816,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 		case OPER:
 		case SPRINT:
 			/* Reset buffer information.  */
-			util_outptr = util_outbuff;
+			TREF(util_outptr) = TREF(util_outbuff_ptr);
 			break;
 	}
 }
@@ -664,11 +824,12 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 void	util_out_print(caddr_t message, int flush, ...)
 {
 	va_list	var;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	va_start(var, flush);
-
 	util_out_print_vaparm(message, flush, var, MAXPOSINT4);
-	va_end(last_va_list_ptr);
+	va_end(TREF(last_va_list_ptr));
 	va_end(var);
 }
 
@@ -682,9 +843,10 @@ void	util_out_print_gtmio(caddr_t message, int flush, ...)
 	boolean_t	usestdio;
 	va_list		var;
 	mval		flushtxt;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	va_start(var, flush);
-
 	usestdio = IS_MCODE_RUNNING;
 	assert((FLUSH == flush) || (NOFLUSH == flush));
 	flush_it = ((FLUSH == flush) && !usestdio) ? FLUSH : NOFLUSH;
@@ -693,45 +855,41 @@ void	util_out_print_gtmio(caddr_t message, int flush, ...)
 	{	/* Message should be in buffer and we just need to flush it */
 		assert(NULL != op_write_ptr);
 		flushtxt.mvtype = MV_STR;
-		flushtxt.str.addr = util_outbuff;
-		flushtxt.str.len = INTCAST(util_outptr - util_outbuff);
+		flushtxt.str.addr = TREF(util_outbuff_ptr);
+		flushtxt.str.len = INTCAST(TREF(util_outptr) - TREF(util_outbuff_ptr));
 		(*op_write_ptr)(&flushtxt);
 		(*op_wteol_ptr)(1);
-		util_outptr = util_outbuff;	/* Signal text is flushed */
+		TREF(util_outptr) = TREF(util_outbuff_ptr);	/* Signal text is flushed */
 	}
-	va_end(last_va_list_ptr);
+	va_end(TREF(last_va_list_ptr));
 	va_end(var);
 }
 
 /* If $x of the standard output device is non-zero, and we are going to flush a buffer,
-   put out a new line and then do the buffer flush. Called and used only by PRN_ERROR
-   macro.
-*/
+ * put out a new line and then do the buffer flush. Called and used only by PRN_ERROR
+ * macro.
+ */
 void util_cond_flush(void)
 {
-	if (NULL != io_std_device.out && 0 < io_std_device.out->dollar.x && util_outptr != util_outbuff)
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	if (NULL != io_std_device.out && 0 < io_std_device.out->dollar.x && TREF(util_outptr) != TREF(util_outbuff_ptr))
 		FPRINTF(stderr, "\n");
-	if (util_outptr != util_outbuff)
+	if (TREF(util_outptr) != TREF(util_outbuff_ptr))
 		util_out_print(NULL, FLUSH);
 }
 
-void util_out_save(void)
+#ifdef DEBUG
+/* White-box test only! Start a timer that prints something to the operator log with a period of
+ * UTIL_OUT_SYSLOG_INTERVAL in attempt to interrupt util_outbuff construction and overwrite the
+ * buffer's contents.
+ */
+void util_out_syslog_dump(void)
 {
-	if (NULL != util_outptr)
-	{
-		save_buff_used = MIN(OUT_BUFF_SIZE, ((NULL != util_outptr) ? (int4)(util_outptr - util_outbuff) : 0));
-		if (0 != save_buff_used)
-			memcpy(save_util_outbuff, util_outbuff, save_buff_used);
-	}
+	util_out_print("Just some white-box test message long enough to ensure that "
+		       "whatever under-construction util_out buffer is not damaged.\n", OPER);
+	/* Resubmit itself for the purposes of the white-box test which expects periodic writes to the syslog. */
+	start_timer((TID)&util_out_syslog_dump, UTIL_OUT_SYSLOG_INTERVAL, util_out_syslog_dump, 0, NULL);
 }
-
-void util_out_restore(void)
-{
-	if (0 != save_buff_used)
-	{
-		assert(OUT_BUFF_SIZE >= save_buff_used);
-		memcpy(util_outbuff, save_util_outbuff, save_buff_used);
-		util_outptr = util_outbuff + save_buff_used;
-		save_buff_used = 0;
-	}
-}
+#endif

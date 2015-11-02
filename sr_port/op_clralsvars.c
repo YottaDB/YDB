@@ -14,7 +14,7 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "op.h"
 #include "hashtab_mname.h"

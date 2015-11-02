@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,10 +65,13 @@
 #include "invocation_mode.h"
 #include "gtm_imagetype_init.h"
 #include "gtm_threadgbl_init.h"
+#include "continue_handler.h"
 
 #ifdef UNICODE_SUPPORTED
-#include "gtm_icu_api.h"
-#include "gtm_utf8.h"
+# include "gtm_icu_api.h"
+# include "gtm_utf8.h"
+# include "gtm_conv.h"
+GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
 
 GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
@@ -97,8 +100,9 @@ int main (int argc, char **argv)
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */
 	err_init(util_base_ch);
+	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
-	sig_init(generic_signal_handler, NULL, suspsigs_handler);	/* Note: no ^C handler is defined (yet) */
+	sig_init(generic_signal_handler, NULL, suspsigs_handler, continue_handler);	/* Note: no ^C handler is defined (yet) */
 	atexit(mupip_exit_handler);
 	licensed = TRUE;
 	in_backup = FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2011 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +79,7 @@
 #endif
 
 #ifdef GTM_TRIGGER
-#include "rtnhdr.h"			/* for rtn_tabent in gv_trigger.h */
+#include <rtnhdr.h>			/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "tp_set_sgm.h"
 #endif
@@ -107,6 +107,9 @@ GBLREF  uint4                   image_count;
 GBLREF boolean_t		disk_blk_read;
 LITREF	mval			literal_hasht;
 static	uint4			last_pre_read_offset;
+
+error_def(ERR_DBCCERR);
+error_def(ERR_ERRCALL);
 
 int updhelper_reader(void)
 {
@@ -169,8 +172,6 @@ boolean_t updproc_preread(void)
 	uint4			write, write_wrap;
 #endif
 
-	error_def(ERR_DBCCERR);
-	error_def(ERR_ERRCALL);
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
 	upd_proc_local = recvpool.upd_proc_local;
 	recvpool_ctl = recvpool.recvpool_ctl;
@@ -365,11 +366,11 @@ boolean_t updproc_preread(void)
 								 * non-NULL. But this is not necessarily guaranteed for example if
 								 * gvcst_search returns abnormal status due to t_qread returning
 								 * NULL (due in turn to the function "wcs_phase2_commit_wait"
-								 * detecting csd->wc_blocked is TRUE and deciding to restart). In
-								 * this case buffaddr will be set to NULL while cr will be non-NULL
-								 * causing srch_status to be inconsistent. Resetting the clue would
-								 * cause this to be freshly initialized next time gvcst_search for
-								 * this gv_target is called.
+								 * detecting csa->nl->wc_blocked is TRUE and deciding to restart).
+								 * In this case buffaddr will be set to NULL while cr will be
+								 * non-NULL causing srch_status to be inconsistent. Resetting the
+								 * clue would cause this to be freshly initialized next time
+								 * gvcst_search for this gv_target is called.
 								 */
 								gv_target->clue.end = 0;
 							}

@@ -17,7 +17,7 @@
 #include "gtm_string.h"
 
 #include "stringpool.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "lv_val.h"	/* needed by "fgncal.h" */
 #include "fgncal.h"
 

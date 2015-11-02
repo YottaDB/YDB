@@ -49,10 +49,13 @@
 #include "gtm_fcntl.h"
 #include "eintr_wrappers.h"
 #include "min_max.h"
+#include "wbox_test_init.h"
 
 #ifdef __linux__
 #include <sys/vfs.h>
 #endif
+
+error_def(ERR_PREMATEOF);
 
 #ifdef KEEP_zOS_EBCDIC
 #define DOWRITE_A	__write_a
@@ -423,6 +426,7 @@
 		RC = errno;									\
 	else											\
 		RC = -1;		/* Something kept us from writing what we wanted */	\
+	GTM_WHITE_BOX_TEST(WBTEST_ANTIFREEZE_DSKNOSPCAVAIL, RC, ENOSPC);			\
 }
 
 #else /* real lseek and read/write - still need to protect against interrupts inbetween calls */
@@ -833,22 +837,26 @@
 
 #define DO_FILE_READ(CHANNEL, OFFSET, READBUFF, LEN, STATUS1, STATUS2)		\
 {										\
-	error_def(ERR_PREMATEOF);						\
-										\
 	STATUS2 = SS_NORMAL;							\
 	LSEEKREAD(CHANNEL, OFFSET, READBUFF, LEN, STATUS1);			\
 	if (-1 == STATUS1)							\
 		STATUS1 = ERR_PREMATEOF;					\
 }
 
-#define DO_FILE_WRITE(CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1, STATUS2)	\
+#define DB_DO_FILE_WRITE(CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1, STATUS2)	\
 {										\
-	error_def(ERR_PREMATEOF);						\
-										\
 	STATUS2 = SS_NORMAL;							\
-	LSEEKWRITE(CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1);			\
+	DB_LSEEKWRITE(NULL, NULL, CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1);	\
 	if (-1 == STATUS1)							\
 		STATUS1 = ERR_PREMATEOF;					\
+}
+
+#define JNL_DO_FILE_WRITE(CSA, JNL_FN, CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1, STATUS2)	\
+{												\
+	STATUS2 = SS_NORMAL;									\
+	JNL_LSEEKWRITE(CSA, JNL_FN, CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1);			\
+	if (-1 == STATUS1)									\
+		STATUS1 = ERR_PREMATEOF;							\
 }
 
 typedef struct

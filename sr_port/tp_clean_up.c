@@ -33,27 +33,28 @@
 #include "have_crit.h"
 #include "min_max.h"
 #ifdef GTM_TRIGGER
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"		/* for INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */
 #endif
 
-GBLREF	jnl_fence_control	jnl_fence_ctl;
-GBLREF	sgm_info		*sgm_info_ptr, *first_sgm_info;
-GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
-GBLREF	ua_list			*curr_ua, *first_ua;
-GBLREF	char			*update_array, *update_array_ptr;
-GBLREF	block_id		tp_allocation_clue;
-GBLREF	uint4			update_array_size, cumul_update_array_size;
-GBLREF	gd_region		*gv_cur_region;
-GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	gv_namehead		*gv_target_list, *gvt_tp_list;
-GBLREF	trans_num		local_tn;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	buddy_list		*global_tlvl_info_list;
-GBLREF	global_tlvl_info	*global_tlvl_info_head;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	ua_list			*curr_ua, *first_ua;
+GBLREF	uint4			dollar_trestart;
+GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
 GBLREF	jnl_gbls_t		jgbl;
-GBLREF	int			process_exiting;
+GBLREF	jnl_fence_control	jnl_fence_ctl;
+GBLREF	trans_num		local_tn;
+GBLREF	global_tlvl_info	*global_tlvl_info_head;
+GBLREF	buddy_list		*global_tlvl_info_list;
 GBLREF	block_id		gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gv_namehead		*gv_target_list, *gvt_tp_list;
+GBLREF	sgm_info		*sgm_info_ptr, *first_sgm_info;
+GBLREF	int			process_exiting;
+GBLREF	block_id		tp_allocation_clue;
+GBLREF	char			*update_array, *update_array_ptr;
+GBLREF	uint4			update_array_size, cumul_update_array_size;
 #ifdef VMS
 GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
 #endif
@@ -192,7 +193,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 			{
 				if (NULL != (ks = si->kill_set_head))
 				{
-					FREE_KILL_SET(si, ks);
+					FREE_KILL_SET(ks);
 					si->kill_set_tail = NULL;
 					si->kill_set_head = NULL;
 				}
@@ -389,7 +390,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 				{	/* check that gv_target->root falls within total blocks range */
 					csa = gvnh->gd_csa;
 					assert(NULL != csa);
-					assert(gvnh->root < csa->ti->total_blks);
+					NON_GTM_TRUNCATE_ONLY(assert(gvnh->root < csa->ti->total_blks));
 					assert(!IS_BITMAP_BLK(gvnh->root));
 				}
 				if (gvnh->clue.end)

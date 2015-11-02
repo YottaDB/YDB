@@ -648,6 +648,7 @@ typedef struct reg_ctl_list_struct
 	boolean_t		deleted_from_unprocessed_list;
 	jnl_ctl_list 		*last_processed_jctl;
 	uint4			last_processed_rec_offset;
+	seq_num			last_processed_jnl_seqno;	/* last jnl_seqno processed in this region */
 #	endif
 	boolean_t		db_present;		/* TRUE if database pointed by curr->gd is present or not */
 } reg_ctl_list;
@@ -986,6 +987,25 @@ typedef struct onln_rlbk_reg_list_struct
 }
 
 #define	MUR_WITHIN_ERROR_LIMIT(err_cnt, error_limit) ((++err_cnt <= error_limit) || (mur_options.interactive && mur_interactive()))
+
+#ifdef DEBUG
+#	define	MUR_DBG_SET_LAST_PROCESSED_JNL_SEQNO(TOKEN, RCTL)					\
+	{												\
+		if (NULL != RCTL)									\
+		{											\
+			assert(!mur_options.rollback || RCTL->last_processed_jnl_seqno <= TOKEN);	\
+			RCTL->last_processed_jnl_seqno = TOKEN;						\
+		}											\
+	}
+#else
+#	define	MUR_DBG_SET_LAST_PROCESSED_JNL_SEQNO(TOKEN, RCTL)
+#endif
+
+#define	MUR_SET_JNL_FENCE_CTL_TOKEN(TOKEN, RCTL)			\
+{									\
+	MUR_DBG_SET_LAST_PROCESSED_JNL_SEQNO(TOKEN, RCTL);		\
+	jnl_fence_ctl.token = TOKEN;					\
+}
 
 #if defined(UNIX)
 #define MUR_TOKEN_LOOKUP(token, image_count, rec_time, fence) mur_token_lookup(token, rec_time, fence)

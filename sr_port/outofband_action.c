@@ -13,7 +13,7 @@
 
 #include "gtm_stdio.h"
 #include "io.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "outofband.h"
 

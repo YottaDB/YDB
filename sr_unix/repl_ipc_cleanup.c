@@ -37,6 +37,8 @@
 #include "ipcrmid.h"
 #include "repl_instance.h"
 #include "wbox_test_init.h"
+#include "have_crit.h"
+#include "gtm_ipc.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	boolean_t		pool_init;
@@ -50,7 +52,7 @@ GBLREF	int			recvpool_shmid;
 int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_src_servers_running)
 {
 	boolean_t	i_am_the_last_user, attempt_ipc_cleanup;
-	int		status, detach_status, remove_status, semval;
+	int		status, detach_status, remove_status, semval, save_errno;
 	unix_db_info	*udi;
 	struct shmid_ds	shm_buf;
 
@@ -104,7 +106,7 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 		}
 	}
 	/* detach from shared memory irrespective of whether we need to cleanup ipcs or not */
-	detach_status = SHMDT(jnlpool.jnlpool_ctl);
+	JNLPOOL_SHMDT(detach_status, save_errno);
 	if (0 == detach_status)
 	{
 		jnlpool.jnlpool_ctl = NULL; /* Detached successfully */
@@ -116,8 +118,7 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 		pool_init = FALSE;
 	} else
 	{
-		repl_log(stderr, TRUE, TRUE,
-			"Error detaching from jnlpool shared memory : %s. Shared memory not removed\n", STRERROR(ERRNO));
+		repl_log(stderr, TRUE, TRUE, "Error detaching from Journal Pool : %s\n", STRERROR(save_errno));
 		attempt_ipc_cleanup = FALSE;
 		*num_src_servers_running = 0;
 		*exit_status = ABNORMAL_SHUTDOWN;

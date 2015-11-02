@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,12 +35,40 @@
 #include "cert_blk.h"
 #include "gtm_ctype.h"
 #ifdef GTM_TRIGGER
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"
 #endif
 
 GBLREF	uint4		dollar_tlevel;
 GBLREF	boolean_t	dse_running;
+
+error_def(ERR_DBBLEVMX);
+error_def(ERR_DBBLEVMN);
+error_def(ERR_DBBSIZMN);
+error_def(ERR_DBBSIZMX);
+error_def(ERR_DBRSIZMN);
+error_def(ERR_DBRSIZMX);
+error_def(ERR_DBCMPNZRO);
+error_def(ERR_DBSTARSIZ);
+error_def(ERR_DBSTARCMP);
+error_def(ERR_DBCMPMX);
+error_def(ERR_DBKEYMX);
+error_def(ERR_DBKEYMN);
+error_def(ERR_DBCMPBAD);
+error_def(ERR_DBKEYORD);
+error_def(ERR_DBPTRNOTPOS);
+error_def(ERR_DBPTRMX);
+error_def(ERR_DBPTRMAP);
+error_def(ERR_DBLVLINC);
+error_def(ERR_DBBMSIZE);
+error_def(ERR_DBBMBARE);
+error_def(ERR_DBBMINV);
+error_def(ERR_DBBMMSTR);
+error_def(ERR_DBROOTBURN);
+error_def(ERR_DBDIRTSUBSC);
+error_def(ERR_DBMAXNRSUBS); /* same error as ERR_MAXNRSUBSCRIPTS, but has a string output as well */
+error_def(ERR_DBINVGBL);
+error_def(ERR_DBBDBALLOC);
 
 #define BITS_PER_UCHAR	8
 #define BLKS_PER_UINT4	((SIZEOF(uint4) / SIZEOF(unsigned char)) * BITS_PER_UCHAR) / BML_BITS_PER_BLK
@@ -72,7 +100,8 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	sm_uint_ptr_t		chunk_p;			/* Value is unaligned so will be assigned to chunk */
 	uint4			chunk;
 	sm_uc_ptr_t		blk_top, blk_id_ptr, next_tp_child_ptr, key_base, mp, b_ptr;
-	unsigned char		rec_cmpc, min_cmpc;	/* the minimum cmpc expected in any record (except star-key) in a gvt */
+	unsigned short		rec_cmpc, min_cmpc;	/* the minimum cmpc expected in any record (except star-key) in a gvt */
+	int			tmp_cmpc;
 	unsigned char		ch, prior_expkey[MAX_KEY_SZ + 1];
 	unsigned int		prior_expkeylen;
 	unsigned short		temp_ushort;
@@ -84,34 +113,6 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	boolean_t		is_gvt, is_directory, first_key, full, prev_char_is_delimiter;
-
-	error_def(ERR_DBBLEVMX);
-	error_def(ERR_DBBLEVMN);
-	error_def(ERR_DBBSIZMN);
-	error_def(ERR_DBBSIZMX);
-	error_def(ERR_DBRSIZMN);
-	error_def(ERR_DBRSIZMX);
-	error_def(ERR_DBCMPNZRO);
-	error_def(ERR_DBSTARSIZ);
-	error_def(ERR_DBSTARCMP);
-	error_def(ERR_DBCMPMX);
-	error_def(ERR_DBKEYMX);
-	error_def(ERR_DBKEYMN);
-	error_def(ERR_DBCMPBAD);
-	error_def(ERR_DBKEYORD);
-	error_def(ERR_DBPTRNOTPOS);
-	error_def(ERR_DBPTRMX);
-	error_def(ERR_DBPTRMAP);
-	error_def(ERR_DBLVLINC);
-	error_def(ERR_DBBMSIZE);
-	error_def(ERR_DBBMBARE);
-	error_def(ERR_DBBMINV);
-	error_def(ERR_DBBMMSTR);
-	error_def(ERR_DBROOTBURN);
-	error_def(ERR_DBDIRTSUBSC);
-	error_def(ERR_DBMAXNRSUBS); /* same error as ERR_MAXNRSUBSCRIPTS, but has a string output as well */
-	error_def(ERR_DBINVGBL);
-	error_def(ERR_DBBDBALLOC);
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
@@ -279,13 +280,13 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			RTS_ERROR_FUNC(ERR_DBRSIZMN, util_buff);
 			return FALSE;
 		}
-		if (rec_size > (short)((sm_ulong_t)blk_top - (sm_ulong_t)rp))
+		if (rec_size > (unsigned short)((sm_ulong_t)blk_top - (sm_ulong_t)rp))
 		{
 			RTS_ERROR_FUNC(ERR_DBRSIZMX, util_buff);
 			return FALSE;
 		}
 		r_top = (rec_hdr_ptr_t)((sm_ulong_t)rp + rec_size);
-		rec_cmpc = rp->cmpc;
+		rec_cmpc = EVAL_CMPC(rp);
 		if (first_key)
 		{
 			if (rec_cmpc)

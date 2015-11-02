@@ -17,7 +17,6 @@
 #include <errno.h>
 #include "gtm_unistd.h"
 #include <signal.h>
-#include "gtm_statvfs.h"	/* for GTM_BAVAIL_TYPE */
 
 #include "buddy_list.h"
 #include "gdsroot.h"
@@ -41,6 +40,7 @@
 #include "gdsblk.h"		/* needed for gds_blk_downgrade.h */
 #include "gds_blk_downgrade.h"	/* for IS_GDS_BLK_DOWNGRADE_NEEDED macro */
 #include "wbox_test_init.h"
+#include "anticipatory_freeze.h"
 /* Include prototypes */
 #include "bit_set.h"
 #include "disk_block_available.h"
@@ -51,6 +51,9 @@
 #include "gtmimagename.h"
 #include "gtmdbglvl.h"
 #include "min_max.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include "error.h"
 
 #define	      GDSFILEXT_CLNUP { if (need_to_restore_mask)				\
 					sigprocmask(SIG_SETMASK, &savemask, NULL);	\
@@ -74,11 +77,13 @@ GBLREF	jnl_gbls_t	jgbl;
 GBLREF	inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
 GBLREF	uint4		gtmDebugLevel;
+GBLREF	jnlpool_addrs	jnlpool;
 
 error_def(ERR_DBFILERR);
 error_def(ERR_DBFILEXT);
 error_def(ERR_DSKSPACEFLOW);
 error_def(ERR_JNLFLUSH);
+error_def(ERR_NOSPACEEXT);
 error_def(ERR_TEXT);
 error_def(ERR_TOTALBLKMAX);
 error_def(ERR_WAITDSKSPACE);
@@ -93,7 +98,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	int			mm_prot, result, save_errno, status;
 	uint4			new_bit_maps, bplmap, map, new_blocks, new_total, max_tot_blks;
 	uint4			jnl_status, to_wait, to_msg, wait_period;
-	GTM_BAVAIL_TYPE		avail_blocks;
+	gtm_uint64_t		avail_blocks;
 	sgmnt_data_ptr_t	tmp_csd;
 	off_t			new_eof;
 	trans_num		curr_tn;
@@ -103,6 +108,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	int4			prev_extend_blks_to_upgrd;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
+	DCL_THREADGBL_ACCESS;
 
 	assert((cs_addrs->nl == NULL) || (process_id != cs_addrs->nl->trunc_pid)); /* mu_truncate shouldn't extend file... */
 	udi = FILE_INFO(gv_cur_region);
@@ -145,10 +151,17 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			avail_blocks = avail_blocks / (cs_data->blk_size / DISK_BLOCK_SIZE);
 			if ((blocks * EXTEND_WARNING_FACTOR) > avail_blocks)
 			{
-				send_msg(VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, DB_LEN_STR(gv_cur_region),
-					 (uint4)(avail_blocks - ((new_blocks <= avail_blocks) ? new_blocks : 0)));
 				if (blocks > (uint4)avail_blocks)
-					return (uint4)(NO_FREE_SPACE);
+				{
+					SETUP_THREADGBL_ACCESS;
+					if (!ANTICIPATORY_FREEZE_ENABLED(cs_addrs))
+						return (uint4)(NO_FREE_SPACE);
+					else
+						send_msg(VARLSTCNT(6) MAKE_MSG_WARNING(ERR_NOSPACEEXT), 4,
+							DB_LEN_STR(gv_cur_region), new_blocks, (uint4)avail_blocks);
+				} else
+					send_msg(VARLSTCNT(5) ERR_DSKSPACEFLOW, 3, DB_LEN_STR(gv_cur_region),
+						 (uint4)(avail_blocks - ((new_blocks <= avail_blocks) ? new_blocks : 0)));
 			}
 		}
 	}
@@ -170,7 +183,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	 */
 	assert(!was_crit || !cs_data->freeze || (dollar_tlevel && (CDB_STAGNATE <= t_tries)));
 	/*
-	 * If we are in the final retry and already hold crit, it is possible that csd->wc_blocked is also set to TRUE
+	 * If we are in the final retry and already hold crit, it is possible that csa->nl->wc_blocked is also set to TRUE
 	 * (by a concurrent process in phase2 which encountered an error in the midst of commit and secshr_db_clnup
 	 * finished the job for it). In this case we do NOT want to invoke wcs_recover as that will update the "bt"
 	 * transaction numbers without correspondingly updating the history transaction numbers (effectively causing
@@ -182,13 +195,13 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		for ( ; ; )
 		{
 			grab_crit(gv_cur_region);
-			if (!cs_data->freeze)
+			if (!cs_data->freeze && !IS_REPL_INST_FROZEN)
 				break;
 			rel_crit(gv_cur_region);
-			while (cs_data->freeze)
+			while (cs_data->freeze || IS_REPL_INST_FROZEN)
 				hiber_start(1000);
 		}
-	} else if (cs_data->freeze && dollar_tlevel)
+	} else if ((cs_data->freeze || IS_REPL_INST_FROZEN) && dollar_tlevel)
 	{	/* We don't want to continue with file extension as explained above. Hence return with an error code which
 		 * op_tcommit will recognize (as a cdb_sc_needcrit type of restart) and restart accordingly.
 		 */
@@ -284,7 +297,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	new_eof = ((off_t)(cs_data->start_vbn - 1) * DISK_BLOCK_SIZE) + ((off_t)new_total * cs_data->blk_size);
 	buff = (char *)malloc(DISK_BLOCK_SIZE);
 	memset(buff, 0, DISK_BLOCK_SIZE);
-	LSEEKWRITE(udi->fd, new_eof, buff, DISK_BLOCK_SIZE, save_errno);
+	DB_LSEEKWRITE(cs_addrs, udi->fn, udi->fd, new_eof, buff, DISK_BLOCK_SIZE, save_errno);
 	if ((ENOSPC == save_errno) && IS_GTM_IMAGE)
 	{
 		/* try to write it every second, and send message to operator
@@ -335,12 +348,12 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			assert(FALSE); /* Should be killed before that */
 		}
 	)
-	GTM_FSYNC(udi->fd, status);
+	GTM_DB_FSYNC(cs_addrs, udi->fd, status);
 	assert(0 == status);
 	if (0 != status)
 	{
 		GDSFILEXT_CLNUP;
-		send_msg(VARLSTCNT(8) ERR_DBFILERR, 5, RTS_ERROR_LITERAL("fsync()"), CALLFROM, errno);
+		send_msg(VARLSTCNT(8) ERR_DBFILERR, 5, RTS_ERROR_LITERAL("fsync1()"), CALLFROM, status);
 		return (uint4)(NO_FREE_SPACE);
 	}
 	DEBUG_ONLY(
@@ -407,12 +420,12 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		}
 	)
 
-	GTM_FSYNC(udi->fd, status);
+	GTM_DB_FSYNC(cs_addrs, udi->fd, status);
 	assert(0 == status);
 	if (0 != status)
 	{
 		GDSFILEXT_CLNUP;
-		send_msg(VARLSTCNT(8) ERR_DBFILERR, 5, RTS_ERROR_LITERAL("fsync()"), CALLFROM, errno);
+		send_msg(VARLSTCNT(8) ERR_DBFILERR, 5, RTS_ERROR_LITERAL("fsync2()"), CALLFROM, status);
 		return (uint4)(NO_FREE_SPACE);
 	}
 	DEBUG_ONLY(
@@ -440,10 +453,6 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		gds_map_moved(cs_addrs->db_addrs[0], old_base[0], old_base[1], new_eof);
                 cs_addrs->total_blks = new_total;       /* Local copy to test if file has extended */
  	}
-#	ifdef GTM_TRUNCATE
- 		/* Used with BG to detect concurrent truncates in t_end and tp_tend */
- 		cs_addrs->total_blks = MAX(cs_addrs->total_blks, new_total);
-#	endif
 	assert(0 < (int)blocks);
 	assert(0 < (int)(cs_addrs->ti->free_blocks + blocks));
 	cs_addrs->ti->free_blocks += blocks;
@@ -481,6 +490,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		}
 	)
 	GDSFILEXT_CLNUP;
+	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_db_extends, 1);
 	if (!gtm_dbfilext_syslog_disable)
 		send_msg(VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), blocks, new_total, &curr_tn);
 	return (SS_NORMAL);

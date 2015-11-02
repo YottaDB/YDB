@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +57,7 @@
 #include "gtmmsg.h"
 #ifdef UNIX
 #include "heartbeat_timer.h"
+#include "anticipatory_freeze.h"
 #endif
 
 #ifdef	GTM_FD_TRACE
@@ -92,6 +93,11 @@ GBLREF	volatile int4		fast_lock_count;
 GBLREF	gvt_container		*gvt_pending_list;
 GBLREF	boolean_t		dse_running;
 GBLREF	jnl_gbls_t		jgbl;
+#ifdef UNIX
+GBLREF	boolean_t		pool_init;
+GBLREF	boolean_t		jnlpool_init_needed;
+GBLREF	jnlpool_addrs		jnlpool;
+#endif
 
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
@@ -172,6 +178,12 @@ void	assert_jrec_member_offsets(void)
 	assert(NULL_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_null), JNL_REC_START_BNDRY)));
 	assert(EPOCH_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_epoch), JNL_REC_START_BNDRY)));
 	assert(EOF_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_eof), JNL_REC_START_BNDRY)));
+	/* Assert following comment which is relied upon in JNL_FILE_TAIL_PRESERVE macro.
+	 * 	"We know PINI_RECLEN is maximum of EPOCH_RECLEN, PFIN_RECLEN, EOF_RECLEN"
+	 */
+	assert(PINI_RECLEN > EPOCH_RECLEN);
+	assert(PINI_RECLEN > PFIN_RECLEN);
+	assert(PINI_RECLEN > EOF_RECLEN);
 	/* Assumption about the structures in code */
 	assert(0 == MIN_ALIGN_RECLEN % JNL_REC_START_BNDRY);
 	assert(SIZEOF(uint4) == SIZEOF(jrec_suffix));
@@ -215,9 +227,15 @@ void gvcst_init(gd_region *greg)
 	gv_namehead		*gvt, *gvt_stay;
 	gvnh_reg_t		*gvnh_reg;
 	hash_table_mname	*table;
-	boolean_t		added, first_wasopen;
+	boolean_t		added, first_wasopen, onln_rlbk_cycle_mismatch = FALSE;
 	intrpt_state_t		save_intrpt_ok_state;
+#	ifdef UNIX
+	replpool_identifier	replpool_id;
+	unsigned int		full_len;
+#	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	UNSUPPORTED_PLATFORM_CHECK;
 	assert(!jgbl.forw_phase_recovery);
 	CWS_INIT;	/* initialize the cw_stagnate hash-table */
@@ -228,8 +246,8 @@ void gvcst_init(gd_region *greg)
         set_num_additional_processors();
 
 	DEBUG_ONLY(
-		/* Note that the "block" member in the blk_ident structure in gdskill.h has 28 bits.
-		 * Currently, the maximum number of blocks is 2**28. If ever this increases, something
+		/* Note that the "block" member in the blk_ident structure in gdskill.h has 30 bits.
+		 * Currently, the maximum number of blocks is 2**30. If ever this increases, something
 		 * has to be correspondingly done to the "block" member to increase its capacity.
 		 * The following assert checks that we always have space in the "block" member
 		 * to represent a GDS block number.
@@ -314,9 +332,7 @@ void gvcst_init(gd_region *greg)
 		greg->jnl_deq = csd->jnl_deq;
 		greg->jnl_buffer_size = csd->jnl_buffer_size;
 		greg->jnl_before_image = csd->jnl_before_image;
-		greg->open = TRUE;
-		greg->opening = FALSE;
-		greg->was_open = TRUE;
+		SET_REGION_OPEN_TRUE(greg, WAS_OPEN_TRUE);
 		assert(1 <= csa->regcnt);
 		csa->regcnt++;	/* Increment # of regions that point to this csa */
 		return;
@@ -437,7 +453,18 @@ void gvcst_init(gd_region *greg)
 	assert(268 == OFFSETOF(node_local, now_running[0]));
  	assert(36 == SIZEOF(((node_local *)NULL)->now_running));
 	assert(36 == MAX_REL_NAME);
-	UNIX_ONLY(START_HEARTBEAT_IF_NEEDED;)
+#	ifdef UNIX
+	START_HEARTBEAT_IF_NEEDED;
+	if (!pool_init && jnlpool_init_needed && ANTICIPATORY_FREEZE_AVAILABLE && REPL_INST_AVAILABLE)
+	{
+		jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL);
+		/* Any LSEEKWRITEs hence forth will wait if the instance is frozen. To aid in printing the region information before
+		 * and after the wait, csa->region is referenced. Since it is NULL at this point, set it to greg. This is a safe
+		 * thing to do since csa->region is anyways set in db_common_init (few lines below).
+		 */
+		csa->region = greg;
+	}
+#	endif
 	/* Protect the db_init and the code below until we set greg->open to TRUE. This is needed as otherwise,
 	 * if a MUPIP STOP is issued to this process at a time-window when db_init is completed but greg->open
 	 * is NOT set to TRUE, will cause gds_rundown NOT to clean up the shared memory created by db_init and
@@ -446,6 +473,13 @@ void gvcst_init(gd_region *greg)
 	DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT);
 	VMS_ONLY(db_init(greg, temp_cs_data);)
 	UNIX_ONLY(db_init(greg);)
+	/* At this point, we have initialized the database, but haven't yet set reg->open to TRUE. If any rts_errors happen in
+	 * the meantime, there are no condition handlers established to handle the rts_error. More importantly, it is non-trivial
+	 * to add logic to such a condition handler to undo the effects of db_init. Also, in some cases, the rts_error can can
+	 * confuse future calls of db_init. By invoking DBG_MARK_RTS_ERROR_UNUSABLE, we can catch any rts_errors in future and
+	 * eliminate it on a case by case basis.
+	 */
+	UNIX_ONLY(DBG_MARK_RTS_ERROR_UNUSABLE);
 	crash_count = csa->critical->crashcnt;
 	csa->regnum = ++region_open_count;
 	csd = csa->hdr;
@@ -581,8 +615,18 @@ void gvcst_init(gd_region *greg)
 		global_tlvl_info_list = (buddy_list *)malloc(SIZEOF(buddy_list));
 		initialize_list(global_tlvl_info_list, SIZEOF(global_tlvl_info), GBL_TLVL_INFO_LIST_INIT_ALLOC);
 	}
-	greg->open = TRUE;
-	greg->opening = FALSE;
+	assert(!greg->was_open);
+	SET_REGION_OPEN_TRUE(greg, WAS_OPEN_FALSE);
+	csa = (sgmnt_addrs*)&FILE_INFO(greg)->s_addrs;
+	if (NULL != csa->dir_tree)
+	{	/* It is possible that dir_tree has already been targ_alloc'ed. This is because GT.CM or VMS DAL
+		 * calls can run down regions without the process halting out. We don't want to double malloc.
+		 */
+		csa->dir_tree->clue.end = 0;
+	}
+	SET_CSA_DIR_TREE(csa, greg->max_key_size, greg);
+	/* Now that reg->open is set to TRUE and directory tree is initialized, go ahead and set rts_error back to being usable */
+	UNIX_ONLY(DBG_MARK_RTS_ERROR_USABLE);
 	/* gds_rundown if invoked from now on will take care of cleaning up the shared memory segment */
 	ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT);
 	if (dba_bg == greg_acc_meth)
@@ -632,6 +676,7 @@ void gvcst_init(gd_region *greg)
 		greg_fid = &(csa->nl->unique_id);
 		for (regcsa = cs_addrs_list; NULL != regcsa; regcsa = regcsa->next_csa)
 		{
+			UNIX_ONLY(onln_rlbk_cycle_mismatch |= (regcsa->db_onln_rlbkd_cycle != regcsa->nl->db_onln_rlbkd_cycle));
 			if ((NULL != prevcsa) && (regcsa->fid_index < prevcsa->fid_index))
 				continue;
 			reg_fid = &((regcsa)->nl->unique_id);
@@ -647,6 +692,14 @@ void gvcst_init(gd_region *greg)
 			csa->fid_index = 1;
 		else
 			csa->fid_index = prevcsa->fid_index + 1;
+		UNIX_ONLY(
+			if (onln_rlbk_cycle_mismatch)
+			{
+				csa->root_search_cycle--;
+				csa->onln_rlbk_cycle--;
+				csa->db_onln_rlbkd_cycle--;
+			}
+		)
 		/* Add current csa into list of open csas */
 		csa->next_csa = cs_addrs_list;
 		cs_addrs_list = csa;
@@ -655,5 +708,21 @@ void gvcst_init(gd_region *greg)
 			tr->file.fid_index = (&FILE_INFO(tr->reg)->s_addrs)->fid_index;
 		DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
 	}
+#	ifdef UNIX
+	if (pool_init && REPL_ALLOWED(csd) && jnlpool_init_needed)
+	{
+		/* Last parameter to VALIDATE_INITIALIZED_JNLPOOL is TRUE if the process does logical updates and FALSE otherwise.
+		 * This parameter governs whether the macro can do SCNDDBNOUPD check or not. All the utilities that sets
+		 * jnlpool_init_needed global variable don't do logical updates (REORG, EXTEND, etc.). But, for GT.M,
+		 * jnlpool_init_needed is set to TRUE unconditionally. Even though GT.M can do logical updates, we pass FALSE
+		 * unconditionally to the macro (indicating no logical updates). This is because, at this point, there is no way to
+		 * tell if this process wants to open the database for read or write operation. If it is for a read operation, we
+		 * don't want the below macro to issue SCNDDBNOUPD error. If it is for write operation, we will skip the
+		 * SCNDDBNOUPD error message here. But, eventually when this process goes to gvcst_{put,kill} or op_ztrigger,
+		 * SCNDDBNOUPD is issued.
+		 */
+		VALIDATE_INITIALIZED_JNLPOOL(csa, csa->nl, greg, GTMRELAXED, SCNDDBNOUPD_CHECK_FALSE);
+	}
+#	endif
 	return;
 }

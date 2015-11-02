@@ -80,6 +80,7 @@ GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
 GBLREF	uint4			mutex_per_process_init_pid;
 
+error_def(ERR_INITORRESUME);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_NORESYNCSUPPLONLY);
 error_def(ERR_NORESYNCUPDATERONLY);
@@ -302,14 +303,22 @@ int gtmrecv(void)
 							  LEN_AND_LIT("Input instance file must be non-supplementary"
 							  		" as current instance is a supplementary root primary"));
 					}
-				} else if (jnlpool.repl_inst_filehdr->is_supplementary && jnlpool.jnlpool_ctl->upd_disabled)
-				{	/* The input instance file is non-supplementary. Allow it only if the current instance is
-					 * non-supplementary or if it is a supplementary root primary.
-					 */
-					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
-					rts_error(VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
-						  LEN_AND_LIT("Input instance file must be supplementary"
-						  		" to match current instance"));
+				} else if (jnlpool.repl_inst_filehdr->is_supplementary)
+				{
+					if (jnlpool.jnlpool_ctl->upd_disabled)
+					{	/* The input instance file is non-supplementary. Allow it only if the current
+						 * instance is non-supplementary or if it is a supplementary root primary.
+						 */
+						rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
+						rts_error(VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
+							  LEN_AND_LIT("Input instance file must be supplementary"
+									" to match current instance"));
+					}
+					if (!gtmrecv_options.resume_specified && !gtmrecv_options.initialize_specified)
+					{
+						rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
+						rts_error(VARLSTCNT(1) ERR_INITORRESUME);
+					}
 				}
 				if (!jnlpool.repl_inst_filehdr->is_supplementary || jnlpool.jnlpool_ctl->upd_disabled)
 				{
@@ -372,6 +381,7 @@ int gtmrecv(void)
 	assert(holds_sem[RECV][RECV_SERV_OPTIONS_SEM]);
 	is_rcvr_server = TRUE;
 	process_id = getpid();
+	OPERATOR_LOG_MSG;
 	/* Reinvoke secshr related initialization with the child's pid */
 	INVOKE_INIT_SECSHR_ADDRS;
 	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
@@ -433,7 +443,7 @@ int gtmrecv(void)
 	upd_proc_local->log_interval = gtmrecv_options.upd_log_interval;
 	upd_helper_ctl->start_helpers = FALSE;
 	upd_helper_ctl->start_n_readers = upd_helper_ctl->start_n_writers = 0;
-	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, NULL, gtmrecv_options.log_file, NULL);
+	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, gtmrecv_options.log_file);
 	assert(SS_NORMAL == log_init_status);
 	repl_log_fd2fp(&gtmrecv_log_fp, gtmrecv_log_fd);
 	if (-1 == (procgp = setsid()))

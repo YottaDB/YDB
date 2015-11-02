@@ -15,7 +15,7 @@
 #include "lv_val.h"	/* needed by "fgncal.h" */
 #include "fgncal.h"
 #include "valid_mname.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 
 GBLREF	symval			*curr_symval;
 

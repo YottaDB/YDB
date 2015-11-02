@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -100,6 +100,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	unsigned short	temp_ushort;
 	int		new_levelp_cur_cmpc, new_levelp_cur_next_cmpc, tkeycmpc,
 			oldblk1_last_cmpc, newblk1_mid_cmpc, newblk1_last_cmpc;
+	int		tmp_cmpc;
 	int		levelp, level2;
 	int		old_blk1_sz, old_blk2_sz;
 	int		old_levelp_cur_prev_keysz,
@@ -258,7 +259,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
         	}
                 BLK_ADDR(old_last_rec_hdr1, SIZEOF(rec_hdr), rec_hdr);
                 old_last_rec_hdr1->rsiz = BSTAR_REC_SIZE + oldblk1_last_keylen;
-                old_last_rec_hdr1->cmpc = oldblk1_last_cmpc;
+                SET_CMPC(old_last_rec_hdr1, oldblk1_last_cmpc);
 	}
 
 	/*
@@ -309,7 +310,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	{
 		BLK_ADDR(new_rec_hdr1, SIZEOF(rec_hdr), rec_hdr);
 		new_rec_hdr1->rsiz = piece_len;
-		new_rec_hdr1->cmpc = newblk1_mid_cmpc;
+		SET_CMPC(new_rec_hdr1, newblk1_mid_cmpc);
 	}
 	/* else only new_blk1_last_key will be appeneded in working block */
 
@@ -399,7 +400,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			new_blk2_remain = new_blk2_first_rec_base + SIZEOF(rec_hdr) + newblk2_first_keylen;
 			BLK_ADDR(new_rec_hdr2, SIZEOF(rec_hdr), rec_hdr);
 			new_rec_hdr2->rsiz = rec_size + tkeycmpc;
-			new_rec_hdr2->cmpc = 0;
+			SET_CMPC(new_rec_hdr2, 0);
 		}
 	}
 
@@ -458,7 +459,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 					new_blk2_ances_first_keysz = tkeylen + tkeycmpc;
 					BLK_ADDR(blk2_ances_hdr, SIZEOF(rec_hdr), rec_hdr); /* new 1st record's header */
 					blk2_ances_hdr->rsiz = new_blk2_ances_first_keysz + BSTAR_REC_SIZE;
-					blk2_ances_hdr->cmpc = 0 ;
+					SET_CMPC(blk2_ances_hdr, 0);
 				}
 				break;
 			}
@@ -501,7 +502,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		*/
 		BLK_ADDR(new_levelp_cur_hdr, SIZEOF(rec_hdr), rec_hdr);
 		new_levelp_cur_hdr->rsiz = BSTAR_REC_SIZE + new_levelp_cur_keylen;
-		new_levelp_cur_hdr->cmpc = new_levelp_cur_cmpc;
+		SET_CMPC(new_levelp_cur_hdr, new_levelp_cur_cmpc);
 	}
 	/* else  old_levelp_cur_key will be deleted */
 
@@ -539,7 +540,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		*/
 		BLK_ADDR(new_levelp_cur_next_hdr, SIZEOF(rec_hdr), rec_hdr);
 		new_levelp_cur_next_hdr->rsiz = BSTAR_REC_SIZE + new_levelp_cur_next_keylen;
-		new_levelp_cur_next_hdr->cmpc = new_levelp_cur_next_cmpc;
+		SET_CMPC(new_levelp_cur_next_hdr, new_levelp_cur_next_cmpc);
 	} else
 	{
 		if (!complete_merge || !delete_all_blk2_ances)
@@ -552,7 +553,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 
 	BLK_ADDR(star_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 	star_rec_hdr->rsiz = BSTAR_REC_SIZE;
-	star_rec_hdr->cmpc = 0;
+	SET_CMPC(star_rec_hdr, 0);
 	/* ------------------------
 	 * Working block's t_write
 	 * ------------------------

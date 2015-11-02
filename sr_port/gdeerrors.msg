@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2011 Fidelity Information Services, Inc	!
+!	Copyright 2001, 2012 Fidelity Information Services, Inc	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -69,4 +69,5 @@ WRITEERROR	<Cannot exit because of write failure.  Reason for failure: !AD>/info
 NONASCII	<!AD is illegal for a !AD as it contains non-ASCII characters>/error/fao=4
 CRYPTNOMM	<!AD is an encrypted database. Cannot support MM access method.>/error/fao=2
 JNLALLOCGROW	<Increased Journal ALLOCATION from [!AD blocks] to [!AD blocks] to match AUTOSWITCHLIMIT for !AD !AD>/info/fao=8
+KEYFORBLK	<But block size !AD can only support key size !AD>/info/fao=4
 	.end

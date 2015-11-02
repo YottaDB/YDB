@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,9 +47,13 @@
 #define	ZSYSTEMSTR	"ZSYSTEM"
 #define	MAXZSYSSTRLEN	4096	/* maximum command line length supported by most Unix shells */
 
+GBLREF	uint4		dollar_trestart;
 GBLREF	int4		dollar_zsystem;			/* exit status of child */
 GBLREF	io_pair		io_std_device;
 GBLREF	uint4           trust;
+
+error_def(ERR_INVSTRLEN);
+error_def(ERR_SYSCALL);
 
 void op_zsystem(mval *v)
 {
@@ -67,9 +71,9 @@ void op_zsystem(mval *v)
 #else
 #error UNSUPPORTED PLATFORM
 #endif
-	error_def(ERR_INVSTRLEN);
-	error_def(ERR_SYSCALL);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	TPNOTACID_CHECK(ZSYSTEMSTR);
 	MV_FORCE_STR(v);
 #ifdef UNIX

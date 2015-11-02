@@ -69,6 +69,7 @@ GBLREF  boolean_t		online_specified;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF 	void			(*call_on_signal)();
 GBLREF	int			process_exiting;
+GBLREF	boolean_t		muint_fast;
 
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBROLLEDBACK);
@@ -217,9 +218,9 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	struct stat		stat_buf;
 	enum db_acc_method	acc_meth;
 	void			*ss_shmaddr;
-	gtm_int64_t		db_file_size;
-	uint4			tempnamprefix_len, crit_counter, tot_blks, prev_ss_shmsize, native_size, fstat_status;
-	uint4			*kip_pids_arr_ptr;
+	gtm_uint64_t		db_file_size, native_size;
+	uint4			tempnamprefix_len, crit_counter, tot_blks, prev_ss_shmsize, fstat_status;
+	pid_t			*kip_pids_arr_ptr;
 	mstr			tempdir_log, tempdir_full, tempdir_trans;
 	boolean_t		debug_mupip = FALSE, wait_for_zero_kip, final_retry;
 	now_t			now;
@@ -506,7 +507,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		}
 		/* Write EOF block in the snapshot file */
 		native_size = gds_file_size(reg->dyn.addr->file_cntl);
-		db_file_size = (gtm_int64_t)(native_size) * DISK_BLOCK_SIZE; /* Size of database file in bytes */
+		db_file_size = native_size * DISK_BLOCK_SIZE; /* Size of database file in bytes */
 		LSEEKWRITE(shdw_fd, ((off_t)db_file_size + ss_shmsize), eof_marker, EOF_MARKER_SIZE, status);
 		if (0 != status)
 		{	/* error while writing EOF record to snapshot file */
@@ -576,7 +577,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		{	/* We have a consistent copy of the total blocks and csd->kill_in_prog is FALSE inside crit. No need for
 			 * retry.
 			 */
-			assert(native_size == ((tot_blks * (csd->blk_size / DISK_BLOCK_SIZE)) + (csd->start_vbn)));
+			assert(native_size == (((gtm_uint64_t)tot_blks * (csd->blk_size / DISK_BLOCK_SIZE)) + (csd->start_vbn)));
 			break;
 		}
 	}
@@ -586,7 +587,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	 * proceed gracefully
 	 */
 	assert(csa->now_crit);
-	assert(native_size == ((tot_blks * (csd->blk_size / DISK_BLOCK_SIZE)) + (csd->start_vbn)));
+	assert(native_size == (((gtm_uint64_t)tot_blks * (csd->blk_size / DISK_BLOCK_SIZE)) + (csd->start_vbn)));
 	assert(NULL != ss_shmaddr);
 	assert(0 == ((long)ss_shmaddr % OS_PAGE_SIZE));
 	assert(0 == ss_shmsize % OS_PAGE_SIZE);
@@ -649,7 +650,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	/* ========== STEP 6: Copy the file header, master map and the native file size into a private structure =========== */
 
 	memcpy(util_ss_ptr->header, csd, SGMNT_HDR_LEN);
-	memcpy(util_ss_ptr->master_map, MM_ADDR(csd), MASTER_MAP_SIZE_MAX);
+	memcpy(util_ss_ptr->master_map, MM_ADDR(csd), MASTER_MAP_SIZE(csd));
 	util_ss_ptr->native_size = native_size;
 
 	/* We are about to copy the process private variables to shared memory. Although we have done grab_crit above, we take
@@ -685,8 +686,9 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	DECR_INHIBIT_KILLS(cnl);
 	/* announce GT.M that it's now ok to write the before images */
 	if (!SNAPSHOTS_IN_PROG(cnl))
-		cnl->snapshot_in_prog = TRUE;
-	csa->snapshot_in_prog = TRUE;
+		SET_SNAPSHOTS_IN_PROG(cnl);
+	SET_SNAPSHOTS_IN_PROG(csa);
+	cnl->fastinteg_in_prog = muint_fast;
 	/* Having a write memory barrier here ensures that whenever GT.M reads a newer value of cnl->ss_shmcycle, it is guaranteed
 	 * that the remaining fields that it reads from the shared memory will be the latest ones.
 	 */
@@ -711,11 +713,16 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		ISSUE_WRITE_ERROR_AND_EXIT(reg, pwrite_res, csa, tempfilename);
 	dsk_addr += ((int)ss_shmsize + (int)SGMNT_HDR_LEN);
 	/* write the database master map to the shadow file */
-	LSEEKWRITE(shdw_fd, dsk_addr, (sm_uc_ptr_t)util_ss_ptr->master_map, MASTER_MAP_SIZE_MAX, pwrite_res);
+	assert(0 == ((dsk_addr + MASTER_MAP_SIZE_MAX) % OS_PAGE_SIZE));
+	LSEEKWRITE(shdw_fd, dsk_addr, (sm_uc_ptr_t)util_ss_ptr->master_map, MASTER_MAP_SIZE(csd), pwrite_res);
 	if (0 != pwrite_res)
 		ISSUE_WRITE_ERROR_AND_EXIT(reg, pwrite_res, csa, tempfilename);
+	/* The size of the master map written to snap-shot file is read from database header i.e. MASTER_MAP_SIZE(csd).
+	 * That is the actual size which may differ depending on the version that created the database file.
+	 * But this sets the dsk_addr for the Starting VBN using the current MASTER_MAP_SIZE_MAX to keep it aligned
+	 * to the OS PAGE SIZE
+	 */
 	dsk_addr += MASTER_MAP_SIZE_MAX;
-	assert(0 == (dsk_addr % OS_PAGE_SIZE));
 	lcl_ss_ctx->cur_state = SNAPSHOT_INIT_DONE; /* Same as AFTER_SHM_CREAT but set for clarity of the snapshot state */
 	call_on_signal = NULL; /* Any further cleanup on signals will be taken care by gds_rundown */
 	ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE);

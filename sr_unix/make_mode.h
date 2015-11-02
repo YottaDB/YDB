@@ -23,6 +23,6 @@ rhdtyp *make_mode (int mode_index);
 #else
 #define	CODE_SIZE	(CODE_LINES * CALL_SIZE + SIZEOF(uint4) * EXTRA_INST)
 #endif /* __ia64 */
-#include "make_mode_sp.h"
+#include <make_mode_sp.h>
 
 #endif

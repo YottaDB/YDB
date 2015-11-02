@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,5 +21,4 @@
 #define F_COPY_GDID(to, from)			memcpy(&(to), &(from), SIZEOF(to))
 #define F_COPY_GDID_FROM_STAT(to, stat_buf) 	set_gdid_from_stat(&(to), &stat_buf);
 #define F_READ_BLK_ALIGNED			LSEEKREAD
-#define F_WRITE_BLK_ALIGNED			LSEEKWRITE
 #endif

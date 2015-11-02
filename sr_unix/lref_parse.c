@@ -14,7 +14,7 @@
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "startup.h"
 #include "gtm_startup.h"
 

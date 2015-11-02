@@ -1002,7 +1002,9 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 			return FALSE;
 		}
 	}
-	if (!REPL_ALLOWED(jfh) && mur_options.rollback)
+	assert(!REPL_WAS_ENABLED(jfh));	/* a journal file can never be created if replication is in WAS_ON state */
+	assert(REPL_ALLOWED(jfh) == REPL_ENABLED(jfh));
+	if (!REPL_ENABLED(jfh) && mur_options.rollback)
 	{
 		gtm_putmsg(VARLSTCNT(4) ERR_REPLNOTON, 2, jctl->jnl_fn_len, jctl->jnl_fn);
 		return FALSE;

@@ -82,7 +82,7 @@ void op_gvorder (mval *v)
 			found = gvcmx_order();
 		else
 		 	found = gvusr_order();
-		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by
+		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by (BYPASSOK)
 				* this to-be-overwritten mval */
 		if (found)
 		{
@@ -185,12 +185,14 @@ void op_gvorder (mval *v)
 			{
 				assert(SIZEOF(map->name) == SIZEOF(mident_fixed));
 				gv_currkey->end = mid_len((mident_fixed *)map->name);
+				assert(gv_currkey->end <= MAX_MIDENT_LEN);
 				memcpy(&gv_currkey->base[0], map->name, gv_currkey->end);
 				gv_currkey->base[ gv_currkey->end - 1 ] -= 1;
 				gv_currkey->base[ gv_currkey->end ] = 0xFF;	/* back off 1 spot from map */
 				gv_currkey->base[ gv_currkey->end + 1] = 0;
 				gv_currkey->base[ gv_currkey->end + 2] = 0;
 				gv_currkey->end += 2;
+				assert(gv_currkey->top > gv_currkey->end);	/* ensure we are within allocated bounds */
 			}
 		}
 		/* Reset gv_currkey as we have potentially skipped one or more regions so we no
@@ -198,13 +200,13 @@ void op_gvorder (mval *v)
 		 */
 		gv_currkey->end = 0;
 		gv_currkey->base[0] = 0;
-		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by
+		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by (BYPASSOK)
 				* this to-be-overwritten mval */
 		if (found)
 		{
 			if (!IS_STP_SPACE_AVAILABLE(name.len + 1))
 			{
-				v->str.len = 0;	/* so stp_gcol ignores otherwise incompletely setup mval */
+				v->str.len = 0;	/* so stp_gcol ignores otherwise incompletely setup mval (BYPASSOK) */
 				INVOKE_STP_GCOL(name.len + 1);
 			}
 #ifdef mips

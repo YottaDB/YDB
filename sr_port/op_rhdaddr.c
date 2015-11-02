@@ -13,7 +13,7 @@
 
 #include "gtm_string.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "op.h"
 
 GBLREF mident_fixed	zlink_mname;

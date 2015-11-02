@@ -25,6 +25,15 @@ if ($?gtm_chset) then
 	endif
 endif
 
+# This script needs root privileges to
+# - test install GT.M
+# - set file ownership to 40535
+set euser = `$gtm_dist/geteuid`
+if ("$euser" != "root") then
+	echo "You must have root privileges to run kitstart"
+	exit -1
+endif
+
 if (-e /etc/csh.cshrc) then
 	# on lester (HPUX), /etc/csh.cshrc does not seem to be invoked at tcsh startup so invoke it explicitly
 	# this is what defines the "version" alias used down below.
@@ -44,52 +53,21 @@ setenv PATH "/usr/local/bin:/usr/sbin:/usr/ccs/bin:/usr/bin:/bin"
 
 # get the osname and arch type from the tables in server_list
 
-set servers      = `echo $distrib_servers_unix`
-set platformarch = `echo $distrib_unix_platformarch`
+set servers      = ( $distrib_servers_unix )
+set platformarch = ( $distrib_unix_platformarch )
 
-@ index = 0
-while ($index < $#servers)
-	@ index = $index + 1
-	if ("$servers[$index]" =~ *${HOST:r:r:r}*) then
+foreach server ( $servers )
+	@ index++
+	if ("$server" =~ *${HOST:r:r:r}*) then
+		set os_arch=$platformarch[$index]		# contortion alert! get the OS_ARCH value from the list
+		set os_arch="${os_arch:s/_/ /}"			# and spilt OS_ARCH into "OS ARCH" and
+		set os_arch=( ${os_arch:s/_/ /} )		# enclose it inside parenthesis to force conversion to an array
 		break
 	endif
 end
-set osname = `echo $platformarch[$index] | awk -F_ '{print $1}'`
-set arch = `echo $platformarch[$index] | awk -F_ '{print $2}'`
+set osname = $os_arch[1]
+set arch = $os_arch[2]
 
-# create a README.txt which has the current year in it
-setenv readme_txt ${gtm_com}/README.txt
-set year = `date | tail -c5`
-cat $cms_tools/license_README_txt | sed "s/#YEAR#/$year/" > $readme_txt
-
-# Set the open source flag and set lib_specific to the platform specific directories that needs to
-# be copied as a part of open source distribution (down the script)
-set open_source = 0
-set GNU_COPYING_license = ""
-set OPENSOURCE_build_README = ""
-if ("$osname" == "linux" && "$arch" == "i686") then
-	set open_source = 1
-	# set lib_specific to be the union of s_linux and s_linux64 so we get the linux sources for
-	# x86 and x86_64
-	set lib_specific = `echo $s_linux $s_linux64 | awk '{for(x=1;x<=NF;x++) array[$x]++ ; for (i in array) print i}'`
-	/bin/cp -pf $cms_tools/opensource_COPYING ${gtm_com}/COPYING
-	# create README with current year in it
-	cat $cms_tools/opensource_README | sed "s/#YEAR#/$year/" > ${gtm_com}/README
-	set GNU_COPYING_license = "${gtm_com}/COPYING"
-	set OPENSOURCE_build_README = "${gtm_com}/README"
-endif
-if ("linux" == "$osname" && "x8664" == "$arch") then
-	# sources already included in i686 above
-	/bin/cp -pf $cms_tools/opensource_COPYING ${gtm_com}/COPYING
-	set GNU_COPYING_license = "${gtm_com}/COPYING"
-endif
-if ("$osname" == "osf1" && "$arch" == "alpha") then
-	set open_source = 1
-	set lib_specific = "$s_dux"
-	/bin/cp -pf $cms_tools/opensource_COPYING ${gtm_com}/COPYING
-	set GNU_COPYING_license = "${gtm_com}/COPYING"
-	set OPENSOURCE_build_README = ""
-endif
 
 set package = "tar cf"
 set repackage = "tar rf"
@@ -121,7 +99,7 @@ endif
 
 if ($syntaxerr) then
 	echo ""
-	echo "Usage : `basename $0` [-ti] <ver> [pro | dbg]"
+	echo "Usage : $0 [-ti] <ver> [pro | dbg]"
 	echo ""
 	echo "<ver>       : Version with no punctuations; create distribution of this GT.M version (must be in $gtm_root)"
 	echo "-ti         : Test installation"
@@ -130,7 +108,7 @@ if ($syntaxerr) then
 	exit 1
 endif
 
-set version = `echo $1 | tr "[a-z]" "[A-Z]"`
+set version = "${1:au}"		# ':au' - 'a' means apply to the whole string and 'u' means uppercase everything
 
 set imagetype = "pro dbg"
 if ($2 != "") then
@@ -162,7 +140,43 @@ if (! $?logfile) then
 endif
 ########################################################################################
 
-version $version p
+version $version p  # Set the current version so that relative paths work
+cmsver $version	    # Set appropriate path to locate $version sources in CMS, the default is V990
+set releasever = `$gtm_dist/mumps -run %XCMD 'write $piece($zversion," ",2),!'`
+
+# create a README.txt which has the current year in it
+setenv readme_txt ${gtm_com}/README.txt
+set year = `date +%Y`
+sed "s/#YEAR#/$year/" $cms_tools/license_README_txt > $readme_txt
+chmod 444 $readme_txt
+
+# Set the open source flag and set lib_specific to the platform specific directories that needs to
+# be copied as a part of open source distribution (down the script)
+set open_source = 0
+set GNU_COPYING_license = ""
+set OPENSOURCE_build_README = ""
+if ("$osname" == "linux" && ( "$arch" == "i686" || "x8664" == "$arch" )) then
+	set open_source = 1
+	set lib_specific = ($s_linux)
+	if ("x8664" == "$arch" ) set lib_specific = ($s_linux64)
+
+	set GNU_COPYING_license = "${gtm_com}/COPYING"
+	/bin/cp -pf $cms_tools/opensource_COPYING $GNU_COPYING_license
+	chmod 444 $GNU_COPYING_license
+
+	# create README with current year in it
+	set OPENSOURCE_build_README = "${gtm_com}/README"
+	sed "s/#YEAR#/$year/" $cms_tools/opensource_README > $OPENSOURCE_build_README
+	chmod 444 $OPENSOURCE_build_README
+endif
+if ("$osname" == "osf1" && "$arch" == "alpha") then
+	set open_source = 1
+	set lib_specific = "$s_dux"
+
+	set GNU_COPYING_license = "${gtm_com}/COPYING"
+	/bin/cp -pf $cms_tools/opensource_COPYING $GNU_COPYING_license
+	chmod 444 $GNU_COPYING_license
+endif
 
 set product = "gtm"
 set dist = "$gtm_ver/dist"
@@ -212,6 +226,7 @@ OPENSOURCE_EOF
 and the build procedure documentation (file $OPENSOURCE_build_README:t)
 OPENSOURCE_EOF
 		endif
+		chmod a-xw ${dist}/README
 	endif
 endif
 foreach image ($imagetype)
@@ -238,6 +253,8 @@ foreach image ($imagetype)
 	endif
 	# add the README.txt file
 	cp $readme_txt README.txt || exit 9
+	# add the custom_errors_sample.txt file
+	cp $gtm_tools/custom_errors_sample.txt . || exit 9
 	if (-e gtmsecshrdir) then
 		$gtm_com/IGS gtmsecshr "UNHIDE"	# make root-owned gtmsecshrdir world-readable
 		chmod u+w gtmsecshrdir
@@ -337,6 +354,7 @@ foreach image ($imagetype)
 		echo ""
 		echo "Copying $GNU_COPYING_license to $cwd"
 		/bin/cp $GNU_COPYING_license . || exit 8
+		chown 40535:40535 COPYING
 		set dist_file="${opensource_dist}/${dist_prefix}_${image}.${package_ext}"
 		echo ""
 		echo "Creating $dist_file"
@@ -349,20 +367,16 @@ foreach image ($imagetype)
 end
 echo ""
 
-# sources for 32 and 64 bit linux done for linux i686 so don't do it for 64 bit linux
-if ("linux" == "$osname" && "x8664" == "$arch") then
-	set GNU_COPYING_license = ""
-endif
-
 # create src tar only for linux and tru64
 if ("$GNU_COPYING_license" != "") then
-	cmsver $version	# Set appropriate path to locate $version sources in CMS mirror
+	cd ${opensource_dist}
 	if ("$OPENSOURCE_build_README" != "") then
 		echo "Creating source distribution for Opensource including $GNU_COPYING_license:t and $OPENSOURCE_build_README:t"
 	else
 		echo "Creating source distribution for Opensource including $GNU_COPYING_license:t"
 	endif
 	echo ""
+	# tar only the directories in ${liblist}
 	set liblist = ""
 	foreach libdir ($lib_specific)
 		set liblist = "$liblist $libdir:t"
@@ -370,14 +384,54 @@ if ("$GNU_COPYING_license" != "") then
 	echo ""
 	set src_tar="${opensource_dist}/${dist_prefix}_src.${package_ext}"
 	echo "Creating $src_tar"
-	cd $cms_root/$version || exit 10
+
+	echo "Copy in the original sources from ${version}"
+	mkdir ${version}
+	cp -r $lib_specific ./${version}/
+
+	# comlist.mk builds fail on newer 32bit versions of RHEL6 and Ubuntu
+	# 12.04 due to a bad interaction between the deprecated -I- option and
+	# GCC. See mails with the subject:
+	# 	[GTM-6465] [cmake] #include "" vs #include <>
+	# Keep in sync with test/manually_start/u_inref/makebuild.csh
+	echo "Massage the source files so that we can build on i386 Linux and other platforms without -I-"
+	set hdrlist="emit_code_sp.h|rtnhdr.h|auto_zlink.h|make_mode_sp.h|auto_zlink_sp.h|emit_code.h|mdefsp.h|incr_link_sp.h|gtm_mtio.h|obj_filesp.h|zbreaksp.h|gtm_registers.h|opcode_def.h"  #BYPASSOK line length
+	set sedlist=${hdrlist:as/|/ /:as/ /\|/} # fixing for use with SED requires some contortions - replace | with space and then space with \|
+	grep -rlE "#include .(${hdrlist})." sr_* > changefiles.list
+	foreach file (`cat changefiles.list`)
+		set orig=${file:h}/.${file:t}
+		mv ${file} {$orig}
+		sed "s/#include .\(${sedlist}\)./#include <\1>/g" ${orig} > ${file}
+		diff -u ${orig} ${file}
+		rm ${orig}
+	end
+
+	echo "Copy in the generated files"
+	set srdir = sr_${arch:s/i686/i386/:s/x8664/x86_64/}
+	cp ${gtm_ver}/src/ttt.c ${gtm_ver}/src/*_ctl.c ${gtm_ver}/inc/merrors_ansi.h ./$version/$srdir/ || exit 10
+
+	echo "Packaging the source from $version"
+	cd $version || exit 10
+	# Linux uses CMakeLists.txt, tru64 uses comlist.mk
+	if ("linux" == "$osname") then
+		# this lets the build override $cms_ver/sr_unix/CMakeLists.txt
+		sed "s/GTM_RELEASE_VERSION/${releasever}/" ${gtm_ver}/tools/CMakeLists.txt > CMakeLists.txt || exit 10
+		set liblist = "$liblist CMakeLists.txt"
+	endif
+	find . -exec chown 40535:40535 {} \;
 	$package $src_tar $liblist || exit 10
+
+	cd ${opensource_dist}
+	rm -rf ./$version
+
+	echo "Package the license and readme files"
 	cd $gtm_com || exit 10
 	if ("$OPENSOURCE_build_README" != "") then
 		$repackage $src_tar $GNU_COPYING_license:t $OPENSOURCE_build_README:t || exit 10
 	else
 		$repackage $src_tar $GNU_COPYING_license:t $readme_txt:t || exit 10
 	endif
+
 	echo ""
 	echo "Gzipping $src_tar"
 	gzip $src_tar || exit 11
@@ -406,7 +460,7 @@ echo "Files in $dist"
 echo ""
 
 set leavedir = 0
-set kitver = `echo $gtm_ver:t | cut -c 2-6`
+set kitver = ${gtm_ver:t:s/V//}
 
 if ($testinstall) then
 	echo ""

@@ -19,12 +19,10 @@
 #include "gtm_times.h"
 #include <sys/resource.h>
 #endif
-#define OFFSET_LEN 			8
-#ifdef GTM64
-#define PROFCALLOC_DSBLKSIZE 		8192
-#else
-#define PROFCALLOC_DSBLKSIZE            8180
-#endif
+#define OFFSET_LEN		8	/* single-pointer padding at the beginning of pcalloc allocation; 8 is chosen to both fit a
+					 * pointer on 32- and 64-bit architectures and ensure proper memory alignment even when we
+					 * are dealing with 32-bit compiles on 64-bit machines */
+#define PROFCALLOC_DSBLKSIZE	8192	/* the size of pcalloc allocation chunks */
 
 #define POPULATE_PROFILING_TABLE() {				\
 	/* xfer_table[xf_linefetch] = op_mproflinefetch; */	\
@@ -68,9 +66,9 @@
 
 typedef struct ext_tms_struct
 {
-	int4	tms_utime;		/* user time */
-	int4	tms_stime;		/* system time */
-	int4	tms_etime;		/* elapsed time */
+	gtm_uint64_t	tms_utime;	/* user time */
+	gtm_uint64_t	tms_stime;	/* system time */
+	gtm_uint64_t	tms_etime;	/* elapsed time */
 } ext_tms;
 
 /* holds information identifying a line of/label in the code */
@@ -79,10 +77,10 @@ typedef struct
 	mident		*rout_name;	/* routine name */
 	mident  	*label_name;	/* label name */
 	signed int  	line_num;	/* line number; -1 used for generic label nodes, and -2 for overflow node */
-	unsigned int	count;		/* number of executions */
-	unsigned int	sys_time;	/* total system time  */
-	unsigned int	usr_time;	/* total user time */
-	unsigned int	elp_time;	/* total elapsed time */
+	unsigned 	count;		/* number of executions */
+	gtm_uint64_t	sys_time;	/* total system time  */
+	gtm_uint64_t	usr_time;	/* total user time */
+	gtm_uint64_t	elp_time;	/* total elapsed time */
 	int		loop_level;	/* nesting level; 0 for regular code and 1+ for (nested) loops */
 	char		*raddr;		/* return address used in FORs to record destination after current iteration */
 } trace_entry;

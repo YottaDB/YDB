@@ -48,8 +48,8 @@ boolean_t t_recycled2free(srch_blk_status *blkhist)
 	cse->blk = blkhist->blk_num;
 	cse->old_block = blkhist->buffaddr;
 	old_block = (blk_hdr_ptr_t)cse->old_block;
-	/* t_recycled2free operates on RECYCLED blocks and hence cse->was_free is set to FALSE unconditionally */
-	cse->was_free = FALSE;
+	/* t_recycled2free operates on RECYCLED blocks and hence cse->blk_prior_state's free_status is set to FALSE */
+	SET_NFREE(cse);
 	cse->cr = blkhist->cr;
 	cse->cycle = blkhist->cycle;
 	cse->blk_checksum = 0;

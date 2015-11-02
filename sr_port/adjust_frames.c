@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 
 GBLREF stack_frame	*frame_pointer;

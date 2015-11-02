@@ -218,7 +218,8 @@
 	assert(SIZEOF(unsigned short) == SIZEOF(((struct_jrec_tcom *)NULL)->num_participants));			\
 	assert((unsigned short)num_participants);								\
 	/* Below is a case of loss of precision but that's okay since we don't expect num_participants		\
-	 * to exceed the unsigned short limit */								\
+	 * to exceed the unsigned short limit
+	 */								\
 	*((unsigned short *)cb) = num_participants;								\
 	cb += SIZEOF(unsigned short);										\
 	/* Initialize jnl_tid from tmp_jnl_tid */								\
@@ -394,24 +395,29 @@ enum
 	NON_REPLIC_JREC_TRIG	/* This update was done inside of a trigger */
 };
 
+/* Although V6.0-000 bumped up the journal format version from V22 to V23, there are no changes between the
+ * two's journal format structures. The reason for increasing the journal version
+ */
 GBLDEF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
-	IF_22TO17,	/* Convert from jnl ver V22 to jnl ver V17 */
-	IF_22TO17,	/* Convert from jnl ver V22 to jnl ver V18 */
-	IF_22TO19,	/* Convert from jnl ver V22 to jnl ver V19 */
-	IF_22TO19,	/* Convert from jnl ver V22 to jnl ver V20 */
-	IF_22TO21,	/* Convert from jnl ver V22 to jnl ver V21 */
-	IF_22TO22	/* Convert from jnl ver V22 to jnl ver V22 */
+	IF_22TO17,	/* Convert from filter format V22 to V17 (i.e., from jnl ver V23 to V17) */
+	IF_22TO17,	/* Convert from filter format V22 to V17 (i.e., from jnl ver V23 to V18) */
+	IF_22TO19,	/* Convert from filter format V22 to V19 (i.e., from jnl ver V23 to V19) */
+	IF_22TO19,	/* Convert from filter format V22 to V19 (i.e., from jnl ver V23 to V20) */
+	IF_22TO21,	/* Convert from filter format V22 to V21 (i.e., from jnl ver V23 to V21) */
+	IF_22TO22,	/* Convert from filter format V22 to V22 (i.e., from jnl ver V23 to V22) */
+	IF_22TO22	/* Convert from filter format V22 to V22 (i.e., from jnl ver V23 to V23) */
 };
 
 GBLDEF	intlfltr_t repl_filter_old2cur[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
-	IF_17TO22,	/* Convert from jnl ver V17 to jnl ver V22 */
-	IF_17TO22,	/* Convert from jnl ver V18 to jnl ver V22 */
-	IF_19TO22,	/* Convert from jnl ver V19 to jnl ver V22 */
-	IF_19TO22,	/* Convert from jnl ver V20 to jnl ver V22 */
-	IF_21TO22,	/* Convert from jnl ver V21 to jnl ver V22 */
-	IF_22TO22	/* Convert from jnl ver V22 to jnl ver V22 */
+	IF_17TO22,	/* Convert from filter format V17 to V22 (i.e., from jnl ver V17 to V23) */
+	IF_17TO22,	/* Convert from filter format V17 to V22 (i.e., from jnl ver V18 to V23) */
+	IF_19TO22,	/* Convert from filter format V19 to V22 (i.e., from jnl ver V19 to V23) */
+	IF_19TO22,	/* Convert from filter format V19 to V22 (i.e., from jnl ver V20 to V23) */
+	IF_21TO22,	/* Convert from filter format V21 to V22 (i.e., from jnl ver V21 to V23) */
+	IF_22TO22,	/* Convert from filter format V22 to V22 (i.e., from jnl ver V22 to V23) */
+	IF_22TO22	/* Convert from filter format V22 to V22 (i.e., from jnl ver V23 to V23) */
 };
 
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
@@ -462,16 +468,16 @@ void jnl_extr_init(void)
 
 static void repl_filter_close_all_pipes(void)
 {
-	int	close_res;
+	int close_res;
 
 	if (FD_INVALID != repl_srv_filter_fd[READ_END])
-		F_CLOSE(repl_srv_filter_fd[READ_END], close_res);	/* resets "repl_srv_filter_fd[READ_END]" to FD_INVALID */
+	    F_CLOSE(repl_srv_filter_fd[READ_END], close_res);	/* resets "repl_srv_filter_fd[READ_END]" to FD_INVALID */
 	if (FD_INVALID != repl_srv_filter_fd[WRITE_END])
-		F_CLOSE(repl_srv_filter_fd[WRITE_END], close_res); /* resets "_CLOSE(repl_srv_filter_fd[WRITE_END]" to FD_INVALID */
+	    F_CLOSE(repl_srv_filter_fd[WRITE_END], close_res); 	/* resets "_CLOSE(repl_srv_filter_fd[WRITE_END]" to FD_INVALID */
 	if (FD_INVALID != repl_filter_srv_fd[READ_END])
-		F_CLOSE(repl_filter_srv_fd[READ_END], close_res);	/* resets "repl_filter_srv_fd[READ_END]" to FD_INVALID */
+	    F_CLOSE(repl_filter_srv_fd[READ_END], close_res);	/* resets "repl_filter_srv_fd[READ_END]" to FD_INVALID */
 	if (FD_INVALID != repl_filter_srv_fd[WRITE_END])
-		F_CLOSE(repl_filter_srv_fd[WRITE_END], close_res);	/* resets "repl_filter_srv_fd[WRITE_END]" to FD_INVALID */
+	    F_CLOSE(repl_filter_srv_fd[WRITE_END], close_res);	/* resets "repl_filter_srv_fd[WRITE_END]" to FD_INVALID */
 
 }
 
@@ -595,9 +601,9 @@ int repl_filter_init(char *filter_cmd)
 static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len, boolean_t first_send)
 {
 	/* Send the transaction tr_num in buffer tr of len tr_len to the filter */
-	ssize_t	extr_len, sent_len;
+	ssize_t		extr_len, sent_len;
 	static ssize_t	send_len;
-	char	first_rectype, *extr_end;
+	char		first_rectype, *extr_end;
 	static char	*send_ptr;
 
 	if (TRUE == first_send)
@@ -650,9 +656,9 @@ static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len, boole
 static int repl_filter_recv_line(char *line, int *line_len, int max_line_len, boolean_t send_done)
 { /* buffer input read from repl_filter_srv_fd[READ_END], return one line at a time; line separator is '\n' */
 
-	int	save_errno;
-	int status;
-	ssize_t l_len, r_len, buff_remaining ;
+	int		save_errno;
+	int		status;
+	ssize_t		l_len, r_len, buff_remaining ;
 	muextract_type	exttype;
 	fd_set		input_fds;
 #ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
@@ -660,7 +666,7 @@ static int repl_filter_recv_line(char *line, int *line_len, int max_line_len, bo
 	unsigned long	poll_nfds;
 	struct pollfd	poll_fdlist[1];
 #endif
-	struct timeval		repl_filter_poll_interval;
+	struct timeval	repl_filter_poll_interval;
 
 	for (; ;)
 	{
@@ -696,7 +702,8 @@ static int repl_filter_recv_line(char *line, int *line_len, int max_line_len, bo
 		if (0 < (buff_remaining = srv_buff_end - srv_read_end))
 		{
 			/* since it is possible that this read could happen twice in this loop (no newline found) then
-			 do a select/poll unless this is the first time and we know the previous select/poll is still valid. */
+			 * do a select/poll unless this is the first time and we know the previous select/poll is still valid.
+			 */
 			if (FALSE == select_valid)
 			{
 				while(1) /* select/poll until ok to read or timeout */
@@ -806,7 +813,6 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len, bool
 		}
 	}
 
-
 	/* if not NULL record */
 	if ((NEED_TCOMMIT == recv_state) || (!is_nontp && !is_null && ('0' != extr_rec[0] || '0' != extr_rec[1])))
 	{
@@ -820,6 +826,8 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len, bool
 					GTMASSERT; /* why didn't we pre-allocate enough memory? */
 				return status;
 			}
+			/* We don't want a null transaction inside a tp so get rid of it */
+			if ('0' == extr_rec[0] && '0' == extr_rec[1]) continue;
 			memcpy(recv_extract_buff + extr_len, extr_rec, extr_reclen);
 			extr_len += extr_reclen;
 			rec_cnt++;
@@ -830,10 +838,11 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len, bool
 		tcom_len = extr_reclen;
 		rec_cnt--;
 	}
-	/* if mini-transaction or fenced transaction not filtered out then convert it and
-	   check for correct journal sequence number */
-	/* if it is filtered out then take the else clause */
-	if (is_nontp && ('0' != extr_rec[0] || '0' != extr_rec[1])) rec_cnt = 1;
+	/* If mini-transaction or fenced transaction not filtered out, then convert it and check for correct journal seq number.
+	 * If it is filtered out, then take the else clause.
+	 */
+	if (is_nontp && (('0' != extr_rec[0]) || ('0' != extr_rec[1])))
+		rec_cnt = 1;
 	if (0 < rec_cnt)
 	{
 		extr_ptr = recv_extract_buff;
@@ -854,23 +863,23 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len, bool
 			}
 		}
 		extr_ptr[extr_len] = '\0'; /* terminate with null for ext2jnlcvt */
-		if ((NULL == (tr_end = ext2jnlcvt(extr_ptr, extr_len, (jnl_record *)tr))) || (save_jnl_seqno != GET_JNL_SEQNO(tr))
+		if ((NULL == (tr_end = ext2jnlcvt(extr_ptr, extr_len, (jnl_record *)tr, save_jnl_seqno, save_strm_seqno)))
+		    || (save_jnl_seqno != GET_JNL_SEQNO(tr))
 		    || (save_strm_seqno != GET_STRM_SEQNO(tr)))
 			return (repl_errno = EREPL_FILTERBADCONV);
 		*tr_len = (int4)(tr_end - (char *)&tr[0]);
 		/* TCOM record for non TP converted to TP must have the same seqno as the original non TP record */
 		if (TRUE == unwrap_nontp && 1 < rec_cnt)
-		{
-			/* tr_end points past the tcom record so need to back up the length of the tcom record */
+		{	/* tr_end points past the tcom record so need to back up the length of the tcom record */
 			tcom_ptr = tr_end - TCOM_RECLEN;
 			if (QWNE(save_jnl_seqno, ((struct_jrec_tcom *)tcom_ptr)->token_seq.jnl_seqno) ||
 				QWNE(save_strm_seqno, ((struct_jrec_tcom *)tcom_ptr)->strm_seqno))
 				return (repl_errno = EREPL_FILTERBADCONV);
 		}
 	} else /* 0 == rec_cnt */
-	{ /* Transaction filtered out, put a JRT_NULL record; the prefix.{pini_addr,time,tn} fields are not filled in as they are
-	   * not relevant on the secondary
-	   */
+	{	/* Transaction filtered out, put a JRT_NULL record; the prefix.{pini_addr,time,tn} fields are not filled in as they
+		 * are not relevant on the secondary
+		 */
 		QWASSIGN(null_jnlrec.jnl_seqno, save_jnl_seqno);
 		QWASSIGN(null_jnlrec.strm_seqno, save_strm_seqno);
 		memcpy(tr, (char *)&null_jnlrec, NULL_RECLEN);
@@ -885,12 +894,12 @@ static int repl_filter_recv(seq_num tr_num, unsigned char *tr, int *tr_len, bool
 
 int repl_filter(seq_num tr_num, unsigned char *tr, int *tr_len, int bufsize)
 {
-	int status;
-	boolean_t try_send = TRUE;
-	boolean_t try_recv = TRUE;
-	boolean_t send_done = FALSE;
-	boolean_t recv_done = FALSE;
-	boolean_t first_send = TRUE;
+	int		status;
+	boolean_t	try_send = TRUE;
+	boolean_t	try_recv = TRUE;
+	boolean_t	send_done = FALSE;
+	boolean_t	recv_done = FALSE;
+	boolean_t	first_send = TRUE;
 	fd_set		output_fds;
 	fd_set		input_fds;
 #ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
@@ -898,11 +907,11 @@ int repl_filter(seq_num tr_num, unsigned char *tr, int *tr_len, int bufsize)
 	unsigned long	poll_nfds;
 	struct pollfd	poll_fdlist[1];
 #endif
-	struct timeval		repl_filter_poll_interval;
+	struct timeval	repl_filter_poll_interval;
 	/*  */
 
 	recv_state = FIRST_RECV;
-	while (FALSE == send_done  || FALSE == recv_done)
+	while ((FALSE == send_done) || (FALSE == recv_done))
 	{
 		if ((FALSE == send_done) && (TRUE == try_send))
 		{
@@ -945,7 +954,6 @@ int repl_filter(seq_num tr_num, unsigned char *tr, int *tr_len, int bufsize)
 			}
 			status = repl_filter_send(tr_num, tr, *tr_len, first_send);
 			first_send = FALSE;
-			/* MORE_TO_TRANSFER means more to transfer */
 			if (MORE_TO_TRANSFER == status)
 			{
 				try_recv = TRUE;
@@ -955,15 +963,13 @@ int repl_filter(seq_num tr_num, unsigned char *tr, int *tr_len, int bufsize)
 			if (SS_NORMAL != status)
 				return (status);
 			else
-			{
-				/* send completed successfully */
+			{	/* send completed successfully */
 				send_done = TRUE;
 				try_recv = TRUE;
 			}
 		}
 		if ((FALSE == recv_done) && (TRUE == try_recv))
-		{
-			/* if send is not done then do a select first */
+		{	/* if send is not done then do a select first */
 			if (FALSE == send_done)
 			{
 				repl_filter_poll_interval.tv_sec = 0;
@@ -979,7 +985,7 @@ int repl_filter(seq_num tr_num, unsigned char *tr, int *tr_len, int bufsize)
 #endif
 #ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 				status = select(repl_filter_srv_fd[READ_END] + 1, &input_fds, NULL, NULL,
-						&repl_filter_poll_interval);
+					&repl_filter_poll_interval);
 #else
 				status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 #endif
@@ -1002,7 +1008,6 @@ int repl_filter(seq_num tr_num, unsigned char *tr, int *tr_len, int bufsize)
 			}
 
 			status = repl_filter_recv(tr_num, tr, tr_len, send_done);
-			/* MORE_TO_TRANSFER means more to transfer */
 			if (MORE_TO_TRANSFER == status)
 			{
 				if (FALSE == send_done)
@@ -1077,7 +1082,7 @@ void repl_check_jnlver_compat(UNIX_ONLY(boolean_t same_endianness))
 	assert(JNL_VER_EARLIEST_REPL <= REMOTE_JNL_VER);
 	if (JNL_VER_EARLIEST_REPL > REMOTE_JNL_VER)
 		rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
-				LEN_AND_LIT("Dual/Multi site replication not supported between these two GT.M versions"));
+			LEN_AND_LIT("Dual/Multi site replication not supported between these two GT.M versions"));
 #	ifdef UNIX
 	else if ((V18_JNL_VER > REMOTE_JNL_VER) && !same_endianness)
 	{	/* cross-endian replication is supported only from V5.3-003 onwards. Issue error and shutdown. */
@@ -1093,7 +1098,7 @@ void repl_check_jnlver_compat(UNIX_ONLY(boolean_t same_endianness))
 }
 
 static void upgrd_V19_hasht_xecute_string_to_V22(uchar_ptr_t jb, uchar_ptr_t cb, jnl_string *keystr, char *xecute_val_ptr,
-					uint4 *conv_reclen)
+		uint4 *conv_reclen)
 {	/* Upgrade the ^#t("GBL",1,"XECUTE") node's value to the xecute string format supported in V5.4-002 (and later).
 	 * Before V5.4-002, the xecute string is stored as-is in the database. But, from V5.4-002, the xecute string is
 	 * stored differently based on whether it is a single-line trigger xecute string or a multi-line trigger xecute
@@ -1125,8 +1130,7 @@ static void upgrd_V19_hasht_xecute_string_to_V22(uchar_ptr_t jb, uchar_ptr_t cb,
 	/* add <SPACE> and copy the xecute string */
 	xecute_val_ptr += SIZEOF(mstr_len_t);		/* move to the beginning of the 'value' */
 	srcptr = jb + ((uchar_ptr_t)xecute_val_ptr - cb - 8);	/* pointer to the xecute string from the source buffer.
-								 * -8 needed because "strm_seqno" is absent in source.
-								 */
+								 * -8 needed because "strm_seqno" is absent in source. */
 	*xecute_val_ptr++ = ' ';			/* add the much needed <SPACE> */
 	memcpy(xecute_val_ptr, srcptr, valstrlen);	/* copy the actual xecute string */
 	xecute_val_ptr += valstrlen;
@@ -1190,7 +1194,7 @@ static void upgrd_V19_hasht_xecute_string_to_V22(uchar_ptr_t jb, uchar_ptr_t cb,
  * that JRT_ZTRIG records are allowed here. JRT_ZTRIG is very similar to a JRT_KILL record
  * in that it has a "struct_jrec_upd" layout and only the key/node (no value).
  *
- * V22 format
+ * V22/V23 format
  * -----------
  *  struct_jrec_upd layout is as follows.
  *	offset = 0000 [0x0000]      size = 0024 [0x0018]    ----> prefix
@@ -1216,7 +1220,7 @@ static void upgrd_V19_hasht_xecute_string_to_V22(uchar_ptr_t jb, uchar_ptr_t cb,
  *	offset = 0044 [0x002c]      size = 0004 [0x0004]    ----> suffix
  */
 
-/* Convert a transaction from jnl version 17 or 18 (V5.0-000 through V5.3-004A) to 22 (V5.5-000 onwards)
+/* Convert a transaction from jnl version 17 or 18 (V5.0-000 through V5.3-004A) to 22/23 (V5.5-000 onwards)
  * Differences between the two versions:
  * ------------------------------------
  * (a) struct_jrec_upd in V22 is 16 bytes more than V17 (8 byte strm_seqno, 4 byte update_num and 2 byte num_participants field).
@@ -1319,7 +1323,7 @@ int jnl_v17TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	return(status);
 }
 
-/* Convert a transaction from jnl version 22 (V5.5-000 onwards) to 17 or 18 (V5.0-000 through V5.3-004A)
+/* Convert a transaction from jnl version 22/23 (V5.5-000 onwards) to 17 or 18 (V5.0-000 through V5.3-004A)
  * For differences between the two versions, see the comment in jnl_v17TOv22. In addition, take care of the following.
  * (a) Since the remote side (V17) does NOT support triggers, skip ^#t, ZTWORM and ZTRIG journal records & reset nodeflags (if set).
  *	If the entire transaction consists of skipped records, send a NULL record instead.
@@ -1404,8 +1408,7 @@ int jnl_v22TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 				if (IS_TUPD(rectype))
 					tupd_num++;
 				else if (IS_UUPD(rectype) && promote_uupd_to_tupd)
-				{
-					/* The previous TUPD record was not replicated since it was a TZTWORM/TZTRIG record and
+				{	/* The previous TUPD record was not replicated since it was a TZTWORM/TZTRIG record and
 					 * hence promote this UUPD to TUPD. Since the update process on the secondary will not care
 					 * about the num_participants field in the TUPD records (it cares about the num_participants
 					 * field only in the TCOM record), it is okay not to initialize the num_participants field
@@ -1488,7 +1491,7 @@ int jnl_v22TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	return(status);
 }
 
-/* Convert a transaction from jnl version 19 or 20 (V5.4-000 through V5.4-001) to 22 (V5.5-000 onwards)
+/* Convert a transaction from jnl version 19 or 20 (V5.4-000 through V5.4-001) to 22/23 (V5.5-000 onwards)
  * Differences between the two versions:
  * ------------------------------------
  * (a) struct_jrec_upd, struct_jrec_tcom and struct_jrec_null in V22 is 8 bytes more than V19 (8 byte strm_seqno).
@@ -1695,7 +1698,7 @@ int jnl_v19TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	return(status);
 }
 
-/* Convert a transaction from jnl version 22 (V5.5-000 onwards) to 19 or 20 (V5.4-000 through V5.4-001)
+/* Convert a transaction from jnl version 22/23 (V5.5-000 onwards) to 19 or 20 (V5.4-000 through V5.4-001)
  * For differences between the two versions, see the comment in jnl_v19TOv22. In addition, take care of the following.
  * a) Skip ZTRIG records unconditionally as V19 (trigger enabled or not does not matter) does not support them.
  * b) If the remote side does NOT support triggers, then skip ^#t or ZTWORM journal records.
@@ -1919,7 +1922,7 @@ int jnl_v22TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	return status;
 }
 
-/* Convert a transaction from jnl version 21 (V5.4-002 through V5.4-002B) to 22 (V5.5-000 onwards)
+/* Convert a transaction from jnl version 21 (V5.4-002 through V5.4-002B) to 22/23 (V5.5-000 onwards)
  * Differences between the two versions:
  * ------------------------------------
  * (a) struct_jrec_upd, struct_jrec_tcom and struct_jrec_null in V22 is 8 bytes more than V21 due to 8 byte strm_seqno.
@@ -2102,7 +2105,7 @@ int jnl_v21TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	return(status);
 }
 
-/* Convert a transaction from jnl version 22 (V5.5-000 onwards) to 21 (V5.4-002 through V5.4-002B)
+/* Convert a transaction from jnl version 22/23 (V5.5-000 onwards) to 21 (V5.4-002 through V5.4-002B)
  * For differences between the two versions, see the comment in jnl_v19TOv22. In addition, take care of the following.
  * (a) If the remote side does NOT support triggers, then skip ^#t or ZTWORM or ZTRIG journal records.
  *	If the entire transaction consists of skipped records, send a NULL record instead.
@@ -2266,7 +2269,8 @@ int jnl_v22TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			status = -1;
 		} else
 		{	/* Create NULL record. Since the null record format is same for V17 and V21, it is safe to use the
-			 * below macro. Note: Side-effect: cb is incremented by below macro */
+			 * below macro. Note: Side-effect: cb is incremented by below macro
+			 */
 			INITIALIZE_V17_NULL_RECORD(prefix, cb, this_upd_seqno);
 		}
 	}
@@ -2275,7 +2279,7 @@ int jnl_v22TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	return status;
 }
 
-/* Convert a transaction from jnl version 22 (V5.5-000 onwards) to 22 (V5.5-000 onwards)
+/* Convert a transaction from jnl version 22/23 (V5.5-000 onwards) to 22/23 (V5.5-000 onwards)
  * Same version filters are needed if one of the below is true.
  * (a) If null-subscript collation is different between the primary and the secondary
  * (b) If the remote side does NOT support triggers, then skip ^#t or ZTWORM or ZTRIG journal records & reset nodeflags (if set).
@@ -2290,7 +2294,7 @@ int jnl_v22TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	jrec_prefix 		*prefix;
 	seq_num			this_upd_seqno, this_strm_seqno;
 	uint4 			trigupd_type = NO_TRIG_JREC;
-	boolean_t		promote_uupd_to_tupd, receiver_supports_triggers;
+	boolean_t		promote_uupd_to_tupd, remote_supports_triggers;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -2300,11 +2304,15 @@ int jnl_v22TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	jlen = *jnl_len;
 	this_upd_seqno = seq_num_zero;
 	promote_uupd_to_tupd = FALSE;
-	assert(is_src_server);
+	/* The following assert ensures that filtering is initiated by the responsible party and in the expected direction, for the
+	 * same function can be used for both V23->V22 and V23->V23 replication. In the case of V23->V22 it can be either the source
+	 * or the receiver doing the filtering, so assert accordingly.
+	 */
+	assert(is_src_server || (LOCAL_JNL_VER > REMOTE_JNL_VER));
 	/* Since this filter function will be invoked only on the source side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the REMOTE side supports triggers.
 	 */
-	receiver_supports_triggers = REMOTE_TRIGGER_SUPPORT;
+	remote_supports_triggers = REMOTE_TRIGGER_SUPPORT;
 	while (JREC_PREFIX_SIZE <= jlen)
 	{
 		assert(0 == ((UINTPTR_T)jb % SIZEOF(uint4)));
@@ -2321,10 +2329,10 @@ int jnl_v22TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			this_strm_seqno = GET_STRM_SEQNO(jb);
 		}
 		assert(IS_REPLICATED(rectype));
-		assert(JRT_MAX_V22 >= rectype);
+		assert(JRT_MAX_V23 >= rectype);
 		if (IS_TUPD(rectype))
 			promote_uupd_to_tupd = FALSE;
-		if (!receiver_supports_triggers && (IS_ZTRIG(rectype) || IS_ZTWORM(rectype)))
+		if (!remote_supports_triggers && (IS_ZTRIG(rectype) || IS_ZTWORM(rectype)))
 		{	/* $ZTWORMHOLE jnl record cannot be handled by secondary which does not support triggers so skip converting.
 			 * If this is a TUPD rectype (actually JRT_TZTWORM/JRT_TZTRIG) then the next UUPD has to be promoted to a
 			 * TUPD type to account for the balance in TUPD and TCOM records
@@ -2343,7 +2351,7 @@ int jnl_v22TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			{
 				assert((jb == jstart) && (cb == cstart));
 				GET_JREC_UPD_TYPE((jb + FIXED_UPD_RECLEN), trigupd_type);
-				if (receiver_supports_triggers)
+				if (remote_supports_triggers)
 				{
 					if (NON_REPLIC_JREC_TRIG == trigupd_type)
 					{
@@ -2370,7 +2378,7 @@ int jnl_v22TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 				}
 				memcpy(cb, jb, conv_reclen);
 				mumps_node_ptr = cb + FIXED_UPD_RECLEN;
-				if (!receiver_supports_triggers)
+				if (!remote_supports_triggers)
 					((jnl_string *)mumps_node_ptr)->nodeflags = 0;
 				NULLSUBSC_TRANSFORM_IF_NEEDED(mumps_node_ptr + SIZEOF(jnl_str_len_t));
 				if (IS_TUPD(rectype))
@@ -2411,7 +2419,7 @@ int jnl_v22TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	{	/* No conversion happened. Currently this is possible ONLY if the remote side does not support triggers and
 		 * all the records are trigger related records (^#t or ZTRIG or ZTWORM). Need to send NULL record instead.
 		 */
-		assert(!receiver_supports_triggers);
+		assert(!remote_supports_triggers);
 		GTMTRIG_ONLY(
 			if (!(TREF(replgbl)).trig_replic_suspect_seqno)
 				(TREF(replgbl)).trig_replic_suspect_seqno = this_upd_seqno;

@@ -180,7 +180,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 			if (GDSVCURR != tmp_ondskblkver)
 				PRINTF("DSK_READ: Block %d being dynamically upgraded on read\n", blk);
 		)
-		assert((GDSV5 == tmp_ondskblkver) || (NULL != save_buff));	/* never read a V4 block directly into cache */
+		assert((GDSV6 == tmp_ondskblkver) || (NULL != save_buff));	/* never read a V4 block directly into cache */
 		if (NULL != ondsk_blkver)
 			*ondsk_blkver = tmp_ondskblkver;
 		/* a bitmap block should never be short of space for a dynamic upgrade. assert that. */

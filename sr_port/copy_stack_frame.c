@@ -13,7 +13,7 @@
 
 #include "gtm_stdio.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mprof.h"
 #include "error.h"

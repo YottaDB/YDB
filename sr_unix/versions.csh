@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -20,7 +20,7 @@
 
 #	gtm_curpro is the current production version
 if (`uname -s` != "OS/390") then
-	setenv	gtm_curpro	"V54001"
+	setenv	gtm_curpro	"V55000"
 else
 	setenv	gtm_curpro	"V53004A"	# until newer version built on z/OS
 endif

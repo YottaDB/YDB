@@ -130,7 +130,7 @@
 #else
 #  define SALVAGE_UNIX_LATCH_DBCRIT(X, is_exiting, wcblocked)								\
 {	/* "wcblocked" is relevant only if X is the database crit semaphore. In this case, BEFORE salvaging crit,	\
-	 * (but AFTER ensuring the previous holder pid is dead) we need to set csa->hdr->wc_blocked to TRUE to		\
+	 * (but AFTER ensuring the previous holder pid is dead) we need to set cnl->wc_blocked to TRUE to		\
 	 * ensure whoever grabs crit next does a cache-recovery. This is necessary in case previous holder of crit	\
 	 * had set some cr->in_cw_set to a non-zero value. Not doing cache recovery could cause incorrect GTMASSERTs	\
 	 * in PIN_CACHE_RECORD macro in t_end/tp_tend.									\
@@ -153,8 +153,8 @@
 }
 
 /* The SALVAGE_UNIX_LATCH macro needs to do exactly the same thing as done by the SALVAGE_UNIX_LATCH_DBCRIT	\
- * macro except that we dont need any special set of wcblocked to TRUE. So we pass in a dummy variable		\
- * (instead of csa->hdr->wc_blocked) to be set to TRUE in case the latch is salvaged.				\
+ * macro except that we dont need any special set of wc_blocked to TRUE. So we pass in a dummy variable		\
+ * (instead of cnl->wc_blocked) to be set to TRUE in case the latch is salvaged.				\
  */														\
 #define	SALVAGE_UNIX_LATCH(X, is_exiting)									\
 {														\
@@ -224,7 +224,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	boolean_t		tp_update_underway = FALSE;	/* set to TRUE if TP commit was in progress or complete */
 	boolean_t		non_tp_update_underway = FALSE;	/* set to TRUE if non-TP commit was in progress or complete */
 	boolean_t		update_underway = FALSE;	/* set to TRUE if either TP or non-TP commit was underway */
-	boolean_t		set_wc_blocked = FALSE;		/* set to TRUE if csd->wc_blocked needs to be set */
+	boolean_t		set_wc_blocked = FALSE;		/* set to TRUE if cnl->wc_blocked needs to be set */
 	boolean_t		dont_reset_data_invalid;	/* set to TRUE in case cr->data_invalid was TRUE in phase2 */
 	int			max_bts;
 	unsigned int		lcnt;
@@ -259,7 +259,11 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 		snapshot_context_ptr_t	lcl_ss_ctx;
 		cache_rec_ptr_t		snapshot_cr;
 	)
+#	ifdef UNIX
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#	endif
 	if (NULL == get_next_gdr_addrs)
 		return;
 	/*
@@ -290,7 +294,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	 * 	the logic for determining whether it is a ROLL-BACK or a ROLL-FORWARD needs to also be in secshr_db_clnup.
 	 * If it is determined that a ROLL-FORWARD needs to be done, secshr_db_clnup takes care of it by itself.
 	 * But if a ROLL-BACK needs to be done, then secshr_db_clnup DOES NOT invoke t_commit_cleanup.
-	 * Instead it sets csd->wc_blocked to TRUE thereby ensuring the next process that gets CRIT does a cache recovery
+	 * Instead it sets cnl->wc_blocked to TRUE thereby ensuring the next process that gets CRIT does a cache recovery
 	 * 	which will take care of doing more than the ROLL-BACK that t_commit_cleanup would have otherwise done.
 	 *
 	 * The logic for determining if it is a ROLL-BACK or ROLL-FORWARD is explained below.
@@ -1029,8 +1033,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						 * rely on precomputed value csa->backup_in_prog since it is not initialized
 						 * if (cw_depth == 0) (see t_end.c). Hence using cnl->nbb explicitly in check.
 						 * However, for snapshots we can rely on csa as it is computed under
-						 * if (update_trans). Use cs->was_free to ensure that FREE blocks are not
-						 * back'ed up either by secshr_db_clnup or wcs_recover.
+						 * if (update_trans). Use cs->blk_prior_state's free status to ensure that FREE
+						 * blocks are not back'ed up either by secshr_db_clnup or wcs_recover.
 						 */
 						if ((SNAPSHOTS_IN_PROG(csa) || (BACKUP_NOT_IN_PROGRESS != cnl->nbb))
 							&& (NULL != cs->old_block))
@@ -1067,7 +1071,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 #								endif
 								/* wcs_recover need not copy before images of FREE blocks
 								 * to the backup buffer */
-								if (!cs->was_free)
+								if (!WAS_FREE(cs))
 									cr->twin = GDS_ANY_ABS2REL(csa, cs->old_block);
 							} else
 							{	/* We have to finish phase2 update.
@@ -1083,7 +1087,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								blk_hdr_ptr = (blk_hdr_ptr_t)cs->old_block;
 								assert(GDS_ANY_REL2ABS(csa, cr->buffaddr)
 										== (sm_uc_ptr_t)blk_hdr_ptr);
-								if (!cs->was_free && (cr->blk >= cnl->nbb)
+								if (!WAS_FREE(cs) && (cr->blk >= cnl->nbb)
 									&& (0 == csa->shmpool_buffer->failed)
 									&& (blk_hdr_ptr->tn < csa->shmpool_buffer->backup_tn)
 									&& (blk_hdr_ptr->tn >= csa->shmpool_buffer->inc_backup_tn))
@@ -1172,7 +1176,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						blk_ptr = (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr);
 					} else
 					{	/* access method is MM */
-						blk_ptr = (sm_uc_ptr_t)csa->acc_meth.mm.base_addr + csd->blk_size * cs->blk;
+						blk_ptr = (sm_uc_ptr_t)csa->acc_meth.mm.base_addr + (off_t)csd->blk_size * cs->blk;
 						if (!GTM_PROBE(csd->blk_size, blk_ptr, WRITE))
 						{
 							SECSHR_ACCOUNTING(7);
@@ -1579,6 +1583,10 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						CAREFUL_INCR_KIP(csd, csa, *kip_csa_addrs);
 						*need_kip_incr_addrs = FALSE;
 					}
+#					ifdef UNIX
+					if (TREF(in_mu_swap_root))
+						cnl->root_search_cycle++;
+#					endif
 				}
 			}	/* if (NULL != first_cw_set) */
 			/* If the process is about to exit AND any kills are in progress (bitmap freeup phase of kill), mark
@@ -1614,6 +1622,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					 */
 					if (kip_csa_usable && (NULL != si->kill_set_head) && (NULL != si->kip_csa))
 					{
+						assert(csa == si->kip_csa);
 						CAREFUL_DECR_KIP(csd, csa, si->kip_csa);
 						CAREFUL_INCR_ABANDONED_KILLS(csd, csa);
 					} else
@@ -1624,8 +1633,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						(GTM_PROBE(SIZEOF(*kip_csa_addrs), kip_csa_addrs, WRITE))
 						? TRUE : FALSE;
 					assert(kip_csa_usable);
-					if (kip_csa_usable && (NULL != *kip_csa_addrs))
+					if (kip_csa_usable && (NULL != *kip_csa_addrs) && (csa == *kip_csa_addrs))
 					{
+						assert(0 < (*kip_csa_addrs)->hdr->kill_in_prog);
 						CAREFUL_DECR_KIP(csd, csa, *kip_csa_addrs);
 						CAREFUL_INCR_ABANDONED_KILLS(csd, csa);
 					}
@@ -1696,7 +1706,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				 * 	so set wc_blocked. This case is folded into phase2 cleanup case below.
 				 * if set_wc_blocked is TRUE, need to clean up queues after phase2 commits.
 				 */
-				SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+				SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 				if (csa->now_crit)
 				{
 					wcblocked_ptr = WCBLOCKED_NOW_CRIT_LIT;
@@ -1820,7 +1830,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			{
 				/* as long as csa->hold_onto_crit is FALSE, we should have released crit if we held it at entry */
 				assert(!csa->now_crit || csa->hold_onto_crit);
-				SALVAGE_UNIX_LATCH_DBCRIT(&csa->critical->semaphore, is_exiting, csa->hdr->wc_blocked);
+				SALVAGE_UNIX_LATCH_DBCRIT(&csa->critical->semaphore, is_exiting, cnl->wc_blocked);
 				SALVAGE_UNIX_LATCH(&csa->critical->crashcnt_latch, is_exiting);
 				SALVAGE_UNIX_LATCH(&csa->critical->prochead.latch, is_exiting);
 				SALVAGE_UNIX_LATCH(&csa->critical->freehead.latch, is_exiting);
@@ -1835,8 +1845,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			SECSHR_PROBE_REGION(reg);	/* SECSHR_PROBE_REGION sets csa */
 			if (csa->now_crit)
 			{
-				assert(NORMAL_TERMINATION != secshr_state); /* for normal termination we should not
-									     * have been holding the journal pool crit lock */
+				/* for normal termination we should not have been holding the journal pool crit lock */
+				assert((NORMAL_TERMINATION) != secshr_state || ((gtm_white_box_test_case_enabled
+				       && (WBTEST_ANTIFREEZE_DSKNOSPCAVAIL == gtm_white_box_test_case_number))));
 				jpl = (jnlpool_ctl_ptr_t)((sm_uc_ptr_t)csa->critical - JNLPOOL_CTL_SIZE); /* see jnlpool_init() for
 													   * relationship between
 													   * critical and jpl */
@@ -1878,6 +1889,16 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							 * commit flow */
 						}
 					}
+#ifdef DEBUG
+					else if (jpl->early_write_addr > jpl->write_addr)
+					{   /* PRO code will do the right thing by overwriting that exact space in the jnlpool with
+					     * the current transaction's journal records. For dbg though, it is better if
+					     * secshr_db_clnup (which is invoked as part of exit handling) does the cleanup.
+					     */
+						assert(!update_underway);
+						jpl->early_write_addr = jpl->write_addr;
+					}
+#endif
 				}
 				cnl = csa->nl;
 				if ((GTM_PROBE(NODE_LOCAL_SIZE_DBS, cnl, WRITE)) &&

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,10 @@
 
 #include "mdef.h"
 
-#include "gtm_ipc.h"
-#include <sys/sem.h>
 #include <errno.h>
+#include <sys/sem.h>
+#include "gtm_stdlib.h"
+#include "gtm_ipc.h"
 #include "gtm_fcntl.h"
 
 #include "do_semop.h"

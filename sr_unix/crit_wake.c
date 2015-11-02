@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include <errno.h>
 #include <signal.h>
+#include "gtm_limits.h"
+
 #include "io.h"
 #include "gtmsecshr.h"
 #include "secshr_client.h"
@@ -31,8 +34,18 @@ int crit_wake (sm_uint_ptr_t pid)
 		return(ESRCH);
 	} else
 		assert(EINVAL != errno);
+#	ifdef NOT_CURRENTLY_USED
+	/* The code segment below basically disabled M LOCK wakeup via gtmsecshr (via send_mesg2gtmsecshr() call below). The
+	 * requisite gtmsecshr support is temporarily also being #ifdef'd out until the M LOCK wakeup mechanism used to wakeup
+	 * processes with different userids can be run outside of crit. At that point, this code will be re-enabled without
+	 * the crit-check below once again allowing improved wakeup times for differing userids without waiting for a 100ms
+	 * poll timer to expire.
+	 */
 	/* if you are in crit don't send, the other process's timer will wake it up any way */
 	if (0 != have_crit(CRIT_HAVE_ANY_REG))
 		return 0;
 	return send_mesg2gtmsecshr(WAKE_MESSAGE, *pid, (char *)NULL, 0);
+#	else
+	return 0;
+#	endif
 }

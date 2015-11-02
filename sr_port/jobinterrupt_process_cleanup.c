@@ -12,7 +12,7 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "objlabel.h"

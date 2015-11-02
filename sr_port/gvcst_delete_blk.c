@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -172,7 +172,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 		ks = kill_set_tail
 		   = ks->next_kill_set;
 	}
-	ks->blk[ks->used].level = level;
+	ks->blk[ks->used].level = (level) ? 1 : 0;
 	if (!dollar_tlevel || !chain.flag)
 	{
 		assert((CDB_STAGNATE > t_tries) || (blk < cs_addrs->ti->total_blks));

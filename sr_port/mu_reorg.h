@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,8 +97,8 @@
 #define INVALID_RECORD(LEVEL, REC_SIZE, KEYLEN, KEYCMPC) 		\
 	(( ((0 == (LEVEL)) && (2 >= (KEYLEN)) )	||			\
 	(BSTAR_REC_SIZE > ((REC_SIZE) + (0 == (LEVEL) ? 1 : 0)) ) || 	\
-	(gv_cur_region->max_key_size < ((int)(KEYLEN) + (KEYCMPC))) || 	\
-	(gv_cur_region->max_rec_size < (REC_SIZE) ) ) ? TRUE:FALSE )
+	(gv_cur_region->max_key_size + 4 < ((int)(KEYLEN) + (KEYCMPC))) )	\
+		? TRUE:FALSE )
 
 /*************************************************************************
 	Process a record and read.
@@ -114,9 +114,11 @@
  *************************************************************************/
 #define READ_RECORD(LEVEL, REC_BASE, KEY_CMPC, REC_SIZE, KEY, KEY_LEN, STATUS)			\
 {												\
+	int tmp_cmpc;										\
+												\
 	GET_USHORT(temp_ushort, &(((rec_hdr_ptr_t)(REC_BASE))->rsiz));				\
 	REC_SIZE = temp_ushort;									\
-	KEY_CMPC = ((rec_hdr_ptr_t)(REC_BASE))->cmpc;						\
+	KEY_CMPC = EVAL_CMPC((rec_hdr_ptr_t)(REC_BASE));						\
 	if (0 != (LEVEL) && BSTAR_REC_SIZE == (REC_SIZE))					\
 	{											\
 		KEY_LEN = 0;									\
@@ -125,16 +127,15 @@
 	else											\
 	{											\
 		for (rPtr1 = (KEY) + KEY_CMPC, rPtr2 = (REC_BASE) + SIZEOF(rec_hdr);		\
-			gv_cur_region->max_key_size - 1 > (rPtr2 - (REC_BASE) - SIZEOF(rec_hdr)) && \
-			gv_cur_region->max_key_size - 1 > (rPtr1 - (KEY)) ;)	\
+			gv_cur_region->max_key_size + 3 > (rPtr2 - (REC_BASE) - SIZEOF(rec_hdr)) && \
+			gv_cur_region->max_key_size + 3 > (rPtr1 - (KEY)) ;)	\
 		{										\
 			if ((0 == (*rPtr1++ = *rPtr2++)) && (0 == *rPtr2))			\
 				break;								\
 		}										\
 		*rPtr1++ = *rPtr2++;								\
 		KEY_LEN = (int)(rPtr2 - (REC_BASE) - SIZEOF(rec_hdr));					\
-		if ((gv_cur_region->max_rec_size < (REC_SIZE)) 		||			\
-			(gv_cur_region->max_key_size < ((int)(KEY_LEN)+ (KEY_CMPC))) ||		\
+		if ((gv_cur_region->max_key_size + 4 < ((int)(KEY_LEN)+ (KEY_CMPC))) ||		\
 			(BSTAR_REC_SIZE > ((REC_SIZE) + ((0 == (LEVEL)) ? 1 : 0))) ||		\
 			(2 >= (KEY_LEN)) || (0 != *(rPtr1 - 1) || 0 != *(rPtr1 - 2)))		\
 			STATUS = cdb_sc_blkmod;							\

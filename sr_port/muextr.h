@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,19 +60,31 @@ typedef muext_hash_hdr	*muext_hash_hdr_ptr_t;
 #ifdef UNIX
 #define V4_BIN_HEADER_VERSION	"4"
 #define V4_BIN_HEADER_LABEL	"GDS BINARY EXTRACT LEVEL "V4_BIN_HEADER_VERSION
-#define BIN_HEADER_VERSION  	"5"
+#define V5_BIN_HEADER_VERSION  	"5"
+#define V5_BIN_HEADER_SZ		92 /* V4 (GTM V5.0) binary header stores null collation information [5 bytes numeric] */
+#define V5_BIN_HEADER_NUMSZ	5
+#define V5_BIN_HEADER_LABEL	"GDS BINARY EXTRACT LEVEL "V5_BIN_HEADER_VERSION
+#define V5_BIN_HEADER_RECOFFSET	(STR_LIT_LEN(BIN_HEADER_LABEL) + STR_LIT_LEN(BIN_HEADER_DATEFMT) + V5_BIN_HEADER_NUMSZ)
+#define V5_BIN_HEADER_KEYOFFSET	(STR_LIT_LEN(BIN_HEADER_LABEL) + STR_LIT_LEN(BIN_HEADER_DATEFMT) + 2 * V5_BIN_HEADER_NUMSZ)
+#define V5_BIN_HEADER_NULLCOLLOFFSET	(STR_LIT_LEN(BIN_HEADER_LABEL) + STR_LIT_LEN(BIN_HEADER_DATEFMT) + 3 * V5_BIN_HEADER_NUMSZ)
+#define BIN_HEADER_VERSION  	"6" /* spanning nodes allow max_rec_len to 7 digits*/
+#define BIN_HEADER_LABEL        "GDS BINARY EXTRACT LEVEL "BIN_HEADER_VERSION
+#define BIN_HEADER_VERSION_ENCR	"7" /* follow convention of low bit of version indicating encryption */
+#define BIN_HEADER_LABEL_ENCR   "GDS BINARY EXTRACT LEVEL "BIN_HEADER_VERSION_ENCR
+#define BIN_HEADER_SZ		100
+#define BIN_HEADER_NUMSZ	7
 #else
 #define BIN_HEADER_VERSION  	"4"
+#define BIN_HEADER_NUMSZ	5
+#define BIN_HEADER_SZ		92 /* V4 (GTM V5.0) binary header stores null collation information [5 bytes numeric] */
 #endif
 #define BIN_HEADER_LABEL        "GDS BINARY EXTRACT LEVEL "BIN_HEADER_VERSION
 #define BIN_HEADER_DATEFMT	"YEARMMDD2460SS"
-#define BIN_HEADER_NUMSZ	5
 #define BIN_HEADER_LABELSZ	32
 #define BIN_HEADER_BLKOFFSET	(STR_LIT_LEN(BIN_HEADER_LABEL) + STR_LIT_LEN(BIN_HEADER_DATEFMT))
 #define BIN_HEADER_RECOFFSET	(STR_LIT_LEN(BIN_HEADER_LABEL) + STR_LIT_LEN(BIN_HEADER_DATEFMT) + BIN_HEADER_NUMSZ)
 #define BIN_HEADER_KEYOFFSET	(STR_LIT_LEN(BIN_HEADER_LABEL) + STR_LIT_LEN(BIN_HEADER_DATEFMT) + 2 * BIN_HEADER_NUMSZ)
 #define BIN_HEADER_NULLCOLLOFFSET	(STR_LIT_LEN(BIN_HEADER_LABEL) + STR_LIT_LEN(BIN_HEADER_DATEFMT) + 3 * BIN_HEADER_NUMSZ)
-#define BIN_HEADER_SZ		92 /* V4 (GTM V5.0) binary header stores null collation information [5 bytes numeric] */
 #define V3_BIN_HEADER_SZ	87
 #define EXTR_HEADER_LEVEL(extr_lbl)	*(extr_lbl + SIZEOF(BIN_HEADER_LABEL) - 2)
 					/* the assumption here is - level wont go beyond a single char representation */

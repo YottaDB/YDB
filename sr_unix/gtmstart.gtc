@@ -1,7 +1,7 @@
-:
+#!/bin/sh
 #################################################################
 #								#
-#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -93,7 +93,8 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 					$echo "logging directory (${logdir}/${service}) does not exist, creating it..."
 					mkdir $logdir/$service
 				fi
-			        nohup $gtm_dist/gtcm_run -service $service -id ${id} -log - $options >> $logdir/${service}/session.log 2>&1 < /dev/null &
+			        nohup $gtm_dist/gtcm_run -service $service -id ${id} -log - $options \
+					>> $logdir/${service}/session.log 2>&1 < /dev/null &
 
         			if [ $? != 0 ]; then
 		                	$echo "The GT.CM server (${service}) failed to start."
@@ -114,7 +115,8 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 				$echo "logging directory (${logdir}/${service}) does not exist, creating it..."
 				mkdir $logdir/$service
 			fi
-		        nohup $gtm_dist/gtcm_run -service $service -id ${id} -log - $options >> $logdir/${service}/session.log 2>&1 < /dev/null &
+		        nohup $gtm_dist/gtcm_run -service $service -id ${id} -log - $options \
+				>> $logdir/${service}/session.log 2>&1 < /dev/null &
 
         		if [ $? != 0 ]; then
                 		$echo "The GT.CM server (${service}) failed to start."

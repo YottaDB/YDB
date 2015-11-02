@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2006 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,6 +94,11 @@ GBLREF	upd_helper_entry_ptr_t	helper_entry;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		is_updhelper;
 
+error_def(ERR_NOTALLDBOPN);
+error_def(ERR_RECVPOOLSETUP);
+error_def(ERR_REPLWARN);
+error_def(ERR_TEXT);
+
 void updhelper_init(recvpool_user who)
 {
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
@@ -103,11 +108,6 @@ void updhelper_init(recvpool_user who)
 	char			proc_name[PROC_NAME_MAXLEN + 1], *proc_prefix;
 	struct dsc$descriptor_s proc_name_desc;
 #endif
-	error_def(ERR_RECVPOOLSETUP);
-	error_def(ERR_TEXT);
-	error_def(ERR_NOTALLDBOPN);
-	error_def(ERR_REPLWARN);
-
 	is_updhelper = TRUE;
 	getjobnum();
 	VMS_ONLY(recvpool_init(UPD_HELPER_READER, FALSE, FALSE);)
@@ -134,6 +134,7 @@ void updhelper_init(recvpool_user who)
 			break;
 		}
 	}
+	OPERATOR_LOG_MSG;
 	if (helper == helper_top)
 	{ /* did not find my entry possibly due to startup directly from command line as opposed to the desired via-rcvr server */
 		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,

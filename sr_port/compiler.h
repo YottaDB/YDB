@@ -205,9 +205,10 @@ typedef struct
 #define	NO_FORMALLIST	(-1)
 
 /* Some errors should not cause stx_error to issue an rts_error. These are the errors related to
- * 	a) Invalid Intrinsic Special Variables
+ *	a) Invalid Intrinsic Commands
  *	b) Invalid Intrinsic Function Names
- *	c) Invalid Deviceparameters for IO commands
+ *	c) Invalid Intrinsic Special Variables
+ *	d) Invalid Deviceparameters for IO commands
  * These should cause an error at runtime if and only if that codepath is reached.
  * PostConditionals can cause this path to be avoided in which case we do not want to issue an error at compile time.
  * Therefore issue only a warning at compile-time and proceed with compilation as if this codepath will not be reached at runtime.
@@ -216,15 +217,16 @@ error_def(ERR_DEVPARINAP);
 error_def(ERR_DEVPARUNK);
 error_def(ERR_DEVPARVALREQ);
 error_def(ERR_FNOTONSYS);
+error_def(ERR_INVCMD);
 error_def(ERR_INVFCN);
 error_def(ERR_INVSVN);
 error_def(ERR_SVNONEW);
 error_def(ERR_SVNOSET);
 
-#define	IS_STX_WARN(errcode)											\
-	((ERR_INVFCN == errcode) || (ERR_FNOTONSYS == errcode) || (ERR_INVSVN == errcode)			\
-		|| (ERR_SVNONEW == errcode) || (ERR_SVNOSET == errcode) || (ERR_DEVPARUNK == errcode) 		\
-		|| (ERR_DEVPARINAP == errcode) || (ERR_DEVPARVALREQ == errcode))
+#define	IS_STX_WARN(errcode)										\
+	((ERR_DEVPARINAP == errcode) || (ERR_DEVPARUNK == errcode) || (ERR_DEVPARVALREQ == errcode)	\
+		|| (ERR_FNOTONSYS == errcode) || (ERR_INVCMD == errcode) || (ERR_INVFCN == errcode) 	\
+		|| (ERR_INVSVN == errcode) || (ERR_SVNONEW == errcode) || (ERR_SVNOSET == errcode))
 
 /* This macro does an "stx_error" of the input errcode but before that it asserts that the input errcode is one
  * of the known error codes that are to be handled as a compile-time warning (instead of an error). It also set
@@ -302,6 +304,21 @@ error_def(ERR_SVNOSET);
 		}											\
 		chksum ^= srcint;									\
 		chksum >>= 1;										\
+	}												\
+}
+
+#define ENCOUNTERED_SIDE_EFFECT										\
+{	/* Needs #include "show_source_line" and #include "fullbool.h" */				\
+	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];					\
+													\
+	if (TREF(shift_side_effects))									\
+	{												\
+		TREF(saw_side_effect) = TRUE;								\
+		if (!run_time && (FULL_BOOL_WARN == TREF(gtm_fullbool)))				\
+		{	/* warnings requested by by gtm_fullbool and enabled by eval_expr */		\
+			show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);		\
+			dec_err(VARLSTCNT(1) ERR_BOOLSIDEFFECT);					\
+		}											\
 	}												\
 }
 

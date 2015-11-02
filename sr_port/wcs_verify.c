@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,19 @@
 
 GBLREF 	uint4			process_id;
 
+error_def(ERR_DBADDRALIGN);
+error_def(ERR_DBADDRANGE);
+error_def(ERR_DBADDRANGE8);
+error_def(ERR_DBCLNUPINFO);
+error_def(ERR_DBCRERR);
+error_def(ERR_DBCRERR8);
+error_def(ERR_DBFHEADERR4);
+error_def(ERR_DBFHEADERR8);
+error_def(ERR_DBFHEADERRANY);
+error_def(ERR_DBQUELINK);
+error_def(ERR_DBWCVERIFYEND);
+error_def(ERR_DBWCVERIFYSTART);
+
 boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs_recover)
 {	/* This routine verifies the shared memory structures used to manage the buffers of the bg access method.
 	 * Changes to those structures or the way that they are managed may require changes to this routine
@@ -48,7 +61,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 
 	uint4			cnt, lcnt ;
         ssize_t			offset ;
-        trans_num 		max_tn ;
+        trans_num 		max_tn, tmp_8byte;
 	INTPTR_T		bp_lo, bp_top, bp, cr_base, cr_top, bt_top_off, bt_base_off;
 	sm_uc_ptr_t		bptmp;
 	boolean_t		ret;
@@ -67,18 +80,6 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	int4			i, n_bts;	/* a copy of csd->n_bts since it is used frequently in this routine */
 	trans_num		dummy_tn;
 	int4			in_wtstart, intent_wtstart, wcs_phase2_commit_pidcnt;
-
-	error_def(ERR_DBFHEADERR4);
-	error_def(ERR_DBFHEADERR8);
-	error_def(ERR_DBADDRANGE);
-	error_def(ERR_DBADDRANGE8);
-	error_def(ERR_DBADDRALIGN);
-	error_def(ERR_DBQUELINK);
-	error_def(ERR_DBCRERR);
-	error_def(ERR_DBCRERR8);
-	error_def(ERR_DBCLNUPINFO);
-	error_def(ERR_DBWCVERIFYSTART);
-	error_def(ERR_DBWCVERIFYEND);
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
@@ -101,7 +102,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+			send_msg(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
 				 RTS_ERROR_TEXT("bt_header_off"), cnl->bt_header_off, offset);
 			cnl->bt_header_off = offset;
 		}
@@ -109,7 +110,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+			send_msg(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
 				 RTS_ERROR_TEXT("bt_header"), csa->bt_header, (sm_uc_ptr_t)csd + cnl->bt_header_off);
 			csa->bt_header = (bt_rec_ptr_t)((sm_uc_ptr_t)csd + cnl->bt_header_off);
 		}
@@ -118,7 +119,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+			send_msg(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
 				 RTS_ERROR_TEXT("th_base_off"), cnl->th_base_off, offset + SIZEOF(bt->blkque));
 			cnl->th_base_off = (offset + SIZEOF(bt->blkque));
 		}
@@ -126,7 +127,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+			send_msg(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
 				 RTS_ERROR_TEXT("th_base"), csa->th_base, (sm_uc_ptr_t)csd + cnl->th_base_off);
 			csa->th_base = (th_rec_ptr_t)((sm_uc_ptr_t)csd + cnl->th_base_off);
 		}
@@ -135,7 +136,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+			send_msg(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
 				 RTS_ERROR_TEXT("bt_base_off"), cnl->bt_base_off, offset);
 			cnl->bt_base_off = offset;
 		}
@@ -143,7 +144,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+			send_msg(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
 				 RTS_ERROR_TEXT("bt_base"), csa->bt_base, (sm_uc_ptr_t)csd + cnl->bt_base_off);
 			csa->bt_base = (bt_rec_ptr_t)((sm_uc_ptr_t)csd + cnl->bt_base_off);
 		}
@@ -153,7 +154,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	{
 		assert(expect_damage);
 		ret = FALSE;
-		send_msg(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+		send_msg(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
 			RTS_ERROR_TEXT("csa->ti"), (sm_uc_ptr_t)csa->ti, (sm_uc_ptr_t)&csd->trans_hist);
 		csa->ti = &csd->trans_hist;
 	}
@@ -165,7 +166,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+			send_msg(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
 				 RTS_ERROR_TEXT("cache_off"), cnl->cache_off, -CACHE_CONTROL_SIZE(csd));
 			cnl->cache_off = -CACHE_CONTROL_SIZE(csd);
 		}
@@ -173,7 +174,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{
 			assert(expect_damage);
 			ret = FALSE;
-			send_msg(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+			send_msg(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
 				 RTS_ERROR_TEXT("cache_state"), csa->acc_meth.bg.cache_state, (sm_uc_ptr_t)csd + cnl->cache_off);
 			csa->acc_meth.bg.cache_state = (cache_que_heads_ptr_t)((sm_uc_ptr_t)csd + cnl->cache_off);
 		}
@@ -189,10 +190,10 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	if (JNL_ALLOWED(csd))
 	{
 		if (NULL == csa->jnl)
-			send_msg(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+			send_msg(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
 				RTS_ERROR_TEXT("csa->jnl"), csa->jnl, (UINTPTR_T)-1);
 		else if (NULL == csa->jnl->jnl_buff)
-			send_msg(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+			send_msg(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
 					RTS_ERROR_TEXT("csa->jnl->jnl_buff"), csa->jnl->jnl_buff, (UINTPTR_T)-1);
 		else
 		{
@@ -201,7 +202,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				send_msg(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
+				send_msg(VARLSTCNT(8) ERR_DBFHEADERRANY, 6, DB_LEN_STR(reg),
 					RTS_ERROR_TEXT("csa->jnl->jnl_buff_expected"), csa->jnl->jnl_buff, jnl_buff_expected);
 				csa->jnl->jnl_buff = (jnl_buffer_ptr_t)jnl_buff_expected;
 			}
@@ -219,13 +220,13 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{	/* if wcs_recover is caller, it would have waited for the following fields to become 0.
 			 * if called from DSE CACHE -VERIFY, none of these are guaranteed. So do these checks only for first case.
 			 */
-			if (FALSE == csd->wc_blocked)
+			if (FALSE == cnl->wc_blocked)
 			{	/* in UNIX this blocks the writer */
 				assert(expect_damage);
 				ret = FALSE;
 				send_msg(VARLSTCNT(8) ERR_DBFHEADERR4, 6, DB_LEN_STR(reg),
-					 RTS_ERROR_TEXT("wc_blocked"), csd->wc_blocked, TRUE);
-				SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+					 RTS_ERROR_TEXT("wc_blocked"), cnl->wc_blocked, TRUE);
+				SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 			}
 			in_wtstart = cnl->in_wtstart;	/* store value in local variable in case the following assert fails */
 			if (0 != in_wtstart)
@@ -241,7 +242,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			if (0 != intent_wtstart)
 			{	/* Two situations are possible.
 				 *	a) A wcs_wtstart() call is concurrently in progress and that the process has just now
-				 *		incremented intent_wtstart. It will notice csd->wc_blocked to be TRUE and
+				 *		incremented intent_wtstart. It will notice cnl->wc_blocked to be TRUE and
 				 *		decrement intent_wtstart right away and return. So we dont need to do anything.
 				 *	b) A wcs_wtstart() call had previously increment intent_wtstart but got shot before it could
 				 *		get a chance to decrement the field. In this case, we need to clear the field to
@@ -314,8 +315,9 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				{
 					assert(expect_damage);
 					ret = FALSE;
-					send_msg(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
-						 th, th->blk, max_tn, RTS_ERROR_TEXT("tnque transaction number"), 1, th->tn);
+					tmp_8byte = 1;
+					send_msg(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), th, th->blk, &max_tn,
+							RTS_ERROR_TEXT("tnque transaction number"), &tmp_8byte, &th->tn);
 				}
 				/* ideally, the following max_tn assignment should have been in the else part of the above if. but
 				 *  the issue with doing that is if there is a sequence of non-decreasing transaction numbers
@@ -375,7 +377,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			assert(expect_damage);
 			ret = FALSE;
 			send_msg(VARLSTCNT(8) ERR_DBFHEADERR8, 6, DB_LEN_STR(reg),
-				 RTS_ERROR_TEXT("MAX(th_base->tn)"), max_tn, csd->trans_hist.curr_tn);
+				 RTS_ERROR_TEXT("MAX(th_base->tn)"), &max_tn, &csd->trans_hist.curr_tn);
 		}
 		/* loop through bt blkques */
 		blkque_array = malloc(n_bts * SIZEOF(boolean_t));
@@ -537,8 +539,9 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				send_msg(VARLSTCNT(11) ERR_DBADDRANGE, 9, DB_LEN_STR(reg),
-					 cr, cr->blk, cr->tn, RTS_ERROR_TEXT("cr->tn"), 0, csd->trans_hist.curr_tn);
+				tmp_8byte = 0;
+				send_msg(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg),
+					 cr, cr->blk, &cr->tn, RTS_ERROR_TEXT("cr->tn"), &tmp_8byte, &csd->trans_hist.curr_tn);
 			}
 			if (0 != cr->bt_index)
 			{

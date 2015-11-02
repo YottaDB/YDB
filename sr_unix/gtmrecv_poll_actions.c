@@ -54,8 +54,6 @@ GBLREF	boolean_t		repl_connection_reset;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int			gtmrecv_log_fd;
 GBLREF	FILE			*gtmrecv_log_fp;
-GBLREF	int			gtmrecv_statslog_fd;
-GBLREF	FILE			*gtmrecv_statslog_fp;
 GBLREF	boolean_t		gtmrecv_logstats;
 GBLREF	boolean_t		gtmrecv_wait_for_jnl_seqno;
 GBLREF	boolean_t		gtmrecv_bad_trans_sent;
@@ -548,7 +546,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				 * just syncing the journal pool cycles as the databases are not opened. But, to be safe, grab
 				 * the lock and sync the cycles.
 				 */
-				GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+				grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
 				SYNC_ONLN_RLBK_CYCLES;
 				rel_lock(jnlpool.jnlpool_dummy_reg);
 				return_status = STOP_POLL;
@@ -575,7 +573,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		if (gtmrecv_local->changelog & REPLIC_CHANGE_LOGFILE)
 		{
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Changing log file to %s\n", gtmrecv_local->log_file);
-			repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, NULL, gtmrecv_local->log_file, NULL);
+			repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, gtmrecv_local->log_file);
 			repl_log_fd2fp(&gtmrecv_log_fp, gtmrecv_log_fd);
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Change log to %s successful\n",gtmrecv_local->log_file);
 		}
@@ -587,27 +585,12 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	if (0 == *pending_data_len && !gtmrecv_logstats && gtmrecv_local->statslog)
 	{
 		gtmrecv_logstats = TRUE;
-		repl_log_init(REPL_STATISTICS_LOG, &gtmrecv_log_fd, &gtmrecv_statslog_fd, gtmrecv_local->log_file,
-				gtmrecv_local->statslog_file);
-		repl_log_fd2fp(&gtmrecv_statslog_fp, gtmrecv_statslog_fd);
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Starting stats log to %s\n", gtmrecv_local->statslog_file);
-		repl_log(gtmrecv_statslog_fp, TRUE, TRUE, "Begin statistics logging\n");
+		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Begin statistics logging\n");
 	} else if (0 == *pending_data_len && gtmrecv_logstats && !gtmrecv_local->statslog)
 	{
 		gtmrecv_logstats = FALSE;
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Stopping stats log\n");
 		/* Force all data out to the file before closing the file */
-		repl_log(gtmrecv_statslog_fp, TRUE, TRUE, "End statistics logging\n");
-		CLOSEFILE_RESET(gtmrecv_statslog_fd, status);	/* resets "gtmrecv_statslog_fd" to FD_INVALID */
-		/* We need to FCLOSE because a later open() in repl_log_init() might return the same file descriptor as the one
-		 * that we just closed. In that case, FCLOSE done in repl_log_fd2fp() affects the newly opened file and
-		 * FDOPEN will fail returning NULL for the file pointer. So, we close both the file descriptor and file pointer.
-		 * Note the same problem does not occur with GENERAL LOG because the current log is kept open while opening
-		 * the new log and hence the new file descriptor will be different (we keep the old log file open in case there
-		 * are errors during DUPing. In such a case, we do not switch the log file, but keep the current one).
-		 * We can FCLOSE the old file pointer later in repl_log_fd2fp() */
-		FCLOSE(gtmrecv_statslog_fp, status);
-		gtmrecv_statslog_fp = NULL;
+		repl_log(gtmrecv_log_fp, TRUE, TRUE, "End statistics logging\n");
 	}
 	if (0 == *pending_data_len)
 	{

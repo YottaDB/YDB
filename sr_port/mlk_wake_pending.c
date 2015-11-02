@@ -108,7 +108,9 @@ void mlk_wake_pending(mlk_ctldata_ptr_t ctl,
 				break;
 		}
 	}
-	if (!lcnt)
-		GTMASSERT;
+	/* The assertpro is to safeguard us against cycles/loops in the "pending" linked list. This way we dont get into an
+	 * infinite loop and yet get a core dump to see how we got ourselves into this out-of-design state.
+	 */
+	assertpro(lcnt);
 	return;
 }

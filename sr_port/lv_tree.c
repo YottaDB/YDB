@@ -656,14 +656,8 @@ lvTreeNode *lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl
 	cloneNode->v = node->v;
 	/* "cloneNode->sbs_child" initialized later */
 	cloneNode->tree_parent = lvt;
-	/* cloneNode->key_mvtype/balance/descent_dir/key_len all initialized in one shot.
-	 * Note: We use "qw_num *" instead of "uint8 *" below because the former works on 32-bit platforms too.
-	 */
-	GTM64_ONLY(assert(IS_PTR_8BYTE_ALIGNED(&cloneNode->key_mvtype));)
-	NON_GTM64_ONLY(assert(IS_PTR_4BYTE_ALIGNED(&cloneNode->key_mvtype));)
-	GTM64_ONLY(assert(IS_PTR_8BYTE_ALIGNED(&node->key_mvtype));)
-	NON_GTM64_ONLY(assert(IS_PTR_4BYTE_ALIGNED(&node->key_mvtype));)
-	*(RECAST(qw_num *)&cloneNode->key_mvtype) = *(RECAST(qw_num *)&node->key_mvtype);
+	/* cloneNode->key_mvtype/balance/descent_dir/key_len all initialized in one shot */
+	memcpy(&cloneNode->key_mvtype, &node->key_mvtype, 8);	/* Asserts above keep the 8 byte length secure */
 	cloneNode->key_addr = node->key_addr;
 	NON_GTM64_ONLY(
 		assert(IS_OFFSET_AND_SIZE_MATCH(lvTreeNode, filler_8byte, lvTreeNodeNum, key_m1));

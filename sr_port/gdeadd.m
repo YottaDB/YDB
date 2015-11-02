@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2011 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2012 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -16,13 +16,10 @@ NAME
 	s nams(NAME)=lquals("REGION")
 	q
 REGION
-	n nullsub
 	i $d(regs(REGION)) zm gdeerr("OBJDUP"):"Region":REGION
 	i '$d(lquals("DYNAMIC_SEGMENT")) zm gdeerr("QUALREQD"):"Dynamic_segment"
 	i $d(lquals("JOURNAL")),lquals("JOURNAL"),'$d(lquals("BEFORE_IMAGE")) zm gdeerr("QUALREQD"):"Before_image"
-	i $d(lquals("NULL_SUBSCRIPTS")) d
-	. s nullsub=lquals("NULL_SUBSCRIPTS")
-	. s lquals("NULL_SUBSCRIPTS")=$s((nullsub="ALWAYS")!(nullsub="TRUE"):1,nullsub="EXISTING":2,1:0)
+	i $d(lquals("NULL_SUBSCRIPTS")) d NQUALS^GDEVERIF(.lquals)
 	i '$$RQUALS^GDEVERIF(.lquals) zm gdeerr("OBJNOTADD"):"Region":REGION
 	s update=1,s="",regs=regs+1
 	f  s s=$o(tmpreg(s)) q:'$l(s)  s regs(REGION,s)=tmpreg(s)

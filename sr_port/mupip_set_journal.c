@@ -26,6 +26,7 @@
 #endif
 #include "gtm_string.h"
 #include "gtm_time.h"
+#include "gtm_stdio.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -78,7 +79,8 @@ error_def(ERR_FILENAMETOOLONG);
 error_def(ERR_FILEPARSE);
 error_def(ERR_JNLALIGNTOOSM);
 error_def(ERR_JNLALLOCGROW);
-error_def(ERR_JNLBUFFTOOSM);
+error_def(ERR_JNLBUFFDBUPD);
+error_def(ERR_JNLBUFFREGUPD);
 error_def(ERR_JNLCREATE);
 error_def(ERR_JNLFNF);
 error_def(ERR_JNLINVSWITCHLMT);
@@ -115,7 +117,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	unsigned int		fn_len;
 	unsigned char		tmp_full_jnl_fn[MAX_FN_LEN + 1], prev_jnl_fn[MAX_FN_LEN + 1];
 	char			*db_reg_name, db_or_reg[DB_OR_REG_SIZE];
-	int			db_reg_name_len, db_or_reg_len, jnl_buffer_size;
+	int			db_reg_name_len, db_or_reg_len;
 	set_jnl_options		jnl_options;
 	boolean_t		curr_jnl_present,	/* for current state 2, is current journal present? */
 				jnl_points_to_db, keep_prev_link, safe_to_switch, newjnlfiles, jnlname_same,
@@ -132,7 +134,11 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	jnl_file_header		header;
 	int4			status1;
 	uint4			status2;
+	boolean_t		header_is_usable = FALSE;
 #	endif
+	boolean_t		jnl_buffer_updated = FALSE, jnl_buffer_invalid = FALSE;
+	int			jnl_buffer_size;
+	char			s[JNLBUFFUPDAPNDX_SIZE];	/* JNLBUFFUPDAPNDX_SIZE is defined in jnl.h */
 
 	assert(SGMNT_HDR_LEN == ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE));
 	memset(&jnl_info, 0, SIZEOF(jnl_info));
@@ -158,9 +164,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			return (uint4)ERR_MUNOFINISH;
 		}
 	} else
-	{	/* The command line specified a single database file;
-		   force the following do-loop to be one-trip */
-		dummy_rlist.fPtr= NULL;
+	{	/* The command line specified a single database file; force the following do-loop to be one-trip */
+		dummy_rlist.fPtr = NULL;
 		grlist = &dummy_rlist;
 	}
 	ESTABLISH_RET(mupip_set_jnl_ch, (uint4)ERR_MUNOFINISH);
@@ -337,6 +342,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		jnl_curr_state = (enum jnl_state_codes)csd->jnl_state;
 		repl_curr_state = (enum repl_state_codes)csd->repl_state;
 		jnl_info.csd = csd;
+		jnl_info.csa = cs_addrs;
 		jnl_info.before_images = rptr->before_images;
 		jnl_info.repl_state = rptr->repl_new_state;
 		jnl_info.jnl_state = csd->jnl_state;
@@ -411,32 +417,22 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				/* jnl_info.extend = (0 == csd->jnl_deq) ? jnl_info.alloc * JNL_EXTEND_DEF_PERC : csd->jnl_deq;
 				 * Uncomment this section when code is ready to use extension = 10% of allocation */
 			}
-			if (!jnl_options.buffer_size_specified || jnl_info.buffer < csd->blk_size / DISK_BLOCK_SIZE + 1)
+			if (!jnl_options.buffer_size_specified)
+				jnl_info.buffer = (0 == csd->jnl_buffer_size) ? JNL_BUFFER_DEF : csd->jnl_buffer_size;
+			ROUND_UP_JNL_BUFF_SIZE(jnl_buffer_size, jnl_info.buffer, csd);
+			if (jnl_buffer_size < JNL_BUFF_PORT_MIN(csd))
 			{
-				if (jnl_options.buffer_size_specified)
-				{
-					gtm_putmsg(VARLSTCNT(4) ERR_JNLBUFFTOOSM, 2,
-						jnl_info.buffer, csd->blk_size / DISK_BLOCK_SIZE + 1);
-					exit_status |= EXIT_WRN;
-				}
-				jnl_buffer_size = (0 == csd->jnl_buffer_size) ? JNL_BUFFER_DEF : csd->jnl_buffer_size;
-			} else
-				jnl_buffer_size = jnl_info.buffer;
-			jnl_buffer_size = ROUND_UP(jnl_buffer_size, MIN(MAX_IO_BLOCK_SIZE, cs_data->blk_size) / DISK_BLOCK_SIZE);
-			if ((jnl_options.buffer_size_specified && jnl_buffer_size != jnl_info.buffer)
-				|| (!jnl_options.buffer_size_specified
-				&& 0 != csd->jnl_buffer_size && jnl_buffer_size != csd->jnl_buffer_size))
+				jnl_buffer_invalid = TRUE;
+				ROUND_UP_MIN_JNL_BUFF_SIZE(jnl_buffer_size, csd);
+			} else if (jnl_buffer_size > JNL_BUFFER_MAX)
 			{
-				if (region)
-					util_out_print("Journal file buffer size for region !AD is now !SL", TRUE,
-						REG_LEN_STR(gv_cur_region), jnl_buffer_size);
-				else
-					util_out_print("Journal file buffer size for database file !AD is now !SL", TRUE,
-						jnl_info.fn_len, jnl_info.fn, jnl_buffer_size);
+				jnl_buffer_invalid = TRUE;
+				ROUND_DOWN_MAX_JNL_BUFF_SIZE(jnl_buffer_size, csd);
 			}
+			if (jnl_buffer_size != jnl_info.buffer)
+				jnl_buffer_updated = TRUE;
 			/* ensure we have exclusive access in case csd->jnl_buffer_size is going to be changed */
-			assert((!(jnl_options.buffer_size_specified && csd->jnl_buffer_size != jnl_buffer_size))
-				|| rptr->exclusive);
+			assert(!(jnl_options.buffer_size_specified && jnl_buffer_updated) || rptr->exclusive);
 			if (!jnl_options.epoch_interval_specified)
 				jnl_info.epoch_interval = (0 == csd->epoch_interval) ? DEFAULT_EPOCH_INTERVAL : csd->epoch_interval;
 			JNL_MAX_RECLEN(&jnl_info, csd);
@@ -576,13 +572,14 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 							if (is_file_identical((char *)header.data_file_name,
 												(char *)jnl_info.fn))
 								jnl_points_to_db = TRUE;
+							UNIX_ONLY(header_is_usable = TRUE;)
 						}
 					}
 				}
 				/* If journal file we are about to create exists, allow the switch only it is safe to do so.
 				 * This way we prevent multiple environments from interfering with each other through a
 				 * common journal file name. Also this way we disallow switching to a user-specified new
-				 * journal file that already exists (say the database file itself due to a commandline typo).
+				 * journal file that already exists (say the database file itself due to a command line typo).
 				 */
 				if (FILE_PRESENT & curr_stat_res)
 				{
@@ -643,8 +640,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					VMS_ONLY(if (memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, SIZEOF(zero_fid))))
 					{
 						if (SS_NORMAL != (status = set_jnl_file_close(SET_JNL_FILE_CLOSE_SETJNL)))
-						{
-							/* Invoke jnl_file_lost to turn off journaling and retry journal creation
+						{	/* Invoke jnl_file_lost to turn off journaling and retry journal creation
 							 * to create fresh journal files.
 							 */
 							jnl_file_lost(jpc, status);
@@ -653,6 +649,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 							next_rptr = rptr;
 							continue;
 						}
+						UNIX_ONLY(header.crash = FALSE;)	/* Even if the journal was crashed, that
+											 * should be fixed now */
 					} else
 					{	/* Ideally, no other process should have a journal file for this database open.
 						 * But, As part of C9I03-002965, we realized it is possible for processes accessing
@@ -665,6 +663,11 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 						assert(NULL != jpc);
 						jpc->jnl_buff->cycle++;
 					}
+#					ifdef UNIX
+					/* Cut the link if the journal is crashed and there is no shared memory around */
+					if (header_is_usable && header.crash)
+						keep_prev_link = FALSE;
+#					endif
 					/* For MM, set_jnl_file_close() can call wcs_flu() which can remap the file.
 					 * So reset csd and rptr->sd since their value may have changed.
 					 */
@@ -746,6 +749,21 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			csd->alignsize = jnl_info.alignsize;
 			csd->autoswitchlimit = jnl_info.autoswitchlimit;
 			csd->jnl_buffer_size = jnl_buffer_size;
+			if (jnl_buffer_updated)
+				if (jnl_buffer_invalid)
+				{
+					SNPRINTF(s, JNLBUFFUPDAPNDX_SIZE, JNLBUFFUPDAPNDX, JNL_BUFF_PORT_MIN(csd), JNL_BUFFER_MAX);
+					gtm_putmsg(VARLSTCNT(10)
+						(region ? ERR_JNLBUFFREGUPD : ERR_JNLBUFFDBUPD), 4,
+						(region ? gv_cur_region->rname_len : jnl_info.fn_len),
+						(region ? gv_cur_region->rname : jnl_info.fn),
+						jnl_info.buffer, jnl_buffer_size, ERR_TEXT, 2, LEN_AND_STR(s));
+				} else
+					gtm_putmsg(VARLSTCNT(6)
+						(region ? ERR_JNLBUFFREGUPD : ERR_JNLBUFFDBUPD), 4,
+						(region ? gv_cur_region->rname_len : jnl_info.fn_len),
+						(region ? gv_cur_region->rname : jnl_info.fn),
+						jnl_info.buffer, jnl_buffer_size);
 			csd->epoch_interval = jnl_info.epoch_interval;
 			csd->jnl_deq = jnl_info.extend;
 			memcpy(csd->jnl_file_name, jnl_info.jnl, jnl_info.jnl_len);

@@ -9,8 +9,10 @@
  *								*
  ****************************************************************/
 
-
 #include "mdef.h"
+#define BYPASS_MEMCPY_OVERRIDE  /* Signals gtm_string.h to not override memcpy(). When this routine is linked into gtcm_pkdisp,
+				 * the assert in the routine called by memcpy macro causes the world to be pulled in. Avoid.
+				 */
 /* Note that since this routine is called prior to reading environment vars or pretty much any
  * other initialization, we cannot use gtm_malloc() yet so care is taken to use the real system
  * malloc.
@@ -47,7 +49,7 @@
 #include "hashtab_str.h"
 #include "hashtab_objcode.h"
 #include "error.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "ccp.h"
@@ -102,6 +104,7 @@
 #include "alias.h"
 #include "zroutines.h"
 #include "parm_pool.h"
+#include "util.h"		/* for util_outbuff manipulations */
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
@@ -219,4 +222,5 @@ void gtm_threadgbl_init(void)
 	MEMCPY_LIT(TADR(prombuf), DEFAULT_PROMPT);
 	(TREF(replgbl)).jnl_release_timeout = DEFAULT_JNL_RELEASE_TIMEOUT;
 	(TREF(window_ident)).addr = TADR(window_string);
+	TREF(util_outbuff_ptr) = TADR(util_outbuff);	/* Point util_outbuff_ptr to the beginning of util_outbuff at first. */
 }

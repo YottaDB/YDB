@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,12 +27,28 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
+#ifdef UNIX			/* needed for frame_pointer in GVCST_ROOT_SEARCH_AND_PREP macro */
+# include "repl_msg.h"
+# include "gtmsource.h"
+# include "rtnhdr.h"
+# include "stack_frame.h"
+#endif
 
 #include "t_end.h"		/* prototypes */
 #include "t_retry.h"
 #include "t_begin.h"
 #include "gvcst_expand_key.h"
 #include "gvcst_protos.h"	/* for gvcst_lftsib,gvcst_search,gvcst_search_blk,gvcst_zprevious prototype */
+
+/* needed for spanning nodes */
+#include "op.h"
+#include "op_tcommit.h"
+#include "error.h"
+#include "tp_frame.h"
+#include "tp_restart.h"
+#include "gtmimagename.h"
+
+LITREF	mval		literal_batch;
 
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF sgmnt_addrs	*cs_addrs;
@@ -43,9 +59,70 @@ GBLREF int4		gv_keysize;
 GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
 
+error_def(ERR_DBROLLEDBACK);
 error_def(ERR_GVORDERFAIL);
+error_def(ERR_TPRETRY);
+
+DEFINE_NSB_CONDITION_HANDLER(gvcst_zprevious_ch)
 
 bool gvcst_zprevious(void)
+{	/* See gvcst_query.c */
+	bool		found, is_hidden, sn_tpwrapped;
+	boolean_t	est_first_pass;
+	char		save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
+	gv_key		*save_gv_currkey;
+	int		end, prev, oldend;
+	int		save_dollar_tlevel;
+
+	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
+	found = gvcst_zprevious2();
+#	ifdef UNIX
+	assert(save_dollar_tlevel == dollar_tlevel);
+	CHECK_HIDDEN_SUBSCRIPT_AND_RETURN(found, gv_altkey, is_hidden);
+	assert(found && is_hidden);
+	IF_SN_DISALLOWED_AND_NO_SPAN_IN_DB(return found);
+	SAVE_GV_CURRKEY_LAST_SUBSCRIPT(gv_currkey, prev, oldend);
+	if (!dollar_tlevel)
+	{
+		sn_tpwrapped = TRUE;
+		op_tstart((IMPLICIT_TSTART), TRUE, &literal_batch, 0);
+		ESTABLISH_NORET(gvcst_zprevious_ch, est_first_pass);
+		GVCST_ROOT_SEARCH_AND_PREP(est_first_pass);
+	} else
+		sn_tpwrapped = FALSE;
+	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_zprev, (gtm_uint64_t) -1);
+	found = gvcst_zprevious2();
+	if (found)
+	{
+		CHECK_HIDDEN_SUBSCRIPT(gv_altkey, is_hidden);
+		if (is_hidden)
+		{	/* Replace last subscript to be the lowest possible hidden subscript so another
+			 * gvcst_zprevious2 will give us the previous non-hidden subscript.
+			 */
+			end = gv_altkey->end;
+			gv_currkey->base[end - 4] = 2;
+			gv_currkey->base[end - 3] = 1;
+			gv_currkey->base[end - 2] = 1;
+			gv_currkey->base[end - 1] = 0;
+			gv_currkey->base[end + 0] = 0;
+			gv_currkey->end = end;
+			/* fix up since it should only be externally counted as one $zprevious */
+			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_zprev, (gtm_uint64_t) -1);
+			found = gvcst_zprevious2();
+		}
+	}
+	if (sn_tpwrapped)
+	{
+		op_tcommit();
+		REVERT; /* remove our condition handler */
+	}
+	RESTORE_GV_CURRKEY_LAST_SUBSCRIPT(gv_currkey, prev, oldend);
+	assert(save_dollar_tlevel == dollar_tlevel);
+#	endif
+	return found;
+}
+
+bool gvcst_zprevious2(void)
 {
 	static gv_key	*zprev_temp_key;
 	static int4	zprev_temp_keysize = 0;

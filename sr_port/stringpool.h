@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@ typedef struct
 } spdesc;
 
 void	stp_expand_array(void);
-void	stp_gcol(int space_needed);
+void	stp_gcol(int space_needed);										/* BYPASSOK */
 void	stp_move(char *from, char *to);
 void	stp_init(unsigned int size);
 void	s2pool(mstr *a);
@@ -36,8 +36,8 @@ GBLREF	spdesc		stringpool;
 
 #define	IS_STP_SPACE_AVAILABLE_PRO(SPC)	((stringpool.free + SPC) <= stringpool.top)
 #define	IS_IN_STRINGPOOL(PTR, LEN)		\
-		((((unsigned char *)PTR + (int)(LEN)) < stringpool.top) && ((unsigned char *)PTR >= stringpool.base))
-#define	INVOKE_STP_GCOL(SPC)		stp_gcol(SPC);
+		((((unsigned char *)PTR + (int)(LEN)) <= stringpool.top) && ((unsigned char *)PTR >= stringpool.base))
+#define	INVOKE_STP_GCOL(SPC)		stp_gcol(SPC);								/* BYPASSOK */
 
 #ifdef DEBUG
 GBLREF	boolean_t	stringpool_unusable;

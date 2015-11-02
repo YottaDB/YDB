@@ -78,7 +78,8 @@ void t_write_map (
 	cs->blk = blkhist->blk_num;
 	assert((cs->blk < csa->ti->total_blks) GTM_TRUNCATE_ONLY(|| (CDB_STAGNATE > t_tries)));
 	cs->old_block = blkhist->buffaddr;
-	cs->was_free = FALSE; /* t_write_map operates on BUSY blocks and hence cs->was_free is set to FALSE unconditionally */
+	/* t_write_map operates on BUSY blocks and hence cs->blk_prior_state's free_status is set to FALSE unconditionally */
+	SET_NFREE(cs);
 	old_block = (blk_hdr_ptr_t)cs->old_block;
 	assert(NULL != old_block);
 	jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
@@ -95,7 +96,7 @@ void t_write_map (
 	/* the buffer in shared memory holding the GDS block contents currently does not have in its block header the
 	 * on-disk format of that block. if it had, we could have easily copied that over to the cw-set-element.
 	 * until then, we have to use the cache-record's field "ondsk_blkver". but the cache-record is available only in BG.
-	 * thankfully, in MM, we do not allow GDSV4 type blocks, so we can safely assign GDSV5 (or GDSVCURR) to this field.
+	 * thankfully, in MM, we do not allow GDSV4 type blocks, so we can safely assign GDSV6 (or GDSVCURR) to this field.
 	 */
 	assert((NULL != cr) || (dba_mm == csa->hdr->acc_meth));
 	cs->ondsk_blkver = (NULL == cr) ? GDSVCURR : cr->ondsk_blkver;

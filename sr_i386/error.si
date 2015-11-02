@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -36,16 +36,13 @@ chnd_jmp	=	12
 .else
 #	setjmp is really __sigsetjmp(env,0)
 .extern	__sigsetjmp
+.extern gtm_asm_establish
 .endif
 
 	.sbttl	error.si    ESTABLISH
 .macro ESTABLISH  x, label
-	addl	$chnd_size,ctxt			# ctxt++
+        call	gtm_asm_establish		# Bulk of ESTABLISH macro
 	movl	ctxt,%eax
-	movl	active_ch,%edx			# ctxt->save_active_ch = active_ch
-	movl	%edx,chnd_save_active(%eax)
-	movl	$0,chnd_ch_active(%eax)		# ctxt->ch_active = FALSE
-	movl	%eax,active_ch			# active_ch = ctxt
 	movl	$\x,chnd_ch(%eax)		# ctxt->ch = x
 	addl	$chnd_jmp,%eax			# setjmp(ctxt->jmp)
 .ifndef cygwin

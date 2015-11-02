@@ -47,6 +47,7 @@
 #include "add_inter.h"
 #include "wbox_test_init.h"
 #include "memcoherency.h"
+#include "wcs_flu.h"		/* for SET_CACHE_FAIL_STATUS macro */
 
 #ifdef UNIX
 #include "io.h"			/* needed by gtmsecshr.h */
@@ -123,6 +124,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	sm_uc_ptr_t		buffaddr;
 	uint4			stuck_cnt = 0;
 	boolean_t		lcl_blk_free;
+	node_local_ptr_t	cnl;
 
 	lcl_blk_free = block_is_free;
 	block_is_free = FALSE;	/* Reset to FALSE so that if t_qread fails below, we don't have an incorrect state of this var */
@@ -300,7 +302,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		bt = NULL;
 	was_crit = csa->now_crit;
 	ocnt = 0;
-	set_wc_blocked = FALSE;	/* to indicate whether csd->wc_blocked was set to TRUE by us */
+	cnl = csa->nl;
+	set_wc_blocked = FALSE;	/* to indicate whether cnl->wc_blocked was set to TRUE by us */
 	hold_onto_crit = csa->hold_onto_crit;	/* note down in local to avoid csa-> dereference in multiple usages below */
 	do
 	{
@@ -316,7 +319,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					assert(clustered);
 					wait_for_block_flush(bt, blk);	/* try for no other node currently writing the block */
 				}
-				if (csd->flush_trigger <= csa->nl->wcs_active_lvl  &&  FALSE == gv_cur_region->read_only)
+				if ((csd->flush_trigger <= cnl->wcs_active_lvl) && (FALSE == gv_cur_region->read_only))
 					JNL_ENSURE_OPEN_WCS_WTSTART(csa, gv_cur_region, 0, dummy_errno);
 						/* a macro that dclast's "wcs_wtstart" and checks for errors etc. */
 				grab_crit(gv_cur_region);
@@ -333,9 +336,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				cr = db_csh_getn(blk);
 				if (CR_NOTVALID == (sm_long_t)cr)
 				{
-					assert(csd->wc_blocked); /* only reason we currently know why wcs_get_space could fail */
+					assert(cnl->wc_blocked); /* only reason we currently know wcs_get_space could fail */
 					assert(gtm_white_box_test_case_enabled);
-					SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
+					SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 					BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_db_csh_getn_invalid_blk);
 					set_wc_blocked = TRUE;
 					break;
@@ -413,13 +416,13 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			{
 				assert(!hold_onto_crit);
 				assert(TRUE == csa->now_crit);
-				assert(csa->nl->in_crit == process_id);
+				assert(cnl->in_crit == process_id);
 				rel_crit(gv_cur_region);
 			}
 		}
 		if (CR_NOTVALID == (sm_long_t)cr)
 		{
-			SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
+			SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 			BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_db_csh_get_invalid_blk);
 			set_wc_blocked = TRUE;
 			break;
@@ -442,8 +445,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		{
 			if (0 > cr->read_in_progress)
 			{	/* it's not being read */
-				if (clustered && (0 == cr->bt_index) &&
-					(cr->tn < ((th_rec *)((uchar_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn))
+				if (clustered && (0 == cr->bt_index) && (cr->tn < OLDEST_HIST_TN(csa)))
 				{	/* can't rely on the buffer */
 					cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 					cr->blk = CR_BLKEMPTY;
@@ -501,7 +503,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					 * final retry in which case it is better to wait here as we dont want to end up in a
 					 * situation where "recompute_upd_array" indicates that a restart is necessary.
 					 */
-					if (dollar_tlevel && gv_target->noisolation && (ERR_GVPUTFAIL == t_err)
+					if (dollar_tlevel && (gv_target && gv_target->noisolation) && (ERR_GVPUTFAIL == t_err)
 						&& (CDB_STAGNATE > t_tries))	/* do not skip wait in case of final retry */
 					{	/* We know that the only caller in this case would be the function "gvcst_search".
 						 * If the input cr and cycle match corresponding fields of gv_target->hist.h[0],
@@ -567,7 +569,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							assert(0 == cr->bt_index);
 							if (cr->bt_index)
 							{
-								SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+								SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 								BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_bad_bt_index1);
 								set_wc_blocked = TRUE;
 								break;
@@ -597,7 +599,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						assert(0 == cr->bt_index);
 						if (cr->bt_index)
 						{
-							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+							SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_bad_bt_index2);
 							set_wc_blocked = TRUE;
 							break;
@@ -620,7 +622,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				sleep_invoked = TRUE;
 			}
 		}
-		if (set_wc_blocked)	/* cannot use csd->wc_blocked here as we might not necessarily have crit */
+		if (set_wc_blocked)	/* cannot use cnl->wc_blocked here as we might not necessarily have crit */
 			break;
 		ocnt++;
 		assert((0 == was_crit) || (1 == was_crit));
@@ -636,8 +638,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		if (!csa->now_crit && !hold_onto_crit)
 			grab_crit(gv_cur_region);
 	} while (TRUE);
-	assert(set_wc_blocked && (csd->wc_blocked || !csa->now_crit));
-	rdfail_detail = cdb_sc_cacheprob;
+	assert(set_wc_blocked && (cnl->wc_blocked || !csa->now_crit));
+	SET_CACHE_FAIL_STATUS(rdfail_detail, csd);
 	if ((was_crit != csa->now_crit) && !hold_onto_crit)
 		rel_crit(gv_cur_region);
 	assert(was_crit == csa->now_crit);

@@ -64,6 +64,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	register srch_blk_status *pCurr;
 	register srch_blk_status *pNonStar;
 	register srch_hist	*pTargHist;
+	int			tmp_cmpc;
 	block_id		nBlkId;
 	cache_rec_ptr_t		cr;
 	int			cycle;
@@ -75,7 +76,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	boolean_t		already_built, is_mm;
 	ht_ent_int4		*tabent;
 	sm_uc_ptr_t		buffaddr;
-	trans_num		blkhdrtn;
+	trans_num		blkhdrtn, oldest_hist_tn;
 	int			hist_size;
 
 	pTarg = gv_target;
@@ -257,9 +258,11 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 		 * performance reasons) in the other tries. The cost of a restart (particularly in TP) is very high that it is
 		 * considered okay to take the hit of validating the entire clue before using it even if it is not the final retry.
 		 */
-		DEBUG_ONLY(is_mm = (dba_mm == cs_data->acc_meth);)
 		if (cdb_sc_normal == status)
 		{
+			is_mm = (dba_mm == cs_data->acc_meth);
+			if (!is_mm)
+				oldest_hist_tn = OLDEST_HIST_TN(cs_addrs);
 			for (srch_status = &pTargHist->h[0]; HIST_TERMINATOR != srch_status->blk_num; srch_status++)
 			{
 				assert(srch_status->level == srch_status - &pTargHist->h[0]);
@@ -279,8 +282,17 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 						status = cdb_sc_lostcr;
 						break;
 					}
-					if (CDB_STAGNATE <= t_tries || mu_reorg_process)
+					if ((CDB_STAGNATE <= t_tries) || mu_reorg_process)
+					{
 						CWS_INSERT(cr->blk);
+						if ((CDB_STAGNATE <= t_tries) && (srch_status->tn <= oldest_hist_tn))
+						{	/* The tn at which the history was last validated is before the earliest
+							 * transaction in the BT. The clue can no longer be relied upon.
+							 */
+							status = cdb_sc_losthist;
+							break;
+						}
+					}
 					cr->refer = TRUE;
 				}
 			}
@@ -457,12 +469,13 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				assert(CDB_STAGNATE > t_tries);
 				return cdb_sc_rmisalign;
 			}
-			if (pNonStar->curr_rec.match < ((rec_hdr_ptr_t)pRec)->cmpc)
+			EVAL_CMPC2((rec_hdr_ptr_t)pRec, n1);
+			if (pNonStar->curr_rec.match < n1)
 			{
 				assert(CDB_STAGNATE > t_tries);
 			 	return cdb_sc_rmisalign;
 			}
-			if ((n1 = ((rec_hdr_ptr_t)pRec)->cmpc) > (int)(pTarg->last_rec->top))
+			if (n1 > (int)(pTarg->last_rec->top))
 			{
 				assert(CDB_STAGNATE > t_tries);
 				return cdb_sc_keyoflow;

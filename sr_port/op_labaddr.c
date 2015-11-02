@@ -17,7 +17,7 @@
 #endif
 
 #include "cmd_qlf.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "zbreak.h"
 
 error_def(ERR_LABELMISSING);

@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -610,7 +610,7 @@ else
 		cat ${TMP_DIR}_main_.final >>! ${TMP_DIR}_build_routine.final
 	endif
 	# If we have a non-zero pct file list then include gde as one of the final build routines
-	if (! -z ${TMP_DIR}_pct_files) then
+	if (-e ${TMP_DIR}_pct_files && ! -z ${TMP_DIR}_pct_files) then
 		echo "gde" >>! ${TMP_DIR}_build_routine.final
 	endif
 	set build_routine = `cat ${TMP_DIR}_build_routine.final`

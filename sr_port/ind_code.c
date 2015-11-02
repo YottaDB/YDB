@@ -12,7 +12,7 @@
 #include "mdef.h"
 #include "compiler.h"
 #include "objlabel.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "cache.h"
 #include "cgp.h"
 #include "stringpool.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,6 +54,8 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat
 {
 	unsigned char	buf1[MAX_KEY_SZ + 1], ch, *ptr, trail_ch;
 	unsigned short	*tbl_ptr;
+	int		num, rev_num, trail_zero;
+	span_subs	*subs_ptr;
 	int		expon, in_length, length, tmp;
 	mstr		mstr_ch, mstr_targ;
 	DCL_THREADGBL_ACCESS;
@@ -93,6 +95,27 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat
 	{	/* Number */
 		if (SUBSCRIPT_ZERO == ch)
 			*targ++ = '0';
+		else if(SPANGLOB_SUB_ESCAPE == ch)
+		{
+			ASGN_SPAN_PREFIX(targ);
+			targ += SPAN_PREFIX_LEN;
+			subs_ptr = (span_subs *)(sub - 1);
+			/* Internal to the database, the spanning node blocks counting starts with 0 i.e. first spanning
+			 * node block has ID '0' but while displaying first block of spanning node is displayed as '1'
+			 * Hence the below adjustment in the 'num'.
+			 */
+			num = SPAN_GVSUBS2INT(subs_ptr) + 1;
+			sub = (sub - 1) + SPAN_SUBS_LEN;
+			for (trail_zero = 0; (num % DECIMAL_BASE) == 0; trail_zero++, num /= DECIMAL_BASE)
+				;
+			for (rev_num = 0; num > 0; rev_num = (rev_num * DECIMAL_BASE + num % DECIMAL_BASE), num /= DECIMAL_BASE)
+				;
+			for (; rev_num > 0; *targ++ = (rev_num % DECIMAL_BASE + ASCII_0), rev_num /= DECIMAL_BASE)
+				;
+			for (; trail_zero > 0 ; *targ++ = '0', trail_zero--);
+			if (*sub != 0)
+				*targ++ = '*';
+		}
 		else
 		{
 			tbl_ptr = (unsigned short *)&dpos[0] - 1;

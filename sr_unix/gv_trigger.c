@@ -18,7 +18,7 @@
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsfhead.h"
-#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
+#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "error.h"
@@ -740,6 +740,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		assert(NULL == gvt->gvt_trigger);
 	}
 	gvt_trigger = (gvt_trigger_t *)malloc(SIZEOF(gvt_trigger_t));
+	gvt_trigger->gv_trigger_cycle = 0;
 	gvt_trigger->gv_trig_array = NULL;
 	gvt_trigger->gv_trig_list = NULL;
 	/* Set gvt->gvt_trigger to this malloced memory (after gv_trig_array has been initialized to NULL to avoid garbage
@@ -1323,9 +1324,7 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 		 * control back to wherever that global reference occurred instead of this ^#t global read. Assert that below.
 		 */
 		cycle_start = csa->db_trigger_cycle;
-		assert(NULL != first_sgm_info);	/* The region corresponding to ^#t should be the only one in this TP so far */
-		assert(NULL == first_sgm_info->next_sgm_info);
-		assert(!first_sgm_info->num_of_blks);	/* This region should not have had ANY other reads until now */
+		ASSERT_BEGIN_OF_FRESH_TP_TRANS;
 		lcl_t_tries = t_tries;
 		t_fail_hist[lcl_t_tries] = cdb_sc_normal;
 		assert(donot_INVOKE_MUMTSTART);
@@ -1372,8 +1371,8 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_
 				 * an error OR redo the root search of the original global as online rollback related restart
 				 * resets root block of all gv_targets to zero.
 				 */
-				assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure))
-						|| (TREF(dollar_zonlnrlbk) && !gv_target->root));
+				assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure)) || !gv_target->root);
+				assert((cdb_sc_onln_rlbk2 != failure) || TREF(dollar_zonlnrlbk));
 				if (cdb_sc_onln_rlbk1 == failure)
 				{
 					root_srch_needed = (ERR_GVPUTFAIL != err_code);

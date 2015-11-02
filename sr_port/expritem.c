@@ -42,21 +42,6 @@ LITREF	mval		literal_null;
 #define f_char f_zchar
 #endif
 
-#define ENCOUNTERED_SIDE_EFFECT										\
-{	/* Needs #include "show_source_line" and #include "fullbool.h" */				\
-	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];					\
-													\
-	if (TREF(shift_side_effects))									\
-	{												\
-		TREF(saw_side_effect) = TRUE;								\
-		if (!run_time && (FULL_BOOL_WARN == TREF(gtm_fullbool)))				\
-		{	/* warnings requested by by gtm_fullbool and enabled by eval_expr */		\
-			show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);		\
-			dec_err(VARLSTCNT(1) ERR_BOOLSIDEFFECT);					\
-		}											\
-	}												\
-}
-
 /* note that svn_index array provides indexes into this array for each letter of the
  * alphabet so changes here should be reflected there.
  */

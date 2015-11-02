@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,8 @@ LITREF	char gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE];
 
 STATICDEF gdr_name	*gdr_name_head;
 STATICDEF gd_addr	*gd_addr_head;
+
+error_def(ERR_GDINVALID);
 
 /*+
 Function:       ZGBLDIR
@@ -136,7 +138,6 @@ gd_addr *gd_load(mstr *v)
 	gd_region	*reg, *reg_top;
 	uint4		t_offset, size;
 	short		i;
-	error_def(ERR_GDINVALID);
 
 	file_ptr = open_gd_file(v);
 
@@ -169,13 +170,16 @@ gd_addr *gd_load(mstr *v)
 	table->regions = (struct gd_region_struct *)((UINTPTR_T)table->regions + (UINTPTR_T)table);
 	table->segments = (struct gd_segment_struct *)((UINTPTR_T)table->segments + (UINTPTR_T)table);
 	table->end = (table->end + (UINTPTR_T)table);
-
 	for (map = table->maps, map_top = map + table->n_maps;  map < map_top;  map++)
 	{
 		t_offset = map->reg.offset;
 		map->reg.addr = (gd_region *)((char *)table + t_offset);
+		assert(SIZEOF(map->name) == (MAX_MIDENT_LEN + 1));
+		map->name[MAX_MIDENT_LEN] = '\0';	/* reset 32nd byte to 0 since only 31 bytes are used in map.
+							 * this is necessary so "mid_len" can be invoked on this
+							 * as it expects a null-terminated string.
+							 */
 	}
-
 	for (reg = table->regions, reg_top = reg + table->n_regions;  reg < reg_top;  reg++)
 	{
 		t_offset = reg->dyn.offset;

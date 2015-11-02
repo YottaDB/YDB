@@ -41,6 +41,8 @@ GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	sgm_info		*first_sgm_info;
+GBLREF	boolean_t		need_kip_incr;
+GBLREF	boolean_t		mu_reorg_process;
 
 void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcst_routine */
 {
@@ -53,6 +55,10 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 	/* any changes to the initialization in the two lines below might need a similar change in T_BEGIN_xxx_NONTP_OR_TP macros */
 	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);
 	update_trans = upd_trans;
+	assert(!update_trans || !need_kip_incr);	/* should not begin an update transaction with a non-zero value of this
+							 * variable as it will then cause csd->kill_in_prog to be incorrectly
+							 * incremented for the current transaction.
+							 */
 	t_err = err;
 
 	/* If we use a clue then we must consider the oldest tn in the search history to be the start tn for this transaction */
@@ -71,6 +77,11 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 		for (s = &gv_target->hist.h[0]; s->blk_num; s++)
 		{
 			histtn = s->tn;
+			/* Assert that we have a NULL cse in case of a non-zero clue as this will otherwise confuse t_end.c.
+			 * The only exception is reorg in which case we nullify the clue AFTER the t_begin call (in mu_reorg.c,
+			 * mu_swap_root.c, mu_truncate.c) but BEFORE the gvcst_search call so the clue does not get used.
+			 */
+			assert(mu_reorg_process || (NULL == s->cse));
 			if (start_tn > histtn)
 				start_tn = histtn;
 		}

@@ -16,7 +16,7 @@
 #include "cmd_qlf.h"
 #include "list_file.h"
 #include "source_file.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "obj_file.h"
 #include "reinit_externs.h"
 #include "compiler.h"

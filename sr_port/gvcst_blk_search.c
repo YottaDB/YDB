@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,6 +99,8 @@ GBLREF unsigned int	t_tries;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 
+error_def(ERR_TEXT);
+
 #ifdef DEBUG
 #include "gdscc.h"
 
@@ -129,8 +131,6 @@ GBLREF gd_region	*gv_cur_region;
 static	void	gvcst_search_fail(srch_blk_status *pStat)
 {
 	char	buff[1024], crbuff[256], regbuff[512];
-
-	error_def(ERR_TEXT);
 
 	assert(CDB_STAGNATE <= t_tries);
 	assert((NULL != pStat) && ((NULL != pStat->cr) || (dba_mm == gv_cur_region->dyn.addr->acc_meth)) && (NULL != cs_addrs));
@@ -169,6 +169,7 @@ enum cdb_sc 	gvcst_search_blk (gv_key *pKey, srch_blk_status *pStat)
 	sm_uc_ptr_t		pBlkBase, pRecBase, pTop, pRec, pPrevRec;
 	unsigned char		*pCurrTarg, *pTargKeyBase;
 	unsigned short		nRecLen;
+	int			tmp_cmpc;
 
 	/* the following load code (and code in a few other places) is coded in a "assember" style
 	 * in an attempt to encourage the compiler to get it efficient;
@@ -220,7 +221,8 @@ enum cdb_sc 	gvcst_search_blk (gv_key *pKey, srch_blk_status *pStat)
 
 		/* If current compression count > last match, then this record
 		   also matches on 'last match' characters; keep looping */
-		if ((nTmp = ((rec_hdr_ptr_t)pRec)->cmpc) > nMatchCnt)
+		EVAL_CMPC2((rec_hdr_ptr_t)pRec, nTmp)
+		if (nTmp > nMatchCnt)
 			continue;
 
 		if (nTmp < nMatchCnt)
@@ -276,6 +278,7 @@ enum cdb_sc	gvcst_search_tail (gv_key *pKey, srch_blk_status *pStat, gv_key *pOl
 	sm_uc_ptr_t		pBlkBase, pRecBase, pRec, pTop, pPrevRec;
 	unsigned char		*pCurrTarg, *pTargKeyBase, *pOldKeyBase, *pCurrTargPos;
 	unsigned short		nRecLen;
+	int			tmp_cmpc;
 
 	/* see comment in gvcst_search_blk above on coding style */
 
@@ -317,8 +320,9 @@ enum cdb_sc	gvcst_search_tail (gv_key *pKey, srch_blk_status *pStat, gv_key *pOl
 	} else
 	{
 		GET_USHORT(nRecLen, &((rec_hdr_ptr_t)pRec)->rsiz);
-
-		if ((nFlg = nTmp = ((rec_hdr_ptr_t)pRec)->cmpc) != 0)
+		EVAL_CMPC2((rec_hdr_ptr_t)pRec, nTmp);
+		nFlg = nTmp;
+		if (nFlg != 0)
 		{
 			do
 			{
@@ -391,7 +395,8 @@ enum cdb_sc	gvcst_search_tail (gv_key *pKey, srch_blk_status *pStat, gv_key *pOl
 			pRecBase = pRec;
 			/* If current compression count > last match, then this record
 			   also matches on 'last match' characters; keep looping */
-			if ((nTmp = ((rec_hdr_ptr_t)pRec)->cmpc) > nMatchCnt)
+			EVAL_CMPC2((rec_hdr_ptr_t)pRec, nTmp);
+			if (nTmp > nMatchCnt)
 				continue;
 			if (nTmp < nMatchCnt)
 /* cc_term: */		{	/* Terminated on compression count < previous match,

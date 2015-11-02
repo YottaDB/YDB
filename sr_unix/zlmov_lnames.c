@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 #include <string.h>
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 
 #ifdef USHBIN_SUPPORTED
 void zlmov_lnames(rhdtyp *hdr)

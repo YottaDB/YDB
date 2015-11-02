@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,13 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "dm_setup.h"
-#ifdef UNIX
 #include "io.h"
 GBLREF	io_desc		*gtm_err_dev;
-#endif
 
 GBLREF stack_frame	*frame_pointer;
 

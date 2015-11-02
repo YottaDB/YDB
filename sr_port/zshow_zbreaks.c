@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "zbreak.h"
 #include "zshow.h"
 

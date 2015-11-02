@@ -17,7 +17,7 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"
 #include "gvcst_protos.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "trigger.h"
 #include "trigger_read_name_entry.h"

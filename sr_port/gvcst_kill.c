@@ -41,7 +41,7 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "interlock.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #ifdef GTM_TRIGGER
 # include "gv_trigger.h"
@@ -73,6 +73,8 @@
 #include "tp_set_sgm.h"		/* for tp_set_sgm prototype */
 #include "op_tcommit.h"		/* for op_tcommit prototype */
 #include "have_crit.h"
+#include "error.h"
+#include "gtmimagename.h" /* needed for spanning nodes */
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey, *gv_altkey;
@@ -106,9 +108,11 @@ GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	uint4			update_array_size; /* needed for the ENSURE_UPDATE_ARRAY_SPACE macro */
 GBLREF	jnl_gbls_t		jgbl;
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
+UNIX_ONLY(GBLREF	boolean_t 		span_nodes_disallowed;)
 
-GTMTRIG_ONLY(error_def(ERR_DBROLLEDBACK);)
+error_def(ERR_DBROLLEDBACK);
 error_def(ERR_TPRETRY);
 error_def(ERR_GVKILLFAIL);
 
@@ -116,16 +120,82 @@ error_def(ERR_GVKILLFAIL);
 LITREF	mval	literal_null;
 LITREF	mval	*fndata_table[2][2];
 #endif
+LITREF	mval	literal_batch;
 
-void	gvcst_kill(bool do_subtree)
+DEFINE_NSB_CONDITION_HANDLER(gvcst_kill_ch)
+
+void	gvcst_kill(boolean_t do_subtree)
+{
+	boolean_t	spanstat;
+	boolean_t	sn_tpwrapped;
+	boolean_t	est_first_pass;
+	int		oldend;
+	int		save_dollar_tlevel;
+
+	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
+	if (do_subtree)
+	{	/* If we're killing the whole subtree, that includes any spanning nodes. No need to do anything special */
+		gvcst_kill2(TRUE, NULL, FALSE);
+		assert(save_dollar_tlevel == dollar_tlevel);
+		return;
+	} else
+	{	/* Attempt to zkill node, but abort if we might have a spanning node */
+		spanstat = 0;
+		gvcst_kill2(FALSE, &spanstat, FALSE);
+		assert(save_dollar_tlevel == dollar_tlevel);
+		if (!spanstat)
+			return;
+	}
+	VMS_ONLY(assert(FALSE));
+#	ifdef UNIX
+	RTS_ERROR_IF_SN_DISALLOWED;
+	oldend = gv_currkey->end;
+	/* Almost certainly have a spanning node to zkill. So start a TP transaction to deal with it. */
+	if (!dollar_tlevel)
+	{
+		sn_tpwrapped = TRUE;
+		op_tstart((IMPLICIT_TSTART + IMPLICIT_TRIGGER_TSTART), TRUE, &literal_batch, 0);
+		assert(!donot_INVOKE_MUMTSTART);
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE);
+		ESTABLISH_NORET(gvcst_kill_ch, est_first_pass);
+		GVCST_ROOT_SEARCH_AND_PREP(est_first_pass);
+	} else
+		sn_tpwrapped = FALSE;
+	/* Fire any triggers FIRST, then proceed with the kill. If we started a lcl_implicit transaction in first gvcst_kill
+	 * triggers were rolled back. So if span_status indicates TRLBKTRIG, do them again.
+	 * Otherwise, skip triggers because they were either kept or didn't happen.
+	 * What if new triggers added between above gvcst_kill and now? Should cause a restart because trigger cycle changes?
+	 */
+	if (sn_tpwrapped)
+		gvcst_kill2(FALSE, NULL, FALSE); /* zkill primary dummy node <--- jnling + trigs happen here */
+	/* kill any existing hidden subscripts */
+	APPEND_HIDDEN_SUB(gv_currkey); /* append "0211" to gv_currkey */
+	gvcst_kill2(FALSE, NULL, TRUE);
+	RESTORE_CURRKEY(gv_currkey, oldend);
+	if (sn_tpwrapped)
+	{
+		op_tcommit();
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);
+		REVERT; /* remove our condition handler */
+	}
+	assert(save_dollar_tlevel == dollar_tlevel);
+#	endif
+}
+
+void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing_chunks)
 {
 	block_id		gvt_root;
 	boolean_t		clue, flush_cache;
 	boolean_t		next_fenced_was_null, write_logical_jnlrecs, jnl_format_done;
 	boolean_t		left_extra, right_extra;
+	boolean_t		want_root_search = FALSE, is_dummy, succeeded, key_exists;
+	rec_hdr_ptr_t		rp;
+	uint4			lcl_onln_rlbkd_cycle;
+	int			data_len, cur_val_offset;
+	unsigned short		rec_size;
 	cw_set_element		*tp_cse;
 	enum cdb_sc		cdb_status;
-	int			lev, end;
+	int			lev, end, target_key_size;
 	uint4			prev_update_trans, actual_update;
 	jnl_format_buffer	*jfb, *ztworm_jfb;
 	jnl_action_code		operation;
@@ -133,7 +203,7 @@ void	gvcst_kill(bool do_subtree)
 	node_local_ptr_t	cnl;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	srch_blk_status		*left,*right;
+	srch_blk_status		*bh, *left, *right;
 	srch_hist		*gvt_hist, *alt_hist, *dir_hist;
 	srch_rec_status		*left_rec_stat, local_srch_rec;
 	uint4			segment_update_array_size;
@@ -153,10 +223,9 @@ void	gvcst_kill(bool do_subtree)
 	unsigned char		*save_msp;
 	mv_stent		*save_mv_chain;
 	mval			*ztold_mval = NULL, ztvalue_new, ztworm_val;
-	DEBUG_ONLY(enum cdb_sc	save_cdb_status;)
 #	endif
 #	ifdef DEBUG
-	boolean_t		is_mm;
+	boolean_t		is_mm, root_search_done = FALSE;
 	uint4			dbg_research_cnt;
 #	endif
 	DCL_THREADGBL_ACCESS;
@@ -204,6 +273,25 @@ void	gvcst_kill(bool do_subtree)
 	for (;;)
 	{
 		actual_update = 0;
+#		ifdef GTM_TRIGGER
+		gvtr_parms.num_triggers_invoked = 0;	/* clear any leftover value */
+		is_tpwrap = FALSE;
+		/* No trigger ^#t reads needed if skip_dbtriggers is TRUE (e.g. mupip load etc.) */
+		if (!skip_dbtriggers)
+		{
+			GVTR_INIT_AND_TPWRAP_IF_NEEDED(csa, csd, gv_target, gvt_trigger, lcl_implicit_tstart, is_tpwrap,
+							ERR_GVKILLFAIL);
+			assert(gvt_trigger == gv_target->gvt_trigger);
+		}
+		/* finish off any pending root search from previous retry */
+		REDO_ROOT_SEARCH_IF_NEEDED(want_root_search, cdb_status);
+		if (cdb_sc_normal != cdb_status)
+		{	/* gvcst_root_search invoked from REDO_ROOT_SEARCH_IF_NEEDED ended up with a restart situation but did not
+			 * actually invoke t_retry. Instead, it returned control back to us asking us to restart.
+			 */
+			goto retry;
+		}
+#		endif
 		/* Need to reinitialize gvt_hist & alt_hist for each try as it might have got set to a value in the previous
 		 * retry that is inappropriate for this try (e.g. gvt_root value changed between tries).
 		 */
@@ -265,71 +353,64 @@ void	gvcst_kill(bool do_subtree)
 		jnl_format_done = FALSE;
 		write_logical_jnlrecs = JNL_WRITE_LOGICAL_RECS(csa);
 #		ifdef GTM_TRIGGER
-		gvtr_parms.num_triggers_invoked = 0;	/* clear any leftover value */
 		dlr_data = 0;
-		is_tpwrap = FALSE;
-		/* No trigger init needed if skip_dbtriggers is TRUE (e.g. mupip load etc.).
-		 * Also if gvt_root is 0 (possible only if gv_play_duplicate_kills is TRUE) we want to only journal the
+		/* No trigger invocation needed if skip_dbtriggers is TRUE (e.g. mupip load etc.).
+		 * If gvt_root is 0 (possible only if gv_play_duplicate_kills is TRUE) we want to only journal the
 		 * kill but not touch the database or invoke triggers. So skip triggers in that case too.
 		 */
-		if (!skip_dbtriggers && gvt_root)
+		if (!skip_dbtriggers && (NULL != gvt_trigger) && gvt_root && !killing_chunks)
 		{
-			GVTR_INIT_AND_TPWRAP_IF_NEEDED(csa, csd, gv_target, gvt_trigger, lcl_implicit_tstart, is_tpwrap,
-							ERR_GVKILLFAIL);
-			assert(gvt_trigger == gv_target->gvt_trigger);
-			if (NULL != gvt_trigger)
-			{
-				PUSH_ZTOLDMVAL_ON_M_STACK(ztold_mval, save_msp, save_mv_chain);
-				/* Determine $ZTOLDVAL & $ZTDATA to fill in trigparms */
-				cdb_status = gvcst_dataget(&dlr_data, ztold_mval);
-				if (cdb_sc_normal != cdb_status)
-					goto retry;
-				assert((11 >= dlr_data) && (1 >= (dlr_data % 10)));
-				/* Invoke triggers for KILL as long as $data is nonzero (1 or 10 or 11).
-				 * Invoke triggers for ZKILL only if $data is 1 or 11 (for 10 case, ZKILL is a no-op).
+			PUSH_ZTOLDMVAL_ON_M_STACK(ztold_mval, save_msp, save_mv_chain);
+			/* Determine $ZTOLDVAL & $ZTDATA to fill in trigparms */
+			dlr_data = DG_DATAGET; /* tell dataget we want full info regarding descendants */
+			cdb_status = gvcst_dataget(&dlr_data, ztold_mval);
+			if (cdb_sc_normal != cdb_status)
+				goto retry;
+			assert((11 >= dlr_data) && (1 >= (dlr_data % 10)));
+			/* Invoke triggers for KILL as long as $data is nonzero (1 or 10 or 11).
+			 * Invoke triggers for ZKILL only if $data is 1 or 11 (for 10 case, ZKILL is a no-op).
+			 */
+			if (do_subtree ? dlr_data : (dlr_data & 1))
+			{	/* Either node or its descendants exists. Invoke KILL triggers for this node.
+				 * But first write journal records (ZTWORM and/or KILL) for the triggering nupdate.
+				 * "ztworm_jfb", "jfb" and "jnl_format_done" are set by the below macro.
 				 */
-				if (do_subtree ? dlr_data : (dlr_data & 1))
-				{	/* Either node or its descendants exists. Invoke KILL triggers for this node.
-					 * But first write journal records (ZTWORM and/or KILL) for the triggering nupdate.
-					 * "ztworm_jfb", "jfb" and "jnl_format_done" are set by the below macro.
+				JNL_FORMAT_ZTWORM_IF_NEEDED(csa, write_logical_jnlrecs,
+						operation, gv_currkey, NULL, ztworm_jfb, jfb, jnl_format_done);
+				/* Initialize trigger parms that dont depend on the context of the matching trigger */
+				trigparms.ztoldval_new = ztold_mval;
+				trigparms.ztdata_new = fndata_table[dlr_data / 10][dlr_data & 1];
+				if (NULL == trigparms.ztvalue_new)
+				{	/* Do not pass literal_null directly since $ztval can be modified inside trigger
+					 * code and literal_null is in read-only segment so will not be modifiable.
+					 * Hence the need for a dummy local variable mval "ztvalue_new" in the C stack.
 					 */
-					JNL_FORMAT_ZTWORM_IF_NEEDED(csa, write_logical_jnlrecs,
-							operation, gv_currkey, NULL, ztworm_jfb, jfb, jnl_format_done);
-					/* Initialize trigger parms that dont depend on the context of the matching trigger */
-					trigparms.ztoldval_new = ztold_mval;
-					trigparms.ztdata_new = fndata_table[dlr_data / 10][dlr_data & 1];
-					if (NULL == trigparms.ztvalue_new)
-					{	/* Do not pass literal_null directly since $ztval can be modified inside trigger
-						 * code and literal_null is in read-only segment so will not be modifiable.
-						 * Hence the need for a dummy local variable mval "ztvalue_new" in the C stack.
-						 */
-						ztvalue_new = literal_null;
-						trigparms.ztvalue_new = &ztvalue_new;
-					}
-					gvtr_parms.gvtr_cmd = do_subtree ? GVTR_CMDTYPE_KILL : GVTR_CMDTYPE_ZKILL;
-					gvtr_parms.gvt_trigger = gvt_trigger;
-					/* Now that we have filled in minimal information, let "gvtr_match_n_invoke" do the rest */
-					gtm_trig_status = gvtr_match_n_invoke(&trigparms, &gvtr_parms);
-					assert((0 == gtm_trig_status) || (ERR_TPRETRY == gtm_trig_status));
-					if (ERR_TPRETRY == gtm_trig_status)
-					{	/* A restart has been signaled that we need to handle or complete the handling of.
-						 * This restart could have occurred reading the trigger in which case no
-						 * tp_restart() has yet been done or it could have occurred in trigger code in
-						 * which case we need to finish the incomplete tp_restart. In both cases this
-						 * must be an implicitly TP wrapped transaction. Our action is to complete the
-						 * necessary tp_restart() logic (t_retry is already completed so should be skipped)
-						 * and then re-do the gvcst_kill logic.
-						 */
-						assert(lcl_implicit_tstart);
-						assert(CDB_STAGNATE >= t_tries);
-						cdb_status = cdb_sc_normal;	/* signal "retry:" to avoid t_retry call */
-						goto retry;
-					}
-					REMOVE_ZTWORM_JFB_IF_NEEDED(ztworm_jfb, jfb, sgm_info_ptr);
+					ztvalue_new = literal_null;
+					trigparms.ztvalue_new = &ztvalue_new;
 				}
-				/* else : we dont invoke any KILL/ZTKILL type triggers for a node whose $data is 0 */
-				POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);
+				gvtr_parms.gvtr_cmd = do_subtree ? GVTR_CMDTYPE_KILL : GVTR_CMDTYPE_ZKILL;
+				gvtr_parms.gvt_trigger = gvt_trigger;
+				/* Now that we have filled in minimal information, let "gvtr_match_n_invoke" do the rest */
+				gtm_trig_status = gvtr_match_n_invoke(&trigparms, &gvtr_parms);
+				assert((0 == gtm_trig_status) || (ERR_TPRETRY == gtm_trig_status));
+				if (ERR_TPRETRY == gtm_trig_status)
+				{	/* A restart has been signaled that we need to handle or complete the handling of.
+					 * This restart could have occurred reading the trigger in which case no
+					 * tp_restart() has yet been done or it could have occurred in trigger code in
+					 * which case we need to finish the incomplete tp_restart. In both cases this
+					 * must be an implicitly TP wrapped transaction. Our action is to complete the
+					 * necessary tp_restart() logic (t_retry is already completed so should be skipped)
+					 * and then re-do the gvcst_kill logic.
+					 */
+					assert(lcl_implicit_tstart || *span_status);
+					assert(CDB_STAGNATE >= t_tries);
+					cdb_status = cdb_sc_normal;	/* signal "retry:" to avoid t_retry call */
+					goto retry;
+				}
+				REMOVE_ZTWORM_JFB_IF_NEEDED(ztworm_jfb, jfb, sgm_info_ptr);
 			}
+			/* else : we dont invoke any KILL/ZTKILL type triggers for a node whose $data is 0 */
+			POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);
 		}
 #		endif
 		assert(csd == cs_data);	/* assert csd is in sync with cs_data even if there were MM db file extensions */
@@ -353,6 +434,13 @@ void	gvcst_kill(bool do_subtree)
 research:
 		if (gvt_root)
 		{
+#if defined(DEBUG) && defined(UNIX)
+			if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVKILLFAIL == gtm_white_box_test_case_number))
+			{
+				cdb_status = cdb_sc_blknumerr;
+				goto retry;
+			}
+#endif
 			if (cdb_sc_normal != (cdb_status = gvcst_search(gv_currkey, NULL)))
 				goto retry;
 			assert(gv_altkey->top == gv_currkey->top);
@@ -368,9 +456,64 @@ research:
 				base[++end] = KEY_DELIMITER;
 			} else
 			{
-				base[end] = 1;
-				base[++end] = KEY_DELIMITER;
-				base[++end] = KEY_DELIMITER;
+#				ifdef UNIX
+				target_key_size = gv_currkey->end + 1;
+				bh = &gv_target->hist.h[0];
+				key_exists = (target_key_size == bh->curr_rec.match);
+				if (key_exists)
+				{	/* check for spanning node dummy value: a single zero byte */
+					rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)bh->buffaddr + bh->curr_rec.offset);
+					GET_USHORT(rec_size, &rp->rsiz);
+					cur_val_offset = SIZEOF(rec_hdr) + target_key_size - EVAL_CMPC((rec_hdr_ptr_t)rp);
+					data_len = rec_size - cur_val_offset;
+					is_dummy = IS_SN_DUMMY(data_len, (sm_uc_ptr_t)rp + cur_val_offset);
+					if (is_dummy && (NULL != span_status) && !(span_nodes_disallowed && csd->span_node_absent))
+					{
+						need_kip_incr = FALSE;
+						if (!dollar_tlevel)
+						{
+							update_trans = 0;
+							succeeded = ((trans_num)0 != t_end(gvt_hist, NULL, TN_NOT_SPECIFIED));
+							if (!succeeded)
+							{	/* see other t_end */
+								assert((NULL == kip_csa) && (csd == cs_data));
+								update_trans = UPDTRNS_DB_UPDATED_MASK;
+								continue;
+							}
+							*span_status = TRUE;
+							return;
+						} else
+						{
+							cdb_status = tp_hist(NULL);
+							if (cdb_sc_normal != cdb_status)
+								goto retry;
+							*span_status = TRUE;
+#							ifdef GTM_TRIGGER
+							if (lcl_implicit_tstart)
+							{	/* Rollback triggers */
+								OP_TROLLBACK(-1);
+								return;
+							}
+#							endif
+							/* do not return in case of entering with TP, still set span_status */
+						}
+					}
+				}
+#				endif
+				if (killing_chunks)
+				{	/* Second call of gvcst_kill2 within TP transaction in gvcst_kill
+					 * Kill all hidden subscripts...
+					 */
+					base[end - 3] = STR_SUB_MAXVAL;
+					base[end - 2] = STR_SUB_MAXVAL;
+					base[end - 1] = KEY_DELIMITER;
+					base[end - 0] = KEY_DELIMITER;
+				} else
+				{
+					base[end] = 1;
+					base[++end] = KEY_DELIMITER;
+					base[++end] = KEY_DELIMITER;
+				}
 			}
 			gv_altkey->end = end;
 			if (cdb_sc_normal != (cdb_status = gvcst_search(gv_altkey, alt_hist)))
@@ -520,12 +663,12 @@ research:
 			} else
 			{
 				/* See comment above IS_OK_TO_INVOKE_GVCST_KILL macro for why the below assert is the way it is */
-				assert(!jgbl.forw_phase_recovery || actual_update || (JS_IS_DUPLICATE & jgbl.mur_jrec_nodeflags)
-						|| jgbl.mur_options_forward);
+				/*assert(!jgbl.forw_phase_recovery || actual_update || (JS_IS_DUPLICATE & jgbl.mur_jrec_nodeflags)
+						|| jgbl.mur_options_forward);*/
 				assert(si->update_trans);
 			}
 		}
-		if (write_logical_jnlrecs && (actual_update || gv_play_duplicate_kills))
+		if (write_logical_jnlrecs && (actual_update || gv_play_duplicate_kills) && !killing_chunks)
 		{	/* Maintain journal records only if the kill actually resulted in a database update OR if
 			 * "gv_play_duplicate_kills" is TRUE. In the latter case, even though no db blocks will be touched,
 			 * it will still increment the db curr_tn and write jnl records.
@@ -632,7 +775,8 @@ research:
                                 goto retry;
 		}
 #		endif
-		INCR_GVSTATS_COUNTER(csa, cnl, n_kill, 1);
+		if (!killing_chunks)
+			INCR_GVSTATS_COUNTER(csa, cnl, n_kill, 1);
 		if (gvt_root && (0 != gv_target->clue.end))
 		{	/* If clue is still valid, then the deletion was confined to a single block */
 			assert(gvt_hist->h[0].blk_num == alt_hist->h[0].blk_num);
@@ -685,11 +829,12 @@ retry:
 			/* else: t_retry has already been done by gtm_trigger so no need to do it again for this try */
 		}
 #		endif
-		assert((cdb_sc_normal != cdb_status) GTMTRIG_ONLY(|| lcl_implicit_tstart));
+		assert((cdb_sc_normal != cdb_status) GTMTRIG_ONLY(|| lcl_implicit_tstart || *span_status));
 		if (cdb_sc_normal != cdb_status)
 		{
 			GTMTRIG_ONLY(POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain));
 			t_retry(cdb_status);
+			GTMTRIG_ONLY(skip_INVOKE_RESTART = FALSE);
 		} else
 		{	/* else: t_retry has already been done so no need to do that again but need to still invoke tp_restart
 			 * to complete pending "tprestart_state" related work.
@@ -698,49 +843,30 @@ retry:
 			assert(ERR_TPRETRY == gtm_trig_status);
 			TRIGGER_BASE_FRAME_UNWIND_IF_NOMANSLAND;
 			POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);
+			if (!lcl_implicit_tstart)
+			{	/* We started an implicit transaction for spanning nodes in gvcst_kill. Invoke restart to return. */
+				assert(*span_status && !skip_INVOKE_RESTART && (&gvcst_kill_ch == ctxt->ch));
+				INVOKE_RESTART;
+			}
 #			endif
 			rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 			assert(0 == rc GTMTRIG_ONLY(&& TPRESTART_STATE_NORMAL == tprestart_state));
 		}
-#		ifdef GTM_TRIGGER
 		assert(0 < t_tries);
+#		ifdef GTM_TRIGGER
 		if (lcl_implicit_tstart)
 		{
-			assert((cdb_sc_normal != cdb_status) || (ERR_TPRETRY == gtm_trig_status));
-			if (cdb_sc_normal == cdb_status)
-			{
-				DEBUG_ONLY(save_cdb_status = cdb_status);
-				cdb_status = t_fail_hist[t_tries - 1]; /* get the last restart code */
-			}
-			assert(((cdb_sc_onln_rlbk1 != cdb_status) && (cdb_sc_onln_rlbk2 != cdb_status))
-				|| (TREF(dollar_zonlnrlbk) && !gv_target->root));
-			if ((cdb_sc_onln_rlbk1 == cdb_status) || (cdb_sc_gvtrootmod == cdb_status))
-			{
-				assert(NULL != gv_target);
-				ASSERT_BEGIN_OF_FRESH_TP_TRANS; /* ensures gvcst_root_search is the first thing done in the
-								 * restarted transaction */
-				/* We are implicit transaction and online rollback update the database but did NOT take us to a
-				 * different logical state. We've already done the restart, but the root is now reset to zero. Do
-				 * root search to establish the new root
-				 */
-				GVCST_ROOT_SEARCH;
-			} else if (cdb_sc_onln_rlbk2 == cdb_status)
-			{	/* Database was taken back to a different logical state and we are an implicit TP transaction.
-				 * Issue DBROLLEDBACK error that the application programmer can catch and do the necessary stuff.
-				 */
-				assert(gtm_trigger_depth == tstart_trigger_depth);
-				rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
-			}
+			SET_WANT_ROOT_SEARCH(cdb_status, want_root_search);
+			assert(!skip_INVOKE_RESTART); /* if set to TRUE above, should have been reset by t_retry */
 		}
 #		endif
-		GTMTRIG_ONLY(assert(!skip_INVOKE_RESTART)); /* if set to TRUE above, should have been reset by t_retry */
 		/* At this point, we can be in TP only if we implicitly did a tstart in gvcst_kill (as part of a trigger update).
 		 * Assert that. Since the t_retry/tp_restart would have reset si->update_trans, we need to set it again.
 		 * So reinvoke the T_BEGIN call only in case of TP. For non-TP, update_trans is unaffected by t_retry.
 		 */
 		assert(!dollar_tlevel GTMTRIG_ONLY(|| lcl_implicit_tstart));
 		if (dollar_tlevel)
-		{
+		{	/* op_ztrigger has similar code and should be maintained in parallel */
 			tp_set_sgm();	/* set sgm_info_ptr & first_sgm_info for TP start */
 			T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVKILLFAIL);	/* set update_trans and t_err for wrapped TP */
 		} else

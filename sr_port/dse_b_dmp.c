@@ -121,7 +121,7 @@ boolean_t dse_b_dmp(void)
 				util_len += i2hexl_nofill(((blk_hdr_ptr_t)bp)->tn, &util_buff[util_len], 16);
 				memcpy(&util_buff[util_len], " ", 1);
 				util_len++;
-				ondsk_blkver = (!is_mm ? cr->ondsk_blkver : GDSV5);
+				ondsk_blkver = (!is_mm ? cr->ondsk_blkver : GDSV6);
 				len = STRLEN(gtm_dbversion_table[ondsk_blkver]);
 				memcpy(&util_buff[util_len], gtm_dbversion_table[ondsk_blkver], len);
 				util_len += len;
@@ -183,7 +183,7 @@ boolean_t dse_b_dmp(void)
 					util_len += i2hexl_nofill(((blk_hdr_ptr_t)bp)->tn, &util_buff[util_len], 16);
 					memcpy(&util_buff[util_len], " ", 1);
 					util_len++;
-					ondsk_blkver = (!is_mm ? cr->ondsk_blkver : GDSV5);
+					ondsk_blkver = (!is_mm ? cr->ondsk_blkver : GDSV6);
 					len = STRLEN(gtm_dbversion_table[ondsk_blkver]);
 					memcpy(&util_buff[util_len], gtm_dbversion_table[ondsk_blkver], len);
 					util_len += len;

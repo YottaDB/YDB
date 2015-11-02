@@ -51,6 +51,7 @@ void    jnl_write_trunc_rec(sgmnt_addrs *csa, uint4 orig_total_blks, uint4 orig_
 	trunc_rec.orig_total_blks = orig_total_blks;
 	trunc_rec.orig_free_blocks = orig_free_blocks;
 	trunc_rec.total_blks_after_trunc = total_blks_after_trunc;
+	trunc_rec.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&trunc_rec, SIZEOF(struct_jrec_trunc));
 	jnl_write(jpc, JRT_TRUNC, (jnl_record *)&trunc_rec, NULL, NULL);
 }
 

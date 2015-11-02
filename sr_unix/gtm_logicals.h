@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,9 +24,11 @@
 #define	GTM_BLKUPGRADE_FLAG		"$gtm_blkupgrade_flag"
 #define	GTM_DBFILEXT_SYSLOG_DISABLE	"$gtm_dbfilext_syslog_disable"
 #define	GTM_TP_ALLOCATION_CLUE		"$gtm_tp_allocation_clue"
+#define	GTM_TPNOTACIDTIME		"$gtm_tpnotacidtime"
 #define	GTM_TPRESTART_LOG_DELTA		"$gtm_tprestart_log_delta"
 #define	GTM_TPRESTART_LOG_LIMIT		"$gtm_tprestart_log_first"
 #define	GTM_FULLBLOCKWRITES		"$gtm_fullblockwrites"
+#define	GTM_ZMAXTPTIME			"$gtm_zmaxtptime"
 
 /* White-box testing */
 #define	GTM_WHITE_BOX_TEST_CASE_ENABLE	"$gtm_white_box_test_case_enable"
@@ -95,6 +97,7 @@
 #define	GTM_EVENT_LOG_LIB_ENV		"$gtm_event_log_libpath"
 #define	GTM_EVENT_LOG_RTN_ENV		"$gtm_event_log_rtn"
 #define GTM_JNL_RELEASE_TIMEOUT		"$gtm_jnl_release_timeout"
+#define GTM_CUSTOM_ERRORS		"$gtm_custom_errors"
 
 /* Unicode */
 #define	GTM_CHSET_ENV			"$gtm_chset"

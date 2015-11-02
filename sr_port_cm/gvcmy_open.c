@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,13 @@
 
 GBLREF spdesc stringpool;
 
+error_def(ERR_BADSRVRNETMSG);
+error_def(ERR_INVNETFILNM);
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_NETDBOPNERR);
+error_def(ERR_SYSCALL);
+
+
 #define GTCM_ENVVAR_PFX "GTCM_"
 #define GTCM_ENVVAR_PFXLEN (SIZEOF(GTCM_ENVVAR_PFX) - 1)
 
@@ -65,12 +72,6 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	short		temp_short;
 	VMS_ONLY($DESCRIPTOR(task, "GTCMSVR");)
 	UNIX_ONLY(MSTR_DEF(task, 0, NULL);)
-
-	error_def(ERR_BADSRVRNETMSG);
-	error_def(ERR_INVNETFILNM);
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_NETDBOPNERR);
-	error_def(ERR_SYSCALL);
 
 	ESTABLISH(gvcmy_open_ch);
 #ifdef VMS
@@ -209,7 +210,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 		/* From level 210 (GT.M V5), server will send null subscript collation info into CMMS_S_INITREG message */
 	reg->dyn.addr->cm_blk = clb_ptr;
 	reg->dyn.addr->acc_meth = dba_cm;
-	reg->open = TRUE;
+	SET_REGION_OPEN_TRUE(reg, WAS_OPEN_FALSE);
 	clb_ptr->mbl = li->buffer_size;
 	if (clb_ptr->mbl < CM_MINBUFSIZE)
 		clb_ptr->mbl = CM_MINBUFSIZE;

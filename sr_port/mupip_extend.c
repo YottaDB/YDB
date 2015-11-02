@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@
 #include "gtmmsg.h"
 #include "gdsfilext.h"
 #include "wcs_backoff.h"
+#include "gt_timer.h"
 #if defined(VMS) || defined(MM_FILE_EXT_OK)
 #define DB_IPCS_RESET(REG)
 #else
@@ -51,10 +52,11 @@
 }
 #endif
 
-GBLREF gd_addr		*gd_header;
-GBLREF gd_region 	*gv_cur_region;
-GBLREF sgmnt_addrs 	*cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
+GBLREF	gd_addr			*gd_header;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	boolean_t		jnlpool_init_needed;
 
 error_def(ERR_DBOPNERR);
 error_def(ERR_DBRDONLY);
@@ -73,6 +75,7 @@ void mupip_extend(void)
 	int		fd;
 
 	r_len = SIZEOF(regionname);
+	jnlpool_init_needed = TRUE;
 	if (cli_get_str("REG_NAME", regionname, &r_len) == FALSE)
 		rts_error(VARLSTCNT(1) ERR_MUNODBNAME);
 	if (cli_get_int("BLOCKS",&tblocks))

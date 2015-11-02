@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,11 +34,11 @@ GBLREF gv_key		*gv_currkey;
 GBLREF spdesc		stringpool;
 
 typedef struct bunch_rec_struct {
-	unsigned char rn;
-	unsigned char len;
-	unsigned char cc;
-	unsigned char prv;
-	unsigned char base[1];
+	unsigned char	rn;
+	unsigned short	len;
+	unsigned short	cc;
+	unsigned short	prv;
+	unsigned char	base[1];
 } bunch_rec;
 
 void gvcmz_bunch(mval *v)
@@ -46,7 +46,8 @@ void gvcmz_bunch(mval *v)
 	struct CLB	*lnk;
 	link_info	*usr;
 	unsigned char	*buffptr, *bufftop, *insert_record, *msgptr;
-	unsigned char	cc, len, i, *new_key, *rec_key;
+	unsigned char	*new_key, *rec_key;
+	unsigned short	cc, len, i;
 	signed char	is_gt;
 	bool		overlay;
 	unsigned short	newrec_len, oldrec_len, tmp_short;

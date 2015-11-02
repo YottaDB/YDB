@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 #include "mmemory.h"
 #include "advancewindow.h"
 #include "cmd.h"
+#include "fullbool.h"
 
 error_def(ERR_INDEXTRACHARS);
 error_def(ERR_SPOREOL);
@@ -41,8 +42,8 @@ int m_if(void)
 
 	SETUP_THREADGBL_ACCESS;
 	ifpos_in_chain = TREF(pos_in_chain);
-	jmpchain = (jmpchn*)mcalloc(SIZEOF(jmpchn));
-	dqinit(jmpchain,link);
+	jmpchain = (jmpchn *)mcalloc(SIZEOF(jmpchn));
+	dqinit(jmpchain, link);
 	if (TK_EOL == TREF(window_token))
 		return TRUE;
 	is_commarg = (1 == TREF(last_source_column));
@@ -54,7 +55,7 @@ int m_if(void)
 		jmpref->operand[0] = x;
 		nxtjmp = (jmpchn *)mcalloc(SIZEOF(jmpchn));
 		nxtjmp->jmptrip = jmpref;
-		dqins(jmpchain,link,nxtjmp);
+		dqins(jmpchain, link, nxtjmp);
 	} else
 	{
 		first_time = TRUE;
@@ -66,8 +67,8 @@ int m_if(void)
 			if (((OC_JMPNEQ == (ref0 = (TREF(curtchain))->exorder.bl)->opcode))
 				&& (OC_COBOOL == (ref1 = ref0->exorder.bl)->opcode)
 				&& (OC_INDGLVN == (ref2 = ref1->exorder.bl)->opcode))
-			{
-				dqdel(ref0,exorder);
+			{	/* short-circuit only optimization that turns a trailing INDGLVN COBOOL into separate indirect IF */
+				dqdel(ref0, exorder);
 				ref1->opcode = OC_JMPTSET;
 				ref1->operand[0] = put_indr(ta_opr);
 				ref2->opcode = OC_COMMARG;
@@ -76,16 +77,30 @@ int m_if(void)
 			t_set = (OC_JMPTSET == (TREF(curtchain))->exorder.bl->opcode);
 			if (!t_set)
 				newtriple(OC_CLRTEST);
+			if (TREF(expr_start) != TREF(expr_start_orig) && (OC_NOOP != (TREF(expr_start))->opcode))
+			{
+				assert((OC_GVSAVTARG == (TREF(expr_start))->opcode));
+				if ((OC_GVRECTARG != (TREF(curtchain))->exorder.bl->opcode)
+					|| ((TREF(curtchain))->exorder.bl->operand[0].oprval.tref != TREF(expr_start)))
+						newtriple(OC_GVRECTARG)->operand[0] = put_tref(TREF(expr_start));
+			}
 			jmpref = newtriple(OC_JMP);
 			jmpref->operand[0] = x;
 			nxtjmp = (jmpchn *)mcalloc(SIZEOF(jmpchn));
 			nxtjmp->jmptrip = jmpref;
-			dqins(jmpchain,link,nxtjmp);
+			dqins(jmpchain, link, nxtjmp);
 			tnxtarg(ta_opr);
 			if (first_time)
 			{
 				if (!t_set)
 					newtriple(OC_SETTEST);
+				if (TREF(expr_start) != TREF(expr_start_orig) && (OC_NOOP != (TREF(expr_start))->opcode))
+				{
+					assert((OC_GVSAVTARG == (TREF(expr_start))->opcode));
+					if ((OC_GVRECTARG != (TREF(curtchain))->exorder.bl->opcode)
+						|| ((TREF(curtchain))->exorder.bl->operand[0].oprval.tref != TREF(expr_start)))
+							newtriple(OC_GVRECTARG)->operand[0] = put_tref(TREF(expr_start));
+				}
 				first_time = FALSE;
 			}
 			if (TK_COMMA != TREF(window_token))

@@ -98,9 +98,14 @@ void	mur_get_options(void)
 	redirect_list	*rl_ptr, *rl_ptr1, *tmp_rl_ptr;
 	select_list	*sl_ptr, *sl_ptr1;
 	boolean_t	interactive, parse_error;
-#ifdef VMS
+#	ifdef VMS
 	int4		item_code, mode;
 	jnl_proc_time	max_time;
+#	endif
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+#	ifdef VMS
 	DEBUG_ONLY(
 		JNL_WHOLE_TIME(max_time);
 		/* The following assert is to make sure we get some fix for the toggling of max_time's bit 55 (bit 0 lsb, 63 msb).
@@ -108,11 +113,10 @@ void	mur_get_options(void)
 		 * approximately every 41700 days (114 years). We need to fix the way mupip recover operates to take care of such
 		 * transition periods. And the fix needs to be done before it is too late. Hence this assert. This assert will
 		 * fail in year 2084, approximately 980 days before the toggle time (in year 2087).
-	 	 */
+		 */
 		assert(JNL_FULL_HI_TIME(max_time) < JNL_HITIME_WARN_THRESHOLD);
 	)
-#endif
-
+#	endif
 	qual_buffer = (char *)malloc(MAX_LINE);
 	entry = (char *)malloc(MAX_LINE);
 	memset(&mur_options, 0, SIZEOF(mur_options));
@@ -133,7 +137,7 @@ void	mur_get_options(void)
 			jgbl.onlnrlbk = onln_rlbk_val ? (onln_rlbk_val != CLI_NEGATED) : FALSE; /* Default is -NOONLINE */
 		)
 	}
-	mupip_jnl_recover = mur_options.update;
+	TREF(skip_file_corrupt_check) = mupip_jnl_recover = mur_options.update;
 	jgbl.mur_rollback = mur_options.rollback;	/* needed to set jfh->repl_state properly for newly created jnl files */
 	UNIX_ONLY(murgbl.resync_strm_index = INVALID_SUPPL_STRM;)
 	if (CLI_PRESENT == cli_present("RESYNC"))

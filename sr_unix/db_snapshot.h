@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,10 @@
 #include "gtm_limits.h"
 
 #define		SNAPSHOT_HDR_LABEL		"SNAPSHOTV1"
+
+#define SET_FAST_INTEG(X)	((X)->proc_property |= 0x0001)
+#define SET_NORM_INTEG(X)	((X)->proc_property &= 0xfffe)
+#define FASTINTEG_IN_PROG(X)	((X)->proc_property & 0x0001)
 
 /* Possible states when snapshot is being init'ed */
 typedef enum
@@ -60,7 +64,7 @@ typedef struct util_snapshot_struct
 {
 	unsigned char		*master_map;
 	sgmnt_data_ptr_t	header;
-	uint4			native_size;
+	gtm_uint64_t		native_size;
 } util_snapshot_t;
 
 typedef	struct snapshot_context_struct
@@ -77,6 +81,10 @@ typedef	struct snapshot_context_struct
 	int4			shadow_vbn;
 	char			shadow_file[GTM_PATH_MAX];
 	ss_proc_status		cur_state;
+	/* the property of process triggering snapshot. At present only last bit is used to indicate property of integ process:
+         * 0x0000: Normal Integ, 0x0001:Fast Integ
+	 */
+	uint4			proc_property;
 } snapshot_context_t;
 
 typedef struct snapshot_filehdr_struct

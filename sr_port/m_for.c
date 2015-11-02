@@ -260,8 +260,6 @@ int m_for(void)
 			break;
 		newtriple(OC_JMP)->operand[0] = iteration_start_addr_indr;
 	}
-	if (not_even_once_addr)
-		 FOR_END_OF_SCOPE(1, *not_even_once_addr);	/* 1 means down a level */
 	forchk1opc = newtriple(OC_FORCHK1);	/* FORCHK1 is a do-nothing routine used by the out-of-band mechanism */
 	*iteration_start_addr = put_tjmp(forchk1opc);
 	if ((TK_EOL != TREF(window_token)) && (TK_SPACE != TREF(window_token)))
@@ -278,6 +276,8 @@ int m_for(void)
 		FOR_POP(BLOWN_FOR);
 		return FALSE;
 	}
+	if (not_even_once_addr)		/* if above errors leave FOR remains behind, improper operval.indr explodes OC_JMPGTR */
+		 FOR_END_OF_SCOPE(1, *not_even_once_addr);	/* 1 means down a level */
 	SAVE_FOR_OVER_ADDR();		/* stash address of next op in the for_stack array */
 	if (0 < arg_cnt)
 		newtriple(OC_JMPAT)->operand[0] = put_tref(eval_next_addr[0]);

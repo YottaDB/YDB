@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
-
+#define BYPASS_MEMCPY_OVERRIDE  /* Signals gtm_string.h to not override memcpy(). The assert in the called routine ends
+                                 * up pulling in the world in various executables so bypass for this routine.
+                                 */
 #include "gtm_string.h"
 #undef UNIX		/* Cause non-GTM-runtime routines to be used since this is a standalone module */
 #include "gtm_stdio.h"

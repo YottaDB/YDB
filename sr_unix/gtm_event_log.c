@@ -16,7 +16,7 @@
 #include "gtm_stdio.h"
 
 #include "gtm_event_log.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "lv_val.h"	/* needed for "fgncal.h" */
 #include "fgncal.h"
 #include "io.h"

@@ -33,6 +33,7 @@
 #include "gtm_string.h"
 #include "gtm_c_stack_trace.h"
 #include "gtmsecshr.h"		/* for continue_proc */
+#include "anticipatory_freeze.h"
 #ifdef DEBUG
 #include "gt_timer.h"
 #include "gtm_stdio.h"
@@ -65,12 +66,6 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	csa = &FILE_INFO(reg)->s_addrs;
 	jpc = csa->jnl;
 	jb  = jpc->jnl_buff;
-	/* If a concurrent online rollback is running, we should never be here since online rollback at the start flushes all the
-	 * dirty buffers and ensures that the journal buffers are all synced to disk. So, there is no need for GT.M processes to
-	 * reach here with a concurrent online rollback. Assert to that effect.
-	 */
-	DEBUG_ONLY(onln_rlbk_pid = csa->nl->onln_rlbk_pid);
-	assert(jgbl.onlnrlbk || !onln_rlbk_pid || !is_proc_alive(onln_rlbk_pid, 0));
 	if ((NOJNL != jpc->channel) && !JNL_FILE_SWITCHED(jpc))
 	{
 		csd = csa->hdr;
@@ -127,7 +122,15 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 				jb->fsync_dskaddr = saved_dsk_addr;
 			} else
 			{
-				GTM_FSYNC(jpc->channel, fsync_ret);
+				/* If a concurrent online rollback is running, we should never be here since online rollback at the
+				 * start flushes all the dirty buffers and ensures that the journal buffers are all synced to disk.
+				 * So, there is no need for GT.M processes to reach here with a concurrent online rollback. Assert
+				 * to that effect.
+				 */
+				DEBUG_ONLY(onln_rlbk_pid = csa->nl->onln_rlbk_pid);
+				assert(jgbl.onlnrlbk || !onln_rlbk_pid || !is_proc_alive(onln_rlbk_pid, 0)
+						|| (onln_rlbk_pid != csa->nl->in_crit));
+				GTM_JNL_FSYNC(csa, jpc->channel, fsync_ret);
 				if (-1 == fsync_ret)
 				{
 					save_errno = errno;

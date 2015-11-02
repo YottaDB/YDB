@@ -10,11 +10,15 @@
  ****************************************************************/
 
 #include "mdef.h"
-/* We want system malloc, not gtm_malloc (which comes from mdef.h --> mdefsp.h).  Since gtmsecshr_wrapper runs as root,
+#define BYPASS_MEMCPY_OVERRIDE  /* Signals gtm_string.h to not override memcpy(). This causes linking problems when libmumps.a
+                                 * is not available.
+                                 */
+#/* We want system malloc, not gtm_malloc (which comes from mdef.h --> mdefsp.h).  Since gtmsecshr_wrapper runs as root,
  * using the system malloc will increase security over using gtm_malloc.  Additionally, by not using gtm_malloc, we
  * are reducing code bloat.
  */
 #undef malloc
+#undef free
 #include "gtm_unistd.h"
 #include "gtm_stat.h"
 #include "gtm_stdlib.h"
@@ -23,31 +27,26 @@
 #include "gtm_syslog.h"
 #include "main_pragma.h"
 #ifndef __MVS__
-#include <malloc.h>
+#  include <malloc.h>
 #endif
 #include <errno.h>
-
 #define ROOTUID 0
 #define ROOTGID 0
-
 #define MAX_ENV_VAR_VAL_LEN 1024
 #define MAX_ALLOWABLE_LEN 256
-
 #define OVERWRITE 1
-
-#define GTM_LOG "gtm_log"
 #define GTM_TMP "gtm_tmp"
 #define GTM_DIST "gtm_dist"
 #define GTM_DBGLVL "gtmdbglvl"
 #ifdef __MVS__
-#define GTM_ZOS_AUTOCVT "_BPXK_AUTOCVT"
-#define GTM_ZOS_AUTOCVT_ON "ON"
+#  define GTM_ZOS_AUTOCVT "_BPXK_AUTOCVT"
+#  define GTM_ZOS_AUTOCVT_ON "ON"
 #endif
-
 #define	SUB_PATH_TO_GTMSECSHRDIR "/gtmsecshrdir"
 #define	REL_PATH_TO_CURDIR "."
 #define	REL_PATH_TO_GTMSECSHR "./gtmsecshr"
 #define	GTMSECSHR_BASENAME "/gtmsecshr"
+#define MAX_ENV_NAME_LEN 2048
 
 #ifdef __osf__
 	/* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
@@ -68,42 +67,30 @@ extern	char	**environ;
 #endif
 
 int gtm_setenv(char * env_var_name, char * env_var_val, int overwrite);
-
 int gtm_setenv(char * env_var_name, char * env_var_val, int overwrite)
-{
-/*
-	The overwrite parameter is not used. In our case we always want to set the value.
-*/
-	char *env_var_ptr;
-	int len;
+{	/* The overwrite parameter is not used. In our case we always want to set the value */
+	char	*env_var_ptr;
+	int 	len;
 
 	len = STRLEN(env_var_name) + STRLEN("=") + STRLEN(env_var_val) + 1;
-
 	env_var_ptr = (char *)malloc(len);
 	if (NULL == env_var_ptr)
 		return -1;
-
 	strcpy(env_var_ptr, env_var_name);
 	strcat(env_var_ptr, "=");
 	strcat(env_var_ptr, env_var_val);
-
 	if (putenv(env_var_ptr))
 		return -1;
-
 	return 0;
 }
 
 int gtm_unsetenv(char * env_var_name);
-
 int gtm_unsetenv(char * env_var_name)
 {
-	return gtm_setenv(env_var_name,"",OVERWRITE);
+	return gtm_setenv(env_var_name, "", OVERWRITE);
 }
 
-#define MAX_ENV_NAME_LEN 2048
-
 int gtm_clearenv(void);
-
 int gtm_clearenv()
 {
         char		env_var_name[MAX_ENV_NAME_LEN];
@@ -135,38 +122,32 @@ int gtm_clearenv()
 
 int main()
 {
-	int ret, status;
-	char * env_var_ptr;
-	struct stat gtm_secshrdir_stat;
-	struct stat gtm_secshr_stat;
+	int		ret, status;
+	char 		*env_var_ptr;
+	struct stat	gtm_secshrdir_stat;
+	struct stat	gtm_secshr_stat;
+	char 		gtm_dist_val[MAX_ENV_VAR_VAL_LEN];
+	char 		gtm_tmp_val[MAX_ENV_VAR_VAL_LEN];
+	char 		gtm_dbglvl_val[MAX_ENV_VAR_VAL_LEN];
+	char 		gtm_secshrdir_path[MAX_ENV_VAR_VAL_LEN];
+	char 		gtm_secshr_path[MAX_ENV_VAR_VAL_LEN];
+	char 		gtm_secshr_orig_path[MAX_ENV_VAR_VAL_LEN];
+	int		gtm_tmp_exists = 0;
+	int		gtm_dbglvl_exists = 0;
 
-	char gtm_dist_val[MAX_ENV_VAR_VAL_LEN];
-	char gtm_log_val[MAX_ENV_VAR_VAL_LEN];
-	char gtm_tmp_val[MAX_ENV_VAR_VAL_LEN];
-	char gtm_dbglvl_val[MAX_ENV_VAR_VAL_LEN];
-	char gtm_secshrdir_path[MAX_ENV_VAR_VAL_LEN];
-	char gtm_secshr_path[MAX_ENV_VAR_VAL_LEN];
-	char gtm_secshr_orig_path[MAX_ENV_VAR_VAL_LEN];
-
-	int gtm_log_exists = 0;
-	int gtm_tmp_exists = 0;
-	int gtm_dbglvl_exists = 0;
-
-	openlog("GTMSECSHRINIT", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
-
+	OPENLOG("GTMSECSHRINIT", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
 	ret = 0; /* start positive */
-
 	/* get the ones we need */
-	if (env_var_ptr = getenv(GTM_DIST))
+	if (env_var_ptr = getenv(GTM_DIST))		/* Warning - assignment */
 	{
-		if (MAX_ALLOWABLE_LEN < strlen(env_var_ptr) + STR_LIT_LEN(SUB_PATH_TO_GTMSECSHRDIR) +
-					  STR_LIT_LEN(GTMSECSHR_BASENAME))
+		if (MAX_ALLOWABLE_LEN < strlen(env_var_ptr) + STR_LIT_LEN(SUB_PATH_TO_GTMSECSHRDIR)
+		    + STR_LIT_LEN(GTMSECSHR_BASENAME))
 		{
-			syslog(LOG_USER | LOG_INFO, "gtm_dist env var too long. gtmsecshr will not be started.\n");
+			SYSLOG(LOG_USER | LOG_INFO, "gtm_dist env var too long. gtmsecshr will not be started\n");
 			ret = -1;
 		} else
 		{
-			strcpy(gtm_dist_val,env_var_ptr);
+			strcpy(gtm_dist_val, env_var_ptr);
 			/* point the path to the real gtmsecshr - for display purposes only */
 			strcpy(gtm_secshr_path, env_var_ptr);
 			strcat(gtm_secshr_path, SUB_PATH_TO_GTMSECSHRDIR);
@@ -177,29 +158,14 @@ int main()
 		}
 	} else
 	{
-		syslog(LOG_USER | LOG_INFO, "gtm_dist env var does not exist. gtmsecshr will not be started.\n");
+		SYSLOG(LOG_USER | LOG_INFO, "gtm_dist env var does not exist. gtmsecshr will not be started\n");
 		ret = -1;
 	}
-
-	if (env_var_ptr = getenv(GTM_LOG))
+	if (env_var_ptr = getenv(GTM_TMP))		/* Warning - assignment */
 	{
 		if (MAX_ALLOWABLE_LEN < strlen(env_var_ptr))
 		{
-			syslog(LOG_USER | LOG_INFO, "gtm_log env var too long. gtmsecshr will not be started.\n");
-			ret = -1;
-		} else
-		{
-			gtm_log_exists = 1;
-			strcpy(gtm_log_val, env_var_ptr);
-		}
-
-	}
-
-	if (env_var_ptr = getenv(GTM_TMP))
-	{
-		if (MAX_ALLOWABLE_LEN < strlen(env_var_ptr))
-		{
-			syslog(LOG_USER | LOG_INFO, "gtm_tmp env var too long. gtmsecshr will not be started.\n");
+			SYSLOG(LOG_USER | LOG_INFO, "gtm_tmp env var too long. gtmsecshr will not be started\n");
 			ret = -1;
 		} else
 		{
@@ -207,12 +173,11 @@ int main()
 			strcpy(gtm_tmp_val, env_var_ptr);
 		}
 	}
-
-	if (env_var_ptr = getenv(GTM_DBGLVL))
+	if (env_var_ptr = getenv(GTM_DBGLVL))		/* Warning - assignment */
 	{
 		if (MAX_ALLOWABLE_LEN < strlen(env_var_ptr))
 		{
-			syslog(LOG_USER | LOG_INFO, "gtmdbglvl env var too long. gtmsecshr will not be started.\n");
+			SYSLOG(LOG_USER | LOG_INFO, "gtmdbglvl env var too long. gtmsecshr will not be started\n");
 			ret = -1;
 		} else
 		{
@@ -220,102 +185,74 @@ int main()
 			strcpy(gtm_dbglvl_val, env_var_ptr);
 		}
 	}
-
-#ifdef __MVS__
-	if (!(env_var_ptr = getenv(GTM_ZOS_AUTOCVT)))
-	{
-		syslog(LOG_USER | LOG_INFO, "_BPXK_AUTOCVT is not set, forcing autoconversion\n");
-	}
-#endif
-
+#	ifdef __MVS__
+	if (!(env_var_ptr = getenv(GTM_ZOS_AUTOCVT)))	/* Warning - assignment */
+		SYSLOG(LOG_USER | LOG_INFO, "_BPXK_AUTOCVT is not set, forcing autoconversion\n");
+#	endif
 	if (!ret)
 	{	/* clear all */
 		status = gtm_clearenv();
 		if (status)
 		{
-			syslog(LOG_USER | LOG_INFO, "clearenv failed. gtmsecshr will not be started.\n");
+			SYSLOG(LOG_USER | LOG_INFO, "clearenv failed. gtmsecshr will not be started\n");
 			ret = -1;
 		}
-
 		/* add the ones we need */
 		status = gtm_setenv(GTM_DIST, gtm_dist_val, OVERWRITE);
 		if (status)
 		{
-			syslog(LOG_USER | LOG_INFO, "setenv for gtm_dist failed. gtmsecshr will not be started.\n");
+			SYSLOG(LOG_USER | LOG_INFO, "setenv for gtm_dist failed. gtmsecshr will not be started\n");
 			ret = -1;
-		}
-		if (gtm_log_exists)
-		{
-			status = gtm_setenv(GTM_LOG, gtm_log_val, OVERWRITE);
-			if (status)
-			{
-				syslog(LOG_USER | LOG_INFO, "setenv for gtm_log failed. gtmsecshr will not be started.\n");
-				ret = -1;
-			}
 		}
 		if (gtm_tmp_exists)
 		{
 			status = gtm_setenv(GTM_TMP, gtm_tmp_val, OVERWRITE);
 			if (status)
 			{
-				syslog(LOG_USER | LOG_INFO, "setenv for gtm_tmp failed. gtmsecshr will not be started.\n");
+				SYSLOG(LOG_USER | LOG_INFO, "setenv for gtm_tmp failed. gtmsecshr will not be started\n");
 				ret = -1;
 			}
 		}
-		if (gtm_dbglvl_exists)
-		{
-			status = gtm_setenv(GTM_DBGLVL, gtm_dbglvl_val, OVERWRITE);
-			if (status)
-			{
-				syslog(LOG_USER | LOG_INFO, "setenv for gtmdbglvl failed. gtmsecshr will not be started.\n");
-				ret = -1;
-			}
-		}
-#ifdef __MVS__
+#		ifdef __MVS__
 		status = gtm_setenv(GTM_ZOS_AUTOCVT, GTM_ZOS_AUTOCVT_ON, OVERWRITE);
 		if (status)
-		{
-			syslog(LOG_USER | LOG_INFO,
-				"setenv for _BPXK_AUTOCVT failed. gtmsecshr logs may contain mixed ASCII and EBCDIC.\n");
-		}
-#endif
+			SYSLOG(LOG_USER | LOG_INFO,
+			       "setenv for _BPXK_AUTOCVT failed. gtmsecshr logs may contain mixed ASCII and EBCDIC\n");
+#		endif
 	}
-
 	if (!ret)
 	{	/* go to root */
 		if (-1 == CHDIR(gtm_secshrdir_path))
-			syslog(LOG_USER | LOG_INFO, "chdir failed on %s, errno %d. gtmsecshr will not be started.\n",
-				gtm_secshrdir_path, errno);
+			SYSLOG(LOG_USER | LOG_INFO, "chdir failed on %s, errno %d. gtmsecshr will not be started\n",
+			       gtm_secshrdir_path, errno);
 		else if (-1 == Stat(REL_PATH_TO_CURDIR, &gtm_secshrdir_stat))
-			syslog(LOG_USER | LOG_INFO, "stat failed on %s, errno %d. gtmsecshr will not be started.\n",
-				gtm_secshrdir_path, errno);
+			SYSLOG(LOG_USER | LOG_INFO, "stat failed on %s, errno %d. gtmsecshr will not be started\n",
+			       gtm_secshrdir_path, errno);
 		else if (ROOTUID != gtm_secshrdir_stat.st_uid)
-			syslog(LOG_USER | LOG_INFO, "%s not owned by root. gtmsecshr will not be started.\n", gtm_secshrdir_path);
+			SYSLOG(LOG_USER | LOG_INFO, "%s not owned by root. gtmsecshr will not be started\n", gtm_secshrdir_path);
 		else if (gtm_secshrdir_stat.st_mode & 0277)
-			syslog(LOG_USER | LOG_INFO, "%s permissions incorrect (%04o). gtmsecshr will not be started.\n",
-				gtm_secshrdir_path, gtm_secshrdir_stat.st_mode & 0777);
+			SYSLOG(LOG_USER | LOG_INFO, "%s permissions incorrect (%04o). gtmsecshr will not be started\n",
+			       gtm_secshrdir_path, gtm_secshrdir_stat.st_mode & 0777);
 		else if (-1 == Stat(REL_PATH_TO_GTMSECSHR, &gtm_secshr_stat))
-			syslog(LOG_USER | LOG_INFO, "stat failed on %s, errno %d. gtmsecshr will not be started.\n",
-				gtm_secshr_path, errno);
+			SYSLOG(LOG_USER | LOG_INFO, "stat failed on %s, errno %d. gtmsecshr will not be started\n",
+			       gtm_secshr_path, errno);
 		else if (ROOTUID != gtm_secshr_stat.st_uid)
-			syslog(LOG_USER | LOG_INFO, "%s not owned by root. gtmsecshr will not be started.\n", gtm_secshr_path);
+			SYSLOG(LOG_USER | LOG_INFO, "%s not owned by root. gtmsecshr will not be started\n", gtm_secshr_path);
 		else if (gtm_secshr_stat.st_mode & 022)
-			syslog(LOG_USER | LOG_INFO, "%s writable. gtmsecshr will not be started.\n", gtm_secshr_path);
+			SYSLOG(LOG_USER | LOG_INFO, "%s writable. gtmsecshr will not be started\n", gtm_secshr_path);
 		else if (!(gtm_secshr_stat.st_mode & 04000))
-			syslog(LOG_USER | LOG_INFO, "%s not set-uid. gtmsecshr will not be started.\n", gtm_secshr_path);
+			SYSLOG(LOG_USER | LOG_INFO, "%s not set-uid. gtmsecshr will not be started\n", gtm_secshr_path);
 		else if (-1 == setuid(ROOTUID))
-			syslog(LOG_USER | LOG_INFO, "setuid failed. gtmsecshr will not be started.\n");
+			SYSLOG(LOG_USER | LOG_INFO, "setuid failed. gtmsecshr will not be started\n");
 		else
 		{	/* call the real gtmsecshr, but have ps display the original gtmsecshr location */
 			strcpy(gtm_secshr_orig_path, gtm_dist_val);
 			strcat(gtm_secshr_orig_path, GTMSECSHR_BASENAME);
 			ret = execl(REL_PATH_TO_GTMSECSHR, gtm_secshr_orig_path, NULL);
 			if (-1 == ret)
-				syslog(LOG_USER | LOG_INFO, "execl of %s failed\n", gtm_secshr_path);
+				SYSLOG(LOG_USER | LOG_INFO, "execl of %s failed\n", gtm_secshr_path);
 		}
 	}
-
 	closelog();
-
 	return ret;
 }

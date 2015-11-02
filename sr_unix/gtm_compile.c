@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,7 @@
 #include "cmd_qlf.h"
 #include "iosp.h"
 #include "cli.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "lv_val.h"
@@ -39,6 +39,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include "gt_timers_add_safe_hndlrs.h"
 
 GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
 GBLREF stack_frame	 	*frame_pointer;
@@ -65,7 +66,6 @@ int	gtm_compile (void)
 	io_init(TRUE);
 	getjobnum();
 	getzdir();
-	prealloc_gt_timers();
 	run_time = FALSE;
 	TREF(compile_time) = TRUE;
 	mstack_ptr = (unsigned char *)malloc(USER_STACK_SIZE);
@@ -99,6 +99,8 @@ int	gtm_compile (void)
 	get_cmd_qlf(&cmd_qlf);
 	initialize_pattern_table();
 	ce_init();	/* initialize compiler escape processing */
+	prealloc_gt_timers();
+	gt_timers_add_safe_hndlrs();	/* Not sure why compiler needs timers but .. */
 	TREF(dollar_zcstatus) = SS_NORMAL;
 	len = MAX_FBUFF;
 	for (status = cli_get_str("INFILE", source_file_string, &len);
@@ -109,6 +111,7 @@ int	gtm_compile (void)
 		len = MAX_FBUFF;
 	}
 	print_exit_stats();
+	SET_PROCESS_EXITING_TRUE;	/* needed by remove_rms($principal) to avoid closing that */
 	io_rundown(NORMAL_RUNDOWN);
 	return (SS_NORMAL == TREF(dollar_zcstatus)) ? SS_NORMAL : -1;
 }

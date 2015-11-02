@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"
 #include "gvcst_protos.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "trigger.h"
 #include "mv_stent.h"			/* for COPY_SUBS_TO_GVCURRKEY macro */
@@ -60,7 +60,6 @@ LITREF	mval			literal_hasht;
 
 error_def(ERR_TRIGNAMBAD);
 error_def(ERR_TPRETRY);
-error_def(ERR_GVGETFAIL);
 
 STATICFNDCL CONDITION_HANDLER(trigger_fill_xecute_buffer_ch);
 STATICFNDCL void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *trigdsc);

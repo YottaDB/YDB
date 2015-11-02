@@ -63,10 +63,14 @@
 #include "gtm_threadgbl_init.h"
 #include "gtmio.h"
 #include "have_crit.h"
+#include "gt_timers_add_safe_hndlrs.h"
+#include "continue_handler.h"
 
 #ifdef UNICODE_SUPPORTED
-#include "gtm_icu_api.h"
-#include "gtm_utf8.h"
+# include "gtm_icu_api.h"
+# include "gtm_utf8.h"
+# include "gtm_conv.h"
+GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
 
 GBLREF VSIG_ATOMIC_T		util_interrupt;
@@ -95,8 +99,9 @@ int main (int argc, char *argv[])
 	gtm_env_init();	/* read in all environment variables */
 	licensed = TRUE;
 	err_init(util_base_ch);
+	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
-	sig_init(generic_signal_handler, lke_ctrlc_handler, suspsigs_handler);
+	sig_init(generic_signal_handler, lke_ctrlc_handler, suspsigs_handler, continue_handler);
 	atexit(util_exit_handler);
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	get_page_size();
@@ -106,6 +111,7 @@ int main (int argc, char *argv[])
 	INVOKE_INIT_SECSHR_ADDRS;
 	getzdir();
 	prealloc_gt_timers();
+	gt_timers_add_safe_hndlrs();
 	initialize_pattern_table();
 	gvinit();
 	region_init(TRUE);
@@ -114,7 +120,7 @@ int main (int argc, char *argv[])
 	cli_lex_setup(argc, argv);
 	/*      this should be after cli_lex_setup() due to S390 A/E conversion    */
 	gtm_chk_dist(argv[0]);
-
+	OPERATOR_LOG_MSG;
 	while (1)
 	{
 		if (!lke_process(argc) || 2 <= argc)

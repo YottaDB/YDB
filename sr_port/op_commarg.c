@@ -14,7 +14,7 @@
 #include "compiler.h"
 #include "cmd.h"
 #include "toktyp.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "opcode.h"
 #include "indir_enum.h"

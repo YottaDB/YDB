@@ -11,6 +11,7 @@
 # Do not add any blank lines after this comment
 pro:
 TTTGEN.m%-r--r----- README.txt
+dse%-r--r----- custom_errors_sample.txt
 gdehelp.dat%-r--r----- gdedefaults
 gtm_descript.h%-r-xr-x--- gtm
 gtmcshrc.gtc%-r-xr-x--- gtmbase
@@ -28,4 +29,5 @@ zzz_insert%-r--r----- source.tar
 
 pro/utf8:
 TTTGEN.m -> ../TTTGEN.m%lrwxrwxrwx README.txt -> ../README.txt
+dse -> ../dse%lrwxrwxrwx custom_errors_sample.txt -> ../custom_errors_sample.txt
 lke -> ../lke%-r-xr-x--- libgtmutil.so

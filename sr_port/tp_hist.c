@@ -38,9 +38,6 @@
 #include "tp_grab_crit.h"
 #endif
 
-#define MMBLK_OFFSET(BLK)     													\
-	(cs_addrs->db_addrs[0] + (cs_addrs->hdr->start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)(cs_addrs->hdr->blk_size * (BLK)))
-
 #define	REPOSITION_PTR(ptr, type, delta, begin, end)			\
 {									\
 	assert((sm_uc_ptr_t)(ptr) >= (sm_uc_ptr_t)(begin));		\
@@ -190,13 +187,13 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				/* Assert that cr->in_tend is never equal to our process_id since at this point we should
 				 * never have locked a buffer for phase2 commit. The only exception is if the previous
 				 * transaction by this process had a commit-time error and secshr_db_clnup finished the
-				 * transaction and had set csd->wc_blocked to TRUE. It is possible in that case no process
+				 * transaction and had set csa->nl->wc_blocked to TRUE. It is possible in that case no process
 				 * has yet done a cache-recovery by the time we come to tp_hist as part of the next transaction
 				 * in which case cr->in_tend could still be pointing to our process_id. Note that
-				 * csd->wc_blocked could be changing concurrently so need to note it down in a local variable
-				 * BEFORE checking the value of cr->in_tend.
+				 * csa->nl->wc_blocked could be changing concurrently so need to note it down in a local
+				 * variable BEFORE checking the value of cr->in_tend.
 				 */
-				DEBUG_ONLY(wc_blocked = cs_addrs->hdr->wc_blocked;)
+				DEBUG_ONLY(wc_blocked = cs_addrs->nl->wc_blocked;)
 				assert((NULL == cr) || (process_id != cr->in_tend) || wc_blocked);
 				if (TP_IS_CDB_SC_BLKMOD(cr, t2))
 				{
@@ -268,31 +265,6 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 #						endif
 					}
 				}
-#				ifdef UNIX
-				if (csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle)
-				{
-					status = cdb_sc_onln_rlbk1;
-					if (csa->db_onln_rlbkd_cycle != csa->nl->db_onln_rlbkd_cycle)
-						status = cdb_sc_onln_rlbk2; /* database taken back to a different logical state */
-					/* We want to sync the online rollback cycles ONLY under crit. So, grab_crit and sync the
-					 * cycles. While tp_grab_crit would have been a better choice, the reason we don't use
-					 * tp_grab_crit here is because if we don't sync cycles because we don't hold crit but
-					 * do invoke t_retry which increments $zonlnrlbk and on the subsequent retry we remain
-					 * unlucky in getting crit, we will end up incrementing $zonlnrlbk more than once for a
-					 * single online rollback event. In the worst case we will have $zonlnrlbk=3 which from
-					 * the user perspective is incorrect. So, sync the cycles the first time we detect the
-					 * online rollback
-					 */
-					assert(!csa->hold_onto_crit);
-					was_crit = csa->now_crit;
-					if (!was_crit)
-						grab_crit(gv_cur_region);
-					SYNC_ONLN_RLBK_CYCLES;
-					if (!was_crit)
-						rel_crit(gv_cur_region);
-					break;
-				}
-#				endif
 				/* Although t1->first_tp_srch_status (i.e. t2) is used for doing blkmod check,
 				 * we need to use BOTH t1 and t1->first_tp_srch_status to do the cdb_sc_lostcr check.
 				 *
@@ -316,7 +288,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				if ((t1 != t2) && t1->cr)
 				{
 					assert(((sm_long_t)GDS_REL2ABS(t1->cr->buffaddr) == (sm_long_t)t1->buffaddr)
-						UNIX_ONLY(|| (0 != csa->nl->onln_rlbk_pid)));
+						UNIX_ONLY(|| (0 != csa->nl->onln_rlbk_pid)
+							  || MISMATCH_ROOT_CYCLES(csa, csa->nl)));
 					if (t1->cycle != t1->cr->cycle)
 					{
 						assert(CDB_STAGNATE > t_tries);
@@ -328,7 +301,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				if (cr)
 				{
 					assert(((sm_long_t)GDS_REL2ABS(cr->buffaddr) == (sm_long_t)t2->buffaddr)
-						UNIX_ONLY( || (0 != csa->nl->onln_rlbk_pid)));
+						UNIX_ONLY( || (0 != csa->nl->onln_rlbk_pid)
+							   || MISMATCH_ROOT_CYCLES(csa, csa->nl)));
 					if (t2->cycle != cr->cycle)
 					{
 						assert(CDB_STAGNATE > t_tries);
@@ -458,7 +432,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 			for (t1 = hist->h; HIST_TERMINATOR != (blk = t1->blk_num); t1++)
 			{
 				t2 = t1->first_tp_srch_status ? t1->first_tp_srch_status : t1;
-				assert((t2->tn <= t1->tn) UNIX_ONLY(|| (0 != csa->nl->onln_rlbk_pid)));
+				assert((t2->tn <= t1->tn) UNIX_ONLY(|| (0 != csa->nl->onln_rlbk_pid)
+								    || MISMATCH_ROOT_CYCLES(csa, csa->nl)));
 				/* Take this time to also check that gv_targets match between t1 and t2.
 				 * If they dont, the restart should be detected in tp_tend.
 				 * Set the flag donot_commit to catch the case this does not restart.
@@ -469,6 +444,34 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 		}
 #		endif
 	}
+#	ifdef UNIX
+	if (MISMATCH_ROOT_CYCLES(csa, csa->nl))
+	{	/* We want to sync the online rollback cycles ONLY under crit. So, grab_crit and sync the
+		 * cycles. While tp_grab_crit would have been a better choice, the reason we don't use
+		 * tp_grab_crit here is because if we don't sync cycles because we don't hold crit but
+		 * do invoke t_retry which increments $zonlnrlbk and on the subsequent retry we remain
+		 * unlucky in getting crit, we will end up incrementing $zonlnrlbk more than once for a
+		 * single online rollback event. In the worst case we will have $zonlnrlbk=3 which from
+		 * the user perspective is incorrect. So, sync the cycles the first time we detect the
+		 * online rollback
+		 */
+		assert(!csa->hold_onto_crit);
+		was_crit = csa->now_crit;
+		if (!was_crit)
+			grab_crit(gv_cur_region);
+		status = cdb_sc_gvtrootmod2;
+		if (MISMATCH_ONLN_RLBK_CYCLES(csa, csa->nl))
+		{
+			assert(!mupip_jnl_recover);
+			status = ONLN_RLBK_STATUS(csa, csa->nl);
+			SYNC_ONLN_RLBK_CYCLES;
+			SYNC_ROOT_CYCLES(NULL);
+		} else
+			SYNC_ROOT_CYCLES(csa);
+		if (!was_crit)
+			rel_crit(gv_cur_region);
+	}
+#	endif
 	/* If validation has succeeded, assert that if gtm_gvundef_fatal is non-zero, then we better not signal a GVUNDEF */
 	assert((cdb_sc_normal != status) || !TREF(gtm_gvundef_fatal) || !ready2signal_gvundef_lcl);
 	ADD_TO_GVT_TP_LIST(gvt);	/* updates gvt->read_local_tn & adds gvt to gvt_tp_list : both only if needed */

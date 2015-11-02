@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -632,10 +632,11 @@ int dbc_read_dbblk(phase_static_area *psa, int blk_num, enum gdsblk_type blk_typ
 void dbc_find_key(phase_static_area *psa, dbc_gv_key *key, uchar_ptr_t rec_p, int blk_levl)
 {
 	int		cmpc, rec_len;
+	int		tmp_cmpc;
 	unsigned short	us_rec_len;
 	uchar_ptr_t	key_targ_p, key_src_p;
 
-	cmpc = ((rec_hdr_ptr_t)rec_p)->cmpc;
+	cmpc = EVAL_CMPC((rec_hdr *)rec_p);
 	GET_USHORT(us_rec_len, &((rec_hdr_ptr_t)rec_p)->rsiz);
 	rec_len = us_rec_len;
 	if (BSTAR_REC_SIZE == rec_len && 0 < blk_levl)
@@ -694,6 +695,7 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 	uchar_ptr_t	rec_p, blk_p, blk_top, key1, key2;
 	unsigned short	us_rec_len;
 	int		blk_ptr, blk_levl, key_len, key_len1, key_len2, rec_len;
+	int		tmp_cmpc;
 	enum gdsblk_type blk_type;
 	block_info	*blk_set_p;
 
@@ -770,7 +772,7 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 			DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Recursing down a level via keyed index record at offset 0x%lx\n",
 				   (rec_p - blk_p)));
 			GET_ULONG(blk_ptr, (rec_p + SIZEOF(rec_hdr) + blk_set_p->curr_blk_key->end
-					   - ((rec_hdr *)rec_p)->cmpc + 1));
+					   - EVAL_CMPC((rec_hdr *)rec_p) + 1));
 			blk_index = dbc_read_dbblk(psa, blk_ptr, blk_type);
 			return dbc_find_record(psa, key, blk_index, min_levl, blk_type, fail_ok);
 		}

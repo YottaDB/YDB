@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,3 +39,4 @@ TRACETYPE(SOCKRFL,	RSTGC,		"",		"buffer_start",	"stp_free",	"")		/* Ditto, value
 TRACETYPE(SOCKRFL,	BEGIN,		"chars_read",	"buffer_start",	"stp_free",	"")		/* Main line code values start of processing */
 TRACETYPE(SOCKRFL,	OUTOFBAND,	"bytes_read",	"chars_read",	"buffer_start",	"")		/* Out-of-band recognized - interrupted */
 TRACETYPE(SOCKRFL,	EXPBUFGC,	"bytes_read",	"stp_free",	"old_stp_free",	"max_bufflen")	/* Buffer expansion */
+TRACETYPE(SOCKRFL,	RDSTATUS,	"read_status",	"out_of_band",	"out_of_time",	"")		/* Read results */

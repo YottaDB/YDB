@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,6 +49,7 @@ GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		is_src_server;
+GBLREF	boolean_t		in_jnl_file_autoswitch;
 
 error_def(ERR_JNLWRTNOWWRTR);
 error_def(ERR_JNLWRTDEFER);
@@ -91,6 +92,20 @@ error_def(ERR_JNLWRTDEFER);
 	}									\
 }
 
+#define	SET_JREC_LEN_PADDING_IF_NEEDED(JREC_LEN, JREC_LEN_PADDED)			\
+{											\
+	/* Before writing a journal record, check if we have some padding space		\
+	 * to close the journal file in case we are on the verge of an autoswitch.	\
+	 * If we are about to autoswitch the journal file at this point, dont		\
+	 * do the padding check since the padding space has already been checked	\
+	 * in jnl_write calls before this autoswitch invocation. We can safely		\
+	 * write the input record without worrying about autoswitch limit overflow.	\
+	 */										\
+	JREC_LEN_PADDED = JREC_LEN;							\
+	if (!in_jnl_file_autoswitch)							\
+		JREC_LEN_PADDED = JREC_LEN + JNL_FILE_TAIL_PRESERVE;			\
+}
+
 /* jpc 	   : Journal private control
  * rectype : Record type
  * jnl_rec : This contains fixed part of a variable size record or the complete fixed size records.
@@ -102,9 +117,11 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	jnl_format_buffer *jfb)
 {
 	int4			align_rec_len, rlen, rlen_with_align, dstlen, lcl_size, lcl_free, lcl_orig_free;
+	int4			align_rec_len_padded, rlen_padded;
 	jnl_buffer_ptr_t	jb;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
+	node_local_ptr_t	cnl;
 	struct_jrec_align	align_rec;
 	uint4 			status;
 	jrec_suffix		suffix;
@@ -116,6 +133,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	char			*ptr;
 	int			jnl_wrt_start_modulus, jnl_wrt_start_mask;
 	uint4			jnl_fs_block_size, aligned_lcl_free, padding_size;
+	uint4			tmp_csum1, tmp_csum2;
 #	ifdef DEBUG
 	uint4			lcl_dskaddr, mumps_node_sz;
 	char			*mumps_node_ptr;
@@ -170,6 +188,14 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	}
 	jnl_wrt_start_mask = JNL_WRT_START_MASK(jb);
 	jnl_wrt_start_modulus = JNL_WRT_START_MODULUS(jb);
+	cnl = csa->nl;
+	/* If we are currently extending the journal file and writing the closing part of journal records,
+	 * it better be the records that we expect. This is because we will skip the padding check for these
+	 * records. The macro JNL_FILE_TAIL_PRESERVE already takes into account padding space for these.
+	 */
+	assert(!in_jnl_file_autoswitch
+		|| (JRT_PINI == rectype) || (JRT_PFIN == rectype) || (JRT_EPOCH == rectype)
+		|| (JRT_INCTN == rectype) || (JRT_EOF == rectype));
 	if (rlen_with_align != rlen)
 	{	/* the calls below to jnl_write_attempt() and jnl_file_extend() are duplicated for the ALIGN record and the
 		 * non-ALIGN journal record instead of making it a function. this is purely for performance reasons.
@@ -191,9 +217,23 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			}
 		}
 		jb->blocked = 0;
-		if (jb->filesize < DISK_BLOCKS_SUM(lcl_freeaddr, align_rec_len)) /* not enough room in jnl file, extend it. */
-		{	/* We should never reach here if we are called from t_end/tp_tend */
-			assert(!IS_GTM_IMAGE || csa->ti->early_tn == csa->ti->curr_tn);
+		SET_JREC_LEN_PADDING_IF_NEEDED(align_rec_len, align_rec_len_padded);	/* sets align_rec_len_padded */
+		if (jb->filesize < DISK_BLOCKS_SUM(lcl_freeaddr, align_rec_len_padded)) /* not enough room in jnl file, extend it */
+		{	/* We should never reach here if we are called from t_end/tp_tend. We check that by using the fact that
+			 * early_tn is different from curr_tn in the t_end/tp_tend case. The only exception is wcs_recover which
+			 * also sets these to be different in case of writing an INCTN record. For this case though it is okay to
+			 * extend/autoswitch the file. So allow that.
+			 */
+			assertpro((csa->ti->early_tn == csa->ti->curr_tn) || (JRT_INCTN == rectype));
+			assert(!IS_REPLICATED(rectype)); /* all replicated jnl records should have gone through t_end/tp_tend */
+			assert(jrt_fixed_size[rectype]); /* this is used later in re-computing checksums */
+			assert(NULL == blk_ptr);	/* as otherwise it is a PBLK or AIMG record which is of variable record
+							 * length that conflicts with the immediately above assert.
+							 */
+			assert(NULL == jfb);		/* as otherwise it is a logical record with formatted journal records which
+							 * is of variable record length (conflicts with the jrt_fixed_size assert).
+							 */
+			assertpro(!in_jnl_file_autoswitch);	/* avoid recursion of jnl_file_extend */
 			if (SS_NORMAL != jnl_flush(reg))
 			{
 				assert(NOJNL == jpc->channel); /* jnl file lost */
@@ -205,12 +245,25 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 				assert(FALSE);
 				return;
 			}
-			if (0 == jpc->pini_addr && JRT_PINI != rectype)
+			if (0 == jpc->pini_addr)
 			{	/* This can happen only if jnl got switched in jnl_file_extend above.
-				 * We can't proceed now since the jnl record that we are writing now contains pini_addr	information
-				 * pointing to the older journal which is inappropriate if written into the new journal.
+				 * Write a PINI record in the new journal file and then continue writing the input record.
+				 * Basically we need to redo the processing in jnl_write because a lot of the local variables
+				 * have changed state (e.g. jb->freeaddr etc.). So we instead call jnl_write()
+				 * recursively and then return immediately.
 				 */
-				GTMASSERT;
+				jnl_put_jrt_pini(csa);
+				assertpro(jpc->pini_addr);	/* should have been set in "jnl_put_jrt_pini" */
+				if (JRT_PINI != rectype)
+				{
+					jnl_rec->prefix.pini_addr = jpc->pini_addr;
+					/* Checksum needs to be recomputed since prefix.pini_addr is changed in above statement */
+					jnl_rec->prefix.checksum = INIT_CHECKSUM_SEED;
+					jnl_rec->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
+										(uint4 *)jnl_rec, jnl_rec->prefix.forwptr);
+					jnl_write(jpc, rectype, jnl_rec, NULL, NULL);
+				}
+				return;
 			}
 		}
 		align_rec.prefix.jrec_type = JRT_ALIGN;
@@ -223,11 +276,11 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		 * first PINI journal record in the journal file which is nothing but JNL_FILE_FIRST_RECORD.
 		 */
 		align_rec.prefix.pini_addr = (JRT_PINI == rectype) ? JNL_FILE_FIRST_RECORD : jnl_rec->prefix.pini_addr;
-		checksum = ADJUST_CHECKSUM(INIT_CHECKSUM_SEED, lcl_freeaddr);
-		checksum = ADJUST_CHECKSUM(checksum, csd->jnl_checksum);
-		assert(checksum);
-		align_rec.prefix.checksum = checksum;
+		align_rec.prefix.checksum = INIT_CHECKSUM_SEED;
 		suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+		align_rec.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&align_rec, SIZEOF(jrec_prefix));
+		ADJUST_CHECKSUM(align_rec.prefix.checksum, lcl_freeaddr, align_rec.prefix.checksum);
+		ADJUST_CHECKSUM(align_rec.prefix.checksum, csd->jnl_checksum, align_rec.prefix.checksum);
 		assert(lcl_free >= 0 && lcl_free < lcl_size);
 		if (lcl_size >= (lcl_free + align_rec_len))
 		{	/* before the string for zeroes */
@@ -256,6 +309,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		if (lcl_size == lcl_free)
 			lcl_free = 0;
 		jpc->new_freeaddr = lcl_freeaddr + align_rec_len;
+		INCR_GVSTATS_COUNTER(csa, cnl, n_jrec_other, 1);
+		INCR_GVSTATS_COUNTER(csa, cnl, n_jbuff_bytes, align_rec_len);
 		assert(jgbl.gbl_jrec_time >= align_rec.prefix.time);
 		assert(align_rec.prefix.time >= jb->prev_jrec_time);
 		jb->prev_jrec_time = align_rec.prefix.time;
@@ -279,30 +334,54 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		jb->free_update_pid = 0;
 		DBG_CHECK_JNL_BUFF_FREEADDR(jb);
 		if (JRT_PINI == rectype)
+		{
 			jnl_rec->prefix.pini_addr = lcl_freeaddr;
+			/* Checksum needs to be recomputed since prefix.pini_addr is changed in above statement */
+			jnl_rec->prefix.checksum = INIT_CHECKSUM_SEED;
+			jnl_rec->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
+								(uint4 *)&jnl_rec->jrec_pini, SIZEOF(struct_jrec_pini));
+		}
 	}
 	checksum = jnl_rec->prefix.checksum;
 	assert(checksum);
 #	ifdef DEBUG
-	/* Ensure that the checksum computed earlier in jnl_format or jnl_write_pblk matches with the block's content. For fixed
-	 * size records and AIMG records, this check is not needed since the checksum is initialized to INIT_CHECKSUM_SEED.
+	/* Ensure that the checksum computed earlier in jnl_format or jnl_write_pblk or jnl_write_aimg_rec or fixed-sized records
+	 * matches with the block's content.
 	 */
-	if (!jrt_fixed_size[rectype] && (JRT_AIMG != rectype))
+	if ((JRT_PBLK == rectype) || (JRT_AIMG == rectype))
 	{
-		if (JRT_PBLK == rectype)
-			assert(checksum == jnl_get_checksum((uint4 *)blk_ptr, NULL, jnl_rec->jrec_pblk.bsiz));
-		else
+		COMPUTE_COMMON_CHECKSUM(tmp_csum2, jnl_rec->prefix);
+		tmp_csum1 = jnl_get_checksum((uint4 *)blk_ptr, NULL, jnl_rec->jrec_pblk.bsiz);
+		COMPUTE_PBLK_CHECKSUM(tmp_csum1, &jnl_rec->jrec_pblk, tmp_csum2, tmp_csum1);
+		assert(checksum == tmp_csum1);
+	} else if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))
+	{
+		COMPUTE_COMMON_CHECKSUM(tmp_csum2, jnl_rec->prefix);
+		mumps_node_ptr = jfb->buff + FIXED_UPD_RECLEN;
+		mumps_node_sz = jfb->record_size - (FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE);
+		tmp_csum1 = jnl_get_checksum((uint4 *)mumps_node_ptr, NULL, mumps_node_sz);
+		COMPUTE_LOGICAL_REC_CHECKSUM(tmp_csum1, &jnl_rec->jrec_set_kill, tmp_csum2, tmp_csum1);
+		assert(checksum == tmp_csum1);
+	}else if (jrt_fixed_size[rectype] || JRT_ALIGN == rectype)
+	{
+		jnl_rec->prefix.checksum = INIT_CHECKSUM_SEED;
+		switch(rectype)
 		{
-			assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype));
-			mumps_node_ptr = jfb->buff + FIXED_UPD_RECLEN;
-			mumps_node_sz = jfb->record_size - (FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE);
-			assert(checksum == jnl_get_checksum((uint4 *)mumps_node_ptr, NULL, mumps_node_sz));
+		case JRT_ALIGN:
+			tmp_csum1 = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&jnl_rec->jrec_align, SIZEOF(jrec_prefix));
+			break;
+		default:
+			if(JRT_TRIPLE != rectype && JRT_HISTREC != rectype)
+				tmp_csum1 = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&jnl_rec->jrec_set_kill,
+						jnl_rec->prefix.forwptr);
+			break;
 		}
+		assert(checksum == tmp_csum1);
+		jnl_rec->prefix.checksum = checksum;
 	}
 #	endif
-	checksum = ADJUST_CHECKSUM(checksum, lcl_freeaddr);
-	checksum = ADJUST_CHECKSUM(checksum, csd->jnl_checksum);
-	ADJUST_CHECKSUM_WITH_SEQNO(is_replicated, checksum, GET_JNL_SEQNO(jnl_rec)); /* Note: checksum is updated inside macro */
+	ADJUST_CHECKSUM(checksum, lcl_freeaddr, checksum);
+	ADJUST_CHECKSUM(checksum, csd->jnl_checksum, checksum);
 	jnl_rec->prefix.checksum = checksum;
 	UNIX_ONLY(assert((!jb->blocked) || (FALSE == is_proc_alive(jb->blocked, 0)));)
 	VMS_ONLY(assert(!jb->blocked || (jb->blocked == process_id) && lib$ast_in_prog())); /* wcs_wipchk_ast can set jb->blocked */
@@ -320,9 +399,22 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		}
 	}
 	jb->blocked = 0;
-	if (jb->filesize < DISK_BLOCKS_SUM(lcl_freeaddr, rlen)) /* not enough room in jnl file, extend it. */
-	{	/* We should never reach here if we are called from t_end/tp_tend */
-		assert(!IS_GTM_IMAGE || csa->ti->early_tn == csa->ti->curr_tn);
+	SET_JREC_LEN_PADDING_IF_NEEDED(rlen, rlen_padded);	/* sets rlen_padded */
+	if (jb->filesize < DISK_BLOCKS_SUM(lcl_freeaddr, rlen_padded)) /* not enough room in jnl file, extend it. */
+	{	/* We should never reach here if we are called from t_end/tp_tend. We check that by using the fact that
+		 * early_tn is different from curr_tn in the t_end/tp_tend case. The only exception is wcs_recover which
+		 * also sets these to be different in case of writing an INCTN record. For this case though it is okay to
+		 * extend/autoswitch the file. So allow that.
+		 */
+		assertpro((csa->ti->early_tn == csa->ti->curr_tn) || (JRT_INCTN == rectype));
+		assert(!IS_REPLICATED(rectype)); /* all replicated jnl records should have gone through t_end/tp_tend */
+		assert(jrt_fixed_size[rectype]); /* this is used later in re-computing checksums */
+		assert(NULL == blk_ptr);	/* as otherwise it is a PBLK or AIMG record which is of variable record
+						 * length that conflicts with the immediately above assert.
+						 */
+		assert(NULL == jfb);		/* as otherwise it is a logical record with formatted journal records which
+						 * is of variable record length (conflicts with the jrt_fixed_size assert).
+						 */
 		if (SS_NORMAL != jnl_flush(reg))
 		{
 			assert(NOJNL == jpc->channel); /* jnl file lost */
@@ -334,12 +426,25 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			assert(FALSE);
 			return;
 		}
-		if (0 == jpc->pini_addr && JRT_PINI != rectype)
+		if (0 == jpc->pini_addr)
 		{	/* This can happen only if jnl got switched in jnl_file_extend above.
-			 * We can't proceed now since the jnl record that we are writing now contains pini_addr	information
-			 * pointing to the older journal which is inappropriate if written into the new journal.
+			 * Write a PINI record in the new journal file and then continue writing the input record.
+			 * Basically we need to redo the processing in jnl_write because a lot of the local variables
+			 * have changed state (e.g. jb->freeaddr etc.). So we instead call jnl_write()
+			 * recursively and then return immediately.
 			 */
-			GTMASSERT;
+			jnl_put_jrt_pini(csa);
+			assertpro(jpc->pini_addr);	/* should have been set in "jnl_put_jrt_pini" */
+			if (JRT_PINI != rectype)
+			{
+				jnl_rec->prefix.pini_addr = jpc->pini_addr;
+				/* Checksum needs to be recomputed since prefix.pini_addr is changed in above statement */
+				jnl_rec->prefix.checksum = INIT_CHECKSUM_SEED;
+				jnl_rec->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
+									(uint4 *)jnl_rec, jnl_rec->prefix.forwptr);
+				jnl_write(jpc, rectype, jnl_rec, NULL, NULL);
+			}
+			return;
 		}
 	}
 	lcl_orig_free = lcl_free;
@@ -370,6 +475,12 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			if (padding_size)
 				memset(lcl_buff + lcl_free, 0, padding_size);
 		}
+		/* Note: Cannot easily use ? : syntax below as INCR_GVSTATS_COUNTER macro
+		 * is not an arithmetic expression but a sequence of statements.
+		 */
+		if (JRT_EPOCH != rectype)
+			INCR_GVSTATS_COUNTER(csa, cnl, n_jrec_other, 1);
+		/* else for EPOCH, the increment of JRE or JRI is done after "jnl_write_epoch_rec" in caller */
 	} else
 	{
 		if (NULL != blk_ptr)	/* PBLK and AIMG */
@@ -398,6 +509,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 				/* Now write trailing characters for 8-bye alignment and then suffix */
 				JNL_PUTSTR(lcl_free, lcl_buff, (uchar_ptr_t)jfb->buff, jfb->record_size, lcl_size);
 			}
+			INCR_GVSTATS_COUNTER(csa, cnl, n_jrec_pblk, 1);
 		} else
 		{	/* SET, KILL, ZKILL for TP, ZTP, non-TP */
 			assert(IS_TP(rectype) || IS_ZTP(rectype) || (0 == ((struct_jrec_upd *)jfb->buff)->update_num));
@@ -411,6 +523,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 					lcl_free = 0;
 			} else
 				JNL_PUTSTR(lcl_free, lcl_buff, (uchar_ptr_t)jfb->buff, rlen, lcl_size);
+			INCR_GVSTATS_COUNTER(csa, cnl, n_jrec_logical, 1);
 		}
 	}
 	assert((lcl_free - lcl_orig_free + lcl_size) % lcl_size == rlen);
@@ -419,6 +532,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	assert((lcl_freeaddr >= jb->dskaddr)
 		|| (gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
 	jpc->new_freeaddr = lcl_freeaddr + rlen;
+	INCR_GVSTATS_COUNTER(csa, cnl, n_jbuff_bytes, rlen);
 	assert(lcl_free == jpc->new_freeaddr % lcl_size);
 	if (REPL_ENABLED(csa) && is_replicated)
 	{	/* If the database is encrypted, then at this point jfb->buff will contain encrypted

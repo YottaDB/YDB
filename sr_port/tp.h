@@ -308,11 +308,32 @@ typedef struct tp_region_struct
 	for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)					\
 	{													\
 		gvnh->clue.end = 0;										\
-		assert((NULL != gvnh->gd_csa) || (reorg_gv_target == gvnh));					\
 		if (gvnh->gd_csa && (gvnh != gvnh->gd_csa->dir_tree))						\
+		{												\
+			assert ((DIR_ROOT != gvnh->root) || (gvnh == reorg_gv_target));				\
 			gvnh->root = 0;										\
+		}												\
 		/* Cleanup any block-split info (of created block #) in gvtarget histories */			\
 		TP_CLEANUP_GVNH_SPLIT_IF_NEEDED(gvnh, 0);							\
+	}													\
+}
+#  define RESET_ALL_GVT_CLUES_REG(CSA)										\
+{														\
+	GBLREF	gv_namehead	*gv_target_list;								\
+	GBLREF	gv_namehead	*reorg_gv_target;								\
+														\
+	gv_namehead		*gvnh;										\
+														\
+	assert(NULL != CSA);											\
+	for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)					\
+	{													\
+		if (CSA == gvnh->gd_csa)									\
+		{	/* Only reset info for globals in CSA. */						\
+			gvnh->clue.end = 0;									\
+			if (gvnh != gvnh->gd_csa->dir_tree)							\
+				gvnh->root = 0;									\
+			TP_CLEANUP_GVNH_SPLIT_IF_NEEDED(gvnh, 0);						\
+		}												\
 	}													\
 }
 #endif
@@ -406,7 +427,7 @@ typedef struct trans_restart_hist_struct
 	}												\
 }
 
-#define TP_TRACE_HIST_MOD(X, Y, n, csd, histtn, bttn, level)						\
+#define TP_TRACE_HIST_MOD(X, Y, N, CSD, HISTTN, BTTN, LEVEL)						\
 {													\
 	DCL_THREADGBL_ACCESS;										\
 													\
@@ -416,22 +437,22 @@ typedef struct trans_restart_hist_struct
 		tp_fail_hist_reg[t_tries] = gv_cur_region;						\
 		t_fail_hist_blk[t_tries] = ((block_id)X);						\
 		tp_fail_hist[t_tries] = (gv_namehead *)(((int)X & ~(-BLKS_PER_LMAP)) ? Y : NULL); 	\
-		(csd)->tp_cdb_sc_blkmod[(n)]++;								\
-		tp_fail_n = (n);									\
-		tp_fail_level = (level);								\
-		tp_fail_histtn[t_tries] = (histtn);							\
-		tp_fail_bttn[t_tries] = (bttn);								\
+		(CSD)->tp_cdb_sc_blkmod[(N)]++;								\
+		tp_fail_n = (N);									\
+		tp_fail_level = (LEVEL);								\
+		tp_fail_histtn[t_tries] = (HISTTN);							\
+		tp_fail_bttn[t_tries] = (BTTN);								\
 	}												\
 }
 
-#define	ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(first_tp_srch_status, sgm_info_ptr)	\
+#define	ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(FIRST_TP_SRCH_STATUS, SGM_INFO_PTR)	\
 {											\
-	assert(NULL == (first_tp_srch_status) 						\
-		|| ((first_tp_srch_status) >= (sgm_info_ptr)->first_tp_hist		\
-			&& (first_tp_srch_status) < (sgm_info_ptr)->last_tp_hist));	\
+	assert(NULL == (FIRST_TP_SRCH_STATUS) 						\
+		|| ((FIRST_TP_SRCH_STATUS) >= (SGM_INFO_PTR)->first_tp_hist		\
+			&& (FIRST_TP_SRCH_STATUS) < (SGM_INFO_PTR)->last_tp_hist));	\
 }
 
-#define	SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status)				\
+#define	SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(CSA, CNL, STATUS)				\
 {	/* set wc_blocked if final retry and cache related failure status */		\
 	if (CDB_STAGNATE <= t_tries)							\
 	{										\
@@ -439,67 +460,50 @@ typedef struct trans_restart_hist_struct
 		GBLREF	boolean_t	is_lchar_wcs_code[];				\
 			boolean_t	is_wcs_code = FALSE;				\
 											\
-		if (ISALPHA_ASCII(status))						\
-		{									\
-			if (status > 'Z')						\
-				is_wcs_code = is_lchar_wcs_code[status - 'a'];		\
-			else								\
-				is_wcs_code = is_uchar_wcs_code[status - 'A'];		\
-		}									\
+		if (ISALPHA_ASCII(STATUS))						\
+			is_wcs_code = (STATUS > 'Z') 					\
+				? is_lchar_wcs_code[STATUS - 'a'] 			\
+				: is_uchar_wcs_code[STATUS - 'A'];			\
 		if (is_wcs_code)							\
 		{									\
-			SET_TRACEABLE_VAR(csa->hdr->wc_blocked, TRUE);			\
-			BG_TRACE_PRO_ANY(csa, wc_blocked_wcs_cdb_sc_final_retry);	\
+			SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);			\
+			BG_TRACE_PRO_ANY(CSA, wc_blocked_wcs_cdb_sc_final_retry);	\
 		}									\
 	}										\
 }
 
-#define	TP_RETRY_ACCOUNTING(csa, cnl, status)						\
+#define	TP_RETRY_ACCOUNTING(CSA, CNL)							\
 {											\
 	GBLREF	uint4		dollar_trestart;					\
 											\
 	switch (dollar_trestart)							\
 	{										\
 		case 0:									\
-			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_cnflct_retries_0, 1);	\
+			INCR_GVSTATS_COUNTER(CSA, CNL, n_tp_cnflct_retries_0, 1);	\
 			break;								\
 		case 1:									\
-			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_cnflct_retries_1, 1);	\
+			INCR_GVSTATS_COUNTER(CSA, CNL, n_tp_cnflct_retries_1, 1);	\
 			break;								\
 		case 2:									\
-			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_cnflct_retries_2, 1);	\
+			INCR_GVSTATS_COUNTER(CSA, CNL, n_tp_cnflct_retries_2, 1);	\
 			break;								\
 		case 3:									\
-			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_cnflct_retries_3, 1);	\
+			INCR_GVSTATS_COUNTER(CSA, CNL, n_tp_cnflct_retries_3, 1);	\
 			break;								\
 		default:								\
-			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_cnflct_retries_4, 1);	\
+			INCR_GVSTATS_COUNTER(CSA, CNL, n_tp_cnflct_retries_4, 1);	\
 			break;								\
 	}										\
 }
 
 #define PREV_OFF_INVALID -1
 
-/* JNL_FILE_TAIL_PRESERVE macro indicates maximum number of bytes to ensure allocated at the end of the journal file
- * 	 to store the journal records that will be written whenever the journal file gets closed.
- * (i)	 Any process closing the journal file needs to write at most one PINI, one EPOCH, one PFIN and one EOF record
- *	 In case of wcs_recover extra INCTN will be written
- * (ii)	 We may need to give room for twice the above space to accommodate the EOF writing by a process that closes the journal
- *	 and the EOF writing by the first process that reopens it and finds no space left and switches to a new journal.
- * (iii) We may need to write one ALIGN record at the most since the total calculated from (i) and (ii) above is
- * 	   less than the minimum alignsize that we support (asserted before using JNL_FILE_TAIL_PRESERVE in macros below)
- * 	   The variable portion of this ALIGN record can get at the most equal to the maximum of the sizes of the
- * 	   PINI/EPOCH/PFIN/EOF record. (We know PINI_RECLEN is maximum of EPOCH_RECLEN, PFIN_RECLEN, EOF_RECLEN)
- */
-#define	JNL_FILE_TAIL_PRESERVE	(MIN_ALIGN_RECLEN + (PINI_RECLEN + EPOCH_RECLEN + INCTN_RECLEN + 		\
-								PFIN_RECLEN + EOF_RECLEN) * 2 + PINI_RECLEN)
-
-#define TOTAL_TPJNL_REC_SIZE(total_jnl_rec_size, si, csa)							\
+#define TOTAL_TPJNL_REC_SIZE(TOTAL_JNL_REC_SIZE, SI, CSA)							\
 {														\
-	DEBUG_ONLY(si->tmp_cw_set_depth = si->cw_set_depth;)	/* save a copy to check later in "tp_tend" */	\
-	total_jnl_rec_size = si->total_jnl_rec_size;								\
-	if (csa->jnl_before_image)										\
-		total_jnl_rec_size += (si->cw_set_depth * csa->pblk_align_jrecsize);				\
+	DEBUG_ONLY(SI->tmp_cw_set_depth = SI->cw_set_depth;)	/* save a copy to check later in "tp_tend" */	\
+	TOTAL_JNL_REC_SIZE = SI->total_jnl_rec_size;								\
+	if (CSA->jnl_before_image)										\
+		TOTAL_JNL_REC_SIZE += (SI->cw_set_depth * CSA->pblk_align_jrecsize);				\
 	/* Since we have already taken into account an align record per journal record and since the size of	\
 	 * an align record will be < (size of the journal record written + fixed-size of align record)		\
 	 * we can be sure we won't need more than twice the computed space.					\
@@ -507,7 +511,7 @@ typedef struct trans_restart_hist_struct
 	 * in case journal file close is needed 								\
 	 */													\
 	assert(JNL_FILE_TAIL_PRESERVE < (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));					\
-	si->total_jnl_rec_size = total_jnl_rec_size = (total_jnl_rec_size * 2) + (uint4)JNL_FILE_TAIL_PRESERVE;	\
+	SI->total_jnl_rec_size = TOTAL_JNL_REC_SIZE = (TOTAL_JNL_REC_SIZE * 2) + (uint4)JNL_FILE_TAIL_PRESERVE;	\
 }
 
 #define MIN_TOTAL_NONTPJNL_REC_SIZE 	(PINI_RECLEN + MIN_ALIGN_RECLEN + INCTN_RECLEN + MIN_ALIGN_RECLEN)
@@ -515,14 +519,14 @@ typedef struct trans_restart_hist_struct
 /* This macro gives a pessimistic estimate on the total journal record size needed.
  * The side effect is that we might end up with a journal file extension when it was actually not needed.
  */
-#define TOTAL_NONTPJNL_REC_SIZE(total_jnl_rec_size, non_tp_jfb_ptr, csa, tmp_cw_set_depth)			\
+#define TOTAL_NONTPJNL_REC_SIZE(TOTAL_JNL_REC_SIZE, NON_TP_JFB_PTR, CSA, TMP_CW_SET_DEPTH)			\
 {														\
-	total_jnl_rec_size = (non_tp_jfb_ptr->record_size + (uint4)MIN_TOTAL_NONTPJNL_REC_SIZE);		\
-	if (csa->jnl_before_image)										\
+	TOTAL_JNL_REC_SIZE = (NON_TP_JFB_PTR->record_size + (uint4)MIN_TOTAL_NONTPJNL_REC_SIZE);		\
+	if (CSA->jnl_before_image)										\
 		/* One PBLK record for each gds block changed by the transaction */				\
-		total_jnl_rec_size += (tmp_cw_set_depth * csa->pblk_align_jrecsize);			\
+		TOTAL_JNL_REC_SIZE += (TMP_CW_SET_DEPTH * CSA->pblk_align_jrecsize);			\
 	if (write_after_image)											\
-		total_jnl_rec_size += (uint4)MIN_AIMG_RECLEN + csa->hdr->blk_size + (uint4)MIN_ALIGN_RECLEN;	\
+		TOTAL_JNL_REC_SIZE += (uint4)MIN_AIMG_RECLEN + CSA->hdr->blk_size + (uint4)MIN_ALIGN_RECLEN;	\
 	/* Since we have already taken into account an align record per journal record and since the size of	\
 	 * an align record will be < (size of the journal record written + fixed-size of align record)		\
 	 * we can be sure we won't need more than twice the computed space.					\
@@ -530,29 +534,29 @@ typedef struct trans_restart_hist_struct
 	 * in case journal file close is needed 								\
 	 */													\
 	assert(JNL_FILE_TAIL_PRESERVE < (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));					\
-	total_jnl_rec_size = total_jnl_rec_size * 2 + (uint4)JNL_FILE_TAIL_PRESERVE;				\
+	TOTAL_JNL_REC_SIZE = TOTAL_JNL_REC_SIZE * 2 + (uint4)JNL_FILE_TAIL_PRESERVE;				\
 }
 
-#define INVALIDATE_CLUE(cse) 					\
+#define INVALIDATE_CLUE(CSE) 					\
 {								\
 	off_chain	macro_chain;				\
 								\
-	assert(cse->blk_target);				\
-	cse->blk_target->clue.end = 0;				\
-	macro_chain = *(off_chain *)&cse->blk_target->root;	\
+	assert(CSE->blk_target);				\
+	CSE->blk_target->clue.end = 0;				\
+	macro_chain = *(off_chain *)&CSE->blk_target->root;	\
 	if (macro_chain.flag)					\
-		cse->blk_target->root = 0;			\
+		CSE->blk_target->root = 0;			\
 }
 
 /* freeup killset starting from the link 'ks' */
 
-#define FREE_KILL_SET(si, ks)					\
+#define FREE_KILL_SET(KS)					\
 {								\
 	kill_set	*macro_next_ks;				\
-	for (; ks; ks = macro_next_ks)				\
+	for (; KS; KS = macro_next_ks)				\
 	{							\
-		macro_next_ks = ks->next_kill_set;		\
-		free(ks);					\
+		macro_next_ks = KS->next_kill_set;		\
+		free(KS);					\
 	}							\
 }
 
@@ -631,10 +635,11 @@ typedef struct trans_restart_hist_struct
 
 /* freeup gbl_tlvl_info_list starting from the link 'gti' */
 
-#define FREE_GBL_TLVL_INFO(gti)							\
+#define FREE_GBL_TLVL_INFO(GTI)							\
 {										\
 	int	macro_cnt;							\
-	for (macro_cnt = 0; gti; gti = gti->next_global_tlvl_info)		\
+										\
+	for (macro_cnt = 0; GTI; GTI = GTI->next_global_tlvl_info)		\
 		macro_cnt++;							\
 	if (macro_cnt)								\
 		free_last_n_elements(global_tlvl_info_list, macro_cnt);		\
@@ -780,35 +785,35 @@ typedef struct trans_restart_hist_struct
  * otherwise been had the two macros been merged and this is used in database code where performance is a concern.
  */
 /* the macro below uses "dollar_tlevel", "t_err" and "sgm_info_ptr" */
-#define T_BEGIN_SETORKILL_NONTP_OR_TP(err_code)										\
+#define T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_CODE)										\
 {															\
 	GBLREF	sgm_info	*sgm_info_ptr;										\
 	GBLREF	sgmnt_addrs	*cs_addrs;										\
 	GBLREF	uint4		t_err;											\
 															\
 	if (!dollar_tlevel)												\
-		t_begin(err_code, UPDTRNS_DB_UPDATED_MASK);								\
+		t_begin(ERR_CODE, UPDTRNS_DB_UPDATED_MASK);								\
 	else														\
 	{														\
-		t_err = err_code;											\
+		t_err = ERR_CODE;											\
 		assert((NULL != sgm_info_ptr) && (cs_addrs->sgm_info_ptr == sgm_info_ptr));				\
 		sgm_info_ptr->update_trans |= UPDTRNS_DB_UPDATED_MASK;							\
 	}														\
 }
 
 /* the macro below uses "dollar_tlevel", "t_err" */
-#define T_BEGIN_READ_NONTP_OR_TP(err_code)										\
+#define T_BEGIN_READ_NONTP_OR_TP(ERR_CODE)										\
 {															\
 	GBLREF	uint4		t_err;											\
 	GBLREF	sgm_info	*sgm_info_ptr;										\
 	GBLREF	sgmnt_addrs	*cs_addrs;										\
 															\
 	if (!dollar_tlevel)												\
-		t_begin(err_code, 0);											\
+		t_begin(ERR_CODE, 0);											\
 	else														\
 	{														\
 		assert((NULL != sgm_info_ptr) && (cs_addrs->sgm_info_ptr == sgm_info_ptr));				\
-		t_err = err_code;											\
+		t_err = ERR_CODE;											\
 	}														\
 }
 
@@ -844,24 +849,37 @@ GBLREF	unsigned int	t_tries;
 														\
 	assert(dollar_tlevel);											\
 	assert(CDB_STAGNATE == t_tries);									\
-	/* In case of journal recovery, it operates at t_tries=CDB_STAGNATE but we should not adjust t_tries	\
-	 * in that case and it is ok to not print the TPNOTACID message in that case. Since we have standalone	\
-	 * access, we dont expect anyone else to interfere with us and cause a restart anyways.			\
+	/* mupip_jnl_recovery operates with t_tries=CDB_STAGNATE so we should not adjust t_tries		\
+	 * In that case, because we have standalone access, we dont expect anyone else to interfere with us 	\
+	 * and cause a restart, but if they do, TPNOTACID_CHECK (below) gives a TPNOTACID message.		\
 	 */													\
 	if (!mupip_jnl_recover)											\
+	{													\
+		assert(CDB_STAGNATE <= dollar_trestart);							\
+		assert(dollar_trestart >= TREF(tp_restart_dont_counts));					\
 		t_tries = CDB_STAGNATE - 1;									\
+		DEBUG_ONLY(if (0 == TREF(tp_restart_dont_counts)))						\
+			DEBUG_ONLY((TREF(tp_restart_dont_counts))++);	/* can live with one too many */	\
+		DEBUG_ONLY(if (0 < TREF(tp_restart_dont_counts)))						\
+			DEBUG_ONLY((TREF(tp_restart_dont_counts)) = -(TREF(tp_restart_dont_counts)));		\
+	}													\
 }
+
+#define TPNOTACID_DEFAULT_TIME	2	/* default (in seconds)for tpnotacidtime */
+#define TPNOTACID_MAX_TIME	30	/* maximum (in seconds)for tpnotacidtime */
+#define TPTIMEOUT_MAX_TIME	60	/* maximum (inseconds) for dollar_zmaxtptime - enforced in gtm_env_init, not in op_svput */
 
 #define	TPNOTACID_CHECK(CALLER_STR)											\
 {															\
+	GBLREF	boolean_t	mupip_jnl_recover;									\
 	mval		zpos;												\
 															\
 	if (IS_TP_AND_FINAL_RETRY)											\
 	{														\
 		TP_REL_CRIT_ALL_REG;											\
+		assert(!mupip_jnl_recover);										\
 		TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;									\
 		getzposition(&zpos);											\
-		gtm_putmsg(VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(CALLER_STR), zpos.str.len, zpos.str.addr);	\
 		send_msg(VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(CALLER_STR), zpos.str.len, zpos.str.addr);		\
 	}														\
 }
@@ -869,7 +887,8 @@ GBLREF	unsigned int	t_tries;
 /* Any retry transition where the destination state is the 3rd retry, we don't want to release crit, i.e. for 2nd to 3rd retry
  * transition or 3rd to 3rd retry transition. Therefore we need to release crit only if (CDB_STAGNATE - 1) > t_tries.
  */
-#define NEED_TO_RELEASE_CRIT(T_TRIES)		((CDB_STAGNATE - 1) > T_TRIES)
+#define NEED_TO_RELEASE_CRIT(T_TRIES, STATUS)		(((CDB_STAGNATE - 1) > T_TRIES)					\
+							 UNIX_ONLY(|| cdb_sc_instancefreeze == STATUS))
 
 void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
 void tp_clean_up(boolean_t rollback_flag);

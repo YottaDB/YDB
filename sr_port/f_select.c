@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "mdq.h"
 #include "mmemory.h"
 #include "advancewindow.h"
+#include "fullbool.h"
 
 error_def(ERR_COLON);
 error_def(ERR_SELECTFALSE);
@@ -41,7 +42,7 @@ int f_select(oprtype *a, opctype op)
 	TREF(saw_side_effect) = FALSE;
 	TREF(expr_depth) = 0;
 	TREF(expr_start) = TREF(expr_start_orig) = NULL;
-	if (save_shift)
+	if ((save_shift) && ((GTM_BOOL == TREF(gtm_fullbool)) || !save_saw_side))
 	{
 		dqinit(&tmpchain, exorder);
 		oldchain = setcurtchain(&tmpchain);
@@ -115,7 +116,7 @@ int f_select(oprtype *a, opctype op)
 	TREF(expr_depth) = save_depth;
 	TREF(expr_start) = save_start;
 	TREF(expr_start_orig) = save_start_orig;
-	if (save_shift)
+	if ((save_shift) && ((GTM_BOOL == TREF(gtm_fullbool)) || !save_saw_side))
 	{
 		newtriple(OC_GVSAVTARG);
 		setcurtchain(oldchain);

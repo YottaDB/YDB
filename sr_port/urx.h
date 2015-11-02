@@ -31,7 +31,7 @@ typedef	struct urx_labref_type
 /* urx_addr_type and associated prototypes can vary by chip or platform */
 
 #include "urxsp.h"
-#include "rtnhdr.h" /* Can be removed when all azl* routines are fixed */
+#include <rtnhdr.h> /* Can be removed when all azl* routines are fixed */
 
 urx_rtnref *urx_putrtn(char *rtn, int rtnlen, urx_rtnref *anchor);
 void urx_free(urx_rtnref *anchor);

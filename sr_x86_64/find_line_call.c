@@ -10,10 +10,10 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "emit_code_sp.h"
+#include <emit_code_sp.h>
 #include "xfer_enum.h"
 #include "i386.h"
-#include "rtnhdr.h"	/* Needed by zbreak.h */
+#include <rtnhdr.h>	/* Needed by zbreak.h */
 #include "zbreak.h"
 
 int inst_size = 0;

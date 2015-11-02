@@ -1,6 +1,6 @@
 /****************************************************************
 *                                                              *
-*      Copyright 2011 Fidelity Information Services, Inc *
+*      Copyright 2011, 2012 Fidelity Information Services, Inc *
 *                                                              *
 *      This source code contains the intellectual property     *
 *      of its copyright holder(s), and is made available       *
@@ -15,6 +15,11 @@
 #include "gtm_c_stack_trace.h"
 #include "gtm_c_stack_trace_semop.h"
 #include "semwt2long_handler.h"
+#include "wbox_test_init.h"
+#include "gt_timer.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
 
 GBLREF uint4            process_id;
 #ifdef DEBUG
@@ -68,8 +73,8 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 						{
 							GET_C_STACK_FROM_SCRIPT("SEMOP_INFO", process_id, semop_pid, stuckcnt);
 							/* Got stack trace signal the first process to continue */
-							GTM_WHITE_BOX_TEST(WBTEST_SEMTOOLONG_STACK_TRACE, \
-											cnl->wbox_test_seq_num, 3);
+							GTM_WHITE_BOX_TEST(WBTEST_SEMTOOLONG_STACK_TRACE,
+								cnl->wbox_test_seq_num, 3);
 						} else if (-1 == semop_pid)
 						{
 							rc = -1;

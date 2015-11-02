@@ -14,7 +14,7 @@
 #include "gtm_stdlib.h"
 
 #include "collseq.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "lv_val.h"		/* needed for "fgncal.h" */
 #include "fgncal.h"
 #include "iosp.h"

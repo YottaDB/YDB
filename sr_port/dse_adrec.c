@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
 GBLREF gd_addr		*gd_header;
 GBLREF char 		patch_comp_key[MAX_KEY_SZ + 1];
-GBLREF unsigned char 	patch_comp_count;
+GBLREF unsigned short 	patch_comp_count;
 GBLREF gd_region        *gv_cur_region;
 GBLREF cw_set_element   cw_set[];
 GBLREF unsigned char    *non_tp_jfb_buff_ptr;
@@ -55,7 +55,8 @@ GBLREF unsigned char    *non_tp_jfb_buff_ptr;
 void dse_adrec(void)
 {
 	char		data[MAX_LINE], key[MAX_KEY_SZ + 1];
-	unsigned char	cc;
+	unsigned short	cc;
+	int		tmp_cmpc;
 	sm_uc_ptr_t	new_bp, lbp, b_top, rp, r_top, key_top;
 	short int	size, new_len, rsize;
 	int		data_len, key_len;
@@ -181,7 +182,7 @@ void dse_adrec(void)
 	size = (key_len < patch_comp_count) ? key_len : patch_comp_count;
 	for (cc = 0; cc < size && patch_comp_key[cc] == key[cc]; cc++)
 		;
-	((rec_hdr_ptr_t)new_bp)->cmpc = cc;
+	SET_CMPC((rec_hdr_ptr_t)new_bp, cc);
 	new_len = key_len - cc + data_len + SIZEOF(rec_hdr);
 	PUT_SHORT(&((rec_hdr_ptr_t)new_bp)->rsiz, new_len);
 	MEMCP(new_bp, &key[cc], SIZEOF(rec_hdr), key_len - cc, blk_size);
@@ -203,10 +204,10 @@ void dse_adrec(void)
 				if (!*key_top++ && !*key_top++)
 					break;
 		}
-		if (((rec_hdr_ptr_t)rp)->cmpc > patch_comp_count)
+		if (EVAL_CMPC((rec_hdr_ptr_t)rp) > patch_comp_count)
 			cc = patch_comp_count;
 		else
-			cc = ((rec_hdr_ptr_t)rp)->cmpc;
+			cc = EVAL_CMPC((rec_hdr_ptr_t)rp);
 		size = key_top - rp - SIZEOF(rec_hdr);
 		if (size > SIZEOF(patch_comp_key) - 2 - cc)
 			size = SIZEOF(patch_comp_key) - 2 - cc;
@@ -217,7 +218,7 @@ void dse_adrec(void)
 		size = (key_len < patch_comp_count) ? key_len : patch_comp_count;
 		for (cc = 0; cc < size && patch_comp_key[cc] ==  key[cc]; cc++)
 			;
-		((rec_hdr_ptr_t)(new_bp + new_len))->cmpc = cc;
+		SET_CMPC((rec_hdr_ptr_t)(new_bp + new_len), cc);
 		rsize = patch_comp_count - cc + r_top - key_top + SIZEOF(rec_hdr);
 		PUT_SHORT(&((rec_hdr_ptr_t)(new_bp + new_len))->rsiz, rsize);
 		MEMCP(new_bp, &patch_comp_key[cc], new_len + SIZEOF(rec_hdr), patch_comp_count - cc, blk_size);

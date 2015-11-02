@@ -16,7 +16,7 @@
 #include "hashtab_objcode.h"
 #include "cachectl.h"
 #include "cacheflush.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gtm_text_alloc.h"
 #include "io.h"
 

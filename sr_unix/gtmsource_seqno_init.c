@@ -154,7 +154,7 @@ void gtmsource_seqno_init(boolean_t this_side_std_null_coll)
 	 */
 	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
 	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-	GRAB_LOCK(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+	grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
 	jnlpool_ctl->start_jnl_seqno = db_seqno;
 	jnlpool_ctl->jnl_seqno = db_seqno;
 	jnlpool_ctl->max_zqgblmod_seqno = zqgblmod_seqno;

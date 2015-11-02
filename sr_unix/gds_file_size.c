@@ -27,7 +27,7 @@
 
 error_def(ERR_DBFILOPERR);
 
-unsigned int gds_file_size(file_control *fc)
+gtm_uint64_t gds_file_size(file_control *fc)
 {
 	unix_db_info	*udi;
 	int		fstat_res;
@@ -38,5 +38,5 @@ unsigned int gds_file_size(file_control *fc)
 	if (-1 == fstat_res)
 		rts_error(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(udi->fn), errno);
 	assert(0 == stat_buf.st_size % DISK_BLOCK_SIZE);
-	return (unsigned int)(stat_buf.st_size / DISK_BLOCK_SIZE);
+	return (gtm_uint64_t)(stat_buf.st_size / DISK_BLOCK_SIZE);
 }

@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 #include "compiler.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mdq.h"
 #include "stringpool.h"
 

@@ -30,7 +30,7 @@
 #include "gtm_ctype.h"
 #include "gtm_string.h"
 #include "error.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "subscript.h"
 #include "svnames.h"
@@ -128,15 +128,15 @@ error_def(ERR_VIEWNOTFOUND);
 #ifdef UNIX
 STATICFNDEF void times_usec(ext_tms *curr)
 {
-	int	res;
-	struct	rusage usage;
-        struct	timespec elp_time;
+	int		res;
+	struct rusage	usage;
+        struct timespec	elp_time;
 
 	res = getrusage(RUSAGE_SELF, &usage);
 	if (res == -1)
 		MPROF_RTS_ERROR((VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("getrusage"), CALLFROM, errno));
-	curr->tms_utime = (usage.ru_utime.tv_sec * 1000000) + usage.ru_utime.tv_usec;
-	curr->tms_stime = (usage.ru_stime.tv_sec * 1000000) + usage.ru_stime.tv_usec;
+	curr->tms_utime = (usage.ru_utime.tv_sec * (gtm_uint64_t)1000000) + usage.ru_utime.tv_usec;
+	curr->tms_stime = (usage.ru_stime.tv_sec * (gtm_uint64_t)1000000) + usage.ru_stime.tv_usec;
 	/* also start recording the elapsed time */
 	while (TRUE)
 	{
@@ -152,20 +152,20 @@ STATICFNDEF void times_usec(ext_tms *curr)
 		}
 		break;
 	}
-	curr->tms_etime = (elp_time.tv_sec * 1000000) + (elp_time.tv_nsec / 1000);
+	curr->tms_etime = (elp_time.tv_sec * (gtm_uint64_t)1000000) + (elp_time.tv_nsec / 1000);
 	return;
 }
 
 STATICFNDEF void child_times_usec(void)
 {
-	int res;
-	struct rusage usage;
+	int		res;
+	struct rusage	usage;
 
 	res = getrusage(RUSAGE_CHILDREN, &usage);
 	if (res == -1)
 		MPROF_RTS_ERROR((VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("getrusage"), CALLFROM, errno));
-	child_user = (usage.ru_utime.tv_sec * 1000000) + usage.ru_utime.tv_usec;
-	child_system = (usage.ru_stime.tv_sec * 1000000) + usage.ru_stime.tv_usec;
+	child_user = (usage.ru_utime.tv_sec * (gtm_uint64_t)1000000) + usage.ru_utime.tv_usec;
+	child_system = (usage.ru_stime.tv_sec * (gtm_uint64_t)1000000) + usage.ru_stime.tv_usec;
 	return;
 }
 #else
@@ -224,7 +224,7 @@ void turn_tracing_on(mval *gvn, boolean_t from_env, boolean_t save_gbl)
 		*(TREF(mprof_ptr))->pcavailbase = 0;
 	}
 	(TREF(mprof_ptr))->pcavailptr = (TREF(mprof_ptr))->pcavailbase;
-	(TREF(mprof_ptr))->pcavail = PROFCALLOC_DSBLKSIZE - SIZEOF(char *);
+	(TREF(mprof_ptr))->pcavail = PROFCALLOC_DSBLKSIZE - OFFSET_LEN;
 	memset((TREF(mprof_ptr))->pcavailptr + 1, 0, (TREF(mprof_ptr))->pcavail);
 	curr = (TREF(mprof_ptr))->tprev;
 	TIMES(&curr);
@@ -302,7 +302,7 @@ void turn_tracing_off(mval *gvn)
 	is_tracing_on = (TREF(mprof_ptr))->is_tracing_ini = FALSE;
 	mprof_stack_free();
 	(TREF(mprof_ptr))->pcavailptr = (TREF(mprof_ptr))->pcavailbase;
-	(TREF(mprof_ptr))->pcavail = PROFCALLOC_DSBLKSIZE - SIZEOF(char *);
+	(TREF(mprof_ptr))->pcavail = PROFCALLOC_DSBLKSIZE - OFFSET_LEN;
 	CLEAR_PROFILING_TABLE();	/* restore the original xfer_table links */
 	TREF(prof_fp) = NULL;
 	return;
@@ -478,7 +478,7 @@ void unw_prof_frame(void)
 	mprof_tree	*t;
 	ext_tms		carryover;
 	stack_frame	*save_fp;
-	unsigned int    frame_usr_time, frame_sys_time, frame_elp_time;
+	gtm_uint64_t	frame_usr_time, frame_sys_time, frame_elp_time;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -525,7 +525,7 @@ void unw_prof_frame(void)
 			e.rout_name->addr = pcalloc((unsigned int)e.rout_name->len);
 			memcpy(e.rout_name->addr, (TREF(prof_fp))->rout_name->addr, (TREF(prof_fp))->rout_name->len);
 			TREF(mprof_alloc_reclaim) = FALSE;	/* memory should not have to be reclaimed after this point,
-							 * so stop updating the count */
+							 	 * so stop updating the count */
 		}
 		e.line_num = -1;
 		/* insert/find a frame entry into/in the MPROF tree, -1 indicating that it is not a
@@ -613,8 +613,11 @@ char *pcalloc(unsigned int n)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	GTM64_ONLY(n = ((n + 7) & ~7);) 	/* same logic applied for alignment */
-	NON_GTM64_ONLY(n = ((n + 3) & ~3);) 	/* make sure that it is quad-word aliged */
+#	if defined (GTM64) || defined(__osf__) || defined(VMS)
+	n = ((n + 7) & ~7); 	/* same logic applied for alignment */
+#	else
+	n = ((n + 3) & ~3); 	/* make sure that it is quad-word aligned */
+#	endif
 	if (n > (TREF(mprof_ptr))->pcavail)
 	{
 		if (*(TREF(mprof_ptr))->pcavailptr)
@@ -626,14 +629,14 @@ char *pcalloc(unsigned int n)
 			(TREF(mprof_ptr))->pcavailptr = x;
 			*(TREF(mprof_ptr))->pcavailptr = NULL;
 		}
-		(TREF(mprof_ptr))->pcavail = PROFCALLOC_DSBLKSIZE - SIZEOF(char *);
+		(TREF(mprof_ptr))->pcavail = PROFCALLOC_DSBLKSIZE - OFFSET_LEN;
 		memset((TREF(mprof_ptr))->pcavailptr + 1, 0, (TREF(mprof_ptr))->pcavail);
 	}
 	(TREF(mprof_ptr))->pcavail -= n;
 	if (TREF(mprof_alloc_reclaim))
 		(TREF(mprof_reclaim_cnt)) += n;	/* update the memory allocation count if needed */
 	assert((TREF(mprof_ptr))->pcavail >= 0);
-	return (char *)(TREF(mprof_ptr))->pcavailptr + (TREF(mprof_ptr))->pcavail + SIZEOF(char *);
+	return (char *)(TREF(mprof_ptr))->pcavailptr + (TREF(mprof_ptr))->pcavail + OFFSET_LEN;
 }
 
 /* Reclaim storage previously allocated by pcalloc(). */
@@ -645,7 +648,7 @@ void mprof_reclaim_slots(void)
 	SETUP_THREADGBL_ACCESS;
 	if (0 < TREF(mprof_reclaim_cnt))	/* in case some memory needs to be reclaimed, do so */
 	{
-		alloc_diff = (PROFCALLOC_DSBLKSIZE - (TREF(mprof_ptr))->pcavail - SIZEOF(char *));
+		alloc_diff = (PROFCALLOC_DSBLKSIZE - (TREF(mprof_ptr))->pcavail - OFFSET_LEN);
 		if (alloc_diff >= TREF(mprof_reclaim_cnt)) /* allocation did not need a new bucket, we are good */
 			(TREF(mprof_ptr))->pcavail += TREF(mprof_reclaim_cnt);
 		else
@@ -735,20 +738,20 @@ void crt_gbl(mprof_tree *p, boolean_t is_for)
 	{
 		*tmpnum = ':';
 		tmpnum++;
-		end = i2asc(tmpnum, p->e.usr_time);
+		end = i2ascl(tmpnum, p->e.usr_time);
 		tmpnum += ((end - tmpnum) > 0) ? (end - tmpnum) : (tmpnum - end);
 #		ifndef VMS
 		*tmpnum = ':';
 		tmpnum++;
-		end = i2asc(tmpnum, p->e.sys_time);
+		end = i2ascl(tmpnum, p->e.sys_time);
 		tmpnum += ((end - tmpnum) > 0) ? (end - tmpnum) : (tmpnum - end);
 		*tmpnum = ':';
 		tmpnum++;
-		end = i2asc(tmpnum, p->e.sys_time + p->e.usr_time);
+		end = i2ascl(tmpnum, p->e.sys_time + p->e.usr_time);
 		tmpnum += ((end - tmpnum) > 0) ? (end - tmpnum) : (tmpnum - end);
 		*tmpnum = ':';
 		tmpnum++;
-		end = i2asc(tmpnum, p->e.elp_time);
+		end = i2ascl(tmpnum, p->e.elp_time);
 		tmpnum += ((end - tmpnum) > 0) ? (end - tmpnum) : (tmpnum - end);
 #		endif
 	}
@@ -794,23 +797,23 @@ STATICFNDEF void insert_total_times(boolean_t for_process)
 	start_point = (INTPTR_T)&dataval[0];
 	tmpnum = (unsigned char *)&dataval[0];
 	if (for_process)
-		end = i2asc(tmpnum, process_user);
+		end = i2ascl(tmpnum, process_user);
 	else
-		end = i2asc(tmpnum, child_user);
+		end = i2ascl(tmpnum, child_user);
 	tmpnum += ((end - tmpnum) > 0) ? (end - tmpnum) : (tmpnum - end);
 	*tmpnum = ':';
 	tmpnum++;
 	if (for_process)
-		end = i2asc(tmpnum, process_system);
+		end = i2ascl(tmpnum, process_system);
 	else
-		end = i2asc(tmpnum, child_system);
+		end = i2ascl(tmpnum, child_system);
 	tmpnum += ((end - tmpnum) > 0) ? (end - tmpnum) : (tmpnum - end);
 	*tmpnum = ':';
 	tmpnum++;
 	if (for_process)
-		end = i2asc(tmpnum, process_user + process_system);
+		end = i2ascl(tmpnum, process_user + process_system);
 	else
-		end = i2asc(tmpnum, child_user + child_system);
+		end = i2ascl(tmpnum, child_user + child_system);
 	tmpnum += ((end - tmpnum) > 0) ? (end - tmpnum) : (tmpnum - end);
 	data.mvtype = MV_STR;
 	data.str.len = (((INTPTR_T)tmpnum - start_point) > 0)
@@ -830,7 +833,6 @@ STATICFNDEF void get_entryref_information(boolean_t line, trace_entry *tmp_trc_t
 	stack_frame	*fp;
 	int		status;
 	unsigned char	*addr, *out_addr;
-	unsigned char	temp[OFFSET_LEN];
 	int4		*line_table, *last_line, len, ct;
 	int4		offset, in_addr_offset;
 	unsigned long	user_time, system_time;

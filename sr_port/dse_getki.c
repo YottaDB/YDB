@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@
 
 #ifdef GTM_TRIGGER
 #include "hashtab_mname.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"		/* needed for INIT_ROOT_GVT */
 #include "targ_alloc.h"
 #endif
@@ -55,8 +55,11 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 	short int	max_key;
 	unsigned short 	buf_len;
 	int  		key_len, dlr_num, dlr_len;
+	int		num;
+	unsigned char	*ptr;
 	mval 		key_subsc;
 	sgmnt_addrs	*csa;
+	span_subs	subs;
 
 	buf_len = SIZEOF(buf);
 	if (!cli_get_str(qual, buf, &buf_len))
@@ -71,7 +74,7 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 	}
 	if ((*src >= 'A' && *src <= 'Z') ||
 	    (*src >= 'a' && *src <= 'z') ||
-	    (*src == '%'))					/* first letter must be an alphabet or % */
+	    (*src == '%') || (*src == '#'))			/* first letter must be an alphabet or % or # */
 	{
 		*temp_dst++ = *src++;
 	} else
@@ -100,13 +103,13 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 	bot = (char *)&gv_currkey->base[0];
 	temp_dst = (char *)&gv_currkey->base[0] + gv_currkey->end;
 	max_key = gv_cur_region->max_key_size;
-	if (*src == '(')
+	if ('(' == *src)
 	{
 		src++;
 		for (;;)
 		{
 			key_subsc.mvtype = MV_STR;
-			if (*src == '$')			/* may be a $char() */
+			if ('$' == *src)			/* may be a $char() */
 			{
 				src++;
 				if ((dlr_len = parse_dlr_char(src, top, slit)) > 0)
@@ -119,6 +122,26 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 					util_out_print("Error:  invalid key.", TRUE);
 					return FALSE;
 				}
+			} else if ('#' == *src)
+			{	/*Special spanning global subscript*/
+				if ('S' != toupper(*(src + 1)) && 'P' != toupper(*(src + 2))
+				     && 'A' != toupper(*(src + 3)) && 'N' != toupper(*(src + 4)))
+				{
+					util_out_print("Error:  invalid key.", TRUE);
+					return FALSE;
+				}
+				src = src + SPAN_SUBS_LEN + 1;
+				for (num = 0, src++; *src != ')'; num = (num * DECIMAL_BASE + (int)(*src++ - ASCII_0)))
+					;
+				ptr = gv_currkey->base + gv_currkey->end;
+				num = num - 1;
+				SPAN_INITSUBS(&subs, num);
+				SPAN_SUBSCOPY_SRC2DST(ptr, (unsigned char *)&subs);
+				ptr = ptr + SPAN_SUBS_LEN;
+				*ptr++ = KEY_DELIMITER;
+				*ptr = KEY_DELIMITER;
+				gv_currkey->end = ptr - gv_currkey->base;
+				break;
 			} else if (*src != '\"')		/* numerical subscript */
 			{
 				for (key_subsc.str.addr = src ; *src != ')' && *src != ','; src++)

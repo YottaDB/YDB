@@ -16,6 +16,10 @@ error_def(ERR_DSEWCREINIT);
 
 #define PATCH_SAVE_SIZE		128
 #define DSE_DMP_TIME_FMT	"DD-MON-YEAR 24:60:SS"
+#define SPAN_START_BYTE 	0x02
+#define SPAN_BYTE_MAX  		255
+#define SPAN_BYTE_MIN		1
+
 
 #define	GET_CURR_TIME_IN_DOLLARH_AND_ZDATE(dollarh_mval, dollarh_buffer, zdate_mval, zdate_buffer)				\
 {	/* gets current time in the mval "dollarh_mval" in dollarh format and in the mval "zdate_mval" in ZDATE format		\
@@ -138,6 +142,7 @@ int dse_data(char *dst, int *len);
 int dse_getki(char *dst, int *len, char *qual, int qual_len);
 int dse_is_blk_in(sm_uc_ptr_t rp, sm_uc_ptr_t r_top, short size);
 int dse_ksrch(block_id srch, block_id_ptr_t pp, int4 *off, char *targ_key, int targ_len);
+int dse_key_srch(block_id srch, block_id_ptr_t pp, int4 *off, char *targ_key, int targ_len);
 int dse_order(block_id srch, block_id_ptr_t pp, int4 *op, char *targ_key, short int targ_len,
 	bool dir_data_blk);
 void  dse_rmsb(void);

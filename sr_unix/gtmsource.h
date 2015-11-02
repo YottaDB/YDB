@@ -27,6 +27,12 @@ GBLREF gd_addr	*gd_header;
 #define JNLPOOL_DUMMY_REG_NAME		"JNLPOOL_REG"
 #define MAX_FILTER_CMD_LEN		512
 #define MIN_JNLPOOL_SIZE		(1 * 1024 * 1024)
+#define MAX_FREEZE_COMMENT_LEN		1024
+/* We need space in the journal pool to let other processes know which error messages should trigger anticipatory freeze.
+ * Instead of storing them as a list, allocate one byte for each error message. Currently, the only piece of information
+ * associated with each error message is whether it can trigger anticipatory freeze or not.
+ */
+#define MERRORS_ARRAY_SZ		(2 * 1024)	/* 2k should be enough for a while */
 
 #ifdef VMS
 #define MAX_GSEC_KEY_LEN		32 /* 31 is allowed + 1 for NULL terminator */
@@ -87,6 +93,7 @@ typedef enum
 #define GTMSOURCE_WAIT_FOR_SHUTDOWN		(1000 - 1) /* ms, almost 1 sec */
 #define GTMSOURCE_WAIT_FOR_SOURCESTART		(1000 - 1) /* ms, almost 1 sec */
 #define	GTMSOURCE_WAIT_FOR_FIRSTHISTINFO	(1000 - 1) /* ms, almost 1 sec */
+#define LOG_WAIT_FOR_JNLOPEN_TIMES		5 /* Number of times the source logs wait_for_jnlopen */
 
 /* Wait for a max of 2 minutes on a single region database as all the source server shutdown
  * timeouts seen so far have been on a single region database. For multi-region databases, wait
@@ -175,7 +182,10 @@ typedef struct
 	seq_num			strm_seqno[MAX_SUPPL_STRMS];		/* the current jnl seqno of each stream */
 	volatile uint4		onln_rlbk_pid;		/* process ID of currently running ONLINE ROLLBACK. 0 if none. */
 	volatile uint4		onln_rlbk_cycle;	/* incremented everytime an ONLINE ROLLBACK ends */
-	unsigned char		filler_align_16[8];	/* for 16-byte alignment */
+	boolean_t		freeze;			/* Freeze all regions in this instance. */
+	char			freeze_comment[MAX_FREEZE_COMMENT_LEN];	/* Text explaining reason for freeze */
+	unsigned char		merrors_array[MERRORS_ARRAY_SZ];
+	unsigned char		filler_align_16[4];	/* for 16-byte alignment */
 } jnlpool_ctl_struct;
 
 #if defined(__osf__) && defined(__alpha)
@@ -197,9 +207,9 @@ typedef struct gtmsrc_lcl_struct	*gtmsrc_lcl_ptr_t;
  *
  * struct jnlpool_trans_struct
  * {
- *	jnldata_hdr_struct	jnldata_hdr; 	- jnldata_hdr.jnldata_len
- *						  is the length of journal
- *						  data of a transaction
+ *	jnldata_hdr_struct	jnldata_hdr; 		- jnldata_hdr.jnldata_len
+ *						  	  is the length of journal
+ *						  	  data of a transaction
  * 	uchar			jnldata[jnldata_len]; 	- transaction journal
  * 							  data
  * };
@@ -213,11 +223,9 @@ typedef struct gtmsrc_lcl_struct	*gtmsrc_lcl_ptr_t;
  **********************************************************************/
 typedef struct
 {
-	uint4 		jnldata_len;	/* length of the journal data of a
-					 * a transaction in bytes */
-	uint4		prev_jnldata_len; /* length of the journal data of
-					   * the previous transaction in the
-					   * journal pool (in bytes) */
+	uint4 		jnldata_len;		/* length of the journal data of a transaction in bytes */
+	uint4		prev_jnldata_len;	/* length of the journal data of the previous transaction in the
+						 * journal pool (in bytes) */
 } jnldata_hdr_struct;
 
 #if defined(__osf__) && defined(__alpha)
@@ -237,8 +245,8 @@ typedef jnldata_hdr_struct 	*jnldata_hdr_ptr_t;
 #define REPL_CONN_ALERT_ALERT_PERIOD		30	/* sec Default alert period*/
 #define REPL_CONN_HEARTBEAT_PERIOD		15	/* sec Default heartbeat period */
 #define REPL_CONN_HEARTBEAT_MAX_WAIT		60	/* sec Default heartbeat maximum waiting period */
-
-#define REPL_MAX_CONN_HARD_TRIES_PERIOD		1000 /* ms */
+#define REPL_MAX_CONN_HARD_TRIES_PERIOD		1000    /* ms */
+#define REPL_MAX_LOG_PERIOD		        150     /* sec Maximum logging period */
 
 enum
 {
@@ -255,7 +263,8 @@ enum
 #define JNLPOOL_SEGMENT			'J'
 
 /*************** Macro to send a REPL_HISTREC message, given an histinfo type of record ***************/
-#define	GTMSOURCE_SEND_REPL_HISTREC(HSTINFO, GTMSRCLCL, RCVR_SAME_ENDIANNESS)							\
+/* Note that HSTINFO.start_seqno is modified by this macro */
+#define	GTMSOURCE_SEND_REPL_HISTREC(HSTINFO, GTMSRCLCL, RCVR_CROSS_ENDIAN)							\
 {																\
 	repl_histrec_msg_t	histrec_msg;											\
 																\
@@ -263,9 +272,10 @@ enum
 	histrec_msg.type = REPL_HISTREC;											\
 	histrec_msg.len = SIZEOF(repl_histrec_msg_t);										\
 	histrec_msg.histjrec.jrec_type = JRT_HISTREC;										\
+	/* Update history record's start_seqno to reflect the starting point of transmission */					\
+	HSTINFO.start_seqno = GTMSRCLCL->read_jnl_seqno;									\
 	histrec_msg.histjrec.histcontent = HSTINFO;										\
-	histrec_msg.histjrec.histcontent.start_seqno = GTMSRCLCL->read_jnl_seqno;						\
-	if (!RCVR_SAME_ENDIANNESS && (this_side->jnl_ver < remote_side->jnl_ver))						\
+	if (RCVR_CROSS_ENDIAN && (this_side->jnl_ver < remote_side->jnl_ver))							\
 	{															\
 		histrec_msg.histjrec.forwptr = GTM_BYTESWAP_24(SIZEOF(repl_histrec_jnl_t));					\
 		ENDIAN_CONVERT_REPL_HISTINFO(&histrec_msg.histjrec.histcontent);						\
@@ -410,10 +420,13 @@ typedef jnlpool_addrs	*jnlpool_addrs_ptr_t;
 /* Types of processes that can do jnlpool_init */
 typedef enum
 {
-	GTMPROC,	/* For GT.M */
-	GTMSOURCE,	/* For source server */
-	GTMRECEIVE	/* For receiver server. Note this name should be different from GTMRECV which is defined to server
+	GTMPROC,	/* For GT.M and Update Process */
+	GTMSOURCE,	/* For Source Server */
+	GTMRECEIVE,	/* For Receiver Server. Note this name should be different from GTMRECV which is defined to serve
 			 * a similar purpose in gtmrecv.h for processes that do recvpool_init.
+			 */
+	GTMRELAXED,	/* For processes which want to a attach to an existing journal pool without the usual validations (currently
+			 * NOJNLPOOL is the only validation that is skipped)
 			 */
 } jnlpool_user;
 
@@ -436,6 +449,10 @@ typedef struct
 	boolean_t	instsecondary;	/* TRUE if -INSTSECONDARY is explicitly or implicitly specified, FALSE otherwise */
 	boolean_t	needrestart;	/* TRUE if -NEEDRESTART was specified, FALSE otherwise */
 	boolean_t	losttncomplete;	/* TRUE if -LOSTTNCOMPLETE was specified, FALSE otherwise */
+	boolean_t	showfreeze;	/* TRUE if -FREEZE was specified with no value, FALSE otherwise */
+	boolean_t	setfreeze;	/* TRUE if -FREEZE was specified with a value, FALSE otherwise */
+	boolean_t	freezeval;	/* TRUE for -FREEZE=ON, FALSE for -FREEZE=OFF */
+	boolean_t	setcomment;	/* TRUE if -COMMENT was specified, FALSE otherwise */
 	int4		cmplvl;
 	int4		shutdown_time;
 	int4		buffsize;
@@ -448,6 +465,7 @@ typedef struct
 	char            secondary_host[MAX_HOST_NAME_LEN];
 	char            log_file[MAX_FN_LEN + 1];
 	char		secondary_instname[MAX_INSTNAME_LEN];	/* instance name specified in -INSTSECONDARY qualifier */
+	char		freeze_comment[MAX_FREEZE_COMMENT_LEN];
 } gtmsource_options_t;
 
 #define ASSERT_VALID_JNLPOOL(CSA)										\
@@ -526,5 +544,7 @@ void		gtmsource_jnl_release_timer(TID tid, int4 interval_len, int *interval_ptr)
 int		gtmsource_start_jnl_release_timer(void);
 int		gtmsource_stop_jnl_release_timer(void);
 void		gtmsource_onln_rlbk_clnup(void);
+int		gtmsource_showfreeze(void);
+int		gtmsource_setfreeze(void);
 
 #endif /* GTMSOURCE_H */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,6 @@
 #include "gtmmsg.h"
 
 GBLREF bool dec_nofac;
-GBLREF va_list last_va_list_ptr;
 
 void dec_err(uint4 argcnt, ...)
 {
@@ -29,7 +28,9 @@ void dec_err(uint4 argcnt, ...)
 	const err_msg	*em;
 	char		msgbuff[2048];
 	mstr		msgstr;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	util_out_print(0, RESET, 0);	/* reset the buffer */
 	VAR_START(var, argcnt);
 	assert (argcnt >= 1);
@@ -37,11 +38,7 @@ void dec_err(uint4 argcnt, ...)
 	ec = err_check(err);
 	em = NULL;
 	if (ec)
-	{
-		assert((err & FACMASK(ec->facnum)) && (MSGMASK(err, ec->facnum) <= ec->msg_cnt));
-		j = MSGMASK(err, ec->facnum);
-		em = ec->fst_msg + j - 1;
-	}
+		GET_MSG_INFO(err, ec, em);
 	msgstr.addr = msgbuff;
 	msgstr.len = SIZEOF(msgbuff);
 	gtm_getmsg(err, &msgstr);
@@ -58,7 +55,7 @@ void dec_err(uint4 argcnt, ...)
 		} else
 			count = 0;
 		util_out_print_vaparm(msgstr.addr, FLUSH, var, count);
-		va_end(last_va_list_ptr);
+		va_end(TREF(last_va_list_ptr));
 	}
 	va_end(var);
 }

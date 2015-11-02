@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,6 +52,11 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	uint4			process_id;
 GBLREF	enum gtmImageTypes	image_type;
 
+error_def(ERR_COMMITWAITSTUCK);
+error_def(ERR_SYSCALL);
+error_def(ERR_SSFILCLNUPFAIL);
+error_def(ERR_SSSHMCLNUPFAIL);
+
 #define CLEANUP_SHADOW_FILE(preserve_snapshot, shadow_file)							 		\
 {																\
 	int		status;											 		\
@@ -96,7 +101,7 @@ GBLREF	enum gtmImageTypes	image_type;
 		cnl->num_snapshots_in_effect--;					\
 	if (0 == cnl->num_snapshots_in_effect)					\
 	{									\
-		cnl->snapshot_in_prog = FALSE;					\
+		CLEAR_SNAPSHOTS_IN_PROG(cnl);					\
 		cnl->ss_shmid = INVALID_SHMID;					\
 	}									\
 	SS_DEFAULT_INIT_POOL(ss_shm_ptr);					\
@@ -118,11 +123,6 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 	struct stat		stat_buf;
 	char			shadow_file[GTM_PATH_MAX];
 	ss_proc_status		cur_state;
-
-	error_def(ERR_COMMITWAITSTUCK);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_SSFILCLNUPFAIL);
-	error_def(ERR_SSSHMCLNUPFAIL);
 
 	assert(NULL != cs_addrs && (NULL != gv_cur_region));
 	csa = cs_addrs;

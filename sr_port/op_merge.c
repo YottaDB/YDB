@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@
 
 #include "min_max.h"
 #include "lv_val.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -75,9 +75,11 @@
 	}									\
 }
 
+GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 GBLREF int4             outofband;
+GBLREF uint4		dollar_tlevel;
 GBLREF gv_key           *gv_currkey;
 GBLREF gd_region        *gv_cur_region;
 GBLREF zshow_out        *zwr_output;
@@ -95,7 +97,7 @@ error_def(ERR_STACKOFLOW);
 
 void op_merge(void)
 {
-	boolean_t		found, check_for_null_subs, is_base_var;
+	boolean_t		found, check_for_null_subs, is_base_var, nontp_and_bgormm;
 	lv_val			*dst_lv;
 	mval 			*mkey, *value, *subsc;
 	int			org_glvn1_keysz, org_glvn2_keysz, delta2, dollardata_src, dollardata_dst, sbs_depth;
@@ -135,6 +137,9 @@ void op_merge(void)
 			merge_args = 0;	/* Must reset to zero to reuse the Global */
 			return;
 		}
+		nontp_and_bgormm = ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth))
+				&& !dollar_tlevel;
+		assert(!nontp_and_bgormm || gv_target->root);
 		if (NULL == TREF(gv_mergekey2))
 		{	/* We need to initialize gvn2 (right hand side). */
 			GVKEY_INIT(TREF(gv_mergekey2), DBKEYSIZE(MAX_KEY_SZ));
@@ -188,6 +193,18 @@ void op_merge(void)
 				gv_currkey->base[gv_currkey->end + 1] = 0;
 				gv_currkey->base[gv_currkey->end + 2] = 0;
 				gv_currkey->end += 2;
+#				ifdef UNIX
+				if (nontp_and_bgormm && (0 == gv_target->root))
+				{	/* This is to handle root blocks moved by REORG. Merge alternates between two
+					 * different gv_targets. If op_gvput below detects a moved root block, it will
+					 * set the root of both to zero, but it will only redo root search for IND1.
+					 * We want op_gvqueryget to redo root search for IND2, so we fake its root
+					 * which will get it far enough to do so.
+					 */
+					cs_addrs->root_search_cycle--;
+					gv_target->root = 2;
+				}
+#				endif
 				/* Do atomic $QUERY and $GET of current glvn2:
 				 * mkey is a mstr which contains $QUERY result in database format (So no conversion necessary)
 				 * value is a mstr which contains $GET result

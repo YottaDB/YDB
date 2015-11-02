@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,9 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#ifndef SLEEP_CNT_H_INCLUDED
+#define SLEEP_CNT_H_INCLUDED
 
 #include "min_max.h"
 
@@ -46,6 +49,9 @@
 #define	PHASE2_COMMIT_WAIT	SLEEP_ONE_MIN
 #define	PHASE2_COMMIT_WAIT_HTBT	8		/* = 8 heartbeats (each 8 seconds) = 64 seconds wait (used in Unix) */
 
+#define	SLEEP_INSTFREEZEWAIT	100		/* 100-msec wait between re-checks of instance freeze status */
+#define	SLEEP_IORETRYWAIT	500		/* 500-msec wait between retries of the same write operation */
+
 #define	SLEEP_JNLQIOLOCKWAIT	1		/* 1-msec wait */
 #define	MAXJNLQIOLOCKWAIT	4000		/* 4sec = 4000 1-msec waits to see if io_in_prog lock is free in wcs_flu */
 
@@ -76,3 +82,5 @@
  * the remaining crs. The value of 4 minutes was chosen because that is what t_qread currently has as its
  * maximum wait for reading a block from disk into the global buffer. */
 #define MAX_WAIT_FOR_RIP	4
+
+#endif

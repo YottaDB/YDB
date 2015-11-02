@@ -135,7 +135,7 @@ DEBUG_ONLY( struct rlimit rlim;)
 
 					status = stat(newname, &fs1);		/* This file exist ? */
 					if (0 != status)
-						status = rename(oldname, newname); /* No, attempt the rename */
+						status = RENAME(oldname, newname); /* No, attempt the rename */
 					else
 						status = -1;			/* Yes, reset status for another iteration */
 				}

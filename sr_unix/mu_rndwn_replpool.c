@@ -56,6 +56,7 @@
 #include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "error.h"
+#include "anticipatory_freeze.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
@@ -63,6 +64,7 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	uint4			process_id;
 GBLREF	mur_gbls_t		murgbl;
+GBLREF	boolean_t		argumentless_rundown;
 
 LITREF char             	gtm_release_name[];
 LITREF int4             	gtm_release_name_len;
@@ -72,13 +74,6 @@ error_def(ERR_REPLINSTOPEN);
 error_def(ERR_REPLPOOLINST);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
-
-
-#define ISSUE_REPLPOOLINST(SAVE_ERRNO, SHM_ID, INSTFILENAME, FAILED_OP)						\
-{														\
-	gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, SHM_ID, LEN_AND_STR(INSTFILENAME));			\
-	gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT(FAILED_OP), CALLFROM, SAVE_ERRNO);			\
-}
 
 #define ISSUE_REPLPOOLINST_AND_RETURN(SAVE_ERRNO, SHM_ID, INSTFILENAME, FAILED_OP)				\
 {														\
@@ -102,26 +97,27 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 {
 	int			semval, status, save_errno, nattch;
 	char			*instfilename, pool_type;
-	boolean_t		sem_created = FALSE, sem_grabbed = FALSE;
 	sm_uc_ptr_t		start_addr;
-	struct semid_ds		semstat;
 	struct shmid_ds		shm_buf;
-	union semun		semarg;
 	unix_db_info		*udi;
 	sgmnt_addrs		*csa;
+	boolean_t		anticipatory_freeze_available, force_attach;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(INVALID_SHMID != shm_id);
-	semarg.buf = &semstat;
 	instfilename = replpool_id->instfilename;
 	pool_type = replpool_id->pool_type;
 	assert((JNLPOOL_SEGMENT == pool_type) || (RECVPOOL_SEGMENT == pool_type));
+	anticipatory_freeze_available = ANTICIPATORY_FREEZE_AVAILABLE;
+	force_attach = (jgbl.onlnrlbk || (!jgbl.mur_rollback && !argumentless_rundown && anticipatory_freeze_available));
 	if (-1 == shmctl(shm_id, IPC_STAT, &shm_buf))
 	{
 		save_errno = errno;
 		ISSUE_REPLPOOLINST_AND_RETURN(save_errno, shm_id, instfilename, "shmctl()");
 	}
 	nattch = shm_buf.shm_nattch;
-	if ((0 != nattch) && !jgbl.onlnrlbk) /* It must be zero before I attach to it (except online rollback) */
+	if ((0 != nattch) && !force_attach)
 	{
 		util_out_print("Replpool segment (id = !UL) for replication instance !AD is in use by another process.",
 				TRUE, shm_id, LEN_AND_STR(instfilename));
@@ -179,9 +175,11 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 		if (0 == nattch)
 		{	/* No one attached. So, we can safely flush the journal pool so that the gtmsrc_lcl structures in the
 			 * jnlpool and disk are in sync with each other. More importantly we are about to remove the jnlpool
-			 * so we better get things in sync before that.
-			 */
-			/* If mu_rndwn_repl_instance created new semaphores (in mu_replpool_remove_sem), we need to flush those
+			 * so we better get things in sync before that. If anticipatory freeze scheme is in effect, then we
+			 * need to keep the journal pool up and running. So, don't reset the crash field in the instance file
+			 * header (dictated by the second parameter to repl_inst_flush_jnlpool below).
+			 * Note:
+			 * If mu_rndwn_repl_instance created new semaphores (in mu_replpool_remove_sem), we need to flush those
 			 * to the instance file as well. So, override the jnlpool_semid and jnlpool_semid_ctime with the new
 			 * values.
 			 */
@@ -189,23 +187,25 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 					&& (0 != repl_inst_filehdr->jnlpool_semid_ctime));
 			jnlpool.repl_inst_filehdr->jnlpool_semid = repl_inst_filehdr->jnlpool_semid;
 			jnlpool.repl_inst_filehdr->jnlpool_semid_ctime = repl_inst_filehdr->jnlpool_semid_ctime;
-			repl_inst_flush_jnlpool(FALSE, TRUE);
-			assert(!jnlpool.repl_inst_filehdr->crash);
+			repl_inst_flush_jnlpool(FALSE, !anticipatory_freeze_available);
+			assert(!jnlpool.repl_inst_filehdr->crash || anticipatory_freeze_available);
 			/* Refresh local copy (repl_inst_filehdr) with the copy that was just flushed (jnlpool.repl_inst_filehdr) */
 			memcpy(repl_inst_filehdr, jnlpool.repl_inst_filehdr, SIZEOF(repl_inst_hdr));
-			/* Now that jnlpool has been flushed and there is going to be no journal pool, reset
-			 * "jnlpool.repl_inst_filehdr" as otherwise other routines (e.g. "repl_inst_recvpool_reset") are
-			 * affected by whether this is NULL or not.
-			 */
-			jnlpool.jnlpool_ctl = NULL;
-			jnlpool_ctl = NULL;
-			jnlpool.gtmsrc_lcl_array = NULL;
-			jnlpool.gtmsource_local_array = NULL;
-			jnlpool.jnldata_base = NULL;
-			jnlpool.repl_inst_filehdr = NULL;
+			if (!anticipatory_freeze_available)
+			{ 	/* Now that jnlpool has been flushed and there is going to be no journal pool, reset
+				 * "jnlpool.repl_inst_filehdr" as otherwise other routines (e.g. "repl_inst_recvpool_reset") are
+				 * affected by whether this is NULL or not.
+				 */
+				jnlpool.jnlpool_ctl = NULL;
+				jnlpool_ctl = NULL;
+				jnlpool.gtmsrc_lcl_array = NULL;
+				jnlpool.gtmsource_local_array = NULL;
+				jnlpool.jnldata_base = NULL;
+				jnlpool.repl_inst_filehdr = NULL;
+			}
 		} /* else we are ONLINE ROLLBACK. repl_inst_flush_jnlpool will be done later after gvcst_init in mur_open_files */
 	}
-	if (0 == nattch)
+	if ((0 == nattch) && (!anticipatory_freeze_available || (RECVPOOL_SEGMENT == pool_type)))
 	{
 		if (-1 == shmdt((caddr_t)start_addr))
 		{
@@ -230,8 +230,8 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 			*ipc_rmvd = TRUE;
 		}
 	} else
-	{	/* else we are ONLINE ROLLBACK. Processes actively attached to the journal pool. Do not remove and/or reset the
-		 * fields in the file heade
+	{	/* Else we are ONLINE ROLLBACK or anticipatory freeze is in effect and so we want to keep the journal pool available
+		 * for the duration of the rollback. Do not remove and/or reset the fields in the file header
 	   	 */
 		assert((JNLPOOL_SEGMENT != pool_type) || ((NULL != jnlpool.jnlpool_ctl) && (NULL != jnlpool_ctl)));
 		if (JNLPOOL_SEGMENT == pool_type)
@@ -246,7 +246,7 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 CONDITION_HANDLER(mu_rndwn_replpool_ch)
 {
 	unix_db_info		*udi;
-	int			save_errno;
+	int			status, save_errno;
 	repl_inst_hdr_ptr_t	inst_hdr;
 
 	START_CH;
@@ -255,9 +255,9 @@ CONDITION_HANDLER(mu_rndwn_replpool_ch)
 		NEXTCH;
 	if (NULL != jnlpool.jnlpool_ctl)
 	{
-		if (-1 == shmdt((caddr_t)jnlpool.jnlpool_ctl))
+		JNLPOOL_SHMDT(status, save_errno);
+		if (0 > status)
 		{
-			save_errno = errno;
 			inst_hdr = jnlpool.repl_inst_filehdr;
 			assert(NULL != inst_hdr);
 			assert(NULL != jnlpool.jnlpool_dummy_reg);
@@ -267,7 +267,6 @@ CONDITION_HANDLER(mu_rndwn_replpool_ch)
 			assert(INVALID_SHMID != inst_hdr->jnlpool_shmid);
 			ISSUE_REPLPOOLINST(save_errno, inst_hdr->jnlpool_shmid, udi->fn, "shmdt()");
 		}
-		jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
 		jnlpool.gtmsrc_lcl_array = NULL;
 		jnlpool.gtmsource_local_array = NULL;
 		jnlpool.jnldata_base = NULL;

@@ -33,7 +33,12 @@
 */
 
 #include "mdef.h"
-
+/* If this is a pro build (meaning PRO_BUILD is defined), avoid the memcpy() override. That code is only
+ * appropriate for a pure debug build.
+ */
+#ifdef PRO_BUILD
+#  define BYPASS_MEMCPY_OVERRIDE	/* Instruct gtm_string.h not to override memcpy() */
+#endif
 /* We are the redefined versions so use real versions in this module */
 #undef malloc
 #undef free
@@ -45,11 +50,11 @@
 #include <stddef.h>
 #include <errno.h>
 #if !defined(VMS) && !defined(__MVS__)
-#include <malloc.h>
+#  include <malloc.h>
 #endif
 #include "gtm_stdio.h"
-#include "gtm_string.h"
 #include "gtm_stdlib.h"
+#include "gtm_string.h"
 
 #include "eintr_wrappers.h"
 #include "gtmdbglvl.h"
@@ -67,8 +72,8 @@
 #include "gtm_malloc.h"
 #include "have_crit.h"
 #ifdef UNIX
-#include "gtmio.h"
-#include "deferred_signal_handler.h"
+#  include "gtmio.h"
+#  include "deferred_signal_handler.h"
 #endif
 
 /* This routine is compiled twice, once as debug and once as pro and put into the same pro build. The alternative
@@ -338,6 +343,7 @@ GBLREF	mcalloc_hdr	*mcavailptr, *mcavailbase;
 GBLREF	void		(*cache_table_relobjs)(void);	/* Function pointer to call cache_table_rebuild() */
 UNIX_ONLY(GBLREF ch_ret_type (*ht_rhash_ch)();)		/* Function pointer to hashtab_rehash_ch */
 UNIX_ONLY(GBLREF ch_ret_type (*jbxm_dump_ch)();)	/* Function pointer to jobexam_dump_ch */
+UNIX_ONLY(GBLREF ch_ret_type (*stpgc_ch)();)		/* Function pointer to stp_gcol_ch */
 /* This var allows us to call ourselves but still have callerid info */
 GBLREF	unsigned char	*smCallerId;			/* Caller of top level malloc/free */
 GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
@@ -1145,7 +1151,7 @@ void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg wh
         {
 #	endif
 		if (NULL != (addr = (void *)outOfMemoryMitigation)
-		    UNIX_ONLY(&& !(ht_rhash_ch == active_ch->ch || jbxm_dump_ch == active_ch->ch || stp_gcol_ch == active_ch->ch)))
+		    UNIX_ONLY(&& !(ht_rhash_ch == active_ch->ch || jbxm_dump_ch == active_ch->ch || stpgc_ch == active_ch->ch)))
 		{       /* Free our reserve only if not in certain condition handlers (on UNIX) since it is */
 			/* going to unwind this error and ignore it. On VMS the error will not be trapped   */
 			outOfMemoryMitigation = NULL;

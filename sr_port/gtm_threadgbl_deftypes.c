@@ -39,7 +39,7 @@
 #include "hashtab_str.h"
 #include "hashtab_objcode.h"
 #include "error.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "ccp.h"
@@ -95,6 +95,7 @@
 #include "zroutines.h"
 #include "trace_table.h"
 #include "parm_pool.h"
+#include "util.h"		/* for util_outbuff manipulations */
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
@@ -110,7 +111,7 @@
 # include "cli.h"
 # include "invocation_mode.h"
 # include "fgncal.h"
-# include "parse_file.h"		/* for MAX_FBUFF */
+# include "parse_file.h"	/* for MAX_FBUFF */
 # include "repl_sem.h"
 # include "gtm_zlib.h"
 # include "zro_shlibs.h"
@@ -213,4 +214,5 @@ int main()
 #	undef THREADGBLAR1DEF
 #	undef THREADGBLAR2DEF
 	printf("# define size_gtm_threadgbl_struct %d\n", (int)SIZEOF(gtm_threadgbl_def_t));
+	return 0;
 }

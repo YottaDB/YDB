@@ -12,7 +12,7 @@
 #include "mdef.h"
 #include <stddef.h>
 #include "gtm_string.h"
-#include "rtnhdr.h" /* needed by urx.h */
+#include <rtnhdr.h> /* needed by urx.h */
 #include "urx.h"
 
 urx_rtnref *urx_putrtn (char *rtn, int rtnlen, urx_rtnref *anchor)

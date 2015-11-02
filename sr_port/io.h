@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,12 +23,14 @@
 #endif
 
 #include "gt_timer.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mv_stent.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
+
+error_def(ERR_BADCHSET);
 
 #define INSERT			TRUE
 #define NO_INSERT		FALSE
@@ -334,6 +336,7 @@ void get_dlr_key(mval *v);
 void flush_pio(void);
 
 void remove_rms(io_desc *ciod);
+void iosocket_destroy(io_desc *ciod);
 
 dev_dispatch_struct *io_get_fgn_driver(mstr *s);
 
@@ -397,7 +400,6 @@ LITREF unsigned char ebcdic_spaces_block[];
 #define SET_ENCODING(CHSET, CHSET_MSTR)												\
 {																\
 	int 	chset_idx;													\
-	error_def(ERR_BADCHSET);												\
 																\
 	chset_idx = verify_chset(CHSET_MSTR);											\
 		;														\

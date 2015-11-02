@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,16 +49,22 @@ GBLREF unsigned char		*mu_int_master;
 GBLREF uint4			mu_int_errknt;
 GBLREF sgmnt_data_ptr_t		cs_data;
 GBLREF pid_t			process_id;
-
-GTMCRYPT_ONLY(
-	GBLREF gtmcrypt_key_t	mu_int_encrypt_key_handle;
-)
 GBLREF boolean_t		ointeg_this_reg;
-GTM_SNAPSHOT_ONLY(
-	GBLREF util_snapshot_ptr_t	util_ss_ptr;
-	GBLREF boolean_t		preserve_snapshot;
-	GBLREF boolean_t		online_specified;
-)
+GBLREF boolean_t		jnlpool_init_needed;
+#ifdef GTM_CRYPT
+GBLREF gtmcrypt_key_t	mu_int_encrypt_key_handle;
+#endif
+#ifdef GTM_SNAPSHOT
+GBLREF util_snapshot_ptr_t	util_ss_ptr;
+GBLREF boolean_t		preserve_snapshot;
+GBLREF boolean_t		online_specified;
+#endif
+
+error_def(ERR_BUFFLUFAILED);
+error_def(ERR_DBRDONLY);
+error_def(ERR_MUKILLIP);
+error_def(ERR_SSV4NOALLOW);
+error_def(ERR_SSMMNOALLOW);
 
 void mu_int_reg(gd_region *reg, boolean_t *return_value)
 {
@@ -72,13 +78,8 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 	int			trynum;
 	uint4			curr_wbox_seq_num;
 
-	error_def(ERR_BUFFLUFAILED);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_MUKILLIP);
-	error_def(ERR_SSV4NOALLOW);
-	error_def(ERR_SSMMNOALLOW);
 	*return_value = FALSE;
-
+	jnlpool_init_needed = TRUE;
 	ESTABLISH(mu_int_reg_ch);
 	if (dba_usr == reg->dyn.addr->acc_meth)
 	{

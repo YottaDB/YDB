@@ -305,8 +305,8 @@ LITDEF	err_msg merrors[] = {
 	"DBBLEVMN", "!AD Block level less than zero", 2,
 	"DBBSIZMN", "!AD Block too small", 2,
 	"DBBSIZMX", "!AD Block larger than file block size", 2,
-	"DBRSIZMN", "!AD Record too small", 2,
-	"DBRSIZMX", "!AD Record too large", 2,
+	"DBRSIZMN", "!AD Physical record too small", 2,
+	"DBRSIZMX", "!AD Physical record too large", 2,
 	"DBCMPNZRO", "!AD First record of block has nonzero compression count", 2,
 	"DBSTARSIZ", "!AD Star record has wrong size", 2,
 	"DBSTARCMP", "!AD Star record has nonzero compression count", 2,
@@ -429,8 +429,8 @@ LITDEF	err_msg merrors[] = {
 	"JNLINVEXT", "Journal file extension !UL is greater than the maximum allowed size of !UL.  Journal file not created.", 2,
 	"MUPCLIERR", "Action not taken due to CLI errors", 0,
 	"JNLTMQUAL4", "Time qualifier BEFORE_TIME=\"!AZ\" is less than AFTER_TIME=\"!AZ\"", 2,
-	"JNLBUFFTOOLG", "Journal file buffer !UL is greater than the maximum allowed size of !UL.  Journal file not created.", 2,
-	"JNLBUFFTOOSM", "Journal file buffer !UL is less than minimum of database block size in 512 byte pages + 1 (!UL)", 2,
+	"UNUSEDMSG594", "JNLBUFFTOOLG Last used in V5.5-000", 0,
+	"UNUSEDMSG595", "JNLBUFFTOOSM Last used in V5.5-000", 0,
 	"MUNODBNAME", "A database name or the region qualifier must be specified", 0,
 	"FILECREATE", "!AD file !AD created", 4,
 	"FILENOTCREATE", "!AD file !AD not created", 4,
@@ -505,7 +505,7 @@ LITDEF	err_msg merrors[] = {
 	"CENOINDIR", "Indirection type information not available for compiler escape feature", 0,
 	"COLLATIONUNDEF", "Collation type !UL is not defined", 1,
 	"RBWRNNOTCHG", "Not all specified database files were changed", 0,
-	"GTMSECSHRSRVF", "!AD - !UL : Attempt to service request failed", 3,
+	"GTMSECSHRSRVF", "!AD - !UL : Attempt to service request failed (retry = !UL)", 4,
 	"FREEZECTRL", "Control Y or control C encountered during attempt to freeze the database. Aborting freeze.", 0,
 	"JNLFLUSH", "Error flushing journal buffers to journal file !AD", 2,
 	"CCPSIGDMP", "CCP non fatal dump, continuing operation. Report to your GT.M Support Channel.", 0,
@@ -583,11 +583,11 @@ LITDEF	err_msg merrors[] = {
 	"BLKSIZ512", "Block size !UL rounds to !UL", 2,
 	"MUTEXERR", "Mutual Exclusion subsystem failure", 0,
 	"JNLVSIZE", "Journal File !AD has incorrect virtual_filesize !UL.  Allocation : !UL, Extension : !UL, Filesize : !UL, File system block size : !UL", 7,
-	"MUTEXLCKALERT", "Mutual Exclusion subsystem ALERT - lock attempt threshold crossed for region !AD.  Process !UL is in crit.", 3,
+	"MUTEXLCKALERT", "Mutual Exclusion subsystem ALERT - lock attempt threshold crossed for region !AD.  Process !UL is in crit cycle !UL.", 4,
 	"MUTEXFRCDTERM", "Mutual Exclusion subsystem detected forced termination of process !UL.  Crit salvaged from region !AD.", 3,
 	"GTMSECSHR", "!UL : Error during gtmsecshr operation", 1,
-	"GTMSECSHRSRVFID", "!AD: !UL - Attempt to service request failed.!/ client id: !UL, mesg type: !UL, mesg data: !UL.", 6,
-	"GTMSECSHRSRVFIL", "!AD: !UL - Attempt to service request failed.!/ client id: !UL, mesg type: !UL!/file: !AD.", 7,
+	"GTMSECSHRSRVFID", "!AD: !UL - Attempt to service request failed.!/ client id: !UL, mesg type: !UL, mesg data: !UL", 6,
+	"GTMSECSHRSRVFIL", "!AD: !UL - Attempt to service request failed.!/ client id: !UL, mesg type: !UL!/file: !AD", 7,
 	"SOCKACTNA", "Action not appropriate for current socket", 0,
 	"PROTNOTSUP", "Protocol !AD not supported", 2,
 	"DELIMSIZNA", "Delimiter size is not appropriate", 0,
@@ -644,7 +644,7 @@ LITDEF	err_msg merrors[] = {
 	"JNLRDONLY", "Journal file !AD read only", 2,
 	"ANCOMPTINC", "Deviceparameter !AD is not compatible with any other deviceparameters in the !AD command", 4,
 	"ABNCOMPTINC", "Deviceparameter !AD and deviceparameter !AD are not compatible in the !AD command", 6,
-	"GTMSECSHRLOGF", "!AD - !UL : Error while creating gtmsecshr log file", 3,
+	"UNUSEDMSG809", "GTMSECSHRLOGF last used in V5.5-000", 0,
 	"SOCKNOTFND", "Socket !AD not found", 2,
 	"CURRSOCKOFR", "Current socket of index !UL is out of range.  There are only !UL sockets.", 2,
 	"SOCKETEXIST", "Socket !AD already exists", 2,
@@ -733,8 +733,8 @@ LITDEF	err_msg merrors[] = {
 	"SCNDDBNOUPD", "Database Updates not allowed on the secondary", 0,
 	"MUINFOUINT4", "!AD : !UL [0x!XL]", 4,
 	"NLMISMATCHCALC", "Location of !AD expected at 0x!XL, but found at 0x!XL", 4,
-	"GTMSECSHRLOGSWH", "Error switching gtmsecshr log file gtmsecshr log -- !AD original log -- !AD error phase -- !AD process id -- !UL", 7,
-	"GTMSECSHRDEFLOG", "$gtm_log is either undefined or not defined to an absolute path, thus gtm_log is set to its default !AD", 2,
+	"UNUSEDMSG898", "GTMSECSHRLOGSWH last used in V5.5-000", 0,
+	"UNUSEDMSG899", "GTMSECSHRDEFLOG last used in V5.5-000", 0,
 	"DBBADNSUB", "!AD Bad numeric subscript", 2,
 	"DBBADKYNM", "!AD Bad key name", 2,
 	"DBBADPNTR", "!AD Bad pointer value in directory", 2,
@@ -813,8 +813,8 @@ LITDEF	err_msg merrors[] = {
 	"DBADDRANGE8", "Database file !AD, element location 0x!XJ: blk = 0x!XL: control 0x!16@XQ was outside !AD range 0x!16@XQ to 0x!16@XQ", 9,
 	"RNDWNSEMFAIL", "Attempting to acquire gds_rundown semaphore when it is already owned", 0,
 	"GTMSECSHRSHUTDN", "gtmsecshr process has received a shutdown request -- shutting down", 0,
-	"NOSPACECRE", "Not enough space to create database file !AD.  !UL blocks are needed, only !UL available.", 4,
-	"LOWSPACECRE", "Disk space for database file !AD is not enough for !UL future extensions.  !UL !UL-byte blocks are needed, only !UL available.", 6,
+	"NOSPACECRE", "Not enough space to create database file !AD.  !@ZQ blocks are needed, only !@ZQ available.", 4,
+	"LOWSPACECRE", "Disk space for database file !AD is not enough for !UL future extensions.  !@ZQ !UL-byte blocks are needed, only !@ZQ available.", 6,
 	"WAITDSKSPACE", "Process 0x!XL will wait !UL seconds for necessary disk space to become available for !AD ", 4,
 	"OUTOFSPACE", "Database file !AD ran out of disk space.  Detected by process !UL.  !/Exit without clearing shared memory due to the disk space constraints.  !/Make space and then perform mupip rundown to ensure database integrity.", 3,
 	"JNLPVTINFO", "Pid 0x!XL!/     cycle 0x!XL fd_mismatch 0x!XL     channel 0x!XL sync_io 0x!XL!/ pini_addr 0x!XL  qio_active 0x!XL old_channel 0x!XL", 8,
@@ -966,7 +966,7 @@ LITDEF	err_msg merrors[] = {
 	"PREVJNLLINKCUT", "Previous journal file name link set to NULL in new journal file !AD created for database file !AD", 4,
 	"PREVJNLLINKSET", "Previous generation journal file name is changed from !AD to !AD", 4,
 	"FILENAMETOOLONG", "File name too long", 0,
-	"UNUSEDMSG1131", "JNLCREATERR Last used in V5.4-001", 0,
+	"REQRECOV", "Error accessing database !AD.  Must be recovered on cluster node !AD.", 4,
 	"JNLTRANS2BIG", "Transaction needs an estimated [!UL blocks] in journal file !AD which exceeds the AUTOSWITCHLIMIT of !UL blocks", 4,
 	"JNLSWITCHTOOSM", "Journal AUTOSWITCHLIMIT [!UL blocks] is less than Journal ALLOCATION [!UL blocks] for database file !AD", 4,
 	"JNLSWITCHSZCHG", "Journal AUTOSWITCHLIMIT [!UL blocks] is rounded down to [!UL blocks] to equal the sum of Journal ALLOCATION [!UL blocks] and a multiple of Journal EXTENSION [!UL blocks] for database file !AD", 6,
@@ -1090,7 +1090,7 @@ LITDEF	err_msg merrors[] = {
 	"REPLINSTSEQORD", "!AD has seqno [0x!16@XQ] which is less than last record seqno [0x!16@XQ] in replication instance file !AD", 6,
 	"REPLINSTSTNDALN", "Could not get exclusive access to replication instance file !AD", 2,
 	"REPLREQROLLBACK", "Replication instance file !AD indicates abnormal shutdown or an incomplete ROLLBACK. Run MUPIP JOURNAL ROLLBACK first", 2,
-	"UNUSEDMSG1255", "REPLUPGRADEPRI : Last used in V5.4-002B", 0,
+	"REQROLLBACK", "Error accessing database !AD.  Run MUPIP JOURNAL ROLLBACK on cluster node !AD.", 4,
 	"UNUSEDMSG1256", "REPLUPGRADESEC : Last used in V5.4-002B", 0,
 	"SRCSRVEXISTS", "Source server for secondary instance !AD is already running with pid !UL", 3,
 	"SRCSRVNOTEXIST", "Source server for secondary instance !AD is not alive", 2,
@@ -1132,7 +1132,7 @@ LITDEF	err_msg merrors[] = {
 	"COMMITWAITPID", "Pid !UL waited !UL minute(s) for pid !UL to finish commits to block 0x!XL in database file !AD", 6,
 	"UPDREPLSTATEOFF", "Error replicating global ^!AD as it maps to database !AD which has replication turned OFF", 4,
 	"LITNONGRAPH", "M standard requires graphics in string literals", 0,
-	"DBFHEADERR8", "Database file !AD: control problem: !AD was 0x!XJ expecting 0x!XJ", 6,
+	"DBFHEADERR8", "Database file !AD: control problem: !AD was 0x!16@XQ expecting 0x!16@XQ", 6,
 	"MMBEFOREJNL", "BEFORE image journaling cannot be set with MM access method in database file !AD", 2,
 	"MMNOBFORRPL", "Replication cannot be used in database file !AD which uses MM access method and NOBEFORE image journaling", 2,
 	"KILLABANDONED", "Abandoned kills counter is greater than zero for file !AD, !AD", 4,
@@ -1248,12 +1248,12 @@ LITDEF	err_msg merrors[] = {
 	"NORESYNCUPDATERONLY", "NORESYNC qualifier only allowed on a Supplementary Instance which allows local updates", 0,
 	"NOSUPPLSUPPL", "Instance !AD is configured to perform local updates so it cannot receive from Supplementary Instance !AD", 4,
 	"REPL2OLD", "Instance !AD uses a GT.M version that does not support connection with the current version on instance !AD", 4,
-	"RCVR2MANY", "The instance already has the maximum supportable number of receiver servers [!UL] active", 1,
-	"RLBKCONFIGBNDRY", "Rollback encountered journal records indicating current source !AD replaced old source !AD; cannot rollback past sequence number 0x!16@XQ", 5,
+	"UNUSEDMSG1413", "RCVR2MANY: Never used before so slot free for reuse", 0,
+	"UNUSEDMSG1414", "RLBKCONFIGBNDRY: Never used before so slot free for reuse", 0,
 	"SECNOTSUPPLEMENTARY", "!AD is a Supplementary Instance and so cannot act as a source to non-Supplementary Instance !AD ", 4,
 	"SUPRCVRNEEDSSUPSRC", "Instance !AD is not configured to perform local updates so it cannot act as a receiver for non-Supplementary Instance !AD", 4,
-	"SYNCTOSAMETYPE", "Source instance !AD and receiver instance !AD must either be both supplementary or both non-supplementary for them to synchronize their state", 4,
-	"TARGINSRUNNING", "Cannot change the instance definition of instance !AD while it is running", 2,
+	"UNUSEDMSG1417", "SYNCTOSAMETYPE: Never used before so slot free for reuse", 0,
+	"UNUSEDMSG1418", "TARGINSRUNNING: Never used before so slot free for reuse", 0,
 	"UPDSYNC2MTINS", "Can only UPDATERESYNC with an empty instance file", 0,
 	"UPDSYNCINSTFILE", "Error with instance file name specified in UPDATERESYNC qualifier", 0,
 	"REUSEINSTNAME", "Error with instance name specified in REUSE qualifier", 0,
@@ -1272,7 +1272,7 @@ LITDEF	err_msg merrors[] = {
 	"ORLBKNOV4BLK", "Region !AD (!AD) has V4 format blocks. Database upgrade required. ONLINE ROLLBACK cannot continue", 4,
 	"DBROLLEDBACK", "Concurrent ONLINE ROLLBACK detected on one or more regions. The current operation is no longer valid", 0,
 	"DSEWCREINIT", "Database cache reinitialized by DSE for region !AD", 2,
-	"RNDWNSKIPCNT", "A total of !UL process(es) skipped database rundown due to a concurrent ONLINE ROLLBACK", 1,
+	"UNUSEDMSG1437", "A total of !UL process(es) skipped database rundown due to a concurrent ONLINE ROLLBACK", 1,
 	"REPLONLNRLBK", "ONLINE ROLLBACK detected. Starting afresh", 0,
 	"SRVLCKWT2LNG", "PID !UL is holding the source server lock. Waited for !UL minute(s). Now exiting", 2,
 	"IGNBMPMRKFREE", "Ignoring bitmap free-up operation for region !AD (!AD) due to concurrent ONLINE ROLLBACK", 4,
@@ -1295,6 +1295,37 @@ LITDEF	err_msg merrors[] = {
 	"STRMSEQMISMTCH", "Unable to play update on Stream !2UL with seqno [0x!16@XQ] as receiving instance has a different stream seqno [0x!16@XQ]", 3,
 	"LOCKSPACEINFO", "Region: !AD: processes on queue: !UL/!UL; LOCK slots in use: !UL/!UL; name space!ADfull", 8,
 	"JRTNULLFAIL", "Applying NULL journal record failed.  Failure code: !AD.", 2,
+	"LOCKSUB2LONG", "Following subscript is !UL bytes long which exceeds 255 byte limit.", 1,
+	"RESRCWAIT", "Waiting briefly for the !AD semaphore for region !AD (!AD) was held by PID !UL (Sem. ID: !UL).", 8,
+	"RESRCINTRLCKBYPAS", "!AD with PID !UL bypassing the !AD semaphore for region !AD (!AD) was held by PID !UL.", 10,
+	"DBFHEADERRANY", "Database file !AD: control problem: !AD was 0x!XJ expecting 0x!XJ", 6,
+	"REPLINSTFROZEN", "Instance !AZ is now Frozen", 1,
+	"REPLINSTFREEZECOMMENT", "Freeze Comment: !AZ", 1,
+	"REPLINSTUNFROZEN", "Instance !AZ is now Unfrozen", 1,
+	"DSKNOSPCAVAIL", "Attempted write to file !AD failed due to lack of disk space. Retrying indefinitely.", 2,
+	"DSKNOSPCBLOCKED", "Retry of write to file !AD suspended due to new instance freeze. Waiting for instance to be unfrozen.", 2,
+	"DSKSPCAVAILABLE", "Write to file !AD succeeded after out-of-space condition cleared", 2,
+	"ENOSPCQIODEFER", "Write to file !AD deferred due to lack of disk space", 2,
+	"CUSTOMFILOPERR", "Error while doing !AD operation on file !AD", 4,
+	"CUSTERRNOTFND", "Error mnemonic !AD specified in custom errors file is not valid for this version of GT.M", 2,
+	"CUSTERRSYNTAX", "Syntax error in file !AD at line number !UL", 3,
+	"ORLBKINPROG", "Online ROLLBACK in progress by PID !UL in region !AD", 3,
+	"DBSPANGLOINCMP", "!AD Spanning node is missing. Block no !UL of spanning node is missing", 3,
+	"DBSPANCHUNKORD", "!AD Chunk of !UL blocks is out of order", 3,
+	"DBDATAMX", "!AD Record too large", 2,
+	"DBIOERR", "Error while doing write operation on region !AD (!AD)", 4,
+	"INITORRESUME", "UPDATERESYNC on a Supplementary Instance must additionally specify INITIALIZE or RESUME", 0,
+	"GTMSECSHRNOARG0", "gtmsecshr cannot identify its origin - argv[0] is null", 0,
+	"GTMSECSHRISNOT", "gtmsecshr is not running as gtmsecshr but !AD - must be gtmsecshr", 2,
+	"GTMSECSHRBADDIR", "gtmsecshr is not running from $gtm_dist/gtmsecshrdir or $gtm_dist cannot be determined", 0,
+	"JNLBUFFREGUPD", "Journal file buffer size for region !AD has been adjusted from !UL to !UL.", 4,
+	"JNLBUFFDBUPD", "Journal file buffer size for database file !AD has been adjusted from !UL to !UL.", 4,
+	"LOCKINCR2HIGH", "Attempt to increment a LOCK more than !UL times", 1,
+	"LOCKIS", "!_!_Resource name: !AD", 2,
+	"LDSPANGLOINCMP", "Incomplete spanning node found during load", 0,
+	"MUFILRNDWNFL2", "Database section (id = !UL) belonging to database file !AD rundown failed", 3,
+	"MUINSTFROZEN", "!AD : Instance !AZ is frozen. Waiting for instance to be unfrozen before proceeding with writes to database file !AD", 5,
+	"MUINSTUNFROZEN", "!AD : Instance !AZ is now Unfrozen. Continuing with writes to database file !AD", 5,
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -1383,7 +1414,7 @@ LITDEF	int ERR_INDMAXNEST = 150373018;
 LITDEF	int ERR_INDRMAXLEN = 150373026;
 LITDEF	int ERR_INSFFBCNT = 150373034;
 LITDEF	int ERR_INTEGERRS = 150373042;
-LITDEF	int ERR_INVCMD = 150373050;
+LITDEF	int ERR_INVCMD = 150373048;
 LITDEF	int ERR_INVFCN = 150373058;
 LITDEF	int ERR_INVOBJ = 150373066;
 LITDEF	int ERR_INVSVN = 150373074;
@@ -1713,8 +1744,8 @@ LITDEF	int ERR_JNLINVALLOC = 150375656;
 LITDEF	int ERR_JNLINVEXT = 150375664;
 LITDEF	int ERR_MUPCLIERR = 150375674;
 LITDEF	int ERR_JNLTMQUAL4 = 150375682;
-LITDEF	int ERR_JNLBUFFTOOLG = 150375688;
-LITDEF	int ERR_JNLBUFFTOOSM = 150375696;
+LITDEF	int ERR_UNUSEDMSG594 = 150375690;
+LITDEF	int ERR_UNUSEDMSG595 = 150375698;
 LITDEF	int ERR_MUNODBNAME = 150375706;
 LITDEF	int ERR_FILECREATE = 150375715;
 LITDEF	int ERR_FILENOTCREATE = 150375723;
@@ -1928,7 +1959,7 @@ LITDEF	int ERR_MUKILLIP = 150377376;
 LITDEF	int ERR_JNLRDONLY = 150377386;
 LITDEF	int ERR_ANCOMPTINC = 150377394;
 LITDEF	int ERR_ABNCOMPTINC = 150377402;
-LITDEF	int ERR_GTMSECSHRLOGF = 150377410;
+LITDEF	int ERR_UNUSEDMSG809 = 150377410;
 LITDEF	int ERR_SOCKNOTFND = 150377418;
 LITDEF	int ERR_CURRSOCKOFR = 150377426;
 LITDEF	int ERR_SOCKETEXIST = 150377434;
@@ -2017,8 +2048,8 @@ LITDEF	int ERR_SECONDAHEAD = 150378090;
 LITDEF	int ERR_SCNDDBNOUPD = 150378098;
 LITDEF	int ERR_MUINFOUINT4 = 150378107;
 LITDEF	int ERR_NLMISMATCHCALC = 150378114;
-LITDEF	int ERR_GTMSECSHRLOGSWH = 150378122;
-LITDEF	int ERR_GTMSECSHRDEFLOG = 150378131;
+LITDEF	int ERR_UNUSEDMSG898 = 150378122;
+LITDEF	int ERR_UNUSEDMSG899 = 150378131;
 LITDEF	int ERR_DBBADNSUB = 150378138;
 LITDEF	int ERR_DBBADKYNM = 150378146;
 LITDEF	int ERR_DBBADPNTR = 150378154;
@@ -2250,7 +2281,7 @@ LITDEF	int ERR_JNLFNF = 150379955;
 LITDEF	int ERR_PREVJNLLINKCUT = 150379963;
 LITDEF	int ERR_PREVJNLLINKSET = 150379971;
 LITDEF	int ERR_FILENAMETOOLONG = 150379978;
-LITDEF	int ERR_UNUSEDMSG1131 = 150379986;
+LITDEF	int ERR_REQRECOV = 150379986;
 LITDEF	int ERR_JNLTRANS2BIG = 150379994;
 LITDEF	int ERR_JNLSWITCHTOOSM = 150380002;
 LITDEF	int ERR_JNLSWITCHSZCHG = 150380011;
@@ -2374,7 +2405,7 @@ LITDEF	int ERR_REPLINSTSECUNDF = 150380946;
 LITDEF	int ERR_REPLINSTSEQORD = 150380954;
 LITDEF	int ERR_REPLINSTSTNDALN = 150380962;
 LITDEF	int ERR_REPLREQROLLBACK = 150380970;
-LITDEF	int ERR_UNUSEDMSG1255 = 150380978;
+LITDEF	int ERR_REQROLLBACK = 150380978;
 LITDEF	int ERR_UNUSEDMSG1256 = 150380986;
 LITDEF	int ERR_SRCSRVEXISTS = 150380994;
 LITDEF	int ERR_SRCSRVNOTEXIST = 150381002;
@@ -2532,12 +2563,12 @@ LITDEF	int ERR_NORESYNCSUPPLONLY = 150382210;
 LITDEF	int ERR_NORESYNCUPDATERONLY = 150382218;
 LITDEF	int ERR_NOSUPPLSUPPL = 150382226;
 LITDEF	int ERR_REPL2OLD = 150382234;
-LITDEF	int ERR_RCVR2MANY = 150382242;
-LITDEF	int ERR_RLBKCONFIGBNDRY = 150382250;
+LITDEF	int ERR_UNUSEDMSG1413 = 150382243;
+LITDEF	int ERR_UNUSEDMSG1414 = 150382251;
 LITDEF	int ERR_SECNOTSUPPLEMENTARY = 150382258;
 LITDEF	int ERR_SUPRCVRNEEDSSUPSRC = 150382266;
-LITDEF	int ERR_SYNCTOSAMETYPE = 150382274;
-LITDEF	int ERR_TARGINSRUNNING = 150382282;
+LITDEF	int ERR_UNUSEDMSG1417 = 150382275;
+LITDEF	int ERR_UNUSEDMSG1418 = 150382283;
 LITDEF	int ERR_UPDSYNC2MTINS = 150382290;
 LITDEF	int ERR_UPDSYNCINSTFILE = 150382298;
 LITDEF	int ERR_REUSEINSTNAME = 150382306;
@@ -2556,7 +2587,7 @@ LITDEF	int ERR_ORLBKFRZOVER = 150382403;
 LITDEF	int ERR_ORLBKNOV4BLK = 150382410;
 LITDEF	int ERR_DBROLLEDBACK = 150382418;
 LITDEF	int ERR_DSEWCREINIT = 150382427;
-LITDEF	int ERR_RNDWNSKIPCNT = 150382435;
+LITDEF	int ERR_UNUSEDMSG1437 = 150382435;
 LITDEF	int ERR_REPLONLNRLBK = 150382442;
 LITDEF	int ERR_SRVLCKWT2LNG = 150382450;
 LITDEF	int ERR_IGNBMPMRKFREE = 150382459;
@@ -2579,9 +2610,40 @@ LITDEF	int ERR_STRMNUMMISMTCH2 = 150382586;
 LITDEF	int ERR_STRMSEQMISMTCH = 150382594;
 LITDEF	int ERR_LOCKSPACEINFO = 150382603;
 LITDEF	int ERR_JRTNULLFAIL = 150382610;
+LITDEF	int ERR_LOCKSUB2LONG = 150382618;
+LITDEF	int ERR_RESRCWAIT = 150382627;
+LITDEF	int ERR_RESRCINTRLCKBYPAS = 150382635;
+LITDEF	int ERR_DBFHEADERRANY = 150382643;
+LITDEF	int ERR_REPLINSTFROZEN = 150382650;
+LITDEF	int ERR_REPLINSTFREEZECOMMENT = 150382659;
+LITDEF	int ERR_REPLINSTUNFROZEN = 150382667;
+LITDEF	int ERR_DSKNOSPCAVAIL = 150382675;
+LITDEF	int ERR_DSKNOSPCBLOCKED = 150382682;
+LITDEF	int ERR_DSKSPCAVAILABLE = 150382691;
+LITDEF	int ERR_ENOSPCQIODEFER = 150382699;
+LITDEF	int ERR_CUSTOMFILOPERR = 150382706;
+LITDEF	int ERR_CUSTERRNOTFND = 150382714;
+LITDEF	int ERR_CUSTERRSYNTAX = 150382722;
+LITDEF	int ERR_ORLBKINPROG = 150382731;
+LITDEF	int ERR_DBSPANGLOINCMP = 150382738;
+LITDEF	int ERR_DBSPANCHUNKORD = 150382746;
+LITDEF	int ERR_DBDATAMX = 150382754;
+LITDEF	int ERR_DBIOERR = 150382762;
+LITDEF	int ERR_INITORRESUME = 150382770;
+LITDEF	int ERR_GTMSECSHRNOARG0 = 150382778;
+LITDEF	int ERR_GTMSECSHRISNOT = 150382786;
+LITDEF	int ERR_GTMSECSHRBADDIR = 150382794;
+LITDEF	int ERR_JNLBUFFREGUPD = 150382800;
+LITDEF	int ERR_JNLBUFFDBUPD = 150382808;
+LITDEF	int ERR_LOCKINCR2HIGH = 150382818;
+LITDEF	int ERR_LOCKIS = 150382827;
+LITDEF	int ERR_LDSPANGLOINCMP = 150382834;
+LITDEF	int ERR_MUFILRNDWNFL2 = 150382843;
+LITDEF	int ERR_MUINSTFROZEN = 150382851;
+LITDEF	int ERR_MUINSTUNFROZEN = 150382859;
 
 GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1282};
+	1313};

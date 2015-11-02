@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2011, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #define DEFAULT_DBINIT_MAX_HRTBT_DELTA	12
 #define NO_SEMWAIT_ON_EAGAIN		0
 #define INDEFINITE_WAIT_ON_EAGAIN	(uint4) -1
+#define MAX_BYPASS_WAIT_SEC		3
 
 #define MAX_C_STACK_TRACES_FOR_SEMWAIT	2
 
@@ -48,7 +49,7 @@ enum gtm_semtype
 typedef struct semwait_status_struct
 {
 	int			line_no;
-	int			save_errno;
+	int			save_errno; /* This value must be checked/assigned only errors. May not be 0 on success. */
 	int			status1;
 	int			status2;
 	int			sem_pid;
@@ -56,8 +57,8 @@ typedef struct semwait_status_struct
 	enum sem_syscalls	op;
 } semwait_status_t;
 
-boolean_t do_blocking_semop(int semid, struct sembuf *sop, int sopcnt, enum gtm_semtype semtype, uint4 start_hrtbt_cntr,
-				semwait_status_t *status);
+boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, uint4 start_hrtbt_cntr,
+				semwait_status_t *status, gd_region *reg, boolean_t *bypass);
 
 #define SENDMSG_SEMOP_SUCCESS_IF_NEEDED(STACKTRACE_ISSUED, SEMTYPE)								 \
 {																 \

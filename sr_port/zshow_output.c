@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@
 #include "error.h"
 #include "lv_val.h"
 #include "subscript.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "mlkdef.h"
 #include "zshow.h"
@@ -75,17 +75,17 @@ void zshow_output(zshow_out *out, const mstr *str)
 		out->size = MAXSTR_BUFF_ALLOC(str->len, out->buff, buff_len);
 		out->ptr = out->buff + buff_len;
 	}
+	if (!process_exiting)
+	{	/* Only if not exiting in case we are called from mdb_condition_handler
+		 * with stack overflow */
+		PUSH_MV_STENT(MVST_MVAL);
+		mv = &mv_chain->mv_st_cont.mvs_mval;
+	} else
+		mv = &lmv;
+	mv->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before value gets initialized below */
 	switch (out->type)
 	{
 	case ZSHOW_DEVICE:
-		if (!process_exiting)
-		{	/* Only if not exiting in case we are called from mdb_condition_handler
-			 * with stack overflow */
-			PUSH_MV_STENT(MVST_MVAL);
-			mv = &mv_chain->mv_st_cont.mvs_mval;
-		} else
-			mv = &lmv;
-		mv->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before value gets initialized below */
 		if (str)
 		{
 			len = str->len;
@@ -169,19 +169,8 @@ void zshow_output(zshow_out *out, const mstr *str)
 			out->displen = 0;
 			out->line_num++;
 		}
-		if (!process_exiting)
-		{
-			POP_MV_STENT();
-		}
 		break;
 	case ZSHOW_LOCAL:
-		if (!process_exiting)
-		{
-			PUSH_MV_STENT(MVST_MVAL);
-			mv = &mv_chain->mv_st_cont.mvs_mval;
-		} else
-			mv = &lmv;
-		mv->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before value gets initialized below */
 		if (out->code)
 		{
 			if (out->code != out->curr_code)
@@ -290,8 +279,6 @@ void zshow_output(zshow_out *out, const mstr *str)
 				out->line_num++;
 			}
 		}
-		if (!process_exiting)
-			POP_MV_STENT();
 		break;
 	case ZSHOW_GLOBAL:
 		if (!out->len)
@@ -301,13 +288,6 @@ void zshow_output(zshow_out *out, const mstr *str)
 			if (out->len < MIN_DATASIZE)
 				rts_error(VARLSTCNT(1) ERR_ZSHOWGLOSMALL);
 		}
-		if (!process_exiting)
-		{
-			PUSH_MV_STENT(MVST_MVAL);
-			mv = &mv_chain->mv_st_cont.mvs_mval;
-		} else
-			mv = &lmv;
-		mv->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before value gets initialized below */
 		if (out->code && out->code != out->curr_code)
 		{
 			gv_currkey->end = out->out_var.gv.end;
@@ -396,14 +376,26 @@ void zshow_output(zshow_out *out, const mstr *str)
 			out->ptr = out->buff;
 			out->line_num++;
 		}
-		if (!process_exiting)
+		break;
+	case ZSHOW_BUFF_ONLY:
+		/* This code is meant to print to a buffer so it DOES NOT bother setting the other fields of output.
+		 * Only beginning and ending pointers because those are the only fields we need
+		 */
+		if (str)
 		{
-			POP_MV_STENT();
+			len = str->len;
+			strptr = str->addr;
+			memcpy(out->ptr, str->addr, len);
+			out->ptr += len;
 		}
 		break;
 	default:
 		GTMASSERT;
 		break;
+	}
+	if (!process_exiting)
+	{
+		POP_MV_STENT();
 	}
 	out->curr_code = out->code;
 	out->flush = 0;

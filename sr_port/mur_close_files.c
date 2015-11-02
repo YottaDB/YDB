@@ -15,6 +15,7 @@
 #include "gtm_string.h"
 #include "gtm_time.h"
 #if defined(UNIX)
+#include <sys/shm.h>
 #include "gtm_unistd.h"
 #elif defined(VMS)
 #include <rms.h>
@@ -56,6 +57,8 @@
 #include "have_crit.h"
 #include "gtmsource_srv_latch.h"
 #include <signal.h>
+#include "anticipatory_freeze.h"
+#include "ipcrmid.h"
 #endif
 #include "util.h"
 #ifdef DEBUG
@@ -104,11 +107,13 @@ error_def(ERR_JNLSTRESTFL);
 error_def(ERR_JNLSUCCESS);
 error_def(ERR_JNLWRERR);
 error_def(ERR_MUJNLSTAT);
+error_def(ERR_MUJPOOLRNDWNSUC);
 error_def(ERR_MUNOACTION);
 error_def(ERR_ORLBKCMPLT);
 error_def(ERR_ORLBKTERMNTD);
 error_def(ERR_PREMATEOF);
 error_def(ERR_RENAMEFAIL);
+error_def(ERR_REPLPOOLINST);
 error_def(ERR_REPLSTATE);
 UNIX_ONLY(error_def(ERR_REPLFTOKSEM);)
 UNIX_ONLY(error_def(ERR_RLBKSTRMSEQ);)
@@ -129,21 +134,25 @@ void	mur_close_files(void)
 #	if defined(VMS)
 	boolean_t		set_resync_to_region = FALSE;
 #	elif defined(UNIX)
-	int			idx, finish_err_code;
+	int			idx, finish_err_code, save_errno;
 	const char		*fini_str = NULL;
+	const char		*termntd_str;
+	unsigned char		ipcs_buff[MAX_IPCS_ID_BUF], *ipcs_ptr;
+	struct shmid_ds		shm_buf;
 	unix_db_info		*udi = NULL;
 	gtmsrc_lcl		gtmsrc_lcl_array[NUM_GTMSRC_LCL];
 	repl_inst_hdr		repl_instance;
 	repl_inst_hdr_ptr_t	inst_hdr = NULL;
 	seq_num			max_strm_seqno[MAX_SUPPL_STRMS], this_strm_seqno;
-	boolean_t		incr_jnlpool_rlbk_cycle = TRUE, got_ftok;
+	boolean_t		incr_jnlpool_rlbk_cycle = TRUE, got_ftok, anticipatory_freeze_available, was_crit;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
 	global_latch_t		*latch;
 	seq_num			max_zqgblmod_seqno = 0, last_histinfo_seqno;
 	DEBUG_ONLY(int		semval;)
-	const char		*termntd_str;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (mur_close_files_done)
 	{
 		assert(mupip_exit_status_displayed);
@@ -155,16 +164,15 @@ void	mur_close_files(void)
 					 */
 	csd = &csd_temp;
 	assert(murgbl.losttn_seqno == murgbl.save_losttn_seqno);
-	UNIX_ONLY(
-		if (mur_options.rollback)
-			memset(&max_strm_seqno[0], 0, SIZEOF(max_strm_seqno));
-	);
 	/* If journaling, gds_rundown will need to write PINI/PFIN records. The timestamp of that journal record will
 	 * need to be adjusted to the current system time to reflect that it is recovery itself writing that record
 	 * instead of simulating GT.M activity. Reset jgbl.dont_reset_gbl_jrec_time to allow for adjustments to gbl_jrec_time.
 	 */
 	jgbl.dont_reset_gbl_jrec_time = FALSE;
 #	ifdef UNIX
+	if (mur_options.rollback)
+		memset(&max_strm_seqno[0], 0, SIZEOF(max_strm_seqno));
+	anticipatory_freeze_available = ANTICIPATORY_FREEZE_AVAILABLE;
 	inst_hdr = jnlpool.repl_inst_filehdr;
 	/* Note that murgbl.consist_jnl_seqno is maintained even if the only thing done by rollback was lost transaction processing.
 	 * In this case, we shouldn't consider the instance as being rolled back. So, set murgbl.incr_db_rlbkd_cycle = FALSE;
@@ -176,9 +184,13 @@ void	mur_close_files(void)
 	}
 	assert(!murgbl.incr_db_rlbkd_cycle || murgbl.incr_onln_rlbk_cycle);
 	assert(jnlpool.jnlpool_ctl == jnlpool_ctl);
+#if 0
+	/* disable assertion until we make jnlpool_init conditional on anticipatory freeze available */
 	assert(jgbl.onlnrlbk || (NULL == jnlpool_ctl));
+#endif
 	assert((NULL == jnlpool_ctl) || (TRUE == inst_hdr->crash));
-	if (jgbl.onlnrlbk && (NULL != jnlpool_ctl))
+	assert((NULL == jnlpool_ctl) || jgbl.onlnrlbk || anticipatory_freeze_available);
+	if (NULL != jnlpool_ctl)
 	{
 		csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 		ASSERT_VALID_JNLPOOL(csa);
@@ -243,9 +255,16 @@ void	mur_close_files(void)
 			if (jgbl.onlnrlbk)
 			{
 				if (murgbl.incr_onln_rlbk_cycle)
+				{
+					csa->nl->root_search_cycle++;
 					csa->nl->onln_rlbk_cycle++;
+				}
 				if (murgbl.incr_db_rlbkd_cycle)
+				{
+					assert(murgbl.incr_db_rlbkd_cycle);
 					csa->nl->db_onln_rlbkd_cycle++;
+				}
+				csa->root_search_cycle = csa->nl->root_search_cycle;
 				csa->onln_rlbk_cycle = csa->nl->onln_rlbk_cycle;
 				csa->db_onln_rlbkd_cycle = csa->nl->db_onln_rlbkd_cycle;
 				if (incr_jnlpool_rlbk_cycle && (NULL != jnlpool_ctl) && murgbl.incr_onln_rlbk_cycle)
@@ -426,7 +445,11 @@ void	mur_close_files(void)
 					if (jctl->jfh->recover_interrupted)
 					{
 						jctl->jfh->recover_interrupted = FALSE;
-						DO_FILE_WRITE(jctl->channel, 0, jctl->jfh, REAL_JNL_HDR_LEN,
+						/* Since overwriting the journal file header (an already allocated block
+						 * in the file) should not cause ENOSPC, we dont take the trouble of
+						 * passing csa or jnl_fn (first two parameters). Instead we pass NULL.
+						 */
+						JNL_DO_FILE_WRITE(NULL, NULL, jctl->channel, 0, jctl->jfh, REAL_JNL_HDR_LEN,
 							jctl->status, jctl->status2);
 						WARN_STATUS(jctl);
 					}
@@ -459,7 +482,12 @@ void	mur_close_files(void)
 				assert(jctl->jfh->prev_recov_blks_to_upgrd_adjust <= rctl->blks_to_upgrd_adjust);
 				jctl->jfh->prev_recov_blks_to_upgrd_adjust = rctl->blks_to_upgrd_adjust;
 				jctl->jfh->next_jnl_file_name_length = 0;
-				DO_FILE_WRITE(jctl->channel, 0, jctl->jfh, REAL_JNL_HDR_LEN, jctl->status, jctl->status2);
+				/* Since overwriting the journal file header (an already allocated block
+				 * in the file) should not cause ENOSPC, we dont take the trouble of
+				 * passing csa or jnl_fn (first two parameters). Instead we pass NULL.
+				 */
+				JNL_DO_FILE_WRITE(NULL, NULL, jctl->channel, 0,
+					jctl->jfh, REAL_JNL_HDR_LEN, jctl->status, jctl->status2);
 				WARN_STATUS(jctl);
 				/* we have to clear next_jnl_file_name fields in the post-turn-around-point journal files.
 				 * but if we get killed in this process, a future recover should be able to resume
@@ -473,7 +501,11 @@ void	mur_close_files(void)
 				{	/* Clear next_jnl_file_name fields in the post-turn-around-point journal files */
 					assert(0 == end_jctl->turn_around_offset);
 					end_jctl->jfh->next_jnl_file_name_length = 0;
-					DO_FILE_WRITE(end_jctl->channel, 0, end_jctl->jfh, REAL_JNL_HDR_LEN,
+					/* Since overwriting the journal file header (an already allocated block
+					 * in the file) should not cause ENOSPC, we dont take the trouble of
+					 * passing csa or jnl_fn (first two parameters). Instead we pass NULL.
+					 */
+					JNL_DO_FILE_WRITE(NULL, NULL, end_jctl->channel, 0, end_jctl->jfh, REAL_JNL_HDR_LEN,
 						end_jctl->status, end_jctl->status2);
 					WARN_STATUS(end_jctl);
 					/* Rename journals whose entire contents have been undone with
@@ -481,6 +513,8 @@ void	mur_close_files(void)
 					rename_fn = fn;
 					prepare_unique_name((char *)end_jctl->jnl_fn, end_jctl->jnl_fn_len,
 						PREFIX_ROLLED_BAK, "", rename_fn, &rename_fn_len, &ustatus);
+					UNIX_ONLY(WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa));
+						/* wait for instance freeze before journal file renames */
 					if (SS_NORMAL == gtm_rename((char *)end_jctl->jnl_fn, end_jctl->jnl_fn_len,
 									rename_fn, rename_fn_len, &ustatus))
 					{
@@ -554,19 +588,30 @@ void	mur_close_files(void)
 			{	/* Virtually truncate the history in the replication instance file if necessary. For online
 				 * rollback, we should truncate the history records ONLY if the instance was actually rolled back
 				 * (indicated by incr_db_rlbkd_cycle)
+				 * Also, the repl_inst_histinfo_truncate function expects the caller to hold journal pool crit
+				 * if jnlpool exists. We can come here with journal pool if:
+				 * (a) ONLINE ROLLBACK
+				 * (b) Regular ROLLBACK with Anticipatory Freeze scheme
 				 */
+				if ((NULL != jnlpool_ctl) && !(was_crit = csa->now_crit))	/* note: assignment */
+				{
+					assert(!jgbl.onlnrlbk);
+					assert(anticipatory_freeze_available);
+					assert(!csa->hold_onto_crit);
+					grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+				}
 				last_histinfo_seqno = repl_inst_histinfo_truncate(murgbl.consist_jnl_seqno);
+				if ((NULL != jnlpool_ctl) && !was_crit)
+					rel_lock(jnlpool.jnlpool_dummy_reg);
 				/* The above also updates "repl_inst_filehdr->jnl_seqno". If regular rollback, it also updates
 				 * "repl_inst_filehdr->crash" to FALSE. For online rollback, we have to update the crash field
 				 * ONLY if there is NO journal pool and that is done below.
 				 */
-				assert(inst_hdr->num_histinfo || (1 == murgbl.consist_jnl_seqno));
-				if (NULL != jnlpool_ctl)
+				if ((NULL != jnlpool_ctl) && jgbl.onlnrlbk)
 				{	/* journal pool still exists and some backward and forward processing happened. More
 					 * importantly, the database was taken to a prior logical state. Refresh the journal
 					 * pool fields to reflect the new state.
 					 */
-					assert(jgbl.onlnrlbk);
 					assert(csa->now_crit && csa->hold_onto_crit);
 					jnlpool_ctl->last_histinfo_seqno = last_histinfo_seqno;
 					jnlpool_ctl->jnl_seqno = murgbl.consist_jnl_seqno;
@@ -622,7 +667,7 @@ void	mur_close_files(void)
 			}
 			repl_inst_write(udi->fn, (off_t)REPL_INST_HDR_SIZE, (sm_uc_ptr_t)gtmsrc_lcl_array, GTMSRC_LCL_SIZE);
 		}
-		if (NULL != jnlpool_ctl)
+		if ((NULL != jnlpool_ctl) && jgbl.onlnrlbk)
 		{	/* Remove any locks that we acquired in mur_open_files. Needs to be done even if this is NOT a clean exit */
 			assert(0 != jnlpool_ctl->onln_rlbk_pid || !murgbl.clean_exit);
 			assert((csa->now_crit && csa->hold_onto_crit) || !murgbl.clean_exit);
@@ -676,7 +721,7 @@ void	mur_close_files(void)
 	{
 		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
 		ASSERT_HOLD_REPLPOOL_SEMS;
-		/* repl_inst_read and mu_replpool_remove_sem expects that the caller holds the ftok semaphore as it is about to
+		/* repl_inst_read and mu_replpool_release_sem expects that the caller holds the ftok semaphore as it is about to
 		 * read the replication instance file and assumes there are no concurrent writers. However, ROLLBACK grabs all the
 		 * access control semaphores of both jnlpool and receiver pool as well as the replication locks in mur_open_files.
 		 * This means -
@@ -692,12 +737,75 @@ void	mur_close_files(void)
 		 * the cleanup.
 		 */
 		repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
-		if (NULL == jnlpool_ctl)
-			repl_instance.crash = FALSE;
 		repl_instance.file_corrupt = inst_hdr->file_corrupt;
+		if (NULL == jnlpool_ctl)
+			repl_instance.crash = inst_hdr->crash = FALSE;
+		else
+		{	/* Online Rollback OR Anticipatory Freeze is in effect. Detach from the journal pool as all the database
+			 * writes are now over. Since the attach count is 1 (we are the only one attached) go ahead and remove the
+			 * journal pool. We've already flushed all the contents to the instance file at the beginning of rollback
+			 */
+			assert(anticipatory_freeze_available || jgbl.onlnrlbk);
+			assert(INVALID_SHMID != repl_instance.jnlpool_shmid);
+			/* Receive pool is typically rundown by almost all callers of mu_rndwn_repl_instance except for ONLINE
+			 * ROLLBACK which can keep it up and running if no one is attached to it (by design). Note: This is just
+			 * an assert to validate our understanding and has no implications in PRO
+			 */
+			assert(INVALID_SHMID == repl_instance.recvpool_shmid || jgbl.onlnrlbk);
+			/* Ensure that no new processes have attached to the journal pool */
+			if (-1 == shmctl(repl_instance.jnlpool_shmid, IPC_STAT, &shm_buf))
+			{
+				save_errno = errno;
+				assert(FALSE);
+				ISSUE_REPLPOOLINST(save_errno, repl_instance.jnlpool_shmid, repl_instance.inst_info.this_instname,
+							"shmctl()");
+			}
+			if (-1 == shmdt((caddr_t)jnlpool_ctl))
+			{
+				save_errno = errno;
+				ISSUE_REPLPOOLINST(save_errno, repl_instance.jnlpool_shmid, repl_instance.inst_info.this_instname,
+							"shmdt()");
+				assert(FALSE);
+			}
+			if (1 == shm_buf.shm_nattch)
+			{	/* We are the only one attached. Go ahead and remove the shared memory ID and invalidate it in the
+				 * instance file header as well.
+				 */
+				if (-1 == shm_rmid(repl_instance.jnlpool_shmid))
+				{
+					save_errno = errno;
+					assert(FALSE);
+					ISSUE_REPLPOOLINST(save_errno, repl_instance.jnlpool_shmid, repl_instance.inst_info.
+								this_instname, "shm_rmid()");
+				}
+				ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, repl_instance.jnlpool_shmid);
+				*ipcs_ptr = '\0';
+				gtm_putmsg(VARLSTCNT(6) ERR_MUJPOOLRNDWNSUC, 4, LEN_AND_STR(ipcs_buff), LEN_AND_STR(udi->fn));
+				/* Now that the journal pool shared memory is removed, go ahead and invalidate it in the file
+				 * header
+				 */
+				repl_instance.jnlpool_shmid = INVALID_SHMID;
+				repl_instance.jnlpool_shmid_ctime = 0;
+				repl_instance.crash = FALSE;	/* reset crash bit as the journal pool no longer exists */
+				jnlpool.jnlpool_ctl = NULL;
+				jnlpool_ctl = NULL;
+				jnlpool.gtmsrc_lcl_array = NULL;
+				jnlpool.gtmsource_local_array = NULL;
+				jnlpool.jnldata_base = NULL;
+				jnlpool.repl_inst_filehdr = NULL;
+			}
+			inst_hdr = &repl_instance; /* now that shared memory is gone, re-point inst_hdr to the one read from file */
+		}
+		/* flush the instance file header to the disk before releasing the semaphores. This way, any process waiting on
+		 * the semaphores will not notice stale values for "crash" and "file_corrupt" flags leading to incorrect
+		 * REPLREQROLLBACK errors. This means writing the instance file header twice (first here and the second one a little
+		 * later (for flushing the sem-id fields). But, these should have negligible penalty as the file system caches the
+		 * disk reads/writes.
+		 */
+		repl_inst_write(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 		got_ftok = ftok_sem_lock(jnlpool.jnlpool_dummy_reg, FALSE, TRUE); /* immediate=TRUE */
-		mu_replpool_remove_sem(&repl_instance, JNLPOOL_SEGMENT, got_ftok);
-		mu_replpool_remove_sem(&repl_instance, RECVPOOL_SEGMENT, got_ftok);
+		mu_replpool_release_sem(&repl_instance, JNLPOOL_SEGMENT, got_ftok);
+		mu_replpool_release_sem(&repl_instance, RECVPOOL_SEGMENT, got_ftok);
 		if (got_ftok)
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, TRUE); /* immediate=TRUE */
 		murgbl.repl_standalone = FALSE;

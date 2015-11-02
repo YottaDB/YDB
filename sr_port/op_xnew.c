@@ -23,7 +23,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "op.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "alias.h"
 

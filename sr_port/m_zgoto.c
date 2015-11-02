@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,14 +88,14 @@ int m_zgoto(void)
 		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
 		if (!bool_expr(FALSE, cr))
 			return FALSE;
-		if (TREF(expr_start) != TREF(expr_start_orig))
+		if ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode))
 		{
 			triptr = newtriple(OC_GVRECTARG);
 			triptr->operand[0] = put_tref(TREF(expr_start));
 		}
 		obp = oldchain->exorder.bl;
 		dqadd(obp, &tmpchain, exorder);		 /* this is a violation of info hiding */
-		if (TREF(expr_start) != TREF(expr_start_orig))
+		if ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode))
 		{
 			ref0 = newtriple(OC_JMP);
 			ref1 = newtriple(OC_GVRECTARG);

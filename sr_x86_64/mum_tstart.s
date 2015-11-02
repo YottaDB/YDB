@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -13,15 +13,15 @@
 
 .include	"linkage.si"
 .include	"g_msf.si"
-#comment perhaps
+
 	.sbttl	mum_tstart
 	.data
 .extern	frame_pointer
 .extern	proc_act_type
+.extern xfer_table
 
 	.text
 .extern	trans_code
-.extern	inst_flush
 
 ENTRY mum_tstart
 	addq	$8, REG_SP	# back up over return address
@@ -30,5 +30,4 @@ ENTRY mum_tstart
 	call	trans_code
 l1:	getframe
 	leaq	xfer_table(REG_IP), REG_XFER_TABLE
-	call	inst_flush	# smw 99/11/24 is this needed
 	ret

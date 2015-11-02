@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,6 +85,8 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 		}
 	}
 	memcpy((unsigned char*)&pini_record.process_vector[CURR_JPV], (unsigned char*)prc_vec, SIZEOF(jnl_process_vector));
+	pini_record.filler = 0;
+	pini_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&pini_record, SIZEOF(struct_jrec_pini));
 	jnl_write(jpc, JRT_PINI, (jnl_record *)&pini_record, NULL, NULL);
 	/* Note : jpc->pini_addr should not be updated until PINI record is written [C9D08-002376] */
 	jpc->pini_addr = jbp->freeaddr - PINI_RECLEN;

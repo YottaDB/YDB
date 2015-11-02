@@ -13,7 +13,7 @@
 
 #include "gtm_stdio.h"
 
-#include "rtnhdr.h"		/* needed for golevel.h */
+#include <rtnhdr.h>		/* needed for golevel.h */
 #include "error.h"
 #include "op.h"
 #include "stack_frame.h"	/* needed for golevel.h */

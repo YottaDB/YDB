@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -142,7 +142,7 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 			 *     At this point, tp_pointer->orig_key and gv_currkey need not be in sync.
 			 * To maintain $reference accurately, we need to restore gv_currkey from tp_pointer->orig_key.
 			 */
-			memcpy(gv_currkey->base, gv_orig_key_ptr->base, gv_orig_key_ptr->end);
+			COPY_KEY(gv_currkey, gv_orig_key_ptr);
 		} else if (gv_currkey != NULL)
 		{
 			gv_currkey->base[0] = '\0';

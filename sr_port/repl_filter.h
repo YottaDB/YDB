@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,12 @@
 #define FILTERSTART_ERR			-1
 #define FILTER_CMD_ARG_DELIM_TOKENS	" \t"
 
-#define MAX_EXTRACT_BUFSIZ		1 * 1024 * 1024
+#ifdef UNIX
+#  define MAX_EXTRACT_BUFSIZ		10 * MAX_LOGI_JNL_REC_SIZE	/* Since we might need up to 9X + 11
+									 * of MAX_LOGI_JNL_REC_SIZE */
+#else
+#  define MAX_EXTRACT_BUFSIZ		1 * 1024 * 1024
+#endif
 
 #define NO_FILTER			0
 #define INTERNAL_FILTER			0x00000001
@@ -56,6 +61,7 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  *	V19	V20	GT.M V5.4-001	64K journal file header change in Unix but V20 change for VMS too; No jnlrec format change
  *	V21	V21	GT.M V5.4-002	Added replicated ZTRIGGER jnl record type
  *	V22	V22	GT.M V5.5-000	strm_seqno added to all logical records (supplementary instances)
+ *	V22	V23	GT.M V6.0-000	Various journaling-related limits have changed, allowing for much larger journal records
  */
 
 typedef enum
@@ -76,6 +82,7 @@ typedef enum
 	REPL_JNL_V20,		/* enum corresponding to journal format V20 */
 	REPL_JNL_V21,		/* enum corresponding to journal format V21 */
 	REPL_JNL_V22,		/* enum corresponding to journal format V22 */
+	REPL_JNL_V23,		/* enum corresponding to journal format V23 */
 	REPL_JNL_MAX
 } repl_jnl_t;
 
@@ -134,18 +141,19 @@ GBLREF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
 #define V20_JNL_VER		20
 #define V21_JNL_VER		21
 #define V22_JNL_VER		22
+#define V23_JNL_VER		23
 
 #define	V17_NULL_RECLEN		40	/* size of a JRT_NULL record in V17/V18 jnl format */
 #define	V19_NULL_RECLEN		40	/* size of a JRT_NULL record in V19/V20 jnl format */
-#define	V21_NULL_RECLEN		40	/* size of a JRT_NULL record in V21/V22 jnl format */
-#define	V22_NULL_RECLEN		48	/* size of a JRT_NULL record in V22     jnl format */
+#define	V21_NULL_RECLEN		40	/* size of a JRT_NULL record in V21	jnl format */
+#define	V22_NULL_RECLEN		48	/* size of a JRT_NULL record in V22/V23	jnl format */
 
 #define	V19_UPDATE_NUM_OFFSET		32	/* offset of "update_num" member in struct_jrec_upd structure in V19 jnl format */
 #define	V19_MUMPS_NODE_OFFSET		40	/* offset of "mumps_node" member in struct_jrec_upd structure in V19 jnl format */
 #define	V19_TCOM_FILLER_SHORT_OFFSET	32	/* offset of "filler_short" in struct_jrec_tcom structure in V19 jnl format */
 #define	V19_NULL_FILLER_OFFSET		32	/* offset of "filler" in struct_jrec_nullstructure in V19 jnl format */
 
-#define	V22_MUMPS_NODE_OFFSET		48	/* offset of "mumps_node" member in struct_jrec_upd structure in V22 jnl format */
+#define	V22_MUMPS_NODE_OFFSET		48	/* offset of "mumps_node" member in struct_jrec_upd struct in V22/V23 jnl format */
 
 typedef struct
 {
@@ -172,9 +180,9 @@ void repl_filter_error(seq_num filter_seqno, int why);
 	GBLREF	unsigned char		jnl_ver, remote_jnl_ver;
 	GBLREF	boolean_t		secondary_side_trigger_support;
 #	define	LOCAL_JNL_VER		jnl_ver
-#	define	LOCAL_TRIGGER_SUPPORT	(DBG_ASSERT(is_rcvr_server) secondary_side_trigger_support)
+#	define	LOCAL_TRIGGER_SUPPORT	secondary_side_trigger_support
 #	define	REMOTE_JNL_VER		remote_jnl_ver
-#	define	REMOTE_TRIGGER_SUPPORT	(DBG_ASSERT(is_src_server) secondary_side_trigger_support)
+#	define	REMOTE_TRIGGER_SUPPORT	secondary_side_trigger_support
 #	define	REMOTE_NULL_SUBS_XFORM	(TREF(replgbl)).null_subs_xform
 #	define	REMOTE_IS_CROSS_ENDIAN	FALSE
 # endif
@@ -236,8 +244,8 @@ void repl_filter_error(seq_num filter_seqno, int why);
 		rts_error(VARLSTCNT(3) ERR_SECNODZTRIGINTP, 1, &FILTER_SEQNO);			\
 	else if (EREPL_INTLFILTER_MULTILINEXECUTE == repl_errno)				\
 		rts_error(VARLSTCNT(3) ERR_REPLNOMULTILINETRG, 1, &FILTER_SEQNO);		\
-	else											\
-		GTMASSERT;									\
+	else	/* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */				\
+		assertpro(FALSE);								\
 }
 #else
 # define INT_FILTER_RTS_ERROR(FILTER_SEQNO)							\
@@ -246,8 +254,8 @@ void repl_filter_error(seq_num filter_seqno, int why);
 		rts_error(VARLSTCNT(1) ERR_REPLRECFMT);						\
 	else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)					\
 		rts_error(VARLSTCNT(1) ERR_REPLGBL2LONG);					\
-	else											\
-		GTMASSERT;									\
+	else	/* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */				\
+		assertpro(FALSE);								\
 }
 #endif
 #endif

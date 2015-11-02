@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "rtnhdr.h" /* for urx.h */
+#include <rtnhdr.h> /* for urx.h */
 #include "urx.h"
 
 void urx_free (urx_rtnref *anchor)

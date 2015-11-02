@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,7 @@
 
 #include "gtm_string.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"		/* this includes lv_val.h which also includes hashtab_mname.h and hashtab.h */
 #include "stack_frame.h"
 #include "mdq.h"
@@ -26,6 +26,9 @@ GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF stack_frame	*frame_pointer;
 
+error_def(ERR_STACKOFLOW);
+error_def(ERR_STACKCRIT);
+
 int4 symbinit(void)
 {
 	unsigned char	*msp_save;
@@ -35,8 +38,6 @@ int4 symbinit(void)
 	int4		shift_size, ls_size, temp_size;
         int		size;
 	unsigned char	*old_sp, *top, *l_syms;
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
 
 	if (frame_pointer->type & SFT_COUNT)
 	{
@@ -91,7 +92,7 @@ int4 symbinit(void)
 	   		} else
 	   			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
 	   	}
-		memcpy(msp, old_sp, top - (unsigned char *)old_sp);
+		memmove(msp, old_sp, top - (unsigned char *)old_sp);	/* Shift stack w/possible overlapping range */
 		if (shift_size > MVST_STAB_SIZE)
 			fp_prev->l_symtab = (ht_ent_mname **)(top - shift_size);
 		l_syms = (unsigned char *)fp_prev->l_symtab;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,7 @@ LITDEF nametabent dev_param_names[] =
 
 	,{4,"DELE*"}    ,{4,"DELE"}
 	,{4,"DELI*"}
+	,{4,"DEST*" }	,{7,"DESTROY"}
 	,{3,"DET*"}
 	,{3,"DOU*"}
 	,{3,"DOW*"}
@@ -114,6 +115,7 @@ LITDEF nametabent dev_param_names[] =
 	,{4,"NOCE*"}	,{6,"NOCENE"}
 	,{6,"NOCONV*"}
 	,{6,"NODELI*"}
+	,{6,"NODEST*"}	,{9,"NODESTROY"}
 	,{5,"NODOU*"}
 	,{4,"NOEB*"}
 	,{4,"NOEC*"}	,{6,"NOECHO"}
@@ -259,22 +261,22 @@ LITDEF nametabent dev_param_names[] =
 LITDEF	unsigned char dev_param_index[27] =
 {
 /*	A    B    C    D    E    F    G    H    I    J    K    L    M    N   */
-	0,   5,   9,   26,  32,  45,  57,  59,  63,  69,  69,  69,  77,  80,
+	0,   5,   9,   26,  34,  47,  59,  61,  65,  71,  71,  71,  79,  82,
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	140, 145, 164, 165, 178, 196, 205, 211, 212, 227, 228, 229, 243
+	144, 149, 168, 169, 182, 200, 209, 215, 216, 231, 232, 233, 247
 };
 /* Offset of string within letter in dev_param_names */
 /* maintained in conjunction with zshow_params.h   = offset in letter, letter  */
 LITDEF zshow_index zshow_param_index[] =
 {
-/*	ALLO     BLOC    COMMAND   CONV     CTRA     DELE     EBCD     EDIT    EXCE     EXTE     FIELD   FIL     FIXED   HOST */
-	{2,0},   {2,1},   {9,2},  {12,2},  {16,2},  {1,3},   {1,4},   {4,4},  {9,4},   {11,4},  {2,5},  {5,5},  {8,5},  {3,7},
-/*      ICHSET   INDEPENDENT  INSE     LAB */
-	{0,8},   {2,8},      {4,8},   {1,11},
-/*	LENG     NOCENE   NOECHO   NOEDIT   NOESCA   NOHOST   NOINSE     */
-	{3,11},  {7,13},  {13,13}, {15,13}, {17,13}, {25,13}, {27,13},
+/*	ALLO     BLOC    COMMAND   CONV     CTRA     DELE   DEST     EBCD     EDIT    EXCE     EXTE     FIELD   FIL     FIXED  */
+	{2,0},   {2,1},   {9,2},  {12,2},  {16,2},  {1,3},  {3,3},  {1,4},   {4,4},  {9,4},   {11,4},  {2,5},  {5,5},  {8,5},
+/*  	HOST    ICHSET   INDEPENDENT  INSE     LAB */
+	{3,7},	{0,8},   {2,8},      {4,8},   {1,11},
+/*	LENG     NOCENE   NODEST    NOECHO   NOEDIT   NOESCA    NOHOST   NOINSE     */
+	{3,11},  {7,13},  {10,13},  {15,13}, {17,13}, {19,13}, {27,13}, {29,13},
 /*	NOPAST   NOREADS  NOTTSY   NOTYPE   NOWRAP   OCHSET   PAD     PARSE   PAST     PRMMBX   RCHK    */
-	{33,13}, {38,13}, {49,13}, {51,13}, {57,13}, {1,14},  {8,15}, {11,15}, {13,15}, {17,15}, {1,17},
+	{35,13}, {40,13}, {51,13}, {53,13}, {59,13}, {1,14},  {8,15}, {11,15}, {13,15}, {17,15}, {1,17},
 /*      READ     READS	  REC      SHAR     SHELL    STDERR   TERM     TTSY     TYPE    UIC      WAIT     WCHK    WIDTH   WRITE  */
 	{2,17},  {4,17},  {5,17},  {5,18},  {7,18},  {15,18},  {1,19},  {6,19},  {8,19}, {1,20},  {2,22},  {4,22}, {6,22}, {10,22}
 };
@@ -321,6 +323,7 @@ int deviceparameters(oprtype *c, char who_calls)
 
 		,iop_delete ,iop_delete
 		,iop_delimiter
+		,iop_destroy ,iop_destroy
 		,iop_detach
 		,iop_doublespace
 		,iop_downscroll
@@ -376,6 +379,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_nocenable ,iop_nocenable
 		,iop_noconvert
 		,iop_nodelimiter
+		,iop_nodestroy ,iop_nodestroy
 		,iop_nodoublespace
 		,iop_noebcdic
 		,iop_noecho ,iop_noecho

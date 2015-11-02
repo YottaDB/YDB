@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -444,6 +444,7 @@ void dbc_write_p1out(phase_static_area *psa, void *obuf, int olen)
 void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 {
 	int		rec_len, rec1_cmpc, rec2_cmpc, key_len, blk_levl, rec1_len, rec2_len, rec2_rlen;
+	int		tmp_cmpc;
 	int		free_bytes, blk_len;
 	int		save_errno, mm_offset;
 	ssize_t		rc;
@@ -468,7 +469,7 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 			dbc_integ_error(psa, blk_num, "Bad block level");
 		/* Isolate first record for length check */
 		rec1_ptr = psa->block_buff + SIZEOF(v15_blk_hdr);
-		rec1_cmpc = ((rec_hdr_ptr_t)rec1_ptr)->cmpc;
+		rec1_cmpc = EVAL_CMPC((rec_hdr_ptr_t)rec1_ptr);
 		if (0 != rec1_cmpc)
 			dbc_integ_error(psa, blk_num, "Bad compression count");
 		GET_USHORT(us_rec_len, &((rec_hdr_ptr_t)rec1_ptr)->rsiz);
@@ -480,7 +481,7 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 			 * record has no value (null value).
 			 */
 			rec2_ptr = rec1_ptr + rec1_len;
-			rec2_cmpc = ((rec_hdr_ptr_t)rec2_ptr)->cmpc;
+			rec2_cmpc = EVAL_CMPC((rec_hdr_ptr_t)rec2_ptr);
 			if (rec2_cmpc > rec1_len)
 				dbc_integ_error(psa, blk_num, "Compression count too large");
 			GET_USHORT(us_rec_len, &((rec_hdr_ptr_t)rec2_ptr)->rsiz);
@@ -752,6 +753,7 @@ void dbc_integ_error(phase_static_area *psa, block_id blk_num, char_ptr_t emsg)
 uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 {
 	int		dtblk_index, hdr_len, rec_value_len, rec_len, rec_cmpc;
+	int		tmp_cmpc;
 	size_t		len;
 	uchar_ptr_t	blk_p, rec_value_p, subrec_p, key_end_p, rec_p;
 	block_info	*blk_set_p;
@@ -782,7 +784,7 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	blk_set_p = &psa->blk_set[dtblk_index];
 	blk_p = blk_set_p->old_buff;
 	assert(0 == ((v15_blk_hdr_ptr_t)blk_p)->levl);
-	rec_cmpc = ((rec_hdr *)blk_set_p->curr_rec)->cmpc;
+	rec_cmpc = EVAL_CMPC((rec_hdr *)blk_set_p->curr_rec);
 	rec_value_p = (blk_set_p->curr_rec + SIZEOF(rec_hdr) + blk_set_p->curr_blk_key->end + 1 - rec_cmpc);
 	/* Verify that the dt record we found is the exact one we were looking for */
 	if ((psa->first_rec_key->gvn_len + 1) != blk_set_p->curr_blk_key->end)

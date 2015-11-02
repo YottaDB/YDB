@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,6 +49,10 @@ GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	gd_addr			*gd_header;
 
+error_def(ERR_NOTALLDBOPN);
+error_def(ERR_REPLJNLCLOSED);
+error_def(ERR_SRCSRVNOTEXIST);
+
 int gtmsource_checkhealth(void)
 {
 	uint4			gtmsource_pid;
@@ -61,10 +65,6 @@ int gtmsource_checkhealth(void)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	char			errtxt[OUT_BUFF_SIZE];
-
-	error_def(ERR_NOTALLDBOPN);
-	error_def(ERR_REPLJNLCLOSED);
-	error_def(ERR_SRCSRVNOTEXIST);
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	if (NULL != jnlpool.gtmsource_local)	/* Check health of a specific source server */
@@ -151,6 +151,12 @@ int gtmsource_checkhealth(void)
 				status |= SRV_ERR;
 			}
 		}
+	}
+	if (jnlpool.jnlpool_ctl->freeze)
+	{
+		repl_log(stderr, FALSE, FALSE, "Warning: Instance Freeze is ON\n");
+		repl_log(stderr, FALSE, TRUE, "   Freeze Comment: %s\n", jnlpool.jnlpool_ctl->freeze_comment);
+		status |= SRV_ERR;
 	}
 	return (status + NORMAL_SHUTDOWN);
 }

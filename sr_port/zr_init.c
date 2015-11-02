@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "zbreak.h"
 
 void zr_init(z_records *zrecs, int4 count)

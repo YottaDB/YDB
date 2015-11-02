@@ -31,14 +31,20 @@
 #include "is_file_identical.h"
 #include "have_crit.h"
 #include "wbox_test_init.h"
+#include "anticipatory_freeze.h"
 
 #ifdef UNIX
+#include "repl_msg.h"			/* needed for gtmsource.h */
+#include "gtmsource.h"			/* needed for jnlpool_addrs typedef */
 #include "gtmmsg.h"
 #endif
 #include "gtm_c_stack_trace.h"
 
-GBLREF	pid_t	process_id;
-GBLREF	uint4	image_count;
+#ifdef UNIX
+GBLREF	jnlpool_addrs	jnlpool;
+#endif
+GBLREF	pid_t		process_id;
+GBLREF	uint4		image_count;
 
 error_def(ERR_JNLCNTRL);
 error_def(ERR_JNLFLUSH);
@@ -302,6 +308,22 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			else
 				return status;
 		}
+#		ifdef UNIX
+		if ((ERR_JNLWRTDEFER == status) && IS_REPL_INST_FROZEN)
+		{	/* Check if instance freeze is in effect and this db has instance freeze activation enabled.
+			 * In that case, we do not want to keep retrying the jnl_qio as that might cause lcnt to increase
+			 * and eventually GTMASSERT implying this is an IO issue whereas it is possible some other process
+			 * is holding the jnl_qio lock on this region and is not able to write to the journal file for a
+			 * long time because the instance is frozen. To avoid false GTMASSERTs, wait for freeze to be
+			 * lifted before continuing with normal flow (which is to increment lcnt and keep retrying the
+			 * attempt at the jnl_qio lock). Note that this process is guaranteed not to have set the instance
+			 * freeze due to a ENOSPC situation as in that case we would never have allowed any interrupt to occur
+			 * until we succeed with that write and will clear the freeze before moving on.
+			 * Note that the below macro takes care of the "db has instance freeze activation enabled" check too.
+			 */
+			 WAIT_FOR_REPL_INST_UNFREEZE(csa);
+		}
+#		endif
 		if ((ERR_JNLWRTDEFER != status) && (ERR_JNLWRTNOWWRTR != status) && (ERR_JNLPROCSTUCK != status))
 		{	/* If holding crit, then jnl_sub_write_attempt would have invoked jnl_file_lost which would have
 			 * caused the JNL_FILE_SWITCHED check at the beginning of this for loop to succeed and return from

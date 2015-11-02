@@ -73,6 +73,8 @@ error_def(ERR_RESOLVESEQNO);
 error_def(ERR_RESOLVESEQSTRM);
 error_def(ERR_TEXT);
 
+#define	MAX_BACK_PROCESS_REDO_CNT	8
+
 #define SAVE_PRE_RESOLVE_SEQNO(rectype, rec_time, rec_token_seq, pre_resolve_seqno)		\
 {												\
 	if ((JRT_EPOCH == rectype) || (JRT_EOF == rectype))					\
@@ -116,8 +118,14 @@ error_def(ERR_TEXT);
 		 * and have not yet reached the last epoch in backward processing and the	\
 		 * pini_addr should also point to an offset that is after the last epoch.	\
 		 */										\
-		assert(JCTL->jfh->crash && (JCTL->rec_offset > JNLREC->prefix.pini_addr)	\
-			&& (JNLREC->prefix.pini_addr > JCTL->jfh->end_of_data));		\
+		assert(JCTL->jfh->crash && (JCTL->rec_offset >= JNLREC->prefix.pini_addr)	\
+			&& (JNLREC->prefix.pini_addr >= JCTL->jfh->end_of_data));		\
+		/* Register the offset of the corrupt record to be the PINI record (not the	\
+		 * current journal record), this way the "mur_back_processing" redo logic	\
+		 * inside "mur_back_process" restarts mur_fread_eof_crash search from the	\
+		 * lower offset and avoids lots of mur_back_processing redos (GTM-7393).	\
+		 */										\
+		JCTL->rec_offset = JNLREC->prefix.pini_addr;					\
 		MUR_BACK_PROCESS_ERROR(JCTL, JJCTL, "pini_addr is bad");			\
 	}											\
 }
@@ -225,7 +233,7 @@ boolean_t mur_back_process(boolean_t apply_pblk, seq_num *pre_resolve_seqno)
 	jnl_ctl_list	*jctl;
 	reg_ctl_list	*rctl;
 	uint4		status;
-	int 		regno, reg_total;
+	int 		redo_cnt, regno, reg_total;
 	jnl_tm_t	alt_tp_resolve_time;
 	jnl_record	*jnlrec;
 
@@ -233,8 +241,10 @@ boolean_t mur_back_process(boolean_t apply_pblk, seq_num *pre_resolve_seqno)
 	assert(!mur_options.forward || 0 == mur_options.lookback_time);
 	reg_total = murgbl.reg_total;
 	alt_tp_resolve_time = 0;
-	for ( ; ; )
+	for ( redo_cnt = 0; ; redo_cnt++)
 	{
+		assert(MAX_BACK_PROCESS_REDO_CNT > redo_cnt);
+			/* ensure we are not doing too many redos of "mur_fread_eof_crash"/"mur_back_processing" */
 		*pre_resolve_seqno = 0;
 		DEBUG_ONLY(jctl = NULL;)
 		status = mur_back_processing(&jctl, apply_pblk, pre_resolve_seqno, alt_tp_resolve_time);
@@ -254,6 +264,7 @@ boolean_t mur_back_process(boolean_t apply_pblk, seq_num *pre_resolve_seqno)
 			alt_tp_resolve_time = jnlrec->prefix.time;
 		} else	/* An error message must have already been printed if status != SS_NORMAL */
 			break;
+		JNL_PUT_MSG_PROGRESS("Restarting Backward processing");
 		REINITIALIZE_LIST(murgbl.multi_list);
 		reinitialize_hashtab_int8(&murgbl.token_table);
 		murgbl.broken_cnt = 0;
@@ -390,7 +401,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 					if (IS_SET(rectype))
 					{
 						GET_MSTR_LEN(val_len, &keystr->text[keystr->length]);
-						if (keystr->length + 1 + SIZEOF(rec_hdr) + val_len > max_rec_size)
+						if (val_len > max_rec_size)
 							MUR_BACK_PROCESS_ERROR(jctl, jjctl, "Record size check failed");
 					}
 				}

@@ -168,7 +168,7 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 	 * loops instead of one is because we don't want to do gvcst_init while holding the journal pool lock as the former
 	 * acquires ftok and access control semaphores and holding the journal pool lock is a potential recipe for deadlocks
 	 */
-	UNIX_ONLY(GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY));
+	UNIX_ONLY(grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY));
 	for (curr = *gld_db_files; NULL != curr; curr = curr->next)
 	{
 		reg = curr->gd;

@@ -12,11 +12,8 @@
 #include "mdef.h"
 #include "mprof.h"
 
-#ifdef DEBUG
-#define MPROF_CHUNK_SIZE 2 * SIZEOF(mprof_stack_frame)				/* for debug only store 2 frames per chunk */
-#else
-#define MPROF_CHUNK_SIZE 8096							/* in pro make each chunk about 8K */
-#endif
+#define MPROF_CHUNK_SIZE 8096	/* previously, allocation for debug was smaller; however, since we have not seen any issues,
+				 * we made it equal with pro */
 #define MPROF_STACK_ALLOC_CNT (MPROF_CHUNK_SIZE / SIZEOF(mprof_stack_frame))	/* size of allocation chunk in number of frames */
 
 GBLREF int process_exiting;

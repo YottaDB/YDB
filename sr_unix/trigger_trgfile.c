@@ -18,7 +18,7 @@
 #include "gdsroot.h"			/* for gdsfhead.h */
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"			/* For gvcst_protos.h */
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "io.h"
 #include "hashtab_str.h"
@@ -213,11 +213,10 @@ boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_
 				break;
 			assert(0 < t_tries);
 			assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));
-			failure = t_fail_hist[t_tries - 1];
+			failure = LAST_RESTART_CODE;
 			assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure))
 				|| !gv_target || !gv_target->root);
-			assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure))
-				|| !IS_MCODE_RUNNING || TREF(dollar_zonlnrlbk));
+			assert((cdb_sc_onln_rlbk2 != failure) || !IS_GTM_IMAGE || TREF(dollar_zonlnrlbk));
 			if (cdb_sc_onln_rlbk2 == failure)
 				rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
 			/* else if (cdb_sc_onln_rlbk1 == status) we don't need to do anything other than trying again. Since this

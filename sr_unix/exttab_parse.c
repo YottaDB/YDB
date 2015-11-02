@@ -22,7 +22,7 @@
 #include "gtm_stat.h"
 #include "copy.h"
 #include "gtmxc_types.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "lv_val.h"	/* needed for "fgncal.h" */
 #include "fgncal.h"
 #include "gtmci.h"

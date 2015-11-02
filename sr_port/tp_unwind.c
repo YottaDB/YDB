@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
@@ -403,16 +403,8 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvsc
 		assert(0 < curr_lv->stats.trefcnt);	/* No need to copy "stats" as curr_lv is more uptodate */
 		assert(0 < curr_lv->stats.crefcnt);
 		assert(8 == (OFFSETOF(lv_val, tp_var) - OFFSETOF(lv_val, has_aliascont)));
-		/* lv_val->has_aliascont/lvmon_mark all initialized in one shot.
-		 * Note: We use "qw_num *" instead of "uint8 *" below because the former works on 32-bit platforms too.
-		 * On 64-bit platforms, this is 1 8-byte move instead of 2 4-byte moves (the latter means more instructions).
-		 * Even though lvmon_mark is maintained only if DEBUG_ALIAS is #defined, we do the copy here unconditionally
-		 * because on 64-bit platforms, a 4-byte copy (of just has_aliascont) is the same as an 8-byte copy
-		 * (of has_aliascont and lvmon_mark). On 32-bit platforms, it saves us one copy but we dont worry about it much.
-		 */
-		GTM64_ONLY(assert(IS_PTR_8BYTE_ALIGNED(&curr_lv->has_aliascont));)
-		NON_GTM64_ONLY(assert(IS_PTR_4BYTE_ALIGNED(&curr_lv->has_aliascont));)
-		*(RECAST(qw_num *)&curr_lv->has_aliascont) = *(RECAST(qw_num *)&save_lv->has_aliascont);
+		curr_lv->has_aliascont = save_lv->has_aliascont;
+		DBGALS_ONLY(curr_lv->lvmon_mark = save_lv->has_aliascont);
 		assert(save_lv->tp_var == curr_lv->tp_var);	/* no need to copy this field */
 		/* save_lv -> curr_lv Copy done */
 		/* Some fixup may need to be done if the variable was cloned (and thus moved around) */

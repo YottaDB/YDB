@@ -80,28 +80,52 @@ typedef enum {
 	WBTEST_JNL_SWITCH_EXPECTED,		/* 51 : We expect an automatic journal file switch in jnl_file_open */
 	WBTEST_SYSCONF_WRAPPER,			/* 52 : Will sleep in SYSCONF wrapper to let us verify that first two MUPIP STOPs
 						 *	are indeed deferred in the interrupt-deferred zone, but the third isn't */
-        WBTEST_DEFERRED_TIMERS,                 /* 53 : Will enter a long loop upon specific WRITE or MUPIP STOP command */
+        WBTEST_DEFERRED_TIMERS,			/* 53 : Will enter a long loop upon specific WRITE or MUPIP STOP command */
 	WBTEST_BREAKMPC,			/* 54 : Breaks the mpc of the previous frame putting 0xdeadbeef in it */
-	WBTEST_CRASH_TRUNCATE_1,                /* 55 : Issue a kill -9 before 1st fsync */
-	WBTEST_CRASH_TRUNCATE_2,                /* 56 : Issue a kill -9 after 1st fsync */
-	WBTEST_CRASH_TRUNCATE_3,                /* 57 : Issue a kill -9 after reducing csa->ti->total_blks, before FTRUNCATE */
-	WBTEST_CRASH_TRUNCATE_4,                /* 58 : Issue a kill -9 after FTRUNCATE, before 2nd fsync */
-	WBTEST_CRASH_TRUNCATE_5                 /* 58 : Issue a kill -9 after after 2nd fsync */
+	WBTEST_CRASH_TRUNCATE_1,		/* 55 : Issue a kill -9 before 1st fsync */
+	WBTEST_CRASH_TRUNCATE_2,		/* 56 : Issue a kill -9 after 1st fsync */
+	WBTEST_CRASH_TRUNCATE_3,		/* 57 : Issue a kill -9 after reducing csa->ti->total_blks, before FTRUNCATE */
+	WBTEST_CRASH_TRUNCATE_4,		/* 58 : Issue a kill -9 after FTRUNCATE, before 2nd fsync */
+	WBTEST_CRASH_TRUNCATE_5,		/* 59 : Issue a kill -9 after after 2nd fsync */
+	WBTEST_HOLD_SEM_BYPASS,			/* 60 : Hold access and FTOK semaphores so that LKE/DSE can bypass it. */
+	WBTEST_UTIL_OUT_BUFFER_PROTECTION,	/* 61 : Start a timer that would mess with util_out buffers by frequently
+						 *	printing long messages via util_out_print */
+	WBTEST_SET_WC_BLOCKED,			/* 62 : Set the wc_blocked when searching the tree to start wcs_recover process*/
+	WBTEST_CLOSE_JNLFILE,			/* 63 : Set the journal file state to close when reading journal files to
+						 *	trigger repl_warn message */
+	WBTEST_WCS_FLU_IOERR,			/* 64 : Force an I/O error (other than ENOSPC) when wcs_wtstart is invoked from
+						 *      wcs_flu */
+	WBTEST_WCS_WTSTART_IOERR,		/* 65 : Force an I/O error (other than ENOSPC) within wcs_wtstart */
+	WBTEST_HOLD_CRIT_TILL_LCKALERT,		/* 66 : Grab and hold crit until 15 seconds past what triggers a lock alert message
+						 *      which should invoke a mutex salvage */
+	WBTEST_OPER_LOG_MSG,			/* 67 : send message to operator log */
+	WBTEST_ANTIFREEZE_DSKNOSPCAVAIL,	/* 68 : */
+	WBTEST_ANTIFREEZE_JNLCLOSE,		/* 69 : */
+	WBTEST_ANTIFREEZE_DBBMLCORRUPT,		/* 70 : */
+	WBTEST_ANTIFREEZE_DBDANGER,		/* 71 : */
+	WBTEST_ANTIFREEZE_DBFSYNCERR,		/* 72 :	*/
+	WBTEST_ANTIFREEZE_GVDATAFAIL,		/* 73 : */
+	WBTEST_ANTIFREEZE_GVGETFAIL,		/* 74 : */
+	WBTEST_ANTIFREEZE_GVINCRPUTFAIL,	/* 75 : */
+	WBTEST_ANTIFREEZE_GVKILLFAIL,		/* 76 : */
+	WBTEST_ANTIFREEZE_GVORDERFAIL,		/* 77 : */
+	WBTEST_ANTIFREEZE_GVQUERYFAIL,		/* 78 : */
+	WBTEST_ANTIFREEZE_GVQUERYGETFAIL,	/* 79 : */
+	WBTEST_ANTIFREEZE_GVZTRIGFAIL,		/* 80 : */
+	WBTEST_ANTIFREEZE_OUTOFSPACE		/* 81 : */
 } wbtest_code_t;
 
 #ifdef DEBUG
+/* Make sure to setenv gtm_white_box_test_case_count if you are going to use GTM_WHITE_BOX_TEST */
 #define GTM_WHITE_BOX_TEST(input_test_case_num, lhs, rhs)						\
 {													\
-	if (gtm_white_box_test_case_enabled)								\
+	if (gtm_white_box_test_case_enabled && (gtm_white_box_test_case_number == input_test_case_num))	\
 	{												\
-		if (gtm_white_box_test_case_number == input_test_case_num)				\
+		gtm_wbox_input_test_case_count++;							\
+		if (gtm_white_box_test_case_count == gtm_wbox_input_test_case_count)			\
 		{											\
-			gtm_wbox_input_test_case_count++;						\
-			if (gtm_white_box_test_case_count == gtm_wbox_input_test_case_count)		\
-			{										\
-				lhs = rhs;								\
-				gtm_wbox_input_test_case_count = 0;					\
-			}										\
+			lhs = rhs;									\
+			gtm_wbox_input_test_case_count = 0;						\
 		}											\
 	}												\
 }

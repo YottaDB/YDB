@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,6 +61,7 @@
 #include "mu_upgrd_dngrd_confirmed.h"
 #include "mu_outofband_setup.h"
 #include "gdsbml.h"
+#include "anticipatory_freeze.h"
 #ifdef UNIX
 #include "mu_all_version_standalone.h"
 #endif
@@ -136,7 +137,7 @@ void mupip_upgrade(void)
 	UNIX_ONLY(mu_all_version_get_standalone(db_fn, sem_inf));
 	mu_outofband_setup();	/* Will ignore user interrupts. Note that now the
 				 * elapsed time for this is order of milliseconds */
-	/* ??? Should we set this just before DO_FILE_WRITE to have smallest time window of ignoring signal? */
+	/* ??? Should we set this just before DB_DO_FILE_WRITE to have smallest time window of ignoring signal? */
 #ifdef VMS
 	mupfab = cc$rms_fab;
 	mupfab.fab$l_fna = db_fn;
@@ -207,23 +208,23 @@ void mupip_upgrade(void)
 		{
 			/* We have detected the master map which supports only 128M blocks so we need to
 			 * bump it up to one that supports 224M blocks. */
-			csd.master_map_len = MASTER_MAP_SIZE_DFLT;
-			assert(START_VBN_CURRENT == csd.start_vbn);
+			csd.master_map_len = MASTER_MAP_SIZE_V5;
+			assert(START_VBN_V5 == csd.start_vbn);
 			DEBUG_ONLY (
-				norm_vbn = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE) + 1;
-				assert(START_VBN_CURRENT == norm_vbn);
+				norm_vbn = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_V5, DISK_BLOCK_SIZE) + 1;
+				assert(START_VBN_V5 == norm_vbn);
 			)
 			csd.free_space = 0;
-			DO_FILE_WRITE(channel, 0, &csd, SIZEOF(csd), status, status2);
+			DB_DO_FILE_WRITE(channel, 0, &csd, SIZEOF(csd), status, status2);
 			if (SS_NORMAL != status)
 			{
 				F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
 				gtm_putmsg(VARLSTCNT(5) ERR_DBFILOPERR, 2, db_fn_len, db_fn, status);
 				mupip_exit(ERR_MUNOUPGRD);
 			}
-			memset(new_v5_master_map, BMP_EIGHT_BLKS_FREE, (MASTER_MAP_SIZE_DFLT - MASTER_MAP_SIZE_V5_OLD));
-			DO_FILE_WRITE(channel, SIZEOF(csd) + MASTER_MAP_SIZE_V5_OLD, new_v5_master_map,
-							(MASTER_MAP_SIZE_DFLT - MASTER_MAP_SIZE_V5_OLD), status, status2);
+			memset(new_v5_master_map, BMP_EIGHT_BLKS_FREE, (MASTER_MAP_SIZE_V5 - MASTER_MAP_SIZE_V5_OLD));
+			DB_DO_FILE_WRITE(channel, SIZEOF(csd) + MASTER_MAP_SIZE_V5_OLD, new_v5_master_map,
+							(MASTER_MAP_SIZE_V5 - MASTER_MAP_SIZE_V5_OLD), status, status2);
 			if (SS_NORMAL != status)
 			{
 				F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
@@ -316,14 +317,14 @@ void mupip_upgrade(void)
         mu_upgrd_header(&v15_csd, &csd);
 	csd.master_map_len = MASTER_MAP_SIZE_V4;	/* V5 master map is not part of file header */
 	memcpy(new_master_map, v15_csd.master_map, MASTER_MAP_SIZE_V4);
-	DO_FILE_WRITE(channel, 0, &csd, SIZEOF(csd), status, status2);
+	DB_DO_FILE_WRITE(channel, 0, &csd, SIZEOF(csd), status, status2);
 	if (SS_NORMAL != status)
 	{
 		F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILOPERR, 2, db_fn_len, db_fn, status);
 		mupip_exit(ERR_MUNOUPGRD);
 	}
-	DO_FILE_WRITE(channel, SIZEOF(csd), new_master_map, MASTER_MAP_SIZE_V4, status, status2);
+	DB_DO_FILE_WRITE(channel, SIZEOF(csd), new_master_map, MASTER_MAP_SIZE_V4, status, status2);
 	if (SS_NORMAL != status)
 	{
 		F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */

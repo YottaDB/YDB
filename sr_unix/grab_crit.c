@@ -36,6 +36,7 @@
 #endif
 #include "gtmimagename.h"
 #include "error.h"
+#include "anticipatory_freeze.h"
 
 GBLREF	volatile int4		crit_count;
 GBLREF	short			crash_count;
@@ -89,7 +90,6 @@ void	grab_crit(gd_region *reg)
 			 * Not following the protocol (obtaining lock on journal pool AFTER obtaining crit on database region),
 			 * can lead to potential deadlocks
 			 */
-			assert((jnlpool.jnlpool_dummy_reg && jnlpool.jnlpool_dummy_reg->open) || jgbl.onlnrlbk);
 			jnlpool_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 			assert(!jnlpool_csa->now_crit);
 		}
@@ -139,9 +139,12 @@ void	grab_crit(gd_region *reg)
 		TREF(grabbing_crit) = NULL;
 		crit_count = 0;
 	}
-	if (csd->file_corrupt && !mupip_jnl_recover)
+	/* Commands/Utilties that plays with the file_corrupt flags (DSE/MUPIP SET -PARTIAL_RECOV_BYPASS/RECOVER/ROLLBACK) should
+	 * NOT issue DBFLCORRP. Use skip_file_corrupt_check global variable for this purpose
+	 */
+	if (csd->file_corrupt && !TREF(skip_file_corrupt_check))
 		rts_error(VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
-	if (csd->wc_blocked)
+	if (cnl->wc_blocked)
 		wcs_recover(reg);
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -133,7 +133,7 @@ uint4	mur_forward_play_multireg_tp(forw_multi_struct *forw_multi, reg_ctl_list *
 				num_tcoms++;
 				if ((num_tcoms == num_participants) && murgbl.ok_to_update_db && (GOOD_TN == recstat))
 				{	/* TCOM record of LAST region. Do actual transaction commit */
-					jnl_fence_ctl.token = rec_token_seq;
+					MUR_SET_JNL_FENCE_CTL_TOKEN(rec_token_seq, ((reg_ctl_list *)NULL));
 					jgbl.mur_jrec_participants = rec->jrec_tcom.num_participants;
 					memcpy(tcom_record.jnl_tid, rec->jrec_tcom.jnl_tid, TID_STR_SIZE);
 					assert(jnl_fence_ctl.token == rec->jrec_tcom.token_seq.token);

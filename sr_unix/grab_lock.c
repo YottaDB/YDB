@@ -27,12 +27,16 @@
 #include "gtmsource.h"
 #include "repl_instance.h"
 #include "jnl.h"
+#include "gtmimagename.h"	/* for IS_GTCM_GNP_SERVER_IMAGE */
+#include "anticipatory_freeze.h"
 
 GBLREF	volatile int4		crit_count;
 GBLREF	uint4			process_id;
 GBLREF	node_local_ptr_t	locknl;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnl_gbls_t		jgbl;
+GBLREF	boolean_t		is_src_server;
+GBLREF	boolean_t		jnlpool_init_needed;
 
 error_def(ERR_DBCCERR);
 error_def(ERR_CRITRESET);
@@ -44,13 +48,17 @@ error_def(ERR_TEXT);
  * mutex_spin_parms_struct, and node_local in shared memory. Initialize the fields as in
  * jnlpool_init(). Pass the address of the dummy region as argument to this function.
  */
-void	grab_lock(gd_region *reg)
+void	grab_lock(gd_region *reg, uint4 onln_rlbk_action)
 {
 	unix_db_info 		*udi;
 	sgmnt_addrs  		*csa;
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
+#	ifdef DEBUG
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#	endif
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
 	assert(!csa->hold_onto_crit);
@@ -95,6 +103,31 @@ void	grab_lock(gd_region *reg)
 		/* No need to do rel_lock before rts_error (mupip_exit_handler will do it for us) */
 		rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn),
 				ERR_TEXT, 2, LEN_AND_LIT("file_corrupt field in instance file header is set to TRUE"));
+	}
+	/* If ASSERT_NO_ONLINE_ROLLBACK, then no concurrent online rollbacks can happen at this point. So, the jnlpool should be in
+	 * in sync. There are two exceptions. If this is GT.CM GNP Server and the last client disconnected, the server invokes
+	 * gtcmd_rundown which in-turn invokes gds_rundown thereby running down all active databases at this point but leaves the
+	 * journal pool up and running. Now, if an online rollback is attempted, it increments the onln_rlbk_cycle in the journal
+	 * pool, but csa->onln_rlbk_cycle is not synced yet. So, the grab_crit done in t_end will NOT detect a concurrent online
+	 * rollback and it doesn't need to because the rollback happened AFTER the rundown. Assert that this is the only case we
+	 * know of for the cycles to be out-of-sync. In PRO jnlpool_ctl->onln_rlbk_cycle is used only by the replication servers
+	 * (which GT.CM is not) and so even if it continues with an out-of-sync csa->onln_rlbk_cycle, t_end logic does the right
+	 * thing. The other exception is if GT.M initialized journal pool while opening database (belonging to a different
+	 * instance) in gvcst_init (for anticipatory freeze) followed by an online rollback which increments the
+	 * jnlpool_ctl->onln_rlbk_cycle but leaves the repl_csa->onln_rlbk_cycle out-of-sync. At this point, if a replicated
+	 * database is open for the first time, we'll reach t_end to commit the update but will end up failing the below assert due
+	 * to the out-of-sync onln_rlbk_cycle. So, assert accordingly. Note : even though the cycles are out-of-sync they are not
+	 * an issue for GT.M because it always relies on the onln_rlbk_cycle from csa->nl and not from repl_csa. But, we don't
+	 * remove the assert as it is valuable for replication servers (Source, Receiver and Update Process).
+	 */
+	assert((ASSERT_NO_ONLINE_ROLLBACK != onln_rlbk_action) || (csa->onln_rlbk_cycle == jnlpool.jnlpool_ctl->onln_rlbk_cycle)
+			|| IS_GTCM_GNP_SERVER_IMAGE || (jnlpool_init_needed && ANTICIPATORY_FREEZE_AVAILABLE));
+	if ((HANDLE_CONCUR_ONLINE_ROLLBACK == onln_rlbk_action) && (csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle))
+	{
+		assert(is_src_server);
+		SYNC_ONLN_RLBK_CYCLES;
+		gtmsource_onln_rlbk_clnup(); /* side-effect : sets gtmsource_state */
+		rel_lock(reg); /* caller knows to disconnect and re-establish the connection */
 	}
 	return;
 }

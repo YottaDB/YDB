@@ -69,9 +69,7 @@ GBLREF	boolean_t		created_core;
 GBLREF	unsigned int		core_in_progress;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	recvpool_addrs		recvpool;
-GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	boolean_t		pool_init;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		is_rcvr_server;
 GBLREF	boolean_t		is_updproc;
@@ -81,15 +79,10 @@ GBLREF	FILE			*gtmrecv_log_fp;
 GBLREF	FILE			*updproc_log_fp;
 GBLREF	FILE			*updhelper_log_fp;
 GBLREF	int			gtmsource_log_fd;
-GBLREF	int			gtmsource_statslog_fd;
-GBLREF	FILE			*gtmsource_statslog_fp;
 GBLREF	int			gtmrecv_log_fd;
-GBLREF	int			gtmrecv_statslog_fd;
-GBLREF	FILE			*gtmrecv_statslog_fp;
 GBLREF	int			updproc_log_fd;
 GBLREF	int			updhelper_log_fd;
 GBLREF	gd_region		*gv_cur_region;
-GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	upd_helper_entry_ptr_t	helper_entry;
 GBLREF	uint4			dollar_tlevel;
@@ -100,7 +93,6 @@ void close_repl_logfiles(void);
 void mupip_exit_handler(void)
 {
 	char		err_log[1024];
-	unix_db_info	*udi;
 	FILE		*fp;
 
 	if (exit_handler_active)	/* Don't recurse if exit handler exited */
@@ -115,19 +107,8 @@ void mupip_exit_handler(void)
 	jgbl.dont_reset_gbl_jrec_time = jgbl.forw_phase_recovery = FALSE;
 	cancel_timer(0);		/* Cancel all timers - No unpleasant surprises */
 	secshr_db_clnup(NORMAL_TERMINATION);
-	if (jnlpool.jnlpool_ctl)
-	{
-		rel_lock(jnlpool.jnlpool_dummy_reg);
-		mutex_cleanup(jnlpool.jnlpool_dummy_reg);
-		if (jnlpool.gtmsource_local && (process_id == jnlpool.gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid))
-			rel_gtmsource_srv_latch(&jnlpool.gtmsource_local->gtmsource_srv_latch);
-		SHMDT(jnlpool.jnlpool_ctl);
-		jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
-		pool_init = FALSE;
-	}
 	if (dollar_tlevel)
 		OP_TROLLBACK(0);
-	gv_rundown();
 	if (is_updhelper && NULL != helper_entry) /* haven't had a chance to cleanup, must be an abnormal exit */
 	{
 		helper_entry->helper_shutdown = ABNORMAL_SHUTDOWN;
@@ -139,44 +120,7 @@ void mupip_exit_handler(void)
 		SHMDT(recvpool.recvpool_ctl);
 		recvpool.recvpool_ctl = NULL;
 	}
-	/*
-	 * Note:
-	 *	In older versions we used to release replication semaphores here.
-	 *	But it does not really help. We do not want to release them until this process exits.
-	 *	We use SEM_UNDO flag for semaphore creation. So when this process will exit,
-	 *	OS will automatically release the semaphore value by 1. That is do nothing about them.
-	 */
-	if (ftok_sem_reg)
-	{
-		/* This segment of code will be executed by utilities
-		 * like mupip integ file/mupip restore etc., which operates on one single region.
-		 * In case of an error or, for any other code path, if the ftok semaphore is
-		 * grabbed but not released, ftok_sem_reg will have non-null value
-		 * and grabbed_ftok_sem will be TRUE.
-		 * (We cannot rely on gv_cur_region which is used in so many places in so many ways.)
-		 * In case a processed released ftok semaphore lock but did not decrement
-		 * the counter, ftok_sem_reg will be NULL. In that case we rely on OS to decrement
-		 * the counter when the process exits completely.
-		 */
-		DEBUG_ONLY(udi = FILE_INFO(ftok_sem_reg);)
-		assert(udi->grabbed_ftok_sem);
-		ftok_sem_release(ftok_sem_reg, TRUE, TRUE);
-	} else
-	{
-		/* This segment is for replication ftok semaphore cleanup in case of error. */
-		if (NULL != jnlpool.jnlpool_dummy_reg)
-		{
-			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-			if (udi->grabbed_ftok_sem)
-				ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-		}
-		if (NULL != recvpool.recvpool_dummy_reg)
-		{
-			udi = FILE_INFO(recvpool.recvpool_dummy_reg);
-			if (udi->grabbed_ftok_sem)
-				ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-		}
-	}
+	gv_rundown(); /* also takes care of detaching from the journal pool */
 	/* Log the exit of replication servers. In case they are exiting abnormally, their log file pointers
 	 * might not be set up. In that case, use "stderr" for logging.
 	 */
@@ -214,26 +158,10 @@ void close_repl_logfiles()
 {
 	int	rc;
 
-	if (FD_INVALID != gtmsource_statslog_fd)
-	{
-		if (gtmsource_log_fd == gtmsource_statslog_fd)
-			gtmsource_log_fd = FD_INVALID;
-		CLOSEFILE_RESET(gtmsource_statslog_fd, rc);	/* resets "gtmsource_statslog_fd" to FD_INVALID */
-	}
-	if (NULL != gtmsource_statslog_fp)
-		FCLOSE(gtmsource_statslog_fp, rc);
 	if (FD_INVALID != gtmsource_log_fd)
 		CLOSEFILE_RESET(gtmsource_log_fd, rc);	/* resets "gtmsource_log_fd" to FD_INVALID */
 	if (NULL != gtmsource_log_fp)
 		FCLOSE(gtmsource_log_fp, rc);
-	if (FD_INVALID != gtmrecv_statslog_fd)
-	{
-		if (gtmrecv_log_fd == gtmrecv_statslog_fd)
-			gtmrecv_log_fd = FD_INVALID;
-		CLOSEFILE_RESET(gtmrecv_statslog_fd, rc);	/* resets "gtmrecv_statslog_fd" to FD_INVALID */
-	}
-	if (NULL != gtmrecv_statslog_fp)
-		FCLOSE(gtmrecv_statslog_fp, rc);
 	if (FD_INVALID != gtmrecv_log_fd)
 		CLOSEFILE_RESET(gtmrecv_log_fd, rc);	/* resets "gtmrecv_log_fd" to FD_INVALID */
 	if (NULL != gtmrecv_log_fp)

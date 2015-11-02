@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 #include "gtm_string.h"
-#include "rtnhdr.h" /* for urx.h */
+#include <rtnhdr.h> /* for urx.h */
 #include "urx.h"
 
 bool urx_getlab (char *lab, int lablen, urx_rtnref *rtn, urx_labref **lp0p, urx_labref **lp1p)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,9 +29,11 @@
 GBLREF short int	patch_path_count;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF char		patch_comp_key[MAX_KEY_SZ + 1];
-GBLREF unsigned char	patch_comp_count;
+GBLREF unsigned short	patch_comp_count;
 GBLREF bool		patch_find_root_search;
 GBLDEF block_id		ksrch_root;
+
+error_def(ERR_DSEBLKRDFAIL);
 
 int dse_ksrch(block_id srch,
 	      block_id_ptr_t pp,
@@ -40,14 +42,14 @@ int dse_ksrch(block_id srch,
 	      int targ_len)
 {
 	sm_uc_ptr_t	bp, b_top, rp, r_top, key_top, blk_id;
-	unsigned char	cc;
+	unsigned short	cc;
+	int		tmp_cmpc;
 	int	    	rsize;
 	ssize_t		size;
 	int4		cmp;
-	short		dummy_short;
+	unsigned short	dummy_short;
 	int4		dummy_int;
 	cache_rec_ptr_t dummy_cr;
-	error_def(ERR_DSEBLKRDFAIL);
 
 	if(!(bp = t_qread(srch, &dummy_int, &dummy_cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
@@ -84,13 +86,13 @@ int dse_ksrch(block_id srch,
 
 		if (((blk_hdr_ptr_t)bp)->levl && key_top > (blk_id = r_top - SIZEOF(block_id)))
 			key_top = blk_id;
-		if (((rec_hdr_ptr_t) rp)->cmpc > patch_comp_count)
+		if (EVAL_CMPC((rec_hdr_ptr_t)rp) > patch_comp_count)
 			cc = patch_comp_count;
 		else
-			cc = ((rec_hdr_ptr_t) rp)->cmpc;
+			cc = EVAL_CMPC((rec_hdr_ptr_t)rp);
 		size = (ssize_t)(key_top - rp - SIZEOF(rec_hdr));
-		if (size > SIZEOF(patch_comp_key) - 2 - cc)
-			size = SIZEOF(patch_comp_key) - 2 - cc;
+		if (size > MAX_KEY_SZ - cc)
+			size = MAX_KEY_SZ - cc;
 		if (size < 0)
 			size = 0;
 		memcpy(&patch_comp_key[cc], rp + SIZEOF(rec_hdr), size);
@@ -118,5 +120,26 @@ int dse_ksrch(block_id srch,
 	    && dse_ksrch(*pp, pp + 1, off + 1, targ_key, targ_len))
 		return TRUE;
 	return FALSE;
+}
 
+int dse_key_srch(block_id srch, block_id_ptr_t key_path, int4 *off, char *targ_key, int targ_len)
+{
+	int status = dse_ksrch(srch, key_path, off, targ_key, targ_len);
+	if(status)
+		return status;
+	else if(!patch_find_root_search)
+	{	/* We are not searching for the global name in the directory tree and search for the regular-key
+		 * has failed. So, adjust to the input key with special subscript to indicate it as a spanning node key.
+		 * call dse_ksrch() again.
+		 */
+		targ_len -= 1;		/* back off 1 to overlay terminator */
+		SPAN_INITSUBS((span_subs *)(targ_key + targ_len), 0);
+		targ_len += SPAN_SUBS_LEN;
+		targ_key[targ_len++] = KEY_DELIMITER;
+		targ_key[targ_len++] = KEY_DELIMITER;
+		patch_path_count = 1; 	/*This indicates the length of the path of node in gvtree*/
+		patch_find_root_search = FALSE;
+		return(dse_ksrch(srch,key_path, off, targ_key, targ_len));
+	}
+	return FALSE;
 }

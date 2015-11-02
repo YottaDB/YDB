@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,10 @@ GBLREF	boolean_t	backup_interrupted;
 #ifdef UNIX
 GBLREF	backup_reg_list	*mu_repl_inst_reg_list;
 GBLREF	jnlpool_addrs	jnlpool;
+GBLREF	boolean_t	jnlpool_init_needed;
 #endif
+
+error_def(ERR_FORCEDHALT);
 
 void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 {
@@ -71,8 +74,6 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 	unix_db_info	*udi;
 	int		rc;
 #endif
-
-	error_def(ERR_FORCEDHALT);
 
 	assert(stage >= need_to_free_space && stage < num_of_clnup_stage);
 
@@ -179,7 +180,7 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 	}
 	UNIX_ONLY(
 		/* Release FTOK lock on the replication instance file if holding it */
-		assert((NULL == jnlpool.jnlpool_dummy_reg) || (NULL != mu_repl_inst_reg_list));
+		assert((NULL == jnlpool.jnlpool_dummy_reg) || (NULL != mu_repl_inst_reg_list) || jnlpool_init_needed);
 		if ((NULL != mu_repl_inst_reg_list) && (NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
 		{
 			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);

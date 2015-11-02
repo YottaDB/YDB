@@ -12,7 +12,7 @@
 #ifndef AUTO_ZLINK_INCLUDED
 #define AUTO_ZLINK_INCLUDED
 
-#include "auto_zlink_sp.h"
+#include <auto_zlink_sp.h>
 
 rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent ***line);
 

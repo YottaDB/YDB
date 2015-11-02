@@ -16,6 +16,6 @@
 LITDEF octabstruct oc_tab[] =
 {
 #define OPCODE_DEF(A,B) {B},
-#include "opcode_def.h"
+#include <opcode_def.h>
 };
 #undef OPCODE_DEF

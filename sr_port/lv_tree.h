@@ -116,7 +116,7 @@ typedef struct
 } treeSrchStatus;
 
 typedef struct lvTreeStruct
-{
+{	/* Note if first 3 fields are disturbed, make sure to fix LV_CLONE_TREE macro which references them as a group */
 	unsigned short		ident;	    /* 2-byte field (same size as mvtype) set to the value MV_LV_TREE */
 	unsigned short		sbs_depth;  /* == "n" => all nodes in current avl tree represent lvns with "n" subscripts */
 	uint4			avl_height; /* Height of the AVL tree rooted at "avl_root" */
@@ -284,12 +284,8 @@ void		lvAvlTreeNodeDelete(lvTree *lvt, lvTreeNode *node);
 	assert(OFFSETOF(lvTree, avl_root) + SIZEOF(LVT->avl_root) == OFFSETOF(lvTree, sbs_parent));			\
 	assert(OFFSETOF(lvTree, sbs_parent) + SIZEOF(LVT->sbs_parent) == OFFSETOF(lvTree, lastLookup));			\
 	assert(OFFSETOF(lvTree, lastLookup) + SIZEOF(LVT->lastLookup) == SIZEOF(lvTree));				\
-	/* Note: We use "qw_num *" instead of "uint8 *" below because the former works on 32-bit platforms too. */	\
-	GTM64_ONLY(assert(IS_PTR_8BYTE_ALIGNED(cloneTree));)								\
-	NON_GTM64_ONLY(assert(IS_PTR_4BYTE_ALIGNED(cloneTree));)							\
-	GTM64_ONLY(assert(IS_PTR_8BYTE_ALIGNED(LVT));)									\
-	NON_GTM64_ONLY(assert(IS_PTR_4BYTE_ALIGNED(LVT));)								\
-	*(qw_num *)cloneTree = *(qw_num *)LVT;										\
+	/* Directly copy the first 3 fields */										\
+	memcpy(cloneTree, (LVT), OFFSETOF(lvTree, avl_height) + SIZEOF(LVT->avl_height));				\
 	cloneTree->base_lv = BASE_LV;											\
 	cloneTree->sbs_parent = SBS_PARENT;	/* see comment in LV_TREE_CREATE macro (against sbs_parent		\
 						 * initialization) for why LVT_PARENT macro is not used */		\

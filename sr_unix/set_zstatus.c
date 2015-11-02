@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 #include "stringpool.h"
 #include "mlkdef.h"
 #include "zshow.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mvalconv.h"
 #include "error_trap.h"
@@ -30,7 +30,6 @@
 GBLREF mval		dollar_zstatus, dollar_zerror;
 GBLREF mval		dollar_ztrap, dollar_etrap;
 GBLREF stack_frame	*zyerr_frame, *frame_pointer;
-GBLREF char		*util_outptr, util_outbuff[OUT_BUFF_SIZE];
 GBLREF mstr             *err_act;
 
 error_def(ERR_MEMORY);
@@ -45,7 +44,9 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 	size_t		util_len ;
 	mval		*status_loc;
 	boolean_t 	trans_frame;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	b_line = 0;
 	if (!need_rtsloc)
 	 	trans_frame = FALSE;
@@ -75,28 +76,28 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 		*zstatus_bptr++ = ',';
 	}
 	zstatus_iter = zstatus_bptr;
-	util_len = util_outptr  - util_outbuff;
+	util_len = TREF(util_outptr)  - TREF(util_outbuff_ptr);
 	if (trans_frame)
 	{	/* currently no inserted message (arg) needs arguments.  The following code needs
 		 * to be changed if any new parametered message is added.
 		 */
-		util_outbuff[0] = '-';
-		memcpy(&zstatus_buff[OUT_BUFF_SIZE], util_outbuff, util_len); /* save original message */
+		*(TREF(util_outbuff_ptr)) = '-';
+		memcpy(&zstatus_buff[OUT_BUFF_SIZE], TREF(util_outbuff_ptr), util_len); /* save original message */
 		util_out_print(NULL, RESET); /* clear any pending msgs and reset util_out_buff */
 		gtm_putmsg_noflush(VARLSTCNT(1) arg);
 
-		memcpy(zstatus_bptr, util_outbuff, util_outptr - util_outbuff);
-		zstatus_bptr += (util_outptr - util_outbuff);
+		memcpy(zstatus_bptr, TREF(util_outbuff_ptr), TREF(util_outptr) - TREF(util_outbuff_ptr));
+		zstatus_bptr += (TREF(util_outptr) - TREF(util_outbuff_ptr));
 		*zstatus_bptr++ = ',';
 		memcpy(zstatus_bptr, &zstatus_buff[OUT_BUFF_SIZE], util_len);
 
 		/* restore original message into util_outbuf */
-		memcpy(util_outbuff, &zstatus_buff[OUT_BUFF_SIZE], util_len);
-		util_outbuff[0] = '%';
-		util_outptr = util_outbuff + util_len;
+		memcpy(TREF(util_outbuff_ptr), &zstatus_buff[OUT_BUFF_SIZE], util_len);
+		*(TREF(util_outbuff_ptr)) = '%';
+		TREF(util_outptr) = TREF(util_outbuff_ptr) + util_len;
 		arg = save_arg;
 	} else
-		memcpy(zstatus_bptr, util_outbuff, util_len);
+		memcpy(zstatus_bptr, TREF(util_outbuff_ptr), util_len);
 	zstatus_bptr += util_len;
 	for (; zstatus_iter < zstatus_bptr; zstatus_iter++)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	enum cdb_sc		status;
 	int4			blk_size, blk_fill_size, cur_blk_size, blk_seg_cnt, delta, tail_len, new_rec_size;
 	int4			target_key_size, data_len;
+	int			tmp_cmpc;
 	mstr			value;
 	rec_hdr_ptr_t		curr_rec_hdr, rp;
 	sm_uc_ptr_t		cp1, buffaddr;
@@ -114,7 +115,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	cur_blk_size = ((blk_hdr_ptr_t)buffaddr)->bsiz;
 	rp = (rec_hdr_ptr_t)(buffaddr + bh->curr_rec.offset);
 	GET_USHORT(rec_size, &rp->rsiz);
-	data_len = rec_size + rp->cmpc - SIZEOF(rec_hdr) - target_key_size;
+	data_len = rec_size + EVAL_CMPC(rp) - SIZEOF(rec_hdr) - target_key_size;
 	if (cdb_sc_normal != (status = gvincr_compute_post_incr(bh)))
 	{
 		assert(CDB_STAGNATE > t_tries);
@@ -149,7 +150,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	BLK_SEG(bs_ptr, buffaddr + SIZEOF(blk_hdr), bh->curr_rec.offset - SIZEOF(blk_hdr));
 	BLK_ADDR(curr_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 	curr_rec_hdr->rsiz = new_rec_size;
-	curr_rec_hdr->cmpc = bh->prev_rec.match;
+	SET_CMPC(curr_rec_hdr, bh->prev_rec.match);
 	BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
 	BLK_ADDR(cp1, target_key_size - bh->prev_rec.match, unsigned char);
 	memcpy(cp1, gv_currkey->base + bh->prev_rec.match, target_key_size - bh->prev_rec.match);

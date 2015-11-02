@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -243,7 +243,7 @@ void	mur_show_header(jnl_ctl_list * jctl)
 	}
 	util_out_print("!/Process That Created the Journal File:!/", TRUE);
 	mur_show_jpv(&hdr->who_created, TRUE);
-	util_out_print("!/Process That Last Wrote to the Journal File:!/", TRUE);
+	util_out_print("!/Process That First Opened the Journal File:!/", TRUE);
 	mur_show_jpv(&hdr->who_opened, TRUE);
 	util_out_print("", TRUE);
 }

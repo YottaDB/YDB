@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,12 +51,15 @@ LITREF	unsigned char		filter_index[27];
 LITREF 	unsigned char		io_params_size[];
 
 error_def(ERR_ABNCOMPTINC);
+error_def(ERR_ACOMPTBINC);
 error_def(ERR_ADDRTOOLONG);
 error_def(ERR_ANCOMPTINC);
-error_def(ERR_ACOMPTBINC);
 error_def(ERR_CURRSOCKOFR);
 error_def(ERR_DELIMSIZNA);
+error_def(ERR_DELIMWIDTH);
+error_def(ERR_DEVPARMNEG);
 error_def(ERR_ILLESOCKBFSIZE);
+error_def(ERR_MRTMAXEXCEEDED);
 error_def(ERR_SETSOCKOPTERR);
 error_def(ERR_SOCKBFNOTEMPTY);
 error_def(ERR_SOCKNOTFND);
@@ -64,10 +67,7 @@ error_def(ERR_SOCKMAX);
 error_def(ERR_TEXT);
 error_def(ERR_TTINVFILTER);
 error_def(ERR_ZFF2MANY);
-error_def(ERR_DEVPARMNEG);
-error_def(ERR_DELIMWIDTH);
 error_def(ERR_ZINTRECURSEIO);
-error_def(ERR_MRTMAXEXCEEDED);
 
 void	iosocket_use(io_desc *iod, mval *pp)
 {

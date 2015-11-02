@@ -18,7 +18,7 @@
 #include "indir_enum.h"
 #include "cache.h"
 #include "op.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "valid_mname.h"
 
 GBLREF	symval			*curr_symval;

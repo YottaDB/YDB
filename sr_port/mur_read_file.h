@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,11 @@
 #ifndef MUR_READ_FILE_H_INCLUDED
 #define MUR_READ_FILE_H_INCLUDED
 
-#define MUR_BUFF_SIZE (DISK_BLOCK_SIZE * 256)
+#ifdef UNIX
+#  define MUR_BUFF_SIZE		(DISK_BLOCK_SIZE * 4096)
+#else
+#  define MUR_BUFF_SIZE		(DISK_BLOCK_SIZE * 256)
+#endif
 
 #if defined (MUR_USE_AIO) || defined(VMS)
 

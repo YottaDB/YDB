@@ -14,7 +14,7 @@
 #include "gtm_string.h"
 
 #include "cache.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "zbreak.h"
 #include "inst_flush.h"
 #include "private_code_copy.h"

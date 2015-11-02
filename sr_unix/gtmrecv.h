@@ -355,6 +355,7 @@ typedef struct
 	boolean_t	helpers;
 	boolean_t	reuse_specified;
 	boolean_t	resume_specified;
+	boolean_t	initialize_specified;
 	int4		resume_strm_num;
 	int4		n_readers;
 	int4		n_writers;

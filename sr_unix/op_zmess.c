@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,8 +18,11 @@
 #include "op.h"
 #include "mval2fao.h"
 #include "tp_restart.h"
+#include "gtmmsg.h"
 
 #define FAO_BUFFER_SPACE 2048
+
+error_def(ERR_TPRETRY);
 
 void op_zmess(unsigned int cnt, ...)
 {
@@ -31,17 +34,12 @@ void op_zmess(unsigned int cnt, ...)
 	unsigned int	errnum, j;
 	int		faocnt;
 
-	error_def(ERR_TPRETRY);
-
 	VAR_START(var, cnt);
 	errnum = va_arg(var, int);
 	cnt--;
 	if (ectl = err_check(errnum))
 	{
-		assert((errnum & FACMASK(ectl->facnum)) && (MSGMASK(errnum, ectl->facnum) <= ectl->msg_cnt));
-		j = MSGMASK(errnum, ectl->facnum);
-		eptr = ectl->fst_msg + j - 1;
-
+		GET_MSG_INFO(errnum, ectl, eptr);
 		faocnt = eptr->parm_count;
 		faocnt = (faocnt > MAX_FAO_PARMS ? MAX_FAO_PARMS : faocnt);
 		faocnt = mval2fao(eptr->msg, var, &fao[0], cnt, faocnt, buff, buff + SIZEOF(buff));

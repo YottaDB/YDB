@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,6 +61,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 
 	unsigned short			temp_ushort;
 	int4				temp_long;
+	int				tmp_cmpc;
 	int				blk_size, blk_seg_cnt, lmatch, rmatch, targ_len, prev_len, targ_base, next_rec_shrink,
 					temp_int, blkseglen;
 	bool				kill_root, first_copy;
@@ -187,7 +188,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		/* create index block */
 		BLK_ADDR(new_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 		new_rec_hdr->rsiz = SIZEOF(rec_hdr) + SIZEOF(block_id);
-		new_rec_hdr->cmpc = 0;
+		SET_CMPC(new_rec_hdr, 0);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, (bytptr)new_rec_hdr, SIZEOF(rec_hdr));
 		BLK_SEG(bs_ptr, (bytptr)&zeroes, SIZEOF(block_id));
@@ -220,13 +221,14 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	} else
 	{
 		targ_base = (rmatch < lmatch) ? rmatch : lmatch;
-		targ_len = ((right_extra) ? right_prev_ptr->cmpc : right_ptr->cmpc) - targ_base;
-		if (targ_len < 0)
-			targ_len = 0;
 		prev_len = 0;
 		if (right_extra)
 		{
-			temp_int = right_prev_ptr->cmpc - right_ptr->cmpc;
+			EVAL_CMPC2(right_prev_ptr, tmp_cmpc);
+			targ_len = tmp_cmpc - targ_base;
+			if (targ_len < 0)
+				targ_len = 0;
+			temp_int = tmp_cmpc - EVAL_CMPC(right_ptr);
 			if (0 >= temp_int)
 				prev_len = - temp_int;
 			else
@@ -236,6 +238,11 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				else
 					targ_len = 0;
 			}
+		} else
+		{
+			targ_len = EVAL_CMPC(right_ptr) - targ_base;
+			if (targ_len < 0)
+				targ_len = 0;
 		}
 		next_rec_shrink += targ_len + prev_len;
 	}
@@ -257,7 +264,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				first_copy = FALSE;
 			}
 			BLK_ADDR(star_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
-			star_rec_hdr->cmpc = 0;
+			SET_CMPC(star_rec_hdr, 0);
 			star_rec_hdr->rsiz = (unsigned short)(SIZEOF(rec_hdr) + SIZEOF(block_id));
 			BLK_SEG(bs_ptr, (bytptr)star_rec_hdr, SIZEOF(rec_hdr));
 			GET_USHORT(temp_ushort, &left_ptr->rsiz);
@@ -275,7 +282,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		} else
 		{
 			BLK_ADDR(new_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
-			new_rec_hdr->cmpc = right_ptr->cmpc - next_rec_shrink;
+			SET_CMPC(new_rec_hdr, EVAL_CMPC(right_ptr) - next_rec_shrink);
 			GET_USHORT(temp_ushort, &right_ptr->rsiz);
 			new_rec_hdr->rsiz = temp_ushort + next_rec_shrink;
 			BLK_SEG(bs_ptr, (bytptr)new_rec_hdr, SIZEOF(rec_hdr));

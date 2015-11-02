@@ -42,6 +42,7 @@
 #include "jnl_typedef.h"
 #include "gtmio.h"
 #include "gtmmsg.h"
+#include "anticipatory_freeze.h"
 #include "wcs_flu.h"	/* for wcs_flu() prototype */
 #include "wbox_test_init.h"
 
@@ -53,7 +54,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 
-error_def(ERR_PREMATEOF); /* for DO_FILE_WRITE */
+error_def(ERR_PREMATEOF); /* for JNL_DO_FILE_WRITE */
 error_def(ERR_JNLNOCREATE);
 error_def(ERR_JNLWRERR);
 error_def(ERR_JNLFSYNCERR);
@@ -238,16 +239,16 @@ uint4 mur_process_intrpt_recov()
 			jbp->prev_jrec_time = jctl->turn_around_time;
 		} else if (dba_bg == csd->acc_meth)
 		{	/* set earliest bt TN to be the turn-around TN (taken from bt_refresh()) */
-			((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn = cs_addrs->ti->curr_tn - 1;
+			SET_OLDEST_HIST_TN(cs_addrs, cs_addrs->ti->curr_tn - 1);
 		}
 #		else
 		if (dba_bg == csd->acc_meth)
 		{	/* set earliest bt TN to be the turn-around TN (taken from bt_refresh()) */
-			((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn = cs_addrs->ti->curr_tn - 1;
+			SET_OLDEST_HIST_TN(cs_addrs, cs_addrs->ti->curr_tn - 1);
 		}
 #		endif
 		csd->turn_around_point = FALSE;
-		assert(((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn == cs_addrs->ti->curr_tn - 1);
+		assert(OLDEST_HIST_TN(cs_addrs) == (cs_addrs->ti->curr_tn - 1));
 		/* In case this is MM and wcs_flu() remapped an extended database, reset rctl->csd */
 		assert((dba_mm == cs_data->acc_meth) || (rctl->csd == cs_data));
 		rctl->csd = cs_data;
@@ -325,7 +326,12 @@ uint4 mur_process_intrpt_recov()
 			}
 			if (jfh_changed)
 			{
-				DO_FILE_WRITE(jctl->channel, 0, jfh, REAL_JNL_HDR_LEN, jctl->status, jctl->status2);
+				/* Since overwriting the journal file header (an already allocated block
+				 * in the file) should not cause ENOSPC, we dont take the trouble of
+				 * passing csa or jnl_fn (first two parameters). Instead we pass NULL.
+				 */
+				JNL_DO_FILE_WRITE(NULL, NULL, jctl->channel, 0, jfh,
+					REAL_JNL_HDR_LEN, jctl->status, jctl->status2);
 				if (SS_NORMAL != jctl->status)
 				{
 					assert(FALSE);
@@ -338,16 +344,16 @@ uint4 mur_process_intrpt_recov()
 					return jctl->status;
 				}
 				UNIX_ONLY(
-				GTM_FSYNC(jctl->channel, jctl->status);
-				if (-1 == jctl->status)
-				{
-					jctl->status2 = errno;
-					assert(FALSE);
-					gtm_putmsg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2,
-						jctl->jnl_fn_len, jctl->jnl_fn,
-						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), jctl->status2);
-					return ERR_JNLFSYNCERR;
-				}
+					GTM_JNL_FSYNC(rctl->csa, jctl->channel, jctl->status);
+					if (-1 == jctl->status)
+					{
+						jctl->status2 = errno;
+						assert(FALSE);
+						gtm_putmsg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2,
+							jctl->jnl_fn_len, jctl->jnl_fn,
+							ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), jctl->status2);
+						return ERR_JNLFSYNCERR;
+					}
 				)
 			}
 			jfh_changed = FALSE;

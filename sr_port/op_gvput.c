@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,7 @@ void op_gvput(mval *var)
 		{
 			assert(gv_currkey->end + 1 <= gv_cur_region->max_key_size);
 			MV_FORCE_STR(var);
-			if (gv_currkey->end + 1 + var->str.len + SIZEOF(rec_hdr) <= gv_cur_region->max_rec_size)
+			if (VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +) var->str.len <= gv_cur_region->max_rec_size)
 			{
 				switch (gv_cur_region->dyn.addr->acc_meth)
 				{
@@ -94,8 +94,8 @@ void op_gvput(mval *var)
 			{
 				if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 					end = &buff[MAX_ZWR_KEY_SZ - 1];
-				rts_error(VARLSTCNT(10) ERR_REC2BIG, 4, gv_currkey->end + 1  + var->str.len + SIZEOF(rec_hdr),
-					  (int4)gv_cur_region->max_rec_size,
+				rts_error(VARLSTCNT(10) ERR_REC2BIG, 4, VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +)
+					  var->str.len, (int4)gv_cur_region->max_rec_size,
 					  REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, end - buff, buff);
 			}
 		} else

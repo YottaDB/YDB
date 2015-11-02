@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -118,7 +118,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 		 * 	store the STR_SUB_ESCAPE byte. Decrement the available space until it becomes zero
 		 *	at which point issue a GVSUBOFLOW error as well.
 		 */
-		avail_bytes = (out_key->top - MAX_NUM_SUBSC_LEN) - (out_key->end + tmp_len + 3);
+		avail_bytes = out_key->top - (out_key->end + tmp_len + 3);
 		if (0 > avail_bytes)
 			ISSUE_GVSUBOFLOW_ERROR(out_key);
 		if (0 < tmp_len)
@@ -150,7 +150,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 	}
 	/* Its a number, is it an integer? But before this assert that we have enough allocated space in the key
 	 * to store the maximum possible numeric subscript and two terminating 0s at the end of the key */
-	assert((MAX_NUM_SUBSC_LEN + 2) <= (int)(out_key->top - out_key->end));
+	assert((MAX_GVKEY_PADDING_LEN + 1) <= (int)(out_key->top - out_key->end));
 	if (mvt & MV_INT)
 	{	/* Yes, its an integer, convert it */
 		is_negative = FALSE;
@@ -296,10 +296,10 @@ FINI:
 	out_key->prev = out_key->end;
 	out_key->end = out_ptr - out_key->base;
 	/* Check if after adding the current subscript and the second terminating NULL byte, there is still
-	 * MAX_NUM_SUBSC_LEN bytes (allocated additionally as part of the DBKEYSIZE macro) left at the end.
+	 * MAX_GVKEY_PADDING_LEN bytes (allocated additionally as part of the DBKEYSIZE macro) left at the end.
 	 * If not, we have overflown the original max-key-size length. Issue error.
 	 */
-	if ((MAX_NUM_SUBSC_LEN + 1) >= (int)(out_key->top - out_key->end))
+	if ((MAX_GVKEY_PADDING_LEN + 1) > (int)(out_key->top - out_key->end))
 		ISSUE_GVSUBOFLOW_ERROR(out_key);
 	return out_ptr;
 }

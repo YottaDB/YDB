@@ -12,9 +12,9 @@
 #include "mdef.h"
 
 #include "opcode.h"
-#include "mdefsp.h"
+#include <mdefsp.h>
 #include "x86_64.h"
-#include "auto_zlink_sp.h"
+#include <auto_zlink_sp.h>
 #include "i386.h"
 
 GBLREF int4	rtnhdr_off, labaddr_off;

@@ -79,6 +79,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	unsigned char	curr_prev_key[MAX_KEY_SZ+1], new_blk1_last_key[MAX_KEY_SZ+1];
 	unsigned short  temp_ushort;
 	int		rec_size, new_ins_keycmpc, tkeycmpc, new_ances_currkeycmpc, old_ances_currkeycmpc;
+	int		tmp_cmpc;
 	block_index	left_index, right_index;
 	block_offset 	ins_off, ins_off2;
 	int		level;
@@ -106,7 +107,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 
 	BLK_ADDR(star_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 	star_rec_hdr->rsiz = BSTAR_REC_SIZE;
-	star_rec_hdr->cmpc = 0;
+	SET_CMPC(star_rec_hdr, 0);
 	level = cur_level;
 	max_fill = (0 == level)? d_max_fill : i_max_fill;
 
@@ -153,7 +154,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 
 	BLK_ADDR(new_rec_hdr1b, SIZEOF(rec_hdr), rec_hdr);
 	new_rec_hdr1b->rsiz = rec_size + tkeycmpc;
-	new_rec_hdr1b->cmpc = 0;
+	SET_CMPC(new_rec_hdr1b, 0);
 
 	/* Create new split piece, we already know that this will not be *-rec only.
 	 * Note that this has to be done BEFORE modifying working block as building this buffer relies on the
@@ -224,7 +225,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		rec_base = old_blk1_base + gv_target->hist.h[level].curr_rec.offset;
 		GET_RSIZ(rec_size, rec_base);
 		old_blk_after_currec = rec_base + rec_size;
-		old_ances_currkeycmpc = ((rec_hdr_ptr_t)rec_base)->cmpc;
+		old_ances_currkeycmpc = EVAL_CMPC((rec_hdr_ptr_t)rec_base);
 		old_ances_currkeylen = rec_size - BSTAR_REC_SIZE;
 		if (INVALID_RECORD(level, rec_size,  old_ances_currkeylen, old_ances_currkeycmpc))
 		{
@@ -323,7 +324,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 					newblk2_first_keysz = newblk2_first_keylen + tkeycmpc;
 					BLK_ADDR(new_rec_hdr2, SIZEOF(rec_hdr), rec_hdr);
 					new_rec_hdr2->rsiz = newblk2_first_keysz + BSTAR_REC_SIZE;
-					new_rec_hdr2->cmpc = 0;
+					SET_CMPC(new_rec_hdr2, 0);
 				}
 				else if (cdb_sc_starrecord != status || !new_rtblk_star_only)
 				{
@@ -358,7 +359,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 					there will be some records before new_ins_key, at least prev_rec */
 				delta = (int)(BSTAR_REC_SIZE + new_ins_keylen
 					- old_ances_currkeylen + new_ances_currkeylen
-					+ ((0 == new_ins_keycmpc) ? 0 : (((rec_hdr_ptr_t)new_blk2_frec_base)->cmpc)));
+					+ ((0 == new_ins_keycmpc) ? 0 : (EVAL_CMPC((rec_hdr_ptr_t)new_blk2_frec_base))));
 				if (SIZEOF(blk_hdr) + old_right_piece_len + delta <= blk_size - cs_data->reserved_bytes)
 				{
 					insert_in_left = FALSE;
@@ -392,10 +393,10 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			split_required = FALSE;
 		BLK_ADDR(new_rec_hdr1a, SIZEOF(rec_hdr), rec_hdr);
 		new_rec_hdr1a->rsiz = BSTAR_REC_SIZE + new_ins_keylen;
-		new_rec_hdr1a->cmpc = new_ins_keycmpc;
+		SET_CMPC(new_rec_hdr1a, new_ins_keycmpc);
 		BLK_ADDR(new_rec_hdr1b, SIZEOF(rec_hdr), rec_hdr);
 		new_rec_hdr1b->rsiz = BSTAR_REC_SIZE + new_ances_currkeylen;
-		new_rec_hdr1b->cmpc = new_ances_currkeycmpc;
+		SET_CMPC(new_rec_hdr1b, new_ances_currkeycmpc);
 		BLK_ADDR(bn_ptr1, SIZEOF(block_id), unsigned char);
 		/* child pointer of ances_currkey */
 		memcpy(bn_ptr1, old_blk1_base + gv_target->hist.h[level].curr_rec.offset +
@@ -594,7 +595,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		{
 			BLK_ADDR(root_hdr, SIZEOF(rec_hdr), rec_hdr);
 			root_hdr->rsiz = BSTAR_REC_SIZE + new_ins_keysz;
-			root_hdr->cmpc = 0;
+			SET_CMPC(root_hdr, 0);
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)root_hdr, SIZEOF(rec_hdr));
 			BLK_SEG(bs_ptr2, new_ins_key, new_ins_keysz);

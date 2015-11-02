@@ -12,7 +12,7 @@
 #ifndef INCR_LINK_SP_INCLUDED
 #define INCR_LINK_SP_INCLUDED
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include <elf.h>
 
 #define NATIVE_HDR_LEN	(SIZEOF(Elf64_Ehdr))

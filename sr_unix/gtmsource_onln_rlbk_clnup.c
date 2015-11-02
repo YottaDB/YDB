@@ -20,7 +20,7 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
@@ -77,7 +77,7 @@ void	gtmsource_onln_rlbk_clnup()
 		 */
 		gtmsource_local->gtmsource_state = gtmsource_state = GTMSOURCE_HANDLE_ONLN_RLBK;
 		if (!was_crit)
-			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK)
+			grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
 		/* We have to let the read files logic know that until we have sent data "upto" the current journal sequence number
 		 * at this point, we cannot rely on the journal pool. Indicate this through the gtmsource_save_read_jnl_seqno global
 		 * variable

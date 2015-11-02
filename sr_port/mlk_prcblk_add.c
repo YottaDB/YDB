@@ -42,25 +42,24 @@ void mlk_prcblk_add(gd_region *reg,
 			return;
 		}
 	}
-	if (!lcnt)
-	{
-		send_msg(VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, DB_LEN_STR(reg));
-		if (ctl->subtop > ctl->subfree)
-			send_msg(VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
-				 (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
-				 (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" not "));
-		else
-			send_msg(VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
-				 (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
-				 (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" "));
-		rts_error(VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, DB_LEN_STR(reg));
-	}
-	if (ctl->prccnt < 1)
-	{
+	if (1 > ctl->prccnt)
+	{	/* No process slot available. */
 		mlk_shrclean(reg, ctl, (mlk_shrblk_ptr_t)R2A(ctl->blkroot));
-		if (ctl->prccnt < 1)
+		if (1 > ctl->prccnt)
+		{	/* Process cleanup did not help. Issue error to syslog. */
+			send_msg(VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, DB_LEN_STR(reg));
+			if (ctl->subtop > ctl->subfree)
+				send_msg(VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
+					 (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
+					 (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" not "));
+			else
+				send_msg(VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
+					 (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
+					 (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" "));
 			return;
+		}
 	}
+	/* Process slot is available. Add process to the queue. */
 	ctl->prccnt--;
 	pr = (mlk_prcblk_ptr_t)R2A(ctl->prcfree);
 	if (0 == pr->next)

@@ -179,12 +179,12 @@ void wcs_recover(gd_region *reg)
 	assert((CDB_STAGNATE > t_tries) || TREF(ok_to_call_wcs_recover) || process_exiting);
 	assert(csa->now_crit || csd->clustered);
 	CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
-	SIGNAL_WRITERS_TO_STOP(csd);		/* to stop all active writers */
+	SIGNAL_WRITERS_TO_STOP(cnl);		/* to stop all active writers */
 	WAIT_FOR_WRITERS_TO_STOP(cnl, lcnt, MAXWTSTARTWAIT);
 	/* if the wait loop above hits the limit, or cnl->intent_wtstart goes negative, it is ok to proceed since
 	 * wcs_verify (invoked below) reports and clears cnl->intent_wtstart and cnl->in_wtstart.
 	 */
-	assert(!TREF(donot_write_inctn_in_wcs_recover) || in_mu_rndwn_file UNIX_ONLY(|| jgbl.onlnrlbk));
+	assert(!TREF(donot_write_inctn_in_wcs_recover) || in_mu_rndwn_file UNIX_ONLY(|| jgbl.onlnrlbk) || jgbl.mur_extract);
 	assert(!in_mu_rndwn_file || (0 == cnl->wcs_phase2_commit_pidcnt));
 	assert(!csa->wcs_pidcnt_incremented); /* we should never have come here with a phase2 commit pending for ourself */
 	/* Wait for any pending phase2 commits to finish */
@@ -575,6 +575,19 @@ void wcs_recover(gd_region *reg)
 			ADD_ENT_TO_ACTIVE_QUE_CNT(&cnl->wcs_active_lvl, &cnl->wc_var_lock);
 			continue;
 		}
+#if defined(DEBUG) && defined(UNIX)
+		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_DBDANGER == gtm_white_box_test_case_number))
+		{
+			gtm_wbox_input_test_case_count++;
+			/* 50 has no special meaning. Just to trigger this somewhere in the middle once. */
+			if (50 == gtm_wbox_input_test_case_count)
+			{
+				cr->blk = 0;
+				cr->dirty = 1;
+				cr->data_invalid = 1;
+			}
+		}
+#endif
 		if ((CR_BLKEMPTY == cr->blk) || (0 == cr->dirty) VMS_ONLY(|| ((0 != cr->iosb.cond) && (0 == cr->bt_index))))
 		{	/* cache record has no valid buffer attached, or its contents are in the database,
 			 * or it has a more recent twin so we don't even have to care how its write terminated */
@@ -795,7 +808,7 @@ void wcs_recover(gd_region *reg)
 		INCREMENT_CURR_TN(csd);
 	}
 	csa->wbuf_dqd = 0;	/* reset this so the wcs_wtstart below will work */
-	SIGNAL_WRITERS_TO_RESUME(csd);
+	SIGNAL_WRITERS_TO_RESUME(cnl);
 	in_wcs_recover = FALSE;
 	if (!reg->read_only)
 	{
@@ -828,7 +841,7 @@ void	wcs_mm_recover(gd_region *reg)
 	assert(cs_addrs->hdr == cs_data);
 	if (!(was_crit = cs_addrs->now_crit) && !(cs_addrs->hdr->clustered))
 		grab_crit(gv_cur_region);
-	SET_TRACEABLE_VAR(cs_addrs->hdr->wc_blocked, FALSE);
+	SET_TRACEABLE_VAR(cs_addrs->nl->wc_blocked, FALSE);
 	if (cs_addrs->total_blks == cs_addrs->ti->total_blks)
 	{
 		/* I am the one who actually did the extension, don't need to remap again */

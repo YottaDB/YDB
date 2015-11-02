@@ -14,7 +14,7 @@
 #include "gtm_string.h"
 #include <dlfcn.h>
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "real_len.h"	/* for COPY_DLERR_MSG */
 #include "lv_val.h"	/* needed for "fgncal.h" */
 #include "fgncal.h"

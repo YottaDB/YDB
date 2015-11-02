@@ -57,6 +57,7 @@
 #include "repl_sp.h"		/* for F_CLOSE (used by JNL_FD_CLOSE) */
 #include "have_crit.h"
 #include "gt_timer.h"
+#include "anticipatory_freeze.h"
 
 #if defined(VMS)
 #include "efn.h"
@@ -244,7 +245,7 @@ void fileheader_sync(gd_region *reg)
 #	elif defined(UNIX)
 	if (dba_mm != csd->acc_meth)
 	{
-		LSEEKWRITE(gds_info->fd, 0, (sm_uc_ptr_t)csd, flush_len, save_errno);
+		DB_LSEEKWRITE(csa, gds_info->fn, gds_info->fd, 0, (sm_uc_ptr_t)csd, flush_len, save_errno);
 		if (0 != save_errno)
 		{
 			rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
@@ -275,7 +276,7 @@ void fileheader_sync(gd_region *reg)
                         }
 		)
  		REGULAR_MSYNC_ONLY(
-			LSEEKWRITE(gds_info->fd, 0, csa->db_addrs[0], flush_len, save_errno);
+			DB_LSEEKWRITE(csa, gds_info->fn, gds_info->fd, 0, csa->db_addrs[0], flush_len, save_errno);
 			if (0 != save_errno)
 			{
 				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
@@ -389,6 +390,8 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	cw_set_element		*cs_ptr, *nxt;
 	off_chain		chain;
 	sm_uc_ptr_t		chain_ptr, db_addr[2];
+	GTM_SNAPSHOT_ONLY(boolean_t		is_in_gv_tree;)
+	GTM_SNAPSHOT_ONLY(boolean_t 	fast_integ_write = TRUE;)
 	GTM_SNAPSHOT_ONLY(
 		snapshot_context_ptr_t	lcl_ss_ctx;
 	)
@@ -563,7 +566,13 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	}
 #	ifdef GTM_SNAPSHOT
 	lcl_ss_ctx = SS_CTX_CAST(cs_addrs->ss_ctx);
-	if (SNAPSHOTS_IN_PROG(cs_addrs) && (NULL != cs->old_block))
+	is_in_gv_tree = (IN_GV_TREE == (cs->blk_prior_state & KEEP_TREE_STATUS));
+	/* For fast integ, do NOT write the data block in global variable tree to snapshot file for mmupdate
+         * Except in case the block was free or recycled
+         */
+	if (FASTINTEG_IN_PROG(lcl_ss_ctx))
+		fast_integ_write = !(0 == cs->level && is_in_gv_tree) || WAS_FREE(cs) || WAS_RECYCLED(cs);
+	if (SNAPSHOTS_IN_PROG(cs_addrs) && (NULL != cs->old_block) && fast_integ_write)
 		WRITE_SNAPSHOT_BLOCK(cs_addrs, NULL, db_addr[0], blkid, lcl_ss_ctx);
 	/* If snapshots are in progress then the current block better be before imaged in the snapshot file. The
 	 * only exception is when the current database transaction number is greater than the snapshot transaction
@@ -685,7 +694,8 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 		}
 #		elif !defined(NO_MSYNC)
 		udi = FILE_INFO(gv_cur_region);
-		LSEEKWRITE(udi->fd, (db_addr[0] - (sm_uc_ptr_t)cs_data), db_addr[0], cs_data->blk_size, save_errno);
+		DB_LSEEKWRITE(csa, udi->fn, udi->fd, (db_addr[0] - (sm_uc_ptr_t)cs_data),
+									db_addr[0], cs_data->blk_size, save_errno);
 		if (0 != save_errno)
 		{
 			gtm_putmsg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region),
@@ -780,7 +790,10 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	assertpro((0 <= blkid) && (blkid < csa->ti->total_blks));
 	INCR_DB_CSH_COUNTER(csa, n_bgmm_updates, 1);
 	bt = bt_put(gv_cur_region, blkid);
+#ifdef UNIX
 	GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_BTPUTNULL, bt, NULL);
+	GTM_WHITE_BOX_TEST(WBTEST_ANTIFREEZE_DBDANGER, bt, NULL);
+#endif
 	if (NULL == bt)
 	{
 		assert(gtm_white_box_test_case_enabled);
@@ -1193,8 +1206,8 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	assert((gds_t_acquired != mode) || (NULL != cs->old_block) || (GDSVCURR == cs->ondsk_blkver));
 	desired_db_format = csd->desired_db_format;
 	/* assert that appropriate inctn journal records were written at the beginning of the commit in t_end */
-	assert((inctn_blkupgrd_fmtchng != inctn_opcode) || (GDSV4 == cr->ondsk_blkver) && (GDSV5 == desired_db_format));
-	assert((inctn_blkdwngrd_fmtchng != inctn_opcode) || (GDSV5 == cr->ondsk_blkver) && (GDSV4 == desired_db_format));
+	assert((inctn_blkupgrd_fmtchng != inctn_opcode) || (GDSV4 == cr->ondsk_blkver) && (GDSV6 == desired_db_format));
+	assert((inctn_blkdwngrd_fmtchng != inctn_opcode) || (GDSV6 == cr->ondsk_blkver) && (GDSV4 == desired_db_format));
 	assert(!(JNL_ENABLED(csa) && csa->jnl_before_image) || !mu_reorg_nosafejnl
 		|| (inctn_blkupgrd != inctn_opcode) || (cr->ondsk_blkver == desired_db_format));
 	assert(!mu_reorg_upgrd_dwngrd_in_prog || (gds_t_acquired != mode));
@@ -1212,7 +1225,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	{	/* Some sort of state change in the block format is occuring */
 		switch(desired_db_format)
 		{
-			case GDSV5:
+			case GDSV6:
 				/* V4 -> V5 transition */
 				if (gds_t_write_recycled != mode)
 					DECR_BLKS_TO_UPGRD(csa, csd, 1);
@@ -1316,6 +1329,8 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	node_local_ptr_t        cnl;
 	enum gds_t_mode		mode;
 	cache_que_heads_ptr_t	cache_state;
+	GTM_SNAPSHOT_ONLY(boolean_t		is_in_gv_tree;) /*whether the block is in global variable tree*/
+	GTM_SNAPSHOT_ONLY(boolean_t 	fast_integ_write = TRUE;)
 #	if defined(VMS)
 	gv_namehead		*targ;
 	srch_blk_status		*blk_hist;
@@ -1370,14 +1385,20 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	 */
 	backup_cr = cr;
 	backup_blk_ptr = blk_ptr;
-	if (!cs->was_free) /* dont do before image write for backup for FREE blocks */
+	if (!WAS_FREE(cs)) /* dont do before image write for backup for FREE blocks */
 		BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved, si->backup_block_saved, ctn);
 #	endif
 	/* Update cr->ondsk_blkver to reflect the current desired_db_format. */
 	SET_ONDSK_BLKVER(cr, csd, ctn);
 #	ifdef GTM_SNAPSHOT
 	lcl_ss_ctx = SS_CTX_CAST(csa->ss_ctx);
-	if (SNAPSHOTS_IN_PROG(csa) && (NULL != cs->old_block))
+	is_in_gv_tree = (IN_GV_TREE == (cs->blk_prior_state & KEEP_TREE_STATUS));
+	/* For fast integ, do NOT write the data block  in global variable tree to snapshot file for bgupdate,
+         * except in case the block was free or recycled
+         */
+	if (FASTINTEG_IN_PROG(lcl_ss_ctx))
+		fast_integ_write = !(0 == cs->level && is_in_gv_tree) || WAS_FREE(cs) || WAS_RECYCLED(cs);
+	if (SNAPSHOTS_IN_PROG(csa) && (NULL != cs->old_block) && fast_integ_write)
 		WRITE_SNAPSHOT_BLOCK(csa, cr, NULL, blkid, lcl_ss_ctx);
 	/* If snapshots are in progress then the current block better be before imaged in the snapshot file. The
 	 * only exception is when the current database transaction number is greater than the snapshot transaction

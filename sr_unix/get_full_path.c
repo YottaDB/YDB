@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,27 +11,35 @@
 
 #include "mdef.h"
 
+#include <sys/param.h>
 #include <errno.h>
 #include "gtm_unistd.h"
 #include "gtm_string.h"
+#include "gtm_limits.h"
 
 #include "gdsroot.h"
 #include "gdsbt.h"
 
-/* gets the full path name for a given file name. Prepends the CWD, even if the file does not exist */
+error_def(ERR_FILENAMETOOLONG);
 
+/* gets the full path name for a given file name. Prepends the CWD, even if the file does not exist */
 boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, unsigned int *full_len, int max_len, uint4 *status)
 {
 	char	*cptr, *c1;
-	char	cwdbuf[MAX_FN_LEN + 1];
+	char	cwdbuf[GTM_PATH_MAX];
 	int	cwd_len;
 	int	i, length;
 	char	*getcwd_res;
-	error_def(ERR_FILENAMETOOLONG);
 
 	if ('/' == *orig_fn)
 	{
 		/* The original path is already complete */
+		if (max_len < orig_len)
+		{
+			*status = ERR_FILENAMETOOLONG;
+			return FALSE;
+
+		}
 		length = orig_len;
 		memcpy(full_fn, orig_fn, length);
 	} else
@@ -55,7 +63,7 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 			for (c1 = &cwdbuf[cwd_len - 1];  i > 0;  --i)
 				while ('/' != *c1)
 					--c1;
-			if ((length = (int)((c1 - cwdbuf) + orig_len - (cptr - orig_fn))) + 1 > max_len)
+			if ((length = (int)((c1 - cwdbuf) + orig_len - (cptr - orig_fn))) + 1 > max_len) /* Warning - assignment */
 			{
 				*status = ERR_FILENAMETOOLONG;
 				return FALSE;
@@ -66,7 +74,7 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 		{
 			if ('.' == *cptr && '/' == (*(cptr + 1)))
 				cptr += 2;
-			if ((length = (int)(cwd_len + 1 + orig_len - (cptr - orig_fn))) + 1 > max_len)
+			if ((length = (int)(cwd_len + 1 + orig_len - (cptr - orig_fn))) + 1 > max_len)	/* Warning - assignment */
 			{
 				*status = ERR_FILENAMETOOLONG;
 				return FALSE;

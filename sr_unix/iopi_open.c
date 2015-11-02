@@ -689,6 +689,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				in_d_rm->inbuf = d_rm->inbuf;
 				in_d_rm->outbuf = d_rm->outbuf;
 				in_d_rm->stderr_parent = iod;
+				in_d_rm->read_fildes = FD_INVALID; /* checked in iorm_get_bom to get correct file descriptor */
 			}
 			in_d_rm->pipe = TRUE;
 			io_ptr->type = rm;

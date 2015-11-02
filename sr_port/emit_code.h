@@ -12,7 +12,7 @@
 #ifndef EMIT_CODE_INCLUDED
 #define EMIT_CODE_INCLUDED
 
-#include "emit_code_sp.h"
+#include <emit_code_sp.h>
 
 #ifdef DEBUG
 void	emit_asmlist(triple *ct);

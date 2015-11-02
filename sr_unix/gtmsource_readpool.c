@@ -98,7 +98,8 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 				avail_data_qw = stop_read_at - read_addr;
 				assert(maxbufflen <= MAXPOSINT4); /* to catch the case of change in type of maxbufflen */
 				avail_data = (uint4)MIN(avail_data_qw, (qw_num)maxbufflen);
-				read_multiple = (first_tr_len < avail_data);
+				assert(next_read_seqno < next_histinfo_seqno);
+				read_multiple = (first_tr_len < avail_data) && ((next_read_seqno + 1) < next_histinfo_seqno);
 				if (read_multiple)
 					jnldata_len = avail_data;
 			}
@@ -126,7 +127,7 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 						)
 						next_read_seqno++;
 						assert(next_read_seqno <= next_histinfo_seqno);
-						if ((read_multiple) && (next_read_seqno < next_histinfo_seqno))
+						if (read_multiple)
 						{	/* Although stop_read_at - read_addr contains no partial transaction, it
 							 * is possible that stop_read_at - read_addr is more than maxbufflen, and
 							 * hence we read fewer bytes than stop_read_at - read_addr; scan what we

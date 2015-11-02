@@ -42,7 +42,7 @@
 /* The define of CHEXPAND below causes error.h to create GBLDEFs */
 #define CHEXPAND
 #include "error.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "ccp.h"
@@ -109,6 +109,7 @@
 #include "parse_file.h"		/* for MAX_FBUFF */
 #include "repl_sem.h"
 #include "gtm_zlib.h"
+#include "anticipatory_freeze.h"
 #endif
 
 #include "jnl_typedef.h"
@@ -123,6 +124,7 @@
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
+#include "gtm_conv.h"
 #endif
 
 # ifdef GTM_CRYPT
@@ -146,6 +148,7 @@ GBLDEF	sgmnt_addrs		*cs_addrs_list;	/* linked list of csa corresponding to all c
 
 GBLDEF	unsigned short	proc_act_type;
 GBLDEF	volatile bool	ctrlc_pending;
+GBLDEF	bool		undef_inhibit;
 GBLDEF	volatile int4	ctrap_action_is;
 GBLDEF	bool		out_of_time;
 GBLDEF	io_pair		io_curr_device;		/* current device	*/
@@ -323,7 +326,6 @@ GBLDEF	boolean_t	heartbeat_started;
 #endif
 
 /* DEFERRED EVENTS */
-GBLDEF	int		dollar_zmaxtptime = 0;
 GBLDEF	bool		licensed = TRUE;
 
 #if defined(UNIX)
@@ -351,6 +353,10 @@ GBLDEF	void			(*tp_timeout_action_ptr)(void) = tp_timeout_action_dummy;
 GBLDEF	void			(*ctrlc_handler_ptr)() = ctrlc_handler_dummy;
 GBLDEF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace) = op_open_dummy;
 GBLDEF	void			(*unw_prof_frame_ptr)(void) = unw_prof_frame_dummy;
+GBLDEF	void			(*heartbeat_timer_ptr)(void);	/* Initialized only in gtm_startup() */
+#ifdef UNICODE_SUPPORTED
+GBLDEF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
+#endif
 GBLDEF	boolean_t		mu_reorg_process;		/* set to TRUE by MUPIP REORG */
 GBLDEF	boolean_t		mu_reorg_in_swap_blk;		/* set to TRUE for the duration of the call to "mu_swap_blk" */
 GBLDEF	boolean_t		mu_rndwn_process;
@@ -366,7 +372,6 @@ GBLDEF	int			gtmsecshr_sockpath_len;
 GBLDEF	int			gtmsecshr_cli_sockpath_len;
 GBLDEF	mstr			gtmsecshr_pathname;
 GBLDEF	int			server_start_tries;
-GBLDEF	int			gtmsecshr_log_file;
 GBLDEF	int			gtmsecshr_sockfd = FD_INVALID;
 GBLDEF	boolean_t		gtmsecshr_sock_init_done;
 GBLDEF	char			muext_code[MUEXT_MAX_TYPES][2] =
@@ -433,9 +438,9 @@ GBLDEF	parmblk_struct 		*param_list; /* call-in parameters block (defined in uni
 GBLDEF	unsigned int		invocation_mode = MUMPS_COMPILE; /* how mumps has been invoked */
 GBLDEF	char			cli_err_str[MAX_CLI_ERR_STR] = "";   /* Parse Error message buffer */
 GBLDEF	char			*cli_err_str_ptr = NULL;
-GBLDEF	io_desc			*gtm_err_dev = NULL;
 GBLDEF	boolean_t		gtm_pipe_child = FALSE;
 #endif
+GBLDEF	io_desc			*gtm_err_dev = NULL;
 
 /* this array is indexed by file descriptor */
 GBLDEF	boolean_t		*lseekIoInProgress_flags = (boolean_t *)0;
@@ -690,7 +695,7 @@ LITDEF	boolean_t	jrt_is_replicated[JRT_RECTYPES] =
 #undef JNL_TABLE_ENTRY
 };
 /* Change the initialization if struct_jrec_tcom in jnl.h changes */
-GBLDEF	struct_jrec_tcom	tcom_record = {{JRT_TCOM, TCOM_RECLEN, 0, 0, 0},
+GBLDEF	struct_jrec_tcom	tcom_record = {{JRT_TCOM, TCOM_RECLEN, 0, 0, 0, 0},
 					0, 0, 0, 0, "", {TCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
 GBLDEF	jnl_gbls_t		jgbl;
 GBLDEF	short 		crash_count;
@@ -892,7 +897,6 @@ GBLDEF	boolean_t		dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */
 GBLDEF	int			socketus_interruptus;	/* How many times socket reads have been interrutped */
 
 GBLDEF	int4			pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
-
 GBLDEF	uint4	process_id;
 GBLDEF	uint4	image_count;	/* not used in UNIX but defined to preserve VMS compatibility */
 
@@ -916,6 +920,7 @@ GBLDEF	uint4			max_cache_entries;	/* Maximum number of cached indirect compilati
 GBLDEF  void            (*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
 UNIX_ONLY(GBLDEF ch_ret_type (*ht_rhash_ch)());         /* Function pointer to hashtab_rehash_ch */
 UNIX_ONLY(GBLDEF ch_ret_type (*jbxm_dump_ch)());        /* Function pointer to jobexam_dump_ch */
+UNIX_ONLY(GBLDEF ch_ret_type (*stpgc_ch)());		/* Function pointer to stp_gcol_ch */
 
 #ifdef VMS
 GBLDEF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
@@ -1136,3 +1141,17 @@ GBLDEF	boolean_t	gv_play_duplicate_kills;	/* A TRUE value implies KILLs of non-e
 GBLDEF	boolean_t	donot_fflush_NULL = FALSE;	/* Set to TRUE whenever we dont want gtm_putmsg to fflush(NULL). BYPASSOK
 							 * As of Jan 2012, mu_rndwn_all is the only user of this functionality.
 							 */
+
+GBLDEF	boolean_t	jnlpool_init_needed;		/* TRUE if jnlpool_init should be done at database init time */
+#ifdef UNIX
+GBLDEF	boolean_t	span_nodes_disallowed; 		/* Indicates whether spanning nodes are not allowed. For example,
+							 * they are not allowed for GT.CM OMI and GNP. */
+GBLDEF	boolean_t	argumentless_rundown;
+
+GBLDEF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
+GBLDEF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
+#endif
+
+GBLDEF	boolean_t	in_jnl_file_autoswitch;	/* set to TRUE for a short window inside jnl_file_extend when we are about to
+						 * autoswitch; used by jnl_write.
+						 */

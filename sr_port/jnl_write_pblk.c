@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		dse_running;
 
-void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer)
+void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer, uint4 com_csum)
 {
 	struct_jrec_blk		pblk_record;
 	int			tmp_jrec_size, jrec_size, zero_len;
@@ -51,7 +51,6 @@ void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer)
 	/* At this point jgbl.gbl_jrec_time should be set by the caller */
 	assert(jgbl.gbl_jrec_time);
 	pblk_record.prefix.time = jgbl.gbl_jrec_time;
-	pblk_record.prefix.checksum = cse->blk_checksum;
 	pblk_record.blknum = cse->blk;
 	/* in case we have a bad block-size, we dont want to write a PBLK larger than the GDS block size (maximum block size).
 	 * in addition, check that checksum computed in t_end/tp_tend did take the adjusted bsiz into consideration.
@@ -70,6 +69,7 @@ void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer)
 	blk_trailer.record_size = zero_len + JREC_SUFFIX_SIZE;
 	suffix = (jrec_suffix *)&local_buff[JNL_REC_START_BNDRY];
 	pblk_record.prefix.forwptr = suffix->backptr = jrec_size;
+	COMPUTE_PBLK_CHECKSUM(cse->blk_checksum, &pblk_record, com_csum, pblk_record.prefix.checksum);
 	suffix->suffix_code = JNL_REC_SUFFIX_CODE;
 	assert(SIZEOF(uint4) == SIZEOF(jrec_suffix));
 	jnl_write(jpc, JRT_PBLK, (jnl_record *)&pblk_record, buffer, &blk_trailer);

@@ -18,7 +18,6 @@
 #include "gtm_stdlib.h"
 #include "gtm_time.h"
 #include "gtm_stat.h"
-
 #include <stddef.h>
 #include <errno.h>
 
@@ -82,22 +81,22 @@
 #include "gtm_imagetype_init.h"
 #include "gtm_threadgbl_init.h"
 #include "fork_init.h"
-
+#include "gt_timers_add_safe_hndlrs.h"
+#include "wbox_test_init.h"
 #ifdef UNICODE_SUPPORTED
-#include "gtm_icu_api.h"
-#include "gtm_utf8.h"
+# include "gtm_icu_api.h"
+# include "gtm_utf8.h"
 #endif
+#include "continue_handler.h"
 
 #ifdef __osf__
-#pragma pointer_size (save)
-#pragma pointer_size (long)
+# pragma pointer_size (save)
+# pragma pointer_size (long)
 #endif
-
 GBLDEF char **gtmenvp;
 GBLREF char cli_err_str[];
-
 #ifdef __osf__
-#pragma pointer_size (restore)
+# pragma pointer_size (restore)
 #endif
 
 GBLREF FILE			*gtcm_errfs;
@@ -429,7 +428,7 @@ int main(int argc, char **argv, char **envp)
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;
 	getzdir();
-	sig_init(generic_signal_handler, null_handler, suspsigs_handler); /* should do be done before cmi_init */
+	sig_init(generic_signal_handler, null_handler, suspsigs_handler, continue_handler); /* should do be done before cmi_init */
 
 	/* Redefine handler for SIGHUP to switch log file */
 	memset(&act, 0, SIZEOF(act));
@@ -479,10 +478,9 @@ int main(int argc, char **argv, char **envp)
 	atexit(gtcm_exi_handler);
 	INVOKE_INIT_SECSHR_ADDRS;
 	initialize_pattern_table();
-
 	/* Pre-allocate some timer blocks. */
 	prealloc_gt_timers();
-
+	gt_timers_add_safe_hndlrs();
 	SET_LATCH_GLOBAL(&action_que.latch, LOCK_AVAILABLE);
 	mu_gv_cur_reg_init();
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
@@ -490,6 +488,7 @@ int main(int argc, char **argv, char **envp)
 	cs_addrs->nl = (node_local_ptr_t)malloc(SIZEOF(node_local));
 	memset((char *)cs_addrs->nl, 0, SIZEOF(node_local));
 	action_que_dummy_reg = gv_cur_region;
+	OPERATOR_LOG_MSG;
 	/* ... now we are ready! */
 	ntd_root->crq = gtcm_init_ast;
 	while (!cm_shutdown)

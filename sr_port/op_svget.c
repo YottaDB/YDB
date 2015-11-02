@@ -25,7 +25,7 @@
 #include "io.h"
 #include "iottdef.h"
 #include "jnl.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "svnames.h"
@@ -69,7 +69,6 @@ GBLREF mval		dollar_job;
 GBLREF uint4		dollar_zjob;
 GBLREF mval		dollar_zstatus;
 GBLREF mval		dollar_zstep;
-GBLREF int		dollar_zmaxtptime;
 GBLREF mval		dollar_zsource;
 GBLREF int4		dollar_zsystem;
 GBLREF int4		dollar_zeditor;
@@ -282,7 +281,7 @@ void op_svget(int varnum, mval *v)
 			*v = TREF(dollar_zmode);
 			break;
 		case SV_ZMAXTPTIME:
-			i2mval(v, dollar_zmaxtptime);
+			i2mval(v, TREF(dollar_zmaxtptime));
 			break;
 		case SV_ZPOS:
 			getzposition(v);

@@ -45,7 +45,8 @@ void	t_busy2free(srch_blk_status *blkhist)
 	cse->blk = blkhist->blk_num;
 	cse->old_block = blkhist->buffaddr;
 	old_block = (blk_hdr_ptr_t)cse->old_block;
-	cse->was_free = FALSE; /* t_busy2free operates on BUSY blocks and hence cse->was_free is set to FALSE unconditionally */
+	/* t_busy2free operates on BUSY blocks and hence cse->blk_prior_state's free status is set to FALSE unconditionally */
+	SET_NFREE(cse);
 	cse->blk_checksum = 0;
 	csa = cs_addrs;
 	assert(NULL != old_block);

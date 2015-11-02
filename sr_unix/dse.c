@@ -13,6 +13,7 @@
 #include "main_pragma.h"
 
 #include <signal.h>
+#include <stdarg.h>
 #include "gtm_inet.h"
 
 #include "mlkdef.h"
@@ -68,10 +69,14 @@
 #include "wbox_test_init.h"
 #include "gtmio.h"
 #include "have_crit.h"
+#include "gt_timers_add_safe_hndlrs.h"
+#include "continue_handler.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
+#include "gtm_conv.h"
+GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
 
 GBLREF gd_region		*gv_cur_region;
@@ -100,7 +105,6 @@ static void 		display_prompt(void);
 static readonly char	prompt[]="DSE> ";
 
 error_def(ERR_CTRLC);
-
 int main(int argc, char *argv[])
 {
 	DCL_THREADGBL_ACCESS;
@@ -115,8 +119,9 @@ int main(int argc, char *argv[])
 	op_open_ptr = op_open;
 	patch_curr_blk = get_dir_root();
 	err_init(util_base_ch);
+	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
-	sig_init(generic_signal_handler, dse_ctrlc_handler, suspsigs_handler);
+	sig_init(generic_signal_handler, dse_ctrlc_handler, suspsigs_handler, continue_handler);
 	atexit(util_exit_handler);
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	get_page_size();
@@ -126,6 +131,7 @@ int main(int argc, char *argv[])
 	INVOKE_INIT_SECSHR_ADDRS;
 	getzdir();
 	prealloc_gt_timers();
+	gt_timers_add_safe_hndlrs();
 	initialize_pattern_table();
 	gvinit();
 	region_init(FALSE);
@@ -136,6 +142,7 @@ int main(int argc, char *argv[])
 	cli_lex_setup(argc, argv);
 	CREATE_DUMMY_GBLDIR(gd_header, original_header, gv_cur_region, gd_map, gd_map_top);
 	gtm_chk_dist(argv[0]);
+	OPERATOR_LOG_MSG;
 #	ifdef DEBUG
 	if ((gtm_white_box_test_case_enabled && (WBTEST_SEMTOOLONG_STACK_TRACE == gtm_white_box_test_case_number) ))
 	{
@@ -144,6 +151,9 @@ int main(int argc, char *argv[])
 		csa = &FILE_INFO(gv_cur_region)->s_addrs;
 		cnl = csa->nl;
 		cnl->wbox_test_seq_num  = 1; /*Signal the first step and wait here*/
+		/* The signal to the shell. MUPIP must not start BEFORE DSE */
+		util_out_print("DSE is ready. MUPIP can start. Note: This message is a part of WBTEST_SEMTOOLONG_STACK_TRACE test. "
+			       "It will not appear in PRO version.", TRUE);
 		while (2 != cnl->wbox_test_seq_num) /*Wait for another process to get hold of the semaphore and signal next step*/
 			LONG_SLEEP(10);
 	}

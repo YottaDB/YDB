@@ -22,7 +22,6 @@
 
 #if defined(UNIX)
 #include "gtm_ipc.h"
-GBLREF uint4	user_id;
 #endif
 
 #include "gdsblk.h"
@@ -40,9 +39,8 @@ GBLREF uint4	user_id;
 #include "min_max.h"		/* needed for init_root_gv.h */
 #include "init_root_gv.h"
 #include "dse.h"
-
 #ifdef UNIX
-#include "mutex.h"
+# include "mutex.h"
 #endif
 #include "wcs_flu.h"
 #include <signal.h>		/* for VSIG_ATOMIC_T */

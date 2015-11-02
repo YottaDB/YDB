@@ -17,7 +17,7 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"
 #include "gvcst_protos.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "trigger.h"
@@ -197,11 +197,10 @@ int trigger_source_read_andor_verify(mstr *trigname, trigger_action trigger_op)
 			assert(CDB_STAGNATE >= t_tries);
 			assert(0 < t_tries);
 			assert((CDB_STAGNATE == t_tries) || (lcl_t_tries == t_tries - 1));
-			failure = t_fail_hist[t_tries - 1];
+			failure = LAST_RESTART_CODE;
 			assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure))
 				|| !gv_target || !gv_target->root);
-			assert(((cdb_sc_onln_rlbk1 != failure) && (cdb_sc_onln_rlbk2 != failure))
-				|| !IS_MCODE_RUNNING || TREF(dollar_zonlnrlbk));
+			assert((cdb_sc_onln_rlbk2 != failure) || TREF(dollar_zonlnrlbk));
 			if (cdb_sc_onln_rlbk2 == failure)
 				rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
 			/* else if (cdb_sc_onln_rlbk1 == status) we don't need to do anything other than proceeding with the next

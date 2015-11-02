@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@
 #include "jnl.h"
 #include "gdscc.h"
 #include "iosp.h"
-#include "mdefsp.h"
+#include <mdefsp.h>
 #include "ccp.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
@@ -105,6 +105,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	sgmnt_data_ptr_t	csd;
 	uint4			align_fill_size, jrec_size, tmp_jrec_size, update_length;
 	boolean_t		is_ztworm_rec = FALSE;
+	uint4			cursum;
 	DEBUG_ONLY(
 		static boolean_t	dbg_in_jnl_format = FALSE;
 	)
@@ -268,6 +269,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	rec->prefix.forwptr = jrec_size;
 	assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
 	rec->jrec_set_kill.update_num = jgbl.tp_ztp_jnl_upd_num;
+	rec->jrec_set_kill.num_participants = 0;
 	local_buffer = (char *)rec + FIXED_UPD_RECLEN;
 	mumps_node_ptr = local_buffer;
 	if (NULL != key)
@@ -326,7 +328,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 		SET_PREV_ZTWORM_JFB_IF_NEEDED(is_ztworm_rec, mumps_node_ptr);
 	}
 	/* The below call to jnl_get_checksum makes sure that checksum computation happens AFTER the encryption (if turned on) */
-	jfb->checksum = jnl_get_checksum((uint4 *)mumps_node_ptr, NULL, (int)(local_buffer - mumps_node_ptr));
+	jfb->checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)mumps_node_ptr, (int)(local_buffer - mumps_node_ptr));
 	assert(0 == ((UINTPTR_T)local_buffer % SIZEOF(jrec_suffix)));
 	DEBUG_ONLY(dbg_in_jnl_format = FALSE;)
 	return jfb;

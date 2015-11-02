@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "urx.h"
 
 GBLDEF urx_rtnref		urx_anchor;

@@ -15,7 +15,7 @@
 #include "error.h"
 #include "send_msg.h"
 #include "gtmmsg.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "hashtab_mname.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"

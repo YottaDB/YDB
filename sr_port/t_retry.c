@@ -41,6 +41,7 @@
 #include "wcs_backoff.h"
 #include "tp_restart.h"
 #include "gtm_ctype.h"		/* for ISALPHA_ASCII */
+#include "anticipatory_freeze.h"
 #ifdef GTM_TRIGGER
 #include "gtm_trigger_trc.h"
 #endif
@@ -50,11 +51,23 @@
 #include "gtmimagename.h"
 #include "wbox_test_init.h"
 #endif
-#ifdef ENABLE_EXTENDED_RESTART_TRACE_HIST
+#ifdef UNIX
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "caller_id.h"
 #endif
+
+/* In mu_reorg if we are in gvcst_bmp_mark_free, we actually have a valid gv_target. Find its root before the next iteration
+ * in mu_reorg.
+ */
+#define WANT_REDO_ROOT_SEARCH								\
+			(	(NULL != gv_target)					\
+			     && (DIR_ROOT != gv_target->root)				\
+			     && !redo_root_search_done					\
+			     && !TREF(in_gvcst_redo_root_search)			\
+			     && !mu_reorg_upgrd_dwngrd_in_prog				\
+			     && (!TREF(in_gvcst_bmp_mark_free) || mu_reorg_process)	\
+			)
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -67,6 +80,7 @@ GBLREF	tp_frame		*tp_pointer;
 GBLREF	trans_num		start_tn;
 GBLREF	unsigned char		cw_set_depth, cw_map_depth, t_fail_hist[CDB_MAX_TRIES];
 GBLREF	boolean_t		mu_reorg_process;
+GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			t_err;
 GBLREF	jnl_gbls_t		jgbl;
@@ -77,15 +91,17 @@ GBLREF	boolean_t		skip_INVOKE_RESTART;
 #endif
 
 #ifdef DEBUG
-GBLDEF	unsigned char		t_fail_hist_dbg[32];
+GBLDEF	unsigned char		t_fail_hist_dbg[T_FAIL_HIST_DBG_SIZE];
 GBLDEF	unsigned int		t_tries_dbg;
 GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	boolean_t		mupip_jnl_recover;
 #endif
 
 #ifdef UNIX
 GBLREF	boolean_t		is_updproc;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	sgmnt_addrs		*kip_csa;
+GBLREF	jnlpool_addrs		jnlpool;
 #endif
 
 #ifdef UNIX
@@ -106,17 +122,18 @@ void t_retry(enum cdb_sc failure)
 	short			tl;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
+	node_local_ptr_t	cnl;
 #	ifdef DEBUG
 	unsigned int		tries;
 #	endif
 	boolean_t		skip_invoke_restart;
 	boolean_t		redo_root_search_done = FALSE;
+	unsigned int		local_t_tries;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 #	ifdef GTM_TRIGGER
 	skip_invoke_restart = skip_INVOKE_RESTART;	/* note down global value in local variable */
-	skip_INVOKE_RESTART = FALSE;	/* reset global variable to default state as soon as possible */
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "t_retry: entered\n")));
 #	else
 	skip_invoke_restart = FALSE;	/* no triggers so set local variable to default state */
@@ -127,16 +144,12 @@ void t_retry(enum cdb_sc failure)
 	 * until the final retry which is why we accept this way of invoking t_retry. Assert accordingly.
 	 */
 	assert((cdb_sc_normal != failure) || mu_reorg_process);
-	/* The only reason online rollback ends up restarting is if some process set wc_blocked outside crit or the prior
-	 * transaction had commit errors and secshr_db_clnup set wc_blocked to TRUE. But, that's possible only if white box test
-	 * cases to induce Phase 1 and Phase 2 commit errors are set. So, assert accordingly
-	 */
-	UNIX_ONLY(assert(!jgbl.onlnrlbk || WB_COMMIT_ERR_ENABLED));
 	t_fail_hist[t_tries] = (unsigned char)failure;
 	if (mu_reorg_process)
 		CWS_RESET;
 	DEBUG_ONLY(TREF(donot_commit) = FALSE;)
 	csa = cs_addrs;
+	cnl = csa ? csa->nl : NULL;	/* making sure we do not try to dereference a NULL pointer */
 	if (!dollar_tlevel)
 	{
 #		ifdef DEBUG
@@ -146,21 +159,35 @@ void t_retry(enum cdb_sc failure)
 		t_fail_hist_dbg[t_tries_dbg++] = (unsigned char)failure;
 		TRACE_TRANS_RESTART(failure);
 #		endif
-		SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, failure);	/* set wc_blocked if cache related status */
+#		ifdef UNIX
+		if (cdb_sc_instancefreeze == failure)
+		{
+			assert(REPL_ALLOWED(csa->hdr)); /* otherwise, a cdb_sc_instancefreeze retry would not have been signalled */
+			WAIT_FOR_REPL_INST_UNFREEZE(csa);
+		}
+#		endif
+		/* Even though rollback and recover operate standalone, there are certain kind of restarts that can still happen
+		 * either due to whitebox test cases or stomping on our own buffers causing cdb_sc_lostcr/cdb_sc_rmisalign. Assert
+		 * accordingly
+		 */
+		assert(!mupip_jnl_recover || WB_COMMIT_ERR_ENABLED || (CDB_STAGNATE > t_tries));
+		SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, cnl, failure);	/* set wc_blocked if cache related status */
+		TREF(prev_t_tries) = t_tries;
+		TREF(rlbk_during_redo_root) = FALSE;
 		switch(t_tries)
 		{
 			case 0:
-				INCR_GVSTATS_COUNTER(csa, csa->nl, n_nontp_retries_0, 1);
+				INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_retries_0, 1);
 				break;
 			case 1:
-				INCR_GVSTATS_COUNTER(csa, csa->nl, n_nontp_retries_1, 1);
+				INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_retries_1, 1);
 				break;
 			case 2:
-				INCR_GVSTATS_COUNTER(csa, csa->nl, n_nontp_retries_2, 1);
+				INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_retries_2, 1);
 				break;
 			default:
 				assert(3 == t_tries);
-				INCR_GVSTATS_COUNTER(csa, csa->nl, n_nontp_retries_3, 1);
+				INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_retries_3, 1);
 				break;
 		}
 		if (csa->critical)
@@ -168,7 +195,7 @@ void t_retry(enum cdb_sc failure)
 		/* If the restart code is something that should not increment t_tries, handle that by decrementing t_tries
 		 * for these special codes just before incrementing it unconditionally. Note that this should be done ONLY IF
 		 * t_tries is CDB_STAGNATE or higher and not for lower values as otherwise it can cause livelocks (e.g.
-		 * because csa->hdr->wc_blocked is set to TRUE, it is possible we end up restarting with cdb_sc_helpedout
+		 * because cnl->wc_blocked is set to TRUE, it is possible we end up restarting with cdb_sc_helpedout
 		 * without even doing a cache-recovery (due to the fast path in t_end that does not invoke grab_crit in case
 		 * of read-only transactions). In this case, not incrementing t_tries causes us to eternally retry
 		 * the transaction with no one eventually grabbing crit and doing the cache-recovery).
@@ -188,16 +215,19 @@ void t_retry(enum cdb_sc failure)
 			 * (b) cdb_sc_jnlclose : journaling might get turned off in the final retry INSIDE crit while trying to
 			 *     flush journal buffer or during extending the journal file (due to possible disk issues) in which
 			 *     case we come here with t_tries = CDB_STAGNATE.
-			 * (c) cdb_sc_helpedout : csd->wc_blocked being TRUE as well as file extension in MM (both of which is
+			 * (c) cdb_sc_helpedout : cnl->wc_blocked being TRUE as well as file extension in MM (both of which is
 			 *     caused due to another process) can happen in final retry with failure status set to cdb_sc_helpedout
 			 * (d) cdb_sc_needcrit : See GTM-7004 for how this is possible and why only a max of one such restart
 			 *     per non-TP transaction is possible.
 			 * (e) cdb_sc_onln_rlbk[1,2] : See comment below as to why we allow online rollback related restarts even
 			 *     in the final retry.
+			 * (f) cdb_sc_instancefreeze : Instance freeze detected while crit held.
+			 * (g) cdb_sc_gvtrootmod2 : Similar to (e).
 			 */
 			if ((cdb_sc_jnlstatemod == failure) || (cdb_sc_jnlclose == failure) || (cdb_sc_helpedout == failure)
 					|| (cdb_sc_needcrit == failure) || (cdb_sc_onln_rlbk1 == failure)
-					|| (cdb_sc_onln_rlbk2 == failure))
+					|| (cdb_sc_onln_rlbk2 == failure) || (cdb_sc_instancefreeze == failure)
+					|| (cdb_sc_gvtrootmod2 == failure))
 			{
 				/* t_tries should never be greater than t_tries_dbg. The only exception is if this is DSE or online
 				 * rollback operates with t_tries = CDB_STAGNATE and restarts if wc_blocked is set outside crit.
@@ -207,7 +237,7 @@ void t_retry(enum cdb_sc failure)
 				assert((t_tries <= t_tries_dbg) UNIX_ONLY(|| (csa->hold_onto_crit && WB_COMMIT_ERR_ENABLED)));
 				/* Assert that the same kind of restart code can never occur more than once once we go to the
 				 * final retry. The only exception is cdb_sc_helpedout which can happen due to other processes
-				 * setting csd->wc_blocked to TRUE without holding crit.
+				 * setting cnl->wc_blocked to TRUE without holding crit.
 				 */
 				assert(failure == t_fail_hist_dbg[t_tries_dbg - 1]);
 				DEBUG_ONLY(
@@ -223,7 +253,7 @@ void t_retry(enum cdb_sc failure)
 			if (!csa->hold_onto_crit)
 				grab_crit(gv_cur_region);
 #			ifdef UNIX
-			if (csa->hdr->wc_blocked)
+			if (cnl->wc_blocked)
 			{	/* Possible ONLY for online rollback or DSE that grabs crit during startup and never grabs again.
 				 * In such cases grab_crit (such as above) is skipped. As a result wcs_recover is also skipped.
 				 * To avoid this, do wcs_recover if wc_blocked is TRUE. But, that's possible only if white box test
@@ -232,7 +262,7 @@ void t_retry(enum cdb_sc failure)
 				assert(csa->hold_onto_crit && WB_COMMIT_ERR_ENABLED);
 				wcs_recover(gv_cur_region);
 			}
-			if (csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle)
+			if (MISMATCH_ROOT_CYCLES(csa, cnl))
 			{	/* We came in to handle a different restart code in the penultimate retry and grab_crit before going
 				 * to final retry. As part of grabbing crit, we detected an online rollback. Although we could treat
 				 * this as just an online rollback restart and handle it by syncing cycles, but by doing so, we will
@@ -246,8 +276,13 @@ void t_retry(enum cdb_sc failure)
 				 * proceeds smoothly.
 				 */
 				RESET_ALL_GVT_CLUES;
-				gvcst_redo_root_search();
-				redo_root_search_done = TRUE;
+				cw_set_depth = 0;
+				cw_map_depth = 0;
+				if (WANT_REDO_ROOT_SEARCH)
+				{
+					gvcst_redo_root_search();
+					redo_root_search_done = TRUE;
+				}
 			}
 #			endif
 			assert(csa->now_crit);
@@ -268,8 +303,12 @@ void t_retry(enum cdb_sc failure)
 					&& (failure != cdb_sc_jnlstatemod) && (failure != cdb_sc_bkupss_statemod)
 					&& (failure != cdb_sc_inhibitkills));
 				assert(csa->now_crit);
+				local_t_tries = t_tries;
 				if (!csa->hold_onto_crit)
+				{
 					rel_crit(gv_cur_region);
+					t_tries = 0;
+				}
 				if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 					end = &buff[MAX_ZWR_KEY_SZ - 1];
 				if (cdb_sc_gbloflow == failure)
@@ -279,19 +318,23 @@ void t_retry(enum cdb_sc failure)
 					assert(ERR_GVPUTFAIL == t_err);
 					t_err = ERR_GVINCRFAIL;	/* print more specific error message */
 				}
-				UNIX_ONLY(send_msg(VARLSTCNT(9) t_err, 2, t_tries, t_fail_hist,
+				UNIX_ONLY(send_msg(VARLSTCNT(9) t_err, 2, local_t_tries, t_fail_hist,
 						   ERR_GVIS, 2, end-buff, buff, ERR_GVFAILCORE));
+#ifdef DEBUG
+				/* Core is not needed. We intentionally create this error. */
+				if (!gtm_white_box_test_case_enabled)
+#endif
 				UNIX_ONLY(gtm_fork_n_core());
-				VMS_ONLY(send_msg(VARLSTCNT(8) t_err, 2, t_tries, t_fail_hist,
+				VMS_ONLY(send_msg(VARLSTCNT(8) t_err, 2, local_t_tries, t_fail_hist,
 						   ERR_GVIS, 2, end-buff, buff));
-				rts_error(VARLSTCNT(8) t_err, 2, t_tries, t_fail_hist, ERR_GVIS, 2, end-buff, buff);
+				rts_error(VARLSTCNT(8) t_err, 2, local_t_tries, t_fail_hist, ERR_GVIS, 2, end-buff, buff);
 			}
 		}
-		if ((cdb_sc_blockflush == failure) && !CCP_SEGMENT_STATE(csa->nl, CCST_MASK_HAVE_DIRTY_BUFFERS))
+		if ((cdb_sc_blockflush == failure) && !CCP_SEGMENT_STATE(cnl, CCST_MASK_HAVE_DIRTY_BUFFERS))
 		{
 			assert(csa->hdr->clustered);
 			CCP_FID_MSG(gv_cur_region, CCTR_FLUSHLK);
-			ccp_userwait(gv_cur_region, CCST_MASK_HAVE_DIRTY_BUFFERS, 0, csa->nl->ccp_cycle);
+			ccp_userwait(gv_cur_region, CCST_MASK_HAVE_DIRTY_BUFFERS, 0, cnl->ccp_cycle);
 		}
 		cw_set_depth = 0;
 		cw_map_depth = 0;
@@ -300,19 +343,6 @@ void t_retry(enum cdb_sc failure)
 		 */
 		GTMTRIG_ONLY(csa->db_trigger_cycle = csa->hdr->db_trigger_cycle);
 		GTMTRIG_ONLY(DBGTRIGR((stderr, "t_retry: csa->db_trigger_cycle updated to %d\n", csa->db_trigger_cycle)));
-#		ifdef GTM_TRUNCATE
-		/* t_end restarts any transaction that may have acquired blocks beyond total_blks when a concurrent truncate
-		 * occurred. The private copy csa->total_blks can be interpreted as the upper bound for acquired blocks.
-		 * Resync private and shared copies of total_blks here to cover the next retry. We do this here instead of
-		 * in t_end before bm_getfree because mu_swap_blk can acquire its own blocks. Essentially, truncate
-		 * detection spans from the syncing of total_blks here (or db_init or tp_set_sgm) to when total_blks are checked
-		 * in t_end.
-		 * csa->total_blks can increase (see gdsfilext)
-		 * csa->ti->total_blks can increase (gdsfilext) or decrease (mu_truncate)
-		 */
-		if (dba_mm != csa->hdr->acc_meth)
-			csa->total_blks = csa->ti->total_blks;
-#		endif
 		start_tn = csa->ti->curr_tn;
 		/* Note: If gv_target was NULL before the start of a transaction and the only operations done inside the transaction
 		 * are trigger deletions causing bitmap free operations which got restarted due to a concurrent update, we can
@@ -323,9 +353,10 @@ void t_retry(enum cdb_sc failure)
 #		ifdef UNIX
 		if ((cdb_sc_onln_rlbk1 == failure) || (cdb_sc_onln_rlbk2 == failure))
 		{	/* restarted due to online rollback */
-			RESET_ALL_GVT_CLUES;
-			if (!TREF(only_reset_clues_if_onln_rlbk))
-			{
+			if (!redo_root_search_done)
+				RESET_ALL_GVT_CLUES;
+			if (!TREF(in_gvcst_bmp_mark_free) || mu_reorg_process)
+			{	/* Handle cleanup beyond just resetting clues */
 				if (cdb_sc_onln_rlbk2 == failure)
 				{
 					if (IS_MCODE_RUNNING || TREF(issue_DBROLLEDBACK_anyways))
@@ -341,15 +372,12 @@ void t_retry(enum cdb_sc failure)
 						 * KILL. So, assert that kip_csa is still NULL
 						 */
 						assert(NULL == kip_csa);
-						need_kip_incr = FALSE; /* reset so the next transaction does not see stale values */
 						rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
 					}
 				}
-				if ((NULL != gv_target) && (DIR_ROOT != gv_target->root))
-				{
-					assert(!redo_root_search_done);	/* assert we dont invoke this twice inside t_retry */
+				assert(!redo_root_search_done);
+				if (WANT_REDO_ROOT_SEARCH)
 					gvcst_redo_root_search();
-				}
 				if (is_updproc)
 					rts_error(VARLSTCNT(1) ERR_REPLONLNRLBK);
 			}
@@ -377,6 +405,22 @@ void t_retry(enum cdb_sc failure)
 			if (!redo_root_search_done && (NULL != gv_target) && (DIR_ROOT != gv_target->root))
 				gvcst_redo_root_search();
 		}
+		if (cdb_sc_gvtrootmod2 == failure)
+		{
+			if (!redo_root_search_done)
+				RESET_ALL_GVT_CLUES;
+			/* It is possible for a read-only transaction to release crit after detecting gvtrootmod2, during which time
+			 * yet another root block could have moved. In that case, the MISMATCH_ROOT_CYCLES check would have
+			 * already done the redo_root_search.
+			 */
+			assert(!redo_root_search_done || !update_trans);
+			if (WANT_REDO_ROOT_SEARCH)
+			{	/* Note: An online rollback can occur DURING gvcst_redo_root_search, which can remove gbls from db,
+				 * leading to gv_target->root being 0, even though failure code is not cdb_sc_onln_rlbk2
+				 */
+				gvcst_redo_root_search();
+			}
+		}
 #		endif
 	} else
 	{	/* for TP, do the minimum; most of the logic is in tp_retry, because it is also invoked directly from t_commit */
@@ -384,10 +428,10 @@ void t_retry(enum cdb_sc failure)
 		assert((NULL == csa) || (NULL != csa->hdr));	/* both csa and csa->hdr should be NULL or non-NULL. */
 		if (NULL != csa)
 		{
-			SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, failure);
-			TP_RETRY_ACCOUNTING(csa, csa->nl, failure);
-		} else /* csa can be NULL if retry in op_lock2 (cdb_sc_needlock) or if cur_reg is not open yet (cdb_sc_needcrit) */
-			assert((CDB_STAGNATE == t_tries) && ((cdb_sc_needlock == failure) || (cdb_sc_needcrit == failure)));
+			SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, cnl, failure);
+			TP_RETRY_ACCOUNTING(csa, cnl);
+		} else /* csa can be NULL if cur_reg is not open yet (cdb_sc_needcrit) */
+			assert((CDB_STAGNATE == t_tries) && (cdb_sc_needcrit == failure));
 		if (NULL != gv_target)
 		{
 			if (cdb_sc_blkmod != failure)

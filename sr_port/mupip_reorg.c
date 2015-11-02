@@ -76,6 +76,8 @@ error_def(ERR_NOEXCLUDE);
 error_def(ERR_REORGCTRLY);
 error_def(ERR_REORGINC);
 
+GTMTRIG_ONLY(LITREF mval		literal_hasht;)
+
 GBLREF bool		mu_ctrlc_occurred;
 GBLREF bool		mu_ctrly_occurred;
 GBLREF boolean_t	mu_reorg_process;
@@ -88,6 +90,7 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF uint4		process_id;
 GBLREF tp_region	*grlist;
 GBLREF bool		error_mupip;
+GBLREF	boolean_t	jnlpool_init_needed;
 
 void mupip_reorg(void)
 {
@@ -99,6 +102,8 @@ void mupip_reorg(void)
 	uint4			cli_status;
 	unsigned short		n_len;
 	boolean_t		truncate, cur_success, restrict_reg, arg_present;
+	int			root_swap_statistic;
+	mval			gn;
 #	ifdef GTM_TRUNCATE
 	int4			truncate_percent;
 	boolean_t		gotlock;
@@ -111,6 +116,7 @@ void mupip_reorg(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	jnlpool_init_needed = TRUE;
 	mu_outofband_setup();
 	truncate = FALSE;
 	GTM_TRUNCATE_ONLY(
@@ -232,10 +238,13 @@ void mupip_reorg(void)
 	}
 	TREF(want_empty_gvts) = FALSE;
 
+	root_swap_statistic = 0;
 	mu_reorg_process = TRUE;
 	assert(NULL == gv_currkey_next_reorg);
 	GVKEY_INIT(gv_currkey_next_reorg, DBKEYSIZE(MAX_KEY_SZ));
 	reorg_gv_target = targ_alloc(MAX_KEY_SZ, NULL, NULL);
+	reorg_gv_target->hist.depth = 0;
+	reorg_gv_target->alt_hist->depth = 0;
 	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
 	{
 		util_out_print("   ", FLUSH);
@@ -246,15 +255,21 @@ void mupip_reorg(void)
 			reorg_success = FALSE;
 			continue;
 		}
+		/* Save the global name in reorg_gv_target. Via gv_currkey_next_reorg, it's possible for gv_currkey to become
+		 * out of sync with gv_target. We'll use reorg_gv_target->gvname to make sure the correct root block is found.
+		 */
+		reorg_gv_target->gvname.var_name.addr = gl_ptr->name.str.addr;
+		reorg_gv_target->gvname.var_name.len = gl_ptr->name.str.len;
 		cur_success = mu_reorg(&gl_ptr->name, &exclude_gl_head, &resume, index_fill_factor, data_fill_factor, reorg_op);
 		reorg_success &= cur_success;
+		SET_GV_CURRKEY_FROM_REORG_GV_TARGET;
 #		ifdef GTM_TRUNCATE
+		if (truncate)
+			/* No need to move root blocks unless truncating */
+			cur_success &= mu_swap_root(&gl_ptr->name, &root_swap_statistic);
 		/* if we successfully reorged this global, add its corresponding region to the set (list) of regions to truncate */
 		if (cur_success)
 		{
-			/* insert gv_cur_region into set */
-			/* in the future, might give REORG a region option... keep that in mind */
-			/* Prepare a list of regions for truncate to work on */
 			for (reg_iter = reg_list, prev_reg = reg_list; reg_iter; reg_iter = reg_iter->next)
 				if (reg_iter->reg == gv_cur_region)
 					break;
@@ -269,6 +284,21 @@ void mupip_reorg(void)
 					reg_list = tmp_reg;
 				else
 					prev_reg->next = tmp_reg;
+#				ifdef GTM_TRIGGER
+				if (truncate)
+				{	/* Reorg ^#t in this region to move it out of the way. */
+					gn = literal_hasht;
+					util_out_print("   ", FLUSH);
+					util_out_print("Global: !AD (region !AD)", FLUSH,
+							gn.str.len, gn.str.addr, REG_LEN_STR(gv_cur_region));
+					reorg_gv_target->gvname.var_name.addr = gn.str.addr;
+					reorg_gv_target->gvname.var_name.len = gn.str.len;
+					reorg_success &= mu_reorg(&gn, &exclude_gl_head, &resume, index_fill_factor,
+							data_fill_factor, reorg_op);
+					SET_GV_CURRKEY_FROM_REORG_GV_TARGET;
+					reorg_success &= mu_swap_root(&gn, &root_swap_statistic);
+				}
+#				endif
 			}
 		}
 #		endif
@@ -286,6 +316,7 @@ void mupip_reorg(void)
 	else if (truncate)
 	{
 #		ifdef GTM_TRUNCATE
+		util_out_print("Total root blocks moved: !UL", FLUSH, root_swap_statistic);
 		mu_reorg_process = FALSE;
 		/* Default threshold is 0 i.e. we attempt to truncate no matter what free_blocks is. */
 		truncate_percent = 0;

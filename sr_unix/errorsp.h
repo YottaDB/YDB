@@ -20,17 +20,34 @@
 #  define GTMCORENAME "gtmcore"
 #endif
 
-/* Define maximum condition handlers. For utilities that do not use triggers (dse, lke, and such) we
-   only need a basic number of condition handlers. But if triggers are supported, not only the GT.M
-   runtime but MUPIP and the GTCM servers too need to be able to nest which means several triggers
-   per allowed level plus extra handlers for that last level.
-*/
-#define MAX_HANDLERS 15		/* should be enough for dse/lke etc. */
-#ifdef GTM_TRIGGER
-#  define MAX_MUMPS_HANDLERS (MAX_HANDLERS + 20 + 15 + (GTM_TRIGGER_DEPTH_MAX * 2))	/* Allow for callins plus many trigr lvls */
+/* Condition handler stack definitions:
+ *
+ * Global: chnd      - Base of condition handler stack.
+ *         chnd_end  - Top of condition handler stack.
+ *	   chnd_incr - Increment for next expansion.
+ *         ctxt	     - Top condition handler stack currently in use.
+ *         active_ch - Top of the inactive (i.e. available for invocation) condition handler stack.
+ *
+ * Note that START_CH used at the top of every condition handler defined "current_ch" as a stack variable
+ * (i.e. "automatic" variable in some lingos). The current_ch var in a given (C) frame always points to the
+ * condition handler entry active for that frame because active_ch can change in a nested handler situation.
+ * Note also that current_ch has the form of an index into the condition handler array because the stack
+ * can be extended via re-allocation.
+ *
+ * Condition handler stack starts off at a modest CONDSTK_INITIAL_INCR frames. If needed, (to cover trigger
+ * and/or spanning node stack frames which nest handlers), it can expand up to MAX_CON
+ *
+ * Note, if ever call-ins fully support TP processing such that each trigger frame could have it's own callin
+ * in addition to the other handlers for each trigger frame, the maximums may need to be re-visited.
+ */
+#ifdef DEBUG
+#  define CONDSTK_INITIAL_INCR	2	/* Low initial limit for DEBUG to exercise extensions */
 #else
-#  define MAX_MUMPS_HANDLERS (MAX_HANDLERS + 20)					/* to allow upto 10 nested callin lvls */
+#  define CONDSTK_INITIAL_INCR	8	/* Initial increment value used when expanding condition handler stack */
 #endif
+#define CONDSTK_MAX_INCR	128	/* Increment doubles each time expanded till hits this level */
+#define CONDSTK_MAX_STACK	512	/* Actual max is approx 504 due to arithmetic progression */
+#define CONDSTK_RESERVE		3	/* Reserve 2 frames for when process_exiting */
 
 #define CONDITION_HANDLER(name)	ch_ret_type name(int arg)
 
@@ -40,29 +57,31 @@
 typedef void	ch_ret_type;
 typedef struct condition_handler_struct
 {
-	struct condition_handler_struct	*save_active_ch;
-	boolean_t			ch_active;
-	ch_ret_type			(*ch)();
-	jmp_buf				jmp;
+	struct condition_handler_struct	*save_active_ch;	/* -> Previous active condition handler */
+	boolean_t			ch_active;		/* True when *THIS* condition handler is active (not usable) */
+	ch_ret_type			(*ch)();		/* Condition handler address */
+	jmp_buf				jmp;			/* setjmp/longjmp buffer associated with ESTABLISH point */
 } condition_handler;
 
 /* The values below usually expand as GBLREF. If CHEXPAND is defined, they will
-   expand as GBLDEF instead (as it does in err_init.c) */
+ * expand as GBLDEF instead (as it does in gbldefs.c).
+ */
 #ifdef CHEXPAND
 #  define GBLEXP GBLDEF
 #else
 #  define GBLEXP GBLREF
 #endif
 GBLEXP condition_handler	*chnd, *ctxt, *active_ch, *chnd_end;
-GBLEXP int4			severity;
+GBLEXP int			severity, chnd_incr;
 
 /* Don't do these GBLREFs if doing above GBLDEFs as this means we are in gbldefs.c where the below
-   are also defined so a REF is likely to cause problems */
+ * are also defined so a REF is likely to cause problems.
+ */
 #ifndef CHEXPAND
 GBLREF int4			error_condition;
-GBLREF char 			util_outbuff[];
 GBLREF err_ctl			merrors_ctl;
 GBLREF void			(*restart)();
+GBLREF int			process_exiting;
 #endif
 
 #define WARNING		0
@@ -73,8 +92,8 @@ GBLREF void			(*restart)();
 #define SEV_MSK		7
 
 #define IS_GTM_ERROR(err) ((err & FACMASK(merrors_ctl.facnum))  &&  (MSGMASK(err, merrors_ctl.facnum) <= merrors_ctl.msg_cnt))
-#define CHECKHIGHBOUND(hptr)  assert(chnd_end > hptr);
-#define CHECKLOWBOUND(hptr)   assert(hptr >= (&chnd[0] - 1));
+#define CHECKHIGHBOUND(hptr)  assert(hptr < (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))
+#define CHECKLOWBOUND(hptr)   assert(hptr >= (&chnd[0] - 1)) /* Low check for chnd - 1 in case last handler setup new handler */
 
 #define SIGNAL		error_condition
 #define SEVERITY	severity
@@ -112,7 +131,7 @@ void ch_trace_point() {return;}
  * two flavors depending on if triggers are enabled or not.
  */
 #ifdef GTM_TRIGGER
-/* Note the 2nd assert makes sure we are NOT returning to a trigger-invoking frame which does not have a valid msp to
+/* Note the 3rd assert makes sure we are NOT returning to a trigger-invoking frame which does not have a valid msp to
  * support a return since a call to op_gvput or op_kill does not save a return addr in the M stackframe but only in the C
  * stackframe. But if proc_act_type is non-zero we set an error frame flag and getframe instead detours to
  * error_return which deals with the module appropriately.
@@ -123,10 +142,12 @@ void ch_trace_point() {return;}
 																\
 					assert(!process_exiting);								\
                                         CHTRACEPOINT;										\
-					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--)	; 		\
-					assert(ctxt->ch == &mdb_condition_handler && FALSE == ctxt->save_active_ch->ch_active);	\
+					for ( ;(ctxt > &chnd[0]) && (ctxt->ch != &mdb_condition_handler); ctxt--);		\
+					CHECKLOWBOUND(ctxt);									\
+					assert((ctxt->ch == &mdb_condition_handler)						\
+					       && (FALSE == ctxt->save_active_ch->ch_active));					\
 					/* Absolutely critical that this *never* occur hence assertpro() */			\
-					assertpro(!(SFF_TRIGR_CALLD & frame_pointer->flags) || (0 != proc_act_type)		\
+					assertpro(!(SFF_IMPLTSTART_CALLD & frame_pointer->flags) || (0 != proc_act_type)	\
 						  || (SFF_ETRAP_ERR & frame_pointer->flags));					\
 					DBGEHND((stderr, "MUM_TSTART: Frame 0x"lvaddr" dispatched\n", frame_pointer));		\
                                         ctxt->ch_active = FALSE; 								\
@@ -140,8 +161,10 @@ void ch_trace_point() {return;}
 																\
 					assert(!process_exiting);								\
                                         CHTRACEPOINT;										\
-					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--)	; 		\
-					assert(ctxt->ch == &mdb_condition_handler && FALSE == ctxt->save_active_ch->ch_active);	\
+					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--); 			\
+					CHECKLOWBOUND(ctxt);									\
+					assert((ctxt->ch == &mdb_condition_handler)						\
+					       && (FALSE == ctxt->save_active_ch->ch_active));					\
 					DBGEHND((stderr, "MUM_TSTART: Frame 0x"lvaddr" dispatched\n", frame_pointer));		\
                                         ctxt->ch_active = FALSE; 								\
 					restart = mum_tstart;									\
@@ -150,67 +173,88 @@ void ch_trace_point() {return;}
 				}
 #endif
 
-
-#define ESTABLISH_RET(x,ret)	{					\
-                                        CHTRACEPOINT;			\
-					ctxt++;				\
-                                        CHECKHIGHBOUND(ctxt);		\
-                                        ctxt->save_active_ch = active_ch; \
-                                        ctxt->ch_active = FALSE;	\
-					active_ch = ctxt;		\
-					ctxt->ch = x;			\
-					if (setjmp(ctxt->jmp) == -1)	\
-					{				\
-						REVERT;			\
-						return ret;		\
-					}				\
+#define ESTABLISH_RET(x, ret)	{										\
+                                        CHTRACEPOINT;								\
+					ctxt++;									\
+					if (ctxt >= (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))	\
+						condstk_expand();						\
+                                        CHECKHIGHBOUND(ctxt);							\
+                                        ctxt->save_active_ch = active_ch;					\
+                                        ctxt->ch_active = FALSE;						\
+					active_ch = ctxt;							\
+					ctxt->ch = x;								\
+					if (setjmp(ctxt->jmp) == -1)						\
+					{									\
+						REVERT;								\
+						return ret;							\
+					}									\
 				}
 
 #ifdef __cplusplus  /* must specify return value (if any) for C++ */
-#define ESTABLISH(x,ret)	{					\
-                                        CHTRACEPOINT;			\
-					ctxt++;				\
-                                        CHECKHIGHBOUND(ctxt);		\
-                                        ctxt->save_active_ch = active_ch; \
-                                        ctxt->ch_active = FALSE;	\
-					active_ch = ctxt;		\
-					ctxt->ch = x;			\
-					if (setjmp(ctxt->jmp) == -1)	\
-					{				\
-						REVERT;			\
-						return ret;		\
-					}				\
+#define ESTABLISH(x, ret)	{										\
+                                        CHTRACEPOINT;								\
+					ctxt++;									\
+					if (ctxt >= (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))	\
+						condstk_expand();						\
+                                        CHECKHIGHBOUND(ctxt);							\
+                                        ctxt->save_active_ch = active_ch;					\
+                                        ctxt->ch_active = FALSE;						\
+					active_ch = ctxt;							\
+					ctxt->ch = x;								\
+					if (setjmp(ctxt->jmp) == -1)						\
+					{									\
+						REVERT;								\
+						return ret;							\
+					}									\
 				}
 #else
-#define ESTABLISH(x)		{					\
-                                        CHTRACEPOINT;			\
-					ctxt++;				\
-                                        CHECKHIGHBOUND(ctxt);		\
-                                        ctxt->save_active_ch = active_ch; \
-                                        ctxt->ch_active = FALSE;	\
-					active_ch = ctxt;		\
-					ctxt->ch = x;			\
-					if (setjmp(ctxt->jmp) == -1)	\
-					{				\
-						REVERT;			\
-						return;			\
-					}				\
+#define ESTABLISH(x)		{										\
+                                        CHTRACEPOINT;								\
+					ctxt++;									\
+					if (ctxt >= (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))	\
+						condstk_expand();						\
+                                        CHECKHIGHBOUND(ctxt);							\
+                                        ctxt->save_active_ch = active_ch;					\
+                                        ctxt->ch_active = FALSE;						\
+					active_ch = ctxt;							\
+					ctxt->ch = x;								\
+					if (setjmp(ctxt->jmp) == -1)						\
+					{									\
+						REVERT;								\
+						return;								\
+					}									\
+				}
+#define ESTABLISH_NORET(x, did_long_jump)	{								\
+					did_long_jump = FALSE;							\
+                                        CHTRACEPOINT;								\
+					ctxt++;									\
+					if (ctxt >= (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))	\
+						condstk_expand();						\
+                                        CHECKHIGHBOUND(ctxt);							\
+                                        ctxt->save_active_ch = active_ch;					\
+                                        ctxt->ch_active = FALSE;						\
+					active_ch = ctxt;							\
+					ctxt->ch = x;								\
+					if (setjmp(ctxt->jmp) == -1)						\
+						did_long_jump = TRUE;						\
 				}
 #endif
 
-#define REVERT			{					\
-                                        CHTRACEPOINT;			\
-					active_ch = ctxt->save_active_ch; \
-					ctxt--;				\
-                                        CHECKLOWBOUND(ctxt);		\
+#define REVERT			{										\
+                                        CHTRACEPOINT;								\
+					active_ch = ctxt->save_active_ch;					\
+					CHECKHIGHBOUND(active_ch);						\
+					CHECKLOWBOUND(active_ch);						\
+					ctxt--;									\
+                                        CHECKLOWBOUND(ctxt);							\
 				}
 
-#define CONTINUE		{					\
-                                        CHTRACEPOINT;			\
-					active_ch++;			\
-                                        CHECKHIGHBOUND(active_ch);	\
-                                        current_ch->ch_active = FALSE;	\
-					return;				\
+#define CONTINUE		{									\
+                                        CHTRACEPOINT;							\
+					active_ch++;							\
+                                        CHECKHIGHBOUND(active_ch);					\
+                                        chnd[current_ch].ch_active = FALSE;				\
+					return;								\
 				}
 
 #define DRIVECH(x)		{									\
@@ -239,11 +283,11 @@ void ch_trace_point() {return;}
 					}								\
                                 }
 
-#define NEXTCH			{					\
-                                        CHTRACEPOINT;			\
-                                        current_ch->ch_active = FALSE;	\
-                                        DRIVECH(arg);			\
-					return;				\
+#define NEXTCH			{									\
+                                        CHTRACEPOINT;							\
+                                        chnd[current_ch].ch_active = FALSE;				\
+                                        DRIVECH(arg);							\
+					return;								\
 				}
 
 #define UNWIND(dummy1, dummy2)	{									\
@@ -252,20 +296,20 @@ void ch_trace_point() {return;}
 													\
 					assert(!process_exiting || ok_to_UNWIND_in_exit_handling);	\
                                         CHTRACEPOINT;							\
-                                        current_ch->ch_active = FALSE;					\
+                                        chnd[current_ch].ch_active = FALSE;				\
 					active_ch++;							\
                                         CHECKHIGHBOUND(active_ch);					\
 					ctxt = active_ch;						\
 					longjmp(active_ch->jmp, -1);					\
 				}
 
-#define START_CH		condition_handler *current_ch;								\
+#define START_CH		int current_ch;										\
 				DCL_THREADGBL_ACCESS;									\
 															\
 				SETUP_THREADGBL_ACCESS;									\
 				CHTRACEPOINT;										\
-				current_ch = active_ch;									\
-				current_ch->ch_active = TRUE;								\
+				current_ch = (active_ch - chnd);							\
+				active_ch->ch_active = TRUE;								\
 				active_ch--;										\
 				CHECKLOWBOUND(active_ch);								\
 				DBGEHND((stderr, "%s: Condition handler entered at line %d - arg: %d  SIGNAL: %d\n",	\
@@ -297,7 +341,7 @@ void stop_image_no_core(void);
 					EXIT(-exi_condition);				\
 				}
 
-#define PROCDIE(x)		_exit(x)
+#define PROCDIE(x)		_exit(x)	/* No exit handler, no cleanup, just die */
 #define EXIT(x)			{					\
 						exit(x);		\
 				}
@@ -327,6 +371,7 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 #define UNIX_EXIT_STATUS_MASK	0xFF
 
 void err_init(void (*x)());
+void condstk_expand(void);
 void gtm_dump(void);
 void gtm_dump_core(void);
 void gtm_fork_n_core(void);
@@ -357,5 +402,14 @@ CONDITION_HANDLER(gtm_trigger_complink_ch);
 CONDITION_HANDLER(op_fnztrigger_ch);
 CONDITION_HANDLER(trigger_tpwrap_ch);
 #endif
+CONDITION_HANDLER(gvcst_redo_root_search_ch);
+CONDITION_HANDLER(gvcst_data_ch);
+CONDITION_HANDLER(gvcst_get_ch);
+CONDITION_HANDLER(gvcst_kill_ch);
+CONDITION_HANDLER(gvcst_order_ch);
+CONDITION_HANDLER(gvcst_put_ch);
+CONDITION_HANDLER(gvcst_query_ch);
+CONDITION_HANDLER(gvcst_queryget_ch);
+CONDITION_HANDLER(gvcst_zprevious_ch);
 
 #endif

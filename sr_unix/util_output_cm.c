@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,30 +30,28 @@
 
 static unsigned char outbuff[OUT_BUFF_SIZE];
 static unsigned char *outptr;
-GBLREF unsigned char *util_outptr;
-GBLREF va_list	last_va_list_ptr;
 
 void util_cm_print(clb_struct *lnk, int code, char *message, int flush, ...)
 {
 	va_list		var;
 	int4		status, i;
         size_t          msglen ;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, flush);
 
 	if (outptr == outbuff)
-	{
 		*outptr++ = code;
-	}
 	if (message)
 	{
 		util_out_print(NULL, RESET);	/* Clear any pending messages */
 		util_out_print_vaparm(message, NOFLUSH, var, MAXPOSINT4);
-		msglen = (size_t)((char *)util_outptr - (char *)util_outbuff);
-		memcpy(outptr, util_outbuff, msglen);
+		msglen = (size_t)(TREF(util_outptr) - TREF(util_outbuff_ptr));
+		memcpy(outptr, TREF(util_outbuff_ptr), msglen);
 		outptr += msglen;
 	}
-	va_end(last_va_list_ptr);
+	va_end(TREF(last_va_list_ptr));
 	va_end(var);
 	switch (flush)
 	{

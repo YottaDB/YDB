@@ -16,6 +16,7 @@
 #include <signal.h>
 
 typedef INTPTR_T TID;		/* Timer ID type */
+typedef void (*timer_hndlr)();	/* Timer handler type */
 
 /* Gtm timer package uses ABS_TIME structure to carry
  * the time information in operating system independent
@@ -82,6 +83,7 @@ typedef struct st_timer_alloc
 	struct st_timer_alloc	*next;
 } st_timer_alloc;
 
+#define MAX_TIMER_HNDLRS	10	/* Max # of safe timer handlers */
 #define GT_WAKE
 
 int4		abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2);
@@ -98,6 +100,7 @@ void		set_blocksig(void);
 void		check_for_timer_pops(void);
 GT_TIMER	*find_timer_intr_safe(TID tid, GT_TIMER **tprev);
 void		check_for_deferred_timers(void);
+void		add_safe_timer_handler(int safetmr_cnt, ...);
 
 STATICFNDCL void	hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag);
 STATICFNDCL void	gt_timers_alloc(void);

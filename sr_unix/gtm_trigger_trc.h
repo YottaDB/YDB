@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +16,9 @@
  * gtm_trigger.h, these have been moved out to this supplemental header file with no
  * pre-reqs.
  * Debugging macros for triggers. In open code so are always defined (at least as null).
- * Uncomment below define to enable debugging macros (and set GTM_TRIGGER of course)
+ * Uncomment below include and define to enable debugging macros (and set GTM_TRIGGER of course)
  */
+/* #include "have_crit.h" for DBGFPF/FFLUSH/INTRPT_IN_FFLUSH */
 /* #define DEBUG_TRIGR */
 #if defined(DEBUG_TRIGR) && defined(GTM_TRIGGER)
 # define DBGTRIGR(x) DBGFPF(x)

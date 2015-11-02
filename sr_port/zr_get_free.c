@@ -13,7 +13,7 @@
 
 #include "gtm_string.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "zbreak.h"
 
 zbrk_struct *zr_get_free(z_records *zrecs, zb_code *addr)

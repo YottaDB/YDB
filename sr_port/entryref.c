@@ -20,7 +20,7 @@
 #include "mlabel2xtern.h"
 #include "mrout2xtern.h"
 #include "gtmimagename.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 
 GBLREF stack_frame	*frame_pointer;

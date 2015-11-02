@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,6 +68,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gv_namehead		*gv_target;
+GBLREF	gv_namehead		*gv_target_list;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLREF	boolean_t		mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified */
@@ -80,6 +81,18 @@ GBLREF	cw_set_element		cw_set[];		/* create write set. */
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned char    	cw_map_depth;
 GBLREF	uint4			update_trans;
+
+error_def(ERR_BUFFLUFAILED);
+error_def(ERR_DBBTUWRNG);
+error_def(ERR_DBFILERR);
+error_def(ERR_DBRDONLY);
+error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DYNUPGRDFAIL);
+error_def(ERR_MUNOACTION);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_MUREORGFAIL);
+error_def(ERR_MUREUPDWNGRDEND);
+error_def(ERR_REORGCTRLY);
 
 /* actually want the following to be a static variable in this module, but getting the address of a
  * static variable through the debugger might be tricky on some platforms. hence use a global variable instead.
@@ -127,18 +140,6 @@ void	mu_reorg_upgrd_dwngrd(void)
 	unsigned char    	save_cw_set_depth;
 	uint4			lcl_update_trans;
 
-	error_def(ERR_BUFFLUFAILED);
-	error_def(ERR_DBBTUWRNG);
-	error_def(ERR_DBFILERR);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_DSEBLKRDFAIL);
-	error_def(ERR_DYNUPGRDFAIL);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_MUNOFINISH);
-	error_def(ERR_MUREORGFAIL);
-	error_def(ERR_MUREUPDWNGRDEND);
-	error_def(ERR_REORGCTRLY);
-
 	region    = (CLI_PRESENT == cli_present("REGION"));
 	upgrade   = (CLI_PRESENT == cli_present("UPGRADE"));
 	downgrade = (CLI_PRESENT == cli_present("DOWNGRADE"));
@@ -173,8 +174,11 @@ void	mu_reorg_upgrd_dwngrd(void)
 		util_out_print("!/MUPIP REORG !AD cannot proceed with above errors!/", TRUE, LEN_AND_STR(command));
 		mupip_exit(ERR_MUNOACTION);
 	}
-	gv_keysize = DBKEYSIZE(MAX_KEY_SZ);
+	GVKEYSIZE_INCREASE_IF_NEEDED(DBKEYSIZE(MAX_KEY_SZ)); /* Keep gv_currkey/gv_altkey in sync with respect to gv_keysize
+							      * (now MAX_KEY_SZ) */
+	assert(DBKEYSIZE(MAX_KEY_SZ) == gv_keysize);
 	gv_target = targ_alloc(gv_keysize, NULL, NULL);	/* t_begin needs this initialized */
+	gv_target_list = NULL;
 	memset(&alt_hist, 0, SIZEOF(alt_hist));	/* null-initialize history */
 	blkhist = &alt_hist.h[0];
 	for (rptr = grlist;  NULL != rptr;  rptr = rptr->fPtr)
@@ -218,8 +222,8 @@ void	mu_reorg_upgrd_dwngrd(void)
 			status = ERR_MUNOFINISH;
 			continue;
 		}
-		assert(GDSVCURR == GDSV5); /* so we trip this assert in case GDSVCURR changes without a change to this module */
-		new_db_format = (upgrade ? GDSV5 : GDSV4);
+		assert(GDSVCURR == GDSV6); /* so we trip this assert in case GDSVCURR changes without a change to this module */
+		new_db_format = (upgrade ? GDSV6 : GDSV4);
 		grab_crit(reg);
 		curr_tn = csd->trans_hist.curr_tn;
 		/* set the desired db format in the file header to the appropriate version, increment transaction number */
@@ -533,6 +537,14 @@ void	mu_reorg_upgrd_dwngrd(void)
 								t_write(blkhist, (unsigned char *)bs1, 0, 0,
 									((blk_hdr_ptr_t)blkBase)->levl, FALSE,
 									FALSE, GDS_WRITE_PLAIN);
+								/* The tree_status for now is only used to determin whether writing
+								 * the block to snapshot file.  * (see t_end_ops.c).
+ 								 * For reorg upgrade/downgrade process, the block is updated in a
+								 * sequential way without changing the gv_target. In this case,
+								 * we assume the block is in directory tree so as to have
+								 * it written to the snapshot file
+			 					 */
+								SET_DIR_TREE(&cw_set[cw_set_depth-1]);
 								/* reset update_trans in case previous retry had set it to 0 */
 								update_trans = UPDTRNS_DB_UPDATED_MASK;
 								if (BLK_RECYCLED == bml_status)

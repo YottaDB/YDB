@@ -20,7 +20,7 @@
 #include "cache.h"
 #include "hashtab_objcode.h"
 #include "op.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "valid_mname.h"
 #include "fullbool.h"
 

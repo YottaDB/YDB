@@ -46,7 +46,7 @@ error_def(ERR_WAITDSKSPACE);
 
 uint4 mur_block_count_correct(reg_ctl_list *rctl)
 {
-	unsigned int		native_size, size;
+	gtm_uint64_t		native_size, size;
 	sgmnt_data_ptr_t 	mu_data;
 	int4			mu_int_ovrhd;
 	uint4			total_blks;
@@ -78,7 +78,7 @@ uint4 mur_block_count_correct(reg_ctl_list *rctl)
 	}
 	mu_int_ovrhd += 1;
 	assert(mu_int_ovrhd == mu_data->start_vbn);
-	size = mu_int_ovrhd + (mu_data->blk_size / DISK_BLOCK_SIZE) * mu_data->trans_hist.total_blks;
+	size = mu_int_ovrhd + (off_t)(mu_data->blk_size / DISK_BLOCK_SIZE) * mu_data->trans_hist.total_blks;
 	native_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl);
 	/* In the following tests, the EOF block should always be 1 greater than the actual size of the file.
 	 * This is due to the GDS being allocated in even DISK_BLOCK_SIZE-byte blocks.
@@ -110,7 +110,7 @@ uint4 mur_block_count_correct(reg_ctl_list *rctl)
 		jgbl.dont_reset_gbl_jrec_time = TRUE;
 		DEBUG_ONLY(
 			/* Check that the filesize and blockcount in the fileheader match now after the extend */
-			size = mu_int_ovrhd + (mu_data->blk_size / DISK_BLOCK_SIZE) * mu_data->trans_hist.total_blks;
+			size = mu_int_ovrhd + (off_t)(mu_data->blk_size / DISK_BLOCK_SIZE) * mu_data->trans_hist.total_blks;
 			native_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl);
 			assert(size == native_size);
 		)

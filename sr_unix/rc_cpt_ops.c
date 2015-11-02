@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -562,7 +562,7 @@ void rc_send_cpt(rc_xblk_hdr *head, rc_rsp_page *last_aq)	/* Zero if no read op 
 		rc_cpt_lock();
 		GET_LONG(blknum, last_aq->pageaddr);
 		if ((b = bt_get(blknum)) ? rc_read_stamp <= b->tn :
-			(rc_read_stamp <= ((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn))
+			(rc_read_stamp <= OLDEST_HIST_TN(cs_addrs)))
 		{
 			last_aq->hdr.a.erc.value = RC_NETERRRETRY;
 		}

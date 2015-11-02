@@ -180,18 +180,21 @@ typedef struct
 typedef struct
 {
 #if defined(UNIX)
+	FILL8DCL(uint4, crit_cycle, 1);
 	global_latch_t	semaphore;
-	CACHELINE_PAD(SIZEOF(global_latch_t), 1)
-	latch_t		crashcnt;
-	int4		filler1;	/* for alignment */
+	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 2)		/* 8 for the FILL8DCL */
+	FILL8DCL(latch_t, crashcnt, 3);
 	global_latch_t	crashcnt_latch;
-	CACHELINE_PAD(SIZEOF(latch_t) + SIZEOF(latch_t) + SIZEOF(global_latch_t), 2)
-	latch_t		queslots;
-	int4		filler2;	/* for alignment */
-	CACHELINE_PAD(SIZEOF(latch_t) + SIZEOF(latch_t), 3)
+	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 4)	/* 8 for the FILL8DCL */
+	compswap_time_field	stuckexec;
+	CACHELINE_PAD(SIZEOF(compswap_time_field), 5)
+	FILL8DCL(latch_t, queslots, 6);
+	CACHELINE_PAD(SIZEOF(latch_t) + SIZEOF(latch_t), 7)
 	mutex_que_head	prochead;
-	CACHELINE_PAD(SIZEOF(mutex_que_head), 4)
+	CACHELINE_PAD(SIZEOF(mutex_que_head), 8)
 	mutex_que_head	freehead;
+	CACHELINE_PAD(SIZEOF(mutex_que_head), 9)
+
 #elif defined(VMS)
 	short		semaphore;
 	unsigned short	wrtpnd;
@@ -311,15 +314,20 @@ typedef struct node_local_struct
 	boolean_t	ccp_jnl_closed;
 	boolean_t	glob_sec_init;
 	uint4		wtstart_pid[MAX_WTSTART_PID_SLOTS];	/* Maintain pids of wcs_wtstart processes */
-	int4		filler8_int;				/* 8-byte alignment filler */
+	volatile boolean_t wc_blocked;				/* Set to TRUE by process that knows it is leaving the cache in a
+								 * possibly inconsistent state. Next process grabbing crit will do
+								 * cache recovery. This setting also stops all concurrent writers
+								 * from working on the cache. In MM mode, it is used to call
+								 * wcs_recover during a file extension */
 	global_latch_t	wc_var_lock;                            /* latch used for access to various wc_* ref counters */
 	CACHELINE_PAD(SIZEOF(global_latch_t), 1)		/* Keep these two latches in separate cache lines */
 	global_latch_t	db_latch;                               /* latch for interlocking on hppa and tandem */
 	CACHELINE_PAD(SIZEOF(global_latch_t), 2)
 	int4		cache_hits;
 	int4		wc_in_free;                             /* number of write cache records in free queue */
-	/* All the counters below (declared using CNTR4DCL are 4-byte counters. We would like to keep them in separate
-	 * cachelines on load-lock/store-conditional platforms particularly and other platforms too just to be safe.
+	/* All counters below (declared using CNTR4DCL) are 2 or 4-bytes, depending on platform, but always stored in 4 bytes.
+	 * CACHELINE_PAD doesn't use SIZEOF because misses any padding added by CNTR4DCL. We want to keep the counters in
+	 * separate cachelines on load-lock/store-conditional platforms particularly and on other platforms too, just to be safe.
 	 */
 	volatile CNTR4DCL(wcs_timers, 1);			/* number of write cache timers in use - 1 */
 	CACHELINE_PAD(4, 3)
@@ -368,8 +376,8 @@ typedef struct node_local_struct
 	char		replinstfilename[MAX_FN_LEN + 1];/* 256 : Name of the replication instance file corresponding to this db.
 							  *       In VMS, this is the name of the corresponding global directory.
 							  */
-   	int4		secshr_ops_index;
-   	gtm_uint64_t	secshr_ops_array[SECSHR_OPS_ARRAY_SIZE]; /* taking up 8K */
+	int4		secshr_ops_index;
+	gtm_uint64_t	secshr_ops_array[SECSHR_OPS_ARRAY_SIZE]; /* taking up 8K */
 	gvstats_rec_t	gvstats_rec;
 	trans_num	last_wcsflu_tn;			/* curr_tn when last wcs_flu was done on this database */
 	sm_off_t	encrypt_glo_buff_off;	/* offset from unencrypted global buffer to its encrypted counterpart */
@@ -384,8 +392,7 @@ typedef struct node_local_struct
 	uint4		num_snapshots_in_effect; /* how many snapshots are currently in place for this region */
 	uint4		wbox_test_seq_num;	 /* used to coordinate with sequential testing steps */
 	NON_GTM64_ONLY(int4 filler_8byte_align;) /* To align the following member at an 8-byte boundry on 32-bit platforms */
-	uint4		kip_pid_array[MAX_KIP_PID_SLOTS]; /* Processes actively doing kill (0 denotes empty slots) */
-
+	UNIX_ONLY(pid_t kip_pid_array[MAX_KIP_PID_SLOTS];) /* Processes actively doing kill (0 denotes empty slots) */
 	gtm_uint64_t	sec_size;	/* Upon going to larger shared memory sizes, we realized that this does not	*/
 					/* need	to be in the file header but the node local since it can be calculated	*/
 					/* from info in the file header.						*/
@@ -403,10 +410,16 @@ typedef struct node_local_struct
 	block_id	highest_lbm_with_busy_blk;	/* Furthest lmap block known to have had a busy block during truncate. */
 #	if defined(UNIX)
 	ftokhist	ftok_ops_array[FTOK_OPS_ARRAY_SIZE];
+	volatile uint4	root_search_cycle;	/* incremented online rollback ends and mu_swap_root */
 	volatile uint4	onln_rlbk_cycle;	/* incremented everytime an online rollback ends */
 	volatile uint4	db_onln_rlbkd_cycle;	/* incremented everytime an online rollback takes the database back in time */
 	volatile uint4	onln_rlbk_pid;		/* process ID of currently running online rollback. */
-	uint4		dbrndwn_skip_cnt;	/* # of processes that skipped gds_rundown due to a concurrent online rollback */
+	uint4		dbrndwn_ftok_skip;	/* # of processes that skipped FTOK semaphore in gds_rundown due to too many MUMPS
+						   processes */
+	uint4		dbrndwn_access_skip;	/* # of processes that skipped access control semaphore in gds_rundown due to a
+						   concurrent online rollback or too many MUMPS processes */
+	boolean_t	fastinteg_in_prog;	/* Tells GT.M if fast integrity is in progress */
+	uint4           wtstart_errcnt;
 #	endif
 } node_local;
 
@@ -599,6 +612,12 @@ typedef mutex_struct *mutex_struct_ptr_t;
 typedef mutex_spin_parms_struct *mutex_spin_parms_ptr_t;
 typedef mutex_que_entry	*mutex_que_entry_ptr_t;
 typedef node_local *node_local_ptr_t;
+
+#define OLDEST_HIST_TN(CSA)		(DBG_ASSERT(CSA->hdr) DBG_ASSERT(CSA->hdr->acc_meth != dba_mm)	\
+						((th_rec_ptr_t)((sm_uc_ptr_t)CSA->th_base + CSA->th_base->tnque.fl))->tn)
+
+#define SET_OLDEST_HIST_TN(CSA, TN)	(DBG_ASSERT(CSA->hdr) DBG_ASSERT(CSA->hdr->acc_meth != dba_mm)	\
+						((th_rec_ptr_t)((sm_uc_ptr_t)CSA->th_base + CSA->th_base->tnque.fl))->tn = TN)
 
 #ifdef DB64
 # ifdef __osf__

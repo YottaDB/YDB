@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,10 +40,12 @@
 #include "gtmmsg.h"
 #include "util.h"
 #include "gtmdbglvl.h"
+#include "anticipatory_freeze.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
 #include "shmpool.h"	/* Needed for the shmpool structures */
+#include "jnl.h"
 
 #define BLK_SIZE (((gd_segment*)gv_cur_region->dyn.addr)->blk_size)
 
@@ -78,6 +80,7 @@
 }
 
 GBLREF	gd_region		*gv_cur_region;
+GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uint4			gtmDebugLevel;
@@ -93,8 +96,8 @@ unsigned char mu_cre_file(void)
 	int		fd = FD_INVALID, i, lower, upper, norm_vbn;
         ssize_t         status;
 	uint4		raw_dev_size;		/* size of a raw device, in bytes */
-	int4		blocks_for_create, blocks_for_extension, save_errno;
-	GTM_BAVAIL_TYPE	avail_blocks;
+	int4		save_errno;
+	gtm_uint64_t	avail_blocks, blocks_for_create, blocks_for_extension, delta_blocks;
 	file_control	fc;
 	mstr		file;
 	parse_blk	pblk;
@@ -226,32 +229,40 @@ unsigned char mu_cre_file(void)
 		seg = gv_cur_region->dyn.addr;
 
 		/* blocks_for_create is in the unit of DISK_BLOCK_SIZE */
-		blocks_for_create = (int4)(DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE) + 1 +
+		blocks_for_create = (gtm_uint64_t)(DIVIDE_ROUND_UP(SIZEOF_FILE_HDR_DFLT, DISK_BLOCK_SIZE) + 1 +
 					(seg->blk_size / DISK_BLOCK_SIZE *
-					 ((DIVIDE_ROUND_UP(seg->allocation, BLKS_PER_LMAP - 1)) + seg->allocation)));
+					 (gtm_uint64_t)((DIVIDE_ROUND_UP(seg->allocation, BLKS_PER_LMAP - 1)) + seg->allocation)));
+		blocks_for_extension = (seg->blk_size / DISK_BLOCK_SIZE *
+					((DIVIDE_ROUND_UP(EXTEND_WARNING_FACTOR * (gtm_uint64_t)seg->ext_blk_count,
+							BLKS_PER_LMAP - 1))
+				 	  + EXTEND_WARNING_FACTOR * (gtm_uint64_t)seg->ext_blk_count));
 		if (!(gtmDebugLevel & GDL_IgnoreAvailSpace))
 		{	/* Bypass this space check if debug flag above is on. Allows us to create a large sparce DB
 			 * in space it could never fit it if wasn't sparse. Needed for some tests.
+			 * Also, if the anticipatory freeze scheme is in effect at this point, we would have issued
+			 * a NOSPACECRE warning (see NOSPACEEXT message which goes through a similar transformation).
+			 * But at this point, we are guaranteed to not have access to the journal pool or csa both
+			 * of which are necessary for the ANTICIPATORY_FREEZE_ENABLED(csa) macro so we dont bother
+			 * to do the warning transformation in this case.
 			 */
-			if ((uint4)avail_blocks < blocks_for_create)
+			assert(NULL == jnlpool.jnlpool_ctl);
+			if (avail_blocks < blocks_for_create)
 			{
-				gtm_putmsg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), blocks_for_create,
-					   (uint4)avail_blocks);
-				send_msg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), blocks_for_create,
-					 (uint4)avail_blocks);
+				gtm_putmsg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), &blocks_for_create,
+					   &avail_blocks);
+				send_msg(VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path), &blocks_for_create,
+					 &avail_blocks);
 				CLEANUP(EXIT_ERR);
 				return EXIT_ERR;
 			}
-		}
-		blocks_for_extension = (seg->blk_size / DISK_BLOCK_SIZE *
-					((DIVIDE_ROUND_UP(EXTEND_WARNING_FACTOR * seg->ext_blk_count, BLKS_PER_LMAP - 1))
-				 	  + EXTEND_WARNING_FACTOR * seg->ext_blk_count));
-		if ((uint4)(avail_blocks - blocks_for_create) < blocks_for_extension)
-		{
-			gtm_putmsg(VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path), EXTEND_WARNING_FACTOR, blocks_for_extension,
-					DISK_BLOCK_SIZE, (uint4)(avail_blocks - blocks_for_create));
-			send_msg(VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path), EXTEND_WARNING_FACTOR, blocks_for_extension,
-					DISK_BLOCK_SIZE, (uint4)(avail_blocks - blocks_for_create));
+			delta_blocks = avail_blocks - blocks_for_create;
+			if (delta_blocks < blocks_for_extension)
+			{
+				gtm_putmsg(VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path), EXTEND_WARNING_FACTOR,
+					   &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
+				send_msg(VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path), EXTEND_WARNING_FACTOR,
+					 &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
+			}
 		}
 	}
 	gv_cur_region->dyn.addr->file_cntl = &fc;
@@ -326,9 +337,11 @@ unsigned char mu_cre_file(void)
 	} else
 		cs_data->is_encrypted = FALSE;
 #	endif
+	cs_data->span_node_absent = TRUE;
+	cs_data->maxkeysz_assured = TRUE;
 	mucregini(cs_data->trans_hist.total_blks);
 	cs_data->createinprogress = FALSE;
-	LSEEKWRITE(udi->fd, 0, cs_data, SIZEOF_FILE_HDR_DFLT, status);
+	DB_LSEEKWRITE(cs_addrs, udi->fn, udi->fd, 0, cs_data, SIZEOF_FILE_HDR_DFLT, status);
 	if (0 != status)
 	{
 		SPRINTF_AND_PERROR("Error writing out header for file %s\n");
@@ -337,7 +350,7 @@ unsigned char mu_cre_file(void)
 	}
 	cc = (char*)malloc(DISK_BLOCK_SIZE);
 	memset(cc, 0, DISK_BLOCK_SIZE);
-	LSEEKWRITE(udi->fd,
+	DB_LSEEKWRITE(cs_addrs, udi->fn, udi->fd,
 		   (cs_data->start_vbn - 1) * DISK_BLOCK_SIZE + ((off_t)(cs_data->trans_hist.total_blks) * cs_data->blk_size),
 		   cc,
 		   DISK_BLOCK_SIZE,

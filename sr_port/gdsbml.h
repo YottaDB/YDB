@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,19 +46,20 @@
 #define	BM_MINUS_BLKHDR_SIZE(bplm)	((bplm) / (BITS_PER_UCHAR / BML_BITS_PER_BLK))
 #define BM_SIZE(bplm)			(SIZEOF(blk_hdr) + BM_MINUS_BLKHDR_SIZE(bplm))
 
-#define	VALIDATE_BM_BLK(blk, bp, csa, region, status)								\
-{														\
-	error_def(ERR_DBBMLCORRUPT);										\
-														\
-	assert(BITS_PER_UCHAR % BML_BITS_PER_BLK == 0);	/* assert this for the BM_MINUS_BLKHDR_SIZE macro */	\
-	if (IS_BITMAP_BLK(blk) && ((LCL_MAP_LEVL != (bp)->levl) || (BM_SIZE(csa->hdr->bplmap) != (bp)->bsiz)))	\
-	{													\
-		send_msg(VARLSTCNT(9) ERR_DBBMLCORRUPT, 7, DB_LEN_STR(region), 					\
-				blk, (bp)->bsiz, (bp)->levl, &(bp)->tn, &csa->ti->curr_tn);			\
-		status = FALSE;											\
-		assert(FALSE);											\
-	} else													\
-		status = TRUE;											\
+#define	VALIDATE_BM_BLK(blk, bp, csa, region, status)									\
+{															\
+	error_def(ERR_DBBMLCORRUPT); /* BYPASSOK */									\
+															\
+	assert(BITS_PER_UCHAR % BML_BITS_PER_BLK == 0);	/* assert this for the BM_MINUS_BLKHDR_SIZE macro */		\
+	if (IS_BITMAP_BLK(blk) && ((LCL_MAP_LEVL != (bp)->levl) || (BM_SIZE(csa->hdr->bplmap) != (bp)->bsiz))		\
+		UNIX_ONLY(DEBUG_ONLY(|| (gtm_white_box_test_case_enabled						\
+		&& (WBTEST_ANTIFREEZE_DBBMLCORRUPT == gtm_white_box_test_case_number)))))				\
+	{														\
+		send_msg(VARLSTCNT(9) ERR_DBBMLCORRUPT, 7, DB_LEN_STR(region),						\
+				blk, (bp)->bsiz, (bp)->levl, &(bp)->tn, &csa->ti->curr_tn);				\
+		status = FALSE;												\
+	} else														\
+		status = TRUE;												\
 }
 
 #define NO_FREE_SPACE		-1

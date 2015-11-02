@@ -17,6 +17,7 @@
 #include "cmmdef.h"
 #include "gdsroot.h"
 #include "gt_timer.h"
+#include "gtm_threadgbl.h"
 #include "iotimer.h"
 #include "locklits.h"
 #include "mlkdef.h"
@@ -28,6 +29,7 @@
 #include "mlk_unpend.h"
 #include "outofband.h"
 #include "lk_check_own.h"
+#include "lock_str_to_buff.h"
 #include "gvcmx.h"
 #include "gvcmz.h"
 #include "rel_quant.h"
@@ -36,19 +38,61 @@
 #include "op.h"
 #include "mv_stent.h"
 #include "find_mvstent.h"
+#include "gdskill.h"
+#include "gdsbt.h"
+#include "gtm_facility.h"
+#include "gtm_maxstr.h"
+#include "fileinfo.h"
+#include "gdsfhead.h"
+#include "gdscc.h"
+#include "filestruct.h"
+#include "buddy_list.h"		/* needed for tp.h */
+#include "io.h"
+#include "jnl.h"
+#include "hashtab_int4.h"	/* needed for tp.h */
+#include "tp.h"
+#include "send_msg.h"
+#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
+#include "change_reg.h"
+#include "setterm.h"
+#include "getzposition.h"
+#ifdef DEBUG
+#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
+#endif
 
-GBLREF	bool		out_of_time;
-GBLREF	bool		remlkreq;
 GBLREF	unsigned char	cm_action;
-GBLREF	unsigned short	lks_this_cmd;
 GBLREF	uint4		dollar_tlevel;
-GBLREF	unsigned int	t_tries;
-GBLREF	uint4		process_id;
-GBLREF	int4		outofband;
+GBLREF	uint4		dollar_trestart;
+GBLREF	unsigned short	lks_this_cmd;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
 GBLREF	mlk_stats_t	mlk_stats;			/* Process-private M-lock statistics */
-GBLREF	unsigned char	*restart_pc, *restart_ctxt;
 GBLREF	mv_stent	*mv_chain;
+GBLREF	int4		outofband;
+GBLREF	bool		out_of_time;
+GBLREF	uint4		process_id;
+GBLREF	bool		remlkreq;
+GBLREF	unsigned char	*restart_ctxt, *restart_pc;
+GBLREF	unsigned int	t_tries;
+
+error_def(ERR_LOCKINCR2HIGH);
+error_def(ERR_LOCKIS);
+
+#define LOCKTIMESTR "LOCK time too long"
+
+/* We made this a error seperate function because we did not wanted to do the MAXSTR_BUFF_DECL(buff) declartion in op_lock2,
+ * because  MAXSTR_BUFF_DECL macro would allocate a huge stack every time op_lock2 is called.
+ */
+STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr); /* This definition is made here because there is no appropriate place to
+						  * put this prototype. This will not be used anywhere else so we did not
+						  * wanted to create a op_lock2.h just for this function.
+						  */
+STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr)
+{
+	MAXSTR_BUFF_DECL(buff);
+	MAXSTR_BUFF_INIT;
+	lock_str_to_buff(pvt_ptr, buff, MAX_STRBUFF_INIT);
+	rts_error(VARLSTCNT(7) ERR_LOCKINCR2HIGH, 1, pvt_ptr->level, ERR_LOCKIS, 2, LEN_AND_STR(buff));
+}
 
 /*
  * -----------------------------------------------
@@ -72,7 +116,7 @@ GBLREF	mv_stent	*mv_chain;
  */
 int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 {
-	bool		blocked, timer_on;
+	boolean_t	blocked, timer_on;
 	signed char	gotit;
 	unsigned short	locks_bckout, locks_done;
 	int4		msec_timeout;	/* timeout in milliseconds */
@@ -80,14 +124,18 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 	unsigned char	action;
 	ABS_TIME	cur_time, end_time, remain_time;
 	mv_stent	*mv_zintcmd;
+
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	gotit = -1;
 	cm_action = laflag;
-	timer_on = (NO_M_TIMEOUT != timeout);
 	out_of_time = FALSE;
-	if (!timer_on)
+	if (timeout < 0)
+		timeout = 0;
+	else if (TREF(tpnotacidtime) < timeout)
+		TPNOTACID_CHECK(LOCKTIMESTR);
+	if (!(timer_on = (NO_M_TIMEOUT != timeout)))	/* NOTE assignment */
 		msec_timeout = NO_M_TIMEOUT;
 	else
 	{
@@ -149,7 +197,8 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 		}
 		for (pvt_ptr1 = mlk_pvt_root, locks_done = 0;  locks_done < lks_this_cmd;  pvt_ptr1 = pvt_ptr1->next, locks_done++)
 		{	/* Go thru the list of all locks to be obtained attempting to lock
-			 * each one. If any lock could not be obtained, break out of the loop */
+			 * each one. If any lock could not be obtained, break out of the loop
+			 */
 			if (!mlk_lock(pvt_ptr1, 0, TRUE))
 			{	/* If lock is obtained */
 				pvt_ptr1->granted = TRUE;
@@ -159,7 +208,10 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 					pvt_ptr1->level = 1;
 					break;
 				case INCREMENTAL:
-					pvt_ptr1->level += pvt_ptr1->translev;
+					if (pvt_ptr1->level < 511) /* The same lock can not be incremented more than 511 times. */
+						pvt_ptr1->level += pvt_ptr1->translev;
+					else
+						level_err(pvt_ptr1);
 					break;
 				default:
 					GTMASSERT;
@@ -196,14 +248,9 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 			mlk_bckout(pvt_ptr2, action);
 		}
 		if (dollar_tlevel && (CDB_STAGNATE <= t_tries))
-		{
-			mlk_unpend(pvt_ptr1);		/* Eliminated the dangling request block */
-			if (timer_on && !out_of_time)
-			{
-				cancel_timer((TID)&timer_on);
-				timer_on = FALSE;
-			}
-			t_retry(cdb_sc_needlock);	/* release crit to prevent a deadlock */
+		{	/* upper TPNOTACID_CHECK conditioned on no short timeout; this one rel_crits to avoid potential deadlock */
+			assert(TREF(tpnotacidtime) >= timeout);
+			TPNOTACID_CHECK(LOCKTIMESTR);
 		}
 		for (;;)
 		{
@@ -304,3 +351,4 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 	mlk_stats.n_user_locks_success++;
 	return (TRUE);
 }
+

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +9,9 @@
  *								*
  ****************************************************************/
 
-#ifndef __CRIT_WAKE_ALARM_H__
-#define __CRIT_WAKE_ALARM_H__
+#ifndef GTM_MVAE_INCLUDED
+#define GTM_MVAE_INCLUDED
 
-void crit_wake_alarm(void);
+void *gtm_memcpy_validate_and_execute(void *target, const void *src, size_t len);
 
 #endif

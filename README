@@ -5,111 +5,67 @@ file included in this package, it contains the terms of the license under
 which the package is provided to you. If there is not a COPYING file in
 the package, you must ensure that your use of FIS GT.M complies with the
 license under which it is provided. If you are unsure as to the terms of
-your license, please consult with the entity that provided you with the package.
+your license, please consult with the entity that provided you with the
+package.
 
-The make file enclosed (sr_unix/comlist.mk) will build GT.M from source.  
-The prerequisites are GNU make, GT.M binary installation (which you can
-download from http://sourceforge.net/projects/fis-gtm/), Linux x86, tcsh,
-Unicode and GPG include files. Unicode include files are automatically 
-installed if ICU is installed. GPG include files require installing the
-GNUPG and related library development packages. GNU make 3.81, 
-Ubuntu 10.04 LTS and RHEL 5.0 were used to do the test builds for this 
-distribution.  The default ICU and GPG packages were taken from the OS
-vendors' repositories.
+GT.M relies on CMake to generate the Makefiles to build GT.M from source. The
+prerequisites are CMake (at least 2.8.5), GNU make (at least 3.81), Linux
+(either x86 or x86_64), Unicode include files and GPG. Unicode include files
+are automatically installed if ICU is installed. GPG include files require
+installing the GNUPG and related library development packages. Debian 6, Ubuntu
+12.04 LTS and RHEL 6.0 were used to do the test builds for this distribution.
+The default ICU and GPG packages were taken from the distribution repositories.
 
-To build a production version GT.M for linux do the following steps:
-1. Fulfill the pre-requisites.
-   Download and install GT.M binary distribution from SourceForge if you
-   do not have GT.M installed already. The build procedure needs an
-   existing GT.M mumps installed on the machine.
+To build GT.M for Linux, do the following steps:
 
-   You can download GT.M from http://sourceforge.net/projects/fis-gtm/
-   Unpack the tar file and run the configure script as root. Note: the tar
-   file unpacks everything into your current working directory, not a new
-   subdirectory. The Linux Standard Base (LSB) install path for GT.M 
-   V54002 is /opt/lsb-gtm/V5.4-002_i686 or /opt/lsb-gtm/V5.4-002_x8664.
-   $ tar xfz gtm_V54002_linux_i686_src.tar.gz
+1. Fulfill the pre-requisites
+   Install developement libraries libelf, zlib, libicu, libgpgme, libgpg-error,
+   libgcrypt.
+
+   [optional] The GT.M source tarball includes pre-generated files. To generate
+   these files requires a binary distribution of GT.M.  You can download GT.M
+   from http://sourceforge.net/projects/fis-gtm/ Unpack the tar file and run
+   the configure script as root. Note: the tar file unpacks everything into
+   your current working directory, not a new subdirectory. The Linux Standard
+   Base (LSB) install path for GT.M V60000 is /opt/lsb-gtm/V6.0-000_i686 or
+   /opt/lsb-gtm/V6.0-000_x8664.
+   $ tar xfz gtm_V60000_linux_i686_pro.tar.gz
    $ sudo sh ./configure
+
+   # Provide the directory path to cmake using
+   #   -D GTM_DIST:PATH=$gtm_dist
 
 2. Unpack the GT.M sources
    Change directory in the directory that you will place the GT.M source,
    here after referred to as <gtm-directory>.
    $ mkdir <gtm-directory>
    $ cd <gtm-directory>
-   $ tar xfz gtm_V54002_linux_i686_src.tar.gz
+   $ tar xfz gtm_V60000_linux_i686_src.tar.gz
 
-   You should find this README, COPYING file and sr_* source directroies.
+   You should find this README, COPYING and CMakeLitst.txt file and sr_* source
+   directories.
 
-3. Define environment variables needed to build GT.M
-   You will need to use tcsh to build GT.M.  GT.M uses several csh script
-   files the define environment variables used in the build process.  You
-   will need to define several variables prior to intiating your GT.M build.
+3. Building GT.M -
+   <gtm-builddir> can be a sub directory of the source directory <gtm-directory>
 
-   - Define 'gtm_curpro' and 'gtm_exe' so that you can compile M programs.
-   This is the directory in which you installed the GT.M binaries from
-   SourceForge.
-   $ setenv gtm_curpro <path to installed GT.M>
-   $ setenv gtm_exe $gtm_curpro
-   $ setenv HOSTOS `uname -s`
+   $ mkdir <gtm-builddir>
+   $ cd <gtm-builddir>
+   $ cmake <gtm-directory>
 
-   - Define 'gtm_tools' and 'gtm_inc'
-   $ setenv gtm_tools $PWD/sr_linux
-   $ setenv gtm_inc $PWD/sr_linux
 
-   - [OPTIONAL] Ubuntu users must define 'distro'
-   $ setenv distro ubuntu
+   # By default the build produces release versions of GT.M. To build a debug
+   # version of GT.M supply the following parameter to cmake
+   #     -D CMAKE_BUILD_TYPE=DEBUG
+   #
+   # Note that the default install location is driven by CMAKE_INSTALL_PREFIX.
+   # You can change this when executing cmake
+   #     -D CMAKE_INSTALL_PREFIX:PATH=/opt/lsb-gtm
+   #
+   $ make
 
-   - [OPTIONAL] By default the build procedure will build 64 bit version of
-   GT.M on a x86_64 bit machine.
-   If you intend to build 32 bit version of GT.M on a x86_64 bit machine you
-   have to explicitly set the environment variable 'OBJECT_MODE' to '32'
-   $ setenv OBJECT_MODE 32
+   $ make install
 
-   - Specify which ICU version is installed.
-   ICU version needs to be of the form #.#  If the result of running
-   "icu-config --version" has the form #.#.#, just use the first two
-   parts.  For example, if "icu-config --version" returns 3.8.1, use
-   3.8 in the  "setenv" step. 
-   $ icu-config --version
-   $ setenv gtm_icu_version <result of previous step>
+   $ make clean
 
-   - Define 'gtm_version_change' and execute gtm_env.csh
-   $ setenv gtm_version_change 1
-   $ source sr_unix/gtm_env.csh
-
-4. Building GT.M -
-
-By default, the gmake will build a production version GT.M. The build type
-of GT.M can be controlled by a parameter "buildtypes" - dbg (debug),
-bta (beta), and pro (production).  Passing a subset of dbg, bta, or pro in
-"buildtypes" from the environment or the command line will build that subset.
-For example:
-
-	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg gtm_ver=$PWD
-
-will build just a debuggable GT.M release.
-
-You can clean your builds by appending 'clean' to the make line.
-For example:
-	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg gtm_ver=$PWD clean
-
-5. Packaging GT.M -
-
-Once the required builds have been done the object distribution can be
-tar'ed by doing:
-
-	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux gtm_ver=$PWD package
-
-Again, buildtypes can be used to package just a subset. For example:
-
-	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=pro gtm_ver=$PWD package
-
-Appendix: Known warnings and errors
-  - "cc1: note: obsolete option -I- used, please use -iquote instead"
-  You can safely ignore this warning
-
-  - "chk2lev.mdep:2: *** missing separator.  Stop."
-  tcsh is using the builtin echo, you need to set the environment variable
-  'distro' to 'ubuntu' and clean your build.
-  $ setenv distro ubuntu
-
+4. Packaging GT.M -
+   Create a tar file from the installed directory

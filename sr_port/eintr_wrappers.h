@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -256,19 +256,11 @@
 	 * changes its state unless invoked with WNOHANG bit set. Make sure not waiting on current pid			\
 	 */														\
 	assert(0 != PID);												\
-	assert(getpid() != PID);					\
+	assert(getpid() != PID);											\
 	do														\
 	{														\
 	   RC = waitpid(PID, STATUS, OPTS);										\
 	} while(-1 == RC && EINTR == errno);										\
-}
-
-#define WRITE_FILE(FD, BUF, SIZE, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = write(FD, BUF, SIZE);		\
-	} while(-1 == RC && EINTR == errno);	\
 }
 
 #define GTM_FSYNC(FD, RC)			\

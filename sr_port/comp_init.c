@@ -15,7 +15,7 @@
 #include "stp_parms.h"
 #include "compiler.h"
 #include "stringpool.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "opcode.h"
 #include "cgp.h"

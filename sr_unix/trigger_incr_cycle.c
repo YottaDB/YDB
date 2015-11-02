@@ -15,7 +15,7 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"			/* For gvcst_protos.h */
 #include "gvcst_protos.h"
-#include "rtnhdr.h"			/* for gv_trigger.h */
+#include <rtnhdr.h>			/* for gv_trigger.h */
 #include "gv_trigger.h"
 #include "trigger.h"
 #include "trigger_incr_cycle.h"

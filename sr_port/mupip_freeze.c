@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,15 +42,16 @@
 #include "interlock.h"
 #include "sleep_cnt.h"
 
-GBLREF bool		mu_ctrly_occurred;
-GBLREF bool		mu_ctrlc_occurred;
-GBLREF gd_region	*gv_cur_region;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF tp_region	*halt_ptr;
-GBLREF tp_region	*grlist;
-GBLREF bool		in_mupip_freeze;
-GBLREF bool		error_mupip;
-GBLREF boolean_t	debug_mupip;
+GBLREF	bool		mu_ctrly_occurred;
+GBLREF	bool		mu_ctrlc_occurred;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	tp_region	*halt_ptr;
+GBLREF	tp_region	*grlist;
+GBLREF	bool		in_mupip_freeze;
+GBLREF	bool		error_mupip;
+GBLREF	boolean_t	debug_mupip;
+GBLREF	boolean_t	jnlpool_init_needed;
 
 #define INTERRUPTED	(mu_ctrly_occurred || mu_ctrlc_occurred)
 #define PRINT_FREEZEERR 											\
@@ -59,6 +60,17 @@ GBLREF boolean_t	debug_mupip;
 	status = ERR_MUNOFINISH;										\
 }
 #define PRINT_UNFROZEN_MSG	util_out_print("All regions will be unfrozen", TRUE)
+
+
+error_def(ERR_BUFFLUFAILED);
+error_def(ERR_DBRDONLY);
+error_def(ERR_FREEZECTRL);
+error_def(ERR_MUNOACTION);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_MUKILLIP);
+error_def(ERR_KILLABANDONED);
+error_def(ERR_FREEZEERR);
 
 void	mupip_freeze(void)
 {
@@ -71,18 +83,9 @@ void	mupip_freeze(void)
 	const char 	*msg2[] = { "UNFROZEN", "FROZEN" } ;
 	const char 	*msg3[] = { "unfrozen", "frozen" } ;
 
-	error_def(ERR_BUFFLUFAILED);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_FREEZECTRL);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_MUNOFINISH);
-	error_def(ERR_MUKILLIP);
-	error_def(ERR_KILLABANDONED);
-	error_def(ERR_FREEZEERR);
-
 	status = SS_NORMAL;
 	in_mupip_freeze = TRUE;
+	jnlpool_init_needed = TRUE;
 	mu_outofband_setup();
 	gvinit();
 	freeze = (CLI_PRESENT == cli_present("ON"));
@@ -163,8 +166,8 @@ void	mupip_freeze(void)
 		{
 			gtm_putmsg(VARLSTCNT(6) ERR_KILLABANDONED, 4, DB_LEN_STR(rptr->reg),
 				LEN_AND_LIT("database could have incorrectly marked busy integrity errors"));
-			PRINT_FREEZEERR;
-			continue;
+			util_out_print("WARNING: The region !AD to be frozen contains abandoned kills",
+				TRUE, REG_LEN_STR(gv_cur_region));
 		}
 		while (REG_FREEZE_SUCCESS != (freeze_ret = region_freeze(gv_cur_region, freeze, override, TRUE)))
 		{

@@ -32,7 +32,7 @@
 
 #include "job.h"
 #include "error.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "io.h"
 #include "iosp.h"
 #include "eintr_wrappers.h"

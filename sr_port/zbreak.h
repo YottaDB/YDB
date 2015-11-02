@@ -12,7 +12,7 @@
 #ifndef ZBREAK_H_INCLUDED
 #define ZBREAK_H_INCLUDED
 
-#include "zbreaksp.h"
+#include <zbreaksp.h>
 #include "cache.h"
 
 typedef struct

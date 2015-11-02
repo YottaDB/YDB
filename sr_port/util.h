@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ boolean_t util_is_log_open(void);
 
 typedef struct
 {
-	unsigned int	req_code : 08;
+	unsigned int	req_code : 8;
 	unsigned int	target   : 24;
 	uint4		mess_code;
 	char		text[OPER_LOG_SIZE];
@@ -51,10 +51,51 @@ void util_out_write(unsigned char *addr, unsigned int len);
 void util_in_open(void *);
 char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leading_spaces);
 void util_out_print_gtmio(caddr_t message, int flush, ...);
-/* util_out_save() and util_out_restore() are UNIX only - called from the UNIX send_msg() */
-void util_out_save(void);
-void util_out_restore(void);
+#ifdef DEBUG
+void		util_out_syslog_dump(void);
+
+#define		UTIL_OUT_SYSLOG_INTERVAL 50
 #endif
+#endif
+
+/* This value determines how many levels of nesting are allowed for protection of util_outbuff. */
+#define UTIL_OUTBUFF_STACK_SIZE	3
+
+/* Save the current va_list and repoint util_outbuff_ptr to the next chunk of util_outbuff,
+ * so that if an interrupt handler invokes util_out_print, the buffer under construction is
+ * left intact. In theory, we should not need more than two buffer chunks, but in pro we
+ * will allow to utilize a third one just to provide more protection against overwrites of
+ * under-construction messages.
+ */
+#define SAVE_UTIL_OUT_BUFFER(UTIL_OUT_SAVE_PTR, VA_LIST_SAVE_PTR, COPY_SAVED)		\
+{											\
+	if (TREF(util_outbuff_ptr) < (TADR(util_outbuff) + 				\
+	    OUT_BUFF_SIZE * (UTIL_OUTBUFF_STACK_SIZE - 1)))				\
+	{										\
+		(TREF(util_outbuff_ptr)) += OUT_BUFF_SIZE;				\
+		VAR_COPY(VA_LIST_SAVE_PTR, TREF(last_va_list_ptr));			\
+		UTIL_OUT_SAVE_PTR = TREF(util_outptr);					\
+		TREF(util_outptr) = NULL;						\
+		COPY_SAVED = TRUE;							\
+	} else										\
+		assert(FALSE);								\
+}
+
+/* Repoint util_outbuff_ptr to the previous chunk of util_outbuff, so that the construction
+ * of the buffer that was saved there could be finished safely, and also restore the
+ * corresponding va_list.
+ */
+#define RESTORE_UTIL_OUT_BUFFER(UTIL_OUT_SAVE_PTR, VA_LIST_SAVE_PTR, COPY_SAVED)	\
+{											\
+	if (COPY_SAVED)									\
+	{										\
+		assert(TREF(util_outbuff_ptr) > TADR(util_outbuff));			\
+		(TREF(util_outbuff_ptr)) -= OUT_BUFF_SIZE;				\
+		TREF(util_outptr) = UTIL_OUT_SAVE_PTR;					\
+		VAR_COPY(TREF(last_va_list_ptr), VA_LIST_SAVE_PTR);			\
+		COPY_SAVED = FALSE;							\
+	}										\
+}
 
 #define OUT_BUFF_SIZE	2048
 #define	NOFLUSH		0

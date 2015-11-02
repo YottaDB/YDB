@@ -52,6 +52,7 @@
 #include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "have_crit.h"
+#include "anticipatory_freeze.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
@@ -101,7 +102,7 @@ error_def(ERR_TEXT);
  */
 boolean_t repl_inst_get_name(char *fn, unsigned int *fn_len, unsigned int bufsize, instname_act error_action)
 {
-	char		temp_inst_fn[MAX_FN_LEN+1];
+	char		temp_inst_fn[MAX_FN_LEN + 1];
 	mstr		log_nam, trans_name;
 	uint4		ustatus;
 	int4		status;
@@ -111,18 +112,7 @@ boolean_t repl_inst_get_name(char *fn, unsigned int *fn_len, unsigned int bufsiz
 	log_nam.len = SIZEOF(GTM_REPL_INSTANCE) - 1;
 	trans_name.addr = temp_inst_fn;
 	ret = FALSE;
-	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, temp_inst_fn, SIZEOF(temp_inst_fn),
-							do_sendmsg_on_log2long)))
-		&& (0 != trans_name.len))
-	{
-		temp_inst_fn[trans_name.len] = '\0';
-		if (!get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize, &ustatus))
-		{
-			gtm_putmsg(VARLSTCNT(9) ERR_REPLINSTACC, 2, trans_name.len, trans_name.addr,
-				ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"), ustatus);
-		} else
-			ret = TRUE;
-	}
+	GET_INSTFILE_NAME(do_sendmsg_on_log2long, issue_gtm_putmsg);
 	if (FALSE == ret)
 	{
 		if (issue_rts_error == error_action)
@@ -310,7 +300,7 @@ void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 		TAG_POLICY_GTM_PUTMSG(fn, errno, realfiletag, TAG_BINARY);
 #endif
 	assert(0 < buflen);
-	LSEEKWRITE(fd, offset, buff, buflen, status);
+	REPL_INST_LSEEKWRITE(fd, offset, buff, buflen, status);
 	assert(0 == status);
 	if (0 != status)
 		rts_error(VARLSTCNT(7) ERR_REPLINSTWRITE, 4, buflen, (qw_off_t *)&offset, LEN_AND_STR(fn), status);
@@ -355,7 +345,7 @@ void	repl_inst_sync(char *fn)
 	OPENFILE3(fn, oflag, 0666, fd);
 	if (FD_INVALID == fd)
 		rts_error(VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
-	GTM_FSYNC(fd, status);
+	GTM_REPL_INST_FSYNC(fd, status);
 	assert(0 == status);
 	if (0 != status)
 		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fsync()"), CALLFROM, errno);
@@ -708,7 +698,8 @@ void	repl_inst_histinfo_add(repl_histinfo *histinfo)
 		}
 		assert((histinfo->start_seqno != last_strm_histinfo->start_seqno)
 				|| (histinfo->strm_seqno == last_strm_histinfo->strm_seqno)
-				|| (HISTINFO_TYPE_NORESYNC == histinfo->history_type));
+				|| (HISTINFO_TYPE_NORESYNC == histinfo->history_type)
+				|| (HISTINFO_TYPE_UPDRESYNC == histinfo->history_type));
 		/* If stream seqnos match between input history and last stream specific history in the instance file,
 		 * make sure the to-be-written history record skips past the last stream specific history record (as we
 		 * expect a decreasing sequence of strm_seqnos in the "prev_histinfo_num" linked list of history records).
@@ -794,8 +785,9 @@ void	repl_inst_histinfo_add(repl_histinfo *histinfo)
 	/* Assert that the prev_histinfo_num list of history records have decreasing "start_seqno" and "strm_seqno" values.
 	 * The only exception is stream # 0 for a supplementary instance as described in a previous comment in this function.
 	 */
-	if (INVALID_HISTINFO_NUM != prev_histinfo_num)
+	if (INVALID_HISTINFO_NUM != histinfo->prev_histinfo_num)
 	{
+		assert(histinfo->prev_histinfo_num == prev_histinfo_num);
 		status = repl_inst_histinfo_get(prev_histinfo_num, &last2_histinfo);
 		assert(0 == status);	/* Since the strm_histinfo_num we are passing is >=0 and < num_histinfo */
 		assert(strm_idx == last2_histinfo.strm_index);	/* they both better have the same stream # */
@@ -877,9 +869,13 @@ seq_num	repl_inst_histinfo_truncate(seq_num rollback_seqno)
 			}
 			index = -1;
 			/* Since we are rolling back all history records in the instance file,
-			 * clear all of "strm_seqno", "strm_group_info[]" and "last_histinfo_num[]" arrays.
-			 * The following logic is similar to that in "repl_inst_create" to initialize the above 4 fields.
-			 * Leave out "jnl_seqno" initialization as that is done anyways after this "if" block.
+			 * clear all of "strm_group_info[]" and "last_histinfo_num[]" arrays.
+			 * The following logic is similar to that in "repl_inst_create" to initialize the above 2 fields.
+			 * Note that we keep "jnl_seqno" and "strm_seqno" set to whatever value it came in with (as opposed
+			 * to setting it to 0). This is different from what is done in "repl_inst_create" because we want
+			 * to keep these set to a non-zero value if possible (see detailed comment below where "jnl_seqno"
+			 * gets set). Keeping "jnl_seqno" at a non-zero value necessitates keeping "strm_seqno" at a non-zero
+			 * value as well in order to avoid REPLINSTDBSTRM errors at source server startup.
 			 */
 			assert(MAX_SUPPL_STRMS == ARRAYSIZE(inst_hdr->last_histinfo_num));
 			for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
@@ -888,11 +884,31 @@ seq_num	repl_inst_histinfo_truncate(seq_num rollback_seqno)
 			{
 				assert(MAX_SUPPL_STRMS == ARRAYSIZE(inst_hdr->strm_seqno));
 				assert(SIZEOF(seq_num) == SIZEOF(inst_hdr->strm_seqno[0]));
-				memset(inst_hdr->strm_seqno, 0, MAX_SUPPL_STRMS * SIZEOF(seq_num));
-				inst_hdr->strm_seqno[0] = 1;	/* like is done in repl_inst_create */
 				assert((MAX_SUPPL_STRMS - 1) == ARRAYSIZE(inst_hdr->strm_group_info));
 				assert(SIZEOF(repl_inst_uuid) == SIZEOF(inst_hdr->strm_group_info[0]));
-				memset(inst_hdr->strm_group_info, 0, (MAX_SUPPL_STRMS - 1) * SIZEOF(repl_inst_uuid));
+				/* Keep the strm_seqno 0 for those streams which this instance has never used/communicated. For all
+				 * other stream#, set the strm_seqno to 1 if the current value of strm_seqno is 0. If the current
+				 * value of strm_seqno is non-zero, let it stay as it is (see comment above about strm_seqno).
+				 * This way, if this instance reconnects after the ROLLBACK to the same instance it was
+				 * communicating before, we avoid issuing REPLINSTNOHIST thereby making it user-friendly.
+				 * Note: The LMS group info for stream# "i" is found in strm_group_info[i - 1] (used below)
+				 */
+				for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+				{
+					if ((idx == 0) || (IS_REPL_INST_UUID_NON_NULL(inst_hdr->strm_group_info[idx - 1])))
+					{
+						if (0 == inst_hdr->strm_seqno[idx])
+							inst_hdr->strm_seqno[idx] = 1;
+					}
+#					ifdef DEBUG
+					else
+						assert(0 == inst_hdr->strm_seqno[idx]);
+#					endif
+				}
+				/* Leave the LMS group information as-is in the instance file header. By doing so, we avoid cases
+				 * where receiver server continuing after the rollback issues an INSUNKNOWN error. While this is
+				 * a valid error, we try to make it as user-friendly as possible.
+				 */
 			}
 		} else
 		{
@@ -930,8 +946,22 @@ seq_num	repl_inst_histinfo_truncate(seq_num rollback_seqno)
 							assert(MAX_SUPPL_STRMS > strmhistinfo.strm_index);
 							assert(IS_REPL_INST_UUID_NON_NULL(strmhistinfo.lms_group));
 							inst_hdr->strm_group_info[idx] = strmhistinfo.lms_group;
-						} else
-							NULL_INITIALIZE_REPL_INST_UUID(inst_hdr->strm_group_info[idx]);
+						} else if (IS_REPL_INST_UUID_NON_NULL(inst_hdr->strm_group_info[idx]))
+						{	/* stream# (idx + 1) has a non-zero UUID information in the file header
+							 * but all the history records corresponding to this stream are now
+							 * truncated. This also implies that strm_seqno of this stream is reset
+							 * to zero by ROLLBACK. To avoid REPLINSTNOHIST next time a communication
+							 * happens with the instance corresponding to stream# idx + 1, set the
+							 * strm_seqno to 1.
+							 * Note: The LMS group info for stream-i is found in strm_group_info[i - 1]
+							 */
+							inst_hdr->strm_seqno[idx + 1] = 1;
+							/* Also, leave the LMS group information for stream# idx + 1 as-is in the
+							 * instance file header By doing so, we avoid cases where receiver server
+							 * continuing after the rollback issues an INSUNKNOWN error. While this is
+							 * a valid error, we try to mae it as user-friendly as possible.
+							 */
+						}
 					}
 				}
 			}
@@ -973,9 +1003,8 @@ seq_num	repl_inst_histinfo_truncate(seq_num rollback_seqno)
 		inst_hdr->recvpool_shmid = INVALID_SHMID;	/* Just in case it is not already reset */
 		inst_hdr->recvpool_semid_ctime = 0;
 		inst_hdr->recvpool_shmid_ctime = 0;
-	} /* else for rollback, we reset the IPC fields in mu_replpool_remove_sem() and crash in mur_close_files */
+	} /* else for rollback, we reset the IPC fields in mu_replpool_release_sem() and crash in mur_close_files */
 	/* Flush all file header changes in jnlpool.repl_inst_filehdr to disk */
-	assert(!jnlpool.jnlpool_dummy_reg->open); /* Ensure the call below will not do a "grab_lock" as there is no jnlpool */
 	repl_inst_flush_filehdr();
 	assert((0 == inst_hdr->num_histinfo) || (0 < last_histinfo_seqno));
 	return last_histinfo_seqno;
@@ -1133,14 +1162,16 @@ boolean_t	repl_inst_was_rootprimary(void)
 	repl_histinfo	temphistinfo, *last_histinfo = &temphistinfo;
 	boolean_t	was_rootprimary, was_crit = FALSE;
 	sgmnt_addrs	*csa;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (NULL != jnlpool.jnlpool_ctl)
 	{	/* If the journal pool is available (indicated by NULL != jnlpool_ctl), we expect jnlpool_dummy_reg to be open.
 		 * The only exception is online rollback which doesn't do a jnlpool_init thereby leaving jnlpool_dummy_reg->open
 		 * to be FALSE. Assert accordingly.
 		 */
 		assert(((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
-				|| jgbl.onlnrlbk);
+				|| jgbl.onlnrlbk || (jgbl.mur_rollback && ANTICIPATORY_FREEZE_AVAILABLE));
 		csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 		ASSERT_VALID_JNLPOOL(csa);
 		assert(csa->now_crit);
@@ -1232,7 +1263,7 @@ int4	repl_inst_reset_zqgblmod_seqno_and_tn(void)
 		 * an online rollback is detected, return without resetting max_zqgblmod_seqno. The caller knows to take appropriate
 		 * action (on seeing -1 as the return code).
 		 */
-		GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+		grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
 		if (repl_csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle)
 		{
 			assert(is_rcvr_server);

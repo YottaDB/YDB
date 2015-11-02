@@ -39,6 +39,7 @@
 #include "gtmimagename.h"
 #include "gdsfilext_nojnl.h"
 #include "gtmio.h"
+#include "anticipatory_freeze.h"
 
 #include "sleep_cnt.h"
 #include "wcs_sleep.h"
@@ -48,7 +49,6 @@
 #include "shmpool.h"
 
 error_def(ERR_DBFILERR);
-
 /* Minimal file extend. Called (at the moment) from mur_back_process.c when processing JRT_TRUNC record.
  * We want to avoid jnl and other interferences of gdsfilext.
  */
@@ -60,8 +60,10 @@ int gdsfilext_nojnl(gd_region* reg, uint4 new_total, uint4 old_total)
 	off_t			offset;
 	char			*newmap;
 	uint4			ii;
+	unix_db_info		*udi;
 
-	csa = &FILE_INFO(reg)->s_addrs;
+	udi = FILE_INFO(reg);
+	csa = &udi->s_addrs;
 	csd = csa->hdr;
 	assert(old_total < new_total);
 	assert(new_total <= MAXTOTALBLKS(csd));
@@ -69,7 +71,6 @@ int gdsfilext_nojnl(gd_region* reg, uint4 new_total, uint4 old_total)
 	if (0 != status)
 	{
 		send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
-		/* if (ENOSPC == status)? wait for more space? */
 		return status;
 	}
 	/* initialize the bitmap tn's to 0. */
@@ -79,7 +80,7 @@ int gdsfilext_nojnl(gd_region* reg, uint4 new_total, uint4 old_total)
 	for (ii = ROUND_UP(old_total, BLKS_PER_LMAP); ii < new_total; ii += BLKS_PER_LMAP)
 	{
 		offset = (off_t)(csd->start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)ii * csd->blk_size;
-		LSEEKWRITE(FILE_INFO(reg)->fd, offset, newmap, csd->blk_size, status);
+		DB_LSEEKWRITE(csa, udi->fn, udi->fd, offset, newmap, csd->blk_size, status);
 		if (0 != status)
 		{
 			send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);

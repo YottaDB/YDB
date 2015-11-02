@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +60,15 @@ GBLREF	boolean_t	dollar_zininterrupt;
 
 LITREF unsigned char	io_params_size[];
 
+error_def(ERR_DEVPARMNEG);
+error_def(ERR_NOPRINCIO);
+error_def(ERR_SYSCALL);
+error_def(ERR_TCGETATTR);
+error_def(ERR_TCSETATTR);
+error_def(ERR_TTINVFILTER);
+error_def(ERR_WIDTHTOOSMALL);
+error_def(ERR_ZINTRECURSEIO);
+
 void iott_use(io_desc *iod, mval *pp)
 {
 	boolean_t	flush_input;
@@ -76,15 +85,6 @@ void iott_use(io_desc *iod, mval *pp)
 	int		status;
 	int		save_errno;
 	int		p_offset;
-
-	error_def(ERR_DEVPARMNEG);
-	error_def(ERR_NOPRINCIO);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_TCGETATTR);
-	error_def(ERR_TCSETATTR);
-	error_def(ERR_TTINVFILTER);
-	error_def(ERR_WIDTHTOOSMALL);
-	error_def(ERR_ZINTRECURSEIO);
 
 	p_offset = 0;
 	assert(iod->state == dev_open);
@@ -115,7 +115,7 @@ void iott_use(io_desc *iod, mval *pp)
                                         stop_image_no_core();
                                 }
                         }
-                        rts_error(VARLSTCNT(3) ERR_TCGETATTR, tt_ptr->fildes, save_errno);
+                        rts_error(VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		flush_input = FALSE;
 		d_in = iod->pair.in;

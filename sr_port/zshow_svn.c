@@ -26,7 +26,7 @@
 #include "gdscc.h"
 #include "io.h"
 #include "jnl.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "svnames.h"
 #include "mlkdef.h"
@@ -142,7 +142,6 @@ GBLREF uint4		dollar_zjob;
 GBLREF mval		dollar_zstatus;
 GBLREF mval		dollar_zstep;
 GBLREF mval		dollar_zsource;
-GBLREF int		dollar_zmaxtptime;
 GBLREF int4		dollar_zsystem;
 GBLREF int4		dollar_zeditor;
 GBLREF uint4		dollar_tlevel;
@@ -527,7 +526,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZMAXTPTIME:
-			MV_FORCE_MVAL(&var, dollar_zmaxtptime);
+			MV_FORCE_MVAL(&var, TREF(dollar_zmaxtptime));
 			ZS_VAR_EQU(&x, zmaxtptime_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)

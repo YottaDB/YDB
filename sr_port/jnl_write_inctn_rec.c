@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,6 +70,9 @@ void	jnl_write_inctn_rec(sgmnt_addrs	*csa)
 	 * copy the entire structure (16 bytes at this point). Pipeline breaks are considered more costly than a few
 	 * unnecessary memory-to-memory copies.
 	 */
+	inctn_detail.blknum_struct.filler_uint4 = 0;
+	inctn_detail.blknum_struct.filler_short = 0;
 	inctn_record.detail = inctn_detail;
+	inctn_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&inctn_record, SIZEOF(struct_jrec_inctn));
 	jnl_write(jpc, JRT_INCTN, (jnl_record *)&inctn_record, NULL, NULL);
 }

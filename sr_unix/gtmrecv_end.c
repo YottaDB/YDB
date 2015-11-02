@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,7 @@
 #include "is_proc_alive.h"
 #include "gtmsource.h"
 #include "gtmio.h"
+#include "have_crit.h"
 
 GBLREF	uint4			process_id;
 GBLREF	recvpool_addrs		recvpool;
@@ -51,9 +52,7 @@ GBLREF	boolean_t		gtmrecv_logstats;
 GBLREF	int			gtmrecv_listen_sock_fd;
 GBLREF	int			gtmrecv_sock_fd;
 GBLREF	int			gtmrecv_log_fd;
-GBLREF	int			gtmrecv_statslog_fd;
 GBLREF	FILE			*gtmrecv_log_fp;
-GBLREF	FILE			*gtmrecv_statslog_fp;
 GBLREF	qw_num			repl_recv_data_recvd;
 GBLREF	qw_num			repl_recv_data_processed;
 GBLREF	repl_msg_ptr_t		gtmrecv_msgp;
@@ -105,7 +104,7 @@ int gtmrecv_endupd(void)
 int gtmrecv_end1(boolean_t auto_shutdown)
 {
 	int4		strm_idx;
-	int		exit_status, idx;
+	int		exit_status, idx, status, save_errno;
 	int		fclose_res, rc;
 	seq_num		log_seqno, log_seqno1, jnlpool_seqno, jnlpool_strm_seqno[MAX_SUPPL_STRMS];
 	uint4		savepid;
@@ -118,7 +117,7 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 	/* Detach from receive pool */
 	recvpool.gtmrecv_local->shutdown = exit_status;
 	recvpool.gtmrecv_local->recv_serv_pid = 0;
-	if (recvpool.recvpool_ctl && 0 > SHMDT(recvpool.recvpool_ctl))
+	if (0 > SHMDT(recvpool.recvpool_ctl))
 		repl_log(stderr, TRUE, TRUE, "Error detaching from Receive Pool : %s\n", REPL_STR_ERROR);
 	recvpool.recvpool_ctl = NULL;
 	assert((NULL != jnlpool_ctl) && (jnlpool_ctl == jnlpool.jnlpool_ctl));
@@ -138,8 +137,9 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 		 */
 		if (!auto_shutdown)
 		{
-			if (0 > SHMDT(jnlpool.jnlpool_ctl))
-				repl_log(stderr, TRUE, TRUE, "Error detaching from Journal Pool : %s\n", REPL_STR_ERROR);
+			JNLPOOL_SHMDT(status, save_errno);
+			if (0 > status)
+				repl_log(stderr, TRUE, TRUE, "Error detaching from Journal Pool : %s\n", STRERROR(save_errno));
 			jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
 			jnlpool.repl_inst_filehdr = NULL;
 			jnlpool.gtmsrc_lcl_array = NULL;

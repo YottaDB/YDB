@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,19 +10,25 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#ifdef VMS
+#include <devdef.h>
+#include <rms.h>
+#endif
+
 #include "io.h"
 #include "iosp.h"
 #include "op.h"
 #include "trans_log_name.h"
-#ifdef __MVS__
 #include "iormdef.h"
-#endif
-
 
 GBLREF io_log_name	*io_root_log_name;
 GBLREF io_pair		io_curr_device;
 GBLREF io_pair		io_std_device;
 GBLREF io_desc		*active_device;
+
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_TEXT);
 
 void op_close(mval *v, mval *p)
 {
@@ -33,10 +39,7 @@ void op_close(mval *v, mval *p)
 	io_log_name	*tl;		/* logical record for translated name */
 	int4		stat;	        /* status */
 	mstr		tn;		/* translated name */
-	ZOS_ONLY(d_rm_struct     *rm_ptr;)
-
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_TEXT);
+	d_rm_struct 	*rm_ptr;
 
 	MV_FORCE_STR(v);
 	MV_FORCE_STR(p);
@@ -98,9 +101,6 @@ void op_close(mval *v, mval *p)
 	if (DEFAULT_CODE_SET != ciod->out_code_set)
 		ICONV_CLOSE_CD(ciod->output_conv_cd);
 #endif
-
 	(ciod->disp_ptr->close)(ciod, p);
 	active_device = 0;
-	if (ciod->type == rm)
-	        remove_rms (ciod);
 }

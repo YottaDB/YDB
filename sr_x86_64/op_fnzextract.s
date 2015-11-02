@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -41,7 +41,7 @@ dest	=	-32
 # PUBLIC	op_fnzextract
 ENTRY op_fnzextract
 	pushq	REG_XFER_TABLE
-	enter	$40,$0    # Need to make sure that the SP will be 16 bytes aligned
+	enter	$48,$0    # Need to make sure that the SP will be 16 bytes aligned
 	movl	REG32_ARG0,last(REG_FRAME_POINTER)
 	movl	REG32_ARG1,first(REG_FRAME_POINTER)
 	movq	REG64_ARG3,dest(REG_FRAME_POINTER)

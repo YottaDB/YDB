@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,6 @@
 error_def(ERR_BFRQUALREQ);
 error_def(ERR_FILEPARSE);
 error_def(ERR_JNLALIGNSZCHG);
-error_def(ERR_JNLBUFFTOOLG);
 error_def(ERR_JNLINVALLOC);
 error_def(ERR_JNLINVEXT);
 error_def(ERR_JNLINVSWITCHLMT);
@@ -136,11 +135,6 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 			return FALSE;
 		if (jnl_info->buffer <= 0)
 			return FALSE;
-		if (jnl_info->buffer > JNL_BUFFER_MAX)
-		{
-			gtm_putmsg(VARLSTCNT(4) ERR_JNLBUFFTOOLG, 2, jnl_info->buffer, JNL_BUFFER_MAX);
-			return FALSE;
-		}
 	}
 	if (jnl_options->epoch_interval_specified = (CLI_PRESENT == cli_present("EPOCH_INTERVAL")))
 	{

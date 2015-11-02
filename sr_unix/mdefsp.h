@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *    Copyright 2001, 2011 Fidelity Information Services, Inc   *
+ *    Copyright 2001, 2012 Fidelity Information Services, Inc   *
  *                                                              *
  *    This source code contains the intellectual property       *
  *    of its copyright holder(s), and is made available         *
@@ -117,15 +117,8 @@ typedef unsigned short	in_port_t;
 
 #ifdef __linux__
 #define SYS_ERRLIST_INCLUDE	"gtm_stdio.h"
-/* For 32-bit linux in i386, we noticed during the RHEL 5.5 upgrade that using msems affects process wakeup times
- * dramatically enough to cause test hangs/failures.  Not sure if it is a linux kernel or package issue.
- * Therefore disabling msems on that platform for now until we know better. The alternative is socket waits (using
- * select/poll system call). Performance differences, if any, is expected to be only a marginally slowdown.
- */
-#  ifndef __i386
-#  define MUTEX_MSEM_WAKE
-#  define POSIX_MSEM
-#  endif
+#define MUTEX_MSEM_WAKE
+#define POSIX_MSEM
 #endif
 
 #ifdef __CYGWIN__

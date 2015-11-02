@@ -13,7 +13,7 @@
 #define INCR_LINK_INCLUDED
 
 #ifdef USHBIN_SUPPORTED
-#include "incr_link_sp.h"
+#include <incr_link_sp.h>
 bool incr_link(int file_desc, zro_ent *zro_entry);
 #else
 bool incr_link(int file_desc);

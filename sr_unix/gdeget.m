@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006, 2011 Fidelity Information Services, Inc	;
+;	Copyright 2006, 2012 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -25,8 +25,13 @@ LOAD
 	s mach=$p($zver," ",4)
 	s seghasencrflag=FALSE
 	if ($e(label,0,9)="GTCGBDUNX"),$e(label,$l(label)-1,99)>5 s seghasencrflag=TRUE
-	s reghasv543fields=FALSE
-	if ($e(label,0,9)="GTCGBDUNX"),$e(label,$l(label)-1,99)>6 s reghasv543fields=TRUE
+	s reghasv550fields=FALSE
+	if ($e(label,0,9)="GTCGBDUNX"),$e(label,$l(label)-1,99)>6 s reghasv550fields=TRUE
+	s reghasv600fields=FALSE
+	if ($e(label,0,9)="GTCGBDUNX"),$e(label,$l(label)-1,99)>7 s reghasv600fields=TRUE
+	set v550=0
+	i (label="GTCGBDUNX007")!(label="GTCGBDUNX107") s label=hdrlab,v550=1,update=1	;autoconvert
+	i (v550=1) n SIZEOF d v550init
 	set v542=0
 	i (label="GTCGBLDIR009")!(label="GTCGBDUNX006")!(label="GTCGBDUNX106") s label=hdrlab,v542=1,update=1	;autoconvert
 	i (v542=1) n SIZEOF d v542init
@@ -114,21 +119,28 @@ LOAD
 ; templates
 	k tmpreg,tmpseg
 	d cretmps
-	i (reghasv543fields=TRUE) d tmpreg("ALIGNSIZE")
+	i (reghasv550fields=TRUE) d tmpreg("ALIGNSIZE")
 	f s="ALLOCATION" d tmpreg(s)
-	i (reghasv543fields=TRUE) d tmpreg("AUTOSWITCHLIMIT")
+	i (reghasv550fields=TRUE) d tmpreg("AUTOSWITCHLIMIT")
 	f s="BEFORE_IMAGE","BUFFER_SIZE" d tmpreg(s)
+	i tmpreg("BUFFER_SIZE")<minreg("BUFFER_SIZE")  s tmpreg("BUFFER_SIZE")=minreg("BUFFER_SIZE"),update=1
 	i 'v30 d tmpreg("COLLATION_DEFAULT")
-	i (reghasv543fields=TRUE) d tmpreg("EPOCH_INTERVAL")
+	i (reghasv550fields=TRUE) d tmpreg("EPOCH_INTERVAL")
 	f s="EXTENSION","FILE_NAME" d tmpreg(s)
-	f s="JOURNAL","KEY_SIZE","NULL_SUBSCRIPTS","RECORD_SIZE" d tmpreg(s) ;,"STOP_ENABLE"
+	i (reghasv600fields=TRUE) d tmpreg("INST_FREEZE_ON_ERROR")
+	f s="JOURNAL","KEY_SIZE","NULL_SUBSCRIPTS" d tmpreg(s)
+	i (reghasv600fields=TRUE) d tmpreg("QDBRUNDOWN")
+	f s="RECORD_SIZE" d tmpreg(s) ;,"STOP_ENABLE"
 	; need to handle versioning
 	i 'v44&'v30 d tmpreg("STDNULLCOLL")
-	i (reghasv543fields=TRUE) d tmpreg("SYNC_IO")
-	i (reghasv543fields=TRUE) d tmpreg("YIELD_LIMIT")
+	i (reghasv550fields=TRUE) d tmpreg("SYNC_IO")
+	i (reghasv550fields=TRUE) d tmpreg("YIELD_LIMIT")
 	; minimum allocation/extension was changed in V54001; check if default current value is lower and if so adjust it
 	i tmpreg("ALLOCATION")<minreg("ALLOCATION")  s tmpreg("ALLOCATION")=minreg("ALLOCATION"),update=1
 	i tmpreg("EXTENSION")<minreg("EXTENSION")  s tmpreg("EXTENSION")=minreg("EXTENSION"),update=1
+	i (reghasv550fields=TRUE) i tmpreg("ALIGNSIZE")<minreg("ALIGNSIZE")  s tmpreg("ALIGNSIZE")=minreg("ALIGNSIZE"),update=1
+	i (reghasv550fields=TRUE) i tmpreg("AUTOSWITCHLIMIT")<minreg("AUTOSWITCHLIMIT")  d
+	. s tmpreg("AUTOSWITCHLIMIT")=minreg("AUTOSWITCHLIMIT"),update=1
 	f i=2:1:$l(accmeth,"\") s am=$p(accmeth,"\",i) d
 	. i am="MM" d:$zl(rec)-(rel-1)<3 nextrec i +$ze(rec,rel,rel+2)'=2 d tmpmm q
 	. f s="ACCESS_METHOD","ALLOCATION","BLOCK_SIZE","BUCKET_SIZE","DEFER" d tmpseg(am,s)
@@ -210,19 +222,22 @@ region:
 	s regs(s,"EXTENSION")=$$bin2num($ze(rec,rel,rel+SIZEOF("reg_jnl_deq")-1)),rel=rel+SIZEOF("reg_jnl_deq")
 	; check if allocation is below new minimums (changed in V54001) if so adjust it to be at least that much
 	i regs(s,"EXTENSION")<minreg("EXTENSION")  s regs(s,"EXTENSION")=minreg("EXTENSION"),update=1
-	i (reghasv543fields=TRUE)  d
+	i (reghasv550fields=TRUE)  d
 	. s regs(s,"AUTOSWITCHLIMIT")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	. s regs(s,"ALIGNSIZE")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
+	. i regs(s,"ALIGNSIZE")<minreg("ALIGNSIZE")  s regs(s,"ALIGNSIZE")=minreg("ALIGNSIZE"),update=1
+	. i regs(s,"AUTOSWITCHLIMIT")<minreg("AUTOSWITCHLIMIT")  s regs(s,"AUTOSWITCHLIMIT")=minreg("AUTOSWITCHLIMIT"),update=1
 	. s regs(s,"EPOCH_INTERVAL")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	. s regs(s,"SYNC_IO")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	. s regs(s,"YIELD_LIMIT")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	e  d
 	. s regs(s,"AUTOSWITCHLIMIT")=8388600
-	. s regs(s,"ALIGNSIZE")=2048
+	. s regs(s,"ALIGNSIZE")=4096
 	. s regs(s,"EPOCH_INTERVAL")=300
 	. s regs(s,"SYNC_IO")=0
 	. s regs(s,"YIELD_LIMIT")=8
 	s regs(s,"BUFFER_SIZE")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
+	i regs(s,"BUFFER_SIZE")<minreg("BUFFER_SIZE")  s regs(s,"BUFFER_SIZE")=minreg("BUFFER_SIZE"),update=1
 	s regs(s,"BEFORE_IMAGE")=$$bin2num($ze(rec,rel)),rel=rel+1
 	i $ze(rec,rel,rel+3)'=$tr($j("",4)," ",ZERO) zm gdeerr("INPINTEG")				; 4 chars
 	s rel=rel+4
@@ -233,10 +248,17 @@ region:
 	. i $ze(rec,rel)'=$tr($j("",1)," ",ZERO) zm gdeerr("INPINTEG")					; 1 chars
 	. s regs(s,"STDNULLCOLL")=0
 	s rel=rel+1
+	i (reghasv600fields=TRUE)  d
+	. s regs(s,"INST_FREEZE_ON_ERROR")=$$bin2num($ze(rec,rel)),rel=rel+1
+	. s regs(s,"QDBRUNDOWN")=$$bin2num($ze(rec,rel)),rel=rel+1
+	e  d
+	. s regs(s,"INST_FREEZE_ON_ERROR")=0
+	. s regs(s,"QDBRUNDOWN")=0
 	s l=$$bin2num($ze(rec,rel)),rel=rel+1 ;jnl_file_len
 	s regs(s,"FILE_NAME")=$ze(rec,rel,rel+l-1),rel=rel+SIZEOF("file_spec")
+	s rel=rel+SIZEOF("gd_region_padding")								; padding
 	i $ze(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) zm gdeerr("INPINTEG")				; reserved
-	s rel=rel+SIZEOF("gd_region_padding")
+	s rel=rel+8											; reserved
 	s abs=abs+SIZEOF("gd_region")
 	q
 segment:
@@ -335,18 +357,20 @@ CREATE
 	s am=tmpacc d maktseg
 	q
 cretmps:
-	s tmpreg("ALIGNSIZE")=2048
+	s tmpreg("ALIGNSIZE")=4096
 	s tmpreg("ALLOCATION")=2048
-	s tmpreg("AUTOSWITCHLIMIT")=8388600
+	s tmpreg("AUTOSWITCHLIMIT")=8386560
 	s tmpreg("BEFORE_IMAGE")=1
-	s tmpreg("BUFFER_SIZE")=128
+	s tmpreg("BUFFER_SIZE")=2308
 	s tmpreg("COLLATION_DEFAULT")=0
 	s tmpreg("EPOCH_INTERVAL")=300
 	s tmpreg("EXTENSION")=2048
 	s tmpreg("FILE_NAME")=""
 	s tmpreg("JOURNAL")=0
+	s tmpreg("INST_FREEZE_ON_ERROR")=0
 	s tmpreg("KEY_SIZE")=64
 	s tmpreg("NULL_SUBSCRIPTS")=0
+	s tmpreg("QDBRUNDOWN")=0
 	s tmpreg("RECORD_SIZE")=256
 	s tmpreg("STDNULLCOLL")=0
 	s tmpreg("SYNC_IO")=0
@@ -409,7 +433,7 @@ v44init:
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=32767
 	s SIZEOF("reg_jnl_deq")=2
-	s SIZEOF("gd_region_padding")=8
+	s SIZEOF("gd_region_padding")=0
 	s MAXNAMLN=SIZEOF("mident"),MAXREGLN=16,MAXSEGLN=16
 	i ver'="VMS" s SIZEOF("blk_hdr")=8
 	e  s SIZEOF("blk_hdr")=7
@@ -427,7 +451,7 @@ v5ft1init:
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=32767
 	s SIZEOF("reg_jnl_deq")=2
-	s SIZEOF("gd_region_padding")=8
+	s SIZEOF("gd_region_padding")=0
 	i ver'="VMS" s SIZEOF("blk_hdr")=8
 	e  s SIZEOF("blk_hdr")=7
 	q
@@ -444,8 +468,8 @@ v532init:
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=32767
 	s SIZEOF("reg_jnl_deq")=2
-	i (gtm64=TRUE) s SIZEOF("gd_region_padding")=12
-	e  s SIZEOF("gd_region_padding")=8
+	i (gtm64=TRUE) s SIZEOF("gd_region_padding")=4
+	e  s SIZEOF("gd_region_padding")=0
 	;s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32
 	;s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
 	i ver'="VMS" s SIZEOF("blk_hdr")=16
@@ -464,8 +488,8 @@ v533init:
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=32767
 	s SIZEOF("reg_jnl_deq")=2
-	i (gtm64=TRUE) s SIZEOF("gd_region_padding")=12
-	e  s SIZEOF("gd_region_padding")=8
+	i (gtm64=TRUE) s SIZEOF("gd_region_padding")=4
+	e  s SIZEOF("gd_region_padding")=0
 	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32
 	s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
 	i ver'="VMS" s SIZEOF("blk_hdr")=16
@@ -485,8 +509,8 @@ v534init:
         s SIZEOF("dsk_blk")=512
         s SIZEOF("max_str")=32767
         s SIZEOF("reg_jnl_deq")=2
-	i (gtm64=TRUE) s SIZEOF("gd_region_padding")=12
-	e  s SIZEOF("gd_region_padding")=8
+	i (gtm64=TRUE) s SIZEOF("gd_region_padding")=4
+	e  s SIZEOF("gd_region_padding")=0
         s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32   ; maximum name length allowed is 31 characters
         s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
         q
@@ -498,7 +522,7 @@ v542init:
         . s SIZEOF("gd_contents")=44
         . s SIZEOF("gd_map")=36
         . s SIZEOF("gd_region")=332
-        . s SIZEOF("gd_region_padding")=8
+        . s SIZEOF("gd_region_padding")=0
         . if (olabel="GTCGBLDIR009") s SIZEOF("gd_segment")=336		; VMS
         . e  s SIZEOF("gd_segment")=340
         e  d								; 64-bit
@@ -508,7 +532,7 @@ v542init:
         . s SIZEOF("gd_contents")=80
         . s SIZEOF("gd_map")=40
         . s SIZEOF("gd_region")=344
-        . s SIZEOF("gd_region_padding")=12
+        . s SIZEOF("gd_region_padding")=4
         . s SIZEOF("gd_segment")=360
         s SIZEOF("mident")=32
         s SIZEOF("blk_hdr")=16
@@ -519,4 +543,31 @@ v542init:
         s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32   ; maximum name length allowed is 31 characters
         s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
         q
-
+v550init:
+	i (olabel="GTCGBDUNX007") d
+	. s SIZEOF("am_offset")=324
+	. s SIZEOF("file_spec")=256
+	. s SIZEOF("gd_header")=16
+	. s SIZEOF("gd_contents")=44
+	. s SIZEOF("gd_map")=36
+	. s SIZEOF("gd_region")=356
+	. s SIZEOF("gd_region_padding")=2
+	. s SIZEOF("gd_segment")=340
+	e  d
+	. s SIZEOF("am_offset")=332
+	. s SIZEOF("file_spec")=256
+	. s SIZEOF("gd_header")=16
+	. s SIZEOF("gd_contents")=80
+	. s SIZEOF("gd_map")=40
+	. s SIZEOF("gd_region")=368
+	. s SIZEOF("gd_region_padding")=6
+	. s SIZEOF("gd_segment")=360
+	s SIZEOF("mident")=32
+	s SIZEOF("blk_hdr")=16
+	s SIZEOF("rec_hdr")=3
+	s SIZEOF("dsk_blk")=512
+	s SIZEOF("max_str")=32767
+	s SIZEOF("reg_jnl_deq")=4
+	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32	; maximum name length allowed is 31 characters
+	s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
+	q

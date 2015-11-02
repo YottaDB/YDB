@@ -35,7 +35,7 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "interlock.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #ifdef GTM_TRIGGER
 #  include "gv_trigger.h"
@@ -61,6 +61,7 @@
 #include "op_tcommit.h"		/* for op_tcommit prototype */
 #include "have_crit.h"
 #include "gvcst_protos.h"
+#include "gtmimagename.h"
 
 LITREF	mval	literal_null;
 
@@ -119,6 +120,8 @@ void op_ztrigger(void)
 	boolean_t			write_logical_jnlrecs, jnl_format_done;
 	boolean_t			is_tpwrap;
 	boolean_t			lcl_implicit_tstart;	/* local copy of the global variable "implicit_tstart" */
+	boolean_t			want_root_search = FALSE;
+	uint4				lcl_onln_rlbkd_cycle;
 	gtm_trigger_parms		trigparms;
 	gvt_trigger_t			*gvt_trigger;
 	gvtr_invoke_parms_t		gvtr_parms;
@@ -221,6 +224,14 @@ void op_ztrigger(void)
 					UNW_MV_STENT_TO(save_msp, save_mv_chain);
 			}
 		}
+		/* finish off any pending root search from previous retry */
+		REDO_ROOT_SEARCH_IF_NEEDED(want_root_search, cdb_status);
+		if (cdb_sc_normal != cdb_status)
+		{	/* gvcst_root_search invoked from REDO_ROOT_SEARCH_IF_NEEDED ended up with a restart situation but did not
+			 * actually invoke t_retry. Instead, it returned control back to us asking us to restart.
+			 */
+			goto retry;
+		}
 		if (write_logical_jnlrecs)
 		{	/* Only write jnl recs if we are in fact journaling..
 			 * skip_dbtriggers is set to TRUE for trigger unsupporting platforms. So, nodeflags will be set to skip
@@ -272,6 +283,7 @@ void op_ztrigger(void)
 			if ((NULL != save_msp) && (save_msp > msp))
 				UNW_MV_STENT_TO(save_msp, save_mv_chain);
 			t_retry(cdb_status);
+			skip_INVOKE_RESTART = FALSE;
 		} else
 		{	/* else: t_retry has already been done so no need to do that again but need to still invoke tp_restart
 			 * to complete pending "tprestart_state" related work.
@@ -284,43 +296,19 @@ void op_ztrigger(void)
 			rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 			assert(0 == rc && TPRESTART_STATE_NORMAL == tprestart_state);
 		}
-#		ifdef GTM_TRIGGER
 		assert(0 < t_tries);
 		if (lcl_implicit_tstart)
 		{
-			assert((cdb_sc_normal != cdb_status) || (ERR_TPRETRY == gtm_trig_status));
-			if (cdb_sc_normal == cdb_status)
-			{
-				DEBUG_ONLY(save_cdb_status = cdb_status);
-				cdb_status = t_fail_hist[t_tries - 1]; /* get the last restart code */
-			}
-			assert(((cdb_sc_onln_rlbk1 != cdb_status) && (cdb_sc_onln_rlbk2 != cdb_status))
-				|| (TREF(dollar_zonlnrlbk) && !gv_target->root));
-			if (cdb_sc_onln_rlbk1 == cdb_status)
-			{	/* We are implicit transaction and online rollback update the database but did NOT take us to a
-				 * different logical state. We've already done the restart, but the root is now reset to zero. Do
-				 * root search to establish the new root
-				 */
-				ASSERT_BEGIN_OF_FRESH_TP_TRANS; /* ensures gvcst_root_search is the first thing done in the
-								 * restarted transaction */
-				GVCST_ROOT_SEARCH;
-			} else if (cdb_sc_onln_rlbk2 == cdb_status)
-			{	/* Database was taken back to a different logical state and we are an implicit TP transaction.
-				 * Issue DBROLLEDBACK error that the application programmer can catch and do the necessary stuff.
-				 */
-				assert(gtm_trigger_depth == tstart_trigger_depth);
-				rts_error(VARLSTCNT(1) ERR_DBROLLEDBACK);
-			}
+			SET_WANT_ROOT_SEARCH(cdb_status, want_root_search);
+			assert(!skip_INVOKE_RESTART); /* if set to TRUE above, should have been reset by t_retry */
 		}
-#		endif
-		assert(!skip_INVOKE_RESTART); /* if set to TRUE above, should have been reset by t_retry */
 		/* At this point, we can be in TP only if we implicitly did a tstart in op_ztrigger trying to drive a trigger.
 		 * Assert that. So reinvoke the T_BEGIN call only in case of TP. For non-TP, update_trans is unaffected by
 		 * t_retry.
 		 */
 		assert(!dollar_tlevel || lcl_implicit_tstart);
 		if (dollar_tlevel)
-		{
+		{	/* gvcst_kill has similar code and should be maintained in parallel */
 			tp_set_sgm();	/* set sgm_info_ptr & first_sgm_info for TP start */
 			T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVZTRIGFAIL);
 		}

@@ -14,10 +14,10 @@
 #include "gtm_string.h"
 
 #include "urx.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "op.h"
-#include "auto_zlink.h"
+#include <auto_zlink.h>
 
 GBLREF unsigned char    *obpt;          /* output buffer index */
 GBLREF stack_frame	*frame_pointer;

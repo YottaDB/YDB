@@ -37,6 +37,14 @@
 #include "fullbool.h"
 #include "trace_table.h"
 #include "parse_trctbl_groups.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdscc.h"
+#include "filestruct.h"
+#include "buddy_list.h"		/* needed for tp.h */
+#include "jnl.h"
+#include "hashtab_int4.h"	/* needed for tp.h */
+#include "tp.h"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -223,6 +231,13 @@ void	gtm_env_init(void)
 				memcpy((TREF(gtmprompt)).addr, trans.addr, trans.len);
 			}
 		}
+		/* Initialize tpnotacidtime */
+		TREF(tpnotacidtime) = TPNOTACID_DEFAULT_TIME;
+		val.addr = GTM_TPNOTACIDTIME;
+		val.len = SIZEOF(GTM_TPNOTACIDTIME) - 1;
+		if ((status = trans_numeric(&val, &is_defined, TRUE)) && (0 <= status)
+			&& (TPNOTACID_MAX_TIME >= status) && is_defined)
+				TREF(tpnotacidtime) = status;	 /* NOTE assignment above */
 		/* Initialize $gtm_tprestart_log_first */
 		val.addr = GTM_TPRESTART_LOG_LIMIT;
 		val.len = STR_LIT_LEN(GTM_TPRESTART_LOG_LIMIT);
@@ -262,6 +277,11 @@ void	gtm_env_init(void)
 				}
 			}
 		}
+		/* Initialize dollar_zmaxtptime */
+		val.addr = GTM_ZMAXTPTIME;
+		val.len = SIZEOF(GTM_ZMAXTPTIME) - 1;
+		if ((status = trans_numeric(&val, &is_defined, TRUE)) && (0 <= status) && (TPTIMEOUT_MAX_TIME >= status))
+			TREF(dollar_zmaxtptime) = status;	 /* NOTE assignment above */
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 		TREF(gtm_env_init_done) = TRUE;

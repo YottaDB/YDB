@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,6 +84,10 @@ void mucregini(int4 blk_init_size)
 	cs_data->max_key_size = gv_cur_region->max_key_size;
 	cs_data->null_subs = gv_cur_region->null_subs;
 	cs_data->std_null_coll = gv_cur_region->std_null_coll;
+#ifdef UNIX
+	cs_data->freeze_on_fail = gv_cur_region->freeze_on_fail;
+	cs_data->mumps_can_bypass = gv_cur_region->mumps_can_bypass;
+#endif
 	cs_data->reserved_bytes = gv_cur_region->dyn.addr->reserved_bytes;
 	cs_data->clustered = FALSE;
 	cs_data->file_corrupt = 0;
@@ -111,6 +115,7 @@ void mucregini(int4 blk_init_size)
 	cs_data->jnl_state = gv_cur_region->jnl_state;
 	cs_data->epoch_interval = JNL_ALLOWED(cs_data) ? DEFAULT_EPOCH_INTERVAL : 0;
 	cs_data->alignsize = JNL_ALLOWED(cs_data) ? (DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE) : 0;
+	ROUND_UP_JNL_BUFF_SIZE(cs_data->jnl_buffer_size, gv_cur_region->jnl_buffer_size, cs_data);
 #ifdef UNIX
 	if (JNL_ALLOWED(cs_data))
 	{
@@ -125,16 +130,21 @@ void mucregini(int4 blk_init_size)
 	else
 		cs_data->autoswitchlimit = 0;
 	assert(!(MAX_IO_BLOCK_SIZE % DISK_BLOCK_SIZE));
-	cs_data->jnl_buffer_size = ROUND_UP(gv_cur_region->jnl_buffer_size,
-		MIN(MAX_IO_BLOCK_SIZE, cs_data->blk_size) / DISK_BLOCK_SIZE);
-	if(cs_data->jnl_alq + cs_data->jnl_deq > cs_data->autoswitchlimit)
+	if (cs_data->jnl_alq + cs_data->jnl_deq > cs_data->autoswitchlimit)
 		cs_data->jnl_alq = cs_data->autoswitchlimit;
 #else
 	cs_data->autoswitchlimit = JNL_ALLOWED(cs_data) ? ALIGNED_ROUND_DOWN(JNL_ALLOC_MAX, cs_data->jnl_alq, cs_data->jnl_deq) : 0;
-	cs_data->jnl_buffer_size = gv_cur_region->jnl_buffer_size;
 #endif
-	if (JNL_ALLOWED(cs_data) && !cs_data->jnl_buffer_size)
-		cs_data->jnl_buffer_size = JNL_BUFFER_DEF;
+	if (!cs_data->jnl_buffer_size)
+		ROUND_UP_JNL_BUFF_SIZE(cs_data->jnl_buffer_size, JNL_BUFFER_DEF, cs_data);
+	if (JNL_ALLOWED(cs_data))
+		if (cs_data->jnl_buffer_size < JNL_BUFF_PORT_MIN(cs_data))
+		{
+			ROUND_UP_MIN_JNL_BUFF_SIZE(cs_data->jnl_buffer_size, cs_data);
+		} else if (cs_data->jnl_buffer_size > JNL_BUFFER_MAX)
+		{
+			ROUND_DOWN_MAX_JNL_BUFF_SIZE(cs_data->jnl_buffer_size, cs_data);
+		}
 	cs_data->def_coll = gv_cur_region->def_coll;
 	if (cs_data->def_coll)
 	{
@@ -240,7 +250,7 @@ void mucregini(int4 blk_init_size)
 				 * this is because the macro relies on max_tn/max_tn_warn being set and that does not happen
 				 * until a few lines later. hence keeping it simple here by doing a plain assignment of curr_tn.
 				 */
-	cs_data->max_tn = MAX_TN_V5;
+	cs_data->max_tn = MAX_TN_V6;
 	SET_TN_WARN(cs_data, cs_data->max_tn_warn);
 	SET_LATCH_GLOBAL(&cs_data->next_upgrd_warn.time_latch, LOCK_AVAILABLE);
 }

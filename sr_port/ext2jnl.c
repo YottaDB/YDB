@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ static	int4		num_records;
 /* callers please set up the proper condition-handlers */
 /* expects a null-terminated ext_buff. does the equivalent but inverse of jnl2ext */
 
-char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec)
+char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved_strm_seqno)
 {
 	char		*ext_next;
 	jnl_record	*temp_rec;
@@ -47,7 +47,7 @@ char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec)
 	for ( ; (NULL != (ext_next = strchr(ext_buff, '\n'))); )
 	{
 		*ext_next++ = '\0';
-		rec = (jnl_record *)ext2jnl(ext_buff, rec);
+		rec = (jnl_record *)ext2jnl(ext_buff, rec, saved_jnl_seqno, saved_strm_seqno);
 		assert(0 == (INTPTR_T)rec % JNL_REC_START_BNDRY);
 		if (ext_stop == ext_buff)
 			break;
@@ -62,19 +62,18 @@ char	*ext2jnlcvt(char *ext_buff, int4 ext_len, jnl_record *rec)
 
 /* expects a single null-terminated ptr (equivalent to one line in the extract-file) */
 
-char	*ext2jnl(char *ptr, jnl_record *rec)
+char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved_strm_seqno)
 {
 	unsigned char	*pool_save, ch, chtmp;
-	int		keylength, keystate, len, i, reclen, temp_reclen;
+	char 		*val_off;
+	int		keylength, keystate, len, i, reclen, temp_reclen, val_len;
 	bool		keepgoing;
 	mstr		src, des;
 	jnl_record	*temp_rec;
 	muextract_type	exttype;
 	enum jnl_record_type	rectype;
 	jrec_suffix	*suffix;
-	seq_num		strm_seqno;
 	uint4		nodeflags;
-	uint4		strm_num;
 	DEBUG_ONLY(uint4	tcom_num = 0;)
 
 	ext_stop = ptr + strlen(ptr) + 1;
@@ -89,11 +88,10 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 		if (in_tp)
 		{
 			if (0 == num_records)
-			{
-				num_records++;
 				rec->prefix.jrec_type = JRT_TSET;
-			} else
+			else
 				rec->prefix.jrec_type = JRT_USET;
+			num_records++;
 		} else
 			rec->prefix.jrec_type = JRT_SET;
 		break;
@@ -102,11 +100,10 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 		if (in_tp)
 		{
 			if (0 == num_records)
-			{
-				num_records++;
 				rec->prefix.jrec_type = JRT_TKILL;
-			} else
+			else
 				rec->prefix.jrec_type = JRT_UKILL;
+			num_records++;
 		} else
 			rec->prefix.jrec_type = JRT_KILL;
 		break;
@@ -115,11 +112,10 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 		if (in_tp)
 		{
 			if (0 == num_records)
-			{
-				num_records++;
 				rec->prefix.jrec_type = JRT_TZKILL;
-			} else
+			else
 				rec->prefix.jrec_type = JRT_UZKILL;
+			num_records++;
 		} else
 			rec->prefix.jrec_type = JRT_ZKILL;
 		break;
@@ -129,11 +125,10 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 		if (in_tp)
 		{
 			if (0 == num_records)
-			{
-				num_records++;
 				rec->prefix.jrec_type = JRT_TZTWORM;
-			} else
+			else
 				rec->prefix.jrec_type = JRT_UZTWORM;
+			num_records++;
 		} else
 			GTMASSERT;	/* ZTWORMHOLE should always been seen only inside a TP fence */
 		break;
@@ -141,11 +136,10 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 		if (in_tp)
 		{
 			if (0 == num_records)
-			{
-				num_records++;
 				rec->prefix.jrec_type = JRT_TZTRIG;
-			} else
+			else
 				rec->prefix.jrec_type = JRT_UZTRIG;
+			num_records++;
 		} else
 			GTMASSERT;	/* ZTRIGGER should always been seen only inside a TP fence */
 		break;
@@ -204,15 +198,12 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	assert(NULL != ptr);
 	ptr = strtok(NULL, "\\");		/* get the token/jnl_seqno field */
 	assert(NULL != ptr);
-	rec->jrec_null.jnl_seqno = asc2l((uchar_ptr_t)ptr,STRLEN(ptr));
+	rec->jrec_null.jnl_seqno = saved_jnl_seqno;
 	ptr = strtok(NULL, "\\");		/* get the strm_num field */
 	assert(NULL != ptr);
-	strm_num = asc2l((uchar_ptr_t)ptr,STRLEN(ptr));
 	ptr = strtok(NULL, "\\");		/* get the strm_seqno field */
 	assert(NULL != ptr);
-	strm_seqno = asc2l((uchar_ptr_t)ptr,STRLEN(ptr));
-	UNIX_ONLY(rec->jrec_null.strm_seqno = SET_STRM_INDEX(strm_seqno, strm_num);)
-	VMS_ONLY(rec->jrec_null.strm_seqno = strm_seqno;)
+	rec->jrec_null.strm_seqno = saved_strm_seqno;
 	switch(exttype)
 	{
 		case MUEXT_NULL:
@@ -234,7 +225,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	ptr = strtok(NULL, "\\");	/* get the update_num field */
 	assert(NULL != ptr);
 	assert(OFFSETOF(struct_jrec_upd, update_num) == OFFSETOF(struct_jrec_ztworm, update_num));
-	rec->jrec_set_kill.update_num = asc2i((uchar_ptr_t)ptr, STRLEN(ptr));
+	rec->jrec_set_kill.update_num = num_records;
 	if (MUEXT_ZTWORM != exttype)
 	{
 		ptr = strtok(NULL, "\\");		/* get the nodeflags field */
@@ -247,8 +238,8 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	{
 		assert(IS_SET_KILL_ZKILL_ZTRIG(rectype));
 		len = STRLEN(ptr);
-		keylength = zwrkeylength(ptr, len); /* determine length of key */
-
+		val_off = ptr;
+		keylength = zwrkeyvallen(ptr, len, &val_off, &val_len, NULL, NULL); /* determine length of key */
 		REPL_DPRINT2("ext2jnl source:KEY=DATA:%s\n", ptr);
 		assert(keylength <= len);
 		str2gvkey_nogvfunc(ptr, keylength, gv_currkey);
@@ -266,8 +257,8 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 			return (char_ptr_t)rec + reclen;
 		}
 		/* we have to get the data value now */
-		src.len = len - keylength - 1;
-		src.addr = ptr + (keylength + 1);
+		src.len = val_len;
+		src.addr = val_off;
 	} else
 	{	/* ZTWORMHOLE */
 		assert(IS_ZTWORM(rectype));

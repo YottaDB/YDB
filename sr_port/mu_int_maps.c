@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,23 @@ GBLREF	int			mu_map_errs;
 GBLREF	int			disp_trans_errors;
 GBLREF	int			trans_errors;
 
+error_def(ERR_DBREADBM);
+error_def(ERR_DBLVLINC);
+error_def(ERR_DBMBSIZMN);
+error_def(ERR_DBMBSIZMX);
+error_def(ERR_DBMBTNSIZMX);
+error_def(ERR_DBLOCMBINC);
+error_def(ERR_DBBFSTAT);
+error_def(ERR_DBMBPFLINT);
+error_def(ERR_DBMBPFLDLBM);
+error_def(ERR_DBMBPFRDLBM);
+error_def(ERR_DBMBPFRINT);
+error_def(ERR_DBMBPFLDIS);
+error_def(ERR_DBMBPINCFL);
+error_def(ERR_DBMRKFREE);
+error_def(ERR_DBMRKBUSY);
+error_def(ERR_DBMBMINCFRE);
+
 void mu_int_maps(void)
 {
 	unsigned char	*local;
@@ -52,23 +69,6 @@ void mu_int_maps(void)
 	block_id	blkno, last_bmp;
 	enum db_ver	ondsk_blkver;
 
-	error_def(ERR_DBREADBM);
-	error_def(ERR_DBLVLINC);
-	error_def(ERR_DBMBSIZMN);
-	error_def(ERR_DBMBSIZMX);
-	error_def(ERR_DBMBTNSIZMX);
-	error_def(ERR_DBLOCMBINC);
-	error_def(ERR_DBBFSTAT);
-	error_def(ERR_DBMBPFLINT);
-	error_def(ERR_DBMBPFLDLBM);
-	error_def(ERR_DBMBPFRDLBM);
-	error_def(ERR_DBMBPFRINT);
-	error_def(ERR_DBMBPFLDIS);
-	error_def(ERR_DBMBPINCFL);
-	error_def(ERR_DBMRKFREE);
-	error_def(ERR_DBMRKBUSY);
-	error_def(ERR_DBMBMINCFRE);
-
 	mu_int_offset[0] = 0;
 	maps = (mu_int_data.trans_hist.total_blks + mu_int_data.bplmap - 1) / mu_int_data.bplmap;
 	local = mu_int_locals;
@@ -80,7 +80,7 @@ void mu_int_maps(void)
 		assert(mapsize == mu_int_data.bplmap);
 		blkno = mcnt * mu_int_data.bplmap;
 		bml_busy(blkno, mu_int_locals);
-		disk = mu_int_read(blkno, &ondsk_blkver);	/* ondsk_blkver set to GDSV4 or GDSV5 (GDSVCURR) */
+		disk = mu_int_read(blkno, &ondsk_blkver);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
 		if (!disk)
 		{
 			mu_int_path[0] = blkno;

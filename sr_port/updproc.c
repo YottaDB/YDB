@@ -60,7 +60,7 @@
 #include "repl_inst_dump.h"		/* for "repl_dump_histinfo" prototype */
 #endif
 #ifdef GTM_TRIGGER
-#include "rtnhdr.h"			/* for rtn_tabent in gv_trigger.h */
+#include <rtnhdr.h>			/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "targ_alloc.h"
 #endif
@@ -99,6 +99,7 @@
 #include "error_trap.h"
 #include "tp_frame.h"
 #include "gvcst_jrt_null.h"	/* for gvcst_jrt_null prototype */
+#include "preemptive_ch.h"
 
 #define	MAX_IDLE_HARD_SPINS		1000	/* Fail-safe count to avoid hanging CPU in tight loop while it's idle */
 #define	UPDPROC_WAIT_FOR_READJNLSEQNO	100	/* ms */
@@ -222,6 +223,35 @@ error_def(ERR_UPDREPLSTATEOFF);
 	RESET_ALL_GVT_CLUES;										\
 	rts_error(VARLSTCNT(1) ERR_REPLONLNRLBK); /* transfers control back to updproc_ch */		\
 }
+
+/* Receiver eventually sees the upd_proc_local->onln_rlbk_flag being set, drains the replication pipe, closes the connection and
+ * restarts. But, before that it also resets recvpool_ctl->jnl_seqno to 0. So, wait until recvpool_ctl->jnl_seqno is reset to 0
+ * to be sure that receiver server did acknowledge the upd_proc_local->onln_rlbk_flag.
+ */
+#define WAIT_FOR_ZERO_RECVPOOL_JNL_SEQNO											\
+{																\
+	repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Waiting for receiver server to reset recvpool_ctl->jnl_seqno\n");	\
+	while (recvpool_ctl->jnl_seqno)												\
+	{															\
+		SHORT_SLEEP(UPDPROC_WAIT_FOR_STARTJNLSEQNO);									\
+		if (SHUTDOWN == upd_proc_local->upd_proc_shutdown)								\
+		{														\
+			updproc_end();												\
+			return SS_NORMAL;											\
+		}														\
+	}															\
+}
+
+#define LOG_ONLINE_ROLLBACK_EVENT												\
+{																\
+	repl_log(updproc_log_fp, TRUE, TRUE, "Starting afresh due to ONLINE ROLLBACK\n");					\
+	repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Jnlpool Seqno : %llu\n", jnlpool.jnlpool_ctl->jnl_seqno);	\
+	repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Update process Read Seqno : %llu\n",				\
+			upd_proc_local->read_jnl_seqno);									\
+	assert(recvpool_ctl->jnl_seqno);											\
+	repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n",					\
+			recvpool_ctl->jnl_seqno);										\
+}
 #endif
 
 CONDITION_HANDLER(updproc_ch)
@@ -288,6 +318,8 @@ CONDITION_HANDLER(updproc_ch)
 #	ifdef UNIX
 	else if (ERR_REPLONLNRLBK == SIGNAL)
 	{
+		preemptive_ch(SEVERITY);
+		assert(INVALID_GV_TARGET == reset_gv_target);
 		set_onln_rlbk_flg = TRUE;
 		UNWIND(NULL, NULL);
 	}
@@ -312,6 +344,7 @@ int updproc(void)
 	struct dsc$descriptor_s proc_name_desc;
 #	endif
 	upd_proc_local_ptr_t	upd_proc_local;
+	sgmnt_addrs		*repl_csa;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -345,7 +378,9 @@ int updproc(void)
 	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool)); /* For util_base_ch and mupip_exit */
 	if (updproc_init(&gld_db_files, &start_jnl_seqno) == UPDPROC_EXISTS) /* we got the global directory header already */
 		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Update Process already exists"));
+	OPERATOR_LOG_MSG;
 	/* Initialization of all the relevant global datastructures and allocation for TP */
+	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 	mu_gv_stack_init();
 	upd_proc_local = recvpool.upd_proc_local;
 	recvpool_ctl = recvpool.recvpool_ctl;
@@ -392,6 +427,18 @@ int updproc(void)
 						recvpool.upd_helper_ctl->first_done = FALSE;
 						recvpool.upd_helper_ctl->pre_read_offset = 0;
 					}
+				}
+				if (repl_csa->onln_rlbk_cycle != jnlpool_ctl->onln_rlbk_cycle)
+				{	/* A concurrent online rollback. Handle it */
+					LOG_ONLINE_ROLLBACK_EVENT;
+					assert(!repl_csa->now_crit && !set_onln_rlbk_flg);
+					grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+					SYNC_ONLN_RLBK_CYCLES;
+					rel_lock(jnlpool.jnlpool_dummy_reg);
+					upd_proc_local->onln_rlbk_flg = TRUE; /* let receiver know about the online rollback */
+					WAIT_FOR_ZERO_RECVPOOL_JNL_SEQNO;
+					upd_proc_local->read = 0;
+					recvpool_ctl->jnl_seqno = jnl_seqno;
 				}
 			}
 			/* Ensure all updates done by the receiver server BEFORE setting
@@ -441,32 +488,9 @@ int updproc(void)
 		{	/* A concurrent online rollback happened which drove the updproc_ch and called us. Need to let the receiver
 			 * server know about it and set up the sequence numbers
 			 */
-			start_jnl_seqno = jnlpool_ctl->jnl_seqno;
-			repl_log(updproc_log_fp, TRUE, TRUE, "Starting afresh due to ONLINE ROLLBACK\n");
-			repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Jnlpool Seqno : %llu\n", start_jnl_seqno);
-			repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Update process Read Seqno : %llu\n",
-					upd_proc_local->read_jnl_seqno);
-			repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n",
-					recvpool_ctl->jnl_seqno);
-
-			assert(recvpool_ctl->jnl_seqno);
-			upd_proc_local->onln_rlbk_flg = TRUE;
-			/* receiver server eventually sees the above flag, drains the replication pipe, closes the connection and
-			 * restarts. But, before that it sets recvpool_ctl->jnl_seqno to 0. We wait until receiver server resets
-			 * this field. This way, when we go back to the beginning of the for loop to set recvpool_ctl->jnl_seqno
-			 * to start_jnl_seqno, our update will not be lost.
-			 */
-			repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Waiting for receiver server to reset "
-					"recvpool_ctl->jnl_seqno\n");
-			while (recvpool_ctl->jnl_seqno)
-			{
-				SHORT_SLEEP(UPDPROC_WAIT_FOR_STARTJNLSEQNO);
-				if (SHUTDOWN == upd_proc_local->upd_proc_shutdown)
-				{
-					updproc_end();
-					return(SS_NORMAL);
-				}
-			}
+			LOG_ONLINE_ROLLBACK_EVENT;
+			upd_proc_local->onln_rlbk_flg = TRUE; /* let receiver know about the online rollback */
+			WAIT_FOR_ZERO_RECVPOOL_JNL_SEQNO;
 			set_onln_rlbk_flg = FALSE;
 			/* Since we are going to start afresh, do a OP_TROLLBACK if we are in TP. This brings the global variables
 			 * dollar_tlevel, dollar_trestart all to a known state thereby erasing any history of lingering TP artifacts
@@ -477,6 +501,7 @@ int updproc(void)
 				assert(!dollar_tlevel);
 				assert(!dollar_trestart);
 			}
+			start_jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno; /* needed when we go back to the beginning of the loop */
 		} else
 #		endif
 		if (!updproc_continue)
@@ -506,6 +531,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	jnl_string		*keystr;
 	mstr			mname;
 	char			*key, *keytop;
+	gv_key			*gv_failed_key = NULL, *gv_failed_key_ptr;
+	unsigned char		*endBuff, fmtBuff[MAX_ZWR_KEY_SZ];
 	enum upd_bad_trans_type	bad_trans_type;
 	recvpool_ctl_ptr_t	recvpool_ctl;
 	upd_proc_local_ptr_t	upd_proc_local;
@@ -696,7 +723,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 #			ifdef UNIX
 			if (!upd_proc_local->onln_rlbk_flg && (repl_csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle))
 			{	/* A concurrent online rollback happened. Start afresh */
-				GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+				grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
 				UPDPROC_ONLN_RLBK_CLNUP(jnlpool.jnlpool_dummy_reg); /* No return */
 			} /* else onln_rlbk_flag is already set and the receiver should take the next appropriate action */
 #			endif
@@ -882,7 +909,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						rel_crit(gv_cur_region);
 					}
 					TP_CHANGE_REG(save_reg);
-					GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY)
+					grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
 					if (repl_csa->onln_rlbk_cycle != jnlpool_ctl->onln_rlbk_cycle)
 						UPDPROC_ONLN_RLBK_CLNUP(jnlpool.jnlpool_dummy_reg); /* No return */
 					jnlpool_ctl->strm_seqno[histinfo.strm_index] = strm_seqno;
@@ -895,7 +922,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
  				assert(jnlpool.jnlpool_ctl->upd_disabled || (strm_index == histinfo.strm_index));
 			}
 			/* Now that we have constructed the history, add it to the instance file. */
-			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY)
+			grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
 			if (repl_csa->onln_rlbk_cycle != jnlpool_ctl->onln_rlbk_cycle)
 				UPDPROC_ONLN_RLBK_CLNUP(jnlpool.jnlpool_dummy_reg); /* No return */
 			repl_inst_histinfo_add(&histinfo);
@@ -1200,7 +1227,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					else
 					{
 						assert(IS_SET(rectype));
-						if (keystr->length + 1 + val_mv.str.len + SIZEOF(rec_hdr) >
+						if (VMS_ONLY(keystr->length + 1 + SIZEOF(rec_hdr) +) val_mv.str.len >
 										gv_cur_region->max_rec_size)
 						{
 							bad_trans_type = upd_bad_val_size;
@@ -1269,7 +1296,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			 */
 			assert(0 == have_crit(CRIT_HAVE_ANY_REG));
 			if (dollar_tlevel)
-			{
+			{	/* Copy gv_currkey into temp variable before TROLLBACK overwrites the current variable. */
+				gv_failed_key = (gv_key *)malloc(SIZEOF(gv_key) + gv_currkey->end);
+				memcpy(gv_failed_key, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);
 				repl_log(updproc_log_fp, TRUE, TRUE,
 					"OP_TROLLBACK IS CALLED -->Bad trans :: dollar_tlevel = %ld\n", dollar_tlevel);
 				OP_TROLLBACK(0);	/* this should also release crit (if any) on all regions in TP */
@@ -1291,26 +1320,50 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			temp_read = 0;
 			temp_write = 0;
 			upd_rec_seqno = tupd_num = tcom_num = 0;
-			/* Throw an error if bad_trans comes for the same sequence number */
+			/* KEY2BIG and REC2BIG are cases for which we need to make sure it is not a transmission hiccup before we
+			 * go ahead and do the rts_error(GVSUBOFLOW) or rts_error(REC2BIG). That is the reason we give those two
+			 * errors a second chance. Other errors are handled by either throwing an rts_error or asking for an
+			 * unconditional re-transmission (as opposed to only two attempts for GVSUBOFLOW and REC2BIG). By asking for
+			 * a re-transmission we increase our confidence level that this is a configuration issue (with smaller
+			 * keysize on the secondary) and proceed with an rts_error if we see the same symptom. It is possible we
+			 * might have two successive transmissions having the exact same corruption, but that is highly unlikely.
+			 */
 			if (last_errored_seqno == jnl_seqno)
 			{
 				last_errored_seqno = 0;
 				switch(bad_trans_type)
 				{
-					case upd_bad_key_size:
-						ISSUE_GVSUBOFLOW_ERROR(gv_currkey);
+					case upd_bad_key_size: /* Not using ISSUE_GVSUBOFLOW_ERROR in order to free gv_failed_key */
+						gv_failed_key_ptr = ((NULL == gv_failed_key) ? gv_currkey : gv_failed_key);
+						/* Assert that input key to format_targ_key is double null terminated */
+						assert(KEY_DELIMITER == gv_failed_key_ptr->base[gv_failed_key_ptr->end]);
+						/* Note: might update "endBuff" */
+						endBuff = format_targ_key(fmtBuff, ARRAYSIZE(fmtBuff), gv_failed_key_ptr, TRUE);
+						GV_SET_LAST_SUBSCRIPT_INCOMPLETE(fmtBuff, endBuff);
+						if (NULL != gv_failed_key)	/* Free memory if it has been used */
+							free(gv_failed_key);
+						rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, endBuff - fmtBuff, fmtBuff);
 						break;
 					case upd_bad_val_size:
-						if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+						if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ,
+						    ((NULL == gv_failed_key) ? gv_currkey : gv_failed_key), TRUE)))
 							end = &buff[MAX_ZWR_KEY_SZ - 1];
+						if (NULL != gv_failed_key)	/* Free memory if it has been used */
+							free(gv_failed_key);
 						rts_error(VARLSTCNT(10) ERR_REC2BIG, 4,
-							gv_currkey->end + 1 + val_mv.str.len + SIZEOF(rec_hdr),
+							VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +) val_mv.str.len,
 							(int4)gv_cur_region->max_rec_size, REG_LEN_STR(gv_cur_region),
 							ERR_GVIS, 2, end - buff, buff);
 						break;
 				}
 			} else
+			{
+				gv_currkey->base[0] = KEY_DELIMITER;
 				last_errored_seqno = jnl_seqno;
+				/* Free memory on the first unsuccessful attempt if gv_failed_key has been previously used */
+				if (NULL != gv_failed_key)
+					free(gv_failed_key);
+			}
 			continue;
 		}
 		if (incr_seqno)
@@ -1336,14 +1389,19 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			{	/* Now that the update process has played an incoming seqno, we expect it to have incremented
 				 * the corresponding jnl_seqno and strm_seqno fields in the current instance's journal pool
 				 * as well. Not doing so will cause the source and receiver instances to go out of sync.
-				 * We know of 3 ways in which this can occur and all of them have already been handled.
+				 * We know of 4 ways in which this can occur and all of them have already been handled.
 				 *	1) UPDREPLSTATEOFF error.
 				 *	2) error_on_jnl_file_lost = JNL_FILE_LOST_ERRORS;
 				 *	3) Duplicate KILL is journaled and increments seqno even though it does not touch db.
-				 * Therefore if we find any out-of-sync situation at this point, we should stop right away
-				 * and get a core dump for further analysis. So GTMASSERT.
+				 *	4) A concurrent online rollback on this instance
+				 * First 3 cases are not expected in a typical update process. But, the 4th case is expected in a
+				 * typical run. So, as long as the out-of-sync is due to the first 3 cases, stop right away and get
+				 * a core dump for further analysis. In case of an online rollback, it is okay for us to continue
+				 * to the next iteration which will eventually detect the online rollback (as part of commit or
+				 * before that in the idle wait loop) and take appropriate action.
 				 */
-				if (upd_proc_local->read_jnl_seqno != jnlpool_ctl_seqno)
+				if ((upd_proc_local->read_jnl_seqno != jnlpool_ctl_seqno)
+					UNIX_ONLY(&& (repl_csa->onln_rlbk_cycle == jnlpool_ctl->onln_rlbk_cycle)))
 				{
 					repl_log(updproc_log_fp, TRUE, TRUE,
 						"JNLSEQNO last updated by  update process = "INT8_FMT" "INT8_FMTX"\n",

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <errno.h>
 #include "gtm_string.h"
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -37,6 +38,9 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_binding	*gd_map, *gd_map_top;
 
+error_def(ERR_KEY2BIG);
+error_def(ERR_GVIS);
+
 void gv_bind_name(gd_addr *addr, mstr *targ)
 {
 	gd_binding		*map;
@@ -47,6 +51,8 @@ void gv_bind_name(gd_addr *addr, mstr *targ)
 	enum db_acc_method	acc_meth;
 	gd_region		*reg;
 	gvnh_reg_t		*gvnh_reg;
+	int			keylen;
+	char			format_key[MAX_MIDENT_LEN + 1];	/* max key length + 1 byte for '^' */
 
 	gd_map = addr->maps;
 	gd_map_top = gd_map + addr->n_maps;
@@ -109,6 +115,14 @@ void gv_bind_name(gd_addr *addr, mstr *targ)
 		}
 	}
 	change_reg();
+	if ((keylen = gvent.var_name.len + 2) > gv_cur_region->max_key_size)	/* caution: embedded assignment of "keylen" */
+	{
+		assert(ARRAYSIZE(format_key) >= (1 + gvent.var_name.len));
+		format_key[0] = '^';
+		memcpy(&format_key[1], gvent.var_name.addr, gvent.var_name.len);
+		rts_error(VARLSTCNT(10) ERR_KEY2BIG, 4, keylen, (int4)gv_cur_region->max_key_size,
+			REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, 1 + gvent.var_name.len, format_key);
+	}
 	memcpy(gv_currkey->base, gvent.var_name.addr, gvent.var_name.len);
 	gv_currkey->base[gvent.var_name.len] = 0;
 	gvent.var_name.len++;

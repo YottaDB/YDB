@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2012 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -10,14 +10,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %lclcol	; ; ; Local Variable Collation Control
 	;
-get()	q $v("YLCT")
+get()		q $v("YLCT")
 getncol()	q $v("YLCT","ncol") ; return null collation order
 	;
-set(lct,ncol)
+getnct()	q $v("YLCT","nct") ; return numeric collation type
+	;
+set(lct,ncol,nct)
 	n ok,$et
 	s $et="s $ec="""" s ok=0",ok=1
-	if ok&$data(lct)&$data(ncol) v "YLCT":lct:ncol q ok
-	if ok&$data(lct)&'$data(ncol) v "YLCT":lct:-1 q ok
-	if ok&'$data(lct)&$data(ncol) v "YLCT":-1:ncol q ok
-	if ok&'$data(lct)&'$data(ncol) v "YLCT":-1:-1 q ok
+	s:'$data(lct) lct=-1
+	s:'$data(ncol) ncol=-1
+	s:'$data(nct) nct=-1
+	v:ok "YLCT":lct:ncol:nct
 	q ok

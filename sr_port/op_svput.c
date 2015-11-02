@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@
 #include "error_trap.h"
 #include "gtm_ctype.h"
 #include "setzdir.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "getzdir.h"
 #include "gtm_newintrinsic.h"
@@ -60,7 +60,6 @@ GBLREF mval		dollar_zstatus;
 GBLREF mval		dollar_zgbldir;
 GBLREF mval		dollar_zstep;
 GBLREF mval		dollar_zsource;
-GBLREF int		dollar_zmaxtptime;
 GBLREF int		ztrap_form;
 GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_zerror;
@@ -166,7 +165,7 @@ void op_svput(int varnum, mval *v)
 			}
 			break;
 		case SV_ZMAXTPTIME:
-			dollar_zmaxtptime = mval2i(v);
+			TREF(dollar_zmaxtptime) = mval2i(v);
 			break;
 		case SV_ZROUTINES:
 			MV_FORCE_STR(v);

@@ -13,7 +13,7 @@
 
 #include "gtm_stdio.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "tp_frame.h"
@@ -123,8 +123,8 @@ void op_unwind(void)
 	if (msp > stackbase)
 		rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
 #	ifdef GTM_TRIGGER
-	if (SFF_TRIGR_CALLD & frame_pointer->type)
-		DBGTRIGR((stderr, "op_unwind: Unwinding frame 0x"lvaddr" with type %d which has SFF_TRIGR_CALLD turned on\n",
+	if (SFF_IMPLTSTART_CALLD & frame_pointer->type)
+		DBGTRIGR((stderr, "op_unwind: Unwinding frame 0x"lvaddr" with type %d which has SFF_IMPLTSTART_CALLD turned on\n",
 			  frame_pointer, frame_pointer->type));
 #	endif
 	PARM_ACT_UNSTACK_IF_NEEDED;

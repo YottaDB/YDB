@@ -47,6 +47,7 @@
 #include "muprec.h"
 #include "repl_ctl.h"
 #include "repl_errno.h"
+#include "gtmio.h"		/* for REPL_DPRINT* macros */
 #include "repl_dbg.h"
 #include "iosp.h"
 #include "gtm_event_log.h"
@@ -73,7 +74,6 @@ GBLREF	boolean_t		gtmsource_pool2file_transition;
 GBLREF	boolean_t		gtmsource_received_cmp2uncmp_msg;
 GBLREF	boolean_t		secondary_side_std_null_coll;
 GBLREF	FILE			*gtmsource_log_fp;
-GBLREF	FILE			*gtmsource_statslog_fp;
 GBLREF	gd_addr			*gd_header;
 GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	int4			strm_index;
@@ -82,7 +82,6 @@ GBLREF	int			gtmsource_filter;
 GBLREF	int			gtmsource_log_fd;
 GBLREF	int			gtmsource_msgbufsiz;
 GBLREF	int			gtmsource_sock_fd;
-GBLREF	int			gtmsource_statslog_fd;
 GBLREF	int			repl_filter_bufsiz;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -129,6 +128,8 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 	char			print_msg[1024], msg_str[1024], *errmsg;
 	gtmsource_local_ptr_t	gtmsource_local;
 	int			send_buffsize, recv_buffsize, tcp_s_bufsize;
+	int 			logging_period, logging_interval; /* logging period = soft_tries_period*logging_interval */
+	int 			logging_attempts;
 
 	gtmsource_local = jnlpool.gtmsource_local;
 	assert(remote_side == &gtmsource_local->remote_side);
@@ -157,13 +158,16 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 			return (SS_NORMAL);
 		gtmsource_comm_init();
 	} while (++connection_attempts < gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT]);
-
 	gtmsource_poll_actions(FALSE);
 	if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 		return (SS_NORMAL);
 
 	if (gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT] <= connection_attempts)
-	{
+	{	/*Initialize logging period related variables*/
+		logging_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD];
+		logging_interval = 1;
+		logging_attempts = 0;
+
 		alert_attempts = DIVIDE_ROUND_DOWN(gtmsource_local->connect_parms[GTMSOURCE_CONN_ALERT_PERIOD],
 							gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Soft tries period = %d, Alert period = %d\n",
@@ -176,16 +180,20 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 			if (0 == status)
 				break;
 			repl_close(&gtmsource_sock_fd);
-			repl_log(gtmsource_log_fp, TRUE, TRUE, "%d soft connection attempt failed : %s\n",
-				 connection_attempts + 1, STRERROR(ERRNO));
+			if (0 == (connection_attempts + 1) % logging_interval)
+			{
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "%d soft connection attempt failed : %s\n",
+					 connection_attempts + 1, STRERROR(ERRNO));
+				logging_attempts++;
+			}
 			LONG_SLEEP(gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
 			gtmsource_poll_actions(FALSE);
 			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 				return (SS_NORMAL);
 			gtmsource_comm_init();
 			connection_attempts++;
-			if (0 == connection_attempts % alert_attempts)
-			{ /* Log ALERT message */
+			if (0 == (connection_attempts % logging_interval) && 0 == (logging_attempts % alert_attempts))
+			{ 	/* Log ALERT message */
 				SNPRINTF(msg_str, SIZEOF(msg_str),
 					 "GTM Replication Source Server : Could not connect to secondary in %d seconds\n",
 					connection_attempts *
@@ -193,6 +201,14 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 				sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLWARN, 2, LEN_AND_STR(msg_str));
 				repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 				gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLWARN", print_msg);
+			}
+			if (logging_period <= REPL_MAX_LOG_PERIOD)
+			{	 /*the maximum real_period can reach 2*REPL_MAX_LOG_PERIOD)*/
+				if (0 == connection_attempts % logging_interval)
+				{	/* Double the logging period after every logging attempt*/
+					logging_interval = logging_interval << 1;
+					logging_period = logging_period << 1;
+				}
 			}
 		} while (TRUE);
 	}
@@ -602,7 +618,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 		 */
 		if ((READ_FILE != gtmsource_local->read_state) || (recvd_jnl_seqno > gtmsource_save_read_jnl_seqno))
 		{
-			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+			grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
 			gtmsource_local->read_state = READ_FILE;
 			gtmsource_save_read_jnl_seqno = jctl->jnl_seqno;
 			gtmsource_local->read_addr = jnlpool.jnlpool_ctl->write_addr;
@@ -675,7 +691,8 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 		{
 			assert(cur_read + SIZEOF(jnldata_hdr_struct) <= jnlpool_size);
 			prev_tr_size = ((jnldata_hdr_ptr_t)(jnlpool.jnldata_base + cur_read))->prev_jnldata_len;
-			if (jnlpool_hasnt_overflowed(jctl, jnlpool_size, cur_read_addr))
+			if ((prev_tr_size <= cur_read_addr) &&
+				jnlpool_hasnt_overflowed(jctl, jnlpool_size, cur_read_addr - prev_tr_size))
 			{
 				QWDECRBYDW(cur_read_addr, prev_tr_size);
 				prev_read = cur_read;
@@ -773,14 +790,13 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 	read_addr = gtmsource_local->read_addr;
 	assert(read_addr <= write_addr);
 	assert((0 != write_addr) || (read_jnl_seqno <= jctl->start_jnl_seqno));
-
-#ifdef GTMSOURCE_ALWAYS_READ_FILES
+#	ifdef GTMSOURCE_ALWAYS_READ_FILES
 	gtmsource_local->read_state = READ_FILE;
-#endif
+#	endif
 	switch(gtmsource_local->read_state)
 	{
 		case READ_POOL:
-#ifndef GTMSOURCE_ALWAYS_READ_FILES_STRESS
+#			ifndef GTMSOURCE_ALWAYS_READ_FILES_STRESS
 			if (read_addr == write_addr)
 			{	/* Nothing to read. While reading pool, the comparison of read_addr against write_addr is
 				 * the only reliable indicator if there are any transactions to be read. This is due to
@@ -801,7 +817,8 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 				return (total_tr_len);
 			if (0 < *data_len)
 				return (-1);
-#endif /* for GTMSOURCE_ALWAYS_READ_FILES_STRESS, we let the source server switch back and forth between pool read and file read */
+#			endif /* for GTMSOURCE_ALWAYS_READ_FILES_STRESS, we let the source server switch back and forth between
+				 pool read and file read */
 			/* Overflow, switch to READ_FILE */
 			gtmsource_local->read_state = READ_FILE;
 			QWASSIGN(gtmsource_save_read_jnl_seqno, read_jnl_seqno);
@@ -1394,7 +1411,7 @@ boolean_t	gtmsource_check_remote_strm_histinfo(seq_num seqno, boolean_t *rollbac
 		return FALSE; /* recv did not succeed */
 	assert(REPL_STRMINFO == strminfo_msg.type);
 	/* Verify that the list of known streams is identical on both sides */
-	GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+	grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		return FALSE;	/* concurrent online rollback happened */
 	status = repl_inst_histinfo_find_seqno(seqno, INVALID_SUPPL_STRM, &local_histinfo);
@@ -1412,9 +1429,15 @@ boolean_t	gtmsource_check_remote_strm_histinfo(seq_num seqno, boolean_t *rollbac
 		lcl_strm_valid = (INVALID_HISTINFO_NUM != local_histinfo.last_histinfo_num[idx]);
 		remote_strm_valid = (INVALID_HISTINFO_NUM != strminfo_msg.last_histinfo_num[idx]);
 		if (!lcl_strm_valid && remote_strm_valid)
+		{
+			assert(FALSE);
 			rts_error(VARLSTCNT(3) ERR_STRMNUMMISMTCH1, 1, idx);
+		}
 		else if (lcl_strm_valid && !remote_strm_valid)
+		{
+			assert(FALSE);
 			rts_error(VARLSTCNT(3) ERR_STRMNUMMISMTCH2, 1, idx);
+		}
 	}
 	/* Now that we know both sides have the exact set of known streams, verify history record for each stream matches */
 	/* Send REPL_NEED_HISTINFO message for each stream. Do common initialization outside loop */
@@ -1444,7 +1467,7 @@ boolean_t	gtmsource_check_remote_strm_histinfo(seq_num seqno, boolean_t *rollbac
 			return FALSE; /* recv did not succeed */
 		assert(REPL_HISTINFO == histinfo_msg.type);
 		/* Find corresponding history record on LOCAL side */
-		GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+		grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 			return FALSE;	/* concurrent online rollback happened */
 		status = repl_inst_histinfo_get(lcl_histinfo_num, &local_histinfo);
@@ -1586,7 +1609,7 @@ seq_num	gtmsource_find_resync_seqno(repl_histinfo *local_histinfo, repl_histinfo
 		{	/* Need to get the previous histinfo record on the primary */
 			local_histinfo_num = local_histinfo->prev_histinfo_num;
 			assert(0 <= local_histinfo->histinfo_num);
-			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+			grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 				return MAX_SEQNO;
 			gtmsource_histinfo_get(local_histinfo_num, local_histinfo);
@@ -1643,7 +1666,7 @@ void	gtmsource_send_new_histrec()
 	if ((GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 		return;	/* "gtmsource_set_next_histinfo_seqno" encountered REPLINSTNOHIST or concurrent online rollback occurred */
 	/*************** Read histinfo (to send) from instance file first ***************/
-	GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+	grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		return;
 	assert(1 <= gtmsource_local->next_histinfo_num);
@@ -1765,7 +1788,7 @@ void	gtmsource_set_next_histinfo_seqno(boolean_t detect_new_histinfo)
 		csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 		ASSERT_VALID_JNLPOOL(csa);
 	)
-	GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+	grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		return;
 	assert(NULL != jnlpool.repl_inst_filehdr);	/* journal pool should be set up */

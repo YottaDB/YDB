@@ -32,7 +32,9 @@
 echo "Start of $0 `date`"
 echo ""
 
-echo "Built on $HOST"
+set uname_out = `uname -a`
+
+echo "Built on $HOST : $uname_out"
 echo ""
 
 echo "arguments: '$1' '$2' '$3' '$4'"

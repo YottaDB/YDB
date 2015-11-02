@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,9 @@ VIEWTAB("JNLTRANSACTION", VTP_NULL,		VTK_JNLTRANSACTION, MV_NM),
 VIEWTAB("JNLWAIT",	VTP_NULL,		VTK_JNLWAIT,	MV_STR),
 VIEWTAB("JOBPID",	VTP_VALUE | VTP_NULL,	VTK_JOBPID,	MV_STR),
 VIEWTAB("LABELS",	VTP_VALUE | VTP_NULL,	VTK_LABELS,	MV_NM),
+#ifdef DEBUG
+VIEWTAB("LVDMP",	VTP_LVN,		VTK_LVDMP,	MV_NM),
+#endif
 VIEWTAB("LVDUPCHECK",	VTP_NULL | VTP_VALUE,	VTK_LVDUPCHECK, MV_STR), /* nodoc : felt unnecessary in all known cases */
 #ifdef DEBUG_ALIAS
 VIEWTAB("LVMONOUT",	VTP_NULL,		VTK_LVMONOUT,	MV_NM),	/* nodoc : code debugging feature */

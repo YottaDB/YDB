@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 
 GBLREF unsigned char *stackbase, *stacktop;
 

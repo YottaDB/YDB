@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,3 +50,17 @@ TAB_GVSTATS_REC(n_tp_cnflct_retries_2, "TC2", "# of Tp Conflict retries [2]     
 TAB_GVSTATS_REC(n_tp_cnflct_retries_3, "TC3", "# of Tp Conflict retries [3]          ")
 TAB_GVSTATS_REC(n_tp_cnflct_retries_4, "TC4", "# of Tp Conflict retries [4]          ")
 TAB_GVSTATS_REC(n_ztrigger           , "ZTR", "# of ZTRigger operations              ")
+TAB_GVSTATS_REC(n_db_flush           , "DFL", "# of Database FLushes                 ")
+TAB_GVSTATS_REC(n_db_fsync           , "DFS", "# of Database FSyncs                  ")
+TAB_GVSTATS_REC(n_jnl_flush          , "JFL", "# of Journal FLushes                  ")
+TAB_GVSTATS_REC(n_jnl_fsync          , "JFS", "# of Journal FSyncs                   ")
+TAB_GVSTATS_REC(n_jbuff_bytes        , "JBB", "# of Bytes written to Journal Buffer  ")
+TAB_GVSTATS_REC(n_jfile_bytes        , "JFB", "# of Bytes written to Journal File    ")
+TAB_GVSTATS_REC(n_jfile_writes       , "JFW", "# of Journal File Writes              ")
+TAB_GVSTATS_REC(n_jrec_logical       , "JRL", "# of Logical Journal Records          ")
+TAB_GVSTATS_REC(n_jrec_pblk          , "JRP", "# of Pblk Journal Records             ")
+TAB_GVSTATS_REC(n_jrec_epoch_regular , "JRE", "# of Regular Epoch Journal Records    ")
+TAB_GVSTATS_REC(n_jrec_epoch_idle    , "JRI", "# of Idle epoch Journal Records       ")
+TAB_GVSTATS_REC(n_jrec_other         , "JRO", "# of Other Journal Records            ")
+TAB_GVSTATS_REC(n_jnl_extends        , "JEX", "# of Journal file EXtensions          ")
+TAB_GVSTATS_REC(n_db_extends         , "DEX", "# of Database file EXtensions         ")

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,10 +32,11 @@
 #include "load.h"
 #include "mu_gvis.h"
 #include "mupip_put_gvdata.h"
+#include "mupip_put_gvn_fragment.h"
 #include "str2gvkey.h"
 #include "gtmmsg.h"
 #include "gtm_utf8.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"
 
 GBLREF bool	mupip_error_occurred;
@@ -44,8 +45,16 @@ GBLREF bool	mu_ctrlc_occurred;
 GBLREF spdesc	stringpool;
 GBLREF gv_key	*gv_currkey;
 
-#define GO_PUT_SUB	     0
-#define GO_PUT_DATA	     1
+error_def(ERR_LOADCTRLY);
+error_def(ERR_LOADEOF);
+error_def(ERR_LOADFILERR);
+error_def(ERR_LOADINVCHSET);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_TRIGDATAIGNORE);
+
+#define GO_PUT_SUB		0
+#define GO_PUT_DATA		1
+#define GO_SET_EXTRACT		2
 #define DEFAULT_MAX_REC_SIZE 3096
 #define ISSUE_TRIGDATAIGNORE_IF_NEEDED(KEYLENGTH, PTR, HASHT_GBL)								\
 {																\
@@ -60,7 +69,7 @@ GBLREF gv_key	*gv_currkey;
 }
 
 static readonly unsigned char gt_lit[] = "LOAD TOTAL";
-void go_call_db(int routine, char *parm1, int parm2);
+void go_call_db(int routine, char *parm1, int parm2, int val_off1, int val_len1);
 
 void go_load(uint4 begin, uint4 end)
 {
@@ -70,13 +79,9 @@ void go_load(uint4 begin, uint4 end)
 	mstr            src, des;
 	unsigned char   *rec_buff, ch;
 	boolean_t	utf8_extract, format_error = FALSE, hasht_ignored = FALSE, hasht_gbl = FALSE;
-
-	error_def(ERR_LOADCTRLY);
-	error_def(ERR_LOADEOF);
-	error_def(ERR_LOADFILERR);
-	error_def(ERR_MUNOFINISH);
-	error_def(ERR_LOADINVCHSET);
-	error_def(ERR_TRIGDATAIGNORE);
+	char		*val_off;
+	int 		val_len, val_off1, val_len1;
+	boolean_t	is_setextract;
 
 	gvinit();
 
@@ -169,20 +174,29 @@ void go_load(uint4 begin, uint4 end)
 				break;
 			ptr++;
 		}
-		stringpool.free = stringpool.base;
 		if (0 == len)
 			continue;
 		if (MU_FMT_GO != fmt)
 		{
-			/* Determine the ZWR key length. -1 (SIZEOF(=)) is needed since ZWR allows '^x(1,2)='*/
-			keylength = zwrkeylength(ptr, len - 1);
+			/* Determine if the ZWR has $extract format */
+			if ('$' == *ptr)
+			{
+				keylength = zwrkeyvallen(ptr, len, &val_off, &val_len, &val_off1, &val_len1);
+				ptr = ptr + 4; /* Skip first 4 character '$','z','e','(' */
+				is_setextract = TRUE;
+			} else
+			{
+				/* Determine the ZWR key length. -1 (SIZEOF(=)) is needed since ZWR allows '^x(1,2)='*/
+				keylength = zwrkeyvallen(ptr, len, &val_off, &val_len, NULL, NULL);
+				is_setextract = FALSE;
+			}
 			ISSUE_TRIGDATAIGNORE_IF_NEEDED(keylength, ptr, hasht_gbl);
 			if (hasht_gbl)
 			{
 				hasht_gbl = FALSE;
 				continue;
 			}
-			go_call_db(GO_PUT_SUB, ptr, keylength);
+			go_call_db(GO_PUT_SUB, ptr, keylength, 0, 0);
 			if (mupip_error_occurred)
 			{
 			        mu_gvis();
@@ -193,8 +207,8 @@ void go_load(uint4 begin, uint4 end)
 			assert(keylength < len - 1);
 			if (max_subsc_len < (gv_currkey->end + 1))
 				max_subsc_len = gv_currkey->end + 1;
-			src.len = len - keylength - 1;
-			src.addr = (char *)(ptr + keylength + 1);
+			src.len = val_len;
+			src.addr = val_off;
 			des.len = 0;
 			if (src.len > max_rec_size)
 			{
@@ -211,8 +225,8 @@ void go_load(uint4 begin, uint4 end)
 			}
 			if (max_data_len < des.len)
 			        max_data_len = des.len;
-			stringpool.free = stringpool.base;
-			go_call_db(GO_PUT_DATA, (char *)rec_buff, des.len);
+			(is_setextract) ? go_call_db(GO_SET_EXTRACT, des.addr, des.len, val_off1, val_len1)
+					: go_call_db(GO_PUT_DATA, (char *)rec_buff, des.len, 0, 0);
 			if (mupip_error_occurred)
 			{
 			        mu_gvis();
@@ -232,7 +246,7 @@ void go_load(uint4 begin, uint4 end)
 				hasht_gbl = FALSE;
 				continue;
 			}
-		        go_call_db(GO_PUT_SUB, ptr, len);
+		        go_call_db(GO_PUT_SUB, ptr, len, 0, 0);
 			if (mupip_error_occurred)
 			{
 			        mu_gvis();
@@ -258,7 +272,7 @@ void go_load(uint4 begin, uint4 end)
 			stringpool.free = stringpool.base;
 			if (max_data_len < len)
 			        max_data_len = len;
-			go_call_db(GO_PUT_DATA, ptr, len);
+			go_call_db(GO_PUT_DATA, ptr, len, 0, 0);
 			if (mupip_error_occurred)
 			{
 			        mu_gvis();
@@ -283,7 +297,7 @@ void go_load(uint4 begin, uint4 end)
 		mupip_exit(ERR_LOADFILERR);
 }
 
-void go_call_db(int routine, char *parm1, int parm2)
+void go_call_db(int routine, char *parm1, int parm2, int val_off1, int val_len1)
 {
 	/* In order to duplicate the VMS functionality, which is to trap all errors in mupip_load_ch
 	 * and continue in go_load after they occur, it is necessary to call these routines from a
@@ -296,7 +310,10 @@ void go_call_db(int routine, char *parm1, int parm2)
 			str2gvkey_gvfunc(parm1, parm2);
 			break;
 		case GO_PUT_DATA:
-			mupip_put_gvdata(parm1 , parm2);
+			mupip_put_gvdata(parm1, parm2);
+			break;
+		case GO_SET_EXTRACT:
+			mupip_put_gvn_fragment(parm1, parm2, val_off1, val_len1);
 			break;
 	}
 	REVERT;

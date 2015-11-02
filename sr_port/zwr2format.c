@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -186,15 +186,27 @@ boolean_t zwr2format(mstr *src, mstr *des)
 	return TRUE;
 }
 
-/* Routine to compute the length of the KEY in ZWR format */
-int zwrkeylength(char* ptr, int len)
+/* Routine to compute the length of the KEY, length of the VALUE and Offset of VALUE in ZWR format.
+ * This function takes 2 inputs and returns 5 piece of information.
+ * INPUT:
+ *	ptr		: starting address of the zwr format string.
+ *	len		: length of the zwr format string.
+ * OUTPUT:
+ *	lenght of the key
+ *	val_off		: offset of the value(Right hand side of the '=' sign).
+ *	val_len		: length of the value(Length of the value present on right hand side of '=' sign).
+ *	val_off1	: offset inside the value of spanning node present.
+ *	val_len1	: length of data (of spanning node) present in the block.
+ */
+int zwrkeyvallen(char* ptr, int len, char **val_off, int *val_len, int *val_off1, int *val_len1)
 {
-	int		keylength, keystate;
+	int		keylength, keystate, off, *tmp;
 	unsigned	ch, chtmp;
-	boolean_t	keepgoing;
+	boolean_t	keepgoing, extfmt;
 
 	keylength = 0;	/* determine length of key */
 	keystate  = 0;
+	ptr = (extfmt = ('$' == ptr[keylength]) ? 1 : 0) ? ptr + 4 : ptr; /*In extract first 4 chars are '$', 'z', 'e' and '(' */
 	keepgoing = TRUE;
 	while ((keylength < len) && keepgoing) /* slightly different here from go_load since we can get kill records too */
 	{
@@ -206,8 +218,11 @@ int zwrkeylength(char* ptr, int len)
 			{
 				keylength--;
 				keepgoing = FALSE;
-			}
-			else if ('(' == ch) /* start of subscripts */
+			} else if (',' == ch)
+			{
+				keylength--;
+				keepgoing = FALSE;
+			} else if ('(' == ch) /* start of subscripts */
 				keystate = 1;
 			break;
 		case 1:	/* in subscripts area, but out of "..." or $C(...) */
@@ -276,6 +291,33 @@ int zwrkeylength(char* ptr, int len)
 			assert(FALSE);
 			break;
 		}
+	}
+
+	if (extfmt)
+	{
+		off = keylength + 1;	/* to point to second exp in $ext format */
+		tmp = val_off1;
+		*tmp = 0;
+		while (TRUE)
+		{
+			ch = ptr[off++];
+			if (')' == ch)
+				break;
+			if (',' == ch)
+			{
+				tmp = val_len1;
+				*tmp = 0;
+				continue;
+			}
+			*tmp = (10 * (*tmp)) + ch - 48;
+		}
+		*val_off = ptr + off + SIZEOF(char); 		/* SIZEOF(char) is used to make adjustment for '=' sign */
+		*val_len = len - (off + SIZEOF(char) + 4); 	/* The prefix '$ze(' account for 4 chars */
+	}
+	else
+	{
+		*val_off = ptr + (keylength + SIZEOF(char));	/* SIZEOF(char) is used to make adjustment for '=' sign */
+		*val_len = len - (keylength + SIZEOF(char)); 	/* SIZEOF(char) is used to make adjustment for '=' sign */
 	}
 	return keylength;
 }

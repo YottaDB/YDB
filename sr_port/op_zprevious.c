@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,7 +89,7 @@ void op_zprevious(mval *v)
 			found = gvcmx_zprevious();
 		else
 			found = gvusr_zprevious();
-		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied
+		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied (BYPASSOK)
 				* by this to-be-overwritten mval */
 		if (found)
 		{
@@ -104,7 +104,7 @@ void op_zprevious(mval *v)
 					n = gv_altkey->end - gv_altkey->prev;
 					assert(n > 0);
 				}
-				v->str.len = 0; /* so stp_gcol (if invoked) can free up space currently occupied by this
+				v->str.len = 0; /* so stp_gcol (if invoked) can free up space currently occupied by this (BYPASSOK)
 						 * to-be-overwritten mval */
 				ENSURE_STP_FREE_SPACE(n);
 			}
@@ -152,6 +152,8 @@ void op_zprevious(mval *v)
 					found = gvcmx_zprevious();
 				else
 					found = gvusr_zprevious();
+				if ('#' == gv_altkey->base[0]) /* don't want to give any hidden ^#* global, e.g "^#t" */
+					found = FALSE;
 				if (!found)
 					break;
 				assert(1 < gv_altkey->end);
@@ -181,18 +183,20 @@ void op_zprevious(mval *v)
 				assert(SIZEOF((map - 1)->name) == SIZEOF(mident_fixed));
 				assert(0 == (map - 1)->name[SIZEOF((map - 1)->name) - 1]);
 				gv_currkey->end = mid_len((mident_fixed *)((map - 1)->name));
+				assert(gv_currkey->end <= MAX_MIDENT_LEN);
 				memcpy(gv_currkey->base, (map - 1)->name, gv_currkey->end);
 				gv_currkey->base[gv_currkey->end++] = KEY_DELIMITER;
 				gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
+				assert(gv_currkey->top > gv_currkey->end);	/* ensure we are within allocated bounds */
 			}
 		}
 		gv_currkey->end = 0;
 		gv_currkey->base[0] = KEY_DELIMITER;
-		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied
+		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied (BYPASSOK)
 				* by this to-be-overwritten mval */
 		if (found)
 		{
-			v->str.len = 0; /* so stp_gcol (if invoked) can free up space currently occupied by this
+			v->str.len = 0; /* so stp_gcol (if invoked) can free up space currently occupied by this (BYPASSOK)
 					 * to-be-overwritten mval */
 			ENSURE_STP_FREE_SPACE(name.len + 1);
 			v->str.addr = (char *)stringpool.free;

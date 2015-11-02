@@ -12,7 +12,7 @@
 #ifndef OBJ_FILE_INCLUDED
 #define OBJ_FILE_INCLUDED
 
-#include "obj_filesp.h"
+#include <obj_filesp.h>
 
 void emit_immed(char *source, uint4 size);
 void emit_literals(void);

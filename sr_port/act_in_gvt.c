@@ -19,7 +19,7 @@
 #include "collseq.h"
 #include "spec_type.h"
 #ifdef GTM_TRIGGER
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"
 #endif
 

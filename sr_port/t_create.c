@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,6 +91,12 @@ block_index t_create (
 	cse->low_tlevel = NULL;
 	cse->high_tlevel = NULL;
 	cse->ondsk_blkver = GDSVCURR;
+	assert (NULL != gv_target);	/* t_create is called by gvcst kill/put,mu split/swap_blk, where gv_target can't be NULL */
+	/* For uninitialized gv_target, initialize the in_tree status as IN_DIR_TREE, which later may be modified by t_write */
+	if (0 == gv_target->root)
+		SET_DIR_TREE(cse);
+	else
+		(DIR_ROOT == gv_target->root) ? SET_DIR_TREE(cse) : SET_GV_TREE(cse);
 	if (!dollar_tlevel)
 		return(cw_set_depth++);
 	else

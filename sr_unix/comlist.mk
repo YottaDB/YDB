@@ -191,8 +191,8 @@ exe_list:=libgtmshr$(gt_ld_shl_suffix) $(exe_list) $(gt_svc_exe)
 # post cms_load forms and pre-cms load forms work.
 plugin_cfiles:= gtmcrypt_ref.c gtmcrypt_pk_ref.c gtmcrypt_dbk_ref.c maskpass.c
 plugin_hfiles:= gtmcrypt_ref.h gtmcrypt_pk_ref.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_interface.h gtmxc_types.h main_pragma.h
-plugin_sh_file:= build.sh install.sh
-plugin_mfile:=getpass.m
+plugin_sh_file:= build.sh install.sh add_db_key.sh encrypt_sign_db_key.sh gen_keypair.sh gen_sym_hash.sh gen_sym_key.sh import_and_sign_key.sh pinentry-gtm.sh
+plugin_mfile:=pinentry.m
 mfile_list:=$(filter-out _%.m, $(filter %.m, $(allfiles_list)))
 mptfile_list:=$(sort $(basename $(filter %.mpt, $(allfiles_list))) $(basename $(patsubst _%.m, %, $(filter _%.m, $(allfiles_list)))))
 mfile_targets:=$(addsuffix .m,$(foreach f,$(basename $(mfile_list)), $(shell echo $(f) | tr '[:lower:]' '[:upper:]')))
@@ -387,7 +387,7 @@ cpplugin_scripts: $(plugin_ksh_file) $(plugin_sh_file)
 cpplugin_file: $(plugin_cfiles) $(plugin_hfiles)
 	cp -f $^ ../plugin/gtmcrypt
 cpplugin_mfile: $(plugin_mfile)
-	cp -f $^ ../plugin/gtmcrypt/GETPASS.m
+	cp -f $^ ../plugin/gtmcrypt/
 build_plugin_lib:
 	gtm_dist=$(dir $(CURDIR));export gtm_dist;cd $(gtm_dist)/plugin/gtmcrypt;sh -f build.sh $(crypttype) $(cryptbuildtype); sh -f install.sh
 endif

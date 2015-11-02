@@ -19,7 +19,7 @@
 #include "iottdef.h"
 #include "iomtdef.h"
 /* ****************
-#include "gtm_mtio.h"
+#include <gtm_mtio.h>
    **************** */
 
 uint4

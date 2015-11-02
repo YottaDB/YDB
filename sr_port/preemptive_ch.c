@@ -18,6 +18,7 @@
 #include "gdsblk.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
+#include "probe.h"
 #include "gdsfhead.h"
 #include "error.h"
 #include "gdskill.h"
@@ -41,6 +42,7 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF  sgm_info                *first_sgm_info;
+GBLREF	boolean_t		need_kip_incr;
 
 /* container for all the common chores that need to be performed on error conditions */
 
@@ -74,6 +76,9 @@ void preemptive_ch(int preemptive_severe)
 			RESET_GV_TARGET(UNIX_ONLY(SKIP_GVT_GVKEY_CHECK) VMS_ONLY(DO_GVT_GVKEY_CHECK));
 		}
 	}
+	need_kip_incr = FALSE;	/* in case we got an error in t_end (e.g. GBLOFLOW), dont want this global variable to get
+				 * carried over to the next non-TP transaction that this process does (e.g. inside an error trap).
+				 */
 	if (dollar_tlevel)
 	{
 		for (si = first_sgm_info;  si != NULL; si = si->next_sgm_info)
@@ -82,11 +87,11 @@ void preemptive_ch(int preemptive_severe)
 			{
 				csa = si->tp_csa;
 				assert(si->tp_csa == si->kip_csa);
-				DECR_KIP(csa->hdr, csa, si->kip_csa);
+				CAREFUL_DECR_KIP(csa->hdr, csa, si->kip_csa);
 			}
 		}
 	} else if (NULL != kip_csa && (NULL != kip_csa->hdr) && (NULL != kip_csa->nl))
-		DECR_KIP(kip_csa->hdr, kip_csa, kip_csa);
+		CAREFUL_DECR_KIP(kip_csa->hdr, kip_csa, kip_csa);
 	if (IS_DSE_IMAGE)
 	{	/* Release crit on any region that was obtained for the current erroring DSE operation.
 		 * Take care NOT to release crits obtained by a previous CRIT -SEIZE command.
@@ -99,9 +104,11 @@ void preemptive_ch(int preemptive_severe)
 				{
 					csa = &FILE_INFO(reg)->s_addrs;
 					assert(csa->hold_onto_crit || !csa->dse_crit_seize_done);
+					assert(!csa->hold_onto_crit || csa->now_crit);
 					if (csa->now_crit && (!csa->hold_onto_crit || !csa->dse_crit_seize_done))
 					{
 						rel_crit(reg);
+						csa->hold_onto_crit = FALSE;
 						t_abort(reg, csa);	/* cancel mini-transaction if any in progress */
 					}
 				}

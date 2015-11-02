@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@
 #include "io_params.h"
 #include "op.h"
 #include "io.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "jobexam_process.h"
 #ifdef UNIX
@@ -47,7 +47,6 @@ GBLREF uint4		process_id;
 GBLREF io_pair		io_std_device, io_curr_device;
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char    *msp, *stackwarn, *stacktop;
-GBLREF char		*util_outptr, util_outbuff[OUT_BUFF_SIZE];
 GBLREF boolean_t        created_core;
 UNIX_ONLY(GBLREF sigset_t blockalrm;)
 DEBUG_ONLY(GBLREF boolean_t ok_to_UNWIND_in_exit_handling;)
@@ -75,6 +74,9 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	struct sigaction	new_action, prev_action;
 	sigset_t		savemask;
 #	endif
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	/* If the input file name is the result of an expression, it is likely being held in the
 	 *  same temporary as the output file spec. We can tell if this is true by comparing the
 	 *  address of the input and output mvals. If they are the same, make a copy of the input
@@ -115,22 +117,36 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 #	endif
 	*dump_file_spec = empty_str_mval;
 	dev_in_use = io_curr_device;		/* Save current IO device */
-	/* Save text in util_outbuff which can be detrimentally overwritten by ZSHOW */
+	/* Save text in util_outbuff which can be detrimentally overwritten by ZSHOW.
+	 * NOTE: The following code needs to be eventually moved to jobinterrupt_process.c and replaced with
+	 * SAVE/RESTORE_UTIL_OUT_BUFFER macros, as follows:
+	 *
+	 * 	char 			*save_util_outptr;
+	 *	va_list			save_last_va_list_ptr;
+	 *	boolean_t		util_copy_saved = FALSE;
+	 *	DCL_THREADGBL_ACCESS;
+	 *
+	 * 	SETUP_THREADGBL_ACCESS;
+	 *	...
+	 * 	SAVE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
+	 *	...
+	 *	RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
+	 */
 	saved_util_outbuff_len = 0;
-	if (NULL == util_outptr)
-		util_outptr = util_outbuff;
-	if (0 != (saved_util_outbuff_len = (int)(util_outptr - util_outbuff)))	/* Caution -- assignment */
+	if (NULL == TREF(util_outptr))
+		TREF(util_outptr) = TREF(util_outbuff_ptr);
+	if (0 != (saved_util_outbuff_len = (int)(TREF(util_outptr) - TREF(util_outbuff_ptr))))	/* Caution -- assignment */
 	{
 		assert(0 <= saved_util_outbuff_len);
 		assert(saved_util_outbuff_len <= SIZEOF(saved_util_outbuff));
-		memcpy(saved_util_outbuff, util_outbuff, saved_util_outbuff_len);
+		memcpy(saved_util_outbuff, TREF(util_outbuff_ptr), saved_util_outbuff_len);
 	}
 	jobexam_dump(input_dump_file_name, dump_file_spec);
 	/* If any errors occur in job_exam_dump, the condition handler will unwind the stack to this point and return.  */
 	if (0 != saved_util_outbuff_len)
 	{	/* Restore util_outbuff values */
-		memcpy(util_outbuff, saved_util_outbuff, saved_util_outbuff_len);
-		util_outptr = util_outbuff + saved_util_outbuff_len;
+		memcpy(TREF(util_outbuff_ptr), saved_util_outbuff, saved_util_outbuff_len);
+		TREF(util_outptr) = TREF(util_outbuff_ptr) + saved_util_outbuff_len;
 	}
 	io_curr_device = dev_in_use;		/* Restore IO device */
 	/* If we saved an mval on our stack, we need to pop it off. If there was an error while doing the

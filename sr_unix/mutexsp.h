@@ -37,6 +37,7 @@
 #define MUTEX_SOCK_DIR                  GTM_TMP_ENV
 #define DEFAULT_MUTEX_SOCK_DIR          DEFAULT_GTM_TMP
 #define MUTEX_SOCK_FILE_PREFIX          "gtm_mutex"
+#define MAX_MUTEX_SOCKFILE_NAME_LEN	(SIZEOF(MUTEX_SOCK_FILE_PREFIX) + MAX_DIGITS_IN_INT)
 
 #define BIN_TOGGLE(x) ((x) ? 0 : 1)
 

@@ -12,7 +12,7 @@
 #include "mdef.h"
 
 #include "compiler.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "opcode.h"
 #include "xfer_enum.h"
@@ -23,7 +23,7 @@
 #include "obj_gen.h"
 #include "i386.h"
 #include "obj_file.h"
-#include "emit_code.h"
+#include <emit_code.h>
 #include "hashtab_mname.h"
 #include "stddef.h"
 

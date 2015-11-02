@@ -28,7 +28,7 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "subscript.h"
 #include "op.h"

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006, 2011 Fidelity Information Services, Inc	;
+;	Copyright 2006, 2012 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -121,9 +121,12 @@ cregion:
 	s rec=rec_$tr($j("",4)," ",ZERO)							;filler
 	s rec=rec_$$num2bin(1,regs(s,"COLLATION_DEFAULT"))
 	s rec=rec_$$num2bin(1,regs(s,"STDNULLCOLL"))
+	i $ZVersion'["VMS" s rec=rec_$$num2bin(1,regs(s,"INST_FREEZE_ON_ERROR"))
+	i $ZVersion'["VMS" s rec=rec_$$num2bin(1,regs(s,"QDBRUNDOWN"))
 	s rec=rec_$$num2bin(1,$zl(regs(s,"FILE_NAME")))
 	s rec=rec_regs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$zl(regs(s,"FILE_NAME")))," ",ZERO)
-	s rec=rec_$tr($j("",SIZEOF("gd_region_padding"))," ",ZERO)				; reserved + padding
+	s rec=rec_$tr($j("",SIZEOF("gd_region_padding"))," ",ZERO)				; padding
+	s rec=rec_$tr($j("",8)," ",ZERO)							; reserved
 	q
 csegment:
 	d writerec

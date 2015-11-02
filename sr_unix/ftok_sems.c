@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,6 @@
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	uint4			process_id;
-GBLREF	boolean_t		sem_incremented;
 GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	int4			exi_condition;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
@@ -106,7 +105,7 @@ error_def(ERR_TEXT);
 	return TRUE;													\
 }
 
-boolean_t ftok_sem_get2(gd_region *reg, uint4 start_hrtbt_cntr, semwait_status_t *retstat)
+boolean_t ftok_sem_get2(gd_region *reg, uint4 start_hrtbt_cntr, semwait_status_t *retstat, boolean_t *bypass)
 {
 	int			status = SS_NORMAL, save_errno;
 	int			ftok_sopcnt, sem_pid;
@@ -146,6 +145,7 @@ boolean_t ftok_sem_get2(gd_region *reg, uint4 start_hrtbt_cntr, semwait_status_t
 		SEMOP(ftokid, ftok_sop, ftok_sopcnt, status, NO_WAIT);
 		if (-1 != status)
 			RETURN_SUCCESS(reg);
+		assert(EINTR != errno);
 		save_errno = errno;
 		if (EAGAIN == save_errno)
 		{	/* someone else is holding it */
@@ -155,15 +155,19 @@ boolean_t ftok_sem_get2(gd_region *reg, uint4 start_hrtbt_cntr, semwait_status_t
 				if (-1 != sem_pid)
 					RETURN_SEMWAIT_FAILURE(retstat, 0, op_invalid_sem_syscall, ERR_SEMWT2LONG, 0, sem_pid);
 				save_errno = errno; /* fall-through */
-			} else if (do_blocking_semop(ftokid, ftok_sop, ftok_sopcnt, gtm_ftok_sem, start_hrtbt_cntr, retstat))
+			} else if (do_blocking_semop(ftokid, gtm_ftok_sem, start_hrtbt_cntr, retstat, reg, bypass))
 			{
-				RETURN_SUCCESS(reg);
+				if (*bypass)
+					return TRUE;
+				else
+					RETURN_SUCCESS(reg);
 			} else if (!SEM_REMOVED(retstat->save_errno))
 				return FALSE; /* retstat will already have the necessary error information */
-			save_errno = errno; /* some other error. Fall-through */
+			save_errno = retstat->save_errno; /* some other error. Fall-through */
 		}
 		if (SEM_REMOVED(save_errno))
 			continue;
+		assert(EINTR != save_errno);
 		RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semctl_or_semop, 0, ERR_CRITSEMFAIL, 0);
 	}
 	assert(FALSE);
@@ -195,7 +199,7 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 	boolean_t		shared_mem_available;
 	int4			lcl_ftok_ops_index;
 	struct sembuf		ftok_sop[3];
-	const char		*msgstr = NULL;
+	char			*msgstr;
 	boolean_t		stacktrace_issued = FALSE;
 	DCL_THREADGBL_ACCESS;
 
@@ -242,10 +246,7 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 		SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
 		assert(mupip_jnl_recover || incr_cnt);
 		/* First try is always non-blocking */
-		do
-		{
-			status = semop(udi->ftok_semid, ftok_sop, ftok_sopcnt);
-		} while ((-1 == status) && (EINTR == errno)); /* EINTR is possible if heartbeat_timer is enabled at this point */
+		SEMOP(udi->ftok_semid, ftok_sop, ftok_sopcnt, status, NO_WAIT);
 		if (-1 != status)
 		{
 			SENDMSG_SEMOP_SUCCESS_IF_NEEDED(stacktrace_issued, gtm_ftok_sem);

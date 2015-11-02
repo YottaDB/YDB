@@ -215,6 +215,7 @@ void	mupip_recover(void)
 	mur_get_options();
 	/*DEFER_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES); */
 	mur_open_files_status = mur_open_files();
+	jgbl.mur_extract = mur_options.extr[GOOD_TN]; /* journal extract process */
 	/*ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES);*/
 	if (!mur_open_files_status) /* mur_open_files already issued error */
 	{

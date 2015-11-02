@@ -64,6 +64,7 @@
 GBLDEF	boolean_t		gtmsource_logstats = FALSE, gtmsource_pool2file_transition = FALSE;
 GBLDEF	int			gtmsource_filter = NO_FILTER;
 GBLDEF	boolean_t		update_disable = FALSE;
+GBLDEF	boolean_t		last_seen_freeze_flag = FALSE;
 
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	gtmsource_state_t	gtmsource_state;
@@ -73,8 +74,6 @@ GBLREF	uint4			process_id;
 GBLREF	int			gtmsource_sock_fd;
 GBLREF	int			gtmsource_log_fd;
 GBLREF	FILE			*gtmsource_log_fp;
-GBLREF	int			gtmsource_statslog_fd;
-GBLREF	FILE			*gtmsource_statslog_fp;
 GBLREF	gd_addr			*gd_header;
 GBLREF	void			(*call_on_signal)();
 GBLREF	seq_num			gtmsource_save_read_jnl_seqno, seq_num_zero;
@@ -98,6 +97,8 @@ error_def(ERR_NOTALLDBOPN);
 error_def(ERR_NULLCOLLDIFF);
 error_def(ERR_REPLCOMM);
 error_def(ERR_REPLINFO);
+error_def(ERR_REPLINSTFREEZECOMMENT);
+error_def(ERR_REPLINSTFROZEN);
 error_def(ERR_REPLOFFJNLON);
 error_def(ERR_TEXT);
 
@@ -161,6 +162,10 @@ int gtmsource()
 		gtmsource_exit(gtmsource_losttncomplete() - NORMAL_SHUTDOWN);
 	else if (gtmsource_options.needrestart)
 		gtmsource_exit(gtmsource_needrestart() - NORMAL_SHUTDOWN);
+	else if (gtmsource_options.showfreeze)
+		gtmsource_exit(gtmsource_showfreeze() - NORMAL_SHUTDOWN);
+	else if (gtmsource_options.setfreeze)
+		gtmsource_exit(gtmsource_setfreeze() - NORMAL_SHUTDOWN);
 	else if (!gtmsource_options.start)
 	{
 		assert(CLI_PRESENT == cli_present("STATSLOG"));
@@ -225,6 +230,7 @@ int gtmsource()
 	assert(!holds_sem[SOURCE][SRC_SERV_COUNT_SEM]);
 	/* Start child source server initialization */
 	is_src_server = TRUE;
+	OPERATOR_LOG_MSG;
 	process_id = getpid();
 	/* Reinvoke secshr related initialization with the child's pid */
 	INVOKE_INIT_SECSHR_ADDRS;
@@ -236,7 +242,7 @@ int gtmsource()
 	mutex_per_process_init();
 	START_HEARTBEAT_IF_NEEDED;
 	ppid = getppid();
-	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, NULL, gtmsource_options.log_file, NULL);
+	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, gtmsource_options.log_file);
 	assert(SS_NORMAL == log_init_status);
 	repl_log_fd2fp(&gtmsource_log_fp, gtmsource_log_fd);
 	if (-1 == (procgp = setsid()))
@@ -275,7 +281,7 @@ int gtmsource()
 			gtm_putmsg(VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(reg));
 			gtmsource_exit(ABNORMAL_SHUTDOWN);
 		}
-		if (reg->read_only && REPL_ALLOWED(csa->hdr))
+		if (reg->read_only && REPL_ALLOWED(csa))
 		{
 			gtm_putmsg(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				   RTS_ERROR_LITERAL("Source Server does not have write permissions to one or "
@@ -339,13 +345,23 @@ int gtmsource()
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Attached to existing jnlpool with shmid = [%d] and semid = [%d]\n",
 			jnlpool.repl_inst_filehdr->jnlpool_shmid, jnlpool.repl_inst_filehdr->jnlpool_semid);
 	gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
+	if (jnlpool.jnlpool_ctl->freeze)
+	{
+		last_seen_freeze_flag = jnlpool.jnlpool_ctl->freeze;
+		sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFROZEN, 1, jnlpool.repl_inst_filehdr->inst_info.this_instname);
+		repl_log(gtmsource_log_fp, TRUE, FALSE, print_msg);
+		sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool.jnlpool_ctl->freeze_comment);
+		repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
+	}
 	do
-	{	/* If mode is passive, go to sleep. Wakeup every now and
-		 * then and check to see if I have to become active */
+	{ 	/* If mode is passive, go to sleep. Wakeup every now and then and check to see if I have to become active. */
 		gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_START;
-		while (gtmsource_local->mode == GTMSOURCE_MODE_PASSIVE
-		       		&& gtmsource_local->shutdown == NO_SHUTDOWN)
+		if ((gtmsource_local->mode == GTMSOURCE_MODE_PASSIVE) && (gtmsource_local->shutdown == NO_SHUTDOWN))
+		{
+			gtmsource_poll_actions(FALSE);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_MODE_CHANGE);
+			continue;
+		}
 		if (GTMSOURCE_MODE_PASSIVE == gtmsource_local->mode)
 		{	/* Shutdown initiated */
 			assert(gtmsource_local->shutdown == SHUTDOWN);
@@ -364,7 +380,7 @@ int gtmsource()
 		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
 		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
 		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-		GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+		grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		{
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "Starting afresh due to ONLINE ROLLBACK\n");

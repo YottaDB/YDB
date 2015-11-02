@@ -18,7 +18,7 @@
 #include "iomtdef.h"
 #include "iosp.h"
 #include "io_params.h"
-#include "gtm_mtio.h"
+#include <gtm_mtio.h>
 
 GBLREF io_pair  io_curr_device;
 

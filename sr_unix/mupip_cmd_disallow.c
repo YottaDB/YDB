@@ -287,9 +287,11 @@ boolean_t cli_disallow_mupip_replic_receive(void)
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("UPDATERESYNC") && d_c_cli_present("NORESYNC"));
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value = (!d_c_cli_present("UPDATERESYNC") && d_c_cli_present("REUSE"));
+	disallow_return_value = (!d_c_cli_present("UPDATERESYNC") && (d_c_cli_present("REUSE")
+									|| d_c_cli_present("RESUME")
+									|| d_c_cli_present("INITIALIZE")));
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value = (!d_c_cli_present("UPDATERESYNC") && d_c_cli_present("RESUME"));
+	disallow_return_value = (d_c_cli_present("INITIALIZE") && d_c_cli_present("RESUME"));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("REUSE") && d_c_cli_present("RESUME"));
 	CLI_DIS_CHECK_N_RESET;
@@ -310,13 +312,16 @@ boolean_t cli_disallow_mupip_replic_receive(void)
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("AUTOROLLBACK") && !d_c_cli_present("LISTENPORT") && !d_c_cli_present("START"));
 	CLI_DIS_CHECK_N_RESET;
+	/* LOG are not allowed with STATS qualifier */
+	disallow_return_value = (d_c_cli_present("STATSLOG") && d_c_cli_present("LOG"));
+	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
 
 boolean_t cli_disallow_mupip_replic_source(void)
 {
 	int		disallow_return_value = 0;
-	boolean_t	p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12;
+	boolean_t	p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13;
 
 	*cli_err_str_ptr = 0;
 
@@ -332,15 +337,16 @@ boolean_t cli_disallow_mupip_replic_source(void)
 	p10 = d_c_cli_present("LOSTTNCOMPLETE");
 	p11 = d_c_cli_present("NEEDRESTART");
 	p12 = d_c_cli_present("JNLPOOL");
+	p13 = d_c_cli_present("FREEZE");
 
 	/* every source server command must have at least one of the above control qualifiers */
-	disallow_return_value = !(p1 || p2 || p3 || p4 || p5 || p6 || p7 || p8 || p9 || p10 || p11 || p12);
+	disallow_return_value = !(p1 || p2 || p3 || p4 || p5 || p6 || p7 || p8 || p9 || p10 || p11 || p12 || p13);
 	CLI_DIS_CHECK;	/* Note CLI_DIS_CHECK_N_RESET is not used as we want to reuse the computed error string (cli_err_str_ptr)
 			 * for the next check as well in case it fails. Note that this can be done only if both checks use
 			 * exactly the same set of qualifiers (which is TRUE in this case). */
 
 	/* every source server command cannot have any more than one of the above control qualifiers */
-	disallow_return_value = cli_check_any2(VARLSTCNT(11) p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12);
+	disallow_return_value = cli_check_any2(VARLSTCNT(11) p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13);
 	CLI_DIS_CHECK_N_RESET;
 
 	/* BUFFSIZE, CMPLVL, FILTER, PASSIVE are supported only with START qualifier */
@@ -354,12 +360,21 @@ boolean_t cli_disallow_mupip_replic_source(void)
 	disallow_return_value = (!d_c_cli_present("START") && !d_c_cli_present("ACTIVATE")
 					&& (d_c_cli_present("CONNECTPARAMS") || d_c_cli_present("SECONDARY")));
 	CLI_DIS_CHECK_N_RESET;
-	/* LOG, LOG_INTERVAL are supported only with START, CHANGELOG, ACTIVATE, STATSLOG qualifiers */
+	/* LOG are not allowed with STATS qualifier */
+	disallow_return_value = (d_c_cli_present("STATSLOG") && d_c_cli_present("LOG"));
+	CLI_DIS_CHECK_N_RESET;
+	/* LOG are supported only with START, CHANGELOG, ACTIVATE qualifiers */
+	disallow_return_value = (!d_c_cli_present("START")
+					&& !d_c_cli_present("CHANGELOG")
+					&& !d_c_cli_present("ACTIVATE")
+					&& d_c_cli_present("LOG"));
+	CLI_DIS_CHECK_N_RESET;
+	/* LOG_INTERVAL are supported only with START, CHANGELOG, ACTIVATE, STATSLOG qualifiers */
 	disallow_return_value = (!d_c_cli_present("START")
 					&& !d_c_cli_present("CHANGELOG")
 					&& !d_c_cli_present("ACTIVATE")
 					&& !d_c_cli_present("STATSLOG")
-					&& (d_c_cli_present("LOG") || d_c_cli_present("LOG_INTERVAL")));
+					&& d_c_cli_present("LOG_INTERVAL"));
 	CLI_DIS_CHECK_N_RESET;
 	/* TIMEOUT is supported only with SHUTDOWN qualifier */
 	disallow_return_value = (!d_c_cli_present("SHUTDOWN") && d_c_cli_present("TIMEOUT"));
@@ -379,7 +394,7 @@ boolean_t cli_disallow_mupip_replic_source(void)
 	disallow_return_value = (d_c_cli_present("CHANGELOG") && !d_c_cli_present("LOG") && !d_c_cli_present("LOG_INTERVAL"));
 	CLI_DIS_CHECK_N_RESET;
 	/* ROOTPRIMARY (or UPDOK) and PROPAGATEPRIMARY (or UPDNOTOK) are mutually exclusive */
-	disallow_return_value = ((d_c_cli_present("ROOTPRIMARY") || d_c_cli_present("UPDNOTOK"))
+	disallow_return_value = ((d_c_cli_present("ROOTPRIMARY") || d_c_cli_present("UPDOK"))
 					&& (d_c_cli_present("PROPAGATEPRIMARY") || d_c_cli_present("UPDNOTOK")));
 	CLI_DIS_CHECK_N_RESET;
 	/* ROOTPRIMARY and PROPAGATEPRIMARY are allowed only along with START, ACTIVATE or DEACTIVATE qualifiers */
@@ -468,6 +483,13 @@ boolean_t cli_disallow_mupip_set(void)
 					|| d_c_cli_present("DEFER_TIME")
 					|| d_c_cli_present("WAIT_DISK")
 					|| d_c_cli_present("PARTIAL_RECOV_BYPASS")));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("INST_FREEZE_ON_ERROR") && p3);
+	CLI_DIS_CHECK_N_RESET;
+	p1 = d_c_cli_present("KEY_SIZE");
+	p2 = d_c_cli_present("RECORD_SIZE");
+	p3 = d_c_cli_present("RESERVED_BYTES");
+	disallow_return_value =  cli_check_any2(VARLSTCNT(3) p1, p2, p3);
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }

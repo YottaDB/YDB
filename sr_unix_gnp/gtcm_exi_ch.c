@@ -36,7 +36,6 @@
 GBLREF bool		gtcm_errfile;
 GBLREF bool		gtcm_firsterr;
 GBLREF FILE		*gtcm_errfs;
-GBLREF unsigned char	*util_outptr;
 GBLREF int4		exi_condition;
 
 error_def(ERR_TEXT);
@@ -46,20 +45,22 @@ CONDITION_HANDLER(gtcm_exi_ch)
 	int		rc;
 	now_t		now;	/* for GET_CUR_TIME macro */
 	char		time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (gtcm_firsterr)
 		gtcm_open_cmerrlog();
 	if (gtcm_errfile)
 	{
-		if ((char *)util_outptr != util_outbuff)
+		if (TREF(util_outptr) != TREF(util_outbuff_ptr))
 		{	/* msg yet to be flushed. Properly terminate it in the buffer. If msg has
 			   already been flushed (to stderr) then this has already been done. */
-			*util_outptr = '\n';
-			*(util_outptr + 1) = 0;
+			*(TREF(util_outptr)) = '\n';
+			*(TREF(util_outptr) + 1) = 0;
 		}
 		GET_CUR_TIME;
 		time_str[CTIME_BEFORE_NL] = 0;
-		FPRINTF(gtcm_errfs, "%s: %s", time_str, util_outbuff);
+		FPRINTF(gtcm_errfs, "%s: %s", time_str, TREF(util_outbuff_ptr));
 		FFLUSH(gtcm_errfs);
 	}
 	send_msg(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("GT.CM TERMINATION RUNDOWN ERROR"));

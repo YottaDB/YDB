@@ -16,6 +16,8 @@
 #include "gtm_unistd.h"
 #include "gtm_inet.h"
 #include "gtm_string.h"
+#include "gtmio.h"
+#include "repl_sp.h"
 
 #include <errno.h>
 #ifdef VMS
@@ -41,12 +43,16 @@
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
+error_def(ERR_REPLLOGOPN);
 
 int gtmsource_mode_change(int to_mode)
 {
 	uint4		savepid;
 	int		exit_status;
 	int		status, detach_status, remove_status;
+	int 	        log_fd = 0, close_status = 0;
+	char*           err_code;
+	int	        save_errno;
 	sgmnt_addrs	*repl_csa;
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
@@ -60,6 +66,23 @@ int gtmsource_mode_change(int to_mode)
 		return (ABNORMAL_SHUTDOWN);
 	}
 	assert(ROOTPRIMARY_UNSPECIFIED != gtmsource_options.rootprimary);
+	/*check if the new log file is writable*/
+	if ('\0' != gtmsource_options.log_file[0] && 0 != STRCMP(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file))
+	{
+		OPENFILE3(gtmsource_options.log_file,
+			      O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH, log_fd);
+		if (log_fd < 0) {
+			save_errno = ERRNO;
+			err_code = STRERROR(save_errno);
+			gtm_putmsg(VARLSTCNT(8) ERR_REPLLOGOPN, 6,
+					   LEN_AND_STR(gtmsource_options.log_file),
+					   LEN_AND_STR(err_code),
+					   LEN_AND_STR(NULL_DEVICE));
+			return (ABNORMAL_SHUTDOWN);
+		}
+		CLOSEFILE_IF_OPEN(log_fd, close_status);
+		assert(close_status==0);
+	}
 	if ((GTMSOURCE_MODE_ACTIVE == to_mode)
 			&& (ROOTPRIMARY_SPECIFIED == gtmsource_options.rootprimary) && jnlpool.jnlpool_ctl->upd_disabled)
 	{	/* ACTIVATE is specified with ROOTPRIMARY on a journal pool that was created with PROPAGATEPRIMARY. This is a
@@ -70,7 +93,7 @@ int gtmsource_mode_change(int to_mode)
 	}
 	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
 	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
-	GRAB_LOCK(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+	grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
 	/* Any ACTIVATE/DEACTIVATE versus ROOTPRIMARY/PROPAGATE incompatibilities have already been checked in the
 	 * function "jnlpool_init" so go ahead and document the impending activation/deactivation and return.
 	 * This flag will be eventually detected by the concurrently running source server which will then change mode.

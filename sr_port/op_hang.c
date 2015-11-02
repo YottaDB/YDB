@@ -36,18 +36,42 @@
 # include "wcs_sleep.h"
 # include "wbox_test_init.h"
 # include "gtmio.h"
-# include "have_crit.h"
 # include "deferred_signal_handler.h"
+# include "util.h"
 #endif
 
+#include "gdsroot.h"
+#include "gdskill.h"
+#include "gdsbt.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsfhead.h"
+#include "gdscc.h"
+#include "filestruct.h"
+#include "buddy_list.h"		/* needed for tp.h */
+#include "jnl.h"
+#include "hashtab_int4.h"	/* needed for tp.h */
+#include "tp.h"
+#include "send_msg.h"
+#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
+#include "change_reg.h"
+#include "setterm.h"
+#include "getzposition.h"
+#ifdef DEBUG
+#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
+#endif
+
+GBLREF	uint4		dollar_trestart;
+GBLREF	mv_stent	*mv_chain;
 GBLREF	int4		outofband;
 GBLREF	unsigned char	*restart_pc, *restart_ctxt;
-GBLREF	mv_stent	*mv_chain;
 #ifdef DEBUG
 GBLREF	stack_frame	*frame_pointer;
 #endif
 
 error_def(ERR_SYSCALL);
+
+#define HANGSTR "HANG time too long"
 
 /*
  * ------------------------------------------
@@ -89,6 +113,8 @@ void op_hang(mval* num)
 		ms = mval2i(num) * 1000;	/* too big to care about fractional amounts */
 	if (ms)
 	{
+		if (TREF(tpnotacidtime) * 1000 < ms)
+			TPNOTACID_CHECK(HANGSTR);
 #		if defined(DEBUG) && defined(UNIX)
 		if (gtm_white_box_test_case_enabled
 			&& (WBTEST_DEFERRED_TIMERS == gtm_white_box_test_case_number)
@@ -109,6 +135,17 @@ void op_hang(mval* num)
 		{
 			frame_pointer->old_frame_pointer->mpc = (unsigned char *)GTM64_ONLY(0xdeadbeef12345678)
 				NON_GTM64_ONLY(0xdead1234);
+			return;
+		}
+		/* Upon seeing a .999s hang this white-box test launches a timer that pops with a period of UTIL_OUT_SYSLOG_INTERVAL
+		 * and prints a long message via util_out_ptr.
+		 */
+		if (gtm_white_box_test_case_enabled
+			&& (WBTEST_UTIL_OUT_BUFFER_PROTECTION == gtm_white_box_test_case_number)
+			&& (0 == gtm_white_box_test_case_count)
+			&& (999 == ms))
+		{
+			start_timer((TID)&util_out_syslog_dump, UTIL_OUT_SYSLOG_INTERVAL, util_out_syslog_dump, 0, NULL);
 			return;
 		}
 #		endif

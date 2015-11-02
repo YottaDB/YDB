@@ -12,7 +12,7 @@
 #ifndef _GTMSOURCE_SRV_LATCH
 #define _GTMSOURCE_SRV_LATCH
 
-boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeout_in_secs);
+boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeout_in_secs, uint4 onln_rlbk_action);
 
 boolean_t	rel_gtmsource_srv_latch(sm_global_latch_ptr_t latch);
 

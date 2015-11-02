@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,6 +55,7 @@ void dse_adstar(void)
 	blk_segment	*bs1, *bs_ptr;
 	int4		blk_seg_cnt, blk_size;
 	short		rsize;
+	int		tmp_cmpc;
 	srch_blk_status	blkhist;
 
 	error_def(ERR_DBRDONLY);
@@ -112,7 +113,7 @@ void dse_adstar(void)
 	}
 	rsize = SIZEOF(rec_hdr) + SIZEOF(block_id);
 	PUT_SHORT(&((rec_hdr_ptr_t)b_top)->rsiz, rsize);
-	((rec_hdr_ptr_t) b_top)->cmpc = 0;
+	SET_CMPC((rec_hdr_ptr_t)b_top, 0);
 	PUT_LONG((block_id_ptr_t)(b_top + SIZEOF(rec_hdr)), blk);
 	((blk_hdr_ptr_t)lbp)->bsiz += (unsigned int)(SIZEOF(rec_hdr) + SIZEOF(block_id));
 

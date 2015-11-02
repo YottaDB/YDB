@@ -39,6 +39,7 @@
 #include "db_ipcs_reset.h"
 #include "jnl.h"
 #include "do_semop.h"
+#include "anticipatory_freeze.h"
 
 GBLREF uint4		process_id;
 GBLREF ipcs_mesg	db_ipcs;
@@ -65,7 +66,9 @@ boolean_t db_ipcs_reset(gd_region *reg)
 	gd_region		*temp_region;
 	char			sgmnthdr_unaligned[SGMNT_HDR_LEN + 8], *sgmnthdr_8byte_aligned;
 	sgmnt_addrs             *csa;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(reg);
 	temp_region = gv_cur_region; 	/* save gv_cur_region wherever there is scope for it to be changed */
 	gv_cur_region = reg; /* dbfilop needs gv_cur_region */
@@ -134,13 +137,13 @@ boolean_t db_ipcs_reset(gd_region *reg)
 		 * BEFORE removing the semaphore as otherwise the waiting process in db_init will notice the semaphore removal
 		 * first and will read the file header and can potentially notice the stale semid/shmid values.
 		 */
-		if (!reg->read_only)
+		if (!reg->read_only DEBUG_ONLY(&& !TREF(gtm_usesecshr)))
 		{
 			csd->semid = INVALID_SEMID;
 			csd->shmid = INVALID_SHMID;
 			csd->gt_sem_ctime.ctime = 0;
 			csd->gt_shm_ctime.ctime = 0;
-			LSEEKWRITE(udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
+			DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
 			if (0 != status)
 			{
 				gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
@@ -156,12 +159,13 @@ boolean_t db_ipcs_reset(gd_region *reg)
 			db_ipcs.gt_sem_ctime = 0;
 			db_ipcs.gt_shm_ctime = 0;
 			if (!get_full_path((char *)DB_STR_LEN(reg), db_ipcs.fn, (unsigned int *)&db_ipcs.fn_len,
-						MAX_TRANS_NAME_LEN, &ustatus))
+					   GTM_PATH_MAX, &ustatus))
 			{
 				gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, DB_LEN_STR(reg), ustatus);
 				return FALSE;
 			}
 			db_ipcs.fn[db_ipcs.fn_len] = 0;
+			WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
 			if (0 != (status = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0)))
 			{
 				gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);

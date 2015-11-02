@@ -50,7 +50,8 @@ error_def(ERR_MUSTANDALONE);
 
 boolean_t mu_int_init(void)
 {
-	unsigned int	native_size, size, status;
+	unsigned int	status;
+	gtm_uint64_t	native_size;
 	file_control	*fc;
 	boolean_t	standalone;
 	char		msgbuff[MSGBUF_SIZE], *msgptr;

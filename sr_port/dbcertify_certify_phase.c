@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,6 +112,7 @@ void dbcertify_certify_phase(void)
 	char_ptr_t	errmsg;
 	boolean_t	restart_transaction, p1rec_read;
 	unsigned short	buff_len;
+	int		tmp_cmpc;
 	char		ans[2];
 	unsigned char	dbfn[MAX_FN_LEN + 1];
 	file_control	*fc;
@@ -299,7 +300,7 @@ void dbcertify_certify_phase(void)
 	{
 		if (psa->blocks_to_process != rec_num)
 		{
-			((sgmnt_data_ptr_t)psa->dbc_cs_data)->certified_for_upgrade_to = GDSV5;
+			((sgmnt_data_ptr_t)psa->dbc_cs_data)->certified_for_upgrade_to = GDSV6;
 			psa->dbc_fhdr_dirty = TRUE;
 			gtm_putmsg(VARLSTCNT(6) ERR_DBCDBCERTIFIED, 4, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 				   RTS_ERROR_LITERAL("GT.M V5"));
@@ -416,6 +417,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 	int		prev_rec_offset, new_blk_len, new_rec_len, remain_offset, remain_len, blk_seg_cnt;
 	int		new_lh_blk_len, new_rh_blk_len, created_blocks, extent_size;
 	int		local_map_max, lbm_blk_index, lcl_blk, curr_rec_cmpc, cmpc;
+	int		tmp_cmpc;
 	int4		lclmap_not_full;
 	uint4		total_blks;
 	boolean_t	dummy_bool;
@@ -524,7 +526,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			*/
 			GET_ULONG(blk_ptr, (psa->blk_set[dtblk_index].curr_rec + SIZEOF(rec_hdr)
 					    + psa->blk_set[dtblk_index].curr_blk_key->end + 1
-					    - ((rec_hdr *)psa->blk_set[dtblk_index].curr_rec)->cmpc));
+					    - EVAL_CMPC((rec_hdr *)psa->blk_set[dtblk_index].curr_rec)));
 			gvtblk_index = dbc_read_dbblk(psa, blk_ptr, gdsblk_gvtroot);
 			assert(-1 != gvtblk_index);
 			/* If our target block was not the gvtroot block we just read in then we keep scanning for our
@@ -682,7 +684,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		GET_USHORT(us_rec_len, &((rec_hdr *)rec_p)->rsiz);
 		curr_rec_len = us_rec_len;
 		dbc_find_key(psa, blk_set_p->curr_blk_key, rec_p, blk_set_p->blk_levl);
-		blk_set_p->curr_match = ((rec_hdr *)rec_p)->cmpc;
+		blk_set_p->curr_match = EVAL_CMPC((rec_hdr *)rec_p);
 		next_rec_p = rec_p + curr_rec_len;
 		if (next_rec_p >= blk_endp)	/* We have reached the last record in the block. Cannot skip anymore. */
 			break;
@@ -753,7 +755,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			assert(insert_point);	/* This is supposed to *be* the insert point */
 		}
 		/* Make convenient copies of some commonly used record fields */
-		curr_rec_cmpc = ((rec_hdr *)blk_set_p->curr_rec)->cmpc;
+		curr_rec_cmpc = EVAL_CMPC((rec_hdr *)blk_set_p->curr_rec);
 		curr_rec_shrink = blk_set_p->curr_match - curr_rec_cmpc;
 		curr_rec_offset = (int)(blk_set_p->curr_rec - blk_set_p->old_buff);
 		GET_USHORT(us_rec_len, &((rec_hdr *)blk_set_p->curr_rec)->rsiz);
@@ -799,7 +801,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			/* Setup new record header */
 			new_rec_len = (int)(SIZEOF(rec_hdr) + ins_rec_len - blk_set_p->prev_match);
 			ins_rec_hdr->rsiz = new_rec_len;
-			ins_rec_hdr->cmpc = blk_set_p->prev_match;
+			SET_CMPC(ins_rec_hdr, blk_set_p->prev_match);
 			BLK_SEG(bs_ptr, (sm_uc_ptr_t)ins_rec_hdr, SIZEOF(rec_hdr));
 			/* Setup key */
 			BLK_ADDR(cp1,
@@ -817,7 +819,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			*/
 			BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);	/* Replacement rec header */
 			next_rec_hdr->rsiz = curr_rec_len - curr_rec_shrink;
-			next_rec_hdr->cmpc = blk_set_p->curr_match;
+			SET_CMPC(next_rec_hdr, blk_set_p->curr_match);
 			BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
 			remain_offset = curr_rec_shrink + SIZEOF(rec_hdr);	/* Where rest of record plus any
 										   further records begin */
@@ -886,7 +888,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			}
 			assert(0 < new_lh_blk_len);
 			/* Right hand side has key of curr_rec expanded since is first key of blcok */
-			new_rh_blk_len = (int)(SIZEOF(v15_blk_hdr) + ((rec_hdr *)blk_set_p->curr_rec)->cmpc +
+			new_rh_blk_len = (int)(SIZEOF(v15_blk_hdr) + EVAL_CMPC((rec_hdr *)blk_set_p->curr_rec) +
 					       (curr_blk_len - curr_rec_offset));
 			assert(0 < new_rh_blk_len);
 			/* Common initialization */
@@ -940,12 +942,12 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 						- SIZEOF(v15_blk_hdr));
 					BLK_ADDR(new_star_hdr, SIZEOF(rec_hdr), rec_hdr);
 					new_star_hdr->rsiz = BSTAR_REC_SIZE;
-					new_star_hdr->cmpc = 0;
+					SET_CMPC(new_star_hdr, 0);
 					BLK_SEG(bs_ptr, (uchar_ptr_t)new_star_hdr, SIZEOF(rec_hdr));
 					BLK_SEG(bs_ptr, (ins_rec_len ? (uchar_ptr_t)&blk_set_p->ins_rec.blk_id
 							 : (blk_set_p->prev_rec + SIZEOF(rec_hdr)
 							    + blk_set_p->prev_blk_key->end + 1
-							    - ((rec_hdr *)blk_set_p->prev_rec)->cmpc)),
+							    - EVAL_CMPC((rec_hdr *)blk_set_p->prev_rec))),
 						SIZEOF(block_id));
 				}
 				/* Complete our LHS block */
@@ -1001,7 +1003,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				blk_set_rhs_p->upd_addr = bs1;		/* Block building roadmap.. */
 				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 				next_rec_hdr->rsiz = curr_rec_len + curr_rec_cmpc;
-				next_rec_hdr->cmpc = 0;
+				SET_CMPC(next_rec_hdr, 0);
 				BLK_SEG(bs_ptr, (uchar_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
 				/* Copy the previously compressed part of the key out of curr_rec. Note, if this
 				   key is a star rec key, nothing is written because cmpc is zero */
@@ -1090,7 +1092,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				/* Replace last record with star key rec */
 				BLK_ADDR(new_star_hdr, SIZEOF(rec_hdr), rec_hdr);
 				new_star_hdr->rsiz = BSTAR_REC_SIZE;
-				new_star_hdr->cmpc = 0;
+				SET_CMPC(new_star_hdr, 0);
 				BLK_SEG(bs_ptr, (uchar_ptr_t)new_star_hdr, SIZEOF(rec_hdr));
 				/* Output pointer from prev_rec as star key record's value */
 				BLK_SEG(bs_ptr,	blk_set_p->curr_rec - SIZEOF(block_id), SIZEOF(block_id));
@@ -1149,7 +1151,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				BLK_ADDR(ins_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 				ins_rec_hdr->rsiz = SIZEOF(rec_hdr) + blk_set_p->ins_rec.ins_key->end + 1
 					+ SIZEOF(block_id);
-				ins_rec_hdr->cmpc = 0;
+				SET_CMPC(ins_rec_hdr, 0);
 				BLK_SEG(bs_ptr, (uchar_ptr_t)ins_rec_hdr, SIZEOF(rec_hdr));
 				/* Now for the inserted record key */
 				BLK_SEG(bs_ptr,
@@ -1162,7 +1164,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				   it is now the second record in the new block. */
 				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 				next_rec_hdr->rsiz = curr_rec_len - curr_rec_shrink;
-				next_rec_hdr->cmpc = blk_set_p->curr_match;
+				SET_CMPC(next_rec_hdr, blk_set_p->curr_match);
 				BLK_SEG(bs_ptr, (uchar_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
 				remain_offset = curr_rec_shrink + SIZEOF(rec_hdr);	/* Where rest of record plus any
 											   further records begin */
@@ -1190,8 +1192,8 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					GTMASSERT;
 				/* First record will have last key in LHS block */
 				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
-				next_rec_hdr->rsiz = SIZEOF(rec_hdr) + last_rec_key->end + 1 + SIZEOF(block_id);;
-				next_rec_hdr->cmpc = 0;
+				next_rec_hdr->rsiz = SIZEOF(rec_hdr) + last_rec_key->end + 1 + SIZEOF(block_id);
+				SET_CMPC(next_rec_hdr, 0);
 				BLK_SEG(bs_ptr, (uchar_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
 				BLK_SEG(bs_ptr, last_rec_key->base, (last_rec_key->end + 1));
 				BLK_ADDR(lhs_block_id_p, SIZEOF(block_id), block_id);	/* First record's value */
@@ -1200,7 +1202,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				/* Second record is a star key record pointing to the RHS block */
 				BLK_ADDR(new_star_hdr, SIZEOF(rec_hdr), rec_hdr);
 				new_star_hdr->rsiz = BSTAR_REC_SIZE;
-				new_star_hdr->cmpc = 0;
+				SET_CMPC(new_star_hdr, 0);
 				BLK_SEG(bs_ptr, (uchar_ptr_t)new_star_hdr, SIZEOF(rec_hdr));
 				BLK_ADDR(rhs_block_id_p, SIZEOF(block_id), block_id);	/* First record's value */
 				BLK_SEG(bs_ptr, (uchar_ptr_t)rhs_block_id_p, SIZEOF(block_id));

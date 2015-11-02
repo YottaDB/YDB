@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,18 +19,27 @@
 #include <inttypes.h>
 #endif
 
-/* The value 1023 for PATH_MAX is derived using pathconf("path", _PC_PATH_MAX) on z/OS.
- * Since we cant afford calling a function on each use of PATH_MAX/GTM_PATH_MAX,
- * this value is hardcoded here.
+/* The value 1023 for PATH_MAX is derived using pathconf("path", _PC_PATH_MAX) on z/OS and
+ * we figure other POSIX platforms are at least as capable if they don't define PATH_MAX.
+ * Since we can't afford to call a function on each use of PATH_MAX/GTM_PATH_MAX, this
+ * value is hardcoded here.
+ *
+ * Note on Linux (at least), PATH_MAX is actually defined in <sys/param.h>. We would include
+ * that here unconditionally but on AIX, param.h includes limits.h. Note that regardless of where
+ * it gets defined, PATH_MAX needs to be defined prior to including stdlib.h. This is because in a
+ * pro build, at least Linux verifies the 2nd parm of realpath() is PATH_MAX bytes or more.
+ * Since param.h sets PATH_MAX to 4K on Linux, this can cause structures defined as GTM_PATH_MAX
+ * to raise an error when used in the 2nd argument of realpath().
  */
-#if defined (__MVS__)
 #ifndef PATH_MAX
-#define PATH_MAX 	1023
+#  ifdef __linux__
+#    include <sys/param.h>
+#  else
+#    define PATH_MAX 	1023
+#  endif
 #endif
+/* Now define our version which includes space for a terminating NULL byte */
 #define	GTM_PATH_MAX	PATH_MAX + 1
-#else
-#define GTM_PATH_MAX	1024	/* includes terminating NULL */
-#endif
 
 #if defined(LLONG_MAX)		/* C99 and others */
 #define GTM_INT64_MIN LLONG_MIN

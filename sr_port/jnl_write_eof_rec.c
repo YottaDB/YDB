@@ -64,10 +64,12 @@ void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 	{
 		if (REPL_ALLOWED(csa))
 			eof_record->jnl_seqno = csa->hdr->reg_seqno;/* Note we cannot use jnlpool_ctl->jnl_seqno since
-									      * we might not presently hold the journal pool lock */
+								     * we might not presently hold the journal pool lock */
 		else
 			eof_record->jnl_seqno = 0;
 	} else
 		QWASSIGN(eof_record->jnl_seqno, jgbl.mur_jrec_seqno);
+	eof_record->filler = 0;
+	eof_record->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)eof_record, SIZEOF(struct_jrec_eof));
 	jnl_write(jpc, JRT_EOF, (jnl_record *)eof_record, NULL, NULL);
 }

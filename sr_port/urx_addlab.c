@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 #include "gtm_string.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "urx.h"
 
 urx_labref **urx_addlab (urx_labref **anchor, urx_labref *lp)

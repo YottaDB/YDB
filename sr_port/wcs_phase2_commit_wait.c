@@ -205,7 +205,7 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 				assert(!was_crit || !value);
 				return TRUE;
 			}
-			if (!was_crit && csd->wc_blocked)
+			if (!was_crit && cnl->wc_blocked)
 			{	/* Some other process could be doing cache-recovery at this point and if it takes more than
 				 * a minute, we will time out for no reason. No point proceeding with this transaction
 				 * anyway as we are bound to restart. Do that right away. Caller knows to restart.
@@ -325,12 +325,12 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	/* If called from wcs_recover(), we dont want to assert(FALSE) as it is possible (in case of STOP/IDs) that
 	 * cnl->wcs_phase2_commit_pidcnt is non-zero even though there is no process in phase2 of commit. In this case
 	 * wcs_recover will call wcs_verify which will clear the flag unconditionally and proceed with normal activity.
-	 * So should not assert. If the caller is wcs_recover, then we expect csd->wc_blocked so be non-zero. Assert
+	 * So should not assert. If the caller is wcs_recover, then we expect cnl->wc_blocked so be non-zero. Assert
 	 * that. If we are called from wcs_flu via ONLINE ROLLBACK, then wc_blocked will NOT be set. Instead, wcs_flu
 	 * will return with a failure status back to ROLLBACK which will invoke wcs_recover and that will take care of
 	 * resetting cnl->wcs_phase2_commit_pidcnt. But, ONLINE ROLLBACK called in a crash situation is done only with
 	 * whitebox test cases. So, assert accordingly.
 	 */
-	assert(csd->wc_blocked || (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number));
+	assert(cnl->wc_blocked || (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number));
 	return FALSE;
 }

@@ -37,18 +37,42 @@
 #include "lckclr.h"
 #include "wake_alarm.h"
 
-GBLREF	bool		out_of_time;
-GBLREF	bool		remlkreq;
+#include "gdskill.h"
+#include "gdsbt.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsfhead.h"
+#include "gdscc.h"
+#include "filestruct.h"
+#include "buddy_list.h"		/* needed for tp.h */
+#include "io.h"
+#include "jnl.h"
+#include "hashtab_int4.h"	/* needed for tp.h */
+#include "tp.h"
+#include "send_msg.h"
+#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
+#include "change_reg.h"
+#include "setterm.h"
+#include "getzposition.h"
+#ifdef DEBUG
+#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
+#endif
+
 GBLREF	unsigned char	cm_action;
-GBLREF	unsigned short	lks_this_cmd;
 GBLREF	uint4		dollar_tlevel;
-GBLREF	unsigned int	t_tries;
-GBLREF	uint4		process_id;
-GBLREF	int4		outofband;
-GBLREF	unsigned char	*restart_pc, *restart_ctxt;
-GBLREF	mv_stent	*mv_chain;
+GBLREF	uint4		dollar_trestart;
+GBLREF	unsigned short	lks_this_cmd;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
 GBLREF	mlk_stats_t	mlk_stats;			/* Process-private M-lock statistics */
+GBLREF	mv_stent	*mv_chain;
+GBLREF	int4		outofband;
+GBLREF	bool		out_of_time;
+GBLREF	uint4		process_id;
+GBLREF	bool		remlkreq;
+GBLREF	unsigned char	*restart_ctxt, *restart_pc;
+GBLREF	unsigned int	t_tries;
+
+#define ZALLOCTIMESTR "ZALLOCATE time too long"
 
 /* -----------------------------------------------
  *
@@ -69,7 +93,7 @@ GBLREF	mlk_stats_t	mlk_stats;			/* Process-private M-lock statistics */
  */
 int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 {
-	bool		blocked, timer_on;
+	boolean_t	blocked, timer_on;
 	signed char	gotit;
 	unsigned short	locks_bckout, locks_done;
 	int4		msec_timeout;	/* timeout in milliseconds */
@@ -81,9 +105,12 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 	SETUP_THREADGBL_ACCESS;
 	gotit = -1;
 	cm_action = CM_ZALLOCATES;
-	timer_on = (NO_M_TIMEOUT != timeout);
 	out_of_time = FALSE;
-	if (!timer_on)
+	if (timeout < 0)
+		timeout = 0;
+	else if (TREF(tpnotacidtime) < timeout)
+		TPNOTACID_CHECK(ZALLOCTIMESTR);
+	if (!(timer_on = (NO_M_TIMEOUT != timeout)))	/* NOTE assignment */
 		msec_timeout = NO_M_TIMEOUT;
 	else
 	{
@@ -146,7 +173,8 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 		}
 		for (pvt_ptr1 = mlk_pvt_root, locks_done = 0;  locks_done < lks_this_cmd;  pvt_ptr1 = pvt_ptr1->next, locks_done++)
 		{	/* Go thru the list of all locks to be obtained attempting to lock
-			 * each one. If any lock could not be obtained, break out of the loop */
+			 * each one. If any lock could not be obtained, break out of the loop
+			 */
 			if (pvt_ptr1->old  &&  !pvt_ptr1->zalloc)
 				pvt_ptr1->old = FALSE;
 			if (!mlk_lock(pvt_ptr1, auxown, TRUE))
@@ -173,16 +201,10 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 			mlk_bckout(pvt_ptr2, ZALLOCATED);
 		}
 		if (dollar_tlevel && (CDB_STAGNATE <= t_tries))
-		{
-			mlk_unpend(pvt_ptr1);		/* Eliminated the dangling request block */
-			if (timer_on && !out_of_time)
-			{
-				cancel_timer((TID)&timer_on);
-				timer_on = FALSE;
-			}
-			t_retry(cdb_sc_needlock);	/* release crit to prevent a deadlock */
+		{	/* upper TPNOTACID_CHECK conditioned on no short timeout; this one rel_crits to avoid potential deadlock */
+			assert(TREF(tpnotacidtime) >= timeout);
+			TPNOTACID_CHECK(ZALLOCTIMESTR);
 		}
-
 		for (;;)
 		{
 			if (out_of_time || outofband)

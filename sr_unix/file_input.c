@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,8 @@
 #define BUFF_SIZE	65535
 
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
-GBLREF io_pair          io_curr_device;
+GBLREF	uint4		dollar_tlevel;
+GBLREF io_pair		io_curr_device;
 
 error_def(ERR_LOADFILERR);
 error_def(ERR_PREMATEOF);
@@ -40,6 +41,7 @@ error_def(ERR_PREMATEOF);
 static char		buff1[BUFF_SIZE];
 static char		*buff1_end;
 static char		*buff1_ptr;
+static ssize_t		buff1_ptr_file_offset;
 static char		*load_fn_ptr;
 static int		load_fn_len;
 static readonly unsigned char open_params_list[] =
@@ -78,6 +80,7 @@ void file_input_init(char *fn, short fn_len)
 	load_fn_ptr = fn;
 	load_fn_len = fn_len;
 	buff1_ptr = buff1;
+	buff1_ptr_file_offset = 0;
 	buff1_end = buff1;
 	REVERT;
 	return;
@@ -96,7 +99,7 @@ void file_input_close(void)
 	op_close(&val, &pars);
 }
 
-int	file_input_bin_get(char **in_ptr)
+int	file_input_bin_get(char **in_ptr, ssize_t *file_offset, char **buff_base)
 {
 	char	*ptr;
 	int	rd_cnt, rd_len, s1;
@@ -138,6 +141,8 @@ int	file_input_bin_get(char **in_ptr)
 	}
 	*in_ptr = buff1_ptr;
 	buff1_ptr += s1;
+	*file_offset = buff1_ptr_file_offset;
+	*buff_base = buff1;
 	REVERT;
 	return s1;
 }
@@ -155,6 +160,7 @@ int file_input_bin_read(void)
 	assert(NULL != d_rm);
 	assert(BUFF_SIZE - s1);
 	buff1_end = buff1 + s1;
+	buff1_ptr_file_offset += (buff1_ptr - buff1);
 	buff1_ptr = buff1;
 	DOREADRL(d_rm->fildes, buff1_end, BUFF_SIZE - s1, rdlen);
 #	ifdef DEBUG_FO_BIN
@@ -167,17 +173,18 @@ int file_input_bin_read(void)
 
 int file_input_get(char **in_ptr)
 {
-	char	*ptr;
-	int	rd_len, ret_len, s1;
+	char	*ptr, *tmp_ptr;
+	int	rd_len, s1;
 	mval	val;
+	static unsigned int mbuff_len = BUFF_SIZE;
+	unsigned int new_mbuff_len, ret_len;
+	static char *mbuff = buff1;
 
 	ESTABLISH_RET(mupip_load_ch, 0);
-	buff1_ptr = buff1_end = buff1;
 	ret_len = 0;
 	for (;;)
-	{
-		/* do untimed reads */
-		op_read(&val, NO_M_TIMEOUT);
+	{	/* one-time only reads if in TP to avoid TPNOTACID, otherwise use untimed reads */
+		op_read(&val, dollar_tlevel ? 0: NO_M_TIMEOUT);
 		rd_len = val.str.len;
 		if ((0 == rd_len) && io_curr_device.in->dollar.zeof)
 		{
@@ -186,17 +193,32 @@ int file_input_get(char **in_ptr)
 				rts_error(VARLSTCNT(1) ERR_PREMATEOF);
 			return -1;
 		}
-		ret_len += rd_len;
-		if (SIZEOF(buff1) < ret_len)
+		if (mbuff_len < ret_len + rd_len)
 		{
-			REVERT;
-			return -1;
+			new_mbuff_len = MAX(ret_len,(2 * mbuff_len));
+			tmp_ptr = (char *)malloc(new_mbuff_len);
+			if (NULL == tmp_ptr)
+			{
+				REVERT;
+				return -1;
+			}
+			if (mbuff != buff1)
+			{
+				memcpy(tmp_ptr, mbuff, (ret_len));
+				free (mbuff);
+			}
+			else
+				memcpy(tmp_ptr, buff1, (ret_len));
+
+			mbuff = tmp_ptr;
+			mbuff_len = new_mbuff_len;
+
 		}
-		memcpy(buff1_end, val.str.addr, rd_len);
-		buff1_end = buff1_end + rd_len;
+		memcpy((unsigned char *) (mbuff + ret_len), val.str.addr, rd_len);
+		ret_len += rd_len;
 		if ( !(io_curr_device.in->dollar.x) )
 		{
-			*in_ptr = buff1_ptr;
+			*in_ptr = mbuff;
 			REVERT;
 			return ret_len;
 		}

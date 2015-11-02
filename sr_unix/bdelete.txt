@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2011 Fidelity Information Services, Inc       #
+#	Copyright 2011, 2012 Fidelity Information Services, Inc       #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -16,7 +16,6 @@ GENDASH.o
 GENOUT.o
 GTMDefinedTypesInit.m
 GTMDefinedTypesInit.o
-GTMHELP.o
 GTMHLPLD.o
 LOADOP.o
 LOADVX.o
@@ -69,7 +68,6 @@ GENDASH.o
 GENOUT.o
 GTMDefinedTypesInit.m -> ../GTMDefinedTypesInit.m
 GTMDefinedTypesInit.o
-GTMHELP.o
 GTMHLPLD.o
 LOADOP.o
 LOADVX.o

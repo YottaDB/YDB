@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@
 #include "eintr_wrappers.h"
 #include "disk_block_available.h"
 
-int4 disk_block_available(int fd, GTM_BAVAIL_TYPE *ret, boolean_t fill_unix_holes)
+int4 disk_block_available(int fd, gtm_uint64_t *ret, boolean_t fill_unix_holes)
 {
 	struct	stat		fstat_buf;
 	struct	statvfs		fstatvfs_buf;
@@ -54,13 +54,13 @@ int4 disk_block_available(int fd, GTM_BAVAIL_TYPE *ret, boolean_t fill_unix_hole
 	FSTATVFS_FILE(fd, &fstatvfs_buf, status);
 	if (-1 == status)
 		return errno;
-	*ret = (GTM_BAVAIL_TYPE)((fstatvfs_buf.f_frsize / DISK_BLOCK_SIZE) * fstatvfs_buf.f_bavail);
+	*ret = (gtm_uint64_t)((fstatvfs_buf.f_frsize / DISK_BLOCK_SIZE) * fstatvfs_buf.f_bavail);
 	if (fill_unix_holes)
 	{
 		FSTAT_FILE(fd, &fstat_buf, status);
 		if (-1 == status)
 			return errno;
-		*ret -= (GTM_BAVAIL_TYPE)(DEV_BSIZE / DISK_BLOCK_SIZE
+		*ret -= (gtm_uint64_t)(DEV_BSIZE / DISK_BLOCK_SIZE
 			* (DIVIDE_ROUND_UP(fstat_buf.st_size, DEV_BSIZE) - fstat_buf.st_blocks));
 	}
 	return 0;

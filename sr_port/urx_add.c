@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "urx.h"
 
 GBLREF urx_rtnref	urx_anchor;

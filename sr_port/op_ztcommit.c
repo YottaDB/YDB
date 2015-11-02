@@ -57,7 +57,7 @@ void    op_ztcommit(int4 n)
 	jnl_buffer_ptr_t		jbp;
 	jnl_tm_t			save_gbl_jrec_time;
 	int4				prev_index;
-        static struct_jrec_ztcom	ztcom_record = {{JRT_ZTCOM, ZTCOM_RECLEN, 0, 0, 0},
+        static struct_jrec_ztcom	ztcom_record = {{JRT_ZTCOM, ZTCOM_RECLEN, 0, 0, 0, 0},
 						0, 0, 0, 0, {ZTCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
 
 	assert(ZTCOM_RECLEN == ztcom_record.suffix.backptr);
@@ -164,6 +164,8 @@ void    op_ztcommit(int4 n)
 		ztcom_record.prefix.tn = csa->ti->curr_tn;
 		ztcom_record.prefix.checksum = INIT_CHECKSUM_SEED;
 		ztcom_record.prefix.time = jgbl.gbl_jrec_time;
+		ztcom_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
+									(uint4 *)&ztcom_record, SIZEOF(struct_jrec_ztcom));
 		JNL_WRITE_APPROPRIATE(csa, jpc, JRT_ZTCOM, (jnl_record *)&ztcom_record, NULL, NULL);
 		if (!csa->hold_onto_crit)
 			rel_crit(jpc->region);

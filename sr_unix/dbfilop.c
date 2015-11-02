@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,9 +33,17 @@
 #include "iosp.h"
 #include "is_file_identical.h"
 #include "dbfilop.h"
+#include "anticipatory_freeze.h"
+#include "jnl.h"
 
 GBLREF	gd_region	*gv_cur_region;
 
+error_def(ERR_DBFILOPERR);
+error_def(ERR_DBNOTGDS);
+error_def(ERR_DBOPNERR);
+error_def(ERR_DBPREMATEOF);
+error_def(ERR_TEXT);
+ZOS_ONLY(error_def(ERR_BADTAG);)
 
 uint4 dbfilop(file_control *fc)
 {
@@ -45,13 +53,6 @@ uint4 dbfilop(file_control *fc)
 	int			fstat_res;
 	sgmnt_data_ptr_t	csd;
 	ZOS_ONLY(int		realfiletag;)
-
-	error_def(ERR_DBFILOPERR);
-	error_def(ERR_DBNOTGDS);
-	error_def(ERR_DBOPNERR);
-	error_def(ERR_DBPREMATEOF);
-	error_def(ERR_TEXT);
-	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	/* assert((dba_mm == fc->file_type) || (dba_bg == fc->file_type)); not always set in unix */
 	udi = (unix_db_info *)fc->file_info;
@@ -88,7 +89,7 @@ uint4 dbfilop(file_control *fc)
 						|| (0 == ((sgmnt_data_ptr_t)fc->op_buff)->acc_meth)))
 					GTMASSERT;
 				assert((1 != fc->op_pos) || fc->op_len <= SIZEOF_FILE_HDR(fc->op_buff));
- 				LSEEKWRITE(udi->fd,
+ 				DB_LSEEKWRITE(&udi->s_addrs, udi->fn, udi->fd,
  					   (off_t)(fc->op_pos - 1) * DISK_BLOCK_SIZE,
  					   fc->op_buff,
  					   fc->op_len,
@@ -111,7 +112,8 @@ uint4 dbfilop(file_control *fc)
 					return ERR_DBOPNERR;
 #ifdef __MVS__
 				if (-1 == gtm_zos_tag_to_policy(udi->fd, TAG_BINARY, &realfiletag))
-					TAG_POLICY_SEND_MSG((char_ptr_t)gv_cur_region->dyn.addr->fname, errno, realfiletag, TAG_BINARY);
+					TAG_POLICY_SEND_MSG((char_ptr_t)gv_cur_region->dyn.addr->fname, errno,
+								realfiletag, TAG_BINARY);
 #endif
 				set_gdid_from_stat(&udi->fileid, &stat_buf);
 				udi->raw = (S_ISCHR(stat_buf.st_mode) || S_ISBLK(stat_buf.st_mode));

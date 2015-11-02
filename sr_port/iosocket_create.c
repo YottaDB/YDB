@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +48,12 @@ const char *hstrerror(int err);
 
 GBLREF	tcp_library_struct	tcp_routines;
 
+error_def(ERR_GETSOCKNAMERR);
+error_def(ERR_INVPORTSPEC);
+error_def(ERR_INVADDRSPEC);
+error_def(ERR_PROTNOTSUP);
+error_def(ERR_TEXT);
+
 socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 {
 	socket_struct	*socketptr;
@@ -57,12 +63,6 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 	GTM_SOCKLEN_TYPE	socknamelen;
 	char 		temp_addr[SA_MAXLITLEN], addr[SA_MAXLEN], tcp[4], *adptr;
 	const char	*errptr;
-
-	error_def(ERR_INVPORTSPEC);
-	error_def(ERR_INVADDRSPEC);
-	error_def(ERR_PROTNOTSUP);
-	error_def(ERR_TEXT);
-	error_def(ERR_GETSOCKNAMERR);
 
 	socketptr = (socket_struct *)malloc(SIZEOF(socket_struct));
 	memset(socketptr, 0, SIZEOF(socket_struct));
@@ -91,6 +91,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 				adptr = iotcp_name2ip(temp_addr);
 				if (NULL == adptr)
 				{
+					free(socketptr);
 #if !defined(__hpux) && !defined(__MVS__)
 					errptr = HSTRERROR(h_errno);
 					rts_error(VARLSTCNT(6) ERR_INVADDRSPEC, 0, ERR_TEXT, 2, LEN_AND_STR(errptr));
@@ -98,7 +99,6 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 					/* Grumble grumble HPUX and z/OS don't have hstrerror() */
 					rts_error(VARLSTCNT(1) ERR_INVADDRSPEC);
 #endif
-					free(socketptr);
 					return NULL;
 				}
 
@@ -136,8 +136,8 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
 			tmplen = STRLEN(errptr);
-			rts_error(VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
 			free(socketptr);
+			rts_error(VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
 			return NULL;
 		}
 		socketptr->local.port = GTM_NTOHS(socketptr->local.sin.sin_port);
@@ -147,8 +147,8 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
 			tmplen = STRLEN(errptr);
-			rts_error(VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr); /* need new error */
 			free(socketptr);
+			rts_error(VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr); /* need new error */
 			return NULL;
 		}
 		socketptr->remote.port = GTM_NTOHS(socketptr->remote.sin.sin_port);

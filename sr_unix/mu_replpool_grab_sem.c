@@ -45,6 +45,7 @@
 #include "mu_rndwn_replpool.h"
 #include "ftok_sems.h"
 #include "util.h"
+#include "anticipatory_freeze.h"
 
 #define REMOVE_SEM_SET(SEM_CREATED, POOL_TYPE)	/* Assumes 'sem_created_ptr' is is already declared */		\
 {														\
@@ -91,9 +92,8 @@ GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnl_gbls_t		jgbl;
-#ifdef UNIX
-GBLREF	boolean_t	holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
-#endif
+GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
+GBLREF	boolean_t		argumentless_rundown;
 
 error_def(ERR_JNLPOOLSETUP);
 error_def(ERR_RECVPOOLSETUP);
@@ -108,21 +108,24 @@ error_def(ERR_TEXT);
  *	Grab all replication semaphores for the instance (both jnlpool and recvpool)
  * 	Release ftok semaphore
  * Parameters:
- * Return Value: TRUE, if succsessful
- *	         FALSE, if fails.
+ * Return Value: SS_NORMAL, if succsessful
+ *	         -1, if fails.
  */
-int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, boolean_t *sem_created_ptr)
+int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, boolean_t *sem_created_ptr, boolean_t immediate)
 {
 	int			status, save_errno, sem_id, semval, semnum, instfilelen;
 	time_t			sem_ctime;
-	boolean_t		sem_created;
+	boolean_t		sem_created, force_increment;
 	char			*instfilename;
 	union semun		semarg;
 	struct semid_ds		semstat;
 	gd_region		*replreg;
 	DEBUG_ONLY(unix_db_info	*udi;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	*sem_created_ptr = sem_created = FALSE; /* assume semaphore not created by default */
+	force_increment = (jgbl.onlnrlbk || (!jgbl.mur_rollback && !argumentless_rundown && ANTICIPATORY_FREEZE_AVAILABLE));
 	/* First ensure that the caller has grabbed the ftok semaphore on the replication instance file */
 	assert((NULL != jnlpool.jnlpool_dummy_reg) && (jnlpool.jnlpool_dummy_reg == recvpool.recvpool_dummy_reg));
 	replreg = jnlpool.jnlpool_dummy_reg;
@@ -182,7 +185,8 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 	/* Semaphores are setup. Grab them */
 	if (JNLPOOL_SEGMENT == pool_type)
 	{
-		if (jgbl.onlnrlbk)
+		assert(!jgbl.onlnrlbk || !immediate);
+		if (!immediate)
 			status = grab_sem(SOURCE, JNL_POOL_ACCESS_SEM); /* want to wait in case of online rollback */
 		else
 			status = grab_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
@@ -198,7 +202,7 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 			RELEASE_ALREADY_HELD_SEMAPHORE(SOURCE, JNL_POOL_ACCESS_SEM);
 			DO_CLNUP_AND_RETURN(save_errno, sem_created, pool_type, instfilename, instfilelen, sem_id, "semctl()");
 		}
-		if (0 < semval && !jgbl.onlnrlbk)
+		if (0 < semval && !force_increment)
 		{
 			RELEASE_ALREADY_HELD_SEMAPHORE(SOURCE, JNL_POOL_ACCESS_SEM);
 			util_out_print("Replpool semaphore (id = !UL) for replication instance !AD is in use by another process.",
@@ -220,7 +224,7 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 	}
 	else
 	{
-		if (jgbl.onlnrlbk)
+		if (!immediate)
 			status = grab_sem(RECV, RECV_POOL_ACCESS_SEM);
 		else
 			status = grab_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);
@@ -229,7 +233,7 @@ int mu_replpool_grab_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, 
 			save_errno = errno;
 			DO_CLNUP_AND_RETURN(save_errno, sem_created, pool_type, instfilename, instfilelen, sem_id, "semop()");
 		}
-		if (jgbl.onlnrlbk)
+		if (!immediate)
 			status = grab_sem(RECV, RECV_SERV_OPTIONS_SEM);
 		else
 			status = grab_sem_immediate(RECV, RECV_SERV_OPTIONS_SEM);

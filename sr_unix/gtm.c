@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,10 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#define BYPASS_MEMCPY_OVERRIDE	/* Signals gtm_string.h to not override memcpy(). This causes linking problems when libmumps.a
+				 * is not available.
+				 */
 #include "main_pragma.h"
 
 #undef UNIX		/* Causes non-GTM-runtime routines (libgtmshr) to be used since libgtmshr is not yet available */
@@ -20,7 +24,6 @@
 #include "gtm_stdlib.h"
 #include "gtm_limits.h"
 #include <dlfcn.h>
-
 #ifdef __osf__
 	/* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
 	 * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is

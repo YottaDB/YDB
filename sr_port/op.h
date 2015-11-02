@@ -12,7 +12,7 @@
 #ifndef OP_INCLUDED
 #define OP_INCLUDED
 
-#include "rtnhdr.h"	/* Avoid changing a few hundred op_* and other modules to put this first */
+#include <rtnhdr.h>	/* Avoid changing a few hundred op_* and other modules to put this first */
 
 #ifdef VMS
 /* Define a TWO-argument VMS_ONLY macro (first argument is empty string but is needed because of the VMS-only , that follows) */

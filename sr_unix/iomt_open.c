@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,17 +30,6 @@
 #include "stringpool.h"
 #include "namelook.h"
 
-static readonly nametabent mtlab_names[] =
-{
-	{3, "ANS"}, {4, "ANSI"}, {3, "DOS"}, {5, "DOS11"}
-};
-static readonly unsigned char mtlab_index[27] =
-{
-	0, 2, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4
-	,4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4
-	,4, 4, 4
-};
-
 LITDEF unsigned char LIB_AB_ASC_EBC[256] =
 {
 	0, 1, 2, 3, 55, 45, 46, 47, 22, 5, 37, 11, 12, 13, 14,
@@ -60,7 +49,6 @@ LITDEF unsigned char LIB_AB_ASC_EBC[256] =
 	63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63,
 	63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 255
 };
-
 LITDEF unsigned char LIB_AB_EBC_ASC[256] =
 {
 	0, 1, 2, 3, 92, 9, 92, 127, 92, 92, 92, 11, 12, 13, 14,
@@ -80,10 +68,33 @@ LITDEF unsigned char LIB_AB_EBC_ASC[256] =
 	92, 92, 92, 83, 84, 85, 86, 87, 88, 89, 90, 92, 92, 92, 92, 92,
 	92, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 92, 92, 92, 92, 92, 255
 };
-
 LITREF unsigned char io_params_size[];
 
+static readonly nametabent mtlab_names[] =
+{
+	{3, "ANS"}, {4, "ANSI"}, {3, "DOS"}, {5, "DOS11"}
+};
+static readonly unsigned char mtlab_index[27] =
+{
+	0, 2, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4
+	,4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4
+	,4, 4, 4
+};
 static readonly char mtlab_type[] = {MTLAB_ANSI, MTLAB_ANSI, MTLAB_DOS11, MTLAB_DOS11};
+
+error_def(ERR_DEVPARMNEG);
+error_def(ERR_MTBLKTOOBIG);
+error_def(ERR_MTBLKTOOSM);
+error_def(ERR_MTFIXRECSZ);
+error_def(ERR_MTRECGTRBLK);
+error_def(ERR_MTRECTOOBIG);
+error_def(ERR_MTRECTOOSM);
+error_def(ERR_MTINVLAB);
+error_def(ERR_MTDOSFOR);
+error_def(ERR_MTANSIFOR);
+error_def(ERR_MTIS);
+error_def(ERR_MTIOERR);
+error_def(ERR_VARRECBLKSZ);
 
 #define VREC_HDR_LEN	4
 
@@ -100,20 +111,6 @@ short iomt_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	io_desc		*ioptr;
 	char		*tab;
 	int		p_offset;
-
-	error_def(ERR_MTRECTOOBIG);
-	error_def(ERR_MTRECGTRBLK);
-	error_def(ERR_MTBLKTOOBIG);
-	error_def(ERR_MTBLKTOOSM);
-	error_def(ERR_MTFIXRECSZ);
-	error_def(ERR_MTRECTOOSM);
-	error_def(ERR_VARRECBLKSZ);
-	error_def(ERR_MTINVLAB);
-	error_def(ERR_MTDOSFOR);
-	error_def(ERR_MTANSIFOR);
-	error_def(ERR_MTIS);
-	error_def(ERR_DEVPARMNEG);
-	error_def(ERR_MTIOERR);
 
 #ifdef DP
 	FPRINTF(stderr, ">> iomt_open(%d)\n", fd);
@@ -304,7 +301,7 @@ short iomt_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		if (newmt.block_sz / newmt.record_sz * newmt.record_sz != newmt.block_sz)
 		{
 			iomt_closesp(fd);
-			rts_error(VARLSTCNT(3) ERR_MTFIXRECSZ, newmt.block_sz, newmt.record_sz);
+			rts_error(VARLSTCNT(4) ERR_MTFIXRECSZ, 2, newmt.block_sz, newmt.record_sz);
 		}
 	} else
 	{

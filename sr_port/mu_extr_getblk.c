@@ -52,7 +52,9 @@ int mu_extr_getblk(unsigned char *ptr)
 	DEBUG_ONLY(unsigned int	lcl_t_tries;)
 	boolean_t		tn_aborted;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(0 != gv_target->root);
 	t_begin(ERR_GVGETFAIL, 0);
 	for (;;)

@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 #include "cmd_qlf.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "op.h"
 #include "job_addr.h"
 #include "zbreak.h"

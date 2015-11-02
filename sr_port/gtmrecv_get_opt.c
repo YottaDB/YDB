@@ -64,6 +64,7 @@ int gtmrecv_get_opt(void)
 #	ifdef UNIX
 	gtmrecv_options.reuse_specified = (CLI_PRESENT == cli_present("REUSE"));
 	gtmrecv_options.resume_specified = (CLI_PRESENT == cli_present("RESUME"));
+	gtmrecv_options.initialize_specified = (CLI_PRESENT == cli_present("INITIALIZE"));
 	/* -UPDATERESYNC=<instance_filename> and optional -REUSE=<instance_name> is supported only in Unix */
 	if (gtmrecv_options.updateresync)
 	{

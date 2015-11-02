@@ -46,7 +46,7 @@ void bt_refresh(sgmnt_addrs *csa, boolean_t init)
 			insqt((que_ent_ptr_t)((sm_uc_ptr_t)ptr + (2 * SIZEOF(sm_off_t))), (que_ent_ptr_t)csa->th_base);
 		}
 	}
-	((th_rec *)((uchar_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn = csa->ti->curr_tn - 1;
+	SET_OLDEST_HIST_TN(csa, csa->ti->curr_tn - 1);
 	csa->ti->mm_tn = 0;
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,10 +63,6 @@ CONDITION_HANDLER(gtmsource_ch)
 	gd_region	*reg_local, *reg_top;
 	sgmnt_addrs	*csa;
 
-#	ifdef UNIX
-	unix_db_info	*udi;
-#	endif
-
 	START_CH;
 	if (!(IS_GTM_ERROR(SIGNAL)) || DUMPABLE || SEVERITY == ERROR)
 	{
@@ -89,16 +85,6 @@ CONDITION_HANDLER(gtmsource_ch)
 			if (csa && csa->now_crit)
 				rel_lock(jnlpool.jnlpool_dummy_reg);
 		}
-		UNIX_ONLY(
-			/* Release FTOK lock on the replication instance file if holding it */
-			if (NULL != jnlpool.jnlpool_dummy_reg)
-			{
-				udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-				if (udi->grabbed_ftok_sem)
-					ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, FALSE);
-				assert(!udi->grabbed_ftok_sem);
-			}
-		)
        		NEXTCH;
 	}
 	/* warning, info, or success */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,14 +26,14 @@
 GBLREF	boolean_t	gtm_blkupgrade_override;
 GBLREF	uint4		gtm_blkupgrade_flag;	/* control whether dynamic upgrade is attempted or not */
 
+error_def(ERR_DYNUPGRDFAIL);
+
 int4 gds_blk_upgrade(sm_uc_ptr_t gds_blk_src, sm_uc_ptr_t gds_blk_trg, int4 blksize, enum db_ver *ondsk_blkver)
 {
 	blk_hdr_ptr_t		bp;
 	v15_blk_hdr_ptr_t	v15bp;
 	v15_trans_num		v15tn;
 	uint4			v15bsiz, v15levl;
-
-	error_def(ERR_DYNUPGRDFAIL);
 
 	assert(gds_blk_src);
 	assert(gds_blk_trg);
@@ -57,7 +57,7 @@ int4 gds_blk_upgrade(sm_uc_ptr_t gds_blk_src, sm_uc_ptr_t gds_blk_trg, int4 blks
 		if (UPGRADE_IF_NEEDED == gtm_blkupgrade_flag)
 		{
 			if (NULL != ondsk_blkver)
-				*ondsk_blkver = GDSV5;
+				*ondsk_blkver = GDSV6;
 			return SS_NORMAL;
 		} else
 		{
@@ -76,6 +76,6 @@ int4 gds_blk_upgrade(sm_uc_ptr_t gds_blk_src, sm_uc_ptr_t gds_blk_trg, int4 blks
 	bp->tn = v15tn;
 	bp->bsiz = v15bsiz;
 	bp->levl = v15levl;
-	bp->bver = GDSV5;
+	bp->bver = GDSV6;
 	return SS_NORMAL;
 }

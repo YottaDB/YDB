@@ -16,7 +16,7 @@
 #include "gtm_string.h"
 #include <errno.h>
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "compiler.h"
 #include "urx.h"
 #include "objlabel.h"	/* needed for masscomp.h */

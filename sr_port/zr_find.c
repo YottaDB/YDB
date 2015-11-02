@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "zbreak.h"
 
 zbrk_struct *zr_find(z_records *zrecs, zb_code *addr)

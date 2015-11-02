@@ -13,7 +13,7 @@
 
 #include "gtm_string.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "cmd_qlf.h"
 #include "gtm_caseconv.h"
 #include "min_max.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,10 @@
 
 GBLREF connection_struct *curr_entry;
 
+error_def(ERR_UNIMPLOP);
+error_def(ERR_TEXT);
+error_def(ERR_GVIS);
+
 bool gtcmtr_initreg(void)
 {
 	cm_region_head	*region;
@@ -33,13 +37,17 @@ bool gtcmtr_initreg(void)
 	unsigned short temp_short;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 
-	error_def(ERR_UNIMPLOP);
-	error_def(ERR_TEXT);
-	error_def(ERR_GVIS);
-
 	assert(*curr_entry->clb_ptr->mbf == CMMS_S_INITREG);
 	region = gtcmd_ini_reg(curr_entry);
 	gtcm_add_region(curr_entry,region);
+
+	if (region->reg->max_rec_size > 32767)
+	{
+		rts_error(VARLSTCNT(10) ERR_UNIMPLOP, 0,
+		ERR_TEXT, 2,
+		LEN_AND_LIT("Client does not support spanning nodes"),
+		ERR_TEXT, 2, DB_LEN_STR(region->reg));
+	 }
 
 	if (region->reg->max_rec_size + CM_BUFFER_OVERHEAD > curr_entry->clb_ptr->mbl)
 	{

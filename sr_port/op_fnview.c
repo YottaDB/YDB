@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -402,13 +402,19 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);
 			break;
 		case VTK_YLCT:
-			if (!arg)
-				n = TREF(local_collseq) ? (TREF(local_collseq))->act : 0;
-			else
+			n = -1;
+			if (arg)
 			{
-				assert(!MEMCMP_LIT(arg->str.addr, "ncol"));
-				n = TREF(local_collseq_stdnull);
+				if (!MEMCMP_LIT(arg->str.addr, "nct"))
+					n = TREF(local_coll_nums_as_strings) ? 1 : 0;
+				else
+				{
+					assert(!MEMCMP_LIT(arg->str.addr, "ncol"));
+					n = TREF(local_collseq_stdnull);
+				}
 			}
+			if (-1 == n)
+				n = TREF(local_collseq) ? (TREF(local_collseq))->act : 0;
 			break;
 		case VTK_ZDEFBUFF:
 			n = 0;

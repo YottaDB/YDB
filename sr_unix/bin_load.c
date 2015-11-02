@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,9 +41,11 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
+#include "format_targ_key.h"
+#include "zshow.h"
 
 GBLREF bool		mupip_DB_full;
 GBLREF bool		mu_ctrly_occurred;
@@ -68,10 +70,12 @@ error_def(ERR_COLLTYPVERSION);
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_OLDBINEXTRACT);
 error_def(ERR_LOADINVCHSET);
+error_def(ERR_LDSPANGLOINCMP);
 
 #define	BIN_PUT		0
 #define BIN_BIND	1
 #define ERR_COR		2
+#define BIN_KILL	3
 #ifdef GTM_CRYPT
 #define EMPTY_GTMCRYPT_HASH16	"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 #define EMPTY_GTMCRYPT_HASH32	EMPTY_GTMCRYPT_HASH16 EMPTY_GTMCRYPT_HASH16
@@ -92,6 +96,68 @@ error_def(ERR_LOADINVCHSET);
 }
 #endif
 
+#define	DEFAULT_SN_HOLD_BUFF_SIZE MAX_IO_BLOCK_SIZE
+
+#define KILL_INCMP_SN_IF_NEEDED				\
+{							\
+	if (!sn_incmp_gbl_already_killed)		\
+	{						\
+		COPY_KEY(sn_savekey,  gv_currkey);	\
+		COPY_KEY(gv_currkey, sn_gvkey);		\
+		bin_call_db(BIN_KILL, 0, 0);		\
+		COPY_KEY(gv_currkey, sn_savekey);	\
+		sn_incmp_gbl_already_killed = TRUE;	\
+	}						\
+}
+
+#define DISPLAY_INCMP_SN_MSG											\
+{														\
+	file_offset = file_offset_base + ((unsigned char *)rp - ptr_base);					\
+	if (file_offset != last_sn_error_offset)								\
+	{													\
+		last_sn_error_offset = file_offset;								\
+		gtm_putmsg(VARLSTCNT(1) ERR_LDSPANGLOINCMP);							\
+		util_out_print("!_!_at File offset : [0x!XL]", TRUE, file_offset);				\
+		if (sn_gvkey->end && expected_sn_chunk_number)							\
+		{												\
+			sn_key_str_end = format_targ_key(&sn_key_str[0], MAX_ZWR_KEY_SZ, sn_gvkey, TRUE);	\
+			util_out_print("!_!_Expected Spanning Global variable : !AD", TRUE,			\
+					sn_key_str_end - &sn_key_str[0], sn_key_str);				\
+		} 												\
+		sn_key_str_end = format_targ_key(&sn_key_str[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE);		\
+		util_out_print("!_!_Global variable from record: !AD", TRUE,					\
+				sn_key_str_end - &sn_key_str[0], sn_key_str);					\
+	}													\
+}
+
+#define DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK								\
+{														\
+	util_out_print("!_!_File offset : [0x!XL]", TRUE, file_offset_base + ((unsigned char *)rp - ptr_base)); \
+	util_out_print("!_!_Rest of Block :", TRUE);								\
+	zwr_out_print((char *)rp, btop - (unsigned char *)rp);							\
+	util_out_print(0, TRUE);										\
+}
+
+#define DISPLAY_CURRKEY										\
+{												\
+	sn_key_str_end = format_targ_key(&sn_key_str[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE);	\
+	util_out_print("!_!_Key: !AD", TRUE, sn_key_str_end - &sn_key_str[0], sn_key_str);	\
+}
+
+#define DISPLAY_VALUE(STR)		 	\
+{						\
+	util_out_print(STR, TRUE);		\
+	zwr_out_print(v.str.addr, v.str.len);	\
+	util_out_print(0, TRUE);		\
+}
+
+#define DISPLAY_PARTIAL_SN_HOLD_BUFF			\
+{							\
+	util_out_print("!_!_Partial Value :", TRUE);	\
+	zwr_out_print(sn_hold_buff, sn_hold_buff_pos);	\
+	util_out_print(0, TRUE);			\
+}
+
 static readonly unsigned char gt_lit[] = "LOAD TOTAL";
 
 /* starting extract file format 3, we have an extra record for each gvn, that contains the
@@ -102,26 +168,64 @@ static readonly unsigned char gt_lit[] = "LOAD TOTAL";
  */
 
 void		bin_call_db(int, INTPTR_T, INTPTR_T);
+void 		zwr_out_print(char * buff, int len);
+
+#define ZWR_BASE_STRIDE 1024
+#define UOP_BASE_STRIDE 1024
+
+void zwr_out_print(char * buff, int bufflen)
+{
+	char zwrbuff[ZWR_BASE_STRIDE * MAX_ZWR_EXP_RATIO], savechar;
+	int zwrlen;
+	int buffpos, left, stride;
+	int uopbuffpos, uopleft, uopstride;
+
+	buffpos = 0;
+	while (left = bufflen - buffpos)
+	{
+		if (buffpos)
+			FPRINTF(stderr,"_");
+		stride = (left > ZWR_BASE_STRIDE) ? ZWR_BASE_STRIDE : left;
+		format2zwr((sm_uc_ptr_t)(buff + buffpos), stride, (unsigned char *) zwrbuff, &zwrlen);
+		uopbuffpos = 0;
+		while (uopleft = zwrlen - uopbuffpos)
+		{
+			uopstride = (uopleft > UOP_BASE_STRIDE) ? UOP_BASE_STRIDE : uopleft;
+			savechar = *(zwrbuff + uopstride);
+			*(zwrbuff + uopstride) = '\0';
+			FPRINTF(stderr,"%s", zwrbuff + uopbuffpos);
+			*(zwrbuff + uopstride) = savechar;
+			uopbuffpos += uopstride;
+		}
+		buffpos += stride;
+	}
+	FPRINTF(stderr,"\n");
+}
 
 void bin_load(uint4 begin, uint4 end)
 {
-	unsigned char	*ptr, *cp1, *cp2, *btop, *gvkey_char_ptr, *tmp_ptr, *tmp_key_ptr, *c, *ctop;
+	unsigned char	*ptr, *cp1, *cp2, *btop, *gvkey_char_ptr, *tmp_ptr, *tmp_key_ptr, *c, *ctop, *ptr_base;
 	unsigned char	hdr_lvl, src_buff[MAX_KEY_SZ + 1], dest_buff[MAX_ZWR_KEY_SZ],
-			cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1];
+			cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1], sn_key_str[MAX_KEY_SZ + 1], *sn_key_str_end;
 	unsigned char	*end_buff;
-	unsigned short	rec_len, next_cmpc;
+	unsigned short	rec_len, next_cmpc, numsubs;
 	int		len;
 	int		current, last, length, max_blk_siz, max_key, status;
-	uint4		iter, max_data_len, max_subsc_len, key_count;
-	ssize_t	        rec_count, global_key_count, subsc_len,extr_std_null_coll;
+	int		tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size;
+	uint4		iter, max_data_len, max_subsc_len, key_count, gblsize;
+	ssize_t		rec_count, global_key_count, subsc_len,extr_std_null_coll, last_sn_error_offset=0,
+				file_offset_base=0, file_offset=0;
 	boolean_t	need_xlation, new_gvn, utf8_extract;
+	boolean_t	is_hidden_subscript, ok_to_put = TRUE, putting_a_sn = FALSE, sn_incmp_gbl_already_killed = FALSE;
 	rec_hdr		*rp, *next_rp;
 	mval		v, tmp_mval;
 	mstr		mstr_src, mstr_dest;
 	collseq		*extr_collseq, *db_collseq, *save_gv_target_collseq;
 	coll_hdr	extr_collhdr, db_collhdr;
 	gv_key 		*tmp_gvkey = NULL;	/* null-initialize at start, will be malloced later */
-	char		std_null_coll[BIN_HEADER_NUMSZ + 1];
+	gv_key		*sn_gvkey = NULL; /* null-initialize at start, will be malloced later */
+	gv_key		*sn_savekey = NULL; /* null-initialize at start, will be malloced later */
+	char		std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff = NULL, *sn_hold_buff_temp = NULL;
 #	ifdef GTM_CRYPT
 	gtmcrypt_key_t			*encr_key_handles;
 	char				*inbuf;
@@ -135,16 +239,20 @@ void bin_load(uint4 begin, uint4 end)
 	assert(4 == SIZEOF(coll_hdr));
 	gvinit();
 	v.mvtype = MV_STR;
-	len = file_input_bin_get((char **)&ptr);
+	len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base);
 	hdr_lvl = EXTR_HEADER_LEVEL(ptr);
-	if (!(((('4' == hdr_lvl) || ('5' == hdr_lvl)) && (BIN_HEADER_SZ == len)) || (('4' > hdr_lvl) && (V3_BIN_HEADER_SZ == len))))
+	if (!(((('4' == hdr_lvl) || ('5' == hdr_lvl)) && (V5_BIN_HEADER_SZ == len)) ||
+			(('6' == hdr_lvl) && (BIN_HEADER_SZ == len)) ||
+			(('7' == hdr_lvl) && (BIN_HEADER_SZ == len)) ||
+			(('4' > hdr_lvl) && (V3_BIN_HEADER_SZ == len))))
 	{
 		rts_error(VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
 	/* expecting the level in a single character */
 	assert(' ' == *(ptr + SIZEOF(BIN_HEADER_LABEL) - 3));
-	if (0 != memcmp(ptr, BIN_HEADER_LABEL, SIZEOF(BIN_HEADER_LABEL) - 2) || ('2' > hdr_lvl) || *(BIN_HEADER_VERSION) < hdr_lvl)
+	if (0 != memcmp(ptr, BIN_HEADER_LABEL, SIZEOF(BIN_HEADER_LABEL) - 2) || ('2' > hdr_lvl) ||
+			*(BIN_HEADER_VERSION_ENCR) < hdr_lvl)
 	{	/* ignore the level check */
 		rts_error(VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
@@ -173,8 +281,16 @@ void bin_load(uint4 begin, uint4 end)
 	new_gvn = FALSE;
 	if (hdr_lvl > '3')
 	{
-		memcpy(std_null_coll, ptr + BIN_HEADER_NULLCOLLOFFSET, BIN_HEADER_NUMSZ);
-		std_null_coll[BIN_HEADER_NUMSZ] = '\0';
+		if (hdr_lvl > '5')
+		{
+			memcpy(std_null_coll, ptr + BIN_HEADER_NULLCOLLOFFSET, BIN_HEADER_NUMSZ);
+			std_null_coll[BIN_HEADER_NUMSZ] = '\0';
+		}
+		else
+		{
+			memcpy(std_null_coll, ptr + V5_BIN_HEADER_NULLCOLLOFFSET, V5_BIN_HEADER_NUMSZ);
+			std_null_coll[V5_BIN_HEADER_NUMSZ] = '\0';
+		}
 		extr_std_null_coll = STRTOUL(std_null_coll, NULL, 10);
 		if (0 != extr_std_null_coll && 1!= extr_std_null_coll)
 		{
@@ -185,10 +301,10 @@ void bin_load(uint4 begin, uint4 end)
 	} else
 		extr_std_null_coll = 0;
 #	ifdef GTM_CRYPT
-	if ('5' <= hdr_lvl)
+	if ('7' <= hdr_lvl)
 	{
 		int	i, num_indexes;
-		len = file_input_bin_get((char **)&ptr);
+		len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base);
 		hash_array = (muext_hash_hdr *)malloc(len);
 		/* store hashes of all the files used during extract into muext_hash_hdr structure */
 		memcpy((char *)hash_array, ptr, len);
@@ -207,7 +323,7 @@ void bin_load(uint4 begin, uint4 end)
 #	endif
 	if ('2' < hdr_lvl)
 	{
-		len = file_input_bin_get((char **)&ptr);
+		len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base);
 		if (SIZEOF(coll_hdr) != len)
 		{
 			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Corrupt collation header"), ERR_LDBINFMT);
@@ -221,7 +337,7 @@ void bin_load(uint4 begin, uint4 end)
 		begin = 2;
 	for (iter = 2; iter < begin; iter++)
 	{
-		if (!(len = file_input_bin_get((char **)&ptr)))
+		if (!(len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base)))
 		{
 			gtm_putmsg(VARLSTCNT(3) ERR_LOADEOF, 1, begin);
 			util_out_print("Error reading record number: !UL\n", TRUE, iter);
@@ -244,6 +360,10 @@ void bin_load(uint4 begin, uint4 end)
 	need_xlation = FALSE;
 	assert(NULL == tmp_gvkey);	/* GVKEY_INIT macro relies on this */
 	GVKEY_INIT(tmp_gvkey, DBKEYSIZE(MAX_KEY_SZ));	/* tmp_gvkey will point to malloced memory after this */
+	assert(NULL == sn_gvkey);	/* GVKEY_INIT macro relies on this */
+	GVKEY_INIT(sn_gvkey, DBKEYSIZE(MAX_KEY_SZ));	/* sn_gvkey will point to malloced memory after this */
+	assert(NULL == sn_savekey);	/* GVKEY_INIT macro relies on this */
+	GVKEY_INIT(sn_savekey, DBKEYSIZE(MAX_KEY_SZ));	/* sn_gvkey will point to malloced memory after this */
 	for (; !mupip_DB_full ;)
 	{
 		if (++rec_count > end)
@@ -261,9 +381,7 @@ void bin_load(uint4 begin, uint4 end)
 			util_out_print(0, TRUE);
 			mu_ctrlc_occurred = FALSE;
 		}
-		/* reset the stringpool for every record in order to avoid garbage collection */
-		stringpool.free = stringpool.base;
-		if (!(len = file_input_bin_get((char **)&ptr)) || mupip_error_occurred)
+		if (!(len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base)) || mupip_error_occurred)
 			break;
 		else if (len == SIZEOF(coll_hdr))
 		{
@@ -275,7 +393,7 @@ void bin_load(uint4 begin, uint4 end)
 		}
 		rp = (rec_hdr*)(ptr);
 #		ifdef GTM_CRYPT
-		if ('5' <= hdr_lvl)
+		if ('7' <= hdr_lvl)
 		{	/* Getting index value from the extracted file. It indicates which database file this record belongs to */
 			GET_LONG(index, ptr);
 			if (-1 != index) /* Indicates that the record is encrypted. */
@@ -305,11 +423,11 @@ void bin_load(uint4 begin, uint4 end)
 			db_collhdr.nct = gv_target->nct;
 		}
 		GET_USHORT(rec_len, &rp->rsiz);
-		if (rp->cmpc != 0 || v.str.len > rec_len || mupip_error_occurred)
+		if (EVAL_CMPC(rp) != 0 || v.str.len > rec_len || mupip_error_occurred)
 		{
 			bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
 			mu_gvis();
-			util_out_print(0, TRUE);
+			DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 			continue;
 		}
 		if (new_gvn)
@@ -365,11 +483,11 @@ void bin_load(uint4 begin, uint4 end)
 			{
 				bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
 				mu_gvis();
-				util_out_print(0, TRUE);
+				DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 				break;
 			}
 			cp1 =  (unsigned char*)(rp + 1);
-			cp2 = gv_currkey->base + rp->cmpc;
+			cp2 = gv_currkey->base + EVAL_CMPC(rp);
 			current = 1;
 			for (;;)
 			{
@@ -380,9 +498,12 @@ void bin_load(uint4 begin, uint4 end)
 				if (cp1 > (unsigned char *)rp + rec_len ||
 				    cp2 > (unsigned char *)gv_currkey + gv_currkey->top)
 				{
+					gv_currkey->end = cp2 - gv_currkey->base - 1;
+					gv_currkey->base[gv_currkey->end] = 0;
+					gv_currkey->base[gv_currkey->end - 1] = 0;
 					bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
 					mu_gvis();
-					util_out_print(0, TRUE);
+					DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 					break;
 				}
 			}
@@ -399,7 +520,7 @@ void bin_load(uint4 begin, uint4 end)
 				next_rp = (rec_hdr *)((unsigned char*)rp + rec_len);
 				if ((unsigned char*)next_rp < btop)
 				{
-					next_cmpc = next_rp->cmpc;
+					next_cmpc = EVAL_CMPC(next_rp);
 					assert(next_cmpc <= gv_currkey->end);
 					memcpy(cmpc_str, gv_currkey->base, next_cmpc);
 				} else
@@ -464,27 +585,185 @@ void bin_load(uint4 begin, uint4 end)
 			{
 				bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
 				mu_gvis();
-				util_out_print(0, TRUE);
+				DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 				continue;
 			}
-			if (max_subsc_len < (gv_currkey->end + 1))
+			/*
+			 * Spanning node-related variables and their usage:
+			 *
+			 * expected_sn_chunk_number: 	0  - looking for spanning nodes (regular nodes are OK, too)
+			 *				!0 - number of the next chunk needed (implies we are building
+			 *					a spanning node's value)
+			 *
+			 * While building a spanning node's value:
+			 * numsubs: the number of chunks needed to build the spanning node's value
+			 * gblsize: the expected size of the completed value
+			 * sn_chunk_number: The chunk number of the chunk from the current record from the extract
+			 *
+			 * Managing the value
+			 * sn_hold_buff: buffer used to accumulate the spanning node's value
+			 * sn_hold_buff_size: Allocated size of buffer
+			 * sn_hold_buff_pos: amount of the buffer used; where to place the next chunk
+			 * sn_hold_buff_temp: used when we have to increase the size of the buffer
+			 *
+			 * Controlling the placing of the key,value in the database:
+			 * ok_to_put: means we are ready to place the key,value in the database, i.e., we have the full value
+			 * 		(either of the spanning node or a regular node).
+			 * putting_a_sn: we are placing a spanning node in the database, i.e, use the key from sn_gvkey and
+			 * 		the value from sn_hold_buff.
+			 */
+			CHECK_HIDDEN_SUBSCRIPT(gv_currkey,is_hidden_subscript);
+			if (!is_hidden_subscript && (max_subsc_len < (gv_currkey->end + 1)))
 				max_subsc_len = gv_currkey->end + 1;
 			v.str.addr = (char*)cp1;
 			v.str.len =INTCAST(rec_len - (cp1 - (unsigned char *)rp));
-			if (max_data_len < v.str.len)
-				max_data_len = v.str.len;
-			bin_call_db(BIN_PUT, (INTPTR_T)&v, 0);
-			if (mupip_error_occurred)
-			{
-				if (!mupip_DB_full)
-				{
-					bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
-					util_out_print(0, TRUE);
-				}
-				break;
+			if (expected_sn_chunk_number && !is_hidden_subscript)
+			{	/* we were expecting a chunk of an spanning node and we did not get one */
+				DISPLAY_INCMP_SN_MSG;
+				util_out_print("!_!_Expected chunk number : !UL but found a non-spanning node", TRUE,
+						expected_sn_chunk_number + 1);
+				if (sn_hold_buff_pos)
+					DISPLAY_PARTIAL_SN_HOLD_BUFF;
+				KILL_INCMP_SN_IF_NEEDED;
+				sn_hold_buff_pos = 0;
+				expected_sn_chunk_number = 0;
+				ok_to_put = TRUE;
+				putting_a_sn = FALSE;
+				numsubs = 0;
 			}
-			key_count++;
-			global_key_count++;
+			if (is_hidden_subscript)
+			{	/* it's a chunk and we were expecting one */
+				sn_chunk_number = SPAN_GVSUBS2INT((span_subs *) &(gv_currkey->base[gv_currkey->end - 4]));
+				if (!expected_sn_chunk_number && is_hidden_subscript && sn_chunk_number)
+				{ /* we not expecting a payload chunk (as opposed to a control record) but we got one */
+					DISPLAY_INCMP_SN_MSG;
+					util_out_print("!_!_Not expecting a spanning node chunk but found chunk : !UL", TRUE,
+							sn_chunk_number + 1);
+					if (v.str.len)
+						DISPLAY_VALUE("!_!_Errant Chunk :");
+					continue;
+				}
+				if (0 == sn_chunk_number)
+				{ 	/* first spanning node chunk, get ctrl info */
+					if (0 != expected_sn_chunk_number)
+					{
+						DISPLAY_INCMP_SN_MSG;
+						util_out_print("!_!_Expected chunk number : !UL but found chunk number : !UL", TRUE,
+								expected_sn_chunk_number + 1, sn_chunk_number + 1);
+						if (sn_hold_buff_pos)
+							DISPLAY_PARTIAL_SN_HOLD_BUFF;
+						KILL_INCMP_SN_IF_NEEDED;
+					}
+					/* start building a new spanning node */
+					sn_gvkey->end = gv_currkey->end - (SPAN_SUBS_LEN + 1);
+					memcpy(sn_gvkey->base, gv_currkey->base, sn_gvkey->end);
+					sn_gvkey->base[sn_gvkey->end] = 0;
+					sn_gvkey->prev = gv_currkey->prev;
+					sn_gvkey->top = gv_currkey->top;
+					GET_NSBCTRL(v.str.addr, numsubs, gblsize);
+					/* look for first payload chunk */
+					expected_sn_chunk_number = 1;
+					sn_hold_buff_pos = 0;
+					ok_to_put = FALSE;
+					sn_incmp_gbl_already_killed = FALSE;
+				} else
+				{	/* we only need to compare the key before the hidden subscripts */
+					if ((expected_sn_chunk_number == sn_chunk_number)
+							&& (sn_gvkey->end == gv_currkey->end - (SPAN_SUBS_LEN + 1))
+							&& !memcmp(sn_gvkey->base,gv_currkey->base, sn_gvkey->end)
+							&& ((sn_hold_buff_pos + v.str.len) <= gblsize))
+					{
+						if (NULL == sn_hold_buff)
+						{
+							sn_hold_buff_size = DEFAULT_SN_HOLD_BUFF_SIZE;
+							sn_hold_buff = (char *)malloc(DEFAULT_SN_HOLD_BUFF_SIZE);
+						}
+						if ((sn_hold_buff_pos + v.str.len) > sn_hold_buff_size)
+						{
+							sn_hold_buff_size = sn_hold_buff_size * 2;
+							sn_hold_buff_temp = (char *)malloc(sn_hold_buff_size);
+							memcpy(sn_hold_buff_temp, sn_hold_buff, sn_hold_buff_pos);
+							free (sn_hold_buff);
+							sn_hold_buff = sn_hold_buff_temp;
+						}
+						memcpy(sn_hold_buff + sn_hold_buff_pos, v.str.addr, v.str.len);
+						sn_hold_buff_pos += v.str.len;
+						if (expected_sn_chunk_number == numsubs)
+						{
+							if (sn_hold_buff_pos != gblsize)
+							{	/* we don't have the expected size even though 	*/
+								/* we have all the expected chunks.		 		*/
+								DISPLAY_INCMP_SN_MSG;
+								util_out_print("!_!_Expected size : !UL actual size : !UL", TRUE,
+										gblsize, sn_hold_buff_pos);
+								if (sn_hold_buff_pos)
+									DISPLAY_PARTIAL_SN_HOLD_BUFF;
+								KILL_INCMP_SN_IF_NEEDED;
+								expected_sn_chunk_number = 0;
+								ok_to_put = FALSE;
+								sn_hold_buff_pos = 0;
+							}
+							else
+							{
+								expected_sn_chunk_number = 0;
+								ok_to_put = TRUE;
+								putting_a_sn = TRUE;
+							}
+
+						}else
+							expected_sn_chunk_number++;
+					}else
+					{
+						DISPLAY_INCMP_SN_MSG;
+						if ((sn_hold_buff_pos + v.str.len) <= gblsize)
+							util_out_print("!_!_Expected chunk number : !UL but found chunk number : !UL", /*BYPASSOK*/
+								TRUE, expected_sn_chunk_number + 1, sn_chunk_number + 1);
+						else
+							util_out_print("!_!_Global value too large:  expected size : !UL actual size : !UL chunk number : !UL", TRUE, /*BYPASSOK*/
+								gblsize, sn_hold_buff_pos + v.str.len, sn_chunk_number + 1);
+						if (sn_hold_buff_pos)
+							DISPLAY_PARTIAL_SN_HOLD_BUFF;
+						if (v.str.len)
+							DISPLAY_VALUE("!_!_Errant Chunk :");
+						KILL_INCMP_SN_IF_NEEDED;
+						sn_hold_buff_pos = 0;
+						expected_sn_chunk_number = 0;
+					}
+				}
+			} else
+				ok_to_put = TRUE;
+			if (ok_to_put)
+			{
+					if (putting_a_sn)
+					{
+						gv_currkey->base[gv_currkey->end - (SPAN_SUBS_LEN + 1)] = 0;
+						gv_currkey->end -= (SPAN_SUBS_LEN + 1);
+						v.str.addr = sn_hold_buff;
+						v.str.len = sn_hold_buff_pos;
+					}
+					if (max_data_len < v.str.len)
+						max_data_len = v.str.len;
+					bin_call_db(BIN_PUT, (INTPTR_T)&v, 0);
+					if (mupip_error_occurred)
+					{
+						if (!mupip_DB_full)
+						{
+							bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+							file_offset = file_offset_base + ((unsigned char *)rp - ptr_base);
+							util_out_print("!_!_at File offset : [0x!XL]", TRUE, file_offset);
+							DISPLAY_CURRKEY;
+							DISPLAY_VALUE("!_!_Value :");
+						}
+						break;
+					}
+					if (putting_a_sn)
+						putting_a_sn = FALSE;
+					else
+					{
+						key_count++;
+						global_key_count++;
+					}
+			}
 		}
 	}
 	GTMCRYPT_ONLY(
@@ -492,6 +771,9 @@ void bin_load(uint4 begin, uint4 end)
 			free(hash_array);
 	)
 	free(tmp_gvkey);
+	free(sn_gvkey);
+	if (NULL != sn_hold_buff)
+		free(sn_hold_buff);
 	file_input_close();
 	util_out_print("LOAD TOTAL!_!_Key Cnt: !UL  Max Subsc Len: !UL  Max Data Len: !UL", TRUE, key_count, max_subsc_len,
 			max_data_len);
@@ -520,6 +802,8 @@ void bin_call_db(int routine, INTPTR_T parm1, INTPTR_T parm2)
 			break;
 		case ERR_COR:
 			rts_error(VARLSTCNT(4) ERR_CORRUPT, 2, parm1, parm2);
+		case BIN_KILL:
+			gvcst_kill(FALSE);
 			break;
 	}
 	REVERT;

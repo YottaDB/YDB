@@ -13,7 +13,7 @@
 
 #include "gtm_string.h"
 #include "toktyp.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "indir_enum.h"
 #include "cmd_qlf.h"

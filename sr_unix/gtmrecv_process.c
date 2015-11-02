@@ -80,13 +80,14 @@
 #include "gtmio.h"
 #include "repl_inst_dump.h"		/* for "repl_dump_histinfo" prototype */
 #include "gv_trigger_common.h"
+#include "anticipatory_freeze.h"
 
 #define	GTM_ZLIB_UNCMP_ERR_STR		"error from zlib uncompress function "
 #define	GTM_ZLIB_Z_MEM_ERROR_STR	"Out-of-memory " GTM_ZLIB_UNCMP_ERR_STR
 #define	GTM_ZLIB_Z_BUF_ERROR_STR	"Insufficient output buffer " GTM_ZLIB_UNCMP_ERR_STR
 #define	GTM_ZLIB_Z_DATA_ERROR_STR	"Input-data-incomplete-or-corrupt " GTM_ZLIB_UNCMP_ERR_STR
 #define	GTM_ZLIB_UNCMPLEN_ERROR_STR	"Decompressed message data length %d is not equal to precompressed length %d "
-#define	GTM_ZLIB_UNCMP_ERR_SEQNO_STR	"at seqno %llu [0x%llx]\n"
+#define	GTM_ZLIB_UNCMP_ERR_SEQNO_STR	"at seqno "INT8_FMT" "INT8_FMTX"\n"
 #define	GTM_ZLIB_UNCMP_ERR_SOLVE_STR	"before sending REPL_CMP_SOLVE message\n"
 #define	GTM_ZLIB_UNCMPTRANSITION_STR	"Defaulting to NO decompression\n"
 
@@ -168,9 +169,7 @@ GBLREF	recvpool_addrs		recvpool;
 GBLREF	boolean_t		gtmrecv_logstats;
 GBLREF	int			gtmrecv_filter;
 GBLREF	int			gtmrecv_log_fd;
-GBLREF	int			gtmrecv_statslog_fd;
 GBLREF	FILE			*gtmrecv_log_fp;
-GBLREF	FILE			*gtmrecv_statslog_fp;
 GBLREF	seq_num			seq_num_zero, seq_num_one, seq_num_minus_one;
 GBLREF	unsigned char		*repl_filter_buff;
 GBLREF	int			repl_filter_bufsiz;
@@ -345,6 +344,27 @@ static	boolean_t	repl_cmp_solve_timer_set;
 	}									\
 }
 
+/* For cross-endian conversion to happen on the receiving side, the receiver must understand the layout of the journal
+ * records. To keep the endian conversion logic on both primary and secondary simple, the following scheme is used:
+ * (a) If primary < secondary, endian conversion will happen on primary.
+ * (b) If primary >= secondary, primary will apply internal filters to convert the records to secondary's format. The
+ *     secondary on receiving them will do the necessary endian conversion before letting the update process see them.
+ *
+ * However, the above logic will cause the older versions (< V5.4-002) to NOT replicate to V5.4-002 as the endian-conversion
+ * by-primary is introduced only from V5.4-002 and above. Hence, allow secondary to do endian conversion for this special
+ * case when the primary is a GT.M version running V5.3-003 (V18_JNL_VER) to V5.4-001 (V20_JNL_VER). The lower limit is
+ * chosen to be V5.3-003 since that was the first version where cross-endian conversion was supported.
+ *
+ * There is one other exception. V5.5 source server (V22_JNL_VER) had a bug wherein a history record is endian-converted
+ * when the replication is NOT cross-endian and vice versa. In either case, do an endian conversion of the history record.
+ *
+ * The below macro takes all the above conditions into consideration to determine if the receiver server needs to do endian
+ * converison or not.
+ */
+#define ENDIAN_CONVERSION_NEEDED(IS_NEW_HISTREC, THIS_JNL_VER, REMOTE_JNL_VER, X_ENDIAN)			\
+	((IS_NEW_HISTREC && (V22_JNL_VER == REMOTE_JNL_VER)) 							\
+		|| (X_ENDIAN && ((REMOTE_JNL_VER >= THIS_JNL_VER) || (V21_JNL_VER > REMOTE_JNL_VER))))
+
 STATICFNDEF void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
 {
 	char		print_msg[1024];
@@ -395,19 +415,7 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 
 	SETUP_THREADGBL_ACCESS;
 #	endif
-
-	/* for cross-endian conversion to happen on the receiving side, the receiver must understand the layout of the journal
-	 * records. To keep the endian conversion logic on both primary and secondary simple, the following scheme is used:
-	 * (a) if primary < secondary, endian conversion will happen on primary.
-	 * (b) if primary >= secondary, primary will apply internal filters to convert the records to secondary's format. The
-	 *     secondary on receiving them will do the necessary endian conversion before letting the update process see them.
-	 *
-	 * However, the above logic will cause the older versions (< V5.4-002) to NOT replicate to V5.4-002 as the endian-conversion
-	 * by-primary is introduced only from V5.4-002 and above. Hence, allow secondary to do endian conversion for this special
-	 * case when the primary is a GT.M version running V5.3-003 (V18_JNL_VER) to V5.4-001 (V20_JNL_VER). The lower limit is
-	 * chosen to be V5.3-003 since that was the first version where cross-endian conversion was supported.
-	 */
-	assert((remote_jnl_ver >= this_side->jnl_ver) || ((V18_JNL_VER <= remote_jnl_ver) && (V20_JNL_VER >= remote_jnl_ver)));
+	assert((remote_jnl_ver >= this_side->jnl_ver) || (V21_JNL_VER > remote_jnl_ver) || (V22_JNL_VER == remote_jnl_ver));
 	jb = jnl_buff;
 	status = SS_NORMAL;
 	jlen = jnl_len;
@@ -455,11 +463,11 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 			}
 			if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))
 			{
-				/* This code will need changes in case the jnl-ver changes from V22 to V24 so add an assert to
+				/* This code will need changes in case the jnl-ver changes from V23 to V24 so add an assert to
 				 * alert to that possibility. Once the code is fixed for the new jnl format, change the assert
 				 * to reflect the new latest jnl-ver.
 				 */
-				assert(JNL_VER_THIS == V22_JNL_VER);
+				assert(JNL_VER_THIS == V23_JNL_VER);
 				/* To better understand the logic below (particularly the use of hardcoded offsets), see comment
 				 * in repl_filter.c (search for "struct_jrec_upd layout" for the various jnl versions we support).
 				 */
@@ -598,7 +606,7 @@ STATICFNDEF void do_flow_control(uint4 write_pos)
 		}
 		CHECK_REPL_SEND_LOOP_ERROR(status, "REPL_XOFF");
 		if (gtmrecv_logstats)
-			repl_log(gtmrecv_statslog_fp, TRUE, TRUE, "Space used = %ld, High water mark = %d Low water mark = %d, "
+			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Space used = %ld, High water mark = %d Low water mark = %d, "
 					"Updproc Read = %d, Recv Write = %d, Sent XOFF\n", space_used, recvpool_high_watermark,
 					recvpool_low_watermark, read_pos, write_pos);
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_XOFF sent as receive pool has %ld bytes transaction data yet to be "
@@ -628,7 +636,7 @@ STATICFNDEF void do_flow_control(uint4 write_pos)
 		}
 		CHECK_REPL_SEND_LOOP_ERROR(status, "REPL_XON");
 		if (gtmrecv_logstats)
-			repl_log(gtmrecv_statslog_fp, TRUE, TRUE, "Space used now = %ld, High water mark = %d, "
+			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Space used now = %ld, High water mark = %d, "
 				 "Low water mark = %d, Updproc Read = %d, Recv Write = %d, Sent XON\n", space_used,
 				 recvpool_high_watermark, recvpool_low_watermark, read_pos, write_pos);
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_XON sent as receive pool has %ld bytes free space to buffer transaction "
@@ -950,7 +958,7 @@ void	gtmrecv_repl_send(repl_msg_ptr_t msgp, int4 type, int4 len, char *msgtypest
 	log_fp = (NULL == gtmrecv_log_fp) ? stdout : gtmrecv_log_fp;
 	if (MAX_SEQNO != optional_seqno)
 	{
-		repl_log(log_fp, TRUE, TRUE, "Sending %s message with seqno %llu [0x%llx]\n", msgtypestr,
+		repl_log(log_fp, TRUE, TRUE, "Sending %s message with seqno "INT8_FMT" "INT8_FMTX"\n", msgtypestr,
 			optional_seqno, optional_seqno);
 	} else
 		repl_log(log_fp, TRUE, TRUE, "Sending %s message\n", msgtypestr);
@@ -981,18 +989,19 @@ void	gtmrecv_repl_send(repl_msg_ptr_t msgp, int4 type, int4 len, char *msgtypest
  */
 void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, boolean_t is_rcvr_srvr)
 {
-	boolean_t		remote_side_is_supplementary;
+	boolean_t		remote_side_is_supplementary, grab_lock_needed;
 	repl_inst_hdr_ptr_t	inst_hdr;
 	repl_instinfo_msg_t	instinfo_msg;
 	repl_inst_uuid		*strm_start, *strm_top, *strm_info;
 	FILE			*log_fp;
 	int			reuse_slot, first_usable_slot;
 	seq_num			strm_jnl_seqno;
-	DEBUG_ONLY(sgmnt_addrs	*repl_csa;)
+	sgmnt_addrs		*repl_csa;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs);
+	repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+	grab_lock_needed = is_rcvr_srvr || ((NULL != jnlpool_ctl) && !repl_csa->hold_onto_crit);
 	remote_side_is_supplementary = need_instinfo_msg->is_supplementary;
 	remote_side->is_supplementary = remote_side_is_supplementary;
 	assert(remote_side->endianness_known); /* ensure remote_side->cross_endian is reliable */
@@ -1023,12 +1032,14 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	 */
 	assert(inst_hdr->lms_group_info.created_time
 		|| need_instinfo_msg->lms_group_info.created_time || !need_instinfo_msg->is_rootprimary);
-	assert((is_rcvr_srvr && (NULL != jnlpool_ctl)) || (!is_rcvr_srvr && (NULL == jnlpool_ctl)) || jgbl.onlnrlbk);
+	assert((is_rcvr_srvr && (NULL != jnlpool_ctl)) || (!is_rcvr_srvr && (NULL == jnlpool_ctl)) || jgbl.onlnrlbk
+			|| (jgbl.mur_rollback && ANTICIPATORY_FREEZE_AVAILABLE));
 	/* If this instance is supplementary and the journal pool exists (to indicate whether updates are enabled or not
 	 * which in turn helps us know whether this is an originating instance or not) do some additional checks.
 	 */
-	if (inst_hdr->is_supplementary && (NULL != jnlpool_ctl))
+	if (is_rcvr_srvr && inst_hdr->is_supplementary)
 	{
+		assert(NULL != jnlpool_ctl);
 		if (!jnlpool_ctl->upd_disabled)
 		{	/* this supplementary instance was started with -UPDOK. Issue error if source is also supplementary */
 			if (need_instinfo_msg->is_supplementary)
@@ -1049,10 +1060,12 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 		}
 	}
 	/* Assert that if the receiver side is a root primary (i.e. has updates enabled), it better be a
-	 * supplementary instance and have the LMS group info filled in.
+	 * supplementary instance and have the LMS group info filled in. Exception is if this a FETCHRESYNC
+	 * ROLLBACK run on an instance which was once primary (not necessarily a supplementary one).
 	 */
 	assert((NULL == jnlpool_ctl) || jnlpool_ctl->upd_disabled
-		|| inst_hdr->is_supplementary && IS_REPL_INST_UUID_NON_NULL(inst_hdr->lms_group_info));
+		|| inst_hdr->is_supplementary && IS_REPL_INST_UUID_NON_NULL(inst_hdr->lms_group_info)
+		|| jgbl.onlnrlbk || (jgbl.mur_rollback && ANTICIPATORY_FREEZE_AVAILABLE));
 	/* Check if primary and secondary are in same LMS group. Otherwise issue error. An exception is if the group info has
 	 * not yet been filled in after instance file creation. In that case, copy the info from primary and skip the error check.
 	 */
@@ -1099,14 +1112,15 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 		 * If caller is rollback, no other process can be touching the instance file until we are done so
 		 * no need of the lock in that case.
 		 */
-		if (is_rcvr_srvr)
+		if (grab_lock_needed)
 		{
-			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
-			GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
+			grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+			if (is_rcvr_srvr)
+				GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 		}
 		inst_hdr->lms_group_info = need_instinfo_msg->lms_group_info;
 		repl_inst_flush_filehdr();
-		if (is_rcvr_srvr)
+		if (grab_lock_needed)
 			rel_lock(jnlpool.jnlpool_dummy_reg);
 	}
 	/* If this instance is supplementary and remote side is not, then find out which stream # the non-supplementary source
@@ -1124,10 +1138,11 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 		 * If a matching stream is found, update gtmrecv_local->strm_index to reflect this while still holding lock.
 		 * This field is checked by the -UPDATERESYNC to see if a receiver has a given stream # actively in use.
 		 */
-		if (is_rcvr_srvr)
+		if (grab_lock_needed)
 		{
-			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
-			GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
+			grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+			if (is_rcvr_srvr)
+				GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 		}
 		reuse_slot = 0;
 		if (is_rcvr_srvr && recvpool.gtmrecv_local->updateresync && gtmrecv_options.reuse_specified)
@@ -1184,14 +1199,14 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 					strm_index = first_usable_slot;
 				else
 				{
-					if (is_rcvr_srvr)
+					if (grab_lock_needed)
 						rel_lock(jnlpool.jnlpool_dummy_reg);
 					rts_error(VARLSTCNT(6) ERR_UPDSYNCINSTFILE, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("No empty slot found. Specify REUSE to choose one for reuse"));
 				}
 			} else
 			{
-				if (is_rcvr_srvr)
+				if (grab_lock_needed)
 					rel_lock(jnlpool.jnlpool_dummy_reg);
 				rts_error(VARLSTCNT(6) ERR_INSUNKNOWN, 4, LEN_AND_STR((char *)inst_hdr->inst_info.this_instname),
 					LEN_AND_STR((char *)need_instinfo_msg->instname));
@@ -1293,14 +1308,10 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 							strm_jnl_seqno = 1;
 					}
 				} else
-				{
-					assert(jnlpool_ctl->strm_seqno[strm_index]
-							== jnlpool.repl_inst_filehdr->strm_seqno[strm_index]);
 					strm_jnl_seqno = jnlpool_ctl->strm_seqno[strm_index];
-				}
 				assert(0 == GET_STRM_INDEX(strm_jnl_seqno));
 			}
-			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Sending Stream Seqno = %llu [0x%llx]\n",
+			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Sending Stream Seqno = "INT8_FMT" "INT8_FMTX"\n",
 										strm_jnl_seqno, strm_jnl_seqno);
 		} else
 		{
@@ -1313,7 +1324,7 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 					|| (jnlpool_ctl->strm_seqno[strm_index] == inst_hdr->strm_seqno[strm_index]));
 				strm_jnl_seqno = jnlpool.repl_inst_filehdr->strm_seqno[strm_index];
 			}
-			repl_log(stdout, TRUE, TRUE, "Sending Stream Seqno = %llu [0x%llx]\n",
+			repl_log(stdout, TRUE, TRUE, "Sending Stream Seqno = "INT8_FMT" "INT8_FMTX"\n",
 										strm_jnl_seqno, strm_jnl_seqno);
 		}
 	} else
@@ -1340,17 +1351,22 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	/*************** Send REPL_INSTINFO message ***************/
 	memset(&instinfo_msg, 0, SIZEOF(instinfo_msg));
 	memcpy(instinfo_msg.instname, inst_hdr->inst_info.this_instname, MAX_INSTNAME_LEN - 1);
-	if (is_rcvr_srvr)
+	if (grab_lock_needed)
 	{
-		GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
-		GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
+		grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+		if (is_rcvr_srvr)
+			GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 	}
 	instinfo_msg.was_rootprimary = (unsigned char)repl_inst_was_rootprimary();
-	if (is_rcvr_srvr)
+	if (grab_lock_needed)
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 	if (!is_rcvr_srvr)
 		murgbl.was_rootprimary = instinfo_msg.was_rootprimary;
 	instinfo_msg.strm_jnl_seqno = strm_jnl_seqno;
+	/* strm_jnl_seqno is not expected to be zero unless this is a non-supplementary instance (like A->B) in which case
+	 * strm_seqno is not maintained OR the remote side is supplementary (like P->Q) in which case the two instances do
+	 * not communicate in-terms of strm_seqno (once the handshake is established)
+	 */
 	assert(strm_jnl_seqno || !inst_hdr->is_supplementary || remote_side_is_supplementary);
 	instinfo_msg.lms_group_info = inst_hdr->lms_group_info;
 	assert(remote_side->endianness_known);	/* only then is remote_side->cross_endian reliable */
@@ -1363,10 +1379,13 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 	if (repl_connection_reset || is_rcvr_srvr && gtmrecv_wait_for_jnl_seqno)
 		return;
 	/* Do not allow an instance which was formerly a root primary or which still
-	 * has a non-zero value of "zqgblmod_seqno" to start up as a tertiary.
+	 * has a non-zero value of "zqgblmod_seqno" to start up as a tertiary. The only exception is
+	 * if this is P (supplementary instance) receiving from a non-supplementary instance.
+	 * In that case, P can never be a root primary of the non-supplementary group and therefore
+	 * cannot be affected by lost transactions being applied from the non-supplementary group.
 	 */
-	if ((instinfo_msg.was_rootprimary || (is_rcvr_srvr && jnlpool_ctl->max_zqgblmod_seqno))
-		&& !need_instinfo_msg->is_rootprimary)
+	if ((!inst_hdr->is_supplementary || remote_side_is_supplementary) && !need_instinfo_msg->is_rootprimary
+		&& (instinfo_msg.was_rootprimary || (is_rcvr_srvr && jnlpool_ctl->max_zqgblmod_seqno)))
 	{
 		if (is_rcvr_srvr)
 		{
@@ -1403,6 +1422,7 @@ STATICFNDEF int	gtmrecv_start_onln_rlbk(void)
 	SNPRINTF(&command[cmdlen], ONLN_RLBK_CMD_MAXLEN, "%d", gtmrecv_local->listen_port); /* will add '\0' at the end */
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Executing %s\n", command);
 	if (0 != (status = SYSTEM((char *)command)))
+
 	{
 		if (-1 == status)
 		{
@@ -1430,15 +1450,25 @@ STATICFNDEF int	gtmrecv_start_onln_rlbk(void)
  */
 void	gtmrecv_onln_rlbk_clnup(void)
 {
+	boolean_t		connection_already_reset;
+
 	assert(NULL != gtmrecv_log_fp);
 	assert(jnlpool.jnlpool_ctl == jnlpool_ctl);
-	repl_log(gtmrecv_log_fp, TRUE, TRUE, "---> ONLINE ROLLBACK. Current Jnlpool Seqno : %llu\n", jnlpool_ctl->jnl_seqno);
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "---> ONLINE ROLLBACK. Current Jnlpool Seqno : "INT8_FMT"\n", jnlpool_ctl->jnl_seqno);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Waiting for update process to set recvpool_ctl->onln_rlbk_flag\n");
+	connection_already_reset = repl_connection_reset;
+	assert(!gtmrecv_wait_for_jnl_seqno);
 	while (TRUE)
 	{
 		SHORT_SLEEP(GTMRECV_WAIT_FOR_UPD_PROGRESS);
 		gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
-		if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
+		/* If connection was already closed before we came here (possible if receiver server closed the connection in
+		 * response to a REPL_ROLLBACK_FIRST message) after spawning off an online rollback, then we should NOT check for
+		 * repl_connection_reset. This way, we avoid breaking prematurely from this loop without waiting for the update
+		 * process to acknowledge the online rollback. In this case, wait for gtmrecv_wait_for_jnl_seqno to be set to TRUE
+		 * by gtmrecv_poll_actions.
+		 */
+		if ((!connection_already_reset && repl_connection_reset) || gtmrecv_wait_for_jnl_seqno)
 			break;
 	}
 	return;
@@ -1606,7 +1636,7 @@ STATICFNDEF void wait_for_updproc_to_clear_backlog(void)
 STATICFNDEF void process_tr_buff(int msg_type)
 {
 	recvpool_ctl_ptr_t		recvpool_ctl;
-	seq_num				log_seqno, recv_jnl_seqno;
+	seq_num				log_seqno, recv_jnl_seqno, upd_seqno, diff_seqno;
 	uint4				in_size, out_size, out_bufsiz, tot_out_size, upd_read, max_strm_histinfo;
 	boolean_t			filter_pass = FALSE, is_new_histrec, is_repl_cmpc;
 	uchar_ptr_t			save_buffp, save_filter_buff, in_buff, out_buff;
@@ -1727,8 +1757,7 @@ STATICFNDEF void process_tr_buff(int msg_type)
 		assert((write_off != write_wrap) || (0 == write_off));
 		assert(remote_side->jnl_ver);
 		assert(!remote_side->cross_endian || (V18_JNL_VER <= remote_side->jnl_ver));
-		if (remote_side->cross_endian
-			&& ((remote_side->jnl_ver >= this_side->jnl_ver) || (V21_JNL_VER > remote_side->jnl_ver)))
+		if (ENDIAN_CONVERSION_NEEDED(is_new_histrec, this_side->jnl_ver, remote_side->jnl_ver, remote_side->cross_endian))
 		{
 			if (SS_NORMAL != (status = repl_tr_endian_convert(remote_side->jnl_ver,
 							recvpool.recvdata_base + write_off, write_len)))
@@ -1831,19 +1860,29 @@ STATICFNDEF void process_tr_buff(int msg_type)
 		if (recvpool_ctl->jnl_seqno - lastlog_seqno >= log_interval)
 		{
 			log_seqno = recvpool_ctl->jnl_seqno;
+			upd_seqno = recvpool.upd_proc_local->read_jnl_seqno;
+			assert(log_seqno >= upd_seqno);
+			diff_seqno = (log_seqno - upd_seqno);
 			trans_recvd_cnt += (log_seqno - lastlog_seqno);
 			msg_total = repl_recv_data_recvd - buff_unprocessed;
 				/* Don't include data not yet processed, we'll include that count in a later log */
 			if (NO_FILTER == gtmrecv_filter)
 			{
-				repl_log(gtmrecv_log_fp, FALSE, TRUE, "REPL INFO - Seqno : %llu"
-					"  Jnl Total : %llu  Msg Total : %llu\n", log_seqno,
-					repl_recv_data_processed, msg_total);
+				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Seqno : "INT8_FMT" "INT8_FMTX
+					"  Jnl Total : "INT8_FMT" "INT8_FMTX"  Msg Total : "INT8_FMT" "INT8_FMTX
+					"  Current backlog : "INT8_FMT" "INT8_FMTX"\n",
+					log_seqno, log_seqno, repl_recv_data_processed, repl_recv_data_processed,
+					msg_total, msg_total, diff_seqno, diff_seqno);
 			} else
 			{
-				repl_log(gtmrecv_log_fp, FALSE, TRUE, "REPL INFO - Seqno : %llu  Pre filter "
-					"total : %llu  Post filter total : %llu  Msg Total : %llu\n", log_seqno,
-					repl_recv_data_processed, repl_recv_postfltr_data_procd, msg_total);
+				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Seqno : "INT8_FMT" "INT8_FMTX
+					"  Pre filter total : "INT8_FMT" "INT8_FMTX"  Post filter total : "
+					INT8_FMT" "INT8_FMTX"  Msg Total : "INT8_FMT" "INT8_FMTX
+					"  Current backlog : "INT8_FMT" "INT8_FMTX"\n",
+					log_seqno, log_seqno,
+					repl_recv_data_processed, repl_recv_data_processed,
+					repl_recv_postfltr_data_procd, repl_recv_postfltr_data_procd,
+					msg_total, msg_total, diff_seqno, diff_seqno);
 			}
 			/* Approximate time with an error not more than GTMRECV_HEARTBEAT_PERIOD. We use this
 			 * instead of calling time(), and expensive system call, especially on VMS. The
@@ -1859,7 +1898,7 @@ STATICFNDEF void process_tr_buff(int msg_type)
 			if ((double)GTMRECV_LOGSTATS_INTERVAL <= time_elapsed)
 			{
 				repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO since last log : Time elapsed : "
-					"%00.f  Tr recvd : %llu  Tr bytes : %llu  Msg bytes : %llu\n",
+					"%00.f  Tr recvd : "INT8_FMT"  Tr bytes : "INT8_FMT"  Msg bytes : "INT8_FMT"\n",
 					time_elapsed, trans_recvd_cnt - last_log_tr_recvd_cnt,
 					repl_recv_data_processed - repl_recv_lastlog_data_procd,
 					msg_total - repl_recv_lastlog_data_recvd);
@@ -1879,15 +1918,15 @@ STATICFNDEF void process_tr_buff(int msg_type)
 		{
 			if (!filter_pass)
 			{
-				repl_log(gtmrecv_statslog_fp, FALSE, FALSE, "Tr : %llu  Size : %d  Write : %d  "
-					 "Total : %llu\n", recvpool_ctl->jnl_seqno, write_len,
+				repl_log(gtmrecv_log_fp, FALSE, FALSE, "Tr : "INT8_FMT"  Size : %d  Write : %d  "
+					 "Total : "INT8_FMT"\n", recvpool_ctl->jnl_seqno, write_len,
 					 write_off, repl_recv_data_processed);
 			} else
 			{
 				assert(!is_new_histrec);
-				repl_log(gtmrecv_statslog_fp, FALSE, FALSE, "Tr : %llu  Pre filter Size : %d  "
+				repl_log(gtmrecv_log_fp, FALSE, FALSE, "Tr : "INT8_FMT"  Pre filter Size : %d  "
 					"Post filter Size  : %d  Pre filter Write : %d  Post filter Write : %d  "
-					"Pre filter Total : %llu  Post filter Total : %llu\n",
+					"Pre filter Total : "INT8_FMT"  Post filter Total : "INT8_FMT"\n",
 					recvpool_ctl->jnl_seqno, pre_filter_write_len, write_len,
 					pre_filter_write, write_off, repl_recv_data_processed,
 					repl_recv_postfltr_data_procd);
@@ -2082,6 +2121,8 @@ STATICFNDEF void process_tr_buff(int msg_type)
 						/* uses and updates "write_loc" */
 					write_off = recvpool_ctl->write;
 					/* Note: "last_rcvd_strm_histinfo" is automatically maintained in this case */
+					/* Now that we have inserted the stream specific history records, reset flag */
+					recvpool_ctl->insert_strm_histinfo = FALSE;
 				} else
 				{	/* Maintain last_rcvd_strm_histinfo[] as well.
 					 * In addition, if insert_strm_histinfo is TRUE, it means no REPL_STRMINFO messages
@@ -2204,8 +2245,8 @@ STATICFNDEF void	gtmrecv_updresync_histinfo_find_seqno(seq_num input_seqno, int4
 	}
 	if (input_seqno > recvpool.gtmrecv_local->updresync_jnl_seqno)
 	{	/* Input seqno is greater than the max seqno in the updateresync input instance file. So can never be found. */
-		SNPRINTF(print_msg, SIZEOF(print_msg), "Seqno %llu [0x%llx] cannot be found in input instance file "
-			" which has a max seqno of %llu [0x%llx]\n", input_seqno, input_seqno,
+		SNPRINTF(print_msg, SIZEOF(print_msg), "Seqno "INT8_FMT" "INT8_FMTX" cannot be found in input instance file "
+			" which has a max seqno of "INT8_FMT" "INT8_FMTX"\n", input_seqno, input_seqno,
 			recvpool.gtmrecv_local->updresync_jnl_seqno, recvpool.gtmrecv_local->updresync_jnl_seqno);
 		rts_error(VARLSTCNT(9) ERR_UPDSYNCINSTFILE, 0, ERR_STRMNUMIS, 1, strm_num, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 	}
@@ -2237,7 +2278,7 @@ STATICFNDEF void	gtmrecv_updresync_histinfo_find_seqno(seq_num input_seqno, int4
 		histinfo_num = (INVALID_SUPPL_STRM == strm_num) ? (histinfo_num - 1) : histinfo->prev_histinfo_num;
 	} while (INVALID_HISTINFO_NUM != histinfo_num);
 	/* Could not find history record in -updateresync= input instance file */
-	SNPRINTF(print_msg, SIZEOF(print_msg), "Receiver side instance seqno %llu [0x%llx] is lesser than "
+	SNPRINTF(print_msg, SIZEOF(print_msg), "Receiver side instance seqno "INT8_FMT" "INT8_FMTX" is less than"
 		" any history record found in instance file", input_seqno, input_seqno);
 	rts_error(VARLSTCNT(9) ERR_UPDSYNCINSTFILE, 0, ERR_STRMNUMIS, 1, strm_num, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 }
@@ -2297,7 +2338,7 @@ STATICFNDEF void	gtmrecv_process_need_strminfo_msg(repl_needstrminfo_msg_ptr_t n
 		need_strminfo_seqno = need_strminfo_msg->seqno;
 	else
 		need_strminfo_seqno = GTM_BYTESWAP_64(need_strminfo_msg->seqno);
-	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_NEED_STRMINFO message for seqno %llu [0x%llx]\n",
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_NEED_STRMINFO message for seqno "INT8_FMT" "INT8_FMTX"\n",
 			need_strminfo_seqno, need_strminfo_seqno);
 	if (recvpool.gtmrecv_local->updateresync && (FD_INVALID != recvpool.gtmrecv_local->updresync_instfile_fd))
 	{	/* The stream information that is being requested needs to be found in the -updateresync input instance file
@@ -2342,7 +2383,7 @@ STATICFNDEF void	gtmrecv_process_need_strminfo_msg(repl_needstrminfo_msg_ptr_t n
 		{
 			repl_log(gtmrecv_log_fp, TRUE, TRUE,
 				"Searching for the desired history in the replication instance file\n");
-			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+			grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
 			GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 				/* above macro will "return" if repl_connection_reset OR gtmrecv_wait_for_jnl_seqno is set */
 			status = repl_inst_wrapper_histinfo_find_seqno(need_strminfo_seqno, INVALID_SUPPL_STRM, &histinfo);
@@ -2409,14 +2450,14 @@ STATICFNDEF void	gtmrecv_process_need_histinfo_msg(repl_needhistinfo_msg_ptr_t n
 			assert(INVALID_SUPPL_STRM == need_histinfo_strm_num);
 			assert(INVALID_HISTINFO_NUM == need_histinfo_num);
 		}
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_NEED_HISTINFO message for seqno %llu [0x%llx]\n",
+		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_NEED_HISTINFO message for seqno "INT8_FMT" "INT8_FMTX"\n",
 			need_histinfo_seqno, need_histinfo_seqno);
 	} else if (0 < strm_index)
 	{	/* Receiver side is supplementary but Source side is a non-supplementary instance */
 		assert(INVALID_SUPPL_STRM == need_histinfo_strm_num);
 		assert(INVALID_HISTINFO_NUM == need_histinfo_num);
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_NEED_HISTINFO message for Stream %d : Seqno %llu [0x%llx]\n",
-			strm_index, need_histinfo_seqno, need_histinfo_seqno);
+		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_NEED_HISTINFO message for Stream %d : Seqno "
+			INT8_FMT" "INT8_FMTX"\n", strm_index, need_histinfo_seqno, need_histinfo_seqno);
 		need_histinfo_strm_num = strm_index;
 	} else
 	{	/* Both receiver and source sides are supplementary instances */
@@ -2424,7 +2465,7 @@ STATICFNDEF void	gtmrecv_process_need_histinfo_msg(repl_needhistinfo_msg_ptr_t n
 		assert(INVALID_SUPPL_STRM != need_histinfo_strm_num);
 		if (INVALID_HISTINFO_NUM == need_histinfo_num)
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_NEED_HISTINFO message for Stream %d : "
-				"Seqno %llu [0x%llx]\n", need_histinfo_strm_num, need_histinfo_seqno, need_histinfo_seqno);
+				"Seqno "INT8_FMT" "INT8_FMTX"\n", need_histinfo_strm_num, need_histinfo_seqno, need_histinfo_seqno);
 		else
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_NEED_HISTINFO message for History Number %d\n",
 				need_histinfo_num);
@@ -2447,7 +2488,7 @@ STATICFNDEF void	gtmrecv_process_need_histinfo_msg(repl_needhistinfo_msg_ptr_t n
 		{	/* The history record needs to be found in the receiver side instance file */
 			repl_log(gtmrecv_log_fp, TRUE, TRUE,
 				"Searching for the desired history in the replication instance file\n");
-			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+			grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
 			GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 				/* above macro will "return" if repl_connection_reset OR gtmrecv_wait_for_jnl_seqno is set */
 			status = repl_inst_histinfo_get(need_histinfo_num, histinfo);
@@ -2474,7 +2515,7 @@ STATICFNDEF void	gtmrecv_process_need_histinfo_msg(repl_needhistinfo_msg_ptr_t n
 	} else
 	{
 		first_unprocessed_seqno = recvpool.upd_proc_local->read_jnl_seqno;
-		repl_log(gtmrecv_log_fp, TRUE, FALSE, "Update process has processed upto seqno %llu [0x%llx]\n",
+		repl_log(gtmrecv_log_fp, TRUE, FALSE, "Update process has processed upto seqno "INT8_FMT" "INT8_FMTX"\n",
 			first_unprocessed_seqno, first_unprocessed_seqno);
 		suppl_propagate_primary = remote_side->is_supplementary;
 		if (!suppl_propagate_primary)
@@ -2482,13 +2523,12 @@ STATICFNDEF void	gtmrecv_process_need_histinfo_msg(repl_needhistinfo_msg_ptr_t n
 		else
 			last_valid_histinfo_seqno = recvpool_ctl->last_valid_strm_histinfo[0].start_seqno;
 		repl_log(gtmrecv_log_fp, TRUE, TRUE,
-			"Starting seqno of the last valid history in the receive pool is %llu [0x%llx]\n",
+			"Starting seqno of the last valid history in the receive pool is "INT8_FMT" "INT8_FMTX"\n",
 			last_valid_histinfo_seqno, last_valid_histinfo_seqno);
 		if (last_valid_histinfo_seqno >= first_unprocessed_seqno)
 			last_unprocessed_histinfo_seqno = last_valid_histinfo_seqno;
 		else
 			last_unprocessed_histinfo_seqno = MAX_SEQNO;
-		assert(last_valid_histinfo_seqno < need_histinfo_seqno);
 		if (last_unprocessed_histinfo_seqno && (need_histinfo_seqno > last_unprocessed_histinfo_seqno))
 		{
 			/* NOTE0: The source server is requesting histinfo information for a seqno whose corresponding
@@ -2537,7 +2577,7 @@ STATICFNDEF void	gtmrecv_process_need_histinfo_msg(repl_needhistinfo_msg_ptr_t n
 			assert(NULL != jnlpool.jnlpool_dummy_reg);
 			repl_log(gtmrecv_log_fp, TRUE, TRUE,
 				"Searching for the desired history in the replication instance file\n");
-			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+			grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
 			GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 			status = repl_inst_wrapper_histinfo_find_seqno(need_histinfo_seqno, need_histinfo_strm_num, histinfo);
 			rel_lock(jnlpool.jnlpool_dummy_reg);
@@ -2667,7 +2707,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 		assert((!jnlpool_ctl->upd_disabled && jnlpool.repl_inst_filehdr->is_supplementary)
 			|| (recvpool_ctl->jnl_seqno >= jnlpool_ctl->jnl_seqno));
 		assert(request_from);
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Requesting transactions from JNL_SEQNO %llu [0x%llx]\n",
+		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Requesting transactions from JNL_SEQNO "INT8_FMT" "INT8_FMTX"\n",
 			request_from, request_from);
 		/* Send (re)start JNL_SEQNO to Source Server.
 		 * Note that even though we might know the endianness of the source side at this time, we still send this
@@ -2680,7 +2720,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 		 * AND the source is cross-endian. In that case, the pre-V55000 source does not know to handle a
 		 * receiver-side-native-endian format message. So endian convert the message only in this case.
 		 */
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Sending REPL_START_JNL_SEQNO message with seqno %llu [0x%llx]\n",
+		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Sending REPL_START_JNL_SEQNO message with seqno "INT8_FMT" "INT8_FMTX"\n",
 			request_from, request_from);
 		send_cross_endian = (remote_side->endianness_known && remote_side->cross_endian
 						&& (REPL_PROTO_VER_SUPPLEMENTARY > remote_side->proto_ver));
@@ -2803,7 +2843,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 		buff_unprocessed += recvd_len;
 		repl_recv_data_recvd += (qw_num)recvd_len;
 		if (gtmrecv_logstats)
-			repl_log(gtmrecv_statslog_fp, FALSE, FALSE, "Recvd : %d  Total : %d\n", recvd_len, repl_recv_data_recvd);
+			repl_log(gtmrecv_log_fp, FALSE, FALSE, "Recvd : %d  Total : %d\n", recvd_len, repl_recv_data_recvd);
 		while (msghdrlen <= buff_unprocessed)
 		{
 			if (0 == data_len)
@@ -2965,7 +3005,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 								(uchar_ptr_t)&heartbeat.ack_seqno[0], SIZEOF(seq_num));
 							 ack_seqno = GTM_BYTESWAP_64(temp_ack_seqno);
 						}
-						REPL_DPRINT4("HEARTBEAT received with time %ld SEQNO %llu at %ld\n",
+						REPL_DPRINT4("HEARTBEAT received with time %ld SEQNO "INT8_FMT" at %ld\n",
 							     ack_time, ack_seqno, time(NULL));
 						ack_seqno = upd_proc_local->read_jnl_seqno;
 						if (!remote_side->cross_endian)
@@ -2989,7 +3029,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
 						}
 						CHECK_REPL_SEND_LOOP_ERROR(status, "REPL_HEARTBEAT");
-						REPL_DPRINT4("HEARTBEAT sent with time %ld SEQNO %llu at %ld\n",
+						REPL_DPRINT4("HEARTBEAT sent with time %ld SEQNO "INT8_FMT" at %ld\n",
 							     ack_time, ack_seqno, time(NULL));
 					}
 					break;
@@ -3028,7 +3068,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						memset(&old_instinfo_msg, 0, SIZEOF(old_instinfo_msg));
 						memcpy(old_instinfo_msg.instname,
 							jnlpool.repl_inst_filehdr->inst_info.this_instname, MAX_INSTNAME_LEN - 1);
-						GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+						grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
 						GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 						old_instinfo_msg.was_rootprimary = (unsigned char)repl_inst_was_rootprimary();
 						rel_lock(jnlpool.jnlpool_dummy_reg);
@@ -3234,7 +3274,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						 * database file headers henceforth controls whether this instance can
 						 * be brought up as a tertiary or not. Flush changes to file on disk.
 						 */
-						GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+						grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
 						GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
 						jnlpool.repl_inst_filehdr->was_rootprimary = FALSE;
 						repl_inst_flush_filehdr();
@@ -3264,7 +3304,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					{
 						repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_ROLLBACK_FIRST message. "
 							"Secondary is out of sync with the primary. "
-							"Secondary at %llu [0x%llx], Primary at %llu [0x%llx]. "
+							"Secondary at "INT8_FMT" "INT8_FMTX", Primary at "INT8_FMT" "INT8_FMTX". "
 							"Do ROLLBACK FIRST\n",
 							request_from, request_from, recvd_jnl_seqno, recvd_jnl_seqno);
 						if (gtmrecv_options.autorollback)
@@ -3284,22 +3324,28 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 								gtmrecv_autoshutdown(); /* should not return */
 								assert(FALSE);
 							}
-							GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
-							GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED; /* No return */
-							rel_lock(jnlpool.jnlpool_dummy_reg); /* in PRO just in case */
+							grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+							GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
+							/* The ONLINE ROLLBACK did not change the physical or the logical state as
+							 * otherwise the above macro would have returned to the caller. But, since
+							 * we have already disconnected the connection by now, we cannot resume the
+							 * flow from this point on. So, go ahead and release the lock and shutdown
+							 * the Receiver Server.
+							 */
+							rel_lock(jnlpool.jnlpool_dummy_reg);
 						} else
 						{
 							repl_log(gtmrecv_log_fp, TRUE, TRUE, "Receiver was not started with "
 									"-AUTOROLLBACK. Manual ROLLBACK required. Shutting down\n");
-							gtmrecv_autoshutdown();	/* should not return */
 						}
+						gtmrecv_autoshutdown();	/* should not return */
 						assert(FALSE);
 						break;
 					}
 					/* Handle REPL_WILL_RESTART_WITH_INFO case now */
 					assert(REPL_WILL_RESTART_WITH_INFO == msg_type);
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_WILL_RESTART_WITH_INFO message"
-							" with seqno %llu [0x%llx]\n", recvd_jnl_seqno, recvd_jnl_seqno);
+							" with seqno "INT8_FMT" "INT8_FMTX"\n", recvd_jnl_seqno, recvd_jnl_seqno);
 					remote_side->jnl_ver = start_msg->jnl_ver;
 					remote_jnl_ver = remote_side->jnl_ver;
 					REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n",
@@ -3379,7 +3425,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							SHM_WRITE_MEMORY_BARRIER;
 							recvpool.upd_proc_local->read_jnl_seqno = recvd_jnl_seqno;
 							repl_log(gtmrecv_log_fp, TRUE, TRUE, "Wrote upd_proc_local->read_jnl_seqno"
-								" : %llu [0x%llx]\n", recvd_jnl_seqno, recvd_jnl_seqno);
+								" : "INT8_FMT" "INT8_FMTX"\n", recvd_jnl_seqno, recvd_jnl_seqno);
 							/* If -NORESYNC was used in receiver startup, we dont want to use it
 							 * anymore as future such connections could cause recvpool_ctl->jnl_seqno
 							 * to be reset further backwards and will confuse the update process.

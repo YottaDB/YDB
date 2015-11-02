@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,9 +48,13 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
 GBLREF block_id 	patch_curr_blk;
 GBLREF char 		patch_comp_key[MAX_KEY_SZ + 1];
-GBLREF unsigned char 	patch_comp_count;
+GBLREF unsigned short 	patch_comp_count;
 GBLREF cw_set_element   cw_set[];
 GBLREF unsigned char	*non_tp_jfb_buff_ptr;
+
+error_def(ERR_DBRDONLY);
+error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DSEFAIL);
 
 void dse_rmrec(void)
 {
@@ -60,13 +64,10 @@ void dse_rmrec(void)
 	int4		count;
 	uchar_ptr_t	lbp, b_top, rp, r_top, key_top, rp_base;
 	char		comp_key[MAX_KEY_SZ + 1];
-	unsigned char	cc, cc_base;
+	unsigned short	cc, cc_base;
+	int		tmp_cmpc;
 	short int	size, i, rsize;
 	srch_blk_status	blkhist;
-
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_DSEBLKRDFAIL);
-	error_def(ERR_DSEFAIL);
 
         if (gv_cur_region->read_only)
                 rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
@@ -159,10 +160,10 @@ void dse_rmrec(void)
 				if (!*key_top++ && !*key_top++)
 					break;
 		}
-		if (((rec_hdr_ptr_t)rp)->cmpc > patch_comp_count)
+		if (EVAL_CMPC((rec_hdr_ptr_t)rp) > patch_comp_count)
 			cc = patch_comp_count;
 		else
-			cc = ((rec_hdr_ptr_t)rp)->cmpc;
+			cc = EVAL_CMPC((rec_hdr_ptr_t)rp);
 		size = key_top - rp - SIZEOF(rec_hdr);
 		if (size > SIZEOF(patch_comp_key) - 2 - cc)
 			size = SIZEOF(patch_comp_key) - 2 - cc;
@@ -178,11 +179,11 @@ void dse_rmrec(void)
 		size = (patch_comp_count < cc_base) ? patch_comp_count : cc_base;
 		for (i = 0; i < size && patch_comp_key[i] == comp_key[i]; i++)
 			;
-		((rec_hdr_ptr_t)rp_base)->cmpc = i;
+		SET_CMPC((rec_hdr_ptr_t)rp_base, i);
 		rsize = r_top - key_top + SIZEOF(rec_hdr) + patch_comp_count - i;
 		PUT_SHORT(&((rec_hdr_ptr_t)rp_base)->rsiz, rsize);
 		memcpy(rp_base + SIZEOF(rec_hdr), &patch_comp_key[i], patch_comp_count - i);
-		memcpy(rp_base + SIZEOF(rec_hdr) + patch_comp_count - i, key_top, b_top - key_top);
+		memmove(rp_base + SIZEOF(rec_hdr) + patch_comp_count - i, key_top, b_top - key_top);
 		((blk_hdr_ptr_t)lbp)->bsiz = (unsigned int)(rp_base + rsize - lbp + b_top - r_top);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + SIZEOF(blk_hdr), ((blk_hdr_ptr_t)lbp)->bsiz - SIZEOF(blk_hdr));

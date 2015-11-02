@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -148,6 +148,7 @@ typedef struct socket_struct_type
         int                             handle_len;
 	int				bufsiz;				/* OS internal buffer size */
         int	  	                n_delimiter;
+	int				last_recv_errno;
         mstr                            delimiter[MAX_N_DELIMITER];
         mstr                            idelimiter[MAX_N_DELIMITER];
 	mstr				odelimiter0;

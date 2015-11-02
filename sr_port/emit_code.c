@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,11 +25,11 @@
 #include "vxt.h"
 #include "cgp.h"
 #include "obj_gen.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "obj_file.h"
 #include "list_file.h"
 #include "min_max.h"
-#include "emit_code.h"
+#include <emit_code.h>
 #ifdef UNIX
 #include "xfer_enum.h"
 #endif
@@ -121,6 +121,10 @@ static boolean_t ocnt_ref_seen = FALSE;
 static oprtype	*ocnt_ref_opr;
 static triple	*current_triple;
 
+error_def(ERR_MAXARGCNT);
+error_def(ERR_SRCNAM);
+error_def(ERR_UNIMPLOP);
+
 void trip_gen (triple *ct)
 {
 	oprtype		**sopr, *opr;	/* triple operand */
@@ -135,13 +139,9 @@ void trip_gen (triple *ct)
 	short		repcnt;
 	int		off;
 
-	error_def	(ERR_UNIMPLOP);
-	error_def	(ERR_MAXARGCNT);
-
 #	if !defined(TRUTH_IN_REG) && (!(defined(__osf__) || defined(__x86_64__) || defined(Linux390)))
 	GTMASSERT;
 #	endif
-
 	DEBUG_ONLY(opcode_emitted = FALSE);
 	current_triple = ct;	/* save for possible use by internal rtns */
 	tp = ttt[ct->opcode];
@@ -150,11 +150,9 @@ void trip_gen (triple *ct)
 		stx_error(ERR_UNIMPLOP);
 		return;
 	}
-
 	code_idx = 0;
 	vax_pushes_seen = 0;
 	vax_number_of_arguments = 0;
-
 	if (cg_phase_last != cg_phase)
 	{
 		cg_phase_last = cg_phase;
@@ -163,7 +161,6 @@ void trip_gen (triple *ct)
 		else
 			reset_push_list_ptr();
 	}
-
 	code_reference = ct->rtaddr;
 	oct = oc_tab[ct->opcode].octype;
 	sopr = &saved_opr[0];
@@ -185,7 +182,6 @@ void trip_gen (triple *ct)
 		opr++;
 	}
 	*sopr = 0;
-
 	jmp_offset = 0;
 	if (oct & OCT_JUMP || ct->opcode == OC_LDADDR || ct->opcode == OC_FORLOOP)
 	{
@@ -268,7 +264,6 @@ void trip_gen (triple *ct)
 		tsp = &ttt[tp];
 	} else
 		tsp = &ttt[tp];
-
 	for (;  *tsp != VXT_END;)
 	{
 		if (*tsp == VXT_IREPAB || *tsp == VXT_IREPL)
@@ -282,7 +277,6 @@ void trip_gen (triple *ct)
 				assert(irep_opr->oprclass == TRIP_REF);
 				irep_opr = &irep_opr->oprval.tref->operand[1];
 			}
-
 			if (irep_opr->oprclass == TRIP_REF)
 			{
 				repl = tsp;
@@ -308,9 +302,8 @@ void trip_gen (triple *ct)
 			if (cg_phase == CGP_ASSEMBLY)
 				emit_asmlist(ct);
 #			endif
-		}/* else */
-	}/* for */
-
+		} /* else */
+	} /* for */
 	if (cg_phase == CGP_APPROX_ADDR)
 		if (vax_pushes_seen > 0)
 			add_to_vax_push_list(vax_pushes_seen);
@@ -368,7 +361,6 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	int		branch_idx, branch_offset, loop_top_idx, instr;
 
 	code_idx = 0;
-
 	switch (cg_phase)
 	{
 		case CGP_ASSEMBLY:
@@ -415,7 +407,6 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 				case VXI_BLBS:
 					assert(*inst == VXT_REG);
 					inst++;
-
 #					ifdef TRUTH_IN_REG
 					reg = GTM_REG_CODEGEN_TEMP;
 					NON_GTM64_ONLY(GEN_LOAD_WORD(reg, gtm_reg(*inst++), 0);)
@@ -448,7 +439,6 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 				case VXI_BRW:
 					emit_jmp(GENERIC_OPCODE_BR, &inst, 0);
 					break;
-
 				case VXI_BICB2:
 #					ifdef TRUTH_IN_REG
 					GEN_CLEAR_TRUTH;
@@ -590,7 +580,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					assert(*inst == VXT_XFER);
 					inst++;
 					emit_call_xfer((int)*inst++);
-				/* Callee may have popped some values so we can't count on anything left on the stack. */
+					/* Callee may have popped some values so we can't count on anything left on the stack. */
 					stack_depth = 0;
 					break;
 				case VXI_MOVAB:
@@ -626,7 +616,6 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						its present size and affect other platforms some day, We put the whole code gen
 						thing in a loop so we can do this regardless of how big it gets.
 					*/
-
 					assert(*inst == VXT_LIT);
 					inst += 2;
 					assert(*inst == VXT_VAL);
@@ -635,7 +624,6 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					assert(*inst == VXT_VAL);
 					inst++;
 					emit_trip(*(fst_opr + *inst++), TRUE, GENERIC_OPCODE_LDA, MOVC3_TRG_REG);
-
 #					if defined(__MVS__) || defined(Linux390)
 					/* The MVC instruction on zSeries facilitates memory copy(mval in this case) in a single
 					 * instruction instead of multiple 8/4 byte copies.
@@ -868,10 +856,8 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 	assert((jmp_offset & 3) == 0);
 #	endif
 	branch_offset = jmp_offset / INST_SIZE;
-
 	/* Some platforms have a different origin for the offset */
 	EMIT_JMP_ADJUST_BRANCH_OFFSET;
-
 	switch (cg_phase)
 	{
 #		ifdef DEBUG
@@ -954,7 +940,6 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 						code_buf[code_idx++] = GENERIC_OPCODE_NOP;
 						branch_offset--;
 #					endif
-
 				}
 				if (EMIT_JMP_LONG_CODE_CHECK)
 				{ /* This is more common unconditional branch generation and should be mutually
@@ -1015,7 +1000,6 @@ void	emit_pcrel(void)
 	int branch_offset;
 
 	jmp_offset -= INTCAST((char *)&code_buf[code_idx] - (char *)&code_buf[0]);
-
 	switch (cg_phase)
 	{
 #		ifdef DEBUG
@@ -1054,9 +1038,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 	triple		*ct;
 	int		low, extra, high;
 	GTM64_ONLY(int	next_ptr_offset = 8;)
-
-	error_def(ERR_SRCNAM);
-
 	if (opr->oprclass == TRIP_REF)
 	{
 		ct = opr->oprval.tref;
@@ -1064,7 +1045,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 			opr = &ct->destination;
 		/* else lit or error */
 	}
-
 	inst_emitted = FALSE;
 	switch (cg_phase)
 	{
@@ -1079,7 +1059,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					{
 						case OC_LIT:
 							assert(ct->operand[0].oprclass == MLIT_REF);
-
 							if (run_time)
 								reg = GTM_REG_PV;
 							else
@@ -1216,7 +1195,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						}
 					}
 					break;
-
 				case OCNT_REF:
 					/* This ref's value is calculated in emit_call_xfer(). This value is related to TSIZ_REF
 					   in that it is used for the same reason to different calls (op_call, op_callsp,
@@ -1323,7 +1301,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							break;
 					}
 					break;
-
 				case TINT_REF:
 				case TVAL_REF:
 					assert(val_output);
@@ -1360,7 +1337,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					)
 					emit_base_offset(GTM_REG_FRAME_TMP_PTR, offset);
 					break;
-
 				case TCAD_REF:
 				case TVAD_REF:
 				case TVAR_REF:
@@ -1405,7 +1381,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							REVERT_GENERICINST_TO_WORD(generic_inst);
 						}
 					)
-
 					emit_base_offset(reg, offset);
 					if (val_output)	/* indirection */
 					{
@@ -1430,7 +1405,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						}
 					}
 					break;
-
 				case OCNT_REF:
 					immediate = opr->oprval.offset;
 					assert(0 < immediate);
@@ -1498,7 +1472,13 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							break;
 						case OC_TRIPSIZE:
 							immediate = ct->operand[0].oprval.tsize->size;
+#							if !defined(__osf__) && !defined(__hppa)
+							/* Legitimate but odd call to next M line on Tru64 and HPUX-HPPA gives an
+							 * immediate value of zero because of how offsets are calculated on
+							 * these platforms so bypass the assert for them.
+							 */
 							assert(0 < immediate);
+#							endif
 							assert(MAX_BRANCH_CODEGEN_SIZE > immediate);
 							EMIT_TRIP_ILIT_GEN;
 							inst_emitted = TRUE;
@@ -1508,7 +1488,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							break;
 					}
 					break;
-
 				case TINT_REF:
 				case TVAL_REF:
 					assert(val_output);
@@ -1528,7 +1507,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					)
 					emit_base_offset(GTM_REG_FRAME_TMP_PTR, offset);
 					break;
-
 				case TCAD_REF:
 				case TVAD_REF:
 				case TVAR_REF:
@@ -1541,7 +1519,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							REVERT_GENERICINST_TO_WORD(generic_inst);
 						}
 					)
-
 					NON_GTM64_ONLY(
 						if (offset < 0 || offset > MAX_OFFSET)
 							GTMASSERT;
@@ -1573,7 +1550,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						}
 					}
 					break;
-
 				case OCNT_REF:
 					immediate = opr->oprval.offset;
 					assert(0 <= immediate);
@@ -1583,7 +1559,6 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					ocnt_ref_seen = TRUE;
 					ocnt_ref_opr = opr;
 					break;
-
 				default:
 					GTMASSERT;
 					break;
@@ -1647,18 +1622,15 @@ int	get_arg_reg(void)
 			else
 				arg_reg_i = GTM_REG_ACCUM;
 			break;
-
 		case	CGP_ASSEMBLY:
 		case	CGP_MACHINE:
 			if (vax_pushes_seen == 0)	/* first push of a series */
 				vax_number_of_arguments = next_vax_push_list();
-
 			if (vax_number_of_arguments <= MACHINE_REG_ARGS)
 				arg_reg_i = GET_ARG_REG(vax_number_of_arguments - 1);
 			else
 				arg_reg_i = GTM_REG_ACCUM;
 			break;
-
 		default:
 			GTMASSERT;
 			break;
@@ -1686,7 +1658,6 @@ int	gtm_reg(int vax_reg)
 		case 9:
 			reg = GTM_REG_FRAME_TMP_PTR;
 			break;
-
 #		ifdef TRUTH_IN_REG
 		case 10:
 			/* The value of $TEST is maintained in r10 for the VAX GT.M
@@ -1698,7 +1669,6 @@ int	gtm_reg(int vax_reg)
 			reg = GTM_REG_DOLLAR_TRUTH;
 			break;
 #		endif
-
 		case 11:
 			reg = GTM_REG_XFER_TABLE;
 			break;
@@ -1709,7 +1679,6 @@ int	gtm_reg(int vax_reg)
 			GTMASSERT;
 			break;
 	}
-
 	return reg;
 }
 
@@ -1733,7 +1702,6 @@ void	emit_push(int reg)
 				)
 			}
 			break;
-
 		case CGP_ASSEMBLY:
 		case CGP_MACHINE:
 			if (vax_number_of_arguments <= MACHINE_REG_ARGS)
@@ -1745,12 +1713,10 @@ void	emit_push(int reg)
 				GEN_STORE_ARG(reg, stack_offset);	/* Store arg on stack */
 			}
 			break;
-
 		default:
 			GTMASSERT;
 			break;
 	}
-
 	if (cg_phase == CGP_MACHINE || cg_phase == CGP_ASSEMBLY)
 	{
 		vax_number_of_arguments--;		/* actually, it's the number of arguments remaining */
@@ -1776,13 +1742,9 @@ void	emit_pop(int count)
 
 
 void	add_to_vax_push_list(int pushes_seen)
-{
-	error_def(ERR_MAXARGCNT);
-
-	/* Make sure there's enough room */
+{	/* Make sure there's enough room */
 	if (pushes_seen > MAX_ARGS)
 		rts_error(VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS);
-
 	push_list_index++;
 	if (push_list_index >= PUSH_LIST_SIZE)
 	{
@@ -1808,7 +1770,6 @@ int	next_vax_push_list(void)
 			GTMASSERT;
 		current_push_list_ptr = current_push_list_ptr->next;
 	}
-
 	return (current_push_list_ptr->value[push_list_index]);
 }
 
@@ -1860,7 +1821,6 @@ void	emit_call_xfer(int xfer)
 		*obpt++ = ' ';
 	}
 #	endif
-
 	assert(0 == (xfer & 0x3));
 	offset = (int)(xfer / SIZEOF(char *));
 #	ifdef __x86_64__
@@ -1872,7 +1832,6 @@ void	emit_call_xfer(int xfer)
 		GEN_LOAD_IMMED(I386_REG_RAX, 0);
 	}
 #	endif /* __x86_64__ */
-
 #	ifdef __ia64
         if (GTM_ASM_RTN == xfer_table_desc[offset])
         {
@@ -1889,7 +1848,6 @@ void	emit_call_xfer(int xfer)
 	/* In the normal case we will return */
 	if (!ocnt_ref_seen)
 		return;		/* fast test for return .. we hope */
-
 	/* If ocnt_ref_seen is set, then we need to compute the value to be used by a recent
 		OCNT_REF parameter. This parameter is (currently as of 6/2003) used by op_call, op_callsp,
 		op_forlcldo, and their mprof counterparts and is the number of bytes those entry points

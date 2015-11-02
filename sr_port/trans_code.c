@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
 
 #include "error.h"
 #include "indir_enum.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "stringpool.h"
@@ -56,9 +56,7 @@ GBLREF mval		dollar_etrap;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*restart_pc, *restart_ctxt;
-#ifdef UNIX
 GBLREF	io_desc		*gtm_err_dev;
-#endif
 
 error_def(ERR_ASSERT);
 error_def(ERR_CTRAP);
@@ -165,13 +163,19 @@ CONDITION_HANDLER(trans_code_ch)
 		TREF(trans_code_pop) = push_mval(&dummy);
 	}
 	op_commarg(TREF(trans_code_pop), indir_goto);
-#ifdef UNIX
 	if (NULL != gtm_err_dev)
 	{
-		remove_rms(gtm_err_dev);
+		if ((gtmsocket == gtm_err_dev->type) && gtm_err_dev->newly_created)
+		{
+			assert(gtm_err_dev->state != dev_open);
+			iosocket_destroy(gtm_err_dev);
+		}
+#ifdef 	UNIX
+		if (gtmsocket != gtm_err_dev->type)
+			remove_rms(gtm_err_dev);
+#endif
 		gtm_err_dev = NULL;
 	}
-#endif
 	trans_code_finish();
 	UNWIND(NULL, NULL);
 }
@@ -210,13 +214,19 @@ void trans_code(void)
 	ESTABLISH(trans_code_ch);
 	op_commarg(TREF(trans_code_pop), ((ztrap_form & ZTRAP_CODE) || IS_ETRAP) ? indir_linetail : indir_goto);
 	REVERT;
-#	ifdef UNIX
 	if (NULL != gtm_err_dev)
 	{
-		remove_rms(gtm_err_dev);
+#		ifdef UNIX
+		if (gtmsocket != gtm_err_dev->type)
+			remove_rms(gtm_err_dev);
+#		endif
+		if ((gtmsocket == gtm_err_dev->type) && gtm_err_dev->newly_created)
+		{
+			assert(gtm_err_dev->state != dev_open);
+			iosocket_destroy(gtm_err_dev);
+		}
 		gtm_err_dev = NULL;
 	}
-#	endif
 	trans_code_finish();
 	return;
 }

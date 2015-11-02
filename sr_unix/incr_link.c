@@ -16,7 +16,7 @@
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "compiler.h"
 #include "urx.h"
 #include "objlabel.h"

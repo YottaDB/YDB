@@ -70,6 +70,7 @@ LITDEF	err_msg gdeerrors[] = {
 	"NONASCII", "!AD is illegal for a !AD as it contains non-ASCII characters", 4,
 	"CRYPTNOMM", "!AD is an encrypted database. Cannot support MM access method.", 2,
 	"JNLALLOCGROW", "Increased Journal ALLOCATION from [!AD blocks] to [!AD blocks] to match AUTOSWITCHLIMIT for !AD !AD", 8,
+	"KEYFORBLK", "But block size !AD can only support key size !AD", 4,
 };
 
 LITDEF	int GDE_BLKSIZ512 = 150503435;
@@ -129,9 +130,10 @@ LITDEF	int GDE_WRITEERROR = 150503859;
 LITDEF	int GDE_NONASCII = 150503866;
 LITDEF	int GDE_CRYPTNOMM = 150503874;
 LITDEF	int GDE_JNLALLOCGROW = 150503883;
+LITDEF	int GDE_KEYFORBLK = 150503891;
 
 GBLDEF	err_ctl gdeerrors_ctl = {
 	248,
 	"GDE",
 	&gdeerrors[0],
-	57};
+	58};

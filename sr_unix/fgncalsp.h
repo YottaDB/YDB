@@ -141,7 +141,7 @@ typedef struct parmblk_struct
 	lv_val	*args[MAX_ACTUALS];
 } parmblk_struct;
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 
 /* function prototypes */
 void_ptr_t	fgn_getpak(char *pak_name, int msgtype);

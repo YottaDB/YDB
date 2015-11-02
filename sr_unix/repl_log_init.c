@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,28 +37,25 @@
 #endif
 
 GBLDEF int		gtmsource_log_fd = FD_INVALID;
-GBLDEF int		gtmsource_statslog_fd = FD_INVALID;
 GBLDEF int		gtmrecv_log_fd = FD_INVALID;
-GBLDEF int		gtmrecv_statslog_fd = FD_INVALID;
 GBLDEF int		updproc_log_fd = FD_INVALID;
 GBLDEF int		updhelper_log_fd = FD_INVALID;
 
 GBLDEF FILE		*gtmsource_log_fp = NULL;
-GBLDEF FILE		*gtmsource_statslog_fp = NULL;
 GBLDEF FILE		*gtmrecv_log_fp = NULL;
-GBLDEF FILE		*gtmrecv_statslog_fp = NULL;
 GBLDEF FILE		*updproc_log_fp = NULL;
 GBLDEF FILE		*updhelper_log_fp = NULL;
 
+error_def(ERR_REPLLOGOPN);
+error_def(ERR_TEXT);
+error_def(ERR_REPLEXITERR);
+ZOS_ONLY(error_def(ERR_BADTAG);)
 int repl_log_init(repl_log_file_t log_type,
 		  int *log_fd,
-		  int *stats_fd,
-		  char *log,
-		  char *stats_log)
+		  char *log)
 {
 	/* Open the log file */
-
-	char	log_file_name[MAX_FN_LEN + 1], *err_code;
+	char log_file_name[MAX_FN_LEN + 1], *err_code;
 	int	tmp_fd;
 	int	save_errno;
 	int	stdout_status, stderr_status;
@@ -68,55 +65,31 @@ int repl_log_init(repl_log_file_t log_type,
 	int		realfiletag;
 	struct stat     info;
 #endif
-	error_def(ERR_REPLLOGOPN);
-	error_def(ERR_TEXT);
-	ZOS_ONLY(error_def(ERR_BADTAG);)
-
 	if (*log == '\0')
 		return(EREPL_LOGFILEOPEN);
 
 	strcpy(log_file_name, log);
-	if (log_type == REPL_STATISTICS_LOG)
-	{
-		if (strcmp(log_file_name, stats_log) != 0)
-			strcpy(log_file_name, stats_log);
-		else
-		{
-			*stats_fd = *log_fd;
-			return(SS_NORMAL);
-		}
-	}
-
 	ZOS_ONLY(STAT_FILE(log_file_name, &info, status);)
 	OPENFILE3(log_file_name, O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH, tmp_fd);
 	if (tmp_fd < 0)
 	{
-		if ((REPL_GENERAL_LOG == log_type) && (FD_INVALID == *log_fd) || (FD_INVALID == *stats_fd))
+		if ((REPL_GENERAL_LOG == log_type) && (FD_INVALID == *log_fd))
 		{
 			save_errno = ERRNO;
 			err_code = STRERROR(save_errno);
-			send_msg(VARLSTCNT(8) ERR_REPLLOGOPN, 6,
-			 	 LEN_AND_STR(log_file_name),
-				 LEN_AND_STR(err_code),
-				 LEN_AND_STR(NULL_DEVICE));
+			gtm_putmsg(VARLSTCNT(8) ERR_REPLLOGOPN, 6, LEN_AND_STR(log_file_name),
+				   LEN_AND_STR(err_code),LEN_AND_STR(NULL_DEVICE));
 			strcpy(log_file_name, NULL_DEVICE);
 			if (log_type == REPL_GENERAL_LOG)
-				strcpy(log, log_file_name);
-			else
-				strcpy(stats_log, log_file_name);
+				strcpy(log, NULL_DEVICE);
 			OPENFILE(log_file_name, O_RDWR, tmp_fd); /* Should not fail */
+			exit(EREPL_LOGFILEOPEN);
 		} else
 		{
 			save_errno = ERRNO;
 			err_code = STRERROR(save_errno);
-			gtm_putmsg(VARLSTCNT(8) ERR_REPLLOGOPN, 6,
-			 	   LEN_AND_STR(log_file_name),
-				   LEN_AND_STR(err_code),
-				   (log_type == REPL_GENERAL_LOG) ?
-				   strlen(log) : strlen(stats_log),
-				   (log_type == REPL_GENERAL_LOG) ?
-				   log : stats_log);
-
+			gtm_putmsg(VARLSTCNT(8) ERR_REPLLOGOPN, 6, LEN_AND_STR(log_file_name),
+				   LEN_AND_STR(err_code), LEN_AND_STR(log));
 			return(EREPL_LOGFILEOPEN);
 		}
 	}
@@ -166,19 +139,11 @@ int repl_log_init(repl_log_file_t log_type,
 			gtm_putmsg(VARLSTCNT(10) ERR_REPLLOGOPN, 6,
 			 	   LEN_AND_STR(log_file_name),
 				   LEN_AND_STR(err_code),
-				   (log_type == REPL_GENERAL_LOG) ?
-				   strlen(log) : strlen(stats_log),
-				   (log_type == REPL_GENERAL_LOG) ?
-				   log : stats_log,
+				   strlen(log),
+				   log,
 				   ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in dup2"));
 		}
-	} else
-	{
-		if (FD_INVALID != *stats_fd)
-			CLOSEFILE_RESET(*stats_fd, rc);	/* resets "*stats_fd" to FD_INVALID */
-		*stats_fd = tmp_fd;
 	}
-
 	return(SS_NORMAL);
 }
 

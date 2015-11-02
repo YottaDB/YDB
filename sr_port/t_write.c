@@ -43,6 +43,8 @@ GBLREF	unsigned int	t_tries;
 GBLREF	boolean_t	horiz_growth;
 GBLREF	int4		prev_first_off, prev_next_off;
 GBLREF	boolean_t	mu_reorg_process;
+GBLREF	boolean_t	dse_running;
+GBLREF 	jnl_gbls_t	jgbl;
 
 cw_set_element *t_write (
 			srch_blk_status	*blkhist,	/* Search History of the block to be written. Currently the
@@ -193,11 +195,17 @@ cw_set_element *t_write (
 		/* the buffer in shared memory holding the GDS block contents currently does not have in its block header the
 		 * on-disk format of that block. if it had, we could have easily copied that over to the cw-set-element.
 		 * until then, we have to use the cache-record's field "ondsk_blkver". but the cache-record is available only in BG.
-		 * thankfully, in MM, we do not allow GDSV4 type blocks, so we can safely assign GDSV5 (or GDSVCURR) to this field.
+		 * thankfully, in MM, we do not allow GDSV4 type blocks, so we can safely assign GDSV6 (or GDSVCURR) to this field.
 		 */
 		cr = blkhist->cr;
 		assert((NULL != cr) || (dba_mm == csa->hdr->acc_meth));
 		cse->ondsk_blkver = (NULL == cr) ? GDSVCURR : cr->ondsk_blkver;
+		/* For uninitialized gv_target, initialize the in_tree status as IN_DIR_TREE */
+		assert (NULL != gv_target || dse_running || jgbl.forw_phase_recovery);
+		if (NULL == gv_target || 0 == gv_target->root)
+			SET_DIR_TREE(cse);
+		else
+			(DIR_ROOT == gv_target->root)? SET_DIR_TREE(cse) : SET_GV_TREE(cse);
 	} else
 	{	/* we did not create a new cse. assert the integrity of few fields filled in when this cse was created */
 		assert(cse->blk == blk);
@@ -219,7 +227,8 @@ cw_set_element *t_write (
 	cse->index = index;
 	cse->reference_cnt = 0;
 	cse->level = level;
-	cse->was_free = FALSE; /* t_write operates on BUSY blocks and hence cse->was_free is set to FALSE unconditionally */
+	/* t_write operates on BUSY blocks and hence cse->blk_prior_state's free_status is set to FALSE unconditionally */
+	SET_NFREE(cse);
 	if (horiz_growth)
 		cse->first_copy = TRUE;
 	else

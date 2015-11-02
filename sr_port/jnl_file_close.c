@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,7 @@
 #include "performcaslatchcheck.h"
 #include "wcs_sleep.h"
 #include "gt_timer.h"
+#include "wbox_test_init.h"
 #elif defined(VMS)
 #include <rms.h>
 #include <iodef.h>
@@ -47,6 +48,7 @@
 #include "ccp.h"
 #include "send_msg.h"
 #include "eintr_wrappers.h"
+#include "anticipatory_freeze.h"
 
 #ifdef UNIX
 #include "wcs_clean_dbsync.h"
@@ -57,9 +59,11 @@ GBLREF	short	astq_dyn_avail;
 static	const	unsigned short	zero_fid[3];
 #endif
 
-#ifdef UNIX
-GBLREF 	jnl_gbls_t	jgbl;
+#ifdef DEBUG
+GBLREF	boolean_t		ok_to_UNWIND_in_exit_handling;
 #endif
+
+GBLREF 	jnl_gbls_t	jgbl;
 
 error_def(ERR_JNLCLOSE);
 error_def(ERR_JNLFLUSH);
@@ -109,7 +113,8 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_base, jnl_fs_block_size));
 	if (clean)
 	{
-		jnl_write_eof_rec(csa, &eof_record);
+		if(!jgbl.mur_extract)
+			jnl_write_eof_rec(csa, &eof_record);
 		if (SS_NORMAL != (jpc->status = jnl_flush(reg)))
 		{
 			send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
@@ -129,13 +134,16 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 		DO_FILE_READ(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 		if (SYSCALL_SUCCESS(jpc->status))
 		{
-			assert(header->end_of_data <= eof_addr);
-			header->end_of_data = eof_addr;
-			header->eov_timestamp = eof_record.prefix.time;
-			assert(header->eov_timestamp >= header->bov_timestamp);
-			header->eov_tn = eof_record.prefix.tn;
-			assert(header->eov_tn >= header->bov_tn);
-			header->end_seqno = eof_record.jnl_seqno;
+			if(!jgbl.mur_extract)
+			{
+				assert(header->end_of_data <= eof_addr);
+				header->end_of_data = eof_addr;
+				header->eov_timestamp = eof_record.prefix.time;
+				assert(header->eov_timestamp >= header->bov_timestamp);
+				header->eov_tn = eof_record.prefix.tn;
+				assert(header->eov_tn >= header->bov_tn);
+				header->end_seqno = eof_record.jnl_seqno;
+			}
 #			ifdef UNIX
 			for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 				header->strm_end_seqno[idx] = csd->strm_reg_seqno[idx];
@@ -145,14 +153,15 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 			}
 #			endif
 			header->crash = FALSE;
-			DO_FILE_WRITE(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
+			JNL_DO_FILE_WRITE(csa, csd->jnl_file_name, jpc->channel,
+				0, header, read_write_size, jpc->status, jpc->status2);
 			if (SYSCALL_ERROR(jpc->status))
 			{
 				assert(FALSE);
 				rts_error(VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
 			}
 			UNIX_ONLY(
-				GTM_FSYNC(jpc->channel, rc);
+				GTM_JNL_FSYNC(csa, jpc->channel, rc);
 				if (-1 == rc)
 				{
 					save_errno = errno;
@@ -173,13 +182,17 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 		jb->cycle++;	/* increment shared cycle so all future callers of jnl_ensure_open recognize journal switch */
 	}
 	JNL_FD_CLOSE(jpc->channel, rc);	/* sets jpc->channel to NOJNL */
+#ifdef UNIX
+	GTM_WHITE_BOX_TEST(WBTEST_ANTIFREEZE_JNLCLOSE, rc, EIO);
+#endif
 	jpc->cycle--;	/* decrement cycle so jnl_ensure_open() knows to reopen the journal */
 	VMS_ONLY(jpc->qio_active = FALSE;)
 	jpc->pini_addr = 0;
-	if (clean && (SS_NORMAL != jpc->status))
+	if (clean && (SS_NORMAL != jpc->status || SS_NORMAL != rc))
 	{
 		status = jpc->status;	/* jnl_send_oper resets jpc->status, so save it */
 		jnl_send_oper(jpc, ERR_JNLCLOSE);
+		DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE;)
 		rts_error(VARLSTCNT(5) ERR_JNLCLOSE, 2, JNL_LEN_STR(csd), status);
 	}
 }

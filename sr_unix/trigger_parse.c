@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "trigger.h"
@@ -236,6 +236,8 @@ GBLREF	boolean_t		gtm_cli_interpret_string;
 
 LITREF	unsigned char		lower_to_upper_table[];
 LITREF	mval			gvtr_cmd_mval[GVTR_CMDTYPES];
+
+error_def(ERR_INVSTRLEN);
 
 STATICFNDEF char *scan_to_end_quote(char *ptr, int len, int max_len)
 {
@@ -597,7 +599,7 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 	return !((*isolation && *noisolation) || (*consistency && *noconsistency));
 }
 
-STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, char **next_str)
+STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, char **next_str, char *out_str, int4 *out_max)
 {
 	boolean_t	alternation;
 	char		dst[MAX_GVSUBS_LEN];
@@ -626,8 +628,6 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 	uint4		subsc_count;
 	uint4		tmp_len;
 	boolean_t	valid_sub;
-
-	error_def(ERR_INVSTRLEN);
 
 	have_pattern = have_range = valid_sub = have_star = FALSE;
 	ptr = subscr_str;
@@ -963,7 +963,7 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 		util_out_print_gtmio("Too many subscripts", FLUSH);
 		return FALSE;
 	}
-	memcpy(subscr_str, dst, (int)(dst_ptr - dst));
+	CHECK_FOR_ROOM_IN_OUTPUT_AND_COPY(dst, out_str, (int)(dst_ptr - dst), *out_max);
 	*subscr_len = (uint4)(dst_ptr - dst);
 	*next_str = ptr + 1;
 	return TRUE;
@@ -1291,11 +1291,10 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 	{
 		ptr1++;
 		len--;
-		if (!process_subscripts(ptr1, &len, &ptr2))
+		if (!process_subscripts(ptr1, &len, &ptr2, values[GVSUBS_SUB], &max_output_len))
 		{
 			ERROR_MSG_RETURN("", input_len, input);
 		}
-		CHECK_FOR_ROOM_IN_OUTPUT_AND_COPY(ptr1, values[GVSUBS_SUB], len, max_output_len);
 	} else
 		len = 0;
 	if (0 > --max_output_len)

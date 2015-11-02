@@ -24,7 +24,7 @@
 #include "opcode.h"
 #include "stringpool.h"
 #include "toktyp.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"
 
 GBLREF unsigned char 		*source_buffer;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,6 @@
 #include "gvcmz.h"
 #include "copy.h"
 
-GBLREF unsigned char	*util_outptr;
 GBLREF boolean_t 	created_core;
 GBLREF boolean_t	dont_want_core;
 
@@ -42,7 +41,9 @@ void gvcmz_errmsg(struct CLB *c, bool close)
 	uint4		status;
 	cmi_descriptor	*desc;
 	link_info 	*li;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	li = (link_info *)c->usr;
 	util_out_print(NULL, RESET);
 	flush_pio();
@@ -63,8 +64,8 @@ void gvcmz_errmsg(struct CLB *c, bool close)
 	CM_GET_LONG(SEVERITY, bufptr, li->convert_byteorder);
 	bufptr += SIZEOF(SEVERITY);
 
-	memcpy(util_outptr, bufptr, msglen);
-	util_outptr += msglen;
+	memcpy(TREF(util_outptr), bufptr, msglen);
+	TREF(util_outptr) += msglen;
 	while(cont)
 	{
 		status = cmi_read(c);
@@ -81,8 +82,8 @@ void gvcmz_errmsg(struct CLB *c, bool close)
 		}
 		CM_GET_SHORT(msglen, bufptr, li->convert_byteorder);
 		bufptr += SIZEOF(short);
-		memcpy(util_outptr, bufptr, msglen);
-		util_outptr += msglen;
+		memcpy(TREF(util_outptr), bufptr, msglen);
+		TREF(util_outptr) += msglen;
 	}
 
 	if (close)

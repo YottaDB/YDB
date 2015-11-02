@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -487,11 +487,20 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 
 	if (n_io_dev_types == naml->iod->type)
 	{
-		if (isatty(file_des))
+		/* On AIX, /dev/{,*}random are of 'terminal type'.Hence define its type before
+		 * calling isatty()
+		 */
+		if ((0 == memvcmp(tn.addr, tn.len, LIT_AND_LEN("/dev/random")))
+			|| (0 == memvcmp(tn.addr, tn.len, LIT_AND_LEN("/dev/urandom"))))
+				tl->iod->type = rm;
+		else if (isatty(file_des))
 			naml->iod->type = tt;
-		else  if (char_or_block_special && file_des > 2)
-			/* assume mag tape */
-			naml->iod->type = mt;
+		else if (char_or_block_special && file_des > 2)
+			if (0 == memvcmp(tn.addr, tn.len, LIT_AND_LEN("/dev/zero")))
+				tl->iod->type = rm;
+			else
+				/* assume mag tape */
+				naml->iod->type = mt;
 		else
 			naml->iod->type = rm;
 	}
@@ -545,8 +554,18 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	status = (naml->iod->disp_ptr->open)(naml, pp, file_des, mspace, timeout);
 	if (TRUE == status)
 		naml->iod->state = dev_open;
-	else if ((dev_open == naml->iod->state) && (gtmsocket != naml->iod->type))
-		naml->iod->state = dev_closed;
+	else
+	{
+		if ((dev_open == naml->iod->state) && (gtmsocket != naml->iod->type))
+			naml->iod->state = dev_closed;
+		if((gtmsocket == naml->iod->type) && naml->iod->newly_created)
+		{
+			assert (naml->iod->state != dev_open);
+			iosocket_destroy(naml->iod);
+			active_device = 0;
+			return status;
+		}
+	}
 #ifdef __MVS__
 	d_rm_out = tl->iod->pair.out->dev_sp;
 	d_rm_in = tl->iod->pair.in->dev_sp;

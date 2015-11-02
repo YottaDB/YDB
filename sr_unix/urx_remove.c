@@ -12,7 +12,7 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "urx.h"
 
 /* Routine to run the unresolved chain in search of entries that point into the linkage section that

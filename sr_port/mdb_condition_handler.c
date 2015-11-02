@@ -42,7 +42,7 @@
 #include "io_params.h"
 #include "jnl.h"
 #include "lv_val.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "outofband.h"
 #include "stack_frame.h"
@@ -119,6 +119,7 @@ GBLREF	mval		dollar_zstatus, dollar_zerror;
 GBLREF	mval		dollar_etrap;
 GBLREF	volatile int4	gtmMallocDepth;
 GBLREF	int4		exi_condition;
+GBLREF	inctn_opcode_t	inctn_opcode;
 #ifdef VMS
 GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
 GBLREF	boolean_t		tp_restart_fail_sig_used;
@@ -137,9 +138,9 @@ GBLREF	sgm_info		*first_sgm_info;
 GBLREF	dollar_stack_type	dollar_stack;
 GBLREF	mval			*alias_retarg;
 #ifdef UNIX
-GBLREF	io_desc			*gtm_err_dev;
-GBLREF	char			*util_outptr, util_outbuff[OUT_BUFF_SIZE];
+GBLREF	jnl_gbls_t		jgbl;
 #endif
+GBLREF	io_desc			*gtm_err_dev;
 #ifdef GTM_TRIGGER
 GBLREF	int			tprestart_state;		/* When triggers restart, multiple states possible.
 								   See tp_restart.h */
@@ -243,24 +244,28 @@ CONDITION_HANDLER(mdb_condition_handler)
 	boolean_t		repeat_error, etrap_handling, reset_mpc;
 	int			level, rc;
 	lv_val			*lvptr;
+	boolean_t		reserve_sock_dev = FALSE;
 #	ifdef UNIX
 	unix_db_info		*udi;
 #	endif
 
 	START_CH;
 	DBGEHND((stderr, "mdb_condition_handler: Entered with SIGNAL=%d frame_pointer=0x"lvaddr"\n", SIGNAL, frame_pointer));
-#	ifdef UNIX
-	/* It is possible that we entered here from a bad compile of the OPEN exception handler
-	 * for an rm device.  If gtm_err_dev is still set from the previous mdb_condition_handler
-	 * invocation that drove the error handler that occurred during the OPEN command, then its
-	 * structures should be released now.
-	 */
 	if (NULL != gtm_err_dev)
 	{
-		remove_rms(gtm_err_dev);
+		/* It is possible that we entered here from a bad compile of the OPEN exception handler
+		 * for a device.  If gtm_err_dev is still set from the previous mdb_condition_handler
+	 	* invocation that drove the error handler that occurred during the OPEN command, then its
+		 * structures should be released now.
+	 	*/
+		if (gtmsocket == gtm_err_dev->type)
+			iosocket_destroy(gtm_err_dev);
+#		ifdef UNIX
+		else
+			remove_rms(gtm_err_dev);
+#		endif
 		gtm_err_dev = NULL;
 	}
-#	endif
 	if (repeat_error = (ERR_REPEATERROR == SIGNAL)) /* assignment and comparison */
 		SIGNAL = dollar_ecode.error_last_ecode;
 	preemptive_ch(SEVERITY);
@@ -303,6 +308,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 */
 	merge_args = 0;
 	TREF(in_zwrite) = FALSE;
+	inctn_opcode = inctn_invalid_op;
 	if ((SUCCESS != SEVERITY) && (INFO != SEVERITY))
 	{
 		if (lvzwrite_block)
@@ -520,7 +526,12 @@ CONDITION_HANDLER(mdb_condition_handler)
 					{
 						csa = (sgmnt_addrs *)&FILE_INFO(reg_local)->s_addrs;
 						if (csa && csa->now_crit)
+						{
+							assert(!csa->hold_onto_crit UNIX_ONLY(|| jgbl.onlnrlbk));
+							if (csa->hold_onto_crit)
+								csa->hold_onto_crit = FALSE; /* Fix it in pro */
 							rel_crit(reg_local);
+						}
 					}
 				}
 			}
@@ -629,8 +640,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 			frame_pointer->ctxt = GTM_CONTEXT(pseudo_ret);
 			frame_pointer->mpc = CODE_ADDRESS(pseudo_ret);
 		}
-		frame_pointer->flags &= SFF_TRIGR_CALLD_OFF;	/* Frame enterable now with mpc reset */
-		GTMTRIG_ONLY(DBGTRIGR((stderr, "mdb_condition_handler: turning off SFF_TRIGR_CALLD (1) in frame 0x"lvaddr"\n",
+		frame_pointer->flags &= SFF_IMPLTSTART_CALLD_OFF;	/* Frame enterable now with mpc reset */
+		GTMTRIG_ONLY(
+			DBGTRIGR((stderr, "mdb_condition_handler: turning off SFF_IMPLTSTART_CALLD_OFF (1) in frame 0x"lvaddr"\n",
 				       frame_pointer)));
 		PRN_ERROR;
 		if (io_curr_device.out != io_std_device.out)
@@ -754,8 +766,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 		{
 			frame_pointer->ctxt = GTM_CONTEXT(call_dm);
 			frame_pointer->mpc = CODE_ADDRESS(call_dm);
-			frame_pointer->flags &= SFF_TRIGR_CALLD_OFF;	/* Frame enterable now with mpc reset */
-			GTMTRIG_ONLY(DBGTRIGR((stderr, "mdb_condition_handler: turning off SFF_TRIGR_CALLD (2) in frame 0x"
+			frame_pointer->flags &= SFF_IMPLTSTART_CALLD_OFF;	/* Frame enterable now with mpc reset */
+			GTMTRIG_ONLY(DBGTRIGR((stderr, "mdb_condition_handler: turning off SFF_IMPLTSTART_CALLD (2) in frame 0x"
 					       lvaddr"\n", frame_pointer)));
 		} else
 		{
@@ -763,8 +775,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 			IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(frame_pointer);
 			frame_pointer->ctxt = GTM_CONTEXT(pseudo_ret);
 			frame_pointer->mpc = CODE_ADDRESS(pseudo_ret);
-			frame_pointer->flags &= SFF_TRIGR_CALLD_OFF;	/* Frame enterable now with mpc reset */
-			GTMTRIG_ONLY(DBGTRIGR((stderr, "mdb_condition_handler: turning off SFF_TRIGR_CALLD (3) in frame 0x"
+			frame_pointer->flags &= SFF_IMPLTSTART_CALLD_OFF;	/* Frame enterable now with mpc reset */
+			GTMTRIG_ONLY(DBGTRIGR((stderr, "mdb_condition_handler: turning off SFF_IMPLTSTART_CALLD (3) in frame 0x"
 					       lvaddr"\n", frame_pointer)));
 		}
 		PRN_ERROR;
@@ -843,6 +855,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		{
 			proc_act_type = SFT_DEV_ACT;
 			err_act = &err_dev->error_handler;
+			reserve_sock_dev = TRUE;
 			/* Reset mpc to beginning of the current line (to retry after processing the IO exception handler) */
 			reset_mpc = TRUE;
 			DBGEHND((stderr, "mdb_condition_handler: dispatching device error handler [%.*s]\n", err_act->len,
@@ -915,6 +928,13 @@ CONDITION_HANDLER(mdb_condition_handler)
 					 err_act->addr));
 			}
 		}
+		/* if the err_act points to the address err_dev->errro_handler, we cannot destroy socket here */
+		if (err_dev && (gtmsocket == err_dev->type) && err_dev->newly_created && !reserve_sock_dev)
+		{
+			assert(err_dev->state != dev_open);
+			iosocket_destroy(err_dev);
+			err_dev = NULL;
+		}
 		if (reset_mpc)
 		{	/* Reset the mpc such that
 			 *   (a) If the current frame is a counted frame, the error line is retried after the error is handled,
@@ -959,25 +979,80 @@ CONDITION_HANDLER(mdb_condition_handler)
 						fp->ctxt = GTM_CONTEXT(pseudo_ret);
 						fp->mpc = CODE_ADDRESS(pseudo_ret);
 					}
-					fp->flags &= SFF_TRIGR_CALLD_OFF;	/* Frame enterable now with mpc reset */
-					GTMTRIG_ONLY(DBGTRIGR((stderr, "mdb_condition_handler: turning off SFF_TRIGR_CALLD (4) "
+					fp->flags &= SFF_IMPLTSTART_CALLD_OFF;	/* Frame enterable now with mpc reset */
+					GTMTRIG_ONLY(
+						DBGTRIGR((stderr, "mdb_condition_handler: turning off SFF_IMPLTSTART_CALLD (4) "
 							       "in frame 0x"lvaddr"\n", frame_pointer)));
 				}
 			}
 		}
 		if (clean_mum_tstart())
 		{
+			if (err_dev)
+			{
+#				ifdef UNIX
+				/* On z/OS, if opening a fifo which is not read only we need to fix the err_dev type to rm */
+#				ifdef __MVS__
+				if ((dev_open != err_dev->state) && (ff == err_dev->type))
+				{
+					assert(NULL != err_dev->pair.out);
+					if (rm == err_dev->pair.out->type)
+					{
+						/* Have to massage the device so remove_rms will cleanup the partially
+						 * created fifo.  Refer to io_open_try.c for creation of split fifo device.
+						 */
+						err_dev->newly_created = 1;
+						err_dev->type = rm;
+						err_dev->dev_sp = err_dev->pair.out->dev_sp;
+						err_dev->pair.out->dev_sp = NULL;
+					}
+				}
+#				endif
+				if ((dev_open != err_dev->state) && (rm == err_dev->type))
+				{
+					gtm_err_dev = err_dev;
+					/* structures pointed to by err_dev were freed so make sure it's not used again */
+					err_dev = NULL;
+				}
+#				endif
+				if (err_dev && (gtmsocket == err_dev->type) && err_dev->newly_created)
+				{
+					assert(err_dev->state != dev_open);
+					assert(reserve_sock_dev);
+					gtm_err_dev = err_dev;
+					err_dev = NULL;
+				}
+			}
+			MUM_TSTART_FRAME_CHECK;
+			MUM_TSTART;
+		} else
+		{
+			/* err_act is null, we can remove the socket device */
+			if (err_dev && (gtmsocket == err_dev->type) && err_dev->newly_created && !reserve_sock_dev)
+			{
+				assert(err_act == NULL);
+				assert(err_dev->state != dev_open);
+				iosocket_destroy(err_dev);
+				err_dev = NULL;
+			}
+			DBGEHND((stderr, "mdb_condition_handler: clean_mum_tstart returned FALSE\n"));
+		}
+	} else
+	{
+		DBGEHND((stderr, "mdb_condition_handler: Transient or direct mode frame -- bypassing handler dispatch\n"));
+		if (err_dev)
+		{
 #			ifdef UNIX
-			/* On z/OS, if opening a fifo which is not read only we need to fix the type for the err_dev to rm */
+			/* Executed from the direct mode so do the rms check and cleanup if necessary. On z/OS, if opening a fifo
+			 * which is not read only we need to fix the type for the err_dev to rm.
+			 */
 #			ifdef __MVS__
-			if (err_dev && dev_open != err_dev->state && (ff == err_dev->type))
+			if ((dev_open != err_dev->state) && (ff == err_dev->type))
 			{
 				assert(NULL != err_dev->pair.out);
 				if (rm == err_dev->pair.out->type)
 				{
-					/* Have to massage the device so remove_rms will cleanup the partially
-					 * created fifo.  Refer to io_open_try.c for creation of split fifo device.
-					 */
+					/* Have to massage the device so remove_rms will cleanup the partially created fifo */
 					err_dev->newly_created = 1;
 					err_dev->type = rm;
 					err_dev->dev_sp = err_dev->pair.out->dev_sp;
@@ -985,45 +1060,19 @@ CONDITION_HANDLER(mdb_condition_handler)
 				}
 			}
 #			endif
-			if (err_dev && dev_open != err_dev->state && (rm == err_dev->type))
+			if (dev_open != err_dev->state && (rm == err_dev->type))
 			{
-				gtm_err_dev = err_dev;
-				/* structures pointed to by err_dev were freed so make sure it's not used again */
+				remove_rms(err_dev);
 				err_dev = NULL;
 			}
 #			endif
-			MUM_TSTART_FRAME_CHECK;
-			MUM_TSTART;
-		} else
-			DBGEHND((stderr, "mdb_condition_handler: clean_mum_tstart returned FALSE\n"));
-	} else
-	{
-		DBGEHND((stderr, "mdb_condition_handler: Transient or direct mode frame -- bypassing handler dispatch\n"));
-#		ifdef UNIX
-		/* Executed from the direct mode so do the rms check and cleanup if necessary. On z/OS, if opening a fifo
-		 * which is not read only we need to fix the type for the err_dev to rm.
-		 */
-#		ifdef __MVS__
-		if (err_dev && dev_open != err_dev->state && (ff == err_dev->type))
-		{
-			assert(NULL != err_dev->pair.out);
-			if (rm == err_dev->pair.out->type)
+			if (err_dev && (gtmsocket == err_dev->type) && err_dev->newly_created)
 			{
-				/* Have to massage the device so remove_rms will cleanup the partially created fifo */
-				err_dev->newly_created = 1;
-				err_dev->type = rm;
-				err_dev->dev_sp = err_dev->pair.out->dev_sp;
-				err_dev->pair.out->dev_sp = NULL;
+				assert(err_dev->state != dev_open);
+				iosocket_destroy(err_dev);
+				err_dev = NULL;
 			}
 		}
-#		endif
-		if (err_dev && dev_open != err_dev->state && (rm == err_dev->type))
-		{
-			remove_rms(err_dev);
-			/* Structures pointed to by err_dev were freed so make sure it's not used again */
-			err_dev = NULL;
-		}
-#		endif
 	}
 	if ((SFT_ZINTR | SFT_COUNT) != proc_act_type || 0 == dollar_ecode.error_last_b_line)
 	{	/* No user console error for $zinterrupt compile problems and if not direct mode. Accomplish

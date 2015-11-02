@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,7 @@
 
 typedef enum
 {
-	REPL_GENERAL_LOG,
-	REPL_STATISTICS_LOG
+	REPL_GENERAL_LOG
 } repl_log_file_t ;
 
 #define NULL_DEVICE 	"/dev/null"
@@ -25,8 +24,7 @@ typedef enum
 
 int repl_log_fd2fp(FILE **fp, int fd);
 int repl_log(FILE *fp, boolean_t stamptime, boolean_t flush, char *fmt, ...);
-int repl_log_init(repl_log_file_t log_type, int *log_fd, int *stats_fd, char *log,
-	char *stats_log);
+int repl_log_init(repl_log_file_t log_type, int *log_fd, char *log);
 
 #define LOGTRNUM_INTERVAL 1000	/* default interval (jnlseqno count) at which source/receiver/upd log */
 

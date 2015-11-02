@@ -29,7 +29,7 @@
 #include "dpgbldir.h"
 #include "sgnl.h"
 #include "mvalconv.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
 

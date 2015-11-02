@@ -82,6 +82,7 @@
 #include "wcs_flu.h"
 #include "wcs_recover.h"
 #include "is_proc_alive.h"
+#include "anticipatory_freeze.h"
 
 #define RELEASE_ACCESS_CONTROL(REGLIST)								\
 {												\
@@ -153,6 +154,7 @@ GBLREF	int4			strm_index;
 GBLREF	uint4			process_id;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	sgmnt_data		*cs_data;
+GBLREF	boolean_t		jnlpool_init_needed;
 #endif
 
 
@@ -229,6 +231,7 @@ boolean_t mur_open_files()
 #	else /* ONLINE ROLLBACK specific variables */
 	onln_rlbk_reg_list		*reglist = NULL, *rl, *rl_last, *save_rl, *rl_new;
 	boolean_t			x_lock, wait_for_kip, replinst_file_corrupt = FALSE, inst_requires_rlbk;
+	boolean_t			jnlpool_sem_created;
 	sgmnt_addrs			*tmpcsa;
 	sgmnt_data			*tmpcsd;
 	gd_region			*reg;
@@ -244,6 +247,7 @@ boolean_t mur_open_files()
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	UNIX_ONLY(jnlpool_init_needed = !mur_options.update);
 	jnl_file_list_len = MAX_LINE;
 	if (FALSE == CLI_GET_STR_ALL("FILE", jnl_file_list, &jnl_file_list_len))
 		mupip_exit(ERR_MUPCLIERR);
@@ -295,17 +299,18 @@ boolean_t mur_open_files()
 	{	/* Rundown the Jnlpool and Recvpool */
 #		if defined(UNIX)
 		if (!repl_inst_get_name((char *)replpool_id.instfilename, &full_len, SIZEOF(replpool_id.instfilename),
-			issue_gtm_putmsg))
+				issue_gtm_putmsg))
 		{	/* appropriate gtm_putmsg would have already been issued by repl_inst_get_name */
 			return FALSE;
 		}
 		assert(NUM_SRC_SEMS == NUM_RECV_SEMS);
 		ASSERT_DONOT_HOLD_REPLPOOL_SEMS;
 		assert(NULL == jnlpool.repl_inst_filehdr);
-		if (!mu_rndwn_repl_instance(&replpool_id, FALSE, TRUE))
+		UNIX_ONLY(if (!mu_rndwn_repl_instance(&replpool_id, FALSE, TRUE, &jnlpool_sem_created)))
+		VMS_ONLY(if (!mu_rndwn_repl_instance(&replpool_id, FALSE, TRUE)))
 			return FALSE;	/* mu_rndwn_repl_instance will have printed appropriate message in case of error */
 		assert(jnlpool.jnlpool_ctl == jnlpool_ctl);
-		assert(jgbl.onlnrlbk || (NULL == jnlpool_ctl));
+		assert(jgbl.onlnrlbk || ANTICIPATORY_FREEZE_AVAILABLE || (NULL == jnlpool_ctl));
 		ASSERT_HOLD_REPLPOOL_SEMS;
 		assert(NULL != jnlpool.repl_inst_filehdr);
 		assert(INVALID_SEMID != jnlpool.repl_inst_filehdr->jnlpool_semid);
@@ -317,7 +322,7 @@ boolean_t mur_open_files()
 		 */
 		if (jnlpool.repl_inst_filehdr->is_supplementary)
 		{
-			assert(INVALID_SUPPL_STRM == strm_index);
+			assert((INVALID_SUPPL_STRM == strm_index) || (0 == strm_index));
 			strm_index = 0;
 		}
 #		elif defined(VMS)
@@ -485,12 +490,11 @@ boolean_t mur_open_files()
 			{	/* Get hold of all the gtmsource_srv_latch in all the source server slots in the journal pool. Hold
 				 * onto it until the end (in mur_close_files).
 				 */
-				if (!grab_gtmsource_srv_latch(&gtmsourcelocal_ptr->gtmsource_srv_latch, 2 * max_epoch_interval))
-				{
-					gtm_putmsg(VARLSTCNT(5) ERR_SRVLCKWT2LNG, 2, (2 * max_epoch_interval),
-							gtmsourcelocal_ptr->gtmsource_pid);
-					return FALSE;
-				}
+				jnlpool.gtmsource_local = gtmsourcelocal_ptr;
+				if (!grab_gtmsource_srv_latch(&gtmsourcelocal_ptr->gtmsource_srv_latch,
+						2 * max_reg_total * max_epoch_interval, GRAB_GTMSOURCE_SRV_LATCH_ONLY))
+					assertpro(FALSE); /* should not reach here due to rts_error in the above function */
+
 			}
 		}
 		/* For online rollback we need to grab crit on all the regions. But, this has to be done in the ftok order. To
@@ -564,7 +568,7 @@ boolean_t mur_open_files()
 		 */
 		if (NULL != jnlpool_ctl)
 		{	/* Validate the journal pool is accessible and the offsets of various structures within it are intact */
-			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
+			grab_lock(jnlpool.jnlpool_dummy_reg, GRAB_LOCK_ONLY);
 			csa->hold_onto_crit = TRUE;	/* No more unconditional rel_lock() */
 			assert(jnlpool.repl_inst_filehdr->crash); /* since we haven't removed the journal pool */
 			repl_inst_flush_jnlpool(FALSE, FALSE);
@@ -598,7 +602,7 @@ boolean_t mur_open_files()
 			if (!wcs_flu(WCSFLU_NONE))
 			{
 				assert(cs_addrs->nl->wcs_phase2_commit_pidcnt); /* only reason why wcs_flu can fail */
-				SET_TRACEABLE_VAR(cs_addrs->hdr->wc_blocked, TRUE);
+				SET_TRACEABLE_VAR(cs_addrs->nl->wc_blocked, TRUE);
 				BG_TRACE_PRO_ANY(cs_addrs, wc_blocked_onln_rlbk);
 				send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wc_blocked_onln_rlbk"),
 						process_id, &cs_addrs->ti->curr_tn, DB_LEN_STR(gv_cur_region));
@@ -721,9 +725,13 @@ boolean_t mur_open_files()
 						}
 					} else
 					{
-						if (!REPL_ALLOWED(csd))
-						{
-							if (JNL_ENABLED(csd))
+						if (!REPL_ENABLED(csd))
+						{	/* Replication is either OFF or WAS_ON. Journaling could be ENABLED or not.
+							 * If replication is OFF and journaling is DISABLED, there is no issue.
+							 * Any other combination (including replication being WAS_ON) is an error
+							 * as we dont have the complete set of journal records to do the rollback.
+							 */
+							if (REPL_ALLOWED(csd) || JNL_ENABLED(csd))
 							{
 								gtm_putmsg(VARLSTCNT(4) ERR_REPLSTATEOFF, 2, DB_LEN_STR(rctl->gd));
 								return FALSE;
@@ -1109,6 +1117,19 @@ boolean_t mur_open_files()
 				}
 			}
 		} /* if mur_options.update */
+		if (mur_options.extr[GOOD_TN])
+		{
+			csa = rctl->csa;
+			if (NULL != csa)
+			{
+#				if (defined(DEBUG) && defined(VMS))
+				/* set wc_blocked as true to invoke wcs_recover */
+				GTM_WHITE_BOX_TEST(WBTEST_SET_WC_BLOCKED, csa->nl->wc_blocked, TRUE);
+#				endif
+				if (csa->nl->wc_blocked)
+					TREF(donot_write_inctn_in_wcs_recover) = TRUE;
+			}
+		}
 		while (NULL != jctl->next_gen) /* Check for continuity */
 		{
 			if (!mur_options.notncheck && (jctl->next_gen->jfh->bov_tn != jctl->jfh->eov_tn))

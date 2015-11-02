@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 
 #include "error.h"
 #include "fnpc.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "stp_parms.h"
@@ -90,6 +90,9 @@
 #include "cenable.h"
 #include "gtmimagename.h"
 #include "mprof.h"
+#include "heartbeat_timer.h"
+#include "gt_timers_add_safe_hndlrs.h"
+#include "continue_handler.h"
 
 GBLDEF void			(*restart)() = &mum_tstart;
 #ifdef __MVS__
@@ -133,8 +136,10 @@ GBLREF casemap_t		casemaps[];
 GBLREF void             	(*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
 GBLREF ch_ret_type		(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
 GBLREF ch_ret_type		(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
+GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 GBLREF enum gtmImageTypes	image_type;
 GBLREF int			init_xfer_table(void);
+GBLREF void			(*heartbeat_timer_ptr)(void);
 
 OS_PAGE_SIZE_DECLARE
 
@@ -167,6 +172,8 @@ void gtm_startup(struct startup_vector *svec)
 	cache_table_relobjs = &cache_table_rebuild;
 	ht_rhash_ch = &hashtab_rehash_ch;
 	jbxm_dump_ch = &jobexam_dump_ch;
+	heartbeat_timer_ptr = &heartbeat_timer;
+	stpgc_ch = &stp_gcol_ch;
 	rtn_fst_table = rtn_names = (rtn_tabent *)svec->rtn_start;
 	rtn_names_end = rtn_names_top = (rtn_tabent *)svec->rtn_end;
 	if (svec->user_stack_size < 4096)
@@ -256,7 +263,7 @@ void gtm_startup(struct startup_vector *svec)
 	io_init(IS_MUPIP_IMAGE);		/* starts with nocenable for GT.M runtime, enabled for MUPIP */
 	if (!IS_MUPIP_IMAGE)
 	{
-		sig_init(generic_signal_handler, ctrlc_handler_ptr, suspsigs_handler);
+		sig_init(generic_signal_handler, ctrlc_handler_ptr, suspsigs_handler, continue_handler);
 		atexit(gtm_exit_handler);
 		cenable();	/* cenable unless the environment indicates otherwise - 2 steps because this can report errors */
 	}
@@ -307,7 +314,8 @@ void gtm_startup(struct startup_vector *svec)
 		}
 	} else
 		TREF(local_collseq) = 0;
-	prealloc_gt_timers(); /* Preallocate some timer blocks. */
+	prealloc_gt_timers();
+	gt_timers_add_safe_hndlrs();
 	for (i = 0; FNPC_MAX > i; i++)
 	{	/* Initialize cache structure for $Piece function */
 		(TREF(fnpca)).fnpcs[i].pcoffmax = &(TREF(fnpca)).fnpcs[i].pstart[FNPC_ELEM_MAX];

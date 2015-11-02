@@ -77,10 +77,10 @@ bool	tp_grab_crit(gd_region *reg)
 			}
 			return(FALSE);
 		}
-		/* There is only one case we know of when csa->nl->in_crit can be non-zero and that is when a process holding
+		/* There is only one case we know of when cnl->in_crit can be non-zero and that is when a process holding
 		 * crit gets kill -9ed and another process ends up invoking "secshr_db_clnup" which in turn clears the
-		 * crit semaphore (making it available for waiters) but does not also clear csa->nl->in_crit since it does not
-		 * hold crit at that point. But in that case, the pid reported in csa->nl->in_crit should be dead. Check that.
+		 * crit semaphore (making it available for waiters) but does not also clear cnl->in_crit since it does not
+		 * hold crit at that point. But in that case, the pid reported in cnl->in_crit should be dead. Check that.
 		 */
 		assert((0 == cnl->in_crit) || (FALSE == is_proc_alive(cnl->in_crit, 0)));
 		cnl->in_crit = process_id;
@@ -100,7 +100,7 @@ bool	tp_grab_crit(gd_region *reg)
 	 * currently do the cache recovery even in case of interrupt code even though it is a heavyweight operation.
 	 * If it is found to cause issues, this logic has to be re-examined.
 	 */
-	if (csd->wc_blocked)
+	if (cnl->wc_blocked)
 		wcs_recover(reg);
 	return(TRUE);
 }

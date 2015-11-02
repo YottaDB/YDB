@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "objlabel.h"
@@ -133,8 +133,8 @@ void trans_code_cleanup(void)
 		IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(fp);
 		fp->mpc = CODE_ADDRESS(pseudo_ret);
 		fp->ctxt = GTM_CONTEXT(pseudo_ret);
-		fp->flags &= SFF_TRIGR_CALLD_OFF;	/* Frame enterable now with mpc reset */
-		GTMTRIG_ONLY(DBGTRIGR((stderr, "trans_code_cleanup: turning off SFF_TRIGR_CALLD in frame 0x"lvaddr"\n",
+		fp->flags &= SFF_IMPLTSTART_CALLD_OFF;	/* Frame enterable now with mpc reset */
+		GTMTRIG_ONLY(DBGTRIGR((stderr, "trans_code_cleanup: turning off SFF_IMPLTSTART_CALLD in frame 0x"lvaddr"\n",
 				       frame_pointer)));
 	}
 	TREF(transform) = TRUE;

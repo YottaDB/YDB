@@ -61,6 +61,7 @@
 #include "ftok_sems.h"
 #include "mu_rndwn_all.h"
 #include "error.h"
+#include "anticipatory_freeze.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
@@ -240,7 +241,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	fc = reg->dyn.addr->file_cntl;
 	fc->op = FC_OPEN;
 	status = dbfilop(fc);
-	gv_cur_region = temp_region;
 	udi = FILE_INFO(reg);
 	if (SS_NORMAL != status)
 	{
@@ -274,6 +274,9 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		RNDWN_ERR("!AD -> Error reading from file.", reg);
 		CLNUP_AND_RETURN(reg, udi, tsd, sem_created, sem_incremented);
 	}
+	csa = &(udi->s_addrs);
+	csa->hdr = tsd;
+	csa->region = gv_cur_region;
 #	ifdef GTM_CRYPT
 	/* During rundown gvcst_init is not called and hence we need to do the encryption setup here. */
 	/* We do some basic encryption initializations here.
@@ -414,7 +417,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				{
 					if (mupip_jnl_recover)
 						memset(tsd->machine_name, 0, MAX_MCNAMELEN);
-					LSEEKWRITE(udi->fd, (off_t)0, tsd, tsd_size, status);
+					DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, tsd, tsd_size, status);
 					if (0 != status)
 					{
 						RNDWN_ERR("!AD -> Unable to write header to disk.", reg);
@@ -434,6 +437,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 						CLNUP_AND_RETURN(reg, udi, tsd, sem_created, sem_incremented);
 					}
 					db_ipcs.fn[db_ipcs.fn_len] = 0;
+					WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
 					if (0 != send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0))
 					{
 						RNDWN_ERR("!AD -> gtmsecshr was unable to write header to disk.", reg);
@@ -475,7 +479,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			}
 		}
 		assert(!standalone);
-		LSEEKWRITE(udi->fd, (off_t)0, tsd, tsd_size, status);
+		DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, tsd, tsd_size, status);
 		if (0 != status)
 		{
 			RNDWN_ERR("!AD -> Unable to write header to disk.", reg);
@@ -822,7 +826,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			}
 			if (!db_shm_in_sync || (dba_bg == acc_meth))
 			{
-				LSEEKWRITE(udi->fd, (off_t)0, csd, csd_size, status);
+				DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, csd, csd_size, status);
 				if (0 != status)
 				{
 					RNDWN_ERR("!AD -> Error writing header to disk.", reg);
@@ -891,7 +895,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		RESET_SHMID_CTIME(tsd);
 		if (mupip_jnl_recover)
 			memset(tsd->machine_name, 0, MAX_MCNAMELEN);
-		LSEEKWRITE(udi->fd, (off_t)0, tsd, tsd_size, status);
+		DB_LSEEKWRITE(csa, udi->fn, udi->fd, (off_t)0, tsd, tsd_size, status);
 		if (0 != status)
 		{
 			RNDWN_ERR("!AD -> Unable to write header to disk.", reg);

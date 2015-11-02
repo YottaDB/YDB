@@ -45,6 +45,7 @@
 #include "gvcst_protos.h"	/* for gvcst_root_search prototype */
 #include "tp_set_sgm.h"
 #include "tp_frame.h"
+#include "wbox_test_init.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
@@ -97,7 +98,6 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 #	if (defined(DEBUG) && defined(UNIX))
 	int4			strm_idx;
 #	endif
-
 	assert(!rctl->forw_eof_seen);
 	jctl = rctl->jctl;
 	/* Ensure we never DOUBLE process the same journal record in the forward phase */

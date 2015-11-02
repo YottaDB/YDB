@@ -24,7 +24,6 @@
 #include "gtm_zos_io.h"
 #endif
 #include "stp_parms.h"
-#include "stringpool.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -53,15 +52,17 @@
 #include "filestruct.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
 
-GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
-GBLREF bool		mu_ctrlc_occurred;
-GBLREF bool		mu_ctrly_occurred;
-GBLREF spdesc		rts_stringpool, stringpool;
-GBLREF gd_region	*gv_cur_region;
-GBLREF gd_addr		*gd_header;
-GBLREF io_pair          io_curr_device;
-GBLREF io_desc          *active_device;
-GBLREF gv_namehead	*gv_target;
+GBLREF	int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF	bool		mu_ctrlc_occurred;
+GBLREF	bool		mu_ctrly_occurred;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	gd_addr		*gd_header;
+GBLREF	io_pair          io_curr_device;
+GBLREF	io_desc          *active_device;
+GBLREF	gv_namehead	*gv_target;
+#ifdef UNIX
+GBLREF	boolean_t	jnlpool_init_needed;
+#endif
 
 error_def(ERR_EXTRACTCTRLY);
 error_def(ERR_EXTRACTFILERR);
@@ -109,7 +110,6 @@ static readonly unsigned char no_param = (unsigned char)iop_eol;
 #define	WRITE_NUMERIC(nmfield)						\
 {									\
 	MV_FORCE_MVAL(&val, nmfield);					\
-	stringpool.free = stringpool.base;				\
 	n2s(&val);							\
 	if (val.mvtype & MV_NUM_APPROX)					\
 		GTMASSERT;						\
@@ -242,6 +242,7 @@ void mu_extract(void)
 		cli_buff[0] = '*';
 	}
 	/* gv_select will select globals */
+	jnlpool_init_needed = TRUE;
         gv_select(cli_buff, n_len, freeze, (char *)select_text, &gl_head, &reg_max_rec, &reg_max_key, &reg_max_blk, FALSE);
  	if (!gl_head.next)
         {
@@ -327,16 +328,14 @@ void mu_extract(void)
 		outptr = outbuf;
 		if (is_any_file_encrypted)
 		{
-			MEMCPY_LIT(outptr, BIN_HEADER_LABEL);
-			outptr += STR_LIT_LEN(BIN_HEADER_LABEL);
+			MEMCPY_LIT(outptr, BIN_HEADER_LABEL_ENCR);
+			outptr += STR_LIT_LEN(BIN_HEADER_LABEL_ENCR);
 		} else
 		{
-			MEMCPY_LIT(outptr, V4_BIN_HEADER_LABEL);
-			outptr += STR_LIT_LEN(V4_BIN_HEADER_LABEL);
+			MEMCPY_LIT(outptr, BIN_HEADER_LABEL);
+			outptr += STR_LIT_LEN(BIN_HEADER_LABEL);
 		}
-		stringpool.free = stringpool.base;
 		op_horolog(&val);
-		stringpool.free = stringpool.base;
 		op_fnzdate(&val, (mval *)&mu_bin_datefmt, &null_str, &null_str, &val);
 		memcpy(outptr, val.str.addr, val.str.len);
 		outptr += val.str.len;
@@ -423,9 +422,7 @@ void mu_extract(void)
 		op_val.str.len = label_len;
 		op_val.str.addr = label_buff;
 		op_write(&op_val);
-		stringpool.free = stringpool.base;
 		op_horolog(&val);
-		stringpool.free = stringpool.base;
 		op_fnzdate(&val, &datefmt, &null_str, &null_str, &val);
 		op_val = val;
 		op_val.mvtype = MV_STR;

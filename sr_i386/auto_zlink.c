@@ -15,9 +15,9 @@
 
 #include "i386.h"
 #include "urx.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "op.h"
-#include "auto_zlink.h"
+#include <auto_zlink.h>
 
 #define PEA_SZ		5
 #define XFER_BYTE_SZ	3

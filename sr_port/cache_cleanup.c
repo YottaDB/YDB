@@ -13,7 +13,7 @@
 #include "objlabel.h"
 #include "cache.h"
 #include "hashtab_objcode.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "cache_cleanup.h"
 

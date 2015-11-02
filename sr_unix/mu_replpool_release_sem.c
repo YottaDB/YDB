@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,7 @@
 #include "gtm_sem.h"
 #include "mu_rndwn_replpool.h"
 #include "ftok_sems.h"
+#include "anticipatory_freeze.h"
 
 #define DO_CLNUP_AND_RETURN(SAVE_ERRNO, INSTFILENAME, INSTFILELEN, SEM_ID, FAILED_OP)	\
 {														\
@@ -55,20 +56,23 @@ GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnl_gbls_t		jgbl;
-#ifdef UNIX
-GBLREF	boolean_t	holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
-#endif
+GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
+GBLREF	boolean_t		argumentless_rundown;
 
 error_def(ERR_REPLACCSEM);
 
-int mu_replpool_remove_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, boolean_t remove_sem)
+int mu_replpool_release_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type, boolean_t remove_sem)
 {
 	int			save_errno, instfilelen, status, sem_id, semval;
 	uint4			semnum;
 	char			*instfilename;
 	gd_region		*replreg;
-	DEBUG_ONLY(unix_db_info	*udi;)
+#	ifdef DEBUG
+	unix_db_info		*udi;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#	endif
 	assert((NULL != jnlpool.jnlpool_dummy_reg) && (jnlpool.jnlpool_dummy_reg == recvpool.recvpool_dummy_reg));
 	replreg = jnlpool.jnlpool_dummy_reg;
 	DEBUG_ONLY(udi = FILE_INFO(jnlpool.jnlpool_dummy_reg));
@@ -81,8 +85,13 @@ int mu_replpool_remove_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_type
 	{
 		sem_id = repl_inst_filehdr->jnlpool_semid;
 		semval = semctl(sem_id, SRC_SERV_COUNT_SEM, GETVAL);
-		assert((1 == semval) || jgbl.onlnrlbk); /* semval MUST be 1 because we incremented in mu_replpool_grab_sem and we
-							 * never released it. Only exception is if we are ONLINE ROLLBACK */
+		/* mu_replpool_grab_sem always increments the counter semaphore. So, it should be 1 at this point. In addition,
+		 * if not ONLINE ROLLBACK or RUNDOWN with Anticipatory Freeze, we wait for the counter to become zero before
+		 * grabbing it. The only exception where semval can be greater than 1 is if we are ONLINE ROLLBACK or RUNDOWN -REG
+		 * with anticipatory freeze scheme in effect.
+		 */
+		assert((1 == semval) || ((1 <= semval)
+			&& (jgbl.onlnrlbk || (!jgbl.mur_rollback && !argumentless_rundown && ANTICIPATORY_FREEZE_AVAILABLE))));
 		remove_sem &= (1 == semval); /* we can remove the sem if the caller intends to and the counter semaphore is 1 */
 		if (0 < semval)
 		{

@@ -106,7 +106,7 @@ static  uint4  		TwoTable[MAXINDEX + 2];
 /* ******* z/OS expansion ******* */
 #undef malloc
 #undef free
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "obj_file.h"
 
 /* This function is meant as a temporary replacement for the gtm_text_alloc code that uses mmap.

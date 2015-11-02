@@ -43,54 +43,49 @@
 #include "mdef.h"
 
 #include <errno.h>
+#include <stddef.h>
+#include <stdarg.h>
 #include "gtm_time.h"
 #include "gtm_string.h"
-#include <stddef.h>
+#include "gtmimagename.h"
 
 #if (defined(__ia64) && defined(__linux__)) || defined(__MVS__)
-#include "gtm_unistd.h"
+# include "gtm_unistd.h"
 #endif /* __ia64 && __linux__ or __MVS__ */
-
 #include "gt_timer.h"
 #include "wake_alarm.h"
-#include "heartbeat_timer.h"
-#include "semwt2long_handler.h"
-#include "secshr_client.h"
-
 #ifdef DEBUG
-#include "wbox_test_init.h"
-#include "io.h"
+# include "wbox_test_init.h"
+# include "io.h"
 #endif
-
 #if	defined(mips) && !defined(_SYSTYPE_SVR4)
-#include <bsd/sys/time.h>
+# include <bsd/sys/time.h>
 #else
-#include <sys/time.h>
+# include <sys/time.h>
 #endif
-
 #ifndef __MVS__
-#include <sys/param.h>
+# include <sys/param.h>
 #endif
 #include "send_msg.h"
 #include "eintr_wrappers.h"
 #include "gtmio.h"
 #include "have_crit.h"
-
+#include "util.h"
 #if defined(__osf__)
-#define HZ	CLK_TCK
+# define HZ	CLK_TCK
 #elif defined(__MVS__)
-#define HZ	gtm_zos_HZ
+# define HZ	gtm_zos_HZ
 STATICDEF int	gtm_zos_HZ = 100;	/* see prealloc_gt_timers below */
 #endif
 
 #ifdef ITIMER_REAL
-#define BSD_TIMER
+# define BSD_TIMER
 #else
 /* check def of time() including arg - see below; should be time_t
  * (from sys/types.h) and traditionally unsigned long */
-#ifndef __osf__
+# ifndef __osf__
 int4	time();
-#endif
+# endif
 #endif
 
 /* Set each timer request to go for 10ms more than requested, since the
@@ -105,6 +100,12 @@ int4	time();
 #define TIMER_BLOCK_SIZE	64	/* # of timer entries allocated initially as well as at every expansion */
 #define GT_TIMER_EXPAND_TRIGGER	8	/* if the # of timer entries in the free queue goes below this, allocate more */
 #define GT_TIMER_INIT_DATA_LEN	8
+
+#define ADD_SAFE_HNDLR(HNDLR)						\
+{									\
+	assert((ARRAYSIZE(safe_handlers) - 1) > safe_handlers_cnt);	\
+	safe_handlers[safe_handlers_cnt++] = HNDLR;			\
+}
 
 #ifdef BSD_TIMER
 STATICDEF struct itimerval sys_timer, old_sys_timer;
@@ -122,18 +123,21 @@ STATICDEF volatile 	int4		num_timers_free;	/* # of timers in the unused queue */
 STATICDEF		int4		timeblk_hdrlen;
 STATICDEF volatile 	st_timer_alloc	*timer_allocs = NULL;
 
-STATICDEF int safe_timer_cnt, timer_pop_cnt;	/* Number of safe timers in queue and timers popped, correspondingly */
-STATICDEF TID *deferred_tids;
+STATICDEF int 		safe_timer_cnt, timer_pop_cnt;		/* Number of safe timers in queue/popped */
+STATICDEF TID 		*deferred_tids;
 
-STATICDEF void (*safe_handlers[])() = {hiber_wake, wake_alarm, semwt2long_handler, client_timer_handler, heartbeat_timer, NULL};
+STATICDEF timer_hndlr	safe_handlers[MAX_TIMER_HNDLRS + 1];	/* +1 for NULL to terminate list, or can use safe_handlers_cnt */
+STATICDEF int		safe_handlers_cnt;
 
 STATICDEF boolean_t	stolen_timer = FALSE;	/* only complain once, used in check_for_timer_pops() */
 STATICDEF char 		*whenstolen[] = {"check_for_timer_pops", "check_for_timer_pops first time"}; /* for check_for_timer_pops */
 
-GBLREF	boolean_t		blocksig_initialized;	/* set to TRUE when blockalrm and block_sigsent are initialized */
-GBLREF	sigset_t		blockalrm;
-GBLREF	sigset_t		block_sigsent;
-GBLREF	boolean_t		heartbeat_started;
+GBLREF	boolean_t	blocksig_initialized;	/* set to TRUE when blockalrm and block_sigsent are initialized */
+GBLREF	sigset_t	blockalrm;
+GBLREF	sigset_t	block_sigsent;
+GBLREF	boolean_t	heartbeat_started;
+GBLREF	void		(*heartbeat_timer_ptr)(void);	/* Initialized only in gtm_startup() */
+
 /* Flag signifying timer is active. Especially useful when the timer handlers get nested. This has not been moved to a
  * threaded framework because we do not know how timers will be used with threads.
  */
@@ -155,12 +159,13 @@ STATICFNDEF void hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag)
 }
 
 /* Preallocate some memory for timers. */
-STATICFNDEF void gt_timers_alloc(void)
+void gt_timers_alloc(void)
 {
 	int4		gt_timer_cnt;
        	GT_TIMER	*timeblk, *timeblks;
 	st_timer_alloc	*new_alloc;
 
+	/* Allocate timer blocks putting each timer on the free queue */
 	assert(1 > timer_stack_count);
 	timeblk_hdrlen = OFFSETOF(GT_TIMER, hd_data[0]);
 	timeblk = timeblks = (GT_TIMER *)malloc((timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN) * TIMER_BLOCK_SIZE);
@@ -177,6 +182,21 @@ STATICFNDEF void gt_timers_alloc(void)
 	}
 	assert(((char *)timeblk - (char *)timeblks) == (timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN) * TIMER_BLOCK_SIZE);
 	num_timers_free += TIMER_BLOCK_SIZE;
+}
+
+void add_safe_timer_handler(int safetmr_cnt, ...)
+{
+	int		i;
+	va_list		var;
+	timer_hndlr	tmrhndlr;
+
+	VAR_START(var, safetmr_cnt);
+	for (i = 1; i <= safetmr_cnt; i++)
+	{
+		tmrhndlr = va_arg(var, timer_hndlr);
+		ADD_SAFE_HNDLR(tmrhndlr);
+	}
+	va_end(var);
 }
 
 /* Do the initialization of block_sigsent and blockalrm, and set blocksig_initialized to TRUE, so
@@ -223,6 +243,13 @@ void prealloc_gt_timers(void)
 	 * If more timer blocks are needed, we will allocate them as needed.
 	 */
 	gt_timers_alloc();	/* Allocate timers */
+	/* Now initialize the safe timers. Must be done dynamically to avoid the situation where this module always references all
+	 * possible safe timers thus pulling extra stuff into executables that don't need or want it.
+	 *
+	 * First step, fill in the safe timers contained within this module which are always available.
+	 */
+	ADD_SAFE_HNDLR(&hiber_wake);				/* Resident in this module */
+	ADD_SAFE_HNDLR(&wake_alarm);				/* Standalone module containing on one global reference */
 }
 
 /* Get current clock time. Fill-in the structure with the absolute time of system clock.
@@ -381,7 +408,9 @@ void cancel_timer(TID tid)
 	sys_get_curr_time(&at);
 	if (tid == 0)
 	{
-		assert(process_exiting); /* wcs_phase2_commit_wait relies on this flag being set BEFORE cancelling all timers */
+		assert(process_exiting || IS_GTMSECSHR_IMAGE); /* wcs_phase2_commit_wait relies on this flag being set BEFORE
+								* cancelling all timers. But secshr doesn't have it.
+								*/
 		cancel_all_timers();
 		uninit_all_timers();
 		timer_stack_count = 0;
@@ -506,13 +535,18 @@ STATICFNDEF void timer_handler(int why)
 	int		save_errno, timer_defer_cnt, offset;
 	TID 		*deferred_tid;
 	boolean_t	tid_found;
-	DEBUG_ONLY(ABS_TIME pseudo_at;)
+	char 		*save_util_outptr;
+	va_list		save_last_va_list_ptr;
+	boolean_t	util_copy_saved = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 #	ifdef DEBUG
-	tpop = find_timer((TID)heartbeat_timer, &tpop);
-	assert(process_exiting || (((NULL != tpop) && heartbeat_started) || ((NULL == tpop) && !heartbeat_started)));
+	if (IS_GTM_IMAGE)
+	{
+		tpop = find_timer((TID)heartbeat_timer_ptr, &tpop);
+		assert(process_exiting || (((NULL != tpop) && heartbeat_started) || ((NULL == tpop) && !heartbeat_started)));
+	}
 #	endif
 	if (0 < timer_stack_count)
 		return;
@@ -523,6 +557,7 @@ STATICFNDEF void timer_handler(int why)
 	sys_get_curr_time(&at);
 	tpop = (GT_TIMER *)timeroot;
 	timer_defer_cnt = 0;				/* reset the deferred timer count, since we are in timer_handler */
+	SAVE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
 	while (tpop)					/* fire all handlers that expired */
 	{
 		cmp = abs_time_comp(&at, (ABS_TIME *)&tpop->expir_time);
@@ -547,7 +582,7 @@ STATICFNDEF void timer_handler(int why)
 #				ifdef DEBUG
 				if (gtm_white_box_test_case_enabled
 					&& (WBTEST_DEFERRED_TIMERS == gtm_white_box_test_case_number)
-					&& ((void *)tpop->handler != (void*)&heartbeat_timer))
+					&& ((void *)tpop->handler != (void*)heartbeat_timer_ptr))
 				{
 					DBGFPF((stderr, "TIMER_HANDLER: handled a timer\n"));
 					timer_pop_cnt++;
@@ -613,6 +648,7 @@ STATICFNDEF void timer_handler(int why)
 				break;
 		}
 	}
+	RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
 	if (((FALSE == process_exiting) && (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state)) || (0 < safe_timer_cnt))
 		start_first_timer(&at);
 	else if ((NULL != timeroot) || (0 < timer_defer_cnt))
@@ -625,7 +661,7 @@ STATICFNDEF void timer_handler(int why)
  * Arguments:	tid	- timer id
  *		tprev	- address of pointer to previous node
  * Return:	pointer to timer in the chain, or 0 if timer is not found
- * NOTE:	tprev is set to the link previous to the tid link
+ * Note:	tprev is set to the link previous to the tid link
  */
 STATICFNDEF GT_TIMER *find_timer(TID tid, GT_TIMER **tprev)
 {
@@ -782,7 +818,7 @@ STATICFNDEF void sys_canc_timer()
 }
 
 /* Cancel all timers.
- * NOTE: The timer signal must be blocked prior to entry
+ * Note: The timer signal must be blocked prior to entry
  */
 STATICFNDEF void cancel_all_timers(void)
 {

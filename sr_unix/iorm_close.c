@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@
 GBLREF io_pair		io_curr_device;
 GBLREF io_pair		io_std_device;
 GBLREF	boolean_t	gtm_pipe_child;
+
 error_def(ERR_CLOSEFAIL);
 
 LITREF unsigned char	io_params_size[];
@@ -52,10 +53,15 @@ void iorm_close(io_desc *iod, mval *pp)
 	unsigned int	*dollary_ptr;
 	char 		*savepath2 = 0;
 	int		path2len;
+	boolean_t	rm_destroy = TRUE;
+	boolean_t	rm_rundown = FALSE;
 
 	assert (iod->type == rm);
 	if (iod->state != dev_open)
-	    return;
+	{
+		remove_rms(iod);
+		return;
+	}
 
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
 
@@ -120,6 +126,15 @@ void iorm_close(io_desc *iod, mval *pp)
 						rts_error(VARLSTCNT(1) errno);
 				}
 				break;
+			case iop_destroy:
+				rm_destroy = TRUE;
+				break;
+			case iop_nodestroy:
+				rm_destroy = FALSE;
+				break;
+			case iop_rundown:
+				rm_rundown = TRUE;
+				break;
 			default:
 				break;
 		}
@@ -148,12 +163,12 @@ void iorm_close(io_desc *iod, mval *pp)
 		rm_ptr->outbuf = NULL;
 	}
 
-	/* Do the close first. If the fclose() is done first and we are being called from io_rundown just prior to the execv
-	   in a newly JOBbed off process, the fclose() does an implied fflush() which is known to do an lseek() which resets
-	   the file pointers of any open (flat) files in the parent due to an archane interaction between child and parent
-	   processes prior to an execv() call. The fclose (for stream files) will fail but it will clean up structures orphaned
-	   by the CLOSEFILE_RESET.
-	*/
+	/* Do the close first. If the fclose is done first and we are being called from io_rundown just prior to the execv
+	 * in a newly JOBbed off process, the fclose does an implied FFLUSH which is known to do an lseek which resets
+	 * the file pointers of any open (flat) files in the parent due to an archane interaction between child and parent
+	 * processes prior to an execv call. The fclose (for stream files) will fail but it will clean up structures orphaned
+	 * by the CLOSEFILE_RESET.
+	 */
 	/* Close the fildes unless this is a direct close of the stderr device */
 	if (!rm_ptr->stderr_parent)
 	{
@@ -216,8 +231,9 @@ void iorm_close(io_desc *iod, mval *pp)
 			stderr_rm_ptr = (d_rm_struct *)rm_ptr->stderr_child->dev_sp;
 			stderr_rm_ptr->stderr_parent = 0;
 			iorm_close(rm_ptr->stderr_child,pp);
-			remove_rms(rm_ptr->stderr_child);
 		}
 	}
+	if ((rm_destroy || rm_ptr->pipe) && !rm_rundown)
+	        remove_rms (iod);
 	return;
 }

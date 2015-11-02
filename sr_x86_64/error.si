@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -22,23 +22,19 @@ chnd_jmp	=	24
 
 	.data
 .extern	ctxt
-.extern	active_ch
 
 #	.text
 #	setjmp is really __sigsetjmp(env,0)
 #.extern	__sigsetjmp
+.extern gtm_asm_establish
 
 	.sbttl	error.si    ESTABLISH
 .macro ESTABLISH label
-	addq	$chnd_size,ctxt(REG_IP)			# ctxt++
+        call	gtm_asm_establish
 	movq	ctxt(REG_IP),%rax
-	movq	active_ch(REG_IP),%rdx
-	movq	%rdx,chnd_save_active(%rax)	# ctxt->save_active_ch = active_ch
-	movl	$0,chnd_ch_active(%rax)		# ctxt->ch_active = FALSE
-	movq	%rax,active_ch(REG_IP)			# active_ch = ctxt
 	leaq	mdb_condition_handler(REG_IP), REG64_SCRATCH1
 	movq    REG64_SCRATCH1, chnd_ch(%rax)		# ctxt->ch = x
-	addq	$chnd_jmp,%rax			# setjmp(ctxt->jnp)
+	addq	$chnd_jmp,%rax			# setjmp(ctxt->jmp)
 	movq	$0,%rsi
 	movq	%rax,%rdi
 	call 	__sigsetjmp@PLT

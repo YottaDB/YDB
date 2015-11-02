@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@
 #include "advancewindow.h"
 #include "cmd.h"
 #include "namelook.h"
+#include "error.h"
 
 #define VMS_OS  01
 #define UNIX_OS 02
@@ -223,9 +224,12 @@ LITDEF struct
 	}
 	if (0 > (x = namelook(cmd_index, cmd_names, c, (TREF(window_ident)).len)))
 	{
-		stx_error(ERR_INVCMD);
-		if (0 > (x = namelook(cmd_index, cmd_names, "ZINVCMD", 7)))
+		if ((TK_COLON != TREF(director_token)) || (0 > (x = namelook(cmd_index, cmd_names, "ZINVCMD", 7))))
+		{	/* the 2nd term of the above if should perform the assignment, but never be true - we're just paranoid */
+			stx_error(MAKE_MSG_TYPE(ERR_INVCMD, ERROR));	/* force INVCMD to an error so stx_error sees it as hard */
 			return FALSE;
+		}
+		stx_error(ERR_INVCMD);				/* the warning form so stx_error treats it as provisional */
 	}
 	if (!VALID_CMD(x) )
 	{
@@ -234,8 +238,10 @@ LITDEF struct
 	}
 	advancewindow();
 	if ((TK_COLON != TREF(window_token)) || !cmd_data[x].pcnd_ok)
+	{
+		assert((m_zinvcmd != cmd_data[x].fcn));
 		cr = NULL;
-	else
+	} else
 	{
 		advancewindow();
 		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
@@ -244,8 +250,8 @@ LITDEF struct
 			stx_error(ERR_PCONDEXPECTED);
 			return FALSE;
 		}
-		if (shifting = (TREF(expr_start) != TREF(expr_start_orig))) /* WARNING - assignent */
-		{
+		if (shifting = ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode)))
+		{	/* NOTE - assignent above */
 			temp_expr_start = TREF(expr_start);
 			triptr = newtriple(OC_GVRECTARG);
 			triptr->operand[0] = put_tref(temp_expr_start);
@@ -291,7 +297,5 @@ LITDEF struct
 				tnxtarg(cr);
 		}
 	}
-	if (!cr && (m_zinvcmd == cmd_data[x].fcn))
-		return FALSE;
 	return rval;
 }

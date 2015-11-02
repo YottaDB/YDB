@@ -13,7 +13,7 @@
 
 #include "gtm_stdio.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "op.h"
 #include "error.h"

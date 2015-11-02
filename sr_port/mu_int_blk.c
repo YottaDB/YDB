@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@
 #include "gtmmsg.h"
 #include "get_spec.h"
 #ifdef GTM_TRIGGER
-#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
+#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #endif
 
@@ -41,6 +41,11 @@
 #define MIN_DATA (3 * SIZEOF(char)) /* a non-empty data block rec must have at least one character of key and two of terminator */
 #define TEXT2 "Block "
 #define TEXT3 " doubly allocated"
+#define SPAN_SUBS_LENGTH   5
+#define SPAN_START_BYTE 0x02
+#define SPAN_BYTE_MAX  	255
+#define SPAN_BYTE_MIN	1
+#define SPAN_SUBS_OFF	48
 
 GBLDEF unsigned char		muint_temp_buff[MAX_MIDENT_LEN + 1];
 GBLREF unsigned char		*mu_int_locals;
@@ -75,6 +80,41 @@ GBLREF gv_key			*muint_end_key;
 GBLREF gv_key			*muint_start_key;
 GBLREF sgmnt_data		mu_int_data;
 GBLREF trans_num		largest_tn;
+GBLREF span_node_integ		*sndata;
+
+error_def(ERR_DBBADKYNM);
+error_def(ERR_DBBADNSUB);
+error_def(ERR_DBBADPNTR);
+error_def(ERR_DBBDBALLOC);
+error_def(ERR_DBBNPNTR);
+error_def(ERR_DBBSIZMN);
+error_def(ERR_DBBSIZMX);
+error_def(ERR_DBCMPBAD);
+error_def(ERR_DBCMPNZRO);
+error_def(ERR_DBCOMPTOOLRG);
+error_def(ERR_DBGTDBMAX);
+error_def(ERR_DBINCLVL);
+error_def(ERR_DBINVGBL);
+error_def(ERR_DBKEYGTIND);
+error_def(ERR_DBKEYMN);
+error_def(ERR_DBKEYMX);
+error_def(ERR_DBKEYORD);
+error_def(ERR_DBKGTALLW);
+error_def(ERR_DBLRCINVSZ);
+error_def(ERR_DBLTSIBL);
+error_def(ERR_DBMAXNRSUBS); /* same error as ERR_MAXNRSUBSCRIPTS, but has a string output as well */
+error_def(ERR_DBPTRMX);
+error_def(ERR_DBPTRNOTPOS);
+error_def(ERR_DBRLEVTOOHI);
+error_def(ERR_DBRLEVLTONE);
+error_def(ERR_DBSTARCMP);
+error_def(ERR_DBRSIZMN);
+error_def(ERR_DBRSIZMX);
+error_def(ERR_DBDATAMX);
+error_def(ERR_DBTN);
+error_def(ERR_DBTNTOOLG);
+error_def(ERR_DBSPANGLOINCMP);
+error_def(ERR_DBSPANCHUNKORD);
 
 LITDEF boolean_t mu_int_possub[16][16] = {
 	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -143,50 +183,23 @@ boolean_t mu_int_blk(
 	} sub_list;
 
 	unsigned char	buff[MAX_KEY_SZ + 1], old_buff[MAX_KEY_SZ + 1], temp_buff[MAX_MIDENT_LEN + 1], util_buff[MAX_UTIL_SIZE];
-	unsigned char	blk_levl, *c1, cc, ch, rec_cmpc;
-	uchar_ptr_t	c0, c2, c_base, blk_base, blk_top, key_base, ptr, rec_base, rec_top;
+	unsigned char	blk_levl, *c1, ch, *ctrlbytes;
+	unsigned short	cc, rec_cmpc;
+	uchar_ptr_t	c0, c2, c_base, blk_base, blk_top, key_base, ptr, rec_base, rec_top, span_key;
 	unsigned short	temp_ushort;
 	boolean_t	first_key, is_top, pstar, valid_gbl, hasht_global;
 	boolean_t	muint_range_done = FALSE;
 	int		blk_size, buff_length, b_index, cmcc, comp_length, key_size, len, name_len,
 			num_len, rec_size, s_index, start_index, hdr_len, idx;
+	int		tmp_cmpc, tmp_numsubs, max_allowed_key_size;
 	block_id	child, root_pointer;
 	sub_list	mu_sub_list[MAX_GVSUBSCRIPTS + 1];
 	sub_num		check_vals;
 	trans_num	blk_tn;
 	uchar_ptr_t	subrec_ptr;
 	enum db_ver	ondsk_blkver;
-
-	error_def(ERR_DBBDBALLOC);
-	error_def(ERR_DBBSIZMN);
-	error_def(ERR_DBBSIZMX);
-	error_def(ERR_DBRLEVTOOHI);
-	error_def(ERR_DBRLEVLTONE);
-	error_def(ERR_DBINCLVL);
-	error_def(ERR_DBTNTOOLG);
-	error_def(ERR_DBRSIZMN);
-	error_def(ERR_DBRSIZMX);
-	error_def(ERR_DBLRCINVSZ);
-	error_def(ERR_DBSTARCMP);
-	error_def(ERR_DBCMPNZRO);
-	error_def(ERR_DBINVGBL);
-	error_def(ERR_DBCOMPTOOLRG);
-	error_def(ERR_DBBADKYNM);
-	error_def(ERR_DBKEYMX);
-	error_def(ERR_DBKEYMN);
-	error_def(ERR_DBKGTALLW);
-	error_def(ERR_DBGTDBMAX);
-	error_def(ERR_DBCMPBAD);
-	error_def(ERR_DBKEYORD);
-	error_def(ERR_DBLTSIBL);
-	error_def(ERR_DBMAXNRSUBS); /* same error as ERR_MAXNRSUBSCRIPTS, but has a string output as well */
-	error_def(ERR_DBBADNSUB);
-	error_def(ERR_DBPTRNOTPOS);
-	error_def(ERR_DBPTRMX);
-	error_def(ERR_DBBNPNTR);
-	error_def(ERR_DBBADPNTR);
-	error_def(ERR_DBKEYGTIND);
-	error_def(ERR_DBTN);
+	uint4		cnt, span_curr_blk, rval_len, gblsize;
+	unsigned short	numsubs;
 
 	mu_int_offset[mu_int_plen] = 0;
 	mu_int_path[mu_int_plen++] = blk;
@@ -196,7 +209,7 @@ boolean_t mu_int_blk(
 		mu_int_err(ERR_DBBDBALLOC, TRUE, TRUE, bot_key, bot_len, top_key, top_len, (unsigned int)(level));
 		return FALSE;
 	}
-	blk_base = mu_int_read(blk, &ondsk_blkver);	/* ondsk_blkver set to GDSV4 or GDSV5 (GDSVCURR) */
+	blk_base = mu_int_read(blk, &ondsk_blkver);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
 	if (!blk_base)
 		return FALSE;
 	blk_size = (int)((blk_hdr_ptr_t)blk_base)->bsiz;
@@ -300,14 +313,14 @@ boolean_t mu_int_blk(
 			free(blk_base);
 			return FALSE;
 		}
-		if (rec_size > blk_top - rec_base)
+		if ((rec_size > blk_top - rec_base))
 		{
 			mu_int_err(ERR_DBRSIZMX, TRUE, TRUE, buff, comp_length, top_key, top_len, (unsigned int)blk_levl);
 			free(blk_base);
 			return FALSE;
 		}
 		rec_top = rec_base + rec_size;
-		rec_cmpc = ((rec_hdr_ptr_t)rec_base)->cmpc;
+		rec_cmpc = EVAL_CMPC((rec_hdr_ptr_t)rec_base);
 		if (level && (rec_top == blk_top))
 		{
 			is_top = TRUE;
@@ -399,26 +412,12 @@ boolean_t mu_int_blk(
 				free(blk_base);
 				return FALSE;
 			}
-			if (key_size > MAX_KEY_SZ)
-			{
+			if (key_size + rec_cmpc > MAX_KEY_SZ)
+			{	/* We'll allow index keys to be whatever length, so long as they don't exceed MAX_KEY_SZ */
 				mu_int_err(ERR_DBKGTALLW, TRUE, TRUE, buff, comp_length, top_key,
 						top_len, (unsigned int)blk_levl);
 				free(blk_base);
 				return FALSE;
-			}
-			if (key_size > mu_int_data.max_key_size)
-			{
-				if (maxkey_errors < disp_maxkey_errors)
-				{
-					mu_int_err(ERR_DBGTDBMAX, TRUE, FALSE, buff, comp_length, top_key,
-						top_len, (unsigned int)blk_levl);
-					mu_int_plen++;	/* continuing, so compensate for mu_int_err decrement */
-					maxkey_errors++;
-				} else
-				{
-					mu_int_errknt++;
-					maxkey_errors++;
-				}
 			}
 			if ((short int)rec_cmpc < buff_length && buff[rec_cmpc] == *key_base)
 			{
@@ -615,6 +614,159 @@ boolean_t mu_int_blk(
 								}
 							}
 						}
+					}
+				}
+			}
+			if (!level && !master_dir)
+			{
+				rval_len = rec_size - SIZEOF(rec_hdr) - key_size;
+				if (mu_int_data.max_rec_size < rval_len)
+				{
+					mu_int_err(ERR_DBDATAMX, TRUE, TRUE, buff, comp_length,
+							top_key, top_len, (unsigned int)blk_levl);
+					free(blk_base);
+					return FALSE;
+				}
+				span_key = buff + buff_length - SPAN_SUBS_LENGTH - 1;
+				max_allowed_key_size = mu_int_data.max_key_size;
+				if ((SPAN_SUBS_LENGTH < key_size + rec_cmpc) && (KEY_DELIMITER == *span_key++)
+						&& (SPAN_START_BYTE == *span_key))
+				{	/* Hidden subscript detected */
+					max_allowed_key_size += 4;
+					if (0 == (span_curr_blk = SPAN_GVSUBS2INT((span_subs *)span_key)))
+					{	/* First record of spanning node. Get the number blocks. */
+						ctrlbytes = key_base + key_size;
+						if (rec_top - ctrlbytes == 6)
+						{
+							GET_NSBCTRL(ctrlbytes, numsubs, gblsize);
+						} else
+						{
+							SSCANF((char *)ctrlbytes, "%d,%d", &tmp_numsubs, &gblsize);
+							numsubs = tmp_numsubs;
+						}
+						sndata->span_tot_blks = numsubs + 1;
+						sndata->span_node_sz = gblsize;
+						sndata->val_len = 0;
+						sndata->sn_type = SPAN_NODE;
+						sndata->span_prev_blk = 0;
+						sndata->span_blk_cnt = 1;
+						sndata->key_len = buff_length;
+						sndata->sn_cnt += 1;
+						memcpy(sndata->span_node_buf, buff, buff_length);
+					} else
+					{
+						switch (sndata->sn_type)
+						{
+						case SN_NOT:	/*First block of the node-fragment*/
+							sndata->sn_type = SN_CHUNK;
+							sndata->span_prev_blk = span_curr_blk;
+							sndata->span_blk_cnt = 1;
+							sndata->span_frag_off = span_curr_blk;
+							sndata->key_len = buff_length;
+							/*Spanning node can never have 0 rval*/
+							sndata->span_node_sz = 0;
+							sndata->val_len = 0;
+							sndata->sn_cnt += 1;
+							memcpy(sndata->span_node_buf, buff, buff_length);
+							break;
+						case SPAN_NODE:	/* Already in the spanning node */
+							if((sndata->span_prev_blk + 1) == span_curr_blk)
+							{	/*Logical continuity of block is present*/
+								sndata->span_prev_blk = span_curr_blk;
+								sndata->span_blk_cnt = sndata->span_blk_cnt + 1;
+								sndata->val_len += rval_len;
+								if(sndata->span_blk_cnt == sndata->span_tot_blks)
+								{	/* All the blocks of the spanning node are seen */
+									sndata->sn_type = SN_NOT;
+									sndata->sn_blk_cnt += sndata->span_blk_cnt;
+								}
+								if (sndata->val_len > sndata->span_node_sz)
+								{
+									mu_int_err(ERR_DBDATAMX, TRUE, TRUE,
+										   sndata->span_node_buf,
+										   sndata->key_len, top_key,
+										   top_len,
+										   (unsigned int)blk_levl);
+									free(blk_base);
+									return FALSE;
+								}
+							}
+							else { /* ERROR 1: There is discontinuity in the spanning node
+							  	* blocks; adjacent spanning block is missing
+							  	*/
+								mu_int_err(ERR_DBSPANGLOINCMP, TRUE, FALSE,
+									   sndata->span_node_buf,
+									   sndata->key_len, top_key,
+								 	   top_len, (unsigned int)blk_levl);
+								sndata->sn_type = SN_NOT;
+								sndata->sn_blk_cnt += sndata->span_blk_cnt;
+								/* continuing, so compensate for mu_int_err decrement */
+								mu_int_plen++;
+								maxkey_errors++;
+							}
+							break;
+						case SN_CHUNK:	/* Already in the spanning node fragment */
+							if((sndata->span_prev_blk + 1) == span_curr_blk)
+							{	/*Logical continuity of block is present*/
+								sndata->span_prev_blk = span_curr_blk;
+								sndata->span_blk_cnt = sndata->span_blk_cnt + 1;
+							}
+							else { /* ERROR 2: Unexpected spanning-node-block occurred in
+							 	* the middle of spanning-node fragment
+							  	*/
+								mu_int_err(ERR_DBSPANCHUNKORD, TRUE, FALSE,
+									   sndata->span_node_buf,
+									   sndata->key_len, top_key,
+									   top_len, (unsigned int)blk_levl);
+								sndata->sn_type = SN_CHUNK;
+								sndata->span_prev_blk = span_curr_blk;
+								sndata->span_blk_cnt = 1;
+								sndata->span_frag_off = span_curr_blk;
+								sndata->key_len = buff_length;
+								memcpy(sndata->span_node_buf, buff, buff_length);
+								sndata->sn_blk_cnt += sndata->span_blk_cnt;
+								/* continuing, so compensate for mu_int_err decrement */
+								mu_int_plen++;
+								maxkey_errors++;
+							}
+							break;
+						}
+					}
+				} else if (sndata->sn_type)
+				{
+					if (SPAN_NODE == sndata->sn_type) /*INCOMPLETE SPANNING NODE*/
+					{ /* ERROR 1: There is discontinuity in the spanning node blocks;
+					   * adjacent spanning block is missing
+					   */
+						mu_int_err(ERR_DBSPANGLOINCMP, TRUE, FALSE,
+							   sndata->span_node_buf, sndata->key_len, top_key,
+							   top_len, (unsigned int)blk_levl);
+					} else /*INCOMPLETE SPANNING NODE FRAGMENT*/
+					{  /* ERROR 2: Spanning-node-block occurred in the middle
+					    * of non-spanning block
+					    */
+						mu_int_err(ERR_DBSPANCHUNKORD, TRUE, FALSE,
+							   sndata->span_node_buf, sndata->key_len, top_key,
+							   top_len, (unsigned int)blk_levl);
+					}
+					sndata->sn_blk_cnt += sndata->span_blk_cnt;
+					/* continuing, so compensate for mu_int_err decrement */
+					mu_int_plen++;
+					maxkey_errors++;
+					sndata->sn_type = SN_NOT;
+				}
+				if (key_size + rec_cmpc > max_allowed_key_size)
+				{
+					if (maxkey_errors < disp_maxkey_errors)
+					{
+						mu_int_err(ERR_DBGTDBMAX, TRUE, FALSE, buff, comp_length, top_key,
+							top_len, (unsigned int)blk_levl);
+						mu_int_plen++;	/* continuing, so compensate for mu_int_err decrement */
+						maxkey_errors++;
+					} else
+					{
+						mu_int_errknt++;
+						maxkey_errors++;
 					}
 				}
 			}

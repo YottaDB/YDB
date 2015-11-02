@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,7 @@ GBLREF bool	dec_nofac;
 #define ERR_TAG		"ENO"
 
 
-void	gtm_getmsg (int4 msgnum, mstr *msgbuf)
+void	gtm_getmsg(int4 msgnum, mstr *msgbuf)
 {
 	short int	m_len, faclen, taglen, j, sever;
 	char		*cp;
@@ -33,11 +33,9 @@ void	gtm_getmsg (int4 msgnum, mstr *msgbuf)
 	const err_ctl	*ctl;
 
 	ctl = err_check(msgnum);
-	if (ctl != 0)
+	if (NULL != ctl)
 	{
-		assert((msgnum & FACMASK(ctl->facnum)) && (MSGMASK(msgnum, ctl->facnum) <= ctl->msg_cnt));
-		j = MSGMASK(msgnum, ctl->facnum);
-		msg = ctl->fst_msg + j - 1;
+		GET_MSG_INFO(msgnum, ctl, msg);
 		msgp = msg->msg;
 		tag = (char_ptr_t)msg->tag;
 		fac = ctl->facname;

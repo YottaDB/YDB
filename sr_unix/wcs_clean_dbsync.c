@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -133,7 +133,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		dbsync_defer_timer = TRUE;
 		GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);
 		DEBUG_ONLY(
-			/* We invoke tp_grab_crit below which can potentially do cache-recoveries if csd->wc_blocked is set.
+			/* We invoke tp_grab_crit below which can potentially do cache-recoveries if cnl->wc_blocked is set.
 			 * But wcs_recover has an assert that we never invoke it in the final retry. This is to avoid
 			 * restarts in the final retry. But wcs_clean_dbsync invokes tp_grab_crit only if we dont already
 			 * hold crit and that means we have already finished commit on this particular region (e.g. if
@@ -142,7 +142,8 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			 * by setting ok_to_call_wcs_recover to TRUE. Need to save and restore the global as it could be
 			 * TRUE or FALSE depending on where wcs_clean_dbsync interrupted mainline code.
 			 */
-			assert(CDB_STAGNATE >= t_tries);
+			assert(CDB_STAGNATE >= t_tries ||
+			       gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVDATAFAIL == gtm_white_box_test_case_number));
 			if (CDB_STAGNATE <= t_tries)
 			{
 				save_ok_to_call_wcs_recover = TREF(ok_to_call_wcs_recover);
@@ -158,7 +159,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			&& ((NULL == check_csaddrs) || !T_IN_CRIT_OR_COMMIT_OR_WRITE(check_csaddrs))
 			&& !T_IN_CRIT_OR_COMMIT_OR_WRITE(csa)
 			&& (FALSE != tp_grab_crit(reg)))
-		{	/* Note that tp_grab_crit invokes wcs_recover in case csd->wc_blocked is non-zero.
+		{	/* Note that tp_grab_crit invokes wcs_recover in case cnl->wc_blocked is non-zero.
 			 * This means we could be doing cache recovery even though we are in interrupt code.
 			 * If this is found undesirable, the logic in tp_grab_crit that invokes wcs_recover has to be re-examined.
 			 */
@@ -190,7 +191,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 							&& (jpc->jnl_buff->epoch_tn < csa->ti->curr_tn))
 					: !is_mm && (cnl->last_wcsflu_tn < csa->ti->curr_tn))
 			{
-				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
+				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH | WCSFLU_CLEAN_DBSYNC);
 				BG_TRACE_PRO_ANY(csa, n_dbsync_writes);
 				/* If MM, file could have been remapped by wcs_flu above.  If so, cs_data needs to be reset */
 				if (is_mm && (save_csaddrs == cs_addrs) && (save_csdata != cs_data))

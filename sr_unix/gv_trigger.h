@@ -36,8 +36,8 @@ typedef enum
 #define GVTR_SUBS_RANGE		3	/* Allow a RANGE of values for this subscript */
 #define GVTR_SUBS_PATTERN	4	/* Allow all values for subscript that match a specified pattern */
 
-#define	GVTR_RANGE_OPEN_LEN	(uint4)-1 /* length assigned to open side of a range (e.g. "a": has an open right side);
-					   * is considered an impossible value for the length of any valid subscript */
+#define	GVTR_RANGE_OPEN_LEN	(uint4)-1	/* length assigned to open side of a range (e.g. "a": has an open right side);
+					   	 * is considered an impossible value for the length of any valid subscript */
 
 #define	GVTR_LIST_ELE_SIZE	8	/* size of each element in gv_trig_list buddy list (see comment in gv_trigger.c) */
 #define	GV_TRIG_LIST_INIT_ALLOC	256	/* we anticipate 256 bytes to be used by each trigger so start the buddy list there */
@@ -92,11 +92,11 @@ typedef union gvtr_subs_struct
 
 typedef gtm_num_range_t	gvtr_piece_t;
 
-/* gv_trigger_t is the structure describing the static components of ONE trigger for a given global variable name.
- * At the time of trigger invocation, there is some process-context-specific information that needs to be
- * passed in which is done in a separate gtm_trigger_parms structure (defined in gtm_trigger.h).
- * The below fields are arranged in order to ensure minimal structure padding added by the compiler. This might not
- * seem logical at first (for e.g. the related fields is_zdelim & delimiter are in different sections).
+/* gv_trigger_t is the structure describing the static components of ONE trigger for a given global variable name. At the time of
+ * trigger invocation, there is some process-context-specific information that needs to be passed in which is done in a separate
+ * gtm_trigger_parms structure (defined in gtm_trigger.h). The below fields are arranged in order to ensure minimal structure
+ * padding added by the compiler. This might not seem logical at first (for e.g. the related fields is_zdelim & delimiter are in
+ * different sections).
  */
 typedef struct gv_trigger_struct
 {
@@ -105,32 +105,26 @@ typedef struct gv_trigger_struct
 			*next_kill, 	/* Next KILL type trigger for this global */
 			*next_ztrig;	/* Next ZTRIGGER type trigger for this global */
 	uint4		cmdmask;	/* bitwise OR of all commands defining this trigger in ^#t(<GBL>,<index>,"CMD").
-					 * e.g. if ^#t(..,"CMD") is "S,K", cmdmask will be "GVTR_OPER_SET | GVTR_OPER_KILL"
-					 */
+					 * e.g. if ^#t(..,"CMD") is "S,K", cmdmask will be "GVTR_OPER_SET | GVTR_OPER_KILL" */
 	uint4		numsubs;	/* # of comma-separated subscripts specified for this particular trigger */
 	uint4		numlvsubs;	/* # of subscripts for which the trigger requested a local variable name to be bound.
-					 * i.e. numlvsubs <= numsubs is always true.
-					 */
+					 * i.e. numlvsubs <= numsubs is always true. */
 	uint4		numpieces;	/* # of contiguous piece ranges specified in the trigger */
 	gvtr_subs_t	*subsarray;	/* pointer to an array of "numsubs" number of gvtr_subs_t structures.
-					 * NULL if no subscript specified in the trigger (i.e. numsubs = 0) and is very unusual.
-					 */
+					 * NULL if no subscript specified in the trigger (i.e. numsubs = 0) and is very unusual. */
 	uint4		*lvindexarray;	/* pointer to an array of "numlvsubs" number of uint4 type fields which contain the index
-					 * in "subsarray" of the subscript whose local variable name binding this corresponds to.
-					 */
+					 * in "subsarray" of the subscript whose local variable name binding this corresponds to. */
 	mname_entry	*lvnamearray;	/* pointer to an array of "numlvsubs" number of mname_entry structures that contain the
 					 * local variable names which need to be bound to each subscript at trigger invocation.
 					 * If no subscripts have lvns specified, this is NULL.
 					 * e.g. if the trigger specified "^GBL(lvn1=:,1,lvn3=:) ..." in this case,
 					 * 	numsubs = 3, numlvsubs = 2, lvindexarray[0] = 0, lvindexarray[1] = 2,
-					 * 	lvnamearray[0].var_name = "lvn1", lvnamearray[1].var_name = "lvn3",
-					 */
+					 * 	lvnamearray[0].var_name = "lvn1", lvnamearray[1].var_name = "lvn3", */
 	gtm_num_range_t	*piecearray;	/* pointer to an array of "numpieces" ranges (range is the closed interval [min,max]).
 					 * e.g, if the piece string specified in ^#t(<GBL>,<index>,"PIECES") is "4:6;8" then
 					 *	numpieces = 2
 					 *	piecearray[0].min=4, piecearray[0].max=6
-					 *	piecearray[1].min=8, piecearray[1].max=8
-					 */
+					 *	piecearray[1].min=8, piecearray[1].max=8 */
 	rtn_tabent	rtn_desc;	/* Compiled routine name/objcode; Inited by gvtr_db_read_hasht() */
 	boolean_t	is_zdelim;	/* TRUE if "ZDELIM" was specified; FALSE if "DELIM" was specified */
 	mstr		delimiter;	/* is a copy of ^#t(<GBL>,<index>,"DELIM") or ^#t(..."ZDELIM") whichever is defined */
@@ -138,8 +132,7 @@ typedef struct gv_trigger_struct
 	mval		xecute_str;	/* Trigger code to execute */
 	struct gvt_trigger_struct	/* top of gvt_trigger block this trigger belongs to. Used in src lookup when we know */
 			*gvt_trigger;	/* .. gv_trigger_t but not owning region or trigger#. Allows us to get both with no
-					 * additional lookup
-					 */
+					 * additional lookup */
 } gv_trigger_t;
 
 /* Structure describing ALL triggers for a given global variable name */
@@ -159,8 +152,8 @@ typedef struct gvt_trigger_struct
 /* Structure describing parameters passed (from gvcst_put/gvcst_kill) to trigger invocation routine */
 typedef struct gvtr_invoke_parms_struct
 {
-	gvt_trigger_t	*gvt_trigger;	/* Input parameter */
-	gvtr_cmd_type_t	gvtr_cmd;	/* Input parameter */
+	gvt_trigger_t	*gvt_trigger;		/* Input parameter */
+	gvtr_cmd_type_t	gvtr_cmd;		/* Input parameter */
 	int		num_triggers_invoked;	/* Output parameter : # of triggers invoked by an update */
 } gvtr_invoke_parms_t;
 
@@ -191,12 +184,12 @@ typedef struct gvtr_invoke_parms_struct
 																\
 	assert(TPRESTART_STATE_NORMAL == tprestart_state);									\
 	assert(!skip_dbtriggers);												\
-	/* If start of transaction, read in GVT's triggers from ^#t global if not already done.					\
-	 * If restart and if it was due to GVT's triggers being out-of-date re-read them.					\
-	 * Note theoretically either CSD or CSA can be used to get the cycle # for comparison with GVT but while		\
-	 * using CSD can relatively reduce the # of times "gvtr_init" is invoked, it can also cause an issue where		\
-	 * a nested trigger for the same global can cause a restart which unloads a running trigger causing problems 		\
-	 * (see trigthrash subtest in triggers test suite specifically trigthrash3.m). For that reason, we stick wish CSA.	\
+	/* If start of transaction, read in GVT's triggers from ^#t global if not already done.	If restart and if it was due to	\
+	 * GVT's triggers being out-of-date re-read them. Note theoretically either CSD or CSA can be used to get the cycle for	\
+	 * comparison with GVT but while using CSD can relatively reduce the # of times "gvtr_init" is invoked, it can also	\
+	 * cause an issue where a nested trigger for the same global can cause a restart which unloads a running trigger	\
+	 * causing problems (see trigthrash subtest in triggers test suite specifically trigthrash3.m). For that reason, we	\
+	 * stick wish CSA.													\
 	 */															\
 	cycle = CSA->db_trigger_cycle;												\
 	assert(CSD == cs_data);													\
@@ -214,29 +207,29 @@ typedef struct gvtr_invoke_parms_struct
 		{	/* need to create implicit TP wrap */									\
 			DEBUG_ONLY(was_nontp = TRUE;)										\
 			assert(!LCL_TSTART);											\
-			/* Set a debug-only global variable to indicate that from now onwards, until the			\
-			 * completion of this tp-wrapped non-tp update, we dont expect "t_retry" to be called			\
-			 * while this gvcst_put is in the C-call-stack. This is because we have not set up the			\
-			 * TP transaction using opp_tstart (like what M code does) and so there is no point			\
-			 * to go back to generated code (mdb_condition_handler invoked from t_retry does this			\
-			 * transfer of control using the MUM_TSTART macro). We instead expect to handle retries			\
-			 * internally in gvcst_put. We also expect any restarts occurring in nested trigger			\
-			 * code to eventually end up as a RESTART return code from "gtm_trigger" so we get to			\
-			 * choose how to handle the restart for this implicit TSTART.						\
+			/* Set a debug-only global variable to indicate that from now onwards, until the completion of this	\
+			 * tp-wrapped non-tp update, we dont expect "t_retry" to be called while this gvcst_put is in the	\
+			 * C-call-stack. This is because we have not set up the TP transaction using opp_tstart (like what M	\
+			 * code does) and so there is no point to go back to generated code (mdb_condition_handler invoked from	\
+			 * t_retry does this transfer of control using the MUM_TSTART macro). We instead expect to handle	\
+			 * retries internally in gvcst_put. We also expect any restarts occurring in nested trigger code to	\
+			 * eventually end up as a RESTART return code from "gtm_trigger" so we get to choose how to handle the	\
+			 * restart for this implicit TSTART.									\
 			 */													\
 			assert(!donot_INVOKE_MUMTSTART);									\
 			DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE;)								\
-			/* With journal recovery, we expect it to play non-TP journal records as non-TP transactions		\
-			 * and ZTP journal records as ZTP transactions so we dont expect an implicit TP wrap to be		\
-			 * done inside recovery due to a trigger (as this means GT.M and recovery have different		\
-			 * values for GVT->gvt_trigger which is not possible). Assert that.					\
+			/* With journal recovery, we expect it to play non-TP journal records as non-TP transactions and ZTP	\
+			 * journal records as ZTP transactions so we dont expect an implicit TP wrap to be done inside recovery	\
+			 * due to a trigger (as this means GT.M and recovery have different values for GVT->gvt_trigger which	\
+			 * is not possible). Assert that.									\
 			 */													\
 			assert(!jgbl.forw_phase_recovery);									\
 			LCL_TSTART = TRUE;											\
 			 /* 0 ==> save no locals but RESTART OK */ 								\
 			op_tstart((IMPLICIT_TSTART + IMPLICIT_TRIGGER_TSTART), TRUE, &literal_batch, 0);			\
 			/* Ensure that the op_tstart done above has set up the TP frame and that the first entry is		\
-			 * of MVST_TPHOLD type. */										\
+			 * of MVST_TPHOLD type.											\
+			 */													\
 			assert((tp_pointer->fp == frame_pointer) && (MVST_TPHOLD == mv_chain->mv_st_type)			\
 				&& (msp == (unsigned char *)mv_chain));								\
 			IS_TPWRAP = TRUE;											\
@@ -282,15 +275,14 @@ typedef struct gvtr_invoke_parms_struct
 			gvtr_init(GVT, cycle, LCL_TSTART, T_ERR);								\
 			/* ^#t reads done via gvtr_init will cause t_err to be set to GVGETFAIL which needs to be reset to 	\
 			 * T_ERR (incoming parameter to this macro) before leaving the macro. Also, in case of an implicit	\
-			 * tstart (LCL_TSTART = TRUE), if a restart happens while reading ^#t global, gvtr_tpwrap_ch will	\
-			 * be invoked which inturn will invoke tp_restart that would reset sgm_info_ptr->update_trans to 	\
-			 * zero. The caller of the macro (gvcst_put and gvcst_kill) relies on sgm_info_ptr->update_trans	\
-			 * being non-zero. 											\
+			 * tstart (LCL_TSTART = TRUE), if a restart happens while reading ^#t global, gvtr_tpwrap_ch will be	\
+			 * invoked which inturn will invoke tp_restart that would reset sgm_info_ptr->update_trans to zero. The	\
+			 * caller of the macro (gvcst_put and gvcst_kill) relies on sgm_info_ptr->update_trans being non-zero. 	\
 			 */													\
 			assert(((0 < dollar_tlevel) || (ERR_GVZTRIGFAIL != T_ERR)) && (2)) ;	/* &&(2) idents assert */	\
 			set_upd_trans_t_err = TRUE;										\
-			/* Check that gvtr_init does not play with "reset_gv_target" a global variable that callers		\
-			 * of this function (e.g. gvcst_put) might have set to a non-default value.				\
+			/* Check that gvtr_init does not play with "reset_gv_target" a global variable that callers of this	\
+			 * function (e.g. gvcst_put) might have set to a non-default value.					\
 			 */													\
 			assert(reset_gv_target == save_reset_gv_target);							\
 			CSD = cs_data; /* if MM and db extension occurred, reset CSD to cs_data to avoid stale value */		\
@@ -345,22 +337,24 @@ typedef struct gvtr_invoke_parms_struct
 	GBLREF	mv_stent		*mv_chain;								\
 	GBLREF	unsigned char		*msp;									\
 														\
-	/* Create mval on the M-stack (thereby it is known to stp_gcol) to save pre-gvcst_put/gvcst_kill value.	\
-	 * The memory needed to save the actual value will be obtained from the stringpool later.		\
+	/* Create mval on the M-stack (thereby it is known to stp_gcol (BYPASSOK)) to save 			\
+	 * pre-gvcst_put/gvcst_kill value. The memory needed to save the actual value will be obtained from the \
+	 * stringpool later.											\
 	 */													\
 	assert(NULL == ZTOLD_MVAL);										\
-	SAVE_MSP = msp;	/* Save current msp & mv_chain to restore finally */					\
+	SAVE_MSP = msp;		/* Save current msp & mv_chain to restore finally */				\
 	SAVE_MV_CHAIN = mv_chain;										\
-	PUSH_MV_STENT(MVST_MVAL);	/* protect $ztoldval from stp_gcol */					\
+	PUSH_MV_STENT(MVST_MVAL);	/* protect $ztoldval from stp_gcol (BYPASSOK) */			\
 	ZTOLD_MVAL = &mv_chain->mv_st_cont.mvs_mval;								\
-	ZTOLD_MVAL->mvtype = 0;	/* make sure mval is setup enough to protect stp_gcol, if invoked below, from	\
-				 * incorrectly reading its contents until it is fully initialized later. */	\
+	ZTOLD_MVAL->mvtype = 0;	/* make sure mval is setup enough to protect stp_gcol (BYPASSOK)(if invoked 	\
+				 * below) from	incorrectly reading its contents until it is fully initialized 	\
+				 * later. */									\
 }
 
-/* The POP_MVALS_FROM_M_STACK_IF_NEEDED macro below pops some mvals pushed on the stack but pops them in an unusual way
- * for performance reasons (not really popping them but just restoring previous pointers). The debug version
- * of that macro will use the slightly longer but verifying form of unwind defined below to make sure we aren't
- * popping something we need in an invisible and tough to track fashion.
+/* The POP_MVALS_FROM_M_STACK_IF_NEEDED macro below pops some mvals pushed on the stack but pops them in an unusual way for
+ * performance reasons (not really popping them but just restoring previous pointers). The debug version of that macro will use the
+ * slightly longer but verifying form of unwind defined below to make sure we aren't popping something we need in an invisible and
+ * tough to track fashion.
  */
 #ifdef DEBUG
 #define UNW_MV_STENT_TO(prev_msp, prev_mv_chain)				\
@@ -392,8 +386,8 @@ typedef struct gvtr_invoke_parms_struct
 	GBLREF	unsigned char		*msp;						\
 											\
 	if (NULL != ZTOLD_MVAL)								\
-	{	/* ZTOLD_MVAL & potentially a few other mvals have been pushed		\
-		 * on to the M-stack. Pop them all in one restore of the M-stack.	\
+	{	/* ZTOLD_MVAL & potentially a few other mvals have been pushed onto the	\
+		 * M-stack. Pop them all in one restore of the M-stack.			\
 		 */									\
 		assert(!skip_dbtriggers);						\
 		assert(SAVE_MSP > msp);							\
@@ -428,9 +422,9 @@ typedef struct gvtr_invoke_parms_struct
 	key += HASHT_GBLNAME_FULL_LEN;											\
 	*key++ = '\0';		/* double '\0' for terminating key */							\
 	gv_currkey->end = HASHT_GBLNAME_FULL_LEN;									\
-	/* Determine root block of ^#t global in this database file. Need to use gvcst_root_search for this.		\
-	 * It expects gv_currkey, gv_target, gv_cur_region, cs_addrs & cs_data to be set up appropriately.		\
-	 * gv_currkey & gv_target are already set up. The remaining should be set up which is asserted below.		\
+	/* Determine root block of ^#t global in this database file. Need to use gvcst_root_search for this. It expects	\
+	 * gv_currkey, gv_target, gv_cur_region, cs_addrs & cs_data to be set up appropriately. gv_currkey & gv_target	\
+	 * are already set up. The remaining should be set up which is asserted below.					\
 	 */														\
 	assert(&FILE_INFO(gv_cur_region)->s_addrs == csa);								\
 	assert(cs_addrs == csa);											\
@@ -463,23 +457,21 @@ GBLREF	uint4		dollar_tlevel;
 GBLREF	int4		gtm_trigger_depth;
 GBLREF	int4		tstart_trigger_depth;
 
-/* This macro returns if the current update is an EXPLICIT update or not. Any update done as part of a
- * trigger invocation is not considered an explicit update. Note that it is possible to do a TROLLBACK
- * while inside trigger code. In this case, any updates done after the trollback while still inside the
- * trigger code are considered explicit updates. Hence the seemingly complicated check below.
- * There is a version without the asserts for use ONLY WITH the IS_OK_TO_INVOKE_GVCST_KILL macro where nested
- * asserts dont work well with the C preprocessor.
+/* This macro returns if the current update is an EXPLICIT update or not. Any update done as part of a trigger invocation is not
+ * considered an explicit update. Note that it is possible to do a TROLLBACK while inside trigger code. In this case, any updates
+ * done after the trollback while still inside the trigger code are considered explicit updates. Hence the seemingly complicated
+ * check below. There is a version without the asserts for use ONLY WITH the IS_OK_TO_INVOKE_GVCST_KILL macro where nested asserts
+ * dont work well with the C preprocessor.
  */
 #define	IS_EXPLICIT_UPDATE	(DBG_ASSERT(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth))	\
 					IS_EXPLICIT_UPDATE_NOASSERT)
 
 #define	IS_EXPLICIT_UPDATE_NOASSERT	(!dollar_tlevel || (tstart_trigger_depth == gtm_trigger_depth))
 
-/* Check if update is inside trigger (implicit update) and to a replicated database. If so check that
- * corresponding triggering update (explicit update) also occurred in a replicated database. If not this
- * is an out-of-design situation as the replicating secondary will see no journal records for this TP
- * transaction (since the triggering update did not get replicated) and so cannot keep the secondary
- * in sync with the primary. In this case, issue an error.
+/* Check if update is inside trigger (implicit update) and to a replicated database. If so check that corresponding triggering
+ * update (explicit update) also occurred in a replicated database. If not this is an out-of-design situation as the replicating
+ * secondary will see no journal records for this TP transaction (since the triggering update did not get replicated) and so cannot
+ * keep the secondary in sync with the primary. In this case, issue an error.
  */
 #define	TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(REG, CSA)							\
 {														\
@@ -519,8 +511,8 @@ GBLREF	int4		tstart_trigger_depth;
 															\
 	uint4			nodeflags;										\
 															\
-	/* No need to write ZTWORMHOLE journal records for updates inside trigger since					\
-	 * those records are not replicated anyways.									\
+	/* No need to write ZTWORMHOLE journal records for updates inside trigger since those records are not		\
+	 * replicated anyway.												\
 	 */														\
 	assert(dollar_tlevel);	/* tstart_trigger_depth is not usable otherwise */					\
 	assert(tstart_trigger_depth <= gtm_trigger_depth);								\
@@ -533,14 +525,14 @@ GBLREF	int4		tstart_trigger_depth;
 		explicit_update_repl_state = REPL_ALLOWED(CSA);								\
 		/* Write ZTWORMHOLE records only if replicating since secondary is the only one that cares about it. */	\
 		if (explicit_update_repl_state && dollar_ztwormhole.str.len)						\
-		{	/* $ZTWORMHOLE is non-NULL. Journal that BEFORE the corresponding SET record.			\
-			 * If it is found that the trigger invocation did not REFERENCE it, we will			\
-			 * remove this from the list of formatted journal records.					\
+		{	/* $ZTWORMHOLE is non-NULL. Journal that BEFORE the corresponding SET record. If it is found	\
+			 * that the trigger invocation did not REFERENCE it, we will remove this from the list of	\
+			 * formatted journal records.									\
 			 */												\
 			ZTWORM_JFB = jnl_format(JNL_ZTWORM, NULL, &dollar_ztwormhole, 0);				\
-			/* Note : ztworm_jfb could be NULL if it was determined that this ZTWORMHOLE			\
-			 * record is not needed i.e. if the exact same value of ZTWORMHOLE was				\
-			 * already written as part of the previous update in this TP transaction.			\
+			/* Note : ztworm_jfb could be NULL if it was determined that this ZTWORMHOLE record is not	\
+			 * needed i.e. if the exact same value of ZTWORMHOLE was already written as part of the		\
+			 * previous update in this TP transaction.							\
 			 */												\
 		}													\
 	} else														\
@@ -578,11 +570,11 @@ GBLREF	int4		tstart_trigger_depth;
 	{ 	/* $ZTWORMHOLE was non-zero before the trigger invocation and was never used inside the	trigger. We	\
 		 * need to remove the corresponding formatted journal record. We dont free up the memory occupied by	\
 		 * ZTWORM_JFB as it is not easy to free up memory in the middle of a buddy list. This memory will	\
-		 * anyways be freed up eventually at tp_clean_up time.							\
+		 * anyway be freed up eventually at tp_clean_up time.							\
 		 * NOTE: Trigger code that does NOT use the $ZTWORMHOLE is equivalent to a trigger code that has	\
-		 * $ZTWORMHOLE set to NULL and hence should have the JS_NULL_ZTWORM_MASK set in the nodeflags. But	\
-		 * for that to happen, checksum of the SET/KILL/ZTRIG records need to be recomputed. Since this is 	\
-		 * a costly operation, we don't touch the nodeflags as there is no known correctness issue.		\
+		 * $ZTWORMHOLE set to NULL and hence should have the JS_NULL_ZTWORM_MASK set in the nodeflags. But for	\
+		 * that to happen, checksum of the SET/KILL/ZTRIG records need to be recomputed. Since this is a costly	\
+		 * operation, we don't touch the nodeflags as there is no known correctness issue.		\
 		 */													\
 		assert(NULL != JFB);											\
 		tmpjfb = ZTWORM_JFB->prev;										\
@@ -614,7 +606,7 @@ GBLREF	int4		tstart_trigger_depth;
 											\
 	util_ptr = i2asc(&UTIL_BUFF[0], TRIGIDX);	/* UTIL_BUFF = 1 */		\
 	assert(MAX_TRIG_UTIL_LEN >= STR_LIT_LEN(PARAM));				\
-	MEMCPY_LIT(util_ptr, PARAM);		/* UTIL_BUFF = 1,"CMD" */		\
+	MEMCPY_LIT(util_ptr, PARAM);			/* UTIL_BUFF = 1,"CMD" */	\
 	util_ptr += STR_LIT_LEN(PARAM);							\
 	UTIL_LEN = UINTCAST(util_ptr - &UTIL_BUFF[0]);					\
 	assert(MAX_TRIG_UTIL_LEN >= UTIL_LEN);						\

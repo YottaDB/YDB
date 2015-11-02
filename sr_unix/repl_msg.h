@@ -139,7 +139,12 @@ typedef struct	/* Used also to send a message of type REPL_TR_CMP_JNL_RECS2 */
 	 * small message buffer */
 } repl_cmpmsg_t;
 
-#define	MAX_REPL_MSGLEN	(1 * 1024 * 1024) /* should ideally match the TCP send (recv) bufsiz of source (receiver) server */
+/* This should ideally match the TCP send/recv buffer size of source/receiver server. However, since the maximum TCP buffer
+ * varies by system, and on many systems it is less than 2 MB or even 1 MB, we keep GTMRECV_TCP_RECV_BUFSIZE and
+ * GTMSOURCE_TCP_SEND_BUFSIZE at 1 MB to avoid extra attempts to send/receive TCP packets before the limit is lowered enough
+ * for the OS to support it.
+ */
+#define	MAX_REPL_MSGLEN	(2 * 1024 * 1024)
 #define MAX_TR_BUFFSIZE	(MAX_REPL_MSGLEN - REPL_MSG_HDRLEN2) /* allow for biggest replication message header */
 
 typedef struct	/* used to send a message of type REPL_START_JNL_SEQNO */

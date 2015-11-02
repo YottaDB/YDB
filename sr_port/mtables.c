@@ -14,7 +14,7 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "release_name.h"
 #include "gdsroot.h"		/* needed for tp.h & gv_trigger.h */
@@ -31,10 +31,11 @@
 #include "tp.h"
 #include "gtmimagename.h"
 #include "arit.h"
-
+#include "gtm_conv.h"
+#include "gtm_caseconv.h"
 #ifdef GTM_TRIGGER
-#include "trigger.h"
-#include "gv_trigger.h"
+# include "trigger.h"
+# include "gv_trigger.h"
 #endif
 
 LITDEF char ctypetab[NUM_CHARS] =
@@ -296,7 +297,7 @@ LITDEF int4 gtm_version_len      = SIZEOF(GTM_VERSION) - 1;
 LITDEF char *gtm_dbversion_table[] =
 {
 	"V4",
-	"V5"
+	"V6"
 };
 
 LITDEF int4 ten_pwr[NUM_DEC_DG_1L+1] = {1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000};
@@ -401,6 +402,40 @@ LITDEF char 	alphanumeric_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'
 					't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7',
 					'8', '9', '\0'};
 LITDEF int	alphanumeric_table_len = (SIZEOF(alphanumeric_table) - 1);
+
+LITDEF mstr chset_names[CHSET_MAX_IDX_ALL] =
+{ /* Supported character set (CHSET) codes for the 3-argument form of $ZCONVERT.
+   *  Note: Update the *_CHSET_LEN macros below if new CHSETs are added.
+   */
+	{1, 1, "M"},	/* "M" should be the first CHSET (0th index of "chset_names" array). verify_chset() callers rely on this.
+			 * $ZCONVERT doesn't support M, but I/O does */
+	{5, 5, "UTF-8"},
+	{6, 6, "UTF-16"},
+	{8, 8, "UTF-16LE"},
+	{8, 8, "UTF-16BE"},
+	{5, 5, "ASCII"},
+	{6, 6, "EBCDIC"},
+	{6, 6, "BINARY"}
+};
+/* This array holds the ICU converter handles corresponding to the respective
+ * CHSET name in the table chset_names[]
+ */
+GBLDEF	UConverter	*chset_desc[CHSET_MAX_IDX];
+GBLDEF casemap_t casemaps[MAX_CASE_IDX] =
+{ /* Supported case mappings and their disposal conversion routines for both $ZCHSET modes.
+   * Note: since UTF-8 disposal functions for "U" and "L" are ICU "function pointers" rather
+   * rather than their direct addresses, they are initialized in gtm_utf8_init() instead
+   */
+	{"U", &lower_to_upper, NULL},
+	{"L", &upper_to_lower, NULL},
+	{"T", NULL,            NULL}
+};
+#endif
+
+#ifdef UNIX
+/* Used as the value for "regular" key (i.e., the one with no hidden subscripts) of a spanning node. */
+LITDEF mstr	nsb_dummy = {0, 1, "\0"};
+/*LITDEF mstr	nsb_dummy = {0, LEN_AND_LIT("dummy")};*/
 #endif
 
 #ifdef DEBUG

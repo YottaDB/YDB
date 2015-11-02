@@ -85,7 +85,7 @@ mu_reduce_level
 mu_reorg
 mu_reorg_upgrd_dwngrd
 mu_replpool_grab_sem
-mu_replpool_remove_sem
+mu_replpool_release_sem
 mu_rndwn_all
 mu_rndwn_file
 mu_rndwn_repl_instance
@@ -93,6 +93,7 @@ mu_rndwn_replpool
 mu_signal_process
 mu_split
 mu_swap_blk
+mu_swap_root
 mu_term_setup
 mu_trig_trgfile
 mu_truncate

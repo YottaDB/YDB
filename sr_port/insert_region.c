@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -214,6 +214,17 @@ tp_region	*insert_region(	gd_region	*reg,
 		DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
 		assert(csa->now_crit);	/* ensure we have crit now */
 		CHECK_MM_DBFILEXT_REMAP_IF_NEEDED(csa, reg);
+#		ifdef UNIX
+		if (MISMATCH_ROOT_CYCLES(csa, csa->nl))
+		{	/* Going into this retry, we have already checked in tp_restart for moved root blocks in tp_reg_list.
+			 * Since we haven't yet checked this region, we check it here and reset clues for an globals in the
+			 * newly inserted region. We don't want to reset ALL gvt clues because the current retry may have made
+			 * use (and valid use at that) of clues for globals in other regions.
+			 */
+			RESET_ALL_GVT_CLUES_REG(csa);
+			csa->root_search_cycle = csa->nl->root_search_cycle;
+		}
+#		endif
 	}
 	DBG_CHECK_TP_REG_LIST_SORTING(*reg_list);
 	return tr_new;

@@ -17,7 +17,7 @@
 #include "gtm_string.h"
 #include "cli.h"
 #include "stringpool.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mvalconv.h"
 #include "gtmxc_types.h"
@@ -53,6 +53,8 @@
 #ifdef UNICODE_SUPPORTED
 # include "gtm_icu_api.h"
 # include "gtm_utf8.h"
+# include "gtm_conv.h"
+GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
 #include "hashtab.h"
 #include "hashtab_str.h"
@@ -526,6 +528,7 @@ int gtm_init()
 		gtm_wcswidth_fnptr = gtm_wcswidth;
 		gtm_env_init();	/* read in all environment variables */
 		err_init(stop_image_conditional_core);
+		UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 		cli_lex_setup(0, NULL);
 		/* Initialize msp to the maximum so if errors occur during GT.M startup below,

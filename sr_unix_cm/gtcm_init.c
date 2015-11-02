@@ -31,7 +31,6 @@
 #include "stp_parms.h"
 #include "patcode.h"
 #include "error.h"
-#include "gtmimagename.h"
 #include "stringpool.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -53,14 +52,13 @@
 #include "hashtab_int4.h"
 #include "tp.h"
 #include "init_secshr_addrs.h"
-#include "gtm_imagetype_init.h"
 #include "fork_init.h"
 #include "gtmio.h"
 #include "have_crit.h"
-
+#include "gt_timers_add_safe_hndlrs.h"
 #ifdef UNICODE_SUPPORTED
-#include "gtm_icu_api.h"
-#include "gtm_utf8.h"
+# include "gtm_icu_api.h"
+# include "gtm_utf8.h"
 #endif
 
 #ifndef lint
@@ -100,10 +98,8 @@ void gtcm_init(int argc, char_ptr_t argv[])
 
 	/*  Disassociate from the rest of the universe */
 	get_page_size();
-	gtm_imagetype_init(GTCM_SERVER_IMAGE);
 	gtm_wcswidth_fnptr = gtm_wcswidth;
-
-#ifndef GTCM_DEBUG_NOBACKGROUND
+#	ifndef GTCM_DEBUG_NOBACKGROUND
 	FORK_CLEAN(pid);
 	if (0 > pid)
 	{
@@ -115,17 +111,14 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	else if (0 < pid)
 		exit(0);
 	(void) setpgrp();
-#endif
+#	endif
 	/* Initialize logging */
-
 	omi_pid = getpid();
-
 	/*  Initialize signals */
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = 0;
 	ignore = act;
 	ignore.sa_handler = SIG_IGN;
-
 	act.sa_handler = (void (*)()) gtcm_term;
 	(void) sigaction(SIGTERM, &act, 0);
 	act.sa_handler = (void (*)()) gtcm_dmpstat;
@@ -135,7 +128,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	(void) sigaction(SIGALRM, &ignore, 0);
 	(void) sigaction(SIGPIPE, &ignore, 0);
 	(void) sigaction(SIGINT, &ignore, 0);
-#ifdef GTCM_RC
+#	ifdef GTCM_RC
 	act.sa_handler = gtcm_fail;
 	act.sa_flags = SA_RESETHAND;
 	/* restore signal handler to default action upon receipt
@@ -145,19 +138,16 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	(void) sigaction(SIGILL, &act, 0);
 	(void) sigaction(SIGTRAP, &act, 0);
 	(void) sigaction(SIGABRT, &act, 0);
-#ifndef __linux__
+#	ifndef __linux__
 	(void) sigaction(SIGEMT, &act, 0);
 	(void) sigaction(SIGSYS, &act, 0);
-#endif
-#endif
-
+#	endif
+#	endif
 	/*  Initialize the process flags */
 	if (0 != gtcm_prsopt(argc, argv))
 		exit(-1);
-
 	/* Write down pid into log file */
 	 OMI_DBG((omi_debug, "GTCM_SERVER pid : %d\n", omi_pid));
-
 	/* Initialize history mechanism */
 	if (history)
 	{
@@ -166,7 +156,6 @@ void gtcm_init(int argc, char_ptr_t argv[])
 		act.sa_flags = 0;
 		(void) sigaction(SIGUSR2, &act, 0);
 	}
-
 	/*  Initialize the DBMS */
 	licensed = TRUE;
 	getjobnum();
@@ -184,10 +173,9 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	pattern_typemask = mumps_pattern.typemask;
 	INVOKE_INIT_SECSHR_ADDRS;
 	initialize_pattern_table();
-
-	 /* Preallocate some timer blocks. */
-	  prealloc_gt_timers();
-
+	/* Preallocate some timer blocks. */
+	prealloc_gt_timers();
+	gt_timers_add_safe_hndlrs();
 	/* Moved to omi_gvextnam, omi_lkextnam */
 	/*    gvinit(); */
 	return;

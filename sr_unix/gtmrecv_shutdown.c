@@ -142,7 +142,7 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 		 * lock if journal pool is available.
 		*/
 		if ((NULL != jnlpool.jnlpool_ctl) && !was_crit)
-			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
+			grab_lock(jnlpool.jnlpool_dummy_reg, ASSERT_NO_ONLINE_ROLLBACK);
 		repl_inst_recvpool_reset();
 		if ((NULL != jnlpool.jnlpool_ctl) && !was_crit)
 			rel_lock(jnlpool.jnlpool_dummy_reg);

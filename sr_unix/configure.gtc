@@ -238,10 +238,11 @@ if [ -d "utf8" ]; then
 	else
 		is64bit_gtm=`file mumps | grep "64-bit" | wc -l`
 	fi
+# please keep in sync with sr_unix/set_library_path.csh
 	if [ $is64bit_gtm -eq 1 ] ; then
-		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /lib64 /lib /usr/local/ssl/lib"
+		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu /lib64 /lib /usr/local/ssl/lib"  #BYPASSOK line length
 	else
-		library_path="/usr/local/lib32 /usr/local/lib /usr/lib32 /usr/lib /lib32 /lib"
+		library_path="/usr/local/lib32 /usr/local/lib /usr/lib32 /usr/lib /usr/lib/i386-linux-gnu /lib32 /lib"
 	fi
 	$echo "Should UTF-8 support be installed? (y or n) \c"
 	read resp
@@ -423,6 +424,14 @@ if [ -f $file ]; then
 	fi
 fi
 
+# Install custom_errors_sample.txt if it is applicable
+file=custom_errors_sample.txt
+if [ -f $file ]; then
+	cp $file $gtmdist
+	if [ "$doutf8" -ne 0 ]; then
+		ln -s ../$file $gtmdist/utf8/$file
+	fi
+fi
 # Install the .cshrc and .profile files
 cp gdedefaults gtmprofile gtmprofile_preV54000 gtm gtmcshrc $gtmdist
 chmod 0444 $gtmdist/gdedefaults
@@ -673,39 +682,40 @@ export gtm_chset
 
 # Now work on UTF-8 mode
 if [ "$doutf8" -ne 0 ]; then
-	# Ensure we ARE in UTF-8 mode
-	utflocale=`locale -a | grep -i en_us | grep -i utf | grep '8$'`
-	if [ $arch = "zos" ]; then
-		utflocale=`locale -a | grep -i en_us | grep -i utf | sed 's/.lp64$//' | grep '8$' | head -n1`
-	fi
+	# Enclose UTF-8 operations inside a subshell. This avoids changing the current M mode execution
+	(
+		# Ensure we ARE in UTF-8 mode
+		utflocale=`locale -a | grep -i en_us | grep -i utf | grep '8$'`
+		if [ $arch = "zos" ]; then
+			utflocale=`locale -a | grep -i en_us | grep -i utf | sed 's/.lp64$//' | grep '8$' | head -n1`
+		fi
 
-	if [ $utflocale = "" ]; then
-		utflocale="C"
-	fi
-	if [ $arch != "zos" ]; then
-		# don't set LC_CTYPE to avoid random error messages from EBCDIC utilities
-		LC_CTYPE=$utflocale
-		export LC_CTYPE
-	else
-		gtm_chset_locale=$utflocale
-		export gtm_chset_locale
-	fi
-	unset LC_ALL
-	gtm_chset="UTF-8"
-	export gtm_chset
-	if [ $arch = "ibm" ]; then
-		export LIBPATH=$save_icu_libpath
-	elif [ $arch = "zos" ]; then
-		# on z/OS LIBPATH is the only library search path so we should preserve it
-		export LIBPATH=${save_icu_libpath}:${LIBPATH}
-	else
-		LD_LIBRARY_PATH=$save_icu_libpath
-		export LD_LIBRARY_PATH
-	fi
-	(gtm_dist=$gtmdist/utf8; export gtm_dist; cd $gtm_dist; ./mumps -noignore *.m; $echo $?>>$gtmdist/compstat; \
-	if [ $is64bit_gtm -eq 1 -o "linux" != $arch ] ; then $ldcmd $ldflags -o libgtmutil$ext *.o ; fi )
-	gtm_chset="M"
-	export gtm_chset
+		if [ $utflocale = "" ]; then
+			utflocale="C"
+		fi
+		if [ $arch != "zos" ]; then
+			# don't set LC_CTYPE to avoid random error messages from EBCDIC utilities
+			LC_CTYPE=$utflocale
+			export LC_CTYPE
+		else
+			gtm_chset_locale=$utflocale
+			export gtm_chset_locale
+		fi
+		unset LC_ALL
+		gtm_chset="UTF-8"
+		export gtm_chset
+		if [ $arch = "ibm" ]; then
+			export LIBPATH=$save_icu_libpath
+		elif [ $arch = "zos" ]; then
+			# on z/OS LIBPATH is the only library search path so we should preserve it
+			export LIBPATH=${save_icu_libpath}:${LIBPATH}
+		else
+			LD_LIBRARY_PATH=$save_icu_libpath
+			export LD_LIBRARY_PATH
+		fi
+		(gtm_dist=$gtmdist/utf8; export gtm_dist; cd $gtm_dist; ./mumps -noignore *.m; $echo $?>>$gtmdist/compstat; \
+		if [ $is64bit_gtm -eq 1 -o "linux" != $arch ] ; then $ldcmd $ldflags -o libgtmutil$ext *.o ; fi )
+	)
 fi
 
 # Change mode to executable for the normal binaries
@@ -718,8 +728,10 @@ chmod 0644 $gtmdist/*.m
 chmod 0644 $gtmdist/*.o
 chown $owner $gtmdist/*.m
 chown $owner $gtmdist/*.o
+chown $owner $gtmdist/*.txt
 chgrp $binuser $gtmdist/*.m
 chgrp $binuser $gtmdist/*.o
+chgrp $binuser $gtmdist/*.txt
 
 if [ "$doutf8" -ne 0 ]; then
 	chmod 0644 $gtmdist/utf8/*.m
@@ -727,8 +739,10 @@ if [ "$doutf8" -ne 0 ]; then
 	chown $owner $gtmdist/utf8
 	chown $owner $gtmdist/utf8/*.m
 	chown $owner $gtmdist/utf8/*.o
+	chown $owner $gtmdist/utf8/*.txt
 	chgrp $binuser $gtmdist/utf8/*.m
 	chgrp $binuser $gtmdist/utf8/*.o
+	chgrp $binuser $gtmdist/utf8/*.txt
 fi
 
 if [ "$dogtmcrypt" -ne 0 ]; then
@@ -754,7 +768,7 @@ export gtmgbldir
 
 cat <<GDE.in1 | $gtmdist/mumps -direct
 Do ^GDE
-Change -segment DEFAULT	-block=2048	-file=$gtmdist/gtmhelp.dat
+Change -segment DEFAULT	-block=2048	-file=\$gtm_dist/gtmhelp.dat
 Change -region DEFAULT	-record=1020	-key=255
 Exit
 GDE.in1
@@ -764,12 +778,12 @@ export gtmgbldir
 
 cat <<GDE.in2 | $gtmdist/mumps -direct
 Do ^GDE
-Change -segment DEFAULT	-block=2048	-file=$gtmdist/gdehelp.dat
+Change -segment DEFAULT	-block=2048	-file=\$gtm_dist/gdehelp.dat
 Change -region DEFAULT	-record=1020	-key=255
 Exit
 GDE.in2
 
-other_object_files="CHK2LEV.o CHKOP.o GENDASH.o GENOUT.o GETNEAR.o GTMHELP.o GTMHLPLD.o LOAD.o LOADOP.o"
+other_object_files="CHK2LEV.o CHKOP.o GENDASH.o GENOUT.o GETNEAR.o GTMHLPLD.o LOAD.o LOADOP.o"
 other_object_files="$other_object_files LOADVX.o MSG.o TTTGEN.o TTTSCAN.o UNLOAD.o GTMDefinedTypesInit.o"
 csh_script_files=""
 if [ $arch = "zos" ]; then
@@ -901,7 +915,7 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
 		*.gtc gtm* gde* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid $other_object_files $csh_script_files lowerc_cp\
 		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.* COPYING README.txt
-	\rm -rf GETPASS.o plugin PINENTRY.o
+	\rm -rf GETPASS.o plugin PINENTRY.o GTMHELP.o custom_errors_sample.txt
 	if [ -d utf8 ]; then
 		\rm -rf utf8
 	fi

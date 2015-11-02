@@ -21,7 +21,7 @@
 #include "iosp.h"
 #include "error.h"
 /* *****************
-#include "gtm_mtio.h"
+#include <gtm_mtio.h>
 #include "gtm_stat.h"
 #include <gtm_termios.h>
 #include <errno.h>

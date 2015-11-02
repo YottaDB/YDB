@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc.	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,7 +109,7 @@ static readonly CLI_ENTRY never_always_allowexisting[] = {
 
 static readonly CLI_ENTRY db_vers[] = {
 	{ "V4",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A,	 0 },
-	{ "V5",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A, 	 0 },
+	{ "V6",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A, 	 0 },
 };
 
 static readonly CLI_ENTRY dse_cfhead_qual[] = {
@@ -163,6 +163,7 @@ static readonly CLI_ENTRY dse_cfhead_qual[] = {
 { "ONLINE_NBB",                0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
 { "OVERRIDE",                  0, 0, 0,			    0,                   0, 0, VAL_N_A,     0, 0,       0,        0       },
 { "PRE_READ_TRIGGER_FACTOR",   0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "QDBRUNDOWN",                0, 0, 0,                     0,                   0, 0, VAL_N_A,     0, NEG,     0,        0       },
 { "RC_SRV_COUNT",              0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "RECORD_MAX_SIZE",           0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "REFERENCE_COUNT",           0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },

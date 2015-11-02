@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,9 +32,10 @@
 #include <signal.h>
 
 #ifdef UNIX
-#include "sig_init.h"
+# include "continue_handler.h"
+# include "sig_init.h"
 #else
-#include "desblk.h"		/* for desblk structure */
+# include "desblk.h"		/* for desblk structure */
 #endif
 #include "gdsroot.h"
 #include "v15_gdsroot.h"
@@ -55,6 +56,7 @@
 #include "cli.h"
 #include "gtm_imagetype_init.h"
 #include "gtm_threadgbl_init.h"
+#include "wbox_test_init.h"
 
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		gtm_utf8_mode;
@@ -83,15 +85,14 @@ int UNIX_ONLY(main)VMS_ONLY(dbcertify)(int argc, char **argv)
 	psa_gbl = malloc(SIZEOF(*psa_gbl));
 	memset(psa_gbl, 0, SIZEOF(*psa_gbl));
 	UNIX_ONLY(err_init(dbcertify_base_ch));
-	UNIX_ONLY(sig_init(dbcertify_signal_handler, dbcertify_signal_handler, NULL));
+	UNIX_ONLY(sig_init(dbcertify_signal_handler, dbcertify_signal_handler, NULL, continue_handler));
 	VMS_ONLY(util_out_open(0));
 	VMS_ONLY(SET_EXIT_HANDLER(exi_blk, dbcertify_exit_handler, exi_condition));	/* Establish exit handler */
 	VMS_ONLY(ESTABLISH(dbcertify_base_ch));
 	process_id = getpid();
-
 	/* Structure checks .. */
 	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
-
+	OPERATOR_LOG_MSG;
 	/* Platform dependent method to get the option scan going and invoke necessary driver routine */
 	dbcertify_parse_and_dispatch(argc, argv);
 	return SS_NORMAL;

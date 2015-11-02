@@ -123,8 +123,12 @@ void db_auto_upgrade(gd_region *reg)
 				/* In addition, V55000 introduced before_trunc_total_blks for MUPIP REORG -TRUNCATE.
 				 * Since it is a new field no initialization necessary.
 				 */
-				break;
 			case GDSMV55000:
+				UNIX_ONLY(csd->freeze_on_fail = FALSE;)
+				UNIX_ONLY(csd->span_node_absent = TRUE;)
+				UNIX_ONLY(csd->maxkeysz_assured = FALSE;)
+				break;
+			case GDSMV60000:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */

@@ -170,9 +170,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	repl_ctl_element	*repl_ctl_list;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	int			gtmsource_log_fd;
-GBLREF	int			gtmsource_statslog_fd;
 GBLREF	FILE			*gtmsource_log_fp;
-GBLREF	FILE			*gtmsource_statslog_fp;
 GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	int			gtmsource_filter;
 GBLREF	gd_addr			*gd_header;
@@ -335,7 +333,7 @@ int gtmsource_process(void)
 	double				time_elapsed;
 	seq_num				resync_seqno, zqgblmod_seqno, filter_seqno;
 	gd_region			*reg, *region_top;
-	sgmnt_addrs			*csa;
+	sgmnt_addrs			*csa, *repl_csa;
 	qw_num				backlog_bytes, backlog_count, delta_sent_cnt, delta_data_sent, delta_msg_sent;
 	long				prev_msg_sent = 0;
 	time_t				prev_now = 0, save_now;
@@ -359,6 +357,7 @@ int gtmsource_process(void)
 	char				histdetail[256];
 	gtm_time4_t			tmp_time4;
 	repl_heartbeat_msg_ptr_t	heartbeat_msg;
+	sm_global_latch_ptr_t		gtmsource_srv_latch;
 	DEBUG_ONLY(uchar_ptr_t		save_inbuff;)
 	DEBUG_ONLY(uchar_ptr_t		save_outbuff;)
 	DCL_THREADGBL_ACCESS;
@@ -366,9 +365,9 @@ int gtmsource_process(void)
 	SETUP_THREADGBL_ACCESS;
 	assert((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open);
 	DEBUG_ONLY(
-		csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
-		assert(!csa->hold_onto_crit); /* so we can do unconditional grab_lock/rel_lock */
-		ASSERT_VALID_JNLPOOL(csa);
+		repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+		assert(!repl_csa->hold_onto_crit); /* so we can do unconditional grab_lock/rel_lock */
+		ASSERT_VALID_JNLPOOL(repl_csa);
 	)
 	assert(REPL_MSG_HDRLEN == SIZEOF(jnldata_hdr_struct)); /* necessary for reading multiple transactions from jnlpool in
 								* a single attempt */
@@ -390,6 +389,7 @@ int gtmsource_process(void)
 	gtmsource_init_sec_addr(&secondary_addr);
 	gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 
+	gtmsource_srv_latch = &gtmsource_local->gtmsource_srv_latch;
 	/* Below is a simplistic representation of the state diagram of a source server.
 	 *
 	 *      ------------------------------
@@ -457,9 +457,9 @@ int gtmsource_process(void)
 				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 			}
 			jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
-			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Current Jnlpool Seqno : %llu\n",
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Current Jnlpool Seqno : "INT8_FMT"\n",
 					jnl_seqno);
-			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Last Seqno sent : %llu\n",
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Last Seqno sent : "INT8_FMT"\n",
 					gtmsource_local->read_jnl_seqno - 1);
 			/* gtmsource_save_read_jnl_seqno is kept uptodate with gtmsource_local->read_addr and gtmsource_local->read
 			 * fields in gtmsource_onln_rlbk_clnup. But, gtmsource_local->read_jnl_seqno is still pointing to the last
@@ -471,7 +471,7 @@ int gtmsource_process(void)
 			 * it is bundled up as part of libgtmshr.so whereas repl_log is bundled in libmupip.a.
 			 */
 			gtmsource_local->read_jnl_seqno = gtmsource_save_read_jnl_seqno;
-			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Source Server Read Seqno is now set to : %llu\n",
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Source Server Read Seqno is now set to : "INT8_FMT"\n",
 					gtmsource_local->read_jnl_seqno);
 			gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 			assert(READ_FILE == gtmsource_local->read_state);
@@ -569,7 +569,7 @@ int gtmsource_process(void)
 		}
 		rollback_first = FALSE;
 		secondary_ahead = FALSE;
-		GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+		grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 			continue;
 		local_jnl_seqno = jctl->jnl_seqno;
@@ -579,14 +579,14 @@ int gtmsource_process(void)
 		 * a response. */
 		assert(0 == GET_STRM_INDEX(recvd_seqno));
 		assert(0 == GET_STRM_INDEX(local_jnl_seqno));
-		repl_log(gtmsource_log_fp, TRUE, FALSE, "Current Journal Seqno of the instance is %llu [0x%llx]\n",
+		repl_log(gtmsource_log_fp, TRUE, FALSE, "Current Journal Seqno of the instance is "INT8_FMT" "INT8_FMTX"\n",
 			local_jnl_seqno, local_jnl_seqno);
 		if (recvd_seqno > local_jnl_seqno)
 		{	/* Secondary journal seqno is greater than that of the Primary. We know it is ahead of the primary. */
 			secondary_ahead = TRUE;
 			repl_log(gtmsource_log_fp, TRUE, FALSE,
-				"Secondary instance journal seqno %llu [0x%llx] is greater than Primary "
-				"instance journal seqno %llu [0x%llx]\n",
+				"Secondary instance journal seqno "INT8_FMT" "INT8_FMTX" is greater than Primary "
+				"instance journal seqno "INT8_FMT" "INT8_FMTX"\n",
 				recvd_seqno, recvd_seqno, local_jnl_seqno, local_jnl_seqno);
 			/* Since the secondary is at least multi-site, the determination of the rollback seqno involves comparing
 			 * the histinfo records between the primary and secondary starting down from "local_jnl_seqno-1"
@@ -669,7 +669,7 @@ int gtmsource_process(void)
 					 * the 0th history record in the instance file corresponds to the 0th stream. So it is
 					 * safe to look at the start_seqno of just the 0th history record in all cases.
 					 */
-					GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+					grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 						continue;
 					status = repl_inst_histinfo_get(0, &local_histinfo);
@@ -685,7 +685,7 @@ int gtmsource_process(void)
 		}
 		if (!skip_last_histinfo_check)
 		{	/* Find histinfo record in the local instance file corresponding to seqno "recvd_seqno-1" */
-			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+			grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 				continue;
 			assert(recvd_seqno <= local_jnl_seqno);
@@ -822,7 +822,10 @@ int gtmsource_process(void)
 				QWASSIGN(*(seq_num *)&reply_msgp->start_seqno[0], resync_seqno);
 				if (!rollback_first)
 				{
-					GRAB_GTMSOURCE_SRV_LATCH(gtmsource_local, max_epoch_interval);
+					assert(NULL != gd_header);
+					assert(0 < gd_header->n_regions);
+					grab_gtmsource_srv_latch(gtmsource_srv_latch, 2 * gd_header->n_regions * max_epoch_interval,
+									HANDLE_CONCUR_ONLINE_ROLLBACK);
 					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 						continue;
 					srch_status = gtmsource_srch_restart(resync_seqno, recvd_start_flags);
@@ -890,7 +893,7 @@ int gtmsource_process(void)
 		/* After having established connection, initialize a few fields in the gtmsource_local
 		 * structure and flush those changes to the instance file on disk.
 		 */
-		GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+		grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 			continue;
 		gtmsource_local->connect_jnl_seqno = jctl->jnl_seqno;
@@ -903,11 +906,12 @@ int gtmsource_process(void)
 			assert(reply_msgp->type == REPL_RESYNC_SEQNO || reply_msgp->type == REPL_ROLLBACK_FIRST);
 			if ((REPL_RESYNC_SEQNO == reply_msgp->type) && secondary_was_rootprimary)
 			{
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sent REPL_RESYNC_SEQNO message with SEQNO %llu [0x%llx]\n",
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sent REPL_RESYNC_SEQNO message with SEQNO "
+					INT8_FMT" "INT8_FMTX"\n",
 					(*(seq_num *)&reply_msgp->start_seqno[0]), (*(seq_num *)&reply_msgp->start_seqno[0]));
 				region_top = gd_header->regions + gd_header->n_regions;
 				assert(NULL != jnlpool.jnlpool_dummy_reg);
-				GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+				grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 				if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 					continue;
 				zqgblmod_seqno = jctl->max_zqgblmod_seqno;
@@ -924,8 +928,8 @@ int gtmsource_process(void)
 					gtmsource_local->send_losttn_complete = jctl->send_losttn_complete;
 				}
 				rel_lock(jnlpool.jnlpool_dummy_reg);
-				REPL_DPRINT2("BEFORE FINDING RESYNC - zqgblmod_seqno is %llu", zqgblmod_seqno);
-				REPL_DPRINT2(", curr_seqno is %llu\n", jctl->jnl_seqno);
+				REPL_DPRINT2("BEFORE FINDING RESYNC - zqgblmod_seqno is "INT8_FMT, zqgblmod_seqno);
+				REPL_DPRINT2(", curr_seqno is "INT8_FMT"\n", jctl->jnl_seqno);
 				if (zqgblmod_seqno > resync_seqno)
 				{	/* reset "zqgblmod_seqno" and "zqgblmod_tn" in all fileheaders to "resync_seqno" */
 					if (SS_NORMAL != gtmsource_update_zqgblmod_seqno_and_tn(resync_seqno))
@@ -1043,7 +1047,7 @@ int gtmsource_process(void)
 				losttncomplete_msg.len = MIN_REPL_MSGLEN;
 				gtmsource_repl_send((repl_msg_ptr_t)&losttncomplete_msg, "REPL_LOSTTNCOMPLETE",
 					MAX_SEQNO, INVALID_SUPPL_STRM);
-				GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+				grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 				if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 					break; /* the outerloop will continue */
 				gtmsource_local->send_losttn_complete = FALSE;
@@ -1072,12 +1076,12 @@ int gtmsource_process(void)
 			 */
 			pre_read_seqno = gtmsource_local->read_jnl_seqno;
 			prev_catchup = catchup;
-			assert(jctl->write_addr >= gtmsource_local->read_addr);
-			backlog_bytes = jctl->write_addr - gtmsource_local->read_addr;
-			GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+			grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 				break; /* the outerloop will continue */
 			jnl_seqno = jctl->jnl_seqno;
+			assert(jctl->write_addr >= gtmsource_local->read_addr);
+			backlog_bytes = jctl->write_addr - gtmsource_local->read_addr;
 			rel_lock(jnlpool.jnlpool_dummy_reg);
 			assert(jnl_seqno >= pre_read_seqno - 1); /* jnl_seqno >= pre_read_seqno is the most common case;
 								      * see gtmsource_readpool() for when the rare case can occur */
@@ -1085,19 +1089,20 @@ int gtmsource_process(void)
 			catchup = (BACKLOG_BYTES_THRESHOLD <= backlog_bytes || BACKLOG_COUNT_THRESHOLD <= backlog_count);
 			if (!prev_catchup && catchup) /* transition from non catchup to catchup */
 			{
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server entering catchup mode at Seqno %llu "
-					"[0x%llx] : Current backlog %llu [0x%llx] : Backlog size in journal pool %llu [0x%llx] "
-					"bytes\n", pre_read_seqno, pre_read_seqno, backlog_count, backlog_count,
-					backlog_bytes, backlog_bytes);
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server entering catchup mode at Seqno "INT8_FMT" "
+					INT8_FMTX" : Current backlog "INT8_FMT" "INT8_FMTX" : Backlog size in journal pool "
+					INT8_FMT" "INT8_FMTX" bytes\n", pre_read_seqno, pre_read_seqno,
+					backlog_count, backlog_count, backlog_bytes, backlog_bytes);
 				prev_now = gtmsource_now;
 				prev_msg_sent = repl_source_msg_sent;
 				force_recv_check = TRUE;
 			} else if (prev_catchup && !catchup) /* transition from catchup to non catchup */
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server returning to regular mode from catchup mode "
-					 "at Seqno %llu [0x%llx] : Current backlog %llu [0x%llx] : Backlog size in journal pool "
-					 " %llu [0x%llx] bytes\n", pre_read_seqno, pre_read_seqno, backlog_count, backlog_count,
-					backlog_bytes, backlog_bytes);
+					 "at Seqno "INT8_FMT" "INT8_FMTX" : Current backlog "INT8_FMT" "INT8_FMTX
+					 " : Backlog size in journal pool  "INT8_FMT" "INT8_FMTX" bytes\n",
+					 pre_read_seqno, pre_read_seqno, backlog_count, backlog_count,
+					 backlog_bytes, backlog_bytes);
 				if (gtmsource_msgbufsiz - MAX_REPL_MSGLEN > 2 * OS_PAGE_SIZE)
 				{/* We have expanded the buffer by too much (could have been avoided had we sent one transaction
 				  * at a time while reading from journal files); let's revert back to our initial buffer size.
@@ -1248,12 +1253,12 @@ int gtmsource_process(void)
 							recvd_start_flags = START_FLAG_NONE;
 							if (REPL_BADTRANS == gtmsource_msgp->type)
 								repl_log(gtmsource_log_fp, TRUE, TRUE, "Received REPL_BADTRANS "
-									"message with SEQNO %llu [0x%llx]\n",
+									"message with SEQNO "INT8_FMT" "INT8_FMTX"\n",
 									recvd_seqno, recvd_seqno);
 							else
 							{
 								repl_log(gtmsource_log_fp, TRUE, TRUE, "Received REPL_CMP2UNCMP "
-									"message with SEQNO %llu [0x%llx]\n",
+									"message with SEQNO "INT8_FMT" "INT8_FMTX"\n",
 									recvd_seqno, recvd_seqno);
 								repl_log(gtmsource_log_fp, TRUE, FALSE,
 									"Defaulting to NO compression for this connection\n");
@@ -1266,8 +1271,8 @@ int gtmsource_process(void)
 								recvd_start_flags = GTM_BYTESWAP_32(recvd_start_flags);
 							already_communicated = FALSE;
 							repl_log(gtmsource_log_fp, TRUE, TRUE,
-								"Received REPL_START_JNL_SEQNO message with SEQNO %llu [0x%llx]. "
-								"Possible crash of recvr/update process\n",
+								"Received REPL_START_JNL_SEQNO message with SEQNO "INT8_FMT" "
+								INT8_FMTX". Possible crash of recvr/update process\n",
 								recvd_seqno, recvd_seqno);
 						}
 						break;
@@ -1355,7 +1360,7 @@ int gtmsource_process(void)
 			if (force_recv_check) /* we want to poll the incoming pipe for possible XOFF */
 				continue;
 			assert(pre_read_seqno == gtmsource_local->read_jnl_seqno);
-			GRAB_GTMSOURCE_SRV_LATCH(gtmsource_local, max_epoch_interval);
+			grab_gtmsource_srv_latch(gtmsource_srv_latch, 2 * max_epoch_interval, HANDLE_CONCUR_ONLINE_ROLLBACK);
 			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 				break; /* the outerloop will continue */
 			tot_tr_len = gtmsource_get_jnlrecs(&gtmsource_msgp->msg[0], &data_len,
@@ -1546,9 +1551,9 @@ int gtmsource_process(void)
 						{
 							repl_log(gtmsource_log_fp, TRUE, TRUE,
 								"Connection reset while sending seqno data from "
-								"%llu [0x%llx] to %llu [0x%llx]. Status = %d ; %s\n",
-								pre_read_seqno, pre_read_seqno, post_read_seqno, post_read_seqno,
-								status, STRERROR(status));
+								INT8_FMT" "INT8_FMTX" to "INT8_FMT" "INT8_FMTX
+								". Status = %d ; %s\n", pre_read_seqno, pre_read_seqno,
+								post_read_seqno, post_read_seqno, status, STRERROR(status));
 							repl_close(&gtmsource_sock_fd);
 							SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 							gtmsource_state = gtmsource_local->gtmsource_state
@@ -1605,59 +1610,64 @@ int gtmsource_process(void)
 						/* jctl->jnl_seqno >= post_read_seqno is the most common case;
 						 * see gtmsource_readpool() for when the rare case can occur */
 						jnl_seqno = jctl->jnl_seqno;
-						assert(jnl_seqno >= post_read_seqno - 1);
-						diff_seqno = (jnl_seqno >= post_read_seqno) ?
-								(jnl_seqno - post_read_seqno) : 0;
-						repl_log(gtmsource_log_fp, FALSE, FALSE, "REPL INFO - Seqno : %llu [0x%llx]",
-							log_seqno, log_seqno);
-						repl_log(gtmsource_log_fp, FALSE, FALSE, "  Jnl Total : %llu [0x%llx] Msg Total :"
-							" %llu [0x%llx] CmpMsg Total : %llu [0x%llx] ",
-							repl_source_data_sent, repl_source_data_sent,
-							repl_source_msg_sent, repl_source_msg_sent,
-							repl_source_cmp_sent, repl_source_cmp_sent);
-						repl_log(gtmsource_log_fp, FALSE, TRUE, "Current backlog : %llu [0x%llx]\n",
-							diff_seqno, diff_seqno);
-						/* gtmsource_now is updated by the heartbeat protocol every heartbeat
-						 * interval. To cut down on calls to time(), we use gtmsource_now as the
-						 * time to figure out if we have to log statistics. This works well as the
-						 * logging interval generally is larger than the heartbeat interval, and that
-						 * the heartbeat protocol is running when we are sending data. The consequence
-						 * although is that we may defer logging when we would have logged. We can live
-						 * with that given the benefit of not calling time related system calls.
-						 * Currently, the logging interval is not changeable by users. When/if we provide
-						 * means of choosing log interval, this code may have to be re-examined.
-						 * Vinaya 2003, Sep 08
-						 */
-						assert(0 != gtmsource_now); /* must hold if we are sending data */
-						repl_source_this_log_time = gtmsource_now; /* approximate time, in the worst case,
-											    * behind by heartbeat interval */
-						assert(repl_source_this_log_time >= repl_source_prev_log_time);
-						time_elapsed = difftime(repl_source_this_log_time,
-										repl_source_prev_log_time);
-						if ((double)GTMSOURCE_LOGSTATS_INTERVAL <= time_elapsed)
+						if (jnl_seqno >= post_read_seqno - 1)
 						{
-							delta_sent_cnt = trans_sent_cnt - last_log_tr_sent_cnt;
-							delta_data_sent = repl_source_data_sent
-										- repl_source_lastlog_data_sent;
-							delta_msg_sent = repl_source_msg_sent
-										- repl_source_lastlog_msg_sent;
-							repl_log(gtmsource_log_fp, TRUE, FALSE, "REPL INFO since last log : "
-								"Time elapsed : %00.f  Tr sent : %llu [0x%llx]  Tr bytes : %llu "
-								"[0x%llx]  Msg bytes : %llu [0x%llx]\n", time_elapsed,
-								delta_sent_cnt, delta_sent_cnt, delta_data_sent, delta_data_sent,
-								delta_msg_sent, delta_msg_sent);
-							repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO since last log : "
-								"Time elapsed : %00.f  Tr sent/s : %f  Tr bytes/s : %f  "
-								"Msg bytes/s : %f\n", time_elapsed,
-								(float)delta_sent_cnt / time_elapsed,
-								(float)delta_data_sent / time_elapsed,
-								(float)delta_msg_sent / time_elapsed);
-							repl_source_lastlog_data_sent = repl_source_data_sent;
-							repl_source_lastlog_msg_sent = repl_source_msg_sent;
-							last_log_tr_sent_cnt = trans_sent_cnt;
-							repl_source_prev_log_time = repl_source_this_log_time;
-						}
-						lastlog_seqno = log_seqno;
+							diff_seqno = (jnl_seqno >= post_read_seqno) ?
+									(jnl_seqno - post_read_seqno) : 0;
+							repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Seqno : "INT8_FMT" "
+								INT8_FMTX"  Jnl Total : "INT8_FMT" "INT8_FMTX
+								"  Msg Total : "INT8_FMT" "INT8_FMTX"  CmpMsg Total : "
+								INT8_FMT" "INT8_FMTX"  Current backlog : "INT8_FMT" "INT8_FMTX"\n",
+								log_seqno, log_seqno, repl_source_data_sent, repl_source_data_sent,
+								repl_source_msg_sent, repl_source_msg_sent,
+								repl_source_cmp_sent, repl_source_cmp_sent, diff_seqno, diff_seqno);
+							/* gtmsource_now is updated by the heartbeat protocol every heartbeat
+							 * interval. To cut down on calls to time(), we use gtmsource_now as the
+							 * time to figure out if we have to log statistics. This works well as the
+							 * logging interval generally is larger than the heartbeat interval, and
+							 * that the heartbeat protocol is running when we are sending data. The
+							 * consequence although is that we may defer logging when we would have
+							 * logged. We can live with that given the benefit of not calling time
+							 * related system calls. Currently, the logging interval is not changeable
+							 * by users. When/if we provide means of choosing log interval, this code
+							 * may have to be re-examined. Vinaya 2003, Sep 08
+							 */
+							assert(0 != gtmsource_now); /* must hold if we are sending data */
+							repl_source_this_log_time = gtmsource_now; /* approximate time, in the
+												    * worst case, behind by
+												    * heartbeat interval */
+							assert(repl_source_this_log_time >= repl_source_prev_log_time);
+							time_elapsed = difftime(repl_source_this_log_time,
+											repl_source_prev_log_time);
+							if ((double)GTMSOURCE_LOGSTATS_INTERVAL <= time_elapsed)
+							{
+								delta_sent_cnt = trans_sent_cnt - last_log_tr_sent_cnt;
+								delta_data_sent = repl_source_data_sent
+											- repl_source_lastlog_data_sent;
+								delta_msg_sent = repl_source_msg_sent
+											- repl_source_lastlog_msg_sent;
+								repl_log(gtmsource_log_fp, TRUE, FALSE,
+									"REPL INFO since last log : "
+									"Time elapsed : %00.f  Tr sent : "INT8_FMT" "INT8_FMTX"  "
+									"Tr bytes : "INT8_FMT" "INT8_FMTX
+									"  Msg bytes : "INT8_FMT" "INT8_FMTX"\n", time_elapsed,
+									delta_sent_cnt, delta_sent_cnt, delta_data_sent,
+									delta_data_sent, delta_msg_sent, delta_msg_sent);
+								repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO since last log : "
+									"Time elapsed : %00.f  Tr sent/s : %f  Tr bytes/s : %f  "
+									"Msg bytes/s : %f\n", time_elapsed,
+									(float)delta_sent_cnt / time_elapsed,
+									(float)delta_data_sent / time_elapsed,
+									(float)delta_msg_sent / time_elapsed);
+								repl_source_lastlog_data_sent = repl_source_data_sent;
+								repl_source_lastlog_msg_sent = repl_source_msg_sent;
+								last_log_tr_sent_cnt = trans_sent_cnt;
+								repl_source_prev_log_time = repl_source_this_log_time;
+							}
+							lastlog_seqno = log_seqno;
+						} /* else an online rollback occurred. Fall-through and the subsequent iteration
+						   * will take care of re-establishing the connection
+						   */
 					}
 					poll_time = poll_immediate;
 				} else /* data_len == 0 */

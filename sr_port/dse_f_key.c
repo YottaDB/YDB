@@ -38,7 +38,7 @@ void dse_f_key(void)
 	int		size, size_root, root_path_count, count, util_len;
 	boolean_t	found, was_crit, was_hold_onto_crit;
 
-	if (!dse_getki(&targ_key[0],&size,LIT_AND_LEN("KEY")))
+	if (!dse_getki(&targ_key[0], &size, LIT_AND_LEN("KEY")))
 		return;
 	patch_path_count = 1;
 	root_path[0] = get_dir_root();
@@ -52,7 +52,7 @@ void dse_f_key(void)
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-	if (!dse_ksrch(root_path[0],&root_path[1],&root_offset[0],&targ_key_root[0],size_root))
+	if (!dse_key_srch(root_path[0], &root_path[1], &root_offset[0], &targ_key_root[0], size_root))
 	{
 		util_out_print("!/Key not found, no root present.!/",TRUE);
 		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
@@ -62,7 +62,7 @@ void dse_f_key(void)
 	patch_path_count = 1;
 	path[0] = ksrch_root;
 	patch_find_root_search = FALSE;
-	if (!dse_ksrch(path[0],&path[1],&offset[0],&targ_key[0],size))
+	if (!dse_key_srch(path[0], &path[1], &offset[0], &targ_key[0], size))
 	{	memcpy(util_buff,"!/Key not found, would be in block  ",36);
 		util_len = 36;
 		util_len += i2hex_nofill(path[patch_path_count - 2], (uchar_ptr_t)&util_buff[util_len], 8);

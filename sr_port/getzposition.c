@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 #include "stringpool.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "getzposition.h"
 

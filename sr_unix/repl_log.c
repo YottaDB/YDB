@@ -23,15 +23,11 @@
 #include "iosp.h"
 
 GBLREF int		gtmsource_log_fd;
-GBLREF int		gtmsource_statslog_fd;
 GBLREF int		gtmrecv_log_fd;
-GBLREF int		gtmrecv_statslog_fd;
 GBLREF int		updproc_log_fd;
 
 GBLREF FILE		*gtmsource_log_fp;
-GBLREF FILE		*gtmsource_statslog_fp;
 GBLREF FILE		*gtmrecv_log_fp;
-GBLREF FILE		*gtmrecv_statslog_fp;
 GBLREF FILE		*updproc_log_fp;
 
 int repl_log(FILE *fp, boolean_t stamptime, boolean_t flush, char *fmt, ...)

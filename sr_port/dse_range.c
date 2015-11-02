@@ -45,7 +45,7 @@ error_def(ERR_CTRLC);
 
 void dse_range(void)
 {
-    char		lower[256], targ_key[256], upper[256], util_buff[MAX_UTIL_LEN];
+    char		lower[MAX_KEY_SZ + 1], targ_key[MAX_KEY_SZ + 1], upper[MAX_KEY_SZ + 1], util_buff[MAX_UTIL_LEN];
     block_id		from, to, blk, blk_child;
     sm_uc_ptr_t		bp, b_top, key_bot, key_top, key_top1, rp, r_top;
     char		level;

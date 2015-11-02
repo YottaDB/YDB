@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,7 +66,7 @@ void print_target(unsigned char *c)
 		} else
 		{
 			is_string = FALSE;
-			ptop1 = ptr + MAX_NUM_SUBSC_LEN;
+			ptop1 = ptr + MAX_GVKEY_PADDING_LEN;
 		}
 		for (ptr1 = ptr;  *ptr1;  ptr1++)
 		{

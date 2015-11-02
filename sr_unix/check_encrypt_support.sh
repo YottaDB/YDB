@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-#	Copyright 2009, 2011 Fidelity Information Services, Inc #
+#	Copyright 2009, 2012 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -26,7 +26,7 @@ if [ "OSF1" = "$hostos" -o \( "HP-UX" = "$hostos" -a "ia64" != `uname -m` \) ]; 
 fi
 
 lib_search_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /lib64 /lib /usr/local/ssl/lib /usr/lib/x86_64-linux-gnu"
-lib_search_path="$lib_search_path /lib/x86_64-linux-gnu"
+lib_search_path="$lib_search_path /usr/lib/i386-linux-gnu /lib/x86_64-linux-gnu /lib/i386-linux-gnu"
 include_search_path="/usr/include /usr/local/include /usr/local/include/gpgme"
 bin_search_path="/usr/bin /usr/local/bin /bin"
 

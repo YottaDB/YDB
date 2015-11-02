@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2011 Fidelity Information Services, Inc       #
+#	Copyright 2011, 2012 Fidelity Information Services, Inc       #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -85,10 +85,11 @@ cd $gtm_dist
 
 set is64bit_gtm = `file mumps | grep 64 | wc -l`
 
+# please keep in sync with sr_unix/set_library_path.csh
 if ( $is64bit_gtm == 1 ) then
-	set library_path = "/usr/local/lib64 /usr/local/lib /usr/lib /usr/lib32"
+	set library_path = "/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib/x86_64-linux-gnu /usr/lib"
 else
-	set library_path = "/usr/local/lib /usr/lib /usr/lib32"
+	set library_path = "                 /usr/local/lib /usr/lib32 /usr/lib/i386-linux-gnu   /usr/lib"
 endif
 
 set is64bit_icu = 0
@@ -166,10 +167,22 @@ foreach libpath ($library_path)
 		endif
 	endif
 end
+# No files are supposed to have write permissions enabled. However part of the kit install
+# test leaves a few files writeable. The list of known writeable files is:
+# 	.:
+# 		-rw-r--r-- 1 root root    1387 Jul 10 11:54 gtm_test_install.out
+# 		-rw-rw-rw- 1 root root  366080 Jul 10 11:54 mumps.dat
+# 		-rw-r--r-- 1 root root    1536 Jul 10 11:54 mumps.gld
+# 	test_gtm:
+# 		-rw-r--r-- 1 root root  670 Jul 10 11:54 gtm.out
+# 		-rw-r--r-- 1 root root 1536 Jul 10 11:54 mumps.gld
+# 		-rw-r--r-- 1 root root   88 Jul 10 11:54 sim.m
+# 		-rw-r--r-- 1 root root  869 Jul 10 11:54 sim.o
 set msg2 = `ls -al * | grep -v \> | grep w- | wc -l`
-@ msg2 = $msg2 - 8
+@ msg2 = $msg2 - 7
 if ( $msg2 ) then
-    echo "Number of writeable lines = $msg2" >>&! gtm_test_install.out
+    echo "Number of writeable lines = $msg2"	>>&! gtm_test_install.out
+    ls -al * | grep -v \> | grep w-		>>&! gtm_test_install.out
 endif
 
 setenv gtm_dist .

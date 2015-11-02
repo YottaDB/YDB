@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,8 +51,21 @@
 #ifdef __MVS__
 #  define PUTENV_BPXK_MDUMP_PREFIX 		"_BPXK_MDUMP="
 #endif
-
+#ifdef DEBUG
+/* Note the var below is NOT located in gtm_logicals because it is DEBUG-only which would screw-up
+ * regresion test v53003/D9I10002703.
+ */
+# define GTM_USESECSHR				"$gtm_usesecshr"
+#endif
 #define DEFAULT_MUPIP_TRIGGER_ETRAP 		"IF $ZJOBEXAM()"
+
+/* Only for this function, define MAX_TRANS_NAME_LEN to be equal to GTM_PATH_MAX as some of the environment variables can indicate
+ * path to files which is limited by GTM_PATH_MAX.
+ */
+#ifdef MAX_TRANS_NAME_LEN
+#undef MAX_TRANS_NAME_LEN
+#endif
+#define MAX_TRANS_NAME_LEN			GTM_PATH_MAX
 
 GBLREF	int4			gtm_shmflags;			/* Shared memory flags for shmat() */
 GBLREF	uint4			gtm_principal_editing_defaults;	/* ext_cap flags if tt */
@@ -261,4 +274,29 @@ void	gtm_env_init_sp(void)
 		TREF(dbinit_max_hrtbt_delta) = (ROUND_UP2(hrtbt_cntr_delta, 8)) / 8;
 	else
 		TREF(dbinit_max_hrtbt_delta) = hrtbt_cntr_delta;
+	/* Initialize variable that controls the location of GT.M custom errors file (used for anticipatory freeze) */
+	val.addr = GTM_CUSTOM_ERRORS;
+	val.len = SIZEOF(GTM_CUSTOM_ERRORS) - 1;
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+	{
+		assert(GTM_PATH_MAX > trans.len);
+		(TREF(gtm_custom_errors)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
+		(TREF(gtm_custom_errors)).len = trans.len;
+		/* For now, we assume that if the environment variable is defined to NULL, anticipatory freeze is NOT in effect */
+		if (0 < trans.len)
+		{
+			memcpy((TREF(gtm_custom_errors)).addr, buf, trans.len);
+			((TREF(gtm_custom_errors)).addr)[trans.len] = '\0';
+		}
+	}
+#	ifdef DEBUG
+	/* DEBUG-only option to bypass 'easy' methods of things and always use gtmsecshr for IPC cleanups, wakeups, file removal,
+	 * etc. Basically use gtmsecshr for anything where it is an option - helps with testing gtmsecshr for proper operation.
+	 */
+	val.addr = GTM_USESECSHR;
+	val.len = SIZEOF(GTM_USESECSHR) - 1;
+	TREF(gtm_usesecshr) = logical_truth_value(&val, FALSE, &is_defined);
+	if (!is_defined)
+		TREF(gtm_usesecshr) = FALSE;
+#	endif
 }

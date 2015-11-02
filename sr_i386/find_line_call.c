@@ -12,7 +12,7 @@
 #include "mdef.h"
 #include "xfer_enum.h"
 #include "i386.h"
-#include "rtnhdr.h"	/* Needed by zbreak.h */
+#include <rtnhdr.h>	/* Needed by zbreak.h */
 #include "zbreak.h"
 
 zb_code  *find_line_call(void *addr)

@@ -20,7 +20,7 @@
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "targ_alloc.h"
 #include "filestruct.h"

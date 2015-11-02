@@ -34,6 +34,8 @@
 #include "bit_clear.h"
 #include "bit_set.h"
 #include "min_max.h"
+#include "anticipatory_freeze.h"
+#include "eintr_wrappers.h"
 #ifdef GTM_CRYPT
 #include "gtm_string.h"
 #endif

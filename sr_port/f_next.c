@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,8 +44,7 @@ int f_next(oprtype *a, opctype op)
 		ref = TREF(shift_side_effects) ? TREF(expr_start) : (TREF(curtchain))->exorder.bl;
 		if (!gvn())
 			return FALSE;
-		/* the following assumes OC_LIT and OC_GVNAME are all one
-		 * gets for an unsubscripted global variable reference */
+		/* the following assumes OC_LIT and OC_GVNAME are all one gets for an unsubscripted global variable reference */
 		if ((TREF(shift_side_effects) ? TREF(expr_start) : TREF(curtchain))->exorder.bl->exorder.bl->exorder.bl == ref)
 		{
 			stx_error(ERR_GVNEXTARG);

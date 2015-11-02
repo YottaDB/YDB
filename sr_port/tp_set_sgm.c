@@ -63,11 +63,6 @@ void tp_set_sgm(void)
 		GTMTRIG_ONLY(csa->db_trigger_cycle = csa->hdr->db_trigger_cycle);
 		GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_set_sgm: Updating csa->db_trigger_cycle to %d\n",
 				       csa->db_trigger_cycle)));
-#		ifdef GTM_TRUNCATE
-		/* see t_retry for comment */
-		if (dba_mm != csa->hdr->acc_meth)
-			csa->total_blks = csa->ti->total_blks;
-#		endif
 		si->tp_set_sgm_done = TRUE;
 		assert(0 == si->update_trans);
 	}

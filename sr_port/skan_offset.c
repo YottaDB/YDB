@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,14 +29,15 @@
 GBLREF block_id		patch_curr_blk;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF char		patch_comp_key[MAX_KEY_SZ + 1];
-GBLREF unsigned char	patch_comp_count;
+GBLREF unsigned short	patch_comp_count;
 GBLREF int		patch_rec_counter;
 
 sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 {
 	sm_uc_ptr_t 	b_top, rp, r_top, rp_targ, key_top;
 	char 		util_buff[MAX_UTIL_LEN];
-	unsigned char 	cc;
+	unsigned short 	cc;
+	int		tmp_cmpc;
 	short int	size, rec_size;
 	uint4		offset;
 
@@ -90,10 +91,11 @@ sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 				if (!*key_top++ && !*key_top++)
 					break;
 		}
-		if (((rec_hdr_ptr_t) rp)->cmpc > patch_comp_count)
+		EVAL_CMPC2((rec_hdr_ptr_t)rp, tmp_cmpc);
+		if (tmp_cmpc > patch_comp_count)
 			cc = patch_comp_count;
 		else
-			cc = ((rec_hdr_ptr_t) rp)->cmpc;
+			cc = tmp_cmpc;
 		size = key_top - rp - SIZEOF(rec_hdr);
 		if (size > SIZEOF(patch_comp_key) - 2 - cc)
 			size = SIZEOF(patch_comp_key) - 2 - cc;

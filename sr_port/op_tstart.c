@@ -29,7 +29,7 @@
 #include "lv_val.h"
 #include "jnl.h"
 #include "mlkdef.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
@@ -92,7 +92,6 @@ GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	uint4			tstartcycle;
 GBLREF	char			*update_array_ptr;
 GBLREF	ua_list			*curr_ua, *first_ua;
-GBLREF	int4			dollar_zmaxtptime;
 #ifdef GTM_TRIGGER
 GBLREF	mval			dollar_ztwormhole;
 GBLREF	int4			gtm_trigger_depth;
@@ -188,11 +187,21 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	{
 		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
 		jgbl.cumul_jnl_rec_len = 0;
-		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0);
+#		ifdef DEBUG
+		if (1 == jgbl.cumul_index)	/* when 1 == jgbl.cumul_index and  0 == jgbl.cumul_index, non-TP morphed into TP */
+			jgbl.cumul_index = 0;
+		else
+			assert(0 == jgbl.cumul_index);
+		TREF(tp_restart_dont_counts) = 0;
+#		endif
+		assert(0 == jgbl.cu_jnl_index);
 		GTMTRIG_ONLY(memcpy(&dollar_ztslate, &literal_null, SIZEOF(mval)));	/* Zap $ZTSLate at start of lvl 1 trans */
 		GTMTRIG_ONLY(if (!implicit_tstart || !implicit_trigger))
 		{	/* This is the path for all non-implicit-trigger type TP fences including the implicit fences
 			 * created by the update process and by mupip recover forward.
+			 * Note: For recover/rollback, t_tries is set to CDB_STAGNATE because unlike Non-TP restarts, TP restarts
+			 * need more context to determine the restart point which is non-trivial for recover/rollback since the
+			 * updates are done with journal records extracted by sequentially reading the journal file.
 			 */
 			t_tries = (FALSE == mupip_jnl_recover) ? 0 : CDB_STAGNATE;
 			t_fail_hist[t_tries] = cdb_sc_normal;
@@ -220,7 +229,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			 * kicking in at all.
 			 */
 			 /* recovery logic does not invoke triggers */
-			assert(!(SFF_TRIGR_CALLD & frame_pointer->flags) || (FALSE == mupip_jnl_recover));
+			assert(!(SFF_IMPLTSTART_CALLD & frame_pointer->flags) || (FALSE == mupip_jnl_recover));
 		}
 #		endif
 		for (tr = tp_reg_list; NULL != tr; tr = tr_next)
@@ -315,7 +324,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			} else
 				rts_error(VARLSTCNT(1) ERR_STACKCRIT);
 		}
-		memcpy(msp, old_sp, top - (unsigned char *)old_sp);
+		memmove(msp, old_sp, top - (unsigned char *)old_sp);	/* Shift stack w/possible overlapping ranges */
 		mv_st_ent = (mv_stent *)(top - shift_size);
 		mv_st_ent->mv_st_type = MVST_TPHOLD;
 		ADJUST_FRAME_POINTER(frame_pointer, shift_size);
@@ -403,7 +412,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	}
 	tf->orig_key = (gv_key *)&((TREF(gv_tporigkey_ptr))->gv_orig_key[dollar_tlevel][0]);
 	assert(NULL != gv_currkey);
-	memcpy(tf->orig_key, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);
+	MEMCPY_KEY(tf->orig_key, gv_currkey);
 	tf->gd_header = gd_header;
 	tf->gd_reg = gv_cur_region;
 	tf->zgbldir = dollar_zgbldir;
@@ -580,8 +589,8 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			si->tlvl_info_head = new_tli;
 	}
 	/* If starting first TP level, also start TP timer if set to non-default value */
-	assert(0 <= dollar_zmaxtptime);
-	if ((0 < dollar_zmaxtptime) && (1 == dollar_tlevel))
-		(*tp_timeout_start_timer_ptr)(dollar_zmaxtptime);
+	assert(0 <= TREF(dollar_zmaxtptime));
+	if ((0 < TREF(dollar_zmaxtptime)) && (1 == dollar_tlevel))
+		(*tp_timeout_start_timer_ptr)(TREF(dollar_zmaxtptime));
 	DBGRFCT((stderr, "\nop_tstart: complete\n"));
 }

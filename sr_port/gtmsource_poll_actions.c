@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,11 +51,18 @@ GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	int			gtmsource_log_fd;
 GBLREF 	FILE			*gtmsource_log_fp;
-GBLREF	int			gtmsource_statslog_fd;
-GBLREF 	FILE			*gtmsource_statslog_fp;
 GBLREF	int			gtmsource_filter;
 GBLREF	volatile time_t		gtmsource_now;
 GBLREF	uint4			log_interval;
+#ifdef UNIX
+GBLREF	boolean_t		last_seen_freeze_flag;
+#endif
+error_def(ERR_REPLWARN);
+#ifdef UNIX
+error_def(ERR_REPLINSTFREEZECOMMENT);
+error_def(ERR_REPLINSTFROZEN);
+error_def(ERR_REPLINSTUNFROZEN);
+#endif
 
 int gtmsource_poll_actions(boolean_t poll_secondary)
 {
@@ -69,7 +76,6 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	char			print_msg[1024], msg_str[1024];
 	boolean_t 		log_switched = FALSE;
 	int			status;
-	error_def(ERR_REPLWARN);
 	time_t			temp_time;
 	gtm_time4_t		time4;
 
@@ -79,6 +85,28 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Shutdown signalled\n");
 		gtmsource_end(); /* Won't return */
 	}
+#ifdef UNIX
+	if (jnlpool.jnlpool_ctl->freeze != last_seen_freeze_flag)
+	{
+		last_seen_freeze_flag = jnlpool.jnlpool_ctl->freeze;
+		if (last_seen_freeze_flag)
+		{
+			sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFROZEN, 1,
+					jnlpool.repl_inst_filehdr->inst_info.this_instname);
+			repl_log(gtmsource_log_fp, TRUE, FALSE, print_msg);
+			sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool.jnlpool_ctl->freeze_comment);
+			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
+		}
+		else
+		{
+			sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTUNFROZEN, 1,
+					jnlpool.repl_inst_filehdr->inst_info.this_instname);
+			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
+		}
+	}
+#endif
+	if (GTMSOURCE_START == gtmsource_state)
+		return (SS_NORMAL);
 	if (GTMSOURCE_CHANGING_MODE != gtmsource_state && GTMSOURCE_MODE_PASSIVE == gtmsource_local->mode)
 	{
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Changing mode from ACTIVE to PASSIVE\n");
@@ -139,7 +167,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 			log_switched = TRUE;
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "Changing log file to %s\n", gtmsource_local->log_file);
 #ifdef UNIX
-			repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, NULL, gtmsource_local->log_file, NULL);
+			repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, gtmsource_local->log_file);
 			repl_log_fd2fp(&gtmsource_log_fp, gtmsource_log_fd);
 #elif defined(VMS)
 			util_log_open(STR_AND_LEN(gtmsource_local->log_file));
@@ -155,11 +183,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	{
 #ifdef UNIX
 		gtmsource_logstats = TRUE;
-		repl_log_init(REPL_STATISTICS_LOG, &gtmsource_log_fd, &gtmsource_statslog_fd, gtmsource_local->log_file,
-			      gtmsource_local->statslog_file);
-		repl_log_fd2fp(&gtmsource_statslog_fp, gtmsource_statslog_fd);
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Starting stats log to %s\n", gtmsource_local->statslog_file);
-		repl_log(gtmsource_statslog_fp, TRUE, TRUE, "Begin statistics logging\n");
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Begin statistics logging\n");
 #else
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Stats logging not supported on VMS\n");
 #endif
@@ -167,19 +191,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	} else if (gtmsource_logstats && !gtmsource_local->statslog)
 	{
 		gtmsource_logstats = FALSE;
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Stopping stats log\n");
-		/* Force all data out to the file before closing the file */
-		repl_log(gtmsource_statslog_fp, TRUE, TRUE, "End statistics logging\n");
-		CLOSEFILE_RESET(gtmsource_statslog_fd, status);	/* resets "gtmsource_statslog_fd" to FD_INVALID */
-		/* We need to FCLOSE because a later open() in repl_log_init() might return the same file descriptor as the one
-		 * that we just closed. In that case, FCLOSE done in repl_log_fd2fp() affects the newly opened file and
-		 * FDOPEN will fail returning NULL for the file pointer. So, we close both the file descriptor and file pointer.
-		 * Note the same problem does not occur with GENERAL LOG because the current log is kept open while opening
-		 * the new log and hence the new file descriptor will be different (we keep the old log file open in case there
-		 * are errors during DUPing. In such a case, we do not switch the log file, but keep the current one).
-		 * We can FCLOSE the old file pointer later in repl_log_fd2fp() */
-		FCLOSE(gtmsource_statslog_fp, status);
-		gtmsource_statslog_fp = NULL;
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "End statistics logging\n");
 	}
 	if ((gtmsource_filter & EXTERNAL_FILTER) && ('\0' == gtmsource_local->filter_cmd[0]))
 	{

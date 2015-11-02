@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@ GBLREF block_id		patch_path[MAX_BT_DEPTH + 1], patch_path1[MAX_BT_DEPTH + 1];
 GBLREF bool		patch_find_root_search;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF short int	patch_path_count;
-GBLREF unsigned char	patch_comp_count;
+GBLREF unsigned short	patch_comp_count;
 
 error_def(ERR_DSEBLKRDFAIL);
 
@@ -44,7 +44,8 @@ int dse_order(block_id srch,
 	      bool dir_data_blk)
 {
 	sm_uc_ptr_t	bp, b_top, key_top, ptr, rp, r_top;
-	unsigned char	cc;
+	unsigned short	cc;
+	int		tmp_cmpc;
 	block_id	last;
 	short int	rsize, size;
 	int4		dummy_int;
@@ -71,7 +72,7 @@ int dse_order(block_id srch,
 			r_top = rp + rsize;
 		if ((r_top > b_top) || (r_top == b_top && ((blk_hdr*)bp)->levl))
 		{
-			if ((SIZEOF(rec_hdr) + SIZEOF(block_id) != (b_top - rp)) || ((rec_hdr *)rp)->cmpc)
+			if ((SIZEOF(rec_hdr) + SIZEOF(block_id) != (b_top - rp)) || EVAL_CMPC((rec_hdr *)rp))
 				return FALSE;
 			if (dir_data_blk && !((blk_hdr_ptr_t)bp)->levl)
 			{
@@ -92,10 +93,10 @@ int dse_order(block_id srch,
 				key_top = ptr;
 			} else
 				key_top = r_top - SIZEOF(block_id);
-			if (((rec_hdr_ptr_t)rp)->cmpc > patch_comp_count)
+			if (EVAL_CMPC((rec_hdr_ptr_t)rp) > patch_comp_count)
 				cc = patch_comp_count;
 			else
-				cc = ((rec_hdr_ptr_t)rp)->cmpc;
+				cc = EVAL_CMPC((rec_hdr_ptr_t)rp);
 			size = key_top - rp - SIZEOF(rec_hdr);
 			if ((SIZEOF(patch_comp_key) - 2 - cc) < size)
 				size = SIZEOF(patch_comp_key) - 2 - cc;

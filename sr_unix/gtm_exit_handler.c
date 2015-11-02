@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,14 +79,6 @@ void gtm_exit_handler(void)
 	cancel_timer(0);		/* Cancel all timers - No unpleasant surprises */
 	ESTABLISH(lastchance1);
 	secshr_db_clnup(NORMAL_TERMINATION);
-	if (pool_init)
-	{
-		rel_lock(jnlpool.jnlpool_dummy_reg);
-		mutex_cleanup(jnlpool.jnlpool_dummy_reg);
-		SHMDT(jnlpool.jnlpool_ctl);
-		jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
-		pool_init = FALSE;
-	}
 	if (dollar_tlevel)
 		OP_TROLLBACK(0);
 	zcall_halt();

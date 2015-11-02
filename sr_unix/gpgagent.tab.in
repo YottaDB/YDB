@@ -1,0 +1,2 @@
+@GTM_TOP@/plugin/libgtmcrypt.so
+unmaskpwd: xc_status_t gc_pk_mask_unmask_passwd_interlude(I:xc_string_t*,O:xc_string_t*[512],I:xc_int_t)

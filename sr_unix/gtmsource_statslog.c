@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,8 @@
 #include "gtm_string.h"
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
+#include "gtm_fcntl.h"
+#include "gtmio.h"
 
 #if !defined(__MVS__) && !defined(VMS)
 #include <sys/param.h>
@@ -35,6 +37,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "repl_msg.h"
+#include "repl_sp.h"
 #include "gtmsource.h"
 #include "repl_dbg.h"
 #include "repl_shutdcode.h"
@@ -45,7 +48,7 @@
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
-
+error_def(ERR_REPLLOGOPN);
 int gtmsource_statslog(void)
 {
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
@@ -64,20 +67,7 @@ int gtmsource_statslog(void)
 		util_out_print("STATSLOG turned OFF", TRUE);
 		return (NORMAL_SHUTDOWN);
 	}
-	if ('\0' == gtmsource_options.log_file[0]) /* Stats log file not specified, use general log file */
-	{
-		util_out_print("No file specified for stats log. Using general log file !AD", TRUE,
-				LEN_AND_STR(jnlpool.gtmsource_local->log_file));
-		STRCPY(gtmsource_options.log_file, jnlpool.gtmsource_local->log_file);
-	} else if (0 == STRCMP(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file))
-	{
-		util_out_print("Stats log file is already !AD. Not initiating change in log file", TRUE,
-				LEN_AND_STR(gtmsource_options.log_file));
-		return (ABNORMAL_SHUTDOWN);
-	}
-	STRCPY(jnlpool.gtmsource_local->statslog_file, gtmsource_options.log_file);
 	jnlpool.gtmsource_local->statslog = TRUE;
-	util_out_print("Stats log turned on with file !AD", TRUE, strlen(jnlpool.gtmsource_local->statslog_file),
-			jnlpool.gtmsource_local->statslog_file);
+	util_out_print("Stats log turned on", TRUE);
 	return (NORMAL_SHUTDOWN);
 }

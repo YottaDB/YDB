@@ -16,7 +16,7 @@
 #include "zshow.h"
 #include "patcode.h"
 #include "compiler.h"	/* for CHARMAXARGS */
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mv_stent.h"	/* for POP_MV_STENT */
 

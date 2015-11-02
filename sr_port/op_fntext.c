@@ -15,7 +15,7 @@
 #include "gtm_stdio.h"
 
 #include "error.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "srcline.h"
 #include "op.h"
 #include "stringpool.h"

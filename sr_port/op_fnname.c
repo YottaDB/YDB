@@ -21,7 +21,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "stringpool.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "fnname.h"
 #include "op.h"

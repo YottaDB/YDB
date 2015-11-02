@@ -25,7 +25,7 @@
 #include "iosp.h"
 #include "error.h"
 /**********
-#include "gtm_mtio.h"
+#include <gtm_mtio.h>
 #include <unistd.h>
 #include <values.h>
  *********/

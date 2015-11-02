@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,10 +28,12 @@
 #include "gtmio.h"
 #include "gds_blk_downgrade.h"
 #include "add_inter.h"
+#include "anticipatory_freeze.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
 #include "min_max.h"
+#include "jnl.h"
 
 GBLREF	sm_uc_ptr_t	reformat_buffer;
 GBLREF	int		reformat_buffer_len;
@@ -83,7 +85,7 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 		/* Represents a block state change from V5 -> V4 */
 		INCR_BLKS_TO_UPGRD(csa, csd, 1);
 		assert(SIZEOF(v15_blk_hdr) <= size);
-	} else DEBUG_ONLY(if (GDSV5 == ondsk_blkver))
+	} else DEBUG_ONLY(if (GDSV6 == ondsk_blkver))
 	{
 		size = (((blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
 		assert(SIZEOF(blk_hdr) <= size);
@@ -122,7 +124,7 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 		}
 	}
 #	endif
-	LSEEKWRITE(udi->fd,
+	DB_LSEEKWRITE(csa, udi->fn, udi->fd,
 		(DISK_BLOCK_SIZE * (csd->start_vbn - 1) + (off_t)blk * csd->blk_size),
 		buff,
 		size,

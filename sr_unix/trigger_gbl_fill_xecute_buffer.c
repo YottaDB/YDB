@@ -16,7 +16,7 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"
 #include "gvcst_protos.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "mv_stent.h"			/* for COPY_SUBS_TO_GVCURRKEY macro (within BUILD_HASHT_...) */
 #include "gvsub2str.h"			/* for COPY_SUBS_TO_GVCURRKEY */

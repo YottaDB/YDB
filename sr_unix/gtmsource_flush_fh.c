@@ -42,7 +42,7 @@ void gtmsource_flush_fh(seq_num resync_seqno)
 	if (jnlpool.gtmsource_local->last_flush_resync_seqno == resync_seqno)
 		return;
 	/* need to flush resync_seqno to instance file. Grab the journal pool lock before flushing */
-	GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK); /* sets gtmsource_state */
+	grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK); /* sets gtmsource_state */
 	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		return;
 	repl_inst_flush_gtmsrc_lcl();	/* this requires the ftok semaphore to be held */

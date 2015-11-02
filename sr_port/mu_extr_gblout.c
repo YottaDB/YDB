@@ -43,6 +43,7 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+#include "gvcst_protos.h"
 
 #define INTEG_ERROR_RETURN 							\
 {										\
@@ -78,6 +79,7 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 	blk_hdr_ptr_t 	bp;
 	boolean_t 	beg_key;
 	int		data_len, des_len, fmtd_key_len, gname_size;
+	int		tmp_cmpc;
 	rec_hdr_ptr_t 	rp, save_rp;
 	sm_uc_ptr_t 	blktop, cp1, rectop;
 	unsigned char  	*cp2, current, *keytop, last;
@@ -86,6 +88,8 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 	static int	max_zwr_len = 0;
 	static unsigned char	*private_blk = NULL, *zwr_buffer = NULL, *key_buffer = NULL;
 	static uint4	private_blksz = 0;
+	mval		*val_span = NULL;
+	boolean_t	is_hidden, found_dummy = FALSE;
 
 #	ifdef GTM_CRYPT
 	char				*inbuf;
@@ -220,11 +224,12 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 		{ 	/* Start scanning a block */
 			GET_USHORT(rec_size, &rp->rsiz);
 			rectop = (sm_uc_ptr_t)rp + rec_size;
-			if (rectop > blktop || rp->cmpc > gv_currkey->end ||
-				(((unsigned char *)rp != private_blk + SIZEOF(blk_hdr)) && rp->cmpc < gname_size))
+			EVAL_CMPC2(rp, tmp_cmpc);
+			if (rectop > blktop || tmp_cmpc > gv_currkey->end ||
+				(((unsigned char *)rp != private_blk + SIZEOF(blk_hdr)) && (tmp_cmpc < gname_size)))
 				INTEG_ERROR_RETURN
 			cp1 = (sm_uc_ptr_t)(rp + 1);
-			cp2 = gv_currkey->base + rp->cmpc;
+			cp2 = gv_currkey->base + tmp_cmpc;
 			if (cp2 >= keytop || cp1 >= rectop)
 				INTEG_ERROR_RETURN
 			if (!beg_key && (*cp2 >= *cp1))
@@ -249,9 +254,14 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 				memcpy(beg_gv_currkey->base, gv_currkey->base, gv_currkey->end + 1);
 				beg_gv_currkey->end = gv_currkey->end;
 			}
-			st->recknt++;
 			if (st->reclen < rec_size)
 				st->reclen = rec_size;
+#			ifdef UNIX
+			CHECK_HIDDEN_SUBSCRIPT(gv_currkey, is_hidden);
+			if (is_hidden)
+				continue;
+#			endif
+			st->recknt++;
 			if (st->keylen < gv_currkey->end + 1)
 				st->keylen = gv_currkey->end + 1;
 			data_len = (int)(rec_size - (cp1 - (sm_uc_ptr_t)rp));
@@ -259,6 +269,22 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 				INTEG_ERROR_RETURN
 			if (st->datalen < data_len)
 				st->datalen = data_len;
+#			ifdef UNIX
+			if ((1 == data_len) && ('\0' == *cp1))
+			{	/* Possibly (probably) a spanning node. Need to read in more blocks to get the value */
+				if (!val_span)
+				{	/* protect val_span from stp_gcol in WRITE_EXTR_LINE/op_write */
+					PUSH_MV_STENT(MVST_MVAL);
+					val_span = &mv_chain->mv_st_cont.mvs_mval;
+				}
+				gvcst_get(val_span);
+				cp1 = (unsigned char *)val_span->str.addr;
+				data_len = val_span->str.len;
+				found_dummy = TRUE;
+				if (st->datalen < data_len)
+					st->datalen = data_len;
+			}
+#			endif
 			if (MU_FMT_BINARY != format)
 			{
 				cp2 = (unsigned char *)format_targ_key(key_buffer, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
@@ -277,6 +303,13 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 					WRITE_EXTR_LINE(cp1, data_len);
 				}
 			}
+#			ifdef UNIX
+			if (found_dummy)
+			{
+				val_span->mvtype = 0; /* so stp_gcol can free up any space */
+				found_dummy = FALSE;
+			}
+#			endif
 		} /* End scanning a block */
 		if ((sm_uc_ptr_t)rp != blktop ||
 			(memcmp(gv_currkey->base, beg_gv_currkey->base, MIN(gv_currkey->end, beg_gv_currkey->end)) < 0))

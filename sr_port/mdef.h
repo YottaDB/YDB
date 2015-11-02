@@ -77,6 +77,10 @@ typedef int 		int4;		/* 4-byte signed integer */
 typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
 
 #define sssize_t	size_t
+
+/* If ever the following macro (SHMDT) is expanded to a multi-line macro, care should be taken to save the errno immediately after
+ * the "shmdt" system call invocation to avoid errno from being mutated by subsequent system calls.
+ */
 #define SHMDT(X)	shmdt((void *)(X))
 
 /* constant needed for FIFO - OS390 redefines in mdefsp.h */
@@ -84,7 +88,7 @@ typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
 
 #include <inttypes.h>
 #include "mdefsa.h"
-#include "mdefsp.h"
+#include <mdefsp.h>
 #include "gtm_sizeof.h"
 #include "gtm_threadgbl.h"
 /* Anchor for thread-global structure rather than individual global vars */
@@ -302,7 +306,7 @@ typedef struct
 #define MAX_MIDENT_LEN		31	/* Maximum length of an mident/mname */
 typedef mstr		mident;
 typedef struct
-{ /* Although we use 31 chars, the extra byte is to keep things aligned */
+{ /* Although we use 31 chars, the extra byte is to keep things aligned AND to keep a null terminator byte for places that care */
 	char	c[MAX_MIDENT_LEN + 1];
 } mident_fixed;
 #define mid_len(name)		strlen(&(name)->c[0])	/* callers of mid_len should include gtm_string.h as well */
@@ -405,7 +409,12 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 #define PERIODIC_FLUSH_CHECK_INTERVAL	(30 * 1000)
 #define MAX_ARGS			256 /* in formallist */
 
-#define MAX_KEY_SZ	255		/* maximum database key size */
+#ifdef UNIX
+# define MAX_KEY_SZ	1023		/* maximum database key size */
+#else
+# define MAX_KEY_SZ	255
+#endif
+# define OLD_MAX_KEY_SZ	255		/* For V5 and earlier, when only 1 byte was used for compression count */
 /* The macro ZWR_EXP_RATIO returns the inflated length when converting the internal subscript
  * representation (byte) length to ZWR representation.
  * In "M" mode,
@@ -602,8 +611,21 @@ int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[]
 #define GTMASSERT	(gtm_assert(CALLFROM))
 #define assertpro(x) ((x) ? 1 : gtm_assert2((SIZEOF(#x) - 1), (#x), CALLFROM))
 #ifdef UNIX
-int rts_error(int argcnt, ...);
-void dec_err(uint4 argcnt, ...);
+#ifdef DEBUG
+/* The below debug only macros are always used in pairs to indicate a window where the code doesn't expect rts_errors to happen.
+ * One reason why the code doesn't expect rts_errors is if the logic is complicated enough that having a condition handler for
+ * the window is tricky and will not undo the state of various global variables that were modified. An example of such a window
+ * is in gvcst_init. If an rts_error happens in this window, an assert will trip in rts_error at which point, the window as well
+ * as the rts_error can be re-examined to see whether the rts_error can be removed or the range of the window can be changed.
+ */
+#define	DBG_MARK_RTS_ERROR_USABLE	{ assert(TREF(rts_error_unusable)); TREF(rts_error_unusable) = FALSE; }
+#define	DBG_MARK_RTS_ERROR_UNUSABLE	{ assert(!TREF(rts_error_unusable)); TREF(rts_error_unusable) = TRUE; }
+#else
+#define	DBG_MARK_RTS_ERROR_USABLE
+#define	DBG_MARK_RTS_ERROR_UNUSABLE
+#endif
+int	rts_error(int argcnt, ...);
+void	dec_err(uint4 argcnt, ...);
 #elif defined(VMS)
 void dec_err(int4 msgnum, ...);
 #else
@@ -890,6 +912,24 @@ typedef struct
 
 #define GLOBAL_LATCH_HELD_BY_US(latch) (process_id == (latch)->u.parts.latch_pid \
 					VMS_ONLY(&& image_count == (latch)->u.parts.latch_image_count))
+
+typedef struct compswap_time_field_struct
+{	/* This structure is used where we want to do a compare-n-swap (CAS) on a time value. The CAS interfaces
+	 * need an instance of global_latch_t to operate on. We will utilize the "latch_pid" field to hold the
+	 * time and the latch_word is unused except on VMS where it will hold 0. Since this structure must be of
+	 * a constant size (size of global_latch_t varies), pad the latch with sufficient space to match the
+	 * size of global_latch_t's largest size (on HPUX).
+	 */
+global_latch_t	time_latch;
+#ifndef __hppa
+int4		hp_latch_space[4];	/* padding only on non-hpux systems */
+#endif
+} compswap_time_field;
+/* takes value of time() but needs to be 4 byte so can use compswap on it. Not using time_t, as that is an indeterminate size on
+ * various platforms. Value is time (in seconds) in a compare/swap updated field so only one process performs a given task in a
+ * given interval
+ */
+#define cas_time time_latch.u.parts.latch_pid
 
 typedef	union gtm_time8_struct
 {
@@ -1829,5 +1869,18 @@ enum
 #define	MAX_ACTUALS	32	/* Maximum number of arguments allowed in an actuallist. This value also determines
 				 * how many parameters are allowed to be passed between M and C.
 				 */
+#if defined(DEBUG) && defined(UNIX)
+#define OPERATOR_LOG_MSG											\
+{														\
+	error_def(ERR_TEXT);											\
+	if (gtm_white_box_test_case_enabled && (WBTEST_OPER_LOG_MSG == gtm_white_box_test_case_number))		\
+	{													\
+		send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Send message to operator log"));		\
+	}													\
+}
+#else
+#define OPERATOR_LOG_MSG
+#endif
+
 
 #endif /* MDEF_included */

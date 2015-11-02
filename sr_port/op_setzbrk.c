@@ -15,7 +15,7 @@
 #include "gtm_stdio.h"
 
 #include "cache.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "zbreak.h"
 #include "stack_frame.h"
 #include "xfer_enum.h"

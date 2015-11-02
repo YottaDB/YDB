@@ -65,7 +65,7 @@
 #endif
 
 #ifdef GTM_TRIGGER
-#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
+#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #endif
@@ -75,6 +75,7 @@ GBLREF	uint4 			dollar_trestart;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	gd_region		*gv_cur_region;
+GBLREF  gv_key			*gv_currkey;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*first_sgm_info, *sgm_info_ptr;
@@ -237,7 +238,7 @@ enum cdb_sc	op_tcommit(void)
 						 */
 						SS_INIT_IF_NEEDED(csa, cnl);
 					} else
-						csa->snapshot_in_prog = FALSE;
+						CLEAR_SNAPSHOTS_IN_PROG(csa);
 #					endif
 					read_before_image = ((NULL != jbp) || csa->backup_in_prog || SNAPSHOTS_IN_PROG(csa));
 					/* The following section allocates new blocks required by the transaction it is done
@@ -325,14 +326,14 @@ enum cdb_sc	op_tcommit(void)
 								GET_CDB_SC_CODE(new_blk, status); /* code is set in status */
 								break;	/* transaction must attempt restart */
 							} else
-								cse->was_free = !blk_used;
+								blk_used ? SET_NFREE(cse) : SET_FREE(cse);
 							BEFORE_IMAGE_NEEDED(read_before_image, cse, csa, csd, new_blk,
 										before_image_needed);
 							if (!before_image_needed)
 								cse->old_block = NULL;
 							else
 							{
-								block_is_free = cse->was_free;
+								block_is_free = WAS_FREE(cse);
 								cse->old_block = t_qread(new_blk,
 										(sm_int_ptr_t)&cse->cycle, &cse->cr);
 								old_block = (blk_hdr_ptr_t)cse->old_block;
@@ -341,8 +342,8 @@ enum cdb_sc	op_tcommit(void)
 									status = (enum cdb_sc)rdfail_detail;
 									break;
 								}
-								if (!cse->was_free
-									&& (NULL != jbp) && (old_block->tn < jbp->epoch_tn))
+								if (!WAS_FREE(cse) && (NULL != jbp)
+								    && (old_block->tn < jbp->epoch_tn))
 								{	/* Compute CHECKSUM for writing PBLK record before crit.
 									 * It is possible that we are reading a block that is
 									 * actually marked free in the bitmap (due to concurrency
@@ -401,8 +402,8 @@ enum cdb_sc	op_tcommit(void)
 			if (cdb_sc_normal != status)
 			{
 				t_fail_hist[t_tries] = status;
-				SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-				TP_RETRY_ACCOUNTING(csa, cnl, status);
+				SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, cnl, status);
+				TP_RETRY_ACCOUNTING(csa, cnl);
 			}
 			if ((cdb_sc_normal == status) && tp_tend())
 				;
@@ -417,7 +418,7 @@ enum cdb_sc	op_tcommit(void)
 				)
 				if (cdb_sc_gbloflow == status)
 				{
-					if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, cse->blk_target->last_rec, TRUE)))
+					if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 						end = &buff[MAX_ZWR_KEY_SZ - 1];
 					rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 				} else if (!skip_invoke_restart)

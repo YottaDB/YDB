@@ -54,7 +54,7 @@ void gtm_dump_core(void)
 			SPRINTF(&newname[0], "core%d", suffix);         /* Make new file name */
 			status = Stat(&newname[0], &fs1);               /* This file exist ? */
 			if (0 != status)
-				status = rename("core", &newname[0]);   /* No, attempt the rename */
+				status = RENAME("core", &newname[0]);   /* No, attempt the rename */
 			else
 				status = -1;                            /* Yes, reset status for another iteration */
 		}

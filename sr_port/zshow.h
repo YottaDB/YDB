@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,11 +12,12 @@
 #ifndef ZSHOW_H
 #define ZSHOW_H
 
-#define ZSHOW_DEVICE 	1
-#define ZSHOW_GLOBAL 	2
-#define ZSHOW_LOCAL 	3
-#define ZSHOW_NOPARM	-1
-#define ZSHOW_ALL	"IVBDLGSC"
+#define ZSHOW_DEVICE	 	1
+#define ZSHOW_GLOBAL		2
+#define ZSHOW_LOCAL		3
+#define ZSHOW_BUFF_ONLY 	4
+#define ZSHOW_NOPARM		-1
+#define ZSHOW_ALL		"IVBDLGSC"
 
 #define CLEANUP_ZSHOW_BUFF				\
 {							\
@@ -90,7 +91,7 @@ void		zshow_zcalls(zshow_out *output);
 void		zshow_gvstats(zshow_out *output);
 void		zshow_zwrite(zshow_out *output);
 boolean_t	zwr2format(mstr *src, mstr *des);
-int		zwrkeylength(char* ptr, int len);
+int		zwrkeyvallen(char* ptr, int len, char **val_off, int *val_len, int *val_off1, int *val_len1);
 int		format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len);
 void		mval_write(zshow_out *output, mval *v, boolean_t flush);
 void		mval_nongraphic(zshow_out *output, char *cp, int len, int num);

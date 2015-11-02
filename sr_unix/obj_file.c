@@ -17,7 +17,7 @@
 #include <errno.h>
 
 #include "compiler.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "obj_gen.h"
 #include "cgp.h"
 #include "mdq.h"

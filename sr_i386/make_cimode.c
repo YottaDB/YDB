@@ -14,7 +14,7 @@
 #include "gtm_string.h"
 
 #include "error.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "op.h"
 #include "i386.h"
 #include "inst_flush.h"

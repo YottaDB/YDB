@@ -67,6 +67,8 @@
 #include "min_max.h"
 #include "gtmxc_types.h"
 #include "gtmcrypt.h"
+#include "jnl.h"
+#include "anticipatory_freeze.h"
 
 GBLDEF	inc_list_struct		in_files;
 GBLREF	uint4			pipe_child;
@@ -360,7 +362,7 @@ void mupip_restore(void)
 						+ ((off_t)inhead.db_total_blks * old_blk_size);
 				new_size = new_eof + DISK_BLOCK_SIZE;
 				memset(buff, 0, DISK_BLOCK_SIZE);
-				LSEEKWRITE(db_fd, new_eof, buff, DISK_BLOCK_SIZE, status);
+				DB_LSEEKWRITE(NULL, NULL, db_fd, new_eof, buff, DISK_BLOCK_SIZE, status);
 				if (0 != status)
 				{
 					util_out_print("Aborting restore!/", TRUE);
@@ -411,7 +413,7 @@ void mupip_restore(void)
 				new_eof = ((off_t)(old_start_vbn - 1) * DISK_BLOCK_SIZE)
 						+ ((off_t)inhead.db_total_blks * old_blk_size);
 				memset(buff, 0, DISK_BLOCK_SIZE);
-				LSEEKWRITE(db_fd, new_eof, buff, DISK_BLOCK_SIZE, status);
+				DB_LSEEKWRITE(NULL, NULL, db_fd, new_eof, buff, DISK_BLOCK_SIZE, status);
 				if (0 != status)
 				{
 					util_out_print("Aborting restore!/", TRUE);
@@ -439,7 +441,7 @@ void mupip_restore(void)
 					for (ii = ROUND_UP(old_tot_blks, bplmap); ii < inhead.db_total_blks; ii += bplmap)
 					{
 						new_eof = (off_t)(old_start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)ii * old_blk_size;
-						LSEEKWRITE(db_fd, new_eof, newmap, old_blk_size, status);
+						DB_LSEEKWRITE(NULL, NULL, db_fd, new_eof, newmap, old_blk_size, status);
 						if (0 != status)
 						{
 							util_out_print("Aborting restore!/", TRUE);
@@ -573,7 +575,7 @@ void mupip_restore(void)
 				}
 			}
 #			endif
-			LSEEKWRITE(db_fd, offset, blk_ptr, size, save_errno);
+			DB_LSEEKWRITE(NULL, NULL, db_fd, offset, blk_ptr, size, save_errno);
 			if (0 != save_errno)
 			{
 				util_out_print("Error accessing output file !AD. Aborting restore.",
@@ -605,7 +607,7 @@ void mupip_restore(void)
 		((sgmnt_data_ptr_t)inbuf)->gt_sem_ctime.ctime = old_data.gt_sem_ctime.ctime;
 		((sgmnt_data_ptr_t)inbuf)->shmid = old_data.shmid;
 		((sgmnt_data_ptr_t)inbuf)->gt_shm_ctime.ctime = old_data.gt_shm_ctime.ctime;
-		LSEEKWRITE(db_fd, 0, inbuf, rsize - SIZEOF(int4), save_errno);
+		DB_LSEEKWRITE(NULL, NULL, db_fd, 0, inbuf, rsize - SIZEOF(int4), save_errno);
 		if (0 != save_errno)
 		{
 			util_out_print("Error accessing output file !AD. Aborting restore.",
@@ -635,7 +637,7 @@ void mupip_restore(void)
 			COMMON_READ(in, inbuf, rsize, inbuf);
 			if (!MEMCMP_LIT(inbuf, MAP_MSG))
 				break;
-			LSEEKWRITE(db_fd,
+			DB_LSEEKWRITE(NULL, NULL, db_fd,
 				   offset,
 				   inbuf,
 				   rsize - SIZEOF(int4),

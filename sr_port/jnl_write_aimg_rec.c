@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@
 #endif
 GBLREF 	jnl_gbls_t		jgbl;
 
-void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse)
+void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 {
 	struct_jrec_blk		aimg_record;
 	int			tmp_jrec_size, jrec_size, zero_len;
@@ -44,6 +44,7 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse)
 	blk_hdr_ptr_t		buffer, save_buffer;
 	jnl_private_control	*jpc;
 	sgmnt_data_ptr_t	csd;
+	uint4			cursum;
 #ifdef GTM_CRYPT
 	char			*buff;
 	int			req_enc_blk_size, init_status, crypt_status;
@@ -93,6 +94,8 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse)
 		buffer = (blk_hdr_ptr_t)csa->encrypted_blk_contents;
 	}
 #	endif
+	cursum = jnl_get_checksum((uint4 *)buffer, NULL, aimg_record.bsiz);
+	COMPUTE_AIMG_CHECKSUM(cursum, &aimg_record, com_csum, aimg_record.prefix.checksum);
 	jnl_write(jpc, JRT_AIMG, (jnl_record *)&aimg_record, buffer, &blk_trailer);
 	buffer = save_buffer;
 }

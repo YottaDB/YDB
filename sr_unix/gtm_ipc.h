@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Serivces, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Serivces, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,8 +20,19 @@
 #define MEGA_BOUND    (1024 * 1024)
 #endif
 
-#define FTOK	gtm_ftok
+#define FTOK		gtm_ftok
 #define FTOK_OLD	ftok
+
+#define JNLPOOL_SHMDT(RC, SAVE_ERRNO)				\
+{								\
+	SAVE_ERRNO = 0; /* clear any left-over value */		\
+	assert(NULL != jnlpool_ctl);				\
+	DEFER_INTERRUPTS(INTRPT_IN_SHMDT);			\
+	RC = SHMDT(jnlpool.jnlpool_ctl);			\
+	SAVE_ERRNO = errno;					\
+	jnlpool_ctl = jnlpool.jnlpool_ctl = NULL;		\
+	ENABLE_INTERRUPTS(INTRPT_IN_SHMDT);			\
+}
 
 key_t gtm_ftok(const char *path, int id);
 

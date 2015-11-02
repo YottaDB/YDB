@@ -38,7 +38,7 @@
 #include "gtm_stdio.h"
 
 #include "compiler.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "obj_gen.h"
 #include "cgp.h"
 #include "mdq.h"
@@ -49,7 +49,7 @@
 #include "gtmio.h"
 #include "mmemory.h"
 #include "obj_file.h"
-#include "obj_filesp.h"
+#include <obj_filesp.h>
 #include "release_name.h"
 #include "min_max.h"
 /* The following definitions are reqquired for the new(for ELF files) create/close_obj_file.c functions */

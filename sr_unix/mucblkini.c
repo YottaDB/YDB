@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,8 @@
 #include "gdsbml.h"
 #include "gtmio.h"
 #include "mucblkini.h"
+#include "anticipatory_freeze.h"
+#include "jnl.h"
 
 #define DIR_ROOT 1
 #define DIR_DATA 2
@@ -58,7 +60,7 @@ void mucblkini (void)
 	}
 	bml_busy(DIR_ROOT, bmp + SIZEOF(blk_hdr));
 	bml_busy(DIR_DATA, bmp + SIZEOF(blk_hdr));
-	LSEEKWRITE(udi->fd, (off_t)(cs_addrs->hdr->start_vbn - 1) * DISK_BLOCK_SIZE, bmp, bmpsize, status);
+	DB_LSEEKWRITE(cs_addrs, udi->fn, udi->fd, (off_t)(cs_addrs->hdr->start_vbn - 1) * DISK_BLOCK_SIZE, bmp, bmpsize, status);
 	if (0 != status)
 	{
 		PERROR("Error writing out first bitmap");

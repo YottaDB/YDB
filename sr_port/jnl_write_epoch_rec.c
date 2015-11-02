@@ -39,6 +39,7 @@
 #include "gtmio.h"
 #include "iosp.h"
 #include "jnl_get_checksum.h"
+#include "anticipatory_freeze.h"
 
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF  jnlpool_ctl_ptr_t	jnlpool_ctl;
@@ -144,7 +145,8 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 					header->strm_end_seqno[idx] = jb->strm_end_seqno[idx];
 			}
 #			endif
-			DO_FILE_WRITE(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
+			JNL_DO_FILE_WRITE(csa, csd->jnl_file_name,
+				jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 			/* for abnormal status do not do anything. journal file header will have previous end_of_data */
 		}
 	}
@@ -167,5 +169,7 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 			jb->strm_end_seqno[idx] = csd->strm_reg_seqno[idx];
 	}
 #	endif
+	epoch_record.filler = 0;
+	epoch_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (uint4 *)&epoch_record, SIZEOF(struct_jrec_epoch));
 	jnl_write(jpc, JRT_EPOCH, (jnl_record *)&epoch_record, NULL, NULL);
 }

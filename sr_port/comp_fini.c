@@ -15,7 +15,7 @@
 #include "opcode.h"
 #include "toktyp.h"
 #include "stringpool.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "cgp.h"
 #include "alloc_reg.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,10 +17,19 @@
 #define DIR_ROOT 1
 #define CDB_STAGNATE 3
 #define CDB_MAX_TRIES (CDB_STAGNATE + 2) /* used in defining arrays, usage requires it must be at least 1 more than CSB_STAGNATE*/
+#define T_FAIL_HIST_DBG_SIZE 32
 #define MAX_BT_DEPTH 7
 #define GLO_NAME_MAXLEN 33	/* 1 for length, 4 for prefix, 15 for dvi, 1 for $, 12 for fid */
 #define MAX_NUM_SUBSC_LEN 10	/* one for exponent, nine for the 18 significant digits */
-#define EXTEND_WARNING_FACTOR 3
+/* Define padding in a gv_key structure to hold
+ *	1) A number : This way we are ensured a key buffer overflow will never occur while converting a number
+ *		from mval representation to subscript representation.
+ *	2) 16 byte of a string : This way if we are about to overflow the max-key-size, we are more likely to fit the
+ *		overflowing key in the padding space and so can give a more user-friendly GVSUBOFLOW message which
+ *		includes the overflowing subscript in most practical situations.
+ */
+#define	MAX_GVKEY_PADDING_LEN	(MAX_NUM_SUBSC_LEN + 16)
+#define EXTEND_WARNING_FACTOR	3
 /* Define macro to compute the maximum key size required in the gv_key structure based on the database's maximum key size.
  * Align it to 4-byte boundary as this macro is mostly used by targ_alloc which allocates 3 keys one for gv_target->clue,
  * one for gv_target->first_rec and one for gv_target->last_rec. The alignment ensures all 3 fields start at aligned boundary.
@@ -29,14 +38,14 @@
  * we use the ROUND_UP macro (which has no checks). It is ok to do that instead of the more-efficient ROUND_UP2 macro
  * as the second parameter is a constant so all this should get evaluated at compile-time itself.
  */
-#define DBKEYSIZE(KSIZE)	(ROUND_UP((KSIZE + MAX_NUM_SUBSC_LEN), 4))
+#define DBKEYSIZE(KSIZE)	(ROUND_UP((KSIZE + MAX_GVKEY_PADDING_LEN), 4))
 
 typedef	gtm_uint64_t	trans_num;
 typedef	uint4		trans_num_4byte;
 
 typedef	int4		block_id;	/* allows for GDS block #s to have 32 bits but see GDS_MAX_BLK_BITS below */
 
-#define	GDS_MAX_BLK_BITS	28	/* see blk_ident structure in gdskill.h for why this cannot be any greater */
+#define	GDS_MAX_BLK_BITS	30	/* see blk_ident structure in gdskill.h for why this cannot be any greater */
 #define	GDS_MAX_VALID_BLK	(1<<GDS_MAX_BLK_BITS - 1)	/* the maximum valid block # that a GT.M database can have */
 #define	GDS_CREATE_BLK_MAX	(block_id)(-1)	/* i.e. 0xFFFFFFFF which also has 31st bit 1 indicating it is a created block */
 

@@ -78,12 +78,12 @@ GBLREF	int			gtmsource_msgbufsiz;
 GBLREF	seq_num			seq_num_zero, seq_num_one;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	FILE			*gtmsource_log_fp;
-GBLREF	FILE			*gtmsource_statslog_fp;
 GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	uint4			process_id;
 
 error_def(ERR_JNLBADRECFMT);
 error_def(ERR_JNLEMPTY);
+error_def(ERR_JNLFILOPN);
 error_def(ERR_JNLRECINCMPL);
 error_def(ERR_NOPREVLINK);
 error_def(ERR_REPLBRKNTRANS);
@@ -383,7 +383,7 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 	}
 	/* Except the latest generation, mark the newly opened future generations CLOSED, or EMPTY.
 	 * We assume that when a new file is opened, the previous generation has been flushed to disk fully.
-	 */
+	C9M06-999999 */
 	for (ctl = reg_ctl_end, n = nopen; n; n--, ctl = ctl->next)
 	{
 		if (ctl->file_state == JNL_FILE_UNREAD)
@@ -763,8 +763,12 @@ static void increase_buffer(unsigned char **buff, int *buflen, int buffer_needed
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			  LEN_AND_LIT("Error extending buffer space while reading files. Malloc error"), alloc_status);
 	}
+	REPL_DPRINT3("Old gtmsource_msgp = 0x%llx; New gtmsource_msgp = 0x%llx\n", (long long)old_msgp, (long long)gtmsource_msgp);
+	REPL_DPRINT2("Old *buff = 0x%llx\n", *buff);
 	*buff = (unsigned char *)gtmsource_msgp + (*buff - old_msgp);
+	REPL_DPRINT2("New *buff = 0x%llx\n", *buff);
 	*buflen =(int)(gtmsource_msgbufsiz - (*buff - (unsigned char *)gtmsource_msgp));
+	REPL_DPRINT2("New remaining len = %ld\n", *buflen);
 	return;
 }
 
@@ -1289,6 +1293,7 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 	boolean_t		brkn_trans;
 	unsigned char		*seq_num_ptr, seq_num_str[32]; /* INT8_PRINT */
 	repl_ctl_element	*ctl;
+	int			wait_for_jnlopen_log_num = -1;
 
 	trans_read = FALSE;
 	num_tcom = -1;
@@ -1298,6 +1303,9 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 	total_wait_for_jnlopen = 0;
 	tcombuffp = gtmsource_tcombuff_start;
 	buff_avail = maxbufflen;
+	/* ensure that buff is always within gtmsource_msgp bounds (especially in case the buffer got expanded in the last call) */
+	assert((buff >= (uchar_ptr_t)gtmsource_msgp + REPL_MSG_HDRLEN)
+			&& (buff <= (uchar_ptr_t)gtmsource_msgp + gtmsource_msgbufsiz));
 	for (ctl = repl_ctl_list->next; ctl != NULL; ctl = ctl->next)
 		ctl->read_complete = FALSE;
 	for (pass = 1; !trans_read; pass++)
@@ -1307,9 +1315,22 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 			gtmsource_poll_actions(TRUE);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNLOPEN);
 			if ((total_wait_for_jnlopen += GTMSOURCE_WAIT_FOR_JNLOPEN) % LOG_WAIT_FOR_JNLOPEN_PERIOD == 0)
+			{
+			    if(++wait_for_jnlopen_log_num < LOG_WAIT_FOR_JNLOPEN_TIMES)
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal file(s) "
 					 "to be opened, or updated while attempting to read seqno %llu [0x%llx]. Check for "
 					 "problems with journaling\n", total_wait_for_jnlopen, read_jnl_seqno, read_jnl_seqno);
+			    else if (wait_for_jnlopen_log_num == LOG_WAIT_FOR_JNLOPEN_TIMES)
+			    {
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Timeout waiting for journal files to be opened."
+					 " Check log file for file details. Source server exits. \n");
+				for (ctl = repl_ctl_list->next; ctl != NULL; ctl = ctl->next)
+					if (ctl->file_state == JNL_FILE_CLOSED)
+						gtm_putmsg(VARLSTCNT(6) ERR_JNLFILOPN, 4, ctl->jnl_fn_len,
+							   ctl->jnl_fn, DB_LEN_STR(ctl->reg));
+				exit(ERR_JNLFILOPN);
+			    }
+			}
 		}
 		read_len = read_regions(&buff, &buff_avail, pass > 1, &brkn_trans, read_jnl_seqno);
 		if (brkn_trans)
@@ -1340,14 +1361,21 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 	sgmnt_addrs		*csa;
 	jnlpool_ctl_ptr_t	jctl;
 	uint4			freeaddr;
+	DEBUG_ONLY(boolean_t	file_close;)
 
 	cumul_read = 0;
 	*brkn_trans = TRUE;
+	DEBUG_ONLY(file_close = FALSE;)
 	assert(repl_ctl_list->next != NULL);
 	jctl = jnlpool.jnlpool_ctl;
+	DEBUG_ONLY(GTM_WHITE_BOX_TEST(WBTEST_CLOSE_JNLFILE, file_close, TRUE);)
 	/* For each region */
 	for (ctl = repl_ctl_list->next, prev_ctl = repl_ctl_list; ctl != NULL && !trans_read; prev_ctl = ctl, ctl = ctl->next)
 	{
+#ifdef DEBUG
+		if (file_close)
+			ctl->file_state = JNL_FILE_CLOSED;
+#endif
 		found = TR_NOT_FOUND;
 		region = ctl->reg;
 		DEBUG_ONLY(loopcnt = 0;)
@@ -1361,7 +1389,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 				;
 			if (ctl == NULL || ctl->reg != region)
 			{	/* Hit the end of generation list for journal file */
-				if (!attempt_open_oldnew)
+				if (!attempt_open_oldnew DEBUG_ONLY( || file_close))
 				{	/* Reposition to skip prev_ctl */
 					REPL_DPRINT2("First pass...not opening newer gener file...skipping %s\n", prev_ctl->jnl_fn);
 					ctl = prev_ctl;
@@ -1621,12 +1649,12 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	 * post-update value differ in their most significant 4-bytes. Since that is considered a virtually impossible
 	 * rare occurrence and since we want to avoid the overhead of doing a "grab_lock", we dont do that here.
 	 */
-	assert(buff == (unsigned char *)gtmsource_msgp + REPL_MSG_HDRLEN); /* else increasing buffer space will not work */
-	assert(maxbufflen == gtmsource_msgbufsiz - REPL_MSG_HDRLEN);
 	assert(REPL_MSG_HDRLEN == SIZEOF(jnldata_hdr_struct));
 	DEBUG_ONLY(loopcnt = 0;)
 	do
 	{
+		assert(buff == (unsigned char *)gtmsource_msgp + REPL_MSG_HDRLEN); /* else increasing buffer space will not work */
+		assert(maxbufflen == gtmsource_msgbufsiz - REPL_MSG_HDRLEN);
 		DEBUG_ONLY(loopcnt++);
 		file2pool = FALSE;
 		if (max_read_seqno > gtmsource_local->next_histinfo_seqno)
@@ -1637,6 +1665,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 		if (read_jnl_seqno == gtmsource_local->next_histinfo_seqno)
 		{	/* Request a REPL_HISTREC message be sent first before sending any more seqnos across */
 			gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_SEND_NEW_HISTINFO;
+			REPL_DPRINT1("REPL_HISTREC message first needs to be sent before any more seqnos can be sent across\n");
 			return 0;
 		}
 		read_addr = gtmsource_local->read_addr;
@@ -1711,6 +1740,11 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 			gtmsource_set_next_histinfo_seqno(TRUE);
 			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 				return 0; /* Connection got reset in "gtmsource_set_next_histinfo_seqno" */
+			/* Since the buffer may have expanded, reposition buff to the beginning and set maxbufflen to the maximum
+			 * available size (as if this is the first time we came into the while loop)
+			 */
+			buff = (unsigned char *)gtmsource_msgp + REPL_MSG_HDRLEN;
+			maxbufflen = gtmsource_msgbufsiz - REPL_MSG_HDRLEN;
 		}
 	} while (TRUE);
 	if (file2pool)
@@ -1883,7 +1917,7 @@ int gtmsource_update_zqgblmod_seqno_and_tn(seq_num resync_seqno)
 	assert(0 < max_zqgblmod_seqno);
 	assert(resync_seqno >= max_zqgblmod_seqno);
 	assert(!(FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs.now_crit));
-	GRAB_LOCK(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
+	grab_lock(jnlpool.jnlpool_dummy_reg, HANDLE_CONCUR_ONLINE_ROLLBACK);
 	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 	{
 		assert(process_id != jnlpool.gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);

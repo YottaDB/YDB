@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,8 @@
 
 GBLREF	boolean_t	gtm_utf8_mode;
 GBLREF	spdesc		stringpool;
+
+error_def(ERR_MAXSTRLEN);
 
 /* --------------------------------------------------------------------
  * NOTE: This module is a near copy of sr_port/op_setzpiece.c differing
@@ -46,12 +48,10 @@ GBLREF	spdesc		stringpool;
  */
 void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *dst)
 {
-	int 		match_res, len, src_len, str_len, delim_cnt;
-	int 		first_src_ind, second_src_ind, numpcs;
+	size_t		str_len, delim_cnt;
+	int 		match_res, len, src_len, first_src_ind, second_src_ind, numpcs;
 	unsigned char 	*match_ptr, *src_str, *str_addr, *tmp_str;
 	delimfmt	unichar;
-
-	error_def(ERR_MAXSTRLEN);
 
 	/* --- code start --- */
 	assert(gtm_utf8_mode);
@@ -117,18 +117,18 @@ void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *
 			second_src_ind = (0 == match_res) ? -1 : INTCAST(match_ptr - (unsigned char *)src->str.addr - del->str.len);
 		}
 	}
-	delim_cnt = first;
+	delim_cnt = (size_t)first;
 	/* Calculate total string len. */
-	str_len = expr->str.len + (first_src_ind + del->str.len * delim_cnt);
+	str_len = (size_t)expr->str.len + ((size_t)first_src_ind + ((size_t)del->str.len * delim_cnt));
 	/* add len. of trailing chars past insertion point */
-	if (second_src_ind >= 0)
-		str_len += (src->str.len - second_src_ind);
-	if (str_len > MAX_STRLEN)
+	if (0 <= second_src_ind)
+		str_len += (size_t)(src->str.len - second_src_ind);
+	if (MAX_STRLEN < str_len)
 	{
 		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 		return;
 	}
-	ENSURE_STP_FREE_SPACE(str_len);
+	ENSURE_STP_FREE_SPACE((int)str_len);
 	str_addr = stringpool.free;
 	/* copy prefix */
 	if (first_src_ind)
@@ -137,7 +137,7 @@ void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *
 		str_addr += first_src_ind;
 	}
 	/* copy delimiters */
-	while (delim_cnt-- > 0)
+	while (0 < delim_cnt--)
 	{
 		memcpy(str_addr, del->str.addr, del->str.len);
 		str_addr += del->str.len;
@@ -146,14 +146,14 @@ void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *
 	memcpy(str_addr, expr->str.addr, expr->str.len);
 	str_addr += expr->str.len;
 	/* copy trailing pieces */
-	if (second_src_ind >= 0)
+	if (0 <= second_src_ind)
 	{
 		len = src->str.len - second_src_ind;
 		tmp_str = (unsigned char *)src->str.addr + second_src_ind;
 		memcpy(str_addr, tmp_str, len);
 		str_addr += len;
 	}
-	assert(str_addr - stringpool.free == str_len);
+	assert((str_addr - stringpool.free) == str_len);
 	dst->mvtype = MV_STR;
 	dst->str.len = INTCAST(str_addr - stringpool.free);
 	dst->str.addr = (char *)stringpool.free;

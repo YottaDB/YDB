@@ -23,6 +23,7 @@
 #include "send_msg.h"		/* prototypes */
 #include "gvcst_map_build.h"
 #include "min_max.h"
+#include "wbox_test_init.h"
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	sgmnt_addrs	*cs_addrs;
@@ -36,16 +37,20 @@ void gvcst_map_build(uint4 *array, sm_uc_ptr_t base_addr, cw_set_element *cs, tr
 	uint4		bitnum, ret;
 #ifdef DEBUG
 	int4		prev_bitnum, actual_cnt = 0;
-#endif
 
-	DEBUG_ONLY(VALIDATE_BM_BLK(cs->blk, (blk_hdr_ptr_t)base_addr, cs_addrs, gv_cur_region, status);)
-	assert(status); /* assert it is a valid bitmap block */
+	if (!gtm_white_box_test_case_enabled || (WBTEST_ANTIFREEZE_DBBMLCORRUPT != gtm_white_box_test_case_number))
+	{
+		VALIDATE_BM_BLK(cs->blk, (blk_hdr_ptr_t)base_addr, cs_addrs, gv_cur_region, status);
+		assert(status); /* assert it is a valid bitmap block */
+	}
+#endif
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	base_addr += SIZEOF(blk_hdr);
 	assert(cs_addrs->now_crit); /* Don't want to be messing with highest_lbm_with_busy_blk outside crit */
 	if (cs_addrs->nl->trunc_pid)
-	{ /* A truncate is in progress. We need to 1) update cnl->highest_lbm_with_busy_blk if needed and 2) select bml_free if this is a
-	   * t_recycled2free transaction. */
+	{ /* A truncate is in progress. We need to 1) update cnl->highest_lbm_with_busy_blk if needed and 2) select bml_free if
+	   * this is a t_recycled2free transaction.
+	   */
 		if (cs->reference_cnt > 0)
 		{
 			bml_func = bml_busy;

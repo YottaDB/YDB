@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -189,7 +189,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			if (FALSE == wcs_get_space(gv_cur_region, 0, cr))
 			{	/* failed to flush it out - force a rebuild */
 				BG_TRACE_PRO(wc_blocked_db_csh_getn_wcsstarvewrt);
-				assert(csd->wc_blocked); /* only reason we currently know why wcs_get_space could fail */
+				assert(csa->nl->wc_blocked); /* only reason we currently know why wcs_get_space could fail */
 				assert(gtm_white_box_test_case_enabled);
 				break;
 			}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
 
 void	null_handler(int sig);
 
-void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)())
+void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)(), void (*continue_handler)())
 {
 	struct sigaction 	ignore, act;
 	int			sig;
@@ -47,7 +47,7 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 	 * --------------------------------------------------------------
          */
 	act.sa_handler = null_handler;
-	sigaction(SIGHUP, &act, 0);
+	sigaction(SIGHUP, &act, NULL);
 
 	/* --------------------------------------------------------------
 	 * Default handling necessary for SIGCLD signal.
@@ -56,7 +56,7 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 	 * --------------------------------------------------------------
 	 */
 	act.sa_handler = SIG_DFL;
-	sigaction(SIGCLD, &act, 0);
+	sigaction(SIGCLD, &act, NULL);
 
 	/* --------------------------------------------------------------
 	 * Give us extra info on the following signals and a full core
@@ -72,9 +72,9 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 	if (NULL != suspsig_handler)
 	{
 		act.sa_sigaction = suspsig_handler;
-		sigaction(SIGTSTP, &act, 0);
-		sigaction(SIGTTIN, &act, 0);
-		sigaction(SIGTTOU, &act, 0);
+		sigaction(SIGTSTP, &act, NULL);
+		sigaction(SIGTTIN, &act, NULL);
+		sigaction(SIGTTOU, &act, NULL);
 	}
 
 	/* --------------------------------------------------------------
@@ -83,30 +83,30 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 	 */
 	act.sa_sigaction = signal_handler;
 
-	sigaction(SIGABRT, &act, 0);
-	sigaction(SIGBUS, &act, 0);
-#ifdef _AIX
-        sigaction(SIGDANGER, &act, 0);
-#endif
-	sigaction(SIGFPE, &act, 0);
-#ifdef __MVS__
-	sigaction(SIGABND, &act, 0);
-#else
-#  ifndef __linux__
-	sigaction(SIGEMT, &act, 0);
-#  endif
-#ifndef __CYGWIN__
-	sigaction(SIGIOT, &act, 0);
-#endif
-#endif
-	sigaction(SIGILL, &act, 0);
-	sigaction(SIGQUIT, &act, 0);
-	sigaction(SIGSEGV, &act, 0);
-#ifndef __linux__
-	sigaction(SIGSYS, &act, 0);
-#endif
-	sigaction(SIGTERM, &act, 0);
-	sigaction(SIGTRAP, &act, 0);
+	sigaction(SIGABRT, &act, NULL);
+	sigaction(SIGBUS, &act, NULL);
+#	ifdef _AIX
+        sigaction(SIGDANGER, &act, NULL);
+#	endif
+	sigaction(SIGFPE, &act, NULL);
+#	ifdef __MVS__
+	sigaction(SIGABND, &act, NULL);
+#	else
+#	ifndef __linux__
+	sigaction(SIGEMT, &act, NULL);
+#	endif
+#	ifndef __CYGWIN__
+	sigaction(SIGIOT, &act, NULL);
+#	endif
+#	endif
+	sigaction(SIGILL, &act, NULL);
+	sigaction(SIGQUIT, &act, NULL);
+	sigaction(SIGSEGV, &act, NULL);
+#	ifndef __linux__
+	sigaction(SIGSYS, &act, NULL);
+#	endif
+	sigaction(SIGTERM, &act, NULL);
+	sigaction(SIGTRAP, &act, NULL);
 
 	/* --------------------------------------------------------------
 	 * If supplied with a control-C handler, install it now.
@@ -115,22 +115,26 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 	if (NULL != ctrlc_handler)
 	{
 		act.sa_sigaction = ctrlc_handler;
-		sigaction(SIGINT, &act, 0);
+		sigaction(SIGINT, &act, NULL);
 	}
 
 	/* --------------------------------------------------------------
 	 * Special handling for SIGCONT
 	 * --------------------------------------------------------------
 	 */
-#ifndef DISABLE_SIGCONT_PROCESSING
-	if (FALSE == TREF(disable_sigcont))
+	if (NULL != continue_handler)
 	{
-		act.sa_sigaction = continue_handler;
-		sigaction(SIGCONT, &act, 0);
-	}
-#else
-	TREF(disable_sigcont) = TRUE;
-#endif
+#		ifndef DISABLE_SIGCONT_PROCESSING
+		if (FALSE == TREF(disable_sigcont))
+		{
+			act.sa_sigaction = continue_handler;
+			sigaction(SIGCONT, &act, NULL);
+		}
+#		else
+		TREF(disable_sigcont) = TRUE;
+#		endif
+	} else
+		TREF(disable_sigcont) = TRUE;
 }
 
 /* Provide null signal handler */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,11 @@ GBLREF	gv_key		*gv_altkey;
 GBLREF	spdesc		stringpool;
 GBLREF	bool		undef_inhibit;
 
+error_def(ERR_BADSRVRNETMSG);
+error_def(ERR_UNIMPLOP);
+error_def(ERR_TEXT);
+error_def(ERR_GVIS);
+
 void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 {
 	unsigned char	*ptr;
@@ -40,11 +45,6 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	struct CLB	*lnk;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 	unsigned short	srv_buff_size;
-
-	error_def(ERR_BADSRVRNETMSG);
-	error_def(ERR_UNIMPLOP);
-	error_def(ERR_TEXT);
-	error_def(ERR_GVIS);
 
 	lnk = gv_cur_region->dyn.addr->cm_blk;
 	if (!((link_info *)lnk->usr)->server_supports_long_names && (PRE_V5_MAX_MIDENT_LEN < strlen((char *)gv_currkey->base)))
@@ -218,7 +218,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	v->mvtype = MV_STR;
 	v->str.len = len;
 	v->str.addr = (char *)stringpool.free;	/* we don't need the reply msg anymore, can overwrite reply */
-	memcpy(v->str.addr, ptr, len);		/* so that we don't leave a gaping hole in the stringpool */
+	memmove(v->str.addr, ptr, len);		/* so that we don't leave a gaping hole in the stringpool */
 	stringpool.free += len;
 	return;
 }

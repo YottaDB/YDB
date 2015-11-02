@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,9 +32,6 @@
 #include "util_out_print_vaparm.h"
 #include "sgtm_putmsg.h"
 
-GBLREF	char	util_outbuff[];
-GBLREF	va_list	last_va_list_ptr;
-
 /*
 **  WARNING:    For chained error messages, all messages MUST be followed by an fao count;
 **  =======     zero MUST be specified if there are no parameters.
@@ -48,7 +45,9 @@ void sgtm_putmsg(char *out_str, ...)
 	char	msg_buffer[OUT_BUFF_SIZE];
 	mstr	msg_string;
 	size_t	util_outbufflen;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, out_str);
 	arg_count = va_arg(var, int);
 
@@ -80,8 +79,8 @@ void sgtm_putmsg(char *out_str, ...)
 
 		util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
 		va_end(var);	/* need before using as dest in va_copy */
-		VAR_COPY(var, last_va_list_ptr);
-		va_end(last_va_list_ptr);
+		VAR_COPY(var, TREF(last_va_list_ptr));
+		va_end(TREF(last_va_list_ptr));
 		arg_count -= fao_count;
 
 		if (0 >= arg_count)
@@ -92,8 +91,8 @@ void sgtm_putmsg(char *out_str, ...)
 	va_end(var);
 
 	util_out_print(NULL, SPRINT);
-	util_outbufflen = strlen(util_outbuff);
-	memcpy(out_str, util_outbuff, util_outbufflen);
+	util_outbufflen = STRLEN(TREF(util_outbuff_ptr));
+	memcpy(out_str, TREF(util_outbuff_ptr), util_outbufflen);
 	out_str[util_outbufflen] = '\n';
 	out_str[util_outbufflen + 1] = '\0';
 }

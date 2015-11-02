@@ -12,7 +12,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "ident.h"
 #include "min_max.h"
 

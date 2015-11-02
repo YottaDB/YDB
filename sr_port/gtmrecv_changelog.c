@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,12 +34,21 @@
 #include "util.h"
 #include "repl_log.h"
 
+#include "gtm_fcntl.h"
+#include "gtmio.h"
+#include "repl_sp.h"
+
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	gtmrecv_options_t	gtmrecv_options;
+error_def(ERR_REPLLOGOPN);
 
 int gtmrecv_changelog(void)
 {
 	uint4	changelog_desired = 0, changelog_accepted = 0;
+	int     log_fd = 0; /*used to indicate whether the new specified log file is writable*/
+	int     close_status = 0; /*used to indicate if log file is successfully closed*/
+	char*   err_code;
+	int     save_errno;
 
 	/* Grab the recvpool jnlpool option write lock */
 	if (0 > grab_sem(RECV, RECV_SERV_OPTIONS_SEM))
@@ -58,9 +67,29 @@ int gtmrecv_changelog(void)
 		changelog_desired |= REPLIC_CHANGE_LOGFILE;
 		if (0 != strcmp(recvpool.gtmrecv_local->log_file, gtmrecv_options.log_file))
 		{
-			changelog_accepted |= REPLIC_CHANGE_LOGFILE;
-			strcpy(recvpool.gtmrecv_local->log_file, gtmrecv_options.log_file);
-			util_out_print("Change log initiated with file !AD", TRUE, LEN_AND_STR(gtmrecv_options.log_file));
+#ifdef UNIX
+			/*check if the new log file is writable*/
+			OPENFILE3(gtmrecv_options.log_file,
+				      O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH, log_fd);
+			if (log_fd < 0) {
+				save_errno = ERRNO;
+				err_code = STRERROR(save_errno);
+				gtm_putmsg(VARLSTCNT(8) ERR_REPLLOGOPN, 6,
+						   LEN_AND_STR(gtmrecv_options.log_file),
+						   LEN_AND_STR(err_code),
+						   LEN_AND_STR(NULL_DEVICE));
+			} else {
+				CLOSEFILE_IF_OPEN(log_fd, close_status);
+				assert(close_status==0);
+				changelog_accepted |= REPLIC_CHANGE_LOGFILE;
+				strcpy(recvpool.gtmrecv_local->log_file, gtmrecv_options.log_file);
+				util_out_print("Change log initiated with file !AD", TRUE, LEN_AND_STR(gtmrecv_options.log_file));
+			}
+#elif defined(VMS)
+				changelog_accepted |= REPLIC_CHANGE_LOGFILE;
+				strcpy(recvpool.gtmrecv_local->log_file, gtmrecv_options.log_file);
+				util_out_print("Change log initiated with file !AD", TRUE, LEN_AND_STR(gtmrecv_options.log_file));
+#endif
 		} else
 			util_out_print("Log file is already !AD. Not initiating change in log file", TRUE,
 					LEN_AND_STR(gtmrecv_options.log_file));

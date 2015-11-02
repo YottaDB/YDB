@@ -25,6 +25,7 @@
  *   3. Larger arrays/structures should go nearer the end.
  *   4. There are no other runtime dependencies on this order. The order of fields can be switched around
  *      any way desired with just a rebuild.
+ *   5. It is important for ANY DEBUG_ONLY fields to go at the VERY END. Failure to do this breaks gtmpcat.
  */
 
 /* Priority access fields - commonly used fields in performance situations */
@@ -33,6 +34,8 @@ THREADGBLDEF(grabbing_crit, 			gd_region *)			/* Region currently grabbing crit 
 /* Compiler */
 THREADGBLDEF(boolchain,				triple)				/* anchor for chain used by bx_boolop  */
 THREADGBLDEF(boolchain_ptr,			triple *)			/* pointer to anchor for chain used by bx_boolop  */
+THREADGBLDEF(bool_targ_anchor,			tbp)				/* anchor of targ chain for bool relocation */
+THREADGBLDEF(bool_targ_ptr,			tbp *)				/* ptr->anchor of targ chain for bool relocation */
 THREADGBLDEF(code_generated,			boolean_t)			/* flag that the compiler generated an object */
 THREADGBLDEF(codegen_padlen,			int4)				/* used to pad code to section alignment */
 THREADGBLDEF(compile_time,			boolean_t)			/* flag that the compiler's at work */
@@ -71,9 +74,11 @@ THREADGBLDEF(window_token,			char)				/* current scanner token from advancewindo
 
 /* Database */
 THREADGBLDEF(dbinit_max_hrtbt_delta,		uint4)				/* max heartbeats before we bail out in db_init */
+THREADGBLDEF(dollar_zmaxtptime, 		int4)				/* tp timeout in seconds */
 THREADGBLDEF(donot_commit,			boolean_t)			/* debug-only - see gdsfhead.h for purpose */
 THREADGBLDEF(donot_write_inctn_in_wcs_recover,	boolean_t)			/* TRUE if wcs_recover should NOT write INCTN */
 THREADGBLDEF(gd_targ_addr,			gd_addr *)			/* current global directory reference */
+THREADGBLDEF(gtm_custom_errors,			mstr)
 THREADGBLDEF(gtm_gvundef_fatal,			boolean_t)			/* core and die intended for testing */
 THREADGBLDEF(gv_extname_size,			int4)				/* part op_gvextname working memory mechanism */
 THREADGBLDEF(gv_last_subsc_null,		boolean_t)			/* indicates whether the last subscript of
@@ -102,16 +107,21 @@ THREADGBLDEF(ok_to_call_wcs_recover,		boolean_t)			/* Set to TRUE before a few w
 										 * transaction and confuse things enough to cause
 										 * further restarts (which is out-of-design while
 										 * in the final retry). */
-THREADGBLDEF(only_reset_clues_if_onln_rlbk,	boolean_t)			/* skip online rollback cleanup on a restart */
+THREADGBLDEF(in_gvcst_bmp_mark_free,		boolean_t)			/* May need to skip online rollback cleanup or
+										 * gvcst_redo_root_search on a restart */
 THREADGBLDEF(prev_gv_target,			gv_namehead *)			/* saves the last gv_target for debugging */
 THREADGBLDEF(ready2signal_gvundef,		boolean_t)			/* TRUE if GET operation about to signal GVUNDEF */
+#ifdef UNIX
+THREADGBLDEF(redo_rootsrch_ctxt,		redo_root_search_context)	/* context to be saved and restored during
+										 * gvcst_redo_root_search */
+#endif
 THREADGBLDEF(semwait2long,			volatile boolean_t)		/* Waited too long for a semaphore */
+THREADGBLDEF(skip_file_corrupt_check,		boolean_t)			/* skip file_corrupt check in grab_crit */
+THREADGBLDEF(tpnotacidtime,			int4)				/* limit for long non-ACID ops in transactions */
 THREADGBLDEF(tp_restart_count,			uint4)				/* tp_restart counter */
-THREADGBLDEF(tp_restart_dont_counts,		uint4)				/* tp_restart count adjustment */
+THREADGBLDEF(tp_restart_dont_counts,		int4)				/* tp_restart count adjustment; NOTE: DEBUG only */
 THREADGBLDEF(tp_restart_entryref,		mval)				/* tp_restart position for reporting */
 THREADGBLDEF(tp_restart_failhist_indx,		int4)				/* tp_restart dbg restart history index */
-THREADGBLDEF(tp_restart_needlock_cnt,		uint4)				/* tp_restart final try counter */
-THREADGBLDEF(tp_restart_needlock_tn,		trans_num)			/* tp_restart final try tn */
 THREADGBLDEF(tprestart_syslog_delta,		int4)				/* defines every n-th restart to be logged */
 THREADGBLDEF(tprestart_syslog_limit,		int4)				/* # of TP restarts logged unconditionally */
 #ifdef ENABLE_EXTENDED_RESTART_TRACE_HIST
@@ -127,6 +137,10 @@ THREADGBLDEF(local_collseq,			collseq *)			/* pointer to collation algorithm for
 THREADGBLDEF(local_collseq_stdnull,		boolean_t)			/* flag temp controlling empty-string subscript
 										 * handling - if true, use standard null subscript
 										 * collation for local variables */
+THREADGBLDEF(local_coll_nums_as_strings,	boolean_t)			/* flag controlling whether local variables that
+										 * evaluate to numbers are treated like numbers
+										 * (collating before strings) or like strings in
+										 * local collations */
 THREADGBLDEF(lv_null_subs,			int)				/* UNIX: set in gtm_env_init_sp(),
 										 * VMS: set in gtm$startup() */
 THREADGBLDEF(max_lcl_coll_xform_bufsiz,		int)				/* max size of local collation buffer,which extends
@@ -168,12 +182,15 @@ THREADGBLDEF(gtm_trctbl_start,			trctbl_entry *)			/* Start of gtm trace table *
 THREADGBLDEF(gtm_waitstuck_script,		mstr)				/* Path to the script to be executed during waits*/
 THREADGBLDEF(gtmprompt,				mstr)				/* mstr pointing to prombuf containing the GTM
 										 * prompt */
+THREADGBLDEF(gtmsecshr_comkey,			unsigned int)			/* Hashed version key for gtmsecshr communications
+										 * eliminates cross-version issues */
 THREADGBLDEF(in_zwrite,				boolean_t)			/* ZWrite is active */
 THREADGBLDEF(lab_proxy,				lab_tabent_proxy)		/* Placeholder storing lab_ln_ptr offset / lnr_adr
 										 * pointer and has_parms value, so they are
 										 * contiguous in memory */
 #ifdef VMS
 THREADGBLDEF(lbl_tbl_entry_index,		int)				/* Index of currently compiled label table entry */
+THREADGBLAR1DEF(login_time,			int4,		2)		/* */
 #endif
 THREADGBLDEF(mprof_alloc_reclaim,		boolean_t)			/* Flag indicating whether the temporarily allocated
 										 * memory should be reclaimed */
@@ -203,9 +220,9 @@ THREADGBLDEF(pipefifo_interrupt,		int)				/* count of number of times a pipe or 
 THREADGBLDEF(prof_fp,				mprof_stack_frame *)		/* Stack frame that mprof currently operates on */
 THREADGBLDEF(trans_code_pop,			mval *)				/* trans_code holder for $ZTRAP popping */
 THREADGBLDEF(view_ydirt_str,			char *)				/* op_view working storage for ydir* ops */
-THREADGBLDEF(view_ydirt_str_len,		int4)				/* part of op_view working storage for ydir* ops */
-THREADGBLDEF(zdate_form,			int4)				/* control for default $zdate() format */
-THREADGBLAR1DEF(zintcmd_active,			zintcmd_active_info,	ZINTCMD_LAST)	/* interrupted timed commands */
+THREADGBLDEF(view_ydirt_str_len,		int4)				/* Part of op_view working storage for ydir* ops */
+THREADGBLDEF(zdate_form,			int4)				/* Control for default $zdate() format */
+THREADGBLAR1DEF(zintcmd_active,			zintcmd_active_info,	ZINTCMD_LAST)	/* Interrupted timed commands */
 THREADGBLDEF(zro_root,				zro_ent *)			/* Anchor for zroutines structure entry array */
 #ifdef UNIX
 THREADGBLDEF(zsearch_var,			lv_val *)			/* UNIX $zsearch() lookup variable */
@@ -214,9 +231,10 @@ THREADGBLDEF(zsearch_dir2,			lv_val *)			/* UNIX $zsearch() directory 2 */
 #endif
 
 /* Larger structures and char strings */
+THREADGBLAR1DEF(director_string,		char,	SIZEOF(mident_fixed))	/* Buffer for director_ident */
 THREADGBLDEF(fnpca,				fnpc_area)			/* $Piece cache structure area */
-THREADGBLAR1DEF(for_stack,			oprtype *,	MAX_FOR_STACK)	/* stacks FOR scope complete (compilation) addrs */
-THREADGBLAR1DEF(for_temps,			boolean_t,	MAX_FOR_STACK)	/* stacked flags of FOR control value temps */
+THREADGBLAR1DEF(for_stack,			oprtype *,	MAX_FOR_STACK)	/* Stacks FOR scope complete (compilation) addrs */
+THREADGBLAR1DEF(for_temps,			boolean_t,	MAX_FOR_STACK)	/* Stacked flags of FOR control value temps */
 THREADGBLAR1DEF(last_fnquery_return_sub,	mval,		MAX_LVSUBSCRIPTS)/* Returned subscripts of last $QUERY() */
 THREADGBLDEF(lcl_coll_xform_buff,		char *)				/* This buffer is for local collation
 										 * transformations, which must not nest - i.e.
@@ -224,9 +242,9 @@ THREADGBLDEF(lcl_coll_xform_buff,		char *)				/* This buffer is for local collat
 										 * or itself. This kind of nesting would cause
 										 * overwriting of the buffer */
 #ifdef UNIX
-THREADGBLAR1DEF(parm_ary,                       char *,         MAX_PARMS)      /* parameter strings buffer */
-THREADGBLAR1DEF(parm_ary_len,                   int,            MAX_PARMS)      /* array element allocation length */
-THREADGBLAR1DEF(parm_str_len,                   int,            MAX_PARMS)      /* parameter strings lengths */
+THREADGBLAR1DEF(parm_ary,                       char *,         MAX_PARMS)      /* Parameter strings buffer */
+THREADGBLAR1DEF(parm_ary_len,                   int,            MAX_PARMS)      /* Array element allocation length */
+THREADGBLAR1DEF(parm_str_len,                   int,            MAX_PARMS)      /* Parameter strings lengths */
 #endif
 THREADGBLAR1DEF(prombuf,			char,	(MAX_MIDENT_LEN + 1))	/* The prompt buffer size (32) would allow at
 										 * least 8 Unicode characters, but since most
@@ -235,11 +253,21 @@ THREADGBLAR1DEF(prombuf,			char,	(MAX_MIDENT_LEN + 1))	/* The prompt buffer size
 										 * accommodate 10 Unicode characters in a prompt */
 THREADGBLDEF(rt_name_tbl,			hash_table_mname)		/* Routine hash table for finding $TEXT() info */
 THREADGBLAR1DEF(tp_restart_failhist_arry,	char,	FAIL_HIST_ARRAY_SIZE)	/* tp_restart dbg storage of restart history */
-THREADGBLAR1DEF(director_string,		char,	SIZEOF(mident_fixed))	/* buffer for director_ident */
-THREADGBLAR1DEF(window_string,			char,	SIZEOF(mident_fixed))	/* buffer for window_ident */
 #ifdef ENABLE_EXTENDED_RESTART_TRACE_HIST
 THREADGBLAR1DEF(trans_restart_hist_array,	trans_restart_hist_t, TRANS_RESTART_HIST_ARRAY_SZ) /* See tp.h for usage */
 #endif
+#ifdef UNIX
+THREADGBLDEF(user_id,				uint4)				/* USERID number */
+#endif
+THREADGBLAR1DEF(window_string,			char,	SIZEOF(mident_fixed))	/* Buffer for window_ident */
+
+/* Utility I/O */
+THREADGBLDEF(last_va_list_ptr,			va_list)			/* Last variable-length argument list used for util
+										 * out buffer management */
+THREADGBLAR1DEF(util_outbuff,			char,	OUT_BUFF_SIZE * UTIL_OUTBUFF_STACK_SIZE) /* Util output buffer */
+THREADGBLDEF(util_outbuff_ptr,			char *)				/* Pointer to util output buffer */
+THREADGBLDEF(util_outptr,			char *)				/* Pointer within util output buffer */
+
 
 /* GTM Call-in related globals */
 #ifdef UNIX
@@ -254,3 +282,21 @@ THREADGBLDEF(gtmci_nested_level,		unsigned int)			/* Current nested depth of cal
 THREADGBLDEF(want_empty_gvts,			boolean_t)			/* set to TRUE by MUPIP REORG when it is selecting
 										 * globals to be reorged. Need to be able to select
 										 * killed globals for effective truncate. */
+THREADGBLDEF(in_mu_swap_root,			boolean_t)			/* set to TRUE by MUPIP REORG when it is moving
+										 * GVT root blocks in mu_swap_root. */
+THREADGBLDEF(prev_t_tries,			unsigned int)			/* t_tries - 1, before t_retry/tp_restart */
+THREADGBLDEF(rlbk_during_redo_root,		boolean_t)			/* set to TRUE if an online rollback which takes
+										 * the db to a different logical state occurs
+										 * during gvcst_redo_root_search in t_retry */
+
+/* Debug values */
+#ifdef DEBUG
+THREADGBLDEF(continue_proc_cnt,			int)				/* Used by whitebox secshr test to count time
+										 * process was continued. */
+THREADGBLDEF(gtm_usesecshr,			boolean_t)			/* Bypass easy methods of dealing with IPCs, files,
+										 * wakeups, etc and always use gtmsecshr (testing).
+										 */
+THREADGBLDEF(rts_error_unusable,		boolean_t)			/* Denotes the window in which an rts_error is
+										 * unusable */
+THREADGBLDEF(rts_error_unusable_seen,		boolean_t)
+#endif

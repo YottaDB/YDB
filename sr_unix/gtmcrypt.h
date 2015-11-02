@@ -13,7 +13,7 @@
 #define GTMCRYPT_H
 
 #include <signal.h>
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "gtmxc_types.h"
 #include "gtmcrypt_interface.h"

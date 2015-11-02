@@ -54,6 +54,7 @@
 #include "memcoherency.h"
 #include "wbox_test_init.h"
 #include "wcs_clean_dbsync.h"
+#include "anticipatory_freeze.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
@@ -66,11 +67,13 @@
 	if (INTERLOCK_FAIL == n)					\
 	{								\
 		assert(FALSE);						\
-		SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);		\
+		SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);		\
 		BG_TRACE_PRO_ANY(csa, trace_cntr);			\
 		break;							\
 	}								\
 }
+
+#define DBIOERR_LOGGING_PERIOD			100
 
 GBLREF	boolean_t	*lseekIoInProgress_flags;	/* needed for the LSEEK* macros in gtmio.h */
 GBLREF	uint4		process_id;
@@ -78,6 +81,7 @@ GBLREF	sm_uc_ptr_t	reformat_buffer;
 GBLREF	int		reformat_buffer_len;
 GBLREF	volatile int	reformat_buffer_in_use;	/* used only in DEBUG mode */
 GBLREF	volatile int4	fast_lock_count;
+GBLREF	int		process_exiting;
 /* In case of a disk-full situation, we want to print a message every 1 minute. We maintain two global variables to that effect.
  * dskspace_msg_counter and save_dskspace_msg_counter. If we encounter a disk-full situation and both those variables are different
  * we start a timer dskspace_msg_timer() that pops after a minute and increments one of the variables dskspace_msg_counter.
@@ -87,6 +91,7 @@ static 	volatile uint4 		save_dskspace_msg_counter = 0;
 GBLDEF	volatile uint4		dskspace_msg_counter = 1;	/* not static since used in dskspace_msg_timer.c */
 
 error_def(ERR_DBFILERR);
+error_def(ERR_DBIOERR);
 error_def(ERR_JNLFSYNCERR);
 error_def(ERR_JNLWRTDEFER);
 error_def(ERR_JNLWRTNOWWRTR);
@@ -117,7 +122,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	uint4			index;
 	boolean_t		is_mm;
 	uint4			curr_wbox_seq_num;
-	int			try_sleep;
+	int			try_sleep, rc;
 	GTMCRYPT_ONLY(
 		int		req_enc_blk_size;
 		int4		crypt_status = 0;
@@ -147,8 +152,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	cnl = csa->nl;
 	INCR_INTENT_WTSTART(cnl);	/* signal intent to enter wcs_wtstart */
 	/* the above interlocked instruction does the appropriate write memory barrier to publish this change to the world */
-	SHM_READ_MEMORY_BARRIER;	/* need to do this to ensure uptodate value of csd->wc_blocked is read */
-	if (csd->wc_blocked)
+	SHM_READ_MEMORY_BARRIER;	/* need to do this to ensure uptodate value of cnl->wc_blocked is read */
+	if (cnl->wc_blocked)
 	{
 		DECR_INTENT_WTSTART(cnl);
 		BG_TRACE_ANY(csa, wrt_blocked);
@@ -188,13 +193,13 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	assert(((sm_long_t)ahead & 7) == 0);
 	queue_empty = FALSE;
 	csa->wbuf_dqd++;			/* Tell rundown we have an orphaned block in case of interrupt */
-	for (n1 = n2 = 0, csrfirst = NULL;  n1 < max_ent  &&  n2 < max_writes  &&  !csd->wc_blocked ;  ++n1)
+	for (n1 = n2 = 0, csrfirst = NULL; (n1 < max_ent) && (n2 < max_writes) && !cnl->wc_blocked; ++n1)
 	{
 		csr = (cache_state_rec_ptr_t)REMQHI((que_head_ptr_t)ahead);
 		if (INTERLOCK_FAIL == (INTPTR_T)csr)
 		{
 			assert(FALSE);
-			SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+			SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 			BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail1);
 			break;
 		}
@@ -258,7 +263,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 						jb->fsync_dskaddr = saved_dsk_addr;
 					} else
 					{
-						if (-1 == fsync(jpc->channel))
+						GTM_JNL_FSYNC(csa, jpc->channel, rc);
+						if (-1 == rc)
 						{
 							assert(FALSE);
 							send_msg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
@@ -324,7 +330,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					gds_blk_downgrade((v15_blk_hdr_ptr_t)reformat_buffer, (blk_hdr_ptr_t)bp);
 					bp = (blk_hdr_ptr_t)reformat_buffer;
 					size = (((v15_blk_hdr_ptr_t)bp)->bsiz + 1) & ~1;
-				} else DEBUG_ONLY(if (GDSV5 == csr->ondsk_blkver))
+				} else DEBUG_ONLY(if (GDSV6 == csr->ondsk_blkver))
 					size = (bp->bsiz + 1) & ~1;
 				DEBUG_ONLY(else GTMASSERT);
 				if (csa->do_fullblockwrites)
@@ -359,7 +365,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 #				endif
 				if (0 == save_errno)
 				{	/* Do db write without timer protect (no need since wtstart not reenterable in one task) */
-					LSEEKWRITE(udi->fd, offset, save_bp, size, save_errno);
+					DB_LSEEKWRITE(csa, udi->fn, udi->fd, offset, save_bp, size, save_errno);
 					if ((blk_hdr_ptr_t)reformat_buffer == bp)
 					{
 						DEBUG_ONLY(reformat_buffer_in_use--;)
@@ -395,10 +401,18 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					offset = (off_t)((sm_uc_ptr_t)bp - (sm_uc_ptr_t)csd);
 					INCR_DB_CSH_COUNTER(csa, n_dsk_writes, 1);
 					/* Do db write without timer protect (not needed --  wtstart not reenterable in one task) */
-					LSEEKWRITE(udi->fd, offset, bp, size, save_errno);
+					DB_LSEEKWRITE(csa, udi->fn, udi->fd, offset, bp, size, save_errno);
 				}
 #				endif
 			}
+#			ifdef DEBUG
+			if (!process_exiting)
+			{	/* Trigger I/O error if white box test case is turned on and if not in gds_rundown (the latter
+				 * is to avoid unnecessary asserts during rundown)
+				 */
+				GTM_WHITE_BOX_TEST(WBTEST_WCS_WTSTART_IOERR, save_errno, ENOENT);
+			}
+#			endif
 			if (0 != save_errno)
 			{
 				if (!is_mm)	/* before releasing update lock, clear epid as well in case of bg */
@@ -408,19 +422,46 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				/* note: this will be automatically retried after csd->flush_time[0] msec, if this was called
 				 * through a timer-pop, otherwise, error should be handled (including ignored) by the caller.
 				 */
-				if ((ENOSPC == save_errno) && (dskspace_msg_counter != save_dskspace_msg_counter))
-				{	/* first time and every minute */
-					send_msg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
-						 ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
-					if (!IS_GTM_IMAGE)
-						gtm_putmsg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
-							   ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
-					save_dskspace_msg_counter = dskspace_msg_counter;
-					start_timer((TID)&dskspace_msg_timer, DSKSPACE_MSG_INTERVAL, dskspace_msg_timer, 0, NULL);
+				if (ENOSPC == save_errno)
+				{
+					if (dskspace_msg_counter != save_dskspace_msg_counter)
+					{	/* Report ENOSPC errors for first time and every minute after that. While this
+						 * approach reduces the number of times ENOSPC is issued by every process, it still
+						 * allows for flooding the syslog with ENOSPC messages if there are a lot of
+						 * concurrent processes encountering ENOSPC errors. We should consider using a
+						 * scheme like what is used limiting non-ENOSPC errors (see below) or MUTEXLCKALERT
+						 * (see mutex.c)
+						 * Also, may be DBFILERR should be replaced with DBIOERR for specificity.
+						 */
+						send_msg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
+							 ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
+						if (!IS_GTM_IMAGE)
+						{
+							gtm_putmsg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region), ERR_TEXT, 2,
+									RTS_ERROR_TEXT("Error during flush write"), save_errno);
+						}
+						save_dskspace_msg_counter = dskspace_msg_counter;
+						start_timer((TID)&dskspace_msg_timer, DSKSPACE_MSG_INTERVAL, dskspace_msg_timer, 0,
+								NULL);
+					}
+				} else
+				{
+					cnl->wtstart_errcnt++;
+					if (1 == (cnl->wtstart_errcnt % DBIOERR_LOGGING_PERIOD))
+					{	/* Every 100th failed attempt, issue an operator log indicating an I/O error.
+						 * wcs_wtstart is typically invoked during periodic flush timeout and since there
+						 * cannot be more than 2 pending flush timers per region, number of concurrent
+						 * processes issuing the below send_msg should be relatively small even if there
+						 * are 1000s of processes.
+						 */
+						send_msg(VARLSTCNT(7) ERR_DBIOERR, 4, REG_LEN_STR(region), DB_LEN_STR(region),
+								save_errno);
+					}
 				}
 				err_status = save_errno;
 				break;
 			}
+			cnl->wtstart_errcnt = 0; /* Discard any previously noted I/O errors */
 			++n2;
 			BG_TRACE_ANY(csa, wrt_count);
 			/* Detect whether queue has become empty. Defer action (calling wcs_clean_dbsync)

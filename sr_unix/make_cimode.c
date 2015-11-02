@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gtmci.h"
 #include "make_mode.h"
 

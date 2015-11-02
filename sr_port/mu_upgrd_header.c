@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,7 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->creation_mdb_ver = v15_csd->creation_mdb_ver;
 	csd->trans_hist.early_tn = v15_csd->trans_hist.early_tn;
 	csd->trans_hist.curr_tn = v15_csd->trans_hist.curr_tn;	/* INCREMENT_CURR_TN comment added to note curr_tn set is done */
-	csd->max_tn = MAX_TN_V5;		/* New in V5.0-000 */
+	csd->max_tn = MAX_TN_V6;		/* New in V5.0-000 */
 	SET_TN_WARN(csd, csd->max_tn_warn);	/* New in V5.0-000 */
 	csd->trans_hist.last_mm_sync = v15_csd->trans_hist.last_mm_sync;
 	csd->trans_hist.mm_tn = v15_csd->trans_hist.mm_tn;

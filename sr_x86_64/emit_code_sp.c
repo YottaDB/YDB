@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007, 2009 Fidelity Information Services, Inc *
+ *      Copyright 2007, 2012 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -19,12 +19,13 @@
 #include "gtm_stdio.h"
 #include "opcode.h"
 #include "mdq.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "vxi.h"
 #include "vxt.h"
 #include "cgp.h"
 #include "compiler.h"
-#include "emit_code.h"
+#include "list_file.h"
+#include <emit_code.h>
 GBLDEF struct emit_base_info emit_base_info;
 
 

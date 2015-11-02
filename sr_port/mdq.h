@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,30 +9,74 @@
  *								*
  ****************************************************************/
 
-#ifdef DEBUG_TRIPLES
-#  define CHKTCHAIN(x)	chktchain(x)
-#else
-#  define CHKTCHAIN(x)
-#endif
+#ifndef MDQ_H_DEFINED
+#define HDQ_H_DEFINED
 
-/* All the following macros assume a doubly-linked list using "fl" and "bl" */
+/* Define basic working macros for doubly linked queue management. The  doubly-linked list is defined using
+ * elements "n.fl" and "n.bl".
+ */
 
-#define dqloop(q,n,i) for (i = (q)->n.fl; i != (q); i = (i)->n.fl)
+/* Loop through a linked list given any element as the start (q) and a var to use as loop incrementer */
+#define DQLOOP(q, n, i) for (i = (q)->n.fl; i != (q); i = (i)->n.fl)
 
-#define dqinit(q,n) ((q)->n.fl = (q)->n.bl = q)
+/* Initialize an element */
+#define DQINIT(q, n) ((q)->n.fl = (q)->n.bl = q)
 
-/* delete one element "x" from the doubly linked list */
-#define dqdel(x,n) ((x)->n.bl->n.fl = (x)->n.fl, (x)->n.fl->n.bl = (x)->n.bl)
+/* Delete one element "x" from the doubly linked list */
+#define DQDEL(x, n) ((x)->n.bl->n.fl = (x)->n.fl, (x)->n.fl->n.bl = (x)->n.bl)
 
-/* delete a doubly-linked list of elements from "x->n.fl" to "y->n.bl" (i.e. everything in between "x" and "y" excluding them) */
-#define dqdelchain(x,y,n) {((x)->n.fl = (y), (y)->n.bl = (x)); CHKTCHAIN(x); CHKTCHAIN(y);}
+/* Delete a doubly-linked list of elements from "x->n.fl" to "y->n.bl" (i.e. everything in between "x" and "y" excluding them) */
+#define DQDELCHAIN(x, y, n) ((x)->n.fl = (y), (y)->n.bl = (x))
 
 /* Insert one element "x" in between "q" and "q->n.fl" */
-#define dqins(q,n,x) ((x)->n.fl = (q)->n.fl, (x)->n.bl =(q), (q)->n.fl=(x), ((x)->n.fl)->n.bl=(x))
+#define DQINS(q, n, x) ((x)->n.fl = (q)->n.fl, (x)->n.bl =(q), (q)->n.fl=(x), ((x)->n.fl)->n.bl=(x))
 
 /* Insert a doubly-linked list of elements from "n->q.fl" to "n->q.bl" in between "o" and "o->q.fl" */
-#define dqadd(o,n,q)												\
-{														\
-	((o)->q.fl->q.bl=(n)->q.bl, (n)->q.bl->q.fl=(o)->q.fl, (o)->q.fl=(n)->q.fl, (n)->q.fl->q.bl=(o));	\
-	CHKTCHAIN(o);												\
+#define DQADD(o, n, q) ((o)->q.fl->q.bl=(n)->q.bl, (n)->q.bl->q.fl=(o)->q.fl, (o)->q.fl=(n)->q.fl, (n)->q.fl->q.bl=(o))
+
+/* Define macros actually used which if #define DEBUG_TRIPLES, adds debugging information. Since these macros are
+ * used in several different queue types and since these debugging macros only work for the exorder field in triples,
+ * the test to see if should do debugging is not elegant but it does allow decent debugging. Note those macros without
+ * debugging are statically defined.
+ */
+
+#define dqloop(q, n, i) DQLOOP(q, n, i)
+#define dqinit(q, n)	DQINIT(q, n)
+
+/* #define DEBUG_TRIPLES / * Uncomment this to do triple debugging */
+#ifndef DEBUG_TRIPLES
+#  define dqdel(x, n)		DQDEL(x, n)
+#  define dqdelchain(x, y, n)	DQDELCHAIN(x, y, n)
+#  define dqins(q, n, x)	DQINS(q, n, x)
+#  define dqadd(o, n, q)	DQADD(o, n, q)
+#  define CHKTCHAIN(x)
+#else
+#  include "compiler.h"
+#  define CHKTCHAIN(x) chktchain((triple *)(x))
+#  define IFEXOCHN(n, c) if (0 == memcmp(#n, "exorder", 3)) c	/* memcmp() should be faster and for 3 chars, just as effective */
+#  define dqdel(x, n)			\
+{					\
+	IFEXOCHN(n, CHKTCHAIN(x));	\
+	DQDEL(x, n);			\
 }
+#  define dqdelchain(x, y, n)		\
+{					\
+	IFEXOCHN(n, CHKTCHAIN(x));	\
+	DQDELCHAIN(x, y, n);		\
+	IFEXOCHN(n, CHKTCHAIN(y));	\
+}
+#  define dqins(q, n, x)		\
+{					\
+	IFEXOCHN(n, CHKTCHAIN(q));	\
+	DQINS(q, n, x);			\
+	IFEXOCHN(n, CHKTCHAIN(q));	\
+}
+#  define dqadd(o, n, q)		\
+{					\
+	IFEXOCHN(n, CHKTCHAIN(o));	\
+	DQADD(o, n, q);			\
+	IFEXOCHN(n, CHKTCHAIN(o));	\
+}
+#endif
+
+#endif

@@ -14,8 +14,8 @@
 #include "opcode.h"
 #include "mdq.h"
 #include "cgp.h"
-#include "emit_code.h"
-#include "rtnhdr.h"
+#include <emit_code.h>
+#include <rtnhdr.h>
 #include "obj_file.h"
 
 GBLREF int4		curr_addr, code_size;

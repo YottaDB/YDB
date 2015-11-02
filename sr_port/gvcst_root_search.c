@@ -37,6 +37,9 @@
 #include "gvcst_protos.h"	/* for gvcst_search,gvcst_root_search prototype */
 #include "get_spec.h"
 #include "collseq.h"
+#ifdef UNIX
+#include "error.h"
+#endif
 
 GBLREF	gv_key		*gv_currkey, *gv_altkey;
 GBLREF	int4		gv_keysize;
@@ -47,72 +50,160 @@ GBLREF	uint4		dollar_tlevel;
 GBLREF	uint4		dollar_trestart;
 GBLREF	unsigned int	t_tries;
 GBLREF	gv_namehead	*reset_gv_target;
+GBLREF	boolean_t	mu_reorg_process;
 GBLREF	boolean_t	mupip_jnl_recover;
 #ifdef UNIX
 # ifdef DEBUG
 GBLREF	boolean_t	is_rcvr_server;
 GBLREF	boolean_t	is_src_server;
+GBLDEF	unsigned char	t_fail_hist_dbg[T_FAIL_HIST_DBG_SIZE];
+GBLDEF	unsigned int	t_tries_dbg;
 # endif
 GBLREF	jnl_gbls_t	jgbl;
 GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
 GBLREF	trans_num	start_tn;
 GBLREF	uint4		update_trans;
+GBLREF	inctn_opcode_t	inctn_opcode;
 GBLREF	uint4		t_err;
+#endif
+#ifdef GTM_TRIGGER
+GBLREF	boolean_t		skip_INVOKE_RESTART;
 #endif
 
 error_def(ERR_GVGETFAIL);
 
 static	mstr	global_collation_mstr;
 
+#ifdef GTM_TRIGGER
+# define TRIG_TP_SET_SGM					\
+{								\
+	if (dollar_tlevel)					\
+	{							\
+		assert(skip_INVOKE_RESTART);			\
+		tp_set_sgm();					\
+	}							\
+}
+#else
+# define TRIG_TP_SET_SGM
+#endif
+
+#define T_RETRY_AND_CLEANUP(STATUS, DONOT_RESTART)						\
+{												\
+	gv_target->clue.end = 0;								\
+	RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);				\
+	if (DONOT_RESTART)									\
+		return status; /* caller will handle the restart */				\
+	t_retry(STATUS);									\
+	save_targ->root = 0;	/* May have been found by gvcst_redo_root_search.		\
+				 * Reset and allow gvcst_root_search to find it itself.		\
+				 */								\
+	TRIG_TP_SET_SGM;									\
+}
+
 #ifdef UNIX
+#define SAVE_ROOTSRCH_ENTRY_STATE								\
+{												\
+	int				idx;							\
+	redo_root_search_context	*rootsrch_ctxt_ptr;					\
+												\
+	rootsrch_ctxt_ptr = &(TREF(redo_rootsrch_ctxt));					\
+	rootsrch_ctxt_ptr->t_tries = t_tries;							\
+	for (idx = 0; CDB_MAX_TRIES > idx; idx++)						\
+		rootsrch_ctxt_ptr->t_fail_hist[idx] = t_fail_hist[idx];				\
+	rootsrch_ctxt_ptr->prev_t_tries = TREF(prev_t_tries);					\
+	DEBUG_ONLY(										\
+		rootsrch_ctxt_ptr->t_tries_dbg = t_tries_dbg;					\
+		for (idx = 0; T_FAIL_HIST_DBG_SIZE > idx; idx++)				\
+			rootsrch_ctxt_ptr->t_fail_hist_dbg[idx] = t_fail_hist_dbg[idx];		\
+	)											\
+	rootsrch_ctxt_ptr->start_tn = start_tn;							\
+	rootsrch_ctxt_ptr->update_trans = update_trans;						\
+	rootsrch_ctxt_ptr->inctn_opcode = inctn_opcode;						\
+	inctn_opcode = 0;									\
+	rootsrch_ctxt_ptr->t_err = t_err;							\
+	rootsrch_ctxt_ptr->hold_onto_crit = cs_addrs->hold_onto_crit;				\
+	if (CDB_STAGNATE <= t_tries)								\
+	{											\
+		assert(cs_addrs->now_crit);							\
+		cs_addrs->hold_onto_crit = TRUE;						\
+	}											\
+	if (mu_reorg_process)									\
+	{	/* In case gv_currkey/gv_target are out of sync. */				\
+		rootsrch_ctxt_ptr->gv_currkey = (gv_key *)&rootsrch_ctxt_ptr->currkey[0];	\
+		MEMCPY_KEY(rootsrch_ctxt_ptr->gv_currkey, gv_currkey);				\
+		SET_GV_CURRKEY_FROM_REORG_GV_TARGET;						\
+	}											\
+}
+
+#define RESTORE_ROOTSRCH_ENTRY_STATE								\
+{												\
+	int				idx;							\
+	redo_root_search_context	*rootsrch_ctxt_ptr;					\
+												\
+	rootsrch_ctxt_ptr = &(TREF(redo_rootsrch_ctxt));					\
+	t_tries = rootsrch_ctxt_ptr->t_tries;							\
+	for (idx = 0; CDB_MAX_TRIES > idx; idx++)						\
+		t_fail_hist[idx] = rootsrch_ctxt_ptr->t_fail_hist[idx];				\
+	TREF(prev_t_tries) = rootsrch_ctxt_ptr->prev_t_tries;					\
+	DEBUG_ONLY(										\
+		t_tries_dbg = rootsrch_ctxt_ptr->t_tries_dbg;					\
+		for (idx = 0; T_FAIL_HIST_DBG_SIZE > idx; idx++)				\
+			t_fail_hist_dbg[idx] = rootsrch_ctxt_ptr->t_fail_hist_dbg[idx];		\
+	)											\
+	start_tn = rootsrch_ctxt_ptr->start_tn;							\
+	update_trans = rootsrch_ctxt_ptr->update_trans;						\
+	inctn_opcode = rootsrch_ctxt_ptr->inctn_opcode;						\
+	t_err = rootsrch_ctxt_ptr->t_err;							\
+	cs_addrs->hold_onto_crit = rootsrch_ctxt_ptr->hold_onto_crit;				\
+	TREF(in_gvcst_redo_root_search) = FALSE;						\
+	if (mu_reorg_process)									\
+		/* Restore gv_currkey */							\
+		MEMCPY_KEY(gv_currkey, rootsrch_ctxt_ptr->gv_currkey);				\
+}
+
+CONDITION_HANDLER(gvcst_redo_root_search_ch)
+{
+	START_CH;
+
+	RESTORE_ROOTSRCH_ENTRY_STATE;
+
+	NEXTCH;
+}
+
 void gvcst_redo_root_search()
 {
 	DEBUG_ONLY(boolean_t	dbg_now_crit;)
-	boolean_t		save_hold_onto_crit;
-	int			idx;
-	trans_num		save_start_tn;
-	uint4			save_update_trans, save_t_err;
-	unsigned char		save_t_fail_hist[CDB_MAX_TRIES];
-	unsigned int		save_t_tries;
+	uint4			lcl_onln_rlbkd_cycle;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(!TREF(in_gvcst_redo_root_search)); /* should never recurse */
-	DEBUG_ONLY(TREF(in_gvcst_redo_root_search) = TRUE;)
+	ESTABLISH(gvcst_redo_root_search_ch);
+	assert(!TREF(in_gvcst_redo_root_search)); /* Should never recurse. However, can be called from non-redo gvcst_root_search,
+						   * e.g. from op_gvname. In that case, the results of gvcst_redo_root_search are
+						   * discarded and the outer root search correctly sets gv_target->root.
+						   */
+	TREF(in_gvcst_redo_root_search) = TRUE;
 	assert(0 < t_tries);
 	assert(!is_src_server && !is_rcvr_server);
 	assert(!jgbl.onlnrlbk);
 	assert((NULL != gv_target) && !gv_target->root);
 	assert(cs_addrs == gv_target->gd_csa);
 	assert(!dollar_tlevel);
-	save_t_tries = t_tries;
-	for (idx = 0; CDB_MAX_TRIES > idx; idx++)
-		save_t_fail_hist[idx] = t_fail_hist[idx];
-	save_start_tn = start_tn;
-	save_update_trans = update_trans;
-	save_t_err = t_err;
 	DEBUG_ONLY(dbg_now_crit = cs_addrs->now_crit);
-	save_hold_onto_crit = cs_addrs->hold_onto_crit;
-	if (CDB_STAGNATE <= t_tries)
-	{
-		assert(cs_addrs->now_crit);
-		cs_addrs->hold_onto_crit = TRUE;
-	}
+	/* save global variables now that we are going to do the root search in the middle of the current transaction */
+	SAVE_ROOTSRCH_ENTRY_STATE;
+	lcl_onln_rlbkd_cycle = cs_addrs->db_onln_rlbkd_cycle;
 	GVCST_ROOT_SEARCH;
+	if (lcl_onln_rlbkd_cycle != cs_addrs->nl->db_onln_rlbkd_cycle)
+		TREF(rlbk_during_redo_root) = TRUE;
 	assert(cs_addrs->now_crit == dbg_now_crit); /* ensure crit state remains same AFTER gvcst_root_search */
 	/* restore global variables now that we are continuing with the original transaction */
-	t_tries = save_t_tries;
-	cs_addrs->hold_onto_crit = save_hold_onto_crit;
-	for (idx = 0; CDB_MAX_TRIES > idx; idx++)
-		t_fail_hist[idx] = save_t_fail_hist[idx];
-	start_tn = save_start_tn;
-	update_trans = save_update_trans;
-	t_err = save_t_err;
-	DEBUG_ONLY(TREF(in_gvcst_redo_root_search) = FALSE;)
+	RESTORE_ROOTSRCH_ENTRY_STATE;
+	REVERT;
 }
 #endif
 
-void gvcst_root_search(void)
+enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 {
 	srch_blk_status	*h0;
 	sm_uc_ptr_t	rp;
@@ -123,18 +214,24 @@ void gvcst_root_search(void)
 	gv_namehead	*save_targ;
 	mname_entry	*gvent;
 	int		altkeylen;
+	int		tmp_cmpc;
 	block_id	lcl_root;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth));
 	SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY;	/* set up gv_altkey to be just the gblname */
 	save_targ = gv_target;
 	/* Check if "gv_target->gvname" matches "gv_altkey->base". If not, there is a name mismatch (out-of-design situation).
-	 * This check is temporary until we catch the situation that caused D9H02-002641 */
+	 * This check is temporary until we catch the situation that caused D9H02-002641.
+	 * It's suspected the original situation has been fixed (see D9I08-002695). But the assertpro will remain until
+	 * gvcst_redo_root_search has been well-tested.
+	 */
 	/* --- Check BEGIN --- */
 	gvent = &save_targ->gvname;
 	altkeylen = gv_altkey->end - 1;
-	if (!altkeylen || (altkeylen != gvent->var_name.len) || memcmp(gv_altkey->base, gvent->var_name.addr, gvent->var_name.len))
-		GTMASSERT;
+	assertpro(altkeylen && (altkeylen == gvent->var_name.len)
+			&& (0 == memcmp(gv_altkey->base, gvent->var_name.addr, gvent->var_name.len)));
 	/* --- Check END   --- */
 	if (INVALID_GV_TARGET != reset_gv_target)
 		gbl_target_was_set = TRUE;
@@ -161,13 +258,11 @@ void gvcst_root_search(void)
 			{
 				h0 = gv_target->hist.h;
 				rp = (h0->buffaddr + h0->curr_rec.offset);
-				hdr_len = SIZEOF(rec_hdr) + gv_altkey->end + 1 - ((rec_hdr_ptr_t)rp)->cmpc;
+				hdr_len = SIZEOF(rec_hdr) + gv_altkey->end + 1 - EVAL_CMPC((rec_hdr_ptr_t)rp);
 				GET_USHORT(rlen, rp);
 				if (FALSE == (CHKRECLEN(rp, h0->buffaddr, rlen)) || (rlen < hdr_len + SIZEOF(block_id)))
 				{
-					gv_target->clue.end = 0;
-					RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
-					t_retry(cdb_sc_rmisalign);
+					T_RETRY_AND_CLEANUP(cdb_sc_rmisalign, donot_restart);
 					continue;
 				}
 				GET_LONG(lcl_root, (rp + hdr_len));
@@ -192,9 +287,7 @@ void gvcst_root_search(void)
 					status = tp_hist(NULL);
 					if (cdb_sc_normal != status)
 					{
-						gv_target->clue.end = 0;
-						RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
-						t_retry(status);
+						T_RETRY_AND_CLEANUP(status, donot_restart);
 						continue;
 					}
 					break;
@@ -209,21 +302,17 @@ void gvcst_root_search(void)
 				status = tp_hist(NULL);
 				if (cdb_sc_normal == status)
 					break;
-				gv_target->clue.end = 0;
-				RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
-				t_retry(status);
+				T_RETRY_AND_CLEANUP(status, donot_restart);
 				continue;
 			}
 		} else
 		{
-			gv_target->clue.end = 0;
-			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
-			t_retry(status);
+			T_RETRY_AND_CLEANUP(status, donot_restart);
 			continue;
 		}
 	}
 	save_targ->root = lcl_root;	/* now that we know the transaction validated fine, set root block in gv_target */
-	RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
+	RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
 	if (rlen > hdr_len + SIZEOF(block_id))
 	{
 		assert(NULL != global_collation_mstr.addr);
@@ -249,5 +338,5 @@ void gvcst_root_search(void)
 	if (gv_target->act)
 		act_in_gvt();
 	assert(gv_target->act || NULL == gv_target->collseq);
-	return;
+	return cdb_sc_normal;
 }

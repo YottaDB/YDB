@@ -19,7 +19,7 @@
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "zroutines.h"
 #include "compiler.h"
 #include "srcline.h"

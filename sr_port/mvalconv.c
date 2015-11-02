@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -107,7 +107,7 @@ void	xi2mval(mval *v, unsigned int i)
 	if (i < INT_HI)
 	{
 		v->mvtype |= MV_INT;
-		v->m[1] = MV_BIAS * i;
+		v->m[1] = MV_BIAS * (v->sgn ? -(int)i : i);
 	} else
 	{
 		if (i < MANT_HI)
@@ -174,7 +174,7 @@ void	xl2mval(mval *v, unsigned long i)
 	if (i < INT_HI)
 	{
 		v->mvtype |= MV_INT;
-		v->m[1] = MV_BIAS * (uint4)i;
+		v->m[1] = MV_BIAS * (v->sgn ? -(int4)i : (uint4)i);
 	} else
 	{
 		if (i < MANT_HI)

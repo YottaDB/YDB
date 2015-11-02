@@ -18,7 +18,7 @@
 #include "hashtab.h"
 #include "hashtab_objcode.h"
 #include "hashtab_mname.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mprof.h"
 #include "gtm_unlink_all.h"
@@ -95,7 +95,10 @@ void gtm_unlink_all(void)
 	/* Step 3: re-Initialize $ECODE, $REFERENCE, and $TEST */
 	NULLIFY_DOLLAR_ECODE;		/* Clears $ECODE and results returned for $STACK */
 	if (NULL != gv_currkey)
-		gv_currkey->end = 0;	/* Clears $REFERENCE */
+	{	/* Clears $REFERENCE */
+		gv_currkey->end = 0;
+		gv_currkey->base[0] = KEY_DELIMITER;
+	}
 	dollar_truth = FALSE;		/* aka $TEST */
 	/* Step 4: Remove all triggers */
 #	ifdef GTM_TRIGGER

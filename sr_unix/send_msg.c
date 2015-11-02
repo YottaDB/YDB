@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,21 +22,23 @@
 #include "send_msg.h"
 #include "caller_id.h"
 #include "gtmsiginfo.h"
+/* database/replication related includes due to anticipatory freeze */
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for anticipatory_freeze.h */
+#include "anticipatory_freeze.h"	/* for SET_ANTICIPATORY_FREEZE_IF_NEEDED */
 
-GBLREF bool		caller_id_flag;
-GBLREF va_list		last_va_list_ptr;
-GBLREF volatile int4	exit_state;
+GBLREF	bool			caller_id_flag;
+GBLREF	volatile int4		exit_state;
+GBLREF	volatile boolean_t	timer_in_handler;
+GBLREF	jnlpool_addrs		jnlpool;
 
 #ifdef DEBUG
 static uint4		nesting_level = 0;
 #endif
-
-#define NOFLUSH 0
-#define FLUSH   1
-#define RESET   2
-#define OPER    4
-
-
 
 /*
 **  WARNING:    For chained error messages, all messages MUST be followed by an fao count;
@@ -47,38 +49,44 @@ static uint4		nesting_level = 0;
 
 void send_msg(int arg_count, ...)
 {
-        va_list var;
-        int   dummy, fao_actual, fao_count, i, msg_id;
-        char    msg_buffer[1024];
-        mstr    msg_string;
+        va_list		var;
+        int		dummy, fao_actual, fao_count, i, msg_id;
+        char    	msg_buffer[1024];
+        mstr    	msg_string;
+	char		*save_util_outptr;
+	va_list		save_last_va_list_ptr;
+	boolean_t	util_copy_saved = FALSE;
+	boolean_t	freeze_set = FALSE;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Since send_msg uses a global variable buffer, reentrant calls to send_msg will use the same buffer.
 	 * Ensure we never overwrite an under-construction send_msg buffer with a nested send_msg call. The
 	 * only exception to this is if the nested call to send_msg is done by exit handling code in which case
 	 * the latest send_msg call prevails and it is ok since we will never return to the original send_msg()
 	 * call again.  Detect if ever this assmption gets violated with an assert.
 	 */
-	assert((0 == nesting_level) || (EXIT_IMMED == exit_state));
+	assert((0 == nesting_level) || ((2 > nesting_level) && timer_in_handler) || (EXIT_IMMED == exit_state));
 	DEBUG_ONLY(nesting_level++;)
         VAR_START(var, arg_count);
         assert(arg_count > 0);
-	util_out_save();
+	if ((NULL != TREF(util_outptr)) && (TREF(util_outptr) != TREF(util_outbuff_ptr)))
+	{
+		SAVE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
+	}
         util_out_print(NULL, RESET);
-
         for (;;)
         {
                 msg_id = (int) va_arg(var, VA_ARG_TYPE);
+		SET_ANTICIPATORY_FREEZE_IF_NEEDED(msg_id, freeze_set);
                 --arg_count;
-
                 msg_string.addr = msg_buffer;
                 msg_string.len = SIZEOF(msg_buffer);
                 gtm_getmsg(msg_id, &msg_string);
-
-                if (arg_count > 0)
+                if (0 < arg_count)
                 {
                         fao_actual = (int) va_arg(var, VA_ARG_TYPE);
                         --arg_count;
-
                         fao_count = fao_actual;
                         if (fao_count > MAX_FAO_PARMS)
 			{
@@ -87,11 +95,10 @@ void send_msg(int arg_count, ...)
 			}
                 } else
                         fao_actual = fao_count = 0;
-
                 util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
 		va_end(var);	/* need this before used as dest in copy */
-		VAR_COPY(var, last_va_list_ptr);
-		va_end(last_va_list_ptr);
+		VAR_COPY(var, TREF(last_va_list_ptr));
+		va_end(TREF(last_va_list_ptr));
 		arg_count -= fao_count;
 
                 if (0 >= arg_count)
@@ -103,11 +110,11 @@ void send_msg(int arg_count, ...)
                 util_out_print("!/", NOFLUSH);
         }
 	va_end(var);
-
         util_out_print(NULL, OPER);
-	util_out_restore();
+	RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
         /* it has been suggested that this would be a place to check a view_debugN
          * and conditionally enter a "forever" loop on wcs_sleep for unix debugging
          */
 	DEBUG_ONLY(nesting_level--;)
+	REPORT_INSTANCE_FROZEN(freeze_set);
 }

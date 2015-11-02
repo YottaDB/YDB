@@ -17,7 +17,7 @@
 #include "error.h"
 #include "error_trap.h"
 #include "dollar_zlevel.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "golevel.h"
 #include "io.h"

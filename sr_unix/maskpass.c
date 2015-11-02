@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -205,14 +205,14 @@ int main()
 	}
 #	endif
 
-	passwd_len = -1;
+	passwd_len = (size_t)-1;
 	memset(passwd, 0, MAX_LEN);
 	memset(out, 0, MAX_LEN * 2);
 
 	if (get_hash_via_env_var(hash))
 		if (get_hash_via_username_and_inode(hash, passwd, &passwd_len))
 			exit(1);
-	if (-1 == passwd_len)
+	if ((size_t)-1 == passwd_len)
 	{
 		prompt_passwd(passwd);
 		passwd_len = strlen(passwd);

@@ -35,6 +35,7 @@
 #include "clear_cache_array.h"
 #include "is_proc_alive.h"
 #include "do_semop.h"
+#include "anticipatory_freeze.h"	/* needed for WRITE_EOF_BLOCK */
 
 error_def(ERR_DBFILERR);
 error_def(ERR_MUTRUNCERROR);
@@ -60,8 +61,11 @@ void recover_truncate(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg)
 	udi = FILE_INFO(reg);
 	assert((udi->grabbed_access_sem && (1 == (semval = semctl(udi->semid, 1, GETVAL)))) || csa->now_crit);
 	/* Interrupted truncate scenario */
+	if (NULL != csa->nl)
+		csa->nl->root_search_cycle++;
 	old_total = csd->before_trunc_total_blks;					/* Pre-truncate total_blks */
-	old_size = (off_t)csd->before_trunc_file_size * DISK_BLOCK_SIZE;		/* Pre-truncate file size (in bytes) */
+	old_size = (off_t)SIZEOF_FILE_HDR(csd)						/* Pre-truncate file size (in bytes) */
+			+ (off_t)old_total * csd->blk_size + DISK_BLOCK_SIZE;
 	cur_total = csa->ti->total_blks;						/* Actual total_blks right now */
 	cur_size = (off_t)gds_file_size(reg->dyn.addr->file_cntl) * DISK_BLOCK_SIZE;	/* Actual file size right now (in bytes) */
 	new_total = csd->after_trunc_total_blks;					/* Post-truncate total_blks */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,10 @@ GBLREF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
 GBLREF	uint4			process_id;
 GBLREF 	jnl_gbls_t		jgbl;
 
+error_def(ERR_BTFAIL);
+error_def(ERR_WCFAIL);
+error_def(ERR_WCBLOCKED);
+
 bt_rec_ptr_t bt_put(gd_region *reg, int4 block)
 {
 	bt_rec_ptr_t		bt, q0, q1, hdr;
@@ -44,10 +48,6 @@ bt_rec_ptr_t bt_put(gd_region *reg, int4 block)
 	th_rec_ptr_t		th;
 	trans_num		lcl_tn;
 	uint4			lcnt;
-
-	error_def(ERR_BTFAIL);
-	error_def(ERR_WCFAIL);
-	error_def(ERR_WCBLOCKED);
 
 	csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
@@ -72,7 +72,7 @@ bt_rec_ptr_t bt_put(gd_region *reg, int4 block)
 					BG_TRACE_PRO_ANY(csa, bt_put_flush_dirty);
 					if (FALSE == wcs_get_space(reg, 0, cr))
 					{
-						assert(csd->wc_blocked);	/* only reason we currently know
+						assert(csa->nl->wc_blocked);	/* only reason we currently know
 										 * why wcs_get_space could fail */
 						assert(gtm_white_box_test_case_enabled);
 						BG_TRACE_PRO_ANY(csa, wcb_bt_put);

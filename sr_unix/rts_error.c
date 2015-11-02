@@ -17,20 +17,20 @@
 #include "gtm_putmsg_list.h"
 #include <errno.h>
 
+#include "gtmimagename.h"
 #include "error.h"
 #include "util.h"
 
-GBLREF int		gtm_errno;
-GBLREF boolean_t 	created_core;
-GBLREF boolean_t	dont_want_core;
-
-#define FLUSH	1
-#define RESET	2
+GBLREF	int		gtm_errno;
+GBLREF	boolean_t 	created_core;
+GBLREF	boolean_t	dont_want_core;
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
 error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
+error_def(ERR_JOBINTRRETHROW);
+error_def(ERR_JOBINTRRQST);
 error_def(ERR_MEMORY);
 error_def(ERR_OUTOFSPACE);
 error_def(ERR_REPEATERROR);
@@ -47,7 +47,20 @@ int rts_error(int argcnt, ...)
 {
 	int 		msgid;
 	va_list		var;
+#	ifdef DEBUG
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	if (TREF(rts_error_unusable) && !TREF(rts_error_unusable_seen))
+	{
+		TREF(rts_error_unusable_seen) = TRUE;
+		/* The below assert ensures that this rts_error invocation is appropriate in the current context of the code that
+		 * triggered this rts_error. If ever this assert fails, investigate the window of DBG_MARK_RTS_ERROR_UNUSABLE
+		 * and DBG_MARK_RTS_ERROR_USABLE in the call-stack.
+		 */
+		assert(FALSE);
+	}
+#	endif
 	if (-1 == gtm_errno)
 		gtm_errno = errno;
 	VAR_START(var, argcnt);
@@ -61,22 +74,23 @@ int rts_error(int argcnt, ...)
 	if (DUMPABLE)
 		PRN_ERROR;
 	/* This is simply a place holder msg to signal tp restart or otherwise rethrow an error */
-	if (ERR_TPRETRY == msgid || ERR_REPEATERROR == msgid || ERR_REPLONLNRLBK == msgid)
-	{
+	if ((ERR_TPRETRY == msgid) || (ERR_REPEATERROR == msgid) || (ERR_REPLONLNRLBK == msgid) || (ERR_JOBINTRRQST == msgid)
+	    || (ERR_JOBINTRRETHROW == msgid))
 		error_condition = msgid;
-		/* util_out_print(NULL, RESET);	Believe this is superfluous housecleaning. SE 9/2000 */
-	} else
-	{
-		/* Note this message is not flushed out. This is so user console is not
-		   polluted with messages that are going to be handled by a ZTRAP. If
-		   ZTRAP is not active, the message will be flushed out in mdb_condition_handler
-		   (which is usually the top level handler or is rolled over into by higher handlers. */
+	else
+	{	/* Note this message is not flushed out. This is so user console is not polluted with messages that are going to be
+		 * handled by a ZTRAP. If ZTRAP is not active, the message will be flushed out in mdb_condition_handler - which is
+		 * usually the top level handler or is rolled over into by higher handlers.
+		 */
+		if (IS_GTMSECSHR_IMAGE)
+			util_out_print(NULL, RESET);
 		VAR_START(var, argcnt);		/* restart arg list */
 		gtm_putmsg_list(argcnt, var);
 		va_end(var);
 		if (DUMPABLE)
 			created_core = dont_want_core = FALSE;		/* We can create a(nother) core now */
-
+		if (IS_GTMSECSHR_IMAGE)
+			util_out_print(NULL, OPER);			/* gtmsecshr errors always immediately pushed out */
 	}
 	DRIVECH(msgid);				/* Drive the topmost (inactive) condition handler */
 	/* Note -- at one time there was code here to catch if we returned from the condition handlers
@@ -85,4 +99,3 @@ int rts_error(int argcnt, ...)
 	 */
 	return 0;
 }
-

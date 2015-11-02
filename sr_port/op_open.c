@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,30 +18,58 @@
 #include "op.h"
 #include "trans_log_name.h"
 
+#include "gdsroot.h"
+#include "gdskill.h"
+#include "gdsbt.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsfhead.h"
+#include "gdscc.h"
+#include "filestruct.h"
+#include "buddy_list.h"		/* needed for tp.h */
+#include "jnl.h"
+#include "hashtab_int4.h"	/* needed for tp.h */
+#include "tp.h"
+#include "send_msg.h"
+#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
+#include "change_reg.h"
+#include "setterm.h"
+#include "getzposition.h"
+#ifdef DEBUG
+#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
+#endif
+
+GBLREF uint4		dollar_trestart;
+GBLREF io_log_name	*io_root_log_name;
 GBLREF bool		licensed;
 GBLREF int4		lkid, lid;
-GBLREF io_log_name	*io_root_log_name;
+
+LITREF unsigned char io_params_size[];
+
+error_def(ERR_LOGTOOLONG);
+error_def(LP_NOTACQ);				/* bad license */
+
+#define OPENTIMESTR "OPEN time too long"
 
 int op_open(mval *device, mval *devparms, int timeout, mval *mspace)
 {
-	LITREF unsigned char io_params_size[];
 	char		buf1[MAX_TRANS_NAME_LEN];	/* buffer to hold translated name */
 	io_log_name	*naml;				/* logical record for passed name */
 	io_log_name	*tl;				/* logical record for translated name */
 	io_log_name	*prev;				/* logical record for removal search */
 	int4		stat;				/* status */
 	mstr		tn;				/* translated name */
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_LOGTOOLONG);
-	error_def(LP_NOTACQ);				/* bad license */
-
+	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(device);
 	MV_FORCE_STR(devparms);
 	if (mspace)
 		MV_FORCE_STR(mspace);
-
 	if (timeout < 0)
 		timeout = 0;
+	else if (TREF(tpnotacidtime) < timeout)
+		TPNOTACID_CHECK(OPENTIMESTR);
 	assert((unsigned char)*devparms->str.addr < n_iops);
 	naml = get_log_name(&device->str, INSERT);
 	if (naml->iod != 0)

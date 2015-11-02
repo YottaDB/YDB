@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,9 +28,16 @@
 #include "eintr_wrappers.h"
 #include "file_head_write.h"
 #include "gtmmsg.h"
+#include "jnl.h"
+#include "anticipatory_freeze.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
+
+error_def(ERR_DBFILOPERR);
+error_def(ERR_DBNOTGDS);
+error_def(ERR_TEXT);
+ZOS_ONLY(error_def(ERR_BADTAG);)
 
 /*
  * This is a plain way to write file header to database.
@@ -45,11 +52,6 @@ boolean_t file_head_write(char *fn, sgmnt_data_ptr_t header, int4 len)
 	int 		save_errno, fd, header_size;
 	ZOS_ONLY(int	realfiletag;)
 
-	error_def(ERR_DBFILOPERR);
-	error_def(ERR_DBNOTGDS);
-	error_def(ERR_TEXT);
-	ZOS_ONLY(error_def(ERR_BADTAG);)
-
 	header_size = (int)SIZEOF_FILE_HDR(header);
 	assert(SGMNT_HDR_LEN == len || header_size == len);
 	OPENFILE(fn, O_RDWR, fd);
@@ -63,7 +65,7 @@ boolean_t file_head_write(char *fn, sgmnt_data_ptr_t header, int4 len)
 	if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
 		TAG_POLICY_GTM_PUTMSG(fn, errno, realfiletag, TAG_BINARY);
 #endif
-	LSEEKWRITE(fd, 0, header, len, save_errno);
+	DB_LSEEKWRITE(NULL, NULL, fd, 0, header, len, save_errno);
 	if (0 != save_errno)
 	{
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);

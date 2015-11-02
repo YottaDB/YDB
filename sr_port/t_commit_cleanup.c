@@ -41,23 +41,24 @@
 #include "send_msg.h"
 #include "have_crit.h"
 
-GBLREF	unsigned char		cw_set_depth;
-GBLREF	cw_set_element		cw_set[];
-GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	gd_region		*gv_cur_region;
-GBLREF	unsigned int		t_tries;
-GBLREF	uint4			dollar_tlevel;
-GBLREF	sgm_info		*first_sgm_info;
 GBLREF	cache_rec_ptr_t		cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
 GBLREF	unsigned int		cr_array_index;
-GBLREF	boolean_t		unhandled_stale_timer_pop;
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	uint4			process_id;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
-GBLREF	gv_namehead		*gv_target;
-GBLREF	uint4			update_trans;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	cw_set_element		cw_set[];
+GBLREF	unsigned char		cw_set_depth;
+GBLREF	uint4			dollar_trestart;
+GBLREF	uint4			dollar_tlevel;
+GBLREF	sgm_info		*first_sgm_info;
 GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
+GBLREF	uint4			process_id;
+GBLREF	unsigned int		t_tries;
+GBLREF	boolean_t		unhandled_stale_timer_pop;
+GBLREF	uint4			update_trans;
 #ifdef UNIX
 GBLREF	jnl_gbls_t		jgbl;
 #endif
@@ -105,10 +106,11 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	gd_region			*xactn_err_region, *jpl_reg = NULL;
 	cache_rec_ptr_t			*tp_cr_array;
 	DEBUG_ONLY(unsigned int		lcl_t_tries;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(cdb_sc_normal != status);
 	xactn_err_region = gv_cur_region;
-
 	/* see comments in secshr_db_clnup for the commit logic flow as a sequence of steps in t_end and tp_tend and how
 	 * t_commit_cleanup() and secshr_db_clnup() complement each other (one does the rollback and one the roll forward)
 	 * update_underway is set to TRUE to indicate the commit is beyond rollback. It is set only if we hold crit on the region.
@@ -158,7 +160,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		 * at a point where the transaction can be rolled backwards (update_underway = FALSE), we release crit before going
 		 * to the error trap thereby avoiding any unintended crit hangs.
 		 */
-		release_crit = (0 == signal) ? NEED_TO_RELEASE_CRIT(t_tries) : TRUE;
+		release_crit = (0 == signal) ? NEED_TO_RELEASE_CRIT(t_tries, status) : TRUE;
 		if ((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
 		{
 			csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;

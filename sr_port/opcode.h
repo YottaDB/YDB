@@ -13,7 +13,7 @@
 
 enum opcode_enum
 {
-#include "opcode_def.h"
+#include <opcode_def.h>
 	OPCODE_COUNT
 };
 

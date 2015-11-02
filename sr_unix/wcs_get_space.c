@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -250,7 +250,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 						 * wcs_wtstart as it will return right away. Instead return FALSE so
 						 * cache-recovery can be triggered by the caller.
 						 */
-						if (csd->wc_blocked)
+						if (cnl->wc_blocked)
 						{
 							assert(gtm_white_box_test_case_enabled);
 							return FALSE;

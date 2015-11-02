@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,7 @@
 #include "util.h"
 #include "mu_rndwn_file.h"
 #include "db_ipcs_reset.h"
+#include "anticipatory_freeze.h"
 
 GBLREF gd_region        *gv_cur_region;
 GBLREF boolean_t	need_no_standalone;
@@ -87,7 +88,7 @@ int4 mupip_set_jnlfile(char *jnl_fname, int jnl_fn_len)
 	header = (jnl_file_header *)hdr_buffer;
 	if (SS_NORMAL != (status = mupip_set_jnlfile_aux(header, jnl_fname)))
 		return status;
-	LSEEKWRITE(jnl_fd, 0, (sm_uc_ptr_t)hdr_buffer, SIZEOF(hdr_buffer), status);
+	JNL_LSEEKWRITE(NULL, NULL, jnl_fd, 0, (sm_uc_ptr_t)hdr_buffer, SIZEOF(hdr_buffer), status);
 	if (0 != status)
 	{
 		save_no = errno;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,8 +46,6 @@ GBLREF	int			gtmsource_sock_fd;
 GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	int			gtmsource_log_fd;
 GBLREF 	FILE			*gtmsource_log_fp;
-GBLREF	int			gtmsource_statslog_fd;
-GBLREF 	FILE			*gtmsource_statslog_fp;
 GBLREF  struct timeval          gtmsource_poll_wait, gtmsource_poll_immediate;
 GBLREF  gtmsource_state_t       gtmsource_state;
 GBLREF	gd_addr          	*gd_header;
@@ -57,6 +55,9 @@ GBLDEF	repl_heartbeat_que_entry_t	*repl_heartbeat_que_head = NULL;
 GBLDEF	repl_heartbeat_que_entry_t	*repl_heartbeat_free_head = NULL;
 GBLDEF	volatile time_t			gtmsource_now;
 GBLDEF	time_t				last_sent_time, earliest_sent_time;
+
+error_def(ERR_REPLCOMM);
+error_def(ERR_TEXT);
 
 static	int				heartbeat_period, heartbeat_max_wait;
 
@@ -74,9 +75,6 @@ int gtmsource_init_heartbeat(void)
 {
 	int				num_q_entries;
 	repl_heartbeat_que_entry_t	*heartbeat_element;
-
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
 
 	assert(NULL == repl_heartbeat_que_head);
 
@@ -169,9 +167,6 @@ int gtmsource_send_heartbeat(time_t *now)
 	int				status;					/* needed for REPL_{SEND,RECV}_LOOP */
 	unsigned char			seq_num_str[32], *seq_num_ptr;
 	gtmsource_local_ptr_t		gtmsource_local;
-
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
 
 	heartbeat_element = (repl_heartbeat_que_entry_t *)remqh((que_ent_ptr_t)repl_heartbeat_free_head);
 	if (NULL == heartbeat_element) /* Too many pending heartbeats, send later */

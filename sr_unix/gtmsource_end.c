@@ -40,6 +40,8 @@
 #include "mutex.h"
 #include "repl_log.h"
 #include "repl_comm.h"
+#include "have_crit.h"
+#include "anticipatory_freeze.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
@@ -62,11 +64,13 @@ GBLREF	boolean_t		pool_init;
 
 int gtmsource_end1(boolean_t auto_shutdown)
 {
-	int		exit_status, idx;
+	int		exit_status, idx, status, save_errno;
 	seq_num		read_jnl_seqno, jnlpool_seqno, diff_seqno, jnlpool_strm_seqno[MAX_SUPPL_STRMS];
 	int		fclose_res;
 	sgmnt_addrs	*repl_csa;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	gtmsource_ctl_close();
 	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
 	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke and "rel_lock" unconditionally */
@@ -81,11 +85,11 @@ int gtmsource_end1(boolean_t auto_shutdown)
 		jnlpool_strm_seqno[idx] = jnlpool.jnlpool_ctl->strm_seqno[idx];
 	jnlpool.gtmsource_local->gtmsource_pid = 0;
 	jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_DUMMY_STATE;
-	if (!auto_shutdown)
+	if (!auto_shutdown && !ANTICIPATORY_FREEZE_AVAILABLE)
 	{	/* Detach from journal pool */
-		if (jnlpool.jnlpool_ctl && 0 > SHMDT(jnlpool.jnlpool_ctl))
-			repl_log(gtmsource_log_fp, FALSE, TRUE, "Error detaching from journal pool : %s\n", REPL_STR_ERROR);
-		jnlpool.jnlpool_ctl = jnlpool_ctl = NULL;
+		JNLPOOL_SHMDT(status, save_errno);
+		if (0 > status)
+			repl_log(gtmsource_log_fp, FALSE, TRUE, "Error detaching from journal pool : %s\n", STRERROR(save_errno));
 		jnlpool.repl_inst_filehdr = NULL;
 		jnlpool.gtmsrc_lcl_array = NULL;
 		jnlpool.gtmsource_local_array = NULL;

@@ -45,7 +45,6 @@ GBLDEF	bool			gtcm_firsterr = TRUE;
 GBLDEF	FILE 			*gtcm_errfs = NULL;
 
 GBLREF	connection_struct	*curr_entry;
-GBLREF	unsigned char		*util_outptr;
 GBLREF	bool			undef_inhibit;
 
 static 	short			szero = 0;
@@ -71,34 +70,34 @@ CONDITION_HANDLER(gtcm_ch)
 	if (gtcm_firsterr)
 		gtcm_open_cmerrlog();
 	msgnum = 1;
-	msglen = (int)((char *)util_outptr - (char *)util_outbuff);
+	msglen = (int)(TREF(util_outptr) - TREF(util_outbuff_ptr));
 	if (0 == msglen)
 	{	/* gtm_putmsg_list has already flushed message. Get length another way.
 		   Also reduce msg length by <\n> on it's end which we don't want to send.
 		*/
-		msglen = STRLEN(util_outbuff) - 1;
+		msglen = STRLEN(TREF(util_outbuff_ptr)) - 1;
 	} else
 	{	/* msg yet to be flushed. Properly terminate it in the buffer */
-		*util_outptr = '\n';
-		*(util_outptr + 1) = 0;
+		*(TREF(util_outptr)) = '\n';
+		*(TREF(util_outptr) + 1) = 0;
 	}
-	msgptr = (unsigned char *)util_outbuff;
+	msgptr = (unsigned char *)TREF(util_outbuff_ptr);
 	assert(msglen);
 	if (gtcm_errfile)
 	{
 		GET_CUR_TIME;
 		time_str[CTIME_BEFORE_NL] = 0;
-		FPRINTF(gtcm_errfs, "%s: %s", time_str, util_outbuff);
+		FPRINTF(gtcm_errfs, "%s: %s", time_str, TREF(util_outbuff_ptr));
 		FFLUSH(gtcm_errfs);
 	}
 	orig_severity = SEVERITY;
 	/* Don't let severe error message cause client to necessarily die. Reflect error using ERR_SERVERERR */
 	if (4 <= SEVERITY)
 	{
-		memcpy(sevmsgbuf, util_outbuff, msglen);
+		memcpy(sevmsgbuf, TREF(util_outbuff_ptr), msglen);
 		util_out_print(NULL, OPER);	/* write msg to operator log */
 		gtm_putmsg_noflush(VARLSTCNT(4) ERR_SERVERERR, 2, msglen, sevmsgbuf);
-		msglen = (int)((char *)util_outptr - (char *)util_outbuff);
+		msglen = (int)(TREF(util_outptr) - TREF(util_outbuff_ptr));
 	}
 	if (curr_entry)
 	{

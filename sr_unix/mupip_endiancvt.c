@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,7 @@
 #include "shmpool.h"
 #include "min_max.h"
 #include "spec_type.h"			/* collation info */
+#include "anticipatory_freeze.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
@@ -545,7 +546,11 @@ void mupip_endiancvt(void)
 		mupip_exit(ERR_MUNOFINISH);	/* endian_process issued specific message */
 	}
 	new_data->file_corrupt = endian_native ? GTM_BYTESWAP_32(FALSE) : FALSE;
-	LSEEKWRITE(outdb_specified ? outdb_fd : db_fd, 0, new_data, SIZEOF(sgmnt_data), save_errno);
+	if (outdb_specified)
+	{
+		LSEEKWRITE(outdb_fd, 0, new_data, SIZEOF(sgmnt_data), save_errno);
+	} else
+		DB_LSEEKWRITE((sgmnt_addrs *)NULL, (char *)NULL, db_fd, 0, new_data, SIZEOF(sgmnt_data), save_errno);
 	if (0 != save_errno)
 	{
 		free(new_data);
@@ -570,7 +575,11 @@ void mupip_endiancvt(void)
 	DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
 	free(new_data);
 	free(old_data);
-	GTM_FSYNC((outdb_specified ? outdb_fd : db_fd), rc);
+	if (outdb_specified)
+	{
+		GTM_FSYNC(outdb_fd, rc);
+	} else
+		GTM_DB_FSYNC((sgmnt_addrs *)NULL, db_fd, rc);
 	if (-1 == rc)
 	{
 		save_errno = errno;
@@ -683,7 +692,6 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(n_wrt_per_flu);
 	SWAP_SD4(wait_disk_space);
 	SWAP_SD4(defer_time);
-	new->wc_blocked = FALSE;	/* is relevant only when database shared memory is up so reset it unconditionally */
 	SWAP_SD4(reserved_for_upd);
 	SWAP_SD4(avg_blks_per_100gbl);
 	SWAP_SD4(pre_read_trigger_factor);
@@ -818,7 +826,7 @@ int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_dat
 		new_is_native = TRUE;
 		buff_old = 0;
 	}
-	dbptr = (startvbn - 1) * DISK_BLOCK_SIZE;
+	dbptr = (off_t)(startvbn - 1) * DISK_BLOCK_SIZE;
 	info->tot_blks = totblks;
 	info->bsize = bsize;
 	info->startvbn = startvbn;
@@ -844,7 +852,7 @@ int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_dat
 		memcpy(lbmap_buff[buff_new], lbmap_buff[buff_old], bsize);
 		endian_cvt_blk_hdr((blk_hdr_ptr_t)lbmap_buff[buff_new], new_is_native, FALSE);
 		assert(LCL_MAP_LEVL == ((blk_hdr_ptr_t)lbmap_buff[buff_native])->levl);
-		/* set all recycled bits to free to avoid trouble if pre GDSV5 */
+		/* set all recycled bits to free to avoid trouble if pre GDSV6 */
 		/* lm_offset 0 is the local bit map itself */
 		for (lm_offset = 1; lm_offset < bplmap && (blk_num + lm_offset) < totblks; lm_offset++)
 		{
@@ -858,7 +866,11 @@ int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_dat
 			else if (BLK_MAPINVALID == lbm_status)
 				GTMASSERT;
 		}
-		LSEEKWRITE(info->inplace ? info->db_fd : info->outdb_fd, dbptr, lbmap_buff[buff_new], bsize, save_errno);
+		if (info->inplace)
+		{
+			DB_LSEEKWRITE(NULL, NULL, info->db_fd, dbptr, lbmap_buff[buff_new], bsize, save_errno);
+		} else
+			LSEEKWRITE(info->outdb_fd, dbptr, lbmap_buff[buff_new], bsize, save_errno);
 		if (0 != save_errno)
 		{
 			free(blk_buff[0]);
@@ -944,8 +956,11 @@ int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_dat
 #				ifdef GTM_CRYPT
 				}
 #				endif
-				LSEEKWRITE(info->inplace ? info->db_fd : info->outdb_fd, dbptr, blk_buff[buff_new], bsize,
-					save_errno);
+				if (info->inplace)
+				{
+					DB_LSEEKWRITE(NULL, NULL, info->db_fd, dbptr, blk_buff[buff_new], bsize, save_errno);
+				} else
+					LSEEKWRITE(info->outdb_fd, dbptr, blk_buff[buff_new], bsize, save_errno);
 				if (0 != save_errno)
 				{
 					free(blk_buff[0]);
@@ -966,7 +981,11 @@ int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_dat
 	{	/* need to create last disk block */
 		memset(blk_buff[0], 0, DISK_BLOCK_SIZE);
 		dbptr = ((off_t)(startvbn - 1) * DISK_BLOCK_SIZE) + ((off_t)totblks * bsize);
-		LSEEKWRITE(info->inplace ? info->db_fd : info->outdb_fd, dbptr, blk_buff[0], DISK_BLOCK_SIZE, save_errno);
+		if (info->inplace)
+		{
+			DB_LSEEKWRITE(NULL, NULL, info->db_fd, dbptr, blk_buff[0], DISK_BLOCK_SIZE, save_errno);
+		} else
+			LSEEKWRITE(info->outdb_fd, dbptr, blk_buff[0], DISK_BLOCK_SIZE, save_errno);
 		if (0 != save_errno)
 		{
 			free(blk_buff[0]);
@@ -1015,7 +1034,7 @@ void endian_cvt_blk_hdr(blk_hdr_ptr_t blkhdr, boolean_t new_is_native, boolean_t
 		v15tn = ((v15_blk_hdr *)blkhdr)->tn;
 		assert(SIZEOF(char) == SIZEOF(blkhdr->levl));	/* no need to swap */
 		blkhdr->levl = v15levl;
-		bver = GDSV5;
+		bver = GDSV6;
 		bsiz = SIZEOF(v15_blk_hdr);
 		if (!new_is_native)
 		{
@@ -1072,7 +1091,7 @@ char *endian_read_dbblk(endian_info *info, block_id blk_to_get)
 			return info->dtblk.buff;	/* already have it */
 		buff = info->dtblk.buff;
 	}
-	blkoff = ((info->startvbn - 1) * DISK_BLOCK_SIZE) + (blk_to_get * info->bsize);
+	blkoff = ((off_t)(info->startvbn - 1) * DISK_BLOCK_SIZE) + ((off_t)blk_to_get * info->bsize);
 	LSEEKREAD(info->db_fd, blkoff, buff, info->bsize, save_errno);
 	if (0 != save_errno)
 	{
@@ -1116,6 +1135,7 @@ char *endian_read_dbblk(endian_info *info, block_id blk_to_get)
 void endian_find_key(endian_info *info, end_gv_key *targ_gv_key, char *rec_p, int rec_len, int blk_levl)
 {	/* find the key for the record and set targ_gv_key */
 	int		cmpc;
+	int		tmp_cmpc;
 	unsigned char	*targ_key;
 	char		*rec_key;
 
@@ -1124,7 +1144,7 @@ void endian_find_key(endian_info *info, end_gv_key *targ_gv_key, char *rec_p, in
 		targ_gv_key->end = 0;
 		return;
 	}
-	cmpc = ((rec_hdr_ptr_t)rec_p)->cmpc;
+	cmpc = EVAL_CMPC((rec_hdr_ptr_t)rec_p);
 	targ_key = targ_gv_key->key + cmpc;
 	rec_key = rec_p + SIZEOF(rec_hdr);
 	while (TRUE)
@@ -1179,6 +1199,7 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key)
 {
 	block_id	blk_to_get, blk_ptr;
 	int		save_errno, rec_len, blk_levl, ptroffset;
+	int		tmp_cmpc;
 	boolean_t	blk_is_native;
 	char		*buff, *blk_top, *rec_p;
 	unsigned short	us_rec_len;
@@ -1221,7 +1242,7 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key)
 			{
 				if (0 == blk_levl)
 					return blk_to_get;	/* found dtleaf block we are looking for */
-				ptroffset = found_gv_key.end - ((rec_hdr *)rec_p)->cmpc + 1;
+				ptroffset = found_gv_key.end - EVAL_CMPC((rec_hdr *)rec_p) + 1;
 				GET_ULONG(blk_ptr, (rec_p + SIZEOF(rec_hdr) + ptroffset));
 				if (!blk_is_native)
 					blk_ptr = GTM_BYTESWAP_32(blk_ptr);
@@ -1245,12 +1266,12 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 {	/* convert records in new_block, could be data, index, or directory
 	   use converted header fields from blkhdr which is in native format */
 	int		rec1_len, rec1_gvn_len, rec2_cmpc, rec2_len;
+	int		tmp_cmpc;
 	int		blk_levl;
-	rec_hdr		*recp;
 	block_id	ptr2blk, ptr2blk_swap, dtblk;
 	boolean_t	new_is_native, have_dt_blk;
 	unsigned short	us_rec_len, us_rec_len_swap;
-	unsigned char	*rec1_ptr, *rec2_ptr, *blk_top, *key_top, *tmp_ptr;
+	unsigned char	*rec1_ptr, *rec2_ptr, *blk_top, *key_top;
 	boolean_t	have_gvtleaf;
 	end_gv_key	gv_key;
 
@@ -1267,7 +1288,7 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 	/* need to check there really is a 2nd record */
 	rec2_ptr = rec1_ptr + rec1_len;
 	if (rec2_ptr < blk_top)
-		rec2_cmpc = ((rec_hdr *)rec2_ptr)->cmpc;
+		rec2_cmpc = EVAL_CMPC((rec_hdr *)rec2_ptr);
 	else
 		rec2_cmpc = -1;		/* no second record */
 
@@ -1340,11 +1361,7 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 		us_rec_len_swap = GTM_BYTESWAP_16(us_rec_len);
 		PUT_USHORT(&((rec_hdr *)rec1_ptr)->rsiz, us_rec_len_swap);
 		rec1_len = new_is_native ? us_rec_len_swap : us_rec_len;
-		/* clear left over char after cmpc */
-		recp = (rec_hdr *)rec1_ptr;
-		tmp_ptr = &recp->cmpc + 1;
-		assert(SIZEOF(rec_hdr) > (tmp_ptr - rec1_ptr));
-		*tmp_ptr = 0;
+		/* leave cmpc and cmpc2 bytes alone */
 		if (!have_gvtleaf)
 		{	/* fix up pointers as well */
 			key_top = rec1_ptr + SIZEOF(rec_hdr);

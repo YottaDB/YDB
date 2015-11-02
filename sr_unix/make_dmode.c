@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "make_mode.h"
 
 rhdtyp *make_dmode (void)

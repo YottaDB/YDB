@@ -14,7 +14,7 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "srcline.h"
 #include "error.h"
 #include "op.h"

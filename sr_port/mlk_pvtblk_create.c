@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,9 @@
 
 GBLREF gd_addr		*gd_header;
 static mstr     	gtmgbldir_mstr;
+
+error_def(ERR_LOCKSUB2LONG);
+error_def(ERR_TEXT);
 
 /*
  * ---------------------------------------------------------
@@ -102,8 +105,10 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 	for (len = 0, rlen=0, i = 0;  i < subcnt;  mp_temp=va_arg(mp, mval *), i++)
 	{
 		MV_FORCE_STR(mp_temp);
+		if ((mp_temp)->str.len > 255)
+			rts_error(VARLSTCNT(7) ERR_LOCKSUB2LONG, 1, (mp_temp)->str.len,
+				  ERR_TEXT, 2, (mp_temp)->str.len, (mp_temp)->str.addr);
 		assert((mp_temp)->mvtype & MV_STR);
-		assert((mp_temp)->str.len < 256);
 		len += (int)(mp_temp)->str.len;
 		rlen += ROUND_UP(((mp_temp)->str.len + 1), 4);
 	}

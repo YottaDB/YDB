@@ -84,7 +84,8 @@ error_def(ERR_MUTNWARN);
 boolean_t mu_int_fhead(void)
 {
 	unsigned char	*p1;
-	unsigned int	maps, native_size, size, block_factor;
+	unsigned int	maps, block_factor;
+	gtm_uint64_t	size, native_size;
 	trans_num	temp_tn, max_tn_warn;
 	sgmnt_data_ptr_t mu_data;
 	GTMCRYPT_ONLY(int	crypt_status;)
@@ -98,7 +99,7 @@ boolean_t mu_int_fhead(void)
 			mu_int_err(ERR_DBINCRVER, 0, 0, 0, 0, 0, 0, 0);
 		return FALSE;
 	}
-	UNIX_ONLY(CHECK_DB_ENDIAN(mu_data, gv_cur_region->dyn.addr->fname_len, gv_cur_region->dyn.addr->fname)); /* bypass ok */
+	UNIX_ONLY(CHECK_DB_ENDIAN(mu_data, gv_cur_region->dyn.addr->fname_len, gv_cur_region->dyn.addr->fname)); /* BYPASSOK */
 	if (mu_data->start_vbn < DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data), DISK_BLOCK_SIZE))
 	{
 		mu_int_err(ERR_DBSVBNMIN, 0, 0, 0, 0, 0, 0, 0);
@@ -165,10 +166,6 @@ boolean_t mu_int_fhead(void)
         }
 	if (MAX_KEY_SZ < mu_data->max_key_size)
 		mu_int_err(ERR_DBMAXKEYEXC, 0, 0, 0, 0, 0, 0, 0);
-	if (SIZEOF(rec_hdr) + SIZEOF(block_id) >= mu_data->max_rec_size)
-		mu_int_err(ERR_DBMXRSEXCMIN, 0, 0, 0, 0, 0, 0, 0);
-	if (mu_data->blk_size - SIZEOF(blk_hdr) < mu_data->max_rec_size)
-		mu_int_err(ERR_DBMAXRSEXBL, 0, 0, 0, 0, 0, 0, 0);
 #	ifdef GTM_CRYPT
 	if (mu_data->is_encrypted)
 	{
@@ -242,7 +239,7 @@ boolean_t mu_int_fhead(void)
 		mu_int_err(ERR_DBHEADINV, 0, 0, 0, 0, 0, 0, 0);
 		return FALSE;
 	}
-	size = mu_int_ovrhd + block_factor * mu_data->trans_hist.total_blks;
+	size = mu_int_ovrhd + (off_t)block_factor * mu_data->trans_hist.total_blks;
 	/* If ONLINE INTEG for this region is in progress, then native_size would have been calculated in ss_initiate. */
 	GET_NATIVE_SIZE(native_size);
 	/* In the following tests, the EOF block should always be 1 greater
@@ -255,19 +252,19 @@ boolean_t mu_int_fhead(void)
 		else
 			mu_int_err(ERR_DBFSTBC, 0, 0, 0, 0, 0, 0, 0);
 		if (native_size % 2) /* Native size should be (64K + n*1K + 512) / DISK_BLOCK_SIZE , so always an odd number. */
-			gtm_putmsg(VARLSTCNT(4) ERR_DBTOTBLK, 2, (native_size - mu_data->start_vbn) / block_factor,
+			gtm_putmsg(VARLSTCNT(4) ERR_DBTOTBLK, 2, (uint4)((native_size - mu_data->start_vbn) / block_factor),
 				mu_data->trans_hist.total_blks);
 		else
 			/* Since native_size is even and the result will be rounded down, we need to add 1 before the division so we
 			 * extend by enough blocks (ie. if current nb. of blocks is 100, and the file size gives 102.5 blocks, we
 			 * need to extend by 3 blocks, not 2). */
 			gtm_putmsg(VARLSTCNT(6) ERR_DBMISALIGN, 4, DB_LEN_STR(gv_cur_region),
-				(native_size - mu_data->start_vbn) / block_factor,
-				((native_size + 1 - mu_data->start_vbn) / block_factor) - mu_data->trans_hist.total_blks);
+				(uint4)((native_size - mu_data->start_vbn) / block_factor),
+				(uint4)(((native_size + 1 - mu_data->start_vbn) / block_factor) - mu_data->trans_hist.total_blks));
 	}
 	/* make working space for all local bitmaps */
 	maps = (mu_data->trans_hist.total_blks + mu_data->bplmap - 1) / mu_data->bplmap;
-	size = (unsigned int)(BM_SIZE(mu_data->bplmap) - SIZEOF(blk_hdr));
+	size = (gtm_uint64_t)(BM_SIZE(mu_data->bplmap) - SIZEOF(blk_hdr));
 	size *= maps;
 	mu_int_locals = (unsigned char *)malloc(size);
 	memset(mu_int_locals, FOUR_BLKS_FREE, size);

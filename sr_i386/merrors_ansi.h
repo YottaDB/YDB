@@ -427,8 +427,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLINVEXT */
 	   0,	/* MUPCLIERR */
 	   0,	/* JNLTMQUAL4 */
-	   0,	/* JNLBUFFTOOLG */
-	   0,	/* JNLBUFFTOOSM */
+	   0,	/* UNUSEDMSG594 */
+	   0,	/* UNUSEDMSG595 */
 	   0,	/* MUNODBNAME */
 	   0,	/* FILECREATE */
 	   0,	/* FILENOTCREATE */
@@ -642,7 +642,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLRDONLY */
 	   0,	/* ANCOMPTINC */
 	   0,	/* ABNCOMPTINC */
-	   0,	/* GTMSECSHRLOGF */
+	   0,	/* UNUSEDMSG809 */
 	   0,	/* SOCKNOTFND */
 	   0,	/* CURRSOCKOFR */
 	  79,	/* SOCKETEXIST */
@@ -731,8 +731,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* SCNDDBNOUPD */
 	   0,	/* MUINFOUINT4 */
 	   0,	/* NLMISMATCHCALC */
-	   0,	/* GTMSECSHRLOGSWH */
-	   0,	/* GTMSECSHRDEFLOG */
+	   0,	/* UNUSEDMSG898 */
+	   0,	/* UNUSEDMSG899 */
 	   0,	/* DBBADNSUB */
 	   0,	/* DBBADKYNM */
 	   0,	/* DBBADPNTR */
@@ -964,7 +964,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* PREVJNLLINKCUT */
 	   0,	/* PREVJNLLINKSET */
 	   0,	/* FILENAMETOOLONG */
-	   0,	/* UNUSEDMSG1131 */
+	   0,	/* REQRECOV */
 	   0,	/* JNLTRANS2BIG */
 	   0,	/* JNLSWITCHTOOSM */
 	   0,	/* JNLSWITCHSZCHG */
@@ -1088,7 +1088,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* REPLINSTSEQORD */
 	   0,	/* REPLINSTSTNDALN */
 	   0,	/* REPLREQROLLBACK */
-	   0,	/* UNUSEDMSG1255 */
+	   0,	/* REQROLLBACK */
 	   0,	/* UNUSEDMSG1256 */
 	   0,	/* SRCSRVEXISTS */
 	   0,	/* SRCSRVNOTEXIST */
@@ -1246,12 +1246,12 @@ const static readonly int error_ansi[] = {
 	   0,	/* NORESYNCUPDATERONLY */
 	   0,	/* NOSUPPLSUPPL */
 	   0,	/* REPL2OLD */
-	   0,	/* RCVR2MANY */
-	   0,	/* RLBKCONFIGBNDRY */
+	   0,	/* UNUSEDMSG1413 */
+	   0,	/* UNUSEDMSG1414 */
 	   0,	/* SECNOTSUPPLEMENTARY */
 	   0,	/* SUPRCVRNEEDSSUPSRC */
-	   0,	/* SYNCTOSAMETYPE */
-	   0,	/* TARGINSRUNNING */
+	   0,	/* UNUSEDMSG1417 */
+	   0,	/* UNUSEDMSG1418 */
 	   0,	/* UPDSYNC2MTINS */
 	   0,	/* UPDSYNCINSTFILE */
 	   0,	/* REUSEINSTNAME */
@@ -1270,7 +1270,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* ORLBKNOV4BLK */
 	   0,	/* DBROLLEDBACK */
 	   0,	/* DSEWCREINIT */
-	   0,	/* RNDWNSKIPCNT */
+	   0,	/* UNUSEDMSG1437 */
 	   0,	/* REPLONLNRLBK */
 	   0,	/* SRVLCKWT2LNG */
 	   0,	/* IGNBMPMRKFREE */
@@ -1293,4 +1293,35 @@ const static readonly int error_ansi[] = {
 	   0,	/* STRMSEQMISMTCH */
 	   0,	/* LOCKSPACEINFO */
 	   0,	/* JRTNULLFAIL */
+	   0,	/* LOCKSUB2LONG */
+	   0,	/* RESRCWAIT */
+	   0,	/* RESRCINTRLCKBYPAS */
+	   0,	/* DBFHEADERRANY */
+	   0,	/* REPLINSTFROZEN */
+	   0,	/* REPLINSTFREEZECOMMENT */
+	   0,	/* REPLINSTUNFROZEN */
+	   0,	/* DSKNOSPCAVAIL */
+	   0,	/* DSKNOSPCBLOCKED */
+	   0,	/* DSKSPCAVAILABLE */
+	   0,	/* ENOSPCQIODEFER */
+	   0,	/* CUSTOMFILOPERR */
+	   0,	/* CUSTERRNOTFND */
+	   0,	/* CUSTERRSYNTAX */
+	   0,	/* ORLBKINPROG */
+	   0,	/* DBSPANGLOINCMP */
+	   0,	/* DBSPANCHUNKORD */
+	   0,	/* DBDATAMX */
+	   0,	/* DBIOERR */
+	   0,	/* INITORRESUME */
+	   0,	/* GTMSECSHRNOARG0 */
+	   0,	/* GTMSECSHRISNOT */
+	   0,	/* GTMSECSHRBADDIR */
+	   0,	/* JNLBUFFREGUPD */
+	   0,	/* JNLBUFFDBUPD */
+	   0,	/* LOCKINCR2HIGH */
+	   0,	/* LOCKIS */
+	   0,	/* LDSPANGLOINCMP */
+	   0,	/* MUFILRNDWNFL2 */
+	   0,	/* MUINSTFROZEN */
+	   0,	/* MUINSTUNFROZEN */
 	};

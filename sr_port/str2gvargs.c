@@ -25,7 +25,7 @@
 #include "gtm_utf8.h"
 #endif
 #ifdef GTM_TRIGGER
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "gv_trigger.h"
 #endif
 

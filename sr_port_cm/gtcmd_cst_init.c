@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,21 +26,17 @@
 #include "targ_alloc.h"
 #include "dpgbldir.h"
 
-#define DIR_ROOT 1
-
 GBLREF int4		gv_keysize;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF short 		gtcm_ast_avail;
 
+error_def(CMERR_CMEXCDASTLM);
+
 void gtcmd_cst_init(cm_region_head *ptr)
 {
-	gv_namehead	*g;
-	gv_key          *temp_key;
 	gd_region	*reg;
 	sgmnt_addrs	*csa;
-
-	error_def(CMERR_CMEXCDASTLM);
 
 	reg = ptr->reg;
 	if (VMS_ONLY(gtcm_ast_avail > 0) UNIX_ONLY(TRUE))
@@ -48,10 +44,11 @@ void gtcmd_cst_init(cm_region_head *ptr)
 	else
 		rts_error(VARLSTCNT(1) CMERR_CMEXCDASTLM);
 	VMS_ONLY(gtcm_ast_avail--);
-	GVKEYSIZE_INCREASE_IF_NEEDED(DBKEYSIZE(reg->max_key_size));
+#	ifdef DEBUG
+	assert(gv_keysize >= DBKEYSIZE(reg->max_key_size));
 	csa = &FILE_INFO(reg)->s_addrs;
-	assert(NULL == csa->dir_tree);
-	SET_CSA_DIR_TREE(csa, reg->max_key_size, reg);
+	assert(NULL != csa->dir_tree);
+#	endif
 	init_hashtab_mname(ptr->reg_hash, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 	cm_add_gdr_ptr(reg);
 }

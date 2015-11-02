@@ -14,7 +14,7 @@
 #include "gdsroot.h"
 #include "gtm_string.h"
 #include "cli.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "mu_gv_stack_init.h"
 #include "trigger_trgfile_protos.h"
 #include "mu_trig_trgfile.h"

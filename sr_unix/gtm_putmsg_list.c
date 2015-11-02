@@ -20,16 +20,17 @@
 #include "util_out_print_vaparm.h"
 #include "gtmmsg.h"
 #include "gtm_putmsg_list.h"
-#include "gtmimagename.h"	/* needed for IS_GTM_IMAGE macro */
-#include "gtmio.h"		/* needed for FFLUSH macro */
+#include "gtmimagename.h"		/* needed for IS_GTM_IMAGE macro */
+#include "gtmio.h"			/* needed for FFLUSH macro */
 #include "io.h"
+/* database/replication related includes due to anticipatory freeze */
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "anticipatory_freeze.h"	/* for SET_ANTICIPATORY_FREEZE_IF_NEEDED */
 
 GBLREF	boolean_t	donot_fflush_NULL;
-GBLREF	va_list		last_va_list_ptr;
-
-#define	NOFLUSH	0
-#define FLUSH	1
-#define RESET	2
 
 /*
  * ----------------------------------------------------------------------------------------
@@ -46,69 +47,62 @@ void gtm_putmsg_list(int arg_count, va_list var)
 	boolean_t	first_error;
 	const err_msg	*msg;
 	const err_ctl	*ctl;
+	boolean_t	freeze_set = FALSE;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Before starting to write to stderr, make sure all other buffered streams are flushed.
 	 * This way we avoid out-of-order logging issues with multiple streams mapping to the same file
 	 * e.g. stdout/stderr could both end up in the same file. We do this now only for the utilities
 	 * (and not mumps) since the implications of that change (is it safe or not) are not yet clear.
 	 */
-	if (!IS_GTM_IMAGE && !donot_fflush_NULL)
-		FFLUSH(NULL);
+	if (!IS_GTMSECSHR_IMAGE)
+	{	/* Note gtmsecshr does no stdout/stderr IO - everything goes to operator log so this doesn't apply */
+		if (!IS_GTM_IMAGE && !donot_fflush_NULL)
+			FFLUSH(NULL);
+		util_out_print(NULL, RESET);
+		flush_pio();
+	}
 	assert(0 < arg_count);
-	util_out_print(NULL, RESET);
 	first_error = TRUE;
-	flush_pio();
-
-	for (;;)
+	for (; ; )
 	{
 		msg_id = va_arg(var, int);
+		SET_ANTICIPATORY_FREEZE_IF_NEEDED(msg_id, freeze_set);
 		--arg_count;
-
 		if (NULL == (ctl = err_check(msg_id)))
 			msg = NULL;
 		else
-		{
-			assert(0 != (msg_id & FACMASK(ctl->facnum))  &&  MSGMASK(msg_id, ctl->facnum) <= ctl->msg_cnt);
-
-			msg = ctl->fst_msg + MSGMASK(msg_id, ctl->facnum) - 1;
-		}
-
+			GET_MSG_INFO(msg_id, ctl, msg);
 		if (first_error)
 		{
 			first_error = FALSE;
 			error_condition = msg_id;
 			severity = NULL == msg ? ERROR : SEVMASK(msg_id);
 		}
-
 		msg_string.addr = msg_buffer;
 		msg_string.len = sizeof msg_buffer;
 		gtm_getmsg(msg_id, &msg_string);
-
 		if (NULL == msg)
 		{
 			util_out_print(msg_string.addr, NOFLUSH, msg_id);
-
 			if (0 < arg_count)
 			{
 				/* --------------------------
 				 * Print the message to date
 				 * --------------------------
 				 */
-
 				util_out_print(NULL, FLUSH);
-
 				/* ---------------------------------------
 				 * Chained error;  scan off the fao count
 				 * (it should be zero)
 				 * ---------------------------------------
 				 */
-
 				i = va_arg(var, int);
 				--arg_count;
 				assert(0 == i);
 			}
-		}
-		else
+		} else
 		{
 			if (0 < arg_count)
 			{
@@ -118,33 +112,27 @@ void gtm_putmsg_list(int arg_count, va_list var)
 				fao_count = fao_actual < msg->parm_count ? fao_actual : msg->parm_count;
 				if (MAX_FAO_PARMS < fao_count)
 					fao_count = MAX_FAO_PARMS;
-			}
-			else
-			{
+			} else
 				fao_actual = fao_count = 0;
-			}
-
 			util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
 			va_end(var);	/* needed before used as dest in copy */
-			VAR_COPY(var, last_va_list_ptr);			/* How much we unwound */
+			VAR_COPY(var, TREF(last_va_list_ptr));			/* How much we unwound */
 			arg_count -= fao_count;
-
 			/* ------------------------------
 			 * Skim off any extra parameters
 			 * ------------------------------
 			 */
-
 			for (i = fao_count;  i < fao_actual;  ++i)
 			{
 				dummy = va_arg(var, int);
 				--arg_count;
 			}
-			va_end(last_va_list_ptr);
+			va_end(TREF(last_va_list_ptr));
 		}
-
 		if (0 == arg_count)
 			break;
-
-		util_out_print("!/", NOFLUSH);
+		if (!IS_GTMSECSHR_IMAGE)
+			util_out_print("!/", NOFLUSH);
 	}
+	REPORT_INSTANCE_FROZEN(freeze_set);
 }

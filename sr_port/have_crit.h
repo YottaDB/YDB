@@ -53,11 +53,13 @@ typedef enum
 	INTRPT_IN_TRIGGER_NOMANS_LAND,	/* State where have trigger base frame but no trigger (exec) frame */
 	INTRPT_IN_MUR_OPEN_FILES,
 	INTRPT_IN_TRUNC,
-	INTRPT_NUM_STATES,
 	INTRPT_IN_SET_NUM_ADD_PROCS,
 	INTRPT_IN_SYSCONF,
 	INTRPT_NO_TIMER_EVENTS,		/* State where primary reason for deferral is to avoid timer pops */
-	INTRPT_IN_FFLUSH		/* Deferring interrupts during fflush */
+	INTRPT_IN_FFLUSH,		/* Deferring interrupts during fflush */
+	INTRPT_IN_SHMDT,		/* Deferring interrupts during SHMDT */
+	INTRPT_IN_WAIT_FOR_DISK_SPACE,	/* Deferring interrupts during wait_for_disk_space.c */
+	INTRPT_NUM_STATES		/* Should be the *last* one in the enum */
 } intrpt_state_t;
 
 GBLREF	intrpt_state_t	intrpt_ok_state;

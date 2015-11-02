@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,6 @@ void remove_rms (io_desc *ciod)
 	io_log_name	**lpp, *lp;	/* logical name pointers */
 	d_rm_struct     *rm_ptr;
 	int		rc, fclose_res;
-
 	assert (ciod->type == rm);
 	assert (ciod->state == dev_closed || ciod->state == dev_never_opened);
 	rm_ptr = (d_rm_struct *) ciod->dev_sp;

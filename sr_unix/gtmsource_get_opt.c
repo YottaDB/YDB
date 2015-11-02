@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,13 +66,16 @@ int gtmsource_get_opt(void)
 	char		*connect_parm_token_str, *connect_parm;
 	char		*connect_parms_str, tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
 	char		secondary_sys[MAX_SECONDARY_LEN], *c, inst_name[MAX_FN_LEN + 1];
-	char		statslog_val[4]; /* "ON" or "OFF" */
+	char		statslog_val[SIZEOF("OFF")]; /* "ON" or "OFF" */
 	char		update_val[SIZEOF("DISABLE")]; /* "ENABLE" or "DISABLE" */
+	char		freeze_val[SIZEOF("OFF")]; /* "ON" or "OFF" */
+	char		freeze_comment[SIZEOF(gtmsource_options.freeze_comment)];
 	int		tries, index = 0, timeout_status, connect_parms_index, status;
 	mstr		log_nam, trans_name;
 	struct hostent	*sec_hostentry;
 	unsigned short	log_file_len, filter_cmd_len;
 	unsigned short	secondary_len, inst_name_len, statslog_val_len, update_val_len, connect_parms_str_len;
+	unsigned short	freeze_val_len, freeze_comment_len;
 
 	memset((char *)&gtmsource_options, 0, SIZEOF(gtmsource_options));
 	gtmsource_options.start = (CLI_PRESENT == cli_present("START"));
@@ -382,9 +385,58 @@ int gtmsource_get_opt(void)
 			gtmsource_options.statslog = FALSE;
 		else
 		{
-			util_out_print("Invalid value for STATSLOG qualifier, should be either ON or OFF", TRUE);
+			util_out_print("Invalid value for STATSLOG qualifier, must be either ON or OFF", TRUE);
 			return(-1);
 		}
+	}
+	if (cli_present("FREEZE") == CLI_PRESENT)
+	{
+		freeze_val_len = SIZEOF(freeze_val);
+		if (cli_get_str("FREEZE", freeze_val, &freeze_val_len))
+		{
+			gtmsource_options.setfreeze = TRUE;
+			cli_strupper(freeze_val);
+			if (0 == STRCMP(freeze_val, "ON"))
+				gtmsource_options.freezeval = TRUE;
+			else if (0 == STRCMP(freeze_val, "OFF"))
+				gtmsource_options.freezeval = FALSE;
+			else
+			{
+				util_out_print("Invalid value for FREEZE qualifier, must be either ON or OFF", TRUE);
+				return -1;
+			}
+			if (cli_present("COMMENT") == CLI_PRESENT)
+			{
+				if (!gtmsource_options.freezeval)
+				{
+					util_out_print("Invalid qualifier combination, cannot specify FREEZE=OFF with COMMENT",
+							TRUE);
+					return -1;
+				}
+				freeze_comment_len = SIZEOF(freeze_comment);
+				if (!cli_get_str("COMMENT", freeze_comment, &freeze_comment_len))
+				{
+					util_out_print("Error parsing COMMENT qualifier", TRUE);
+					return -1;
+				}
+				gtmsource_options.setcomment = TRUE;
+				STRNCPY_STR(gtmsource_options.freeze_comment, freeze_comment,
+					SIZEOF(gtmsource_options.freeze_comment) - 1);
+				gtmsource_options.freeze_comment[SIZEOF(gtmsource_options.freeze_comment) - 1] = '\0';
+			}
+			else if (cli_present("COMMENT") == CLI_NEGATED)
+			{
+				gtmsource_options.setcomment = TRUE;
+				gtmsource_options.freeze_comment[0] = '\0';
+			}
+			else if (gtmsource_options.freezeval)
+			{
+				util_out_print("Missing qualifier, must specify either COMMENT or NOCOMMENT with FREEZE=ON", TRUE);
+				return -1;
+			}
+		}
+		else
+			gtmsource_options.showfreeze = TRUE;
 	}
 	return(0);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,9 @@ GBLREF io_pair		io_curr_device;
 #ifdef UNICODE_SUPPORTED
 LITREF	mstr		chset_names[];
 #endif
+
+#define MAX_WIDTH 65535
+
 error_def(ERR_NOTTOEOFONPUT);
 error_def(ERR_DEVICEREADONLY);
 error_def(ERR_SYSCALL);
@@ -355,7 +358,7 @@ void iorm_write(mstr *v)
 	else
 		outlen = iod->width - iod->dollar.x;
 
-	if (!iod->wrap && inlen > outlen)
+	if (!iod->wrap && inlen > outlen && outlen != MAX_WIDTH)
 		inlen = outlen;
 	if (!inlen)
 		return;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,23 +12,32 @@
 #ifndef _GTMSECSHR
 #define _GTMSECSHR
 
+/* To enable debugging of gtmsecshr, uncomment #define immediately below */
+/* #define DEBUG_GTMSECSHR */
+#ifdef DEBUG_GTMSECSHR
+# define LOGFLAGS (LOG_USER | LOG_INFO)
+# define DBGGSSHR(x) syslog x
+#else
+# define DBGGSSHR(x)
+#endif
+#define ABSOLUTE_PATH(X)	('/' == X[0])
 #define GTMSECSHR_MESG_TIMEOUT  30
 #define GTMSECSHR_PERMS		0666
 
-/* Exit codes from gtmsecshr */
+/* Exit codes from gtmsecshr - note matching text entries are in message table in secshr_client.c */
 #define NORMALEXIT			0
 #define SETUIDROOT			1
-#define SETGIDROOT			2
-#define UNABLETOOPNLOGFILE		3
-#define UNABLETODUPLOG			4
-#define INVTRANSGTMSECSHR		5
-#define UNABLETOEXECGTMSECSHR		6
-#define GNDCHLDFORKFLD  		7
-#define UNABLETOOPNLOGFILEFTL		8
-#define SEMGETERROR			9
-#define SEMAPHORETAKEN			10
-#define SYSLOGHASERRORDETAIL		11
-#define UNABLETOCHDIR			12
+#define INVTRANSGTMSECSHR		2
+#define UNABLETOEXECGTMSECSHR		3
+#define GNDCHLDFORKFLD  		4
+#define SEMGETERROR			5
+#define SEMAPHORETAKEN			6
+#define SYSLOGHASERRORDETAIL		7
+#define UNABLETOCHDIR			8
+#define UNABLETODETERMINEPATH		9
+#define NOTGTMSECSHR			10
+#define BADGTMDISTDIR			11
+#define LASTEXITCODE			11	/* Should have same value as last error code */
 
 /* return codes with gtmsecshr*/
 #define INVLOGNAME			20
@@ -44,86 +53,88 @@
 #define SERVER				0
 #define CLIENT				1
 
-#define GTMSECSHR_LOG_DIR		GTM_LOG_ENV
-#define DEFAULT_GTMSECSHR_LOG_DIR	DEFAULT_GTM_TMP
-#define GTMSECSHR_LOG_PREFIX		"gtm_secshr_log"
 #define GTMSECSHR_SOCK_DIR		GTM_TMP_ENV
 #define DEFAULT_GTMSECSHR_SOCK_DIR	DEFAULT_GTM_TMP
 #define GTMSECSHR_SOCK_PREFIX		"gtm_secshr"
-#define GTMSECSHR_PATH			GTM_DIST_LOG "/gtmsecshr"
+#define GTMSECSHR_DIR_SUFFIX		"/gtmsecshrdir"
+#define GTMSECSHR_EXECUTABLE		"gtmsecshr"
+#define GTMSECSHR_PATH			GTM_DIST_LOG "/" GTMSECSHR_EXECUTABLE
 
 #define	ROOTUID				0
-#define ROOTGID				0
-
-#define ABSOLUTE_PATH(X)		(X[0] == '/')
 
 #ifdef SHORT_GTMSECSHR_TIMEOUT
-#define MAX_TIMEOUT_VALUE		30
+#    define MAX_TIMEOUT_VALUE		30
 #else
-#define MAX_TIMEOUT_VALUE		6000
+#  ifdef DEBUG
+#    define MAX_TIMEOUT_VALUE		60	/* Give secshr timeout/startup some excercise in DEBUG mode */
+#  else
+#    define MAX_TIMEOUT_VALUE		6000
+#  endif
 #endif
 
 #define	MAX_ID_LEN			8
 #define	MAX_MESG			2048
-#define MAX_GTMSECSHR_FAIL_MESG_LEN	70
-#define MAX_SOCKFILE_NAME_LEN		25
+#define MAX_SECSHR_SOCKFILE_NAME_LEN	(SIZEOF(GTMSECSHR_SOCK_PREFIX) + MAX_DIGITS_IN_INT)
 
-typedef struct ipcs_mesg_struct {
+typedef struct ipcs_mesg_struct
+{
 	int		semid;
 	int		shmid;
 	time_t		gt_sem_ctime;
 	time_t		gt_shm_ctime;
 	unsigned int	fn_len;
-	char		fn[MAX_TRANS_NAME_LEN];
+	char		fn[GTM_PATH_MAX];
 } ipcs_mesg;
 
-typedef struct gtmsecshr_mesg_struct {
-	int len;	/* this is the whole hdr (4 ints) plus the mesg data */
-	int code;
-	int ack;
-	int pid;
-	unsigned long seqno;
+typedef struct gtmsecshr_mesg_struct
+{
+	int		code;		/* To gtmsecshr:   requested gtmsecshr_mesg_type function code.
+					 * From gtmsecshr: return code (0 or errno).
+					 */
+	unsigned int	comkey;		/* Unique key per version keeps from having cross-version issues */
+	boolean_t	usesecshr;	/* Copy of client's gtm_usesecshr flag. Only used in debug build but always kept
+					 * for alignment.
+					 */
+	pid_t		pid;		/* Process id of sender */
+	unsigned long	seqno;		/* Used only by client to validate response is for message sent */
 	union
 	{
-		long id;
-		char path[MAX_TRANS_NAME_LEN];
+		int4 		id;	/* Can be pid, semid or shmid */
+		char 		path[GTM_PATH_MAX];
 		ipcs_mesg	db_ipcs;
-	}mesg;
-}gtmsecshr_mesg;
+	} mesg;
+} gtmsecshr_mesg;
 
 /* include <stddef.h> for offsetof() */
 #define GTM_MESG_HDR_SIZE		offsetof(gtmsecshr_mesg, mesg.id)
 
-/* There should be NO deletions of messages types. Only replacements with the UNUSED_ prefix to signal disuse.
- * This is because we want to maintain a static mapping between a given command and its corresponding message
- * type number across all versions of GT.M (old and new). This way there is no chance of misinterpreting a command
- * in case there is a version mismatch between the GT.M client and GTMSECSHR server processes.
+/* Version V6.0-000 largely re-built the interface between gtmsecshr client and server. Later versions should strive to
+ * not change the order or placement of the message codes below. If a message becomes obsolete, rename the code to be
+ * prefixed with "UNUSED_". This is so for future versions, if a security bug is found, we can take the source, compile
+ * it for the relevant version and refresh just this module (assuming the client doesn't have issues).
  */
-enum gtmsecshr_mesg_type{
+enum gtmsecshr_mesg_type
+{
+	/* Starting here, these are request codes put in mesg.code. They are returned unchanged except in case of error */
         WAKE_MESSAGE = 1,
-        UNUSED_CHECK_PROCESS_ALIVE,
         REMOVE_SEM,
-        REMOVE_SHMMEM,
-        UNUSED_PING_MESSAGE,
+        REMOVE_SHM,
 	REMOVE_FILE,
 	CONTINUE_PROCESS,
-	UNUSED_PING_MESG_RECVD,
 	FLUSH_DB_IPCS_INFO,
-	GTMSECSHR_MESG_COUNT
+	/* From here down are response codes. These codes are never processed but all except INVALID_COMMAND (for which there is
+	 * no response) can be returned to client.
+	 */
+	INVALID_COMMAND = 0x8000,	/* No response given */
+	INVALID_COMKEY
+
 };
 
-enum gtmsecshr_ack_type{
-        ACK_NOT_REQUIRED,
-        ACK_REQUIRED
-};
-
-void	gtmsecshr_log(char *, int), gtmsecshr_exit(int, boolean_t), gtmsecshr_init(void), gtmsecshr_sig_init(void);
-void	gtmsecshr_switch_log_file(int);
-int	gtmsecshr_open_log_file(void), gtmsecshr_getenv(char *, char **);
-int 	service_request(gtmsecshr_mesg *);
-int4	gtmsecshr_sock_init(int caller);
-void	gtmsecshr_sock_cleanup(int);
-int4	gtmsecshr_pathname_init(int caller);
-int	continue_proc(pid_t pid);
+int		validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int save_code);
+void		service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_len);
+int4		gtmsecshr_sock_init(int caller);
+void		gtmsecshr_sock_cleanup(int);
+int4		gtmsecshr_pathname_init(int caller, char *execpath, int execpathln);
+int		continue_proc(pid_t pid);
 
 #endif

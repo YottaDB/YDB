@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -204,7 +204,10 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	 * from this function.
 	 */
 	if (gv_currkey)
+	{
 		gv_currkey->end = 0;
+		gv_currkey->base[0] = KEY_DELIMITER;
+	}
 	TREF(gv_last_subsc_null) = TREF(gv_some_subsc_null) = FALSE;
 	ESTABLISH(op_fnztrigger_ch);
 	dollar_ztrigger_invoked = TRUE; /* reset after use when the transaction commits, restarts or rollbacks */

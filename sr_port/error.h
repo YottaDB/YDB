@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,7 @@ typedef struct err_ctl_struct
 #ifdef DEBUG_ERRHND
 # define DBGEHND(x) DBGFPF(x)
 # define DBGEHND_ONLY(x) x
+# include "gtm_stdio.h"
 #else
 # define DBGEHND(x)
 # define DBGEHND_ONLY(x)
@@ -71,6 +72,7 @@ CONDITION_HANDLER(gds_rundown_ch);
 CONDITION_HANDLER(gtcm_ch);
 CONDITION_HANDLER(gtcm_exi_ch);
 CONDITION_HANDLER(gtm_env_xlate_ch);
+CONDITION_HANDLER(gtm_maxstr_ch);
 CONDITION_HANDLER(gtmrecv_ch);
 CONDITION_HANDLER(gtmrecv_fetchresync_ch);
 CONDITION_HANDLER(gtmsource_ch);
@@ -78,11 +80,12 @@ CONDITION_HANDLER(gvcmy_open_ch);
 CONDITION_HANDLER(gvcmz_netopen_ch);
 CONDITION_HANDLER(gvzwrite_ch);
 CONDITION_HANDLER(hashtab_rehash_ch);
-CONDITION_HANDLER(jobexam_dump_ch);
-CONDITION_HANDLER(iob_io_error);
 CONDITION_HANDLER(io_init_ch);
+CONDITION_HANDLER(iob_io_error);
 CONDITION_HANDLER(iomt_ch);
+CONDITION_HANDLER(jnl_file_autoswitch_ch);
 CONDITION_HANDLER(job_init_ch);
+CONDITION_HANDLER(jobexam_dump_ch);
 CONDITION_HANDLER(lastchance1);
 CONDITION_HANDLER(lastchance2);
 CONDITION_HANDLER(lastchance3);
@@ -106,7 +109,6 @@ CONDITION_HANDLER(trans_code_ch);
 CONDITION_HANDLER(updproc_ch);
 CONDITION_HANDLER(util_base_ch);
 CONDITION_HANDLER(util_ch);
-CONDITION_HANDLER(gtm_maxstr_ch);
 CONDITION_HANDLER(zshow_ch);
 CONDITION_HANDLER(zyerr_ch);
 

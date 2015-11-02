@@ -12,7 +12,7 @@
 #include "mdef.h"
 
 #include "compiler.h"
-#include "rtnhdr.h"
+#include <rtnhdr.h>
 #include "obj_file.h"
 #include "cg_var.h"
 #include "stringpool.h"
